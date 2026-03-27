@@ -168,6 +168,7 @@ All sprites, tilesets, and backgrounds are from the **Super Mango 2D Pixel Art P
 This game is based on the Mario-style platformer by **JSLegendDev**, built with Kaboom.js. The game design, mechanics, and sound effects were originally created for that project:
 
 - [https://github.com/JSLegendDev/Mario-Game-Kaboom.js](https://github.com/JSLegendDev/Mario-Game-Kaboom.js)
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
