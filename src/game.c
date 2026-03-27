@@ -95,7 +95,7 @@ void game_init(GameState *gs) {
      * Mix_Chunk that can be played on any available mixer channel.
      * Assets path is relative to where the binary is run (repo root).
      */
-    gs->snd_jump = Mix_LoadWAV("assets/sounds/jump.wav");
+    gs->snd_jump = Mix_LoadWAV("sounds/jump.wav");
     if (!gs->snd_jump) {
         fprintf(stderr, "Failed to load jump.wav: %s\n", Mix_GetError());
         SDL_DestroyTexture(gs->floor_tile);

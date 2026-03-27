@@ -59,9 +59,9 @@ See [coding-standards.md](./references/coding-standards.md) for the full rules. 
 
 ### Adding Sound Effects
 
-1. Place `.wav` / `.mp3` files in `assets/sounds/`.
+1. Place `.wav` / `.mp3` files in `sounds/`.
 2. Add `Mix_Chunk *snd_<name>` to `GameState` in `game.h`.
-3. In `game_init`: `gs->snd_<name> = Mix_LoadWAV("assets/sounds/<name>.wav");` — treat as non-fatal (warn, don't exit).
+3. In `game_init`: `gs->snd_<name> = Mix_LoadWAV("sounds/<name>.wav");` — treat as non-fatal (warn, don't exit).
 4. In `game_cleanup`: `if (gs->snd_<name>) { Mix_FreeChunk(gs->snd_<name>); gs->snd_<name> = NULL; }`
 5. Play it: `Mix_PlayChannel(-1, gs->snd_<name>, 0);` — `-1` picks any free channel.
 
