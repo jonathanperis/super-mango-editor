@@ -155,6 +155,19 @@ VSync is requested from the GPU via `SDL_RENDERER_PRESENTVSYNC`. A manual `SDL_D
 
 All sprites are PNG files in `assets/`. The project ships with a full set of tiles, enemies, UI elements, and backgrounds ready for future development. `assets/Round9x13.ttf` is available for on-screen text rendering.
 
+## Credits
+
+### Art Assets
+
+All sprites, tilesets, and backgrounds are from the **Super Mango 2D Pixel Art Platformer Asset Pack (16×16)** by **Juho** on itch.io:
+
+- [https://juhosprite.itch.io/super-mango-2d-pixelart-platformer-asset-pack16x16](https://juhosprite.itch.io/super-mango-2d-pixelart-platformer-asset-pack16x16)
+
+### Game Reference
+
+This game is based on the Mario-style platformer by **JSLegendDev**, built with Kaboom.js. The game design, mechanics, and sound effects were originally created for that project:
+
+- [https://github.com/JSLegendDev/Mario-Game-Kaboom.js](https://github.com/JSLegendDev/Mario-Game-Kaboom.js)
 ## License
 
 MIT — see [LICENSE](LICENSE).
