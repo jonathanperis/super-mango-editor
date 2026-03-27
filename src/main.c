@@ -27,7 +27,8 @@
 /* Our own game state and loop declarations */
 #include "game.h"
 
-int main(void) {
+int main(int argc, char *argv[]) {
+    (void)argc; (void)argv;   /* unused; required by SDL2 on Windows */
     /*
      * SDL_Init — start the SDL core.
      * Flags tell SDL which subsystems to activate:
