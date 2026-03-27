@@ -125,13 +125,12 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump) {
     }
 
     /*
-     * Jump: Space, W, or ↑ — only allowed while standing on the floor.
+     * Jump: Space only — only allowed while standing on the floor.
      * Setting on_ground = 0 ensures this block only fires once per jump;
-     * subsequent frames while the key is held skip it because on_ground is.
+     * subsequent frames while the key is held skip it because on_ground is 0.
      * vy is set to a negative value (up is negative in SDL screen-space).
      */
-    if (player->on_ground &&
-        (keys[SDL_SCANCODE_SPACE] || keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_UP])) {
+    if (player->on_ground && keys[SDL_SCANCODE_SPACE]) {
         player->vy        = -399.0f;  /* upward impulse in logical px/s */
         player->on_ground  = 0;
         if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);

@@ -103,7 +103,7 @@ The compiled binary is placed at `out/super-mango`.
 
 | Key | Action |
 |---|---|
-| `W` / `↑` / `Space` | Jump |
+| `Space` | Jump |
 | `A` / `←` | Move left |
 | `D` / `→` | Move right |
 | `ESC` | Quit |
