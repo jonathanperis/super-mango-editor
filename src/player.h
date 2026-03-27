@@ -19,10 +19,12 @@ typedef struct {
     float x;            /* horizontal position in pixels (top-left corner)  */
     float y;            /* vertical   position in pixels (top-left corner)   */
     float vx;           /* horizontal velocity: pixels per second            */
-    float vy;           /* vertical   velocity: pixels per second            */
-    float speed;        /* scalar max speed; applied to vx/vy from input     */
-    int   w;            /* sprite width  in pixels (read from the PNG)       */
-    int   h;            /* sprite height in pixels (read from the PNG)       */
+    float vy;           /* vertical   velocity: pixels per second (gravity)  */
+    float speed;        /* horizontal max speed in pixels per second         */
+    int   w;            /* display width  of one frame in pixels (48)        */
+    int   h;            /* display height of one frame in pixels (48)        */
+    int   on_ground;    /* 1 if standing on the floor, 0 if airborne         */
+    SDL_Rect     frame;   /* source rect: which part of the sheet to draw    */
     SDL_Texture *texture; /* GPU image handle; NULL until player_init runs   */
 } Player;
 

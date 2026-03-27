@@ -59,15 +59,29 @@ void game_init(GameState *gs) {
      * A "texture" is an image that lives on the GPU and can be drawn very fast.
      * The path is relative to where the binary is run from (repo root).
      */
-    gs->background = IMG_LoadTexture(gs->renderer, "assets/Sky_Background_0.png");
+    /* Load the forest background (stretched to fill the window at render time) */
+    gs->background = IMG_LoadTexture(gs->renderer, "assets/Forest_Background_0.png");
     if (!gs->background) {
-        fprintf(stderr, "Failed to load Sky_Background_0.png: %s\n", IMG_GetError());
+        fprintf(stderr, "Failed to load Forest_Background_0.png: %s\n", IMG_GetError());
         SDL_DestroyRenderer(gs->renderer);
         SDL_DestroyWindow(gs->window);
         exit(EXIT_FAILURE);
     }
 
-    /* Set up the player (loads texture, sets initial position) */
+    /*
+     * Load the grass tile. This single 48×48 texture will be repeated
+     * (tiled) across the full window width to form the floor.
+     */
+    gs->floor_tile = IMG_LoadTexture(gs->renderer, "assets/Grass_Tileset.png");
+    if (!gs->floor_tile) {
+        fprintf(stderr, "Failed to load Grass_Tileset.png: %s\n", IMG_GetError());
+        SDL_DestroyTexture(gs->background);
+        SDL_DestroyRenderer(gs->renderer);
+        SDL_DestroyWindow(gs->window);
+        exit(EXIT_FAILURE);
+    }
+
+    /* Set up the player (loads texture, sets initial position on the floor) */
     player_init(&gs->player, gs->renderer);
 
     /* Signal the loop to start running */
@@ -149,7 +163,17 @@ void game_loop(GameState *gs) {
         SDL_Rect bg = {0, 0, WINDOW_W, WINDOW_H};
         SDL_RenderCopy(gs->renderer, gs->background, NULL, &bg);
 
-        /* Draw the player sprite on top of the background */
+        /*
+         * Draw the grass floor: repeat the 48×48 tile across the full width.
+         * We start at x=0 and step by TILE_SIZE pixels until we reach WINDOW_W.
+         * The tile is drawn at y=FLOOR_Y, which is WINDOW_H - TILE_SIZE.
+         */
+        for (int tx = 0; tx < WINDOW_W; tx += TILE_SIZE) {
+            SDL_Rect tile_dst = {tx, FLOOR_Y, TILE_SIZE, TILE_SIZE};
+            SDL_RenderCopy(gs->renderer, gs->floor_tile, NULL, &tile_dst);
+        }
+
+        /* Draw the player sprite on top of the background and floor */
         player_render(&gs->player, gs->renderer);
 
         /*
@@ -186,6 +210,11 @@ void game_loop(GameState *gs) {
 void game_cleanup(GameState *gs) {
     /* Free the player's texture first (also renderer-dependent) */
     player_cleanup(&gs->player);
+
+    if (gs->floor_tile) {
+        SDL_DestroyTexture(gs->floor_tile);
+        gs->floor_tile = NULL;
+    }
 
     if (gs->background) {
         SDL_DestroyTexture(gs->background);  /* release GPU memory */

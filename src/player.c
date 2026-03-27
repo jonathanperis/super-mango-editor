@@ -14,11 +14,15 @@
 /*
  * player_init — Load the sprite and place the player in the center of the window.
  */
+/* Width and height of one sprite frame in the sheet (pixels). */
+#define FRAME_W 48
+#define FRAME_H 48
+
 void player_init(Player *player, SDL_Renderer *renderer) {
     /*
-     * IMG_LoadTexture — a convenience function from SDL2_image.
-     * It decodes the PNG file and uploads the pixel data to the GPU in one call.
-     * The returned SDL_Texture* is a handle to that GPU memory.
+     * IMG_LoadTexture — decode the PNG sprite sheet and upload it to the GPU.
+     * The sheet is 192×288 px and contains a 4-column × 6-row grid of 48×48
+     * frames. We only draw one frame at a time using a source clipping rect.
      */
     player->texture = IMG_LoadTexture(renderer, "assets/Player.png");
     if (!player->texture) {
@@ -27,24 +31,30 @@ void player_init(Player *player, SDL_Renderer *renderer) {
     }
 
     /*
-     * SDL_QueryTexture — ask SDL for the texture's metadata.
-     * The first two NULLs say "we don't need the pixel format or access mode".
-     * &player->w and &player->h receive the sprite's dimensions in pixels.
-     * This way we never hardcode the sprite size — it comes from the PNG itself.
+     * frame — the source rectangle: which 48×48 cell to cut from the sheet.
+     * {x=0, y=0} → top-left cell, which is the first idle/standing pose.
+     * We keep frame.w and frame.h constant at FRAME_W/FRAME_H for now.
      */
-    SDL_QueryTexture(player->texture, NULL, NULL, &player->w, &player->h);
+    player->frame.x = 0;
+    player->frame.y = 0;
+    player->frame.w = FRAME_W;
+    player->frame.h = FRAME_H;
+
+    /* The on-screen display size matches the frame size exactly. */
+    player->w = FRAME_W;
+    player->h = FRAME_H;
 
     /*
-     * Center the player in the window.
-     * (WINDOW_W - player->w) is the total horizontal space not occupied by the sprite.
-     * Dividing by 2 gives the left margin needed to center it.
-     * The 2.0f suffix makes it a float division so we don't lose decimals.
+     * Place the player horizontally centered, sitting on top of the floor.
+     * FLOOR_Y is the top edge of the grass tiles, so the player's bottom
+     * edge (y + h) should equal FLOOR_Y at rest.
      */
-    player->x     = (WINDOW_W - player->w) / 2.0f;
-    player->y     = (WINDOW_H - player->h) / 2.0f;
-    player->vx    = 0.0f;   /* start stationary */
-    player->vy    = 0.0f;
-    player->speed = 200.0f; /* 200 pixels per second */
+    player->x        = (WINDOW_W - player->w) / 2.0f;
+    player->y        = (float)(FLOOR_Y - player->h);
+    player->vx       = 0.0f;
+    player->vy       = 0.0f;   /* start stationary; gravity will pull down   */
+    player->speed    = 200.0f; /* horizontal speed: 200 pixels per second     */
+    player->on_ground = 1;     /* starts on the floor                         */
 }
 
 /* ------------------------------------------------------------------ */
@@ -68,22 +78,15 @@ void player_handle_input(Player *player) {
     const Uint8 *keys = SDL_GetKeyboardState(NULL);
 
     /*
-     * Reset velocity to zero at the start of every frame.
-     * This means the player only moves while a key is held.
-     * Releasing all keys immediately stops movement (no sliding).
+     * Only horizontal input is handled here.
+     * Vertical movement is driven by gravity in player_update, not by keys.
+     * Reset vx each frame so the player stops the moment the key is released.
      */
     player->vx = 0.0f;
-    player->vy = 0.0f;
 
-    /* Support both arrow keys and WASD — either works */
+    /* Left/Right: arrow keys and WASD both work */
     if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A]) player->vx -= player->speed;
     if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) player->vx += player->speed;
-    if (keys[SDL_SCANCODE_UP]    || keys[SDL_SCANCODE_W]) player->vy -= player->speed;
-    if (keys[SDL_SCANCODE_DOWN]  || keys[SDL_SCANCODE_S]) player->vy += player->speed;
-    /*
-     * Note: in SDL's coordinate system, Y increases downward.
-     * So vy < 0 moves the sprite UP the screen, vy > 0 moves it DOWN.
-     */
 }
 
 /* ------------------------------------------------------------------ */
@@ -118,9 +121,9 @@ void player_update(Player *player, float dt) {
  */
 void player_render(Player *player, SDL_Renderer *renderer) {
     /*
-     * SDL_Rect describes a rectangle on screen: {x, y, width, height}.
-     * We cast x/y from float to int here — SDL works in whole pixels.
-     * The sprite is drawn at its natural size (w × h from the PNG).
+     * dst — where on screen the sprite will appear.
+     * x/y are cast from float to int because SDL works in whole pixels.
+     * w/h match the frame size (FRAME_W × FRAME_H = 48×48).
      */
     SDL_Rect dst = {
         .x = (int)player->x,
@@ -130,13 +133,14 @@ void player_render(Player *player, SDL_Renderer *renderer) {
     };
 
     /*
-     * SDL_RenderCopy — copy a texture onto the renderer's back buffer.
-     *   renderer    → the drawing context
-     *   texture     → source image (on the GPU)
-     *   NULL        → source rect: NULL means "use the entire texture"
-     *   &dst        → destination rect: where/how big to draw it on screen
+     * SDL_RenderCopy — copy a region of the texture onto the back buffer.
+     *   renderer      → the drawing context
+     *   texture       → the full sprite sheet (192×288) on the GPU
+     *   &player->frame → source clipping rect: selects the 48×48 frame
+     *                    we want from the sheet (currently always frame 0)
+     *   &dst          → destination rect: where/how big to draw on screen
      */
-    SDL_RenderCopy(renderer, player->texture, NULL, &dst);
+    SDL_RenderCopy(renderer, player->texture, &player->frame, &dst);
 }
 
 /* ------------------------------------------------------------------ */

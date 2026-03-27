@@ -26,6 +26,24 @@
 #define WINDOW_H      600             /* window height in pixels       */
 #define TARGET_FPS    60             /* desired frames per second      */
 
+/*
+ * TILE_SIZE — display size of one grass tile in pixels.
+ * The Grass_Tileset.png is 48×48; we render it at its natural size.
+ */
+#define TILE_SIZE     48
+
+/*
+ * FLOOR_Y — the Y coordinate of the top edge of the floor.
+ * Anything at or below this Y is "inside" the floor.
+ */
+#define FLOOR_Y       (WINDOW_H - TILE_SIZE)
+
+/*
+ * GRAVITY — downward acceleration in pixels per second squared.
+ * Applied every frame so the player accelerates toward the floor.
+ */
+#define GRAVITY       800.0f
+
 /* ------------------------------------------------------------------ */
 /* GameState — the single source of truth for everything the game owns */
 /* ------------------------------------------------------------------ */
@@ -33,7 +51,8 @@
 typedef struct {
     SDL_Window   *window;      /* the OS window (created by SDL)              */
     SDL_Renderer *renderer;    /* GPU-accelerated 2D drawing context          */
-    SDL_Texture  *background;  /* sky background image loaded into GPU memory */
+    SDL_Texture  *background;  /* forest background loaded into GPU memory    */
+    SDL_Texture  *floor_tile;  /* grass tile repeated across the floor layer  */
     Player        player;      /* the player, stored by value (not a pointer) */
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
 } GameState;
