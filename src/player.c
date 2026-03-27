@@ -19,6 +19,31 @@
 #define FRAME_W 48
 #define FRAME_H 48
 
+/*
+ * FLOOR_SINK — extra pixels the player overlaps with the top of the floor tile.
+ * The sprite sheet has transparent padding at the bottom of each frame, so the
+ * physics edge (y + h = FLOOR_Y) leaves the character visually floating.
+ * Sinking by this many pixels makes the feet appear to rest on the grass.
+ */
+#define FLOOR_SINK 8
+
+/*
+ * Animation tables — indexed by AnimState (0=IDLE, 1=WALK, 2=JUMP, 3=FALL).
+ *
+ * ANIM_FRAME_COUNT : how many frames the animation has.
+ * ANIM_FRAME_MS    : how long each frame is shown, in milliseconds.
+ * ANIM_ROW         : which row of the sprite sheet the animation lives on.
+ *
+ * Frame layout confirmed from Player.png (192×288, 4 cols × 6 rows, 48×48 each):
+ *   Row 0 — Idle : 4 frames  (cols 0–3)
+ *   Row 1 — Walk : 4 frames  (cols 0–3)
+ *   Row 2 — Jump : 2 frames  (cols 0–1, rising-phase poses)
+ *   Row 3 — Fall : 1 frame   (col 0, descent pose)
+ */
+static const int ANIM_FRAME_COUNT[4] = { 4,   4,   2,   1   };
+static const int ANIM_FRAME_MS[4]    = { 150, 100, 150, 200 };
+static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
+
 void player_init(Player *player, SDL_Renderer *renderer) {
     /*
      * IMG_LoadTexture — decode the PNG sprite sheet and upload it to the GPU.
@@ -51,11 +76,17 @@ void player_init(Player *player, SDL_Renderer *renderer) {
      * edge (y + h) should equal FLOOR_Y at rest.
      */
     player->x        = (GAME_W - player->w) / 2.0f;
-    player->y        = (float)(FLOOR_Y - player->h);
+    player->y        = (float)(FLOOR_Y - player->h + FLOOR_SINK);
     player->vx       = 0.0f;
     player->vy       = 0.0f;   /* start stationary; gravity will pull down   */
     player->speed    = 160.0f; /* horizontal speed: 160 logical px per second */
     player->on_ground = 1;     /* starts on the floor                         */
+
+    /* Animation — start in idle state, first frame, facing right */
+    player->anim_state       = ANIM_IDLE;
+    player->anim_frame_index = 0;
+    player->anim_timer_ms    = 0;
+    player->facing_left      = 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -83,8 +114,14 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump) {
      * Reset vx to 0 each frame so the player stops when keys are released.
      */
     player->vx = 0.0f;
-    if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A]) player->vx -= player->speed;
-    if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) player->vx += player->speed;
+    if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A]) {
+        player->vx -= player->speed;
+        player->facing_left = 1;   /* mirror sprite so character faces left */
+    }
+    if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) {
+        player->vx += player->speed;
+        player->facing_left = 0;
+    }
 
     /*
      * Jump: Space, W, or ↑ — only allowed while standing on the floor.
@@ -94,10 +131,66 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump) {
      */
     if (player->on_ground &&
         (keys[SDL_SCANCODE_SPACE] || keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_UP])) {
-        player->vy        = -520.0f;  /* upward impulse in logical px/s */
+        player->vy        = -399.0f;  /* upward impulse in logical px/s */
         player->on_ground  = 0;
         if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
     }
+}
+
+/* ------------------------------------------------------------------ */
+
+/*
+ * player_animate — Choose the correct animation state and advance its frame.
+ *
+ * Called once per frame from player_update, after physics are resolved.
+ * Uses the player's velocity and on_ground flag to determine which
+ * animation should be playing, then advances the frame timer.
+ *
+ * On state transitions the frame index is reset to 0 so animations
+ * always start from the beginning rather than mid-sequence.
+ */
+static void player_animate(Player *player, Uint32 dt_ms) {
+    /* Determine the target animation from current physics state */
+    AnimState target;
+    if (!player->on_ground) {
+        /*
+         * In the air: negative vy means moving upward (SDL y-axis is inverted),
+         * positive vy means falling down under gravity.
+         */
+        target = (player->vy < 0.0f) ? ANIM_JUMP : ANIM_FALL;
+    } else if (player->vx != 0.0f) {
+        target = ANIM_WALK;
+    } else {
+        target = ANIM_IDLE;
+    }
+
+    /* Reset the frame counter whenever the animation state changes */
+    if (target != player->anim_state) {
+        player->anim_state       = target;
+        player->anim_frame_index = 0;
+        player->anim_timer_ms    = 0;
+    }
+
+    /*
+     * Advance the frame timer. When it exceeds the per-frame duration,
+     * subtract the duration (rather than resetting to 0) so any leftover
+     * time carries into the next frame — keeping animation speed accurate.
+     */
+    player->anim_timer_ms += dt_ms;
+    Uint32 frame_duration = (Uint32)ANIM_FRAME_MS[player->anim_state];
+    if (player->anim_timer_ms >= frame_duration) {
+        player->anim_timer_ms -= frame_duration;
+        player->anim_frame_index =
+            (player->anim_frame_index + 1) % ANIM_FRAME_COUNT[player->anim_state];
+    }
+
+    /*
+     * Update the source rectangle to point at the correct cell on the sheet.
+     *   frame.x = column × FRAME_W  (horizontal offset into the sheet)
+     *   frame.y = row    × FRAME_H  (vertical  offset into the sheet)
+     */
+    player->frame.x = player->anim_frame_index * FRAME_W;
+    player->frame.y = ANIM_ROW[player->anim_state] * FRAME_H;
 }
 
 /* ------------------------------------------------------------------ */
@@ -126,8 +219,8 @@ void player_update(Player *player, float dt) {
      * FLOOR_Y is the top edge of the grass tiles in logical coordinates.
      * The player's bottom edge is y + h; when it reaches FLOOR_Y, land.
      */
-    if (player->y >= (float)(FLOOR_Y - player->h)) {
-        player->y        = (float)(FLOOR_Y - player->h);
+    if (player->y >= (float)(FLOOR_Y - player->h + FLOOR_SINK)) {
+        player->y        = (float)(FLOOR_Y - player->h + FLOOR_SINK);
         player->vy       = 0.0f;
         player->on_ground = 1;
     }
@@ -144,6 +237,12 @@ void player_update(Player *player, float dt) {
         player->y  = 0.0f;
         player->vy = 0.0f;
     }
+
+    /*
+     * Advance the sprite animation based on the resolved physics state.
+     * Convert dt (seconds) to milliseconds for the frame timer.
+     */
+    player_animate(player, (Uint32)(dt * 1000.0f));
 }
 
 /* ------------------------------------------------------------------ */
@@ -165,14 +264,14 @@ void player_render(Player *player, SDL_Renderer *renderer) {
     };
 
     /*
-     * SDL_RenderCopy — copy a region of the texture onto the back buffer.
-     *   renderer      → the drawing context
-     *   texture       → the full sprite sheet (192×288) on the GPU
-     *   &player->frame → source clipping rect: selects the 48×48 frame
-     *                    we want from the sheet (currently always frame 0)
-     *   &dst          → destination rect: where/how big to draw on screen
+     * SDL_RenderCopyEx — like SDL_RenderCopy but supports rotation and flipping.
+     * We pass angle=0 and center=NULL (no rotation), and flip the texture
+     * horizontally when the player last moved left, so the character always
+     * faces the correct direction regardless of which animation is playing.
      */
-    SDL_RenderCopy(renderer, player->texture, &player->frame, &dst);
+    SDL_RendererFlip flip = player->facing_left ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
+    SDL_RenderCopyEx(renderer, player->texture, &player->frame, &dst,
+                     0.0, NULL, flip);
 }
 
 /* ------------------------------------------------------------------ */
