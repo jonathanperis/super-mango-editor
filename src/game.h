@@ -22,9 +22,20 @@
 /* ------------------------------------------------------------------ */
 
 #define WINDOW_TITLE  "Super Mango"   /* title bar text                */
-#define WINDOW_W      800             /* window width  in pixels       */
-#define WINDOW_H      600             /* window height in pixels       */
+#define WINDOW_W      800             /* OS window width  in pixels    */
+#define WINDOW_H      600             /* OS window height in pixels    */
 #define TARGET_FPS    60             /* desired frames per second      */
+
+/*
+ * GAME_W / GAME_H — the internal (logical) rendering resolution.
+ *
+ * All game objects are positioned and sized in this coordinate space.
+ * SDL automatically scales this canvas up to fill the OS window, giving
+ * a 2× pixel scale (800/400 = 2, 600/300 = 2). This makes every sprite
+ * and tile appear twice as large on screen without changing any game logic.
+ */
+#define GAME_W        400
+#define GAME_H        300
 
 /*
  * TILE_SIZE — display size of one grass tile in pixels.
@@ -35,8 +46,9 @@
 /*
  * FLOOR_Y — the Y coordinate of the top edge of the floor.
  * Anything at or below this Y is "inside" the floor.
+ * Uses GAME_H because all positions live in logical (400×300) space.
  */
-#define FLOOR_Y       (WINDOW_H - TILE_SIZE)
+#define FLOOR_Y       (GAME_H - TILE_SIZE)
 
 /*
  * GRAVITY — downward acceleration in pixels per second squared.

@@ -49,11 +49,11 @@ void player_init(Player *player, SDL_Renderer *renderer) {
      * FLOOR_Y is the top edge of the grass tiles, so the player's bottom
      * edge (y + h) should equal FLOOR_Y at rest.
      */
-    player->x        = (WINDOW_W - player->w) / 2.0f;
+    player->x        = (GAME_W - player->w) / 2.0f;
     player->y        = (float)(FLOOR_Y - player->h);
     player->vx       = 0.0f;
     player->vy       = 0.0f;   /* start stationary; gravity will pull down   */
-    player->speed    = 200.0f; /* horizontal speed: 200 pixels per second     */
+    player->speed    = 160.0f; /* horizontal speed: 160 logical px per second */
     player->on_ground = 1;     /* starts on the floor                         */
 }
 

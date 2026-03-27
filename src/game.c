@@ -55,6 +55,14 @@ void game_init(GameState *gs) {
     }
 
     /*
+     * SDL_RenderSetLogicalSize — define the internal canvas resolution.
+     * All SDL render calls now use GAME_W × GAME_H coordinates (400×300).
+     * SDL scales this canvas up to the OS window size (800×600) automatically,
+     * giving every pixel a 2×2 block on screen — the chunky pixel-art look.
+     */
+    SDL_RenderSetLogicalSize(gs->renderer, GAME_W, GAME_H);
+
+    /*
      * IMG_LoadTexture — decode a PNG file and upload it to GPU memory.
      * A "texture" is an image that lives on the GPU and can be drawn very fast.
      * The path is relative to where the binary is run from (repo root).
@@ -156,19 +164,17 @@ void game_loop(GameState *gs) {
         SDL_RenderClear(gs->renderer);
 
         /*
-         * Draw the background stretched to cover the entire window.
-         * SDL_Rect describes a rectangle: {x, y, width, height}.
-         * Passing NULL as the source rect means "use the whole texture".
+         * Draw the background stretched to cover the entire logical canvas (GAME_W×GAME_H).
+         * SDL_RenderSetLogicalSize handles scaling to the OS window automatically.
          */
-        SDL_Rect bg = {0, 0, WINDOW_W, WINDOW_H};
+        SDL_Rect bg = {0, 0, GAME_W, GAME_H};
         SDL_RenderCopy(gs->renderer, gs->background, NULL, &bg);
 
         /*
-         * Draw the grass floor: repeat the 48×48 tile across the full width.
-         * We start at x=0 and step by TILE_SIZE pixels until we reach WINDOW_W.
-         * The tile is drawn at y=FLOOR_Y, which is WINDOW_H - TILE_SIZE.
+         * Draw the grass floor: repeat the 48×48 tile across the full logical
+         * width (GAME_W = 400). All coordinates are in logical space; SDL 2× scales.
          */
-        for (int tx = 0; tx < WINDOW_W; tx += TILE_SIZE) {
+        for (int tx = 0; tx < GAME_W; tx += TILE_SIZE) {
             SDL_Rect tile_dst = {tx, FLOOR_Y, TILE_SIZE, TILE_SIZE};
             SDL_RenderCopy(gs->renderer, gs->floor_tile, NULL, &tile_dst);
         }
