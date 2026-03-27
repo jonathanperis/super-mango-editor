@@ -10,17 +10,79 @@ Super Mango is an MVP 2D game where a player character moves around an 800×600 
 
 You need the following installed on your system:
 
-- **clang** (or any C11-compatible compiler)
+- **clang** or **gcc** (any C11-compatible compiler)
+- **make**
 - **SDL2** — window, renderer, input, audio
 - **SDL2_image** — loading PNG textures
 - **SDL2_ttf** — loading TrueType fonts
 - **SDL2_mixer** — audio mixing
 
-On macOS with Homebrew:
+### macOS
+
+Install via [Homebrew](https://brew.sh):
 
 ```sh
 brew install sdl2 sdl2_image sdl2_ttf sdl2_mixer
 ```
+
+The compiler (`clang`) and `make` are included with Xcode Command Line Tools:
+
+```sh
+xcode-select --install
+```
+
+### Linux (Debian / Ubuntu)
+
+```sh
+sudo apt update
+sudo apt install build-essential clang \
+    libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-mixer-dev
+```
+
+On **Fedora / RHEL / CentOS**:
+
+```sh
+sudo dnf install clang make \
+    SDL2-devel SDL2_image-devel SDL2_ttf-devel SDL2_mixer-devel
+```
+
+On **Arch Linux**:
+
+```sh
+sudo pacman -S clang make sdl2 sdl2_image sdl2_ttf sdl2_mixer
+```
+
+### Windows
+
+The recommended approach on Windows is to use **MSYS2**, which gives you a Unix-like shell, `make`, and the MinGW-w64 compiler toolchain.
+
+1. Download and install [MSYS2](https://www.msys2.org/).
+
+2. Open the **MSYS2 UCRT64** terminal and install the dependencies:
+
+```sh
+pacman -S mingw-w64-ucrt-x86_64-gcc \
+          mingw-w64-ucrt-x86_64-make \
+          mingw-w64-ucrt-x86_64-SDL2 \
+          mingw-w64-ucrt-x86_64-SDL2_image \
+          mingw-w64-ucrt-x86_64-SDL2_ttf \
+          mingw-w64-ucrt-x86_64-SDL2_mixer
+```
+
+3. In the same UCRT64 terminal, navigate to the project and build:
+
+```sh
+cd /c/path/to/super-mango-game
+make CC=gcc
+```
+
+4. The SDL2 DLLs must be in the same directory as the binary to run it. Copy them from the MSYS2 prefix:
+
+```sh
+cp /ucrt64/bin/SDL2*.dll out/
+```
+
+Then run `./out/super-mango.exe` from the terminal, or double-click `out/super-mango.exe` in Explorer.
 
 ## Building
 
