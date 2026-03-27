@@ -1,5 +1,5 @@
 ---
-name: pixelart-gamer-c-developer
+name: pixelart-game-c-developer
 description: "C developer expert in pixel art 2D games using SDL2, SDL2_image, SDL2_ttf, SDL2_mixer. Use when: adding new game features, implementing new entities, writing SDL2 rendering/audio/input code, documenting C code for learners, adding new source files, understanding the init→loop→cleanup pattern, physics/gravity/collision, sprite animation in C, sound effects with Mix_Chunk, structuring GameState. Trigger phrases: 'add feature', 'new entity', 'how do I render', 'SDL2 code', 'implement', 'add sound', 'document this', 'write the C', 'game loop', 'player physics', 'collision', 'new .c file', 'new .h file'."
 argument-hint: "Describe what to implement or document (e.g. 'add a coin entity', 'document player_update', 'add enemy movement')"
 ---

@@ -1,5 +1,5 @@
 ---
-name: pixelart-gamer-designer
+name: pixelart-game-designer
 description: "Pixel art game design expert. Use when: analyzing sprite sheets, cropping frames from PNG assets, understanding animation sequences from image grids, mapping frame rows/cols to game states (idle/walk/jump/attack), designing tile layouts, working with pixel art conventions (palette, scaling, tile sizes). Trigger phrases: 'analyze sprite', 'crop frames', 'animation frames', 'sprite sheet', 'pixel art', 'which row is idle', 'how many frames', 'tileset layout', 'frame index', 'SDL_Rect source'."
 argument-hint: "Describe the asset or animation question (e.g. 'analyze Player.png', 'map walk animation frames')"
 ---
@@ -72,7 +72,7 @@ Use `SDL_RenderSetLogicalSize(renderer, GAME_W, GAME_H)` to handle scaling autom
 
 1. Run [analyze_sprite.py](./scripts/analyze_sprite.py) on the PNG:
    ```sh
-   python3 .agents/skills/pixelart-gamer-designer/scripts/analyze_sprite.py assets/Player.png
+   python3 .github/skills/pixelart-game-designer/scripts/analyze_sprite.py assets/Player.png
    ```
 2. The script outputs: sheet size, detected frame size, grid dimensions, alpha column/row map.
 3. Cross-reference with [sprite-sheet-analysis.md](./references/sprite-sheet-analysis.md) to interpret the grid.
