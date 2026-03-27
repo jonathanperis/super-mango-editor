@@ -126,7 +126,7 @@ void game_init(GameState *gs) {
     /*
      * Mix_VolumeMusic — set the music playback volume.
      * Range: 0 (silent) to MIX_MAX_VOLUME (128, full volume).
-     * 70% of 128 = ~90, giving a subtle ambient level that doesn't
+     * 13/128 ≈ 10%, keeping the ambient track soft so it doesn't
      * compete with sound effects.
      */
     Mix_VolumeMusic(13);

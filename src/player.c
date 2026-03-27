@@ -72,8 +72,9 @@ void player_init(Player *player, SDL_Renderer *renderer) {
 
     /*
      * Place the player horizontally centered, sitting on top of the floor.
-     * FLOOR_Y is the top edge of the grass tiles, so the player's bottom
-     * edge (y + h) should equal FLOOR_Y at rest.
+     * FLOOR_Y is the top edge of the grass tiles. FLOOR_SINK adds a small
+     * downward offset to compensate for transparent padding at the bottom of
+     * the sprite frame, so the feet visually rest on the grass surface.
      */
     player->x        = (GAME_W - player->w) / 2.0f;
     player->y        = (float)(FLOOR_Y - player->h + FLOOR_SINK);
