@@ -25,7 +25,7 @@
  * physics edge (y + h = FLOOR_Y) leaves the character visually floating.
  * Sinking by this many pixels makes the feet appear to rest on the grass.
  */
-#define FLOOR_SINK 8
+#define FLOOR_SINK 16
 
 /*
  * Animation tables — indexed by AnimState (0=IDLE, 1=WALK, 2=JUMP, 3=FALL).
