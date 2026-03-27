@@ -19,21 +19,23 @@ on:
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
   # BUILD JOB
-  # Compiles the game on both Linux (x86_64) and macOS (arm64) in parallel.
-  # Runs on every push to main AND every pull request.
+  # Compiles the game on Linux (x86_64), macOS (arm64), and Windows (x86_64)
+  # in parallel. Runs on every push to main AND every pull request.
   # ────────────────────────────────────────────────────────────────────────────
   build:
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
 
     strategy:
-      fail-fast: false   # let both platforms finish even if one fails
+      fail-fast: false   # let all platforms finish even if one fails
       matrix:
         include:
           - os: ubuntu-latest
             artifact: super-mango-linux-x86_64
           - os: macos-latest
             artifact: super-mango-macos-arm64
+          - os: windows-latest
+            artifact: super-mango-windows-x86_64
 
     steps:
       # Check out the repository so the runner has access to the source code.
@@ -55,26 +57,72 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install sdl2 sdl2_image sdl2_ttf sdl2_mixer
 
-      # Run `make`, which produces out/super-mango via the project Makefile.
-      - name: Build
+      # ── Windows dependency install ──────────────────────────────────────────
+      # MSYS2 is pre-installed on windows-latest runners. We use the
+      # msys2/setup-msys2 action to configure the UCRT64 environment and
+      # install MinGW-w64 gcc, make, and all SDL2 companion packages.
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-make
+            mingw-w64-ucrt-x86_64-SDL2
+            mingw-w64-ucrt-x86_64-SDL2_image
+            mingw-w64-ucrt-x86_64-SDL2_ttf
+            mingw-w64-ucrt-x86_64-SDL2_mixer
+
+      # ── Compile (Linux / macOS) ─────────────────────────────────────────────
+      # Produces out/super-mango via the project Makefile.
+      - name: Build (Linux / macOS)
+        if: runner.os != 'Windows'
         run: make
 
-      # Upload the compiled binary as a workflow artifact so the release job
-      # (and developers investigating failures) can download it.
-      # retention-days: 1 keeps storage usage low for PR build checks.
+      # ── Compile (Windows) ───────────────────────────────────────────────────
+      # The msys2 shell is required so the UCRT64 toolchain and sdl2-config
+      # are on PATH. We pass CC=gcc and override the output name to include
+      # the .exe extension.
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make CC=gcc
+
+      # ── Bundle SDL2 DLLs for Windows ────────────────────────────────────────
+      # On Windows, SDL2 is dynamically linked. The DLLs must ship alongside
+      # the .exe or it will fail to start on any machine without SDL2 installed.
+      # We copy every SDL2*.dll from the UCRT64 bin directory into out/.
+      - name: Bundle SDL2 DLLs (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: cp /ucrt64/bin/SDL2*.dll out/
+
+      # ── Rename .exe for upload (Windows) ────────────────────────────────────
+      # The Makefile produces "super-mango" on all platforms; on Windows the
+      # linker names it "super-mango.exe". We normalise the name here so the
+      # upload-artifact path is consistent.
+      - name: Rename binary (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: mv out/super-mango.exe out/super-mango
+
+      # Upload the compiled binary (and, on Windows, the DLLs) as a workflow
+      # artifact. retention-days: 1 keeps storage low for PR build checks.
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: out/super-mango
+          path: out/
           if-no-files-found: error
           retention-days: 1
 
   # ────────────────────────────────────────────────────────────────────────────
   # RELEASE JOB
   # Runs ONLY when a commit is pushed to main (not on pull_request events).
-  # Waits for both build matrix legs to succeed, then creates a GitHub Release
-  # tagged v0.0.<run_number> with both platform binaries attached.
+  # Waits for all three build matrix legs to succeed, then creates a GitHub
+  # Release tagged v0.0.<run_number> with all platform binaries attached.
   # ────────────────────────────────────────────────────────────────────────────
   release:
     name: Create Release
@@ -89,8 +137,8 @@ jobs:
       contents: write
 
     steps:
-      # Download the Linux binary into its own subdirectory so the two platform
-      # binaries (both named "super-mango") don't overwrite each other.
+      # Download each platform's artifact into its own subdirectory so files
+      # with the same name ("super-mango") don't overwrite each other.
       - name: Download Linux binary
         uses: actions/download-artifact@v4
         with:
@@ -103,13 +151,23 @@ jobs:
           name: super-mango-macos-arm64
           path: dist/macos/
 
-      # Rename the binaries so each has a unique, descriptive filename before
-      # they are attached to the GitHub Release.
+      - name: Download Windows binary
+        uses: actions/download-artifact@v4
+        with:
+          name: super-mango-windows-x86_64
+          path: dist/windows/
+
+      # Rename the Linux and macOS binaries to unique filenames.
+      # The Windows artifact already contains the .exe and its SDL2 DLLs;
+      # we zip the whole windows directory so they stay together in one file.
       - name: Prepare release assets
         run: |
-          mv dist/linux/super-mango dist/super-mango-linux-x86_64
-          mv dist/macos/super-mango dist/super-mango-macos-arm64
+          mv dist/linux/super-mango  dist/super-mango-linux-x86_64
+          mv dist/macos/super-mango  dist/super-mango-macos-arm64
           chmod +x dist/super-mango-linux-x86_64 dist/super-mango-macos-arm64
+          cd dist/windows
+          mv super-mango super-mango.exe
+          zip -r ../super-mango-windows-x86_64.zip .
 
       # Create the GitHub Release. The tag is auto-created by the action.
       # softprops/action-gh-release picks up GITHUB_TOKEN automatically.
@@ -123,13 +181,15 @@ jobs:
 
             ### Downloads
 
-            | Platform      | Binary                        |
-            |---------------|-------------------------------|
-            | Linux x86_64  | `super-mango-linux-x86_64`    |
-            | macOS arm64   | `super-mango-macos-arm64`     |
+            | Platform        | File                                  | Notes                              |
+            |-----------------|---------------------------------------|------------------------------------|  
+            | Linux x86_64    | `super-mango-linux-x86_64`            | Run from repo root                 |
+            | macOS arm64     | `super-mango-macos-arm64`             | Run from repo root                 |
+            | Windows x86_64  | `super-mango-windows-x86_64.zip`      | Extract zip; SDL2 DLLs are included|
 
-            > **Note:** Run the binary from the repository root so it can find the `assets/` folder.
+            > **Note:** Always run the binary from the repository root so it can find the `assets/` folder.
           files: |
             dist/super-mango-linux-x86_64
             dist/super-mango-macos-arm64
+            dist/super-mango-windows-x86_64.zip
           fail_on_unmatched_files: true
