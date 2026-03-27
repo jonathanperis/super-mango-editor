@@ -10,6 +10,17 @@
 #include <SDL_mixer.h>  /* Mix_Chunk */
 
 /*
+ * AnimState — which animation sequence is currently playing.
+ * The value maps directly to the sheet row (see ANIM_ROW[] in player.c).
+ */
+typedef enum {
+    ANIM_IDLE = 0,  /* standing still:       sheet row 0, 4 frames */
+    ANIM_WALK,      /* running left/right:   sheet row 1, 4 frames */
+    ANIM_JUMP,      /* rising after a jump:  sheet row 2, 2 frames */
+    ANIM_FALL       /* falling under gravity: sheet row 3, 1 frame */
+} AnimState;
+
+/*
  * Player — all the data needed to represent the player character.
  *
  * Position and velocity use float (not int) so that sub-pixel movement
@@ -25,6 +36,10 @@ typedef struct {
     int   w;            /* display width  of one frame in pixels (48)        */
     int   h;            /* display height of one frame in pixels (48)        */
     int   on_ground;    /* 1 if standing on the floor, 0 if airborne         */
+    AnimState anim_state;       /* which animation is active (idle/walk/jump/fall) */
+    int       anim_frame_index; /* current frame index within the animation       */
+    Uint32    anim_timer_ms;    /* ms accumulated in the current frame            */
+    int       facing_left;      /* 1 = mirror sprite horizontally                 */
     SDL_Rect     frame;   /* source rect: which part of the sheet to draw    */
     SDL_Texture *texture; /* GPU image handle; NULL until player_init runs   */
 } Player;
