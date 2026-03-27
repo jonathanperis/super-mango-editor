@@ -14,8 +14,9 @@
  */
 #pragma once
 
-#include <SDL.h>      /* SDL_Window, SDL_Renderer, SDL_Texture */
-#include "player.h"   /* Player struct — embedded by value in GameState */
+#include <SDL.h>        /* SDL_Window, SDL_Renderer, SDL_Texture */
+#include <SDL_mixer.h>  /* Mix_Chunk */
+#include "player.h"     /* Player struct — embedded by value in GameState */
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -65,6 +66,7 @@ typedef struct {
     SDL_Renderer *renderer;    /* GPU-accelerated 2D drawing context          */
     SDL_Texture  *background;  /* forest background loaded into GPU memory    */
     SDL_Texture  *floor_tile;  /* grass tile repeated across the floor layer  */
+    Mix_Chunk    *snd_jump;    /* WAV chunk for the jump sound effect         */
     Player        player;      /* the player, stored by value (not a pointer) */
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
 } GameState;

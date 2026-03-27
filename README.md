@@ -4,7 +4,7 @@ A 2D platformer game written in C using SDL2, built for learning purposes.
 
 ## About
 
-Super Mango is an MVP 2D game where a player character moves around an 800×600 window against a sky background. Movement is smooth and frame-rate independent thanks to delta-time physics. The project is intentionally minimal and well-commented so the source code can be read as a learning resource for C + SDL2 game development.
+Super Mango is a 2D platformer where a player character runs and jumps across a forest stage with a grass floor. The game renders at a 400×300 logical resolution scaled 2× to an 800×600 OS window, giving a chunky pixel-art look. Movement is smooth and frame-rate independent thanks to delta-time physics. The project is intentionally minimal and well-commented so the source code can be read as a learning resource for C + SDL2 game development.
 
 ## Prerequisites
 
@@ -103,31 +103,31 @@ The compiled binary is placed at `out/super-mango`.
 
 | Key | Action |
 |---|---|
-| `W` / `↑` | Move up |
-| `S` / `↓` | Move down |
+| `W` / `↑` / `Space` | Jump |
 | `A` / `←` | Move left |
 | `D` / `→` | Move right |
 | `ESC` | Quit |
 | Close window | Quit |
 
-Diagonal movement is supported (e.g. `W` + `D` moves up-right).
-
 ## Project Structure
 
 ```
 super-mango-game/
-├── Makefile          ← Build system (clang, sdl2-config)
-├── assets/           ← PNG sprites and TTF font
+├── Makefile               ← Build system (clang, sdl2-config)
+├── assets/                ← PNG sprites, TTF font, and sound effects
 │   ├── Player.png
-│   ├── Sky_Background_0.png
+│   ├── Forest_Background_0.png
+│   ├── Grass_Tileset.png
 │   ├── Round9x13.ttf
+│   ├── sounds/            ← WAV sound effects
+│   │   └── jump.wav
 │   └── ... (more sprites for future use)
 └── src/
-    ├── main.c        ← Entry point: SDL init/teardown
-    ├── game.h        ← GameState struct and constants
-    ├── game.c        ← Window, renderer, background, game loop
-    ├── player.h      ← Player struct declaration
-    └── player.c      ← Player init, input, physics, render
+    ├── main.c             ← Entry point: SDL init/teardown
+    ├── game.h             ← GameState struct and constants
+    ├── game.c             ← Window, renderer, textures, sound, game loop
+    ├── player.h           ← Player struct declaration
+    └── player.c           ← Player init, input, physics, render
 ```
 
 ## Architecture
@@ -145,7 +145,7 @@ main()
 
 ### Delta Time
 
-Movement uses **delta time** (`dt`): the number of seconds elapsed since the last frame. Multiplying velocity by `dt` makes movement speed consistent regardless of frame rate — so the player moves at 200 px/s whether the game runs at 30 FPS or 120 FPS.
+Movement uses **delta time** (`dt`): the number of seconds elapsed since the last frame. Multiplying velocity by `dt` makes movement speed consistent regardless of frame rate — so the player moves at 160 px/s whether the game runs at 30 FPS or 120 FPS.
 
 ### Frame Cap
 
