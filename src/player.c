@@ -3,11 +3,12 @@
  */
 
 #include <SDL_image.h>  /* IMG_LoadTexture */
+#include <SDL_mixer.h>  /* Mix_Chunk, Mix_PlayChannel */
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "player.h"
-#include "game.h"   /* WINDOW_W, WINDOW_H (for centering and clamping) */
+#include "game.h"   /* GAME_W, GAME_H, FLOOR_Y, GRAVITY (for physics and clamping) */
 
 /* ------------------------------------------------------------------ */
 
@@ -68,7 +69,7 @@ void player_init(Player *player, SDL_Renderer *renderer) {
  * it tells us which keys are held RIGHT NOW, giving smooth, continuous
  * movement rather than one-shot movement on the moment of press.
  */
-void player_handle_input(Player *player) {
+void player_handle_input(Player *player, Mix_Chunk *snd_jump) {
     /*
      * SDL_GetKeyboardState returns a pointer to an array of key states.
      * Each element is 1 if that key is currently held, 0 if not.
@@ -78,40 +79,71 @@ void player_handle_input(Player *player) {
     const Uint8 *keys = SDL_GetKeyboardState(NULL);
 
     /*
-     * Only horizontal input is handled here.
-     * Vertical movement is driven by gravity in player_update, not by keys.
-     * Reset vx each frame so the player stops the moment the key is released.
+     * Horizontal movement: left/right arrow keys and A/D both work.
+     * Reset vx to 0 each frame so the player stops when keys are released.
      */
     player->vx = 0.0f;
-
-    /* Left/Right: arrow keys and WASD both work */
     if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A]) player->vx -= player->speed;
     if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) player->vx += player->speed;
+
+    /*
+     * Jump: Space, W, or ↑ — only allowed while standing on the floor.
+     * Setting on_ground = 0 ensures this block only fires once per jump;
+     * subsequent frames while the key is held skip it because on_ground is.
+     * vy is set to a negative value (up is negative in SDL screen-space).
+     */
+    if (player->on_ground &&
+        (keys[SDL_SCANCODE_SPACE] || keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_UP])) {
+        player->vy        = -520.0f;  /* upward impulse in logical px/s */
+        player->on_ground  = 0;
+        if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+    }
 }
 
 /* ------------------------------------------------------------------ */
 
 /*
- * player_update — Apply velocity to position, then enforce window boundaries.
+ * player_update — Apply gravity and velocity to position, handle floor/ceiling collisions.
  *
  * dt (delta time) is the time in seconds since the last frame (e.g. 0.016).
  * Multiplying velocity (px/s) by dt (s) gives displacement in pixels.
  * This makes movement speed identical regardless of frame rate.
  */
 void player_update(Player *player, float dt) {
+    /*
+     * Gravity: accelerate downward each frame while the player is airborne.
+     * GRAVITY is in px/s² so we multiply by dt to get px/s added this frame.
+     */
+    if (!player->on_ground) {
+        player->vy += GRAVITY * dt;
+    }
+
     player->x += player->vx * dt;   /* move horizontally */
     player->y += player->vy * dt;   /* move vertically   */
 
     /*
-     * Clamp — keep the player fully inside the window.
-     * Left/top edge: position must be >= 0.
-     * Right/bottom edge: position must be <= window size minus sprite size
-     *   (because x/y refers to the top-left corner of the sprite).
+     * Floor collision — snap to the grass surface and stop falling.
+     * FLOOR_Y is the top edge of the grass tiles in logical coordinates.
+     * The player's bottom edge is y + h; when it reaches FLOOR_Y, land.
      */
-    if (player->x < 0.0f)                 player->x = 0.0f;
-    if (player->y < 0.0f)                 player->y = 0.0f;
-    if (player->x > WINDOW_W - player->w) player->x = (float)(WINDOW_W - player->w);
-    if (player->y > WINDOW_H - player->h) player->y = (float)(WINDOW_H - player->h);
+    if (player->y >= (float)(FLOOR_Y - player->h)) {
+        player->y        = (float)(FLOOR_Y - player->h);
+        player->vy       = 0.0f;
+        player->on_ground = 1;
+    }
+
+    /*
+     * Horizontal clamp — keep the player inside the logical canvas (GAME_W).
+     * All coordinates live in logical (400×300) space, not OS window space.
+     */
+    if (player->x < 0.0f)               player->x = 0.0f;
+    if (player->x > GAME_W - player->w) player->x = (float)(GAME_W - player->w);
+
+    /* Ceiling clamp — stop upward movement at the top of the canvas. */
+    if (player->y < 0.0f) {
+        player->y  = 0.0f;
+        player->vy = 0.0f;
+    }
 }
 
 /* ------------------------------------------------------------------ */

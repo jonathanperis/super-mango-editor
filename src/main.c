@@ -68,7 +68,6 @@ int main(void) {
      *   MIX_DEFAULT_FORMAT → 16-bit signed samples (platform default)
      *   2      → stereo (2 channels)
      *   2048   → audio buffer size in samples (controls latency vs. stability)
-     * Not used in the MVP yet, but ready for sound effects and music.
      */
     if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) != 0) {
         fprintf(stderr, "Mix_OpenAudio error: %s\n", Mix_GetError());

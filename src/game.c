@@ -4,6 +4,7 @@
 
 #include <SDL.h>
 #include <SDL_image.h>
+#include <SDL_mixer.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -89,6 +90,21 @@ void game_init(GameState *gs) {
         exit(EXIT_FAILURE);
     }
 
+    /*
+     * Load the jump sound effect. Mix_LoadWAV decodes the WAV into a
+     * Mix_Chunk that can be played on any available mixer channel.
+     * Assets path is relative to where the binary is run (repo root).
+     */
+    gs->snd_jump = Mix_LoadWAV("assets/sounds/jump.wav");
+    if (!gs->snd_jump) {
+        fprintf(stderr, "Failed to load jump.wav: %s\n", Mix_GetError());
+        SDL_DestroyTexture(gs->floor_tile);
+        SDL_DestroyTexture(gs->background);
+        SDL_DestroyRenderer(gs->renderer);
+        SDL_DestroyWindow(gs->window);
+        exit(EXIT_FAILURE);
+    }
+
     /* Set up the player (loads texture, sets initial position on the floor) */
     player_init(&gs->player, gs->renderer);
 
@@ -151,7 +167,7 @@ void game_loop(GameState *gs) {
 
         /* ---- 2. Update ------------------------------------------- */
         /* Read the keyboard and set the player's velocity for this frame */
-        player_handle_input(&gs->player);
+        player_handle_input(&gs->player, gs->snd_jump);
         /* Move the player based on velocity × dt, then clamp to the window */
         player_update(&gs->player, dt);
 
@@ -216,6 +232,11 @@ void game_loop(GameState *gs) {
 void game_cleanup(GameState *gs) {
     /* Free the player's texture first (also renderer-dependent) */
     player_cleanup(&gs->player);
+
+    if (gs->snd_jump) {
+        Mix_FreeChunk(gs->snd_jump);
+        gs->snd_jump = NULL;
+    }
 
     if (gs->floor_tile) {
         SDL_DestroyTexture(gs->floor_tile);
