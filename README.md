@@ -114,14 +114,16 @@ The compiled binary is placed at `out/super-mango`.
 ```
 super-mango-game/
 ├── Makefile               ← Build system (clang, sdl2-config)
-├── assets/                ← PNG sprites, TTF font, and sound effects
+├── assets/                ← PNG sprites and TTF font
 │   ├── Player.png
 │   ├── Forest_Background_0.png
 │   ├── Grass_Tileset.png
 │   ├── Round9x13.ttf
-│   ├── sounds/            ← WAV sound effects
-│   │   └── jump.wav
 │   └── ... (more sprites for future use)
+├── sounds/                ← WAV/MP3 sound effects
+│   ├── jump.wav
+│   ├── water-ambience.mp3
+│   └── ... (more sounds for future use)
 └── src/
     ├── main.c             ← Entry point: SDL init/teardown
     ├── game.h             ← GameState struct and constants

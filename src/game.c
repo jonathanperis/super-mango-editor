@@ -105,6 +105,32 @@ void game_init(GameState *gs) {
         exit(EXIT_FAILURE);
     }
 
+    /*
+     * Load and immediately start the background music track.
+     * Mix_Music is the streaming type used for long audio (MP3/OGG/FLAC).
+     * Unlike Mix_Chunk, it streams from disk rather than loading all at once,
+     * which keeps memory usage low for large files.
+     * Mix_PlayMusic(-1) means loop forever until Mix_HaltMusic() is called.
+     */
+    gs->music = Mix_LoadMUS("sounds/water-ambience.mp3");
+    if (!gs->music) {
+        fprintf(stderr, "Failed to load water-ambience.mp3: %s\n", Mix_GetError());
+        Mix_FreeChunk(gs->snd_jump);
+        SDL_DestroyTexture(gs->floor_tile);
+        SDL_DestroyTexture(gs->background);
+        SDL_DestroyRenderer(gs->renderer);
+        SDL_DestroyWindow(gs->window);
+        exit(EXIT_FAILURE);
+    }
+    Mix_PlayMusic(gs->music, -1);   /* -1 = loop indefinitely                */
+    /*
+     * Mix_VolumeMusic — set the music playback volume.
+     * Range: 0 (silent) to MIX_MAX_VOLUME (128, full volume).
+     * 70% of 128 = ~90, giving a subtle ambient level that doesn't
+     * compete with sound effects.
+     */
+    Mix_VolumeMusic(13);
+
     /* Set up the player (loads texture, sets initial position on the floor) */
     player_init(&gs->player, gs->renderer);
 
@@ -232,6 +258,12 @@ void game_loop(GameState *gs) {
 void game_cleanup(GameState *gs) {
     /* Free the player's texture first (also renderer-dependent) */
     player_cleanup(&gs->player);
+
+    if (gs->music) {
+        Mix_HaltMusic();           /* stop playback before freeing           */
+        Mix_FreeMusic(gs->music);
+        gs->music = NULL;
+    }
 
     if (gs->snd_jump) {
         Mix_FreeChunk(gs->snd_jump);

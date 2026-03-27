@@ -67,6 +67,7 @@ typedef struct {
     SDL_Texture  *background;  /* forest background loaded into GPU memory    */
     SDL_Texture  *floor_tile;  /* grass tile repeated across the floor layer  */
     Mix_Chunk    *snd_jump;    /* WAV chunk for the jump sound effect         */
+    Mix_Music    *music;       /* MP3 stream for the looping background music */
     Player        player;      /* the player, stored by value (not a pointer) */
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
 } GameState;
