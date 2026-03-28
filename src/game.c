@@ -168,6 +168,24 @@ void game_init(GameState *gs) {
     }
 
     /*
+     * Load the coin pickup SFX.
+     * Non-fatal: if loading fails, gameplay continues without this effect.
+     */
+    gs->snd_coin = Mix_LoadWAV("sounds/coin.wav");
+    if (!gs->snd_coin) {
+        fprintf(stderr, "Warning: Failed to load coin.wav: %s\n", Mix_GetError());
+    }
+
+    /*
+     * Load the player-hit SFX.
+     * Non-fatal: if loading fails, gameplay continues without this effect.
+     */
+    gs->snd_hit = Mix_LoadWAV("sounds/hit.wav");
+    if (!gs->snd_hit) {
+        fprintf(stderr, "Warning: Failed to load hit.wav: %s\n", Mix_GetError());
+    }
+
+    /*
      * Load and immediately start the background music track.
      * Mix_Music is the streaming type used for long audio (MP3/OGG/FLAC).
      * Unlike Mix_Chunk, it streams from disk rather than loading all at once,
@@ -300,6 +318,12 @@ void game_loop(GameState *gs) {
                 /* SDL_HasIntersection returns SDL_TRUE when the two rects overlap */
                 if (SDL_HasIntersection(&phit, &shit)) {
                     gs->player.hurt_timer = 1.5f;   /* 1.5 s of invincibility */
+
+                    /* Play hit SFX once when damage is applied. */
+                    if (gs->snd_hit) {
+                        Mix_PlayChannel(-1, gs->snd_hit, 0);
+                    }
+
                     gs->hearts--;
                     if (gs->hearts <= 0) {
                         gs->lives--;
@@ -337,6 +361,12 @@ void game_loop(GameState *gs) {
                 };
                 if (SDL_HasIntersection(&phit, &cbox)) {
                     gs->coins[i].active = 0;
+
+                    /* Play coin SFX immediately when a coin is collected. */
+                    if (gs->snd_coin) {
+                        Mix_PlayChannel(-1, gs->snd_coin, 0);
+                    }
+
                     gs->score += COIN_SCORE;
                     gs->coins_for_heart++;
                     if (gs->coins_for_heart >= COINS_PER_HEART) {
@@ -501,6 +531,16 @@ void game_cleanup(GameState *gs) {
     if (gs->snd_jump) {
         Mix_FreeChunk(gs->snd_jump);
         gs->snd_jump = NULL;
+    }
+
+    if (gs->snd_coin) {
+        Mix_FreeChunk(gs->snd_coin);
+        gs->snd_coin = NULL;
+    }
+
+    if (gs->snd_hit) {
+        Mix_FreeChunk(gs->snd_hit);
+        gs->snd_hit = NULL;
     }
 
     water_cleanup(&gs->water);
