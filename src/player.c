@@ -105,6 +105,9 @@ void player_init(Player *player, SDL_Renderer *renderer) {
     player->anim_frame_index = 0;
     player->anim_timer_ms    = 0;
     player->facing_left      = 0;
+
+    /* Not hurt at startup; timer counts down to 0 during invincibility */
+    player->hurt_timer = 0.0f;
 }
 
 /* ------------------------------------------------------------------ */
@@ -326,8 +329,21 @@ void player_update(Player *player, float dt,
 
 /*
  * player_render — Draw the player sprite at its current position.
+ *
+ * While hurt_timer > 0 the sprite blinks on/off every 100 ms to give
+ * visual feedback that the player was hit and is temporarily invincible.
  */
 void player_render(Player *player, SDL_Renderer *renderer) {
+    /*
+     * Blink effect: during invincibility, convert the remaining hurt time
+     * into a 100-ms cadence.  On odd intervals the sprite is hidden,
+     * creating a flash / blink pattern.
+     */
+    if (player->hurt_timer > 0.0f) {
+        int interval = (int)(player->hurt_timer * 1000.0f) / 100;
+        if (interval % 2 == 1) return;   /* skip this frame — blink off */
+    }
+
     /*
      * dst — where on screen the sprite will appear.
      * x/y are cast from float to int because SDL works in whole pixels.
@@ -349,6 +365,24 @@ void player_render(Player *player, SDL_Renderer *renderer) {
     SDL_RendererFlip flip = player->facing_left ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
     SDL_RenderCopyEx(renderer, player->texture, &player->frame, &dst,
                      0.0, NULL, flip);
+}
+
+/* ------------------------------------------------------------------ */
+
+/*
+ * player_get_hitbox — Return the player's physics hitbox as an SDL_Rect.
+ *
+ * The hitbox is inset from the full 48×48 sprite frame on every side
+ * to match the visible character art.  Used by game.c for collision
+ * checks against enemies.
+ */
+SDL_Rect player_get_hitbox(const Player *player) {
+    SDL_Rect r;
+    r.x = (int)(player->x) + PHYS_PAD_X;
+    r.y = (int)(player->y) + PHYS_PAD_TOP;
+    r.w = player->w - 2 * PHYS_PAD_X;
+    r.h = player->h - PHYS_PAD_TOP - FLOOR_SINK;
+    return r;
 }
 
 /* ------------------------------------------------------------------ */

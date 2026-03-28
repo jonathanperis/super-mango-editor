@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <SDL.h>        /* SDL_Texture, SDL_Renderer */
+#include <SDL.h>        /* SDL_Texture, SDL_Renderer, SDL_Rect */
 #include <SDL_mixer.h>  /* Mix_Chunk */
 #include "platform.h"   /* Platform, MAX_PLATFORMS — needed for player_update signature */
 
@@ -41,6 +41,7 @@ typedef struct {
     int       anim_frame_index; /* current frame index within the animation       */
     Uint32    anim_timer_ms;    /* ms accumulated in the current frame            */
     int       facing_left;      /* 1 = mirror sprite horizontally                 */
+    float     hurt_timer;        /* seconds remaining of invincibility blink; 0 = normal */
     SDL_Rect     frame;   /* source rect: which part of the sheet to draw    */
     SDL_Texture *texture; /* GPU image handle; NULL until player_init runs   */
 } Player;
@@ -56,6 +57,9 @@ void player_update(Player *player, float dt, const Platform *platforms, int plat
 
 /* Draw the player sprite at its current position. */
 void player_render(Player *player, SDL_Renderer *renderer);
+
+/* Return the player's tightly-inset physics hitbox (logical pixels). */
+SDL_Rect player_get_hitbox(const Player *player);
 
 /* Release the player's GPU texture. */
 void player_cleanup(Player *player);

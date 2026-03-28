@@ -245,6 +245,38 @@ void game_loop(GameState *gs) {
         player_update(&gs->player, dt, gs->platforms, gs->platform_count);
         /* Move spiders along their patrol paths and advance their animation */
         spiders_update(gs->spiders, gs->spider_count, dt);
+
+        /*
+         * Player–spider collision.
+         *
+         * Count down the invincibility timer first.  While it is positive the
+         * player is still blinking from a previous hit and cannot be hurt again.
+         * When the timer reaches zero, test each spider's render rect against
+         * the player's physics hitbox (AABB overlap).  On contact, start a new
+         * 1.5-second invincibility window.
+         */
+        if (gs->player.hurt_timer > 0.0f) {
+            gs->player.hurt_timer -= dt;
+            if (gs->player.hurt_timer < 0.0f)
+                gs->player.hurt_timer = 0.0f;
+        } else {
+            SDL_Rect phit = player_get_hitbox(&gs->player);
+            for (int i = 0; i < gs->spider_count; i++) {
+                const Spider *s = &gs->spiders[i];
+                SDL_Rect shit = {
+                    (int)s->x,
+                    FLOOR_Y - SPIDER_ART_H,
+                    SPIDER_FRAME_W,
+                    SPIDER_ART_H
+                };
+                /* SDL_HasIntersection returns SDL_TRUE when the two rects overlap */
+                if (SDL_HasIntersection(&phit, &shit)) {
+                    gs->player.hurt_timer = 1.5f;   /* 1.5 s of invincibility */
+                    break;
+                }
+            }
+        }
+
         /* Advance the water scroll offset */
         water_update(&gs->water, dt);
         /* Advance the fog wave positions and spawn the next wave if it is time */
