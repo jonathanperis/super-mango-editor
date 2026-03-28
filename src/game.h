@@ -20,6 +20,7 @@
 #include "platform.h"   /* Platform struct + MAX_PLATFORMS constant */
 #include "water.h"      /* Water struct — animated bottom strip              */
 #include "fog.h"        /* FogSystem struct — atmospheric fog overlay      */
+#include "spider.h"     /* Spider struct + MAX_SPIDERS constant              */
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -70,6 +71,7 @@ typedef struct {
     SDL_Texture  *background;  /* forest background loaded into GPU memory    */
     SDL_Texture  *floor_tile;  /* grass tile repeated across the floor layer  */
     SDL_Texture  *platform_tex;/* shared tile texture for all pillars         */
+    SDL_Texture  *spider_tex;  /* shared texture for all spider enemies       */
     Mix_Chunk    *snd_jump;    /* WAV chunk for the jump sound effect         */
     Mix_Music    *music;       /* MP3 stream for the looping background music */
     Player        player;      /* the player, stored by value (not a pointer) */
@@ -77,6 +79,8 @@ typedef struct {
     int           platform_count;           /* how many platforms are active  */
     Water         water;        /* animated water strip at the bottom of screen*/
     FogSystem     fog;         /* atmospheric fog overlay — topmost layer      */
+    Spider        spiders[MAX_SPIDERS]; /* ground-patrol enemy instances      */
+    int           spider_count;         /* number of active spiders           */
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
 } GameState;
 

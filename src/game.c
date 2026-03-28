@@ -13,6 +13,7 @@
 #include "platform.h"
 #include "water.h"
 #include "fog.h"
+#include "spider.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -114,6 +115,22 @@ void game_init(GameState *gs) {
 
     /* Load the animated water strip texture and reset scroll state */
     water_init(&gs->water, gs->renderer);
+
+    /*
+     * Load the shared spider texture.  All spider instances blit from
+     * this single texture using different source rects per frame.
+     */
+    gs->spider_tex = IMG_LoadTexture(gs->renderer, "assets/Spider_1.png");
+    if (!gs->spider_tex) {
+        fprintf(stderr, "Failed to load Spider_1.png: %s\n", IMG_GetError());
+        SDL_DestroyTexture(gs->platform_tex);
+        SDL_DestroyTexture(gs->floor_tile);
+        SDL_DestroyTexture(gs->background);
+        SDL_DestroyRenderer(gs->renderer);
+        SDL_DestroyWindow(gs->window);
+        exit(EXIT_FAILURE);
+    }
+    spiders_init(gs->spiders, &gs->spider_count);
 
     /*
      * Load the jump sound effect. Mix_LoadWAV decodes the WAV into a
@@ -226,6 +243,8 @@ void game_loop(GameState *gs) {
         player_handle_input(&gs->player, gs->snd_jump);
         /* Move the player, check floor + one-way platform collisions */
         player_update(&gs->player, dt, gs->platforms, gs->platform_count);
+        /* Move spiders along their patrol paths and advance their animation */
+        spiders_update(gs->spiders, gs->spider_count, dt);
         /* Advance the water scroll offset */
         water_update(&gs->water, dt);
         /* Advance the fog wave positions and spawn the next wave if it is time */
@@ -311,6 +330,10 @@ void game_loop(GameState *gs) {
          */
         water_render(&gs->water, gs->renderer);
 
+        /* Draw spiders on top of the water strip, before the player */
+        spiders_render(gs->spiders, gs->spider_count,
+                       gs->renderer, gs->spider_tex);
+
         /* Draw the player sprite on top of everything */
         player_render(&gs->player, gs->renderer);
 
@@ -367,6 +390,11 @@ void game_cleanup(GameState *gs) {
     }
 
     water_cleanup(&gs->water);
+
+    if (gs->spider_tex) {
+        SDL_DestroyTexture(gs->spider_tex);
+        gs->spider_tex = NULL;
+    }
 
     if (gs->platform_tex) {
         SDL_DestroyTexture(gs->platform_tex);
