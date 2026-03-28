@@ -70,13 +70,13 @@ Called **once per frame** before `player_update`. Uses `SDL_GetKeyboardState` to
 
 ```c
 if (player->on_ground && keys[SDL_SCANCODE_SPACE]) {
-    player->vy        = -399.0f;   // upward impulse (negative = up in SDL)
+    player->vy        = -500.0f;   // upward impulse (negative = up in SDL)
     player->on_ground  = 0;
     if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
 }
 ```
 
-- Jump impulse is `-399.0f` px/s (upward).
+- Jump impulse is `-500.0f` px/s (upward).
 - `on_ground` is set to `0` immediately so the jump condition fires only once.
 - The sound is guarded by `if (snd_jump)` to tolerate a failed WAV load.
 
@@ -97,12 +97,11 @@ void player_update(Player *player, float dt, const Platform *platforms, int plat
 ### Gravity
 
 ```c
-if (!player->on_ground) {
-    player->vy += GRAVITY * dt;   // GRAVITY = 800.0f px/s²
-}
+player->on_ground = 0;          // reset every frame — walk-off edges start falling immediately
+player->vy += GRAVITY * dt;     // GRAVITY = 800.0f px/s²; runs unconditionally
 ```
 
-While airborne, `vy` increases by 800 × dt each frame, accelerating the player downward.
+`on_ground` is cleared to `0` at the start of every `player_update` call so the player immediately begins falling when they walk off a platform edge. Gravity then runs unconditionally; the floor/platform snap below cancels the tiny fall each frame while the player stands on a surface, keeping them rock-solid on the ground.
 
 ### Position Integration
 
@@ -129,22 +128,24 @@ When the player's bottom edge reaches the floor surface, position is snapped, `v
 ### Horizontal Clamp
 
 ```c
-if (player->x < 0.0f)               player->x = 0.0f;
-if (player->x > GAME_W - player->w) player->x = (float)(GAME_W - player->w);
+if (player->x + PHYS_PAD_X < 0.0f)
+    player->x = -(float)PHYS_PAD_X;
+if (player->x + player->w - PHYS_PAD_X > GAME_W)
+    player->x = (float)(GAME_W - player->w + PHYS_PAD_X);
 ```
 
-Keeps the player fully inside the 400 px logical canvas.
+Keeps the player's **physics body** (inset by `PHYS_PAD_X = 12` px on each side) inside the 400 px logical canvas. The transparent side-padding of the sprite frame is allowed to slide off-screen while the visible character stays flush with the border.
 
 ### Ceiling Clamp
 
 ```c
-if (player->y < 0.0f) {
-    player->y  = 0.0f;
+if (player->y + PHYS_PAD_TOP < 0.0f) {
+    player->y  = -(float)PHYS_PAD_TOP;
     player->vy = 0.0f;
 }
 ```
 
-Prevents the player from flying off the top of the canvas.
+Stops upward movement when the physics top edge (`y + PHYS_PAD_TOP`) hits the canvas ceiling. `PHYS_PAD_TOP = 6` lets the transparent head-room of the sprite frame slide above `y = 0` before the physics edge triggers.
 
 ---
 
@@ -210,6 +211,12 @@ void player_render(Player *player, SDL_Renderer *renderer);
 ```
 
 ```c
+/* Invincibility blink: skip every alternate 100 ms window */
+if (player->hurt_timer > 0.0f) {
+    int interval = (int)(player->hurt_timer * 1000.0f) / 100;
+    if (interval % 2 == 1) return;   /* blink off — skip this frame */
+}
+
 SDL_Rect dst = {
     .x = (int)player->x,   // float → int at render time only
     .y = (int)player->y,
@@ -227,7 +234,7 @@ SDL_RenderCopyEx(renderer, player->texture, &player->frame, &dst,
 
 `SDL_RenderCopyEx` is used (instead of `SDL_RenderCopy`) to support horizontal flipping. Angle and center are `0` / `NULL` so no rotation is applied.
 
-> **Invincibility blink:** While `player->hurt_timer > 0`, `player_render` skips every alternate 100 ms window (using `((int)(player->hurt_timer * 10)) % 2`), making the sprite flash to indicate the player cannot be hurt again yet.
+> **Invincibility blink:** While `player->hurt_timer > 0`, `player_render` converts the remaining time into a 100 ms cadence — `interval = (int)(player->hurt_timer * 1000.0f) / 100`. On odd intervals the function returns early, skipping the draw call and making the sprite flash to indicate temporary invincibility.
 
 ---
 
@@ -238,6 +245,23 @@ SDL_Rect player_get_hitbox(const Player *player);
 ```
 
 Returns an `SDL_Rect` representing the player's tightly-inset physics hitbox in logical pixels. The hitbox is smaller than the full 48×48 display frame to exclude transparent padding in the sprite sheet. It is used by `game_loop` for AABB intersection tests against spider enemies.
+
+| Inset | Constant | Value | Effect |
+|-------|----------|-------|--------|
+| Left & Right | `PHYS_PAD_X` | `12` px | Physics width = 48 - 24 = 24 px |
+| Top | `PHYS_PAD_TOP` | `6` px | Physics top tracks the character's head |
+| Bottom | `FLOOR_SINK` | `16` px | Physics bottom tracks the character's feet |
+
+```c
+SDL_Rect r;
+r.x = (int)(player->x) + PHYS_PAD_X;
+r.y = (int)(player->y) + PHYS_PAD_TOP;
+r.w = player->w - 2 * PHYS_PAD_X;
+r.h = player->h - PHYS_PAD_TOP - FLOOR_SINK;
+return r;
+```
+
+`game_loop` calls `player_get_hitbox` each frame (when `hurt_timer == 0`) and passes the result to `SDL_HasIntersection` alongside each spider's rect. On overlap, `hurt_timer` is set to `1.5` seconds.
 
 ---
 
@@ -262,7 +286,7 @@ Must be called **before** `SDL_DestroyRenderer`, because textures are owned by t
 |----------|-------|----------|
 | `GRAVITY` | `800.0f` px/s² | `game.h` |
 | `FLOOR_Y` | `252` px | `game.h` (`GAME_H - TILE_SIZE`) |
-| Jump impulse `vy` | `-399.0f` px/s | `player.c` (hard-coded) |
+| Jump impulse `vy` | `-500.0f` px/s | `player.c` (hard-coded) |
 | Horizontal speed | `160.0f` px/s | `player.c` (`player->speed`) |
 | `FLOOR_SINK` | `16` px | `player.c` (local `#define`) |
 | `FRAME_W` / `FRAME_H` | `48` px | `player.c` (local `#define`) |
