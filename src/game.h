@@ -75,6 +75,8 @@ typedef struct {
     SDL_Texture  *platform_tex;/* shared tile texture for all pillars         */
     SDL_Texture  *spider_tex;  /* shared texture for all spider enemies       */
     Mix_Chunk    *snd_jump;    /* WAV chunk for the jump sound effect         */
+    Mix_Chunk    *snd_coin;    /* WAV chunk played when collecting a coin     */
+    Mix_Chunk    *snd_hit;     /* WAV chunk played when player gets hurt      */
     Mix_Music    *music;       /* MP3 stream for the looping background music */
     Player        player;      /* the player, stored by value (not a pointer) */
     Platform      platforms[MAX_PLATFORMS]; /* one-way pillar definitions     */
