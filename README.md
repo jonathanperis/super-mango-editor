@@ -4,7 +4,16 @@ A 2D platformer game written in C using SDL2, built for learning purposes.
 
 ## About
 
-Super Mango is a 2D platformer where a player character runs and jumps across a forest stage with a grass floor. The game renders at a 400×300 logical resolution scaled 2× to an 800×600 OS window, giving a chunky pixel-art look. Movement is smooth and frame-rate independent thanks to delta-time physics. The project is intentionally minimal and well-commented so the source code can be read as a learning resource for C + SDL2 game development.
+Super Mango is a 2D platformer where a player character runs and jumps through a forest stage with one-way platforms, animated water, patrolling spider enemies, and atmospheric fog. The game renders at a 400×300 logical resolution scaled 2× to an 800×600 OS window, giving a chunky pixel-art look. Movement is smooth and frame-rate independent thanks to delta-time physics. The project is intentionally minimal and well-commented so the source code can be read as a learning resource for C + SDL2 game development.
+
+### Current Features
+
+- **Player** — 4-state animated character (idle/walk/jump/fall) with gravity, floor collision, and one-way platform landing
+- **One-way platforms** — Pillar stacks built from 9-slice tiled grass blocks; the player can jump through from below and land on top
+- **Animated water** — Seamless scrolling water strip at the bottom of the screen using cropped sprite frames
+- **Spider enemies** — Ground-patrol spiders with 4-frame walk animation that reverse at patrol boundaries (no collision yet)
+- **Fog overlay** — Semi-transparent sky layers that slide across the screen for an atmospheric mist effect
+- **Audio** — Jump sound effect and looping ambient background music
 
 ## Prerequisites
 
@@ -113,14 +122,19 @@ The compiled binary is placed at `out/super-mango`.
 
 ```
 super-mango-game/
-├── Makefile               ← Build system (clang, sdl2-config)
+├── Makefile               ← Build system (clang, sdl2-config, ad-hoc codesign)
 ├── assets/                ← PNG sprites and TTF font
 │   ├── Player.png
 │   ├── Forest_Background_0.png
 │   ├── Grass_Tileset.png
+│   ├── Grass_Oneway.png
+│   ├── Water.png
+│   ├── Spider_1.png
+│   ├── Sky_Background_1.png
+│   ├── Sky_Background_2.png
 │   ├── Round9x13.ttf
 │   └── ... (more sprites for future use)
-├── sounds/                ← WAV/MP3 sound effects
+├── sounds/                ← WAV/OGG sound effects and music
 │   ├── jump.wav
 │   ├── water-ambience.ogg
 │   └── ... (more sounds for future use)
@@ -129,7 +143,15 @@ super-mango-game/
     ├── game.h             ← GameState struct and constants
     ├── game.c             ← Window, renderer, textures, sound, game loop
     ├── player.h           ← Player struct declaration
-    └── player.c           ← Player init, input, physics, render
+    ├── player.c           ← Player init, input, physics, render
+    ├── platform.h         ← Platform struct + MAX_PLATFORMS constant
+    ├── platform.c         ← One-way platform init and 9-slice render
+    ├── water.h            ← Water struct + animation constants
+    ├── water.c            ← Animated water strip: init, scroll, render
+    ├── spider.h           ← Spider struct + patrol constants
+    ├── spider.c           ← Spider enemy patrol, animation, render
+    ├── fog.h              ← FogSystem struct + instance pool
+    └── fog.c              ← Fog overlay: init, slide, spawn, render
 ```
 
 ## Architecture
@@ -139,11 +161,23 @@ The game follows a simple **init → loop → cleanup** pattern:
 ```
 main()
   └── SDL/audio/image/font init
-       └── game_init()      — create window, renderer, load textures
+       └── game_init()      — create window, renderer, load textures, sounds, entities
             └── game_loop() — event poll → update → render (60 FPS)
                  └── game_cleanup() — destroy all resources in reverse order
   └── SDL subsystem teardown
 ```
+
+### Render Order (back to front)
+
+| Layer | What |
+|-------|------|
+| 1 | Background (Forest_Background_0.png) |
+| 2 | Floor (9-slice tiled Grass_Tileset.png) |
+| 3 | Platforms (9-slice tiled Grass_Oneway.png pillars) |
+| 4 | Water (animated Water.png strip) |
+| 5 | Spiders (animated Spider_1.png patrol enemies) |
+| 6 | Player (animated Player.png sprite) |
+| 7 | Fog (semi-transparent Sky_Background sliding layers) |
 
 ### Delta Time
 
