@@ -61,7 +61,7 @@ The recommended approach on Windows is to use **MSYS2**, which gives you a Unix-
 2. Open the **MSYS2 UCRT64** terminal and install the dependencies:
 
 ```sh
-pacman -S mingw-w64-ucrt-x86_64-gcc \
+pacman -S mingw-w64-ucrt-x86_64-clang \
           mingw-w64-ucrt-x86_64-make \
           mingw-w64-ucrt-x86_64-SDL2 \
           mingw-w64-ucrt-x86_64-SDL2_image \
@@ -73,7 +73,7 @@ pacman -S mingw-w64-ucrt-x86_64-gcc \
 
 ```sh
 cd /c/path/to/super-mango-game
-make CC=gcc
+make
 ```
 
 4. The SDL2 DLLs must be in the same directory as the binary to run it. Copy them from the MSYS2 prefix:
@@ -122,7 +122,7 @@ super-mango-game/
 │   └── ... (more sprites for future use)
 ├── sounds/                ← WAV/MP3 sound effects
 │   ├── jump.wav
-│   ├── water-ambience.mp3
+│   ├── water-ambience.ogg
 │   └── ... (more sounds for future use)
 └── src/
     ├── main.c             ← Entry point: SDL init/teardown

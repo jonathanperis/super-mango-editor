@@ -112,9 +112,9 @@ void game_init(GameState *gs) {
      * which keeps memory usage low for large files.
      * Mix_PlayMusic(-1) means loop forever until Mix_HaltMusic() is called.
      */
-    gs->music = Mix_LoadMUS("sounds/water-ambience.mp3");
+    gs->music = Mix_LoadMUS("sounds/water-ambience.ogg");
     if (!gs->music) {
-        fprintf(stderr, "Failed to load water-ambience.mp3: %s\n", Mix_GetError());
+        fprintf(stderr, "Failed to load water-ambience.ogg: %s\n", Mix_GetError());
         Mix_FreeChunk(gs->snd_jump);
         SDL_DestroyTexture(gs->floor_tile);
         SDL_DestroyTexture(gs->background);
@@ -213,12 +213,55 @@ void game_loop(GameState *gs) {
         SDL_RenderCopy(gs->renderer, gs->background, NULL, &bg);
 
         /*
-         * Draw the grass floor: repeat the 48×48 tile across the full logical
-         * width (GAME_W = 400). All coordinates are in logical space; SDL 2× scales.
+         * 9-slice floor rendering.
+         *
+         * The 48×48 Grass_Tileset.png is divided into a 3×3 grid of 16×16 pieces
+         * (TILE_SIZE / 3 = 16). Each piece has a role:
+         *
+         *   [TL][TC][TR]   row 0  y= 0..15  ← grass edge
+         *   [ML][MC][MR]   row 1  y=16..31  ← dirt interior
+         *   [BL][BC][BR]   row 2  y=32..47  ← floor base edge
+         *
+         * Piece selection per screen position:
+         *   • Leftmost  column (tx == 0)           → col 0 (left  cap: TL/ML/BL)
+         *   • Rightmost column (tx + P >= GAME_W)  → col 2 (right cap: TR/MR/BR)
+         *   • All other columns                    → col 1 (center fill: TC/MC/BC)
+         *
+         *   • First row  (ty == FLOOR_Y)           → row 0 (grass edge)
+         *   • Last  row  (ty + P >= GAME_H)        → row 2 (base edge)
+         *   • Middle rows                          → row 1 (dirt interior)
+         *
+         * GAME_W (400) and floor height (48) are both exact multiples of P (16),
+         * so every piece fits without needing a partial-pixel crop.
+         * The cap pieces carry the black outline border; the center pieces are
+         * pure interior texture — no seams appear between adjacent pieces.
          */
-        for (int tx = 0; tx < GAME_W; tx += TILE_SIZE) {
-            SDL_Rect tile_dst = {tx, FLOOR_Y, TILE_SIZE, TILE_SIZE};
-            SDL_RenderCopy(gs->renderer, gs->floor_tile, NULL, &tile_dst);
+        const int P = TILE_SIZE / 3;   /* 9-slice piece size: 16 px */
+
+        for (int ty = FLOOR_Y; ty < GAME_H; ty += P) {
+            /* Choose which row of the 9-slice to sample */
+            int piece_row;
+            if (ty == FLOOR_Y)        piece_row = 0;   /* top: grass edge  */
+            else if (ty + P >= GAME_H) piece_row = 2;  /* bottom: base edge */
+            else                      piece_row = 1;   /* middle: dirt fill */
+
+            for (int tx = 0; tx < GAME_W; tx += P) {
+                /* Choose which column of the 9-slice to sample */
+                int piece_col;
+                if (tx == 0)            piece_col = 0;  /* left cap  */
+                else if (tx + P >= GAME_W) piece_col = 2; /* right cap */
+                else                    piece_col = 1;  /* center    */
+
+                /*
+                 * src — the 16×16 region cut from the tile sheet.
+                 *   x = piece_col × P selects the column (0, 16, or 32).
+                 *   y = piece_row × P selects the row    (0, 16, or 32).
+                 * dst — where on screen this piece is drawn (1:1 pixel mapping).
+                 */
+                SDL_Rect src = {piece_col * P, piece_row * P, P, P};
+                SDL_Rect dst = {tx, ty, P, P};
+                SDL_RenderCopy(gs->renderer, gs->floor_tile, &src, &dst);
+            }
         }
 
         /* Draw the player sprite on top of the background and floor */
