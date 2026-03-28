@@ -10,6 +10,7 @@
 
 #include "game.h"
 #include "player.h"
+#include "fog.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -134,6 +135,9 @@ void game_init(GameState *gs) {
     /* Set up the player (loads texture, sets initial position on the floor) */
     player_init(&gs->player, gs->renderer);
 
+    /* Load fog textures and spawn the first mist wave */
+    fog_init(&gs->fog, gs->renderer);
+
     /* Signal the loop to start running */
     gs->running = 1;
 }
@@ -196,6 +200,8 @@ void game_loop(GameState *gs) {
         player_handle_input(&gs->player, gs->snd_jump);
         /* Move the player based on velocity × dt, then clamp to the window */
         player_update(&gs->player, dt);
+        /* Advance the fog wave positions and spawn the next wave if it is time */
+        fog_update(&gs->fog, dt);
 
         /* ---- 3. Render ------------------------------------------- */
         /*
@@ -267,6 +273,9 @@ void game_loop(GameState *gs) {
         /* Draw the player sprite on top of the background and floor */
         player_render(&gs->player, gs->renderer);
 
+        /* Draw fog/mist as the topmost layer — rendered after the player */
+        fog_render(&gs->fog, gs->renderer);
+
         /*
          * SDL_RenderPresent — swap the back buffer to the screen.
          * Everything drawn since RenderClear was on a hidden buffer.
@@ -299,6 +308,9 @@ void game_loop(GameState *gs) {
  * are safe (SDL_Destroy* and free() on NULL are no-ops).
  */
 void game_cleanup(GameState *gs) {
+    /* Free fog textures (renderer-dependent, free before renderer) */
+    fog_cleanup(&gs->fog);
+
     /* Free the player's texture first (also renderer-dependent) */
     player_cleanup(&gs->player);
 

@@ -17,6 +17,7 @@
 #include <SDL.h>        /* SDL_Window, SDL_Renderer, SDL_Texture */
 #include <SDL_mixer.h>  /* Mix_Chunk */
 #include "player.h"     /* Player struct — embedded by value in GameState */
+#include "fog.h"        /* FogSystem struct — atmospheric fog overlay      */
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -69,6 +70,7 @@ typedef struct {
     Mix_Chunk    *snd_jump;    /* WAV chunk for the jump sound effect         */
     Mix_Music    *music;       /* MP3 stream for the looping background music */
     Player        player;      /* the player, stored by value (not a pointer) */
+    FogSystem     fog;         /* atmospheric fog overlay — topmost layer      */
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
 } GameState;
 
