@@ -8,6 +8,7 @@
 
 #include <SDL.h>        /* SDL_Texture, SDL_Renderer */
 #include <SDL_mixer.h>  /* Mix_Chunk */
+#include "platform.h"   /* Platform, MAX_PLATFORMS — needed for player_update signature */
 
 /*
  * AnimState — which animation sequence is currently playing.
@@ -50,8 +51,8 @@ void player_init(Player *player, SDL_Renderer *renderer);
 /* Sample the keyboard every frame and set vx/vy accordingly. */
 void player_handle_input(Player *player, Mix_Chunk *snd_jump);
 
-/* Move the player by velocity × dt and clamp to the window edges. */
-void player_update(Player *player, float dt);
+/* Move the player by velocity × dt; resolve floor and one-way platform collisions. */
+void player_update(Player *player, float dt, const Platform *platforms, int platform_count);
 
 /* Draw the player sprite at its current position. */
 void player_render(Player *player, SDL_Renderer *renderer);

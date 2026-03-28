@@ -28,6 +28,23 @@
 #define FLOOR_SINK 16
 
 /*
+ * Physics-box insets — how many pixels to trim from each side of the 48×48
+ * sprite frame to reach the visible character boundary.
+ *
+ * The character art is centred in the frame with significant transparent
+ * padding, especially on the left and right. Using the raw frame size for
+ * collisions creates an invisible wall well outside the art.
+ *
+ * PHYS_PAD_X : pixels trimmed from the LEFT and RIGHT edges (each side).
+ *              Physics width  = FRAME_W − 2 × PHYS_PAD_X  = 48 − 24 = 24 px.
+ * PHYS_PAD_TOP : pixels trimmed from the TOP edge.
+ *              Combined with FLOOR_SINK at the bottom the physics box
+ *              tracks the drawn character closely on all four sides.
+ */
+#define PHYS_PAD_X   12
+#define PHYS_PAD_TOP  6
+
+/*
  * Animation tables — indexed by AnimState (0=IDLE, 1=WALK, 2=JUMP, 3=FALL).
  *
  * ANIM_FRAME_COUNT : how many frames the animation has.
@@ -131,7 +148,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump) {
      * vy is set to a negative value (up is negative in SDL screen-space).
      */
     if (player->on_ground && keys[SDL_SCANCODE_SPACE]) {
-        player->vy        = -399.0f;  /* upward impulse in logical px/s */
+        player->vy        = -500.0f;  /* upward impulse; reaches ~156 px, clearing the tall pillar */
         player->on_ground  = 0;
         if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
     }
@@ -196,45 +213,105 @@ static void player_animate(Player *player, Uint32 dt_ms) {
 /* ------------------------------------------------------------------ */
 
 /*
- * player_update — Apply gravity and velocity to position, handle floor/ceiling collisions.
+ * player_update -- Apply gravity and velocity to position, handle floor and
+ *                  one-way platform collisions.
  *
  * dt (delta time) is the time in seconds since the last frame (e.g. 0.016).
  * Multiplying velocity (px/s) by dt (s) gives displacement in pixels.
  * This makes movement speed identical regardless of frame rate.
+ *
+ * One-way platforms:
+ *   Only the TOP SURFACE of each platform triggers a landing.  The player
+ *   can jump through from below; collision is only checked when the player
+ *   is moving downward (vy >= 0) and their bottom edge crosses the platform
+ *   top surface this frame (crossing test prevents tunnelling at high speed).
  */
-void player_update(Player *player, float dt) {
+void player_update(Player *player, float dt,
+                   const Platform *platforms, int platform_count) {
     /*
-     * Gravity: accelerate downward each frame while the player is airborne.
-     * GRAVITY is in px/s² so we multiply by dt to get px/s added this frame.
+     * Reset on_ground every frame so the player immediately starts falling
+     * when they walk off the edge of a platform.  Collision checks below
+     * will set it back to 1 if the player is resting on a surface.
      */
-    if (!player->on_ground) {
-        player->vy += GRAVITY * dt;
-    }
+    player->on_ground = 0;
+
+    /*
+     * Gravity: accelerate downward each frame.
+     * Because on_ground was just cleared, gravity always runs here; the
+     * floor/platform snap below cancels the tiny fall each frame while the
+     * player stands still, keeping the character rock-solid on the ground.
+     */
+    player->vy += GRAVITY * dt;
 
     player->x += player->vx * dt;   /* move horizontally */
     player->y += player->vy * dt;   /* move vertically   */
 
     /*
-     * Floor collision — snap to the grass surface and stop falling.
+     * Floor collision -- snap to the grass surface and stop falling.
      * FLOOR_Y is the top edge of the grass tiles in logical coordinates.
-     * The player's bottom edge is y + h; when it reaches FLOOR_Y, land.
      */
-    if (player->y >= (float)(FLOOR_Y - player->h + FLOOR_SINK)) {
-        player->y        = (float)(FLOOR_Y - player->h + FLOOR_SINK);
-        player->vy       = 0.0f;
+    const float ground_snap = (float)(FLOOR_Y - player->h + FLOOR_SINK);
+    if (player->y >= ground_snap) {
+        player->y         = ground_snap;
+        player->vy        = 0.0f;
         player->on_ground = 1;
     }
 
     /*
-     * Horizontal clamp — keep the player inside the logical canvas (GAME_W).
-     * All coordinates live in logical (400×300) space, not OS window space.
+     * One-way platform collision -- top surface only.
+     *
+     * We only test when:
+     *   1. The player is not already on the floor (avoid double-snap).
+     *   2. The player is moving downward (vy >= 0), so upward jumps pass through.
+     *
+     * Crossing test: compare where the player's bottom was BEFORE this frame's
+     * movement (prev_bottom) with where it is NOW (bottom).  A landing is
+     * detected when the edge crossed the platform's top Y from above to below.
+     * This is frame-rate-independent and handles any fall speed correctly.
+     *
+     * The "physics bottom" strips the FLOOR_SINK visual offset so contact
+     * lands the sprite at the same apparent depth as on the main floor.
      */
-    if (player->x < 0.0f)               player->x = 0.0f;
-    if (player->x > GAME_W - player->w) player->x = (float)(GAME_W - player->w);
+    if (!player->on_ground && player->vy >= 0.0f) {
+        const float bottom      = player->y + player->h - FLOOR_SINK;
+        const float prev_bottom = bottom - player->vy * dt;   /* back-project */
 
-    /* Ceiling clamp — stop upward movement at the top of the canvas. */
-    if (player->y < 0.0f) {
-        player->y  = 0.0f;
+        for (int i = 0; i < platform_count; i++) {
+            const Platform *plat = &platforms[i];
+
+            /* Horizontal overlap: use the inset physics box, not the full sprite */
+            int h_overlap = (player->x + player->w - PHYS_PAD_X > plat->x) &&
+                            (player->x + PHYS_PAD_X < plat->x + plat->w);
+            if (!h_overlap) continue;
+
+            /* Vertical crossing: bottom was at or above surface, now below */
+            if (prev_bottom <= plat->y && bottom >= plat->y) {
+                player->y         = plat->y - player->h + FLOOR_SINK;
+                player->vy        = 0.0f;
+                player->on_ground = 1;
+                break;   /* first platform wins */
+            }
+        }
+    }
+
+    /*
+     * Horizontal clamp — keep the PHYSICS body inside the logical canvas.
+     * We clamp the inset edge (x + PHYS_PAD_X), not the sprite left edge,
+     * so the transparent side-padding can slide off-screen while the visible
+     * character stays flush with the border instead of stopping early.
+     */
+    if (player->x + PHYS_PAD_X < 0.0f)
+        player->x = -(float)PHYS_PAD_X;
+    if (player->x + player->w - PHYS_PAD_X > GAME_W)
+        player->x = (float)(GAME_W - player->w + PHYS_PAD_X);
+
+    /*
+     * Ceiling clamp — stop upward movement when the physics top hits the
+     * canvas ceiling.  PHYS_PAD_TOP lets the transparent head-room of the
+     * sprite frame slide above y=0 before the physics edge triggers.
+     */
+    if (player->y + PHYS_PAD_TOP < 0.0f) {
+        player->y  = -(float)PHYS_PAD_TOP;
         player->vy = 0.0f;
     }
 
