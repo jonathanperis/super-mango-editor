@@ -19,6 +19,7 @@
 #include "player.h"     /* Player struct — embedded by value in GameState */
 #include "platform.h"   /* Platform struct + MAX_PLATFORMS constant */
 #include "water.h"      /* Water struct — animated bottom strip              */
+#include "fog.h"        /* FogSystem struct — atmospheric fog overlay      */
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -75,6 +76,7 @@ typedef struct {
     Platform      platforms[MAX_PLATFORMS]; /* one-way pillar definitions     */
     int           platform_count;           /* how many platforms are active  */
     Water         water;        /* animated water strip at the bottom of screen*/
+    FogSystem     fog;         /* atmospheric fog overlay — topmost layer      */
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
 } GameState;
 
