@@ -28,14 +28,14 @@ void spiders_init(Spider *spiders, int *count)
 
     /*
      * Spider 1 — patrols the right region of the floor.
-     * Starts at x=310, walking left; frame offset avoids both spiders
+     * Starts at x=290, walking left; frame offset avoids both spiders
      * being in sync with each other.
      */
-    spiders[1].x             = 310.0f;
+    spiders[1].x             = 290.0f;
     spiders[1].vx            = -SPIDER_SPEED;
-    spiders[1].patrol_x0     = 220.0f;
+    spiders[1].patrol_x0     = 200.0f;
     spiders[1].patrol_x1     = 370.0f;
-    spiders[1].frame_index   = 2;
+    spiders[1].frame_index   = 1;
     spiders[1].anim_timer_ms = 0;
 }
 
@@ -110,11 +110,11 @@ void spiders_render(const Spider *spiders, int count,
         };
 
         /*
-         * SDL_RenderCopyEx lets us flip the sprite by passing SDL_FLIP_HORIZONTAL
-         * when the spider is walking left (vx < 0).  The rotation angle is 0 and
-         * the rotation centre is NULL (defaults to the dst rect centre).
+         * The base sprite faces left, so flip horizontally when the spider
+         * walks right (vx > 0).  Rotation angle is 0 and the rotation centre
+         * is NULL (defaults to the dst rect centre).
          */
-        SDL_RendererFlip flip = (s->vx < 0.0f)
+        SDL_RendererFlip flip = (s->vx > 0.0f)
                                 ? SDL_FLIP_HORIZONTAL
                                 : SDL_FLIP_NONE;
         SDL_RenderCopyEx(renderer, tex, &src, &dst, 0.0, NULL, flip);
