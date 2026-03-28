@@ -14,9 +14,13 @@ all: $(OUTDIR) $(TARGET)
 $(OUTDIR):
 	mkdir -p $(OUTDIR)
 
+UNAME := $(shell uname -s)
+
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
+ifeq ($(UNAME),Darwin)
 	codesign --force --sign - $@
+endif
 
 $(SRCDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
