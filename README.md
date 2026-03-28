@@ -11,7 +11,7 @@ Super Mango is a 2D platformer where a player character runs and jumps through a
 - **Player** — 4-state animated character (idle/walk/jump/fall) with gravity, floor collision, and one-way platform landing
 - **One-way platforms** — Pillar stacks built from 9-slice tiled grass blocks; the player can jump through from below and land on top
 - **Animated water** — Seamless scrolling water strip at the bottom of the screen using cropped sprite frames
-- **Spider enemies** — Ground-patrol spiders with 4-frame walk animation that reverse at patrol boundaries (no collision yet)
+- **Spider enemies** — Ground-patrol spiders with 4-frame walk animation that reverse at patrol boundaries; touching a spider grants 1.5 s of invincibility and triggers a blinking sprite effect
 - **Fog overlay** — Semi-transparent sky layers that slide across the screen for an atmospheric mist effect
 - **Audio** — Jump sound effect and looping ambient background music
 
