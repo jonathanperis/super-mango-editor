@@ -18,6 +18,7 @@
 #include <SDL_mixer.h>  /* Mix_Chunk */
 #include "player.h"     /* Player struct — embedded by value in GameState */
 #include "platform.h"   /* Platform struct + MAX_PLATFORMS constant */
+#include "water.h"      /* Water struct — animated bottom strip              */
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -73,6 +74,7 @@ typedef struct {
     Player        player;      /* the player, stored by value (not a pointer) */
     Platform      platforms[MAX_PLATFORMS]; /* one-way pillar definitions     */
     int           platform_count;           /* how many platforms are active  */
+    Water         water;        /* animated water strip at the bottom of screen*/
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
 } GameState;
 

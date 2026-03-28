@@ -11,6 +11,7 @@
 #include "game.h"
 #include "player.h"
 #include "platform.h"
+#include "water.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -109,6 +110,9 @@ void game_init(GameState *gs) {
 
     /* Populate the platforms array with the two pillar definitions */
     platforms_init(gs->platforms, &gs->platform_count);
+
+    /* Load the animated water strip texture and reset scroll state */
+    water_init(&gs->water, gs->renderer);
 
     /*
      * Load the jump sound effect. Mix_LoadWAV decodes the WAV into a
@@ -218,6 +222,8 @@ void game_loop(GameState *gs) {
         player_handle_input(&gs->player, gs->snd_jump);
         /* Move the player, check floor + one-way platform collisions */
         player_update(&gs->player, dt, gs->platforms, gs->platform_count);
+        /* Advance the water scroll offset */
+        water_update(&gs->water, dt);
 
         /* ---- 3. Render ------------------------------------------- */
         /*
@@ -293,7 +299,13 @@ void game_loop(GameState *gs) {
         platforms_render(gs->platforms, gs->platform_count,
                          gs->renderer, gs->platform_tex);
 
-        /* Draw the player sprite on top of the background, floor, and platforms */
+        /*
+         * Draw the water strip on top of the floor/platforms.
+         * The full 384-px sheet scrolls rightward as a seamless loop.
+         */
+        water_render(&gs->water, gs->renderer);
+
+        /* Draw the player sprite on top of everything */
         player_render(&gs->player, gs->renderer);
 
         /*
@@ -341,6 +353,8 @@ void game_cleanup(GameState *gs) {
         Mix_FreeChunk(gs->snd_jump);
         gs->snd_jump = NULL;
     }
+
+    water_cleanup(&gs->water);
 
     if (gs->platform_tex) {
         SDL_DestroyTexture(gs->platform_tex);
