@@ -61,5 +61,8 @@ void player_render(Player *player, SDL_Renderer *renderer);
 /* Return the player's tightly-inset physics hitbox (logical pixels). */
 SDL_Rect player_get_hitbox(const Player *player);
 
+/* Reset the player's position and state without reloading the texture. */
+void player_reset(Player *player);
+
 /* Release the player's GPU texture. */
 void player_cleanup(Player *player);
