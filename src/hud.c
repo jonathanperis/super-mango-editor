@@ -108,7 +108,7 @@ void hud_render(const Hud *hud, SDL_Renderer *renderer,
     for (int i = 0; i < hearts; i++) {
         SDL_Rect dst = {
             HUD_MARGIN + i * (HUD_HEART_SIZE + HUD_HEART_GAP),
-            hud_row_y,
+            hud_row_y + (HUD_ICON_SIZE - HUD_HEART_SIZE) / 2,
             HUD_HEART_SIZE,
             HUD_HEART_SIZE
         };
@@ -140,7 +140,7 @@ void hud_render(const Hud *hud, SDL_Renderer *renderer,
     TTF_SizeText(hud->font, lives_buf, &lives_w, &lives_h);
     render_text(hud->font, renderer, lives_buf,
                 icon_x + HUD_ICON_SIZE + 4,
-                hud_row_y);
+                hud_row_y + (HUD_ICON_SIZE - lives_h) / 2);
 
     /* ---- Score (top-right) ---------------------------------------- */
     /*
@@ -154,7 +154,7 @@ void hud_render(const Hud *hud, SDL_Renderer *renderer,
     TTF_SizeText(hud->font, score_buf, &text_w, &text_h);
     render_text(hud->font, renderer, score_buf,
                 GAME_W - HUD_MARGIN - text_w,
-                hud_row_y);
+                hud_row_y + (HUD_ICON_SIZE - text_h) / 2);
 }
 
 /* ------------------------------------------------------------------ */
