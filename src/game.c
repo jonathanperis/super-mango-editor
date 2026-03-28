@@ -10,6 +10,7 @@
 
 #include "game.h"
 #include "player.h"
+#include "platform.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -91,6 +92,25 @@ void game_init(GameState *gs) {
     }
 
     /*
+     * Load the one-way platform tile texture.
+     * Grass_Oneway.png is a 48×48 grass block used to build pillar stacks.
+     * The same texture is reused for every tile in every platform, so we
+     * load it once here and pass it to platforms_render each frame.
+     */
+    gs->platform_tex = IMG_LoadTexture(gs->renderer, "assets/Grass_Oneway.png");
+    if (!gs->platform_tex) {
+        fprintf(stderr, "Failed to load Grass_Oneway.png: %s\n", IMG_GetError());
+        SDL_DestroyTexture(gs->floor_tile);
+        SDL_DestroyTexture(gs->background);
+        SDL_DestroyRenderer(gs->renderer);
+        SDL_DestroyWindow(gs->window);
+        exit(EXIT_FAILURE);
+    }
+
+    /* Populate the platforms array with the two pillar definitions */
+    platforms_init(gs->platforms, &gs->platform_count);
+
+    /*
      * Load the jump sound effect. Mix_LoadWAV decodes the WAV into a
      * Mix_Chunk that can be played on any available mixer channel.
      * Assets path is relative to where the binary is run (repo root).
@@ -98,6 +118,7 @@ void game_init(GameState *gs) {
     gs->snd_jump = Mix_LoadWAV("sounds/jump.wav");
     if (!gs->snd_jump) {
         fprintf(stderr, "Failed to load jump.wav: %s\n", Mix_GetError());
+        SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
         SDL_DestroyTexture(gs->background);
         SDL_DestroyRenderer(gs->renderer);
@@ -116,6 +137,7 @@ void game_init(GameState *gs) {
     if (!gs->music) {
         fprintf(stderr, "Failed to load water-ambience.ogg: %s\n", Mix_GetError());
         Mix_FreeChunk(gs->snd_jump);
+        SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
         SDL_DestroyTexture(gs->background);
         SDL_DestroyRenderer(gs->renderer);
@@ -194,8 +216,8 @@ void game_loop(GameState *gs) {
         /* ---- 2. Update ------------------------------------------- */
         /* Read the keyboard and set the player's velocity for this frame */
         player_handle_input(&gs->player, gs->snd_jump);
-        /* Move the player based on velocity × dt, then clamp to the window */
-        player_update(&gs->player, dt);
+        /* Move the player, check floor + one-way platform collisions */
+        player_update(&gs->player, dt, gs->platforms, gs->platform_count);
 
         /* ---- 3. Render ------------------------------------------- */
         /*
@@ -264,7 +286,14 @@ void game_loop(GameState *gs) {
             }
         }
 
-        /* Draw the player sprite on top of the background and floor */
+        /*
+         * Draw the one-way platforms after the floor but before the player,
+         * so the player sprite appears in front of the pillar tiles.
+         */
+        platforms_render(gs->platforms, gs->platform_count,
+                         gs->renderer, gs->platform_tex);
+
+        /* Draw the player sprite on top of the background, floor, and platforms */
         player_render(&gs->player, gs->renderer);
 
         /*
@@ -311,6 +340,11 @@ void game_cleanup(GameState *gs) {
     if (gs->snd_jump) {
         Mix_FreeChunk(gs->snd_jump);
         gs->snd_jump = NULL;
+    }
+
+    if (gs->platform_tex) {
+        SDL_DestroyTexture(gs->platform_tex);
+        gs->platform_tex = NULL;
     }
 
     if (gs->floor_tile) {
