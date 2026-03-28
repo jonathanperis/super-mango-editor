@@ -56,7 +56,7 @@ The floor is drawn by repeating the 48×48 grass tile from `x=0` to `x=GAME_W` a
 
 Every frame while airborne: `player->vy += GRAVITY * dt`.
 
-At 60 FPS (`dt ≈ 0.016s`) gravity adds ~12.8 px/s per frame. The jump impulse (`-399.0f` px/s) produces an arc that peaks in ~0.5 s and lands in ~1 s.
+At 60 FPS (`dt ≈ 0.016s`) gravity adds ~12.8 px/s per frame. The jump impulse (`-500.0f` px/s) produces an arc that peaks in ~0.625 s and lands in ~1.25 s.
 
 ---
 
@@ -108,7 +108,7 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 | Value | Location | Description |
 |-------|----------|-------------|
 | `160.0f` | `player_init` | `player->speed` — horizontal max speed (px/s) |
-| `-399.0f` | `player_handle_input` | Jump vertical impulse (upward, px/s) |
+| `-500.0f` | `player_handle_input` | Jump vertical impulse (upward, px/s) |
 
 ---
 
