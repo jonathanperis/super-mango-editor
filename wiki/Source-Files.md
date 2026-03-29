@@ -25,6 +25,10 @@ src/
 ├── parallax.c    Multi-layer scrolling background: init, tiled render, cleanup
 ├── coin.h        Coin struct + constants (MAX_COINS, COIN_SCORE, …)
 ├── coin.c        Coin placement, AABB collection, render
+├── vine.h        VineDecor struct + MAX_VINES / VINE_W / VINE_H constants
+├── vine.c        Static vine decoration: init and render
+├── fish.h        Fish struct + patrol / jump / animation constants
+├── fish.c        Jumping fish enemy: patrol, random jump arcs, render
 ├── hud.h         Hud struct (font + star texture) + HUD constants
 └── hud.c         HUD renderer: hearts, lives counter, score text
 ```
@@ -105,6 +109,8 @@ See [Constants Reference](Constants-Reference) for full details.
 #include "fog.h"        // FogSystem struct
 #include "spider.h"     // Spider struct + MAX_SPIDERS
 #include "coin.h"       // Coin struct + MAX_COINS constant
+#include "vine.h"       // VineDecor struct + MAX_VINES constant
+#include "fish.h"       // Fish struct + MAX_FISH constant
 #include "hud.h"        // Hud struct — HUD display resources
 #include "parallax.h"   // ParallaxSystem — multi-layer scrolling background
 ```
@@ -120,6 +126,8 @@ See [Constants Reference](Constants-Reference) for full details.
 | `floor_tile` | `SDL_Texture *` | Grass tile, 9-slice tiled across `FLOOR_Y` |
 | `platform_tex` | `SDL_Texture *` | Shared tile texture for all platform pillars |
 | `spider_tex` | `SDL_Texture *` | Shared texture for all spider enemies |
+| `fish_tex` | `SDL_Texture *` | Shared texture for all fish enemies |
+| `vine_tex` | `SDL_Texture *` | Shared texture for vine decorations |
 | `snd_jump` | `Mix_Chunk *` | Jump WAV effect |
 | `snd_coin` | `Mix_Chunk *` | WAV chunk played when a coin is collected |
 | `snd_hit` | `Mix_Chunk *` | WAV chunk played when the player is hurt |
@@ -134,6 +142,10 @@ See [Constants Reference](Constants-Reference) for full details.
 | `coin_tex` | `SDL_Texture *` | Shared texture for all coin collectibles |
 | `coins` | `Coin[MAX_COINS]` | Collectible coin instances |
 | `coin_count` | `int` | Number of coins placed |
+| `fish` | `Fish[MAX_FISH]` | Jumping water enemy instances |
+| `fish_count` | `int` | Number of active fish |
+| `vines` | `VineDecor[MAX_VINES]` | Static scenery vine instances |
+| `vine_count` | `int` | Number of vine decorations placed |
 | `hud` | `Hud` | HUD display: hearts, lives, score |
 | `hearts` | `int` | Current hit points (0–MAX_HEARTS) |
 | `lives` | `int` | Remaining lives; 0 triggers game over |
@@ -172,15 +184,19 @@ Creates all runtime resources in this order:
 10. `spiders_init(gs->spiders, &gs->spider_count)` — two patrol spiders
 11. `IMG_LoadTexture(renderer, "assets/Coin.png")` → `gs->coin_tex`
 12. `coins_init(gs->coins, &gs->coin_count)` — place initial coins
-13. `Mix_LoadWAV("sounds/jump.wav")` → `gs->snd_jump`
-14. `Mix_LoadWAV("sounds/coin.wav")` → `gs->snd_coin` (non-fatal)
-15. `Mix_LoadWAV("sounds/hit.wav")` → `gs->snd_hit` (non-fatal)
-16. `Mix_LoadMUS("sounds/water-ambience.ogg")` → `gs->music`
-17. `Mix_PlayMusic(gs->music, -1)` + `Mix_VolumeMusic(13)` — start music at ~10%
-18. `player_init(&gs->player, gs->renderer)`
-19. `fog_init(&gs->fog, gs->renderer)` — loads Sky_Background_1/2.png, spawns first wave
-20. `hud_init(&gs->hud, gs->renderer)` — load font and heart texture
-21. `gs->running = 1`
+13. `IMG_LoadTexture(renderer, "assets/Fish_2.png")` → `gs->fish_tex` (non-fatal)
+14. `fish_init(gs->fish, &gs->fish_count)` — place fish in water lane
+15. `IMG_LoadTexture(renderer, "assets/Vine.png")` → `gs->vine_tex` (non-fatal)
+16. `vine_init(gs->vines, &gs->vine_count)` — place vine decorations
+17. `Mix_LoadWAV("sounds/jump.wav")` → `gs->snd_jump`
+18. `Mix_LoadWAV("sounds/coin.wav")` → `gs->snd_coin` (non-fatal)
+19. `Mix_LoadWAV("sounds/hit.wav")` → `gs->snd_hit` (non-fatal)
+20. `Mix_LoadMUS("sounds/water-ambience.ogg")` → `gs->music`
+21. `Mix_PlayMusic(gs->music, -1)` + `Mix_VolumeMusic(13)` — start music at ~10%
+22. `player_init(&gs->player, gs->renderer)`
+23. `fog_init(&gs->fog, gs->renderer)` — loads Sky_Background_1/2.png, spawns first wave
+24. `hud_init(&gs->hud, gs->renderer)` — load font and heart texture
+25. `gs->running = 1`
 
 **Renderer flags:**
 
@@ -217,6 +233,7 @@ while (gs->running):
   coins_update / coin–player AABB collision: award COIN_SCORE, coins_for_heart++
   if coins_for_heart >= COINS_PER_HEART && hearts < MAX_HEARTS: hearts++, coins_for_heart = 0
   if hearts <= 0: lives--, player_reset(&gs->player), hearts = MAX_HEARTS
+  fish_update(gs->fish, gs->fish_count, dt)
   water_update(&gs->water, dt)
   fog_update(&gs->fog, dt)
 
@@ -225,7 +242,9 @@ while (gs->running):
   parallax_render(&gs->parallax, gs->renderer, cam_x)
   9-slice floor tiles (Grass_Tileset.png at FLOOR_Y)
   platforms_render(platforms, platform_count, renderer, platform_tex)
+  vine_render(vines, vine_count, renderer, vine_tex, cam_x)
   coins_render(coins, coin_count, renderer, coin_tex, cam_x)
+  fish_render(fish, fish_count, renderer, fish_tex, cam_x)
   water_render(&water, renderer)
   spiders_render(spiders, spider_count, renderer, spider_tex)
   player_render(&player, renderer)
@@ -240,8 +259,8 @@ while (gs->running):
 **Render layer order (painter's algorithm):**
 
 ```
-[1] Parallax background → [2] Floor tiles → [3] Platforms → [4] Coins →
-[5] Water → [6] Spiders → [7] Player → [8] Fog → [9] HUD
+[1] Parallax background → [2] Floor tiles → [3] Platforms → [4] Vines →
+[5] Coins → [6] Fish → [7] Water → [8] Spiders → [9] Player → [10] Fog → [11] HUD
 ```
 
 ### `game_cleanup(GameState *gs)`
@@ -258,6 +277,8 @@ Mix_FreeChunk(snd_coin)              → snd_coin = NULL
 Mix_FreeChunk(snd_hit)               → snd_hit = NULL
 water_cleanup(&water)
 SDL_DestroyTexture(coin_tex)         → coin_tex = NULL
+SDL_DestroyTexture(vine_tex)         → vine_tex = NULL
+SDL_DestroyTexture(fish_tex)         → fish_tex = NULL
 SDL_DestroyTexture(spider_tex)       → spider_tex = NULL
 SDL_DestroyTexture(platform_tex)     → platform_tex = NULL
 SDL_DestroyTexture(floor_tile)       → floor_tile = NULL
@@ -640,6 +661,100 @@ Coins are placed on the ground and on platforms at `coins_init`. Each frame, `ga
 
 ---
 
+## `vine.h`
+
+**Role:** Defines the `VineDecor` struct and constants for static plant decorations placed on the ground and platform tops.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_VINES` | `24` | Maximum number of vine decoration instances |
+| `VINE_W` | `16` | Sprite width in logical pixels |
+| `VINE_H` | `48` | Sprite height in logical pixels |
+
+### `VineDecor` Struct Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `x` | `float` | Left edge in logical world pixels |
+| `y` | `float` | Top edge in logical world pixels |
+
+### Function Declarations
+
+```c
+void vine_init(VineDecor *vines, int *count);
+void vine_render(const VineDecor *vines, int count,
+                 SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+```
+
+---
+
+## `vine.c`
+
+**Role:** Implements static vine/plant decoration — placement on the ground floor and platform tops, and camera-aware rendering.
+
+Vines are purely visual: there is no update step and no collision. `vine_init` populates the `VineDecor` array with world-space positions on the floor and on select platform tops. `vine_render` blits each vine with a world-to-screen camera offset; vines are drawn after platforms but before coins, placing them behind all moving entities.
+
+---
+
+## `fish.h`
+
+**Role:** Defines the `Fish` struct and constants for the jumping water enemy module.
+
+### Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_FISH` | `4` | `int` | Maximum simultaneous fish instances |
+| `FISH_FRAMES` | `2` | `int` | Horizontal frames in `Fish_2.png` (96×48 sheet) |
+| `FISH_FRAME_W` | `48` | `int` | Width of one frame slot in the sheet (px) |
+| `FISH_FRAME_H` | `48` | `int` | Height of one frame slot in the sheet (px) |
+| `FISH_RENDER_W` | `48` | `int` | On-screen render width in logical pixels |
+| `FISH_RENDER_H` | `48` | `int` | On-screen render height in logical pixels |
+| `FISH_SPEED` | `70.0f` | `float` | Horizontal patrol speed (px/s) |
+| `FISH_JUMP_VY` | `-280.0f` | `float` | Upward jump impulse (px/s) |
+| `FISH_JUMP_MIN` | `1.4f` | `float` | Minimum seconds before next jump |
+| `FISH_JUMP_MAX` | `3.0f` | `float` | Maximum seconds before next jump |
+| `FISH_HITBOX_PAD_X` | `8` | `int` | Horizontal inset for fair collision box |
+| `FISH_HITBOX_PAD_Y` | `8` | `int` | Vertical inset for fair collision box |
+| `FISH_FRAME_MS` | `120` | `int` | Milliseconds per swim animation frame |
+
+### `Fish` Struct Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `x` | `float` | World-space top-left horizontal position (logical px) |
+| `y` | `float` | World-space top-left vertical position (logical px) |
+| `vx` | `float` | Horizontal patrol velocity (px/s) |
+| `vy` | `float` | Current vertical velocity (px/s; negative = up) |
+| `patrol_x0` | `float` | Left patrol boundary in world space |
+| `patrol_x1` | `float` | Right patrol boundary in world space |
+| `jump_timer` | `float` | Countdown in seconds until the next jump |
+| `water_y` | `float` | Resting top-left Y when the fish is submerged |
+| `frame_index` | `int` | Current animation frame (0 or 1) |
+| `anim_timer_ms` | `Uint32` | Accumulator driving frame advances |
+
+### Function Declarations
+
+```c
+void fish_init(Fish *fish, int *count);
+void fish_update(Fish *fish, int count, float dt);
+void fish_render(const Fish *fish, int count,
+                 SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+SDL_Rect fish_get_hitbox(const Fish *fish);
+```
+
+---
+
+## `fish.c`
+
+**Role:** Implements the jumping fish enemy — patrol movement, random jump arcs, animation, and camera-aware rendering.
+
+Fish patrol the water lane horizontally between `patrol_x0` and `patrol_x1`, reversing direction at the boundaries. A countdown timer triggers a vertical jump impulse at a random interval between `FISH_JUMP_MIN` and `FISH_JUMP_MAX` seconds; gravity pulls them back down until they return to `water_y`. The two-frame swim animation advances every `FISH_FRAME_MS` milliseconds. Fish are drawn before the water strip so the water wave art occludes their submerged portion, giving a natural surfacing look. A slightly inset hitbox (`FISH_HITBOX_PAD_X/Y`) is used for player collision tests.
+
+---
+
 ## `hud.h`
 
 **Role:** Defines the `Hud` struct and constants for the heads-up display overlay.
@@ -678,7 +793,7 @@ void hud_cleanup(Hud *hud);
 
 **Role:** Implements the HUD overlay — loading the font and heart icon, and rendering hearts, lives counter, and score text on every frame.
 
-The HUD is always drawn last (layer 9), on top of the fog overlay. Three sections are rendered in the top margin:
+The HUD is always drawn last (layer 11), on top of the fog overlay. Three sections are rendered in the top margin:
 
 - **Left:** `hearts` heart icons drawn using `Stars_Ui.png`, spaced `HUD_HEART_GAP` px apart
 - **Centre:** first frame of `Player.png` as a player icon, followed by `x{lives}` text

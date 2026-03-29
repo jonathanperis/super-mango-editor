@@ -16,6 +16,8 @@ Super Mango is a 2D platformer where a player character runs and jumps through a
 - **Spider enemies** — Ground-patrol spiders with 4-frame walk animation that reverse at patrol boundaries; touching a spider grants 1.5 s of invincibility and triggers a blinking sprite effect
 - **Fog overlay** — Semi-transparent sky layers that slide across the screen for an atmospheric mist effect
 - **Coins** — Collectible items placed on the ground and platforms; AABB pickup awards 100 points each; every 3 coins restores one heart
+- **Vine decorations** — Static plant sprites placed on the ground and platform tops for visual variety; purely scenery with no collision
+- **Fish enemies** — Jumping water enemies that patrol the bottom lane, leap out of the water on random arcs, and use AABB collision with the player
 - **HUD overlay** — Top-of-screen display showing heart icons (hit points), player icon + lives counter, and a score readout
 - **Lives/Hearts system** — The player has hearts (hit points, max 3) and lives (remaining tries, starts at 3); spider collision drains a heart; reaching 0 hearts costs a life
 - **Audio** — Jump sound, coin pickup sound, hurt sound effect, and looping ambient background music
@@ -150,6 +152,8 @@ super-mango-game/
 │   ├── Spider_1.png
 │   ├── Sky_Background_1.png
 │   ├── Sky_Background_2.png
+│   ├── Vine.png
+│   ├── Fish_2.png
 │   ├── Round9x13.ttf
 │   └── ... (more sprites for future use)
 ├── sounds/                ← WAV/OGG sound effects and music
@@ -174,6 +178,10 @@ super-mango-game/
     ├── parallax.c         ← Multi-layer scrolling background: init, tiled render, cleanup
     ├── coin.h             ← Coin struct + constants (MAX_COINS, COIN_SCORE, …)
     ├── coin.c             ← Coin placement, AABB collection, render
+    ├── vine.h             ← VineDecor struct + MAX_VINES / VINE_W / VINE_H constants
+    ├── vine.c             ← Static vine decoration: init and render
+    ├── fish.h             ← Fish struct + patrol / jump / animation constants
+    ├── fish.c             ← Jumping fish enemy: patrol, random jump arcs, render
     ├── hud.h              ← Hud struct (font + star texture) + HUD constants
     └── hud.c              ← HUD renderer: hearts, lives counter, score text
 ```
@@ -198,12 +206,14 @@ main()
 | 1 | Parallax background (6 layers from `assets/Parallax/`, rendered back-to-front via `parallax_render`) |
 | 2 | Floor (9-slice tiled Grass_Tileset.png) |
 | 3 | Platforms (9-slice tiled Grass_Oneway.png pillars) |
-| 4 | Coins (animated Coin.png collectibles) |
-| 5 | Water (animated Water.png strip) |
-| 6 | Spiders (animated Spider_1.png patrol enemies) |
-| 7 | Player (animated Player.png sprite) |
-| 8 | Fog (semi-transparent Sky_Background sliding layers) |
-| 9 | HUD (`hud_render`: hearts, lives, score — always drawn on top) |
+| 4 | Vines (static Vine.png scenery on ground and platform tops) |
+| 5 | Coins (animated Coin.png collectibles) |
+| 6 | Fish (animated Fish_2.png jumping water enemies, drawn before water) |
+| 7 | Water (animated Water.png strip) |
+| 8 | Spiders (animated Spider_1.png patrol enemies) |
+| 9 | Player (animated Player.png sprite) |
+| 10 | Fog (semi-transparent Sky_Background sliding layers) |
+| 11 | HUD (`hud_render`: hearts, lives, score — always drawn on top) |
 
 ### Delta Time
 

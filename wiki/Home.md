@@ -74,6 +74,10 @@ super-mango-game/
     ├── parallax.c          ← Multi-layer scrolling background: init, tiled render, cleanup
     ├── coin.h              ← Coin struct + constants (MAX_COINS, COIN_SCORE, …)
     ├── coin.c              ← Coin placement, AABB collection, render
+    ├── vine.h              ← VineDecor struct + MAX_VINES / VINE_W / VINE_H constants
+    ├── vine.c              ← Static vine decoration: init and render
+    ├── fish.h              ← Fish struct + patrol / jump / animation constants
+    ├── fish.c              ← Jumping fish enemy: patrol, random jump arcs, render
     ├── hud.h               ← Hud struct (font + star texture) + HUD constants
     └── hud.c               ← HUD renderer: hearts, lives counter, score text
 ```

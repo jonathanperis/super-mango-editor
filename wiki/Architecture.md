@@ -32,6 +32,10 @@ main()
   │     ├── spiders_init(gs.spiders, &gs.spider_count)
   │     ├── IMG_LoadTexture → gs.coin_tex      (Coin.png)
   │     ├── coins_init(gs.coins, &gs.coin_count)
+  │     ├── IMG_LoadTexture → gs.fish_tex      (Fish_2.png — non-fatal)
+  │     ├── fish_init(gs.fish, &gs.fish_count)
+  │     ├── IMG_LoadTexture → gs.vine_tex      (Vine.png — non-fatal)
+  │     ├── vine_init(gs.vines, &gs.vine_count)
   │     ├── Mix_LoadWAV     → gs.snd_jump      (jump.wav)
   │     ├── Mix_LoadWAV     → gs.snd_coin      (coin.wav — non-fatal)
   │     ├── Mix_LoadWAV     → gs.snd_hit       (hit.wav — non-fatal)
@@ -53,6 +57,8 @@ main()
         ├── Mix_FreeChunk (snd_hit)
         ├── water_cleanup
         ├── SDL_DestroyTexture (coin_tex)
+        ├── SDL_DestroyTexture (vine_tex)
+        ├── SDL_DestroyTexture (fish_tex)
         ├── SDL_DestroyTexture (spider_tex)
         ├── SDL_DestroyTexture (platform_tex)
         ├── SDL_DestroyTexture (floor_tile)
@@ -83,9 +89,9 @@ while (gs.running) {
                     SDL_CONTROLLERBUTTONDOWN (START) — sets gs->running = 0 to quit
   3. Update       — player_handle_input → player_update → spiders_update
                     → spider collision check → coins_update / coin–player collision
-                    → heart/lives logic → water_update → fog_update
-  4. Render       — clear → parallax background → floor tiles → platforms → coins
-                    → water → spiders → player → fog → hud → present
+                    → heart/lives logic → fish_update → water_update → fog_update
+  4. Render       — clear → parallax background → floor tiles → platforms → vines
+                    → coins → fish → water → spiders → player → fog → hud → present
 }
 ```
 
@@ -106,12 +112,14 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 | 1 | Background | 6 layers from `assets/Parallax/` tiled horizontally, each scrolling at a different speed fraction of `cam_x` |
 | 2 | Floor | `Grass_Tileset.png` 9-slice tiled across `GAME_W` at `FLOOR_Y` |
 | 3 | Platforms | `Grass_Oneway.png` 9-slice tiled pillar stacks |
-| 4 | Coins | `Coin.png` collectible sprites drawn on top of platforms |
-| 5 | Water | `Water.png` animated scrolling strip at the bottom |
-| 6 | Spiders | `Spider_1.png` animated patrol enemies on the ground |
-| 7 | Player | Animated sprite sheet, drawn on top of environment |
-| 8 | Fog | `Sky_Background_1/2.png` semi-transparent sliding overlay |
-| 9 | HUD | `hud_render`: hearts, lives, score — always drawn on top |
+| 4 | Vines | `Vine.png` static scenery on ground floor and platform tops |
+| 5 | Coins | `Coin.png` collectible sprites drawn on top of platforms |
+| 6 | Fish | `Fish_2.png` animated jumping enemies, drawn before water for submerged look |
+| 7 | Water | `Water.png` animated scrolling strip at the bottom |
+| 8 | Spiders | `Spider_1.png` animated patrol enemies on the ground |
+| 9 | Player | Animated sprite sheet, drawn on top of environment |
+| 10 | Fog | `Sky_Background_1/2.png` semi-transparent sliding overlay |
+| 11 | HUD | `hud_render`: hearts, lives, score — always drawn on top |
 
 ---
 
@@ -151,6 +159,8 @@ typedef struct {
     SDL_Texture   *floor_tile;  // Grass tile image (GPU)
     SDL_Texture   *platform_tex; // Shared tile for platform pillars (GPU)
     SDL_Texture   *spider_tex;  // Shared texture for all spiders (GPU)
+    SDL_Texture   *fish_tex;    // Shared texture for all fish enemies (GPU)
+    SDL_Texture   *vine_tex;    // Shared texture for vine decorations (GPU)
     Mix_Chunk    *snd_jump;    // Jump sound effect (WAV)
     Mix_Chunk    *snd_coin;    // Coin collect sound effect (WAV)
     Mix_Chunk    *snd_hit;     // Player hurt sound effect (WAV)
@@ -165,6 +175,10 @@ typedef struct {
     SDL_Texture  *coin_tex;    // Shared texture for all coin collectibles
     Coin          coins[MAX_COINS]; // Collectible coin instances
     int           coin_count;       // Number of coins placed
+    Fish          fish[MAX_FISH];   // Jumping water enemy instances
+    int           fish_count;
+    VineDecor     vines[MAX_VINES]; // Static scenery vine instances
+    int           vine_count;
     Hud           hud;         // HUD display: hearts, lives, score
     int           hearts;      // Current hit points (0–MAX_HEARTS)
     int           lives;       // Remaining lives; 0 triggers game over
