@@ -10,7 +10,7 @@
 src/
 ├── main.c        Entry point — SDL subsystem lifecycle
 ├── game.h        Shared constants + GameState struct (included everywhere)
-├── game.c        Window, renderer, background rendering, game loop
+├── game.c        Window, renderer, parallax background, game loop
 ├── player.h      Player struct + function declarations
 ├── player.c      Player input, physics, animation, rendering
 ├── platform.h    Platform struct + MAX_PLATFORMS constant
@@ -21,6 +21,8 @@ src/
 ├── spider.c      Spider enemy: patrol movement, animation, render
 ├── fog.h         FogSystem struct + instance pool
 ├── fog.c         Atmospheric fog overlay: init, slide, spawn, render
+├── parallax.h    ParallaxSystem struct + PARALLAX_MAX_LAYERS constant
+├── parallax.c    Multi-layer scrolling background: init, tiled render, cleanup
 ├── coin.h        Coin struct + constants (MAX_COINS, COIN_SCORE, …)
 ├── coin.c        Coin placement, AABB collection, render
 ├── hud.h         Hud struct (font + star texture) + HUD constants
@@ -104,6 +106,7 @@ See [Constants Reference](Constants-Reference) for full details.
 #include "spider.h"     // Spider struct + MAX_SPIDERS
 #include "coin.h"       // Coin struct + MAX_COINS constant
 #include "hud.h"        // Hud struct — HUD display resources
+#include "parallax.h"   // ParallaxSystem — multi-layer scrolling background
 ```
 
 ### GameState Fields
@@ -112,7 +115,7 @@ See [Constants Reference](Constants-Reference) for full details.
 |-------|------|-------------|
 | `window` | `SDL_Window *` | OS window handle |
 | `renderer` | `SDL_Renderer *` | GPU drawing context |
-| `background` | `SDL_Texture *` | Forest background, uploaded to GPU |
+| `parallax` | `ParallaxSystem` | Multi-layer scrolling background (replaces single `background` texture) |
 | `floor_tile` | `SDL_Texture *` | Grass tile, 9-slice tiled across `FLOOR_Y` |
 | `platform_tex` | `SDL_Texture *` | Shared tile texture for all platform pillars |
 | `spider_tex` | `SDL_Texture *` | Shared texture for all spider enemies |
@@ -159,7 +162,7 @@ Creates all runtime resources in this order:
 1. `SDL_CreateWindow(WINDOW_TITLE, centered, 800×600, SHOWN)` → `gs->window`
 2. `SDL_CreateRenderer(window, -1, ACCELERATED | PRESENTVSYNC)` → `gs->renderer`
 3. `SDL_RenderSetLogicalSize(renderer, 400, 300)` — enables 2× scaling
-4. `IMG_LoadTexture(renderer, "assets/Forest_Background_0.png")` → `gs->background`
+4. `parallax_init(&gs->parallax, gs->renderer)` — loads multi-layer background textures (non-fatal per layer)
 5. `IMG_LoadTexture(renderer, "assets/Grass_Tileset.png")` → `gs->floor_tile`
 6. `IMG_LoadTexture(renderer, "assets/Grass_Oneway.png")` → `gs->platform_tex`
 7. `platforms_init(gs->platforms, &gs->platform_count)` — two pillar definitions
@@ -168,14 +171,14 @@ Creates all runtime resources in this order:
 10. `spiders_init(gs->spiders, &gs->spider_count)` — two patrol spiders
 11. `IMG_LoadTexture(renderer, "assets/Coin.png")` → `gs->coin_tex`
 12. `coins_init(gs->coins, &gs->coin_count)` — place initial coins
-13. `Mix_LoadWAV("sounds/coin.wav")` → `gs->snd_coin`
-14. `Mix_LoadWAV("sounds/hit.wav")` → `gs->snd_hit`
-15. `hud_init(&gs->hud, gs->renderer)` — load font and heart texture
-16. `Mix_LoadWAV("sounds/jump.wav")` → `gs->snd_jump`
-17. `Mix_LoadMUS("sounds/water-ambience.ogg")` → `gs->music`
-18. `Mix_PlayMusic(gs->music, -1)` + `Mix_VolumeMusic(13)` — start music at ~10%
-19. `player_init(&gs->player, gs->renderer)`
-20. `fog_init(&gs->fog, gs->renderer)` — loads Sky_Background_1/2.png, spawns first wave
+13. `Mix_LoadWAV("sounds/jump.wav")` → `gs->snd_jump`
+14. `Mix_LoadWAV("sounds/coin.wav")` → `gs->snd_coin` (non-fatal)
+15. `Mix_LoadWAV("sounds/hit.wav")` → `gs->snd_hit` (non-fatal)
+16. `Mix_LoadMUS("sounds/water-ambience.ogg")` → `gs->music`
+17. `Mix_PlayMusic(gs->music, -1)` + `Mix_VolumeMusic(13)` — start music at ~10%
+18. `player_init(&gs->player, gs->renderer)`
+19. `fog_init(&gs->fog, gs->renderer)` — loads Sky_Background_1/2.png, spawns first wave
+20. `hud_init(&gs->hud, gs->renderer)` — load font and heart texture
 21. `gs->running = 1`
 
 **Renderer flags:**
@@ -215,7 +218,7 @@ while (gs->running):
 
   // 3. Render
   SDL_RenderClear
-  SDL_RenderCopy(background, fullscreen)
+  parallax_render(&gs->parallax, gs->renderer, cam_x)
   9-slice floor tiles (Grass_Tileset.png at FLOOR_Y)
   platforms_render(platforms, platform_count, renderer, platform_tex)
   coins_render(coins, coin_count, renderer, coin_tex, cam_x)
@@ -233,7 +236,7 @@ while (gs->running):
 **Render layer order (painter's algorithm):**
 
 ```
-[1] Background → [2] Floor tiles → [3] Platforms → [4] Coins →
+[1] Parallax background → [2] Floor tiles → [3] Platforms → [4] Coins →
 [5] Water → [6] Spiders → [7] Player → [8] Fog → [9] HUD
 ```
 
@@ -242,19 +245,19 @@ while (gs->running):
 Frees all resources in **reverse init order**:
 
 ```
+hud_cleanup(&hud)
 fog_cleanup(&fog)
 player_cleanup
-hud_cleanup(&hud)
 Mix_HaltMusic → Mix_FreeMusic(music) → music = NULL
-Mix_FreeChunk(snd_hit)               → snd_hit = NULL
-Mix_FreeChunk(snd_coin)              → snd_coin = NULL
 Mix_FreeChunk(snd_jump)              → snd_jump = NULL
-SDL_DestroyTexture(coin_tex)         → coin_tex = NULL
+Mix_FreeChunk(snd_coin)              → snd_coin = NULL
+Mix_FreeChunk(snd_hit)               → snd_hit = NULL
 water_cleanup(&water)
+SDL_DestroyTexture(coin_tex)         → coin_tex = NULL
 SDL_DestroyTexture(spider_tex)       → spider_tex = NULL
 SDL_DestroyTexture(platform_tex)     → platform_tex = NULL
 SDL_DestroyTexture(floor_tile)       → floor_tile = NULL
-SDL_DestroyTexture(background)       → background = NULL
+parallax_cleanup(&parallax)
 SDL_DestroyRenderer(renderer)        → renderer = NULL
 SDL_DestroyWindow(window)            → window = NULL
 ```
@@ -543,6 +546,50 @@ void fog_cleanup(FogSystem *fog);
 | 1 | `Sky_Background_2.png` |
 
 Each fog instance picks a random texture, direction, and duration (2–3 seconds) when spawned, then slides across the canvas at a constant speed. A 1-second overlap between consecutive waves ensures continuous coverage. Fog is rendered as the topmost layer, after the player sprite.
+
+---
+
+## `parallax.h`
+
+**Role:** Defines the `ParallaxSystem` and `ParallaxLayer` structs for the multi-layer scrolling background.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `PARALLAX_MAX_LAYERS` | `8` | Maximum number of background layers the system can hold |
+
+### `ParallaxLayer` Struct Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `texture` | `SDL_Texture *` | GPU image handle; `NULL` if the asset failed to load |
+| `tex_w` | `int` | Natural width of the loaded PNG in pixels |
+| `tex_h` | `int` | Natural height of the loaded PNG in pixels |
+| `speed` | `float` | Parallax fraction: `0.0` = static, `0.5` = half camera speed, `1.0` = full world speed |
+
+### `ParallaxSystem` Struct Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `layers` | `ParallaxLayer[PARALLAX_MAX_LAYERS]` | All configured background layers |
+| `count` | `int` | Number of layers actually configured |
+
+### Function Declarations
+
+```c
+void parallax_init(ParallaxSystem *ps, SDL_Renderer *renderer);
+void parallax_render(const ParallaxSystem *ps, SDL_Renderer *renderer, int cam_x);
+void parallax_cleanup(ParallaxSystem *ps);
+```
+
+---
+
+## `parallax.c`
+
+**Role:** Implements multi-layer parallax scrolling — loading layer textures, tiling them horizontally, and scrolling each at a configurable fraction of the camera offset.
+
+Each layer scrolls at `speed × cam_x` pixels. Layers with lower `speed` values appear further away; `speed = 0.0` produces a completely static background. Each layer is tiled seamlessly: `offset = (int)(cam_x × speed) % tex_w`, then drawn from `-offset` rightward to cover `GAME_W`. Missing PNGs print a warning and leave the layer's texture `NULL` so the game continues without that layer.
 
 ---
 
