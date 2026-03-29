@@ -103,7 +103,7 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 
 | Layer | What | How |
 |-------|------|-----|
-| 1 | Background | Multi-layer parallax: `Forest_Background_0.png` layers scrolling at varying speed fractions of `cam_x` |
+| 1 | Background | 6 layers from `assets/Parallax/` tiled horizontally, each scrolling at a different speed fraction of `cam_x` |
 | 2 | Floor | `Grass_Tileset.png` 9-slice tiled across `GAME_W` at `FLOOR_Y` |
 | 3 | Platforms | `Grass_Oneway.png` 9-slice tiled pillar stacks |
 | 4 | Coins | `Coin.png` collectible sprites drawn on top of platforms |
