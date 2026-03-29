@@ -143,11 +143,11 @@ When the player's bottom edge reaches the floor surface, position is snapped, `v
 ```c
 if (player->x + PHYS_PAD_X < 0.0f)
     player->x = -(float)PHYS_PAD_X;
-if (player->x + player->w - PHYS_PAD_X > GAME_W)
-    player->x = (float)(GAME_W - player->w + PHYS_PAD_X);
+if (player->x + player->w - PHYS_PAD_X > WORLD_W)
+    player->x = (float)(WORLD_W - player->w + PHYS_PAD_X);
 ```
 
-Keeps the player's **physics body** (inset by `PHYS_PAD_X = 12` px on each side) inside the 400 px logical canvas. The transparent side-padding of the sprite frame is allowed to slide off-screen while the visible character stays flush with the border.
+Keeps the player's **physics body** (inset by `PHYS_PAD_X = 12` px on each side) inside the full `WORLD_W` (1600 px) scrollable world. The transparent side-padding of the sprite frame is allowed to slide off-screen while the visible character stays flush with the world border.
 
 ### Ceiling Clamp
 
@@ -220,7 +220,7 @@ player->frame.y = ANIM_ROW[player->anim_state]  * FRAME_H;  // row × 48
 ## Rendering — `player_render`
 
 ```c
-void player_render(Player *player, SDL_Renderer *renderer);
+void player_render(Player *player, SDL_Renderer *renderer, int cam_x);
 ```
 
 ```c
@@ -231,7 +231,7 @@ if (player->hurt_timer > 0.0f) {
 }
 
 SDL_Rect dst = {
-    .x = (int)player->x,   // float → int at render time only
+    .x = (int)player->x - cam_x,  // world → screen: subtract camera offset
     .y = (int)player->y,
     .w = player->w,         // 48
     .h = player->h          // 48

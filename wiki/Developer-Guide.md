@@ -247,12 +247,14 @@ Always draw in painter's algorithm order (back to front):
 1. Background        (parallax_render: 6 layers from assets/Parallax/)
 2. Floor tiles       (Grass_Tileset.png 9-slice at FLOOR_Y)
 3. Platforms         (Grass_Oneway.png 9-slice pillar stacks)
-4. Coins             (Coin.png collectibles on top of platforms)
-5. Water             (Water.png animated scrolling strip)
-6. Enemies           (Spider_1.png ground patrol)
-7. Player            (Player.png animated sprite)
-8. Fog / Overlays    (Sky_Background sliding layers)
-9. HUD / UI          (hud_render: hearts, lives, score — always on top)
+4. Vines             (Vine.png static scenery on ground and platform tops)
+5. Coins             (Coin.png collectibles on top of platforms)
+6. Fish              (Fish_2.png jumping water enemies, before water for submerged look)
+7. Water             (Water.png animated scrolling strip)
+8. Spiders           (Spider_1.png ground patrol enemies)
+9. Player            (Player.png animated sprite)
+10. Fog / Overlays   (Sky_Background sliding layers)
+11. HUD / UI         (hud_render: hearts, lives, score — always on top)
 ```
 
 ---
