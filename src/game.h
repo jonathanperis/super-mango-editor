@@ -21,6 +21,7 @@
 #include "water.h"      /* Water struct — animated bottom strip              */
 #include "fog.h"        /* FogSystem struct — atmospheric fog overlay      */
 #include "spider.h"     /* Spider struct + MAX_SPIDERS constant              */
+#include "fish.h"       /* Fish struct + MAX_FISH constant                  */
 #include "coin.h"       /* Coin struct + MAX_COINS constant                  */
 #include "hud.h"        /* Hud struct — HUD display resources                */
 #include "parallax.h"   /* ParallaxSystem — multi-layer scrolling background */
@@ -128,6 +129,9 @@ typedef struct {
     FogSystem     fog;         /* atmospheric fog overlay — topmost layer      */
     Spider        spiders[MAX_SPIDERS]; /* ground-patrol enemy instances      */
     int           spider_count;         /* number of active spiders           */
+    SDL_Texture  *fish_tex;    /* shared texture for all fish enemies          */
+    Fish          fish[MAX_FISH]; /* jumping water enemy instances             */
+    int           fish_count;      /* number of active fish                     */
     SDL_Texture  *coin_tex;    /* shared texture for all coin collectibles    */
     Coin          coins[MAX_COINS]; /* collectible coin instances             */
     int           coin_count;       /* number of coins placed                */

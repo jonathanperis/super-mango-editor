@@ -14,6 +14,7 @@
 #include "water.h"
 #include "fog.h"
 #include "spider.h"
+#include "fish.h"
 #include "coin.h"
 #include "hud.h"
 #include "parallax.h"
@@ -44,6 +45,15 @@ void game_init(GameState *gs) {
         fprintf(stderr, "SDL_CreateWindow error: %s\n", SDL_GetError());
         exit(EXIT_FAILURE);
     }
+
+    /*
+     * Nearest-neighbour pixel scaling — must be set before SDL_CreateRenderer.
+     * Value "0" = SDL_ScaleModeNearest: each source pixel maps to an exact
+     * NxN block of destination pixels, preserving the crisp look of pixel art.
+     * The default ("linear") blurs sprites when they are scaled, which makes
+     * small pixel-art sprites (e.g. 16×16 fish → 48×48 on screen) look wrong.
+     */
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
 
     /*
      * SDL_CreateRenderer — create a 2D drawing context tied to the window.
@@ -130,12 +140,30 @@ void game_init(GameState *gs) {
     spiders_init(gs->spiders, &gs->spider_count);
 
     /*
+     * Load the shared fish texture. Fish live in the water lane and use
+     * the same texture for all instances, just like the spider enemy.
+     */
+    gs->fish_tex = IMG_LoadTexture(gs->renderer, "assets/Fish_2.png");
+    if (!gs->fish_tex) {
+        fprintf(stderr, "Failed to load Fish_2.png: %s\n", IMG_GetError());
+        SDL_DestroyTexture(gs->spider_tex);
+        SDL_DestroyTexture(gs->platform_tex);
+        SDL_DestroyTexture(gs->floor_tile);
+        parallax_cleanup(&gs->parallax);
+        SDL_DestroyRenderer(gs->renderer);
+        SDL_DestroyWindow(gs->window);
+        exit(EXIT_FAILURE);
+    }
+    fish_init(gs->fish, &gs->fish_count);
+
+    /*
      * Load the shared coin texture.  All coin instances blit from this
      * single texture using the full image as the source rect.
      */
     gs->coin_tex = IMG_LoadTexture(gs->renderer, "assets/Coin.png");
     if (!gs->coin_tex) {
         fprintf(stderr, "Failed to load Coin.png: %s\n", IMG_GetError());
+        SDL_DestroyTexture(gs->fish_tex);
         SDL_DestroyTexture(gs->spider_tex);
         SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
@@ -155,6 +183,7 @@ void game_init(GameState *gs) {
     if (!gs->snd_jump) {
         fprintf(stderr, "Failed to load jump.wav: %s\n", Mix_GetError());
         SDL_DestroyTexture(gs->coin_tex);
+        SDL_DestroyTexture(gs->fish_tex);
         SDL_DestroyTexture(gs->spider_tex);
         SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
@@ -194,6 +223,7 @@ void game_init(GameState *gs) {
         fprintf(stderr, "Failed to load water-ambience.ogg: %s\n", Mix_GetError());
         Mix_FreeChunk(gs->snd_jump);
         SDL_DestroyTexture(gs->coin_tex);
+        SDL_DestroyTexture(gs->fish_tex);
         SDL_DestroyTexture(gs->spider_tex);
         SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
@@ -213,6 +243,9 @@ void game_init(GameState *gs) {
 
     /* Set up the player (loads texture, sets initial position on the floor) */
     player_init(&gs->player, gs->renderer);
+
+    /* Camera starts at the far-left edge of the world. */
+    gs->camera.x = 0.0f;
 
     /* Load fog textures and spawn the first mist wave */
     fog_init(&gs->fog, gs->renderer);
@@ -362,6 +395,8 @@ void game_loop(GameState *gs) {
         player_update(&gs->player, dt, gs->platforms, gs->platform_count);
         /* Move spiders along their patrol paths and advance their animation */
         spiders_update(gs->spiders, gs->spider_count, dt);
+        /* Move fish through the water lane and trigger random jump arcs */
+        fish_update(gs->fish, gs->fish_count, dt);
 
         /*
          * Player–spider collision.
@@ -408,8 +443,39 @@ void game_loop(GameState *gs) {
                         player_reset(&gs->player);
                         coins_init(gs->coins, &gs->coin_count);
                         spiders_init(gs->spiders, &gs->spider_count);
+                        fish_init(gs->fish, &gs->fish_count);
                     }
                     break;
+                }
+            }
+
+            /* Fish can hurt the player both while swimming and while jumping. */
+            if (gs->player.hurt_timer == 0.0f) {
+                for (int i = 0; i < gs->fish_count; i++) {
+                    SDL_Rect fhit = fish_get_hitbox(&gs->fish[i]);
+                    if (SDL_HasIntersection(&phit, &fhit)) {
+                        gs->player.hurt_timer = 1.5f;
+
+                        if (gs->snd_hit) {
+                            Mix_PlayChannel(-1, gs->snd_hit, 0);
+                        }
+
+                        gs->hearts--;
+                        if (gs->hearts <= 0) {
+                            gs->lives--;
+                            if (gs->lives <= 0) {
+                                gs->lives           = DEFAULT_LIVES;
+                                gs->score           = 0;
+                                gs->coins_for_heart = 0;
+                            }
+                            gs->hearts = MAX_HEARTS;
+                            player_reset(&gs->player);
+                            coins_init(gs->coins, &gs->coin_count);
+                            spiders_init(gs->spiders, &gs->spider_count);
+                            fish_init(gs->fish, &gs->fish_count);
+                        }
+                        break;
+                    }
                 }
             }
         }
@@ -577,8 +643,13 @@ void game_loop(GameState *gs) {
         coins_render(gs->coins, gs->coin_count,
                      gs->renderer, gs->coin_tex, cam_x);
 
+        /* Draw fish behind the water strip (submerged look) but in front of
+         * the ground, so the water wave art occludes the submerged portion. */
+        fish_render(gs->fish, gs->fish_count,
+                gs->renderer, gs->fish_tex, cam_x);
+
         /*
-         * Draw the water strip on top of the floor/platforms.
+         * Draw the water strip on top of the floor/platforms and fish.
          * The full 384-px sheet scrolls rightward as a seamless loop.
          */
         water_render(&gs->water, gs->renderer);
@@ -680,6 +751,11 @@ void game_cleanup(GameState *gs) {
     if (gs->coin_tex) {
         SDL_DestroyTexture(gs->coin_tex);
         gs->coin_tex = NULL;
+    }
+
+    if (gs->fish_tex) {
+        SDL_DestroyTexture(gs->fish_tex);
+        gs->fish_tex = NULL;
     }
 
     if (gs->spider_tex) {
