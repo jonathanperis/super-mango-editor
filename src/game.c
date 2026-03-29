@@ -219,6 +219,7 @@ void game_init(GameState *gs) {
     if (!gs->snd_spring) {
         fprintf(stderr, "Warning: Failed to load spring-boing.mp3: %s\n", Mix_GetError());
     }
+    /*
      * Load the rail tile texture.  Rails.png is a 64×64 sprite sheet divided
      * into a 4×4 grid of 16×16 tiles.  Non-fatal: missing texture prints a
      * warning and rail_render silently skips the draw each frame.
