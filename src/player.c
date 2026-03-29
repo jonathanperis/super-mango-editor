@@ -388,6 +388,33 @@ SDL_Rect player_get_hitbox(const Player *player) {
 /* ------------------------------------------------------------------ */
 
 /*
+ * player_reset — Reset position, velocity, and animation to the initial
+ *                state without reloading the texture from disk.
+ *
+ * Called when the player loses all hearts and a life is consumed.
+ * The texture and display dimensions (w/h/speed) are left untouched
+ * because they were set once in player_init and don't change.
+ */
+void player_reset(Player *player) {
+    player->x         = (GAME_W - player->w) / 2.0f;
+    player->y         = (float)(FLOOR_Y - player->h + FLOOR_SINK);
+    player->vx        = 0.0f;
+    player->vy        = 0.0f;
+    player->on_ground = 1;
+
+    player->anim_state       = ANIM_IDLE;
+    player->anim_frame_index = 0;
+    player->anim_timer_ms    = 0;
+    player->facing_left      = 0;
+    player->hurt_timer       = 0.0f;
+
+    player->frame.x = 0;
+    player->frame.y = 0;
+}
+
+/* ------------------------------------------------------------------ */
+
+/*
  * player_cleanup — Release GPU memory held by the player's texture.
  *
  * Must be called before the renderer is destroyed, because SDL_Texture

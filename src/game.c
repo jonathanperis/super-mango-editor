@@ -14,6 +14,8 @@
 #include "water.h"
 #include "fog.h"
 #include "spider.h"
+#include "coin.h"
+#include "hud.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -133,6 +135,23 @@ void game_init(GameState *gs) {
     spiders_init(gs->spiders, &gs->spider_count);
 
     /*
+     * Load the shared coin texture.  All coin instances blit from this
+     * single texture using the full image as the source rect.
+     */
+    gs->coin_tex = IMG_LoadTexture(gs->renderer, "assets/Coin.png");
+    if (!gs->coin_tex) {
+        fprintf(stderr, "Failed to load Coin.png: %s\n", IMG_GetError());
+        SDL_DestroyTexture(gs->spider_tex);
+        SDL_DestroyTexture(gs->platform_tex);
+        SDL_DestroyTexture(gs->floor_tile);
+        SDL_DestroyTexture(gs->background);
+        SDL_DestroyRenderer(gs->renderer);
+        SDL_DestroyWindow(gs->window);
+        exit(EXIT_FAILURE);
+    }
+    coins_init(gs->coins, &gs->coin_count);
+
+    /*
      * Load the jump sound effect. Mix_LoadWAV decodes the WAV into a
      * Mix_Chunk that can be played on any available mixer channel.
      * Assets path is relative to where the binary is run (repo root).
@@ -140,12 +159,32 @@ void game_init(GameState *gs) {
     gs->snd_jump = Mix_LoadWAV("sounds/jump.wav");
     if (!gs->snd_jump) {
         fprintf(stderr, "Failed to load jump.wav: %s\n", Mix_GetError());
+        SDL_DestroyTexture(gs->coin_tex);
+        SDL_DestroyTexture(gs->spider_tex);
         SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
         SDL_DestroyTexture(gs->background);
         SDL_DestroyRenderer(gs->renderer);
         SDL_DestroyWindow(gs->window);
         exit(EXIT_FAILURE);
+    }
+
+    /*
+     * Load the coin pickup SFX.
+     * Non-fatal: if loading fails, gameplay continues without this effect.
+     */
+    gs->snd_coin = Mix_LoadWAV("sounds/coin.wav");
+    if (!gs->snd_coin) {
+        fprintf(stderr, "Warning: Failed to load coin.wav: %s\n", Mix_GetError());
+    }
+
+    /*
+     * Load the player-hit SFX.
+     * Non-fatal: if loading fails, gameplay continues without this effect.
+     */
+    gs->snd_hit = Mix_LoadWAV("sounds/hit.wav");
+    if (!gs->snd_hit) {
+        fprintf(stderr, "Warning: Failed to load hit.wav: %s\n", Mix_GetError());
     }
 
     /*
@@ -159,6 +198,8 @@ void game_init(GameState *gs) {
     if (!gs->music) {
         fprintf(stderr, "Failed to load water-ambience.ogg: %s\n", Mix_GetError());
         Mix_FreeChunk(gs->snd_jump);
+        SDL_DestroyTexture(gs->coin_tex);
+        SDL_DestroyTexture(gs->spider_tex);
         SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
         SDL_DestroyTexture(gs->background);
@@ -180,6 +221,15 @@ void game_init(GameState *gs) {
 
     /* Load fog textures and spawn the first mist wave */
     fog_init(&gs->fog, gs->renderer);
+
+    /* Load the HUD font and heart icon texture */
+    hud_init(&gs->hud, gs->renderer);
+
+    /* Initialise the health/lives/score system */
+    gs->hearts         = MAX_HEARTS;
+    gs->lives          = DEFAULT_LIVES;
+    gs->score          = 0;
+    gs->coins_for_heart = 0;
 
     /* Signal the loop to start running */
     gs->running = 1;
@@ -272,7 +322,62 @@ void game_loop(GameState *gs) {
                 /* SDL_HasIntersection returns SDL_TRUE when the two rects overlap */
                 if (SDL_HasIntersection(&phit, &shit)) {
                     gs->player.hurt_timer = 1.5f;   /* 1.5 s of invincibility */
+
+                    /* Play hit SFX once when damage is applied. */
+                    if (gs->snd_hit) {
+                        Mix_PlayChannel(-1, gs->snd_hit, 0);
+                    }
+
+                    gs->hearts--;
+                    if (gs->hearts <= 0) {
+                        gs->lives--;
+                        if (gs->lives <= 0) {
+                            /* Game over: restart everything */
+                            gs->lives          = DEFAULT_LIVES;
+                            gs->score          = 0;
+                            gs->coins_for_heart = 0;
+                        }
+                        gs->hearts = MAX_HEARTS;
+                        player_reset(&gs->player);
+                        coins_init(gs->coins, &gs->coin_count);
+                        spiders_init(gs->spiders, &gs->spider_count);
+                    }
                     break;
+                }
+            }
+        }
+
+        /*
+         * Coin collection.
+         *
+         * Test the player's physics hitbox against every active coin.
+         * On overlap: deactivate the coin, award COIN_SCORE points, and
+         * increment the coins-toward-heart counter.  When the counter
+         * reaches COINS_PER_HEART, restore one heart (if below max).
+         */
+        {
+            SDL_Rect phit = player_get_hitbox(&gs->player);
+            for (int i = 0; i < gs->coin_count; i++) {
+                if (!gs->coins[i].active) continue;
+                SDL_Rect cbox = {
+                    (int)gs->coins[i].x, (int)gs->coins[i].y,
+                    COIN_DISPLAY_W, COIN_DISPLAY_H
+                };
+                if (SDL_HasIntersection(&phit, &cbox)) {
+                    gs->coins[i].active = 0;
+
+                    /* Play coin SFX immediately when a coin is collected. */
+                    if (gs->snd_coin) {
+                        Mix_PlayChannel(-1, gs->snd_coin, 0);
+                    }
+
+                    gs->score += COIN_SCORE;
+                    gs->coins_for_heart++;
+                    if (gs->coins_for_heart >= COINS_PER_HEART) {
+                        gs->coins_for_heart = 0;
+                        if (gs->hearts < MAX_HEARTS)
+                            gs->hearts++;
+                    }
                 }
             }
         }
@@ -356,6 +461,10 @@ void game_loop(GameState *gs) {
         platforms_render(gs->platforms, gs->platform_count,
                          gs->renderer, gs->platform_tex);
 
+        /* Draw coins on top of the platforms, before the water and player */
+        coins_render(gs->coins, gs->coin_count,
+                     gs->renderer, gs->coin_tex);
+
         /*
          * Draw the water strip on top of the floor/platforms.
          * The full 384-px sheet scrolls rightward as a seamless loop.
@@ -371,6 +480,10 @@ void game_loop(GameState *gs) {
 
         /* Draw fog/mist as the topmost layer — rendered after the player */
         fog_render(&gs->fog, gs->renderer);
+
+        /* Draw the HUD overlay on top of everything (hearts, lives, score) */
+        hud_render(&gs->hud, gs->renderer, gs->player.texture,
+                   gs->hearts, gs->lives, gs->score);
 
         /*
          * SDL_RenderPresent — swap the back buffer to the screen.
@@ -404,6 +517,9 @@ void game_loop(GameState *gs) {
  * are safe (SDL_Destroy* and free() on NULL are no-ops).
  */
 void game_cleanup(GameState *gs) {
+    /* Free HUD resources (font + star texture, renderer-dependent) */
+    hud_cleanup(&gs->hud);
+
     /* Free fog textures (renderer-dependent, free before renderer) */
     fog_cleanup(&gs->fog);
 
@@ -421,7 +537,22 @@ void game_cleanup(GameState *gs) {
         gs->snd_jump = NULL;
     }
 
+    if (gs->snd_coin) {
+        Mix_FreeChunk(gs->snd_coin);
+        gs->snd_coin = NULL;
+    }
+
+    if (gs->snd_hit) {
+        Mix_FreeChunk(gs->snd_hit);
+        gs->snd_hit = NULL;
+    }
+
     water_cleanup(&gs->water);
+
+    if (gs->coin_tex) {
+        SDL_DestroyTexture(gs->coin_tex);
+        gs->coin_tex = NULL;
+    }
 
     if (gs->spider_tex) {
         SDL_DestroyTexture(gs->spider_tex);
