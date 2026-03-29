@@ -8,7 +8,7 @@ Super Mango is a 2D platformer where a player character runs and jumps through a
 
 ### Current Features
 
-- **Parallax background** — Multi-layer scrolling sky/mountain/cloud PNGs from `assets/Parallax/` scroll at increasing speeds to create a sense of depth as the camera follows the player
+- **Parallax background** — Multi-layer scrolling sky/mountain/cloud PNGs from `assets/parallax/` scroll at increasing speeds to create a sense of depth as the camera follows the player
 - **Scrolling camera** — smooth lerp-follow camera with directional look-ahead; the level is 1 600 logical pixels wide (4 screens), clamped so the canvas never shows beyond the world boundaries
 - **Player** — 4-state animated character (idle/walk/jump/fall) with gravity, floor collision, and one-way platform landing
 - **One-way platforms** — Pillar stacks built from 9-slice tiled grass blocks; the player can jump through from below and land on top
@@ -20,7 +20,7 @@ Super Mango is a 2D platformer where a player character runs and jumps through a
 - **Fish enemies** — Jumping water enemies that patrol the bottom lane, leap out of the water on random arcs, and use AABB collision with the player
 - **HUD overlay** — Top-of-screen display showing heart icons (hit points), player icon + lives counter, and a score readout
 - **Lives/Hearts system** — The player has hearts (hit points, max 3) and lives (remaining tries, starts at 3); spider collision drains a heart; reaching 0 hearts costs a life
-- **Bouncepads** — Wooden spring launch pads with 3-frame squash/release animation; landing on one launches the player upward and plays a spring-boing sound
+- **Bouncepads** — Wooden spring launch pads with 3-frame squash/release animation; landing on one launches the player upward and plays a bouncepad sound
 - **Spike blocks** — Rail-riding rotating hazards (16×16 scaled to 24×24, 360°/s spin); collision pushes the player away and deals damage
 - **Rails** — Tile-based rail paths (closed loops and open lines) that spike blocks travel along; built from a 4×4 bitmask tileset
 - **Debug overlay** — `--debug` flag enables an FPS counter, collision hitbox visualization, and a scrolling event log
@@ -218,7 +218,7 @@ main()
 
 | Layer | What |
 |-------|------|
-| 1 | Parallax background (6 layers from `assets/Parallax/`, rendered back-to-front via `parallax_render`) |
+| 1 | Parallax background (6 layers from `assets/parallax/`, rendered back-to-front via `parallax_render`) |
 | 2 | Floor (9-slice tiled Grass_Tileset.png) |
 | 3 | Platforms (9-slice tiled Grass_Oneway.png pillars) |
 | 4 | Bouncepads (Bouncepad_Wood.png spring pads) |

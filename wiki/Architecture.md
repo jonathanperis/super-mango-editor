@@ -38,7 +38,7 @@ main()
   │     ├── vine_init(gs.vines, &gs.vine_count)
   │     ├── IMG_LoadTexture → gs.bouncepad_tex (Bouncepad_Wood.png)
   │     ├── bouncepads_init(gs.bouncepads, &gs.bouncepad_count)
-  │     ├── Mix_LoadWAV     → gs.snd_spring    (spring-boing.mp3 — non-fatal)
+  │     ├── Mix_LoadWAV     → gs.snd_spring    (bouncepad.mp3 — non-fatal)
   │     ├── IMG_LoadTexture → gs.rail_tex      (Rails.png — non-fatal)
   │     ├── rail_init(gs.rails, &gs.rail_count)
   │     ├── IMG_LoadTexture → gs.spike_block_tex (Spike_Block.png — non-fatal)
@@ -126,7 +126,7 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 
 | Layer | What | How |
 |-------|------|-----|
-| 1 | Background | 6 layers from `assets/Parallax/` tiled horizontally, each scrolling at a different speed fraction of `cam_x` |
+| 1 | Background | 6 layers from `assets/parallax/` tiled horizontally, each scrolling at a different speed fraction of `cam_x` |
 | 2 | Floor | `Grass_Tileset.png` 9-slice tiled across `GAME_W` at `FLOOR_Y` |
 | 3 | Platforms | `Grass_Oneway.png` 9-slice tiled pillar stacks |
 | 4 | Bouncepads | `Bouncepad_Wood.png` spring pads on floor and platforms |
@@ -203,7 +203,7 @@ typedef struct {
     SDL_Texture  *bouncepad_tex;              // Shared texture for all bouncepads (GPU)
     Bouncepad     bouncepads[MAX_BOUNCEPADS]; // Spring launch pad instances
     int           bouncepad_count;            // Number of bouncepads placed
-    Mix_Chunk    *snd_spring;  // Bouncepad spring-boing sound effect (MP3)
+    Mix_Chunk    *snd_spring;  // Bouncepad bouncepad sound effect (MP3)
     SDL_Texture  *rail_tex;    // Shared texture for all rail tiles (GPU)
     Rail          rails[MAX_RAILS];       // Level rail path definitions
     int           rail_count;             // Number of active rail paths

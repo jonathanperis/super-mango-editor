@@ -77,7 +77,7 @@ make run
 
 The binary must be run from the **repo root** because asset paths are relative:
 ```c
-IMG_LoadTexture(renderer, "assets/Parallax/sky.png");
+IMG_LoadTexture(renderer, "assets/parallax/sky.png");
 Mix_LoadWAV("sounds/jump.wav");
 ```
 

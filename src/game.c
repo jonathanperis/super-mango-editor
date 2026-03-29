@@ -211,13 +211,13 @@ void game_init(GameState *gs) {
     bouncepads_init(gs->bouncepads, &gs->bouncepad_count);
 
     /*
-     * Load the spring-boing sound effect.
+     * Load the bouncepad sound effect.
      * Mix_LoadWAV handles WAV and, with SDL2_mixer ≥ 2.0, also MP3.
      * Non-fatal: gameplay continues without audio if loading fails.
      */
-    gs->snd_spring = Mix_LoadWAV("sounds/spring-boing.mp3");
+    gs->snd_spring = Mix_LoadWAV("sounds/bouncepad.mp3");
     if (!gs->snd_spring) {
-        fprintf(stderr, "Warning: Failed to load spring-boing.mp3: %s\n", Mix_GetError());
+        fprintf(stderr, "Warning: Failed to load bouncepad.mp3: %s\n", Mix_GetError());
     }
     /*
      * Load the rail tile texture.  Rails.png is a 64×64 sprite sheet divided
