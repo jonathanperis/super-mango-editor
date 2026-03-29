@@ -69,6 +69,8 @@ void spiders_update(Spider *spiders, int count, float dt);
  *
  * Blits the current animation frame for each spider, flipping the sprite
  * horizontally when the spider is walking left (vx < 0).
+ * cam_x is the camera left-edge offset (world px); subtract it from dst.x
+ * to convert world coordinates to screen coordinates.
  */
 void spiders_render(const Spider *spiders, int count,
-                    SDL_Renderer *renderer, SDL_Texture *tex);
+                    SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
