@@ -17,6 +17,7 @@
 #include "fish.h"
 #include "coin.h"
 #include "vine.h"
+#include "bouncepad.h"
 #include "hud.h"
 #include "parallax.h"
 #include "rail.h"
@@ -187,6 +188,37 @@ void game_init(GameState *gs) {
     }
     vine_init(gs->vines, &gs->vine_count);
 
+    /*
+     * Load the bouncepad texture and initialise pad placements.
+     *
+     * Bouncepad_Wood.png is a 144×48 single-row sheet with 3 frames of 48×48.
+     * Fatal if missing — the pad is a gameplay element, not just decoration.
+     */
+    gs->bouncepad_tex = IMG_LoadTexture(gs->renderer, "assets/Bouncepad_Wood.png");
+    if (!gs->bouncepad_tex) {
+        fprintf(stderr, "Failed to load Bouncepad_Wood.png: %s\n", IMG_GetError());
+        if (gs->vine_tex) SDL_DestroyTexture(gs->vine_tex);
+        SDL_DestroyTexture(gs->coin_tex);
+        SDL_DestroyTexture(gs->fish_tex);
+        SDL_DestroyTexture(gs->spider_tex);
+        SDL_DestroyTexture(gs->platform_tex);
+        SDL_DestroyTexture(gs->floor_tile);
+        parallax_cleanup(&gs->parallax);
+        SDL_DestroyRenderer(gs->renderer);
+        SDL_DestroyWindow(gs->window);
+        exit(EXIT_FAILURE);
+    }
+    bouncepads_init(gs->bouncepads, &gs->bouncepad_count);
+
+    /*
+     * Load the spring-boing sound effect.
+     * Mix_LoadWAV handles WAV and, with SDL2_mixer ≥ 2.0, also MP3.
+     * Non-fatal: gameplay continues without audio if loading fails.
+     */
+    gs->snd_spring = Mix_LoadWAV("sounds/spring-boing.mp3");
+    if (!gs->snd_spring) {
+        fprintf(stderr, "Warning: Failed to load spring-boing.mp3: %s\n", Mix_GetError());
+    }
     /*
      * Load the rail tile texture.  Rails.png is a 64×64 sprite sheet divided
      * into a 4×4 grid of 16×16 tiles.  Non-fatal: missing texture prints a
@@ -478,8 +510,30 @@ void game_loop(GameState *gs) {
 
         /* Read keyboard and gamepad; set the player's velocity for this frame */
         player_handle_input(&gs->player, gs->snd_jump, gs->controller);
-        /* Move the player, check floor + one-way platform collisions */
-        player_update(&gs->player, dt, gs->platforms, gs->platform_count);
+
+        /*
+         * Move the player, resolve floor + platform + bouncepad collisions.
+         * bounce_idx is set to the index of the bouncepad hit this frame,
+         * or stays -1 if no bouncepad was landed on.
+         */
+        int bounce_idx = -1;
+        player_update(&gs->player, dt,
+                      gs->platforms, gs->platform_count,
+                      gs->bouncepads, gs->bouncepad_count,
+                      &bounce_idx);
+
+        /*
+         * Bouncepad landing response: start the release animation and play
+         * the spring sound.  The launch impulse itself was already applied
+         * inside player_update so the player is already moving upward.
+         */
+        if (bounce_idx >= 0) {
+            Bouncepad *bp       = &gs->bouncepads[bounce_idx];
+            bp->state           = BOUNCE_ACTIVE;
+            bp->anim_frame      = 1;   /* start mid-compress → extends to 0 */
+            bp->anim_timer_ms   = 0;
+            if (gs->snd_spring) Mix_PlayChannel(-1, gs->snd_spring, 0);
+        }
         /* Move spiders along their patrol paths and advance their animation */
         spiders_update(gs->spiders, gs->spider_count, dt);
         /* Move fish through the water lane and trigger random jump arcs */
@@ -653,6 +707,8 @@ void game_loop(GameState *gs) {
         water_update(&gs->water, dt);
         /* Advance the fog wave positions and spawn the next wave if it is time */
         fog_update(&gs->fog, dt);
+        /* Advance the bouncepad release animation (frame 1 → 0 → back to 2) */
+        bouncepads_update(gs->bouncepads, gs->bouncepad_count, (Uint32)(dt * 1000.0f));
 
         /* ---- Camera update --------------------------------------- */
         /*
@@ -774,6 +830,14 @@ void game_loop(GameState *gs) {
         platforms_render(gs->platforms, gs->platform_count,
                          gs->renderer, gs->platform_tex, cam_x);
 
+        /*
+         * Draw bouncepads between the platform pillars and vine decorations.
+         * This places them visually on the floor surface, with vines potentially
+         * overlapping the edges for a natural overgrown look.
+         */
+        bouncepads_render(gs->bouncepads, gs->bouncepad_count,
+                          gs->renderer, gs->bouncepad_tex, cam_x);
+                          
         /*
          * Draw rail tracks before vines and entities so rail tiles appear
          * behind all game objects — the track is part of the background layer.
@@ -917,6 +981,11 @@ void game_cleanup(GameState *gs) {
     if (gs->vine_tex) {
         SDL_DestroyTexture(gs->vine_tex);
         gs->vine_tex = NULL;
+    }
+
+    if (gs->snd_spring) {
+        Mix_FreeChunk(gs->snd_spring);
+        gs->snd_spring = NULL;
     }
 
     if (gs->coin_tex) {

@@ -27,6 +27,15 @@
 #define SPIKE_DISPLAY_H  24
 
 /*
+ * SPIKE_SPIN_DEG_PER_SEC — rotation speed of the spinning animation.
+ *
+ * The block rotates continuously clockwise at this many degrees per second.
+ * 360° per second = one full rotation every second, giving a clear visual
+ * cue that the block is a moving hazard.
+ */
+#define SPIKE_SPIN_DEG_PER_SEC  360.0f
+
+/*
  * Speed presets — rail traversal speed in tiles per second.
  *
  * Three named tiers cover the range of interesting gameplay pacing:
@@ -102,6 +111,7 @@ typedef struct {
     int          w;
     int          h;
     int          active;
+    float        spin_angle;  /* current rotation in degrees [0, 360) */
     const Rail  *rail;
 } SpikeBlock;
 

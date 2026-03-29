@@ -37,9 +37,10 @@ void spike_block_init(SpikeBlock *sb, const Rail *rail, float t0, float speed) {
     sb->detached  = 0;    /* starts riding the rail, not in free-fall */
     sb->fall_vx   = 0.0f;
     sb->fall_vy   = 0.0f;
-    sb->w         = SPIKE_DISPLAY_W;
-    sb->h         = SPIKE_DISPLAY_H;
-    sb->active    = 1;
+    sb->w          = SPIKE_DISPLAY_W;
+    sb->h          = SPIKE_DISPLAY_H;
+    sb->active     = 1;
+    sb->spin_angle = 0.0f;
 
     /*
      * Set the initial world position from the rail immediately so the block
@@ -116,6 +117,14 @@ void spike_blocks_init(SpikeBlock *blocks, int *count, const Rail *rails) {
  */
 void spike_block_update(SpikeBlock *sb, float dt, int cam_x) {
     if (!sb->active) return;
+
+    /*
+     * Advance the spin angle every frame, even while waiting or in free-fall,
+     * so the block always looks alive.  Wrap within [0, 360) to avoid float
+     * drift over time.
+     */
+    sb->spin_angle += SPIKE_SPIN_DEG_PER_SEC * dt;
+    if (sb->spin_angle >= 360.0f) sb->spin_angle -= 360.0f;
 
     /* ---- Waiting state: hold at start until the rail enters the viewport - */
     /*
@@ -247,11 +256,17 @@ void spike_block_render(const SpikeBlock *sb,
     };
 
     /*
-     * SDL_RenderCopy with NULL src — blit the full texture into dst.
+     * SDL_RenderCopyEx — blit the full texture into dst with rotation.
+     *
+     *   angle  : spin_angle in degrees, advances each frame.
+     *   center : NULL = rotate around the rect's own centre (natural pivot).
+     *   flip   : SDL_FLIP_NONE — no mirror; rotation alone drives the spin.
+     *
      * SDL scales from 16×16 (source) to 24×24 (dst) using the nearest-
      * neighbour hint set in game_init, preserving the pixel-art look.
      */
-    SDL_RenderCopy(renderer, tex, NULL, &dst);
+    SDL_RenderCopyEx(renderer, tex, NULL, &dst,
+                     (double)sb->spin_angle, NULL, SDL_FLIP_NONE);
 }
 
 void spike_blocks_render(const SpikeBlock *blocks, int count,
