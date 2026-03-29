@@ -340,6 +340,16 @@ void game_loop(GameState *gs) {
         float  dt  = (float)(now - prev) / 1000.0f;
         prev = now;
 
+        /*
+         * Delta-time guard — cap to 100 ms (≈ 10 fps minimum).
+         * When the OS moves the window to the background it can pause or
+         * throttle the process for hundreds of milliseconds.  Without this
+         * cap the first frame after a focus-loss produces a huge dt that
+         * sends physics haywire (entities teleport, hurt_timer expires
+         * instantly, collisions pile up) and resets the game state.
+         */
+        if (dt > 0.1f) dt = 0.1f;
+
         /* ---- 1. Events ------------------------------------------- */
         /*
          * SDL_PollEvent — drain the event queue one event at a time.
@@ -395,6 +405,17 @@ void game_loop(GameState *gs) {
                  */
                 if (event.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
                     gs->running = 0;
+                }
+
+            } else if (event.type == SDL_WINDOWEVENT) {
+                if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+                    /*
+                     * Reset the frame timestamp when the window regains focus.
+                     * This prevents accumulating wall-clock time that passed
+                     * while the window was in the background from appearing as
+                     * a single massive dt spike on the first resumed frame.
+                     */
+                    prev = SDL_GetTicks64();
                 }
             }
         }
