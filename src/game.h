@@ -142,9 +142,12 @@ typedef struct {
     SDL_Texture  *vine_tex;    /* shared texture for all vine decorations         */
     VineDecor     vines[MAX_VINES]; /* static scenery vine instances               */
     int           vine_count;       /* number of vine decorations placed           */
+    SDL_Texture  *bouncepad_tex;              /* shared texture for all bouncepads   */
+    Bouncepad     bouncepads[MAX_BOUNCEPADS]; /* spring launch pads                  */
+    int           bouncepad_count;            /* number of bouncepads placed         */
+    Mix_Chunk    *snd_spring;  /* WAV chunk played when bouncepad is triggered    */
     SDL_Texture  *rail_tex;        /* shared texture for all rail tiles           */
     Rail          rails[MAX_RAILS];/* level rail loop definitions                 */
-    Bouncepad     bouncepads[MAX_BOUNCEPADS]; /* spring launch pads               */
     int           rail_count;      /* number of active rail loops                 */
     SDL_Texture  *spike_block_tex; /* shared texture for all spike block entities */
     SpikeBlock    spike_blocks[MAX_SPIKE_BLOCKS]; /* rail-riding hazard instances */
