@@ -57,6 +57,8 @@ main()
         ├── SDL_DestroyTexture (platform_tex)
         ├── SDL_DestroyTexture (floor_tile)
         ├── parallax_cleanup
+        ├── SDL_GameControllerClose(gs->controller)  ← if non-NULL
+        ├── SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER)
         ├── SDL_DestroyRenderer
         └── SDL_DestroyWindow
   │
@@ -76,6 +78,9 @@ The loop runs at **60 FPS**, capped via VSync + a manual `SDL_Delay` fallback. E
 while (gs.running) {
   1. Delta Time   — measure ms since last frame → dt (seconds)
   2. Events       — SDL_PollEvent (quit / ESC key)
+                    SDL_CONTROLLERDEVICEADDED   — opens a newly plugged-in controller
+                    SDL_CONTROLLERDEVICEREMOVED — closes and NULLs gs->controller when unplugged
+                    SDL_CONTROLLERBUTTONDOWN (START) — sets gs->running = 0 to quit
   3. Update       — player_handle_input → player_update → spiders_update
                     → spider collision check → coins_update / coin–player collision
                     → heart/lives logic → water_update → fog_update
@@ -139,9 +144,10 @@ Defined in `game.h`. The **single container** for every runtime resource.
 
 ```c
 typedef struct {
-    SDL_Window    *window;      // OS window handle
-    SDL_Renderer  *renderer;    // GPU drawing context
-    ParallaxSystem parallax;    // multi-layer scrolling background
+    SDL_Window         *window;      // OS window handle
+    SDL_Renderer       *renderer;    // GPU drawing context
+    SDL_GameController *controller;  // first connected gamepad; NULL = none
+    ParallaxSystem      parallax;    // multi-layer scrolling background
     SDL_Texture   *floor_tile;  // Grass tile image (GPU)
     SDL_Texture   *platform_tex; // Shared tile for platform pillars (GPU)
     SDL_Texture   *spider_tex;  // Shared texture for all spiders (GPU)

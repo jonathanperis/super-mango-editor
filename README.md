@@ -115,6 +115,8 @@ The compiled binary is placed at `out/super-mango`.
 
 ## Controls
 
+### Keyboard
+
 | Key | Action |
 |---|---|
 | `Space` | Jump |
@@ -122,6 +124,17 @@ The compiled binary is placed at `out/super-mango`.
 | `D` / `→` | Move right |
 | `ESC` | Quit |
 | Close window | Quit |
+
+### Gamepad (optional)
+
+Gamepad support is **hot-plug**: a controller can be connected or disconnected while the game is running.
+
+| Input | Action |
+|---|---|
+| D-Pad `←` / `→` | Move left / right |
+| Left analog stick (X-axis) | Move left / right (dead-zone: 8000 / 32767) |
+| `A` button (Cross on PlayStation) | Jump |
+| `Start` button | Quit |
 
 ## Project Structure
 

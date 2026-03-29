@@ -204,7 +204,7 @@ while (gs->running):
   SDL_PollEvent → SDL_QUIT or SDLK_ESCAPE → gs->running = 0
 
   // 2. Update
-  player_handle_input(&gs->player, gs->snd_jump)
+  player_handle_input(&gs->player, gs->snd_jump, gs->controller)
   player_update(&gs->player, dt, gs->platforms, gs->platform_count)
   spiders_update(gs->spiders, gs->spider_count, dt)
   // player-spider AABB collision (with 1.5 s invincibility window)
@@ -309,7 +309,8 @@ Values map directly to the sprite sheet **row index** via the `ANIM_ROW[]` table
 
 ```c
 void player_init(Player *player, SDL_Renderer *renderer);
-void player_handle_input(Player *player, Mix_Chunk *snd_jump);
+void player_handle_input(Player *player, Mix_Chunk *snd_jump,
+                         SDL_GameController *ctrl);
 void player_update(Player *player, float dt, const Platform *platforms, int platform_count);
 void player_render(Player *player, SDL_Renderer *renderer);
 SDL_Rect player_get_hitbox(const Player *player);
