@@ -26,6 +26,8 @@ All visual assets live in the `assets/` directory. They are PNG files (loaded vi
 | `Water.png` | `water.c` (`water->texture`) | 384×64 sprite sheet, 8 frames of 48×64 with 16×31 art crop |
 | `Spider_1.png` | `game.c` (`gs->spider_tex`) | 192×48 sprite sheet, 4 frames of 48×48 with 10 px art band |
 | `Coin.png` | `coin.c` (`gs->coin_tex`) | 16×16 coin collectible sprite |
+| `Vine.png` | `vine.c` (`gs->vine_tex`) | 16×48 single-frame plant sprite for static scenery |
+| `Fish_2.png` | `fish.c` (`gs->fish_tex`) | 96×48 sprite sheet, 2 frames of 48×48 (swim animation) |
 | `Sky_Background_1.png` | `fog.c` (`fog->textures[0]`) | Fog overlay layer, semi-transparent sliding effect |
 | `Sky_Background_2.png` | `fog.c` (`fog->textures[1]`) | Fog overlay layer, semi-transparent sliding effect |
 | `Stars_Ui.png` | `hud.c` (`hud->star_tex`) | Heart/health indicator icon used in the HUD |
@@ -96,7 +98,7 @@ These are included in `assets/` and ready for future use in platformer levels.
 | `Ladder.png` | Climbable ladder |
 | `Rails.png` | Rail / cart track |
 | `Rope.png` | Rope (climbable) |
-| `Vine.png` | Vine (climbable) |
+| `Vine.png` | ✅ In use — `vine.c` static scenery decoration |
 | `Water.png` | ✅ In use — animated water surface strip |
 | `Lava.png` | Lava hazard tile |
 
@@ -118,7 +120,7 @@ These are included in `assets/` and ready for future use in platformer levels.
 | `Bird_1.png` | Bird enemy, variant 1 |
 | `Bird_2.png` | Bird enemy, variant 2 |
 | `Fish_1.png` | Fish enemy, variant 1 |
-| `Fish_2.png` | Fish enemy, variant 2 |
+| `Fish_2.png` | ✅ In use — `fish.c` jumping water enemy |
 | `Spider_1.png` | ✅ In use — ground patrol spider enemy |
 | `Spider_2.png` | Spider enemy, variant 2 |
 
