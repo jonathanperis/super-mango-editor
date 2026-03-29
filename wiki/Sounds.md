@@ -4,7 +4,7 @@
 
 ---
 
-All audio files live in the `sounds/` directory. SDL2_mixer handles both short sound effects (`Mix_Chunk` / WAV) and long streaming music (`Mix_Music` / MP3).
+All audio files live in the `sounds/` directory. SDL2_mixer handles both short sound effects (`Mix_Chunk` / WAV) and long streaming music (`Mix_Music` / OGG/MP3).
 
 ---
 
