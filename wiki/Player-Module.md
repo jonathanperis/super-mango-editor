@@ -21,6 +21,9 @@ per frame (game_loop):
   player_render         ← draw the current frame to the renderer
   player_get_hitbox     ← return physics hitbox used by game_loop for collision
 
+player_reset       ← called from game_loop when the player loses a life
+  └── reset position, velocity, and animation state (texture is reused, not reloaded)
+
 player_cleanup     ← called once from game_cleanup
   └── SDL_DestroyTexture
 ```
@@ -277,6 +280,25 @@ void player_cleanup(Player *player) {
 ```
 
 Must be called **before** `SDL_DestroyRenderer`, because textures are owned by the renderer.
+
+---
+
+## Reset — `player_reset`
+
+```c
+void player_reset(Player *player);
+```
+
+Resets the player's position and state to the starting values **without reloading the texture**. Called by `game_loop` when the player loses a life (hearts reach 0). Because the GPU texture is already loaded, only the position, velocity, `on_ground`, and animation fields need to be re-initialised — the same `Player.png` texture handle is reused directly.
+
+| Action | Detail |
+|--------|--------|
+| Position | Reset to horizontal center, `FLOOR_Y` snap |
+| Velocity | `vx = vy = 0.0f` |
+| `on_ground` | `1` |
+| `hurt_timer` | `0.0f` (no invincibility) |
+| Animation | `ANIM_IDLE`, frame 0 |
+| Texture | **unchanged** — reuses the already-loaded handle |
 
 ---
 

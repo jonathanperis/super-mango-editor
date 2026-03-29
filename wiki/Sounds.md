@@ -13,6 +13,8 @@ All audio files live in the `sounds/` directory. SDL2_mixer handles both short s
 | File | Type | Used By | Description |
 |------|------|---------|-------------|
 | `jump.wav` | `Mix_Chunk` | `gs->snd_jump` | Played on Space press when `on_ground == 1` |
+| `coin.wav` | `Mix_Chunk` | `gs->snd_coin` | Played when the player collects a coin |
+| `hit.wav` | `Mix_Chunk` | `gs->snd_hit` | Played when the player takes damage |
 | `water-ambience.ogg` | `Mix_Music` | `gs->music` | Background ambient loop, volume ~10% |
 
 ---
@@ -24,12 +26,12 @@ All audio files live in the `sounds/` directory. SDL2_mixer handles both short s
 | File | Suggested Use |
 |------|---------------|
 | `jump.wav` | ✅ In use — player jump |
-| `coin.wav` | Coin collected |
+| `coin.wav` | ✅ In use — coin collected |
 | `confirm-ui.wav` | Menu confirmation / level complete |
 | `dive.wav` | Dive or fast-fall move |
 | `fireball.wav` | Projectile / fireball fired |
 | `flapping.wav` | Bird enemy wing flap |
-| `hit.wav` | Player or enemy takes damage |
+| `hit.wav` | ✅ In use — player takes damage |
 | `lava.wav` | Player touches lava |
 | `saw.wav` | Circular saw spinning |
 | `strong-wind.wav` | Wind gust / outdoor ambience |

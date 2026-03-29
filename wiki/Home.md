@@ -69,5 +69,9 @@ super-mango-game/
     ├── spider.h            ← Spider struct + patrol constants
     ├── spider.c            ← Spider enemy patrol, animation, render
     ├── fog.h               ← FogSystem struct + instance pool
-    └── fog.c               ← Fog overlay: init, slide, spawn, render
+    ├── fog.c               ← Fog overlay: init, slide, spawn, render
+    ├── coin.h              ← Coin struct + constants (MAX_COINS, COIN_SCORE, …)
+    ├── coin.c              ← Coin placement, AABB collection, render
+    ├── hud.h               ← Hud struct (font + star texture) + HUD constants
+    └── hud.c               ← HUD renderer: hearts, lives counter, score text
 ```
