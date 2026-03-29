@@ -19,6 +19,8 @@
 #include "vine.h"
 #include "hud.h"
 #include "parallax.h"
+#include "rail.h"
+#include "spike_block.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -186,6 +188,27 @@ void game_init(GameState *gs) {
     vine_init(gs->vines, &gs->vine_count);
 
     /*
+     * Load the rail tile texture.  Rails.png is a 64×64 sprite sheet divided
+     * into a 4×4 grid of 16×16 tiles.  Non-fatal: missing texture prints a
+     * warning and rail_render silently skips the draw each frame.
+     */
+    gs->rail_tex = IMG_LoadTexture(gs->renderer, "assets/Rails.png");
+    if (!gs->rail_tex) {
+        fprintf(stderr, "Warning: Failed to load Rails.png: %s\n", IMG_GetError());
+    }
+    rail_init(gs->rails, &gs->rail_count);
+
+    /*
+     * Load the spike block texture.  Spike_Block.png is a single 16×16 frame.
+     * Non-fatal for the same reason as rail_tex.
+     */
+    gs->spike_block_tex = IMG_LoadTexture(gs->renderer, "assets/Spike_Block.png");
+    if (!gs->spike_block_tex) {
+        fprintf(stderr, "Warning: Failed to load Spike_Block.png: %s\n", IMG_GetError());
+    }
+    spike_blocks_init(gs->spike_blocks, &gs->spike_block_count, gs->rails);
+
+    /*
      * Load the jump sound effect. Mix_LoadWAV decodes the WAV into a
      * Mix_Chunk that can be played on any available mixer channel.
      * Assets path is relative to where the binary is run (repo root).
@@ -303,8 +326,9 @@ void game_init(GameState *gs) {
         }
     }
 
-    /* Signal the loop to start running */
+    /* Signal the loop to start running; game starts in the foreground */
     gs->running = 1;
+    gs->paused  = 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -347,6 +371,8 @@ void game_loop(GameState *gs) {
          * cap the first frame after a focus-loss produces a huge dt that
          * sends physics haywire (entities teleport, hurt_timer expires
          * instantly, collisions pile up) and resets the game state.
+         * The same spike happens on Windows when the user drags the window,
+         * which blocks the event loop for the duration of the drag.
          */
         if (dt > 0.1f) dt = 0.1f;
 
@@ -408,19 +434,48 @@ void game_loop(GameState *gs) {
                 }
 
             } else if (event.type == SDL_WINDOWEVENT) {
-                if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-                    /*
-                     * Reset the frame timestamp when the window regains focus.
-                     * This prevents accumulating wall-clock time that passed
-                     * while the window was in the background from appearing as
-                     * a single massive dt spike on the first resumed frame.
-                     */
+                /*
+                 * SDL_WINDOWEVENT carries several sub-types that describe
+                 * changes to the OS window state.  We use two of them:
+                 *
+                 * FOCUS_LOST  — the window moved to the background (user
+                 *               switched to another app, minimised, etc.).
+                 *               We pause physics and music so the game
+                 *               doesn't advance while unattended and the
+                 *               audio doesn't play into the background.
+                 *
+                 * FOCUS_GAINED — the window came back to the foreground.
+                 *               We resume music and reset the frame timestamp
+                 *               so the first resumed frame gets a normal dt
+                 *               instead of a spike from the pause duration.
+                 */
+                if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+                    gs->paused = 1;
+                    Mix_PauseMusic();
+                } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+                    gs->paused = 0;
+                    Mix_ResumeMusic();
                     prev = SDL_GetTicks64();
                 }
             }
         }
 
         /* ---- 2. Update ------------------------------------------- */
+        /*
+         * cam_x is declared here so it is in scope for both the paused and
+         * the active paths.  When paused we jump straight to render with the
+         * camera frozen at its last position; when active the camera-update
+         * block below overwrites it with the new smoothed value.
+         */
+        int cam_x = (int)gs->camera.x;
+
+        /*
+         * Skip all physics and game-logic updates while the window is in the
+         * background.  The render step still runs so the last frame stays
+         * visible in the taskbar thumbnail and on the screen.
+         */
+        if (gs->paused) goto render;
+
         /* Read keyboard and gamepad; set the player's velocity for this frame */
         player_handle_input(&gs->player, gs->snd_jump, gs->controller);
         /* Move the player, check floor + one-way platform collisions */
@@ -429,6 +484,9 @@ void game_loop(GameState *gs) {
         spiders_update(gs->spiders, gs->spider_count, dt);
         /* Move fish through the water lane and trigger random jump arcs */
         fish_update(gs->fish, gs->fish_count, dt);
+        /* Advance each spike block along its rail path (cam_x needed for
+         * the waiting-until-visible check on fall-off rails) */
+        spike_blocks_update(gs->spike_blocks, gs->spike_block_count, dt, cam_x);
 
         /*
          * Player–spider collision.
@@ -505,6 +563,50 @@ void game_loop(GameState *gs) {
                             coins_init(gs->coins, &gs->coin_count);
                             spiders_init(gs->spiders, &gs->spider_count);
                             fish_init(gs->fish, &gs->fish_count);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            /* ---- Spike-block collision ---------------------------------- */
+            /*
+             * Spike blocks deal the same damage as spiders and fish, but also
+             * apply a push impulse opposite to the player's movement direction.
+             * The invincibility timer (hurt_timer) from the spider/fish check
+             * above is re-used here: if it is still > 0 this block is skipped.
+             */
+            if (gs->player.hurt_timer == 0.0f) {
+                SDL_Rect phit = player_get_hitbox(&gs->player);
+                for (int i = 0; i < gs->spike_block_count; i++) {
+                    if (!gs->spike_blocks[i].active) continue;
+                    SDL_Rect sbhit = spike_block_get_hitbox(&gs->spike_blocks[i]);
+                    if (SDL_HasIntersection(&phit, &sbhit)) {
+                        /* Push the player back before applying damage */
+                        spike_block_push_player(&gs->spike_blocks[i], &gs->player);
+
+                        gs->player.hurt_timer = 1.5f;
+
+                        if (gs->snd_hit) {
+                            Mix_PlayChannel(-1, gs->snd_hit, 0);
+                        }
+
+                        gs->hearts--;
+                        if (gs->hearts <= 0) {
+                            gs->lives--;
+                            if (gs->lives <= 0) {
+                                gs->lives           = DEFAULT_LIVES;
+                                gs->score           = 0;
+                                gs->coins_for_heart = 0;
+                            }
+                            gs->hearts = MAX_HEARTS;
+                            player_reset(&gs->player);
+                            coins_init(gs->coins, &gs->coin_count);
+                            spiders_init(gs->spiders, &gs->spider_count);
+                            fish_init(gs->fish, &gs->fish_count);
+                            spike_blocks_init(gs->spike_blocks,
+                                              &gs->spike_block_count,
+                                              gs->rails);
                         }
                         break;
                     }
@@ -597,9 +699,10 @@ void game_loop(GameState *gs) {
          * All world-space render functions subtract cam_x from their dst.x
          * to convert from world coordinates to screen coordinates.
          */
-        int cam_x = (int)gs->camera.x;
+        cam_x = (int)gs->camera.x;
 
         /* ---- 3. Render ------------------------------------------- */
+        render:
         /*
          * SDL_RenderClear — fill the back buffer with the draw colour.
          * We always clear before drawing to avoid leftover pixels from the
@@ -671,6 +774,15 @@ void game_loop(GameState *gs) {
         platforms_render(gs->platforms, gs->platform_count,
                          gs->renderer, gs->platform_tex, cam_x);
 
+        /*
+         * Draw rail tracks before vines and entities so rail tiles appear
+         * behind all game objects — the track is part of the background layer.
+         */
+        if (gs->rail_tex) {
+            rail_render(gs->rails, gs->rail_count,
+                        gs->renderer, gs->rail_tex, cam_x);
+        }
+
         /* Draw vine decorations on ground and platform tops, behind entities */
         if (gs->vine_tex) {
             vine_render(gs->vines, gs->vine_count,
@@ -691,6 +803,12 @@ void game_loop(GameState *gs) {
          * The full 384-px sheet scrolls rightward as a seamless loop.
          */
         water_render(&gs->water, gs->renderer);
+
+        /* Draw spike blocks above the water strip but below the player */
+        if (gs->spike_block_tex) {
+            spike_blocks_render(gs->spike_blocks, gs->spike_block_count,
+                                gs->renderer, gs->spike_block_tex, cam_x);
+        }
 
         /* Draw spiders on top of the water strip, before the player */
         spiders_render(gs->spiders, gs->spider_count,
@@ -785,6 +903,16 @@ void game_cleanup(GameState *gs) {
     }
 
     water_cleanup(&gs->water);
+
+    if (gs->spike_block_tex) {
+        SDL_DestroyTexture(gs->spike_block_tex);
+        gs->spike_block_tex = NULL;
+    }
+
+    if (gs->rail_tex) {
+        SDL_DestroyTexture(gs->rail_tex);
+        gs->rail_tex = NULL;
+    }
 
     if (gs->vine_tex) {
         SDL_DestroyTexture(gs->vine_tex);
