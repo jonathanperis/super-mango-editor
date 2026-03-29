@@ -115,6 +115,7 @@ See [Constants Reference](Constants-Reference) for full details.
 |-------|------|-------------|
 | `window` | `SDL_Window *` | OS window handle |
 | `renderer` | `SDL_Renderer *` | GPU drawing context |
+| `controller` | `SDL_GameController *` | First connected gamepad; `NULL` when none |
 | `parallax` | `ParallaxSystem` | Multi-layer scrolling background (replaces single `background` texture) |
 | `floor_tile` | `SDL_Texture *` | Grass tile, 9-slice tiled across `FLOOR_Y` |
 | `platform_tex` | `SDL_Texture *` | Shared tile texture for all platform pillars |
@@ -258,6 +259,8 @@ SDL_DestroyTexture(spider_tex)       → spider_tex = NULL
 SDL_DestroyTexture(platform_tex)     → platform_tex = NULL
 SDL_DestroyTexture(floor_tile)       → floor_tile = NULL
 parallax_cleanup(&parallax)
+SDL_GameControllerClose(controller)  → controller = NULL  (skipped if NULL)
+SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER)
 SDL_DestroyRenderer(renderer)        → renderer = NULL
 SDL_DestroyWindow(window)            → window = NULL
 ```
