@@ -8,7 +8,8 @@
 #include <stdlib.h>
 
 #include "player.h"
-#include "game.h"   /* GAME_W, GAME_H, FLOOR_Y, GRAVITY (for physics and clamping) */
+#include "bouncepad.h" /* Bouncepad, BOUNCEPAD_VY — for bouncepad landing collision */
+#include "game.h"      /* GAME_W, GAME_H, FLOOR_Y, GRAVITY (for physics and clamping) */
 
 /* ------------------------------------------------------------------ */
 
@@ -167,7 +168,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
      * vy is set to a negative value (up is negative in SDL screen-space).
      */
     if (player->on_ground && keys[SDL_SCANCODE_SPACE]) {
-        player->vy        = -500.0f;  /* upward impulse; reaches ~156 px, clearing the tall pillar */
+        player->vy        = -325.0f;  /* upward impulse: original −500 × 0.5 × 1.3 = −325 px/s */
         player->on_ground  = 0;
         if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
     }
@@ -312,7 +313,9 @@ static void player_animate(Player *player, Uint32 dt_ms) {
  *   top surface this frame (crossing test prevents tunnelling at high speed).
  */
 void player_update(Player *player, float dt,
-                   const Platform *platforms, int platform_count) {
+                   const Platform *platforms, int platform_count,
+                   const Bouncepad *bouncepads, int bouncepad_count,
+                   int *out_bounce_idx) {
     /*
      * Reset on_ground every frame so the player immediately starts falling
      * when they walk off the edge of a platform.  Collision checks below
@@ -350,14 +353,52 @@ void player_update(Player *player, float dt,
     player->y += player->vy * dt;   /* move vertically   */
 
     /*
-     * Floor collision -- snap to the grass surface and stop falling.
-     * FLOOR_Y is the top edge of the grass tiles in logical coordinates.
+     * Floor collision — snap to the grass surface.
+     *
+     * Before zeroing vy and setting on_ground, we check whether the player
+     * has landed horizontally over a bouncepad.  If so the bouncepad wins:
+     * we apply its launch impulse instead of a normal landing, and leave
+     * on_ground = 0 so the player immediately goes airborne.
+     *
+     * Bouncepads are floor-level objects — their collision is checked here
+     * (at FLOOR_Y) rather than as a crossing-test against the pad's visual
+     * top edge (FLOOR_Y − BOUNCEPAD_H).  The pad's sprite is decorative;
+     * physically it is just a region of the floor that bounces.
      */
     const float ground_snap = (float)(FLOOR_Y - player->h + FLOOR_SINK);
     if (player->y >= ground_snap) {
-        player->y         = ground_snap;
-        player->vy        = 0.0f;
-        player->on_ground = 1;
+        player->y = ground_snap;   /* snap to floor in all cases */
+
+        int bounced = 0;
+        for (int i = 0; i < bouncepad_count; i++) {
+            const Bouncepad *bp = &bouncepads[i];
+
+            /*
+             * Horizontal overlap test: use the inset PHYS_PAD_X physics box
+             * so only the visible character art overlaps, not transparent padding.
+             */
+            int h_overlap = (player->x + player->w - PHYS_PAD_X > bp->x) &&
+                            (player->x + PHYS_PAD_X < bp->x + bp->w);
+            if (!h_overlap) continue;
+
+            /*
+             * The player's physics bottom has reached the floor inside the
+             * bouncepad's horizontal zone → launch them upward.
+             * BOUNCEPAD_VY (−875 px/s) is 75 % higher than the original
+             * −500 px/s jump impulse.
+             */
+            player->vy        = BOUNCEPAD_VY;
+            player->on_ground = 0;
+            *out_bounce_idx   = i;
+            bounced           = 1;
+            break;   /* first pad wins */
+        }
+
+        if (!bounced) {
+            /* Normal floor landing: cancel vertical velocity. */
+            player->vy        = 0.0f;
+            player->on_ground = 1;
+        }
     }
 
     /*

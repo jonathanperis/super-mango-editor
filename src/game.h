@@ -24,6 +24,7 @@
 #include "fish.h"       /* Fish struct + MAX_FISH constant                  */
 #include "coin.h"       /* Coin struct + MAX_COINS constant                  */
 #include "vine.h"       /* VineDecor struct + MAX_VINES constant              */
+#include "bouncepad.h"  /* Bouncepad struct + MAX_BOUNCEPADS constant         */
 #include "hud.h"        /* Hud struct — HUD display resources                */
 #include "parallax.h"   /* ParallaxSystem — multi-layer scrolling background */
 
@@ -139,6 +140,10 @@ typedef struct {
     SDL_Texture  *vine_tex;    /* shared texture for all vine decorations         */
     VineDecor     vines[MAX_VINES]; /* static scenery vine instances               */
     int           vine_count;       /* number of vine decorations placed           */
+    SDL_Texture  *bouncepad_tex;    /* shared texture for all bouncepads           */
+    Bouncepad     bouncepads[MAX_BOUNCEPADS]; /* spring launch pads              */
+    int           bouncepad_count;            /* number of bouncepads placed     */
+    Mix_Chunk    *snd_spring;  /* WAV/MP3 chunk played when bouncepad is triggered */
     Hud           hud;         /* HUD display: hearts, lives, score           */
     int           hearts;      /* current hit points (0–MAX_HEARTS)           */
     int           lives;       /* remaining lives; 0 triggers game over       */
