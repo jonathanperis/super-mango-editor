@@ -16,7 +16,7 @@ player_init        ← called once from game_init
   └── set initial position, speed, animation state
 
 per frame (game_loop):
-  player_handle_input   ← sample keyboard, set vx / vy / on_ground
+  player_handle_input   ← sample keyboard and gamepad, set vx / vy / on_ground
   player_update         ← apply gravity, integrate position, collide, animate
   player_render         ← draw the current frame to the renderer
   player_get_hitbox     ← return physics hitbox used by game_loop for collision
@@ -55,24 +55,34 @@ void player_init(Player *player, SDL_Renderer *renderer);
 ## Input — `player_handle_input`
 
 ```c
-void player_handle_input(Player *player, Mix_Chunk *snd_jump);
+void player_handle_input(Player *player, Mix_Chunk *snd_jump,
+                         SDL_GameController *ctrl);
 ```
 
-Called **once per frame** before `player_update`. Uses `SDL_GetKeyboardState` to read the instantaneous keyboard state (held keys), not events. This gives smooth, continuous movement.
+Called **once per frame** before `player_update`. Uses `SDL_GetKeyboardState` to read the instantaneous keyboard state (held keys), not events. This gives smooth, continuous movement. The `ctrl` parameter is the active gamepad handle; pass `NULL` when no controller is connected — keyboard input still works normally.
 
 ### Key Bindings
 
-| Key(s) | Action |
+| Input | Action |
 |--------|--------|
 | Left Arrow / A | Move left (`vx -= speed`), `facing_left = 1` |
 | Right Arrow / D | Move right (`vx += speed`), `facing_left = 0` |
+| D-Pad `←` | Move left (gamepad) |
+| D-Pad `→` | Move right (gamepad) |
+| Left analog stick (X-axis) | Move left / right (dead-zone: 8000 / 32767) |
 | Space | Jump (only when `on_ground == 1`) |
+| `A` button / Cross (gamepad) | Jump (only when `on_ground == 1`) |
 | ESC | Quit (handled in `game_loop`, not here) |
+| `Start` button (gamepad) | Quit (handled in `game_loop`, not here) |
 
 ### Jump Logic
 
 ```c
-if (player->on_ground && keys[SDL_SCANCODE_SPACE]) {
+int want_jump = keys[SDL_SCANCODE_SPACE];
+if (ctrl) {
+    want_jump |= SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A);
+}
+if (player->on_ground && want_jump) {
     player->vy        = -500.0f;   // upward impulse (negative = up in SDL)
     player->on_ground  = 0;
     if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
