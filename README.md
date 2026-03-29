@@ -181,11 +181,12 @@ main()
 | 1 | Background (Forest_Background_0.png) |
 | 2 | Floor (9-slice tiled Grass_Tileset.png) |
 | 3 | Platforms (9-slice tiled Grass_Oneway.png pillars) |
-| 4 | Water (animated Water.png strip) |
-| 5 | Spiders (animated Spider_1.png patrol enemies) |
-| 6 | Player (animated Player.png sprite) |
-| 7 | Fog (semi-transparent Sky_Background sliding layers) |
-| 8 | HUD (`hud_render`: hearts, lives, score — always drawn on top) |
+| 4 | Coins (animated Coin.png collectibles) |
+| 5 | Water (animated Water.png strip) |
+| 6 | Spiders (animated Spider_1.png patrol enemies) |
+| 7 | Player (animated Player.png sprite) |
+| 8 | Fog (semi-transparent Sky_Background sliding layers) |
+| 9 | HUD (`hud_render`: hearts, lives, score — always drawn on top) |
 
 ### Delta Time
 
