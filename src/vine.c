@@ -53,7 +53,7 @@ void vine_init(VineDecor *vines, int *count)
      * repetition.
      */
     int indices[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };
-    int vine_count = 2 + rand() % 2;  /* 2 or 3 */
+    int vine_count = 3 + rand() % 3;  /* 3, 4, or 5 platforms */
     for (int i = 0; i < vine_count; i++) {
         int j = i + rand() % (8 - i);
         int tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp;
@@ -68,12 +68,13 @@ void vine_init(VineDecor *vines, int *count)
         int tiles = 2 + rand() % 2;
 
         /*
-         * Randomly pick left or right inset position for the single vine.
-         *   Left:  plat_x + VINE_BORDER
-         *   Right: plat_x + TILE_SIZE - VINE_BORDER - VINE_W
+         * Alternate left/right by loop index, then flip with rand() for
+         * extra variety — guarantees at least visual alternation even when
+         * rand() returns the same parity repeatedly at startup.
          */
         float vine_x;
-        if (rand() % 2 == 0)
+        int side = (i % 2) ^ (rand() % 2);  /* 0 = left, 1 = right */
+        if (side == 0)
             vine_x = plat_x[p] + VINE_BORDER;
         else
             vine_x = plat_x[p] + TILE_SIZE - VINE_BORDER - VINE_W;
