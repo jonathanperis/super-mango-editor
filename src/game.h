@@ -21,6 +21,8 @@
 #include "water.h"      /* Water struct — animated bottom strip              */
 #include "fog.h"        /* FogSystem struct — atmospheric fog overlay      */
 #include "spider.h"     /* Spider struct + MAX_SPIDERS constant              */
+#include "coin.h"       /* Coin struct + MAX_COINS constant                  */
+#include "hud.h"        /* Hud struct — HUD display resources                */
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -73,6 +75,8 @@ typedef struct {
     SDL_Texture  *platform_tex;/* shared tile texture for all pillars         */
     SDL_Texture  *spider_tex;  /* shared texture for all spider enemies       */
     Mix_Chunk    *snd_jump;    /* WAV chunk for the jump sound effect         */
+    Mix_Chunk    *snd_coin;    /* WAV chunk played when collecting a coin     */
+    Mix_Chunk    *snd_hit;     /* WAV chunk played when player gets hurt      */
     Mix_Music    *music;       /* MP3 stream for the looping background music */
     Player        player;      /* the player, stored by value (not a pointer) */
     Platform      platforms[MAX_PLATFORMS]; /* one-way pillar definitions     */
@@ -81,6 +85,14 @@ typedef struct {
     FogSystem     fog;         /* atmospheric fog overlay — topmost layer      */
     Spider        spiders[MAX_SPIDERS]; /* ground-patrol enemy instances      */
     int           spider_count;         /* number of active spiders           */
+    SDL_Texture  *coin_tex;    /* shared texture for all coin collectibles    */
+    Coin          coins[MAX_COINS]; /* collectible coin instances             */
+    int           coin_count;       /* number of coins placed                */
+    Hud           hud;         /* HUD display: hearts, lives, score           */
+    int           hearts;      /* current hit points (0–MAX_HEARTS)           */
+    int           lives;       /* remaining lives; 0 triggers game over       */
+    int           score;       /* cumulative score from collecting coins      */
+    int           coins_for_heart; /* coins collected toward next heart restore */
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
 } GameState;
 
