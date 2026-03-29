@@ -4,7 +4,7 @@
 
 ---
 
-All audio files live in the `sounds/` directory. SDL2_mixer handles both short sound effects (`Mix_Chunk` / WAV) and long streaming music (`Mix_Music` / MP3).
+All audio files live in the `sounds/` directory. SDL2_mixer handles both short sound effects (`Mix_Chunk` / WAV) and long streaming music (`Mix_Music` / OGG/MP3).
 
 ---
 
@@ -34,7 +34,7 @@ All audio files live in the `sounds/` directory. SDL2_mixer handles both short s
 | `saw.wav` | Circular saw spinning |
 | `strong-wind.wav` | Wind gust / outdoor ambience |
 
-### Music Tracks (MP3 — `Mix_Music`)
+### Music Tracks (OGG/MP3 — `Mix_Music`)
 
 | File | Suggested Use |
 |------|---------------|

@@ -136,7 +136,7 @@ sudo pacman -S clang make sdl2 sdl2_image sdl2_ttf sdl2_mixer
 2. Open the **MSYS2 UCRT64** terminal:
 
 ```sh
-pacman -S mingw-w64-ucrt-x86_64-gcc \
+pacman -S mingw-w64-ucrt-x86_64-clang \
           mingw-w64-ucrt-x86_64-make \
           mingw-w64-ucrt-x86_64-SDL2 \
           mingw-w64-ucrt-x86_64-SDL2_image \
@@ -144,11 +144,11 @@ pacman -S mingw-w64-ucrt-x86_64-gcc \
           mingw-w64-ucrt-x86_64-SDL2_mixer
 ```
 
-3. Build using `gcc`:
+3. Build:
 
 ```sh
 cd /c/path/to/super-mango-game
-make CC=gcc
+make
 ```
 
 4. SDL2 DLLs must be in the same directory as the binary. Copy them from the MSYS2 prefix.
