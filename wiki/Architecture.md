@@ -30,10 +30,10 @@ main()
   │     ├── water_init(&gs.water, gs.renderer)  (Water.png)
   │     ├── IMG_LoadTexture → gs.spider_tex    (Spider_1.png)
   │     ├── spiders_init(gs.spiders, &gs.spider_count)
+  │     ├── IMG_LoadTexture → gs.fish_tex      (Fish_2.png)
+  │     ├── fish_init(gs.fish, &gs.fish_count)
   │     ├── IMG_LoadTexture → gs.coin_tex      (Coin.png)
   │     ├── coins_init(gs.coins, &gs.coin_count)
-  │     ├── IMG_LoadTexture → gs.fish_tex      (Fish_2.png — non-fatal)
-  │     ├── fish_init(gs.fish, &gs.fish_count)
   │     ├── IMG_LoadTexture → gs.vine_tex      (Vine.png — non-fatal)
   │     ├── vine_init(gs.vines, &gs.vine_count)
   │     ├── Mix_LoadWAV     → gs.snd_jump      (jump.wav)
@@ -48,6 +48,8 @@ main()
   ├── game_loop(&gs)          ← see Game Loop section below
   │
   └── game_cleanup(&gs)       ← reverse init order
+        ├── SDL_GameControllerClose(gs->controller)  ← if non-NULL
+        ├── SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER)
         ├── hud_cleanup
         ├── fog_cleanup
         ├── player_cleanup
@@ -56,15 +58,13 @@ main()
         ├── Mix_FreeChunk (snd_coin)
         ├── Mix_FreeChunk (snd_hit)
         ├── water_cleanup
-        ├── SDL_DestroyTexture (coin_tex)
         ├── SDL_DestroyTexture (vine_tex)
+        ├── SDL_DestroyTexture (coin_tex)
         ├── SDL_DestroyTexture (fish_tex)
         ├── SDL_DestroyTexture (spider_tex)
         ├── SDL_DestroyTexture (platform_tex)
         ├── SDL_DestroyTexture (floor_tile)
         ├── parallax_cleanup
-        ├── SDL_GameControllerClose(gs->controller)  ← if non-NULL
-        ├── SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER)
         ├── SDL_DestroyRenderer
         └── SDL_DestroyWindow
   │
