@@ -321,6 +321,24 @@ void player_update(Player *player, float dt,
     player->on_ground = 0;
 
     /*
+     * Sample the physics bottom BEFORE this frame's movement so the
+     * platform crossing test can compare "where was the player last frame"
+     * vs "where is the player now".
+     *
+     * Why capture it here instead of back-projecting later:
+     *   back-projection computes  prev = (y_new + 32) - vy_new * dt
+     *   which is mathematically   (y_old + vy_new*dt + 32) - vy_new*dt = y_old + 32.
+     *   In IEEE 754 single-precision, (a + b) - b can differ from a by up
+     *   to 1 ULP due to rounding during the addition.  When the player is
+     *   snapped to a platform at y=plat->y, that 1-ULP error makes
+     *   prev_bottom > plat->y, the crossing test fails, and the player
+     *   silently sinks through the platform every frame until they hit the
+     *   floor.  Capturing the true absolute value before the update avoids
+     *   all cancellation error.
+     */
+    const float prev_bottom = player->y + player->h - FLOOR_SINK;
+
+    /*
      * Gravity: accelerate downward each frame.
      * Because on_ground was just cleared, gravity always runs here; the
      * floor/platform snap below cancels the tiny fall each frame while the
@@ -350,16 +368,16 @@ void player_update(Player *player, float dt,
      *   2. The player is moving downward (vy >= 0), so upward jumps pass through.
      *
      * Crossing test: compare where the player's bottom was BEFORE this frame's
-     * movement (prev_bottom) with where it is NOW (bottom).  A landing is
-     * detected when the edge crossed the platform's top Y from above to below.
-     * This is frame-rate-independent and handles any fall speed correctly.
+     * movement (prev_bottom, captured above) with where it is NOW (bottom).
+     * A landing is detected when the edge crossed the platform's top Y from
+     * above to below.  This is frame-rate-independent and handles any fall
+     * speed correctly.
      *
      * The "physics bottom" strips the FLOOR_SINK visual offset so contact
      * lands the sprite at the same apparent depth as on the main floor.
      */
     if (!player->on_ground && player->vy >= 0.0f) {
-        const float bottom      = player->y + player->h - FLOOR_SINK;
-        const float prev_bottom = bottom - player->vy * dt;   /* back-project */
+        const float bottom = player->y + player->h - FLOOR_SINK;
 
         for (int i = 0; i < platform_count; i++) {
             const Platform *plat = &platforms[i];
