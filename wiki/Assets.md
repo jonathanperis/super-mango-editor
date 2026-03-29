@@ -14,7 +14,12 @@ All visual assets live in the `assets/` directory. They are PNG files (loaded vi
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `Forest_Background_0.png` | `game.c` (`gs->background`) | Full-canvas background, stretched to 400×300 |
+| `Parallax/sky.png` | `parallax.c` (layer 0, speed 0.00) | Static sky gradient backdrop |
+| `Parallax/clouds_bg.png` | `parallax.c` (layer 1, speed 0.08) | Background cloud layer, slow scroll |
+| `Parallax/glacial_mountains.png` | `parallax.c` (layer 2, speed 0.15) | Distant mountains |
+| `Parallax/clouds_mg_3.png` | `parallax.c` (layer 3, speed 0.25) | Midground cloud layer 3 |
+| `Parallax/clouds_mg_2.png` | `parallax.c` (layer 4, speed 0.38) | Midground cloud layer 2 |
+| `Parallax/clouds_mg_1.png` | `parallax.c` (layer 5, speed 0.50) | Foreground cloud layer |
 | `Grass_Tileset.png` | `game.c` (`gs->floor_tile`) | 48×48 tile, 9-slice rendered across `FLOOR_Y` to form the floor |
 | `Grass_Oneway.png` | `game.c` (`gs->platform_tex`) | 48×48 tile, 9-slice rendered as one-way platform pillars |
 | `Player.png` | `player.c` (`player->texture`) | 192×288 sprite sheet, 4 cols × 6 rows, 48×48 frames |
@@ -65,7 +70,7 @@ These are included in `assets/` and ready for future use in platformer levels.
 
 | File | Description |
 |------|-------------|
-| `Forest_Background_0.png` | ✅ In use — forest scene |
+| `Forest_Background_0.png` | Forest scene (not currently in use) |
 | `Sky_Background_0.png` | Sky gradient, layer 0 |
 | `Sky_Background_1.png` | ✅ In use — fog overlay texture |
 | `Sky_Background_2.png` | ✅ In use — fog overlay texture |
