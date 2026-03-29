@@ -244,7 +244,7 @@ TTF_CloseFont(font);
 Always draw in painter's algorithm order (back to front):
 
 ```
-1. Background        (Forest_Background_0.png)
+1. Background        (parallax_render: 6 layers from assets/Parallax/)
 2. Floor tiles       (Grass_Tileset.png 9-slice at FLOOR_Y)
 3. Platforms         (Grass_Oneway.png 9-slice pillar stacks)
 4. Coins             (Coin.png collectibles on top of platforms)
