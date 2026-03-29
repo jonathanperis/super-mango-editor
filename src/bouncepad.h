@@ -29,10 +29,10 @@
 /*
  * BOUNCEPAD_VY — upward launch impulse applied to the player on landing.
  *
- * 1.5× the normal jump impulse: -325 × 1.5 = -487.5 px/s.
+ * -487.5 × 1.10 = -536.25 px/s (10% higher than the previous value).
  * Negative because SDL's Y axis increases downward (up = negative vy).
  */
-#define BOUNCEPAD_VY     -487.5f
+#define BOUNCEPAD_VY     -536.25f
 
 /*
  * BOUNCEPAD_FRAME_MS — how many milliseconds each animation frame is shown

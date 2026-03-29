@@ -55,8 +55,8 @@ void bouncepads_init(Bouncepad *pads, int *count) {
     pads[1].anim_frame    = 2;
     pads[1].anim_timer_ms = 0;
 
-    /* Pad 2: right side of the last pillar (6 px gap after right edge 1528) */
-    pads[2].x             = 1534.0f;
+    /* Pad 2: right side of the screen-2 tall pillar (x=680, right edge=728, 6 px gap) */
+    pads[2].x             = 734.0f;
     pads[2].y             = (float)(FLOOR_Y - BOUNCEPAD_SRC_H);
     pads[2].w             = BOUNCEPAD_W;
     pads[2].h             = BOUNCEPAD_SRC_H;
