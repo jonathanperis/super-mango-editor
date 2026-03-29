@@ -45,7 +45,9 @@ void platforms_init(Platform *platforms, int *count);
  * platforms_render — Draw every platform using the supplied tile texture.
  *
  * Tiles the 48×48 grass texture vertically to fill each pillar's height.
+ * cam_x is the camera left-edge offset (world px); subtract it from every
+ * dst.x to convert world coordinates to screen coordinates.
  * Called every frame from game_loop, after the background, before the player.
  */
 void platforms_render(const Platform *platforms, int count,
-                      SDL_Renderer *renderer, SDL_Texture *tex);
+                      SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);

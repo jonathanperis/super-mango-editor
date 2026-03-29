@@ -55,8 +55,8 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump);
 /* Move the player by velocity × dt; resolve floor and one-way platform collisions. */
 void player_update(Player *player, float dt, const Platform *platforms, int platform_count);
 
-/* Draw the player sprite at its current position. */
-void player_render(Player *player, SDL_Renderer *renderer);
+/* Draw the player sprite at its current position, offset by the camera. */
+void player_render(Player *player, SDL_Renderer *renderer, int cam_x);
 
 /* Return the player's tightly-inset physics hitbox (logical pixels). */
 SDL_Rect player_get_hitbox(const Player *player);

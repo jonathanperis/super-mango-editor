@@ -387,6 +387,53 @@ void game_loop(GameState *gs) {
         /* Advance the fog wave positions and spawn the next wave if it is time */
         fog_update(&gs->fog, dt);
 
+        /* ---- Camera update --------------------------------------- */
+        /*
+         * The camera tries to keep the player centred on screen, offset by a
+         * directional lookahead that reveals more terrain ahead of the player.
+         *
+         * target_x = player_center_in_world - half_screen + lookahead
+         *
+         * lookahead shifts the viewport in the direction the player faces:
+         *   facing right (+) → window peeks further right
+         *   facing left  (−) → window peeks further left
+         */
+        float lookahead = gs->player.facing_left ? -(float)CAM_LOOKAHEAD
+                                                 :  (float)CAM_LOOKAHEAD;
+
+        float cam_target = (gs->player.x + gs->player.w * 0.5f)
+                           - (GAME_W * 0.5f)
+                           + lookahead;
+
+        /*
+         * Clamp the target to the world boundaries so the camera never
+         * shows the void beyond the left or right edge of the level.
+         * When the target is clamped, the camera stops moving and the player
+         * walks freely within the screen until facing back toward open space.
+         */
+        if (cam_target < 0.0f)               cam_target = 0.0f;
+        if (cam_target > WORLD_W - GAME_W)   cam_target = (float)(WORLD_W - GAME_W);
+
+        /*
+         * Smooth follow: close a fraction of the remaining gap each frame.
+         * CAM_SMOOTHING × dt gives the fraction: at 60 fps (dt≈0.016) and
+         * CAM_SMOOTHING=8, each frame closes 8×0.016 ≈ 13% of the gap.
+         * When the gap is tiny (< CAM_SNAP_THRESHOLD px), snap exactly to
+         * prevent endless sub-pixel drift.
+         */
+        float cam_diff = cam_target - gs->camera.x;
+        if (cam_diff > CAM_SNAP_THRESHOLD || cam_diff < -CAM_SNAP_THRESHOLD)
+            gs->camera.x += cam_diff * CAM_SMOOTHING * dt;
+        else
+            gs->camera.x = cam_target;
+
+        /*
+         * Convert to integer pixels for this frame's render calls.
+         * All world-space render functions subtract cam_x from their dst.x
+         * to convert from world coordinates to screen coordinates.
+         */
+        int cam_x = (int)gs->camera.x;
+
         /* ---- 3. Render ------------------------------------------- */
         /*
          * SDL_RenderClear — fill the back buffer with the draw colour.
@@ -403,53 +450,51 @@ void game_loop(GameState *gs) {
         SDL_RenderCopy(gs->renderer, gs->background, NULL, &bg);
 
         /*
-         * 9-slice floor rendering.
+         * 9-slice floor rendering — camera-aware, world-wide.
          *
          * The 48×48 Grass_Tileset.png is divided into a 3×3 grid of 16×16 pieces
-         * (TILE_SIZE / 3 = 16). Each piece has a role:
+         * (TILE_SIZE / 3 = 16). Layout:
          *
          *   [TL][TC][TR]   row 0  y= 0..15  ← grass edge
          *   [ML][MC][MR]   row 1  y=16..31  ← dirt interior
          *   [BL][BC][BR]   row 2  y=32..47  ← floor base edge
          *
-         * Piece selection per screen position:
-         *   • Leftmost  column (tx == 0)           → col 0 (left  cap: TL/ML/BL)
-         *   • Rightmost column (tx + P >= GAME_W)  → col 2 (right cap: TR/MR/BR)
-         *   • All other columns                    → col 1 (center fill: TC/MC/BC)
+         * Piece column selection (based on world-space tx):
+         *   • tx == 0              → col 0 (left  world edge cap)
+         *   • tx + P >= WORLD_W    → col 2 (right world edge cap)
+         *   • all other columns    → col 1 (seamless center fill)
          *
-         *   • First row  (ty == FLOOR_Y)           → row 0 (grass edge)
-         *   • Last  row  (ty + P >= GAME_H)        → row 2 (base edge)
-         *   • Middle rows                          → row 1 (dirt interior)
-         *
-         * GAME_W (400) and floor height (48) are both exact multiples of P (16),
-         * so every piece fits without needing a partial-pixel crop.
-         * The cap pieces carry the black outline border; the center pieces are
-         * pure interior texture — no seams appear between adjacent pieces.
+         * We iterate tx in world coordinates starting from the tile-aligned
+         * column just behind cam_x, and stop once tx is off the right edge
+         * of the screen. dst.x = tx - cam_x converts world → screen.
          */
         const int P = TILE_SIZE / 3;   /* 9-slice piece size: 16 px */
+
+        /* First piece column at or before the left edge of the viewport */
+        int floor_start_tx = (cam_x / P) * P;
 
         for (int ty = FLOOR_Y; ty < GAME_H; ty += P) {
             /* Choose which row of the 9-slice to sample */
             int piece_row;
-            if (ty == FLOOR_Y)        piece_row = 0;   /* top: grass edge  */
-            else if (ty + P >= GAME_H) piece_row = 2;  /* bottom: base edge */
-            else                      piece_row = 1;   /* middle: dirt fill */
+            if (ty == FLOOR_Y)         piece_row = 0;  /* top:    grass edge */
+            else if (ty + P >= GAME_H) piece_row = 2;  /* bottom: base edge  */
+            else                       piece_row = 1;  /* middle: dirt fill  */
 
-            for (int tx = 0; tx < GAME_W; tx += P) {
+            for (int tx = floor_start_tx; tx < cam_x + GAME_W; tx += P) {
                 /* Choose which column of the 9-slice to sample */
                 int piece_col;
-                if (tx == 0)            piece_col = 0;  /* left cap  */
-                else if (tx + P >= GAME_W) piece_col = 2; /* right cap */
-                else                    piece_col = 1;  /* center    */
+                if (tx <= 0)               piece_col = 0;  /* left  world edge cap */
+                else if (tx + P >= WORLD_W) piece_col = 2; /* right world edge cap */
+                else                       piece_col = 1;  /* seamless center fill */
 
                 /*
-                 * src — the 16×16 region cut from the tile sheet.
-                 *   x = piece_col × P selects the column (0, 16, or 32).
-                 *   y = piece_row × P selects the row    (0, 16, or 32).
-                 * dst — where on screen this piece is drawn (1:1 pixel mapping).
+                 * src  — the 16×16 region to cut from the tile sheet.
+                 * dst  — world → screen: dst.x = tx - cam_x.
+                 *        Pieces outside the viewport are discarded by SDL's
+                 *        internal clipping — no manual culling needed.
                  */
-                SDL_Rect src = {piece_col * P, piece_row * P, P, P};
-                SDL_Rect dst = {tx, ty, P, P};
+                SDL_Rect src = { piece_col * P, piece_row * P, P, P };
+                SDL_Rect dst = { tx - cam_x,    ty,            P, P };
                 SDL_RenderCopy(gs->renderer, gs->floor_tile, &src, &dst);
             }
         }
@@ -459,11 +504,11 @@ void game_loop(GameState *gs) {
          * so the player sprite appears in front of the pillar tiles.
          */
         platforms_render(gs->platforms, gs->platform_count,
-                         gs->renderer, gs->platform_tex);
+                         gs->renderer, gs->platform_tex, cam_x);
 
         /* Draw coins on top of the platforms, before the water and player */
         coins_render(gs->coins, gs->coin_count,
-                     gs->renderer, gs->coin_tex);
+                     gs->renderer, gs->coin_tex, cam_x);
 
         /*
          * Draw the water strip on top of the floor/platforms.
@@ -473,10 +518,10 @@ void game_loop(GameState *gs) {
 
         /* Draw spiders on top of the water strip, before the player */
         spiders_render(gs->spiders, gs->spider_count,
-                       gs->renderer, gs->spider_tex);
+                       gs->renderer, gs->spider_tex, cam_x);
 
         /* Draw the player sprite on top of everything */
-        player_render(&gs->player, gs->renderer);
+        player_render(&gs->player, gs->renderer, cam_x);
 
         /* Draw fog/mist as the topmost layer — rendered after the player */
         fog_render(&gs->fog, gs->renderer);

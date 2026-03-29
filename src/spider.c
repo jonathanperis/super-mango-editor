@@ -74,7 +74,7 @@ void spiders_update(Spider *spiders, int count, float dt)
 /* ------------------------------------------------------------------ */
 
 void spiders_render(const Spider *spiders, int count,
-                    SDL_Renderer *renderer, SDL_Texture *tex)
+                    SDL_Renderer *renderer, SDL_Texture *tex, int cam_x)
 {
     for (int i = 0; i < count; i++) {
         const Spider *s = &spiders[i];
@@ -83,8 +83,7 @@ void spiders_render(const Spider *spiders, int count,
          * Source rect: the 10-px tall art band of the current frame.
          *   x = frame_index × SPIDER_FRAME_W  — selects the correct column.
          *   y = SPIDER_ART_Y (22)              — skips the transparent top.
-         *   w = SPIDER_FRAME_W (48)            — full frame width; horizontal
-         *       transparency inside is handled by alpha blending.
+         *   w = SPIDER_FRAME_W (48)            — full frame width.
          *   h = SPIDER_ART_H  (10)             — only the visible art rows.
          */
         SDL_Rect src = {
@@ -95,15 +94,11 @@ void spiders_render(const Spider *spiders, int count,
         };
 
         /*
-         * Destination rect: art bottom aligned exactly with FLOOR_Y so the
-         * spider appears to stand on the grass surface.
-         *
-         *   x = (int)s->x          — left edge of the frame slot.
-         *   y = FLOOR_Y - SPIDER_ART_H = 252 - 10 = 242
-         *       art bottom = 242 + 10 = 252 = FLOOR_Y  ✓
+         * Destination rect: world → screen by subtracting cam_x from x.
+         * y keeps the art bottom flush with FLOOR_Y (252 - 10 = 242).
          */
         SDL_Rect dst = {
-            (int)s->x,
+            (int)s->x - cam_x,   /* world-space x converted to screen-space */
             FLOOR_Y - SPIDER_ART_H,
             SPIDER_FRAME_W,
             SPIDER_ART_H
@@ -111,8 +106,7 @@ void spiders_render(const Spider *spiders, int count,
 
         /*
          * The base sprite faces left, so flip horizontally when the spider
-         * walks right (vx > 0).  Rotation angle is 0 and the rotation centre
-         * is NULL (defaults to the dst rect centre).
+         * walks right (vx > 0).
          */
         SDL_RendererFlip flip = (s->vx > 0.0f)
                                 ? SDL_FLIP_HORIZONTAL
