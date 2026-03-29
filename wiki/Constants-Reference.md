@@ -188,7 +188,7 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_COINS` | `8` | `int` | Maximum simultaneous coins on screen |
+| `MAX_COINS` | `24` | `int` | Maximum simultaneous coins on screen |
 | `COIN_DISPLAY_W` | `16` | `int` | Render width in logical pixels |
 | `COIN_DISPLAY_H` | `16` | `int` | Render height in logical pixels |
 | `COIN_SCORE` | `100` | `int` | Score awarded per coin collected |
