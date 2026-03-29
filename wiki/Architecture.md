@@ -87,9 +87,9 @@ while (gs.running) {
                     SDL_CONTROLLERDEVICEADDED   — opens a newly plugged-in controller
                     SDL_CONTROLLERDEVICEREMOVED — closes and NULLs gs->controller when unplugged
                     SDL_CONTROLLERBUTTONDOWN (START) — sets gs->running = 0 to quit
-  3. Update       — player_handle_input → player_update → spiders_update
-                    → spider collision check → coins_update / coin–player collision
-                    → heart/lives logic → fish_update → water_update → fog_update
+  3. Update       — player_handle_input → player_update → spiders_update → fish_update
+                    → spider collision check → fish collision check → coins_update / coin–player collision
+                    → heart/lives logic → water_update → fog_update
   4. Render       — clear → parallax background → floor tiles → platforms → vines
                     → coins → fish → water → spiders → player → fog → hud → present
 }

@@ -227,13 +227,15 @@ while (gs->running):
   player_handle_input(&gs->player, gs->snd_jump, gs->controller)
   player_update(&gs->player, dt, gs->platforms, gs->platform_count)
   spiders_update(gs->spiders, gs->spider_count, dt)
+  fish_update(gs->fish, gs->fish_count, dt)
   // player-spider AABB collision (with 1.5 s invincibility window)
   if hurt_timer > 0: hurt_timer -= dt
   else: for each spider → if SDL_HasIntersection(player_hitbox, spider_rect): hurt_timer = 1.5, snd_hit
+  // player-fish AABB collision (reuses the same hurt_timer invincibility window)
+  if hurt_timer == 0: for each fish → if SDL_HasIntersection(player_hitbox, fish_hitbox): hurt_timer = 1.5, snd_hit
   coins_update / coin–player AABB collision: award COIN_SCORE, coins_for_heart++
   if coins_for_heart >= COINS_PER_HEART && hearts < MAX_HEARTS: hearts++, coins_for_heart = 0
   if hearts <= 0: lives--, player_reset(&gs->player), hearts = MAX_HEARTS
-  fish_update(gs->fish, gs->fish_count, dt)
   water_update(&gs->water, dt)
   fog_update(&gs->fog, dt)
 
