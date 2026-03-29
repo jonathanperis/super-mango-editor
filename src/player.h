@@ -49,8 +49,10 @@ typedef struct {
 /* Load the player texture and set its initial position. */
 void player_init(Player *player, SDL_Renderer *renderer);
 
-/* Sample the keyboard every frame and set vx/vy accordingly. */
-void player_handle_input(Player *player, Mix_Chunk *snd_jump);
+/* Sample keyboard and gamepad every frame and set vx/vy accordingly.
+ * ctrl may be NULL when no controller is connected; keyboard still works. */
+void player_handle_input(Player *player, Mix_Chunk *snd_jump,
+                         SDL_GameController *ctrl);
 
 /* Move the player by velocity × dt; resolve floor and one-way platform collisions. */
 void player_update(Player *player, float dt, const Platform *platforms, int platform_count);

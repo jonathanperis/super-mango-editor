@@ -121,7 +121,23 @@ void player_init(Player *player, SDL_Renderer *renderer) {
  * it tells us which keys are held RIGHT NOW, giving smooth, continuous
  * movement rather than one-shot movement on the moment of press.
  */
-void player_handle_input(Player *player, Mix_Chunk *snd_jump) {
+/*
+ * AXIS_DEAD_ZONE — minimum absolute value an analog axis must exceed before
+ * it is treated as intentional input.
+ *
+ * SDL reports axis values in the range [-32768, +32767].  Physical sticks
+ * produce small non-zero readings even when untouched (electrical noise,
+ * mechanical centre offset).  Ignoring anything below this threshold
+ * prevents the player from drifting without touching the controller.
+ *
+ * 8000 ≈ 24% of the full range — safe for all DualSense / DS4 / Xbox sticks.
+ * Raise this value if a specific controller drifts; lower it for more
+ * sensitivity at the cost of accidental movement.
+ */
+#define AXIS_DEAD_ZONE  8000
+
+void player_handle_input(Player *player, Mix_Chunk *snd_jump,
+                         SDL_GameController *ctrl) {
     /*
      * SDL_GetKeyboardState returns a pointer to an array of key states.
      * Each element is 1 if that key is currently held, 0 if not.
@@ -154,6 +170,72 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump) {
         player->vy        = -500.0f;  /* upward impulse; reaches ~156 px, clearing the tall pillar */
         player->on_ground  = 0;
         if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+    }
+
+    /* ----------------------------------------------------------------
+     * Gamepad input — only runs when a controller is connected (ctrl != NULL).
+     *
+     * SDL_GameController maps every supported device (DualSense, DualShock 4,
+     * Xbox Series / One / 360) to a unified button/axis layout regardless of
+     * the physical label on the device.  We read two input sources:
+     *
+     *   1. D-Pad buttons — digital on/off, perfect for precision platforming.
+     *   2. Left analog stick X axis — analog range; requires a dead zone check
+     *      to filter electrical noise when the stick is at rest.
+     *
+     * Both sources can be active simultaneously; the velocity accumulates.
+     * Keyboard and gamepad also work at the same time — no mode switching.
+     * ---------------------------------------------------------------- */
+    if (ctrl) {
+        /*
+         * D-Pad left / right — SDL_GameControllerGetButton returns 1 if the
+         * named button is currently pressed, 0 if not.
+         *
+         * SDL_CONTROLLER_BUTTON_DPAD_LEFT  → D-Pad left  on all controllers
+         * SDL_CONTROLLER_BUTTON_DPAD_RIGHT → D-Pad right on all controllers
+         */
+        if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_LEFT)) {
+            player->vx -= player->speed;
+            player->facing_left = 1;
+        }
+        if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)) {
+            player->vx += player->speed;
+            player->facing_left = 0;
+        }
+
+        /*
+         * Left analog stick horizontal axis.
+         *
+         * SDL_GameControllerGetAxis returns a Sint16 in [-32768, +32767].
+         * Negative = left, positive = right.
+         * We compare the raw value against AXIS_DEAD_ZONE to ignore noise.
+         *
+         * SDL_CONTROLLER_AXIS_LEFTX maps to:
+         *   DualSense / DS4 → left stick horizontal
+         *   Xbox             → left stick horizontal
+         */
+        Sint16 axis_x = SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_LEFTX);
+        if (axis_x < -AXIS_DEAD_ZONE) {
+            player->vx -= player->speed;
+            player->facing_left = 1;
+        } else if (axis_x > AXIS_DEAD_ZONE) {
+            player->vx += player->speed;
+            player->facing_left = 0;
+        }
+
+        /*
+         * Jump button — A (Xbox) / Cross × (DualSense / DS4).
+         *
+         * SDL maps both to SDL_CONTROLLER_BUTTON_A in the unified layout.
+         * Same one-shot guard as the keyboard: on_ground prevents re-triggering
+         * while the button is held after takeoff.
+         */
+        if (player->on_ground &&
+            SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
+            player->vy        = -500.0f;
+            player->on_ground = 0;
+            if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+        }
     }
 }
 

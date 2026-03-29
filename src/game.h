@@ -110,9 +110,10 @@ typedef struct {
 } Camera;
 
 typedef struct {
-    SDL_Window    *window;      /* the OS window (created by SDL)              */
-    SDL_Renderer  *renderer;   /* GPU-accelerated 2D drawing context          */
-    ParallaxSystem parallax;   /* multi-layer scrolling background            */
+    SDL_Window         *window;     /* the OS window (created by SDL)              */
+    SDL_Renderer       *renderer;  /* GPU-accelerated 2D drawing context          */
+    SDL_GameController *controller;/* first connected gamepad; NULL = none         */
+    ParallaxSystem      parallax;  /* multi-layer scrolling background            */
     SDL_Texture   *floor_tile; /* grass tile repeated across the floor layer  */
     SDL_Texture  *platform_tex;/* shared tile texture for all pillars         */
     SDL_Texture  *spider_tex;  /* shared texture for all spider enemies       */
