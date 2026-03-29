@@ -19,7 +19,9 @@
 #define HUD_MARGIN      4     /* pixel margin from screen edges            */
 #define HUD_HEART_SIZE 12     /* display size of each heart icon (px)      */
 #define HUD_HEART_GAP   2     /* horizontal gap between heart icons (px)   */
-#define HUD_ICON_SIZE  48     /* display size of the player icon (px)      */
+#define HUD_ICON_W     16     /* display width  of the player icon (px)    */
+#define HUD_ICON_H     13     /* display height of the player icon (px)    */
+#define HUD_ROW_H      13     /* row height for text alignment (font px)   */
 
 /*
  * Hud — resources needed by the HUD renderer.
