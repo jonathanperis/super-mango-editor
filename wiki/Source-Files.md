@@ -202,7 +202,10 @@ while (gs->running):
   prev = now
 
   // 1. Events
-  SDL_PollEvent → SDL_QUIT or SDLK_ESCAPE → gs->running = 0
+  SDL_PollEvent → SDL_QUIT or SDLK_ESCAPE             → gs->running = 0
+               → SDL_CONTROLLERDEVICEADDED            → lazy controller open
+               → SDL_CONTROLLERDEVICEREMOVED          → close and NULL gs->controller
+               → SDL_CONTROLLERBUTTONDOWN (START)     → gs->running = 0
 
   // 2. Update
   player_handle_input(&gs->player, gs->snd_jump, gs->controller)
