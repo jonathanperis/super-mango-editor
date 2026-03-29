@@ -27,6 +27,8 @@
 #include "bouncepad.h"  /* Bouncepad struct + MAX_BOUNCEPADS constant         */
 #include "hud.h"        /* Hud struct — HUD display resources                */
 #include "parallax.h"   /* ParallaxSystem — multi-layer scrolling background */
+#include "rail.h"         /* Rail, RailTile — rail path system              */
+#include "spike_block.h"  /* SpikeBlock — rail-riding hazard entity          */
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -140,10 +142,13 @@ typedef struct {
     SDL_Texture  *vine_tex;    /* shared texture for all vine decorations         */
     VineDecor     vines[MAX_VINES]; /* static scenery vine instances               */
     int           vine_count;       /* number of vine decorations placed           */
-    SDL_Texture  *bouncepad_tex;    /* shared texture for all bouncepads           */
-    Bouncepad     bouncepads[MAX_BOUNCEPADS]; /* spring launch pads              */
-    int           bouncepad_count;            /* number of bouncepads placed     */
-    Mix_Chunk    *snd_spring;  /* WAV/MP3 chunk played when bouncepad is triggered */
+    SDL_Texture  *rail_tex;        /* shared texture for all rail tiles           */
+    Rail          rails[MAX_RAILS];/* level rail loop definitions                 */
+    Bouncepad     bouncepads[MAX_BOUNCEPADS]; /* spring launch pads               */
+    int           rail_count;      /* number of active rail loops                 */
+    SDL_Texture  *spike_block_tex; /* shared texture for all spike block entities */
+    SpikeBlock    spike_blocks[MAX_SPIKE_BLOCKS]; /* rail-riding hazard instances */
+    int           spike_block_count;              /* number of active blocks      */
     Hud           hud;         /* HUD display: hearts, lives, score           */
     int           hearts;      /* current hit points (0–MAX_HEARTS)           */
     int           lives;       /* remaining lives; 0 triggers game over       */
@@ -151,6 +156,7 @@ typedef struct {
     int           coins_for_heart; /* coins collected toward next heart restore */
     Camera        camera;      /* viewport scroll position; updated every frame*/
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
+    int           paused;      /* 1 = window lost focus; physics/music frozen */
 } GameState;
 
 /* ------------------------------------------------------------------ */
