@@ -13,8 +13,6 @@ permissions:
 checkout:
   - path: .
     fetch-depth: 1
-  - repository: jonathanperis/super-mango-game.wiki
-    path: ./wiki
 
 tools:
   github:
