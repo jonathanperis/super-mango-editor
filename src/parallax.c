@@ -42,12 +42,12 @@ static const struct {
     const char *path;   /* PNG path relative to the repo root     */
     float       speed;  /* parallax scroll fraction (0 = static)  */
 } LAYER_CONFIG[] = {
-    { "assets/Parallax/sky.png",               0.00f },
-    { "assets/Parallax/clouds_bg.png",         0.08f },
-    { "assets/Parallax/glacial_mountains.png", 0.15f },
-    { "assets/Parallax/clouds_mg_3.png",       0.25f },
-    { "assets/Parallax/clouds_mg_2.png",       0.38f },
-    { "assets/Parallax/clouds_mg_1.png",       0.50f },
+    { "assets/parallax/sky.png",               0.00f },
+    { "assets/parallax/clouds_bg.png",         0.08f },
+    { "assets/parallax/glacial_mountains.png", 0.15f },
+    { "assets/parallax/clouds_mg_3.png",       0.25f },
+    { "assets/parallax/clouds_mg_2.png",       0.38f },
+    { "assets/parallax/clouds_mg_1.png",       0.50f },
 };
 
 /* Number of entries in LAYER_CONFIG, computed at compile time. */
