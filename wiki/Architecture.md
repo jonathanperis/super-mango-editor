@@ -30,6 +30,11 @@ main()
   │     ├── water_init(&gs.water, gs.renderer)  (Water.png)
   │     ├── IMG_LoadTexture → gs.spider_tex    (Spider_1.png)
   │     ├── spiders_init(gs.spiders, &gs.spider_count)
+  │     ├── IMG_LoadTexture → gs.coin_tex      (Coin.png)
+  │     ├── coins_init(gs.coins, &gs.coin_count)
+  │     ├── Mix_LoadWAV     → gs.snd_coin      (coin.wav)
+  │     ├── Mix_LoadWAV     → gs.snd_hit       (hit.wav)
+  │     ├── hud_init(&gs.hud, gs.renderer)
   │     ├── Mix_LoadWAV     → gs.snd_jump      (jump.wav)
   │     ├── Mix_LoadMUS     → gs.music         (water-ambience.ogg)
   │     ├── Mix_PlayMusic(-1)                  (loop forever, 10% volume)
@@ -41,8 +46,12 @@ main()
   └── game_cleanup(&gs)       ← reverse init order
         ├── fog_cleanup
         ├── player_cleanup
+        ├── hud_cleanup
         ├── Mix_HaltMusic + Mix_FreeMusic
+        ├── Mix_FreeChunk (snd_hit)
+        ├── Mix_FreeChunk (snd_coin)
         ├── Mix_FreeChunk (snd_jump)
+        ├── SDL_DestroyTexture (coin_tex)
         ├── water_cleanup
         ├── SDL_DestroyTexture (spider_tex)
         ├── SDL_DestroyTexture (platform_tex)
@@ -68,9 +77,10 @@ while (gs.running) {
   1. Delta Time   — measure ms since last frame → dt (seconds)
   2. Events       — SDL_PollEvent (quit / ESC key)
   3. Update       — player_handle_input → player_update → spiders_update
-                    → spider collision check → water_update → fog_update
+                    → spider collision check → coins_update / coin–player collision
+                    → heart/lives logic → water_update → fog_update
   4. Render       — clear → background → floor tiles → platforms → water
-                    → spiders → player → fog → present
+                    → spiders → player → fog → hud → present
 }
 ```
 
@@ -95,6 +105,7 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 | 5 | Spiders | `Spider_1.png` animated patrol enemies on the ground |
 | 6 | Player | Animated sprite sheet, drawn on top of environment |
 | 7 | Fog | `Sky_Background_1/2.png` semi-transparent sliding overlay |
+| 8 | HUD | `hud_render`: hearts, lives, score — always drawn on top |
 
 ---
 
@@ -134,6 +145,8 @@ typedef struct {
     SDL_Texture  *platform_tex; // Shared tile for platform pillars (GPU)
     SDL_Texture  *spider_tex;  // Shared texture for all spiders (GPU)
     Mix_Chunk    *snd_jump;    // Jump sound effect (WAV)
+    Mix_Chunk    *snd_coin;    // Coin collect sound effect (WAV)
+    Mix_Chunk    *snd_hit;     // Player hurt sound effect (WAV)
     Mix_Music    *music;       // Background music stream (OGG)
     Player        player;      // Player data — stored by value
     Platform      platforms[MAX_PLATFORMS]; // One-way pillar definitions
@@ -142,6 +155,14 @@ typedef struct {
     FogSystem     fog;         // Atmospheric fog overlay — topmost layer
     Spider        spiders[MAX_SPIDERS]; // Ground-patrol enemy instances
     int           spider_count;         // Number of active spiders
+    SDL_Texture  *coin_tex;    // Shared texture for all coin collectibles
+    Coin          coins[MAX_COINS]; // Collectible coin instances
+    int           coin_count;       // Number of coins placed
+    Hud           hud;         // HUD display: hearts, lives, score
+    int           hearts;      // Current hit points (0–MAX_HEARTS)
+    int           lives;       // Remaining lives; 0 triggers game over
+    int           score;       // Cumulative score from collecting coins
+    int           coins_for_heart; // Coins collected toward next heart restore
     int           running;     // Loop flag: 1 = keep going, 0 = quit
 } GameState;
 ```

@@ -20,7 +20,11 @@ src/
 ├── spider.h      Spider struct + patrol/animation constants
 ├── spider.c      Spider enemy: patrol movement, animation, render
 ├── fog.h         FogSystem struct + instance pool
-└── fog.c         Atmospheric fog overlay: init, slide, spawn, render
+├── fog.c         Atmospheric fog overlay: init, slide, spawn, render
+├── coin.h        Coin struct + constants (MAX_COINS, COIN_SCORE, …)
+├── coin.c        Coin placement, AABB collection, render
+├── hud.h         Hud struct (font + star texture) + HUD constants
+└── hud.c         HUD renderer: hearts, lives counter, score text
 ```
 
 Every `.c` file in `src/` is automatically picked up by the Makefile wildcard — no changes to the build system are needed when adding new source files.
@@ -94,6 +98,8 @@ See [Constants Reference](Constants-Reference) for full details.
 #include "water.h"      // Water struct
 #include "fog.h"        // FogSystem struct
 #include "spider.h"     // Spider struct + MAX_SPIDERS
+#include "coin.h"       // Coin struct + MAX_COINS constant
+#include "hud.h"        // Hud struct — HUD display resources
 ```
 
 ### GameState Fields
@@ -107,6 +113,8 @@ See [Constants Reference](Constants-Reference) for full details.
 | `platform_tex` | `SDL_Texture *` | Shared tile texture for all platform pillars |
 | `spider_tex` | `SDL_Texture *` | Shared texture for all spider enemies |
 | `snd_jump` | `Mix_Chunk *` | Jump WAV effect |
+| `snd_coin` | `Mix_Chunk *` | WAV chunk played when a coin is collected |
+| `snd_hit` | `Mix_Chunk *` | WAV chunk played when the player is hurt |
 | `music` | `Mix_Music *` | Streaming background music (OGG) |
 | `player` | `Player` | Player data — **by value**, not pointer |
 | `platforms` | `Platform[MAX_PLATFORMS]` | One-way pillar definitions |
@@ -115,6 +123,14 @@ See [Constants Reference](Constants-Reference) for full details.
 | `fog` | `FogSystem` | Atmospheric fog overlay — topmost layer |
 | `spiders` | `Spider[MAX_SPIDERS]` | Ground-patrol enemy instances |
 | `spider_count` | `int` | Number of active spiders |
+| `coin_tex` | `SDL_Texture *` | Shared texture for all coin collectibles |
+| `coins` | `Coin[MAX_COINS]` | Collectible coin instances |
+| `coin_count` | `int` | Number of coins placed |
+| `hud` | `Hud` | HUD display: hearts, lives, score |
+| `hearts` | `int` | Current hit points (0–MAX_HEARTS) |
+| `lives` | `int` | Remaining lives; 0 triggers game over |
+| `score` | `int` | Cumulative score from collecting coins |
+| `coins_for_heart` | `int` | Coins collected toward next heart restore |
 | `running` | `int` | `1` = loop running, `0` = exit |
 
 ### Function Declarations
@@ -145,12 +161,17 @@ Creates all runtime resources in this order:
 8. `water_init(&gs->water, gs->renderer)` — loads Water.png and resets scroll
 9. `IMG_LoadTexture(renderer, "assets/Spider_1.png")` → `gs->spider_tex`
 10. `spiders_init(gs->spiders, &gs->spider_count)` — two patrol spiders
-11. `Mix_LoadWAV("sounds/jump.wav")` → `gs->snd_jump`
-12. `Mix_LoadMUS("sounds/water-ambience.ogg")` → `gs->music`
-13. `Mix_PlayMusic(gs->music, -1)` + `Mix_VolumeMusic(13)` — start music at ~10%
-14. `player_init(&gs->player, gs->renderer)`
-15. `fog_init(&gs->fog, gs->renderer)` — loads Sky_Background_1/2.png, spawns first wave
-16. `gs->running = 1`
+11. `IMG_LoadTexture(renderer, "assets/Coin.png")` → `gs->coin_tex`
+12. `coins_init(gs->coins, &gs->coin_count)` — place initial coins
+13. `Mix_LoadWAV("sounds/coin.wav")` → `gs->snd_coin`
+14. `Mix_LoadWAV("sounds/hit.wav")` → `gs->snd_hit`
+15. `hud_init(&gs->hud, gs->renderer)` — load font and heart texture
+16. `Mix_LoadWAV("sounds/jump.wav")` → `gs->snd_jump`
+17. `Mix_LoadMUS("sounds/water-ambience.ogg")` → `gs->music`
+18. `Mix_PlayMusic(gs->music, -1)` + `Mix_VolumeMusic(13)` — start music at ~10%
+19. `player_init(&gs->player, gs->renderer)`
+20. `fog_init(&gs->fog, gs->renderer)` — loads Sky_Background_1/2.png, spawns first wave
+21. `gs->running = 1`
 
 **Renderer flags:**
 
@@ -180,7 +201,10 @@ while (gs->running):
   spiders_update(gs->spiders, gs->spider_count, dt)
   // player-spider AABB collision (with 1.5 s invincibility window)
   if hurt_timer > 0: hurt_timer -= dt
-  else: for each spider → if SDL_HasIntersection(player_hitbox, spider_rect): hurt_timer = 1.5
+  else: for each spider → if SDL_HasIntersection(player_hitbox, spider_rect): hurt_timer = 1.5, snd_hit
+  coins_update / coin–player AABB collision: award COIN_SCORE, coins_for_heart++
+  if coins_for_heart >= COINS_PER_HEART && hearts < MAX_HEARTS: hearts++, coins_for_heart = 0
+  if hearts <= 0: lives--, player_reset(&gs->player), hearts = MAX_HEARTS
   water_update(&gs->water, dt)
   fog_update(&gs->fog, dt)
 
@@ -193,6 +217,7 @@ while (gs->running):
   spiders_render(spiders, spider_count, renderer, spider_tex)
   player_render(&player, renderer)
   fog_render(&fog, renderer)
+  hud_render(&hud, renderer, player_tex, hearts, lives, score)
   SDL_RenderPresent
 
   // 4. Frame cap fallback
@@ -213,8 +238,12 @@ Frees all resources in **reverse init order**:
 ```
 fog_cleanup(&fog)
 player_cleanup
+hud_cleanup(&hud)
 Mix_HaltMusic → Mix_FreeMusic(music) → music = NULL
+Mix_FreeChunk(snd_hit)               → snd_hit = NULL
+Mix_FreeChunk(snd_coin)              → snd_coin = NULL
 Mix_FreeChunk(snd_jump)              → snd_jump = NULL
+SDL_DestroyTexture(coin_tex)         → coin_tex = NULL
 water_cleanup(&water)
 SDL_DestroyTexture(spider_tex)       → spider_tex = NULL
 SDL_DestroyTexture(platform_tex)     → platform_tex = NULL
@@ -275,6 +304,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump);
 void player_update(Player *player, float dt, const Platform *platforms, int platform_count);
 void player_render(Player *player, SDL_Renderer *renderer);
 SDL_Rect player_get_hitbox(const Player *player);
+void player_reset(Player *player);
 void player_cleanup(Player *player);
 ```
 
@@ -507,3 +537,89 @@ void fog_cleanup(FogSystem *fog);
 | 1 | `Sky_Background_2.png` |
 
 Each fog instance picks a random texture, direction, and duration (2–3 seconds) when spawned, then slides across the canvas at a constant speed. A 1-second overlap between consecutive waves ensures continuous coverage. Fog is rendered as the topmost layer, after the player sprite.
+
+---
+
+## `coin.h`
+
+**Role:** Defines the `Coin` struct and constants for collectible coin items.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_COINS` | `8` | Maximum simultaneous coins on screen |
+| `COIN_DISPLAY_W` | `16` | Render width in logical pixels |
+| `COIN_DISPLAY_H` | `16` | Render height in logical pixels |
+| `COIN_SCORE` | `100` | Score awarded per coin collected |
+| `COINS_PER_HEART` | `3` | Coins needed to restore one heart |
+
+### `Coin` Struct Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `x` | `float` | Horizontal position in logical pixels (top-left) |
+| `y` | `float` | Vertical position in logical pixels (top-left) |
+| `active` | `int` | `1` = visible and collectible, `0` = already collected |
+
+### Function Declarations
+
+```c
+void coins_init(Coin *coins, int *count);
+void coins_render(const Coin *coins, int count,
+                  SDL_Renderer *renderer, SDL_Texture *tex);
+```
+
+---
+
+## `coin.c`
+
+**Role:** Implements coin placement, AABB-based collection, and rendering.
+
+Coins are placed on the ground and on platforms at `coins_init`. Each frame, `game_loop` performs an AABB test between the player hitbox and each active coin's `COIN_DISPLAY_W × COIN_DISPLAY_H` rect. On overlap, the coin's `active` flag is cleared, `COIN_SCORE` is added to `gs->score`, and `coins_for_heart` is incremented. When `coins_for_heart` reaches `COINS_PER_HEART` and `hearts < MAX_HEARTS`, one heart is restored.
+
+---
+
+## `hud.h`
+
+**Role:** Defines the `Hud` struct and constants for the heads-up display overlay.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_HEARTS` | `3` | Maximum hearts the player can have |
+| `DEFAULT_LIVES` | `3` | Lives the player starts with |
+| `HUD_MARGIN` | `4` | Pixel margin from screen edges |
+| `HUD_HEART_SIZE` | `12` | Display size of each heart icon (px) |
+| `HUD_HEART_GAP` | `2` | Horizontal gap between heart icons (px) |
+| `HUD_ICON_SIZE` | `48` | Display size of the player icon (px) |
+
+### `Hud` Struct Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `font` | `TTF_Font *` | `Round9x13.ttf` loaded at its native bitmap size |
+| `star_tex` | `SDL_Texture *` | Heart/health indicator icon (`Stars_Ui.png`) |
+
+### Function Declarations
+
+```c
+void hud_init(Hud *hud, SDL_Renderer *renderer);
+void hud_render(const Hud *hud, SDL_Renderer *renderer,
+                SDL_Texture *player_tex,
+                int hearts, int lives, int score);
+void hud_cleanup(Hud *hud);
+```
+
+---
+
+## `hud.c`
+
+**Role:** Implements the HUD overlay — loading the font and heart icon, and rendering hearts, lives counter, and score text on every frame.
+
+The HUD is always drawn last (layer 8), on top of the fog overlay. Three sections are rendered in the top margin:
+
+- **Left:** `hearts` heart icons drawn using `Stars_Ui.png`, spaced `HUD_HEART_GAP` px apart
+- **Centre:** first frame of `Player.png` as a player icon, followed by `x{lives}` text
+- **Right:** `SCORE: {score}` text rendered with `Round9x13.ttf`

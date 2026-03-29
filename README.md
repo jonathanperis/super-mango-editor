@@ -13,7 +13,10 @@ Super Mango is a 2D platformer where a player character runs and jumps through a
 - **Animated water** — Seamless scrolling water strip at the bottom of the screen using cropped sprite frames
 - **Spider enemies** — Ground-patrol spiders with 4-frame walk animation that reverse at patrol boundaries; touching a spider grants 1.5 s of invincibility and triggers a blinking sprite effect
 - **Fog overlay** — Semi-transparent sky layers that slide across the screen for an atmospheric mist effect
-- **Audio** — Jump sound effect and looping ambient background music
+- **Coins** — Collectible items placed on the ground and platforms; AABB pickup awards 100 points each; every 3 coins restores one heart
+- **HUD overlay** — Top-of-screen display showing heart icons (hit points), player icon + lives counter, and a score readout
+- **Lives/Hearts system** — The player has hearts (hit points, max 3) and lives (remaining tries, starts at 3); spider collision drains a heart; reaching 0 hearts costs a life
+- **Audio** — Jump sound, coin pickup sound, hurt sound effect, and looping ambient background music
 
 ## Prerequisites
 
@@ -151,7 +154,11 @@ super-mango-game/
     ├── spider.h           ← Spider struct + patrol constants
     ├── spider.c           ← Spider enemy patrol, animation, render
     ├── fog.h              ← FogSystem struct + instance pool
-    └── fog.c              ← Fog overlay: init, slide, spawn, render
+    ├── fog.c              ← Fog overlay: init, slide, spawn, render
+    ├── coin.h             ← Coin struct + constants (MAX_COINS, COIN_SCORE, …)
+    ├── coin.c             ← Coin placement, AABB collection, render
+    ├── hud.h              ← Hud struct (font + star texture) + HUD constants
+    └── hud.c              ← HUD renderer: hearts, lives counter, score text
 ```
 
 ## Architecture
@@ -178,6 +185,7 @@ main()
 | 5 | Spiders (animated Spider_1.png patrol enemies) |
 | 6 | Player (animated Player.png sprite) |
 | 7 | Fog (semi-transparent Sky_Background sliding layers) |
+| 8 | HUD (`hud_render`: hearts, lives, score — always drawn on top) |
 
 ### Delta Time
 

@@ -20,8 +20,11 @@ All visual assets live in the `assets/` directory. They are PNG files (loaded vi
 | `Player.png` | `player.c` (`player->texture`) | 192×288 sprite sheet, 4 cols × 6 rows, 48×48 frames |
 | `Water.png` | `water.c` (`water->texture`) | 384×64 sprite sheet, 8 frames of 48×64 with 16×31 art crop |
 | `Spider_1.png` | `game.c` (`gs->spider_tex`) | 192×48 sprite sheet, 4 frames of 48×48 with 10 px art band |
+| `Coin.png` | `coin.c` (`gs->coin_tex`) | 16×16 coin collectible sprite |
 | `Sky_Background_1.png` | `fog.c` (`fog->textures[0]`) | Fog overlay layer, semi-transparent sliding effect |
 | `Sky_Background_2.png` | `fog.c` (`fog->textures[1]`) | Fog overlay layer, semi-transparent sliding effect |
+| `Stars_Ui.png` | `hud.c` (`hud->star_tex`) | Heart/health indicator icon used in the HUD |
+| `Round9x13.ttf` | `hud.c` (`hud->font`) | Bitmap font for score and lives text in the HUD |
 
 ---
 
@@ -96,12 +99,12 @@ These are included in `assets/` and ready for future use in platformer levels.
 
 | File | Description |
 |------|-------------|
-| `Coin.png` | Standard coin collectible |
+| `Coin.png` | ✅ In use — `coin.c` collectible sprite (16×16) |
 | `Coins_Ui.png` | Coin count UI icon |
 | `Star_Green.png` | Green star collectible |
 | `Star_Red.png` | Red star collectible |
 | `Star_Yellow.png` | Yellow star collectible |
-| `Stars_Ui.png` | Star count UI icon |
+| `Stars_Ui.png` | ✅ In use — `hud.c` heart/health indicator icon |
 
 ### Enemies
 
@@ -139,8 +142,8 @@ These are included in `assets/` and ready for future use in platformer levels.
 |------|-------------|
 | `Logo.png` | Game logo graphic |
 | `Coins_Ui.png` | Coin counter icon |
-| `Stars_Ui.png` | Star counter icon |
-| `Round9x13.ttf` | TrueType font (9×13 px bitmap-style), ready for score/HUD text |
+| `Stars_Ui.png` | ✅ In use — `hud.c` heart/health indicator icon |
+| `Round9x13.ttf` | ✅ In use — `hud.c` bitmap font for score/HUD text |
 
 ---
 
