@@ -319,6 +319,9 @@ void game_init(GameState *gs) {
     /* Load the HUD font and heart icon texture */
     hud_init(&gs->hud, gs->renderer);
 
+    /* Initialise the debug overlay if --debug was passed on the CLI */
+    if (gs->debug_mode) debug_init(&gs->debug);
+
     /* Initialise the health/lives/score system */
     gs->hearts         = MAX_HEARTS;
     gs->lives          = DEFAULT_LIVES;
@@ -533,6 +536,7 @@ void game_loop(GameState *gs) {
             bp->anim_frame      = 1;   /* start mid-compress → extends to 0 */
             bp->anim_timer_ms   = 0;
             if (gs->snd_spring) Mix_PlayChannel(-1, gs->snd_spring, 0);
+            if (gs->debug_mode) debug_log(&gs->debug, "BOUNCE pad[%d]", bounce_idx);
         }
         /* Move spiders along their patrol paths and advance their animation */
         spiders_update(gs->spiders, gs->spider_count, dt);
@@ -575,13 +579,16 @@ void game_loop(GameState *gs) {
                     }
 
                     gs->hearts--;
+                    if (gs->debug_mode) debug_log(&gs->debug, "HIT spider[%d] hearts=%d", i, gs->hearts);
                     if (gs->hearts <= 0) {
                         gs->lives--;
+                        if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
                         if (gs->lives <= 0) {
                             /* Game over: restart everything */
                             gs->lives          = DEFAULT_LIVES;
                             gs->score          = 0;
                             gs->coins_for_heart = 0;
+                            if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                         }
                         gs->hearts = MAX_HEARTS;
                         player_reset(&gs->player);
@@ -605,12 +612,15 @@ void game_loop(GameState *gs) {
                         }
 
                         gs->hearts--;
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT fish[%d] hearts=%d", i, gs->hearts);
                         if (gs->hearts <= 0) {
                             gs->lives--;
+                            if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
                             if (gs->lives <= 0) {
                                 gs->lives           = DEFAULT_LIVES;
                                 gs->score           = 0;
                                 gs->coins_for_heart = 0;
+                                if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                             }
                             gs->hearts = MAX_HEARTS;
                             player_reset(&gs->player);
@@ -646,12 +656,15 @@ void game_loop(GameState *gs) {
                         }
 
                         gs->hearts--;
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT spike[%d] hearts=%d", i, gs->hearts);
                         if (gs->hearts <= 0) {
                             gs->lives--;
+                            if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
                             if (gs->lives <= 0) {
                                 gs->lives           = DEFAULT_LIVES;
                                 gs->score           = 0;
                                 gs->coins_for_heart = 0;
+                                if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                             }
                             gs->hearts = MAX_HEARTS;
                             player_reset(&gs->player);
@@ -693,11 +706,14 @@ void game_loop(GameState *gs) {
                     }
 
                     gs->score += COIN_SCORE;
+                    if (gs->debug_mode) debug_log(&gs->debug, "COIN [%d] score=%d", i, gs->score);
                     gs->coins_for_heart++;
                     if (gs->coins_for_heart >= COINS_PER_HEART) {
                         gs->coins_for_heart = 0;
-                        if (gs->hearts < MAX_HEARTS)
+                        if (gs->hearts < MAX_HEARTS) {
                             gs->hearts++;
+                            if (gs->debug_mode) debug_log(&gs->debug, "HEART +1 hearts=%d", gs->hearts);
+                        }
                     }
                 }
             }
@@ -759,6 +775,12 @@ void game_loop(GameState *gs) {
 
         /* ---- 3. Render ------------------------------------------- */
         render:
+        /*
+         * Update the debug overlay even while paused so the FPS counter
+         * keeps measuring render frames and log entries age correctly.
+         */
+        if (gs->debug_mode) debug_update(&gs->debug, dt);
+
         /*
          * SDL_RenderClear — fill the back buffer with the draw colour.
          * We always clear before drawing to avoid leftover pixels from the
@@ -887,6 +909,11 @@ void game_loop(GameState *gs) {
         /* Draw the HUD overlay on top of everything (hearts, lives, score) */
         hud_render(&gs->hud, gs->renderer, gs->player.texture,
                    gs->hearts, gs->lives, gs->score);
+
+        /* Draw debug overlays (collision boxes, FPS, event log) if active */
+        if (gs->debug_mode) {
+            debug_render(&gs->debug, gs->hud.font, gs->renderer, gs, cam_x);
+        }
 
         /*
          * SDL_RenderPresent — swap the back buffer to the screen.

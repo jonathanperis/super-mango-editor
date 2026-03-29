@@ -29,6 +29,7 @@
 #include "parallax.h"   /* ParallaxSystem — multi-layer scrolling background */
 #include "rail.h"         /* Rail, RailTile — rail path system              */
 #include "spike_block.h"  /* SpikeBlock — rail-riding hazard entity          */
+#include "debug.h"        /* DebugOverlay — debug collision/FPS/log overlay  */
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -160,6 +161,8 @@ typedef struct {
     Camera        camera;      /* viewport scroll position; updated every frame*/
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
     int           paused;      /* 1 = window lost focus; physics/music frozen */
+    int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
+    DebugOverlay  debug;       /* FPS counter, collision vis, event log      */
 } GameState;
 
 /* ------------------------------------------------------------------ */

@@ -23,12 +23,21 @@
 /* Standard C I/O (fprintf, stderr) and exit codes (EXIT_FAILURE/SUCCESS) */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>    /* strcmp — used to match the "--debug" CLI flag */
 
 /* Our own game state and loop declarations */
 #include "game.h"
 
 int main(int argc, char *argv[]) {
-    (void)argc; (void)argv;   /* unused; required by SDL2 on Windows */
+    /*
+     * Scan command-line arguments for the --debug flag.
+     * argc/argv are required by SDL2's platform-specific main redefinition
+     * on Windows; we now also use them to enable the debug overlay.
+     */
+    int debug_mode = 0;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--debug") == 0) debug_mode = 1;
+    }
     /*
      * SDL_Init — start the SDL core.
      * Flags tell SDL which subsystems to activate:
@@ -98,6 +107,7 @@ int main(int argc, char *argv[]) {
     srand((unsigned int)SDL_GetTicks());
 
     GameState gs = {0};
+    gs.debug_mode = debug_mode;  /* pass CLI flag into GameState before init */
     game_init(&gs);     /* create window, renderer, load textures           */
     game_loop(&gs);     /* run until the player quits                       */
     game_cleanup(&gs);  /* free all game-level resources                    */
