@@ -16,6 +16,7 @@
 #include "spider.h"
 #include "coin.h"
 #include "hud.h"
+#include "parallax.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -70,18 +71,12 @@ void game_init(GameState *gs) {
     SDL_RenderSetLogicalSize(gs->renderer, GAME_W, GAME_H);
 
     /*
-     * IMG_LoadTexture — decode a PNG file and upload it to GPU memory.
-     * A "texture" is an image that lives on the GPU and can be drawn very fast.
-     * The path is relative to where the binary is run from (repo root).
+     * Load the multi-layer parallax background system.
+     * Each layer is non-fatal: missing PNGs print a warning and are skipped
+     * at render time.  The renderer must exist before this call because
+     * IMG_LoadTexture uploads data to the GPU immediately.
      */
-    /* Load the forest background (stretched to fill the window at render time) */
-    gs->background = IMG_LoadTexture(gs->renderer, "assets/Forest_Background_0.png");
-    if (!gs->background) {
-        fprintf(stderr, "Failed to load Forest_Background_0.png: %s\n", IMG_GetError());
-        SDL_DestroyRenderer(gs->renderer);
-        SDL_DestroyWindow(gs->window);
-        exit(EXIT_FAILURE);
-    }
+    parallax_init(&gs->parallax, gs->renderer);
 
     /*
      * Load the grass tile. This single 48×48 texture will be repeated
@@ -90,7 +85,7 @@ void game_init(GameState *gs) {
     gs->floor_tile = IMG_LoadTexture(gs->renderer, "assets/Grass_Tileset.png");
     if (!gs->floor_tile) {
         fprintf(stderr, "Failed to load Grass_Tileset.png: %s\n", IMG_GetError());
-        SDL_DestroyTexture(gs->background);
+        parallax_cleanup(&gs->parallax);
         SDL_DestroyRenderer(gs->renderer);
         SDL_DestroyWindow(gs->window);
         exit(EXIT_FAILURE);
@@ -106,7 +101,7 @@ void game_init(GameState *gs) {
     if (!gs->platform_tex) {
         fprintf(stderr, "Failed to load Grass_Oneway.png: %s\n", IMG_GetError());
         SDL_DestroyTexture(gs->floor_tile);
-        SDL_DestroyTexture(gs->background);
+        parallax_cleanup(&gs->parallax);
         SDL_DestroyRenderer(gs->renderer);
         SDL_DestroyWindow(gs->window);
         exit(EXIT_FAILURE);
@@ -127,7 +122,7 @@ void game_init(GameState *gs) {
         fprintf(stderr, "Failed to load Spider_1.png: %s\n", IMG_GetError());
         SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
-        SDL_DestroyTexture(gs->background);
+        parallax_cleanup(&gs->parallax);
         SDL_DestroyRenderer(gs->renderer);
         SDL_DestroyWindow(gs->window);
         exit(EXIT_FAILURE);
@@ -144,7 +139,7 @@ void game_init(GameState *gs) {
         SDL_DestroyTexture(gs->spider_tex);
         SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
-        SDL_DestroyTexture(gs->background);
+        parallax_cleanup(&gs->parallax);
         SDL_DestroyRenderer(gs->renderer);
         SDL_DestroyWindow(gs->window);
         exit(EXIT_FAILURE);
@@ -163,7 +158,7 @@ void game_init(GameState *gs) {
         SDL_DestroyTexture(gs->spider_tex);
         SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
-        SDL_DestroyTexture(gs->background);
+        parallax_cleanup(&gs->parallax);
         SDL_DestroyRenderer(gs->renderer);
         SDL_DestroyWindow(gs->window);
         exit(EXIT_FAILURE);
@@ -202,7 +197,7 @@ void game_init(GameState *gs) {
         SDL_DestroyTexture(gs->spider_tex);
         SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
-        SDL_DestroyTexture(gs->background);
+        parallax_cleanup(&gs->parallax);
         SDL_DestroyRenderer(gs->renderer);
         SDL_DestroyWindow(gs->window);
         exit(EXIT_FAILURE);
@@ -443,11 +438,11 @@ void game_loop(GameState *gs) {
         SDL_RenderClear(gs->renderer);
 
         /*
-         * Draw the background stretched to cover the entire logical canvas (GAME_W×GAME_H).
-         * SDL_RenderSetLogicalSize handles scaling to the OS window automatically.
+         * Draw the multi-layer parallax background, back-to-front.
+         * Each layer scrolls at a fraction of cam_x to simulate depth.
+         * cam_x is the integer camera offset computed above.
          */
-        SDL_Rect bg = {0, 0, GAME_W, GAME_H};
-        SDL_RenderCopy(gs->renderer, gs->background, NULL, &bg);
+        parallax_render(&gs->parallax, gs->renderer, cam_x);
 
         /*
          * 9-slice floor rendering — camera-aware, world-wide.
@@ -614,10 +609,8 @@ void game_cleanup(GameState *gs) {
         gs->floor_tile = NULL;
     }
 
-    if (gs->background) {
-        SDL_DestroyTexture(gs->background);  /* release GPU memory */
-        gs->background = NULL;
-    }
+    /* Release all parallax layer textures (must precede renderer destruction) */
+    parallax_cleanup(&gs->parallax);
 
     if (gs->renderer) {
         SDL_DestroyRenderer(gs->renderer);
