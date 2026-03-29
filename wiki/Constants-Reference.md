@@ -181,3 +181,28 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 |----------|-------|------|-------------|
 | `FOG_TEX_COUNT` | `2` | `int` | Number of fog texture assets in rotation |
 | `FOG_MAX` | `4` | `int` | Maximum concurrent fog instances |
+
+---
+
+## `coin.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_COINS` | `8` | `int` | Maximum simultaneous coins on screen |
+| `COIN_DISPLAY_W` | `16` | `int` | Render width in logical pixels |
+| `COIN_DISPLAY_H` | `16` | `int` | Render height in logical pixels |
+| `COIN_SCORE` | `100` | `int` | Score awarded per coin collected |
+| `COINS_PER_HEART` | `3` | `int` | Coins needed to restore one heart |
+
+---
+
+## `hud.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_HEARTS` | `3` | `int` | Maximum hearts the player can have |
+| `DEFAULT_LIVES` | `3` | `int` | Lives the player starts with |
+| `HUD_MARGIN` | `4` | `int` | Pixel margin from screen edges |
+| `HUD_HEART_SIZE` | `12` | `int` | Display size of each heart icon (px) |
+| `HUD_HEART_GAP` | `2` | `int` | Horizontal gap between heart icons (px) |
+| `HUD_ICON_SIZE` | `48` | `int` | Display size of the player icon (px) |
