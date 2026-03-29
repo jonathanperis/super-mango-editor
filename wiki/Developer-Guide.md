@@ -247,11 +247,12 @@ Always draw in painter's algorithm order (back to front):
 1. Background        (Forest_Background_0.png)
 2. Floor tiles       (Grass_Tileset.png 9-slice at FLOOR_Y)
 3. Platforms         (Grass_Oneway.png 9-slice pillar stacks)
-4. Water             (Water.png animated scrolling strip)
-5. Enemies           (Spider_1.png ground patrol)
-6. Player            (Player.png animated sprite)
-7. Fog / Overlays    (Sky_Background sliding layers)
-8. HUD / UI          (always on top — future)
+4. Coins             (Coin.png collectibles on top of platforms)
+5. Water             (Water.png animated scrolling strip)
+6. Enemies           (Spider_1.png ground patrol)
+7. Player            (Player.png animated sprite)
+8. Fog / Overlays    (Sky_Background sliding layers)
+9. HUD / UI          (hud_render: hearts, lives, score — always on top)
 ```
 
 ---
