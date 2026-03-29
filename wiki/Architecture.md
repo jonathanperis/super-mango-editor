@@ -23,7 +23,7 @@ main()
   │     ├── SDL_CreateWindow  → gs.window
   │     ├── SDL_CreateRenderer → gs.renderer
   │     ├── SDL_RenderSetLogicalSize(GAME_W, GAME_H)
-  │     ├── IMG_LoadTexture → gs.background    (Forest_Background_0.png)
+  │     ├── parallax_init(&gs->parallax, gs->renderer)   (assets/Parallax/*.png)
   │     ├── IMG_LoadTexture → gs.floor_tile    (Grass_Tileset.png)
   │     ├── IMG_LoadTexture → gs.platform_tex  (Grass_Oneway.png)
   │     ├── platforms_init(gs.platforms, &gs.platform_count)
@@ -56,7 +56,7 @@ main()
         ├── SDL_DestroyTexture (spider_tex)
         ├── SDL_DestroyTexture (platform_tex)
         ├── SDL_DestroyTexture (floor_tile)
-        ├── SDL_DestroyTexture (background)
+        ├── parallax_cleanup(&gs->parallax)
         ├── SDL_DestroyRenderer
         └── SDL_DestroyWindow
   │
@@ -79,7 +79,7 @@ while (gs.running) {
   3. Update       — player_handle_input → player_update → spiders_update
                     → spider collision check → coins_update / coin–player collision
                     → heart/lives logic → water_update → fog_update
-  4. Render       — clear → background → floor tiles → platforms → coins
+  4. Render       — clear → parallax layers → floor tiles → platforms → coins
                     → water → spiders → player → fog → hud → present
 }
 ```
@@ -98,7 +98,7 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 
 | Layer | What | How |
 |-------|------|-----|
-| 1 | Background | `Forest_Background_0.png` stretched to 400×300 |
+| 1 | Parallax background layers | `ParallaxSystem` layers (`assets/Parallax/*.png`) tiled horizontally, scrolled by `cam_x × speed` |
 | 2 | Floor | `Grass_Tileset.png` 9-slice tiled across `GAME_W` at `FLOOR_Y` |
 | 3 | Platforms | `Grass_Oneway.png` 9-slice tiled pillar stacks |
 | 4 | Coins | `Coin.png` collectible sprites drawn on top of platforms |
@@ -141,7 +141,7 @@ Defined in `game.h`. The **single container** for every runtime resource.
 typedef struct {
     SDL_Window   *window;      // OS window handle
     SDL_Renderer *renderer;    // GPU drawing context
-    SDL_Texture  *background;  // Forest background image (GPU)
+    ParallaxSystem parallax;   /* multi-layer scrolling background */
     SDL_Texture  *floor_tile;  // Grass tile image (GPU)
     SDL_Texture  *platform_tex; // Shared tile for platform pillars (GPU)
     SDL_Texture  *spider_tex;  // Shared texture for all spiders (GPU)

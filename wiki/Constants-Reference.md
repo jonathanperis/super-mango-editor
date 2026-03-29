@@ -217,3 +217,11 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 | `HUD_HEART_SIZE` | `12` | `int` | Display size of each heart icon (px) |
 | `HUD_HEART_GAP` | `2` | `int` | Horizontal gap between heart icons (px) |
 | `HUD_ICON_SIZE` | `48` | `int` | Display size of the player icon (px) |
+
+---
+
+## `parallax.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `PARALLAX_MAX_LAYERS` | `8` | `int` | Maximum layers the `ParallaxSystem` array can hold |

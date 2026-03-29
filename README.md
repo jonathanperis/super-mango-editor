@@ -16,6 +16,7 @@ Super Mango is a 2D platformer where a player character runs and jumps through a
 - **Coins** — Collectible items placed on the ground and platforms; AABB pickup awards 100 points each; every 3 coins restores one heart
 - **HUD overlay** — Top-of-screen display showing heart icons (hit points), player icon + lives counter, and a score readout
 - **Lives/Hearts system** — The player has hearts (hit points, max 3) and lives (remaining tries, starts at 3); spider collision drains a heart; reaching 0 hearts costs a life
+- **Parallax background** — Multi-layer scrolling sky built from 10 PNG assets in `assets/Parallax/`; each layer moves at a different fraction of the camera speed to create a sense of depth
 - **Audio** — Jump sound, coin pickup sound, hurt sound effect, and looping ambient background music
 
 ## Prerequisites
@@ -127,8 +128,18 @@ The compiled binary is placed at `out/super-mango`.
 super-mango-game/
 ├── Makefile               ← Build system (clang, sdl2-config, ad-hoc codesign)
 ├── assets/                ← PNG sprites and TTF font
+│   ├── Parallax/
+│   │   ├── sky.png
+│   │   ├── sky_lightened.png
+│   │   ├── glacial_mountains.png
+│   │   ├── glacial_mountains_lightened.png
+│   │   ├── clouds_bg.png
+│   │   ├── clouds_mg_1.png
+│   │   ├── clouds_mg_1_lightened.png
+│   │   ├── clouds_mg_2.png
+│   │   ├── clouds_mg_3.png
+│   │   └── cloud_lonely.png
 │   ├── Player.png
-│   ├── Forest_Background_0.png
 │   ├── Grass_Tileset.png
 │   ├── Grass_Oneway.png
 │   ├── Water.png
@@ -158,7 +169,9 @@ super-mango-game/
     ├── coin.h             ← Coin struct + constants (MAX_COINS, COIN_SCORE, …)
     ├── coin.c             ← Coin placement, AABB collection, render
     ├── hud.h              ← Hud struct (font + star texture) + HUD constants
-    └── hud.c              ← HUD renderer: hearts, lives counter, score text
+    ├── hud.c              ← HUD renderer: hearts, lives counter, score text
+    ├── parallax.h         ← ParallaxLayer / ParallaxSystem structs + PARALLAX_MAX_LAYERS
+    └── parallax.c         ← layer config table, init, tiled render, cleanup
 ```
 
 ## Architecture
@@ -178,7 +191,7 @@ main()
 
 | Layer | What |
 |-------|------|
-| 1 | Background (Forest_Background_0.png) |
+| 1 | Parallax background layers (ParallaxSystem — assets/Parallax/*.png, back-to-front) |
 | 2 | Floor (9-slice tiled Grass_Tileset.png) |
 | 3 | Platforms (9-slice tiled Grass_Oneway.png pillars) |
 | 4 | Coins (animated Coin.png collectibles) |

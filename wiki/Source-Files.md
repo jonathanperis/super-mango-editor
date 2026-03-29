@@ -24,7 +24,9 @@ src/
 ├── coin.h        Coin struct + constants (MAX_COINS, COIN_SCORE, …)
 ├── coin.c        Coin placement, AABB collection, render
 ├── hud.h         Hud struct (font + star texture) + HUD constants
-└── hud.c         HUD renderer: hearts, lives counter, score text
+├── hud.c         HUD renderer: hearts, lives counter, score text
+├── parallax.h    ParallaxLayer / ParallaxSystem structs + PARALLAX_MAX_LAYERS constant
+└── parallax.c    Layer config table, texture loading, tiled render, cleanup
 ```
 
 Every `.c` file in `src/` is automatically picked up by the Makefile wildcard — no changes to the build system are needed when adding new source files.
@@ -104,6 +106,7 @@ See [Constants Reference](Constants-Reference) for full details.
 #include "spider.h"     // Spider struct + MAX_SPIDERS
 #include "coin.h"       // Coin struct + MAX_COINS constant
 #include "hud.h"        // Hud struct — HUD display resources
+#include "parallax.h"   // ParallaxSystem — multi-layer scrolling background
 ```
 
 ### GameState Fields
@@ -112,7 +115,7 @@ See [Constants Reference](Constants-Reference) for full details.
 |-------|------|-------------|
 | `window` | `SDL_Window *` | OS window handle |
 | `renderer` | `SDL_Renderer *` | GPU drawing context |
-| `background` | `SDL_Texture *` | Forest background, uploaded to GPU |
+| `parallax` | `ParallaxSystem` | Multi-layer scrolling background (owned by value) |
 | `floor_tile` | `SDL_Texture *` | Grass tile, 9-slice tiled across `FLOOR_Y` |
 | `platform_tex` | `SDL_Texture *` | Shared tile texture for all platform pillars |
 | `spider_tex` | `SDL_Texture *` | Shared texture for all spider enemies |
@@ -159,7 +162,7 @@ Creates all runtime resources in this order:
 1. `SDL_CreateWindow(WINDOW_TITLE, centered, 800×600, SHOWN)` → `gs->window`
 2. `SDL_CreateRenderer(window, -1, ACCELERATED | PRESENTVSYNC)` → `gs->renderer`
 3. `SDL_RenderSetLogicalSize(renderer, 400, 300)` — enables 2× scaling
-4. `IMG_LoadTexture(renderer, "assets/Forest_Background_0.png")` → `gs->background`
+4. `parallax_init(&gs->parallax, gs->renderer)` — loads all Parallax/ layer PNGs (non-fatal per layer)
 5. `IMG_LoadTexture(renderer, "assets/Grass_Tileset.png")` → `gs->floor_tile`
 6. `IMG_LoadTexture(renderer, "assets/Grass_Oneway.png")` → `gs->platform_tex`
 7. `platforms_init(gs->platforms, &gs->platform_count)` — two pillar definitions
@@ -215,7 +218,7 @@ while (gs->running):
 
   // 3. Render
   SDL_RenderClear
-  SDL_RenderCopy(background, fullscreen)
+  parallax_render(&parallax, renderer, cam_x)
   9-slice floor tiles (Grass_Tileset.png at FLOOR_Y)
   platforms_render(platforms, platform_count, renderer, platform_tex)
   coins_render(coins, coin_count, renderer, coin_tex, cam_x)
@@ -233,7 +236,7 @@ while (gs->running):
 **Render layer order (painter's algorithm):**
 
 ```
-[1] Background → [2] Floor tiles → [3] Platforms → [4] Coins →
+[1] Parallax layers → [2] Floor tiles → [3] Platforms → [4] Coins →
 [5] Water → [6] Spiders → [7] Player → [8] Fog → [9] HUD
 ```
 
@@ -254,7 +257,7 @@ water_cleanup(&water)
 SDL_DestroyTexture(spider_tex)       → spider_tex = NULL
 SDL_DestroyTexture(platform_tex)     → platform_tex = NULL
 SDL_DestroyTexture(floor_tile)       → floor_tile = NULL
-SDL_DestroyTexture(background)       → background = NULL
+parallax_cleanup(&parallax)
 SDL_DestroyRenderer(renderer)        → renderer = NULL
 SDL_DestroyWindow(window)            → window = NULL
 ```
