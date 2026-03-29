@@ -215,6 +215,36 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 
 ---
 
+## `vine.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_VINES` | `24` | `int` | Maximum number of vine decoration instances |
+| `VINE_W` | `16` | `int` | Sprite width in logical pixels |
+| `VINE_H` | `48` | `int` | Sprite height in logical pixels |
+
+---
+
+## `fish.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_FISH` | `4` | `int` | Maximum simultaneous fish instances |
+| `FISH_FRAMES` | `2` | `int` | Horizontal frames in `Fish_2.png` (96×48 sheet) |
+| `FISH_FRAME_W` | `48` | `int` | Width of one frame slot in the sheet (px) |
+| `FISH_FRAME_H` | `48` | `int` | Height of one frame slot in the sheet (px) |
+| `FISH_RENDER_W` | `48` | `int` | On-screen render width in logical pixels |
+| `FISH_RENDER_H` | `48` | `int` | On-screen render height in logical pixels |
+| `FISH_SPEED` | `70.0f` | `float` | Horizontal patrol speed (px/s) |
+| `FISH_JUMP_VY` | `-280.0f` | `float` | Upward jump impulse (px/s) |
+| `FISH_JUMP_MIN` | `1.4f` | `float` | Minimum seconds before next jump |
+| `FISH_JUMP_MAX` | `3.0f` | `float` | Maximum seconds before next jump |
+| `FISH_HITBOX_PAD_X` | `8` | `int` | Horizontal inset for fair AABB collision |
+| `FISH_HITBOX_PAD_Y` | `8` | `int` | Vertical inset for fair AABB collision |
+| `FISH_FRAME_MS` | `120` | `int` | Milliseconds per swim animation frame |
+
+---
+
 ## `hud.h` Constants
 
 | Constant | Value | Type | Description |
