@@ -30,7 +30,15 @@ src/
 ├── fish.h        Fish struct + patrol / jump / animation constants
 ├── fish.c        Jumping fish enemy: patrol, random jump arcs, render
 ├── hud.h         Hud struct (font + star texture) + HUD constants
-└── hud.c         HUD renderer: hearts, lives counter, score text
+├── hud.c         HUD renderer: hearts, lives counter, score text
+├── bouncepad.h   Bouncepad struct + spring launch constants
+├── bouncepad.c   Bouncepad init, squash/release animation, render
+├── rail.h        Rail/RailTile structs + bitmask direction constants
+├── rail.c        Rail path builder, bitmask tile rendering, position interpolation
+├── spike_block.h SpikeBlock struct + speed/push/hitbox constants
+├── spike_block.c Rail-riding hazard: traversal, free-fall, push collision, render
+├── debug.h       DebugOverlay struct + FPS/log constants
+└── debug.c       Debug overlay: FPS counter, collision hitbox drawing, event log
 ```
 
 Every `.c` file in `src/` is automatically picked up by the Makefile wildcard — no changes to the build system are needed when adding new source files.
@@ -475,8 +483,8 @@ Each tile is cropped from the sheet at `{ frame*48+16, 17, 16, 31 }` — extract
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `MAX_SPIDERS` | `4` | Maximum simultaneous spiders |
-| `SPIDER_FRAMES` | `4` | Animation frames in `Spider_1.png` |
-| `SPIDER_FRAME_W` | `48` | Width of one frame slot in the sheet (px) |
+| `SPIDER_FRAMES` | `3` | Animation frames in `Spider_1.png` (192÷64 = 3) |
+| `SPIDER_FRAME_W` | `64` | Width of one frame slot in the sheet (px) |
 | `SPIDER_ART_Y` | `22` | First visible row in each frame slot |
 | `SPIDER_ART_H` | `10` | Height of visible art (rows 22–31) |
 | `SPIDER_SPEED` | `50.0f` | Walk speed (px/s) |
@@ -490,7 +498,7 @@ Each tile is cropped from the sheet at `{ frame*48+16, 17, 16, 31 }` — extract
 | `vx` | `float` | Horizontal velocity (px/s); sign encodes direction |
 | `patrol_x0` | `float` | Left patrol boundary |
 | `patrol_x1` | `float` | Right patrol boundary |
-| `frame_index` | `int` | Current animation frame (0–3) |
+| `frame_index` | `int` | Current animation frame (0–2) |
 | `anim_timer_ms` | `Uint32` | Accumulator driving frame advances |
 
 ### Function Declarations
@@ -795,8 +803,267 @@ void hud_cleanup(Hud *hud);
 
 **Role:** Implements the HUD overlay — loading the font and heart icon, and rendering hearts, lives counter, and score text on every frame.
 
-The HUD is always drawn last (layer 11), on top of the fog overlay. Three sections are rendered in the top margin:
+The HUD is drawn at layer 14, on top of the fog overlay. Three sections are rendered in the top margin:
 
 - **Left:** `hearts` heart icons drawn using `Stars_Ui.png`, spaced `HUD_HEART_GAP` px apart
 - **Centre:** first frame of `Player.png` as a player icon, followed by `x{lives}` text
 - **Right:** `SCORE: {score}` text rendered with `Round9x13.ttf`
+
+---
+
+## `bouncepad.h`
+
+**Role:** Defines the `Bouncepad` struct, `BounceState` enum, and constants for wooden spring launch pads.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_BOUNCEPADS` | `4` | Maximum simultaneous bouncepad instances |
+| `BOUNCEPAD_W` | `48` | Display width of one frame (px) |
+| `BOUNCEPAD_H` | `48` | Display height of one frame (px) |
+| `BOUNCEPAD_VY` | `-536.25f` | Upward launch impulse applied to the player (px/s) |
+| `BOUNCEPAD_FRAME_MS` | `80` | Milliseconds per animation frame during release |
+| `BOUNCEPAD_SRC_Y` | `14` | First non-transparent row in the frame |
+| `BOUNCEPAD_SRC_H` | `18` | Height of the art region (rows 14–31) |
+
+### `Bouncepad` Struct Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `x` | `float` | Left edge in world-space logical pixels |
+| `y` | `float` | Top edge in world-space logical pixels |
+| `w` | `int` | Display width (BOUNCEPAD_W = 48 px) |
+| `h` | `int` | Display height (BOUNCEPAD_H = 48 px) |
+| `state` | `BounceState` | `BOUNCE_IDLE` or `BOUNCE_ACTIVE` |
+| `anim_frame` | `int` | Current displayed frame index (0, 1, or 2) |
+| `anim_timer_ms` | `Uint32` | Milliseconds accumulated in the current frame |
+
+### Function Declarations
+
+```c
+void bouncepads_init(Bouncepad *pads, int *count);
+void bouncepads_update(Bouncepad *pads, int count, Uint32 dt_ms);
+void bouncepads_render(const Bouncepad *pads, int count,
+                       SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+```
+
+---
+
+## `bouncepad.c`
+
+**Role:** Implements bouncepad placement, release animation, and rendering.
+
+### Animation Sequence
+
+When the player lands on a pad, `game_loop` sets `state = BOUNCE_ACTIVE` and `anim_frame = 1`. The release animation plays frame 1 → frame 0 (80 ms each), then returns to frame 2 (compressed idle). The 3-frame sheet layout:
+
+| Frame | X offset | Description |
+|-------|----------|-------------|
+| 0 | 0 | Extended / post-launch |
+| 1 | 48 | Mid-compress |
+| 2 | 96 | Fully compressed — idle state |
+
+### Rendering
+
+Only the art region (`y=14, h=18` within each 48×48 frame) is drawn. The pad is positioned so its art bottom edge sits exactly at `FLOOR_Y`.
+
+---
+
+## `rail.h`
+
+**Role:** Defines the `RailTile` and `Rail` structs plus bitmask direction constants for tile-based rail paths.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `RAIL_N` | `1 << 0` | Tile opens upward |
+| `RAIL_E` | `1 << 1` | Tile opens rightward |
+| `RAIL_S` | `1 << 2` | Tile opens downward |
+| `RAIL_W` | `1 << 3` | Tile opens leftward |
+| `RAIL_TILE_W` | `16` | Width of one tile in the sprite sheet (px) |
+| `RAIL_TILE_H` | `16` | Height of one tile in the sprite sheet (px) |
+| `MAX_RAIL_TILES` | `128` | Maximum tiles in a single Rail path |
+| `MAX_RAILS` | `4` | Maximum Rail instances per level |
+
+### `RailTile` Struct Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `x` | `int` | Top-left world-space X in logical pixels |
+| `y` | `int` | Top-left world-space Y in logical pixels |
+| `connections` | `int` | Bitmask of `RAIL_N/E/S/W` for sprite selection |
+
+### `Rail` Struct Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tiles` | `RailTile[128]` | Tiles in traversal order |
+| `count` | `int` | Number of valid tiles |
+| `closed` | `int` | 1 = loop wraps; 0 = open path |
+| `end_cap` | `int` | 1 = bounce at far end; 0 = fall off at far end (open rails only) |
+
+### Function Declarations
+
+```c
+void  rail_init(Rail *rails, int *count);
+void  rail_render(const Rail *rails, int count,
+                  SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+void  rail_get_world_pos(const Rail *r, float t, float *out_x, float *out_y);
+float rail_advance(const Rail *r, float t, float speed, float dt);
+```
+
+---
+
+## `rail.c`
+
+**Role:** Implements rail path building, bitmask-based sprite selection, position interpolation, and rendering.
+
+### Sprite Sheet Lookup
+
+Rails.png is a 64×64 image (4×4 grid of 16×16 tiles). The `connections` bitmask directly indexes into the grid:
+
+```
+source_x = (connections % 4) * RAIL_TILE_W
+source_y = (connections / 4) * RAIL_TILE_H
+```
+
+### Position Interpolation
+
+`rail_get_world_pos(rail, t, &x, &y)` — the integer part of `t` selects the current tile, the fractional part linearly interpolates toward the next tile's centre. For closed rails, the last tile wraps to tile 0.
+
+### Traversal
+
+`rail_advance(rail, t, speed, dt)` — moves `t` forward by `speed × dt` tiles. Closed rails wrap modulo `count`. Open rails with `end_cap=1` bounce at the far end; open rails with `end_cap=0` let `t` exceed `count` (the rider detaches).
+
+---
+
+## `spike_block.h`
+
+**Role:** Defines the `SpikeBlock` struct and constants for rail-riding rotating hazards.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `SPIKE_DISPLAY_W` | `24` | On-screen width (16×16 upscaled to 24×24) |
+| `SPIKE_DISPLAY_H` | `24` | On-screen height |
+| `SPIKE_SPIN_DEG_PER_SEC` | `360.0f` | Rotation: one full turn per second |
+| `SPIKE_SPEED_SLOW` | `1.5f` | Rail traversal: 1.5 tiles/s |
+| `SPIKE_SPEED_NORMAL` | `3.0f` | Rail traversal: 3.0 tiles/s |
+| `SPIKE_SPEED_FAST` | `6.0f` | Rail traversal: 6.0 tiles/s |
+| `SPIKE_PUSH_SPEED` | `220.0f` | Horizontal push impulse (px/s) |
+| `SPIKE_PUSH_VY` | `-150.0f` | Upward push component (px/s) |
+| `MAX_SPIKE_BLOCKS` | `4` | Maximum instances per level |
+
+### `SpikeBlock` Struct Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `t` | `float` | Position on the rail [0, count) |
+| `speed` | `float` | Traversal speed (tiles/s) |
+| `direction` | `int` | +1 forward, -1 backward (bounce on open rails) |
+| `waiting` | `int` | 1 = paused until camera reveals this block |
+| `detached` | `int` | 1 = off the rail, free-falling |
+| `fall_vx` | `float` | Horizontal velocity during free-fall (px/s) |
+| `fall_vy` | `float` | Vertical velocity during free-fall (px/s) |
+| `x` | `float` | World-space left edge (updated each frame) |
+| `y` | `float` | World-space top edge |
+| `w` | `int` | Display width (24) |
+| `h` | `int` | Display height (24) |
+| `active` | `int` | 1 = alive, 0 = off-screen and eliminated |
+| `spin_angle` | `float` | Current rotation in degrees [0, 360) |
+| `rail` | `const Rail *` | Pointer to the rail this block rides (not owned) |
+
+### Function Declarations
+
+```c
+void     spike_block_init(SpikeBlock *sb, const Rail *rail, float t0, float speed);
+void     spike_blocks_init(SpikeBlock *blocks, int *count, const Rail *rails);
+void     spike_block_update(SpikeBlock *sb, float dt, int cam_x);
+void     spike_blocks_update(SpikeBlock *blocks, int count, float dt, int cam_x);
+void     spike_block_render(const SpikeBlock *sb,
+                            SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+void     spike_blocks_render(const SpikeBlock *blocks, int count,
+                             SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+SDL_Rect spike_block_get_hitbox(const SpikeBlock *sb);
+void     spike_block_push_player(const SpikeBlock *sb, Player *player);
+```
+
+---
+
+## `spike_block.c`
+
+**Role:** Implements spike block rail traversal, free-fall physics, player push response, and rendering.
+
+### Update Logic
+
+1. If `waiting == 1`, check whether the block's start position is within the camera viewport; if so, set `waiting = 0` and begin moving.
+2. If `detached == 0`, call `rail_advance` to move `t` forward. When `t` reaches the end of an open rail with `end_cap=0`, set `detached = 1` and inherit `fall_vx` from the rail speed.
+3. If `detached == 1`, apply gravity to `fall_vy` and integrate position. If the block exits the screen vertically, set `active = 0`.
+4. Update `spin_angle += SPIKE_SPIN_DEG_PER_SEC * dt` (wrap at 360).
+
+### Collision & Push
+
+`spike_block_push_player` — applies `SPIKE_PUSH_SPEED` (220 px/s) in the direction opposite to the player's movement, plus `SPIKE_PUSH_VY` (-150 px/s) upward. If the player is stationary, the push is based on relative position.
+
+---
+
+## `debug.h`
+
+**Role:** Defines the `DebugOverlay` struct (FPS counters + circular log buffer) and declares the debug overlay functions.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `DEBUG_LOG_MAX_ENTRIES` | `8` | Maximum visible log messages |
+| `DEBUG_LOG_MSG_LEN` | `64` | Max characters per message (incl. null) |
+| `DEBUG_LOG_DISPLAY_SEC` | `4.0f` | Seconds each message stays visible |
+| `DEBUG_FPS_SAMPLE_MS` | `500` | Milliseconds between FPS counter refreshes |
+
+### `DebugOverlay` Struct Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `fps_prev_ticks` | `Uint64` | SDL_GetTicks64 at last FPS sample |
+| `fps_frame_count` | `int` | Frames since last sample |
+| `fps_display` | `int` | FPS number shown on screen |
+| `log` | `DebugLogEntry[8]` | Circular buffer of event messages |
+| `log_head` | `int` | Next write slot index |
+| `log_count` | `int` | Valid entries (≤ 8) |
+
+### Function Declarations
+
+```c
+void debug_init(DebugOverlay *dbg);
+void debug_update(DebugOverlay *dbg, float dt);
+void debug_log(DebugOverlay *dbg, const char *fmt, ...);
+void debug_render(const DebugOverlay *dbg, TTF_Font *font,
+                  SDL_Renderer *renderer, const void *gs_ptr, int cam_x);
+```
+
+---
+
+## `debug.c`
+
+**Role:** Implements the debug overlay — FPS counter, collision hitbox visualization, and scrolling event log.
+
+### Collision Boxes
+
+When `--debug` is active, `debug_render` draws coloured outlined rectangles for:
+- Player physics hitbox
+- Platform surfaces
+- Coin pickup zones
+- Spider/fish/spike block damage hitboxes
+
+### FPS Counter
+
+Samples every 500 ms (`DEBUG_FPS_SAMPLE_MS`). Renders the current FPS value in the top-left corner using the HUD's `Round9x13.ttf` font.
+
+### Event Log
+
+A circular buffer of 8 entries. New entries are pushed via `debug_log(dbg, "fmt", ...)` (printf-style). Each entry ages by `dt` every frame; entries older than 4 seconds are no longer drawn. Rendered in the bottom-right corner, newest at the bottom.
+
+The `gs_ptr` parameter is declared as `const void *` to break a circular include dependency — `debug.c` casts it to `const GameState *` internally.

@@ -102,10 +102,13 @@ if (player->on_ground && want_jump) {
 ## Physics — `player_update`
 
 ```c
-void player_update(Player *player, float dt, const Platform *platforms, int platform_count);
+void player_update(Player *player, float dt,
+                   const Platform *platforms, int platform_count,
+                   const Bouncepad *bouncepads, int bouncepad_count,
+                   int *out_bounce_idx);
 ```
 
-`dt` is the time in **seconds** since the last frame (e.g. `0.016` for 60 FPS). Multiplying speed by `dt` makes movement frame-rate independent. The `platforms` array and `platform_count` are used to resolve one-way platform landings in addition to the main floor collision.
+`dt` is the time in **seconds** since the last frame (e.g. `0.016` for 60 FPS). Multiplying speed by `dt` makes movement frame-rate independent. The `platforms` array and `platform_count` are used to resolve one-way platform landings in addition to the main floor collision. The `bouncepads` array and `bouncepad_count` are used for bouncepad landing detection — if the player lands on a bouncepad, `*out_bounce_idx` is set to that pad's index; callers should initialise it to `-1` before the call. The caller (`game_loop`) then triggers the pad's release animation and plays the spring sound.
 
 ### Gravity
 

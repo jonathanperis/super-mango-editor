@@ -244,17 +244,21 @@ TTF_CloseFont(font);
 Always draw in painter's algorithm order (back to front):
 
 ```
-1. Background        (parallax_render: 6 layers from assets/Parallax/)
-2. Floor tiles       (Grass_Tileset.png 9-slice at FLOOR_Y)
-3. Platforms         (Grass_Oneway.png 9-slice pillar stacks)
-4. Vines             (Vine.png static scenery on ground and platform tops)
-5. Coins             (Coin.png collectibles on top of platforms)
-6. Fish              (Fish_2.png jumping water enemies, before water for submerged look)
-7. Water             (Water.png animated scrolling strip)
-8. Spiders           (Spider_1.png ground patrol enemies)
-9. Player            (Player.png animated sprite)
-10. Fog / Overlays   (Sky_Background sliding layers)
-11. HUD / UI         (hud_render: hearts, lives, score — always on top)
+1.  Background        (parallax_render: 6 layers from assets/Parallax/)
+2.  Floor tiles       (Grass_Tileset.png 9-slice at FLOOR_Y)
+3.  Platforms         (Grass_Oneway.png 9-slice pillar stacks)
+4.  Bouncepads        (Bouncepad_Wood.png spring pads on floor/platforms)
+5.  Rails             (Rails.png bitmask tile tracks)
+6.  Vines             (Vine.png static scenery on ground and platform tops)
+7.  Coins             (Coin.png collectibles on top of platforms)
+8.  Fish              (Fish_2.png jumping water enemies, before water for submerged look)
+9.  Water             (Water.png animated scrolling strip)
+10. Spike blocks      (Spike_Block.png rotating rail-riding hazards)
+11. Spiders           (Spider_1.png ground patrol enemies)
+12. Player            (Player.png animated sprite)
+13. Fog / Overlays    (Sky_Background sliding layers)
+14. HUD / UI          (hud_render: hearts, lives, score — always on top)
+15. Debug overlay     (debug_render: FPS, collision boxes, event log — when --debug)
 ```
 
 ---

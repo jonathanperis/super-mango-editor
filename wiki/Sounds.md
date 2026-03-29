@@ -15,6 +15,7 @@ All audio files live in the `sounds/` directory. SDL2_mixer handles both short s
 | `jump.wav` | `Mix_Chunk` | `gs->snd_jump` | Played on Space press when `on_ground == 1` |
 | `coin.wav` | `Mix_Chunk` | `gs->snd_coin` | Played when the player collects a coin |
 | `hit.wav` | `Mix_Chunk` | `gs->snd_hit` | Played when the player takes damage |
+| `spring-boing.mp3` | `Mix_Chunk` | `gs->snd_spring` | Played when the player lands on a bouncepad |
 | `water-ambience.ogg` | `Mix_Music` | `gs->music` | Background ambient loop, volume ~10% |
 
 ---
@@ -32,6 +33,7 @@ All audio files live in the `sounds/` directory. SDL2_mixer handles both short s
 | `fireball.wav` | Projectile / fireball fired |
 | `flapping.wav` | Bird enemy wing flap |
 | `hit.wav` | ✅ In use — player takes damage |
+| `spring-boing.mp3` | ✅ In use — bouncepad spring launch |
 | `lava.wav` | Player touches lava |
 | `saw.wav` | Circular saw spinning |
 | `strong-wind.wav` | Wind gust / outdoor ambience |

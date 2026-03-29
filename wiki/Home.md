@@ -2,7 +2,7 @@
 
 > A 2D pixel art platformer written in **C11 + SDL2**, targeting macOS (Apple Silicon) but buildable on Linux and Windows.
 
-Super Mango is an intentionally minimal, heavily-commented game project designed as a **learning resource** for C + SDL2 game development. The player runs and jumps through a multi-layer parallax forest stage with one-way platforms, collectible coins, vine decorations, animated water, patrolling spider enemies, jumping fish enemies, and atmospheric fog, with smooth delta-time physics, a scrolling camera, and sprite sheet animation.
+Super Mango is an intentionally minimal, heavily-commented game project designed as a **learning resource** for C + SDL2 game development. The player runs and jumps through a multi-layer parallax forest stage with one-way platforms, collectible coins, vine decorations, animated water, patrolling spider enemies, jumping fish enemies, spring-loaded bouncepads, rail-riding spike blocks, and atmospheric fog, with smooth delta-time physics, a scrolling camera, sprite sheet animation, and an optional debug overlay.
 
 ---
 
@@ -79,5 +79,13 @@ super-mango-game/
     ├── fish.h              ← Fish struct + patrol / jump / animation constants
     ├── fish.c              ← Jumping fish enemy: patrol, random jump arcs, render
     ├── hud.h               ← Hud struct (font + star texture) + HUD constants
-    └── hud.c               ← HUD renderer: hearts, lives counter, score text
+    ├── hud.c               ← HUD renderer: hearts, lives counter, score text
+    ├── bouncepad.h         ← Bouncepad struct + spring launch constants
+    ├── bouncepad.c         ← Bouncepad init, squash/release animation, render
+    ├── rail.h              ← Rail/RailTile structs + bitmask direction constants
+    ├── rail.c              ← Rail path builder, bitmask tile render, position interpolation
+    ├── spike_block.h       ← SpikeBlock struct + speed/push constants
+    ├── spike_block.c       ← Rail-riding hazard: traversal, free-fall, player collision
+    ├── debug.h             ← DebugOverlay struct + FPS/log constants
+    └── debug.c             ← Debug overlay: FPS counter, collision hitboxes, event log
 ```
