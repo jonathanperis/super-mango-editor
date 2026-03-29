@@ -2,7 +2,7 @@
 
 > A 2D pixel art platformer written in **C11 + SDL2**, targeting macOS (Apple Silicon) but buildable on Linux and Windows.
 
-Super Mango is an intentionally minimal, heavily-commented game project designed as a **learning resource** for C + SDL2 game development. The player runs and jumps through a forest stage with one-way platforms, animated water, patrolling spider enemies, and atmospheric fog, with smooth delta-time physics and sprite sheet animation.
+Super Mango is an intentionally minimal, heavily-commented game project designed as a **learning resource** for C + SDL2 game development. The player runs and jumps through a multi-layer parallax forest stage with one-way platforms, collectible coins, vine decorations, animated water, patrolling spider enemies, jumping fish enemies, and atmospheric fog, with smooth delta-time physics, a scrolling camera, and sprite sheet animation.
 
 ---
 
