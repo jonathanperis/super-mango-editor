@@ -23,6 +23,7 @@
 #include "spider.h"     /* Spider struct + MAX_SPIDERS constant              */
 #include "fish.h"       /* Fish struct + MAX_FISH constant                  */
 #include "coin.h"       /* Coin struct + MAX_COINS constant                  */
+#include "vine.h"       /* VineDecor struct + MAX_VINES constant              */
 #include "hud.h"        /* Hud struct — HUD display resources                */
 #include "parallax.h"   /* ParallaxSystem — multi-layer scrolling background */
 
@@ -135,6 +136,9 @@ typedef struct {
     SDL_Texture  *coin_tex;    /* shared texture for all coin collectibles    */
     Coin          coins[MAX_COINS]; /* collectible coin instances             */
     int           coin_count;       /* number of coins placed                */
+    SDL_Texture  *vine_tex;    /* shared texture for all vine decorations         */
+    VineDecor     vines[MAX_VINES]; /* static scenery vine instances               */
+    int           vine_count;       /* number of vine decorations placed           */
     Hud           hud;         /* HUD display: hearts, lives, score           */
     int           hearts;      /* current hit points (0–MAX_HEARTS)           */
     int           lives;       /* remaining lives; 0 triggers game over       */
