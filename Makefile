@@ -6,6 +6,7 @@ TARGET  = $(OUTDIR)/super-mango
 SRCDIR  = src
 SRCS    = $(wildcard $(SRCDIR)/*.c)
 OBJS    = $(SRCS:.c=.o)
+DEPS    = $(OBJS:.o=.d)
 
 .PHONY: all clean run
 
@@ -23,11 +24,14 @@ ifeq ($(UNAME),Darwin)
 endif
 
 $(SRCDIR)/%.o: $(SRCDIR)/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -MMD -MP -c -o $@ $<
+
+-include $(DEPS)
 
 run: all
 	./$(TARGET)
 
 clean:
 	rm -f $(SRCDIR)/*.o
+	rm -f $(SRCDIR)/*.d
 	rm -rf $(OUTDIR)
