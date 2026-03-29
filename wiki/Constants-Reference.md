@@ -195,6 +195,14 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 
 ---
 
+## `parallax.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `PARALLAX_MAX_LAYERS` | `8` | `int` | Maximum number of background layers the system can hold |
+
+---
+
 ## `coin.h` Constants
 
 | Constant | Value | Type | Description |

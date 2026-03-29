@@ -70,6 +70,8 @@ super-mango-game/
     ├── spider.c            ← Spider enemy patrol, animation, render
     ├── fog.h               ← FogSystem struct + instance pool
     ├── fog.c               ← Fog overlay: init, slide, spawn, render
+    ├── parallax.h          ← ParallaxSystem struct + PARALLAX_MAX_LAYERS constant
+    ├── parallax.c          ← Multi-layer scrolling background: init, tiled render, cleanup
     ├── coin.h              ← Coin struct + constants (MAX_COINS, COIN_SCORE, …)
     ├── coin.c              ← Coin placement, AABB collection, render
     ├── hud.h               ← Hud struct (font + star texture) + HUD constants

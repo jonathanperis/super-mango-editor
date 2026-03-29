@@ -8,6 +8,7 @@ Super Mango is a 2D platformer where a player character runs and jumps through a
 
 ### Current Features
 
+- **Scrolling camera** — smooth lerp-follow camera with directional look-ahead; the level is 1 600 logical pixels wide (4 screens), clamped so the canvas never shows beyond the world boundaries
 - **Player** — 4-state animated character (idle/walk/jump/fall) with gravity, floor collision, and one-way platform landing
 - **One-way platforms** — Pillar stacks built from 9-slice tiled grass blocks; the player can jump through from below and land on top
 - **Animated water** — Seamless scrolling water strip at the bottom of the screen using cropped sprite frames
@@ -155,6 +156,8 @@ super-mango-game/
     ├── spider.c           ← Spider enemy patrol, animation, render
     ├── fog.h              ← FogSystem struct + instance pool
     ├── fog.c              ← Fog overlay: init, slide, spawn, render
+    ├── parallax.h         ← ParallaxSystem struct + PARALLAX_MAX_LAYERS constant
+    ├── parallax.c         ← Multi-layer scrolling background: init, tiled render, cleanup
     ├── coin.h             ← Coin struct + constants (MAX_COINS, COIN_SCORE, …)
     ├── coin.c             ← Coin placement, AABB collection, render
     ├── hud.h              ← Hud struct (font + star texture) + HUD constants
