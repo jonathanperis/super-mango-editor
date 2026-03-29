@@ -79,8 +79,8 @@ while (gs.running) {
   3. Update       — player_handle_input → player_update → spiders_update
                     → spider collision check → coins_update / coin–player collision
                     → heart/lives logic → water_update → fog_update
-  4. Render       — clear → background → floor tiles → platforms → water
-                    → spiders → player → fog → hud → present
+  4. Render       — clear → background → floor tiles → platforms → coins
+                    → water → spiders → player → fog → hud → present
 }
 ```
 
@@ -101,11 +101,12 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 | 1 | Background | `Forest_Background_0.png` stretched to 400×300 |
 | 2 | Floor | `Grass_Tileset.png` 9-slice tiled across `GAME_W` at `FLOOR_Y` |
 | 3 | Platforms | `Grass_Oneway.png` 9-slice tiled pillar stacks |
-| 4 | Water | `Water.png` animated scrolling strip at the bottom |
-| 5 | Spiders | `Spider_1.png` animated patrol enemies on the ground |
-| 6 | Player | Animated sprite sheet, drawn on top of environment |
-| 7 | Fog | `Sky_Background_1/2.png` semi-transparent sliding overlay |
-| 8 | HUD | `hud_render`: hearts, lives, score — always drawn on top |
+| 4 | Coins | `Coin.png` collectible sprites drawn on top of platforms |
+| 5 | Water | `Water.png` animated scrolling strip at the bottom |
+| 6 | Spiders | `Spider_1.png` animated patrol enemies on the ground |
+| 7 | Player | Animated sprite sheet, drawn on top of environment |
+| 8 | Fog | `Sky_Background_1/2.png` semi-transparent sliding overlay |
+| 9 | HUD | `hud_render`: hearts, lives, score — always drawn on top |
 
 ---
 
@@ -163,6 +164,7 @@ typedef struct {
     int           lives;       // Remaining lives; 0 triggers game over
     int           score;       // Cumulative score from collecting coins
     int           coins_for_heart; // Coins collected toward next heart restore
+    Camera        camera;      // Viewport scroll position; updated every frame
     int           running;     // Loop flag: 1 = keep going, 0 = quit
 } GameState;
 ```

@@ -23,6 +23,7 @@
 #include "spider.h"     /* Spider struct + MAX_SPIDERS constant              */
 #include "coin.h"       /* Coin struct + MAX_COINS constant                  */
 #include "hud.h"        /* Hud struct — HUD display resources                */
+#include "parallax.h"   /* ParallaxSystem — multi-layer scrolling background */
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -109,10 +110,10 @@ typedef struct {
 } Camera;
 
 typedef struct {
-    SDL_Window   *window;      /* the OS window (created by SDL)              */
-    SDL_Renderer *renderer;    /* GPU-accelerated 2D drawing context          */
-    SDL_Texture  *background;  /* forest background loaded into GPU memory    */
-    SDL_Texture  *floor_tile;  /* grass tile repeated across the floor layer  */
+    SDL_Window    *window;      /* the OS window (created by SDL)              */
+    SDL_Renderer  *renderer;   /* GPU-accelerated 2D drawing context          */
+    ParallaxSystem parallax;   /* multi-layer scrolling background            */
+    SDL_Texture   *floor_tile; /* grass tile repeated across the floor layer  */
     SDL_Texture  *platform_tex;/* shared tile texture for all pillars         */
     SDL_Texture  *spider_tex;  /* shared texture for all spider enemies       */
     Mix_Chunk    *snd_jump;    /* WAV chunk for the jump sound effect         */
