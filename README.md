@@ -8,6 +8,7 @@ Super Mango is a 2D platformer where a player character runs and jumps through a
 
 ### Current Features
 
+- **Parallax background** — Multi-layer scrolling sky/mountain/cloud PNGs from `assets/Parallax/` scroll at increasing speeds to create a sense of depth as the camera follows the player
 - **Scrolling camera** — smooth lerp-follow camera with directional look-ahead; the level is 1 600 logical pixels wide (4 screens), clamped so the canvas never shows beyond the world boundaries
 - **Player** — 4-state animated character (idle/walk/jump/fall) with gravity, floor collision, and one-way platform landing
 - **One-way platforms** — Pillar stacks built from 9-slice tiled grass blocks; the player can jump through from below and land on top
@@ -181,7 +182,7 @@ main()
 
 | Layer | What |
 |-------|------|
-| 1 | Background (Forest_Background_0.png) |
+| 1 | Parallax background (6 layers from `assets/Parallax/`, rendered back-to-front via `parallax_render`) |
 | 2 | Floor (9-slice tiled Grass_Tileset.png) |
 | 3 | Platforms (9-slice tiled Grass_Oneway.png pillars) |
 | 4 | Coins (animated Coin.png collectibles) |
