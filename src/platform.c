@@ -15,41 +15,90 @@
 /* ------------------------------------------------------------------ */
 
 /*
- * platforms_init — Define the two pillar platforms.
+ * platforms_init — Define pillar platforms spread across the full world width.
  *
  * Pillars sit directly on top of the floor (their bottom edge == FLOOR_Y)
  * so they look like natural extensions of the ground.
  *
- * Platform layout (logical 400×300 space):
+ * World layout (WORLD_W = 1600 px, 4 screens of 400 px each):
  *
- *   Pillar 1 — MEDIUM (2 tiles tall, 48×96 px)
- *     x  = 80    (roughly 1/5 from the left)
- *     y  = FLOOR_Y − 2 × TILE_SIZE  = 252 − 96 = 156
- *     Top surface visible at y = 156; floor base at y = 252.
+ *   Screen 1 (x 0–400):
+ *     Pillar 1 — medium (2 tiles tall) at x=80
+ *     Pillar 2 — tall   (3 tiles tall) at x=256
  *
- *   Pillar 2 — BIGGER (3 tiles tall, 48×144 px)
- *     x  = 256   (roughly 2/3 across the screen)
- *     y  = FLOOR_Y − 3 × TILE_SIZE  = 252 − 144 = 108
- *     Top surface visible at y = 108; floor base at y = 252.
+ *   Screen 2 (x 400–800):
+ *     Pillar 3 — medium (2 tiles tall) at x=500
+ *     Pillar 4 — tall   (3 tiles tall) at x=680
  *
- * Jump physics note: with vy = −500 px/s (set in player.c), the player's
- * apex reaches ~156 px above the floor, clearing the top of the taller
- * pillar (108 px up) and allowing a clean one-way landing on both.
+ *   Screen 3 (x 800–1200):
+ *     Pillar 5 — medium (2 tiles tall) at x=880
+ *     Pillar 6 — tall   (3 tiles tall) at x=1050
+ *
+ *   Screen 4 (x 1200–1600):
+ *     Pillar 7 — medium (2 tiles tall) at x=1300
+ *     Pillar 8 — tall   (3 tiles tall) at x=1480
+ *
+ * Jump physics note: with vy = −500 px/s, the player's apex reaches ~156 px
+ * above the floor, clearing all pillars (tallest top at FLOOR_Y − 3×TILE = 108).
  */
 void platforms_init(Platform *platforms, int *count) {
-    /* --- Pillar 1: medium (2 tiles tall) -------------------------------- */
+    /* ── Screen 1 ──────────────────────────────────────────────────── */
+
+    /* Pillar 1: medium (2 tiles tall) */
     platforms[0].x = 80.0f;
-    platforms[0].y = (float)(FLOOR_Y - 2 * TILE_SIZE);  /* 156 */
-    platforms[0].w = TILE_SIZE;                          /* 48  */
-    platforms[0].h = 2 * TILE_SIZE;                      /* 96  */
+    platforms[0].y = (float)(FLOOR_Y - 2 * TILE_SIZE);  /* y=156 */
+    platforms[0].w = TILE_SIZE;                          /* 48 px */
+    platforms[0].h = 2 * TILE_SIZE;                      /* 96 px */
 
-    /* --- Pillar 2: bigger (3 tiles tall) -------------------------------- */
+    /* Pillar 2: tall (3 tiles tall) */
     platforms[1].x = 256.0f;
-    platforms[1].y = (float)(FLOOR_Y - 3 * TILE_SIZE);  /* 108 */
-    platforms[1].w = TILE_SIZE;                          /* 48  */
-    platforms[1].h = 3 * TILE_SIZE;                      /* 144 */
+    platforms[1].y = (float)(FLOOR_Y - 3 * TILE_SIZE);  /* y=108 */
+    platforms[1].w = TILE_SIZE;
+    platforms[1].h = 3 * TILE_SIZE;                      /* 144 px */
 
-    *count = 2;
+    /* ── Screen 2 ──────────────────────────────────────────────────── */
+
+    /* Pillar 3: medium */
+    platforms[2].x = 500.0f;
+    platforms[2].y = (float)(FLOOR_Y - 2 * TILE_SIZE);
+    platforms[2].w = TILE_SIZE;
+    platforms[2].h = 2 * TILE_SIZE;
+
+    /* Pillar 4: tall */
+    platforms[3].x = 680.0f;
+    platforms[3].y = (float)(FLOOR_Y - 3 * TILE_SIZE);
+    platforms[3].w = TILE_SIZE;
+    platforms[3].h = 3 * TILE_SIZE;
+
+    /* ── Screen 3 ──────────────────────────────────────────────────── */
+
+    /* Pillar 5: medium */
+    platforms[4].x = 880.0f;
+    platforms[4].y = (float)(FLOOR_Y - 2 * TILE_SIZE);
+    platforms[4].w = TILE_SIZE;
+    platforms[4].h = 2 * TILE_SIZE;
+
+    /* Pillar 6: tall */
+    platforms[5].x = 1050.0f;
+    platforms[5].y = (float)(FLOOR_Y - 3 * TILE_SIZE);
+    platforms[5].w = TILE_SIZE;
+    platforms[5].h = 3 * TILE_SIZE;
+
+    /* ── Screen 4 ──────────────────────────────────────────────────── */
+
+    /* Pillar 7: medium */
+    platforms[6].x = 1300.0f;
+    platforms[6].y = (float)(FLOOR_Y - 2 * TILE_SIZE);
+    platforms[6].w = TILE_SIZE;
+    platforms[6].h = 2 * TILE_SIZE;
+
+    /* Pillar 8: tall */
+    platforms[7].x = 1480.0f;
+    platforms[7].y = (float)(FLOOR_Y - 3 * TILE_SIZE);
+    platforms[7].w = TILE_SIZE;
+    platforms[7].h = 3 * TILE_SIZE;
+
+    *count = 8;
 }
 
 /* ------------------------------------------------------------------ */
@@ -74,7 +123,7 @@ void platforms_init(Platform *platforms, int *count) {
  * corners instead of a stack of identical repeated tiles.
  */
 void platforms_render(const Platform *platforms, int count,
-                      SDL_Renderer *renderer, SDL_Texture *tex) {
+                      SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
     const int P = TILE_SIZE / 3;   /* 9-slice piece size: 16 px */
 
     for (int i = 0; i < count; i++) {
@@ -100,12 +149,11 @@ void platforms_render(const Platform *platforms, int count,
 
                 /*
                  * src — the 16×16 cell to cut from Grass_Oneway.png.
-                 *   x = piece_col × P  (0, 16, or 32)
-                 *   y = piece_row × P  (0, 16, or 32)
-                 * dst — where on the logical canvas to draw this piece.
+                 * dst — world → screen: subtract cam_x from the x coordinate
+                 *       so the pillar scrolls with the camera.
                  */
                 SDL_Rect src = { piece_col * P, piece_row * P, P, P };
-                SDL_Rect dst = { (int)p->x + tx, (int)p->y + ty, P, P };
+                SDL_Rect dst = { (int)p->x + tx - cam_x, (int)p->y + ty, P, P };
                 SDL_RenderCopy(renderer, tex, &src, &dst);
             }
         }
