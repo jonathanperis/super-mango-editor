@@ -88,6 +88,10 @@ See [Constants Reference](Constants-Reference) for full details.
 #define TILE_SIZE     48
 #define FLOOR_Y       (GAME_H - TILE_SIZE)   // = 252
 #define GRAVITY       800.0f
+#define WORLD_W       1600
+#define CAM_LOOKAHEAD  40
+#define CAM_SMOOTHING  8.0f
+#define CAM_SNAP_THRESHOLD  0.5f
 ```
 
 ### Includes
@@ -131,6 +135,7 @@ See [Constants Reference](Constants-Reference) for full details.
 | `lives` | `int` | Remaining lives; 0 triggers game over |
 | `score` | `int` | Cumulative score from collecting coins |
 | `coins_for_heart` | `int` | Coins collected toward next heart restore |
+| `camera` | `Camera` | Viewport scroll position; updated every frame |
 | `running` | `int` | `1` = loop running, `0` = exit |
 
 ### Function Declarations

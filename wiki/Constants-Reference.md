@@ -58,6 +58,17 @@ Every frame while airborne: `player->vy += GRAVITY * dt`.
 
 At 60 FPS (`dt ≈ 0.016s`) gravity adds ~12.8 px/s per frame. The jump impulse (`-500.0f` px/s) produces an arc that peaks in ~0.625 s and lands in ~1.25 s.
 
+### Camera
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `WORLD_W` | `1600` | `int` | Total logical level width (4 × GAME_W) |
+| `CAM_LOOKAHEAD` | `40` | `int` | Forward-look offset in px added in the player's facing direction |
+| `CAM_SMOOTHING` | `8.0f` | `float` | Lerp speed factor (per second); higher = snappier follow |
+| `CAM_SNAP_THRESHOLD` | `0.5f` | `float` | Sub-pixel distance at which the camera snaps exactly to target |
+
+`WORLD_W` defines the full scrollable level width. The visible canvas is always `GAME_W` (400 px); the `Camera` struct tracks the left edge of the viewport in world coordinates.
+
 ---
 
 ## `player.c` Local Constants

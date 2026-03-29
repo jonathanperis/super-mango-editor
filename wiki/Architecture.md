@@ -164,6 +164,7 @@ typedef struct {
     int           lives;       // Remaining lives; 0 triggers game over
     int           score;       // Cumulative score from collecting coins
     int           coins_for_heart; // Coins collected toward next heart restore
+    Camera        camera;      // Viewport scroll position; updated every frame
     int           running;     // Loop flag: 1 = keep going, 0 = quit
 } GameState;
 ```
