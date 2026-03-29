@@ -213,6 +213,7 @@ while (gs->running):
   SDL_RenderCopy(background, fullscreen)
   9-slice floor tiles (Grass_Tileset.png at FLOOR_Y)
   platforms_render(platforms, platform_count, renderer, platform_tex)
+  coins_render(coins, coin_count, renderer, coin_tex, cam_x)
   water_render(&water, renderer)
   spiders_render(spiders, spider_count, renderer, spider_tex)
   player_render(&player, renderer)
@@ -227,8 +228,8 @@ while (gs->running):
 **Render layer order (painter's algorithm):**
 
 ```
-[1] Background → [2] Floor tiles → [3] Platforms → [4] Water →
-[5] Spiders → [6] Player → [7] Fog
+[1] Background → [2] Floor tiles → [3] Platforms → [4] Coins →
+[5] Water → [6] Spiders → [7] Player → [8] Fog → [9] HUD
 ```
 
 ### `game_cleanup(GameState *gs)`
@@ -548,7 +549,7 @@ Each fog instance picks a random texture, direction, and duration (2–3 seconds
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `MAX_COINS` | `8` | Maximum simultaneous coins on screen |
+| `MAX_COINS` | `24` | Maximum simultaneous coins on screen |
 | `COIN_DISPLAY_W` | `16` | Render width in logical pixels |
 | `COIN_DISPLAY_H` | `16` | Render height in logical pixels |
 | `COIN_SCORE` | `100` | Score awarded per coin collected |
@@ -618,7 +619,7 @@ void hud_cleanup(Hud *hud);
 
 **Role:** Implements the HUD overlay — loading the font and heart icon, and rendering hearts, lives counter, and score text on every frame.
 
-The HUD is always drawn last (layer 8), on top of the fog overlay. Three sections are rendered in the top margin:
+The HUD is always drawn last (layer 9), on top of the fog overlay. Three sections are rendered in the top margin:
 
 - **Left:** `hearts` heart icons drawn using `Stars_Ui.png`, spaced `HUD_HEART_GAP` px apart
 - **Centre:** first frame of `Player.png` as a player icon, followed by `x{lives}` text
