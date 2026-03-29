@@ -196,11 +196,11 @@ void rail_init(Rail *rails, int *count) {
      * end_cap is irrelevant for closed rails (the loop never terminates),
      * but we set it to 1 as a safe default.
      */
-    build_rect_rail(&rails[0], 444, 72, 10, 6);
+    build_rect_rail(&rails[0], 444, 45, 10, 6);  /* 5% of GAME_H=300 → 15 px higher than y=60 */
     rails[0].end_cap = 1;
 
     /* Rail 1 — closed loop, screen 3. */
-    build_rect_rail(&rails[1], 852, 80, 8, 5);
+    build_rect_rail(&rails[1], 852, 62, 8, 5);  /* 6% of GAME_H=300 → 18 px higher than original y=80 */
     rails[1].end_cap = 1;
 
     /*

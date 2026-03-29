@@ -9,6 +9,7 @@
 #include <SDL.h>        /* SDL_Texture, SDL_Renderer, SDL_Rect */
 #include <SDL_mixer.h>  /* Mix_Chunk */
 #include "platform.h"   /* Platform, MAX_PLATFORMS — needed for player_update signature */
+#include "bouncepad.h"  /* Bouncepad — needed for player_update signature */
 
 /*
  * AnimState — which animation sequence is currently playing.
@@ -54,8 +55,16 @@ void player_init(Player *player, SDL_Renderer *renderer);
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                          SDL_GameController *ctrl);
 
-/* Move the player by velocity × dt; resolve floor and one-way platform collisions. */
-void player_update(Player *player, float dt, const Platform *platforms, int platform_count);
+/*
+ * Move the player by velocity × dt; resolve floor, one-way platform, and
+ * bouncepad collisions.  If the player lands on a bouncepad, *out_bounce_idx
+ * is set to that pad's index in the array; otherwise it is left unchanged.
+ * Callers should initialise *out_bounce_idx to -1 before the call.
+ */
+void player_update(Player *player, float dt,
+                   const Platform *platforms, int platform_count,
+                   const Bouncepad *bouncepads, int bouncepad_count,
+                   int *out_bounce_idx);
 
 /* Draw the player sprite at its current position, offset by the camera. */
 void player_render(Player *player, SDL_Renderer *renderer, int cam_x);
