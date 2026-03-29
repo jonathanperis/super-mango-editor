@@ -42,6 +42,8 @@ void hud_init(Hud *hud, SDL_Renderer *renderer)
     hud->star_tex = IMG_LoadTexture(renderer, "assets/Stars_Ui.png");
     if (!hud->star_tex) {
         fprintf(stderr, "Failed to load Stars_Ui.png: %s\n", IMG_GetError());
+        TTF_CloseFont(hud->font);
+        hud->font = NULL;
         exit(EXIT_FAILURE);
     }
 }
@@ -136,11 +138,10 @@ void hud_render(const Hud *hud, SDL_Renderer *renderer,
      */
     char lives_buf[8];
     snprintf(lives_buf, sizeof(lives_buf), "x%d", lives);
-    int lives_w = 0, lives_h = 0;
-    TTF_SizeText(hud->font, lives_buf, &lives_w, &lives_h);
+    /* Centre text vertically within the icon row; font is 13 px tall by design */
     render_text(hud->font, renderer, lives_buf,
                 icon_x + HUD_ICON_SIZE + 4,
-                hud_row_y + (HUD_ICON_SIZE - lives_h) / 2);
+                hud_row_y + (HUD_ICON_SIZE - 13) / 2);
 
     /* ---- Score (top-right) ---------------------------------------- */
     /*
@@ -150,11 +151,15 @@ void hud_render(const Hud *hud, SDL_Renderer *renderer,
     char score_buf[32];
     snprintf(score_buf, sizeof(score_buf), "SCORE: %d", score);
 
-    int text_w = 0, text_h = 0;
-    TTF_SizeText(hud->font, score_buf, &text_w, &text_h);
+    int text_w = 0;
+    if (TTF_SizeText(hud->font, score_buf, &text_w, NULL) != 0) {
+        fprintf(stderr, "TTF_SizeText failed for score text: %s\n", TTF_GetError());
+        text_w = 0;  /* Fallback: draw at GAME_W - HUD_MARGIN, as before */
+    }
+    /* Centre text vertically within the icon row; font is 13 px tall by design */
     render_text(hud->font, renderer, score_buf,
                 GAME_W - HUD_MARGIN - text_w,
-                hud_row_y + (HUD_ICON_SIZE - text_h) / 2);
+                hud_row_y + (HUD_ICON_SIZE - 13) / 2);
 }
 
 /* ------------------------------------------------------------------ */

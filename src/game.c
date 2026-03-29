@@ -159,6 +159,8 @@ void game_init(GameState *gs) {
     gs->snd_jump = Mix_LoadWAV("sounds/jump.wav");
     if (!gs->snd_jump) {
         fprintf(stderr, "Failed to load jump.wav: %s\n", Mix_GetError());
+        SDL_DestroyTexture(gs->coin_tex);
+        SDL_DestroyTexture(gs->spider_tex);
         SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
         SDL_DestroyTexture(gs->background);
@@ -196,6 +198,8 @@ void game_init(GameState *gs) {
     if (!gs->music) {
         fprintf(stderr, "Failed to load water-ambience.ogg: %s\n", Mix_GetError());
         Mix_FreeChunk(gs->snd_jump);
+        SDL_DestroyTexture(gs->coin_tex);
+        SDL_DestroyTexture(gs->spider_tex);
         SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
         SDL_DestroyTexture(gs->background);
@@ -545,14 +549,14 @@ void game_cleanup(GameState *gs) {
 
     water_cleanup(&gs->water);
 
-    if (gs->spider_tex) {
-        SDL_DestroyTexture(gs->spider_tex);
-        gs->spider_tex = NULL;
-    }
-
     if (gs->coin_tex) {
         SDL_DestroyTexture(gs->coin_tex);
         gs->coin_tex = NULL;
+    }
+
+    if (gs->spider_tex) {
+        SDL_DestroyTexture(gs->spider_tex);
+        gs->spider_tex = NULL;
     }
 
     if (gs->platform_tex) {
