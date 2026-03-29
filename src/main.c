@@ -34,6 +34,12 @@ int main(int argc, char *argv[]) {
      * Flags tell SDL which subsystems to activate:
      *   SDL_INIT_VIDEO  → creates the event queue, window, and renderer support.
      *   SDL_INIT_AUDIO  → sets up the platform audio device.
+     *
+     * SDL_INIT_GAMECONTROLLER is intentionally omitted here.
+     * It is initialised lazily inside game_init via SDL_InitSubSystem, after
+     * the window is already visible.  Deferring the gamepad subsystem avoids
+     * triggering antivirus heuristics that flag programs enumerating HID /
+     * XInput devices during the very first moments of process startup.
      * Returns 0 on success, negative on failure.
      */
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
