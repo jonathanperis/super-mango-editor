@@ -182,10 +182,10 @@ Creates all runtime resources in this order:
 8. `water_init(&gs->water, gs->renderer)` — loads Water.png and resets scroll
 9. `IMG_LoadTexture(renderer, "assets/Spider_1.png")` → `gs->spider_tex`
 10. `spiders_init(gs->spiders, &gs->spider_count)` — two patrol spiders
-11. `IMG_LoadTexture(renderer, "assets/Coin.png")` → `gs->coin_tex`
-12. `coins_init(gs->coins, &gs->coin_count)` — place initial coins
-13. `IMG_LoadTexture(renderer, "assets/Fish_2.png")` → `gs->fish_tex` (non-fatal)
-14. `fish_init(gs->fish, &gs->fish_count)` — place fish in water lane
+11. `IMG_LoadTexture(renderer, "assets/Fish_2.png")` → `gs->fish_tex`
+12. `fish_init(gs->fish, &gs->fish_count)` — place fish in water lane
+13. `IMG_LoadTexture(renderer, "assets/Coin.png")` → `gs->coin_tex`
+14. `coins_init(gs->coins, &gs->coin_count)` — place initial coins
 15. `IMG_LoadTexture(renderer, "assets/Vine.png")` → `gs->vine_tex` (non-fatal)
 16. `vine_init(gs->vines, &gs->vine_count)` — place vine decorations
 17. `Mix_LoadWAV("sounds/jump.wav")` → `gs->snd_jump`
@@ -248,8 +248,8 @@ while (gs->running):
   coins_render(coins, coin_count, renderer, coin_tex, cam_x)
   fish_render(fish, fish_count, renderer, fish_tex, cam_x)
   water_render(&water, renderer)
-  spiders_render(spiders, spider_count, renderer, spider_tex)
-  player_render(&player, renderer)
+  spiders_render(spiders, spider_count, renderer, spider_tex, cam_x)
+  player_render(&player, renderer, cam_x)
   fog_render(&fog, renderer)
   hud_render(&hud, renderer, player_tex, hearts, lives, score)
   SDL_RenderPresent
@@ -270,6 +270,8 @@ while (gs->running):
 Frees all resources in **reverse init order**:
 
 ```
+SDL_GameControllerClose(controller)  → controller = NULL  (skipped if NULL)
+SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER)
 hud_cleanup(&hud)
 fog_cleanup(&fog)
 player_cleanup
@@ -278,15 +280,13 @@ Mix_FreeChunk(snd_jump)              → snd_jump = NULL
 Mix_FreeChunk(snd_coin)              → snd_coin = NULL
 Mix_FreeChunk(snd_hit)               → snd_hit = NULL
 water_cleanup(&water)
-SDL_DestroyTexture(coin_tex)         → coin_tex = NULL
 SDL_DestroyTexture(vine_tex)         → vine_tex = NULL
+SDL_DestroyTexture(coin_tex)         → coin_tex = NULL
 SDL_DestroyTexture(fish_tex)         → fish_tex = NULL
 SDL_DestroyTexture(spider_tex)       → spider_tex = NULL
 SDL_DestroyTexture(platform_tex)     → platform_tex = NULL
 SDL_DestroyTexture(floor_tile)       → floor_tile = NULL
 parallax_cleanup(&parallax)
-SDL_GameControllerClose(controller)  → controller = NULL  (skipped if NULL)
-SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER)
 SDL_DestroyRenderer(renderer)        → renderer = NULL
 SDL_DestroyWindow(window)            → window = NULL
 ```
@@ -341,7 +341,7 @@ void player_init(Player *player, SDL_Renderer *renderer);
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                          SDL_GameController *ctrl);
 void player_update(Player *player, float dt, const Platform *platforms, int platform_count);
-void player_render(Player *player, SDL_Renderer *renderer);
+void player_render(Player *player, SDL_Renderer *renderer, int cam_x);
 SDL_Rect player_get_hitbox(const Player *player);
 void player_reset(Player *player);
 void player_cleanup(Player *player);
