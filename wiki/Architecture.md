@@ -36,6 +36,13 @@ main()
   │     ├── coins_init(gs.coins, &gs.coin_count)
   │     ├── IMG_LoadTexture → gs.vine_tex      (Vine.png — non-fatal)
   │     ├── vine_init(gs.vines, &gs.vine_count)
+  │     ├── IMG_LoadTexture → gs.bouncepad_tex (Bouncepad_Wood.png)
+  │     ├── bouncepads_init(gs.bouncepads, &gs.bouncepad_count)
+  │     ├── Mix_LoadWAV     → gs.snd_spring    (spring-boing.mp3 — non-fatal)
+  │     ├── IMG_LoadTexture → gs.rail_tex      (Rails.png — non-fatal)
+  │     ├── rail_init(gs.rails, &gs.rail_count)
+  │     ├── IMG_LoadTexture → gs.spike_block_tex (Spike_Block.png — non-fatal)
+  │     ├── spike_blocks_init(gs.spike_blocks, &gs.spike_block_count, gs.rails)
   │     ├── Mix_LoadWAV     → gs.snd_jump      (jump.wav)
   │     ├── Mix_LoadWAV     → gs.snd_coin      (coin.wav — non-fatal)
   │     ├── Mix_LoadWAV     → gs.snd_hit       (hit.wav — non-fatal)
@@ -43,7 +50,8 @@ main()
   │     ├── Mix_PlayMusic(-1)                  (loop forever, 10% volume)
   │     ├── player_init(&gs.player, gs.renderer)
   │     ├── fog_init(&gs.fog, gs.renderer)     (Sky_Background_1/2.png)
-  │     └── hud_init(&gs.hud, gs.renderer)
+  │     ├── hud_init(&gs.hud, gs.renderer)
+  │     └── if (debug_mode) debug_init(&gs.debug)
   │
   ├── game_loop(&gs)          ← see Game Loop section below
   │
@@ -58,7 +66,10 @@ main()
         ├── Mix_FreeChunk (snd_coin)
         ├── Mix_FreeChunk (snd_hit)
         ├── water_cleanup
+        ├── SDL_DestroyTexture (spike_block_tex)
+        ├── SDL_DestroyTexture (rail_tex)
         ├── SDL_DestroyTexture (vine_tex)
+        ├── Mix_FreeChunk (snd_spring)
         ├── SDL_DestroyTexture (coin_tex)
         ├── SDL_DestroyTexture (fish_tex)
         ├── SDL_DestroyTexture (spider_tex)
@@ -87,11 +98,17 @@ while (gs.running) {
                     SDL_CONTROLLERDEVICEADDED   — opens a newly plugged-in controller
                     SDL_CONTROLLERDEVICEREMOVED — closes and NULLs gs->controller when unplugged
                     SDL_CONTROLLERBUTTONDOWN (START) — sets gs->running = 0 to quit
-  3. Update       — player_handle_input → player_update → spiders_update → fish_update
-                    → spider collision check → fish collision check → coins_update / coin–player collision
-                    → heart/lives logic → water_update → fog_update
-  4. Render       — clear → parallax background → floor tiles → platforms → vines
-                    → coins → fish → water → spiders → player → fog → hud → present
+  3. Update       — player_handle_input → player_update (incl. bouncepad landing detection)
+                    → bouncepad response (animation + spring sound)
+                    → spiders_update → fish_update → spike_blocks_update
+                    → spider collision → fish collision → spike_block collision (+ push impulse)
+                    → coin–player collision → heart/lives logic
+                    → water_update → fog_update → bouncepads_update
+                    → debug_update (if --debug)
+  4. Render       — clear → parallax background → floor tiles → platforms
+                    → bouncepads → rails → vines → coins → fish → water
+                    → spike blocks → spiders → player → fog → hud
+                    → debug overlay (if --debug) → present
 }
 ```
 
@@ -112,14 +129,18 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 | 1 | Background | 6 layers from `assets/Parallax/` tiled horizontally, each scrolling at a different speed fraction of `cam_x` |
 | 2 | Floor | `Grass_Tileset.png` 9-slice tiled across `GAME_W` at `FLOOR_Y` |
 | 3 | Platforms | `Grass_Oneway.png` 9-slice tiled pillar stacks |
-| 4 | Vines | `Vine.png` static scenery on ground floor and platform tops |
-| 5 | Coins | `Coin.png` collectible sprites drawn on top of platforms |
-| 6 | Fish | `Fish_2.png` animated jumping enemies, drawn before water for submerged look |
-| 7 | Water | `Water.png` animated scrolling strip at the bottom |
-| 8 | Spiders | `Spider_1.png` animated patrol enemies on the ground |
-| 9 | Player | Animated sprite sheet, drawn on top of environment |
-| 10 | Fog | `Sky_Background_1/2.png` semi-transparent sliding overlay |
-| 11 | HUD | `hud_render`: hearts, lives, score — always drawn on top |
+| 4 | Bouncepads | `Bouncepad_Wood.png` spring pads on floor and platforms |
+| 5 | Rails | `Rails.png` bitmask tile tracks for spike blocks |
+| 6 | Vines | `Vine.png` static scenery on ground floor and platform tops |
+| 7 | Coins | `Coin.png` collectible sprites drawn on top of platforms |
+| 8 | Fish | `Fish_2.png` animated jumping enemies, drawn before water for submerged look |
+| 9 | Water | `Water.png` animated scrolling strip at the bottom |
+| 10 | Spike blocks | `Spike_Block.png` rotating rail-riding hazards |
+| 11 | Spiders | `Spider_1.png` animated patrol enemies on the ground |
+| 12 | Player | Animated sprite sheet, drawn on top of environment |
+| 13 | Fog | `Sky_Background_1/2.png` semi-transparent sliding overlay |
+| 14 | HUD | `hud_render`: hearts, lives, score — always drawn on top |
+| 15 | Debug | `debug_render`: FPS counter, collision boxes, event log — when `--debug` active |
 
 ---
 
@@ -179,6 +200,16 @@ typedef struct {
     int           fish_count;
     VineDecor     vines[MAX_VINES]; // Static scenery vine instances
     int           vine_count;
+    SDL_Texture  *bouncepad_tex;              // Shared texture for all bouncepads (GPU)
+    Bouncepad     bouncepads[MAX_BOUNCEPADS]; // Spring launch pad instances
+    int           bouncepad_count;            // Number of bouncepads placed
+    Mix_Chunk    *snd_spring;  // Bouncepad spring-boing sound effect (MP3)
+    SDL_Texture  *rail_tex;    // Shared texture for all rail tiles (GPU)
+    Rail          rails[MAX_RAILS];       // Level rail path definitions
+    int           rail_count;             // Number of active rail paths
+    SDL_Texture  *spike_block_tex;        // Shared texture for spike blocks (GPU)
+    SpikeBlock    spike_blocks[MAX_SPIKE_BLOCKS]; // Rail-riding hazard instances
+    int           spike_block_count;              // Number of active spike blocks
     Hud           hud;         // HUD display: hearts, lives, score
     int           hearts;      // Current hit points (0–MAX_HEARTS)
     int           lives;       // Remaining lives; 0 triggers game over
@@ -186,6 +217,9 @@ typedef struct {
     int           coins_for_heart; // Coins collected toward next heart restore
     Camera        camera;      // Viewport scroll position; updated every frame
     int           running;     // Loop flag: 1 = keep going, 0 = quit
+    int           paused;      // 1 = window lost focus; physics/music frozen
+    int           debug_mode;  // 1 = debug overlays active (--debug flag)
+    DebugOverlay  debug;       // FPS counter, collision vis, event log
 } GameState;
 ```
 

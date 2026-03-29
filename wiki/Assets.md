@@ -24,7 +24,10 @@ All visual assets live in the `assets/` directory. They are PNG files (loaded vi
 | `Grass_Oneway.png` | `game.c` (`gs->platform_tex`) | 48×48 tile, 9-slice rendered as one-way platform pillars |
 | `Player.png` | `player.c` (`player->texture`) | 192×288 sprite sheet, 4 cols × 6 rows, 48×48 frames |
 | `Water.png` | `water.c` (`water->texture`) | 384×64 sprite sheet, 8 frames of 48×64 with 16×31 art crop |
-| `Spider_1.png` | `game.c` (`gs->spider_tex`) | 192×48 sprite sheet, 4 frames of 48×48 with 10 px art band |
+| `Bouncepad_Wood.png` | `game.c` (`gs->bouncepad_tex`) | 144×48 sprite sheet, 3 frames of 48×48 (spring pad animation) |
+| `Rails.png` | `game.c` (`gs->rail_tex`) | 64×64 sprite sheet, 4×4 grid of 16×16 bitmask rail tiles |
+| `Spike_Block.png` | `game.c` (`gs->spike_block_tex`) | 16×16 single-frame rotating hazard sprite |
+| `Spider_1.png` | `game.c` (`gs->spider_tex`) | 192×48 sprite sheet, 3 frames of 64×48 with 10 px art band |
 | `Coin.png` | `coin.c` (`gs->coin_tex`) | 16×16 coin collectible sprite |
 | `Vine.png` | `vine.c` (`gs->vine_tex`) | 16×48 single-frame plant sprite for static scenery |
 | `Fish_2.png` | `fish.c` (`gs->fish_tex`) | 96×48 sprite sheet, 2 frames of 48×48 (swim animation) |
@@ -96,7 +99,7 @@ These are included in `assets/` and ready for future use in platformer levels.
 | `Spike_Platform.png` | Spiked platform (hazard) |
 | `Bridge.png` | Bridge / walkway tile |
 | `Ladder.png` | Climbable ladder |
-| `Rails.png` | Rail / cart track |
+| `Rails.png` | ✅ In use — `rail.c` bitmask tile track system |
 | `Rope.png` | Rope (climbable) |
 | `Vine.png` | ✅ In use — `vine.c` static scenery decoration |
 | `Water.png` | ✅ In use — animated water surface strip |
@@ -131,7 +134,7 @@ These are included in `assets/` and ready for future use in platformer levels.
 | `Axe_Trap.png` | Swinging axe hazard |
 | `Circular_Saw.png` | Rotating saw blade hazard |
 | `Spike.png` | Floor/ceiling spike |
-| `Spike_Block.png` | Moving spike block |
+| `Spike_Block.png` | ✅ In use — `spike_block.c` rail-riding rotating hazard |
 | `Flame_1.png` | Flame hazard, variant 1 |
 | `Flame_2.png` | Flame hazard, variant 2 |
 
@@ -141,7 +144,7 @@ These are included in `assets/` and ready for future use in platformer levels.
 |------|-------------|
 | `Bouncepad_Green.png` | Green bounce pad |
 | `Bouncepad_Red.png` | Red bounce pad |
-| `Bouncepad_Wood.png` | Wooden bounce pad |
+| `Bouncepad_Wood.png` | ✅ In use — `bouncepad.c` spring launch pad |
 
 ### UI / Branding
 

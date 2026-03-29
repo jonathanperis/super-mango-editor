@@ -179,8 +179,8 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
 | `MAX_SPIDERS` | `4` | `int` | Maximum simultaneous spider enemies |
-| `SPIDER_FRAMES` | `4` | `int` | Animation frames in `Spider_1.png` |
-| `SPIDER_FRAME_W` | `48` | `int` | Width of one frame slot in the sheet (px) |
+| `SPIDER_FRAMES` | `3` | `int` | Animation frames in `Spider_1.png` (192÷64 = 3) |
+| `SPIDER_FRAME_W` | `64` | `int` | Width of one frame slot in the sheet (px) |
 | `SPIDER_ART_Y` | `22` | `int` | First visible row within each frame slot |
 | `SPIDER_ART_H` | `10` | `int` | Height of visible art (rows 22–31) |
 | `SPIDER_SPEED` | `50.0f` | `float` | Walk speed (px/s) |
@@ -257,3 +257,59 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 | `HUD_HEART_SIZE` | `12` | `int` | Display size of each heart icon (px) |
 | `HUD_HEART_GAP` | `2` | `int` | Horizontal gap between heart icons (px) |
 | `HUD_ICON_SIZE` | `48` | `int` | Display size of the player icon (px) |
+
+---
+
+## `bouncepad.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_BOUNCEPADS` | `4` | `int` | Maximum simultaneous bouncepad instances |
+| `BOUNCEPAD_W` | `48` | `int` | Display width of one bouncepad frame (px) |
+| `BOUNCEPAD_H` | `48` | `int` | Display height of one bouncepad frame (px) |
+| `BOUNCEPAD_VY` | `-536.25f` | `float` | Upward launch impulse applied to the player (px/s) |
+| `BOUNCEPAD_FRAME_MS` | `80` | `int` | Milliseconds per animation frame during release |
+| `BOUNCEPAD_SRC_Y` | `14` | `int` | First non-transparent row in the frame |
+| `BOUNCEPAD_SRC_H` | `18` | `int` | Height of the art region (rows 14–31) |
+
+---
+
+## `rail.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `RAIL_N` | `1 << 0` | bitmask | Tile opens upward |
+| `RAIL_E` | `1 << 1` | bitmask | Tile opens rightward |
+| `RAIL_S` | `1 << 2` | bitmask | Tile opens downward |
+| `RAIL_W` | `1 << 3` | bitmask | Tile opens leftward |
+| `RAIL_TILE_W` | `16` | `int` | Width of one tile in the sprite sheet (px) |
+| `RAIL_TILE_H` | `16` | `int` | Height of one tile in the sprite sheet (px) |
+| `MAX_RAIL_TILES` | `128` | `int` | Maximum tiles in a single Rail path |
+| `MAX_RAILS` | `4` | `int` | Maximum Rail instances per level |
+
+---
+
+## `spike_block.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `SPIKE_DISPLAY_W` | `24` | `int` | On-screen width in logical pixels (16×16 scaled up) |
+| `SPIKE_DISPLAY_H` | `24` | `int` | On-screen height in logical pixels |
+| `SPIKE_SPIN_DEG_PER_SEC` | `360.0f` | `float` | Rotation speed — one full turn per second |
+| `SPIKE_SPEED_SLOW` | `1.5f` | `float` | Rail traversal: 1.5 tiles/s |
+| `SPIKE_SPEED_NORMAL` | `3.0f` | `float` | Rail traversal: 3.0 tiles/s |
+| `SPIKE_SPEED_FAST` | `6.0f` | `float` | Rail traversal: 6.0 tiles/s |
+| `SPIKE_PUSH_SPEED` | `220.0f` | `float` | Horizontal push impulse magnitude (px/s) |
+| `SPIKE_PUSH_VY` | `-150.0f` | `float` | Upward push component on collision (px/s) |
+| `MAX_SPIKE_BLOCKS` | `4` | `int` | Maximum spike block instances per level |
+
+---
+
+## `debug.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `DEBUG_LOG_MAX_ENTRIES` | `8` | `int` | Maximum visible log messages |
+| `DEBUG_LOG_MSG_LEN` | `64` | `int` | Max characters per log message (incl. null) |
+| `DEBUG_LOG_DISPLAY_SEC` | `4.0f` | `float` | Seconds each log entry stays visible |
+| `DEBUG_FPS_SAMPLE_MS` | `500` | `int` | Milliseconds between FPS counter refreshes |

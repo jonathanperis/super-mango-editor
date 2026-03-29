@@ -69,7 +69,7 @@ make
 
 ### `make run`
 
-Builds (if out of date) then immediately executes the binary.
+Builds (if out of date) then immediately executes the binary (no CLI flags).
 
 ```sh
 make run
@@ -79,6 +79,14 @@ The binary must be run from the **repo root** because asset paths are relative:
 ```c
 IMG_LoadTexture(renderer, "assets/Parallax/sky.png");
 Mix_LoadWAV("sounds/jump.wav");
+```
+
+### `make run-debug`
+
+Builds (if out of date) then runs the binary with the `--debug` flag, which enables the debug overlay: FPS counter, collision hitbox visualization, and scrolling event log.
+
+```sh
+make run-debug
 ```
 
 ### `make clean`
@@ -184,5 +192,13 @@ src/
 ├── water.o
 ├── spider.o
 ├── fog.o
-└── (any new .o files)
+├── parallax.o
+├── coin.o
+├── vine.o
+├── fish.o
+├── hud.o
+├── bouncepad.o
+├── rail.o
+├── spike_block.o
+└── debug.o
 ```

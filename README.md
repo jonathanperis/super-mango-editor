@@ -13,14 +13,18 @@ Super Mango is a 2D platformer where a player character runs and jumps through a
 - **Player** — 4-state animated character (idle/walk/jump/fall) with gravity, floor collision, and one-way platform landing
 - **One-way platforms** — Pillar stacks built from 9-slice tiled grass blocks; the player can jump through from below and land on top
 - **Animated water** — Seamless scrolling water strip at the bottom of the screen using cropped sprite frames
-- **Spider enemies** — Ground-patrol spiders with 4-frame walk animation that reverse at patrol boundaries; touching a spider grants 1.5 s of invincibility and triggers a blinking sprite effect
+- **Spider enemies** — Ground-patrol spiders with 3-frame walk animation that reverse at patrol boundaries; touching a spider grants 1.5 s of invincibility and triggers a blinking sprite effect
 - **Fog overlay** — Semi-transparent sky layers that slide across the screen for an atmospheric mist effect
 - **Coins** — Collectible items placed on the ground and platforms; AABB pickup awards 100 points each; every 3 coins restores one heart
 - **Vine decorations** — Static plant sprites placed on the ground and platform tops for visual variety; purely scenery with no collision
 - **Fish enemies** — Jumping water enemies that patrol the bottom lane, leap out of the water on random arcs, and use AABB collision with the player
 - **HUD overlay** — Top-of-screen display showing heart icons (hit points), player icon + lives counter, and a score readout
 - **Lives/Hearts system** — The player has hearts (hit points, max 3) and lives (remaining tries, starts at 3); spider collision drains a heart; reaching 0 hearts costs a life
-- **Audio** — Jump sound, coin pickup sound, hurt sound effect, and looping ambient background music
+- **Bouncepads** — Wooden spring launch pads with 3-frame squash/release animation; landing on one launches the player upward and plays a spring-boing sound
+- **Spike blocks** — Rail-riding rotating hazards (16×16 scaled to 24×24, 360°/s spin); collision pushes the player away and deals damage
+- **Rails** — Tile-based rail paths (closed loops and open lines) that spike blocks travel along; built from a 4×4 bitmask tileset
+- **Debug overlay** — `--debug` flag enables an FPS counter, collision hitbox visualization, and a scrolling event log
+- **Audio** — Jump sound, coin pickup sound, hurt sound effect, bouncepad spring sound, and looping ambient background music
 
 ## Prerequisites
 
@@ -109,6 +113,9 @@ make
 # Build and run immediately
 make run
 
+# Build and run with debug overlay (FPS, collision boxes, event log)
+make run-debug
+
 # Remove all build artifacts
 make clean
 ```
@@ -183,7 +190,15 @@ super-mango-game/
     ├── fish.h             ← Fish struct + patrol / jump / animation constants
     ├── fish.c             ← Jumping fish enemy: patrol, random jump arcs, render
     ├── hud.h              ← Hud struct (font + star texture) + HUD constants
-    └── hud.c              ← HUD renderer: hearts, lives counter, score text
+    ├── hud.c              ← HUD renderer: hearts, lives counter, score text
+    ├── bouncepad.h        ← Bouncepad struct + constants (MAX_BOUNCEPADS, BOUNCEPAD_VY, …)
+    ├── bouncepad.c        ← Bouncepad init, 3-frame release animation, render
+    ├── rail.h             ← Rail/RailTile structs + bitmask constants (MAX_RAILS, MAX_RAIL_TILES, …)
+    ├── rail.c             ← Rail path building, bitmask tile rendering, position interpolation
+    ├── spike_block.h      ← SpikeBlock struct + speed/push constants
+    ├── spike_block.c      ← Spike block rail traversal, free-fall, push collision, render
+    ├── debug.h            ← DebugOverlay struct + log/FPS constants
+    └── debug.c            ← Debug overlay: FPS counter, collision boxes, scrolling event log
 ```
 
 ## Architecture
@@ -206,14 +221,18 @@ main()
 | 1 | Parallax background (6 layers from `assets/Parallax/`, rendered back-to-front via `parallax_render`) |
 | 2 | Floor (9-slice tiled Grass_Tileset.png) |
 | 3 | Platforms (9-slice tiled Grass_Oneway.png pillars) |
-| 4 | Vines (static Vine.png scenery on ground and platform tops) |
-| 5 | Coins (animated Coin.png collectibles) |
-| 6 | Fish (animated Fish_2.png jumping water enemies, drawn before water) |
-| 7 | Water (animated Water.png strip) |
-| 8 | Spiders (animated Spider_1.png patrol enemies) |
-| 9 | Player (animated Player.png sprite) |
-| 10 | Fog (semi-transparent Sky_Background sliding layers) |
-| 11 | HUD (`hud_render`: hearts, lives, score — always drawn on top) |
+| 4 | Bouncepads (Bouncepad_Wood.png spring pads) |
+| 5 | Rails (Rails.png bitmask tile tracks) |
+| 6 | Vines (static Vine.png scenery on ground and platform tops) |
+| 7 | Coins (Coin.png collectibles) |
+| 8 | Fish (animated Fish_2.png jumping water enemies, drawn before water) |
+| 9 | Water (animated Water.png strip) |
+| 10 | Spike blocks (Spike_Block.png rotating rail-riding hazards) |
+| 11 | Spiders (animated Spider_1.png patrol enemies) |
+| 12 | Player (animated Player.png sprite) |
+| 13 | Fog (semi-transparent Sky_Background sliding layers) |
+| 14 | HUD (`hud_render`: hearts, lives, score — always drawn on top) |
+| 15 | Debug overlay (FPS counter, collision boxes, event log — when `--debug` active) |
 
 ### Delta Time
 
