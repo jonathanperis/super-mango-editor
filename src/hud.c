@@ -110,7 +110,7 @@ void hud_render(const Hud *hud, SDL_Renderer *renderer,
     for (int i = 0; i < hearts; i++) {
         SDL_Rect dst = {
             HUD_MARGIN + i * (HUD_HEART_SIZE + HUD_HEART_GAP),
-            hud_row_y + (HUD_ICON_SIZE - HUD_HEART_SIZE) / 2,
+            hud_row_y + (HUD_ROW_H - HUD_HEART_SIZE) / 2,
             HUD_HEART_SIZE,
             HUD_HEART_SIZE
         };
@@ -125,23 +125,30 @@ void hud_render(const Hud *hud, SDL_Renderer *renderer,
     int icon_x = HUD_MARGIN + MAX_HEARTS * (HUD_HEART_SIZE + HUD_HEART_GAP) + 6;
 
     /*
-     * Source rect: first frame of Player.png (row 0, col 0, 48×48 px).
-     * This is the idle standing pose — recognisable as the player character.
+     * Source rect: crop to just the visible character art within the
+     * 48×48 idle frame.  The art occupies x=16..31, y=19..31 (16×13 px);
+     * the rest is transparent padding.  Displaying at HUD_ICON_W × HUD_ICON_H
+     * gives a 1:1 pixel-crisp icon that aligns with the hearts and text.
      */
-    SDL_Rect icon_src = {0, 0, 48, 48};
-    SDL_Rect icon_dst = {icon_x, hud_row_y, HUD_ICON_SIZE, HUD_ICON_SIZE};
+    SDL_Rect icon_src = {16, 19, 16, 13};
+    SDL_Rect icon_dst = {
+        icon_x,
+        hud_row_y + (HUD_ROW_H - HUD_ICON_H) / 2,
+        HUD_ICON_W,
+        HUD_ICON_H
+    };
     SDL_RenderCopy(renderer, player_tex, &icon_src, &icon_dst);
 
     /*
      * "x3" — lives counter text, rendered right next to the player icon.
      * snprintf formats the number; render_text draws it in white.
+     * Aligned to HUD_ROW_H so it sits level with hearts and score.
      */
     char lives_buf[8];
     snprintf(lives_buf, sizeof(lives_buf), "x%d", lives);
-    /* Centre text vertically within the icon row; font is 13 px tall by design */
     render_text(hud->font, renderer, lives_buf,
-                icon_x + HUD_ICON_SIZE + 4,
-                hud_row_y + (HUD_ICON_SIZE - 13) / 2);
+                icon_x + HUD_ICON_W + 4,
+                hud_row_y + (HUD_ROW_H - 13) / 2);
 
     /* ---- Score (top-right) ---------------------------------------- */
     /*
@@ -156,10 +163,9 @@ void hud_render(const Hud *hud, SDL_Renderer *renderer,
         fprintf(stderr, "TTF_SizeText failed for score text: %s\n", TTF_GetError());
         text_w = 0;  /* Fallback: draw at GAME_W - HUD_MARGIN, as before */
     }
-    /* Centre text vertically within the icon row; font is 13 px tall by design */
     render_text(hud->font, renderer, score_buf,
                 GAME_W - HUD_MARGIN - text_w,
-                hud_row_y + (HUD_ICON_SIZE - 13) / 2);
+                hud_row_y + (HUD_ROW_H - 13) / 2);
 }
 
 /* ------------------------------------------------------------------ */
