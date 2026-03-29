@@ -80,6 +80,8 @@ These are `#define`s local to `player.c` (not visible to other files).
 | `FRAME_W` | `48` | Width of one sprite frame in the sheet (px) |
 | `FRAME_H` | `48` | Height of one sprite frame in the sheet (px) |
 | `FLOOR_SINK` | `16` | Visual overlap onto the floor tile to prevent floating feet |
+| `PHYS_PAD_X` | `12` | Pixels trimmed from each horizontal side of the frame for the physics box (physics width = 48 − 24 = 24 px) |
+| `PHYS_PAD_TOP` | `6` | Pixels trimmed from the top of the frame for the physics box |
 
 ### Why `FLOOR_SINK`?
 
