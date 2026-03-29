@@ -89,6 +89,14 @@ int main(int argc, char *argv[]) {
      * The {0} syntax in C sets every field to 0/NULL, so no garbage values.
      * We pass it by pointer (&gs) so functions can modify it in place.
      */
+    /*
+     * Seed the C standard library RNG so vine layout (and any other
+     * rand()-driven decoration) differs each run.  SDL_GetTicks() returns
+     * milliseconds since SDL_Init, which varies by OS scheduling jitter
+     * and gives a different seed on every launch.
+     */
+    srand((unsigned int)SDL_GetTicks());
+
     GameState gs = {0};
     game_init(&gs);     /* create window, renderer, load textures           */
     game_loop(&gs);     /* run until the player quits                       */
