@@ -63,9 +63,50 @@
  */
 #define GRAVITY       800.0f
 
+/*
+ * WORLD_W — total logical width of the level in pixels.
+ * The visible window is still GAME_W (400 px); the camera scrolls to reveal
+ * the rest. WORLD_W = 4 × GAME_W gives four screens of horizontal space.
+ */
+#define WORLD_W       1600
+
+/*
+ * CAM_LOOKAHEAD — extra pixels the camera shifts in the direction the player
+ * faces, revealing more terrain ahead before the player reaches the edge.
+ * Increase this value for more forward visibility; set to 0 to disable.
+ */
+#define CAM_LOOKAHEAD  40
+
+/*
+ * CAM_SMOOTHING — lerp speed factor (dimensionless, applied per second).
+ * Each frame the camera closes (CAM_SMOOTHING × dt) of the remaining gap to
+ * the target. 8.0 gives responsive follow without snapping. Lower = laggier.
+ */
+#define CAM_SMOOTHING  8.0f
+
+/*
+ * CAM_SNAP_THRESHOLD — when the remaining gap between cam_x and its target
+ * is smaller than this many pixels, snap exactly instead of lerping.
+ * Prevents endless sub-pixel micro-drift each frame.
+ */
+#define CAM_SNAP_THRESHOLD  0.5f
+
 /* ------------------------------------------------------------------ */
 /* GameState — the single source of truth for everything the game owns */
 /* ------------------------------------------------------------------ */
+
+/*
+ * Camera — tracks the horizontal scroll position of the viewport.
+ *
+ * cam.x is the left edge of the visible window in world coordinates.
+ * To convert a world-space x to a screen-space x: screen_x = world_x - cam.x
+ * The camera lerps toward a target that keeps the player centered, with a
+ * directional lookahead offset. It clamps at the world boundaries so the
+ * black void beyond WORLD_W is never shown.
+ */
+typedef struct {
+    float x;   /* left edge of the visible window in world-space logical pixels */
+} Camera;
 
 typedef struct {
     SDL_Window   *window;      /* the OS window (created by SDL)              */
@@ -93,6 +134,7 @@ typedef struct {
     int           lives;       /* remaining lives; 0 triggers game over       */
     int           score;       /* cumulative score from collecting coins      */
     int           coins_for_heart; /* coins collected toward next heart restore */
+    Camera        camera;      /* viewport scroll position; updated every frame*/
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
 } GameState;
 

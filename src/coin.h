@@ -10,7 +10,7 @@
 
 #include <SDL.h>
 
-#define MAX_COINS        8     /* maximum simultaneous coins on screen     */
+#define MAX_COINS       24     /* coin slots across the full world         */
 #define COIN_DISPLAY_W  16     /* render width  in logical pixels          */
 #define COIN_DISPLAY_H  16     /* render height in logical pixels          */
 #define COIN_SCORE     100     /* score awarded per coin collected         */
@@ -41,6 +41,8 @@ void coins_init(Coin *coins, int *count);
  *
  * Inactive coins (active == 0) are skipped.  Each coin is drawn at its
  * position scaled to COIN_DISPLAY_W × COIN_DISPLAY_H logical pixels.
+ * cam_x is the camera left-edge offset (world px); subtract it from dst.x
+ * to convert world coordinates to screen coordinates.
  */
 void coins_render(const Coin *coins, int count,
-                  SDL_Renderer *renderer, SDL_Texture *tex);
+                  SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);

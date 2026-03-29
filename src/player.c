@@ -305,8 +305,8 @@ void player_update(Player *player, float dt,
      */
     if (player->x + PHYS_PAD_X < 0.0f)
         player->x = -(float)PHYS_PAD_X;
-    if (player->x + player->w - PHYS_PAD_X > GAME_W)
-        player->x = (float)(GAME_W - player->w + PHYS_PAD_X);
+    if (player->x + player->w - PHYS_PAD_X > WORLD_W)
+        player->x = (float)(WORLD_W - player->w + PHYS_PAD_X);
 
     /*
      * Ceiling clamp — stop upward movement when the physics top hits the
@@ -333,7 +333,7 @@ void player_update(Player *player, float dt,
  * While hurt_timer > 0 the sprite blinks on/off every 100 ms to give
  * visual feedback that the player was hit and is temporarily invincible.
  */
-void player_render(Player *player, SDL_Renderer *renderer) {
+void player_render(Player *player, SDL_Renderer *renderer, int cam_x) {
     /*
      * Blink effect: during invincibility, convert the remaining hurt time
      * into a 100-ms cadence.  On odd intervals the sprite is hidden,
@@ -350,7 +350,7 @@ void player_render(Player *player, SDL_Renderer *renderer) {
      * w/h match the frame size (FRAME_W × FRAME_H = 48×48).
      */
     SDL_Rect dst = {
-        .x = (int)player->x,
+        .x = (int)player->x - cam_x,  /* world → screen: subtract camera offset */
         .y = (int)player->y,
         .w = player->w,
         .h = player->h
