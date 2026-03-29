@@ -13,17 +13,21 @@
 
 #define MAX_VINES   24              /* upper bound on decoration instances   */
 #define VINE_W      16              /* sprite width  (natural size)          */
-#define VINE_H      48              /* sprite height (natural size)          */
+#define VINE_H      32              /* content height after removing 8 px transparent padding top+bottom */
+#define VINE_SRC_Y   8              /* first pixel row with content in Vine.png */
+#define VINE_SRC_H  32              /* height of content area in Vine.png    */
 
 /*
- * VineDecor — world-space position of one vine instance.
+ * VineDecor — world-space position and length of one hanging vine.
  *
- * x : left edge in logical world pixels.
- * y : top  edge in logical world pixels (bottom = y + VINE_H).
+ * x          : left edge in logical world pixels.
+ * y          : top edge (attachment to platform surface).
+ * tile_count : number of VINE_H-px tiles stacked downward (2–4).
  */
 typedef struct {
     float x;
     float y;
+    int   tile_count;
 } VineDecor;
 
 /* Populate the vine array with ground and platform placements. */

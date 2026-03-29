@@ -1,70 +1,85 @@
 /*
- * vine.c — Static vine/plant decorations placed on the ground and platforms.
+ * vine.c — Hanging vine decorations that drape from platform tops toward
+ *           the ground floor.
  *
- * Vines are placed once at init time.  No state changes after that —
- * vine_render just blits each instance with the camera offset applied.
+ * Vines are placed once at init time and are purely visual — no state
+ * changes, no collision.
  *
- * Ground placement: one vine every ~130–160 logical px across WORLD_W,
- * chosen to avoid overlapping platform pillars (each 48 px wide).
+ * One vine per pillar, placed at either the left or the right inset
+ * position chosen randomly at startup.  VINE_BORDER keeps the vine
+ * centred within the platform edge rather than flush against it.
  *
- * Platform placement: four of the eight pillars get a vine on their top
- * surface — every other pillar for a natural, irregular appearance.
- * Each pillar is 48 px wide; the 16-px vine is offset 4 px from the
- * pillar's left edge so it sits visually near the centre.
+ * With TILE_SIZE=48, VINE_W=16, VINE_BORDER=8:
+ *   Left  position: plat_x + VINE_BORDER          (= plat_x +  8)
+ *   Right position: plat_x + TILE_SIZE - VINE_BORDER - VINE_W (= plat_x + 24)
  *
- * Coordinate reference  (GAME_H=300, TILE_SIZE=48, FLOOR_Y=252):
- *   Ground vine top  = FLOOR_Y  - VINE_H  = 252 - 48 = 204
- *   Platform vine top = platform.y - VINE_H
- *     Pillar 0 (x= 80, y=156): vine top = 156 - 48 = 108
- *     Pillar 3 (x=680, y=108): vine top = 108 - 48 =  60
- *     Pillar 4 (x=880, y=156): vine top = 156 - 48 = 108
- *     Pillar 6 (x=1300,y=156): vine top = 156 - 48 = 108
+ * The vine always fills completely from the platform's top surface down to
+ * FLOOR_Y — tile count = (FLOOR_Y − plat_y) / VINE_H:
+ *
+ *   Medium pillar (top y=156): 3 tiles — covers 156 → 252 (96 px / 32)
+ *   Tall   pillar (top y=108): 4 tiles — covers 108 → 252 (144 px / 32)
+ *
+ * The sprite is rendered with SDL_FLIP_VERTICAL so the plant's base
+ * (thicker, root end) attaches to the platform and the leafy tip
+ * hangs toward the ground, matching the classic hanging-vine look.
  */
 #include "vine.h"
-#include "game.h"   /* FLOOR_Y, TILE_SIZE */
+#include "game.h"   /* FLOOR_Y, TILE_SIZE, GAME_W */
+#include <stdlib.h> /* rand */
+
+/* Horizontal inset from each edge of the platform. */
+#define VINE_BORDER 8
+/* Tile step in pixels: VINE_H minus overlap — 20% smaller gap than previous 24. */
+#define VINE_STEP   19
 
 /* ------------------------------------------------------------------ */
 
 void vine_init(VineDecor *vines, int *count)
 {
     int n = 0;
-    /* Embed vines 14 px into the surface so they look well planted.
-     * x positions are chosen to keep at least ~32 px clear of any coin
-     * so vines and coins never appear stacked on the same spot.       */
-    const int   embed     = 14;
-    const float ground_y  = (float)(FLOOR_Y - VINE_H + embed);  /* = 218 */
 
-    /* ── Ground vines ─────────────────────────────────────────────── */
-    /* Spread across all four screens, avoiding the 48-px pillar slots.
-     * Coins sit at ground x ≈ 30, 170, 350, 430, 595, 760, 820, 965,
-     * 1130, 1230, 1390, 1555 — vines are offset away from each.      */
+    /*
+     * Platform layout — mirrors platform.c (local constants to avoid a
+     * circular-include dependency on the platform array at call time).
+     *   x : left edge of the pillar in world pixels
+     *   y : top surface (landing surface) in world pixels
+     */
+    static const float plat_x[8] = {  80, 256, 500,  680,  880, 1050, 1300, 1480 };
+    static const float plat_y[8] = { 156, 108, 156,  108,  156,  108,  156,  108 };
 
-    vines[n++] = (VineDecor){ 58.0f,   ground_y }; /* screen 1 left  (coin@30 cleared) */
-    vines[n++] = (VineDecor){ 210.0f,  ground_y }; /* screen 1 mid   (coin@170 cleared)*/
-    vines[n++] = (VineDecor){ 318.0f,  ground_y }; /* screen 1 right (coin@350 cleared)*/
-    vines[n++] = (VineDecor){ 468.0f,  ground_y }; /* screen 2 left  (coin@430 cleared)*/
-    vines[n++] = (VineDecor){ 635.0f,  ground_y }; /* screen 2 mid   (coin@595 cleared)*/
-    vines[n++] = (VineDecor){ 800.0f,  ground_y }; /* screen 2 right (coin@760 ok)     */
-    vines[n++] = (VineDecor){ 1010.0f, ground_y }; /* screen 3       (coin@965 cleared)*/
-    vines[n++] = (VineDecor){ 1165.0f, ground_y }; /* screen 3 right (coin@1130 cleared*/
-    vines[n++] = (VineDecor){ 1265.0f, ground_y }; /* screen 4 left  (coin@1230 cleared*/
-    vines[n++] = (VineDecor){ 1420.0f, ground_y }; /* screen 4 right (coin@1390 ok)    */
+    /*
+     * Randomly pick 2 or 3 platforms to receive a vine.
+     * Fisher-Yates partial shuffle on an index array selects them without
+     * repetition.
+     */
+    int indices[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };
+    int vine_count = 2 + rand() % 2;  /* 2 or 3 */
+    for (int i = 0; i < vine_count; i++) {
+        int j = i + rand() % (8 - i);
+        int tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp;
+    }
 
-    /* ── Platform vines ───────────────────────────────────────────── */
-    /* Placed on alternating pillars; offset +4 px so the vine sits
-     * near the visual centre of the 48-px wide pillar top.          */
+    for (int i = 0; i < vine_count && n < MAX_VINES; i++) {
+        int p = indices[i];
+        /*
+         * Tile count: capped at 2 or 3 tiles randomly — purely decorative,
+         * not required to reach the floor.
+         */
+        int tiles = 2 + rand() % 2;
 
-    /* Pillar 0 — x=80,  top y=156  (medium, 2 tiles tall)           */
-    vines[n++] = (VineDecor){ 84.0f,   (float)(FLOOR_Y - 2 * TILE_SIZE - VINE_H + embed) };
+        /*
+         * Randomly pick left or right inset position for the single vine.
+         *   Left:  plat_x + VINE_BORDER
+         *   Right: plat_x + TILE_SIZE - VINE_BORDER - VINE_W
+         */
+        float vine_x;
+        if (rand() % 2 == 0)
+            vine_x = plat_x[p] + VINE_BORDER;
+        else
+            vine_x = plat_x[p] + TILE_SIZE - VINE_BORDER - VINE_W;
 
-    /* Pillar 3 — x=680, top y=108  (tall,   3 tiles tall)           */
-    vines[n++] = (VineDecor){ 684.0f,  (float)(FLOOR_Y - 3 * TILE_SIZE - VINE_H + embed) };
-
-    /* Pillar 4 — x=880, top y=156  (medium, 2 tiles tall)           */
-    vines[n++] = (VineDecor){ 884.0f,  (float)(FLOOR_Y - 2 * TILE_SIZE - VINE_H + embed) };
-
-    /* Pillar 6 — x=1300, top y=156 (medium, 2 tiles tall)           */
-    vines[n++] = (VineDecor){ 1304.0f, (float)(FLOOR_Y - 2 * TILE_SIZE - VINE_H + embed) };
+        vines[n++] = (VineDecor){ vine_x, plat_y[p], tiles };
+    }
 
     *count = n;
 }
@@ -76,17 +91,31 @@ void vine_render(const VineDecor *vines, int count,
 {
     for (int i = 0; i < count; i++) {
         const VineDecor *v = &vines[i];
+        int screen_x = (int)v->x - cam_x;
 
-        SDL_Rect dst = {
-            (int)v->x - cam_x,
-            (int)v->y,
-            VINE_W,
-            VINE_H
-        };
+        /* Cull the entire vine chain when it is off the current viewport */
+        if (screen_x + VINE_W < 0 || screen_x >= GAME_W) continue;
 
-        /* Skip instances fully outside the current viewport */
-        if (dst.x + VINE_W < 0 || dst.x >= 400) continue;
+        for (int t = 0; t < v->tile_count; t++) {
+            /* Step by VINE_STEP to overlap tiles, hiding transparent edge pixels. */
+            int tile_y = (int)v->y + t * VINE_STEP;
 
-        SDL_RenderCopy(renderer, tex, NULL, &dst);
+            /* Safety guard — tiles always stay within world bounds */
+            if (tile_y >= FLOOR_Y) break;
+
+            SDL_Rect src = { 0, VINE_SRC_Y, VINE_W, VINE_SRC_H };
+            SDL_Rect dst = { screen_x, tile_y, VINE_W, VINE_H };
+
+            /*
+             * SDL_FLIP_VERTICAL — render the sprite upside-down.
+             * The Vine.png has its root/base at the bottom (upright plant).
+             * Flipping puts the base at the TOP so it visually attaches to
+             * the platform surface, while the leafy tip hangs downward.
+             * src crops the 8 px transparent rows at top and bottom of the
+             * sprite so tiles stack flush with no visible gap.
+             */
+            SDL_RenderCopyEx(renderer, tex, &src, &dst,
+                             0.0, NULL, SDL_FLIP_VERTICAL);
+        }
     }
 }
