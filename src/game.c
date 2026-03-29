@@ -16,6 +16,7 @@
 #include "spider.h"
 #include "fish.h"
 #include "coin.h"
+#include "vine.h"
 #include "hud.h"
 #include "parallax.h"
 
@@ -173,6 +174,16 @@ void game_init(GameState *gs) {
         exit(EXIT_FAILURE);
     }
     coins_init(gs->coins, &gs->coin_count);
+
+    /*
+     * Load the shared vine texture.  Vines are static scenery; loading
+     * failure is non-fatal — the decorations are simply skipped.
+     */
+    gs->vine_tex = IMG_LoadTexture(gs->renderer, "assets/Vine.png");
+    if (!gs->vine_tex) {
+        fprintf(stderr, "Warning: Failed to load Vine.png: %s\n", IMG_GetError());
+    }
+    vine_init(gs->vines, &gs->vine_count);
 
     /*
      * Load the jump sound effect. Mix_LoadWAV decodes the WAV into a
@@ -639,6 +650,12 @@ void game_loop(GameState *gs) {
         platforms_render(gs->platforms, gs->platform_count,
                          gs->renderer, gs->platform_tex, cam_x);
 
+        /* Draw vine decorations on ground and platform tops, behind entities */
+        if (gs->vine_tex) {
+            vine_render(gs->vines, gs->vine_count,
+                        gs->renderer, gs->vine_tex, cam_x);
+        }
+
         /* Draw coins on top of the platforms, before the water and player */
         coins_render(gs->coins, gs->coin_count,
                      gs->renderer, gs->coin_tex, cam_x);
@@ -747,6 +764,11 @@ void game_cleanup(GameState *gs) {
     }
 
     water_cleanup(&gs->water);
+
+    if (gs->vine_tex) {
+        SDL_DestroyTexture(gs->vine_tex);
+        gs->vine_tex = NULL;
+    }
 
     if (gs->coin_tex) {
         SDL_DestroyTexture(gs->coin_tex);
