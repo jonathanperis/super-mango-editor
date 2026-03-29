@@ -226,6 +226,39 @@ void game_init(GameState *gs) {
     gs->score          = 0;
     gs->coins_for_heart = 0;
 
+    /*
+     * Lazy gamepad initialisation — deferred from SDL_Init on purpose.
+     *
+     * SDL_InitSubSystem activates one SDL subsystem after the main SDL_Init
+     * call.  We do this here, after the window is already visible, instead of
+     * at process startup.  Antivirus software applies stricter heuristics to
+     * code that enumerates HID / XInput devices during the very first frames
+     * of a new process; waiting until the game window exists sidesteps those
+     * false-positive triggers.
+     *
+     * Non-fatal: if the subsystem fails to start (e.g. driver issue) the game
+     * continues with keyboard-only input.
+     */
+    if (SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) != 0) {
+        fprintf(stderr, "Warning: SDL_INIT_GAMECONTROLLER failed: %s — "
+                        "gamepad support unavailable\n", SDL_GetError());
+    } else {
+        /*
+         * Scan for already-connected controllers.
+         * SDL_IsGameController checks whether SDL has a known mapping for
+         * the device (DualSense, DS4, Xbox, etc.).  We open the first one
+         * found; hot-plug events (SDL_CONTROLLERDEVICEADDED) handle
+         * controllers connected after this point.
+         */
+        for (int i = 0; i < SDL_NumJoysticks(); i++) {
+            if (SDL_IsGameController(i)) {
+                gs->controller = SDL_GameControllerOpen(i);
+                if (gs->controller)
+                    break;
+            }
+        }
+    }
+
     /* Signal the loop to start running */
     gs->running = 1;
 }
@@ -275,17 +308,56 @@ void game_loop(GameState *gs) {
             if (event.type == SDL_QUIT) {
                 /* User clicked the window's X button */
                 gs->running = 0;
+
             } else if (event.type == SDL_KEYDOWN) {
                 /* A key was pressed this frame */
                 if (event.key.keysym.sym == SDLK_ESCAPE) {
+                    gs->running = 0;
+                }
+
+            } else if (event.type == SDL_CONTROLLERDEVICEADDED) {
+                /*
+                 * A new gamepad was plugged in while the game is running.
+                 * Open it only if we don't already have one active.
+                 * event.cdevice.which is the joystick device index (not
+                 * an instance ID), so it can be passed directly to
+                 * SDL_GameControllerOpen.
+                 */
+                if (!gs->controller) {
+                    gs->controller = SDL_GameControllerOpen(event.cdevice.which);
+                }
+
+            } else if (event.type == SDL_CONTROLLERDEVICEREMOVED) {
+                /*
+                 * A gamepad was unplugged.  Check whether it is the one we
+                 * have open by comparing instance IDs.
+                 * SDL_GameControllerGetJoystick + SDL_JoystickInstanceID
+                 * retrieves the runtime ID of our open controller so we can
+                 * compare it against the event's which field.
+                 */
+                if (gs->controller) {
+                    SDL_Joystick *joy = SDL_GameControllerGetJoystick(gs->controller);
+                    if (SDL_JoystickInstanceID(joy) == event.cdevice.which) {
+                        SDL_GameControllerClose(gs->controller);
+                        gs->controller = NULL;
+                    }
+                }
+
+            } else if (event.type == SDL_CONTROLLERBUTTONDOWN) {
+                /*
+                 * Start (Xbox) / Options (DualSense / DS4) → quit.
+                 * Mirrors the ESC key behaviour so the player can exit
+                 * from the couch without reaching for the keyboard.
+                 */
+                if (event.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
                     gs->running = 0;
                 }
             }
         }
 
         /* ---- 2. Update ------------------------------------------- */
-        /* Read the keyboard and set the player's velocity for this frame */
-        player_handle_input(&gs->player, gs->snd_jump);
+        /* Read keyboard and gamepad; set the player's velocity for this frame */
+        player_handle_input(&gs->player, gs->snd_jump, gs->controller);
         /* Move the player, check floor + one-way platform collisions */
         player_update(&gs->player, dt, gs->platforms, gs->platform_count);
         /* Move spiders along their patrol paths and advance their animation */
@@ -557,6 +629,22 @@ void game_loop(GameState *gs) {
  * are safe (SDL_Destroy* and free() on NULL are no-ops).
  */
 void game_cleanup(GameState *gs) {
+    /*
+     * Close the gamepad and shut down the controller subsystem.
+     *
+     * SDL_GameControllerClose releases the handle for this specific device.
+     * SDL_QuitSubSystem mirrors the SDL_InitSubSystem call in game_init —
+     * it decrements the internal reference count for SDL_INIT_GAMECONTROLLER
+     * and shuts the subsystem down when the count reaches zero.
+     * Both calls are safe when their argument is NULL / the subsystem is
+     * not active, so no extra guard is needed beyond the pointer check.
+     */
+    if (gs->controller) {
+        SDL_GameControllerClose(gs->controller);
+        gs->controller = NULL;
+    }
+    SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+
     /* Free HUD resources (font + star texture, renderer-dependent) */
     hud_cleanup(&gs->hud);
 
