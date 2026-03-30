@@ -5,10 +5,25 @@
  * along a sine curve centred at base_y.  The wave amplitude and frequency
  * create a gentle, lazy flight path.  The bird reverses at patrol boundaries.
  */
-#include <math.h>   /* sinf */
+#include <math.h>   /* sinf, fabsf */
 
 #include "bird.h"
 #include "game.h"   /* GAME_W, GAME_H, WORLD_W */
+
+/*
+ * BIRD_AUDIBLE_RANGE — max distance (px) at which the flap SFX is audible.
+ * Set to GAME_W so the bird fades to silence right at the screen edge.
+ */
+#define BIRD_AUDIBLE_RANGE  ((float)GAME_W)
+#define BIRD_VOL_MAX        96
+#define BIRD_VOL_MIN        16
+
+static int bird_volume_for_distance(float dist) {
+    if (dist >= BIRD_AUDIBLE_RANGE) return 0;
+    if (dist <= 0.0f) return BIRD_VOL_MAX;
+    float fraction = dist / BIRD_AUDIBLE_RANGE;
+    return BIRD_VOL_MAX - (int)(fraction * (BIRD_VOL_MAX - BIRD_VOL_MIN));
+}
 
 /* ------------------------------------------------------------------ */
 
@@ -43,7 +58,8 @@ void birds_init(Bird *birds, int *count)
 
 /* ------------------------------------------------------------------ */
 
-void birds_update(Bird *birds, int count, float dt)
+void birds_update(Bird *birds, int count, float dt,
+                  Mix_Chunk *snd_flap, float player_x, int cam_x)
 {
     for (int i = 0; i < count; i++) {
         Bird *b = &birds[i];
@@ -64,7 +80,27 @@ void birds_update(Bird *birds, int count, float dt)
         b->anim_timer_ms += (Uint32)(dt * 1000.0f);
         if (b->anim_timer_ms >= BIRD_FRAME_MS) {
             b->anim_timer_ms -= BIRD_FRAME_MS;
-            b->frame_index    = (b->frame_index + 1) % BIRD_FRAMES;
+            int prev_frame = b->frame_index;
+            b->frame_index = (b->frame_index + 1) % BIRD_FRAMES;
+
+            /*
+             * Play the flap sound once per animation cycle (when frame
+             * wraps back to 0).  Volume scales with player distance,
+             * like the axe trap sound logic.
+             */
+            if (b->frame_index == 0 && prev_frame != 0 && snd_flap) {
+                float bird_cx = b->x + BIRD_FRAME_W / 2.0f;
+                int on_screen = (bird_cx >= (float)cam_x - BIRD_FRAME_W &&
+                                 bird_cx <= (float)cam_x + GAME_W + BIRD_FRAME_W);
+                if (on_screen) {
+                    float dist = fabsf(player_x - bird_cx);
+                    int vol = bird_volume_for_distance(dist);
+                    if (vol > 0) {
+                        int ch = Mix_PlayChannel(-1, snd_flap, 0);
+                        if (ch >= 0) Mix_Volume(ch, vol);
+                    }
+                }
+            }
         }
     }
 }

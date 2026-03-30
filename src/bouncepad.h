@@ -27,12 +27,29 @@
 #define BOUNCEPAD_H      48
 
 /*
- * BOUNCEPAD_VY — upward launch impulse applied to the player on landing.
+ * Bounce impulse presets — three strength tiers.
  *
- * -487.5 × 1.10 = -536.25 px/s (10% higher than the previous value).
+ * BOUNCEPAD_VY_SMALL  : gentle hop — clears 1-tile pillars but not 2-tile.
+ * BOUNCEPAD_VY_MEDIUM : standard launch — clears 2-tile pillars comfortably.
+ * BOUNCEPAD_VY_HIGH   : powerful launch — clears 3-tile pillars with margin.
+ *
  * Negative because SDL's Y axis increases downward (up = negative vy).
  */
-#define BOUNCEPAD_VY     -536.25f
+#define BOUNCEPAD_VY_SMALL   -380.0f
+#define BOUNCEPAD_VY_MEDIUM  -536.25f
+#define BOUNCEPAD_VY_HIGH    -700.0f
+
+/* Legacy define — kept for existing code that references it. */
+#define BOUNCEPAD_VY  BOUNCEPAD_VY_MEDIUM
+
+/*
+ * BouncepadType — selects which texture variant to use.
+ */
+typedef enum {
+    BOUNCEPAD_GREEN,   /* small jump — Bouncepad_Green.png  */
+    BOUNCEPAD_WOOD,    /* medium jump — Bouncepad_Wood.png  */
+    BOUNCEPAD_RED      /* high jump — Bouncepad_Red.png     */
+} BouncepadType;
 
 /*
  * BOUNCEPAD_FRAME_MS — how many milliseconds each animation frame is shown
@@ -83,13 +100,15 @@ typedef enum {
  * they are cast to int at render time when building SDL_Rect.
  */
 typedef struct {
-    float       x;             /* left edge in world-space logical pixels   */
-    float       y;             /* top  edge in world-space logical pixels   */
-    int         w;             /* display width  (BOUNCEPAD_W = 48 px)      */
-    int         h;             /* display height (BOUNCEPAD_H = 48 px)      */
-    BounceState state;         /* IDLE or ACTIVE                            */
-    int         anim_frame;    /* current displayed frame index (0, 1, or 2)*/
-    Uint32      anim_timer_ms; /* ms accumulated in the current anim frame  */
+    float        x;             /* left edge in world-space logical pixels   */
+    float        y;             /* top  edge in world-space logical pixels   */
+    int          w;             /* display width  (BOUNCEPAD_W = 48 px)      */
+    int          h;             /* display height (BOUNCEPAD_H = 48 px)      */
+    BounceState  state;         /* IDLE or ACTIVE                            */
+    int          anim_frame;    /* current displayed frame index (0, 1, or 2)*/
+    Uint32       anim_timer_ms; /* ms accumulated in the current anim frame  */
+    float        launch_vy;     /* upward impulse applied to player on land  */
+    BouncepadType pad_type;     /* GREEN / WOOD / RED — selects texture      */
 } Bouncepad;
 
 /* ------------------------------------------------------------------ */

@@ -136,13 +136,13 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
         SDL_RenderDrawRect(renderer, &r);
     }
 
-    /* ---- Red stars (active only) — magenta (255, 0, 255) ------------- */
+    /* ---- Yellow stars (active only) — magenta (255, 0, 255) ---------- */
     SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
-    for (int i = 0; i < gs->red_star_count; i++) {
-        if (!gs->red_stars[i].active) continue;
+    for (int i = 0; i < gs->yellow_star_count; i++) {
+        if (!gs->yellow_stars[i].active) continue;
         r = (SDL_Rect){
-            (int)gs->red_stars[i].x - cam_x, (int)gs->red_stars[i].y,
-            RED_STAR_DISPLAY_W, RED_STAR_DISPLAY_H
+            (int)gs->yellow_stars[i].x - cam_x, (int)gs->yellow_stars[i].y,
+            YELLOW_STAR_DISPLAY_W, YELLOW_STAR_DISPLAY_H
         };
         SDL_RenderDrawRect(renderer, &r);
     }
@@ -294,10 +294,126 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
         SDL_RenderDrawRect(renderer, &r);
     }
 
-    /* ---- Bouncepads — cyan (0, 255, 255) ---------------------------- */
+    /* ---- Axe traps (active only) — dark red (200, 0, 50) ------------- */
+    /*
+     * Draw the rotated blade hitbox returned by axe_trap_get_hitbox.
+     * The hitbox follows the blade's current position (trig-based),
+     * so the debug rect swings/spins with the axe animation.
+     * Also draw a small cross at the pivot point (top of the handle).
+     */
+    SDL_SetRenderDrawColor(renderer, 200, 0, 50, 255);
+    for (int i = 0; i < gs->axe_trap_count; i++) {
+        if (!gs->axe_traps[i].active) continue;
+        r = axe_trap_get_hitbox(&gs->axe_traps[i]);
+        r.x -= cam_x;
+        SDL_RenderDrawRect(renderer, &r);
+
+        /* Pivot cross — 6 px arms centred on the axe's mount point */
+        int px = (int)gs->axe_traps[i].x - cam_x;
+        int py = (int)gs->axe_traps[i].y + 4;   /* matches render pivot offset */
+        SDL_RenderDrawLine(renderer, px - 3, py, px + 3, py);
+        SDL_RenderDrawLine(renderer, px, py - 3, px, py + 3);
+    }
+
+    /* ---- Spike rows (active only) — bright yellow-red (220, 180, 0) -- */
+    SDL_SetRenderDrawColor(renderer, 220, 180, 0, 255);
+    for (int i = 0; i < gs->spike_row_count; i++) {
+        if (!gs->spike_rows[i].active) continue;
+        r = spike_row_get_rect(&gs->spike_rows[i]);
+        r.x -= cam_x;
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
+    /* ---- Spike platforms (active only) — dark magenta (180, 0, 120) - */
+    SDL_SetRenderDrawColor(renderer, 180, 0, 120, 255);
+    for (int i = 0; i < gs->spike_platform_count; i++) {
+        if (!gs->spike_platforms[i].active) continue;
+        r = spike_platform_get_rect(&gs->spike_platforms[i]);
+        r.x -= cam_x;
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
+    /* ---- Flames (visible only) — fiery orange-red (255, 80, 0) ------- */
+    /*
+     * Draw the inset hitbox for each flame that is currently visible
+     * (not in WAITING state).  Skipping hidden flames avoids drawing
+     * debug rects below the floor where the flame is resting.
+     */
+    SDL_SetRenderDrawColor(renderer, 255, 80, 0, 255);
+    for (int i = 0; i < gs->flame_count; i++) {
+        if (!gs->flames[i].active) continue;
+        if (gs->flames[i].state == FLAME_WAITING) continue;
+        r = flame_get_hitbox(&gs->flames[i]);
+        r.x -= cam_x;
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
+    /* ---- Circular saws (active only) — bright orange (255, 140, 0) --- */
+    /*
+     * Draw the inset hitbox returned by circular_saw_get_hitbox.
+     * The hitbox is slightly smaller than the display rect to account
+     * for the transparent corners of the circular blade sprite.
+     */
+    SDL_SetRenderDrawColor(renderer, 255, 140, 0, 255);
+    for (int i = 0; i < gs->circular_saw_count; i++) {
+        if (!gs->circular_saws[i].active) continue;
+        r = circular_saw_get_hitbox(&gs->circular_saws[i]);
+        r.x -= cam_x;
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
+    /* ---- Faster fish — light magenta (220, 100, 180) ---------------- */
+    SDL_SetRenderDrawColor(renderer, 220, 100, 180, 255);
+    for (int i = 0; i < gs->faster_fish_count; i++) {
+        r = faster_fish_get_hitbox(&gs->faster_fish[i]);
+        r.x -= cam_x;
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
+    /* ---- Last star — gold (255, 215, 0) ----------------------------- */
+    if (gs->last_star.active) {
+        SDL_SetRenderDrawColor(renderer, 255, 215, 0, 255);
+        r = last_star_get_hitbox(&gs->last_star);
+        r.x -= cam_x;
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
+    /* ---- Ladders — brown-orange (180, 120, 60) ---------------------- */
+    SDL_SetRenderDrawColor(renderer, 180, 120, 60, 255);
+    for (int i = 0; i < gs->ladder_count; i++) {
+        const LadderDecor *ld = &gs->ladders[i];
+        int lh = (ld->tile_count - 1) * LADDER_STEP + LADDER_H;
+        r = (SDL_Rect){ (int)ld->x - cam_x, (int)ld->y, LADDER_W, lh };
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
+    /* ---- Ropes — tan (200, 160, 100) -------------------------------- */
+    SDL_SetRenderDrawColor(renderer, 200, 160, 100, 255);
+    for (int i = 0; i < gs->rope_count; i++) {
+        const RopeDecor *rp = &gs->ropes[i];
+        int rh = (rp->tile_count - 1) * ROPE_STEP + ROPE_H;
+        r = (SDL_Rect){ (int)rp->x - cam_x, (int)rp->y, ROPE_W, rh };
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
+    /* ---- Bouncepads — medium=cyan, small=green, high=red ------------- */
     SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
-    for (int i = 0; i < gs->bouncepad_count; i++) {
-        const Bouncepad *bp = &gs->bouncepads[i];
+    for (int i = 0; i < gs->bouncepad_medium_count; i++) {
+        const Bouncepad *bp = &gs->bouncepads_medium[i];
+        r = (SDL_Rect){ (int)bp->x + BOUNCEPAD_ART_X - cam_x, (int)bp->y,
+                        BOUNCEPAD_ART_W, bp->h };
+        SDL_RenderDrawRect(renderer, &r);
+    }
+    SDL_SetRenderDrawColor(renderer, 0, 200, 0, 255);
+    for (int i = 0; i < gs->bouncepad_small_count; i++) {
+        const Bouncepad *bp = &gs->bouncepads_small[i];
+        r = (SDL_Rect){ (int)bp->x + BOUNCEPAD_ART_X - cam_x, (int)bp->y,
+                        BOUNCEPAD_ART_W, bp->h };
+        SDL_RenderDrawRect(renderer, &r);
+    }
+    SDL_SetRenderDrawColor(renderer, 255, 50, 50, 255);
+    for (int i = 0; i < gs->bouncepad_high_count; i++) {
+        const Bouncepad *bp = &gs->bouncepads_high[i];
         r = (SDL_Rect){ (int)bp->x + BOUNCEPAD_ART_X - cam_x, (int)bp->y,
                         BOUNCEPAD_ART_W, bp->h };
         SDL_RenderDrawRect(renderer, &r);
@@ -382,16 +498,27 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
             SDL_RenderDrawRect(renderer, &r);
         }
 
-        /* Score text — right-aligned, same formula as hud_render */
+        /* Score text + coin icon — right-aligned, same formula as hud_render */
         {
             char score_buf[32];
             snprintf(score_buf, sizeof(score_buf), "SCORE: %d", gs->score);
             int sw = 0;
             TTF_SizeText(gs->hud.font, score_buf, &sw, NULL);
+            int coin_gap = 3;
+            int total_w = sw + coin_gap + HUD_COIN_ICON_SIZE;
+            int score_x = GAME_W - HUD_MARGIN - total_w;
+            /* Text hitbox */
             r = (SDL_Rect){
-                GAME_W - HUD_MARGIN - sw,
+                score_x,
                 hud_row_y + (HUD_ROW_H - 13) / 2,
                 sw, 13
+            };
+            SDL_RenderDrawRect(renderer, &r);
+            /* Coin icon hitbox */
+            r = (SDL_Rect){
+                score_x + sw + coin_gap,
+                hud_row_y + (HUD_ROW_H - HUD_COIN_ICON_SIZE) / 2,
+                HUD_COIN_ICON_SIZE, HUD_COIN_ICON_SIZE
             };
             SDL_RenderDrawRect(renderer, &r);
         }
@@ -459,12 +586,19 @@ static void draw_player_state(const Player *player, TTF_Font *font,
     render_debug_text(font, renderer, buf,
                       GAME_W - HUD_MARGIN - text_w, GAME_H - 20 - line_h, white);
 
-    /* Line 2: state + ground + facing + vine */
-    snprintf(buf, sizeof(buf), "%s %s %s%s",
-             state_str,
-             player->on_ground ? "GND" : "AIR",
-             player->facing_left ? "<-" : "->",
-             player->on_vine ? " VINE" : "");
+    /* Line 2: state + ground + facing + climb source */
+    {
+        const char *climb_str = "";
+        if (player->on_vine) {
+            static const char *climb_names[] = { " VINE", " LADDER", " ROPE" };
+            climb_str = climb_names[player->climb_source];
+        }
+        snprintf(buf, sizeof(buf), "%s %s %s%s",
+                 state_str,
+                 player->on_ground ? "GND" : "AIR",
+                 player->facing_left ? "<-" : "->",
+                 climb_str);
+    }
     TTF_SizeText(font, buf, &text_w, NULL);
     render_debug_text(font, renderer, buf,
                       GAME_W - HUD_MARGIN - text_w, GAME_H - 20 - 2 * line_h, white);

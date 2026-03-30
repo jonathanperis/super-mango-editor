@@ -14,6 +14,7 @@
 #pragma once
 
 #include <SDL.h>
+#include <SDL_mixer.h>
 
 /* ---- Constants ---------------------------------------------------------- */
 
@@ -52,7 +53,15 @@ typedef struct {
 
 void birds_init(Bird *birds, int *count);
 
-void birds_update(Bird *birds, int count, float dt);
+/*
+ * birds_update — Move and animate birds.
+ *
+ * snd_flap  : wing flap SFX, played once per animation cycle per bird.
+ * player_x  : player's world-space x (for distance-based volume).
+ * cam_x     : camera left edge (sound only plays when bird is on-screen).
+ */
+void birds_update(Bird *birds, int count, float dt,
+                  Mix_Chunk *snd_flap, float player_x, int cam_x);
 
 void birds_render(const Bird *birds, int count,
                   SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);

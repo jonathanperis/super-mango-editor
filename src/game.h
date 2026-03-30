@@ -24,7 +24,10 @@
 #include "fish.h"       /* Fish struct + MAX_FISH constant                  */
 #include "coin.h"       /* Coin struct + MAX_COINS constant                  */
 #include "vine.h"       /* VineDecor struct + MAX_VINES constant              */
-#include "bouncepad.h"  /* Bouncepad struct + MAX_BOUNCEPADS constant         */
+#include "bouncepad.h"       /* Bouncepad struct — shared mechanics            */
+#include "bouncepad_small.h" /* Green bouncepad (small jump) placement        */
+#include "bouncepad_medium.h"/* Wood bouncepad (medium jump) placement        */
+#include "bouncepad_high.h"  /* Red bouncepad (high jump) placement           */
 #include "hud.h"        /* Hud struct — HUD display resources                */
 #include "parallax.h"   /* ParallaxSystem — multi-layer scrolling background */
 #include "rail.h"           /* Rail, RailTile — rail path system              */
@@ -34,7 +37,16 @@
 #include "jumping_spider.h" /* JumpingSpider — jumping patrol enemy          */
 #include "bird.h"           /* Bird — slow sine-wave sky patrol             */
 #include "faster_bird.h"    /* FasterBird — fast sine-wave sky patrol       */
-#include "red_star.h"       /* RedStar — health-restoring collectible       */
+#include "yellow_star.h"    /* YellowStar — health-restoring collectible    */
+#include "axe_trap.h"       /* AxeTrap — swinging/spinning axe hazard       */
+#include "circular_saw.h"  /* CircularSaw — fast rotating patrol hazard    */
+#include "flame.h"         /* Flame — erupting fire hazard from sea gaps   */
+#include "ladder.h"        /* LadderDecor — climbable ladder                */
+#include "rope.h"          /* RopeDecor — climbable rope                   */
+#include "faster_fish.h"   /* FasterFish — fast variant of jumping fish     */
+#include "last_star.h"     /* LastStar — end-of-level collectible           */
+#include "spike.h"         /* SpikeRow — static ground spike hazards       */
+#include "spike_platform.h"/* SpikePlatform — elevated spike hazard surface*/
 #include "debug.h"        /* DebugOverlay — debug collision/FPS/log overlay  */
 
 /* ------------------------------------------------------------------ */
@@ -169,9 +181,21 @@ typedef struct {
     SDL_Texture  *vine_tex;    /* shared texture for all vine decorations         */
     VineDecor     vines[MAX_VINES]; /* static scenery vine instances               */
     int           vine_count;       /* number of vine decorations placed           */
-    SDL_Texture  *bouncepad_tex;              /* shared texture for all bouncepads   */
-    Bouncepad     bouncepads[MAX_BOUNCEPADS]; /* spring launch pads                  */
-    int           bouncepad_count;            /* number of bouncepads placed         */
+    SDL_Texture  *ladder_tex;      /* shared texture for ladder climbables        */
+    LadderDecor   ladders[MAX_LADDERS]; /* climbable ladder instances             */
+    int           ladder_count;    /* number of ladders placed                    */
+    SDL_Texture  *rope_tex;        /* shared texture for rope climbables          */
+    RopeDecor     ropes[MAX_ROPES];/* climbable rope instances                    */
+    int           rope_count;      /* number of ropes placed                      */
+    SDL_Texture  *bouncepad_medium_tex;        /* wood (medium) bouncepad texture      */
+    Bouncepad     bouncepads_medium[MAX_BOUNCEPADS_MEDIUM]; /* wood pads             */
+    int           bouncepad_medium_count;     /* number of medium bouncepads         */
+    SDL_Texture  *bouncepad_small_tex;        /* green (small) bouncepad texture      */
+    Bouncepad     bouncepads_small[MAX_BOUNCEPADS_SMALL];   /* green pads            */
+    int           bouncepad_small_count;      /* number of small bouncepads          */
+    SDL_Texture  *bouncepad_high_tex;         /* red (high) bouncepad texture         */
+    Bouncepad     bouncepads_high[MAX_BOUNCEPADS_HIGH];     /* red pads              */
+    int           bouncepad_high_count;       /* number of high bouncepads           */
     Mix_Chunk    *snd_spring;  /* WAV chunk played when bouncepad is triggered    */
     SDL_Texture  *rail_tex;        /* shared texture for all rail tiles           */
     Rail          rails[MAX_RAILS];/* level rail loop definitions                 */
@@ -187,9 +211,32 @@ typedef struct {
     int           bridge_count;        /* number of active bridges             */
     int           sea_gaps[MAX_SEA_GAPS]; /* left-edge x of each sea gap       */
     int           sea_gap_count;         /* number of active sea gaps          */
-    SDL_Texture  *red_star_tex;          /* shared texture for red star pickups*/
-    RedStar       red_stars[MAX_RED_STARS]; /* health-restoring collectibles   */
-    int           red_star_count;        /* number of red stars placed         */
+    SDL_Texture  *yellow_star_tex;       /* shared texture for yellow star pickups*/
+    YellowStar    yellow_stars[MAX_YELLOW_STARS]; /* health-restoring collectibles */
+    int           yellow_star_count;     /* number of yellow stars placed       */
+    SDL_Texture  *axe_trap_tex;          /* shared texture for axe trap hazards*/
+    AxeTrap       axe_traps[MAX_AXE_TRAPS]; /* swinging/spinning axe hazards  */
+    int           axe_trap_count;        /* number of axe traps placed         */
+    Mix_Chunk    *snd_axe;               /* SFX played on axe swing completion */
+    Mix_Chunk    *snd_flap;              /* SFX for bird wing flap             */
+    Mix_Chunk    *snd_spider_attack;     /* SFX for jumping spider leap        */
+    Mix_Chunk    *snd_dive;              /* SFX for falling into sea gap       */
+    SDL_Texture  *circular_saw_tex;      /* shared texture for circular saw hazards*/
+    CircularSaw   circular_saws[MAX_CIRCULAR_SAWS]; /* fast patrol saw hazards */
+    int           circular_saw_count;    /* number of circular saws placed     */
+    SDL_Texture  *flame_tex;             /* shared texture for flame hazards   */
+    Flame         flames[MAX_FLAMES];    /* erupting fire hazards from gaps    */
+    int           flame_count;           /* number of flames placed            */
+    SDL_Texture  *faster_fish_tex;       /* shared texture for faster fish     */
+    FasterFish    faster_fish[MAX_FASTER_FISH]; /* fast jumping fish enemies   */
+    int           faster_fish_count;     /* number of faster fish placed       */
+    LastStar      last_star;             /* end-of-level collectible           */
+    SDL_Texture  *spike_tex;             /* shared texture for ground spikes   */
+    SpikeRow      spike_rows[MAX_SPIKE_ROWS]; /* static ground spike hazards  */
+    int           spike_row_count;       /* number of spike rows placed        */
+    SDL_Texture  *spike_platform_tex;    /* shared texture for spike platforms */
+    SpikePlatform spike_platforms[MAX_SPIKE_PLATFORMS]; /* elevated spike surfs*/
+    int           spike_platform_count;  /* number of spike platforms placed   */
     Hud           hud;         /* HUD display: hearts, lives, score           */
     int           hearts;      /* current hit points (0–MAX_HEARTS)           */
     int           lives;       /* remaining lives; <0 triggers game over      */

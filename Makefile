@@ -8,7 +8,7 @@ SRCS    = $(wildcard $(SRCDIR)/*.c)
 OBJS    = $(SRCS:.c=.o)
 DEPS    = $(OBJS:.o=.d)
 
-.PHONY: all clean run run-debug
+.PHONY: all clean run run-debug run-sandbox run-sandbox-debug
 
 all: $(OUTDIR) $(TARGET)
 
@@ -33,6 +33,12 @@ run: all
 
 run-debug: all
 	./$(TARGET) --debug
+
+run-sandbox: all
+	./$(TARGET) --sandbox
+
+run-sandbox-debug: all
+	./$(TARGET) --sandbox --debug
 
 clean:
 	rm -f $(SRCDIR)/*.o
