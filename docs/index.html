@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Mango - 2D Pixel Art Platformer</title>
+  <meta name="description" content="A 2D pixel art platformer written in C11 + SDL2. Play in your browser via WebAssembly.">
+
+  <!-- Press Start 2P — pixel art font from Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── Reset & base ──────────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:        #0f0e17;
+      --bg-card:   #1a1a2e;
+      --gold:      #f5c542;
+      --gold-dim:  #c49b30;
+      --green:     #4ade80;
+      --text:      #e0e0e0;
+      --text-dim:  #888;
+      --pixel-font: 'Press Start 2P', monospace;
+      --mono:      'Courier New', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    /* ── Pixel-border utility ─────────────────────────────────────── */
+    .pixel-border {
+      border: 4px solid var(--gold);
+      box-shadow:
+        4px 4px 0 var(--gold-dim),
+        inset 0 0 0 2px rgba(245, 197, 66, 0.15);
+    }
+
+    /* ── Navigation ───────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--bg);
+      border-bottom: 3px solid var(--gold);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 2rem;
+    }
+
+    nav .logo {
+      font-family: var(--pixel-font);
+      font-size: 0.85rem;
+      color: var(--gold);
+      text-decoration: none;
+    }
+
+    nav .links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    nav .links a {
+      font-family: var(--pixel-font);
+      font-size: 0.55rem;
+      color: var(--text);
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: color 0.2s;
+    }
+
+    nav .links a:hover { color: var(--gold); }
+
+    /* ── Hero ──────────────────────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      padding: 3rem 1rem 2rem;
+    }
+
+    .hero h1 {
+      font-family: var(--pixel-font);
+      font-size: clamp(1.4rem, 4vw, 2.4rem);
+      color: var(--gold);
+      text-shadow: 3px 3px 0 var(--gold-dim);
+      margin-bottom: 0.75rem;
+    }
+
+    .hero p {
+      max-width: 600px;
+      margin: 0 auto;
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+
+    /* ── Game section ─────────────────────────────────────────────── */
+    .game-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem 1rem 2.5rem;
+    }
+
+    .game-wrapper {
+      background: var(--bg-card);
+      padding: 1rem;
+      max-width: 860px;
+      width: 100%;
+    }
+
+    #canvas {
+      display: block;
+      width: 100%;
+      max-width: 800px;
+      height: auto;
+      aspect-ratio: 800 / 600;
+      margin: 0 auto;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      cursor: default;
+      background: #000;
+    }
+
+    #game-status {
+      text-align: center;
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+
+    .game-controls {
+      text-align: center;
+      margin-top: 0.75rem;
+      font-family: var(--pixel-font);
+      font-size: 0.5rem;
+      color: var(--text-dim);
+      line-height: 2;
+    }
+
+    .game-controls kbd {
+      display: inline-block;
+      background: var(--bg);
+      color: var(--gold);
+      border: 2px solid var(--gold-dim);
+      padding: 0.15em 0.5em;
+      margin: 0 0.1em;
+      font-family: var(--pixel-font);
+      font-size: 0.5rem;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 1em;
+      height: 1em;
+      border: 2px solid #555;
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.5em;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #play-btn {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.6em 1.6em;
+      font-family: var(--pixel-font);
+      font-size: 0.7rem;
+      color: var(--bg);
+      background: var(--gold);
+      border: none;
+      cursor: pointer;
+      text-transform: uppercase;
+      box-shadow: 3px 3px 0 var(--gold-dim);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+
+    #play-btn:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 4px 4px 0 var(--gold-dim);
+    }
+
+    #play-btn:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0 var(--gold-dim);
+    }
+
+    #play-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+      transform: none;
+      box-shadow: 3px 3px 0 var(--gold-dim);
+    }
+
+    /* ── About / Features ─────────────────────────────────────────── */
+    .about-section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    .about-section h2 {
+      font-family: var(--pixel-font);
+      font-size: 0.9rem;
+      color: var(--gold);
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+    }
+
+    .about-section p {
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      padding: 1rem;
+      border: 2px solid #333;
+    }
+
+    .feature-card h3 {
+      font-family: var(--pixel-font);
+      font-size: 0.55rem;
+      color: var(--gold);
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+    }
+
+    .feature-card p {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-bottom: 0;
+    }
+
+    /* ── Docs / Links section ─────────────────────────────────────── */
+    .docs-section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    .docs-section h2 {
+      font-family: var(--pixel-font);
+      font-size: 0.9rem;
+      color: var(--gold);
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+    }
+
+    .docs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+
+    .doc-card {
+      background: var(--bg-card);
+      border: 2px solid #333;
+      padding: 1.2rem;
+      text-decoration: none;
+      color: var(--text);
+      transition: border-color 0.2s, transform 0.15s;
+      display: block;
+    }
+
+    .doc-card:hover {
+      border-color: var(--gold);
+      transform: translateY(-2px);
+    }
+
+    .doc-card h3 {
+      font-family: var(--pixel-font);
+      font-size: 0.55rem;
+      color: var(--gold);
+      margin-bottom: 0.5rem;
+    }
+
+    .doc-card p {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-bottom: 0;
+    }
+
+    /* ── Downloads ─────────────────────────────────────────────────── */
+    .downloads-section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    .downloads-section h2 {
+      font-family: var(--pixel-font);
+      font-size: 0.9rem;
+      color: var(--gold);
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+    }
+
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+    }
+
+    .download-card {
+      background: var(--bg-card);
+      border: 2px solid #333;
+      padding: 1rem;
+      text-align: center;
+      text-decoration: none;
+      color: var(--text);
+      transition: border-color 0.2s, transform 0.15s;
+      display: block;
+    }
+
+    .download-card:hover {
+      border-color: var(--green);
+      transform: translateY(-2px);
+    }
+
+    .download-card .platform {
+      font-family: var(--pixel-font);
+      font-size: 0.55rem;
+      color: var(--green);
+      margin-bottom: 0.4rem;
+    }
+
+    .download-card .arch {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    /* ── Footer ────────────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      border-top: 3px solid #222;
+      color: var(--text-dim);
+      font-size: 0.75rem;
+    }
+
+    footer a {
+      color: var(--gold);
+      text-decoration: none;
+    }
+
+    footer a:hover { text-decoration: underline; }
+
+    /* ── Responsive ────────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      nav { flex-direction: column; gap: 0.5rem; padding: 0.5rem 1rem; }
+      nav .links { gap: 0.8rem; }
+      .hero { padding: 2rem 1rem 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Navigation ─────────────────────────────────────────────── -->
+  <nav>
+    <a href="#" class="logo">Super Mango</a>
+    <ul class="links">
+      <li><a href="#play">Play</a></li>
+      <li><a href="#about">About</a></li>
+      <li><a href="#docs">Docs</a></li>
+      <li><a href="#downloads">Downloads</a></li>
+    </ul>
+  </nav>
+
+  <!-- ── Hero ───────────────────────────────────────────────────── -->
+  <section class="hero">
+    <h1>Super Mango</h1>
+    <p>A 2D pixel art platformer written in C11 + SDL2.<br>
+       Play it right here in your browser — powered by WebAssembly.</p>
+  </section>
+
+  <!-- ── Game ───────────────────────────────────────────────────── -->
+  <section id="play" class="game-section">
+    <div class="game-wrapper pixel-border">
+      <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+      <p id="game-status">
+        <button id="play-btn" onclick="startGame()">Start Game</button>
+      </p>
+      <div class="game-controls">
+        <kbd>WASD</kbd> / <kbd>Arrows</kbd> Move &nbsp;&middot;&nbsp;
+        <kbd>Space</kbd> Jump &nbsp;&middot;&nbsp;
+        <kbd>ESC</kbd> Quit
+      </div>
+    </div>
+  </section>
+
+  <!-- ── About ──────────────────────────────────────────────────── -->
+  <section id="about" class="about-section">
+    <h2>About the Game</h2>
+    <p>
+      Super Mango is a classic side-scrolling platformer built as a
+      <strong>learning resource</strong> for C and SDL2 game programming.
+      Every line of code is commented to explain the <em>why</em>, not just the
+      what — making it ideal for developers who want to learn how 2D games work
+      under the hood.
+    </p>
+    <p>
+      The game renders at 400&times;300 logical pixels scaled 2&times; to an
+      800&times;600 window, uses delta-time physics for frame-rate-independent
+      movement, and follows a clean init &rarr; loop &rarr; cleanup architecture.
+    </p>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3>Platforming</h3>
+        <p>One-way platforms, float platforms (static, crumble, rail), crumble bridges, and sea gaps with animated water.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Enemies</h3>
+        <p>6 enemy types: spiders, jumping spiders, birds, faster birds, fish, and faster fish — each with unique behavior.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Hazards</h3>
+        <p>Spike rows, spike platforms, axe traps, circular saws, blue flames, and spike blocks on rails.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Mechanics</h3>
+        <p>Bouncepads (3 heights), climbable vines, ladders, ropes, collectible coins and stars, lives and hearts system.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Visual Polish</h3>
+        <p>Parallax multi-layer scrolling, 5-state player animation, scrolling camera, fog overlay, and pixel-perfect rendering.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Cross-Platform</h3>
+        <p>Builds natively for macOS, Linux, Windows, and WebAssembly. Play on desktop or in your browser.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Documentation ──────────────────────────────────────────── -->
+  <section id="docs" class="docs-section">
+    <h2>Documentation</h2>
+    <div class="docs-grid">
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game#readme">
+        <h3>README</h3>
+        <p>Project overview, build instructions for all platforms, controls reference, architecture diagram, and full project structure.</p>
+      </a>
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki">
+        <h3>Wiki &mdash; Home</h3>
+        <p>Landing page with quick-start guide, project-at-a-glance, and navigation to all wiki pages.</p>
+      </a>
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/architecture">
+        <h3>Wiki &mdash; Architecture</h3>
+        <p>Startup sequence, game loop phases, coordinate system, GameState struct, and error handling strategy.</p>
+      </a>
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/build_system">
+        <h3>Wiki &mdash; Build System</h3>
+        <p>Makefile overview, compiler flags, build targets, prerequisites, and adding new source files.</p>
+      </a>
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/developer_guide">
+        <h3>Wiki &mdash; Developer Guide</h3>
+        <p>Coding conventions, naming rules, memory safety, and step-by-step entity addition walkthrough.</p>
+      </a>
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/player_module">
+        <h3>Wiki &mdash; Player Module</h3>
+        <p>Player lifecycle, input handling, jump and climb logic, physics update, animation state machine.</p>
+      </a>
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/source_files">
+        <h3>Wiki &mdash; Source Files</h3>
+        <p>Complete file map of all 48 source files with descriptions of main.c, game.h, and game.c roles.</p>
+      </a>
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/assets">
+        <h3>Wiki &mdash; Assets</h3>
+        <p>Asset catalog with 57 sprites, player sprite sheet analysis, animation row mapping, and unused assets.</p>
+      </a>
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/sounds">
+        <h3>Wiki &mdash; Sounds</h3>
+        <p>Sound effects catalog, audio configuration, Mix_Chunk vs Mix_Music, and adding new sound effects.</p>
+      </a>
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/constants_reference">
+        <h3>Wiki &mdash; Constants</h3>
+        <p>All compile-time constants: window, canvas, timing, tiles, physics, camera, and player locals.</p>
+      </a>
+    </div>
+  </section>
+
+  <!-- ── Downloads ──────────────────────────────────────────────── -->
+  <section id="downloads" class="downloads-section">
+    <h2>Downloads</h2>
+    <p style="margin-bottom: 1rem; color: var(--text-dim);">
+      Grab the latest release from
+      <a href="https://github.com/jonathanperis/super-mango-game/releases/latest" style="color: var(--gold);">GitHub Releases</a>.
+      Native builds must be run from the repository root so they can find the <code>assets/</code> folder.
+    </p>
+    <div class="download-grid">
+      <a class="download-card" href="https://github.com/jonathanperis/super-mango-game/releases/latest">
+        <div class="platform">Linux</div>
+        <div class="arch">x86_64</div>
+      </a>
+      <a class="download-card" href="https://github.com/jonathanperis/super-mango-game/releases/latest">
+        <div class="platform">macOS</div>
+        <div class="arch">arm64 (Apple Silicon)</div>
+      </a>
+      <a class="download-card" href="https://github.com/jonathanperis/super-mango-game/releases/latest">
+        <div class="platform">Windows</div>
+        <div class="arch">x86_64 (SDL2 DLLs included)</div>
+      </a>
+      <a class="download-card" href="#play" style="border-color: var(--gold);">
+        <div class="platform" style="color: var(--gold);">WebAssembly</div>
+        <div class="arch">Play in browser above!</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- ── Footer ─────────────────────────────────────────────────── -->
+  <footer>
+    <p>
+      <a href="https://github.com/jonathanperis/super-mango-game">GitHub Repository</a>
+      &nbsp;&middot;&nbsp;
+      <a href="https://github.com/jonathanperis/super-mango-game/wiki">Wiki</a>
+      &nbsp;&middot;&nbsp;
+      <a href="https://github.com/jonathanperis/super-mango-game/releases/latest">Releases</a>
+    </p>
+    <p style="margin-top: 0.5rem;">
+      Art from <a href="https://juho.itch.io">Super Mango 2D Pixel Art Platformer Asset Pack</a> by Juho.
+    </p>
+  </footer>
+
+  <!-- ── Emscripten game loader ─────────────────────────────────── -->
+  <script>
+    /*
+     * Game loading is deferred behind a "Start Game" button so the page
+     * loads instantly and the ~40 MB .data file is only fetched on demand.
+     */
+    var Module;
+
+    function startGame() {
+      var btn = document.getElementById('play-btn');
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+
+      var statusEl = document.getElementById('game-status');
+      statusEl.innerHTML = '<span class="spinner"></span>Downloading game data...';
+
+      Module = {
+        canvas: (function() {
+          var c = document.getElementById('canvas');
+          c.addEventListener('webglcontextlost', function(e) {
+            alert('WebGL context lost — please reload the page.');
+            e.preventDefault();
+          }, false);
+          return c;
+        })(),
+        setStatus: function(text) {
+          if (!text) {
+            statusEl.style.display = 'none';
+            btn.style.display = 'none';
+          } else {
+            statusEl.innerHTML = text.includes('Downloading')
+              ? '<span class="spinner"></span>' + text
+              : text;
+            statusEl.style.display = '';
+          }
+        },
+        monitorRunDependencies: function(left) {
+          if (left === 0) {
+            Module.setStatus('');
+            document.getElementById('canvas').focus();
+          }
+        }
+      };
+
+      /* Dynamically load the Emscripten-generated JS loader. */
+      var script = document.createElement('script');
+      script.src = 'super-mango.js';
+      script.onerror = function() {
+        statusEl.innerHTML = 'Failed to load game files. Try refreshing the page.';
+        btn.style.display = 'inline-block';
+        btn.disabled = false;
+        btn.textContent = 'Retry';
+      };
+      document.body.appendChild(script);
+    }
+  </script>
+
+</body>
+</html>
