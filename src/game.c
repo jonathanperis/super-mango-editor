@@ -7,6 +7,7 @@
 #include <SDL_mixer.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>   /* sqrtf — used by apply_damage push impulse */
 
 #include "game.h"
 #include "player.h"
@@ -509,6 +510,71 @@ static void level_reset(GameState *gs, int *fp_prev_riding) {
 
 /* ------------------------------------------------------------------ */
 
+/*
+ * apply_damage — centralised damage and knockback handler.
+ *
+ * amount   : hearts to remove.  Pass gs->hearts for an instant-kill
+ *            (e.g. sea gap) that bypasses the normal 1-heart decrement.
+ *
+ * push     : 1 = apply a knockback impulse opposite to the contact
+ *            direction; 0 = skip (sea gap fall has no contact surface).
+ *
+ * src_cx / src_cy : world-space centre of the damage source.
+ *            Used only when push=1 and the player is stationary — the
+ *            impulse pushes the player away from this point.
+ *            Ignored when push=0.
+ *
+ * Knockback algorithm (mirrors spike_block_push_player):
+ *   • Moving player: reverse the velocity vector, scale to SPIKE_PUSH_SPEED,
+ *     add SPIKE_PUSH_VY upward so the recoil always lifts the player.
+ *   • Stationary player: push horizontally away from (src_cx, src_cy),
+ *     same upward component.
+ *   • on_ground cleared so the upward impulse is not cancelled immediately
+ *     by the floor-snap in player_update.
+ *
+ * After the impulse, hurt_timer is set to 1.5 s (invincibility window),
+ * the hit SFX is played, and hearts are decremented.  If hearts reach
+ * zero the lives/game-over cascade runs and level_reset is called.
+ */
+static void apply_damage(GameState *gs, int *fp_prev_riding,
+                         int amount, int push,
+                         float src_cx, float src_cy) {
+    if (push) {
+        float vx  = gs->player.vx;
+        float vy  = gs->player.vy;
+        float len = sqrtf(vx * vx + vy * vy);
+        if (len > 1.0f) {
+            gs->player.vx = -(vx / len) * SPIKE_PUSH_SPEED;
+            gs->player.vy = -(vy / len) * SPIKE_PUSH_SPEED + SPIKE_PUSH_VY;
+        } else {
+            float dir = (gs->player.x + gs->player.w * 0.5f >= src_cx) ? 1.0f : -1.0f;
+            gs->player.vx = dir * SPIKE_PUSH_SPEED;
+            gs->player.vy = SPIKE_PUSH_VY;
+        }
+        gs->player.on_ground = 0;
+    }
+    (void)src_cy;   /* reserved for future vertical-push logic */
+
+    gs->player.hurt_timer = 1.5f;
+    if (gs->snd_hit) Mix_PlayChannel(-1, gs->snd_hit, 0);
+
+    gs->hearts -= amount;
+    if (gs->hearts <= 0) {
+        gs->lives--;
+        if (gs->lives <= 0) {
+            gs->lives           = DEFAULT_LIVES;
+            gs->score           = 0;
+            gs->coins_for_heart = 0;
+            if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
+        }
+        if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
+        gs->hearts = MAX_HEARTS;
+        level_reset(gs, fp_prev_riding);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+
 void game_loop(GameState *gs) {
     /*
      * frame_ms — how many milliseconds one frame should take at TARGET_FPS.
@@ -702,26 +768,9 @@ void game_loop(GameState *gs) {
                 float gx = (float)gs->sea_gaps[g];
                 if (pcx >= gx && pcx < gx + (float)SEA_GAP_W &&
                     pcy > (float)(GAME_H - WATER_ART_H)) {
-                    if (gs->snd_hit) Mix_PlayChannel(-1, gs->snd_hit, 0);
-                    /*
-                     * Sea damage always costs MAX_HEARTS (3 stars), then
-                     * the same hearts≤0 → life-lost cascade as enemies.
-                     */
-                    gs->player.hurt_timer = 1.5f;
-                    gs->hearts -= gs->hearts;   /* drain all remaining hearts — always lethal */
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT sea gap[%d] hearts=%d", g, gs->hearts);
-                    if (gs->hearts <= 0) {
-                        gs->lives--;
-                        if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                        if (gs->lives < 0) {
-                            gs->lives           = DEFAULT_LIVES;
-                            gs->score           = 0;
-                            gs->score_life_next = SCORE_PER_LIFE;
-                            if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
-                        }
-                        gs->hearts = MAX_HEARTS;
-                        level_reset(gs, &fp_prev_riding);
-                    }
+                    if (gs->debug_mode) debug_log(&gs->debug, "HIT sea gap[%d]", g);
+                    /* Sea gap is always lethal — drain all remaining hearts, no push */
+                    apply_damage(gs, &fp_prev_riding, gs->hearts, 0, 0.0f, 0.0f);
                     break;
                 }
             }
@@ -839,28 +888,10 @@ void game_loop(GameState *gs) {
                 };
                 /* SDL_HasIntersection returns SDL_TRUE when the two rects overlap */
                 if (SDL_HasIntersection(&phit, &shit)) {
-                    gs->player.hurt_timer = 1.5f;   /* 1.5 s of invincibility */
-
-                    /* Play hit SFX once when damage is applied. */
-                    if (gs->snd_hit) {
-                        Mix_PlayChannel(-1, gs->snd_hit, 0);
-                    }
-
-                    gs->hearts--;
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT spider[%d] hearts=%d", i, gs->hearts);
-                    if (gs->hearts <= 0) {
-                        gs->lives--;
-                        if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                        if (gs->lives < 0) {
-                            /* Game over: restart everything */
-                            gs->lives          = DEFAULT_LIVES;
-                            gs->score          = 0;
-                            gs->score_life_next = SCORE_PER_LIFE;
-                            if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
-                        }
-                        gs->hearts = MAX_HEARTS;
-                        level_reset(gs, &fp_prev_riding);
-                    }
+                    if (gs->debug_mode) debug_log(&gs->debug, "HIT spider[%d]", i);
+                    float sx = shit.x + shit.w * 0.5f;
+                    float sy = shit.y + shit.h * 0.5f;
+                    apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
                     break;
                 }
             }
@@ -876,22 +907,10 @@ void game_loop(GameState *gs) {
                         JSPIDER_ART_H
                     };
                     if (SDL_HasIntersection(&phit, &jhit)) {
-                        gs->player.hurt_timer = 1.5f;
-                        if (gs->snd_hit) Mix_PlayChannel(-1, gs->snd_hit, 0);
-                        gs->hearts--;
-                        if (gs->debug_mode) debug_log(&gs->debug, "HIT jspider[%d] hearts=%d", i, gs->hearts);
-                        if (gs->hearts <= 0) {
-                            gs->lives--;
-                            if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                            if (gs->lives < 0) {
-                                gs->lives           = DEFAULT_LIVES;
-                                gs->score           = 0;
-                                gs->score_life_next = SCORE_PER_LIFE;
-                                if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
-                            }
-                            gs->hearts = MAX_HEARTS;
-                            level_reset(gs, &fp_prev_riding);
-                        }
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT jspider[%d]", i);
+                        float sx = jhit.x + jhit.w * 0.5f;
+                        float sy = jhit.y + jhit.h * 0.5f;
+                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -902,22 +921,10 @@ void game_loop(GameState *gs) {
                 for (int i = 0; i < gs->bird_count; i++) {
                     SDL_Rect bhit = bird_get_hitbox(&gs->birds[i]);
                     if (SDL_HasIntersection(&phit, &bhit)) {
-                        gs->player.hurt_timer = 1.5f;
-                        if (gs->snd_hit) Mix_PlayChannel(-1, gs->snd_hit, 0);
-                        gs->hearts--;
-                        if (gs->debug_mode) debug_log(&gs->debug, "HIT bird[%d] hearts=%d", i, gs->hearts);
-                        if (gs->hearts <= 0) {
-                            gs->lives--;
-                            if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                            if (gs->lives < 0) {
-                                gs->lives           = DEFAULT_LIVES;
-                                gs->score           = 0;
-                                gs->score_life_next = SCORE_PER_LIFE;
-                                if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
-                            }
-                            gs->hearts = MAX_HEARTS;
-                            level_reset(gs, &fp_prev_riding);
-                        }
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT bird[%d]", i);
+                        float sx = bhit.x + bhit.w * 0.5f;
+                        float sy = bhit.y + bhit.h * 0.5f;
+                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -928,22 +935,10 @@ void game_loop(GameState *gs) {
                 for (int i = 0; i < gs->faster_bird_count; i++) {
                     SDL_Rect fbhit = faster_bird_get_hitbox(&gs->faster_birds[i]);
                     if (SDL_HasIntersection(&phit, &fbhit)) {
-                        gs->player.hurt_timer = 1.5f;
-                        if (gs->snd_hit) Mix_PlayChannel(-1, gs->snd_hit, 0);
-                        gs->hearts--;
-                        if (gs->debug_mode) debug_log(&gs->debug, "HIT fbird[%d] hearts=%d", i, gs->hearts);
-                        if (gs->hearts <= 0) {
-                            gs->lives--;
-                            if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                            if (gs->lives < 0) {
-                                gs->lives           = DEFAULT_LIVES;
-                                gs->score           = 0;
-                                gs->score_life_next = SCORE_PER_LIFE;
-                                if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
-                            }
-                            gs->hearts = MAX_HEARTS;
-                            level_reset(gs, &fp_prev_riding);
-                        }
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT fbird[%d]", i);
+                        float sx = fbhit.x + fbhit.w * 0.5f;
+                        float sy = fbhit.y + fbhit.h * 0.5f;
+                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -954,26 +949,10 @@ void game_loop(GameState *gs) {
                 for (int i = 0; i < gs->fish_count; i++) {
                     SDL_Rect fhit = fish_get_hitbox(&gs->fish[i]);
                     if (SDL_HasIntersection(&phit, &fhit)) {
-                        gs->player.hurt_timer = 1.5f;
-
-                        if (gs->snd_hit) {
-                            Mix_PlayChannel(-1, gs->snd_hit, 0);
-                        }
-
-                        gs->hearts--;
-                        if (gs->debug_mode) debug_log(&gs->debug, "HIT fish[%d] hearts=%d", i, gs->hearts);
-                        if (gs->hearts <= 0) {
-                            gs->lives--;
-                            if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                            if (gs->lives < 0) {
-                                gs->lives           = DEFAULT_LIVES;
-                                gs->score           = 0;
-                                gs->score_life_next = SCORE_PER_LIFE;
-                                if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
-                            }
-                            gs->hearts = MAX_HEARTS;
-                            level_reset(gs, &fp_prev_riding);
-                        }
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT fish[%d]", i);
+                        float sx = fhit.x + fhit.w * 0.5f;
+                        float sy = fhit.y + fhit.h * 0.5f;
+                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -992,29 +971,10 @@ void game_loop(GameState *gs) {
                     if (!gs->spike_blocks[i].active) continue;
                     SDL_Rect sbhit = spike_block_get_hitbox(&gs->spike_blocks[i]);
                     if (SDL_HasIntersection(&phit, &sbhit)) {
-                        /* Push the player back before applying damage */
-                        spike_block_push_player(&gs->spike_blocks[i], &gs->player);
-
-                        gs->player.hurt_timer = 1.5f;
-
-                        if (gs->snd_hit) {
-                            Mix_PlayChannel(-1, gs->snd_hit, 0);
-                        }
-
-                        gs->hearts--;
-                        if (gs->debug_mode) debug_log(&gs->debug, "HIT spike[%d] hearts=%d", i, gs->hearts);
-                        if (gs->hearts <= 0) {
-                            gs->lives--;
-                            if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                            if (gs->lives < 0) {
-                                gs->lives           = DEFAULT_LIVES;
-                                gs->score           = 0;
-                                gs->score_life_next = SCORE_PER_LIFE;
-                                if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
-                            }
-                            gs->hearts = MAX_HEARTS;
-                            level_reset(gs, &fp_prev_riding);
-                        }
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT spike[%d]", i);
+                        float sx = sbhit.x + sbhit.w * 0.5f;
+                        float sy = sbhit.y + sbhit.h * 0.5f;
+                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
                         break;
                     }
                 }
