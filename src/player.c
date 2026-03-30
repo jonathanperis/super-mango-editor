@@ -8,8 +8,9 @@
 #include <stdlib.h>
 
 #include "player.h"
-#include "bouncepad.h" /* Bouncepad, BOUNCEPAD_VY — for bouncepad landing collision */
-#include "game.h"      /* GAME_W, GAME_H, FLOOR_Y, GRAVITY (for physics and clamping) */
+#include "bouncepad.h"     /* Bouncepad, BOUNCEPAD_VY — for bouncepad landing collision */
+#include "float_platform.h"/* FloatPlatform — for one-way landing collision             */
+#include "game.h"          /* GAME_W, GAME_H, FLOOR_Y, GRAVITY (physics and clamping)  */
 
 /* ------------------------------------------------------------------ */
 
@@ -456,12 +457,33 @@ static void player_animate(Player *player, Uint32 dt_ms) {
  *   is moving downward (vy >= 0) and their bottom edge crosses the platform
  *   top surface this frame (crossing test prevents tunnelling at high speed).
  */
+/*
+ * FLOAT_PLATFORM_STICK_TOL — tolerance in logical pixels for the stay-on check.
+ *
+ * When a rail platform moves upward, it escapes from under the player before
+ * the crossing test can fire (the player's feet are slightly BELOW the new
+ * surface position, but `prev_bottom` was also below the new position so the
+ * "from above" test fails).  The stay-on check catches this by accepting any
+ * gap smaller than this tolerance between the player's physics bottom and the
+ * platform's top surface.
+ *
+ * Worst-case gap in one frame at the dt cap (0.1 s):
+ *   platform moves up : 2 tiles/s × 16 px/tile × 0.1 s = 3.2 px
+ *   player falls      : ½ × GRAVITY × dt²            = 4.0 px
+ *   total gap                                          = 7.2 px
+ * 16 px gives a safe margin over the dt-capped worst case.
+ */
+#define FLOAT_PLATFORM_STICK_TOL  16
+
 void player_update(Player *player, float dt,
                    const Platform *platforms, int platform_count,
+                   const FloatPlatform *float_platforms, int float_platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
                    const VineDecor *vines, int vine_count,
                    const int *sea_gaps, int sea_gap_count,
-                   int *out_bounce_idx) {
+                   int *out_bounce_idx,
+                   int *out_fp_landed_idx,
+                   int prev_fp_landed_idx) {
 
     (void)vine_count;   /* vine_index selects the vine; count unused here */
 
@@ -513,6 +535,7 @@ void player_update(Player *player, float dt,
         player_animate(player, (Uint32)(dt * 1000.0f));
         return;   /* skip normal gravity / floor / platform logic */
     }
+
 
     /*
      * Reset on_ground every frame so the player immediately starts falling
@@ -648,6 +671,77 @@ void player_update(Player *player, float dt,
                 player->vy        = 0.0f;
                 player->on_ground = 1;
                 break;   /* first platform wins */
+            }
+        }
+
+        /*
+         * Float-platform collision — same crossing test as above.
+         *
+         * Only runs if the player hasn't already landed on a static platform
+         * or the floor.  The FLOAT_PLATFORM_H sprite (16 px) is a thin surface
+         * so the crossing test is the correct approach: we check whether the
+         * player's physics bottom crossed the platform's top surface y this
+         * frame, rather than using a distance threshold.
+         *
+         * When a landing is detected:
+         *   • The player is snapped so their physics bottom sits at fp->y.
+         *   • vy is zeroed to prevent continued falling.
+         *   • on_ground is set so the animation state resolves to IDLE/WALK,
+         *     not FALL — this is the main reason the check lives here inside
+         *     player_update rather than in game_loop after the fact.
+         *   • *out_fp_landed_idx is set to the matching index so game_loop
+         *     can drive the crumble timer and nudge the player on rail platforms.
+         */
+        if (!player->on_ground) {
+            for (int i = 0; i < float_platform_count; i++) {
+                const FloatPlatform *fp = &float_platforms[i];
+                if (!fp->active) continue;
+
+                /* Horizontal overlap using the same inset physics box */
+                int h_overlap = (player->x + player->w - PHYS_PAD_X > fp->x) &&
+                                (player->x + PHYS_PAD_X < fp->x + fp->w);
+                if (!h_overlap) continue;
+
+                /* Vertical crossing: bottom crossed the top surface from above */
+                if (prev_bottom <= fp->y && bottom >= fp->y) {
+                    player->y          = fp->y - player->h + FLOOR_SINK;
+                    player->vy         = 0.0f;
+                    player->on_ground  = 1;
+                    *out_fp_landed_idx = i;
+                    break;   /* first float platform wins */
+                }
+            }
+
+            /*
+             * Stay-on check — handles platforms that moved UPWARD this frame.
+             *
+             * When the surface escapes upward, the crossing test fails because
+             * both prev_bottom and bottom end up BELOW the new fp->y.  We detect
+             * this by remembering which platform the player was on last frame
+             * (prev_fp_landed_idx) and checking whether the player's physics
+             * bottom is still within FLOAT_PLATFORM_STICK_TOL pixels of that
+             * surface.  If so, snap back and re-establish contact.
+             *
+             * The outer `player->vy >= 0` guard already excludes upward jumps,
+             * so this check cannot mistakenly re-snap a player who just jumped.
+             */
+            if (!player->on_ground &&
+                prev_fp_landed_idx >= 0 &&
+                prev_fp_landed_idx < float_platform_count) {
+
+                const FloatPlatform *sfp = &float_platforms[prev_fp_landed_idx];
+                if (sfp->active) {
+                    int h_ov = (player->x + player->w - PHYS_PAD_X > sfp->x) &&
+                               (player->x + PHYS_PAD_X < sfp->x + sfp->w);
+                    /* gap > 0 means player is below the surface (platform rose) */
+                    float gap = bottom - sfp->y;
+                    if (h_ov && gap >= 0.0f && gap < (float)FLOAT_PLATFORM_STICK_TOL) {
+                        player->y          = sfp->y - player->h + FLOOR_SINK;
+                        player->vy         = 0.0f;
+                        player->on_ground  = 1;
+                        *out_fp_landed_idx = prev_fp_landed_idx;
+                    }
+                }
             }
         }
     }

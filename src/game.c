@@ -22,6 +22,7 @@
 #include "parallax.h"
 #include "rail.h"
 #include "spike_block.h"
+#include "float_platform.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -291,8 +292,20 @@ void game_init(GameState *gs) {
     gs->spike_block_tex = IMG_LoadTexture(gs->renderer, "assets/Spike_Block.png");
     if (!gs->spike_block_tex) {
         fprintf(stderr, "Warning: Failed to load Spike_Block.png: %s\n", IMG_GetError());
+
     }
     spike_blocks_init(gs->spike_blocks, &gs->spike_block_count, gs->rails);
+
+    /*
+     * Load the float-platform texture.  Platform.png is a 48×16 px sprite
+     * divided into three 16×16 horizontal slices (left cap, centre fill,
+     * right cap).  Non-fatal: platforms are skipped at render time if NULL.
+     */
+    gs->float_platform_tex = IMG_LoadTexture(gs->renderer, "assets/Platform.png");
+    if (!gs->float_platform_tex) {
+        fprintf(stderr, "Warning: Failed to load Platform.png: %s\n", IMG_GetError());
+    }
+    float_platforms_init(gs->float_platforms, &gs->float_platform_count, gs->rails);
 
     /*
      * Load the jump sound effect. Mix_LoadWAV decodes the WAV into a
@@ -454,6 +467,13 @@ void game_loop(GameState *gs) {
     /* Record the timestamp at the start of the very first frame */
     Uint64 prev = SDL_GetTicks64();
 
+    /*
+     * fp_prev_riding — index of the float platform the player was standing on
+     * during the previous frame, or -1 if none.  Persists across loop iterations
+     * so player_update can use it for the stay-on check when a platform moves up.
+     */
+    int fp_prev_riding = -1;
+
     while (gs->running) {
         /*
          * Delta time (dt) — seconds elapsed since the previous frame.
@@ -582,17 +602,22 @@ void game_loop(GameState *gs) {
                             gs->vines, gs->vine_count);
 
         /*
-         * Move the player, resolve floor + platform + bouncepad collisions.
-         * bounce_idx is set to the index of the bouncepad hit this frame,
-         * or stays -1 if no bouncepad was landed on.
+         * Move the player, resolve floor + platform + float-platform +
+         * bouncepad collisions.
+         * bounce_idx is set to the bouncepad hit this frame, or -1.
+         * fp_landed_idx is set to the float platform the player landed on,
+         * or -1 if none.  Both must be initialised to -1 before the call.
          */
-        int bounce_idx = -1;
+        int bounce_idx    = -1;
+        int fp_landed_idx = -1;
         player_update(&gs->player, dt,
                       gs->platforms, gs->platform_count,
+                      gs->float_platforms, gs->float_platform_count,
                       gs->bouncepads, gs->bouncepad_count,
                       gs->vines, gs->vine_count,
                       gs->sea_gaps, gs->sea_gap_count,
-                      &bounce_idx);
+                      &bounce_idx, &fp_landed_idx,
+                      fp_prev_riding);
 
         /*
          * Bouncepad landing response: start the release animation and play
@@ -661,6 +686,40 @@ void game_loop(GameState *gs) {
         spike_blocks_update(gs->spike_blocks, gs->spike_block_count, dt, cam_x);
 
         /*
+         * Advance float platforms: drives crumble timers and rail movement.
+         * fp_landed_idx tells which platform (if any) the player is standing
+         * on this frame, so the crumble timer only accumulates while the
+         * player is in contact.
+         */
+        float_platforms_update(gs->float_platforms, gs->float_platform_count,
+                               dt, fp_landed_idx);
+
+        /*
+         * Rail-platform player nudge — push the player sideways by the
+         * distance the rail platform moved this frame.
+         *
+         * float_platforms_update has already advanced fp->x to the new
+         * position and saved the old position in fp->prev_x, so the delta
+         * (fp->x − fp->prev_x) is the exact horizontal displacement for
+         * this frame.  Applying it to the player keeps them riding smoothly
+         * as the platform orbits the rail loop.
+         */
+        if (fp_landed_idx >= 0) {
+            const FloatPlatform *fp = &gs->float_platforms[fp_landed_idx];
+            if (fp->mode == FLOAT_PLATFORM_RAIL) {
+                gs->player.x += fp->x - fp->prev_x;
+            }
+        }
+
+        /*
+         * Update fp_prev_riding so next frame's player_update knows which
+         * float platform (if any) the player is currently standing on.
+         * Reset to -1 whenever the game resets so the stay-on check doesn't
+         * reference a stale index after a respawn.
+         */
+        fp_prev_riding = fp_landed_idx;
+
+        /*
          * Player–spider collision.
          *
          * Count down the invincibility timer first.  While it is positive the
@@ -709,6 +768,10 @@ void game_loop(GameState *gs) {
                         coins_init(gs->coins, &gs->coin_count);
                         spiders_init(gs->spiders, &gs->spider_count);
                         fish_init(gs->fish, &gs->fish_count);
+                        float_platforms_init(gs->float_platforms,
+                                             &gs->float_platform_count,
+                                             gs->rails);
+                        fp_prev_riding = -1;
                     }
                     break;
                 }
@@ -841,6 +904,9 @@ void game_loop(GameState *gs) {
                             coins_init(gs->coins, &gs->coin_count);
                             spiders_init(gs->spiders, &gs->spider_count);
                             fish_init(gs->fish, &gs->fish_count);
+                            float_platforms_init(gs->float_platforms,
+                                                 &gs->float_platform_count,
+                                                 gs->rails);
                         }
                         break;
                     }
@@ -888,6 +954,9 @@ void game_loop(GameState *gs) {
                             spike_blocks_init(gs->spike_blocks,
                                               &gs->spike_block_count,
                                               gs->rails);
+                            float_platforms_init(gs->float_platforms,
+                                                 &gs->float_platform_count,
+                                                 gs->rails);
                         }
                         break;
                     }
@@ -1104,6 +1173,20 @@ void game_loop(GameState *gs) {
         }
 
         /*
+         * Draw the one-way platforms after the floor but before the player,
+         * so the player sprite appears in front of the pillar tiles.
+         */
+        platforms_render(gs->platforms, gs->platform_count,
+                         gs->renderer, gs->platform_tex, cam_x);
+
+        /*
+         * Draw floating platforms above the floor and pillar layer but below
+         * bouncepads and entities, so they read as mid-air surfaces.
+         */
+        float_platforms_render(gs->float_platforms, gs->float_platform_count,
+                               gs->renderer, gs->float_platform_tex, cam_x);
+
+        /*
          * Draw bouncepads between the platform pillars and vine decorations.
          * This places them visually on the floor surface, with vines potentially
          * overlapping the edges for a natural overgrown look.
@@ -1258,6 +1341,11 @@ void game_cleanup(GameState *gs) {
     if (gs->spike_block_tex) {
         SDL_DestroyTexture(gs->spike_block_tex);
         gs->spike_block_tex = NULL;
+    }
+
+    if (gs->float_platform_tex) {
+        SDL_DestroyTexture(gs->float_platform_tex);
+        gs->float_platform_tex = NULL;
     }
 
     if (gs->rail_tex) {
