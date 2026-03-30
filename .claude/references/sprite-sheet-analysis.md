@@ -13,7 +13,7 @@
 ```python
 from PIL import Image
 
-img = Image.open("assets/Player.png")
+img = Image.open("assets/player.png")
 w, h = img.size
 print(f"Sheet: {w}×{h}")
 
@@ -33,13 +33,12 @@ The [analyze_sprite.py](../scripts/analyze_sprite.py) script does this automatic
 
 The **Super Mango 2D Pixel Art Platformer Asset Pack** (by Juho) uses **48×48 px frames**.
 
-| Asset              | Sheet Size | Grid          | Total Frames |
-|--------------------|-----------|---------------|--------------|
-| `Player.png`       | 192×288   | 4 cols × 6 rows | 24          |
-| `Grass_Tileset.png`| 48×48     | 1×1 (single tile) | 1         |
-| `Brick_Tileset.png`| 48×48     | 1×1             | 1           |
-| `Coin.png`         | varies    | measure at runtime | —         |
-| `Bird_1.png`       | varies    | measure at runtime | —         |
+| Asset                 | Sheet Size | Grid             | Total Frames |
+|-----------------------|-----------|------------------|--------------|
+| `player.png`          | 192×288   | 4 cols × 6 rows  | 24           |
+| `grass_tileset.png`   | 48×48     | 1×1 (single tile)| 1            |
+| `coin.png`            | varies    | measure at runtime | —          |
+| `bird.png`            | varies    | measure at runtime | —          |
 
 > Always re-measure when in doubt. Use the analysis script.
 

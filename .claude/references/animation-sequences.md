@@ -18,7 +18,7 @@ Most pixel art packs follow this convention (adapt per pack):
 | Attack        | 4   | One-shot; return to idle on completion      | No    |
 | Hurt / Hitstun| 5   | Brief flash, then back to idle              | No    |
 
-> The Super Mango `Player.png` has 6 rows — map them by visual inspection using the analysis script, then confirm here.
+> The Super Mango `player.png` has 6 rows — map them by visual inspection using the analysis script, then confirm here.
 
 ## Animation Timing
 

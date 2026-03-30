@@ -35,13 +35,17 @@ The Makefile uses `src/*.c` wildcards — **new `.c` files are picked up automat
 super-mango-game/
 ├── CLAUDE.md               ← you are here
 ├── Makefile
-├── assets/                 ← PNG sprites + Round9x13.ttf
-├── sounds/                 ← .wav / .mp3 sound effects
+├── assets/                 ← PNG sprites + round9x13.ttf (snake_case, named after components)
+├── assets/unused/          ← unused assets for future use
+├── sounds/                 ← .wav sound effects (snake_case, named after components)
+├── sounds/unused/          ← unused sounds for future use
+├── .claude/                ← slash commands, references, scripts
 └── src/
     ├── main.c              ← SDL init/teardown, entry point
     ├── game.h / game.c     ← GameState, window, renderer, background, game loop
     ├── player.h / player.c ← Player struct, input, update, render, clamp
-    └── (future entities)   ← coin.h/c, enemy.h/c, etc.
+    ├── sandbox.c           ← Level layout and entity placement
+    └── <entity>.h / .c     ← One module per entity (coin, spider, bird, etc.)
 ```
 
 ### Module responsibilities
@@ -89,8 +93,8 @@ main()
 
 ## Current Game State (MVP)
 
-- `Sky_Background_0.png` fills the logical canvas as the background
-- `Player.png` centered at startup; 8-directional movement via WASD / arrow keys
+- Parallax multi-layer scrolling background
+- `player.png` centered at startup; 8-directional movement via WASD / arrow keys
 - Player speed: 200 px/s (dt-based, frame-rate independent)
 - ESC or window close → quit
 
@@ -100,11 +104,11 @@ main()
 
 ### Adding a new entity (coin, enemy, platform…)
 
-@.github/skills/pixelart-game-c-developer/references/entity-template.md
+@.claude/references/entity-template.md
 
 ### Coding standards and comment style
 
-@.github/skills/pixelart-game-c-developer/references/coding-standards.md
+@.claude/references/coding-standards.md
 
 ### Physics / collision pattern
 
@@ -132,7 +136,7 @@ if (player->x > GAME_W - player->w) player->x = (float)(GAME_W - player->w);
 
 ### Adding sound effects
 
-1. Place `.wav` / `.mp3` in `sounds/`.
+1. Place `.wav` files in `sounds/` (all sounds use `.wav` format, named after their component).
 2. Add `Mix_Chunk *snd_<name>` to `GameState` in `game.h`.
 3. Load: `gs->snd_<name> = Mix_LoadWAV("sounds/<name>.wav");` — non-fatal (warn, don't exit).
 4. Free: `if (gs->snd_<name>) { Mix_FreeChunk(gs->snd_<name>); gs->snd_<name> = NULL; }`
@@ -145,7 +149,7 @@ if (player->x > GAME_W - player->w) player->x = (float)(GAME_W - player->w);
 ### Analyzing a sprite sheet
 
 ```sh
-python3 .github/skills/pixelart-game-designer/scripts/analyze_sprite.py assets/<sprite>.png
+python3 .claude/scripts/analyze_sprite.py assets/<sprite>.png
 ```
 
 ### Frame math
@@ -169,9 +173,9 @@ source_y = (frame_index / cols) * frame_h
 | 4   | Attack      | 4–8 frames, one-shot         |
 | 5   | Death / Hurt| 4–6 frames, one-shot         |
 
-Full animation reference: @.github/skills/pixelart-game-designer/references/animation-sequences.md
+Full animation reference: @.claude/references/animation-sequences.md
 
-Full sprite sheet analysis notes: @.github/skills/pixelart-game-designer/references/sprite-sheet-analysis.md
+Full sprite sheet analysis notes: @.claude/references/sprite-sheet-analysis.md
 
 ---
 
