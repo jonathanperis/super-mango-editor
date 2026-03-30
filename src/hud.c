@@ -39,12 +39,30 @@ void hud_init(Hud *hud, SDL_Renderer *renderer)
      * IMG_LoadTexture — decode Stars_Ui.png and upload it to GPU memory.
      * This single texture is drawn once per current heart in hud_render.
      */
-    hud->star_tex = IMG_LoadTexture(renderer, "assets/Stars_Ui.png");
+    hud->star_tex = IMG_LoadTexture(renderer, "assets/Star_Yellow.png");
     if (!hud->star_tex) {
         fprintf(stderr, "Failed to load Stars_Ui.png: %s\n", IMG_GetError());
         TTF_CloseFont(hud->font);
         hud->font = NULL;
         exit(EXIT_FAILURE);
+    }
+
+    /*
+     * Load the coin icon for the score display.
+     * Non-fatal: the score still shows without the icon.
+     */
+    hud->coin_icon = IMG_LoadTexture(renderer, "assets/Coins_Ui.png");
+    if (!hud->coin_icon) {
+        fprintf(stderr, "Warning: Failed to load Coins_Ui.png: %s\n", IMG_GetError());
+    }
+
+    /*
+     * Load the player sprite sheet so the HUD can crop a small icon
+     * for the lives counter.  Non-fatal: lives text still renders.
+     */
+    hud->player_icon = IMG_LoadTexture(renderer, "assets/Player.png");
+    if (!hud->player_icon) {
+        fprintf(stderr, "Warning: Failed to load Player.png (HUD icon): %s\n", IMG_GetError());
     }
 }
 
@@ -97,7 +115,6 @@ static void render_text(TTF_Font *font, SDL_Renderer *renderer,
  * Score is right-aligned with HUD_MARGIN from the right edge.
  */
 void hud_render(const Hud *hud, SDL_Renderer *renderer,
-                SDL_Texture *player_tex,
                 int hearts, int lives, int score)
 {
     int hud_row_y = HUD_MARGIN;
@@ -137,7 +154,9 @@ void hud_render(const Hud *hud, SDL_Renderer *renderer,
         HUD_ICON_W,
         HUD_ICON_H
     };
-    SDL_RenderCopy(renderer, player_tex, &icon_src, &icon_dst);
+    if (hud->player_icon) {
+        SDL_RenderCopy(renderer, hud->player_icon, &icon_src, &icon_dst);
+    }
 
     /*
      * "x3" — lives counter text, rendered right next to the player icon.
@@ -163,9 +182,29 @@ void hud_render(const Hud *hud, SDL_Renderer *renderer,
         fprintf(stderr, "TTF_SizeText failed for score text: %s\n", TTF_GetError());
         text_w = 0;  /* Fallback: draw at GAME_W - HUD_MARGIN, as before */
     }
+    /*
+     * Compute score text x position, leaving room for the coin icon after it.
+     * Layout: [SCORE: 123] [coin_icon]
+     * The coin icon sits immediately to the right of the score text.
+     */
+    int coin_gap = 3;  /* px gap between score text and coin icon */
+    int total_score_w = text_w + coin_gap + HUD_COIN_ICON_SIZE;
+    int score_x = GAME_W - HUD_MARGIN - total_score_w;
+
     render_text(hud->font, renderer, score_buf,
-                GAME_W - HUD_MARGIN - text_w,
+                score_x,
                 hud_row_y + (HUD_ROW_H - 13) / 2);
+
+    /* Draw the coin icon right after the score text */
+    if (hud->coin_icon) {
+        SDL_Rect coin_dst = {
+            score_x + text_w + coin_gap,
+            hud_row_y + (HUD_ROW_H - HUD_COIN_ICON_SIZE) / 2,
+            HUD_COIN_ICON_SIZE,
+            HUD_COIN_ICON_SIZE
+        };
+        SDL_RenderCopy(renderer, hud->coin_icon, NULL, &coin_dst);
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -178,6 +217,14 @@ void hud_render(const Hud *hud, SDL_Renderer *renderer,
  */
 void hud_cleanup(Hud *hud)
 {
+    if (hud->player_icon) {
+        SDL_DestroyTexture(hud->player_icon);
+        hud->player_icon = NULL;
+    }
+    if (hud->coin_icon) {
+        SDL_DestroyTexture(hud->coin_icon);
+        hud->coin_icon = NULL;
+    }
     if (hud->star_tex) {
         SDL_DestroyTexture(hud->star_tex);
         hud->star_tex = NULL;

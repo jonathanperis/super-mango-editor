@@ -4,10 +4,21 @@
  * Same mechanics as the regular bird but with higher speed, faster wing
  * animation, and a tighter sine-wave frequency for more aggressive curves.
  */
-#include <math.h>   /* sinf */
+#include <math.h>   /* sinf, fabsf */
 
 #include "faster_bird.h"
 #include "game.h"   /* GAME_W, GAME_H, WORLD_W */
+
+#define FBIRD_AUDIBLE_RANGE  ((float)GAME_W)
+#define FBIRD_VOL_MAX        96
+#define FBIRD_VOL_MIN        16
+
+static int fbird_volume_for_distance(float dist) {
+    if (dist >= FBIRD_AUDIBLE_RANGE) return 0;
+    if (dist <= 0.0f) return FBIRD_VOL_MAX;
+    float fraction = dist / FBIRD_AUDIBLE_RANGE;
+    return FBIRD_VOL_MAX - (int)(fraction * (FBIRD_VOL_MAX - FBIRD_VOL_MIN));
+}
 
 /* ------------------------------------------------------------------ */
 
@@ -42,7 +53,8 @@ void faster_birds_init(FasterBird *birds, int *count)
 
 /* ------------------------------------------------------------------ */
 
-void faster_birds_update(FasterBird *birds, int count, float dt)
+void faster_birds_update(FasterBird *birds, int count, float dt,
+                         Mix_Chunk *snd_flap, float player_x, int cam_x)
 {
     for (int i = 0; i < count; i++) {
         FasterBird *b = &birds[i];
@@ -62,7 +74,23 @@ void faster_birds_update(FasterBird *birds, int count, float dt)
         b->anim_timer_ms += (Uint32)(dt * 1000.0f);
         if (b->anim_timer_ms >= FBIRD_FRAME_MS) {
             b->anim_timer_ms -= FBIRD_FRAME_MS;
-            b->frame_index    = (b->frame_index + 1) % FBIRD_FRAMES;
+            int prev_frame = b->frame_index;
+            b->frame_index = (b->frame_index + 1) % FBIRD_FRAMES;
+
+            /* Play flap sound once per cycle with distance-based volume */
+            if (b->frame_index == 0 && prev_frame != 0 && snd_flap) {
+                float bird_cx = b->x + FBIRD_FRAME_W / 2.0f;
+                int on_screen = (bird_cx >= (float)cam_x - FBIRD_FRAME_W &&
+                                 bird_cx <= (float)cam_x + GAME_W + FBIRD_FRAME_W);
+                if (on_screen) {
+                    float dist = fabsf(player_x - bird_cx);
+                    int vol = fbird_volume_for_distance(dist);
+                    if (vol > 0) {
+                        int ch = Mix_PlayChannel(-1, snd_flap, 0);
+                        if (ch >= 0) Mix_Volume(ch, vol);
+                    }
+                }
+            }
         }
     }
 }

@@ -19,12 +19,25 @@
 #include "coin.h"
 #include "vine.h"
 #include "bouncepad.h"
+#include "bouncepad_small.h"
+#include "bouncepad_medium.h"
+#include "bouncepad_high.h"
 #include "hud.h"
 #include "parallax.h"
 #include "rail.h"
 #include "spike_block.h"
 #include "float_platform.h"
-#include "red_star.h"
+#include "yellow_star.h"
+#include "axe_trap.h"
+#include "circular_saw.h"
+#include "flame.h"
+#include "ladder.h"
+#include "rope.h"
+#include "faster_fish.h"
+#include "last_star.h"
+#include "spike.h"
+#include "spike_platform.h"
+#include "sandbox.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -124,9 +137,6 @@ void game_init(GameState *gs) {
         exit(EXIT_FAILURE);
     }
 
-    /* Populate the platforms array with the two pillar definitions */
-    platforms_init(gs->platforms, &gs->platform_count);
-
     /* Load the animated water strip texture and reset scroll state */
     water_init(&gs->water, gs->renderer);
 
@@ -144,7 +154,6 @@ void game_init(GameState *gs) {
         SDL_DestroyWindow(gs->window);
         exit(EXIT_FAILURE);
     }
-    spiders_init(gs->spiders, &gs->spider_count);
 
     /*
      * Load the jumping spider texture (Spider_2.png, same layout as Spider_1).
@@ -161,173 +170,93 @@ void game_init(GameState *gs) {
         SDL_DestroyWindow(gs->window);
         exit(EXIT_FAILURE);
     }
-    jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
 
-    /*
-     * Load the bird texture (Bird_2.png — slow bird).
-     * Non-fatal would be acceptable but birds are gameplay enemies, so fatal.
-     */
+    /* ---- Load all entity textures (engine resources) --------------- */
     gs->bird_tex = IMG_LoadTexture(gs->renderer, "assets/Bird_2.png");
-    if (!gs->bird_tex) {
-        fprintf(stderr, "Failed to load Bird_2.png: %s\n", IMG_GetError());
-        SDL_DestroyTexture(gs->jumping_spider_tex);
-        SDL_DestroyTexture(gs->spider_tex);
-        SDL_DestroyTexture(gs->platform_tex);
-        SDL_DestroyTexture(gs->floor_tile);
-        parallax_cleanup(&gs->parallax);
-        SDL_DestroyRenderer(gs->renderer);
-        SDL_DestroyWindow(gs->window);
-        exit(EXIT_FAILURE);
-    }
-    birds_init(gs->birds, &gs->bird_count);
-
-    /*
-     * Load the faster bird texture (Bird_1.png — fast bird).
-     */
+    if (!gs->bird_tex) { fprintf(stderr, "Failed to load Bird_2.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
     gs->faster_bird_tex = IMG_LoadTexture(gs->renderer, "assets/Bird_1.png");
-    if (!gs->faster_bird_tex) {
-        fprintf(stderr, "Failed to load Bird_1.png: %s\n", IMG_GetError());
-        SDL_DestroyTexture(gs->bird_tex);
-        SDL_DestroyTexture(gs->jumping_spider_tex);
-        SDL_DestroyTexture(gs->spider_tex);
-        SDL_DestroyTexture(gs->platform_tex);
-        SDL_DestroyTexture(gs->floor_tile);
-        parallax_cleanup(&gs->parallax);
-        SDL_DestroyRenderer(gs->renderer);
-        SDL_DestroyWindow(gs->window);
-        exit(EXIT_FAILURE);
-    }
-    faster_birds_init(gs->faster_birds, &gs->faster_bird_count);
-
-    /*
-     * Load the shared fish texture. Fish live in the water lane and use
-     * the same texture for all instances, just like the spider enemy.
-     */
+    if (!gs->faster_bird_tex) { fprintf(stderr, "Failed to load Bird_1.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
     gs->fish_tex = IMG_LoadTexture(gs->renderer, "assets/Fish_2.png");
-    if (!gs->fish_tex) {
-        fprintf(stderr, "Failed to load Fish_2.png: %s\n", IMG_GetError());
-        SDL_DestroyTexture(gs->jumping_spider_tex);
-        SDL_DestroyTexture(gs->spider_tex);
-        SDL_DestroyTexture(gs->platform_tex);
-        SDL_DestroyTexture(gs->floor_tile);
-        parallax_cleanup(&gs->parallax);
-        SDL_DestroyRenderer(gs->renderer);
-        SDL_DestroyWindow(gs->window);
-        exit(EXIT_FAILURE);
-    }
-    fish_init(gs->fish, &gs->fish_count);
-
-    /*
-     * Load the shared coin texture.  All coin instances blit from this
-     * single texture using the full image as the source rect.
-     */
+    if (!gs->fish_tex) { fprintf(stderr, "Failed to load Fish_2.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
     gs->coin_tex = IMG_LoadTexture(gs->renderer, "assets/Coin.png");
-    if (!gs->coin_tex) {
-        fprintf(stderr, "Failed to load Coin.png: %s\n", IMG_GetError());
-        SDL_DestroyTexture(gs->fish_tex);
-        SDL_DestroyTexture(gs->spider_tex);
-        SDL_DestroyTexture(gs->platform_tex);
-        SDL_DestroyTexture(gs->floor_tile);
-        parallax_cleanup(&gs->parallax);
-        SDL_DestroyRenderer(gs->renderer);
-        SDL_DestroyWindow(gs->window);
-        exit(EXIT_FAILURE);
-    }
-    coins_init(gs->coins, &gs->coin_count);
+    if (!gs->coin_tex) { fprintf(stderr, "Failed to load Coin.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
+    gs->bouncepad_medium_tex = IMG_LoadTexture(gs->renderer, "assets/Bouncepad_Wood.png");
+    if (!gs->bouncepad_medium_tex) { fprintf(stderr, "Failed to load Bouncepad_Wood.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
 
-    /*
-     * Load the shared vine texture.  Vines are static scenery; loading
-     * failure is non-fatal — the decorations are simply skipped.
-     */
+    /* Non-fatal textures — game runs without them */
     gs->vine_tex = IMG_LoadTexture(gs->renderer, "assets/Vine.png");
-    if (!gs->vine_tex) {
-        fprintf(stderr, "Warning: Failed to load Vine.png: %s\n", IMG_GetError());
-    }
-    vine_init(gs->vines, &gs->vine_count);
+    if (!gs->vine_tex) fprintf(stderr, "Warning: Failed to load Vine.png: %s\n", IMG_GetError());
+    gs->ladder_tex = IMG_LoadTexture(gs->renderer, "assets/Ladder.png");
+    if (!gs->ladder_tex) fprintf(stderr, "Warning: Failed to load Ladder.png: %s\n", IMG_GetError());
+    gs->rope_tex = IMG_LoadTexture(gs->renderer, "assets/Rope.png");
+    if (!gs->rope_tex) fprintf(stderr, "Warning: Failed to load Rope.png: %s\n", IMG_GetError());
+    gs->bouncepad_small_tex = IMG_LoadTexture(gs->renderer, "assets/Bouncepad_Green.png");
+    if (!gs->bouncepad_small_tex) fprintf(stderr, "Warning: Failed to load Bouncepad_Green.png: %s\n", IMG_GetError());
+    gs->bouncepad_high_tex = IMG_LoadTexture(gs->renderer, "assets/Bouncepad_Red.png");
+    if (!gs->bouncepad_high_tex) fprintf(stderr, "Warning: Failed to load Bouncepad_Red.png: %s\n", IMG_GetError());
+    gs->rail_tex = IMG_LoadTexture(gs->renderer, "assets/Rails.png");
+    if (!gs->rail_tex) fprintf(stderr, "Warning: Failed to load Rails.png: %s\n", IMG_GetError());
+    gs->spike_block_tex = IMG_LoadTexture(gs->renderer, "assets/Spike_Block.png");
+    if (!gs->spike_block_tex) fprintf(stderr, "Warning: Failed to load Spike_Block.png: %s\n", IMG_GetError());
+    gs->float_platform_tex = IMG_LoadTexture(gs->renderer, "assets/Platform.png");
+    if (!gs->float_platform_tex) fprintf(stderr, "Warning: Failed to load Platform.png: %s\n", IMG_GetError());
+    gs->bridge_tex = IMG_LoadTexture(gs->renderer, "assets/Bridge.png");
+    if (!gs->bridge_tex) fprintf(stderr, "Warning: Failed to load Bridge.png: %s\n", IMG_GetError());
+    gs->yellow_star_tex = IMG_LoadTexture(gs->renderer, "assets/Star_Yellow.png");
+    if (!gs->yellow_star_tex) fprintf(stderr, "Warning: Failed to load Star_Yellow.png: %s\n", IMG_GetError());
+    gs->axe_trap_tex = IMG_LoadTexture(gs->renderer, "assets/Axe_Trap.png");
+    if (!gs->axe_trap_tex) fprintf(stderr, "Warning: Failed to load Axe_Trap.png: %s\n", IMG_GetError());
+    gs->circular_saw_tex = IMG_LoadTexture(gs->renderer, "assets/Circular_Saw.png");
+    if (!gs->circular_saw_tex) fprintf(stderr, "Warning: Failed to load Circular_Saw.png: %s\n", IMG_GetError());
+    gs->flame_tex = IMG_LoadTexture(gs->renderer, "assets/Flame_2.png");
+    if (!gs->flame_tex) fprintf(stderr, "Warning: Failed to load Flame_2.png: %s\n", IMG_GetError());
+    gs->faster_fish_tex = IMG_LoadTexture(gs->renderer, "assets/Fish_1.png");
+    if (!gs->faster_fish_tex) fprintf(stderr, "Warning: Failed to load Fish_1.png: %s\n", IMG_GetError());
+    gs->spike_tex = IMG_LoadTexture(gs->renderer, "assets/Spike.png");
+    if (!gs->spike_tex) fprintf(stderr, "Warning: Failed to load Spike.png: %s\n", IMG_GetError());
+    gs->spike_platform_tex = IMG_LoadTexture(gs->renderer, "assets/Spike_Platform.png");
+    if (!gs->spike_platform_tex) fprintf(stderr, "Warning: Failed to load Spike_Platform.png: %s\n", IMG_GetError());
+
+    /* ---- Load all sound effects ----------------------------------- */
+    gs->snd_spring = Mix_LoadWAV("sounds/bouncepad.mp3");
+    if (!gs->snd_spring) fprintf(stderr, "Warning: Failed to load bouncepad.mp3: %s\n", Mix_GetError());
 
     /*
-     * Load the bouncepad texture and initialise pad placements.
-     *
-     * Bouncepad_Wood.png is a 144×48 single-row sheet with 3 frames of 48×48.
-     * Fatal if missing — the pad is a gameplay element, not just decoration.
-     */
-    gs->bouncepad_tex = IMG_LoadTexture(gs->renderer, "assets/Bouncepad_Wood.png");
-    if (!gs->bouncepad_tex) {
-        fprintf(stderr, "Failed to load Bouncepad_Wood.png: %s\n", IMG_GetError());
-        if (gs->vine_tex) SDL_DestroyTexture(gs->vine_tex);
-        SDL_DestroyTexture(gs->coin_tex);
-        SDL_DestroyTexture(gs->fish_tex);
-        SDL_DestroyTexture(gs->spider_tex);
-        SDL_DestroyTexture(gs->platform_tex);
-        SDL_DestroyTexture(gs->floor_tile);
-        parallax_cleanup(&gs->parallax);
-        SDL_DestroyRenderer(gs->renderer);
-        SDL_DestroyWindow(gs->window);
-        exit(EXIT_FAILURE);
-    }
-    bouncepads_init(gs->bouncepads, &gs->bouncepad_count);
-
-    /*
-     * Load the bouncepad sound effect.
+     * Load the swinging axe sound effect.
      * Mix_LoadWAV handles WAV and, with SDL2_mixer ≥ 2.0, also MP3.
      * Non-fatal: gameplay continues without audio if loading fails.
      */
-    gs->snd_spring = Mix_LoadWAV("sounds/bouncepad.mp3");
-    if (!gs->snd_spring) {
-        fprintf(stderr, "Warning: Failed to load bouncepad.mp3: %s\n", Mix_GetError());
+    gs->snd_axe = Mix_LoadWAV("sounds/swinging-axe.mp3");
+    if (!gs->snd_axe) {
+        fprintf(stderr, "Warning: Failed to load swinging-axe.mp3: %s\n", Mix_GetError());
     }
-    /*
-     * Load the rail tile texture.  Rails.png is a 64×64 sprite sheet divided
-     * into a 4×4 grid of 16×16 tiles.  Non-fatal: missing texture prints a
-     * warning and rail_render silently skips the draw each frame.
-     */
-    gs->rail_tex = IMG_LoadTexture(gs->renderer, "assets/Rails.png");
-    if (!gs->rail_tex) {
-        fprintf(stderr, "Warning: Failed to load Rails.png: %s\n", IMG_GetError());
-    }
-    rail_init(gs->rails, &gs->rail_count);
 
     /*
-     * Load the spike block texture.  Spike_Block.png is a single 16×16 frame.
-     * Non-fatal for the same reason as rail_tex.
+     * Load the bird flapping sound effect.
+     * Non-fatal: gameplay continues without audio if loading fails.
      */
-    gs->spike_block_tex = IMG_LoadTexture(gs->renderer, "assets/Spike_Block.png");
-    if (!gs->spike_block_tex) {
-        fprintf(stderr, "Warning: Failed to load Spike_Block.png: %s\n", IMG_GetError());
-
+    gs->snd_flap = Mix_LoadWAV("sounds/flapping.wav");
+    if (!gs->snd_flap) {
+        fprintf(stderr, "Warning: Failed to load flapping.wav: %s\n", Mix_GetError());
     }
-    spike_blocks_init(gs->spike_blocks, &gs->spike_block_count, gs->rails);
 
     /*
-     * Load the float-platform texture.  Platform.png is a 48×16 px sprite
-     * divided into three 16×16 horizontal slices (left cap, centre fill,
-     * right cap).  Non-fatal: platforms are skipped at render time if NULL.
+     * Load the jumping spider attack sound effect.
+     * Non-fatal: gameplay continues without audio if loading fails.
      */
-    gs->float_platform_tex = IMG_LoadTexture(gs->renderer, "assets/Platform.png");
-    if (!gs->float_platform_tex) {
-        fprintf(stderr, "Warning: Failed to load Platform.png: %s\n", IMG_GetError());
+    gs->snd_spider_attack = Mix_LoadWAV("sounds/spider-attack.mp3");
+    if (!gs->snd_spider_attack) {
+        fprintf(stderr, "Warning: Failed to load spider-attack.mp3: %s\n", Mix_GetError());
     }
-    float_platforms_init(gs->float_platforms, &gs->float_platform_count, gs->rails);
 
     /*
-     * Load the bridge tile texture (Bridge.png, 16×16).
-     * Non-fatal — the game can run without it (warning only).
+     * Load the dive/splash sound for falling into sea gaps.
+     * Non-fatal: gameplay continues without audio if loading fails.
      */
-    gs->bridge_tex = IMG_LoadTexture(gs->renderer, "assets/Bridge.png");
-    if (!gs->bridge_tex) {
-        fprintf(stderr, "Warning: Failed to load Bridge.png: %s\n", IMG_GetError());
+    gs->snd_dive = Mix_LoadWAV("sounds/dive.wav");
+    if (!gs->snd_dive) {
+        fprintf(stderr, "Warning: Failed to load dive.wav: %s\n", Mix_GetError());
     }
-    bridges_init(gs->bridges, &gs->bridge_count);
-
-    /*
-     * Load the red star collectible texture (Star_Red.png, small red star).
-     * Non-fatal: the game can run without health pickups.
-     */
-    gs->red_star_tex = IMG_LoadTexture(gs->renderer, "assets/Star_Red.png");
-    if (!gs->red_star_tex) {
-        fprintf(stderr, "Warning: Failed to load Star_Red.png: %s\n", IMG_GetError());
-    }
-    red_stars_init(gs->red_stars, &gs->red_star_count);
 
     /*
      * Load the jump sound effect. Mix_LoadWAV decodes the WAV into a
@@ -411,17 +340,8 @@ void game_init(GameState *gs) {
     /* Initialise the debug overlay if --debug was passed on the CLI */
     if (gs->debug_mode) debug_init(&gs->debug);
 
-    /*
-     * Sea gaps — holes in the ground floor that expose the water below.
-     * Each gap is SEA_GAP_W (32 px) wide, positioned to avoid overlapping
-     * platforms, bouncepads, and ground coins.
-     */
-    gs->sea_gaps[0] = 0;       /* left world edge  (screen 1 start)   */
-    gs->sea_gaps[1] = 192;     /* screen 1 mid     (free zone 187–255)*/
-    gs->sea_gaps[2] = 560;     /* screen 2 mid     (free zone 549–594)*/
-    gs->sea_gaps[3] = 928;     /* screen 3 mid     (16px-aligned, after platform at 880) */
-    gs->sea_gaps[4] = 1152;    /* screen 3–4 boundary (free 1147–1229)*/
-    gs->sea_gap_count = 5;
+    /* Load the sandbox level — all entity placements and sea gaps */
+    sandbox_load_level(gs);
 
     /* Initialise the health/lives/score system */
     gs->hearts          = MAX_HEARTS;
@@ -494,18 +414,7 @@ void game_init(GameState *gs) {
  * exists after the reset.
  */
 static void level_reset(GameState *gs, int *fp_prev_riding) {
-    player_reset(&gs->player);
-    coins_init(gs->coins, &gs->coin_count);
-    spiders_init(gs->spiders, &gs->spider_count);
-    jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
-    birds_init(gs->birds, &gs->bird_count);
-    faster_birds_init(gs->faster_birds, &gs->faster_bird_count);
-    fish_init(gs->fish, &gs->fish_count);
-    spike_blocks_init(gs->spike_blocks, &gs->spike_block_count, gs->rails);
-    float_platforms_init(gs->float_platforms, &gs->float_platform_count, gs->rails);
-    bridges_init(gs->bridges, &gs->bridge_count);
-    red_stars_init(gs->red_stars, &gs->red_star_count);
-    *fp_prev_riding = -1;
+    sandbox_reset_level(gs, fp_prev_riding);
 }
 
 /* ------------------------------------------------------------------ */
@@ -718,7 +627,9 @@ void game_loop(GameState *gs) {
 
         /* Read keyboard and gamepad; set the player's velocity for this frame */
         player_handle_input(&gs->player, gs->snd_jump, gs->controller,
-                            gs->vines, gs->vine_count);
+                            gs->vines, gs->vine_count,
+                            gs->ladders, gs->ladder_count,
+                            gs->ropes, gs->rope_count);
 
         /*
          * Move the player, resolve floor + platform + float-platform +
@@ -727,14 +638,31 @@ void game_loop(GameState *gs) {
          * fp_landed_idx is set to the float platform the player landed on,
          * or -1 if none.  Both must be initialised to -1 before the call.
          */
+        /*
+         * Build a combined bouncepad array for player_update collision.
+         * The three separate arrays (medium, small, high) are concatenated
+         * so player_update sees all pads in one flat array.
+         */
+        Bouncepad all_pads[MAX_BOUNCEPADS_MEDIUM + MAX_BOUNCEPADS_SMALL + MAX_BOUNCEPADS_HIGH];
+        int all_pad_count = 0;
+        for (int i = 0; i < gs->bouncepad_medium_count; i++)
+            all_pads[all_pad_count++] = gs->bouncepads_medium[i];
+        for (int i = 0; i < gs->bouncepad_small_count; i++)
+            all_pads[all_pad_count++] = gs->bouncepads_small[i];
+        for (int i = 0; i < gs->bouncepad_high_count; i++)
+            all_pads[all_pad_count++] = gs->bouncepads_high[i];
+
         int bounce_idx    = -1;
         int fp_landed_idx = -1;
         player_update(&gs->player, dt,
                       gs->platforms, gs->platform_count,
                       gs->float_platforms, gs->float_platform_count,
-                      gs->bouncepads, gs->bouncepad_count,
+                      all_pads, all_pad_count,
                       gs->vines, gs->vine_count,
+                      gs->ladders, gs->ladder_count,
+                      gs->ropes, gs->rope_count,
                       gs->bridges, gs->bridge_count,
+                      gs->spike_platforms, gs->spike_platform_count,
                       gs->sea_gaps, gs->sea_gap_count,
                       &bounce_idx, &fp_landed_idx,
                       fp_prev_riding);
@@ -745,12 +673,32 @@ void game_loop(GameState *gs) {
          * inside player_update so the player is already moving upward.
          */
         if (bounce_idx >= 0) {
-            Bouncepad *bp       = &gs->bouncepads[bounce_idx];
+            /*
+             * Map the combined-array index back to the correct sub-array.
+             * Order: medium (0..mc-1), small (mc..mc+sc-1), high (mc+sc..).
+             */
+            Bouncepad *bp = NULL;
+            int mc = gs->bouncepad_medium_count;
+            int sc = gs->bouncepad_small_count;
+            if (bounce_idx < mc) {
+                bp = &gs->bouncepads_medium[bounce_idx];
+            } else if (bounce_idx < mc + sc) {
+                bp = &gs->bouncepads_small[bounce_idx - mc];
+            } else {
+                bp = &gs->bouncepads_high[bounce_idx - mc - sc];
+            }
             bp->state           = BOUNCE_ACTIVE;
-            bp->anim_frame      = 1;   /* start mid-compress → extends to 0 */
+            bp->anim_frame      = 1;
             bp->anim_timer_ms   = 0;
             if (gs->snd_spring) Mix_PlayChannel(-1, gs->snd_spring, 0);
-            if (gs->debug_mode) debug_log(&gs->debug, "BOUNCE pad[%d]", bounce_idx);
+            if (gs->debug_mode) {
+                static const char *pad_names[] = { "GREEN(small)", "WOOD(medium)", "RED(high)" };
+                const char *name = pad_names[1]; /* default medium */
+                if (bounce_idx < mc) name = pad_names[1];
+                else if (bounce_idx < mc + sc) name = pad_names[0];
+                else name = pad_names[2];
+                debug_log(&gs->debug, "BOUNCE %s", name);
+            }
         }
         /*
          * Sea gap collision — instant life loss.
@@ -769,6 +717,8 @@ void game_loop(GameState *gs) {
                 if (pcx >= gx && pcx < gx + (float)SEA_GAP_W &&
                     pcy > (float)(GAME_H - WATER_ART_H)) {
                     if (gs->debug_mode) debug_log(&gs->debug, "HIT sea gap[%d]", g);
+                    /* Play the dive/splash SFX */
+                    if (gs->snd_dive) Mix_PlayChannel(-1, gs->snd_dive, 0);
                     /* Sea gap is always lethal — drain all remaining hearts, no push */
                     apply_damage(gs, &fp_prev_riding, gs->hearts, 0, 0.0f, 0.0f);
                     break;
@@ -781,12 +731,18 @@ void game_loop(GameState *gs) {
                        gs->sea_gaps, gs->sea_gap_count);
         /* Move jumping spiders: patrol + periodic jump arcs */
         jumping_spiders_update(gs->jumping_spiders, gs->jumping_spider_count, dt,
-                               gs->sea_gaps, gs->sea_gap_count);
+                               gs->sea_gaps, gs->sea_gap_count,
+                               gs->snd_spider_attack,
+                               gs->player.x + gs->player.w / 2.0f, cam_x);
         /* Move birds along their sine-wave patrol paths */
-        birds_update(gs->birds, gs->bird_count, dt);
-        faster_birds_update(gs->faster_birds, gs->faster_bird_count, dt);
+        birds_update(gs->birds, gs->bird_count, dt, gs->snd_flap,
+                     gs->player.x + gs->player.w / 2.0f, cam_x);
+        faster_birds_update(gs->faster_birds, gs->faster_bird_count, dt, gs->snd_flap,
+                            gs->player.x + gs->player.w / 2.0f, cam_x);
         /* Move fish through the water lane and trigger random jump arcs */
         fish_update(gs->fish, gs->fish_count, dt);
+        /* Move faster fish through the water lane with higher jumps */
+        faster_fish_update(gs->faster_fish, gs->faster_fish_count, dt);
         /* Advance each spike block along its rail path (cam_x needed for
          * the waiting-until-visible check on fall-off rails) */
         spike_blocks_update(gs->spike_blocks, gs->spike_block_count, dt, cam_x);
@@ -958,6 +914,21 @@ void game_loop(GameState *gs) {
                 }
             }
 
+            /* ---- Faster fish collision --------------------------------- */
+            if (gs->player.hurt_timer == 0.0f) {
+                SDL_Rect phit = player_get_hitbox(&gs->player);
+                for (int i = 0; i < gs->faster_fish_count; i++) {
+                    SDL_Rect ffhit = faster_fish_get_hitbox(&gs->faster_fish[i]);
+                    if (SDL_HasIntersection(&phit, &ffhit)) {
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT ffish[%d]", i);
+                        float sx = ffhit.x + ffhit.w * 0.5f;
+                        float sy = ffhit.y + ffhit.h * 0.5f;
+                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        break;
+                    }
+                }
+            }
+
             /* ---- Spike-block collision ---------------------------------- */
             /*
              * Spike blocks deal the same damage as spiders and fish, but also
@@ -974,6 +945,110 @@ void game_loop(GameState *gs) {
                         if (gs->debug_mode) debug_log(&gs->debug, "HIT spike[%d]", i);
                         float sx = sbhit.x + sbhit.w * 0.5f;
                         float sy = sbhit.y + sbhit.h * 0.5f;
+                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        break;
+                    }
+                }
+            }
+
+            /* ---- Axe-trap collision ------------------------------------ */
+            /*
+             * Axe traps deal the same damage as other enemies (1 heart).
+             * The hitbox follows the blade's rotated position so the player
+             * must dodge the swinging arc, not just the resting sprite rect.
+             */
+            if (gs->player.hurt_timer == 0.0f) {
+                SDL_Rect phit = player_get_hitbox(&gs->player);
+                for (int i = 0; i < gs->axe_trap_count; i++) {
+                    if (!gs->axe_traps[i].active) continue;
+                    SDL_Rect ahit = axe_trap_get_hitbox(&gs->axe_traps[i]);
+                    if (SDL_HasIntersection(&phit, &ahit)) {
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT axe[%d]", i);
+                        float sx = ahit.x + ahit.w * 0.5f;
+                        float sy = ahit.y + ahit.h * 0.5f;
+                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        break;
+                    }
+                }
+            }
+
+            /* ---- Circular-saw collision -------------------------------- */
+            /*
+             * Circular saws deal the same damage as other hazards (1 heart).
+             * The hitbox is a slightly inset square centred on the blade.
+             */
+            if (gs->player.hurt_timer == 0.0f) {
+                SDL_Rect phit = player_get_hitbox(&gs->player);
+                for (int i = 0; i < gs->circular_saw_count; i++) {
+                    if (!gs->circular_saws[i].active) continue;
+                    SDL_Rect shit = circular_saw_get_hitbox(&gs->circular_saws[i]);
+                    if (SDL_HasIntersection(&phit, &shit)) {
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT saw[%d]", i);
+                        float sx = shit.x + shit.w * 0.5f;
+                        float sy = shit.y + shit.h * 0.5f;
+                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        break;
+                    }
+                }
+            }
+
+            /* ---- Flame collision -------------------------------------- */
+            /*
+             * Flames deal the same damage as other hazards (1 heart).
+             * Only check visible flames (not in WAITING state).
+             */
+            if (gs->player.hurt_timer == 0.0f) {
+                SDL_Rect phit = player_get_hitbox(&gs->player);
+                for (int i = 0; i < gs->flame_count; i++) {
+                    if (!gs->flames[i].active) continue;
+                    if (gs->flames[i].state == FLAME_WAITING) continue;
+                    SDL_Rect fhit = flame_get_hitbox(&gs->flames[i]);
+                    if (SDL_HasIntersection(&phit, &fhit)) {
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT flame[%d]", i);
+                        float sx = fhit.x + fhit.w * 0.5f;
+                        float sy = fhit.y + fhit.h * 0.5f;
+                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        break;
+                    }
+                }
+            }
+
+            /* ---- Spike row collision ---------------------------------- */
+            /*
+             * Ground spikes deal 1 heart of damage on contact.
+             * Check the player hitbox against each spike row's full rect.
+             */
+            if (gs->player.hurt_timer == 0.0f) {
+                SDL_Rect phit = player_get_hitbox(&gs->player);
+                for (int i = 0; i < gs->spike_row_count; i++) {
+                    if (!gs->spike_rows[i].active) continue;
+                    if (spike_row_hit_test(&gs->spike_rows[i], &phit)) {
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT spike_row[%d]", i);
+                        SDL_Rect sr = spike_row_get_rect(&gs->spike_rows[i]);
+                        float sx = sr.x + sr.w * 0.5f;
+                        float sy = sr.y + sr.h * 0.5f;
+                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        break;
+                    }
+                }
+            }
+
+            /* ---- Spike platform collision ----------------------------- */
+            /*
+             * Spike platforms deal 1 heart of damage on contact.
+             * The player can still land on top (one-way landing is handled
+             * separately in player_update), but touching from any direction
+             * triggers damage.
+             */
+            if (gs->player.hurt_timer == 0.0f) {
+                SDL_Rect phit = player_get_hitbox(&gs->player);
+                for (int i = 0; i < gs->spike_platform_count; i++) {
+                    if (!gs->spike_platforms[i].active) continue;
+                    SDL_Rect spr = spike_platform_get_rect(&gs->spike_platforms[i]);
+                    if (SDL_HasIntersection(&phit, &spr)) {
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT spike_plat[%d]", i);
+                        float sx = spr.x + spr.w * 0.5f;
+                        float sy = spr.y + spr.h * 0.5f;
                         apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
                         break;
                     }
@@ -1031,14 +1106,14 @@ void game_loop(GameState *gs) {
          */
         {
             SDL_Rect phit = player_get_hitbox(&gs->player);
-            for (int i = 0; i < gs->red_star_count; i++) {
-                if (!gs->red_stars[i].active) continue;
+            for (int i = 0; i < gs->yellow_star_count; i++) {
+                if (!gs->yellow_stars[i].active) continue;
                 SDL_Rect sbox = {
-                    (int)gs->red_stars[i].x, (int)gs->red_stars[i].y,
-                    RED_STAR_DISPLAY_W, RED_STAR_DISPLAY_H
+                    (int)gs->yellow_stars[i].x, (int)gs->yellow_stars[i].y,
+                    YELLOW_STAR_DISPLAY_W, YELLOW_STAR_DISPLAY_H
                 };
                 if (SDL_HasIntersection(&phit, &sbox)) {
-                    gs->red_stars[i].active = 0;
+                    gs->yellow_stars[i].active = 0;
 
                     if (gs->snd_coin) {
                         Mix_PlayChannel(-1, gs->snd_coin, 0);
@@ -1046,9 +1121,23 @@ void game_loop(GameState *gs) {
 
                     if (gs->hearts < MAX_HEARTS) {
                         gs->hearts++;
-                        if (gs->debug_mode) debug_log(&gs->debug, "RED STAR [%d] hearts=%d", i, gs->hearts);
+                        if (gs->debug_mode) debug_log(&gs->debug, "YELLOW STAR [%d] hearts=%d", i, gs->hearts);
                     }
                 }
+            }
+        }
+
+        /* ---- Last star collection (end-phase trigger) --------------- */
+        if (gs->last_star.active) {
+            SDL_Rect phit = player_get_hitbox(&gs->player);
+            SDL_Rect lsbox = last_star_get_hitbox(&gs->last_star);
+            if (SDL_HasIntersection(&phit, &lsbox)) {
+                gs->last_star.active    = 0;
+                gs->last_star.collected = 1;
+                if (gs->snd_coin) {
+                    Mix_PlayChannel(-1, gs->snd_coin, 0);
+                }
+                if (gs->debug_mode) debug_log(&gs->debug, "LAST STAR collected — phase passed!");
             }
         }
 
@@ -1057,7 +1146,16 @@ void game_loop(GameState *gs) {
         /* Advance the fog wave positions and spawn the next wave if it is time */
         fog_update(&gs->fog, dt);
         /* Advance the bouncepad release animation (frame 1 → 0 → back to 2) */
-        bouncepads_update(gs->bouncepads, gs->bouncepad_count, (Uint32)(dt * 1000.0f));
+        bouncepads_update(gs->bouncepads_medium, gs->bouncepad_medium_count, (Uint32)(dt * 1000.0f));
+        bouncepads_update(gs->bouncepads_small, gs->bouncepad_small_count, (Uint32)(dt * 1000.0f));
+        bouncepads_update(gs->bouncepads_high, gs->bouncepad_high_count, (Uint32)(dt * 1000.0f));
+        /* Advance axe trap swing/spin animation and trigger distance-scaled sound */
+        axe_traps_update(gs->axe_traps, gs->axe_trap_count, dt, gs->snd_axe,
+                         gs->player.x + gs->player.w / 2.0f, cam_x);
+        /* Advance circular saw patrol and spin animation */
+        circular_saws_update(gs->circular_saws, gs->circular_saw_count, dt);
+        /* Advance flame eruption cycles (rise, flip, fall, wait) */
+        flames_update(gs->flames, gs->flame_count, dt);
 
         /* ---- Camera update --------------------------------------- */
         /*
@@ -1229,6 +1327,14 @@ void game_loop(GameState *gs) {
         float_platforms_render(gs->float_platforms, gs->float_platform_count,
                                gs->renderer, gs->float_platform_tex, cam_x);
 
+        /* Draw ground spikes on the floor surface, same layer as platforms */
+        spike_rows_render(gs->spike_rows, gs->spike_row_count,
+                          gs->renderer, gs->spike_tex, cam_x);
+
+        /* Draw spike platforms in the same layer as float platforms */
+        spike_platforms_render(gs->spike_platforms, gs->spike_platform_count,
+                               gs->renderer, gs->spike_platform_tex, cam_x);
+
         /* Draw bridges in the same layer as float platforms */
         bridges_render(gs->bridges, gs->bridge_count,
                        gs->renderer, gs->bridge_tex, cam_x);
@@ -1238,8 +1344,17 @@ void game_loop(GameState *gs) {
          * This places them visually on the floor surface, with vines potentially
          * overlapping the edges for a natural overgrown look.
          */
-        bouncepads_render(gs->bouncepads, gs->bouncepad_count,
-                          gs->renderer, gs->bouncepad_tex, cam_x);
+        /* Render each bouncepad variant with its own texture */
+        bouncepads_render(gs->bouncepads_medium, gs->bouncepad_medium_count,
+                          gs->renderer, gs->bouncepad_medium_tex, cam_x);
+        if (gs->bouncepad_small_tex) {
+            bouncepads_render(gs->bouncepads_small, gs->bouncepad_small_count,
+                              gs->renderer, gs->bouncepad_small_tex, cam_x);
+        }
+        if (gs->bouncepad_high_tex) {
+            bouncepads_render(gs->bouncepads_high, gs->bouncepad_high_count,
+                              gs->renderer, gs->bouncepad_high_tex, cam_x);
+        }
                           
         /*
          * Draw rail tracks before vines and entities so rail tiles appear
@@ -1256,18 +1371,39 @@ void game_loop(GameState *gs) {
                         gs->renderer, gs->vine_tex, cam_x);
         }
 
+        /* Draw ladders and ropes in the same layer as vines */
+        if (gs->ladder_tex) {
+            ladder_render(gs->ladders, gs->ladder_count,
+                          gs->renderer, gs->ladder_tex, cam_x);
+        }
+        if (gs->rope_tex) {
+            rope_render(gs->ropes, gs->rope_count,
+                        gs->renderer, gs->rope_tex, cam_x);
+        }
+
         /* Draw coins on top of the platforms, before the water and player */
         coins_render(gs->coins, gs->coin_count,
                      gs->renderer, gs->coin_tex, cam_x);
 
-        /* Draw red stars alongside coins — same layer, same visibility */
-        red_stars_render(gs->red_stars, gs->red_star_count,
-                         gs->renderer, gs->red_star_tex, cam_x);
+        /* Draw yellow stars alongside coins — same layer, same visibility */
+        yellow_stars_render(gs->yellow_stars, gs->yellow_star_count,
+                         gs->renderer, gs->yellow_star_tex, cam_x);
+
+        /* Draw the end-of-level last star (uses Stars_Ui.png from HUD) */
+        last_star_render(&gs->last_star, gs->renderer,
+                         gs->hud.star_tex, cam_x);
+
+        /* Draw flames behind the water and fish, in front of ground */
+        flames_render(gs->flames, gs->flame_count,
+                      gs->renderer, gs->flame_tex, cam_x);
 
         /* Draw fish behind the water strip (submerged look) but in front of
          * the ground, so the water wave art occludes the submerged portion. */
         fish_render(gs->fish, gs->fish_count,
                 gs->renderer, gs->fish_tex, cam_x);
+        /* Draw faster fish in the same layer as regular fish */
+        faster_fish_render(gs->faster_fish, gs->faster_fish_count,
+                           gs->renderer, gs->faster_fish_tex, cam_x);
 
         /*
          * Draw the water strip on top of the floor/platforms and fish.
@@ -1280,6 +1416,14 @@ void game_loop(GameState *gs) {
             spike_blocks_render(gs->spike_blocks, gs->spike_block_count,
                                 gs->renderer, gs->spike_block_tex, cam_x);
         }
+
+        /* Draw axe traps above spike blocks and water, before spiders */
+        axe_traps_render(gs->axe_traps, gs->axe_trap_count,
+                         gs->renderer, gs->axe_trap_tex, cam_x);
+
+        /* Draw circular saws in the same hazard layer as axe traps */
+        circular_saws_render(gs->circular_saws, gs->circular_saw_count,
+                             gs->renderer, gs->circular_saw_tex, cam_x);
 
         /* Draw spiders on top of the water strip, before the player */
         spiders_render(gs->spiders, gs->spider_count,
@@ -1301,7 +1445,7 @@ void game_loop(GameState *gs) {
         fog_render(&gs->fog, gs->renderer);
 
         /* Draw the HUD overlay on top of everything (hearts, lives, score) */
-        hud_render(&gs->hud, gs->renderer, gs->player.texture,
+        hud_render(&gs->hud, gs->renderer,
                    gs->hearts, gs->lives, gs->score);
 
         /* Draw debug overlays (collision boxes, FPS, event log) if active */
@@ -1414,9 +1558,34 @@ void game_cleanup(GameState *gs) {
         gs->vine_tex = NULL;
     }
 
+    if (gs->ladder_tex) {
+        SDL_DestroyTexture(gs->ladder_tex);
+        gs->ladder_tex = NULL;
+    }
+
+    if (gs->rope_tex) {
+        SDL_DestroyTexture(gs->rope_tex);
+        gs->rope_tex = NULL;
+    }
+
     if (gs->snd_spring) {
         Mix_FreeChunk(gs->snd_spring);
         gs->snd_spring = NULL;
+    }
+
+    if (gs->bouncepad_medium_tex) {
+        SDL_DestroyTexture(gs->bouncepad_medium_tex);
+        gs->bouncepad_medium_tex = NULL;
+    }
+
+    if (gs->bouncepad_small_tex) {
+        SDL_DestroyTexture(gs->bouncepad_small_tex);
+        gs->bouncepad_small_tex = NULL;
+    }
+
+    if (gs->bouncepad_high_tex) {
+        SDL_DestroyTexture(gs->bouncepad_high_tex);
+        gs->bouncepad_high_tex = NULL;
     }
 
     if (gs->coin_tex) {
@@ -1424,9 +1593,59 @@ void game_cleanup(GameState *gs) {
         gs->coin_tex = NULL;
     }
 
-    if (gs->red_star_tex) {
-        SDL_DestroyTexture(gs->red_star_tex);
-        gs->red_star_tex = NULL;
+    if (gs->yellow_star_tex) {
+        SDL_DestroyTexture(gs->yellow_star_tex);
+        gs->yellow_star_tex = NULL;
+    }
+
+    if (gs->snd_dive) {
+        Mix_FreeChunk(gs->snd_dive);
+        gs->snd_dive = NULL;
+    }
+
+    if (gs->snd_spider_attack) {
+        Mix_FreeChunk(gs->snd_spider_attack);
+        gs->snd_spider_attack = NULL;
+    }
+
+    if (gs->snd_flap) {
+        Mix_FreeChunk(gs->snd_flap);
+        gs->snd_flap = NULL;
+    }
+
+    if (gs->snd_axe) {
+        Mix_FreeChunk(gs->snd_axe);
+        gs->snd_axe = NULL;
+    }
+
+    if (gs->axe_trap_tex) {
+        SDL_DestroyTexture(gs->axe_trap_tex);
+        gs->axe_trap_tex = NULL;
+    }
+
+    if (gs->circular_saw_tex) {
+        SDL_DestroyTexture(gs->circular_saw_tex);
+        gs->circular_saw_tex = NULL;
+    }
+
+    if (gs->flame_tex) {
+        SDL_DestroyTexture(gs->flame_tex);
+        gs->flame_tex = NULL;
+    }
+
+    if (gs->faster_fish_tex) {
+        SDL_DestroyTexture(gs->faster_fish_tex);
+        gs->faster_fish_tex = NULL;
+    }
+
+    if (gs->spike_tex) {
+        SDL_DestroyTexture(gs->spike_tex);
+        gs->spike_tex = NULL;
+    }
+
+    if (gs->spike_platform_tex) {
+        SDL_DestroyTexture(gs->spike_platform_tex);
+        gs->spike_platform_tex = NULL;
     }
 
     if (gs->fish_tex) {

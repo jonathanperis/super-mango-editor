@@ -57,29 +57,26 @@ void coins_init(Coin *coins, int *count)
     /* ── Screen 2: ground coins ──────────────────────────────────── */
     coins[n].x = 430.0f;  coins[n].y = gy; coins[n].active = 1; n++;
     coins[n].x = 595.0f;  coins[n].y = gy; coins[n].active = 1; n++;
-    coins[n].x = 792.0f;  coins[n].y = gy; coins[n].active = 1; n++;   /* past bouncepad 2 */
+    coins[n].x = 904.0f;  coins[n].y = gy; coins[n].active = 1; n++;   /* after spike row  */
 
     /* ── Screen 2: platform coins ───────────────────────────────── */
     /* Platform 2: x=452, 2-tile */
     coins[n].x = (float)COIN_ON_PLAT_X(452); coins[n].y = p2; coins[n].active = 1; n++;
-    /* Platform 3: x=680, 3-tile */
-    coins[n].x = (float)COIN_ON_PLAT_X(680); coins[n].y = p3; coins[n].active = 1; n++;
+    /* Platform 3: x=680, 3-tile — replaced by a yellow star */
 
     /* ── Screen 3: ground coins ──────────────────────────────────── */
-    coins[n].x = 820.0f;  coins[n].y = gy; coins[n].active = 1; n++;
+    coins[n].x = 855.0f;  coins[n].y = gy; coins[n].active = 1; n++;   /* after spike row */
     coins[n].x = 965.0f;  coins[n].y = gy; coins[n].active = 1; n++;
     coins[n].x = 1130.0f; coins[n].y = gy; coins[n].active = 1; n++;
 
     /* ── Screen 3: platform coins ───────────────────────────────── */
     /* Platform 4: x=880, 2-tile */
     coins[n].x = (float)COIN_ON_PLAT_X(880);  coins[n].y = p2; coins[n].active = 1; n++;
-    /* Platform 5: x=1050, 3-tile */
-    coins[n].x = (float)COIN_ON_PLAT_X(1050); coins[n].y = p3; coins[n].active = 1; n++;
+    /* Platform 5: x=1050, 3-tile — replaced by a yellow star */
 
     /* ── Screen 4: ground coins ──────────────────────────────────── */
     coins[n].x = 1230.0f; coins[n].y = gy; coins[n].active = 1; n++;
-    coins[n].x = 1390.0f; coins[n].y = gy; coins[n].active = 1; n++;
-    coins[n].x = 1555.0f; coins[n].y = gy; coins[n].active = 1; n++;
+    coins[n].x = 1390.0f; coins[n].y = gy; coins[n].active = 1; n++;   /* left of red bouncepad */
 
     /* ── Screen 4: platform coins ───────────────────────────────── */
     /* Platform 6: x=1300, 2-tile */

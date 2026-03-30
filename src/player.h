@@ -12,7 +12,10 @@
 #include "bouncepad.h"     /* Bouncepad — needed for player_update signature */
 #include "float_platform.h"/* FloatPlatform — needed for player_update signature */
 #include "bridge.h"        /* Bridge — needed for player_update signature */
+#include "spike_platform.h"/* SpikePlatform — needed for player_update signature */
 #include "vine.h"          /* VineDecor — needed for climbing input + update  */
+#include "ladder.h"        /* LadderDecor — climbable, same mechanics as vine */
+#include "rope.h"          /* RopeDecor — climbable, same mechanics as vine   */
 
 /*
  * AnimState — which animation sequence is currently playing.
@@ -46,8 +49,10 @@ typedef struct {
     int       anim_frame_index; /* current frame index within the animation       */
     Uint32    anim_timer_ms;    /* ms accumulated in the current frame            */
     int       facing_left;      /* 1 = mirror sprite horizontally                 */
-    int       on_vine;          /* 1 = currently climbing a vine, 0 = normal      */
-    int       vine_index;       /* index into the vine array of the vine climbed  */
+    int       on_vine;          /* 1 = currently climbing a climbable, 0 = normal  */
+    int       vine_index;       /* index into the climbable array being climbed   */
+    int       climb_source;     /* 0 = vine, 1 = ladder, 2 = rope                */
+    int       jump_held;         /* 1 = jump key still held from last jump; prevents re-jump */
     float     hurt_timer;        /* seconds remaining of invincibility blink; 0 = normal */
     SDL_Rect     frame;   /* source rect: which part of the sheet to draw    */
     SDL_Texture *texture; /* GPU image handle; NULL until player_init runs   */
@@ -60,7 +65,9 @@ void player_init(Player *player, SDL_Renderer *renderer);
  * ctrl may be NULL when no controller is connected; keyboard still works. */
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                          SDL_GameController *ctrl,
-                         const VineDecor *vines, int vine_count);
+                         const VineDecor *vines, int vine_count,
+                         const LadderDecor *ladders, int ladder_count,
+                         const RopeDecor *ropes, int rope_count);
 
 /*
  * Move the player by velocity × dt; resolve floor, one-way platform,
@@ -83,7 +90,10 @@ void player_update(Player *player, float dt,
                    const FloatPlatform *float_platforms, int float_platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
                    const VineDecor *vines, int vine_count,
+                   const LadderDecor *ladders, int ladder_count,
+                   const RopeDecor *ropes, int rope_count,
                    const Bridge *bridges, int bridge_count,
+                   const SpikePlatform *spike_platforms, int spike_platform_count,
                    const int *sea_gaps, int sea_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,

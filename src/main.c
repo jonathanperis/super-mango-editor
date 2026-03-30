@@ -3,7 +3,10 @@
  *
  * Responsibilities:
  *   1. Boot every SDL subsystem the game needs.
- *   2. Hand control to the game (init → loop → cleanup).
+ *   2. Route to the appropriate screen based on CLI arguments:
+ *        default           → start_menu (black screen with title)
+ *        --sandbox         → game sandbox (the full gameplay phase)
+ *        --sandbox --debug → game sandbox with debug overlays
  *   3. Tear every subsystem back down before exiting.
  *
  * The order of init and teardown is intentional:
@@ -23,20 +26,23 @@
 /* Standard C I/O (fprintf, stderr) and exit codes (EXIT_FAILURE/SUCCESS) */
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>    /* strcmp — used to match the "--debug" CLI flag */
+#include <string.h>    /* strcmp — used to match CLI flags */
 
-/* Our own game state and loop declarations */
+/* Our own modules */
 #include "game.h"
+#include "start_menu.h"
 
 int main(int argc, char *argv[]) {
     /*
-     * Scan command-line arguments for the --debug flag.
-     * argc/argv are required by SDL2's platform-specific main redefinition
-     * on Windows; we now also use them to enable the debug overlay.
+     * Scan command-line arguments for flags:
+     *   --debug   → enable debug overlays in the sandbox
+     *   --sandbox → run the gameplay sandbox instead of the start menu
      */
-    int debug_mode = 0;
+    int debug_mode  = 0;
+    int sandbox_mode = 0;
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--debug") == 0) debug_mode = 1;
+        if (strcmp(argv[i], "--debug") == 0)   debug_mode   = 1;
+        if (strcmp(argv[i], "--sandbox") == 0) sandbox_mode = 1;
     }
     /*
      * SDL_Init — start the SDL core.
@@ -69,7 +75,6 @@ int main(int argc, char *argv[]) {
 
     /*
      * TTF_Init — initialise SDL2_ttf (FreeType under the hood).
-     * Not used in the MVP yet, but the foundation is here for on-screen text.
      */
     if (TTF_Init() != 0) {
         fprintf(stderr, "TTF_Init error: %s\n", TTF_GetError());
@@ -94,11 +99,6 @@ int main(int argc, char *argv[]) {
     }
 
     /*
-     * Create our game state on the stack, zero-initialised.
-     * The {0} syntax in C sets every field to 0/NULL, so no garbage values.
-     * We pass it by pointer (&gs) so functions can modify it in place.
-     */
-    /*
      * Seed the C standard library RNG so vine layout (and any other
      * rand()-driven decoration) differs each run.  SDL_GetTicks() returns
      * milliseconds since SDL_Init, which varies by OS scheduling jitter
@@ -106,11 +106,67 @@ int main(int argc, char *argv[]) {
      */
     srand((unsigned int)SDL_GetTicks());
 
-    GameState gs = {0};
-    gs.debug_mode = debug_mode;  /* pass CLI flag into GameState before init */
-    game_init(&gs);     /* create window, renderer, load textures           */
-    game_loop(&gs);     /* run until the player quits                       */
-    game_cleanup(&gs);  /* free all game-level resources                    */
+    if (sandbox_mode) {
+        /*
+         * Sandbox mode — run the full gameplay phase.
+         * This is the original game loop, now isolated behind a flag.
+         */
+        GameState gs = {0};
+        gs.debug_mode = debug_mode;
+        game_init(&gs);
+        game_loop(&gs);
+        game_cleanup(&gs);
+    } else {
+        /*
+         * Start Menu — the default entry point.
+         * Creates its own window+renderer, renders a black screen
+         * with "Start Menu" text and the game logo.
+         */
+
+        /*
+         * Nearest-neighbour pixel scaling for crisp pixel art.
+         */
+        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+
+        SDL_Window *window = SDL_CreateWindow(
+            "Super Mango",
+            SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+            800, 600,
+            SDL_WINDOW_SHOWN
+        );
+        if (!window) {
+            fprintf(stderr, "SDL_CreateWindow error: %s\n", SDL_GetError());
+            Mix_CloseAudio();
+            TTF_Quit();
+            IMG_Quit();
+            SDL_Quit();
+            return EXIT_FAILURE;
+        }
+
+        SDL_Renderer *renderer = SDL_CreateRenderer(
+            window, -1,
+            SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
+        );
+        if (!renderer) {
+            fprintf(stderr, "SDL_CreateRenderer error: %s\n", SDL_GetError());
+            SDL_DestroyWindow(window);
+            Mix_CloseAudio();
+            TTF_Quit();
+            IMG_Quit();
+            SDL_Quit();
+            return EXIT_FAILURE;
+        }
+
+        SDL_RenderSetLogicalSize(renderer, 400, 300);
+
+        StartMenu menu = {0};
+        start_menu_init(&menu, window, renderer);
+        start_menu_loop(&menu);
+        start_menu_cleanup(&menu);
+
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+    }
 
     /* Tear down SDL subsystems in reverse init order */
     Mix_CloseAudio();

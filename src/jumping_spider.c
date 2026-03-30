@@ -11,8 +11,21 @@
  * the spider is airborne for ~0.67 s and covers ~37 px — enough to clear
  * a 32-px sea gap.
  */
+#include <math.h>   /* fabsf */
+
 #include "jumping_spider.h"
 #include "game.h"   /* FLOOR_Y, GAME_W, SEA_GAP_W */
+
+#define JSPIDER_AUDIBLE_RANGE  ((float)GAME_W)
+#define JSPIDER_VOL_MAX        128
+#define JSPIDER_VOL_MIN        16
+
+static int jspider_volume_for_distance(float dist) {
+    if (dist >= JSPIDER_AUDIBLE_RANGE) return 0;
+    if (dist <= 0.0f) return JSPIDER_VOL_MAX;
+    float fraction = dist / JSPIDER_AUDIBLE_RANGE;
+    return JSPIDER_VOL_MAX - (int)(fraction * (JSPIDER_VOL_MAX - JSPIDER_VOL_MIN));
+}
 
 /* ------------------------------------------------------------------ */
 
@@ -43,7 +56,8 @@ void jumping_spiders_init(JumpingSpider *spiders, int *count)
 /* ------------------------------------------------------------------ */
 
 void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
-                            const int *sea_gaps, int sea_gap_count)
+                            const int *sea_gaps, int sea_gap_count,
+                            Mix_Chunk *snd_attack, float player_x, int cam_x)
 {
     for (int i = 0; i < count; i++) {
         JumpingSpider *s = &spiders[i];
@@ -79,6 +93,21 @@ void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
 
                     s->vy        = JSPIDER_JUMP_VY;
                     s->on_ground = 0;
+
+                    /* Play attack sound with distance-based volume */
+                    if (snd_attack) {
+                        float spider_cx = s->x + JSPIDER_ART_X + JSPIDER_ART_W / 2.0f;
+                        int on_screen = (spider_cx >= (float)cam_x - JSPIDER_FRAME_W &&
+                                         spider_cx <= (float)cam_x + GAME_W + JSPIDER_FRAME_W);
+                        if (on_screen) {
+                            float dist = fabsf(player_x - spider_cx);
+                            int vol = jspider_volume_for_distance(dist);
+                            if (vol > 0) {
+                                int ch = Mix_PlayChannel(-1, snd_attack, 0);
+                                if (ch >= 0) Mix_Volume(ch, vol);
+                            }
+                        }
+                    }
                     break;
                 }
             }

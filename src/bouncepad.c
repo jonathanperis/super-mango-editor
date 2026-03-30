@@ -22,50 +22,11 @@
  * This puts it just to the left of the first tall pillar (x=256, 3 tiles),
  * making it easy to test whether the bounce impulse clears the pillar top.
  */
-void bouncepads_init(Bouncepad *pads, int *count) {
-    /*
-     * Pad 0 — ground level, screen 1, left of the 3-tile pillar at x=256.
-     */
-    /*
-     * x=310 places the pad 6 px to the right of the tall pillar at x=256
-     * (right edge x=304), so it sits right beside it on screen 1.
-     */
-    pads[0].x             = 310.0f;
-    /*
-     * y = FLOOR_Y - BOUNCEPAD_SRC_H positions the pad so the art's bottom
-     * pixel (row 31 in the source frame) lands exactly on FLOOR_Y=252,
-     * flush with the top of the grass tiles.  We render only the cropped
-     * 18-px art region, so no transparent padding is drawn below it.
-     */
-    pads[0].y             = (float)(FLOOR_Y - BOUNCEPAD_SRC_H);  /* y = 234 */
-    pads[0].w             = BOUNCEPAD_W;
-    pads[0].h             = BOUNCEPAD_SRC_H;
-    pads[0].state         = BOUNCE_IDLE;
-    pads[0].anim_frame    = 2;   /* idle shows the compressed (third) frame */
-    pads[0].anim_timer_ms = 0;
-
-    /* ── Screen 4 — flanking the last tall pillar (x=1480, right edge=1528) ── */
-
-    /* Pad 1: left side of the last pillar */
-    pads[1].x             = 1420.0f;
-    pads[1].y             = (float)(FLOOR_Y - BOUNCEPAD_SRC_H);
-    pads[1].w             = BOUNCEPAD_W;
-    pads[1].h             = BOUNCEPAD_SRC_H;
-    pads[1].state         = BOUNCE_IDLE;
-    pads[1].anim_frame    = 2;
-    pads[1].anim_timer_ms = 0;
-
-    /* Pad 2: right side of the screen-2 tall pillar (x=680, right edge=728, 6 px gap) */
-    pads[2].x             = 734.0f;
-    pads[2].y             = (float)(FLOOR_Y - BOUNCEPAD_SRC_H);
-    pads[2].w             = BOUNCEPAD_W;
-    pads[2].h             = BOUNCEPAD_SRC_H;
-    pads[2].state         = BOUNCE_IDLE;
-    pads[2].anim_frame    = 2;
-    pads[2].anim_timer_ms = 0;
-
-    *count = 3;
-}
+/*
+ * bouncepads_init is no longer used — each variant (small/medium/high)
+ * has its own init function in bouncepad_small.c, bouncepad_medium.c,
+ * bouncepad_high.c.  This file only provides the shared update and render.
+ */
 
 /* ------------------------------------------------------------------ */
 

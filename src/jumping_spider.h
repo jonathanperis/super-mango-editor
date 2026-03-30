@@ -16,6 +16,7 @@
 #pragma once
 
 #include <SDL.h>
+#include <SDL_mixer.h>
 
 /* ---- Constants ---------------------------------------------------------- */
 
@@ -60,7 +61,8 @@ void jumping_spiders_init(JumpingSpider *spiders, int *count);
 
 /* Move, jump, patrol, animate each jumping spider. */
 void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
-                            const int *sea_gaps, int sea_gap_count);
+                            const int *sea_gaps, int sea_gap_count,
+                            Mix_Chunk *snd_attack, float player_x, int cam_x);
 
 /* Draw all jumping spiders using the shared texture. */
 void jumping_spiders_render(const JumpingSpider *spiders, int count,
