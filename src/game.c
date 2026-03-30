@@ -561,10 +561,10 @@ static void apply_damage(GameState *gs, int *fp_prev_riding,
     gs->hearts -= amount;
     if (gs->hearts <= 0) {
         gs->lives--;
-        if (gs->lives <= 0) {
+        if (gs->lives < 0) {
             gs->lives           = DEFAULT_LIVES;
             gs->score           = 0;
-            gs->coins_for_heart = 0;
+            gs->score_life_next = SCORE_PER_LIFE;
             if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
         }
         if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
