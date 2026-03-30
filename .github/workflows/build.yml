@@ -19,11 +19,12 @@ on:
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
   # BUILD JOB
-  # Compiles the game on Linux (x86_64), macOS (arm64), and Windows (x86_64)
-  # in parallel. Runs on every push to main AND every pull request.
+  # Compiles the game on Linux (x86_64), macOS (arm64), Windows (x86_64),
+  # and WebAssembly in parallel.
+  # Runs on every push to main AND every pull request.
   # ────────────────────────────────────────────────────────────────────────────
   build:
-    name: Build (${{ matrix.os }})
+    name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -31,11 +32,21 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            platform: Linux x86_64
             artifact: super-mango-linux-x86_64
+            target: native
           - os: macos-latest
+            platform: macOS arm64
             artifact: super-mango-macos-arm64
+            target: native
           - os: windows-latest
+            platform: Windows x86_64
             artifact: super-mango-windows-x86_64
+            target: native
+          - os: ubuntu-latest
+            platform: WebAssembly
+            artifact: super-mango-wasm
+            target: wasm
 
     steps:
       # Check out the repository so the runner has access to the source code.
@@ -45,7 +56,7 @@ jobs:
       # ── Linux dependency install ────────────────────────────────────────────
       # apt packages: build tools + SDL2 and all companion library dev headers.
       - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
+        if: matrix.target == 'native' && runner.os == 'Linux'
         run: |
           sudo apt-get update -q
           sudo apt-get install -y clang \
@@ -75,10 +86,23 @@ jobs:
             mingw-w64-ucrt-x86_64-SDL2_ttf
             mingw-w64-ucrt-x86_64-SDL2_mixer
 
+      # ── Emscripten SDK install (WebAssembly) ────────────────────────────────
+      # Provides emcc, the C-to-WebAssembly compiler. SDL2 ports are compiled
+      # from source by Emscripten automatically via -s USE_SDL=2 flags.
+      - name: Install Emscripten SDK
+        if: matrix.target == 'wasm'
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+
+      - name: Verify Emscripten
+        if: matrix.target == 'wasm'
+        run: emcc --version
+
       # ── Compile (Linux / macOS) ─────────────────────────────────────────────
       # Produces out/super-mango via the project Makefile.
       - name: Build (Linux / macOS)
-        if: runner.os != 'Windows'
+        if: matrix.target == 'native' && runner.os != 'Windows'
         run: make
 
       # ── Compile (Windows) ───────────────────────────────────────────────────
@@ -89,6 +113,13 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make CC=gcc
+
+      # ── Compile (WebAssembly) ───────────────────────────────────────────────
+      # Uses the 'web' Makefile target with emcc. Assets are bundled into
+      # the .data file via --preload-file.
+      - name: Build (WebAssembly)
+        if: matrix.target == 'wasm'
+        run: make web
 
       # ── Bundle SDL2 DLLs for Windows ────────────────────────────────────────
       # On Windows, SDL2 is dynamically linked. The DLLs must ship alongside
@@ -119,55 +150,14 @@ jobs:
           retention-days: 1
 
   # ────────────────────────────────────────────────────────────────────────────
-  # WEBASSEMBLY BUILD JOB
-  # Compiles the game to WebAssembly using Emscripten on Ubuntu.
-  # Produces super-mango.html, .js, .wasm, and .data (bundled assets).
-  # ────────────────────────────────────────────────────────────────────────────
-  build-wasm:
-    name: Build (WebAssembly)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-
-      # Install Emscripten SDK — provides emcc, the C-to-WebAssembly compiler.
-      # SDL2 ports are compiled from source by Emscripten automatically when
-      # the -s USE_SDL=2 flags are used.
-      - name: Install Emscripten SDK
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: latest
-
-      - name: Verify Emscripten
-        run: emcc --version
-
-      # Build the WebAssembly version using the 'web' Makefile target.
-      # Assets are bundled into the .data file via --preload-file.
-      - name: Build WebAssembly
-        run: make web
-
-      - name: Upload WebAssembly build
-        uses: actions/upload-artifact@v4
-        with:
-          name: super-mango-wasm
-          path: |
-            out/super-mango.html
-            out/super-mango.js
-            out/super-mango.wasm
-            out/super-mango.data
-          if-no-files-found: error
-          retention-days: 1
-
-  # ────────────────────────────────────────────────────────────────────────────
   # RELEASE JOB
   # Runs ONLY when a commit is pushed to main (not on pull_request events).
-  # Waits for all build jobs to succeed, then creates a GitHub Release
-  # tagged v0.0.<run_number> with all platform binaries attached.
+  # Waits for all four build matrix legs to succeed, then creates a GitHub
+  # Release tagged v0.0.<run_number> with all platform binaries attached.
   # ────────────────────────────────────────────────────────────────────────────
   release:
     name: Create Release
-    needs: [build, build-wasm]
+    needs: build
     # Guard: skip this job entirely for pull_request events and non-main pushes.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -229,7 +219,7 @@ jobs:
             ### Downloads
 
             | Platform        | File                                  | Notes                              |
-            |-----------------|---------------------------------------|------------------------------------|  
+            |-----------------|---------------------------------------|------------------------------------|
             | Linux x86_64    | `super-mango-linux-x86_64`            | Run from repo root                 |
             | macOS arm64     | `super-mango-macos-arm64`             | Run from repo root                 |
             | Windows x86_64  | `super-mango-windows-x86_64.zip`      | Extract zip; SDL2 DLLs are included|
