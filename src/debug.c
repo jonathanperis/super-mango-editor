@@ -180,12 +180,36 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
         SDL_RenderDrawRect(renderer, &r);
     }
 
+    /* ---- Bird patrol ranges — dim orange (180, 120, 0) --------------- */
+    SDL_SetRenderDrawColor(renderer, 180, 120, 0, 255);
+    for (int i = 0; i < gs->bird_count; i++) {
+        const Bird *b = &gs->birds[i];
+        int left  = (int)b->patrol_x0 + BIRD_ART_X;
+        int right = (int)b->patrol_x1 - BIRD_FRAME_W + BIRD_ART_X + BIRD_ART_W;
+        int py    = (int)b->base_y + BIRD_ART_H / 2;
+        SDL_RenderDrawLine(renderer,
+                           left  - cam_x, py,
+                           right - cam_x, py);
+    }
+
     /* ---- Faster birds — pink (255, 100, 200) ------------------------- */
     SDL_SetRenderDrawColor(renderer, 255, 100, 200, 255);
     for (int i = 0; i < gs->faster_bird_count; i++) {
         r = faster_bird_get_hitbox(&gs->faster_birds[i]);
         r.x -= cam_x;
         SDL_RenderDrawRect(renderer, &r);
+    }
+
+    /* ---- Faster bird patrol ranges — dim pink (180, 70, 140) --------- */
+    SDL_SetRenderDrawColor(renderer, 180, 70, 140, 255);
+    for (int i = 0; i < gs->faster_bird_count; i++) {
+        const FasterBird *fb = &gs->faster_birds[i];
+        int left  = (int)fb->patrol_x0 + FBIRD_ART_X;
+        int right = (int)fb->patrol_x1 - FBIRD_FRAME_W + FBIRD_ART_X + FBIRD_ART_W;
+        int py    = (int)fb->base_y + FBIRD_ART_H / 2;
+        SDL_RenderDrawLine(renderer,
+                           left  - cam_x, py,
+                           right - cam_x, py);
     }
 
     /* ---- Fish — light red (255, 50, 50) ----------------------------- */
