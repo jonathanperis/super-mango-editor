@@ -109,6 +109,22 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
         SDL_RenderDrawRect(renderer, &r);
     }
 
+    /* ---- Bridge bricks — brown (180, 120, 60) -------------------------- */
+    SDL_SetRenderDrawColor(renderer, 180, 120, 60, 255);
+    for (int i = 0; i < gs->bridge_count; i++) {
+        const Bridge *br = &gs->bridges[i];
+        for (int j = 0; j < br->brick_count; j++) {
+            const BridgeBrick *bk = &br->bricks[j];
+            if (!bk->active) continue;
+            r = (SDL_Rect){
+                (int)br->x + j * BRIDGE_TILE_W - cam_x,
+                (int)(br->base_y + bk->y_offset),
+                BRIDGE_TILE_W, BRIDGE_TILE_H
+            };
+            SDL_RenderDrawRect(renderer, &r);
+        }
+    }
+
     /* ---- Coins (active only) — yellow (255, 255, 0) ----------------- */
     SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
     for (int i = 0; i < gs->coin_count; i++) {
