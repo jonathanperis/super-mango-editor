@@ -37,6 +37,16 @@ src/
 ├── rail.c        Rail path builder, bitmask tile rendering, position interpolation
 ├── spike_block.h SpikeBlock struct + speed/push/hitbox constants
 ├── spike_block.c Rail-riding hazard: traversal, free-fall, push collision, render
+├── float_platform.h FloatPlatform struct + mode enum + crumble/rail constants
+├── float_platform.c Hovering platform: static, crumble, and rail behaviours
+├── bridge.h      Bridge/BridgeBrick structs + cascade-fall constants
+├── bridge.c      Tiled crumble walkway: init, cascade-fall, render
+├── jumping_spider.h JumpingSpider struct + jump/patrol constants
+├── jumping_spider.c Jumping spider: patrol, jump arcs, sea-gap awareness
+├── bird.h        Bird struct + sine-wave patrol constants
+├── bird.c        Slow bird enemy: sine-wave sky patrol, animation, render
+├── faster_bird.h FasterBird struct + aggressive patrol constants
+├── faster_bird.c Fast bird enemy: tighter sine-wave, faster animation
 ├── debug.h       DebugOverlay struct + FPS/log constants
 └── debug.c       Debug overlay: FPS counter, collision hitbox drawing, event log
 ```
@@ -119,8 +129,17 @@ See [Constants Reference](Constants-Reference) for full details.
 #include "coin.h"       // Coin struct + MAX_COINS constant
 #include "vine.h"       // VineDecor struct + MAX_VINES constant
 #include "fish.h"       // Fish struct + MAX_FISH constant
+#include "bouncepad.h"  // Bouncepad struct + MAX_BOUNCEPADS
 #include "hud.h"        // Hud struct — HUD display resources
 #include "parallax.h"   // ParallaxSystem — multi-layer scrolling background
+#include "rail.h"           // Rail, RailTile — rail path system
+#include "spike_block.h"    // SpikeBlock — rail-riding hazard entity
+#include "float_platform.h" // FloatPlatform — hovering/crumble/rail surfaces
+#include "bridge.h"         // Bridge — tiled crumble walkway
+#include "jumping_spider.h" // JumpingSpider — jumping patrol enemy
+#include "bird.h"           // Bird — slow sine-wave sky patrol
+#include "faster_bird.h"    // FasterBird — fast sine-wave sky patrol
+#include "debug.h"          // DebugOverlay — debug collision/FPS/log overlay
 ```
 
 ### GameState Fields
@@ -134,6 +153,15 @@ See [Constants Reference](Constants-Reference) for full details.
 | `floor_tile` | `SDL_Texture *` | Grass tile, 9-slice tiled across `FLOOR_Y` |
 | `platform_tex` | `SDL_Texture *` | Shared tile texture for all platform pillars |
 | `spider_tex` | `SDL_Texture *` | Shared texture for all spider enemies |
+| `jumping_spider_tex` | `SDL_Texture *` | Shared texture for jumping spiders |
+| `jumping_spiders` | `JumpingSpider[MAX_JUMPING_SPIDERS]` | Jump-patrol enemy instances |
+| `jumping_spider_count` | `int` | Number of active jumping spiders |
+| `bird_tex` | `SDL_Texture *` | Shared texture for Bird enemies (Bird_2.png) |
+| `birds` | `Bird[MAX_BIRDS]` | Slow sine-wave sky patrol enemies |
+| `bird_count` | `int` | Number of active birds |
+| `faster_bird_tex` | `SDL_Texture *` | Shared texture for FasterBird (Bird_1.png) |
+| `faster_birds` | `FasterBird[MAX_FASTER_BIRDS]` | Fast sky patrol enemies |
+| `faster_bird_count` | `int` | Number of active faster birds |
 | `fish_tex` | `SDL_Texture *` | Shared texture for all fish enemies |
 | `vine_tex` | `SDL_Texture *` | Shared texture for vine decorations |
 | `snd_jump` | `Mix_Chunk *` | Jump WAV effect |
@@ -152,8 +180,26 @@ See [Constants Reference](Constants-Reference) for full details.
 | `coin_count` | `int` | Number of coins placed |
 | `fish` | `Fish[MAX_FISH]` | Jumping water enemy instances |
 | `fish_count` | `int` | Number of active fish |
-| `vines` | `VineDecor[MAX_VINES]` | Static scenery vine instances |
+| `vines` | `VineDecor[MAX_VINES]` | Climbable vine instances |
 | `vine_count` | `int` | Number of vine decorations placed |
+| `bouncepad_tex` | `SDL_Texture *` | Shared texture for all bouncepads |
+| `bouncepads` | `Bouncepad[MAX_BOUNCEPADS]` | Spring launch pad instances |
+| `bouncepad_count` | `int` | Number of bouncepads placed |
+| `snd_spring` | `Mix_Chunk *` | Bouncepad spring sound (MP3) |
+| `rail_tex` | `SDL_Texture *` | Shared texture for all rail tiles |
+| `rails` | `Rail[MAX_RAILS]` | Level rail path definitions |
+| `rail_count` | `int` | Number of active rail paths |
+| `spike_block_tex` | `SDL_Texture *` | Shared texture for spike blocks |
+| `spike_blocks` | `SpikeBlock[MAX_SPIKE_BLOCKS]` | Rail-riding hazard instances |
+| `spike_block_count` | `int` | Number of active spike blocks |
+| `float_platform_tex` | `SDL_Texture *` | Platform.png 3-slice texture |
+| `float_platforms` | `FloatPlatform[MAX_FLOAT_PLATFORMS]` | Hovering surface instances |
+| `float_platform_count` | `int` | Number of float platforms |
+| `bridge_tex` | `SDL_Texture *` | Bridge.png tile texture |
+| `bridges` | `Bridge[MAX_BRIDGES]` | Tiled crumble walkway instances |
+| `bridge_count` | `int` | Number of active bridges |
+| `sea_gaps` | `int[MAX_SEA_GAPS]` | Left-edge x of each sea gap |
+| `sea_gap_count` | `int` | Number of active sea gaps |
 | `hud` | `Hud` | HUD display: hearts, lives, score |
 | `hearts` | `int` | Current hit points (0–MAX_HEARTS) |
 | `lives` | `int` | Remaining lives; 0 triggers game over |
@@ -161,6 +207,9 @@ See [Constants Reference](Constants-Reference) for full details.
 | `coins_for_heart` | `int` | Coins collected toward next heart restore |
 | `camera` | `Camera` | Viewport scroll position; updated every frame |
 | `running` | `int` | `1` = loop running, `0` = exit |
+| `paused` | `int` | `1` = window lost focus; physics/music frozen |
+| `debug_mode` | `int` | `1` = debug overlays active (--debug flag) |
+| `debug` | `DebugOverlay` | FPS counter, collision vis, event log |
 
 ### Function Declarations
 
@@ -186,25 +235,43 @@ Creates all runtime resources in this order:
 4. `parallax_init(&gs->parallax, gs->renderer)` — loads multi-layer background textures (non-fatal per layer)
 5. `IMG_LoadTexture(renderer, "assets/Grass_Tileset.png")` → `gs->floor_tile`
 6. `IMG_LoadTexture(renderer, "assets/Grass_Oneway.png")` → `gs->platform_tex`
-7. `platforms_init(gs->platforms, &gs->platform_count)` — two pillar definitions
+7. `platforms_init(gs->platforms, &gs->platform_count)` — 8 pillar definitions
 8. `water_init(&gs->water, gs->renderer)` — loads Water.png and resets scroll
 9. `IMG_LoadTexture(renderer, "assets/Spider_1.png")` → `gs->spider_tex`
-10. `spiders_init(gs->spiders, &gs->spider_count)` — two patrol spiders
-11. `IMG_LoadTexture(renderer, "assets/Fish_2.png")` → `gs->fish_tex`
-12. `fish_init(gs->fish, &gs->fish_count)` — place fish in water lane
-13. `IMG_LoadTexture(renderer, "assets/Coin.png")` → `gs->coin_tex`
-14. `coins_init(gs->coins, &gs->coin_count)` — place initial coins
-15. `IMG_LoadTexture(renderer, "assets/Vine.png")` → `gs->vine_tex` (non-fatal)
-16. `vine_init(gs->vines, &gs->vine_count)` — place vine decorations
-17. `Mix_LoadWAV("sounds/jump.wav")` → `gs->snd_jump`
-18. `Mix_LoadWAV("sounds/coin.wav")` → `gs->snd_coin` (non-fatal)
-19. `Mix_LoadWAV("sounds/hit.wav")` → `gs->snd_hit` (non-fatal)
-20. `Mix_LoadMUS("sounds/water-ambience.ogg")` → `gs->music`
-21. `Mix_PlayMusic(gs->music, -1)` + `Mix_VolumeMusic(13)` — start music at ~10%
-22. `player_init(&gs->player, gs->renderer)`
-23. `fog_init(&gs->fog, gs->renderer)` — loads Sky_Background_1/2.png, spawns first wave
-24. `hud_init(&gs->hud, gs->renderer)` — load font and heart texture
-25. `gs->running = 1`
+10. `spiders_init(gs->spiders, &gs->spider_count)` — patrol spiders
+11. `IMG_LoadTexture(renderer, "assets/Spider_2.png")` → `gs->jumping_spider_tex`
+12. `jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count)` — jumping patrol spiders
+13. `IMG_LoadTexture(renderer, "assets/Bird_2.png")` → `gs->bird_tex`
+14. `birds_init(gs->birds, &gs->bird_count)` — slow sine-wave sky patrol
+15. `IMG_LoadTexture(renderer, "assets/Bird_1.png")` → `gs->faster_bird_tex`
+16. `faster_birds_init(gs->faster_birds, &gs->faster_bird_count)` — fast aggressive sky patrol
+17. `IMG_LoadTexture(renderer, "assets/Fish_2.png")` → `gs->fish_tex`
+18. `fish_init(gs->fish, &gs->fish_count)` — place fish in water lane
+19. `IMG_LoadTexture(renderer, "assets/Coin.png")` → `gs->coin_tex`
+20. `coins_init(gs->coins, &gs->coin_count)` — place initial coins
+21. `IMG_LoadTexture(renderer, "assets/Vine.png")` → `gs->vine_tex` (non-fatal)
+22. `vine_init(gs->vines, &gs->vine_count)` — place climbable vines
+23. `IMG_LoadTexture(renderer, "assets/Bouncepad_Wood.png")` → `gs->bouncepad_tex`
+24. `bouncepads_init(gs->bouncepads, &gs->bouncepad_count)`
+25. `Mix_LoadWAV("sounds/bouncepad.mp3")` → `gs->snd_spring` (non-fatal)
+26. `IMG_LoadTexture(renderer, "assets/Rails.png")` → `gs->rail_tex` (non-fatal)
+27. `rail_init(gs->rails, &gs->rail_count)`
+28. `IMG_LoadTexture(renderer, "assets/Spike_Block.png")` → `gs->spike_block_tex` (non-fatal)
+29. `spike_blocks_init(gs->spike_blocks, &gs->spike_block_count, gs->rails)`
+30. `IMG_LoadTexture(renderer, "assets/Platform.png")` → `gs->float_platform_tex` (non-fatal)
+31. `float_platforms_init(gs->float_platforms, &gs->float_platform_count, gs->rails)`
+32. `IMG_LoadTexture(renderer, "assets/Bridge.png")` → `gs->bridge_tex` (non-fatal)
+33. `bridges_init(gs->bridges, &gs->bridge_count)`
+34. `Mix_LoadWAV("sounds/jump.wav")` → `gs->snd_jump`
+35. `Mix_LoadWAV("sounds/coin.wav")` → `gs->snd_coin` (non-fatal)
+36. `Mix_LoadWAV("sounds/hit.wav")` → `gs->snd_hit` (non-fatal)
+37. `Mix_LoadMUS("sounds/water-ambience.ogg")` → `gs->music`
+38. `Mix_PlayMusic(gs->music, -1)` + `Mix_VolumeMusic(13)` — start music at ~10%
+39. `player_init(&gs->player, gs->renderer)`
+40. `fog_init(&gs->fog, gs->renderer)` — loads Sky_Background_1/2.png, spawns first wave
+41. `hud_init(&gs->hud, gs->renderer)` — load font and heart texture
+42. Sea gaps initialisation (5 gap positions)
+43. `gs->running = 1`
 
 **Renderer flags:**
 
@@ -232,34 +299,29 @@ while (gs->running):
   SDL_CONTROLLERBUTTONDOWN (SDL_CONTROLLER_BUTTON_START) → gs->running = 0
 
   // 2. Update
-  player_handle_input(&gs->player, gs->snd_jump, gs->controller)
-  player_update(&gs->player, dt, gs->platforms, gs->platform_count)
-  spiders_update(gs->spiders, gs->spider_count, dt)
-  fish_update(gs->fish, gs->fish_count, dt)
-  // player-spider AABB collision (with 1.5 s invincibility window)
-  if hurt_timer > 0: hurt_timer -= dt
-  else: for each spider → if SDL_HasIntersection(player_hitbox, spider_rect): hurt_timer = 1.5, snd_hit
-  // player-fish AABB collision (reuses the same hurt_timer invincibility window)
-  if hurt_timer == 0: for each fish → if SDL_HasIntersection(player_hitbox, fish_hitbox): hurt_timer = 1.5, snd_hit
+  player_handle_input(&gs->player, gs->snd_jump, gs->controller, gs->vines, gs->vine_count)
+  player_update(&gs->player, dt, platforms, float_platforms, bouncepads, vines, bridges, sea_gaps, ...)
+  → bouncepad response (animation + spring sound)
+  spiders_update → jumping_spiders_update → birds_update → faster_birds_update
+  fish_update → spike_blocks_update → float_platforms_update → bridges_update
+  // Enemy collision checks (with 1.5 s invincibility window):
+  spider collision → jumping_spider collision → bird collision → faster_bird collision
+  fish collision → spike_block collision (+ push impulse)
+  // Sea gap detection: instant death if player falls through
   coins_update / coin–player AABB collision: award COIN_SCORE, coins_for_heart++
   if coins_for_heart >= COINS_PER_HEART && hearts < MAX_HEARTS: hearts++, coins_for_heart = 0
-  if hearts <= 0: lives--, player_reset(&gs->player), hearts = MAX_HEARTS
-  water_update(&gs->water, dt)
-  fog_update(&gs->fog, dt)
+  if hearts <= 0: lives--, player_reset, hearts = MAX_HEARTS
+  water_update → fog_update → bouncepads_update
+  debug_update (if --debug)
 
   // 3. Render
   SDL_RenderClear
-  parallax_render(&gs->parallax, gs->renderer, cam_x)
-  9-slice floor tiles (Grass_Tileset.png at FLOOR_Y)
-  platforms_render(platforms, platform_count, renderer, platform_tex)
-  vine_render(vines, vine_count, renderer, vine_tex, cam_x)
-  coins_render(coins, coin_count, renderer, coin_tex, cam_x)
-  fish_render(fish, fish_count, renderer, fish_tex, cam_x)
-  water_render(&water, renderer)
-  spiders_render(spiders, spider_count, renderer, spider_tex, cam_x)
-  player_render(&player, renderer, cam_x)
-  fog_render(&fog, renderer)
-  hud_render(&hud, renderer, player_tex, hearts, lives, score)
+  parallax_render → platforms_render → 9-slice floor tiles (with sea gaps)
+  float_platforms_render → bridges_render → bouncepads_render → rail_render
+  vine_render → coins_render → fish_render → water_render
+  spike_blocks_render → spiders_render → jumping_spiders_render
+  birds_render → faster_birds_render → player_render
+  fog_render → hud_render → debug_render (if --debug)
   SDL_RenderPresent
 
   // 4. Frame cap fallback
@@ -269,8 +331,10 @@ while (gs->running):
 **Render layer order (painter's algorithm):**
 
 ```
-[1] Parallax background → [2] Floor tiles → [3] Platforms → [4] Vines →
-[5] Coins → [6] Fish → [7] Water → [8] Spiders → [9] Player → [10] Fog → [11] HUD
+[1] Parallax background → [2] Platforms → [3] Floor tiles → [4] Float platforms →
+[5] Bridges → [6] Bouncepads → [7] Rails → [8] Vines → [9] Coins → [10] Fish →
+[11] Water → [12] Spike blocks → [13] Spiders → [14] Jumping spiders →
+[15] Birds → [16] Faster birds → [17] Player → [18] Fog → [19] HUD → [20] Debug
 ```
 
 ### `game_cleanup(GameState *gs)`
@@ -288,9 +352,17 @@ Mix_FreeChunk(snd_jump)              → snd_jump = NULL
 Mix_FreeChunk(snd_coin)              → snd_coin = NULL
 Mix_FreeChunk(snd_hit)               → snd_hit = NULL
 water_cleanup(&water)
+SDL_DestroyTexture(spike_block_tex)  → spike_block_tex = NULL
+SDL_DestroyTexture(bridge_tex)       → bridge_tex = NULL
+SDL_DestroyTexture(float_platform_tex) → float_platform_tex = NULL
+SDL_DestroyTexture(rail_tex)         → rail_tex = NULL
 SDL_DestroyTexture(vine_tex)         → vine_tex = NULL
+Mix_FreeChunk(snd_spring)            → snd_spring = NULL
 SDL_DestroyTexture(coin_tex)         → coin_tex = NULL
 SDL_DestroyTexture(fish_tex)         → fish_tex = NULL
+SDL_DestroyTexture(faster_bird_tex)  → faster_bird_tex = NULL
+SDL_DestroyTexture(bird_tex)         → bird_tex = NULL
+SDL_DestroyTexture(jumping_spider_tex) → jumping_spider_tex = NULL
 SDL_DestroyTexture(spider_tex)       → spider_tex = NULL
 SDL_DestroyTexture(platform_tex)     → platform_tex = NULL
 SDL_DestroyTexture(floor_tile)       → floor_tile = NULL
@@ -316,7 +388,8 @@ typedef enum {
     ANIM_IDLE = 0,   // Row 0 on the sprite sheet — 4 frames
     ANIM_WALK,       // Row 1                     — 4 frames
     ANIM_JUMP,       // Row 2                     — 2 frames
-    ANIM_FALL        // Row 3                     — 1 frame
+    ANIM_FALL,       // Row 3                     — 1 frame
+    ANIM_CLIMB       // Row 4                     — 2 frames
 } AnimState;
 ```
 
@@ -338,6 +411,8 @@ Values map directly to the sprite sheet **row index** via the `ANIM_ROW[]` table
 | `anim_frame_index` | `int` | Current frame within the animation |
 | `anim_timer_ms` | `Uint32` | Accumulated ms in the current frame |
 | `facing_left` | `int` | `1` = flip sprite horizontally |
+| `on_vine` | `int` | `1` = currently climbing a vine, `0` = normal |
+| `vine_index` | `int` | Index into the vine array of the vine being climbed |
 | `hurt_timer` | `float` | Seconds of invincibility remaining; `0` = normal |
 | `frame` | `SDL_Rect` | Source rect cut from the sprite sheet |
 | `texture` | `SDL_Texture *` | GPU handle to `Player.png` |
@@ -347,8 +422,18 @@ Values map directly to the sprite sheet **row index** via the `ANIM_ROW[]` table
 ```c
 void player_init(Player *player, SDL_Renderer *renderer);
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
-                         SDL_GameController *ctrl);
-void player_update(Player *player, float dt, const Platform *platforms, int platform_count);
+                         SDL_GameController *ctrl,
+                         const VineDecor *vines, int vine_count);
+void player_update(Player *player, float dt,
+                   const Platform *platforms, int platform_count,
+                   const FloatPlatform *float_platforms, int float_platform_count,
+                   const Bouncepad *bouncepads, int bouncepad_count,
+                   const VineDecor *vines, int vine_count,
+                   const Bridge *bridges, int bridge_count,
+                   const int *sea_gaps, int sea_gap_count,
+                   int *out_bounce_idx,
+                   int *out_fp_landed_idx,
+                   int prev_fp_landed_idx);
 void player_render(Player *player, SDL_Renderer *renderer, int cam_x);
 SDL_Rect player_get_hitbox(const Player *player);
 void player_reset(Player *player);
@@ -368,16 +453,21 @@ See [Player Module](Player-Module) for a full deep dive into input, physics, and
 | `FRAME_W` | `48` | Width of one sprite frame (pixels) |
 | `FRAME_H` | `48` | Height of one sprite frame (pixels) |
 | `FLOOR_SINK` | `16` | Pixels the player overlaps the floor visually |
+| `PHYS_PAD_X` | `15` | Pixels trimmed from each horizontal side for physics box |
+| `PHYS_PAD_TOP` | `18` | Pixels trimmed from top of frame for physics box |
+| `CLIMB_SPEED` | `80.0f` | Vertical climbing speed on vines (px/s) |
+| `CLIMB_H_SPEED` | `80.0f` | Horizontal drift speed while on vine (px/s) |
+| `VINE_GRAB_PAD` | `4` | Extra grab-zone pixels on each side of vine |
 
 ### Animation Tables (static arrays)
 
 ```c
-static const int ANIM_FRAME_COUNT[4] = { 4,   4,   2,   1   };
-static const int ANIM_FRAME_MS[4]    = { 150, 100, 150, 200 };
-static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
+static const int ANIM_FRAME_COUNT[5] = { 4,   4,   2,   1,   2   };
+static const int ANIM_FRAME_MS[5]    = { 150, 100, 150, 200, 100 };
+static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 ```
 
-Indexed by `AnimState` value (0–3).
+Indexed by `AnimState` value (0–4).
 
 ---
 
@@ -416,12 +506,18 @@ void platforms_render(const Platform *platforms, int count,
 
 ### Platform Definitions
 
-Two pillar stacks are placed on the floor:
+Eight pillar stacks are placed across the world (2 per screen):
 
-| Platform | X | Width | Height | Top surface Y |
-|----------|---|-------|--------|---------------|
-| 0 | 80 | 48 | 96 | `FLOOR_Y - 96 = 156` |
-| 1 | 256 | 48 | 144 | `FLOOR_Y - 144 = 108` |
+| Platform | X | Height | Top surface Y | Screen |
+|----------|---|--------|---------------|--------|
+| 0 | 80 | 2 tiles (96 px) | 172 | 1 |
+| 1 | 256 | 3 tiles (144 px) | 124 | 1 |
+| 2 | 452 | 2 tiles (96 px) | 172 | 2 |
+| 3 | 680 | 3 tiles (144 px) | 124 | 2 |
+| 4 | 880 | 2 tiles (96 px) | 172 | 3 |
+| 5 | 1050 | 3 tiles (144 px) | 124 | 3 |
+| 6 | 1300 | 2 tiles (96 px) | 172 | 4 |
+| 7 | 1480 | 3 tiles (144 px) | 124 | 4 |
 
 ### 9-Slice Tile Rendering
 
@@ -485,6 +581,8 @@ Each tile is cropped from the sheet at `{ frame*48+16, 17, 16, 31 }` — extract
 | `MAX_SPIDERS` | `4` | Maximum simultaneous spiders |
 | `SPIDER_FRAMES` | `3` | Animation frames in `Spider_1.png` (192÷64 = 3) |
 | `SPIDER_FRAME_W` | `64` | Width of one frame slot in the sheet (px) |
+| `SPIDER_ART_X` | `20` | First visible col in each frame slot |
+| `SPIDER_ART_W` | `25` | Width of visible art (cols 20–44) |
 | `SPIDER_ART_Y` | `22` | First visible row in each frame slot |
 | `SPIDER_ART_H` | `10` | Height of visible art (rows 22–31) |
 | `SPIDER_SPEED` | `50.0f` | Walk speed (px/s) |
@@ -505,7 +603,8 @@ Each tile is cropped from the sheet at `{ frame*48+16, 17, 16, 31 }` — extract
 
 ```c
 void spiders_init(Spider *spiders, int *count);
-void spiders_update(Spider *spiders, int count, float dt);
+void spiders_update(Spider *spiders, int count, float dt,
+                    const int *sea_gaps, int sea_gap_count);
 void spiders_render(const Spider *spiders, int count,
                     SDL_Renderer *renderer, SDL_Texture *tex);
 ```
@@ -518,16 +617,16 @@ void spiders_render(const Spider *spiders, int count,
 
 ### Spider Definitions
 
-Two spiders patrol the ground floor:
+Two spiders patrol the ground floor, respecting sea gaps:
 
-| Spider | Patrol range | Start dir | Frame offset |
-|--------|-------------|-----------|-------------|
-| 0 | x = 20..190 | Right | 0 |
-| 1 | x = 220..370 | Left | 2 |
+| Spider | Start X | Patrol range | Start dir |
+|--------|---------|-------------|-----------|
+| 0 | 600 | 592..750 (screen 2–3, east of sea gap) | Right |
+| 1 | 1100 | 1000..1152 (screen 3–4, west of sea gap) | Left |
 
 ### Rendering
 
-The source rect crops to the art band `{ frame*48, 22, 48, 10 }`. Spiders are bottom-aligned at `FLOOR_Y` and flipped horizontally via `SDL_RenderCopyEx` when walking left (`vx < 0`).
+The source rect crops to the art band `{ frame*64, 22, 64, 10 }`. Spiders are bottom-aligned at `FLOOR_Y` and flipped horizontally via `SDL_RenderCopyEx` when walking left (`vx < 0`). The spider reverses at patrol boundaries and at sea gap edges.
 
 ---
 
@@ -673,22 +772,26 @@ Coins are placed on the ground and on platforms at `coins_init`. Each frame, `ga
 
 ## `vine.h`
 
-**Role:** Defines the `VineDecor` struct and constants for static plant decorations placed on the ground and platform tops.
+**Role:** Defines the `VineDecor` struct and constants for climbable vine decorations hanging from platforms.
 
 ### Constants
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `MAX_VINES` | `24` | Maximum number of vine decoration instances |
+| `MAX_VINES` | `24` | Maximum number of vine instances |
 | `VINE_W` | `16` | Sprite width in logical pixels |
-| `VINE_H` | `48` | Sprite height in logical pixels |
+| `VINE_H` | `32` | Content height after removing transparent padding |
+| `VINE_SRC_Y` | `8` | First pixel row with content in Vine.png |
+| `VINE_SRC_H` | `32` | Height of content area in Vine.png |
+| `VINE_STEP` | `19` | Vertical spacing between stacked tiles (px) |
 
 ### `VineDecor` Struct Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `x` | `float` | Left edge in logical world pixels |
-| `y` | `float` | Top edge in logical world pixels |
+| `y` | `float` | Top edge (attachment to platform surface) |
+| `tile_count` | `int` | Number of VINE_H-px tiles stacked downward (2–4) |
 
 ### Function Declarations
 
@@ -702,9 +805,9 @@ void vine_render(const VineDecor *vines, int count,
 
 ## `vine.c`
 
-**Role:** Implements static vine/plant decoration — placement on the ground floor and platform tops, and camera-aware rendering.
+**Role:** Implements climbable vine decoration — placement on platforms, and camera-aware rendering.
 
-Vines are purely visual: there is no update step and no collision. `vine_init` populates the `VineDecor` array with world-space positions on the floor and on select platform tops. `vine_render` blits each vine with a world-to-screen camera offset; vines are drawn after platforms but before coins, placing them behind all moving entities.
+Vines serve both as visual scenery and as climbable surfaces. `vine_init` populates the `VineDecor` array with world-space positions hanging from platform surfaces. `vine_render` blits each vine (stacking `tile_count` tiles downward at `VINE_STEP` spacing) with a world-to-screen camera offset. Climbing logic is handled in `player.c` — the vine's grab zone is `VINE_W + 2 × VINE_GRAB_PAD` = 24 px wide.
 
 ---
 
@@ -778,7 +881,9 @@ Fish patrol the water lane horizontally between `patrol_x0` and `patrol_x1`, rev
 | `HUD_MARGIN` | `4` | Pixel margin from screen edges |
 | `HUD_HEART_SIZE` | `12` | Display size of each heart icon (px) |
 | `HUD_HEART_GAP` | `2` | Horizontal gap between heart icons (px) |
-| `HUD_ICON_SIZE` | `48` | Display size of the player icon (px) |
+| `HUD_ICON_W` | `16` | Display width of the player icon (px) |
+| `HUD_ICON_H` | `13` | Display height of the player icon (px) |
+| `HUD_ROW_H` | `13` | Row height for text alignment (font px) |
 
 ### `Hud` Struct Fields
 
@@ -1007,6 +1112,195 @@ void     spike_block_push_player(const SpikeBlock *sb, Player *player);
 ### Collision & Push
 
 `spike_block_push_player` — applies `SPIKE_PUSH_SPEED` (220 px/s) in the direction opposite to the player's movement, plus `SPIKE_PUSH_VY` (-150 px/s) upward. If the player is stationary, the push is based on relative position.
+
+---
+
+## `float_platform.h`
+
+**Role:** Defines the `FloatPlatform` struct, `FloatPlatformMode` enum, and constants for hovering surfaces with three behaviour modes.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `FLOAT_PLATFORM_PIECE_W` | `16` | Width of each 3-slice piece (px) |
+| `FLOAT_PLATFORM_H` | `16` | Height of the platform sprite (px) |
+| `MAX_FLOAT_PLATFORMS` | `6` | Maximum float platform instances per level |
+| `CRUMBLE_STAND_LIMIT` | `0.75f` | Seconds before crumble-fall starts |
+| `CRUMBLE_FALL_GRAVITY` | `250.0f` | Fall acceleration (px/s²) |
+| `CRUMBLE_FALL_INITIAL_VY` | `20.0f` | Initial downward velocity on fall (px/s) |
+
+### `FloatPlatformMode` Enum
+
+| Value | Description |
+|-------|-------------|
+| `FLOAT_PLATFORM_STATIC` | Hovers at a fixed world position forever |
+| `FLOAT_PLATFORM_CRUMBLE` | Falls after the player stands on it |
+| `FLOAT_PLATFORM_RAIL` | Follows a Rail path (closed loop or bouncing) |
+
+### Function Declarations
+
+```c
+void float_platform_init(FloatPlatform *fp, FloatPlatformMode mode,
+                         float x, float y, int w_tiles,
+                         float stand_limit,
+                         const Rail *rail, float t, float speed);
+void float_platforms_init(FloatPlatform *fps, int *count, const Rail *rails);
+void float_platform_update(FloatPlatform *fp, float dt, int player_on_top);
+void float_platforms_update(FloatPlatform *fps, int count, float dt, int landed_idx);
+void float_platform_render(const FloatPlatform *fp,
+                           SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+void float_platforms_render(const FloatPlatform *fps, int count,
+                            SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+SDL_Rect float_platform_get_rect(const FloatPlatform *fp);
+```
+
+---
+
+## `float_platform.c`
+
+**Role:** Implements hovering platform behaviour — static hovering, crumble-fall after the player stands for `CRUMBLE_STAND_LIMIT` seconds, and rail-following using the same `rail_get_world_pos` / `rail_advance` infrastructure as `SpikeBlock`. The 3-slice sprite (left cap, centre fill, right cap from `Platform.png`) is rendered at the platform's world position. Collision is one-way top-surface landing, resolved inside `player_update`.
+
+---
+
+## `bridge.h`
+
+**Role:** Defines the `Bridge` and `BridgeBrick` structs and constants for tiled crumble walkways.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_BRIDGES` | `2` | Maximum bridge instances |
+| `MAX_BRIDGE_BRICKS` | `16` | Maximum bricks per bridge |
+| `BRIDGE_TILE_W` | `16` | Width of one brick (px) |
+| `BRIDGE_TILE_H` | `16` | Height of one brick (px) |
+| `BRIDGE_FALL_DELAY` | `0.1f` | Seconds before first brick falls |
+| `BRIDGE_CASCADE_DELAY` | `0.06f` | Seconds between successive bricks cascading outward |
+| `BRIDGE_FALL_GRAVITY` | `250.0f` | Brick fall acceleration (px/s²) |
+| `BRIDGE_FALL_INITIAL_VY` | `20.0f` | Initial brick fall speed (px/s) |
+
+### Function Declarations
+
+```c
+void bridges_init(Bridge *bridges, int *count);
+void bridges_update(Bridge *bridges, int count, float dt,
+                    int landed_idx, float player_cx);
+void bridges_render(const Bridge *bridges, int count,
+                    SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+SDL_Rect bridge_get_rect(const Bridge *b);
+int bridge_has_solid_at(const Bridge *b, float wx);
+```
+
+---
+
+## `bridge.c`
+
+**Role:** Implements tiled crumble walkways — placement, cascade-fall timing, per-brick physics, and rendering. When the player steps on a bridge, the brick beneath their feet starts a fall delay timer. Adjacent bricks cascade outward with `BRIDGE_CASCADE_DELAY` staggering, creating a domino-ripple effect. Each brick falls independently under `BRIDGE_FALL_GRAVITY` once its timer expires.
+
+---
+
+## `jumping_spider.h`
+
+**Role:** Defines the `JumpingSpider` struct and constants for the jumping patrol enemy.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_JUMPING_SPIDERS` | `4` | Maximum instances |
+| `JSPIDER_FRAMES` | `3` | Animation frames (Spider_2.png) |
+| `JSPIDER_FRAME_W` | `64` | Width of one frame slot (px) |
+| `JSPIDER_ART_X` | `20` | First visible col |
+| `JSPIDER_ART_W` | `25` | Visible art width |
+| `JSPIDER_ART_Y` | `22` | First visible row |
+| `JSPIDER_ART_H` | `10` | Visible art height |
+| `JSPIDER_SPEED` | `55.0f` | Walk speed (px/s) |
+| `JSPIDER_FRAME_MS` | `150` | ms per animation frame |
+| `JSPIDER_JUMP_VY` | `-200.0f` | Jump impulse (px/s) |
+| `JSPIDER_GRAVITY` | `600.0f` | Airborne gravity (px/s²) |
+
+### Function Declarations
+
+```c
+void jumping_spiders_init(JumpingSpider *spiders, int *count);
+void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
+                            const int *sea_gaps, int sea_gap_count);
+void jumping_spiders_render(const JumpingSpider *spiders, int count,
+                            SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+```
+
+---
+
+## `jumping_spider.c`
+
+**Role:** Implements jumping spider patrol — horizontal ground movement with periodic jumps. The spider respects sea gaps by jumping when it reaches a gap edge, clearing the 32 px gap with its arc. The jump impulse (`-200` px/s) and spider gravity (`600` px/s²) produce a ~0.67 s airborne period covering ~37 px horizontally at 55 px/s.
+
+---
+
+## `bird.h`
+
+**Role:** Defines the `Bird` struct and constants for the slow sine-wave sky patrol enemy.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_BIRDS` | `4` | Maximum instances |
+| `BIRD_FRAMES` | `3` | Animation frames (Bird_2.png) |
+| `BIRD_SPEED` | `45.0f` | Horizontal flight speed (px/s) |
+| `BIRD_FRAME_MS` | `140` | ms per wing animation frame |
+| `BIRD_WAVE_AMP` | `20.0f` | Sine-wave vertical amplitude (px) |
+| `BIRD_WAVE_FREQ` | `0.015f` | Sine cycles per pixel of horizontal travel |
+
+### Function Declarations
+
+```c
+void birds_init(Bird *birds, int *count);
+void birds_update(Bird *birds, int count, float dt);
+void birds_render(const Bird *birds, int count,
+                  SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+SDL_Rect bird_get_hitbox(const Bird *b);
+```
+
+---
+
+## `bird.c`
+
+**Role:** Implements slow bird enemy — horizontal patrol with a sine-wave vertical curve. The bird reverses at `patrol_x0` / `patrol_x1` boundaries. The 3-frame wing animation plays at 140 ms/frame. The sine-wave amplitude (20 px) and low frequency (0.015) create lazy, wide curves. Hitbox matches the visible art bounds (15×14 px).
+
+---
+
+## `faster_bird.h`
+
+**Role:** Defines the `FasterBird` struct and constants for the fast aggressive sky patrol enemy.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_FASTER_BIRDS` | `4` | Maximum instances |
+| `FBIRD_FRAMES` | `3` | Animation frames (Bird_1.png) |
+| `FBIRD_SPEED` | `80.0f` | Horizontal speed — nearly 2× the slow bird |
+| `FBIRD_FRAME_MS` | `90` | Faster wing animation (ms per frame) |
+| `FBIRD_WAVE_AMP` | `15.0f` | Tighter sine-wave amplitude (px) |
+| `FBIRD_WAVE_FREQ` | `0.025f` | Higher frequency — more erratic curves |
+
+### Function Declarations
+
+```c
+void faster_birds_init(FasterBird *birds, int *count);
+void faster_birds_update(FasterBird *birds, int count, float dt);
+void faster_birds_render(const FasterBird *birds, int count,
+                         SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+SDL_Rect faster_bird_get_hitbox(const FasterBird *b);
+```
+
+---
+
+## `faster_bird.c`
+
+**Role:** Implements fast bird enemy — same sine-wave patrol pattern as `bird.c` but with nearly 2× horizontal speed (80 vs 45 px/s), tighter curves (15 px amplitude, 0.025 frequency), and quicker wing animation (90 ms vs 140 ms per frame). The more erratic flight makes these harder to avoid.
 
 ---
 

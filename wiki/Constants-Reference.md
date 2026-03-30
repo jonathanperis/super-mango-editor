@@ -46,17 +46,19 @@ Used to compute `frame_ms = 1000 / TARGET_FPS` (≈ 16 ms), which is the manual 
 | `TILE_SIZE` | `48` | literal | Width and height of one grass tile (px) |
 | `FLOOR_Y` | `252` | `GAME_H - TILE_SIZE` | Y coordinate of the floor's top edge |
 
-The floor is drawn by repeating the 48×48 grass tile from `x=0` to `x=GAME_W` at `y=FLOOR_Y`.
+The floor is drawn by repeating the 48×48 grass tile across the full `WORLD_W` at `y=FLOOR_Y`, with gaps cut out at each `sea_gaps[]` position.
 
 ### Physics
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
 | `GRAVITY` | `800.0f` | `float` | Downward acceleration in px/s² |
+| `SEA_GAP_W` | `32` | `int` | Width of each sea gap in logical pixels |
+| `MAX_SEA_GAPS` | `8` | `int` | Maximum number of sea gaps per level |
 
 Every frame while airborne: `player->vy += GRAVITY * dt`.
 
-At 60 FPS (`dt ≈ 0.016s`) gravity adds ~12.8 px/s per frame. The jump impulse (`-500.0f` px/s) produces an arc that peaks in ~0.625 s and lands in ~1.25 s.
+At 60 FPS (`dt ≈ 0.016s`) gravity adds ~12.8 px/s per frame. The jump impulse (`-325.0f` px/s) produces a moderate arc.
 
 ### Camera
 
@@ -80,8 +82,8 @@ These are `#define`s local to `player.c` (not visible to other files).
 | `FRAME_W` | `48` | Width of one sprite frame in the sheet (px) |
 | `FRAME_H` | `48` | Height of one sprite frame in the sheet (px) |
 | `FLOOR_SINK` | `16` | Visual overlap onto the floor tile to prevent floating feet |
-| `PHYS_PAD_X` | `12` | Pixels trimmed from each horizontal side of the frame for the physics box (physics width = 48 − 24 = 24 px) |
-| `PHYS_PAD_TOP` | `6` | Pixels trimmed from the top of the frame for the physics box |
+| `PHYS_PAD_X` | `15` | Pixels trimmed from each horizontal side of the frame for the physics box (physics width = 48 − 30 = 18 px) |
+| `PHYS_PAD_TOP` | `18` | Pixels trimmed from the top of the frame for the physics box (physics height = 48 − 18 − 16 = 14… combined with FLOOR_SINK gives a 30 px tall box) |
 
 ### Why `FLOOR_SINK`?
 
@@ -99,12 +101,12 @@ The character's sprite appears to rest naturally on the grass at that Y.
 
 ## Animation Tables in `player.c`
 
-Static arrays indexed by `AnimState` (0 = `ANIM_IDLE`, 1 = `ANIM_WALK`, 2 = `ANIM_JUMP`, 3 = `ANIM_FALL`):
+Static arrays indexed by `AnimState` (0 = `ANIM_IDLE`, 1 = `ANIM_WALK`, 2 = `ANIM_JUMP`, 3 = `ANIM_FALL`, 4 = `ANIM_CLIMB`):
 
 ```c
-static const int ANIM_FRAME_COUNT[4] = { 4,   4,   2,   1   };
-static const int ANIM_FRAME_MS[4]    = { 150, 100, 150, 200 };
-static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
+static const int ANIM_FRAME_COUNT[5] = { 4,   4,   2,   1,   2   };
+static const int ANIM_FRAME_MS[5]    = { 150, 100, 150, 200, 100 };
+static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 ```
 
 | Index | State | Frames | ms/frame | Sheet row |
@@ -113,6 +115,7 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 | 1 | `ANIM_WALK` | 4 | 100 | Row 1 |
 | 2 | `ANIM_JUMP` | 2 | 150 | Row 2 |
 | 3 | `ANIM_FALL` | 1 | 200 | Row 3 |
+| 4 | `ANIM_CLIMB` | 2 | 100 | Row 4 |
 
 ---
 
@@ -121,7 +124,16 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 | Value | Location | Description |
 |-------|----------|-------------|
 | `160.0f` | `player_init` | `player->speed` — horizontal max speed (px/s) |
-| `-500.0f` | `player_handle_input` | Jump vertical impulse (upward, px/s) |
+| `-325.0f` | `player_handle_input` | Jump vertical impulse — keyboard (ground + vine dismount) |
+| `-500.0f` | `player_handle_input` | Jump vertical impulse — gamepad (ground + vine dismount) |
+
+## Vine Climbing Constants in `player.c`
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `CLIMB_SPEED` | `80.0f` | `float` | Vertical climbing speed on vines (px/s) |
+| `CLIMB_H_SPEED` | `80.0f` | `float` | Horizontal drift speed while on vine (px/s) |
+| `VINE_GRAB_PAD` | `4` | `int` | Extra pixels on each side of vine sprite that count as the grab zone (total grab width = VINE_W + 2 × 4 = 24 px) |
 
 ---
 
@@ -181,6 +193,8 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 | `MAX_SPIDERS` | `4` | `int` | Maximum simultaneous spider enemies |
 | `SPIDER_FRAMES` | `3` | `int` | Animation frames in `Spider_1.png` (192÷64 = 3) |
 | `SPIDER_FRAME_W` | `64` | `int` | Width of one frame slot in the sheet (px) |
+| `SPIDER_ART_X` | `20` | `int` | First visible col within each frame slot |
+| `SPIDER_ART_W` | `25` | `int` | Width of visible art (cols 20–44) |
 | `SPIDER_ART_Y` | `22` | `int` | First visible row within each frame slot |
 | `SPIDER_ART_H` | `10` | `int` | Height of visible art (rows 22–31) |
 | `SPIDER_SPEED` | `50.0f` | `float` | Walk speed (px/s) |
@@ -221,9 +235,12 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_VINES` | `24` | `int` | Maximum number of vine decoration instances |
+| `MAX_VINES` | `24` | `int` | Maximum number of vine instances |
 | `VINE_W` | `16` | `int` | Sprite width in logical pixels |
-| `VINE_H` | `48` | `int` | Sprite height in logical pixels |
+| `VINE_H` | `32` | `int` | Content height after removing transparent padding |
+| `VINE_SRC_Y` | `8` | `int` | First pixel row with content in Vine.png |
+| `VINE_SRC_H` | `32` | `int` | Height of content area in Vine.png |
+| `VINE_STEP` | `19` | `int` | Vertical spacing between stacked tiles (px) |
 
 ---
 
@@ -256,7 +273,9 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 | `HUD_MARGIN` | `4` | `int` | Pixel margin from screen edges |
 | `HUD_HEART_SIZE` | `12` | `int` | Display size of each heart icon (px) |
 | `HUD_HEART_GAP` | `2` | `int` | Horizontal gap between heart icons (px) |
-| `HUD_ICON_SIZE` | `48` | `int` | Display size of the player icon (px) |
+| `HUD_ICON_W` | `16` | `int` | Display width of the player icon (px) |
+| `HUD_ICON_H` | `13` | `int` | Display height of the player icon (px) |
+| `HUD_ROW_H` | `13` | `int` | Row height for text alignment (font px) |
 
 ---
 
@@ -313,3 +332,85 @@ static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
 | `DEBUG_LOG_MSG_LEN` | `64` | `int` | Max characters per log message (incl. null) |
 | `DEBUG_LOG_DISPLAY_SEC` | `4.0f` | `float` | Seconds each log entry stays visible |
 | `DEBUG_FPS_SAMPLE_MS` | `500` | `int` | Milliseconds between FPS counter refreshes |
+
+---
+
+## `jumping_spider.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_JUMPING_SPIDERS` | `4` | `int` | Maximum simultaneous jumping spider instances |
+| `JSPIDER_FRAMES` | `3` | `int` | Animation frames in `Spider_2.png` (192÷64 = 3) |
+| `JSPIDER_FRAME_W` | `64` | `int` | Width of one frame slot in the sheet (px) |
+| `JSPIDER_ART_X` | `20` | `int` | First visible col within each frame |
+| `JSPIDER_ART_W` | `25` | `int` | Width of visible art (cols 20–44) |
+| `JSPIDER_ART_Y` | `22` | `int` | First visible row within each frame |
+| `JSPIDER_ART_H` | `10` | `int` | Height of visible art (rows 22–31) |
+| `JSPIDER_SPEED` | `55.0f` | `float` | Walk speed (px/s) |
+| `JSPIDER_FRAME_MS` | `150` | `int` | Milliseconds per animation frame |
+| `JSPIDER_JUMP_VY` | `-200.0f` | `float` | Upward jump impulse (px/s) |
+| `JSPIDER_GRAVITY` | `600.0f` | `float` | Downward acceleration while airborne (px/s²) |
+
+---
+
+## `bird.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_BIRDS` | `4` | `int` | Maximum simultaneous bird instances |
+| `BIRD_FRAMES` | `3` | `int` | Animation frames in `Bird_2.png` (144÷48 = 3) |
+| `BIRD_FRAME_W` | `48` | `int` | Width of one frame slot in the sheet (px) |
+| `BIRD_ART_X` | `17` | `int` | First visible col within each frame |
+| `BIRD_ART_W` | `15` | `int` | Width of visible art (cols 17–31) |
+| `BIRD_ART_Y` | `17` | `int` | First visible row within each frame |
+| `BIRD_ART_H` | `14` | `int` | Height of visible art (rows 17–30) |
+| `BIRD_SPEED` | `45.0f` | `float` | Horizontal flight speed (px/s) |
+| `BIRD_FRAME_MS` | `140` | `int` | Milliseconds per wing animation frame |
+| `BIRD_WAVE_AMP` | `20.0f` | `float` | Sine-wave amplitude in logical pixels |
+| `BIRD_WAVE_FREQ` | `0.015f` | `float` | Sine cycles per pixel of horizontal travel |
+
+---
+
+## `faster_bird.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_FASTER_BIRDS` | `4` | `int` | Maximum simultaneous faster bird instances |
+| `FBIRD_FRAMES` | `3` | `int` | Animation frames in `Bird_1.png` (144÷48 = 3) |
+| `FBIRD_FRAME_W` | `48` | `int` | Width of one frame slot in the sheet (px) |
+| `FBIRD_ART_X` | `17` | `int` | First visible col within each frame |
+| `FBIRD_ART_W` | `15` | `int` | Width of visible art (cols 17–31) |
+| `FBIRD_ART_Y` | `17` | `int` | First visible row within each frame |
+| `FBIRD_ART_H` | `14` | `int` | Height of visible art (rows 17–30) |
+| `FBIRD_SPEED` | `80.0f` | `float` | Horizontal speed — nearly 2× the slow bird |
+| `FBIRD_FRAME_MS` | `90` | `int` | Faster wing animation (ms per frame) |
+| `FBIRD_WAVE_AMP` | `15.0f` | `float` | Tighter sine-wave amplitude (px) |
+| `FBIRD_WAVE_FREQ` | `0.025f` | `float` | Higher frequency — more erratic curves |
+
+---
+
+## `float_platform.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `FLOAT_PLATFORM_PIECE_W` | `16` | `int` | Width of each 3-slice piece (px) |
+| `FLOAT_PLATFORM_H` | `16` | `int` | Height of the platform sprite (px) |
+| `MAX_FLOAT_PLATFORMS` | `6` | `int` | Maximum float platform instances per level |
+| `CRUMBLE_STAND_LIMIT` | `0.75f` | `float` | Seconds of standing before crumble-fall starts |
+| `CRUMBLE_FALL_GRAVITY` | `250.0f` | `float` | Downward acceleration during crumble fall (px/s²) |
+| `CRUMBLE_FALL_INITIAL_VY` | `20.0f` | `float` | Initial downward velocity on crumble-start (px/s) |
+
+---
+
+## `bridge.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_BRIDGES` | `2` | `int` | Maximum bridge instances per level |
+| `MAX_BRIDGE_BRICKS` | `16` | `int` | Maximum bricks in a single bridge |
+| `BRIDGE_TILE_W` | `16` | `int` | Width of one Bridge.png tile (px) |
+| `BRIDGE_TILE_H` | `16` | `int` | Height of one Bridge.png tile (px) |
+| `BRIDGE_FALL_DELAY` | `0.1f` | `float` | Seconds between touch and first brick falling |
+| `BRIDGE_CASCADE_DELAY` | `0.06f` | `float` | Extra seconds between successive bricks cascading outward |
+| `BRIDGE_FALL_GRAVITY` | `250.0f` | `float` | Downward acceleration per brick during fall (px/s²) |
+| `BRIDGE_FALL_INITIAL_VY` | `20.0f` | `float` | Initial downward velocity on fall-start (px/s) |

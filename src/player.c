@@ -10,6 +10,7 @@
 #include "player.h"
 #include "bouncepad.h"     /* Bouncepad, BOUNCEPAD_VY — for bouncepad landing collision */
 #include "float_platform.h"/* FloatPlatform — for one-way landing collision             */
+#include "bridge.h"        /* Bridge — for one-way landing collision on bridges         */
 #include "game.h"          /* GAME_W, GAME_H, FLOOR_Y, GRAVITY (physics and clamping)  */
 
 /* ------------------------------------------------------------------ */
@@ -480,6 +481,7 @@ void player_update(Player *player, float dt,
                    const FloatPlatform *float_platforms, int float_platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
                    const VineDecor *vines, int vine_count,
+                   const Bridge *bridges, int bridge_count,
                    const int *sea_gaps, int sea_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
@@ -742,6 +744,33 @@ void player_update(Player *player, float dt,
                         *out_fp_landed_idx = prev_fp_landed_idx;
                     }
                 }
+            }
+        }
+    }
+
+    /*
+     * Bridge collision — same one-way crossing test as static platforms.
+     * Only land if the brick under the player's centre is still solid
+     * (not already falling or deactivated).
+     */
+    if (!player->on_ground && player->vy >= 0.0f) {
+        const float bottom = player->y + player->h - FLOOR_SINK;
+        float pcx = player->x + player->w / 2.0f;
+
+        for (int i = 0; i < bridge_count; i++) {
+            const Bridge *br = &bridges[i];
+
+            int h_overlap = (player->x + player->w - PHYS_PAD_X > br->x) &&
+                            (player->x + PHYS_PAD_X < br->x + br->brick_count * BRIDGE_TILE_W);
+            if (!h_overlap) continue;
+
+            if (!bridge_has_solid_at(br, pcx)) continue;
+
+            if (prev_bottom <= br->base_y && bottom >= br->base_y) {
+                player->y         = br->base_y - player->h + FLOOR_SINK;
+                player->vy        = 0.0f;
+                player->on_ground = 1;
+                break;
             }
         }
     }
