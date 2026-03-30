@@ -56,10 +56,11 @@ void player_init(Player *player, SDL_Renderer *renderer);
 
 ```c
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
-                         SDL_GameController *ctrl);
+                         SDL_GameController *ctrl,
+                         const VineDecor *vines, int vine_count);
 ```
 
-Called **once per frame** before `player_update`. Uses `SDL_GetKeyboardState` to read the instantaneous keyboard state (held keys), not events. This gives smooth, continuous movement. The `ctrl` parameter is the active gamepad handle; pass `NULL` when no controller is connected — keyboard input still works normally.
+Called **once per frame** before `player_update`. Uses `SDL_GetKeyboardState` to read the instantaneous keyboard state (held keys), not events. This gives smooth, continuous movement. The `ctrl` parameter is the active gamepad handle; pass `NULL` when no controller is connected — keyboard input still works normally. The `vines` array is used for vine grab detection when the player presses UP.
 
 ### Key Bindings
 
@@ -67,11 +68,14 @@ Called **once per frame** before `player_update`. Uses `SDL_GetKeyboardState` to
 |--------|--------|
 | Left Arrow / A | Move left (`vx -= speed`), `facing_left = 1` |
 | Right Arrow / D | Move right (`vx += speed`), `facing_left = 0` |
-| D-Pad `←` | Move left (gamepad) |
-| D-Pad `→` | Move right (gamepad) |
+| Up Arrow / W | Grab nearest vine / climb up on vine |
+| Down Arrow / S | Climb down on vine |
+| D-Pad `←` / `→` | Move left / right (gamepad) |
+| D-Pad `↑` / `↓` | Grab vine / climb up / climb down (gamepad) |
 | Left analog stick (X-axis) | Move left / right (dead-zone: 8000 / 32767) |
-| Space | Jump (only when `on_ground == 1`) |
-| `A` button / Cross (gamepad) | Jump (only when `on_ground == 1`) |
+| Left analog stick (Y-axis) | Climb up / down on vine (gamepad) |
+| Space | Jump (ground: `-325` px/s impulse; vine dismount: `-500` px/s impulse) |
+| `A` button / Cross (gamepad) | Jump |
 | ESC | Quit (handled in `game_loop`, not here) |
 | `Start` button (gamepad) | Quit (handled in `game_loop`, not here) |
 
@@ -83,15 +87,28 @@ if (ctrl) {
     want_jump |= SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A);
 }
 if (player->on_ground && want_jump) {
-    player->vy        = -500.0f;   // upward impulse (negative = up in SDL)
+    player->vy        = -325.0f;   // upward impulse (negative = up in SDL)
     player->on_ground  = 0;
     if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
 }
 ```
 
-- Jump impulse is `-500.0f` px/s (upward).
+- Ground jump impulse is `-325.0f` px/s (upward).
+- Vine dismount jump is `-500.0f` px/s (stronger impulse for vine escape).
 - `on_ground` is set to `0` immediately so the jump condition fires only once.
 - The sound is guarded by `if (snd_jump)` to tolerate a failed WAV load.
+
+### Vine Climbing
+
+When the player presses UP (and is not holding Space), the input handler searches for the nearest vine within grab range (`VINE_W + 2 × VINE_GRAB_PAD = 24 px` wide). If found:
+
+1. `player->on_vine = 1`, `player->vine_index` is set to the vine's index.
+2. The player snaps horizontally to centre on the vine.
+3. Gravity is disabled while `on_vine == 1`.
+4. UP/DOWN keys control vertical movement at `CLIMB_SPEED` (80 px/s).
+5. LEFT/RIGHT keys allow horizontal drift at `CLIMB_H_SPEED` (80 px/s).
+6. Pressing Space while on a vine triggers a dismount: `on_vine = 0`, `vy = -500.0f`.
+7. The `ANIM_CLIMB` state plays (row 4, 2 frames at 100 ms each); the animation freezes when the player is stationary on the vine.
 
 ### Horizontal velocity reset
 
@@ -104,11 +121,21 @@ if (player->on_ground && want_jump) {
 ```c
 void player_update(Player *player, float dt,
                    const Platform *platforms, int platform_count,
+                   const FloatPlatform *float_platforms, int float_platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
-                   int *out_bounce_idx);
+                   const VineDecor *vines, int vine_count,
+                   const Bridge *bridges, int bridge_count,
+                   const int *sea_gaps, int sea_gap_count,
+                   int *out_bounce_idx,
+                   int *out_fp_landed_idx,
+                   int prev_fp_landed_idx);
 ```
 
-`dt` is the time in **seconds** since the last frame (e.g. `0.016` for 60 FPS). Multiplying speed by `dt` makes movement frame-rate independent. The `platforms` array and `platform_count` are used to resolve one-way platform landings in addition to the main floor collision. The `bouncepads` array and `bouncepad_count` are used for bouncepad landing detection — if the player lands on a bouncepad, `*out_bounce_idx` is set to that pad's index; callers should initialise it to `-1` before the call. The caller (`game_loop`) then triggers the pad's release animation and plays the spring sound.
+`dt` is the time in **seconds** since the last frame (e.g. `0.016` for 60 FPS). Multiplying speed by `dt` makes movement frame-rate independent. The function resolves collisions against the floor, one-way platforms, float platforms, bridges, bouncepads, and vines.
+
+- `*out_bounce_idx` is set to the bouncepad index if the player lands on one; callers initialise to `-1`.
+- `*out_fp_landed_idx` is set to the float platform index if the player lands on one; used to drive the crumble timer and nudge the player along with moving rail platforms.
+- `prev_fp_landed_idx` is the float platform the player was standing on last frame — needed for the "stay on" check when a platform moves upward.
 
 ### Gravity
 
@@ -173,7 +200,9 @@ Called at the end of `player_update`. Selects the correct `AnimState` based on p
 
 ```c
 AnimState target;
-if (!player->on_ground) {
+if (player->on_vine) {
+    target = ANIM_CLIMB;
+} else if (!player->on_ground) {
     target = (player->vy < 0.0f) ? ANIM_JUMP : ANIM_FALL;
 } else if (player->vx != 0.0f) {
     target = ANIM_WALK;
@@ -184,10 +213,13 @@ if (!player->on_ground) {
 
 | Condition | Selected State |
 |-----------|---------------|
+| Climbing a vine (`on_vine == 1`) | `ANIM_CLIMB` |
 | Airborne + moving up (`vy < 0`) | `ANIM_JUMP` |
 | Airborne + moving down (`vy ≥ 0`) | `ANIM_FALL` |
 | On ground + horizontal velocity | `ANIM_WALK` |
 | On ground + no movement | `ANIM_IDLE` |
+
+> **Climb freeze:** When `ANIM_CLIMB` is active but the player has zero vertical velocity (stationary on vine), the animation timer is paused — the climb sprite holds its current frame.
 
 ### Frame Timer
 
@@ -210,6 +242,7 @@ Leftover time carries into the next frame to keep animation speed accurate acros
 | `ANIM_WALK` | 1 | 4 | 100 | 400 ms |
 | `ANIM_JUMP` | 2 | 2 | 150 | 300 ms |
 | `ANIM_FALL` | 3 | 1 | 200 | 200 ms |
+| `ANIM_CLIMB` | 4 | 2 | 100 | 200 ms |
 
 ### Source Rect Update
 
@@ -264,8 +297,8 @@ Returns an `SDL_Rect` representing the player's tightly-inset physics hitbox in 
 
 | Inset | Constant | Value | Effect |
 |-------|----------|-------|--------|
-| Left & Right | `PHYS_PAD_X` | `12` px | Physics width = 48 - 24 = 24 px |
-| Top | `PHYS_PAD_TOP` | `6` px | Physics top tracks the character's head |
+| Left & Right | `PHYS_PAD_X` | `15` px | Physics width = 48 - 30 = 18 px |
+| Top | `PHYS_PAD_TOP` | `18` px | Physics top tracks the character's head |
 | Bottom | `FLOOR_SINK` | `16` px | Physics bottom tracks the character's feet |
 
 ```c
@@ -321,7 +354,11 @@ Resets the player's position and state to the starting values **without reloadin
 |----------|-------|----------|
 | `GRAVITY` | `800.0f` px/s² | `game.h` |
 | `FLOOR_Y` | `252` px | `game.h` (`GAME_H - TILE_SIZE`) |
-| Jump impulse `vy` | `-500.0f` px/s | `player.c` (hard-coded) |
+| Jump impulse `vy` (ground) | `-325.0f` px/s | `player.c` (hard-coded) |
+| Jump impulse `vy` (vine dismount) | `-500.0f` px/s | `player.c` (hard-coded) |
+| `CLIMB_SPEED` | `80.0f` px/s | `player.c` (local `#define`) |
+| `CLIMB_H_SPEED` | `80.0f` px/s | `player.c` (local `#define`) |
+| `VINE_GRAB_PAD` | `4` px | `player.c` (local `#define`) |
 | Horizontal speed | `160.0f` px/s | `player.c` (`player->speed`) |
 | `FLOOR_SINK` | `16` px | `player.c` (local `#define`) |
 | `FRAME_W` / `FRAME_H` | `48` px | `player.c` (local `#define`) |
