@@ -58,8 +58,8 @@ void platforms_init(Platform *platforms, int *count) {
 
     /* ── Screen 2 ──────────────────────────────────────────────────── */
 
-    /* Pillar 3: medium */
-    platforms[2].x = 500.0f;
+    /* Pillar 3: medium, pulled 48 px left from screen-2 centre */
+    platforms[2].x = 452.0f;
     platforms[2].y = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);
     platforms[2].w = TILE_SIZE;
     platforms[2].h = 2 * TILE_SIZE;
@@ -92,11 +92,11 @@ void platforms_init(Platform *platforms, int *count) {
     platforms[6].w = TILE_SIZE;
     platforms[6].h = 2 * TILE_SIZE;
 
-    /* Pillar 8: tall */
+    /* Pillar 8: medium (same height as pillar 7) */
     platforms[7].x = 1480.0f;
-    platforms[7].y = (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
+    platforms[7].y = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);
     platforms[7].w = TILE_SIZE;
-    platforms[7].h = 3 * TILE_SIZE;
+    platforms[7].h = 2 * TILE_SIZE;
 
     *count = 8;
 }
