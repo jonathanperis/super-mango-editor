@@ -11,6 +11,7 @@
 #include "platform.h"      /* Platform, MAX_PLATFORMS — needed for player_update signature */
 #include "bouncepad.h"     /* Bouncepad — needed for player_update signature */
 #include "float_platform.h"/* FloatPlatform — needed for player_update signature */
+#include "bridge.h"        /* Bridge — needed for player_update signature */
 #include "vine.h"          /* VineDecor — needed for climbing input + update  */
 
 /*
@@ -82,6 +83,7 @@ void player_update(Player *player, float dt,
                    const FloatPlatform *float_platforms, int float_platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
                    const VineDecor *vines, int vine_count,
+                   const Bridge *bridges, int bridge_count,
                    const int *sea_gaps, int sea_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
