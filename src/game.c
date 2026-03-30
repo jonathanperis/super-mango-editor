@@ -445,7 +445,7 @@ static void level_reset(GameState *gs, int *fp_prev_riding) {
  * the hit SFX is played, and hearts are decremented.  If hearts reach
  * zero the lives/game-over cascade runs and level_reset is called.
  */
-static void apply_damage(GameState *gs, int *fp_prev_riding,
+static void apply_damage(GameState *gs,
                          int amount, int push,
                          float src_cx, float src_cy) {
     if (push) {
@@ -478,31 +478,25 @@ static void apply_damage(GameState *gs, int *fp_prev_riding,
         }
         if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
         gs->hearts = MAX_HEARTS;
-        level_reset(gs, fp_prev_riding);
+        level_reset(gs, &gs->fp_prev_riding);
     }
 }
 
 /* ------------------------------------------------------------------ */
 
-void game_loop(GameState *gs) {
-    /*
-     * frame_ms — how many milliseconds one frame should take at TARGET_FPS.
-     * e.g. 1000ms / 60fps ≈ 16ms per frame.
-     * Used as a manual frame cap fallback if VSync is not active.
-     */
+/*
+ * game_loop_frame — Execute one frame of the game loop.
+ *
+ * Extracted from game_loop so it can be called either in a blocking
+ * while loop (native) or as an emscripten_set_main_loop_arg callback
+ * (WebAssembly).  The void* parameter is cast back to GameState*.
+ */
+static void game_loop_frame(void *arg) {
+    GameState *gs = (GameState *)arg;
+
     const Uint32 frame_ms = 1000 / TARGET_FPS;
 
-    /* Record the timestamp at the start of the very first frame */
-    Uint64 prev = SDL_GetTicks64();
-
-    /*
-     * fp_prev_riding — index of the float platform the player was standing on
-     * during the previous frame, or -1 if none.  Persists across loop iterations
-     * so player_update can use it for the stay-on check when a platform moves up.
-     */
-    int fp_prev_riding = -1;
-
-    while (gs->running) {
+    {
         /*
          * Delta time (dt) — seconds elapsed since the previous frame.
          * SDL_GetTicks64() returns milliseconds since SDL was initialised.
@@ -510,8 +504,8 @@ void game_loop(GameState *gs) {
          * We multiply velocities by dt so movement is frame-rate independent.
          */
         Uint64 now = SDL_GetTicks64();
-        float  dt  = (float)(now - prev) / 1000.0f;
-        prev = now;
+        float  dt  = (float)(now - gs->loop_prev_ticks) / 1000.0f;
+        gs->loop_prev_ticks = now;
 
         /*
          * Delta-time guard — cap to 100 ms (≈ 10 fps minimum).
@@ -604,7 +598,7 @@ void game_loop(GameState *gs) {
                 } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
                     gs->paused = 0;
                     Mix_ResumeMusic();
-                    prev = SDL_GetTicks64();
+                    gs->loop_prev_ticks = SDL_GetTicks64();
                 }
             }
         }
@@ -665,7 +659,7 @@ void game_loop(GameState *gs) {
                       gs->spike_platforms, gs->spike_platform_count,
                       gs->sea_gaps, gs->sea_gap_count,
                       &bounce_idx, &fp_landed_idx,
-                      fp_prev_riding);
+                      gs->fp_prev_riding);
 
         /*
          * Bouncepad landing response: start the release animation and play
@@ -720,7 +714,7 @@ void game_loop(GameState *gs) {
                     /* Play the dive/splash SFX */
                     if (gs->snd_dive) Mix_PlayChannel(-1, gs->snd_dive, 0);
                     /* Sea gap is always lethal — drain all remaining hearts, no push */
-                    apply_damage(gs, &fp_prev_riding, gs->hearts, 0, 0.0f, 0.0f);
+                    apply_damage(gs, gs->hearts, 0, 0.0f, 0.0f);
                     break;
                 }
             }
@@ -774,12 +768,12 @@ void game_loop(GameState *gs) {
         }
 
         /*
-         * Update fp_prev_riding so next frame's player_update knows which
+         * Update gs->fp_prev_riding so next frame's player_update knows which
          * float platform (if any) the player is currently standing on.
          * Reset to -1 whenever the game resets so the stay-on check doesn't
          * reference a stale index after a respawn.
          */
-        fp_prev_riding = fp_landed_idx;
+        gs->fp_prev_riding = fp_landed_idx;
 
         /*
          * Bridge landing check — detect if the player is standing on any
@@ -847,7 +841,7 @@ void game_loop(GameState *gs) {
                     if (gs->debug_mode) debug_log(&gs->debug, "HIT spider[%d]", i);
                     float sx = shit.x + shit.w * 0.5f;
                     float sy = shit.y + shit.h * 0.5f;
-                    apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                    apply_damage(gs, 1, 1, sx, sy);
                     break;
                 }
             }
@@ -866,7 +860,7 @@ void game_loop(GameState *gs) {
                         if (gs->debug_mode) debug_log(&gs->debug, "HIT jspider[%d]", i);
                         float sx = jhit.x + jhit.w * 0.5f;
                         float sy = jhit.y + jhit.h * 0.5f;
-                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        apply_damage(gs, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -880,7 +874,7 @@ void game_loop(GameState *gs) {
                         if (gs->debug_mode) debug_log(&gs->debug, "HIT bird[%d]", i);
                         float sx = bhit.x + bhit.w * 0.5f;
                         float sy = bhit.y + bhit.h * 0.5f;
-                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        apply_damage(gs, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -894,7 +888,7 @@ void game_loop(GameState *gs) {
                         if (gs->debug_mode) debug_log(&gs->debug, "HIT fbird[%d]", i);
                         float sx = fbhit.x + fbhit.w * 0.5f;
                         float sy = fbhit.y + fbhit.h * 0.5f;
-                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        apply_damage(gs, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -908,7 +902,7 @@ void game_loop(GameState *gs) {
                         if (gs->debug_mode) debug_log(&gs->debug, "HIT fish[%d]", i);
                         float sx = fhit.x + fhit.w * 0.5f;
                         float sy = fhit.y + fhit.h * 0.5f;
-                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        apply_damage(gs, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -923,7 +917,7 @@ void game_loop(GameState *gs) {
                         if (gs->debug_mode) debug_log(&gs->debug, "HIT ffish[%d]", i);
                         float sx = ffhit.x + ffhit.w * 0.5f;
                         float sy = ffhit.y + ffhit.h * 0.5f;
-                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        apply_damage(gs, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -945,7 +939,7 @@ void game_loop(GameState *gs) {
                         if (gs->debug_mode) debug_log(&gs->debug, "HIT spike[%d]", i);
                         float sx = sbhit.x + sbhit.w * 0.5f;
                         float sy = sbhit.y + sbhit.h * 0.5f;
-                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        apply_damage(gs, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -966,7 +960,7 @@ void game_loop(GameState *gs) {
                         if (gs->debug_mode) debug_log(&gs->debug, "HIT axe[%d]", i);
                         float sx = ahit.x + ahit.w * 0.5f;
                         float sy = ahit.y + ahit.h * 0.5f;
-                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        apply_damage(gs, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -986,7 +980,7 @@ void game_loop(GameState *gs) {
                         if (gs->debug_mode) debug_log(&gs->debug, "HIT saw[%d]", i);
                         float sx = shit.x + shit.w * 0.5f;
                         float sy = shit.y + shit.h * 0.5f;
-                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        apply_damage(gs, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -1007,7 +1001,7 @@ void game_loop(GameState *gs) {
                         if (gs->debug_mode) debug_log(&gs->debug, "HIT blue_flame[%d]", i);
                         float sx = fhit.x + fhit.w * 0.5f;
                         float sy = fhit.y + fhit.h * 0.5f;
-                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        apply_damage(gs, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -1027,7 +1021,7 @@ void game_loop(GameState *gs) {
                         SDL_Rect sr = spike_row_get_rect(&gs->spike_rows[i]);
                         float sx = sr.x + sr.w * 0.5f;
                         float sy = sr.y + sr.h * 0.5f;
-                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        apply_damage(gs, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -1049,7 +1043,7 @@ void game_loop(GameState *gs) {
                         if (gs->debug_mode) debug_log(&gs->debug, "HIT spike_plat[%d]", i);
                         float sx = spr.x + spr.w * 0.5f;
                         float sy = spr.y + spr.h * 0.5f;
-                        apply_damage(gs, &fp_prev_riding, 1, 1, sx, sy);
+                        apply_damage(gs, 1, 1, sx, sy);
                         break;
                     }
                 }
@@ -1467,11 +1461,50 @@ void game_loop(GameState *gs) {
          * (e.g. VSync is off), sleep for the remaining time.
          * SDL_Delay sleeps the CPU so we don't burn 100% for no reason.
          */
+        /*
+         * Manual frame cap fallback (native only — Emscripten controls timing).
+         */
+#ifndef __EMSCRIPTEN__
         Uint64 elapsed = SDL_GetTicks64() - now;
         if (elapsed < frame_ms) {
             SDL_Delay((Uint32)(frame_ms - elapsed));
         }
+#endif
     }
+}
+
+/* ------------------------------------------------------------------ */
+
+/*
+ * game_loop — Run the game until gs->running becomes 0.
+ *
+ * On native platforms this is a blocking while loop.
+ * On Emscripten (WebAssembly) we hand control to the browser's
+ * requestAnimationFrame via emscripten_set_main_loop_arg, which
+ * calls game_loop_frame once per vsync.
+ */
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
+void game_loop(GameState *gs) {
+    gs->loop_prev_ticks = SDL_GetTicks64();
+    gs->fp_prev_riding  = -1;
+
+#ifdef __EMSCRIPTEN__
+    /*
+     * emscripten_set_main_loop_arg — register a per-frame callback.
+     *   arg 1: callback function (receives void* user data)
+     *   arg 2: user data pointer (our GameState)
+     *   arg 3: target FPS (0 = use requestAnimationFrame, recommended)
+     *   arg 4: simulate_infinite_loop (1 = never return from this call)
+     */
+    emscripten_set_main_loop_arg(game_loop_frame, gs, 0, 1);
+#else
+    while (gs->running) {
+        game_loop_frame(gs);
+    }
+#endif
 }
 
 /* ------------------------------------------------------------------ */

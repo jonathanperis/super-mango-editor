@@ -119,14 +119,55 @@ jobs:
           retention-days: 1
 
   # ────────────────────────────────────────────────────────────────────────────
+  # WEBASSEMBLY BUILD JOB
+  # Compiles the game to WebAssembly using Emscripten on Ubuntu.
+  # Produces super-mango.html, .js, .wasm, and .data (bundled assets).
+  # ────────────────────────────────────────────────────────────────────────────
+  build-wasm:
+    name: Build (WebAssembly)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # Install Emscripten SDK — provides emcc, the C-to-WebAssembly compiler.
+      # SDL2 ports are compiled from source by Emscripten automatically when
+      # the -s USE_SDL=2 flags are used.
+      - name: Install Emscripten SDK
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+
+      - name: Verify Emscripten
+        run: emcc --version
+
+      # Build the WebAssembly version using the 'web' Makefile target.
+      # Assets are bundled into the .data file via --preload-file.
+      - name: Build WebAssembly
+        run: make web
+
+      - name: Upload WebAssembly build
+        uses: actions/upload-artifact@v4
+        with:
+          name: super-mango-wasm
+          path: |
+            out/super-mango.html
+            out/super-mango.js
+            out/super-mango.wasm
+            out/super-mango.data
+          if-no-files-found: error
+          retention-days: 1
+
+  # ────────────────────────────────────────────────────────────────────────────
   # RELEASE JOB
   # Runs ONLY when a commit is pushed to main (not on pull_request events).
-  # Waits for all three build matrix legs to succeed, then creates a GitHub
-  # Release tagged v0.0.<run_number> with all platform binaries attached.
+  # Waits for all build jobs to succeed, then creates a GitHub Release
+  # tagged v0.0.<run_number> with all platform binaries attached.
   # ────────────────────────────────────────────────────────────────────────────
   release:
     name: Create Release
-    needs: build
+    needs: [build, build-wasm]
     # Guard: skip this job entirely for pull_request events and non-main pushes.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -157,9 +198,13 @@ jobs:
           name: super-mango-windows-x86_64
           path: dist/windows/
 
-      # Rename the Linux and macOS binaries to unique filenames.
-      # The Windows artifact already contains the .exe and its SDL2 DLLs;
-      # we zip the whole windows directory so they stay together in one file.
+      - name: Download WebAssembly build
+        uses: actions/download-artifact@v4
+        with:
+          name: super-mango-wasm
+          path: dist/wasm/
+
+      # Rename platform binaries and zip bundles for release upload.
       - name: Prepare release assets
         run: |
           mv dist/linux/super-mango  dist/super-mango-linux-x86_64
@@ -168,6 +213,8 @@ jobs:
           cd dist/windows
           mv super-mango super-mango.exe
           zip -r ../super-mango-windows-x86_64.zip .
+          cd ../wasm
+          zip -r ../super-mango-wasm.zip .
 
       # Create the GitHub Release. The tag is auto-created by the action.
       # softprops/action-gh-release picks up GITHUB_TOKEN automatically.
@@ -186,10 +233,12 @@ jobs:
             | Linux x86_64    | `super-mango-linux-x86_64`            | Run from repo root                 |
             | macOS arm64     | `super-mango-macos-arm64`             | Run from repo root                 |
             | Windows x86_64  | `super-mango-windows-x86_64.zip`      | Extract zip; SDL2 DLLs are included|
+            | WebAssembly     | `super-mango-wasm.zip`                | Serve with any HTTP server         |
 
-            > **Note:** Always run the binary from the repository root so it can find the `assets/` folder.
+            > **Note:** Native binaries must be run from the repository root so they can find the `assets/` folder. The WebAssembly build bundles assets into the `.data` file.
           files: |
             dist/super-mango-linux-x86_64
             dist/super-mango-macos-arm64
             dist/super-mango-windows-x86_64.zip
+            dist/super-mango-wasm.zip
           fail_on_unmatched_files: true
