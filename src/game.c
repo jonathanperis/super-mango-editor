@@ -491,6 +491,7 @@ static void level_reset(GameState *gs, int *fp_prev_riding) {
     fish_init(gs->fish, &gs->fish_count);
     spike_blocks_init(gs->spike_blocks, &gs->spike_block_count, gs->rails);
     float_platforms_init(gs->float_platforms, &gs->float_platform_count, gs->rails);
+    bridges_init(gs->bridges, &gs->bridge_count);
     *fp_prev_riding = -1;
 }
 
