@@ -106,6 +106,50 @@ void start_menu_loop(StartMenu *menu) {
             }
         }
 
+        /*
+         * Draw hint text below centre: tells the user how to launch the game.
+         * Rendered in a dim grey so it doesn't compete with the title.
+         */
+        {
+            SDL_Color grey = {160, 160, 160, 255};
+            const char *hint = "run with: make run-sandbox";
+            SDL_Surface *surf = TTF_RenderText_Solid(menu->font, hint, grey);
+            if (surf) {
+                SDL_Texture *tex = SDL_CreateTextureFromSurface(menu->renderer, surf);
+                if (tex) {
+                    SDL_Rect dst = {
+                        (MENU_GAME_W - surf->w) / 2,
+                        (MENU_GAME_H - surf->h) / 2 + 20,
+                        surf->w,
+                        surf->h
+                    };
+                    SDL_RenderCopy(menu->renderer, tex, NULL, &dst);
+                    SDL_DestroyTexture(tex);
+                }
+                SDL_FreeSurface(surf);
+            }
+        }
+
+        {
+            SDL_Color grey = {160, 160, 160, 255};
+            const char *hint2 = "or: make run-sandbox-debug";
+            SDL_Surface *surf = TTF_RenderText_Solid(menu->font, hint2, grey);
+            if (surf) {
+                SDL_Texture *tex = SDL_CreateTextureFromSurface(menu->renderer, surf);
+                if (tex) {
+                    SDL_Rect dst = {
+                        (MENU_GAME_W - surf->w) / 2,
+                        (MENU_GAME_H - surf->h) / 2 + 34,
+                        surf->w,
+                        surf->h
+                    };
+                    SDL_RenderCopy(menu->renderer, tex, NULL, &dst);
+                    SDL_DestroyTexture(tex);
+                }
+                SDL_FreeSurface(surf);
+            }
+        }
+
         SDL_RenderPresent(menu->renderer);
 
         /* Cap at ~60 FPS to avoid burning CPU */
