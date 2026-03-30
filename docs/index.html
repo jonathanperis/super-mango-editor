@@ -399,7 +399,7 @@
     <div class="game-wrapper pixel-border">
       <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
       <p id="game-status">
-        <button id="play-btn" onclick="startGame()">Start Game</button>
+        <button id="play-btn" onclick="startGame()">Play (~43 MB)</button>
       </p>
       <div class="game-controls">
         <kbd>WASD</kbd> / <kbd>Arrows</kbd> Move &nbsp;&middot;&nbsp;
@@ -545,8 +545,8 @@
   <!-- ── Emscripten game loader ─────────────────────────────────── -->
   <script>
     /*
-     * Game loading is deferred behind a "Start Game" button so the page
-     * loads instantly and the ~40 MB .data file is only fetched on demand.
+     * Game loading is deferred behind a "Play" button so the page loads
+     * instantly and the ~43 MB .data file is only fetched on demand.
      */
     var Module;
 
@@ -559,6 +559,8 @@
       statusEl.innerHTML = '<span class="spinner"></span>Downloading game data...';
 
       Module = {
+        /* Launch directly into the sandbox gameplay phase (skip start menu). */
+        arguments: ['--sandbox'],
         canvas: (function() {
           var c = document.getElementById('canvas');
           c.addEventListener('webglcontextlost', function(e) {
@@ -593,7 +595,7 @@
         statusEl.innerHTML = 'Failed to load game files. Try refreshing the page.';
         btn.style.display = 'inline-block';
         btn.disabled = false;
-        btn.textContent = 'Retry';
+        btn.textContent = 'Retry (~43 MB)';
       };
       document.body.appendChild(script);
     }
