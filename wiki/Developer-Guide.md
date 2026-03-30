@@ -244,7 +244,7 @@ TTF_CloseFont(font);
 Always draw in painter's algorithm order (back to front):
 
 ```
-1.  Background        (parallax_render: 6 layers from assets/parallax/)
+1.  Background        (parallax_render: 7 layers from assets/parallax/)
 2.  Platforms         (Grass_Oneway.png 9-slice pillar stacks — before floor so pillars sink into ground)
 3.  Floor tiles       (Grass_Tileset.png 9-slice at FLOOR_Y, with sea-gap openings)
 4.  Float platforms   (Platform.png 3-slice hovering surfaces — static/crumble/rail)

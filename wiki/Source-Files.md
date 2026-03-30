@@ -235,7 +235,7 @@ Creates all runtime resources in this order:
 4. `parallax_init(&gs->parallax, gs->renderer)` — loads multi-layer background textures (non-fatal per layer)
 5. `IMG_LoadTexture(renderer, "assets/Grass_Tileset.png")` → `gs->floor_tile`
 6. `IMG_LoadTexture(renderer, "assets/Grass_Oneway.png")` → `gs->platform_tex`
-7. `platforms_init(gs->platforms, &gs->platform_count)` — two pillar definitions
+7. `platforms_init(gs->platforms, &gs->platform_count)` — 8 pillar definitions
 8. `water_init(&gs->water, gs->renderer)` — loads Water.png and resets scroll
 9. `IMG_LoadTexture(renderer, "assets/Spider_1.png")` → `gs->spider_tex`
 10. `spiders_init(gs->spiders, &gs->spider_count)` — patrol spiders
@@ -506,12 +506,18 @@ void platforms_render(const Platform *platforms, int count,
 
 ### Platform Definitions
 
-Two pillar stacks are placed on the floor:
+Eight pillar stacks are placed across the world (2 per screen):
 
-| Platform | X | Width | Height | Top surface Y |
-|----------|---|-------|--------|---------------|
-| 0 | 80 | 48 | 96 | `FLOOR_Y - 96 = 156` |
-| 1 | 256 | 48 | 144 | `FLOOR_Y - 144 = 108` |
+| Platform | X | Height | Top surface Y | Screen |
+|----------|---|--------|---------------|--------|
+| 0 | 80 | 2 tiles (96 px) | 172 | 1 |
+| 1 | 256 | 3 tiles (144 px) | 124 | 1 |
+| 2 | 452 | 2 tiles (96 px) | 172 | 2 |
+| 3 | 680 | 3 tiles (144 px) | 124 | 2 |
+| 4 | 880 | 2 tiles (96 px) | 172 | 3 |
+| 5 | 1050 | 3 tiles (144 px) | 124 | 3 |
+| 6 | 1300 | 2 tiles (96 px) | 172 | 4 |
+| 7 | 1480 | 3 tiles (144 px) | 124 | 4 |
 
 ### 9-Slice Tile Rendering
 
@@ -575,6 +581,8 @@ Each tile is cropped from the sheet at `{ frame*48+16, 17, 16, 31 }` — extract
 | `MAX_SPIDERS` | `4` | Maximum simultaneous spiders |
 | `SPIDER_FRAMES` | `3` | Animation frames in `Spider_1.png` (192÷64 = 3) |
 | `SPIDER_FRAME_W` | `64` | Width of one frame slot in the sheet (px) |
+| `SPIDER_ART_X` | `20` | First visible col in each frame slot |
+| `SPIDER_ART_W` | `25` | Width of visible art (cols 20–44) |
 | `SPIDER_ART_Y` | `22` | First visible row in each frame slot |
 | `SPIDER_ART_H` | `10` | Height of visible art (rows 22–31) |
 | `SPIDER_SPEED` | `50.0f` | Walk speed (px/s) |
@@ -595,7 +603,8 @@ Each tile is cropped from the sheet at `{ frame*48+16, 17, 16, 31 }` — extract
 
 ```c
 void spiders_init(Spider *spiders, int *count);
-void spiders_update(Spider *spiders, int count, float dt);
+void spiders_update(Spider *spiders, int count, float dt,
+                    const int *sea_gaps, int sea_gap_count);
 void spiders_render(const Spider *spiders, int count,
                     SDL_Renderer *renderer, SDL_Texture *tex);
 ```
@@ -608,16 +617,16 @@ void spiders_render(const Spider *spiders, int count,
 
 ### Spider Definitions
 
-Two spiders patrol the ground floor:
+Two spiders patrol the ground floor, respecting sea gaps:
 
-| Spider | Patrol range | Start dir | Frame offset |
-|--------|-------------|-----------|-------------|
-| 0 | x = 20..190 | Right | 0 |
-| 1 | x = 220..370 | Left | 2 |
+| Spider | Start X | Patrol range | Start dir |
+|--------|---------|-------------|-----------|
+| 0 | 600 | 592..750 (screen 2–3, east of sea gap) | Right |
+| 1 | 1100 | 1000..1152 (screen 3–4, west of sea gap) | Left |
 
 ### Rendering
 
-The source rect crops to the art band `{ frame*48, 22, 48, 10 }`. Spiders are bottom-aligned at `FLOOR_Y` and flipped horizontally via `SDL_RenderCopyEx` when walking left (`vx < 0`).
+The source rect crops to the art band `{ frame*64, 22, 64, 10 }`. Spiders are bottom-aligned at `FLOOR_Y` and flipped horizontally via `SDL_RenderCopyEx` when walking left (`vx < 0`). The spider reverses at patrol boundaries and at sea gap edges.
 
 ---
 
@@ -872,7 +881,9 @@ Fish patrol the water lane horizontally between `patrol_x0` and `patrol_x1`, rev
 | `HUD_MARGIN` | `4` | Pixel margin from screen edges |
 | `HUD_HEART_SIZE` | `12` | Display size of each heart icon (px) |
 | `HUD_HEART_GAP` | `2` | Horizontal gap between heart icons (px) |
-| `HUD_ICON_SIZE` | `48` | Display size of the player icon (px) |
+| `HUD_ICON_W` | `16` | Display width of the player icon (px) |
+| `HUD_ICON_H` | `13` | Display height of the player icon (px) |
+| `HUD_ROW_H` | `13` | Row height for text alignment (font px) |
 
 ### `Hud` Struct Fields
 

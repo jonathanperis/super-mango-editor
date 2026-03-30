@@ -238,7 +238,7 @@ main()
 
 | Layer | What |
 |-------|------|
-| 1 | Parallax background (6 layers from `assets/parallax/`, rendered back-to-front via `parallax_render`) |
+| 1 | Parallax background (7 layers from `assets/parallax/`, rendered back-to-front via `parallax_render`) |
 | 2 | Platforms (9-slice tiled Grass_Oneway.png pillars — drawn before floor so pillars sink into ground) |
 | 3 | Floor (9-slice tiled Grass_Tileset.png with sea-gap openings) |
 | 4 | Float platforms (Platform.png 3-slice hovering surfaces — static, crumble, rail modes) |

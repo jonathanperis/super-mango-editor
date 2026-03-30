@@ -41,8 +41,8 @@ void player_init(Player *player, SDL_Renderer *renderer);
 | Load texture | `IMG_LoadTexture(renderer, "assets/Player.png")` — 192×288 sheet |
 | Frame rect | `{x=0, y=0, w=48, h=48}` — first cell (row 0, col 0) |
 | Display size | `w = h = 48` px (logical coordinates) |
-| Start position | Horizontally centered: `x = (GAME_W - 48) / 2.0f` |
-| Start Y | `FLOOR_Y - 48 + FLOOR_SINK` = `252 - 48 + 16` = `220` |
+| Start position | On pillar 0: `x = 80.0f + (TILE_SIZE - 48) / 2.0f` = `80` |
+| Start Y | `FLOOR_Y - 2*TILE_SIZE + 16 - 48 + FLOOR_SINK` = `172` (on top of 2-high pillar) |
 | Speed | `160.0f` px/s horizontal |
 | Initial velocity | `vx = vy = 0.0f` |
 | `on_ground` | `1` (starts on the floor) |
@@ -74,7 +74,7 @@ Called **once per frame** before `player_update`. Uses `SDL_GetKeyboardState` to
 | D-Pad `↑` / `↓` | Grab vine / climb up / climb down (gamepad) |
 | Left analog stick (X-axis) | Move left / right (dead-zone: 8000 / 32767) |
 | Left analog stick (Y-axis) | Climb up / down on vine (gamepad) |
-| Space | Jump (ground: `-325` px/s impulse; vine dismount: `-500` px/s impulse) |
+| Space | Jump (`-325` px/s impulse — ground and vine dismount) |
 | `A` button / Cross (gamepad) | Jump |
 | ESC | Quit (handled in `game_loop`, not here) |
 | `Start` button (gamepad) | Quit (handled in `game_loop`, not here) |
@@ -93,8 +93,8 @@ if (player->on_ground && want_jump) {
 }
 ```
 
-- Ground jump impulse is `-325.0f` px/s (upward).
-- Vine dismount jump is `-500.0f` px/s (stronger impulse for vine escape).
+- Keyboard jump impulse is `-325.0f` px/s (upward) for both ground and vine dismount.
+- Gamepad jump impulse is `-500.0f` px/s (upward) for both ground and vine dismount.
 - `on_ground` is set to `0` immediately so the jump condition fires only once.
 - The sound is guarded by `if (snd_jump)` to tolerate a failed WAV load.
 
@@ -107,7 +107,7 @@ When the player presses UP (and is not holding Space), the input handler searche
 3. Gravity is disabled while `on_vine == 1`.
 4. UP/DOWN keys control vertical movement at `CLIMB_SPEED` (80 px/s).
 5. LEFT/RIGHT keys allow horizontal drift at `CLIMB_H_SPEED` (80 px/s).
-6. Pressing Space while on a vine triggers a dismount: `on_vine = 0`, `vy = -500.0f`.
+6. Pressing Space while on a vine triggers a dismount: `on_vine = 0`, `vy = -325.0f` (keyboard) or `-500.0f` (gamepad).
 7. The `ANIM_CLIMB` state plays (row 4, 2 frames at 100 ms each); the animation freezes when the player is stationary on the vine.
 
 ### Horizontal velocity reset
@@ -188,7 +188,7 @@ if (player->y + PHYS_PAD_TOP < 0.0f) {
 }
 ```
 
-Stops upward movement when the physics top edge (`y + PHYS_PAD_TOP`) hits the canvas ceiling. `PHYS_PAD_TOP = 6` lets the transparent head-room of the sprite frame slide above `y = 0` before the physics edge triggers.
+Stops upward movement when the physics top edge (`y + PHYS_PAD_TOP`) hits the canvas ceiling. `PHYS_PAD_TOP = 18` lets the transparent head-room of the sprite frame slide above `y = 0` before the physics edge triggers.
 
 ---
 
@@ -339,7 +339,7 @@ Resets the player's position and state to the starting values **without reloadin
 
 | Action | Detail |
 |--------|--------|
-| Position | Reset to horizontal center, `FLOOR_Y` snap |
+| Position | Reset to pillar 0 (x=80), snapped to pillar top surface |
 | Velocity | `vx = vy = 0.0f` |
 | `on_ground` | `1` |
 | `hurt_timer` | `0.0f` (no invincibility) |
@@ -354,8 +354,8 @@ Resets the player's position and state to the starting values **without reloadin
 |----------|-------|----------|
 | `GRAVITY` | `800.0f` px/s² | `game.h` |
 | `FLOOR_Y` | `252` px | `game.h` (`GAME_H - TILE_SIZE`) |
-| Jump impulse `vy` (ground) | `-325.0f` px/s | `player.c` (hard-coded) |
-| Jump impulse `vy` (vine dismount) | `-500.0f` px/s | `player.c` (hard-coded) |
+| Jump impulse `vy` (keyboard) | `-325.0f` px/s | `player.c` (hard-coded) |
+| Jump impulse `vy` (gamepad) | `-500.0f` px/s | `player.c` (hard-coded) |
 | `CLIMB_SPEED` | `80.0f` px/s | `player.c` (local `#define`) |
 | `CLIMB_H_SPEED` | `80.0f` px/s | `player.c` (local `#define`) |
 | `VINE_GRAB_PAD` | `4` px | `player.c` (local `#define`) |
