@@ -30,6 +30,8 @@
 #include "rail.h"         /* Rail, RailTile — rail path system              */
 #include "spike_block.h"  /* SpikeBlock — rail-riding hazard entity          */
 #include "jumping_spider.h" /* JumpingSpider — jumping patrol enemy          */
+#include "bird.h"           /* Bird — slow sine-wave sky patrol             */
+#include "faster_bird.h"    /* FasterBird — fast sine-wave sky patrol       */
 #include "debug.h"        /* DebugOverlay — debug collision/FPS/log overlay  */
 
 /* ------------------------------------------------------------------ */
@@ -149,6 +151,12 @@ typedef struct {
     SDL_Texture  *jumping_spider_tex;  /* texture for jumping spider enemies  */
     JumpingSpider jumping_spiders[MAX_JUMPING_SPIDERS]; /* jump-patrol enemies*/
     int           jumping_spider_count; /* number of active jumping spiders   */
+    SDL_Texture  *bird_tex;    /* shared texture for Bird enemies (Bird_2.png) */
+    Bird          birds[MAX_BIRDS]; /* slow sine-wave sky patrol enemies      */
+    int           bird_count;       /* number of active birds                 */
+    SDL_Texture  *faster_bird_tex;  /* texture for FasterBird (Bird_1.png)    */
+    FasterBird    faster_birds[MAX_FASTER_BIRDS]; /* fast sky patrol enemies  */
+    int           faster_bird_count; /* number of active faster birds         */
     SDL_Texture  *fish_tex;    /* shared texture for all fish enemies          */
     Fish          fish[MAX_FISH]; /* jumping water enemy instances             */
     int           fish_count;      /* number of active fish                     */
