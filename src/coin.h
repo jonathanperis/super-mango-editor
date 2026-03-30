@@ -3,8 +3,8 @@
  *
  * Coins are small static collectibles placed on the ground and on platforms.
  * The player picks them up by walking through them (AABB overlap).
- * Each coin awards COIN_SCORE points; collecting COINS_PER_HEART coins
- * restores one heart if the player has fewer than MAX_HEARTS.
+ * Each coin awards COIN_SCORE points.  Every SCORE_PER_LIFE points the
+ * player earns a bonus life.
  */
 #pragma once
 
@@ -14,7 +14,7 @@
 #define COIN_DISPLAY_W  16     /* render width  in logical pixels          */
 #define COIN_DISPLAY_H  16     /* render height in logical pixels          */
 #define COIN_SCORE     100     /* score awarded per coin collected         */
-#define COINS_PER_HEART  3     /* coins needed to restore one heart        */
+#define SCORE_PER_LIFE 1000    /* score multiple that grants a bonus life  */
 
 /*
  * Coin — state for one coin collectible.

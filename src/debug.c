@@ -136,6 +136,17 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
         SDL_RenderDrawRect(renderer, &r);
     }
 
+    /* ---- Red stars (active only) — magenta (255, 0, 255) ------------- */
+    SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
+    for (int i = 0; i < gs->red_star_count; i++) {
+        if (!gs->red_stars[i].active) continue;
+        r = (SDL_Rect){
+            (int)gs->red_stars[i].x - cam_x, (int)gs->red_stars[i].y,
+            RED_STAR_DISPLAY_W, RED_STAR_DISPLAY_H
+        };
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
     /* ---- Spiders — red (255, 0, 0) ---------------------------------- */
     /*
      * Spider hitbox matches game.c: the visible art occupies rows 22..31
