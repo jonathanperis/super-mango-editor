@@ -172,6 +172,22 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
                            right - cam_x, jpy);
     }
 
+    /* ---- Birds — orange (255, 160, 0) -------------------------------- */
+    SDL_SetRenderDrawColor(renderer, 255, 160, 0, 255);
+    for (int i = 0; i < gs->bird_count; i++) {
+        r = bird_get_hitbox(&gs->birds[i]);
+        r.x -= cam_x;
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
+    /* ---- Faster birds — pink (255, 100, 200) ------------------------- */
+    SDL_SetRenderDrawColor(renderer, 255, 100, 200, 255);
+    for (int i = 0; i < gs->faster_bird_count; i++) {
+        r = faster_bird_get_hitbox(&gs->faster_birds[i]);
+        r.x -= cam_x;
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
     /* ---- Fish — light red (255, 50, 50) ----------------------------- */
     /*
      * fish_get_hitbox returns an inset collision box (8 px padding

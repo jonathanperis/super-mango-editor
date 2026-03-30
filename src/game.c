@@ -161,6 +161,42 @@ void game_init(GameState *gs) {
     jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
 
     /*
+     * Load the bird texture (Bird_2.png — slow bird).
+     * Non-fatal would be acceptable but birds are gameplay enemies, so fatal.
+     */
+    gs->bird_tex = IMG_LoadTexture(gs->renderer, "assets/Bird_2.png");
+    if (!gs->bird_tex) {
+        fprintf(stderr, "Failed to load Bird_2.png: %s\n", IMG_GetError());
+        SDL_DestroyTexture(gs->jumping_spider_tex);
+        SDL_DestroyTexture(gs->spider_tex);
+        SDL_DestroyTexture(gs->platform_tex);
+        SDL_DestroyTexture(gs->floor_tile);
+        parallax_cleanup(&gs->parallax);
+        SDL_DestroyRenderer(gs->renderer);
+        SDL_DestroyWindow(gs->window);
+        exit(EXIT_FAILURE);
+    }
+    birds_init(gs->birds, &gs->bird_count);
+
+    /*
+     * Load the faster bird texture (Bird_1.png — fast bird).
+     */
+    gs->faster_bird_tex = IMG_LoadTexture(gs->renderer, "assets/Bird_1.png");
+    if (!gs->faster_bird_tex) {
+        fprintf(stderr, "Failed to load Bird_1.png: %s\n", IMG_GetError());
+        SDL_DestroyTexture(gs->bird_tex);
+        SDL_DestroyTexture(gs->jumping_spider_tex);
+        SDL_DestroyTexture(gs->spider_tex);
+        SDL_DestroyTexture(gs->platform_tex);
+        SDL_DestroyTexture(gs->floor_tile);
+        parallax_cleanup(&gs->parallax);
+        SDL_DestroyRenderer(gs->renderer);
+        SDL_DestroyWindow(gs->window);
+        exit(EXIT_FAILURE);
+    }
+    faster_birds_init(gs->faster_birds, &gs->faster_bird_count);
+
+    /*
      * Load the shared fish texture. Fish live in the water lane and use
      * the same texture for all instances, just like the spider enemy.
      */
@@ -601,6 +637,8 @@ void game_loop(GameState *gs) {
                     coins_init(gs->coins, &gs->coin_count);
                     spiders_init(gs->spiders, &gs->spider_count);
                     jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
+                    birds_init(gs->birds, &gs->bird_count);
+                    faster_birds_init(gs->faster_birds, &gs->faster_bird_count);
                     fish_init(gs->fish, &gs->fish_count);
                     break;
                 }
@@ -613,6 +651,9 @@ void game_loop(GameState *gs) {
         /* Move jumping spiders: patrol + periodic jump arcs */
         jumping_spiders_update(gs->jumping_spiders, gs->jumping_spider_count, dt,
                                gs->sea_gaps, gs->sea_gap_count);
+        /* Move birds along their sine-wave patrol paths */
+        birds_update(gs->birds, gs->bird_count, dt);
+        faster_birds_update(gs->faster_birds, gs->faster_bird_count, dt);
         /* Move fish through the water lane and trigger random jump arcs */
         fish_update(gs->fish, gs->fish_count, dt);
         /* Advance each spike block along its rail path (cam_x needed for
@@ -702,6 +743,70 @@ void game_loop(GameState *gs) {
                             coins_init(gs->coins, &gs->coin_count);
                             spiders_init(gs->spiders, &gs->spider_count);
                             jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
+                            fish_init(gs->fish, &gs->fish_count);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            /* Bird collision — slow birds in the sky. */
+            if (gs->player.hurt_timer == 0.0f) {
+                for (int i = 0; i < gs->bird_count; i++) {
+                    SDL_Rect bhit = bird_get_hitbox(&gs->birds[i]);
+                    if (SDL_HasIntersection(&phit, &bhit)) {
+                        gs->player.hurt_timer = 1.5f;
+                        if (gs->snd_hit) Mix_PlayChannel(-1, gs->snd_hit, 0);
+                        gs->hearts--;
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT bird[%d] hearts=%d", i, gs->hearts);
+                        if (gs->hearts <= 0) {
+                            gs->lives--;
+                            if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
+                            if (gs->lives <= 0) {
+                                gs->lives           = DEFAULT_LIVES;
+                                gs->score           = 0;
+                                gs->coins_for_heart = 0;
+                                if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
+                            }
+                            gs->hearts = MAX_HEARTS;
+                            player_reset(&gs->player);
+                            coins_init(gs->coins, &gs->coin_count);
+                            spiders_init(gs->spiders, &gs->spider_count);
+                            jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
+                            birds_init(gs->birds, &gs->bird_count);
+                            faster_birds_init(gs->faster_birds, &gs->faster_bird_count);
+                            fish_init(gs->fish, &gs->fish_count);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            /* Faster bird collision. */
+            if (gs->player.hurt_timer == 0.0f) {
+                for (int i = 0; i < gs->faster_bird_count; i++) {
+                    SDL_Rect fbhit = faster_bird_get_hitbox(&gs->faster_birds[i]);
+                    if (SDL_HasIntersection(&phit, &fbhit)) {
+                        gs->player.hurt_timer = 1.5f;
+                        if (gs->snd_hit) Mix_PlayChannel(-1, gs->snd_hit, 0);
+                        gs->hearts--;
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT fbird[%d] hearts=%d", i, gs->hearts);
+                        if (gs->hearts <= 0) {
+                            gs->lives--;
+                            if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
+                            if (gs->lives <= 0) {
+                                gs->lives           = DEFAULT_LIVES;
+                                gs->score           = 0;
+                                gs->coins_for_heart = 0;
+                                if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
+                            }
+                            gs->hearts = MAX_HEARTS;
+                            player_reset(&gs->player);
+                            coins_init(gs->coins, &gs->coin_count);
+                            spiders_init(gs->spiders, &gs->spider_count);
+                            jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
+                            birds_init(gs->birds, &gs->bird_count);
+                            faster_birds_init(gs->faster_birds, &gs->faster_bird_count);
                             fish_init(gs->fish, &gs->fish_count);
                         }
                         break;
@@ -1049,6 +1154,12 @@ void game_loop(GameState *gs) {
         jumping_spiders_render(gs->jumping_spiders, gs->jumping_spider_count,
                                gs->renderer, gs->jumping_spider_tex, cam_x);
 
+        /* Draw birds in the sky, in front of spiders but behind the player */
+        birds_render(gs->birds, gs->bird_count,
+                     gs->renderer, gs->bird_tex, cam_x);
+        faster_birds_render(gs->faster_birds, gs->faster_bird_count,
+                            gs->renderer, gs->faster_bird_tex, cam_x);
+
         /* Draw the player sprite on top of everything */
         player_render(&gs->player, gs->renderer, cam_x);
 
@@ -1172,6 +1283,16 @@ void game_cleanup(GameState *gs) {
     if (gs->fish_tex) {
         SDL_DestroyTexture(gs->fish_tex);
         gs->fish_tex = NULL;
+    }
+
+    if (gs->faster_bird_tex) {
+        SDL_DestroyTexture(gs->faster_bird_tex);
+        gs->faster_bird_tex = NULL;
+    }
+
+    if (gs->bird_tex) {
+        SDL_DestroyTexture(gs->bird_tex);
+        gs->bird_tex = NULL;
     }
 
     if (gs->jumping_spider_tex) {
