@@ -40,10 +40,22 @@
 
 /*
  * CRUMBLE_STAND_LIMIT — seconds the player must stand continuously before the
- * platform starts falling.  1.5 s gives the player time to jump off once they
- * feel the platform begin to shake (future visual cue).
+ * platform starts falling.  0.75 s gives a brief warning window before the drop.
  */
-#define CRUMBLE_STAND_LIMIT  1.5f
+#define CRUMBLE_STAND_LIMIT  0.75f
+
+/*
+ * CRUMBLE_FALL_GRAVITY — downward acceleration during the crumble fall.
+ * Lower than the player's GRAVITY (800) to produce a smoother, floatier
+ * descent that reads as a heavy platform sinking rather than a sharp drop.
+ */
+#define CRUMBLE_FALL_GRAVITY  250.0f
+
+/*
+ * CRUMBLE_FALL_INITIAL_VY — small initial downward velocity when the fall
+ * starts, so the platform eases into motion instead of snapping from zero.
+ */
+#define CRUMBLE_FALL_INITIAL_VY  20.0f
 
 /* ---- Mode enum ----------------------------------------------------------- */
 

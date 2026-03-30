@@ -86,13 +86,13 @@ void float_platform_init(FloatPlatform *fp, FloatPlatformMode mode,
 void float_platforms_init(FloatPlatform *fps, int *count, const Rail *rails) {
     /* Platform 0 — static hover, screen 1 */
     float_platform_init(&fps[0], FLOAT_PLATFORM_STATIC,
-                        140.0f, 200.0f, 4,
+                        172.0f, 200.0f, 4,
                         0.0f,           /* stand_limit: unused for STATIC */
                         NULL, 0.0f, 0.0f);
 
     /* Platform 1 — crumble, screen 2 */
     float_platform_init(&fps[1], FLOAT_PLATFORM_CRUMBLE,
-                        540.0f, 190.0f, 3,
+                        572.0f, 190.0f, 3,
                         CRUMBLE_STAND_LIMIT,
                         NULL, 0.0f, 0.0f);
 
@@ -141,7 +141,8 @@ void float_platform_update(FloatPlatform *fp, float dt, int player_on_top) {
                 if (player_on_top) {
                     fp->stand_timer += dt;
                     if (fp->stand_timer >= fp->stand_limit) {
-                        fp->falling = 1;
+                        fp->falling  = 1;
+                        fp->fall_vy  = CRUMBLE_FALL_INITIAL_VY;
                     }
                 } else {
                     /*
@@ -153,11 +154,11 @@ void float_platform_update(FloatPlatform *fp, float dt, int player_on_top) {
                 }
             } else {
                 /*
-                 * Free-fall: accelerate downward at GRAVITY px/s², move y,
-                 * then deactivate once 64 px below the logical canvas so the
-                 * platform completes its exit animation before disappearing.
+                 * Smooth fall: accelerate at CRUMBLE_FALL_GRAVITY (much
+                 * gentler than player GRAVITY) so the platform sinks
+                 * gradually before picking up speed.
                  */
-                fp->fall_vy += GRAVITY * dt;
+                fp->fall_vy += CRUMBLE_FALL_GRAVITY * dt;
                 fp->y       += fp->fall_vy * dt;
                 if (fp->y > (float)(GAME_H + 64)) {
                     fp->active = 0;
