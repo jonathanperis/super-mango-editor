@@ -39,34 +39,34 @@
  *     Pillar 8 — tall   (3 tiles tall) at x=1480
  *
  * Jump physics note: with vy = −500 px/s, the player's apex reaches ~156 px
- * above the floor, clearing all pillars (tallest top at FLOOR_Y − 3×TILE = 108).
+ * above the floor, clearing all pillars (tallest top at FLOOR_Y − 3×TILE + 16 = 124).
  */
 void platforms_init(Platform *platforms, int *count) {
     /* ── Screen 1 ──────────────────────────────────────────────────── */
 
-    /* Pillar 1: medium (2 tiles tall) */
+    /* Pillar 1: medium (2 tiles tall), shifted 16 px into the floor */
     platforms[0].x = 80.0f;
-    platforms[0].y = (float)(FLOOR_Y - 2 * TILE_SIZE);  /* y=156 */
-    platforms[0].w = TILE_SIZE;                          /* 48 px */
-    platforms[0].h = 2 * TILE_SIZE;                      /* 96 px */
+    platforms[0].y = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);  /* y=172 */
+    platforms[0].w = TILE_SIZE;                                /* 48 px */
+    platforms[0].h = 2 * TILE_SIZE;                            /* 96 px */
 
-    /* Pillar 2: tall (3 tiles tall) */
+    /* Pillar 2: tall (3 tiles tall), shifted 16 px into the floor */
     platforms[1].x = 256.0f;
-    platforms[1].y = (float)(FLOOR_Y - 3 * TILE_SIZE);  /* y=108 */
+    platforms[1].y = (float)(FLOOR_Y - 3 * TILE_SIZE + 16);  /* y=124 */
     platforms[1].w = TILE_SIZE;
-    platforms[1].h = 3 * TILE_SIZE;                      /* 144 px */
+    platforms[1].h = 3 * TILE_SIZE;                            /* 144 px */
 
     /* ── Screen 2 ──────────────────────────────────────────────────── */
 
     /* Pillar 3: medium */
     platforms[2].x = 500.0f;
-    platforms[2].y = (float)(FLOOR_Y - 2 * TILE_SIZE);
+    platforms[2].y = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);
     platforms[2].w = TILE_SIZE;
     platforms[2].h = 2 * TILE_SIZE;
 
     /* Pillar 4: tall */
     platforms[3].x = 680.0f;
-    platforms[3].y = (float)(FLOOR_Y - 3 * TILE_SIZE);
+    platforms[3].y = (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
     platforms[3].w = TILE_SIZE;
     platforms[3].h = 3 * TILE_SIZE;
 
@@ -74,13 +74,13 @@ void platforms_init(Platform *platforms, int *count) {
 
     /* Pillar 5: medium */
     platforms[4].x = 880.0f;
-    platforms[4].y = (float)(FLOOR_Y - 2 * TILE_SIZE);
+    platforms[4].y = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);
     platforms[4].w = TILE_SIZE;
     platforms[4].h = 2 * TILE_SIZE;
 
     /* Pillar 6: tall */
     platforms[5].x = 1050.0f;
-    platforms[5].y = (float)(FLOOR_Y - 3 * TILE_SIZE);
+    platforms[5].y = (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
     platforms[5].w = TILE_SIZE;
     platforms[5].h = 3 * TILE_SIZE;
 
@@ -88,13 +88,13 @@ void platforms_init(Platform *platforms, int *count) {
 
     /* Pillar 7: medium */
     platforms[6].x = 1300.0f;
-    platforms[6].y = (float)(FLOOR_Y - 2 * TILE_SIZE);
+    platforms[6].y = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);
     platforms[6].w = TILE_SIZE;
     platforms[6].h = 2 * TILE_SIZE;
 
     /* Pillar 8: tall */
     platforms[7].x = 1480.0f;
-    platforms[7].y = (float)(FLOOR_Y - 3 * TILE_SIZE);
+    platforms[7].y = (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
     platforms[7].w = TILE_SIZE;
     platforms[7].h = 3 * TILE_SIZE;
 

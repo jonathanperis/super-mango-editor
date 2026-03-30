@@ -16,6 +16,7 @@
 #define VINE_H      32              /* content height after removing 8 px transparent padding top+bottom */
 #define VINE_SRC_Y   8              /* first pixel row with content in Vine.png */
 #define VINE_SRC_H  32              /* height of content area in Vine.png    */
+#define VINE_STEP   19              /* vertical spacing between stacked tiles */
 
 /*
  * VineDecor — world-space position and length of one hanging vine.

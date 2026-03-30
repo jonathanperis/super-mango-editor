@@ -11,6 +11,7 @@
 #include "platform.h"      /* Platform, MAX_PLATFORMS — needed for player_update signature */
 #include "bouncepad.h"     /* Bouncepad — needed for player_update signature */
 #include "float_platform.h"/* FloatPlatform — needed for player_update signature */
+#include "vine.h"          /* VineDecor — needed for climbing input + update  */
 
 /*
  * AnimState — which animation sequence is currently playing.
@@ -20,7 +21,8 @@ typedef enum {
     ANIM_IDLE = 0,  /* standing still:       sheet row 0, 4 frames */
     ANIM_WALK,      /* running left/right:   sheet row 1, 4 frames */
     ANIM_JUMP,      /* rising after a jump:  sheet row 2, 2 frames */
-    ANIM_FALL       /* falling under gravity: sheet row 3, 1 frame */
+    ANIM_FALL,      /* falling under gravity: sheet row 3, 1 frame */
+    ANIM_CLIMB      /* climbing a vine:      sheet row 4, 2 frames */
 } AnimState;
 
 /*
@@ -43,6 +45,8 @@ typedef struct {
     int       anim_frame_index; /* current frame index within the animation       */
     Uint32    anim_timer_ms;    /* ms accumulated in the current frame            */
     int       facing_left;      /* 1 = mirror sprite horizontally                 */
+    int       on_vine;          /* 1 = currently climbing a vine, 0 = normal      */
+    int       vine_index;       /* index into the vine array of the vine climbed  */
     float     hurt_timer;        /* seconds remaining of invincibility blink; 0 = normal */
     SDL_Rect     frame;   /* source rect: which part of the sheet to draw    */
     SDL_Texture *texture; /* GPU image handle; NULL until player_init runs   */
@@ -54,7 +58,8 @@ void player_init(Player *player, SDL_Renderer *renderer);
 /* Sample keyboard and gamepad every frame and set vx/vy accordingly.
  * ctrl may be NULL when no controller is connected; keyboard still works. */
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
-                         SDL_GameController *ctrl);
+                         SDL_GameController *ctrl,
+                         const VineDecor *vines, int vine_count);
 
 /*
  * Move the player by velocity × dt; resolve floor, one-way platform,
@@ -76,6 +81,8 @@ void player_update(Player *player, float dt,
                    const Platform *platforms, int platform_count,
                    const FloatPlatform *float_platforms, int float_platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
+                   const VineDecor *vines, int vine_count,
+                   const int *sea_gaps, int sea_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
                    int prev_fp_landed_idx);
