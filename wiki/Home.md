@@ -2,7 +2,7 @@
 
 > A 2D pixel art platformer written in **C11 + SDL2**, targeting macOS (Apple Silicon) but buildable on Linux and Windows.
 
-Super Mango is an intentionally minimal, heavily-commented game project designed as a **learning resource** for C + SDL2 game development. The player runs and jumps through a multi-layer parallax forest stage with one-way platforms, collectible coins, vine decorations, animated water, patrolling spider enemies, jumping fish enemies, spring-loaded bouncepads, rail-riding spike blocks, and atmospheric fog, with smooth delta-time physics, a scrolling camera, sprite sheet animation, and an optional debug overlay.
+Super Mango is an intentionally minimal, heavily-commented game project designed as a **learning resource** for C + SDL2 game development. The player runs, jumps, and climbs through a multi-layer parallax forest stage with one-way platforms, floating platforms (static/crumble/rail), crumble bridges, sea gaps, collectible coins, climbable vines, animated water, six enemy types (spiders, jumping spiders, birds, faster birds, fish, rail-riding spike blocks), spring-loaded bouncepads, and atmospheric fog, with smooth delta-time physics, a scrolling camera, sprite sheet animation, and an optional debug overlay.
 
 ---
 
@@ -75,7 +75,7 @@ super-mango-game/
     ├── coin.h              ← Coin struct + constants (MAX_COINS, COIN_SCORE, …)
     ├── coin.c              ← Coin placement, AABB collection, render
     ├── vine.h              ← VineDecor struct + MAX_VINES / VINE_W / VINE_H constants
-    ├── vine.c              ← Static vine decoration: init and render
+    ├── vine.c              ← Climbable vine: init, render, grab-zone for climbing
     ├── fish.h              ← Fish struct + patrol / jump / animation constants
     ├── fish.c              ← Jumping fish enemy: patrol, random jump arcs, render
     ├── hud.h               ← Hud struct (font + star texture) + HUD constants
@@ -86,6 +86,16 @@ super-mango-game/
     ├── rail.c              ← Rail path builder, bitmask tile render, position interpolation
     ├── spike_block.h       ← SpikeBlock struct + speed/push constants
     ├── spike_block.c       ← Rail-riding hazard: traversal, free-fall, player collision
+    ├── float_platform.h    ← FloatPlatform struct + mode enum + crumble/rail constants
+    ├── float_platform.c    ← Hovering platform: static, crumble, and rail behaviours
+    ├── bridge.h            ← Bridge/BridgeBrick structs + cascade-fall constants
+    ├── bridge.c            ← Tiled crumble walkway: init, cascade-fall, render
+    ├── jumping_spider.h    ← JumpingSpider struct + jump/patrol constants
+    ├── jumping_spider.c    ← Jumping spider enemy: patrol, jump arcs, sea-gap awareness
+    ├── bird.h              ← Bird struct + sine-wave patrol constants
+    ├── bird.c              ← Slow bird enemy: sine-wave sky patrol, animation, render
+    ├── faster_bird.h       ← FasterBird struct + aggressive patrol constants
+    ├── faster_bird.c       ← Fast bird enemy: tighter sine-wave, faster animation
     ├── debug.h             ← DebugOverlay struct + FPS/log constants
     └── debug.c             ← Debug overlay: FPS counter, collision hitboxes, event log
 ```

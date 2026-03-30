@@ -30,6 +30,7 @@
 #include "rail.h"           /* Rail, RailTile — rail path system              */
 #include "spike_block.h"    /* SpikeBlock — rail-riding hazard entity          */
 #include "float_platform.h" /* FloatPlatform — hovering/crumble/rail surfaces */
+#include "bridge.h"         /* Bridge — tiled crumble walkway                */
 #include "jumping_spider.h" /* JumpingSpider — jumping patrol enemy          */
 #include "bird.h"           /* Bird — slow sine-wave sky patrol             */
 #include "faster_bird.h"    /* FasterBird — fast sine-wave sky patrol       */
@@ -180,6 +181,9 @@ typedef struct {
     SDL_Texture  *float_platform_tex;                       /* Platform.png — 3-slice strip      */
     FloatPlatform  float_platforms[MAX_FLOAT_PLATFORMS];    /* hovering surface instances        */
     int            float_platform_count;                    /* number of float platforms placed  */
+    SDL_Texture  *bridge_tex;          /* shared texture for bridge tiles       */
+    Bridge        bridges[MAX_BRIDGES];/* tiled crumble walkway instances      */
+    int           bridge_count;        /* number of active bridges             */
     int           sea_gaps[MAX_SEA_GAPS]; /* left-edge x of each sea gap       */
     int           sea_gap_count;         /* number of active sea gaps          */
     Hud           hud;         /* HUD display: hearts, lives, score           */
