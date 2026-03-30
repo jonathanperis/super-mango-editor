@@ -38,48 +38,43 @@ void vine_init(VineDecor *vines, int *count)
     int n = 0;
 
     /*
-     * Platform layout — mirrors platform.c (local constants to avoid a
-     * circular-include dependency on the platform array at call time).
+     * Platform layout — mirrors platform.c.
      *   x : left edge of the pillar in world pixels
      *   y : top surface (landing surface) in world pixels
+     *
+     *   Index  Screen  Size    x      y
+     *     0      1     medium   80   172
+     *     1      1     tall    256   124
+     *     2      2     medium  452   172  ← rope goes here, skip vine
+     *     3      2     tall    680   124
+     *     4      3     medium  880   172
+     *     5      3     tall   1050   124
+     *     6      4     medium 1300   172
+     *     7      4     tall   1480   124
      */
     static const float plat_x[8] = {  80, 256, 452,  680,  880, 1050, 1300, 1480 };
-    static const float plat_y[8] = { 172, 124, 172,  124,  172,  124,  172,  172 };
+    static const float plat_y[8] = { 172, 124, 172,  124,  172,  124,  172,  124 };
 
     /*
-     * Randomly pick 2 or 3 platforms to receive a vine.
-     * Fisher-Yates partial shuffle on an index array selects them without
-     * repetition.
+     * Fixed vine placements — no randomness.
+     * Skip pillar 2 (x=452) because the rope is placed there.
+     *
+     * Vines on pillars: 0 (left), 1 (right), 3 (left), 5 (right), 6 (left).
      */
-    int indices[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };
-    int vine_count = 3 + rand() % 3;  /* 3, 4, or 5 platforms */
-    for (int i = 0; i < vine_count; i++) {
-        int j = i + rand() % (8 - i);
-        int tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp;
-    }
+    /* Pillar 0 (medium, x=80) — left side, 2 tiles */
+    vines[n++] = (VineDecor){ plat_x[0] + VINE_BORDER, plat_y[0], 2 };
 
-    for (int i = 0; i < vine_count && n < MAX_VINES; i++) {
-        int p = indices[i];
-        /*
-         * Tile count: capped at 2 or 3 tiles randomly — purely decorative,
-         * not required to reach the floor.
-         */
-        int tiles = 2 + rand() % 2;
+    /* Pillar 1 (tall, x=256) — right side, 3 tiles */
+    vines[n++] = (VineDecor){ plat_x[1] + TILE_SIZE - VINE_BORDER - VINE_W, plat_y[1], 3 };
 
-        /*
-         * Alternate left/right by loop index, then flip with rand() for
-         * extra variety — guarantees at least visual alternation even when
-         * rand() returns the same parity repeatedly at startup.
-         */
-        float vine_x;
-        int side = (i % 2) ^ (rand() % 2);  /* 0 = left, 1 = right */
-        if (side == 0)
-            vine_x = plat_x[p] + VINE_BORDER;
-        else
-            vine_x = plat_x[p] + TILE_SIZE - VINE_BORDER - VINE_W;
+    /* Pillar 3 (tall, x=680) — left side, 3 tiles */
+    vines[n++] = (VineDecor){ plat_x[3] + VINE_BORDER, plat_y[3], 3 };
 
-        vines[n++] = (VineDecor){ vine_x, plat_y[p], tiles };
-    }
+    /* Pillar 5 (tall, x=1050) — right side, 3 tiles */
+    vines[n++] = (VineDecor){ plat_x[5] + TILE_SIZE - VINE_BORDER - VINE_W, plat_y[5], 3 };
+
+    /* Pillar 6 (medium, x=1300) — left side, 2 tiles */
+    vines[n++] = (VineDecor){ plat_x[6] + VINE_BORDER, plat_y[6], 2 };
 
     *count = n;
 }

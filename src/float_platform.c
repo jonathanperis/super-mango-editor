@@ -90,9 +90,9 @@ void float_platforms_init(FloatPlatform *fps, int *count, const Rail *rails) {
                         0.0f,           /* stand_limit: unused for STATIC */
                         NULL, 0.0f, 0.0f);
 
-    /* Platform 1 — crumble, screen 2 */
+    /* Platform 1 — crumble, screen 2, right of the spike block rail */
     float_platform_init(&fps[1], FLOAT_PLATFORM_CRUMBLE,
-                        572.0f, 190.0f, 3,
+                        570.0f, 190.0f, 3,
                         CRUMBLE_STAND_LIMIT,
                         NULL, 0.0f, 0.0f);
 

@@ -11,6 +11,8 @@
 #include "bouncepad.h"     /* Bouncepad, BOUNCEPAD_VY — for bouncepad landing collision */
 #include "float_platform.h"/* FloatPlatform — for one-way landing collision             */
 #include "bridge.h"        /* Bridge — for one-way landing collision on bridges         */
+#include "ladder.h"        /* LadderDecor — climbable, same mechanics as vine          */
+#include "rope.h"          /* RopeDecor — climbable, same mechanics as vine            */
 #include "game.h"          /* GAME_W, GAME_H, FLOOR_Y, GRAVITY (physics and clamping)  */
 
 /* ------------------------------------------------------------------ */
@@ -117,8 +119,10 @@ void player_init(Player *player, SDL_Renderer *renderer) {
     player->facing_left      = 0;
 
     /* Not climbing at startup */
-    player->on_vine    = 0;
-    player->vine_index = 0;
+    player->on_vine      = 0;
+    player->vine_index   = 0;
+    player->climb_source = 0;
+    player->jump_held   = 0;
 
     /* Not hurt at startup; timer counts down to 0 during invincibility */
     player->hurt_timer = 0.0f;
@@ -179,9 +183,73 @@ static SDL_Rect vine_grab_rect(const VineDecor *v) {
     };
 }
 
+/*
+ * ladder_grab_rect — Return the grab zone for a ladder (same concept as vine).
+ */
+static SDL_Rect ladder_grab_rect(const LadderDecor *ld) {
+    int total_h = (ld->tile_count - 1) * LADDER_STEP + LADDER_H;
+    return (SDL_Rect){
+        (int)ld->x - VINE_GRAB_PAD,
+        (int)ld->y,
+        LADDER_W + 2 * VINE_GRAB_PAD,
+        total_h
+    };
+}
+
+/*
+ * rope_grab_rect — Return the grab zone for a rope (same concept as vine).
+ */
+static SDL_Rect rope_grab_rect(const RopeDecor *rp) {
+    int total_h = (rp->tile_count - 1) * ROPE_STEP + ROPE_H;
+    return (SDL_Rect){
+        (int)rp->x - VINE_GRAB_PAD,
+        (int)rp->y,
+        ROPE_W + 2 * VINE_GRAB_PAD,
+        total_h
+    };
+}
+
+/*
+ * climb_get_bounds — Return the grab rect, top y, and bottom y of the
+ * currently climbed object, regardless of its type (vine/ladder/rope).
+ */
+static void climb_get_bounds(const Player *player,
+                             const VineDecor *vines,
+                             const LadderDecor *ladders,
+                             const RopeDecor *ropes,
+                             SDL_Rect *out_grab, float *out_top,
+                             float *out_bottom) {
+    SDL_Rect grab = {0, 0, 0, 0};
+    float top = 0.0f, bot = 0.0f;
+    int idx = player->vine_index;
+
+    if (player->climb_source == 0) {
+        grab = vine_grab_rect(&vines[idx]);
+        int vh = (vines[idx].tile_count - 1) * VINE_STEP + VINE_H;
+        top = vines[idx].y;
+        bot = vines[idx].y + (float)vh;
+    } else if (player->climb_source == 1) {
+        grab = ladder_grab_rect(&ladders[idx]);
+        int lh = (ladders[idx].tile_count - 1) * LADDER_STEP + LADDER_H;
+        top = ladders[idx].y;
+        bot = ladders[idx].y + (float)lh;
+    } else {
+        grab = rope_grab_rect(&ropes[idx]);
+        int rh = (ropes[idx].tile_count - 1) * ROPE_STEP + ROPE_H;
+        top = ropes[idx].y;
+        bot = ropes[idx].y + (float)rh;
+    }
+
+    *out_grab   = grab;
+    *out_top    = top;
+    *out_bottom = bot;
+}
+
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                          SDL_GameController *ctrl,
-                         const VineDecor *vines, int vine_count) {
+                         const VineDecor *vines, int vine_count,
+                         const LadderDecor *ladders, int ladder_count,
+                         const RopeDecor *ropes, int rope_count) {
     /*
      * SDL_GetKeyboardState returns a pointer to an array of key states.
      * Each element is 1 if that key is currently held, 0 if not.
@@ -201,16 +269,41 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
     if (!player->on_vine && !keys[SDL_SCANCODE_SPACE] &&
         (keys[SDL_SCANCODE_UP] || keys[SDL_SCANCODE_W])) {
         SDL_Rect phit = player_get_hitbox(player);
-        for (int i = 0; i < vine_count; i++) {
+        int grabbed = 0;
+        /* Check vines */
+        for (int i = 0; i < vine_count && !grabbed; i++) {
             SDL_Rect vgrab = vine_grab_rect(&vines[i]);
             if (SDL_HasIntersection(&phit, &vgrab)) {
-                player->on_vine    = 1;
-                player->vine_index = i;
-                player->on_ground  = 0;
-                player->vy         = 0.0f;
-                player->vx         = 0.0f;
-                break;
+                player->on_vine      = 1;
+                player->vine_index   = i;
+                player->climb_source = 0;
+                grabbed = 1;
             }
+        }
+        /* Check ladders */
+        for (int i = 0; i < ladder_count && !grabbed; i++) {
+            SDL_Rect lgrab = ladder_grab_rect(&ladders[i]);
+            if (SDL_HasIntersection(&phit, &lgrab)) {
+                player->on_vine      = 1;
+                player->vine_index   = i;
+                player->climb_source = 1;
+                grabbed = 1;
+            }
+        }
+        /* Check ropes */
+        for (int i = 0; i < rope_count && !grabbed; i++) {
+            SDL_Rect rgrab = rope_grab_rect(&ropes[i]);
+            if (SDL_HasIntersection(&phit, &rgrab)) {
+                player->on_vine      = 1;
+                player->vine_index   = i;
+                player->climb_source = 2;
+                grabbed = 1;
+            }
+        }
+        if (grabbed) {
+            player->on_ground  = 0;
+            player->vy         = 0.0f;
+            player->vx         = 0.0f;
         }
     }
 
@@ -256,15 +349,19 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
         }
 
         /*
-         * Jump: Space only — only allowed while standing on the floor.
-         * Setting on_ground = 0 ensures this block only fires once per jump;
-         * subsequent frames while the key is held skip it because on_ground is 0.
-         * vy is set to a negative value (up is negative in SDL screen-space).
+         * Jump: Space only — requires on_ground AND the key was not already
+         * held from a previous jump.  jump_held prevents auto-repeat: the
+         * player must release Space and press it again to jump again.
          */
-        if (player->on_ground && keys[SDL_SCANCODE_SPACE]) {
-            player->vy        = -325.0f;
-            player->on_ground  = 0;
-            if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+        if (keys[SDL_SCANCODE_SPACE]) {
+            if (player->on_ground && !player->jump_held) {
+                player->vy         = -325.0f;
+                player->on_ground  = 0;
+                player->jump_held  = 1;
+                if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+            }
+        } else {
+            player->jump_held = 0;
         }
     }
 
@@ -291,16 +388,38 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
             !SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A) &&
             SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_UP)) {
             SDL_Rect phit = player_get_hitbox(player);
-            for (int i = 0; i < vine_count; i++) {
+            int grabbed = 0;
+            for (int i = 0; i < vine_count && !grabbed; i++) {
                 SDL_Rect vgrab = vine_grab_rect(&vines[i]);
                 if (SDL_HasIntersection(&phit, &vgrab)) {
-                    player->on_vine    = 1;
-                    player->vine_index = i;
-                    player->on_ground  = 0;
-                    player->vy         = 0.0f;
-                    player->vx         = 0.0f;
-                    break;
+                    player->on_vine      = 1;
+                    player->vine_index   = i;
+                    player->climb_source = 0;
+                    grabbed = 1;
                 }
+            }
+            for (int i = 0; i < ladder_count && !grabbed; i++) {
+                SDL_Rect lgrab = ladder_grab_rect(&ladders[i]);
+                if (SDL_HasIntersection(&phit, &lgrab)) {
+                    player->on_vine      = 1;
+                    player->vine_index   = i;
+                    player->climb_source = 1;
+                    grabbed = 1;
+                }
+            }
+            for (int i = 0; i < rope_count && !grabbed; i++) {
+                SDL_Rect rgrab = rope_grab_rect(&ropes[i]);
+                if (SDL_HasIntersection(&phit, &rgrab)) {
+                    player->on_vine      = 1;
+                    player->vine_index   = i;
+                    player->climb_source = 2;
+                    grabbed = 1;
+                }
+            }
+            if (grabbed) {
+                player->on_ground  = 0;
+                player->vy         = 0.0f;
+                player->vx         = 0.0f;
             }
         }
 
@@ -366,11 +485,15 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                 player->facing_left = 0;
             }
 
-            if (player->on_ground &&
-                SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
-                player->vy        = -500.0f;
-                player->on_ground = 0;
-                if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
+                if (player->on_ground && !player->jump_held) {
+                    player->vy         = -325.0f;
+                    player->on_ground  = 0;
+                    player->jump_held  = 1;
+                    if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+                }
+            } else {
+                player->jump_held = 0;
             }
         }
     }
@@ -481,49 +604,53 @@ void player_update(Player *player, float dt,
                    const FloatPlatform *float_platforms, int float_platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
                    const VineDecor *vines, int vine_count,
+                   const LadderDecor *ladders, int ladder_count,
+                   const RopeDecor *ropes, int rope_count,
                    const Bridge *bridges, int bridge_count,
+                   const SpikePlatform *spike_platforms, int spike_platform_count,
                    const int *sea_gaps, int sea_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
                    int prev_fp_landed_idx) {
 
-    (void)vine_count;   /* vine_index selects the vine; count unused here */
+    (void)vine_count;    /* vine_index selects the climbable; count unused here */
+    (void)ladder_count;
+    (void)rope_count;
 
-    /* ---- Vine climbing physics ----------------------------------- */
+    /* ---- Vine/ladder/rope climbing physics ----------------------- */
     /*
      * While climbing, gravity and floor/platform collisions are skipped.
      * The player moves only by the velocities set in player_handle_input.
      * Detach if the player drifts horizontally out of the grab zone or
-     * their feet drop below the vine bottom.
+     * their feet drop below the climbable bottom.
      */
     if (player->on_vine) {
         player->x += player->vx * dt;
         player->y += player->vy * dt;
 
-        const VineDecor *v = &vines[player->vine_index];
-        SDL_Rect vgrab = vine_grab_rect(v);
-        SDL_Rect phit  = player_get_hitbox(player);
+        SDL_Rect grab;
+        float climb_top, climb_bottom;
+        climb_get_bounds(player, vines, ladders, ropes,
+                         &grab, &climb_top, &climb_bottom);
+        SDL_Rect phit = player_get_hitbox(player);
 
         /* Horizontal detach — player drifted out of the grab zone */
-        if (!SDL_HasIntersection(&phit, &vgrab)) {
+        if (!SDL_HasIntersection(&phit, &grab)) {
             player->on_vine = 0;
             player->vy      = 0.0f;
             player_animate(player, (Uint32)(dt * 1000.0f));
             return;
         }
 
-        /* Vertical clamp at vine top */
-        int vine_total_h = (v->tile_count - 1) * VINE_STEP + VINE_H;
-        float vine_top = v->y;
-        if (player->y + PHYS_PAD_TOP < vine_top) {
-            player->y  = vine_top - (float)PHYS_PAD_TOP;
+        /* Vertical clamp at climbable top */
+        if (player->y + PHYS_PAD_TOP < climb_top) {
+            player->y  = climb_top - (float)PHYS_PAD_TOP;
             player->vy = 0.0f;
         }
 
-        /* Bottom detach — feet below vine bottom → release and fall */
-        float vine_bottom   = v->y + (float)vine_total_h;
+        /* Bottom detach — feet below climbable bottom → release and fall */
         float player_bottom = player->y + player->h - FLOOR_SINK;
-        if (player_bottom > vine_bottom) {
+        if (player_bottom > climb_bottom) {
             player->on_vine = 0;
             player->vy      = 0.0f;
         }
@@ -626,7 +753,7 @@ void player_update(Player *player, float dt,
              * BOUNCEPAD_VY (−875 px/s) is 75 % higher than the original
              * −500 px/s jump impulse.
              */
-            player->vy        = BOUNCEPAD_VY;
+            player->vy        = bouncepads[i].launch_vy;
             player->on_ground = 0;
             *out_bounce_idx   = i;
             bounced           = 1;
@@ -776,6 +903,30 @@ void player_update(Player *player, float dt,
     }
 
     /*
+     * Spike platform collision — same one-way crossing test as bridges.
+     * The player can land on top (solid surface) but will take damage
+     * from the spike hitbox check in game.c.
+     */
+    if (!player->on_ground && player->vy >= 0.0f) {
+        const float bottom = player->y + player->h - FLOOR_SINK;
+        for (int i = 0; i < spike_platform_count; i++) {
+            const SpikePlatform *sp = &spike_platforms[i];
+            if (!sp->active) continue;
+
+            int h_overlap = (player->x + player->w - PHYS_PAD_X > sp->x) &&
+                            (player->x + PHYS_PAD_X < sp->x + sp->w);
+            if (!h_overlap) continue;
+
+            if (prev_bottom <= sp->y && bottom >= sp->y) {
+                player->y         = sp->y - player->h + FLOOR_SINK;
+                player->vy        = 0.0f;
+                player->on_ground = 1;
+                break;
+            }
+        }
+    }
+
+    /*
      * Horizontal clamp — keep the PHYSICS body inside the logical canvas.
      * We clamp the inset edge (x + PHYS_PAD_X), not the sprite left edge,
      * so the transparent side-padding can slide off-screen while the visible
@@ -887,6 +1038,8 @@ void player_reset(Player *player) {
     player->facing_left      = 0;
     player->on_vine          = 0;
     player->vine_index       = 0;
+    player->climb_source     = 0;
+    player->jump_held        = 0;
     player->hurt_timer       = 0.0f;
 
     player->frame.x = 0;
