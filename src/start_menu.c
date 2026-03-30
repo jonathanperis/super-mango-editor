@@ -56,8 +56,14 @@ void start_menu_init(StartMenu *menu, SDL_Window *window, SDL_Renderer *renderer
 
 /* ------------------------------------------------------------------ */
 
-void start_menu_loop(StartMenu *menu) {
-    while (menu->running) {
+/*
+ * start_menu_frame — Render one frame of the start menu.
+ *
+ * Extracted so it can be used as an emscripten_set_main_loop_arg callback.
+ */
+static void start_menu_frame(void *arg) {
+    StartMenu *menu = (StartMenu *)arg;
+    {
         /* ---- Event polling ----------------------------------------- */
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
@@ -152,9 +158,27 @@ void start_menu_loop(StartMenu *menu) {
 
         SDL_RenderPresent(menu->renderer);
 
-        /* Cap at ~60 FPS to avoid burning CPU */
+        /* Cap at ~60 FPS to avoid burning CPU (native only) */
+#ifndef __EMSCRIPTEN__
         SDL_Delay(16);
+#endif
     }
+}
+
+/* ------------------------------------------------------------------ */
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
+void start_menu_loop(StartMenu *menu) {
+#ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop_arg(start_menu_frame, menu, 0, 1);
+#else
+    while (menu->running) {
+        start_menu_frame(menu);
+    }
+#endif
 }
 
 /* ------------------------------------------------------------------ */
