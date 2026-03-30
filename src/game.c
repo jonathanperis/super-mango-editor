@@ -309,6 +309,16 @@ void game_init(GameState *gs) {
     float_platforms_init(gs->float_platforms, &gs->float_platform_count, gs->rails);
 
     /*
+     * Load the bridge tile texture (Bridge.png, 16×16).
+     * Non-fatal — the game can run without it (warning only).
+     */
+    gs->bridge_tex = IMG_LoadTexture(gs->renderer, "assets/Bridge.png");
+    if (!gs->bridge_tex) {
+        fprintf(stderr, "Warning: Failed to load Bridge.png: %s\n", IMG_GetError());
+    }
+    bridges_init(gs->bridges, &gs->bridge_count);
+
+    /*
      * Load the jump sound effect. Mix_LoadWAV decodes the WAV into a
      * Mix_Chunk that can be played on any available mixer channel.
      * Assets path is relative to where the binary is run (repo root).
@@ -482,6 +492,7 @@ static void level_reset(GameState *gs, int *fp_prev_riding) {
     fish_init(gs->fish, &gs->fish_count);
     spike_blocks_init(gs->spike_blocks, &gs->spike_block_count, gs->rails);
     float_platforms_init(gs->float_platforms, &gs->float_platform_count, gs->rails);
+    bridges_init(gs->bridges, &gs->bridge_count);
     *fp_prev_riding = -1;
 }
 
@@ -711,6 +722,7 @@ void game_loop(GameState *gs) {
                       gs->float_platforms, gs->float_platform_count,
                       gs->bouncepads, gs->bouncepad_count,
                       gs->vines, gs->vine_count,
+                      gs->bridges, gs->bridge_count,
                       gs->sea_gaps, gs->sea_gap_count,
                       &bounce_idx, &fp_landed_idx,
                       fp_prev_riding);
@@ -800,6 +812,44 @@ void game_loop(GameState *gs) {
          * reference a stale index after a respawn.
          */
         fp_prev_riding = fp_landed_idx;
+
+        /*
+         * Bridge landing check — detect if the player is standing on any
+         * active bridge using the same physics-bottom logic as platforms.
+         * The bridge_landed_idx drives the crumble timer in bridges_update.
+         */
+        int bridge_landed_idx = -1;
+        if (gs->player.on_ground) {
+            float pcx = gs->player.x + gs->player.w / 2.0f;
+            SDL_Rect phit = player_get_hitbox(&gs->player);
+            int player_bottom = phit.y + phit.h;
+            for (int i = 0; i < gs->bridge_count; i++) {
+                const Bridge *br = &gs->bridges[i];
+                SDL_Rect brect = bridge_get_rect(br);
+                /* Player's bottom is within 4 px of the bridge top,
+                 * overlaps horizontally, AND the brick under feet is solid */
+                if (player_bottom >= brect.y && player_bottom <= brect.y + 4 &&
+                    phit.x + phit.w > brect.x && phit.x < brect.x + brect.w &&
+                    bridge_has_solid_at(br, pcx)) {
+                    bridge_landed_idx = i;
+                    break;
+                }
+            }
+        }
+        /* Log the first frame the player touches a bridge brick */
+        if (bridge_landed_idx >= 0 && gs->debug_mode) {
+            float pcx = gs->player.x + gs->player.w / 2.0f;
+            const Bridge *br = &gs->bridges[bridge_landed_idx];
+            int idx = (int)((pcx - br->x) / BRIDGE_TILE_W);
+            if (idx >= 0 && idx < br->brick_count) {
+                const BridgeBrick *bk = &br->bricks[idx];
+                if (bk->active && !bk->falling && bk->fall_delay < 0.0f) {
+                    debug_log(&gs->debug, "BRIDGE brick[%d] touched", idx);
+                }
+            }
+        }
+        bridges_update(gs->bridges, gs->bridge_count, dt, bridge_landed_idx,
+                       gs->player.x + gs->player.w / 2.0f);
 
         /*
          * Player–spider collision.
@@ -1134,6 +1184,10 @@ void game_loop(GameState *gs) {
         float_platforms_render(gs->float_platforms, gs->float_platform_count,
                                gs->renderer, gs->float_platform_tex, cam_x);
 
+        /* Draw bridges in the same layer as float platforms */
+        bridges_render(gs->bridges, gs->bridge_count,
+                       gs->renderer, gs->bridge_tex, cam_x);
+
         /*
          * Draw bouncepads between the platform pillars and vine decorations.
          * This places them visually on the floor surface, with vines potentially
@@ -1289,6 +1343,11 @@ void game_cleanup(GameState *gs) {
     if (gs->spike_block_tex) {
         SDL_DestroyTexture(gs->spike_block_tex);
         gs->spike_block_tex = NULL;
+    }
+
+    if (gs->bridge_tex) {
+        SDL_DestroyTexture(gs->bridge_tex);
+        gs->bridge_tex = NULL;
     }
 
     if (gs->float_platform_tex) {

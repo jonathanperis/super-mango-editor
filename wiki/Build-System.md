@@ -191,6 +191,9 @@ src/
 ├── platform.o
 ├── water.o
 ├── spider.o
+├── jumping_spider.o
+├── bird.o
+├── faster_bird.o
 ├── fog.o
 ├── parallax.o
 ├── coin.o
@@ -200,5 +203,7 @@ src/
 ├── bouncepad.o
 ├── rail.o
 ├── spike_block.o
+├── float_platform.o
+├── bridge.o
 └── debug.o
 ```
