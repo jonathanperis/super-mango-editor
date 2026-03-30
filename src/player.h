@@ -6,10 +6,11 @@
  */
 #pragma once
 
-#include <SDL.h>        /* SDL_Texture, SDL_Renderer, SDL_Rect */
-#include <SDL_mixer.h>  /* Mix_Chunk */
-#include "platform.h"   /* Platform, MAX_PLATFORMS — needed for player_update signature */
-#include "bouncepad.h"  /* Bouncepad — needed for player_update signature */
+#include <SDL.h>           /* SDL_Texture, SDL_Renderer, SDL_Rect */
+#include <SDL_mixer.h>     /* Mix_Chunk */
+#include "platform.h"      /* Platform, MAX_PLATFORMS — needed for player_update signature */
+#include "bouncepad.h"     /* Bouncepad — needed for player_update signature */
+#include "float_platform.h"/* FloatPlatform — needed for player_update signature */
 
 /*
  * AnimState — which animation sequence is currently playing.
@@ -56,15 +57,28 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                          SDL_GameController *ctrl);
 
 /*
- * Move the player by velocity × dt; resolve floor, one-way platform, and
- * bouncepad collisions.  If the player lands on a bouncepad, *out_bounce_idx
- * is set to that pad's index in the array; otherwise it is left unchanged.
- * Callers should initialise *out_bounce_idx to -1 before the call.
+ * Move the player by velocity × dt; resolve floor, one-way platform,
+ * float-platform, and bouncepad collisions.
+ *
+ * If the player lands on a bouncepad, *out_bounce_idx is set to that pad's
+ * index; otherwise it is left unchanged.  Callers should initialise it to -1.
+ *
+ * If the player lands on a float platform, *out_fp_landed_idx is set to that
+ * platform's index; otherwise it is left at -1.  Used by game_loop to drive
+ * the crumble timer and to nudge the player along with a moving rail platform.
+ *
+ * prev_fp_landed_idx : the index that *out_fp_landed_idx was set to last frame
+ *   (pass -1 on the first frame).  Used internally to "stay" on a platform that
+ *   moved upward this frame — without it, the crossing test misses because the
+ *   surface escaped upward past the player's feet before they could cross it.
  */
 void player_update(Player *player, float dt,
                    const Platform *platforms, int platform_count,
+                   const FloatPlatform *float_platforms, int float_platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
-                   int *out_bounce_idx);
+                   int *out_bounce_idx,
+                   int *out_fp_landed_idx,
+                   int prev_fp_landed_idx);
 
 /* Draw the player sprite at its current position, offset by the camera. */
 void player_render(Player *player, SDL_Renderer *renderer, int cam_x);

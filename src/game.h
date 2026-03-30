@@ -27,9 +27,10 @@
 #include "bouncepad.h"  /* Bouncepad struct + MAX_BOUNCEPADS constant         */
 #include "hud.h"        /* Hud struct — HUD display resources                */
 #include "parallax.h"   /* ParallaxSystem — multi-layer scrolling background */
-#include "rail.h"         /* Rail, RailTile — rail path system              */
-#include "spike_block.h"  /* SpikeBlock — rail-riding hazard entity          */
-#include "debug.h"        /* DebugOverlay — debug collision/FPS/log overlay  */
+#include "rail.h"           /* Rail, RailTile — rail path system              */
+#include "spike_block.h"    /* SpikeBlock — rail-riding hazard entity          */
+#include "float_platform.h" /* FloatPlatform — hovering/crumble/rail surfaces */
+#include "debug.h"          /* DebugOverlay — debug collision/FPS/log overlay  */
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -153,6 +154,9 @@ typedef struct {
     SDL_Texture  *spike_block_tex; /* shared texture for all spike block entities */
     SpikeBlock    spike_blocks[MAX_SPIKE_BLOCKS]; /* rail-riding hazard instances */
     int           spike_block_count;              /* number of active blocks      */
+    SDL_Texture  *float_platform_tex;                       /* Platform.png — 3-slice strip      */
+    FloatPlatform  float_platforms[MAX_FLOAT_PLATFORMS];    /* hovering surface instances        */
+    int            float_platform_count;                    /* number of float platforms placed  */
     Hud           hud;         /* HUD display: hearts, lives, score           */
     int           hearts;      /* current hit points (0–MAX_HEARTS)           */
     int           lives;       /* remaining lives; 0 triggers game over       */
