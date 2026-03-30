@@ -86,7 +86,7 @@ void <entity>_init(<Entity> *e, SDL_Renderer *renderer, float x, float y) {
      * The returned SDL_Texture* lives on the GPU until SDL_DestroyTexture.
      * Path is relative to the working directory (repo root when using make run).
      */
-    e->texture = IMG_LoadTexture(renderer, "assets/<Entity>.png");
+    e->texture = IMG_LoadTexture(renderer, "assets/<entity>.png");
     if (!e->texture) {
         fprintf(stderr, "Failed to load <Entity>.png: %s\n", IMG_GetError());
         exit(EXIT_FAILURE);

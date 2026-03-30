@@ -6,9 +6,9 @@ Usage:
     python3 analyze_sprite.py <path/to/sprite.png> [frame_w] [frame_h]
 
 Examples:
-    python3 analyze_sprite.py assets/Player.png
-    python3 analyze_sprite.py assets/Player.png 48 48
-    python3 analyze_sprite.py assets/Coin.png 16 16
+    python3 analyze_sprite.py assets/player.png
+    python3 analyze_sprite.py assets/player.png 48 48
+    python3 analyze_sprite.py assets/coin.png 16 16
 
 If frame_w / frame_h are omitted, the script attempts to auto-detect the frame
 size by scanning for fully transparent column/row separators.
