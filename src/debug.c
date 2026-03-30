@@ -333,17 +333,17 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
         SDL_RenderDrawRect(renderer, &r);
     }
 
-    /* ---- Flames (visible only) — fiery orange-red (255, 80, 0) ------- */
+    /* ---- Blue flames (visible only) — fiery orange-red (255, 80, 0) -- */
     /*
-     * Draw the inset hitbox for each flame that is currently visible
-     * (not in WAITING state).  Skipping hidden flames avoids drawing
-     * debug rects below the floor where the flame is resting.
+     * Draw the inset hitbox for each blue flame that is currently visible
+     * (not in WAITING state).  Skipping hidden blue flames avoids drawing
+     * debug rects below the floor where the blue flame is resting.
      */
     SDL_SetRenderDrawColor(renderer, 255, 80, 0, 255);
-    for (int i = 0; i < gs->flame_count; i++) {
-        if (!gs->flames[i].active) continue;
-        if (gs->flames[i].state == FLAME_WAITING) continue;
-        r = flame_get_hitbox(&gs->flames[i]);
+    for (int i = 0; i < gs->blue_flame_count; i++) {
+        if (!gs->blue_flames[i].active) continue;
+        if (gs->blue_flames[i].state == BLUE_FLAME_WAITING) continue;
+        r = blue_flame_get_hitbox(&gs->blue_flames[i]);
         r.x -= cam_x;
         SDL_RenderDrawRect(renderer, &r);
     }

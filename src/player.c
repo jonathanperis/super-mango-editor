@@ -74,7 +74,7 @@ void player_init(Player *player, SDL_Renderer *renderer) {
      * The sheet is 192×288 px and contains a 4-column × 6-row grid of 48×48
      * frames. We only draw one frame at a time using a source clipping rect.
      */
-    player->texture = IMG_LoadTexture(renderer, "assets/Player.png");
+    player->texture = IMG_LoadTexture(renderer, "assets/player.png");
     if (!player->texture) {
         fprintf(stderr, "Failed to load Player.png: %s\n", IMG_GetError());
         exit(EXIT_FAILURE);
