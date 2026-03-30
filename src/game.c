@@ -144,12 +144,30 @@ void game_init(GameState *gs) {
     spiders_init(gs->spiders, &gs->spider_count);
 
     /*
+     * Load the jumping spider texture (Spider_2.png, same layout as Spider_1).
+     * Fatal — a gameplay enemy that the player must be able to see.
+     */
+    gs->jumping_spider_tex = IMG_LoadTexture(gs->renderer, "assets/Spider_2.png");
+    if (!gs->jumping_spider_tex) {
+        fprintf(stderr, "Failed to load Spider_2.png: %s\n", IMG_GetError());
+        SDL_DestroyTexture(gs->spider_tex);
+        SDL_DestroyTexture(gs->platform_tex);
+        SDL_DestroyTexture(gs->floor_tile);
+        parallax_cleanup(&gs->parallax);
+        SDL_DestroyRenderer(gs->renderer);
+        SDL_DestroyWindow(gs->window);
+        exit(EXIT_FAILURE);
+    }
+    jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
+
+    /*
      * Load the shared fish texture. Fish live in the water lane and use
      * the same texture for all instances, just like the spider enemy.
      */
     gs->fish_tex = IMG_LoadTexture(gs->renderer, "assets/Fish_2.png");
     if (!gs->fish_tex) {
         fprintf(stderr, "Failed to load Fish_2.png: %s\n", IMG_GetError());
+        SDL_DestroyTexture(gs->jumping_spider_tex);
         SDL_DestroyTexture(gs->spider_tex);
         SDL_DestroyTexture(gs->platform_tex);
         SDL_DestroyTexture(gs->floor_tile);
@@ -321,6 +339,18 @@ void game_init(GameState *gs) {
 
     /* Initialise the debug overlay if --debug was passed on the CLI */
     if (gs->debug_mode) debug_init(&gs->debug);
+
+    /*
+     * Sea gaps — holes in the ground floor that expose the water below.
+     * Each gap is SEA_GAP_W (32 px) wide, positioned to avoid overlapping
+     * platforms, bouncepads, and ground coins.
+     */
+    gs->sea_gaps[0] = 0;       /* left world edge  (screen 1 start)   */
+    gs->sea_gaps[1] = 192;     /* screen 1 mid     (free zone 187–255)*/
+    gs->sea_gaps[2] = 560;     /* screen 2 mid     (free zone 549–594)*/
+    gs->sea_gaps[3] = 928;     /* screen 3 mid     (16px-aligned, after platform at 880) */
+    gs->sea_gaps[4] = 1152;    /* screen 3–4 boundary (free 1147–1229)*/
+    gs->sea_gap_count = 5;
 
     /* Initialise the health/lives/score system */
     gs->hearts         = MAX_HEARTS;
@@ -512,7 +542,8 @@ void game_loop(GameState *gs) {
         if (gs->paused) goto render;
 
         /* Read keyboard and gamepad; set the player's velocity for this frame */
-        player_handle_input(&gs->player, gs->snd_jump, gs->controller);
+        player_handle_input(&gs->player, gs->snd_jump, gs->controller,
+                            gs->vines, gs->vine_count);
 
         /*
          * Move the player, resolve floor + platform + bouncepad collisions.
@@ -523,6 +554,8 @@ void game_loop(GameState *gs) {
         player_update(&gs->player, dt,
                       gs->platforms, gs->platform_count,
                       gs->bouncepads, gs->bouncepad_count,
+                      gs->vines, gs->vine_count,
+                      gs->sea_gaps, gs->sea_gap_count,
                       &bounce_idx);
 
         /*
@@ -538,8 +571,48 @@ void game_loop(GameState *gs) {
             if (gs->snd_spring) Mix_PlayChannel(-1, gs->snd_spring, 0);
             if (gs->debug_mode) debug_log(&gs->debug, "BOUNCE pad[%d]", bounce_idx);
         }
+        /*
+         * Sea gap collision — instant life loss.
+         *
+         * Each sea gap is a SEA_GAP_W-wide hole in the floor.  The player
+         * falls through into the water below.  Once the player's physics
+         * centre drops below FLOOR_Y + 16 (the water surface) inside any
+         * gap, they lose a life (not a heart) and respawn.  This check
+         * ignores the invincibility timer — falling into the sea is fatal.
+         */
+        {
+            float pcx = gs->player.x + gs->player.w / 2.0f;
+            float pcy = gs->player.y + gs->player.h / 2.0f;
+            for (int g = 0; g < gs->sea_gap_count; g++) {
+                float gx = (float)gs->sea_gaps[g];
+                if (pcx >= gx && pcx < gx + (float)SEA_GAP_W &&
+                    pcy > (float)(GAME_H - WATER_ART_H)) {
+                    if (gs->snd_hit) Mix_PlayChannel(-1, gs->snd_hit, 0);
+                    gs->lives--;
+                    if (gs->debug_mode) debug_log(&gs->debug, "SEA DEATH gap[%d] lives=%d", g, gs->lives);
+                    if (gs->lives <= 0) {
+                        gs->lives           = DEFAULT_LIVES;
+                        gs->score           = 0;
+                        gs->coins_for_heart = 0;
+                        if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
+                    }
+                    gs->hearts = MAX_HEARTS;
+                    player_reset(&gs->player);
+                    coins_init(gs->coins, &gs->coin_count);
+                    spiders_init(gs->spiders, &gs->spider_count);
+                    jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
+                    fish_init(gs->fish, &gs->fish_count);
+                    break;
+                }
+            }
+        }
+
         /* Move spiders along their patrol paths and advance their animation */
-        spiders_update(gs->spiders, gs->spider_count, dt);
+        spiders_update(gs->spiders, gs->spider_count, dt,
+                       gs->sea_gaps, gs->sea_gap_count);
+        /* Move jumping spiders: patrol + periodic jump arcs */
+        jumping_spiders_update(gs->jumping_spiders, gs->jumping_spider_count, dt,
+                               gs->sea_gaps, gs->sea_gap_count);
         /* Move fish through the water lane and trigger random jump arcs */
         fish_update(gs->fish, gs->fish_count, dt);
         /* Advance each spike block along its rail path (cam_x needed for
@@ -564,9 +637,9 @@ void game_loop(GameState *gs) {
             for (int i = 0; i < gs->spider_count; i++) {
                 const Spider *s = &gs->spiders[i];
                 SDL_Rect shit = {
-                    (int)s->x,
+                    (int)s->x + SPIDER_ART_X,
                     FLOOR_Y - SPIDER_ART_H,
-                    SPIDER_FRAME_W,
+                    SPIDER_ART_W,
                     SPIDER_ART_H
                 };
                 /* SDL_HasIntersection returns SDL_TRUE when the two rects overlap */
@@ -597,6 +670,42 @@ void game_loop(GameState *gs) {
                         fish_init(gs->fish, &gs->fish_count);
                     }
                     break;
+                }
+            }
+
+            /* Jumping spiders use the same damage pattern as regular spiders. */
+            if (gs->player.hurt_timer == 0.0f) {
+                for (int i = 0; i < gs->jumping_spider_count; i++) {
+                    const JumpingSpider *js = &gs->jumping_spiders[i];
+                    SDL_Rect jhit = {
+                        (int)js->x + JSPIDER_ART_X,
+                        FLOOR_Y - JSPIDER_ART_H + (int)js->y,
+                        JSPIDER_ART_W,
+                        JSPIDER_ART_H
+                    };
+                    if (SDL_HasIntersection(&phit, &jhit)) {
+                        gs->player.hurt_timer = 1.5f;
+                        if (gs->snd_hit) Mix_PlayChannel(-1, gs->snd_hit, 0);
+                        gs->hearts--;
+                        if (gs->debug_mode) debug_log(&gs->debug, "HIT jspider[%d] hearts=%d", i, gs->hearts);
+                        if (gs->hearts <= 0) {
+                            gs->lives--;
+                            if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
+                            if (gs->lives <= 0) {
+                                gs->lives           = DEFAULT_LIVES;
+                                gs->score           = 0;
+                                gs->coins_for_heart = 0;
+                                if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
+                            }
+                            gs->hearts = MAX_HEARTS;
+                            player_reset(&gs->player);
+                            coins_init(gs->coins, &gs->coin_count);
+                            spiders_init(gs->spiders, &gs->spider_count);
+                            jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
+                            fish_init(gs->fish, &gs->fish_count);
+                        }
+                        break;
+                    }
                 }
             }
 
@@ -796,6 +905,14 @@ void game_loop(GameState *gs) {
         parallax_render(&gs->parallax, gs->renderer, cam_x);
 
         /*
+         * Draw the platforms BEFORE the floor so the floor tiles render
+         * on top, hiding the 16 px of each pillar that sinks below FLOOR_Y.
+         * This makes the pillars look like they grow out of the ground.
+         */
+        platforms_render(gs->platforms, gs->platform_count,
+                         gs->renderer, gs->platform_tex, cam_x);
+
+        /*
          * 9-slice floor rendering — camera-aware, world-wide.
          *
          * The 48×48 Grass_Tileset.png is divided into a 3×3 grid of 16×16 pieces
@@ -827,11 +944,47 @@ void game_loop(GameState *gs) {
             else                       piece_row = 1;  /* middle: dirt fill  */
 
             for (int tx = floor_start_tx; tx < cam_x + GAME_W; tx += P) {
-                /* Choose which column of the 9-slice to sample */
+                /*
+                 * Skip this piece if it falls inside any sea gap.
+                 * A piece at tx is inside a gap when:
+                 *   gap_x <= tx  AND  tx + P <= gap_x + SEA_GAP_W
+                 * (both edges of the 16-px piece are within the 32-px gap).
+                 */
+                int in_gap = 0;
+                for (int g = 0; g < gs->sea_gap_count; g++) {
+                    int gx = gs->sea_gaps[g];
+                    if (tx >= gx && tx + P <= gx + SEA_GAP_W) {
+                        in_gap = 1;
+                        break;
+                    }
+                }
+                if (in_gap) continue;
+
+                /*
+                 * Choose which column of the 9-slice to sample.
+                 * Use edge caps at gap boundaries so the floor has
+                 * clean left/right edges beside each hole.
+                 */
                 int piece_col;
-                if (tx <= 0)               piece_col = 0;  /* left  world edge cap */
-                else if (tx + P >= WORLD_W) piece_col = 2; /* right world edge cap */
-                else                       piece_col = 1;  /* seamless center fill */
+                int at_left_edge  = 0;
+                int at_right_edge = 0;
+
+                /* World boundaries */
+                if (tx <= 0)                at_left_edge  = 1;
+                if (tx + P >= WORLD_W)      at_right_edge = 1;
+
+                /* Gap boundaries: piece is a right-cap if next piece is gap,
+                 * left-cap if previous piece was gap. */
+                for (int g = 0; g < gs->sea_gap_count; g++) {
+                    int gx = gs->sea_gaps[g];
+                    if (tx + P == gx)              at_right_edge = 1;  /* gap starts right after this piece */
+                    if (tx     == gx + SEA_GAP_W)  at_left_edge  = 1;  /* gap ends right before this piece  */
+                }
+
+                if (at_left_edge && at_right_edge) piece_col = 1;  /* squeezed — use fill */
+                else if (at_left_edge)             piece_col = 0;
+                else if (at_right_edge)            piece_col = 2;
+                else                               piece_col = 1;
 
                 /*
                  * src  — the 16×16 region to cut from the tile sheet.
@@ -844,13 +997,6 @@ void game_loop(GameState *gs) {
                 SDL_RenderCopy(gs->renderer, gs->floor_tile, &src, &dst);
             }
         }
-
-        /*
-         * Draw the one-way platforms after the floor but before the player,
-         * so the player sprite appears in front of the pillar tiles.
-         */
-        platforms_render(gs->platforms, gs->platform_count,
-                         gs->renderer, gs->platform_tex, cam_x);
 
         /*
          * Draw bouncepads between the platform pillars and vine decorations.
@@ -899,6 +1045,9 @@ void game_loop(GameState *gs) {
         /* Draw spiders on top of the water strip, before the player */
         spiders_render(gs->spiders, gs->spider_count,
                        gs->renderer, gs->spider_tex, cam_x);
+        /* Draw jumping spiders in the same layer as regular spiders */
+        jumping_spiders_render(gs->jumping_spiders, gs->jumping_spider_count,
+                               gs->renderer, gs->jumping_spider_tex, cam_x);
 
         /* Draw the player sprite on top of everything */
         player_render(&gs->player, gs->renderer, cam_x);
@@ -1023,6 +1172,11 @@ void game_cleanup(GameState *gs) {
     if (gs->fish_tex) {
         SDL_DestroyTexture(gs->fish_tex);
         gs->fish_tex = NULL;
+    }
+
+    if (gs->jumping_spider_tex) {
+        SDL_DestroyTexture(gs->jumping_spider_tex);
+        gs->jumping_spider_tex = NULL;
     }
 
     if (gs->spider_tex) {

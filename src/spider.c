@@ -16,32 +16,32 @@ void spiders_init(Spider *spiders, int *count)
     *count = 2;
 
     /*
-     * Spider 0 — patrols the left region of the floor.
-     * Starts at x=40, walking right.
+     * Spider 0 — patrols screen 2–3, east of the sea gap at x=560–592.
+     * Patrol starts after the gap so the debug range matches movement.
      */
-    spiders[0].x             = 40.0f;
+    spiders[0].x             = 600.0f;
     spiders[0].vx            = SPIDER_SPEED;
-    spiders[0].patrol_x0     = 20.0f;
-    spiders[0].patrol_x1     = 190.0f;
+    spiders[0].patrol_x0     = 592.0f;
+    spiders[0].patrol_x1     = 750.0f;
     spiders[0].frame_index   = 0;
     spiders[0].anim_timer_ms = 0;
 
     /*
-     * Spider 1 — patrols the right region of the floor.
-     * Starts at x=290, walking left; frame offset avoids both spiders
-     * being in sync with each other.
+     * Spider 1 — patrols screen 3–4, west of the sea gap at x=1152–1184.
+     * Patrol ends before the gap so the debug range matches movement.
      */
-    spiders[1].x             = 290.0f;
+    spiders[1].x             = 1100.0f;
     spiders[1].vx            = -SPIDER_SPEED;
-    spiders[1].patrol_x0     = 200.0f;
-    spiders[1].patrol_x1     = 370.0f;
+    spiders[1].patrol_x0     = 1000.0f;
+    spiders[1].patrol_x1     = 1152.0f;
     spiders[1].frame_index   = 1;
     spiders[1].anim_timer_ms = 0;
 }
 
 /* ------------------------------------------------------------------ */
 
-void spiders_update(Spider *spiders, int count, float dt)
+void spiders_update(Spider *spiders, int count, float dt,
+                    const int *sea_gaps, int sea_gap_count)
 {
     for (int i = 0; i < count; i++) {
         Spider *s = &spiders[i];
@@ -50,7 +50,7 @@ void spiders_update(Spider *spiders, int count, float dt)
         s->x += s->vx * dt;
 
         /*
-         * Patrol boundary check: when the right edge of the 48-px frame
+         * Patrol boundary check: when the right edge of the frame
          * slot reaches patrol_x1, or the left edge drops below patrol_x0,
          * snap position to the boundary and reverse velocity.
          */
@@ -60,6 +60,27 @@ void spiders_update(Spider *spiders, int count, float dt)
         } else if (s->vx < 0.0f && s->x <= s->patrol_x0) {
             s->x  = s->patrol_x0;
             s->vx =  SPIDER_SPEED;
+        }
+
+        /*
+         * Sea gap check — reverse if the spider's art centre would be
+         * over a hole in the ground.  This prevents them from walking
+         * across gaps and floating in mid-air.
+         */
+        float art_center = s->x + SPIDER_ART_X + SPIDER_ART_W / 2.0f;
+        for (int g = 0; g < sea_gap_count; g++) {
+            float gx = (float)sea_gaps[g];
+            if (art_center >= gx && art_center < gx + (float)SEA_GAP_W) {
+                /* Snap back to the gap edge and reverse direction */
+                if (s->vx > 0.0f) {
+                    s->x  = gx - SPIDER_ART_X - SPIDER_ART_W;
+                    s->vx = -SPIDER_SPEED;
+                } else {
+                    s->x  = gx + (float)SEA_GAP_W - SPIDER_ART_X;
+                    s->vx =  SPIDER_SPEED;
+                }
+                break;
+            }
         }
 
         /* ── advance animation frame ───────────────────────────────── */

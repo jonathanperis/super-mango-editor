@@ -18,8 +18,13 @@
 #define FISH_JUMP_VY     -280.0f    /* upward jump impulse in px/s             */
 #define FISH_JUMP_MIN      1.4f     /* minimum seconds before next jump        */
 #define FISH_JUMP_MAX      3.0f     /* maximum seconds before next jump        */
-#define FISH_HITBOX_PAD_X   8       /* inset to keep collision fair (48-px sprite) */
-#define FISH_HITBOX_PAD_Y   8       /* inset to keep collision fair (48-px sprite) */
+/*
+ * Pixel analysis: Fish art occupies x=16..31 (16 px), y=13..31 (19 px)
+ * within each 48×48 frame.  Pad values trim transparent padding so the
+ * hitbox matches the visible art.
+ */
+#define FISH_HITBOX_PAD_X  16       /* left/right inset → hitbox width  = 16 px */
+#define FISH_HITBOX_PAD_Y  13       /* top inset        → hitbox height = 19 px */
 #define FISH_FRAME_MS      120      /* ms per swim animation frame (fast tail flip) */
 
 /*

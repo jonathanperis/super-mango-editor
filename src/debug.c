@@ -16,11 +16,7 @@
 #include "debug.h"
 #include "game.h"      /* GameState, GAME_W, GAME_H, FLOOR_Y, entity types */
 
-/*
- * VINE_STEP — pixel spacing between stacked vine tiles (defined locally
- * in vine.c; duplicated here so we can compute the vine bounding box).
- */
-#define VINE_STEP  19
+/* VINE_STEP is now defined in vine.h (included via game.h). */
 
 /* ------------------------------------------------------------------ */
 /* Static helpers                                                      */
@@ -80,6 +76,18 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
     r.x -= cam_x;
     SDL_RenderDrawRect(renderer, &r);
 
+    /* ---- Sea gaps — dark blue (0, 50, 200) ----------------------------- */
+    /*
+     * Each sea kill zone is SEA_GAP_W wide, drawn at the water surface
+     * (FLOOR_Y + 16).  The box height matches the Water.png art band.
+     */
+    SDL_SetRenderDrawColor(renderer, 0, 50, 200, 255);
+    for (int g = 0; g < gs->sea_gap_count; g++) {
+        r = (SDL_Rect){ gs->sea_gaps[g] - cam_x, GAME_H - WATER_ART_H,
+                        SEA_GAP_W, WATER_ART_H };
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
     /* ---- Platforms — blue (0, 100, 255) ----------------------------- */
     SDL_SetRenderDrawColor(renderer, 0, 100, 255, 255);
     for (int i = 0; i < gs->platform_count; i++) {
@@ -109,9 +117,9 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
     for (int i = 0; i < gs->spider_count; i++) {
         const Spider *s = &gs->spiders[i];
         r = (SDL_Rect){
-            (int)s->x - cam_x,
+            (int)s->x + SPIDER_ART_X - cam_x,
             FLOOR_Y - SPIDER_ART_H,
-            SPIDER_FRAME_W,
+            SPIDER_ART_W,
             SPIDER_ART_H
         };
         SDL_RenderDrawRect(renderer, &r);
@@ -126,9 +134,42 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
     for (int i = 0; i < gs->spider_count; i++) {
         const Spider *s = &gs->spiders[i];
         int py = FLOOR_Y - SPIDER_ART_H / 2;   /* midpoint of spider art */
+        /*
+         * The art doesn't start at x=0 of the frame — it starts at
+         * SPIDER_ART_X.  The spider reverses when x + SPIDER_FRAME_W
+         * hits patrol_x1, so the rightmost art edge is
+         * patrol_x1 − SPIDER_FRAME_W + SPIDER_ART_X + SPIDER_ART_W.
+         */
+        int left  = (int)s->patrol_x0 + SPIDER_ART_X;
+        int right = (int)s->patrol_x1 - SPIDER_FRAME_W + SPIDER_ART_X + SPIDER_ART_W;
         SDL_RenderDrawLine(renderer,
-                           (int)s->patrol_x0 - cam_x, py,
-                           (int)s->patrol_x1 - cam_x, py);
+                           left  - cam_x, py,
+                           right - cam_x, py);
+    }
+
+    /* ---- Jumping spiders — magenta (255, 0, 180) --------------------- */
+    SDL_SetRenderDrawColor(renderer, 255, 0, 180, 255);
+    for (int i = 0; i < gs->jumping_spider_count; i++) {
+        const JumpingSpider *js = &gs->jumping_spiders[i];
+        r = (SDL_Rect){
+            (int)js->x + JSPIDER_ART_X - cam_x,
+            FLOOR_Y - JSPIDER_ART_H + (int)js->y,
+            JSPIDER_ART_W,
+            JSPIDER_ART_H
+        };
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
+    /* ---- Jumping spider patrol ranges — dim magenta (180, 0, 120) --- */
+    SDL_SetRenderDrawColor(renderer, 180, 0, 120, 255);
+    for (int i = 0; i < gs->jumping_spider_count; i++) {
+        const JumpingSpider *js = &gs->jumping_spiders[i];
+        int jpy = FLOOR_Y - JSPIDER_ART_H / 2;
+        int left  = (int)js->patrol_x0 + JSPIDER_ART_X;
+        int right = (int)js->patrol_x1 - JSPIDER_FRAME_W + JSPIDER_ART_X + JSPIDER_ART_W;
+        SDL_RenderDrawLine(renderer,
+                           left  - cam_x, jpy,
+                           right - cam_x, jpy);
     }
 
     /* ---- Fish — light red (255, 50, 50) ----------------------------- */
@@ -152,9 +193,16 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
     for (int i = 0; i < gs->fish_count; i++) {
         const Fish *f = &gs->fish[i];
         int fy = (int)f->water_y + 24;   /* midpoint of 48-px frame */
+        /*
+         * The fish reverses when x + FISH_RENDER_W hits patrol_x1,
+         * so the rightmost hitbox edge is patrol_x1 − FISH_HITBOX_PAD_X.
+         * The leftmost hitbox edge is patrol_x0 + FISH_HITBOX_PAD_X.
+         */
+        int left  = (int)f->patrol_x0 + FISH_HITBOX_PAD_X;
+        int right = (int)f->patrol_x1 - FISH_HITBOX_PAD_X;
         SDL_RenderDrawLine(renderer,
-                           (int)f->patrol_x0 - cam_x, fy,
-                           (int)f->patrol_x1 - cam_x, fy);
+                           left  - cam_x, fy,
+                           right - cam_x, fy);
     }
 
     /* ---- Spike blocks (active only) — orange (255, 140, 0) --------- */
@@ -170,22 +218,26 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
     SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
     for (int i = 0; i < gs->bouncepad_count; i++) {
         const Bouncepad *bp = &gs->bouncepads[i];
-        r = (SDL_Rect){ (int)bp->x - cam_x, (int)bp->y, bp->w, bp->h };
+        r = (SDL_Rect){ (int)bp->x + BOUNCEPAD_ART_X - cam_x, (int)bp->y,
+                        BOUNCEPAD_ART_W, bp->h };
         SDL_RenderDrawRect(renderer, &r);
     }
 
     /* ---- Vines — dark green (0, 180, 0) ----------------------------- */
     /*
-     * Vines are purely decorative (no collision), but showing their
-     * bounding area helps verify placement.  Each vine is VINE_W wide;
-     * its total height spans tile_count tiles stepped by VINE_STEP,
+     * Show the vine grab zone — the 24 px-wide area (VINE_W + 2 × 4 px
+     * padding) that the player can interact with to start climbing.
+     * The total height spans tile_count tiles stepped by VINE_STEP,
      * plus the remaining VINE_H of the last tile.
      */
+    #define VINE_GRAB_PAD_DBG 4   /* must match VINE_GRAB_PAD in player.c */
     SDL_SetRenderDrawColor(renderer, 0, 180, 0, 255);
     for (int i = 0; i < gs->vine_count; i++) {
         const VineDecor *v = &gs->vines[i];
         int vine_total_h = (v->tile_count - 1) * VINE_STEP + VINE_H;
-        r = (SDL_Rect){ (int)v->x - cam_x, (int)v->y, VINE_W, vine_total_h };
+        int grab_x = (int)v->x - VINE_GRAB_PAD_DBG;
+        int grab_w = VINE_W + 2 * VINE_GRAB_PAD_DBG;
+        r = (SDL_Rect){ grab_x - cam_x, (int)v->y, grab_w, vine_total_h };
         SDL_RenderDrawRect(renderer, &r);
     }
 
@@ -318,7 +370,7 @@ static void draw_player_state(const Player *player, TTF_Font *font,
     const int line_h = 14;   /* 13 px font + 1 px gap */
 
     /* State names matching the AnimState enum order */
-    static const char *state_names[] = { "IDLE", "WALK", "JUMP", "FALL" };
+    static const char *state_names[] = { "IDLE", "WALK", "JUMP", "FALL", "CLIMB" };
     const char *state_str = state_names[player->anim_state];
 
     /* Line 1 (bottom): velocity */
@@ -327,11 +379,12 @@ static void draw_player_state(const Player *player, TTF_Font *font,
     render_debug_text(font, renderer, buf,
                       GAME_W - HUD_MARGIN - text_w, GAME_H - 20 - line_h, white);
 
-    /* Line 2: state + ground + facing */
-    snprintf(buf, sizeof(buf), "%s %s %s",
+    /* Line 2: state + ground + facing + vine */
+    snprintf(buf, sizeof(buf), "%s %s %s%s",
              state_str,
              player->on_ground ? "GND" : "AIR",
-             player->facing_left ? "<-" : "->");
+             player->facing_left ? "<-" : "->",
+             player->on_vine ? " VINE" : "");
     TTF_SizeText(font, buf, &text_w, NULL);
     render_debug_text(font, renderer, buf,
                       GAME_W - HUD_MARGIN - text_w, GAME_H - 20 - 2 * line_h, white);
