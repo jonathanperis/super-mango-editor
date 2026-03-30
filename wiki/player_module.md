@@ -57,10 +57,12 @@ void player_init(Player *player, SDL_Renderer *renderer);
 ```c
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                          SDL_GameController *ctrl,
-                         const VineDecor *vines, int vine_count);
+                         const VineDecor *vines, int vine_count,
+                         const LadderDecor *ladders, int ladder_count,
+                         const RopeDecor *ropes, int rope_count);
 ```
 
-Called **once per frame** before `player_update`. Uses `SDL_GetKeyboardState` to read the instantaneous keyboard state (held keys), not events. This gives smooth, continuous movement. The `ctrl` parameter is the active gamepad handle; pass `NULL` when no controller is connected — keyboard input still works normally. The `vines` array is used for vine grab detection when the player presses UP.
+Called **once per frame** before `player_update`. Uses `SDL_GetKeyboardState` to read the instantaneous keyboard state (held keys), not events. This gives smooth, continuous movement. The `ctrl` parameter is the active gamepad handle; pass `NULL` when no controller is connected — keyboard input still works normally. The `vines`, `ladders`, and `ropes` arrays are used for climbable grab detection when the player presses UP.
 
 ### Key Bindings
 
@@ -124,14 +126,17 @@ void player_update(Player *player, float dt,
                    const FloatPlatform *float_platforms, int float_platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
                    const VineDecor *vines, int vine_count,
+                   const LadderDecor *ladders, int ladder_count,
+                   const RopeDecor *ropes, int rope_count,
                    const Bridge *bridges, int bridge_count,
+                   const SpikePlatform *spike_platforms, int spike_platform_count,
                    const int *sea_gaps, int sea_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
                    int prev_fp_landed_idx);
 ```
 
-`dt` is the time in **seconds** since the last frame (e.g. `0.016` for 60 FPS). Multiplying speed by `dt` makes movement frame-rate independent. The function resolves collisions against the floor, one-way platforms, float platforms, bridges, bouncepads, and vines.
+`dt` is the time in **seconds** since the last frame (e.g. `0.016` for 60 FPS). Multiplying speed by `dt` makes movement frame-rate independent. The function resolves collisions against the floor, one-way platforms, float platforms, bridges, spike platforms, bouncepads, vines, ladders, and ropes.
 
 - `*out_bounce_idx` is set to the bouncepad index if the player lands on one; callers initialise to `-1`.
 - `*out_fp_landed_idx` is set to the float platform index if the player lands on one; used to drive the crumble timer and nudge the player along with moving rail platforms.

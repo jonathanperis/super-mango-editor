@@ -227,7 +227,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `COIN_DISPLAY_W` | `16` | `int` | Render width in logical pixels |
 | `COIN_DISPLAY_H` | `16` | `int` | Render height in logical pixels |
 | `COIN_SCORE` | `100` | `int` | Score awarded per coin collected |
-| `COINS_PER_HEART` | `3` | `int` | Coins needed to restore one heart |
+| `SCORE_PER_LIFE` | `1000` | `int` | Score multiple that grants a bonus life |
 
 ---
 
@@ -258,8 +258,8 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `FISH_JUMP_VY` | `-280.0f` | `float` | Upward jump impulse (px/s) |
 | `FISH_JUMP_MIN` | `1.4f` | `float` | Minimum seconds before next jump |
 | `FISH_JUMP_MAX` | `3.0f` | `float` | Maximum seconds before next jump |
-| `FISH_HITBOX_PAD_X` | `8` | `int` | Horizontal inset for fair AABB collision |
-| `FISH_HITBOX_PAD_Y` | `8` | `int` | Vertical inset for fair AABB collision |
+| `FISH_HITBOX_PAD_X` | `16` | `int` | Horizontal inset for fair AABB collision (hitbox width = 16 px) |
+| `FISH_HITBOX_PAD_Y` | `13` | `int` | Vertical inset for fair AABB collision (hitbox height = 19 px...) |
 | `FISH_FRAME_MS` | `120` | `int` | Milliseconds per swim animation frame |
 
 ---
@@ -271,11 +271,12 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `MAX_HEARTS` | `3` | `int` | Maximum hearts the player can have |
 | `DEFAULT_LIVES` | `3` | `int` | Lives the player starts with |
 | `HUD_MARGIN` | `4` | `int` | Pixel margin from screen edges |
-| `HUD_HEART_SIZE` | `12` | `int` | Display size of each heart icon (px) |
+| `HUD_HEART_SIZE` | `16` | `int` | Display size of each heart icon (px) |
 | `HUD_HEART_GAP` | `2` | `int` | Horizontal gap between heart icons (px) |
 | `HUD_ICON_W` | `16` | `int` | Display width of the player icon (px) |
 | `HUD_ICON_H` | `13` | `int` | Display height of the player icon (px) |
-| `HUD_ROW_H` | `13` | `int` | Row height for text alignment (font px) |
+| `HUD_ROW_H` | `16` | `int` | Row height for text alignment (font px) |
+| `HUD_COIN_ICON_SIZE` | `12` | `int` | Display size of the coin count icon (px) |
 
 ---
 
@@ -286,10 +287,15 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `MAX_BOUNCEPADS` | `4` | `int` | Maximum simultaneous bouncepad instances |
 | `BOUNCEPAD_W` | `48` | `int` | Display width of one bouncepad frame (px) |
 | `BOUNCEPAD_H` | `48` | `int` | Display height of one bouncepad frame (px) |
-| `BOUNCEPAD_VY` | `-536.25f` | `float` | Upward launch impulse applied to the player (px/s) |
+| `BOUNCEPAD_VY_SMALL` | `-380.0f` | `float` | Small bouncepad launch impulse (px/s) |
+| `BOUNCEPAD_VY_MEDIUM` | `-536.25f` | `float` | Medium bouncepad launch impulse (px/s) |
+| `BOUNCEPAD_VY_HIGH` | `-700.0f` | `float` | High bouncepad launch impulse (px/s) |
+| `BOUNCEPAD_VY` | `-536.25f` | `float` | Default launch impulse (alias for `BOUNCEPAD_VY_MEDIUM`) |
 | `BOUNCEPAD_FRAME_MS` | `80` | `int` | Milliseconds per animation frame during release |
 | `BOUNCEPAD_SRC_Y` | `14` | `int` | First non-transparent row in the frame |
 | `BOUNCEPAD_SRC_H` | `18` | `int` | Height of the art region (rows 14–31) |
+| `BOUNCEPAD_ART_X` | `16` | `int` | First non-transparent col in the frame |
+| `BOUNCEPAD_ART_W` | `16` | `int` | Width of the art region (cols 16–31) |
 
 ---
 

@@ -10,13 +10,14 @@ The project uses a **GNU Makefile** that auto-discovers source files via a wildc
 
 ```makefile
 CC      = clang
-CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic -MMD -MP $(shell sdl2-config --cflags)
+CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(shell sdl2-config --cflags)
 LIBS    = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
 OUTDIR  = out
 TARGET  = $(OUTDIR)/super-mango
 SRCDIR  = src
 SRCS    = $(wildcard $(SRCDIR)/*.c)
 OBJS    = $(SRCS:.c=.o)
+DEPS    = $(OBJS:.o=.d)
 ```
 
 ### Key Variables
@@ -29,6 +30,7 @@ OBJS    = $(SRCS:.c=.o)
 | `TARGET` | `out/super-mango` | Output binary path |
 | `SRCS` | `src/*.c` | All C source files (auto-discovered) |
 | `OBJS` | `src/*.o` | Object files, placed next to sources |
+| `DEPS` | `src/*.d` | Auto-generated dependency files (tracks header changes) |
 
 ### Compiler Flags Explained
 
@@ -38,8 +40,8 @@ OBJS    = $(SRCS:.c=.o)
 | `-Wall` | Enable common warnings |
 | `-Wextra` | Enable extra warnings beyond `-Wall` |
 | `-Wpedantic` | Strict ISO compliance warnings |
-| `-MMD` | Generate `.d` dependency files for each `.o` (tracks header changes) |
-| `-MP` | Add phony targets for each dependency (prevents errors when headers are deleted) |
+| `-MMD` | Generate `.d` dependency files for each `.o` (tracks header changes) — passed in compile rule, not in `CFLAGS` |
+| `-MP` | Add phony targets for each dependency (prevents errors when headers are deleted) — passed in compile rule, not in `CFLAGS` |
 | `$(shell sdl2-config --cflags)` | SDL2 include paths (`-I/opt/homebrew/include/SDL2`) |
 
 ### Linker Flags Explained
@@ -68,7 +70,7 @@ make
 1. Creates `out/` directory if it does not exist
 2. Compiles each `src/*.c` → `src/*.o`
 3. Links all `.o` files → `out/super-mango`
-4. Ad-hoc code signs the binary with `codesign --force --sign - $@` (required on macOS Apple Silicon to avoid `Killed: 9` errors)
+4. On macOS (`uname -s == Darwin`), ad-hoc code signs the binary with `codesign --force --sign - $@` (required on Apple Silicon to avoid `Killed: 9` errors). On other platforms this step is skipped
 
 ### `make run`
 
@@ -107,6 +109,16 @@ Builds (if out of date) then runs the binary with both `--sandbox` and `--debug`
 ```sh
 make run-sandbox-debug
 ```
+
+### `make web`
+
+Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). Requires Emscripten to be installed and `emcc` on `PATH`.
+
+```sh
+make web
+```
+
+Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). SDL2 ports are compiled from source by Emscripten on first build; subsequent builds reuse cached port libraries. Uses a custom shell template from `web/shell.html`.
 
 ### `make clean`
 

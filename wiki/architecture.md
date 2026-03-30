@@ -23,73 +23,54 @@ main()
   │     ├── SDL_CreateWindow  → gs.window
   │     ├── SDL_CreateRenderer → gs.renderer
   │     ├── SDL_RenderSetLogicalSize(GAME_W, GAME_H)
+  │     │
+  │     │   ── Load all textures (engine resources) ──
   │     ├── parallax_init(&gs.parallax, gs.renderer)  (multi-layer background)
-  │     ├── IMG_LoadTexture → gs.floor_tile    (grass_tileset.png)
-  │     ├── IMG_LoadTexture → gs.platform_tex  (platform.png)
-  │     ├── platforms_init(gs.platforms, &gs.platform_count)
-  │     ├── water_init(&gs.water, gs.renderer)  (water.png)
-  │     ├── IMG_LoadTexture → gs.spider_tex    (spider.png)
-  │     ├── spiders_init(gs.spiders, &gs.spider_count)
-  │     ├── IMG_LoadTexture → gs.jumping_spider_tex (jumping_spider.png)
-  │     ├── jumping_spiders_init(gs.jumping_spiders, &gs.jumping_spider_count)
-  │     ├── IMG_LoadTexture → gs.bird_tex      (bird.png)
-  │     ├── birds_init(gs.birds, &gs.bird_count)
-  │     ├── IMG_LoadTexture → gs.faster_bird_tex (faster_bird.png)
-  │     ├── faster_birds_init(gs.faster_birds, &gs.faster_bird_count)
-  │     ├── IMG_LoadTexture → gs.fish_tex      (fish.png)
-  │     ├── fish_init(gs.fish, &gs.fish_count)
-  │     ├── IMG_LoadTexture → gs.faster_fish_tex (faster_fish.png)
-  │     ├── faster_fish_init(gs.faster_fish, &gs.faster_fish_count)
-  │     ├── IMG_LoadTexture → gs.coin_tex      (coin.png)
-  │     ├── coins_init(gs.coins, &gs.coin_count)
-  │     ├── IMG_LoadTexture → gs.yellow_star_tex (yellow_star.png)
-  │     ├── yellow_stars_init(gs.yellow_stars, &gs.yellow_star_count)
-  │     ├── last_star_init(&gs.last_star, gs.renderer) (last_star.png)
-  │     ├── IMG_LoadTexture → gs.vine_tex      (vine.png — non-fatal)
-  │     ├── vine_init(gs.vines, &gs.vine_count)
-  │     ├── IMG_LoadTexture → gs.ladder_tex    (ladder.png — non-fatal)
-  │     ├── ladder_init(gs.ladders, &gs.ladder_count)
-  │     ├── IMG_LoadTexture → gs.rope_tex      (rope.png — non-fatal)
-  │     ├── rope_init(gs.ropes, &gs.rope_count)
-  │     ├── IMG_LoadTexture → gs.bouncepad_small_tex  (bouncepad_small.png)
-  │     ├── bouncepads_small_init(gs.bouncepads_small, &gs.bouncepad_small_count)
-  │     ├── IMG_LoadTexture → gs.bouncepad_medium_tex (bouncepad_medium.png)
-  │     ├── bouncepads_medium_init(gs.bouncepads_medium, &gs.bouncepad_medium_count)
-  │     ├── IMG_LoadTexture → gs.bouncepad_high_tex   (bouncepad_high.png)
-  │     ├── bouncepads_high_init(gs.bouncepads_high, &gs.bouncepad_high_count)
-  │     ├── Mix_LoadWAV     → gs.snd_spring    (bouncepad.wav — non-fatal)
-  │     ├── IMG_LoadTexture → gs.rail_tex      (rail.png — non-fatal)
-  │     ├── rail_init(gs.rails, &gs.rail_count)
-  │     ├── IMG_LoadTexture → gs.spike_block_tex (spike_block.png — non-fatal)
-  │     ├── spike_blocks_init(gs.spike_blocks, &gs.spike_block_count, gs.rails)
-  │     ├── IMG_LoadTexture → gs.spike_tex     (spike.png — non-fatal)
-  │     ├── spikes_init(gs.spike_rows, &gs.spike_row_count)
-  │     ├── IMG_LoadTexture → gs.spike_platform_tex (spike_platform.png — non-fatal)
-  │     ├── spike_platforms_init(gs.spike_platforms, &gs.spike_platform_count)
-  │     ├── IMG_LoadTexture → gs.circular_saw_tex (circular_saw.png — non-fatal)
-  │     ├── circular_saws_init(gs.circular_saws, &gs.circular_saw_count)
-  │     ├── IMG_LoadTexture → gs.axe_trap_tex  (axe_trap.png — non-fatal)
-  │     ├── axe_traps_init(gs.axe_traps, &gs.axe_trap_count)
-  │     ├── IMG_LoadTexture → gs.blue_flame_tex (blue_flame.png — non-fatal)
-  │     ├── blue_flames_init(gs.blue_flames, &gs.blue_flame_count)
+  │     ├── IMG_LoadTexture → gs.floor_tile        (grass_tileset.png — fatal)
+  │     ├── IMG_LoadTexture → gs.platform_tex      (platform.png — fatal)
+  │     ├── water_init(&gs.water, gs.renderer)      (water.png)
+  │     ├── IMG_LoadTexture → gs.spider_tex        (spider.png — fatal)
+  │     ├── IMG_LoadTexture → gs.jumping_spider_tex (jumping_spider.png — fatal)
+  │     ├── IMG_LoadTexture → gs.bird_tex          (bird.png — fatal)
+  │     ├── IMG_LoadTexture → gs.faster_bird_tex   (faster_bird.png — fatal)
+  │     ├── IMG_LoadTexture → gs.fish_tex          (fish.png — fatal)
+  │     ├── IMG_LoadTexture → gs.coin_tex          (coin.png — fatal)
+  │     ├── IMG_LoadTexture → gs.bouncepad_medium_tex (bouncepad_medium.png — fatal)
+  │     ├── IMG_LoadTexture → gs.vine_tex          (vine.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.ladder_tex        (ladder.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.rope_tex          (rope.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.bouncepad_small_tex  (bouncepad_small.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.bouncepad_high_tex   (bouncepad_high.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.rail_tex          (rail.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.spike_block_tex   (spike_block.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.float_platform_tex (float_platform.png — non-fatal)
-  │     ├── float_platforms_init(gs.float_platforms, &gs.float_platform_count, gs.rails)
-  │     ├── IMG_LoadTexture → gs.bridge_tex    (bridge.png — non-fatal)
-  │     ├── bridges_init(gs.bridges, &gs.bridge_count)
-  │     ├── Mix_LoadWAV     → gs.snd_jump      (player_jump.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_coin      (coin.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_hit       (player_hit.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_axe       (axe_trap.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_flap      (bird.wav — non-fatal)
+  │     ├── IMG_LoadTexture → gs.bridge_tex        (bridge.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.yellow_star_tex   (yellow_star.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.axe_trap_tex      (axe_trap.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.circular_saw_tex  (circular_saw.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.blue_flame_tex    (blue_flame.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.faster_fish_tex   (faster_fish.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.spike_tex         (spike.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.spike_platform_tex (spike_platform.png — non-fatal)
+  │     │
+  │     │   ── Load all sound effects ──
+  │     ├── Mix_LoadWAV     → gs.snd_spring        (bouncepad.wav — non-fatal)
+  │     ├── Mix_LoadWAV     → gs.snd_axe           (axe_trap.wav — non-fatal)
+  │     ├── Mix_LoadWAV     → gs.snd_flap          (bird.wav — non-fatal)
   │     ├── Mix_LoadWAV     → gs.snd_spider_attack (spider.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_dive      (fish.wav — non-fatal)
-  │     ├── Mix_LoadMUS     → gs.music         (game_music.wav)
-  │     ├── Mix_PlayMusic(-1)                  (loop forever, 10% volume)
+  │     ├── Mix_LoadWAV     → gs.snd_dive          (fish.wav — non-fatal)
+  │     ├── Mix_LoadWAV     → gs.snd_jump          (player_jump.wav — fatal)
+  │     ├── Mix_LoadWAV     → gs.snd_coin          (coin.wav — non-fatal)
+  │     ├── Mix_LoadWAV     → gs.snd_hit           (player_hit.wav — non-fatal)
+  │     ├── Mix_LoadMUS     → gs.music             (game_music.wav — fatal)
+  │     ├── Mix_PlayMusic(-1)                      (loop forever, 10% volume)
+  │     │
+  │     │   ── Initialise game objects ──
   │     ├── player_init(&gs.player, gs.renderer)
-  │     ├── fog_init(&gs.fog, gs.renderer)     (fog_background_1.png, fog_background_2.png)
+  │     ├── fog_init(&gs.fog, gs.renderer)         (fog_background_1.png, fog_background_2.png)
   │     ├── hud_init(&gs.hud, gs.renderer)
   │     ├── if (debug_mode) debug_init(&gs.debug)
-  │     ├── sea_gaps[] initialisation (5 gap positions)
+  │     ├── sandbox_load_level(&gs)                (all entity inits + sea gap positions)
   │     ├── hearts/lives/score/score_life_next initialisation
   │     ├── SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) — lazy init, non-fatal
   │     └── scan joysticks for first connected gamepad
@@ -106,6 +87,7 @@ main()
         ├── Mix_FreeChunk (snd_jump)
         ├── Mix_FreeChunk (snd_coin)
         ├── Mix_FreeChunk (snd_hit)
+        ├── Mix_FreeChunk (snd_spring)
         ├── Mix_FreeChunk (snd_axe)
         ├── Mix_FreeChunk (snd_flap)
         ├── Mix_FreeChunk (snd_spider_attack)
@@ -176,10 +158,11 @@ while (gs.running) {
                     → water_update → fog_update → bouncepads_update (small, medium, high)
                     → debug_update (if --debug)
   4. Render       — clear → parallax background → platforms → floor tiles
-                    → float platforms → bridges → bouncepads (small, medium, high)
-                    → rails → vines → ladders → ropes → coins → yellow stars → last star
-                    → fish → faster fish → water → spike blocks → spikes → spike platforms
-                    → circular saws → axe traps → blue flames
+                    → float platforms → spike rows → spike platforms → bridges
+                    → bouncepads (medium, small, high) → rails
+                    → vines → ladders → ropes → coins → yellow stars → last star
+                    → blue flames → fish → faster fish → water
+                    → spike blocks → axe traps → circular saws
                     → spiders → jumping spiders → birds → faster birds
                     → player → fog → hud
                     → debug overlay (if --debug) → present
@@ -204,26 +187,26 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 | 2 | Platforms | `platform.png` 9-slice tiled pillar stacks (drawn before floor so pillars sink into ground) |
 | 3 | Floor | `grass_tileset.png` 9-slice tiled across world width at `FLOOR_Y`, with sea-gap openings |
 | 4 | Float platforms | `float_platform.png` 3-slice hovering surfaces (static, crumble, rail modes) |
-| 5 | Bridges | `bridge.png` tiled crumble walkways |
-| 6 | Bouncepads (small) | `bouncepad_small.png` low-launch spring pads |
-| 7 | Bouncepads (medium) | `bouncepad_medium.png` medium-launch spring pads |
-| 8 | Bouncepads (high) | `bouncepad_high.png` high-launch spring pads |
-| 9 | Rails | `rail.png` bitmask tile tracks for spike blocks and float platforms |
-| 10 | Vines | `vine.png` climbable plant decorations hanging from platforms |
-| 11 | Ladders | `ladder.png` climbable ladder structures |
-| 12 | Ropes | `rope.png` climbable rope segments |
-| 13 | Coins | `coin.png` collectible sprites drawn on top of platforms |
-| 14 | Yellow stars | `yellow_star.png` collectible star pickups |
-| 15 | Last star | `last_star.png` special end-of-level star collectible |
-| 16 | Fish | `fish.png` animated jumping enemies, drawn before water for submerged look |
-| 17 | Faster fish | `faster_fish.png` fast aggressive jumping fish enemies |
-| 18 | Water | `water.png` animated scrolling strip at the bottom |
-| 19 | Spike blocks | `spike_block.png` rotating rail-riding hazards |
-| 20 | Spikes | `spike.png` static ground spike hazards |
-| 21 | Spike platforms | `spike_platform.png` elevated spike hazard surfaces |
-| 22 | Circular saws | `circular_saw.png` spinning blade hazards |
+| 5 | Spike rows | `spike.png` ground-level spike strips on the floor surface |
+| 6 | Spike platforms | `spike_platform.png` elevated spike hazard surfaces |
+| 7 | Bridges | `bridge.png` tiled crumble walkways |
+| 8 | Bouncepads (medium) | `bouncepad_medium.png` standard-launch spring pads |
+| 9 | Bouncepads (small) | `bouncepad_small.png` low-launch spring pads |
+| 10 | Bouncepads (high) | `bouncepad_high.png` high-launch spring pads |
+| 11 | Rails | `rail.png` bitmask tile tracks for spike blocks and float platforms |
+| 12 | Vines | `vine.png` climbable plant decorations hanging from platforms |
+| 13 | Ladders | `ladder.png` climbable ladder structures |
+| 14 | Ropes | `rope.png` climbable rope segments |
+| 15 | Coins | `coin.png` collectible sprites drawn on top of platforms |
+| 16 | Yellow stars | `yellow_star.png` collectible star pickups |
+| 17 | Last star | end-of-level star collectible (uses HUD star sprite) |
+| 18 | Blue flames | `blue_flame.png` animated flame hazards erupting from sea gaps |
+| 19 | Fish | `fish.png` animated jumping enemies, drawn before water for submerged look |
+| 20 | Faster fish | `faster_fish.png` fast aggressive jumping fish enemies |
+| 21 | Water | `water.png` animated scrolling strip at the bottom |
+| 22 | Spike blocks | `spike_block.png` rotating rail-riding hazards |
 | 23 | Axe traps | `axe_trap.png` swinging axe hazards |
-| 24 | Blue flames | `blue_flame.png` animated flame hazards |
+| 24 | Circular saws | `circular_saw.png` spinning blade hazards |
 | 25 | Spiders | `spider.png` animated ground patrol enemies |
 | 26 | Jumping spiders | `jumping_spider.png` animated jumping patrol enemies |
 | 27 | Birds | `bird.png` slow sine-wave sky patrol enemies |
@@ -311,23 +294,23 @@ typedef struct {
     int            vine_count;
 
     SDL_Texture   *ladder_tex;       // Shared texture for ladders (GPU)
-    Ladder         ladders[MAX_LADDERS];
+    LadderDecor    ladders[MAX_LADDERS];
     int            ladder_count;
 
     SDL_Texture   *rope_tex;         // Shared texture for ropes (GPU)
-    Rope           ropes[MAX_ROPES];
+    RopeDecor      ropes[MAX_ROPES];
     int            rope_count;
 
     SDL_Texture   *bouncepad_small_tex;    // Shared texture for small bouncepads (GPU)
-    BouncepadSmall bouncepads_small[MAX_BOUNCEPADS_SMALL];
+    Bouncepad      bouncepads_small[MAX_BOUNCEPADS_SMALL];
     int            bouncepad_small_count;
 
     SDL_Texture   *bouncepad_medium_tex;   // Shared texture for medium bouncepads (GPU)
-    BouncepadMedium bouncepads_medium[MAX_BOUNCEPADS_MEDIUM];
-    int             bouncepad_medium_count;
+    Bouncepad      bouncepads_medium[MAX_BOUNCEPADS_MEDIUM];
+    int            bouncepad_medium_count;
 
     SDL_Texture   *bouncepad_high_tex;     // Shared texture for high bouncepads (GPU)
-    BouncepadHigh  bouncepads_high[MAX_BOUNCEPADS_HIGH];
+    Bouncepad      bouncepads_high[MAX_BOUNCEPADS_HIGH];
     int            bouncepad_high_count;
 
     SDL_Texture   *rail_tex;         // Shared texture for all rail tiles (GPU)
@@ -339,7 +322,7 @@ typedef struct {
     int            spike_block_count;
 
     SDL_Texture   *spike_tex;        // Shared texture for ground spikes (GPU)
-    Spike          spike_rows[MAX_SPIKE_ROWS];
+    SpikeRow       spike_rows[MAX_SPIKE_ROWS];
     int            spike_row_count;
 
     SDL_Texture   *spike_platform_tex;  // Shared texture for spike platforms (GPU)
@@ -387,16 +370,19 @@ typedef struct {
 
     Hud            hud;              // HUD display: hearts, lives, score
     int            hearts;           // Current hit points (0-MAX_HEARTS)
-    int            lives;            // Remaining lives; 0 triggers game over
+    int            lives;            // Remaining lives; <0 triggers game over
     int            score;            // Cumulative score from collecting coins/stars
-    int            coins_for_heart;  // Coins collected toward next heart restore
-    int            score_life_next;  // Score threshold for next 1UP award
+    int            score_life_next;  // Score threshold for next bonus life
 
     Camera         camera;           // Viewport scroll position; updated every frame
     int            running;          // Loop flag: 1 = keep going, 0 = quit
     int            paused;           // 1 = window lost focus; physics/music frozen
     int            debug_mode;       // 1 = debug overlays active (--debug flag)
     DebugOverlay   debug;            // FPS counter, collision vis, event log
+
+    // ---- Loop state (persists across frames for emscripten callback) ----
+    Uint64         loop_prev_ticks;  // timestamp of previous frame
+    int            fp_prev_riding;   // float platform player stood on last frame
 } GameState;
 ```
 
