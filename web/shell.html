@@ -59,6 +59,8 @@
 
   <script>
     var Module = {
+      /* Launch directly into the sandbox gameplay phase (skip start menu). */
+      arguments: ['--sandbox'],
       canvas: (function() {
         var c = document.getElementById('canvas');
         c.addEventListener('webglcontextlost', function(e) {
