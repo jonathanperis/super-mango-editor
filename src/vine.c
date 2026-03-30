@@ -16,8 +16,8 @@
  * The vine always fills completely from the platform's top surface down to
  * FLOOR_Y — tile count = (FLOOR_Y − plat_y) / VINE_H:
  *
- *   Medium pillar (top y=156): 3 tiles — covers 156 → 252 (96 px / 32)
- *   Tall   pillar (top y=108): 4 tiles — covers 108 → 252 (144 px / 32)
+ *   Medium pillar (top y=172): 3 tiles — covers 172 → 268 (96 px / 32)
+ *   Tall   pillar (top y=124): 4 tiles — covers 124 → 268 (144 px / 32)
  *
  * The sprite is rendered with SDL_FLIP_VERTICAL so the plant's base
  * (thicker, root end) attaches to the platform and the leafy tip
@@ -29,8 +29,7 @@
 
 /* Horizontal inset from each edge of the platform. */
 #define VINE_BORDER 8
-/* Tile step in pixels: VINE_H minus overlap — 20% smaller gap than previous 24. */
-#define VINE_STEP   19
+/* VINE_STEP is defined in vine.h (19 px — tiles overlap for flush stacking). */
 
 /* ------------------------------------------------------------------ */
 
@@ -45,7 +44,7 @@ void vine_init(VineDecor *vines, int *count)
      *   y : top surface (landing surface) in world pixels
      */
     static const float plat_x[8] = {  80, 256, 500,  680,  880, 1050, 1300, 1480 };
-    static const float plat_y[8] = { 156, 108, 156,  108,  156,  108,  156,  108 };
+    static const float plat_y[8] = { 172, 124, 172,  124,  172,  124,  172,  124 };
 
     /*
      * Randomly pick 2 or 3 platforms to receive a vine.

@@ -37,13 +37,15 @@
  * collisions creates an invisible wall well outside the art.
  *
  * PHYS_PAD_X : pixels trimmed from the LEFT and RIGHT edges (each side).
- *              Physics width  = FRAME_W − 2 × PHYS_PAD_X  = 48 − 24 = 24 px.
+ *              Physics width  = FRAME_W − 2 × PHYS_PAD_X  = 48 − 30 = 18 px.
  * PHYS_PAD_TOP : pixels trimmed from the TOP edge.
  *              Combined with FLOOR_SINK at the bottom the physics box
- *              tracks the drawn character closely on all four sides.
+ *              tracks the drawn character art closely on all four sides.
+ *
+ * Pixel analysis: art occupies x=15..32 (18 px), y=18..33 (16 px).
  */
-#define PHYS_PAD_X   12
-#define PHYS_PAD_TOP  6
+#define PHYS_PAD_X   15
+#define PHYS_PAD_TOP 18
 
 /*
  * Animation tables — indexed by AnimState (0=IDLE, 1=WALK, 2=JUMP, 3=FALL).
@@ -58,9 +60,9 @@
  *   Row 2 — Jump : 2 frames  (cols 0–1, rising-phase poses)
  *   Row 3 — Fall : 1 frame   (col 0, descent pose)
  */
-static const int ANIM_FRAME_COUNT[4] = { 4,   4,   2,   1   };
-static const int ANIM_FRAME_MS[4]    = { 150, 100, 150, 200 };
-static const int ANIM_ROW[4]         = { 0,   1,   2,   3   };
+static const int ANIM_FRAME_COUNT[5] = { 4,   4,   2,   1,   2   };
+static const int ANIM_FRAME_MS[5]    = { 150, 100, 150, 200, 100 };
+static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 void player_init(Player *player, SDL_Renderer *renderer) {
     /*
@@ -94,8 +96,13 @@ void player_init(Player *player, SDL_Renderer *renderer) {
      * downward offset to compensate for transparent padding at the bottom of
      * the sprite frame, so the feet visually rest on the grass surface.
      */
-    player->x        = (GAME_W - player->w) / 2.0f;
-    player->y        = (float)(FLOOR_Y - player->h + FLOOR_SINK);
+    /*
+     * Spawn on top of the first platform (x=80, y=172, width=TILE_SIZE).
+     * Centre horizontally on the pillar; snap vertically using the same
+     * formula as platform landing: plat_y − player_h + FLOOR_SINK.
+     */
+    player->x        = 80.0f + (TILE_SIZE - player->w) / 2.0f;
+    player->y        = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - player->h + FLOOR_SINK);
     player->vx       = 0.0f;
     player->vy       = 0.0f;   /* start stationary; gravity will pull down   */
     player->speed    = 160.0f; /* horizontal speed: 160 logical px per second */
@@ -106,6 +113,10 @@ void player_init(Player *player, SDL_Renderer *renderer) {
     player->anim_frame_index = 0;
     player->anim_timer_ms    = 0;
     player->facing_left      = 0;
+
+    /* Not climbing at startup */
+    player->on_vine    = 0;
+    player->vine_index = 0;
 
     /* Not hurt at startup; timer counts down to 0 during invincibility */
     player->hurt_timer = 0.0f;
@@ -137,8 +148,38 @@ void player_init(Player *player, SDL_Renderer *renderer) {
  */
 #define AXIS_DEAD_ZONE  8000
 
+/*
+ * Vine climbing constants.
+ *
+ * CLIMB_SPEED   : vertical speed while climbing, in logical px/s (half of walk).
+ * CLIMB_H_SPEED : horizontal drift speed while on vine (half of walk).
+ * VINE_GRAB_PAD : extra pixels on each side of the vine sprite that count as
+ *                 the "grab zone".  The visual vine is VINE_W (16 px); the
+ *                 grab zone is VINE_W + 2 × VINE_GRAB_PAD = 24 px.
+ */
+#define CLIMB_SPEED     80.0f
+#define CLIMB_H_SPEED   80.0f
+#define VINE_GRAB_PAD   4
+
+/*
+ * vine_grab_rect — Return the axis-aligned grab zone for a vine.
+ *
+ * The grab zone is wider than the 16 px visual sprite (padded by
+ * VINE_GRAB_PAD on each side) and spans the full vine height.
+ */
+static SDL_Rect vine_grab_rect(const VineDecor *v) {
+    int vine_total_h = (v->tile_count - 1) * VINE_STEP + VINE_H;
+    return (SDL_Rect){
+        (int)v->x - VINE_GRAB_PAD,
+        (int)v->y,
+        VINE_W + 2 * VINE_GRAB_PAD,
+        vine_total_h
+    };
+}
+
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
-                         SDL_GameController *ctrl) {
+                         SDL_GameController *ctrl,
+                         const VineDecor *vines, int vine_count) {
     /*
      * SDL_GetKeyboardState returns a pointer to an array of key states.
      * Each element is 1 if that key is currently held, 0 if not.
@@ -148,29 +189,81 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
     const Uint8 *keys = SDL_GetKeyboardState(NULL);
 
     /*
-     * Horizontal movement: left/right arrow keys and A/D both work.
-     * Reset vx to 0 each frame so the player stops when keys are released.
+     * Vine grab — if the player is not already climbing and presses UP
+     * while overlapping a vine's grab zone, enter climbing mode.
+     *
+     * Ignore the grab when Space is held — otherwise holding Space + UP
+     * causes the player to grab and immediately jump-dismount every frame,
+     * spamming the jump action and accumulating height.
      */
-    player->vx = 0.0f;
-    if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A]) {
-        player->vx -= player->speed;
-        player->facing_left = 1;   /* mirror sprite so character faces left */
-    }
-    if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) {
-        player->vx += player->speed;
-        player->facing_left = 0;
+    if (!player->on_vine && !keys[SDL_SCANCODE_SPACE] &&
+        (keys[SDL_SCANCODE_UP] || keys[SDL_SCANCODE_W])) {
+        SDL_Rect phit = player_get_hitbox(player);
+        for (int i = 0; i < vine_count; i++) {
+            SDL_Rect vgrab = vine_grab_rect(&vines[i]);
+            if (SDL_HasIntersection(&phit, &vgrab)) {
+                player->on_vine    = 1;
+                player->vine_index = i;
+                player->on_ground  = 0;
+                player->vy         = 0.0f;
+                player->vx         = 0.0f;
+                break;
+            }
+        }
     }
 
-    /*
-     * Jump: Space only — only allowed while standing on the floor.
-     * Setting on_ground = 0 ensures this block only fires once per jump;
-     * subsequent frames while the key is held skip it because on_ground is 0.
-     * vy is set to a negative value (up is negative in SDL screen-space).
-     */
-    if (player->on_ground && keys[SDL_SCANCODE_SPACE]) {
-        player->vy        = -325.0f;  /* upward impulse: original −500 × 0.5 × 1.3 = −325 px/s */
-        player->on_ground  = 0;
-        if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+    if (player->on_vine) {
+        /*
+         * Climbing controls — vertical movement along the vine, reduced
+         * horizontal drift, and Space to jump-dismount.
+         */
+        player->vy = 0.0f;
+        if (keys[SDL_SCANCODE_UP]   || keys[SDL_SCANCODE_W]) player->vy = -CLIMB_SPEED;
+        if (keys[SDL_SCANCODE_DOWN] || keys[SDL_SCANCODE_S]) player->vy =  CLIMB_SPEED;
+
+        player->vx = 0.0f;
+        if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A]) {
+            player->vx = -CLIMB_H_SPEED;
+            player->facing_left = 1;
+        }
+        if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) {
+            player->vx = CLIMB_H_SPEED;
+            player->facing_left = 0;
+        }
+
+        /* Jump dismount — leap off the vine with a normal upward impulse */
+        if (keys[SDL_SCANCODE_SPACE]) {
+            player->on_vine   = 0;
+            player->vy        = -325.0f;
+            player->on_ground = 0;
+            if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+        }
+    } else {
+        /*
+         * Normal ground controls — horizontal movement and jump.
+         * Reset vx to 0 each frame so the player stops when keys are released.
+         */
+        player->vx = 0.0f;
+        if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A]) {
+            player->vx -= player->speed;
+            player->facing_left = 1;
+        }
+        if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) {
+            player->vx += player->speed;
+            player->facing_left = 0;
+        }
+
+        /*
+         * Jump: Space only — only allowed while standing on the floor.
+         * Setting on_ground = 0 ensures this block only fires once per jump;
+         * subsequent frames while the key is held skip it because on_ground is 0.
+         * vy is set to a negative value (up is negative in SDL screen-space).
+         */
+        if (player->on_ground && keys[SDL_SCANCODE_SPACE]) {
+            player->vy        = -325.0f;
+            player->on_ground  = 0;
+            if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+        }
     }
 
     /* ----------------------------------------------------------------
@@ -189,53 +282,94 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
      * ---------------------------------------------------------------- */
     if (ctrl) {
         /*
-         * D-Pad left / right — SDL_GameControllerGetButton returns 1 if the
-         * named button is currently pressed, 0 if not.
-         *
-         * SDL_CONTROLLER_BUTTON_DPAD_LEFT  → D-Pad left  on all controllers
-         * SDL_CONTROLLER_BUTTON_DPAD_RIGHT → D-Pad right on all controllers
+         * Vine grab via D-Pad UP — same logic as keyboard UP above.
+         * Skip when A / Cross is held to prevent grab-dismount spam.
          */
-        if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_LEFT)) {
-            player->vx -= player->speed;
-            player->facing_left = 1;
-        }
-        if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)) {
-            player->vx += player->speed;
-            player->facing_left = 0;
-        }
-
-        /*
-         * Left analog stick horizontal axis.
-         *
-         * SDL_GameControllerGetAxis returns a Sint16 in [-32768, +32767].
-         * Negative = left, positive = right.
-         * We compare the raw value against AXIS_DEAD_ZONE to ignore noise.
-         *
-         * SDL_CONTROLLER_AXIS_LEFTX maps to:
-         *   DualSense / DS4 → left stick horizontal
-         *   Xbox             → left stick horizontal
-         */
-        Sint16 axis_x = SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_LEFTX);
-        if (axis_x < -AXIS_DEAD_ZONE) {
-            player->vx -= player->speed;
-            player->facing_left = 1;
-        } else if (axis_x > AXIS_DEAD_ZONE) {
-            player->vx += player->speed;
-            player->facing_left = 0;
+        if (!player->on_vine &&
+            !SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A) &&
+            SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_UP)) {
+            SDL_Rect phit = player_get_hitbox(player);
+            for (int i = 0; i < vine_count; i++) {
+                SDL_Rect vgrab = vine_grab_rect(&vines[i]);
+                if (SDL_HasIntersection(&phit, &vgrab)) {
+                    player->on_vine    = 1;
+                    player->vine_index = i;
+                    player->on_ground  = 0;
+                    player->vy         = 0.0f;
+                    player->vx         = 0.0f;
+                    break;
+                }
+            }
         }
 
-        /*
-         * Jump button — A (Xbox) / Cross × (DualSense / DS4).
-         *
-         * SDL maps both to SDL_CONTROLLER_BUTTON_A in the unified layout.
-         * Same one-shot guard as the keyboard: on_ground prevents re-triggering
-         * while the button is held after takeoff.
-         */
-        if (player->on_ground &&
-            SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
-            player->vy        = -500.0f;
-            player->on_ground = 0;
-            if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+        if (player->on_vine) {
+            /* D-Pad vertical climbing */
+            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_UP))
+                player->vy = -CLIMB_SPEED;
+            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_DOWN))
+                player->vy =  CLIMB_SPEED;
+
+            /* D-Pad horizontal drift (reduced speed) */
+            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_LEFT)) {
+                player->vx = -CLIMB_H_SPEED;
+                player->facing_left = 1;
+            }
+            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)) {
+                player->vx = CLIMB_H_SPEED;
+                player->facing_left = 0;
+            }
+
+            /* Left stick vertical climbing */
+            Sint16 axis_y = SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_LEFTY);
+            if (axis_y < -AXIS_DEAD_ZONE) player->vy = -CLIMB_SPEED;
+            else if (axis_y > AXIS_DEAD_ZONE) player->vy = CLIMB_SPEED;
+
+            /* Left stick horizontal drift */
+            Sint16 axis_x = SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_LEFTX);
+            if (axis_x < -AXIS_DEAD_ZONE) {
+                player->vx = -CLIMB_H_SPEED;
+                player->facing_left = 1;
+            } else if (axis_x > AXIS_DEAD_ZONE) {
+                player->vx = CLIMB_H_SPEED;
+                player->facing_left = 0;
+            }
+
+            /* A / Cross button → jump dismount */
+            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
+                player->on_vine   = 0;
+                player->vy        = -500.0f;
+                player->on_ground = 0;
+                if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+            }
+        } else {
+            /*
+             * Normal gamepad controls — D-Pad and analog stick for horizontal
+             * movement, A / Cross for jump.
+             */
+            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_LEFT)) {
+                player->vx -= player->speed;
+                player->facing_left = 1;
+            }
+            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)) {
+                player->vx += player->speed;
+                player->facing_left = 0;
+            }
+
+            Sint16 axis_x = SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_LEFTX);
+            if (axis_x < -AXIS_DEAD_ZONE) {
+                player->vx -= player->speed;
+                player->facing_left = 1;
+            } else if (axis_x > AXIS_DEAD_ZONE) {
+                player->vx += player->speed;
+                player->facing_left = 0;
+            }
+
+            if (player->on_ground &&
+                SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
+                player->vy        = -500.0f;
+                player->on_ground = 0;
+                if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+            }
         }
     }
 }
@@ -255,7 +389,9 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
 static void player_animate(Player *player, Uint32 dt_ms) {
     /* Determine the target animation from current physics state */
     AnimState target;
-    if (!player->on_ground) {
+    if (player->on_vine) {
+        target = ANIM_CLIMB;
+    } else if (!player->on_ground) {
         /*
          * In the air: negative vy means moving upward (SDL y-axis is inverted),
          * positive vy means falling down under gravity.
@@ -278,13 +414,21 @@ static void player_animate(Player *player, Uint32 dt_ms) {
      * Advance the frame timer. When it exceeds the per-frame duration,
      * subtract the duration (rather than resetting to 0) so any leftover
      * time carries into the next frame — keeping animation speed accurate.
+     *
+     * While climbing with vy == 0 (holding still on the vine), freeze the
+     * animation on the current frame so the player looks like they are
+     * clinging motionless.
      */
-    player->anim_timer_ms += dt_ms;
-    Uint32 frame_duration = (Uint32)ANIM_FRAME_MS[player->anim_state];
-    if (player->anim_timer_ms >= frame_duration) {
-        player->anim_timer_ms -= frame_duration;
-        player->anim_frame_index =
-            (player->anim_frame_index + 1) % ANIM_FRAME_COUNT[player->anim_state];
+    if (player->anim_state == ANIM_CLIMB && player->vy == 0.0f) {
+        /* Freeze — do not advance the timer or frame index */
+    } else {
+        player->anim_timer_ms += dt_ms;
+        Uint32 frame_duration = (Uint32)ANIM_FRAME_MS[player->anim_state];
+        if (player->anim_timer_ms >= frame_duration) {
+            player->anim_timer_ms -= frame_duration;
+            player->anim_frame_index =
+                (player->anim_frame_index + 1) % ANIM_FRAME_COUNT[player->anim_state];
+        }
     }
 
     /*
@@ -315,7 +459,61 @@ static void player_animate(Player *player, Uint32 dt_ms) {
 void player_update(Player *player, float dt,
                    const Platform *platforms, int platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
+                   const VineDecor *vines, int vine_count,
+                   const int *sea_gaps, int sea_gap_count,
                    int *out_bounce_idx) {
+
+    (void)vine_count;   /* vine_index selects the vine; count unused here */
+
+    /* ---- Vine climbing physics ----------------------------------- */
+    /*
+     * While climbing, gravity and floor/platform collisions are skipped.
+     * The player moves only by the velocities set in player_handle_input.
+     * Detach if the player drifts horizontally out of the grab zone or
+     * their feet drop below the vine bottom.
+     */
+    if (player->on_vine) {
+        player->x += player->vx * dt;
+        player->y += player->vy * dt;
+
+        const VineDecor *v = &vines[player->vine_index];
+        SDL_Rect vgrab = vine_grab_rect(v);
+        SDL_Rect phit  = player_get_hitbox(player);
+
+        /* Horizontal detach — player drifted out of the grab zone */
+        if (!SDL_HasIntersection(&phit, &vgrab)) {
+            player->on_vine = 0;
+            player->vy      = 0.0f;
+            player_animate(player, (Uint32)(dt * 1000.0f));
+            return;
+        }
+
+        /* Vertical clamp at vine top */
+        int vine_total_h = (v->tile_count - 1) * VINE_STEP + VINE_H;
+        float vine_top = v->y;
+        if (player->y + PHYS_PAD_TOP < vine_top) {
+            player->y  = vine_top - (float)PHYS_PAD_TOP;
+            player->vy = 0.0f;
+        }
+
+        /* Bottom detach — feet below vine bottom → release and fall */
+        float vine_bottom   = v->y + (float)vine_total_h;
+        float player_bottom = player->y + player->h - FLOOR_SINK;
+        if (player_bottom > vine_bottom) {
+            player->on_vine = 0;
+            player->vy      = 0.0f;
+        }
+
+        /* Horizontal world clamp (same logic as normal path) */
+        if (player->x + PHYS_PAD_X < 0.0f)
+            player->x = -(float)PHYS_PAD_X;
+        if (player->x + player->w - PHYS_PAD_X > WORLD_W)
+            player->x = (float)(WORLD_W - player->w + PHYS_PAD_X);
+
+        player_animate(player, (Uint32)(dt * 1000.0f));
+        return;   /* skip normal gravity / floor / platform logic */
+    }
+
     /*
      * Reset on_ground every frame so the player immediately starts falling
      * when they walk off the edge of a platform.  Collision checks below
@@ -366,7 +564,23 @@ void player_update(Player *player, float dt,
      * physically it is just a region of the floor that bounces.
      */
     const float ground_snap = (float)(FLOOR_Y - player->h + FLOOR_SINK);
-    if (player->y >= ground_snap) {
+
+    /*
+     * The physics centre of the player determines whether solid ground
+     * exists beneath them.  Sea gaps are holes in the floor — the player
+     * falls through into the water below.
+     */
+    float phys_center_x = player->x + player->w / 2.0f;
+    int over_ground = 1;
+    for (int g = 0; g < sea_gap_count; g++) {
+        float gx = (float)sea_gaps[g];
+        if (phys_center_x >= gx && phys_center_x < gx + (float)SEA_GAP_W) {
+            over_ground = 0;
+            break;
+        }
+    }
+
+    if (over_ground && player->y >= ground_snap) {
         player->y = ground_snap;   /* snap to floor in all cases */
 
         int bounced = 0;
@@ -377,8 +591,8 @@ void player_update(Player *player, float dt,
              * Horizontal overlap test: use the inset PHYS_PAD_X physics box
              * so only the visible character art overlaps, not transparent padding.
              */
-            int h_overlap = (player->x + player->w - PHYS_PAD_X > bp->x) &&
-                            (player->x + PHYS_PAD_X < bp->x + bp->w);
+            int h_overlap = (player->x + player->w - PHYS_PAD_X > bp->x + BOUNCEPAD_ART_X) &&
+                            (player->x + PHYS_PAD_X < bp->x + BOUNCEPAD_ART_X + BOUNCEPAD_ART_W);
             if (!h_overlap) continue;
 
             /*
@@ -537,8 +751,9 @@ SDL_Rect player_get_hitbox(const Player *player) {
  * because they were set once in player_init and don't change.
  */
 void player_reset(Player *player) {
-    player->x         = (GAME_W - player->w) / 2.0f;
-    player->y         = (float)(FLOOR_Y - player->h + FLOOR_SINK);
+    /* Respawn on top of the first platform (same as player_init). */
+    player->x         = 80.0f + (TILE_SIZE - player->w) / 2.0f;
+    player->y         = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - player->h + FLOOR_SINK);
     player->vx        = 0.0f;
     player->vy        = 0.0f;
     player->on_ground = 1;
@@ -547,6 +762,8 @@ void player_reset(Player *player) {
     player->anim_frame_index = 0;
     player->anim_timer_ms    = 0;
     player->facing_left      = 0;
+    player->on_vine          = 0;
+    player->vine_index       = 0;
     player->hurt_timer       = 0.0f;
 
     player->frame.x = 0;

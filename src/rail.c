@@ -196,25 +196,25 @@ void rail_init(Rail *rails, int *count) {
      * end_cap is irrelevant for closed rails (the loop never terminates),
      * but we set it to 1 as a safe default.
      */
-    build_rect_rail(&rails[0], 444, 45, 10, 6);  /* 5% of GAME_H=300 → 15 px higher than y=60 */
+    build_rect_rail(&rails[0], 444, 35, 10, 6);  /* bottom edge at y=131, clears 2-tile platform coins at y=140 */
     rails[0].end_cap = 1;
 
     /* Rail 1 — closed loop, screen 3. */
-    build_rect_rail(&rails[1], 852, 62, 8, 5);  /* 6% of GAME_H=300 → 18 px higher than original y=80 */
+    build_rect_rail(&rails[1], 852, 50, 8, 5);  /* bottom edge at y=130, clears 2-tile platform coins at y=140 */
     rails[1].end_cap = 1;
 
     /*
      * Rail 2 — open horizontal line, screen 4.  end_cap = 0.
-     * 14 tiles × 16 px = 224 px wide, at world (1248, 112).
+     * 14 tiles × 16 px = 224 px wide, at world (1200, 112).
      *
      * With no right end-cap, the FAST spike block detaches when it reaches
      * tile 13 and enters free-fall with its rail speed as initial vx.
      * This demonstrates the "no end cap → fall off" mechanic.
      *
-     * y=112 sits above the 2-tile pillar tops (y=156) and within jumping
-     * reach from the 3-tile pillar nearby (top at y=108).
+     * y=112 sits above the 2-tile pillar tops (y=172) and within jumping
+     * reach from the 3-tile pillar nearby (top at y=124).
      */
-    build_horiz_rail(&rails[2], 1248, 112, 14, 0);
+    build_horiz_rail(&rails[2], 1200, 112, 14, 0);
 
     *count = 3;
 }

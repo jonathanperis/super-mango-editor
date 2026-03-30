@@ -24,6 +24,8 @@
 #define MAX_SPIDERS      4     /* maximum simultaneous spiders on screen    */
 #define SPIDER_FRAMES    3     /* animation frames in Spider_1.png          */
 #define SPIDER_FRAME_W   64    /* width of one frame slot in the sheet (px) */
+#define SPIDER_ART_X     20    /* first visible col within each frame slot  */
+#define SPIDER_ART_W     25    /* width of visible art  (cols 20..44)       */
 #define SPIDER_ART_Y     22    /* first visible row within each frame slot  */
 #define SPIDER_ART_H     10    /* height of visible art (rows 22..31)       */
 #define SPIDER_SPEED     50.0f /* walk speed in logical pixels per second   */
@@ -62,7 +64,8 @@ void spiders_init(Spider *spiders, int *count);
  * count   : number of active entries
  * dt      : delta-time in seconds (frame-rate independent movement)
  */
-void spiders_update(Spider *spiders, int count, float dt);
+void spiders_update(Spider *spiders, int count, float dt,
+                    const int *sea_gaps, int sea_gap_count);
 
 /*
  * spiders_render — Draw all active spiders using the shared texture.
