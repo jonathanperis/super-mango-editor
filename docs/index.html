@@ -4,9 +4,38 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Super Mango - 2D Pixel Art Platformer</title>
-  <meta name="description" content="A 2D pixel art platformer written in C11 + SDL2. Play in your browser via WebAssembly.">
+  <meta name="description" content="A 2D pixel art platformer written in C11 + SDL2. Play in your browser via WebAssembly or download for macOS, Linux, and Windows.">
+  <meta name="keywords" content="Super Mango, platformer, 2D game, pixel art, SDL2, C11, WebAssembly, indie game, side-scroller, open source, game development">
+  <link rel="canonical" href="https://jonathanperis.github.io/super-mango-game/">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Super Mango - 2D Pixel Art Platformer">
+  <meta property="og:description" content="A 2D pixel art platformer written in C11 + SDL2. Play in your browser via WebAssembly or download for macOS, Linux, and Windows.">
+  <meta property="og:url" content="https://jonathanperis.github.io/super-mango-game/">
+  <meta property="og:site_name" content="Super Mango">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Super Mango - 2D Pixel Art Platformer">
+  <meta name="twitter:description" content="A 2D pixel art platformer written in C11 + SDL2. Play in your browser via WebAssembly.">
+  <meta name="twitter:creator" content="@jperis_silva">
+
+  <!-- Theme -->
+  <meta name="theme-color" content="#0f0e17">
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-RM840JHD7N"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-RM840JHD7N');
+  </script>
 
   <!-- Press Start 2P — pixel art font from Google Fonts -->
+  <link rel="dns-prefetch" href="https://www.googletagmanager.com">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -373,6 +402,36 @@
       .hero { padding: 2rem 1rem 1.5rem; }
     }
   </style>
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "VideoGame",
+    "name": "Super Mango",
+    "description": "A 2D pixel art platformer written in C11 + SDL2. Play in your browser via WebAssembly or download for macOS, Linux, and Windows.",
+    "url": "https://jonathanperis.github.io/super-mango-game/",
+    "genre": ["Platformer", "Indie", "Pixel Art"],
+    "gamePlatform": ["Web Browser", "macOS", "Linux", "Windows"],
+    "applicationCategory": "Game",
+    "operatingSystem": ["macOS", "Linux", "Windows", "Web"],
+    "programmingLanguage": "C11",
+    "author": [
+      {
+        "@type": "Person",
+        "name": "Jonathan Peris",
+        "url": "https://github.com/jonathanperis"
+      },
+      {
+        "@type": "Person",
+        "name": "Fernando Santos",
+        "url": "https://github.com/fersantos"
+      }
+    ],
+    "isAccessibleForFree": true,
+    "license": "https://github.com/jonathanperis/super-mango-game/blob/master/LICENSE",
+    "codeRepository": "https://github.com/jonathanperis/super-mango-game"
+  }
+  </script>
 </head>
 <body>
 
@@ -457,43 +516,43 @@
   <section id="docs" class="docs-section">
     <h2>Documentation</h2>
     <div class="docs-grid">
-      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game#readme">
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game#readme" target="_blank" rel="noreferrer noopener" aria-label="Read the project README on GitHub">
         <h3>README</h3>
         <p>Project overview, build instructions for all platforms, controls reference, architecture diagram, and full project structure.</p>
       </a>
-      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki">
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki" target="_blank" rel="noreferrer noopener" aria-label="Visit the Wiki home page">
         <h3>Wiki &mdash; Home</h3>
         <p>Landing page with quick-start guide, project-at-a-glance, and navigation to all wiki pages.</p>
       </a>
-      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/architecture">
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/architecture" target="_blank" rel="noreferrer noopener" aria-label="Read the Architecture wiki page">
         <h3>Wiki &mdash; Architecture</h3>
         <p>Startup sequence, game loop phases, coordinate system, GameState struct, and error handling strategy.</p>
       </a>
-      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/build_system">
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/build_system" target="_blank" rel="noreferrer noopener" aria-label="Read the Build System wiki page">
         <h3>Wiki &mdash; Build System</h3>
         <p>Makefile overview, compiler flags, build targets, prerequisites, and adding new source files.</p>
       </a>
-      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/developer_guide">
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/developer_guide" target="_blank" rel="noreferrer noopener" aria-label="Read the Developer Guide wiki page">
         <h3>Wiki &mdash; Developer Guide</h3>
         <p>Coding conventions, naming rules, memory safety, and step-by-step entity addition walkthrough.</p>
       </a>
-      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/player_module">
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/player_module" target="_blank" rel="noreferrer noopener" aria-label="Read the Player Module wiki page">
         <h3>Wiki &mdash; Player Module</h3>
         <p>Player lifecycle, input handling, jump and climb logic, physics update, animation state machine.</p>
       </a>
-      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/source_files">
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/source_files" target="_blank" rel="noreferrer noopener" aria-label="Read the Source Files wiki page">
         <h3>Wiki &mdash; Source Files</h3>
         <p>Complete file map of all 48 source files with descriptions of main.c, game.h, and game.c roles.</p>
       </a>
-      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/assets">
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/assets" target="_blank" rel="noreferrer noopener" aria-label="Read the Assets wiki page">
         <h3>Wiki &mdash; Assets</h3>
         <p>Asset catalog with 57 sprites, player sprite sheet analysis, animation row mapping, and unused assets.</p>
       </a>
-      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/sounds">
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/sounds" target="_blank" rel="noreferrer noopener" aria-label="Read the Sounds wiki page">
         <h3>Wiki &mdash; Sounds</h3>
         <p>Sound effects catalog, audio configuration, Mix_Chunk vs Mix_Music, and adding new sound effects.</p>
       </a>
-      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/constants_reference">
+      <a class="doc-card" href="https://github.com/jonathanperis/super-mango-game/wiki/constants_reference" target="_blank" rel="noreferrer noopener" aria-label="Read the Constants Reference wiki page">
         <h3>Wiki &mdash; Constants</h3>
         <p>All compile-time constants: window, canvas, timing, tiles, physics, camera, and player locals.</p>
       </a>
@@ -505,19 +564,19 @@
     <h2>Downloads</h2>
     <p style="margin-bottom: 1rem; color: var(--text-dim);">
       Grab the latest release from
-      <a href="https://github.com/jonathanperis/super-mango-game/releases/latest" style="color: var(--gold);">GitHub Releases</a>.
+      <a href="https://github.com/jonathanperis/super-mango-game/releases/latest" style="color: var(--gold);" target="_blank" rel="noreferrer noopener">GitHub Releases</a>.
       Native builds must be run from the repository root so they can find the <code>assets/</code> folder.
     </p>
     <div class="download-grid">
-      <a class="download-card" href="https://github.com/jonathanperis/super-mango-game/releases/latest">
+      <a class="download-card" href="https://github.com/jonathanperis/super-mango-game/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for Linux x86_64">
         <div class="platform">Linux</div>
         <div class="arch">x86_64</div>
       </a>
-      <a class="download-card" href="https://github.com/jonathanperis/super-mango-game/releases/latest">
+      <a class="download-card" href="https://github.com/jonathanperis/super-mango-game/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for macOS Apple Silicon">
         <div class="platform">macOS</div>
         <div class="arch">arm64 (Apple Silicon)</div>
       </a>
-      <a class="download-card" href="https://github.com/jonathanperis/super-mango-game/releases/latest">
+      <a class="download-card" href="https://github.com/jonathanperis/super-mango-game/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for Windows x86_64">
         <div class="platform">Windows</div>
         <div class="arch">x86_64 (SDL2 DLLs included)</div>
       </a>
@@ -531,18 +590,18 @@
   <!-- ── Footer ─────────────────────────────────────────────────── -->
   <footer>
     <p>
-      <a href="https://github.com/jonathanperis/super-mango-game">GitHub Repository</a>
+      <a href="https://github.com/jonathanperis/super-mango-game" target="_blank" rel="noreferrer noopener" aria-label="Super Mango GitHub Repository">GitHub Repository</a>
       &nbsp;&middot;&nbsp;
-      <a href="https://github.com/jonathanperis/super-mango-game/wiki">Wiki</a>
+      <a href="https://github.com/jonathanperis/super-mango-game/wiki" target="_blank" rel="noreferrer noopener" aria-label="Super Mango Wiki">Wiki</a>
       &nbsp;&middot;&nbsp;
-      <a href="https://github.com/jonathanperis/super-mango-game/releases/latest">Releases</a>
+      <a href="https://github.com/jonathanperis/super-mango-game/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Super Mango Releases">Releases</a>
     </p>
     <p style="margin-top: 0.5rem;">
-      Created by <a href="https://github.com/jonathanperis">jonathanperis</a>
-      &amp; <a href="https://github.com/fersantos">fersantos</a>.
+      Created by <a href="https://github.com/jonathanperis" target="_blank" rel="noreferrer noopener">jonathanperis</a>
+      &amp; <a href="https://github.com/fersantos" target="_blank" rel="noreferrer noopener">fersantos</a>.
     </p>
     <p style="margin-top: 0.25rem;">
-      Art from <a href="https://juho.itch.io">Super Mango 2D Pixel Art Platformer Asset Pack</a> by Juho.
+      Art from <a href="https://juho.itch.io" target="_blank" rel="noreferrer noopener">Super Mango 2D Pixel Art Platformer Asset Pack</a> by Juho.
     </p>
   </footer>
 
