@@ -96,6 +96,19 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
         SDL_RenderDrawRect(renderer, &r);
     }
 
+    /* ---- Float platforms — teal (0, 200, 180) ------------------------- */
+    /*
+     * Draw the bounding rect for each active float platform.
+     * Uses float_platform_get_rect for world-space coords.
+     */
+    SDL_SetRenderDrawColor(renderer, 0, 200, 180, 255);
+    for (int i = 0; i < gs->float_platform_count; i++) {
+        if (!gs->float_platforms[i].active) continue;
+        r = float_platform_get_rect(&gs->float_platforms[i]);
+        r.x -= cam_x;
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
     /* ---- Coins (active only) — yellow (255, 255, 0) ----------------- */
     SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
     for (int i = 0; i < gs->coin_count; i++) {

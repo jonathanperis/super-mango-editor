@@ -649,22 +649,31 @@ void game_loop(GameState *gs) {
                 if (pcx >= gx && pcx < gx + (float)SEA_GAP_W &&
                     pcy > (float)(GAME_H - WATER_ART_H)) {
                     if (gs->snd_hit) Mix_PlayChannel(-1, gs->snd_hit, 0);
-                    gs->lives--;
-                    if (gs->debug_mode) debug_log(&gs->debug, "SEA DEATH gap[%d] lives=%d", g, gs->lives);
-                    if (gs->lives <= 0) {
-                        gs->lives           = DEFAULT_LIVES;
-                        gs->score           = 0;
-                        gs->coins_for_heart = 0;
-                        if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
+                    /*
+                     * Sea damage always costs MAX_HEARTS (3 stars), then
+                     * the same hearts≤0 → life-lost cascade as enemies.
+                     */
+                    gs->player.hurt_timer = 1.5f;
+                    gs->hearts -= MAX_HEARTS;
+                    if (gs->debug_mode) debug_log(&gs->debug, "HIT sea gap[%d] hearts=%d", g, gs->hearts);
+                    if (gs->hearts <= 0) {
+                        gs->lives--;
+                        if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
+                        if (gs->lives <= 0) {
+                            gs->lives           = DEFAULT_LIVES;
+                            gs->score           = 0;
+                            gs->coins_for_heart = 0;
+                            if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
+                        }
+                        gs->hearts = MAX_HEARTS;
+                        player_reset(&gs->player);
+                        coins_init(gs->coins, &gs->coin_count);
+                        spiders_init(gs->spiders, &gs->spider_count);
+                        jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
+                        birds_init(gs->birds, &gs->bird_count);
+                        faster_birds_init(gs->faster_birds, &gs->faster_bird_count);
+                        fish_init(gs->fish, &gs->fish_count);
                     }
-                    gs->hearts = MAX_HEARTS;
-                    player_reset(&gs->player);
-                    coins_init(gs->coins, &gs->coin_count);
-                    spiders_init(gs->spiders, &gs->spider_count);
-                    jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
-                    birds_init(gs->birds, &gs->bird_count);
-                    faster_birds_init(gs->faster_birds, &gs->faster_bird_count);
-                    fish_init(gs->fish, &gs->fish_count);
                     break;
                 }
             }
@@ -1171,13 +1180,6 @@ void game_loop(GameState *gs) {
                 SDL_RenderCopy(gs->renderer, gs->floor_tile, &src, &dst);
             }
         }
-
-        /*
-         * Draw the one-way platforms after the floor but before the player,
-         * so the player sprite appears in front of the pillar tiles.
-         */
-        platforms_render(gs->platforms, gs->platform_count,
-                         gs->renderer, gs->platform_tex, cam_x);
 
         /*
          * Draw floating platforms above the floor and pillar layer but below

@@ -60,8 +60,8 @@ void coins_init(Coin *coins, int *count)
     coins[n].x = 792.0f;  coins[n].y = gy; coins[n].active = 1; n++;   /* past bouncepad 2 */
 
     /* ── Screen 2: platform coins ───────────────────────────────── */
-    /* Platform 2: x=500, 2-tile */
-    coins[n].x = (float)COIN_ON_PLAT_X(500); coins[n].y = p2; coins[n].active = 1; n++;
+    /* Platform 2: x=452, 2-tile */
+    coins[n].x = (float)COIN_ON_PLAT_X(452); coins[n].y = p2; coins[n].active = 1; n++;
     /* Platform 3: x=680, 3-tile */
     coins[n].x = (float)COIN_ON_PLAT_X(680); coins[n].y = p3; coins[n].active = 1; n++;
 
@@ -84,8 +84,8 @@ void coins_init(Coin *coins, int *count)
     /* ── Screen 4: platform coins ───────────────────────────────── */
     /* Platform 6: x=1300, 2-tile */
     coins[n].x = (float)COIN_ON_PLAT_X(1300); coins[n].y = p2; coins[n].active = 1; n++;
-    /* Platform 7: x=1480, 3-tile */
-    coins[n].x = (float)COIN_ON_PLAT_X(1480); coins[n].y = p3; coins[n].active = 1; n++;
+    /* Platform 7: x=1480, 2-tile (same height as platform 6) */
+    coins[n].x = (float)COIN_ON_PLAT_X(1480); coins[n].y = p2; coins[n].active = 1; n++;
 
     *count = n;   /* 20 coins total */
 }

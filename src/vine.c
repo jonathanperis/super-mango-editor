@@ -43,8 +43,8 @@ void vine_init(VineDecor *vines, int *count)
      *   x : left edge of the pillar in world pixels
      *   y : top surface (landing surface) in world pixels
      */
-    static const float plat_x[8] = {  80, 256, 500,  680,  880, 1050, 1300, 1480 };
-    static const float plat_y[8] = { 172, 124, 172,  124,  172,  124,  172,  124 };
+    static const float plat_x[8] = {  80, 256, 452,  680,  880, 1050, 1300, 1480 };
+    static const float plat_y[8] = { 172, 124, 172,  124,  172,  124,  172,  172 };
 
     /*
      * Randomly pick 2 or 3 platforms to receive a vine.
