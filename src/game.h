@@ -27,8 +27,9 @@
 #include "bouncepad.h"  /* Bouncepad struct + MAX_BOUNCEPADS constant         */
 #include "hud.h"        /* Hud struct — HUD display resources                */
 #include "parallax.h"   /* ParallaxSystem — multi-layer scrolling background */
-#include "rail.h"         /* Rail, RailTile — rail path system              */
-#include "spike_block.h"  /* SpikeBlock — rail-riding hazard entity          */
+#include "rail.h"           /* Rail, RailTile — rail path system              */
+#include "spike_block.h"    /* SpikeBlock — rail-riding hazard entity          */
+#include "float_platform.h" /* FloatPlatform — hovering/crumble/rail surfaces */
 #include "jumping_spider.h" /* JumpingSpider — jumping patrol enemy          */
 #include "bird.h"           /* Bird — slow sine-wave sky patrol             */
 #include "faster_bird.h"    /* FasterBird — fast sine-wave sky patrol       */
@@ -176,6 +177,9 @@ typedef struct {
     SDL_Texture  *spike_block_tex; /* shared texture for all spike block entities */
     SpikeBlock    spike_blocks[MAX_SPIKE_BLOCKS]; /* rail-riding hazard instances */
     int           spike_block_count;              /* number of active blocks      */
+    SDL_Texture  *float_platform_tex;                       /* Platform.png — 3-slice strip      */
+    FloatPlatform  float_platforms[MAX_FLOAT_PLATFORMS];    /* hovering surface instances        */
+    int            float_platform_count;                    /* number of float platforms placed  */
     int           sea_gaps[MAX_SEA_GAPS]; /* left-edge x of each sea gap       */
     int           sea_gap_count;         /* number of active sea gaps          */
     Hud           hud;         /* HUD display: hearts, lives, score           */
