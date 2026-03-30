@@ -23,7 +23,7 @@ Super Mango is a 2D platformer where a player character runs, jumps, and climbs 
 - **Faster bird enemies** — Aggressive fast sky patrol birds (`faster_bird.png`) with tighter, more erratic sine-wave curves and quicker wing animation
 - **Fish enemies** — Jumping water enemies that patrol the bottom lane, leap out of the water on random arcs, and use AABB collision with the player
 - **Faster fish enemies** — A speedier fish variant with more aggressive jump arcs and quicker patrol movement
-- **Blue flame hazards** — Animated flame obstacles placed in the environment that damage the player on contact
+- **Blue flame hazards** — Animated flame obstacles that erupt from sea gaps, cycling through rise/flip/fall phases, damaging the player on contact
 - **Spike rows** — Ground-level spike strips placed on the floor surface that damage the player on contact
 - **Spike platforms** — Elevated spike hazards mounted on platforms
 - **Axe traps** — Swinging axe hazards with animated rotation that damage the player on contact
@@ -134,6 +134,15 @@ make run
 
 # Build and run with debug overlay (FPS, collision boxes, event log)
 make run-debug
+
+# Build and run in sandbox mode
+make run-sandbox
+
+# Build and run in sandbox mode with debug overlay
+make run-sandbox-debug
+
+# Build to WebAssembly (requires Emscripten SDK)
+make web
 
 # Remove all build artifacts
 make clean
@@ -334,7 +343,7 @@ main()
 | 15 | Coins (`coin.png` collectibles) |
 | 16 | Yellow stars (`yellow_star.png` health pickups) |
 | 17 | Last star (end-of-level star using HUD star sprite) |
-| 18 | Blue flames (`blue_flame.png` animated flame hazards) |
+| 18 | Blue flames (`blue_flame.png` animated flame hazards erupting from sea gaps) |
 | 19 | Fish (`fish.png` jumping water enemies, drawn before water for submerged look) |
 | 20 | Faster fish (`faster_fish.png` aggressive jumping water enemies) |
 | 21 | Water (animated `water.png` strip) |
