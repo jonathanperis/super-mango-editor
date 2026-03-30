@@ -1,6 +1,6 @@
 # Constants Reference
 
-← [Home](Home)
+← [Home](home)
 
 ---
 
@@ -87,7 +87,7 @@ These are `#define`s local to `player.c` (not visible to other files).
 
 ### Why `FLOOR_SINK`?
 
-The `Player.png` sprite sheet has transparent padding at the **bottom** of each 48×48 frame. Without the sink offset, the physics floor edge (`y + h = FLOOR_Y`) would leave the character visually floating 16 px above the grass. `FLOOR_SINK` compensates:
+The `player.png` sprite sheet has transparent padding at the **bottom** of each 48×48 frame. Without the sink offset, the physics floor edge (`y + h = FLOOR_Y`) would leave the character visually floating 16 px above the grass. `FLOOR_SINK` compensates:
 
 ```
 floor_snap = FLOOR_Y - player->h + FLOOR_SINK
@@ -175,7 +175,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `WATER_FRAMES` | `8` | `int` | Total animation frames in `Water.png` |
+| `WATER_FRAMES` | `8` | `int` | Total animation frames in `water.png` |
 | `WATER_FRAME_W` | `48` | `int` | Full slot width per frame in the sheet (px) |
 | `WATER_ART_DX` | `16` | `int` | Left offset to visible art within each slot |
 | `WATER_ART_W` | `16` | `int` | Width of actual art pixels per frame |
@@ -191,7 +191,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
 | `MAX_SPIDERS` | `4` | `int` | Maximum simultaneous spider enemies |
-| `SPIDER_FRAMES` | `3` | `int` | Animation frames in `Spider_1.png` (192÷64 = 3) |
+| `SPIDER_FRAMES` | `3` | `int` | Animation frames in `spider.png` (192÷64 = 3) |
 | `SPIDER_FRAME_W` | `64` | `int` | Width of one frame slot in the sheet (px) |
 | `SPIDER_ART_X` | `20` | `int` | First visible col within each frame slot |
 | `SPIDER_ART_W` | `25` | `int` | Width of visible art (cols 20–44) |
@@ -238,8 +238,8 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `MAX_VINES` | `24` | `int` | Maximum number of vine instances |
 | `VINE_W` | `16` | `int` | Sprite width in logical pixels |
 | `VINE_H` | `32` | `int` | Content height after removing transparent padding |
-| `VINE_SRC_Y` | `8` | `int` | First pixel row with content in Vine.png |
-| `VINE_SRC_H` | `32` | `int` | Height of content area in Vine.png |
+| `VINE_SRC_Y` | `8` | `int` | First pixel row with content in vine.png |
+| `VINE_SRC_H` | `32` | `int` | Height of content area in vine.png |
 | `VINE_STEP` | `19` | `int` | Vertical spacing between stacked tiles (px) |
 
 ---
@@ -249,7 +249,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
 | `MAX_FISH` | `4` | `int` | Maximum simultaneous fish instances |
-| `FISH_FRAMES` | `2` | `int` | Horizontal frames in `Fish_2.png` (96×48 sheet) |
+| `FISH_FRAMES` | `2` | `int` | Horizontal frames in `fish.png` (96×48 sheet) |
 | `FISH_FRAME_W` | `48` | `int` | Width of one frame slot in the sheet (px) |
 | `FISH_FRAME_H` | `48` | `int` | Height of one frame slot in the sheet (px) |
 | `FISH_RENDER_W` | `48` | `int` | On-screen render width in logical pixels |
@@ -340,7 +340,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
 | `MAX_JUMPING_SPIDERS` | `4` | `int` | Maximum simultaneous jumping spider instances |
-| `JSPIDER_FRAMES` | `3` | `int` | Animation frames in `Spider_2.png` (192÷64 = 3) |
+| `JSPIDER_FRAMES` | `3` | `int` | Animation frames in `jumping_spider.png` (192÷64 = 3) |
 | `JSPIDER_FRAME_W` | `64` | `int` | Width of one frame slot in the sheet (px) |
 | `JSPIDER_ART_X` | `20` | `int` | First visible col within each frame |
 | `JSPIDER_ART_W` | `25` | `int` | Width of visible art (cols 20–44) |
@@ -358,7 +358,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
 | `MAX_BIRDS` | `4` | `int` | Maximum simultaneous bird instances |
-| `BIRD_FRAMES` | `3` | `int` | Animation frames in `Bird_2.png` (144÷48 = 3) |
+| `BIRD_FRAMES` | `3` | `int` | Animation frames in `bird.png` (144÷48 = 3) |
 | `BIRD_FRAME_W` | `48` | `int` | Width of one frame slot in the sheet (px) |
 | `BIRD_ART_X` | `17` | `int` | First visible col within each frame |
 | `BIRD_ART_W` | `15` | `int` | Width of visible art (cols 17–31) |
@@ -376,7 +376,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
 | `MAX_FASTER_BIRDS` | `4` | `int` | Maximum simultaneous faster bird instances |
-| `FBIRD_FRAMES` | `3` | `int` | Animation frames in `Bird_1.png` (144÷48 = 3) |
+| `FBIRD_FRAMES` | `3` | `int` | Animation frames in `faster_bird.png` (144÷48 = 3) |
 | `FBIRD_FRAME_W` | `48` | `int` | Width of one frame slot in the sheet (px) |
 | `FBIRD_ART_X` | `17` | `int` | First visible col within each frame |
 | `FBIRD_ART_W` | `15` | `int` | Width of visible art (cols 17–31) |
@@ -408,9 +408,159 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 |----------|-------|------|-------------|
 | `MAX_BRIDGES` | `2` | `int` | Maximum bridge instances per level |
 | `MAX_BRIDGE_BRICKS` | `16` | `int` | Maximum bricks in a single bridge |
-| `BRIDGE_TILE_W` | `16` | `int` | Width of one Bridge.png tile (px) |
-| `BRIDGE_TILE_H` | `16` | `int` | Height of one Bridge.png tile (px) |
+| `BRIDGE_TILE_W` | `16` | `int` | Width of one bridge.png tile (px) |
+| `BRIDGE_TILE_H` | `16` | `int` | Height of one bridge.png tile (px) |
 | `BRIDGE_FALL_DELAY` | `0.1f` | `float` | Seconds between touch and first brick falling |
 | `BRIDGE_CASCADE_DELAY` | `0.06f` | `float` | Extra seconds between successive bricks cascading outward |
 | `BRIDGE_FALL_GRAVITY` | `250.0f` | `float` | Downward acceleration per brick during fall (px/s²) |
 | `BRIDGE_FALL_INITIAL_VY` | `20.0f` | `float` | Initial downward velocity on fall-start (px/s) |
+
+---
+
+## `yellow_star.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_YELLOW_STARS` | `3` | `int` | Maximum yellow star instances per level |
+| `YELLOW_STAR_DISPLAY_W` | `16` | `int` | Display width (logical px) |
+| `YELLOW_STAR_DISPLAY_H` | `16` | `int` | Display height (logical px) |
+
+---
+
+## `last_star.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `LAST_STAR_DISPLAY_W` | `24` | `int` | Display width (logical px) |
+| `LAST_STAR_DISPLAY_H` | `24` | `int` | Display height (logical px) |
+
+---
+
+## `axe_trap.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `AXE_FRAME_W` | `48` | `int` | Source sprite width (px) |
+| `AXE_FRAME_H` | `64` | `int` | Source sprite height (px) |
+| `AXE_DISPLAY_W` | `48` | `int` | On-screen display width (logical px) |
+| `AXE_DISPLAY_H` | `64` | `int` | On-screen display height (logical px) |
+| `AXE_SWING_AMPLITUDE` | `60.0f` | `float` | Maximum pendulum angle from vertical (degrees) |
+| `AXE_SWING_PERIOD` | `2.0f` | `float` | Time for one full pendulum cycle (s) |
+| `AXE_SPIN_SPEED` | `180.0f` | `float` | Rotation speed for spin variant (degrees/s) |
+| `MAX_AXE_TRAPS` | `4` | `int` | Maximum axe trap instances per level |
+
+---
+
+## `circular_saw.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `SAW_FRAME_W` | `32` | `int` | Source sprite width (px) |
+| `SAW_FRAME_H` | `32` | `int` | Source sprite height (px) |
+| `SAW_DISPLAY_W` | `32` | `int` | On-screen display width (logical px) |
+| `SAW_DISPLAY_H` | `32` | `int` | On-screen display height (logical px) |
+| `SAW_SPIN_DEG_PER_SEC` | `720.0f` | `float` | Rotation speed (degrees/s) |
+| `SAW_PATROL_SPEED` | `180.0f` | `float` | Horizontal patrol speed (px/s) |
+| `SAW_PUSH_SPEED` | `220.0f` | `float` | Push impulse magnitude (px/s) |
+| `SAW_PUSH_VY` | `-150.0f` | `float` | Upward bounce component on collision (px/s) |
+| `MAX_CIRCULAR_SAWS` | `4` | `int` | Maximum circular saw instances per level |
+
+---
+
+## `blue_flame.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `BLUE_FLAME_FRAME_W` | `48` | `int` | Animation frame width (px) |
+| `BLUE_FLAME_FRAME_H` | `48` | `int` | Animation frame height (px) |
+| `BLUE_FLAME_DISPLAY_W` | `48` | `int` | On-screen display width (logical px) |
+| `BLUE_FLAME_DISPLAY_H` | `48` | `int` | On-screen display height (logical px) |
+| `BLUE_FLAME_FRAME_COUNT` | `2` | `int` | Number of animation frames |
+| `BLUE_FLAME_ANIM_SPEED` | `0.1f` | `float` | Seconds between frame advances |
+| `BLUE_FLAME_LAUNCH_VY` | `-550.0f` | `float` | Initial upward impulse (px/s) |
+| `BLUE_FLAME_RISE_DECEL` | `800.0f` | `float` | Deceleration during rise (px/s²) |
+| `BLUE_FLAME_APEX_Y` | `60.0f` | `float` | World-space y coordinate at apex (px) |
+| `BLUE_FLAME_FLIP_DURATION` | `0.12f` | `float` | Time to rotate 180 degrees at apex (s) |
+| `BLUE_FLAME_WAIT_DURATION` | `1.5f` | `float` | Time hidden below floor before next eruption (s) |
+| `MAX_BLUE_FLAMES` | `8` | `int` | Maximum blue flame instances per level |
+
+---
+
+## `faster_fish.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_FASTER_FISH` | `4` | `int` | Maximum faster fish instances per level |
+| `FFISH_FRAMES` | `2` | `int` | Number of animation frames |
+| `FFISH_FRAME_W` | `48` | `int` | Frame width (px) |
+| `FFISH_FRAME_H` | `48` | `int` | Frame height (px) |
+| `FFISH_RENDER_W` | `48` | `int` | Render width (logical px) |
+| `FFISH_RENDER_H` | `48` | `int` | Render height (logical px) |
+| `FFISH_SPEED` | `120.0f` | `float` | Patrol speed (px/s) |
+| `FFISH_JUMP_VY` | `-420.0f` | `float` | Jump impulse (px/s) |
+| `FFISH_JUMP_MIN` | `1.0f` | `float` | Minimum delay between jumps (s) |
+| `FFISH_JUMP_MAX` | `2.2f` | `float` | Maximum delay between jumps (s) |
+| `FFISH_HITBOX_PAD_X` | `16` | `int` | Horizontal hitbox inset (px) |
+| `FFISH_HITBOX_PAD_Y` | `13` | `int` | Vertical hitbox inset (px) |
+| `FFISH_FRAME_MS` | `100` | `int` | Frame animation duration (ms) |
+
+---
+
+## `spike.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_SPIKE_ROWS` | `4` | `int` | Maximum spike row instances per level |
+| `MAX_SPIKE_TILES` | `16` | `int` | Maximum tiles in a single spike row |
+| `SPIKE_TILE_W` | `16` | `int` | Spike tile width (px) |
+| `SPIKE_TILE_H` | `16` | `int` | Spike tile height (px) |
+
+---
+
+## `spike_platform.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_SPIKE_PLATFORMS` | `4` | `int` | Maximum spike platform instances per level |
+| `SPIKE_PLAT_PIECE_W` | `16` | `int` | Width of one 3-slice piece (px) |
+| `SPIKE_PLAT_H` | `16` | `int` | Full frame height (px) |
+| `SPIKE_PLAT_SRC_Y` | `5` | `int` | First content row in each piece (px) |
+| `SPIKE_PLAT_SRC_H` | `11` | `int` | Content height (rows 5-15, px) |
+
+---
+
+## `ladder.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_LADDERS` | `8` | `int` | Maximum ladder instances per level |
+| `LADDER_W` | `16` | `int` | Sprite width (px) |
+| `LADDER_H` | `22` | `int` | Content height after cropping padding (px) |
+| `LADDER_SRC_Y` | `13` | `int` | First pixel row with content |
+| `LADDER_SRC_H` | `22` | `int` | Height of content area (px) |
+| `LADDER_STEP` | `8` | `int` | Vertical overlap when tiling (px) |
+
+---
+
+## `rope.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_ROPES` | `8` | `int` | Maximum rope instances per level |
+| `ROPE_W` | `12` | `int` | Display width with padding (px) |
+| `ROPE_H` | `36` | `int` | Display height with padding (px) |
+| `ROPE_SRC_X` | `2` | `int` | Source crop x offset (px) |
+| `ROPE_SRC_Y` | `6` | `int` | Source crop y offset (px) |
+| `ROPE_SRC_W` | `12` | `int` | Source crop width (px) |
+| `ROPE_SRC_H` | `36` | `int` | Source crop height (px) |
+| `ROPE_STEP` | `34` | `int` | Vertical spacing between stacked tiles (px) |
+
+---
+
+## `bouncepad_small.h` / `bouncepad_medium.h` / `bouncepad_high.h` Constants
+
+| Constant | Value | Type | Description |
+|----------|-------|------|-------------|
+| `MAX_BOUNCEPADS_SMALL` | `4` | `int` | Maximum small bouncepad instances |
+| `MAX_BOUNCEPADS_MEDIUM` | `4` | `int` | Maximum medium bouncepad instances |
+| `MAX_BOUNCEPADS_HIGH` | `4` | `int` | Maximum high bouncepad instances |

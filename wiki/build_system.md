@@ -1,6 +1,6 @@
 # Build System
 
-← [Home](Home)
+← [Home](home)
 
 ---
 
@@ -10,8 +10,8 @@ The project uses a **GNU Makefile** that auto-discovers source files via a wildc
 
 ```makefile
 CC      = clang
-CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(shell sdl2-config --cflags)
-LIBS    = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer
+CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic -MMD -MP $(shell sdl2-config --cflags)
+LIBS    = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
 OUTDIR  = out
 TARGET  = $(OUTDIR)/super-mango
 SRCDIR  = src
@@ -38,6 +38,8 @@ OBJS    = $(SRCS:.c=.o)
 | `-Wall` | Enable common warnings |
 | `-Wextra` | Enable extra warnings beyond `-Wall` |
 | `-Wpedantic` | Strict ISO compliance warnings |
+| `-MMD` | Generate `.d` dependency files for each `.o` (tracks header changes) |
+| `-MP` | Add phony targets for each dependency (prevents errors when headers are deleted) |
 | `$(shell sdl2-config --cflags)` | SDL2 include paths (`-I/opt/homebrew/include/SDL2`) |
 
 ### Linker Flags Explained
@@ -48,6 +50,7 @@ OBJS    = $(SRCS:.c=.o)
 | `-lSDL2_image` | PNG/JPG texture loading |
 | `-lSDL2_ttf` | TrueType font rendering |
 | `-lSDL2_mixer` | Audio mixing (WAV, MP3, OGG) |
+| `-lm` | Math library (`math.h` functions: `sinf`, `cosf`, `fmodf`, etc.) |
 
 ---
 
@@ -77,8 +80,8 @@ make run
 
 The binary must be run from the **repo root** because asset paths are relative:
 ```c
-IMG_LoadTexture(renderer, "assets/parallax/sky.png");
-Mix_LoadWAV("sounds/jump.wav");
+IMG_LoadTexture(renderer, "assets/parallax_sky.png");
+Mix_LoadWAV("sounds/player_jump.wav");
 ```
 
 ### `make run-debug`
@@ -87,6 +90,22 @@ Builds (if out of date) then runs the binary with the `--debug` flag, which enab
 
 ```sh
 make run-debug
+```
+
+### `make run-sandbox`
+
+Builds (if out of date) then runs the binary with the `--sandbox` flag, which launches the sandbox/level-editor mode for testing entity placement and interactions.
+
+```sh
+make run-sandbox
+```
+
+### `make run-sandbox-debug`
+
+Builds (if out of date) then runs the binary with both `--sandbox` and `--debug` flags, combining sandbox mode with the debug overlay.
+
+```sh
+make run-sandbox-debug
 ```
 
 ### `make clean`
@@ -99,6 +118,7 @@ make clean
 
 Deletes:
 - `src/*.o` — all object files
+- `src/*.d` — all generated dependency files
 - `out/` — the output directory and binary
 
 ---
@@ -173,7 +193,7 @@ touch src/coin.c src/coin.h
 make   # coin.c is compiled automatically
 ```
 
-See [Developer Guide](Developer-Guide) for the full new-entity workflow.
+See [Developer Guide](developer_guide) for the full new-entity workflow.
 
 ---
 
@@ -183,27 +203,43 @@ After a successful build:
 
 ```
 out/
-└── super-mango     ← the game binary
+└── super-mango          ← the game binary
 src/
 ├── main.o
 ├── game.o
 ├── player.o
 ├── platform.o
 ├── water.o
+├── fog.o
+├── parallax.o
+├── hud.o
+├── debug.o
+├── sandbox.o
+├── start_menu.o
+├── coin.o
+├── yellow_star.o
+├── last_star.o
 ├── spider.o
 ├── jumping_spider.o
 ├── bird.o
 ├── faster_bird.o
-├── fog.o
-├── parallax.o
-├── coin.o
-├── vine.o
 ├── fish.o
-├── hud.o
-├── bouncepad.o
-├── rail.o
+├── faster_fish.o
+├── blue_flame.o
+├── spike.o
 ├── spike_block.o
+├── spike_platform.o
+├── circular_saw.o
+├── axe_trap.o
+├── bouncepad.o
+├── bouncepad_small.o
+├── bouncepad_medium.o
+├── bouncepad_high.o
 ├── float_platform.o
 ├── bridge.o
-└── debug.o
+├── rail.o
+├── vine.o
+├── ladder.o
+├── rope.o
+└── (plus corresponding .d dependency files)
 ```
