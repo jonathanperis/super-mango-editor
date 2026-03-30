@@ -34,6 +34,7 @@
 #include "jumping_spider.h" /* JumpingSpider — jumping patrol enemy          */
 #include "bird.h"           /* Bird — slow sine-wave sky patrol             */
 #include "faster_bird.h"    /* FasterBird — fast sine-wave sky patrol       */
+#include "red_star.h"       /* RedStar — health-restoring collectible       */
 #include "debug.h"        /* DebugOverlay — debug collision/FPS/log overlay  */
 
 /* ------------------------------------------------------------------ */
@@ -186,11 +187,14 @@ typedef struct {
     int           bridge_count;        /* number of active bridges             */
     int           sea_gaps[MAX_SEA_GAPS]; /* left-edge x of each sea gap       */
     int           sea_gap_count;         /* number of active sea gaps          */
+    SDL_Texture  *red_star_tex;          /* shared texture for red star pickups*/
+    RedStar       red_stars[MAX_RED_STARS]; /* health-restoring collectibles   */
+    int           red_star_count;        /* number of red stars placed         */
     Hud           hud;         /* HUD display: hearts, lives, score           */
     int           hearts;      /* current hit points (0–MAX_HEARTS)           */
-    int           lives;       /* remaining lives; 0 triggers game over       */
+    int           lives;       /* remaining lives; <0 triggers game over      */
     int           score;       /* cumulative score from collecting coins      */
-    int           coins_for_heart; /* coins collected toward next heart restore */
+    int           score_life_next; /* score threshold for next bonus life     */
     Camera        camera;      /* viewport scroll position; updated every frame*/
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
     int           paused;      /* 1 = window lost focus; physics/music frozen */
