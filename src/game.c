@@ -456,6 +456,36 @@ void game_init(GameState *gs) {
  *   3. Update game state (player position, etc.).
  *   4. Draw everything to the screen.
  */
+
+/* ------------------------------------------------------------------ */
+
+/*
+ * level_reset — centralised "player died, restart level" handler.
+ *
+ * Resets every entity array and the player to their initial state.
+ * Called from every hearts<=0 branch so all sources of death produce
+ * an identical reset — no entity is accidentally left in a stale state.
+ *
+ * fp_prev_riding is passed by pointer because it lives as a local
+ * variable inside game_loop; resetting it here keeps the float-platform
+ * stay-on logic from snapping the player to a platform that no longer
+ * exists after the reset.
+ */
+static void level_reset(GameState *gs, int *fp_prev_riding) {
+    player_reset(&gs->player);
+    coins_init(gs->coins, &gs->coin_count);
+    spiders_init(gs->spiders, &gs->spider_count);
+    jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
+    birds_init(gs->birds, &gs->bird_count);
+    faster_birds_init(gs->faster_birds, &gs->faster_bird_count);
+    fish_init(gs->fish, &gs->fish_count);
+    spike_blocks_init(gs->spike_blocks, &gs->spike_block_count, gs->rails);
+    float_platforms_init(gs->float_platforms, &gs->float_platform_count, gs->rails);
+    *fp_prev_riding = -1;
+}
+
+/* ------------------------------------------------------------------ */
+
 void game_loop(GameState *gs) {
     /*
      * frame_ms — how many milliseconds one frame should take at TARGET_FPS.
@@ -654,7 +684,7 @@ void game_loop(GameState *gs) {
                      * the same hearts≤0 → life-lost cascade as enemies.
                      */
                     gs->player.hurt_timer = 1.5f;
-                    gs->hearts -= MAX_HEARTS;
+                    gs->hearts -= gs->hearts;   /* drain all remaining hearts — always lethal */
                     if (gs->debug_mode) debug_log(&gs->debug, "HIT sea gap[%d] hearts=%d", g, gs->hearts);
                     if (gs->hearts <= 0) {
                         gs->lives--;
@@ -666,13 +696,7 @@ void game_loop(GameState *gs) {
                             if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                         }
                         gs->hearts = MAX_HEARTS;
-                        player_reset(&gs->player);
-                        coins_init(gs->coins, &gs->coin_count);
-                        spiders_init(gs->spiders, &gs->spider_count);
-                        jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
-                        birds_init(gs->birds, &gs->bird_count);
-                        faster_birds_init(gs->faster_birds, &gs->faster_bird_count);
-                        fish_init(gs->fish, &gs->fish_count);
+                        level_reset(gs, &fp_prev_riding);
                     }
                     break;
                 }
@@ -773,14 +797,7 @@ void game_loop(GameState *gs) {
                             if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                         }
                         gs->hearts = MAX_HEARTS;
-                        player_reset(&gs->player);
-                        coins_init(gs->coins, &gs->coin_count);
-                        spiders_init(gs->spiders, &gs->spider_count);
-                        fish_init(gs->fish, &gs->fish_count);
-                        float_platforms_init(gs->float_platforms,
-                                             &gs->float_platform_count,
-                                             gs->rails);
-                        fp_prev_riding = -1;
+                        level_reset(gs, &fp_prev_riding);
                     }
                     break;
                 }
@@ -811,11 +828,7 @@ void game_loop(GameState *gs) {
                                 if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                             }
                             gs->hearts = MAX_HEARTS;
-                            player_reset(&gs->player);
-                            coins_init(gs->coins, &gs->coin_count);
-                            spiders_init(gs->spiders, &gs->spider_count);
-                            jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
-                            fish_init(gs->fish, &gs->fish_count);
+                            level_reset(gs, &fp_prev_riding);
                         }
                         break;
                     }
@@ -841,13 +854,7 @@ void game_loop(GameState *gs) {
                                 if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                             }
                             gs->hearts = MAX_HEARTS;
-                            player_reset(&gs->player);
-                            coins_init(gs->coins, &gs->coin_count);
-                            spiders_init(gs->spiders, &gs->spider_count);
-                            jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
-                            birds_init(gs->birds, &gs->bird_count);
-                            faster_birds_init(gs->faster_birds, &gs->faster_bird_count);
-                            fish_init(gs->fish, &gs->fish_count);
+                            level_reset(gs, &fp_prev_riding);
                         }
                         break;
                     }
@@ -873,13 +880,7 @@ void game_loop(GameState *gs) {
                                 if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                             }
                             gs->hearts = MAX_HEARTS;
-                            player_reset(&gs->player);
-                            coins_init(gs->coins, &gs->coin_count);
-                            spiders_init(gs->spiders, &gs->spider_count);
-                            jumping_spiders_init(gs->jumping_spiders, &gs->jumping_spider_count);
-                            birds_init(gs->birds, &gs->bird_count);
-                            faster_birds_init(gs->faster_birds, &gs->faster_bird_count);
-                            fish_init(gs->fish, &gs->fish_count);
+                            level_reset(gs, &fp_prev_riding);
                         }
                         break;
                     }
@@ -909,13 +910,7 @@ void game_loop(GameState *gs) {
                                 if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                             }
                             gs->hearts = MAX_HEARTS;
-                            player_reset(&gs->player);
-                            coins_init(gs->coins, &gs->coin_count);
-                            spiders_init(gs->spiders, &gs->spider_count);
-                            fish_init(gs->fish, &gs->fish_count);
-                            float_platforms_init(gs->float_platforms,
-                                                 &gs->float_platform_count,
-                                                 gs->rails);
+                            level_reset(gs, &fp_prev_riding);
                         }
                         break;
                     }
@@ -956,16 +951,7 @@ void game_loop(GameState *gs) {
                                 if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                             }
                             gs->hearts = MAX_HEARTS;
-                            player_reset(&gs->player);
-                            coins_init(gs->coins, &gs->coin_count);
-                            spiders_init(gs->spiders, &gs->spider_count);
-                            fish_init(gs->fish, &gs->fish_count);
-                            spike_blocks_init(gs->spike_blocks,
-                                              &gs->spike_block_count,
-                                              gs->rails);
-                            float_platforms_init(gs->float_platforms,
-                                                 &gs->float_platform_count,
-                                                 gs->rails);
+                            level_reset(gs, &fp_prev_riding);
                         }
                         break;
                     }
