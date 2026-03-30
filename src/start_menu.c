@@ -38,7 +38,7 @@ void start_menu_init(StartMenu *menu, SDL_Window *window, SDL_Renderer *renderer
      * Load the same bitmap font used by the HUD (Round9x13.ttf at size 13).
      * Fatal if missing — we need it to render the title text.
      */
-    menu->font = TTF_OpenFont("assets/Round9x13.ttf", 13);
+    menu->font = TTF_OpenFont("assets/round9x13.ttf", 13);
     if (!menu->font) {
         fprintf(stderr, "Failed to load Round9x13.ttf: %s\n", TTF_GetError());
         exit(EXIT_FAILURE);
@@ -48,7 +48,7 @@ void start_menu_init(StartMenu *menu, SDL_Window *window, SDL_Renderer *renderer
      * Load the Logo.png texture (64×48 px source).
      * Non-fatal — the menu can run without the logo.
      */
-    menu->logo_tex = IMG_LoadTexture(renderer, "assets/Logo.png");
+    menu->logo_tex = IMG_LoadTexture(renderer, "assets/start_menu_logo.png");
     if (!menu->logo_tex) {
         fprintf(stderr, "Warning: Failed to load Logo.png: %s\n", IMG_GetError());
     }

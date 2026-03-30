@@ -29,7 +29,7 @@ void hud_init(Hud *hud, SDL_Renderer *renderer)
      * 13 matches the font's designed pixel height (9×13 character cells),
      * giving the crispest rendering without fractional scaling.
      */
-    hud->font = TTF_OpenFont("assets/Round9x13.ttf", 13);
+    hud->font = TTF_OpenFont("assets/round9x13.ttf", 13);
     if (!hud->font) {
         fprintf(stderr, "Failed to load Round9x13.ttf: %s\n", TTF_GetError());
         exit(EXIT_FAILURE);
@@ -39,7 +39,7 @@ void hud_init(Hud *hud, SDL_Renderer *renderer)
      * IMG_LoadTexture — decode Stars_Ui.png and upload it to GPU memory.
      * This single texture is drawn once per current heart in hud_render.
      */
-    hud->star_tex = IMG_LoadTexture(renderer, "assets/Star_Yellow.png");
+    hud->star_tex = IMG_LoadTexture(renderer, "assets/yellow_star.png");
     if (!hud->star_tex) {
         fprintf(stderr, "Failed to load Stars_Ui.png: %s\n", IMG_GetError());
         TTF_CloseFont(hud->font);
@@ -51,7 +51,7 @@ void hud_init(Hud *hud, SDL_Renderer *renderer)
      * Load the coin icon for the score display.
      * Non-fatal: the score still shows without the icon.
      */
-    hud->coin_icon = IMG_LoadTexture(renderer, "assets/Coins_Ui.png");
+    hud->coin_icon = IMG_LoadTexture(renderer, "assets/hud_coins.png");
     if (!hud->coin_icon) {
         fprintf(stderr, "Warning: Failed to load Coins_Ui.png: %s\n", IMG_GetError());
     }
@@ -60,7 +60,7 @@ void hud_init(Hud *hud, SDL_Renderer *renderer)
      * Load the player sprite sheet so the HUD can crop a small icon
      * for the lives counter.  Non-fatal: lives text still renders.
      */
-    hud->player_icon = IMG_LoadTexture(renderer, "assets/Player.png");
+    hud->player_icon = IMG_LoadTexture(renderer, "assets/player.png");
     if (!hud->player_icon) {
         fprintf(stderr, "Warning: Failed to load Player.png (HUD icon): %s\n", IMG_GetError());
     }

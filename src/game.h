@@ -40,7 +40,7 @@
 #include "yellow_star.h"    /* YellowStar — health-restoring collectible    */
 #include "axe_trap.h"       /* AxeTrap — swinging/spinning axe hazard       */
 #include "circular_saw.h"  /* CircularSaw — fast rotating patrol hazard    */
-#include "flame.h"         /* Flame — erupting fire hazard from sea gaps   */
+#include "blue_flame.h"    /* BlueFlame — erupting fire hazard from sea gaps */
 #include "ladder.h"        /* LadderDecor — climbable ladder                */
 #include "rope.h"          /* RopeDecor — climbable rope                   */
 #include "faster_fish.h"   /* FasterFish — fast variant of jumping fish     */
@@ -224,9 +224,9 @@ typedef struct {
     SDL_Texture  *circular_saw_tex;      /* shared texture for circular saw hazards*/
     CircularSaw   circular_saws[MAX_CIRCULAR_SAWS]; /* fast patrol saw hazards */
     int           circular_saw_count;    /* number of circular saws placed     */
-    SDL_Texture  *flame_tex;             /* shared texture for flame hazards   */
-    Flame         flames[MAX_FLAMES];    /* erupting fire hazards from gaps    */
-    int           flame_count;           /* number of flames placed            */
+    SDL_Texture  *blue_flame_tex;        /* shared texture for blue flame hazards */
+    BlueFlame     blue_flames[MAX_BLUE_FLAMES]; /* erupting fire hazards from gaps */
+    int           blue_flame_count;     /* number of blue flames placed        */
     SDL_Texture  *faster_fish_tex;       /* shared texture for faster fish     */
     FasterFish    faster_fish[MAX_FASTER_FISH]; /* fast jumping fish enemies   */
     int           faster_fish_count;     /* number of faster fish placed       */

@@ -125,8 +125,8 @@ void fog_init(FogSystem *fog, SDL_Renderer *renderer) {
 
     /* Paths for the two cloud assets used as fog layers (Sky_Background_0 excluded) */
     const char *paths[FOG_TEX_COUNT] = {
-        "assets/Sky_Background_1.png",
-        "assets/Sky_Background_2.png",
+        "assets/fog_background_1.png",
+        "assets/fog_background_2.png",
     };
 
     for (int i = 0; i < FOG_TEX_COUNT; i++) {

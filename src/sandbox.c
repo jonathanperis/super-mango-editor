@@ -22,7 +22,7 @@
 void sandbox_load_level(GameState *gs) {
     /*
      * Sea gaps — holes in the ground floor that expose the water below.
-     * Must be set before flames_init because flames read gap positions.
+     * Must be set before blue_flames_init because blue flames read gap positions.
      */
     gs->sea_gaps[0] = 0;       /* left world edge  (screen 1 start)   */
     gs->sea_gaps[1] = 192;     /* screen 1 mid     (free zone 187–255)*/
@@ -52,7 +52,7 @@ void sandbox_load_level(GameState *gs) {
     spike_blocks_init(gs->spike_blocks, &gs->spike_block_count, gs->rails);
     axe_traps_init(gs->axe_traps, &gs->axe_trap_count);
     circular_saws_init(gs->circular_saws, &gs->circular_saw_count);
-    flames_init(gs->flames, &gs->flame_count,
+    blue_flames_init(gs->blue_flames, &gs->blue_flame_count,
                 gs->sea_gaps, gs->sea_gap_count);
     spike_rows_init(gs->spike_rows, &gs->spike_row_count);
     spike_platforms_init(gs->spike_platforms, &gs->spike_platform_count);
@@ -98,7 +98,7 @@ void sandbox_reset_level(GameState *gs, int *fp_prev_riding) {
     spike_blocks_init(gs->spike_blocks, &gs->spike_block_count, gs->rails);
     axe_traps_init(gs->axe_traps, &gs->axe_trap_count);
     circular_saws_init(gs->circular_saws, &gs->circular_saw_count);
-    flames_init(gs->flames, &gs->flame_count,
+    blue_flames_init(gs->blue_flames, &gs->blue_flame_count,
                 gs->sea_gaps, gs->sea_gap_count);
     spike_rows_init(gs->spike_rows, &gs->spike_row_count);
     spike_platforms_init(gs->spike_platforms, &gs->spike_platform_count);
