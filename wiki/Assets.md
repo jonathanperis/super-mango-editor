@@ -29,7 +29,12 @@ All visual assets live in the `assets/` directory. They are PNG files (loaded vi
 | `Spike_Block.png` | `game.c` (`gs->spike_block_tex`) | 16×16 single-frame rotating hazard sprite |
 | `Spider_1.png` | `game.c` (`gs->spider_tex`) | 192×48 sprite sheet, 3 frames of 64×48 with 10 px art band |
 | `Coin.png` | `coin.c` (`gs->coin_tex`) | 16×16 coin collectible sprite |
-| `Vine.png` | `vine.c` (`gs->vine_tex`) | 16×48 single-frame plant sprite for static scenery |
+| `Platform.png` | `game.c` (`gs->float_platform_tex`) | 48×16 sprite, 3-slice horizontal strip (left cap, centre fill, right cap) |
+| `Bridge.png` | `game.c` (`gs->bridge_tex`) | 16×16 single-frame brick tile for crumble walkways |
+| `Spider_2.png` | `game.c` (`gs->jumping_spider_tex`) | 192×48 sprite sheet, 3 frames of 64×48 (jumping spider enemy) |
+| `Bird_2.png` | `game.c` (`gs->bird_tex`) | 144×48 sprite sheet, 3 frames of 48×48 (slow sine-wave bird) |
+| `Bird_1.png` | `game.c` (`gs->faster_bird_tex`) | 144×48 sprite sheet, 3 frames of 48×48 (fast aggressive bird) |
+| `Vine.png` | `vine.c` (`gs->vine_tex`) | 16×48 single-frame plant sprite for climbable vines |
 | `Fish_2.png` | `fish.c` (`gs->fish_tex`) | 96×48 sprite sheet, 2 frames of 48×48 (swim animation) |
 | `Sky_Background_1.png` | `fog.c` (`fog->textures[0]`) | Fog overlay layer, semi-transparent sliding effect |
 | `Sky_Background_2.png` | `fog.c` (`fog->textures[1]`) | Fog overlay layer, semi-transparent sliding effect |
@@ -52,7 +57,8 @@ All visual assets live in the `assets/` directory. They are PNG files (loaded vi
 | 1 | `ANIM_WALK` | 4 | 100 ms/frame | Looping run cycle |
 | 2 | `ANIM_JUMP` | 2 | 150 ms/frame | Rising phase poses |
 | 3 | `ANIM_FALL` | 1 | 200 ms/frame | Descent pose |
-| 4–5 | *(unused)* | — | — | Available for future states |
+| 4 | `ANIM_CLIMB` | 2 | 100 ms/frame | Vine climbing cycle |
+| 5 | *(unused)* | — | — | Available for future states |
 
 ### Frame Source Rect Formula
 
@@ -95,13 +101,13 @@ These are included in `assets/` and ready for future use in platformer levels.
 | `Stone_Tileset.png` | Stone floor / wall tile |
 | `Cloud_Tileset.png` | Cloud platform tile |
 | `Leaf_Tileset.png` | Leaf / foliage platform tile |
-| `Platform.png` | Generic floating platform |
+| `Platform.png` | ✅ In use — `float_platform.c` 3-slice hovering surfaces |
 | `Spike_Platform.png` | Spiked platform (hazard) |
-| `Bridge.png` | Bridge / walkway tile |
+| `Bridge.png` | ✅ In use — `bridge.c` tiled crumble walkway |
 | `Ladder.png` | Climbable ladder |
 | `Rails.png` | ✅ In use — `rail.c` bitmask tile track system |
 | `Rope.png` | Rope (climbable) |
-| `Vine.png` | ✅ In use — `vine.c` static scenery decoration |
+| `Vine.png` | ✅ In use — `vine.c` climbable plant decoration |
 | `Water.png` | ✅ In use — animated water surface strip |
 | `Lava.png` | Lava hazard tile |
 
@@ -120,12 +126,12 @@ These are included in `assets/` and ready for future use in platformer levels.
 
 | File | Description |
 |------|-------------|
-| `Bird_1.png` | Bird enemy, variant 1 |
-| `Bird_2.png` | Bird enemy, variant 2 |
+| `Bird_1.png` | ✅ In use — `faster_bird.c` fast aggressive sine-wave sky patrol |
+| `Bird_2.png` | ✅ In use — `bird.c` slow sine-wave sky patrol |
 | `Fish_1.png` | Fish enemy, variant 1 |
 | `Fish_2.png` | ✅ In use — `fish.c` jumping water enemy |
 | `Spider_1.png` | ✅ In use — ground patrol spider enemy |
-| `Spider_2.png` | Spider enemy, variant 2 |
+| `Spider_2.png` | ✅ In use — `jumping_spider.c` jumping patrol enemy |
 
 ### Hazards / Traps
 
