@@ -30,6 +30,7 @@
 #include "rail.h"           /* Rail, RailTile — rail path system              */
 #include "spike_block.h"    /* SpikeBlock — rail-riding hazard entity          */
 #include "float_platform.h" /* FloatPlatform — hovering/crumble/rail surfaces */
+#include "jumping_spider.h" /* JumpingSpider — jumping patrol enemy          */
 #include "debug.h"          /* DebugOverlay — debug collision/FPS/log overlay  */
 
 /* ------------------------------------------------------------------ */
@@ -77,6 +78,17 @@
  * the rest. WORLD_W = 4 × GAME_W gives four screens of horizontal space.
  */
 #define WORLD_W       1600
+
+/*
+ * SEA_GAP_W — width of each sea gap in logical pixels.
+ * MAX_SEA_GAPS — maximum number of gaps the level can hold.
+ *
+ * Sea gaps are holes in the ground floor that expose the water below.
+ * Falling into any gap costs a life (instant death, not a hurt point).
+ * Each gap is defined by its left-edge x coordinate; all are SEA_GAP_W wide.
+ */
+#define SEA_GAP_W         32
+#define MAX_SEA_GAPS       8
 
 /*
  * CAM_LOOKAHEAD — extra pixels the camera shifts in the direction the player
@@ -135,6 +147,9 @@ typedef struct {
     FogSystem     fog;         /* atmospheric fog overlay — topmost layer      */
     Spider        spiders[MAX_SPIDERS]; /* ground-patrol enemy instances      */
     int           spider_count;         /* number of active spiders           */
+    SDL_Texture  *jumping_spider_tex;  /* texture for jumping spider enemies  */
+    JumpingSpider jumping_spiders[MAX_JUMPING_SPIDERS]; /* jump-patrol enemies*/
+    int           jumping_spider_count; /* number of active jumping spiders   */
     SDL_Texture  *fish_tex;    /* shared texture for all fish enemies          */
     Fish          fish[MAX_FISH]; /* jumping water enemy instances             */
     int           fish_count;      /* number of active fish                     */
@@ -157,6 +172,8 @@ typedef struct {
     SDL_Texture  *float_platform_tex;                       /* Platform.png — 3-slice strip      */
     FloatPlatform  float_platforms[MAX_FLOAT_PLATFORMS];    /* hovering surface instances        */
     int            float_platform_count;                    /* number of float platforms placed  */
+    int           sea_gaps[MAX_SEA_GAPS]; /* left-edge x of each sea gap       */
+    int           sea_gap_count;         /* number of active sea gaps          */
     Hud           hud;         /* HUD display: hearts, lives, score           */
     int           hearts;      /* current hit points (0–MAX_HEARTS)           */
     int           lives;       /* remaining lives; 0 triggers game over       */
