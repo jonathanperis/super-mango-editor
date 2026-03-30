@@ -47,6 +47,7 @@ static const struct {
     { "assets/parallax/glacial_mountains.png", 0.15f },
     { "assets/parallax/clouds_mg_3.png",       0.25f },
     { "assets/parallax/clouds_mg_2.png",       0.38f },
+    { "assets/parallax/cloud_lonely.png",      0.44f },
     { "assets/parallax/clouds_mg_1.png",       0.50f },
 };
 

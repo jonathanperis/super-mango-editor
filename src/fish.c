@@ -41,30 +41,30 @@ void fish_init(Fish *fish, int *count)
     *count = 2;
 
     /*
-     * Fish 0 — patrols the opening left region near the first platform.
+     * Fish 0 — patrols the middle of the world (screens 2–3).
      * Starts swimming right with a short random delay before its first jump.
      */
-    fish[0].x          = 140.0f;
+    fish[0].x          = 700.0f;
     fish[0].y          = water_y;
     fish[0].vx         = FISH_SPEED;
     fish[0].vy         = 0.0f;
-    fish[0].patrol_x0  = 40.0f;
-    fish[0].patrol_x1  = 430.0f;
+    fish[0].patrol_x0  = 500.0f;
+    fish[0].patrol_x1  = 950.0f;
     fish[0].jump_timer = fish_random_jump_delay(FISH_JUMP_MIN, FISH_JUMP_MAX);
     fish[0].water_y    = water_y;
     fish[0].frame_index   = 0;
     fish[0].anim_timer_ms = 0;
 
     /*
-     * Fish 1 — patrols the next world segment so the hazard remains visible
-     * as the camera scrolls to the right.
+     * Fish 1 — patrols the end of the world (screens 3–4).
+     * Starts swimming left to create variety in movement direction.
      */
-    fish[1].x          = 620.0f;
+    fish[1].x          = 1200.0f;
     fish[1].y          = water_y;
     fish[1].vx         = -FISH_SPEED;
     fish[1].vy         = 0.0f;
-    fish[1].patrol_x0  = 470.0f;
-    fish[1].patrol_x1  = 940.0f;
+    fish[1].patrol_x0  = 1000.0f;
+    fish[1].patrol_x1  = 1500.0f;
     fish[1].jump_timer = fish_random_jump_delay(FISH_JUMP_MIN, FISH_JUMP_MAX);
     fish[1].water_y    = water_y;
     fish[1].frame_index   = 0;
@@ -166,8 +166,8 @@ SDL_Rect fish_get_hitbox(const Fish *fish)
 
     hitbox.x = (int)fish->x + FISH_HITBOX_PAD_X;
     hitbox.y = (int)fish->y + FISH_HITBOX_PAD_Y;
-    hitbox.w = FISH_RENDER_W - 2 * FISH_HITBOX_PAD_X;
-    hitbox.h = FISH_RENDER_H - 2 * FISH_HITBOX_PAD_Y;
+    hitbox.w = FISH_RENDER_W  - 2 * FISH_HITBOX_PAD_X;   /* 48 − 32 = 16 */
+    hitbox.h = FISH_RENDER_H  - FISH_HITBOX_PAD_Y - 16;  /* 48 − 13 − 16 = 19 */
 
     return hitbox;
 }

@@ -1,8 +1,8 @@
 /*
  * coin.c — Coin placement and rendering across the full world width.
  *
- * Places 20 coins: 12 on the ground floor (3 per screen section) and
- * 8 on top of the pillar platforms (1 per pillar).
+ * Places 19 coins: 12 on the ground floor (3 per screen section) and
+ * 7 on top of the pillar platforms (Platform 0 is the spawn point).
  * Coins are static; collection is handled in game.c via AABB overlap.
  */
 
@@ -30,32 +30,34 @@
  *   Screen 4 (1200–1600): pillars at x=1300 (2-tile) and x=1480 (3-tile)
  *
  * Ground coin y = FLOOR_Y − COIN_DISPLAY_H  =  252 − 16 = 236.
- * Platform coin y (2-tile top): FLOOR_Y − 2×TILE_SIZE − COIN_DISPLAY_H = 140.
- * Platform coin y (3-tile top): FLOOR_Y − 3×TILE_SIZE − COIN_DISPLAY_H =  92.
+ * Platform coin y (2-tile top): FLOOR_Y − 2×TILE_SIZE + 16 − COIN_DISPLAY_H = 156.
+ * Platform coin y (3-tile top): FLOOR_Y − 3×TILE_SIZE + 16 − COIN_DISPLAY_H = 108.
+ *
+ * The +16 accounts for platforms being shifted 16 px into the floor so
+ * they visually grow from the ground rather than floating on top of it.
  */
 void coins_init(Coin *coins, int *count)
 {
-    const float gy = (float)(FLOOR_Y - COIN_DISPLAY_H);   /* ground y = 236 */
-    const float p2 = (float)(FLOOR_Y - 2 * TILE_SIZE - COIN_DISPLAY_H); /* 140 */
-    const float p3 = (float)(FLOOR_Y - 3 * TILE_SIZE - COIN_DISPLAY_H); /* 92  */
+    const float gy = (float)(FLOOR_Y - COIN_DISPLAY_H);                   /* ground y = 236 */
+    const float p2 = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - COIN_DISPLAY_H); /* 156 */
+    const float p3 = (float)(FLOOR_Y - 3 * TILE_SIZE + 16 - COIN_DISPLAY_H); /* 108 */
 
     int n = 0;   /* running coin index */
 
     /* ── Screen 1: ground coins ──────────────────────────────────── */
-    coins[n].x = 30.0f;   coins[n].y = gy; coins[n].active = 1; n++;   /* left   */
+    coins[n].x = 46.0f;   coins[n].y = gy; coins[n].active = 1; n++;   /* left   */
     coins[n].x = 170.0f;  coins[n].y = gy; coins[n].active = 1; n++;   /* middle */
-    coins[n].x = 350.0f;  coins[n].y = gy; coins[n].active = 1; n++;   /* right  */
+    coins[n].x = 368.0f;  coins[n].y = gy; coins[n].active = 1; n++;   /* right (past bouncepad 0) */
 
     /* ── Screen 1: platform coins ───────────────────────────────── */
-    /* Platform 0: x=80,  2-tile, coin x = 80 + 24 - 8 = 96  */
-    coins[n].x = (float)COIN_ON_PLAT_X(80);  coins[n].y = p2; coins[n].active = 1; n++;
+    /* Platform 0 (x=80, 2-tile): no coin — player spawn point.  */
     /* Platform 1: x=256, 3-tile, coin x = 256 + 24 - 8 = 272 */
     coins[n].x = (float)COIN_ON_PLAT_X(256); coins[n].y = p3; coins[n].active = 1; n++;
 
     /* ── Screen 2: ground coins ──────────────────────────────────── */
     coins[n].x = 430.0f;  coins[n].y = gy; coins[n].active = 1; n++;
     coins[n].x = 595.0f;  coins[n].y = gy; coins[n].active = 1; n++;
-    coins[n].x = 760.0f;  coins[n].y = gy; coins[n].active = 1; n++;
+    coins[n].x = 792.0f;  coins[n].y = gy; coins[n].active = 1; n++;   /* past bouncepad 2 */
 
     /* ── Screen 2: platform coins ───────────────────────────────── */
     /* Platform 2: x=500, 2-tile */

@@ -52,6 +52,17 @@
 #define BOUNCEPAD_SRC_Y  14   /* first non-transparent row in the frame  */
 #define BOUNCEPAD_SRC_H  18   /* height of the art region (rows 14–31)   */
 
+/*
+ * BOUNCEPAD_ART_X / BOUNCEPAD_ART_W — horizontal crop of each frame.
+ *
+ * The art occupies cols 16–31 (16 px) within each 48-px frame slot;
+ * the left 16 px and right 16 px are fully transparent padding.
+ * These constants define the collision box width so it matches the
+ * visible art, not the full frame slot.
+ */
+#define BOUNCEPAD_ART_X  16   /* first non-transparent col in the frame  */
+#define BOUNCEPAD_ART_W  16   /* width  of the art region (cols 16–31)   */
+
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
