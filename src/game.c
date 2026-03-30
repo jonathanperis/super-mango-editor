@@ -23,6 +23,7 @@
 #include "rail.h"
 #include "spike_block.h"
 #include "float_platform.h"
+#include "red_star.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -318,6 +319,16 @@ void game_init(GameState *gs) {
     bridges_init(gs->bridges, &gs->bridge_count);
 
     /*
+     * Load the red star collectible texture (Star_Red.png, small red star).
+     * Non-fatal: the game can run without health pickups.
+     */
+    gs->red_star_tex = IMG_LoadTexture(gs->renderer, "assets/Star_Red.png");
+    if (!gs->red_star_tex) {
+        fprintf(stderr, "Warning: Failed to load Star_Red.png: %s\n", IMG_GetError());
+    }
+    red_stars_init(gs->red_stars, &gs->red_star_count);
+
+    /*
      * Load the jump sound effect. Mix_LoadWAV decodes the WAV into a
      * Mix_Chunk that can be played on any available mixer channel.
      * Assets path is relative to where the binary is run (repo root).
@@ -412,10 +423,10 @@ void game_init(GameState *gs) {
     gs->sea_gap_count = 5;
 
     /* Initialise the health/lives/score system */
-    gs->hearts         = MAX_HEARTS;
-    gs->lives          = DEFAULT_LIVES;
-    gs->score          = 0;
-    gs->coins_for_heart = 0;
+    gs->hearts          = MAX_HEARTS;
+    gs->lives           = DEFAULT_LIVES;
+    gs->score           = 0;
+    gs->score_life_next = SCORE_PER_LIFE;
 
     /*
      * Lazy gamepad initialisation — deferred from SDL_Init on purpose.
@@ -492,6 +503,7 @@ static void level_reset(GameState *gs, int *fp_prev_riding) {
     spike_blocks_init(gs->spike_blocks, &gs->spike_block_count, gs->rails);
     float_platforms_init(gs->float_platforms, &gs->float_platform_count, gs->rails);
     bridges_init(gs->bridges, &gs->bridge_count);
+    red_stars_init(gs->red_stars, &gs->red_star_count);
     *fp_prev_riding = -1;
 }
 
@@ -701,10 +713,10 @@ void game_loop(GameState *gs) {
                     if (gs->hearts <= 0) {
                         gs->lives--;
                         if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                        if (gs->lives <= 0) {
+                        if (gs->lives < 0) {
                             gs->lives           = DEFAULT_LIVES;
                             gs->score           = 0;
-                            gs->coins_for_heart = 0;
+                            gs->score_life_next = SCORE_PER_LIFE;
                             if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                         }
                         gs->hearts = MAX_HEARTS;
@@ -839,11 +851,11 @@ void game_loop(GameState *gs) {
                     if (gs->hearts <= 0) {
                         gs->lives--;
                         if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                        if (gs->lives <= 0) {
+                        if (gs->lives < 0) {
                             /* Game over: restart everything */
                             gs->lives          = DEFAULT_LIVES;
                             gs->score          = 0;
-                            gs->coins_for_heart = 0;
+                            gs->score_life_next = SCORE_PER_LIFE;
                             if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                         }
                         gs->hearts = MAX_HEARTS;
@@ -871,10 +883,10 @@ void game_loop(GameState *gs) {
                         if (gs->hearts <= 0) {
                             gs->lives--;
                             if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                            if (gs->lives <= 0) {
+                            if (gs->lives < 0) {
                                 gs->lives           = DEFAULT_LIVES;
                                 gs->score           = 0;
-                                gs->coins_for_heart = 0;
+                                gs->score_life_next = SCORE_PER_LIFE;
                                 if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                             }
                             gs->hearts = MAX_HEARTS;
@@ -897,10 +909,10 @@ void game_loop(GameState *gs) {
                         if (gs->hearts <= 0) {
                             gs->lives--;
                             if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                            if (gs->lives <= 0) {
+                            if (gs->lives < 0) {
                                 gs->lives           = DEFAULT_LIVES;
                                 gs->score           = 0;
-                                gs->coins_for_heart = 0;
+                                gs->score_life_next = SCORE_PER_LIFE;
                                 if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                             }
                             gs->hearts = MAX_HEARTS;
@@ -923,10 +935,10 @@ void game_loop(GameState *gs) {
                         if (gs->hearts <= 0) {
                             gs->lives--;
                             if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                            if (gs->lives <= 0) {
+                            if (gs->lives < 0) {
                                 gs->lives           = DEFAULT_LIVES;
                                 gs->score           = 0;
-                                gs->coins_for_heart = 0;
+                                gs->score_life_next = SCORE_PER_LIFE;
                                 if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                             }
                             gs->hearts = MAX_HEARTS;
@@ -953,10 +965,10 @@ void game_loop(GameState *gs) {
                         if (gs->hearts <= 0) {
                             gs->lives--;
                             if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                            if (gs->lives <= 0) {
+                            if (gs->lives < 0) {
                                 gs->lives           = DEFAULT_LIVES;
                                 gs->score           = 0;
-                                gs->coins_for_heart = 0;
+                                gs->score_life_next = SCORE_PER_LIFE;
                                 if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                             }
                             gs->hearts = MAX_HEARTS;
@@ -994,10 +1006,10 @@ void game_loop(GameState *gs) {
                         if (gs->hearts <= 0) {
                             gs->lives--;
                             if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-                            if (gs->lives <= 0) {
+                            if (gs->lives < 0) {
                                 gs->lives           = DEFAULT_LIVES;
                                 gs->score           = 0;
-                                gs->coins_for_heart = 0;
+                                gs->score_life_next = SCORE_PER_LIFE;
                                 if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
                             }
                             gs->hearts = MAX_HEARTS;
@@ -1035,13 +1047,46 @@ void game_loop(GameState *gs) {
 
                     gs->score += COIN_SCORE;
                     if (gs->debug_mode) debug_log(&gs->debug, "COIN [%d] score=%d", i, gs->score);
-                    gs->coins_for_heart++;
-                    if (gs->coins_for_heart >= COINS_PER_HEART) {
-                        gs->coins_for_heart = 0;
-                        if (gs->hearts < MAX_HEARTS) {
-                            gs->hearts++;
-                            if (gs->debug_mode) debug_log(&gs->debug, "HEART +1 hearts=%d", gs->hearts);
-                        }
+
+                    /*
+                     * Bonus life — every SCORE_PER_LIFE (1000) points the
+                     * player earns an extra life.  score_life_next tracks the
+                     * next threshold so the reward fires exactly once per
+                     * milestone regardless of how many coins are collected at
+                     * once (e.g. rapid-fire collection in the same frame).
+                     */
+                    if (gs->score >= gs->score_life_next) {
+                        gs->lives++;
+                        gs->score_life_next += SCORE_PER_LIFE;
+                        if (gs->debug_mode) debug_log(&gs->debug, "1UP! lives=%d", gs->lives);
+                    }
+                }
+            }
+        }
+
+        /* ---- Red star collision ------------------------------------- */
+        /*
+         * Red stars restore one heart (star) immediately on pickup.
+         * They do not award score — they are purely a health pickup.
+         */
+        {
+            SDL_Rect phit = player_get_hitbox(&gs->player);
+            for (int i = 0; i < gs->red_star_count; i++) {
+                if (!gs->red_stars[i].active) continue;
+                SDL_Rect sbox = {
+                    (int)gs->red_stars[i].x, (int)gs->red_stars[i].y,
+                    RED_STAR_DISPLAY_W, RED_STAR_DISPLAY_H
+                };
+                if (SDL_HasIntersection(&phit, &sbox)) {
+                    gs->red_stars[i].active = 0;
+
+                    if (gs->snd_coin) {
+                        Mix_PlayChannel(-1, gs->snd_coin, 0);
+                    }
+
+                    if (gs->hearts < MAX_HEARTS) {
+                        gs->hearts++;
+                        if (gs->debug_mode) debug_log(&gs->debug, "RED STAR [%d] hearts=%d", i, gs->hearts);
                     }
                 }
             }
@@ -1255,6 +1300,10 @@ void game_loop(GameState *gs) {
         coins_render(gs->coins, gs->coin_count,
                      gs->renderer, gs->coin_tex, cam_x);
 
+        /* Draw red stars alongside coins — same layer, same visibility */
+        red_stars_render(gs->red_stars, gs->red_star_count,
+                         gs->renderer, gs->red_star_tex, cam_x);
+
         /* Draw fish behind the water strip (submerged look) but in front of
          * the ground, so the water wave art occludes the submerged portion. */
         fish_render(gs->fish, gs->fish_count,
@@ -1413,6 +1462,11 @@ void game_cleanup(GameState *gs) {
     if (gs->coin_tex) {
         SDL_DestroyTexture(gs->coin_tex);
         gs->coin_tex = NULL;
+    }
+
+    if (gs->red_star_tex) {
+        SDL_DestroyTexture(gs->red_star_tex);
+        gs->red_star_tex = NULL;
     }
 
     if (gs->fish_tex) {
