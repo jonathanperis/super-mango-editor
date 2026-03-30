@@ -247,6 +247,10 @@ typedef struct {
     int           paused;      /* 1 = window lost focus; physics/music frozen */
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
     DebugOverlay  debug;       /* FPS counter, collision vis, event log      */
+
+    /* ---- Loop state (persists across frames for emscripten callback) - */
+    Uint64        loop_prev_ticks;  /* timestamp of previous frame         */
+    int           fp_prev_riding;   /* float platform player stood on last frame */
 } GameState;
 
 /* ------------------------------------------------------------------ */

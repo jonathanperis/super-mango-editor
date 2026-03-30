@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Mango</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Courier New', monospace;
+      color: #e0e0e0;
+    }
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+      color: #f5c542;
+    }
+    #canvas {
+      border: 2px solid #f5c542;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      cursor: default;
+    }
+    .info {
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      color: #888;
+    }
+    #status {
+      margin-top: 0.25rem;
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+    .spinner {
+      display: inline-block;
+      width: 1em;
+      height: 1em;
+      border: 2px solid #555;
+      border-top-color: #f5c542;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.5em;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <h1>Super Mango</h1>
+  <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+  <p id="status"><span class="spinner"></span>Loading...</p>
+  <p class="info">WASD / Arrows to move &middot; Space to jump &middot; ESC to quit</p>
+
+  <script>
+    var Module = {
+      canvas: (function() {
+        var c = document.getElementById('canvas');
+        c.addEventListener('webglcontextlost', function(e) {
+          alert('WebGL context lost — please reload the page.');
+          e.preventDefault();
+        }, false);
+        return c;
+      })(),
+      setStatus: function(text) {
+        var el = document.getElementById('status');
+        if (!text) {
+          el.style.display = 'none';
+        } else {
+          el.innerHTML = text.includes('Downloading')
+            ? '<span class="spinner"></span>' + text
+            : text;
+          el.style.display = '';
+        }
+      },
+      monitorRunDependencies: function(left) {
+        if (left === 0) {
+          Module.setStatus('');
+          document.getElementById('canvas').focus();
+        }
+      }
+    };
+    Module.setStatus('Loading...');
+    window.onerror = function() {
+      Module.setStatus('Error — check the browser console.');
+    };
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>
