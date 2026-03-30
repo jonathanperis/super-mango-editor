@@ -46,7 +46,7 @@ Used to compute `frame_ms = 1000 / TARGET_FPS` (≈ 16 ms), which is the manual 
 | `TILE_SIZE` | `48` | literal | Width and height of one grass tile (px) |
 | `FLOOR_Y` | `252` | `GAME_H - TILE_SIZE` | Y coordinate of the floor's top edge |
 
-The floor is drawn by repeating the 48×48 grass tile from `x=0` to `x=GAME_W` at `y=FLOOR_Y`.
+The floor is drawn by repeating the 48×48 grass tile across the full `WORLD_W` at `y=FLOOR_Y`, with gaps cut out at each `sea_gaps[]` position.
 
 ### Physics
 
@@ -124,8 +124,8 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | Value | Location | Description |
 |-------|----------|-------------|
 | `160.0f` | `player_init` | `player->speed` — horizontal max speed (px/s) |
-| `-325.0f` | `player_handle_input` | Jump vertical impulse from ground (upward, px/s) |
-| `-500.0f` | `player_handle_input` | Jump impulse when dismounting a vine (upward, px/s) |
+| `-325.0f` | `player_handle_input` | Jump vertical impulse — keyboard (ground + vine dismount) |
+| `-500.0f` | `player_handle_input` | Jump vertical impulse — gamepad (ground + vine dismount) |
 
 ## Vine Climbing Constants in `player.c`
 
@@ -193,6 +193,8 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `MAX_SPIDERS` | `4` | `int` | Maximum simultaneous spider enemies |
 | `SPIDER_FRAMES` | `3` | `int` | Animation frames in `Spider_1.png` (192÷64 = 3) |
 | `SPIDER_FRAME_W` | `64` | `int` | Width of one frame slot in the sheet (px) |
+| `SPIDER_ART_X` | `20` | `int` | First visible col within each frame slot |
+| `SPIDER_ART_W` | `25` | `int` | Width of visible art (cols 20–44) |
 | `SPIDER_ART_Y` | `22` | `int` | First visible row within each frame slot |
 | `SPIDER_ART_H` | `10` | `int` | Height of visible art (rows 22–31) |
 | `SPIDER_SPEED` | `50.0f` | `float` | Walk speed (px/s) |
@@ -271,7 +273,9 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `HUD_MARGIN` | `4` | `int` | Pixel margin from screen edges |
 | `HUD_HEART_SIZE` | `12` | `int` | Display size of each heart icon (px) |
 | `HUD_HEART_GAP` | `2` | `int` | Horizontal gap between heart icons (px) |
-| `HUD_ICON_SIZE` | `48` | `int` | Display size of the player icon (px) |
+| `HUD_ICON_W` | `16` | `int` | Display width of the player icon (px) |
+| `HUD_ICON_H` | `13` | `int` | Display height of the player icon (px) |
+| `HUD_ROW_H` | `13` | `int` | Row height for text alignment (font px) |
 
 ---
 

@@ -62,7 +62,10 @@ main()
   │     ├── fog_init(&gs.fog, gs.renderer)     (Sky_Background_1/2.png)
   │     ├── hud_init(&gs.hud, gs.renderer)
   │     ├── if (debug_mode) debug_init(&gs.debug)
-  │     └── sea_gaps[] initialisation (5 gap positions)
+  │     ├── sea_gaps[] initialisation (5 gap positions)
+  │     ├── hearts/lives/score initialisation
+  │     ├── SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) — lazy init, non-fatal
+  │     └── scan joysticks for first connected gamepad
   │
   ├── game_loop(&gs)          ← see Game Loop section below
   │
@@ -146,7 +149,7 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 
 | Layer | What | How |
 |-------|------|-----|
-| 1 | Background | 6 layers from `assets/parallax/` tiled horizontally, each scrolling at a different speed fraction of `cam_x` |
+| 1 | Background | 7 layers from `assets/parallax/` tiled horizontally, each scrolling at a different speed fraction of `cam_x` |
 | 2 | Platforms | `Grass_Oneway.png` 9-slice tiled pillar stacks (drawn before floor so pillars sink into ground) |
 | 3 | Floor | `Grass_Tileset.png` 9-slice tiled across world width at `FLOOR_Y`, with sea-gap openings |
 | 4 | Float platforms | `Platform.png` 3-slice hovering surfaces (static, crumble, rail modes) |
