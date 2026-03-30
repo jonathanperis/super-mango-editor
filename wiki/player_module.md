@@ -1,6 +1,6 @@
 # Player Module
 
-← [Home](Home)
+← [Home](home)
 
 ---
 
@@ -12,7 +12,7 @@ The player module spans `player.h` and `player.c` and owns the full lifecycle of
 
 ```
 player_init        ← called once from game_init
-  └── IMG_LoadTexture (Player.png → GPU)
+  └── IMG_LoadTexture (player.png → GPU)
   └── set initial position, speed, animation state
 
 per frame (game_loop):
@@ -38,7 +38,7 @@ void player_init(Player *player, SDL_Renderer *renderer);
 
 | Action | Detail |
 |--------|--------|
-| Load texture | `IMG_LoadTexture(renderer, "assets/Player.png")` — 192×288 sheet |
+| Load texture | `IMG_LoadTexture(renderer, "assets/player.png")` — 192×288 sheet |
 | Frame rect | `{x=0, y=0, w=48, h=48}` — first cell (row 0, col 0) |
 | Display size | `w = h = 48` px (logical coordinates) |
 | Start position | On pillar 0: `x = 80.0f + (TILE_SIZE - 48) / 2.0f` = `80` |
@@ -335,7 +335,7 @@ Must be called **before** `SDL_DestroyRenderer`, because textures are owned by t
 void player_reset(Player *player);
 ```
 
-Resets the player's position and state to the starting values **without reloading the texture**. Called by `game_loop` when the player loses a life (hearts reach 0). Because the GPU texture is already loaded, only the position, velocity, `on_ground`, and animation fields need to be re-initialised — the same `Player.png` texture handle is reused directly.
+Resets the player's position and state to the starting values **without reloading the texture**. Called by `game_loop` when the player loses a life (hearts reach 0). Because the GPU texture is already loaded, only the position, velocity, `on_ground`, and animation fields need to be re-initialised — the same `player.png` texture handle is reused directly.
 
 | Action | Detail |
 |--------|--------|
