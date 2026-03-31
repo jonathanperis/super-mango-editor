@@ -29,7 +29,7 @@
  * (fall_delay is set on the first contact frame); the brick holds for
  * this duration then drops.
  */
-#define BRIDGE_FALL_DELAY    0.1f
+#define BRIDGE_FALL_DELAY    0.2f
 
 /*
  * BRIDGE_CASCADE_DELAY — extra seconds between each successive brick's
