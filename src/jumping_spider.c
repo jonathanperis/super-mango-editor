@@ -18,13 +18,13 @@
 
 #define JSPIDER_AUDIBLE_RANGE  ((float)GAME_W)
 #define JSPIDER_VOL_MAX        128
-#define JSPIDER_VOL_MIN        16
 
 static int jspider_volume_for_distance(float dist) {
     if (dist >= JSPIDER_AUDIBLE_RANGE) return 0;
     if (dist <= 0.0f) return JSPIDER_VOL_MAX;
+    /* Linear fade from MAX at dist=0 to 0 at dist=AUDIBLE_RANGE. */
     float fraction = dist / JSPIDER_AUDIBLE_RANGE;
-    return JSPIDER_VOL_MAX - (int)(fraction * (JSPIDER_VOL_MAX - JSPIDER_VOL_MIN));
+    return (int)((1.0f - fraction) * JSPIDER_VOL_MAX);
 }
 
 /* ------------------------------------------------------------------ */
