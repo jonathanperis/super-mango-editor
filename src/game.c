@@ -1029,20 +1029,36 @@ static void game_loop_frame(void *arg) {
 
             /* ---- Spike platform collision ----------------------------- */
             /*
-             * Spike platforms deal 1 heart of damage on contact.
-             * The player can still land on top (one-way landing is handled
-             * separately in player_update), but touching from any direction
-             * triggers damage.
+             * Spike platforms deal 1 heart of damage only when the player
+             * touches the spike side (top surface).  The smooth underside
+             * acts as a barrier (blocks upward movement in player_update)
+             * without dealing damage.
+             *
+             * We use a narrow damage zone covering only the spike tips
+             * (the top ~5 px of the platform) so that approaching from
+             * below or from the sides never triggers damage.
              */
             if (gs->player.hurt_timer == 0.0f) {
                 SDL_Rect phit = player_get_hitbox(&gs->player);
                 for (int i = 0; i < gs->spike_platform_count; i++) {
                     if (!gs->spike_platforms[i].active) continue;
-                    SDL_Rect spr = spike_platform_get_rect(&gs->spike_platforms[i]);
-                    if (SDL_HasIntersection(&phit, &spr)) {
+                    const SpikePlatform *sp = &gs->spike_platforms[i];
+                    /*
+                     * spike_zone — narrow rect covering only the spike tips
+                     * at the top of the platform (the 2 px upward extension
+                     * plus the first few content rows where the tips live).
+                     * A player hitting from below will never reach this zone.
+                     */
+                    SDL_Rect spike_zone = {
+                        .x = (int)sp->x,
+                        .y = (int)sp->y - 2,  /* match the 2 px upward extension */
+                        .w = sp->w,
+                        .h = 5,               /* just the spike tips ~5 px tall  */
+                    };
+                    if (SDL_HasIntersection(&phit, &spike_zone)) {
                         if (gs->debug_mode) debug_log(&gs->debug, "HIT spike_plat[%d]", i);
-                        float sx = spr.x + spr.w * 0.5f;
-                        float sy = spr.y + spr.h * 0.5f;
+                        float sx = sp->x + sp->w * 0.5f;
+                        float sy = sp->y;
                         apply_damage(gs, 1, 1, sx, sy);
                         break;
                     }

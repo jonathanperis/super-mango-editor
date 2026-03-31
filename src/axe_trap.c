@@ -69,37 +69,35 @@ void axe_traps_init(AxeTrap *traps, int *count) {
 
 /*
  * AXE_VOLUME_MAX — the loudest the axe SFX can be (MIX_MAX_VOLUME = 128).
- * AXE_VOLUME_MIN — the quietest level when the axe is at the screen edge.
  * AXE_AUDIBLE_RANGE — maximum horizontal distance (px) at which the axe
- *                     is audible.  Beyond this range the sound is silent.
- *                     Set to GAME_W so the axe fades to min-volume right
- *                     at the screen edge and becomes silent off-screen.
+ *                     is audible.  Set to GAME_W (the logical canvas width)
+ *                     so the sound fades to complete silence exactly when the
+ *                     player is one full screen-width away from the axe.
  */
 #define AXE_VOLUME_MAX       128
-#define AXE_VOLUME_MIN        16
 #define AXE_AUDIBLE_RANGE    ((float)GAME_W)
 
 /*
  * axe_volume_for_distance — Compute the Mix_Chunk volume (0–128)
  * based on horizontal distance between the player and the axe pivot.
  *
- * At distance 0 → AXE_VOLUME_MAX (128, full volume).
- * At distance AXE_AUDIBLE_RANGE → AXE_VOLUME_MIN (16, barely audible).
- * Beyond AXE_AUDIBLE_RANGE → 0 (silent).
+ * At distance 0            → AXE_VOLUME_MAX (128, full volume).
+ * At distance AUDIBLE_RANGE → 0 (completely silent).
+ * Beyond AUDIBLE_RANGE     → 0 (silent).
  *
- * Linear interpolation keeps the attenuation smooth and predictable.
+ * Linear interpolation gives a smooth, gradual fade from full volume
+ * to silence as the player moves one screen-width away from the source.
  */
 static int axe_volume_for_distance(float dist) {
     if (dist >= AXE_AUDIBLE_RANGE) return 0;
     if (dist <= 0.0f) return AXE_VOLUME_MAX;
 
     /*
-     * Linear ramp from MAX at dist=0 to MIN at dist=AUDIBLE_RANGE.
-     * fraction goes from 0.0 (closest) to 1.0 (farthest audible).
+     * Linear ramp from MAX at dist=0 to 0 at dist=AUDIBLE_RANGE.
+     * (1 - fraction) goes from 1.0 (closest) to 0.0 (farthest audible).
      */
     float fraction = dist / AXE_AUDIBLE_RANGE;
-    int vol = AXE_VOLUME_MAX - (int)(fraction * (AXE_VOLUME_MAX - AXE_VOLUME_MIN));
-    return vol;
+    return (int)((1.0f - fraction) * AXE_VOLUME_MAX);
 }
 
 /* ------------------------------------------------------------------ */
