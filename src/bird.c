@@ -12,17 +12,18 @@
 
 /*
  * BIRD_AUDIBLE_RANGE — max distance (px) at which the flap SFX is audible.
- * Set to GAME_W so the bird fades to silence right at the screen edge.
+ * Set to GAME_W: the sound fades to complete silence exactly when the player
+ * is one full screen-width away from the bird.
  */
 #define BIRD_AUDIBLE_RANGE  ((float)GAME_W)
-#define BIRD_VOL_MAX        96
-#define BIRD_VOL_MIN        16
+#define BIRD_VOL_MAX        67
 
 static int bird_volume_for_distance(float dist) {
     if (dist >= BIRD_AUDIBLE_RANGE) return 0;
     if (dist <= 0.0f) return BIRD_VOL_MAX;
+    /* Linear fade from MAX at dist=0 to 0 at dist=AUDIBLE_RANGE. */
     float fraction = dist / BIRD_AUDIBLE_RANGE;
-    return BIRD_VOL_MAX - (int)(fraction * (BIRD_VOL_MAX - BIRD_VOL_MIN));
+    return (int)((1.0f - fraction) * BIRD_VOL_MAX);
 }
 
 /* ------------------------------------------------------------------ */
