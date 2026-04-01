@@ -52,7 +52,7 @@ jobs:
     steps:
       # Check out the repository so the runner has access to the source code.
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       # ── Linux dependency install ────────────────────────────────────────────
       # apt packages: build tools + SDL2 and all companion library dev headers.
@@ -257,7 +257,7 @@ jobs:
     steps:
       # Check out the repository to get the docs/ folder.
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       # Download the WebAssembly build artifacts (super-mango.html, .js,
       # .wasm, .data) produced by the build job's "make web" step.
