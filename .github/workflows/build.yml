@@ -16,6 +16,7 @@ on:
       - main
   pull_request:
 
+  workflow_dispatch:
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
   # BUILD JOB
