@@ -34,44 +34,64 @@
     gtag('config', 'G-VSE71K3VNL');
   </script>
 
-  <!-- Press Start 2P — pixel art font from Google Fonts -->
   <link rel="dns-prefetch" href="https://www.googletagmanager.com">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 
   <style>
     /* ── Reset & base ──────────────────────────────────────────────── */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg:        #0f0e17;
-      --bg-card:   #1a1a2e;
-      --gold:      #f5c542;
-      --gold-dim:  #c49b30;
-      --green:     #4ade80;
-      --text:      #e0e0e0;
-      --text-dim:  #888;
-      --pixel-font: 'Press Start 2P', monospace;
-      --mono:      'Courier New', monospace;
+      --bg:          #060e06;   /* deep forest night */
+      --bg-card:     #0d1f0d;   /* forest floor */
+      --accent:      #ff8c00;   /* mango orange glow */
+      --accent-dim:  #c45f00;   /* mango shadow */
+      --green:       #39d353;   /* jungle green */
+      --green-dim:   #1a8a2a;
+      --text:        #f0ead2;   /* warm parchment */
+      --text-dim:    #8a9a7a;   /* mossy grey */
+      --border:      #1a3a1a;   /* dark leaf border */
+      --pixel-font:  'Pixelify Sans', monospace;
+      --mono:        'Space Mono', monospace;
     }
 
     html { scroll-behavior: smooth; }
 
     body {
       background: var(--bg);
+      background-image:
+        radial-gradient(ellipse at 50% 0%, rgba(57,211,83,0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 100%, rgba(255,140,0,0.08) 0%, transparent 40%),
+        radial-gradient(ellipse at 80% 80%, rgba(255,140,0,0.05) 0%, transparent 40%);
       color: var(--text);
       font-family: var(--mono);
       font-size: 14px;
       line-height: 1.7;
     }
 
-    /* ── Pixel-border utility ─────────────────────────────────────── */
-    .pixel-border {
-      border: 4px solid var(--gold);
-      box-shadow:
-        4px 4px 0 var(--gold-dim),
-        inset 0 0 0 2px rgba(245, 197, 66, 0.15);
+    code, kbd {
+      font-family: var(--mono);
+    }
+
+    /* ── Fireflies ─────────────────────────────────────────────────── */
+    @keyframes firefly {
+      0%   { transform: translate(0, 0)   scale(1);   opacity: 0; }
+      20%  { opacity: 0.8; }
+      80%  { opacity: 0.6; }
+      100% { transform: translate(var(--fx), var(--fy)) scale(0.5); opacity: 0; }
+    }
+    .firefly {
+      position: fixed;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: #39d353;
+      box-shadow: 0 0 6px 2px rgba(57,211,83,0.6);
+      animation: firefly var(--fd, 6s) ease-in-out infinite;
+      pointer-events: none;
+      z-index: 0;
     }
 
     /* ── Navigation ───────────────────────────────────────────────── */
@@ -79,19 +99,21 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      background: var(--bg);
-      border-bottom: 3px solid var(--gold);
+      background: rgba(6,14,6,0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 2px solid var(--green-dim);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.6rem 2rem;
+      padding: 0.7rem 2rem;
     }
 
     nav .logo {
       font-family: var(--pixel-font);
-      font-size: 0.85rem;
-      color: var(--gold);
+      font-size: 1rem;
+      color: var(--accent);
       text-decoration: none;
+      text-shadow: 0 0 12px rgba(255,140,0,0.4);
     }
 
     nav .links {
@@ -101,29 +123,35 @@
     }
 
     nav .links a {
-      font-family: var(--pixel-font);
-      font-size: 0.55rem;
-      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--text-dim);
       text-decoration: none;
       text-transform: uppercase;
       letter-spacing: 1px;
-      transition: color 0.2s;
+      transition: color 0.2s, text-shadow 0.2s;
     }
 
-    nav .links a:hover { color: var(--gold); }
+    nav .links a:hover {
+      color: var(--green);
+      text-shadow: 0 0 8px rgba(57,211,83,0.5);
+    }
 
     /* ── Hero ──────────────────────────────────────────────────────── */
     .hero {
       text-align: center;
-      padding: 3rem 1rem 2rem;
+      padding: 4rem 1rem 2rem;
+      position: relative;
+      z-index: 1;
     }
 
     .hero h1 {
       font-family: var(--pixel-font);
-      font-size: clamp(1.4rem, 4vw, 2.4rem);
-      color: var(--gold);
-      text-shadow: 3px 3px 0 var(--gold-dim);
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      color: var(--accent);
+      text-shadow: 0 0 20px rgba(255,140,0,0.5), 3px 3px 0 var(--accent-dim);
       margin-bottom: 0.75rem;
+      letter-spacing: 2px;
     }
 
     .hero p {
@@ -131,6 +159,7 @@
       margin: 0 auto;
       color: var(--text-dim);
       font-size: 0.9rem;
+      line-height: 1.8;
     }
 
     /* ── Game section ─────────────────────────────────────────────── */
@@ -138,7 +167,9 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 1rem 1rem 2.5rem;
+      padding: 1rem 1rem 3rem;
+      position: relative;
+      z-index: 1;
     }
 
     .game-wrapper {
@@ -146,6 +177,13 @@
       padding: 1rem;
       max-width: 860px;
       width: 100%;
+      border: 2px solid var(--green-dim);
+      box-shadow: 0 0 30px rgba(57,211,83,0.08), 0 0 60px rgba(255,140,0,0.05);
+    }
+
+    .pixel-border {
+      border: 2px solid var(--green-dim);
+      box-shadow: 0 0 30px rgba(57,211,83,0.08), 0 0 60px rgba(255,140,0,0.05);
     }
 
     #canvas {
@@ -171,29 +209,27 @@
     .game-controls {
       text-align: center;
       margin-top: 0.75rem;
-      font-family: var(--pixel-font);
-      font-size: 0.5rem;
+      font-family: var(--mono);
+      font-size: 0.7rem;
       color: var(--text-dim);
       line-height: 2;
     }
 
     .game-controls kbd {
-      display: inline-block;
-      background: var(--bg);
-      color: var(--gold);
-      border: 2px solid var(--gold-dim);
+      background: rgba(255,140,0,0.1);
+      color: var(--accent);
+      border: 1px solid var(--accent-dim);
       padding: 0.15em 0.5em;
       margin: 0 0.1em;
-      font-family: var(--pixel-font);
-      font-size: 0.5rem;
+      font-family: var(--mono);
+      font-size: 0.7rem;
     }
 
     .spinner {
       display: inline-block;
-      width: 1em;
-      height: 1em;
-      border: 2px solid #555;
-      border-top-color: var(--gold);
+      width: 1em; height: 1em;
+      border: 2px solid rgba(57,211,83,0.2);
+      border-top-color: var(--green);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       vertical-align: middle;
@@ -205,51 +241,56 @@
     #play-btn {
       display: inline-block;
       margin-top: 1rem;
-      padding: 0.6em 1.6em;
+      padding: 0.7em 2em;
       font-family: var(--pixel-font);
-      font-size: 0.7rem;
-      color: var(--bg);
-      background: var(--gold);
+      font-size: 0.9rem;
+      color: #060e06;
+      background: var(--accent);
       border: none;
       cursor: pointer;
       text-transform: uppercase;
-      box-shadow: 3px 3px 0 var(--gold-dim);
+      letter-spacing: 2px;
+      box-shadow: 0 0 20px rgba(255,140,0,0.4), 3px 3px 0 var(--accent-dim);
       transition: transform 0.1s, box-shadow 0.1s;
     }
 
     #play-btn:hover {
-      transform: translate(-1px, -1px);
-      box-shadow: 4px 4px 0 var(--gold-dim);
+      transform: translate(-1px,-1px);
+      box-shadow: 0 0 30px rgba(255,140,0,0.6), 4px 4px 0 var(--accent-dim);
     }
 
     #play-btn:active {
-      transform: translate(2px, 2px);
-      box-shadow: 1px 1px 0 var(--gold-dim);
+      transform: translate(2px,2px);
+      box-shadow: 1px 1px 0 var(--accent-dim);
     }
 
     #play-btn:disabled {
       opacity: 0.5;
       cursor: default;
       transform: none;
-      box-shadow: 3px 3px 0 var(--gold-dim);
+      box-shadow: 3px 3px 0 var(--accent-dim);
     }
 
-    /* ── About / Features ─────────────────────────────────────────── */
-    .about-section {
+    /* ── About / Features / Docs / Downloads ─────────────────────────────────────────── */
+    .about-section, .docs-section, .downloads-section {
       max-width: 860px;
       margin: 0 auto;
-      padding: 2rem 1rem;
+      padding: 2.5rem 1rem;
+      position: relative;
+      z-index: 1;
     }
 
-    .about-section h2 {
+    h2 {
       font-family: var(--pixel-font);
-      font-size: 0.9rem;
-      color: var(--gold);
-      margin-bottom: 1rem;
+      font-size: 1.1rem;
+      color: var(--green);
+      margin-bottom: 1.2rem;
       text-transform: uppercase;
+      letter-spacing: 3px;
+      text-shadow: 0 0 12px rgba(57,211,83,0.3);
     }
 
-    .about-section p {
+    .about-section p, .downloads-section > p {
       margin-bottom: 1rem;
       color: var(--text);
     }
@@ -261,120 +302,77 @@
       margin-top: 1rem;
     }
 
-    .feature-card {
-      background: var(--bg-card);
-      padding: 1rem;
-      border: 2px solid #333;
-    }
-
-    .feature-card h3 {
-      font-family: var(--pixel-font);
-      font-size: 0.55rem;
-      color: var(--gold);
-      margin-bottom: 0.5rem;
-      text-transform: uppercase;
-    }
-
-    .feature-card p {
-      font-size: 0.85rem;
-      color: var(--text-dim);
-      margin-bottom: 0;
-    }
-
-    /* ── Docs / Links section ─────────────────────────────────────── */
-    .docs-section {
-      max-width: 860px;
-      margin: 0 auto;
-      padding: 2rem 1rem;
-    }
-
-    .docs-section h2 {
-      font-family: var(--pixel-font);
-      font-size: 0.9rem;
-      color: var(--gold);
-      margin-bottom: 1rem;
-      text-transform: uppercase;
-    }
-
     .docs-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 1rem;
-    }
-
-    .doc-card {
-      background: var(--bg-card);
-      border: 2px solid #333;
-      padding: 1.2rem;
-      text-decoration: none;
-      color: var(--text);
-      transition: border-color 0.2s, transform 0.15s;
-      display: block;
-    }
-
-    .doc-card:hover {
-      border-color: var(--gold);
-      transform: translateY(-2px);
-    }
-
-    .doc-card h3 {
-      font-family: var(--pixel-font);
-      font-size: 0.55rem;
-      color: var(--gold);
-      margin-bottom: 0.5rem;
-    }
-
-    .doc-card p {
-      font-size: 0.85rem;
-      color: var(--text-dim);
-      margin-bottom: 0;
-    }
-
-    /* ── Downloads ─────────────────────────────────────────────────── */
-    .downloads-section {
-      max-width: 860px;
-      margin: 0 auto;
-      padding: 2rem 1rem;
-    }
-
-    .downloads-section h2 {
-      font-family: var(--pixel-font);
-      font-size: 0.9rem;
-      color: var(--gold);
-      margin-bottom: 1rem;
-      text-transform: uppercase;
+      margin-top: 1rem;
     }
 
     .download-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .feature-card, .doc-card, .download-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      transition: border-color 0.25s, box-shadow 0.25s, transform 0.15s;
+    }
+
+    .feature-card { padding: 1rem; }
+    
+    .doc-card {
+      padding: 1.2rem;
+      text-decoration: none;
+      color: var(--text);
+      display: block;
     }
 
     .download-card {
-      background: var(--bg-card);
-      border: 2px solid #333;
       padding: 1rem;
       text-align: center;
       text-decoration: none;
       color: var(--text);
-      transition: border-color 0.2s, transform 0.15s;
       display: block;
+    }
+
+    .feature-card:hover, .doc-card:hover, .download-card:hover {
+      border-color: var(--green-dim);
+      box-shadow: 0 0 16px rgba(57,211,83,0.12);
+      transform: translateY(-2px);
     }
 
     .download-card:hover {
       border-color: var(--green);
-      transform: translateY(-2px);
+      box-shadow: 0 0 16px rgba(57,211,83,0.15);
+    }
+
+    .feature-card h3, .doc-card h3 {
+      font-family: var(--pixel-font);
+      font-size: 0.65rem;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+      letter-spacing: 1px;
+    }
+
+    .feature-card p, .doc-card p {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-bottom: 0;
     }
 
     .download-card .platform {
       font-family: var(--pixel-font);
-      font-size: 0.55rem;
+      font-size: 0.65rem;
       color: var(--green);
       margin-bottom: 0.4rem;
     }
 
     .download-card .arch {
+      font-family: var(--mono);
       font-size: 0.75rem;
       color: var(--text-dim);
     }
@@ -382,24 +380,22 @@
     /* ── Footer ────────────────────────────────────────────────────── */
     footer {
       text-align: center;
-      padding: 2rem 1rem;
-      border-top: 3px solid #222;
+      padding: 2.5rem 1rem;
+      border-top: 1px solid var(--border);
       color: var(--text-dim);
       font-size: 0.75rem;
+      position: relative;
+      z-index: 1;
     }
 
-    footer a {
-      color: var(--gold);
-      text-decoration: none;
-    }
-
-    footer a:hover { text-decoration: underline; }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { color: var(--green); text-decoration: underline; }
 
     /* ── Responsive ────────────────────────────────────────────────── */
     @media (max-width: 600px) {
       nav { flex-direction: column; gap: 0.5rem; padding: 0.5rem 1rem; }
       nav .links { gap: 0.8rem; }
-      .hero { padding: 2rem 1rem 1.5rem; }
+      .hero { padding: 3rem 1rem 1.5rem; }
     }
   </style>
   <!-- JSON-LD Structured Data -->
@@ -434,6 +430,15 @@
   </script>
 </head>
 <body>
+
+  <div class="firefly" style="top:15%;left:8%;--fd:7s;--fx:40px;--fy:-60px;animation-delay:0s"></div>
+  <div class="firefly" style="top:30%;left:92%;--fd:5s;--fx:-30px;--fy:50px;animation-delay:1.5s"></div>
+  <div class="firefly" style="top:55%;left:5%;--fd:8s;--fx:60px;--fy:-40px;animation-delay:3s"></div>
+  <div class="firefly" style="top:70%;left:88%;--fd:6s;--fx:-50px;--fy:-30px;animation-delay:0.8s"></div>
+  <div class="firefly" style="top:80%;left:20%;--fd:9s;--fx:35px;--fy:-70px;animation-delay:2.2s"></div>
+  <div class="firefly" style="top:10%;left:60%;--fd:5.5s;--fx:-45px;--fy:55px;animation-delay:4s"></div>
+  <div class="firefly" style="top:45%;left:45%;--fd:7.5s;--fx:25px;--fy:-45px;animation-delay:1s"></div>
+  <div class="firefly" style="top:90%;left:70%;--fd:6.5s;--fx:-35px;--fy:-60px;animation-delay:3.5s"></div>
 
   <!-- ── Navigation ─────────────────────────────────────────────── -->
   <nav>
@@ -580,8 +585,8 @@
         <div class="platform">Windows</div>
         <div class="arch">x86_64 (SDL2 DLLs included)</div>
       </a>
-      <a class="download-card" href="#play" style="border-color: var(--gold);">
-        <div class="platform" style="color: var(--gold);">WebAssembly</div>
+      <a class="download-card" href="#play" style="border-color: var(--green);">
+        <div class="platform" style="color: var(--green);">WebAssembly</div>
         <div class="arch">Play in browser above!</div>
       </a>
     </div>
