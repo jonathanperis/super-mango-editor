@@ -172,25 +172,25 @@ jobs:
       # Download each platform's artifact into its own subdirectory so files
       # with the same name ("super-mango") don't overwrite each other.
       - name: Download Linux binary
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: super-mango-linux-x86_64
           path: dist/linux/
 
       - name: Download macOS binary
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: super-mango-macos-arm64
           path: dist/macos/
 
       - name: Download Windows binary
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: super-mango-windows-x86_64
           path: dist/windows/
 
       - name: Download WebAssembly build
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: super-mango-wasm
           path: dist/wasm/
@@ -262,7 +262,7 @@ jobs:
       # Download the WebAssembly build artifacts (super-mango.html, .js,
       # .wasm, .data) produced by the build job's "make web" step.
       - name: Download WebAssembly build
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: super-mango-wasm
           path: wasm-build/
