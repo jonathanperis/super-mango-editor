@@ -51,7 +51,7 @@ jobs:
     steps:
       # Check out the repository so the runner has access to the source code.
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # ── Linux dependency install ────────────────────────────────────────────
       # apt packages: build tools + SDL2 and all companion library dev headers.
@@ -142,7 +142,7 @@ jobs:
       # Upload the compiled binary (and, on Windows, the DLLs) as a workflow
       # artifact. retention-days: 1 keeps storage low for PR build checks.
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.artifact }}
           path: out/
@@ -171,25 +171,25 @@ jobs:
       # Download each platform's artifact into its own subdirectory so files
       # with the same name ("super-mango") don't overwrite each other.
       - name: Download Linux binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: super-mango-linux-x86_64
           path: dist/linux/
 
       - name: Download macOS binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: super-mango-macos-arm64
           path: dist/macos/
 
       - name: Download Windows binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: super-mango-windows-x86_64
           path: dist/windows/
 
       - name: Download WebAssembly build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: super-mango-wasm
           path: dist/wasm/
@@ -256,12 +256,12 @@ jobs:
     steps:
       # Check out the repository to get the docs/ folder.
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Download the WebAssembly build artifacts (super-mango.html, .js,
       # .wasm, .data) produced by the build job's "make web" step.
       - name: Download WebAssembly build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: super-mango-wasm
           path: wasm-build/
@@ -277,7 +277,7 @@ jobs:
           cp wasm-build/super-mango.data _site/
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: _site/
 
