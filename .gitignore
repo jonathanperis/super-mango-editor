@@ -59,3 +59,7 @@ dkms.conf
 
 # Generated files
 .DS_Store
+
+# Docs generation
+wiki/
+node_modules/
