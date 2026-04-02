@@ -372,7 +372,254 @@
         display: block;
       }
     }
-  </style>
+  
+
+    /* === Enhanced Design System === */
+    :root {
+        --enhanced-accent: #ffb700;
+        --enhanced-accent-dim: rgba(255, 183, 0, 0.15);
+        --enhanced-accent-glow: rgba(255, 183, 0, 0.08);
+        --enhanced-bg-deep: #060a14;
+        --enhanced-bg-surface: #0d1520;
+        --enhanced-text-primary: #f0e6c8;
+        --enhanced-text-secondary: #7a8a6a;
+        --enhanced-text-muted: #5a6a4a;
+        --enhanced-border-subtle: rgba(255, 183, 0, 0.08);
+        --enhanced-border-medium: rgba(255, 183, 0, 0.15);
+        --enhanced-code-bg: #0d1520;
+        --enhanced-code-text: #c8b8a8;
+    }
+
+    /* Ambient Background */
+    body::before {
+        background: radial-gradient(ellipse at 20% 50%, rgba(255, 183, 0, 0.08) 0%, transparent 50%);
+    }
+
+    /* Enhanced Sidebar */
+    .sidebar {
+        border-right: 1px solid rgba(255, 183, 0, 0.08);
+    }
+    .sidebar-header {
+        border-bottom: 1px solid rgba(255, 183, 0, 0.08);
+    }
+    .repo-title {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 16px;
+        letter-spacing: -0.02em;
+    }
+    .repo-title::before {
+        width: 10px;
+        height: 10px;
+        background: #ffb700;
+        border-radius: 3px;
+        box-shadow: 0 0 8px #ffb700;
+    }
+    .repo-description {
+        font-size: 12px;
+        line-height: 1.5;
+    }
+    .search-box {
+        background: #0d1520;
+        border: 1px solid rgba(255, 183, 0, 0.08);
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 13px;
+        font-family: 'Inter', sans-serif;
+        transition: all 0.2s;
+    }
+    .search-box:focus {
+        border-color: #ffb700;
+        box-shadow: 0 0 0 3px rgba(255, 183, 0, 0.15);
+    }
+    .search-box::placeholder {
+        color: #5a6a4a;
+    }
+    .sidebar-nav-container {
+        padding: 16px 12px 24px;
+    }
+    .sidebar-nav-container::-webkit-scrollbar {
+        width: 4px;
+    }
+    .sidebar-nav-container::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .sidebar-nav-container::-webkit-scrollbar-thumb {
+        background: rgba(255, 183, 0, 0.15);
+        border-radius: 4px;
+    }
+    .nav-item {
+        padding: 10px 14px;
+        font-size: 13px;
+        border-radius: 8px;
+        font-weight: 500;
+        position: relative;
+        transition: all 0.2s;
+    }
+    .nav-item:hover {
+        background: #0d1520;
+    }
+    .nav-item.active {
+        background: rgba(255, 183, 0, 0.15);
+        font-weight: 600;
+    }
+    .nav-item.active::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 3px;
+        height: 60%;
+        background: #ffb700;
+        border-radius: 0 3px 3px 0;
+    }
+    .sidebar-footer {
+        border-top: 1px solid rgba(255, 183, 0, 0.08);
+    }
+    .sidebar-footer a {
+        font-weight: 500;
+        transition: color 0.2s;
+    }
+    .sidebar-footer a:hover {
+        color: #ffb700;
+    }
+
+    /* Enhanced Content */
+    .content {
+        padding: 56px 64px;
+    }
+
+    /* Enhanced Typography */
+    h1 {
+        font-family: 'Inter', sans-serif;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        line-height: 1.2;
+    }
+    h2 {
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        margin: 56px 0 20px;
+        padding-bottom: 12px;
+    }
+    h3 {
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        margin: 32px 0 12px;
+    }
+    p {
+        font-family: 'Inter', sans-serif;
+        line-height: 1.75;
+    }
+    a {
+        transition: color 0.2s;
+    }
+    a:hover {
+        color: #f0e6c8;
+    }
+
+    /* Enhanced Code */
+    pre {
+        background: #0d1520;
+        border: 1px solid rgba(255, 183, 0, 0.08);
+        border-radius: 12px;
+        padding: 20px 24px;
+        margin: 28px 0;
+    }
+    pre code {
+        color: #c8b8a8;
+        font-size: 13px;
+        font-family: 'JetBrains Mono', monospace;
+        line-height: 1.7;
+    }
+    code {
+        font-family: 'JetBrains Mono', monospace;
+        background: #0d1520;
+        color: #ffb700;
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 13px;
+        border: 1px solid rgba(255, 183, 0, 0.08);
+    }
+
+    /* Enhanced Tables */
+    table {
+        border-collapse: separate;
+        border-spacing: 0;
+        border-radius: 12px;
+        overflow: hidden;
+        margin: 28px 0;
+        font-size: 14px;
+        border: 1px solid rgba(255, 183, 0, 0.08);
+    }
+    th {
+        background: #0d1520;
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid rgba(255, 183, 0, 0.08);
+    }
+    td {
+        border-bottom: 1px solid rgba(255, 183, 0, 0.08);
+    }
+    tr:last-child td {
+        border-bottom: none;
+    }
+    tr:hover td {
+        background: rgba(255, 183, 0, 0.08);
+    }
+
+    /* Enhanced Blockquotes */
+    blockquote {
+        background: #0d1520;
+        border-left: 3px solid #ffb700;
+        border-radius: 0 12px 12px 0;
+        padding: 16px 24px;
+        margin: 28px 0;
+    }
+    blockquote p {
+        color: #7a8a6a;
+    }
+
+    /* Enhanced HR */
+    hr {
+        border-top: 1px solid rgba(255, 183, 0, 0.08);
+        margin: 48px 0;
+    }
+
+    /* Enhanced Lists */
+    ul {
+        padding-left: 24px;
+        margin: 16px 0;
+    }
+    li {
+        margin-bottom: 8px;
+        line-height: 1.6;
+    }
+    li::marker {
+        color: #ffb700;
+    }
+
+    /* Enhanced Mobile */
+    .mobile-header {
+        backdrop-filter: blur(12px);
+    }
+    .menu-toggle span {
+        transition: all 0.3s;
+    }
+    .overlay {
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+    }
+
+    @media (max-width: 768px) {
+        .content {
+            padding: 32px 24px;
+        }
+    }
+</style>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
