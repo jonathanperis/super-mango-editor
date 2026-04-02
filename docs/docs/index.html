@@ -5,19 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Super Mango Game - Documentation</title>
   <meta name="description" content="2D side-scrolling platformer written in C using SDL2 — browser-playable via WebAssembly">
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0a0a0a;
-      --sidebar-bg: #111111;
-      --text-primary: #ededed;
-      --text-muted: #888888;
-      --text-body: #c8c8c8;
-      --accent: #7c6af7;
-      --accent-hover: #9b8df9;
-      --code-bg: #1e1e2e;
-      --code-text: #cdd6f4;
-      --border: #1f1f2e;
-      --code-border: #2a2a3e;
+      --bg: #060a14;
+      --sidebar-bg: #0d1520;
+      --text-primary: #f0e6c8;
+      --text-muted: #7a8a6a;
+      --text-body: #d0c8a8;
+      --accent: #ffb700;
+      --accent-hover: #39d353;
+      --code-bg: #0a1a0e;
+      --code-text: #f0e6c8;
+      --border: #1a3020;
+      --code-border: #1a3020;
       --sidebar-width: 260px;
     }
 
@@ -25,13 +26,14 @@
     
     html {
       scroll-behavior: smooth;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: 'DM Mono', monospace;
     }
     
     body {
       margin: 0;
       padding: 0;
       background: var(--bg);
+      background-image: radial-gradient(circle at 50% 0%, rgba(255,183,0,0.05) 0%, transparent 50%);
       color: var(--text-primary);
       display: flex;
     }
@@ -130,7 +132,7 @@
 
     .nav-item.active {
       color: var(--accent);
-      background: rgba(124, 106, 247, 0.1);
+      background: rgba(255, 183, 0, 0.1);
       font-weight: 500;
     }
 
@@ -229,7 +231,7 @@
     }
 
     code {
-      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-family: 'DM Mono', monospace;
       background: var(--code-bg);
       color: var(--code-text);
       border-radius: 4px;
@@ -254,7 +256,7 @@
     }
 
     th {
-      background: #1a1a2e;
+      background: var(--sidebar-bg);
       color: var(--text-primary);
       font-weight: 600;
       border-bottom: 1px solid var(--border);
@@ -305,7 +307,7 @@
     }
     
     .search-highlight {
-      background: rgba(124, 106, 247, 0.3);
+      background: rgba(255, 183, 0, 0.3);
       border-radius: 2px;
       padding: 0 2px;
     }
@@ -372,254 +374,7 @@
         display: block;
       }
     }
-  
-
-    /* === Enhanced Design System === */
-    :root {
-        --enhanced-accent: #ffb700;
-        --enhanced-accent-dim: rgba(255, 183, 0, 0.15);
-        --enhanced-accent-glow: rgba(255, 183, 0, 0.08);
-        --enhanced-bg-deep: #060a14;
-        --enhanced-bg-surface: #0d1520;
-        --enhanced-text-primary: #f0e6c8;
-        --enhanced-text-secondary: #7a8a6a;
-        --enhanced-text-muted: #5a6a4a;
-        --enhanced-border-subtle: rgba(255, 183, 0, 0.08);
-        --enhanced-border-medium: rgba(255, 183, 0, 0.15);
-        --enhanced-code-bg: #0d1520;
-        --enhanced-code-text: #c8b8a8;
-    }
-
-    /* Ambient Background */
-    body::before {
-        background: radial-gradient(ellipse at 20% 50%, rgba(255, 183, 0, 0.08) 0%, transparent 50%);
-    }
-
-    /* Enhanced Sidebar */
-    .sidebar {
-        border-right: 1px solid rgba(255, 183, 0, 0.08);
-    }
-    .sidebar-header {
-        border-bottom: 1px solid rgba(255, 183, 0, 0.08);
-    }
-    .repo-title {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 16px;
-        letter-spacing: -0.02em;
-    }
-    .repo-title::before {
-        width: 10px;
-        height: 10px;
-        background: #ffb700;
-        border-radius: 3px;
-        box-shadow: 0 0 8px #ffb700;
-    }
-    .repo-description {
-        font-size: 12px;
-        line-height: 1.5;
-    }
-    .search-box {
-        background: #0d1520;
-        border: 1px solid rgba(255, 183, 0, 0.08);
-        border-radius: 8px;
-        padding: 10px 14px;
-        font-size: 13px;
-        font-family: 'Inter', sans-serif;
-        transition: all 0.2s;
-    }
-    .search-box:focus {
-        border-color: #ffb700;
-        box-shadow: 0 0 0 3px rgba(255, 183, 0, 0.15);
-    }
-    .search-box::placeholder {
-        color: #5a6a4a;
-    }
-    .sidebar-nav-container {
-        padding: 16px 12px 24px;
-    }
-    .sidebar-nav-container::-webkit-scrollbar {
-        width: 4px;
-    }
-    .sidebar-nav-container::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    .sidebar-nav-container::-webkit-scrollbar-thumb {
-        background: rgba(255, 183, 0, 0.15);
-        border-radius: 4px;
-    }
-    .nav-item {
-        padding: 10px 14px;
-        font-size: 13px;
-        border-radius: 8px;
-        font-weight: 500;
-        position: relative;
-        transition: all 0.2s;
-    }
-    .nav-item:hover {
-        background: #0d1520;
-    }
-    .nav-item.active {
-        background: rgba(255, 183, 0, 0.15);
-        font-weight: 600;
-    }
-    .nav-item.active::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 3px;
-        height: 60%;
-        background: #ffb700;
-        border-radius: 0 3px 3px 0;
-    }
-    .sidebar-footer {
-        border-top: 1px solid rgba(255, 183, 0, 0.08);
-    }
-    .sidebar-footer a {
-        font-weight: 500;
-        transition: color 0.2s;
-    }
-    .sidebar-footer a:hover {
-        color: #ffb700;
-    }
-
-    /* Enhanced Content */
-    .content {
-        padding: 56px 64px;
-    }
-
-    /* Enhanced Typography */
-    h1 {
-        font-family: 'Inter', sans-serif;
-        font-weight: 800;
-        letter-spacing: -0.03em;
-        line-height: 1.2;
-    }
-    h2 {
-        font-family: 'Inter', sans-serif;
-        font-weight: 700;
-        letter-spacing: -0.02em;
-        margin: 56px 0 20px;
-        padding-bottom: 12px;
-    }
-    h3 {
-        font-family: 'Inter', sans-serif;
-        font-weight: 600;
-        margin: 32px 0 12px;
-    }
-    p {
-        font-family: 'Inter', sans-serif;
-        line-height: 1.75;
-    }
-    a {
-        transition: color 0.2s;
-    }
-    a:hover {
-        color: #f0e6c8;
-    }
-
-    /* Enhanced Code */
-    pre {
-        background: #0d1520;
-        border: 1px solid rgba(255, 183, 0, 0.08);
-        border-radius: 12px;
-        padding: 20px 24px;
-        margin: 28px 0;
-    }
-    pre code {
-        color: #c8b8a8;
-        font-size: 13px;
-        font-family: 'JetBrains Mono', monospace;
-        line-height: 1.7;
-    }
-    code {
-        font-family: 'JetBrains Mono', monospace;
-        background: #0d1520;
-        color: #ffb700;
-        border-radius: 6px;
-        padding: 2px 8px;
-        font-size: 13px;
-        border: 1px solid rgba(255, 183, 0, 0.08);
-    }
-
-    /* Enhanced Tables */
-    table {
-        border-collapse: separate;
-        border-spacing: 0;
-        border-radius: 12px;
-        overflow: hidden;
-        margin: 28px 0;
-        font-size: 14px;
-        border: 1px solid rgba(255, 183, 0, 0.08);
-    }
-    th {
-        background: #0d1520;
-        font-weight: 600;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        border-bottom: 1px solid rgba(255, 183, 0, 0.08);
-    }
-    td {
-        border-bottom: 1px solid rgba(255, 183, 0, 0.08);
-    }
-    tr:last-child td {
-        border-bottom: none;
-    }
-    tr:hover td {
-        background: rgba(255, 183, 0, 0.08);
-    }
-
-    /* Enhanced Blockquotes */
-    blockquote {
-        background: #0d1520;
-        border-left: 3px solid #ffb700;
-        border-radius: 0 12px 12px 0;
-        padding: 16px 24px;
-        margin: 28px 0;
-    }
-    blockquote p {
-        color: #7a8a6a;
-    }
-
-    /* Enhanced HR */
-    hr {
-        border-top: 1px solid rgba(255, 183, 0, 0.08);
-        margin: 48px 0;
-    }
-
-    /* Enhanced Lists */
-    ul {
-        padding-left: 24px;
-        margin: 16px 0;
-    }
-    li {
-        margin-bottom: 8px;
-        line-height: 1.6;
-    }
-    li::marker {
-        color: #ffb700;
-    }
-
-    /* Enhanced Mobile */
-    .mobile-header {
-        backdrop-filter: blur(12px);
-    }
-    .menu-toggle span {
-        transition: all 0.3s;
-    }
-    .overlay {
-        background: rgba(0, 0, 0, 0.6);
-        backdrop-filter: blur(4px);
-    }
-
-    @media (max-width: 768px) {
-        .content {
-            padding: 32px 24px;
-        }
-    }
-</style>
+  </style>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
@@ -657,6 +412,7 @@
 </ul>
     </div>
     <div class="sidebar-footer">
+      <a href="../" class="back-home">← Back to home</a>
       <a href="https://github.com/jonathanperis/super-mango-game" target="_blank" rel="noopener noreferrer">View on GitHub</a>
       <div>Built by Jonathan Peris</div>
     </div>
