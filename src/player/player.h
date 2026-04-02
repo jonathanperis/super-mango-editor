@@ -1,0 +1,112 @@
+/*
+ * player.h — Public interface for the player module.
+ *
+ * Defines the Player data structure and declares the five functions
+ * that manage a player's full lifecycle: init, input, update, render, cleanup.
+ */
+#pragma once
+
+#include <SDL.h>           /* SDL_Texture, SDL_Renderer, SDL_Rect */
+#include <SDL_mixer.h>     /* Mix_Chunk */
+#include "../surfaces/platform.h"       /* Platform, MAX_PLATFORMS — needed for player_update signature */
+#include "../surfaces/bouncepad.h"      /* Bouncepad — needed for player_update signature */
+#include "../surfaces/float_platform.h" /* FloatPlatform — needed for player_update signature */
+#include "../surfaces/bridge.h"         /* Bridge — needed for player_update signature */
+#include "../hazards/spike_platform.h"  /* SpikePlatform — needed for player_update signature */
+#include "../surfaces/vine.h"           /* VineDecor — needed for climbing input + update  */
+#include "../surfaces/ladder.h"         /* LadderDecor — climbable, same mechanics as vine */
+#include "../surfaces/rope.h"           /* RopeDecor — climbable, same mechanics as vine   */
+
+/*
+ * AnimState — which animation sequence is currently playing.
+ * The value maps directly to the sheet row (see ANIM_ROW[] in player.c).
+ */
+typedef enum {
+    ANIM_IDLE = 0,  /* standing still:       sheet row 0, 4 frames */
+    ANIM_WALK,      /* running left/right:   sheet row 1, 4 frames */
+    ANIM_JUMP,      /* rising after a jump:  sheet row 2, 2 frames */
+    ANIM_FALL,      /* falling under gravity: sheet row 3, 1 frame */
+    ANIM_CLIMB      /* climbing a vine:      sheet row 4, 2 frames */
+} AnimState;
+
+/*
+ * Player — all the data needed to represent the player character.
+ *
+ * Position and velocity use float (not int) so that sub-pixel movement
+ * accumulated via delta time doesn't get truncated each frame.
+ * We only convert to int at the very last moment when drawing.
+ */
+typedef struct {
+    float x;            /* horizontal position in pixels (top-left corner)  */
+    float y;            /* vertical   position in pixels (top-left corner)   */
+    float vx;           /* horizontal velocity: pixels per second            */
+    float vy;           /* vertical   velocity: pixels per second (gravity)  */
+    float speed;        /* horizontal max speed in pixels per second         */
+    int   w;            /* display width  of one frame in pixels (48)        */
+    int   h;            /* display height of one frame in pixels (48)        */
+    int   on_ground;    /* 1 if standing on the floor, 0 if airborne         */
+    AnimState anim_state;       /* which animation is active (idle/walk/jump/fall) */
+    int       anim_frame_index; /* current frame index within the animation       */
+    Uint32    anim_timer_ms;    /* ms accumulated in the current frame            */
+    int       facing_left;      /* 1 = mirror sprite horizontally                 */
+    int       on_vine;          /* 1 = currently climbing a climbable, 0 = normal  */
+    int       vine_index;       /* index into the climbable array being climbed   */
+    int       climb_source;     /* 0 = vine, 1 = ladder, 2 = rope                */
+    int       jump_held;         /* 1 = jump key still held from last jump; prevents re-jump */
+    float     hurt_timer;        /* seconds remaining of invincibility blink; 0 = normal */
+    SDL_Rect     frame;   /* source rect: which part of the sheet to draw    */
+    SDL_Texture *texture; /* GPU image handle; NULL until player_init runs   */
+} Player;
+
+/* Load the player texture and set its initial position. */
+void player_init(Player *player, SDL_Renderer *renderer);
+
+/* Sample keyboard and gamepad every frame and set vx/vy accordingly.
+ * ctrl may be NULL when no controller is connected; keyboard still works. */
+void player_handle_input(Player *player, Mix_Chunk *snd_jump,
+                         SDL_GameController *ctrl,
+                         const VineDecor *vines, int vine_count,
+                         const LadderDecor *ladders, int ladder_count,
+                         const RopeDecor *ropes, int rope_count);
+
+/*
+ * Move the player by velocity × dt; resolve floor, one-way platform,
+ * float-platform, and bouncepad collisions.
+ *
+ * If the player lands on a bouncepad, *out_bounce_idx is set to that pad's
+ * index; otherwise it is left unchanged.  Callers should initialise it to -1.
+ *
+ * If the player lands on a float platform, *out_fp_landed_idx is set to that
+ * platform's index; otherwise it is left at -1.  Used by game_loop to drive
+ * the crumble timer and to nudge the player along with a moving rail platform.
+ *
+ * prev_fp_landed_idx : the index that *out_fp_landed_idx was set to last frame
+ *   (pass -1 on the first frame).  Used internally to "stay" on a platform that
+ *   moved upward this frame — without it, the crossing test misses because the
+ *   surface escaped upward past the player's feet before they could cross it.
+ */
+void player_update(Player *player, float dt,
+                   const Platform *platforms, int platform_count,
+                   const FloatPlatform *float_platforms, int float_platform_count,
+                   const Bouncepad *bouncepads, int bouncepad_count,
+                   const VineDecor *vines, int vine_count,
+                   const LadderDecor *ladders, int ladder_count,
+                   const RopeDecor *ropes, int rope_count,
+                   const Bridge *bridges, int bridge_count,
+                   const SpikePlatform *spike_platforms, int spike_platform_count,
+                   const int *sea_gaps, int sea_gap_count,
+                   int *out_bounce_idx,
+                   int *out_fp_landed_idx,
+                   int prev_fp_landed_idx);
+
+/* Draw the player sprite at its current position, offset by the camera. */
+void player_render(Player *player, SDL_Renderer *renderer, int cam_x);
+
+/* Return the player's tightly-inset physics hitbox (logical pixels). */
+SDL_Rect player_get_hitbox(const Player *player);
+
+/* Reset the player's position and state without reloading the texture. */
+void player_reset(Player *player);
+
+/* Release the player's GPU texture. */
+void player_cleanup(Player *player);

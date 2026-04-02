@@ -16,38 +16,38 @@
 
 #include <SDL.h>        /* SDL_Window, SDL_Renderer, SDL_Texture */
 #include <SDL_mixer.h>  /* Mix_Chunk */
-#include "player.h"     /* Player struct — embedded by value in GameState */
-#include "platform.h"   /* Platform struct + MAX_PLATFORMS constant */
-#include "water.h"      /* Water struct — animated bottom strip              */
-#include "fog.h"        /* FogSystem struct — atmospheric fog overlay      */
-#include "spider.h"     /* Spider struct + MAX_SPIDERS constant              */
-#include "fish.h"       /* Fish struct + MAX_FISH constant                  */
-#include "coin.h"       /* Coin struct + MAX_COINS constant                  */
-#include "vine.h"       /* VineDecor struct + MAX_VINES constant              */
-#include "bouncepad.h"       /* Bouncepad struct — shared mechanics            */
-#include "bouncepad_small.h" /* Green bouncepad (small jump) placement        */
-#include "bouncepad_medium.h"/* Wood bouncepad (medium jump) placement        */
-#include "bouncepad_high.h"  /* Red bouncepad (high jump) placement           */
-#include "hud.h"        /* Hud struct — HUD display resources                */
-#include "parallax.h"   /* ParallaxSystem — multi-layer scrolling background */
-#include "rail.h"           /* Rail, RailTile — rail path system              */
-#include "spike_block.h"    /* SpikeBlock — rail-riding hazard entity          */
-#include "float_platform.h" /* FloatPlatform — hovering/crumble/rail surfaces */
-#include "bridge.h"         /* Bridge — tiled crumble walkway                */
-#include "jumping_spider.h" /* JumpingSpider — jumping patrol enemy          */
-#include "bird.h"           /* Bird — slow sine-wave sky patrol             */
-#include "faster_bird.h"    /* FasterBird — fast sine-wave sky patrol       */
-#include "yellow_star.h"    /* YellowStar — health-restoring collectible    */
-#include "axe_trap.h"       /* AxeTrap — swinging/spinning axe hazard       */
-#include "circular_saw.h"  /* CircularSaw — fast rotating patrol hazard    */
-#include "blue_flame.h"    /* BlueFlame — erupting fire hazard from sea gaps */
-#include "ladder.h"        /* LadderDecor — climbable ladder                */
-#include "rope.h"          /* RopeDecor — climbable rope                   */
-#include "faster_fish.h"   /* FasterFish — fast variant of jumping fish     */
-#include "last_star.h"     /* LastStar — end-of-level collectible           */
-#include "spike.h"         /* SpikeRow — static ground spike hazards       */
-#include "spike_platform.h"/* SpikePlatform — elevated spike hazard surface*/
-#include "debug.h"        /* DebugOverlay — debug collision/FPS/log overlay  */
+#include "player/player.h"          /* Player struct — embedded by value in GameState */
+#include "surfaces/platform.h"      /* Platform struct + MAX_PLATFORMS constant */
+#include "effects/water.h"          /* Water struct — animated bottom strip */
+#include "effects/fog.h"            /* FogSystem struct — atmospheric fog overlay */
+#include "entities/spider.h"        /* Spider struct + MAX_SPIDERS constant */
+#include "entities/fish.h"          /* Fish struct + MAX_FISH constant */
+#include "collectibles/coin.h"      /* Coin struct + MAX_COINS constant */
+#include "surfaces/vine.h"          /* VineDecor struct + MAX_VINES constant */
+#include "surfaces/bouncepad.h"       /* Bouncepad struct — shared mechanics */
+#include "surfaces/bouncepad_small.h" /* Green bouncepad (small jump) placement */
+#include "surfaces/bouncepad_medium.h"/* Wood bouncepad (medium jump) placement */
+#include "surfaces/bouncepad_high.h"  /* Red bouncepad (high jump) placement */
+#include "screens/hud.h"            /* Hud struct — HUD display resources */
+#include "effects/parallax.h"       /* ParallaxSystem — multi-layer scrolling background */
+#include "surfaces/rail.h"          /* Rail, RailTile — rail path system */
+#include "hazards/spike_block.h"    /* SpikeBlock — rail-riding hazard entity */
+#include "surfaces/float_platform.h"/* FloatPlatform — hovering/crumble/rail surfaces */
+#include "surfaces/bridge.h"        /* Bridge — tiled crumble walkway */
+#include "entities/jumping_spider.h"/* JumpingSpider — jumping patrol enemy */
+#include "entities/bird.h"          /* Bird — slow sine-wave sky patrol */
+#include "entities/faster_bird.h"   /* FasterBird — fast sine-wave sky patrol */
+#include "collectibles/yellow_star.h"/* YellowStar — health-restoring collectible */
+#include "hazards/axe_trap.h"       /* AxeTrap — swinging/spinning axe hazard */
+#include "hazards/circular_saw.h"   /* CircularSaw — fast rotating patrol hazard */
+#include "hazards/blue_flame.h"     /* BlueFlame — erupting fire hazard from sea gaps */
+#include "surfaces/ladder.h"        /* LadderDecor — climbable ladder */
+#include "surfaces/rope.h"          /* RopeDecor — climbable rope */
+#include "entities/faster_fish.h"   /* FasterFish — fast variant of jumping fish */
+#include "collectibles/last_star.h" /* LastStar — end-of-level collectible */
+#include "hazards/spike.h"          /* SpikeRow — static ground spike hazards */
+#include "hazards/spike_platform.h" /* SpikePlatform — elevated spike hazard surface */
+#include "core/debug.h"             /* DebugOverlay — debug collision/FPS/log overlay */
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -147,7 +147,16 @@ typedef struct {
 typedef struct {
     SDL_Window         *window;     /* the OS window (created by SDL)              */
     SDL_Renderer       *renderer;  /* GPU-accelerated 2D drawing context          */
-    SDL_GameController *controller;/* first connected gamepad; NULL = none         */
+    SDL_GameController *controller;  /* first connected gamepad; NULL = none          */
+    /*
+     * Gamepad init state machine (avoids blocking the main thread):
+     *   0 = idle / done
+     *   1 = first frame rendered — start background thread next
+     *   2 = thread running — show HUD message, check each frame
+     */
+    int         ctrl_pending_init;
+    SDL_Thread *ctrl_init_thread;    /* background thread for SDL_InitSubSystem call   */
+    volatile int ctrl_init_done;     /* set to 1 by thread when subsystem is ready     */
     ParallaxSystem      parallax;  /* multi-layer scrolling background            */
     SDL_Texture   *floor_tile; /* grass tile repeated across the floor layer  */
     SDL_Texture  *platform_tex;/* shared tile texture for all pillars         */

@@ -5,39 +5,40 @@
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_mixer.h>
+#include <SDL_ttf.h>    /* TTF_RenderText_Solid — gamepad init HUD message */
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>   /* sqrtf — used by apply_damage push impulse */
 
 #include "game.h"
-#include "player.h"
-#include "platform.h"
-#include "water.h"
-#include "fog.h"
-#include "spider.h"
-#include "fish.h"
-#include "coin.h"
-#include "vine.h"
-#include "bouncepad.h"
-#include "bouncepad_small.h"
-#include "bouncepad_medium.h"
-#include "bouncepad_high.h"
-#include "hud.h"
-#include "parallax.h"
-#include "rail.h"
-#include "spike_block.h"
-#include "float_platform.h"
-#include "yellow_star.h"
-#include "axe_trap.h"
-#include "circular_saw.h"
-#include "blue_flame.h"
-#include "ladder.h"
-#include "rope.h"
-#include "faster_fish.h"
-#include "last_star.h"
-#include "spike.h"
-#include "spike_platform.h"
-#include "sandbox.h"
+#include "player/player.h"
+#include "surfaces/platform.h"
+#include "effects/water.h"
+#include "effects/fog.h"
+#include "entities/spider.h"
+#include "entities/fish.h"
+#include "collectibles/coin.h"
+#include "surfaces/vine.h"
+#include "surfaces/bouncepad.h"
+#include "surfaces/bouncepad_small.h"
+#include "surfaces/bouncepad_medium.h"
+#include "surfaces/bouncepad_high.h"
+#include "screens/hud.h"
+#include "effects/parallax.h"
+#include "surfaces/rail.h"
+#include "hazards/spike_block.h"
+#include "surfaces/float_platform.h"
+#include "collectibles/yellow_star.h"
+#include "hazards/axe_trap.h"
+#include "hazards/circular_saw.h"
+#include "hazards/blue_flame.h"
+#include "surfaces/ladder.h"
+#include "surfaces/rope.h"
+#include "entities/faster_fish.h"
+#include "collectibles/last_star.h"
+#include "hazards/spike.h"
+#include "hazards/spike_platform.h"
+#include "screens/sandbox.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -302,28 +303,20 @@ void game_init(GameState *gs) {
      * which keeps memory usage low for large files.
      * Mix_PlayMusic(-1) means loop forever until Mix_HaltMusic() is called.
      */
-    gs->music = Mix_LoadMUS("sounds/game_music.wav");
+    gs->music = Mix_LoadMUS("sounds/game_music.ogg");
     if (!gs->music) {
-        fprintf(stderr, "Failed to load game_music.wav: %s\n", Mix_GetError());
-        Mix_FreeChunk(gs->snd_jump);
-        SDL_DestroyTexture(gs->coin_tex);
-        SDL_DestroyTexture(gs->fish_tex);
-        SDL_DestroyTexture(gs->spider_tex);
-        SDL_DestroyTexture(gs->platform_tex);
-        SDL_DestroyTexture(gs->floor_tile);
-        parallax_cleanup(&gs->parallax);
-        SDL_DestroyRenderer(gs->renderer);
-        SDL_DestroyWindow(gs->window);
-        exit(EXIT_FAILURE);
+        /* Non-fatal: game runs without music if the file is missing. */
+        fprintf(stderr, "Warning: failed to load game_music.ogg: %s\n", Mix_GetError());
+    } else {
+        Mix_PlayMusic(gs->music, -1);   /* -1 = loop indefinitely                */
+        /*
+         * Mix_VolumeMusic — set the music playback volume.
+         * Range: 0 (silent) to MIX_MAX_VOLUME (128, full volume).
+         * 13/128 ≈ 10%, keeping the ambient track soft so it doesn't
+         * compete with sound effects.
+         */
+        Mix_VolumeMusic(13);
     }
-    Mix_PlayMusic(gs->music, -1);   /* -1 = loop indefinitely                */
-    /*
-     * Mix_VolumeMusic — set the music playback volume.
-     * Range: 0 (silent) to MIX_MAX_VOLUME (128, full volume).
-     * 13/128 ≈ 10%, keeping the ambient track soft so it doesn't
-     * compete with sound effects.
-     */
-    Mix_VolumeMusic(13);
 
     /* Set up the player (loads texture, sets initial position on the floor) */
     player_init(&gs->player, gs->renderer);
@@ -362,25 +355,13 @@ void game_init(GameState *gs) {
      * Non-fatal: if the subsystem fails to start (e.g. driver issue) the game
      * continues with keyboard-only input.
      */
-    if (SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) != 0) {
-        fprintf(stderr, "Warning: SDL_INIT_GAMECONTROLLER failed: %s — "
-                        "gamepad support unavailable\n", SDL_GetError());
-    } else {
-        /*
-         * Scan for already-connected controllers.
-         * SDL_IsGameController checks whether SDL has a known mapping for
-         * the device (DualSense, DS4, Xbox, etc.).  We open the first one
-         * found; hot-plug events (SDL_CONTROLLERDEVICEADDED) handle
-         * controllers connected after this point.
-         */
-        for (int i = 0; i < SDL_NumJoysticks(); i++) {
-            if (SDL_IsGameController(i)) {
-                gs->controller = SDL_GameControllerOpen(i);
-                if (gs->controller)
-                    break;
-            }
-        }
-    }
+    /*
+     * Gamepad init is deferred to the first frame of the game loop.
+     * SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) enumerates HID devices,
+     * which can block for 20-30 seconds on Windows when antivirus software
+     * is active. Deferring keeps game_init fast so the window appears immediately.
+     */
+    gs->ctrl_pending_init = 1;
 
     /* Signal the loop to start running; game starts in the foreground */
     gs->running = 1;
@@ -480,6 +461,34 @@ static void apply_damage(GameState *gs,
         gs->hearts = MAX_HEARTS;
         level_reset(gs, &gs->fp_prev_riding);
     }
+}
+
+/* ------------------------------------------------------------------ */
+
+/*
+ * ctrl_init_worker — background thread that calls SDL_InitSubSystem.
+ *
+ * SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) enumerates HID devices and
+ * can block for 20-30 seconds on Windows when antivirus software is active.
+ * Running it in a separate thread keeps the main loop responsive so the OS
+ * does not show "application not responding" and the game continues drawing.
+ *
+ * Only SDL_InitSubSystem is called here — SDL gamepad functions
+ * (SDL_NumJoysticks, SDL_GameControllerOpen) are not thread-safe and must
+ * be called from the main thread after this thread finishes.
+ */
+static int ctrl_init_worker(void *data) {
+    GameState *gs = (GameState *)data;
+    if (SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) != 0) {
+        fprintf(stderr, "Warning: SDL_INIT_GAMECONTROLLER failed: %s — "
+                        "gamepad support unavailable\n", SDL_GetError());
+    }
+    /*
+     * Atomic write: signal the main thread that the subsystem is ready.
+     * volatile ensures the compiler does not cache this value in a register.
+     */
+    gs->ctrl_init_done = 1;
+    return 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1464,6 +1473,35 @@ static void game_loop_frame(void *arg) {
         }
 
         /*
+         * Gamepad init HUD message — shown while the background thread is running.
+         *
+         * TTF_RenderText_Solid renders the string into a CPU surface; we then
+         * upload it to the GPU with SDL_CreateTextureFromSurface and draw it
+         * in the bottom-right corner.  The texture is created and destroyed
+         * every frame it is needed — acceptable cost for a one-time message.
+         */
+        if (gs->ctrl_pending_init == 2 && gs->hud.font) {
+            SDL_Color white = {255, 255, 255, 200};
+            SDL_Surface *surf = TTF_RenderText_Solid(
+                gs->hud.font, "A inicializar controle...", white);
+            if (surf) {
+                SDL_Texture *tex = SDL_CreateTextureFromSurface(gs->renderer, surf);
+                if (tex) {
+                    /* Bottom-right corner, 6 px from each edge. */
+                    SDL_Rect dst = {
+                        GAME_W - surf->w - 6,
+                        GAME_H - surf->h - 6,
+                        surf->w,
+                        surf->h
+                    };
+                    SDL_RenderCopy(gs->renderer, tex, NULL, &dst);
+                    SDL_DestroyTexture(tex);
+                }
+                SDL_FreeSurface(surf);
+            }
+        }
+
+        /*
          * SDL_RenderPresent — swap the back buffer to the screen.
          * Everything drawn since RenderClear was on a hidden buffer.
          * This call makes it visible instantly, preventing flicker.
@@ -1471,6 +1509,43 @@ static void game_loop_frame(void *arg) {
          * is ready for the next frame (typically ~16ms at 60 Hz).
          */
         SDL_RenderPresent(gs->renderer);
+
+        /*
+         * Gamepad init state machine — runs non-blocking across multiple frames.
+         *
+         * State 1: first frame just presented — spawn the background thread.
+         * State 2: thread running — check each frame if it has finished.
+         *          When done, open the controller on the main thread (thread-safe)
+         *          and clear ctrl_pending_init so the HUD message disappears.
+         */
+        if (gs->ctrl_pending_init == 1) {
+            gs->ctrl_init_done   = 0;
+            gs->ctrl_init_thread = SDL_CreateThread(ctrl_init_worker, "ctrl_init", gs);
+            if (!gs->ctrl_init_thread) {
+                fprintf(stderr, "Warning: could not start gamepad init thread: %s\n",
+                        SDL_GetError());
+                gs->ctrl_pending_init = 0;  /* give up gracefully */
+            } else {
+                gs->ctrl_pending_init = 2;
+            }
+        } else if (gs->ctrl_pending_init == 2 && gs->ctrl_init_done) {
+            /*
+             * SDL_WaitThread — join the thread and free its resources.
+             * Safe to call here because ctrl_init_done guarantees the thread
+             * has already returned.
+             */
+            SDL_WaitThread(gs->ctrl_init_thread, NULL);
+            gs->ctrl_init_thread = NULL;
+
+            /* Open the first available gamepad on the main thread. */
+            for (int i = 0; i < SDL_NumJoysticks(); i++) {
+                if (SDL_IsGameController(i)) {
+                    gs->controller = SDL_GameControllerOpen(i);
+                    if (gs->controller) break;
+                }
+            }
+            gs->ctrl_pending_init = 0;
+        }
 
         /*
          * Manual frame cap fallback: if the frame finished before frame_ms ms
