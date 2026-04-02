@@ -126,6 +126,58 @@ void float_platforms_init(FloatPlatform *fps, int *count, const Rail *rails) {
  *              (which wraps t).  Open rails advance manually with bounce
  *              at both endpoints (no fall-off — platforms never detach).
  */
+/*
+ * float_platform_update_rail — Advance a RAIL-mode platform for one frame.
+ *
+ * Extracted from float_platform_update to keep the switch statement concise.
+ * Saves prev_x for the game-loop nudge calculation, advances t along the rail,
+ * and recomputes the world-space position from rail_get_world_pos.
+ */
+static void float_platform_update_rail(FloatPlatform *fp, float dt)
+{
+    /*
+     * Save the current x before advancing so game_loop can compute
+     * the horizontal delta (fp->x − fp->prev_x) and push the player
+     * sideways when they are riding this platform.
+     */
+    fp->prev_x = fp->x;
+
+    if (fp->rail->closed) {
+        /* Closed loop: rail_advance wraps t continuously in [0, count) */
+        fp->t = rail_advance(fp->rail, fp->t, fp->speed, dt);
+    } else {
+        /*
+         * Open rail: advance by speed × direction × dt.
+         * Bounce at both endpoints — platforms never fall off.
+         */
+        fp->t += fp->speed * (float)fp->direction * dt;
+        if (fp->t >= (float)(fp->rail->count - 1)) {
+            fp->t         = (float)(fp->rail->count - 1);
+            fp->direction = -1;
+        } else if (fp->t <= 0.0f) {
+            fp->t         = 0.0f;
+            fp->direction = 1;
+        }
+    }
+
+    /*
+     * Clamp t just below (count − 1) for open rails before the
+     * position lookup so the next-tile index j never wraps to tile[0].
+     */
+    float t_safe = fp->t;
+    if (!fp->rail->closed && t_safe >= (float)(fp->rail->count - 1))
+        t_safe = (float)(fp->rail->count - 1) - 0.0001f;
+
+    /*
+     * Recompute world-space position from the interpolated rail centre.
+     * Subtract half the platform size to place the top-left corner.
+     */
+    float cx, cy;
+    rail_get_world_pos(fp->rail, t_safe, &cx, &cy);
+    fp->x = cx - fp->w * 0.5f;
+    fp->y = cy - fp->h * 0.5f;
+}
+
 void float_platform_update(FloatPlatform *fp, float dt, int player_on_top) {
     if (!fp->active) return;
 
@@ -167,50 +219,9 @@ void float_platform_update(FloatPlatform *fp, float dt, int player_on_top) {
             break;
 
         /* ---- RAIL: ride the track ---------------------------------- */
-        case FLOAT_PLATFORM_RAIL: {
-            /*
-             * Save the current x before advancing so game_loop can compute
-             * the horizontal delta (fp->x − fp->prev_x) and push the player
-             * sideways when they are riding this platform.
-             */
-            fp->prev_x = fp->x;
-
-            if (fp->rail->closed) {
-                /* Closed loop: rail_advance wraps t continuously in [0, count) */
-                fp->t = rail_advance(fp->rail, fp->t, fp->speed, dt);
-            } else {
-                /*
-                 * Open rail: advance by speed × direction × dt.
-                 * Bounce at both endpoints — platforms never fall off.
-                 */
-                fp->t += fp->speed * (float)fp->direction * dt;
-                if (fp->t >= (float)(fp->rail->count - 1)) {
-                    fp->t         = (float)(fp->rail->count - 1);
-                    fp->direction = -1;
-                } else if (fp->t <= 0.0f) {
-                    fp->t         = 0.0f;
-                    fp->direction = 1;
-                }
-            }
-
-            /*
-             * Clamp t just below (count − 1) for open rails before the
-             * position lookup so the next-tile index j never wraps to tile[0].
-             */
-            float t_safe = fp->t;
-            if (!fp->rail->closed && t_safe >= (float)(fp->rail->count - 1))
-                t_safe = (float)(fp->rail->count - 1) - 0.0001f;
-
-            /*
-             * Recompute world-space position from the interpolated rail centre.
-             * Subtract half the platform size to place the top-left corner.
-             */
-            float cx, cy;
-            rail_get_world_pos(fp->rail, t_safe, &cx, &cy);
-            fp->x = cx - fp->w * 0.5f;
-            fp->y = cy - fp->h * 0.5f;
+        case FLOAT_PLATFORM_RAIL:
+            float_platform_update_rail(fp, dt);
             break;
-        }
     }
 }
 

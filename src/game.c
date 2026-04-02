@@ -919,7 +919,6 @@ static void game_loop_frame(void *arg) {
 
             /* ---- Faster fish collision --------------------------------- */
             if (gs->player.hurt_timer == 0.0f) {
-                SDL_Rect phit = player_get_hitbox(&gs->player);
                 for (int i = 0; i < gs->faster_fish_count; i++) {
                     SDL_Rect ffhit = faster_fish_get_hitbox(&gs->faster_fish[i]);
                     if (SDL_HasIntersection(&phit, &ffhit)) {
@@ -940,7 +939,6 @@ static void game_loop_frame(void *arg) {
              * above is re-used here: if it is still > 0 this block is skipped.
              */
             if (gs->player.hurt_timer == 0.0f) {
-                SDL_Rect phit = player_get_hitbox(&gs->player);
                 for (int i = 0; i < gs->spike_block_count; i++) {
                     if (!gs->spike_blocks[i].active) continue;
                     SDL_Rect sbhit = spike_block_get_hitbox(&gs->spike_blocks[i]);
@@ -961,7 +959,6 @@ static void game_loop_frame(void *arg) {
              * must dodge the swinging arc, not just the resting sprite rect.
              */
             if (gs->player.hurt_timer == 0.0f) {
-                SDL_Rect phit = player_get_hitbox(&gs->player);
                 for (int i = 0; i < gs->axe_trap_count; i++) {
                     if (!gs->axe_traps[i].active) continue;
                     SDL_Rect ahit = axe_trap_get_hitbox(&gs->axe_traps[i]);
@@ -981,7 +978,6 @@ static void game_loop_frame(void *arg) {
              * The hitbox is a slightly inset square centred on the blade.
              */
             if (gs->player.hurt_timer == 0.0f) {
-                SDL_Rect phit = player_get_hitbox(&gs->player);
                 for (int i = 0; i < gs->circular_saw_count; i++) {
                     if (!gs->circular_saws[i].active) continue;
                     SDL_Rect shit = circular_saw_get_hitbox(&gs->circular_saws[i]);
@@ -1001,7 +997,6 @@ static void game_loop_frame(void *arg) {
              * Only check visible blue flames (not in WAITING state).
              */
             if (gs->player.hurt_timer == 0.0f) {
-                SDL_Rect phit = player_get_hitbox(&gs->player);
                 for (int i = 0; i < gs->blue_flame_count; i++) {
                     if (!gs->blue_flames[i].active) continue;
                     if (gs->blue_flames[i].state == BLUE_FLAME_WAITING) continue;
@@ -1022,7 +1017,6 @@ static void game_loop_frame(void *arg) {
              * Check the player hitbox against each spike row's full rect.
              */
             if (gs->player.hurt_timer == 0.0f) {
-                SDL_Rect phit = player_get_hitbox(&gs->player);
                 for (int i = 0; i < gs->spike_row_count; i++) {
                     if (!gs->spike_rows[i].active) continue;
                     if (spike_row_hit_test(&gs->spike_rows[i], &phit)) {
@@ -1048,7 +1042,6 @@ static void game_loop_frame(void *arg) {
              * below or from the sides never triggers damage.
              */
             if (gs->player.hurt_timer == 0.0f) {
-                SDL_Rect phit = player_get_hitbox(&gs->player);
                 for (int i = 0; i < gs->spike_platform_count; i++) {
                     if (!gs->spike_platforms[i].active) continue;
                     const SpikePlatform *sp = &gs->spike_platforms[i];

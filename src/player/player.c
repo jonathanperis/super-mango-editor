@@ -1021,7 +1021,7 @@ void player_render(Player *player, SDL_Renderer *renderer, int cam_x) {
      */
     if (player->hurt_timer > 0.0f) {
         int interval = (int)(player->hurt_timer * 1000.0f) / 100;
-        if (interval % 2 == 1) return;   /* skip this frame — blink off */
+        if (interval % 2 != 0) return;   /* skip this frame — blink off */
     }
 
     /*
