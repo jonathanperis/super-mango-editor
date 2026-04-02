@@ -1,13 +1,18 @@
-UNAME := $(shell uname -s)
+# ── Compiler + SDL2 detection ────────────────────────────────────────
+# Override any of these on the command line, e.g.:
+#   make CC=gcc
+#   make SDL2CFG=/my/path/sdl2-config
+#
+# Windows detection uses the OS environment variable (always "Windows_NT"
+# on any Windows shell: cmd, PowerShell, Git Bash, MSYS2).
+# On macOS/Linux we fall back to whatever is on PATH.
 
-ifeq ($(findstring MINGW,$(UNAME))$(findstring MSYS,$(UNAME)),)
-# macOS / Linux — use whatever sdl2-config is on PATH
-CC      = clang
-SDL2CFG = sdl2-config
+ifeq ($(OS),Windows_NT)
+CC      ?= /c/msys64/ucrt64/bin/clang.exe
+SDL2CFG ?= /c/msys64/ucrt64/bin/sdl2-config
 else
-# Windows (MSYS2 UCRT64) — pin to the MSYS2 installation
-CC      = /c/msys64/ucrt64/bin/clang.exe
-SDL2CFG = /c/msys64/ucrt64/bin/sdl2-config
+CC      ?= clang
+SDL2CFG ?= sdl2-config
 endif
 
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(shell $(SDL2CFG) --cflags)
