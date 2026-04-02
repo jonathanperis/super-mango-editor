@@ -1,18 +1,24 @@
 # ── Compiler + SDL2 detection ────────────────────────────────────────
-# Override any of these on the command line, e.g.:
+# Both CC and SDL2CFG can be overridden on the command line:
 #   make CC=gcc
-#   make SDL2CFG=/my/path/sdl2-config
+#   make CC=gcc SDL2CFG=/custom/sdl2-config
 #
-# Windows detection uses the OS environment variable (always "Windows_NT"
-# on any Windows shell: cmd, PowerShell, Git Bash, MSYS2).
-# On macOS/Linux we fall back to whatever is on PATH.
+# SDL2CFG always resolves from PATH so it works in any MSYS2/UCRT64
+# shell (local or CI) without needing a hardcoded install location.
+#
+# CC defaults to the MSYS2 UCRT64 clang when running on Windows outside
+# an MSYS2 shell (e.g. Git Bash), where the wrong clang from Git for
+# Windows would otherwise be picked up first.  Inside an MSYS2 shell
+# (CI: shell: msys2 {0}, or local: launched from MSYS2 terminal) the
+# right gcc/clang is already first on PATH, so the ?= default is ignored
+# and only the SDL2CFG path matters — which is just "sdl2-config".
+
+SDL2CFG ?= sdl2-config
 
 ifeq ($(OS),Windows_NT)
 CC      ?= /c/msys64/ucrt64/bin/clang.exe
-SDL2CFG ?= /c/msys64/ucrt64/bin/sdl2-config
 else
 CC      ?= clang
-SDL2CFG ?= sdl2-config
 endif
 
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(shell $(SDL2CFG) --cflags)
@@ -42,7 +48,8 @@ $(OUTDIR):
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
-ifeq ($(UNAME),Darwin)
+ifeq ($(OS),Windows_NT)
+else ifeq ($(shell uname -s),Darwin)
 	codesign --force --sign - $@
 endif
 
