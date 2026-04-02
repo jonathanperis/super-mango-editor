@@ -30,7 +30,7 @@
 
 /* Our own modules */
 #include "game.h"
-#include "start_menu.h"
+#include "screens/start_menu.h"
 
 int main(int argc, char *argv[]) {
     /*
