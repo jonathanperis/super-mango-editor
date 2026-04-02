@@ -113,7 +113,7 @@ WEB_FLAGS = -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='["png"]' \
             --shell-file web/shell.html
 
 web: $(OUTDIR)
-	emcc -std=c11 -O2 $(SRCS) -o $(OUTDIR)/super-mango.html $(WEB_FLAGS)
+	emcc -std=c11 -O2 -I$(SRCDIR) $(SRCS) -o $(OUTDIR)/super-mango.html $(WEB_FLAGS)
 
 clean:
 	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.d
