@@ -5,19 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Super Mango Game - Documentation</title>
   <meta name="description" content="2D side-scrolling platformer written in C using SDL2 — browser-playable via WebAssembly">
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0a0a0a;
-      --sidebar-bg: #111111;
-      --text-primary: #ededed;
-      --text-muted: #888888;
-      --text-body: #c8c8c8;
-      --accent: #7c6af7;
-      --accent-hover: #9b8df9;
-      --code-bg: #1e1e2e;
-      --code-text: #cdd6f4;
-      --border: #1f1f2e;
-      --code-border: #2a2a3e;
+      --bg: #060a14;
+      --sidebar-bg: #0d1520;
+      --text-primary: #f0e6c8;
+      --text-muted: #7a8a6a;
+      --text-body: #d0c8a8;
+      --accent: #ffb700;
+      --accent-hover: #39d353;
+      --code-bg: #0a1a0e;
+      --code-text: #f0e6c8;
+      --border: #1a3020;
+      --code-border: #1a3020;
       --sidebar-width: 260px;
     }
 
@@ -25,13 +26,14 @@
     
     html {
       scroll-behavior: smooth;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: 'DM Mono', monospace;
     }
     
     body {
       margin: 0;
       padding: 0;
       background: var(--bg);
+      background-image: radial-gradient(circle at 50% 0%, rgba(255,183,0,0.05) 0%, transparent 50%);
       color: var(--text-primary);
       display: flex;
     }
@@ -130,7 +132,7 @@
 
     .nav-item.active {
       color: var(--accent);
-      background: rgba(124, 106, 247, 0.1);
+      background: rgba(255, 183, 0, 0.1);
       font-weight: 500;
     }
 
@@ -229,7 +231,7 @@
     }
 
     code {
-      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-family: 'DM Mono', monospace;
       background: var(--code-bg);
       color: var(--code-text);
       border-radius: 4px;
@@ -254,7 +256,7 @@
     }
 
     th {
-      background: #1a1a2e;
+      background: var(--sidebar-bg);
       color: var(--text-primary);
       font-weight: 600;
       border-bottom: 1px solid var(--border);
@@ -305,7 +307,7 @@
     }
     
     .search-highlight {
-      background: rgba(124, 106, 247, 0.3);
+      background: rgba(255, 183, 0, 0.3);
       border-radius: 2px;
       padding: 0 2px;
     }
@@ -410,6 +412,7 @@
 </ul>
     </div>
     <div class="sidebar-footer">
+      <a href="../" class="back-home">← Back to home</a>
       <a href="https://github.com/jonathanperis/super-mango-game" target="_blank" rel="noopener noreferrer">View on GitHub</a>
       <div>Built by Jonathan Peris</div>
     </div>
