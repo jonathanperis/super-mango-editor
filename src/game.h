@@ -157,6 +157,7 @@ typedef struct {
     int         ctrl_pending_init;
     SDL_Thread *ctrl_init_thread;    /* background thread for SDL_InitSubSystem call   */
     volatile int ctrl_init_done;     /* set to 1 by thread when subsystem is ready     */
+    SDL_Texture *ctrl_init_msg_tex;  /* cached HUD text for the init message; NULL when not shown */
     ParallaxSystem      parallax;  /* multi-layer scrolling background            */
     SDL_Texture   *floor_tile; /* grass tile repeated across the floor layer  */
     SDL_Texture  *platform_tex;/* shared tile texture for all pillars         */
