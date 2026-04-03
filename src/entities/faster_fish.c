@@ -8,8 +8,9 @@
 #include <stdlib.h>   /* rand */
 
 #include "faster_fish.h"
-#include "../game.h"          /* FLOOR_Y, GRAVITY, WORLD_W */
-#include "../effects/water.h" /* WATER_ART_H */
+#include "../game.h"               /* FLOOR_Y, GRAVITY, WORLD_W */
+#include "../effects/water.h"      /* WATER_ART_H */
+#include "../core/entity_utils.h"  /* animate_frame_ms */
 
 /* ------------------------------------------------------------------ */
 
@@ -85,12 +86,9 @@ void faster_fish_update(FasterFish *fish, int count, float dt) {
             }
         }
 
-        /* Animation */
-        f->anim_timer_ms += (Uint32)(dt * 1000.0f);
-        if (f->anim_timer_ms >= FFISH_FRAME_MS) {
-            f->anim_timer_ms -= FFISH_FRAME_MS;
-            f->frame_index = (f->frame_index + 1) % FFISH_FRAMES;
-        }
+        /* Animation — delegates to the shared utility for consistency. */
+        animate_frame_ms(&f->frame_index, &f->anim_timer_ms,
+                         dt, FFISH_FRAME_MS, FFISH_FRAMES);
     }
 }
 

@@ -5,8 +5,9 @@
 #include <stdlib.h>   /* rand */
 
 #include "fish.h"
-#include "../game.h"          /* FLOOR_Y, GRAVITY, WORLD_W */
-#include "../effects/water.h" /* WATER_ART_H */
+#include "../game.h"               /* FLOOR_Y, GRAVITY, WORLD_W */
+#include "../effects/water.h"      /* WATER_ART_H */
+#include "../core/entity_utils.h"  /* animate_frame_ms */
 
 /* ------------------------------------------------------------------ */
 
@@ -123,12 +124,10 @@ void fish_update(Fish *fish, int count, float dt)
          * Timed animation: cycle the two swim frames every FISH_FRAME_MS ms.
          * Both frames are left-facing in the sheet; direction is handled by
          * SDL_FLIP_HORIZONTAL in fish_render, not by frame selection.
+         * animate_frame_ms accumulates dt and advances frame_index on overflow.
          */
-        f->anim_timer_ms += (Uint32)(dt * 1000.0f);
-        if (f->anim_timer_ms >= FISH_FRAME_MS) {
-            f->anim_timer_ms -= FISH_FRAME_MS;
-            f->frame_index = (f->frame_index + 1) % FISH_FRAMES;
-        }
+        animate_frame_ms(&f->frame_index, &f->anim_timer_ms,
+                         dt, FISH_FRAME_MS, FISH_FRAMES);
     }
 }
 
