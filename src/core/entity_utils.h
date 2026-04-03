@@ -80,6 +80,35 @@ void patrol_update(float *x, float *vx, float entity_w,
 /* Sea-gap avoidance                                                   */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Audio                                                               */
+/* ------------------------------------------------------------------ */
+
+/*
+ * sound_volume_for_distance — compute a Mix_Chunk volume (0–max_volume)
+ * that falls off linearly with horizontal distance.
+ *
+ * At dist == 0              → max_volume  (loudest).
+ * At dist == audible_range  → 0          (silent).
+ * Beyond audible_range      → 0          (silent, clamped).
+ *
+ * Parameters:
+ *   dist          : absolute horizontal distance from player to sound source (px).
+ *   audible_range : distance at which the sound becomes completely silent (px).
+ *   max_volume    : volume returned when the player is at the source (0–128).
+ *
+ * Usage:
+ *   int vol = sound_volume_for_distance(fabsf(player_cx - source_cx),
+ *                                       (float)GAME_W, 128);
+ *   Mix_PlayChannel(-1, snd, 0);
+ *   Mix_Volume(channel, vol);
+ */
+int sound_volume_for_distance(float dist, float audible_range, int max_volume);
+
+/* ------------------------------------------------------------------ */
+/* Sea-gap avoidance                                                   */
+/* ------------------------------------------------------------------ */
+
 /*
  * patrol_gap_reverse — reverse direction when art centre enters a sea gap.
  *

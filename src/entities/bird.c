@@ -19,13 +19,6 @@
 #define BIRD_AUDIBLE_RANGE  ((float)GAME_W)
 #define BIRD_VOL_MAX        67
 
-static int bird_volume_for_distance(float dist) {
-    if (dist >= BIRD_AUDIBLE_RANGE) return 0;
-    if (dist <= 0.0f) return BIRD_VOL_MAX;
-    /* Linear fade from MAX at dist=0 to 0 at dist=AUDIBLE_RANGE. */
-    float fraction = dist / BIRD_AUDIBLE_RANGE;
-    return (int)((1.0f - fraction) * BIRD_VOL_MAX);
-}
 
 /* ------------------------------------------------------------------ */
 
@@ -84,7 +77,7 @@ void birds_update(Bird *birds, int count, float dt,
                              bird_cx <= (float)cam_x + GAME_W + BIRD_FRAME_W);
             if (on_screen) {
                 float dist = fabsf(player_x - bird_cx);
-                int vol = bird_volume_for_distance(dist);
+                int vol = sound_volume_for_distance(dist, BIRD_AUDIBLE_RANGE, BIRD_VOL_MAX);
                 if (vol > 0) {
                     int ch = Mix_PlayChannel(-1, snd_flap, 0);
                     if (ch >= 0) Mix_Volume(ch, vol);

@@ -34,6 +34,28 @@ int animate_frame_ms(int *frame_index, Uint32 *timer_ms,
 
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+
+/*
+ * sound_volume_for_distance — linear volume fade based on distance.
+ *
+ * Returns max_volume at dist=0, linearly interpolating to 0 at
+ * dist=audible_range, and clamping to 0 beyond that.  The formula is
+ * the same used by every entity module; centralising it here removes
+ * the four identical copies that previously lived in jumping_spider.c,
+ * bird.c, faster_bird.c, and axe_trap.c.
+ */
+int sound_volume_for_distance(float dist, float audible_range, int max_volume)
+{
+    if (dist >= audible_range) return 0;
+    if (dist <= 0.0f)          return max_volume;
+    /* Linear ramp: fraction goes from 0.0 (closest) to 1.0 (farthest). */
+    float fraction = dist / audible_range;
+    return (int)((1.0f - fraction) * (float)max_volume);
+}
+
+/* ------------------------------------------------------------------ */
+
 /*
  * patrol_update — horizontal movement with boundary reversal.
  *
