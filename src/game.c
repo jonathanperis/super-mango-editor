@@ -1468,30 +1468,17 @@ static void game_loop_frame(void *arg) {
         /*
          * Gamepad init HUD message — shown while the background thread is running.
          *
-         * TTF_RenderText_Solid renders the string into a CPU surface; we then
-         * upload it to the GPU with SDL_CreateTextureFromSurface and draw it
-         * in the bottom-right corner.  The texture is created and destroyed
-         * every frame it is needed — acceptable cost for a one-time message.
+         * The texture is pre-rendered once when the thread starts (state 1→2
+         * in the state machine below) and reused each frame until init completes
+         * (state 2→0).  This avoids calling TTF_RenderText_Solid and uploading
+         * to GPU memory on every frame for the duration of the init window.
          */
-        if (gs->ctrl_pending_init == 2 && gs->hud.font) {
-            SDL_Color white = {255, 255, 255, 200};
-            SDL_Surface *surf = TTF_RenderText_Solid(
-                gs->hud.font, "A inicializar controle...", white);
-            if (surf) {
-                SDL_Texture *tex = SDL_CreateTextureFromSurface(gs->renderer, surf);
-                if (tex) {
-                    /* Bottom-right corner, 6 px from each edge. */
-                    SDL_Rect dst = {
-                        GAME_W - surf->w - 6,
-                        GAME_H - surf->h - 6,
-                        surf->w,
-                        surf->h
-                    };
-                    SDL_RenderCopy(gs->renderer, tex, NULL, &dst);
-                    SDL_DestroyTexture(tex);
-                }
-                SDL_FreeSurface(surf);
-            }
+        if (gs->ctrl_pending_init == 2 && gs->ctrl_init_msg_tex) {
+            int tw, th;
+            SDL_QueryTexture(gs->ctrl_init_msg_tex, NULL, NULL, &tw, &th);
+            /* Bottom-right corner, 6 px from each edge. */
+            SDL_Rect dst = { GAME_W - tw - 6, GAME_H - th - 6, tw, th };
+            SDL_RenderCopy(gs->renderer, gs->ctrl_init_msg_tex, NULL, &dst);
         }
 
         /*
@@ -1520,6 +1507,22 @@ static void game_loop_frame(void *arg) {
                 gs->ctrl_pending_init = 0;  /* give up gracefully */
             } else {
                 gs->ctrl_pending_init = 2;
+                /*
+                 * Pre-render the init HUD message once at state 1→2.
+                 * Storing it in ctrl_init_msg_tex avoids TTF rasterisation and a
+                 * GPU texture upload on every frame for the ~100–200 ms window
+                 * while the gamepad subsystem initialises in the background.
+                 */
+                if (gs->hud.font) {
+                    SDL_Color white = {255, 255, 255, 200};
+                    SDL_Surface *surf = TTF_RenderText_Solid(
+                        gs->hud.font, "A inicializar controle...", white);
+                    if (surf) {
+                        gs->ctrl_init_msg_tex =
+                            SDL_CreateTextureFromSurface(gs->renderer, surf);
+                        SDL_FreeSurface(surf);
+                    }
+                }
             }
         } else if (gs->ctrl_pending_init == 2 && gs->ctrl_init_done) {
             /*
@@ -1538,6 +1541,11 @@ static void game_loop_frame(void *arg) {
                 }
             }
             gs->ctrl_pending_init = 0;
+            /* Release the cached HUD message texture — no longer needed. */
+            if (gs->ctrl_init_msg_tex) {
+                SDL_DestroyTexture(gs->ctrl_init_msg_tex);
+                gs->ctrl_init_msg_tex = NULL;
+            }
         }
 
         /*
@@ -1649,6 +1657,13 @@ void game_cleanup(GameState *gs) {
     }
 
     water_cleanup(&gs->water);
+
+    /* Release the gamepad init HUD message texture if the thread was still
+     * running when the game was asked to quit (e.g. user pressed ESC early). */
+    if (gs->ctrl_init_msg_tex) {
+        SDL_DestroyTexture(gs->ctrl_init_msg_tex);
+        gs->ctrl_init_msg_tex = NULL;
+    }
 
     if (gs->spike_block_tex) {
         SDL_DestroyTexture(gs->spike_block_tex);
