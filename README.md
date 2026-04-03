@@ -2,9 +2,9 @@
 
 > 2D side-scrolling platformer written in C using SDL2 -- browser-playable via WebAssembly
 
-[![Build Check](https://github.com/jonathanperis/super-mango-game/actions/workflows/build-check.yml/badge.svg)](https://github.com/jonathanperis/super-mango-game/actions/workflows/build-check.yml) [![Main Release](https://github.com/jonathanperis/super-mango-game/actions/workflows/main-release.yml/badge.svg)](https://github.com/jonathanperis/super-mango-game/actions/workflows/main-release.yml) [![CodeQL](https://github.com/jonathanperis/super-mango-game/actions/workflows/codeql.yml/badge.svg)](https://github.com/jonathanperis/super-mango-game/actions/workflows/codeql.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Build Check](https://github.com/jonathanperis/super-mango-game/actions/workflows/build.yml/badge.svg?event=pull_request)](https://github.com/jonathanperis/super-mango-game/actions/workflows/build.yml) [![Main Release](https://github.com/jonathanperis/super-mango-game/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/jonathanperis/super-mango-game/actions/workflows/build.yml) [![CodeQL](https://github.com/jonathanperis/super-mango-game/actions/workflows/codeql.yml/badge.svg)](https://github.com/jonathanperis/super-mango-game/actions/workflows/codeql.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**[Play in browser →](https://jonathanperis.github.io/super-mango-game/)**
+**[Live demo →](https://jonathanperis.github.io/super-mango-game/)** | **[Documentation →](https://jonathanperis.github.io/super-mango-game/docs/)**
 
 ---
 
@@ -81,7 +81,7 @@ make web      # build to WebAssembly (requires Emscripten)
 make clean    # remove all build artifacts
 ```
 
-Or just **[play in your browser](https://jonathanperis.github.io/super-mango-game/)** -- no build required.
+Or just **[play in your browser](https://jonathanperis.github.io/super-mango-game/)** -- no build required. Full project documentation is available at the **[docs site](https://jonathanperis.github.io/super-mango-game/docs/)**.
 
 ## Project Structure
 
@@ -129,9 +129,9 @@ super-mango-game/
 ├── docs/                     GitHub Pages shell (index.html)
 ├── web/                      Emscripten shell template
 └── .github/workflows/        CI/CD pipelines
-    ├── build-check.yml       PR build verification (Linux/macOS/Windows/WASM)
-    ├── main-release.yml      Release + GitHub Pages deployment on push to main
-    └── codeql.yml            Code security analysis
+    ├── build.yml             Build check (PRs) + release + Pages deploy (main)
+    ├── codeql.yml            Code security analysis
+    └── deploy-docs.yml       Documentation generation from wiki
 ```
 
 ## CI/CD
@@ -140,11 +140,11 @@ Three GitHub Actions workflows:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build Check | `build-check.yml` | Pull requests | Multi-platform build verification (Linux x86_64, macOS arm64, Windows x86_64, WebAssembly) with artifact uploads |
-| Main Release | `main-release.yml` | Push to `main` | Multi-platform build, GitHub Release creation with platform binaries, GitHub Pages deployment of WebAssembly build |
+| Build & Release | `build.yml` | Push to `main`, pull requests | Multi-platform build (Linux x86_64, macOS arm64, Windows x86_64, WebAssembly); on main push: GitHub Release creation + Pages deployment |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly | Automated code security and quality analysis |
+| Deploy Docs | `deploy-docs.yml` | Push to `main`, wiki changes, manual | Generates documentation from wiki and creates update PR |
 
-All workflows install SDL2 dependencies per platform and compile with the project Makefile. The Main Release workflow additionally creates versioned GitHub Releases and deploys the WebAssembly build to GitHub Pages for browser play.
+All workflows install SDL2 dependencies per platform and compile with the project Makefile. The Build & Release workflow creates versioned GitHub Releases and deploys the WebAssembly build to GitHub Pages for browser play.
 
 ## License
 
