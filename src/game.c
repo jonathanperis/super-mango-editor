@@ -1641,179 +1641,51 @@ void game_cleanup(GameState *gs) {
         gs->music = NULL;
     }
 
-    if (gs->snd_jump) {
-        Mix_FreeChunk(gs->snd_jump);
-        gs->snd_jump = NULL;
-    }
-
-    if (gs->snd_coin) {
-        Mix_FreeChunk(gs->snd_coin);
-        gs->snd_coin = NULL;
-    }
-
-    if (gs->snd_hit) {
-        Mix_FreeChunk(gs->snd_hit);
-        gs->snd_hit = NULL;
-    }
+    /* Sound chunks — FREE_CHUNK is null-safe; sets pointer to NULL after free. */
+    FREE_CHUNK(gs->snd_jump);
+    FREE_CHUNK(gs->snd_coin);
+    FREE_CHUNK(gs->snd_hit);
 
     water_cleanup(&gs->water);
 
-    /* Release the gamepad init HUD message texture if the thread was still
-     * running when the game was asked to quit (e.g. user pressed ESC early). */
-    if (gs->ctrl_init_msg_tex) {
-        SDL_DestroyTexture(gs->ctrl_init_msg_tex);
-        gs->ctrl_init_msg_tex = NULL;
-    }
+    /* Transient HUD texture (may already be NULL if init finished before quit). */
+    DESTROY_TEX(gs->ctrl_init_msg_tex);
 
-    if (gs->spike_block_tex) {
-        SDL_DestroyTexture(gs->spike_block_tex);
-        gs->spike_block_tex = NULL;
-    }
+    /* Entity textures — DESTROY_TEX is null-safe; reverse init order. */
+    DESTROY_TEX(gs->spike_block_tex);
+    DESTROY_TEX(gs->bridge_tex);
+    DESTROY_TEX(gs->float_platform_tex);
+    DESTROY_TEX(gs->rail_tex);
+    DESTROY_TEX(gs->vine_tex);
+    DESTROY_TEX(gs->ladder_tex);
+    DESTROY_TEX(gs->rope_tex);
 
-    if (gs->bridge_tex) {
-        SDL_DestroyTexture(gs->bridge_tex);
-        gs->bridge_tex = NULL;
-    }
+    FREE_CHUNK(gs->snd_spring);
+    DESTROY_TEX(gs->bouncepad_medium_tex);
+    DESTROY_TEX(gs->bouncepad_small_tex);
+    DESTROY_TEX(gs->bouncepad_high_tex);
 
-    if (gs->float_platform_tex) {
-        SDL_DestroyTexture(gs->float_platform_tex);
-        gs->float_platform_tex = NULL;
-    }
+    DESTROY_TEX(gs->coin_tex);
+    DESTROY_TEX(gs->yellow_star_tex);
 
-    if (gs->rail_tex) {
-        SDL_DestroyTexture(gs->rail_tex);
-        gs->rail_tex = NULL;
-    }
+    FREE_CHUNK(gs->snd_dive);
+    FREE_CHUNK(gs->snd_spider_attack);
+    FREE_CHUNK(gs->snd_flap);
+    FREE_CHUNK(gs->snd_axe);
 
-    if (gs->vine_tex) {
-        SDL_DestroyTexture(gs->vine_tex);
-        gs->vine_tex = NULL;
-    }
-
-    if (gs->ladder_tex) {
-        SDL_DestroyTexture(gs->ladder_tex);
-        gs->ladder_tex = NULL;
-    }
-
-    if (gs->rope_tex) {
-        SDL_DestroyTexture(gs->rope_tex);
-        gs->rope_tex = NULL;
-    }
-
-    if (gs->snd_spring) {
-        Mix_FreeChunk(gs->snd_spring);
-        gs->snd_spring = NULL;
-    }
-
-    if (gs->bouncepad_medium_tex) {
-        SDL_DestroyTexture(gs->bouncepad_medium_tex);
-        gs->bouncepad_medium_tex = NULL;
-    }
-
-    if (gs->bouncepad_small_tex) {
-        SDL_DestroyTexture(gs->bouncepad_small_tex);
-        gs->bouncepad_small_tex = NULL;
-    }
-
-    if (gs->bouncepad_high_tex) {
-        SDL_DestroyTexture(gs->bouncepad_high_tex);
-        gs->bouncepad_high_tex = NULL;
-    }
-
-    if (gs->coin_tex) {
-        SDL_DestroyTexture(gs->coin_tex);
-        gs->coin_tex = NULL;
-    }
-
-    if (gs->yellow_star_tex) {
-        SDL_DestroyTexture(gs->yellow_star_tex);
-        gs->yellow_star_tex = NULL;
-    }
-
-    if (gs->snd_dive) {
-        Mix_FreeChunk(gs->snd_dive);
-        gs->snd_dive = NULL;
-    }
-
-    if (gs->snd_spider_attack) {
-        Mix_FreeChunk(gs->snd_spider_attack);
-        gs->snd_spider_attack = NULL;
-    }
-
-    if (gs->snd_flap) {
-        Mix_FreeChunk(gs->snd_flap);
-        gs->snd_flap = NULL;
-    }
-
-    if (gs->snd_axe) {
-        Mix_FreeChunk(gs->snd_axe);
-        gs->snd_axe = NULL;
-    }
-
-    if (gs->axe_trap_tex) {
-        SDL_DestroyTexture(gs->axe_trap_tex);
-        gs->axe_trap_tex = NULL;
-    }
-
-    if (gs->circular_saw_tex) {
-        SDL_DestroyTexture(gs->circular_saw_tex);
-        gs->circular_saw_tex = NULL;
-    }
-
-    if (gs->blue_flame_tex) {
-        SDL_DestroyTexture(gs->blue_flame_tex);
-        gs->blue_flame_tex = NULL;
-    }
-
-    if (gs->faster_fish_tex) {
-        SDL_DestroyTexture(gs->faster_fish_tex);
-        gs->faster_fish_tex = NULL;
-    }
-
-    if (gs->spike_tex) {
-        SDL_DestroyTexture(gs->spike_tex);
-        gs->spike_tex = NULL;
-    }
-
-    if (gs->spike_platform_tex) {
-        SDL_DestroyTexture(gs->spike_platform_tex);
-        gs->spike_platform_tex = NULL;
-    }
-
-    if (gs->fish_tex) {
-        SDL_DestroyTexture(gs->fish_tex);
-        gs->fish_tex = NULL;
-    }
-
-    if (gs->faster_bird_tex) {
-        SDL_DestroyTexture(gs->faster_bird_tex);
-        gs->faster_bird_tex = NULL;
-    }
-
-    if (gs->bird_tex) {
-        SDL_DestroyTexture(gs->bird_tex);
-        gs->bird_tex = NULL;
-    }
-
-    if (gs->jumping_spider_tex) {
-        SDL_DestroyTexture(gs->jumping_spider_tex);
-        gs->jumping_spider_tex = NULL;
-    }
-
-    if (gs->spider_tex) {
-        SDL_DestroyTexture(gs->spider_tex);
-        gs->spider_tex = NULL;
-    }
-
-    if (gs->platform_tex) {
-        SDL_DestroyTexture(gs->platform_tex);
-        gs->platform_tex = NULL;
-    }
-
-    if (gs->floor_tile) {
-        SDL_DestroyTexture(gs->floor_tile);
-        gs->floor_tile = NULL;
-    }
+    DESTROY_TEX(gs->axe_trap_tex);
+    DESTROY_TEX(gs->circular_saw_tex);
+    DESTROY_TEX(gs->blue_flame_tex);
+    DESTROY_TEX(gs->faster_fish_tex);
+    DESTROY_TEX(gs->spike_tex);
+    DESTROY_TEX(gs->spike_platform_tex);
+    DESTROY_TEX(gs->fish_tex);
+    DESTROY_TEX(gs->faster_bird_tex);
+    DESTROY_TEX(gs->bird_tex);
+    DESTROY_TEX(gs->jumping_spider_tex);
+    DESTROY_TEX(gs->spider_tex);
+    DESTROY_TEX(gs->platform_tex);
+    DESTROY_TEX(gs->floor_tile);
 
     /* Release all parallax layer textures (must precede renderer destruction) */
     parallax_cleanup(&gs->parallax);
