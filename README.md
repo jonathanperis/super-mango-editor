@@ -87,51 +87,64 @@ Or just **[play in your browser](https://jonathanperis.github.io/super-mango-gam
 
 ```
 super-mango-game/
-├── Makefile                  Build system (clang, sdl2-config, ad-hoc codesign)
-├── src/                      36 C source files + headers
-│   ├── main.c                Entry point: SDL init/teardown
-│   ├── game.h / game.c       GameState struct, window, renderer, game loop
-│   ├── player.h / player.c   Player input, physics, animation, render
-│   ├── sandbox.h / sandbox.c Level layout and entity placement
-│   ├── start_menu.h / .c     Start menu screen
-│   ├── platform.h / .c       One-way platform pillars (9-slice)
-│   ├── float_platform.h / .c Hovering platforms (static/crumble/rail)
-│   ├── bridge.h / .c         Crumble walkways
-│   ├── spider.h / .c         Spider enemy (ground patrol)
-│   ├── jumping_spider.h / .c Jumping spider enemy
-│   ├── bird.h / .c           Bird enemy (sine-wave sky patrol)
-│   ├── faster_bird.h / .c    Fast bird enemy
-│   ├── fish.h / .c           Fish enemy (jumping water patrol)
-│   ├── faster_fish.h / .c    Fast fish enemy
-│   ├── coin.h / .c           Coin collectible
-│   ├── yellow_star.h / .c    Health pickup
-│   ├── last_star.h / .c      End-of-level star
-│   ├── blue_flame.h / .c     Blue flame hazard
-│   ├── spike.h / .c          Ground spike rows
-│   ├── spike_block.h / .c    Rail-riding spike hazard
-│   ├── spike_platform.h / .c Elevated spike hazard
-│   ├── circular_saw.h / .c   Rotating saw hazard
-│   ├── axe_trap.h / .c       Swinging axe hazard
-│   ├── bouncepad*.h / .c     Bouncepad variants (small/medium/high)
-│   ├── rail.h / .c           Rail path system
-│   ├── vine.h / .c           Climbable vine
-│   ├── ladder.h / .c         Climbable ladder
-│   ├── rope.h / .c           Climbable rope
-│   ├── water.h / .c          Animated water strip
-│   ├── fog.h / .c            Fog overlay
-│   ├── parallax.h / .c       Multi-layer scrolling background
-│   ├── hud.h / .c            HUD (hearts, lives, score)
-│   └── debug.h / .c          Debug overlay (FPS, hitboxes, event log)
-├── assets/                   PNG sprites, tilesets, TTF font
-│   └── unused/               Reserve assets from asset pack
-├── sounds/                   WAV sound effects and music
-│   └── unused/               Reserve sound files
-├── docs/                     GitHub Pages shell (index.html)
-├── web/                      Emscripten shell template
-└── .github/workflows/        CI/CD pipelines
-    ├── build.yml             Build check (PRs) + release + Pages deploy (main)
-    ├── codeql.yml            Code security analysis
-    └── deploy-docs.yml       Documentation generation from wiki
+├── Makefile                          Build system (clang, sdl2-config, ad-hoc codesign)
+├── src/                              39 C source files + headers
+│   ├── main.c                        Entry point: SDL init/teardown
+│   ├── game.h / game.c               GameState struct, window, renderer, game loop
+│   ├── collectibles/                  Pickup items
+│   │   ├── coin.h / .c               Coin (100 pts, 3 restore a heart)
+│   │   ├── yellow_star.h / .c        Health pickup
+│   │   └── last_star.h / .c          End-of-level star
+│   ├── core/                          Shared utilities
+│   │   ├── debug.h / .c              Debug overlay (FPS, hitboxes, event log)
+│   │   └── entity_utils.h / .c       Shared entity helper functions
+│   ├── effects/                       Visual effects
+│   │   ├── fog.h / .c                Fog overlay
+│   │   ├── parallax.h / .c           Multi-layer scrolling background
+│   │   └── water.h / .c              Animated water strip
+│   ├── entities/                      Enemies
+│   │   ├── spider.h / .c             Spider (ground patrol)
+│   │   ├── jumping_spider.h / .c     Jumping spider
+│   │   ├── bird.h / .c               Bird (sine-wave sky patrol)
+│   │   ├── faster_bird.h / .c        Fast bird
+│   │   ├── fish.h / .c               Fish (jumping water patrol)
+│   │   └── faster_fish.h / .c        Fast fish
+│   ├── hazards/                       Damaging obstacles
+│   │   ├── spike.h / .c              Ground spike rows
+│   │   ├── spike_block.h / .c        Rail-riding spike
+│   │   ├── spike_platform.h / .c     Elevated spike
+│   │   ├── circular_saw.h / .c       Rotating saw
+│   │   ├── axe_trap.h / .c           Swinging axe
+│   │   └── blue_flame.h / .c         Blue flame
+│   ├── levels/                        Level system
+│   │   ├── level.h                    Shared level definitions
+│   │   ├── level_01.h / .c           Level 1 data
+│   │   └── level_loader.h / .c       Level loading and switching
+│   ├── player/                        Player module
+│   │   └── player.h / .c             Input, physics, animation, render
+│   ├── screens/                       Game screens
+│   │   ├── start_menu.h / .c         Start menu
+│   │   ├── sandbox.h / .c            Level layout and entity placement
+│   │   └── hud.h / .c                HUD (hearts, lives, score)
+│   └── surfaces/                      Traversable objects
+│       ├── platform.h / .c           One-way platform pillars (9-slice)
+│       ├── float_platform.h / .c     Hovering platforms (static/crumble/rail)
+│       ├── bridge.h / .c             Crumble walkways
+│       ├── bouncepad*.h / .c         Bouncepad base + 3 variants (small/medium/high)
+│       ├── rail.h / .c               Rail path system
+│       ├── vine.h / .c               Climbable vine
+│       ├── ladder.h / .c             Climbable ladder
+│       └── rope.h / .c               Climbable rope
+├── assets/                            PNG sprites, tilesets, TTF font
+│   └── unused/                        Reserve assets from asset pack
+├── sounds/                            WAV sound effects and music
+│   └── unused/                        Reserve sound files
+├── docs/                              GitHub Pages shell (index.html)
+├── web/                               Emscripten shell template
+└── .github/workflows/                 CI/CD pipelines
+    ├── build.yml                      Build check (PRs) + release + Pages deploy (main)
+    ├── codeql.yml                     Code security analysis
+    └── deploy-docs.yml                Documentation generation from wiki
 ```
 
 ## CI/CD
