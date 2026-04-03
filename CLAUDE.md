@@ -39,23 +39,39 @@ super-mango-game/
 ├── assets/unused/          ← unused assets for future use
 ├── sounds/                 ← .wav sound effects (snake_case, named after components)
 ├── sounds/unused/          ← unused sounds for future use
-├── .claude/                ← slash commands, references, scripts
+├── .claude/                ← slash commands, references, scripts, skills
+├── docs/                   ← GitHub Pages shell (index.html)
+├── web/                    ← Emscripten shell template (shell.html)
 └── src/
     ├── main.c              ← SDL init/teardown, entry point
-    ├── game.h / game.c     ← GameState, window, renderer, background, game loop
-    ├── player.h / player.c ← Player struct, input, update, render, clamp
-    ├── sandbox.c           ← Level layout and entity placement
-    └── <entity>.h / .c     ← One module per entity (coin, spider, bird, etc.)
+    ├── game.h / game.c     ← GameState, window, renderer, game loop
+    ├── collectibles/       ← coin, yellow_star, last_star
+    ├── core/               ← debug overlay, entity utilities
+    ├── effects/            ← fog, parallax, water
+    ├── entities/           ← bird, faster_bird, fish, faster_fish, spider, jumping_spider
+    ├── hazards/            ← spike, spike_block, spike_platform, circular_saw, axe_trap, blue_flame
+    ├── levels/             ← level definitions and loader
+    ├── player/             ← player input, physics, animation
+    ├── screens/            ← start_menu, sandbox, hud
+    └── surfaces/           ← platform, float_platform, bridge, bouncepad*, vine, ladder, rope, rail
 ```
 
 ### Module responsibilities
 
-| File           | Purpose                                                      |
-|----------------|--------------------------------------------------------------|
-| `main.c`       | Calls SDL/IMG/TTF/Mix init + teardown; owns `main()`         |
-| `game.h`       | `GameState` struct + shared constants; included everywhere   |
-| `game.c`       | Implements `game_init`, `game_loop`, `game_cleanup`          |
-| `player.h/c`   | Player lifecycle: init, input, update, render, cleanup       |
+| File / Directory | Purpose                                                      |
+|------------------|--------------------------------------------------------------|
+| `main.c`         | Calls SDL/IMG/TTF/Mix init + teardown; owns `main()`         |
+| `game.h`         | `GameState` struct + shared constants; included everywhere   |
+| `game.c`         | Implements `game_init`, `game_loop`, `game_cleanup`          |
+| `player/`        | Player lifecycle: init, input, update, render, cleanup       |
+| `collectibles/`  | Coins, yellow stars, last star — pickup items                |
+| `core/`          | Debug overlay (`--debug`), shared entity utilities           |
+| `effects/`       | Fog overlays, parallax backgrounds, animated water           |
+| `entities/`      | Enemies: spiders, birds, fish (normal + faster variants)     |
+| `hazards/`       | Spikes, circular saws, axe traps, blue flames                |
+| `levels/`        | Level data definitions and loader system                     |
+| `screens/`       | Start menu, sandbox (level layout), HUD                      |
+| `surfaces/`      | Platforms, bridges, bouncepads, vines, ladders, ropes, rails |
 
 ---
 
@@ -91,12 +107,19 @@ main()
 
 ---
 
-## Current Game State (MVP)
+## Current Game State
 
-- Parallax multi-layer scrolling background
-- `player.png` centered at startup; 8-directional movement via WASD / arrow keys
-- Player speed: 200 px/s (dt-based, frame-rate independent)
-- ESC or window close → quit
+- Multi-screen forest stage (1600px world, 4 screens wide)
+- 32 render layers: parallax background → platforms → floor → enemies → player → fog → HUD → debug
+- Delta-time physics at 60 FPS (VSync + manual fallback)
+- 6 enemy types (spider, jumping spider, bird, faster bird, fish, faster fish)
+- 6 hazard types (spike, spike block, spike platform, circular saw, axe trap, blue flame)
+- Collectibles: coins (100 pts, 3 restore a heart), yellow stars, end-of-level last star
+- Climbable vines, ladders, ropes; 3 bouncepad variants (small, medium, high)
+- Start menu, HUD (hearts/lives/score), lives system, invincibility blink on damage
+- Keyboard and gamepad (hot-plug) controls
+- Debug overlay (`--debug`): FPS counter, hitbox visualization, scrolling event log
+- Builds natively on macOS, Linux, Windows; WebAssembly via Emscripten
 
 ---
 
