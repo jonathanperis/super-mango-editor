@@ -202,6 +202,13 @@ Full sprite sheet analysis notes: @.claude/references/sprite-sheet-analysis.md
 
 ---
 
+## Git Workflow
+
+- **Before creating a new branch:** always `git fetch origin main && git checkout main && git pull origin main` to sync with the latest main.
+- **Before opening a PR:** always `git fetch origin main` to confirm the branch is still clean against main.
+
+---
+
 ## Safety Rules
 
 - Every pointer field must be set to `NULL` after freeing (double-free safety).
