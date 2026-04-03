@@ -2,6 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-VSE71K3VNL"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-VSE71K3VNL');
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Super Mango Game - Documentation</title>
   <meta name="description" content="2D side-scrolling platformer written in C using SDL2 — browser-playable via WebAssembly">
@@ -424,7 +432,6 @@
       
 <section id="home" class="doc-section">
   <h1 class="page-title">Home</h1>
-  <h1>super-mango-game</h1>
 <blockquote>
 <p>2D side-scrolling platformer written in C using SDL2 -- browser-playable via WebAssembly</p>
 </blockquote>
@@ -535,7 +542,6 @@ make run
 
 <section id="architecture" class="doc-section">
   <h1 class="page-title">Architecture</h1>
-  <h1>Architecture</h1>
 <p><a href="home">← Home</a></p>
 <hr>
 <h2>Overview</h2>
@@ -1065,7 +1071,6 @@ prev = now;
 
 <section id="assets" class="doc-section">
   <h1 class="page-title">Assets</h1>
-  <h1>Assets</h1>
 <p><a href="home">← Home</a></p>
 <hr>
 <p>All visual assets live in the <code>assets/</code> directory. They are PNG files (loaded via <code>SDL2_image</code>) with one TrueType font.</p>
@@ -1460,7 +1465,6 @@ if (tex) { SDL_DestroyTexture(tex); tex = NULL; }
 
 <section id="build-system" class="doc-section">
   <h1 class="page-title">Build System</h1>
-  <h1>Build System</h1>
 <p><a href="home">← Home</a></p>
 <hr>
 <h2>Makefile Overview</h2>
@@ -1679,7 +1683,7 @@ make
 </ol>
 <hr>
 <h2>CI/CD Pipelines</h2>
-<p>Three GitHub Actions workflows handle automated builds:</p>
+<p>Three GitHub Actions workflows:</p>
 <table>
 <thead>
 <tr>
@@ -1690,16 +1694,10 @@ make
 </tr>
 </thead>
 <tbody><tr>
-<td>Build Check</td>
-<td><code>build-check.yml</code></td>
-<td>Pull requests</td>
-<td>Multi-platform build verification (Linux x86_64, macOS arm64, Windows x86_64, WebAssembly) with artifact uploads</td>
-</tr>
-<tr>
-<td>Main Release</td>
-<td><code>main-release.yml</code></td>
-<td>Push to <code>main</code></td>
-<td>Multi-platform build, GitHub Release creation with platform binaries, GitHub Pages deployment of WebAssembly build</td>
+<td>Build &amp; Release</td>
+<td><code>build.yml</code></td>
+<td>Push to <code>main</code>, pull requests</td>
+<td>Multi-platform build (Linux x86_64, macOS arm64, Windows x86_64, WebAssembly); on main push: GitHub Release creation + Pages deployment of WebAssembly build</td>
 </tr>
 <tr>
 <td>CodeQL</td>
@@ -1707,14 +1705,20 @@ make
 <td>Push/PR to <code>main</code>, weekly</td>
 <td>Automated code security and quality analysis</td>
 </tr>
+<tr>
+<td>Deploy</td>
+<td><code>deploy.yml</code></td>
+<td>Push to <code>main</code>, manual</td>
+<td>Deploys <code>docs/</code> to GitHub Pages via actions/deploy-pages</td>
+</tr>
 </tbody></table>
-<p>All workflows install SDL2 dependencies per platform and compile with the project Makefile.</p>
+<p>All workflows install SDL2 dependencies per platform and compile with the project Makefile. The Deploy workflow handles static site deployment only.</p>
 <hr>
 <h2>Adding New Source Files</h2>
-<p>Because the Makefile uses <code>$(wildcard src/*.c)</code>, any new <code>.c</code> file placed in <code>src/</code> is compiled automatically on the next <code>make</code> invocation. No Makefile changes required.</p>
-<pre><code class="language-sh"># Example: adding a coin entity
-touch src/coin.c src/coin.h
-make   # coin.c is compiled automatically
+<p>Because the Makefile uses per-subdirectory wildcards, any new <code>.c</code> file placed in <code>src/</code> or its recognized subdirectories is compiled automatically on the next <code>make</code> invocation. No Makefile changes required.</p>
+<pre><code class="language-sh"># Example: adding a new enemy entity
+touch src/entities/new_enemy.c src/entities/new_enemy.h
+make   # new_enemy.c is compiled automatically
 </code></pre>
 <p>See <a href="developer_guide">Developer Guide</a> for the full new-entity workflow.</p>
 <hr>
@@ -1766,7 +1770,6 @@ src/
 
 <section id="constants-reference" class="doc-section">
   <h1 class="page-title">Constants Reference</h1>
-  <h1>Constants Reference</h1>
 <p><a href="home">← Home</a></p>
 <hr>
 <p>A complete reference for every compile-time constant in the codebase.</p>
@@ -3750,7 +3753,6 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 <section id="developer-guide" class="doc-section">
   <h1 class="page-title">Developer Guide</h1>
-  <h1>Developer Guide</h1>
 <p><a href="home">← Home</a></p>
 <hr>
 <p>This guide covers the patterns and conventions used in Super Mango and explains how to extend the game safely and consistently.</p>
@@ -3835,7 +3837,7 @@ entity_cleanup -&gt; SDL_DestroyTexture, set to NULL
 entity_animate        -&gt; static helper, called from entity_update
 </code></pre>
 <h3>Step-by-Step</h3>
-<h4>1. Create the header -- <code>src/coin.h</code></h4>
+<h4>1. Create the header -- <code>src/collectibles/coin.h</code></h4>
 <pre><code class="language-c">#pragma once
 #include &lt;SDL.h&gt;
 
@@ -3851,7 +3853,7 @@ void coin_update(Coin *coin, float dt);
 void coin_render(Coin *coin, SDL_Renderer *renderer);
 void coin_cleanup(Coin *coin);
 </code></pre>
-<h4>2. Create the implementation -- <code>src/coin.c</code></h4>
+<h4>2. Create the implementation -- <code>src/collectibles/coin.c</code></h4>
 <pre><code class="language-c">#include &lt;SDL_image.h&gt;
 #include &lt;stdio.h&gt;
 #include &lt;stdlib.h&gt;
@@ -3913,14 +3915,14 @@ for (int i = 0; i &lt; gs-&gt;coin_count; i++)
 for (int i = 0; i &lt; gs-&gt;coin_count; i++)
     coin_cleanup(&amp;gs-&gt;coins[i]);
 </code></pre>
-<h4>5. Place in sandbox -- <code>src/sandbox.c</code></h4>
+<h4>5. Place in sandbox -- <code>src/screens/sandbox.c</code></h4>
 <p>Entity spawn positions are defined in <code>sandbox.c</code>. Add your entity placements there:</p>
 <pre><code class="language-c">// In sandbox_init or the appropriate placement function:
 coin_init(&amp;gs-&gt;coins[0], gs-&gt;tex_coin, 120.0f, 180.0f);
 coin_init(&amp;gs-&gt;coins[1], gs-&gt;tex_coin, 200.0f, 140.0f);
 gs-&gt;coin_count = 2;
 </code></pre>
-<h4>6. Add debug hitbox -- <code>src/debug.c</code></h4>
+<h4>6. Add debug hitbox -- <code>src/core/debug.c</code></h4>
 <p>Every entity must have hitbox visualization in <code>debug.c</code>:</p>
 <pre><code class="language-c">// In debug_render:
 for (int i = 0; i &lt; gs-&gt;coin_count; i++) {
@@ -4183,7 +4185,6 @@ source_y = (frame_index / num_cols) * frame_h
 
 <section id="player-module" class="doc-section">
   <h1 class="page-title">Player Module</h1>
-  <h1>Player Module</h1>
 <p><a href="home">← Home</a></p>
 <hr>
 <p>The player module spans <code>player.h</code> and <code>player.c</code> and owns the full lifecycle of the player character: texture loading, keyboard input, physics simulation, sprite animation, rendering, and cleanup.</p>
@@ -4694,7 +4695,6 @@ return r;
 
 <section id="sounds" class="doc-section">
   <h1 class="page-title">Sounds</h1>
-  <h1>Sounds</h1>
 <p><a href="home">← Home</a></p>
 <hr>
 <p>All audio files live in the <code>sounds/</code> directory. All sound files use the <code>.wav</code> format. SDL2_mixer handles both short sound effects (<code>Mix_Chunk</code> via <code>Mix_LoadWAV</code>) and streaming music (<code>Mix_Music</code> via <code>Mix_LoadMUS</code>).</p>
@@ -4916,50 +4916,62 @@ gs-&gt;music = NULL;
 
 <section id="source-files" class="doc-section">
   <h1 class="page-title">Source Files</h1>
-  <h1>Source Files</h1>
 <p><a href="home">← Home</a></p>
 <hr>
 <h2>File Map</h2>
 <pre><code>src/
-├── main.c              Entry point -- SDL subsystem lifecycle
-├── game.h              Shared constants + GameState struct (included everywhere)
-├── game.c              Window, renderer, textures, sounds, game loop
-├── player.h / .c       Player input, physics, animation, rendering
-├── sandbox.h / .c      Level layout and entity placement
-├── start_menu.h / .c   Start menu screen with logo
-├── platform.h / .c     One-way platform pillar init and 9-slice rendering
-├── float_platform.h/.c Hovering platform: static, crumble, and rail behaviours
-├── bridge.h / .c       Tiled crumble walkway: init, cascade-fall, render
-├── water.h / .c        Animated water strip: init, scroll, tile render
-├── fog.h / .c          Atmospheric fog overlay: init, slide, spawn, render
-├── parallax.h / .c     Multi-layer scrolling background: init, tiled render, cleanup
-├── hud.h / .c          HUD renderer: hearts, lives counter, score text
-├── debug.h / .c        Debug overlay: FPS counter, collision hitboxes, event log
-├── coin.h / .c         Coin collectible: placement, AABB collection, render
-├── yellow_star.h / .c  Yellow star health pickup
-├── last_star.h / .c    End-of-level star collectible
-├── spider.h / .c       Spider enemy: ground patrol, animation, render
-├── jumping_spider.h/.c Jumping spider: patrol, jump arcs, sea-gap awareness
-├── bird.h / .c         Slow bird enemy: sine-wave sky patrol, animation
-├── faster_bird.h / .c  Fast bird enemy: tighter sine-wave, faster animation
-├── fish.h / .c         Fish enemy: patrol, random jump arcs, render
-├── faster_fish.h / .c  Fast fish enemy: higher jumps, faster patrol
-├── blue_flame.h / .c   Blue flame hazard: erupts from sea gaps, rise/flip/fall cycle
-├── spike.h / .c        Static ground spike hazard rows
-├── spike_block.h / .c  Rail-riding rotating spike hazard
-├── spike_platform.h/.c Elevated spike surface hazard
-├── circular_saw.h / .c Fast rotating patrol saw hazard
-├── axe_trap.h / .c     Swinging/spinning axe hazard
-├── bouncepad.h / .c    Shared bouncepad mechanics (squash/release animation)
-├── bouncepad_small.h/.c Green bouncepad (small jump)
-├── bouncepad_medium.h/.c Wood bouncepad (medium jump)
-├── bouncepad_high.h/.c Red bouncepad (high jump)
-├── rail.h / .c         Rail path builder, bitmask tile render, position interpolation
-├── vine.h / .c         Climbable vine decoration
-├── ladder.h / .c       Climbable ladder decoration
-└── rope.h / .c         Climbable rope decoration
+├── main.c                        Entry point -- SDL subsystem lifecycle
+├── game.h                        Shared constants + GameState struct (included everywhere)
+├── game.c                        Window, renderer, textures, sounds, game loop
+├── collectibles/
+│   ├── coin.h / .c               Coin collectible: placement, AABB collection, render
+│   ├── yellow_star.h / .c        Yellow star health pickup
+│   └── last_star.h / .c          End-of-level star collectible
+├── core/
+│   ├── debug.h / .c              Debug overlay: FPS counter, collision hitboxes, event log
+│   └── entity_utils.h / .c      Shared entity helper functions
+├── effects/
+│   ├── fog.h / .c                Atmospheric fog overlay: init, slide, spawn, render
+│   ├── parallax.h / .c           Multi-layer scrolling background: init, tiled render, cleanup
+│   └── water.h / .c              Animated water strip: init, scroll, tile render
+├── entities/
+│   ├── spider.h / .c             Spider enemy: ground patrol, animation, render
+│   ├── jumping_spider.h / .c     Jumping spider: patrol, jump arcs, sea-gap awareness
+│   ├── bird.h / .c               Slow bird enemy: sine-wave sky patrol, animation
+│   ├── faster_bird.h / .c        Fast bird enemy: tighter sine-wave, faster animation
+│   ├── fish.h / .c               Fish enemy: patrol, random jump arcs, render
+│   └── faster_fish.h / .c        Fast fish enemy: higher jumps, faster patrol
+├── hazards/
+│   ├── spike.h / .c              Static ground spike hazard rows
+│   ├── spike_block.h / .c        Rail-riding rotating spike hazard
+│   ├── spike_platform.h / .c     Elevated spike surface hazard
+│   ├── circular_saw.h / .c       Fast rotating patrol saw hazard
+│   ├── axe_trap.h / .c           Swinging/spinning axe hazard
+│   └── blue_flame.h / .c         Blue flame hazard: erupts from sea gaps, rise/flip/fall cycle
+├── levels/
+│   ├── level.h                   Shared level definitions
+│   ├── level_01.h / .c           Level 1 data
+│   └── level_loader.h / .c       Level loading and switching
+├── player/
+│   └── player.h / .c             Player input, physics, animation, rendering
+├── screens/
+│   ├── start_menu.h / .c         Start menu screen with logo
+│   ├── sandbox.h / .c            Level layout and entity placement
+│   └── hud.h / .c                HUD renderer: hearts, lives counter, score text
+└── surfaces/
+    ├── platform.h / .c           One-way platform pillar init and 9-slice rendering
+    ├── float_platform.h / .c     Hovering platform: static, crumble, and rail behaviours
+    ├── bridge.h / .c             Tiled crumble walkway: init, cascade-fall, render
+    ├── bouncepad.h / .c          Shared bouncepad mechanics (squash/release animation)
+    ├── bouncepad_small.h / .c    Green bouncepad (small jump)
+    ├── bouncepad_medium.h / .c   Wood bouncepad (medium jump)
+    ├── bouncepad_high.h / .c     Red bouncepad (high jump)
+    ├── rail.h / .c               Rail path builder, bitmask tile render, position interpolation
+    ├── vine.h / .c               Climbable vine decoration
+    ├── ladder.h / .c             Climbable ladder decoration
+    └── rope.h / .c               Climbable rope decoration
 </code></pre>
-<p>Every <code>.c</code> file in <code>src/</code> is automatically picked up by the Makefile wildcard -- no changes to the build system are needed when adding new source files.</p>
+<p>Every <code>.c</code> file in <code>src/</code> and its subdirectories is automatically picked up by the Makefile wildcard -- no changes to the build system are needed when adding new source files.</p>
 <hr>
 <h2><code>main.c</code></h2>
 <p><strong>Role:</strong> Owns the program entry point and every SDL subsystem&#39;s lifetime.</p>
