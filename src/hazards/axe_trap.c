@@ -12,7 +12,8 @@
 #include <stdio.h>
 
 #include "axe_trap.h"
-#include "../game.h"    /* FLOOR_Y, TILE_SIZE, platforms — for placement */
+#include "../game.h"               /* FLOOR_Y, TILE_SIZE, platforms — for placement */
+#include "../core/entity_utils.h"  /* sound_volume_for_distance */
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -73,32 +74,11 @@ void axe_traps_init(AxeTrap *traps, int *count) {
  *                     is audible.  Set to GAME_W (the logical canvas width)
  *                     so the sound fades to complete silence exactly when the
  *                     player is one full screen-width away from the axe.
+ *
+ * Volume calculation delegates to sound_volume_for_distance() in entity_utils.
  */
 #define AXE_VOLUME_MAX       128
 #define AXE_AUDIBLE_RANGE    ((float)GAME_W)
-
-/*
- * axe_volume_for_distance — Compute the Mix_Chunk volume (0–128)
- * based on horizontal distance between the player and the axe pivot.
- *
- * At distance 0            → AXE_VOLUME_MAX (128, full volume).
- * At distance AUDIBLE_RANGE → 0 (completely silent).
- * Beyond AUDIBLE_RANGE     → 0 (silent).
- *
- * Linear interpolation gives a smooth, gradual fade from full volume
- * to silence as the player moves one screen-width away from the source.
- */
-static int axe_volume_for_distance(float dist) {
-    if (dist >= AXE_AUDIBLE_RANGE) return 0;
-    if (dist <= 0.0f) return AXE_VOLUME_MAX;
-
-    /*
-     * Linear ramp from MAX at dist=0 to 0 at dist=AUDIBLE_RANGE.
-     * (1 - fraction) goes from 1.0 (closest) to 0.0 (farthest audible).
-     */
-    float fraction = dist / AXE_AUDIBLE_RANGE;
-    return (int)((1.0f - fraction) * AXE_VOLUME_MAX);
-}
 
 /* ------------------------------------------------------------------ */
 
@@ -130,7 +110,7 @@ void axe_traps_update(AxeTrap *traps, int count, float dt,
          * Used for volume scaling — closer player = louder whoosh.
          */
         float dist = fabsf(player_x - t->x);
-        int vol = axe_volume_for_distance(dist);
+        int vol = sound_volume_for_distance(dist, AXE_AUDIBLE_RANGE, AXE_VOLUME_MAX);
 
         /*
          * On-screen check — the axe is visible when its pivot falls
