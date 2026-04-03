@@ -128,6 +128,28 @@
 #define CAM_SNAP_THRESHOLD  0.5f
 
 /* ------------------------------------------------------------------ */
+/* Cleanup helpers                                                     */
+/* ------------------------------------------------------------------ */
+
+/*
+ * DESTROY_TEX / FREE_CHUNK — null-safe one-liner resource release.
+ *
+ * Both macros check for NULL before destroying, then set the pointer to
+ * NULL so accidental double-frees become safe no-ops.  They are intended
+ * for use inside game_cleanup() where ~35 identical if-guard-destroy-null
+ * blocks would otherwise appear.
+ *
+ * SDL_DestroyTexture(NULL) and Mix_FreeChunk(NULL) are SDL-defined safe
+ * no-ops, so the guard is a belt-and-suspenders layer that also clears
+ * the pointer to prevent the same resource from being freed twice.
+ */
+#define DESTROY_TEX(tex) \
+    do { if (tex) { SDL_DestroyTexture(tex); (tex) = NULL; } } while (0)
+
+#define FREE_CHUNK(snd) \
+    do { if (snd) { Mix_FreeChunk(snd); (snd) = NULL; } } while (0)
+
+/* ------------------------------------------------------------------ */
 /* GameState — the single source of truth for everything the game owns */
 /* ------------------------------------------------------------------ */
 
