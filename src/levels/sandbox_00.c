@@ -1,5 +1,5 @@
 /*
- * level_01.c — Sandbox level: the original hand-crafted four-screen level.
+ * sandbox_00.c — Sandbox level: the original hand-crafted four-screen level.
  *
  * This file contains ONLY placement data — positions, patrol ranges, modes.
  * Entity behaviour lives in each entity's .c module.
@@ -13,7 +13,7 @@
  *   FLOOR_Y - 3*TILE_SIZE + 16   = 124   (3-tile pillar top)
  */
 
-#include "level_01.h"
+#include "sandbox_00.h"
 
 /* Pull in entity constants needed for SPEED / VY / MODE values */
 #include "../entities/spider.h"         /* SPIDER_SPEED */
@@ -36,7 +36,7 @@
 
 /* ------------------------------------------------------------------ */
 
-const LevelDef level_01_def = {
+const LevelDef sandbox_00_def = {
     .name = "Sandbox",
 
     /* ---- Sea gaps: holes in the ground floor exposing water below -- */

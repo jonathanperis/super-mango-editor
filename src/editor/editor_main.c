@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
 
     /*
      * Optional level load from command line:
-     *   ./editor levels/level_01.json
+     *   ./editor levels/sandbox_00.json
      *
      * argv[0] is the executable name; argv[1] (if present) is treated as
      * a path to a JSON level file.  If the file fails to load we warn but

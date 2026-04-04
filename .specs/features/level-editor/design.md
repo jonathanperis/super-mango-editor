@@ -8,9 +8,9 @@
 | D-002 | UI Framework | Custom SDL2 + SDL2_ttf immediate-mode | ~7 widget functions in ui.c, no external deps |
 | D-003 | Game JSON Loader | No — game reads only compiled `const LevelDef` | Play-test cycle: export → `make run` |
 
-## Primary Goal: Recreate level_01 (Sandbox)
+## Primary Goal: Recreate sandbox_00 (Sandbox)
 
-The editor must produce a visual representation of level_01.c that matches the running game. This requires replicating the game's Y-position derivation formulas, display size calculations, source-rect cropping, and floor/water rendering.
+The editor must produce a visual representation of sandbox_00.c that matches the running game. This requires replicating the game's Y-position derivation formulas, display size calculations, source-rect cropping, and floor/water rendering.
 
 ## Architecture Overview
 
@@ -72,7 +72,7 @@ super-mango-game/
 │   └── (game source — untouched)
 ├── vendor/cJSON/                   ← Editor-only
 ├── levels/                         ← JSON level files
-│   └── level_01.json
+│   └── sandbox_00.json
 └── Makefile                        ← Updated with `editor` target
 ```
 
@@ -117,26 +117,26 @@ These formulas MUST be used in the editor to position entities for preview. They
 |--------|-----------|---------------|-----------------|
 | Spider | `FLOOR_Y - SPIDER_ART_H` | 252 - 10 = **242** | spider.h SPIDER_ART_H=10 |
 | Jumping Spider | `FLOOR_Y - JSPIDER_ART_H` | 252 - 10 = **242** | jumping_spider.h |
-| Bird | `base_y` (from placement) + sine wave at runtime | **base_y** (static preview) | level_01.c |
-| Faster Bird | `base_y` (from placement) | **base_y** (static preview) | level_01.c |
+| Bird | `base_y` (from placement) + sine wave at runtime | **base_y** (static preview) | sandbox_00.c |
+| Faster Bird | `base_y` (from placement) | **base_y** (static preview) | sandbox_00.c |
 | Fish | `(GAME_H - WATER_ART_H) - FISH_RENDER_H/2` | (300-31) - 24 = **245** | fish.c |
 | Faster Fish | same as Fish | **245** | faster_fish.c |
 | Axe Trap | `FLOOR_Y - 3*TILE_SIZE + 16` | 252 - 144 + 16 = **124** | level_loader.c |
 | Circular Saw | `FLOOR_Y - 2*TILE_SIZE + 16 - SAW_DISPLAY_H` | 252 - 96 + 16 - 32 = **140** | level_loader.c |
 | Spike Row | `FLOOR_Y - SPIKE_TILE_H` | 252 - 16 = **236** | level_loader.c |
-| Spike Platform | from placement (x, y) | **varies** | level_01.c |
+| Spike Platform | from placement (x, y) | **varies** | sandbox_00.c |
 | Spike Block | `rail_get_world_pos(rail, t_offset)` | **rail-dependent** | spike_block.c |
-| Float Platform (STATIC/CRUMBLE) | from placement (x, y) | **varies** | level_01.c |
+| Float Platform (STATIC/CRUMBLE) | from placement (x, y) | **varies** | sandbox_00.c |
 | Float Platform (RAIL) | `rail_get_world_pos(rail, t_offset)` | **rail-dependent** | float_platform.c |
 | Bouncepad (all) | `FLOOR_Y - BOUNCEPAD_SRC_H` | 252 - 18 = **234** | bouncepad.c |
 | Platform | `FLOOR_Y - tile_height*TILE_SIZE + 16` | 2-tile=**172**, 3-tile=**124** | level_loader.c |
-| Bridge | from placement (x, y) | **varies** (typically 172) | level_01.c |
-| Vine | from placement (x, y) | **varies** | level_01.c |
-| Ladder | from placement (x, y) | **varies** | level_01.c |
-| Rope | from placement (x, y) | **varies** | level_01.c |
-| Coin | from placement (x, y) | **varies** | level_01.c |
-| Yellow Star | from placement (x, y) | **varies** | level_01.c |
-| Last Star | from placement (x, y) | **varies** | level_01.c |
+| Bridge | from placement (x, y) | **varies** (typically 172) | sandbox_00.c |
+| Vine | from placement (x, y) | **varies** | sandbox_00.c |
+| Ladder | from placement (x, y) | **varies** | sandbox_00.c |
+| Rope | from placement (x, y) | **varies** | sandbox_00.c |
+| Coin | from placement (x, y) | **varies** | sandbox_00.c |
+| Yellow Star | from placement (x, y) | **varies** | sandbox_00.c |
+| Last Star | from placement (x, y) | **varies** | sandbox_00.c |
 
 ### Blue Flame Auto-Derivation (Preview Only)
 
@@ -398,7 +398,7 @@ Matches LevelDef field-for-field. Enum values serialized as strings:
 
 ### Exporter — C Code Style
 
-Must match `level_01.c` exactly:
+Must match `sandbox_00.c` exactly:
 - Designated initializers: `.field = value`
 - Section separator comments: `/* ---- Section name ---- */`
 - Speed constant names where available (e.g., `SPIDER_SPEED` instead of `50.0f`)
@@ -448,7 +448,7 @@ Custom immediate-mode with SDL2_ttf. ~7 widgets: button, label, panel, int_field
 │                                           │ PROPERTIES         │
 │                                           │  (per-entity)      │
 ├───────────────────────────────────���───────┴────────────────────┤
-│ (320, 200)  │ Select │ 47 entities │ level_01.json *          │ 32px
+│ (320, 200)  │ Select │ 47 entities │ sandbox_00.json *          │ 32px
 └────────────────────────────────────────────────────────────────┘
         896px                             384px = 1280px
 ```

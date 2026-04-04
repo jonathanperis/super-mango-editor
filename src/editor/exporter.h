@@ -3,7 +3,7 @@
  *
  * Declares level_export_c(), which generates compilable C source files
  * (.h and .c) from a LevelDef struct.  The output matches the exact
- * style of the hand-written level_01.c so generated levels are
+ * style of the hand-written sandbox_00.c so generated levels are
  * indistinguishable from manually authored ones.
  *
  * Include this header in any editor module that needs to export levels.

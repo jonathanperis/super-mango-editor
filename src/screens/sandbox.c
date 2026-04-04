@@ -1,12 +1,13 @@
 /*
- * sandbox.c — Sandbox phase: wires the Level 01 data into the game engine.
+ * sandbox.c — Sandbox phase: wires the sandbox_00 data into the game engine.
  *
  * This file is the entry point for the sandbox level.  All actual placement
- * data lives in levels/level_01.c as a const LevelDef.  The engine glue
+ * data lives in levels/sandbox_00.c as a const LevelDef.  The engine glue
  * (populating GameState from that data) lives in level_loader.c.
  *
- * To add a second level, create levels/level_02.h/.c, then call
- * level_load(gs, &level_02_def) from a new phase entry point.
+ * To add a new level, create levels/level_XX.h/.c (or use the editor to
+ * export one), then call level_load(gs, &level_XX_def) from a new phase
+ * entry point.
  *
  * Separating content (levels/) from engine (level_loader.c) means new
  * levels require zero changes to engine or entity code.
@@ -14,7 +15,7 @@
 
 #include "sandbox.h"
 #include "../levels/level_loader.h"  /* level_load, level_reset */
-#include "../levels/level_01.h"      /* level_01_def */
+#include "../levels/sandbox_00.h"    /* sandbox_00_def */
 
 /* ------------------------------------------------------------------ */
 
@@ -22,10 +23,10 @@
  * sandbox_load_level — Initialise all entities for the sandbox level.
  *
  * Called once from game_init after all textures have been loaded.
- * Delegates entirely to level_load with the Level 01 definition.
+ * Delegates entirely to level_load with the sandbox_00 definition.
  */
 void sandbox_load_level(GameState *gs) {
-    level_load(gs, &level_01_def);
+    level_load(gs, &sandbox_00_def);
 }
 
 /* ------------------------------------------------------------------ */
@@ -38,6 +39,6 @@ void sandbox_load_level(GameState *gs) {
  * carry stale state from the previous life into the next.
  */
 void sandbox_reset_level(GameState *gs, int *fp_prev_riding) {
-    level_reset(gs, &level_01_def);
+    level_reset(gs, &sandbox_00_def);
     *fp_prev_riding = -1;
 }

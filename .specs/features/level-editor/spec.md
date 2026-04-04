@@ -4,7 +4,7 @@
 
 Standalone SDL2/C application that provides a visual interface for creating, editing, and exporting game levels. Replaces manual `const LevelDef` C struct authoring with a point-and-click editor.
 
-The editor must be capable of recreating the existing Sandbox level (level_01) with pixel-perfect fidelity — every entity at the exact same position and visual appearance as the running game.
+The editor must be capable of recreating the existing Sandbox level (sandbox_00) with pixel-perfect fidelity — every entity at the exact same position and visual appearance as the running game.
 
 ## Motivation
 
@@ -81,7 +81,7 @@ The editor MUST allow editing entity-specific properties after placement via SDL
 The editor MUST save and load levels in JSON format using cJSON (vendor library, editor-only). The JSON schema maps 1:1 to `LevelDef` struct fields. Serializer validates array counts against MAX_* bounds.
 
 ### R-007: C Code Export
-The editor MUST export a level as a valid C source file (`level_XX.c` + `level_XX.h`) that compiles and runs identically to a hand-written level. Generated code MUST follow `level_01.c` style exactly.
+The editor MUST export a level as a valid C source file (`level_XX.c` + `level_XX.h`) that compiles and runs identically to a hand-written level. Generated code MUST follow `sandbox_00.c` style exactly.
 
 ### R-008: Core Editing Operations
 Place, select, move, delete — with correct entity display sizes for hit testing.
@@ -115,7 +115,7 @@ WASD scroll, middle-mouse drag, scroll-wheel zoom (1x, 2x, 4x).
 ## Success Criteria
 
 1. `make editor` builds without affecting `make` (game)
-2. Load level_01.json → visual layout matches game screenshot pixel-for-pixel:
+2. Load sandbox_00.json → visual layout matches game screenshot pixel-for-pixel:
    - All 8 platforms at correct heights and positions
    - All 5 sea gaps with correct floor edge caps and water strips
    - All 16 coins at correct positions (ground and platform tops)
@@ -124,5 +124,5 @@ WASD scroll, middle-mouse drag, scroll-wheel zoom (1x, 2x, 4x).
    - 3 rail paths visible as connected lines
    - Spike blocks and float platforms shown at rail positions
    - Blue flames shown as ghost preview at sea gap positions
-3. Round-trip: level_01 → JSON → LevelDef → all fields match
-4. C export: level_01 → JSON → C export → compile → game behavior identical
+3. Round-trip: sandbox_00 → JSON → LevelDef → all fields match
+4. C export: sandbox_00 → JSON → C export → compile → game behavior identical
