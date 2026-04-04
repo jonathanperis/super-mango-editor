@@ -245,4 +245,12 @@ const LevelDef sandbox_00_def = {
 
     /* Fog enabled for atmospheric forest effect */
     .fog_enabled = 1,
+
+    /* Water strip at bottom of screen (visible in sea gap regions) */
+    .water_enabled = 1,
+
+    /* Game rules — standard difficulty settings */
+    .initial_hearts  = 3,    /* 3 hit points before losing a life      */
+    .initial_lives   = 3,    /* 3 extra lives before game over         */
+    .score_per_life  = 1000, /* bonus life every 1000 points           */
 };

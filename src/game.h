@@ -283,6 +283,8 @@ typedef struct {
     /* ---- Level-wide configuration (set by level_load from LevelDef) -- */
     const void   *current_level;    /* pointer to the active LevelDef          */
     int           fog_enabled;      /* 1 = fog rendering active, 0 = disabled  */
+    int           water_enabled;    /* 1 = water strip rendered, 0 = disabled  */
+    int           score_per_life;   /* score threshold for bonus life           */
 
     /* ---- Loop state (persists across frames for emscripten callback) - */
     Uint64        loop_prev_ticks;  /* timestamp of previous frame         */

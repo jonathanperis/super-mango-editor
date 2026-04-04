@@ -518,8 +518,19 @@ void level_load(GameState *gs, const LevelDef *def)
         gs->player.y = def->player_start_y - gs->player.h + 16;  /* 16 = FLOOR_SINK */
     }
 
-    /* Fog enabled/disabled flag — read by game.c at render time */
-    gs->fog_enabled = def->fog_enabled;
+    /* ---- Level-wide configuration ---------------------------------- */
+    gs->fog_enabled   = def->fog_enabled;
+    gs->water_enabled = def->water_enabled;
+
+    /*
+     * Game rules — use level-defined values if set (>0), otherwise fall
+     * back to engine defaults defined in hud.h and coin.h.
+     */
+    gs->hearts          = def->initial_hearts  > 0 ? def->initial_hearts  : MAX_HEARTS;
+    gs->lives           = def->initial_lives   > 0 ? def->initial_lives   : DEFAULT_LIVES;
+    gs->score           = 0;
+    gs->score_per_life  = def->score_per_life  > 0 ? def->score_per_life  : SCORE_PER_LIFE;
+    gs->score_life_next = gs->score_per_life;
 }
 
 /*

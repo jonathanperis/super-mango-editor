@@ -314,5 +314,9 @@
 	"player_start_y":	172,
 	"music_path":	"sounds/game_music.ogg",
 	"music_volume":	13,
-	"fog_enabled":	1
+	"fog_enabled":	1,
+	"water_enabled":	1,
+	"initial_hearts":	3,
+	"initial_lives":	3,
+	"score_per_life":	1000
 }

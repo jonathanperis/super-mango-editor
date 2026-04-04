@@ -926,16 +926,35 @@ void level_config_render(EditorState *es) {
         es->modified = 1;
     y += 24;
 
-    /* ---- Fog ---- */
+    /* ---- Fog & Water ---- */
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
-    ui_label(&es->ui, x + 8, y, "Fog");
-    y += 18;
     {
-        static const char *fog_opts[] = { "Off", "On" };
-        if (ui_dropdown(&es->ui, 9004, x + 8, y, 100, fog_opts, 2, &es->level.fog_enabled))
+        static const char *toggle_opts[] = { "Off", "On" };
+        ui_label(&es->ui, x + 8, y, "Fog:");
+        if (ui_dropdown(&es->ui, 9004, x + 50, y, 80, toggle_opts, 2, &es->level.fog_enabled))
+            es->modified = 1;
+        ui_label(&es->ui, x + 150, y, "Water:");
+        if (ui_dropdown(&es->ui, 9005, x + 205, y, 80, toggle_opts, 2, &es->level.water_enabled))
             es->modified = 1;
     }
+    y += 24;
+
+    /* ---- Game rules ---- */
+    ui_separator(&es->ui, x + 4, y, PROP_W - 8);
+    y += 6;
+    ui_label(&es->ui, x + 8, y, "Game Rules");
+    y += 18;
+    ui_label(&es->ui, x + 8, y, "hearts:");
+    if (ui_int_field(&es->ui, 9006, x + 70, y, 60, &es->level.initial_hearts))
+        es->modified = 1;
+    ui_label(&es->ui, x + 150, y, "lives:");
+    if (ui_int_field(&es->ui, 9007, x + 205, y, 60, &es->level.initial_lives))
+        es->modified = 1;
+    y += 22;
+    ui_label(&es->ui, x + 8, y, "pts/life:");
+    if (ui_int_field(&es->ui, 9008, x + 80, y, 80, &es->level.score_per_life))
+        es->modified = 1;
     y += 24;
 
     /* ---- Parallax layers ---- */

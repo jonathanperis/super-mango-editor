@@ -392,6 +392,14 @@ typedef struct {
 
     /* Fog atmosphere */
     int   fog_enabled;      /* 1 = fog active, 0 = disabled */
+
+    /* Water */
+    int   water_enabled;    /* 1 = render water strip, 0 = disabled */
+
+    /* Game rules */
+    int   initial_hearts;   /* starting hit points (0 = use MAX_HEARTS default) */
+    int   initial_lives;    /* starting extra lives (0 = use DEFAULT_LIVES default) */
+    int   score_per_life;   /* score threshold for bonus life (0 = use default 1000) */
 } LevelDef;
 
 /* ------------------------------------------------------------------ */

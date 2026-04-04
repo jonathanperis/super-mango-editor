@@ -364,11 +364,11 @@ void game_init(GameState *gs) {
         }
     }
 
-    /* Initialise the health/lives/score system */
-    gs->hearts          = MAX_HEARTS;
-    gs->lives           = DEFAULT_LIVES;
-    gs->score           = 0;
-    gs->score_life_next = SCORE_PER_LIFE;
+    /*
+     * Health/lives/score are now set by level_load() from LevelDef fields
+     * (initial_hearts, initial_lives, score_per_life).  No hardcoded init
+     * needed here — sandbox_load_level → level_load handles it.
+     */
 
     /*
      * Lazy gamepad initialisation — deferred from SDL_Init on purpose.
@@ -480,13 +480,20 @@ static void apply_damage(GameState *gs,
     if (gs->hearts <= 0) {
         gs->lives--;
         if (gs->lives < 0) {
-            gs->lives           = DEFAULT_LIVES;
+            /* Game over — reset to level-defined starting values */
+            const LevelDef *def = (const LevelDef *)gs->current_level;
+            gs->lives           = def && def->initial_lives  > 0
+                                ? def->initial_lives  : DEFAULT_LIVES;
             gs->score           = 0;
-            gs->score_life_next = SCORE_PER_LIFE;
+            gs->score_life_next = gs->score_per_life;
             if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
         }
         if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-        gs->hearts = MAX_HEARTS;
+        {
+            const LevelDef *def = (const LevelDef *)gs->current_level;
+            gs->hearts = def && def->initial_hearts > 0
+                       ? def->initial_hearts : MAX_HEARTS;
+        }
         level_reset(gs, &gs->fp_prev_riding);
     }
 }
@@ -815,7 +822,7 @@ static void game_collide(GameState *gs, float dt)
                  */
                 if (gs->score >= gs->score_life_next) {
                     gs->lives++;
-                    gs->score_life_next += SCORE_PER_LIFE;
+                    gs->score_life_next += gs->score_per_life;
                     if (gs->debug_mode) debug_log(&gs->debug, "1UP! lives=%d", gs->lives);
                 }
             }
@@ -1079,7 +1086,7 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
      * Draw the water strip on top of the floor/platforms and fish.
      * The full 384-px sheet scrolls rightward as a seamless loop.
      */
-    water_render(&gs->water, gs->renderer);
+    if (gs->water_enabled) water_render(&gs->water, gs->renderer);
 
     /* Draw spike blocks above the water strip but below the player */
     if (gs->spike_block_tex) {
@@ -1481,8 +1488,8 @@ static void game_loop_frame(void *arg) {
 
         game_collide(gs, dt);
 
-        /* Advance the water scroll offset */
-        water_update(&gs->water, dt);
+        /* Advance the water scroll offset (if water is enabled for this level) */
+        if (gs->water_enabled) water_update(&gs->water, dt);
         /* Advance the fog wave positions and spawn the next wave if it is time.
          * Only active when the level definition enables fog. */
         if (gs->fog_enabled) fog_update(&gs->fog, dt);
