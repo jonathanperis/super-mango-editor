@@ -396,6 +396,15 @@ cJSON *level_to_json(const LevelDef *def) {
         cJSON_AddItemToArray(sblk_arr, obj);
     }
 
+    /* ---- Blue flames -------------------------------------------- */
+
+    cJSON *bf_arr = cJSON_AddArrayToObject(root, "blue_flames");
+    for (int i = 0; i < def->blue_flame_count; i++) {
+        cJSON *obj = cJSON_CreateObject();
+        cJSON_AddNumberToObject(obj, "x", def->blue_flames[i].x);
+        cJSON_AddItemToArray(bf_arr, obj);
+    }
+
     /* ---- Float platforms ----------------------------------------- */
 
     cJSON *fp_arr = cJSON_AddArrayToObject(root, "float_platforms");
@@ -768,6 +777,13 @@ int level_from_json(const cJSON *json, LevelDef *def) {
         def->spike_blocks[idx].rail_index = (int)get_number(elem, "rail_index", 0);
         def->spike_blocks[idx].t_offset   = (float)get_number(elem, "t_offset", 0);
         def->spike_blocks[idx].speed      = (float)get_number(elem, "speed", 0);
+    });
+
+    /* ---- Blue flames -------------------------------------------- */
+
+    PARSE_ARRAY("blue_flames", def->blue_flames, blue_flame_count,
+                MAX_BLUE_FLAMES, {
+        def->blue_flames[idx].x = (float)get_number(elem, "x", 0);
     });
 
     /* ---- Float platforms ----------------------------------------- */

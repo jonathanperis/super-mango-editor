@@ -20,6 +20,7 @@
 #include <SDL.h>                       /* Uint32 */
 #include "../surfaces/bouncepad.h"     /* BouncepadType, MAX_BOUNCEPADS_* */
 #include "../hazards/axe_trap.h"       /* AxeTrapMode, MAX_AXE_TRAPS */
+#include "../hazards/blue_flame.h"     /* MAX_BLUE_FLAMES */
 #include "../surfaces/float_platform.h"/* FloatPlatformMode, MAX_FLOAT_PLATFORMS */
 #include "../surfaces/rail.h"          /* MAX_RAILS */
 #include "../game.h"                   /* MAX_* constants, FLOOR_Y, TILE_SIZE, etc. */
@@ -210,6 +211,16 @@ typedef struct {
 } SpikeBlockPlacement;
 
 /*
+ * BlueFlamePlacement — one erupting blue flame hazard.
+ *
+ * x : gap x position in world-space logical pixels — the blue flame
+ *     erupts centred within a sea-gap-sized opening at this x coordinate.
+ */
+typedef struct {
+    float x;  /* gap x position — blue flame erupts centred in the gap */
+} BlueFlamePlacement;
+
+/*
  * FloatPlatformPlacement — a hovering / crumbling / rail-riding platform.
  *
  * mode       : FLOAT_PLATFORM_STATIC, CRUMBLE, or RAIL.
@@ -294,8 +305,8 @@ typedef struct {
  * All arrays use the same MAX_* upper bounds as GameState so the
  * level_loader can safely fill GameState arrays directly.
  *
- * Note on blue_flames: positions are derived automatically from the
- * sea_gaps array by blue_flames_init — no explicit placement struct needed.
+ * Blue flames are manually placed via the blue_flames[] array.
+ * Each entry specifies the gap x position where a flame erupts.
  */
 typedef struct {
     char  name[64];     /* display name, e.g. "Sandbox" — editable buffer */
@@ -344,6 +355,8 @@ typedef struct {
     int                    spike_platform_count;
     SpikeBlockPlacement    spike_blocks[MAX_SPIKE_BLOCKS];
     int                    spike_block_count;
+    BlueFlamePlacement     blue_flames[MAX_BLUE_FLAMES];
+    int                    blue_flame_count;
 
     /* ---- Surfaces ---------------------------------------------------- */
     FloatPlatformPlacement float_platforms[MAX_FLOAT_PLATFORMS];

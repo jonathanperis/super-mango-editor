@@ -337,15 +337,35 @@ static void load_spike_blocks(GameState *gs, const LevelDef *def)
     gs->spike_block_count = def->spike_block_count;
 }
 
-static void load_blue_flames(GameState *gs)
+static void load_blue_flames(GameState *gs, const LevelDef *def)
 {
     /*
-     * Blue flame positions are derived from the sea_gaps array — each gap
-     * that is not at the world edge gets one erupting flame.
-     * This function assumes load_sea_gaps has already been called.
+     * Blue flames are now manually placed in LevelDef — each entry
+     * specifies the gap x position where a flame erupts.  We initialise
+     * each BlueFlame struct from the placement data.
      */
-    blue_flames_init(gs->blue_flames, &gs->blue_flame_count,
-                     gs->sea_gaps, gs->sea_gap_count);
+    int n = 0;
+    for (int i = 0; i < def->blue_flame_count && n < MAX_BLUE_FLAMES; i++) {
+        float gap_x = def->blue_flames[i].x;
+        if (gap_x <= 0.0f) continue;
+
+        BlueFlame *f = &gs->blue_flames[n];
+        f->gap_x      = gap_x;
+        f->x          = gap_x + (SEA_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f;
+        f->start_y    = (float)(FLOOR_Y + TILE_SIZE);
+        f->y          = f->start_y;
+        f->vy         = 0.0f;
+        f->w          = BLUE_FLAME_DISPLAY_W;
+        f->h          = BLUE_FLAME_DISPLAY_H;
+        f->angle      = 0.0f;
+        f->state      = BLUE_FLAME_WAITING;
+        f->timer      = (float)n * 0.5f;
+        f->anim_timer = 0.0f;
+        f->anim_frame = 0;
+        f->active     = 1;
+        n++;
+    }
+    gs->blue_flame_count = n;
 }
 
 /* ------------------------------------------------------------------ */
@@ -497,7 +517,7 @@ void level_load(GameState *gs, const LevelDef *def)
     load_spike_rows(gs, def);
     load_spike_platforms(gs, def);
     load_spike_blocks(gs, def);
-    load_blue_flames(gs);   /* derived from sea_gaps; no placement array */
+    load_blue_flames(gs, def);
 
     /* ---- Surfaces ------------------------------------------------- */
     load_float_platforms(gs, def);
@@ -569,7 +589,7 @@ void level_reset(GameState *gs, const LevelDef *def)
     load_spike_rows(gs, def);
     load_spike_platforms(gs, def);
     load_spike_blocks(gs, def);
-    load_blue_flames(gs);
+    load_blue_flames(gs, def);
 
     /* Surfaces */
     load_float_platforms(gs, def);

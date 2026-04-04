@@ -929,11 +929,11 @@ static void render_player_spawn(EditorState *es) {
 /* ---- Blue flames ------------------------------------------------- */
 
 /*
- * render_blue_flames — Draw blue flame ghost previews in sea gaps.
+ * render_blue_flames — Draw blue flame entities from placement data.
  *
- * Blue flames are auto-spawned from sea gaps at runtime, so there is no
- * explicit placement array.  We draw a 50% alpha preview centered in
- * each sea gap to show designers where flames will appear.
+ * Each blue flame is positioned centred within its gap x coordinate.
+ * The preview is drawn at FLOOR_Y - BLUE_FLAME_H so designers can see
+ * where the flame will erupt from.
  *
  * x = gap_x + (SEA_GAP_W - BLUE_FLAME_W) / 2
  * y = FLOOR_Y - BLUE_FLAME_H  (visible preview position above gap)
@@ -941,20 +941,14 @@ static void render_player_spawn(EditorState *es) {
 static void render_blue_flames(EditorState *es) {
     if (!es->textures.blue_flame) return;
 
-    /* Set 50% alpha for ghost preview appearance */
-    SDL_SetTextureAlphaMod(es->textures.blue_flame, 128);
-
-    for (int g = 0; g < es->level.sea_gap_count; g++) {
-        float gx = (float)es->level.sea_gaps[g];
-        float fx = gx + (float)(SEA_GAP_W - BLUE_FLAME_W) / 2.0f;
+    for (int i = 0; i < es->level.blue_flame_count; i++) {
+        float gap_x = es->level.blue_flames[i].x;
+        float fx = gap_x + (float)(SEA_GAP_W - BLUE_FLAME_W) / 2.0f;
         float fy = (float)(FLOOR_Y - BLUE_FLAME_H);
 
         draw_tex(es, es->textures.blue_flame, NULL,
                  fx, fy, BLUE_FLAME_W, BLUE_FLAME_H);
     }
-
-    /* Restore full opacity so other renders using this texture are unaffected */
-    SDL_SetTextureAlphaMod(es->textures.blue_flame, 255);
 }
 
 /* ---- Fish -------------------------------------------------------- */
@@ -1330,6 +1324,15 @@ static void render_selection(EditorState *es) {
         wh = SPIKE_DISPLAY_H;
         break;
     }
+    case ENT_BLUE_FLAME: {
+        if (es->selection.index >= es->level.blue_flame_count) return;
+        float gap_x = es->level.blue_flames[es->selection.index].x;
+        wx = gap_x + (float)(SEA_GAP_W - BLUE_FLAME_W) / 2.0f;
+        wy = (float)(FLOOR_Y - BLUE_FLAME_H);
+        ww = BLUE_FLAME_W;
+        wh = BLUE_FLAME_H;
+        break;
+    }
     case ENT_FLOAT_PLATFORM: {
         if (es->selection.index >= es->level.float_platform_count) return;
         const FloatPlatformPlacement *fp =
@@ -1510,6 +1513,10 @@ static void render_ghost(EditorState *es) {
     case ENT_SPIKE_BLOCK:
         tex = es->textures.spike_block;
         dw = SPIKE_DISPLAY_W; dh = SPIKE_DISPLAY_H;
+        break;
+    case ENT_BLUE_FLAME:
+        tex = es->textures.blue_flame;
+        dw = BLUE_FLAME_W; dh = BLUE_FLAME_H;
         break;
     case ENT_FLOAT_PLATFORM:
         tex = es->textures.float_platform;

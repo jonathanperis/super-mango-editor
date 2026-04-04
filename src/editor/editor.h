@@ -110,6 +110,7 @@ typedef enum {
     ENT_SPIKE_ROW,         /* static ground spike strip                     */
     ENT_SPIKE_PLATFORM,    /* elevated spike hazard surface                 */
     ENT_SPIKE_BLOCK,       /* rail-riding spike block                       */
+    ENT_BLUE_FLAME,        /* erupting fire hazard from sea gaps            */
     ENT_FLOAT_PLATFORM,    /* hovering / crumble / rail platform            */
     ENT_BRIDGE,            /* tiled crumble walkway                         */
     ENT_BOUNCEPAD_SMALL,   /* green bouncepad (small jump)                  */

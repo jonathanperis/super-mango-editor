@@ -425,7 +425,18 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .spike_block_count = %d,\n", def->spike_block_count);
 
-    /* ---- 19. Float platforms ---- */
+    /* ---- 19. Blue flames ---- */
+    write_section(f, "Blue flames");
+    if (def->blue_flame_count > 0) {
+        fprintf(f, "    .blue_flames = {\n");
+        for (int i = 0; i < def->blue_flame_count; i++) {
+            fprintf(f, "        { .x = %.1ff },\n", def->blue_flames[i].x);
+        }
+        fprintf(f, "    },\n");
+    }
+    fprintf(f, "    .blue_flame_count = %d,\n", def->blue_flame_count);
+
+    /* ---- 20. Float platforms ---- */
     write_section(f, "Float platforms");
     if (def->float_platform_count > 0) {
         fprintf(f, "    .float_platforms = {\n");
@@ -441,7 +452,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .float_platform_count = %d,\n", def->float_platform_count);
 
-    /* ---- 20. Bridges ---- */
+    /* ---- 21. Bridges ---- */
     write_section(f, "Bridges");
     if (def->bridge_count > 0) {
         fprintf(f, "    .bridges = {\n");
@@ -454,7 +465,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .bridge_count = %d,\n", def->bridge_count);
 
-    /* ---- 21. Bouncepads (small) ---- */
+    /* ---- 22. Bouncepads (small) ---- */
     write_section(f, "Bouncepads small");
     if (def->bouncepad_small_count > 0) {
         fprintf(f, "    .bouncepads_small = {\n");
@@ -467,7 +478,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .bouncepad_small_count = %d,\n", def->bouncepad_small_count);
 
-    /* ---- 22. Bouncepads (medium) ---- */
+    /* ---- 23. Bouncepads (medium) ---- */
     write_section(f, "Bouncepads medium");
     if (def->bouncepad_medium_count > 0) {
         fprintf(f, "    .bouncepads_medium = {\n");
@@ -480,7 +491,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .bouncepad_medium_count = %d,\n", def->bouncepad_medium_count);
 
-    /* ---- 23. Bouncepads (high) ---- */
+    /* ---- 24. Bouncepads (high) ---- */
     write_section(f, "Bouncepads high");
     if (def->bouncepad_high_count > 0) {
         fprintf(f, "    .bouncepads_high = {\n");
@@ -493,7 +504,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .bouncepad_high_count = %d,\n", def->bouncepad_high_count);
 
-    /* ---- 24. Vines ---- */
+    /* ---- 25. Vines ---- */
     write_section(f, "Vines");
     if (def->vine_count > 0) {
         fprintf(f, "    .vines = {\n");
@@ -506,7 +517,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .vine_count = %d,\n", def->vine_count);
 
-    /* ---- 25. Ladders ---- */
+    /* ---- 26. Ladders ---- */
     write_section(f, "Ladders");
     if (def->ladder_count > 0) {
         fprintf(f, "    .ladders = {\n");
@@ -519,7 +530,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .ladder_count = %d,\n", def->ladder_count);
 
-    /* ---- 26. Ropes ---- */
+    /* ---- 27. Ropes ---- */
     write_section(f, "Ropes");
     if (def->rope_count > 0) {
         fprintf(f, "    .ropes = {\n");
@@ -532,7 +543,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .rope_count = %d,\n", def->rope_count);
 
-    /* ---- 27. Level-wide configuration ---- */
+    /* ---- 28. Level-wide configuration ---- */
     write_section(f, "Level-wide configuration");
 
     /* Parallax layers */
