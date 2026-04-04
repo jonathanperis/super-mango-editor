@@ -223,23 +223,23 @@ const LevelDef sandbox_00_def = {
 
     /* ---- Level-wide configuration ---- */
 
-    .floor_tile_path = "assets/grass_tileset.png",
+    .floor_tile_path = "assets/sprites/levels/grass_tileset.png",
 
     .parallax_layers = {
-        { "assets/parallax_sky.png", 0.00f },
-        { "assets/parallax_clouds_bg.png", 0.08f },
-        { "assets/parallax_glacial_mountains.png", 0.15f },
-        { "assets/parallax_clouds_mg_3.png", 0.25f },
-        { "assets/parallax_clouds_mg_2.png", 0.38f },
-        { "assets/parallax_cloud_lonely.png", 0.44f },
-        { "assets/parallax_clouds_mg_1.png", 0.50f },
+        { "assets/sprites/effects/parallax_sky.png", 0.00f },
+        { "assets/sprites/effects/parallax_clouds_bg.png", 0.08f },
+        { "assets/sprites/effects/parallax_glacial_mountains.png", 0.15f },
+        { "assets/sprites/effects/parallax_clouds_mg_3.png", 0.25f },
+        { "assets/sprites/effects/parallax_clouds_mg_2.png", 0.38f },
+        { "assets/sprites/effects/parallax_cloud_lonely.png", 0.44f },
+        { "assets/sprites/effects/parallax_clouds_mg_1.png", 0.50f },
     },
     .parallax_layer_count = 7,
 
     .player_start_x = 80.0f,
     .player_start_y = 172.0f,
 
-    .music_path   = "sounds/game_music.ogg",
+    .music_path   = "assets/sounds/levels/game_music.ogg",
     .music_volume = 13,
 
     .fog_enabled = 1,

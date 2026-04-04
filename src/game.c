@@ -112,7 +112,7 @@ void game_init(GameState *gs) {
      * Load the grass tile. This single 48×48 texture will be repeated
      * (tiled) across the full window width to form the floor.
      */
-    gs->floor_tile = IMG_LoadTexture(gs->renderer, "assets/grass_tileset.png");
+    gs->floor_tile = IMG_LoadTexture(gs->renderer, "assets/sprites/levels/grass_tileset.png");
     if (!gs->floor_tile) {
         fprintf(stderr, "Failed to load Grass_Tileset.png: %s\n", IMG_GetError());
         parallax_cleanup(&gs->parallax);
@@ -127,7 +127,7 @@ void game_init(GameState *gs) {
      * The same texture is reused for every tile in every platform, so we
      * load it once here and pass it to platforms_render each frame.
      */
-    gs->platform_tex = IMG_LoadTexture(gs->renderer, "assets/platform.png");
+    gs->platform_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/platform.png");
     if (!gs->platform_tex) {
         fprintf(stderr, "Failed to load Grass_Oneway.png: %s\n", IMG_GetError());
         SDL_DestroyTexture(gs->floor_tile);
@@ -144,7 +144,7 @@ void game_init(GameState *gs) {
      * Load the shared spider texture.  All spider instances blit from
      * this single texture using different source rects per frame.
      */
-    gs->spider_tex = IMG_LoadTexture(gs->renderer, "assets/spider.png");
+    gs->spider_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/spider.png");
     if (!gs->spider_tex) {
         fprintf(stderr, "Failed to load Spider_1.png: %s\n", IMG_GetError());
         SDL_DestroyTexture(gs->platform_tex);
@@ -159,7 +159,7 @@ void game_init(GameState *gs) {
      * Load the jumping spider texture (Spider_2.png, same layout as Spider_1).
      * Fatal — a gameplay enemy that the player must be able to see.
      */
-    gs->jumping_spider_tex = IMG_LoadTexture(gs->renderer, "assets/jumping_spider.png");
+    gs->jumping_spider_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/jumping_spider.png");
     if (!gs->jumping_spider_tex) {
         fprintf(stderr, "Failed to load Spider_2.png: %s\n", IMG_GetError());
         SDL_DestroyTexture(gs->spider_tex);
@@ -172,53 +172,53 @@ void game_init(GameState *gs) {
     }
 
     /* ---- Load all entity textures (engine resources) --------------- */
-    gs->bird_tex = IMG_LoadTexture(gs->renderer, "assets/bird.png");
+    gs->bird_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/bird.png");
     if (!gs->bird_tex) { fprintf(stderr, "Failed to load Bird_2.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
-    gs->faster_bird_tex = IMG_LoadTexture(gs->renderer, "assets/faster_bird.png");
+    gs->faster_bird_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/faster_bird.png");
     if (!gs->faster_bird_tex) { fprintf(stderr, "Failed to load Bird_1.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
-    gs->fish_tex = IMG_LoadTexture(gs->renderer, "assets/fish.png");
+    gs->fish_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/fish.png");
     if (!gs->fish_tex) { fprintf(stderr, "Failed to load Fish_2.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
-    gs->coin_tex = IMG_LoadTexture(gs->renderer, "assets/coin.png");
+    gs->coin_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/coin.png");
     if (!gs->coin_tex) { fprintf(stderr, "Failed to load Coin.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
-    gs->bouncepad_medium_tex = IMG_LoadTexture(gs->renderer, "assets/bouncepad_medium.png");
+    gs->bouncepad_medium_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/bouncepad_medium.png");
     if (!gs->bouncepad_medium_tex) { fprintf(stderr, "Failed to load Bouncepad_Wood.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
 
     /* Non-fatal textures — game runs without them */
-    gs->vine_tex = IMG_LoadTexture(gs->renderer, "assets/vine.png");
+    gs->vine_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/vine.png");
     if (!gs->vine_tex) fprintf(stderr, "Warning: Failed to load Vine.png: %s\n", IMG_GetError());
-    gs->ladder_tex = IMG_LoadTexture(gs->renderer, "assets/ladder.png");
+    gs->ladder_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/ladder.png");
     if (!gs->ladder_tex) fprintf(stderr, "Warning: Failed to load Ladder.png: %s\n", IMG_GetError());
-    gs->rope_tex = IMG_LoadTexture(gs->renderer, "assets/rope.png");
+    gs->rope_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/rope.png");
     if (!gs->rope_tex) fprintf(stderr, "Warning: Failed to load Rope.png: %s\n", IMG_GetError());
-    gs->bouncepad_small_tex = IMG_LoadTexture(gs->renderer, "assets/bouncepad_small.png");
+    gs->bouncepad_small_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/bouncepad_small.png");
     if (!gs->bouncepad_small_tex) fprintf(stderr, "Warning: Failed to load Bouncepad_Green.png: %s\n", IMG_GetError());
-    gs->bouncepad_high_tex = IMG_LoadTexture(gs->renderer, "assets/bouncepad_high.png");
+    gs->bouncepad_high_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/bouncepad_high.png");
     if (!gs->bouncepad_high_tex) fprintf(stderr, "Warning: Failed to load Bouncepad_Red.png: %s\n", IMG_GetError());
-    gs->rail_tex = IMG_LoadTexture(gs->renderer, "assets/rail.png");
+    gs->rail_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/rail.png");
     if (!gs->rail_tex) fprintf(stderr, "Warning: Failed to load Rails.png: %s\n", IMG_GetError());
-    gs->spike_block_tex = IMG_LoadTexture(gs->renderer, "assets/spike_block.png");
+    gs->spike_block_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/spike_block.png");
     if (!gs->spike_block_tex) fprintf(stderr, "Warning: Failed to load Spike_Block.png: %s\n", IMG_GetError());
-    gs->float_platform_tex = IMG_LoadTexture(gs->renderer, "assets/float_platform.png");
+    gs->float_platform_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/float_platform.png");
     if (!gs->float_platform_tex) fprintf(stderr, "Warning: Failed to load Platform.png: %s\n", IMG_GetError());
-    gs->bridge_tex = IMG_LoadTexture(gs->renderer, "assets/bridge.png");
+    gs->bridge_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/bridge.png");
     if (!gs->bridge_tex) fprintf(stderr, "Warning: Failed to load Bridge.png: %s\n", IMG_GetError());
-    gs->yellow_star_tex = IMG_LoadTexture(gs->renderer, "assets/yellow_star.png");
+    gs->yellow_star_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/yellow_star.png");
     if (!gs->yellow_star_tex) fprintf(stderr, "Warning: Failed to load Star_Yellow.png: %s\n", IMG_GetError());
-    gs->axe_trap_tex = IMG_LoadTexture(gs->renderer, "assets/axe_trap.png");
+    gs->axe_trap_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/axe_trap.png");
     if (!gs->axe_trap_tex) fprintf(stderr, "Warning: Failed to load Axe_Trap.png: %s\n", IMG_GetError());
-    gs->circular_saw_tex = IMG_LoadTexture(gs->renderer, "assets/circular_saw.png");
+    gs->circular_saw_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/circular_saw.png");
     if (!gs->circular_saw_tex) fprintf(stderr, "Warning: Failed to load Circular_Saw.png: %s\n", IMG_GetError());
-    gs->blue_flame_tex = IMG_LoadTexture(gs->renderer, "assets/blue_flame.png");
+    gs->blue_flame_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/blue_flame.png");
     if (!gs->blue_flame_tex) fprintf(stderr, "Warning: Failed to load blue_flame.png: %s\n", IMG_GetError());
-    gs->faster_fish_tex = IMG_LoadTexture(gs->renderer, "assets/faster_fish.png");
+    gs->faster_fish_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/faster_fish.png");
     if (!gs->faster_fish_tex) fprintf(stderr, "Warning: Failed to load Fish_1.png: %s\n", IMG_GetError());
-    gs->spike_tex = IMG_LoadTexture(gs->renderer, "assets/spike.png");
+    gs->spike_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/spike.png");
     if (!gs->spike_tex) fprintf(stderr, "Warning: Failed to load Spike.png: %s\n", IMG_GetError());
-    gs->spike_platform_tex = IMG_LoadTexture(gs->renderer, "assets/spike_platform.png");
+    gs->spike_platform_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/spike_platform.png");
     if (!gs->spike_platform_tex) fprintf(stderr, "Warning: Failed to load Spike_Platform.png: %s\n", IMG_GetError());
 
     /* ---- Load all sound effects ----------------------------------- */
-    gs->snd_spring = Mix_LoadWAV("sounds/bouncepad.wav");
+    gs->snd_spring = Mix_LoadWAV("assets/sounds/surfaces/bouncepad.wav");
     if (!gs->snd_spring) fprintf(stderr, "Warning: Failed to load bouncepad.mp3: %s\n", Mix_GetError());
 
     /*
@@ -226,7 +226,7 @@ void game_init(GameState *gs) {
      * Mix_LoadWAV handles WAV and, with SDL2_mixer ≥ 2.0, also MP3.
      * Non-fatal: gameplay continues without audio if loading fails.
      */
-    gs->snd_axe = Mix_LoadWAV("sounds/axe_trap.wav");
+    gs->snd_axe = Mix_LoadWAV("assets/sounds/hazards/axe_trap.wav");
     if (!gs->snd_axe) {
         fprintf(stderr, "Warning: Failed to load swinging-axe.mp3: %s\n", Mix_GetError());
     }
@@ -235,7 +235,7 @@ void game_init(GameState *gs) {
      * Load the bird flapping sound effect.
      * Non-fatal: gameplay continues without audio if loading fails.
      */
-    gs->snd_flap = Mix_LoadWAV("sounds/bird.wav");
+    gs->snd_flap = Mix_LoadWAV("assets/sounds/entities/bird.wav");
     if (!gs->snd_flap) {
         fprintf(stderr, "Warning: Failed to load flapping.wav: %s\n", Mix_GetError());
     }
@@ -244,7 +244,7 @@ void game_init(GameState *gs) {
      * Load the jumping spider attack sound effect.
      * Non-fatal: gameplay continues without audio if loading fails.
      */
-    gs->snd_spider_attack = Mix_LoadWAV("sounds/spider.wav");
+    gs->snd_spider_attack = Mix_LoadWAV("assets/sounds/entities/spider.wav");
     if (!gs->snd_spider_attack) {
         fprintf(stderr, "Warning: Failed to load spider-attack.mp3: %s\n", Mix_GetError());
     }
@@ -253,7 +253,7 @@ void game_init(GameState *gs) {
      * Load the dive/splash sound for falling into sea gaps.
      * Non-fatal: gameplay continues without audio if loading fails.
      */
-    gs->snd_dive = Mix_LoadWAV("sounds/fish.wav");
+    gs->snd_dive = Mix_LoadWAV("assets/sounds/entities/fish.wav");
     if (!gs->snd_dive) {
         fprintf(stderr, "Warning: Failed to load dive.wav: %s\n", Mix_GetError());
     }
@@ -263,7 +263,7 @@ void game_init(GameState *gs) {
      * Mix_Chunk that can be played on any available mixer channel.
      * Assets path is relative to where the binary is run (repo root).
      */
-    gs->snd_jump = Mix_LoadWAV("sounds/player_jump.wav");
+    gs->snd_jump = Mix_LoadWAV("assets/sounds/player/player_jump.wav");
     if (!gs->snd_jump) {
         fprintf(stderr, "Failed to load jump.wav: %s\n", Mix_GetError());
         SDL_DestroyTexture(gs->coin_tex);
@@ -281,7 +281,7 @@ void game_init(GameState *gs) {
      * Load the coin pickup SFX.
      * Non-fatal: if loading fails, gameplay continues without this effect.
      */
-    gs->snd_coin = Mix_LoadWAV("sounds/coin.wav");
+    gs->snd_coin = Mix_LoadWAV("assets/sounds/collectibles/coin.wav");
     if (!gs->snd_coin) {
         fprintf(stderr, "Warning: Failed to load coin.wav: %s\n", Mix_GetError());
     }
@@ -290,7 +290,7 @@ void game_init(GameState *gs) {
      * Load the player-hit SFX.
      * Non-fatal: if loading fails, gameplay continues without this effect.
      */
-    gs->snd_hit = Mix_LoadWAV("sounds/player_hit.wav");
+    gs->snd_hit = Mix_LoadWAV("assets/sounds/player/player_hit.wav");
     if (!gs->snd_hit) {
         fprintf(stderr, "Warning: Failed to load hit.wav: %s\n", Mix_GetError());
     }
@@ -363,7 +363,7 @@ void game_init(GameState *gs) {
                         def->floor_tile_path, IMG_GetError());
                 /* Fall back to default grass tileset */
                 gs->floor_tile = IMG_LoadTexture(gs->renderer,
-                                                 "assets/grass_tileset.png");
+                                                 "assets/sprites/levels/grass_tileset.png");
             }
         }
 
