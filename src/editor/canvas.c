@@ -127,6 +127,10 @@
 #define BLUE_FLAME_W       48
 #define BLUE_FLAME_H       48
 
+/* Fire flame — 48x48 display, erupts from sea gaps (fire variant) */
+#define FIRE_FLAME_W       48
+#define FIRE_FLAME_H       48
+
 /* Player spawn — full 48x48 idle frame */
 #define PLAYER_SPAWN_W     48
 #define PLAYER_SPAWN_H     48
@@ -198,6 +202,7 @@ static void render_yellow_stars(EditorState *es);
 static void render_last_star(EditorState *es);
 static void render_player_spawn(EditorState *es);
 static void render_blue_flames(EditorState *es);
+static void render_fire_flames(EditorState *es);
 static void render_fish(EditorState *es);
 static void render_faster_fish(EditorState *es);
 static void render_spike_blocks(EditorState *es);
@@ -312,6 +317,7 @@ void canvas_render(EditorState *es) {
 
     /* Hazards */
     render_blue_flames(es);
+    render_fire_flames(es);
     render_spike_blocks(es);
     render_axe_traps(es);
     render_circular_saws(es);
@@ -957,6 +963,30 @@ static void render_blue_flames(EditorState *es) {
     }
 }
 
+/* ---- Fire flames ------------------------------------------------- */
+
+/*
+ * render_fire_flames — Draw fire flame entities from placement data.
+ *
+ * Identical layout to render_blue_flames but uses the fire_flame texture
+ * and reads from the fire_flames placement array.
+ *
+ * x = gap_x + (SEA_GAP_W - FIRE_FLAME_W) / 2
+ * y = FLOOR_Y - FIRE_FLAME_H  (visible preview position above gap)
+ */
+static void render_fire_flames(EditorState *es) {
+    if (!es->textures.fire_flame) return;
+
+    for (int i = 0; i < es->level.fire_flame_count; i++) {
+        float gap_x = es->level.fire_flames[i].x;
+        float fx = gap_x + (float)(SEA_GAP_W - FIRE_FLAME_W) / 2.0f;
+        float fy = (float)(FLOOR_Y - FIRE_FLAME_H);
+
+        draw_tex(es, es->textures.fire_flame, NULL,
+                 fx, fy, FIRE_FLAME_W, FIRE_FLAME_H);
+    }
+}
+
 /* ---- Fish -------------------------------------------------------- */
 
 /*
@@ -1342,6 +1372,15 @@ static void render_selection(EditorState *es) {
         wh = BLUE_FLAME_H;
         break;
     }
+    case ENT_FIRE_FLAME: {
+        if (es->selection.index >= es->level.fire_flame_count) return;
+        float gap_x = es->level.fire_flames[es->selection.index].x;
+        wx = gap_x + (float)(SEA_GAP_W - FIRE_FLAME_W) / 2.0f;
+        wy = (float)(FLOOR_Y - FIRE_FLAME_H);
+        ww = FIRE_FLAME_W;
+        wh = FIRE_FLAME_H;
+        break;
+    }
     case ENT_FLOAT_PLATFORM: {
         if (es->selection.index >= es->level.float_platform_count) return;
         const FloatPlatformPlacement *fp =
@@ -1526,6 +1565,10 @@ static void render_ghost(EditorState *es) {
     case ENT_BLUE_FLAME:
         tex = es->textures.blue_flame;
         dw = BLUE_FLAME_W; dh = BLUE_FLAME_H;
+        break;
+    case ENT_FIRE_FLAME:
+        tex = es->textures.fire_flame;
+        dw = FIRE_FLAME_W; dh = FIRE_FLAME_H;
         break;
     case ENT_FLOAT_PLATFORM:
         tex = es->textures.float_platform;

@@ -111,6 +111,7 @@ typedef enum {
     ENT_SPIKE_PLATFORM,    /* elevated spike hazard surface                 */
     ENT_SPIKE_BLOCK,       /* rail-riding spike block                       */
     ENT_BLUE_FLAME,        /* erupting fire hazard from sea gaps            */
+    ENT_FIRE_FLAME,        /* erupting fire hazard (fire variant)           */
     ENT_FLOAT_PLATFORM,    /* hovering / crumble / rail platform            */
     ENT_BRIDGE,            /* tiled crumble walkway                         */
     ENT_BOUNCEPAD_SMALL,   /* green bouncepad (small jump)                  */
@@ -193,6 +194,7 @@ typedef struct {
     SDL_Texture *axe_trap;          /* axe hazard sprite sheet                      */
     SDL_Texture *circular_saw;      /* circular saw hazard sprite sheet             */
     SDL_Texture *blue_flame;        /* blue flame hazard sprite sheet               */
+    SDL_Texture *fire_flame;        /* fire flame hazard sprite sheet               */
     SDL_Texture *spike;             /* ground spike tile texture                    */
     SDL_Texture *spike_platform;    /* elevated spike surface texture               */
     SDL_Texture *spike_block;       /* rail-riding spike block texture              */

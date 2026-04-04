@@ -260,6 +260,9 @@ typedef struct {
     SDL_Texture  *blue_flame_tex;        /* shared texture for blue flame hazards */
     BlueFlame     blue_flames[MAX_BLUE_FLAMES]; /* erupting fire hazards from gaps */
     int           blue_flame_count;     /* number of blue flames placed        */
+    SDL_Texture  *fire_flame_tex;        /* shared texture for fire flame hazards */
+    BlueFlame     fire_flames[MAX_BLUE_FLAMES]; /* erupting fire hazards (fire variant) */
+    int           fire_flame_count;     /* number of fire flames placed        */
     SDL_Texture  *faster_fish_tex;       /* shared texture for faster fish     */
     FasterFish    faster_fish[MAX_FASTER_FISH]; /* fast jumping fish enemies   */
     int           faster_fish_count;     /* number of faster fish placed       */

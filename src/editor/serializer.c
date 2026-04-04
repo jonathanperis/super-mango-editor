@@ -409,6 +409,15 @@ cJSON *level_to_json(const LevelDef *def) {
         cJSON_AddItemToArray(bf_arr, obj);
     }
 
+    /* ---- Fire flames -------------------------------------------- */
+
+    cJSON *ff_arr = cJSON_AddArrayToObject(root, "fire_flames");
+    for (int i = 0; i < def->fire_flame_count; i++) {
+        cJSON *obj = cJSON_CreateObject();
+        cJSON_AddNumberToObject(obj, "x", def->fire_flames[i].x);
+        cJSON_AddItemToArray(ff_arr, obj);
+    }
+
     /* ---- Float platforms ----------------------------------------- */
 
     cJSON *fp_arr = cJSON_AddArrayToObject(root, "float_platforms");
@@ -795,6 +804,13 @@ int level_from_json(const cJSON *json, LevelDef *def) {
     PARSE_ARRAY("blue_flames", def->blue_flames, blue_flame_count,
                 MAX_BLUE_FLAMES, {
         def->blue_flames[idx].x = (float)get_number(elem, "x", 0);
+    });
+
+    /* ---- Fire flames -------------------------------------------- */
+
+    PARSE_ARRAY("fire_flames", def->fire_flames, fire_flame_count,
+                MAX_BLUE_FLAMES, {
+        def->fire_flames[idx].x = (float)get_number(elem, "x", 0);
     });
 
     /* ---- Float platforms ----------------------------------------- */
