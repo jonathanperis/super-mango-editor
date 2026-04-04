@@ -222,6 +222,9 @@ const LevelDef sandbox_00_def = {
     .rope_count = 1,
 
     /* ---- Level-wide configuration ---- */
+
+    .floor_tile_path = "assets/grass_tileset.png",
+
     .parallax_layers = {
         { "assets/parallax_sky.png", 0.00f },
         { "assets/parallax_clouds_bg.png", 0.08f },

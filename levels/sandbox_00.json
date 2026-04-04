@@ -228,14 +228,6 @@
 			"rail_index":	0,
 			"t_offset":	0,
 			"speed":	0
-		}, {
-			"mode":	"RAIL",
-			"x":	0,
-			"y":	0,
-			"tile_count":	3,
-			"rail_index":	1,
-			"t_offset":	14,
-			"speed":	2
 		}],
 	"bridges":	[{
 			"x":	1350,
