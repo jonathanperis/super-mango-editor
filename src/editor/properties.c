@@ -1065,20 +1065,11 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
 
     /* ---- World Width (screen count) ---- */
     ui_label(&es->ui, x + 8, y, "Screens:");
-    {
-        static const char *screen_opts[] = { "1", "2", "3", "4", "5", "6", "8", "10" };
-        static const int screen_vals[] = { 1, 2, 3, 4, 5, 6, 8, 10 };
-        static const int screen_opt_count = 8;
-
-        int sel = 3; /* default 4 */
-        for (int si = 0; si < screen_opt_count; si++) {
-            if (es->level.screen_count == screen_vals[si]) { sel = si; break; }
-        }
-        if (ui_dropdown(&es->ui, 9011, x + 80, y, 50,
-                         screen_opts, screen_opt_count, &sel)) {
-            es->level.screen_count = screen_vals[sel];
-            es->modified = 1;
-        }
+    if (ui_int_field(&es->ui, 9011, x + 80, y, 50, &es->level.screen_count)) {
+        /* Clamp to valid range 1-99 */
+        if (es->level.screen_count < 1)  es->level.screen_count = 1;
+        if (es->level.screen_count > 99) es->level.screen_count = 99;
+        es->modified = 1;
     }
     {
         char width_text[32];
@@ -1088,14 +1079,21 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
     }
     y += 24;
 
-    /* ---- Background Music ---- */
+    /* ---- Background Sound ---- */
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
-    ui_label(&es->ui, x + 8, y, "Background Music:");
+    ui_label(&es->ui, x + 8, y, "Background Sound:");
     {
-        static const char *music_names[] = { "(none)", "water.wav" };
-        static const char *music_paths[] = { "", "assets/sounds/levels/water.wav" };
-        static const int music_count = 2;
+        static const char *music_names[] = {
+            "(none)", "water.wav", "lava.wav", "winds.wav"
+        };
+        static const char *music_paths[] = {
+            "",
+            "assets/sounds/levels/water.wav",
+            "assets/sounds/levels/lava.wav",
+            "assets/sounds/levels/winds.wav"
+        };
+        static const int music_count = 4;
 
         int sel = 0;
         for (int i = 0; i < music_count; i++) {

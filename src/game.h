@@ -187,7 +187,7 @@ typedef struct {
     Mix_Chunk    *snd_jump;    /* WAV chunk for the jump sound effect         */
     Mix_Chunk    *snd_coin;    /* WAV chunk played when collecting a coin     */
     Mix_Chunk    *snd_hit;     /* WAV chunk played when player gets hurt      */
-    Mix_Music    *music;       /* MP3 stream for the looping background music */
+    Mix_Music    *music;       /* looping background sound (WAV/OGG)          */
     Player        player;      /* the player, stored by value (not a pointer) */
     Platform      platforms[MAX_PLATFORMS]; /* one-way pillar definitions     */
     int           platform_count;           /* how many platforms are active  */
