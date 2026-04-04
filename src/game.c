@@ -918,7 +918,7 @@ static void game_collide(GameState *gs, float dt)
                     Mix_PlayChannel(-1, gs->snd_coin, 0);
                 }
 
-                gs->score += COIN_SCORE;
+                gs->score += gs->coin_score;
                 if (gs->debug_mode) debug_log(&gs->debug, "COIN [%d] score=%d", i, gs->score);
 
                 /*

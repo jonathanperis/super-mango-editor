@@ -184,6 +184,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
     fprintf(fp, "initial_hearts = %d\n", def->initial_hearts);
     fprintf(fp, "initial_lives = %d\n", def->initial_lives);
     fprintf(fp, "score_per_life = %d\n", def->score_per_life);
+    fprintf(fp, "coin_score = %d\n", def->coin_score);
 
     /* ---- Floor gaps (plain integer array) ------------------------- */
 
@@ -937,6 +938,7 @@ int level_load_toml(const char *path, LevelDef *def) {
     def->initial_hearts = get_int(top, "initial_hearts", 0);
     def->initial_lives  = get_int(top, "initial_lives", 0);
     def->score_per_life = get_int(top, "score_per_life", 0);
+    def->coin_score     = get_int(top, "coin_score", 0);
 
     /*
      * toml_free — release all memory allocated by toml_parse_file_ex.
