@@ -601,8 +601,8 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                     var_name = name_buf;
                 }
 
-                if (level_export_c(&es->level, var_name, "src/levels") == 0) {
-                    fprintf(stderr, "Exported to src/levels/%s.h/.c\n",
+                if (level_export_c(&es->level, var_name, "src/levels/exported") == 0) {
+                    fprintf(stderr, "Exported to src/levels/exported/%s.h/.c\n",
                             var_name);
                 } else {
                     fprintf(stderr, "Error: export failed for '%s'\n",
@@ -1585,8 +1585,8 @@ static void render_toolbar(EditorState *es) {
             var_name = name_buf;
         }
 
-        if (level_export_c(&es->level, var_name, "src/levels") == 0) {
-            fprintf(stderr, "Exported to src/levels/%s.h/.c\n", var_name);
+        if (level_export_c(&es->level, var_name, "src/levels/exported") == 0) {
+            fprintf(stderr, "Exported to src/levels/exported/%s.h/.c\n", var_name);
         } else {
             fprintf(stderr, "Error: export failed for '%s'\n", var_name);
         }

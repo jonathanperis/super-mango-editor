@@ -105,7 +105,7 @@ static int write_header(const char *var_name, const char *dir_path)
 {
     /*
      * snprintf — build the full file path into a stack buffer.
-     * 512 bytes is generous for typical paths like "src/levels/level_02.h".
+     * 512 bytes is generous for typical paths like "src/levels/exported/level_02.h".
      */
     char path[512];
     snprintf(path, sizeof(path), "%s/%s.h", dir_path, var_name);
@@ -127,7 +127,7 @@ static int write_header(const char *var_name, const char *dir_path)
      *   extern const LevelDef {var_name}_def;
      */
     fprintf(f, "#pragma once\n\n");
-    fprintf(f, "#include \"level.h\"\n\n");
+    fprintf(f, "#include \"../level.h\"\n\n");
     fprintf(f, "extern const LevelDef %s_def;\n", var_name);
 
     fclose(f);
@@ -168,23 +168,23 @@ static int write_source(const LevelDef *def, const char *var_name,
      */
     fprintf(f, "#include \"%s.h\"\n\n", var_name);
     fprintf(f, "/* Pull in entity constants needed for SPEED / VY / MODE values */\n");
-    fprintf(f, "#include \"../entities/spider.h\"         /* SPIDER_SPEED */\n");
-    fprintf(f, "#include \"../entities/jumping_spider.h\" /* JSPIDER_SPEED */\n");
-    fprintf(f, "#include \"../entities/bird.h\"           /* BIRD_SPEED */\n");
-    fprintf(f, "#include \"../entities/faster_bird.h\"    /* FBIRD_SPEED */\n");
-    fprintf(f, "#include \"../entities/fish.h\"           /* FISH_SPEED */\n");
-    fprintf(f, "#include \"../entities/faster_fish.h\"    /* FFISH_SPEED */\n");
-    fprintf(f, "#include \"../collectibles/coin.h\"       /* COIN_DISPLAY_W, COIN_DISPLAY_H */\n");
-    fprintf(f, "#include \"../collectibles/yellow_star.h\"/* YELLOW_STAR_DISPLAY_W/H */\n");
-    fprintf(f, "#include \"../collectibles/last_star.h\"  /* LAST_STAR_DISPLAY_W/H */\n");
-    fprintf(f, "#include \"../surfaces/bouncepad.h\"      /* BOUNCEPAD_VY_*, BouncepadType */\n");
-    fprintf(f, "#include \"../hazards/axe_trap.h\"        /* AxeTrapMode */\n");
-    fprintf(f, "#include \"../hazards/circular_saw.h\"    /* SAW_DISPLAY_W/H */\n");
-    fprintf(f, "#include \"../hazards/spike.h\"           /* SPIKE_TILE_H */\n");
-    fprintf(f, "#include \"../hazards/spike_block.h\"     /* SPIKE_SPEED_* */\n");
-    fprintf(f, "#include \"../surfaces/float_platform.h\" /* FLOAT_PLATFORM_*, CRUMBLE_STAND_LIMIT */\n");
-    fprintf(f, "#include \"../surfaces/vine.h\"           /* VINE_W */\n");
-    fprintf(f, "#include \"../game.h\"                    /* FLOOR_Y, TILE_SIZE, GAME_H */\n");
+    fprintf(f, "#include \"../../entities/spider.h\"         /* SPIDER_SPEED */\n");
+    fprintf(f, "#include \"../../entities/jumping_spider.h\" /* JSPIDER_SPEED */\n");
+    fprintf(f, "#include \"../../entities/bird.h\"           /* BIRD_SPEED */\n");
+    fprintf(f, "#include \"../../entities/faster_bird.h\"    /* FBIRD_SPEED */\n");
+    fprintf(f, "#include \"../../entities/fish.h\"           /* FISH_SPEED */\n");
+    fprintf(f, "#include \"../../entities/faster_fish.h\"    /* FFISH_SPEED */\n");
+    fprintf(f, "#include \"../../collectibles/coin.h\"       /* COIN_DISPLAY_W, COIN_DISPLAY_H */\n");
+    fprintf(f, "#include \"../../collectibles/yellow_star.h\"/* YELLOW_STAR_DISPLAY_W/H */\n");
+    fprintf(f, "#include \"../../collectibles/last_star.h\"  /* LAST_STAR_DISPLAY_W/H */\n");
+    fprintf(f, "#include \"../../surfaces/bouncepad.h\"      /* BOUNCEPAD_VY_*, BouncepadType */\n");
+    fprintf(f, "#include \"../../hazards/axe_trap.h\"        /* AxeTrapMode */\n");
+    fprintf(f, "#include \"../../hazards/circular_saw.h\"    /* SAW_DISPLAY_W/H */\n");
+    fprintf(f, "#include \"../../hazards/spike.h\"           /* SPIKE_TILE_H */\n");
+    fprintf(f, "#include \"../../hazards/spike_block.h\"     /* SPIKE_SPEED_* */\n");
+    fprintf(f, "#include \"../../surfaces/float_platform.h\" /* FLOAT_PLATFORM_*, CRUMBLE_STAND_LIMIT */\n");
+    fprintf(f, "#include \"../../surfaces/vine.h\"           /* VINE_W */\n");
+    fprintf(f, "#include \"../../game.h\"                    /* FLOOR_Y, TILE_SIZE, GAME_H */\n");
 
     /* ---- Open the LevelDef definition ---- */
     fprintf(f, "\n/* ------------------------------------------------------------------ */\n\n");

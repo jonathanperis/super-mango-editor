@@ -59,6 +59,8 @@ dkms.conf
 
 # Generated files
 .DS_Store
+src/levels/exported/*.c
+src/levels/exported/*.h
 
 # Docs generation
 wiki/

@@ -141,7 +141,7 @@ WEB_FLAGS = -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='["png"]' \
             -s USE_SDL_TTF=2 -s USE_SDL_MIXER=2 \
             -s SDL2_MIXER_FORMATS='["wav"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
-            --preload-file assets --preload-file sounds \
+            --preload-file assets \
             --shell-file web/shell.html
 
 web: $(OUTDIR)
