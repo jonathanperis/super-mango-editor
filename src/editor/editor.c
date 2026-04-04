@@ -867,6 +867,13 @@ static void handle_event(EditorState *es, SDL_Event *event) {
         int mx, my;
         SDL_GetMouseState(&mx, &my);
 
+        /* Right panel scroll — when cursor is over the right column */
+        if (mx >= CANVAS_W && my > TOOLBAR_H && my < EDITOR_H - STATUS_H) {
+            es->panel_scroll -= event->wheel.y * 20;
+            if (es->panel_scroll < 0) es->panel_scroll = 0;
+            break;
+        }
+
         /* Hit test: cursor must be inside the canvas rectangle */
         if (mx < CANVAS_W && my > TOOLBAR_H && my < EDITOR_H - STATUS_H) {
             int ctrl_held = (SDL_GetModState() & KMOD_CTRL) != 0;

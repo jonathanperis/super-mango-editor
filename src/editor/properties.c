@@ -15,6 +15,7 @@
  * to track which widget is actively being edited.
  */
 
+#include <SDL.h>        /* SDL_Rect, SDL_RenderSetClipRect       */
 #include <stdio.h>      /* snprintf for header label formatting */
 #include <string.h>     /* strrchr for filename extraction       */
 
@@ -151,6 +152,10 @@ void properties_render(EditorState *es)
      */
     ui_panel(&es->ui, PROP_X, PROP_Y, PROP_W, PROP_H);
 
+    /* Clip rendering to the panel bounds so scrolled content doesn't bleed */
+    SDL_Rect clip = { PROP_X, PROP_Y, PROP_W, PROP_H };
+    SDL_RenderSetClipRect(es->ui.renderer, &clip);
+
     /* ---- Header: entity type name + array index --------------------- */
 
     /*
@@ -180,7 +185,7 @@ void properties_render(EditorState *es)
      * y — cursor tracking the current vertical drawing position.
      * Advances by ROW_H after each field so rows stack top-to-bottom.
      */
-    int y = PROP_Y + ROW_H + 8;
+    int y = PROP_Y + ROW_H + 8 - es->panel_scroll;
 
     /* ---- Per-type field rendering ----------------------------------- */
 
@@ -917,6 +922,9 @@ void properties_render(EditorState *es)
     case ENT_COUNT:
         break;
     }
+
+    /* Remove the clip rect so other rendering is not affected */
+    SDL_RenderSetClipRect(es->ui.renderer, NULL);
 }
 
 /* ================================================================== */
@@ -939,7 +947,12 @@ void level_config_render(EditorState *es) {
 
     /* Panel background */
     ui_panel(&es->ui, x, y, PROP_W, PROP_H);
-    y += 4;
+
+    /* Clip rendering to panel bounds for scrolling */
+    SDL_Rect cfg_clip = { PROP_X, PROP_Y, PROP_W, PROP_H };
+    SDL_RenderSetClipRect(es->ui.renderer, &cfg_clip);
+
+    y += 4 - es->panel_scroll;
 
     /* Header */
     ui_label_color(&es->ui, x + 8, y, "LEVEL CONFIG", UI_ACCENT);
@@ -1024,7 +1037,7 @@ void level_config_render(EditorState *es) {
 
     /* Show each parallax layer's path and speed (both editable) */
     for (int i = 0; i < es->level.parallax_layer_count && i < PARALLAX_MAX_LAYERS; i++) {
-        if (y + 40 > PROP_Y + PROP_H - 4) break;  /* clip if out of panel */
+        /* Scrolling handles overflow — no need to clip here */
 
         char label[16];
         snprintf(label, sizeof(label), "%d:", i);
@@ -1045,7 +1058,7 @@ void level_config_render(EditorState *es) {
 
     /* Button to add a layer */
     if (es->level.parallax_layer_count < PARALLAX_MAX_LAYERS) {
-        if (y + 22 < PROP_Y + PROP_H - 4) {
+        {
             if (ui_button(&es->ui, x + 8, y, 100, 20, "+ Add Layer")) {
                 int idx = es->level.parallax_layer_count;
                 strncpy(es->level.parallax_layers[idx].path, "assets/sprites/effects/", 63);
@@ -1055,4 +1068,7 @@ void level_config_render(EditorState *es) {
             }
         }
     }
+
+    /* Remove the clip rect */
+    SDL_RenderSetClipRect(es->ui.renderer, NULL);
 }

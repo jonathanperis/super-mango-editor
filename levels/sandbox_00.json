@@ -219,6 +219,15 @@
 			"t_offset":	0,
 			"speed":	6
 		}],
+	"blue_flames":	[{
+			"x":	192
+		}, {
+			"x":	560
+		}, {
+			"x":	928
+		}, {
+			"x":	1152
+		}],
 	"float_platforms":	[{
 			"mode":	"STATIC",
 			"x":	172,
