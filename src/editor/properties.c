@@ -53,6 +53,9 @@
 #define CONTENT_X  (PROP_X + 8)
 #define FIELD_X    (CONTENT_X + LABEL_W)
 
+/* Parallax subsection collapse state — accessed by editor.c for layout */
+int g_plx_open = 0;
+
 /* ------------------------------------------------------------------ */
 /* Human-readable entity type names                                    */
 /* ------------------------------------------------------------------ */
@@ -284,6 +287,12 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "tile_height:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_PLATFORM, 1),
                          FIELD_X, y, FIELD_W, &p->tile_height))
+            es->modified = 1;
+        y += ROW_H;
+
+        ui_label(&es->ui, CONTENT_X, y, "tile_width:");
+        if (ui_int_field(&es->ui, FIELD_ID(ENT_PLATFORM, 2),
+                         FIELD_X, y, FIELD_W, &p->tile_width))
             es->modified = 1;
         break;
     }
@@ -996,10 +1005,6 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
 
     if (!es->config_open) return;
 
-    /* Clip content below the title bar so it doesn't overflow */
-    SDL_Rect cfg_clip = { x, y + ROW_H + 4, PROP_W, cfg_h - ROW_H - 4 };
-    SDL_RenderSetClipRect(es->ui.renderer, &cfg_clip);
-
     y += ROW_H + 8;
 
     /* ---- Level name ---- */
@@ -1009,15 +1014,55 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
         es->modified = 1;
     y += 24;
 
-    /* ---- Music ---- */
+    /* ---- World Width (screen count) ---- */
+    ui_label(&es->ui, x + 8, y, "Screens:");
+    {
+        static const char *screen_opts[] = { "1", "2", "3", "4", "5", "6", "8", "10" };
+        static const int screen_vals[] = { 1, 2, 3, 4, 5, 6, 8, 10 };
+        static const int screen_opt_count = 8;
+
+        int sel = 3; /* default 4 */
+        for (int si = 0; si < screen_opt_count; si++) {
+            if (es->level.screen_count == screen_vals[si]) { sel = si; break; }
+        }
+        if (ui_dropdown(&es->ui, 9011, x + 80, y, 50,
+                         screen_opts, screen_opt_count, &sel)) {
+            es->level.screen_count = screen_vals[sel];
+            es->modified = 1;
+        }
+    }
+    {
+        char width_text[32];
+        snprintf(width_text, sizeof(width_text), "= %dpx",
+                 es->level.screen_count * GAME_W);
+        ui_label_color(&es->ui, x + 140, y, width_text, UI_TEXT_DIM);
+    }
+    y += 24;
+
+    /* ---- Background Music ---- */
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
-    ui_label(&es->ui, x + 8, y, "Music");
-    y += 18;
-    ui_label(&es->ui, x + 8, y, "path:");
-    if (ui_text_field(&es->ui, 9009, x + 50, y, 320, es->level.music_path,
-                      (int)sizeof(es->level.music_path)))
-        es->modified = 1;
+    ui_label(&es->ui, x + 8, y, "Background Music:");
+    {
+        static const char *music_names[] = { "(none)", "game_music.ogg" };
+        static const char *music_paths[] = { "", "assets/sounds/levels/game_music.ogg" };
+        static const int music_count = 2;
+
+        int sel = 0;
+        for (int i = 0; i < music_count; i++) {
+            if (strcmp(es->level.music_path, music_paths[i]) == 0) {
+                sel = i;
+                break;
+            }
+        }
+        if (ui_dropdown(&es->ui, 9009, x + 160, y, 210,
+                         music_names, music_count, &sel)) {
+            strncpy(es->level.music_path, music_paths[sel],
+                    sizeof(es->level.music_path) - 1);
+            es->level.music_path[sizeof(es->level.music_path) - 1] = '\0';
+            es->modified = 1;
+        }
+    }
     y += 22;
     ui_label(&es->ui, x + 8, y, "vol:");
     if (ui_int_field(&es->ui, 9003, x + 50, y, 80, &es->level.music_volume))
@@ -1087,47 +1132,95 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
         es->modified = 1;
     y += 24;
 
-    /* ---- Parallax layers ---- */
+    /* ---- Parallax layers (collapsible subsection) ---- */
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
     {
         char plx_header[48];
-        snprintf(plx_header, sizeof(plx_header), "Parallax (%d layers)",
+        snprintf(plx_header, sizeof(plx_header), "%s Parallax (%d layers)",
+                 g_plx_open ? "v" : ">",
                  es->level.parallax_layer_count);
-        ui_label(&es->ui, x + 8, y, plx_header);
-    }
-    y += 18;
 
-    /* Show each parallax layer's path and speed (both editable) */
+        int plx_hovered = (es->ui.mouse_x >= x &&
+                           es->ui.mouse_x < x + PROP_W &&
+                           es->ui.mouse_y >= y &&
+                           es->ui.mouse_y < y + 18);
+        if (plx_hovered && es->ui.mouse_clicked)
+            g_plx_open = !g_plx_open;
+
+        ui_label_color(&es->ui, x + 8, y, plx_header,
+                       plx_hovered ? UI_TEXT : UI_TEXT_DIM);
+        y += 18;
+
+        if (!g_plx_open) goto plx_done;
+    }
+
+    /* Parallax asset dropdown options */
+    static const char *plx_names[] = {
+        "parallax_sky.png",
+        "parallax_clouds_bg.png",
+        "parallax_glacial_mountains.png",
+        "parallax_clouds_mg_3.png",
+        "parallax_clouds_mg_2.png",
+        "parallax_cloud_lonely.png",
+        "parallax_clouds_mg_1.png"
+    };
+    static const char *plx_paths[] = {
+        "assets/sprites/effects/parallax_sky.png",
+        "assets/sprites/effects/parallax_clouds_bg.png",
+        "assets/sprites/effects/parallax_glacial_mountains.png",
+        "assets/sprites/effects/parallax_clouds_mg_3.png",
+        "assets/sprites/effects/parallax_clouds_mg_2.png",
+        "assets/sprites/effects/parallax_cloud_lonely.png",
+        "assets/sprites/effects/parallax_clouds_mg_1.png"
+    };
+    static const int plx_opt_count = 7;
+
     for (int i = 0; i < es->level.parallax_layer_count && i < PARALLAX_MAX_LAYERS; i++) {
         char label[16];
         snprintf(label, sizeof(label), "%d:", i);
         ui_label(&es->ui, x + 8, y, label);
 
-        /* Editable path field */
-        if (ui_text_field(&es->ui, 9200 + i, x + 28, y, 250,
-                          es->level.parallax_layers[i].path,
-                          (int)sizeof(es->level.parallax_layers[i].path)))
+        /* Dropdown for parallax asset */
+        int sel = 0;
+        for (int j = 0; j < plx_opt_count; j++) {
+            if (strcmp(es->level.parallax_layers[i].path, plx_paths[j]) == 0) {
+                sel = j;
+                break;
+            }
+        }
+        if (ui_dropdown(&es->ui, 9200 + i, x + 28, y, 200,
+                         plx_names, plx_opt_count, &sel)) {
+            strncpy(es->level.parallax_layers[i].path, plx_paths[sel],
+                    sizeof(es->level.parallax_layers[i].path) - 1);
+            es->level.parallax_layers[i].path[sizeof(es->level.parallax_layers[i].path) - 1] = '\0';
             es->modified = 1;
+        }
 
         /* Speed field */
-        ui_label(&es->ui, x + 286, y, "spd:");
-        if (ui_float_field(&es->ui, 9100 + i, x + 315, y, 60, &es->level.parallax_layers[i].speed))
+        ui_label(&es->ui, x + 236, y, "spd:");
+        if (ui_float_field(&es->ui, 9100 + i, x + 265, y, 60, &es->level.parallax_layers[i].speed))
             es->modified = 1;
         y += 20;
     }
 
-    /* Button to add a layer */
+    /* Buttons to add / remove layers */
     if (es->level.parallax_layer_count < PARALLAX_MAX_LAYERS) {
-        if (ui_button(&es->ui, x + 8, y, 100, 20, "+ Add Layer")) {
+        if (ui_button(&es->ui, x + 8, y, 80, 20, "+ Add")) {
             int idx = es->level.parallax_layer_count;
-            strncpy(es->level.parallax_layers[idx].path, "assets/sprites/effects/", 63);
+            strncpy(es->level.parallax_layers[idx].path, "assets/sprites/effects/parallax_sky.png", 63);
             es->level.parallax_layers[idx].speed = 0.1f;
             es->level.parallax_layer_count++;
             es->modified = 1;
         }
     }
+    if (es->level.parallax_layer_count > 0) {
+        if (ui_button(&es->ui, x + 96, y, 100, 20, "- Remove Last")) {
+            es->level.parallax_layer_count--;
+            es->modified = 1;
+        }
+    }
 
-    /* Remove clip rect so other sections are not affected */
-    SDL_RenderSetClipRect(es->ui.renderer, NULL);
+plx_done:
+    (void)0;  /* label requires a statement */
 }

@@ -240,8 +240,8 @@ static int write_source(const LevelDef *def, const char *var_name,
         fprintf(f, "    .platforms = {\n");
         for (int i = 0; i < def->platform_count; i++) {
             const PlatformPlacement *p = &def->platforms[i];
-            fprintf(f, "        { .x = %.1ff, .tile_height = %d },\n",
-                    p->x, p->tile_height);
+            fprintf(f, "        { .x = %.1ff, .tile_height = %d, .tile_width = %d },\n",
+                    p->x, p->tile_height, p->tile_width);
         }
         fprintf(f, "    },\n");
     }

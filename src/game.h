@@ -286,6 +286,7 @@ typedef struct {
     const void   *current_level;    /* pointer to the active LevelDef          */
     int           fog_enabled;      /* 1 = fog rendering active, 0 = disabled  */
     int           water_enabled;    /* 1 = water strip rendered, 0 = disabled  */
+    int           world_w;         /* level width in pixels (screen_count * GAME_W) */
     int           score_per_life;   /* score threshold for bonus life           */
 
     /* ---- Loop state (persists across frames for emscripten callback) - */

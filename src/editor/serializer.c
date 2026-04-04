@@ -169,6 +169,7 @@ cJSON *level_to_json(const LevelDef *def) {
      */
     cJSON_AddStringToObject(root, "name",
                             def->name[0] ? def->name : "Untitled");
+    cJSON_AddNumberToObject(root, "screen_count", def->screen_count);
 
     /* ---- Sea gaps ------------------------------------------------ */
 
@@ -215,6 +216,7 @@ cJSON *level_to_json(const LevelDef *def) {
         cJSON *obj = cJSON_CreateObject();
         cJSON_AddNumberToObject(obj, "x", p->x);
         cJSON_AddNumberToObject(obj, "tile_height", p->tile_height);
+        cJSON_AddNumberToObject(obj, "tile_width", p->tile_width);
         cJSON_AddItemToArray(plat_arr, obj);
     }
 
@@ -601,6 +603,7 @@ int level_from_json(const cJSON *json, LevelDef *def) {
     const char *name_str = get_string(json, "name", "Untitled");
     strncpy(def->name, name_str, sizeof(def->name) - 1);
     def->name[sizeof(def->name) - 1] = '\0';
+    def->screen_count = (int)get_number(json, "screen_count", 4);
 
     /* ---- Sea gaps ------------------------------------------------ */
 
@@ -643,6 +646,7 @@ int level_from_json(const cJSON *json, LevelDef *def) {
     PARSE_ARRAY("platforms", def->platforms, platform_count, MAX_PLATFORMS, {
         def->platforms[idx].x           = (float)get_number(elem, "x", 0);
         def->platforms[idx].tile_height = (int)get_number(elem, "tile_height", 1);
+        def->platforms[idx].tile_width  = (int)get_number(elem, "tile_width", 1);
     });
 
     /* ---- Coins --------------------------------------------------- */

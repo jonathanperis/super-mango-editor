@@ -1045,7 +1045,7 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
 
             /* World boundaries */
             if (tx <= 0)                at_left_edge  = 1;
-            if (tx + P >= WORLD_W)      at_right_edge = 1;
+            if (tx + P >= gs->world_w)  at_right_edge = 1;
 
             /* Gap boundaries: piece is a right-cap if next piece is gap,
              * left-cap if previous piece was gap. */
@@ -1605,7 +1605,7 @@ static void game_loop_frame(void *arg) {
          * walks freely within the screen until facing back toward open space.
          */
         if (cam_target < 0.0f)               cam_target = 0.0f;
-        if (cam_target > WORLD_W - GAME_W)   cam_target = (float)(WORLD_W - GAME_W);
+        if (cam_target > gs->world_w - GAME_W) cam_target = (float)(gs->world_w - GAME_W);
 
         /*
          * Smooth follow: close a fraction of the remaining gap each frame.

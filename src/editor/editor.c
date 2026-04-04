@@ -173,6 +173,7 @@ int editor_init(EditorState *es) {
     es->show_grid    = 1;
     es->panel_open   = 1;
     es->config_open  = 1;
+    es->palette_open = 1;
 
     /* ---- Undo stack ------------------------------------------------- */
     /*
@@ -220,6 +221,7 @@ int editor_init(EditorState *es) {
     strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
 
     /* Sensible defaults so new levels have a visible player and last star */
+    es->level.screen_count = 4;
     es->level.player_start_x = 48.0f;
     es->level.player_start_y = 205.0f;
     es->level.last_star.x = 145.0f;
@@ -452,11 +454,21 @@ void editor_loop(EditorState *es) {
                 int right_bottom = EDITOR_H - STATUS_H;
                 int section_hdr  = 28;  /* matches palette TITLE_H */
 
-                /* Section 1: Level Config */
+                /* Section 1: Level Config — height fits all content exactly */
                 int config_y = right_top;
                 int config_h;
                 if (es->config_open) {
-                    config_h = 220;  /* enough for all config fields */
+                    /* Base: header(28) + margin(8) + name(24) + screens(24)
+                     * + music(24+22+24) + floor(30) + fog/water(30)
+                     * + game rules(24+22+24) + parallax header(24)
+                     * + bottom margin(10) */
+                    extern int g_plx_open;
+                    config_h = 28 + 8 + 24 + 24 + 24 + 22 + 24 + 30 + 30
+                             + 24 + 22 + 24 + 24 + 10;
+                    if (g_plx_open) {
+                        /* Add layers(20 each) + add button(20) */
+                        config_h += es->level.parallax_layer_count * 20 + 20;
+                    }
                 } else {
                     config_h = section_hdr;
                 }
@@ -467,10 +479,16 @@ void editor_loop(EditorState *es) {
                     props_h = es->panel_open ? 200 : section_hdr;
                 }
 
-                /* Section 2: Palette gets remaining space */
+                /* Section 2: Palette */
                 int palette_y = config_y + config_h;
-                int palette_h = right_bottom - palette_y - props_h;
-                if (palette_h < section_hdr) palette_h = section_hdr;
+                int palette_h;
+                if (es->palette_open) {
+                    /* Palette gets remaining space minus properties */
+                    palette_h = right_bottom - palette_y - props_h;
+                    if (palette_h < section_hdr + 50) palette_h = section_hdr + 50;
+                } else {
+                    palette_h = section_hdr;  /* just the header */
+                }
 
                 /* Section 3: Properties (positioned after palette) */
                 int props_y = palette_y + palette_h;
@@ -957,16 +975,18 @@ static void handle_event(EditorState *es, SDL_Event *event) {
             int ctrl_held = (SDL_GetModState() & KMOD_CTRL) != 0;
 
             if (ctrl_held) {
-                /* Ctrl + scroll → zoom */
-                if (event->wheel.y > 0) {
-                    if (es->camera.zoom < 1.5f)      es->camera.zoom = 2.0f;
-                    else if (es->camera.zoom < 3.0f)  es->camera.zoom = 4.0f;
-                    else                               es->camera.zoom = 1.0f;
-                } else if (event->wheel.y < 0) {
-                    if (es->camera.zoom > 3.0f)       es->camera.zoom = 2.0f;
-                    else if (es->camera.zoom > 1.5f)  es->camera.zoom = 1.0f;
-                    else                               es->camera.zoom = 4.0f;
+                /* Ctrl + scroll → cycle zoom: 1x → 2x → 3x → 5x */
+                static const float zooms[] = { 1.0f, 2.0f, 3.0f, 5.0f };
+                static const int zoom_count = 4;
+                int cur = 1; /* default to 2x index */
+                for (int zi = 0; zi < zoom_count; zi++) {
+                    if (es->camera.zoom == zooms[zi]) { cur = zi; break; }
                 }
+                if (event->wheel.y > 0)
+                    cur = (cur + 1) % zoom_count;
+                else if (event->wheel.y < 0)
+                    cur = (cur - 1 + zoom_count) % zoom_count;
+                es->camera.zoom = zooms[cur];
             } else {
                 /*
                  * Scroll → horizontal pan.
@@ -983,8 +1003,8 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                 es->camera.x -= event->wheel.y * scroll_step;
 
                 /* Clamp camera to world boundaries */
-                float max_x = (float)WORLD_W
-                            - (float)CANVAS_W / es->camera.zoom;
+                int eww = (es->level.screen_count > 0 ? es->level.screen_count : 4) * GAME_W;
+                float max_x = (float)eww - (float)CANVAS_W / es->camera.zoom;
                 if (es->camera.x < 0.0f) es->camera.x = 0.0f;
                 if (es->camera.x > max_x) es->camera.x = max_x;
             }
@@ -1642,25 +1662,29 @@ static void render_toolbar(EditorState *es) {
         SDL_RenderFillRect(es->renderer, &underline);
     }
 
-    /* ---- Zoom display ----------------------------------------------- */
-    /*
-     * Show the current zoom level as "Zoom: Nx" in the middle-left area.
-     * This is a read-only label — zoom changes via the scroll wheel.
-     */
-    bx += bw + 20;
-    char zoom_text[32];
-    snprintf(zoom_text, sizeof(zoom_text), "Zoom: %dx", (int)es->camera.zoom);
-    ui_label(&es->ui, bx, by + 4, zoom_text);
-
     /* ---- Grid toggle button ----------------------------------------- */
-    /*
-     * A compact button that shows the current grid state.
-     * Clicking toggles show_grid (same as pressing 'G').
-     */
-    bx += 90;
+    bx += bw + 20;
     const char *grid_label = es->show_grid ? "[Grid]" : " Grid ";
     if (ui_button(&es->ui, bx, by, 56, bh, grid_label)) {
         es->show_grid ^= 1;
+    }
+
+    /* ---- Zoom dropdown ---------------------------------------------- */
+    bx += 60;
+    {
+        static const char *zoom_opts[] = { "1x", "2x", "3x", "5x" };
+        static const float zoom_vals[] = { 1.0f, 2.0f, 3.0f, 5.0f };
+        static const int zoom_count = 4;
+
+        int sel = 1;
+        for (int zi = 0; zi < zoom_count; zi++) {
+            if (es->camera.zoom == zoom_vals[zi]) { sel = zi; break; }
+        }
+        ui_label(&es->ui, bx, by + 4, "Zoom:");
+        if (ui_dropdown(&es->ui, 8888, bx + 48, by + 2, 44,
+                         zoom_opts, zoom_count, &sel)) {
+            es->camera.zoom = zoom_vals[sel];
+        }
     }
 
     /* ---- File and play buttons (right-aligned) ------------------------ */
