@@ -99,7 +99,8 @@ void player_update(Player *player, float dt,
                    const int *floor_gaps, int floor_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
-                   int prev_fp_landed_idx);
+                   int prev_fp_landed_idx,
+                   int world_w);
 
 /* Draw the player sprite at its current position, offset by the camera. */
 void player_render(Player *player, SDL_Renderer *renderer, int cam_x);
