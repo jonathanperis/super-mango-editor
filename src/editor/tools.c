@@ -1641,7 +1641,7 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
         ny = (float)((int)(ny / TILE_SIZE) * TILE_SIZE);
     }
 
-    /* Clamp to world bounds so entities can't be dragged off-screen */
+    /* Clamp to world bounds — keep entity within the level area */
     if (nx < 0.0f) nx = 0.0f;
     if (nx > (float)WORLD_W) nx = (float)WORLD_W;
     if (ny < 0.0f) ny = 0.0f;

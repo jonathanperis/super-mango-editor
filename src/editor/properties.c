@@ -175,11 +175,7 @@ void properties_render(EditorState *es)
     /* If collapsed, just show the header */
     if (!es->panel_open) return;
 
-    /* Clip rendering to the panel bounds so scrolled content doesn't bleed */
-    SDL_Rect clip = { PROP_X, PROP_Y + ROW_H + 4, PROP_W, PROP_H - ROW_H - 4 };
-    SDL_RenderSetClipRect(es->ui.renderer, &clip);
-
-    int y = PROP_Y + ROW_H + 8 - es->panel_scroll;
+    int y = PROP_Y + ROW_H + 8;
 
     /* ---- Per-type field rendering ----------------------------------- */
 
@@ -917,8 +913,6 @@ void properties_render(EditorState *es)
         break;
     }
 
-    /* Remove the clip rect so other rendering is not affected */
-    SDL_RenderSetClipRect(es->ui.renderer, NULL);
 }
 
 /* ================================================================== */
@@ -960,11 +954,7 @@ void level_config_render(EditorState *es) {
 
     if (!es->panel_open) return;
 
-    /* Clip rendering to panel bounds for scrolling */
-    SDL_Rect cfg_clip = { PROP_X, PROP_Y + ROW_H + 4, PROP_W, PROP_H - ROW_H - 4 };
-    SDL_RenderSetClipRect(es->ui.renderer, &cfg_clip);
-
-    y += ROW_H + 8 - es->panel_scroll;
+    y += ROW_H + 8;
 
     /* ---- Level name ---- */
     ui_label(&es->ui, x + 8, y, "Name:");
@@ -1075,6 +1065,4 @@ void level_config_render(EditorState *es) {
         }
     }
 
-    /* Remove the clip rect */
-    SDL_RenderSetClipRect(es->ui.renderer, NULL);
 }

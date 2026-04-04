@@ -18,7 +18,7 @@
 
 /* ---- Constants ---------------------------------------------------------- */
 
-#define MAX_FASTER_BIRDS     4
+#define MAX_FASTER_BIRDS    16
 #define FBIRD_FRAMES         3       /* animation frames in the sheet         */
 #define FBIRD_FRAME_W        48      /* width  of one frame slot (px)         */
 #define FBIRD_ART_X          17      /* first visible col within each frame   */

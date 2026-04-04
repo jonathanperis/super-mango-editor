@@ -61,7 +61,7 @@
 
 /* ------------------------------------------------------------------ */
 
-#define MAX_CIRCULAR_SAWS  4  /* max CircularSaw instances in one level */
+#define MAX_CIRCULAR_SAWS 16  /* max CircularSaw instances in one level */
 
 /*
  * CircularSaw — a fast rotating hazard that patrols a horizontal line.

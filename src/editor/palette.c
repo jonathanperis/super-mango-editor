@@ -367,9 +367,13 @@ void palette_render(EditorState *es)
 
     /*
      * content_top — the Y coordinate where scrollable content starts,
-     * just below the fixed title bar.
+     * just below the fixed title bar.  A clip rect ensures scrolled
+     * content passes behind the title bar instead of overlapping it.
      */
     int content_top = panel_y + TITLE_H;
+
+    SDL_Rect pal_clip = { panel_x, content_top, PANEL_W, panel_h - TITLE_H };
+    SDL_RenderSetClipRect(ui->renderer, &pal_clip);
 
     /*
      * clip_bottom — the Y coordinate of the panel's bottom edge.
@@ -534,4 +538,7 @@ void palette_render(EditorState *es)
             cursor_y += ROW_H;
         }
     }
+
+    /* Remove clip rect so other panels are not affected */
+    SDL_RenderSetClipRect(ui->renderer, NULL);
 }

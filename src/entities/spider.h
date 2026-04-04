@@ -21,7 +21,7 @@
 
 #include <SDL.h>
 
-#define MAX_SPIDERS      4     /* maximum simultaneous spiders on screen    */
+#define MAX_SPIDERS     16     /* maximum simultaneous spiders on screen    */
 #define SPIDER_FRAMES    3     /* animation frames in Spider_1.png          */
 #define SPIDER_FRAME_W   64    /* width of one frame slot in the sheet (px) */
 #define SPIDER_ART_X     20    /* first visible col within each frame slot  */

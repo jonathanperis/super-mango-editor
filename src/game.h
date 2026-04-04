@@ -104,7 +104,7 @@
  * Each gap is defined by its left-edge x coordinate; all are SEA_GAP_W wide.
  */
 #define SEA_GAP_W         32
-#define MAX_SEA_GAPS       8
+#define MAX_SEA_GAPS      16
 
 /*
  * CAM_LOOKAHEAD — extra pixels the camera shifts in the direction the player

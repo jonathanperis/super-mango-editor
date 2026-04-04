@@ -10,7 +10,7 @@
 
 #include <SDL.h>
 
-#define MAX_ROPES     8
+#define MAX_ROPES    16
 #define ROPE_W       12              /* display width  with some padding       */
 #define ROPE_H       36              /* display height with some padding       */
 #define ROPE_SRC_X    2              /* source crop x (2 px padding each side) */

@@ -14,7 +14,7 @@
 
 /* ---- Constants ---------------------------------------------------------- */
 
-#define MAX_YELLOW_STARS       3     /* maximum yellow star instances per level */
+#define MAX_YELLOW_STARS      16     /* maximum yellow star instances per level */
 #define YELLOW_STAR_DISPLAY_W 16     /* render width  in logical pixels        */
 #define YELLOW_STAR_DISPLAY_H 16     /* render height in logical pixels        */
 

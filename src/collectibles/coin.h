@@ -10,7 +10,7 @@
 
 #include <SDL.h>
 
-#define MAX_COINS       24     /* coin slots across the full world         */
+#define MAX_COINS       64     /* coin slots across the full world         */
 #define COIN_DISPLAY_W  16     /* render width  in logical pixels          */
 #define COIN_DISPLAY_H  16     /* render height in logical pixels          */
 #define COIN_SCORE     100     /* score awarded per coin collected         */

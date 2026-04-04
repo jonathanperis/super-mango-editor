@@ -15,7 +15,7 @@
  * MAX_PLATFORMS — upper bound on how many platforms the game can hold.
  * Stored as a fixed-size array inside GameState; no dynamic allocation needed.
  */
-#define MAX_PLATFORMS 8
+#define MAX_PLATFORMS 32
 
 /*
  * Platform — a rectangular one-way surface built from tiled 48×48 grass blocks.

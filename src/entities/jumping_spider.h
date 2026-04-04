@@ -20,7 +20,7 @@
 
 /* ---- Constants ---------------------------------------------------------- */
 
-#define MAX_JUMPING_SPIDERS  4
+#define MAX_JUMPING_SPIDERS 16
 #define JSPIDER_FRAMES       3       /* animation frames in Spider_2.png      */
 #define JSPIDER_FRAME_W      64      /* width  of one frame slot (px)         */
 #define JSPIDER_ART_X        20      /* first visible col within each frame   */

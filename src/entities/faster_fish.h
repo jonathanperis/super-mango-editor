@@ -9,7 +9,7 @@
 
 #include <SDL.h>
 
-#define MAX_FASTER_FISH         4
+#define MAX_FASTER_FISH        16
 #define FFISH_FRAMES            2
 #define FFISH_FRAME_W          48
 #define FFISH_FRAME_H          48

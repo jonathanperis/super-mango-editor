@@ -8,7 +8,7 @@
 
 #include <SDL.h>
 
-#define MAX_FISH            4       /* maximum simultaneous fish instances     */
+#define MAX_FISH           16       /* maximum simultaneous fish instances     */
 #define FISH_FRAMES         2       /* horizontal frames in Fish_2.png (96×48) */
 #define FISH_FRAME_W       48       /* width of one frame slot in the sheet    */
 #define FISH_FRAME_H       48       /* height of one frame slot in the sheet   */

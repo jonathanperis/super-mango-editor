@@ -219,8 +219,8 @@ int editor_init(EditorState *es) {
     strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
 
     /* Sensible defaults so new levels have a visible player and last star */
-    es->level.player_start_x = 24.0f;
-    es->level.player_start_y = 204.0f;
+    es->level.player_start_x = 48.0f;
+    es->level.player_start_y = 205.0f;
     es->level.last_star.x = 145.0f;
     es->level.last_star.y = 167.0f;
 
@@ -806,12 +806,20 @@ static void handle_event(EditorState *es, SDL_Event *event) {
             es->mouse_down       = 1;
             es->ui.mouse_clicked = 1;
 
-            float world_x = (float)event->button.x / es->camera.zoom
-                            + es->camera.x;
-            float world_y = (float)(event->button.y - TOOLBAR_H)
-                            / es->camera.zoom;
+            /*
+             * Only forward clicks to the tool system when the cursor is
+             * inside the canvas area.  Clicks on the panel (palette,
+             * properties) must not be interpreted as canvas actions —
+             * otherwise clicking a property field deselects the entity.
+             */
+            if (canvas_contains(event->button.x, event->button.y)) {
+                float world_x = (float)event->button.x / es->camera.zoom
+                                + es->camera.x;
+                float world_y = (float)(event->button.y - TOOLBAR_H)
+                                / es->camera.zoom;
 
-            tools_mouse_down(es, world_x, world_y);
+                tools_mouse_down(es, world_x, world_y);
+            }
         } else if (event->button.button == SDL_BUTTON_RIGHT) {
             /*
              * Right click — quick-delete shortcut.
@@ -822,12 +830,15 @@ static void handle_event(EditorState *es, SDL_Event *event) {
              */
             es->mouse_right_down = 1;
 
-            float world_x = (float)event->button.x / es->camera.zoom
-                            + es->camera.x;
-            float world_y = (float)(event->button.y - TOOLBAR_H)
-                            / es->camera.zoom;
+            /* Only process right-clicks that land on the canvas */
+            if (canvas_contains(event->button.x, event->button.y)) {
+                float world_x = (float)event->button.x / es->camera.zoom
+                                + es->camera.x;
+                float world_y = (float)(event->button.y - TOOLBAR_H)
+                                / es->camera.zoom;
 
-            tools_right_click(es, world_x, world_y);
+                tools_right_click(es, world_x, world_y);
+            }
         }
         break;
 
@@ -876,11 +887,8 @@ static void handle_event(EditorState *es, SDL_Event *event) {
             if (my < split_y) {
                 /* Cursor is over the palette — scroll it */
                 palette_scroll(-event->wheel.y * 20);
-            } else {
-                /* Cursor is over the properties/config panel */
-                es->panel_scroll -= event->wheel.y * 20;
-                if (es->panel_scroll < 0) es->panel_scroll = 0;
             }
+            /* Bottom panel does not scroll — content fits within the panel */
             break;
         }
 
