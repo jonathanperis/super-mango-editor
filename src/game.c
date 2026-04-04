@@ -329,13 +329,29 @@ void game_init(GameState *gs) {
 
     /* Load level from JSON if a path was provided via --level */
     memset(&s_level, 0, sizeof(s_level));
-    if (gs->level_path[0] != '\0' &&
+
+    /*
+     * Validate the level path before opening.  Reject absolute paths and
+     * path traversal sequences ("..") to prevent reading outside the
+     * game's working directory.
+     */
+    int path_valid = gs->level_path[0] != '\0'
+                  && gs->level_path[0] != '/'
+                  && gs->level_path[0] != '\\'
+                  && !strstr(gs->level_path, "..");
+
+    if (path_valid &&
         level_load_json(gs->level_path, &s_level) == 0) {
         /* Successfully loaded from the given path */
     } else {
-        if (gs->level_path[0] != '\0')
-            fprintf(stderr, "Warning: could not load %s — starting empty level\n",
-                    gs->level_path);
+        if (gs->level_path[0] != '\0') {
+            if (!path_valid)
+                fprintf(stderr, "Error: invalid level path '%s' (no absolute or .. paths)\n",
+                        gs->level_path);
+            else
+                fprintf(stderr, "Warning: could not load %s — starting empty level\n",
+                        gs->level_path);
+        }
         strncpy(s_level.name, "Untitled", sizeof(s_level.name) - 1);
     }
     level_load(gs, &s_level);

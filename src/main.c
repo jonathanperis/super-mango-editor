@@ -41,9 +41,10 @@ int main(int argc, char *argv[]) {
     int debug_mode  = 0;
     const char *level_path = NULL;
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--debug") == 0) debug_mode = 1;
-        if (strcmp(argv[i], "--level") == 0 && i + 1 < argc)
-            level_path = argv[++i];
+        if (strcmp(argv[i], "--debug") == 0)
+            debug_mode = 1;
+        else if (strcmp(argv[i], "--level") == 0 && i + 1 < argc)
+            level_path = argv[i + 1];   /* next arg is consumed by the flag */
     }
     /*
      * SDL_Init — start the SDL core.
