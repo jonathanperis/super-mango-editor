@@ -21,7 +21,7 @@
 #include <stdlib.h>  /* malloc, free, exit */
 #include <string.h>  /* strcmp, memset, strdup */
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 #include <sys/stat.h> /* open, O_WRONLY, O_CREAT, O_TRUNC */
 #include <fcntl.h>
 #endif
@@ -936,7 +936,7 @@ int level_save_json(const LevelDef *def, const char *path) {
      * Write the JSON string to disk.  On POSIX we use open() with explicit
      * 0644 permissions so the file is owner-writable only, not world-writable.
      */
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
     int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     FILE *fp = fd >= 0 ? fdopen(fd, "w") : NULL;
 #else

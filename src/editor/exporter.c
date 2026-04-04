@@ -20,7 +20,7 @@
 #include <stdio.h>             /* FILE, fopen, fprintf, fclose           */
 #include <string.h>            /* snprintf — path assembly               */
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 #include <sys/stat.h>          /* open, O_WRONLY, O_CREAT, O_TRUNC      */
 #include <fcntl.h>
 #endif
@@ -119,7 +119,7 @@ static int write_header(const char *var_name, const char *dir_path)
      * Open with restricted permissions (0644) on POSIX so generated files
      * are not world-writable.
      */
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
     int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     FILE *f = fd >= 0 ? fdopen(fd, "w") : NULL;
 #else
@@ -164,7 +164,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     char path[512];
     snprintf(path, sizeof(path), "%s/%s.c", dir_path, var_name);
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
     int fds = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     FILE *f = fds >= 0 ? fdopen(fds, "w") : NULL;
 #else
