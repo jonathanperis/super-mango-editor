@@ -139,52 +139,46 @@ static const char *fplat_mode_opts[] = { "Static", "Crumble", "Rail" };
 
 void properties_render(EditorState *es)
 {
-    /* If nothing is selected, draw nothing — the palette fills the column. */
     if (es->selection.index < 0)
         return;
 
-    /* ---- Panel background ------------------------------------------- */
-
-    /*
-     * ui_panel — draw a dark filled rectangle as the visual container.
-     * This covers the bottom-right area so fields render on a clean
-     * background rather than on top of whatever the canvas drew.
-     */
+    /* Panel background */
     ui_panel(&es->ui, PROP_X, PROP_Y, PROP_W, PROP_H);
 
-    /* Clip rendering to the panel bounds so scrolled content doesn't bleed */
-    SDL_Rect clip = { PROP_X, PROP_Y, PROP_W, PROP_H };
-    SDL_RenderSetClipRect(es->ui.renderer, &clip);
-
-    /* ---- Header: entity type name + array index --------------------- */
-
-    /*
-     * Build a label like "Spider #2" — the human-readable type name from
-     * the lookup table plus the zero-based array index.
-     */
+    /* ---- Collapsible header (like palette categories) --------------- */
     char header[64];
-    /* Single-instance entities (Player Spawn, Last Star) don't need an index */
     if (es->selection.type == ENT_PLAYER_SPAWN ||
         es->selection.type == ENT_LAST_STAR) {
-        snprintf(header, sizeof(header), "%s",
+        snprintf(header, sizeof(header), "%s %s",
+                 es->panel_open ? "v" : ">",
                  entity_type_names[es->selection.type]);
     } else {
-        snprintf(header, sizeof(header), "%s #%d",
+        snprintf(header, sizeof(header), "%s %s #%d",
+                 es->panel_open ? "v" : ">",
                  entity_type_names[es->selection.type],
                  es->selection.index);
     }
-    ui_label_color(&es->ui, CONTENT_X, PROP_Y + 4, header, UI_ACCENT);
 
-    /*
-     * ui_separator — thin horizontal line dividing the header from the
-     * editable fields.  Drawn at header baseline + ROW_H.
-     */
+    /* Click on header toggles expand/collapse */
+    int hdr_y = PROP_Y + 4;
+    int hdr_hovered = (es->ui.mouse_x >= PROP_X &&
+                       es->ui.mouse_x < PROP_X + PROP_W &&
+                       es->ui.mouse_y >= PROP_Y &&
+                       es->ui.mouse_y < PROP_Y + ROW_H + 4);
+    if (hdr_hovered && es->ui.mouse_clicked)
+        es->panel_open = !es->panel_open;
+
+    ui_label_color(&es->ui, CONTENT_X, hdr_y, header,
+                   hdr_hovered ? UI_TEXT : UI_ACCENT);
     ui_separator(&es->ui, PROP_X + 4, PROP_Y + ROW_H + 2, PROP_W - 8);
 
-    /*
-     * y — cursor tracking the current vertical drawing position.
-     * Advances by ROW_H after each field so rows stack top-to-bottom.
-     */
+    /* If collapsed, just show the header */
+    if (!es->panel_open) return;
+
+    /* Clip rendering to the panel bounds so scrolled content doesn't bleed */
+    SDL_Rect clip = { PROP_X, PROP_Y + ROW_H + 4, PROP_W, PROP_H - ROW_H - 4 };
+    SDL_RenderSetClipRect(es->ui.renderer, &clip);
+
     int y = PROP_Y + ROW_H + 8 - es->panel_scroll;
 
     /* ---- Per-type field rendering ----------------------------------- */
@@ -948,17 +942,29 @@ void level_config_render(EditorState *es) {
     /* Panel background */
     ui_panel(&es->ui, x, y, PROP_W, PROP_H);
 
+    /* ---- Collapsible header ---- */
+    char cfg_header[32];
+    snprintf(cfg_header, sizeof(cfg_header), "%s Level Config",
+             es->panel_open ? "v" : ">");
+
+    int hdr_hovered = (es->ui.mouse_x >= PROP_X &&
+                       es->ui.mouse_x < PROP_X + PROP_W &&
+                       es->ui.mouse_y >= PROP_Y &&
+                       es->ui.mouse_y < PROP_Y + ROW_H + 4);
+    if (hdr_hovered && es->ui.mouse_clicked)
+        es->panel_open = !es->panel_open;
+
+    ui_label_color(&es->ui, x + 8, y + 4, cfg_header,
+                   hdr_hovered ? UI_TEXT : UI_ACCENT);
+    ui_separator(&es->ui, x + 4, y + ROW_H + 2, PROP_W - 8);
+
+    if (!es->panel_open) return;
+
     /* Clip rendering to panel bounds for scrolling */
-    SDL_Rect cfg_clip = { PROP_X, PROP_Y, PROP_W, PROP_H };
+    SDL_Rect cfg_clip = { PROP_X, PROP_Y + ROW_H + 4, PROP_W, PROP_H - ROW_H - 4 };
     SDL_RenderSetClipRect(es->ui.renderer, &cfg_clip);
 
-    y += 4 - es->panel_scroll;
-
-    /* Header */
-    ui_label_color(&es->ui, x + 8, y, "LEVEL CONFIG", UI_ACCENT);
-    y += 22;
-    ui_separator(&es->ui, x + 4, y, PROP_W - 8);
-    y += 8;
+    y += ROW_H + 8 - es->panel_scroll;
 
     /* ---- Level name ---- */
     ui_label(&es->ui, x + 8, y, "Name:");
