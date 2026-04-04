@@ -9,6 +9,7 @@ floor_tile_path = "assets/sprites/levels/grass_tileset.png"
 initial_hearts = 3
 initial_lives = 3
 score_per_life = 1000
+coin_score = 100
 floor_gaps = [0, 192, 560, 928, 1152]
 
 [[rails]]
