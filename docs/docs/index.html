@@ -484,7 +484,7 @@
 <li>2D side-scrolling platformer with a multi-screen forest stage (1600px world)</li>
 <li>32 render layers drawn back-to-front with parallax scrolling background</li>
 <li>Delta-time physics for frame-rate-independent movement at 60 FPS</li>
-<li>Six enemy types, six hazard types, collectibles, bouncepads, climbable vines/ladders/ropes</li>
+<li>Six enemy types, seven hazard types, collectibles, bouncepads, climbable vines/ladders/ropes</li>
 <li>Start menu, HUD (hearts/lives/score), lives system, debug overlay</li>
 <li>Keyboard and gamepad (hot-plug) controls</li>
 <li>Builds natively on macOS, Linux, Windows; WebAssembly via Emscripten</li>
@@ -525,7 +525,7 @@
 </tr>
 <tr>
 <td>Libraries</td>
-<td>SDL2, SDL2_image, SDL2_ttf, SDL2_mixer</td>
+<td>SDL2, SDL2_image, SDL2_ttf, SDL2_mixer, tomlc17 (vendored TOML parser)</td>
 </tr>
 </tbody></table>
 <hr>
@@ -605,7 +605,7 @@ make run
   │     ├── fog_init(&amp;gs.fog, gs.renderer)         (fog_background_1.png, fog_background_2.png)
   │     ├── hud_init(&amp;gs.hud, gs.renderer)
   │     ├── if (debug_mode) debug_init(&amp;gs.debug)
-  │     ├── sandbox_load_level(&amp;gs)                (all entity inits + floor gap positions)
+  │     ├── level_loader_load(&amp;gs)                 (load level from TOML, entity inits + floor gap positions)
   │     ├── hearts/lives/score/score_life_next initialisation
   │     ├── SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) — lazy init, non-fatal
   │     └── scan joysticks for first connected gamepad
@@ -1615,13 +1615,21 @@ Mix_LoadWAV(&quot;sounds/player_jump.wav&quot;);
 <p>Builds (if out of date) then runs the binary with the <code>--debug</code> flag, which enables the debug overlay: FPS counter, collision hitbox visualization, and scrolling event log.</p>
 <pre><code class="language-sh">make run-debug
 </code></pre>
-<h3><code>make run-sandbox</code></h3>
-<p>Builds (if out of date) then runs the binary with the <code>--sandbox</code> flag, which launches the sandbox/level-editor mode for testing entity placement and interactions.</p>
-<pre><code class="language-sh">make run-sandbox
+<h3><code>make run-level LEVEL=&lt;path&gt;</code></h3>
+<p>Builds (if out of date) then runs the binary with the <code>--level &lt;path&gt;</code> flag, which loads the specified TOML level file.</p>
+<pre><code class="language-sh">make run-level LEVEL=levels/sandbox_00.toml
 </code></pre>
-<h3><code>make run-sandbox-debug</code></h3>
-<p>Builds (if out of date) then runs the binary with both <code>--sandbox</code> and <code>--debug</code> flags, combining sandbox mode with the debug overlay.</p>
-<pre><code class="language-sh">make run-sandbox-debug
+<h3><code>make run-level-debug LEVEL=&lt;path&gt;</code></h3>
+<p>Builds (if out of date) then runs the binary with both <code>--level &lt;path&gt;</code> and <code>--debug</code> flags, combining level loading with the debug overlay.</p>
+<pre><code class="language-sh">make run-level-debug LEVEL=levels/sandbox_00.toml
+</code></pre>
+<h3><code>make editor</code></h3>
+<p>Compiles the standalone visual level editor binary to <code>out/super-mango-editor</code>.</p>
+<pre><code class="language-sh">make editor
+</code></pre>
+<h3><code>make run-editor</code></h3>
+<p>Builds (if out of date) then launches the level editor.</p>
+<pre><code class="language-sh">make run-editor
 </code></pre>
 <h3><code>make web</code></h3>
 <p>Compiles the game to WebAssembly using the Emscripten SDK (<code>emcc</code>). Requires Emscripten to be installed and <code>emcc</code> on <code>PATH</code>.</p>
@@ -1736,7 +1744,6 @@ src/
 ├── parallax.o
 ├── hud.o
 ├── debug.o
-├── sandbox.o
 ├── start_menu.o
 ├── coin.o
 ├── star_yellow.o
@@ -2338,7 +2345,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </tr>
 </thead>
 <tbody><tr>
-<td><code>PARALLAX_MAX_LAYERS</code></td>
+<td><code>MAX_BACKGROUND_LAYERS</code></td>
 <td><code>8</code></td>
 <td><code>int</code></td>
 <td>Maximum number of background layers the system can hold</td>
@@ -3915,13 +3922,8 @@ for (int i = 0; i &lt; gs-&gt;coin_count; i++)
 for (int i = 0; i &lt; gs-&gt;coin_count; i++)
     coin_cleanup(&amp;gs-&gt;coins[i]);
 </code></pre>
-<h4>5. Place in sandbox -- <code>src/screens/sandbox.c</code></h4>
-<p>Entity spawn positions are defined in <code>sandbox.c</code>. Add your entity placements there:</p>
-<pre><code class="language-c">// In sandbox_init or the appropriate placement function:
-coin_init(&amp;gs-&gt;coins[0], gs-&gt;tex_coin, 120.0f, 180.0f);
-coin_init(&amp;gs-&gt;coins[1], gs-&gt;tex_coin, 200.0f, 140.0f);
-gs-&gt;coin_count = 2;
-</code></pre>
+<h4>5. Define entity placements in level TOML</h4>
+<p>Entity spawn positions are defined in level TOML files (e.g. <code>levels/sandbox_00.toml</code>). Add your entity placements there, or use the visual editor (<code>make run-editor</code>) to place entities graphically.</p>
 <h4>6. Add debug hitbox -- <code>src/core/debug.c</code></h4>
 <p>Every entity must have hitbox visualization in <code>debug.c</code>:</p>
 <pre><code class="language-c">// In debug_render:
@@ -4162,7 +4164,7 @@ source_y = (frame_index / num_cols) * frame_h
 <li><input disabled="" type="checkbox"> Call <code>&lt;entity&gt;_render</code> in <code>game_loop</code> render section (correct layer order)</li>
 <li><input disabled="" type="checkbox"> Call <code>&lt;entity&gt;_cleanup</code> in <code>game_cleanup</code> (before <code>SDL_DestroyRenderer</code>)</li>
 <li><input disabled="" type="checkbox"> Set all freed pointers to <code>NULL</code></li>
-<li><input disabled="" type="checkbox"> Place entity spawn positions in <code>sandbox.c</code></li>
+<li><input disabled="" type="checkbox"> Define entity spawn positions in a level TOML file or use the visual editor</li>
 <li><input disabled="" type="checkbox"> Add hitbox visualization in <code>debug.c</code></li>
 <li><input disabled="" type="checkbox"> Add <code>debug_log</code> calls in <code>game.c</code> for significant entity events</li>
 <li><input disabled="" type="checkbox"> Build with <code>make</code> -- no Makefile changes needed</li>
@@ -4949,14 +4951,25 @@ gs-&gt;music = NULL;
 │   ├── axe_trap.h / .c           Swinging/spinning axe hazard
 │   └── blue_flame.h / .c         Blue flame hazard: erupts from floor gaps, rise/flip/fall cycle
 ├── levels/
-│   ├── level.h                   Shared level definitions
-│   ├── level_01.h / .c           Level 1 data
-│   └── level_loader.h / .c       Level loading and switching
+│   ├── level.h                   LevelDef struct and placement types
+│   ├── level_loader.h / .c       Level loading from LevelDef
+│   └── exported/                 Auto-generated C level exports
+├── editor/
+│   ├── editor.h / .c             Editor state and main loop
+│   ├── editor_main.c             Editor entry point
+│   ├── canvas.h / .c             Canvas rendering and interaction
+│   ├── palette.h / .c            Entity palette panel
+│   ├── properties.h / .c         Entity property inspector
+│   ├── tools.h / .c              Editor tools (select, place, erase)
+│   ├── ui.h / .c                 Editor UI framework
+│   ├── undo.h / .c               Undo/redo stack
+│   ├── serializer.h / .c         TOML level serialization
+│   ├── exporter.h / .c           C level export
+│   └── file_dialog.h / .c        Native file dialog integration
 ├── player/
 │   └── player.h / .c             Player input, physics, animation, rendering
 ├── screens/
 │   ├── start_menu.h / .c         Start menu screen with logo
-│   ├── sandbox.h / .c            Level layout and entity placement
 │   └── hud.h / .c                HUD renderer: hearts, lives counter, score text
 └── surfaces/
     ├── platform.h / .c           One-way platform pillar init and 9-slice rendering
@@ -4977,9 +4990,9 @@ gs-&gt;music = NULL;
 <p><strong>Role:</strong> Owns the program entry point and every SDL subsystem&#39;s lifetime.</p>
 <h3>Responsibilities</h3>
 <ul>
-<li>Parse CLI flags: <code>--debug</code> and <code>--sandbox</code></li>
+<li>Parse CLI flags: <code>--debug</code> and <code>--level &lt;path&gt;</code></li>
 <li>Call <code>SDL_Init</code>, <code>IMG_Init</code>, <code>TTF_Init</code>, <code>Mix_OpenAudio</code> in order</li>
-<li>Route to start menu or sandbox (game) mode</li>
+<li>Route to start menu or level mode via <code>--level</code> flag</li>
 <li>Tear down SDL subsystems in reverse order before returning</li>
 </ul>
 <h3>Subsystem Init Order</h3>
@@ -5085,7 +5098,7 @@ void game_cleanup(GameState *gs);
 <li>Entity textures: <code>spider.png</code>, <code>jumping_spider.png</code>, <code>bird.png</code>, <code>faster_bird.png</code>, <code>fish.png</code>, <code>faster_fish.png</code>, <code>coin.png</code>, <code>bouncepad_medium.png</code>, <code>bouncepad_small.png</code>, <code>bouncepad_high.png</code>, <code>vine.png</code>, <code>ladder.png</code>, <code>rope.png</code>, <code>rail.png</code>, <code>spike_block.png</code>, <code>float_platform.png</code>, <code>bridge.png</code>, <code>star_yellow.png</code>, <code>axe_trap.png</code>, <code>circular_saw.png</code>, <code>blue_flame.png</code>, <code>spike.png</code>, <code>spike_platform.png</code></li>
 <li>Sound effects: <code>bouncepad.wav</code>, <code>axe_trap.wav</code>, <code>bird.wav</code>, <code>spider.wav</code>, <code>fish.wav</code>, <code>player_jump.wav</code>, <code>coin.wav</code>, <code>player_hit.wav</code></li>
 <li>Background music: <code>game_music.wav</code> (via <code>Mix_LoadMUS</code>)</li>
-<li>Entity init: player, water, fog, HUD, debug, level (via sandbox)</li>
+<li>Entity init: player, water, fog, HUD, debug, level (via level loader)</li>
 <li>Gamepad controller init</li>
 </ol>
 <h3><code>game_loop(GameState *gs)</code></h3>
@@ -5097,13 +5110,17 @@ void game_cleanup(GameState *gs);
 <p><strong>Role:</strong> Player character lifecycle. See <a href="player_module">Player Module</a> for the deep dive.</p>
 <p><strong>Key functions:</strong> <code>player_init</code>, <code>player_handle_input</code>, <code>player_update</code>, <code>player_render</code>, <code>player_get_hitbox</code>, <code>player_reset</code>, <code>player_cleanup</code></p>
 <hr>
-<h2><code>sandbox.h</code> / <code>sandbox.c</code></h2>
-<p><strong>Role:</strong> Level layout and entity placement. Separates content (WHERE entities are placed) from engine logic (HOW they behave).</p>
+<h2><code>level.h</code> / <code>level_loader.h</code> / <code>level_loader.c</code></h2>
+<p><strong>Role:</strong> Level definitions and loading. <code>level.h</code> defines the <code>LevelDef</code> struct and placement types. <code>level_loader</code> loads level data from TOML files and initialises all entities accordingly.</p>
 <p><strong>Key functions:</strong></p>
 <ul>
-<li><code>sandbox_load_level(GameState *gs)</code> -- place all entities, define floor gaps, set up the level (called once from <code>game_init</code>)</li>
-<li><code>sandbox_reset_level(GameState *gs, int *fp_prev_riding)</code> -- reset all entities on player death</li>
+<li><code>level_loader_load(GameState *gs, const char *path)</code> -- parse a TOML level file, place all entities, define floor gaps (called once from <code>game_init</code>)</li>
+<li><code>level_loader_reset(GameState *gs, int *fp_prev_riding)</code> -- reset all entities on player death</li>
 </ul>
+<hr>
+<h2>Editor Modules (<code>src/editor/</code>)</h2>
+<p><strong>Role:</strong> Standalone visual level editor (11 modules). Build with <code>make editor</code>, run with <code>make run-editor</code>.</p>
+<p><strong>Modules:</strong> <code>editor.h/.c</code>, <code>editor_main.c</code>, <code>canvas</code>, <code>palette</code>, <code>properties</code>, <code>tools</code>, <code>ui</code>, <code>undo</code>, <code>serializer</code>, <code>exporter</code>, <code>file_dialog</code></p>
 <hr>
 <h2><code>start_menu.h</code> / <code>start_menu.c</code></h2>
 <p><strong>Role:</strong> Start menu screen with centred title text and <code>start_menu_logo.png</code> logo.</p>
