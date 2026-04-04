@@ -23,7 +23,7 @@
 #include "editor.h"  /* EditorState, EntityType, Selection, EditorTool    */
 #include "undo.h"    /* Command, PlacementData, undo_push                 */
 #include "../game.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE, WORLD_W,
-                        SEA_GAP_W, MAX_* constants                        */
+                        FLOOR_GAP_W, MAX_* constants                      */
 
 /* ------------------------------------------------------------------ */
 /* Entity display dimensions — duplicated from canvas.c                */
@@ -166,8 +166,8 @@ static void get_entity_pos(const LevelDef *level, EntityType type, int index,
         *y = (float)(FLOOR_Y - p->tile_height * TILE_SIZE + 16);
         break;
     }
-    case ENT_SEA_GAP:
-        *x = (float)level->sea_gaps[index];
+    case ENT_FLOOR_GAP:
+        *x = (float)level->floor_gaps[index];
         *y = (float)FLOOR_Y;
         break;
     case ENT_RAIL:
@@ -262,13 +262,13 @@ static void get_entity_pos(const LevelDef *level, EntityType type, int index,
     }
     case ENT_BLUE_FLAME: {
         float gap_x = level->blue_flames[index].x;
-        *x = gap_x + (float)(SEA_GAP_W - BLUE_FLAME_W) / 2.0f;
+        *x = gap_x + (float)(FLOOR_GAP_W - BLUE_FLAME_W) / 2.0f;
         *y = (float)(FLOOR_Y - BLUE_FLAME_H);
         break;
     }
     case ENT_FIRE_FLAME: {
         float gap_x = level->fire_flames[index].x;
-        *x = gap_x + (float)(SEA_GAP_W - FIRE_FLAME_W) / 2.0f;
+        *x = gap_x + (float)(FLOOR_GAP_W - FIRE_FLAME_W) / 2.0f;
         *y = (float)(FLOOR_Y - FIRE_FLAME_H);
         break;
     }
@@ -327,8 +327,8 @@ static void set_entity_pos(LevelDef *level, EntityType type, int index,
         level->platforms[index].x = x;
         /* tile_height stays — y is derived from it */
         break;
-    case ENT_SEA_GAP:
-        level->sea_gaps[index] = (int)x;
+    case ENT_FLOOR_GAP:
+        level->floor_gaps[index] = (int)x;
         break;
     case ENT_RAIL:
         level->rails[index].x = (int)x;
@@ -447,7 +447,7 @@ static int get_count(const LevelDef *level, EntityType type)
 {
     switch (type) {
     case ENT_PLATFORM:         return level->platform_count;
-    case ENT_SEA_GAP:          return level->sea_gap_count;
+    case ENT_FLOOR_GAP:        return level->floor_gap_count;
     case ENT_RAIL:             return level->rail_count;
     case ENT_COIN:             return level->coin_count;
     case ENT_STAR_YELLOW:      return level->star_yellow_count;
@@ -490,7 +490,7 @@ static int get_max_count(EntityType type)
 {
     switch (type) {
     case ENT_PLATFORM:         return MAX_PLATFORMS;
-    case ENT_SEA_GAP:          return MAX_SEA_GAPS;
+    case ENT_FLOOR_GAP:        return MAX_FLOOR_GAPS;
     case ENT_RAIL:             return MAX_RAILS;
     case ENT_COIN:             return MAX_COINS;
     case ENT_STAR_YELLOW:      return MAX_STAR_YELLOWS;
@@ -543,8 +543,8 @@ static PlacementData snapshot_entity(const LevelDef *level, EntityType type,
     case ENT_PLATFORM:
         pd.platform = level->platforms[index];
         break;
-    case ENT_SEA_GAP:
-        pd.sea_gap = level->sea_gaps[index];
+    case ENT_FLOOR_GAP:
+        pd.floor_gap = level->floor_gaps[index];
         break;
     case ENT_RAIL:
         pd.rail = level->rails[index];
@@ -827,10 +827,10 @@ static Selection hit_test(const LevelDef *level, float wx, float wy)
         }
     }
 
-    /* Blue flames — erupting fire hazards, preview centred in sea gap */
+    /* Blue flames — erupting fire hazards, preview centred in floor gap */
     for (int i = level->blue_flame_count - 1; i >= 0; i--) {
         float gap_x = level->blue_flames[i].x;
-        ex = gap_x + (float)(SEA_GAP_W - BLUE_FLAME_W) / 2.0f;
+        ex = gap_x + (float)(FLOOR_GAP_W - BLUE_FLAME_W) / 2.0f;
         ey = (float)(FLOOR_Y - BLUE_FLAME_H);
         ew = BLUE_FLAME_W;
         eh = BLUE_FLAME_H;
@@ -844,7 +844,7 @@ static Selection hit_test(const LevelDef *level, float wx, float wy)
     /* Fire flames — erupting fire hazards (fire variant), same layout */
     for (int i = level->fire_flame_count - 1; i >= 0; i--) {
         float gap_x = level->fire_flames[i].x;
-        ex = gap_x + (float)(SEA_GAP_W - FIRE_FLAME_W) / 2.0f;
+        ex = gap_x + (float)(FLOOR_GAP_W - FIRE_FLAME_W) / 2.0f;
         ey = (float)(FLOOR_Y - FIRE_FLAME_H);
         ew = FIRE_FLAME_W;
         eh = FIRE_FLAME_H;
@@ -1075,14 +1075,14 @@ static Selection hit_test(const LevelDef *level, float wx, float wy)
         }
     }
 
-    /* Sea gaps — holes in the floor */
-    for (int i = level->sea_gap_count - 1; i >= 0; i--) {
-        ex = (float)level->sea_gaps[i];
+    /* Floor gaps — holes in the floor */
+    for (int i = level->floor_gap_count - 1; i >= 0; i--) {
+        ex = (float)level->floor_gaps[i];
         ey = (float)FLOOR_Y;
-        ew = SEA_GAP_W;
+        ew = FLOOR_GAP_W;
         eh = GAME_H - FLOOR_Y;
         if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_SEA_GAP;
+            sel.type = ENT_FLOOR_GAP;
             sel.index = i;
             return sel;
         }
@@ -1118,8 +1118,8 @@ static void delete_entity(EditorState *es, EntityType type, int index)
         array_remove(level->platforms, &level->platform_count,
                      index, sizeof(PlatformPlacement));
         break;
-    case ENT_SEA_GAP:
-        array_remove(level->sea_gaps, &level->sea_gap_count,
+    case ENT_FLOOR_GAP:
+        array_remove(level->floor_gaps, &level->floor_gap_count,
                      index, sizeof(int));
         break;
     case ENT_RAIL:
@@ -1575,14 +1575,14 @@ static void place_entity(EditorState *es, float world_x, float world_y)
         level->player_start_y = world_y;
         break;
     }
-    case ENT_SEA_GAP: {
+    case ENT_FLOOR_GAP: {
         /*
-         * Sea gaps snap to a 32-px grid (SEA_GAP_W) so they align
+         * Floor gaps snap to a 32-px grid (FLOOR_GAP_W) so they align
          * with the floor tile boundaries.
          */
-        int snapped_x = ((int)world_x / SEA_GAP_W) * SEA_GAP_W;
-        level->sea_gaps[new_index] = snapped_x;
-        level->sea_gap_count++;
+        int snapped_x = ((int)world_x / FLOOR_GAP_W) * FLOOR_GAP_W;
+        level->floor_gaps[new_index] = snapped_x;
+        level->floor_gap_count++;
         break;
     }
     case ENT_RAIL: {

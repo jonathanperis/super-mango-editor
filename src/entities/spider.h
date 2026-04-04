@@ -65,7 +65,7 @@ void spiders_init(Spider *spiders, int *count);
  * dt      : delta-time in seconds (frame-rate independent movement)
  */
 void spiders_update(Spider *spiders, int count, float dt,
-                    const int *sea_gaps, int sea_gap_count);
+                    const int *floor_gaps, int floor_gap_count);
 
 /*
  * spiders_render — Draw all active spiders using the shared texture.

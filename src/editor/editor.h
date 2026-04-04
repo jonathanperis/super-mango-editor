@@ -93,7 +93,7 @@
  * and it updates itself whenever you add new values above it.
  */
 typedef enum {
-    ENT_SEA_GAP = 0,       /* hole in the ground floor (exposes water)      */
+    ENT_FLOOR_GAP = 0,     /* hole in the ground floor (exposes water)      */
     ENT_RAIL,              /* rail path (spike blocks / platforms ride on)  */
     ENT_PLATFORM,          /* ground pillar (static collision surface)      */
     ENT_COIN,              /* collectable coin (100 pts, 3 restore a heart) */

@@ -470,7 +470,7 @@ void editor_loop(EditorState *es) {
                     config_h = 28 + 8 + 24 + 24 + 24 + 22 + 24 + 30
                              + 24 + 22 + 24 + 24 + 24 + 10;
                     if (g_plx_open)
-                        config_h += es->level.parallax_layer_count * 20 + 24;
+                        config_h += es->level.background_layer_count * 20 + 24;
                     if (g_fg_open)
                         config_h += es->level.foreground_layer_count * 20 + 24;
                 } else {
@@ -1130,8 +1130,8 @@ static void copy_selected(EditorState *es) {
 
     /* Snapshot the placement data based on entity type */
     switch (t) {
-    case ENT_SEA_GAP:
-        es->clipboard_data.sea_gap = es->level.sea_gaps[i];
+    case ENT_FLOOR_GAP:
+        es->clipboard_data.floor_gap = es->level.floor_gaps[i];
         break;
     case ENT_RAIL:
         es->clipboard_data.rail = es->level.rails[i];
@@ -1416,12 +1416,12 @@ static void paste_clipboard(EditorState *es) {
         d.rope.x += PASTE_OFFSET;
         PASTE_INTO(ropes, rope_count, MAX_ROPES, rope);
         break;
-    case ENT_SEA_GAP:
-        d.sea_gap += (int)PASTE_OFFSET;
-        if (es->level.sea_gap_count < MAX_SEA_GAPS) {
-            int idx = es->level.sea_gap_count;
-            es->level.sea_gaps[idx] = d.sea_gap;
-            es->level.sea_gap_count++;
+    case ENT_FLOOR_GAP:
+        d.floor_gap += (int)PASTE_OFFSET;
+        if (es->level.floor_gap_count < MAX_FLOOR_GAPS) {
+            int idx = es->level.floor_gap_count;
+            es->level.floor_gaps[idx] = d.floor_gap;
+            es->level.floor_gap_count++;
             es->selection.type = t;
             es->selection.index = idx;
             es->modified = 1;
@@ -1430,7 +1430,7 @@ static void paste_clipboard(EditorState *es) {
             cmd.type = CMD_PLACE;
             cmd.entity_type = (int)t;
             cmd.entity_index = idx;
-            cmd.after.sea_gap = d.sea_gap;
+            cmd.after.floor_gap = d.floor_gap;
             undo_push(es->undo, cmd);
         }
         break;
@@ -1877,7 +1877,7 @@ static void render_status_bar(EditorState *es) {
      * Sum up all entity counts in the LevelDef to show the total number
      * of placed entities.  This gives a quick sense of level complexity.
      */
-    int total = es->level.sea_gap_count
+    int total = es->level.floor_gap_count
               + es->level.rail_count
               + es->level.platform_count
               + es->level.coin_count
@@ -2187,9 +2187,9 @@ static void apply_undo_command(EditorState *es, const Command *cmd,
                      rail, MAX_RAILS);
         break;
 
-    case ENT_SEA_GAP:
-        APPLY_ARRAY(es->level.sea_gaps, es->level.sea_gap_count,
-                     sea_gap, MAX_SEA_GAPS);
+    case ENT_FLOOR_GAP:
+        APPLY_ARRAY(es->level.floor_gaps, es->level.floor_gap_count,
+                     floor_gap, MAX_FLOOR_GAPS);
         break;
 
     default:

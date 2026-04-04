@@ -1,7 +1,7 @@
 # Level: Sandbox
 name = "Sandbox"
 screen_count = 4
-sea_gaps = [0, 192, 560, 928, 1152]
+floor_gaps = [0, 192, 560, 928, 1152]
 
 [[rails]]
 layout = "RECT"
@@ -353,31 +353,31 @@ x = 460.0
 y = 172.0
 tile_count = 1
 
-[[parallax_layers]]
+[[background_layers]]
 path = "assets/sprites/backgrounds/sky_blue.png"
 speed = 0.0
 
-[[parallax_layers]]
+[[background_layers]]
 path = "assets/sprites/backgrounds/clouds_bg.png"
 speed = 0.1
 
-[[parallax_layers]]
+[[background_layers]]
 path = "assets/sprites/backgrounds/glacial_mountains.png"
 speed = 0.2
 
-[[parallax_layers]]
+[[background_layers]]
 path = "assets/sprites/backgrounds/clouds_mg_3.png"
 speed = 0.3
 
-[[parallax_layers]]
+[[background_layers]]
 path = "assets/sprites/backgrounds/clouds_mg_2.png"
 speed = 0.4
 
-[[parallax_layers]]
+[[background_layers]]
 path = "assets/sprites/backgrounds/clouds_lonely.png"
 speed = 0.4
 
-[[parallax_layers]]
+[[background_layers]]
 path = "assets/sprites/backgrounds/clouds_mg_1.png"
 speed = 0.5
 

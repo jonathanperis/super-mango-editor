@@ -23,7 +23,7 @@
 /*
  * level_save_toml — Serialize a LevelDef to a human-readable TOML file.
  *
- * Writes every field of the LevelDef (name, sea_gaps, all entity arrays,
+ * Writes every field of the LevelDef (name, floor_gaps, all entity arrays,
  * parallax/foreground layers, and level-wide configuration) to the file
  * at `path`.  Enum fields are stored as human-readable strings ("RECT",
  * "SPIN", etc.) so the TOML is easy to read and edit by hand.

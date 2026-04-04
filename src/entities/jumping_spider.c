@@ -14,7 +14,7 @@
 #include <math.h>   /* fabsf */
 
 #include "jumping_spider.h"
-#include "../game.h"                /* FLOOR_Y, GAME_W, SEA_GAP_W */
+#include "../game.h"                /* FLOOR_Y, GAME_W, FLOOR_GAP_W */
 #include "../core/entity_utils.h"  /* patrol_update, animate_frame_ms */
 
 #define JSPIDER_AUDIBLE_RANGE  ((float)GAME_W)
@@ -49,7 +49,7 @@ void jumping_spiders_init(JumpingSpider *spiders, int *count)
 /* ------------------------------------------------------------------ */
 
 void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
-                            const int *sea_gaps, int sea_gap_count,
+                            const int *floor_gaps, int floor_gap_count,
                             Mix_Chunk *snd_attack, float player_x, int cam_x)
 {
     for (int i = 0; i < count; i++) {
@@ -59,7 +59,7 @@ void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
         patrol_update(&s->x, &s->vx, JSPIDER_FRAME_W,
                       s->patrol_x0, s->patrol_x1, JSPIDER_SPEED, dt);
 
-        /* ── sea gap interaction ──────────────────────────────────── */
+        /* ── floor gap interaction ────────────────────────────────── */
         /*
          * Check if the spider's art centre is over a gap.
          *   - On the ground → trigger a jump to clear the gap.
@@ -67,14 +67,14 @@ void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
          */
         float art_center = s->x + JSPIDER_ART_X + JSPIDER_ART_W / 2.0f;
         if (s->on_ground) {
-            for (int g = 0; g < sea_gap_count; g++) {
-                float gx = (float)sea_gaps[g];
-                if (art_center >= gx && art_center < gx + (float)SEA_GAP_W) {
+            for (int g = 0; g < floor_gap_count; g++) {
+                float gx = (float)floor_gaps[g];
+                if (art_center >= gx && art_center < gx + (float)FLOOR_GAP_W) {
                     /* Snap back to the gap edge and leap */
                     if (s->vx > 0.0f)
                         s->x = gx - JSPIDER_ART_X - JSPIDER_ART_W / 2.0f;
                     else
-                        s->x = gx + (float)SEA_GAP_W - JSPIDER_ART_X - JSPIDER_ART_W / 2.0f;
+                        s->x = gx + (float)FLOOR_GAP_W - JSPIDER_ART_X - JSPIDER_ART_W / 2.0f;
 
                     s->vy        = JSPIDER_JUMP_VY;
                     s->on_ground = 0;

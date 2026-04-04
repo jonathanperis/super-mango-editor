@@ -384,22 +384,22 @@ void game_init(GameState *gs) {
         const LevelDef *def = (const LevelDef *)gs->current_level;
 
         /*
-         * Parallax — initialise from level definition if layers are defined;
-         * fall back to the hardcoded LAYER_CONFIG table otherwise.
+         * Background layers — initialise from level definition if layers are
+         * defined; fall back to the hardcoded LAYER_CONFIG table otherwise.
          */
-        if (def && def->parallax_layer_count > 0) {
+        if (def && def->background_layer_count > 0) {
             /*
              * Extract paths and speeds into flat arrays so we can pass them
              * to parallax_init_from_def.  The anonymous struct in LevelDef
              * stores them interleaved; we need separate pointers.
              */
-            char  paths[PARALLAX_MAX_LAYERS][64];
-            float speeds[PARALLAX_MAX_LAYERS];
-            int   n = def->parallax_layer_count;
-            if (n > PARALLAX_MAX_LAYERS) n = PARALLAX_MAX_LAYERS;
+            char  paths[MAX_BACKGROUND_LAYERS][64];
+            float speeds[MAX_BACKGROUND_LAYERS];
+            int   n = def->background_layer_count;
+            if (n > MAX_BACKGROUND_LAYERS) n = MAX_BACKGROUND_LAYERS;
             for (int i = 0; i < n; i++) {
-                SDL_strlcpy(paths[i], def->parallax_layers[i].path, 64);
-                speeds[i] = def->parallax_layers[i].speed;
+                SDL_strlcpy(paths[i], def->background_layers[i].path, 64);
+                speeds[i] = def->background_layers[i].speed;
             }
             parallax_init_from_def(&gs->parallax, gs->renderer, paths, speeds, n);
         } else {
@@ -1103,13 +1103,13 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
             /*
              * Skip this piece if it falls inside any sea gap.
              * A piece at tx is inside a gap when:
-             *   gap_x <= tx  AND  tx + P <= gap_x + SEA_GAP_W
+             *   gap_x <= tx  AND  tx + P <= gap_x + FLOOR_GAP_W
              * (both edges of the 16-px piece are within the 32-px gap).
              */
             int in_gap = 0;
-            for (int g = 0; g < gs->sea_gap_count; g++) {
-                int gx = gs->sea_gaps[g];
-                if (tx >= gx && tx + P <= gx + SEA_GAP_W) {
+            for (int g = 0; g < gs->floor_gap_count; g++) {
+                int gx = gs->floor_gaps[g];
+                if (tx >= gx && tx + P <= gx + FLOOR_GAP_W) {
                     in_gap = 1;
                     break;
                 }
@@ -1131,10 +1131,10 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
 
             /* Gap boundaries: piece is a right-cap if next piece is gap,
              * left-cap if previous piece was gap. */
-            for (int g = 0; g < gs->sea_gap_count; g++) {
-                int gx = gs->sea_gaps[g];
-                if (tx + P == gx)              at_right_edge = 1;  /* gap starts right after this piece */
-                if (tx     == gx + SEA_GAP_W)  at_left_edge  = 1;  /* gap ends right before this piece  */
+            for (int g = 0; g < gs->floor_gap_count; g++) {
+                int gx = gs->floor_gaps[g];
+                if (tx + P == gx)                at_right_edge = 1;  /* gap starts right after this piece */
+                if (tx     == gx + FLOOR_GAP_W)  at_left_edge  = 1;  /* gap ends right before this piece  */
             }
 
             if (at_left_edge && at_right_edge) piece_col = 1;  /* squeezed — use fill */
@@ -1498,7 +1498,7 @@ static void game_loop_frame(void *arg) {
                       gs->ropes, gs->rope_count,
                       gs->bridges, gs->bridge_count,
                       gs->spike_platforms, gs->spike_platform_count,
-                      gs->sea_gaps, gs->sea_gap_count,
+                      gs->floor_gaps, gs->floor_gap_count,
                       &bounce_idx, &fp_landed_idx,
                       gs->fp_prev_riding);
 
@@ -1536,25 +1536,25 @@ static void game_loop_frame(void *arg) {
             }
         }
         /*
-         * Sea gap collision — instant life loss.
+         * Floor gap collision — instant life loss.
          *
-         * Each sea gap is a SEA_GAP_W-wide hole in the floor.  The player
+         * Each floor gap is a FLOOR_GAP_W-wide hole in the floor.  The player
          * falls through into the water below.  Once the player's physics
          * centre drops below FLOOR_Y + 16 (the water surface) inside any
          * gap, they lose a life (not a heart) and respawn.  This check
-         * ignores the invincibility timer — falling into the sea is fatal.
+         * ignores the invincibility timer — falling into the gap is fatal.
          */
         {
             float pcx = gs->player.x + gs->player.w / 2.0f;
             float pcy = gs->player.y + gs->player.h / 2.0f;
-            for (int g = 0; g < gs->sea_gap_count; g++) {
-                float gx = (float)gs->sea_gaps[g];
-                if (pcx >= gx && pcx < gx + (float)SEA_GAP_W &&
+            for (int g = 0; g < gs->floor_gap_count; g++) {
+                float gx = (float)gs->floor_gaps[g];
+                if (pcx >= gx && pcx < gx + (float)FLOOR_GAP_W &&
                     pcy > (float)(GAME_H - WATER_ART_H)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT sea gap[%d]", g);
+                    if (gs->debug_mode) debug_log(&gs->debug, "HIT floor gap[%d]", g);
                     /* Play the dive/splash SFX */
                     if (gs->snd_dive) Mix_PlayChannel(-1, gs->snd_dive, 0);
-                    /* Sea gap is always lethal — drain all remaining hearts, no push */
+                    /* Floor gap is always lethal — drain all remaining hearts, no push */
                     apply_damage(gs, gs->hearts, 0, 0.0f, 0.0f);
                     break;
                 }
@@ -1563,10 +1563,10 @@ static void game_loop_frame(void *arg) {
 
         /* Move spiders along their patrol paths and advance their animation */
         spiders_update(gs->spiders, gs->spider_count, dt,
-                       gs->sea_gaps, gs->sea_gap_count);
+                       gs->floor_gaps, gs->floor_gap_count);
         /* Move jumping spiders: patrol + periodic jump arcs */
         jumping_spiders_update(gs->jumping_spiders, gs->jumping_spider_count, dt,
-                               gs->sea_gaps, gs->sea_gap_count,
+                               gs->floor_gaps, gs->floor_gap_count,
                                gs->snd_spider_attack,
                                gs->player.x + gs->player.w / 2.0f, cam_x);
         /* Move birds along their sine-wave patrol paths */

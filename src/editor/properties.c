@@ -53,7 +53,7 @@
 #define CONTENT_X  (PROP_X + 8)
 #define FIELD_X    (CONTENT_X + LABEL_W)
 
-/* Parallax subsection collapse state — accessed by editor.c for layout */
+/* Background/foreground subsection collapse state — accessed by editor.c for layout */
 int g_plx_open = 0;
 int g_fg_open = 0;
 
@@ -68,7 +68,7 @@ int g_fg_open = 0;
  * header to show e.g. "Spider #2" when the user selects the third spider.
  */
 static const char *entity_type_names[ENT_COUNT] = {
-    [ENT_SEA_GAP]          = "Sea Gap",
+    [ENT_FLOOR_GAP]        = "Floor Gap",
     [ENT_RAIL]             = "Rail",
     [ENT_PLATFORM]         = "Platform",
     [ENT_COIN]             = "Coin",
@@ -218,14 +218,14 @@ void properties_render(EditorState *es, int start_y, int available_h)
     /* World geometry                                                    */
     /* ================================================================ */
 
-    case ENT_SEA_GAP: {
+    case ENT_FLOOR_GAP: {
         /*
-         * sea_gaps is an int array — each element is a single x coordinate.
+         * floor_gaps is an int array — each element is a single x coordinate.
          * We take a pointer to the array element so ui_int_field can modify it.
          */
-        int *p = &es->level.sea_gaps[es->selection.index];
+        int *p = &es->level.floor_gaps[es->selection.index];
         ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_SEA_GAP, 0),
+        if (ui_int_field(&es->ui, FIELD_ID(ENT_FLOOR_GAP, 0),
                          FIELD_X, y, FIELD_W, p))
             es->modified = 1;
         break;
@@ -1178,14 +1178,14 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
         es->modified = 1;
     y += 24;
 
-    /* ---- Parallax (Background) — collapsible subsection ---- */
+    /* ---- Background Layers — collapsible subsection ---- */
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
     {
         char plx_header[64];
-        snprintf(plx_header, sizeof(plx_header), "%s Parallax - Background (%d)",
+        snprintf(plx_header, sizeof(plx_header), "%s Background Layers (%d)",
                  g_plx_open ? "v" : ">",
-                 es->level.parallax_layer_count);
+                 es->level.background_layer_count);
 
         int plx_hovered = (es->ui.mouse_x >= x &&
                            es->ui.mouse_x < x + PROP_W &&
@@ -1233,43 +1233,43 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
         };
         static const int bg_count = 12;
 
-        for (int i = 0; i < es->level.parallax_layer_count && i < PARALLAX_MAX_LAYERS; i++) {
+        for (int i = 0; i < es->level.background_layer_count && i < MAX_BACKGROUND_LAYERS; i++) {
             char label[16];
             snprintf(label, sizeof(label), "%d:", i);
             ui_label(&es->ui, x + 8, y, label);
 
             int sel = 0;
             for (int j = 0; j < bg_count; j++) {
-                if (strcmp(es->level.parallax_layers[i].path, bg_paths[j]) == 0) {
+                if (strcmp(es->level.background_layers[i].path, bg_paths[j]) == 0) {
                     sel = j; break;
                 }
             }
             if (ui_dropdown(&es->ui, 9200 + i, x + 28, y, 200,
                              bg_names, bg_count, &sel)) {
-                strncpy(es->level.parallax_layers[i].path, bg_paths[sel],
-                        sizeof(es->level.parallax_layers[i].path) - 1);
+                strncpy(es->level.background_layers[i].path, bg_paths[sel],
+                        sizeof(es->level.background_layers[i].path) - 1);
                 es->modified = 1;
             }
             ui_label(&es->ui, x + 236, y, "spd:");
             if (ui_float_field(&es->ui, 9100 + i, x + 265, y, 60,
-                               &es->level.parallax_layers[i].speed))
+                               &es->level.background_layers[i].speed))
                 es->modified = 1;
             y += 20;
         }
 
-        if (es->level.parallax_layer_count < PARALLAX_MAX_LAYERS) {
+        if (es->level.background_layer_count < MAX_BACKGROUND_LAYERS) {
             if (ui_button(&es->ui, x + 8, y, 80, 20, "+ Add")) {
-                int idx = es->level.parallax_layer_count;
-                strncpy(es->level.parallax_layers[idx].path,
+                int idx = es->level.background_layer_count;
+                strncpy(es->level.background_layers[idx].path,
                         "assets/sprites/backgrounds/sky_blue.png", 63);
-                es->level.parallax_layers[idx].speed = 0.1f;
-                es->level.parallax_layer_count++;
+                es->level.background_layers[idx].speed = 0.1f;
+                es->level.background_layer_count++;
                 es->modified = 1;
             }
         }
-        if (es->level.parallax_layer_count > 0) {
+        if (es->level.background_layer_count > 0) {
             if (ui_button(&es->ui, x + 96, y, 100, 20, "- Remove Last")) {
-                es->level.parallax_layer_count--;
+                es->level.background_layer_count--;
                 es->modified = 1;
             }
         }
@@ -1278,13 +1278,13 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
 
 bg_done:
 
-    /* ---- Parallax (Foreground) — collapsible subsection ---- */
+    /* ---- Foreground Layers — collapsible subsection ---- */
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
     {
         extern int g_g_fg_open;
         char fg_header[64];
-        snprintf(fg_header, sizeof(fg_header), "%s Parallax - Foreground (%d)",
+        snprintf(fg_header, sizeof(fg_header), "%s Foreground Layers (%d)",
                  g_fg_open ? "v" : ">",
                  es->level.foreground_layer_count);
 
@@ -1318,7 +1318,7 @@ bg_done:
         };
         static const int fg_count = 5;
 
-        for (int i = 0; i < es->level.foreground_layer_count && i < PARALLAX_MAX_LAYERS; i++) {
+        for (int i = 0; i < es->level.foreground_layer_count && i < MAX_BACKGROUND_LAYERS; i++) {
             char label[16];
             snprintf(label, sizeof(label), "%d:", i);
             ui_label(&es->ui, x + 8, y, label);
@@ -1342,7 +1342,7 @@ bg_done:
             y += 20;
         }
 
-        if (es->level.foreground_layer_count < PARALLAX_MAX_LAYERS) {
+        if (es->level.foreground_layer_count < MAX_BACKGROUND_LAYERS) {
             if (ui_button(&es->ui, x + 8, y, 80, 20, "+ Add")) {
                 int idx = es->level.foreground_layer_count;
                 strncpy(es->level.foreground_layers[idx].path,

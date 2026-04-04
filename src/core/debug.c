@@ -76,15 +76,15 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
     r.x -= cam_x;
     SDL_RenderDrawRect(renderer, &r);
 
-    /* ---- Sea gaps — dark blue (0, 50, 200) ----------------------------- */
+    /* ---- Floor gaps — dark blue (0, 50, 200) ---------------------------- */
     /*
-     * Each sea kill zone is SEA_GAP_W wide, drawn at the water surface
+     * Each floor kill zone is FLOOR_GAP_W wide, drawn at the water surface
      * (FLOOR_Y + 16).  The box height matches the Water.png art band.
      */
     SDL_SetRenderDrawColor(renderer, 0, 50, 200, 255);
-    for (int g = 0; g < gs->sea_gap_count; g++) {
-        r = (SDL_Rect){ gs->sea_gaps[g] - cam_x, GAME_H - WATER_ART_H,
-                        SEA_GAP_W, WATER_ART_H };
+    for (int g = 0; g < gs->floor_gap_count; g++) {
+        r = (SDL_Rect){ gs->floor_gaps[g] - cam_x, GAME_H - WATER_ART_H,
+                        FLOOR_GAP_W, WATER_ART_H };
         SDL_RenderDrawRect(renderer, &r);
     }
 

@@ -22,10 +22,10 @@
 #include <SDL.h>   /* SDL_Texture, SDL_Renderer */
 
 /*
- * PARALLAX_MAX_LAYERS — maximum number of background layers the system can hold.
+ * MAX_BACKGROUND_LAYERS — maximum number of background layers the system can hold.
  * Stored as a fixed-size array; no heap allocation needed.
  */
-#define PARALLAX_MAX_LAYERS  8
+#define MAX_BACKGROUND_LAYERS  8
 
 /* ------------------------------------------------------------------ */
 
@@ -49,7 +49,7 @@ typedef struct {
  * Stored by value inside GameState — no heap allocation needed.
  */
 typedef struct {
-    ParallaxLayer layers[PARALLAX_MAX_LAYERS];
+    ParallaxLayer layers[MAX_BACKGROUND_LAYERS];
     int           count;    /* number of layers actually configured            */
 } ParallaxSystem;
 
@@ -72,7 +72,7 @@ void parallax_init(ParallaxSystem *ps, SDL_Renderer *renderer);
  * LevelDef.  Each layer is non-fatal: a missing PNG prints a warning and
  * leaves that layer's texture NULL (skipped at render time).
  *
- * count must be <= PARALLAX_MAX_LAYERS; excess entries are silently ignored.
+ * count must be <= MAX_BACKGROUND_LAYERS; excess entries are silently ignored.
  */
 void parallax_init_from_def(ParallaxSystem *ps, SDL_Renderer *renderer,
                             const char (*paths)[64], const float *speeds, int count);

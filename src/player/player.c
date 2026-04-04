@@ -613,7 +613,7 @@ void player_update(Player *player, float dt,
                    const RopeDecor *ropes, int rope_count,
                    const Bridge *bridges, int bridge_count,
                    const SpikePlatform *spike_platforms, int spike_platform_count,
-                   const int *sea_gaps, int sea_gap_count,
+                   const int *floor_gaps, int floor_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
                    int prev_fp_landed_idx) {
@@ -736,9 +736,9 @@ void player_update(Player *player, float dt,
      */
     float phys_center_x = player->x + player->w / 2.0f;
     int over_ground = 1;
-    for (int g = 0; g < sea_gap_count; g++) {
-        float gx = (float)sea_gaps[g];
-        if (phys_center_x >= gx && phys_center_x < gx + (float)SEA_GAP_W) {
+    for (int g = 0; g < floor_gap_count; g++) {
+        float gx = (float)floor_gaps[g];
+        if (phys_center_x >= gx && phys_center_x < gx + (float)FLOOR_GAP_W) {
             over_ground = 0;
             break;
         }
