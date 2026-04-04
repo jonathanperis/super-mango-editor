@@ -902,6 +902,13 @@ void level_config_render(EditorState *es) {
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 8;
 
+    /* ---- Level name ---- */
+    ui_label(&es->ui, x + 8, y, "Name:");
+    if (ui_text_field(&es->ui, 9000, x + 55, y, 310, es->level.name,
+                      (int)sizeof(es->level.name)))
+        es->modified = 1;
+    y += 24;
+
     /* ---- Player spawn ---- */
     ui_label(&es->ui, x + 8, y, "Player Spawn");
     y += 18;

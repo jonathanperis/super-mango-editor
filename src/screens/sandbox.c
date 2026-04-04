@@ -54,7 +54,7 @@ void sandbox_load_level(GameState *gs) {
     if (level_load_json(SANDBOX_JSON_PATH, &s_level) != 0) {
         fprintf(stderr, "Warning: could not load %s — starting empty level\n",
                 SANDBOX_JSON_PATH);
-        s_level.name = "Untitled";
+        strncpy(s_level.name, "Untitled", sizeof(s_level.name) - 1);
     }
 
     level_load(gs, &s_level);

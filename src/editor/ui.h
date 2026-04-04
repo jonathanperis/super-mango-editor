@@ -175,6 +175,22 @@ int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value);
 int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value);
 
 /*
+ * ui_text_field — Editable single-line text field.
+ *
+ * Same interaction model as ui_int_field, but accepts any printable
+ * character (not just digits).  The buffer is caller-owned with a given
+ * maximum size.
+ *
+ * id       — unique non-zero integer identifying this field.
+ * buf      — pointer to the editable char buffer.
+ * buf_size — total capacity of buf (including the '\0' terminator).
+ *
+ * Returns 1 when the value changes (user pressed Return), else 0.
+ */
+int ui_text_field(UIState *ui, int id, int x, int y, int w,
+                  char *buf, int buf_size);
+
+/*
  * ui_dropdown — Selectable dropdown list.
  *
  * Displays the currently selected option in a box.  Clicking the box

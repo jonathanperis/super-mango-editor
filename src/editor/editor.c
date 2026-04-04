@@ -215,7 +215,7 @@ int editor_init(EditorState *es) {
      * Set a default level name so the title bar and status bar have
      * something to display before the user saves or loads a file.
      */
-    es->level.name = "Untitled";
+    strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
 
     /* ---- Start the loop --------------------------------------------- */
     /*
@@ -557,7 +557,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  * positions become 0.0f, and all pointers become NULL.
                  */
                 memset(&es->level, 0, sizeof(es->level));
-                es->level.name = "Untitled";
+                strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
                 es->file_path[0] = '\0';
                 undo_clear(es->undo);
                 es->modified        = 0;
@@ -1630,7 +1630,7 @@ static void render_toolbar(EditorState *es) {
          * Reset level, path, undo stack, and selection.
          */
         memset(&es->level, 0, sizeof(es->level));
-        es->level.name = "Untitled";
+        strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
         es->file_path[0] = '\0';
         undo_clear(es->undo);
         es->modified        = 0;

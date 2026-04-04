@@ -298,7 +298,7 @@ typedef struct {
  * sea_gaps array by blue_flames_init — no explicit placement struct needed.
  */
 typedef struct {
-    const char *name;   /* display name, e.g. "Sandbox" */
+    char  name[64];     /* display name, e.g. "Sandbox" — editable buffer */
 
     /* ---- World geometry --------------------------------------------- */
     int sea_gaps[MAX_SEA_GAPS];

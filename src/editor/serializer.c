@@ -163,7 +163,7 @@ cJSON *level_to_json(const LevelDef *def) {
      * internally, so `def->name` doesn't need to outlive this call.
      */
     cJSON_AddStringToObject(root, "name",
-                            def->name ? def->name : "Untitled");
+                            def->name[0] ? def->name : "Untitled");
 
     /* ---- Sea gaps ------------------------------------------------ */
 
@@ -579,11 +579,12 @@ int level_from_json(const cJSON *json, LevelDef *def) {
 
     /*
      * get_string returns the cJSON-owned string or our fallback.
-     * The LevelDef.name field is a const char* — it points into the cJSON
-     * tree in-flight, but we strdup it so the LevelDef outlives the tree.
+     * Copy into the fixed-size name buffer so the LevelDef outlives
+     * the cJSON tree that gets freed after parsing.
      */
     const char *name_str = get_string(json, "name", "Untitled");
-    def->name = strdup(name_str);
+    strncpy(def->name, name_str, sizeof(def->name) - 1);
+    def->name[sizeof(def->name) - 1] = '\0';
 
     /* ---- Sea gaps ------------------------------------------------ */
 

@@ -506,6 +506,113 @@ int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value)
 /* ------------------------------------------------------------------ */
 
 /*
+ * ui_text_field — Editable single-line text field.
+ *
+ * Identical interaction model to ui_int_field but accepts any printable
+ * character, not just digits.  The caller owns the buffer; this widget
+ * copies the edit result back on Return.
+ *
+ * buf      — pointer to the editable char array (e.g. LevelDef.name).
+ * buf_size — total capacity including the '\0' terminator.
+ */
+int ui_text_field(UIState *ui, int id, int x, int y, int w,
+                  char *buf, int buf_size)
+{
+    int h         = 20;
+    int is_active = (ui->active_id == id);
+    int changed   = 0;
+
+    /* --- Background and border --- */
+    draw_rect(ui->renderer, x, y, w, h, UI_INPUT_BG);
+
+    SDL_Color border = is_active ? UI_ACCENT : UI_TEXT_DIM;
+    SDL_SetRenderDrawColor(ui->renderer, border.r, border.g, border.b,
+                           border.a);
+    SDL_Rect outline = { x, y, w, h };
+    SDL_RenderDrawRect(ui->renderer, &outline);
+
+    /* --- Activation on click --- */
+    if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
+                                           x, y, w, h)) {
+        ui->active_id = id;
+        /*
+         * Copy the current buffer contents into edit_buf so the user
+         * sees the existing text and can modify it.
+         */
+        strncpy(ui->edit_buf, buf, sizeof(ui->edit_buf) - 1);
+        ui->edit_buf[sizeof(ui->edit_buf) - 1] = '\0';
+        ui->edit_cursor = (int)strlen(ui->edit_buf);
+    }
+
+    /* Deactivate on click outside. */
+    if (is_active && ui->mouse_clicked &&
+        !point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h)) {
+        ui->active_id = 0;
+        is_active = 0;
+    }
+
+    /* --- Keyboard handling while active --- */
+    if (is_active) {
+        /*
+         * Accept any printable character (>= space).  The edit_buf capacity
+         * (64 chars) and the caller's buf_size both limit the length.
+         */
+        if (ui->has_text_input) {
+            int max_len = buf_size - 1;
+            if (max_len > (int)sizeof(ui->edit_buf) - 1)
+                max_len = (int)sizeof(ui->edit_buf) - 1;
+            for (int i = 0; ui->text_input[i] != '\0'; i++) {
+                char ch = ui->text_input[i];
+                if (ch >= ' ' && ui->edit_cursor < max_len) {
+                    ui->edit_buf[ui->edit_cursor++] = ch;
+                    ui->edit_buf[ui->edit_cursor]   = '\0';
+                }
+            }
+        }
+
+        if (ui->key_backspace && ui->edit_cursor > 0) {
+            ui->edit_cursor--;
+            ui->edit_buf[ui->edit_cursor] = '\0';
+        }
+
+        /*
+         * Return — confirm the edit.  Copy edit_buf back into the caller's
+         * buffer.  Only signal "changed" if the text actually differs.
+         */
+        if (ui->key_return) {
+            if (strcmp(ui->edit_buf, buf) != 0) {
+                strncpy(buf, ui->edit_buf, (size_t)(buf_size - 1));
+                buf[buf_size - 1] = '\0';
+                changed = 1;
+            }
+            ui->active_id = 0;
+            is_active = 0;
+        }
+
+        if (ui->key_escape) {
+            ui->active_id = 0;
+            is_active = 0;
+        }
+    }
+
+    /* --- Draw display text --- */
+    if (is_active) {
+        char display[80];
+        int blink = (SDL_GetTicks() / 500) % 2;
+        snprintf(display, sizeof(display), "%s%s",
+                 ui->edit_buf, blink ? "|" : "");
+        draw_text(ui->renderer, ui->font, x + 4, y + 3, display, UI_TEXT);
+    } else {
+        draw_text(ui->renderer, ui->font, x + 4, y + 3,
+                  buf[0] ? buf : "Untitled", UI_TEXT_DIM);
+    }
+
+    return changed;
+}
+
+/* ------------------------------------------------------------------ */
+
+/*
  * ui_dropdown — Selectable dropdown (combo box).
  *
  * Visual layout:

@@ -191,7 +191,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     fprintf(f, "const LevelDef %s_def = {\n", var_name);
 
     /* ---- 1. name ---- */
-    fprintf(f, "    .name = \"%s\",\n", def->name ? def->name : "Untitled");
+    fprintf(f, "    .name = \"%s\",\n", def->name[0] ? def->name : "Untitled");
 
     /* ---- 2. Sea gaps ---- */
     write_section(f, "Sea gaps");
