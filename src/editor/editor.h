@@ -28,22 +28,7 @@
 #include <SDL_ttf.h>       /* TTF_Font — for rendering panel labels and tooltips */
 #include "../levels/level.h" /* LevelDef — the data-driven level definition we edit */
 #include "ui.h"            /* UIState — immediate-mode UI widget state            */
-
-/* ------------------------------------------------------------------ */
-/* Forward declarations                                                */
-/* ------------------------------------------------------------------ */
-
-/*
- * UndoStack — opaque type declared in undo.h and defined in undo.c.
- *
- * Forward-declaring it here lets EditorState hold a *pointer* to an
- * UndoStack without needing the full struct definition.  In C, pointers
- * have a fixed size regardless of what they point to, so the compiler
- * only needs to know the type exists — not its layout.  The actual
- * struct definition lives in undo.h, which only undo.c and files that
- * call undo functions need to include.
- */
-typedef struct UndoStack UndoStack;
+#include "undo.h"          /* UndoStack, PlacementData — undo system + clipboard */
 
 /* ------------------------------------------------------------------ */
 /* Constants — editor window layout                                    */
@@ -297,6 +282,18 @@ typedef struct {
      * allocates this at init and frees it at cleanup.
      */
     UndoStack     *undo;
+
+    /* ---- Clipboard (copy/paste) ---------------------------------------- */
+    /*
+     * clipboard — holds a snapshot of one entity's placement data for Ctrl+C/V.
+     *
+     * has_clipboard is 1 after a Ctrl+C; the entity_type and data fields
+     * identify what was copied.  Ctrl+V creates a new entity from this
+     * snapshot at a position offset from the original.
+     */
+    int            has_clipboard;
+    EntityType     clipboard_type;
+    PlacementData  clipboard_data;
 
     /* ---- File I/O ----------------------------------------------------- */
     /*
