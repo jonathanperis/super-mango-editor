@@ -288,8 +288,8 @@
 		}],
 	"ladders":	[{
 			"x":	1552,
-			"y":	-962,
-			"tile_count":	150
+			"y":	12,
+			"tile_count":	30
 		}],
 	"ropes":	[{
 			"x":	460,

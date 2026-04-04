@@ -569,8 +569,8 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  */
                 memset(&es->level, 0, sizeof(es->level));
                 strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
-                es->level.player_start_x = 24.0f;
-                es->level.player_start_y = 204.0f;
+                es->level.player_start_x = 48.0f;
+                es->level.player_start_y = 205.0f;
                 es->level.last_star.x = 145.0f;
                 es->level.last_star.y = 167.0f;
                 es->file_path[0] = '\0';
@@ -1686,8 +1686,10 @@ static void render_toolbar(EditorState *es) {
          */
         memset(&es->level, 0, sizeof(es->level));
         strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
+        es->level.player_start_x = 48.0f;
+        es->level.player_start_y = 205.0f;
         es->level.last_star.x = 145.0f;
-    es->level.last_star.y = 167.0f;
+        es->level.last_star.y = 167.0f;
         es->file_path[0] = '\0';
         undo_clear(es->undo);
         es->modified        = 0;

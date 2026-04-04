@@ -344,6 +344,7 @@ cJSON *level_to_json(const LevelDef *def) {
         const AxeTrapPlacement *a = &def->axe_traps[i];
         cJSON *obj = cJSON_CreateObject();
         cJSON_AddNumberToObject(obj, "pillar_x", a->pillar_x);
+        cJSON_AddNumberToObject(obj, "y", a->y);
         cJSON_AddStringToObject(obj, "mode", axe_mode_to_str(a->mode));
         cJSON_AddItemToArray(axe_arr, obj);
     }
@@ -355,6 +356,7 @@ cJSON *level_to_json(const LevelDef *def) {
         const CircularSawPlacement *cs = &def->circular_saws[i];
         cJSON *obj = cJSON_CreateObject();
         cJSON_AddNumberToObject(obj, "x", cs->x);
+        cJSON_AddNumberToObject(obj, "y", cs->y);
         cJSON_AddNumberToObject(obj, "patrol_x0", cs->patrol_x0);
         cJSON_AddNumberToObject(obj, "patrol_x1", cs->patrol_x1);
         cJSON_AddNumberToObject(obj, "direction", cs->direction);
@@ -739,6 +741,7 @@ int level_from_json(const cJSON *json, LevelDef *def) {
 
     PARSE_ARRAY("axe_traps", def->axe_traps, axe_trap_count, MAX_AXE_TRAPS, {
         def->axe_traps[idx].pillar_x = (float)get_number(elem, "pillar_x", 0);
+        def->axe_traps[idx].y        = (float)get_number(elem, "y", 0);
         def->axe_traps[idx].mode     = axe_mode_from_str(
             get_string(elem, "mode", "PENDULUM"));
     });
@@ -748,6 +751,7 @@ int level_from_json(const cJSON *json, LevelDef *def) {
     PARSE_ARRAY("circular_saws", def->circular_saws, circular_saw_count,
                 MAX_CIRCULAR_SAWS, {
         def->circular_saws[idx].x         = (float)get_number(elem, "x", 0);
+        def->circular_saws[idx].y         = (float)get_number(elem, "y", 0);
         def->circular_saws[idx].patrol_x0 = (float)get_number(elem, "patrol_x0", 0);
         def->circular_saws[idx].patrol_x1 = (float)get_number(elem, "patrol_x1", 0);
         def->circular_saws[idx].direction = (int)get_number(elem, "direction", 1);
