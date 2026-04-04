@@ -1,6 +1,6 @@
 # Tasks: Visual Level Editor
 
-All decisions finalized. Primary validation target: **recreate level_01.c (Sandbox) with pixel-perfect fidelity**.
+All decisions finalized. Primary validation target: **recreate sandbox_00.c (Sandbox) with pixel-perfect fidelity**.
 
 ---
 
@@ -65,7 +65,7 @@ Enum string mappings:
 
 **`level_from_json`**: validate counts against MAX_*. Missing arrays → count=0. `last_star` is single object.
 
-**Verify:** Convert `level_01_def` → JSON → LevelDef → compare every field. Must match exactly (float equality ok for round-trip of own output).
+**Verify:** Convert `sandbox_00_def` → JSON → LevelDef → compare every field. Must match exactly (float equality ok for round-trip of own output).
 **Commit:** `feat(editor): add JSON serializer for LevelDef — all 25 placement types`
 
 ---
@@ -75,7 +75,7 @@ Enum string mappings:
 **Files:** `src/editor/exporter.h`, `src/editor/exporter.c`
 **Work:**
 
-`level_export_c(def, var_name, dir_path)` generates two files matching `level_01.c` style:
+`level_export_c(def, var_name, dir_path)` generates two files matching `sandbox_00.c` style:
 
 **Header** (`{var_name}.h`):
 ```c
@@ -105,7 +105,7 @@ extern const LevelDef {var_name}_def;
 - Section separators: `/* ---- World geometry ---- */`
 
 **Verify:**
-1. Export `level_01_def` → compile: zero warnings with `-std=c11 -Wall -Wextra -Wpedantic`
+1. Export `sandbox_00_def` → compile: zero warnings with `-std=c11 -Wall -Wextra -Wpedantic`
 2. Replace original in game → `make run` → identical behavior
 **Commit:** `feat(editor): add C code exporter — generates compilable level source`
 
@@ -206,7 +206,7 @@ Replicate the game's 9-slice floor algorithm:
 - For each sea_gap: draw solid blue rect (#1A6BA0) from y=GAME_H-31 to y=GAME_H, width=SEA_GAP_W
 - Optionally render one static water frame from `water.png` for visual fidelity
 
-**Verify:** Load level_01 data. Floor matches game exactly:
+**Verify:** Load sandbox_00 data. Floor matches game exactly:
 - 5 sea gaps with clean edge caps at positions 0, 192, 560, 928, 1152
 - Grass tiles seamlessly fill between gaps
 - Water visible in gap regions
@@ -343,7 +343,7 @@ for (int t = 0; t < tile_count; t++)
 
 **Render order:** follow the 31-layer order from design.md exactly.
 
-**Verify:** Load level_01 data into editor. Compare canvas screenshot with game screenshot:
+**Verify:** Load sandbox_00 data into editor. Compare canvas screenshot with game screenshot:
 - All 8 platforms at correct heights (2-tile at y=172, 3-tile at y=124)
 - 5 sea gaps with floor edge caps
 - 16 coins at correct x,y
@@ -489,7 +489,7 @@ Selection hit_test(const LevelDef *level, float wx, float wy) {
 Move: drag updates placement x (and y where stored). Shift → snap to TILE_SIZE grid.
 Selection highlight: 2px outline (#4A90D9) around display bounding box.
 
-**Verify:** Can select any entity in level_01. Click on spider (thin 10px strip) works. Drag moves. Shift snaps.
+**Verify:** Can select any entity in sandbox_00. Click on spider (thin 10px strip) works. Drag moves. Shift snaps.
 **Commit:** `feat(editor): add select and move tool with display-size hit testing`
 
 ---
@@ -502,7 +502,7 @@ Selection highlight: 2px outline (#4A90D9) around display bounding box.
 Ghost preview at cursor using 50% alpha (`SDL_SetTextureAlphaMod(tex, 128)`).
 Click → check MAX_* → append to array → increment count → push CMD_PLACE.
 
-Default placement values for level_01 accuracy:
+Default placement values for sandbox_00 accuracy:
 
 | Entity | Defaults |
 |--------|----------|
@@ -588,7 +588,7 @@ Special: `ENT_LAST_STAR` overwrites (single struct). `ENT_SEA_GAP` snaps to 32px
 - Call `level_export_c()`, show status bar confirmation
 - Validate: level must have name, warn if empty
 
-**Verify:** Export → compile with game → behavior identical to level_01.
+**Verify:** Export → compile with game → behavior identical to sandbox_00.
 **Commit:** `feat(editor): add C export workflow — Ctrl+E generates compilable level source`
 
 ---
@@ -607,12 +607,12 @@ Special: `ENT_LAST_STAR` overwrites (single struct). `ENT_SEA_GAP` snaps to 32px
 
 ---
 
-### T-019: Seed editor with level_01 JSON conversion
+### T-019: Seed editor with sandbox_00 JSON conversion
 **Requires:** T-002 | **Refs:** Success criteria #3, #4
-**Files:** `levels/level_01.json`
+**Files:** `levels/sandbox_00.json`
 **Work:**
 
-One-time conversion: access `level_01_def` → `level_to_json()` → write `levels/level_01.json`.
+One-time conversion: access `sandbox_00_def` → `level_to_json()` → write `levels/sandbox_00.json`.
 
 This JSON becomes:
 - The reference file for round-trip validation
@@ -620,12 +620,12 @@ This JSON becomes:
 - The benchmark: load in editor, compare with game screenshot
 
 **Round-trip verification chain:**
-1. `level_01_def` (C const) → JSON → LevelDef → field-by-field comparison ✓
+1. `sandbox_00_def` (C const) → JSON → LevelDef → field-by-field comparison ✓
 2. JSON → LevelDef → C export → compile → game runs identically ✓
 3. JSON → editor canvas → visual match with game screenshot ✓
 
-**Verify:** `levels/level_01.json` loads in editor. All 47+ entities at correct positions.
-**Commit:** `feat(editor): convert level_01 to JSON — seed and validation benchmark`
+**Verify:** `levels/sandbox_00.json` loads in editor. All 47+ entities at correct positions.
+**Commit:** `feat(editor): convert sandbox_00 to JSON — seed and validation benchmark`
 
 ---
 
@@ -652,7 +652,7 @@ This JSON becomes:
 - When selecting a spike_block or RAIL float_platform, highlight the referenced rail path
 - Show rail_index in properties as dropdown (0 to rail_count-1)
 
-**Verify:** Can recreate level_01's 5 sea gaps and 3 rails. Spike blocks show at correct rail positions.
+**Verify:** Can recreate sandbox_00's 5 sea gaps and 3 rails. Spike blocks show at correct rail positions.
 **Commit:** `feat(editor): add rail path and sea gap editing tools`
 
 ---
@@ -664,7 +664,7 @@ T-001 (cJSON)
   └── T-002 (serializer)
         ├── T-003 (exporter) → T-017 (export workflow)
         ├── T-016 (save/load)
-        └── T-019 (level_01 JSON seed)
+        └── T-019 (sandbox_00 JSON seed)
 
 T-004 (Makefile)
   └── T-005 (editor skeleton)
@@ -693,15 +693,15 @@ T-020 (rails/sea gaps) ← T-012, T-013
 | R-003 (Visual canvas) | T-006-T-008b | 9-slice floor, water, display-accurate entities |
 | R-004 (Palette) | T-010 | 25 types in 6 categories |
 | R-005 (Properties) | T-011 | Per-type field mapping (25 configs) |
-| R-006 (JSON) | T-001, T-002, T-016, T-019 | Round-trip fidelity for level_01 |
-| R-007 (C export) | T-003, T-017 | level_01.c style match |
+| R-006 (JSON) | T-001, T-002, T-016, T-019 | Round-trip fidelity for sandbox_00 |
+| R-007 (C export) | T-003, T-017 | sandbox_00.c style match |
 | R-008 (Edit ops) | T-012-T-014 | Display-size hit testing |
 | R-009 (Undo/redo) | T-015 | 256 commands, PlacementData union |
 | R-010 (Camera) | T-006 | WASD + middle-mouse + zoom |
 
-## Sandbox Validation Checklist (level_01.c)
+## Sandbox Validation Checklist (sandbox_00.c)
 
-The following must be visually correct when loading `level_01.json` in the editor:
+The following must be visually correct when loading `sandbox_00.json` in the editor:
 
 - [ ] 5 sea gaps at x = 0, 192, 560, 928, 1152 with floor edge caps
 - [ ] 3 rails: RECT 10×6 at (444,35), RECT 8×5 at (852,50), HORIZ 14-tile at (1200,112)

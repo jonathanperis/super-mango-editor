@@ -11,9 +11,9 @@
  *
  * Usage:
  *   #include "level.h"
- *   #include "levels/level_01.h"     // extern const LevelDef level_01_def;
- *   level_load(gs, &level_01_def);   // from level_loader.h
- *   level_reset(gs, &level_01_def);  // on player death
+ *   #include "levels/sandbox_00.h"     // extern const LevelDef sandbox_00_def;
+ *   level_load(gs, &sandbox_00_def);   // from level_loader.h
+ *   level_reset(gs, &sandbox_00_def);  // on player death
  */
 #pragma once
 

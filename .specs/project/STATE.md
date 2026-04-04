@@ -4,7 +4,7 @@
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Level Editor | Ready to implement | 3rd revision complete — game-accurate rendering details, level_01 validation checklist |
+| Level Editor | Ready to implement | 3rd revision complete — game-accurate rendering details, sandbox_00 validation checklist |
 
 ## Decisions (Finalized)
 
