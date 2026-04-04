@@ -1,6 +1,6 @@
 {
 	"name":	"Sandbox",
-	"sea_gaps":	[0, 192, 560, 928, 1152],
+	"sea_gaps":	[0, 192, 560, 928, 1152, 480, 448],
 	"rails":	[{
 			"layout":	"RECT",
 			"x":	444,
@@ -249,7 +249,7 @@
 		}],
 	"bouncepads_medium":	[{
 			"x":	310,
-			"launch_vy":	-536.25,
+			"launch_vy":	-536.20001220703125,
 			"pad_type":	"WOOD"
 		}],
 	"bouncepads_high":	[{
@@ -287,5 +287,32 @@
 			"x":	460,
 			"y":	172,
 			"tile_count":	1
-		}]
+		}],
+	"parallax_layers":	[{
+			"path":	"assets/parallax_sky.png",
+			"speed":	0
+		}, {
+			"path":	"assets/parallax_clouds_bg.png",
+			"speed":	0.079999998211860657
+		}, {
+			"path":	"assets/parallax_glacial_mountains.png",
+			"speed":	0.15000000596046448
+		}, {
+			"path":	"assets/parallax_clouds_mg_3.png",
+			"speed":	0.25
+		}, {
+			"path":	"assets/parallax_clouds_mg_2.png",
+			"speed":	0.37999999523162842
+		}, {
+			"path":	"assets/parallax_cloud_lonely.png",
+			"speed":	0.43999999761581421
+		}, {
+			"path":	"assets/parallax_clouds_mg_1.png",
+			"speed":	0.5
+		}],
+	"player_start_x":	80,
+	"player_start_y":	172,
+	"music_path":	"sounds/game_music.ogg",
+	"music_volume":	13,
+	"fog_enabled":	1
 }

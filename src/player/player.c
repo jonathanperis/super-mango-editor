@@ -101,12 +101,17 @@ void player_init(Player *player, SDL_Renderer *renderer) {
      * the sprite frame, so the feet visually rest on the grass surface.
      */
     /*
-     * Spawn on top of the first platform (x=80, y=172, width=TILE_SIZE).
+     * Default spawn on top of the first platform (x=80, y=172, width=TILE_SIZE).
      * Centre horizontally on the pillar; snap vertically using the same
      * formula as platform landing: plat_y − player_h + FLOOR_SINK.
+     *
+     * spawn_x/spawn_y store the level-defined spawn point.  level_load will
+     * override these (and reposition x/y) once the LevelDef is available.
      */
-    player->x        = 80.0f + (TILE_SIZE - player->w) / 2.0f;
-    player->y        = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - player->h + FLOOR_SINK);
+    player->spawn_x  = 80.0f;
+    player->spawn_y  = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);
+    player->x        = player->spawn_x + (TILE_SIZE - player->w) / 2.0f;
+    player->y        = player->spawn_y - player->h + FLOOR_SINK;
     player->vx       = 0.0f;
     player->vy       = 0.0f;   /* start stationary; gravity will pull down   */
     player->speed    = 160.0f; /* horizontal speed: 160 logical px per second */
@@ -1076,9 +1081,9 @@ SDL_Rect player_get_hitbox(const Player *player) {
  * because they were set once in player_init and don't change.
  */
 void player_reset(Player *player) {
-    /* Respawn on top of the first platform (same as player_init). */
-    player->x         = 80.0f + (TILE_SIZE - player->w) / 2.0f;
-    player->y         = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - player->h + FLOOR_SINK);
+    /* Respawn at the level-defined spawn point (set by level_load). */
+    player->x         = player->spawn_x + (TILE_SIZE - player->w) / 2.0f;
+    player->y         = player->spawn_y - player->h + FLOOR_SINK;
     player->vx        = 0.0f;
     player->vy        = 0.0f;
     player->on_ground = 1;

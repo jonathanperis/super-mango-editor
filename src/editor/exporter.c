@@ -517,6 +517,32 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .rope_count = %d,\n", def->rope_count);
 
+    /* ---- 27. Level-wide configuration ---- */
+    write_section(f, "Level-wide configuration");
+
+    /* Parallax layers */
+    if (def->parallax_layer_count > 0) {
+        fprintf(f, "    .parallax_layers = {\n");
+        for (int i = 0; i < def->parallax_layer_count; i++) {
+            fprintf(f, "        { \"%s\", %.2ff },\n",
+                    def->parallax_layers[i].path,
+                    (double)def->parallax_layers[i].speed);
+        }
+        fprintf(f, "    },\n");
+    }
+    fprintf(f, "    .parallax_layer_count = %d,\n", def->parallax_layer_count);
+
+    /* Player spawn */
+    fprintf(f, "\n    .player_start_x = %.1ff,\n", (double)def->player_start_x);
+    fprintf(f, "    .player_start_y = %.1ff,\n", (double)def->player_start_y);
+
+    /* Music */
+    fprintf(f, "\n    .music_path   = \"%s\",\n", def->music_path);
+    fprintf(f, "    .music_volume = %d,\n", def->music_volume);
+
+    /* Fog */
+    fprintf(f, "\n    .fog_enabled = %d,\n", def->fog_enabled);
+
     /* ---- Close the struct ---- */
     fprintf(f, "};\n");
 

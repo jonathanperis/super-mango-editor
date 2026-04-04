@@ -103,6 +103,40 @@ void parallax_init(ParallaxSystem *ps, SDL_Renderer *renderer)
 /* ------------------------------------------------------------------ */
 
 /*
+ * parallax_init_from_def — Load layers from level-definition path/speed arrays.
+ *
+ * Same logic as parallax_init but reads from caller-provided arrays instead
+ * of the internal LAYER_CONFIG table.  Used when the LevelDef provides its
+ * own parallax configuration.  count is clamped to PARALLAX_MAX_LAYERS.
+ */
+void parallax_init_from_def(ParallaxSystem *ps, SDL_Renderer *renderer,
+                            const char (*paths)[64], const float *speeds, int count)
+{
+    if (count > PARALLAX_MAX_LAYERS) count = PARALLAX_MAX_LAYERS;
+    ps->count = count;
+
+    for (int i = 0; i < count; i++) {
+        ParallaxLayer *layer = &ps->layers[i];
+
+        layer->speed   = speeds[i];
+        layer->tex_w   = 0;
+        layer->tex_h   = 0;
+        layer->texture = NULL;
+
+        layer->texture = IMG_LoadTexture(renderer, paths[i]);
+        if (!layer->texture) {
+            fprintf(stderr, "Warning: parallax layer %s not loaded: %s\n",
+                    paths[i], IMG_GetError());
+            continue;
+        }
+
+        SDL_QueryTexture(layer->texture, NULL, NULL, &layer->tex_w, &layer->tex_h);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+
+/*
  * parallax_render — Draw every layer with horizontal tiling and parallax offset.
  *
  * For each layer the horizontal scroll offset is:

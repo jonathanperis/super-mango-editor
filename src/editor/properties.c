@@ -16,6 +16,7 @@
  */
 
 #include <stdio.h>      /* snprintf for header label formatting */
+#include <string.h>     /* strrchr for filename extraction       */
 
 #include "properties.h"
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, PANEL_W, etc. */
@@ -870,5 +871,115 @@ void properties_render(EditorState *es)
     /* ---- Fallthrough for ENT_COUNT (not a real type) ---------------- */
     case ENT_COUNT:
         break;
+    }
+}
+
+/* ================================================================== */
+/* level_config_render — Level-wide configuration panel                 */
+/* ================================================================== */
+
+/*
+ * level_config_render — Show editable level-wide settings.
+ *
+ * Renders in the same bottom-right panel location as the entity properties
+ * but is shown when NO entity is selected.  This gives the designer access
+ * to parallax background layers, player spawn position, music, and fog
+ * without needing to select a specific entity.
+ *
+ * Widget IDs use the 9000+ range to avoid collisions with entity fields.
+ */
+void level_config_render(EditorState *es) {
+    int x = PROP_X;
+    int y = PROP_Y;
+
+    /* Panel background */
+    ui_panel(&es->ui, x, y, PROP_W, PROP_H);
+    y += 4;
+
+    /* Header */
+    ui_label_color(&es->ui, x + 8, y, "LEVEL CONFIG", UI_ACCENT);
+    y += 22;
+    ui_separator(&es->ui, x + 4, y, PROP_W - 8);
+    y += 8;
+
+    /* ---- Player spawn ---- */
+    ui_label(&es->ui, x + 8, y, "Player Spawn");
+    y += 18;
+    ui_label(&es->ui, x + 8, y, "x:");
+    if (ui_float_field(&es->ui, 9001, x + 30, y, 100, &es->level.player_start_x))
+        es->modified = 1;
+    ui_label(&es->ui, x + 140, y, "y:");
+    if (ui_float_field(&es->ui, 9002, x + 160, y, 100, &es->level.player_start_y))
+        es->modified = 1;
+    y += 24;
+
+    /* ---- Music ---- */
+    ui_separator(&es->ui, x + 4, y, PROP_W - 8);
+    y += 6;
+    ui_label(&es->ui, x + 8, y, "Music");
+    y += 18;
+    ui_label(&es->ui, x + 8, y, "path:");
+    ui_label(&es->ui, x + 50, y, es->level.music_path[0] ? es->level.music_path : "(none)");
+    y += 18;
+    ui_label(&es->ui, x + 8, y, "vol:");
+    if (ui_int_field(&es->ui, 9003, x + 50, y, 80, &es->level.music_volume))
+        es->modified = 1;
+    y += 24;
+
+    /* ---- Fog ---- */
+    ui_separator(&es->ui, x + 4, y, PROP_W - 8);
+    y += 6;
+    ui_label(&es->ui, x + 8, y, "Fog");
+    y += 18;
+    {
+        static const char *fog_opts[] = { "Off", "On" };
+        if (ui_dropdown(&es->ui, 9004, x + 8, y, 100, fog_opts, 2, &es->level.fog_enabled))
+            es->modified = 1;
+    }
+    y += 24;
+
+    /* ---- Parallax layers ---- */
+    ui_separator(&es->ui, x + 4, y, PROP_W - 8);
+    y += 6;
+    {
+        char plx_header[48];
+        snprintf(plx_header, sizeof(plx_header), "Parallax (%d layers)",
+                 es->level.parallax_layer_count);
+        ui_label(&es->ui, x + 8, y, plx_header);
+    }
+    y += 18;
+
+    /* Show each parallax layer's path (read-only) and speed (editable) */
+    for (int i = 0; i < es->level.parallax_layer_count && i < PARALLAX_MAX_LAYERS; i++) {
+        if (y + 20 > PROP_Y + PROP_H - 4) break;  /* clip if out of panel */
+
+        char label[16];
+        snprintf(label, sizeof(label), "%d:", i);
+        ui_label(&es->ui, x + 8, y, label);
+
+        /* Show filename portion of path */
+        const char *path = es->level.parallax_layers[i].path;
+        const char *slash = strrchr(path, '/');
+        const char *display = slash ? slash + 1 : path;
+        ui_label(&es->ui, x + 28, y, display[0] ? display : "(empty)");
+
+        /* Speed field */
+        ui_label(&es->ui, x + 260, y, "spd:");
+        if (ui_float_field(&es->ui, 9100 + i, x + 295, y, 70, &es->level.parallax_layers[i].speed))
+            es->modified = 1;
+        y += 18;
+    }
+
+    /* Button to add a layer */
+    if (es->level.parallax_layer_count < PARALLAX_MAX_LAYERS) {
+        if (y + 22 < PROP_Y + PROP_H - 4) {
+            if (ui_button(&es->ui, x + 8, y, 100, 20, "+ Add Layer")) {
+                int idx = es->level.parallax_layer_count;
+                strncpy(es->level.parallax_layers[idx].path, "assets/", 63);
+                es->level.parallax_layers[idx].speed = 0.1f;
+                es->level.parallax_layer_count++;
+                es->modified = 1;
+            }
+        }
     }
 }

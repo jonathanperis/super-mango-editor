@@ -368,6 +368,30 @@ typedef struct {
     int             ladder_count;
     RopePlacement   ropes[MAX_ROPES];
     int             rope_count;
+
+    /* ---- Level-wide configuration ----------------------------------- */
+    /*
+     * Fields below control systems that were previously hardcoded in game.c.
+     * Moving them into LevelDef lets the editor configure them per-level.
+     */
+
+    /* Parallax background layers (back-to-front render order) */
+    struct {
+        char  path[64];   /* PNG path relative to repo root */
+        float speed;      /* scroll fraction: 0.0=static, 0.5=half cam speed */
+    } parallax_layers[PARALLAX_MAX_LAYERS];
+    int parallax_layer_count;
+
+    /* Player spawn position */
+    float player_start_x;
+    float player_start_y;
+
+    /* Background music */
+    char  music_path[64];   /* path to .ogg/.wav music file, empty = no music */
+    int   music_volume;     /* 0-128, SDL_mixer range */
+
+    /* Fog atmosphere */
+    int   fog_enabled;      /* 1 = fog active, 0 = disabled */
 } LevelDef;
 
 /* ------------------------------------------------------------------ */

@@ -424,6 +424,9 @@ void editor_loop(EditorState *es) {
 
             if (es->selection.index >= 0) {
                 properties_render(es);
+            } else {
+                /* No entity selected — show level-wide config panel */
+                level_config_render(es);
             }
 
             render_status_bar(es);

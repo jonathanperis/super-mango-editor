@@ -65,6 +65,19 @@ typedef struct {
 void parallax_init(ParallaxSystem *ps, SDL_Renderer *renderer);
 
 /*
+ * parallax_init_from_def — Load layers from level definition data.
+ *
+ * Instead of reading from the hardcoded LAYER_CONFIG table, this function
+ * accepts parallel arrays of PNG paths and speed factors extracted from a
+ * LevelDef.  Each layer is non-fatal: a missing PNG prints a warning and
+ * leaves that layer's texture NULL (skipped at render time).
+ *
+ * count must be <= PARALLAX_MAX_LAYERS; excess entries are silently ignored.
+ */
+void parallax_init_from_def(ParallaxSystem *ps, SDL_Renderer *renderer,
+                            const char (*paths)[64], const float *speeds, int count);
+
+/*
  * parallax_render — Draw all layers back-to-front with horizontal tiling.
  *
  * cam_x is the integer camera offset for this frame (from game_loop).

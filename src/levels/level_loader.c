@@ -464,6 +464,9 @@ static void load_ropes(GameState *gs, const LevelDef *def)
  */
 void level_load(GameState *gs, const LevelDef *def)
 {
+    /* Store a pointer to the active level definition for game.c to read */
+    gs->current_level = def;
+
     /* ---- Static geometry ------------------------------------------ */
     load_sea_gaps(gs, def);
     load_rails(gs, def);
@@ -499,6 +502,24 @@ void level_load(GameState *gs, const LevelDef *def)
     load_vines(gs, def);
     load_ladders(gs, def);
     load_ropes(gs, def);
+
+    /* ---- Level-wide configuration --------------------------------- */
+
+    /*
+     * Player spawn — override the defaults set by player_init.
+     * player_init has already run by this point, so w/h are valid.
+     * FLOOR_SINK is 16 px (defined in player.c); we use the same literal
+     * here to keep the spawn formula consistent with player_reset.
+     */
+    if (def->player_start_x != 0.0f || def->player_start_y != 0.0f) {
+        gs->player.spawn_x = def->player_start_x;
+        gs->player.spawn_y = def->player_start_y;
+        gs->player.x = def->player_start_x + (TILE_SIZE - gs->player.w) / 2.0f;
+        gs->player.y = def->player_start_y - gs->player.h + 16;  /* 16 = FLOOR_SINK */
+    }
+
+    /* Fog enabled/disabled flag — read by game.c at render time */
+    gs->fog_enabled = def->fog_enabled;
 }
 
 /*

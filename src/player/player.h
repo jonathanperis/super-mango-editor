@@ -54,6 +54,8 @@ typedef struct {
     int       climb_source;     /* 0 = vine, 1 = ladder, 2 = rope                */
     int       jump_held;         /* 1 = jump key still held from last jump; prevents re-jump */
     float     hurt_timer;        /* seconds remaining of invincibility blink; 0 = normal */
+    float     spawn_x;          /* level-defined spawn x (platform top-left)           */
+    float     spawn_y;          /* level-defined spawn y (platform top; adjusted by -h + FLOOR_SINK) */
     SDL_Rect     frame;   /* source rect: which part of the sheet to draw    */
     SDL_Texture *texture; /* GPU image handle; NULL until player_init runs   */
 } Player;

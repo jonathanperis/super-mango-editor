@@ -280,6 +280,10 @@ typedef struct {
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
     DebugOverlay  debug;       /* FPS counter, collision vis, event log      */
 
+    /* ---- Level-wide configuration (set by level_load from LevelDef) -- */
+    const void   *current_level;    /* pointer to the active LevelDef          */
+    int           fog_enabled;      /* 1 = fog rendering active, 0 = disabled  */
+
     /* ---- Loop state (persists across frames for emscripten callback) - */
     Uint64        loop_prev_ticks;  /* timestamp of previous frame         */
     int           fp_prev_riding;   /* float platform player stood on last frame */

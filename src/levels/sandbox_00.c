@@ -25,8 +25,8 @@ const LevelDef sandbox_00_def = {
     .name = "Sandbox",
 
     /* ---- Sea gaps ---- */
-    .sea_gaps      = { 0, 192, 560, 928, 1152 },
-    .sea_gap_count = 5,
+    .sea_gaps      = { 0, 192, 560, 928, 1152, 480, 448 },
+    .sea_gap_count = 7,
 
     /* ---- Rails ---- */
     .rails = {
@@ -220,4 +220,29 @@ const LevelDef sandbox_00_def = {
         { .x = 460.0f, .y = 172.0f, .tile_count = 1 },
     },
     .rope_count = 1,
+
+    /* ---- Level-wide configuration ----------------------------------- */
+
+    /* Parallax layers (back-to-front) — 7 layers for the forest theme */
+    .parallax_layers = {
+        { "assets/parallax_sky.png",               0.00f },
+        { "assets/parallax_clouds_bg.png",         0.08f },
+        { "assets/parallax_glacial_mountains.png", 0.15f },
+        { "assets/parallax_clouds_mg_3.png",       0.25f },
+        { "assets/parallax_clouds_mg_2.png",       0.38f },
+        { "assets/parallax_cloud_lonely.png",      0.44f },
+        { "assets/parallax_clouds_mg_1.png",       0.50f },
+    },
+    .parallax_layer_count = 7,
+
+    /* Player spawns on top of the first 2-tile platform at x=80 */
+    .player_start_x = 80.0f,
+    .player_start_y = 172.0f,
+
+    /* Background music */
+    .music_path   = "sounds/game_music.ogg",
+    .music_volume = 13,
+
+    /* Fog enabled for atmospheric forest effect */
+    .fog_enabled = 1,
 };

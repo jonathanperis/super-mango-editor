@@ -494,6 +494,28 @@ cJSON *level_to_json(const LevelDef *def) {
         cJSON_AddItemToArray(rope_arr, obj);
     }
 
+    /* ---- Level-wide configuration ----------------------------------- */
+
+    /* Parallax layers */
+    cJSON *plx_arr = cJSON_AddArrayToObject(root, "parallax_layers");
+    for (int i = 0; i < def->parallax_layer_count; i++) {
+        cJSON *obj = cJSON_CreateObject();
+        cJSON_AddStringToObject(obj, "path", def->parallax_layers[i].path);
+        cJSON_AddNumberToObject(obj, "speed", (double)def->parallax_layers[i].speed);
+        cJSON_AddItemToArray(plx_arr, obj);
+    }
+
+    /* Player spawn */
+    cJSON_AddNumberToObject(root, "player_start_x", (double)def->player_start_x);
+    cJSON_AddNumberToObject(root, "player_start_y", (double)def->player_start_y);
+
+    /* Music */
+    cJSON_AddStringToObject(root, "music_path", def->music_path);
+    cJSON_AddNumberToObject(root, "music_volume", def->music_volume);
+
+    /* Fog */
+    cJSON_AddNumberToObject(root, "fog_enabled", def->fog_enabled);
+
     return root;
 }
 
@@ -806,6 +828,44 @@ int level_from_json(const cJSON *json, LevelDef *def) {
         def->ropes[idx].y          = (float)get_number(elem, "y", 0);
         def->ropes[idx].tile_count = (int)get_number(elem, "tile_count", 1);
     });
+
+    /* ---- Level-wide configuration ----------------------------------- */
+
+    /* Parallax layers */
+    {
+        const cJSON *plx = cJSON_GetObjectItemCaseSensitive(json, "parallax_layers");
+        if (cJSON_IsArray(plx)) {
+            int n = cJSON_GetArraySize(plx);
+            if (n > PARALLAX_MAX_LAYERS) n = PARALLAX_MAX_LAYERS;
+            def->parallax_layer_count = n;
+            for (int i = 0; i < n; i++) {
+                const cJSON *elem = cJSON_GetArrayItem(plx, i);
+                const cJSON *p = cJSON_GetObjectItemCaseSensitive(elem, "path");
+                if (cJSON_IsString(p) && p->valuestring) {
+                    strncpy(def->parallax_layers[i].path, p->valuestring, 63);
+                    def->parallax_layers[i].path[63] = '\0';
+                }
+                def->parallax_layers[i].speed = (float)get_number(elem, "speed", 0);
+            }
+        }
+    }
+
+    /* Player spawn */
+    def->player_start_x = (float)get_number(json, "player_start_x", 0);
+    def->player_start_y = (float)get_number(json, "player_start_y", 0);
+
+    /* Music */
+    {
+        const cJSON *mp = cJSON_GetObjectItemCaseSensitive(json, "music_path");
+        if (cJSON_IsString(mp) && mp->valuestring) {
+            strncpy(def->music_path, mp->valuestring, 63);
+            def->music_path[63] = '\0';
+        }
+    }
+    def->music_volume = (int)get_number(json, "music_volume", 0);
+
+    /* Fog */
+    def->fog_enabled = (int)get_number(json, "fog_enabled", 0);
 
     return 0;
 }

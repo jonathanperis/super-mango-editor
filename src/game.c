@@ -39,6 +39,7 @@
 #include "hazards/spike.h"
 #include "hazards/spike_platform.h"
 #include "screens/sandbox.h"
+#include "levels/level.h"       /* LevelDef — cast gs->current_level for level config */
 
 /* ------------------------------------------------------------------ */
 
@@ -102,12 +103,10 @@ void game_init(GameState *gs) {
     SDL_RenderSetLogicalSize(gs->renderer, GAME_W, GAME_H);
 
     /*
-     * Load the multi-layer parallax background system.
-     * Each layer is non-fatal: missing PNGs print a warning and are skipped
-     * at render time.  The renderer must exist before this call because
-     * IMG_LoadTexture uploads data to the GPU immediately.
+     * Parallax background is now initialised AFTER level_load, so that
+     * the LevelDef can specify per-level layer paths and speeds.
+     * See the "Apply level-wide configuration" block below sandbox_load_level.
      */
-    parallax_init(&gs->parallax, gs->renderer);
 
     /*
      * Load the grass tile. This single 48×48 texture will be repeated
@@ -297,26 +296,10 @@ void game_init(GameState *gs) {
     }
 
     /*
-     * Load and immediately start the background music track.
-     * Mix_Music is the streaming type used for long audio (MP3/OGG/FLAC).
-     * Unlike Mix_Chunk, it streams from disk rather than loading all at once,
-     * which keeps memory usage low for large files.
-     * Mix_PlayMusic(-1) means loop forever until Mix_HaltMusic() is called.
+     * Music is now loaded AFTER level_load, so that the LevelDef can
+     * specify per-level music path and volume.  See the block below.
      */
-    gs->music = Mix_LoadMUS("sounds/game_music.ogg");
-    if (!gs->music) {
-        /* Non-fatal: game runs without music if the file is missing. */
-        fprintf(stderr, "Warning: failed to load game_music.ogg: %s\n", Mix_GetError());
-    } else {
-        Mix_PlayMusic(gs->music, -1);   /* -1 = loop indefinitely                */
-        /*
-         * Mix_VolumeMusic — set the music playback volume.
-         * Range: 0 (silent) to MIX_MAX_VOLUME (128, full volume).
-         * 13/128 ≈ 10%, keeping the ambient track soft so it doesn't
-         * compete with sound effects.
-         */
-        Mix_VolumeMusic(13);
-    }
+    gs->music = NULL;
 
     /* Set up the player (loads texture, sets initial position on the floor) */
     player_init(&gs->player, gs->renderer);
@@ -335,6 +318,51 @@ void game_init(GameState *gs) {
 
     /* Load the sandbox level — all entity placements and sea gaps */
     sandbox_load_level(gs);
+
+    /* ---- Apply level-wide configuration from the LevelDef ----------- */
+    {
+        const LevelDef *def = (const LevelDef *)gs->current_level;
+
+        /*
+         * Parallax — initialise from level definition if layers are defined;
+         * fall back to the hardcoded LAYER_CONFIG table otherwise.
+         */
+        if (def && def->parallax_layer_count > 0) {
+            /*
+             * Extract paths and speeds into flat arrays so we can pass them
+             * to parallax_init_from_def.  The anonymous struct in LevelDef
+             * stores them interleaved; we need separate pointers.
+             */
+            char  paths[PARALLAX_MAX_LAYERS][64];
+            float speeds[PARALLAX_MAX_LAYERS];
+            int   n = def->parallax_layer_count;
+            if (n > PARALLAX_MAX_LAYERS) n = PARALLAX_MAX_LAYERS;
+            for (int i = 0; i < n; i++) {
+                SDL_strlcpy(paths[i], def->parallax_layers[i].path, 64);
+                speeds[i] = def->parallax_layers[i].speed;
+            }
+            parallax_init_from_def(&gs->parallax, gs->renderer, paths, speeds, n);
+        } else {
+            /* No level-defined layers — use the hardcoded defaults */
+            parallax_init(&gs->parallax, gs->renderer);
+        }
+
+        /*
+         * Music — load and play from level definition if a path is specified.
+         * Mix_Music streams from disk; Mix_PlayMusic(-1) loops indefinitely.
+         * Non-fatal: game runs without music if the file is missing.
+         */
+        if (def && def->music_path[0] != '\0') {
+            gs->music = Mix_LoadMUS(def->music_path);
+            if (!gs->music) {
+                fprintf(stderr, "Warning: failed to load %s: %s\n",
+                        def->music_path, Mix_GetError());
+            } else {
+                Mix_PlayMusic(gs->music, -1);
+                Mix_VolumeMusic(def->music_volume > 0 ? def->music_volume : 13);
+            }
+        }
+    }
 
     /* Initialise the health/lives/score system */
     gs->hearts          = MAX_HEARTS;
@@ -1083,8 +1111,9 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
     /* Draw the player sprite on top of everything */
     player_render(&gs->player, gs->renderer, cam_x);
 
-    /* Draw fog/mist as the topmost layer — rendered after the player */
-    fog_render(&gs->fog, gs->renderer);
+    /* Draw fog/mist as the topmost layer — rendered after the player.
+     * Only active when the level definition enables fog (fog_enabled == 1). */
+    if (gs->fog_enabled) fog_render(&gs->fog, gs->renderer);
 
     /* Draw the HUD overlay on top of everything (hearts, lives, score) */
     hud_render(&gs->hud, gs->renderer,
@@ -1454,8 +1483,9 @@ static void game_loop_frame(void *arg) {
 
         /* Advance the water scroll offset */
         water_update(&gs->water, dt);
-        /* Advance the fog wave positions and spawn the next wave if it is time */
-        fog_update(&gs->fog, dt);
+        /* Advance the fog wave positions and spawn the next wave if it is time.
+         * Only active when the level definition enables fog. */
+        if (gs->fog_enabled) fog_update(&gs->fog, dt);
         /* Advance the bouncepad release animation (frame 1 → 0 → back to 2) */
         bouncepads_update(gs->bouncepads_medium, gs->bouncepad_medium_count, (Uint32)(dt * 1000.0f));
         bouncepads_update(gs->bouncepads_small, gs->bouncepad_small_count, (Uint32)(dt * 1000.0f));

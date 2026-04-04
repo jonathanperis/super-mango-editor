@@ -41,3 +41,12 @@
  *      level field values and modified flag).
  */
 void properties_render(EditorState *es);
+
+/*
+ * level_config_render — Draw the level-wide configuration panel.
+ *
+ * Shows editable fields for parallax layers, player spawn, music, and fog.
+ * Displayed in the bottom-right panel when no entity is selected, giving
+ * the designer access to level-wide settings without selecting an entity.
+ */
+void level_config_render(EditorState *es);
