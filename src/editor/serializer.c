@@ -174,6 +174,17 @@ int level_save_toml(const LevelDef *def, const char *path) {
     fprintf(fp, "name = \"%s\"\n", def->name[0] ? def->name : "Untitled");
     fprintf(fp, "screen_count = %d\n", def->screen_count);
 
+    /* ---- Level-wide configuration (must come before [[arrays]]) --- */
+
+    fprintf(fp, "player_start_x = %.1f\n", (double)def->player_start_x);
+    fprintf(fp, "player_start_y = %.1f\n", (double)def->player_start_y);
+    fprintf(fp, "music_path = \"%s\"\n", def->music_path);
+    fprintf(fp, "music_volume = %d\n", def->music_volume);
+    fprintf(fp, "floor_tile_path = \"%s\"\n", def->floor_tile_path);
+    fprintf(fp, "initial_hearts = %d\n", def->initial_hearts);
+    fprintf(fp, "initial_lives = %d\n", def->initial_lives);
+    fprintf(fp, "score_per_life = %d\n", def->score_per_life);
+
     /* ---- Floor gaps (plain integer array) ------------------------- */
 
     if (def->floor_gap_count > 0) {
@@ -520,17 +531,6 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "speed = %.1f\n", (double)def->foreground_layers[i].speed);
         fprintf(fp, "\n");
     }
-
-    /* ---- Level-wide configuration -------------------------------- */
-
-    fprintf(fp, "player_start_x = %.1f\n", (double)def->player_start_x);
-    fprintf(fp, "player_start_y = %.1f\n", (double)def->player_start_y);
-    fprintf(fp, "music_path = \"%s\"\n", def->music_path);
-    fprintf(fp, "music_volume = %d\n", def->music_volume);
-    fprintf(fp, "floor_tile_path = \"%s\"\n", def->floor_tile_path);
-    fprintf(fp, "initial_hearts = %d\n", def->initial_hearts);
-    fprintf(fp, "initial_lives = %d\n", def->initial_lives);
-    fprintf(fp, "score_per_life = %d\n", def->score_per_life);
 
     fclose(fp);
     return 0;

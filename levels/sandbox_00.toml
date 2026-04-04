@@ -1,6 +1,14 @@
 # Level: Sandbox
 name = "Sandbox"
 screen_count = 4
+player_start_x = 79.0
+player_start_y = 124.5
+music_path = "assets/sounds/levels/water.wav"
+music_volume = 13
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+initial_hearts = 3
+initial_lives = 3
+score_per_life = 1000
 floor_gaps = [0, 192, 560, 928, 1152]
 
 [[rails]]
@@ -388,12 +396,3 @@ speed = 0.6
 [[foreground_layers]]
 path = "assets/sprites/foregrounds/water.png"
 speed = 0.0
-
-player_start_x = 79.0
-player_start_y = 124.5
-music_path = "assets/sounds/levels/water.wav"
-music_volume = 13
-floor_tile_path = "assets/sprites/levels/grass_tileset.png"
-initial_hearts = 3
-initial_lives = 3
-score_per_life = 1000
