@@ -235,11 +235,6 @@ pillar_x = 680.0
 y = 0.0
 mode = "SPIN"
 
-[[axe_traps]]
-pillar_x = 1659.5
-y = 0.0
-mode = "PENDULUM"
-
 [[circular_saws]]
 x = 1350.0
 y = 0.0
@@ -254,11 +249,6 @@ count = 4
 [[spike_platforms]]
 x = 370.0
 y = 200.0
-tile_count = 3
-
-[[spike_platforms]]
-x = 1637.0
-y = 236.0
 tile_count = 3
 
 [[spike_blocks]]
