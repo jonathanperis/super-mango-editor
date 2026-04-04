@@ -39,7 +39,16 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
 OBJS    = $(SRCS:.c=.o)
 DEPS    = $(OBJS:.o=.d)
 
-.PHONY: all clean run run-debug run-sandbox run-sandbox-debug web
+# ── Editor (standalone level editor) ─────────────────────────────────
+EDITOR_DIR    = src/editor
+VENDOR_DIR    = vendor/cJSON
+EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(VENDOR_DIR)/cJSON.c
+EDITOR_OBJS   = $(EDITOR_SRCS:.c=.o)
+EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
+EDITOR_TARGET = $(OUTDIR)/super-mango-editor
+EDITOR_LIBS   = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lm
+
+.PHONY: all clean run run-debug run-sandbox run-sandbox-debug web editor run-editor
 
 all: $(OUTDIR) $(TARGET)
 
@@ -99,6 +108,27 @@ run-sandbox: all
 run-sandbox-debug: all
 	./$(TARGET) --sandbox --debug
 
+# ── Editor targets ───────────────────────────────────────────────────
+editor: $(OUTDIR) $(EDITOR_TARGET)
+
+$(EDITOR_TARGET): $(EDITOR_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(EDITOR_LIBS)
+ifeq ($(OS),Windows_NT)
+else ifeq ($(shell uname -s),Darwin)
+	codesign --force --sign - $@
+endif
+
+$(EDITOR_DIR)/%.o: $(EDITOR_DIR)/%.c
+	$(CC) $(CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(VENDOR_DIR)/%.o: $(VENDOR_DIR)/%.c
+	$(CC) -std=c11 -MMD -MP -c -o $@ $<
+
+run-editor: editor
+	./$(EDITOR_TARGET)
+
+-include $(EDITOR_DEPS)
+
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
 # Requires the Emscripten SDK (emcc on PATH).
 # Produces out/super-mango.html, .js, .wasm, and .data (bundled assets).
@@ -126,4 +156,6 @@ clean:
 	rm -f $(SRCDIR)/player/*.o $(SRCDIR)/player/*.d
 	rm -f $(SRCDIR)/screens/*.o $(SRCDIR)/screens/*.d
 	rm -f $(SRCDIR)/surfaces/*.o $(SRCDIR)/surfaces/*.d
+	rm -f $(EDITOR_DIR)/*.o $(EDITOR_DIR)/*.d
+	rm -f $(VENDOR_DIR)/*.o $(VENDOR_DIR)/*.d
 	rm -rf $(OUTDIR)
