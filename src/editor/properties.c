@@ -55,6 +55,7 @@
 
 /* Parallax subsection collapse state — accessed by editor.c for layout */
 int g_plx_open = 0;
+int g_fg_open = 0;
 
 /* ------------------------------------------------------------------ */
 /* Human-readable entity type names                                    */
@@ -1100,20 +1101,6 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
     }
     y += 24;
 
-    /* ---- Fog & Water ---- */
-    ui_separator(&es->ui, x + 4, y, PROP_W - 8);
-    y += 6;
-    {
-        static const char *toggle_opts[] = { "Off", "On" };
-        ui_label(&es->ui, x + 8, y, "Fog:");
-        if (ui_dropdown(&es->ui, 9004, x + 50, y, 80, toggle_opts, 2, &es->level.fog_enabled))
-            es->modified = 1;
-        ui_label(&es->ui, x + 150, y, "Water:");
-        if (ui_dropdown(&es->ui, 9005, x + 205, y, 80, toggle_opts, 2, &es->level.water_enabled))
-            es->modified = 1;
-        /* TODO: water type dropdown when water_enabled == 1 */
-    }
-    y += 24;
 
     /* ---- Game rules ---- */
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
@@ -1132,12 +1119,12 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
         es->modified = 1;
     y += 24;
 
-    /* ---- Parallax layers (collapsible subsection) ---- */
+    /* ---- Parallax (Background) — collapsible subsection ---- */
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
     {
-        char plx_header[48];
-        snprintf(plx_header, sizeof(plx_header), "%s Parallax (%d layers)",
+        char plx_header[64];
+        snprintf(plx_header, sizeof(plx_header), "%s Parallax - Background (%d)",
                  g_plx_open ? "v" : ">",
                  es->level.parallax_layer_count);
 
@@ -1152,75 +1139,154 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
                        plx_hovered ? UI_TEXT : UI_TEXT_DIM);
         y += 18;
 
-        if (!g_plx_open) goto plx_done;
+        if (!g_plx_open) goto bg_done;
     }
 
-    /* Parallax asset dropdown options */
-    static const char *plx_names[] = {
-        "sky_blue.png",
-        "clouds_bg.png",
-        "glacial_mountains.png",
-        "clouds_mg_3.png",
-        "clouds_mg_2.png",
-        "clouds_lonely.png",
-        "clouds_mg_1.png"
-    };
-    static const char *plx_paths[] = {
-        "assets/sprites/backgrounds/sky_blue.png",
-        "assets/sprites/backgrounds/clouds_bg.png",
-        "assets/sprites/backgrounds/glacial_mountains.png",
-        "assets/sprites/backgrounds/clouds_mg_3.png",
-        "assets/sprites/backgrounds/clouds_mg_2.png",
-        "assets/sprites/backgrounds/clouds_lonely.png",
-        "assets/sprites/backgrounds/clouds_mg_1.png"
-    };
-    static const int plx_opt_count = 7;
+    /* Background asset dropdown options */
+    {
+        static const char *bg_names[] = {
+            "sky_blue.png",
+            "clouds_bg.png",
+            "glacial_mountains.png",
+            "clouds_mg_3.png",
+            "clouds_mg_2.png",
+            "clouds_lonely.png",
+            "clouds_mg_1.png"
+        };
+        static const char *bg_paths[] = {
+            "assets/sprites/backgrounds/sky_blue.png",
+            "assets/sprites/backgrounds/clouds_bg.png",
+            "assets/sprites/backgrounds/glacial_mountains.png",
+            "assets/sprites/backgrounds/clouds_mg_3.png",
+            "assets/sprites/backgrounds/clouds_mg_2.png",
+            "assets/sprites/backgrounds/clouds_lonely.png",
+            "assets/sprites/backgrounds/clouds_mg_1.png"
+        };
+        static const int bg_count = 7;
 
-    for (int i = 0; i < es->level.parallax_layer_count && i < PARALLAX_MAX_LAYERS; i++) {
-        char label[16];
-        snprintf(label, sizeof(label), "%d:", i);
-        ui_label(&es->ui, x + 8, y, label);
+        for (int i = 0; i < es->level.parallax_layer_count && i < PARALLAX_MAX_LAYERS; i++) {
+            char label[16];
+            snprintf(label, sizeof(label), "%d:", i);
+            ui_label(&es->ui, x + 8, y, label);
 
-        /* Dropdown for parallax asset */
-        int sel = 0;
-        for (int j = 0; j < plx_opt_count; j++) {
-            if (strcmp(es->level.parallax_layers[i].path, plx_paths[j]) == 0) {
-                sel = j;
-                break;
+            int sel = 0;
+            for (int j = 0; j < bg_count; j++) {
+                if (strcmp(es->level.parallax_layers[i].path, bg_paths[j]) == 0) {
+                    sel = j; break;
+                }
+            }
+            if (ui_dropdown(&es->ui, 9200 + i, x + 28, y, 200,
+                             bg_names, bg_count, &sel)) {
+                strncpy(es->level.parallax_layers[i].path, bg_paths[sel],
+                        sizeof(es->level.parallax_layers[i].path) - 1);
+                es->modified = 1;
+            }
+            ui_label(&es->ui, x + 236, y, "spd:");
+            if (ui_float_field(&es->ui, 9100 + i, x + 265, y, 60,
+                               &es->level.parallax_layers[i].speed))
+                es->modified = 1;
+            y += 20;
+        }
+
+        if (es->level.parallax_layer_count < PARALLAX_MAX_LAYERS) {
+            if (ui_button(&es->ui, x + 8, y, 80, 20, "+ Add")) {
+                int idx = es->level.parallax_layer_count;
+                strncpy(es->level.parallax_layers[idx].path,
+                        "assets/sprites/backgrounds/sky_blue.png", 63);
+                es->level.parallax_layers[idx].speed = 0.1f;
+                es->level.parallax_layer_count++;
+                es->modified = 1;
             }
         }
-        if (ui_dropdown(&es->ui, 9200 + i, x + 28, y, 200,
-                         plx_names, plx_opt_count, &sel)) {
-            strncpy(es->level.parallax_layers[i].path, plx_paths[sel],
-                    sizeof(es->level.parallax_layers[i].path) - 1);
-            es->level.parallax_layers[i].path[sizeof(es->level.parallax_layers[i].path) - 1] = '\0';
-            es->modified = 1;
-        }
-
-        /* Speed field */
-        ui_label(&es->ui, x + 236, y, "spd:");
-        if (ui_float_field(&es->ui, 9100 + i, x + 265, y, 60, &es->level.parallax_layers[i].speed))
-            es->modified = 1;
-        y += 20;
-    }
-
-    /* Buttons to add / remove layers */
-    if (es->level.parallax_layer_count < PARALLAX_MAX_LAYERS) {
-        if (ui_button(&es->ui, x + 8, y, 80, 20, "+ Add")) {
-            int idx = es->level.parallax_layer_count;
-            strncpy(es->level.parallax_layers[idx].path, "assets/sprites/backgrounds/sky_blue.png", 63);
-            es->level.parallax_layers[idx].speed = 0.1f;
-            es->level.parallax_layer_count++;
-            es->modified = 1;
-        }
-    }
-    if (es->level.parallax_layer_count > 0) {
-        if (ui_button(&es->ui, x + 96, y, 100, 20, "- Remove Last")) {
-            es->level.parallax_layer_count--;
-            es->modified = 1;
+        if (es->level.parallax_layer_count > 0) {
+            if (ui_button(&es->ui, x + 96, y, 100, 20, "- Remove Last")) {
+                es->level.parallax_layer_count--;
+                es->modified = 1;
+            }
         }
     }
 
-plx_done:
-    (void)0;  /* label requires a statement */
+bg_done:
+    y += 4;
+
+    /* ---- Parallax (Foreground) — collapsible subsection ---- */
+    ui_separator(&es->ui, x + 4, y, PROP_W - 8);
+    y += 6;
+    {
+        extern int g_g_fg_open;
+        char fg_header[64];
+        snprintf(fg_header, sizeof(fg_header), "%s Parallax - Foreground (%d)",
+                 g_fg_open ? "v" : ">",
+                 es->level.foreground_layer_count);
+
+        int fg_hovered = (es->ui.mouse_x >= x &&
+                          es->ui.mouse_x < x + PROP_W &&
+                          es->ui.mouse_y >= y &&
+                          es->ui.mouse_y < y + 18);
+        if (fg_hovered && es->ui.mouse_clicked)
+            g_fg_open = !g_fg_open;
+
+        ui_label_color(&es->ui, x + 8, y, fg_header,
+                       fg_hovered ? UI_TEXT : UI_TEXT_DIM);
+        y += 18;
+
+        if (!g_fg_open) goto fg_done;
+
+        /* Foreground asset dropdown options */
+        static const char *fg_names[] = {
+            "fog_1.png",
+            "fog_2.png",
+            "water.png"
+        };
+        static const char *fg_paths[] = {
+            "assets/sprites/foregrounds/fog_1.png",
+            "assets/sprites/foregrounds/fog_2.png",
+            "assets/sprites/foregrounds/water.png"
+        };
+        static const int fg_count = 3;
+
+        for (int i = 0; i < es->level.foreground_layer_count && i < PARALLAX_MAX_LAYERS; i++) {
+            char label[16];
+            snprintf(label, sizeof(label), "%d:", i);
+            ui_label(&es->ui, x + 8, y, label);
+
+            int sel = 0;
+            for (int j = 0; j < fg_count; j++) {
+                if (strcmp(es->level.foreground_layers[i].path, fg_paths[j]) == 0) {
+                    sel = j; break;
+                }
+            }
+            if (ui_dropdown(&es->ui, 9300 + i, x + 28, y, 200,
+                             fg_names, fg_count, &sel)) {
+                strncpy(es->level.foreground_layers[i].path, fg_paths[sel],
+                        sizeof(es->level.foreground_layers[i].path) - 1);
+                es->modified = 1;
+            }
+            ui_label(&es->ui, x + 236, y, "spd:");
+            if (ui_float_field(&es->ui, 9400 + i, x + 265, y, 60,
+                               &es->level.foreground_layers[i].speed))
+                es->modified = 1;
+            y += 20;
+        }
+
+        if (es->level.foreground_layer_count < PARALLAX_MAX_LAYERS) {
+            if (ui_button(&es->ui, x + 8, y, 80, 20, "+ Add")) {
+                int idx = es->level.foreground_layer_count;
+                strncpy(es->level.foreground_layers[idx].path,
+                        "assets/sprites/foregrounds/fog_1.png", 63);
+                es->level.foreground_layers[idx].speed = 0.5f;
+                es->level.foreground_layer_count++;
+                es->modified = 1;
+            }
+        }
+        if (es->level.foreground_layer_count > 0) {
+            if (ui_button(&es->ui, x + 96, y, 100, 20, "- Remove Last")) {
+                es->level.foreground_layer_count--;
+                es->modified = 1;
+            }
+        }
+    }
+
+fg_done:
+    (void)0;
 }

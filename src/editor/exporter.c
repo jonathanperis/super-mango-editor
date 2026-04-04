@@ -558,6 +558,18 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .parallax_layer_count = %d,\n", def->parallax_layer_count);
 
+    /* Foreground layers */
+    if (def->foreground_layer_count > 0) {
+        fprintf(f, "    .foreground_layers = {\n");
+        for (int i = 0; i < def->foreground_layer_count; i++) {
+            fprintf(f, "        { \"%s\", %.2ff },\n",
+                    def->foreground_layers[i].path,
+                    (double)def->foreground_layers[i].speed);
+        }
+        fprintf(f, "    },\n");
+    }
+    fprintf(f, "    .foreground_layer_count = %d,\n", def->foreground_layer_count);
+
     /* Player spawn */
     fprintf(f, "\n    .player_start_x = %.1ff,\n", (double)def->player_start_x);
     fprintf(f, "    .player_start_y = %.1ff,\n", (double)def->player_start_y);
@@ -565,12 +577,6 @@ static int write_source(const LevelDef *def, const char *var_name,
     /* Music */
     fprintf(f, "\n    .music_path   = \"%s\",\n", def->music_path);
     fprintf(f, "    .music_volume = %d,\n", def->music_volume);
-
-    /* Fog */
-    fprintf(f, "\n    .fog_enabled = %d,\n", def->fog_enabled);
-
-    /* Water */
-    fprintf(f, "\n    .water_enabled = %d,\n", def->water_enabled);
 
     /* Game rules */
     fprintf(f, "\n    .initial_hearts  = %d,\n", def->initial_hearts);

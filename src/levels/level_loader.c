@@ -11,6 +11,7 @@
  */
 
 #include <stdlib.h>  /* rand(), RAND_MAX */
+#include <string.h>  /* strstr — fog/water auto-detection */
 
 #include "level_loader.h"
 
@@ -552,8 +553,19 @@ void level_load(GameState *gs, const LevelDef *def)
     }
 
     /* ---- Level-wide configuration ---------------------------------- */
-    gs->fog_enabled   = def->fog_enabled;
-    gs->water_enabled = def->water_enabled;
+    /*
+     * Auto-detect fog and water from foreground layers.
+     * If any foreground layer path contains "fog_", enable fog.
+     * If any foreground layer path contains "water", enable water.
+     */
+    gs->fog_enabled   = 0;
+    gs->water_enabled = 0;
+    for (int i = 0; i < def->foreground_layer_count; i++) {
+        if (strstr(def->foreground_layers[i].path, "fog_"))
+            gs->fog_enabled = 1;
+        if (strstr(def->foreground_layers[i].path, "water"))
+            gs->water_enabled = 1;
+    }
 
     /*
      * Game rules — use level-defined values if set (>0), otherwise fall

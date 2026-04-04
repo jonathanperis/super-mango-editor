@@ -523,6 +523,15 @@ cJSON *level_to_json(const LevelDef *def) {
         cJSON_AddItemToArray(plx_arr, obj);
     }
 
+    /* Foreground layers */
+    cJSON *fg_arr = cJSON_AddArrayToObject(root, "foreground_layers");
+    for (int i = 0; i < def->foreground_layer_count; i++) {
+        cJSON *obj = cJSON_CreateObject();
+        cJSON_AddStringToObject(obj, "path", def->foreground_layers[i].path);
+        cJSON_AddNumberToObject(obj, "speed", (double)def->foreground_layers[i].speed);
+        cJSON_AddItemToArray(fg_arr, obj);
+    }
+
     /* Player spawn */
     cJSON_AddNumberToObject(root, "player_start_x", (double)def->player_start_x);
     cJSON_AddNumberToObject(root, "player_start_y", (double)def->player_start_y);
@@ -533,12 +542,6 @@ cJSON *level_to_json(const LevelDef *def) {
 
     /* Floor tile */
     cJSON_AddStringToObject(root, "floor_tile_path", def->floor_tile_path);
-
-    /* Fog */
-    cJSON_AddNumberToObject(root, "fog_enabled", def->fog_enabled);
-
-    /* Water */
-    cJSON_AddNumberToObject(root, "water_enabled", def->water_enabled);
 
     /* Game rules */
     cJSON_AddNumberToObject(root, "initial_hearts", def->initial_hearts);
@@ -891,6 +894,25 @@ int level_from_json(const cJSON *json, LevelDef *def) {
         }
     }
 
+    /* Foreground layers */
+    {
+        const cJSON *fg = cJSON_GetObjectItemCaseSensitive(json, "foreground_layers");
+        if (cJSON_IsArray(fg)) {
+            int n = cJSON_GetArraySize(fg);
+            if (n > PARALLAX_MAX_LAYERS) n = PARALLAX_MAX_LAYERS;
+            def->foreground_layer_count = n;
+            for (int i = 0; i < n; i++) {
+                const cJSON *elem = cJSON_GetArrayItem(fg, i);
+                const cJSON *p = cJSON_GetObjectItemCaseSensitive(elem, "path");
+                if (cJSON_IsString(p) && p->valuestring) {
+                    strncpy(def->foreground_layers[i].path, p->valuestring, 63);
+                    def->foreground_layers[i].path[63] = '\0';
+                }
+                def->foreground_layers[i].speed = (float)get_number(elem, "speed", 0);
+            }
+        }
+    }
+
     /* Player spawn */
     def->player_start_x = (float)get_number(json, "player_start_x", 0);
     def->player_start_y = (float)get_number(json, "player_start_y", 0);
@@ -913,12 +935,6 @@ int level_from_json(const cJSON *json, LevelDef *def) {
             def->floor_tile_path[63] = '\0';
         }
     }
-
-    /* Fog */
-    def->fog_enabled = (int)get_number(json, "fog_enabled", 0);
-
-    /* Water */
-    def->water_enabled = (int)get_number(json, "water_enabled", 0);
 
     /* Game rules */
     def->initial_hearts = (int)get_number(json, "initial_hearts", 0);

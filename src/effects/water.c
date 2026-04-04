@@ -13,7 +13,7 @@
 
 void water_init(Water *w, SDL_Renderer *renderer)
 {
-    w->texture  = IMG_LoadTexture(renderer, "assets/sprites/backgrounds/foreground_water.png");
+    w->texture  = IMG_LoadTexture(renderer, "assets/sprites/foregrounds/water.png");
     if (!w->texture) {
         fprintf(stderr, "water_init: IMG_LoadTexture: %s\n", IMG_GetError());
         exit(EXIT_FAILURE);

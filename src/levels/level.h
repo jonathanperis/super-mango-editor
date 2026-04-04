@@ -401,6 +401,13 @@ typedef struct {
     } parallax_layers[PARALLAX_MAX_LAYERS];
     int parallax_layer_count;
 
+    /* Foreground layers (fog, water — rendered on top of floor/entities) */
+    struct {
+        char  path[64];
+        float speed;
+    } foreground_layers[PARALLAX_MAX_LAYERS];
+    int foreground_layer_count;
+
     /* Player spawn position */
     float player_start_x;
     float player_start_y;
@@ -411,12 +418,6 @@ typedef struct {
 
     /* Floor tile texture */
     char  floor_tile_path[64]; /* 9-slice tileset PNG, e.g. "assets/sprites/levels/grass_tileset.png" */
-
-    /* Fog atmosphere */
-    int   fog_enabled;      /* 1 = fog active, 0 = disabled */
-
-    /* Water */
-    int   water_enabled;    /* 1 = render water strip, 0 = disabled */
 
     /* Game rules */
     int   initial_hearts;   /* starting hit points (0 = use MAX_HEARTS default) */

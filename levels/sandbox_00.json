@@ -1,5 +1,6 @@
 {
 	"name":	"Sandbox",
+	"screen_count":	4,
 	"sea_gaps":	[0, 192, 560, 928, 1152],
 	"rails":	[{
 			"layout":	"RECT",
@@ -25,28 +26,36 @@
 		}],
 	"platforms":	[{
 			"x":	80,
-			"tile_height":	2
+			"tile_height":	2,
+			"tile_width":	1
 		}, {
 			"x":	256,
-			"tile_height":	3
+			"tile_height":	3,
+			"tile_width":	1
 		}, {
 			"x":	452,
-			"tile_height":	2
+			"tile_height":	2,
+			"tile_width":	1
 		}, {
 			"x":	680,
-			"tile_height":	3
+			"tile_height":	3,
+			"tile_width":	1
 		}, {
 			"x":	880,
-			"tile_height":	2
+			"tile_height":	2,
+			"tile_width":	1
 		}, {
 			"x":	1050,
-			"tile_height":	3
+			"tile_height":	3,
+			"tile_width":	1
 		}, {
 			"x":	1300,
-			"tile_height":	2
+			"tile_height":	2,
+			"tile_width":	1
 		}, {
 			"x":	1480,
-			"tile_height":	2
+			"tile_height":	2,
+			"tile_width":	1
 		}],
 	"coins":	[{
 			"x":	46,
@@ -322,13 +331,18 @@
 			"path":	"assets/sprites/backgrounds/clouds_mg_1.png",
 			"speed":	0.5
 		}],
+	"foreground_layers":	[{
+			"path":	"assets/sprites/foregrounds/fog_1.png",
+			"speed":	0.6
+		}, {
+			"path":	"assets/sprites/foregrounds/water.png",
+			"speed":	0
+		}],
 	"player_start_x":	79,
 	"player_start_y":	124.5,
 	"music_path":	"assets/sounds/levels/game_music.ogg",
 	"music_volume":	13,
-	"floor_tile_path":	"",
-	"fog_enabled":	1,
-	"water_enabled":	1,
+	"floor_tile_path":	"assets/sprites/levels/grass_tileset.png",
 	"initial_hearts":	3,
 	"initial_lives":	3,
 	"score_per_life":	1000

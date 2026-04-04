@@ -280,7 +280,7 @@ static void load_textures(EditorState *es) {
 
     /* Floor and water — the base environment textures */
     LOAD_TEX(floor_tile,       "assets/sprites/levels/grass_tileset.png");
-    LOAD_TEX(water,            "assets/sprites/backgrounds/foreground_water.png");
+    LOAD_TEX(water,            "assets/sprites/foregrounds/water.png");
 
     /* Static geometry */
     LOAD_TEX(platform,         "assets/sprites/levels/grass_platform.png");
@@ -459,16 +459,17 @@ void editor_loop(EditorState *es) {
                 int config_h;
                 if (es->config_open) {
                     /* Base: header(28) + margin(8) + name(24) + screens(24)
-                     * + music(24+22+24) + floor(30) + fog/water(30)
-                     * + game rules(24+22+24) + parallax header(24)
-                     * + bottom margin(10) */
+                     * + music(24+22+24) + floor(30)
+                     * + game rules(24+22+24)
+                     * + bg header(24) + fg header(24) + margin(10) */
                     extern int g_plx_open;
-                    config_h = 28 + 8 + 24 + 24 + 24 + 22 + 24 + 30 + 30
-                             + 24 + 22 + 24 + 24 + 10;
-                    if (g_plx_open) {
-                        /* Add layers(20 each) + add button(20) */
-                        config_h += es->level.parallax_layer_count * 20 + 20;
-                    }
+                    extern int g_fg_open;
+                    config_h = 28 + 8 + 24 + 24 + 24 + 22 + 24 + 30
+                             + 24 + 22 + 24 + 24 + 24 + 10;
+                    if (g_plx_open)
+                        config_h += es->level.parallax_layer_count * 20 + 24;
+                    if (g_fg_open)
+                        config_h += es->level.foreground_layer_count * 20 + 24;
                 } else {
                     config_h = section_hdr;
                 }
