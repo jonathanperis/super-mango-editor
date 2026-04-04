@@ -35,7 +35,9 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(wildcard $(SRCDIR)/levels/*.c) \
           $(wildcard $(SRCDIR)/player/*.c) \
           $(wildcard $(SRCDIR)/screens/*.c) \
-          $(wildcard $(SRCDIR)/surfaces/*.c)
+          $(wildcard $(SRCDIR)/surfaces/*.c) \
+          $(SRCDIR)/editor/serializer.c \
+          vendor/cJSON/cJSON.c
 OBJS    = $(SRCS:.c=.o)
 DEPS    = $(OBJS:.o=.d)
 

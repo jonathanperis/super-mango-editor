@@ -1296,29 +1296,37 @@ static void paste_clipboard(EditorState *es) {
 static void play_test(EditorState *es) {
     if (es->playing) return;   /* already running */
 
-    /* Step 1 — Export the level as sandbox_00 */
-    if (level_export_c(&es->level, "sandbox_00", "src/levels") != 0) {
-        fprintf(stderr, "Play: export failed — cannot launch game\n");
+    /*
+     * Step 1 — Save the level as JSON.
+     *
+     * The game now loads levels/sandbox_00.json at runtime (no compiled
+     * .c file needed).  So the Play button just saves the JSON and
+     * launches the already-compiled game binary.
+     *
+     * If the editor has a file path, save there.  Otherwise save to the
+     * default sandbox_00.json path so the game can find it.
+     */
+    const char *save_path = es->file_path[0] != '\0'
+                          ? es->file_path
+                          : "levels/sandbox_00.json";
+
+    if (level_save_json(&es->level, save_path) != 0) {
+        fprintf(stderr, "Play: failed to save %s\n", save_path);
         return;
     }
+    es->modified = 0;
 
-    /* Step 2 — Auto-save JSON */
-    if (es->file_path[0] != '\0') {
-        if (level_save_json(&es->level, es->file_path) == 0) {
-            es->modified = 0;
-            char title[300];
-            snprintf(title, sizeof(title), "Super Mango Editor - %s",
-                     es->file_path);
-            SDL_SetWindowTitle(es->window, title);
-        }
+    /* Update file path if we used the default */
+    if (es->file_path[0] == '\0') {
+        strncpy(es->file_path, save_path, sizeof(es->file_path) - 1);
+        es->file_path[sizeof(es->file_path) - 1] = '\0';
     }
 
-    /* Step 3 — Compile the game (blocking — wait for build to finish) */
-    fprintf(stderr, "Play: compiling game...\n");
-    int build_result = system("make 2>&1");
-    if (build_result != 0) {
-        fprintf(stderr, "Play: build failed (exit code %d)\n", build_result);
-        return;
+    {
+        char title[300];
+        snprintf(title, sizeof(title), "Super Mango Editor - %s",
+                 es->file_path);
+        SDL_SetWindowTitle(es->window, title);
     }
 
     /* Step 4 — Launch the game as a child process */
@@ -1340,7 +1348,7 @@ static void play_test(EditorState *es) {
     pid_t pid = fork();
     if (pid == 0) {
         /* Child process — become the game */
-        execl("./out/super-mango", "super-mango", (char *)NULL);
+        execl("./out/super-mango", "super-mango", "--sandbox", (char *)NULL);
         /* execl only returns on error */
         _exit(1);
     } else if (pid > 0) {
