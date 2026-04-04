@@ -33,7 +33,7 @@ Implement 4 functions. The serializer handles all 25 placement types plus `last_
   "rails": [{ "layout": "RECT", "x": 444, "y": 35, "w": 10, "h": 6, "end_cap": 0 }],
   "platforms": [{ "x": 80.0, "tile_height": 2 }],
   "coins": [{ "x": 120.0, "y": 236.0 }],
-  "yellow_stars": [{ "x": 268.0, "y": 108.0 }],
+  "star_yellows": [{ "x": 268.0, "y": 108.0 }],
   "last_star": { "x": 1492.0, "y": 100.0 },
   "spiders": [{ "x": 600.0, "vx": 50.0, "patrol_x0": 580.0, "patrol_x1": 730.0, "frame_index": 0 }],
   "jumping_spiders": [{ "x": 192.0, "vx": 55.0, "patrol_x0": 180.0, "patrol_x1": 224.0 }],
@@ -93,7 +93,7 @@ extern const LevelDef {var_name}_def;
   3. `.rails = { ... }, .rail_count = N,`
   4. `.platforms = { ... }, .platform_count = N,`
   5. `.coins = { ... }, .coin_count = N,`
-  6. `.yellow_stars = { ... }, .yellow_star_count = N,`
+  6. `.star_yellows = { ... }, .star_yellow_count = N,`
   7. `.last_star = { .x = ..., .y = ... },`
   8. All enemies (spiders through faster_fish)
   9. All hazards (axe_traps through spike_blocks)
@@ -257,7 +257,7 @@ dst_y = 245;
 src = {0, 0, tex_w, tex_h};  /* full texture */
 dst = {x, y, 16, 16};  /* scaled to display size */
 
-/* Yellow Star: display 16×16 */
+/* Star Yellow: display 16×16 */
 dst = {x, y, 16, 16};
 
 /* Last Star: display 24×24 */
@@ -410,7 +410,7 @@ Colors: #2D2D2D panels, #3D3D3D title bars, #4D4D4D buttons, #5D5D5D hover, #4A9
 
 Static array of 25 entries, 6 categories:
 - **World** (2): Sea Gap, Rail
-- **Collectibles** (3): Coin, Yellow Star, Last Star
+- **Collectibles** (3): Coin, Star Yellow, Last Star
 - **Enemies** (6): Spider, Jumping Spider, Bird, Faster Bird, Fish, Faster Fish
 - **Hazards** (5): Axe Trap, Circular Saw, Spike Row, Spike Platform, Spike Block
 - **Surfaces** (7): Platform, Float Platform, Bridge, Bouncepad Small/Medium/High
@@ -438,7 +438,7 @@ Show editable fields when `selection.index >= 0`. Full per-type mapping:
 | Rail | layout (dropdown: RECT/HORIZ), x (int), y (int), w (int), h (int), end_cap (int) |
 | Platform | x (float), tile_height (int: 1-5) |
 | Coin | x (float), y (float) |
-| Yellow Star | x (float), y (float) |
+| Star Yellow | x (float), y (float) |
 | Last Star | x (float), y (float) |
 | Spider | x (float), vx (float), patrol_x0 (float), patrol_x1 (float), frame_index (int) |
 | Jumping Spider | x (float), vx (float), patrol_x0 (float), patrol_x1 (float) |

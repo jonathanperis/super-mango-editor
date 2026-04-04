@@ -77,7 +77,9 @@ typedef enum {
  */
 typedef union {
     CoinPlacement           coin;
-    YellowStarPlacement     yellow_star;
+    StarYellowPlacement     star_yellow;
+    StarGreenPlacement      star_green;
+    StarRedPlacement        star_red;
     LastStarPlacement       last_star;
     SpiderPlacement         spider;
     JumpingSpiderPlacement  jumping_spider;

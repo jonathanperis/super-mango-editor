@@ -136,13 +136,35 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
         SDL_RenderDrawRect(renderer, &r);
     }
 
-    /* ---- Yellow stars (active only) — magenta (255, 0, 255) ---------- */
+    /* ---- Star yellows (active only) — magenta (255, 0, 255) ---------- */
     SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
-    for (int i = 0; i < gs->yellow_star_count; i++) {
-        if (!gs->yellow_stars[i].active) continue;
+    for (int i = 0; i < gs->star_yellow_count; i++) {
+        if (!gs->star_yellows[i].active) continue;
         r = (SDL_Rect){
-            (int)gs->yellow_stars[i].x - cam_x, (int)gs->yellow_stars[i].y,
-            YELLOW_STAR_DISPLAY_W, YELLOW_STAR_DISPLAY_H
+            (int)gs->star_yellows[i].x - cam_x, (int)gs->star_yellows[i].y,
+            STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
+        };
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
+    /* ---- Star greens (active only) — green (0, 200, 0) -------------- */
+    SDL_SetRenderDrawColor(renderer, 0, 200, 0, 255);
+    for (int i = 0; i < gs->star_green_count; i++) {
+        if (!gs->star_greens[i].active) continue;
+        r = (SDL_Rect){
+            (int)gs->star_greens[i].x - cam_x, (int)gs->star_greens[i].y,
+            STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
+        };
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
+    /* ---- Star reds (active only) — dark red (200, 0, 0) ------------- */
+    SDL_SetRenderDrawColor(renderer, 200, 0, 0, 255);
+    for (int i = 0; i < gs->star_red_count; i++) {
+        if (!gs->star_reds[i].active) continue;
+        r = (SDL_Rect){
+            (int)gs->star_reds[i].x - cam_x, (int)gs->star_reds[i].y,
+            STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
         };
         SDL_RenderDrawRect(renderer, &r);
     }

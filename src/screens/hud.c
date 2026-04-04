@@ -39,7 +39,7 @@ void hud_init(Hud *hud, SDL_Renderer *renderer)
      * IMG_LoadTexture — decode Stars_Ui.png and upload it to GPU memory.
      * This single texture is drawn once per current heart in hud_render.
      */
-    hud->star_tex = IMG_LoadTexture(renderer, "assets/sprites/collectibles/yellow_star.png");
+    hud->star_tex = IMG_LoadTexture(renderer, "assets/sprites/collectibles/star_yellow.png");
     if (!hud->star_tex) {
         fprintf(stderr, "Failed to load Stars_Ui.png: %s\n", IMG_GetError());
         TTF_CloseFont(hud->font);

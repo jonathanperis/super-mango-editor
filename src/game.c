@@ -33,7 +33,7 @@
 #include "surfaces/rail.h"
 #include "hazards/spike_block.h"
 #include "surfaces/float_platform.h"
-#include "collectibles/yellow_star.h"
+#include "collectibles/star_yellow.h"
 #include "hazards/axe_trap.h"
 #include "hazards/circular_saw.h"
 #include "hazards/blue_flame.h"
@@ -218,8 +218,12 @@ void game_init(GameState *gs) {
     if (!gs->float_platform_tex) fprintf(stderr, "Warning: Failed to load Platform.png: %s\n", IMG_GetError());
     gs->bridge_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/bridge.png");
     if (!gs->bridge_tex) fprintf(stderr, "Warning: Failed to load Bridge.png: %s\n", IMG_GetError());
-    gs->yellow_star_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/yellow_star.png");
-    if (!gs->yellow_star_tex) fprintf(stderr, "Warning: Failed to load Star_Yellow.png: %s\n", IMG_GetError());
+    gs->star_yellow_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/star_yellow.png");
+    if (!gs->star_yellow_tex) fprintf(stderr, "Warning: Failed to load star_yellow.png: %s\n", IMG_GetError());
+    gs->star_green_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/star_green.png");
+    if (!gs->star_green_tex) fprintf(stderr, "Warning: Failed to load star_green.png: %s\n", IMG_GetError());
+    gs->star_red_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/star_red.png");
+    if (!gs->star_red_tex) fprintf(stderr, "Warning: Failed to load star_red.png: %s\n", IMG_GetError());
     gs->last_star_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/last_star.png");
     if (!gs->last_star_tex) fprintf(stderr, "Warning: Failed to load last_star.png: %s\n", IMG_GetError());
     gs->axe_trap_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/axe_trap.png");
@@ -933,14 +937,14 @@ static void game_collide(GameState *gs, float dt)
      */
     {
         SDL_Rect phit = player_get_hitbox(&gs->player);
-        for (int i = 0; i < gs->yellow_star_count; i++) {
-            if (!gs->yellow_stars[i].active) continue;
+        for (int i = 0; i < gs->star_yellow_count; i++) {
+            if (!gs->star_yellows[i].active) continue;
             SDL_Rect sbox = {
-                (int)gs->yellow_stars[i].x, (int)gs->yellow_stars[i].y,
-                YELLOW_STAR_DISPLAY_W, YELLOW_STAR_DISPLAY_H
+                (int)gs->star_yellows[i].x, (int)gs->star_yellows[i].y,
+                STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
             };
             if (SDL_HasIntersection(&phit, &sbox)) {
-                gs->yellow_stars[i].active = 0;
+                gs->star_yellows[i].active = 0;
 
                 if (gs->snd_coin) {
                     Mix_PlayChannel(-1, gs->snd_coin, 0);
@@ -949,6 +953,62 @@ static void game_collide(GameState *gs, float dt)
                 if (gs->hearts < MAX_HEARTS) {
                     gs->hearts++;
                     if (gs->debug_mode) debug_log(&gs->debug, "YELLOW STAR [%d] hearts=%d", i, gs->hearts);
+                }
+            }
+        }
+    }
+
+    /* ---- Green star collision ---------------------------------- */
+    /*
+     * Green stars restore one heart immediately on pickup.
+     * Same mechanics as yellow stars — purely a health pickup.
+     */
+    {
+        SDL_Rect phit = player_get_hitbox(&gs->player);
+        for (int i = 0; i < gs->star_green_count; i++) {
+            if (!gs->star_greens[i].active) continue;
+            SDL_Rect sbox = {
+                (int)gs->star_greens[i].x, (int)gs->star_greens[i].y,
+                STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
+            };
+            if (SDL_HasIntersection(&phit, &sbox)) {
+                gs->star_greens[i].active = 0;
+
+                if (gs->snd_coin) {
+                    Mix_PlayChannel(-1, gs->snd_coin, 0);
+                }
+
+                if (gs->hearts < MAX_HEARTS) {
+                    gs->hearts++;
+                    if (gs->debug_mode) debug_log(&gs->debug, "GREEN STAR [%d] hearts=%d", i, gs->hearts);
+                }
+            }
+        }
+    }
+
+    /* ---- Red star collision ------------------------------------ */
+    /*
+     * Red stars restore one heart immediately on pickup.
+     * Same mechanics as yellow stars — purely a health pickup.
+     */
+    {
+        SDL_Rect phit = player_get_hitbox(&gs->player);
+        for (int i = 0; i < gs->star_red_count; i++) {
+            if (!gs->star_reds[i].active) continue;
+            SDL_Rect sbox = {
+                (int)gs->star_reds[i].x, (int)gs->star_reds[i].y,
+                STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
+            };
+            if (SDL_HasIntersection(&phit, &sbox)) {
+                gs->star_reds[i].active = 0;
+
+                if (gs->snd_coin) {
+                    Mix_PlayChannel(-1, gs->snd_coin, 0);
+                }
+
+                if (gs->hearts < MAX_HEARTS) {
+                    gs->hearts++;
+                    if (gs->debug_mode) debug_log(&gs->debug, "RED STAR [%d] hearts=%d", i, gs->hearts);
                 }
             }
         }
@@ -1159,9 +1219,17 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
     coins_render(gs->coins, gs->coin_count,
                  gs->renderer, gs->coin_tex, cam_x);
 
-    /* Draw yellow stars alongside coins — same layer, same visibility */
-    yellow_stars_render(gs->yellow_stars, gs->yellow_star_count,
-                     gs->renderer, gs->yellow_star_tex, cam_x);
+    /* Draw star yellows alongside coins — same layer, same visibility */
+    star_yellows_render(gs->star_yellows, gs->star_yellow_count,
+                     gs->renderer, gs->star_yellow_tex, cam_x);
+
+    /* Draw star greens — same mechanics and display size as yellow stars */
+    star_yellows_render(gs->star_greens, gs->star_green_count,
+                     gs->renderer, gs->star_green_tex, cam_x);
+
+    /* Draw star reds — same mechanics and display size as yellow stars */
+    star_yellows_render(gs->star_reds, gs->star_red_count,
+                     gs->renderer, gs->star_red_tex, cam_x);
 
     /* Draw the end-of-level last star using its dedicated sprite */
     last_star_render(&gs->last_star, gs->renderer,
@@ -1834,7 +1902,9 @@ void game_cleanup(GameState *gs) {
     DESTROY_TEX(gs->bouncepad_high_tex);
 
     DESTROY_TEX(gs->coin_tex);
-    DESTROY_TEX(gs->yellow_star_tex);
+    DESTROY_TEX(gs->star_yellow_tex);
+    DESTROY_TEX(gs->star_green_tex);
+    DESTROY_TEX(gs->star_red_tex);
     DESTROY_TEX(gs->last_star_tex);
 
     FREE_CHUNK(gs->snd_dive);

@@ -178,9 +178,17 @@ static void get_entity_pos(const LevelDef *level, EntityType type, int index,
         *x = level->coins[index].x;
         *y = level->coins[index].y;
         break;
-    case ENT_YELLOW_STAR:
-        *x = level->yellow_stars[index].x;
-        *y = level->yellow_stars[index].y;
+    case ENT_STAR_YELLOW:
+        *x = level->star_yellows[index].x;
+        *y = level->star_yellows[index].y;
+        break;
+    case ENT_STAR_GREEN:
+        *x = level->star_greens[index].x;
+        *y = level->star_greens[index].y;
+        break;
+    case ENT_STAR_RED:
+        *x = level->star_reds[index].x;
+        *y = level->star_reds[index].y;
         break;
     case ENT_LAST_STAR:
         *x = level->last_star.x;
@@ -330,9 +338,17 @@ static void set_entity_pos(LevelDef *level, EntityType type, int index,
         level->coins[index].x = x;
         level->coins[index].y = y;
         break;
-    case ENT_YELLOW_STAR:
-        level->yellow_stars[index].x = x;
-        level->yellow_stars[index].y = y;
+    case ENT_STAR_YELLOW:
+        level->star_yellows[index].x = x;
+        level->star_yellows[index].y = y;
+        break;
+    case ENT_STAR_GREEN:
+        level->star_greens[index].x = x;
+        level->star_greens[index].y = y;
+        break;
+    case ENT_STAR_RED:
+        level->star_reds[index].x = x;
+        level->star_reds[index].y = y;
         break;
     case ENT_LAST_STAR:
         level->last_star.x = x;
@@ -434,7 +450,9 @@ static int get_count(const LevelDef *level, EntityType type)
     case ENT_SEA_GAP:          return level->sea_gap_count;
     case ENT_RAIL:             return level->rail_count;
     case ENT_COIN:             return level->coin_count;
-    case ENT_YELLOW_STAR:      return level->yellow_star_count;
+    case ENT_STAR_YELLOW:      return level->star_yellow_count;
+    case ENT_STAR_GREEN:       return level->star_green_count;
+    case ENT_STAR_RED:         return level->star_red_count;
     case ENT_LAST_STAR:        return 1; /* always exactly one */
     case ENT_PLAYER_SPAWN:     return 1; /* always exactly one */
     case ENT_SPIDER:           return level->spider_count;
@@ -475,7 +493,9 @@ static int get_max_count(EntityType type)
     case ENT_SEA_GAP:          return MAX_SEA_GAPS;
     case ENT_RAIL:             return MAX_RAILS;
     case ENT_COIN:             return MAX_COINS;
-    case ENT_YELLOW_STAR:      return MAX_YELLOW_STARS;
+    case ENT_STAR_YELLOW:      return MAX_STAR_YELLOWS;
+    case ENT_STAR_GREEN:       return MAX_STAR_YELLOWS;
+    case ENT_STAR_RED:         return MAX_STAR_YELLOWS;
     case ENT_LAST_STAR:        return 1;
     case ENT_PLAYER_SPAWN:     return 1;
     case ENT_SPIDER:           return MAX_SPIDERS;
@@ -532,8 +552,14 @@ static PlacementData snapshot_entity(const LevelDef *level, EntityType type,
     case ENT_COIN:
         pd.coin = level->coins[index];
         break;
-    case ENT_YELLOW_STAR:
-        pd.yellow_star = level->yellow_stars[index];
+    case ENT_STAR_YELLOW:
+        pd.star_yellow = level->star_yellows[index];
+        break;
+    case ENT_STAR_GREEN:
+        pd.star_green = level->star_greens[index];
+        break;
+    case ENT_STAR_RED:
+        pd.star_red = level->star_reds[index];
         break;
     case ENT_LAST_STAR:
         pd.last_star = level->last_star;
@@ -844,14 +870,40 @@ static Selection hit_test(const LevelDef *level, float wx, float wy)
         }
     }
 
-    /* Yellow stars — 16x16 health pickups */
-    for (int i = level->yellow_star_count - 1; i >= 0; i--) {
-        ex = level->yellow_stars[i].x;
-        ey = level->yellow_stars[i].y;
+    /* Star yellows — 16x16 health pickups */
+    for (int i = level->star_yellow_count - 1; i >= 0; i--) {
+        ex = level->star_yellows[i].x;
+        ey = level->star_yellows[i].y;
         ew = YSTAR_DISPLAY_W;
         eh = YSTAR_DISPLAY_H;
         if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_YELLOW_STAR;
+            sel.type = ENT_STAR_YELLOW;
+            sel.index = i;
+            return sel;
+        }
+    }
+
+    /* Star greens — 16x16 health pickups */
+    for (int i = level->star_green_count - 1; i >= 0; i--) {
+        ex = level->star_greens[i].x;
+        ey = level->star_greens[i].y;
+        ew = YSTAR_DISPLAY_W;
+        eh = YSTAR_DISPLAY_H;
+        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
+            sel.type = ENT_STAR_GREEN;
+            sel.index = i;
+            return sel;
+        }
+    }
+
+    /* Star reds — 16x16 health pickups */
+    for (int i = level->star_red_count - 1; i >= 0; i--) {
+        ex = level->star_reds[i].x;
+        ey = level->star_reds[i].y;
+        ew = YSTAR_DISPLAY_W;
+        eh = YSTAR_DISPLAY_H;
+        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
+            sel.type = ENT_STAR_RED;
             sel.index = i;
             return sel;
         }
@@ -1078,9 +1130,17 @@ static void delete_entity(EditorState *es, EntityType type, int index)
         array_remove(level->coins, &level->coin_count,
                      index, sizeof(CoinPlacement));
         break;
-    case ENT_YELLOW_STAR:
-        array_remove(level->yellow_stars, &level->yellow_star_count,
-                     index, sizeof(YellowStarPlacement));
+    case ENT_STAR_YELLOW:
+        array_remove(level->star_yellows, &level->star_yellow_count,
+                     index, sizeof(StarYellowPlacement));
+        break;
+    case ENT_STAR_GREEN:
+        array_remove(level->star_greens, &level->star_green_count,
+                     index, sizeof(StarGreenPlacement));
+        break;
+    case ENT_STAR_RED:
+        array_remove(level->star_reds, &level->star_red_count,
+                     index, sizeof(StarRedPlacement));
         break;
     case ENT_LAST_STAR:
         /*
@@ -1470,13 +1530,31 @@ static void place_entity(EditorState *es, float world_x, float world_y)
         level->coin_count++;
         break;
     }
-    case ENT_YELLOW_STAR: {
-        YellowStarPlacement ysp = {
+    case ENT_STAR_YELLOW: {
+        StarYellowPlacement ysp = {
             .x = world_x,
             .y = world_y
         };
-        level->yellow_stars[new_index] = ysp;
-        level->yellow_star_count++;
+        level->star_yellows[new_index] = ysp;
+        level->star_yellow_count++;
+        break;
+    }
+    case ENT_STAR_GREEN: {
+        StarGreenPlacement gsp = {
+            .x = world_x,
+            .y = world_y
+        };
+        level->star_greens[new_index] = gsp;
+        level->star_green_count++;
+        break;
+    }
+    case ENT_STAR_RED: {
+        StarRedPlacement rsp = {
+            .x = world_x,
+            .y = world_y
+        };
+        level->star_reds[new_index] = rsp;
+        level->star_red_count++;
         break;
     }
     case ENT_LAST_STAR: {

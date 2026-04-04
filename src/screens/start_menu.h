@@ -13,6 +13,7 @@
 
 #include <SDL.h>
 #include <SDL_ttf.h>
+#include <SDL_mixer.h>
 
 /*
  * MenuResult — what the user chose in the start menu.
@@ -31,6 +32,7 @@ typedef struct {
     SDL_Renderer *renderer;
     TTF_Font     *font;
     SDL_Texture  *logo_tex;
+    Mix_Chunk    *snd_confirm; /* SFX played when Play is clicked   */
     int           running;    /* 1 = menu loop active, 0 = done   */
     MenuResult    result;     /* what the user chose               */
 } StartMenu;

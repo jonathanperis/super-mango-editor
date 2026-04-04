@@ -580,7 +580,7 @@ make run
   │     ├── IMG_LoadTexture → gs.spike_block_tex   (spike_block.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.float_platform_tex (float_platform.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.bridge_tex        (bridge.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.yellow_star_tex   (yellow_star.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.star_yellow_tex   (star_yellow.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.axe_trap_tex      (axe_trap.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.circular_saw_tex  (circular_saw.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.blue_flame_tex    (blue_flame.png — non-fatal)
@@ -644,7 +644,7 @@ make run
         ├── SDL_DestroyTexture (ladder_tex)
         ├── SDL_DestroyTexture (vine_tex)
         ├── last_star_cleanup
-        ├── SDL_DestroyTexture (yellow_star_tex)
+        ├── SDL_DestroyTexture (star_yellow_tex)
         ├── SDL_DestroyTexture (coin_tex)
         ├── SDL_DestroyTexture (faster_fish_tex)
         ├── SDL_DestroyTexture (fish_tex)
@@ -683,7 +683,7 @@ make run
                     → spike collision → spike_platform collision → circular_saw collision
                     → axe_trap collision → blue_flame collision
                     → sea gap fall detection (instant death)
-                    → coin–player collision → yellow_star–player collision → last_star–player collision
+                    → coin–player collision → star_yellow–player collision → last_star–player collision
                     → heart/lives/score_life_next logic
                     → water_update → fog_update → bouncepads_update (small, medium, high)
                     → debug_update (if --debug)
@@ -790,8 +790,8 @@ prev = now;
 </tr>
 <tr>
 <td>16</td>
-<td>Yellow stars</td>
-<td><code>yellow_star.png</code> collectible star pickups</td>
+<td>Star yellows</td>
+<td><code>star_yellow.png</code> collectible star pickups</td>
 </tr>
 <tr>
 <td>17</td>
@@ -931,9 +931,9 @@ prev = now;
     Coin           coins[MAX_COINS];
     int            coin_count;
 
-    SDL_Texture   *yellow_star_tex;  // Shared texture for yellow star pickups (GPU)
-    YellowStar     yellow_stars[MAX_YELLOW_STARS];
-    int            yellow_star_count;
+    SDL_Texture   *star_yellow_tex;  // Shared texture for star yellow pickups (GPU)
+    StarYellow     star_yellows[MAX_STAR_YELLOWS];
+    int            star_yellow_count;
 
     LastStar       last_star;        // Special end-of-level star collectible
 
@@ -1178,9 +1178,9 @@ prev = now;
 <td>16x16 coin collectible sprite</td>
 </tr>
 <tr>
-<td><code>yellow_star.png</code></td>
-<td><code>gs-&gt;yellow_star_tex</code></td>
-<td>Yellow star collectible sprite</td>
+<td><code>star_yellow.png</code></td>
+<td><code>gs-&gt;star_yellow_tex</code></td>
+<td>Star yellow collectible sprite</td>
 </tr>
 <tr>
 <td><code>last_star.png</code></td>
@@ -1739,7 +1739,7 @@ src/
 ├── sandbox.o
 ├── start_menu.o
 ├── coin.o
-├── yellow_star.o
+├── star_yellow.o
 ├── last_star.o
 ├── spider.o
 ├── jumping_spider.o
@@ -3179,7 +3179,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </tr>
 </tbody></table>
 <hr>
-<h2><code>yellow_star.h</code> Constants</h2>
+<h2><code>star_yellow.h</code> Constants</h2>
 <table>
 <thead>
 <tr>
@@ -3190,19 +3190,19 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </tr>
 </thead>
 <tbody><tr>
-<td><code>MAX_YELLOW_STARS</code></td>
+<td><code>MAX_STAR_YELLOWS</code></td>
 <td><code>3</code></td>
 <td><code>int</code></td>
 <td>Maximum yellow star instances per level</td>
 </tr>
 <tr>
-<td><code>YELLOW_STAR_DISPLAY_W</code></td>
+<td><code>STAR_YELLOW_DISPLAY_W</code></td>
 <td><code>16</code></td>
 <td><code>int</code></td>
 <td>Display width (logical px)</td>
 </tr>
 <tr>
-<td><code>YELLOW_STAR_DISPLAY_H</code></td>
+<td><code>STAR_YELLOW_DISPLAY_H</code></td>
 <td><code>16</code></td>
 <td><code>int</code></td>
 <td>Display height (logical px)</td>
@@ -4080,7 +4080,7 @@ TTF_CloseFont(font);
 13. Ladders                (ladder.png climbable)
 14. Ropes                  (rope.png climbable)
 15. Coins                  (coin.png collectibles)
-16. Yellow stars           (yellow_star.png health pickups)
+16. Star yellows           (star_yellow.png health pickups)
 17. Last star              (end-of-level star using HUD star sprite)
 18. Blue flames            (blue_flame.png erupting from sea gaps)
 19. Fish                   (fish.png jumping water enemies)
@@ -4925,7 +4925,7 @@ gs-&gt;music = NULL;
 ├── game.c                        Window, renderer, textures, sounds, game loop
 ├── collectibles/
 │   ├── coin.h / .c               Coin collectible: placement, AABB collection, render
-│   ├── yellow_star.h / .c        Yellow star health pickup
+│   ├── star_yellow.h / .c        Star yellow health pickup
 │   └── last_star.h / .c          End-of-level star collectible
 ├── core/
 │   ├── debug.h / .c              Debug overlay: FPS counter, collision hitboxes, event log
@@ -5056,7 +5056,7 @@ gs-&gt;music = NULL;
 #include &quot;jumping_spider.h&quot;  // JumpingSpider
 #include &quot;bird.h&quot;            // Bird
 #include &quot;faster_bird.h&quot;     // FasterBird
-#include &quot;yellow_star.h&quot;     // YellowStar
+#include &quot;star_yellow.h&quot;     // StarYellow
 #include &quot;axe_trap.h&quot;        // AxeTrap
 #include &quot;circular_saw.h&quot;    // CircularSaw
 #include &quot;blue_flame.h&quot;      // BlueFlame
@@ -5082,7 +5082,7 @@ void game_cleanup(GameState *gs);
 <li>Window + renderer + logical size (400x300)</li>
 <li>Parallax background (7 layers)</li>
 <li>Floor tile (<code>grass_tileset.png</code>) and platform tile (<code>platform.png</code>)</li>
-<li>Entity textures: <code>spider.png</code>, <code>jumping_spider.png</code>, <code>bird.png</code>, <code>faster_bird.png</code>, <code>fish.png</code>, <code>faster_fish.png</code>, <code>coin.png</code>, <code>bouncepad_medium.png</code>, <code>bouncepad_small.png</code>, <code>bouncepad_high.png</code>, <code>vine.png</code>, <code>ladder.png</code>, <code>rope.png</code>, <code>rail.png</code>, <code>spike_block.png</code>, <code>float_platform.png</code>, <code>bridge.png</code>, <code>yellow_star.png</code>, <code>axe_trap.png</code>, <code>circular_saw.png</code>, <code>blue_flame.png</code>, <code>spike.png</code>, <code>spike_platform.png</code></li>
+<li>Entity textures: <code>spider.png</code>, <code>jumping_spider.png</code>, <code>bird.png</code>, <code>faster_bird.png</code>, <code>fish.png</code>, <code>faster_fish.png</code>, <code>coin.png</code>, <code>bouncepad_medium.png</code>, <code>bouncepad_small.png</code>, <code>bouncepad_high.png</code>, <code>vine.png</code>, <code>ladder.png</code>, <code>rope.png</code>, <code>rail.png</code>, <code>spike_block.png</code>, <code>float_platform.png</code>, <code>bridge.png</code>, <code>star_yellow.png</code>, <code>axe_trap.png</code>, <code>circular_saw.png</code>, <code>blue_flame.png</code>, <code>spike.png</code>, <code>spike_platform.png</code></li>
 <li>Sound effects: <code>bouncepad.wav</code>, <code>axe_trap.wav</code>, <code>bird.wav</code>, <code>spider.wav</code>, <code>fish.wav</code>, <code>player_jump.wav</code>, <code>coin.wav</code>, <code>player_hit.wav</code></li>
 <li>Background music: <code>game_music.wav</code> (via <code>Mix_LoadMUS</code>)</li>
 <li>Entity init: player, water, fog, HUD, debug, level (via sandbox)</li>
@@ -5140,8 +5140,8 @@ void game_cleanup(GameState *gs);
 <h2>Collectible Modules</h2>
 <h3><code>coin.h</code> / <code>coin.c</code></h3>
 <p>Gold coin collectible. AABB pickup awards 100 points. Every 3 coins restores one heart. Asset: <code>coin.png</code>.</p>
-<h3><code>yellow_star.h</code> / <code>yellow_star.c</code></h3>
-<p>Yellow star health pickup that restores hearts. Asset: <code>yellow_star.png</code>.</p>
+<h3><code>star_yellow.h</code> / <code>star_yellow.c</code></h3>
+<p>Star yellow health pickup that restores hearts. Asset: <code>star_yellow.png</code>.</p>
 <h3><code>last_star.h</code> / <code>last_star.c</code></h3>
 <p>End-of-level star collectible. Asset: <code>last_star.png</code>.</p>
 <hr>
@@ -5181,7 +5181,7 @@ void game_cleanup(GameState *gs);
 <h3><code>rail.h</code> / <code>rail.c</code></h3>
 <p>Rail path system. Builds closed-loop and open-line rail paths from tile definitions. 4x4 bitmask tileset for rendering. Used by spike blocks and float platforms. Asset: <code>rail.png</code>.</p>
 <h3><code>hud.h</code> / <code>hud.c</code></h3>
-<p>HUD renderer. Draws heart icons (health), player icon + lives counter, coin icon + score. Assets: <code>yellow_star.png</code> (hearts), <code>hud_coins.png</code> (coin icon), <code>player.png</code> (lives icon), <code>round9x13.ttf</code> (font).</p>
+<p>HUD renderer. Draws heart icons (health), player icon + lives counter, coin icon + score. Assets: <code>star_yellow.png</code> (hearts), <code>hud_coins.png</code> (coin icon), <code>player.png</code> (lives icon), <code>round9x13.ttf</code> (font).</p>
 <h3><code>debug.h</code> / <code>debug.c</code></h3>
 <p>Debug overlay (activated with <code>--debug</code> flag). FPS counter, collision hitbox visualization for all entities, and a scrolling event log.</p>
 

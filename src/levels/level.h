@@ -139,12 +139,28 @@ typedef struct {
 } CoinPlacement;
 
 /*
- * YellowStarPlacement — one health-restoring star pickup.
+ * StarYellowPlacement — one health-restoring star pickup.
  */
 typedef struct {
     float x;
     float y;
-} YellowStarPlacement;
+} StarYellowPlacement;
+
+/*
+ * StarGreenPlacement — one green health-restoring star pickup.
+ */
+typedef struct {
+    float x;
+    float y;
+} StarGreenPlacement;
+
+/*
+ * StarRedPlacement — one red health-restoring star pickup.
+ */
+typedef struct {
+    float x;
+    float y;
+} StarRedPlacement;
 
 /*
  * LastStarPlacement — the single end-of-level star.
@@ -343,8 +359,12 @@ typedef struct {
     /* ---- Collectibles ------------------------------------------------ */
     CoinPlacement        coins[MAX_COINS];
     int                  coin_count;
-    YellowStarPlacement  yellow_stars[MAX_YELLOW_STARS];
-    int                  yellow_star_count;
+    StarYellowPlacement  star_yellows[MAX_STAR_YELLOWS];
+    int                  star_yellow_count;
+    StarGreenPlacement   star_greens[MAX_STAR_YELLOWS];
+    int                  star_green_count;
+    StarRedPlacement     star_reds[MAX_STAR_YELLOWS];
+    int                  star_red_count;
     LastStarPlacement    last_star;
 
     /* ---- Enemies ----------------------------------------------------- */

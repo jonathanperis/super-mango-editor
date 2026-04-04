@@ -72,7 +72,9 @@ static const char *entity_type_names[ENT_COUNT] = {
     [ENT_RAIL]             = "Rail",
     [ENT_PLATFORM]         = "Platform",
     [ENT_COIN]             = "Coin",
-    [ENT_YELLOW_STAR]      = "Yellow Star",
+    [ENT_STAR_YELLOW]      = "Star Yellow",
+    [ENT_STAR_GREEN]       = "Star Green",
+    [ENT_STAR_RED]         = "Star Red",
     [ENT_LAST_STAR]        = "Last Star",
     [ENT_SPIDER]           = "Spider",
     [ENT_JUMPING_SPIDER]   = "Jumping Spider",
@@ -319,18 +321,52 @@ void properties_render(EditorState *es, int start_y, int available_h)
         break;
     }
 
-    case ENT_YELLOW_STAR: {
-        YellowStarPlacement *p =
-            &es->level.yellow_stars[es->selection.index];
+    case ENT_STAR_YELLOW: {
+        StarYellowPlacement *p =
+            &es->level.star_yellows[es->selection.index];
 
         ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_YELLOW_STAR, 0),
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_YELLOW, 0),
                            FIELD_X, y, FIELD_W, &p->x))
             es->modified = 1;
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_YELLOW_STAR, 1),
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_YELLOW, 1),
+                           FIELD_X, y, FIELD_W, &p->y))
+            es->modified = 1;
+        break;
+    }
+
+    case ENT_STAR_GREEN: {
+        StarGreenPlacement *p =
+            &es->level.star_greens[es->selection.index];
+
+        ui_label(&es->ui, CONTENT_X, y, "x:");
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_GREEN, 0),
+                           FIELD_X, y, FIELD_W, &p->x))
+            es->modified = 1;
+        y += ROW_H;
+
+        ui_label(&es->ui, CONTENT_X, y, "y:");
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_GREEN, 1),
+                           FIELD_X, y, FIELD_W, &p->y))
+            es->modified = 1;
+        break;
+    }
+
+    case ENT_STAR_RED: {
+        StarRedPlacement *p =
+            &es->level.star_reds[es->selection.index];
+
+        ui_label(&es->ui, CONTENT_X, y, "x:");
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_RED, 0),
+                           FIELD_X, y, FIELD_W, &p->x))
+            es->modified = 1;
+        y += ROW_H;
+
+        ui_label(&es->ui, CONTENT_X, y, "y:");
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_RED, 1),
                            FIELD_X, y, FIELD_W, &p->y))
             es->modified = 1;
         break;

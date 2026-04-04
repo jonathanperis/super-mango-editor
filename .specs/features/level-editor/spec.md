@@ -36,7 +36,7 @@ The editor MUST support placing, moving, and configuring all 25 entity placement
 | World Geometry | rails | `RailPlacement` | layout, x, y, w, h, end_cap | Rail tile positions (for path preview) |
 | Static Geometry | platforms | `PlatformPlacement` | x, tile_height | y = FLOOR_Y - tile_height*TILE_SIZE + 16 |
 | Collectibles | coins | `CoinPlacement` | x, y | — |
-| Collectibles | yellow_stars | `YellowStarPlacement` | x, y | — |
+| Collectibles | star_yellows | `StarYellowPlacement` | x, y | — |
 | Collectibles | last_star | `LastStarPlacement` | x, y | Single struct, not array |
 | Enemies | spiders | `SpiderPlacement` | x, vx, patrol_x0, patrol_x1, frame_index | y = FLOOR_Y - 10 (SPIDER_ART_H) |
 | Enemies | jumping_spiders | `JumpingSpiderPlacement` | x, vx, patrol_x0, patrol_x1 | y = FLOOR_Y - 10 (same art height as spider) |

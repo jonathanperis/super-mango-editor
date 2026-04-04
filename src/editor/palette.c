@@ -94,7 +94,9 @@ static const PaletteEntry entries[] = {
 
     /* ---- Category 1: Collectibles ---- */
     { "Coin",             ENT_COIN,             1 },
-    { "Yellow Star",      ENT_YELLOW_STAR,      1 },
+    { "Star Yellow",      ENT_STAR_YELLOW,      1 },
+    { "Star Green",       ENT_STAR_GREEN,       1 },
+    { "Star Red",         ENT_STAR_RED,         1 },
     { "Last Star",        ENT_LAST_STAR,        1 },
 
     /* ---- Category 2: Enemies ---- */

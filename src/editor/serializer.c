@@ -231,15 +231,37 @@ cJSON *level_to_json(const LevelDef *def) {
         cJSON_AddItemToArray(coin_arr, obj);
     }
 
-    /* ---- Yellow stars --------------------------------------------- */
+    /* ---- Star yellows --------------------------------------------- */
 
-    cJSON *ystar_arr = cJSON_AddArrayToObject(root, "yellow_stars");
-    for (int i = 0; i < def->yellow_star_count; i++) {
-        const YellowStarPlacement *s = &def->yellow_stars[i];
+    cJSON *ystar_arr = cJSON_AddArrayToObject(root, "star_yellows");
+    for (int i = 0; i < def->star_yellow_count; i++) {
+        const StarYellowPlacement *s = &def->star_yellows[i];
         cJSON *obj = cJSON_CreateObject();
         cJSON_AddNumberToObject(obj, "x", s->x);
         cJSON_AddNumberToObject(obj, "y", s->y);
         cJSON_AddItemToArray(ystar_arr, obj);
+    }
+
+    /* ---- Star greens ---------------------------------------------- */
+
+    cJSON *gstar_arr = cJSON_AddArrayToObject(root, "star_greens");
+    for (int i = 0; i < def->star_green_count; i++) {
+        const StarGreenPlacement *s = &def->star_greens[i];
+        cJSON *obj = cJSON_CreateObject();
+        cJSON_AddNumberToObject(obj, "x", s->x);
+        cJSON_AddNumberToObject(obj, "y", s->y);
+        cJSON_AddItemToArray(gstar_arr, obj);
+    }
+
+    /* ---- Star reds ------------------------------------------------ */
+
+    cJSON *rstar_arr = cJSON_AddArrayToObject(root, "star_reds");
+    for (int i = 0; i < def->star_red_count; i++) {
+        const StarRedPlacement *s = &def->star_reds[i];
+        cJSON *obj = cJSON_CreateObject();
+        cJSON_AddNumberToObject(obj, "x", s->x);
+        cJSON_AddNumberToObject(obj, "y", s->y);
+        cJSON_AddItemToArray(rstar_arr, obj);
     }
 
     /* ---- Last star (single object, not array) -------------------- */
@@ -668,12 +690,28 @@ int level_from_json(const cJSON *json, LevelDef *def) {
         def->coins[idx].y = (float)get_number(elem, "y", 0);
     });
 
-    /* ---- Yellow stars --------------------------------------------- */
+    /* ---- Star yellows --------------------------------------------- */
 
-    PARSE_ARRAY("yellow_stars", def->yellow_stars, yellow_star_count,
-                MAX_YELLOW_STARS, {
-        def->yellow_stars[idx].x = (float)get_number(elem, "x", 0);
-        def->yellow_stars[idx].y = (float)get_number(elem, "y", 0);
+    PARSE_ARRAY("star_yellows", def->star_yellows, star_yellow_count,
+                MAX_STAR_YELLOWS, {
+        def->star_yellows[idx].x = (float)get_number(elem, "x", 0);
+        def->star_yellows[idx].y = (float)get_number(elem, "y", 0);
+    });
+
+    /* ---- Star greens ---------------------------------------------- */
+
+    PARSE_ARRAY("star_greens", def->star_greens, star_green_count,
+                MAX_STAR_YELLOWS, {
+        def->star_greens[idx].x = (float)get_number(elem, "x", 0);
+        def->star_greens[idx].y = (float)get_number(elem, "y", 0);
+    });
+
+    /* ---- Star reds ------------------------------------------------ */
+
+    PARSE_ARRAY("star_reds", def->star_reds, star_red_count,
+                MAX_STAR_YELLOWS, {
+        def->star_reds[idx].x = (float)get_number(elem, "x", 0);
+        def->star_reds[idx].y = (float)get_number(elem, "y", 0);
     });
 
     /* ---- Last star (single object, not array) -------------------- */

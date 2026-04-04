@@ -95,6 +95,13 @@ void start_menu_init(StartMenu *menu, SDL_Window *window, SDL_Renderer *renderer
         fprintf(stderr, "Warning: Failed to load start_menu_logo.png: %s\n",
                 IMG_GetError());
     }
+
+    /* Load the confirm UI sound effect (non-fatal) */
+    menu->snd_confirm = Mix_LoadWAV("assets/sounds/screens/confirm_ui.wav");
+    if (!menu->snd_confirm) {
+        fprintf(stderr, "Warning: Failed to load confirm_ui.wav: %s\n",
+                Mix_GetError());
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -127,6 +134,7 @@ static void start_menu_frame(void *arg) {
                  * Enter or Space starts the game — same as clicking Play.
                  * This gives keyboard-only users a fast way to start.
                  */
+                if (menu->snd_confirm) Mix_PlayChannel(-1, menu->snd_confirm, 0);
                 menu->result  = MENU_PLAY;
                 menu->running = 0;
                 break;
@@ -152,6 +160,7 @@ static void start_menu_frame(void *arg) {
             int ly = (int)(e.button.y / sy);
 
             if (point_in_rect(lx, ly, BTN_X, BTN_Y, BTN_W, BTN_H)) {
+                if (menu->snd_confirm) Mix_PlayChannel(-1, menu->snd_confirm, 0);
                 menu->result  = MENU_PLAY;
                 menu->running = 0;
             }
@@ -255,6 +264,10 @@ void start_menu_loop(StartMenu *menu) {
 /* ------------------------------------------------------------------ */
 
 void start_menu_cleanup(StartMenu *menu) {
+    if (menu->snd_confirm) {
+        Mix_FreeChunk(menu->snd_confirm);
+        menu->snd_confirm = NULL;
+    }
     if (menu->logo_tex) {
         SDL_DestroyTexture(menu->logo_tex);
         menu->logo_tex = NULL;

@@ -93,7 +93,7 @@ The game's loader and render functions compute display positions and sizes that 
 | Fish | 48×48 | 48×48 | Full frame | Full frame rendered |
 | Faster Fish | 48×48 | 48×48 | Full frame | Full frame |
 | Coin | varies | 16×16 | Full texture | Scaled to display size |
-| Yellow Star | varies | 16×16 | Full texture | Scaled to display size |
+| Star Yellow | varies | 16×16 | Full texture | Scaled to display size |
 | Last Star | varies | 24×24 | Full texture | Uses HUD star asset |
 | Axe Trap | 48×64 | 48×64 | Full frame | Rotated at pivot point |
 | Circular Saw | 32×32 | 32×32 | Full frame | Rotated continuously |
@@ -135,7 +135,7 @@ These formulas MUST be used in the editor to position entities for preview. They
 | Ladder | from placement (x, y) | **varies** | sandbox_00.c |
 | Rope | from placement (x, y) | **varies** | sandbox_00.c |
 | Coin | from placement (x, y) | **varies** | sandbox_00.c |
-| Yellow Star | from placement (x, y) | **varies** | sandbox_00.c |
+| Star Yellow | from placement (x, y) | **varies** | sandbox_00.c |
 | Last Star | from placement (x, y) | **varies** | sandbox_00.c |
 
 ### Blue Flame Auto-Derivation (Preview Only)
@@ -165,7 +165,7 @@ The editor must load the exact same textures as the game. All paths are relative
 | fish_tex | `assets/fish.png` | Fatal |
 | faster_fish_tex | `assets/faster_fish.png` | Non-fatal |
 | coin_tex | `assets/coin.png` | Fatal |
-| yellow_star_tex | `assets/yellow_star.png` | Non-fatal |
+| star_yellow_tex | `assets/star_yellow.png` | Non-fatal |
 | last_star_tex | (uses HUD star texture) | Non-fatal |
 | axe_trap_tex | `assets/axe_trap.png` | Non-fatal |
 | circular_saw_tex | `assets/circular_saw.png` | Non-fatal |
@@ -313,7 +313,7 @@ The select tool uses AABB hit-testing. The hit-test rectangle MUST match the ent
 | Fish | 48 | 48 | placement x | 245 (derived) |
 | Faster Fish | 48 | 48 | placement x | 245 (derived) |
 | Coin | 16 | 16 | placement x | placement y |
-| Yellow Star | 16 | 16 | placement x | placement y |
+| Star Yellow | 16 | 16 | placement x | placement y |
 | Last Star | 24 | 24 | placement x | placement y |
 | Axe Trap | 48 | 64 | pillar_x + 24 - 24 | 124 (derived) |
 | Circular Saw | 32 | 32 | placement x | 140 (derived) |
@@ -339,7 +339,7 @@ The select tool uses AABB hit-testing. The hit-test rectangle MUST match the ent
 ```c
 typedef enum {
     ENT_SEA_GAP, ENT_RAIL, ENT_PLATFORM,
-    ENT_COIN, ENT_YELLOW_STAR, ENT_LAST_STAR,
+    ENT_COIN, ENT_STAR_YELLOW, ENT_LAST_STAR,
     ENT_SPIDER, ENT_JUMPING_SPIDER, ENT_BIRD, ENT_FASTER_BIRD,
     ENT_FISH, ENT_FASTER_FISH,
     ENT_AXE_TRAP, ENT_CIRCULAR_SAW, ENT_SPIKE_ROW,
@@ -358,7 +358,7 @@ typedef struct {
     SDL_Texture *floor_tile, *water;
     SDL_Texture *platform, *spider, *jumping_spider;
     SDL_Texture *bird, *faster_bird, *fish, *faster_fish;
-    SDL_Texture *coin, *yellow_star, *last_star;
+    SDL_Texture *coin, *star_yellow, *last_star;
     SDL_Texture *axe_trap, *circular_saw, *blue_flame;
     SDL_Texture *spike, *spike_platform, *spike_block;
     SDL_Texture *float_platform, *bridge;
@@ -418,7 +418,7 @@ typedef union {
     BouncepadPlacement bouncepad; PlatformPlacement platform;
     VinePlacement vine; LadderPlacement ladder; RopePlacement rope;
     RailPlacement rail; int sea_gap; LastStarPlacement last_star;
-    YellowStarPlacement yellow_star;
+    StarYellowPlacement star_yellow;
 } PlacementData;
 
 typedef struct {

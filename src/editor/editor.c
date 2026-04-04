@@ -295,7 +295,9 @@ static void load_textures(EditorState *es) {
 
     /* Collectibles — coins, stars */
     LOAD_TEX(coin,             "assets/sprites/collectibles/coin.png");
-    LOAD_TEX(yellow_star,      "assets/sprites/collectibles/yellow_star.png");
+    LOAD_TEX(star_yellow,      "assets/sprites/collectibles/star_yellow.png");
+    LOAD_TEX(star_green,       "assets/sprites/collectibles/star_green.png");
+    LOAD_TEX(star_red,         "assets/sprites/collectibles/star_red.png");
     LOAD_TEX(last_star,        "assets/sprites/collectibles/last_star.png");
 
     /* Hazards — traps that damage the player on contact */
@@ -1140,8 +1142,14 @@ static void copy_selected(EditorState *es) {
     case ENT_COIN:
         es->clipboard_data.coin = es->level.coins[i];
         break;
-    case ENT_YELLOW_STAR:
-        es->clipboard_data.yellow_star = es->level.yellow_stars[i];
+    case ENT_STAR_YELLOW:
+        es->clipboard_data.star_yellow = es->level.star_yellows[i];
+        break;
+    case ENT_STAR_GREEN:
+        es->clipboard_data.star_green = es->level.star_greens[i];
+        break;
+    case ENT_STAR_RED:
+        es->clipboard_data.star_red = es->level.star_reds[i];
         break;
     case ENT_LAST_STAR:
         es->clipboard_data.last_star = es->level.last_star;
@@ -1275,10 +1283,20 @@ static void paste_clipboard(EditorState *es) {
         d.coin.y += PASTE_OFFSET;
         PASTE_INTO(coins, coin_count, MAX_COINS, coin);
         break;
-    case ENT_YELLOW_STAR:
-        d.yellow_star.x += PASTE_OFFSET;
-        d.yellow_star.y += PASTE_OFFSET;
-        PASTE_INTO(yellow_stars, yellow_star_count, MAX_YELLOW_STARS, yellow_star);
+    case ENT_STAR_YELLOW:
+        d.star_yellow.x += PASTE_OFFSET;
+        d.star_yellow.y += PASTE_OFFSET;
+        PASTE_INTO(star_yellows, star_yellow_count, MAX_STAR_YELLOWS, star_yellow);
+        break;
+    case ENT_STAR_GREEN:
+        d.star_green.x += PASTE_OFFSET;
+        d.star_green.y += PASTE_OFFSET;
+        PASTE_INTO(star_greens, star_green_count, MAX_STAR_YELLOWS, star_green);
+        break;
+    case ENT_STAR_RED:
+        d.star_red.x += PASTE_OFFSET;
+        d.star_red.y += PASTE_OFFSET;
+        PASTE_INTO(star_reds, star_red_count, MAX_STAR_YELLOWS, star_red);
         break;
     case ENT_LAST_STAR:
         d.last_star.x += PASTE_OFFSET;
@@ -1485,8 +1503,12 @@ static void play_test(EditorState *es) {
     pid_t pid = fork();
     if (pid == 0) {
         /* Child process — become the game, passing the level file */
-        execl("./out/super-mango", "super-mango",
-              "--level", save_path, (char *)NULL);
+        if (es->debug_play)
+            execl("./out/super-mango", "super-mango",
+                  "--level", save_path, "--debug", (char *)NULL);
+        else
+            execl("./out/super-mango", "super-mango",
+                  "--level", save_path, (char *)NULL);
         /* execl only returns on error */
         _exit(1);
     } else if (pid > 0) {
@@ -1502,8 +1524,8 @@ static void play_test(EditorState *es) {
     {
         char cmd[512];
         snprintf(cmd, sizeof(cmd),
-                 "start /B .\\out\\super-mango.exe --level \"%s\"",
-                 save_path);
+                 "start /B .\\out\\super-mango.exe --level \"%s\"%s",
+                 save_path, es->debug_play ? " --debug" : "");
         system(cmd);
     }
     es->playing = 1;
@@ -1678,6 +1700,15 @@ static void render_toolbar(EditorState *es) {
         es->show_grid ^= 1;
     }
 
+    /* ---- Debug toggle button ---------------------------------------- */
+    bx += 60;
+    {
+        const char *dbg_label = es->debug_play ? "[Debug]" : " Debug ";
+        if (ui_button(&es->ui, bx, by, 56, bh, dbg_label)) {
+            es->debug_play ^= 1;
+        }
+    }
+
     /* ---- Zoom dropdown ---------------------------------------------- */
     bx += 60;
     {
@@ -1850,7 +1881,9 @@ static void render_status_bar(EditorState *es) {
               + es->level.rail_count
               + es->level.platform_count
               + es->level.coin_count
-              + es->level.yellow_star_count
+              + es->level.star_yellow_count
+              + es->level.star_green_count
+              + es->level.star_red_count
               + (es->level.last_star.x != 0.0f || es->level.last_star.y != 0.0f
                  ? 1 : 0)
               + es->level.spider_count
@@ -1991,9 +2024,19 @@ static void apply_undo_command(EditorState *es, const Command *cmd,
                      coin, MAX_COINS);
         break;
 
-    case ENT_YELLOW_STAR:
-        APPLY_ARRAY(es->level.yellow_stars, es->level.yellow_star_count,
-                     yellow_star, MAX_YELLOW_STARS);
+    case ENT_STAR_YELLOW:
+        APPLY_ARRAY(es->level.star_yellows, es->level.star_yellow_count,
+                     star_yellow, MAX_STAR_YELLOWS);
+        break;
+
+    case ENT_STAR_GREEN:
+        APPLY_ARRAY(es->level.star_greens, es->level.star_green_count,
+                     star_green, MAX_STAR_YELLOWS);
+        break;
+
+    case ENT_STAR_RED:
+        APPLY_ARRAY(es->level.star_reds, es->level.star_red_count,
+                     star_red, MAX_STAR_YELLOWS);
         break;
 
     case ENT_LAST_STAR:
@@ -2190,7 +2233,9 @@ void editor_cleanup(EditorState *es) {
     DESTROY_TEX(es->textures.fish);
     DESTROY_TEX(es->textures.faster_fish);
     DESTROY_TEX(es->textures.coin);
-    DESTROY_TEX(es->textures.yellow_star);
+    DESTROY_TEX(es->textures.star_yellow);
+    DESTROY_TEX(es->textures.star_green);
+    DESTROY_TEX(es->textures.star_red);
     DESTROY_TEX(es->textures.last_star);
     DESTROY_TEX(es->textures.axe_trap);
     DESTROY_TEX(es->textures.circular_saw);

@@ -45,7 +45,7 @@ super-mango-game/
 └── src/
     ├── main.c              ← SDL init/teardown, entry point
     ├── game.h / game.c     ← GameState, window, renderer, game loop
-    ├── collectibles/       ← coin, yellow_star, last_star
+    ├── collectibles/       ← coin, star_yellow, last_star
     ├── core/               ← debug overlay, entity utilities
     ├── effects/            ← fog, parallax, water
     ├── entities/           ← bird, faster_bird, fish, faster_fish, spider, jumping_spider

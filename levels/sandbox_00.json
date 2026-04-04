@@ -106,7 +106,7 @@
 			"x":	1496,
 			"y":	156
 		}],
-	"yellow_stars":	[{
+	"star_yellows":	[{
 			"x":	272,
 			"y":	108
 		}, {
@@ -241,6 +241,7 @@
 		}, {
 			"x":	1152
 		}],
+	"fire_flames":	[],
 	"float_platforms":	[{
 			"mode":	"STATIC",
 			"x":	172,

@@ -93,7 +93,7 @@ super-mango-game/
 │   ├── game.h / game.c               GameState struct, window, renderer, game loop
 │   ├── collectibles/                  Pickup items
 │   │   ├── coin.h / .c               Coin (100 pts, 3 restore a heart)
-│   │   ├── yellow_star.h / .c        Health pickup
+│   │   ├── star_yellow.h / .c        Health pickup
 │   │   └── last_star.h / .c          End-of-level star
 │   ├── core/                          Shared utilities
 │   │   ├── debug.h / .c              Debug overlay (FPS, hitboxes, event log)

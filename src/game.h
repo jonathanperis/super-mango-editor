@@ -37,7 +37,7 @@
 #include "entities/jumping_spider.h"/* JumpingSpider — jumping patrol enemy */
 #include "entities/bird.h"          /* Bird — slow sine-wave sky patrol */
 #include "entities/faster_bird.h"   /* FasterBird — fast sine-wave sky patrol */
-#include "collectibles/yellow_star.h"/* YellowStar — health-restoring collectible */
+#include "collectibles/star_yellow.h"/* StarYellow — health-restoring collectible */
 #include "hazards/axe_trap.h"       /* AxeTrap — swinging/spinning axe hazard */
 #include "hazards/circular_saw.h"   /* CircularSaw — fast rotating patrol hazard */
 #include "hazards/blue_flame.h"     /* BlueFlame — erupting fire hazard from sea gaps */
@@ -243,10 +243,16 @@ typedef struct {
     int           bridge_count;        /* number of active bridges             */
     int           sea_gaps[MAX_SEA_GAPS]; /* left-edge x of each sea gap       */
     int           sea_gap_count;         /* number of active sea gaps          */
-    SDL_Texture  *yellow_star_tex;       /* shared texture for yellow star pickups*/
+    SDL_Texture  *star_yellow_tex;       /* shared texture for star yellow pickups*/
+    SDL_Texture  *star_green_tex;       /* shared texture for star green pickups */
+    SDL_Texture  *star_red_tex;         /* shared texture for star red pickups   */
     SDL_Texture  *last_star_tex;         /* dedicated texture for end-of-level star*/
-    YellowStar    yellow_stars[MAX_YELLOW_STARS]; /* health-restoring collectibles */
-    int           yellow_star_count;     /* number of yellow stars placed       */
+    StarYellow    star_yellows[MAX_STAR_YELLOWS]; /* health-restoring collectibles */
+    int           star_yellow_count;     /* number of star yellows placed       */
+    StarYellow    star_greens[MAX_STAR_YELLOWS]; /* green health-restoring collectibles */
+    int           star_green_count;      /* number of star greens placed        */
+    StarYellow    star_reds[MAX_STAR_YELLOWS]; /* red health-restoring collectibles */
+    int           star_red_count;        /* number of star reds placed          */
     SDL_Texture  *axe_trap_tex;          /* shared texture for axe trap hazards*/
     AxeTrap       axe_traps[MAX_AXE_TRAPS]; /* swinging/spinning axe hazards  */
     int           axe_trap_count;        /* number of axe traps placed         */

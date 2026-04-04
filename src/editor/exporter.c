@@ -190,7 +190,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     fprintf(f, "#include \"../../entities/fish.h\"           /* FISH_SPEED */\n");
     fprintf(f, "#include \"../../entities/faster_fish.h\"    /* FFISH_SPEED */\n");
     fprintf(f, "#include \"../../collectibles/coin.h\"       /* COIN_DISPLAY_W, COIN_DISPLAY_H */\n");
-    fprintf(f, "#include \"../../collectibles/yellow_star.h\"/* YELLOW_STAR_DISPLAY_W/H */\n");
+    fprintf(f, "#include \"../../collectibles/star_yellow.h\"/* STAR_YELLOW_DISPLAY_W/H, MAX_STAR_YELLOWS */\n");
     fprintf(f, "#include \"../../collectibles/last_star.h\"  /* LAST_STAR_DISPLAY_W/H */\n");
     fprintf(f, "#include \"../../surfaces/bouncepad.h\"      /* BOUNCEPAD_VY_*, BouncepadType */\n");
     fprintf(f, "#include \"../../hazards/axe_trap.h\"        /* AxeTrapMode */\n");
@@ -259,17 +259,41 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .coin_count = %d,\n", def->coin_count);
 
-    /* ---- 6. Yellow stars ---- */
-    write_section(f, "Yellow stars");
-    if (def->yellow_star_count > 0) {
-        fprintf(f, "    .yellow_stars = {\n");
-        for (int i = 0; i < def->yellow_star_count; i++) {
-            const YellowStarPlacement *ys = &def->yellow_stars[i];
+    /* ---- 6. Star yellows ---- */
+    write_section(f, "Star yellows");
+    if (def->star_yellow_count > 0) {
+        fprintf(f, "    .star_yellows = {\n");
+        for (int i = 0; i < def->star_yellow_count; i++) {
+            const StarYellowPlacement *ys = &def->star_yellows[i];
             fprintf(f, "        { %.1ff, %.1ff },\n", ys->x, ys->y);
         }
         fprintf(f, "    },\n");
     }
-    fprintf(f, "    .yellow_star_count = %d,\n", def->yellow_star_count);
+    fprintf(f, "    .star_yellow_count = %d,\n", def->star_yellow_count);
+
+    /* ---- 6b. Star greens ---- */
+    write_section(f, "Star greens");
+    if (def->star_green_count > 0) {
+        fprintf(f, "    .star_greens = {\n");
+        for (int i = 0; i < def->star_green_count; i++) {
+            const StarGreenPlacement *gs = &def->star_greens[i];
+            fprintf(f, "        { %.1ff, %.1ff },\n", gs->x, gs->y);
+        }
+        fprintf(f, "    },\n");
+    }
+    fprintf(f, "    .star_green_count = %d,\n", def->star_green_count);
+
+    /* ---- 6c. Star reds ---- */
+    write_section(f, "Star reds");
+    if (def->star_red_count > 0) {
+        fprintf(f, "    .star_reds = {\n");
+        for (int i = 0; i < def->star_red_count; i++) {
+            const StarRedPlacement *rs = &def->star_reds[i];
+            fprintf(f, "        { %.1ff, %.1ff },\n", rs->x, rs->y);
+        }
+        fprintf(f, "    },\n");
+    }
+    fprintf(f, "    .star_red_count = %d,\n", def->star_red_count);
 
     /* ---- 7. Last star (single, not array) ---- */
     write_section(f, "Last star");

@@ -20,7 +20,7 @@
 #include "../surfaces/platform.h"
 #include "../surfaces/rail.h"
 #include "../collectibles/coin.h"
-#include "../collectibles/yellow_star.h"
+#include "../collectibles/star_yellow.h"
 #include "../collectibles/last_star.h"
 #include "../entities/spider.h"
 #include "../entities/jumping_spider.h"
@@ -116,14 +116,34 @@ static void load_coins(GameState *gs, const LevelDef *def)
     gs->coin_count = def->coin_count;
 }
 
-static void load_yellow_stars(GameState *gs, const LevelDef *def)
+static void load_star_yellows(GameState *gs, const LevelDef *def)
 {
-    for (int i = 0; i < def->yellow_star_count; i++) {
-        gs->yellow_stars[i].x      = def->yellow_stars[i].x;
-        gs->yellow_stars[i].y      = def->yellow_stars[i].y;
-        gs->yellow_stars[i].active = 1;
+    for (int i = 0; i < def->star_yellow_count; i++) {
+        gs->star_yellows[i].x      = def->star_yellows[i].x;
+        gs->star_yellows[i].y      = def->star_yellows[i].y;
+        gs->star_yellows[i].active = 1;
     }
-    gs->yellow_star_count = def->yellow_star_count;
+    gs->star_yellow_count = def->star_yellow_count;
+}
+
+static void load_star_greens(GameState *gs, const LevelDef *def)
+{
+    for (int i = 0; i < def->star_green_count; i++) {
+        gs->star_greens[i].x      = def->star_greens[i].x;
+        gs->star_greens[i].y      = def->star_greens[i].y;
+        gs->star_greens[i].active = 1;
+    }
+    gs->star_green_count = def->star_green_count;
+}
+
+static void load_star_reds(GameState *gs, const LevelDef *def)
+{
+    for (int i = 0; i < def->star_red_count; i++) {
+        gs->star_reds[i].x      = def->star_reds[i].x;
+        gs->star_reds[i].y      = def->star_reds[i].y;
+        gs->star_reds[i].active = 1;
+    }
+    gs->star_red_count = def->star_red_count;
 }
 
 static void load_last_star(GameState *gs, const LevelDef *def)
@@ -539,7 +559,9 @@ void level_load(GameState *gs, const LevelDef *def)
 
     /* ---- Collectibles --------------------------------------------- */
     load_coins(gs, def);
-    load_yellow_stars(gs, def);
+    load_star_yellows(gs, def);
+    load_star_greens(gs, def);
+    load_star_reds(gs, def);
     load_last_star(gs, def);
 
     /* ---- Enemies -------------------------------------------------- */
@@ -623,7 +645,9 @@ void level_reset(GameState *gs, const LevelDef *def)
 
     /* Collectibles */
     load_coins(gs, def);
-    load_yellow_stars(gs, def);
+    load_star_yellows(gs, def);
+    load_star_greens(gs, def);
+    load_star_reds(gs, def);
     load_last_star(gs, def);
 
     /* Enemies */

@@ -97,7 +97,9 @@ typedef enum {
     ENT_RAIL,              /* rail path (spike blocks / platforms ride on)  */
     ENT_PLATFORM,          /* ground pillar (static collision surface)      */
     ENT_COIN,              /* collectable coin (100 pts, 3 restore a heart) */
-    ENT_YELLOW_STAR,       /* health-restoring star pickup                  */
+    ENT_STAR_YELLOW,       /* health-restoring star pickup                  */
+    ENT_STAR_GREEN,        /* green health-restoring star pickup             */
+    ENT_STAR_RED,          /* red health-restoring star pickup               */
     ENT_LAST_STAR,         /* end-of-level star (triggers level complete)   */
     ENT_SPIDER,            /* ground-patrol enemy (walks back and forth)    */
     ENT_JUMPING_SPIDER,    /* spider variant that leaps across sea gaps     */
@@ -189,7 +191,9 @@ typedef struct {
     SDL_Texture *fish;              /* slow fish sprite sheet                       */
     SDL_Texture *faster_fish;       /* fast fish sprite sheet                       */
     SDL_Texture *coin;              /* coin collectible sprite sheet                */
-    SDL_Texture *yellow_star;       /* yellow star collectible sprite sheet         */
+    SDL_Texture *star_yellow;       /* star yellow collectible sprite sheet         */
+    SDL_Texture *star_green;        /* star green collectible sprite sheet          */
+    SDL_Texture *star_red;          /* star red collectible sprite sheet            */
     SDL_Texture *last_star;         /* end-of-level star sprite sheet               */
     SDL_Texture *axe_trap;          /* axe hazard sprite sheet                      */
     SDL_Texture *circular_saw;      /* circular saw hazard sprite sheet             */
@@ -322,6 +326,7 @@ typedef struct {
     int            panel_open;    /* 1 = properties panel expanded, 0 = collapsed  */
     int            config_open;   /* 1 = level config panel expanded, 0 = collapsed */
     int            palette_open;  /* 1 = palette panel expanded, 0 = collapsed      */
+    int            debug_play;   /* 1 = launch game with --debug when playing      */
 
     /* ---- Mouse state (updated every frame from SDL events) ------------ */
     int            mouse_x;       /* current cursor x in window pixels         */

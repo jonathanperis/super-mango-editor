@@ -198,7 +198,9 @@ static void render_vines(EditorState *es);
 static void render_ladders(EditorState *es);
 static void render_ropes(EditorState *es);
 static void render_coins(EditorState *es);
-static void render_yellow_stars(EditorState *es);
+static void render_star_yellows(EditorState *es);
+static void render_star_greens(EditorState *es);
+static void render_star_reds(EditorState *es);
 static void render_last_star(EditorState *es);
 static void render_player_spawn(EditorState *es);
 static void render_blue_flames(EditorState *es);
@@ -309,7 +311,9 @@ void canvas_render(EditorState *es) {
 
     /* Collectibles */
     render_coins(es);
-    render_yellow_stars(es);
+    render_star_yellows(es);
+    render_star_greens(es);
+    render_star_reds(es);
     render_last_star(es);
 
     /* Player spawn — draw idle frame at the spawn position */
@@ -896,16 +900,44 @@ static void render_coins(EditorState *es) {
     }
 }
 
-/* ---- Yellow stars ------------------------------------------------ */
+/* ---- Star yellows ------------------------------------------------ */
 
 /*
- * render_yellow_stars — Draw health-restoring star pickups at 16x16.
+ * render_star_yellows — Draw health-restoring star pickups at 16x16.
  */
-static void render_yellow_stars(EditorState *es) {
-    for (int i = 0; i < es->level.yellow_star_count; i++) {
-        draw_tex(es, es->textures.yellow_star, NULL,
-                 es->level.yellow_stars[i].x,
-                 es->level.yellow_stars[i].y,
+static void render_star_yellows(EditorState *es) {
+    for (int i = 0; i < es->level.star_yellow_count; i++) {
+        draw_tex(es, es->textures.star_yellow, NULL,
+                 es->level.star_yellows[i].x,
+                 es->level.star_yellows[i].y,
+                 YSTAR_DISPLAY_W, YSTAR_DISPLAY_H);
+    }
+}
+
+/* ---- Star greens ------------------------------------------------- */
+
+/*
+ * render_star_greens — Draw green health-restoring star pickups at 16x16.
+ */
+static void render_star_greens(EditorState *es) {
+    for (int i = 0; i < es->level.star_green_count; i++) {
+        draw_tex(es, es->textures.star_green, NULL,
+                 es->level.star_greens[i].x,
+                 es->level.star_greens[i].y,
+                 YSTAR_DISPLAY_W, YSTAR_DISPLAY_H);
+    }
+}
+
+/* ---- Star reds --------------------------------------------------- */
+
+/*
+ * render_star_reds — Draw red health-restoring star pickups at 16x16.
+ */
+static void render_star_reds(EditorState *es) {
+    for (int i = 0; i < es->level.star_red_count; i++) {
+        draw_tex(es, es->textures.star_red, NULL,
+                 es->level.star_reds[i].x,
+                 es->level.star_reds[i].y,
                  YSTAR_DISPLAY_W, YSTAR_DISPLAY_H);
     }
 }
@@ -1236,10 +1268,26 @@ static void render_selection(EditorState *es) {
         wh = COIN_DISPLAY_H;
         break;
     }
-    case ENT_YELLOW_STAR: {
-        if (es->selection.index >= es->level.yellow_star_count) return;
-        wx = es->level.yellow_stars[es->selection.index].x;
-        wy = es->level.yellow_stars[es->selection.index].y;
+    case ENT_STAR_YELLOW: {
+        if (es->selection.index >= es->level.star_yellow_count) return;
+        wx = es->level.star_yellows[es->selection.index].x;
+        wy = es->level.star_yellows[es->selection.index].y;
+        ww = YSTAR_DISPLAY_W;
+        wh = YSTAR_DISPLAY_H;
+        break;
+    }
+    case ENT_STAR_GREEN: {
+        if (es->selection.index >= es->level.star_green_count) return;
+        wx = es->level.star_greens[es->selection.index].x;
+        wy = es->level.star_greens[es->selection.index].y;
+        ww = YSTAR_DISPLAY_W;
+        wh = YSTAR_DISPLAY_H;
+        break;
+    }
+    case ENT_STAR_RED: {
+        if (es->selection.index >= es->level.star_red_count) return;
+        wx = es->level.star_reds[es->selection.index].x;
+        wy = es->level.star_reds[es->selection.index].y;
         ww = YSTAR_DISPLAY_W;
         wh = YSTAR_DISPLAY_H;
         break;
@@ -1493,8 +1541,16 @@ static void render_ghost(EditorState *es) {
         tex = es->textures.coin;
         dw = COIN_DISPLAY_W; dh = COIN_DISPLAY_H;
         break;
-    case ENT_YELLOW_STAR:
-        tex = es->textures.yellow_star;
+    case ENT_STAR_YELLOW:
+        tex = es->textures.star_yellow;
+        dw = YSTAR_DISPLAY_W; dh = YSTAR_DISPLAY_H;
+        break;
+    case ENT_STAR_GREEN:
+        tex = es->textures.star_green;
+        dw = YSTAR_DISPLAY_W; dh = YSTAR_DISPLAY_H;
+        break;
+    case ENT_STAR_RED:
+        tex = es->textures.star_red;
         dw = YSTAR_DISPLAY_W; dh = YSTAR_DISPLAY_H;
         break;
     case ENT_LAST_STAR:

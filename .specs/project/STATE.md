@@ -56,7 +56,7 @@ Game reads only compiled `const LevelDef`. Play-test: Ctrl+E export → `make ru
 | MAX_RAILS | 4 |
 | MAX_PLATFORMS | 8 |
 | MAX_COINS | 24 |
-| MAX_YELLOW_STARS | 3 |
+| MAX_STAR_YELLOWS | 3 |
 | MAX_SPIDERS | 4 |
 | MAX_JUMPING_SPIDERS | 4 |
 | MAX_BIRDS | 4 |
