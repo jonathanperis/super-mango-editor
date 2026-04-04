@@ -513,6 +513,9 @@ cJSON *level_to_json(const LevelDef *def) {
     cJSON_AddStringToObject(root, "music_path", def->music_path);
     cJSON_AddNumberToObject(root, "music_volume", def->music_volume);
 
+    /* Floor tile */
+    cJSON_AddStringToObject(root, "floor_tile_path", def->floor_tile_path);
+
     /* Fog */
     cJSON_AddNumberToObject(root, "fog_enabled", def->fog_enabled);
 
@@ -871,6 +874,15 @@ int level_from_json(const cJSON *json, LevelDef *def) {
         }
     }
     def->music_volume = (int)get_number(json, "music_volume", 0);
+
+    /* Floor tile */
+    {
+        const cJSON *fp = cJSON_GetObjectItemCaseSensitive(json, "floor_tile_path");
+        if (cJSON_IsString(fp) && fp->valuestring) {
+            strncpy(def->floor_tile_path, fp->valuestring, 63);
+            def->floor_tile_path[63] = '\0';
+        }
+    }
 
     /* Fog */
     def->fog_enabled = (int)get_number(json, "fog_enabled", 0);

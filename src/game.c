@@ -348,6 +348,26 @@ void game_init(GameState *gs) {
         }
 
         /*
+         * Floor tile — reload from level definition if a custom path is set.
+         * This allows different levels to use different floor themes (grass,
+         * stone, sand, etc.) without changing engine code.
+         */
+        if (def && def->floor_tile_path[0] != '\0') {
+            if (gs->floor_tile) {
+                SDL_DestroyTexture(gs->floor_tile);
+                gs->floor_tile = NULL;
+            }
+            gs->floor_tile = IMG_LoadTexture(gs->renderer, def->floor_tile_path);
+            if (!gs->floor_tile) {
+                fprintf(stderr, "Warning: failed to load floor tile %s: %s\n",
+                        def->floor_tile_path, IMG_GetError());
+                /* Fall back to default grass tileset */
+                gs->floor_tile = IMG_LoadTexture(gs->renderer,
+                                                 "assets/grass_tileset.png");
+            }
+        }
+
+        /*
          * Music — load and play from level definition if a path is specified.
          * Mix_Music streams from disk; Mix_PlayMusic(-1) loops indefinitely.
          * Non-fatal: game runs without music if the file is missing.
