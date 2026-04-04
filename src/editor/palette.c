@@ -26,6 +26,7 @@
  */
 
 #include <SDL.h>       /* SDL_Rect, SDL_SetRenderDrawColor, SDL_RenderFillRect */
+#include <stdio.h>     /* snprintf */
 
 #include "editor.h"    /* EditorState, EntityType, EditorTool, CANVAS_W, etc.  */
 #include "ui.h"        /* UIState, ui_panel, ui_label_color, UI_* colours      */
@@ -181,6 +182,22 @@ static const PaletteEntry entries[] = {
  */
 static int scroll_y = 0;
 
+/*
+ * category_open — tracks which categories are expanded (1) or collapsed (0).
+ * All start expanded.  Clicking a category header toggles it.
+ */
+static int category_open[6] = { 1, 1, 1, 1, 1, 1 };
+
+/*
+ * palette_scroll — Adjust the palette scroll offset by a pixel delta.
+ * Called from the editor's mouse wheel handler when the cursor is over
+ * the palette area.  The clamp in palette_render keeps it in range.
+ */
+void palette_scroll(int delta) {
+    scroll_y += delta;
+    if (scroll_y < 0) scroll_y = 0;
+}
+
 /* ------------------------------------------------------------------ */
 /* Internal helpers — forward declarations                             */
 /* ------------------------------------------------------------------ */
@@ -268,18 +285,16 @@ void palette_render(EditorState *es)
     /* ---- Step 2: Calculate total content height ---- */
 
     /*
-     * We need to know the total height of all palette content (title +
-     * category headers + entity rows) to determine whether scrolling is
-     * necessary and to clamp the scroll offset.
-     *
-     * Walk through the categories and count headers + rows.
+     * Total height accounts for headers always, but only adds row heights
+     * for expanded categories.
      */
-    int total_content_h = TITLE_H;  /* start with the title bar */
+    int total_content_h = TITLE_H;
     for (int cat = 0; cat < NUM_CATEGORIES; cat++) {
-        total_content_h += CATEGORY_H;  /* category header */
-        for (int i = 0; i < ENTRY_COUNT; i++) {
-            if (entries[i].category == cat) {
-                total_content_h += ROW_H;  /* one entity row */
+        total_content_h += CATEGORY_H;
+        if (category_open[cat]) {
+            for (int i = 0; i < ENTRY_COUNT; i++) {
+                if (entries[i].category == cat)
+                    total_content_h += ROW_H;
             }
         }
     }
@@ -383,22 +398,25 @@ void palette_render(EditorState *es)
          * to be at least partially visible.
          */
         if (cursor_y + CATEGORY_H > content_top && cursor_y < clip_bottom) {
-            /*
-             * Draw category name in the dim text colour to visually
-             * subordinate it to entity names (which use the brighter
-             * UI_TEXT colour).  The dimmer tone signals "this is a label,
-             * not a clickable item".
-             */
+            /* Click on category header toggles open/closed */
+            int hdr_hovered = point_in_rect(ui->mouse_x, ui->mouse_y,
+                                            panel_x, cursor_y,
+                                            PANEL_W, CATEGORY_H);
+            if (hdr_hovered && ui->mouse_clicked) {
+                category_open[cat] = !category_open[cat];
+            }
+
+            /* Draw expand/collapse indicator and category name */
+            char header_label[64];
+            snprintf(header_label, sizeof(header_label), "%s %s",
+                     category_open[cat] ? "v" : ">",
+                     category_names[cat]);
             ui_label_color(ui,
                            panel_x + PAD_X,
-                           cursor_y + 7,  /* vertical centre in 28-px row */
-                           category_names[cat],
-                           UI_TEXT_DIM);
+                           cursor_y + 7,
+                           header_label,
+                           hdr_hovered ? UI_TEXT : UI_TEXT_DIM);
 
-            /*
-             * Draw a subtle separator line below the category name.
-             * The line spans most of the panel width with some padding.
-             */
             ui_separator(ui,
                          panel_x + PAD_X,
                          cursor_y + CATEGORY_H - 2,
@@ -408,13 +426,10 @@ void palette_render(EditorState *es)
         /* Advance cursor past the category header. */
         cursor_y += CATEGORY_H;
 
-        /* ---- Entity rows for this category ---- */
+        /* ---- Entity rows for this category (only if expanded) ---- */
 
-        /*
-         * Scan all entries and draw those belonging to the current category.
-         * This nested loop is O(entries * categories) = O(25 * 6) = 150
-         * iterations, which is trivial for a 60 FPS editor.
-         */
+        if (!category_open[cat]) continue;
+
         for (int i = 0; i < ENTRY_COUNT; i++) {
             if (entries[i].category != cat) continue;
 

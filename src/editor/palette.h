@@ -37,3 +37,6 @@
  *      tool on click).
  */
 void palette_render(EditorState *es);
+
+/* Scroll the palette content by delta pixels (positive = down). */
+void palette_scroll(int delta);

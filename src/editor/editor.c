@@ -684,15 +684,16 @@ static void handle_event(EditorState *es, SDL_Event *event) {
             switch (key) {
             case SDLK_ESCAPE:
                 /*
-                 * Escape has two behaviours:
-                 *   - If the place tool is active, switch back to select
-                 *     (cancel placement mode without quitting).
-                 *   - Otherwise, exit the editor.
+                 * Escape cycles through cancel actions:
+                 *   1. If placing or deleting, switch back to select tool.
+                 *   2. If an entity is selected, deselect it (shows level config).
+                 *   3. Otherwise, do nothing (editor stays open).
                  */
-                if (es->tool == TOOL_PLACE) {
+                if (es->tool == TOOL_PLACE || es->tool == TOOL_DELETE) {
                     es->tool = TOOL_SELECT;
-                } else {
-                    es->running = 0;
+                } else if (es->selection.index >= 0) {
+                    es->selection.index = -1;
+                    es->panel_scroll = 0;
                 }
                 break;
 
@@ -867,10 +868,17 @@ static void handle_event(EditorState *es, SDL_Event *event) {
         int mx, my;
         SDL_GetMouseState(&mx, &my);
 
-        /* Right panel scroll — when cursor is over the right column */
+        /* Right panel scroll — route to palette (top) or properties (bottom) */
         if (mx >= CANVAS_W && my > TOOLBAR_H && my < EDITOR_H - STATUS_H) {
-            es->panel_scroll -= event->wheel.y * 20;
-            if (es->panel_scroll < 0) es->panel_scroll = 0;
+            int split_y = (es->selection.index >= 0) ? EDITOR_H / 2 : EDITOR_H - STATUS_H;
+            if (my < split_y) {
+                /* Cursor is over the palette — scroll it */
+                palette_scroll(-event->wheel.y * 20);
+            } else {
+                /* Cursor is over the properties/config panel */
+                es->panel_scroll -= event->wheel.y * 20;
+                if (es->panel_scroll < 0) es->panel_scroll = 0;
+            }
             break;
         }
 
