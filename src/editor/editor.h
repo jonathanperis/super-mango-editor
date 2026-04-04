@@ -317,6 +317,7 @@ typedef struct {
     int            show_grid;     /* 1 = draw grid lines on the canvas         */
     int            running;       /* 1 = main loop active, 0 = exit requested  */
     int            panel_scroll;  /* scroll offset (px) for the right panel    */
+    int            panel_open;    /* 1 = bottom panel expanded, 0 = collapsed  */
 
     /* ---- Mouse state (updated every frame from SDL events) ------------ */
     int            mouse_x;       /* current cursor x in window pixels         */

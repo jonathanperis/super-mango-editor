@@ -170,7 +170,8 @@ int editor_init(EditorState *es) {
      * The user can toggle this with the 'G' key.  Grid lines help align
      * entities to TILE_SIZE boundaries without needing a snap-to-grid mode.
      */
-    es->show_grid = 1;
+    es->show_grid  = 1;
+    es->panel_open = 1;
 
     /* ---- Undo stack ------------------------------------------------- */
     /*
