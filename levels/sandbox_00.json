@@ -1,6 +1,6 @@
 {
 	"name":	"Sandbox",
-	"sea_gaps":	[0, 192, 560, 928, 1152, 480, 448],
+	"sea_gaps":	[0, 192, 560, 928, 1152],
 	"rails":	[{
 			"layout":	"RECT",
 			"x":	444,
@@ -183,6 +183,9 @@
 		}, {
 			"pillar_x":	680,
 			"mode":	"SPIN"
+		}, {
+			"pillar_x":	1659.5,
+			"mode":	"PENDULUM"
 		}],
 	"circular_saws":	[{
 			"x":	1350,
@@ -197,6 +200,10 @@
 	"spike_platforms":	[{
 			"x":	370,
 			"y":	200,
+			"tile_count":	3
+		}, {
+			"x":	1637,
+			"y":	236,
 			"tile_count":	3
 		}],
 	"spike_blocks":	[{
