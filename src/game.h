@@ -278,6 +278,7 @@ typedef struct {
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
     int           paused;      /* 1 = window lost focus; physics/music frozen */
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
+    char          level_path[256]; /* JSON level to load (--level flag)      */
     DebugOverlay  debug;       /* FPS counter, collision vis, event log      */
 
     /* ---- Level-wide configuration (set by level_load from LevelDef) -- */

@@ -38,8 +38,19 @@
 #include "collectibles/last_star.h"
 #include "hazards/spike.h"
 #include "hazards/spike_platform.h"
-#include "screens/sandbox.h"
-#include "levels/level.h"       /* LevelDef — cast gs->current_level for level config */
+#include "levels/level.h"         /* LevelDef struct                                    */
+#include "levels/level_loader.h"  /* level_load, level_reset                            */
+#include "editor/serializer.h"    /* level_load_json                                    */
+
+/* ------------------------------------------------------------------ */
+/* Level data — loaded once from JSON, reused on player death resets    */
+/* ------------------------------------------------------------------ */
+
+/*
+ * File-scoped level definition.  Populated once from JSON in game_init,
+ * then referenced by reset_current_level on player death.
+ */
+static LevelDef s_level;
 
 /* ------------------------------------------------------------------ */
 
@@ -105,7 +116,7 @@ void game_init(GameState *gs) {
     /*
      * Parallax background is now initialised AFTER level_load, so that
      * the LevelDef can specify per-level layer paths and speeds.
-     * See the "Apply level-wide configuration" block below sandbox_load_level.
+     * See the "Apply level-wide configuration" block below level_load.
      */
 
     /*
@@ -316,8 +327,18 @@ void game_init(GameState *gs) {
     /* Initialise the debug overlay if --debug was passed on the CLI */
     if (gs->debug_mode) debug_init(&gs->debug);
 
-    /* Load the sandbox level — all entity placements and sea gaps */
-    sandbox_load_level(gs);
+    /* Load level from JSON if a path was provided via --level */
+    memset(&s_level, 0, sizeof(s_level));
+    if (gs->level_path[0] != '\0' &&
+        level_load_json(gs->level_path, &s_level) == 0) {
+        /* Successfully loaded from the given path */
+    } else {
+        if (gs->level_path[0] != '\0')
+            fprintf(stderr, "Warning: could not load %s — starting empty level\n",
+                    gs->level_path);
+        strncpy(s_level.name, "Untitled", sizeof(s_level.name) - 1);
+    }
+    level_load(gs, &s_level);
 
     /* ---- Apply level-wide configuration from the LevelDef ----------- */
     {
@@ -387,7 +408,7 @@ void game_init(GameState *gs) {
     /*
      * Health/lives/score are now set by level_load() from LevelDef fields
      * (initial_hearts, initial_lives, score_per_life).  No hardcoded init
-     * needed here — sandbox_load_level → level_load handles it.
+     * needed here — level_load handles it.
      */
 
     /*
@@ -431,7 +452,7 @@ void game_init(GameState *gs) {
 /* ------------------------------------------------------------------ */
 
 /*
- * level_reset — centralised "player died, restart level" handler.
+ * reset_current_level — centralised "player died, restart level" handler.
  *
  * Resets every entity array and the player to their initial state.
  * Called from every hearts<=0 branch so all sources of death produce
@@ -442,8 +463,9 @@ void game_init(GameState *gs) {
  * stay-on logic from snapping the player to a platform that no longer
  * exists after the reset.
  */
-static void level_reset(GameState *gs, int *fp_prev_riding) {
-    sandbox_reset_level(gs, fp_prev_riding);
+static void reset_current_level(GameState *gs, int *fp_prev_riding) {
+    level_reset(gs, &s_level);
+    *fp_prev_riding = -1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -514,7 +536,7 @@ static void apply_damage(GameState *gs,
             gs->hearts = def && def->initial_hearts > 0
                        ? def->initial_hearts : MAX_HEARTS;
         }
-        level_reset(gs, &gs->fp_prev_riding);
+        reset_current_level(gs, &gs->fp_prev_riding);
     }
 }
 

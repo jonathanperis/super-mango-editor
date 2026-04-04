@@ -5,8 +5,8 @@
  * and (b) the LevelDef placement format.  Entity modules know HOW things behave;
  * level files know WHERE things go; this file is the bridge between the two.
  *
- * level_load  : called once at game_init via sandbox_load_level.
- * level_reset : called on player death via sandbox_reset_level; skips static
+ * level_load  : called once at game_init.
+ * level_reset : called on player death via reset_current_level; skips static
  *               geometry that never changes (platforms, rails, sea gaps).
  */
 

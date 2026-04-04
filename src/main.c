@@ -4,9 +4,9 @@
  * Responsibilities:
  *   1. Boot every SDL subsystem the game needs.
  *   2. Route to the appropriate screen based on CLI arguments:
- *        default           → start_menu (black screen with title)
- *        --sandbox         → game sandbox (the full gameplay phase)
- *        --sandbox --debug → game sandbox with debug overlays
+ *        default                → start_menu (title screen with Play button)
+ *        --level <path>         → load a JSON level and start gameplay directly
+ *        --level <path> --debug → same, with debug overlays
  *   3. Tear every subsystem back down before exiting.
  *
  * The order of init and teardown is intentional:
@@ -35,14 +35,15 @@
 int main(int argc, char *argv[]) {
     /*
      * Scan command-line arguments for flags:
-     *   --debug   → enable debug overlays in the sandbox
-     *   --sandbox → run the gameplay sandbox instead of the start menu
+     *   --debug        → enable debug overlays
+     *   --level <path> → load a JSON level file (also skips the start menu)
      */
     int debug_mode  = 0;
-    int sandbox_mode = 0;
+    const char *level_path = NULL;
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--debug") == 0)   debug_mode   = 1;
-        if (strcmp(argv[i], "--sandbox") == 0) sandbox_mode = 1;
+        if (strcmp(argv[i], "--debug") == 0) debug_mode = 1;
+        if (strcmp(argv[i], "--level") == 0 && i + 1 < argc)
+            level_path = argv[++i];
     }
     /*
      * SDL_Init — start the SDL core.
@@ -106,13 +107,14 @@ int main(int argc, char *argv[]) {
      */
     srand((unsigned int)SDL_GetTicks());
 
-    if (sandbox_mode) {
+    if (level_path) {
         /*
-         * Sandbox mode — run the full gameplay phase directly.
-         * Bypasses the start menu for quick iteration (make run-sandbox).
+         * Direct play — --level <path> skips the start menu.
+         * Used by the editor's Play button and make run-level.
          */
         GameState gs = {0};
         gs.debug_mode = debug_mode;
+        strncpy(gs.level_path, level_path, sizeof(gs.level_path) - 1);
         game_init(&gs);
         game_loop(&gs);
         game_cleanup(&gs);
@@ -176,8 +178,7 @@ int main(int argc, char *argv[]) {
          *
          * game_init creates its own window and renderer, so we destroy
          * the menu's first to avoid having two windows open at once.
-         * The game loads sandbox_00 by default (the same level the
-         * editor targets) — this is the single-phase flow.
+         * No --level was given, so the game starts with an empty level.
          */
         if (result == MENU_PLAY) {
             GameState gs = {0};

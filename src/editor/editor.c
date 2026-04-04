@@ -217,6 +217,10 @@ int editor_init(EditorState *es) {
      */
     strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
 
+    /* Place the last star at a visible default so new levels have one */
+    es->level.last_star.x = 145.0f;
+    es->level.last_star.y = 167.0f;
+
     /* ---- Start the loop --------------------------------------------- */
     /*
      * running = 1 keeps the main loop active.  Setting it to 0 (via
@@ -558,6 +562,8 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  */
                 memset(&es->level, 0, sizeof(es->level));
                 strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
+                es->level.last_star.x = 145.0f;
+    es->level.last_star.y = 167.0f;
                 es->file_path[0] = '\0';
                 undo_clear(es->undo);
                 es->modified        = 0;
@@ -1299,35 +1305,19 @@ static void play_test(EditorState *es) {
     /*
      * Step 1 — Save the level as JSON.
      *
-     * The game now loads levels/sandbox_00.json at runtime (no compiled
-     * .c file needed).  So the Play button just saves the JSON and
-     * launches the already-compiled game binary.
-     *
-     * If the editor has a file path, save there.  Otherwise save to the
-     * default sandbox_00.json path so the game can find it.
+     * The game accepts --level <path> to load any JSON file.
+     * If the editor has a file path, save and play from there.
+     * Otherwise save to a temporary file so the game has something to load.
      */
     const char *save_path = es->file_path[0] != '\0'
                           ? es->file_path
-                          : "levels/sandbox_00.json";
+                          : "levels/_playtest.json";
 
     if (level_save_json(&es->level, save_path) != 0) {
         fprintf(stderr, "Play: failed to save %s\n", save_path);
         return;
     }
     es->modified = 0;
-
-    /* Update file path if we used the default */
-    if (es->file_path[0] == '\0') {
-        strncpy(es->file_path, save_path, sizeof(es->file_path) - 1);
-        es->file_path[sizeof(es->file_path) - 1] = '\0';
-    }
-
-    {
-        char title[300];
-        snprintf(title, sizeof(title), "Super Mango Editor - %s",
-                 es->file_path);
-        SDL_SetWindowTitle(es->window, title);
-    }
 
     /* Step 4 — Launch the game as a child process */
     fprintf(stderr, "Play: launching game...\n");
@@ -1347,8 +1337,9 @@ static void play_test(EditorState *es) {
      */
     pid_t pid = fork();
     if (pid == 0) {
-        /* Child process — become the game */
-        execl("./out/super-mango", "super-mango", "--sandbox", (char *)NULL);
+        /* Child process — become the game, passing the level file */
+        execl("./out/super-mango", "super-mango",
+              "--level", save_path, (char *)NULL);
         /* execl only returns on error */
         _exit(1);
     } else if (pid > 0) {
@@ -1361,7 +1352,13 @@ static void play_test(EditorState *es) {
     }
 #else
     /* Windows: use system() with start to launch non-blocking */
-    system("start /B .\\out\\super-mango.exe");
+    {
+        char cmd[512];
+        snprintf(cmd, sizeof(cmd),
+                 "start /B .\\out\\super-mango.exe --level \"%s\"",
+                 save_path);
+        system(cmd);
+    }
     es->playing = 1;
     SDL_SetWindowTitle(es->window, "Super Mango Editor - Playing...");
 #endif
@@ -1631,6 +1628,8 @@ static void render_toolbar(EditorState *es) {
          */
         memset(&es->level, 0, sizeof(es->level));
         strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
+        es->level.last_star.x = 145.0f;
+    es->level.last_star.y = 167.0f;
         es->file_path[0] = '\0';
         undo_clear(es->undo);
         es->modified        = 0;

@@ -50,7 +50,7 @@ EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor
 EDITOR_LIBS   = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lm
 
-.PHONY: all clean run run-debug run-sandbox run-sandbox-debug web editor run-editor
+.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor
 
 all: $(OUTDIR) $(TARGET)
 
@@ -104,11 +104,11 @@ run: all
 run-debug: all
 	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --debug
 
-run-sandbox: all
-	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --sandbox
+run-level: all
+	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --level levels/sandbox_00.json
 
-run-sandbox-debug: all
-	./$(TARGET) --sandbox --debug
+run-level-debug: all
+	./$(TARGET) --debug --level levels/sandbox_00.json
 
 # ── Editor targets ───────────────────────────────────────────────────
 editor: $(OUTDIR) $(EDITOR_TARGET)
