@@ -272,8 +272,13 @@ void palette_render(EditorState *es)
      * only gets the top half.  Integer division of CANVAS_H by 2 gives
      * an even split.
      */
-    int has_selection = (es->selection.index >= 0);
-    int panel_h       = has_selection ? (CANVAS_H / 2) : CANVAS_H;
+    /*
+     * The palette always gets the top half of the right column.
+     * The bottom half is used by the properties panel (when an entity
+     * is selected) or the level config panel (when nothing is selected).
+     */
+    (void)es->selection.index; /* palette height is now fixed */
+    int panel_h = CANVAS_H / 2;
 
     /*
      * Draw the panel background — a dark rectangle that visually separates

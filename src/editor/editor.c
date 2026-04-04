@@ -433,8 +433,9 @@ void editor_loop(EditorState *es) {
 
             if (es->selection.index >= 0) {
                 properties_render(es);
-            } else {
-                /* No entity selected — show level-wide config panel */
+            }
+            /* Level config always shows in the bottom-right when nothing selected */
+            if (es->selection.index < 0) {
                 level_config_render(es);
             }
 
@@ -868,9 +869,9 @@ static void handle_event(EditorState *es, SDL_Event *event) {
         int mx, my;
         SDL_GetMouseState(&mx, &my);
 
-        /* Right panel scroll — route to palette (top) or properties (bottom) */
+        /* Right panel scroll — route to palette (top half) or properties (bottom half) */
         if (mx >= CANVAS_W && my > TOOLBAR_H && my < EDITOR_H - STATUS_H) {
-            int split_y = (es->selection.index >= 0) ? EDITOR_H / 2 : EDITOR_H - STATUS_H;
+            int split_y = TOOLBAR_H + CANVAS_H / 2;
             if (my < split_y) {
                 /* Cursor is over the palette — scroll it */
                 palette_scroll(-event->wheel.y * 20);
