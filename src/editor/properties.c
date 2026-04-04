@@ -157,10 +157,17 @@ void properties_render(EditorState *es)
      * the lookup table plus the zero-based array index.
      */
     char header[64];
-    snprintf(header, sizeof(header), "%s #%d",
-             entity_type_names[es->selection.type],
-             es->selection.index);
-    ui_label(&es->ui, CONTENT_X, PROP_Y + 4, header);
+    /* Single-instance entities (Player Spawn, Last Star) don't need an index */
+    if (es->selection.type == ENT_PLAYER_SPAWN ||
+        es->selection.type == ENT_LAST_STAR) {
+        snprintf(header, sizeof(header), "%s",
+                 entity_type_names[es->selection.type]);
+    } else {
+        snprintf(header, sizeof(header), "%s #%d",
+                 entity_type_names[es->selection.type],
+                 es->selection.index);
+    }
+    ui_label_color(&es->ui, CONTENT_X, PROP_Y + 4, header, UI_ACCENT);
 
     /*
      * ui_separator — thin horizontal line dividing the header from the
@@ -941,10 +948,23 @@ void level_config_render(EditorState *es) {
     ui_label(&es->ui, x + 8, y, "Music");
     y += 18;
     ui_label(&es->ui, x + 8, y, "path:");
-    ui_label(&es->ui, x + 50, y, es->level.music_path[0] ? es->level.music_path : "(none)");
-    y += 18;
+    if (ui_text_field(&es->ui, 9009, x + 50, y, 320, es->level.music_path,
+                      (int)sizeof(es->level.music_path)))
+        es->modified = 1;
+    y += 22;
     ui_label(&es->ui, x + 8, y, "vol:");
     if (ui_int_field(&es->ui, 9003, x + 50, y, 80, &es->level.music_volume))
+        es->modified = 1;
+    y += 24;
+
+    /* ---- Floor tile ---- */
+    ui_separator(&es->ui, x + 4, y, PROP_W - 8);
+    y += 6;
+    ui_label(&es->ui, x + 8, y, "Floor Tile");
+    y += 18;
+    ui_label(&es->ui, x + 8, y, "path:");
+    if (ui_text_field(&es->ui, 9010, x + 50, y, 320, es->level.floor_tile_path,
+                      (int)sizeof(es->level.floor_tile_path)))
         es->modified = 1;
     y += 24;
 
@@ -990,25 +1010,25 @@ void level_config_render(EditorState *es) {
     }
     y += 18;
 
-    /* Show each parallax layer's path (read-only) and speed (editable) */
+    /* Show each parallax layer's path and speed (both editable) */
     for (int i = 0; i < es->level.parallax_layer_count && i < PARALLAX_MAX_LAYERS; i++) {
-        if (y + 20 > PROP_Y + PROP_H - 4) break;  /* clip if out of panel */
+        if (y + 40 > PROP_Y + PROP_H - 4) break;  /* clip if out of panel */
 
         char label[16];
         snprintf(label, sizeof(label), "%d:", i);
         ui_label(&es->ui, x + 8, y, label);
 
-        /* Show filename portion of path */
-        const char *path = es->level.parallax_layers[i].path;
-        const char *slash = strrchr(path, '/');
-        const char *display = slash ? slash + 1 : path;
-        ui_label(&es->ui, x + 28, y, display[0] ? display : "(empty)");
+        /* Editable path field */
+        if (ui_text_field(&es->ui, 9200 + i, x + 28, y, 250,
+                          es->level.parallax_layers[i].path,
+                          (int)sizeof(es->level.parallax_layers[i].path)))
+            es->modified = 1;
 
         /* Speed field */
-        ui_label(&es->ui, x + 260, y, "spd:");
-        if (ui_float_field(&es->ui, 9100 + i, x + 295, y, 70, &es->level.parallax_layers[i].speed))
+        ui_label(&es->ui, x + 286, y, "spd:");
+        if (ui_float_field(&es->ui, 9100 + i, x + 315, y, 60, &es->level.parallax_layers[i].speed))
             es->modified = 1;
-        y += 18;
+        y += 20;
     }
 
     /* Button to add a layer */
