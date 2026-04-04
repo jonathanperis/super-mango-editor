@@ -146,6 +146,9 @@ WEB_FLAGS = -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='["png"]' \
 
 web: $(OUTDIR)
 	emcc -std=c11 -O2 -I$(SRCDIR) $(SRCS) -o $(OUTDIR)/super-mango.html $(WEB_FLAGS)
+	emcc -std=c11 -O2 -I$(SRCDIR) $(SRCS) -o $(OUTDIR)/super-mango-debug.html $(WEB_FLAGS) \
+		-s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]' \
+		--post-js web/debug-boot.js
 
 clean:
 	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.d

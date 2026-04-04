@@ -13,8 +13,55 @@
 #include <string.h>    /* memset    */
 #include <stdarg.h>    /* va_list, va_start, va_end — for debug_log printf */
 
+/* Platform-specific memory usage */
+#if defined(__APPLE__)
+#include <mach/mach.h>
+#elif defined(__linux__) || defined(__EMSCRIPTEN__)
+/* /proc/self/status parsing */
+#elif defined(_WIN32)
+#include <windows.h>
+#include <psapi.h>
+#endif
+
 #include "debug.h"
 #include "../game.h"   /* GameState, GAME_W, GAME_H, FLOOR_Y, entity types */
+
+/* ------------------------------------------------------------------ */
+/* Platform-specific memory query                                      */
+/* ------------------------------------------------------------------ */
+
+/*
+ * get_resident_mb — Return the process's resident memory in megabytes.
+ * Uses platform-specific APIs; returns 0 on unsupported platforms.
+ */
+static float get_resident_mb(void)
+{
+#if defined(__APPLE__)
+    struct mach_task_basic_info info;
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+                  (task_info_t)&info, &count) == KERN_SUCCESS)
+        return (float)info.resident_size / (1024.0f * 1024.0f);
+#elif defined(__linux__)
+    FILE *f = fopen("/proc/self/status", "r");
+    if (f) {
+        char line[128];
+        while (fgets(line, sizeof(line), f)) {
+            long kb;
+            if (sscanf(line, "VmRSS: %ld kB", &kb) == 1) {
+                fclose(f);
+                return (float)kb / 1024.0f;
+            }
+        }
+        fclose(f);
+    }
+#elif defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+        return (float)pmc.WorkingSetSize / (1024.0f * 1024.0f);
+#endif
+    return 0.0f;
+}
 
 /* VINE_STEP is now defined in vine.h (included via game.h). */
 
@@ -577,23 +624,44 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
  * same technique as the score display in hud.c.
  * Drawn in green to distinguish from normal HUD text.
  */
-static void draw_fps(int fps_display, TTF_Font *font,
-                     SDL_Renderer *renderer)
+static void draw_performance(const DebugOverlay *dbg, TTF_Font *font,
+                             SDL_Renderer *renderer)
 {
-    char buf[16];
-    snprintf(buf, sizeof(buf), "FPS: %d", fps_display);
+    SDL_Color green  = {   0, 255,   0, 255 };
+    SDL_Color yellow = { 255, 255,   0, 255 };
+    SDL_Color red    = { 255,  80,  80, 255 };
+    SDL_Color cyan   = { 100, 220, 255, 255 };
 
-    int text_w = 0;
+    int y = GAME_H - 52;  /* start above the bottom edge */
+    char buf[48];
+    int text_w;
+
+    /* FPS counter — green if 55+, yellow if 30-54, red if <30 */
+    snprintf(buf, sizeof(buf), "FPS: %d", dbg->fps_display);
+    SDL_Color fps_col = dbg->fps_display >= 55 ? green
+                      : dbg->fps_display >= 30 ? yellow : red;
     TTF_SizeText(font, buf, &text_w, NULL);
-
-    /*
-     * Position: right-aligned with HUD_MARGIN (4 px) from the right edge,
-     * near the bottom of the logical canvas (GAME_H = 300).
-     * y = GAME_H - 20 keeps it above the very bottom edge.
-     */
-    SDL_Color green = { 0, 255, 0, 255 };
     render_debug_text(font, renderer, buf,
-                      GAME_W - HUD_MARGIN - text_w, GAME_H - 20, green);
+                      GAME_W - HUD_MARGIN - text_w, y, fps_col);
+    y += 13;
+
+    /* Frame time + CPU budget — green if <12ms, yellow if 12-16ms, red if >16ms */
+    snprintf(buf, sizeof(buf), "CPU: %.1fms (%.0f%%)",
+             (double)dbg->frame_ms_display, (double)dbg->cpu_percent);
+    SDL_Color cpu_col = dbg->frame_ms_display < 12.0f ? green
+                      : dbg->frame_ms_display < 16.7f ? yellow : red;
+    TTF_SizeText(font, buf, &text_w, NULL);
+    render_debug_text(font, renderer, buf,
+                      GAME_W - HUD_MARGIN - text_w, y, cpu_col);
+    y += 13;
+
+    /* Memory usage */
+    if (dbg->mem_mb > 0.0f) {
+        snprintf(buf, sizeof(buf), "MEM: %.1f MB", (double)dbg->mem_mb);
+        TTF_SizeText(font, buf, &text_w, NULL);
+        render_debug_text(font, renderer, buf,
+                          GAME_W - HUD_MARGIN - text_w, y, cyan);
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -745,19 +813,25 @@ void debug_init(DebugOverlay *dbg)
  */
 void debug_update(DebugOverlay *dbg, float dt)
 {
+    /* ---- Frame time (CPU proxy) ------------------------------------ */
+    dbg->frame_ms = dt * 1000.0f;
+
     /* ---- FPS sampling ----------------------------------------------- */
     dbg->fps_frame_count++;
 
     Uint64 now     = SDL_GetTicks64();
     Uint64 elapsed = now - dbg->fps_prev_ticks;
     if (elapsed >= DEBUG_FPS_SAMPLE_MS) {
-        /*
-         * fps_display = frames × 1000 / elapsed_ms.
-         * Integer division is fine — we only need whole-number FPS.
-         */
         dbg->fps_display     = (int)(dbg->fps_frame_count * 1000 / elapsed);
         dbg->fps_frame_count = 0;
         dbg->fps_prev_ticks  = now;
+
+        /* Smooth the frame time display (average over the sample period) */
+        dbg->frame_ms_display = dbg->frame_ms;
+        dbg->cpu_percent = dbg->frame_ms_display / 16.667f * 100.0f;
+
+        /* Update memory usage once per sample (avoid per-frame syscalls) */
+        dbg->mem_mb = get_resident_mb();
     }
 
     /* ---- Age log entries -------------------------------------------- */
@@ -806,7 +880,7 @@ void debug_render(const DebugOverlay *dbg, TTF_Font *font,
     const GameState *gs = (const GameState *)gs_ptr;
 
     draw_collision_boxes(renderer, gs, cam_x);
-    draw_fps(dbg->fps_display, font, renderer);
+    draw_performance(dbg, font, renderer);
     draw_player_state(&gs->player, font, renderer, cam_x);
     draw_debug_log(dbg, font, renderer);
 

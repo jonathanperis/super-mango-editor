@@ -277,6 +277,9 @@ jobs:
           cp wasm-build/super-mango.js   _site/
           cp wasm-build/super-mango.wasm _site/
           cp wasm-build/super-mango.data _site/
+          cp wasm-build/super-mango-debug.html _site/ 2>/dev/null || true
+          cp wasm-build/super-mango-debug.js   _site/ 2>/dev/null || true
+          cp wasm-build/super-mango-debug.wasm _site/ 2>/dev/null || true
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
