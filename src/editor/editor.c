@@ -32,6 +32,7 @@
 #include "serializer.h"   /* level_save_json, level_load_json               */
 #include "exporter.h"     /* level_export_c — write .h/.c from LevelDef    */
 #include "ui.h"           /* UIState, ui_init, ui_begin_frame, ui_button    */
+#include "file_dialog.h"  /* file_dialog_open — native OS file picker       */
 
 /* ------------------------------------------------------------------ */
 /* Forward declarations for static helpers                             */
@@ -42,6 +43,8 @@ static void handle_event(EditorState *es, SDL_Event *event);
 static void render_toolbar(EditorState *es);
 static void render_status_bar(EditorState *es);
 static void apply_undo_command(EditorState *es, const Command *cmd, int reverse);
+static void open_level_file(EditorState *es);
+static void load_level_from_path(EditorState *es, const char *path);
 
 /* ------------------------------------------------------------------ */
 /* editor_init                                                         */
@@ -530,14 +533,13 @@ static void handle_event(EditorState *es, SDL_Event *event) {
 
             case SDLK_o:
                 /*
-                 * Ctrl+O — Load / Open a level file.
+                 * Ctrl+O — Open a level file via the native OS file picker.
                  *
-                 * A proper file dialog requires platform-specific code or
-                 * a third-party library (tinyfiledialogs, nfd).  For v1
-                 * the designer passes the file path on the command line.
-                 * This shortcut is reserved for a future implementation.
+                 * Shows the platform's file dialog (macOS: NSOpenPanel via
+                 * osascript, Linux: zenity, Windows: PowerShell OpenFileDialog).
+                 * If the user selects a .json file, load it into the editor.
                  */
-                /* TODO: implement file open dialog in a future version */
+                open_level_file(es);
                 break;
 
             case SDLK_n:
@@ -865,11 +867,78 @@ static void handle_event(EditorState *es, SDL_Event *event) {
 /* render_toolbar — static helper                                      */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* open_level_file / load_level_from_path — file import helpers        */
+/* ------------------------------------------------------------------ */
+
+/*
+ * load_level_from_path — Load a JSON level file into the editor.
+ *
+ * Replaces the current level data, clears undo history, resets selection,
+ * updates the file path and window title.  Called by both open_level_file
+ * (from the dialog) and editor_main.c (from argv[1]).
+ */
+static void load_level_from_path(EditorState *es, const char *path) {
+    LevelDef new_level;
+    memset(&new_level, 0, sizeof(new_level));
+
+    if (level_load_json(path, &new_level) != 0) {
+        fprintf(stderr, "Error: failed to load %s\n", path);
+        return;
+    }
+
+    /*
+     * Replace the current level with the loaded data.
+     * Clear undo/redo history because the commands reference the old level
+     * state and would corrupt data if applied to the new level.
+     */
+    es->level = new_level;
+    strncpy(es->file_path, path, sizeof(es->file_path) - 1);
+    es->file_path[sizeof(es->file_path) - 1] = '\0';
+    undo_clear(es->undo);
+    es->selection.index = -1;
+    es->modified = 0;
+
+    /* Update the title bar to show the loaded file */
+    char title[300];
+    snprintf(title, sizeof(title), "Super Mango Editor - %s", es->file_path);
+    SDL_SetWindowTitle(es->window, title);
+
+    fprintf(stderr, "Loaded %s (%d entities)\n", path,
+            es->level.coin_count + es->level.spider_count +
+            es->level.platform_count + es->level.rail_count +
+            es->level.bird_count + es->level.fish_count);
+}
+
+/*
+ * open_level_file — Show the native OS file picker and load the selected file.
+ *
+ * Uses file_dialog_open() which invokes the platform's file dialog:
+ *   macOS  → osascript (AppleScript NSOpenPanel)
+ *   Linux  → zenity --file-selection
+ *   Windows → PowerShell OpenFileDialog
+ *
+ * If the user cancels the dialog, nothing happens.
+ * If the user selects a file, it's loaded into the editor.
+ */
+static void open_level_file(EditorState *es) {
+    char path[256];
+
+    if (file_dialog_open(path, sizeof(path))) {
+        load_level_from_path(es, path);
+    }
+    /* User cancelled — do nothing */
+}
+
+/* ------------------------------------------------------------------ */
+/* render_toolbar — static helper                                      */
+/* ------------------------------------------------------------------ */
+
 /*
  * render_toolbar — Draw the top toolbar (32 px tall, full width).
  *
  * Layout from left to right:
- *   [Select] [Place] [Delete]  |  Zoom: 2x  |  [Grid]  |  [New] [Save] [Export]
+ *   [Select] [Place] [Delete]  |  Zoom: 2x  |  [Grid]  |  [New] [Open] [Save] [Export]
  *
  * Tool buttons highlight in the accent colour (blue) when active.
  * File buttons use the default button style.
@@ -1010,6 +1079,15 @@ static void render_toolbar(EditorState *es) {
         } else {
             fprintf(stderr, "Error: failed to save %s\n", es->file_path);
         }
+    }
+
+    rx -= 64 + 4;
+    if (ui_button(&es->ui, rx, by, 64, bh, "Open")) {
+        /*
+         * Open button — show the native file dialog and load the selected
+         * JSON level file.  Same behaviour as Ctrl+O.
+         */
+        open_level_file(es);
     }
 
     rx -= 64 + 4;
