@@ -1157,22 +1157,22 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
 
     /* Parallax asset dropdown options */
     static const char *plx_names[] = {
-        "parallax_sky.png",
-        "parallax_clouds_bg.png",
-        "parallax_glacial_mountains.png",
-        "parallax_clouds_mg_3.png",
-        "parallax_clouds_mg_2.png",
-        "parallax_cloud_lonely.png",
-        "parallax_clouds_mg_1.png"
+        "sky.png",
+        "clouds_bg.png",
+        "glacial_mountains.png",
+        "clouds_mg_3.png",
+        "clouds_mg_2.png",
+        "cloud_lonely.png",
+        "clouds_mg_1.png"
     };
     static const char *plx_paths[] = {
-        "assets/sprites/effects/parallax_sky.png",
-        "assets/sprites/effects/parallax_clouds_bg.png",
-        "assets/sprites/effects/parallax_glacial_mountains.png",
-        "assets/sprites/effects/parallax_clouds_mg_3.png",
-        "assets/sprites/effects/parallax_clouds_mg_2.png",
-        "assets/sprites/effects/parallax_cloud_lonely.png",
-        "assets/sprites/effects/parallax_clouds_mg_1.png"
+        "assets/sprites/backgrounds/sky.png",
+        "assets/sprites/backgrounds/clouds_bg.png",
+        "assets/sprites/backgrounds/glacial_mountains.png",
+        "assets/sprites/backgrounds/clouds_mg_3.png",
+        "assets/sprites/backgrounds/clouds_mg_2.png",
+        "assets/sprites/backgrounds/cloud_lonely.png",
+        "assets/sprites/backgrounds/clouds_mg_1.png"
     };
     static const int plx_opt_count = 7;
 
@@ -1208,7 +1208,7 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
     if (es->level.parallax_layer_count < PARALLAX_MAX_LAYERS) {
         if (ui_button(&es->ui, x + 8, y, 80, 20, "+ Add")) {
             int idx = es->level.parallax_layer_count;
-            strncpy(es->level.parallax_layers[idx].path, "assets/sprites/effects/parallax_sky.png", 63);
+            strncpy(es->level.parallax_layers[idx].path, "assets/sprites/backgrounds/sky.png", 63);
             es->level.parallax_layers[idx].speed = 0.1f;
             es->level.parallax_layer_count++;
             es->modified = 1;
