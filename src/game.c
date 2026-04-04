@@ -228,6 +228,8 @@ void game_init(GameState *gs) {
     if (!gs->circular_saw_tex) fprintf(stderr, "Warning: Failed to load Circular_Saw.png: %s\n", IMG_GetError());
     gs->blue_flame_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/blue_flame.png");
     if (!gs->blue_flame_tex) fprintf(stderr, "Warning: Failed to load blue_flame.png: %s\n", IMG_GetError());
+    gs->fire_flame_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/fire_flame.png");
+    if (!gs->fire_flame_tex) fprintf(stderr, "Warning: Failed to load fire_flame.png: %s\n", IMG_GetError());
     gs->faster_fish_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/faster_fish.png");
     if (!gs->faster_fish_tex) fprintf(stderr, "Warning: Failed to load Fish_1.png: %s\n", IMG_GetError());
     gs->spike_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/spike.png");
@@ -804,6 +806,26 @@ static void game_collide(GameState *gs, float dt)
             }
         }
 
+        /* ---- Fire flame collision --------------------------------- */
+        /*
+         * Fire flames use the same BlueFlame struct and mechanics.
+         * Only check visible fire flames (not in WAITING state).
+         */
+        if (gs->player.hurt_timer == 0.0f) {
+            for (int i = 0; i < gs->fire_flame_count; i++) {
+                if (!gs->fire_flames[i].active) continue;
+                if (gs->fire_flames[i].state == BLUE_FLAME_WAITING) continue;
+                SDL_Rect fhit = blue_flame_get_hitbox(&gs->fire_flames[i]);
+                if (SDL_HasIntersection(&phit, &fhit)) {
+                    if (gs->debug_mode) debug_log(&gs->debug, "HIT fire_flame[%d]", i);
+                    float sx = fhit.x + fhit.w * 0.5f;
+                    float sy = fhit.y + fhit.h * 0.5f;
+                    apply_damage(gs, 1, 1, sx, sy);
+                    break;
+                }
+            }
+        }
+
         /* ---- Spike row collision ---------------------------------- */
         /*
          * Ground spikes deal 1 heart of damage on contact.
@@ -1148,6 +1170,9 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
     /* Draw blue flames behind the water and fish, in front of ground */
     blue_flames_render(gs->blue_flames, gs->blue_flame_count,
                   gs->renderer, gs->blue_flame_tex, cam_x);
+    /* Draw fire flames in the same layer (fire variant texture) */
+    blue_flames_render(gs->fire_flames, gs->fire_flame_count,
+                  gs->renderer, gs->fire_flame_tex, cam_x);
 
     /* Draw fish behind the water strip (submerged look) but in front of
      * the ground, so the water wave art occludes the submerged portion. */
@@ -1579,6 +1604,8 @@ static void game_loop_frame(void *arg) {
         circular_saws_update(gs->circular_saws, gs->circular_saw_count, dt);
         /* Advance blue flame eruption cycles (rise, flip, fall, wait) */
         blue_flames_update(gs->blue_flames, gs->blue_flame_count, dt);
+        /* Advance fire flame eruption cycles (same mechanics, fire variant) */
+        blue_flames_update(gs->fire_flames, gs->fire_flame_count, dt);
 
         /* ---- Camera update --------------------------------------- */
         /*
@@ -1818,6 +1845,7 @@ void game_cleanup(GameState *gs) {
     DESTROY_TEX(gs->axe_trap_tex);
     DESTROY_TEX(gs->circular_saw_tex);
     DESTROY_TEX(gs->blue_flame_tex);
+    DESTROY_TEX(gs->fire_flame_tex);
     DESTROY_TEX(gs->faster_fish_tex);
     DESTROY_TEX(gs->spike_tex);
     DESTROY_TEX(gs->spike_platform_tex);

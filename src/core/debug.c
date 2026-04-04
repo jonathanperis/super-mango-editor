@@ -348,6 +348,21 @@ static void draw_collision_boxes(SDL_Renderer *renderer,
         SDL_RenderDrawRect(renderer, &r);
     }
 
+    /* ---- Fire flames (visible only) — warm orange-red (255, 120, 0) -- */
+    /*
+     * Draw the inset hitbox for each fire flame that is currently visible
+     * (not in WAITING state).  Uses the same BlueFlame struct and hitbox
+     * function as blue flames but with a different debug colour.
+     */
+    SDL_SetRenderDrawColor(renderer, 255, 120, 0, 255);
+    for (int i = 0; i < gs->fire_flame_count; i++) {
+        if (!gs->fire_flames[i].active) continue;
+        if (gs->fire_flames[i].state == BLUE_FLAME_WAITING) continue;
+        r = blue_flame_get_hitbox(&gs->fire_flames[i]);
+        r.x -= cam_x;
+        SDL_RenderDrawRect(renderer, &r);
+    }
+
     /* ---- Circular saws (active only) — bright orange (255, 140, 0) --- */
     /*
      * Draw the inset hitbox returned by circular_saw_get_hitbox.

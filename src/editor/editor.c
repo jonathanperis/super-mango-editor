@@ -302,6 +302,7 @@ static void load_textures(EditorState *es) {
     LOAD_TEX(axe_trap,         "assets/sprites/hazards/axe_trap.png");
     LOAD_TEX(circular_saw,     "assets/sprites/hazards/circular_saw.png");
     LOAD_TEX(blue_flame,       "assets/sprites/hazards/blue_flame.png");
+    LOAD_TEX(fire_flame,       "assets/sprites/hazards/fire_flame.png");
     LOAD_TEX(spike,            "assets/sprites/hazards/spike.png");
     LOAD_TEX(spike_platform,   "assets/sprites/hazards/spike_platform.png");
     LOAD_TEX(spike_block,      "assets/sprites/hazards/spike_block.png");
@@ -1191,6 +1192,9 @@ static void copy_selected(EditorState *es) {
     case ENT_BLUE_FLAME:
         es->clipboard_data.blue_flame = es->level.blue_flames[i];
         break;
+    case ENT_FIRE_FLAME:
+        es->clipboard_data.fire_flame = es->level.fire_flames[i];
+        break;
     case ENT_FLOAT_PLATFORM:
         es->clipboard_data.float_platform = es->level.float_platforms[i];
         break;
@@ -1352,6 +1356,10 @@ static void paste_clipboard(EditorState *es) {
     case ENT_BLUE_FLAME:
         d.blue_flame.x += PASTE_OFFSET;
         PASTE_INTO(blue_flames, blue_flame_count, MAX_BLUE_FLAMES, blue_flame);
+        break;
+    case ENT_FIRE_FLAME:
+        d.fire_flame.x += PASTE_OFFSET;
+        PASTE_INTO(fire_flames, fire_flame_count, MAX_BLUE_FLAMES, fire_flame);
         break;
     case ENT_FLOAT_PLATFORM:
         d.float_platform.x += PASTE_OFFSET;
@@ -1673,7 +1681,7 @@ static void render_toolbar(EditorState *es) {
     /* ---- Zoom dropdown ---------------------------------------------- */
     bx += 60;
     {
-        static const char *zoom_opts[] = { "1x", "2x", "3x", "5x" };
+        static const char *zoom_opts[] = { "Zoom: 1x", "Zoom: 2x", "Zoom: 3x", "Zoom: 5x" };
         static const float zoom_vals[] = { 1.0f, 2.0f, 3.0f, 5.0f };
         static const int zoom_count = 4;
 
@@ -1681,8 +1689,7 @@ static void render_toolbar(EditorState *es) {
         for (int zi = 0; zi < zoom_count; zi++) {
             if (es->camera.zoom == zoom_vals[zi]) { sel = zi; break; }
         }
-        ui_label(&es->ui, bx, by + 4, "Zoom:");
-        if (ui_dropdown(&es->ui, 8888, bx + 48, by + 2, 44,
+        if (ui_dropdown(&es->ui, 8888, bx, by + 2, 80,
                          zoom_opts, zoom_count, &sel)) {
             es->camera.zoom = zoom_vals[sel];
         }
@@ -2078,6 +2085,11 @@ static void apply_undo_command(EditorState *es, const Command *cmd,
                      blue_flame, MAX_BLUE_FLAMES);
         break;
 
+    case ENT_FIRE_FLAME:
+        APPLY_ARRAY(es->level.fire_flames, es->level.fire_flame_count,
+                     fire_flame, MAX_BLUE_FLAMES);
+        break;
+
     case ENT_FLOAT_PLATFORM:
         APPLY_ARRAY(es->level.float_platforms,
                      es->level.float_platform_count,
@@ -2183,6 +2195,7 @@ void editor_cleanup(EditorState *es) {
     DESTROY_TEX(es->textures.axe_trap);
     DESTROY_TEX(es->textures.circular_saw);
     DESTROY_TEX(es->textures.blue_flame);
+    DESTROY_TEX(es->textures.fire_flame);
     DESTROY_TEX(es->textures.spike);
     DESTROY_TEX(es->textures.spike_platform);
     DESTROY_TEX(es->textures.spike_block);

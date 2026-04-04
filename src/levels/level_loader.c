@@ -372,6 +372,37 @@ static void load_blue_flames(GameState *gs, const LevelDef *def)
     gs->blue_flame_count = n;
 }
 
+static void load_fire_flames(GameState *gs, const LevelDef *def)
+{
+    /*
+     * Fire flames use the same BlueFlame struct and eruption mechanics as
+     * blue flames — only the texture differs (set in game.c at render time).
+     * Initialisation is identical to load_blue_flames.
+     */
+    int n = 0;
+    for (int i = 0; i < def->fire_flame_count && n < MAX_BLUE_FLAMES; i++) {
+        float gap_x = def->fire_flames[i].x;
+        if (gap_x <= 0.0f) continue;
+
+        BlueFlame *f = &gs->fire_flames[n];
+        f->gap_x      = gap_x;
+        f->x          = gap_x + (SEA_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f;
+        f->start_y    = (float)(FLOOR_Y + TILE_SIZE);
+        f->y          = f->start_y;
+        f->vy         = 0.0f;
+        f->w          = BLUE_FLAME_DISPLAY_W;
+        f->h          = BLUE_FLAME_DISPLAY_H;
+        f->angle      = 0.0f;
+        f->state      = BLUE_FLAME_WAITING;
+        f->timer      = (float)n * 0.5f;
+        f->anim_timer = 0.0f;
+        f->anim_frame = 0;
+        f->active     = 1;
+        n++;
+    }
+    gs->fire_flame_count = n;
+}
+
 /* ------------------------------------------------------------------ */
 /* Surfaces                                                            */
 /* ------------------------------------------------------------------ */
@@ -526,6 +557,7 @@ void level_load(GameState *gs, const LevelDef *def)
     load_spike_platforms(gs, def);
     load_spike_blocks(gs, def);
     load_blue_flames(gs, def);
+    load_fire_flames(gs, def);
 
     /* ---- Surfaces ------------------------------------------------- */
     load_float_platforms(gs, def);
@@ -609,6 +641,7 @@ void level_reset(GameState *gs, const LevelDef *def)
     load_spike_platforms(gs, def);
     load_spike_blocks(gs, def);
     load_blue_flames(gs, def);
+    load_fire_flames(gs, def);
 
     /* Surfaces */
     load_float_platforms(gs, def);

@@ -86,6 +86,7 @@ static const char *entity_type_names[ENT_COUNT] = {
     [ENT_SPIKE_PLATFORM]   = "Spike Platform",
     [ENT_SPIKE_BLOCK]      = "Spike Block",
     [ENT_BLUE_FLAME]       = "Blue Flame",
+    [ENT_FIRE_FLAME]       = "Fire Flame",
     [ENT_FLOAT_PLATFORM]   = "Float Platform",
     [ENT_BRIDGE]           = "Bridge",
     [ENT_BOUNCEPAD_SMALL]  = "Bouncepad (S)",
@@ -730,6 +731,17 @@ void properties_render(EditorState *es, int start_y, int available_h)
         break;
     }
 
+    case ENT_FIRE_FLAME: {
+        FireFlamePlacement *p =
+            &es->level.fire_flames[es->selection.index];
+
+        ui_label(&es->ui, CONTENT_X, y, "x:");
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_FIRE_FLAME, 0),
+                           FIELD_X, y, FIELD_W, &p->x))
+            es->modified = 1;
+        break;
+    }
+
     /* ================================================================ */
     /* Surfaces                                                          */
     /* ================================================================ */
@@ -1076,12 +1088,23 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
     ui_label(&es->ui, x + 8, y, "Floor Tile:");
     {
         /* Display names (shown in dropdown) */
-        static const char *floor_tile_names[] = { "grass_tileset.png" };
-        /* Full paths (written to LevelDef) */
-        static const char *floor_tile_paths[] = {
-            "assets/sprites/levels/grass_tileset.png"
+        static const char *floor_tile_names[] = {
+            "grass_tileset.png",
+            "brick_tileset.png",
+            "cloud_tileset.png",
+            "grass_rock_tileset.png",
+            "leaf_tileset.png",
+            "stone_tileset.png"
         };
-        static const int floor_tile_count = 1;
+        static const char *floor_tile_paths[] = {
+            "assets/sprites/levels/grass_tileset.png",
+            "assets/sprites/levels/brick_tileset.png",
+            "assets/sprites/levels/cloud_tileset.png",
+            "assets/sprites/levels/grass_rock_tileset.png",
+            "assets/sprites/levels/leaf_tileset.png",
+            "assets/sprites/levels/stone_tileset.png"
+        };
+        static const int floor_tile_count = 6;
 
         /* Find which option matches the current path (default to 0) */
         int sel = 0;
@@ -1146,23 +1169,33 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
     {
         static const char *bg_names[] = {
             "sky_blue.png",
+            "sky_blue_lightened.png",
+            "castle_pillars.png",
+            "forest_leafs.png",
             "clouds_bg.png",
             "glacial_mountains.png",
+            "glacial_mountains_lightened.png",
             "clouds_mg_3.png",
             "clouds_mg_2.png",
             "clouds_lonely.png",
-            "clouds_mg_1.png"
+            "clouds_mg_1.png",
+            "clouds_mg_1_lightened.png"
         };
         static const char *bg_paths[] = {
             "assets/sprites/backgrounds/sky_blue.png",
+            "assets/sprites/backgrounds/sky_blue_lightened.png",
+            "assets/sprites/backgrounds/castle_pillars.png",
+            "assets/sprites/backgrounds/forest_leafs.png",
             "assets/sprites/backgrounds/clouds_bg.png",
             "assets/sprites/backgrounds/glacial_mountains.png",
+            "assets/sprites/backgrounds/glacial_mountains_lightened.png",
             "assets/sprites/backgrounds/clouds_mg_3.png",
             "assets/sprites/backgrounds/clouds_mg_2.png",
             "assets/sprites/backgrounds/clouds_lonely.png",
-            "assets/sprites/backgrounds/clouds_mg_1.png"
+            "assets/sprites/backgrounds/clouds_mg_1.png",
+            "assets/sprites/backgrounds/clouds_mg_1_lightened.png"
         };
-        static const int bg_count = 7;
+        static const int bg_count = 12;
 
         for (int i = 0; i < es->level.parallax_layer_count && i < PARALLAX_MAX_LAYERS; i++) {
             char label[16];
@@ -1204,10 +1237,10 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
                 es->modified = 1;
             }
         }
+        y += 24;
     }
 
 bg_done:
-    y += 4;
 
     /* ---- Parallax (Foreground) — collapsible subsection ---- */
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
@@ -1236,14 +1269,18 @@ bg_done:
         static const char *fg_names[] = {
             "fog_1.png",
             "fog_2.png",
-            "water.png"
+            "water.png",
+            "clouds.png",
+            "lava.png"
         };
         static const char *fg_paths[] = {
             "assets/sprites/foregrounds/fog_1.png",
             "assets/sprites/foregrounds/fog_2.png",
-            "assets/sprites/foregrounds/water.png"
+            "assets/sprites/foregrounds/water.png",
+            "assets/sprites/foregrounds/clouds.png",
+            "assets/sprites/foregrounds/lava.png"
         };
-        static const int fg_count = 3;
+        static const int fg_count = 5;
 
         for (int i = 0; i < es->level.foreground_layer_count && i < PARALLAX_MAX_LAYERS; i++) {
             char label[16];
@@ -1285,6 +1322,7 @@ bg_done:
                 es->modified = 1;
             }
         }
+        y += 24;
     }
 
 fg_done:

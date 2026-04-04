@@ -333,7 +333,7 @@
 		}],
 	"foreground_layers":	[{
 			"path":	"assets/sprites/foregrounds/fog_1.png",
-			"speed":	0.6
+			"speed":	0.600000023841858
 		}, {
 			"path":	"assets/sprites/foregrounds/water.png",
 			"speed":	0

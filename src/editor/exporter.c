@@ -436,7 +436,18 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .blue_flame_count = %d,\n", def->blue_flame_count);
 
-    /* ---- 20. Float platforms ---- */
+    /* ---- 20. Fire flames ---- */
+    write_section(f, "Fire flames");
+    if (def->fire_flame_count > 0) {
+        fprintf(f, "    .fire_flames = {\n");
+        for (int i = 0; i < def->fire_flame_count; i++) {
+            fprintf(f, "        { .x = %.1ff },\n", def->fire_flames[i].x);
+        }
+        fprintf(f, "    },\n");
+    }
+    fprintf(f, "    .fire_flame_count = %d,\n", def->fire_flame_count);
+
+    /* ---- 21. Float platforms ---- */
     write_section(f, "Float platforms");
     if (def->float_platform_count > 0) {
         fprintf(f, "    .float_platforms = {\n");

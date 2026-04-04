@@ -226,6 +226,17 @@ typedef struct {
 } BlueFlamePlacement;
 
 /*
+ * FireFlamePlacement — one erupting fire flame hazard (fire variant).
+ *
+ * Identical mechanics to BlueFlamePlacement but uses a different texture.
+ * x : gap x position in world-space logical pixels — the fire flame
+ *     erupts centred within a sea-gap-sized opening at this x coordinate.
+ */
+typedef struct {
+    float x;
+} FireFlamePlacement;
+
+/*
  * FloatPlatformPlacement — a hovering / crumbling / rail-riding platform.
  *
  * mode       : FLOAT_PLATFORM_STATIC, CRUMBLE, or RAIL.
@@ -363,6 +374,8 @@ typedef struct {
     int                    spike_block_count;
     BlueFlamePlacement     blue_flames[MAX_BLUE_FLAMES];
     int                    blue_flame_count;
+    FireFlamePlacement     fire_flames[MAX_BLUE_FLAMES];
+    int                    fire_flame_count;
 
     /* ---- Surfaces ---------------------------------------------------- */
     FloatPlatformPlacement float_platforms[MAX_FLOAT_PLATFORMS];
