@@ -42,12 +42,12 @@ static const struct {
     const char *path;   /* PNG path relative to the repo root     */
     float       speed;  /* parallax scroll fraction (0 = static)  */
 } LAYER_CONFIG[] = {
-    { "assets/sprites/backgrounds/sky.png",               0.00f },
+    { "assets/sprites/backgrounds/sky_blue.png",               0.00f },
     { "assets/sprites/backgrounds/clouds_bg.png",         0.08f },
     { "assets/sprites/backgrounds/glacial_mountains.png", 0.15f },
     { "assets/sprites/backgrounds/clouds_mg_3.png",       0.25f },
     { "assets/sprites/backgrounds/clouds_mg_2.png",       0.38f },
-    { "assets/sprites/backgrounds/cloud_lonely.png",      0.44f },
+    { "assets/sprites/backgrounds/clouds_lonely.png",      0.44f },
     { "assets/sprites/backgrounds/clouds_mg_1.png",       0.50f },
 };
 

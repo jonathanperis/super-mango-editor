@@ -301,7 +301,7 @@
 			"tile_count":	1
 		}],
 	"parallax_layers":	[{
-			"path":	"assets/sprites/backgrounds/sky.png",
+			"path":	"assets/sprites/backgrounds/sky_blue.png",
 			"speed":	0
 		}, {
 			"path":	"assets/sprites/backgrounds/clouds_bg.png",
@@ -316,7 +316,7 @@
 			"path":	"assets/sprites/backgrounds/clouds_mg_2.png",
 			"speed":	0.37999999523162842
 		}, {
-			"path":	"assets/sprites/backgrounds/cloud_lonely.png",
+			"path":	"assets/sprites/backgrounds/clouds_lonely.png",
 			"speed":	0.43999999761581421
 		}, {
 			"path":	"assets/sprites/backgrounds/clouds_mg_1.png",

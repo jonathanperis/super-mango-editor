@@ -280,7 +280,7 @@ static void load_textures(EditorState *es) {
 
     /* Floor and water — the base environment textures */
     LOAD_TEX(floor_tile,       "assets/sprites/levels/grass_tileset.png");
-    LOAD_TEX(water,            "assets/sprites/backgrounds/water.png");
+    LOAD_TEX(water,            "assets/sprites/backgrounds/foreground_water.png");
 
     /* Static geometry */
     LOAD_TEX(platform,         "assets/sprites/levels/grass_platform.png");
