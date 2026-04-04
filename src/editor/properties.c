@@ -1093,8 +1093,8 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
     y += 6;
     ui_label(&es->ui, x + 8, y, "Background Music:");
     {
-        static const char *music_names[] = { "(none)", "game_music.ogg" };
-        static const char *music_paths[] = { "", "assets/sounds/levels/game_music.ogg" };
+        static const char *music_names[] = { "(none)", "water.wav" };
+        static const char *music_paths[] = { "", "assets/sounds/levels/water.wav" };
         static const int music_count = 2;
 
         int sel = 0;
