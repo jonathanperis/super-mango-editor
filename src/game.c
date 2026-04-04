@@ -215,6 +215,8 @@ void game_init(GameState *gs) {
     if (!gs->bridge_tex) fprintf(stderr, "Warning: Failed to load Bridge.png: %s\n", IMG_GetError());
     gs->yellow_star_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/yellow_star.png");
     if (!gs->yellow_star_tex) fprintf(stderr, "Warning: Failed to load Star_Yellow.png: %s\n", IMG_GetError());
+    gs->last_star_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/last_star.png");
+    if (!gs->last_star_tex) fprintf(stderr, "Warning: Failed to load last_star.png: %s\n", IMG_GetError());
     gs->axe_trap_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/axe_trap.png");
     if (!gs->axe_trap_tex) fprintf(stderr, "Warning: Failed to load Axe_Trap.png: %s\n", IMG_GetError());
     gs->circular_saw_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/circular_saw.png");
@@ -1124,9 +1126,9 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
     yellow_stars_render(gs->yellow_stars, gs->yellow_star_count,
                      gs->renderer, gs->yellow_star_tex, cam_x);
 
-    /* Draw the end-of-level last star (uses Stars_Ui.png from HUD) */
+    /* Draw the end-of-level last star using its dedicated sprite */
     last_star_render(&gs->last_star, gs->renderer,
-                     gs->hud.star_tex, cam_x);
+                     gs->last_star_tex, cam_x);
 
     /* Draw blue flames behind the water and fish, in front of ground */
     blue_flames_render(gs->blue_flames, gs->blue_flame_count,
@@ -1791,6 +1793,7 @@ void game_cleanup(GameState *gs) {
 
     DESTROY_TEX(gs->coin_tex);
     DESTROY_TEX(gs->yellow_star_tex);
+    DESTROY_TEX(gs->last_star_tex);
 
     FREE_CHUNK(gs->snd_dive);
     FREE_CHUNK(gs->snd_spider_attack);

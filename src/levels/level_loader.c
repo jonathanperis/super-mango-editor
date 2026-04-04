@@ -130,8 +130,14 @@ static void load_last_star(GameState *gs, const LevelDef *def)
     gs->last_star.y         = def->last_star.y;
     gs->last_star.w         = LAST_STAR_DISPLAY_W;
     gs->last_star.h         = LAST_STAR_DISPLAY_H;
-    gs->last_star.active    = 1;
     gs->last_star.collected = 0;
+
+    /* If the level didn't place one, use a visible default position */
+    if (def->last_star.x == 0.0f && def->last_star.y == 0.0f) {
+        gs->last_star.x = 145.0f;
+        gs->last_star.y = 167.0f;
+    }
+    gs->last_star.active = 1;
 }
 
 /* ------------------------------------------------------------------ */

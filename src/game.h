@@ -244,6 +244,7 @@ typedef struct {
     int           sea_gaps[MAX_SEA_GAPS]; /* left-edge x of each sea gap       */
     int           sea_gap_count;         /* number of active sea gaps          */
     SDL_Texture  *yellow_star_tex;       /* shared texture for yellow star pickups*/
+    SDL_Texture  *last_star_tex;         /* dedicated texture for end-of-level star*/
     YellowStar    yellow_stars[MAX_YELLOW_STARS]; /* health-restoring collectibles */
     int           yellow_star_count;     /* number of yellow stars placed       */
     SDL_Texture  *axe_trap_tex;          /* shared texture for axe trap hazards*/
