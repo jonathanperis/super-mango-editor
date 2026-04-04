@@ -34,7 +34,5 @@ typedef struct {
 
 /* ---- Function declarations ---------------------------------------------- */
 
-void star_yellows_init(StarYellow *stars, int *count);
-
 void star_yellows_render(const StarYellow *stars, int count,
                          SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);

@@ -22,7 +22,8 @@
  * Stars_Ui.png is loaded as the heart indicator icon.  Both are fatal if
  * missing — the HUD is essential for gameplay feedback.
  */
-void hud_init(Hud *hud, SDL_Renderer *renderer)
+void hud_init(Hud *hud, SDL_Renderer *renderer,
+              SDL_Texture *star_tex, SDL_Texture *player_tex)
 {
     /*
      * TTF_OpenFont — load a TrueType font file and set its point size.
@@ -36,33 +37,19 @@ void hud_init(Hud *hud, SDL_Renderer *renderer)
     }
 
     /*
-     * IMG_LoadTexture — decode Stars_Ui.png and upload it to GPU memory.
-     * This single texture is drawn once per current heart in hud_render.
+     * Reuse shared textures from GameState — avoids loading the same
+     * PNGs twice (star_yellow.png and player.png are already on the GPU).
      */
-    hud->star_tex = IMG_LoadTexture(renderer, "assets/sprites/collectibles/star_yellow.png");
-    if (!hud->star_tex) {
-        fprintf(stderr, "Failed to load Stars_Ui.png: %s\n", IMG_GetError());
-        TTF_CloseFont(hud->font);
-        hud->font = NULL;
-        exit(EXIT_FAILURE);
-    }
+    hud->star_tex    = star_tex;
+    hud->player_icon = player_tex;
 
     /*
-     * Load the coin icon for the score display.
+     * Load the coin icon for the score display (HUD-only asset).
      * Non-fatal: the score still shows without the icon.
      */
     hud->coin_icon = IMG_LoadTexture(renderer, "assets/sprites/screens/hud_coins.png");
     if (!hud->coin_icon) {
         fprintf(stderr, "Warning: Failed to load Coins_Ui.png: %s\n", IMG_GetError());
-    }
-
-    /*
-     * Load the player sprite sheet so the HUD can crop a small icon
-     * for the lives counter.  Non-fatal: lives text still renders.
-     */
-    hud->player_icon = IMG_LoadTexture(renderer, "assets/sprites/player/player.png");
-    if (!hud->player_icon) {
-        fprintf(stderr, "Warning: Failed to load Player.png (HUD icon): %s\n", IMG_GetError());
     }
 }
 
@@ -217,17 +204,17 @@ void hud_render(const Hud *hud, SDL_Renderer *renderer,
  */
 void hud_cleanup(Hud *hud)
 {
-    if (hud->player_icon) {
-        SDL_DestroyTexture(hud->player_icon);
-        hud->player_icon = NULL;
-    }
+    /*
+     * star_tex and player_icon are shared textures owned by GameState —
+     * they are destroyed in game_cleanup, not here.  Only NULL the
+     * pointers so no stale references remain.
+     */
+    hud->star_tex    = NULL;
+    hud->player_icon = NULL;
+
     if (hud->coin_icon) {
         SDL_DestroyTexture(hud->coin_icon);
         hud->coin_icon = NULL;
-    }
-    if (hud->star_tex) {
-        SDL_DestroyTexture(hud->star_tex);
-        hud->star_tex = NULL;
     }
     if (hud->font) {
         TTF_CloseFont(hud->font);

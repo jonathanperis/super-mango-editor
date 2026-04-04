@@ -29,14 +29,6 @@ typedef struct {
 } Coin;
 
 /*
- * coins_init — Place the initial set of coins on the ground and platforms.
- *
- * Sets *count to the number of coins placed (currently 5).  Can be called
- * again to re-activate all coins when the phase restarts.
- */
-void coins_init(Coin *coins, int *count);
-
-/*
  * coins_render — Draw all active coins using the shared coin texture.
  *
  * Inactive coins (active == 0) are skipped.  Each coin is drawn at its

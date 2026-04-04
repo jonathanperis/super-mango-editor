@@ -8,5 +8,3 @@
 #include "bouncepad.h"
 
 #define MAX_BOUNCEPADS_HIGH 16
-
-void bouncepads_high_init(Bouncepad *pads, int *count);

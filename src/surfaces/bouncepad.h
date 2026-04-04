@@ -131,9 +131,6 @@ typedef struct {
  */
 void bouncepad_place(Bouncepad *pad, float x, float launch_vy, BouncepadType pad_type);
 
-/* Place all bouncepads at their initial world positions. */
-void bouncepads_init(Bouncepad *pads, int *count);
-
 /*
  * Advance the release animation for every ACTIVE pad.
  * dt_ms is delta time converted to milliseconds (dt * 1000).

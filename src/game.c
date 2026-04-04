@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>   /* sqrtf — used by apply_damage push impulse */
-#include <string.h> /* strncpy, memset, strstr */
+#include <string.h> /* strncpy, memset */
 
 #if defined(_WIN32)
 #include <windows.h> /* GetFullPathNameA */
@@ -337,7 +337,7 @@ void game_init(GameState *gs) {
     fog_init(&gs->fog, gs->renderer);
 
     /* Load the HUD font and heart icon texture */
-    hud_init(&gs->hud, gs->renderer);
+    hud_init(&gs->hud, gs->renderer, gs->star_yellow_tex, gs->player.texture);
 
     /* Initialise the debug overlay if --debug was passed on the CLI */
     if (gs->debug_mode) debug_init(&gs->debug);
