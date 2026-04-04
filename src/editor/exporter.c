@@ -20,6 +20,11 @@
 #include <stdio.h>             /* FILE, fopen, fprintf, fclose           */
 #include <string.h>            /* snprintf — path assembly               */
 
+#ifndef _WIN32
+#include <sys/stat.h>          /* open, O_WRONLY, O_CREAT, O_TRUNC      */
+#include <fcntl.h>
+#endif
+
 /* ------------------------------------------------------------------ */
 /* Helper: enum-to-string mappers                                      */
 /* ------------------------------------------------------------------ */
@@ -111,17 +116,22 @@ static int write_header(const char *var_name, const char *dir_path)
     snprintf(path, sizeof(path), "%s/%s.h", dir_path, var_name);
 
     /*
-     * fopen with "w" mode — create or truncate the file for writing.
-     * Returns NULL if the directory doesn't exist or permissions fail.
+     * Open with restricted permissions (0644) on POSIX so generated files
+     * are not world-writable.
      */
+#ifndef _WIN32
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    FILE *f = fd >= 0 ? fdopen(fd, "w") : NULL;
+#else
     FILE *f = fopen(path, "w");
+#endif
     if (!f) {
         fprintf(stderr, "exporter: failed to open %s for writing\n", path);
         return -1;
     }
 
     /*
-     * Write a minimal header that matches the sandbox_00.h pattern:
+     * Write a minimal header:
      *   #pragma once
      *   #include "level.h"
      *   extern const LevelDef {var_name}_def;
@@ -154,7 +164,12 @@ static int write_source(const LevelDef *def, const char *var_name,
     char path[512];
     snprintf(path, sizeof(path), "%s/%s.c", dir_path, var_name);
 
+#ifndef _WIN32
+    int fds = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    FILE *f = fds >= 0 ? fdopen(fds, "w") : NULL;
+#else
     FILE *f = fopen(path, "w");
+#endif
     if (!f) {
         fprintf(stderr, "exporter: failed to open %s for writing\n", path);
         return -1;
