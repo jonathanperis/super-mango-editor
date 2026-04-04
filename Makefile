@@ -105,10 +105,10 @@ run-debug: all
 	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --debug
 
 run-level: all
-	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --level levels/sandbox_00.json
+	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --level $(LEVEL)
 
 run-level-debug: all
-	./$(TARGET) --debug --level levels/sandbox_00.json
+	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --debug --level $(LEVEL)
 
 # ── Editor targets ───────────────────────────────────────────────────
 editor: $(OUTDIR) $(EDITOR_TARGET)
