@@ -170,8 +170,9 @@ int editor_init(EditorState *es) {
      * The user can toggle this with the 'G' key.  Grid lines help align
      * entities to TILE_SIZE boundaries without needing a snap-to-grid mode.
      */
-    es->show_grid  = 1;
-    es->panel_open = 1;
+    es->show_grid    = 1;
+    es->panel_open   = 1;
+    es->config_open  = 1;
 
     /* ---- Undo stack ------------------------------------------------- */
     /*
@@ -223,6 +224,8 @@ int editor_init(EditorState *es) {
     es->level.player_start_y = 205.0f;
     es->level.last_star.x = 145.0f;
     es->level.last_star.y = 167.0f;
+    strncpy(es->level.floor_tile_path, "assets/sprites/levels/grass_tileset.png",
+            sizeof(es->level.floor_tile_path) - 1);
 
     /* ---- Start the loop --------------------------------------------- */
     /*
@@ -430,14 +433,54 @@ void editor_loop(EditorState *es) {
             /* ---- Normal editor rendering ----------------------------- */
             canvas_render(es);
             render_toolbar(es);
-            palette_render(es);
 
-            if (es->selection.index >= 0) {
-                properties_render(es);
-            }
-            /* Level config always shows in the bottom-right when nothing selected */
-            if (es->selection.index < 0) {
-                level_config_render(es);
+            /* ---- Right panel layout — three stacked sections ---- */
+            /*
+             * The right column (x = CANVAS_W to EDITOR_W) is divided into
+             * up to three vertical sections that share the available space:
+             *
+             *   1. Level Config — collapsible; always visible at top.
+             *   2. Palette      — collapsible; scrollable entity categories.
+             *   3. Properties   — only shown when an entity is selected.
+             *
+             * Each section starts where the previous one ends.  Heights
+             * are computed dynamically based on collapse state and whether
+             * an entity is selected.
+             */
+            {
+                int right_top    = TOOLBAR_H;
+                int right_bottom = EDITOR_H - STATUS_H;
+                int section_hdr  = 28;  /* matches palette TITLE_H */
+
+                /* Section 1: Level Config */
+                int config_y = right_top;
+                int config_h;
+                if (es->config_open) {
+                    config_h = 220;  /* enough for all config fields */
+                } else {
+                    config_h = section_hdr;
+                }
+
+                /* Section 3 height (computed early so palette knows remaining space) */
+                int props_h = 0;
+                if (es->selection.index >= 0) {
+                    props_h = es->panel_open ? 200 : section_hdr;
+                }
+
+                /* Section 2: Palette gets remaining space */
+                int palette_y = config_y + config_h;
+                int palette_h = right_bottom - palette_y - props_h;
+                if (palette_h < section_hdr) palette_h = section_hdr;
+
+                /* Section 3: Properties (positioned after palette) */
+                int props_y = palette_y + palette_h;
+
+                /* Render in top-to-bottom order */
+                level_config_render(es, config_y, config_h);
+                palette_render(es, palette_y, palette_h);
+                if (es->selection.index >= 0) {
+                    properties_render(es, props_y, props_h);
+                }
             }
 
             render_status_bar(es);
@@ -881,14 +924,31 @@ static void handle_event(EditorState *es, SDL_Event *event) {
         int mx, my;
         SDL_GetMouseState(&mx, &my);
 
-        /* Right panel scroll — route to palette (top half) or properties (bottom half) */
+        /*
+         * Right panel scroll — route wheel events to the palette section.
+         *
+         * The right panel has three stacked sections: Level Config, Palette,
+         * and Properties.  Only the Palette section scrolls.  We compute
+         * its Y range using the same logic as the render layout so the
+         * hit test matches what the user sees.
+         */
         if (mx >= CANVAS_W && my > TOOLBAR_H && my < EDITOR_H - STATUS_H) {
-            int split_y = TOOLBAR_H + CANVAS_H / 2;
-            if (my < split_y) {
+            int section_hdr = 28;
+            int cfg_h  = es->config_open ? 220 : section_hdr;
+            int pal_top = TOOLBAR_H + cfg_h;
+
+            int ph = 0;
+            if (es->selection.index >= 0)
+                ph = es->panel_open ? 200 : section_hdr;
+            int pal_h = (EDITOR_H - STATUS_H) - pal_top - ph;
+            if (pal_h < section_hdr) pal_h = section_hdr;
+            int pal_bot = pal_top + pal_h;
+
+            if (my >= pal_top && my < pal_bot) {
                 /* Cursor is over the palette — scroll it */
                 palette_scroll(-event->wheel.y * 20);
             }
-            /* Bottom panel does not scroll — content fits within the panel */
+            /* Level Config and Properties do not scroll */
             break;
         }
 

@@ -33,10 +33,13 @@
  * Detects mouse clicks on rows to update es->palette_type and es->tool.
  * Handles mouse-wheel scrolling when the content exceeds the visible height.
  *
+ * start_y     : top edge of the section in window pixels.
+ * available_h : total height available for this section.
+ *
  * es : pointer to the editor state (reads ui, selection; writes palette_type,
  *      tool on click).
  */
-void palette_render(EditorState *es);
+void palette_render(EditorState *es, int start_y, int available_h);
 
 /* Scroll the palette content by delta pixels (positive = down). */
 void palette_scroll(int delta);

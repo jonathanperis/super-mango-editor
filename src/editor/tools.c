@@ -304,13 +304,6 @@ static void get_entity_pos(const LevelDef *level, EntityType type, int index,
 static void set_entity_pos(LevelDef *level, EntityType type, int index,
                            float x, float y)
 {
-    /*
-     * Clamp y to 205 max for all entities except fish.
-     * This keeps everything above the ground floor visible area.
-     */
-    if (type != ENT_FISH && type != ENT_FASTER_FISH && y > 205.0f)
-        y = 205.0f;
-
     switch (type) {
     case ENT_PLATFORM:
         level->platforms[index].x = x;
@@ -1183,10 +1176,6 @@ static void place_entity(EditorState *es, float world_x, float world_y)
 {
     LevelDef *level = &es->level;
     EntityType type  = es->palette_type;
-
-    /* Clamp y to 205 max for all entities except fish */
-    if (type != ENT_FISH && type != ENT_FASTER_FISH && world_y > 205.0f)
-        world_y = 205.0f;
 
     /* Check capacity — every entity type has a fixed-size array */
     int count = get_count(level, type);

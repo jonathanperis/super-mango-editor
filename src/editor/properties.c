@@ -137,20 +137,29 @@ static const char *fplat_mode_opts[] = { "Static", "Crumble", "Rail" };
 /* properties_render                                                   */
 /* ------------------------------------------------------------------ */
 
-void properties_render(EditorState *es)
+void properties_render(EditorState *es, int start_y, int available_h)
 {
     if (es->selection.index < 0)
         return;
 
+    /*
+     * Use caller-supplied position instead of the old fixed PROP_Y / PROP_H
+     * constants.  The layout orchestrator in editor.c computes where this
+     * section starts and how tall it is based on the sections above it.
+     */
+    int prop_x = PROP_X;
+    int prop_y = start_y;
+    int prop_h = available_h;
+
     /* Panel background */
-    ui_panel(&es->ui, PROP_X, PROP_Y, PROP_W, PROP_H);
+    ui_panel(&es->ui, prop_x, prop_y, PROP_W, prop_h);
 
     /* ---- Fixed title bar (same style as palette header) ------------- */
     {
         SDL_Color title_bg = UI_TITLE_BG;
         SDL_SetRenderDrawColor(es->ui.renderer,
                                title_bg.r, title_bg.g, title_bg.b, title_bg.a);
-        SDL_Rect title_rect = { PROP_X, PROP_Y, PROP_W, ROW_H + 4 };
+        SDL_Rect title_rect = { prop_x, prop_y, PROP_W, ROW_H + 4 };
         SDL_RenderFillRect(es->ui.renderer, &title_rect);
     }
 
@@ -168,23 +177,25 @@ void properties_render(EditorState *es)
                  es->selection.index);
     }
 
-    int hdr_hovered = (es->ui.mouse_x >= PROP_X &&
-                       es->ui.mouse_x < PROP_X + PROP_W &&
-                       es->ui.mouse_y >= PROP_Y &&
-                       es->ui.mouse_y < PROP_Y + ROW_H + 4);
+    int content_x = prop_x + 8;
+
+    int hdr_hovered = (es->ui.mouse_x >= prop_x &&
+                       es->ui.mouse_x < prop_x + PROP_W &&
+                       es->ui.mouse_y >= prop_y &&
+                       es->ui.mouse_y < prop_y + ROW_H + 4);
     if (hdr_hovered && es->ui.mouse_clicked)
         es->panel_open = !es->panel_open;
 
-    ui_label_color(&es->ui, CONTENT_X, PROP_Y + 4, header,
+    ui_label_color(&es->ui, content_x, prop_y + 4, header,
                    hdr_hovered ? UI_TEXT : UI_ACCENT);
 
     if (!es->panel_open) return;
 
     /* Clip content below the title bar */
-    SDL_Rect prop_clip = { PROP_X, PROP_Y + ROW_H + 4, PROP_W, PROP_H - ROW_H - 4 };
+    SDL_Rect prop_clip = { prop_x, prop_y + ROW_H + 4, PROP_W, prop_h - ROW_H - 4 };
     SDL_RenderSetClipRect(es->ui.renderer, &prop_clip);
 
-    int y = PROP_Y + ROW_H + 8;
+    int y = prop_y + ROW_H + 8;
 
     /* ---- Per-type field rendering ----------------------------------- */
 
@@ -946,12 +957,18 @@ void properties_render(EditorState *es)
  *
  * Widget IDs use the 9000+ range to avoid collisions with entity fields.
  */
-void level_config_render(EditorState *es) {
+void level_config_render(EditorState *es, int start_y, int available_h) {
+    /*
+     * Use caller-supplied position instead of the old fixed PROP_Y / PROP_H
+     * constants.  The layout orchestrator in editor.c computes where this
+     * section starts and how tall it is based on the sections around it.
+     */
     int x = PROP_X;
-    int y = PROP_Y;
+    int y = start_y;
+    int cfg_h = available_h;
 
     /* Panel background */
-    ui_panel(&es->ui, x, y, PROP_W, PROP_H);
+    ui_panel(&es->ui, x, y, PROP_W, cfg_h);
 
     /* ---- Fixed title bar (same style as palette header) ------------- */
     {
@@ -965,19 +982,23 @@ void level_config_render(EditorState *es) {
     /* ---- Collapsible header ---- */
     char cfg_header[32];
     snprintf(cfg_header, sizeof(cfg_header), "%s Level Config",
-             es->panel_open ? "v" : ">");
+             es->config_open ? "v" : ">");
 
-    int hdr_hovered = (es->ui.mouse_x >= PROP_X &&
-                       es->ui.mouse_x < PROP_X + PROP_W &&
-                       es->ui.mouse_y >= PROP_Y &&
-                       es->ui.mouse_y < PROP_Y + ROW_H + 4);
+    int hdr_hovered = (es->ui.mouse_x >= x &&
+                       es->ui.mouse_x < x + PROP_W &&
+                       es->ui.mouse_y >= y &&
+                       es->ui.mouse_y < y + ROW_H + 4);
     if (hdr_hovered && es->ui.mouse_clicked)
-        es->panel_open = !es->panel_open;
+        es->config_open = !es->config_open;
 
     ui_label_color(&es->ui, x + 8, y + 4, cfg_header,
                    hdr_hovered ? UI_TEXT : UI_ACCENT);
 
-    if (!es->panel_open) return;
+    if (!es->config_open) return;
+
+    /* Clip content below the title bar so it doesn't overflow */
+    SDL_Rect cfg_clip = { x, y + ROW_H + 4, PROP_W, cfg_h - ROW_H - 4 };
+    SDL_RenderSetClipRect(es->ui.renderer, &cfg_clip);
 
     y += ROW_H + 8;
 
@@ -1006,12 +1027,32 @@ void level_config_render(EditorState *es) {
     /* ---- Floor tile ---- */
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
-    ui_label(&es->ui, x + 8, y, "Floor Tile");
-    y += 18;
-    ui_label(&es->ui, x + 8, y, "path:");
-    if (ui_text_field(&es->ui, 9010, x + 50, y, 320, es->level.floor_tile_path,
-                      (int)sizeof(es->level.floor_tile_path)))
-        es->modified = 1;
+    ui_label(&es->ui, x + 8, y, "Floor Tile:");
+    {
+        /* Display names (shown in dropdown) */
+        static const char *floor_tile_names[] = { "grass_tileset.png" };
+        /* Full paths (written to LevelDef) */
+        static const char *floor_tile_paths[] = {
+            "assets/sprites/levels/grass_tileset.png"
+        };
+        static const int floor_tile_count = 1;
+
+        /* Find which option matches the current path (default to 0) */
+        int sel = 0;
+        for (int i = 0; i < floor_tile_count; i++) {
+            if (strcmp(es->level.floor_tile_path, floor_tile_paths[i]) == 0) {
+                sel = i;
+                break;
+            }
+        }
+        if (ui_dropdown(&es->ui, 9010, x + 100, y, 270,
+                         floor_tile_names, floor_tile_count, &sel)) {
+            strncpy(es->level.floor_tile_path, floor_tile_paths[sel],
+                    sizeof(es->level.floor_tile_path) - 1);
+            es->level.floor_tile_path[sizeof(es->level.floor_tile_path) - 1] = '\0';
+            es->modified = 1;
+        }
+    }
     y += 24;
 
     /* ---- Fog & Water ---- */
@@ -1025,6 +1066,7 @@ void level_config_render(EditorState *es) {
         ui_label(&es->ui, x + 150, y, "Water:");
         if (ui_dropdown(&es->ui, 9005, x + 205, y, 80, toggle_opts, 2, &es->level.water_enabled))
             es->modified = 1;
+        /* TODO: water type dropdown when water_enabled == 1 */
     }
     y += 24;
 
@@ -1058,8 +1100,6 @@ void level_config_render(EditorState *es) {
 
     /* Show each parallax layer's path and speed (both editable) */
     for (int i = 0; i < es->level.parallax_layer_count && i < PARALLAX_MAX_LAYERS; i++) {
-        /* Scrolling handles overflow — no need to clip here */
-
         char label[16];
         snprintf(label, sizeof(label), "%d:", i);
         ui_label(&es->ui, x + 8, y, label);
@@ -1079,15 +1119,15 @@ void level_config_render(EditorState *es) {
 
     /* Button to add a layer */
     if (es->level.parallax_layer_count < PARALLAX_MAX_LAYERS) {
-        {
-            if (ui_button(&es->ui, x + 8, y, 100, 20, "+ Add Layer")) {
-                int idx = es->level.parallax_layer_count;
-                strncpy(es->level.parallax_layers[idx].path, "assets/sprites/effects/", 63);
-                es->level.parallax_layers[idx].speed = 0.1f;
-                es->level.parallax_layer_count++;
-                es->modified = 1;
-            }
+        if (ui_button(&es->ui, x + 8, y, 100, 20, "+ Add Layer")) {
+            int idx = es->level.parallax_layer_count;
+            strncpy(es->level.parallax_layers[idx].path, "assets/sprites/effects/", 63);
+            es->level.parallax_layers[idx].speed = 0.1f;
+            es->level.parallax_layer_count++;
+            es->modified = 1;
         }
     }
 
+    /* Remove clip rect so other sections are not affected */
+    SDL_RenderSetClipRect(es->ui.renderer, NULL);
 }

@@ -179,16 +179,20 @@
 		}],
 	"axe_traps":	[{
 			"pillar_x":	256,
+			"y":	0,
 			"mode":	"PENDULUM"
 		}, {
 			"pillar_x":	680,
+			"y":	0,
 			"mode":	"SPIN"
 		}, {
 			"pillar_x":	1659.5,
+			"y":	0,
 			"mode":	"PENDULUM"
 		}],
 	"circular_saws":	[{
 			"x":	1350,
+			"y":	0,
 			"patrol_x0":	1350,
 			"patrol_x1":	1446,
 			"direction":	1
@@ -288,7 +292,7 @@
 		}],
 	"ladders":	[{
 			"x":	1552,
-			"y":	12,
+			"y":	0,
 			"tile_count":	30
 		}],
 	"ropes":	[{

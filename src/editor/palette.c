@@ -246,7 +246,7 @@ static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
  * cursor upward so earlier content scrolls off the top edge.  We skip
  * drawing any row whose Y falls outside the visible clip region.
  */
-void palette_render(EditorState *es)
+void palette_render(EditorState *es, int start_y, int available_h)
 {
     UIState *ui = &es->ui;
 
@@ -254,31 +254,13 @@ void palette_render(EditorState *es)
 
     /*
      * panel_x — the palette panel starts immediately after the canvas area.
-     * panel_y — starts below the toolbar strip.
-     *
-     * These match the editor's horizontal and vertical layout defined in
-     * editor.h: the left CANVAS_W pixels are the canvas; the right PANEL_W
-     * pixels are the palette + inspector column.
+     * panel_y / panel_h — passed in by the caller so the layout orchestrator
+     * in editor.c can position the palette dynamically between the level
+     * config section above and the properties section below.
      */
     int panel_x = CANVAS_W;
-    int panel_y = TOOLBAR_H;
-
-    /*
-     * panel_h — available height for the palette.
-     *
-     * When nothing is selected (selection.index == -1), the palette takes
-     * the full column height (CANVAS_H).  When an entity is selected, the
-     * bottom half is reserved for the properties inspector, so the palette
-     * only gets the top half.  Integer division of CANVAS_H by 2 gives
-     * an even split.
-     */
-    /*
-     * The palette always gets the top half of the right column.
-     * The bottom half is used by the properties panel (when an entity
-     * is selected) or the level config panel (when nothing is selected).
-     */
-    (void)es->selection.index; /* palette height is now fixed */
-    int panel_h = CANVAS_H / 2;
+    int panel_y = start_y;
+    int panel_h = available_h;
 
     /*
      * Draw the panel background — a dark rectangle that visually separates

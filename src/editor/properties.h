@@ -37,16 +37,22 @@
  * When any field value changes, es->modified is set to 1 so the title bar
  * shows the unsaved-changes indicator.
  *
+ * start_y     : top edge of the section in window pixels.
+ * available_h : total height available for this section.
+ *
  * es : pointer to the editor state (reads selection, level, ui; writes
  *      level field values and modified flag).
  */
-void properties_render(EditorState *es);
+void properties_render(EditorState *es, int start_y, int available_h);
 
 /*
  * level_config_render — Draw the level-wide configuration panel.
  *
  * Shows editable fields for parallax layers, player spawn, music, and fog.
- * Displayed in the bottom-right panel when no entity is selected, giving
- * the designer access to level-wide settings without selecting an entity.
+ * Rendered as the topmost section of the right panel so level-wide settings
+ * are always accessible regardless of entity selection.
+ *
+ * start_y     : top edge of the section in window pixels.
+ * available_h : total height available for this section.
  */
-void level_config_render(EditorState *es);
+void level_config_render(EditorState *es, int start_y, int available_h);

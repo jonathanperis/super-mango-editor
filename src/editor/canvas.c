@@ -1589,13 +1589,9 @@ static void render_ghost(EditorState *es) {
         SDL_SetTextureAlphaMod(tex, 128);
     }
 
-    /* Center the ghost on the cursor, clamped to y<=205 (except fish) */
+    /* Center the ghost on the cursor */
     float ghost_x = wx - (float)dw / 2.0f;
     float ghost_y = wy - (float)dh / 2.0f;
-    if (es->palette_type != ENT_FISH && es->palette_type != ENT_FASTER_FISH) {
-        if (ghost_y > 205.0f)
-            ghost_y = 205.0f;
-    }
 
     if (tex) {
         draw_tex(es, tex, use_src ? &src_rect : NULL,
