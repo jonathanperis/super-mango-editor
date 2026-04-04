@@ -132,9 +132,13 @@ static void start_menu_frame(void *arg) {
             case SDLK_SPACE:
                 /*
                  * Enter or Space starts the game — same as clicking Play.
-                 * This gives keyboard-only users a fast way to start.
+                 * Play the confirm sound and wait briefly so it's audible
+                 * before the menu closes and the game takes over audio.
                  */
-                if (menu->snd_confirm) Mix_PlayChannel(-1, menu->snd_confirm, 0);
+                if (menu->snd_confirm) {
+                    Mix_PlayChannel(-1, menu->snd_confirm, 0);
+                    SDL_Delay(200);
+                }
                 menu->result  = MENU_PLAY;
                 menu->running = 0;
                 break;
@@ -160,7 +164,10 @@ static void start_menu_frame(void *arg) {
             int ly = (int)(e.button.y / sy);
 
             if (point_in_rect(lx, ly, BTN_X, BTN_Y, BTN_W, BTN_H)) {
-                if (menu->snd_confirm) Mix_PlayChannel(-1, menu->snd_confirm, 0);
+                if (menu->snd_confirm) {
+                    Mix_PlayChannel(-1, menu->snd_confirm, 0);
+                    SDL_Delay(200);
+                }
                 menu->result  = MENU_PLAY;
                 menu->running = 0;
             }
