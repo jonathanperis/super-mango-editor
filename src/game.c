@@ -11,8 +11,10 @@
 #include <math.h>   /* sqrtf — used by apply_damage push impulse */
 #include <string.h> /* strncpy, memset, strstr */
 
-#ifndef _WIN32
-#include <limits.h> /* PATH_MAX */
+#if defined(_WIN32)
+#include <windows.h> /* GetFullPathNameA */
+#elif !defined(__EMSCRIPTEN__)
+#include <limits.h>  /* PATH_MAX */
 #endif
 
 #include "game.h"
@@ -352,17 +354,21 @@ void game_init(GameState *gs) {
     char safe_path[512] = {0};
     int path_valid = 0;
     if (gs->level_path[0] != '\0') {
-#ifndef _WIN32
+#if defined(__EMSCRIPTEN__)
+        /* Emscripten has no realpath — use the path as-is */
+        strncpy(safe_path, gs->level_path, sizeof(safe_path) - 1);
+        path_valid = 1;
+#elif defined(_WIN32)
+        char resolved[260];  /* MAX_PATH */
+        if (GetFullPathNameA(gs->level_path, 260, resolved, NULL)) {
+            strncpy(safe_path, resolved, sizeof(safe_path) - 1);
+            path_valid = 1;
+        }
+#else
         char *resolved = realpath(gs->level_path, NULL);
         if (resolved) {
             strncpy(safe_path, resolved, sizeof(safe_path) - 1);
             free(resolved);
-            path_valid = 1;
-        }
-#else
-        char resolved[MAX_PATH];
-        if (GetFullPathNameA(gs->level_path, MAX_PATH, resolved, NULL)) {
-            strncpy(safe_path, resolved, sizeof(safe_path) - 1);
             path_valid = 1;
         }
 #endif
@@ -401,7 +407,8 @@ void game_init(GameState *gs) {
                 SDL_strlcpy(paths[i], def->background_layers[i].path, 64);
                 speeds[i] = def->background_layers[i].speed;
             }
-            parallax_init_from_def(&gs->parallax, gs->renderer, paths, speeds, n);
+            parallax_init_from_def(&gs->parallax, gs->renderer,
+                                   (const char (*)[64])paths, speeds, n);
         } else {
             /* No level-defined layers — use the hardcoded defaults */
             parallax_init(&gs->parallax, gs->renderer);
