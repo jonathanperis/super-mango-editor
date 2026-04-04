@@ -1082,6 +1082,9 @@ static void copy_selected(EditorState *es) {
     case ENT_SPIKE_BLOCK:
         es->clipboard_data.spike_block = es->level.spike_blocks[i];
         break;
+    case ENT_BLUE_FLAME:
+        es->clipboard_data.blue_flame = es->level.blue_flames[i];
+        break;
     case ENT_FLOAT_PLATFORM:
         es->clipboard_data.float_platform = es->level.float_platforms[i];
         break;
@@ -1239,6 +1242,10 @@ static void paste_clipboard(EditorState *es) {
         break;
     case ENT_SPIKE_BLOCK:
         PASTE_INTO(spike_blocks, spike_block_count, MAX_SPIKE_BLOCKS, spike_block);
+        break;
+    case ENT_BLUE_FLAME:
+        d.blue_flame.x += PASTE_OFFSET;
+        PASTE_INTO(blue_flames, blue_flame_count, MAX_BLUE_FLAMES, blue_flame);
         break;
     case ENT_FLOAT_PLATFORM:
         d.float_platform.x += PASTE_OFFSET;
@@ -1952,6 +1959,11 @@ static void apply_undo_command(EditorState *es, const Command *cmd,
     case ENT_SPIKE_BLOCK:
         APPLY_ARRAY(es->level.spike_blocks, es->level.spike_block_count,
                      spike_block, MAX_SPIKE_BLOCKS);
+        break;
+
+    case ENT_BLUE_FLAME:
+        APPLY_ARRAY(es->level.blue_flames, es->level.blue_flame_count,
+                     blue_flame, MAX_BLUE_FLAMES);
         break;
 
     case ENT_FLOAT_PLATFORM:

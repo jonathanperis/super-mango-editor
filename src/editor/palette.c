@@ -110,6 +110,7 @@ static const PaletteEntry entries[] = {
     { "Spike Row",        ENT_SPIKE_ROW,        3 },
     { "Spike Platform",   ENT_SPIKE_PLATFORM,   3 },
     { "Spike Block",      ENT_SPIKE_BLOCK,      3 },
+    { "Blue Flame",       ENT_BLUE_FLAME,       3 },
 
     /* ---- Category 4: Surfaces ---- */
     { "Platform",         ENT_PLATFORM,         4 },

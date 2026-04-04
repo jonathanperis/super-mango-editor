@@ -74,6 +74,10 @@
 #define SPIKE_DISPLAY_W    24
 #define SPIKE_DISPLAY_H    24
 
+/* Blue flame — 48x48 display, erupts from sea gaps */
+#define BLUE_FLAME_W       48
+#define BLUE_FLAME_H       48
+
 /* Floating platform — 16x16 pieces */
 #define FPLAT_PIECE_W      16
 #define FPLAT_PIECE_H      16
@@ -242,6 +246,12 @@ static void get_entity_pos(const LevelDef *level, EntityType type, int index,
         }
         break;
     }
+    case ENT_BLUE_FLAME: {
+        float gap_x = level->blue_flames[index].x;
+        *x = gap_x + (float)(SEA_GAP_W - BLUE_FLAME_W) / 2.0f;
+        *y = (float)(FLOOR_Y - BLUE_FLAME_H);
+        break;
+    }
     case ENT_FLOAT_PLATFORM:
         *x = level->float_platforms[index].x;
         *y = level->float_platforms[index].y;
@@ -356,6 +366,9 @@ static void set_entity_pos(LevelDef *level, EntityType type, int index,
     case ENT_SPIKE_BLOCK:
         /* spike blocks ride rails; moving them changes t_offset */
         break;
+    case ENT_BLUE_FLAME:
+        level->blue_flames[index].x = x;
+        break;
     case ENT_FLOAT_PLATFORM:
         level->float_platforms[index].x = x;
         level->float_platforms[index].y = y;
@@ -418,6 +431,7 @@ static int get_count(const LevelDef *level, EntityType type)
     case ENT_SPIKE_ROW:        return level->spike_row_count;
     case ENT_SPIKE_PLATFORM:   return level->spike_platform_count;
     case ENT_SPIKE_BLOCK:      return level->spike_block_count;
+    case ENT_BLUE_FLAME:       return level->blue_flame_count;
     case ENT_FLOAT_PLATFORM:   return level->float_platform_count;
     case ENT_BRIDGE:           return level->bridge_count;
     case ENT_BOUNCEPAD_SMALL:  return level->bouncepad_small_count;
@@ -457,6 +471,7 @@ static int get_max_count(EntityType type)
     case ENT_SPIKE_ROW:        return MAX_SPIKE_ROWS;
     case ENT_SPIKE_PLATFORM:   return MAX_SPIKE_PLATFORMS;
     case ENT_SPIKE_BLOCK:      return MAX_SPIKE_BLOCKS;
+    case ENT_BLUE_FLAME:       return MAX_BLUE_FLAMES;
     case ENT_FLOAT_PLATFORM:   return MAX_FLOAT_PLATFORMS;
     case ENT_BRIDGE:           return MAX_BRIDGES;
     case ENT_BOUNCEPAD_SMALL:  return MAX_BOUNCEPADS_SMALL;
@@ -546,6 +561,9 @@ static PlacementData snapshot_entity(const LevelDef *level, EntityType type,
         break;
     case ENT_SPIKE_BLOCK:
         pd.spike_block = level->spike_blocks[index];
+        break;
+    case ENT_BLUE_FLAME:
+        pd.blue_flame = level->blue_flames[index];
         break;
     case ENT_FLOAT_PLATFORM:
         pd.float_platform = level->float_platforms[index];
@@ -756,6 +774,20 @@ static Selection hit_test(const LevelDef *level, float wx, float wy)
         eh = SPIKE_DISPLAY_H;
         if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
             sel.type = ENT_SPIKE_BLOCK;
+            sel.index = i;
+            return sel;
+        }
+    }
+
+    /* Blue flames — erupting fire hazards, preview centred in sea gap */
+    for (int i = level->blue_flame_count - 1; i >= 0; i--) {
+        float gap_x = level->blue_flames[i].x;
+        ex = gap_x + (float)(SEA_GAP_W - BLUE_FLAME_W) / 2.0f;
+        ey = (float)(FLOOR_Y - BLUE_FLAME_H);
+        ew = BLUE_FLAME_W;
+        eh = BLUE_FLAME_H;
+        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
+            sel.type = ENT_BLUE_FLAME;
             sel.index = i;
             return sel;
         }
@@ -1074,6 +1106,10 @@ static void delete_entity(EditorState *es, EntityType type, int index)
         array_remove(level->spike_blocks, &level->spike_block_count,
                      index, sizeof(SpikeBlockPlacement));
         break;
+    case ENT_BLUE_FLAME:
+        array_remove(level->blue_flames, &level->blue_flame_count,
+                     index, sizeof(BlueFlamePlacement));
+        break;
     case ENT_FLOAT_PLATFORM:
         array_remove(level->float_platforms, &level->float_platform_count,
                      index, sizeof(FloatPlatformPlacement));
@@ -1272,6 +1308,14 @@ static void place_entity(EditorState *es, float world_x, float world_y)
         };
         level->spike_blocks[new_index] = sbp;
         level->spike_block_count++;
+        break;
+    }
+    case ENT_BLUE_FLAME: {
+        BlueFlamePlacement bfp = {
+            .x = world_x
+        };
+        level->blue_flames[new_index] = bfp;
+        level->blue_flame_count++;
         break;
     }
     case ENT_FLOAT_PLATFORM: {

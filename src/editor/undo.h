@@ -88,6 +88,7 @@ typedef union {
     SpikeRowPlacement       spike_row;
     SpikePlatformPlacement  spike_platform;
     SpikeBlockPlacement     spike_block;
+    BlueFlamePlacement      blue_flame;
     FloatPlatformPlacement  float_platform;
     BridgePlacement         bridge;
     BouncepadPlacement      bouncepad;

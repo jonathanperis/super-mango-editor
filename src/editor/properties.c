@@ -80,6 +80,7 @@ static const char *entity_type_names[ENT_COUNT] = {
     [ENT_SPIKE_ROW]        = "Spike Row",
     [ENT_SPIKE_PLATFORM]   = "Spike Platform",
     [ENT_SPIKE_BLOCK]      = "Spike Block",
+    [ENT_BLUE_FLAME]       = "Blue Flame",
     [ENT_FLOAT_PLATFORM]   = "Float Platform",
     [ENT_BRIDGE]           = "Bridge",
     [ENT_BOUNCEPAD_SMALL]  = "Bouncepad (S)",
@@ -682,6 +683,17 @@ void properties_render(EditorState *es)
         ui_label(&es->ui, CONTENT_X, y, "speed:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 2),
                            FIELD_X, y, FIELD_W, &p->speed))
+            es->modified = 1;
+        break;
+    }
+
+    case ENT_BLUE_FLAME: {
+        BlueFlamePlacement *p =
+            &es->level.blue_flames[es->selection.index];
+
+        ui_label(&es->ui, CONTENT_X, y, "x:");
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_BLUE_FLAME, 0),
+                           FIELD_X, y, FIELD_W, &p->x))
             es->modified = 1;
         break;
     }
