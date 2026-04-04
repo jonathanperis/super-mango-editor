@@ -543,6 +543,14 @@ static int write_source(const LevelDef *def, const char *var_name,
     /* Fog */
     fprintf(f, "\n    .fog_enabled = %d,\n", def->fog_enabled);
 
+    /* Water */
+    fprintf(f, "\n    .water_enabled = %d,\n", def->water_enabled);
+
+    /* Game rules */
+    fprintf(f, "\n    .initial_hearts  = %d,\n", def->initial_hearts);
+    fprintf(f, "    .initial_lives   = %d,\n", def->initial_lives);
+    fprintf(f, "    .score_per_life  = %d,\n", def->score_per_life);
+
     /* ---- Close the struct ---- */
     fprintf(f, "};\n");
 

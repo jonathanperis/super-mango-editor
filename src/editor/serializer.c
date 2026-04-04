@@ -516,6 +516,14 @@ cJSON *level_to_json(const LevelDef *def) {
     /* Fog */
     cJSON_AddNumberToObject(root, "fog_enabled", def->fog_enabled);
 
+    /* Water */
+    cJSON_AddNumberToObject(root, "water_enabled", def->water_enabled);
+
+    /* Game rules */
+    cJSON_AddNumberToObject(root, "initial_hearts", def->initial_hearts);
+    cJSON_AddNumberToObject(root, "initial_lives", def->initial_lives);
+    cJSON_AddNumberToObject(root, "score_per_life", def->score_per_life);
+
     return root;
 }
 
@@ -866,6 +874,14 @@ int level_from_json(const cJSON *json, LevelDef *def) {
 
     /* Fog */
     def->fog_enabled = (int)get_number(json, "fog_enabled", 0);
+
+    /* Water */
+    def->water_enabled = (int)get_number(json, "water_enabled", 0);
+
+    /* Game rules */
+    def->initial_hearts = (int)get_number(json, "initial_hearts", 0);
+    def->initial_lives  = (int)get_number(json, "initial_lives", 0);
+    def->score_per_life = (int)get_number(json, "score_per_life", 0);
 
     return 0;
 }
