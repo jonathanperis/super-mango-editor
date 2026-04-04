@@ -145,7 +145,16 @@ void properties_render(EditorState *es)
     /* Panel background */
     ui_panel(&es->ui, PROP_X, PROP_Y, PROP_W, PROP_H);
 
-    /* ---- Collapsible header (like palette categories) --------------- */
+    /* ---- Fixed title bar (same style as palette header) ------------- */
+    {
+        SDL_Color title_bg = UI_TITLE_BG;
+        SDL_SetRenderDrawColor(es->ui.renderer,
+                               title_bg.r, title_bg.g, title_bg.b, title_bg.a);
+        SDL_Rect title_rect = { PROP_X, PROP_Y, PROP_W, ROW_H + 4 };
+        SDL_RenderFillRect(es->ui.renderer, &title_rect);
+    }
+
+    /* ---- Collapsible header ----------------------------------------- */
     char header[64];
     if (es->selection.type == ENT_PLAYER_SPAWN ||
         es->selection.type == ENT_LAST_STAR) {
@@ -159,8 +168,6 @@ void properties_render(EditorState *es)
                  es->selection.index);
     }
 
-    /* Click on header toggles expand/collapse */
-    int hdr_y = PROP_Y + 4;
     int hdr_hovered = (es->ui.mouse_x >= PROP_X &&
                        es->ui.mouse_x < PROP_X + PROP_W &&
                        es->ui.mouse_y >= PROP_Y &&
@@ -168,12 +175,14 @@ void properties_render(EditorState *es)
     if (hdr_hovered && es->ui.mouse_clicked)
         es->panel_open = !es->panel_open;
 
-    ui_label_color(&es->ui, CONTENT_X, hdr_y, header,
+    ui_label_color(&es->ui, CONTENT_X, PROP_Y + 4, header,
                    hdr_hovered ? UI_TEXT : UI_ACCENT);
-    ui_separator(&es->ui, PROP_X + 4, PROP_Y + ROW_H + 2, PROP_W - 8);
 
-    /* If collapsed, just show the header */
     if (!es->panel_open) return;
+
+    /* Clip content below the title bar */
+    SDL_Rect prop_clip = { PROP_X, PROP_Y + ROW_H + 4, PROP_W, PROP_H - ROW_H - 4 };
+    SDL_RenderSetClipRect(es->ui.renderer, &prop_clip);
 
     int y = PROP_Y + ROW_H + 8;
 
@@ -920,6 +929,7 @@ void properties_render(EditorState *es)
         break;
     }
 
+    SDL_RenderSetClipRect(es->ui.renderer, NULL);
 }
 
 /* ================================================================== */
@@ -943,6 +953,15 @@ void level_config_render(EditorState *es) {
     /* Panel background */
     ui_panel(&es->ui, x, y, PROP_W, PROP_H);
 
+    /* ---- Fixed title bar (same style as palette header) ------------- */
+    {
+        SDL_Color title_bg = UI_TITLE_BG;
+        SDL_SetRenderDrawColor(es->ui.renderer,
+                               title_bg.r, title_bg.g, title_bg.b, title_bg.a);
+        SDL_Rect title_rect = { x, y, PROP_W, ROW_H + 4 };
+        SDL_RenderFillRect(es->ui.renderer, &title_rect);
+    }
+
     /* ---- Collapsible header ---- */
     char cfg_header[32];
     snprintf(cfg_header, sizeof(cfg_header), "%s Level Config",
@@ -957,7 +976,6 @@ void level_config_render(EditorState *es) {
 
     ui_label_color(&es->ui, x + 8, y + 4, cfg_header,
                    hdr_hovered ? UI_TEXT : UI_ACCENT);
-    ui_separator(&es->ui, x + 4, y + ROW_H + 2, PROP_W - 8);
 
     if (!es->panel_open) return;
 
