@@ -108,8 +108,8 @@ int main(int argc, char *argv[]) {
 
     if (sandbox_mode) {
         /*
-         * Sandbox mode — run the full gameplay phase.
-         * This is the original game loop, now isolated behind a flag.
+         * Sandbox mode — run the full gameplay phase directly.
+         * Bypasses the start menu for quick iteration (make run-sandbox).
          */
         GameState gs = {0};
         gs.debug_mode = debug_mode;
@@ -118,13 +118,16 @@ int main(int argc, char *argv[]) {
         game_cleanup(&gs);
     } else {
         /*
-         * Start Menu — the default entry point.
-         * Creates its own window+renderer, renders a black screen
-         * with "Start Menu" text and the game logo.
-         */
-
-        /*
-         * Nearest-neighbour pixel scaling for crisp pixel art.
+         * Start Menu → Game flow.
+         *
+         * The start menu creates its own window+renderer at 800×600 with
+         * a 400×300 logical canvas (matching the game's resolution).
+         *
+         * When the user clicks "Play" or presses Enter/Space, the menu
+         * sets result = MENU_PLAY.  The menu's window and renderer are
+         * then destroyed, and a fresh GameState is created for the game
+         * loop.  This clean separation avoids resource leaks and ensures
+         * the game gets a pristine renderer with all its own settings.
          */
         SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
 
@@ -162,10 +165,27 @@ int main(int argc, char *argv[]) {
         StartMenu menu = {0};
         start_menu_init(&menu, window, renderer);
         start_menu_loop(&menu);
+        MenuResult result = menu.result;
         start_menu_cleanup(&menu);
 
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
+
+        /*
+         * If the user clicked Play, launch the full game.
+         *
+         * game_init creates its own window and renderer, so we destroy
+         * the menu's first to avoid having two windows open at once.
+         * The game loads sandbox_00 by default (the same level the
+         * editor targets) — this is the single-phase flow.
+         */
+        if (result == MENU_PLAY) {
+            GameState gs = {0};
+            gs.debug_mode = debug_mode;
+            game_init(&gs);
+            game_loop(&gs);
+            game_cleanup(&gs);
+        }
     }
 
     /* Tear down SDL subsystems in reverse init order */

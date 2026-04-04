@@ -221,36 +221,29 @@ const LevelDef sandbox_00_def = {
     },
     .rope_count = 1,
 
-    /* ---- Level-wide configuration ----------------------------------- */
-
-    /* Parallax layers (back-to-front) — 7 layers for the forest theme */
+    /* ---- Level-wide configuration ---- */
     .parallax_layers = {
-        { "assets/parallax_sky.png",               0.00f },
-        { "assets/parallax_clouds_bg.png",         0.08f },
+        { "assets/parallax_sky.png", 0.00f },
+        { "assets/parallax_clouds_bg.png", 0.08f },
         { "assets/parallax_glacial_mountains.png", 0.15f },
-        { "assets/parallax_clouds_mg_3.png",       0.25f },
-        { "assets/parallax_clouds_mg_2.png",       0.38f },
-        { "assets/parallax_cloud_lonely.png",      0.44f },
-        { "assets/parallax_clouds_mg_1.png",       0.50f },
+        { "assets/parallax_clouds_mg_3.png", 0.25f },
+        { "assets/parallax_clouds_mg_2.png", 0.38f },
+        { "assets/parallax_cloud_lonely.png", 0.44f },
+        { "assets/parallax_clouds_mg_1.png", 0.50f },
     },
     .parallax_layer_count = 7,
 
-    /* Player spawns on top of the first 2-tile platform at x=80 */
     .player_start_x = 80.0f,
     .player_start_y = 172.0f,
 
-    /* Background music */
     .music_path   = "sounds/game_music.ogg",
     .music_volume = 13,
 
-    /* Fog enabled for atmospheric forest effect */
     .fog_enabled = 1,
 
-    /* Water strip at bottom of screen (visible in sea gap regions) */
     .water_enabled = 1,
 
-    /* Game rules — standard difficulty settings */
-    .initial_hearts  = 3,    /* 3 hit points before losing a life      */
-    .initial_lives   = 3,    /* 3 extra lives before game over         */
-    .score_per_life  = 1000, /* bonus life every 1000 points           */
+    .initial_hearts  = 3,
+    .initial_lives   = 3,
+    .score_per_life  = 1000,
 };
