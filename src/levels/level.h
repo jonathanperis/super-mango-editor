@@ -456,6 +456,7 @@ typedef struct {
     int   initial_hearts;   /* starting hit points (0 = use MAX_HEARTS default) */
     int   initial_lives;    /* starting extra lives (0 = use DEFAULT_LIVES default) */
     int   score_per_life;   /* score threshold for bonus life (0 = use default 1000) */
+    int   coin_score;       /* points per coin (0 = use COIN_SCORE default 100)      */
 } LevelDef;
 
 /* ------------------------------------------------------------------ */

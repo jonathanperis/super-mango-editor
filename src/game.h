@@ -297,6 +297,7 @@ typedef struct {
     int           water_enabled;    /* 1 = water strip rendered, 0 = disabled  */
     int           world_w;         /* level width in pixels (screen_count * GAME_W) */
     int           score_per_life;   /* score threshold for bonus life           */
+    int           coin_score;       /* points awarded per coin collected        */
 
     /* ---- Loop state (persists across frames for emscripten callback) - */
     Uint64        loop_prev_ticks;  /* timestamp of previous frame         */

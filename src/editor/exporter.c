@@ -617,6 +617,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     fprintf(f, "\n    .initial_hearts  = %d,\n", def->initial_hearts);
     fprintf(f, "    .initial_lives   = %d,\n", def->initial_lives);
     fprintf(f, "    .score_per_life  = %d,\n", def->score_per_life);
+    fprintf(f, "    .coin_score      = %d,\n", def->coin_score);
 
     /* ---- Close the struct ---- */
     fprintf(f, "};\n");

@@ -1112,8 +1112,11 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
     }
     y += 22;
     ui_label(&es->ui, x + 8, y, "vol:");
-    if (ui_int_field(&es->ui, 9003, x + 50, y, 80, &es->level.music_volume))
+    if (ui_int_field(&es->ui, 9003, x + 50, y, 80, &es->level.music_volume)) {
+        if (es->level.music_volume < 0)  es->level.music_volume = 0;
+        if (es->level.music_volume > 99) es->level.music_volume = 99;
         es->modified = 1;
+    }
     y += 24;
 
     /* ---- Floor tile ---- */
@@ -1159,20 +1162,27 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
     y += 24;
 
 
-    /* ---- Game rules ---- */
+    /* ---- Hearts / Lives / Score ---- */
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
-    ui_label(&es->ui, x + 8, y, "Game Rules");
-    y += 18;
     ui_label(&es->ui, x + 8, y, "hearts:");
-    if (ui_int_field(&es->ui, 9006, x + 70, y, 60, &es->level.initial_hearts))
+    if (ui_int_field(&es->ui, 9006, x + 70, y, 60, &es->level.initial_hearts)) {
+        if (es->level.initial_hearts < 1) es->level.initial_hearts = 1;
+        if (es->level.initial_hearts > 3) es->level.initial_hearts = 3;
         es->modified = 1;
+    }
     ui_label(&es->ui, x + 150, y, "lives:");
-    if (ui_int_field(&es->ui, 9007, x + 205, y, 60, &es->level.initial_lives))
+    if (ui_int_field(&es->ui, 9007, x + 205, y, 60, &es->level.initial_lives)) {
+        if (es->level.initial_lives < 0)  es->level.initial_lives = 0;
+        if (es->level.initial_lives > 99) es->level.initial_lives = 99;
         es->modified = 1;
+    }
     y += 22;
     ui_label(&es->ui, x + 8, y, "pts/life:");
     if (ui_int_field(&es->ui, 9008, x + 80, y, 80, &es->level.score_per_life))
+        es->modified = 1;
+    ui_label(&es->ui, x + 180, y, "coin pts:");
+    if (ui_int_field(&es->ui, 9012, x + 240, y, 60, &es->level.coin_score))
         es->modified = 1;
     y += 24;
 

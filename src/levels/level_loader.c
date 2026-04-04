@@ -630,6 +630,7 @@ void level_load(GameState *gs, const LevelDef *def)
     gs->score           = 0;
     gs->score_per_life  = def->score_per_life  > 0 ? def->score_per_life  : SCORE_PER_LIFE;
     gs->score_life_next = gs->score_per_life;
+    gs->coin_score      = def->coin_score     > 0 ? def->coin_score      : COIN_SCORE;
 }
 
 /*

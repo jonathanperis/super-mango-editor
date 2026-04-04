@@ -463,12 +463,12 @@ void editor_loop(EditorState *es) {
                 if (es->config_open) {
                     /* Base: header(28) + margin(8) + name(24) + screens(24)
                      * + music(24+22+24) + floor(30)
-                     * + game rules(24+22+24)
+                     * + hearts/lives(6+22) + pts/life(24)
                      * + bg header(24) + fg header(24) + margin(10) */
                     extern int g_plx_open;
                     extern int g_fg_open;
                     config_h = 28 + 8 + 24 + 24 + 24 + 22 + 24 + 30
-                             + 24 + 22 + 24 + 24 + 24 + 10;
+                             + 6 + 22 + 24 + 24 + 24 + 10;
                     if (g_plx_open)
                         config_h += es->level.background_layer_count * 20 + 24;
                     if (g_fg_open)
