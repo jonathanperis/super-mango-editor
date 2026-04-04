@@ -1001,7 +1001,7 @@ void level_config_render(EditorState *es) {
         if (y + 22 < PROP_Y + PROP_H - 4) {
             if (ui_button(&es->ui, x + 8, y, 100, 20, "+ Add Layer")) {
                 int idx = es->level.parallax_layer_count;
-                strncpy(es->level.parallax_layers[idx].path, "assets/", 63);
+                strncpy(es->level.parallax_layers[idx].path, "assets/sprites/effects/", 63);
                 es->level.parallax_layers[idx].speed = 0.1f;
                 es->level.parallax_layer_count++;
                 es->modified = 1;

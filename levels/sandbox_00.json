@@ -281,30 +281,30 @@
 			"tile_count":	1
 		}],
 	"parallax_layers":	[{
-			"path":	"assets/parallax_sky.png",
+			"path":	"assets/sprites/effects/parallax_sky.png",
 			"speed":	0
 		}, {
-			"path":	"assets/parallax_clouds_bg.png",
+			"path":	"assets/sprites/effects/parallax_clouds_bg.png",
 			"speed":	0.079999998211860657
 		}, {
-			"path":	"assets/parallax_glacial_mountains.png",
+			"path":	"assets/sprites/effects/parallax_glacial_mountains.png",
 			"speed":	0.15000000596046448
 		}, {
-			"path":	"assets/parallax_clouds_mg_3.png",
+			"path":	"assets/sprites/effects/parallax_clouds_mg_3.png",
 			"speed":	0.25
 		}, {
-			"path":	"assets/parallax_clouds_mg_2.png",
+			"path":	"assets/sprites/effects/parallax_clouds_mg_2.png",
 			"speed":	0.37999999523162842
 		}, {
-			"path":	"assets/parallax_cloud_lonely.png",
+			"path":	"assets/sprites/effects/parallax_cloud_lonely.png",
 			"speed":	0.43999999761581421
 		}, {
-			"path":	"assets/parallax_clouds_mg_1.png",
+			"path":	"assets/sprites/effects/parallax_clouds_mg_1.png",
 			"speed":	0.5
 		}],
 	"player_start_x":	80,
 	"player_start_y":	172,
-	"music_path":	"sounds/game_music.ogg",
+	"music_path":	"assets/sounds/levels/game_music.ogg",
 	"music_volume":	13,
 	"fog_enabled":	1,
 	"water_enabled":	1,

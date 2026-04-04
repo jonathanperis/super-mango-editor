@@ -391,7 +391,7 @@ typedef struct {
     int   music_volume;     /* 0-128, SDL_mixer range */
 
     /* Floor tile texture */
-    char  floor_tile_path[64]; /* 9-slice tileset PNG, e.g. "assets/grass_tileset.png" */
+    char  floor_tile_path[64]; /* 9-slice tileset PNG, e.g. "assets/sprites/levels/grass_tileset.png" */
 
     /* Fog atmosphere */
     int   fog_enabled;      /* 1 = fog active, 0 = disabled */

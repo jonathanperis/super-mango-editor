@@ -134,7 +134,7 @@ int editor_init(EditorState *es) {
      * Font loading is fatal because the editor is unusable without text —
      * every panel label, tooltip, and status message requires the font.
      */
-    es->font = TTF_OpenFont("assets/round9x13.ttf", 13);
+    es->font = TTF_OpenFont("assets/fonts/round9x13.ttf", 13);
     if (!es->font) {
         fprintf(stderr, "TTF_OpenFont error: %s\n", TTF_GetError());
         SDL_DestroyRenderer(es->renderer);
@@ -267,47 +267,47 @@ static void load_textures(EditorState *es) {
         } while (0)
 
     /* Floor and water — the base environment textures */
-    LOAD_TEX(floor_tile,       "assets/grass_tileset.png");
-    LOAD_TEX(water,            "assets/water.png");
+    LOAD_TEX(floor_tile,       "assets/sprites/levels/grass_tileset.png");
+    LOAD_TEX(water,            "assets/sprites/effects/water.png");
 
     /* Static geometry */
-    LOAD_TEX(platform,         "assets/platform.png");
+    LOAD_TEX(platform,         "assets/sprites/surfaces/platform.png");
 
     /* Enemies — ground, air, and water patrol types */
-    LOAD_TEX(spider,           "assets/spider.png");
-    LOAD_TEX(jumping_spider,   "assets/jumping_spider.png");
-    LOAD_TEX(bird,             "assets/bird.png");
-    LOAD_TEX(faster_bird,      "assets/faster_bird.png");
-    LOAD_TEX(fish,             "assets/fish.png");
-    LOAD_TEX(faster_fish,      "assets/faster_fish.png");
+    LOAD_TEX(spider,           "assets/sprites/entities/spider.png");
+    LOAD_TEX(jumping_spider,   "assets/sprites/entities/jumping_spider.png");
+    LOAD_TEX(bird,             "assets/sprites/entities/bird.png");
+    LOAD_TEX(faster_bird,      "assets/sprites/entities/faster_bird.png");
+    LOAD_TEX(fish,             "assets/sprites/entities/fish.png");
+    LOAD_TEX(faster_fish,      "assets/sprites/entities/faster_fish.png");
 
     /* Collectibles — coins, stars */
-    LOAD_TEX(coin,             "assets/coin.png");
-    LOAD_TEX(yellow_star,      "assets/yellow_star.png");
-    LOAD_TEX(last_star,        "assets/last_star.png");
+    LOAD_TEX(coin,             "assets/sprites/collectibles/coin.png");
+    LOAD_TEX(yellow_star,      "assets/sprites/collectibles/yellow_star.png");
+    LOAD_TEX(last_star,        "assets/sprites/collectibles/last_star.png");
 
     /* Hazards — traps that damage the player on contact */
-    LOAD_TEX(axe_trap,         "assets/axe_trap.png");
-    LOAD_TEX(circular_saw,     "assets/circular_saw.png");
-    LOAD_TEX(blue_flame,       "assets/blue_flame.png");
-    LOAD_TEX(spike,            "assets/spike.png");
-    LOAD_TEX(spike_platform,   "assets/spike_platform.png");
-    LOAD_TEX(spike_block,      "assets/spike_block.png");
+    LOAD_TEX(axe_trap,         "assets/sprites/hazards/axe_trap.png");
+    LOAD_TEX(circular_saw,     "assets/sprites/hazards/circular_saw.png");
+    LOAD_TEX(blue_flame,       "assets/sprites/hazards/blue_flame.png");
+    LOAD_TEX(spike,            "assets/sprites/hazards/spike.png");
+    LOAD_TEX(spike_platform,   "assets/sprites/hazards/spike_platform.png");
+    LOAD_TEX(spike_block,      "assets/sprites/hazards/spike_block.png");
 
     /* Surfaces — platforms, bridges, bouncepads */
-    LOAD_TEX(float_platform,   "assets/float_platform.png");
-    LOAD_TEX(bridge,           "assets/bridge.png");
-    LOAD_TEX(bouncepad_small,  "assets/bouncepad_small.png");
-    LOAD_TEX(bouncepad_medium, "assets/bouncepad_medium.png");
-    LOAD_TEX(bouncepad_high,   "assets/bouncepad_high.png");
+    LOAD_TEX(float_platform,   "assets/sprites/surfaces/float_platform.png");
+    LOAD_TEX(bridge,           "assets/sprites/surfaces/bridge.png");
+    LOAD_TEX(bouncepad_small,  "assets/sprites/surfaces/bouncepad_small.png");
+    LOAD_TEX(bouncepad_medium, "assets/sprites/surfaces/bouncepad_medium.png");
+    LOAD_TEX(bouncepad_high,   "assets/sprites/surfaces/bouncepad_high.png");
 
     /* Climbables — vertical traversal */
-    LOAD_TEX(vine,             "assets/vine.png");
-    LOAD_TEX(ladder,           "assets/ladder.png");
-    LOAD_TEX(rope,             "assets/rope.png");
+    LOAD_TEX(vine,             "assets/sprites/surfaces/vine.png");
+    LOAD_TEX(ladder,           "assets/sprites/surfaces/ladder.png");
+    LOAD_TEX(rope,             "assets/sprites/surfaces/rope.png");
 
     /* Rail paths — spike blocks and platforms ride on these */
-    LOAD_TEX(rail,             "assets/rail.png");
+    LOAD_TEX(rail,             "assets/sprites/surfaces/rail.png");
 
     #undef LOAD_TEX
 }
