@@ -1507,7 +1507,8 @@ static void game_loop_frame(void *arg) {
                       gs->spike_platforms, gs->spike_platform_count,
                       gs->floor_gaps, gs->floor_gap_count,
                       &bounce_idx, &fp_landed_idx,
-                      gs->fp_prev_riding);
+                      gs->fp_prev_riding,
+                      gs->world_w);
 
         /*
          * Bouncepad landing response: start the release animation and play

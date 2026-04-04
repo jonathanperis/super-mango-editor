@@ -1,0 +1,489 @@
+# Level: Volcanic Depths
+name = "Volcanic Depths"
+screen_count = 8
+player_start_x = 48.0
+player_start_y = 205.0
+music_path = "assets/sounds/levels/lava.wav"
+music_volume = 15
+floor_tile_path = "assets/sprites/levels/stone_tileset.png"
+initial_hearts = 3
+initial_lives = 3
+score_per_life = 1000
+coin_score = 100
+floor_gaps = [0, 352, 640, 960, 1280, 1520, 1920, 2240, 2560, 2880]
+
+[[rails]]
+layout = "RECT"
+x = 1700
+y = 40
+w = 8
+h = 5
+end_cap = 0
+
+[[rails]]
+layout = "HORIZ"
+x = 2500
+y = 100
+w = 12
+h = 0
+end_cap = 0
+
+[[platforms]]
+x = 80.0
+tile_height = 2
+tile_width = 1
+
+[[platforms]]
+x = 200.0
+tile_height = 3
+tile_width = 1
+
+[[platforms]]
+x = 450.0
+tile_height = 2
+tile_width = 1
+
+[[platforms]]
+x = 560.0
+tile_height = 2
+tile_width = 1
+
+[[platforms]]
+x = 800.0
+tile_height = 3
+tile_width = 1
+
+[[platforms]]
+x = 920.0
+tile_height = 2
+tile_width = 1
+
+[[platforms]]
+x = 1100.0
+tile_height = 2
+tile_width = 1
+
+[[platforms]]
+x = 1250.0
+tile_height = 3
+tile_width = 1
+
+[[platforms]]
+x = 1500.0
+tile_height = 2
+tile_width = 1
+
+[[platforms]]
+x = 1680.0
+tile_height = 3
+tile_width = 1
+
+[[platforms]]
+x = 1850.0
+tile_height = 2
+tile_width = 1
+
+[[platforms]]
+x = 2050.0
+tile_height = 2
+tile_width = 2
+
+[[platforms]]
+x = 2200.0
+tile_height = 3
+tile_width = 1
+
+[[platforms]]
+x = 2450.0
+tile_height = 2
+tile_width = 1
+
+[[platforms]]
+x = 2600.0
+tile_height = 3
+tile_width = 1
+
+[[platforms]]
+x = 2900.0
+tile_height = 4
+tile_width = 1
+
+[[platforms]]
+x = 3050.0
+tile_height = 3
+tile_width = 1
+
+[[platforms]]
+x = 3120.0
+tile_height = 5
+tile_width = 1
+
+[[coins]]
+x = 130.0
+y = 236.0
+
+[[coins]]
+x = 250.0
+y = 236.0
+
+[[coins]]
+x = 320.0
+y = 236.0
+
+[[coins]]
+x = 216.0
+y = 108.0
+
+[[coins]]
+x = 466.0
+y = 156.0
+
+[[coins]]
+x = 576.0
+y = 156.0
+
+[[coins]]
+x = 700.0
+y = 236.0
+
+[[coins]]
+x = 816.0
+y = 108.0
+
+[[coins]]
+x = 936.0
+y = 156.0
+
+[[coins]]
+x = 1050.0
+y = 236.0
+
+[[coins]]
+x = 1116.0
+y = 156.0
+
+[[coins]]
+x = 1350.0
+y = 236.0
+
+[[coins]]
+x = 1516.0
+y = 156.0
+
+[[coins]]
+x = 1696.0
+y = 108.0
+
+[[coins]]
+x = 1866.0
+y = 156.0
+
+[[coins]]
+x = 2066.0
+y = 156.0
+
+[[coins]]
+x = 2216.0
+y = 108.0
+
+[[coins]]
+x = 2466.0
+y = 156.0
+
+[[coins]]
+x = 2750.0
+y = 236.0
+
+[[coins]]
+x = 2916.0
+y = 60.0
+
+[[coins]]
+x = 3066.0
+y = 108.0
+
+[[star_yellows]]
+x = 1116.0
+y = 108.0
+
+[[star_yellows]]
+x = 1866.0
+y = 108.0
+
+[[star_reds]]
+x = 2466.0
+y = 108.0
+
+[last_star]
+x = 3132.0
+y = 44.0
+
+[[spiders]]
+x = 300.0
+vx = 50.0
+patrol_x0 = 250.0
+patrol_x1 = 400.0
+frame_index = 0
+
+[[spiders]]
+x = 650.0
+vx = -50.0
+patrol_x0 = 560.0
+patrol_x1 = 750.0
+frame_index = 1
+
+[[spiders]]
+x = 1400.0
+vx = 50.0
+patrol_x0 = 1350.0
+patrol_x1 = 1520.0
+frame_index = 0
+
+[[spiders]]
+x = 2150.0
+vx = 50.0
+patrol_x0 = 2050.0
+patrol_x1 = 2250.0
+frame_index = 2
+
+[[jumping_spiders]]
+x = 850.0
+vx = 55.0
+patrol_x0 = 800.0
+patrol_x1 = 1000.0
+
+[[jumping_spiders]]
+x = 1750.0
+vx = -55.0
+patrol_x0 = 1680.0
+patrol_x1 = 1870.0
+
+[[birds]]
+x = 500.0
+base_y = 70.0
+vx = 45.0
+patrol_x0 = 300.0
+patrol_x1 = 900.0
+frame_index = 0
+
+[[birds]]
+x = 2700.0
+base_y = 60.0
+vx = 45.0
+patrol_x0 = 2500.0
+patrol_x1 = 3100.0
+frame_index = 0
+
+[[faster_birds]]
+x = 1800.0
+base_y = 50.0
+vx = -80.0
+patrol_x0 = 1500.0
+patrol_x1 = 2200.0
+frame_index = 1
+
+[[fish]]
+x = 700.0
+vx = 70.0
+patrol_x0 = 600.0
+patrol_x1 = 1000.0
+
+[[faster_fish]]
+x = 2300.0
+vx = -120.0
+patrol_x0 = 2100.0
+patrol_x1 = 2600.0
+
+[[axe_traps]]
+pillar_x = 800.0
+y = 0.0
+mode = "PENDULUM"
+
+[[axe_traps]]
+pillar_x = 1250.0
+y = 0.0
+mode = "SPIN"
+
+[[axe_traps]]
+pillar_x = 2600.0
+y = 0.0
+mode = "PENDULUM"
+
+[[circular_saws]]
+x = 2050.0
+y = 0.0
+patrol_x0 = 2050.0
+patrol_x1 = 2200.0
+direction = 1
+
+[[circular_saws]]
+x = 2200.0
+y = 0.0
+patrol_x0 = 2200.0
+patrol_x1 = 2400.0
+direction = -1
+
+[[spike_rows]]
+x = 1000.0
+count = 3
+
+[[spike_rows]]
+x = 1600.0
+count = 4
+
+[[spike_rows]]
+x = 2800.0
+count = 3
+
+[[spike_platforms]]
+x = 1700.0
+y = 180.0
+tile_count = 3
+
+[[spike_blocks]]
+rail_index = 0
+t_offset = 0.0
+speed = 2.0
+
+[[spike_blocks]]
+rail_index = 0
+t_offset = 12.0
+speed = 2.0
+
+[[spike_blocks]]
+rail_index = 1
+t_offset = 0.0
+speed = 4.0
+
+[[fire_flames]]
+x = 352.0
+
+[[fire_flames]]
+x = 640.0
+
+[[fire_flames]]
+x = 960.0
+
+[[fire_flames]]
+x = 1280.0
+
+[[fire_flames]]
+x = 1520.0
+
+[[fire_flames]]
+x = 1920.0
+
+[[fire_flames]]
+x = 2240.0
+
+[[fire_flames]]
+x = 2560.0
+
+[[fire_flames]]
+x = 2880.0
+
+[[float_platforms]]
+mode = "STATIC"
+x = 380.0
+y = 190.0
+tile_count = 3
+rail_index = 0
+t_offset = 0.0
+speed = 0.0
+
+[[float_platforms]]
+mode = "CRUMBLE"
+x = 1300.0
+y = 185.0
+tile_count = 3
+rail_index = 0
+t_offset = 0.0
+speed = 0.0
+
+[[float_platforms]]
+mode = "RAIL"
+x = 0.0
+y = 0.0
+tile_count = 3
+rail_index = 1
+t_offset = 3.0
+speed = 2.0
+
+[[bridges]]
+x = 2700.0
+y = 172.0
+brick_count = 10
+
+[[bouncepads_small]]
+x = 500.0
+launch_vy = -380.0
+pad_type = "GREEN"
+
+[[bouncepads_medium]]
+x = 1850.0
+launch_vy = -536.0
+pad_type = "WOOD"
+
+[[bouncepads_high]]
+x = 2950.0
+launch_vy = -700.0
+pad_type = "RED"
+
+[[vines]]
+x = 88.0
+y = 172.0
+tile_count = 2
+
+[[vines]]
+x = 808.0
+y = 124.0
+tile_count = 3
+
+[[vines]]
+x = 1688.0
+y = 124.0
+tile_count = 3
+
+[[vines]]
+x = 2608.0
+y = 124.0
+tile_count = 3
+
+[[ladders]]
+x = 3080.0
+y = 20.0
+tile_count = 28
+
+[[ropes]]
+x = 1550.0
+y = 150.0
+tile_count = 2
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/sky_blue.png"
+speed = 0.0
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/glacial_mountains.png"
+speed = 0.1
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/clouds_mg_3.png"
+speed = 0.2
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/clouds_mg_2.png"
+speed = 0.3
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/clouds_mg_1.png"
+speed = 0.4
+
+[[foreground_layers]]
+path = "assets/sprites/foregrounds/fog_1.png"
+speed = 0.4
+
+[[foreground_layers]]
+path = "assets/sprites/foregrounds/lava.png"
+speed = 0.0
+

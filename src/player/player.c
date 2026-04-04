@@ -616,7 +616,8 @@ void player_update(Player *player, float dt,
                    const int *floor_gaps, int floor_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
-                   int prev_fp_landed_idx) {
+                   int prev_fp_landed_idx,
+                   int world_w) {
 
     (void)vine_count;    /* vine_index selects the climbable; count unused here */
     (void)ladder_count;
@@ -663,8 +664,8 @@ void player_update(Player *player, float dt,
         /* Horizontal world clamp (same logic as normal path) */
         if (player->x + PHYS_PAD_X < 0.0f)
             player->x = -(float)PHYS_PAD_X;
-        if (player->x + player->w - PHYS_PAD_X > WORLD_W)
-            player->x = (float)(WORLD_W - player->w + PHYS_PAD_X);
+        if (player->x + player->w - PHYS_PAD_X > world_w)
+            player->x = (float)(world_w - player->w + PHYS_PAD_X);
 
         player_animate(player, (Uint32)(dt * 1000.0f));
         return;   /* skip normal gravity / floor / platform logic */
