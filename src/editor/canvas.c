@@ -123,6 +123,10 @@
 #define BLUE_FLAME_W       48
 #define BLUE_FLAME_H       48
 
+/* Player spawn — full 48x48 idle frame */
+#define PLAYER_SPAWN_W     48
+#define PLAYER_SPAWN_H     48
+
 /* Water art strip height — matches water.h constant */
 #define WATER_ART_H        31
 
@@ -188,6 +192,7 @@ static void render_ropes(EditorState *es);
 static void render_coins(EditorState *es);
 static void render_yellow_stars(EditorState *es);
 static void render_last_star(EditorState *es);
+static void render_player_spawn(EditorState *es);
 static void render_blue_flames(EditorState *es);
 static void render_fish(EditorState *es);
 static void render_faster_fish(EditorState *es);
@@ -297,6 +302,9 @@ void canvas_render(EditorState *es) {
     render_coins(es);
     render_yellow_stars(es);
     render_last_star(es);
+
+    /* Player spawn — draw idle frame at the spawn position */
+    render_player_spawn(es);
 
     /* Hazards */
     render_blue_flames(es);
@@ -901,6 +909,23 @@ static void render_last_star(EditorState *es) {
              LSTAR_DISPLAY_W, LSTAR_DISPLAY_H);
 }
 
+/* ---- Player spawn ------------------------------------------------ */
+
+/*
+ * render_player_spawn — Draw the player idle frame at the spawn position.
+ *
+ * Uses row 0, col 0 of the player sprite sheet (48x48) for the idle frame.
+ * Rendered at PLAYER_SPAWN_W x PLAYER_SPAWN_H (48x48) in world space.
+ */
+static void render_player_spawn(EditorState *es) {
+    if (!es->textures.player) return;
+
+    SDL_Rect src = { 0, 0, PLAYER_SPAWN_W, PLAYER_SPAWN_H };
+    draw_tex(es, es->textures.player, &src,
+             es->level.player_start_x, es->level.player_start_y,
+             PLAYER_SPAWN_W, PLAYER_SPAWN_H);
+}
+
 /* ---- Blue flames ------------------------------------------------- */
 
 /*
@@ -1194,6 +1219,13 @@ static void render_selection(EditorState *es) {
         wh = LSTAR_DISPLAY_H;
         break;
     }
+    case ENT_PLAYER_SPAWN: {
+        wx = es->level.player_start_x;
+        wy = es->level.player_start_y;
+        ww = PLAYER_SPAWN_W;
+        wh = PLAYER_SPAWN_H;
+        break;
+    }
     case ENT_SPIDER: {
         if (es->selection.index >= es->level.spider_count) return;
         wx = es->level.spiders[es->selection.index].x;
@@ -1417,6 +1449,12 @@ static void render_ghost(EditorState *es) {
     case ENT_LAST_STAR:
         tex = es->textures.last_star;
         dw = LSTAR_DISPLAY_W; dh = LSTAR_DISPLAY_H;
+        break;
+    case ENT_PLAYER_SPAWN:
+        tex = es->textures.player;
+        src_rect = (SDL_Rect){ 0, 0, PLAYER_SPAWN_W, PLAYER_SPAWN_H };
+        use_src = 1;
+        dw = PLAYER_SPAWN_W; dh = PLAYER_SPAWN_H;
         break;
     case ENT_SPIDER:
         tex = es->textures.spider;

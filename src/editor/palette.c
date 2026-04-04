@@ -87,6 +87,7 @@ static const char *category_names[] = {
  */
 static const PaletteEntry entries[] = {
     /* ---- Category 0: World ---- */
+    { "Player Spawn",     ENT_PLAYER_SPAWN,     0 },
     { "Sea Gap",          ENT_SEA_GAP,          0 },
     { "Rail",             ENT_RAIL,             0 },
 

@@ -118,6 +118,7 @@ typedef enum {
     ENT_VINE,              /* hanging climbable vine                        */
     ENT_LADDER,            /* climbable ladder                              */
     ENT_ROPE,              /* climbable rope                                */
+    ENT_PLAYER_SPAWN,      /* player start position (single, always one)    */
     ENT_COUNT              /* sentinel — total number of entity types       */
 } EntityType;
 
@@ -203,6 +204,7 @@ typedef struct {
     SDL_Texture *ladder;            /* ladder climbable texture                     */
     SDL_Texture *rope;              /* rope climbable texture                       */
     SDL_Texture *rail;              /* rail path tile texture                       */
+    SDL_Texture *player;            /* player sprite for spawn point preview        */
 } EntityTextures;
 
 /* ------------------------------------------------------------------ */

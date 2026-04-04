@@ -105,6 +105,10 @@
 #define RAIL_TILE_W        16
 #define RAIL_TILE_H        16
 
+/* Player spawn — full 48x48 idle frame used as preview */
+#define PLAYER_SPAWN_W     48
+#define PLAYER_SPAWN_H     48
+
 /* Water art height — needed for fish Y derivation */
 #define WATER_ART_H        31
 
@@ -173,6 +177,10 @@ static void get_entity_pos(const LevelDef *level, EntityType type, int index,
     case ENT_LAST_STAR:
         *x = level->last_star.x;
         *y = level->last_star.y;
+        break;
+    case ENT_PLAYER_SPAWN:
+        *x = level->player_start_x;
+        *y = level->player_start_y;
         break;
     case ENT_SPIDER:
         *x = level->spiders[index].x;
@@ -308,6 +316,10 @@ static void set_entity_pos(LevelDef *level, EntityType type, int index,
         level->last_star.x = x;
         level->last_star.y = y;
         break;
+    case ENT_PLAYER_SPAWN:
+        level->player_start_x = x;
+        level->player_start_y = y;
+        break;
     case ENT_SPIDER:
         level->spiders[index].x = x;
         break;
@@ -394,6 +406,7 @@ static int get_count(const LevelDef *level, EntityType type)
     case ENT_COIN:             return level->coin_count;
     case ENT_YELLOW_STAR:      return level->yellow_star_count;
     case ENT_LAST_STAR:        return 1; /* always exactly one */
+    case ENT_PLAYER_SPAWN:     return 1; /* always exactly one */
     case ENT_SPIDER:           return level->spider_count;
     case ENT_JUMPING_SPIDER:   return level->jumping_spider_count;
     case ENT_BIRD:             return level->bird_count;
@@ -432,6 +445,7 @@ static int get_max_count(EntityType type)
     case ENT_COIN:             return MAX_COINS;
     case ENT_YELLOW_STAR:      return MAX_YELLOW_STARS;
     case ENT_LAST_STAR:        return 1;
+    case ENT_PLAYER_SPAWN:     return 1;
     case ENT_SPIDER:           return MAX_SPIDERS;
     case ENT_JUMPING_SPIDER:   return MAX_JUMPING_SPIDERS;
     case ENT_BIRD:             return MAX_BIRDS;
@@ -490,6 +504,16 @@ static PlacementData snapshot_entity(const LevelDef *level, EntityType type,
     case ENT_LAST_STAR:
         pd.last_star = level->last_star;
         break;
+    case ENT_PLAYER_SPAWN: {
+        /*
+         * Reuse the last_star union member for player spawn data.
+         * Both are simple {float x, float y} structs.
+         */
+        LastStarPlacement psp = { level->player_start_x,
+                                  level->player_start_y };
+        pd.last_star = psp;
+        break;
+    }
     case ENT_SPIDER:
         pd.spider = level->spiders[index];
         break;
@@ -778,6 +802,19 @@ static Selection hit_test(const LevelDef *level, float wx, float wy)
         }
     }
 
+    /* Player spawn — single 48x48 idle frame at spawn position */
+    {
+        ex = level->player_start_x;
+        ey = level->player_start_y;
+        ew = PLAYER_SPAWN_W;
+        eh = PLAYER_SPAWN_H;
+        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
+            sel.type = ENT_PLAYER_SPAWN;
+            sel.index = 0;
+            return sel;
+        }
+    }
+
     /* ---- Surfaces --------------------------------------------------- */
 
     /* Bouncepads — all three variants sit at FLOOR_Y - BP_SRC_H */
@@ -984,6 +1021,14 @@ static void delete_entity(EditorState *es, EntityType type, int index)
          */
         level->last_star.x = 0.0f;
         level->last_star.y = 0.0f;
+        break;
+    case ENT_PLAYER_SPAWN:
+        /*
+         * Player spawn is a single position.  "Deleting" it resets to
+         * (0, 0) as a sentinel, same pattern as last_star.
+         */
+        level->player_start_x = 0.0f;
+        level->player_start_y = 0.0f;
         break;
     case ENT_SPIDER:
         array_remove(level->spiders, &level->spider_count,
@@ -1347,6 +1392,15 @@ static void place_entity(EditorState *es, float world_x, float world_y)
          */
         level->last_star.x = world_x;
         level->last_star.y = world_y;
+        break;
+    }
+    case ENT_PLAYER_SPAWN: {
+        /*
+         * Player spawn is a single position — "placing" it overwrites
+         * the existing spawn point, same pattern as last_star.
+         */
+        level->player_start_x = world_x;
+        level->player_start_y = world_y;
         break;
     }
     case ENT_SEA_GAP: {

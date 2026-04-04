@@ -217,7 +217,9 @@ int editor_init(EditorState *es) {
      */
     strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
 
-    /* Place the last star at a visible default so new levels have one */
+    /* Sensible defaults so new levels have a visible player and last star */
+    es->level.player_start_x = 24.0f;
+    es->level.player_start_y = 204.0f;
     es->level.last_star.x = 145.0f;
     es->level.last_star.y = 167.0f;
 
@@ -312,6 +314,9 @@ static void load_textures(EditorState *es) {
 
     /* Rail paths — spike blocks and platforms ride on these */
     LOAD_TEX(rail,             "assets/sprites/surfaces/rail.png");
+
+    /* Player — used for spawn point preview in the editor */
+    LOAD_TEX(player,           "assets/sprites/player/player.png");
 
     #undef LOAD_TEX
 }
@@ -562,8 +567,10 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  */
                 memset(&es->level, 0, sizeof(es->level));
                 strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
+                es->level.player_start_x = 24.0f;
+                es->level.player_start_y = 204.0f;
                 es->level.last_star.x = 145.0f;
-    es->level.last_star.y = 167.0f;
+                es->level.last_star.y = 167.0f;
                 es->file_path[0] = '\0';
                 undo_clear(es->undo);
                 es->modified        = 0;
@@ -1032,6 +1039,16 @@ static void copy_selected(EditorState *es) {
     case ENT_LAST_STAR:
         es->clipboard_data.last_star = es->level.last_star;
         break;
+    case ENT_PLAYER_SPAWN: {
+        /*
+         * Player spawn is a single position (like last_star).
+         * Reuse the last_star union member since both are {float x, float y}.
+         */
+        LastStarPlacement p = { es->level.player_start_x,
+                                es->level.player_start_y };
+        es->clipboard_data.last_star = p;
+        break;
+    }
     case ENT_SPIDER:
         es->clipboard_data.spider = es->level.spiders[i];
         break;
@@ -1154,6 +1171,15 @@ static void paste_clipboard(EditorState *es) {
         d.last_star.x += PASTE_OFFSET;
         d.last_star.y += PASTE_OFFSET;
         es->level.last_star = d.last_star;
+        es->modified = 1;
+        break;
+    case ENT_PLAYER_SPAWN:
+        /*
+         * Player spawn is a single position — paste overwrites the
+         * existing position, offset from the copied location.
+         */
+        es->level.player_start_x = d.last_star.x + PASTE_OFFSET;
+        es->level.player_start_y = d.last_star.y + PASTE_OFFSET;
         es->modified = 1;
         break;
     case ENT_SPIDER:
@@ -1856,6 +1882,21 @@ static void apply_undo_command(EditorState *es, const Command *cmd,
         }
         break;
 
+    case ENT_PLAYER_SPAWN:
+        /*
+         * Player spawn is a single position (like last_star).  Undo/redo
+         * overwrites the position directly from the before/after snapshot.
+         * We reuse the last_star union member since both are {float x, y}.
+         */
+        if (reverse) {
+            es->level.player_start_x = cmd->before.last_star.x;
+            es->level.player_start_y = cmd->before.last_star.y;
+        } else {
+            es->level.player_start_x = cmd->after.last_star.x;
+            es->level.player_start_y = cmd->after.last_star.y;
+        }
+        break;
+
     case ENT_SPIDER:
         APPLY_ARRAY(es->level.spiders, es->level.spider_count,
                      spider, MAX_SPIDERS);
@@ -2030,6 +2071,7 @@ void editor_cleanup(EditorState *es) {
     DESTROY_TEX(es->textures.ladder);
     DESTROY_TEX(es->textures.rope);
     DESTROY_TEX(es->textures.rail);
+    DESTROY_TEX(es->textures.player);
 
     /* ---- Font ------------------------------------------------------- */
     /*

@@ -333,13 +333,11 @@ void game_init(GameState *gs) {
     memset(&s_level, 0, sizeof(s_level));
 
     /*
-     * Validate the level path before opening.  Reject absolute paths and
-     * path traversal sequences ("..") to prevent reading outside the
-     * game's working directory.
+     * Validate the level path before opening.  Reject path traversal
+     * sequences ("..") to prevent reading unintended directories.
+     * Absolute paths are allowed since the editor's file dialog returns them.
      */
     int path_valid = gs->level_path[0] != '\0'
-                  && gs->level_path[0] != '/'
-                  && gs->level_path[0] != '\\'
                   && !strstr(gs->level_path, "..");
 
     if (path_valid &&

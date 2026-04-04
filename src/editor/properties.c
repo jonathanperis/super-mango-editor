@@ -88,6 +88,7 @@ static const char *entity_type_names[ENT_COUNT] = {
     [ENT_VINE]             = "Vine",
     [ENT_LADDER]           = "Ladder",
     [ENT_ROPE]             = "Rope",
+    [ENT_PLAYER_SPAWN]     = "Player Spawn",
 };
 
 /* ------------------------------------------------------------------ */
@@ -317,6 +318,31 @@ void properties_render(EditorState *es)
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_LAST_STAR, 1),
                            FIELD_X, y, FIELD_W, &p->y))
+            es->modified = 1;
+        break;
+    }
+
+    /* ================================================================ */
+    /* Player                                                            */
+    /* ================================================================ */
+
+    case ENT_PLAYER_SPAWN: {
+        /*
+         * player_start_x / player_start_y are scalar fields in LevelDef,
+         * not a struct like LastStarPlacement.  The selection index is
+         * always 0 because there is exactly one player spawn per level.
+         */
+        ui_label(&es->ui, CONTENT_X, y, "x:");
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_PLAYER_SPAWN, 0),
+                           FIELD_X, y, FIELD_W,
+                           &es->level.player_start_x))
+            es->modified = 1;
+        y += ROW_H;
+
+        ui_label(&es->ui, CONTENT_X, y, "y:");
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_PLAYER_SPAWN, 1),
+                           FIELD_X, y, FIELD_W,
+                           &es->level.player_start_y))
             es->modified = 1;
         break;
     }
@@ -906,17 +932,6 @@ void level_config_render(EditorState *es) {
     ui_label(&es->ui, x + 8, y, "Name:");
     if (ui_text_field(&es->ui, 9000, x + 55, y, 310, es->level.name,
                       (int)sizeof(es->level.name)))
-        es->modified = 1;
-    y += 24;
-
-    /* ---- Player spawn ---- */
-    ui_label(&es->ui, x + 8, y, "Player Spawn");
-    y += 18;
-    ui_label(&es->ui, x + 8, y, "x:");
-    if (ui_float_field(&es->ui, 9001, x + 30, y, 100, &es->level.player_start_x))
-        es->modified = 1;
-    ui_label(&es->ui, x + 140, y, "y:");
-    if (ui_float_field(&es->ui, 9002, x + 160, y, 100, &es->level.player_start_y))
         es->modified = 1;
     y += 24;
 

@@ -302,10 +302,11 @@
 			"path":	"assets/sprites/effects/parallax_clouds_mg_1.png",
 			"speed":	0.5
 		}],
-	"player_start_x":	80,
-	"player_start_y":	172,
+	"player_start_x":	79,
+	"player_start_y":	124.5,
 	"music_path":	"assets/sounds/levels/game_music.ogg",
 	"music_volume":	13,
+	"floor_tile_path":	"",
 	"fog_enabled":	1,
 	"water_enabled":	1,
 	"initial_hearts":	3,
