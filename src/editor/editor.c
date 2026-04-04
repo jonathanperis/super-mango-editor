@@ -47,6 +47,7 @@ static void open_level_file(EditorState *es);
 static void load_level_from_path(EditorState *es, const char *path);
 static void copy_selected(EditorState *es);
 static void paste_clipboard(EditorState *es);
+static void play_test(EditorState *es);
 
 /* ------------------------------------------------------------------ */
 /* editor_init                                                         */
@@ -683,6 +684,17 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                 }
                 break;
 
+            case SDLK_F5:
+                /*
+                 * F5 — Play-test: export the level and launch the game.
+                 *
+                 * Exports the current level as sandbox_00 C source, compiles
+                 * and runs the game in a background process.  The editor
+                 * stays open so the designer can keep editing while testing.
+                 */
+                play_test(es);
+                break;
+
             case SDLK_g:
                 /*
                  * G — Toggle the grid overlay on the canvas.
@@ -1265,6 +1277,83 @@ static void paste_clipboard(EditorState *es) {
 }
 
 /* ------------------------------------------------------------------ */
+/* play_test — export level and launch the game                        */
+/* ------------------------------------------------------------------ */
+
+/*
+ * play_test — Export the current level as sandbox_00 and run the game.
+ *
+ * Workflow:
+ *   1. Export the editor's LevelDef as src/levels/sandbox_00.c/.h
+ *      (overwrites the existing sandbox level source).
+ *   2. Also auto-save the JSON if a path is set.
+ *   3. Launch "make run" in a background process so the game compiles
+ *      and starts while the editor remains interactive.
+ *
+ * The game compiles the exported sandbox_00.c into its binary, so the
+ * designer sees exactly what they built in the editor.  The editor stays
+ * open — close the game window to return to editing.
+ *
+ * Uses system() with a trailing "&" (POSIX) or "start" (Windows) to
+ * run the build+launch without blocking the editor's event loop.
+ */
+static void play_test(EditorState *es) {
+    /*
+     * Step 1 — Export the level as sandbox_00 to src/levels/.
+     *
+     * level_export_c writes two files:
+     *   src/levels/sandbox_00.h  — extern const LevelDef sandbox_00_def;
+     *   src/levels/sandbox_00.c  — full designated-initialiser definition
+     *
+     * These replace the hand-written sandbox level source so the game
+     * binary reflects the editor's current state after recompilation.
+     */
+    if (level_export_c(&es->level, "sandbox_00", "src/levels") != 0) {
+        fprintf(stderr, "Play: export failed — cannot launch game\n");
+        return;
+    }
+    fprintf(stderr, "Play: exported src/levels/sandbox_00.c\n");
+
+    /*
+     * Step 2 — Auto-save the JSON so the editor and disk stay in sync.
+     * Only saves if a file path has already been set (the designer has
+     * previously saved at least once).  Skip silently otherwise.
+     */
+    if (es->file_path[0] != '\0') {
+        if (level_save_json(&es->level, es->file_path) == 0) {
+            es->modified = 0;
+            char title[300];
+            snprintf(title, sizeof(title), "Super Mango Editor - %s",
+                     es->file_path);
+            SDL_SetWindowTitle(es->window, title);
+        }
+    }
+
+    /*
+     * Step 3 — Compile and launch the game in the background.
+     *
+     * "make run" compiles the game (picking up the new sandbox_00.c)
+     * and then runs out/super-mango.
+     *
+     * On POSIX (macOS/Linux): append " &" to run in background.
+     *   The shell immediately returns control; the game runs as a
+     *   separate process.  The editor keeps rendering frames.
+     *
+     * On Windows: use "start /B" to achieve the same non-blocking launch.
+     *
+     * stderr from the build is visible in the terminal that launched
+     * the editor, which is helpful for diagnosing compile errors.
+     */
+    fprintf(stderr, "Play: compiling and launching game...\n");
+
+#if defined(_WIN32)
+    system("start /B make run");
+#else
+    system("make run &");
+#endif
+}
+
+/* ------------------------------------------------------------------ */
 /* render_toolbar — static helper                                      */
 /* ------------------------------------------------------------------ */
 
@@ -1361,13 +1450,18 @@ static void render_toolbar(EditorState *es) {
         es->show_grid ^= 1;
     }
 
-    /* ---- File operation buttons (right-aligned) --------------------- */
+    /* ---- File and play buttons (right-aligned) ------------------------ */
     /*
-     * New, Save, and Export are placed at the right side of the toolbar.
+     * Play, Export, Save, Open, New — placed at the right side of the toolbar.
      * We compute positions from the right edge of the window minus the
      * button widths and spacing.
      */
-    int rx = EDITOR_W - 4 - 64;   /* rightmost button */
+    int rx = EDITOR_W - 4 - 52;   /* rightmost button */
+    if (ui_button(&es->ui, rx, by, 52, bh, "Play")) {
+        play_test(es);
+    }
+
+    rx -= 64 + 4;
     if (ui_button(&es->ui, rx, by, 64, bh, "Export")) {
         /*
          * Duplicate the Ctrl+E export logic inline.
