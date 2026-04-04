@@ -636,32 +636,28 @@ static void draw_performance(const DebugOverlay *dbg, TTF_Font *font,
     char buf[48];
     int text_w;
 
-    /* FPS counter — green if 55+, yellow if 30-54, red if <30 */
+    /* FPS counter — left-aligned, green if 55+, yellow if 30-54, red if <30 */
     snprintf(buf, sizeof(buf), "FPS: %d", dbg->fps_display);
     SDL_Color fps_col = dbg->fps_display >= 55 ? green
                       : dbg->fps_display >= 30 ? yellow : red;
-    TTF_SizeText(font, buf, &text_w, NULL);
-    render_debug_text(font, renderer, buf,
-                      GAME_W - HUD_MARGIN - text_w, y, fps_col);
+    render_debug_text(font, renderer, buf, HUD_MARGIN, y, fps_col);
     y += 13;
 
-    /* Frame time + CPU budget — green if <12ms, yellow if 12-16ms, red if >16ms */
+    /* Frame time + CPU budget */
     snprintf(buf, sizeof(buf), "CPU: %.1fms (%.0f%%)",
              (double)dbg->frame_ms_display, (double)dbg->cpu_percent);
     SDL_Color cpu_col = dbg->frame_ms_display < 12.0f ? green
                       : dbg->frame_ms_display < 16.7f ? yellow : red;
-    TTF_SizeText(font, buf, &text_w, NULL);
-    render_debug_text(font, renderer, buf,
-                      GAME_W - HUD_MARGIN - text_w, y, cpu_col);
+    render_debug_text(font, renderer, buf, HUD_MARGIN, y, cpu_col);
     y += 13;
 
     /* Memory usage */
     if (dbg->mem_mb > 0.0f) {
         snprintf(buf, sizeof(buf), "MEM: %.1f MB", (double)dbg->mem_mb);
-        TTF_SizeText(font, buf, &text_w, NULL);
-        render_debug_text(font, renderer, buf,
-                          GAME_W - HUD_MARGIN - text_w, y, cyan);
+        render_debug_text(font, renderer, buf, HUD_MARGIN, y, cyan);
     }
+
+    (void)text_w; /* suppress unused warning */
 }
 
 /* ------------------------------------------------------------------ */

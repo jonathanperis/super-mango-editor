@@ -445,8 +445,8 @@ typedef struct {
     float player_start_x;
     float player_start_y;
 
-    /* Background music */
-    char  music_path[64];   /* path to .ogg/.wav music file, empty = no music */
+    /* Background sound */
+    char  music_path[64];   /* path to .wav sound file, empty = no sound */
     int   music_volume;     /* 0-128, SDL_mixer range */
 
     /* Floor tile texture */
