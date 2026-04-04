@@ -1037,8 +1037,8 @@ static void render_axe_traps(EditorState *es) {
     for (int i = 0; i < es->level.axe_trap_count; i++) {
         const AxeTrapPlacement *at = &es->level.axe_traps[i];
 
-        float ax = at->pillar_x + (float)(TILE_SIZE / 2 - AXE_FRAME_W / 2);
-        float ay = (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
+        float ax = at->pillar_x;
+        float ay = (at->y != 0.0f) ? at->y : (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
 
         draw_tex(es, es->textures.axe_trap, NULL,
                  ax, ay, AXE_FRAME_W, AXE_FRAME_H);
@@ -1055,12 +1055,13 @@ static void render_axe_traps(EditorState *es) {
  *     = 252 - 96 + 16 - 32 = 140
  */
 static void render_circular_saws(EditorState *es) {
-    float saw_y = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H);
+    float default_y = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H);
 
     for (int i = 0; i < es->level.circular_saw_count; i++) {
+        const CircularSawPlacement *cs = &es->level.circular_saws[i];
+        float sy = (cs->y != 0.0f) ? cs->y : default_y;
         draw_tex(es, es->textures.circular_saw, NULL,
-                 es->level.circular_saws[i].x, saw_y,
-                 SAW_DISPLAY_W, SAW_DISPLAY_H);
+                 cs->x, sy, SAW_DISPLAY_W, SAW_DISPLAY_H);
     }
 }
 
@@ -1271,16 +1272,17 @@ static void render_selection(EditorState *es) {
     case ENT_AXE_TRAP: {
         if (es->selection.index >= es->level.axe_trap_count) return;
         const AxeTrapPlacement *at = &es->level.axe_traps[es->selection.index];
-        wx = at->pillar_x + (float)(TILE_SIZE / 2 - AXE_FRAME_W / 2);
-        wy = (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
+        wx = at->pillar_x;
+        wy = (at->y != 0.0f) ? at->y : (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
         ww = AXE_FRAME_W;
         wh = AXE_FRAME_H;
         break;
     }
     case ENT_CIRCULAR_SAW: {
         if (es->selection.index >= es->level.circular_saw_count) return;
-        wx = es->level.circular_saws[es->selection.index].x;
-        wy = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H);
+        const CircularSawPlacement *cs = &es->level.circular_saws[es->selection.index];
+        wx = cs->x;
+        wy = (cs->y != 0.0f) ? cs->y : (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H);
         ww = SAW_DISPLAY_W;
         wh = SAW_DISPLAY_H;
         break;
@@ -1587,9 +1589,13 @@ static void render_ghost(EditorState *es) {
         SDL_SetTextureAlphaMod(tex, 128);
     }
 
-    /* Center the ghost on the cursor */
+    /* Center the ghost on the cursor, clamped to y<=205 (except fish) */
     float ghost_x = wx - (float)dw / 2.0f;
     float ghost_y = wy - (float)dh / 2.0f;
+    if (es->palette_type != ENT_FISH && es->palette_type != ENT_FASTER_FISH) {
+        if (ghost_y > 205.0f)
+            ghost_y = 205.0f;
+    }
 
     if (tex) {
         draw_tex(es, tex, use_src ? &src_rect : NULL,

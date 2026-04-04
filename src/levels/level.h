@@ -157,20 +157,23 @@ typedef struct {
  *
  * pillar_x : left edge of the host platform pillar in world pixels.
  *            The pivot is computed as: pillar_x + TILE_SIZE/2.
+ * y        : vertical position (pivot y). 0 = use default (FLOOR_Y - 3*TILE_SIZE + 16).
  * mode     : AXE_MODE_PENDULUM or AXE_MODE_SPIN.
  */
 typedef struct {
     float      pillar_x;
+    float      y;
     AxeTrapMode mode;
 } AxeTrapPlacement;
 
 /*
  * CircularSawPlacement — one horizontally patrolling rotating saw.
  *
- * y is computed: FLOOR_Y − 2 × TILE_SIZE + 16 − SAW_DISPLAY_H.
+ * y : vertical position. 0 = use default (FLOOR_Y − 2*TILE_SIZE + 16 − SAW_DISPLAY_H).
  */
 typedef struct {
     float x;
+    float y;
     float patrol_x0;
     float patrol_x1;
     int   direction;   /* +1 = start moving right, -1 = start moving left */

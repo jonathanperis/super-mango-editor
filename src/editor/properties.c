@@ -574,11 +574,12 @@ void properties_render(EditorState *es)
             es->modified = 1;
         y += ROW_H;
 
-        /*
-         * mode — dropdown that selects between Pendulum and Spin.
-         * Cast the AxeTrapMode enum to int for the dropdown widget,
-         * then cast back when the selection changes.
-         */
+        ui_label(&es->ui, CONTENT_X, y, "y:");
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_AXE_TRAP, 3),
+                           FIELD_X, y, FIELD_W, &p->y))
+            es->modified = 1;
+        y += ROW_H;
+
         int mode_sel = (int)p->mode;
         ui_label(&es->ui, CONTENT_X, y, "mode:");
         if (ui_dropdown(&es->ui, FIELD_ID(ENT_AXE_TRAP, 1),
@@ -597,6 +598,12 @@ void properties_render(EditorState *es)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 0),
                            FIELD_X, y, FIELD_W, &p->x))
+            es->modified = 1;
+        y += ROW_H;
+
+        ui_label(&es->ui, CONTENT_X, y, "y:");
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 4),
+                           FIELD_X, y, FIELD_W, &p->y))
             es->modified = 1;
         y += ROW_H;
 

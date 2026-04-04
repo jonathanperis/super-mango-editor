@@ -212,14 +212,16 @@ static void get_entity_pos(const LevelDef *level, EntityType type, int index,
         break;
     case ENT_AXE_TRAP: {
         const AxeTrapPlacement *at = &level->axe_traps[index];
-        *x = at->pillar_x + (float)(TILE_SIZE / 2 - AXE_FRAME_W / 2);
-        *y = (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
+        *x = at->pillar_x;
+        *y = (at->y != 0.0f) ? at->y : (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
         break;
     }
-    case ENT_CIRCULAR_SAW:
-        *x = level->circular_saws[index].x;
-        *y = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H);
+    case ENT_CIRCULAR_SAW: {
+        const CircularSawPlacement *cs = &level->circular_saws[index];
+        *x = cs->x;
+        *y = (cs->y != 0.0f) ? cs->y : (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H);
         break;
+    }
     case ENT_SPIKE_ROW:
         *x = level->spike_rows[index].x;
         *y = (float)(FLOOR_Y - SPIKE_TILE_H);
@@ -302,6 +304,13 @@ static void get_entity_pos(const LevelDef *level, EntityType type, int index,
 static void set_entity_pos(LevelDef *level, EntityType type, int index,
                            float x, float y)
 {
+    /*
+     * Clamp y to 205 max for all entities except fish.
+     * This keeps everything above the ground floor visible area.
+     */
+    if (type != ENT_FISH && type != ENT_FASTER_FISH && y > 205.0f)
+        y = 205.0f;
+
     switch (type) {
     case ENT_PLATFORM:
         level->platforms[index].x = x;
@@ -352,9 +361,11 @@ static void set_entity_pos(LevelDef *level, EntityType type, int index,
         break;
     case ENT_AXE_TRAP:
         level->axe_traps[index].pillar_x = x;
+        level->axe_traps[index].y = y;
         break;
     case ENT_CIRCULAR_SAW:
         level->circular_saws[index].x = x;
+        level->circular_saws[index].y = y;
         break;
     case ENT_SPIKE_ROW:
         level->spike_rows[index].x = x;
@@ -1172,6 +1183,10 @@ static void place_entity(EditorState *es, float world_x, float world_y)
 {
     LevelDef *level = &es->level;
     EntityType type  = es->palette_type;
+
+    /* Clamp y to 205 max for all entities except fish */
+    if (type != ENT_FISH && type != ENT_FASTER_FISH && world_y > 205.0f)
+        world_y = 205.0f;
 
     /* Check capacity — every entity type has a fixed-size array */
     int count = get_count(level, type);
