@@ -61,7 +61,7 @@ dkms.conf
 .DS_Store
 src/levels/exported/*.c
 src/levels/exported/*.h
-levels/_playtest.json
+levels/_playtest.toml
 
 # Docs generation
 wiki/

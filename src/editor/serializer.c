@@ -1,25 +1,22 @@
 /*
- * serializer.c — JSON serialization for level definitions.
+ * serializer.c — TOML serialization for level definitions.
  *
  * Converts between LevelDef structs (the engine's in-memory level format)
- * and cJSON trees (a lightweight JSON DOM).  This lets the editor save
- * levels as human-readable .json files and load them back for editing or
- * playtesting.
+ * and TOML files on disk.  This lets the editor save levels as human-
+ * readable .toml files and load them back for editing or playtesting.
  *
- * cJSON works like a tree of nodes.  Each node has a type (object, array,
- * number, string) and can have children.  We build trees by creating nodes
- * and attaching them, then render the whole tree to a JSON string.  For
- * parsing, cJSON reads a JSON string and gives us back a tree we can walk
- * with cJSON_GetObjectItem / cJSON_GetArrayItem.
+ * The emitter (level_save_toml) writes TOML using plain fprintf calls.
+ * The parser (level_load_toml) uses tomlc17 to parse the file and then
+ * walks the resulting table/array tree to fill a LevelDef.
  *
  * All enum values are serialized as readable strings ("RECT", "SPIN", etc.)
- * rather than raw integers, so the JSON files are easy to understand and
+ * rather than raw integers, so the TOML files are easy to understand and
  * edit by hand.
  */
 
 #include <stdio.h>   /* fprintf, fopen, fclose, fread, fseek, ftell */
 #include <stdlib.h>  /* malloc, free, exit */
-#include <string.h>  /* strcmp, memset, strdup */
+#include <string.h>  /* strcmp, memset, strncpy */
 
 #if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 #include <sys/stat.h> /* open, O_WRONLY, O_CREAT, O_TRUNC */
@@ -27,18 +24,18 @@
 #endif
 
 #include "serializer.h"
-#include "../../vendor/cJSON/cJSON.h" /* cJSON API */
-#include "../levels/level.h"          /* LevelDef, all placement types */
-#include "../game.h"                  /* MAX_* constants */
+#include "../../vendor/tomlc17/tomlc17.h" /* tomlc17 API */
+#include "../levels/level.h"              /* LevelDef, all placement types */
+#include "../game.h"                      /* MAX_* constants */
 
 /* ================================================================== */
-/* Enum ↔ string conversion helpers                                    */
+/* Enum <-> string conversion helpers                                  */
 /* ================================================================== */
 
 /*
  * Each enum has a pair of functions: one converts the C enum value to a
- * human-readable string for JSON output; the other parses a string back
- * into the enum value.  This keeps the JSON portable and self-documenting.
+ * human-readable string for TOML output; the other parses a string back
+ * into the enum value.  This keeps the TOML portable and self-documenting.
  */
 
 /* ---- RailLayout -------------------------------------------------- */
@@ -106,928 +103,58 @@ static BouncepadType bouncepad_type_from_str(const char *s) {
 }
 
 /* ================================================================== */
-/* JSON helper: safely read a number from a cJSON object field         */
+/* TOML helpers: safely read values from a toml_datum_t table          */
 /* ================================================================== */
 
 /*
- * get_number — Read a numeric field from a JSON object.
+ * get_float — Read a numeric field from a TOML table, returning float.
  *
- * cJSON stores all numbers as doubles internally.  This helper returns
- * the double value of the named field, or `fallback` if the field is
- * missing or not a number.  We use this everywhere to avoid repeating
- * the NULL-check + type-check boilerplate.
+ * TOML distinguishes integers (no decimal point) from floats (with decimal).
+ * A field written as "79" comes back as TOML_INT64, while "79.0" comes as
+ * TOML_FP64.  We accept both and convert to float.
  */
-static double get_number(const cJSON *obj, const char *key, double fallback) {
-    /*
-     * cJSON_GetObjectItemCaseSensitive — look up a child node by key name.
-     * Returns NULL if the key doesn't exist in this object.
-     */
-    const cJSON *item = cJSON_GetObjectItemCaseSensitive(obj, key);
-
-    /*
-     * cJSON_IsNumber — returns true (non-zero) if the node holds a number.
-     * We check this to avoid reading garbage from a string or null node.
-     */
-    if (cJSON_IsNumber(item)) return item->valuedouble;
+static float get_float(toml_datum_t tab, const char *key, float fallback) {
+    toml_datum_t d = toml_get(tab, key);
+    if (d.type == TOML_FP64)  return (float)d.u.fp64;
+    if (d.type == TOML_INT64) return (float)d.u.int64;
     return fallback;
 }
 
 /*
- * get_string — Read a string field from a JSON object.
+ * get_int — Read an integer field from a TOML table.
  *
- * Returns the string pointer (owned by the cJSON tree — do NOT free it),
- * or `fallback` if the field is missing or not a string.
+ * Accepts both TOML_INT64 and TOML_FP64 for resilience (a hand-edited
+ * file might use "1.0" instead of "1").
  */
-static const char *get_string(const cJSON *obj, const char *key,
-                              const char *fallback) {
-    const cJSON *item = cJSON_GetObjectItemCaseSensitive(obj, key);
-    if (cJSON_IsString(item) && item->valuestring) return item->valuestring;
+static int get_int(toml_datum_t tab, const char *key, int fallback) {
+    toml_datum_t d = toml_get(tab, key);
+    if (d.type == TOML_INT64) return (int)d.u.int64;
+    if (d.type == TOML_FP64)  return (int)d.u.fp64;
+    return fallback;
+}
+
+/*
+ * get_str — Read a string field from a TOML table.
+ *
+ * Returns a pointer into the parsed TOML tree (valid until toml_free).
+ * Returns `fallback` if the field is missing or not a string.
+ */
+static const char *get_str(toml_datum_t tab, const char *key,
+                           const char *fallback) {
+    toml_datum_t d = toml_get(tab, key);
+    if (d.type == TOML_STRING) return d.u.s;
     return fallback;
 }
 
 /* ================================================================== */
-/* level_to_json — Build a cJSON tree from a LevelDef                  */
+/* level_save_toml — Write a LevelDef to a human-readable TOML file    */
 /* ================================================================== */
 
-cJSON *level_to_json(const LevelDef *def) {
-    if (!def) return NULL;
-
-    /*
-     * cJSON_CreateObject — allocate a new JSON object node (the root {}).
-     * Every key/value pair we add becomes a child of this root.
-     * Returns NULL if memory allocation fails.
-     */
-    cJSON *root = cJSON_CreateObject();
-    if (!root) return NULL;
-
-    /* ---- Name ---------------------------------------------------- */
-
-    /*
-     * cJSON_AddStringToObject — create a string node and attach it to
-     * the parent object under the given key.  cJSON copies the string
-     * internally, so `def->name` doesn't need to outlive this call.
-     */
-    cJSON_AddStringToObject(root, "name",
-                            def->name[0] ? def->name : "Untitled");
-    cJSON_AddNumberToObject(root, "screen_count", def->screen_count);
-
-    /* ---- Sea gaps ------------------------------------------------ */
-
-    /*
-     * cJSON_AddArrayToObject — create an empty JSON array [] and attach
-     * it to the parent object.  We then fill it by adding items one by one.
-     */
-    cJSON *sea_arr = cJSON_AddArrayToObject(root, "sea_gaps");
-    for (int i = 0; i < def->sea_gap_count; i++) {
-        /*
-         * cJSON_CreateNumber — allocate a number node with the given value.
-         * cJSON_AddItemToArray — append that node to the array.
-         * Sea gaps are plain integers (left-edge x coordinates).
-         */
-        cJSON_AddItemToArray(sea_arr, cJSON_CreateNumber(def->sea_gaps[i]));
-    }
-
-    /* ---- Rails --------------------------------------------------- */
-
-    cJSON *rail_arr = cJSON_AddArrayToObject(root, "rails");
-    for (int i = 0; i < def->rail_count; i++) {
-        const RailPlacement *r = &def->rails[i];
-
-        /*
-         * cJSON_CreateObject — each rail is a JSON object with named fields.
-         * We build it, add all fields, then append the whole object to the
-         * rails array.
-         */
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddStringToObject(obj, "layout", rail_layout_to_str(r->layout));
-        cJSON_AddNumberToObject(obj, "x", r->x);
-        cJSON_AddNumberToObject(obj, "y", r->y);
-        cJSON_AddNumberToObject(obj, "w", r->w);
-        cJSON_AddNumberToObject(obj, "h", r->h);
-        cJSON_AddNumberToObject(obj, "end_cap", r->end_cap);
-        cJSON_AddItemToArray(rail_arr, obj);
-    }
-
-    /* ---- Platforms ------------------------------------------------ */
-
-    cJSON *plat_arr = cJSON_AddArrayToObject(root, "platforms");
-    for (int i = 0; i < def->platform_count; i++) {
-        const PlatformPlacement *p = &def->platforms[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", p->x);
-        cJSON_AddNumberToObject(obj, "tile_height", p->tile_height);
-        cJSON_AddNumberToObject(obj, "tile_width", p->tile_width);
-        cJSON_AddItemToArray(plat_arr, obj);
-    }
-
-    /* ---- Coins --------------------------------------------------- */
-
-    cJSON *coin_arr = cJSON_AddArrayToObject(root, "coins");
-    for (int i = 0; i < def->coin_count; i++) {
-        const CoinPlacement *c = &def->coins[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", c->x);
-        cJSON_AddNumberToObject(obj, "y", c->y);
-        cJSON_AddItemToArray(coin_arr, obj);
-    }
-
-    /* ---- Star yellows --------------------------------------------- */
-
-    cJSON *ystar_arr = cJSON_AddArrayToObject(root, "star_yellows");
-    for (int i = 0; i < def->star_yellow_count; i++) {
-        const StarYellowPlacement *s = &def->star_yellows[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", s->x);
-        cJSON_AddNumberToObject(obj, "y", s->y);
-        cJSON_AddItemToArray(ystar_arr, obj);
-    }
-
-    /* ---- Star greens ---------------------------------------------- */
-
-    cJSON *gstar_arr = cJSON_AddArrayToObject(root, "star_greens");
-    for (int i = 0; i < def->star_green_count; i++) {
-        const StarGreenPlacement *s = &def->star_greens[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", s->x);
-        cJSON_AddNumberToObject(obj, "y", s->y);
-        cJSON_AddItemToArray(gstar_arr, obj);
-    }
-
-    /* ---- Star reds ------------------------------------------------ */
-
-    cJSON *rstar_arr = cJSON_AddArrayToObject(root, "star_reds");
-    for (int i = 0; i < def->star_red_count; i++) {
-        const StarRedPlacement *s = &def->star_reds[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", s->x);
-        cJSON_AddNumberToObject(obj, "y", s->y);
-        cJSON_AddItemToArray(rstar_arr, obj);
-    }
-
-    /* ---- Last star (single object, not array) -------------------- */
-
-    {
-        /*
-         * last_star is a single struct, not an array.  We serialize it as
-         * a JSON object with x and y fields, attached directly to the root.
-         */
-        const LastStarPlacement *ls = &def->last_star;
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", ls->x);
-        cJSON_AddNumberToObject(obj, "y", ls->y);
-        cJSON_AddItemToObject(root, "last_star", obj);
-    }
-
-    /* ---- Spiders ------------------------------------------------- */
-
-    cJSON *spider_arr = cJSON_AddArrayToObject(root, "spiders");
-    for (int i = 0; i < def->spider_count; i++) {
-        const SpiderPlacement *sp = &def->spiders[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", sp->x);
-        cJSON_AddNumberToObject(obj, "vx", sp->vx);
-        cJSON_AddNumberToObject(obj, "patrol_x0", sp->patrol_x0);
-        cJSON_AddNumberToObject(obj, "patrol_x1", sp->patrol_x1);
-        cJSON_AddNumberToObject(obj, "frame_index", sp->frame_index);
-        cJSON_AddItemToArray(spider_arr, obj);
-    }
-
-    /* ---- Jumping spiders ----------------------------------------- */
-
-    cJSON *jspider_arr = cJSON_AddArrayToObject(root, "jumping_spiders");
-    for (int i = 0; i < def->jumping_spider_count; i++) {
-        const JumpingSpiderPlacement *js = &def->jumping_spiders[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", js->x);
-        cJSON_AddNumberToObject(obj, "vx", js->vx);
-        cJSON_AddNumberToObject(obj, "patrol_x0", js->patrol_x0);
-        cJSON_AddNumberToObject(obj, "patrol_x1", js->patrol_x1);
-        cJSON_AddItemToArray(jspider_arr, obj);
-    }
-
-    /* ---- Birds --------------------------------------------------- */
-
-    cJSON *bird_arr = cJSON_AddArrayToObject(root, "birds");
-    for (int i = 0; i < def->bird_count; i++) {
-        const BirdPlacement *b = &def->birds[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", b->x);
-        cJSON_AddNumberToObject(obj, "base_y", b->base_y);
-        cJSON_AddNumberToObject(obj, "vx", b->vx);
-        cJSON_AddNumberToObject(obj, "patrol_x0", b->patrol_x0);
-        cJSON_AddNumberToObject(obj, "patrol_x1", b->patrol_x1);
-        cJSON_AddNumberToObject(obj, "frame_index", b->frame_index);
-        cJSON_AddItemToArray(bird_arr, obj);
-    }
-
-    /* ---- Faster birds -------------------------------------------- */
-
-    cJSON *fbird_arr = cJSON_AddArrayToObject(root, "faster_birds");
-    for (int i = 0; i < def->faster_bird_count; i++) {
-        const BirdPlacement *b = &def->faster_birds[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", b->x);
-        cJSON_AddNumberToObject(obj, "base_y", b->base_y);
-        cJSON_AddNumberToObject(obj, "vx", b->vx);
-        cJSON_AddNumberToObject(obj, "patrol_x0", b->patrol_x0);
-        cJSON_AddNumberToObject(obj, "patrol_x1", b->patrol_x1);
-        cJSON_AddNumberToObject(obj, "frame_index", b->frame_index);
-        cJSON_AddItemToArray(fbird_arr, obj);
-    }
-
-    /* ---- Fish ---------------------------------------------------- */
-
-    cJSON *fish_arr = cJSON_AddArrayToObject(root, "fish");
-    for (int i = 0; i < def->fish_count; i++) {
-        const FishPlacement *f = &def->fish[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", f->x);
-        cJSON_AddNumberToObject(obj, "vx", f->vx);
-        cJSON_AddNumberToObject(obj, "patrol_x0", f->patrol_x0);
-        cJSON_AddNumberToObject(obj, "patrol_x1", f->patrol_x1);
-        cJSON_AddItemToArray(fish_arr, obj);
-    }
-
-    /* ---- Faster fish --------------------------------------------- */
-
-    cJSON *ffish_arr = cJSON_AddArrayToObject(root, "faster_fish");
-    for (int i = 0; i < def->faster_fish_count; i++) {
-        const FishPlacement *f = &def->faster_fish[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", f->x);
-        cJSON_AddNumberToObject(obj, "vx", f->vx);
-        cJSON_AddNumberToObject(obj, "patrol_x0", f->patrol_x0);
-        cJSON_AddNumberToObject(obj, "patrol_x1", f->patrol_x1);
-        cJSON_AddItemToArray(ffish_arr, obj);
-    }
-
-    /* ---- Axe traps ----------------------------------------------- */
-
-    cJSON *axe_arr = cJSON_AddArrayToObject(root, "axe_traps");
-    for (int i = 0; i < def->axe_trap_count; i++) {
-        const AxeTrapPlacement *a = &def->axe_traps[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "pillar_x", a->pillar_x);
-        cJSON_AddNumberToObject(obj, "y", a->y);
-        cJSON_AddStringToObject(obj, "mode", axe_mode_to_str(a->mode));
-        cJSON_AddItemToArray(axe_arr, obj);
-    }
-
-    /* ---- Circular saws ------------------------------------------- */
-
-    cJSON *saw_arr = cJSON_AddArrayToObject(root, "circular_saws");
-    for (int i = 0; i < def->circular_saw_count; i++) {
-        const CircularSawPlacement *cs = &def->circular_saws[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", cs->x);
-        cJSON_AddNumberToObject(obj, "y", cs->y);
-        cJSON_AddNumberToObject(obj, "patrol_x0", cs->patrol_x0);
-        cJSON_AddNumberToObject(obj, "patrol_x1", cs->patrol_x1);
-        cJSON_AddNumberToObject(obj, "direction", cs->direction);
-        cJSON_AddItemToArray(saw_arr, obj);
-    }
-
-    /* ---- Spike rows ---------------------------------------------- */
-
-    cJSON *srow_arr = cJSON_AddArrayToObject(root, "spike_rows");
-    for (int i = 0; i < def->spike_row_count; i++) {
-        const SpikeRowPlacement *sr = &def->spike_rows[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", sr->x);
-        cJSON_AddNumberToObject(obj, "count", sr->count);
-        cJSON_AddItemToArray(srow_arr, obj);
-    }
-
-    /* ---- Spike platforms ----------------------------------------- */
-
-    cJSON *splat_arr = cJSON_AddArrayToObject(root, "spike_platforms");
-    for (int i = 0; i < def->spike_platform_count; i++) {
-        const SpikePlatformPlacement *sp = &def->spike_platforms[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", sp->x);
-        cJSON_AddNumberToObject(obj, "y", sp->y);
-        cJSON_AddNumberToObject(obj, "tile_count", sp->tile_count);
-        cJSON_AddItemToArray(splat_arr, obj);
-    }
-
-    /* ---- Spike blocks -------------------------------------------- */
-
-    cJSON *sblk_arr = cJSON_AddArrayToObject(root, "spike_blocks");
-    for (int i = 0; i < def->spike_block_count; i++) {
-        const SpikeBlockPlacement *sb = &def->spike_blocks[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "rail_index", sb->rail_index);
-        cJSON_AddNumberToObject(obj, "t_offset", sb->t_offset);
-        cJSON_AddNumberToObject(obj, "speed", sb->speed);
-        cJSON_AddItemToArray(sblk_arr, obj);
-    }
-
-    /* ---- Blue flames -------------------------------------------- */
-
-    cJSON *bf_arr = cJSON_AddArrayToObject(root, "blue_flames");
-    for (int i = 0; i < def->blue_flame_count; i++) {
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", def->blue_flames[i].x);
-        cJSON_AddItemToArray(bf_arr, obj);
-    }
-
-    /* ---- Fire flames -------------------------------------------- */
-
-    cJSON *ff_arr = cJSON_AddArrayToObject(root, "fire_flames");
-    for (int i = 0; i < def->fire_flame_count; i++) {
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", def->fire_flames[i].x);
-        cJSON_AddItemToArray(ff_arr, obj);
-    }
-
-    /* ---- Float platforms ----------------------------------------- */
-
-    cJSON *fp_arr = cJSON_AddArrayToObject(root, "float_platforms");
-    for (int i = 0; i < def->float_platform_count; i++) {
-        const FloatPlatformPlacement *fp = &def->float_platforms[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddStringToObject(obj, "mode", float_mode_to_str(fp->mode));
-        cJSON_AddNumberToObject(obj, "x", fp->x);
-        cJSON_AddNumberToObject(obj, "y", fp->y);
-        cJSON_AddNumberToObject(obj, "tile_count", fp->tile_count);
-        cJSON_AddNumberToObject(obj, "rail_index", fp->rail_index);
-        cJSON_AddNumberToObject(obj, "t_offset", fp->t_offset);
-        cJSON_AddNumberToObject(obj, "speed", fp->speed);
-        cJSON_AddItemToArray(fp_arr, obj);
-    }
-
-    /* ---- Bridges ------------------------------------------------- */
-
-    cJSON *br_arr = cJSON_AddArrayToObject(root, "bridges");
-    for (int i = 0; i < def->bridge_count; i++) {
-        const BridgePlacement *br = &def->bridges[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", br->x);
-        cJSON_AddNumberToObject(obj, "y", br->y);
-        cJSON_AddNumberToObject(obj, "brick_count", br->brick_count);
-        cJSON_AddItemToArray(br_arr, obj);
-    }
-
-    /* ---- Bouncepads (small) -------------------------------------- */
-
-    cJSON *bs_arr = cJSON_AddArrayToObject(root, "bouncepads_small");
-    for (int i = 0; i < def->bouncepad_small_count; i++) {
-        const BouncepadPlacement *bp = &def->bouncepads_small[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", bp->x);
-        cJSON_AddNumberToObject(obj, "launch_vy", bp->launch_vy);
-        cJSON_AddStringToObject(obj, "pad_type",
-                                bouncepad_type_to_str(bp->pad_type));
-        cJSON_AddItemToArray(bs_arr, obj);
-    }
-
-    /* ---- Bouncepads (medium) ------------------------------------- */
-
-    cJSON *bm_arr = cJSON_AddArrayToObject(root, "bouncepads_medium");
-    for (int i = 0; i < def->bouncepad_medium_count; i++) {
-        const BouncepadPlacement *bp = &def->bouncepads_medium[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", bp->x);
-        cJSON_AddNumberToObject(obj, "launch_vy", bp->launch_vy);
-        cJSON_AddStringToObject(obj, "pad_type",
-                                bouncepad_type_to_str(bp->pad_type));
-        cJSON_AddItemToArray(bm_arr, obj);
-    }
-
-    /* ---- Bouncepads (high) --------------------------------------- */
-
-    cJSON *bh_arr = cJSON_AddArrayToObject(root, "bouncepads_high");
-    for (int i = 0; i < def->bouncepad_high_count; i++) {
-        const BouncepadPlacement *bp = &def->bouncepads_high[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", bp->x);
-        cJSON_AddNumberToObject(obj, "launch_vy", bp->launch_vy);
-        cJSON_AddStringToObject(obj, "pad_type",
-                                bouncepad_type_to_str(bp->pad_type));
-        cJSON_AddItemToArray(bh_arr, obj);
-    }
-
-    /* ---- Vines --------------------------------------------------- */
-
-    cJSON *vine_arr = cJSON_AddArrayToObject(root, "vines");
-    for (int i = 0; i < def->vine_count; i++) {
-        const VinePlacement *v = &def->vines[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", v->x);
-        cJSON_AddNumberToObject(obj, "y", v->y);
-        cJSON_AddNumberToObject(obj, "tile_count", v->tile_count);
-        cJSON_AddItemToArray(vine_arr, obj);
-    }
-
-    /* ---- Ladders ------------------------------------------------- */
-
-    cJSON *ladder_arr = cJSON_AddArrayToObject(root, "ladders");
-    for (int i = 0; i < def->ladder_count; i++) {
-        const LadderPlacement *l = &def->ladders[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", l->x);
-        cJSON_AddNumberToObject(obj, "y", l->y);
-        cJSON_AddNumberToObject(obj, "tile_count", l->tile_count);
-        cJSON_AddItemToArray(ladder_arr, obj);
-    }
-
-    /* ---- Ropes --------------------------------------------------- */
-
-    cJSON *rope_arr = cJSON_AddArrayToObject(root, "ropes");
-    for (int i = 0; i < def->rope_count; i++) {
-        const RopePlacement *rp = &def->ropes[i];
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(obj, "x", rp->x);
-        cJSON_AddNumberToObject(obj, "y", rp->y);
-        cJSON_AddNumberToObject(obj, "tile_count", rp->tile_count);
-        cJSON_AddItemToArray(rope_arr, obj);
-    }
-
-    /* ---- Level-wide configuration ----------------------------------- */
-
-    /* Parallax layers */
-    cJSON *plx_arr = cJSON_AddArrayToObject(root, "parallax_layers");
-    for (int i = 0; i < def->parallax_layer_count; i++) {
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddStringToObject(obj, "path", def->parallax_layers[i].path);
-        cJSON_AddNumberToObject(obj, "speed", (double)def->parallax_layers[i].speed);
-        cJSON_AddItemToArray(plx_arr, obj);
-    }
-
-    /* Foreground layers */
-    cJSON *fg_arr = cJSON_AddArrayToObject(root, "foreground_layers");
-    for (int i = 0; i < def->foreground_layer_count; i++) {
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddStringToObject(obj, "path", def->foreground_layers[i].path);
-        cJSON_AddNumberToObject(obj, "speed", (double)def->foreground_layers[i].speed);
-        cJSON_AddItemToArray(fg_arr, obj);
-    }
-
-    /* Player spawn */
-    cJSON_AddNumberToObject(root, "player_start_x", (double)def->player_start_x);
-    cJSON_AddNumberToObject(root, "player_start_y", (double)def->player_start_y);
-
-    /* Music */
-    cJSON_AddStringToObject(root, "music_path", def->music_path);
-    cJSON_AddNumberToObject(root, "music_volume", def->music_volume);
-
-    /* Floor tile */
-    cJSON_AddStringToObject(root, "floor_tile_path", def->floor_tile_path);
-
-    /* Game rules */
-    cJSON_AddNumberToObject(root, "initial_hearts", def->initial_hearts);
-    cJSON_AddNumberToObject(root, "initial_lives", def->initial_lives);
-    cJSON_AddNumberToObject(root, "score_per_life", def->score_per_life);
-
-    return root;
-}
-
-/* ================================================================== */
-/* level_from_json — Populate a LevelDef from a cJSON tree             */
-/* ================================================================== */
-
-/*
- * PARSE_ARRAY — helper macro to reduce repetition when reading arrays.
- *
- * For each JSON array named `json_key`, this macro:
- *   1. Looks up the array in the root object.
- *   2. Checks that its size doesn't exceed `max_count`.
- *   3. Iterates over each element and calls the `parse_body` block,
- *      where `elem` is the current cJSON array element and `idx` is
- *      the 0-based index into the destination array.
- *
- * If the array is missing from the JSON, the count stays at 0 (lenient).
- * If the array exceeds the maximum, the function returns -1 immediately.
- */
-#define PARSE_ARRAY(json_key, dest_array, count_field, max_count, parse_body) \
-    do {                                                                       \
-        const cJSON *arr = cJSON_GetObjectItemCaseSensitive(json, json_key);   \
-        if (cJSON_IsArray(arr)) {                                              \
-            int n = cJSON_GetArraySize(arr);                                   \
-            if (n > (max_count)) {                                             \
-                fprintf(stderr, "serializer: %s array has %d items "           \
-                        "(max %d)\n", json_key, n, (max_count));               \
-                return -1;                                                     \
-            }                                                                  \
-            def->count_field = n;                                              \
-            for (int idx = 0; idx < n; idx++) {                                \
-                const cJSON *elem = cJSON_GetArrayItem(arr, idx);              \
-                parse_body                                                     \
-            }                                                                  \
-        }                                                                      \
-    } while (0)
-
-int level_from_json(const cJSON *json, LevelDef *def) {
-    if (!json || !def) return -1;
-
-    /*
-     * Zero the entire struct first.  This sets all counts to 0, all
-     * floats to 0.0, and all pointers to NULL — a clean starting state.
-     * Any arrays missing from the JSON will naturally have count = 0.
-     */
-    memset(def, 0, sizeof(*def));
-
-    /* ---- Name ---------------------------------------------------- */
-
-    /*
-     * get_string returns the cJSON-owned string or our fallback.
-     * Copy into the fixed-size name buffer so the LevelDef outlives
-     * the cJSON tree that gets freed after parsing.
-     */
-    const char *name_str = get_string(json, "name", "Untitled");
-    strncpy(def->name, name_str, sizeof(def->name) - 1);
-    def->name[sizeof(def->name) - 1] = '\0';
-    def->screen_count = (int)get_number(json, "screen_count", 4);
-
-    /* ---- Sea gaps ------------------------------------------------ */
-
-    {
-        const cJSON *arr = cJSON_GetObjectItemCaseSensitive(json, "sea_gaps");
-        if (cJSON_IsArray(arr)) {
-            int n = cJSON_GetArraySize(arr);
-            if (n > MAX_SEA_GAPS) {
-                fprintf(stderr, "serializer: sea_gaps array has %d items "
-                        "(max %d)\n", n, MAX_SEA_GAPS);
-                return -1;
-            }
-            def->sea_gap_count = n;
-            for (int i = 0; i < n; i++) {
-                /*
-                 * cJSON_GetArrayItem — retrieve the i-th element of the array.
-                 * Sea gap values are plain integers (left-edge x coordinates),
-                 * stored as JSON numbers.  We cast the double to int.
-                 */
-                const cJSON *item = cJSON_GetArrayItem(arr, i);
-                def->sea_gaps[i] = cJSON_IsNumber(item) ? item->valueint : 0;
-            }
-        }
-    }
-
-    /* ---- Rails --------------------------------------------------- */
-
-    PARSE_ARRAY("rails", def->rails, rail_count, MAX_RAILS, {
-        def->rails[idx].layout  = rail_layout_from_str(
-            get_string(elem, "layout", "RECT"));
-        def->rails[idx].x       = (int)get_number(elem, "x", 0);
-        def->rails[idx].y       = (int)get_number(elem, "y", 0);
-        def->rails[idx].w       = (int)get_number(elem, "w", 0);
-        def->rails[idx].h       = (int)get_number(elem, "h", 0);
-        def->rails[idx].end_cap = (int)get_number(elem, "end_cap", 0);
-    });
-
-    /* ---- Platforms ------------------------------------------------ */
-
-    PARSE_ARRAY("platforms", def->platforms, platform_count, MAX_PLATFORMS, {
-        def->platforms[idx].x           = (float)get_number(elem, "x", 0);
-        def->platforms[idx].tile_height = (int)get_number(elem, "tile_height", 1);
-        def->platforms[idx].tile_width  = (int)get_number(elem, "tile_width", 1);
-    });
-
-    /* ---- Coins --------------------------------------------------- */
-
-    PARSE_ARRAY("coins", def->coins, coin_count, MAX_COINS, {
-        def->coins[idx].x = (float)get_number(elem, "x", 0);
-        def->coins[idx].y = (float)get_number(elem, "y", 0);
-    });
-
-    /* ---- Star yellows --------------------------------------------- */
-
-    PARSE_ARRAY("star_yellows", def->star_yellows, star_yellow_count,
-                MAX_STAR_YELLOWS, {
-        def->star_yellows[idx].x = (float)get_number(elem, "x", 0);
-        def->star_yellows[idx].y = (float)get_number(elem, "y", 0);
-    });
-
-    /* ---- Star greens ---------------------------------------------- */
-
-    PARSE_ARRAY("star_greens", def->star_greens, star_green_count,
-                MAX_STAR_YELLOWS, {
-        def->star_greens[idx].x = (float)get_number(elem, "x", 0);
-        def->star_greens[idx].y = (float)get_number(elem, "y", 0);
-    });
-
-    /* ---- Star reds ------------------------------------------------ */
-
-    PARSE_ARRAY("star_reds", def->star_reds, star_red_count,
-                MAX_STAR_YELLOWS, {
-        def->star_reds[idx].x = (float)get_number(elem, "x", 0);
-        def->star_reds[idx].y = (float)get_number(elem, "y", 0);
-    });
-
-    /* ---- Last star (single object, not array) -------------------- */
-
-    {
-        /*
-         * last_star is a single JSON object, not an array.  We read it
-         * directly from the root.  If missing, x and y stay at 0 from
-         * the memset above.
-         */
-        const cJSON *ls = cJSON_GetObjectItemCaseSensitive(json, "last_star");
-        if (cJSON_IsObject(ls)) {
-            def->last_star.x = (float)get_number(ls, "x", 0);
-            def->last_star.y = (float)get_number(ls, "y", 0);
-        }
-    }
-
-    /* ---- Spiders ------------------------------------------------- */
-
-    PARSE_ARRAY("spiders", def->spiders, spider_count, MAX_SPIDERS, {
-        def->spiders[idx].x           = (float)get_number(elem, "x", 0);
-        def->spiders[idx].vx          = (float)get_number(elem, "vx", 0);
-        def->spiders[idx].patrol_x0   = (float)get_number(elem, "patrol_x0", 0);
-        def->spiders[idx].patrol_x1   = (float)get_number(elem, "patrol_x1", 0);
-        def->spiders[idx].frame_index = (int)get_number(elem, "frame_index", 0);
-    });
-
-    /* ---- Jumping spiders ----------------------------------------- */
-
-    PARSE_ARRAY("jumping_spiders", def->jumping_spiders, jumping_spider_count,
-                MAX_JUMPING_SPIDERS, {
-        def->jumping_spiders[idx].x         = (float)get_number(elem, "x", 0);
-        def->jumping_spiders[idx].vx        = (float)get_number(elem, "vx", 0);
-        def->jumping_spiders[idx].patrol_x0 = (float)get_number(elem, "patrol_x0", 0);
-        def->jumping_spiders[idx].patrol_x1 = (float)get_number(elem, "patrol_x1", 0);
-    });
-
-    /* ---- Birds --------------------------------------------------- */
-
-    PARSE_ARRAY("birds", def->birds, bird_count, MAX_BIRDS, {
-        def->birds[idx].x           = (float)get_number(elem, "x", 0);
-        def->birds[idx].base_y      = (float)get_number(elem, "base_y", 0);
-        def->birds[idx].vx          = (float)get_number(elem, "vx", 0);
-        def->birds[idx].patrol_x0   = (float)get_number(elem, "patrol_x0", 0);
-        def->birds[idx].patrol_x1   = (float)get_number(elem, "patrol_x1", 0);
-        def->birds[idx].frame_index = (int)get_number(elem, "frame_index", 0);
-    });
-
-    /* ---- Faster birds -------------------------------------------- */
-
-    PARSE_ARRAY("faster_birds", def->faster_birds, faster_bird_count,
-                MAX_FASTER_BIRDS, {
-        def->faster_birds[idx].x           = (float)get_number(elem, "x", 0);
-        def->faster_birds[idx].base_y      = (float)get_number(elem, "base_y", 0);
-        def->faster_birds[idx].vx          = (float)get_number(elem, "vx", 0);
-        def->faster_birds[idx].patrol_x0   = (float)get_number(elem, "patrol_x0", 0);
-        def->faster_birds[idx].patrol_x1   = (float)get_number(elem, "patrol_x1", 0);
-        def->faster_birds[idx].frame_index = (int)get_number(elem, "frame_index", 0);
-    });
-
-    /* ---- Fish ---------------------------------------------------- */
-
-    PARSE_ARRAY("fish", def->fish, fish_count, MAX_FISH, {
-        def->fish[idx].x         = (float)get_number(elem, "x", 0);
-        def->fish[idx].vx        = (float)get_number(elem, "vx", 0);
-        def->fish[idx].patrol_x0 = (float)get_number(elem, "patrol_x0", 0);
-        def->fish[idx].patrol_x1 = (float)get_number(elem, "patrol_x1", 0);
-    });
-
-    /* ---- Faster fish --------------------------------------------- */
-
-    PARSE_ARRAY("faster_fish", def->faster_fish, faster_fish_count,
-                MAX_FASTER_FISH, {
-        def->faster_fish[idx].x         = (float)get_number(elem, "x", 0);
-        def->faster_fish[idx].vx        = (float)get_number(elem, "vx", 0);
-        def->faster_fish[idx].patrol_x0 = (float)get_number(elem, "patrol_x0", 0);
-        def->faster_fish[idx].patrol_x1 = (float)get_number(elem, "patrol_x1", 0);
-    });
-
-    /* ---- Axe traps ----------------------------------------------- */
-
-    PARSE_ARRAY("axe_traps", def->axe_traps, axe_trap_count, MAX_AXE_TRAPS, {
-        def->axe_traps[idx].pillar_x = (float)get_number(elem, "pillar_x", 0);
-        def->axe_traps[idx].y        = (float)get_number(elem, "y", 0);
-        def->axe_traps[idx].mode     = axe_mode_from_str(
-            get_string(elem, "mode", "PENDULUM"));
-    });
-
-    /* ---- Circular saws ------------------------------------------- */
-
-    PARSE_ARRAY("circular_saws", def->circular_saws, circular_saw_count,
-                MAX_CIRCULAR_SAWS, {
-        def->circular_saws[idx].x         = (float)get_number(elem, "x", 0);
-        def->circular_saws[idx].y         = (float)get_number(elem, "y", 0);
-        def->circular_saws[idx].patrol_x0 = (float)get_number(elem, "patrol_x0", 0);
-        def->circular_saws[idx].patrol_x1 = (float)get_number(elem, "patrol_x1", 0);
-        def->circular_saws[idx].direction = (int)get_number(elem, "direction", 1);
-    });
-
-    /* ---- Spike rows ---------------------------------------------- */
-
-    PARSE_ARRAY("spike_rows", def->spike_rows, spike_row_count,
-                MAX_SPIKE_ROWS, {
-        def->spike_rows[idx].x     = (float)get_number(elem, "x", 0);
-        def->spike_rows[idx].count = (int)get_number(elem, "count", 1);
-    });
-
-    /* ---- Spike platforms ----------------------------------------- */
-
-    PARSE_ARRAY("spike_platforms", def->spike_platforms, spike_platform_count,
-                MAX_SPIKE_PLATFORMS, {
-        def->spike_platforms[idx].x          = (float)get_number(elem, "x", 0);
-        def->spike_platforms[idx].y          = (float)get_number(elem, "y", 0);
-        def->spike_platforms[idx].tile_count = (int)get_number(elem, "tile_count", 1);
-    });
-
-    /* ---- Spike blocks -------------------------------------------- */
-
-    PARSE_ARRAY("spike_blocks", def->spike_blocks, spike_block_count,
-                MAX_SPIKE_BLOCKS, {
-        def->spike_blocks[idx].rail_index = (int)get_number(elem, "rail_index", 0);
-        def->spike_blocks[idx].t_offset   = (float)get_number(elem, "t_offset", 0);
-        def->spike_blocks[idx].speed      = (float)get_number(elem, "speed", 0);
-    });
-
-    /* ---- Blue flames -------------------------------------------- */
-
-    PARSE_ARRAY("blue_flames", def->blue_flames, blue_flame_count,
-                MAX_BLUE_FLAMES, {
-        def->blue_flames[idx].x = (float)get_number(elem, "x", 0);
-    });
-
-    /* ---- Fire flames -------------------------------------------- */
-
-    PARSE_ARRAY("fire_flames", def->fire_flames, fire_flame_count,
-                MAX_BLUE_FLAMES, {
-        def->fire_flames[idx].x = (float)get_number(elem, "x", 0);
-    });
-
-    /* ---- Float platforms ----------------------------------------- */
-
-    PARSE_ARRAY("float_platforms", def->float_platforms, float_platform_count,
-                MAX_FLOAT_PLATFORMS, {
-        def->float_platforms[idx].mode       = float_mode_from_str(
-            get_string(elem, "mode", "STATIC"));
-        def->float_platforms[idx].x          = (float)get_number(elem, "x", 0);
-        def->float_platforms[idx].y          = (float)get_number(elem, "y", 0);
-        def->float_platforms[idx].tile_count = (int)get_number(elem, "tile_count", 1);
-        def->float_platforms[idx].rail_index = (int)get_number(elem, "rail_index", 0);
-        def->float_platforms[idx].t_offset   = (float)get_number(elem, "t_offset", 0);
-        def->float_platforms[idx].speed      = (float)get_number(elem, "speed", 0);
-    });
-
-    /* ---- Bridges ------------------------------------------------- */
-
-    PARSE_ARRAY("bridges", def->bridges, bridge_count, MAX_BRIDGES, {
-        def->bridges[idx].x           = (float)get_number(elem, "x", 0);
-        def->bridges[idx].y           = (float)get_number(elem, "y", 0);
-        def->bridges[idx].brick_count = (int)get_number(elem, "brick_count", 1);
-    });
-
-    /* ---- Bouncepads (small) -------------------------------------- */
-
-    PARSE_ARRAY("bouncepads_small", def->bouncepads_small, bouncepad_small_count,
-                MAX_BOUNCEPADS_SMALL, {
-        def->bouncepads_small[idx].x         = (float)get_number(elem, "x", 0);
-        def->bouncepads_small[idx].launch_vy = (float)get_number(elem, "launch_vy", 0);
-        def->bouncepads_small[idx].pad_type  = bouncepad_type_from_str(
-            get_string(elem, "pad_type", "GREEN"));
-    });
-
-    /* ---- Bouncepads (medium) ------------------------------------- */
-
-    PARSE_ARRAY("bouncepads_medium", def->bouncepads_medium,
-                bouncepad_medium_count, MAX_BOUNCEPADS_MEDIUM, {
-        def->bouncepads_medium[idx].x         = (float)get_number(elem, "x", 0);
-        def->bouncepads_medium[idx].launch_vy = (float)get_number(elem, "launch_vy", 0);
-        def->bouncepads_medium[idx].pad_type  = bouncepad_type_from_str(
-            get_string(elem, "pad_type", "WOOD"));
-    });
-
-    /* ---- Bouncepads (high) --------------------------------------- */
-
-    PARSE_ARRAY("bouncepads_high", def->bouncepads_high, bouncepad_high_count,
-                MAX_BOUNCEPADS_HIGH, {
-        def->bouncepads_high[idx].x         = (float)get_number(elem, "x", 0);
-        def->bouncepads_high[idx].launch_vy = (float)get_number(elem, "launch_vy", 0);
-        def->bouncepads_high[idx].pad_type  = bouncepad_type_from_str(
-            get_string(elem, "pad_type", "RED"));
-    });
-
-    /* ---- Vines --------------------------------------------------- */
-
-    PARSE_ARRAY("vines", def->vines, vine_count, MAX_VINES, {
-        def->vines[idx].x          = (float)get_number(elem, "x", 0);
-        def->vines[idx].y          = (float)get_number(elem, "y", 0);
-        def->vines[idx].tile_count = (int)get_number(elem, "tile_count", 1);
-    });
-
-    /* ---- Ladders ------------------------------------------------- */
-
-    PARSE_ARRAY("ladders", def->ladders, ladder_count, MAX_LADDERS, {
-        def->ladders[idx].x          = (float)get_number(elem, "x", 0);
-        def->ladders[idx].y          = (float)get_number(elem, "y", 0);
-        def->ladders[idx].tile_count = (int)get_number(elem, "tile_count", 1);
-    });
-
-    /* ---- Ropes --------------------------------------------------- */
-
-    PARSE_ARRAY("ropes", def->ropes, rope_count, MAX_ROPES, {
-        def->ropes[idx].x          = (float)get_number(elem, "x", 0);
-        def->ropes[idx].y          = (float)get_number(elem, "y", 0);
-        def->ropes[idx].tile_count = (int)get_number(elem, "tile_count", 1);
-    });
-
-    /* ---- Level-wide configuration ----------------------------------- */
-
-    /* Parallax layers */
-    {
-        const cJSON *plx = cJSON_GetObjectItemCaseSensitive(json, "parallax_layers");
-        if (cJSON_IsArray(plx)) {
-            int n = cJSON_GetArraySize(plx);
-            if (n > PARALLAX_MAX_LAYERS) n = PARALLAX_MAX_LAYERS;
-            def->parallax_layer_count = n;
-            for (int i = 0; i < n; i++) {
-                const cJSON *elem = cJSON_GetArrayItem(plx, i);
-                const cJSON *p = cJSON_GetObjectItemCaseSensitive(elem, "path");
-                if (cJSON_IsString(p) && p->valuestring) {
-                    strncpy(def->parallax_layers[i].path, p->valuestring, 63);
-                    def->parallax_layers[i].path[63] = '\0';
-                }
-                def->parallax_layers[i].speed = (float)get_number(elem, "speed", 0);
-            }
-        }
-    }
-
-    /* Foreground layers */
-    {
-        const cJSON *fg = cJSON_GetObjectItemCaseSensitive(json, "foreground_layers");
-        if (cJSON_IsArray(fg)) {
-            int n = cJSON_GetArraySize(fg);
-            if (n > PARALLAX_MAX_LAYERS) n = PARALLAX_MAX_LAYERS;
-            def->foreground_layer_count = n;
-            for (int i = 0; i < n; i++) {
-                const cJSON *elem = cJSON_GetArrayItem(fg, i);
-                const cJSON *p = cJSON_GetObjectItemCaseSensitive(elem, "path");
-                if (cJSON_IsString(p) && p->valuestring) {
-                    strncpy(def->foreground_layers[i].path, p->valuestring, 63);
-                    def->foreground_layers[i].path[63] = '\0';
-                }
-                def->foreground_layers[i].speed = (float)get_number(elem, "speed", 0);
-            }
-        }
-    }
-
-    /* Player spawn */
-    def->player_start_x = (float)get_number(json, "player_start_x", 0);
-    def->player_start_y = (float)get_number(json, "player_start_y", 0);
-
-    /* Music */
-    {
-        const cJSON *mp = cJSON_GetObjectItemCaseSensitive(json, "music_path");
-        if (cJSON_IsString(mp) && mp->valuestring) {
-            strncpy(def->music_path, mp->valuestring, 63);
-            def->music_path[63] = '\0';
-        }
-    }
-    def->music_volume = (int)get_number(json, "music_volume", 0);
-
-    /* Floor tile */
-    {
-        const cJSON *fp = cJSON_GetObjectItemCaseSensitive(json, "floor_tile_path");
-        if (cJSON_IsString(fp) && fp->valuestring) {
-            strncpy(def->floor_tile_path, fp->valuestring, 63);
-            def->floor_tile_path[63] = '\0';
-        }
-    }
-
-    /* Game rules */
-    def->initial_hearts = (int)get_number(json, "initial_hearts", 0);
-    def->initial_lives  = (int)get_number(json, "initial_lives", 0);
-    def->score_per_life = (int)get_number(json, "score_per_life", 0);
-
-    return 0;
-}
-
-#undef PARSE_ARRAY
-
-/* ================================================================== */
-/* level_save_json — Write a LevelDef to a pretty-printed JSON file    */
-/* ================================================================== */
-
-int level_save_json(const LevelDef *def, const char *path) {
+int level_save_toml(const LevelDef *def, const char *path) {
     if (!def || !path) return -1;
 
-    /* Build the cJSON tree from the level definition. */
-    cJSON *root = level_to_json(def);
-    if (!root) {
-        fprintf(stderr, "serializer: failed to build JSON tree\n");
-        return -1;
-    }
-
     /*
-     * cJSON_Print — render the entire tree as a pretty-printed JSON string.
-     * Returns a malloc'd char* with indentation and newlines for readability.
-     * The caller must free() it when done.
-     */
-    char *json_str = cJSON_Print(root);
-    if (!json_str) {
-        fprintf(stderr, "serializer: cJSON_Print failed\n");
-        cJSON_Delete(root);
-        return -1;
-    }
-
-    /*
-     * Write the JSON string to disk.  On POSIX we use open() with explicit
+     * Open the output file.  On POSIX we use open() with explicit
      * 0644 permissions so the file is owner-writable only, not world-writable.
      */
 #if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
@@ -1038,117 +165,787 @@ int level_save_json(const LevelDef *def, const char *path) {
 #endif
     if (!fp) {
         fprintf(stderr, "serializer: cannot open '%s' for writing\n", path);
-        free(json_str);
-        cJSON_Delete(root);
         return -1;
     }
 
-    /*
-     * fputs — write the null-terminated string to the file.
-     * We add a trailing newline so the file ends cleanly (POSIX convention).
-     */
-    fputs(json_str, fp);
-    fputc('\n', fp);
+    /* ---- Header / name ------------------------------------------- */
+
+    fprintf(fp, "# Level: %s\n", def->name[0] ? def->name : "Untitled");
+    fprintf(fp, "name = \"%s\"\n", def->name[0] ? def->name : "Untitled");
+    fprintf(fp, "screen_count = %d\n", def->screen_count);
+
+    /* ---- Sea gaps (plain integer array) -------------------------- */
+
+    if (def->sea_gap_count > 0) {
+        fprintf(fp, "sea_gaps = [");
+        for (int i = 0; i < def->sea_gap_count; i++) {
+            if (i > 0) fprintf(fp, ", ");
+            fprintf(fp, "%d", def->sea_gaps[i]);
+        }
+        fprintf(fp, "]\n");
+    }
+
+    fprintf(fp, "\n");
+
+    /* ---- Rails --------------------------------------------------- */
+
+    for (int i = 0; i < def->rail_count; i++) {
+        const RailPlacement *r = &def->rails[i];
+        fprintf(fp, "[[rails]]\n");
+        fprintf(fp, "layout = \"%s\"\n", rail_layout_to_str(r->layout));
+        fprintf(fp, "x = %d\n", r->x);
+        fprintf(fp, "y = %d\n", r->y);
+        fprintf(fp, "w = %d\n", r->w);
+        fprintf(fp, "h = %d\n", r->h);
+        fprintf(fp, "end_cap = %d\n", r->end_cap);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Platforms ------------------------------------------------ */
+
+    for (int i = 0; i < def->platform_count; i++) {
+        const PlatformPlacement *p = &def->platforms[i];
+        fprintf(fp, "[[platforms]]\n");
+        fprintf(fp, "x = %.1f\n", (double)p->x);
+        fprintf(fp, "tile_height = %d\n", p->tile_height);
+        fprintf(fp, "tile_width = %d\n", p->tile_width);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Coins --------------------------------------------------- */
+
+    for (int i = 0; i < def->coin_count; i++) {
+        const CoinPlacement *c = &def->coins[i];
+        fprintf(fp, "[[coins]]\n");
+        fprintf(fp, "x = %.1f\n", (double)c->x);
+        fprintf(fp, "y = %.1f\n", (double)c->y);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Star yellows --------------------------------------------- */
+
+    for (int i = 0; i < def->star_yellow_count; i++) {
+        const StarYellowPlacement *s = &def->star_yellows[i];
+        fprintf(fp, "[[star_yellows]]\n");
+        fprintf(fp, "x = %.1f\n", (double)s->x);
+        fprintf(fp, "y = %.1f\n", (double)s->y);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Star greens ---------------------------------------------- */
+
+    for (int i = 0; i < def->star_green_count; i++) {
+        const StarGreenPlacement *s = &def->star_greens[i];
+        fprintf(fp, "[[star_greens]]\n");
+        fprintf(fp, "x = %.1f\n", (double)s->x);
+        fprintf(fp, "y = %.1f\n", (double)s->y);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Star reds ------------------------------------------------ */
+
+    for (int i = 0; i < def->star_red_count; i++) {
+        const StarRedPlacement *s = &def->star_reds[i];
+        fprintf(fp, "[[star_reds]]\n");
+        fprintf(fp, "x = %.1f\n", (double)s->x);
+        fprintf(fp, "y = %.1f\n", (double)s->y);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Last star (single table, not array) --------------------- */
+
+    {
+        const LastStarPlacement *ls = &def->last_star;
+        fprintf(fp, "[last_star]\n");
+        fprintf(fp, "x = %.1f\n", (double)ls->x);
+        fprintf(fp, "y = %.1f\n", (double)ls->y);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Spiders ------------------------------------------------- */
+
+    for (int i = 0; i < def->spider_count; i++) {
+        const SpiderPlacement *sp = &def->spiders[i];
+        fprintf(fp, "[[spiders]]\n");
+        fprintf(fp, "x = %.1f\n", (double)sp->x);
+        fprintf(fp, "vx = %.1f\n", (double)sp->vx);
+        fprintf(fp, "patrol_x0 = %.1f\n", (double)sp->patrol_x0);
+        fprintf(fp, "patrol_x1 = %.1f\n", (double)sp->patrol_x1);
+        fprintf(fp, "frame_index = %d\n", sp->frame_index);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Jumping spiders ----------------------------------------- */
+
+    for (int i = 0; i < def->jumping_spider_count; i++) {
+        const JumpingSpiderPlacement *js = &def->jumping_spiders[i];
+        fprintf(fp, "[[jumping_spiders]]\n");
+        fprintf(fp, "x = %.1f\n", (double)js->x);
+        fprintf(fp, "vx = %.1f\n", (double)js->vx);
+        fprintf(fp, "patrol_x0 = %.1f\n", (double)js->patrol_x0);
+        fprintf(fp, "patrol_x1 = %.1f\n", (double)js->patrol_x1);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Birds --------------------------------------------------- */
+
+    for (int i = 0; i < def->bird_count; i++) {
+        const BirdPlacement *b = &def->birds[i];
+        fprintf(fp, "[[birds]]\n");
+        fprintf(fp, "x = %.1f\n", (double)b->x);
+        fprintf(fp, "base_y = %.1f\n", (double)b->base_y);
+        fprintf(fp, "vx = %.1f\n", (double)b->vx);
+        fprintf(fp, "patrol_x0 = %.1f\n", (double)b->patrol_x0);
+        fprintf(fp, "patrol_x1 = %.1f\n", (double)b->patrol_x1);
+        fprintf(fp, "frame_index = %d\n", b->frame_index);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Faster birds -------------------------------------------- */
+
+    for (int i = 0; i < def->faster_bird_count; i++) {
+        const BirdPlacement *b = &def->faster_birds[i];
+        fprintf(fp, "[[faster_birds]]\n");
+        fprintf(fp, "x = %.1f\n", (double)b->x);
+        fprintf(fp, "base_y = %.1f\n", (double)b->base_y);
+        fprintf(fp, "vx = %.1f\n", (double)b->vx);
+        fprintf(fp, "patrol_x0 = %.1f\n", (double)b->patrol_x0);
+        fprintf(fp, "patrol_x1 = %.1f\n", (double)b->patrol_x1);
+        fprintf(fp, "frame_index = %d\n", b->frame_index);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Fish ---------------------------------------------------- */
+
+    for (int i = 0; i < def->fish_count; i++) {
+        const FishPlacement *f = &def->fish[i];
+        fprintf(fp, "[[fish]]\n");
+        fprintf(fp, "x = %.1f\n", (double)f->x);
+        fprintf(fp, "vx = %.1f\n", (double)f->vx);
+        fprintf(fp, "patrol_x0 = %.1f\n", (double)f->patrol_x0);
+        fprintf(fp, "patrol_x1 = %.1f\n", (double)f->patrol_x1);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Faster fish --------------------------------------------- */
+
+    for (int i = 0; i < def->faster_fish_count; i++) {
+        const FishPlacement *f = &def->faster_fish[i];
+        fprintf(fp, "[[faster_fish]]\n");
+        fprintf(fp, "x = %.1f\n", (double)f->x);
+        fprintf(fp, "vx = %.1f\n", (double)f->vx);
+        fprintf(fp, "patrol_x0 = %.1f\n", (double)f->patrol_x0);
+        fprintf(fp, "patrol_x1 = %.1f\n", (double)f->patrol_x1);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Axe traps ----------------------------------------------- */
+
+    for (int i = 0; i < def->axe_trap_count; i++) {
+        const AxeTrapPlacement *a = &def->axe_traps[i];
+        fprintf(fp, "[[axe_traps]]\n");
+        fprintf(fp, "pillar_x = %.1f\n", (double)a->pillar_x);
+        fprintf(fp, "y = %.1f\n", (double)a->y);
+        fprintf(fp, "mode = \"%s\"\n", axe_mode_to_str(a->mode));
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Circular saws ------------------------------------------- */
+
+    for (int i = 0; i < def->circular_saw_count; i++) {
+        const CircularSawPlacement *cs = &def->circular_saws[i];
+        fprintf(fp, "[[circular_saws]]\n");
+        fprintf(fp, "x = %.1f\n", (double)cs->x);
+        fprintf(fp, "y = %.1f\n", (double)cs->y);
+        fprintf(fp, "patrol_x0 = %.1f\n", (double)cs->patrol_x0);
+        fprintf(fp, "patrol_x1 = %.1f\n", (double)cs->patrol_x1);
+        fprintf(fp, "direction = %d\n", cs->direction);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Spike rows ---------------------------------------------- */
+
+    for (int i = 0; i < def->spike_row_count; i++) {
+        const SpikeRowPlacement *sr = &def->spike_rows[i];
+        fprintf(fp, "[[spike_rows]]\n");
+        fprintf(fp, "x = %.1f\n", (double)sr->x);
+        fprintf(fp, "count = %d\n", sr->count);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Spike platforms ----------------------------------------- */
+
+    for (int i = 0; i < def->spike_platform_count; i++) {
+        const SpikePlatformPlacement *sp = &def->spike_platforms[i];
+        fprintf(fp, "[[spike_platforms]]\n");
+        fprintf(fp, "x = %.1f\n", (double)sp->x);
+        fprintf(fp, "y = %.1f\n", (double)sp->y);
+        fprintf(fp, "tile_count = %d\n", sp->tile_count);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Spike blocks -------------------------------------------- */
+
+    for (int i = 0; i < def->spike_block_count; i++) {
+        const SpikeBlockPlacement *sb = &def->spike_blocks[i];
+        fprintf(fp, "[[spike_blocks]]\n");
+        fprintf(fp, "rail_index = %d\n", sb->rail_index);
+        fprintf(fp, "t_offset = %.1f\n", (double)sb->t_offset);
+        fprintf(fp, "speed = %.1f\n", (double)sb->speed);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Blue flames --------------------------------------------- */
+
+    for (int i = 0; i < def->blue_flame_count; i++) {
+        fprintf(fp, "[[blue_flames]]\n");
+        fprintf(fp, "x = %.1f\n", (double)def->blue_flames[i].x);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Fire flames --------------------------------------------- */
+
+    for (int i = 0; i < def->fire_flame_count; i++) {
+        fprintf(fp, "[[fire_flames]]\n");
+        fprintf(fp, "x = %.1f\n", (double)def->fire_flames[i].x);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Float platforms ----------------------------------------- */
+
+    for (int i = 0; i < def->float_platform_count; i++) {
+        const FloatPlatformPlacement *fl = &def->float_platforms[i];
+        fprintf(fp, "[[float_platforms]]\n");
+        fprintf(fp, "mode = \"%s\"\n", float_mode_to_str(fl->mode));
+        fprintf(fp, "x = %.1f\n", (double)fl->x);
+        fprintf(fp, "y = %.1f\n", (double)fl->y);
+        fprintf(fp, "tile_count = %d\n", fl->tile_count);
+        fprintf(fp, "rail_index = %d\n", fl->rail_index);
+        fprintf(fp, "t_offset = %.1f\n", (double)fl->t_offset);
+        fprintf(fp, "speed = %.1f\n", (double)fl->speed);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Bridges ------------------------------------------------- */
+
+    for (int i = 0; i < def->bridge_count; i++) {
+        const BridgePlacement *br = &def->bridges[i];
+        fprintf(fp, "[[bridges]]\n");
+        fprintf(fp, "x = %.1f\n", (double)br->x);
+        fprintf(fp, "y = %.1f\n", (double)br->y);
+        fprintf(fp, "brick_count = %d\n", br->brick_count);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Bouncepads (small) -------------------------------------- */
+
+    for (int i = 0; i < def->bouncepad_small_count; i++) {
+        const BouncepadPlacement *bp = &def->bouncepads_small[i];
+        fprintf(fp, "[[bouncepads_small]]\n");
+        fprintf(fp, "x = %.1f\n", (double)bp->x);
+        fprintf(fp, "launch_vy = %.1f\n", (double)bp->launch_vy);
+        fprintf(fp, "pad_type = \"%s\"\n", bouncepad_type_to_str(bp->pad_type));
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Bouncepads (medium) ------------------------------------- */
+
+    for (int i = 0; i < def->bouncepad_medium_count; i++) {
+        const BouncepadPlacement *bp = &def->bouncepads_medium[i];
+        fprintf(fp, "[[bouncepads_medium]]\n");
+        fprintf(fp, "x = %.1f\n", (double)bp->x);
+        fprintf(fp, "launch_vy = %.1f\n", (double)bp->launch_vy);
+        fprintf(fp, "pad_type = \"%s\"\n", bouncepad_type_to_str(bp->pad_type));
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Bouncepads (high) --------------------------------------- */
+
+    for (int i = 0; i < def->bouncepad_high_count; i++) {
+        const BouncepadPlacement *bp = &def->bouncepads_high[i];
+        fprintf(fp, "[[bouncepads_high]]\n");
+        fprintf(fp, "x = %.1f\n", (double)bp->x);
+        fprintf(fp, "launch_vy = %.1f\n", (double)bp->launch_vy);
+        fprintf(fp, "pad_type = \"%s\"\n", bouncepad_type_to_str(bp->pad_type));
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Vines --------------------------------------------------- */
+
+    for (int i = 0; i < def->vine_count; i++) {
+        const VinePlacement *v = &def->vines[i];
+        fprintf(fp, "[[vines]]\n");
+        fprintf(fp, "x = %.1f\n", (double)v->x);
+        fprintf(fp, "y = %.1f\n", (double)v->y);
+        fprintf(fp, "tile_count = %d\n", v->tile_count);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Ladders ------------------------------------------------- */
+
+    for (int i = 0; i < def->ladder_count; i++) {
+        const LadderPlacement *l = &def->ladders[i];
+        fprintf(fp, "[[ladders]]\n");
+        fprintf(fp, "x = %.1f\n", (double)l->x);
+        fprintf(fp, "y = %.1f\n", (double)l->y);
+        fprintf(fp, "tile_count = %d\n", l->tile_count);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Ropes --------------------------------------------------- */
+
+    for (int i = 0; i < def->rope_count; i++) {
+        const RopePlacement *rp = &def->ropes[i];
+        fprintf(fp, "[[ropes]]\n");
+        fprintf(fp, "x = %.1f\n", (double)rp->x);
+        fprintf(fp, "y = %.1f\n", (double)rp->y);
+        fprintf(fp, "tile_count = %d\n", rp->tile_count);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Parallax layers ----------------------------------------- */
+
+    for (int i = 0; i < def->parallax_layer_count; i++) {
+        fprintf(fp, "[[parallax_layers]]\n");
+        fprintf(fp, "path = \"%s\"\n", def->parallax_layers[i].path);
+        fprintf(fp, "speed = %.1f\n", (double)def->parallax_layers[i].speed);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Foreground layers --------------------------------------- */
+
+    for (int i = 0; i < def->foreground_layer_count; i++) {
+        fprintf(fp, "[[foreground_layers]]\n");
+        fprintf(fp, "path = \"%s\"\n", def->foreground_layers[i].path);
+        fprintf(fp, "speed = %.1f\n", (double)def->foreground_layers[i].speed);
+        fprintf(fp, "\n");
+    }
+
+    /* ---- Level-wide configuration -------------------------------- */
+
+    fprintf(fp, "player_start_x = %.1f\n", (double)def->player_start_x);
+    fprintf(fp, "player_start_y = %.1f\n", (double)def->player_start_y);
+    fprintf(fp, "music_path = \"%s\"\n", def->music_path);
+    fprintf(fp, "music_volume = %d\n", def->music_volume);
+    fprintf(fp, "floor_tile_path = \"%s\"\n", def->floor_tile_path);
+    fprintf(fp, "initial_hearts = %d\n", def->initial_hearts);
+    fprintf(fp, "initial_lives = %d\n", def->initial_lives);
+    fprintf(fp, "score_per_life = %d\n", def->score_per_life);
+
     fclose(fp);
-
-    /*
-     * Clean up: free the rendered string and the cJSON tree.
-     * cJSON_Print uses stdlib malloc internally, so plain free() is correct.
-     * cJSON_Delete recursively frees all nodes in the tree.
-     */
-    free(json_str);
-    cJSON_Delete(root);
-
     return 0;
 }
 
 /* ================================================================== */
-/* level_load_json — Read a JSON file and populate a LevelDef          */
+/* level_load_toml — Read a TOML file and populate a LevelDef          */
 /* ================================================================== */
 
-int level_load_json(const char *path, LevelDef *def) {
+/*
+ * PARSE_ARRAY — helper macro to reduce repetition when reading entity arrays.
+ *
+ * For each TOML array-of-tables named `toml_key`, this macro:
+ *   1. Looks up the array in the top-level table.
+ *   2. Checks that its size doesn't exceed `max_count`.
+ *   3. Iterates over each element and calls the `parse_body` block,
+ *      where `elem` is the current toml_datum_t (a table) and `idx`
+ *      is the 0-based index into the destination array.
+ *
+ * If the key is missing from the TOML, the count stays at 0 (lenient).
+ * If the array exceeds the maximum, the function returns -1 immediately.
+ */
+#define PARSE_ARRAY(toml_key, count_field, max_count, parse_body)          \
+    do {                                                                    \
+        toml_datum_t arr_d = toml_get(top, toml_key);                      \
+        if (arr_d.type == TOML_ARRAY) {                                    \
+            int n = arr_d.u.arr.size;                                      \
+            if (n > (max_count)) {                                         \
+                fprintf(stderr, "serializer: %s array has %d items "       \
+                        "(max %d)\n", toml_key, n, (max_count));           \
+                toml_free(r);                                              \
+                return -1;                                                 \
+            }                                                              \
+            def->count_field = n;                                          \
+            for (int idx = 0; idx < n; idx++) {                            \
+                toml_datum_t elem = arr_d.u.arr.elem[idx];                 \
+                parse_body                                                 \
+            }                                                              \
+        }                                                                  \
+    } while (0)
+
+int level_load_toml(const char *path, LevelDef *def) {
     if (!path || !def) return -1;
 
     /*
-     * Step 1: Read the entire file into memory.
+     * toml_parse_file_ex — open and parse a TOML file in one call.
      *
-     * We need the whole file as a contiguous string for cJSON_Parse.
-     * fseek/ftell gives us the size; then we malloc a buffer and fread.
+     * Returns a toml_result_t.  If parsing fails, r.ok is false and
+     * r.errmsg contains a human-readable error description.  On success,
+     * r.toptab is the root TOML table we can query with toml_get().
      */
-    FILE *fp = fopen(path, "rb");
-    if (!fp) {
-        fprintf(stderr, "serializer: cannot open '%s' for reading\n", path);
+    toml_result_t r = toml_parse_file_ex(path);
+    if (!r.ok) {
+        fprintf(stderr, "serializer: TOML parse error in '%s': %s\n",
+                path, r.errmsg);
         return -1;
     }
 
     /*
-     * fseek to the end, ftell to get the byte count, then rewind.
-     * This is the standard C idiom for measuring file size.
+     * Zero the entire struct first.  This sets all counts to 0, all
+     * floats to 0.0, and all pointers to NULL — a clean starting state.
+     * Any arrays missing from the TOML will naturally have count = 0.
      */
-    fseek(fp, 0, SEEK_END);
-    long file_size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
+    memset(def, 0, sizeof(*def));
 
-    if (file_size <= 0) {
-        fprintf(stderr, "serializer: '%s' is empty or unreadable\n", path);
-        fclose(fp);
-        return -1;
+    toml_datum_t top = r.toptab;
+
+    /* ---- Name ---------------------------------------------------- */
+
+    {
+        const char *name_str = get_str(top, "name", "Untitled");
+        strncpy(def->name, name_str, sizeof(def->name) - 1);
+        def->name[sizeof(def->name) - 1] = '\0';
+    }
+    def->screen_count = get_int(top, "screen_count", 4);
+
+    /* ---- Sea gaps ------------------------------------------------ */
+
+    {
+        toml_datum_t sg = toml_get(top, "sea_gaps");
+        if (sg.type == TOML_ARRAY) {
+            int n = sg.u.arr.size;
+            if (n > MAX_SEA_GAPS) {
+                fprintf(stderr, "serializer: sea_gaps array has %d items "
+                        "(max %d)\n", n, MAX_SEA_GAPS);
+                toml_free(r);
+                return -1;
+            }
+            def->sea_gap_count = n;
+            for (int i = 0; i < n; i++) {
+                toml_datum_t v = sg.u.arr.elem[i];
+                if (v.type == TOML_INT64)     def->sea_gaps[i] = (int)v.u.int64;
+                else if (v.type == TOML_FP64) def->sea_gaps[i] = (int)v.u.fp64;
+                else                          def->sea_gaps[i] = 0;
+            }
+        }
     }
 
-    /*
-     * Allocate file_size + 1 bytes: the extra byte is for the null terminator
-     * that cJSON_Parse expects (it parses a C string, not a raw buffer).
-     */
-    char *buf = (char *)malloc((size_t)file_size + 1);
-    if (!buf) {
-        fprintf(stderr, "serializer: malloc failed for %ld bytes\n", file_size);
-        fclose(fp);
-        return -1;
+    /* ---- Rails --------------------------------------------------- */
+
+    PARSE_ARRAY("rails", rail_count, MAX_RAILS, {
+        def->rails[idx].layout  = rail_layout_from_str(
+            get_str(elem, "layout", "RECT"));
+        def->rails[idx].x       = get_int(elem, "x", 0);
+        def->rails[idx].y       = get_int(elem, "y", 0);
+        def->rails[idx].w       = get_int(elem, "w", 0);
+        def->rails[idx].h       = get_int(elem, "h", 0);
+        def->rails[idx].end_cap = get_int(elem, "end_cap", 0);
+    });
+
+    /* ---- Platforms ------------------------------------------------ */
+
+    PARSE_ARRAY("platforms", platform_count, MAX_PLATFORMS, {
+        def->platforms[idx].x           = get_float(elem, "x", 0);
+        def->platforms[idx].tile_height = get_int(elem, "tile_height", 1);
+        def->platforms[idx].tile_width  = get_int(elem, "tile_width", 1);
+    });
+
+    /* ---- Coins --------------------------------------------------- */
+
+    PARSE_ARRAY("coins", coin_count, MAX_COINS, {
+        def->coins[idx].x = get_float(elem, "x", 0);
+        def->coins[idx].y = get_float(elem, "y", 0);
+    });
+
+    /* ---- Star yellows --------------------------------------------- */
+
+    PARSE_ARRAY("star_yellows", star_yellow_count, MAX_STAR_YELLOWS, {
+        def->star_yellows[idx].x = get_float(elem, "x", 0);
+        def->star_yellows[idx].y = get_float(elem, "y", 0);
+    });
+
+    /* ---- Star greens ---------------------------------------------- */
+
+    PARSE_ARRAY("star_greens", star_green_count, MAX_STAR_YELLOWS, {
+        def->star_greens[idx].x = get_float(elem, "x", 0);
+        def->star_greens[idx].y = get_float(elem, "y", 0);
+    });
+
+    /* ---- Star reds ------------------------------------------------ */
+
+    PARSE_ARRAY("star_reds", star_red_count, MAX_STAR_YELLOWS, {
+        def->star_reds[idx].x = get_float(elem, "x", 0);
+        def->star_reds[idx].y = get_float(elem, "y", 0);
+    });
+
+    /* ---- Last star (single table, not array) --------------------- */
+
+    {
+        toml_datum_t ls = toml_get(top, "last_star");
+        if (ls.type == TOML_TABLE) {
+            def->last_star.x = get_float(ls, "x", 0);
+            def->last_star.y = get_float(ls, "y", 0);
+        }
     }
 
-    /*
-     * fread — read the entire file into our buffer in one call.
-     * The return value is the number of items read (should equal file_size
-     * for a single-byte item size).
-     */
-    size_t bytes_read = fread(buf, 1, (size_t)file_size, fp);
-    fclose(fp);
+    /* ---- Spiders ------------------------------------------------- */
 
-    /* Null-terminate the buffer so cJSON can parse it as a C string. */
-    buf[bytes_read] = '\0';
+    PARSE_ARRAY("spiders", spider_count, MAX_SPIDERS, {
+        def->spiders[idx].x           = get_float(elem, "x", 0);
+        def->spiders[idx].vx          = get_float(elem, "vx", 0);
+        def->spiders[idx].patrol_x0   = get_float(elem, "patrol_x0", 0);
+        def->spiders[idx].patrol_x1   = get_float(elem, "patrol_x1", 0);
+        def->spiders[idx].frame_index = get_int(elem, "frame_index", 0);
+    });
 
-    /*
-     * Step 2: Parse the JSON string into a cJSON tree.
-     *
-     * cJSON_Parse returns the root node of the tree, or NULL if the JSON
-     * is malformed.  On failure, cJSON_GetErrorPtr() points to the location
-     * in the string where parsing broke down.
-     */
-    cJSON *root = cJSON_Parse(buf);
-    free(buf);  /* buffer is no longer needed; cJSON copies what it needs */
+    /* ---- Jumping spiders ----------------------------------------- */
 
-    if (!root) {
-        const char *err = cJSON_GetErrorPtr();
-        fprintf(stderr, "serializer: JSON parse error in '%s'", path);
-        if (err) fprintf(stderr, " near: %.40s", err);
-        fprintf(stderr, "\n");
-        return -1;
+    PARSE_ARRAY("jumping_spiders", jumping_spider_count,
+                MAX_JUMPING_SPIDERS, {
+        def->jumping_spiders[idx].x         = get_float(elem, "x", 0);
+        def->jumping_spiders[idx].vx        = get_float(elem, "vx", 0);
+        def->jumping_spiders[idx].patrol_x0 = get_float(elem, "patrol_x0", 0);
+        def->jumping_spiders[idx].patrol_x1 = get_float(elem, "patrol_x1", 0);
+    });
+
+    /* ---- Birds --------------------------------------------------- */
+
+    PARSE_ARRAY("birds", bird_count, MAX_BIRDS, {
+        def->birds[idx].x           = get_float(elem, "x", 0);
+        def->birds[idx].base_y      = get_float(elem, "base_y", 0);
+        def->birds[idx].vx          = get_float(elem, "vx", 0);
+        def->birds[idx].patrol_x0   = get_float(elem, "patrol_x0", 0);
+        def->birds[idx].patrol_x1   = get_float(elem, "patrol_x1", 0);
+        def->birds[idx].frame_index = get_int(elem, "frame_index", 0);
+    });
+
+    /* ---- Faster birds -------------------------------------------- */
+
+    PARSE_ARRAY("faster_birds", faster_bird_count, MAX_FASTER_BIRDS, {
+        def->faster_birds[idx].x           = get_float(elem, "x", 0);
+        def->faster_birds[idx].base_y      = get_float(elem, "base_y", 0);
+        def->faster_birds[idx].vx          = get_float(elem, "vx", 0);
+        def->faster_birds[idx].patrol_x0   = get_float(elem, "patrol_x0", 0);
+        def->faster_birds[idx].patrol_x1   = get_float(elem, "patrol_x1", 0);
+        def->faster_birds[idx].frame_index = get_int(elem, "frame_index", 0);
+    });
+
+    /* ---- Fish ---------------------------------------------------- */
+
+    PARSE_ARRAY("fish", fish_count, MAX_FISH, {
+        def->fish[idx].x         = get_float(elem, "x", 0);
+        def->fish[idx].vx        = get_float(elem, "vx", 0);
+        def->fish[idx].patrol_x0 = get_float(elem, "patrol_x0", 0);
+        def->fish[idx].patrol_x1 = get_float(elem, "patrol_x1", 0);
+    });
+
+    /* ---- Faster fish --------------------------------------------- */
+
+    PARSE_ARRAY("faster_fish", faster_fish_count, MAX_FASTER_FISH, {
+        def->faster_fish[idx].x         = get_float(elem, "x", 0);
+        def->faster_fish[idx].vx        = get_float(elem, "vx", 0);
+        def->faster_fish[idx].patrol_x0 = get_float(elem, "patrol_x0", 0);
+        def->faster_fish[idx].patrol_x1 = get_float(elem, "patrol_x1", 0);
+    });
+
+    /* ---- Axe traps ----------------------------------------------- */
+
+    PARSE_ARRAY("axe_traps", axe_trap_count, MAX_AXE_TRAPS, {
+        def->axe_traps[idx].pillar_x = get_float(elem, "pillar_x", 0);
+        def->axe_traps[idx].y        = get_float(elem, "y", 0);
+        def->axe_traps[idx].mode     = axe_mode_from_str(
+            get_str(elem, "mode", "PENDULUM"));
+    });
+
+    /* ---- Circular saws ------------------------------------------- */
+
+    PARSE_ARRAY("circular_saws", circular_saw_count, MAX_CIRCULAR_SAWS, {
+        def->circular_saws[idx].x         = get_float(elem, "x", 0);
+        def->circular_saws[idx].y         = get_float(elem, "y", 0);
+        def->circular_saws[idx].patrol_x0 = get_float(elem, "patrol_x0", 0);
+        def->circular_saws[idx].patrol_x1 = get_float(elem, "patrol_x1", 0);
+        def->circular_saws[idx].direction = get_int(elem, "direction", 1);
+    });
+
+    /* ---- Spike rows ---------------------------------------------- */
+
+    PARSE_ARRAY("spike_rows", spike_row_count, MAX_SPIKE_ROWS, {
+        def->spike_rows[idx].x     = get_float(elem, "x", 0);
+        def->spike_rows[idx].count = get_int(elem, "count", 1);
+    });
+
+    /* ---- Spike platforms ----------------------------------------- */
+
+    PARSE_ARRAY("spike_platforms", spike_platform_count,
+                MAX_SPIKE_PLATFORMS, {
+        def->spike_platforms[idx].x          = get_float(elem, "x", 0);
+        def->spike_platforms[idx].y          = get_float(elem, "y", 0);
+        def->spike_platforms[idx].tile_count = get_int(elem, "tile_count", 1);
+    });
+
+    /* ---- Spike blocks -------------------------------------------- */
+
+    PARSE_ARRAY("spike_blocks", spike_block_count, MAX_SPIKE_BLOCKS, {
+        def->spike_blocks[idx].rail_index = get_int(elem, "rail_index", 0);
+        def->spike_blocks[idx].t_offset   = get_float(elem, "t_offset", 0);
+        def->spike_blocks[idx].speed      = get_float(elem, "speed", 0);
+    });
+
+    /* ---- Blue flames --------------------------------------------- */
+
+    PARSE_ARRAY("blue_flames", blue_flame_count, MAX_BLUE_FLAMES, {
+        def->blue_flames[idx].x = get_float(elem, "x", 0);
+    });
+
+    /* ---- Fire flames --------------------------------------------- */
+
+    PARSE_ARRAY("fire_flames", fire_flame_count, MAX_BLUE_FLAMES, {
+        def->fire_flames[idx].x = get_float(elem, "x", 0);
+    });
+
+    /* ---- Float platforms ----------------------------------------- */
+
+    PARSE_ARRAY("float_platforms", float_platform_count,
+                MAX_FLOAT_PLATFORMS, {
+        def->float_platforms[idx].mode       = float_mode_from_str(
+            get_str(elem, "mode", "STATIC"));
+        def->float_platforms[idx].x          = get_float(elem, "x", 0);
+        def->float_platforms[idx].y          = get_float(elem, "y", 0);
+        def->float_platforms[idx].tile_count = get_int(elem, "tile_count", 1);
+        def->float_platforms[idx].rail_index = get_int(elem, "rail_index", 0);
+        def->float_platforms[idx].t_offset   = get_float(elem, "t_offset", 0);
+        def->float_platforms[idx].speed      = get_float(elem, "speed", 0);
+    });
+
+    /* ---- Bridges ------------------------------------------------- */
+
+    PARSE_ARRAY("bridges", bridge_count, MAX_BRIDGES, {
+        def->bridges[idx].x           = get_float(elem, "x", 0);
+        def->bridges[idx].y           = get_float(elem, "y", 0);
+        def->bridges[idx].brick_count = get_int(elem, "brick_count", 1);
+    });
+
+    /* ---- Bouncepads (small) -------------------------------------- */
+
+    PARSE_ARRAY("bouncepads_small", bouncepad_small_count,
+                MAX_BOUNCEPADS_SMALL, {
+        def->bouncepads_small[idx].x         = get_float(elem, "x", 0);
+        def->bouncepads_small[idx].launch_vy = get_float(elem, "launch_vy", 0);
+        def->bouncepads_small[idx].pad_type  = bouncepad_type_from_str(
+            get_str(elem, "pad_type", "GREEN"));
+    });
+
+    /* ---- Bouncepads (medium) ------------------------------------- */
+
+    PARSE_ARRAY("bouncepads_medium", bouncepad_medium_count,
+                MAX_BOUNCEPADS_MEDIUM, {
+        def->bouncepads_medium[idx].x         = get_float(elem, "x", 0);
+        def->bouncepads_medium[idx].launch_vy = get_float(elem, "launch_vy", 0);
+        def->bouncepads_medium[idx].pad_type  = bouncepad_type_from_str(
+            get_str(elem, "pad_type", "WOOD"));
+    });
+
+    /* ---- Bouncepads (high) --------------------------------------- */
+
+    PARSE_ARRAY("bouncepads_high", bouncepad_high_count,
+                MAX_BOUNCEPADS_HIGH, {
+        def->bouncepads_high[idx].x         = get_float(elem, "x", 0);
+        def->bouncepads_high[idx].launch_vy = get_float(elem, "launch_vy", 0);
+        def->bouncepads_high[idx].pad_type  = bouncepad_type_from_str(
+            get_str(elem, "pad_type", "RED"));
+    });
+
+    /* ---- Vines --------------------------------------------------- */
+
+    PARSE_ARRAY("vines", vine_count, MAX_VINES, {
+        def->vines[idx].x          = get_float(elem, "x", 0);
+        def->vines[idx].y          = get_float(elem, "y", 0);
+        def->vines[idx].tile_count = get_int(elem, "tile_count", 1);
+    });
+
+    /* ---- Ladders ------------------------------------------------- */
+
+    PARSE_ARRAY("ladders", ladder_count, MAX_LADDERS, {
+        def->ladders[idx].x          = get_float(elem, "x", 0);
+        def->ladders[idx].y          = get_float(elem, "y", 0);
+        def->ladders[idx].tile_count = get_int(elem, "tile_count", 1);
+    });
+
+    /* ---- Ropes --------------------------------------------------- */
+
+    PARSE_ARRAY("ropes", rope_count, MAX_ROPES, {
+        def->ropes[idx].x          = get_float(elem, "x", 0);
+        def->ropes[idx].y          = get_float(elem, "y", 0);
+        def->ropes[idx].tile_count = get_int(elem, "tile_count", 1);
+    });
+
+    /* ---- Level-wide configuration -------------------------------- */
+
+    /* Parallax layers */
+    {
+        toml_datum_t plx = toml_get(top, "parallax_layers");
+        if (plx.type == TOML_ARRAY) {
+            int n = plx.u.arr.size;
+            if (n > PARALLAX_MAX_LAYERS) n = PARALLAX_MAX_LAYERS;
+            def->parallax_layer_count = n;
+            for (int i = 0; i < n; i++) {
+                toml_datum_t elem = plx.u.arr.elem[i];
+                const char *p = get_str(elem, "path", "");
+                strncpy(def->parallax_layers[i].path, p, 63);
+                def->parallax_layers[i].path[63] = '\0';
+                def->parallax_layers[i].speed = get_float(elem, "speed", 0);
+            }
+        }
     }
 
-    /*
-     * Step 3: Convert the cJSON tree into a LevelDef struct.
-     *
-     * level_from_json validates all array sizes against MAX_* limits
-     * and returns -1 if anything is out of bounds.
-     */
-    int result = level_from_json(root, def);
+    /* Foreground layers */
+    {
+        toml_datum_t fg = toml_get(top, "foreground_layers");
+        if (fg.type == TOML_ARRAY) {
+            int n = fg.u.arr.size;
+            if (n > PARALLAX_MAX_LAYERS) n = PARALLAX_MAX_LAYERS;
+            def->foreground_layer_count = n;
+            for (int i = 0; i < n; i++) {
+                toml_datum_t elem = fg.u.arr.elem[i];
+                const char *p = get_str(elem, "path", "");
+                strncpy(def->foreground_layers[i].path, p, 63);
+                def->foreground_layers[i].path[63] = '\0';
+                def->foreground_layers[i].speed = get_float(elem, "speed", 0);
+            }
+        }
+    }
+
+    /* Player spawn */
+    def->player_start_x = get_float(top, "player_start_x", 0);
+    def->player_start_y = get_float(top, "player_start_y", 0);
+
+    /* Music */
+    {
+        const char *mp = get_str(top, "music_path", "");
+        strncpy(def->music_path, mp, sizeof(def->music_path) - 1);
+        def->music_path[sizeof(def->music_path) - 1] = '\0';
+    }
+    def->music_volume = get_int(top, "music_volume", 0);
+
+    /* Floor tile */
+    {
+        const char *ftp = get_str(top, "floor_tile_path", "");
+        strncpy(def->floor_tile_path, ftp, sizeof(def->floor_tile_path) - 1);
+        def->floor_tile_path[sizeof(def->floor_tile_path) - 1] = '\0';
+    }
+
+    /* Game rules */
+    def->initial_hearts = get_int(top, "initial_hearts", 0);
+    def->initial_lives  = get_int(top, "initial_lives", 0);
+    def->score_per_life = get_int(top, "score_per_life", 0);
 
     /*
-     * cJSON_Delete — recursively free the entire parsed tree.
+     * toml_free — release all memory allocated by toml_parse_file_ex.
      * The LevelDef struct now holds its own copies of all data, so
-     * the tree is safe to destroy.
+     * the TOML tree is safe to destroy.
      */
-    cJSON_Delete(root);
+    toml_free(r);
 
-    return result;
+    return 0;
 }
+
+#undef PARSE_ARRAY

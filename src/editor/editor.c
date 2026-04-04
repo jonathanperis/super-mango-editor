@@ -35,7 +35,7 @@
 #include "properties.h"   /* properties_render — draw the selection inspector */
 #include "tools.h"        /* tools_mouse_down/up/drag/right_click/delete    */
 #include "undo.h"         /* UndoStack, undo_create/destroy/push/pop/clear  */
-#include "serializer.h"   /* level_save_json, level_load_json               */
+#include "serializer.h"   /* level_save_toml, level_load_toml               */
 #include "exporter.h"     /* level_export_c — write .h/.c from LevelDef    */
 #include "ui.h"           /* UIState, ui_init, ui_begin_frame, ui_button    */
 #include "file_dialog.h"  /* file_dialog_open — native OS file picker       */
@@ -577,19 +577,19 @@ static void handle_event(EditorState *es, SDL_Event *event) {
             switch (key) {
             case SDLK_s: {
                 /*
-                 * Ctrl+S — Save the current level to disk as JSON.
+                 * Ctrl+S — Save the current level to disk as TOML.
                  *
                  * If no file path has been set yet (first save), default
-                 * to "levels/untitled.json".  After a successful save,
+                 * to "levels/untitled.toml".  After a successful save,
                  * clear the modified flag and update the window title to
                  * reflect the saved state.
                  */
                 if (es->file_path[0] == '\0') {
-                    strncpy(es->file_path, "levels/untitled.json",
+                    strncpy(es->file_path, "levels/untitled.toml",
                             sizeof(es->file_path) - 1);
                     es->file_path[sizeof(es->file_path) - 1] = '\0';
                 }
-                if (level_save_json(&es->level, es->file_path) == 0) {
+                if (level_save_toml(&es->level, es->file_path) == 0) {
                     es->modified = 0;
                     /*
                      * SDL_SetWindowTitle — update the title bar text.
@@ -615,7 +615,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  *
                  * Shows the platform's file dialog (macOS: NSOpenPanel via
                  * osascript, Linux: zenity, Windows: PowerShell OpenFileDialog).
-                 * If the user selects a .json file, load it into the editor.
+                 * If the user selects a .toml file, load it into the editor.
                  */
                 open_level_file(es);
                 break;
@@ -651,7 +651,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  *
                  * Derives the variable name from the file path by stripping
                  * the directory and extension.  For example:
-                 *   "levels/level_02.json" → "level_02"
+                 *   "levels/level_02.toml" → "level_02"
                  *
                  * If no file has been saved yet, uses "untitled" as the
                  * variable name.  The export writes two files:
@@ -1050,7 +1050,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
 /* ------------------------------------------------------------------ */
 
 /*
- * load_level_from_path — Load a JSON level file into the editor.
+ * load_level_from_path — Load a TOML level file into the editor.
  *
  * Replaces the current level data, clears undo history, resets selection,
  * updates the file path and window title.  Called by both open_level_file
@@ -1060,7 +1060,7 @@ static void load_level_from_path(EditorState *es, const char *path) {
     LevelDef new_level;
     memset(&new_level, 0, sizeof(new_level));
 
-    if (level_load_json(path, &new_level) != 0) {
+    if (level_load_toml(path, &new_level) != 0) {
         fprintf(stderr, "Error: failed to load %s\n", path);
         return;
     }
@@ -1455,7 +1455,7 @@ static void paste_clipboard(EditorState *es) {
  *
  * Workflow:
  *   1. Export the current level as src/levels/sandbox_00.c/.h.
- *   2. Auto-save JSON if a path is set.
+ *   2. Auto-save TOML if a path is set.
  *   3. Compile the game (blocking — we wait for make to finish).
  *   4. Fork the game as a child process.
  *   5. Switch the editor to "playing" mode: the Play button becomes
@@ -1468,17 +1468,17 @@ static void play_test(EditorState *es) {
     if (es->playing) return;   /* already running */
 
     /*
-     * Step 1 — Save the level as JSON.
+     * Step 1 — Save the level as TOML.
      *
-     * The game accepts --level <path> to load any JSON file.
+     * The game accepts --level <path> to load any TOML file.
      * If the editor has a file path, save and play from there.
      * Otherwise save to a temporary file so the game has something to load.
      */
     const char *save_path = es->file_path[0] != '\0'
                           ? es->file_path
-                          : "levels/_playtest.json";
+                          : "levels/_playtest.toml";
 
-    if (level_save_json(&es->level, save_path) != 0) {
+    if (level_save_toml(&es->level, save_path) != 0) {
         fprintf(stderr, "Play: failed to save %s\n", save_path);
         return;
     }
@@ -1774,14 +1774,14 @@ static void render_toolbar(EditorState *es) {
     if (ui_button(&es->ui, rx, by, 64, bh, "Save")) {
         /*
          * Duplicate the Ctrl+S save logic inline.
-         * Default to "levels/untitled.json" if no path has been set.
+         * Default to "levels/untitled.toml" if no path has been set.
          */
         if (es->file_path[0] == '\0') {
-            strncpy(es->file_path, "levels/untitled.json",
+            strncpy(es->file_path, "levels/untitled.toml",
                     sizeof(es->file_path) - 1);
             es->file_path[sizeof(es->file_path) - 1] = '\0';
         }
-        if (level_save_json(&es->level, es->file_path) == 0) {
+        if (level_save_toml(&es->level, es->file_path) == 0) {
             es->modified = 0;
             char title[300];
             snprintf(title, sizeof(title), "Super Mango Editor - %s",
@@ -1796,7 +1796,7 @@ static void render_toolbar(EditorState *es) {
     if (ui_button(&es->ui, rx, by, 64, bh, "Open")) {
         /*
          * Open button — show the native file dialog and load the selected
-         * JSON level file.  Same behaviour as Ctrl+O.
+         * TOML level file.  Same behaviour as Ctrl+O.
          */
         open_level_file(es);
     }
@@ -1829,7 +1829,7 @@ static void render_toolbar(EditorState *es) {
  * render_status_bar — Draw the bottom status bar (32 px tall, full width).
  *
  * Layout from left to right:
- *   Mouse: (worldX, worldY)  |  Tool: Select  |  Entities: 42  |  path.json *
+ *   Mouse: (worldX, worldY)  |  Tool: Select  |  Entities: 42  |  path.toml *
  *
  * The status bar gives the designer constant feedback about cursor position,
  * active tool, total entity count, and file state (path + modified indicator).

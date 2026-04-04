@@ -1,5 +1,5 @@
 /*
- * file_dialog.h — Native file dialog for opening JSON level files.
+ * file_dialog.h — Native file dialog for opening TOML level files.
  *
  * Provides a cross-platform function that opens the OS file picker and
  * returns the selected file path.  Uses platform-specific commands:
@@ -12,7 +12,7 @@
 #pragma once
 
 /*
- * file_dialog_open — Show a native file open dialog filtered to .json files.
+ * file_dialog_open — Show a native file open dialog filtered to .toml files.
  *
  * buf      : buffer to receive the selected file path (null-terminated).
  * buf_size : size of the buffer in bytes.

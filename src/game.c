@@ -45,14 +45,14 @@
 #include "hazards/spike_platform.h"
 #include "levels/level.h"         /* LevelDef struct                                    */
 #include "levels/level_loader.h"  /* level_load, level_reset                            */
-#include "editor/serializer.h"    /* level_load_json                                    */
+#include "editor/serializer.h"    /* level_load_toml                                    */
 
 /* ------------------------------------------------------------------ */
-/* Level data — loaded once from JSON, reused on player death resets    */
+/* Level data — loaded once from TOML, reused on player death resets    */
 /* ------------------------------------------------------------------ */
 
 /*
- * File-scoped level definition.  Populated once from JSON in game_init,
+ * File-scoped level definition.  Populated once from TOML in game_init,
  * then referenced by reset_current_level on player death.
  */
 static LevelDef s_level;
@@ -369,7 +369,7 @@ void game_init(GameState *gs) {
     }
 
     if (path_valid &&
-        level_load_json(safe_path, &s_level) == 0) {
+        level_load_toml(safe_path, &s_level) == 0) {
         /* Successfully loaded from the resolved path */
     } else {
         if (gs->level_path[0] != '\0')

@@ -26,7 +26,7 @@
  *   otherwise   → Linux     (zenity)
  *
  * Each platform command is designed to:
- *   1. Show only .json files by default (with a way to see all files).
+ *   1. Show only .toml files by default (with a way to see all files).
  *   2. Print the selected absolute path to stdout.
  *   3. Exit with code 0 on selection, non-zero on cancel.
  *
@@ -40,7 +40,7 @@ int file_dialog_open(char *buf, int buf_size) {
      * macOS: use osascript to run an AppleScript that invokes NSOpenPanel.
      *
      * "choose file" shows the native macOS open dialog.
-     * "of type {\"json\"}" filters to .json files.
+     * "of type {\"toml\"}" filters to .toml files.
      * "POSIX path of" converts the result from an AppleScript alias
      * (e.g. "Macintosh HD:Users:...") to a POSIX path ("/Users/...").
      *
@@ -49,8 +49,8 @@ int file_dialog_open(char *buf, int buf_size) {
      */
     const char *cmd =
         "osascript -e '"
-        "set f to choose file of type {\"json\", \"public.json\"} "
-        "with prompt \"Open Level JSON\"' "
+        "set f to choose file of type {\"toml\", \"public.toml\"} "
+        "with prompt \"Open Level TOML\"' "
         "-e 'POSIX path of f' 2>/dev/null";
 
 #elif defined(_WIN32)
@@ -58,15 +58,15 @@ int file_dialog_open(char *buf, int buf_size) {
      * Windows: use PowerShell to show System.Windows.Forms.OpenFileDialog.
      *
      * Add-Type loads the WinForms assembly.  The dialog is configured to
-     * filter for .json files.  ShowDialog() returns "OK" if a file was
+     * filter for .toml files.  ShowDialog() returns "OK" if a file was
      * selected; the FileName property holds the path.
      */
     const char *cmd =
         "powershell -NoProfile -Command \""
         "Add-Type -AssemblyName System.Windows.Forms;"
         "$d = New-Object System.Windows.Forms.OpenFileDialog;"
-        "$d.Filter = 'JSON files (*.json)|*.json|All files (*.*)|*.*';"
-        "$d.Title = 'Open Level JSON';"
+        "$d.Filter = 'TOML files (*.toml)|*.toml|All files (*.*)|*.*';"
+        "$d.Title = 'Open Level TOML';"
         "if ($d.ShowDialog() -eq 'OK') { $d.FileName }\"";
 
 #else
@@ -76,12 +76,12 @@ int file_dialog_open(char *buf, int buf_size) {
      * is not installed, popen returns NULL.
      *
      * --file-selection shows the open dialog.
-     * --file-filter limits to .json files.
+     * --file-filter limits to .toml files.
      */
     const char *cmd =
         "zenity --file-selection "
-        "--title='Open Level JSON' "
-        "--file-filter='JSON files | *.json' "
+        "--title='Open Level TOML' "
+        "--file-filter='TOML files | *.toml' "
         "--file-filter='All files | *' "
         "2>/dev/null";
 #endif

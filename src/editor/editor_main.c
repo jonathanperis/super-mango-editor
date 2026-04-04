@@ -26,7 +26,7 @@
 #include <string.h>    /* strncpy — safe string copy for file path        */
 
 #include "editor.h"       /* EditorState, editor_init/loop/cleanup */
-#include "serializer.h"   /* level_load_json — load a .json level file     */
+#include "serializer.h"   /* level_load_toml — load a .toml level file     */
 
 /* ------------------------------------------------------------------ */
 
@@ -97,10 +97,10 @@ int main(int argc, char *argv[]) {
 
     /*
      * Optional level load from command line:
-     *   ./editor levels/sandbox_00.json
+     *   ./editor levels/sandbox_00.toml
      *
      * argv[0] is the executable name; argv[1] (if present) is treated as
-     * a path to a JSON level file.  If the file fails to load we warn but
+     * a path to a TOML level file.  If the file fails to load we warn but
      * continue — the designer can start a fresh level instead.
      *
      * strncpy with sizeof-1 ensures the path is always NUL-terminated
@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
      * here — the save dialog will use the stored path as-is).
      */
     if (argc > 1) {
-        if (level_load_json(argv[1], &es.level) == 0) {
+        if (level_load_toml(argv[1], &es.level) == 0) {
             strncpy(es.file_path, argv[1], sizeof(es.file_path) - 1);
             es.file_path[sizeof(es.file_path) - 1] = '\0';
             es.modified = 0;

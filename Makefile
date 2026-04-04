@@ -37,14 +37,14 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(wildcard $(SRCDIR)/screens/*.c) \
           $(wildcard $(SRCDIR)/surfaces/*.c) \
           $(SRCDIR)/editor/serializer.c \
-          vendor/cJSON/cJSON.c
+          vendor/tomlc17/tomlc17.c
 OBJS    = $(SRCS:.c=.o)
 DEPS    = $(OBJS:.o=.d)
 
 # ── Editor (standalone level editor) ─────────────────────────────────
 EDITOR_DIR    = src/editor
-VENDOR_DIR    = vendor/cJSON
-EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(VENDOR_DIR)/cJSON.c
+VENDOR_DIR    = vendor/tomlc17
+EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(VENDOR_DIR)/tomlc17.c
 EDITOR_OBJS   = $(EDITOR_SRCS:.c=.o)
 EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor
