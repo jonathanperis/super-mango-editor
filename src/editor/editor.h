@@ -319,6 +319,7 @@ typedef struct {
     int            panel_scroll;  /* scroll offset (px) for the right panel    */
     int            panel_open;    /* 1 = properties panel expanded, 0 = collapsed  */
     int            config_open;   /* 1 = level config panel expanded, 0 = collapsed */
+    int            palette_open;  /* 1 = palette panel expanded, 0 = collapsed      */
 
     /* ---- Mouse state (updated every frame from SDL events) ------------ */
     int            mouse_x;       /* current cursor x in window pixels         */

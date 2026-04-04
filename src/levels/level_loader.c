@@ -92,9 +92,10 @@ static void load_platforms(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->platform_count; i++) {
         const PlatformPlacement *p = &def->platforms[i];
+        int tw = (p->tile_width > 0) ? p->tile_width : 1;
         gs->platforms[i].x = p->x;
         gs->platforms[i].y = (float)(FLOOR_Y - p->tile_height * TILE_SIZE + 16);
-        gs->platforms[i].w = TILE_SIZE;
+        gs->platforms[i].w = tw * TILE_SIZE;
         gs->platforms[i].h = p->tile_height * TILE_SIZE;
     }
     gs->platform_count = def->platform_count;
@@ -494,6 +495,10 @@ void level_load(GameState *gs, const LevelDef *def)
 {
     /* Store a pointer to the active level definition for game.c to read */
     gs->current_level = def;
+
+    /* Set world width from screen_count (default 4 screens if not specified) */
+    int screens = (def->screen_count > 0) ? def->screen_count : 4;
+    gs->world_w = screens * GAME_W;
 
     /* ---- Static geometry ------------------------------------------ */
     load_sea_gaps(gs, def);

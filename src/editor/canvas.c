@@ -23,10 +23,14 @@
 #include <stdio.h>      /* snprintf for debug labels                      */
 
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, TOOLBAR_H, etc. */
-#include "../game.h"    /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE, WORLD_W,
+#include "../game.h"    /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE,
                            SEA_GAP_W, MAX_* constants, GRAVITY              */
 
 /* ------------------------------------------------------------------ */
+/* Helper: dynamic world width from editor's screen_count setting */
+#define EDITOR_WORLD_W(es) \
+    (((es)->level.screen_count > 0 ? (es)->level.screen_count : 4) * GAME_W)
+
 /* Entity display dimensions — extracted from game source headers       */
 /* ------------------------------------------------------------------ */
 /*
@@ -407,22 +411,24 @@ static void render_platforms(EditorState *es) {
          *   h = tile_height * TILE_SIZE
          */
         float plat_x = pp->x;
+        int   tw     = (pp->tile_width > 0) ? pp->tile_width : 1;
+        int   plat_w = tw * TILE_SIZE;
         int   plat_h = pp->tile_height * TILE_SIZE;
         float plat_y = (float)(FLOOR_Y - pp->tile_height * TILE_SIZE + 16);
 
         if (es->textures.platform) {
-            /* 9-slice tiling — walk every 16x16 piece inside the pillar */
+            /* 9-slice tiling — walk every 16x16 piece inside the platform */
             for (int ty = 0; ty < plat_h; ty += P) {
                 int piece_row;
                 if (ty == 0)               piece_row = 0;  /* top: grass  */
                 else if (ty + P >= plat_h) piece_row = 2;  /* bottom: base*/
                 else                       piece_row = 1;  /* middle: dirt*/
 
-                for (int tx = 0; tx < TILE_SIZE; tx += P) {
+                for (int tx = 0; tx < plat_w; tx += P) {
                     int piece_col;
-                    if (tx == 0)                  piece_col = 0;  /* left  */
-                    else if (tx + P >= TILE_SIZE) piece_col = 2;  /* right */
-                    else                          piece_col = 1;  /* center*/
+                    if (tx == 0)                 piece_col = 0;  /* left  */
+                    else if (tx + P >= plat_w)   piece_col = 2;  /* right */
+                    else                         piece_col = 1;  /* center*/
 
                     SDL_Rect src = { piece_col * P, piece_row * P, P, P };
                     SDL_Rect dst = {
@@ -470,7 +476,7 @@ static void render_floor(EditorState *es) {
         else if (ty + P >= GAME_H) piece_row = 2;  /* bottom: base edge  */
         else                       piece_row = 1;  /* middle: dirt fill  */
 
-        for (int tx = 0; tx < WORLD_W; tx += P) {
+        for (int tx = 0; tx < EDITOR_WORLD_W(es); tx += P) {
             /*
              * Skip this piece if it falls inside any sea gap.
              * A piece at tx is inside a gap when both edges are within
@@ -497,7 +503,7 @@ static void render_floor(EditorState *es) {
 
             /* World boundaries */
             if (tx <= 0)           at_left_edge  = 1;
-            if (tx + P >= WORLD_W) at_right_edge = 1;
+            if (tx + P >= EDITOR_WORLD_W(es)) at_right_edge = 1;
 
             /* Gap boundaries */
             for (int g = 0; g < es->level.sea_gap_count; g++) {
@@ -1168,9 +1174,10 @@ static void render_selection(EditorState *es) {
     case ENT_PLATFORM: {
         if (es->selection.index >= es->level.platform_count) return;
         const PlatformPlacement *p = &es->level.platforms[es->selection.index];
+        int ptw = (p->tile_width > 0) ? p->tile_width : 1;
         wx = p->x;
         wy = (float)(FLOOR_Y - p->tile_height * TILE_SIZE + 16);
-        ww = TILE_SIZE;
+        ww = ptw * TILE_SIZE;
         wh = p->tile_height * TILE_SIZE;
         break;
     }
@@ -1634,7 +1641,7 @@ static void render_grid(EditorState *es) {
     SDL_SetRenderDrawColor(es->renderer, 0x40, 0x40, 0x40, 0x40);
 
     /* Vertical grid lines */
-    for (int wx = 0; wx <= WORLD_W; wx += TILE_SIZE) {
+    for (int wx = 0; wx <= EDITOR_WORLD_W(es); wx += TILE_SIZE) {
         int sx = w2s_x(es, (float)wx);
         if (sx < 0 || sx > CANVAS_W) continue;
 
@@ -1654,7 +1661,7 @@ static void render_grid(EditorState *es) {
     /* ---- Screen boundaries (blue, 2 px wide) ---- */
     SDL_SetRenderDrawColor(es->renderer, 0x4A, 0x90, 0xD9, 0xFF);
 
-    for (int screen = 0; screen < WORLD_W / GAME_W; screen++) {
+    for (int screen = 0; screen < EDITOR_WORLD_W(es) / GAME_W; screen++) {
         int wx = screen * GAME_W;
         int sx = w2s_x(es, (float)wx);
         if (sx < -2 || sx > CANVAS_W + 2) continue;

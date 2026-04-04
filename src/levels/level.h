@@ -67,10 +67,12 @@ typedef struct {
  *
  * x           : left edge in world-space logical pixels.
  * tile_height : number of TILE_SIZE (48 px) tiles tall (typically 2 or 3).
+ * tile_width  : number of TILE_SIZE tiles wide (0 or 1 = single tile).
  */
 typedef struct {
     float x;
     int   tile_height;
+    int   tile_width;
 } PlatformPlacement;
 
 /*
@@ -313,6 +315,7 @@ typedef struct {
  */
 typedef struct {
     char  name[64];     /* display name, e.g. "Sandbox" — editable buffer */
+    int   screen_count; /* number of screens wide (0 = default 4)          */
 
     /* ---- World geometry --------------------------------------------- */
     int sea_gaps[MAX_SEA_GAPS];

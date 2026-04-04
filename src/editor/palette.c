@@ -186,7 +186,7 @@ static int scroll_y = 0;
  * category_open — tracks which categories are expanded (1) or collapsed (0).
  * All start expanded.  Clicking a category header toggles it.
  */
-static int category_open[6] = { 1, 1, 1, 1, 1, 1 };
+static int category_open[6] = { 0, 0, 0, 0, 0, 0 };
 
 /*
  * palette_scroll — Adjust the palette scroll offset by a pixel delta.
@@ -330,6 +330,7 @@ void palette_render(EditorState *es, int start_y, int available_h)
      * We draw it with a slightly lighter background (UI_TITLE_BG) to
      * distinguish it from the scrolling content below.
      */
+    /* ---- Collapsible title bar ---- */
     {
         SDL_Color title_bg = UI_TITLE_BG;
         SDL_SetRenderDrawColor(ui->renderer,
@@ -337,21 +338,28 @@ void palette_render(EditorState *es, int start_y, int available_h)
         SDL_Rect title_rect = { panel_x, panel_y, PANEL_W, TITLE_H };
         SDL_RenderFillRect(ui->renderer, &title_rect);
 
-        /*
-         * Draw "PALETTE" centred vertically in the title bar.
-         * The +6 vertical offset eyeball-centres the 13-px font in the
-         * 28-px title bar: (28 - 13) / 2 ~ 7, minus 1 for baseline = 6.
-         */
-        ui_label_color(ui, panel_x + PAD_X, panel_y + 6, "PALETTE", UI_TEXT);
+        /* Click header to toggle expand/collapse */
+        int hdr_hovered = (ui->mouse_x >= panel_x &&
+                           ui->mouse_x < panel_x + PANEL_W &&
+                           ui->mouse_y >= panel_y &&
+                           ui->mouse_y < panel_y + TITLE_H);
+        if (hdr_hovered && ui->mouse_clicked)
+            es->palette_open = !es->palette_open;
+
+        char pal_header[32];
+        snprintf(pal_header, sizeof(pal_header), "%s PALETTE",
+                 es->palette_open ? "v" : ">");
+        ui_label_color(ui, panel_x + PAD_X, panel_y + 6, pal_header,
+                       hdr_hovered ? UI_TEXT : UI_TEXT_DIM);
     }
 
-    /* ---- Step 5: Draw scrolling content (categories + entries) ---- */
+    /* If collapsed, just show the header bar */
+    if (!es->palette_open) {
+        return;
+    }
 
-    /*
-     * content_top — the Y coordinate where scrollable content starts,
-     * just below the fixed title bar.  A clip rect ensures scrolled
-     * content passes behind the title bar instead of overlapping it.
-     */
+    /* ---- Draw scrolling content (categories + entries) ---- */
+
     int content_top = panel_y + TITLE_H;
 
     SDL_Rect pal_clip = { panel_x, content_top, PANEL_W, panel_h - TITLE_H };

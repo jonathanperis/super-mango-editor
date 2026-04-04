@@ -979,9 +979,10 @@ static Selection hit_test(const LevelDef *level, float wx, float wy)
     /* Platforms — ground pillars */
     for (int i = level->platform_count - 1; i >= 0; i--) {
         const PlatformPlacement *p = &level->platforms[i];
+        int ptw = (p->tile_width > 0) ? p->tile_width : 1;
         ex = p->x;
         ey = (float)(FLOOR_Y - p->tile_height * TILE_SIZE + 16);
-        ew = TILE_SIZE;
+        ew = ptw * TILE_SIZE;
         eh = p->tile_height * TILE_SIZE;
         if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
             sel.type = ENT_PLATFORM;
@@ -1379,7 +1380,8 @@ static void place_entity(EditorState *es, float world_x, float world_y)
     case ENT_PLATFORM: {
         PlatformPlacement pp = {
             .x           = world_x,
-            .tile_height = 2
+            .tile_height = 2,
+            .tile_width  = 1
         };
         level->platforms[new_index] = pp;
         level->platform_count++;
@@ -1647,7 +1649,8 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
 
     /* Clamp to world bounds — keep entity within the level area */
     if (nx < 0.0f) nx = 0.0f;
-    if (nx > (float)WORLD_W) nx = (float)WORLD_W;
+    int ww = (es->level.screen_count > 0 ? es->level.screen_count : 4) * GAME_W;
+    if (nx > (float)ww) nx = (float)ww;
     if (ny < 0.0f) ny = 0.0f;
     if (ny > (float)GAME_H) ny = (float)GAME_H;
 
