@@ -325,6 +325,21 @@ typedef struct {
     float          drag_start_x;  /* world-space x where the drag began        */
     float          drag_start_y;  /* world-space y where the drag began        */
 
+    /* ---- Play-test state ---------------------------------------------- */
+    /*
+     * playing — 1 while the game is running as a child process.
+     * play_pid — PID of the game process (POSIX) for kill/waitpid.
+     *
+     * When playing == 1 the editor hides its window and shows only a
+     * minimal "Stop" overlay.  The game runs in its own window.  When
+     * the user clicks Stop or the game exits, playing returns to 0 and
+     * the editor window is restored.
+     */
+    int            playing;
+#ifndef _WIN32
+    int            play_pid;       /* pid_t stored as int for portability */
+#endif
+
     /* ---- Immediate-mode UI state ------------------------------------- */
     /*
      * ui — per-frame input snapshot and retained state for the IMGUI widgets.

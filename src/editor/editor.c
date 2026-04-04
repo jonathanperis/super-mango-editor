@@ -23,6 +23,12 @@
 #include <stdio.h>        /* fprintf, stderr, snprintf — error and status  */
 #include <string.h>       /* memset, strncpy, strrchr — string operations  */
 
+#ifndef _WIN32
+#include <unistd.h>       /* fork, execl, _exit — POSIX process control    */
+#include <signal.h>       /* kill — send signal to child process            */
+#include <sys/wait.h>     /* waitpid, WNOHANG — non-blocking child check   */
+#endif
+
 #include "editor.h"       /* EditorState, constants, EntityType, EditorTool */
 #include "canvas.h"       /* canvas_render — draw the level preview         */
 #include "palette.h"      /* palette_render — draw the entity palette panel */
@@ -48,6 +54,8 @@ static void load_level_from_path(EditorState *es, const char *path);
 static void copy_selected(EditorState *es);
 static void paste_clipboard(EditorState *es);
 static void play_test(EditorState *es);
+static void stop_play(EditorState *es);
+static void check_play_status(EditorState *es);
 
 /* ------------------------------------------------------------------ */
 /* editor_init                                                         */
@@ -377,61 +385,49 @@ void editor_loop(EditorState *es) {
         es->ui.mouse_x = es->mouse_x;
         es->ui.mouse_y = es->mouse_y;
 
-        /* ---- Clear the screen --------------------------------------- */
+        /* ---- Check if game child process exited --------------------- */
         /*
-         * Fill the entire back buffer with dark grey (0x1A1A1A).
-         * This serves as the background behind the canvas and all panels.
-         * The alpha is 0xFF (fully opaque) because the editor has no
-         * transparency effects.
+         * When the editor is in play-test mode, check each frame whether
+         * the game process has exited.  If it has, return to editor mode.
          */
+        if (es->playing) {
+            check_play_status(es);
+        }
+
+        /* ---- Clear the screen --------------------------------------- */
         SDL_SetRenderDrawColor(es->renderer, 0x1A, 0x1A, 0x1A, 0xFF);
         SDL_RenderClear(es->renderer);
 
-        /* ---- Render the level canvas -------------------------------- */
-        /*
-         * canvas_render — draw the scrollable level preview.
-         *
-         * Renders floor tiles, entity sprites, grid lines, and selection
-         * highlights within the canvas area (0, TOOLBAR_H, CANVAS_W, CANVAS_H).
-         * Uses the editor camera for scroll/zoom transformation.
-         */
-        canvas_render(es);
+        if (es->playing) {
+            /* ---- Play-test mode: show minimal overlay --------------- */
+            /*
+             * While the game is running, the editor shows a dark screen
+             * with a centered "Playing..." message and a [Stop] button.
+             * This makes it clear the game is active and provides a way
+             * to terminate it without switching windows.
+             */
+            ui_label(&es->ui, EDITOR_W / 2 - 60, EDITOR_H / 2 - 40,
+                     "Playing level...");
+            ui_label_color(&es->ui, EDITOR_W / 2 - 80, EDITOR_H / 2 - 10,
+                           "Close the game window or click Stop",
+                           UI_TEXT_DIM);
 
-        /* ---- Render the top toolbar --------------------------------- */
-        /*
-         * render_toolbar — draw tool buttons, zoom display, and file ops.
-         *
-         * Occupies the top TOOLBAR_H (32 px) strip across the full width.
-         */
-        render_toolbar(es);
+            if (ui_button(&es->ui, EDITOR_W / 2 - 40, EDITOR_H / 2 + 30,
+                          80, 28, "Stop")) {
+                stop_play(es);
+            }
+        } else {
+            /* ---- Normal editor rendering ----------------------------- */
+            canvas_render(es);
+            render_toolbar(es);
+            palette_render(es);
 
-        /* ---- Render the right-side panels --------------------------- */
-        /*
-         * palette_render — draw the entity palette on the right panel.
-         *
-         * Shows a scrollable grid of entity thumbnails.  Clicking one
-         * selects it as the active palette_type for placement.
-         */
-        palette_render(es);
+            if (es->selection.index >= 0) {
+                properties_render(es);
+            }
 
-        /*
-         * properties_render — draw the property inspector below the palette.
-         *
-         * Only drawn when an entity is selected (selection.index >= 0).
-         * Shows editable fields for the selected entity's position, size,
-         * speed, patrol range, etc.
-         */
-        if (es->selection.index >= 0) {
-            properties_render(es);
+            render_status_bar(es);
         }
-
-        /* ---- Render the bottom status bar --------------------------- */
-        /*
-         * render_status_bar — draw cursor coords, tool name, and file info.
-         *
-         * Occupies the bottom STATUS_H (32 px) strip across the full width.
-         */
-        render_status_bar(es);
 
         /* ---- Present the frame -------------------------------------- */
         /*
@@ -1277,48 +1273,33 @@ static void paste_clipboard(EditorState *es) {
 }
 
 /* ------------------------------------------------------------------ */
-/* play_test — export level and launch the game                        */
+/* play_test / stop_play / check_play_status                           */
 /* ------------------------------------------------------------------ */
 
 /*
- * play_test — Export the current level as sandbox_00 and run the game.
+ * play_test — Export the level, compile the game, and launch it.
  *
  * Workflow:
- *   1. Export the editor's LevelDef as src/levels/sandbox_00.c/.h
- *      (overwrites the existing sandbox level source).
- *   2. Also auto-save the JSON if a path is set.
- *   3. Launch "make run" in a background process so the game compiles
- *      and starts while the editor remains interactive.
+ *   1. Export the current level as src/levels/sandbox_00.c/.h.
+ *   2. Auto-save JSON if a path is set.
+ *   3. Compile the game (blocking — we wait for make to finish).
+ *   4. Fork the game as a child process.
+ *   5. Switch the editor to "playing" mode: the Play button becomes
+ *      Stop, and the editor shows a waiting screen.
  *
- * The game compiles the exported sandbox_00.c into its binary, so the
- * designer sees exactly what they built in the editor.  The editor stays
- * open — close the game window to return to editing.
- *
- * Uses system() with a trailing "&" (POSIX) or "start" (Windows) to
- * run the build+launch without blocking the editor's event loop.
+ * When the user closes the game window (or clicks Stop in the editor),
+ * the editor returns to normal editing mode.
  */
 static void play_test(EditorState *es) {
-    /*
-     * Step 1 — Export the level as sandbox_00 to src/levels/.
-     *
-     * level_export_c writes two files:
-     *   src/levels/sandbox_00.h  — extern const LevelDef sandbox_00_def;
-     *   src/levels/sandbox_00.c  — full designated-initialiser definition
-     *
-     * These replace the hand-written sandbox level source so the game
-     * binary reflects the editor's current state after recompilation.
-     */
+    if (es->playing) return;   /* already running */
+
+    /* Step 1 — Export the level as sandbox_00 */
     if (level_export_c(&es->level, "sandbox_00", "src/levels") != 0) {
         fprintf(stderr, "Play: export failed — cannot launch game\n");
         return;
     }
-    fprintf(stderr, "Play: exported src/levels/sandbox_00.c\n");
 
-    /*
-     * Step 2 — Auto-save the JSON so the editor and disk stay in sync.
-     * Only saves if a file path has already been set (the designer has
-     * previously saved at least once).  Skip silently otherwise.
-     */
+    /* Step 2 — Auto-save JSON */
     if (es->file_path[0] != '\0') {
         if (level_save_json(&es->level, es->file_path) == 0) {
             es->modified = 0;
@@ -1329,27 +1310,133 @@ static void play_test(EditorState *es) {
         }
     }
 
-    /*
-     * Step 3 — Compile and launch the game in the background.
-     *
-     * "make run" compiles the game (picking up the new sandbox_00.c)
-     * and then runs out/super-mango.
-     *
-     * On POSIX (macOS/Linux): append " &" to run in background.
-     *   The shell immediately returns control; the game runs as a
-     *   separate process.  The editor keeps rendering frames.
-     *
-     * On Windows: use "start /B" to achieve the same non-blocking launch.
-     *
-     * stderr from the build is visible in the terminal that launched
-     * the editor, which is helpful for diagnosing compile errors.
-     */
-    fprintf(stderr, "Play: compiling and launching game...\n");
+    /* Step 3 — Compile the game (blocking — wait for build to finish) */
+    fprintf(stderr, "Play: compiling game...\n");
+    int build_result = system("make 2>&1");
+    if (build_result != 0) {
+        fprintf(stderr, "Play: build failed (exit code %d)\n", build_result);
+        return;
+    }
 
-#if defined(_WIN32)
-    system("start /B make run");
+    /* Step 4 — Launch the game as a child process */
+    fprintf(stderr, "Play: launching game...\n");
+
+#ifndef _WIN32
+    /*
+     * fork() — create a child process that is a copy of the editor.
+     *
+     * The child calls execl() to replace itself with the game binary.
+     * The parent (editor) records the child's PID so it can monitor
+     * the game and kill it when the user clicks Stop.
+     *
+     * execl replaces the child's memory with the game — it never returns
+     * on success.  If it fails, _exit(1) terminates the child immediately
+     * (using _exit instead of exit avoids running atexit handlers that
+     * could corrupt the editor's SDL state in the parent).
+     */
+    pid_t pid = fork();
+    if (pid == 0) {
+        /* Child process — become the game */
+        execl("./out/super-mango", "super-mango", (char *)NULL);
+        /* execl only returns on error */
+        _exit(1);
+    } else if (pid > 0) {
+        /* Parent process — record the child and enter play mode */
+        es->play_pid = (int)pid;
+        es->playing = 1;
+        SDL_SetWindowTitle(es->window, "Super Mango Editor - Playing...");
+    } else {
+        fprintf(stderr, "Play: fork() failed\n");
+    }
 #else
-    system("make run &");
+    /* Windows: use system() with start to launch non-blocking */
+    system("start /B .\\out\\super-mango.exe");
+    es->playing = 1;
+    SDL_SetWindowTitle(es->window, "Super Mango Editor - Playing...");
+#endif
+}
+
+/*
+ * stop_play — Terminate the game process and return to editor mode.
+ *
+ * Sends SIGTERM to the game child process (a graceful termination
+ * signal that SDL handles by posting an SDL_QUIT event).  Then waits
+ * briefly for the child to exit.  If it doesn't exit within a short
+ * window, SIGKILL forces termination.
+ */
+static void stop_play(EditorState *es) {
+    if (!es->playing) return;
+
+#ifndef _WIN32
+    if (es->play_pid > 0) {
+        /*
+         * SIGTERM asks the game to quit gracefully.  Most SDL applications
+         * handle this by posting SDL_QUIT, which exits the game loop.
+         */
+        kill((pid_t)es->play_pid, SIGTERM);
+
+        /*
+         * waitpid with 0 options blocks until the child exits.
+         * This is brief since SIGTERM usually exits the game within
+         * one frame (~16ms).
+         */
+        waitpid((pid_t)es->play_pid, NULL, 0);
+        es->play_pid = 0;
+    }
+#endif
+
+    es->playing = 0;
+
+    /* Restore the editor title bar */
+    if (es->file_path[0] != '\0') {
+        char title[300];
+        snprintf(title, sizeof(title), "Super Mango Editor - %s%s",
+                 es->file_path, es->modified ? " *" : "");
+        SDL_SetWindowTitle(es->window, title);
+    } else {
+        SDL_SetWindowTitle(es->window, "Super Mango Editor");
+    }
+}
+
+/*
+ * check_play_status — Non-blocking check if the game process has exited.
+ *
+ * Called every frame while es->playing == 1.  Uses waitpid with WNOHANG
+ * to check without blocking.  If the child has exited (user closed the
+ * game window), automatically returns to editor mode.
+ */
+static void check_play_status(EditorState *es) {
+#ifndef _WIN32
+    if (es->play_pid > 0) {
+        int status;
+        /*
+         * waitpid with WNOHANG returns immediately:
+         *   > 0 : child has exited (returns the child's PID).
+         *   0   : child is still running.
+         *   -1  : error (child doesn't exist).
+         *
+         * If the child has exited, we call stop_play to clean up and
+         * return to editor mode.
+         */
+        pid_t result = waitpid((pid_t)es->play_pid, &status, WNOHANG);
+        if (result != 0) {
+            /* Child exited (either normally or via signal) */
+            es->play_pid = 0;
+            es->playing = 0;
+
+            /* Restore the editor title */
+            if (es->file_path[0] != '\0') {
+                char title[300];
+                snprintf(title, sizeof(title), "Super Mango Editor - %s%s",
+                         es->file_path, es->modified ? " *" : "");
+                SDL_SetWindowTitle(es->window, title);
+            } else {
+                SDL_SetWindowTitle(es->window, "Super Mango Editor");
+            }
+        }
+    }
+#else
+    (void)es; /* Windows: no PID tracking in this simple implementation */
 #endif
 }
 
@@ -1457,8 +1544,15 @@ static void render_toolbar(EditorState *es) {
      * button widths and spacing.
      */
     int rx = EDITOR_W - 4 - 52;   /* rightmost button */
-    if (ui_button(&es->ui, rx, by, 52, bh, "Play")) {
-        play_test(es);
+    if (es->playing) {
+        /* While the game is running, show Stop instead of Play */
+        if (ui_button(&es->ui, rx, by, 52, bh, "Stop")) {
+            stop_play(es);
+        }
+    } else {
+        if (ui_button(&es->ui, rx, by, 52, bh, "Play")) {
+            play_test(es);
+        }
     }
 
     rx -= 64 + 4;
