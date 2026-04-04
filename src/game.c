@@ -143,7 +143,7 @@ void game_init(GameState *gs) {
      * The same texture is reused for every tile in every platform, so we
      * load it once here and pass it to platforms_render each frame.
      */
-    gs->platform_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/platform.png");
+    gs->platform_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/levels/grass_platform.png");
     if (!gs->platform_tex) {
         fprintf(stderr, "Failed to load Grass_Oneway.png: %s\n", IMG_GetError());
         SDL_DestroyTexture(gs->floor_tile);

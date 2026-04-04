@@ -280,10 +280,10 @@ static void load_textures(EditorState *es) {
 
     /* Floor and water — the base environment textures */
     LOAD_TEX(floor_tile,       "assets/sprites/levels/grass_tileset.png");
-    LOAD_TEX(water,            "assets/sprites/effects/water.png");
+    LOAD_TEX(water,            "assets/sprites/backgrounds/water.png");
 
     /* Static geometry */
-    LOAD_TEX(platform,         "assets/sprites/surfaces/platform.png");
+    LOAD_TEX(platform,         "assets/sprites/levels/grass_platform.png");
 
     /* Enemies — ground, air, and water patrol types */
     LOAD_TEX(spider,           "assets/sprites/entities/spider.png");
