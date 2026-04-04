@@ -107,12 +107,12 @@ void parallax_init(ParallaxSystem *ps, SDL_Renderer *renderer)
  *
  * Same logic as parallax_init but reads from caller-provided arrays instead
  * of the internal LAYER_CONFIG table.  Used when the LevelDef provides its
- * own parallax configuration.  count is clamped to PARALLAX_MAX_LAYERS.
+ * own parallax configuration.  count is clamped to MAX_BACKGROUND_LAYERS.
  */
 void parallax_init_from_def(ParallaxSystem *ps, SDL_Renderer *renderer,
                             const char (*paths)[64], const float *speeds, int count)
 {
-    if (count > PARALLAX_MAX_LAYERS) count = PARALLAX_MAX_LAYERS;
+    if (count > MAX_BACKGROUND_LAYERS) count = MAX_BACKGROUND_LAYERS;
     ps->count = count;
 
     for (int i = 0; i < count; i++) {

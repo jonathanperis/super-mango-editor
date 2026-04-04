@@ -100,7 +100,7 @@ typedef union {
     LadderPlacement         ladder;
     RopePlacement           rope;
     RailPlacement           rail;
-    int                     sea_gap;
+    int                     floor_gap;
 } PlacementData;
 
 /* ------------------------------------------------------------------ */

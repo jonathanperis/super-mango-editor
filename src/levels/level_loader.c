@@ -59,16 +59,16 @@ static float rand_range(float lo, float hi) {
 /* ------------------------------------------------------------------ */
 
 /*
- * load_sea_gaps — Copy sea gap x-positions from the level definition.
+ * load_floor_gaps — Copy floor gap x-positions from the level definition.
  *
- * Sea gaps are holes in the ground floor.  Their positions feed into both
+ * Floor gaps are holes in the ground floor.  Their positions feed into both
  * spider gap-avoidance logic and the blue flame eruption system.
  */
-static void load_sea_gaps(GameState *gs, const LevelDef *def)
+static void load_floor_gaps(GameState *gs, const LevelDef *def)
 {
-    for (int i = 0; i < def->sea_gap_count; i++)
-        gs->sea_gaps[i] = def->sea_gaps[i];
-    gs->sea_gap_count = def->sea_gap_count;
+    for (int i = 0; i < def->floor_gap_count; i++)
+        gs->floor_gaps[i] = def->floor_gaps[i];
+    gs->floor_gap_count = def->floor_gap_count;
 }
 
 /*
@@ -375,7 +375,7 @@ static void load_blue_flames(GameState *gs, const LevelDef *def)
 
         BlueFlame *f = &gs->blue_flames[n];
         f->gap_x      = gap_x;
-        f->x          = gap_x + (SEA_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f;
+        f->x          = gap_x + (FLOOR_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f;
         f->start_y    = (float)(FLOOR_Y + TILE_SIZE);
         f->y          = f->start_y;
         f->vy         = 0.0f;
@@ -406,7 +406,7 @@ static void load_fire_flames(GameState *gs, const LevelDef *def)
 
         BlueFlame *f = &gs->fire_flames[n];
         f->gap_x      = gap_x;
-        f->x          = gap_x + (SEA_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f;
+        f->x          = gap_x + (FLOOR_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f;
         f->start_y    = (float)(FLOOR_Y + TILE_SIZE);
         f->y          = f->start_y;
         f->vy         = 0.0f;
@@ -553,7 +553,7 @@ void level_load(GameState *gs, const LevelDef *def)
     gs->world_w = screens * GAME_W;
 
     /* ---- Static geometry ------------------------------------------ */
-    load_sea_gaps(gs, def);
+    load_floor_gaps(gs, def);
     load_rails(gs, def);
     load_platforms(gs, def);
 

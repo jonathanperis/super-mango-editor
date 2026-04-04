@@ -7,7 +7,7 @@
  * No player collision is handled here; that comes in a later pass.
  */
 #include "spider.h"
-#include "../game.h"                /* FLOOR_Y, GAME_W, SEA_GAP_W */
+#include "../game.h"                /* FLOOR_Y, GAME_W, FLOOR_GAP_W */
 #include "../core/entity_utils.h"  /* patrol_update, patrol_gap_reverse, animate_frame_ms */
 
 /* ------------------------------------------------------------------ */
@@ -42,7 +42,7 @@ void spiders_init(Spider *spiders, int *count)
 /* ------------------------------------------------------------------ */
 
 void spiders_update(Spider *spiders, int count, float dt,
-                    const int *sea_gaps, int sea_gap_count)
+                    const int *floor_gaps, int floor_gap_count)
 {
     for (int i = 0; i < count; i++) {
         Spider *s = &spiders[i];
@@ -52,12 +52,12 @@ void spiders_update(Spider *spiders, int count, float dt,
                       s->patrol_x0, s->patrol_x1, SPIDER_SPEED, dt);
 
         /*
-         * Sea gap check — reverse if the spider's art centre would be
+         * Floor gap check — reverse if the spider's art centre would be
          * over a hole in the ground, preventing them from floating in mid-air.
          */
         patrol_gap_reverse(&s->x, &s->vx,
                            SPIDER_ART_X, SPIDER_ART_W, SPIDER_SPEED,
-                           sea_gaps, sea_gap_count, SEA_GAP_W);
+                           floor_gaps, floor_gap_count, FLOOR_GAP_W);
 
         /* ── advance animation frame ───────────────────────────────── */
         animate_frame_ms(&s->frame_index, &s->anim_timer_ms,

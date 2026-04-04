@@ -174,13 +174,13 @@ int level_save_toml(const LevelDef *def, const char *path) {
     fprintf(fp, "name = \"%s\"\n", def->name[0] ? def->name : "Untitled");
     fprintf(fp, "screen_count = %d\n", def->screen_count);
 
-    /* ---- Sea gaps (plain integer array) -------------------------- */
+    /* ---- Floor gaps (plain integer array) ------------------------- */
 
-    if (def->sea_gap_count > 0) {
-        fprintf(fp, "sea_gaps = [");
-        for (int i = 0; i < def->sea_gap_count; i++) {
+    if (def->floor_gap_count > 0) {
+        fprintf(fp, "floor_gaps = [");
+        for (int i = 0; i < def->floor_gap_count; i++) {
             if (i > 0) fprintf(fp, ", ");
-            fprintf(fp, "%d", def->sea_gaps[i]);
+            fprintf(fp, "%d", def->floor_gaps[i]);
         }
         fprintf(fp, "]\n");
     }
@@ -503,12 +503,12 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "\n");
     }
 
-    /* ---- Parallax layers ----------------------------------------- */
+    /* ---- Background layers --------------------------------------- */
 
-    for (int i = 0; i < def->parallax_layer_count; i++) {
-        fprintf(fp, "[[parallax_layers]]\n");
-        fprintf(fp, "path = \"%s\"\n", def->parallax_layers[i].path);
-        fprintf(fp, "speed = %.1f\n", (double)def->parallax_layers[i].speed);
+    for (int i = 0; i < def->background_layer_count; i++) {
+        fprintf(fp, "[[background_layers]]\n");
+        fprintf(fp, "path = \"%s\"\n", def->background_layers[i].path);
+        fprintf(fp, "speed = %.1f\n", (double)def->background_layers[i].speed);
         fprintf(fp, "\n");
     }
 
@@ -607,24 +607,24 @@ int level_load_toml(const char *path, LevelDef *def) {
     }
     def->screen_count = get_int(top, "screen_count", 4);
 
-    /* ---- Sea gaps ------------------------------------------------ */
+    /* ---- Floor gaps ----------------------------------------------- */
 
     {
-        toml_datum_t sg = toml_get(top, "sea_gaps");
+        toml_datum_t sg = toml_get(top, "floor_gaps");
         if (sg.type == TOML_ARRAY) {
             int n = sg.u.arr.size;
-            if (n > MAX_SEA_GAPS) {
-                fprintf(stderr, "serializer: sea_gaps array has %d items "
-                        "(max %d)\n", n, MAX_SEA_GAPS);
+            if (n > MAX_FLOOR_GAPS) {
+                fprintf(stderr, "serializer: floor_gaps array has %d items "
+                        "(max %d)\n", n, MAX_FLOOR_GAPS);
                 toml_free(r);
                 return -1;
             }
-            def->sea_gap_count = n;
+            def->floor_gap_count = n;
             for (int i = 0; i < n; i++) {
                 toml_datum_t v = sg.u.arr.elem[i];
-                if (v.type == TOML_INT64)     def->sea_gaps[i] = (int)v.u.int64;
-                else if (v.type == TOML_FP64) def->sea_gaps[i] = (int)v.u.fp64;
-                else                          def->sea_gaps[i] = 0;
+                if (v.type == TOML_INT64)     def->floor_gaps[i] = (int)v.u.int64;
+                else if (v.type == TOML_FP64) def->floor_gaps[i] = (int)v.u.fp64;
+                else                          def->floor_gaps[i] = 0;
             }
         }
     }
@@ -880,19 +880,19 @@ int level_load_toml(const char *path, LevelDef *def) {
 
     /* ---- Level-wide configuration -------------------------------- */
 
-    /* Parallax layers */
+    /* Background layers */
     {
-        toml_datum_t plx = toml_get(top, "parallax_layers");
+        toml_datum_t plx = toml_get(top, "background_layers");
         if (plx.type == TOML_ARRAY) {
             int n = plx.u.arr.size;
-            if (n > PARALLAX_MAX_LAYERS) n = PARALLAX_MAX_LAYERS;
-            def->parallax_layer_count = n;
+            if (n > MAX_BACKGROUND_LAYERS) n = MAX_BACKGROUND_LAYERS;
+            def->background_layer_count = n;
             for (int i = 0; i < n; i++) {
                 toml_datum_t elem = plx.u.arr.elem[i];
                 const char *p = get_str(elem, "path", "");
-                strncpy(def->parallax_layers[i].path, p, 63);
-                def->parallax_layers[i].path[63] = '\0';
-                def->parallax_layers[i].speed = get_float(elem, "speed", 0);
+                strncpy(def->background_layers[i].path, p, 63);
+                def->background_layers[i].path[63] = '\0';
+                def->background_layers[i].speed = get_float(elem, "speed", 0);
             }
         }
     }
@@ -902,7 +902,7 @@ int level_load_toml(const char *path, LevelDef *def) {
         toml_datum_t fg = toml_get(top, "foreground_layers");
         if (fg.type == TOML_ARRAY) {
             int n = fg.u.arr.size;
-            if (n > PARALLAX_MAX_LAYERS) n = PARALLAX_MAX_LAYERS;
+            if (n > MAX_BACKGROUND_LAYERS) n = MAX_BACKGROUND_LAYERS;
             def->foreground_layer_count = n;
             for (int i = 0; i < n; i++) {
                 toml_datum_t elem = fg.u.arr.elem[i];

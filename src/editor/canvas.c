@@ -24,7 +24,7 @@
 
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, TOOLBAR_H, etc. */
 #include "../game.h"    /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE,
-                           SEA_GAP_W, MAX_* constants, GRAVITY              */
+                           FLOOR_GAP_W, MAX_* constants, GRAVITY            */
 
 /* ------------------------------------------------------------------ */
 /* Helper: dynamic world width from editor's screen_count setting */
@@ -488,14 +488,14 @@ static void render_floor(EditorState *es) {
 
         for (int tx = 0; tx < EDITOR_WORLD_W(es); tx += P) {
             /*
-             * Skip this piece if it falls inside any sea gap.
+             * Skip this piece if it falls inside any floor gap.
              * A piece at tx is inside a gap when both edges are within
-             * the gap bounds: gap_x <= tx AND tx + P <= gap_x + SEA_GAP_W.
+             * the gap bounds: gap_x <= tx AND tx + P <= gap_x + FLOOR_GAP_W.
              */
             int in_gap = 0;
-            for (int g = 0; g < es->level.sea_gap_count; g++) {
-                int gx = es->level.sea_gaps[g];
-                if (tx >= gx && tx + P <= gx + SEA_GAP_W) {
+            for (int g = 0; g < es->level.floor_gap_count; g++) {
+                int gx = es->level.floor_gaps[g];
+                if (tx >= gx && tx + P <= gx + FLOOR_GAP_W) {
                     in_gap = 1;
                     break;
                 }
@@ -516,10 +516,10 @@ static void render_floor(EditorState *es) {
             if (tx + P >= EDITOR_WORLD_W(es)) at_right_edge = 1;
 
             /* Gap boundaries */
-            for (int g = 0; g < es->level.sea_gap_count; g++) {
-                int gx = es->level.sea_gaps[g];
-                if (tx + P == gx)             at_right_edge = 1;
-                if (tx == gx + SEA_GAP_W)     at_left_edge  = 1;
+            for (int g = 0; g < es->level.floor_gap_count; g++) {
+                int gx = es->level.floor_gaps[g];
+                if (tx + P == gx)               at_right_edge = 1;
+                if (tx == gx + FLOOR_GAP_W)     at_left_edge  = 1;
             }
 
             if (at_left_edge && at_right_edge) piece_col = 1;
@@ -553,14 +553,14 @@ static void render_floor(EditorState *es) {
 static void render_water(EditorState *es) {
     SDL_SetRenderDrawColor(es->renderer, 0x1A, 0x6B, 0xA0, 0xFF);
 
-    for (int g = 0; g < es->level.sea_gap_count; g++) {
-        float gx = (float)es->level.sea_gaps[g];
+    for (int g = 0; g < es->level.floor_gap_count; g++) {
+        float gx = (float)es->level.floor_gaps[g];
         float wy = (float)(GAME_H - WATER_ART_H);
 
         SDL_Rect dst = {
             w2s_x(es, gx),
             w2s_y(es, wy),
-            w2s_w(es, SEA_GAP_W),
+            w2s_w(es, FLOOR_GAP_W),
             w2s_h(es, WATER_ART_H)
         };
         SDL_RenderFillRect(es->renderer, &dst);
@@ -979,7 +979,7 @@ static void render_player_spawn(EditorState *es) {
  * The preview is drawn at FLOOR_Y - BLUE_FLAME_H so designers can see
  * where the flame will erupt from.
  *
- * x = gap_x + (SEA_GAP_W - BLUE_FLAME_W) / 2
+ * x = gap_x + (FLOOR_GAP_W - BLUE_FLAME_W) / 2
  * y = FLOOR_Y - BLUE_FLAME_H  (visible preview position above gap)
  */
 static void render_blue_flames(EditorState *es) {
@@ -987,7 +987,7 @@ static void render_blue_flames(EditorState *es) {
 
     for (int i = 0; i < es->level.blue_flame_count; i++) {
         float gap_x = es->level.blue_flames[i].x;
-        float fx = gap_x + (float)(SEA_GAP_W - BLUE_FLAME_W) / 2.0f;
+        float fx = gap_x + (float)(FLOOR_GAP_W - BLUE_FLAME_W) / 2.0f;
         float fy = (float)(FLOOR_Y - BLUE_FLAME_H);
 
         draw_tex(es, es->textures.blue_flame, NULL,
@@ -1003,7 +1003,7 @@ static void render_blue_flames(EditorState *es) {
  * Identical layout to render_blue_flames but uses the fire_flame texture
  * and reads from the fire_flames placement array.
  *
- * x = gap_x + (SEA_GAP_W - FIRE_FLAME_W) / 2
+ * x = gap_x + (FLOOR_GAP_W - FIRE_FLAME_W) / 2
  * y = FLOOR_Y - FIRE_FLAME_H  (visible preview position above gap)
  */
 static void render_fire_flames(EditorState *es) {
@@ -1011,7 +1011,7 @@ static void render_fire_flames(EditorState *es) {
 
     for (int i = 0; i < es->level.fire_flame_count; i++) {
         float gap_x = es->level.fire_flames[i].x;
-        float fx = gap_x + (float)(SEA_GAP_W - FIRE_FLAME_W) / 2.0f;
+        float fx = gap_x + (float)(FLOOR_GAP_W - FIRE_FLAME_W) / 2.0f;
         float fy = (float)(FLOOR_Y - FIRE_FLAME_H);
 
         draw_tex(es, es->textures.fire_flame, NULL,
@@ -1243,11 +1243,11 @@ static void render_selection(EditorState *es) {
         wh = p->tile_height * TILE_SIZE;
         break;
     }
-    case ENT_SEA_GAP: {
-        if (es->selection.index >= es->level.sea_gap_count) return;
-        wx = (float)es->level.sea_gaps[es->selection.index];
+    case ENT_FLOOR_GAP: {
+        if (es->selection.index >= es->level.floor_gap_count) return;
+        wx = (float)es->level.floor_gaps[es->selection.index];
         wy = (float)FLOOR_Y;
-        ww = SEA_GAP_W;
+        ww = FLOOR_GAP_W;
         wh = GAME_H - FLOOR_Y;
         break;
     }
@@ -1414,7 +1414,7 @@ static void render_selection(EditorState *es) {
     case ENT_BLUE_FLAME: {
         if (es->selection.index >= es->level.blue_flame_count) return;
         float gap_x = es->level.blue_flames[es->selection.index].x;
-        wx = gap_x + (float)(SEA_GAP_W - BLUE_FLAME_W) / 2.0f;
+        wx = gap_x + (float)(FLOOR_GAP_W - BLUE_FLAME_W) / 2.0f;
         wy = (float)(FLOOR_Y - BLUE_FLAME_H);
         ww = BLUE_FLAME_W;
         wh = BLUE_FLAME_H;
@@ -1423,7 +1423,7 @@ static void render_selection(EditorState *es) {
     case ENT_FIRE_FLAME: {
         if (es->selection.index >= es->level.fire_flame_count) return;
         float gap_x = es->level.fire_flames[es->selection.index].x;
-        wx = gap_x + (float)(SEA_GAP_W - FIRE_FLAME_W) / 2.0f;
+        wx = gap_x + (float)(FLOOR_GAP_W - FIRE_FLAME_W) / 2.0f;
         wy = (float)(FLOOR_Y - FIRE_FLAME_H);
         ww = FIRE_FLAME_W;
         wh = FIRE_FLAME_H;
@@ -1678,9 +1678,9 @@ static void render_ghost(EditorState *es) {
         tex = es->textures.platform;
         dw = TILE_SIZE; dh = 2 * TILE_SIZE;  /* default 2-tile pillar */
         break;
-    case ENT_SEA_GAP:
-        /* Sea gap: draw a blue outline (no texture) */
-        dw = SEA_GAP_W; dh = GAME_H - FLOOR_Y;
+    case ENT_FLOOR_GAP:
+        /* Floor gap: draw a blue outline (no texture) */
+        dw = FLOOR_GAP_W; dh = GAME_H - FLOOR_Y;
         break;
     case ENT_RAIL:
         /* Rail: draw a green outline (no texture) */
@@ -1705,8 +1705,8 @@ static void render_ghost(EditorState *es) {
         /* Restore full opacity */
         SDL_SetTextureAlphaMod(tex, 255);
     } else {
-        /* Fallback for non-textured entities (sea gaps, rails) */
-        if (es->palette_type == ENT_SEA_GAP) {
+        /* Fallback for non-textured entities (floor gaps, rails) */
+        if (es->palette_type == ENT_FLOOR_GAP) {
             SDL_SetRenderDrawColor(es->renderer, 0x1A, 0x6B, 0xA0, 0x80);
         } else {
             SDL_SetRenderDrawColor(es->renderer, 0x00, 0xAA, 0x00, 0x80);

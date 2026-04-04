@@ -61,7 +61,7 @@ void jumping_spiders_init(JumpingSpider *spiders, int *count);
 
 /* Move, jump, patrol, animate each jumping spider. */
 void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
-                            const int *sea_gaps, int sea_gap_count,
+                            const int *floor_gaps, int floor_gap_count,
                             Mix_Chunk *snd_attack, float player_x, int cam_x);
 
 /* Draw all jumping spiders using the shared texture. */

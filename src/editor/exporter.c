@@ -208,17 +208,17 @@ static int write_source(const LevelDef *def, const char *var_name,
     /* ---- 1. name ---- */
     fprintf(f, "    .name = \"%s\",\n", def->name[0] ? def->name : "Untitled");
 
-    /* ---- 2. Sea gaps ---- */
-    write_section(f, "Sea gaps");
-    if (def->sea_gap_count > 0) {
-        fprintf(f, "    .sea_gaps      = {");
-        for (int i = 0; i < def->sea_gap_count; i++) {
-            fprintf(f, " %d", def->sea_gaps[i]);
-            if (i < def->sea_gap_count - 1) fprintf(f, ",");
+    /* ---- 2. Floor gaps ---- */
+    write_section(f, "Floor gaps");
+    if (def->floor_gap_count > 0) {
+        fprintf(f, "    .floor_gaps      = {");
+        for (int i = 0; i < def->floor_gap_count; i++) {
+            fprintf(f, " %d", def->floor_gaps[i]);
+            if (i < def->floor_gap_count - 1) fprintf(f, ",");
         }
         fprintf(f, " },\n");
     }
-    fprintf(f, "    .sea_gap_count = %d,\n", def->sea_gap_count);
+    fprintf(f, "    .floor_gap_count = %d,\n", def->floor_gap_count);
 
     /* ---- 3. Rails ---- */
     write_section(f, "Rails");
@@ -581,17 +581,17 @@ static int write_source(const LevelDef *def, const char *var_name,
     /* ---- 28. Level-wide configuration ---- */
     write_section(f, "Level-wide configuration");
 
-    /* Parallax layers */
-    if (def->parallax_layer_count > 0) {
-        fprintf(f, "    .parallax_layers = {\n");
-        for (int i = 0; i < def->parallax_layer_count; i++) {
+    /* Background layers */
+    if (def->background_layer_count > 0) {
+        fprintf(f, "    .background_layers = {\n");
+        for (int i = 0; i < def->background_layer_count; i++) {
             fprintf(f, "        { \"%s\", %.2ff },\n",
-                    def->parallax_layers[i].path,
-                    (double)def->parallax_layers[i].speed);
+                    def->background_layers[i].path,
+                    (double)def->background_layers[i].speed);
         }
         fprintf(f, "    },\n");
     }
-    fprintf(f, "    .parallax_layer_count = %d,\n", def->parallax_layer_count);
+    fprintf(f, "    .background_layer_count = %d,\n", def->background_layer_count);
 
     /* Foreground layers */
     if (def->foreground_layer_count > 0) {

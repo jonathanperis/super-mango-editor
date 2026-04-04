@@ -96,15 +96,15 @@
 #define WORLD_W       1600
 
 /*
- * SEA_GAP_W — width of each sea gap in logical pixels.
- * MAX_SEA_GAPS — maximum number of gaps the level can hold.
+ * FLOOR_GAP_W — width of each floor gap in logical pixels.
+ * MAX_FLOOR_GAPS — maximum number of gaps the level can hold.
  *
- * Sea gaps are holes in the ground floor that expose the water below.
+ * Floor gaps are holes in the ground floor that expose the water below.
  * Falling into any gap costs a life (instant death, not a hurt point).
- * Each gap is defined by its left-edge x coordinate; all are SEA_GAP_W wide.
+ * Each gap is defined by its left-edge x coordinate; all are FLOOR_GAP_W wide.
  */
-#define SEA_GAP_W         32
-#define MAX_SEA_GAPS      16
+#define FLOOR_GAP_W         32
+#define MAX_FLOOR_GAPS      16
 
 /*
  * CAM_LOOKAHEAD — extra pixels the camera shifts in the direction the player
@@ -241,8 +241,8 @@ typedef struct {
     SDL_Texture  *bridge_tex;          /* shared texture for bridge tiles       */
     Bridge        bridges[MAX_BRIDGES];/* tiled crumble walkway instances      */
     int           bridge_count;        /* number of active bridges             */
-    int           sea_gaps[MAX_SEA_GAPS]; /* left-edge x of each sea gap       */
-    int           sea_gap_count;         /* number of active sea gaps          */
+    int           floor_gaps[MAX_FLOOR_GAPS]; /* left-edge x of each floor gap     */
+    int           floor_gap_count;           /* number of active floor gaps       */
     SDL_Texture  *star_yellow_tex;       /* shared texture for star yellow pickups*/
     SDL_Texture  *star_green_tex;       /* shared texture for star green pickups */
     SDL_Texture  *star_red_tex;         /* shared texture for star red pickups   */

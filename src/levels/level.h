@@ -345,8 +345,8 @@ typedef struct {
     int   screen_count; /* number of screens wide (0 = default 4)          */
 
     /* ---- World geometry --------------------------------------------- */
-    int sea_gaps[MAX_SEA_GAPS];
-    int sea_gap_count;
+    int floor_gaps[MAX_FLOOR_GAPS];
+    int floor_gap_count;
 
     /* ---- Rails (must be initialised before spike_blocks/float_platforms) */
     RailPlacement   rails[MAX_RAILS];
@@ -427,18 +427,18 @@ typedef struct {
      * Moving them into LevelDef lets the editor configure them per-level.
      */
 
-    /* Parallax background layers (back-to-front render order) */
+    /* Background layers (back-to-front render order) */
     struct {
         char  path[64];   /* PNG path relative to repo root */
         float speed;      /* scroll fraction: 0.0=static, 0.5=half cam speed */
-    } parallax_layers[PARALLAX_MAX_LAYERS];
-    int parallax_layer_count;
+    } background_layers[MAX_BACKGROUND_LAYERS];
+    int background_layer_count;
 
     /* Foreground layers (fog, water — rendered on top of floor/entities) */
     struct {
         char  path[64];
         float speed;
-    } foreground_layers[PARALLAX_MAX_LAYERS];
+    } foreground_layers[MAX_BACKGROUND_LAYERS];
     int foreground_layer_count;
 
     /* Player spawn position */
