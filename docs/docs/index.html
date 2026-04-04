@@ -605,7 +605,7 @@ make run
   │     ├── fog_init(&amp;gs.fog, gs.renderer)         (fog_background_1.png, fog_background_2.png)
   │     ├── hud_init(&amp;gs.hud, gs.renderer)
   │     ├── if (debug_mode) debug_init(&amp;gs.debug)
-  │     ├── sandbox_load_level(&amp;gs)                (all entity inits + sea gap positions)
+  │     ├── sandbox_load_level(&amp;gs)                (all entity inits + floor gap positions)
   │     ├── hearts/lives/score/score_life_next initialisation
   │     ├── SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) — lazy init, non-fatal
   │     └── scan joysticks for first connected gamepad
@@ -682,7 +682,7 @@ make run
                     → fish collision → faster_fish collision → spike_block collision (+ push impulse)
                     → spike collision → spike_platform collision → circular_saw collision
                     → axe_trap collision → blue_flame collision
-                    → sea gap fall detection (instant death)
+                    → floor gap fall detection (instant death)
                     → coin–player collision → star_yellow–player collision → last_star–player collision
                     → heart/lives/score_life_next logic
                     → water_update → fog_update → bouncepads_update (small, medium, high)
@@ -726,7 +726,7 @@ prev = now;
 <tr>
 <td>3</td>
 <td>Floor</td>
-<td><code>grass_tileset.png</code> 9-slice tiled across world width at <code>FLOOR_Y</code>, with sea-gap openings</td>
+<td><code>grass_tileset.png</code> 9-slice tiled across world width at <code>FLOOR_Y</code>, with floor-gap openings</td>
 </tr>
 <tr>
 <td>4</td>
@@ -801,7 +801,7 @@ prev = now;
 <tr>
 <td>18</td>
 <td>Blue flames</td>
-<td><code>blue_flame.png</code> animated flame hazards erupting from sea gaps</td>
+<td><code>blue_flame.png</code> animated flame hazards erupting from floor gaps</td>
 </tr>
 <tr>
 <td>19</td>
@@ -1013,8 +1013,8 @@ prev = now;
     Water          water;            // Animated water strip at the bottom
     FogSystem      fog;              // Atmospheric fog overlay — topmost layer
 
-    int            sea_gaps[MAX_SEA_GAPS];
-    int            sea_gap_count;
+    int            floor_gaps[MAX_FLOOR_GAPS];
+    int            floor_gap_count;
 
     Hud            hud;              // HUD display: hearts, lives, score
     int            hearts;           // Current hit points (0-MAX_HEARTS)
@@ -1864,7 +1864,7 @@ src/
 <td>Y coordinate of the floor&#39;s top edge</td>
 </tr>
 </tbody></table>
-<p>The floor is drawn by repeating the 48x48 grass tile across the full <code>WORLD_W</code> at <code>y=FLOOR_Y</code>, with gaps cut out at each <code>sea_gaps[]</code> position.</p>
+<p>The floor is drawn by repeating the 48x48 grass tile across the full <code>WORLD_W</code> at <code>y=FLOOR_Y</code>, with gaps cut out at each <code>floor_gaps[]</code> position.</p>
 <h3>Physics</h3>
 <table>
 <thead>
@@ -1882,16 +1882,16 @@ src/
 <td>Downward acceleration in px/s^2</td>
 </tr>
 <tr>
-<td><code>SEA_GAP_W</code></td>
+<td><code>FLOOR_GAP_W</code></td>
 <td><code>32</code></td>
 <td><code>int</code></td>
-<td>Width of each sea gap in logical pixels</td>
+<td>Width of each floor gap in logical pixels</td>
 </tr>
 <tr>
-<td><code>MAX_SEA_GAPS</code></td>
+<td><code>MAX_FLOOR_GAPS</code></td>
 <td><code>8</code></td>
 <td><code>int</code></td>
-<td>Maximum number of sea gaps per level</td>
+<td>Maximum number of floor gaps per level</td>
 </tr>
 </tbody></table>
 <p>Every frame while airborne: <code>player-&gt;vy += GRAVITY * dt</code>.</p>
@@ -4067,7 +4067,7 @@ TTF_CloseFont(font);
 <p>Always draw in painter&#39;s algorithm order (back to front). The game currently uses 32 layers:</p>
 <pre><code> 1. Parallax background    (7 parallax_*.png layers from assets/)
  2. Platforms              (platform.png 9-slice pillars)
- 3. Floor tiles            (grass_tileset.png at FLOOR_Y, with sea-gap openings)
+ 3. Floor tiles            (grass_tileset.png at FLOOR_Y, with floor-gap openings)
  4. Float platforms        (float_platform.png 3-slice hovering surfaces)
  5. Spike rows             (spike.png ground-level spike strips)
  6. Spike platforms        (spike_platform.png elevated spike hazards)
@@ -4082,7 +4082,7 @@ TTF_CloseFont(font);
 15. Coins                  (coin.png collectibles)
 16. Star yellows           (star_yellow.png health pickups)
 17. Last star              (end-of-level star using HUD star sprite)
-18. Blue flames            (blue_flame.png erupting from sea gaps)
+18. Blue flames            (blue_flame.png erupting from floor gaps)
 19. Fish                   (fish.png jumping water enemies)
 20. Faster fish            (faster_fish.png fast jumping enemies)
 21. Water                  (water.png animated strip)
@@ -4362,7 +4362,7 @@ if (player-&gt;on_ground &amp;&amp; want_jump) {
                    const RopeDecor *ropes, int rope_count,
                    const Bridge *bridges, int bridge_count,
                    const SpikePlatform *spike_platforms, int spike_platform_count,
-                   const int *sea_gaps, int sea_gap_count,
+                   const int *floor_gaps, int floor_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
                    int prev_fp_landed_idx);
@@ -4936,7 +4936,7 @@ gs-&gt;music = NULL;
 │   └── water.h / .c              Animated water strip: init, scroll, tile render
 ├── entities/
 │   ├── spider.h / .c             Spider enemy: ground patrol, animation, render
-│   ├── jumping_spider.h / .c     Jumping spider: patrol, jump arcs, sea-gap awareness
+│   ├── jumping_spider.h / .c     Jumping spider: patrol, jump arcs, floor-gap awareness
 │   ├── bird.h / .c               Slow bird enemy: sine-wave sky patrol, animation
 │   ├── faster_bird.h / .c        Fast bird enemy: tighter sine-wave, faster animation
 │   ├── fish.h / .c               Fish enemy: patrol, random jump arcs, render
@@ -4947,7 +4947,7 @@ gs-&gt;music = NULL;
 │   ├── spike_platform.h / .c     Elevated spike surface hazard
 │   ├── circular_saw.h / .c       Fast rotating patrol saw hazard
 │   ├── axe_trap.h / .c           Swinging/spinning axe hazard
-│   └── blue_flame.h / .c         Blue flame hazard: erupts from sea gaps, rise/flip/fall cycle
+│   └── blue_flame.h / .c         Blue flame hazard: erupts from floor gaps, rise/flip/fall cycle
 ├── levels/
 │   ├── level.h                   Shared level definitions
 │   ├── level_01.h / .c           Level 1 data
@@ -5031,8 +5031,8 @@ gs-&gt;music = NULL;
 #define CAM_LOOKAHEAD  40
 #define CAM_SMOOTHING  8.0f
 #define CAM_SNAP_THRESHOLD  0.5f
-#define SEA_GAP_W     32
-#define MAX_SEA_GAPS  8
+#define FLOOR_GAP_W     32
+#define MAX_FLOOR_GAPS  8
 </code></pre>
 <h3>Includes</h3>
 <pre><code class="language-c">#include &quot;player.h&quot;          // Player struct
@@ -5101,7 +5101,7 @@ void game_cleanup(GameState *gs);
 <p><strong>Role:</strong> Level layout and entity placement. Separates content (WHERE entities are placed) from engine logic (HOW they behave).</p>
 <p><strong>Key functions:</strong></p>
 <ul>
-<li><code>sandbox_load_level(GameState *gs)</code> -- place all entities, define sea gaps, set up the level (called once from <code>game_init</code>)</li>
+<li><code>sandbox_load_level(GameState *gs)</code> -- place all entities, define floor gaps, set up the level (called once from <code>game_init</code>)</li>
 <li><code>sandbox_reset_level(GameState *gs, int *fp_prev_riding)</code> -- reset all entities on player death</li>
 </ul>
 <hr>
@@ -5111,9 +5111,9 @@ void game_cleanup(GameState *gs);
 <hr>
 <h2>Enemy Modules</h2>
 <h3><code>spider.h</code> / <code>spider.c</code></h3>
-<p>Ground-patrol spider enemy with 3-frame walk animation. Reverses at patrol boundaries and respects sea gaps. Asset: <code>spider.png</code>.</p>
+<p>Ground-patrol spider enemy with 3-frame walk animation. Reverses at patrol boundaries and respects floor gaps. Asset: <code>spider.png</code>.</p>
 <h3><code>jumping_spider.h</code> / <code>jumping_spider.c</code></h3>
-<p>Faster spider variant that periodically jumps in short arcs to clear sea gaps. Asset: <code>jumping_spider.png</code>.</p>
+<p>Faster spider variant that periodically jumps in short arcs to clear floor gaps. Asset: <code>jumping_spider.png</code>.</p>
 <h3><code>bird.h</code> / <code>bird.c</code></h3>
 <p>Slow sine-wave sky patrol bird. Asset: <code>bird.png</code>.</p>
 <h3><code>faster_bird.h</code> / <code>faster_bird.c</code></h3>
@@ -5125,7 +5125,7 @@ void game_cleanup(GameState *gs);
 <hr>
 <h2>Hazard Modules</h2>
 <h3><code>blue_flame.h</code> / <code>blue_flame.c</code></h3>
-<p>Erupting fire hazard from sea gaps. Cycles through waiting -&gt; rising -&gt; flipping (180 degree rotation at apex) -&gt; falling. 2-frame animation. Asset: <code>blue_flame.png</code>.</p>
+<p>Erupting fire hazard from floor gaps. Cycles through waiting -&gt; rising -&gt; flipping (180 degree rotation at apex) -&gt; falling. 2-frame animation. Asset: <code>blue_flame.png</code>.</p>
 <h3><code>spike.h</code> / <code>spike.c</code></h3>
 <p>Static ground spike rows placed along the floor. Asset: <code>spike.png</code>.</p>
 <h3><code>spike_block.h</code> / <code>spike_block.c</code></h3>

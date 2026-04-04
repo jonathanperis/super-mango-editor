@@ -20,7 +20,8 @@ This project's documentation lives in these locations:
 | `.claude/references/sprite-sheet-analysis.md` | Sprite sheet measurement and analysis guide |
 | `.claude/commands/*.md` | Slash command definitions |
 | `.specs/` | Feature specs, design docs, task breakdowns |
-| `docs/` | GitHub Pages site (index.html) |
+| `docs/index.html` | GitHub Pages landing page — game description, WebAssembly player, download links |
+| `docs/docs/index.html` | GitHub Pages documentation site — mirrors wiki content as a single-page HTML reference |
 | **Wiki repo** | `github.com/jonathanperis/super-mango-game.wiki.git` — detailed documentation pages |
 
 ## Steps
@@ -108,11 +109,27 @@ Verify:
 - Screenshots or GIFs (if any) reflect current game/editor state
 - Links to wiki, pages, or external resources are valid
 
-### 6. Verify GitHub Pages docs
+### 6. Verify and update GitHub Pages docs
 
-- Check that `docs/index.html` doesn't reference features or screenshots that no longer exist
-- Verify any links in the docs site point to valid targets
-- Check for stale references to JSON format (now TOML)
+**Landing page (`docs/index.html`):**
+- Check that feature descriptions, entity counts, and terminology match the code
+- Verify the WebAssembly player buttons work (Play + Debug Mode)
+- Check for stale references (JSON format, sea gaps, old entity names)
+
+**Documentation site (`docs/docs/index.html`):**
+- This single-page HTML site mirrors the wiki content and serves as the public documentation
+- **Every wiki page's content must be reflected here** — when wiki pages are updated, this file must be regenerated or manually updated to match
+- Cross-reference each section in `docs/docs/index.html` against the corresponding wiki page:
+  - Architecture section ↔ `architecture.md`
+  - Build System section ↔ `build_system.md`
+  - Assets section ↔ `assets.md`
+  - Sounds section ↔ `sounds.md`
+  - Constants section ↔ `constants_reference.md`
+  - Developer Guide section ↔ `developer_guide.md`
+  - Player Module section ↔ `player_module.md`
+  - Source Files section ↔ `source_files.md`
+- Check for stale entity names, asset paths, build commands, and counts
+- The HTML content should match what the wiki says — wiki is the source of truth for doc content, code is the source of truth for technical accuracy
 
 ### 7. Verify and update .specs/ documents
 
