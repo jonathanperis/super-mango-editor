@@ -289,7 +289,14 @@ The editor serializer (`src/editor/serializer.c`) writes TOML sections in a spec
 
 ## Lesson 18: Difficulty Scale (1-12) calibrates every design decision
 
-Every level must define its difficulty (1-12) in the TOML `difficulty` field. This scale determines enemy counts, hazard density, gap spacing, and collectible risk-reward.
+Every level must indicate its difficulty (1-12) in the `description` field, prefixed as "Difficulty N - ". This scale determines enemy counts, hazard density, gap spacing, and collectible risk-reward.
+
+**Example:**
+```toml
+description = """
+Difficulty 4 - The mountain opened its throat and swallowed the sky...
+"""
+```
 
 **Difficulty Scale Reference:**
 
@@ -310,7 +317,7 @@ Every level must define its difficulty (1-12) in the TOML `difficulty` field. Th
 | 10-12 | Tight sequences | Single tile only | Very Fast (150-200%) | 1-2 total, high risk |
 
 **Reference levels:**
-- `01_lugio_01.toml` (Volcanic Depths 1) — difficulty 4 (baseline intermediate)
-- `02_lugio_02.toml` (Volcanic Depths 2) — difficulty 5 (intermediate, more hazards)
+- `01_lugio_01.toml` (Volcanic Depths 1) — Difficulty 4 (baseline intermediate)
+- `02_lugio_02.toml` (Volcanic Depths 2) — Difficulty 5 (intermediate, more hazards)
 
-**Rule:** When asked to create a level, always ASK for the difficulty level (1-12). If not specified, default to 4 (intermediate baseline). Calibrate entity counts, gap spacing, and platform sizes to match the tier guidelines.
+**Rule:** When asked to create a level, always ASK for the difficulty level (1-12). If not specified, default to 4 (intermediate baseline). Calibrate entity counts, gap spacing, and platform sizes to match the tier guidelines. Embed the difficulty number in the description field as "Difficulty N - [lore text]".
