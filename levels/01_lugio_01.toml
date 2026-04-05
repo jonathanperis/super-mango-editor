@@ -300,9 +300,6 @@ patrol_x0 = 1500.0
 patrol_x1 = 2200.0
 frame_index = 1
 
-# Fish swim in the lava lane — gaps don't matter, they patrol freely.
-# Follows the sandbox pattern: fish span multiple gaps per patrol.
-
 [[fish]]
 x = 700.0
 vx = 70.0
