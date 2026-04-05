@@ -224,6 +224,8 @@ Before delivering, mentally check:
 - [ ] All asset paths are valid (use only the assets listed above)
 - [ ] screen_count matches the actual x-range of placed entities
 - [ ] **NO platform overlaps a floor gap** (see Lessons Learned #1)
+- [ ] **Every vine/rope overlaps a platform** — climbables lead TO platforms (Lesson 6)
+- [ ] **Every float platform is reachable** — no (0,0) defaults, jumpable from ground or adjacent platform (Lesson 7)
 
 ### Step 5: Automated validation script
 After writing the TOML, run this validation to catch placement errors:
@@ -283,6 +285,19 @@ speed = 0.5
 path = "assets/sprites/foregrounds/lava.png"     # strip LAST
 speed = 0.0
 ```
+
+### Lesson 6: Vines and ropes MUST overlap a platform
+**Problem:** A vine or rope hanging in empty space serves no purpose. The player climbs them to reach platforms — if there's no platform at the top, it's a dead end.
+
+**Rule:** Every vine and rope must have its x-position overlapping a platform's x-range. The climbable should lead TO a platform — the player grabs it, climbs up, and lands on top. A vine at x=88 should overlap a platform at x=80 (width 48, range 80-128). If no platform exists at that x, either add one or remove the vine.
+
+### Lesson 7: Float platforms must be reachable
+**Problem:** A float platform at (0, 0) or at an unreachable height is wasted geometry. RAIL-mode platforms with x=0, y=0 are a common mistake because those are the struct defaults.
+
+**Rule:** Every float platform must be reachable by the player:
+- **STATIC/CRUMBLE**: Must be jumpable from the ground (y >= ~170) or from an adjacent higher platform. Max jump height from ground is ~120px, so y must be >= FLOOR_Y - 120 ≈ 132 minimum if jumping from ground.
+- **RAIL**: x and y are ignored (position comes from the rail), but verify the rail path passes through reachable airspace.
+- **Never** leave x=0, y=0 as defaults for STATIC/CRUMBLE platforms — that's off-screen.
 
 ### Lesson 5: Every TOML file gets Luigo's signature
 **Rule:** Every generated TOML file must start with a comment header containing:

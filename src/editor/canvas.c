@@ -384,13 +384,25 @@ int canvas_contains(int sx, int sy) {
 /* ---- Sky --------------------------------------------------------- */
 
 /*
- * render_sky — Fill the canvas with a light blue sky colour (#87CEEB).
+ * render_sky — Draw the first background layer as the sky backdrop.
  *
- * This provides the background behind all world geometry.  The colour
- * approximates a clear daytime sky that matches the game's parallax
- * background tone.
+ * If a sky texture is loaded (from the level's first background_layer),
+ * tile it across the canvas.  Otherwise fall back to a flat blue fill.
  */
 static void render_sky(EditorState *es) {
+    if (es->textures.sky) {
+        int tex_w = 0, tex_h = 0;
+        SDL_QueryTexture(es->textures.sky, NULL, NULL, &tex_w, &tex_h);
+        if (tex_w > 0 && tex_h > 0) {
+            /* Tile the sky texture across the canvas area */
+            for (int tx = 0; tx < CANVAS_W; tx += tex_w) {
+                SDL_Rect dst = { tx, TOOLBAR_H, tex_w, CANVAS_H };
+                SDL_RenderCopy(es->renderer, es->textures.sky, NULL, &dst);
+            }
+            return;
+        }
+    }
+    /* Fallback: flat blue */
     SDL_SetRenderDrawColor(es->renderer, 0x87, 0xCE, 0xEB, 0xFF);
     SDL_Rect sky = { 0, TOOLBAR_H, CANVAS_W, CANVAS_H };
     SDL_RenderFillRect(es->renderer, &sky);

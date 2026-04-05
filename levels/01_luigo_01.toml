@@ -452,6 +452,11 @@ y = 124.0
 tile_count = 3
 
 [[vines]]
+x = 1228.0
+y = 124.0
+tile_count = 3
+
+[[vines]]
 x = 1688.0
 y = 124.0
 tile_count = 3
@@ -467,7 +472,7 @@ y = 20.0
 tile_count = 28
 
 [[ropes]]
-x = 1550.0
+x = 1468.0
 y = 150.0
 tile_count = 2
 

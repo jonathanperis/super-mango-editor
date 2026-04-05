@@ -278,7 +278,8 @@ static void load_textures(EditorState *es) {
             } \
         } while (0)
 
-    /* Floor and water — the base environment textures */
+    /* Environment textures — sky, floor, water (reloaded per-level) */
+    LOAD_TEX(sky,              "assets/sprites/backgrounds/sky_blue.png");
     LOAD_TEX(floor_tile,       "assets/sprites/levels/grass_tileset.png");
     LOAD_TEX(water,            "assets/sprites/foregrounds/water.png");
 
@@ -1076,6 +1077,43 @@ static void load_level_from_path(EditorState *es, const char *path) {
     undo_clear(es->undo);
     es->selection.index = -1;
     es->modified = 0;
+
+    /*
+     * Reload theme-dependent textures so the editor preview matches the
+     * level's visual identity (floor tileset, foreground strip).
+     */
+    if (es->level.background_layer_count > 0) {
+        const char *sky_path = es->level.background_layers[0].path;
+        if (sky_path[0] != '\0') {
+            SDL_Texture *new_sky = IMG_LoadTexture(es->renderer, sky_path);
+            if (new_sky) {
+                if (es->textures.sky)
+                    SDL_DestroyTexture(es->textures.sky);
+                es->textures.sky = new_sky;
+            }
+        }
+    }
+    if (es->level.floor_tile_path[0] != '\0') {
+        SDL_Texture *new_floor = IMG_LoadTexture(es->renderer,
+                                                  es->level.floor_tile_path);
+        if (new_floor) {
+            if (es->textures.floor_tile)
+                SDL_DestroyTexture(es->textures.floor_tile);
+            es->textures.floor_tile = new_floor;
+        }
+    }
+    if (es->level.foreground_layer_count > 0) {
+        const char *strip = es->level.foreground_layers[
+            es->level.foreground_layer_count - 1].path;
+        if (strip[0] != '\0') {
+            SDL_Texture *new_water = IMG_LoadTexture(es->renderer, strip);
+            if (new_water) {
+                if (es->textures.water)
+                    SDL_DestroyTexture(es->textures.water);
+                es->textures.water = new_water;
+            }
+        }
+    }
 
     /* Update the title bar to show the loaded file */
     char title[300];
@@ -2223,6 +2261,7 @@ void editor_cleanup(EditorState *es) {
      * Textures must be destroyed BEFORE the renderer because they live
      * on the GPU and are associated with the renderer that created them.
      */
+    DESTROY_TEX(es->textures.sky);
     DESTROY_TEX(es->textures.floor_tile);
     DESTROY_TEX(es->textures.water);
     DESTROY_TEX(es->textures.platform);
