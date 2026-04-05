@@ -105,9 +105,9 @@
 #define LADDER_STEP         8
 
 /* Rope — stacked tiles with step */
-#define ROPE_W             12
+#define ROPE_W             16
 #define ROPE_H             36
-#define ROPE_STEP          34
+#define ROPE_STEP          23
 
 /* Rail — 16x16 tiles */
 #define RAIL_TILE_W        16

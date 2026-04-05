@@ -112,13 +112,13 @@
 #define LADDER_STEP         8   /* tight overlap for seamless stacking    */
 
 /* Rope — stacked tiles with vertical step */
-#define ROPE_SRC_X          2   /* 2 px padding on left side of source    */
+#define ROPE_SRC_X          0   /* no crop, use full sprite width         */
 #define ROPE_SRC_Y          6   /* 6 px top padding in source             */
-#define ROPE_SRC_W         12   /* source crop width                      */
+#define ROPE_SRC_W         16   /* source crop width (full sprite)        */
 #define ROPE_SRC_H         36   /* source crop height                     */
-#define ROPE_W             12   /* display width                          */
+#define ROPE_W             16   /* display width                          */
 #define ROPE_H             36   /* display height of one tile segment     */
-#define ROPE_STEP          34   /* vertical spacing between stacked tiles */
+#define ROPE_STEP          23   /* vertical spacing for 13px overlap       */
 
 /* Rail — 16x16 tiles forming a closed or open track path */
 #define RAIL_TILE_W        16
