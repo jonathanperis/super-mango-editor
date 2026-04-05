@@ -208,7 +208,38 @@ int level_save_toml(const LevelDef *def, const char *path) {
     /* ---- Header / name ------------------------------------------- */
 
     fprintf(fp, "# Level: %s\n", def->name[0] ? def->name : "Untitled");
+
+    /*
+     * Write the description as a comment block at the top of the file.
+     * Each line of the description is prefixed with "# " so it appears
+     * as human-readable TOML comments.  The description is also stored
+     * as a TOML string field below so it survives round-trip saves.
+     */
+    if (def->description[0] != '\0') {
+        const char *p = def->description;
+        fprintf(fp, "#\n");
+        while (*p) {
+            fprintf(fp, "# ");
+            while (*p && *p != '\n') {
+                fputc(*p, fp);
+                p++;
+            }
+            fputc('\n', fp);
+            if (*p == '\n') p++;
+        }
+    }
+
     fprintf(fp, "name = \"%s\"\n", def->name[0] ? def->name : "Untitled");
+
+    /*
+     * Description field — stored as a TOML string so the editor can
+     * read it back on load.  The comment block above is for humans
+     * reading the raw file; this field is the machine-readable copy.
+     */
+    if (def->description[0] != '\0') {
+        fprintf(fp, "description = \"\"\"\n%s\n\"\"\"\n", def->description);
+    }
+
     fprintf(fp, "screen_count = %d\n", def->screen_count);
 
     /* ---- Level-wide configuration (must come before [[arrays]]) --- */
@@ -652,6 +683,14 @@ int level_load_toml(const char *path, LevelDef *def) {
         strncpy(def->name, name_str, sizeof(def->name) - 1);
         def->name[sizeof(def->name) - 1] = '\0';
     }
+
+    /* Description — multi-line string or single-line */
+    {
+        const char *desc = get_str(top, "description", "");
+        strncpy(def->description, desc, sizeof(def->description) - 1);
+        def->description[sizeof(def->description) - 1] = '\0';
+    }
+
     def->screen_count = get_int(top, "screen_count", 4);
 
     /* ---- Floor gaps ----------------------------------------------- */

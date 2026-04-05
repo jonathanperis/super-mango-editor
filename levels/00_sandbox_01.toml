@@ -1,5 +1,15 @@
-# Level: Sandbox
+# Level: Creator's Playground
+#
+# The original sandbox — four screens of everything the engine can throw
+# at you. Platforms, gaps, every enemy type, every hazard, every surface.
+# This is where you learn to play, and where the engine proves it works.
+#
 name = "Creator's Playground"
+description = """
+The original sandbox — four screens of everything the engine can throw
+at you. Platforms, gaps, every enemy type, every hazard, every surface.
+This is where you learn to play, and where the engine proves it works.
+"""
 screen_count = 4
 player_start_x = 79.0
 player_start_y = 124.5

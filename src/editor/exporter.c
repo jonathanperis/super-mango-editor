@@ -205,8 +205,19 @@ static int write_source(const LevelDef *def, const char *var_name,
     fprintf(f, "\n/* ------------------------------------------------------------------ */\n\n");
     fprintf(f, "const LevelDef %s_def = {\n", var_name);
 
-    /* ---- 1. name ---- */
+    /* ---- 1. name + description ---- */
     fprintf(f, "    .name = \"%s\",\n", def->name[0] ? def->name : "Untitled");
+    if (def->description[0] != '\0') {
+        /* Escape newlines for C string literal */
+        fprintf(f, "    .description = \"");
+        for (const char *p = def->description; *p; p++) {
+            if (*p == '\n')      fprintf(f, "\\n");
+            else if (*p == '"')  fprintf(f, "\\\"");
+            else if (*p == '\\') fprintf(f, "\\\\");
+            else                 fputc(*p, f);
+        }
+        fprintf(f, "\",\n");
+    }
 
     /* ---- 2. Floor gaps ---- */
     write_section(f, "Floor gaps");
