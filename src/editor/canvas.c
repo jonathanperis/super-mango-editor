@@ -859,9 +859,14 @@ static void render_vines(EditorState *es) {
     for (int i = 0; i < es->level.vine_count; i++) {
         const VinePlacement *v = &es->level.vines[i];
 
+        /* Select texture by vine type: 0 = green, 1 = brown */
+        SDL_Texture *tex = (v->vine_type == 1)
+            ? es->textures.vine_brown
+            : es->textures.vine_green;
+
         for (int t = 0; t < v->tile_count; t++) {
             float tile_y = v->y + (float)(t * VINE_STEP);
-            draw_tex(es, es->textures.vine, &src,
+            draw_tex(es, tex, &src,
                      v->x, tile_y, VINE_W, VINE_H);
         }
     }
@@ -1681,7 +1686,7 @@ static void render_ghost(EditorState *es) {
         dw = BP_FRAME_W; dh = BP_SRC_H;
         break;
     case ENT_VINE:
-        tex = es->textures.vine;
+        tex = es->textures.vine_green;
         src_rect = (SDL_Rect){ 0, VINE_SRC_Y, VINE_W, VINE_SRC_H };
         use_src = 1;
         dw = VINE_W; dh = VINE_H;

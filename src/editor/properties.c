@@ -125,6 +125,11 @@ static const char *axe_mode_opts[] = { "Pendulum", "Spin" };
  */
 static const char *fplat_mode_opts[] = { "Static", "Crumble", "Rail" };
 
+/*
+ * Vine type options — maps to VineType enum (VINE_GREEN = 0, VINE_BROWN = 1).
+ */
+static const char *vine_type_opts[] = { "Green", "Brown" };
+
 /* ------------------------------------------------------------------ */
 /* Helper: unique widget ID from entity type and field offset          */
 /* ------------------------------------------------------------------ */
@@ -299,6 +304,45 @@ void properties_render(EditorState *es, int start_y, int available_h)
         if (ui_int_field(&es->ui, FIELD_ID(ENT_PLATFORM, 2),
                          FIELD_X, y, FIELD_W, &p->tile_width))
             es->modified = 1;
+        y += ROW_H;
+
+        /* Tile path dropdown — select platform texture override */
+        {
+            static const char *platform_tile_names[] = {
+                "(default)",
+                "stone_platform.png",
+                "leaf_platform.png"
+            };
+            static const char *platform_tile_paths[] = {
+                "",
+                "assets/sprites/levels/stone_platform.png",
+                "assets/sprites/levels/leaf_platform.png"
+            };
+            static const int platform_tile_count = 3;
+
+            int sel = 0;
+            if (p->tile_path[0] != '\0') {
+                for (int i = 1; i < platform_tile_count; i++) {
+                    if (strcmp(p->tile_path, platform_tile_paths[i]) == 0) {
+                        sel = i;
+                        break;
+                    }
+                }
+            }
+            ui_label(&es->ui, CONTENT_X, y, "tile_path:");
+            if (ui_dropdown(&es->ui, FIELD_ID(ENT_PLATFORM, 3),
+                            FIELD_X, y, FIELD_W,
+                            platform_tile_names, platform_tile_count, &sel)) {
+                if (sel == 0) {
+                    p->tile_path[0] = '\0';  /* Clear to use default */
+                } else {
+                    strncpy(p->tile_path, platform_tile_paths[sel],
+                            sizeof(p->tile_path) - 1);
+                    p->tile_path[sizeof(p->tile_path) - 1] = '\0';
+                }
+                es->modified = 1;
+            }
+        }
         break;
     }
 
@@ -946,6 +990,13 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "tile_count:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_VINE, 2),
                          FIELD_X, y, FIELD_W, &p->tile_count))
+            es->modified = 1;
+        y += ROW_H;
+
+        ui_label(&es->ui, CONTENT_X, y, "vine_type:");
+        if (ui_dropdown(&es->ui, FIELD_ID(ENT_VINE, 3),
+                        FIELD_X, y, FIELD_W,
+                        vine_type_opts, 2, &p->vine_type))
             es->modified = 1;
         break;
     }
