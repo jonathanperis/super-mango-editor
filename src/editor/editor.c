@@ -285,6 +285,8 @@ static void load_textures(EditorState *es) {
 
     /* Static geometry */
     LOAD_TEX(platform,         "assets/sprites/levels/grass_platform.png");
+    LOAD_TEX(platform_stone,   "assets/sprites/levels/stone_platform.png");
+    LOAD_TEX(platform_leaf,    "assets/sprites/levels/leaf_platform.png");
 
     /* Enemies — ground, air, and water patrol types */
     LOAD_TEX(spider,           "assets/sprites/entities/spider.png");
@@ -2270,6 +2272,8 @@ void editor_cleanup(EditorState *es) {
     DESTROY_TEX(es->textures.floor_tile);
     DESTROY_TEX(es->textures.water);
     DESTROY_TEX(es->textures.platform);
+    DESTROY_TEX(es->textures.platform_stone);
+    DESTROY_TEX(es->textures.platform_leaf);
     DESTROY_TEX(es->textures.spider);
     DESTROY_TEX(es->textures.jumping_spider);
     DESTROY_TEX(es->textures.bird);
