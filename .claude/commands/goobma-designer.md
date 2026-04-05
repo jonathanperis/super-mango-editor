@@ -62,16 +62,18 @@ Use the analyze_sprite script for sprite sheets:
 python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<existing>.png
 ```
 
-**Standard animation row layout** (for entity/player sprite sheets):
+**Super Mango player animation layout** (player.png: 192×288, 4 cols × 6 rows of 48×48):
 
-| Row | Animation    | Notes                           |
-|-----|-------------|----------------------------------|
-| 0   | Idle        | 1-4 frames, subtle breathing    |
-| 1   | Walk / Run  | 6-8 frames, looping             |
-| 2   | Jump (up)   | 2-4 frames, one-shot            |
-| 3   | Fall / Land | 2-4 frames                      |
-| 4   | Attack      | 4-8 frames, one-shot            |
-| 5   | Death / Hurt| 4-6 frames, one-shot            |
+| Row | State | Frames | Notes |
+|-----|-------|--------|-------|
+| 0   | Idle  | 4      | Breathing cycle, 150ms per frame |
+| 1   | Walk  | 4      | Looping, 100ms per frame |
+| 2   | Jump  | 2      | Rising phase only, 150ms |
+| 3   | Fall  | 1      | Single descent pose, 200ms |
+| 4   | Hurt  | 2      | Damage reaction, 100ms |
+| 5   | (unused) | —   | Row exists but no animation mapped |
+
+**Enemy sprite sheets** vary per type — always analyze the existing sprite before creating a variant. Spiders use 64×48 frames, birds use 48×48, fish use 48×48.
 
 ### Step 3: Design the new asset
 Create the new PNG that:
