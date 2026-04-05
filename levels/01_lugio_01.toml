@@ -260,7 +260,7 @@ patrol_x1 = 1000.0
 x = 1750.0
 vx = -55.0
 patrol_x0 = 1680.0
-patrol_x1 = 1870.0
+patrol_x1 = 1960.0
 
 [[birds]]
 x = 500.0
