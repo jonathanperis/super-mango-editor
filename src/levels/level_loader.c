@@ -11,6 +11,8 @@
  */
 
 #include <stdlib.h>  /* rand(), RAND_MAX */
+#include <SDL_image.h> /* IMG_LoadTexture, IMG_GetError */
+#include <stdio.h>     /* fprintf, stderr */
 /* string.h no longer needed — foreground detection is count-based */
 
 #include "level_loader.h"
@@ -88,6 +90,10 @@ static void load_rails(GameState *gs, const LevelDef *def)
  *
  * Each pillar is shifted 16 px into the floor so the grass top edge meets
  * the ground seamlessly.  Width is always one TILE_SIZE (48 px).
+ *
+ * If a platform specifies a tile_path, that texture is loaded and assigned
+ * to the platform.  Otherwise the platform uses the level's floor_tile_path
+ * (loaded separately in game.c and passed as default_tex to platforms_render).
  */
 static void load_platforms(GameState *gs, const LevelDef *def)
 {
@@ -98,6 +104,16 @@ static void load_platforms(GameState *gs, const LevelDef *def)
         gs->platforms[i].y = (float)(FLOOR_Y - p->tile_height * TILE_SIZE + 16);
         gs->platforms[i].w = tw * TILE_SIZE;
         gs->platforms[i].h = p->tile_height * TILE_SIZE;
+        gs->platforms[i].tex = NULL;
+
+        /* Load per-platform tileset texture if specified */
+        if (p->tile_path[0] != '\0') {
+            gs->platforms[i].tex = IMG_LoadTexture(gs->renderer, p->tile_path);
+            if (!gs->platforms[i].tex) {
+                fprintf(stderr, "Warning: Failed to load platform tile %s: %s\n",
+                        p->tile_path, IMG_GetError());
+            }
+        }
     }
     gs->platform_count = def->platform_count;
 }
@@ -507,6 +523,7 @@ static void load_vines(GameState *gs, const LevelDef *def)
         gs->vines[i].x          = def->vines[i].x;
         gs->vines[i].y          = def->vines[i].y;
         gs->vines[i].tile_count = def->vines[i].tile_count;
+        gs->vines[i].type       = (VineType)def->vines[i].vine_type;
     }
     gs->vine_count = def->vine_count;
 }

@@ -273,6 +273,9 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "x = %s\n", fmt_float(p->x));
         fprintf(fp, "tile_height = %d\n", p->tile_height);
         fprintf(fp, "tile_width = %d\n", p->tile_width);
+        if (p->tile_path[0] != '\0') {
+            fprintf(fp, "tile_path = \"%s\"\n", p->tile_path);
+        }
         fprintf(fp, "\n");
     }
 
@@ -542,6 +545,9 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "x = %s\n", fmt_float(v->x));
         fprintf(fp, "y = %s\n", fmt_float(v->y));
         fprintf(fp, "tile_count = %d\n", v->tile_count);
+        if (v->vine_type != 0) {
+            fprintf(fp, "vine_type = %d\n", v->vine_type);
+        }
         fprintf(fp, "\n");
     }
 
@@ -724,6 +730,10 @@ int level_load_toml(const char *path, LevelDef *def) {
         def->platforms[idx].x           = get_float(elem, "x", 0);
         def->platforms[idx].tile_height = get_int(elem, "tile_height", 1);
         def->platforms[idx].tile_width  = get_int(elem, "tile_width", 1);
+        const char *tp = get_str(elem, "tile_path", "");
+        strncpy(def->platforms[idx].tile_path, tp,
+                sizeof(def->platforms[idx].tile_path) - 1);
+        def->platforms[idx].tile_path[sizeof(def->platforms[idx].tile_path) - 1] = '\0';
     });
 
     /* ---- Coins --------------------------------------------------- */
@@ -937,6 +947,7 @@ int level_load_toml(const char *path, LevelDef *def) {
         def->vines[idx].x          = get_float(elem, "x", 0);
         def->vines[idx].y          = get_float(elem, "y", 0);
         def->vines[idx].tile_count = get_int(elem, "tile_count", 1);
+        def->vines[idx].vine_type  = get_int(elem, "vine_type", 0);
     });
 
     /* ---- Ladders ------------------------------------------------- */

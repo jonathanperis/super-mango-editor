@@ -210,7 +210,8 @@ typedef struct {
     SDL_Texture  *coin_tex;    /* shared texture for all coin collectibles    */
     Coin          coins[MAX_COINS]; /* collectible coin instances             */
     int           coin_count;       /* number of coins placed                */
-    SDL_Texture  *vine_tex;    /* shared texture for all vine decorations         */
+    SDL_Texture  *vine_green_tex;  /* lush vine (forest/fertile themes)       */
+    SDL_Texture  *vine_brown_tex;  /* dried vine (arid/volcanic themes)       */
     VineDecor     vines[MAX_VINES]; /* static scenery vine instances               */
     int           vine_count;       /* number of vine decorations placed           */
     SDL_Texture  *ladder_tex;      /* shared texture for ladder climbables        */

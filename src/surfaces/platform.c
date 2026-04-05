@@ -123,11 +123,15 @@ void platforms_init(Platform *platforms, int *count) {
  * corners instead of a stack of identical repeated tiles.
  */
 void platforms_render(const Platform *platforms, int count,
-                      SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                       SDL_Renderer *renderer, SDL_Texture *default_tex, int cam_x) {
     const int P = TILE_SIZE / 3;   /* 9-slice piece size: 16 px */
 
     for (int i = 0; i < count; i++) {
         const Platform *p = &platforms[i];
+
+        /* Use per-platform texture if set, otherwise fall back to default */
+        SDL_Texture *tex = p->tex ? p->tex : default_tex;
+        if (!tex) continue;
 
         /*
          * Walk every 16×16 piece position inside the pillar bounding box.
@@ -148,7 +152,7 @@ void platforms_render(const Platform *platforms, int count,
                 else                      piece_col = 1;   /* center fill*/
 
                 /*
-                 * src — the 16×16 cell to cut from Grass_Oneway.png.
+                 * src — the 16×16 cell to cut from the tileset.
                  * dst — world → screen: subtract cam_x from the x coordinate
                  *       so the pillar scrolls with the camera.
                  */

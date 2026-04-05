@@ -202,8 +202,10 @@ void game_init(GameState *gs) {
     if (!gs->bouncepad_medium_tex) { fprintf(stderr, "Failed to load Bouncepad_Wood.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
 
     /* Non-fatal textures — game runs without them */
-    gs->vine_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/vine_green.png");
-    if (!gs->vine_tex) fprintf(stderr, "Warning: Failed to load Vine_Green.png: %s\n", IMG_GetError());
+    gs->vine_green_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/vine_green.png");
+    if (!gs->vine_green_tex) fprintf(stderr, "Warning: Failed to load Vine_Green.png: %s\n", IMG_GetError());
+    gs->vine_brown_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/vine_brown.png");
+    if (!gs->vine_brown_tex) fprintf(stderr, "Warning: Failed to load Vine_Brown.png: %s\n", IMG_GetError());
     gs->ladder_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/ladder.png");
     if (!gs->ladder_tex) fprintf(stderr, "Warning: Failed to load Ladder.png: %s\n", IMG_GetError());
     gs->rope_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/rope.png");
@@ -1238,9 +1240,9 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
     }
 
     /* Draw vine decorations on ground and platform tops, behind entities */
-    if (gs->vine_tex) {
+    if (gs->vine_green_tex || gs->vine_brown_tex) {
         vine_render(gs->vines, gs->vine_count,
-                    gs->renderer, gs->vine_tex, cam_x);
+                    gs->renderer, gs->vine_green_tex, gs->vine_brown_tex, cam_x);
     }
 
     /* Draw ladders and ropes in the same layer as vines */
@@ -1931,7 +1933,8 @@ void game_cleanup(GameState *gs) {
     DESTROY_TEX(gs->bridge_tex);
     DESTROY_TEX(gs->float_platform_tex);
     DESTROY_TEX(gs->rail_tex);
-    DESTROY_TEX(gs->vine_tex);
+    DESTROY_TEX(gs->vine_green_tex);
+    DESTROY_TEX(gs->vine_brown_tex);
     DESTROY_TEX(gs->ladder_tex);
     DESTROY_TEX(gs->rope_tex);
 
@@ -1963,6 +1966,13 @@ void game_cleanup(GameState *gs) {
     DESTROY_TEX(gs->bird_tex);
     DESTROY_TEX(gs->jumping_spider_tex);
     DESTROY_TEX(gs->spider_tex);
+    /* Free per-platform tileset textures */
+    for (int i = 0; i < gs->platform_count; i++) {
+        if (gs->platforms[i].tex) {
+            SDL_DestroyTexture(gs->platforms[i].tex);
+            gs->platforms[i].tex = NULL;
+        }
+    }
     DESTROY_TEX(gs->platform_tex);
     DESTROY_TEX(gs->floor_tile);
 
