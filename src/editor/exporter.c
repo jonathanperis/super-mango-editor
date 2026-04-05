@@ -218,6 +218,9 @@ static int write_source(const LevelDef *def, const char *var_name,
         }
         fprintf(f, "\",\n");
     }
+    if (def->generated_by[0] != '\0') {
+        fprintf(f, "    .generated_by = \"%s\",\n", def->generated_by);
+    }
 
     /* ---- 2. Floor gaps ---- */
     write_section(f, "Floor gaps");

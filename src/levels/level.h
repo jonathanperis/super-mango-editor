@@ -341,10 +341,12 @@ typedef struct {
  * Each entry specifies the gap x position where a flame erupts.
  */
 typedef struct {
-    char  name[64];        /* display name, e.g. "Sandbox" — editable buffer */
-    char  description[512];/* free-form level description — preserved as TOML
-                            * comment header and as a string field on save   */
-    int   screen_count;    /* number of screens wide (0 = default 4)          */
+    char  name[64];          /* display name, e.g. "Sandbox" — editable buffer  */
+    char  description[512];  /* free-form level description — preserved as TOML
+                              * comment header and as a string field on save    */
+    char  generated_by[128]; /* author attribution, e.g. "Lugio, the Creator"
+                              * or "Bosser, the Engineer" — crew member sign    */
+    int   screen_count;      /* number of screens wide (0 = default 4)          */
 
     /* ---- World geometry --------------------------------------------- */
     int floor_gaps[MAX_FLOOR_GAPS];
