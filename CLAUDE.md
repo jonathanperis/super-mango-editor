@@ -1,5 +1,7 @@
 # Super Mango — Claude Code Guide
 
+@.claude/commands/bosser-engine.md
+
 A 2D pixel art platformer written in C11 + SDL2, targeting macOS (Apple Silicon).
 
 ---
