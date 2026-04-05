@@ -605,6 +605,18 @@ static int write_source(const LevelDef *def, const char *var_name,
     }
     fprintf(f, "    .foreground_layer_count = %d,\n", def->foreground_layer_count);
 
+    /* Fog layers */
+    if (def->fog_layer_count > 0) {
+        fprintf(f, "    .fog_layers = {\n");
+        for (int i = 0; i < def->fog_layer_count; i++) {
+            fprintf(f, "        { \"%s\", %.2ff },\n",
+                    def->fog_layers[i].path,
+                    (double)def->fog_layers[i].speed);
+        }
+        fprintf(f, "    },\n");
+    }
+    fprintf(f, "    .fog_layer_count = %d,\n", def->fog_layer_count);
+
     /* Player spawn */
     fprintf(f, "\n    .player_start_x = %.1ff,\n", (double)def->player_start_x);
     fprintf(f, "    .player_start_y = %.1ff,\n", (double)def->player_start_y);

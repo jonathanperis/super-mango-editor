@@ -434,12 +434,19 @@ typedef struct {
     } background_layers[MAX_BACKGROUND_LAYERS];
     int background_layer_count;
 
-    /* Foreground layers (fog, water — rendered on top of floor/entities) */
+    /* Foreground layers (water/lava strip — rendered on top of floor/entities) */
     struct {
         char  path[64];
         float speed;
     } foreground_layers[MAX_BACKGROUND_LAYERS];
     int foreground_layer_count;
+
+    /* Fog layers (atmospheric overlay textures that pan across the screen) */
+    struct {
+        char  path[64];
+        float speed;    /* reserved for future use (e.g. variable drift speed) */
+    } fog_layers[MAX_FOG_TEXTURES];
+    int fog_layer_count;
 
     /* Player spawn position */
     float player_start_x;

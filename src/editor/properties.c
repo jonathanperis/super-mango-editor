@@ -53,9 +53,10 @@
 #define CONTENT_X  (PROP_X + 8)
 #define FIELD_X    (CONTENT_X + LABEL_W)
 
-/* Background/foreground subsection collapse state — accessed by editor.c for layout */
+/* Background/foreground/fog subsection collapse state — accessed by editor.c for layout */
 int g_plx_open = 0;
 int g_fg_open = 0;
+int g_fog_open = 0;
 
 /* ------------------------------------------------------------------ */
 /* Human-readable entity type names                                    */
@@ -1370,5 +1371,89 @@ bg_done:
     }
 
 fg_done:
+    (void)0;
+
+    /* ---- Fog Layers subsection -------------------------------------- */
+
+    char fog_header[64];
+    snprintf(fog_header, sizeof(fog_header), "%s Fog Layers (%d)",
+             g_fog_open ? "v" : ">",
+             es->level.fog_layer_count);
+
+    int fog_hovered = (es->ui.mouse_x >= x &&
+                       es->ui.mouse_x <= x + 200 &&
+                       es->ui.mouse_y >= y &&
+                       es->ui.mouse_y <= y + 18);
+    if (fog_hovered && es->ui.mouse_clicked)
+        g_fog_open = !g_fog_open;
+
+    ui_label_color(&es->ui, x + 8, y, fog_header,
+                   fog_hovered ? UI_TEXT : UI_TEXT_DIM);
+    y += 18;
+
+    if (!g_fog_open) goto fog_done;
+
+    {
+        /* Fog asset dropdown options — includes original + fire/volcanic variants */
+        static const char *fog_names[] = {
+            "fog_1.png",
+            "fog_2.png",
+            "fog_fire_1.png",
+            "fog_fire_2.png",
+            "smoke.png",
+        };
+        static const char *fog_paths[] = {
+            "assets/sprites/foregrounds/fog_1.png",
+            "assets/sprites/foregrounds/fog_2.png",
+            "assets/sprites/foregrounds/fog_fire_1.png",
+            "assets/sprites/foregrounds/fog_fire_2.png",
+            "assets/sprites/foregrounds/smoke.png",
+        };
+        static const int fog_opt_count = 5;
+
+        for (int i = 0; i < es->level.fog_layer_count && i < MAX_FOG_TEXTURES; i++) {
+            char label[16];
+            snprintf(label, sizeof(label), "%d:", i);
+            ui_label(&es->ui, x + 8, y, label);
+
+            int sel = 0;
+            for (int j = 0; j < fog_opt_count; j++) {
+                if (strcmp(es->level.fog_layers[i].path, fog_paths[j]) == 0) {
+                    sel = j; break;
+                }
+            }
+            if (ui_dropdown(&es->ui, 9600 + i, x + 28, y, 200,
+                             fog_names, fog_opt_count, &sel)) {
+                strncpy(es->level.fog_layers[i].path, fog_paths[sel],
+                        sizeof(es->level.fog_layers[i].path) - 1);
+                es->modified = 1;
+            }
+            ui_label(&es->ui, x + 236, y, "spd:");
+            if (ui_float_field(&es->ui, 9700 + i, x + 265, y, 60,
+                               &es->level.fog_layers[i].speed))
+                es->modified = 1;
+            y += 20;
+        }
+
+        if (es->level.fog_layer_count < MAX_FOG_TEXTURES) {
+            if (ui_button(&es->ui, x + 8, y, 80, 20, "+ Add")) {
+                int idx = es->level.fog_layer_count;
+                strncpy(es->level.fog_layers[idx].path,
+                        "assets/sprites/foregrounds/fog_1.png", 63);
+                es->level.fog_layers[idx].speed = 0.5f;
+                es->level.fog_layer_count++;
+                es->modified = 1;
+            }
+        }
+        if (es->level.fog_layer_count > 0) {
+            if (ui_button(&es->ui, x + 96, y, 100, 20, "- Remove Last")) {
+                es->level.fog_layer_count--;
+                es->modified = 1;
+            }
+        }
+        y += 24;
+    }
+
+fog_done:
     (void)0;
 }

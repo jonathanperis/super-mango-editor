@@ -106,6 +106,45 @@ python3 .claude/scripts/analyze_sprite.py assets/sprites/entities/spider.png 64 
 
 **Enemy sprite sheets** vary per type — always analyze the existing sprite before creating a variant. Spiders use 64×48 frames, birds use 48×48, fish use 48×48.
 
+### The Theme Variant Generator
+
+For creating **themed variants** of existing sprites (e.g., fire, ice, desert, night), use the palette-remapping script:
+
+```sh
+python3 .claude/scripts/gen_fire_sprites.py
+```
+
+This script demonstrates the standard approach for theme variants:
+1. **Analyze** the original sprite's exact palette with `analyze_sprite.py`
+2. **Define a color mapping** — each original RGB → its themed replacement RGB
+3. **Remap every pixel** — load the PNG, swap colors, save. Shapes stay identical.
+4. **Never change the silhouette** — only colors change. The hand-pixeled detail is sacred.
+
+The `remap_colors()` function inside is the reusable core:
+```python
+def remap_colors(src, dst, cmap):
+    """Load PNG, remap opaque pixel colors via RGB tuple lookup, save."""
+    img = Image.open(src).convert("RGBA")
+    px = img.load()
+    w, h = img.size
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a == 0:
+                continue
+            k = (r, g, b)
+            if k in cmap:
+                px[x, y] = cmap[k] + (a,)
+    img.save(dst)
+```
+
+When creating a new theme, copy `gen_fire_sprites.py` as a template and replace the color mappings.
+
+**Existing theme scripts:**
+| Script | Theme | Sprites generated |
+|--------|-------|-------------------|
+| `gen_fire_sprites.py` | Fire/volcanic | 13 (sky, volcanic mountains, smoke clouds, fire fog, smoke puffs) |
+
 ### Step 3: Design the new asset
 Create the new PNG that:
 - **Matches the exact dimensions** of its category peers (same width × height)
@@ -129,13 +168,18 @@ After creating, report:
 ## Category-Specific Rules
 
 ### Backgrounds (`assets/sprites/backgrounds/`)
-- **Existing assets** (12 files): sky_blue, sky_blue_lightened, castle_pillars, forest_leafs, clouds_bg, glacial_mountains, glacial_mountains_lightened, clouds_mg_1/2/3, clouds_lonely, clouds_mg_1_lightened
+- **Existing assets** (22 files):
+  - **Forest/default theme**: sky_blue, sky_blue_lightened, castle_pillars, forest_leafs, clouds_bg, glacial_mountains, glacial_mountains_lightened, clouds_mg_1/2/3, clouds_lonely, clouds_mg_1_lightened
+  - **Fire theme** (generated via `gen_fire_sprites.py`): sky_fire, sky_fire_lightened, volcanic_mountains, volcanic_mountains_lightened, smoke_bg, smoke_mg_1, smoke_mg_1_lightened, smoke_mg_2, smoke_mg_3, smoke_lonely
 - **Convention**: Various widths, designed to tile horizontally for parallax scrolling
-- **Style**: Soft gradients for sky layers, detailed silhouettes for mountains/castles, wispy shapes for clouds
-- **Alpha**: Background layers are fully opaque; cloud layers have transparent gaps
+- **Style**: Soft gradients for sky layers, detailed silhouettes for mountains/castles, wispy shapes for clouds/smoke
+- **Alpha**: Background layers are fully opaque; cloud/smoke layers have transparent gaps
+- **Theme variants**: Fire sprites are pure palette remaps of the forest originals — same pixel positions, different colors. Use `gen_fire_sprites.py` to regenerate after palette tweaks.
 
 ### Foregrounds (`assets/sprites/foregrounds/`)
-- **Existing assets** (5 files): fog_1, fog_2, water, lava, clouds
+- **Existing assets** (8 files):
+  - **Default**: fog_1, fog_2, water, lava, clouds
+  - **Fire theme** (generated via `gen_fire_sprites.py`): fog_fire_1, fog_fire_2, smoke
 - **Convention**: Full-width strips or overlays, semi-transparent for fog
 - **Style**: fog uses soft alpha gradients; water/lava are animated strips (384×64, 8 frames of 48×64)
 - **Alpha**: Fog layers are semi-transparent; water/lava strips have transparent padding around art

@@ -333,8 +333,10 @@ void game_init(GameState *gs) {
     /* Camera starts at the far-left edge of the world. */
     gs->camera.x = 0.0f;
 
-    /* Load fog textures and spawn the first mist wave */
-    fog_init(&gs->fog, gs->renderer);
+    /*
+     * Fog textures are loaded later, after level_load, because the fog
+     * texture paths come from the level definition (fog_layers in LevelDef).
+     */
 
     /* Load the HUD font and heart icon texture */
     hud_init(&gs->hud, gs->renderer, gs->star_yellow_tex, gs->player.texture);
@@ -444,6 +446,23 @@ void game_init(GameState *gs) {
             const char *strip = def->foreground_layers[def->foreground_layer_count - 1].path;
             if (strip[0] != '\0')
                 water_reload_texture(&gs->water, gs->renderer, strip);
+        }
+
+        /*
+         * Fog layers — load fog textures from the level definition.
+         * Each level specifies its own fog overlay assets in [[fog_layers]].
+         * If no fog layers are defined, the fog system is left uninitialised
+         * and fog_enabled stays 0 — no fog renders for this level.
+         */
+        if (def && def->fog_layer_count > 0) {
+            char  fog_paths[MAX_FOG_TEXTURES][64];
+            int   n = def->fog_layer_count;
+            if (n > MAX_FOG_TEXTURES) n = MAX_FOG_TEXTURES;
+            for (int i = 0; i < n; i++) {
+                SDL_strlcpy(fog_paths[i], def->fog_layers[i].path, 64);
+            }
+            fog_init(&gs->fog, gs->renderer,
+                     (const char (*)[64])fog_paths, n);
         }
 
         /*
