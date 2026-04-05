@@ -184,7 +184,9 @@ typedef struct {
     SDL_Texture *sky;               /* first background layer — sky/backdrop        */
     SDL_Texture *floor_tile;        /* grass tile — floor surface texture           */
     SDL_Texture *water;             /* animated water — bottom strip texture        */
-    SDL_Texture *platform;          /* ground pillar — static platform texture      */
+    SDL_Texture *platform;          /* ground pillar — default grass platform       */
+    SDL_Texture *platform_stone;    /* ground pillar — stone platform (volcanic)     */
+    SDL_Texture *platform_leaf;      /* ground pillar — leaf platform (forest)       */
     SDL_Texture *spider;            /* spider enemy sprite sheet                    */
     SDL_Texture *jumping_spider;    /* jumping spider sprite sheet                  */
     SDL_Texture *bird;              /* slow bird sprite sheet                       */

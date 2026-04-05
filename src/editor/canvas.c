@@ -21,6 +21,7 @@
 #include <SDL.h>
 #include <SDL_image.h>  /* IMG_LoadTexture (not used here, but available) */
 #include <stdio.h>      /* snprintf for debug labels                      */
+#include <string.h>    /* strcmp for platform texture selection          */
 
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, TOOLBAR_H, etc. */
 #include "../game.h"    /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE,
@@ -438,7 +439,21 @@ static void render_platforms(EditorState *es) {
         int   plat_h = pp->tile_height * TILE_SIZE;
         float plat_y = (float)(FLOOR_Y - pp->tile_height * TILE_SIZE + 16);
 
-        if (es->textures.platform) {
+        /* Select texture based on tile_path */
+        SDL_Texture *tex;
+        if (pp->tile_path[0] != '\0') {
+            if (strcmp(pp->tile_path, "assets/sprites/levels/stone_platform.png") == 0) {
+                tex = es->textures.platform_stone;
+            } else if (strcmp(pp->tile_path, "assets/sprites/levels/leaf_platform.png") == 0) {
+                tex = es->textures.platform_leaf;
+            } else {
+                tex = es->textures.platform;  /* fallback to default */
+            }
+        } else {
+            tex = es->textures.platform;  /* default grass */
+        }
+
+        if (tex) {
             /* 9-slice tiling — walk every 16x16 piece inside the platform */
             for (int ty = 0; ty < plat_h; ty += P) {
                 int piece_row;
@@ -459,8 +474,7 @@ static void render_platforms(EditorState *es) {
                         w2s_w(es, P),
                         w2s_h(es, P)
                     };
-                    SDL_RenderCopy(es->renderer, es->textures.platform,
-                                   &src, &dst);
+                    SDL_RenderCopy(es->renderer, tex, &src, &dst);
                 }
             }
         } else {
