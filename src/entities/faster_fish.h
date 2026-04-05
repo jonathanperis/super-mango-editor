@@ -43,7 +43,7 @@ typedef struct {
 void faster_fish_init(FasterFish *fish, int *count);
 
 /* Move fish, trigger jumps, and advance animation. */
-void faster_fish_update(FasterFish *fish, int count, float dt);
+void faster_fish_update(FasterFish *fish, int count, float dt, int world_w);
 
 /* Draw all faster fish with camera offset. */
 void faster_fish_render(const FasterFish *fish, int count,

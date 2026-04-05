@@ -1616,9 +1616,9 @@ static void game_loop_frame(void *arg) {
         faster_birds_update(gs->faster_birds, gs->faster_bird_count, dt, gs->snd_flap,
                             gs->player.x + gs->player.w / 2.0f, cam_x);
         /* Move fish through the water lane and trigger random jump arcs */
-        fish_update(gs->fish, gs->fish_count, dt);
+        fish_update(gs->fish, gs->fish_count, dt, gs->world_w);
         /* Move faster fish through the water lane with higher jumps */
-        faster_fish_update(gs->faster_fish, gs->faster_fish_count, dt);
+        faster_fish_update(gs->faster_fish, gs->faster_fish_count, dt, gs->world_w);
         /* Advance each spike block along its rail path (cam_x needed for
          * the waiting-until-visible check on fall-off rails) */
         spike_blocks_update(gs->spike_blocks, gs->spike_block_count, dt, cam_x);
