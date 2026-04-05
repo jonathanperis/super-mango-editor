@@ -68,11 +68,14 @@ typedef struct {
  * x           : left edge in world-space logical pixels.
  * tile_height : number of TILE_SIZE (48 px) tiles tall (typically 2 or 3).
  * tile_width  : number of TILE_SIZE tiles wide (0 or 1 = single tile).
+ * tile_path   : optional 9-slice tileset PNG for this platform.
+ *               If empty, uses the level's floor_tile_path.
  */
 typedef struct {
     float x;
     int   tile_height;
     int   tile_width;
+    char  tile_path[64];
 } PlatformPlacement;
 
 /*
@@ -298,11 +301,14 @@ typedef struct {
 
 /*
  * VinePlacement — a hanging vine decoration on a platform.
+ *
+ * type : VINE_GREEN (lush/forest) or VINE_BROWN (arid/volcanic).
  */
 typedef struct {
-    float x;
-    float y;
-    int   tile_count;
+    float    x;
+    float    y;
+    int      tile_count;
+    int      vine_type;   /* 0 = green, 1 = brown — matches VineType enum */
 } VinePlacement;
 
 /*

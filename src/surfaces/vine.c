@@ -82,7 +82,9 @@ void vine_init(VineDecor *vines, int *count)
 /* ------------------------------------------------------------------ */
 
 void vine_render(const VineDecor *vines, int count,
-                 SDL_Renderer *renderer, SDL_Texture *tex, int cam_x)
+                 SDL_Renderer *renderer,
+                 SDL_Texture *green_tex, SDL_Texture *brown_tex,
+                 int cam_x)
 {
     for (int i = 0; i < count; i++) {
         const VineDecor *v = &vines[i];
@@ -90,6 +92,10 @@ void vine_render(const VineDecor *vines, int count,
 
         /* Cull the entire vine chain when it is off the current viewport */
         if (screen_x + VINE_W < 0 || screen_x >= GAME_W) continue;
+
+        /* Select texture by vine type — green for lush, brown for arid */
+        SDL_Texture *tex = (v->type == VINE_BROWN) ? brown_tex : green_tex;
+        if (!tex) continue;
 
         for (int t = 0; t < v->tile_count; t++) {
             /* Step by VINE_STEP to overlap tiles, hiding transparent edge pixels. */

@@ -40,6 +40,7 @@ end_cap = 0
 x = 80.0
 tile_height = 2
 tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
 
 [[platforms]]
 x = 200.0
@@ -105,11 +106,109 @@ tile_width = 1
 x = 2450.0
 tile_height = 2
 tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 200.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 450.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 560.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 800.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 900.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 1100.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 1220.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 1460.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 1680.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 1850.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 2050.0
+tile_height = 2
+tile_width = 2
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 2180.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 2450.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
 
 [[platforms]]
 x = 2600.0
 tile_height = 3
 tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 2920.0
+tile_height = 4
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 3050.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 3120.0
+tile_height = 5
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
 
 [[platforms]]
 x = 2920.0
@@ -439,6 +538,30 @@ x = 2950.0
 launch_vy = -700.0
 pad_type = "RED"
 
+[[vines]]
+x = 208.0
+y = 124.0
+tile_count = 3
+vine_type = 1
+
+[[vines]]
+x = 568.0
+y = 172.0
+tile_count = 2
+vine_type = 1
+
+[[vines]]
+x = 1858.0
+y = 172.0
+tile_count = 2
+vine_type = 1
+
+[[vines]]
+x = 2188.0
+y = 124.0
+tile_count = 3
+vine_type = 1
+
 [[ladders]]
 x = 3080.0
 y = 20.0
@@ -466,26 +589,6 @@ tile_count = 3
 
 [[ropes]]
 x = 2608.0
-y = 124.0
-tile_count = 3
-
-[[vines]]
-x = 208.0
-y = 124.0
-tile_count = 3
-
-[[vines]]
-x = 568.0
-y = 172.0
-tile_count = 2
-
-[[vines]]
-x = 1858.0
-y = 172.0
-tile_count = 2
-
-[[vines]]
-x = 2188.0
 y = 124.0
 tile_count = 3
 
