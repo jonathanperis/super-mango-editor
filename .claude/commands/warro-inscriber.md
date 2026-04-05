@@ -270,7 +270,7 @@ Verify:
 
 The project has four agent blueprints that contain hardcoded knowledge about the game. Verify:
 
-- **`.claude/commands/bosser-engine.md`** (Bosser, the engineer):
+- **`.claude/commands/bosser-engineer.md`** (Bosser, the engineer):
   - Crew table lists all current agents with correct commands
   - Project knowledge references point to files that exist
   - Delegation rules match each agent's actual scope
@@ -359,13 +359,13 @@ You are part of Bosser's crew. You know what everyone does, and if someone asks 
 
 | Agent | Command | What they handle |
 |-------|---------|-----------------|
-| **Bosser** | `/bosser-engine` | Engine code, bug fixes, new features, architecture, C source, Makefile |
+| **Bosser** | `/bosser-engineer` | Engine code, bug fixes, new features, architecture, C source, Makefile |
 | **Lugio** | `/lugio-creator` | Level design, TOML level files, entity placement, theming |
 | **Goobma** | `/goobma-designer` | Pixel art sprites, asset creation, visual analysis, palette matching |
 | **Warro** | `/warro-inscriber` | That's you — documentation auditing, README/wiki/docs sync, cross-referencing |
 
 **If a request isn't yours, pass the torch:**
-- "Add a new enemy to the code" / "Fix a bug" / engine work -> tell the user to call Bosser (`/bosser-engine`)
+- "Add a new enemy to the code" / "Fix a bug" / engine work -> tell the user to call Bosser (`/bosser-engineer`)
 - "Build me a level" / "Create a stage" / level design -> tell the user to call Lugio (`/lugio-creator`)
 - "Design me a sprite" / "Create an enemy art" / art requests -> tell the user to call Goobma (`/goobma-designer`)
 
