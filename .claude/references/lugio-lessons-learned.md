@@ -248,3 +248,39 @@ There are two vine sprites available:
 - Volcanic/cave/desert/castle themes → `vine_brown.png`
 
 **Rule:** When placing `[[vines]]` in a TOML file, know which variant *should* be used for the level's theme. The TOML entity syntax stays the same (`[[vines]]` with `x, y, tile_count`), but keep the theme mapping in mind for when the engine supports it. Don't place a lush green vine in a lava level — it breaks the visual story.
+
+---
+
+## Lesson 17: Follow the serializer's canonical TOML section order
+
+The editor serializer (`src/editor/serializer.c`) writes TOML sections in a specific sequence. When you create or imagine a new level, organize your TOML sections in this **exact order**. The serializer will reorder them anyway — writing in the wrong order just creates confusing diffs.
+
+**Canonical section order:**
+
+1. **Header scalars** — `name`, `description`, `generated_by`
+2. **Config scalars** — `screen_count`, `player_start_x`, `player_start_y`, `music_*`, `floor_tile_path`, hearts/lives/score
+3. **floor_gaps** — plain integer array
+4. **[[rails]]** — rail definitions
+5. **[[platforms]]** — static platforms
+6. **[[coins]]** — collectible coins
+7. **[[star_yellows]]**, **[[star_greens]]**, **[[star_reds]]** — health pickups
+8. **[last_star]** — end-of-level goal (single table, not array)
+9. **[[spiders]]**, **[[jumping_spiders]]** — ground enemies
+10. **[[birds]]**, **[[faster_birds]]** — flying enemies
+11. **[[fish]]**, **[[faster_fish]]** — aquatic enemies
+12. **[[axe_traps]]**, **[[circular_saws]]** — mechanical hazards
+13. **[[spike_rows]]**, **[[spike_platforms]]**, **[[spike_blocks]]** — spike hazards
+14. **[[blue_flames]]**, **[[fire_flames]]** — flame hazards
+15. **[[float_platforms]]** — floating/moving platforms
+16. **[[bridges]]** — crumble bridges
+17. **[[bouncepads_small]]**, **[[bouncepads_medium]]**, **[[bouncepads_high]]** — jump pads
+18. **[[vines]]** — climbable surfaces ← **BEFORE ladders!**
+19. **[[ladders]]** — climbable ladders
+20. **[[ropes]]** — climbable ropes
+21. **[[background_layers]]** — parallax backgrounds (sky to clouds, back to front)
+22. **[[foreground_layers]]** — animated strip (water/lava/clouds)
+23. **[[fog_layers]]** — atmospheric fog overlays
+
+**Critical gotcha:** `[[vines]]` comes BEFORE `[[ladders]]`, NOT after `[[ropes]]`. When imagining placement phases: rails → platforms → coins → stars → enemies → hazards → surfaces → climbables (vines → ladders → ropes) → layers.
+
+**Why this matters:** If you write `[[ropes]]` before `[[vines]]`, the serializer will reorder them on save. The diff will show vines moving up, ropes moving down, even though nothing semantically changed. Following the canonical order from the start keeps diffs clean and reflects the actual file structure.
