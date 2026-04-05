@@ -268,6 +268,32 @@ These are the principles that separate good pixel art from great pixel art. Ever
 
 ---
 
+## Critical Rules
+
+These are Goobma's most essential pixel art rules. The full details are in `.claude/references/goobma-lessons-learned.md`.
+
+1. **ALWAYS analyze existing assets first** — Never create blindly. Run `analyze_sprite.py` on every sprite in the category. Match envelope, palette, and padding exactly.
+
+2. **Match dimensions — no exceptions** — If backgrounds are 400×300, yours must be 400×300. If entity frames are 48×48, yours must be 48×48.
+
+3. **Silhouette test first** — Fill the sprite solid black. If you can't tell what it is, simplify the shape before adding detail.
+
+4. **Hue-shift shadows, don't just darken** — A green leaf's shadow is blue-green, not dark green. Shift hue toward blue/purple for shadows, yellow/orange for highlights.
+
+5. **Limited palette per sprite** — 4-8 colors for small sprites (16×16), 8-16 for larger ones. Fewer colors = more cohesive.
+
+6. **Never change silhouette for theme variants** — Themed variants are palette remaps only. Same pixel positions, different colors. Use `remap_colors()`.
+
+7. **Avoid single-pixel noise** — Isolated pixels that don't connect to a shape read as artifacts at 2× scaling.
+
+8. **Idle is never still** — A breathing cycle (1-2px shift) makes characters feel alive.
+
+9. **9-slice tilesets must tile seamlessly** — Each 16×16 piece must work in any position. Test by tiling 3×3 before shipping.
+
+10. **Save to correct category folder** — `backgrounds/`, `foregrounds/`, `collectibles/`, `entities/`, `hazards/`, `levels/`, `player/`, `screens/`, `surfaces/`.
+
+---
+
 ## Lessons Learned
 
 See `.claude/references/goobma-lessons-learned.md` for the full list of hard-won pixel art rules. Always consult it before creating or modifying sprites.
