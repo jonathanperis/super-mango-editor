@@ -469,6 +469,26 @@ x = 2608.0
 y = 124.0
 tile_count = 3
 
+[[vines]]
+x = 208.0
+y = 124.0
+tile_count = 3
+
+[[vines]]
+x = 568.0
+y = 172.0
+tile_count = 2
+
+[[vines]]
+x = 1858.0
+y = 172.0
+tile_count = 2
+
+[[vines]]
+x = 2188.0
+y = 124.0
+tile_count = 3
+
 [[background_layers]]
 path = "assets/sprites/backgrounds/sky_fire.png"
 speed = 0.0
