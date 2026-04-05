@@ -44,7 +44,8 @@ DEPS    = $(OBJS:.o=.d)
 # ── Editor (standalone level editor) ─────────────────────────────────
 EDITOR_DIR    = src/editor
 VENDOR_DIR    = vendor/tomlc17
-EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(VENDOR_DIR)/tomlc17.c
+EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(VENDOR_DIR)/tomlc17.c \
+                src/surfaces/rail.c
 EDITOR_OBJS   = $(EDITOR_SRCS:.c=.o)
 EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor

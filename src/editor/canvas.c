@@ -676,10 +676,26 @@ static void render_rails(EditorState *es) {
  * definition for v1 of the editor).
  */
 static void render_float_platforms(EditorState *es) {
+    /*
+     * Build rail paths from placements so RAIL-mode float platforms
+     * can be positioned at their actual rail coordinates instead of (0,0).
+     */
+    Rail tmp_rails[MAX_RAILS];
+    int  tmp_rail_count = 0;
+    rail_init_from_placements(tmp_rails, &tmp_rail_count,
+                              es->level.rails, es->level.rail_count);
+
     for (int i = 0; i < es->level.float_platform_count; i++) {
         const FloatPlatformPlacement *fp = &es->level.float_platforms[i];
         float fx = fp->x;
         float fy = fp->y;
+
+        /* RAIL mode: compute position from rail path */
+        if (fp->mode == FLOAT_PLATFORM_RAIL &&
+            fp->rail_index >= 0 && fp->rail_index < tmp_rail_count) {
+            rail_get_world_pos(&tmp_rails[fp->rail_index],
+                               fp->t_offset, &fx, &fy);
+        }
         int   total_w = fp->tile_count * FPLAT_PIECE_W;
 
         if (es->textures.float_platform) {
@@ -1077,25 +1093,22 @@ static void render_faster_fish(EditorState *es) {
  * This is approximate but sufficient for visual level editing.
  */
 static void render_spike_blocks(EditorState *es) {
+    /* Build rail paths to compute actual spike block positions */
+    Rail tmp_rails[MAX_RAILS];
+    int  tmp_rail_count = 0;
+    rail_init_from_placements(tmp_rails, &tmp_rail_count,
+                              es->level.rails, es->level.rail_count);
+
     for (int i = 0; i < es->level.spike_block_count; i++) {
         const SpikeBlockPlacement *sb = &es->level.spike_blocks[i];
         int ri = sb->rail_index;
 
-        /* Validate rail index is within bounds */
-        if (ri < 0 || ri >= es->level.rail_count) continue;
+        if (ri < 0 || ri >= tmp_rail_count) continue;
 
-        const RailPlacement *rp = &es->level.rails[ri];
         float sx, sy;
-
-        if (rp->layout == RAIL_LAYOUT_RECT) {
-            /* Place at rail origin, centered on the tile */
-            sx = (float)rp->x + (float)(RAIL_TILE_W - SPIKE_DISPLAY_W) / 2.0f;
-            sy = (float)rp->y + (float)(RAIL_TILE_H - SPIKE_DISPLAY_H) / 2.0f;
-        } else {
-            /* HORIZ: approximate position along the rail */
-            sx = (float)rp->x + sb->t_offset * (float)RAIL_TILE_W;
-            sy = (float)rp->y + (float)(RAIL_TILE_H - SPIKE_DISPLAY_H) / 2.0f;
-        }
+        rail_get_world_pos(&tmp_rails[ri], sb->t_offset, &sx, &sy);
+        sx -= SPIKE_DISPLAY_W / 2.0f;
+        sy -= SPIKE_DISPLAY_H / 2.0f;
 
         draw_tex(es, es->textures.spike_block, NULL,
                  sx, sy, SPIKE_DISPLAY_W, SPIKE_DISPLAY_H);
