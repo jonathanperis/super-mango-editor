@@ -29,6 +29,43 @@
 #include "../game.h"                      /* MAX_* constants */
 
 /* ================================================================== */
+/* Float formatting helper                                             */
+/* ================================================================== */
+
+/*
+ * fmt_float — Format a float with up to 2 decimal places, stripping
+ * unnecessary trailing zeros but always keeping at least one decimal
+ * digit so the TOML parser reads it as a float (not an integer).
+ *
+ * Examples:  80.0f  → "80.0"     (not "80.00" or "80")
+ *            0.08f  → "0.08"     (preserved — was lost with %.1f)
+ *            536.2f → "536.2"    (not "536.20")
+ *            0.50f  → "0.5"      (trailing zero stripped)
+ *           -380.0f → "-380.0"
+ *
+ * Returns a pointer to a static buffer — valid until the next call.
+ * Safe for single-float-per-fprintf usage (which is all we do here).
+ */
+static const char *fmt_float(double val) {
+    static char buf[64];
+    snprintf(buf, sizeof(buf), "%.2f", val);
+
+    /* Find the decimal point */
+    char *dot = strchr(buf, '.');
+    if (dot) {
+        /* Walk back from the end, stripping trailing '0' characters,
+         * but always keep at least one digit after the decimal point
+         * so "80.00" becomes "80.0" (not "80." or "80"). */
+        char *end = buf + strlen(buf) - 1;
+        while (end > dot + 1 && *end == '0') {
+            *end = '\0';
+            end--;
+        }
+    }
+    return buf;
+}
+
+/* ================================================================== */
 /* Enum <-> string conversion helpers                                  */
 /* ================================================================== */
 
@@ -176,8 +213,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
 
     /* ---- Level-wide configuration (must come before [[arrays]]) --- */
 
-    fprintf(fp, "player_start_x = %.1f\n", (double)def->player_start_x);
-    fprintf(fp, "player_start_y = %.1f\n", (double)def->player_start_y);
+    fprintf(fp, "player_start_x = %s\n", fmt_float(def->player_start_x));
+    fprintf(fp, "player_start_y = %s\n", fmt_float(def->player_start_y));
     fprintf(fp, "music_path = \"%s\"\n", def->music_path);
     fprintf(fp, "music_volume = %d\n", def->music_volume);
     fprintf(fp, "floor_tile_path = \"%s\"\n", def->floor_tile_path);
@@ -218,7 +255,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->platform_count; i++) {
         const PlatformPlacement *p = &def->platforms[i];
         fprintf(fp, "[[platforms]]\n");
-        fprintf(fp, "x = %.1f\n", (double)p->x);
+        fprintf(fp, "x = %s\n", fmt_float(p->x));
         fprintf(fp, "tile_height = %d\n", p->tile_height);
         fprintf(fp, "tile_width = %d\n", p->tile_width);
         fprintf(fp, "\n");
@@ -229,8 +266,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->coin_count; i++) {
         const CoinPlacement *c = &def->coins[i];
         fprintf(fp, "[[coins]]\n");
-        fprintf(fp, "x = %.1f\n", (double)c->x);
-        fprintf(fp, "y = %.1f\n", (double)c->y);
+        fprintf(fp, "x = %s\n", fmt_float(c->x));
+        fprintf(fp, "y = %s\n", fmt_float(c->y));
         fprintf(fp, "\n");
     }
 
@@ -239,8 +276,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->star_yellow_count; i++) {
         const StarYellowPlacement *s = &def->star_yellows[i];
         fprintf(fp, "[[star_yellows]]\n");
-        fprintf(fp, "x = %.1f\n", (double)s->x);
-        fprintf(fp, "y = %.1f\n", (double)s->y);
+        fprintf(fp, "x = %s\n", fmt_float(s->x));
+        fprintf(fp, "y = %s\n", fmt_float(s->y));
         fprintf(fp, "\n");
     }
 
@@ -249,8 +286,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->star_green_count; i++) {
         const StarGreenPlacement *s = &def->star_greens[i];
         fprintf(fp, "[[star_greens]]\n");
-        fprintf(fp, "x = %.1f\n", (double)s->x);
-        fprintf(fp, "y = %.1f\n", (double)s->y);
+        fprintf(fp, "x = %s\n", fmt_float(s->x));
+        fprintf(fp, "y = %s\n", fmt_float(s->y));
         fprintf(fp, "\n");
     }
 
@@ -259,8 +296,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->star_red_count; i++) {
         const StarRedPlacement *s = &def->star_reds[i];
         fprintf(fp, "[[star_reds]]\n");
-        fprintf(fp, "x = %.1f\n", (double)s->x);
-        fprintf(fp, "y = %.1f\n", (double)s->y);
+        fprintf(fp, "x = %s\n", fmt_float(s->x));
+        fprintf(fp, "y = %s\n", fmt_float(s->y));
         fprintf(fp, "\n");
     }
 
@@ -269,8 +306,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     {
         const LastStarPlacement *ls = &def->last_star;
         fprintf(fp, "[last_star]\n");
-        fprintf(fp, "x = %.1f\n", (double)ls->x);
-        fprintf(fp, "y = %.1f\n", (double)ls->y);
+        fprintf(fp, "x = %s\n", fmt_float(ls->x));
+        fprintf(fp, "y = %s\n", fmt_float(ls->y));
         fprintf(fp, "\n");
     }
 
@@ -279,10 +316,10 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->spider_count; i++) {
         const SpiderPlacement *sp = &def->spiders[i];
         fprintf(fp, "[[spiders]]\n");
-        fprintf(fp, "x = %.1f\n", (double)sp->x);
-        fprintf(fp, "vx = %.1f\n", (double)sp->vx);
-        fprintf(fp, "patrol_x0 = %.1f\n", (double)sp->patrol_x0);
-        fprintf(fp, "patrol_x1 = %.1f\n", (double)sp->patrol_x1);
+        fprintf(fp, "x = %s\n", fmt_float(sp->x));
+        fprintf(fp, "vx = %s\n", fmt_float(sp->vx));
+        fprintf(fp, "patrol_x0 = %s\n", fmt_float(sp->patrol_x0));
+        fprintf(fp, "patrol_x1 = %s\n", fmt_float(sp->patrol_x1));
         fprintf(fp, "frame_index = %d\n", sp->frame_index);
         fprintf(fp, "\n");
     }
@@ -292,10 +329,10 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->jumping_spider_count; i++) {
         const JumpingSpiderPlacement *js = &def->jumping_spiders[i];
         fprintf(fp, "[[jumping_spiders]]\n");
-        fprintf(fp, "x = %.1f\n", (double)js->x);
-        fprintf(fp, "vx = %.1f\n", (double)js->vx);
-        fprintf(fp, "patrol_x0 = %.1f\n", (double)js->patrol_x0);
-        fprintf(fp, "patrol_x1 = %.1f\n", (double)js->patrol_x1);
+        fprintf(fp, "x = %s\n", fmt_float(js->x));
+        fprintf(fp, "vx = %s\n", fmt_float(js->vx));
+        fprintf(fp, "patrol_x0 = %s\n", fmt_float(js->patrol_x0));
+        fprintf(fp, "patrol_x1 = %s\n", fmt_float(js->patrol_x1));
         fprintf(fp, "\n");
     }
 
@@ -304,11 +341,11 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->bird_count; i++) {
         const BirdPlacement *b = &def->birds[i];
         fprintf(fp, "[[birds]]\n");
-        fprintf(fp, "x = %.1f\n", (double)b->x);
-        fprintf(fp, "base_y = %.1f\n", (double)b->base_y);
-        fprintf(fp, "vx = %.1f\n", (double)b->vx);
-        fprintf(fp, "patrol_x0 = %.1f\n", (double)b->patrol_x0);
-        fprintf(fp, "patrol_x1 = %.1f\n", (double)b->patrol_x1);
+        fprintf(fp, "x = %s\n", fmt_float(b->x));
+        fprintf(fp, "base_y = %s\n", fmt_float(b->base_y));
+        fprintf(fp, "vx = %s\n", fmt_float(b->vx));
+        fprintf(fp, "patrol_x0 = %s\n", fmt_float(b->patrol_x0));
+        fprintf(fp, "patrol_x1 = %s\n", fmt_float(b->patrol_x1));
         fprintf(fp, "frame_index = %d\n", b->frame_index);
         fprintf(fp, "\n");
     }
@@ -318,11 +355,11 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->faster_bird_count; i++) {
         const BirdPlacement *b = &def->faster_birds[i];
         fprintf(fp, "[[faster_birds]]\n");
-        fprintf(fp, "x = %.1f\n", (double)b->x);
-        fprintf(fp, "base_y = %.1f\n", (double)b->base_y);
-        fprintf(fp, "vx = %.1f\n", (double)b->vx);
-        fprintf(fp, "patrol_x0 = %.1f\n", (double)b->patrol_x0);
-        fprintf(fp, "patrol_x1 = %.1f\n", (double)b->patrol_x1);
+        fprintf(fp, "x = %s\n", fmt_float(b->x));
+        fprintf(fp, "base_y = %s\n", fmt_float(b->base_y));
+        fprintf(fp, "vx = %s\n", fmt_float(b->vx));
+        fprintf(fp, "patrol_x0 = %s\n", fmt_float(b->patrol_x0));
+        fprintf(fp, "patrol_x1 = %s\n", fmt_float(b->patrol_x1));
         fprintf(fp, "frame_index = %d\n", b->frame_index);
         fprintf(fp, "\n");
     }
@@ -332,10 +369,10 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->fish_count; i++) {
         const FishPlacement *f = &def->fish[i];
         fprintf(fp, "[[fish]]\n");
-        fprintf(fp, "x = %.1f\n", (double)f->x);
-        fprintf(fp, "vx = %.1f\n", (double)f->vx);
-        fprintf(fp, "patrol_x0 = %.1f\n", (double)f->patrol_x0);
-        fprintf(fp, "patrol_x1 = %.1f\n", (double)f->patrol_x1);
+        fprintf(fp, "x = %s\n", fmt_float(f->x));
+        fprintf(fp, "vx = %s\n", fmt_float(f->vx));
+        fprintf(fp, "patrol_x0 = %s\n", fmt_float(f->patrol_x0));
+        fprintf(fp, "patrol_x1 = %s\n", fmt_float(f->patrol_x1));
         fprintf(fp, "\n");
     }
 
@@ -344,10 +381,10 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->faster_fish_count; i++) {
         const FishPlacement *f = &def->faster_fish[i];
         fprintf(fp, "[[faster_fish]]\n");
-        fprintf(fp, "x = %.1f\n", (double)f->x);
-        fprintf(fp, "vx = %.1f\n", (double)f->vx);
-        fprintf(fp, "patrol_x0 = %.1f\n", (double)f->patrol_x0);
-        fprintf(fp, "patrol_x1 = %.1f\n", (double)f->patrol_x1);
+        fprintf(fp, "x = %s\n", fmt_float(f->x));
+        fprintf(fp, "vx = %s\n", fmt_float(f->vx));
+        fprintf(fp, "patrol_x0 = %s\n", fmt_float(f->patrol_x0));
+        fprintf(fp, "patrol_x1 = %s\n", fmt_float(f->patrol_x1));
         fprintf(fp, "\n");
     }
 
@@ -356,8 +393,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->axe_trap_count; i++) {
         const AxeTrapPlacement *a = &def->axe_traps[i];
         fprintf(fp, "[[axe_traps]]\n");
-        fprintf(fp, "pillar_x = %.1f\n", (double)a->pillar_x);
-        fprintf(fp, "y = %.1f\n", (double)a->y);
+        fprintf(fp, "pillar_x = %s\n", fmt_float(a->pillar_x));
+        fprintf(fp, "y = %s\n", fmt_float(a->y));
         fprintf(fp, "mode = \"%s\"\n", axe_mode_to_str(a->mode));
         fprintf(fp, "\n");
     }
@@ -367,10 +404,10 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->circular_saw_count; i++) {
         const CircularSawPlacement *cs = &def->circular_saws[i];
         fprintf(fp, "[[circular_saws]]\n");
-        fprintf(fp, "x = %.1f\n", (double)cs->x);
-        fprintf(fp, "y = %.1f\n", (double)cs->y);
-        fprintf(fp, "patrol_x0 = %.1f\n", (double)cs->patrol_x0);
-        fprintf(fp, "patrol_x1 = %.1f\n", (double)cs->patrol_x1);
+        fprintf(fp, "x = %s\n", fmt_float(cs->x));
+        fprintf(fp, "y = %s\n", fmt_float(cs->y));
+        fprintf(fp, "patrol_x0 = %s\n", fmt_float(cs->patrol_x0));
+        fprintf(fp, "patrol_x1 = %s\n", fmt_float(cs->patrol_x1));
         fprintf(fp, "direction = %d\n", cs->direction);
         fprintf(fp, "\n");
     }
@@ -380,7 +417,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->spike_row_count; i++) {
         const SpikeRowPlacement *sr = &def->spike_rows[i];
         fprintf(fp, "[[spike_rows]]\n");
-        fprintf(fp, "x = %.1f\n", (double)sr->x);
+        fprintf(fp, "x = %s\n", fmt_float(sr->x));
         fprintf(fp, "count = %d\n", sr->count);
         fprintf(fp, "\n");
     }
@@ -390,8 +427,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->spike_platform_count; i++) {
         const SpikePlatformPlacement *sp = &def->spike_platforms[i];
         fprintf(fp, "[[spike_platforms]]\n");
-        fprintf(fp, "x = %.1f\n", (double)sp->x);
-        fprintf(fp, "y = %.1f\n", (double)sp->y);
+        fprintf(fp, "x = %s\n", fmt_float(sp->x));
+        fprintf(fp, "y = %s\n", fmt_float(sp->y));
         fprintf(fp, "tile_count = %d\n", sp->tile_count);
         fprintf(fp, "\n");
     }
@@ -402,8 +439,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
         const SpikeBlockPlacement *sb = &def->spike_blocks[i];
         fprintf(fp, "[[spike_blocks]]\n");
         fprintf(fp, "rail_index = %d\n", sb->rail_index);
-        fprintf(fp, "t_offset = %.1f\n", (double)sb->t_offset);
-        fprintf(fp, "speed = %.1f\n", (double)sb->speed);
+        fprintf(fp, "t_offset = %s\n", fmt_float(sb->t_offset));
+        fprintf(fp, "speed = %s\n", fmt_float(sb->speed));
         fprintf(fp, "\n");
     }
 
@@ -411,7 +448,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
 
     for (int i = 0; i < def->blue_flame_count; i++) {
         fprintf(fp, "[[blue_flames]]\n");
-        fprintf(fp, "x = %.1f\n", (double)def->blue_flames[i].x);
+        fprintf(fp, "x = %s\n", fmt_float(def->blue_flames[i].x));
         fprintf(fp, "\n");
     }
 
@@ -419,7 +456,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
 
     for (int i = 0; i < def->fire_flame_count; i++) {
         fprintf(fp, "[[fire_flames]]\n");
-        fprintf(fp, "x = %.1f\n", (double)def->fire_flames[i].x);
+        fprintf(fp, "x = %s\n", fmt_float(def->fire_flames[i].x));
         fprintf(fp, "\n");
     }
 
@@ -429,12 +466,12 @@ int level_save_toml(const LevelDef *def, const char *path) {
         const FloatPlatformPlacement *fl = &def->float_platforms[i];
         fprintf(fp, "[[float_platforms]]\n");
         fprintf(fp, "mode = \"%s\"\n", float_mode_to_str(fl->mode));
-        fprintf(fp, "x = %.1f\n", (double)fl->x);
-        fprintf(fp, "y = %.1f\n", (double)fl->y);
+        fprintf(fp, "x = %s\n", fmt_float(fl->x));
+        fprintf(fp, "y = %s\n", fmt_float(fl->y));
         fprintf(fp, "tile_count = %d\n", fl->tile_count);
         fprintf(fp, "rail_index = %d\n", fl->rail_index);
-        fprintf(fp, "t_offset = %.1f\n", (double)fl->t_offset);
-        fprintf(fp, "speed = %.1f\n", (double)fl->speed);
+        fprintf(fp, "t_offset = %s\n", fmt_float(fl->t_offset));
+        fprintf(fp, "speed = %s\n", fmt_float(fl->speed));
         fprintf(fp, "\n");
     }
 
@@ -443,8 +480,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->bridge_count; i++) {
         const BridgePlacement *br = &def->bridges[i];
         fprintf(fp, "[[bridges]]\n");
-        fprintf(fp, "x = %.1f\n", (double)br->x);
-        fprintf(fp, "y = %.1f\n", (double)br->y);
+        fprintf(fp, "x = %s\n", fmt_float(br->x));
+        fprintf(fp, "y = %s\n", fmt_float(br->y));
         fprintf(fp, "brick_count = %d\n", br->brick_count);
         fprintf(fp, "\n");
     }
@@ -454,8 +491,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->bouncepad_small_count; i++) {
         const BouncepadPlacement *bp = &def->bouncepads_small[i];
         fprintf(fp, "[[bouncepads_small]]\n");
-        fprintf(fp, "x = %.1f\n", (double)bp->x);
-        fprintf(fp, "launch_vy = %.1f\n", (double)bp->launch_vy);
+        fprintf(fp, "x = %s\n", fmt_float(bp->x));
+        fprintf(fp, "launch_vy = %s\n", fmt_float(bp->launch_vy));
         fprintf(fp, "pad_type = \"%s\"\n", bouncepad_type_to_str(bp->pad_type));
         fprintf(fp, "\n");
     }
@@ -465,8 +502,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->bouncepad_medium_count; i++) {
         const BouncepadPlacement *bp = &def->bouncepads_medium[i];
         fprintf(fp, "[[bouncepads_medium]]\n");
-        fprintf(fp, "x = %.1f\n", (double)bp->x);
-        fprintf(fp, "launch_vy = %.1f\n", (double)bp->launch_vy);
+        fprintf(fp, "x = %s\n", fmt_float(bp->x));
+        fprintf(fp, "launch_vy = %s\n", fmt_float(bp->launch_vy));
         fprintf(fp, "pad_type = \"%s\"\n", bouncepad_type_to_str(bp->pad_type));
         fprintf(fp, "\n");
     }
@@ -476,8 +513,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->bouncepad_high_count; i++) {
         const BouncepadPlacement *bp = &def->bouncepads_high[i];
         fprintf(fp, "[[bouncepads_high]]\n");
-        fprintf(fp, "x = %.1f\n", (double)bp->x);
-        fprintf(fp, "launch_vy = %.1f\n", (double)bp->launch_vy);
+        fprintf(fp, "x = %s\n", fmt_float(bp->x));
+        fprintf(fp, "launch_vy = %s\n", fmt_float(bp->launch_vy));
         fprintf(fp, "pad_type = \"%s\"\n", bouncepad_type_to_str(bp->pad_type));
         fprintf(fp, "\n");
     }
@@ -487,8 +524,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->vine_count; i++) {
         const VinePlacement *v = &def->vines[i];
         fprintf(fp, "[[vines]]\n");
-        fprintf(fp, "x = %.1f\n", (double)v->x);
-        fprintf(fp, "y = %.1f\n", (double)v->y);
+        fprintf(fp, "x = %s\n", fmt_float(v->x));
+        fprintf(fp, "y = %s\n", fmt_float(v->y));
         fprintf(fp, "tile_count = %d\n", v->tile_count);
         fprintf(fp, "\n");
     }
@@ -498,8 +535,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->ladder_count; i++) {
         const LadderPlacement *l = &def->ladders[i];
         fprintf(fp, "[[ladders]]\n");
-        fprintf(fp, "x = %.1f\n", (double)l->x);
-        fprintf(fp, "y = %.1f\n", (double)l->y);
+        fprintf(fp, "x = %s\n", fmt_float(l->x));
+        fprintf(fp, "y = %s\n", fmt_float(l->y));
         fprintf(fp, "tile_count = %d\n", l->tile_count);
         fprintf(fp, "\n");
     }
@@ -509,8 +546,8 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->rope_count; i++) {
         const RopePlacement *rp = &def->ropes[i];
         fprintf(fp, "[[ropes]]\n");
-        fprintf(fp, "x = %.1f\n", (double)rp->x);
-        fprintf(fp, "y = %.1f\n", (double)rp->y);
+        fprintf(fp, "x = %s\n", fmt_float(rp->x));
+        fprintf(fp, "y = %s\n", fmt_float(rp->y));
         fprintf(fp, "tile_count = %d\n", rp->tile_count);
         fprintf(fp, "\n");
     }
@@ -520,7 +557,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->background_layer_count; i++) {
         fprintf(fp, "[[background_layers]]\n");
         fprintf(fp, "path = \"%s\"\n", def->background_layers[i].path);
-        fprintf(fp, "speed = %.1f\n", (double)def->background_layers[i].speed);
+        fprintf(fp, "speed = %s\n", fmt_float(def->background_layers[i].speed));
         fprintf(fp, "\n");
     }
 
@@ -529,7 +566,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->foreground_layer_count; i++) {
         fprintf(fp, "[[foreground_layers]]\n");
         fprintf(fp, "path = \"%s\"\n", def->foreground_layers[i].path);
-        fprintf(fp, "speed = %.1f\n", (double)def->foreground_layers[i].speed);
+        fprintf(fp, "speed = %s\n", fmt_float(def->foreground_layers[i].speed));
         fprintf(fp, "\n");
     }
 
@@ -538,7 +575,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->fog_layer_count; i++) {
         fprintf(fp, "[[fog_layers]]\n");
         fprintf(fp, "path = \"%s\"\n", def->fog_layers[i].path);
-        fprintf(fp, "speed = %.1f\n", (double)def->fog_layers[i].speed);
+        fprintf(fp, "speed = %s\n", fmt_float(def->fog_layers[i].speed));
         fprintf(fp, "\n");
     }
 
