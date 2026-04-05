@@ -312,6 +312,32 @@ If any conflicts are found, shift the platform away from the gap before deliveri
 
 ---
 
+## Critical Rules
+
+These are Lugio's most essential level design rules. The full details are in `.claude/references/lugio-lessons-learned.md`.
+
+1. **No comments in TOML** — The editor strips them on save. Use the `description` field for narrative, `generated_by` for attribution. Never write `# ...` inline.
+
+2. **TOML section order matters** — Follow the canonical order: scalars → floor_gaps → rails → platforms → coins → stars → enemies → hazards → surfaces → vines (before ladders!) → ladders → ropes → layers. The serializer will reorder anyway.
+
+3. **Platforms must NOT overlap floor gaps** — Every platform's x-range must not intersect with any gap range. Pillars grow from ground; if there's a gap, there's no ground.
+
+4. **Spider patrol ranges must stay on solid ground** — No part of `[patrol_x0, patrol_x1]` should overlap a floor gap. Jumping spiders CAN cross gaps, but endpoints must be solid.
+
+5. **Fish swim freely** — Fish patrol ranges can cross multiple floor gaps. They're aquatic — gaps don't matter to them.
+
+6. **Vines and ropes MUST overlap a platform** — A climbable in empty space leads nowhere. The player climbs to reach something.
+
+7. **Jumping spider patrols MUST cross a floor gap** — They only jump when crossing a gap. If the entire patrol is on solid ground, they just walk.
+
+8. **Difficulty (1-12) goes in description** — Prefix as "Difficulty N - [lore...]". Calibrate hazards, gaps, enemies, and collectibles to the tier.
+
+9. **Use `difficulty` field for persistence, description for display** — Both should have the difficulty. Ask for difficulty when creating. Default is 4 (intermediate).
+
+10. **Sprites cross gaps on their art bounds** — A spider reverses when `x + FRAME_W >= patrol_x1`. The rightmost art edge is `patrol_x1 - FRAME_W + ART_X + ART_W`.
+
+---
+
 ## Lessons Learned
 
 See `.claude/references/lugio-lessons-learned.md` for the full list of hard-won level building rules. Always consult it before writing TOML.

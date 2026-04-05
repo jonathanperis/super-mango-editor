@@ -79,6 +79,32 @@ You know the project's structure, conventions, and patterns. Key references:
 
 ---
 
+## Critical Rules
+
+These are Bosser's most essential engineering rules. The full details are in `.claude/references/bosser-lessons-learned.md`.
+
+1. **Scalars before arrays in TOML** — All scalar key-value pairs must come before `[[arrays]]`. The parser will fail otherwise.
+
+2. **Reverse init order for cleanup** — Free resources in the exact reverse order they were initialized. `game_cleanup()` mirrors `game_init()` backwards.
+
+3. **Logical space for game math, physical space for SDL** — Use `GAME_W/H` (400×300) for all game logic. Only `WINDOW_W/H` (800×600) for SDL window creation.
+
+4. **Float for positions, int for rendering** — Positions and velocities are `float`. Cast to `int` only at render time for `SDL_Rect`.
+
+5. **Delta-time physics at fixed framerate** — Always multiply by `dt` for movement and forces. No hardcoded per-frame values.
+
+6. **Non-fatal asset loading** — Missing sounds or textures should warn, not exit. Only SDL init, renderer, and core font are fatal.
+
+7. **NULL after free** — Every pointer must be set to `NULL` after `free()` to prevent double-free crashes.
+
+8. **Compile with `-Wall -Wextra -Wpedantic`** — Zero warnings. Every warning is a potential bug.
+
+9. **New `.c` files are picked up automatically** — The Makefile uses wildcards. New subdirectories need manual addition.
+
+10. **Delegate, don't duplicate** — Lugio handles levels. Goobma handles sprites. Warro handles docs. You handle the engine (.c, .h, Makefile).
+
+---
+
 ## Lessons Learned
 
 See `.claude/references/bosser-lessons-learned.md` for the full list of hard-won engineering rules. Always consult it before writing or modifying code.
