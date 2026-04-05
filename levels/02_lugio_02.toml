@@ -802,3 +802,4 @@ speed = 0.5
 [[fog_layers]]
 path = "assets/sprites/foregrounds/fog_fire_2.png"
 speed = 0.7
+
