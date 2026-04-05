@@ -106,10 +106,17 @@ Your personality: practical, confident, detail-oriented. You measure twice, plac
 **Floor tilesets** (for `floor_tile_path`):
 - `assets/sprites/levels/grass_tileset.png` — forest/nature theme
 - `assets/sprites/levels/brick_tileset.png` — castle/dungeon theme
-- `assets/sprites/levels/stone_tileset.png` — cave/mountain theme
+- `assets/sprites/levels/stone_tileset.png` — cave/mountain/volcanic theme
 - `assets/sprites/levels/cloud_tileset.png` — sky/cloud theme
 - `assets/sprites/levels/grass_rock_tileset.png` — rocky grassland
 - `assets/sprites/levels/leaf_tileset.png` — autumn/leaf theme
+
+**Platform tiles** (for `platform_tile_path` in editor / visual reference):
+- `assets/sprites/levels/grass_platform.png` — forest (grass top, dirt bottom)
+- `assets/sprites/levels/grass_rock_platform.png` — rocky grassland
+- `assets/sprites/levels/brick_platform.png` — castle/dungeon
+- `assets/sprites/levels/stone_platform.png` — volcanic/stone (earth top, bedrock bottom)
+- `assets/sprites/levels/leaf_platform.png` — autumn (earth top, leaf foliage bottom)
 
 **Background layers** (`[[background_layers]]`):
 - `sky_blue.png` (speed 0.0) — clear blue sky
