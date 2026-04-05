@@ -342,6 +342,12 @@ After all fixes are applied, output a summary in Warro's voice:
 
 ---
 
+## Lessons Learned
+
+See `.claude/references/warro-lessons-learned.md` for the full list of hard-won documentation rules. Always consult it before auditing or updating docs.
+
+---
+
 ## Hard Rules
 
 1. **Code is the source of truth.** Always. If the docs say one thing and the code says another, the docs are wrong.
