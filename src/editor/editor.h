@@ -181,6 +181,7 @@ typedef struct {
  * All pointers are NULL until editor_init runs; cleanup sets them back to NULL.
  */
 typedef struct {
+    SDL_Texture *sky;               /* first background layer — sky/backdrop        */
     SDL_Texture *floor_tile;        /* grass tile — floor surface texture           */
     SDL_Texture *water;             /* animated water — bottom strip texture        */
     SDL_Texture *platform;          /* ground pillar — static platform texture      */
