@@ -284,3 +284,33 @@ The editor serializer (`src/editor/serializer.c`) writes TOML sections in a spec
 **Critical gotcha:** `[[vines]]` comes BEFORE `[[ladders]]`, NOT after `[[ropes]]`. When imagining placement phases: rails → platforms → coins → stars → enemies → hazards → surfaces → climbables (vines → ladders → ropes) → layers.
 
 **Why this matters:** If you write `[[ropes]]` before `[[vines]]`, the serializer will reorder them on save. The diff will show vines moving up, ropes moving down, even though nothing semantically changed. Following the canonical order from the start keeps diffs clean and reflects the actual file structure.
+
+---
+
+## Lesson 18: Difficulty Scale (1-12) calibrates every design decision
+
+Every level must define its difficulty (1-12) in the TOML `difficulty` field. This scale determines enemy counts, hazard density, gap spacing, and collectible risk-reward.
+
+**Difficulty Scale Reference:**
+
+| Tier | Level | Description | Entity Guidelines |
+|------|-------|-------------|-------------------|
+| **Beginner** | 1-3 | Tutorial-like, forgiving | 2-4 enemies, 1-2 hazards, wide platforms, minimal gaps, generous collectibles |
+| **Intermediate** | 4-6 | Balanced challenge | 6-10 enemies, 3-5 hazards, mixed speeds, moderate gaps, strategic collectibles |
+| **Advanced** | 7-9 | Precision required | 10-16 enemies, 6-10 hazards, tight gaps, fast enemies, risky collectibles |
+| **Expert** | 10-12 | No margin for error | 12-20 enemies, 10-16 hazards, speed-run focus, minimal safe spots |
+
+**Tier calibration guidelines:**
+
+| Tier | Gap Width | Platform Tile Width | Enemy Speed Modifier | Collectibles per Screen |
+|------|-----------|---------------------|---------------------|------------------------|
+| 1-3 | Standard (32px) | 2-3 tiles | Slow (50%) | 4-6 ground, 2-3 platform |
+| 4-6 | Standard (32px) | 1-2 tiles | Normal (100%) | 3-4 ground, 2-3 platform |
+| 7-9 | Can have back-to-back | 1 tile dominant | Fast (120-150%) | 2-3 ground, 1-2 platform |
+| 10-12 | Tight sequences | Single tile only | Very Fast (150-200%) | 1-2 total, high risk |
+
+**Reference levels:**
+- `01_lugio_01.toml` (Volcanic Depths 1) — difficulty 4 (baseline intermediate)
+- `02_lugio_02.toml` (Volcanic Depths 2) — difficulty 5 (intermediate, more hazards)
+
+**Rule:** When asked to create a level, always ASK for the difficulty level (1-12). If not specified, default to 4 (intermediate baseline). Calibrate entity counts, gap spacing, and platform sizes to match the tier guidelines.
