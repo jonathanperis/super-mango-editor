@@ -154,6 +154,45 @@ coin_score = 100            # points per coin
 floor_gaps = [0, 192, 560]  # x-positions of floor holes
 ```
 
+### Sprite Analyzer — Know Your Entities
+
+Use `analyze_sprite.py` to inspect any sprite before placing it. This tool tells you the real art bounds, hitbox dimensions, and animation frames — critical for placing entities precisely.
+
+```sh
+python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png [frame_w] [frame_h]
+```
+
+**When to use it:**
+- Before placing a new enemy type you haven't worked with before — check its actual hitbox size
+- When calculating patrol ranges — the art bounding box tells you the real visual width of an entity, not the frame width
+- When positioning hazards near platforms — know the exact inset so flame/spike art doesn't visually overlap geometry
+- When validating asset paths exist — if the script loads successfully, the path is valid
+
+**What the script tells you:**
+1. **Frame size & grid** — e.g., spider.png is 3 frames of 64×48 (auto-detects or provide manually)
+2. **Art bounding box** — the tight crop of visible pixels within each frame, with padding on all sides
+3. **Envelope** — union of all frames' art bounds. The actual visual footprint of the entity.
+4. **Hitbox constants** — the `ART_X/Y/W/H` or `PAD_X/Y` values the game uses for collision. These tell you how big the entity actually "is" for gameplay.
+5. **Color palette** — useful when choosing themed hazards (fire = warm colors, ice = cool)
+
+**Practical examples for level building:**
+
+```sh
+# Spider: 64×48 frames, art at (20,22) size 25×10
+# → Real spider width is ~25px, sits at floor level. Patrol range needs 25px clearance from gaps.
+python3 .claude/scripts/analyze_sprite.py assets/sprites/entities/spider.png 64 48
+
+# Bird: 48×48 frames, art at (17,17) size 15×14
+# → Bird visual is only 15px wide, 14px tall. base_y positions the frame, not the art.
+python3 .claude/scripts/analyze_sprite.py assets/sprites/entities/bird.png
+
+# Blue flame: 48×48 frames, hitbox at (17,17) size 14×15
+# → Flame art is small within the frame. Gap coverage is just 14px wide.
+python3 .claude/scripts/analyze_sprite.py assets/sprites/hazards/blue_flame.png
+```
+
+**Key insight for patrol ranges:** The game flips sprites at patrol boundaries using the FRAME width, not the art width. A spider with FRAME_W=64 reverses when `x + 64 >= patrol_x1`. So the rightmost art edge is `patrol_x1 - FRAME_W + ART_X + ART_W`. Factor this in when making sure spiders don't visually walk over gaps.
+
 ### Difficulty Guidelines
 
 | Difficulty | Screens | Enemies | Hazards | Gaps | Stars | Description |

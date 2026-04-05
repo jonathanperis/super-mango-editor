@@ -57,10 +57,41 @@ Before creating anything, ask:
 4. Understand the frame layout (for sprite sheets: cols × rows, frame size)
 5. Note any patterns (transparency, padding, animation conventions)
 
-Use the analyze_sprite script for sprite sheets:
+Use the `analyze_sprite.py` script — this is your primary tool for studying existing assets:
 ```sh
 python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<existing>.png
 ```
+
+The script auto-detects frame size, grid layout, and outputs everything you need. To override auto-detection (e.g., spider uses 64×48 frames, not the auto-detected 48×48):
+```sh
+python3 .claude/scripts/analyze_sprite.py assets/sprites/entities/spider.png 64 48
+```
+
+#### What the script gives you
+
+1. **Frame size & grid** — auto-detected or provided. Tells you the exact cell dimensions to match.
+2. **Per-row frame map** — which cells have art (`#`) and which are empty (`.`). Shows the animation row layout.
+3. **Art bounding box per frame** — the tight crop around visible pixels within each cell. Reports:
+   - Art origin `(x, y)` relative to the frame's top-left corner
+   - Art size `WxH` in pixels
+   - Padding on all four sides: `L=left T=top R=right B=bottom`
+   - Number of unique colors in that frame
+4. **Envelope** — the union bounding box across ALL frames. This is the maximum art extent — your new sprite's art must stay within these bounds to look consistent.
+5. **Color palette** — every unique opaque color with hex codes and RGB values. **Use this palette exactly** when creating new assets in the same category.
+6. **Hitbox constants** — suggested `#define` constants in two styles:
+   - **ART offset style** (`ART_X, ART_Y, ART_W, ART_H`) — when art is off-center within the frame
+   - **PAD style** (`HITBOX_PAD_X, HITBOX_PAD_Y`) — when art is horizontally centered
+   - Includes a ready-to-paste `hitbox_get()` C function
+7. **Animation rows** — frame counts per row and whether sizes vary (useful for identifying animation states)
+
+#### How to use it as Goobma
+
+- **Before creating anything**: run the script on EVERY existing asset in the target category
+- **Match the envelope**: your new sprite's art must fit within the same origin/size envelope
+- **Match the palette**: use only colors from the palette output (or a strict subset)
+- **Match the padding**: if existing sprites have 17px left padding, yours should too
+- **For sprite sheets**: match the same grid (cols × rows) and frame size exactly
+- **For variants** (e.g., new enemy based on existing spider): run with the same frame_w/frame_h to get identical layout
 
 **Super Mango player animation layout** (player.png: 192×288, 4 cols × 6 rows of 48×48):
 
