@@ -208,7 +208,8 @@ typedef struct {
     SDL_Texture *bouncepad_small;   /* green bouncepad (small jump) texture         */
     SDL_Texture *bouncepad_medium;  /* wood bouncepad (medium jump) texture         */
     SDL_Texture *bouncepad_high;    /* red bouncepad (high jump) texture            */
-    SDL_Texture *vine;              /* hanging vine climbable texture               */
+    SDL_Texture *vine_green;        /* green vine climbable texture                 */
+    SDL_Texture *vine_brown;        /* brown/dried vine climbable texture           */
     SDL_Texture *ladder;            /* ladder climbable texture                     */
     SDL_Texture *rope;              /* rope climbable texture                       */
     SDL_Texture *rail;              /* rail path tile texture                       */

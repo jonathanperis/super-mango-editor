@@ -318,7 +318,8 @@ static void load_textures(EditorState *es) {
     LOAD_TEX(bouncepad_high,   "assets/sprites/surfaces/bouncepad_high.png");
 
     /* Climbables — vertical traversal */
-    LOAD_TEX(vine,             "assets/sprites/surfaces/vine_green.png");
+    LOAD_TEX(vine_green,       "assets/sprites/surfaces/vine_green.png");
+    LOAD_TEX(vine_brown,       "assets/sprites/surfaces/vine_brown.png");
     LOAD_TEX(ladder,           "assets/sprites/surfaces/ladder.png");
     LOAD_TEX(rope,             "assets/sprites/surfaces/rope.png");
 
@@ -2292,7 +2293,8 @@ void editor_cleanup(EditorState *es) {
     DESTROY_TEX(es->textures.bouncepad_small);
     DESTROY_TEX(es->textures.bouncepad_medium);
     DESTROY_TEX(es->textures.bouncepad_high);
-    DESTROY_TEX(es->textures.vine);
+    DESTROY_TEX(es->textures.vine_green);
+    DESTROY_TEX(es->textures.vine_brown);
     DESTROY_TEX(es->textures.ladder);
     DESTROY_TEX(es->textures.rope);
     DESTROY_TEX(es->textures.rail);
