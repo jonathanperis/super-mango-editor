@@ -435,6 +435,18 @@ void game_init(GameState *gs) {
         }
 
         /*
+         * Foreground strip texture — the LAST foreground layer is used as
+         * the animated strip at the bottom of the screen (water, lava,
+         * clouds, etc.).  This is a convention: designers put the strip
+         * layer last in the foreground_layers list.
+         */
+        if (def && def->foreground_layer_count > 0) {
+            const char *strip = def->foreground_layers[def->foreground_layer_count - 1].path;
+            if (strip[0] != '\0')
+                water_reload_texture(&gs->water, gs->renderer, strip);
+        }
+
+        /*
          * Music — load and play from level definition if a path is specified.
          * Mix_Music streams from disk; Mix_PlayMusic(-1) loops indefinitely.
          * Non-fatal: game runs without music if the file is missing.

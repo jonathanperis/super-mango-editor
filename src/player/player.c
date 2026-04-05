@@ -991,8 +991,8 @@ void player_update(Player *player, float dt,
      */
     if (player->x + PHYS_PAD_X < 0.0f)
         player->x = -(float)PHYS_PAD_X;
-    if (player->x + player->w - PHYS_PAD_X > WORLD_W)
-        player->x = (float)(WORLD_W - player->w + PHYS_PAD_X);
+    if (player->x + player->w - PHYS_PAD_X > world_w)
+        player->x = (float)(world_w - player->w + PHYS_PAD_X);
 
     /*
      * Ceiling clamp — stop upward movement when the physics top hits the
