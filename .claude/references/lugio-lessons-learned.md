@@ -207,3 +207,27 @@ Fish swim in the lava/water lane and jump periodically. Their patrol ranges shou
 - Fish 2: patrol 1000–1500 = 500px
 
 **Rule:** Fish patrol range should be 400–500px. Fish are not constrained by floor gaps (Lesson 3), so the range can cross multiple gaps freely. The goal is to give the fish enough horizontal space to feel present and threatening without dominating the entire level.
+
+---
+
+## Lesson 14: Jumping spider patrols MUST cross a floor gap
+
+Jumping spiders only jump when their art center crosses a **floor gap**. If the entire patrol range sits on solid ground between two gaps, the spider just walks back and forth like a regular spider — it never jumps.
+
+**Rule:** For every jumping spider, verify that at least one floor gap falls within `[patrol_x0, patrol_x1]`. If no gap is crossed, the entity is functionally a regular spider.
+
+**Example:** Gap at 1520, jumping spider patrol 1680–1870 → no gap crossed, never jumps. Fix: extend to 1680–1960 (crosses gap at 1920).
+
+---
+
+## Lesson 15: Spiders can overlap platforms, but not ground entities
+
+Spiders and jumping spiders can patrol across platform positions — they walk on top of them fine. But they must NOT overlap with other ground-level entities: spike rows, bouncepads, or other spiders/enemies that share the floor.
+
+**Rule:** Check for conflicts with:
+- `[[spike_rows]]` — ground-level, same y as spiders
+- `[[bouncepads_*]]` — sit on the floor
+- Other `[[spiders]]` and `[[jumping_spiders]]` — patrol ranges shouldn't overlap
+- `[[circular_saws]]` — ground-level patrol
+
+Platforms are fine. Ground entities are not.
