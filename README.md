@@ -60,6 +60,36 @@ make editor       # build the editor binary into out/
 make run-editor   # build and run the editor
 ```
 
+## Development Crew
+
+Super Mango is developed with the help of four specialized [Claude Code](https://docs.anthropic.com/en/docs/claude-code) agents, each owning a distinct part of the project. Call them by name with slash commands in any Claude Code session inside this repository.
+
+| Agent | Command | Role | Owns |
+|-------|---------|------|------|
+| **Bosser** | `/bosser-engineer` | Chief Engineer | C source, SDL2 engine, editor, Makefile, architecture, bug fixes |
+| **Lugio** | `/lugio-creator` | Level Builder | TOML level files, entity placement, theming, difficulty balancing |
+| **Goobma** | `/goobma-designer` | Pixel Art Designer | Sprite assets, palette remapping, frame layout analysis |
+| **Warro** | `/warro-inscriber` | Documentation Inscriber | README, CLAUDE.md, wiki, GitHub Pages docs, cross-referencing |
+
+### When to call whom
+
+| You want to... | Call |
+|----------------|------|
+| Add a new enemy, surface, or hazard type | `/bosser-engineer` |
+| Fix a bug or refactor engine code | `/bosser-engineer` |
+| Create a new level or redesign an existing one | `/lugio-creator` |
+| Design a new sprite or create a theme variant | `/goobma-designer` |
+| Update documentation or audit for accuracy | `/warro-inscriber` |
+
+### How to get the best results
+
+- **Be specific about what you want.** "Add a spider that jumps higher" gives Bosser a clear target. "Make the game better" does not.
+- **One agent at a time.** Each agent stays in their lane. If you ask Lugio to fix a bug, he'll tell you to call Bosser. That's by design.
+- **Bosser delegates.** If you're unsure who to call, start with `/bosser-engineer` -- he'll route the work to the right crew member or handle it himself.
+- **Lugio needs a theme.** When requesting a level, tell him the theme (forest, volcanic, sky), difficulty (easy/medium/hard), and length (number of screens). He'll ask if you don't.
+- **Goobma needs a reference.** When requesting a sprite, point him at an existing asset in the same category. He matches dimensions, palette, and style automatically.
+- **Warro verifies against code.** He reads source files and runs analysis tools before writing a single word. If the docs say one thing and the code says another, Warro trusts the code.
+
 ## Getting Started
 
 ### Prerequisites
