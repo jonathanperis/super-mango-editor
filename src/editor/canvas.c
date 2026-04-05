@@ -2,9 +2,12 @@
  * canvas.c — Level canvas renderer for the Super Mango level editor.
  *
  * This is the most complex rendering module in the editor.  It draws the
- * entire 1600x300 game world inside the editor viewport, reproducing every
+ * entire game world inside the editor viewport, reproducing every
  * entity at its exact game display size and derived Y position.  The result
  * is a WYSIWYG preview: what designers see here matches the running game.
+ *
+ * The world width is dynamic, calculated from screen_count:
+ *   world_w = screen_count * GAME_W (default 4 screens = 1600 px)
  *
  * Rendering order (back to front):
  *   1. Sky background
@@ -147,7 +150,7 @@
  * w2s_x — Convert a world-space x coordinate to a screen-space x.
  *
  * Subtracts the camera scroll offset and applies the zoom factor so that
- * the visible portion of the 1600-px world maps onto the CANVAS_W-pixel
+ * the visible portion of the dynamic-width world maps onto the CANVAS_W-pixel
  * viewport.  The result can be negative (entity is off-screen left).
  */
 static inline int w2s_x(const EditorState *es, float wx) {

@@ -20,7 +20,8 @@
  * Pillars sit directly on top of the floor (their bottom edge == FLOOR_Y)
  * so they look like natural extensions of the ground.
  *
- * World layout (WORLD_W = 1600 px, 4 screens of 400 px each):
+ * This default layout is for a 4-screen world (screen_count=4, 1600 px).
+ * Levels loaded from TOML can define any screen_count and world width.
  *
  *   Screen 1 (x 0–400):
  *     Pillar 1 — medium (2 tiles tall) at x=80

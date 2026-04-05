@@ -1,10 +1,11 @@
 /*
  * canvas.h — Public interface for the editor canvas (world viewport).
  *
- * The canvas renders the 1600x300 game world inside the left portion of the
- * editor window (CANVAS_W x CANVAS_H pixels).  Entities are drawn at their
- * exact game display sizes and derived Y positions so the editor is WYSIWYG
- * with the running game.
+ * The canvas renders the game world inside the left portion of the
+ * editor window (CANVAS_W x CANVAS_H pixels).  World width is dynamic,
+ * calculated from the level's screen_count (screen_count * GAME_W).
+ * Entities are drawn at their exact game display sizes and derived Y
+ * positions so the editor is WYSIWYG with the running game.
  *
  * Functions:
  *   canvas_render          — draw the full level preview for the current frame.
