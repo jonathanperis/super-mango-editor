@@ -48,7 +48,7 @@ typedef struct {
 
 /* ---- Function declarations ---------------------------------------------- */
 
-void faster_birds_init(FasterBird *birds, int *count);
+void faster_birds_init(FasterBird *birds, int *count, int world_w);
 
 void faster_birds_update(FasterBird *birds, int count, float dt,
                          Mix_Chunk *snd_flap, float player_x, int cam_x);
