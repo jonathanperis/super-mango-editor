@@ -158,3 +158,52 @@ Every generated TOML file must have:
 2. A `generated_by` field with attribution (NOT inside the description)
 
 The `description` field is the machine-readable copy that survives editor round-trips. The `generated_by` field is the canonical attribution source. Do NOT write `# ...` comment headers — the editor strips them on save. The `description` string is the only persistent narrative text.
+
+---
+
+## Lesson 11: Spider patrol ranges must be meaningful (at least 150px)
+
+A spider with a patrol range of 70px barely moves — it looks broken. The sandbox (`00_sandbox_01.toml`) uses 150–160px ranges:
+- Spider 1: patrol 592–750 = 158px
+- Spider 2: patrol 1000–1152 = 152px
+- Jumping spider: patrol 46–310 = 264px
+
+**Rule:** Minimum patrol range for spiders: `patrol_x1 - patrol_x0 >= 150`. The patrol must still stay on solid ground (no gap crossings), but within those bounds, make it wide enough to look like the spider is actually patrolling, not twitching in place.
+
+---
+
+## Lesson 12: Only use yellow stars and last_star for now
+
+Green and red stars have different mechanics that aren't implemented yet. Only place `[[star_yellows]]` (health restore pickups) and `[last_star]` (end-of-level goal) in levels.
+
+**Wrong:**
+```toml
+[[star_greens]]
+x = 700.0
+y = 180.0
+
+[[star_reds]]
+x = 2466.0
+y = 108.0
+```
+
+**Right:**
+```toml
+[[star_yellows]]
+x = 1116.0
+y = 108.0
+
+[last_star]
+x = 3132.0
+y = 44.0
+```
+
+---
+
+## Lesson 13: Fish patrol ranges should be 400–500px
+
+Fish swim in the lava/water lane and jump periodically. Their patrol ranges should cover a meaningful area — 400–500px is the sweet spot. The sandbox (`00_sandbox_01.toml`) uses:
+- Fish 1: patrol 500–950 = 450px
+- Fish 2: patrol 1000–1500 = 500px
+
+**Rule:** Fish patrol range should be 400–500px. Fish are not constrained by floor gaps (Lesson 3), so the range can cross multiple gaps freely. The goal is to give the fish enough horizontal space to feel present and threatening without dominating the entire level.
