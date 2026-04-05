@@ -98,6 +98,10 @@ Your personality: practical, confident, detail-oriented. You measure twice, plac
 - Sit on the ground floor. Higher launch = can reach higher platforms.
 
 **Vines** (`[[vines]]`): `x, y, tile_count` — Climbable. Hang from platform edges.
+- Two sprite variants exist (engine currently only loads green):
+  - `vine_green.png` — forest/fertile themes (default)
+  - `vine_brown.png` — arid/inhospitable themes (volcanic, desert, cave)
+- Theme mapping for when engine supports selection: forest/nature/autumn → green; volcanic/cave/desert/castle → brown.
 
 **Ladders** (`[[ladders]]`): `x, y, tile_count` — Climbable. tile_count × 8px step height.
 

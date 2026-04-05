@@ -202,8 +202,8 @@ void game_init(GameState *gs) {
     if (!gs->bouncepad_medium_tex) { fprintf(stderr, "Failed to load Bouncepad_Wood.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
 
     /* Non-fatal textures — game runs without them */
-    gs->vine_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/vine.png");
-    if (!gs->vine_tex) fprintf(stderr, "Warning: Failed to load Vine.png: %s\n", IMG_GetError());
+    gs->vine_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/vine_green.png");
+    if (!gs->vine_tex) fprintf(stderr, "Warning: Failed to load Vine_Green.png: %s\n", IMG_GetError());
     gs->ladder_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/ladder.png");
     if (!gs->ladder_tex) fprintf(stderr, "Warning: Failed to load Ladder.png: %s\n", IMG_GetError());
     gs->rope_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/rope.png");

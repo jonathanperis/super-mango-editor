@@ -231,3 +231,20 @@ Spiders and jumping spiders can patrol across platform positions — they walk o
 - `[[circular_saws]]` — ground-level patrol
 
 Platforms are fine. Ground entities are not.
+
+---
+
+## Lesson 16: Two vine variants — pick the right one for the theme
+
+There are two vine sprites available:
+
+| Asset | Theme | Use case |
+|-------|-------|----------|
+| `assets/sprites/surfaces/vine_green.png` | Forest/fertile | Lush environments, forest themes, nature levels |
+| `assets/sprites/surfaces/vine_brown.png` | Arid/inhospitable | Volcanic, desert, cave, dead/dried vegetation themes |
+
+**Engine note:** The game currently only loads `vine_green.png` as the vine texture. The `vine_brown.png` asset exists but the engine has no mechanism to select between vine types per-level yet. When Bosser adds theme-based surface selection, the mapping is:
+- Forest/nature/autumn themes → `vine_green.png`
+- Volcanic/cave/desert/castle themes → `vine_brown.png`
+
+**Rule:** When placing `[[vines]]` in a TOML file, know which variant *should* be used for the level's theme. The TOML entity syntax stays the same (`[[vines]]` with `x, y, tile_count`), but keep the theme mapping in mind for when the engine supports it. Don't place a lush green vine in a lava level — it breaks the visual story.

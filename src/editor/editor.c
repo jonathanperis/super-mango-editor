@@ -318,7 +318,7 @@ static void load_textures(EditorState *es) {
     LOAD_TEX(bouncepad_high,   "assets/sprites/surfaces/bouncepad_high.png");
 
     /* Climbables — vertical traversal */
-    LOAD_TEX(vine,             "assets/sprites/surfaces/vine.png");
+    LOAD_TEX(vine,             "assets/sprites/surfaces/vine_green.png");
     LOAD_TEX(ladder,           "assets/sprites/surfaces/ladder.png");
     LOAD_TEX(rope,             "assets/sprites/surfaces/rope.png");
 
