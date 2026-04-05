@@ -608,12 +608,12 @@ void level_load(GameState *gs, const LevelDef *def)
 
     /* ---- Level-wide configuration ---------------------------------- */
     /*
-     * Enable foreground rendering if any foreground layers are defined.
-     * The designer's choice of layers determines what renders — no
-     * filename sniffing needed.  Both fog (overlay) and water/lava
-     * (animated strip) activate when foreground layers are present.
+     * Enable foreground systems based on what the level definition provides.
+     * Fog is driven by fog_layers (the atmospheric overlay textures).
+     * Water/lava strip is driven by foreground_layers (the animated bottom strip).
+     * Each system is independent — a level can have fog without water, or vice versa.
      */
-    gs->fog_enabled   = (def->foreground_layer_count > 0) ? 1 : 0;
+    gs->fog_enabled   = (def->fog_layer_count > 0) ? 1 : 0;
     gs->water_enabled = (def->foreground_layer_count > 0) ? 1 : 0;
 
     /*

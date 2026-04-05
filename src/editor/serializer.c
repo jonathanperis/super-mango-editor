@@ -533,6 +533,15 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "\n");
     }
 
+    /* ---- Fog layers ------------------------------------------------- */
+
+    for (int i = 0; i < def->fog_layer_count; i++) {
+        fprintf(fp, "[[fog_layers]]\n");
+        fprintf(fp, "path = \"%s\"\n", def->fog_layers[i].path);
+        fprintf(fp, "speed = %.1f\n", (double)def->fog_layers[i].speed);
+        fprintf(fp, "\n");
+    }
+
     fclose(fp);
     return 0;
 }
@@ -911,6 +920,23 @@ int level_load_toml(const char *path, LevelDef *def) {
                 strncpy(def->foreground_layers[i].path, p, 63);
                 def->foreground_layers[i].path[63] = '\0';
                 def->foreground_layers[i].speed = get_float(elem, "speed", 0);
+            }
+        }
+    }
+
+    /* Fog layers */
+    {
+        toml_datum_t fl = toml_get(top, "fog_layers");
+        if (fl.type == TOML_ARRAY) {
+            int n = fl.u.arr.size;
+            if (n > MAX_FOG_TEXTURES) n = MAX_FOG_TEXTURES;
+            def->fog_layer_count = n;
+            for (int i = 0; i < n; i++) {
+                toml_datum_t elem = fl.u.arr.elem[i];
+                const char *p = get_str(elem, "path", "");
+                strncpy(def->fog_layers[i].path, p, 63);
+                def->fog_layers[i].path[63] = '\0';
+                def->fog_layers[i].speed = get_float(elem, "speed", 0);
             }
         }
     }

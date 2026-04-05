@@ -10,8 +10,11 @@
 
 #include <SDL.h>   /* SDL_Texture, SDL_Renderer */
 
-/* Number of fog texture assets in rotation (Sky_Background_1 and 2) */
-#define FOG_TEX_COUNT  2
+/*
+ * MAX_FOG_TEXTURES — maximum number of fog texture assets the system can hold.
+ * Actual count is determined per-level via the fog_layers[] in LevelDef.
+ */
+#define MAX_FOG_TEXTURES  4
 
 /*
  * Maximum concurrent fog instances. Two would suffice for the overlap,
@@ -38,18 +41,31 @@ typedef struct {
 } FogInstance;
 
 /*
- * FogSystem — owns all three textures and the pool of active instances.
+ * FogSystem — owns the loaded textures and the pool of active instances.
  * Stored by value inside GameState — no heap allocation needed.
+ * tex_count tracks how many textures were actually loaded from the level
+ * definition (may be less than MAX_FOG_TEXTURES).
  */
 typedef struct {
-    SDL_Texture *textures[FOG_TEX_COUNT]; /* GPU images for the three assets */
-    FogInstance  instances[FOG_MAX];      /* pool of simultaneous fog layers  */
+    SDL_Texture *textures[MAX_FOG_TEXTURES]; /* GPU images for the fog assets  */
+    int          tex_count;                  /* number of textures loaded       */
+    FogInstance  instances[FOG_MAX];         /* pool of simultaneous fog layers */
 } FogSystem;
 
 /* ------------------------------------------------------------------ */
 
-/* Load the three sky textures and spawn the first fog wave immediately. */
-void fog_init(FogSystem *fog, SDL_Renderer *renderer);
+/*
+ * fog_init — Load fog textures from level-defined paths and spawn the first wave.
+ *
+ * paths  : array of PNG file paths (up to MAX_FOG_TEXTURES entries).
+ * count  : number of paths provided; clamped to MAX_FOG_TEXTURES internally.
+ *
+ * If count is 0, no textures are loaded and no fog waves will spawn.
+ * Each texture is non-fatal: a missing asset prints a warning and leaves
+ * its pointer NULL (fog_render silently skips NULL entries).
+ */
+void fog_init(FogSystem *fog, SDL_Renderer *renderer,
+              const char (*paths)[64], int count);
 
 /* Advance every active instance; spawn the next wave when it is time. */
 void fog_update(FogSystem *fog, float dt);
