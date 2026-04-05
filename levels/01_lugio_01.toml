@@ -457,6 +457,30 @@ x = 2950.0
 launch_vy = -700.0
 pad_type = "RED"
 
+[[vines]]
+x = 208.0
+y = 124.0
+tile_count = 3
+vine_type = 1
+
+[[vines]]
+x = 568.0
+y = 172.0
+tile_count = 2
+vine_type = 1
+
+[[vines]]
+x = 1858.0
+y = 172.0
+tile_count = 2
+vine_type = 1
+
+[[vines]]
+x = 2188.0
+y = 124.0
+tile_count = 3
+vine_type = 1
+
 [[ladders]]
 x = 3080.0
 y = 20.0
@@ -486,30 +510,6 @@ tile_count = 3
 x = 2608.0
 y = 124.0
 tile_count = 3
-
-[[vines]]
-x = 208.0
-y = 124.0
-tile_count = 3
-vine_type = 1
-
-[[vines]]
-x = 568.0
-y = 172.0
-tile_count = 2
-vine_type = 1
-
-[[vines]]
-x = 1858.0
-y = 172.0
-tile_count = 2
-vine_type = 1
-
-[[vines]]
-x = 2188.0
-y = 124.0
-tile_count = 3
-vine_type = 1
 
 [[background_layers]]
 path = "assets/sprites/backgrounds/sky_fire.png"
