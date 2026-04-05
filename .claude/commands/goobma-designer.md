@@ -62,6 +62,17 @@ Use the analyze_sprite script for sprite sheets:
 python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<existing>.png
 ```
 
+**Standard animation row layout** (for entity/player sprite sheets):
+
+| Row | Animation    | Notes                           |
+|-----|-------------|----------------------------------|
+| 0   | Idle        | 1-4 frames, subtle breathing    |
+| 1   | Walk / Run  | 6-8 frames, looping             |
+| 2   | Jump (up)   | 2-4 frames, one-shot            |
+| 3   | Fall / Land | 2-4 frames                      |
+| 4   | Attack      | 4-8 frames, one-shot            |
+| 5   | Death / Hurt| 4-6 frames, one-shot            |
+
 ### Step 3: Design the new asset
 Create the new PNG that:
 - **Matches the exact dimensions** of its category peers (same width × height)
