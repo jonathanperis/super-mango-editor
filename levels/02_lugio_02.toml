@@ -19,6 +19,20 @@ initial_hearts = 3
 initial_lives = 3
 score_per_life = 1000
 coin_score = 100
+
+[physics]
+walk_max_speed       = -1.0
+run_max_speed        = -1.0
+walk_ground_accel    = -1.0
+run_ground_accel     = -1.0
+ground_friction      = -1.0
+ground_counter_accel = -1.0
+air_accel_walk       = -1.0
+air_accel_run        = -1.0
+air_friction         = -1.0
+cam_lookahead_vx_factor = -1.0
+cam_lookahead_max    = -1.0
+
 floor_gaps = [0, 320, 680, 1040, 1400, 1800, 2200, 2600, 3000, 3400, 3800, 4200]
 
 [[rails]]

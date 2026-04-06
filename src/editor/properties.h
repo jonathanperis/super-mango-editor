@@ -52,7 +52,17 @@ void properties_render(EditorState *es, int start_y, int available_h);
  * Rendered as the topmost section of the right panel so level-wide settings
  * are always accessible regardless of entity selection.
  *
- * start_y     : top edge of the section in window pixels.
- * available_h : total height available for this section.
+ * start_y        : top edge of the section in window pixels.
+ * available_h    : visible height allocated for this section (capped by caller).
+ * total_content_h: uncapped full height of all content; used to clamp scroll.
  */
-void level_config_render(EditorState *es, int start_y, int available_h);
+void level_config_render(EditorState *es, int start_y, int available_h,
+                         int total_content_h);
+
+/*
+ * cfg_scroll — Adjust the Level Config scroll offset by a pixel delta.
+ *
+ * Called from the editor's mouse wheel handler when the cursor is over
+ * the Level Config section.  Clamping happens inside level_config_render.
+ */
+void cfg_scroll(int delta);

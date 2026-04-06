@@ -475,10 +475,11 @@ typedef struct {
     int   score_per_life;   /* score threshold for bonus life (0 = use default 1000) */
     int   coin_score;       /* points per coin (0 = use COIN_SCORE default 100)      */
 
-    /* ---- Player movement physics (0.0 = use engine #define default) --------- *
-     * These fields are applied by level_load after player_init, so they          *
-     * override the constants without touching any .c file.  Set only the values  *
-     * you want to change; leave the rest at 0.0 to keep the engine defaults.     */
+    /* ---- Player movement physics (-1.0 = use engine #define default) --------- *
+     * These fields are applied by level_load after player_init, so they           *
+     * override the constants without touching any .c file.  Set only the values   *
+     * you want to change; leave the rest at -1.0 to keep the engine defaults.     *
+     * 0.0 is a valid override (e.g. zero friction) — do not use it as sentinel.  */
     struct {
         float walk_max_speed;       /* max walking speed (px/s)                        */
         float run_max_speed;        /* max running speed (px/s)                        */
