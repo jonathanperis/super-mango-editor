@@ -745,3 +745,19 @@ void ui_separator(UIState *ui, int x, int y, int w)
      */
     SDL_RenderDrawLine(ui->renderer, x, y, x + w, y);
 }
+
+/* ------------------------------------------------------------------ */
+
+/*
+ * ui_text_width — Return the rendered pixel width of a string in the UI font.
+ *
+ * Uses TTF_SizeText to measure without actually drawing anything.
+ * Returns 0 if the font is NULL or the string is empty.
+ */
+int ui_text_width(UIState *ui, const char *text)
+{
+    if (!ui->font || !text || text[0] == '\0') return 0;
+    int w = 0;
+    TTF_SizeText(ui->font, text, &w, NULL);
+    return w;
+}
