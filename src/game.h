@@ -118,7 +118,7 @@
  * Each frame the camera closes (CAM_SMOOTHING × dt) of the remaining gap to
  * the target. 8.0 gives responsive follow without snapping. Lower = laggier.
  */
-#define CAM_SMOOTHING  8.0f
+#define CAM_SMOOTHING  16.0f
 
 /*
  * CAM_SNAP_THRESHOLD — when the remaining gap between cam_x and its target

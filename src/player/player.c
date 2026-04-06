@@ -128,6 +128,9 @@ void player_init(Player *player, SDL_Renderer *renderer) {
     player->vine_index   = 0;
     player->climb_source = 0;
     player->jump_held   = 0;
+    player->move_dir       = 0;   /* no direction pressed at startup */
+    player->is_running     = 0;   /* not running at startup          */
+    player->air_is_running = 0;   /* starts on the ground, no run momentum */
 
     /* Not hurt at startup; timer counts down to 0 during invincibility */
     player->hurt_timer = 0.0f;
@@ -144,6 +147,57 @@ void player_init(Player *player, SDL_Renderer *renderer) {
  * it tells us which keys are held RIGHT NOW, giving smooth, continuous
  * movement rather than one-shot movement on the moment of press.
  */
+/* ---- Horizontal movement physics -----------------------------------------
+ *
+ * All values are in logical pixels and seconds.  Tweak these to feel the
+ * difference — no recompile of unrelated code needed.
+ *
+ * Walk (default, no run key):
+ *   WALK_MAX_SPEED    — top speed while walking (px/s).
+ *   WALK_GROUND_ACCEL — how quickly the player reaches walk speed on the
+ *                       ground (px/s²). Higher = snappier start.
+ *
+ * Run (Shift on keyboard / Right Bumper on gamepad):
+ *   RUN_MAX_SPEED     — top speed while running (px/s).
+ *   RUN_GROUND_ACCEL  — ramp-up while running on the ground (px/s²).
+ *                       Slightly lower than walk so the player feels the
+ *                       extra weight of running.
+ *
+ * Friction (shared by both walk and run):
+ *   GROUND_FRICTION       — deceleration when no direction key is held (px/s²).
+ *                           High value = short skid; low value = long skid.
+ *   GROUND_COUNTER_ACCEL  — extra deceleration added when the pressed direction
+ *                           is OPPOSITE to current vx (counter-steering on ground).
+ *                           Stacks with the normal accel: player brakes harder
+ *                           when actively fighting their own momentum.
+ *
+ * Air control:
+ *   AIR_ACCEL_WALK    — horizontal acceleration while airborne in walk mode.
+ *                       Deliberately lower than ground to make jumps feel
+ *                       committed rather than infinitely steerable.
+ *   AIR_ACCEL_RUN     — air accel in run mode. Even lower: once airborne
+ *                       with running momentum, direction changes are hard.
+ *   AIR_FRICTION      — passive drag in the air when no key is held (px/s²).
+ *                       Keep low — mid-air braking should feel floaty.
+ *
+ * Animation:
+ *   WALK_ANIM_MIN_VX  — below this speed the idle animation plays instead
+ *                       of walk, so a brief deceleration skid doesn't show
+ *                       the walk cycle for just 1–2 frames.
+ */
+#define WALK_MAX_SPEED    100.0f   /* px/s  */
+#define RUN_MAX_SPEED     250.0f   /* px/s  */
+#define WALK_GROUND_ACCEL 750.0f   /* px/s² */
+#define RUN_GROUND_ACCEL  600.0f   /* px/s² */
+#define GROUND_FRICTION        400.0f   /* px/s² */
+#define GROUND_COUNTER_ACCEL   100.0f   /* px/s² — extra brake when pressing opposite direction */
+#define AIR_ACCEL_WALK    350.0f   /* px/s² */
+#define AIR_ACCEL_RUN     180.0f   /* px/s² */
+#define AIR_FRICTION       80.0f   /* px/s² */
+#define WALK_ANIM_MIN_VX    8.0f   /* px/s  */
+
+/* ---- Gamepad dead zone --------------------------------------------------- */
+
 /*
  * AXIS_DEAD_ZONE — minimum absolute value an analog axis must exceed before
  * it is treated as intentional input.
@@ -340,16 +394,26 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
         }
     } else {
         /*
-         * Normal ground controls — horizontal movement and jump.
-         * Reset vx to 0 each frame so the player stops when keys are released.
+         * Normal ground controls — record direction intent and run state.
+         *
+         * We no longer set vx directly here.  Instead we store move_dir
+         * (-1 / 0 / +1) and is_running, then player_update applies
+         * acceleration and friction to smoothly ramp vx toward the target
+         * speed.  This produces:
+         *   • A ramp-up feel on direction change (not instant top speed).
+         *   • A skid-to-stop on the ground when the key is released.
+         *   • Committed jump arcs: air control is weaker once airborne.
+         *
+         * Run key: Left or Right Shift → higher max speed, less air control.
          */
-        player->vx = 0.0f;
+        player->is_running = (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT]) ? 1 : 0;
+        player->move_dir   = 0;
         if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A]) {
-            player->vx -= player->speed;
+            player->move_dir    = -1;
             player->facing_left = 1;
         }
         if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) {
-            player->vx += player->speed;
+            player->move_dir    = 1;
             player->facing_left = 0;
         }
 
@@ -471,22 +535,31 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
             /*
              * Normal gamepad controls — D-Pad and analog stick for horizontal
              * movement, A / Cross for jump.
+             *
+             * Right Bumper (RB / R1) → run, matching the keyboard Shift key.
+             * D-Pad and left stick both set move_dir; actual vx acceleration
+             * happens in player_update just like the keyboard path.
              */
+
+            /* Right bumper → run mode */
+            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER))
+                player->is_running = 1;
+
             if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_LEFT)) {
-                player->vx -= player->speed;
+                player->move_dir    = -1;
                 player->facing_left = 1;
             }
             if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)) {
-                player->vx += player->speed;
+                player->move_dir    = 1;
                 player->facing_left = 0;
             }
 
             Sint16 axis_x = SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_LEFTX);
             if (axis_x < -AXIS_DEAD_ZONE) {
-                player->vx -= player->speed;
+                player->move_dir    = -1;
                 player->facing_left = 1;
             } else if (axis_x > AXIS_DEAD_ZONE) {
-                player->vx += player->speed;
+                player->move_dir    = 1;
                 player->facing_left = 0;
             }
 
@@ -527,7 +600,12 @@ static void player_animate(Player *player, Uint32 dt_ms) {
          * positive vy means falling down under gravity.
          */
         target = (player->vy < 0.0f) ? ANIM_JUMP : ANIM_FALL;
-    } else if (player->vx != 0.0f) {
+    } else if (player->vx > WALK_ANIM_MIN_VX || player->vx < -WALK_ANIM_MIN_VX) {
+        /*
+         * Only show the walk animation above WALK_ANIM_MIN_VX (8 px/s).
+         * During a ground skid vx tapers to 0; below the threshold it looks
+         * odd to cycle the walk frames for just 1–2 frames, so we show idle.
+         */
         target = ANIM_WALK;
     } else {
         target = ANIM_IDLE;
@@ -673,6 +751,13 @@ void player_update(Player *player, float dt,
 
 
     /*
+     * Capture the ground state from LAST frame before clearing it.
+     * on_ground is about to be reset below; the acceleration block needs the
+     * previous value to decide between ground accel and air accel.
+     */
+    const int was_on_ground = player->on_ground;
+
+    /*
      * Reset on_ground every frame so the player immediately starts falling
      * when they walk off the edge of a platform.  Collision checks below
      * will set it back to 1 if the player is resting on a surface.
@@ -711,6 +796,93 @@ void player_update(Player *player, float dt,
      * player stands still, keeping the character rock-solid on the ground.
      */
     player->vy += GRAVITY * dt;
+
+    /* ---- Horizontal acceleration / friction (momentum system) ------------ */
+    /*
+     * player_handle_input sets move_dir (-1/0/+1) and is_running each frame.
+     * Here we translate those intentions into a smoothly accelerating vx,
+     * rather than snapping instantly to top speed.
+     *
+     * Ground vs air:
+     *   was_on_ground == 1  → use ground accel + strong friction (tight, skiddy).
+     *   was_on_ground == 0  → use air accel   + weak   friction  (committed arc).
+     *
+     * Walk vs run (is_running flag set by Shift / RB):
+     *   Walk: moderate max speed, faster accel  → precise, easy to control.
+     *   Run:  high    max speed, slower accel   → powerful but takes time to ramp;
+     *         air accel is dramatically reduced → mid-air direction changes are hard.
+     */
+    {
+        /*
+         * air_is_running — "snapshot" of is_running taken while on the ground.
+         *
+         * Every frame the player stands on the ground we refresh this value.
+         * The moment they leave (jump or walk off an edge), air_is_running
+         * freezes at whatever it was on the last ground frame.
+         *
+         * This means holding or releasing Shift mid-air has no effect on
+         * physics: the momentum built on the ground is what carries the arc.
+         */
+        if (was_on_ground)
+            player->air_is_running = player->is_running;
+
+        /* Ground physics uses live is_running; air uses the frozen snapshot. */
+        int running = was_on_ground ? player->is_running : player->air_is_running;
+
+        float max_spd = running ? RUN_MAX_SPEED    : WALK_MAX_SPEED;
+        float accel   = was_on_ground
+                          ? (running ? RUN_GROUND_ACCEL : WALK_GROUND_ACCEL)
+                          : (running ? AIR_ACCEL_RUN    : AIR_ACCEL_WALK);
+        float friction = was_on_ground ? GROUND_FRICTION : AIR_FRICTION;
+
+        if (player->move_dir != 0) {
+            /*
+             * Direction key held — accelerate toward the target speed.
+             *
+             * Counter-direction bonus: when the pressed direction is opposite
+             * to current vx (e.g. moving right but pressing left), the player
+             * is actively fighting their own momentum.  On the ground we add
+             * GROUND_COUNTER_ACCEL to brake harder, giving a snappier reversal
+             * feel without reducing the passive skid (GROUND_FRICTION).
+             *
+             * step = how many px/s to add this frame (accel × dt).
+             * We clamp to target_vx so we never overshoot in a single frame.
+             */
+            int counter = was_on_ground &&
+                          ((player->move_dir > 0 && player->vx < 0.0f) ||
+                           (player->move_dir < 0 && player->vx > 0.0f));
+            float effective_accel = accel + (counter ? GROUND_COUNTER_ACCEL : 0.0f);
+
+            float target_vx = (float)player->move_dir * max_spd;
+            float step       = effective_accel * dt;
+            if (player->move_dir > 0) {
+                /* Moving right: increase vx but don't exceed +target_vx */
+                player->vx += step;
+                if (player->vx > target_vx) player->vx = target_vx;
+            } else {
+                /* Moving left: decrease vx but don't go below -target_vx */
+                player->vx -= step;
+                if (player->vx < target_vx) player->vx = target_vx;
+            }
+        } else {
+            /*
+             * No direction key held — friction decelerates vx toward 0.
+             * This is what produces the skid on the ground and the gentle
+             * float-through in the air.
+             *
+             * We apply friction symmetrically so it always moves vx toward 0
+             * regardless of sign, and clamp to 0 to avoid oscillation.
+             */
+            float step = friction * dt;
+            if (player->vx > 0.0f) {
+                player->vx -= step;
+                if (player->vx < 0.0f) player->vx = 0.0f;
+            } else if (player->vx < 0.0f) {
+                player->vx += step;
+                if (player->vx > 0.0f) player->vx = 0.0f;
+            }
+        }
+    }
 
     player->x += player->vx * dt;   /* move horizontally */
     player->y += player->vy * dt;   /* move vertically   */
@@ -1097,6 +1269,9 @@ void player_reset(Player *player) {
     player->vine_index       = 0;
     player->climb_source     = 0;
     player->jump_held        = 0;
+    player->move_dir         = 0;
+    player->is_running       = 0;
+    player->air_is_running   = 0;
     player->hurt_timer       = 0.0f;
 
     player->frame.x = 0;

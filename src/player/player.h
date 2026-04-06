@@ -53,6 +53,10 @@ typedef struct {
     int       vine_index;       /* index into the climbable array being climbed   */
     int       climb_source;     /* 0 = vine, 1 = ladder, 2 = rope                */
     int       jump_held;         /* 1 = jump key still held from last jump; prevents re-jump */
+    int       move_dir;          /* input direction this frame: -1 = left, 0 = none, +1 = right */
+    int       is_running;        /* 1 if run key (Shift / RB) is held this frame, 0 = walking  */
+    int       air_is_running;    /* run state captured when the player last left the ground;
+                                  * governs air accel so mid-air Shift changes have no effect   */
     float     hurt_timer;        /* seconds remaining of invincibility blink; 0 = normal */
     float     spawn_x;          /* level-defined spawn x (platform top-left)           */
     float     spawn_y;          /* level-defined spawn y (platform top; adjusted by -h + FLOOR_SINK) */
