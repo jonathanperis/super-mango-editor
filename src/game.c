@@ -1718,17 +1718,32 @@ static void game_loop_frame(void *arg) {
 
         /* ---- Camera update --------------------------------------- */
         /*
-         * The camera tries to keep the player centred on screen, offset by a
-         * directional lookahead that reveals more terrain ahead of the player.
+         * Velocity-driven lookahead: the camera shifts ahead of the player
+         * proportionally to their current horizontal velocity (vx).
          *
-         * target_x = player_center_in_world - half_screen + lookahead
+         *   lookahead = vx × CAM_LOOKAHEAD_VX_FACTOR
          *
-         * lookahead shifts the viewport in the direction the player faces:
-         *   facing right (+) → window peeks further right
-         *   facing left  (−) → window peeks further left
+         * This means:
+         *   vx = 0  → lookahead = 0  → player perfectly centred.
+         *   vx = max run speed       → lookahead ≈ CAM_LOOKAHEAD_MAX,
+         *                              revealing more terrain ahead.
+         *   reversing direction      → lookahead crosses 0 and builds in the
+         *                              new direction as speed increases again.
+         *
+         * CAM_LOOKAHEAD_MAX caps the offset so it never grows unboundedly.
          */
-        float lookahead = gs->player.facing_left ? -(float)CAM_LOOKAHEAD
-                                                 :  (float)CAM_LOOKAHEAD;
+        /* Use level-defined camera params if set, otherwise fall back to macros. */
+        const LevelDef *cam_def = (const LevelDef *)gs->current_level;
+        float cam_vx_factor = (cam_def && cam_def->physics.cam_lookahead_vx_factor != 0.0f)
+                                ? cam_def->physics.cam_lookahead_vx_factor
+                                : CAM_LOOKAHEAD_VX_FACTOR;
+        float cam_max = (cam_def && cam_def->physics.cam_lookahead_max != 0.0f)
+                          ? cam_def->physics.cam_lookahead_max
+                          : CAM_LOOKAHEAD_MAX;
+
+        float lookahead = gs->player.vx * cam_vx_factor;
+        if (lookahead >  cam_max) lookahead =  cam_max;
+        if (lookahead < -cam_max) lookahead = -cam_max;
 
         float cam_target = (gs->player.x + gs->player.w * 0.5f)
                            - (GAME_W * 0.5f)

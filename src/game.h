@@ -107,18 +107,28 @@
 #define MAX_FLOOR_GAPS      16
 
 /*
- * CAM_LOOKAHEAD — extra pixels the camera shifts in the direction the player
- * faces, revealing more terrain ahead before the player reaches the edge.
- * Increase this value for more forward visibility; set to 0 to disable.
+ * CAM_LOOKAHEAD_VX_FACTOR — how many pixels of lookahead per px/s of player
+ * horizontal velocity.  The lookahead scales continuously with vx: at rest
+ * it is exactly 0 (player centred), at full run speed it peaks near
+ * CAM_LOOKAHEAD_MAX.  The camera therefore reveals more terrain the faster
+ * the player is moving, and smoothly recentres when they stop.
+ *
+ * Example: factor 0.20 × 220 px/s (run max) = 44 px of lookahead.
  */
-#define CAM_LOOKAHEAD  40
+#define CAM_LOOKAHEAD_VX_FACTOR  0.20f
+
+/*
+ * CAM_LOOKAHEAD_MAX — hard cap (pixels) on the lookahead in either direction.
+ * Prevents the offset from growing excessively if vx ever exceeds normal max.
+ */
+#define CAM_LOOKAHEAD_MAX  50.0f
 
 /*
  * CAM_SMOOTHING — lerp speed factor (dimensionless, applied per second).
  * Each frame the camera closes (CAM_SMOOTHING × dt) of the remaining gap to
  * the target. 8.0 gives responsive follow without snapping. Lower = laggier.
  */
-#define CAM_SMOOTHING  16.0f
+#define CAM_SMOOTHING  8.0f
 
 /*
  * CAM_SNAP_THRESHOLD — when the remaining gap between cam_x and its target

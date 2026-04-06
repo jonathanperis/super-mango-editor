@@ -474,6 +474,25 @@ typedef struct {
     int   initial_lives;    /* starting extra lives (0 = use DEFAULT_LIVES default) */
     int   score_per_life;   /* score threshold for bonus life (0 = use default 1000) */
     int   coin_score;       /* points per coin (0 = use COIN_SCORE default 100)      */
+
+    /* ---- Player movement physics (0.0 = use engine #define default) --------- *
+     * These fields are applied by level_load after player_init, so they          *
+     * override the constants without touching any .c file.  Set only the values  *
+     * you want to change; leave the rest at 0.0 to keep the engine defaults.     */
+    struct {
+        float walk_max_speed;       /* max walking speed (px/s)                        */
+        float run_max_speed;        /* max running speed (px/s)                        */
+        float walk_ground_accel;    /* ground accel while walking (px/s²)              */
+        float run_ground_accel;     /* ground accel while running (px/s²)              */
+        float ground_friction;      /* brake when no key held on ground (px/s²)        */
+        float ground_counter_accel; /* extra brake when pressing opposite dir (px/s²)  */
+        float air_accel_walk;       /* air accel in walk arc (px/s²)                   */
+        float air_accel_run;        /* air accel in run arc (less control) (px/s²)     */
+        float air_friction;         /* passive drag in air when no key held (px/s²)    */
+        /* Camera lookahead */
+        float cam_lookahead_vx_factor; /* px of lookahead per px/s of velocity         */
+        float cam_lookahead_max;       /* maximum lookahead offset in pixels            */
+    } physics;
 } LevelDef;
 
 /* ------------------------------------------------------------------ */

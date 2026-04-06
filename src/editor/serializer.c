@@ -238,6 +238,26 @@ int level_save_toml(const LevelDef *def, const char *path) {
     fprintf(fp, "score_per_life = %d\n", def->score_per_life);
     fprintf(fp, "coin_score = %d\n", def->coin_score);
 
+    /* ---- Player movement physics ---------------------------------- */
+    /*
+     * Always written as a [physics] table so the level file documents the
+     * current values.  The engine treats 0.0 as "use the #define default",
+     * so leaving a field at 0.0 is harmless — it just means "engine default".
+     */
+    fprintf(fp, "\n[physics]\n");
+    fprintf(fp, "walk_max_speed       = %s\n", fmt_float(def->physics.walk_max_speed));
+    fprintf(fp, "run_max_speed        = %s\n", fmt_float(def->physics.run_max_speed));
+    fprintf(fp, "walk_ground_accel    = %s\n", fmt_float(def->physics.walk_ground_accel));
+    fprintf(fp, "run_ground_accel     = %s\n", fmt_float(def->physics.run_ground_accel));
+    fprintf(fp, "ground_friction      = %s\n", fmt_float(def->physics.ground_friction));
+    fprintf(fp, "ground_counter_accel = %s\n", fmt_float(def->physics.ground_counter_accel));
+    fprintf(fp, "air_accel_walk       = %s\n", fmt_float(def->physics.air_accel_walk));
+    fprintf(fp, "air_accel_run        = %s\n", fmt_float(def->physics.air_accel_run));
+    fprintf(fp, "air_friction         = %s\n", fmt_float(def->physics.air_friction));
+    fprintf(fp, "cam_lookahead_vx_factor = %s\n", fmt_float(def->physics.cam_lookahead_vx_factor));
+    fprintf(fp, "cam_lookahead_max    = %s\n", fmt_float(def->physics.cam_lookahead_max));
+    fprintf(fp, "\n");
+
     /* ---- Floor gaps (plain integer array) ------------------------- */
 
     if (def->floor_gap_count > 0) {
@@ -1043,6 +1063,24 @@ int level_load_toml(const char *path, LevelDef *def) {
     def->initial_lives  = get_int(top, "initial_lives", 0);
     def->score_per_life = get_int(top, "score_per_life", 0);
     def->coin_score     = get_int(top, "coin_score", 0);
+
+    /* Player movement physics — [physics] sub-table; 0.0 = use engine default */
+    {
+        toml_datum_t ph = toml_get(top, "physics");
+        if (ph.type == TOML_TABLE) {
+            def->physics.walk_max_speed          = get_float(ph, "walk_max_speed",          0.0f);
+            def->physics.run_max_speed           = get_float(ph, "run_max_speed",           0.0f);
+            def->physics.walk_ground_accel       = get_float(ph, "walk_ground_accel",       0.0f);
+            def->physics.run_ground_accel        = get_float(ph, "run_ground_accel",        0.0f);
+            def->physics.ground_friction         = get_float(ph, "ground_friction",         0.0f);
+            def->physics.ground_counter_accel    = get_float(ph, "ground_counter_accel",    0.0f);
+            def->physics.air_accel_walk          = get_float(ph, "air_accel_walk",          0.0f);
+            def->physics.air_accel_run           = get_float(ph, "air_accel_run",           0.0f);
+            def->physics.air_friction            = get_float(ph, "air_friction",            0.0f);
+            def->physics.cam_lookahead_vx_factor = get_float(ph, "cam_lookahead_vx_factor", 0.0f);
+            def->physics.cam_lookahead_max       = get_float(ph, "cam_lookahead_max",       0.0f);
+        }
+    }
 
     /*
      * toml_free — release all memory allocated by toml_parse_file_ex.
