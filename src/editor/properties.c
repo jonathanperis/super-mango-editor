@@ -53,10 +53,29 @@
 #define CONTENT_X  (PROP_X + 8)
 #define FIELD_X    (CONTENT_X + LABEL_W)
 
-/* Background/foreground/fog subsection collapse state — accessed by editor.c for layout */
-int g_plx_open = 0;
-int g_fg_open = 0;
-int g_fog_open = 0;
+/* Collapsible subsection open states — accessed by editor.c for config_h computation */
+int g_plx_open  = 0;
+int g_fg_open   = 0;
+int g_fog_open  = 0;
+int g_phys_open = 0;
+
+/*
+ * cfg_scroll_y — vertical scroll offset (px) for the Level Config content.
+ *
+ * When the config panel has more content than fits in the visible area,
+ * scrolling shifts content upward.  Clamped to [0, max] in
+ * level_config_render each frame.
+ */
+static int cfg_scroll_y = 0;
+
+/*
+ * cfg_scroll — Adjust the Level Config scroll offset by a pixel delta.
+ * Called from editor.c's mouse wheel handler.
+ */
+void cfg_scroll(int delta) {
+    cfg_scroll_y += delta;
+    if (cfg_scroll_y < 0) cfg_scroll_y = 0;
+}
 
 /* ------------------------------------------------------------------ */
 /* Human-readable entity type names                                    */
@@ -177,15 +196,19 @@ void properties_render(EditorState *es, int start_y, int available_h)
     }
 
     /* ---- Collapsible header ----------------------------------------- */
+    /*
+     * The expand/collapse symbol (">" / "v") is drawn in UI_ACCENT so it
+     * stands out from the label text and clearly signals the panel state.
+     * The label text uses UI_ACCENT at rest and UI_TEXT when hovered, to
+     * match the existing header style.
+     */
     char header[64];
     if (es->selection.type == ENT_PLAYER_SPAWN ||
         es->selection.type == ENT_LAST_STAR) {
-        snprintf(header, sizeof(header), "%s %s",
-                 es->panel_open ? "v" : ">",
+        snprintf(header, sizeof(header), " %s",
                  entity_type_names[es->selection.type]);
     } else {
-        snprintf(header, sizeof(header), "%s %s #%d",
-                 es->panel_open ? "v" : ">",
+        snprintf(header, sizeof(header), " %s #%d",
                  entity_type_names[es->selection.type],
                  es->selection.index);
     }
@@ -199,7 +222,11 @@ void properties_render(EditorState *es, int start_y, int available_h)
     if (hdr_hovered && es->ui.mouse_clicked)
         es->panel_open = !es->panel_open;
 
-    ui_label_color(&es->ui, content_x, prop_y + 4, header,
+    /* Symbol in accent colour; label in accent (rest) or white (hovered) */
+    const char *sym = es->panel_open ? "v" : ">";
+    int sym_w = ui_text_width(&es->ui, sym);
+    ui_label_color(&es->ui, content_x, prop_y + 4, sym, UI_ACCENT);
+    ui_label_color(&es->ui, content_x + sym_w, prop_y + 4, header,
                    hdr_hovered ? UI_TEXT : UI_ACCENT);
 
     if (!es->panel_open) return;
@@ -1067,46 +1094,67 @@ void properties_render(EditorState *es, int start_y, int available_h)
  *
  * Widget IDs use the 9000+ range to avoid collisions with entity fields.
  */
-void level_config_render(EditorState *es, int start_y, int available_h) {
-    /*
-     * Use caller-supplied position instead of the old fixed PROP_Y / PROP_H
-     * constants.  The layout orchestrator in editor.c computes where this
-     * section starts and how tall it is based on the sections around it.
-     */
-    int x = PROP_X;
-    int y = start_y;
+void level_config_render(EditorState *es, int start_y, int available_h,
+                         int total_content_h) {
+    int x     = PROP_X;
     int cfg_h = available_h;
 
     /* Panel background */
-    ui_panel(&es->ui, x, y, PROP_W, cfg_h);
+    ui_panel(&es->ui, x, start_y, PROP_W, cfg_h);
 
     /* ---- Fixed title bar (same style as palette header) ------------- */
     {
         SDL_Color title_bg = UI_TITLE_BG;
         SDL_SetRenderDrawColor(es->ui.renderer,
                                title_bg.r, title_bg.g, title_bg.b, title_bg.a);
-        SDL_Rect title_rect = { x, y, PROP_W, ROW_H + 4 };
+        SDL_Rect title_rect = { x, start_y, PROP_W, ROW_H + 4 };
         SDL_RenderFillRect(es->ui.renderer, &title_rect);
     }
 
     /* ---- Collapsible header ---- */
-    char cfg_header[32];
-    snprintf(cfg_header, sizeof(cfg_header), "%s Level Config",
-             es->config_open ? "v" : ">");
-
     int hdr_hovered = (es->ui.mouse_x >= x &&
                        es->ui.mouse_x < x + PROP_W &&
-                       es->ui.mouse_y >= y &&
-                       es->ui.mouse_y < y + ROW_H + 4);
+                       es->ui.mouse_y >= start_y &&
+                       es->ui.mouse_y < start_y + ROW_H + 4);
     if (hdr_hovered && es->ui.mouse_clicked)
         es->config_open = !es->config_open;
 
-    ui_label_color(&es->ui, x + 8, y + 4, cfg_header,
-                   hdr_hovered ? UI_TEXT : UI_ACCENT);
+    {
+        const char *cfg_sym = es->config_open ? "v" : ">";
+        int cfg_sym_w = ui_text_width(&es->ui, cfg_sym);
+        ui_label_color(&es->ui, x + 8, start_y + 4, cfg_sym, UI_ACCENT);
+        ui_label_color(&es->ui, x + 8 + cfg_sym_w, start_y + 4, " Level Config",
+                       hdr_hovered ? UI_TEXT : UI_ACCENT);
+    }
 
     if (!es->config_open) return;
 
-    y += ROW_H + 8;
+    /*
+     * Scroll clamping — clamp cfg_scroll_y so we never scroll past the
+     * last pixel of content.  title_h is the fixed header that never
+     * scrolls; content_visible_h is the drawable area below it.
+     */
+    int title_h          = ROW_H + 4;
+    int content_visible_h = cfg_h - title_h;
+    int content_total_h   = total_content_h - title_h;
+    int max_scroll = content_total_h - content_visible_h;
+    if (max_scroll < 0)        max_scroll = 0;
+    if (cfg_scroll_y > max_scroll) cfg_scroll_y = max_scroll;
+
+    /*
+     * Clip rect — restrict all content drawing to the area below the
+     * title bar.  Anything that would scroll off the top or bottom edge
+     * is invisible.  We clear the clip rect at the end of this function.
+     */
+    int content_top = start_y + title_h;
+    SDL_Rect cfg_clip = { x, content_top, PROP_W, content_visible_h };
+    SDL_RenderSetClipRect(es->ui.renderer, &cfg_clip);
+
+    /*
+     * y — the running vertical cursor for content rendering.
+     * Subtracting cfg_scroll_y shifts content upward as the user scrolls.
+     */
+    int y = content_top + 8 - cfg_scroll_y;
 
     /* ---- Level name ---- */
     ui_label(&es->ui, x + 8, y, "Name:");
@@ -1242,81 +1290,103 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
     {
-        static int g_phys_open = 0;
+        /*
+         * Two-column layout constants for the physics grid.
+         * Each column holds a label and an input field side by side.
+         *
+         * Column 1: label at COL1_L, field at COL1_F (width PHYS_FW = 82)
+         *   → field ends at x+178, leaving 18 px gap before COL2_L.
+         * Column 2: label at COL2_L, field at COL2_F (width PHYS_FW = 82)
+         *   → field ends at x+350, right margin = 26 px.
+         *
+         * The 18 px gap between left field and right label prevents the two
+         * columns from visually merging into a single unreadable block.
+         */
+#define COL1_L  (x +  8)
+#define COL1_F  (x + 96)
+#define COL2_L  (x + 196)
+#define COL2_F  (x + 268)
+#define PHYS_FW  82
+
         int phys_hovered = (es->ui.mouse_x >= x &&
                             es->ui.mouse_x < x + PROP_W &&
                             es->ui.mouse_y >= y &&
                             es->ui.mouse_y < y + 18);
         if (phys_hovered && es->ui.mouse_clicked) g_phys_open = !g_phys_open;
-        char phys_header[64];
-        snprintf(phys_header, sizeof(phys_header), "%s Physics (0 = engine default)",
-                 g_phys_open ? "v" : ">");
-        ui_label(&es->ui, x + 8, y, phys_header);
+        {
+            const char *phys_sym = g_phys_open ? "v" : ">";
+            int phys_sym_w = ui_text_width(&es->ui, phys_sym);
+            ui_label_color(&es->ui, x + 8, y, phys_sym, UI_ACCENT);
+            ui_label_color(&es->ui, x + 8 + phys_sym_w, y,
+                           " Physics (-1 = engine default)",
+                           phys_hovered ? UI_TEXT : UI_TEXT_DIM);
+        }
         y += 20;
 
         if (g_phys_open) {
             /* -- Walk / Run speeds -- */
-            ui_label(&es->ui, x + 8, y, "walk spd:");
-            if (ui_float_field(&es->ui, 9020, x + 80, y, 80, &es->level.physics.walk_max_speed))
+            ui_label(&es->ui, COL1_L, y, "walk spd:");
+            if (ui_float_field(&es->ui, 9020, COL1_F, y, PHYS_FW, &es->level.physics.walk_max_speed))
                 es->modified = 1;
-            ui_label(&es->ui, x + 175, y, "run spd:");
-            if (ui_float_field(&es->ui, 9021, x + 245, y, 80, &es->level.physics.run_max_speed))
+            ui_label(&es->ui, COL2_L, y, "run spd:");
+            if (ui_float_field(&es->ui, 9021, COL2_F, y, PHYS_FW, &es->level.physics.run_max_speed))
                 es->modified = 1;
             y += 22;
 
             /* -- Ground acceleration -- */
-            ui_label(&es->ui, x + 8, y, "walk accel:");
-            if (ui_float_field(&es->ui, 9022, x + 85, y, 75, &es->level.physics.walk_ground_accel))
+            ui_label(&es->ui, COL1_L, y, "walk accel:");
+            if (ui_float_field(&es->ui, 9022, COL1_F, y, PHYS_FW, &es->level.physics.walk_ground_accel))
                 es->modified = 1;
-            ui_label(&es->ui, x + 175, y, "run accel:");
-            if (ui_float_field(&es->ui, 9023, x + 248, y, 75, &es->level.physics.run_ground_accel))
+            ui_label(&es->ui, COL2_L, y, "run accel:");
+            if (ui_float_field(&es->ui, 9023, COL2_F, y, PHYS_FW, &es->level.physics.run_ground_accel))
                 es->modified = 1;
             y += 22;
 
             /* -- Ground friction / counter -- */
-            ui_label(&es->ui, x + 8, y, "friction:");
-            if (ui_float_field(&es->ui, 9024, x + 70, y, 75, &es->level.physics.ground_friction))
+            ui_label(&es->ui, COL1_L, y, "friction:");
+            if (ui_float_field(&es->ui, 9024, COL1_F, y, PHYS_FW, &es->level.physics.ground_friction))
                 es->modified = 1;
-            ui_label(&es->ui, x + 160, y, "counter:");
-            if (ui_float_field(&es->ui, 9025, x + 225, y, 75, &es->level.physics.ground_counter_accel))
+            ui_label(&es->ui, COL2_L, y, "counter:");
+            if (ui_float_field(&es->ui, 9025, COL2_F, y, PHYS_FW, &es->level.physics.ground_counter_accel))
                 es->modified = 1;
             y += 22;
 
             /* -- Air acceleration -- */
-            ui_label(&es->ui, x + 8, y, "air walk:");
-            if (ui_float_field(&es->ui, 9026, x + 70, y, 75, &es->level.physics.air_accel_walk))
+            ui_label(&es->ui, COL1_L, y, "air walk:");
+            if (ui_float_field(&es->ui, 9026, COL1_F, y, PHYS_FW, &es->level.physics.air_accel_walk))
                 es->modified = 1;
-            ui_label(&es->ui, x + 160, y, "air run:");
-            if (ui_float_field(&es->ui, 9027, x + 225, y, 75, &es->level.physics.air_accel_run))
+            ui_label(&es->ui, COL2_L, y, "air run:");
+            if (ui_float_field(&es->ui, 9027, COL2_F, y, PHYS_FW, &es->level.physics.air_accel_run))
                 es->modified = 1;
             y += 22;
 
             /* -- Air friction -- */
-            ui_label(&es->ui, x + 8, y, "air fric:");
-            if (ui_float_field(&es->ui, 9028, x + 70, y, 75, &es->level.physics.air_friction))
+            ui_label(&es->ui, COL1_L, y, "air fric:");
+            if (ui_float_field(&es->ui, 9028, COL1_F, y, PHYS_FW, &es->level.physics.air_friction))
                 es->modified = 1;
             y += 22;
 
             /* -- Camera lookahead -- */
-            ui_label(&es->ui, x + 8, y, "cam vx factor:");
-            if (ui_float_field(&es->ui, 9029, x + 105, y, 65, &es->level.physics.cam_lookahead_vx_factor))
+            ui_label(&es->ui, COL1_L, y, "cam vx:");
+            if (ui_float_field(&es->ui, 9029, COL1_F, y, PHYS_FW, &es->level.physics.cam_lookahead_vx_factor))
                 es->modified = 1;
-            ui_label(&es->ui, x + 185, y, "cam max:");
-            if (ui_float_field(&es->ui, 9030, x + 248, y, 75, &es->level.physics.cam_lookahead_max))
+            ui_label(&es->ui, COL2_L, y, "cam max:");
+            if (ui_float_field(&es->ui, 9030, COL2_F, y, PHYS_FW, &es->level.physics.cam_lookahead_max))
                 es->modified = 1;
             y += 22;
         }
+
+#undef COL1_L
+#undef COL1_F
+#undef COL2_L
+#undef COL2_F
+#undef PHYS_FW
     }
 
     /* ---- Background Layers — collapsible subsection ---- */
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
     {
-        char plx_header[64];
-        snprintf(plx_header, sizeof(plx_header), "%s Background Layers (%d)",
-                 g_plx_open ? "v" : ">",
-                 es->level.background_layer_count);
-
         int plx_hovered = (es->ui.mouse_x >= x &&
                            es->ui.mouse_x < x + PROP_W &&
                            es->ui.mouse_y >= y &&
@@ -1324,7 +1394,13 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
         if (plx_hovered && es->ui.mouse_clicked)
             g_plx_open = !g_plx_open;
 
-        ui_label_color(&es->ui, x + 8, y, plx_header,
+        char plx_label[48];
+        snprintf(plx_label, sizeof(plx_label), " Background Layers (%d)",
+                 es->level.background_layer_count);
+        const char *plx_sym = g_plx_open ? "v" : ">";
+        int plx_sym_w = ui_text_width(&es->ui, plx_sym);
+        ui_label_color(&es->ui, x + 8, y, plx_sym, UI_ACCENT);
+        ui_label_color(&es->ui, x + 8 + plx_sym_w, y, plx_label,
                        plx_hovered ? UI_TEXT : UI_TEXT_DIM);
         y += 18;
 
@@ -1412,12 +1488,6 @@ bg_done:
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
     {
-        extern int g_g_fg_open;
-        char fg_header[64];
-        snprintf(fg_header, sizeof(fg_header), "%s Foreground Layers (%d)",
-                 g_fg_open ? "v" : ">",
-                 es->level.foreground_layer_count);
-
         int fg_hovered = (es->ui.mouse_x >= x &&
                           es->ui.mouse_x < x + PROP_W &&
                           es->ui.mouse_y >= y &&
@@ -1425,7 +1495,13 @@ bg_done:
         if (fg_hovered && es->ui.mouse_clicked)
             g_fg_open = !g_fg_open;
 
-        ui_label_color(&es->ui, x + 8, y, fg_header,
+        char fg_label[48];
+        snprintf(fg_label, sizeof(fg_label), " Foreground Layers (%d)",
+                 es->level.foreground_layer_count);
+        const char *fg_sym = g_fg_open ? "v" : ">";
+        int fg_sym_w = ui_text_width(&es->ui, fg_sym);
+        ui_label_color(&es->ui, x + 8, y, fg_sym, UI_ACCENT);
+        ui_label_color(&es->ui, x + 8 + fg_sym_w, y, fg_label,
                        fg_hovered ? UI_TEXT : UI_TEXT_DIM);
         y += 18;
 
@@ -1496,11 +1572,6 @@ fg_done:
 
     /* ---- Fog Layers subsection -------------------------------------- */
 
-    char fog_header[64];
-    snprintf(fog_header, sizeof(fog_header), "%s Fog Layers (%d)",
-             g_fog_open ? "v" : ">",
-             es->level.fog_layer_count);
-
     int fog_hovered = (es->ui.mouse_x >= x &&
                        es->ui.mouse_x <= x + 200 &&
                        es->ui.mouse_y >= y &&
@@ -1508,8 +1579,16 @@ fg_done:
     if (fog_hovered && es->ui.mouse_clicked)
         g_fog_open = !g_fog_open;
 
-    ui_label_color(&es->ui, x + 8, y, fog_header,
-                   fog_hovered ? UI_TEXT : UI_TEXT_DIM);
+    {
+        char fog_label[48];
+        snprintf(fog_label, sizeof(fog_label), " Fog Layers (%d)",
+                 es->level.fog_layer_count);
+        const char *fog_sym = g_fog_open ? "v" : ">";
+        int fog_sym_w = ui_text_width(&es->ui, fog_sym);
+        ui_label_color(&es->ui, x + 8, y, fog_sym, UI_ACCENT);
+        ui_label_color(&es->ui, x + 8 + fog_sym_w, y, fog_label,
+                       fog_hovered ? UI_TEXT : UI_TEXT_DIM);
+    }
     y += 18;
 
     if (!g_fog_open) goto fog_done;
@@ -1576,5 +1655,5 @@ fg_done:
     }
 
 fog_done:
-    (void)0;
+    SDL_RenderSetClipRect(es->ui.renderer, NULL);
 }

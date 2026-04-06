@@ -214,3 +214,12 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
  * Draws a 1-pixel-high line in TEXT_DIM colour from (x, y) to (x+w, y).
  */
 void ui_separator(UIState *ui, int x, int y, int w);
+
+/*
+ * ui_text_width — Return the rendered pixel width of a string in the UI font.
+ *
+ * Uses TTF_SizeText to measure the text as it would appear on screen.
+ * Returns 0 if the font is NULL or the string is empty.
+ * Useful for offsetting a second label that immediately follows the first.
+ */
+int ui_text_width(UIState *ui, const char *text);

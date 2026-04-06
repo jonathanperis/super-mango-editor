@@ -461,9 +461,9 @@ void editor_loop(EditorState *es) {
                 int right_bottom = EDITOR_H - STATUS_H;
                 int section_hdr  = 28;  /* matches palette TITLE_H */
 
-                /* Section 1: Level Config — height fits all content exactly */
+                /* Section 1: Level Config */
                 int config_y = right_top;
-                int config_h;
+                int config_h_total; /* uncapped full content height */
                 if (es->config_open) {
                     /* Base: header(28) + margin(8) + name(24) + screens(24)
                      * + music(24+22+24) + floor(30)
@@ -473,17 +473,30 @@ void editor_loop(EditorState *es) {
                     extern int g_plx_open;
                     extern int g_fg_open;
                     extern int g_fog_open;
-                    config_h = 28 + 8 + 24 + 24 + 24 + 22 + 24 + 30
-                             + 6 + 22 + 24 + 24 + 24 + 24 + 10;
+                    extern int g_phys_open;
+                    config_h_total = 28 + 8 + 24 + 24 + 24 + 22 + 24 + 30
+                                   + 6 + 22 + 24 + 24 + 24 + 24 + 10;
                     if (g_plx_open)
-                        config_h += es->level.background_layer_count * 20 + 24;
+                        config_h_total += es->level.background_layer_count * 20 + 24;
                     if (g_fg_open)
-                        config_h += es->level.foreground_layer_count * 20 + 24;
+                        config_h_total += es->level.foreground_layer_count * 20 + 24;
                     if (g_fog_open)
-                        config_h += es->level.fog_layer_count * 20 + 24;
+                        config_h_total += es->level.fog_layer_count * 20 + 24;
+                    if (g_phys_open)
+                        config_h_total += 6 * 22;
                 } else {
-                    config_h = section_hdr;
+                    config_h_total = section_hdr;
                 }
+
+                /*
+                 * Cap the config panel so it never consumes more than half
+                 * the right column, leaving room for the palette.  When
+                 * content exceeds the cap, level_config_render clips and
+                 * scrolls it.
+                 */
+                int config_h_max = (right_bottom - right_top) / 2;
+                int config_h = config_h_total < config_h_max
+                             ? config_h_total : config_h_max;
 
                 /* Section 3 height (computed early so palette knows remaining space) */
                 int props_h = 0;
@@ -506,7 +519,7 @@ void editor_loop(EditorState *es) {
                 int props_y = palette_y + palette_h;
 
                 /* Render in top-to-bottom order */
-                level_config_render(es, config_y, config_h);
+                level_config_render(es, config_y, config_h, config_h_total);
                 palette_render(es, palette_y, palette_h);
                 if (es->selection.index >= 0) {
                     properties_render(es, props_y, props_h);
@@ -955,30 +968,34 @@ static void handle_event(EditorState *es, SDL_Event *event) {
         SDL_GetMouseState(&mx, &my);
 
         /*
-         * Right panel scroll — route wheel events to the palette section.
+         * Right panel scroll — route to cfg_scroll or palette_scroll based
+         * on which section the cursor is over.
          *
-         * The right panel has three stacked sections: Level Config, Palette,
-         * and Properties.  Only the Palette section scrolls.  We compute
-         * its Y range using the same logic as the render layout so the
-         * hit test matches what the user sees.
+         * The config section occupies [TOOLBAR_H, TOOLBAR_H + config_h).
+         * Everything below it (palette + properties) scrolls the palette.
+         * We recompute config_h here using the same logic as the render
+         * path so the hit-test matches what the user sees.
          */
         if (mx >= CANVAS_W && my > TOOLBAR_H && my < EDITOR_H - STATUS_H) {
-            int section_hdr = 28;
-            int cfg_h  = es->config_open ? 220 : section_hdr;
-            int pal_top = TOOLBAR_H + cfg_h;
-
-            int ph = 0;
-            if (es->selection.index >= 0)
-                ph = es->panel_open ? 200 : section_hdr;
-            int pal_h = (EDITOR_H - STATUS_H) - pal_top - ph;
-            if (pal_h < section_hdr) pal_h = section_hdr;
-            int pal_bot = pal_top + pal_h;
-
-            if (my >= pal_top && my < pal_bot) {
-                /* Cursor is over the palette — scroll it */
-                palette_scroll(-event->wheel.y * 20);
+            int sc_section_hdr = 28;
+            int sc_cfg_total   = sc_section_hdr;
+            if (es->config_open) {
+                extern int g_plx_open, g_fg_open, g_fog_open, g_phys_open;
+                sc_cfg_total = 28 + 8 + 24 + 24 + 24 + 22 + 24 + 30
+                             + 6 + 22 + 24 + 24 + 24 + 24 + 10;
+                if (g_plx_open) sc_cfg_total += es->level.background_layer_count * 20 + 24;
+                if (g_fg_open)  sc_cfg_total += es->level.foreground_layer_count  * 20 + 24;
+                if (g_fog_open) sc_cfg_total += es->level.fog_layer_count         * 20 + 24;
+                if (g_phys_open) sc_cfg_total += 6 * 22;
             }
-            /* Level Config and Properties do not scroll */
+            int sc_cfg_max = (EDITOR_H - STATUS_H - TOOLBAR_H) / 2;
+            int sc_cfg_h   = sc_cfg_total < sc_cfg_max ? sc_cfg_total : sc_cfg_max;
+            int sc_cfg_bot = TOOLBAR_H + sc_cfg_h;
+
+            if (my < sc_cfg_bot)
+                cfg_scroll(-event->wheel.y * 20);
+            else
+                palette_scroll(-event->wheel.y * 20);
             break;
         }
 

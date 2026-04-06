@@ -349,10 +349,11 @@ void palette_render(EditorState *es, int start_y, int available_h)
         if (hdr_hovered && ui->mouse_clicked)
             es->palette_open = !es->palette_open;
 
-        char pal_header[32];
-        snprintf(pal_header, sizeof(pal_header), "%s PALETTE",
-                 es->palette_open ? "v" : ">");
-        ui_label_color(ui, panel_x + PAD_X, panel_y + 6, pal_header,
+        const char *pal_sym = es->palette_open ? "v" : ">";
+        int pal_sym_w = ui_text_width(ui, pal_sym);
+        ui_label_color(ui, panel_x + PAD_X, panel_y + 6, pal_sym, UI_ACCENT);
+        ui_label_color(ui, panel_x + PAD_X + pal_sym_w, panel_y + 6,
+                       " PALETTE",
                        hdr_hovered ? UI_TEXT : UI_TEXT_DIM);
     }
 
@@ -409,14 +410,12 @@ void palette_render(EditorState *es, int start_y, int available_h)
             }
 
             /* Draw expand/collapse indicator and category name */
-            char header_label[64];
-            snprintf(header_label, sizeof(header_label), "%s %s",
-                     category_open[cat] ? "v" : ">",
-                     category_names[cat]);
-            ui_label_color(ui,
-                           panel_x + PAD_X,
-                           cursor_y + 7,
-                           header_label,
+            const char *cat_sym = category_open[cat] ? "v" : ">";
+            int cat_sym_w = ui_text_width(ui, cat_sym);
+            ui_label_color(ui, panel_x + PAD_X, cursor_y + 7,
+                           cat_sym, UI_ACCENT);
+            ui_label_color(ui, panel_x + PAD_X + cat_sym_w, cursor_y + 7,
+                           category_names[cat],
                            hdr_hovered ? UI_TEXT : UI_TEXT_DIM);
 
             ui_separator(ui,
