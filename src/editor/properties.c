@@ -1238,6 +1238,76 @@ void level_config_render(EditorState *es, int start_y, int available_h) {
         es->modified = 1;
     y += 24;
 
+    /* ---- Movement Physics — collapsible subsection ---- */
+    ui_separator(&es->ui, x + 4, y, PROP_W - 8);
+    y += 6;
+    {
+        static int g_phys_open = 0;
+        int phys_hovered = (es->ui.mouse_x >= x &&
+                            es->ui.mouse_x < x + PROP_W &&
+                            es->ui.mouse_y >= y &&
+                            es->ui.mouse_y < y + 18);
+        if (phys_hovered && es->ui.mouse_clicked) g_phys_open = !g_phys_open;
+        char phys_header[64];
+        snprintf(phys_header, sizeof(phys_header), "%s Physics (0 = engine default)",
+                 g_phys_open ? "v" : ">");
+        ui_label(&es->ui, x + 8, y, phys_header);
+        y += 20;
+
+        if (g_phys_open) {
+            /* -- Walk / Run speeds -- */
+            ui_label(&es->ui, x + 8, y, "walk spd:");
+            if (ui_float_field(&es->ui, 9020, x + 80, y, 80, &es->level.physics.walk_max_speed))
+                es->modified = 1;
+            ui_label(&es->ui, x + 175, y, "run spd:");
+            if (ui_float_field(&es->ui, 9021, x + 245, y, 80, &es->level.physics.run_max_speed))
+                es->modified = 1;
+            y += 22;
+
+            /* -- Ground acceleration -- */
+            ui_label(&es->ui, x + 8, y, "walk accel:");
+            if (ui_float_field(&es->ui, 9022, x + 85, y, 75, &es->level.physics.walk_ground_accel))
+                es->modified = 1;
+            ui_label(&es->ui, x + 175, y, "run accel:");
+            if (ui_float_field(&es->ui, 9023, x + 248, y, 75, &es->level.physics.run_ground_accel))
+                es->modified = 1;
+            y += 22;
+
+            /* -- Ground friction / counter -- */
+            ui_label(&es->ui, x + 8, y, "friction:");
+            if (ui_float_field(&es->ui, 9024, x + 70, y, 75, &es->level.physics.ground_friction))
+                es->modified = 1;
+            ui_label(&es->ui, x + 160, y, "counter:");
+            if (ui_float_field(&es->ui, 9025, x + 225, y, 75, &es->level.physics.ground_counter_accel))
+                es->modified = 1;
+            y += 22;
+
+            /* -- Air acceleration -- */
+            ui_label(&es->ui, x + 8, y, "air walk:");
+            if (ui_float_field(&es->ui, 9026, x + 70, y, 75, &es->level.physics.air_accel_walk))
+                es->modified = 1;
+            ui_label(&es->ui, x + 160, y, "air run:");
+            if (ui_float_field(&es->ui, 9027, x + 225, y, 75, &es->level.physics.air_accel_run))
+                es->modified = 1;
+            y += 22;
+
+            /* -- Air friction -- */
+            ui_label(&es->ui, x + 8, y, "air fric:");
+            if (ui_float_field(&es->ui, 9028, x + 70, y, 75, &es->level.physics.air_friction))
+                es->modified = 1;
+            y += 22;
+
+            /* -- Camera lookahead -- */
+            ui_label(&es->ui, x + 8, y, "cam vx factor:");
+            if (ui_float_field(&es->ui, 9029, x + 105, y, 65, &es->level.physics.cam_lookahead_vx_factor))
+                es->modified = 1;
+            ui_label(&es->ui, x + 185, y, "cam max:");
+            if (ui_float_field(&es->ui, 9030, x + 248, y, 75, &es->level.physics.cam_lookahead_max))
+                es->modified = 1;
+            y += 22;
+        }
+    }
+
     /* ---- Background Layers — collapsible subsection ---- */
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;

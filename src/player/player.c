@@ -68,6 +68,44 @@ static const int ANIM_FRAME_COUNT[5] = { 4,   4,   2,   1,   2   };
 static const int ANIM_FRAME_MS[5]    = { 150, 100, 150, 200, 100 };
 static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
+/* ---- Horizontal movement physics (default values) ------------------------
+ *
+ * All values are in logical pixels and seconds.  These are the engine
+ * defaults — each can be overridden per-level via LevelDef.physics in the
+ * .toml file (set to 0 there to keep the default).
+ *
+ * Walk (default, no run key):
+ *   WALK_MAX_SPEED    — top speed while walking (px/s).
+ *   WALK_GROUND_ACCEL — how quickly the player reaches walk speed on the
+ *                       ground (px/s²). Higher = snappier start.
+ *
+ * Run (Shift on keyboard / Right Bumper on gamepad):
+ *   RUN_MAX_SPEED     — top speed while running (px/s).
+ *   RUN_GROUND_ACCEL  — ramp-up while running on the ground (px/s²).
+ *
+ * Friction (shared by both walk and run):
+ *   GROUND_FRICTION       — deceleration when no key held on ground (px/s²).
+ *   GROUND_COUNTER_ACCEL  — extra brake when pressing opposite direction (px/s²).
+ *
+ * Air control:
+ *   AIR_ACCEL_WALK    — air accel in walk arc (px/s²).
+ *   AIR_ACCEL_RUN     — air accel in run arc, less control (px/s²).
+ *   AIR_FRICTION      — passive drag in air when no key held (px/s²).
+ *
+ * Animation:
+ *   WALK_ANIM_MIN_VX  — below this speed show idle, not walk (px/s).
+ */
+#define WALK_MAX_SPEED         100.0f   /* px/s  */
+#define RUN_MAX_SPEED          250.0f   /* px/s  */
+#define WALK_GROUND_ACCEL      750.0f   /* px/s² */
+#define RUN_GROUND_ACCEL       600.0f   /* px/s² */
+#define GROUND_FRICTION        550.0f   /* px/s² */
+#define GROUND_COUNTER_ACCEL   100.0f   /* px/s² */
+#define AIR_ACCEL_WALK         350.0f   /* px/s² */
+#define AIR_ACCEL_RUN          180.0f   /* px/s² */
+#define AIR_FRICTION            80.0f   /* px/s² */
+#define WALK_ANIM_MIN_VX         8.0f   /* px/s  */
+
 void player_init(Player *player, SDL_Renderer *renderer) {
     /*
      * IMG_LoadTexture — decode the PNG sprite sheet and upload it to the GPU.
@@ -132,6 +170,21 @@ void player_init(Player *player, SDL_Renderer *renderer) {
     player->is_running     = 0;   /* not running at startup          */
     player->air_is_running = 0;   /* starts on the ground, no run momentum */
 
+    /*
+     * Physics fields — initialised from the #define defaults above.
+     * level_load may override these after player_init if the LevelDef
+     * specifies non-zero physics values for finetuning per level.
+     */
+    player->walk_max_speed       = WALK_MAX_SPEED;
+    player->run_max_speed        = RUN_MAX_SPEED;
+    player->walk_ground_accel    = WALK_GROUND_ACCEL;
+    player->run_ground_accel     = RUN_GROUND_ACCEL;
+    player->ground_friction      = GROUND_FRICTION;
+    player->ground_counter_accel = GROUND_COUNTER_ACCEL;
+    player->air_accel_walk       = AIR_ACCEL_WALK;
+    player->air_accel_run        = AIR_ACCEL_RUN;
+    player->air_friction         = AIR_FRICTION;
+
     /* Not hurt at startup; timer counts down to 0 during invincibility */
     player->hurt_timer = 0.0f;
 }
@@ -147,54 +200,7 @@ void player_init(Player *player, SDL_Renderer *renderer) {
  * it tells us which keys are held RIGHT NOW, giving smooth, continuous
  * movement rather than one-shot movement on the moment of press.
  */
-/* ---- Horizontal movement physics -----------------------------------------
- *
- * All values are in logical pixels and seconds.  Tweak these to feel the
- * difference — no recompile of unrelated code needed.
- *
- * Walk (default, no run key):
- *   WALK_MAX_SPEED    — top speed while walking (px/s).
- *   WALK_GROUND_ACCEL — how quickly the player reaches walk speed on the
- *                       ground (px/s²). Higher = snappier start.
- *
- * Run (Shift on keyboard / Right Bumper on gamepad):
- *   RUN_MAX_SPEED     — top speed while running (px/s).
- *   RUN_GROUND_ACCEL  — ramp-up while running on the ground (px/s²).
- *                       Slightly lower than walk so the player feels the
- *                       extra weight of running.
- *
- * Friction (shared by both walk and run):
- *   GROUND_FRICTION       — deceleration when no direction key is held (px/s²).
- *                           High value = short skid; low value = long skid.
- *   GROUND_COUNTER_ACCEL  — extra deceleration added when the pressed direction
- *                           is OPPOSITE to current vx (counter-steering on ground).
- *                           Stacks with the normal accel: player brakes harder
- *                           when actively fighting their own momentum.
- *
- * Air control:
- *   AIR_ACCEL_WALK    — horizontal acceleration while airborne in walk mode.
- *                       Deliberately lower than ground to make jumps feel
- *                       committed rather than infinitely steerable.
- *   AIR_ACCEL_RUN     — air accel in run mode. Even lower: once airborne
- *                       with running momentum, direction changes are hard.
- *   AIR_FRICTION      — passive drag in the air when no key is held (px/s²).
- *                       Keep low — mid-air braking should feel floaty.
- *
- * Animation:
- *   WALK_ANIM_MIN_VX  — below this speed the idle animation plays instead
- *                       of walk, so a brief deceleration skid doesn't show
- *                       the walk cycle for just 1–2 frames.
- */
-#define WALK_MAX_SPEED    100.0f   /* px/s  */
-#define RUN_MAX_SPEED     250.0f   /* px/s  */
-#define WALK_GROUND_ACCEL 750.0f   /* px/s² */
-#define RUN_GROUND_ACCEL  600.0f   /* px/s² */
-#define GROUND_FRICTION        400.0f   /* px/s² */
-#define GROUND_COUNTER_ACCEL   100.0f   /* px/s² — extra brake when pressing opposite direction */
-#define AIR_ACCEL_WALK    350.0f   /* px/s² */
-#define AIR_ACCEL_RUN     180.0f   /* px/s² */
-#define AIR_FRICTION       80.0f   /* px/s² */
-#define WALK_ANIM_MIN_VX    8.0f   /* px/s  */
+/* ---- Gamepad dead zone --------------------------------------------------- */
 
 /* ---- Gamepad dead zone --------------------------------------------------- */
 
@@ -829,11 +835,11 @@ void player_update(Player *player, float dt,
         /* Ground physics uses live is_running; air uses the frozen snapshot. */
         int running = was_on_ground ? player->is_running : player->air_is_running;
 
-        float max_spd = running ? RUN_MAX_SPEED    : WALK_MAX_SPEED;
+        float max_spd = running ? player->run_max_speed    : player->walk_max_speed;
         float accel   = was_on_ground
-                          ? (running ? RUN_GROUND_ACCEL : WALK_GROUND_ACCEL)
-                          : (running ? AIR_ACCEL_RUN    : AIR_ACCEL_WALK);
-        float friction = was_on_ground ? GROUND_FRICTION : AIR_FRICTION;
+                          ? (running ? player->run_ground_accel  : player->walk_ground_accel)
+                          : (running ? player->air_accel_run     : player->air_accel_walk);
+        float friction = was_on_ground ? player->ground_friction : player->air_friction;
 
         if (player->move_dir != 0) {
             /*
@@ -842,8 +848,8 @@ void player_update(Player *player, float dt,
              * Counter-direction bonus: when the pressed direction is opposite
              * to current vx (e.g. moving right but pressing left), the player
              * is actively fighting their own momentum.  On the ground we add
-             * GROUND_COUNTER_ACCEL to brake harder, giving a snappier reversal
-             * feel without reducing the passive skid (GROUND_FRICTION).
+             * ground_counter_accel to brake harder, giving a snappier reversal
+             * feel without reducing the passive skid (ground_friction).
              *
              * step = how many px/s to add this frame (accel × dt).
              * We clamp to target_vx so we never overshoot in a single frame.
@@ -851,7 +857,7 @@ void player_update(Player *player, float dt,
             int counter = was_on_ground &&
                           ((player->move_dir > 0 && player->vx < 0.0f) ||
                            (player->move_dir < 0 && player->vx > 0.0f));
-            float effective_accel = accel + (counter ? GROUND_COUNTER_ACCEL : 0.0f);
+            float effective_accel = accel + (counter ? player->ground_counter_accel : 0.0f);
 
             float target_vx = (float)player->move_dir * max_spd;
             float step       = effective_accel * dt;

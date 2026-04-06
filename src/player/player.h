@@ -57,6 +57,19 @@ typedef struct {
     int       is_running;        /* 1 if run key (Shift / RB) is held this frame, 0 = walking  */
     int       air_is_running;    /* run state captured when the player last left the ground;
                                   * governs air accel so mid-air Shift changes have no effect   */
+
+    /* ---- Horizontal movement physics (tunable per-level via LevelDef) ---- *
+     * Initialised from #define defaults in player_init; overridden by         *
+     * level_load when LevelDef.physics fields are non-zero.                   */
+    float walk_max_speed;      /* max walking speed (px/s)                        */
+    float run_max_speed;       /* max running speed (px/s)                        */
+    float walk_ground_accel;   /* ground acceleration while walking (px/s²)       */
+    float run_ground_accel;    /* ground acceleration while running (px/s²)       */
+    float ground_friction;     /* deceleration when no key held on ground (px/s²) */
+    float ground_counter_accel;/* extra brake when pressing opposite dir (px/s²)  */
+    float air_accel_walk;      /* air acceleration (walk arc) (px/s²)             */
+    float air_accel_run;       /* air acceleration (run arc, less control) (px/s²)*/
+    float air_friction;        /* passive air drag when no key held (px/s²)       */
     float     hurt_timer;        /* seconds remaining of invincibility blink; 0 = normal */
     float     spawn_x;          /* level-defined spawn x (platform top-left)           */
     float     spawn_y;          /* level-defined spawn y (platform top; adjusted by -h + FLOOR_SINK) */
