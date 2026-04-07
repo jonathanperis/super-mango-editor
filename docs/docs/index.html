@@ -435,7 +435,7 @@
 <blockquote>
 <p>2D side-scrolling platformer written in C using SDL2 -- browser-playable via WebAssembly</p>
 </blockquote>
-<p>Super Mango is a 2D platformer built in C11 with SDL2, designed as an educational project with well-commented source code for learning C + SDL2 game development. The game features a multi-screen forest stage with parallax backgrounds, enemies, hazards, collectibles, and delta-time physics, building natively on macOS/Linux/Windows and as WebAssembly for browser play.</p>
+<p>Super Mango is a 2D platformer built in C11 with SDL2, designed as an educational project with well-commented source code for learning C + SDL2 game development. The game features TOML-based levels with configurable multi-screen stages, parallax backgrounds, enemies, hazards, collectibles, and delta-time physics with walk/run acceleration. It includes a standalone visual level editor and builds natively on macOS/Linux/Windows and as WebAssembly for browser play.</p>
 <hr>
 <h2>Quick Links</h2>
 <table>
@@ -481,12 +481,14 @@
 <hr>
 <h2>Key Features</h2>
 <ul>
-<li>2D side-scrolling platformer with a multi-screen forest stage (1600px world)</li>
-<li>32 render layers drawn back-to-front with parallax scrolling background</li>
-<li>Delta-time physics for frame-rate-independent movement at 60 FPS</li>
-<li>Six enemy types, seven hazard types, collectibles, bouncepads, climbable vines/ladders/ropes</li>
+<li>2D side-scrolling platformer with TOML-based levels (dynamic world width via <code>screen_count</code>, default 1600px / 4 screens)</li>
+<li>35 render layers drawn back-to-front with configurable parallax scrolling background</li>
+<li>Delta-time physics with walk/run acceleration, momentum, and friction at 60 FPS</li>
+<li>Six enemy types, seven hazard types, collectibles (coins, 3 star colors, end-of-level star), bouncepads, climbable vines/ladders/ropes</li>
+<li>Standalone visual level editor (canvas, palette, tools, properties, undo, serializer, exporter)</li>
 <li>Start menu, HUD (hearts/lives/score), lives system, debug overlay</li>
-<li>Keyboard and gamepad (hot-plug) controls</li>
+<li>Keyboard and gamepad (lazy-initialized, hot-plug) controls</li>
+<li>Per-level configurable physics, music, floor tilesets, and background layers</li>
 <li>Builds natively on macOS, Linux, Windows; WebAssembly via Emscripten</li>
 </ul>
 <p><strong><a href="https://jonathanperis.github.io/super-mango-editor/">Play in browser →</a></strong></p>
@@ -524,6 +526,10 @@
 <td>44100 Hz, stereo, 16-bit</td>
 </tr>
 <tr>
+<td>Level format</td>
+<td>TOML (via vendored tomlc17 parser)</td>
+</tr>
+<tr>
 <td>Libraries</td>
 <td>SDL2, SDL2_image, SDL2_ttf, SDL2_mixer, tomlc17 (vendored TOML parser)</td>
 </tr>
@@ -533,8 +539,14 @@
 <pre><code class="language-sh"># macOS -- install dependencies
 brew install sdl2 sdl2_image sdl2_ttf sdl2_mixer
 
-# Build and run
+# Build and run the game
 make run
+
+# Build and run a specific level
+make run-level LEVEL=levels/00_sandbox_01.toml
+
+# Build and run the level editor
+make run-editor
 </code></pre>
 <p>See <a href="build_system">Build System</a> for Linux and Windows instructions.</p>
 
@@ -560,45 +572,48 @@ make run
   │     ├── SDL_RenderSetLogicalSize(GAME_W, GAME_H)
   │     │
   │     │   ── Load all textures (engine resources) ──
-  │     ├── parallax_init(&amp;gs.parallax, gs.renderer)  (multi-layer background)
-  │     ├── IMG_LoadTexture → gs.floor_tile        (grass_tileset.png — fatal)
-  │     ├── IMG_LoadTexture → gs.platform_tex      (platform.png — fatal)
-  │     ├── water_init(&amp;gs.water, gs.renderer)      (water.png)
-  │     ├── IMG_LoadTexture → gs.spider_tex        (spider.png — fatal)
-  │     ├── IMG_LoadTexture → gs.jumping_spider_tex (jumping_spider.png — fatal)
-  │     ├── IMG_LoadTexture → gs.bird_tex          (bird.png — fatal)
-  │     ├── IMG_LoadTexture → gs.faster_bird_tex   (faster_bird.png — fatal)
-  │     ├── IMG_LoadTexture → gs.fish_tex          (fish.png — fatal)
-  │     ├── IMG_LoadTexture → gs.coin_tex          (coin.png — fatal)
-  │     ├── IMG_LoadTexture → gs.bouncepad_medium_tex (bouncepad_medium.png — fatal)
-  │     ├── IMG_LoadTexture → gs.vine_tex          (vine.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.ladder_tex        (ladder.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.rope_tex          (rope.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.bouncepad_small_tex  (bouncepad_small.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.bouncepad_high_tex   (bouncepad_high.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.rail_tex          (rail.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.spike_block_tex   (spike_block.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.float_platform_tex (float_platform.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.bridge_tex        (bridge.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.star_yellow_tex   (star_yellow.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.axe_trap_tex      (axe_trap.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.circular_saw_tex  (circular_saw.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.blue_flame_tex    (blue_flame.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.faster_fish_tex   (faster_fish.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.spike_tex         (spike.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.spike_platform_tex (spike_platform.png — non-fatal)
+  │     ├── parallax_init(&amp;gs.parallax, gs.renderer)  (multi-layer background, configured per level)
+  │     ├── IMG_LoadTexture → gs.floor_tile        (sprites/levels/grass_tileset.png — fatal)
+  │     ├── IMG_LoadTexture → gs.platform_tex      (sprites/surfaces/Platform.png — fatal)
+  │     ├── water_init(&amp;gs.water, gs.renderer)      (sprites/foregrounds/water.png)
+  │     ├── IMG_LoadTexture → gs.spider_tex        (sprites/entities/spider.png — fatal)
+  │     ├── IMG_LoadTexture → gs.jumping_spider_tex (sprites/entities/jumping_spider.png — fatal)
+  │     ├── IMG_LoadTexture → gs.bird_tex          (sprites/entities/bird.png — fatal)
+  │     ├── IMG_LoadTexture → gs.faster_bird_tex   (sprites/entities/faster_bird.png — fatal)
+  │     ├── IMG_LoadTexture → gs.fish_tex          (sprites/entities/fish.png — fatal)
+  │     ├── IMG_LoadTexture → gs.coin_tex          (sprites/collectibles/coin.png — fatal)
+  │     ├── IMG_LoadTexture → gs.bouncepad_medium_tex (sprites/surfaces/bouncepad_medium.png — fatal)
+  │     ├── IMG_LoadTexture → gs.vine_tex          (sprites/surfaces/vine.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.ladder_tex        (sprites/surfaces/ladder.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.rope_tex          (sprites/surfaces/rope.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.bouncepad_small_tex  (sprites/surfaces/bouncepad_small.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.bouncepad_high_tex   (sprites/surfaces/bouncepad_high.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.rail_tex          (sprites/surfaces/rail.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.spike_block_tex   (sprites/hazards/spike_block.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.float_platform_tex (sprites/surfaces/float_platform.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.bridge_tex        (sprites/surfaces/bridge.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.star_yellow_tex   (sprites/collectibles/star_yellow.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.star_green_tex    (sprites/collectibles/star_green.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.star_red_tex      (sprites/collectibles/star_red.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.axe_trap_tex      (sprites/hazards/axe_trap.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.circular_saw_tex  (sprites/hazards/circular_saw.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.blue_flame_tex    (sprites/hazards/blue_flame.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.fire_flame_tex    (sprites/hazards/fire_flame.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.faster_fish_tex   (sprites/entities/faster_fish.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.spike_tex         (sprites/hazards/spike.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.spike_platform_tex (sprites/hazards/spike_platform.png — non-fatal)
   │     │
   │     │   ── Load all sound effects ──
-  │     ├── Mix_LoadWAV     → gs.snd_spring        (bouncepad.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_axe           (axe_trap.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_flap          (bird.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_spider_attack (spider.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_dive          (fish.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_jump          (player_jump.wav — fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_coin          (coin.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_hit           (player_hit.wav — non-fatal)
-  │     ├── Mix_LoadMUS     → gs.music             (game_music.wav — fatal)
-  │     ├── Mix_PlayMusic(-1)                      (loop forever, 10% volume)
+  │     ├── Mix_LoadWAV     → gs.snd_spring        (sounds/surfaces/bouncepad.wav — non-fatal)
+  │     ├── Mix_LoadWAV     → gs.snd_axe           (sounds/hazards/axe_trap.wav — non-fatal)
+  │     ├── Mix_LoadWAV     → gs.snd_flap          (sounds/entities/bird.wav — non-fatal)
+  │     ├── Mix_LoadWAV     → gs.snd_spider_attack (sounds/entities/spider.wav — non-fatal)
+  │     ├── Mix_LoadWAV     → gs.snd_dive          (sounds/entities/fish.wav — non-fatal)
+  │     ├── Mix_LoadWAV     → gs.snd_jump          (sounds/player/player_jump.wav — fatal)
+  │     ├── Mix_LoadWAV     → gs.snd_coin          (sounds/collectibles/coin.wav — non-fatal)
+  │     ├── Mix_LoadWAV     → gs.snd_hit           (sounds/player/player_hit.wav — non-fatal)
+  │     ├── Mix_LoadMUS     → gs.music             (per-level music_path — non-fatal)
+  │     ├── Mix_PlayMusic(-1)                      (loop forever, per-level volume)
   │     │
   │     │   ── Initialise game objects ──
   │     ├── player_init(&amp;gs.player, gs.renderer)
@@ -607,8 +622,8 @@ make run
   │     ├── if (debug_mode) debug_init(&amp;gs.debug)
   │     ├── level_loader_load(&amp;gs)                 (load level from TOML, entity inits + floor gap positions)
   │     ├── hearts/lives/score/score_life_next initialisation
-  │     ├── SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) — lazy init, non-fatal
-  │     └── scan joysticks for first connected gamepad
+  │     ├── ctrl_pending_init = 1 — deferred gamepad init (avoids antivirus/HID delays)
+  │     └── gamepad subsystem initializes on first rendered frame via background thread
   │
   ├── game_loop(&amp;gs)          ← see Game Loop section below
   │
@@ -628,6 +643,7 @@ make run
         ├── Mix_FreeChunk (snd_spider_attack)
         ├── Mix_FreeChunk (snd_dive)
         ├── water_cleanup
+        ├── SDL_DestroyTexture (fire_flame_tex)
         ├── SDL_DestroyTexture (blue_flame_tex)
         ├── SDL_DestroyTexture (axe_trap_tex)
         ├── SDL_DestroyTexture (circular_saw_tex)
@@ -644,6 +660,8 @@ make run
         ├── SDL_DestroyTexture (ladder_tex)
         ├── SDL_DestroyTexture (vine_tex)
         ├── last_star_cleanup
+        ├── SDL_DestroyTexture (star_red_tex)
+        ├── SDL_DestroyTexture (star_green_tex)
         ├── SDL_DestroyTexture (star_yellow_tex)
         ├── SDL_DestroyTexture (coin_tex)
         ├── SDL_DestroyTexture (faster_fish_tex)
@@ -677,21 +695,24 @@ make run
                     → spiders_update → jumping_spiders_update → birds_update → faster_birds_update
                     → fish_update → faster_fish_update → spike_blocks_update → spikes_update
                     → spike_platforms_update → circular_saws_update → axe_traps_update
-                    → blue_flames_update → float_platforms_update → bridges_update
+                    → blue_flames_update → fire_flames_update → float_platforms_update → bridges_update
                     → spider collision → jumping_spider collision → bird collision → faster_bird collision
                     → fish collision → faster_fish collision → spike_block collision (+ push impulse)
                     → spike collision → spike_platform collision → circular_saw collision
-                    → axe_trap collision → blue_flame collision
+                    → axe_trap collision → blue_flame collision → fire_flame collision
                     → floor gap fall detection (instant death)
-                    → coin–player collision → star_yellow–player collision → last_star–player collision
+                    → coin–player collision → star_yellow–player collision
+                    → star_green–player collision → star_red–player collision
+                    → last_star–player collision
                     → heart/lives/score_life_next logic
                     → water_update → fog_update → bouncepads_update (small, medium, high)
                     → debug_update (if --debug)
   4. Render       — clear → parallax background → platforms → floor tiles
                     → float platforms → spike rows → spike platforms → bridges
                     → bouncepads (medium, small, high) → rails
-                    → vines → ladders → ropes → coins → yellow stars → last star
-                    → blue flames → fish → faster fish → water
+                    → vines → ladders → ropes → coins → yellow stars
+                    → green stars → red stars → last star
+                    → blue flames → fire flames → fish → faster fish → water
                     → spike blocks → axe traps → circular saws
                     → spiders → jumping spiders → birds → faster birds
                     → player → fog → hud
@@ -716,7 +737,7 @@ prev = now;
 <tbody><tr>
 <td>1</td>
 <td>Background</td>
-<td>7 layers from <code>assets/</code> (parallax_sky.png, parallax_clouds_bg.png, parallax_glacial_mountains.png, parallax_clouds_mg_1/2/3.png, parallax_cloud_lonely.png) tiled horizontally, each scrolling at a different speed fraction of <code>cam_x</code></td>
+<td>Up to 8 layers from <code>assets/sprites/backgrounds/</code> configured per level via <code>[[background_layers]]</code> in TOML, tiled horizontally, each scrolling at a different speed fraction of <code>cam_x</code></td>
 </tr>
 <tr>
 <td>2</td>
@@ -795,81 +816,96 @@ prev = now;
 </tr>
 <tr>
 <td>17</td>
+<td>Star greens</td>
+<td><code>star_green.png</code> collectible star pickups</td>
+</tr>
+<tr>
+<td>18</td>
+<td>Star reds</td>
+<td><code>star_red.png</code> collectible star pickups</td>
+</tr>
+<tr>
+<td>19</td>
 <td>Last star</td>
 <td>end-of-level star collectible (uses HUD star sprite)</td>
 </tr>
 <tr>
-<td>18</td>
+<td>20</td>
 <td>Blue flames</td>
 <td><code>blue_flame.png</code> animated flame hazards erupting from floor gaps</td>
 </tr>
 <tr>
-<td>19</td>
+<td>21</td>
+<td>Fire flames</td>
+<td><code>fire_flame.png</code> animated fire variant flame hazards erupting from floor gaps</td>
+</tr>
+<tr>
+<td>22</td>
 <td>Fish</td>
 <td><code>fish.png</code> animated jumping enemies, drawn before water for submerged look</td>
 </tr>
 <tr>
-<td>20</td>
+<td>23</td>
 <td>Faster fish</td>
 <td><code>faster_fish.png</code> fast aggressive jumping fish enemies</td>
 </tr>
 <tr>
-<td>21</td>
+<td>24</td>
 <td>Water</td>
 <td><code>water.png</code> animated scrolling strip at the bottom</td>
 </tr>
 <tr>
-<td>22</td>
+<td>25</td>
 <td>Spike blocks</td>
 <td><code>spike_block.png</code> rotating rail-riding hazards</td>
 </tr>
 <tr>
-<td>23</td>
+<td>26</td>
 <td>Axe traps</td>
 <td><code>axe_trap.png</code> swinging axe hazards</td>
 </tr>
 <tr>
-<td>24</td>
+<td>27</td>
 <td>Circular saws</td>
 <td><code>circular_saw.png</code> spinning blade hazards</td>
 </tr>
 <tr>
-<td>25</td>
+<td>28</td>
 <td>Spiders</td>
 <td><code>spider.png</code> animated ground patrol enemies</td>
 </tr>
 <tr>
-<td>26</td>
+<td>29</td>
 <td>Jumping spiders</td>
 <td><code>jumping_spider.png</code> animated jumping patrol enemies</td>
 </tr>
 <tr>
-<td>27</td>
+<td>30</td>
 <td>Birds</td>
 <td><code>bird.png</code> slow sine-wave sky patrol enemies</td>
 </tr>
 <tr>
-<td>28</td>
+<td>31</td>
 <td>Faster birds</td>
 <td><code>faster_bird.png</code> fast aggressive sky patrol enemies</td>
 </tr>
 <tr>
-<td>29</td>
+<td>32</td>
 <td>Player</td>
 <td>Animated sprite sheet, drawn on top of environment</td>
 </tr>
 <tr>
-<td>30</td>
+<td>33</td>
 <td>Fog</td>
 <td><code>fog_background_1.png</code> / <code>fog_background_2.png</code> semi-transparent sliding overlay</td>
 </tr>
 <tr>
-<td>31</td>
+<td>34</td>
 <td>HUD</td>
 <td><code>hud_render</code>: hearts, lives, score -- always drawn on top</td>
 </tr>
 <tr>
-<td>32</td>
+<td>35</td>
 <td>Debug</td>
 <td><code>debug_render</code>: FPS counter, collision boxes, event log -- when <code>--debug</code> active</td>
 </tr>
@@ -935,6 +971,14 @@ prev = now;
     StarYellow     star_yellows[MAX_STAR_YELLOWS];
     int            star_yellow_count;
 
+    SDL_Texture   *star_green_tex;   // Shared texture for star green pickups (GPU)
+    StarYellow     star_greens[MAX_STAR_YELLOWS];
+    int            star_green_count;
+
+    SDL_Texture   *star_red_tex;     // Shared texture for star red pickups (GPU)
+    StarYellow     star_reds[MAX_STAR_YELLOWS];
+    int            star_red_count;
+
     LastStar       last_star;        // Special end-of-level star collectible
 
     SDL_Texture   *vine_tex;         // Shared texture for vine decorations (GPU)
@@ -989,6 +1033,10 @@ prev = now;
     BlueFlame      blue_flames[MAX_BLUE_FLAMES];
     int            blue_flame_count;
 
+    SDL_Texture   *fire_flame_tex;      // Shared texture for fire flames (GPU)
+    BlueFlame      fire_flames[MAX_BLUE_FLAMES];
+    int            fire_flame_count;
+
     SDL_Texture   *float_platform_tex;  // float_platform.png 3-slice (GPU)
     FloatPlatform  float_platforms[MAX_FLOAT_PLATFORMS];
     int            float_platform_count;
@@ -1027,6 +1075,20 @@ prev = now;
     int            paused;           // 1 = window lost focus; physics/music frozen
     int            debug_mode;       // 1 = debug overlays active (--debug flag)
     DebugOverlay   debug;            // FPS counter, collision vis, event log
+
+    char           level_path[256];  // Path to loaded TOML level file
+    const void    *current_level;    // Pointer to active LevelDef
+    int            fog_enabled;      // 1 = fog rendering active
+    int            water_enabled;    // 1 = water strip rendered
+    int            world_w;          // Dynamic level width (set per level)
+    int            score_per_life;   // Per-level score threshold for bonus life
+    int            coin_score;       // Per-level points per coin
+
+    // ---- Gamepad lazy init (deferred to avoid antivirus/HID delays) ----
+    int            ctrl_pending_init;   // 0=idle, 1=first frame, 2=thread running
+    SDL_Thread    *ctrl_init_thread;    // Background init thread
+    volatile int   ctrl_init_done;     // Thread completion flag
+    SDL_Texture   *ctrl_init_msg_tex;  // Cached HUD "Initializing gamepad..." texture
 
     // ---- Loop state (persists across frames for emscripten callback) ----
     Uint64         loop_prev_ticks;  // timestamp of previous frame
@@ -1073,7 +1135,7 @@ prev = now;
   <h1 class="page-title">Assets</h1>
 <p><a href="home">← Home</a></p>
 <hr>
-<p>All visual assets live in the <code>assets/</code> directory. They are PNG files (loaded via <code>SDL2_image</code>) with one TrueType font.</p>
+<p>All visual assets live in the <code>assets/sprites/</code> directory, organized by category (backgrounds, collectibles, entities, foregrounds, hazards, levels, player, screens, surfaces). They are PNG files (loaded via <code>SDL2_image</code>). Fonts live in <code>assets/fonts/</code>.</p>
 <blockquote>
 <p><strong>Coordinate note:</strong> All game objects use <strong>logical space (400x300)</strong>. SDL scales to the 800x600 OS window 2x. A 48x48 sprite appears as 96x96 physical pixels on screen.</p>
 </blockquote>
@@ -1088,202 +1150,187 @@ prev = now;
 </tr>
 </thead>
 <tbody><tr>
-<td><code>parallax_sky.png</code></td>
-<td><code>parallax.c</code> (layer 0, speed 0.00)</td>
-<td>Static sky gradient backdrop</td>
+<td><code>sprites/backgrounds/*.png</code></td>
+<td><code>parallax.c</code> (configured per level via <code>[[background_layers]]</code>)</td>
+<td>Up to 8 parallax layers (sky_blue, sky_fire, clouds, glacial/volcanic_mountains, forest_leafs, castle_pillars, smoke variants, etc.) -- each with a scroll speed factor (0.0-1.0)</td>
 </tr>
 <tr>
-<td><code>parallax_clouds_bg.png</code></td>
-<td><code>parallax.c</code> (layer 1, speed 0.08)</td>
-<td>Background cloud layer, slow scroll</td>
-</tr>
-<tr>
-<td><code>parallax_glacial_mountains.png</code></td>
-<td><code>parallax.c</code> (layer 2, speed 0.15)</td>
-<td>Distant mountains</td>
-</tr>
-<tr>
-<td><code>parallax_clouds_mg_3.png</code></td>
-<td><code>parallax.c</code> (layer 3, speed 0.25)</td>
-<td>Midground cloud layer 3</td>
-</tr>
-<tr>
-<td><code>parallax_clouds_mg_2.png</code></td>
-<td><code>parallax.c</code> (layer 4, speed 0.38)</td>
-<td>Midground cloud layer 2</td>
-</tr>
-<tr>
-<td><code>parallax_cloud_lonely.png</code></td>
-<td><code>parallax.c</code> (layer 5, speed 0.44)</td>
-<td>Single lonely cloud</td>
-</tr>
-<tr>
-<td><code>parallax_clouds_mg_1.png</code></td>
-<td><code>parallax.c</code> (layer 6, speed 0.50)</td>
-<td>Foreground cloud layer</td>
-</tr>
-<tr>
-<td><code>grass_tileset.png</code></td>
+<td><code>sprites/levels/grass_tileset.png</code></td>
 <td><code>gs-&gt;floor_tile</code></td>
-<td>48x48 tile, 9-slice rendered across <code>FLOOR_Y</code> to form the floor</td>
+<td>48x48 tile, 9-slice rendered across <code>FLOOR_Y</code> to form the floor (per-level configurable via <code>floor_tile_path</code>)</td>
 </tr>
 <tr>
-<td><code>platform.png</code></td>
+<td><code>sprites/surfaces/Platform.png</code></td>
 <td><code>gs-&gt;platform_tex</code></td>
 <td>48x48 tile, 9-slice rendered as one-way platform pillars</td>
 </tr>
 <tr>
-<td><code>player.png</code></td>
+<td><code>sprites/player/player.png</code></td>
 <td><code>player-&gt;texture</code></td>
 <td>192x288 sprite sheet, 4 cols x 6 rows, 48x48 frames</td>
 </tr>
 <tr>
-<td><code>water.png</code></td>
+<td><code>sprites/foregrounds/water.png</code></td>
 <td><code>water-&gt;texture</code></td>
 <td>384x64 sprite sheet, 8 frames of 48x64 with 16x31 art crop</td>
 </tr>
 <tr>
-<td><code>spider.png</code></td>
+<td><code>sprites/entities/spider.png</code></td>
 <td><code>gs-&gt;spider_tex</code></td>
 <td>Spider enemy sprite sheet (ground patrol)</td>
 </tr>
 <tr>
-<td><code>jumping_spider.png</code></td>
+<td><code>sprites/entities/jumping_spider.png</code></td>
 <td><code>gs-&gt;jumping_spider_tex</code></td>
 <td>Jumping spider enemy sprite sheet</td>
 </tr>
 <tr>
-<td><code>bird.png</code></td>
+<td><code>sprites/entities/bird.png</code></td>
 <td><code>gs-&gt;bird_tex</code></td>
 <td>Slow sine-wave bird enemy sprite sheet</td>
 </tr>
 <tr>
-<td><code>faster_bird.png</code></td>
+<td><code>sprites/entities/faster_bird.png</code></td>
 <td><code>gs-&gt;faster_bird_tex</code></td>
 <td>Fast aggressive bird enemy sprite sheet</td>
 </tr>
 <tr>
-<td><code>fish.png</code></td>
+<td><code>sprites/entities/fish.png</code></td>
 <td><code>gs-&gt;fish_tex</code></td>
 <td>Jumping fish enemy sprite sheet</td>
 </tr>
 <tr>
-<td><code>faster_fish.png</code></td>
+<td><code>sprites/entities/faster_fish.png</code></td>
 <td><code>gs-&gt;faster_fish_tex</code></td>
 <td>Faster fish enemy sprite sheet</td>
 </tr>
 <tr>
-<td><code>coin.png</code></td>
+<td><code>sprites/collectibles/coin.png</code></td>
 <td><code>gs-&gt;coin_tex</code></td>
 <td>16x16 coin collectible sprite</td>
 </tr>
 <tr>
-<td><code>star_yellow.png</code></td>
+<td><code>sprites/collectibles/star_yellow.png</code></td>
 <td><code>gs-&gt;star_yellow_tex</code></td>
 <td>Star yellow collectible sprite</td>
 </tr>
 <tr>
-<td><code>last_star.png</code></td>
+<td><code>sprites/collectibles/star_green.png</code></td>
+<td><code>gs-&gt;star_green_tex</code></td>
+<td>Star green collectible sprite</td>
+</tr>
+<tr>
+<td><code>sprites/collectibles/star_red.png</code></td>
+<td><code>gs-&gt;star_red_tex</code></td>
+<td>Star red collectible sprite</td>
+</tr>
+<tr>
+<td><code>sprites/collectibles/last_star.png</code></td>
 <td><code>last_star.c</code></td>
 <td>Last star goal collectible sprite</td>
 </tr>
 <tr>
-<td><code>spike.png</code></td>
+<td><code>sprites/hazards/spike.png</code></td>
 <td><code>gs-&gt;spike_tex</code></td>
 <td>Floor/ceiling spike hazard</td>
 </tr>
 <tr>
-<td><code>spike_block.png</code></td>
+<td><code>sprites/hazards/spike_block.png</code></td>
 <td><code>gs-&gt;spike_block_tex</code></td>
 <td>Rail-riding rotating hazard sprite</td>
 </tr>
 <tr>
-<td><code>spike_platform.png</code></td>
+<td><code>sprites/hazards/spike_platform.png</code></td>
 <td><code>gs-&gt;spike_platform_tex</code></td>
 <td>Spiked platform hazard sprite</td>
 </tr>
 <tr>
-<td><code>circular_saw.png</code></td>
+<td><code>sprites/hazards/circular_saw.png</code></td>
 <td><code>gs-&gt;circular_saw_tex</code></td>
 <td>Rotating saw blade hazard</td>
 </tr>
 <tr>
-<td><code>axe_trap.png</code></td>
+<td><code>sprites/hazards/axe_trap.png</code></td>
 <td><code>gs-&gt;axe_trap_tex</code></td>
 <td>Swinging axe trap hazard</td>
 </tr>
 <tr>
-<td><code>blue_flame.png</code></td>
+<td><code>sprites/hazards/blue_flame.png</code></td>
 <td><code>gs-&gt;blue_flame_tex</code></td>
 <td>Blue flame hazard sprite</td>
 </tr>
 <tr>
-<td><code>float_platform.png</code></td>
+<td><code>sprites/hazards/fire_flame.png</code></td>
+<td><code>gs-&gt;fire_flame_tex</code></td>
+<td>Fire flame hazard sprite (fire-colored variant)</td>
+</tr>
+<tr>
+<td><code>sprites/surfaces/float_platform.png</code></td>
 <td><code>gs-&gt;float_platform_tex</code></td>
 <td>48x16 sprite, 3-slice horizontal strip (left cap, centre fill, right cap)</td>
 </tr>
 <tr>
-<td><code>bridge.png</code></td>
+<td><code>sprites/surfaces/bridge.png</code></td>
 <td><code>gs-&gt;bridge_tex</code></td>
 <td>16x16 single-frame brick tile for crumble walkways</td>
 </tr>
 <tr>
-<td><code>bouncepad_small.png</code></td>
+<td><code>sprites/surfaces/bouncepad_small.png</code></td>
 <td><code>gs-&gt;bouncepad_small_tex</code></td>
 <td>Small bouncepad sprite (low launch)</td>
 </tr>
 <tr>
-<td><code>bouncepad_medium.png</code></td>
+<td><code>sprites/surfaces/bouncepad_medium.png</code></td>
 <td><code>gs-&gt;bouncepad_medium_tex</code></td>
 <td>Medium bouncepad sprite (standard launch)</td>
 </tr>
 <tr>
-<td><code>bouncepad_high.png</code></td>
+<td><code>sprites/surfaces/bouncepad_high.png</code></td>
 <td><code>gs-&gt;bouncepad_high_tex</code></td>
 <td>High bouncepad sprite (max launch)</td>
 </tr>
 <tr>
-<td><code>rail.png</code></td>
+<td><code>sprites/surfaces/rail.png</code></td>
 <td><code>gs-&gt;rail_tex</code></td>
 <td>64x64 sprite sheet, 4x4 grid of 16x16 bitmask rail tiles</td>
 </tr>
 <tr>
-<td><code>vine.png</code></td>
+<td><code>sprites/surfaces/vine.png</code></td>
 <td><code>gs-&gt;vine_tex</code></td>
 <td>16x48 single-frame plant sprite for climbable vines</td>
 </tr>
 <tr>
-<td><code>ladder.png</code></td>
+<td><code>sprites/surfaces/ladder.png</code></td>
 <td><code>gs-&gt;ladder_tex</code></td>
 <td>Climbable ladder sprite</td>
 </tr>
 <tr>
-<td><code>rope.png</code></td>
+<td><code>sprites/surfaces/rope.png</code></td>
 <td><code>gs-&gt;rope_tex</code></td>
 <td>Climbable rope sprite</td>
 </tr>
 <tr>
-<td><code>fog_background_1.png</code></td>
+<td><code>sprites/foregrounds/fog_background_1.png</code></td>
 <td><code>fog.c</code> (<code>fog-&gt;textures[0]</code>)</td>
 <td>Fog overlay layer, semi-transparent sliding effect</td>
 </tr>
 <tr>
-<td><code>fog_background_2.png</code></td>
+<td><code>sprites/foregrounds/fog_background_2.png</code></td>
 <td><code>fog.c</code> (<code>fog-&gt;textures[1]</code>)</td>
 <td>Fog overlay layer, semi-transparent sliding effect</td>
 </tr>
 <tr>
-<td><code>hud_coins.png</code></td>
+<td><code>sprites/screens/hud_coins.png</code></td>
 <td><code>hud.c</code></td>
 <td>Coin count UI icon used in the HUD</td>
 </tr>
 <tr>
-<td><code>start_menu_logo.png</code></td>
+<td><code>sprites/screens/start_menu_logo.png</code></td>
 <td><code>start_menu.c</code></td>
 <td>Game logo displayed on the start menu screen</td>
 </tr>
 <tr>
-<td><code>round9x13.ttf</code></td>
+<td><code>fonts/round9x13.ttf</code></td>
 <td><code>hud.c</code> (<code>hud-&gt;font</code>)</td>
 <td>Bitmap font for score and lives text in the HUD</td>
 </tr>
@@ -1355,7 +1402,7 @@ frame.y = ANIM_ROW[anim_state] * FRAME_H; // row x 48
 <p>When <code>player-&gt;facing_left == 1</code>, the sprite is drawn with <code>SDL_FLIP_HORIZONTAL</code> via <code>SDL_RenderCopyEx</code>. This means the same right-facing animation frames are used for both directions -- no duplicate assets needed.</p>
 <hr>
 <h2>Unused Assets</h2>
-<p>The following assets are stored in <code>assets/unused/</code> and are not loaded by the game. They are available as reserves for future use.</p>
+<p>The following assets are stored in <code>assets/sprites/unused/</code> and are not loaded by the game. They are available as reserves for future use.</p>
 <table>
 <thead>
 <tr>
@@ -1424,13 +1471,6 @@ frame.y = ANIM_ROW[anim_state] * FRAME_H; // row x 48
 <td>Lightened sky variant</td>
 </tr>
 <tr>
-<td><code>star_green.png</code></td>
-<td>Green star collectible</td>
-</tr>
-<tr>
-<td><code>star_red.png</code></td>
-<td>Red star collectible</td>
-</tr>
 <tr>
 <td><code>stone_tileset.png</code></td>
 <td>Stone floor / wall tile</td>
@@ -1451,7 +1491,7 @@ source_y = (frame_index / cols) * frame_h
 <hr>
 <h2>Loading an Asset</h2>
 <pre><code class="language-c">// In game_init or an entity&#39;s init function:
-SDL_Texture *tex = IMG_LoadTexture(gs-&gt;renderer, &quot;assets/coin.png&quot;);
+SDL_Texture *tex = IMG_LoadTexture(gs-&gt;renderer, &quot;assets/sprites/collectibles/coin.png&quot;);
 if (!tex) {
     fprintf(stderr, &quot;Failed to load coin.png: %s\n&quot;, IMG_GetError());
     exit(EXIT_FAILURE);
@@ -1475,7 +1515,18 @@ LIBS    = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
 OUTDIR  = out
 TARGET  = $(OUTDIR)/super-mango
 SRCDIR  = src
-SRCS    = $(wildcard $(SRCDIR)/*.c)
+SRCS    = $(wildcard $(SRCDIR)/*.c) \
+          $(wildcard $(SRCDIR)/collectibles/*.c) \
+          $(wildcard $(SRCDIR)/core/*.c) \
+          $(wildcard $(SRCDIR)/effects/*.c) \
+          $(wildcard $(SRCDIR)/entities/*.c) \
+          $(wildcard $(SRCDIR)/hazards/*.c) \
+          $(wildcard $(SRCDIR)/levels/*.c) \
+          $(wildcard $(SRCDIR)/player/*.c) \
+          $(wildcard $(SRCDIR)/screens/*.c) \
+          $(wildcard $(SRCDIR)/surfaces/*.c) \
+          $(SRCDIR)/editor/serializer.c \
+          vendor/tomlc17/tomlc17.c
 OBJS    = $(SRCS:.c=.o)
 DEPS    = $(OBJS:.o=.d)
 </code></pre>
@@ -1510,8 +1561,8 @@ DEPS    = $(OBJS:.o=.d)
 </tr>
 <tr>
 <td><code>SRCS</code></td>
-<td><code>src/*.c</code></td>
-<td>All C source files (auto-discovered)</td>
+<td><code>src/**/*.c</code></td>
+<td>All C source files per subdirectory (auto-discovered via explicit wildcards)</td>
 </tr>
 <tr>
 <td><code>OBJS</code></td>
@@ -1593,13 +1644,13 @@ DEPS    = $(OBJS:.o=.d)
 <hr>
 <h2>Build Targets</h2>
 <h3><code>make</code> / <code>make all</code></h3>
-<p>Compiles all <code>src/*.c</code> files to <code>.o</code> objects, then links them into <code>out/super-mango</code>.</p>
+<p>Compiles all <code>src/**/*.c</code> files (across all subdirectories) to <code>.o</code> objects, then links them into <code>out/super-mango</code>.</p>
 <pre><code class="language-sh">make
 </code></pre>
 <p><strong>Steps:</strong></p>
 <ol>
 <li>Creates <code>out/</code> directory if it does not exist</li>
-<li>Compiles each <code>src/*.c</code> → <code>src/*.o</code></li>
+<li>Compiles each <code>src/**/*.c</code> → <code>src/**/*.o</code></li>
 <li>Links all <code>.o</code> files → <code>out/super-mango</code></li>
 <li>On macOS (<code>uname -s == Darwin</code>), ad-hoc code signs the binary with <code>codesign --force --sign - $@</code> (required on Apple Silicon to avoid <code>Killed: 9</code> errors). On other platforms this step is skipped</li>
 </ol>
@@ -1608,8 +1659,8 @@ DEPS    = $(OBJS:.o=.d)
 <pre><code class="language-sh">make run
 </code></pre>
 <p>The binary must be run from the <strong>repo root</strong> because asset paths are relative:</p>
-<pre><code class="language-c">IMG_LoadTexture(renderer, &quot;assets/parallax_sky.png&quot;);
-Mix_LoadWAV(&quot;sounds/player_jump.wav&quot;);
+<pre><code class="language-c">IMG_LoadTexture(renderer, &quot;assets/sprites/backgrounds/sky_blue.png&quot;);
+Mix_LoadWAV(&quot;assets/sounds/player/player_jump.wav&quot;);
 </code></pre>
 <h3><code>make run-debug</code></h3>
 <p>Builds (if out of date) then runs the binary with the <code>--debug</code> flag, which enables the debug overlay: FPS counter, collision hitbox visualization, and scrolling event log.</p>
@@ -1617,11 +1668,11 @@ Mix_LoadWAV(&quot;sounds/player_jump.wav&quot;);
 </code></pre>
 <h3><code>make run-level LEVEL=&lt;path&gt;</code></h3>
 <p>Builds (if out of date) then runs the binary with the <code>--level &lt;path&gt;</code> flag, which loads the specified TOML level file.</p>
-<pre><code class="language-sh">make run-level LEVEL=levels/sandbox_00.toml
+<pre><code class="language-sh">make run-level LEVEL=levels/00_sandbox_01.toml
 </code></pre>
 <h3><code>make run-level-debug LEVEL=&lt;path&gt;</code></h3>
 <p>Builds (if out of date) then runs the binary with both <code>--level &lt;path&gt;</code> and <code>--debug</code> flags, combining level loading with the debug overlay.</p>
-<pre><code class="language-sh">make run-level-debug LEVEL=levels/sandbox_00.toml
+<pre><code class="language-sh">make run-level-debug LEVEL=levels/00_sandbox_01.toml
 </code></pre>
 <h3><code>make editor</code></h3>
 <p>Compiles the standalone visual level editor binary to <code>out/super-mango-editor</code>.</p>
@@ -1642,8 +1693,8 @@ Mix_LoadWAV(&quot;sounds/player_jump.wav&quot;);
 </code></pre>
 <p>Deletes:</p>
 <ul>
-<li><code>src/*.o</code> -- all object files</li>
-<li><code>src/*.d</code> -- all generated dependency files</li>
+<li><code>src/**/*.o</code> -- all object files across subdirectories</li>
+<li><code>src/**/*.d</code> -- all generated dependency files</li>
 <li><code>out/</code> -- the output directory and binary</li>
 </ul>
 <hr>
@@ -1723,7 +1774,7 @@ make
 <p>All workflows install SDL2 dependencies per platform and compile with the project Makefile. The Deploy workflow handles static site deployment only.</p>
 <hr>
 <h2>Adding New Source Files</h2>
-<p>Because the Makefile uses per-subdirectory wildcards, any new <code>.c</code> file placed in <code>src/</code> or its recognized subdirectories is compiled automatically on the next <code>make</code> invocation. No Makefile changes required.</p>
+<p>The Makefile uses per-subdirectory wildcards. Any new <code>.c</code> file placed in <code>src/</code> or its recognized subdirectories (<code>collectibles/</code>, <code>core/</code>, <code>effects/</code>, <code>entities/</code>, <code>hazards/</code>, <code>levels/</code>, <code>player/</code>, <code>screens/</code>, <code>surfaces/</code>) is compiled automatically. <strong>New subdirectories</strong> require adding a wildcard line to the Makefile.</p>
 <pre><code class="language-sh"># Example: adding a new enemy entity
 touch src/entities/new_enemy.c src/entities/new_enemy.h
 make   # new_enemy.c is compiled automatically
@@ -1737,40 +1788,19 @@ make   # new_enemy.c is compiled automatically
 src/
 ├── main.o
 ├── game.o
-├── player.o
-├── platform.o
-├── water.o
-├── fog.o
-├── parallax.o
-├── hud.o
-├── debug.o
-├── start_menu.o
-├── coin.o
-├── star_yellow.o
-├── last_star.o
-├── spider.o
-├── jumping_spider.o
-├── bird.o
-├── faster_bird.o
-├── fish.o
-├── faster_fish.o
-├── blue_flame.o
-├── spike.o
-├── spike_block.o
-├── spike_platform.o
-├── circular_saw.o
-├── axe_trap.o
-├── bouncepad.o
-├── bouncepad_small.o
-├── bouncepad_medium.o
-├── bouncepad_high.o
-├── float_platform.o
-├── bridge.o
-├── rail.o
-├── vine.o
-├── ladder.o
-├── rope.o
+├── collectibles/        ← coin.o, star_yellow.o, star_green.o, star_red.o, last_star.o
+├── core/                ← debug.o, entity_utils.o
+├── effects/             ← fog.o, parallax.o, water.o
+├── entities/            ← spider.o, jumping_spider.o, bird.o, faster_bird.o, fish.o, faster_fish.o
+├── hazards/             ← spike.o, spike_block.o, spike_platform.o, circular_saw.o, axe_trap.o, blue_flame.o
+├── levels/              ← level_loader.o
+├── player/              ← player.o
+├── screens/             ← hud.o, start_menu.o
+├── surfaces/            ← platform.o, float_platform.o, bridge.o, bouncepad.o, bouncepad_*.o, rail.o, vine.o, ladder.o, rope.o
+├── editor/              ← serializer.o (shared with game build)
 └── (plus corresponding .d dependency files)
+vendor/
+└── tomlc17/tomlc17.o
 </code></pre>
 
 </section>
@@ -1896,7 +1926,7 @@ src/
 </tr>
 <tr>
 <td><code>MAX_FLOOR_GAPS</code></td>
-<td><code>8</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum number of floor gaps per level</td>
 </tr>
@@ -1920,10 +1950,16 @@ src/
 <td>Total logical level width (4 x GAME_W)</td>
 </tr>
 <tr>
-<td><code>CAM_LOOKAHEAD</code></td>
-<td><code>40</code></td>
-<td><code>int</code></td>
-<td>Forward-look offset in px added in the player&#39;s facing direction</td>
+<td><code>CAM_LOOKAHEAD_VX_FACTOR</code></td>
+<td><code>0.20f</code></td>
+<td><code>float</code></td>
+<td>Pixels of lookahead per px/s of player velocity (dynamic lookahead)</td>
+</tr>
+<tr>
+<td><code>CAM_LOOKAHEAD_MAX</code></td>
+<td><code>50.0f</code></td>
+<td><code>float</code></td>
+<td>Maximum forward-look offset in px</td>
 </tr>
 <tr>
 <td><code>CAM_SMOOTHING</code></td>
@@ -2037,31 +2073,67 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </tr>
 </tbody></table>
 <hr>
-<h2>Hard-Coded Values in <code>player.c</code></h2>
+<h2>Movement Constants in <code>player.c</code></h2>
 <table>
 <thead>
 <tr>
+<th>Constant</th>
 <th>Value</th>
-<th>Location</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><code>160.0f</code></td>
-<td><code>player_init</code></td>
-<td><code>player-&gt;speed</code> -- horizontal max speed (px/s)</td>
+<td><code>WALK_MAX_SPEED</code></td>
+<td><code>100.0f</code></td>
+<td>Maximum walking speed (px/s)</td>
 </tr>
 <tr>
-<td><code>-325.0f</code></td>
-<td><code>player_handle_input</code></td>
-<td>Jump vertical impulse -- keyboard (ground + vine dismount)</td>
+<td><code>RUN_MAX_SPEED</code></td>
+<td><code>250.0f</code></td>
+<td>Maximum running speed (px/s, Shift held)</td>
 </tr>
 <tr>
-<td><code>-500.0f</code></td>
-<td><code>player_handle_input</code></td>
-<td>Jump vertical impulse -- gamepad (ground + vine dismount)</td>
+<td><code>WALK_GROUND_ACCEL</code></td>
+<td><code>750.0f</code></td>
+<td>Ground acceleration while walking (px/s^2)</td>
+</tr>
+<tr>
+<td><code>RUN_GROUND_ACCEL</code></td>
+<td><code>600.0f</code></td>
+<td>Ground acceleration while running (px/s^2)</td>
+</tr>
+<tr>
+<td><code>GROUND_FRICTION</code></td>
+<td><code>550.0f</code></td>
+<td>Ground deceleration when no input (px/s^2)</td>
+</tr>
+<tr>
+<td><code>GROUND_COUNTER_ACCEL</code></td>
+<td><code>100.0f</code></td>
+<td>Extra deceleration when reversing direction (px/s^2)</td>
+</tr>
+<tr>
+<td><code>AIR_ACCEL_WALK</code></td>
+<td><code>350.0f</code></td>
+<td>Airborne acceleration while walking (px/s^2)</td>
+</tr>
+<tr>
+<td><code>AIR_ACCEL_RUN</code></td>
+<td><code>180.0f</code></td>
+<td>Airborne acceleration while running (px/s^2)</td>
+</tr>
+<tr>
+<td><code>AIR_FRICTION</code></td>
+<td><code>80.0f</code></td>
+<td>Airborne deceleration when no input (px/s^2)</td>
+</tr>
+<tr>
+<td><code>WALK_ANIM_MIN_VX</code></td>
+<td><code>8.0f</code></td>
+<td>Minimum horizontal speed to trigger walk animation (px/s)</td>
 </tr>
 </tbody></table>
+<p>The player uses an acceleration-based movement model. Hold Shift to run. Physics overrides for all these values can be configured per level in the TOML <code>[physics]</code> section.</p>
 <h2>Vine Climbing Constants in <code>player.c</code></h2>
 <table>
 <thead>
@@ -2117,8 +2189,8 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 <td>Mixer buffer size (samples)</td>
 </tr>
 <tr>
-<td><code>13</code></td>
-<td>Music volume (0-128, approximately 10%) set in <code>game_init</code></td>
+<td>per level</td>
+<td>Music volume (0-128) configured via <code>music_volume</code> in level TOML (default 13, ~10%)</td>
 </tr>
 </tbody></table>
 <hr>
@@ -2179,7 +2251,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_PLATFORMS</code></td>
-<td><code>8</code></td>
+<td><code>32</code></td>
 <td>Maximum number of platforms in the game</td>
 </tr>
 </tbody></table>
@@ -2256,7 +2328,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_SPIDERS</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum simultaneous spider enemies</td>
 </tr>
@@ -2364,7 +2436,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_COINS</code></td>
-<td><code>24</code></td>
+<td><code>64</code></td>
 <td><code>int</code></td>
 <td>Maximum simultaneous coins on screen</td>
 </tr>
@@ -2454,7 +2526,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_FISH</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum simultaneous fish instances</td>
 </tr>
@@ -2610,9 +2682,9 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_BOUNCEPADS</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
-<td>Maximum simultaneous bouncepad instances</td>
+<td>Maximum simultaneous bouncepad instances (per variant)</td>
 </tr>
 <tr>
 <td><code>BOUNCEPAD_W</code></td>
@@ -2736,7 +2808,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </tr>
 <tr>
 <td><code>MAX_RAILS</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum Rail instances per level</td>
 </tr>
@@ -2802,7 +2874,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </tr>
 <tr>
 <td><code>MAX_SPIKE_BLOCKS</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum spike block instances per level</td>
 </tr>
@@ -2856,7 +2928,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_JUMPING_SPIDERS</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum simultaneous jumping spider instances</td>
 </tr>
@@ -2934,7 +3006,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_BIRDS</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum simultaneous bird instances</td>
 </tr>
@@ -3012,7 +3084,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_FASTER_BIRDS</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum simultaneous faster bird instances</td>
 </tr>
@@ -3102,7 +3174,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </tr>
 <tr>
 <td><code>MAX_FLOAT_PLATFORMS</code></td>
-<td><code>6</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum float platform instances per level</td>
 </tr>
@@ -3138,7 +3210,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_BRIDGES</code></td>
-<td><code>2</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum bridge instances per level</td>
 </tr>
@@ -3198,9 +3270,9 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_STAR_YELLOWS</code></td>
-<td><code>3</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
-<td>Maximum yellow star instances per level</td>
+<td>Maximum star instances per color per level</td>
 </tr>
 <tr>
 <td><code>STAR_YELLOW_DISPLAY_W</code></td>
@@ -3294,7 +3366,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </tr>
 <tr>
 <td><code>MAX_AXE_TRAPS</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum axe trap instances per level</td>
 </tr>
@@ -3360,7 +3432,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </tr>
 <tr>
 <td><code>MAX_CIRCULAR_SAWS</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum circular saw instances per level</td>
 </tr>
@@ -3444,9 +3516,9 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </tr>
 <tr>
 <td><code>MAX_BLUE_FLAMES</code></td>
-<td><code>8</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
-<td>Maximum blue flame instances per level</td>
+<td>Maximum blue/fire flame instances per level</td>
 </tr>
 </tbody></table>
 <hr>
@@ -3462,7 +3534,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_FASTER_FISH</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum faster fish instances per level</td>
 </tr>
@@ -3552,7 +3624,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_SPIKE_ROWS</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum spike row instances per level</td>
 </tr>
@@ -3588,7 +3660,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_SPIKE_PLATFORMS</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum spike platform instances per level</td>
 </tr>
@@ -3630,7 +3702,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_LADDERS</code></td>
-<td><code>8</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum ladder instances per level</td>
 </tr>
@@ -3678,7 +3750,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_ROPES</code></td>
-<td><code>8</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum rope instances per level</td>
 </tr>
@@ -3738,19 +3810,19 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </thead>
 <tbody><tr>
 <td><code>MAX_BOUNCEPADS_SMALL</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum small bouncepad instances</td>
 </tr>
 <tr>
 <td><code>MAX_BOUNCEPADS_MEDIUM</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum medium bouncepad instances</td>
 </tr>
 <tr>
 <td><code>MAX_BOUNCEPADS_HIGH</code></td>
-<td><code>4</code></td>
+<td><code>16</code></td>
 <td><code>int</code></td>
 <td>Maximum high bouncepad instances</td>
 </tr>
@@ -3867,7 +3939,7 @@ void coin_cleanup(Coin *coin);
 #include &quot;coin.h&quot;
 
 void coin_init(Coin *coin, SDL_Renderer *renderer, float x, float y) {
-    coin-&gt;texture = IMG_LoadTexture(renderer, &quot;assets/coin.png&quot;);
+    coin-&gt;texture = IMG_LoadTexture(renderer, &quot;assets/sprites/collectibles/coin.png&quot;);
     if (!coin-&gt;texture) {
         fprintf(stderr, &quot;Failed to load coin.png: %s\n&quot;, IMG_GetError());
         exit(EXIT_FAILURE);
@@ -3906,7 +3978,7 @@ typedef struct {
 </code></pre>
 <h4>4. Wire up in <code>game.c</code></h4>
 <pre><code class="language-c">// game_init -- load texture and init entities:
-gs-&gt;tex_coin = IMG_LoadTexture(gs-&gt;renderer, &quot;assets/coin.png&quot;);
+gs-&gt;tex_coin = IMG_LoadTexture(gs-&gt;renderer, &quot;assets/sprites/collectibles/coin.png&quot;);
 coin_init(&amp;gs-&gt;coins[0], gs-&gt;tex_coin, 200.0f, 100.0f);
 gs-&gt;coin_count = 1;
 
@@ -3923,7 +3995,7 @@ for (int i = 0; i &lt; gs-&gt;coin_count; i++)
     coin_cleanup(&amp;gs-&gt;coins[i]);
 </code></pre>
 <h4>5. Define entity placements in level TOML</h4>
-<p>Entity spawn positions are defined in level TOML files (e.g. <code>levels/sandbox_00.toml</code>). Add your entity placements there, or use the visual editor (<code>make run-editor</code>) to place entities graphically.</p>
+<p>Entity spawn positions are defined in level TOML files (e.g. <code>levels/00_sandbox_01.toml</code>). Add your entity placements there, or use the visual editor (<code>make run-editor</code>) to place entities graphically.</p>
 <h4>6. Add debug hitbox -- <code>src/core/debug.c</code></h4>
 <p>Every entity must have hitbox visualization in <code>debug.c</code>:</p>
 <pre><code class="language-c">// In debug_render:
@@ -4007,11 +4079,11 @@ if (entity-&gt;x &gt; GAME_W - entity-&gt;w)  entity-&gt;x = (float)(GAME_W - en
 </tbody></table>
 <p>Steps to add a new sound:</p>
 <ol>
-<li>Place <code>.wav</code> in <code>sounds/</code>.</li>
+<li>Place <code>.wav</code> in <code>assets/sounds/&lt;category&gt;/</code>.</li>
 <li>Add <code>Mix_Chunk *snd_&lt;name&gt;;</code> to <code>GameState</code> in <code>game.h</code>.</li>
 <li>Load in <code>game_init</code> (non-fatal -- warn but continue):</li>
 </ol>
-<pre><code class="language-c">gs-&gt;snd_&lt;name&gt; = Mix_LoadWAV(&quot;sounds/&lt;name&gt;.wav&quot;);
+<pre><code class="language-c">gs-&gt;snd_&lt;name&gt; = Mix_LoadWAV(&quot;assets/sounds/&lt;category&gt;/&lt;name&gt;.wav&quot;);
 if (!gs-&gt;snd_&lt;name&gt;) {
     fprintf(stderr, &quot;Warning: could not load &lt;name&gt;.wav: %s\n&quot;, Mix_GetError());
 }
@@ -4029,13 +4101,13 @@ if (!gs-&gt;snd_&lt;name&gt;) {
 <p>See <a href="sounds">Sounds</a> for the full list of available sound files.</p>
 <hr>
 <h2>Adding Background Music</h2>
-<p>Background music is loaded via <code>Mix_LoadMUS</code> (not <code>Mix_LoadWAV</code>). The current track is <code>game_music.wav</code>:</p>
-<pre><code class="language-c">// Load
-gs-&gt;music = Mix_LoadMUS(&quot;sounds/game_music.wav&quot;);
+<p>Background music is loaded via <code>Mix_LoadMUS</code> (not <code>Mix_LoadWAV</code>). The track path is configured per level via <code>music_path</code> in the TOML file:</p>
+<pre><code class="language-c">// Load (path from level TOML music_path field)
+gs-&gt;music = Mix_LoadMUS(level-&gt;music_path);
 
 // Play (looping)
 Mix_PlayMusic(gs-&gt;music, -1);
-Mix_VolumeMusic(64);  // 50% -- adjust as needed
+Mix_VolumeMusic(level-&gt;music_volume);  // 0-128, configured per level
 
 // Cleanup
 Mix_HaltMusic();
@@ -4044,9 +4116,9 @@ gs-&gt;music = NULL;
 </code></pre>
 <hr>
 <h2>Adding HUD / Text Rendering</h2>
-<p><code>SDL2_ttf</code> is already initialized in <code>main.c</code>. The font <code>round9x13.ttf</code> is in <code>assets/</code>.</p>
+<p><code>SDL2_ttf</code> is already initialized in <code>main.c</code>. The font <code>round9x13.ttf</code> is in <code>assets/fonts/</code>.</p>
 <pre><code class="language-c">// Load font
-TTF_Font *font = TTF_OpenFont(&quot;assets/round9x13.ttf&quot;, 13);
+TTF_Font *font = TTF_OpenFont(&quot;assets/fonts/round9x13.ttf&quot;, 13);
 if (!font) { fprintf(stderr, &quot;TTF_OpenFont: %s\n&quot;, TTF_GetError()); }
 
 // Render text to a surface, then upload to a texture
@@ -4066,10 +4138,10 @@ TTF_CloseFont(font);
 <p>The HUD renders hearts (lives), life counter, and score. It is drawn after all game entities so it always appears on top.</p>
 <hr>
 <h2>Render Layer Order</h2>
-<p>Always draw in painter&#39;s algorithm order (back to front). The game currently uses 32 layers:</p>
-<pre><code> 1. Parallax background    (7 parallax_*.png layers from assets/)
+<p>Always draw in painter&#39;s algorithm order (back to front). The game currently uses 35 layers:</p>
+<pre><code> 1. Parallax background    (up to 8 layers from assets/sprites/backgrounds/, per level)
  2. Platforms              (platform.png 9-slice pillars)
- 3. Floor tiles            (grass_tileset.png at FLOOR_Y, with floor-gap openings)
+ 3. Floor tiles            (per-level tileset at FLOOR_Y, with floor-gap openings)
  4. Float platforms        (float_platform.png 3-slice hovering surfaces)
  5. Spike rows             (spike.png ground-level spike strips)
  6. Spike platforms        (spike_platform.png elevated spike hazards)
@@ -4083,22 +4155,25 @@ TTF_CloseFont(font);
 14. Ropes                  (rope.png climbable)
 15. Coins                  (coin.png collectibles)
 16. Star yellows           (star_yellow.png health pickups)
-17. Last star              (end-of-level star using HUD star sprite)
-18. Blue flames            (blue_flame.png erupting from floor gaps)
-19. Fish                   (fish.png jumping water enemies)
-20. Faster fish            (faster_fish.png fast jumping enemies)
-21. Water                  (water.png animated strip)
-22. Spike blocks           (spike_block.png rail-riding hazards)
-23. Axe traps              (axe_trap.png swinging hazards)
-24. Circular saws          (circular_saw.png patrol hazards)
-25. Spiders                (spider.png ground patrol)
-26. Jumping spiders        (jumping_spider.png jumping patrol)
-27. Birds                  (bird.png slow sine-wave)
-28. Faster birds           (faster_bird.png fast sine-wave)
-29. Player                 (player.png animated)
-30. Fog                    (fog_background_1/2.png sliding overlay)
-31. HUD                    (hearts, lives, score -- always on top)
-32. Debug overlay          (FPS, hitboxes, event log -- when --debug)
+17. Star greens            (star_green.png health pickups)
+18. Star reds              (star_red.png health pickups)
+19. Last star              (end-of-level star using HUD star sprite)
+20. Blue flames            (blue_flame.png erupting from floor gaps)
+21. Fire flames            (fire_flame.png fire variant erupting from floor gaps)
+22. Fish                   (fish.png jumping water enemies)
+23. Faster fish            (faster_fish.png fast jumping enemies)
+24. Water                  (water.png animated strip)
+25. Spike blocks           (spike_block.png rail-riding hazards)
+26. Axe traps              (axe_trap.png swinging hazards)
+27. Circular saws          (circular_saw.png patrol hazards)
+28. Spiders                (spider.png ground patrol)
+29. Jumping spiders        (jumping_spider.png jumping patrol)
+30. Birds                  (bird.png slow sine-wave)
+31. Faster birds           (faster_bird.png fast sine-wave)
+32. Player                 (player.png animated)
+33. Fog                    (fog_background_1/2.png sliding overlay)
+34. HUD                    (hearts, lives, score -- always on top)
+35. Debug overlay          (FPS, hitboxes, event log -- when --debug)
 </code></pre>
 <p>See <a href="architecture">Architecture</a> for details on the render pipeline.</p>
 <hr>
@@ -4221,7 +4296,7 @@ player_cleanup     ← called once from game_cleanup
 </thead>
 <tbody><tr>
 <td>Load texture</td>
-<td><code>IMG_LoadTexture(renderer, &quot;assets/player.png&quot;)</code> -- 192x288 sheet</td>
+<td><code>IMG_LoadTexture(renderer, &quot;assets/sprites/player/player.png&quot;)</code> -- 192x288 sheet</td>
 </tr>
 <tr>
 <td>Frame rect</td>
@@ -4241,7 +4316,7 @@ player_cleanup     ← called once from game_cleanup
 </tr>
 <tr>
 <td>Speed</td>
-<td><code>160.0f</code> px/s horizontal</td>
+<td>Walk: <code>100.0f</code> px/s, Run: <code>250.0f</code> px/s (acceleration-based)</td>
 </tr>
 <tr>
 <td>Initial velocity</td>
@@ -4307,6 +4382,10 @@ player_cleanup     ← called once from game_cleanup
 <td>Climb up / down on vine (gamepad)</td>
 </tr>
 <tr>
+<td>Left Shift</td>
+<td>Run (hold for <code>RUN_MAX_SPEED</code>, release for <code>WALK_MAX_SPEED</code>)</td>
+</tr>
+<tr>
 <td>Space</td>
 <td>Jump (<code>-325</code> px/s impulse -- ground and vine dismount)</td>
 </tr>
@@ -4351,8 +4430,8 @@ if (player-&gt;on_ground &amp;&amp; want_jump) {
 <li>Pressing Space while on a vine triggers a dismount: <code>on_vine = 0</code>, <code>vy = -325.0f</code> (keyboard) or <code>-500.0f</code> (gamepad).</li>
 <li>The <code>ANIM_CLIMB</code> state plays (row 4, 2 frames at 100 ms each); the animation freezes when the player is stationary on the vine.</li>
 </ol>
-<h3>Horizontal velocity reset</h3>
-<p><code>player-&gt;vx</code> is reset to <code>0.0f</code> at the start of each call. The player stops instantly when no horizontal key is held -- no friction/deceleration is applied in the current MVP.</p>
+<h3>Walk / Run Mode</h3>
+<p>Hold <strong>Shift</strong> (keyboard) or <strong>Right Trigger</strong> (gamepad) to run. Walking uses <code>WALK_MAX_SPEED</code> (100 px/s) with <code>WALK_GROUND_ACCEL</code> (750 px/s^2). Running uses <code>RUN_MAX_SPEED</code> (250 px/s) with <code>RUN_GROUND_ACCEL</code> (600 px/s^2). The player decelerates via <code>GROUND_FRICTION</code> (550 px/s^2) when no input is held, and <code>GROUND_COUNTER_ACCEL</code> (100 px/s^2) is added when reversing direction. Air movement uses reduced acceleration (<code>AIR_ACCEL_WALK</code> = 350, <code>AIR_ACCEL_RUN</code> = 180) and <code>AIR_FRICTION</code> (80 px/s^2).</p>
 <hr>
 <h2>Physics -- <code>player_update</code></h2>
 <pre><code class="language-c">void player_update(Player *player, float dt,
@@ -4398,10 +4477,10 @@ if (player-&gt;y &gt;= floor_snap) {
 <h3>Horizontal Clamp</h3>
 <pre><code class="language-c">if (player-&gt;x + PHYS_PAD_X &lt; 0.0f)
     player-&gt;x = -(float)PHYS_PAD_X;
-if (player-&gt;x + player-&gt;w - PHYS_PAD_X &gt; WORLD_W)
-    player-&gt;x = (float)(WORLD_W - player-&gt;w + PHYS_PAD_X);
+if (player-&gt;x + player-&gt;w - PHYS_PAD_X &gt; world_w)
+    player-&gt;x = (float)(world_w - player-&gt;w + PHYS_PAD_X);
 </code></pre>
-<p>Keeps the player&#39;s <strong>physics body</strong> (inset by <code>PHYS_PAD_X = 12</code> px on each side) inside the full <code>WORLD_W</code> (1600 px) scrollable world. The transparent side-padding of the sprite frame is allowed to slide off-screen while the visible character stays flush with the world border.</p>
+<p>Keeps the player&#39;s <strong>physics body</strong> (inset by <code>PHYS_PAD_X = 15</code> px on each side) inside the full <code>WORLD_W</code> (dynamic, default 1600 px) scrollable world. The transparent side-padding of the sprite frame is allowed to slide off-screen while the visible character stays flush with the world border.</p>
 <h3>Ceiling Clamp</h3>
 <pre><code class="language-c">if (player-&gt;y + PHYS_PAD_TOP &lt; 0.0f) {
     player-&gt;y  = -(float)PHYS_PAD_TOP;
@@ -4677,9 +4756,14 @@ return r;
 <td><code>player.c</code> (local <code>#define</code>)</td>
 </tr>
 <tr>
-<td>Horizontal speed</td>
-<td><code>160.0f</code> px/s</td>
-<td><code>player.c</code> (<code>player-&gt;speed</code>)</td>
+<td>Walk max speed</td>
+<td><code>100.0f</code> px/s</td>
+<td><code>player.c</code> (<code>WALK_MAX_SPEED</code>)</td>
+</tr>
+<tr>
+<td>Run max speed</td>
+<td><code>250.0f</code> px/s</td>
+<td><code>player.c</code> (<code>RUN_MAX_SPEED</code>)</td>
 </tr>
 <tr>
 <td><code>FLOOR_SINK</code></td>
@@ -4699,7 +4783,7 @@ return r;
   <h1 class="page-title">Sounds</h1>
 <p><a href="home">← Home</a></p>
 <hr>
-<p>All audio files live in the <code>sounds/</code> directory. All sound files use the <code>.wav</code> format. SDL2_mixer handles both short sound effects (<code>Mix_Chunk</code> via <code>Mix_LoadWAV</code>) and streaming music (<code>Mix_Music</code> via <code>Mix_LoadMUS</code>).</p>
+<p>All audio files live in the <code>assets/sounds/</code> directory, organized by category (<code>collectibles/</code>, <code>entities/</code>, <code>hazards/</code>, <code>levels/</code>, <code>player/</code>, <code>screens/</code>, <code>surfaces/</code>). All sound files use the <code>.wav</code> format. SDL2_mixer handles both short sound effects (<code>Mix_Chunk</code> via <code>Mix_LoadWAV</code>) and streaming music (<code>Mix_Music</code> via <code>Mix_LoadMUS</code>).</p>
 <hr>
 <h2>Currently Used Sounds</h2>
 <table>
@@ -4712,63 +4796,95 @@ return r;
 </tr>
 </thead>
 <tbody><tr>
-<td><code>player_jump.wav</code></td>
+<td><code>sounds/player/player_jump.wav</code></td>
 <td><code>Mix_Chunk</code></td>
 <td><code>gs-&gt;snd_jump</code></td>
 <td>Played on Space press when <code>on_ground == 1</code></td>
 </tr>
 <tr>
-<td><code>coin.wav</code></td>
+<td><code>sounds/collectibles/coin.wav</code></td>
 <td><code>Mix_Chunk</code></td>
 <td><code>gs-&gt;snd_coin</code></td>
 <td>Played when the player collects a coin</td>
 </tr>
 <tr>
-<td><code>player_hit.wav</code></td>
+<td><code>sounds/player/player_hit.wav</code></td>
 <td><code>Mix_Chunk</code></td>
 <td><code>gs-&gt;snd_hit</code></td>
 <td>Played when the player takes damage</td>
 </tr>
 <tr>
-<td><code>bouncepad.wav</code></td>
+<td><code>sounds/surfaces/bouncepad.wav</code></td>
 <td><code>Mix_Chunk</code></td>
 <td><code>gs-&gt;snd_spring</code></td>
 <td>Played when the player lands on a bouncepad</td>
 </tr>
 <tr>
-<td><code>bird.wav</code></td>
+<td><code>sounds/entities/bird.wav</code></td>
 <td><code>Mix_Chunk</code></td>
 <td><code>gs-&gt;snd_flap</code></td>
 <td>Played for bird enemy wing flap</td>
 </tr>
 <tr>
-<td><code>spider.wav</code></td>
+<td><code>sounds/entities/spider.wav</code></td>
 <td><code>Mix_Chunk</code></td>
 <td><code>gs-&gt;snd_spider_attack</code></td>
 <td>Played for spider enemy attack</td>
 </tr>
 <tr>
-<td><code>fish.wav</code></td>
+<td><code>sounds/entities/fish.wav</code></td>
 <td><code>Mix_Chunk</code></td>
 <td><code>gs-&gt;snd_dive</code></td>
 <td>Played for fish enemy dive</td>
 </tr>
 <tr>
-<td><code>axe_trap.wav</code></td>
+<td><code>sounds/hazards/axe_trap.wav</code></td>
 <td><code>Mix_Chunk</code></td>
 <td><code>gs-&gt;snd_axe</code></td>
 <td>Played for axe trap swing</td>
 </tr>
 <tr>
-<td><code>game_music.wav</code></td>
+<td><code>music_path</code> (per level)</td>
 <td><code>Mix_Music</code></td>
 <td><code>gs-&gt;music</code></td>
-<td>Background music loop, loaded via <code>Mix_LoadMUS</code> (streaming)</td>
+<td>Background music loop, configured per level in TOML, loaded via <code>Mix_LoadMUS</code> (streaming)</td>
 </tr>
 </tbody></table>
 <hr>
 <h2>Unused Sounds</h2>
-<p>The following sounds are stored in <code>sounds/unused/</code> and are not loaded by the game. They are available as reserves for future use.</p>
+<h2>Other Available Sounds</h2>
+<p>Additional sounds available in <code>assets/sounds/</code> by category:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Category</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sounds/screens/confirm_ui.wav</code></td>
+<td>Screens</td>
+<td>Menu confirmation / level complete</td>
+</tr>
+<tr>
+<td><code>sounds/levels/water.wav</code></td>
+<td>Levels</td>
+<td>Water ambience</td>
+</tr>
+<tr>
+<td><code>sounds/levels/lava.wav</code></td>
+<td>Levels</td>
+<td>Lava ambience</td>
+</tr>
+<tr>
+<td><code>sounds/levels/winds.wav</code></td>
+<td>Levels</td>
+<td>Wind gust / outdoor ambience</td>
+</tr>
+</tbody></table>
+<h2>Unused Sounds</h2>
+<p>The following sounds are stored in <code>assets/sounds/unused/</code> and are not loaded by the game.</p>
 <table>
 <thead>
 <tr>
@@ -4777,24 +4893,12 @@ return r;
 </tr>
 </thead>
 <tbody><tr>
-<td><code>confirm_ui.wav</code></td>
-<td>Menu confirmation / level complete</td>
-</tr>
-<tr>
 <td><code>fireball.wav</code></td>
 <td>Projectile / fireball effect</td>
 </tr>
 <tr>
-<td><code>lava.wav</code></td>
-<td>Player touches lava</td>
-</tr>
-<tr>
 <td><code>saw.wav</code></td>
 <td>Circular saw spinning</td>
-</tr>
-<tr>
-<td><code>strong_wind.wav</code></td>
-<td>Wind gust / outdoor ambience</td>
 </tr>
 </tbody></table>
 <hr>
@@ -4867,7 +4971,7 @@ return r;
 <td><code>Mix_VolumeMusic</code></td>
 </tr>
 </tbody></table>
-<p>All eight sound effects use <code>Mix_LoadWAV</code> and are fully loaded into memory. The background music (<code>game_music.wav</code>) uses <code>Mix_LoadMUS</code> which streams from disk, keeping memory usage low.</p>
+<p>All eight sound effects use <code>Mix_LoadWAV</code> and are fully loaded into memory. The background music (configured per level via <code>music_path</code>) uses <code>Mix_LoadMUS</code> which streams from disk, keeping memory usage low.</p>
 <hr>
 <h2>Adding a New Sound Effect</h2>
 <ol>
@@ -4875,7 +4979,7 @@ return r;
 <li>Add a <code>Mix_Chunk *snd_&lt;name&gt;</code> field to <code>GameState</code> in <code>game.h</code>.</li>
 <li>Load it in <code>game_init</code>:</li>
 </ol>
-<pre><code class="language-c">gs-&gt;snd_&lt;name&gt; = Mix_LoadWAV(&quot;sounds/&lt;name&gt;.wav&quot;);
+<pre><code class="language-c">gs-&gt;snd_&lt;name&gt; = Mix_LoadWAV(&quot;assets/sounds/&lt;category&gt;/&lt;name&gt;.wav&quot;);
 if (!gs-&gt;snd_&lt;name&gt;) {
     fprintf(stderr, &quot;Warning: failed to load &lt;name&gt;.wav: %s\n&quot;, Mix_GetError());
     /* Non-fatal — game continues without this sound */
@@ -4898,7 +5002,7 @@ if (!gs-&gt;snd_&lt;name&gt;) {
 <hr>
 <h2>Adding a New Music Track</h2>
 <pre><code class="language-c">// Load (streaming — not fully decoded into RAM)
-gs-&gt;music = Mix_LoadMUS(&quot;sounds/new_track.wav&quot;);
+gs-&gt;music = Mix_LoadMUS(&quot;assets/sounds/levels/new_track.wav&quot;);
 if (!gs-&gt;music) { /* handle error */ }
 
 // Start (loop forever)
@@ -4928,6 +5032,8 @@ gs-&gt;music = NULL;
 ├── collectibles/
 │   ├── coin.h / .c               Coin collectible: placement, AABB collection, render
 │   ├── star_yellow.h / .c        Star yellow health pickup
+│   ├── star_green.h / .c         Star green health pickup
+│   ├── star_red.h / .c           Star red health pickup
 │   └── last_star.h / .c          End-of-level star collectible
 ├── core/
 │   ├── debug.h / .c              Debug overlay: FPS counter, collision hitboxes, event log
@@ -4949,7 +5055,8 @@ gs-&gt;music = NULL;
 │   ├── spike_platform.h / .c     Elevated spike surface hazard
 │   ├── circular_saw.h / .c       Fast rotating patrol saw hazard
 │   ├── axe_trap.h / .c           Swinging/spinning axe hazard
-│   └── blue_flame.h / .c         Blue flame hazard: erupts from floor gaps, rise/flip/fall cycle
+│   ├── blue_flame.h / .c         Blue flame hazard: erupts from floor gaps, rise/flip/fall cycle
+│   └── fire_flame.h / .c         Fire flame hazard: fire-colored variant (reuses BlueFlame struct)
 ├── levels/
 │   ├── level.h                   LevelDef struct and placement types
 │   ├── level_loader.h / .c       Level loading from LevelDef
@@ -5041,11 +5148,12 @@ gs-&gt;music = NULL;
 #define FLOOR_Y       (GAME_H - TILE_SIZE)   // = 252
 #define GRAVITY       800.0f
 #define WORLD_W       1600
-#define CAM_LOOKAHEAD  40
-#define CAM_SMOOTHING  8.0f
-#define CAM_SNAP_THRESHOLD  0.5f
-#define FLOOR_GAP_W     32
-#define MAX_FLOOR_GAPS  8
+#define CAM_LOOKAHEAD_VX_FACTOR 0.20f
+#define CAM_LOOKAHEAD_MAX       50.0f
+#define CAM_SMOOTHING           8.0f
+#define CAM_SNAP_THRESHOLD      0.5f
+#define FLOOR_GAP_W             32
+#define MAX_FLOOR_GAPS          16
 </code></pre>
 <h3>Includes</h3>
 <pre><code class="language-c">#include &quot;player.h&quot;          // Player struct
@@ -5069,7 +5177,7 @@ gs-&gt;music = NULL;
 #include &quot;jumping_spider.h&quot;  // JumpingSpider
 #include &quot;bird.h&quot;            // Bird
 #include &quot;faster_bird.h&quot;     // FasterBird
-#include &quot;star_yellow.h&quot;     // StarYellow
+#include &quot;star_yellow.h&quot;     // StarYellow (also used for green/red)
 #include &quot;axe_trap.h&quot;        // AxeTrap
 #include &quot;circular_saw.h&quot;    // CircularSaw
 #include &quot;blue_flame.h&quot;      // BlueFlame
@@ -5079,6 +5187,7 @@ gs-&gt;music = NULL;
 #include &quot;last_star.h&quot;       // LastStar
 #include &quot;spike.h&quot;           // SpikeRow
 #include &quot;spike_platform.h&quot;  // SpikePlatform
+#include &quot;entity_utils.h&quot;    // Shared entity helpers
 #include &quot;debug.h&quot;           // DebugOverlay
 </code></pre>
 <h3>Function Declarations</h3>
@@ -5095,9 +5204,9 @@ void game_cleanup(GameState *gs);
 <li>Window + renderer + logical size (400x300)</li>
 <li>Parallax background (7 layers)</li>
 <li>Floor tile (<code>grass_tileset.png</code>) and platform tile (<code>platform.png</code>)</li>
-<li>Entity textures: <code>spider.png</code>, <code>jumping_spider.png</code>, <code>bird.png</code>, <code>faster_bird.png</code>, <code>fish.png</code>, <code>faster_fish.png</code>, <code>coin.png</code>, <code>bouncepad_medium.png</code>, <code>bouncepad_small.png</code>, <code>bouncepad_high.png</code>, <code>vine.png</code>, <code>ladder.png</code>, <code>rope.png</code>, <code>rail.png</code>, <code>spike_block.png</code>, <code>float_platform.png</code>, <code>bridge.png</code>, <code>star_yellow.png</code>, <code>axe_trap.png</code>, <code>circular_saw.png</code>, <code>blue_flame.png</code>, <code>spike.png</code>, <code>spike_platform.png</code></li>
+<li>Entity textures: <code>spider.png</code>, <code>jumping_spider.png</code>, <code>bird.png</code>, <code>faster_bird.png</code>, <code>fish.png</code>, <code>faster_fish.png</code>, <code>coin.png</code>, <code>bouncepad_medium.png</code>, <code>bouncepad_small.png</code>, <code>bouncepad_high.png</code>, <code>vine.png</code>, <code>ladder.png</code>, <code>rope.png</code>, <code>rail.png</code>, <code>spike_block.png</code>, <code>float_platform.png</code>, <code>bridge.png</code>, <code>star_yellow.png</code>, <code>star_green.png</code>, <code>star_red.png</code>, <code>axe_trap.png</code>, <code>circular_saw.png</code>, <code>blue_flame.png</code>, <code>fire_flame.png</code>, <code>spike.png</code>, <code>spike_platform.png</code></li>
 <li>Sound effects: <code>bouncepad.wav</code>, <code>axe_trap.wav</code>, <code>bird.wav</code>, <code>spider.wav</code>, <code>fish.wav</code>, <code>player_jump.wav</code>, <code>coin.wav</code>, <code>player_hit.wav</code></li>
-<li>Background music: <code>game_music.wav</code> (via <code>Mix_LoadMUS</code>)</li>
+<li>Background music: per-level <code>music_path</code> (via <code>Mix_LoadMUS</code>)</li>
 <li>Entity init: player, water, fog, HUD, debug, level (via level loader)</li>
 <li>Gamepad controller init</li>
 </ol>
@@ -5153,12 +5262,18 @@ void game_cleanup(GameState *gs);
 <p>Fast rotating patrol saw hazard (720 degrees/s). Patrols horizontally. Asset: <code>circular_saw.png</code>.</p>
 <h3><code>axe_trap.h</code> / <code>axe_trap.c</code></h3>
 <p>Swinging pendulum or spinning axe hazard. Two behaviour modes: swing (60 degree amplitude) and spin (180 degrees/s). Asset: <code>axe_trap.png</code>.</p>
+<h3><code>fire_flame.h</code> / <code>fire_flame.c</code></h3>
+<p>Fire-colored variant of the blue flame hazard. Reuses the <code>BlueFlame</code> struct and functions. Erupts from floor gaps with the same rise/flip/fall cycle. Asset: <code>fire_flame.png</code>.</p>
 <hr>
 <h2>Collectible Modules</h2>
 <h3><code>coin.h</code> / <code>coin.c</code></h3>
 <p>Gold coin collectible. AABB pickup awards 100 points. Every 3 coins restores one heart. Asset: <code>coin.png</code>.</p>
 <h3><code>star_yellow.h</code> / <code>star_yellow.c</code></h3>
 <p>Star yellow health pickup that restores hearts. Asset: <code>star_yellow.png</code>.</p>
+<h3><code>star_green.h</code> / <code>star_green.c</code></h3>
+<p>Star green health pickup that restores hearts. Asset: <code>star_green.png</code>.</p>
+<h3><code>star_red.h</code> / <code>star_red.c</code></h3>
+<p>Star red health pickup that restores hearts. Asset: <code>star_red.png</code>.</p>
 <h3><code>last_star.h</code> / <code>last_star.c</code></h3>
 <p>End-of-level star collectible. Asset: <code>last_star.png</code>.</p>
 <hr>
@@ -5192,7 +5307,7 @@ void game_cleanup(GameState *gs);
 <h3><code>fog.h</code> / <code>fog.c</code></h3>
 <p>Atmospheric fog overlay. Two semi-transparent sky layers slide across the screen with random direction, duration, and fade-in/out. Assets: <code>fog_background_1.png</code>, <code>fog_background_2.png</code>.</p>
 <h3><code>parallax.h</code> / <code>parallax.c</code></h3>
-<p>Multi-layer scrolling background. 7 layers tiled horizontally, each at a different scroll speed. Assets: <code>parallax_sky.png</code>, <code>parallax_clouds_bg.png</code>, <code>parallax_glacial_mountains.png</code>, <code>parallax_clouds_mg_1/2/3.png</code>, <code>parallax_cloud_lonely.png</code>.</p>
+<p>Multi-layer scrolling background. Up to 8 layers tiled horizontally, each at a different scroll speed configured per level via <code>[[background_layers]]</code> in TOML. Assets: <code>assets/sprites/backgrounds/</code> (sky_blue, sky_fire, clouds, glacial_mountains, volcanic_mountains, forest_leafs, castle_pillars, smoke variants, etc.).</p>
 <hr>
 <h2>System Modules</h2>
 <h3><code>rail.h</code> / <code>rail.c</code></h3>
