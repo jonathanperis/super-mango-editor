@@ -18,7 +18,7 @@
 
 /* ---- Constants ---------------------------------------------------------- */
 
-#define MAX_BIRDS        4
+#define MAX_BIRDS       16
 #define BIRD_FRAMES      3       /* animation frames in the sheet            */
 #define BIRD_FRAME_W     48      /* width  of one frame slot (px)            */
 #define BIRD_ART_X       17      /* first visible col within each frame      */
@@ -51,7 +51,7 @@ typedef struct {
 
 /* ---- Function declarations ---------------------------------------------- */
 
-void birds_init(Bird *birds, int *count);
+void birds_init(Bird *birds, int *count, int world_w);
 
 /*
  * birds_update — Move and animate birds.

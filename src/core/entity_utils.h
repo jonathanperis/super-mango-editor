@@ -110,10 +110,10 @@ int sound_volume_for_distance(float dist, float audible_range, int max_volume);
 /* ------------------------------------------------------------------ */
 
 /*
- * patrol_gap_reverse — reverse direction when art centre enters a sea gap.
+ * patrol_gap_reverse — reverse direction when art centre enters a floor gap.
  *
- * Sea gaps are holes in the ground floor at known x positions (each
- * SEA_GAP_W pixels wide).  Ground-patrol enemies must not walk across them.
+ * Floor gaps are holes in the ground floor at known x positions (each
+ * FLOOR_GAP_W pixels wide).  Ground-patrol enemies must not walk across them.
  * This function checks whether the centre of the entity's visible art region
  * is currently over any gap and, if so, snaps the entity back to the gap
  * edge and reverses its velocity.
@@ -124,15 +124,15 @@ int sound_volume_for_distance(float dist, float audible_range, int max_volume);
  *   art_x_offset   : distance (px) from entity.x to the left edge of the art.
  *   art_w          : width (px) of the visible art region.
  *   speed          : absolute patrol speed in px/s (always positive).
- *   sea_gaps       : array of gap left-edge x positions in world-space px.
- *   sea_gap_count  : number of entries in sea_gaps.
- *   sea_gap_w      : width of each gap in px (pass SEA_GAP_W from game.h).
+ *   floor_gaps     : array of gap left-edge x positions in world-space px.
+ *   floor_gap_count: number of entries in floor_gaps.
+ *   floor_gap_w    : width of each gap in px (pass FLOOR_GAP_W from game.h).
  *
  * Usage:
  *   patrol_gap_reverse(&s->x, &s->vx,
  *                      SPIDER_ART_X, SPIDER_ART_W, SPIDER_SPEED,
- *                      sea_gaps, sea_gap_count, SEA_GAP_W);
+ *                      floor_gaps, floor_gap_count, FLOOR_GAP_W);
  */
 void patrol_gap_reverse(float *x, float *vx,
                         float art_x_offset, float art_w, float speed,
-                        const int *sea_gaps, int sea_gap_count, int sea_gap_w);
+                        const int *floor_gaps, int floor_gap_count, int floor_gap_w);

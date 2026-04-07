@@ -9,7 +9,7 @@
 
 #include <SDL.h>
 
-#define MAX_FASTER_FISH         4
+#define MAX_FASTER_FISH        16
 #define FFISH_FRAMES            2
 #define FFISH_FRAME_W          48
 #define FFISH_FRAME_H          48
@@ -43,7 +43,7 @@ typedef struct {
 void faster_fish_init(FasterFish *fish, int *count);
 
 /* Move fish, trigger jumps, and advance animation. */
-void faster_fish_update(FasterFish *fish, int count, float dt);
+void faster_fish_update(FasterFish *fish, int count, float dt, int world_w);
 
 /* Draw all faster fish with camera offset. */
 void faster_fish_render(const FasterFish *fish, int count,

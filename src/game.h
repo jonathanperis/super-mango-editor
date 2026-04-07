@@ -37,7 +37,7 @@
 #include "entities/jumping_spider.h"/* JumpingSpider — jumping patrol enemy */
 #include "entities/bird.h"          /* Bird — slow sine-wave sky patrol */
 #include "entities/faster_bird.h"   /* FasterBird — fast sine-wave sky patrol */
-#include "collectibles/yellow_star.h"/* YellowStar — health-restoring collectible */
+#include "collectibles/star_yellow.h"/* StarYellow — health-restoring collectible */
 #include "hazards/axe_trap.h"       /* AxeTrap — swinging/spinning axe hazard */
 #include "hazards/circular_saw.h"   /* CircularSaw — fast rotating patrol hazard */
 #include "hazards/blue_flame.h"     /* BlueFlame — erupting fire hazard from sea gaps */
@@ -96,22 +96,32 @@
 #define WORLD_W       1600
 
 /*
- * SEA_GAP_W — width of each sea gap in logical pixels.
- * MAX_SEA_GAPS — maximum number of gaps the level can hold.
+ * FLOOR_GAP_W — width of each floor gap in logical pixels.
+ * MAX_FLOOR_GAPS — maximum number of gaps the level can hold.
  *
- * Sea gaps are holes in the ground floor that expose the water below.
+ * Floor gaps are holes in the ground floor that expose the water below.
  * Falling into any gap costs a life (instant death, not a hurt point).
- * Each gap is defined by its left-edge x coordinate; all are SEA_GAP_W wide.
+ * Each gap is defined by its left-edge x coordinate; all are FLOOR_GAP_W wide.
  */
-#define SEA_GAP_W         32
-#define MAX_SEA_GAPS       8
+#define FLOOR_GAP_W         32
+#define MAX_FLOOR_GAPS      16
 
 /*
- * CAM_LOOKAHEAD — extra pixels the camera shifts in the direction the player
- * faces, revealing more terrain ahead before the player reaches the edge.
- * Increase this value for more forward visibility; set to 0 to disable.
+ * CAM_LOOKAHEAD_VX_FACTOR — how many pixels of lookahead per px/s of player
+ * horizontal velocity.  The lookahead scales continuously with vx: at rest
+ * it is exactly 0 (player centred), at full run speed it peaks near
+ * CAM_LOOKAHEAD_MAX.  The camera therefore reveals more terrain the faster
+ * the player is moving, and smoothly recentres when they stop.
+ *
+ * Example: factor 0.20 × 220 px/s (run max) = 44 px of lookahead.
  */
-#define CAM_LOOKAHEAD  40
+#define CAM_LOOKAHEAD_VX_FACTOR  0.20f
+
+/*
+ * CAM_LOOKAHEAD_MAX — hard cap (pixels) on the lookahead in either direction.
+ * Prevents the offset from growing excessively if vx ever exceeds normal max.
+ */
+#define CAM_LOOKAHEAD_MAX  50.0f
 
 /*
  * CAM_SMOOTHING — lerp speed factor (dimensionless, applied per second).
@@ -187,7 +197,7 @@ typedef struct {
     Mix_Chunk    *snd_jump;    /* WAV chunk for the jump sound effect         */
     Mix_Chunk    *snd_coin;    /* WAV chunk played when collecting a coin     */
     Mix_Chunk    *snd_hit;     /* WAV chunk played when player gets hurt      */
-    Mix_Music    *music;       /* MP3 stream for the looping background music */
+    Mix_Music    *music;       /* looping background sound (WAV/OGG)          */
     Player        player;      /* the player, stored by value (not a pointer) */
     Platform      platforms[MAX_PLATFORMS]; /* one-way pillar definitions     */
     int           platform_count;           /* how many platforms are active  */
@@ -210,7 +220,8 @@ typedef struct {
     SDL_Texture  *coin_tex;    /* shared texture for all coin collectibles    */
     Coin          coins[MAX_COINS]; /* collectible coin instances             */
     int           coin_count;       /* number of coins placed                */
-    SDL_Texture  *vine_tex;    /* shared texture for all vine decorations         */
+    SDL_Texture  *vine_green_tex;  /* lush vine (forest/fertile themes)       */
+    SDL_Texture  *vine_brown_tex;  /* dried vine (arid/volcanic themes)       */
     VineDecor     vines[MAX_VINES]; /* static scenery vine instances               */
     int           vine_count;       /* number of vine decorations placed           */
     SDL_Texture  *ladder_tex;      /* shared texture for ladder climbables        */
@@ -241,11 +252,18 @@ typedef struct {
     SDL_Texture  *bridge_tex;          /* shared texture for bridge tiles       */
     Bridge        bridges[MAX_BRIDGES];/* tiled crumble walkway instances      */
     int           bridge_count;        /* number of active bridges             */
-    int           sea_gaps[MAX_SEA_GAPS]; /* left-edge x of each sea gap       */
-    int           sea_gap_count;         /* number of active sea gaps          */
-    SDL_Texture  *yellow_star_tex;       /* shared texture for yellow star pickups*/
-    YellowStar    yellow_stars[MAX_YELLOW_STARS]; /* health-restoring collectibles */
-    int           yellow_star_count;     /* number of yellow stars placed       */
+    int           floor_gaps[MAX_FLOOR_GAPS]; /* left-edge x of each floor gap     */
+    int           floor_gap_count;           /* number of active floor gaps       */
+    SDL_Texture  *star_yellow_tex;       /* shared texture for star yellow pickups*/
+    SDL_Texture  *star_green_tex;       /* shared texture for star green pickups */
+    SDL_Texture  *star_red_tex;         /* shared texture for star red pickups   */
+    SDL_Texture  *last_star_tex;         /* dedicated texture for end-of-level star*/
+    StarYellow    star_yellows[MAX_STAR_YELLOWS]; /* health-restoring collectibles */
+    int           star_yellow_count;     /* number of star yellows placed       */
+    StarYellow    star_greens[MAX_STAR_YELLOWS]; /* green health-restoring collectibles */
+    int           star_green_count;      /* number of star greens placed        */
+    StarYellow    star_reds[MAX_STAR_YELLOWS]; /* red health-restoring collectibles */
+    int           star_red_count;        /* number of star reds placed          */
     SDL_Texture  *axe_trap_tex;          /* shared texture for axe trap hazards*/
     AxeTrap       axe_traps[MAX_AXE_TRAPS]; /* swinging/spinning axe hazards  */
     int           axe_trap_count;        /* number of axe traps placed         */
@@ -259,6 +277,9 @@ typedef struct {
     SDL_Texture  *blue_flame_tex;        /* shared texture for blue flame hazards */
     BlueFlame     blue_flames[MAX_BLUE_FLAMES]; /* erupting fire hazards from gaps */
     int           blue_flame_count;     /* number of blue flames placed        */
+    SDL_Texture  *fire_flame_tex;        /* shared texture for fire flame hazards */
+    BlueFlame     fire_flames[MAX_BLUE_FLAMES]; /* erupting fire hazards (fire variant) */
+    int           fire_flame_count;     /* number of fire flames placed        */
     SDL_Texture  *faster_fish_tex;       /* shared texture for faster fish     */
     FasterFish    faster_fish[MAX_FASTER_FISH]; /* fast jumping fish enemies   */
     int           faster_fish_count;     /* number of faster fish placed       */
@@ -278,7 +299,16 @@ typedef struct {
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
     int           paused;      /* 1 = window lost focus; physics/music frozen */
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
+    char          level_path[256]; /* JSON level to load (--level flag)      */
     DebugOverlay  debug;       /* FPS counter, collision vis, event log      */
+
+    /* ---- Level-wide configuration (set by level_load from LevelDef) -- */
+    const void   *current_level;    /* pointer to the active LevelDef          */
+    int           fog_enabled;      /* 1 = fog rendering active, 0 = disabled  */
+    int           water_enabled;    /* 1 = water strip rendered, 0 = disabled  */
+    int           world_w;         /* level width in pixels (screen_count * GAME_W) */
+    int           score_per_life;   /* score threshold for bonus life           */
+    int           coin_score;       /* points awarded per coin collected        */
 
     /* ---- Loop state (persists across frames for emscripten callback) - */
     Uint64        loop_prev_ticks;  /* timestamp of previous frame         */

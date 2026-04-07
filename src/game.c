@@ -9,6 +9,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>   /* sqrtf — used by apply_damage push impulse */
+#include <string.h> /* strncpy, memset */
+
+#if defined(_WIN32)
+#include <windows.h> /* GetFullPathNameA */
+#elif !defined(__EMSCRIPTEN__)
+#include <limits.h>  /* PATH_MAX */
+#endif
 
 #include "game.h"
 #include "player/player.h"
@@ -28,7 +35,7 @@
 #include "surfaces/rail.h"
 #include "hazards/spike_block.h"
 #include "surfaces/float_platform.h"
-#include "collectibles/yellow_star.h"
+#include "collectibles/star_yellow.h"
 #include "hazards/axe_trap.h"
 #include "hazards/circular_saw.h"
 #include "hazards/blue_flame.h"
@@ -38,7 +45,19 @@
 #include "collectibles/last_star.h"
 #include "hazards/spike.h"
 #include "hazards/spike_platform.h"
-#include "screens/sandbox.h"
+#include "levels/level.h"         /* LevelDef struct                                    */
+#include "levels/level_loader.h"  /* level_load, level_reset                            */
+#include "editor/serializer.h"    /* level_load_toml                                    */
+
+/* ------------------------------------------------------------------ */
+/* Level data — loaded once from TOML, reused on player death resets    */
+/* ------------------------------------------------------------------ */
+
+/*
+ * File-scoped level definition.  Populated once from TOML in game_init,
+ * then referenced by reset_current_level on player death.
+ */
+static LevelDef s_level;
 
 /* ------------------------------------------------------------------ */
 
@@ -102,18 +121,16 @@ void game_init(GameState *gs) {
     SDL_RenderSetLogicalSize(gs->renderer, GAME_W, GAME_H);
 
     /*
-     * Load the multi-layer parallax background system.
-     * Each layer is non-fatal: missing PNGs print a warning and are skipped
-     * at render time.  The renderer must exist before this call because
-     * IMG_LoadTexture uploads data to the GPU immediately.
+     * Parallax background is now initialised AFTER level_load, so that
+     * the LevelDef can specify per-level layer paths and speeds.
+     * See the "Apply level-wide configuration" block below level_load.
      */
-    parallax_init(&gs->parallax, gs->renderer);
 
     /*
      * Load the grass tile. This single 48×48 texture will be repeated
      * (tiled) across the full window width to form the floor.
      */
-    gs->floor_tile = IMG_LoadTexture(gs->renderer, "assets/grass_tileset.png");
+    gs->floor_tile = IMG_LoadTexture(gs->renderer, "assets/sprites/levels/grass_tileset.png");
     if (!gs->floor_tile) {
         fprintf(stderr, "Failed to load Grass_Tileset.png: %s\n", IMG_GetError());
         parallax_cleanup(&gs->parallax);
@@ -128,7 +145,7 @@ void game_init(GameState *gs) {
      * The same texture is reused for every tile in every platform, so we
      * load it once here and pass it to platforms_render each frame.
      */
-    gs->platform_tex = IMG_LoadTexture(gs->renderer, "assets/platform.png");
+    gs->platform_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/levels/grass_platform.png");
     if (!gs->platform_tex) {
         fprintf(stderr, "Failed to load Grass_Oneway.png: %s\n", IMG_GetError());
         SDL_DestroyTexture(gs->floor_tile);
@@ -145,7 +162,7 @@ void game_init(GameState *gs) {
      * Load the shared spider texture.  All spider instances blit from
      * this single texture using different source rects per frame.
      */
-    gs->spider_tex = IMG_LoadTexture(gs->renderer, "assets/spider.png");
+    gs->spider_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/spider.png");
     if (!gs->spider_tex) {
         fprintf(stderr, "Failed to load Spider_1.png: %s\n", IMG_GetError());
         SDL_DestroyTexture(gs->platform_tex);
@@ -160,7 +177,7 @@ void game_init(GameState *gs) {
      * Load the jumping spider texture (Spider_2.png, same layout as Spider_1).
      * Fatal — a gameplay enemy that the player must be able to see.
      */
-    gs->jumping_spider_tex = IMG_LoadTexture(gs->renderer, "assets/jumping_spider.png");
+    gs->jumping_spider_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/jumping_spider.png");
     if (!gs->jumping_spider_tex) {
         fprintf(stderr, "Failed to load Spider_2.png: %s\n", IMG_GetError());
         SDL_DestroyTexture(gs->spider_tex);
@@ -173,53 +190,63 @@ void game_init(GameState *gs) {
     }
 
     /* ---- Load all entity textures (engine resources) --------------- */
-    gs->bird_tex = IMG_LoadTexture(gs->renderer, "assets/bird.png");
+    gs->bird_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/bird.png");
     if (!gs->bird_tex) { fprintf(stderr, "Failed to load Bird_2.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
-    gs->faster_bird_tex = IMG_LoadTexture(gs->renderer, "assets/faster_bird.png");
+    gs->faster_bird_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/faster_bird.png");
     if (!gs->faster_bird_tex) { fprintf(stderr, "Failed to load Bird_1.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
-    gs->fish_tex = IMG_LoadTexture(gs->renderer, "assets/fish.png");
+    gs->fish_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/fish.png");
     if (!gs->fish_tex) { fprintf(stderr, "Failed to load Fish_2.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
-    gs->coin_tex = IMG_LoadTexture(gs->renderer, "assets/coin.png");
+    gs->coin_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/coin.png");
     if (!gs->coin_tex) { fprintf(stderr, "Failed to load Coin.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
-    gs->bouncepad_medium_tex = IMG_LoadTexture(gs->renderer, "assets/bouncepad_medium.png");
+    gs->bouncepad_medium_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/bouncepad_medium.png");
     if (!gs->bouncepad_medium_tex) { fprintf(stderr, "Failed to load Bouncepad_Wood.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
 
     /* Non-fatal textures — game runs without them */
-    gs->vine_tex = IMG_LoadTexture(gs->renderer, "assets/vine.png");
-    if (!gs->vine_tex) fprintf(stderr, "Warning: Failed to load Vine.png: %s\n", IMG_GetError());
-    gs->ladder_tex = IMG_LoadTexture(gs->renderer, "assets/ladder.png");
+    gs->vine_green_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/vine_green.png");
+    if (!gs->vine_green_tex) fprintf(stderr, "Warning: Failed to load Vine_Green.png: %s\n", IMG_GetError());
+    gs->vine_brown_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/vine_brown.png");
+    if (!gs->vine_brown_tex) fprintf(stderr, "Warning: Failed to load Vine_Brown.png: %s\n", IMG_GetError());
+    gs->ladder_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/ladder.png");
     if (!gs->ladder_tex) fprintf(stderr, "Warning: Failed to load Ladder.png: %s\n", IMG_GetError());
-    gs->rope_tex = IMG_LoadTexture(gs->renderer, "assets/rope.png");
+    gs->rope_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/rope.png");
     if (!gs->rope_tex) fprintf(stderr, "Warning: Failed to load Rope.png: %s\n", IMG_GetError());
-    gs->bouncepad_small_tex = IMG_LoadTexture(gs->renderer, "assets/bouncepad_small.png");
+    gs->bouncepad_small_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/bouncepad_small.png");
     if (!gs->bouncepad_small_tex) fprintf(stderr, "Warning: Failed to load Bouncepad_Green.png: %s\n", IMG_GetError());
-    gs->bouncepad_high_tex = IMG_LoadTexture(gs->renderer, "assets/bouncepad_high.png");
+    gs->bouncepad_high_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/bouncepad_high.png");
     if (!gs->bouncepad_high_tex) fprintf(stderr, "Warning: Failed to load Bouncepad_Red.png: %s\n", IMG_GetError());
-    gs->rail_tex = IMG_LoadTexture(gs->renderer, "assets/rail.png");
+    gs->rail_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/rail.png");
     if (!gs->rail_tex) fprintf(stderr, "Warning: Failed to load Rails.png: %s\n", IMG_GetError());
-    gs->spike_block_tex = IMG_LoadTexture(gs->renderer, "assets/spike_block.png");
+    gs->spike_block_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/spike_block.png");
     if (!gs->spike_block_tex) fprintf(stderr, "Warning: Failed to load Spike_Block.png: %s\n", IMG_GetError());
-    gs->float_platform_tex = IMG_LoadTexture(gs->renderer, "assets/float_platform.png");
+    gs->float_platform_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/float_platform.png");
     if (!gs->float_platform_tex) fprintf(stderr, "Warning: Failed to load Platform.png: %s\n", IMG_GetError());
-    gs->bridge_tex = IMG_LoadTexture(gs->renderer, "assets/bridge.png");
+    gs->bridge_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/bridge.png");
     if (!gs->bridge_tex) fprintf(stderr, "Warning: Failed to load Bridge.png: %s\n", IMG_GetError());
-    gs->yellow_star_tex = IMG_LoadTexture(gs->renderer, "assets/yellow_star.png");
-    if (!gs->yellow_star_tex) fprintf(stderr, "Warning: Failed to load Star_Yellow.png: %s\n", IMG_GetError());
-    gs->axe_trap_tex = IMG_LoadTexture(gs->renderer, "assets/axe_trap.png");
+    gs->star_yellow_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/star_yellow.png");
+    if (!gs->star_yellow_tex) fprintf(stderr, "Warning: Failed to load star_yellow.png: %s\n", IMG_GetError());
+    gs->star_green_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/star_green.png");
+    if (!gs->star_green_tex) fprintf(stderr, "Warning: Failed to load star_green.png: %s\n", IMG_GetError());
+    gs->star_red_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/star_red.png");
+    if (!gs->star_red_tex) fprintf(stderr, "Warning: Failed to load star_red.png: %s\n", IMG_GetError());
+    gs->last_star_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/last_star.png");
+    if (!gs->last_star_tex) fprintf(stderr, "Warning: Failed to load last_star.png: %s\n", IMG_GetError());
+    gs->axe_trap_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/axe_trap.png");
     if (!gs->axe_trap_tex) fprintf(stderr, "Warning: Failed to load Axe_Trap.png: %s\n", IMG_GetError());
-    gs->circular_saw_tex = IMG_LoadTexture(gs->renderer, "assets/circular_saw.png");
+    gs->circular_saw_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/circular_saw.png");
     if (!gs->circular_saw_tex) fprintf(stderr, "Warning: Failed to load Circular_Saw.png: %s\n", IMG_GetError());
-    gs->blue_flame_tex = IMG_LoadTexture(gs->renderer, "assets/blue_flame.png");
+    gs->blue_flame_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/blue_flame.png");
     if (!gs->blue_flame_tex) fprintf(stderr, "Warning: Failed to load blue_flame.png: %s\n", IMG_GetError());
-    gs->faster_fish_tex = IMG_LoadTexture(gs->renderer, "assets/faster_fish.png");
+    gs->fire_flame_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/fire_flame.png");
+    if (!gs->fire_flame_tex) fprintf(stderr, "Warning: Failed to load fire_flame.png: %s\n", IMG_GetError());
+    gs->faster_fish_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/faster_fish.png");
     if (!gs->faster_fish_tex) fprintf(stderr, "Warning: Failed to load Fish_1.png: %s\n", IMG_GetError());
-    gs->spike_tex = IMG_LoadTexture(gs->renderer, "assets/spike.png");
+    gs->spike_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/spike.png");
     if (!gs->spike_tex) fprintf(stderr, "Warning: Failed to load Spike.png: %s\n", IMG_GetError());
-    gs->spike_platform_tex = IMG_LoadTexture(gs->renderer, "assets/spike_platform.png");
+    gs->spike_platform_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/hazards/spike_platform.png");
     if (!gs->spike_platform_tex) fprintf(stderr, "Warning: Failed to load Spike_Platform.png: %s\n", IMG_GetError());
 
     /* ---- Load all sound effects ----------------------------------- */
-    gs->snd_spring = Mix_LoadWAV("sounds/bouncepad.wav");
+    gs->snd_spring = Mix_LoadWAV("assets/sounds/surfaces/bouncepad.wav");
     if (!gs->snd_spring) fprintf(stderr, "Warning: Failed to load bouncepad.mp3: %s\n", Mix_GetError());
 
     /*
@@ -227,7 +254,7 @@ void game_init(GameState *gs) {
      * Mix_LoadWAV handles WAV and, with SDL2_mixer ≥ 2.0, also MP3.
      * Non-fatal: gameplay continues without audio if loading fails.
      */
-    gs->snd_axe = Mix_LoadWAV("sounds/axe_trap.wav");
+    gs->snd_axe = Mix_LoadWAV("assets/sounds/hazards/axe_trap.wav");
     if (!gs->snd_axe) {
         fprintf(stderr, "Warning: Failed to load swinging-axe.mp3: %s\n", Mix_GetError());
     }
@@ -236,7 +263,7 @@ void game_init(GameState *gs) {
      * Load the bird flapping sound effect.
      * Non-fatal: gameplay continues without audio if loading fails.
      */
-    gs->snd_flap = Mix_LoadWAV("sounds/bird.wav");
+    gs->snd_flap = Mix_LoadWAV("assets/sounds/entities/bird.wav");
     if (!gs->snd_flap) {
         fprintf(stderr, "Warning: Failed to load flapping.wav: %s\n", Mix_GetError());
     }
@@ -245,7 +272,7 @@ void game_init(GameState *gs) {
      * Load the jumping spider attack sound effect.
      * Non-fatal: gameplay continues without audio if loading fails.
      */
-    gs->snd_spider_attack = Mix_LoadWAV("sounds/spider.wav");
+    gs->snd_spider_attack = Mix_LoadWAV("assets/sounds/entities/spider.wav");
     if (!gs->snd_spider_attack) {
         fprintf(stderr, "Warning: Failed to load spider-attack.mp3: %s\n", Mix_GetError());
     }
@@ -254,7 +281,7 @@ void game_init(GameState *gs) {
      * Load the dive/splash sound for falling into sea gaps.
      * Non-fatal: gameplay continues without audio if loading fails.
      */
-    gs->snd_dive = Mix_LoadWAV("sounds/fish.wav");
+    gs->snd_dive = Mix_LoadWAV("assets/sounds/entities/fish.wav");
     if (!gs->snd_dive) {
         fprintf(stderr, "Warning: Failed to load dive.wav: %s\n", Mix_GetError());
     }
@@ -264,7 +291,7 @@ void game_init(GameState *gs) {
      * Mix_Chunk that can be played on any available mixer channel.
      * Assets path is relative to where the binary is run (repo root).
      */
-    gs->snd_jump = Mix_LoadWAV("sounds/player_jump.wav");
+    gs->snd_jump = Mix_LoadWAV("assets/sounds/player/player_jump.wav");
     if (!gs->snd_jump) {
         fprintf(stderr, "Failed to load jump.wav: %s\n", Mix_GetError());
         SDL_DestroyTexture(gs->coin_tex);
@@ -282,7 +309,7 @@ void game_init(GameState *gs) {
      * Load the coin pickup SFX.
      * Non-fatal: if loading fails, gameplay continues without this effect.
      */
-    gs->snd_coin = Mix_LoadWAV("sounds/coin.wav");
+    gs->snd_coin = Mix_LoadWAV("assets/sounds/collectibles/coin.wav");
     if (!gs->snd_coin) {
         fprintf(stderr, "Warning: Failed to load coin.wav: %s\n", Mix_GetError());
     }
@@ -291,32 +318,16 @@ void game_init(GameState *gs) {
      * Load the player-hit SFX.
      * Non-fatal: if loading fails, gameplay continues without this effect.
      */
-    gs->snd_hit = Mix_LoadWAV("sounds/player_hit.wav");
+    gs->snd_hit = Mix_LoadWAV("assets/sounds/player/player_hit.wav");
     if (!gs->snd_hit) {
         fprintf(stderr, "Warning: Failed to load hit.wav: %s\n", Mix_GetError());
     }
 
     /*
-     * Load and immediately start the background music track.
-     * Mix_Music is the streaming type used for long audio (MP3/OGG/FLAC).
-     * Unlike Mix_Chunk, it streams from disk rather than loading all at once,
-     * which keeps memory usage low for large files.
-     * Mix_PlayMusic(-1) means loop forever until Mix_HaltMusic() is called.
+     * Music is now loaded AFTER level_load, so that the LevelDef can
+     * specify per-level music path and volume.  See the block below.
      */
-    gs->music = Mix_LoadMUS("sounds/game_music.ogg");
-    if (!gs->music) {
-        /* Non-fatal: game runs without music if the file is missing. */
-        fprintf(stderr, "Warning: failed to load game_music.ogg: %s\n", Mix_GetError());
-    } else {
-        Mix_PlayMusic(gs->music, -1);   /* -1 = loop indefinitely                */
-        /*
-         * Mix_VolumeMusic — set the music playback volume.
-         * Range: 0 (silent) to MIX_MAX_VOLUME (128, full volume).
-         * 13/128 ≈ 10%, keeping the ambient track soft so it doesn't
-         * compete with sound effects.
-         */
-        Mix_VolumeMusic(13);
-    }
+    gs->music = NULL;
 
     /* Set up the player (loads texture, sets initial position on the floor) */
     player_init(&gs->player, gs->renderer);
@@ -324,23 +335,160 @@ void game_init(GameState *gs) {
     /* Camera starts at the far-left edge of the world. */
     gs->camera.x = 0.0f;
 
-    /* Load fog textures and spawn the first mist wave */
-    fog_init(&gs->fog, gs->renderer);
+    /*
+     * Fog textures are loaded later, after level_load, because the fog
+     * texture paths come from the level definition (fog_layers in LevelDef).
+     */
 
     /* Load the HUD font and heart icon texture */
-    hud_init(&gs->hud, gs->renderer);
+    hud_init(&gs->hud, gs->renderer, gs->star_yellow_tex, gs->player.texture);
 
     /* Initialise the debug overlay if --debug was passed on the CLI */
     if (gs->debug_mode) debug_init(&gs->debug);
 
-    /* Load the sandbox level — all entity placements and sea gaps */
-    sandbox_load_level(gs);
+    /* Load level from JSON if a path was provided via --level */
+    memset(&s_level, 0, sizeof(s_level));
 
-    /* Initialise the health/lives/score system */
-    gs->hearts          = MAX_HEARTS;
-    gs->lives           = DEFAULT_LIVES;
-    gs->score           = 0;
-    gs->score_life_next = SCORE_PER_LIFE;
+    /*
+     * Validate the level path before opening.  Resolve the path to its
+     * canonical form with realpath() so symbolic links and ".." are
+     * eliminated, then pass only the resolved path to fopen.
+     * This satisfies CodeQL's taint analysis for user-controlled paths.
+     */
+    char safe_path[512] = {0};
+    int path_valid = 0;
+    if (gs->level_path[0] != '\0') {
+#if defined(__EMSCRIPTEN__)
+        /* Emscripten has no realpath — use the path as-is */
+        strncpy(safe_path, gs->level_path, sizeof(safe_path) - 1);
+        path_valid = 1;
+#elif defined(_WIN32)
+        char resolved[260];  /* MAX_PATH */
+        if (GetFullPathNameA(gs->level_path, 260, resolved, NULL)) {
+            strncpy(safe_path, resolved, sizeof(safe_path) - 1);
+            path_valid = 1;
+        }
+#else
+        char *resolved = realpath(gs->level_path, NULL);
+        if (resolved) {
+            strncpy(safe_path, resolved, sizeof(safe_path) - 1);
+            free(resolved);
+            path_valid = 1;
+        }
+#endif
+    }
+
+    if (path_valid &&
+        level_load_toml(safe_path, &s_level) == 0) {
+        /* Successfully loaded from the resolved path */
+    } else {
+        if (gs->level_path[0] != '\0')
+            fprintf(stderr, "Warning: could not load %s — starting empty level\n",
+                    gs->level_path);
+        strncpy(s_level.name, "Untitled", sizeof(s_level.name) - 1);
+    }
+    level_load(gs, &s_level);
+
+    /* ---- Apply level-wide configuration from the LevelDef ----------- */
+    {
+        const LevelDef *def = (const LevelDef *)gs->current_level;
+
+        /*
+         * Background layers — initialise from level definition if layers are
+         * defined; fall back to the hardcoded LAYER_CONFIG table otherwise.
+         */
+        if (def && def->background_layer_count > 0) {
+            /*
+             * Extract paths and speeds into flat arrays so we can pass them
+             * to parallax_init_from_def.  The anonymous struct in LevelDef
+             * stores them interleaved; we need separate pointers.
+             */
+            char  paths[MAX_BACKGROUND_LAYERS][64];
+            float speeds[MAX_BACKGROUND_LAYERS];
+            int   n = def->background_layer_count;
+            if (n > MAX_BACKGROUND_LAYERS) n = MAX_BACKGROUND_LAYERS;
+            for (int i = 0; i < n; i++) {
+                SDL_strlcpy(paths[i], def->background_layers[i].path, 64);
+                speeds[i] = def->background_layers[i].speed;
+            }
+            parallax_init_from_def(&gs->parallax, gs->renderer,
+                                   (const char (*)[64])paths, speeds, n);
+        } else {
+            /* No level-defined layers — use the hardcoded defaults */
+            parallax_init(&gs->parallax, gs->renderer);
+        }
+
+        /*
+         * Floor tile — reload from level definition if a custom path is set.
+         * This allows different levels to use different floor themes (grass,
+         * stone, sand, etc.) without changing engine code.
+         */
+        if (def && def->floor_tile_path[0] != '\0') {
+            if (gs->floor_tile) {
+                SDL_DestroyTexture(gs->floor_tile);
+                gs->floor_tile = NULL;
+            }
+            gs->floor_tile = IMG_LoadTexture(gs->renderer, def->floor_tile_path);
+            if (!gs->floor_tile) {
+                fprintf(stderr, "Warning: failed to load floor tile %s: %s\n",
+                        def->floor_tile_path, IMG_GetError());
+                /* Fall back to default grass tileset */
+                gs->floor_tile = IMG_LoadTexture(gs->renderer,
+                                                 "assets/sprites/levels/grass_tileset.png");
+            }
+        }
+
+        /*
+         * Foreground strip texture — the LAST foreground layer is used as
+         * the animated strip at the bottom of the screen (water, lava,
+         * clouds, etc.).  This is a convention: designers put the strip
+         * layer last in the foreground_layers list.
+         */
+        if (def && def->foreground_layer_count > 0) {
+            const char *strip = def->foreground_layers[def->foreground_layer_count - 1].path;
+            if (strip[0] != '\0')
+                water_reload_texture(&gs->water, gs->renderer, strip);
+        }
+
+        /*
+         * Fog layers — load fog textures from the level definition.
+         * Each level specifies its own fog overlay assets in [[fog_layers]].
+         * If no fog layers are defined, the fog system is left uninitialised
+         * and fog_enabled stays 0 — no fog renders for this level.
+         */
+        if (def && def->fog_layer_count > 0) {
+            char  fog_paths[MAX_FOG_TEXTURES][64];
+            int   n = def->fog_layer_count;
+            if (n > MAX_FOG_TEXTURES) n = MAX_FOG_TEXTURES;
+            for (int i = 0; i < n; i++) {
+                SDL_strlcpy(fog_paths[i], def->fog_layers[i].path, 64);
+            }
+            fog_init(&gs->fog, gs->renderer,
+                     (const char (*)[64])fog_paths, n);
+        }
+
+        /*
+         * Music — load and play from level definition if a path is specified.
+         * Mix_Music streams from disk; Mix_PlayMusic(-1) loops indefinitely.
+         * Non-fatal: game runs without music if the file is missing.
+         */
+        if (def && def->music_path[0] != '\0') {
+            gs->music = Mix_LoadMUS(def->music_path);
+            if (!gs->music) {
+                fprintf(stderr, "Warning: failed to load %s: %s\n",
+                        def->music_path, Mix_GetError());
+            } else {
+                Mix_PlayMusic(gs->music, -1);
+                Mix_VolumeMusic(def->music_volume > 0 ? def->music_volume : 13);
+            }
+        }
+    }
+
+    /*
+     * Health/lives/score are now set by level_load() from LevelDef fields
+     * (initial_hearts, initial_lives, score_per_life).  No hardcoded init
+     * needed here — level_load handles it.
+     */
 
     /*
      * Lazy gamepad initialisation — deferred from SDL_Init on purpose.
@@ -383,7 +531,7 @@ void game_init(GameState *gs) {
 /* ------------------------------------------------------------------ */
 
 /*
- * level_reset — centralised "player died, restart level" handler.
+ * reset_current_level — centralised "player died, restart level" handler.
  *
  * Resets every entity array and the player to their initial state.
  * Called from every hearts<=0 branch so all sources of death produce
@@ -394,8 +542,9 @@ void game_init(GameState *gs) {
  * stay-on logic from snapping the player to a platform that no longer
  * exists after the reset.
  */
-static void level_reset(GameState *gs, int *fp_prev_riding) {
-    sandbox_reset_level(gs, fp_prev_riding);
+static void reset_current_level(GameState *gs, int *fp_prev_riding) {
+    level_reset(gs, &s_level);
+    *fp_prev_riding = -1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -452,14 +601,21 @@ static void apply_damage(GameState *gs,
     if (gs->hearts <= 0) {
         gs->lives--;
         if (gs->lives < 0) {
-            gs->lives           = DEFAULT_LIVES;
+            /* Game over — reset to level-defined starting values */
+            const LevelDef *def = (const LevelDef *)gs->current_level;
+            gs->lives           = def && def->initial_lives  > 0
+                                ? def->initial_lives  : DEFAULT_LIVES;
             gs->score           = 0;
-            gs->score_life_next = SCORE_PER_LIFE;
+            gs->score_life_next = gs->score_per_life;
             if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
         }
         if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
-        gs->hearts = MAX_HEARTS;
-        level_reset(gs, &gs->fp_prev_riding);
+        {
+            const LevelDef *def = (const LevelDef *)gs->current_level;
+            gs->hearts = def && def->initial_hearts > 0
+                       ? def->initial_hearts : MAX_HEARTS;
+        }
+        reset_current_level(gs, &gs->fp_prev_riding);
     }
 }
 
@@ -694,6 +850,26 @@ static void game_collide(GameState *gs, float dt)
             }
         }
 
+        /* ---- Fire flame collision --------------------------------- */
+        /*
+         * Fire flames use the same BlueFlame struct and mechanics.
+         * Only check visible fire flames (not in WAITING state).
+         */
+        if (gs->player.hurt_timer == 0.0f) {
+            for (int i = 0; i < gs->fire_flame_count; i++) {
+                if (!gs->fire_flames[i].active) continue;
+                if (gs->fire_flames[i].state == BLUE_FLAME_WAITING) continue;
+                SDL_Rect fhit = blue_flame_get_hitbox(&gs->fire_flames[i]);
+                if (SDL_HasIntersection(&phit, &fhit)) {
+                    if (gs->debug_mode) debug_log(&gs->debug, "HIT fire_flame[%d]", i);
+                    float sx = fhit.x + fhit.w * 0.5f;
+                    float sy = fhit.y + fhit.h * 0.5f;
+                    apply_damage(gs, 1, 1, sx, sy);
+                    break;
+                }
+            }
+        }
+
         /* ---- Spike row collision ---------------------------------- */
         /*
          * Ground spikes deal 1 heart of damage on contact.
@@ -775,7 +951,7 @@ static void game_collide(GameState *gs, float dt)
                     Mix_PlayChannel(-1, gs->snd_coin, 0);
                 }
 
-                gs->score += COIN_SCORE;
+                gs->score += gs->coin_score;
                 if (gs->debug_mode) debug_log(&gs->debug, "COIN [%d] score=%d", i, gs->score);
 
                 /*
@@ -787,7 +963,7 @@ static void game_collide(GameState *gs, float dt)
                  */
                 if (gs->score >= gs->score_life_next) {
                     gs->lives++;
-                    gs->score_life_next += SCORE_PER_LIFE;
+                    gs->score_life_next += gs->score_per_life;
                     if (gs->debug_mode) debug_log(&gs->debug, "1UP! lives=%d", gs->lives);
                 }
             }
@@ -801,14 +977,14 @@ static void game_collide(GameState *gs, float dt)
      */
     {
         SDL_Rect phit = player_get_hitbox(&gs->player);
-        for (int i = 0; i < gs->yellow_star_count; i++) {
-            if (!gs->yellow_stars[i].active) continue;
+        for (int i = 0; i < gs->star_yellow_count; i++) {
+            if (!gs->star_yellows[i].active) continue;
             SDL_Rect sbox = {
-                (int)gs->yellow_stars[i].x, (int)gs->yellow_stars[i].y,
-                YELLOW_STAR_DISPLAY_W, YELLOW_STAR_DISPLAY_H
+                (int)gs->star_yellows[i].x, (int)gs->star_yellows[i].y,
+                STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
             };
             if (SDL_HasIntersection(&phit, &sbox)) {
-                gs->yellow_stars[i].active = 0;
+                gs->star_yellows[i].active = 0;
 
                 if (gs->snd_coin) {
                     Mix_PlayChannel(-1, gs->snd_coin, 0);
@@ -817,6 +993,62 @@ static void game_collide(GameState *gs, float dt)
                 if (gs->hearts < MAX_HEARTS) {
                     gs->hearts++;
                     if (gs->debug_mode) debug_log(&gs->debug, "YELLOW STAR [%d] hearts=%d", i, gs->hearts);
+                }
+            }
+        }
+    }
+
+    /* ---- Green star collision ---------------------------------- */
+    /*
+     * Green stars restore one heart immediately on pickup.
+     * Same mechanics as yellow stars — purely a health pickup.
+     */
+    {
+        SDL_Rect phit = player_get_hitbox(&gs->player);
+        for (int i = 0; i < gs->star_green_count; i++) {
+            if (!gs->star_greens[i].active) continue;
+            SDL_Rect sbox = {
+                (int)gs->star_greens[i].x, (int)gs->star_greens[i].y,
+                STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
+            };
+            if (SDL_HasIntersection(&phit, &sbox)) {
+                gs->star_greens[i].active = 0;
+
+                if (gs->snd_coin) {
+                    Mix_PlayChannel(-1, gs->snd_coin, 0);
+                }
+
+                if (gs->hearts < MAX_HEARTS) {
+                    gs->hearts++;
+                    if (gs->debug_mode) debug_log(&gs->debug, "GREEN STAR [%d] hearts=%d", i, gs->hearts);
+                }
+            }
+        }
+    }
+
+    /* ---- Red star collision ------------------------------------ */
+    /*
+     * Red stars restore one heart immediately on pickup.
+     * Same mechanics as yellow stars — purely a health pickup.
+     */
+    {
+        SDL_Rect phit = player_get_hitbox(&gs->player);
+        for (int i = 0; i < gs->star_red_count; i++) {
+            if (!gs->star_reds[i].active) continue;
+            SDL_Rect sbox = {
+                (int)gs->star_reds[i].x, (int)gs->star_reds[i].y,
+                STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
+            };
+            if (SDL_HasIntersection(&phit, &sbox)) {
+                gs->star_reds[i].active = 0;
+
+                if (gs->snd_coin) {
+                    Mix_PlayChannel(-1, gs->snd_coin, 0);
+                }
+
+                if (gs->hearts < MAX_HEARTS) {
+                    gs->hearts++;
+                    if (gs->debug_mode) debug_log(&gs->debug, "RED STAR [%d] hearts=%d", i, gs->hearts);
                 }
             }
         }
@@ -911,13 +1143,13 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
             /*
              * Skip this piece if it falls inside any sea gap.
              * A piece at tx is inside a gap when:
-             *   gap_x <= tx  AND  tx + P <= gap_x + SEA_GAP_W
+             *   gap_x <= tx  AND  tx + P <= gap_x + FLOOR_GAP_W
              * (both edges of the 16-px piece are within the 32-px gap).
              */
             int in_gap = 0;
-            for (int g = 0; g < gs->sea_gap_count; g++) {
-                int gx = gs->sea_gaps[g];
-                if (tx >= gx && tx + P <= gx + SEA_GAP_W) {
+            for (int g = 0; g < gs->floor_gap_count; g++) {
+                int gx = gs->floor_gaps[g];
+                if (tx >= gx && tx + P <= gx + FLOOR_GAP_W) {
                     in_gap = 1;
                     break;
                 }
@@ -935,14 +1167,14 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
 
             /* World boundaries */
             if (tx <= 0)                at_left_edge  = 1;
-            if (tx + P >= WORLD_W)      at_right_edge = 1;
+            if (tx + P >= gs->world_w)  at_right_edge = 1;
 
             /* Gap boundaries: piece is a right-cap if next piece is gap,
              * left-cap if previous piece was gap. */
-            for (int g = 0; g < gs->sea_gap_count; g++) {
-                int gx = gs->sea_gaps[g];
-                if (tx + P == gx)              at_right_edge = 1;  /* gap starts right after this piece */
-                if (tx     == gx + SEA_GAP_W)  at_left_edge  = 1;  /* gap ends right before this piece  */
+            for (int g = 0; g < gs->floor_gap_count; g++) {
+                int gx = gs->floor_gaps[g];
+                if (tx + P == gx)                at_right_edge = 1;  /* gap starts right after this piece */
+                if (tx     == gx + FLOOR_GAP_W)  at_left_edge  = 1;  /* gap ends right before this piece  */
             }
 
             if (at_left_edge && at_right_edge) piece_col = 1;  /* squeezed — use fill */
@@ -1008,9 +1240,9 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
     }
 
     /* Draw vine decorations on ground and platform tops, behind entities */
-    if (gs->vine_tex) {
+    if (gs->vine_green_tex || gs->vine_brown_tex) {
         vine_render(gs->vines, gs->vine_count,
-                    gs->renderer, gs->vine_tex, cam_x);
+                    gs->renderer, gs->vine_green_tex, gs->vine_brown_tex, cam_x);
     }
 
     /* Draw ladders and ropes in the same layer as vines */
@@ -1027,17 +1259,28 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
     coins_render(gs->coins, gs->coin_count,
                  gs->renderer, gs->coin_tex, cam_x);
 
-    /* Draw yellow stars alongside coins — same layer, same visibility */
-    yellow_stars_render(gs->yellow_stars, gs->yellow_star_count,
-                     gs->renderer, gs->yellow_star_tex, cam_x);
+    /* Draw star yellows alongside coins — same layer, same visibility */
+    star_yellows_render(gs->star_yellows, gs->star_yellow_count,
+                     gs->renderer, gs->star_yellow_tex, cam_x);
 
-    /* Draw the end-of-level last star (uses Stars_Ui.png from HUD) */
+    /* Draw star greens — same mechanics and display size as yellow stars */
+    star_yellows_render(gs->star_greens, gs->star_green_count,
+                     gs->renderer, gs->star_green_tex, cam_x);
+
+    /* Draw star reds — same mechanics and display size as yellow stars */
+    star_yellows_render(gs->star_reds, gs->star_red_count,
+                     gs->renderer, gs->star_red_tex, cam_x);
+
+    /* Draw the end-of-level last star using its dedicated sprite */
     last_star_render(&gs->last_star, gs->renderer,
-                     gs->hud.star_tex, cam_x);
+                     gs->last_star_tex, cam_x);
 
     /* Draw blue flames behind the water and fish, in front of ground */
     blue_flames_render(gs->blue_flames, gs->blue_flame_count,
                   gs->renderer, gs->blue_flame_tex, cam_x);
+    /* Draw fire flames in the same layer (fire variant texture) */
+    blue_flames_render(gs->fire_flames, gs->fire_flame_count,
+                  gs->renderer, gs->fire_flame_tex, cam_x);
 
     /* Draw fish behind the water strip (submerged look) but in front of
      * the ground, so the water wave art occludes the submerged portion. */
@@ -1051,7 +1294,7 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
      * Draw the water strip on top of the floor/platforms and fish.
      * The full 384-px sheet scrolls rightward as a seamless loop.
      */
-    water_render(&gs->water, gs->renderer);
+    if (gs->water_enabled) water_render(&gs->water, gs->renderer);
 
     /* Draw spike blocks above the water strip but below the player */
     if (gs->spike_block_tex) {
@@ -1083,8 +1326,9 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
     /* Draw the player sprite on top of everything */
     player_render(&gs->player, gs->renderer, cam_x);
 
-    /* Draw fog/mist as the topmost layer — rendered after the player */
-    fog_render(&gs->fog, gs->renderer);
+    /* Draw fog/mist as the topmost layer — rendered after the player.
+     * Only active when the level definition enables fog (fog_enabled == 1). */
+    if (gs->fog_enabled) fog_render(&gs->fog, gs->renderer);
 
     /* Draw the HUD overlay on top of everything (hearts, lives, score) */
     hud_render(&gs->hud, gs->renderer,
@@ -1294,9 +1538,10 @@ static void game_loop_frame(void *arg) {
                       gs->ropes, gs->rope_count,
                       gs->bridges, gs->bridge_count,
                       gs->spike_platforms, gs->spike_platform_count,
-                      gs->sea_gaps, gs->sea_gap_count,
+                      gs->floor_gaps, gs->floor_gap_count,
                       &bounce_idx, &fp_landed_idx,
-                      gs->fp_prev_riding);
+                      gs->fp_prev_riding,
+                      gs->world_w);
 
         /*
          * Bouncepad landing response: start the release animation and play
@@ -1332,25 +1577,25 @@ static void game_loop_frame(void *arg) {
             }
         }
         /*
-         * Sea gap collision — instant life loss.
+         * Floor gap collision — instant life loss.
          *
-         * Each sea gap is a SEA_GAP_W-wide hole in the floor.  The player
+         * Each floor gap is a FLOOR_GAP_W-wide hole in the floor.  The player
          * falls through into the water below.  Once the player's physics
          * centre drops below FLOOR_Y + 16 (the water surface) inside any
          * gap, they lose a life (not a heart) and respawn.  This check
-         * ignores the invincibility timer — falling into the sea is fatal.
+         * ignores the invincibility timer — falling into the gap is fatal.
          */
         {
             float pcx = gs->player.x + gs->player.w / 2.0f;
             float pcy = gs->player.y + gs->player.h / 2.0f;
-            for (int g = 0; g < gs->sea_gap_count; g++) {
-                float gx = (float)gs->sea_gaps[g];
-                if (pcx >= gx && pcx < gx + (float)SEA_GAP_W &&
+            for (int g = 0; g < gs->floor_gap_count; g++) {
+                float gx = (float)gs->floor_gaps[g];
+                if (pcx >= gx && pcx < gx + (float)FLOOR_GAP_W &&
                     pcy > (float)(GAME_H - WATER_ART_H)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT sea gap[%d]", g);
+                    if (gs->debug_mode) debug_log(&gs->debug, "HIT floor gap[%d]", g);
                     /* Play the dive/splash SFX */
                     if (gs->snd_dive) Mix_PlayChannel(-1, gs->snd_dive, 0);
-                    /* Sea gap is always lethal — drain all remaining hearts, no push */
+                    /* Floor gap is always lethal — drain all remaining hearts, no push */
                     apply_damage(gs, gs->hearts, 0, 0.0f, 0.0f);
                     break;
                 }
@@ -1359,10 +1604,10 @@ static void game_loop_frame(void *arg) {
 
         /* Move spiders along their patrol paths and advance their animation */
         spiders_update(gs->spiders, gs->spider_count, dt,
-                       gs->sea_gaps, gs->sea_gap_count);
+                       gs->floor_gaps, gs->floor_gap_count);
         /* Move jumping spiders: patrol + periodic jump arcs */
         jumping_spiders_update(gs->jumping_spiders, gs->jumping_spider_count, dt,
-                               gs->sea_gaps, gs->sea_gap_count,
+                               gs->floor_gaps, gs->floor_gap_count,
                                gs->snd_spider_attack,
                                gs->player.x + gs->player.w / 2.0f, cam_x);
         /* Move birds along their sine-wave patrol paths */
@@ -1371,9 +1616,9 @@ static void game_loop_frame(void *arg) {
         faster_birds_update(gs->faster_birds, gs->faster_bird_count, dt, gs->snd_flap,
                             gs->player.x + gs->player.w / 2.0f, cam_x);
         /* Move fish through the water lane and trigger random jump arcs */
-        fish_update(gs->fish, gs->fish_count, dt);
+        fish_update(gs->fish, gs->fish_count, dt, gs->world_w);
         /* Move faster fish through the water lane with higher jumps */
-        faster_fish_update(gs->faster_fish, gs->faster_fish_count, dt);
+        faster_fish_update(gs->faster_fish, gs->faster_fish_count, dt, gs->world_w);
         /* Advance each spike block along its rail path (cam_x needed for
          * the waiting-until-visible check on fall-off rails) */
         spike_blocks_update(gs->spike_blocks, gs->spike_block_count, dt, cam_x);
@@ -1452,10 +1697,11 @@ static void game_loop_frame(void *arg) {
 
         game_collide(gs, dt);
 
-        /* Advance the water scroll offset */
-        water_update(&gs->water, dt);
-        /* Advance the fog wave positions and spawn the next wave if it is time */
-        fog_update(&gs->fog, dt);
+        /* Advance the water scroll offset (if water is enabled for this level) */
+        if (gs->water_enabled) water_update(&gs->water, dt);
+        /* Advance the fog wave positions and spawn the next wave if it is time.
+         * Only active when the level definition enables fog. */
+        if (gs->fog_enabled) fog_update(&gs->fog, dt);
         /* Advance the bouncepad release animation (frame 1 → 0 → back to 2) */
         bouncepads_update(gs->bouncepads_medium, gs->bouncepad_medium_count, (Uint32)(dt * 1000.0f));
         bouncepads_update(gs->bouncepads_small, gs->bouncepad_small_count, (Uint32)(dt * 1000.0f));
@@ -1467,20 +1713,37 @@ static void game_loop_frame(void *arg) {
         circular_saws_update(gs->circular_saws, gs->circular_saw_count, dt);
         /* Advance blue flame eruption cycles (rise, flip, fall, wait) */
         blue_flames_update(gs->blue_flames, gs->blue_flame_count, dt);
+        /* Advance fire flame eruption cycles (same mechanics, fire variant) */
+        blue_flames_update(gs->fire_flames, gs->fire_flame_count, dt);
 
         /* ---- Camera update --------------------------------------- */
         /*
-         * The camera tries to keep the player centred on screen, offset by a
-         * directional lookahead that reveals more terrain ahead of the player.
+         * Velocity-driven lookahead: the camera shifts ahead of the player
+         * proportionally to their current horizontal velocity (vx).
          *
-         * target_x = player_center_in_world - half_screen + lookahead
+         *   lookahead = vx × CAM_LOOKAHEAD_VX_FACTOR
          *
-         * lookahead shifts the viewport in the direction the player faces:
-         *   facing right (+) → window peeks further right
-         *   facing left  (−) → window peeks further left
+         * This means:
+         *   vx = 0  → lookahead = 0  → player perfectly centred.
+         *   vx = max run speed       → lookahead ≈ CAM_LOOKAHEAD_MAX,
+         *                              revealing more terrain ahead.
+         *   reversing direction      → lookahead crosses 0 and builds in the
+         *                              new direction as speed increases again.
+         *
+         * CAM_LOOKAHEAD_MAX caps the offset so it never grows unboundedly.
          */
-        float lookahead = gs->player.facing_left ? -(float)CAM_LOOKAHEAD
-                                                 :  (float)CAM_LOOKAHEAD;
+        /* Use level-defined camera params if set, otherwise fall back to macros. */
+        const LevelDef *cam_def = (const LevelDef *)gs->current_level;
+        float cam_vx_factor = (cam_def && cam_def->physics.cam_lookahead_vx_factor != 0.0f)
+                                ? cam_def->physics.cam_lookahead_vx_factor
+                                : CAM_LOOKAHEAD_VX_FACTOR;
+        float cam_max = (cam_def && cam_def->physics.cam_lookahead_max != 0.0f)
+                          ? cam_def->physics.cam_lookahead_max
+                          : CAM_LOOKAHEAD_MAX;
+
+        float lookahead = gs->player.vx * cam_vx_factor;
+        if (lookahead >  cam_max) lookahead =  cam_max;
+        if (lookahead < -cam_max) lookahead = -cam_max;
 
         float cam_target = (gs->player.x + gs->player.w * 0.5f)
                            - (GAME_W * 0.5f)
@@ -1493,7 +1756,7 @@ static void game_loop_frame(void *arg) {
          * walks freely within the screen until facing back toward open space.
          */
         if (cam_target < 0.0f)               cam_target = 0.0f;
-        if (cam_target > WORLD_W - GAME_W)   cam_target = (float)(WORLD_W - GAME_W);
+        if (cam_target > gs->world_w - GAME_W) cam_target = (float)(gs->world_w - GAME_W);
 
         /*
          * Smooth follow: close a fraction of the remaining gap each frame.
@@ -1685,7 +1948,8 @@ void game_cleanup(GameState *gs) {
     DESTROY_TEX(gs->bridge_tex);
     DESTROY_TEX(gs->float_platform_tex);
     DESTROY_TEX(gs->rail_tex);
-    DESTROY_TEX(gs->vine_tex);
+    DESTROY_TEX(gs->vine_green_tex);
+    DESTROY_TEX(gs->vine_brown_tex);
     DESTROY_TEX(gs->ladder_tex);
     DESTROY_TEX(gs->rope_tex);
 
@@ -1695,7 +1959,10 @@ void game_cleanup(GameState *gs) {
     DESTROY_TEX(gs->bouncepad_high_tex);
 
     DESTROY_TEX(gs->coin_tex);
-    DESTROY_TEX(gs->yellow_star_tex);
+    DESTROY_TEX(gs->star_yellow_tex);
+    DESTROY_TEX(gs->star_green_tex);
+    DESTROY_TEX(gs->star_red_tex);
+    DESTROY_TEX(gs->last_star_tex);
 
     FREE_CHUNK(gs->snd_dive);
     FREE_CHUNK(gs->snd_spider_attack);
@@ -1705,6 +1972,7 @@ void game_cleanup(GameState *gs) {
     DESTROY_TEX(gs->axe_trap_tex);
     DESTROY_TEX(gs->circular_saw_tex);
     DESTROY_TEX(gs->blue_flame_tex);
+    DESTROY_TEX(gs->fire_flame_tex);
     DESTROY_TEX(gs->faster_fish_tex);
     DESTROY_TEX(gs->spike_tex);
     DESTROY_TEX(gs->spike_platform_tex);
@@ -1713,6 +1981,13 @@ void game_cleanup(GameState *gs) {
     DESTROY_TEX(gs->bird_tex);
     DESTROY_TEX(gs->jumping_spider_tex);
     DESTROY_TEX(gs->spider_tex);
+    /* Free per-platform tileset textures */
+    for (int i = 0; i < gs->platform_count; i++) {
+        if (gs->platforms[i].tex) {
+            SDL_DestroyTexture(gs->platforms[i].tex);
+            gs->platforms[i].tex = NULL;
+        }
+    }
     DESTROY_TEX(gs->platform_tex);
     DESTROY_TEX(gs->floor_tile);
 

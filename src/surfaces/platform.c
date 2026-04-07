@@ -20,7 +20,8 @@
  * Pillars sit directly on top of the floor (their bottom edge == FLOOR_Y)
  * so they look like natural extensions of the ground.
  *
- * World layout (WORLD_W = 1600 px, 4 screens of 400 px each):
+ * This default layout is for a 4-screen world (screen_count=4, 1600 px).
+ * Levels loaded from TOML can define any screen_count and world width.
  *
  *   Screen 1 (x 0–400):
  *     Pillar 1 — medium (2 tiles tall) at x=80
@@ -123,11 +124,15 @@ void platforms_init(Platform *platforms, int *count) {
  * corners instead of a stack of identical repeated tiles.
  */
 void platforms_render(const Platform *platforms, int count,
-                      SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                       SDL_Renderer *renderer, SDL_Texture *default_tex, int cam_x) {
     const int P = TILE_SIZE / 3;   /* 9-slice piece size: 16 px */
 
     for (int i = 0; i < count; i++) {
         const Platform *p = &platforms[i];
+
+        /* Use per-platform texture if set, otherwise fall back to default */
+        SDL_Texture *tex = p->tex ? p->tex : default_tex;
+        if (!tex) continue;
 
         /*
          * Walk every 16×16 piece position inside the pillar bounding box.
@@ -148,7 +153,7 @@ void platforms_render(const Platform *platforms, int count,
                 else                      piece_col = 1;   /* center fill*/
 
                 /*
-                 * src — the 16×16 cell to cut from Grass_Oneway.png.
+                 * src — the 16×16 cell to cut from the tileset.
                  * dst — world → screen: subtract cam_x from the x coordinate
                  *       so the pillar scrolls with the camera.
                  */

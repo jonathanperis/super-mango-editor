@@ -21,7 +21,7 @@
 
 #include <SDL.h>
 
-#define MAX_SPIDERS      4     /* maximum simultaneous spiders on screen    */
+#define MAX_SPIDERS     16     /* maximum simultaneous spiders on screen    */
 #define SPIDER_FRAMES    3     /* animation frames in Spider_1.png          */
 #define SPIDER_FRAME_W   64    /* width of one frame slot in the sheet (px) */
 #define SPIDER_ART_X     20    /* first visible col within each frame slot  */
@@ -65,7 +65,7 @@ void spiders_init(Spider *spiders, int *count);
  * dt      : delta-time in seconds (frame-rate independent movement)
  */
 void spiders_update(Spider *spiders, int count, float dt,
-                    const int *sea_gaps, int sea_gap_count);
+                    const int *floor_gaps, int floor_gap_count);
 
 /*
  * spiders_render — Draw all active spiders using the shared texture.

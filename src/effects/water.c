@@ -13,12 +13,30 @@
 
 void water_init(Water *w, SDL_Renderer *renderer)
 {
-    w->texture  = IMG_LoadTexture(renderer, "assets/water.png");
+    w->texture  = IMG_LoadTexture(renderer, "assets/sprites/foregrounds/water.png");
     if (!w->texture) {
         fprintf(stderr, "water_init: IMG_LoadTexture: %s\n", IMG_GetError());
         exit(EXIT_FAILURE);
     }
     w->scroll_x = 0.0f;
+}
+
+/*
+ * water_reload_texture — Replace the water texture with a different asset.
+ * Used when the level's foreground layers specify lava or another strip
+ * instead of the default water.  Keeps scroll state intact.
+ */
+void water_reload_texture(Water *w, SDL_Renderer *renderer, const char *path)
+{
+    if (!path || path[0] == '\0') return;
+
+    SDL_Texture *new_tex = IMG_LoadTexture(renderer, path);
+    if (new_tex) {
+        if (w->texture) SDL_DestroyTexture(w->texture);
+        w->texture = new_tex;
+    } else {
+        fprintf(stderr, "water_reload_texture: %s: %s\n", path, IMG_GetError());
+    }
 }
 
 void water_update(Water *w, float dt)

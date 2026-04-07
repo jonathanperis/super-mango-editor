@@ -4,9 +4,9 @@
  * Responsibilities:
  *   1. Boot every SDL subsystem the game needs.
  *   2. Route to the appropriate screen based on CLI arguments:
- *        default           → start_menu (black screen with title)
- *        --sandbox         → game sandbox (the full gameplay phase)
- *        --sandbox --debug → game sandbox with debug overlays
+ *        default                → start_menu (title screen with Play button)
+ *        --level <path>         → load a JSON level and start gameplay directly
+ *        --level <path> --debug → same, with debug overlays
  *   3. Tear every subsystem back down before exiting.
  *
  * The order of init and teardown is intentional:
@@ -35,14 +35,16 @@
 int main(int argc, char *argv[]) {
     /*
      * Scan command-line arguments for flags:
-     *   --debug   → enable debug overlays in the sandbox
-     *   --sandbox → run the gameplay sandbox instead of the start menu
+     *   --debug        → enable debug overlays
+     *   --level <path> → load a JSON level file (also skips the start menu)
      */
     int debug_mode  = 0;
-    int sandbox_mode = 0;
+    const char *level_path = NULL;
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--debug") == 0)   debug_mode   = 1;
-        if (strcmp(argv[i], "--sandbox") == 0) sandbox_mode = 1;
+        if (strcmp(argv[i], "--debug") == 0)
+            debug_mode = 1;
+        else if (strcmp(argv[i], "--level") == 0 && i + 1 < argc)
+            level_path = argv[i + 1];   /* next arg is consumed by the flag */
     }
     /*
      * SDL_Init — start the SDL core.
@@ -106,25 +108,29 @@ int main(int argc, char *argv[]) {
      */
     srand((unsigned int)SDL_GetTicks());
 
-    if (sandbox_mode) {
+    if (level_path) {
         /*
-         * Sandbox mode — run the full gameplay phase.
-         * This is the original game loop, now isolated behind a flag.
+         * Direct play — --level <path> skips the start menu.
+         * Used by the editor's Play button and make run-level.
          */
         GameState gs = {0};
         gs.debug_mode = debug_mode;
+        strncpy(gs.level_path, level_path, sizeof(gs.level_path) - 1);
         game_init(&gs);
         game_loop(&gs);
         game_cleanup(&gs);
     } else {
         /*
-         * Start Menu — the default entry point.
-         * Creates its own window+renderer, renders a black screen
-         * with "Start Menu" text and the game logo.
-         */
-
-        /*
-         * Nearest-neighbour pixel scaling for crisp pixel art.
+         * Start Menu → Game flow.
+         *
+         * The start menu creates its own window+renderer at 800×600 with
+         * a 400×300 logical canvas (matching the game's resolution).
+         *
+         * When the user clicks "Play" or presses Enter/Space, the menu
+         * sets result = MENU_PLAY.  The menu's window and renderer are
+         * then destroyed, and a fresh GameState is created for the game
+         * loop.  This clean separation avoids resource leaks and ensures
+         * the game gets a pristine renderer with all its own settings.
          */
         SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
 
@@ -162,10 +168,26 @@ int main(int argc, char *argv[]) {
         StartMenu menu = {0};
         start_menu_init(&menu, window, renderer);
         start_menu_loop(&menu);
+        MenuResult result = menu.result;
         start_menu_cleanup(&menu);
 
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
+
+        /*
+         * If the user clicked Play, launch the full game.
+         *
+         * game_init creates its own window and renderer, so we destroy
+         * the menu's first to avoid having two windows open at once.
+         * No --level was given, so the game starts with an empty level.
+         */
+        if (result == MENU_PLAY) {
+            GameState gs = {0};
+            gs.debug_mode = debug_mode;
+            game_init(&gs);
+            game_loop(&gs);
+            game_cleanup(&gs);
+        }
     }
 
     /* Tear down SDL subsystems in reverse init order */

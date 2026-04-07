@@ -15,14 +15,14 @@
 #include <stdio.h>
 
 #include "blue_flame.h"
-#include "../game.h"   /* FLOOR_Y, TILE_SIZE, GAME_W, SEA_GAP_W */
+#include "../game.h"   /* FLOOR_Y, TILE_SIZE, GAME_W, FLOOR_GAP_W */
 
 /* ------------------------------------------------------------------ */
 
 /*
- * blue_flames_init — Place one blue flame per sea gap (except the world-edge gap).
+ * blue_flames_init — Place one blue flame per floor gap (except the world-edge gap).
  *
- * Each blue flame is centred horizontally within its sea gap.  The start_y
+ * Each blue flame is centred horizontally within its floor gap.  The start_y
  * is set just below the floor so the blue flame begins hidden and rises up.
  *
  * Staggered initial timers prevent all blue flames from erupting at the same
@@ -42,10 +42,10 @@ void blue_flames_init(BlueFlame *blue_flames, int *count,
 
         f->gap_x    = (float)gap_xs[i];
         /*
-         * Centre the blue flame within the sea gap.
-         * gap centre = gap_x + SEA_GAP_W/2; blue flame left = centre − DISPLAY_W/2.
+         * Centre the blue flame within the floor gap.
+         * gap centre = gap_x + FLOOR_GAP_W/2; blue flame left = centre − DISPLAY_W/2.
          */
-        f->x        = (float)gap_xs[i] + (SEA_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f;
+        f->x        = (float)gap_xs[i] + (FLOOR_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f;
         f->start_y  = (float)(FLOOR_Y + TILE_SIZE);  /* below the floor, hidden */
         f->y        = f->start_y;
         f->vy       = 0.0f;

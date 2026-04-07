@@ -20,7 +20,7 @@
 
 /* ---- Constants ---------------------------------------------------------- */
 
-#define MAX_JUMPING_SPIDERS  4
+#define MAX_JUMPING_SPIDERS 16
 #define JSPIDER_FRAMES       3       /* animation frames in Spider_2.png      */
 #define JSPIDER_FRAME_W      64      /* width  of one frame slot (px)         */
 #define JSPIDER_ART_X        20      /* first visible col within each frame   */
@@ -61,7 +61,7 @@ void jumping_spiders_init(JumpingSpider *spiders, int *count);
 
 /* Move, jump, patrol, animate each jumping spider. */
 void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
-                            const int *sea_gaps, int sea_gap_count,
+                            const int *floor_gaps, int floor_gap_count,
                             Mix_Chunk *snd_attack, float player_x, int cam_x);
 
 /* Draw all jumping spiders using the shared texture. */

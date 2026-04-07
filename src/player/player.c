@@ -68,13 +68,51 @@ static const int ANIM_FRAME_COUNT[5] = { 4,   4,   2,   1,   2   };
 static const int ANIM_FRAME_MS[5]    = { 150, 100, 150, 200, 100 };
 static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
+/* ---- Horizontal movement physics (default values) ------------------------
+ *
+ * All values are in logical pixels and seconds.  These are the engine
+ * defaults — each can be overridden per-level via LevelDef.physics in the
+ * .toml file (set to 0 there to keep the default).
+ *
+ * Walk (default, no run key):
+ *   WALK_MAX_SPEED    — top speed while walking (px/s).
+ *   WALK_GROUND_ACCEL — how quickly the player reaches walk speed on the
+ *                       ground (px/s²). Higher = snappier start.
+ *
+ * Run (Shift on keyboard / Right Bumper on gamepad):
+ *   RUN_MAX_SPEED     — top speed while running (px/s).
+ *   RUN_GROUND_ACCEL  — ramp-up while running on the ground (px/s²).
+ *
+ * Friction (shared by both walk and run):
+ *   GROUND_FRICTION       — deceleration when no key held on ground (px/s²).
+ *   GROUND_COUNTER_ACCEL  — extra brake when pressing opposite direction (px/s²).
+ *
+ * Air control:
+ *   AIR_ACCEL_WALK    — air accel in walk arc (px/s²).
+ *   AIR_ACCEL_RUN     — air accel in run arc, less control (px/s²).
+ *   AIR_FRICTION      — passive drag in air when no key held (px/s²).
+ *
+ * Animation:
+ *   WALK_ANIM_MIN_VX  — below this speed show idle, not walk (px/s).
+ */
+#define WALK_MAX_SPEED         100.0f   /* px/s  */
+#define RUN_MAX_SPEED          250.0f   /* px/s  */
+#define WALK_GROUND_ACCEL      750.0f   /* px/s² */
+#define RUN_GROUND_ACCEL       600.0f   /* px/s² */
+#define GROUND_FRICTION        550.0f   /* px/s² */
+#define GROUND_COUNTER_ACCEL   100.0f   /* px/s² */
+#define AIR_ACCEL_WALK         350.0f   /* px/s² */
+#define AIR_ACCEL_RUN          180.0f   /* px/s² */
+#define AIR_FRICTION            80.0f   /* px/s² */
+#define WALK_ANIM_MIN_VX         8.0f   /* px/s  */
+
 void player_init(Player *player, SDL_Renderer *renderer) {
     /*
      * IMG_LoadTexture — decode the PNG sprite sheet and upload it to the GPU.
      * The sheet is 192×288 px and contains a 4-column × 6-row grid of 48×48
      * frames. We only draw one frame at a time using a source clipping rect.
      */
-    player->texture = IMG_LoadTexture(renderer, "assets/player.png");
+    player->texture = IMG_LoadTexture(renderer, "assets/sprites/player/player.png");
     if (!player->texture) {
         fprintf(stderr, "Failed to load Player.png: %s\n", IMG_GetError());
         exit(EXIT_FAILURE);
@@ -101,12 +139,17 @@ void player_init(Player *player, SDL_Renderer *renderer) {
      * the sprite frame, so the feet visually rest on the grass surface.
      */
     /*
-     * Spawn on top of the first platform (x=80, y=172, width=TILE_SIZE).
+     * Default spawn on top of the first platform (x=80, y=172, width=TILE_SIZE).
      * Centre horizontally on the pillar; snap vertically using the same
      * formula as platform landing: plat_y − player_h + FLOOR_SINK.
+     *
+     * spawn_x/spawn_y store the level-defined spawn point.  level_load will
+     * override these (and reposition x/y) once the LevelDef is available.
      */
-    player->x        = 80.0f + (TILE_SIZE - player->w) / 2.0f;
-    player->y        = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - player->h + FLOOR_SINK);
+    player->spawn_x  = 80.0f;
+    player->spawn_y  = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);
+    player->x        = player->spawn_x + (TILE_SIZE - player->w) / 2.0f;
+    player->y        = player->spawn_y - player->h + FLOOR_SINK;
     player->vx       = 0.0f;
     player->vy       = 0.0f;   /* start stationary; gravity will pull down   */
     player->speed    = 160.0f; /* horizontal speed: 160 logical px per second */
@@ -123,6 +166,24 @@ void player_init(Player *player, SDL_Renderer *renderer) {
     player->vine_index   = 0;
     player->climb_source = 0;
     player->jump_held   = 0;
+    player->move_dir       = 0;   /* no direction pressed at startup */
+    player->is_running     = 0;   /* not running at startup          */
+    player->air_is_running = 0;   /* starts on the ground, no run momentum */
+
+    /*
+     * Physics fields — initialised from the #define defaults above.
+     * level_load may override these after player_init if the LevelDef
+     * specifies non-zero physics values for finetuning per level.
+     */
+    player->walk_max_speed       = WALK_MAX_SPEED;
+    player->run_max_speed        = RUN_MAX_SPEED;
+    player->walk_ground_accel    = WALK_GROUND_ACCEL;
+    player->run_ground_accel     = RUN_GROUND_ACCEL;
+    player->ground_friction      = GROUND_FRICTION;
+    player->ground_counter_accel = GROUND_COUNTER_ACCEL;
+    player->air_accel_walk       = AIR_ACCEL_WALK;
+    player->air_accel_run        = AIR_ACCEL_RUN;
+    player->air_friction         = AIR_FRICTION;
 
     /* Not hurt at startup; timer counts down to 0 during invincibility */
     player->hurt_timer = 0.0f;
@@ -139,6 +200,10 @@ void player_init(Player *player, SDL_Renderer *renderer) {
  * it tells us which keys are held RIGHT NOW, giving smooth, continuous
  * movement rather than one-shot movement on the moment of press.
  */
+/* ---- Gamepad dead zone --------------------------------------------------- */
+
+/* ---- Gamepad dead zone --------------------------------------------------- */
+
 /*
  * AXIS_DEAD_ZONE — minimum absolute value an analog axis must exceed before
  * it is treated as intentional input.
@@ -335,16 +400,26 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
         }
     } else {
         /*
-         * Normal ground controls — horizontal movement and jump.
-         * Reset vx to 0 each frame so the player stops when keys are released.
+         * Normal ground controls — record direction intent and run state.
+         *
+         * We no longer set vx directly here.  Instead we store move_dir
+         * (-1 / 0 / +1) and is_running, then player_update applies
+         * acceleration and friction to smoothly ramp vx toward the target
+         * speed.  This produces:
+         *   • A ramp-up feel on direction change (not instant top speed).
+         *   • A skid-to-stop on the ground when the key is released.
+         *   • Committed jump arcs: air control is weaker once airborne.
+         *
+         * Run key: Left or Right Shift → higher max speed, less air control.
          */
-        player->vx = 0.0f;
+        player->is_running = (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT]) ? 1 : 0;
+        player->move_dir   = 0;
         if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A]) {
-            player->vx -= player->speed;
+            player->move_dir    = -1;
             player->facing_left = 1;
         }
         if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) {
-            player->vx += player->speed;
+            player->move_dir    = 1;
             player->facing_left = 0;
         }
 
@@ -466,22 +541,31 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
             /*
              * Normal gamepad controls — D-Pad and analog stick for horizontal
              * movement, A / Cross for jump.
+             *
+             * Right Bumper (RB / R1) → run, matching the keyboard Shift key.
+             * D-Pad and left stick both set move_dir; actual vx acceleration
+             * happens in player_update just like the keyboard path.
              */
+
+            /* Right bumper → run mode */
+            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER))
+                player->is_running = 1;
+
             if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_LEFT)) {
-                player->vx -= player->speed;
+                player->move_dir    = -1;
                 player->facing_left = 1;
             }
             if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)) {
-                player->vx += player->speed;
+                player->move_dir    = 1;
                 player->facing_left = 0;
             }
 
             Sint16 axis_x = SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_LEFTX);
             if (axis_x < -AXIS_DEAD_ZONE) {
-                player->vx -= player->speed;
+                player->move_dir    = -1;
                 player->facing_left = 1;
             } else if (axis_x > AXIS_DEAD_ZONE) {
-                player->vx += player->speed;
+                player->move_dir    = 1;
                 player->facing_left = 0;
             }
 
@@ -522,7 +606,12 @@ static void player_animate(Player *player, Uint32 dt_ms) {
          * positive vy means falling down under gravity.
          */
         target = (player->vy < 0.0f) ? ANIM_JUMP : ANIM_FALL;
-    } else if (player->vx != 0.0f) {
+    } else if (player->vx > WALK_ANIM_MIN_VX || player->vx < -WALK_ANIM_MIN_VX) {
+        /*
+         * Only show the walk animation above WALK_ANIM_MIN_VX (8 px/s).
+         * During a ground skid vx tapers to 0; below the threshold it looks
+         * odd to cycle the walk frames for just 1–2 frames, so we show idle.
+         */
         target = ANIM_WALK;
     } else {
         target = ANIM_IDLE;
@@ -608,10 +697,11 @@ void player_update(Player *player, float dt,
                    const RopeDecor *ropes, int rope_count,
                    const Bridge *bridges, int bridge_count,
                    const SpikePlatform *spike_platforms, int spike_platform_count,
-                   const int *sea_gaps, int sea_gap_count,
+                   const int *floor_gaps, int floor_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
-                   int prev_fp_landed_idx) {
+                   int prev_fp_landed_idx,
+                   int world_w) {
 
     (void)vine_count;    /* vine_index selects the climbable; count unused here */
     (void)ladder_count;
@@ -658,13 +748,20 @@ void player_update(Player *player, float dt,
         /* Horizontal world clamp (same logic as normal path) */
         if (player->x + PHYS_PAD_X < 0.0f)
             player->x = -(float)PHYS_PAD_X;
-        if (player->x + player->w - PHYS_PAD_X > WORLD_W)
-            player->x = (float)(WORLD_W - player->w + PHYS_PAD_X);
+        if (player->x + player->w - PHYS_PAD_X > world_w)
+            player->x = (float)(world_w - player->w + PHYS_PAD_X);
 
         player_animate(player, (Uint32)(dt * 1000.0f));
         return;   /* skip normal gravity / floor / platform logic */
     }
 
+
+    /*
+     * Capture the ground state from LAST frame before clearing it.
+     * on_ground is about to be reset below; the acceleration block needs the
+     * previous value to decide between ground accel and air accel.
+     */
+    const int was_on_ground = player->on_ground;
 
     /*
      * Reset on_ground every frame so the player immediately starts falling
@@ -706,6 +803,93 @@ void player_update(Player *player, float dt,
      */
     player->vy += GRAVITY * dt;
 
+    /* ---- Horizontal acceleration / friction (momentum system) ------------ */
+    /*
+     * player_handle_input sets move_dir (-1/0/+1) and is_running each frame.
+     * Here we translate those intentions into a smoothly accelerating vx,
+     * rather than snapping instantly to top speed.
+     *
+     * Ground vs air:
+     *   was_on_ground == 1  → use ground accel + strong friction (tight, skiddy).
+     *   was_on_ground == 0  → use air accel   + weak   friction  (committed arc).
+     *
+     * Walk vs run (is_running flag set by Shift / RB):
+     *   Walk: moderate max speed, faster accel  → precise, easy to control.
+     *   Run:  high    max speed, slower accel   → powerful but takes time to ramp;
+     *         air accel is dramatically reduced → mid-air direction changes are hard.
+     */
+    {
+        /*
+         * air_is_running — "snapshot" of is_running taken while on the ground.
+         *
+         * Every frame the player stands on the ground we refresh this value.
+         * The moment they leave (jump or walk off an edge), air_is_running
+         * freezes at whatever it was on the last ground frame.
+         *
+         * This means holding or releasing Shift mid-air has no effect on
+         * physics: the momentum built on the ground is what carries the arc.
+         */
+        if (was_on_ground)
+            player->air_is_running = player->is_running;
+
+        /* Ground physics uses live is_running; air uses the frozen snapshot. */
+        int running = was_on_ground ? player->is_running : player->air_is_running;
+
+        float max_spd = running ? player->run_max_speed    : player->walk_max_speed;
+        float accel   = was_on_ground
+                          ? (running ? player->run_ground_accel  : player->walk_ground_accel)
+                          : (running ? player->air_accel_run     : player->air_accel_walk);
+        float friction = was_on_ground ? player->ground_friction : player->air_friction;
+
+        if (player->move_dir != 0) {
+            /*
+             * Direction key held — accelerate toward the target speed.
+             *
+             * Counter-direction bonus: when the pressed direction is opposite
+             * to current vx (e.g. moving right but pressing left), the player
+             * is actively fighting their own momentum.  On the ground we add
+             * ground_counter_accel to brake harder, giving a snappier reversal
+             * feel without reducing the passive skid (ground_friction).
+             *
+             * step = how many px/s to add this frame (accel × dt).
+             * We clamp to target_vx so we never overshoot in a single frame.
+             */
+            int counter = was_on_ground &&
+                          ((player->move_dir > 0 && player->vx < 0.0f) ||
+                           (player->move_dir < 0 && player->vx > 0.0f));
+            float effective_accel = accel + (counter ? player->ground_counter_accel : 0.0f);
+
+            float target_vx = (float)player->move_dir * max_spd;
+            float step       = effective_accel * dt;
+            if (player->move_dir > 0) {
+                /* Moving right: increase vx but don't exceed +target_vx */
+                player->vx += step;
+                if (player->vx > target_vx) player->vx = target_vx;
+            } else {
+                /* Moving left: decrease vx but don't go below -target_vx */
+                player->vx -= step;
+                if (player->vx < target_vx) player->vx = target_vx;
+            }
+        } else {
+            /*
+             * No direction key held — friction decelerates vx toward 0.
+             * This is what produces the skid on the ground and the gentle
+             * float-through in the air.
+             *
+             * We apply friction symmetrically so it always moves vx toward 0
+             * regardless of sign, and clamp to 0 to avoid oscillation.
+             */
+            float step = friction * dt;
+            if (player->vx > 0.0f) {
+                player->vx -= step;
+                if (player->vx < 0.0f) player->vx = 0.0f;
+            } else if (player->vx < 0.0f) {
+                player->vx += step;
+                if (player->vx > 0.0f) player->vx = 0.0f;
+            }
+        }
+    }
+
     player->x += player->vx * dt;   /* move horizontally */
     player->y += player->vy * dt;   /* move vertically   */
 
@@ -731,9 +915,9 @@ void player_update(Player *player, float dt,
      */
     float phys_center_x = player->x + player->w / 2.0f;
     int over_ground = 1;
-    for (int g = 0; g < sea_gap_count; g++) {
-        float gx = (float)sea_gaps[g];
-        if (phys_center_x >= gx && phys_center_x < gx + (float)SEA_GAP_W) {
+    for (int g = 0; g < floor_gap_count; g++) {
+        float gx = (float)floor_gaps[g];
+        if (phys_center_x >= gx && phys_center_x < gx + (float)FLOOR_GAP_W) {
             over_ground = 0;
             break;
         }
@@ -985,8 +1169,8 @@ void player_update(Player *player, float dt,
      */
     if (player->x + PHYS_PAD_X < 0.0f)
         player->x = -(float)PHYS_PAD_X;
-    if (player->x + player->w - PHYS_PAD_X > WORLD_W)
-        player->x = (float)(WORLD_W - player->w + PHYS_PAD_X);
+    if (player->x + player->w - PHYS_PAD_X > world_w)
+        player->x = (float)(world_w - player->w + PHYS_PAD_X);
 
     /*
      * Ceiling clamp — stop upward movement when the physics top hits the
@@ -1076,9 +1260,9 @@ SDL_Rect player_get_hitbox(const Player *player) {
  * because they were set once in player_init and don't change.
  */
 void player_reset(Player *player) {
-    /* Respawn on top of the first platform (same as player_init). */
-    player->x         = 80.0f + (TILE_SIZE - player->w) / 2.0f;
-    player->y         = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - player->h + FLOOR_SINK);
+    /* Respawn at the level-defined spawn point (set by level_load). */
+    player->x         = player->spawn_x + (TILE_SIZE - player->w) / 2.0f;
+    player->y         = player->spawn_y - player->h + FLOOR_SINK;
     player->vx        = 0.0f;
     player->vy        = 0.0f;
     player->on_ground = 1;
@@ -1091,6 +1275,9 @@ void player_reset(Player *player) {
     player->vine_index       = 0;
     player->climb_source     = 0;
     player->jump_held        = 0;
+    player->move_dir         = 0;
+    player->is_running       = 0;
+    player->air_is_running   = 0;
     player->hurt_timer       = 0.0f;
 
     player->frame.x = 0;

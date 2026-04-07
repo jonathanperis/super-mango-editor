@@ -57,8 +57,15 @@ dkms.conf
 # debug information files
 *.dwo
 
+# Python bytecache
+__pycache__/
+*.pyc
+
 # Generated files
 .DS_Store
+src/levels/exported/*.c
+src/levels/exported/*.h
+levels/_playtest.toml
 
 # Docs generation
 wiki/

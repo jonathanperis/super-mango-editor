@@ -7,7 +7,7 @@
 #include <math.h>   /* sinf, fabsf */
 
 #include "faster_bird.h"
-#include "../game.h"                /* GAME_W, GAME_H, WORLD_W */
+#include "../game.h"                /* GAME_W */
 #include "../core/entity_utils.h"  /* patrol_update, animate_frame_ms */
 
 #define FBIRD_AUDIBLE_RANGE  ((float)GAME_W)
@@ -16,7 +16,7 @@
 
 /* ------------------------------------------------------------------ */
 
-void faster_birds_init(FasterBird *birds, int *count)
+void faster_birds_init(FasterBird *birds, int *count, int world_w)
 {
     *count = 2;
 
@@ -40,7 +40,7 @@ void faster_birds_init(FasterBird *birds, int *count)
     birds[1].base_y        = 40.0f;
     birds[1].vx            = FBIRD_SPEED;
     birds[1].patrol_x0     = 900.0f;
-    birds[1].patrol_x1     = 1600.0f;
+    birds[1].patrol_x1     = (float)(world_w - 1 * 400);  /* last screen boundary */
     birds[1].frame_index   = 2;
     birds[1].anim_timer_ms = 0;
 }

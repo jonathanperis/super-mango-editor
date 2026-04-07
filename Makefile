@@ -35,11 +35,23 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(wildcard $(SRCDIR)/levels/*.c) \
           $(wildcard $(SRCDIR)/player/*.c) \
           $(wildcard $(SRCDIR)/screens/*.c) \
-          $(wildcard $(SRCDIR)/surfaces/*.c)
+          $(wildcard $(SRCDIR)/surfaces/*.c) \
+          $(SRCDIR)/editor/serializer.c \
+          vendor/tomlc17/tomlc17.c
 OBJS    = $(SRCS:.c=.o)
 DEPS    = $(OBJS:.o=.d)
 
-.PHONY: all clean run run-debug run-sandbox run-sandbox-debug web
+# ── Editor (standalone level editor) ─────────────────────────────────
+EDITOR_DIR    = src/editor
+VENDOR_DIR    = vendor/tomlc17
+EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(VENDOR_DIR)/tomlc17.c \
+                src/surfaces/rail.c
+EDITOR_OBJS   = $(EDITOR_SRCS:.c=.o)
+EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
+EDITOR_TARGET = $(OUTDIR)/super-mango-editor
+EDITOR_LIBS   = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lm
+
+.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor
 
 all: $(OUTDIR) $(TARGET)
 
@@ -93,11 +105,32 @@ run: all
 run-debug: all
 	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --debug
 
-run-sandbox: all
-	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --sandbox
+run-level: all
+	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --level $(LEVEL)
 
-run-sandbox-debug: all
-	./$(TARGET) --sandbox --debug
+run-level-debug: all
+	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --debug --level $(LEVEL)
+
+# ── Editor targets ───────────────────────────────────────────────────
+editor: $(OUTDIR) $(EDITOR_TARGET)
+
+$(EDITOR_TARGET): $(EDITOR_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(EDITOR_LIBS)
+ifeq ($(OS),Windows_NT)
+else ifeq ($(shell uname -s),Darwin)
+	codesign --force --sign - $@
+endif
+
+$(EDITOR_DIR)/%.o: $(EDITOR_DIR)/%.c
+	$(CC) $(CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(VENDOR_DIR)/%.o: $(VENDOR_DIR)/%.c
+	$(CC) -std=c11 -MMD -MP -c -o $@ $<
+
+run-editor: editor
+	./$(EDITOR_TARGET)
+
+-include $(EDITOR_DEPS)
 
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
 # Requires the Emscripten SDK (emcc on PATH).
@@ -109,11 +142,14 @@ WEB_FLAGS = -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='["png"]' \
             -s USE_SDL_TTF=2 -s USE_SDL_MIXER=2 \
             -s SDL2_MIXER_FORMATS='["wav"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
-            --preload-file assets --preload-file sounds \
+            --preload-file assets \
             --shell-file web/shell.html
 
 web: $(OUTDIR)
 	emcc -std=c11 -O2 -I$(SRCDIR) $(SRCS) -o $(OUTDIR)/super-mango.html $(WEB_FLAGS)
+	emcc -std=c11 -O2 -I$(SRCDIR) $(SRCS) -o $(OUTDIR)/super-mango-debug.html $(WEB_FLAGS) \
+		-s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]' \
+		--post-js web/debug-boot.js
 
 clean:
 	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.d
@@ -126,4 +162,6 @@ clean:
 	rm -f $(SRCDIR)/player/*.o $(SRCDIR)/player/*.d
 	rm -f $(SRCDIR)/screens/*.o $(SRCDIR)/screens/*.d
 	rm -f $(SRCDIR)/surfaces/*.o $(SRCDIR)/surfaces/*.d
+	rm -f $(EDITOR_DIR)/*.o $(EDITOR_DIR)/*.d
+	rm -f $(VENDOR_DIR)/*.o $(VENDOR_DIR)/*.d
 	rm -rf $(OUTDIR)

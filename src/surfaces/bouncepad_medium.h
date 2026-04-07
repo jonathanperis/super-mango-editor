@@ -7,6 +7,4 @@
 
 #include "bouncepad.h"
 
-#define MAX_BOUNCEPADS_MEDIUM  4
-
-void bouncepads_medium_init(Bouncepad *pads, int *count);
+#define MAX_BOUNCEPADS_MEDIUM 16

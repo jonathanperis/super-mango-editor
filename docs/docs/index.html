@@ -11,7 +11,7 @@
     gtag('config', 'G-VSE71K3VNL');
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Super Mango Game - Documentation</title>
+  <title>Super Mango Editor - Documentation</title>
   <meta name="description" content="2D side-scrolling platformer written in C using SDL2 — browser-playable via WebAssembly">
   <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
   <style>
@@ -394,7 +394,7 @@
       <span></span>
       <span></span>
     </button>
-    <div class="repo-title">Super Mango Game</div>
+    <div class="repo-title">Super Mango Editor</div>
   </div>
 
   <div class="overlay" id="overlay"></div>
@@ -402,7 +402,7 @@
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <h1 class="repo-title">Super Mango Game</h1>
+      <h1 class="repo-title">Super Mango Editor</h1>
       <p class="repo-description">2D side-scrolling platformer written in C using SDL2 — browser-playable via WebAssembly</p>
       <input type="text" id="searchInput" class="search-box" placeholder="Search documentation...">
     </div>
@@ -421,7 +421,7 @@
     </div>
     <div class="sidebar-footer">
       <a href="../" class="back-home">← Back to home</a>
-      <a href="https://github.com/jonathanperis/super-mango-game" target="_blank" rel="noopener noreferrer">View on GitHub</a>
+      <a href="https://github.com/jonathanperis/super-mango-editor" target="_blank" rel="noopener noreferrer">View on GitHub</a>
       <div>Built by Jonathan Peris</div>
     </div>
   </aside>
@@ -484,12 +484,12 @@
 <li>2D side-scrolling platformer with a multi-screen forest stage (1600px world)</li>
 <li>32 render layers drawn back-to-front with parallax scrolling background</li>
 <li>Delta-time physics for frame-rate-independent movement at 60 FPS</li>
-<li>Six enemy types, six hazard types, collectibles, bouncepads, climbable vines/ladders/ropes</li>
+<li>Six enemy types, seven hazard types, collectibles, bouncepads, climbable vines/ladders/ropes</li>
 <li>Start menu, HUD (hearts/lives/score), lives system, debug overlay</li>
 <li>Keyboard and gamepad (hot-plug) controls</li>
 <li>Builds natively on macOS, Linux, Windows; WebAssembly via Emscripten</li>
 </ul>
-<p><strong><a href="https://jonathanperis.github.io/super-mango-game/">Play in browser →</a></strong></p>
+<p><strong><a href="https://jonathanperis.github.io/super-mango-editor/">Play in browser →</a></strong></p>
 <hr>
 <h2>Project at a Glance</h2>
 <table>
@@ -525,7 +525,7 @@
 </tr>
 <tr>
 <td>Libraries</td>
-<td>SDL2, SDL2_image, SDL2_ttf, SDL2_mixer</td>
+<td>SDL2, SDL2_image, SDL2_ttf, SDL2_mixer, tomlc17 (vendored TOML parser)</td>
 </tr>
 </tbody></table>
 <hr>
@@ -580,7 +580,7 @@ make run
   │     ├── IMG_LoadTexture → gs.spike_block_tex   (spike_block.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.float_platform_tex (float_platform.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.bridge_tex        (bridge.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.yellow_star_tex   (yellow_star.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.star_yellow_tex   (star_yellow.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.axe_trap_tex      (axe_trap.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.circular_saw_tex  (circular_saw.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.blue_flame_tex    (blue_flame.png — non-fatal)
@@ -605,7 +605,7 @@ make run
   │     ├── fog_init(&amp;gs.fog, gs.renderer)         (fog_background_1.png, fog_background_2.png)
   │     ├── hud_init(&amp;gs.hud, gs.renderer)
   │     ├── if (debug_mode) debug_init(&amp;gs.debug)
-  │     ├── sandbox_load_level(&amp;gs)                (all entity inits + sea gap positions)
+  │     ├── level_loader_load(&amp;gs)                 (load level from TOML, entity inits + floor gap positions)
   │     ├── hearts/lives/score/score_life_next initialisation
   │     ├── SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) — lazy init, non-fatal
   │     └── scan joysticks for first connected gamepad
@@ -644,7 +644,7 @@ make run
         ├── SDL_DestroyTexture (ladder_tex)
         ├── SDL_DestroyTexture (vine_tex)
         ├── last_star_cleanup
-        ├── SDL_DestroyTexture (yellow_star_tex)
+        ├── SDL_DestroyTexture (star_yellow_tex)
         ├── SDL_DestroyTexture (coin_tex)
         ├── SDL_DestroyTexture (faster_fish_tex)
         ├── SDL_DestroyTexture (fish_tex)
@@ -682,8 +682,8 @@ make run
                     → fish collision → faster_fish collision → spike_block collision (+ push impulse)
                     → spike collision → spike_platform collision → circular_saw collision
                     → axe_trap collision → blue_flame collision
-                    → sea gap fall detection (instant death)
-                    → coin–player collision → yellow_star–player collision → last_star–player collision
+                    → floor gap fall detection (instant death)
+                    → coin–player collision → star_yellow–player collision → last_star–player collision
                     → heart/lives/score_life_next logic
                     → water_update → fog_update → bouncepads_update (small, medium, high)
                     → debug_update (if --debug)
@@ -726,7 +726,7 @@ prev = now;
 <tr>
 <td>3</td>
 <td>Floor</td>
-<td><code>grass_tileset.png</code> 9-slice tiled across world width at <code>FLOOR_Y</code>, with sea-gap openings</td>
+<td><code>grass_tileset.png</code> 9-slice tiled across world width at <code>FLOOR_Y</code>, with floor-gap openings</td>
 </tr>
 <tr>
 <td>4</td>
@@ -790,8 +790,8 @@ prev = now;
 </tr>
 <tr>
 <td>16</td>
-<td>Yellow stars</td>
-<td><code>yellow_star.png</code> collectible star pickups</td>
+<td>Star yellows</td>
+<td><code>star_yellow.png</code> collectible star pickups</td>
 </tr>
 <tr>
 <td>17</td>
@@ -801,7 +801,7 @@ prev = now;
 <tr>
 <td>18</td>
 <td>Blue flames</td>
-<td><code>blue_flame.png</code> animated flame hazards erupting from sea gaps</td>
+<td><code>blue_flame.png</code> animated flame hazards erupting from floor gaps</td>
 </tr>
 <tr>
 <td>19</td>
@@ -931,9 +931,9 @@ prev = now;
     Coin           coins[MAX_COINS];
     int            coin_count;
 
-    SDL_Texture   *yellow_star_tex;  // Shared texture for yellow star pickups (GPU)
-    YellowStar     yellow_stars[MAX_YELLOW_STARS];
-    int            yellow_star_count;
+    SDL_Texture   *star_yellow_tex;  // Shared texture for star yellow pickups (GPU)
+    StarYellow     star_yellows[MAX_STAR_YELLOWS];
+    int            star_yellow_count;
 
     LastStar       last_star;        // Special end-of-level star collectible
 
@@ -1013,8 +1013,8 @@ prev = now;
     Water          water;            // Animated water strip at the bottom
     FogSystem      fog;              // Atmospheric fog overlay — topmost layer
 
-    int            sea_gaps[MAX_SEA_GAPS];
-    int            sea_gap_count;
+    int            floor_gaps[MAX_FLOOR_GAPS];
+    int            floor_gap_count;
 
     Hud            hud;              // HUD display: hearts, lives, score
     int            hearts;           // Current hit points (0-MAX_HEARTS)
@@ -1178,9 +1178,9 @@ prev = now;
 <td>16x16 coin collectible sprite</td>
 </tr>
 <tr>
-<td><code>yellow_star.png</code></td>
-<td><code>gs-&gt;yellow_star_tex</code></td>
-<td>Yellow star collectible sprite</td>
+<td><code>star_yellow.png</code></td>
+<td><code>gs-&gt;star_yellow_tex</code></td>
+<td>Star yellow collectible sprite</td>
 </tr>
 <tr>
 <td><code>last_star.png</code></td>
@@ -1615,13 +1615,21 @@ Mix_LoadWAV(&quot;sounds/player_jump.wav&quot;);
 <p>Builds (if out of date) then runs the binary with the <code>--debug</code> flag, which enables the debug overlay: FPS counter, collision hitbox visualization, and scrolling event log.</p>
 <pre><code class="language-sh">make run-debug
 </code></pre>
-<h3><code>make run-sandbox</code></h3>
-<p>Builds (if out of date) then runs the binary with the <code>--sandbox</code> flag, which launches the sandbox/level-editor mode for testing entity placement and interactions.</p>
-<pre><code class="language-sh">make run-sandbox
+<h3><code>make run-level LEVEL=&lt;path&gt;</code></h3>
+<p>Builds (if out of date) then runs the binary with the <code>--level &lt;path&gt;</code> flag, which loads the specified TOML level file.</p>
+<pre><code class="language-sh">make run-level LEVEL=levels/sandbox_00.toml
 </code></pre>
-<h3><code>make run-sandbox-debug</code></h3>
-<p>Builds (if out of date) then runs the binary with both <code>--sandbox</code> and <code>--debug</code> flags, combining sandbox mode with the debug overlay.</p>
-<pre><code class="language-sh">make run-sandbox-debug
+<h3><code>make run-level-debug LEVEL=&lt;path&gt;</code></h3>
+<p>Builds (if out of date) then runs the binary with both <code>--level &lt;path&gt;</code> and <code>--debug</code> flags, combining level loading with the debug overlay.</p>
+<pre><code class="language-sh">make run-level-debug LEVEL=levels/sandbox_00.toml
+</code></pre>
+<h3><code>make editor</code></h3>
+<p>Compiles the standalone visual level editor binary to <code>out/super-mango-editor</code>.</p>
+<pre><code class="language-sh">make editor
+</code></pre>
+<h3><code>make run-editor</code></h3>
+<p>Builds (if out of date) then launches the level editor.</p>
+<pre><code class="language-sh">make run-editor
 </code></pre>
 <h3><code>make web</code></h3>
 <p>Compiles the game to WebAssembly using the Emscripten SDK (<code>emcc</code>). Requires Emscripten to be installed and <code>emcc</code> on <code>PATH</code>.</p>
@@ -1675,7 +1683,7 @@ sudo apt install build-essential clang \
 <ol start="3">
 <li>Build:</li>
 </ol>
-<pre><code class="language-sh">cd /c/path/to/super-mango-game
+<pre><code class="language-sh">cd /c/path/to/super-mango-editor
 make
 </code></pre>
 <ol start="4">
@@ -1736,10 +1744,9 @@ src/
 ├── parallax.o
 ├── hud.o
 ├── debug.o
-├── sandbox.o
 ├── start_menu.o
 ├── coin.o
-├── yellow_star.o
+├── star_yellow.o
 ├── last_star.o
 ├── spider.o
 ├── jumping_spider.o
@@ -1864,7 +1871,7 @@ src/
 <td>Y coordinate of the floor&#39;s top edge</td>
 </tr>
 </tbody></table>
-<p>The floor is drawn by repeating the 48x48 grass tile across the full <code>WORLD_W</code> at <code>y=FLOOR_Y</code>, with gaps cut out at each <code>sea_gaps[]</code> position.</p>
+<p>The floor is drawn by repeating the 48x48 grass tile across the full <code>WORLD_W</code> at <code>y=FLOOR_Y</code>, with gaps cut out at each <code>floor_gaps[]</code> position.</p>
 <h3>Physics</h3>
 <table>
 <thead>
@@ -1882,16 +1889,16 @@ src/
 <td>Downward acceleration in px/s^2</td>
 </tr>
 <tr>
-<td><code>SEA_GAP_W</code></td>
+<td><code>FLOOR_GAP_W</code></td>
 <td><code>32</code></td>
 <td><code>int</code></td>
-<td>Width of each sea gap in logical pixels</td>
+<td>Width of each floor gap in logical pixels</td>
 </tr>
 <tr>
-<td><code>MAX_SEA_GAPS</code></td>
+<td><code>MAX_FLOOR_GAPS</code></td>
 <td><code>8</code></td>
 <td><code>int</code></td>
-<td>Maximum number of sea gaps per level</td>
+<td>Maximum number of floor gaps per level</td>
 </tr>
 </tbody></table>
 <p>Every frame while airborne: <code>player-&gt;vy += GRAVITY * dt</code>.</p>
@@ -2338,7 +2345,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </tr>
 </thead>
 <tbody><tr>
-<td><code>PARALLAX_MAX_LAYERS</code></td>
+<td><code>MAX_BACKGROUND_LAYERS</code></td>
 <td><code>8</code></td>
 <td><code>int</code></td>
 <td>Maximum number of background layers the system can hold</td>
@@ -3179,7 +3186,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </tr>
 </tbody></table>
 <hr>
-<h2><code>yellow_star.h</code> Constants</h2>
+<h2><code>star_yellow.h</code> Constants</h2>
 <table>
 <thead>
 <tr>
@@ -3190,19 +3197,19 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 </tr>
 </thead>
 <tbody><tr>
-<td><code>MAX_YELLOW_STARS</code></td>
+<td><code>MAX_STAR_YELLOWS</code></td>
 <td><code>3</code></td>
 <td><code>int</code></td>
 <td>Maximum yellow star instances per level</td>
 </tr>
 <tr>
-<td><code>YELLOW_STAR_DISPLAY_W</code></td>
+<td><code>STAR_YELLOW_DISPLAY_W</code></td>
 <td><code>16</code></td>
 <td><code>int</code></td>
 <td>Display width (logical px)</td>
 </tr>
 <tr>
-<td><code>YELLOW_STAR_DISPLAY_H</code></td>
+<td><code>STAR_YELLOW_DISPLAY_H</code></td>
 <td><code>16</code></td>
 <td><code>int</code></td>
 <td>Display height (logical px)</td>
@@ -3915,13 +3922,8 @@ for (int i = 0; i &lt; gs-&gt;coin_count; i++)
 for (int i = 0; i &lt; gs-&gt;coin_count; i++)
     coin_cleanup(&amp;gs-&gt;coins[i]);
 </code></pre>
-<h4>5. Place in sandbox -- <code>src/screens/sandbox.c</code></h4>
-<p>Entity spawn positions are defined in <code>sandbox.c</code>. Add your entity placements there:</p>
-<pre><code class="language-c">// In sandbox_init or the appropriate placement function:
-coin_init(&amp;gs-&gt;coins[0], gs-&gt;tex_coin, 120.0f, 180.0f);
-coin_init(&amp;gs-&gt;coins[1], gs-&gt;tex_coin, 200.0f, 140.0f);
-gs-&gt;coin_count = 2;
-</code></pre>
+<h4>5. Define entity placements in level TOML</h4>
+<p>Entity spawn positions are defined in level TOML files (e.g. <code>levels/sandbox_00.toml</code>). Add your entity placements there, or use the visual editor (<code>make run-editor</code>) to place entities graphically.</p>
 <h4>6. Add debug hitbox -- <code>src/core/debug.c</code></h4>
 <p>Every entity must have hitbox visualization in <code>debug.c</code>:</p>
 <pre><code class="language-c">// In debug_render:
@@ -4067,7 +4069,7 @@ TTF_CloseFont(font);
 <p>Always draw in painter&#39;s algorithm order (back to front). The game currently uses 32 layers:</p>
 <pre><code> 1. Parallax background    (7 parallax_*.png layers from assets/)
  2. Platforms              (platform.png 9-slice pillars)
- 3. Floor tiles            (grass_tileset.png at FLOOR_Y, with sea-gap openings)
+ 3. Floor tiles            (grass_tileset.png at FLOOR_Y, with floor-gap openings)
  4. Float platforms        (float_platform.png 3-slice hovering surfaces)
  5. Spike rows             (spike.png ground-level spike strips)
  6. Spike platforms        (spike_platform.png elevated spike hazards)
@@ -4080,9 +4082,9 @@ TTF_CloseFont(font);
 13. Ladders                (ladder.png climbable)
 14. Ropes                  (rope.png climbable)
 15. Coins                  (coin.png collectibles)
-16. Yellow stars           (yellow_star.png health pickups)
+16. Star yellows           (star_yellow.png health pickups)
 17. Last star              (end-of-level star using HUD star sprite)
-18. Blue flames            (blue_flame.png erupting from sea gaps)
+18. Blue flames            (blue_flame.png erupting from floor gaps)
 19. Fish                   (fish.png jumping water enemies)
 20. Faster fish            (faster_fish.png fast jumping enemies)
 21. Water                  (water.png animated strip)
@@ -4162,7 +4164,7 @@ source_y = (frame_index / num_cols) * frame_h
 <li><input disabled="" type="checkbox"> Call <code>&lt;entity&gt;_render</code> in <code>game_loop</code> render section (correct layer order)</li>
 <li><input disabled="" type="checkbox"> Call <code>&lt;entity&gt;_cleanup</code> in <code>game_cleanup</code> (before <code>SDL_DestroyRenderer</code>)</li>
 <li><input disabled="" type="checkbox"> Set all freed pointers to <code>NULL</code></li>
-<li><input disabled="" type="checkbox"> Place entity spawn positions in <code>sandbox.c</code></li>
+<li><input disabled="" type="checkbox"> Define entity spawn positions in a level TOML file or use the visual editor</li>
 <li><input disabled="" type="checkbox"> Add hitbox visualization in <code>debug.c</code></li>
 <li><input disabled="" type="checkbox"> Add <code>debug_log</code> calls in <code>game.c</code> for significant entity events</li>
 <li><input disabled="" type="checkbox"> Build with <code>make</code> -- no Makefile changes needed</li>
@@ -4362,7 +4364,7 @@ if (player-&gt;on_ground &amp;&amp; want_jump) {
                    const RopeDecor *ropes, int rope_count,
                    const Bridge *bridges, int bridge_count,
                    const SpikePlatform *spike_platforms, int spike_platform_count,
-                   const int *sea_gaps, int sea_gap_count,
+                   const int *floor_gaps, int floor_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
                    int prev_fp_landed_idx);
@@ -4925,7 +4927,7 @@ gs-&gt;music = NULL;
 ├── game.c                        Window, renderer, textures, sounds, game loop
 ├── collectibles/
 │   ├── coin.h / .c               Coin collectible: placement, AABB collection, render
-│   ├── yellow_star.h / .c        Yellow star health pickup
+│   ├── star_yellow.h / .c        Star yellow health pickup
 │   └── last_star.h / .c          End-of-level star collectible
 ├── core/
 │   ├── debug.h / .c              Debug overlay: FPS counter, collision hitboxes, event log
@@ -4936,7 +4938,7 @@ gs-&gt;music = NULL;
 │   └── water.h / .c              Animated water strip: init, scroll, tile render
 ├── entities/
 │   ├── spider.h / .c             Spider enemy: ground patrol, animation, render
-│   ├── jumping_spider.h / .c     Jumping spider: patrol, jump arcs, sea-gap awareness
+│   ├── jumping_spider.h / .c     Jumping spider: patrol, jump arcs, floor-gap awareness
 │   ├── bird.h / .c               Slow bird enemy: sine-wave sky patrol, animation
 │   ├── faster_bird.h / .c        Fast bird enemy: tighter sine-wave, faster animation
 │   ├── fish.h / .c               Fish enemy: patrol, random jump arcs, render
@@ -4947,16 +4949,27 @@ gs-&gt;music = NULL;
 │   ├── spike_platform.h / .c     Elevated spike surface hazard
 │   ├── circular_saw.h / .c       Fast rotating patrol saw hazard
 │   ├── axe_trap.h / .c           Swinging/spinning axe hazard
-│   └── blue_flame.h / .c         Blue flame hazard: erupts from sea gaps, rise/flip/fall cycle
+│   └── blue_flame.h / .c         Blue flame hazard: erupts from floor gaps, rise/flip/fall cycle
 ├── levels/
-│   ├── level.h                   Shared level definitions
-│   ├── level_01.h / .c           Level 1 data
-│   └── level_loader.h / .c       Level loading and switching
+│   ├── level.h                   LevelDef struct and placement types
+│   ├── level_loader.h / .c       Level loading from LevelDef
+│   └── exported/                 Auto-generated C level exports
+├── editor/
+│   ├── editor.h / .c             Editor state and main loop
+│   ├── editor_main.c             Editor entry point
+│   ├── canvas.h / .c             Canvas rendering and interaction
+│   ├── palette.h / .c            Entity palette panel
+│   ├── properties.h / .c         Entity property inspector
+│   ├── tools.h / .c              Editor tools (select, place, erase)
+│   ├── ui.h / .c                 Editor UI framework
+│   ├── undo.h / .c               Undo/redo stack
+│   ├── serializer.h / .c         TOML level serialization
+│   ├── exporter.h / .c           C level export
+│   └── file_dialog.h / .c        Native file dialog integration
 ├── player/
 │   └── player.h / .c             Player input, physics, animation, rendering
 ├── screens/
 │   ├── start_menu.h / .c         Start menu screen with logo
-│   ├── sandbox.h / .c            Level layout and entity placement
 │   └── hud.h / .c                HUD renderer: hearts, lives counter, score text
 └── surfaces/
     ├── platform.h / .c           One-way platform pillar init and 9-slice rendering
@@ -4977,9 +4990,9 @@ gs-&gt;music = NULL;
 <p><strong>Role:</strong> Owns the program entry point and every SDL subsystem&#39;s lifetime.</p>
 <h3>Responsibilities</h3>
 <ul>
-<li>Parse CLI flags: <code>--debug</code> and <code>--sandbox</code></li>
+<li>Parse CLI flags: <code>--debug</code> and <code>--level &lt;path&gt;</code></li>
 <li>Call <code>SDL_Init</code>, <code>IMG_Init</code>, <code>TTF_Init</code>, <code>Mix_OpenAudio</code> in order</li>
-<li>Route to start menu or sandbox (game) mode</li>
+<li>Route to start menu or level mode via <code>--level</code> flag</li>
 <li>Tear down SDL subsystems in reverse order before returning</li>
 </ul>
 <h3>Subsystem Init Order</h3>
@@ -5031,8 +5044,8 @@ gs-&gt;music = NULL;
 #define CAM_LOOKAHEAD  40
 #define CAM_SMOOTHING  8.0f
 #define CAM_SNAP_THRESHOLD  0.5f
-#define SEA_GAP_W     32
-#define MAX_SEA_GAPS  8
+#define FLOOR_GAP_W     32
+#define MAX_FLOOR_GAPS  8
 </code></pre>
 <h3>Includes</h3>
 <pre><code class="language-c">#include &quot;player.h&quot;          // Player struct
@@ -5056,7 +5069,7 @@ gs-&gt;music = NULL;
 #include &quot;jumping_spider.h&quot;  // JumpingSpider
 #include &quot;bird.h&quot;            // Bird
 #include &quot;faster_bird.h&quot;     // FasterBird
-#include &quot;yellow_star.h&quot;     // YellowStar
+#include &quot;star_yellow.h&quot;     // StarYellow
 #include &quot;axe_trap.h&quot;        // AxeTrap
 #include &quot;circular_saw.h&quot;    // CircularSaw
 #include &quot;blue_flame.h&quot;      // BlueFlame
@@ -5082,10 +5095,10 @@ void game_cleanup(GameState *gs);
 <li>Window + renderer + logical size (400x300)</li>
 <li>Parallax background (7 layers)</li>
 <li>Floor tile (<code>grass_tileset.png</code>) and platform tile (<code>platform.png</code>)</li>
-<li>Entity textures: <code>spider.png</code>, <code>jumping_spider.png</code>, <code>bird.png</code>, <code>faster_bird.png</code>, <code>fish.png</code>, <code>faster_fish.png</code>, <code>coin.png</code>, <code>bouncepad_medium.png</code>, <code>bouncepad_small.png</code>, <code>bouncepad_high.png</code>, <code>vine.png</code>, <code>ladder.png</code>, <code>rope.png</code>, <code>rail.png</code>, <code>spike_block.png</code>, <code>float_platform.png</code>, <code>bridge.png</code>, <code>yellow_star.png</code>, <code>axe_trap.png</code>, <code>circular_saw.png</code>, <code>blue_flame.png</code>, <code>spike.png</code>, <code>spike_platform.png</code></li>
+<li>Entity textures: <code>spider.png</code>, <code>jumping_spider.png</code>, <code>bird.png</code>, <code>faster_bird.png</code>, <code>fish.png</code>, <code>faster_fish.png</code>, <code>coin.png</code>, <code>bouncepad_medium.png</code>, <code>bouncepad_small.png</code>, <code>bouncepad_high.png</code>, <code>vine.png</code>, <code>ladder.png</code>, <code>rope.png</code>, <code>rail.png</code>, <code>spike_block.png</code>, <code>float_platform.png</code>, <code>bridge.png</code>, <code>star_yellow.png</code>, <code>axe_trap.png</code>, <code>circular_saw.png</code>, <code>blue_flame.png</code>, <code>spike.png</code>, <code>spike_platform.png</code></li>
 <li>Sound effects: <code>bouncepad.wav</code>, <code>axe_trap.wav</code>, <code>bird.wav</code>, <code>spider.wav</code>, <code>fish.wav</code>, <code>player_jump.wav</code>, <code>coin.wav</code>, <code>player_hit.wav</code></li>
 <li>Background music: <code>game_music.wav</code> (via <code>Mix_LoadMUS</code>)</li>
-<li>Entity init: player, water, fog, HUD, debug, level (via sandbox)</li>
+<li>Entity init: player, water, fog, HUD, debug, level (via level loader)</li>
 <li>Gamepad controller init</li>
 </ol>
 <h3><code>game_loop(GameState *gs)</code></h3>
@@ -5097,13 +5110,17 @@ void game_cleanup(GameState *gs);
 <p><strong>Role:</strong> Player character lifecycle. See <a href="player_module">Player Module</a> for the deep dive.</p>
 <p><strong>Key functions:</strong> <code>player_init</code>, <code>player_handle_input</code>, <code>player_update</code>, <code>player_render</code>, <code>player_get_hitbox</code>, <code>player_reset</code>, <code>player_cleanup</code></p>
 <hr>
-<h2><code>sandbox.h</code> / <code>sandbox.c</code></h2>
-<p><strong>Role:</strong> Level layout and entity placement. Separates content (WHERE entities are placed) from engine logic (HOW they behave).</p>
+<h2><code>level.h</code> / <code>level_loader.h</code> / <code>level_loader.c</code></h2>
+<p><strong>Role:</strong> Level definitions and loading. <code>level.h</code> defines the <code>LevelDef</code> struct and placement types. <code>level_loader</code> loads level data from TOML files and initialises all entities accordingly.</p>
 <p><strong>Key functions:</strong></p>
 <ul>
-<li><code>sandbox_load_level(GameState *gs)</code> -- place all entities, define sea gaps, set up the level (called once from <code>game_init</code>)</li>
-<li><code>sandbox_reset_level(GameState *gs, int *fp_prev_riding)</code> -- reset all entities on player death</li>
+<li><code>level_loader_load(GameState *gs, const char *path)</code> -- parse a TOML level file, place all entities, define floor gaps (called once from <code>game_init</code>)</li>
+<li><code>level_loader_reset(GameState *gs, int *fp_prev_riding)</code> -- reset all entities on player death</li>
 </ul>
+<hr>
+<h2>Editor Modules (<code>src/editor/</code>)</h2>
+<p><strong>Role:</strong> Standalone visual level editor (11 modules). Build with <code>make editor</code>, run with <code>make run-editor</code>.</p>
+<p><strong>Modules:</strong> <code>editor.h/.c</code>, <code>editor_main.c</code>, <code>canvas</code>, <code>palette</code>, <code>properties</code>, <code>tools</code>, <code>ui</code>, <code>undo</code>, <code>serializer</code>, <code>exporter</code>, <code>file_dialog</code></p>
 <hr>
 <h2><code>start_menu.h</code> / <code>start_menu.c</code></h2>
 <p><strong>Role:</strong> Start menu screen with centred title text and <code>start_menu_logo.png</code> logo.</p>
@@ -5111,9 +5128,9 @@ void game_cleanup(GameState *gs);
 <hr>
 <h2>Enemy Modules</h2>
 <h3><code>spider.h</code> / <code>spider.c</code></h3>
-<p>Ground-patrol spider enemy with 3-frame walk animation. Reverses at patrol boundaries and respects sea gaps. Asset: <code>spider.png</code>.</p>
+<p>Ground-patrol spider enemy with 3-frame walk animation. Reverses at patrol boundaries and respects floor gaps. Asset: <code>spider.png</code>.</p>
 <h3><code>jumping_spider.h</code> / <code>jumping_spider.c</code></h3>
-<p>Faster spider variant that periodically jumps in short arcs to clear sea gaps. Asset: <code>jumping_spider.png</code>.</p>
+<p>Faster spider variant that periodically jumps in short arcs to clear floor gaps. Asset: <code>jumping_spider.png</code>.</p>
 <h3><code>bird.h</code> / <code>bird.c</code></h3>
 <p>Slow sine-wave sky patrol bird. Asset: <code>bird.png</code>.</p>
 <h3><code>faster_bird.h</code> / <code>faster_bird.c</code></h3>
@@ -5125,7 +5142,7 @@ void game_cleanup(GameState *gs);
 <hr>
 <h2>Hazard Modules</h2>
 <h3><code>blue_flame.h</code> / <code>blue_flame.c</code></h3>
-<p>Erupting fire hazard from sea gaps. Cycles through waiting -&gt; rising -&gt; flipping (180 degree rotation at apex) -&gt; falling. 2-frame animation. Asset: <code>blue_flame.png</code>.</p>
+<p>Erupting fire hazard from floor gaps. Cycles through waiting -&gt; rising -&gt; flipping (180 degree rotation at apex) -&gt; falling. 2-frame animation. Asset: <code>blue_flame.png</code>.</p>
 <h3><code>spike.h</code> / <code>spike.c</code></h3>
 <p>Static ground spike rows placed along the floor. Asset: <code>spike.png</code>.</p>
 <h3><code>spike_block.h</code> / <code>spike_block.c</code></h3>
@@ -5140,8 +5157,8 @@ void game_cleanup(GameState *gs);
 <h2>Collectible Modules</h2>
 <h3><code>coin.h</code> / <code>coin.c</code></h3>
 <p>Gold coin collectible. AABB pickup awards 100 points. Every 3 coins restores one heart. Asset: <code>coin.png</code>.</p>
-<h3><code>yellow_star.h</code> / <code>yellow_star.c</code></h3>
-<p>Yellow star health pickup that restores hearts. Asset: <code>yellow_star.png</code>.</p>
+<h3><code>star_yellow.h</code> / <code>star_yellow.c</code></h3>
+<p>Star yellow health pickup that restores hearts. Asset: <code>star_yellow.png</code>.</p>
 <h3><code>last_star.h</code> / <code>last_star.c</code></h3>
 <p>End-of-level star collectible. Asset: <code>last_star.png</code>.</p>
 <hr>
@@ -5181,7 +5198,7 @@ void game_cleanup(GameState *gs);
 <h3><code>rail.h</code> / <code>rail.c</code></h3>
 <p>Rail path system. Builds closed-loop and open-line rail paths from tile definitions. 4x4 bitmask tileset for rendering. Used by spike blocks and float platforms. Asset: <code>rail.png</code>.</p>
 <h3><code>hud.h</code> / <code>hud.c</code></h3>
-<p>HUD renderer. Draws heart icons (health), player icon + lives counter, coin icon + score. Assets: <code>yellow_star.png</code> (hearts), <code>hud_coins.png</code> (coin icon), <code>player.png</code> (lives icon), <code>round9x13.ttf</code> (font).</p>
+<p>HUD renderer. Draws heart icons (health), player icon + lives counter, coin icon + score. Assets: <code>star_yellow.png</code> (hearts), <code>hud_coins.png</code> (coin icon), <code>player.png</code> (lives icon), <code>round9x13.ttf</code> (font).</p>
 <h3><code>debug.h</code> / <code>debug.c</code></h3>
 <p>Debug overlay (activated with <code>--debug</code> flag). FPS counter, collision hitbox visualization for all entities, and a scrolling event log.</p>
 

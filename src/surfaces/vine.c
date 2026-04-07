@@ -62,19 +62,19 @@ void vine_init(VineDecor *vines, int *count)
      * Vines on pillars: 0 (left), 1 (right), 3 (left), 5 (right), 6 (left).
      */
     /* Pillar 0 (medium, x=80) — left side, 2 tiles */
-    vines[n++] = (VineDecor){ plat_x[0] + VINE_BORDER, plat_y[0], 2 };
+    vines[n++] = (VineDecor){ plat_x[0] + VINE_BORDER, plat_y[0], 2, VINE_GREEN };
 
     /* Pillar 1 (tall, x=256) — right side, 3 tiles */
-    vines[n++] = (VineDecor){ plat_x[1] + TILE_SIZE - VINE_BORDER - VINE_W, plat_y[1], 3 };
+    vines[n++] = (VineDecor){ plat_x[1] + TILE_SIZE - VINE_BORDER - VINE_W, plat_y[1], 3, VINE_GREEN };
 
     /* Pillar 3 (tall, x=680) — left side, 3 tiles */
-    vines[n++] = (VineDecor){ plat_x[3] + VINE_BORDER, plat_y[3], 3 };
+    vines[n++] = (VineDecor){ plat_x[3] + VINE_BORDER, plat_y[3], 3, VINE_GREEN };
 
     /* Pillar 5 (tall, x=1050) — right side, 3 tiles */
-    vines[n++] = (VineDecor){ plat_x[5] + TILE_SIZE - VINE_BORDER - VINE_W, plat_y[5], 3 };
+    vines[n++] = (VineDecor){ plat_x[5] + TILE_SIZE - VINE_BORDER - VINE_W, plat_y[5], 3, VINE_GREEN };
 
     /* Pillar 6 (medium, x=1300) — left side, 2 tiles */
-    vines[n++] = (VineDecor){ plat_x[6] + VINE_BORDER, plat_y[6], 2 };
+    vines[n++] = (VineDecor){ plat_x[6] + VINE_BORDER, plat_y[6], 2, VINE_GREEN };
 
     *count = n;
 }
@@ -82,7 +82,9 @@ void vine_init(VineDecor *vines, int *count)
 /* ------------------------------------------------------------------ */
 
 void vine_render(const VineDecor *vines, int count,
-                 SDL_Renderer *renderer, SDL_Texture *tex, int cam_x)
+                 SDL_Renderer *renderer,
+                 SDL_Texture *green_tex, SDL_Texture *brown_tex,
+                 int cam_x)
 {
     for (int i = 0; i < count; i++) {
         const VineDecor *v = &vines[i];
@@ -90,6 +92,10 @@ void vine_render(const VineDecor *vines, int count,
 
         /* Cull the entire vine chain when it is off the current viewport */
         if (screen_x + VINE_W < 0 || screen_x >= GAME_W) continue;
+
+        /* Select texture by vine type — green for lush, brown for arid */
+        SDL_Texture *tex = (v->type == VINE_BROWN) ? brown_tex : green_tex;
+        if (!tex) continue;
 
         for (int t = 0; t < v->tile_count; t++) {
             /* Step by VINE_STEP to overlap tiles, hiding transparent edge pixels. */

@@ -88,7 +88,7 @@
 
 /* ------------------------------------------------------------------ */
 
-#define MAX_BLUE_FLAMES  8  /* max BlueFlame instances in one level */
+#define MAX_BLUE_FLAMES 16  /* max BlueFlame instances in one level */
 
 /*
  * BlueFlameState — the four phases of the blue flame's eruption cycle.

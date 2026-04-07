@@ -1,11 +1,12 @@
 /*
  * fog.c — Atmospheric fog/mist overlay that pans sky layers across the screen.
  *
- * Two semi-transparent cloud assets (Sky_Background_1 and 2) are chosen at
- * random and panned slowly across the logical canvas. Each wave lasts 6–10 s.
- * The image is rendered at 2× the canvas width so its edges are always outside
- * the viewport — you only ever see a cropped interior portion drifting past.
- * The next wave always starts 1 s before the current one ends.
+ * Fog textures are loaded from level-defined paths (fog_layers in LevelDef),
+ * chosen at random, and panned slowly across the logical canvas. Each wave
+ * lasts 6–10 s. The image is rendered at 2× the canvas width so its edges
+ * are always outside the viewport — you only ever see a cropped interior
+ * portion drifting past. The next wave always starts 1 s before the current
+ * one ends.
  */
 
 #include <SDL_image.h>  /* IMG_LoadTexture                  */
@@ -71,8 +72,8 @@ static void fog_spawn(FogSystem *fog) {
 
         FogInstance *inst = &fog->instances[i];
 
-        /* Random texture: 0 or 1 (maps to Sky_Background_1 and Sky_Background_2) */
-        inst->tex_index = rand() % FOG_TEX_COUNT;
+        /* Random texture: pick from however many were loaded for this level */
+        inst->tex_index = rand() % fog->tex_count;
 
         /* Random direction: +1 (left→right) or -1 (right→left) */
         inst->dir = (rand() % 2) ? +1 : -1;
@@ -105,13 +106,22 @@ static void fog_spawn(FogSystem *fog) {
 /* ------------------------------------------------------------------ */
 
 /*
- * fog_init — Load all three sky textures and kick off the first fog wave.
+ * fog_init — Load fog textures from level-defined paths and kick off the
+ * first fog wave.
+ *
+ * paths  : array of PNG file paths provided by the level definition.
+ * count  : number of entries in paths; clamped to MAX_FOG_TEXTURES.
  *
  * Texture loading is non-fatal: a missing asset prints a warning and
  * leaves its pointer NULL. fog_render silently skips NULL entries so the
  * game continues to run normally without the missing layer.
+ *
+ * If count is 0, no textures are loaded and no fog waves will spawn —
+ * fog_update and fog_render become safe no-ops.
  */
-void fog_init(FogSystem *fog, SDL_Renderer *renderer) {
+void fog_init(FogSystem *fog, SDL_Renderer *renderer,
+              const char (*paths)[64], int count)
+{
     /*
      * Seed the random number generator with the current uptime so that
      * each game session produces a different sequence of fog waves.
@@ -123,13 +133,16 @@ void fog_init(FogSystem *fog, SDL_Renderer *renderer) {
         fog->instances[i].active = 0;
     }
 
-    /* Paths for the two cloud assets used as fog layers (Sky_Background_0 excluded) */
-    const char *paths[FOG_TEX_COUNT] = {
-        "assets/fog_background_1.png",
-        "assets/fog_background_2.png",
-    };
+    /* Zero-init all texture slots (NULL = no texture loaded) */
+    for (int i = 0; i < MAX_FOG_TEXTURES; i++) {
+        fog->textures[i] = NULL;
+    }
 
-    for (int i = 0; i < FOG_TEX_COUNT; i++) {
+    /* Clamp to the maximum the array can hold */
+    if (count > MAX_FOG_TEXTURES) count = MAX_FOG_TEXTURES;
+    fog->tex_count = count;
+
+    for (int i = 0; i < count; i++) {
         /*
          * IMG_LoadTexture — decode the PNG and upload it to GPU memory.
          * Returns NULL on failure (file not found, corrupt PNG, etc.).
@@ -150,7 +163,8 @@ void fog_init(FogSystem *fog, SDL_Renderer *renderer) {
     }
 
     /* Spawn the very first fog wave so the effect starts immediately */
-    fog_spawn(fog);
+    if (fog->tex_count > 0)
+        fog_spawn(fog);
 }
 
 /* ------------------------------------------------------------------ */
@@ -284,7 +298,7 @@ void fog_render(FogSystem *fog, SDL_Renderer *renderer) {
  * SDL_DestroyTexture(NULL) is a documented no-op.
  */
 void fog_cleanup(FogSystem *fog) {
-    for (int i = 0; i < FOG_TEX_COUNT; i++) {
+    for (int i = 0; i < fog->tex_count; i++) {
         if (fog->textures[i]) {
             SDL_DestroyTexture(fog->textures[i]);
             fog->textures[i] = NULL;

@@ -93,17 +93,17 @@ void patrol_update(float *x, float *vx, float entity_w,
  *
  * On a match we snap the entity back to the gap edge (based on travel
  * direction) and reverse velocity.  The 'break' exits after the first gap
- * match; an entity cannot straddle two gaps simultaneously at SEA_GAP_W=32.
+ * match; an entity cannot straddle two gaps simultaneously at FLOOR_GAP_W=32.
  */
 void patrol_gap_reverse(float *x, float *vx,
                         float art_x_offset, float art_w, float speed,
-                        const int *sea_gaps, int sea_gap_count, int sea_gap_w)
+                        const int *floor_gaps, int floor_gap_count, int floor_gap_w)
 {
     float art_center = *x + art_x_offset + art_w * 0.5f;
-    float gw = (float)sea_gap_w;
+    float gw = (float)floor_gap_w;
 
-    for (int g = 0; g < sea_gap_count; g++) {
-        float gx = (float)sea_gaps[g];
+    for (int g = 0; g < floor_gap_count; g++) {
+        float gx = (float)floor_gaps[g];
         if (art_center >= gx && art_center < gx + gw) {
             if (*vx > 0.0f) {
                 /* Travelling right — snap left edge of art to gap left edge. */

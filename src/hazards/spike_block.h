@@ -67,7 +67,7 @@
 
 /* ------------------------------------------------------------------ */
 
-#define MAX_SPIKE_BLOCKS  4   /* max SpikeBlock instances in one level */
+#define MAX_SPIKE_BLOCKS 16   /* max SpikeBlock instances in one level */
 
 /*
  * SpikeBlock — a hazard that travels along a Rail, and can fall off open ends.
