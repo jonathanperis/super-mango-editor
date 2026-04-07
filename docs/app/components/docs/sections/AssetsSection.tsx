@@ -1,0 +1,120 @@
+export default function AssetsSection({ visible }: { visible: boolean }) {
+  return (
+    <section id="assets" className={`doc-section${!visible ? " hidden-section" : ""}`}>
+      <h1 className="page-title">Assets</h1>
+      <p><a href="home">&#8592; Home</a></p>
+      <hr />
+      <p>All visual assets live in the <code>assets/sprites/</code> directory, organized by category (backgrounds, collectibles, entities, foregrounds, hazards, levels, player, screens, surfaces). They are PNG files (loaded via <code>SDL2_image</code>). Fonts live in <code>assets/fonts/</code>.</p>
+      <blockquote><p><strong>Coordinate note:</strong> All game objects use <strong>logical space (400x300)</strong>. SDL scales to the 800x600 OS window 2x. A 48x48 sprite appears as 96x96 physical pixels on screen.</p></blockquote>
+      <hr />
+      <h2>Currently Used Assets</h2>
+      <table>
+        <thead><tr><th>File</th><th>GameState Field / Used By</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>sprites/backgrounds/*.png</code></td><td><code>parallax.c</code> (configured per level via <code>[[background_layers]]</code>)</td><td>Up to 8 parallax layers (sky_blue, sky_fire, clouds, glacial/volcanic_mountains, forest_leafs, castle_pillars, smoke variants, etc.) -- each with a scroll speed factor (0.0-1.0)</td></tr>
+          <tr><td><code>sprites/levels/grass_tileset.png</code></td><td><code>gs-&gt;floor_tile</code></td><td>48x48 tile, 9-slice rendered across <code>FLOOR_Y</code> to form the floor (per-level configurable via <code>floor_tile_path</code>)</td></tr>
+          <tr><td><code>sprites/surfaces/Platform.png</code></td><td><code>gs-&gt;platform_tex</code></td><td>48x48 tile, 9-slice rendered as one-way platform pillars</td></tr>
+          <tr><td><code>sprites/player/player.png</code></td><td><code>player-&gt;texture</code></td><td>192x288 sprite sheet, 4 cols x 6 rows, 48x48 frames</td></tr>
+          <tr><td><code>sprites/foregrounds/water.png</code></td><td><code>water-&gt;texture</code></td><td>384x64 sprite sheet, 8 frames of 48x64 with 16x31 art crop</td></tr>
+          <tr><td><code>sprites/entities/spider.png</code></td><td><code>gs-&gt;spider_tex</code></td><td>Spider enemy sprite sheet (ground patrol)</td></tr>
+          <tr><td><code>sprites/entities/jumping_spider.png</code></td><td><code>gs-&gt;jumping_spider_tex</code></td><td>Jumping spider enemy sprite sheet</td></tr>
+          <tr><td><code>sprites/entities/bird.png</code></td><td><code>gs-&gt;bird_tex</code></td><td>Slow sine-wave bird enemy sprite sheet</td></tr>
+          <tr><td><code>sprites/entities/faster_bird.png</code></td><td><code>gs-&gt;faster_bird_tex</code></td><td>Fast aggressive bird enemy sprite sheet</td></tr>
+          <tr><td><code>sprites/entities/fish.png</code></td><td><code>gs-&gt;fish_tex</code></td><td>Jumping fish enemy sprite sheet</td></tr>
+          <tr><td><code>sprites/entities/faster_fish.png</code></td><td><code>gs-&gt;faster_fish_tex</code></td><td>Faster fish enemy sprite sheet</td></tr>
+          <tr><td><code>sprites/collectibles/coin.png</code></td><td><code>gs-&gt;coin_tex</code></td><td>16x16 coin collectible sprite</td></tr>
+          <tr><td><code>sprites/collectibles/star_yellow.png</code></td><td><code>gs-&gt;star_yellow_tex</code></td><td>Star yellow collectible sprite</td></tr>
+          <tr><td><code>sprites/collectibles/star_green.png</code></td><td><code>gs-&gt;star_green_tex</code></td><td>Star green collectible sprite</td></tr>
+          <tr><td><code>sprites/collectibles/star_red.png</code></td><td><code>gs-&gt;star_red_tex</code></td><td>Star red collectible sprite</td></tr>
+          <tr><td><code>sprites/collectibles/last_star.png</code></td><td><code>last_star.c</code></td><td>Last star goal collectible sprite</td></tr>
+          <tr><td><code>sprites/hazards/spike.png</code></td><td><code>gs-&gt;spike_tex</code></td><td>Floor/ceiling spike hazard</td></tr>
+          <tr><td><code>sprites/hazards/spike_block.png</code></td><td><code>gs-&gt;spike_block_tex</code></td><td>Rail-riding rotating hazard sprite</td></tr>
+          <tr><td><code>sprites/hazards/spike_platform.png</code></td><td><code>gs-&gt;spike_platform_tex</code></td><td>Spiked platform hazard sprite</td></tr>
+          <tr><td><code>sprites/hazards/circular_saw.png</code></td><td><code>gs-&gt;circular_saw_tex</code></td><td>Rotating saw blade hazard</td></tr>
+          <tr><td><code>sprites/hazards/axe_trap.png</code></td><td><code>gs-&gt;axe_trap_tex</code></td><td>Swinging axe trap hazard</td></tr>
+          <tr><td><code>sprites/hazards/blue_flame.png</code></td><td><code>gs-&gt;blue_flame_tex</code></td><td>Blue flame hazard sprite</td></tr>
+          <tr><td><code>sprites/hazards/fire_flame.png</code></td><td><code>gs-&gt;fire_flame_tex</code></td><td>Fire flame hazard sprite (fire-colored variant)</td></tr>
+          <tr><td><code>sprites/surfaces/float_platform.png</code></td><td><code>gs-&gt;float_platform_tex</code></td><td>48x16 sprite, 3-slice horizontal strip (left cap, centre fill, right cap)</td></tr>
+          <tr><td><code>sprites/surfaces/bridge.png</code></td><td><code>gs-&gt;bridge_tex</code></td><td>16x16 single-frame brick tile for crumble walkways</td></tr>
+          <tr><td><code>sprites/surfaces/bouncepad_small.png</code></td><td><code>gs-&gt;bouncepad_small_tex</code></td><td>Small bouncepad sprite (low launch)</td></tr>
+          <tr><td><code>sprites/surfaces/bouncepad_medium.png</code></td><td><code>gs-&gt;bouncepad_medium_tex</code></td><td>Medium bouncepad sprite (standard launch)</td></tr>
+          <tr><td><code>sprites/surfaces/bouncepad_high.png</code></td><td><code>gs-&gt;bouncepad_high_tex</code></td><td>High bouncepad sprite (max launch)</td></tr>
+          <tr><td><code>sprites/surfaces/rail.png</code></td><td><code>gs-&gt;rail_tex</code></td><td>64x64 sprite sheet, 4x4 grid of 16x16 bitmask rail tiles</td></tr>
+          <tr><td><code>sprites/surfaces/vine.png</code></td><td><code>gs-&gt;vine_tex</code></td><td>16x48 single-frame plant sprite for climbable vines</td></tr>
+          <tr><td><code>sprites/surfaces/ladder.png</code></td><td><code>gs-&gt;ladder_tex</code></td><td>Climbable ladder sprite</td></tr>
+          <tr><td><code>sprites/surfaces/rope.png</code></td><td><code>gs-&gt;rope_tex</code></td><td>Climbable rope sprite</td></tr>
+          <tr><td><code>sprites/foregrounds/fog_background_1.png</code></td><td><code>fog.c</code> (<code>fog-&gt;textures[0]</code>)</td><td>Fog overlay layer, semi-transparent sliding effect</td></tr>
+          <tr><td><code>sprites/foregrounds/fog_background_2.png</code></td><td><code>fog.c</code> (<code>fog-&gt;textures[1]</code>)</td><td>Fog overlay layer, semi-transparent sliding effect</td></tr>
+          <tr><td><code>sprites/screens/hud_coins.png</code></td><td><code>hud.c</code></td><td>Coin count UI icon used in the HUD</td></tr>
+          <tr><td><code>sprites/screens/start_menu_logo.png</code></td><td><code>start_menu.c</code></td><td>Game logo displayed on the start menu screen</td></tr>
+          <tr><td><code>fonts/round9x13.ttf</code></td><td><code>hud.c</code> (<code>hud-&gt;font</code>)</td><td>Bitmap font for score and lives text in the HUD</td></tr>
+        </tbody>
+      </table>
+      <hr />
+      <h2>Player Sprite Sheet -- <code>player.png</code></h2>
+      <p><strong>Sheet dimensions:</strong> 192 x 288 px<br /><strong>Grid:</strong> 4 columns x 6 rows<br /><strong>Frame size:</strong> 48 x 48 px</p>
+      <h3>Animation Row Map</h3>
+      <table>
+        <thead><tr><th>Row</th><th>AnimState</th><th>Frame Count</th><th>Frame Duration</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>0</td><td><code>ANIM_IDLE</code></td><td>4</td><td>150 ms/frame</td><td>Subtle breathing cycle</td></tr>
+          <tr><td>1</td><td><code>ANIM_WALK</code></td><td>4</td><td>100 ms/frame</td><td>Looping run cycle</td></tr>
+          <tr><td>2</td><td><code>ANIM_JUMP</code></td><td>2</td><td>150 ms/frame</td><td>Rising phase poses</td></tr>
+          <tr><td>3</td><td><code>ANIM_FALL</code></td><td>1</td><td>200 ms/frame</td><td>Descent pose</td></tr>
+          <tr><td>4</td><td><code>ANIM_CLIMB</code></td><td>2</td><td>100 ms/frame</td><td>Vine climbing cycle</td></tr>
+          <tr><td>5</td><td><em>(unused)</em></td><td>--</td><td>--</td><td>Available for future states</td></tr>
+        </tbody>
+      </table>
+      <h3>Frame Source Rect Formula</h3>
+      <pre><code className="language-c">{`frame.x = anim_frame_index * FRAME_W;   // column x 48
+frame.y = ANIM_ROW[anim_state] * FRAME_H; // row x 48`}</code></pre>
+      <h3>Horizontal Flipping</h3>
+      <p>When <code>player-&gt;facing_left == 1</code>, the sprite is drawn with <code>SDL_FLIP_HORIZONTAL</code> via <code>SDL_RenderCopyEx</code>. This means the same right-facing animation frames are used for both directions -- no duplicate assets needed.</p>
+      <hr />
+      <h2>Unused Assets</h2>
+      <p>The following assets are stored in <code>assets/sprites/unused/</code> and are not loaded by the game. They are available as reserves for future use.</p>
+      <table>
+        <thead><tr><th>File</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>brick_oneway.png</code></td><td>One-way brick platform tile</td></tr>
+          <tr><td><code>brick_tileset.png</code></td><td>Brick wall / platform tile</td></tr>
+          <tr><td><code>castle_background_0.png</code></td><td>Castle/dungeon interior background</td></tr>
+          <tr><td><code>cloud_tileset.png</code></td><td>Cloud platform tile</td></tr>
+          <tr><td><code>clouds.png</code></td><td>Decorative cloud layer</td></tr>
+          <tr><td><code>clouds_mg_1_lightened.png</code></td><td>Lightened midground cloud variant</td></tr>
+          <tr><td><code>flame_1.png</code></td><td>Flame hazard variant</td></tr>
+          <tr><td><code>forest_background_0.png</code></td><td>Forest scene background</td></tr>
+          <tr><td><code>glacial_mountains_lightened.png</code></td><td>Lightened mountain variant</td></tr>
+          <tr><td><code>grass_rock_oneway.png</code></td><td>One-way grass + rock platform</td></tr>
+          <tr><td><code>grass_rock_tileset.png</code></td><td>Grass + rock mixed tileset</td></tr>
+          <tr><td><code>lava.png</code></td><td>Lava hazard tile</td></tr>
+          <tr><td><code>leaf_tileset.png</code></td><td>Leaf / foliage platform tile</td></tr>
+          <tr><td><code>sky_background_0.png</code></td><td>Sky gradient background</td></tr>
+          <tr><td><code>sky_lightened.png</code></td><td>Lightened sky variant</td></tr>
+          <tr><td><code>stone_tileset.png</code></td><td>Stone floor / wall tile</td></tr>
+        </tbody>
+      </table>
+      <hr />
+      <h2>Sprite Sheet Analysis</h2>
+      <p>To inspect any sprite sheet&#39;s exact dimensions and pixel layout:</p>
+      <pre><code className="language-sh">{`python3 .claude/scripts/analyze_sprite.py assets/<sprite>.png`}</code></pre>
+      <h3>Frame Math Reference</h3>
+      <pre><code>{`Sheet width  = cols x frame_w
+Sheet height = rows x frame_h
+
+source_x = (frame_index % cols) * frame_w
+source_y = (frame_index / cols) * frame_h`}</code></pre>
+      <hr />
+      <h2>Loading an Asset</h2>
+      <pre><code className="language-c">{`// In game_init or an entity's init function:
+SDL_Texture *tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/coin.png");
+if (!tex) {
+    fprintf(stderr, "Failed to load coin.png: %s\\n", IMG_GetError());
+    exit(EXIT_FAILURE);
+}
+
+// At cleanup (reverse init order):
+if (tex) { SDL_DestroyTexture(tex); tex = NULL; }`}</code></pre>
+    </section>
+  );
+}

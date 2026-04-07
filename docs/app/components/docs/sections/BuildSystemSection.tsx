@@ -1,0 +1,187 @@
+export default function BuildSystemSection({ visible }: { visible: boolean }) {
+  return (
+    <section id="build-system" className={`doc-section${!visible ? " hidden-section" : ""}`}>
+      <h1 className="page-title">Build System</h1>
+      <p><a href="home">&#8592; Home</a></p>
+      <hr />
+      <h2>Makefile Overview</h2>
+      <p>The project uses a <strong>GNU Makefile</strong> that auto-discovers source files via a wildcard -- no manual edits required when adding new <code>.c</code> files.</p>
+      <pre><code className="language-makefile">{`CC      = clang
+CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(shell sdl2-config --cflags)
+LIBS    = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
+OUTDIR  = out
+TARGET  = $(OUTDIR)/super-mango
+SRCDIR  = src
+SRCS    = $(wildcard $(SRCDIR)/*.c) \\
+          $(wildcard $(SRCDIR)/collectibles/*.c) \\
+          $(wildcard $(SRCDIR)/core/*.c) \\
+          $(wildcard $(SRCDIR)/effects/*.c) \\
+          $(wildcard $(SRCDIR)/entities/*.c) \\
+          $(wildcard $(SRCDIR)/hazards/*.c) \\
+          $(wildcard $(SRCDIR)/levels/*.c) \\
+          $(wildcard $(SRCDIR)/player/*.c) \\
+          $(wildcard $(SRCDIR)/screens/*.c) \\
+          $(wildcard $(SRCDIR)/surfaces/*.c) \\
+          $(SRCDIR)/editor/serializer.c \\
+          vendor/tomlc17/tomlc17.c
+OBJS    = $(SRCS:.c=.o)
+DEPS    = $(OBJS:.o=.d)`}</code></pre>
+      <h3>Key Variables</h3>
+      <table>
+        <thead><tr><th>Variable</th><th>Value</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>CC</code></td><td><code>clang</code></td><td>C compiler (override with <code>CC=gcc</code> if needed)</td></tr>
+          <tr><td><code>CFLAGS</code></td><td>see below</td><td>Compiler flags</td></tr>
+          <tr><td><code>LIBS</code></td><td>see below</td><td>Linker flags</td></tr>
+          <tr><td><code>TARGET</code></td><td><code>out/super-mango</code></td><td>Output binary path</td></tr>
+          <tr><td><code>SRCS</code></td><td><code>src/**/*.c</code></td><td>All C source files per subdirectory (auto-discovered via explicit wildcards)</td></tr>
+          <tr><td><code>OBJS</code></td><td><code>src/*.o</code></td><td>Object files, placed next to sources</td></tr>
+          <tr><td><code>DEPS</code></td><td><code>src/*.d</code></td><td>Auto-generated dependency files (tracks header changes)</td></tr>
+        </tbody>
+      </table>
+      <h3>Compiler Flags Explained</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>-std=c11</code></td><td>Compile as C11 (ISO/IEC 9899:2011)</td></tr>
+          <tr><td><code>-Wall</code></td><td>Enable common warnings</td></tr>
+          <tr><td><code>-Wextra</code></td><td>Enable extra warnings beyond <code>-Wall</code></td></tr>
+          <tr><td><code>-Wpedantic</code></td><td>Strict ISO compliance warnings</td></tr>
+          <tr><td><code>-MMD</code></td><td>Generate <code>.d</code> dependency files for each <code>.o</code> (tracks header changes) -- passed in compile rule, not in <code>CFLAGS</code></td></tr>
+          <tr><td><code>-MP</code></td><td>Add phony targets for each dependency (prevents errors when headers are deleted) -- passed in compile rule, not in <code>CFLAGS</code></td></tr>
+          <tr><td><code>$(shell sdl2-config --cflags)</code></td><td>SDL2 include paths (<code>-I/opt/homebrew/include/SDL2</code>)</td></tr>
+        </tbody>
+      </table>
+      <h3>Linker Flags Explained</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>$(shell sdl2-config --libs)</code></td><td>SDL2 core library (<code>-L/opt/homebrew/lib -lSDL2</code>)</td></tr>
+          <tr><td><code>-lSDL2_image</code></td><td>PNG/JPG texture loading</td></tr>
+          <tr><td><code>-lSDL2_ttf</code></td><td>TrueType font rendering</td></tr>
+          <tr><td><code>-lSDL2_mixer</code></td><td>Audio mixing (WAV, MP3, OGG)</td></tr>
+          <tr><td><code>-lm</code></td><td>Math library (<code>math.h</code> functions: <code>sinf</code>, <code>cosf</code>, <code>fmodf</code>, etc.)</td></tr>
+        </tbody>
+      </table>
+      <hr />
+      <h2>Build Targets</h2>
+      <h3><code>make</code> / <code>make all</code></h3>
+      <p>Compiles all <code>src/**/*.c</code> files (across all subdirectories) to <code>.o</code> objects, then links them into <code>out/super-mango</code>.</p>
+      <pre><code className="language-sh">make</code></pre>
+      <p><strong>Steps:</strong></p>
+      <ol>
+        <li>Creates <code>out/</code> directory if it does not exist</li>
+        <li>Compiles each <code>src/**/*.c</code> &#8594; <code>src/**/*.o</code></li>
+        <li>Links all <code>.o</code> files &#8594; <code>out/super-mango</code></li>
+        <li>On macOS (<code>uname -s == Darwin</code>), ad-hoc code signs the binary with <code>codesign --force --sign - $@</code> (required on Apple Silicon to avoid <code>Killed: 9</code> errors). On other platforms this step is skipped</li>
+      </ol>
+      <h3><code>make run</code></h3>
+      <p>Builds (if out of date) then immediately executes the binary (no CLI flags).</p>
+      <pre><code className="language-sh">make run</code></pre>
+      <p>The binary must be run from the <strong>repo root</strong> because asset paths are relative:</p>
+      <pre><code className="language-c">{`IMG_LoadTexture(renderer, "assets/sprites/backgrounds/sky_blue.png");
+Mix_LoadWAV("assets/sounds/player/player_jump.wav");`}</code></pre>
+      <h3><code>make run-debug</code></h3>
+      <p>Builds (if out of date) then runs the binary with the <code>--debug</code> flag, which enables the debug overlay: FPS counter, collision hitbox visualization, and scrolling event log.</p>
+      <pre><code className="language-sh">make run-debug</code></pre>
+      <h3><code>make run-level LEVEL=&lt;path&gt;</code></h3>
+      <p>Builds (if out of date) then runs the binary with the <code>--level &lt;path&gt;</code> flag, which loads the specified TOML level file.</p>
+      <pre><code className="language-sh">{`make run-level LEVEL=levels/00_sandbox_01.toml`}</code></pre>
+      <h3><code>make run-level-debug LEVEL=&lt;path&gt;</code></h3>
+      <p>Builds (if out of date) then runs the binary with both <code>--level &lt;path&gt;</code> and <code>--debug</code> flags, combining level loading with the debug overlay.</p>
+      <pre><code className="language-sh">{`make run-level-debug LEVEL=levels/00_sandbox_01.toml`}</code></pre>
+      <h3><code>make editor</code></h3>
+      <p>Compiles the standalone visual level editor binary to <code>out/super-mango-editor</code>.</p>
+      <pre><code className="language-sh">make editor</code></pre>
+      <h3><code>make run-editor</code></h3>
+      <p>Builds (if out of date) then launches the level editor.</p>
+      <pre><code className="language-sh">make run-editor</code></pre>
+      <h3><code>make web</code></h3>
+      <p>Compiles the game to WebAssembly using the Emscripten SDK (<code>emcc</code>). Requires Emscripten to be installed and <code>emcc</code> on <code>PATH</code>.</p>
+      <pre><code className="language-sh">make web</code></pre>
+      <p>Produces <code>out/super-mango.html</code>, <code>.js</code>, <code>.wasm</code>, and <code>.data</code> (bundled assets/sounds). SDL2 ports are compiled from source by Emscripten on first build; subsequent builds reuse cached port libraries. Uses a custom shell template from <code>web/shell.html</code>.</p>
+      <h3><code>make clean</code></h3>
+      <p>Removes all build artifacts.</p>
+      <pre><code className="language-sh">make clean</code></pre>
+      <p>Deletes:</p>
+      <ul>
+        <li><code>src/**/*.o</code> -- all object files across subdirectories</li>
+        <li><code>src/**/*.d</code> -- all generated dependency files</li>
+        <li><code>out/</code> -- the output directory and binary</li>
+      </ul>
+      <hr />
+      <h2>Prerequisites</h2>
+      <h3>macOS (Apple Silicon / Intel)</h3>
+      <pre><code className="language-sh">{`# Install Homebrew if needed: https://brew.sh
+brew install sdl2 sdl2_image sdl2_ttf sdl2_mixer
+
+# Xcode Command Line Tools (provides clang and make)
+xcode-select --install`}</code></pre>
+      <p>SDL2 libraries are installed to <code>/opt/homebrew/</code> on Apple Silicon. <code>sdl2-config</code> resolves the correct paths automatically.</p>
+      <h3>Linux -- Debian / Ubuntu</h3>
+      <pre><code className="language-sh">{`sudo apt update
+sudo apt install build-essential clang \\
+    libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-mixer-dev`}</code></pre>
+      <h3>Linux -- Fedora / RHEL / CentOS</h3>
+      <pre><code className="language-sh">{`sudo dnf install clang make \\
+    SDL2-devel SDL2_image-devel SDL2_ttf-devel SDL2_mixer-devel`}</code></pre>
+      <h3>Linux -- Arch Linux</h3>
+      <pre><code className="language-sh">{`sudo pacman -S clang make sdl2 sdl2_image sdl2_ttf sdl2_mixer`}</code></pre>
+      <h3>Windows (MSYS2)</h3>
+      <ol>
+        <li>Install <a href="https://www.msys2.org/">MSYS2</a></li>
+        <li>Open the <strong>MSYS2 UCRT64</strong> terminal:</li>
+      </ol>
+      <pre><code className="language-sh">{`pacman -S mingw-w64-ucrt-x86_64-clang \\
+          mingw-w64-ucrt-x86_64-make \\
+          mingw-w64-ucrt-x86_64-SDL2 \\
+          mingw-w64-ucrt-x86_64-SDL2_image \\
+          mingw-w64-ucrt-x86_64-SDL2_ttf \\
+          mingw-w64-ucrt-x86_64-SDL2_mixer`}</code></pre>
+      <ol start={3}><li>Build:</li></ol>
+      <pre><code className="language-sh">{`cd /c/path/to/super-mango-editor
+make`}</code></pre>
+      <ol start={4}><li>SDL2 DLLs must be in the same directory as the binary. Copy them from the MSYS2 prefix.</li></ol>
+      <hr />
+      <h2>CI/CD Pipelines</h2>
+      <p>Three GitHub Actions workflows:</p>
+      <table>
+        <thead><tr><th>Workflow</th><th>File</th><th>Trigger</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td>Build &amp; Release</td><td><code>build.yml</code></td><td>Push to <code>main</code>, pull requests</td><td>Multi-platform build (Linux x86_64, macOS arm64, Windows x86_64, WebAssembly); on main push: GitHub Release creation + Pages deployment of WebAssembly build</td></tr>
+          <tr><td>CodeQL</td><td><code>codeql.yml</code></td><td>Push/PR to <code>main</code>, weekly</td><td>Automated code security and quality analysis</td></tr>
+          <tr><td>Deploy</td><td><code>deploy.yml</code></td><td>Push to <code>main</code>, manual</td><td>Deploys <code>docs/</code> to GitHub Pages via actions/deploy-pages</td></tr>
+        </tbody>
+      </table>
+      <p>All workflows install SDL2 dependencies per platform and compile with the project Makefile. The Deploy workflow handles static site deployment only.</p>
+      <hr />
+      <h2>Adding New Source Files</h2>
+      <p>The Makefile uses per-subdirectory wildcards. Any new <code>.c</code> file placed in <code>src/</code> or its recognized subdirectories (<code>collectibles/</code>, <code>core/</code>, <code>effects/</code>, <code>entities/</code>, <code>hazards/</code>, <code>levels/</code>, <code>player/</code>, <code>screens/</code>, <code>surfaces/</code>) is compiled automatically. <strong>New subdirectories</strong> require adding a wildcard line to the Makefile.</p>
+      <pre><code className="language-sh">{`# Example: adding a new enemy entity
+touch src/entities/new_enemy.c src/entities/new_enemy.h
+make   # new_enemy.c is compiled automatically`}</code></pre>
+      <p>See <a href="developer_guide">Developer Guide</a> for the full new-entity workflow.</p>
+      <hr />
+      <h2>Output Structure</h2>
+      <p>After a successful build:</p>
+      <pre><code>{`out/
+\u2514\u2500\u2500 super-mango          \u2190 the game binary
+src/
+\u251C\u2500\u2500 main.o
+\u251C\u2500\u2500 game.o
+\u251C\u2500\u2500 collectibles/        \u2190 coin.o, star_yellow.o, star_green.o, star_red.o, last_star.o
+\u251C\u2500\u2500 core/                \u2190 debug.o, entity_utils.o
+\u251C\u2500\u2500 effects/             \u2190 fog.o, parallax.o, water.o
+\u251C\u2500\u2500 entities/            \u2190 spider.o, jumping_spider.o, bird.o, faster_bird.o, fish.o, faster_fish.o
+\u251C\u2500\u2500 hazards/             \u2190 spike.o, spike_block.o, spike_platform.o, circular_saw.o, axe_trap.o, blue_flame.o
+\u251C\u2500\u2500 levels/              \u2190 level_loader.o
+\u251C\u2500\u2500 player/              \u2190 player.o
+\u251C\u2500\u2500 screens/             \u2190 hud.o, start_menu.o
+\u251C\u2500\u2500 surfaces/            \u2190 platform.o, float_platform.o, bridge.o, bouncepad.o, bouncepad_*.o, rail.o, vine.o, ladder.o, rope.o
+\u251C\u2500\u2500 editor/              \u2190 serializer.o (shared with game build)
+\u2514\u2500\u2500 (plus corresponding .d dependency files)
+vendor/
+\u2514\u2500\u2500 tomlc17/tomlc17.o`}</code></pre>
+    </section>
+  );
+}
