@@ -2,10 +2,10 @@
  * level_loader.h — Public interface for loading and resetting levels.
  *
  * level_load  : Populate all GameState entity arrays from a LevelDef.
- *               Called once from sandbox_load_level (game startup).
+ *               Called once from game_init (game startup).
  *
  * level_reset : Re-populate all mutable entity arrays and reset the player.
- *               Called from sandbox_reset_level (player death / level retry).
+ *               Called from reset_current_level (player death / level retry).
  *               Geometry (platforms, rails) and sea gaps are not re-applied
  *               because they never change during a play session.
  */

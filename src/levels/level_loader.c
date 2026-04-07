@@ -5,12 +5,15 @@
  * and (b) the LevelDef placement format.  Entity modules know HOW things behave;
  * level files know WHERE things go; this file is the bridge between the two.
  *
- * level_load  : called once at game_init via sandbox_load_level.
- * level_reset : called on player death via sandbox_reset_level; skips static
+ * level_load  : called once at game_init.
+ * level_reset : called on player death via reset_current_level; skips static
  *               geometry that never changes (platforms, rails, sea gaps).
  */
 
 #include <stdlib.h>  /* rand(), RAND_MAX */
+#include <SDL_image.h> /* IMG_LoadTexture, IMG_GetError */
+#include <stdio.h>     /* fprintf, stderr */
+/* string.h no longer needed — foreground detection is count-based */
 
 #include "level_loader.h"
 
@@ -19,7 +22,7 @@
 #include "../surfaces/platform.h"
 #include "../surfaces/rail.h"
 #include "../collectibles/coin.h"
-#include "../collectibles/yellow_star.h"
+#include "../collectibles/star_yellow.h"
 #include "../collectibles/last_star.h"
 #include "../entities/spider.h"
 #include "../entities/jumping_spider.h"
@@ -58,16 +61,16 @@ static float rand_range(float lo, float hi) {
 /* ------------------------------------------------------------------ */
 
 /*
- * load_sea_gaps — Copy sea gap x-positions from the level definition.
+ * load_floor_gaps — Copy floor gap x-positions from the level definition.
  *
- * Sea gaps are holes in the ground floor.  Their positions feed into both
+ * Floor gaps are holes in the ground floor.  Their positions feed into both
  * spider gap-avoidance logic and the blue flame eruption system.
  */
-static void load_sea_gaps(GameState *gs, const LevelDef *def)
+static void load_floor_gaps(GameState *gs, const LevelDef *def)
 {
-    for (int i = 0; i < def->sea_gap_count; i++)
-        gs->sea_gaps[i] = def->sea_gaps[i];
-    gs->sea_gap_count = def->sea_gap_count;
+    for (int i = 0; i < def->floor_gap_count; i++)
+        gs->floor_gaps[i] = def->floor_gaps[i];
+    gs->floor_gap_count = def->floor_gap_count;
 }
 
 /*
@@ -87,15 +90,30 @@ static void load_rails(GameState *gs, const LevelDef *def)
  *
  * Each pillar is shifted 16 px into the floor so the grass top edge meets
  * the ground seamlessly.  Width is always one TILE_SIZE (48 px).
+ *
+ * If a platform specifies a tile_path, that texture is loaded and assigned
+ * to the platform.  Otherwise the platform uses the level's floor_tile_path
+ * (loaded separately in game.c and passed as default_tex to platforms_render).
  */
 static void load_platforms(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->platform_count; i++) {
         const PlatformPlacement *p = &def->platforms[i];
+        int tw = (p->tile_width > 0) ? p->tile_width : 1;
         gs->platforms[i].x = p->x;
         gs->platforms[i].y = (float)(FLOOR_Y - p->tile_height * TILE_SIZE + 16);
-        gs->platforms[i].w = TILE_SIZE;
+        gs->platforms[i].w = tw * TILE_SIZE;
         gs->platforms[i].h = p->tile_height * TILE_SIZE;
+        gs->platforms[i].tex = NULL;
+
+        /* Load per-platform tileset texture if specified */
+        if (p->tile_path[0] != '\0') {
+            gs->platforms[i].tex = IMG_LoadTexture(gs->renderer, p->tile_path);
+            if (!gs->platforms[i].tex) {
+                fprintf(stderr, "Warning: Failed to load platform tile %s: %s\n",
+                        p->tile_path, IMG_GetError());
+            }
+        }
     }
     gs->platform_count = def->platform_count;
 }
@@ -114,14 +132,34 @@ static void load_coins(GameState *gs, const LevelDef *def)
     gs->coin_count = def->coin_count;
 }
 
-static void load_yellow_stars(GameState *gs, const LevelDef *def)
+static void load_star_yellows(GameState *gs, const LevelDef *def)
 {
-    for (int i = 0; i < def->yellow_star_count; i++) {
-        gs->yellow_stars[i].x      = def->yellow_stars[i].x;
-        gs->yellow_stars[i].y      = def->yellow_stars[i].y;
-        gs->yellow_stars[i].active = 1;
+    for (int i = 0; i < def->star_yellow_count; i++) {
+        gs->star_yellows[i].x      = def->star_yellows[i].x;
+        gs->star_yellows[i].y      = def->star_yellows[i].y;
+        gs->star_yellows[i].active = 1;
     }
-    gs->yellow_star_count = def->yellow_star_count;
+    gs->star_yellow_count = def->star_yellow_count;
+}
+
+static void load_star_greens(GameState *gs, const LevelDef *def)
+{
+    for (int i = 0; i < def->star_green_count; i++) {
+        gs->star_greens[i].x      = def->star_greens[i].x;
+        gs->star_greens[i].y      = def->star_greens[i].y;
+        gs->star_greens[i].active = 1;
+    }
+    gs->star_green_count = def->star_green_count;
+}
+
+static void load_star_reds(GameState *gs, const LevelDef *def)
+{
+    for (int i = 0; i < def->star_red_count; i++) {
+        gs->star_reds[i].x      = def->star_reds[i].x;
+        gs->star_reds[i].y      = def->star_reds[i].y;
+        gs->star_reds[i].active = 1;
+    }
+    gs->star_red_count = def->star_red_count;
 }
 
 static void load_last_star(GameState *gs, const LevelDef *def)
@@ -130,8 +168,14 @@ static void load_last_star(GameState *gs, const LevelDef *def)
     gs->last_star.y         = def->last_star.y;
     gs->last_star.w         = LAST_STAR_DISPLAY_W;
     gs->last_star.h         = LAST_STAR_DISPLAY_H;
-    gs->last_star.active    = 1;
     gs->last_star.collected = 0;
+
+    /* If the level didn't place one, use a visible default position */
+    if (def->last_star.x == 0.0f && def->last_star.y == 0.0f) {
+        gs->last_star.x = 145.0f;
+        gs->last_star.y = 167.0f;
+    }
+    gs->last_star.active = 1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -259,7 +303,8 @@ static void load_axe_traps(GameState *gs, const LevelDef *def)
          * Pivot y: top surface of a 3-tile pillar.
          */
         gs->axe_traps[i].x            = p->pillar_x + TILE_SIZE / 2.0f;
-        gs->axe_traps[i].y            = (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
+        gs->axe_traps[i].y            = (p->y != 0.0f) ? p->y
+                                       : (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
         gs->axe_traps[i].angle        = 0.0f;
         gs->axe_traps[i].time         = 0.0f;
         gs->axe_traps[i].mode         = p->mode;
@@ -279,7 +324,8 @@ static void load_circular_saws(GameState *gs, const LevelDef *def)
          * 2-tile pillar's top edge.
          */
         gs->circular_saws[i].x          = p->x;
-        gs->circular_saws[i].y          = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H);
+        gs->circular_saws[i].y          = (p->y != 0.0f) ? p->y
+                                         : (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H);
         gs->circular_saws[i].w          = SAW_DISPLAY_W;
         gs->circular_saws[i].h          = SAW_DISPLAY_H;
         gs->circular_saws[i].patrol_x0  = p->patrol_x0;
@@ -331,15 +377,66 @@ static void load_spike_blocks(GameState *gs, const LevelDef *def)
     gs->spike_block_count = def->spike_block_count;
 }
 
-static void load_blue_flames(GameState *gs)
+static void load_blue_flames(GameState *gs, const LevelDef *def)
 {
     /*
-     * Blue flame positions are derived from the sea_gaps array — each gap
-     * that is not at the world edge gets one erupting flame.
-     * This function assumes load_sea_gaps has already been called.
+     * Blue flames are now manually placed in LevelDef — each entry
+     * specifies the gap x position where a flame erupts.  We initialise
+     * each BlueFlame struct from the placement data.
      */
-    blue_flames_init(gs->blue_flames, &gs->blue_flame_count,
-                     gs->sea_gaps, gs->sea_gap_count);
+    int n = 0;
+    for (int i = 0; i < def->blue_flame_count && n < MAX_BLUE_FLAMES; i++) {
+        float gap_x = def->blue_flames[i].x;
+        if (gap_x <= 0.0f) continue;
+
+        BlueFlame *f = &gs->blue_flames[n];
+        f->gap_x      = gap_x;
+        f->x          = gap_x + (FLOOR_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f;
+        f->start_y    = (float)(FLOOR_Y + TILE_SIZE);
+        f->y          = f->start_y;
+        f->vy         = 0.0f;
+        f->w          = BLUE_FLAME_DISPLAY_W;
+        f->h          = BLUE_FLAME_DISPLAY_H;
+        f->angle      = 0.0f;
+        f->state      = BLUE_FLAME_WAITING;
+        f->timer      = (float)n * 0.5f;
+        f->anim_timer = 0.0f;
+        f->anim_frame = 0;
+        f->active     = 1;
+        n++;
+    }
+    gs->blue_flame_count = n;
+}
+
+static void load_fire_flames(GameState *gs, const LevelDef *def)
+{
+    /*
+     * Fire flames use the same BlueFlame struct and eruption mechanics as
+     * blue flames — only the texture differs (set in game.c at render time).
+     * Initialisation is identical to load_blue_flames.
+     */
+    int n = 0;
+    for (int i = 0; i < def->fire_flame_count && n < MAX_BLUE_FLAMES; i++) {
+        float gap_x = def->fire_flames[i].x;
+        if (gap_x <= 0.0f) continue;
+
+        BlueFlame *f = &gs->fire_flames[n];
+        f->gap_x      = gap_x;
+        f->x          = gap_x + (FLOOR_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f;
+        f->start_y    = (float)(FLOOR_Y + TILE_SIZE);
+        f->y          = f->start_y;
+        f->vy         = 0.0f;
+        f->w          = BLUE_FLAME_DISPLAY_W;
+        f->h          = BLUE_FLAME_DISPLAY_H;
+        f->angle      = 0.0f;
+        f->state      = BLUE_FLAME_WAITING;
+        f->timer      = (float)n * 0.5f;
+        f->anim_timer = 0.0f;
+        f->anim_frame = 0;
+        f->active     = 1;
+        n++;
+    }
+    gs->fire_flame_count = n;
 }
 
 /* ------------------------------------------------------------------ */
@@ -426,6 +523,7 @@ static void load_vines(GameState *gs, const LevelDef *def)
         gs->vines[i].x          = def->vines[i].x;
         gs->vines[i].y          = def->vines[i].y;
         gs->vines[i].tile_count = def->vines[i].tile_count;
+        gs->vines[i].type       = (VineType)def->vines[i].vine_type;
     }
     gs->vine_count = def->vine_count;
 }
@@ -464,14 +562,23 @@ static void load_ropes(GameState *gs, const LevelDef *def)
  */
 void level_load(GameState *gs, const LevelDef *def)
 {
+    /* Store a pointer to the active level definition for game.c to read */
+    gs->current_level = def;
+
+    /* Set world width from screen_count (default 4 screens if not specified) */
+    int screens = (def->screen_count > 0) ? def->screen_count : 4;
+    gs->world_w = screens * GAME_W;
+
     /* ---- Static geometry ------------------------------------------ */
-    load_sea_gaps(gs, def);
+    load_floor_gaps(gs, def);
     load_rails(gs, def);
     load_platforms(gs, def);
 
     /* ---- Collectibles --------------------------------------------- */
     load_coins(gs, def);
-    load_yellow_stars(gs, def);
+    load_star_yellows(gs, def);
+    load_star_greens(gs, def);
+    load_star_reds(gs, def);
     load_last_star(gs, def);
 
     /* ---- Enemies -------------------------------------------------- */
@@ -488,7 +595,8 @@ void level_load(GameState *gs, const LevelDef *def)
     load_spike_rows(gs, def);
     load_spike_platforms(gs, def);
     load_spike_blocks(gs, def);
-    load_blue_flames(gs);   /* derived from sea_gaps; no placement array */
+    load_blue_flames(gs, def);
+    load_fire_flames(gs, def);
 
     /* ---- Surfaces ------------------------------------------------- */
     load_float_platforms(gs, def);
@@ -499,6 +607,65 @@ void level_load(GameState *gs, const LevelDef *def)
     load_vines(gs, def);
     load_ladders(gs, def);
     load_ropes(gs, def);
+
+    /* ---- Level-wide configuration --------------------------------- */
+
+    /*
+     * Player spawn — override the defaults set by player_init.
+     * player_init has already run by this point, so w/h are valid.
+     * FLOOR_SINK is 16 px (defined in player.c); we use the same literal
+     * here to keep the spawn formula consistent with player_reset.
+     */
+    if (def->player_start_x != 0.0f || def->player_start_y != 0.0f) {
+        gs->player.spawn_x = def->player_start_x;
+        gs->player.spawn_y = def->player_start_y;
+        gs->player.x = def->player_start_x + (TILE_SIZE - gs->player.w) / 2.0f;
+        gs->player.y = def->player_start_y - gs->player.h + 16;  /* 16 = FLOOR_SINK */
+    }
+
+    /* ---- Level-wide configuration ---------------------------------- */
+    /*
+     * Enable foreground systems based on what the level definition provides.
+     * Fog is driven by fog_layers (the atmospheric overlay textures).
+     * Water/lava strip is driven by foreground_layers (the animated bottom strip).
+     * Each system is independent — a level can have fog without water, or vice versa.
+     */
+    gs->fog_enabled   = (def->fog_layer_count > 0) ? 1 : 0;
+    gs->water_enabled = (def->foreground_layer_count > 0) ? 1 : 0;
+
+    /*
+     * Game rules — use level-defined values if set (>0), otherwise fall
+     * back to engine defaults defined in hud.h and coin.h.
+     */
+    gs->hearts          = def->initial_hearts  > 0 ? def->initial_hearts  : MAX_HEARTS;
+    gs->lives           = def->initial_lives   > 0 ? def->initial_lives   : DEFAULT_LIVES;
+    gs->score           = 0;
+    gs->score_per_life  = def->score_per_life  > 0 ? def->score_per_life  : SCORE_PER_LIFE;
+    gs->score_life_next = gs->score_per_life;
+    gs->coin_score      = def->coin_score     > 0 ? def->coin_score      : COIN_SCORE;
+
+    /*
+     * Player physics overrides — apply level-defined values if >= 0,
+     * otherwise the defaults set by player_init (#define macros) remain.
+     *
+     * -1.0 (and any negative value) means "use engine default" — this lets
+     * level designers set a field to 0.0 without it being misread as "unset".
+     *
+     * This lets a level tune movement feel without touching any .c file:
+     * just set the relevant [physics] field in the .toml and reload.
+     */
+#define PHYS_OVERRIDE(field) \
+    if (def->physics.field >= 0.0f) gs->player.field = def->physics.field
+    PHYS_OVERRIDE(walk_max_speed);
+    PHYS_OVERRIDE(run_max_speed);
+    PHYS_OVERRIDE(walk_ground_accel);
+    PHYS_OVERRIDE(run_ground_accel);
+    PHYS_OVERRIDE(ground_friction);
+    PHYS_OVERRIDE(ground_counter_accel);
+    PHYS_OVERRIDE(air_accel_walk);
+    PHYS_OVERRIDE(air_accel_run);
+    PHYS_OVERRIDE(air_friction);
+#undef PHYS_OVERRIDE
 }
 
 /*
@@ -514,7 +681,9 @@ void level_reset(GameState *gs, const LevelDef *def)
 
     /* Collectibles */
     load_coins(gs, def);
-    load_yellow_stars(gs, def);
+    load_star_yellows(gs, def);
+    load_star_greens(gs, def);
+    load_star_reds(gs, def);
     load_last_star(gs, def);
 
     /* Enemies */
@@ -531,7 +700,8 @@ void level_reset(GameState *gs, const LevelDef *def)
     load_spike_rows(gs, def);
     load_spike_platforms(gs, def);
     load_spike_blocks(gs, def);
-    load_blue_flames(gs);
+    load_blue_flames(gs, def);
+    load_fire_flames(gs, def);
 
     /* Surfaces */
     load_float_platforms(gs, def);

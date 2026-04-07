@@ -5,7 +5,7 @@
 #include <stdlib.h>   /* rand */
 
 #include "fish.h"
-#include "../game.h"               /* FLOOR_Y, GRAVITY, WORLD_W */
+#include "../game.h"               /* FLOOR_Y, GRAVITY */
 #include "../effects/water.h"      /* WATER_ART_H */
 #include "../core/entity_utils.h"  /* animate_frame_ms */
 
@@ -74,7 +74,7 @@ void fish_init(Fish *fish, int *count)
 
 /* ------------------------------------------------------------------ */
 
-void fish_update(Fish *fish, int count, float dt)
+void fish_update(Fish *fish, int count, float dt, int world_w)
 {
     for (int i = 0; i < count; i++) {
         Fish *f = &fish[i];
@@ -104,8 +104,8 @@ void fish_update(Fish *fish, int count, float dt)
             f->x = 0.0f;
             f->vx = FISH_SPEED;
         }
-        if (f->x > WORLD_W - FISH_RENDER_W) {
-            f->x = (float)(WORLD_W - FISH_RENDER_W);
+        if (f->x > world_w - FISH_RENDER_W) {
+            f->x = (float)(world_w - FISH_RENDER_W);
             f->vx = -FISH_SPEED;
         }
 

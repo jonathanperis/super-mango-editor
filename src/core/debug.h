@@ -64,6 +64,14 @@ typedef struct {
     int    fps_frame_count;   /* frames rendered since the last sample    */
     int    fps_display;       /* the FPS number currently shown on screen */
 
+    /* Frame time (CPU proxy) */
+    float  frame_ms;          /* last frame duration in milliseconds      */
+    float  frame_ms_display;  /* smoothed frame time shown on screen      */
+    float  cpu_percent;       /* frame_ms / 16.67 as percentage of budget */
+
+    /* Memory usage (updated every sample period) */
+    float  mem_mb;            /* resident memory in megabytes             */
+
     /* Scrolling event log (circular buffer) */
     DebugLogEntry log[DEBUG_LOG_MAX_ENTRIES];
     int           log_head;   /* index of the next slot to write into     */

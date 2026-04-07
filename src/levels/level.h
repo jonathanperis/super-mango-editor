@@ -11,15 +11,16 @@
  *
  * Usage:
  *   #include "level.h"
- *   #include "levels/level_01.h"     // extern const LevelDef level_01_def;
- *   level_load(gs, &level_01_def);   // from level_loader.h
- *   level_reset(gs, &level_01_def);  // on player death
+ *   #include "levels/sandbox_00.h"     // extern const LevelDef sandbox_00_def;
+ *   level_load(gs, &sandbox_00_def);   // from level_loader.h
+ *   level_reset(gs, &sandbox_00_def);  // on player death
  */
 #pragma once
 
 #include <SDL.h>                       /* Uint32 */
 #include "../surfaces/bouncepad.h"     /* BouncepadType, MAX_BOUNCEPADS_* */
 #include "../hazards/axe_trap.h"       /* AxeTrapMode, MAX_AXE_TRAPS */
+#include "../hazards/blue_flame.h"     /* MAX_BLUE_FLAMES */
 #include "../surfaces/float_platform.h"/* FloatPlatformMode, MAX_FLOAT_PLATFORMS */
 #include "../surfaces/rail.h"          /* MAX_RAILS */
 #include "../game.h"                   /* MAX_* constants, FLOOR_Y, TILE_SIZE, etc. */
@@ -66,10 +67,15 @@ typedef struct {
  *
  * x           : left edge in world-space logical pixels.
  * tile_height : number of TILE_SIZE (48 px) tiles tall (typically 2 or 3).
+ * tile_width  : number of TILE_SIZE tiles wide (0 or 1 = single tile).
+ * tile_path   : optional 9-slice tileset PNG for this platform.
+ *               If empty, uses the level's floor_tile_path.
  */
 typedef struct {
     float x;
     int   tile_height;
+    int   tile_width;
+    char  tile_path[64];
 } PlatformPlacement;
 
 /*
@@ -136,12 +142,28 @@ typedef struct {
 } CoinPlacement;
 
 /*
- * YellowStarPlacement — one health-restoring star pickup.
+ * StarYellowPlacement — one health-restoring star pickup.
  */
 typedef struct {
     float x;
     float y;
-} YellowStarPlacement;
+} StarYellowPlacement;
+
+/*
+ * StarGreenPlacement — one green health-restoring star pickup.
+ */
+typedef struct {
+    float x;
+    float y;
+} StarGreenPlacement;
+
+/*
+ * StarRedPlacement — one red health-restoring star pickup.
+ */
+typedef struct {
+    float x;
+    float y;
+} StarRedPlacement;
 
 /*
  * LastStarPlacement — the single end-of-level star.
@@ -156,20 +178,23 @@ typedef struct {
  *
  * pillar_x : left edge of the host platform pillar in world pixels.
  *            The pivot is computed as: pillar_x + TILE_SIZE/2.
+ * y        : vertical position (pivot y). 0 = use default (FLOOR_Y - 3*TILE_SIZE + 16).
  * mode     : AXE_MODE_PENDULUM or AXE_MODE_SPIN.
  */
 typedef struct {
     float      pillar_x;
+    float      y;
     AxeTrapMode mode;
 } AxeTrapPlacement;
 
 /*
  * CircularSawPlacement — one horizontally patrolling rotating saw.
  *
- * y is computed: FLOOR_Y − 2 × TILE_SIZE + 16 − SAW_DISPLAY_H.
+ * y : vertical position. 0 = use default (FLOOR_Y − 2*TILE_SIZE + 16 − SAW_DISPLAY_H).
  */
 typedef struct {
     float x;
+    float y;
     float patrol_x0;
     float patrol_x1;
     int   direction;   /* +1 = start moving right, -1 = start moving left */
@@ -208,6 +233,27 @@ typedef struct {
     float t_offset;
     float speed;
 } SpikeBlockPlacement;
+
+/*
+ * BlueFlamePlacement — one erupting blue flame hazard.
+ *
+ * x : gap x position in world-space logical pixels — the blue flame
+ *     erupts centred within a sea-gap-sized opening at this x coordinate.
+ */
+typedef struct {
+    float x;  /* gap x position — blue flame erupts centred in the gap */
+} BlueFlamePlacement;
+
+/*
+ * FireFlamePlacement — one erupting fire flame hazard (fire variant).
+ *
+ * Identical mechanics to BlueFlamePlacement but uses a different texture.
+ * x : gap x position in world-space logical pixels — the fire flame
+ *     erupts centred within a sea-gap-sized opening at this x coordinate.
+ */
+typedef struct {
+    float x;
+} FireFlamePlacement;
 
 /*
  * FloatPlatformPlacement — a hovering / crumbling / rail-riding platform.
@@ -255,11 +301,14 @@ typedef struct {
 
 /*
  * VinePlacement — a hanging vine decoration on a platform.
+ *
+ * type : VINE_GREEN (lush/forest) or VINE_BROWN (arid/volcanic).
  */
 typedef struct {
-    float x;
-    float y;
-    int   tile_count;
+    float    x;
+    float    y;
+    int      tile_count;
+    int      vine_type;   /* 0 = green, 1 = brown — matches VineType enum */
 } VinePlacement;
 
 /*
@@ -294,15 +343,20 @@ typedef struct {
  * All arrays use the same MAX_* upper bounds as GameState so the
  * level_loader can safely fill GameState arrays directly.
  *
- * Note on blue_flames: positions are derived automatically from the
- * sea_gaps array by blue_flames_init — no explicit placement struct needed.
+ * Blue flames are manually placed via the blue_flames[] array.
+ * Each entry specifies the gap x position where a flame erupts.
  */
 typedef struct {
-    const char *name;   /* display name, e.g. "Sandbox" */
+    char  name[64];          /* display name, e.g. "Sandbox" — editable buffer  */
+    char  description[512];  /* free-form level description — preserved as TOML
+                              * comment header and as a string field on save    */
+    char  generated_by[128]; /* author attribution, e.g. "Lugio, the Creator"
+                              * or "Bosser, the Engineer" — crew member sign    */
+    int   screen_count;      /* number of screens wide (0 = default 4)          */
 
     /* ---- World geometry --------------------------------------------- */
-    int sea_gaps[MAX_SEA_GAPS];
-    int sea_gap_count;
+    int floor_gaps[MAX_FLOOR_GAPS];
+    int floor_gap_count;
 
     /* ---- Rails (must be initialised before spike_blocks/float_platforms) */
     RailPlacement   rails[MAX_RAILS];
@@ -315,8 +369,12 @@ typedef struct {
     /* ---- Collectibles ------------------------------------------------ */
     CoinPlacement        coins[MAX_COINS];
     int                  coin_count;
-    YellowStarPlacement  yellow_stars[MAX_YELLOW_STARS];
-    int                  yellow_star_count;
+    StarYellowPlacement  star_yellows[MAX_STAR_YELLOWS];
+    int                  star_yellow_count;
+    StarGreenPlacement   star_greens[MAX_STAR_YELLOWS];
+    int                  star_green_count;
+    StarRedPlacement     star_reds[MAX_STAR_YELLOWS];
+    int                  star_red_count;
     LastStarPlacement    last_star;
 
     /* ---- Enemies ----------------------------------------------------- */
@@ -344,6 +402,10 @@ typedef struct {
     int                    spike_platform_count;
     SpikeBlockPlacement    spike_blocks[MAX_SPIKE_BLOCKS];
     int                    spike_block_count;
+    BlueFlamePlacement     blue_flames[MAX_BLUE_FLAMES];
+    int                    blue_flame_count;
+    FireFlamePlacement     fire_flames[MAX_BLUE_FLAMES];
+    int                    fire_flame_count;
 
     /* ---- Surfaces ---------------------------------------------------- */
     FloatPlatformPlacement float_platforms[MAX_FLOAT_PLATFORMS];
@@ -368,6 +430,70 @@ typedef struct {
     int             ladder_count;
     RopePlacement   ropes[MAX_ROPES];
     int             rope_count;
+
+    /* ---- Level-wide configuration ----------------------------------- */
+    /*
+     * Fields below control systems that were previously hardcoded in game.c.
+     * Moving them into LevelDef lets the editor configure them per-level.
+     */
+
+    /* Background layers (back-to-front render order) */
+    struct {
+        char  path[64];   /* PNG path relative to repo root */
+        float speed;      /* scroll fraction: 0.0=static, 0.5=half cam speed */
+    } background_layers[MAX_BACKGROUND_LAYERS];
+    int background_layer_count;
+
+    /* Foreground layers (water/lava strip — rendered on top of floor/entities) */
+    struct {
+        char  path[64];
+        float speed;
+    } foreground_layers[MAX_BACKGROUND_LAYERS];
+    int foreground_layer_count;
+
+    /* Fog layers (atmospheric overlay textures that pan across the screen) */
+    struct {
+        char  path[64];
+        float speed;    /* reserved for future use (e.g. variable drift speed) */
+    } fog_layers[MAX_FOG_TEXTURES];
+    int fog_layer_count;
+
+    /* Player spawn position */
+    float player_start_x;
+    float player_start_y;
+
+    /* Background sound */
+    char  music_path[64];   /* path to .wav sound file, empty = no sound */
+    int   music_volume;     /* 0-128, SDL_mixer range */
+
+    /* Floor tile texture */
+    char  floor_tile_path[64]; /* 9-slice tileset PNG, e.g. "assets/sprites/levels/grass_tileset.png" */
+
+    /* Game rules */
+    int   initial_hearts;   /* starting hit points (0 = use MAX_HEARTS default) */
+    int   initial_lives;    /* starting extra lives (0 = use DEFAULT_LIVES default) */
+    int   score_per_life;   /* score threshold for bonus life (0 = use default 1000) */
+    int   coin_score;       /* points per coin (0 = use COIN_SCORE default 100)      */
+
+    /* ---- Player movement physics (-1.0 = use engine #define default) --------- *
+     * These fields are applied by level_load after player_init, so they           *
+     * override the constants without touching any .c file.  Set only the values   *
+     * you want to change; leave the rest at -1.0 to keep the engine defaults.     *
+     * 0.0 is a valid override (e.g. zero friction) — do not use it as sentinel.  */
+    struct {
+        float walk_max_speed;       /* max walking speed (px/s)                        */
+        float run_max_speed;        /* max running speed (px/s)                        */
+        float walk_ground_accel;    /* ground accel while walking (px/s²)              */
+        float run_ground_accel;     /* ground accel while running (px/s²)              */
+        float ground_friction;      /* brake when no key held on ground (px/s²)        */
+        float ground_counter_accel; /* extra brake when pressing opposite dir (px/s²)  */
+        float air_accel_walk;       /* air accel in walk arc (px/s²)                   */
+        float air_accel_run;        /* air accel in run arc (less control) (px/s²)     */
+        float air_friction;         /* passive drag in air when no key held (px/s²)    */
+        /* Camera lookahead */
+        float cam_lookahead_vx_factor; /* px of lookahead per px/s of velocity         */
+        float cam_lookahead_max;       /* maximum lookahead offset in pixels            */
+    } physics;
 } LevelDef;
 
 /* ------------------------------------------------------------------ */

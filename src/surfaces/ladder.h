@@ -12,7 +12,7 @@
 
 #include <SDL.h>
 
-#define MAX_LADDERS    8
+#define MAX_LADDERS   16
 #define LADDER_W      16              /* sprite width  (px)                    */
 #define LADDER_H      22              /* content height after cropping padding */
 #define LADDER_SRC_Y  13              /* first pixel row with content          */

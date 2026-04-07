@@ -59,7 +59,7 @@
  * MAX_AXE_TRAPS — upper bound on how many axe traps the level can hold.
  * Stored as a fixed-size array inside GameState.
  */
-#define MAX_AXE_TRAPS  4
+#define MAX_AXE_TRAPS 16
 
 /* ------------------------------------------------------------------ */
 

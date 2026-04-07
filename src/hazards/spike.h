@@ -15,7 +15,7 @@
 
 /* ---- Constants ---------------------------------------------------------- */
 
-#define MAX_SPIKE_ROWS      4
+#define MAX_SPIKE_ROWS     16
 #define MAX_SPIKE_TILES    16     /* max tiles in a single spike row          */
 #define SPIKE_TILE_W       16     /* width  of one Spike.png tile (px)        */
 #define SPIKE_TILE_H       16     /* height of one Spike.png tile (px)        */

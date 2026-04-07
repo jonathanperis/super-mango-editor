@@ -39,7 +39,7 @@
 /* ---- Capacity ------------------------------------------------------------ */
 
 #define MAX_RAIL_TILES  128   /* max tiles in a single Rail path      */
-#define MAX_RAILS         4   /* max Rail instances in one level      */
+#define MAX_RAILS        16   /* max Rail instances in one level      */
 
 /* ---- Types --------------------------------------------------------------- */
 

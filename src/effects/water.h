@@ -31,6 +31,7 @@ typedef struct {
 } Water;
 
 void water_init(Water *w, SDL_Renderer *renderer);
+void water_reload_texture(Water *w, SDL_Renderer *renderer, const char *path);
 void water_update(Water *w, float dt);
 void water_render(const Water *w, SDL_Renderer *renderer);
 void water_cleanup(Water *w);

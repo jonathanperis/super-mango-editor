@@ -15,22 +15,26 @@
  * MAX_PLATFORMS — upper bound on how many platforms the game can hold.
  * Stored as a fixed-size array inside GameState; no dynamic allocation needed.
  */
-#define MAX_PLATFORMS 8
+#define MAX_PLATFORMS 32
 
 /*
- * Platform — a rectangular one-way surface built from tiled 48×48 grass blocks.
+ * Platform — a rectangular one-way surface built from tiled 48×48 blocks.
  *
  * `x` and `y` mark the top-left corner of the platform in logical (400×300)
  * coordinates.  `y` is specifically the TOP SURFACE — the Y value a player's
  * feet must cross to trigger a landing.
  *
  * `w` and `h` are set at init time and never change during a play session.
+ *
+ * `tex` is the 9-slice tileset texture for this platform.  If NULL, the
+ * renderer falls back to the level's default floor tile texture.
  */
 typedef struct {
-    float x;   /* left edge of the platform in logical pixels   */
-    float y;   /* top  edge (landing surface) in logical pixels */
-    int   w;   /* total width  in logical pixels                */
-    int   h;   /* total height in logical pixels                */
+    float       x;   /* left edge of the platform in logical pixels   */
+    float       y;   /* top  edge (landing surface) in logical pixels */
+    int         w;   /* total width  in logical pixels                */
+    int         h;   /* total height in logical pixels                */
+    SDL_Texture *tex; /* 9-slice tileset texture (NULL = use default) */
 } Platform;
 
 /*

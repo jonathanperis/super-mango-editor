@@ -34,7 +34,7 @@
 
 /* ---- Capacity ------------------------------------------------------------ */
 
-#define MAX_FLOAT_PLATFORMS  6   /* max FloatPlatform instances in one level */
+#define MAX_FLOAT_PLATFORMS 16   /* max FloatPlatform instances in one level */
 
 /* ---- Crumble parameters -------------------------------------------------- */
 

@@ -53,7 +53,26 @@ typedef struct {
     int       vine_index;       /* index into the climbable array being climbed   */
     int       climb_source;     /* 0 = vine, 1 = ladder, 2 = rope                */
     int       jump_held;         /* 1 = jump key still held from last jump; prevents re-jump */
+    int       move_dir;          /* input direction this frame: -1 = left, 0 = none, +1 = right */
+    int       is_running;        /* 1 if run key (Shift / RB) is held this frame, 0 = walking  */
+    int       air_is_running;    /* run state captured when the player last left the ground;
+                                  * governs air accel so mid-air Shift changes have no effect   */
+
+    /* ---- Horizontal movement physics (tunable per-level via LevelDef) ---- *
+     * Initialised from #define defaults in player_init; overridden by         *
+     * level_load when LevelDef.physics fields are non-zero.                   */
+    float walk_max_speed;      /* max walking speed (px/s)                        */
+    float run_max_speed;       /* max running speed (px/s)                        */
+    float walk_ground_accel;   /* ground acceleration while walking (px/s²)       */
+    float run_ground_accel;    /* ground acceleration while running (px/s²)       */
+    float ground_friction;     /* deceleration when no key held on ground (px/s²) */
+    float ground_counter_accel;/* extra brake when pressing opposite dir (px/s²)  */
+    float air_accel_walk;      /* air acceleration (walk arc) (px/s²)             */
+    float air_accel_run;       /* air acceleration (run arc, less control) (px/s²)*/
+    float air_friction;        /* passive air drag when no key held (px/s²)       */
     float     hurt_timer;        /* seconds remaining of invincibility blink; 0 = normal */
+    float     spawn_x;          /* level-defined spawn x (platform top-left)           */
+    float     spawn_y;          /* level-defined spawn y (platform top; adjusted by -h + FLOOR_SINK) */
     SDL_Rect     frame;   /* source rect: which part of the sheet to draw    */
     SDL_Texture *texture; /* GPU image handle; NULL until player_init runs   */
 } Player;
@@ -94,10 +113,11 @@ void player_update(Player *player, float dt,
                    const RopeDecor *ropes, int rope_count,
                    const Bridge *bridges, int bridge_count,
                    const SpikePlatform *spike_platforms, int spike_platform_count,
-                   const int *sea_gaps, int sea_gap_count,
+                   const int *floor_gaps, int floor_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
-                   int prev_fp_landed_idx);
+                   int prev_fp_landed_idx,
+                   int world_w);
 
 /* Draw the player sprite at its current position, offset by the camera. */
 void player_render(Player *player, SDL_Renderer *renderer, int cam_x);

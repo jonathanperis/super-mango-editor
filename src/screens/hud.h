@@ -41,8 +41,9 @@ typedef struct {
     SDL_Texture *player_icon; /* small player icon for lives (Player.png)  */
 } Hud;
 
-/* Load the font and heart icon texture. */
-void hud_init(Hud *hud, SDL_Renderer *renderer);
+/* Load the font; accept shared textures from GameState to avoid duplicates. */
+void hud_init(Hud *hud, SDL_Renderer *renderer,
+              SDL_Texture *star_tex, SDL_Texture *player_tex);
 
 /*
  * hud_render — Draw the full HUD overlay.

@@ -8,7 +8,7 @@
 #include <stdlib.h>   /* rand */
 
 #include "faster_fish.h"
-#include "../game.h"               /* FLOOR_Y, GRAVITY, WORLD_W */
+#include "../game.h"               /* FLOOR_Y, GRAVITY */
 #include "../effects/water.h"      /* WATER_ART_H */
 #include "../core/entity_utils.h"  /* animate_frame_ms */
 
@@ -44,7 +44,7 @@ void faster_fish_init(FasterFish *fish, int *count) {
 
 /* ------------------------------------------------------------------ */
 
-void faster_fish_update(FasterFish *fish, int count, float dt) {
+void faster_fish_update(FasterFish *fish, int count, float dt, int world_w) {
     for (int i = 0; i < count; i++) {
         FasterFish *f = &fish[i];
 
@@ -70,8 +70,8 @@ void faster_fish_update(FasterFish *fish, int count, float dt) {
 
         /* Clamp to world edges */
         if (f->x < 0.0f) { f->x = 0.0f; f->vx = FFISH_SPEED; }
-        if (f->x > WORLD_W - FFISH_RENDER_W) {
-            f->x = (float)(WORLD_W - FFISH_RENDER_W);
+        if (f->x > world_w - FFISH_RENDER_W) {
+            f->x = (float)(world_w - FFISH_RENDER_W);
             f->vx = -FFISH_SPEED;
         }
 

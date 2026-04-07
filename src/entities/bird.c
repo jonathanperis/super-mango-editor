@@ -8,7 +8,7 @@
 #include <math.h>   /* sinf, fabsf */
 
 #include "bird.h"
-#include "../game.h"                /* GAME_W, GAME_H, WORLD_W */
+#include "../game.h"                /* GAME_W */
 #include "../core/entity_utils.h"  /* patrol_update, animate_frame_ms */
 
 /*
@@ -22,18 +22,18 @@
 
 /* ------------------------------------------------------------------ */
 
-void birds_init(Bird *birds, int *count)
+void birds_init(Bird *birds, int *count, int world_w)
 {
     *count = 2;
 
     /*
-     * Bird 0 — patrols across screens 1–2 in the upper sky.
-     * Starts mid-patrol, flying right.
+     * Bird 0 — patrols across screens 1–2, slightly higher.
+     * Starts flying right.
      */
-    birds[0].x             = 100.0f;
-    birds[0].base_y        = 60.0f;
+    birds[0].x             = 300.0f;
+    birds[0].base_y        = 70.0f;
     birds[0].vx            = BIRD_SPEED;
-    birds[0].patrol_x0     = 0.0f;
+    birds[0].patrol_x0     = 100.0f;
     birds[0].patrol_x1     = 700.0f;
     birds[0].frame_index   = 0;
     birds[0].anim_timer_ms = 0;
@@ -46,7 +46,7 @@ void birds_init(Bird *birds, int *count)
     birds[1].base_y        = 80.0f;
     birds[1].vx            = -BIRD_SPEED;
     birds[1].patrol_x0     = 800.0f;
-    birds[1].patrol_x1     = 1600.0f;
+    birds[1].patrol_x1     = (float)(world_w - 1 * 400);  /* last screen boundary */
     birds[1].frame_index   = 1;
     birds[1].anim_timer_ms = 0;
 }

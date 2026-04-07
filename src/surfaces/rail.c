@@ -185,11 +185,14 @@ static void build_horiz_rail(Rail *r, int x0, int y0, int w_tiles, int end_cap) 
  *     World origin (852, 80).  22 tiles total.
  *     Spike block speed: NORMAL (3.0 tiles/s, ~7.3 s per loop).
  *
- *   Rail 2 — Screen 4 (world x ≈ 1200–1600), open horizontal line
+ *   Rail 2 — Screen 4 (world x ≈ 1200–1600 for default 4-screen world), open horizontal line
  *     14 tiles wide = 224 logical px
  *     World origin (1248, 112).  14 tiles total.
  *     Spike block speed: FAST (6.0 tiles/s, ~2.3 s per pass).
  *     The block bounces left↔right continuously.
+ *
+ * Note: Levels loaded from TOML can define any screen_count.
+ * This default layout assumes 4 screens (1600 px world width).
  */
 void rail_init(Rail *rails, int *count) {
     /*

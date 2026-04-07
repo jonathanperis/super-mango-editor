@@ -8,7 +8,7 @@
 
 #include <SDL.h>
 
-#define MAX_FISH            4       /* maximum simultaneous fish instances     */
+#define MAX_FISH           16       /* maximum simultaneous fish instances     */
 #define FISH_FRAMES         2       /* horizontal frames in Fish_2.png (96×48) */
 #define FISH_FRAME_W       48       /* width of one frame slot in the sheet    */
 #define FISH_FRAME_H       48       /* height of one frame slot in the sheet   */
@@ -55,7 +55,7 @@ typedef struct {
 void fish_init(Fish *fish, int *count);
 
 /* Move fish, trigger random jumps, and advance animation. */
-void fish_update(Fish *fish, int count, float dt);
+void fish_update(Fish *fish, int count, float dt, int world_w);
 
 /* Draw all fish with camera-aware world-to-screen conversion. */
 void fish_render(const Fish *fish, int count,

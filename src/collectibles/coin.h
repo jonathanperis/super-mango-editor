@@ -10,7 +10,7 @@
 
 #include <SDL.h>
 
-#define MAX_COINS       24     /* coin slots across the full world         */
+#define MAX_COINS       64     /* coin slots across the full world         */
 #define COIN_DISPLAY_W  16     /* render width  in logical pixels          */
 #define COIN_DISPLAY_H  16     /* render height in logical pixels          */
 #define COIN_SCORE     100     /* score awarded per coin collected         */
@@ -27,14 +27,6 @@ typedef struct {
     float y;              /* vertical   position in logical pixels         */
     int   active;         /* 1 = on screen, 0 = collected                  */
 } Coin;
-
-/*
- * coins_init — Place the initial set of coins on the ground and platforms.
- *
- * Sets *count to the number of coins placed (currently 5).  Can be called
- * again to re-activate all coins when the phase restarts.
- */
-void coins_init(Coin *coins, int *count);
 
 /*
  * coins_render — Draw all active coins using the shared coin texture.
