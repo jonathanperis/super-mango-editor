@@ -1,4 +1,4 @@
-# Memory Index — Super Mango Game
+# Memory Index — Super Mango Editor
 
 Project-level memory for Claude Code sessions working on this repository.
 Each entry is a one-line hook; the file holds the full context.

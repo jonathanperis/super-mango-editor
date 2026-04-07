@@ -119,7 +119,7 @@ This project's documentation lives in these locations:
 | `.specs/` | Feature specs, design docs, task breakdowns |
 | `docs/index.html` | GitHub Pages landing page — game description, WebAssembly player, download links |
 | `docs/docs/index.html` | GitHub Pages documentation site — mirrors wiki content as a single-page HTML reference |
-| **Wiki repo** | `github.com/jonathanperis/super-mango-game.wiki.git` — detailed documentation pages |
+| **Wiki repo** | `github.com/jonathanperis/super-mango-editor.wiki.git` — detailed documentation pages |
 
 ---
 
@@ -295,11 +295,11 @@ The project has four agent blueprints that contain hardcoded knowledge about the
 
 ### Step 10: Update Wiki repository
 
-The project wiki lives at `github.com/jonathanperis/super-mango-game.wiki.git`. After updating in-repo docs:
+The project wiki lives at `github.com/jonathanperis/super-mango-editor.wiki.git`. After updating in-repo docs:
 
 1. **Clone the wiki** (if not already cloned):
    ```sh
-   git clone https://github.com/jonathanperis/super-mango-game.wiki.git /tmp/super-mango-wiki
+   git clone https://github.com/jonathanperis/super-mango-editor.wiki.git /tmp/super-mango-wiki
    ```
 
 2. **Sync key content to wiki pages:**
@@ -319,7 +319,7 @@ The project wiki lives at `github.com/jonathanperis/super-mango-game.wiki.git`. 
    git push origin master
    ```
 
-4. **Verify** wiki pages render correctly at `github.com/jonathanperis/super-mango-game/wiki`
+4. **Verify** wiki pages render correctly at `github.com/jonathanperis/super-mango-editor/wiki`
 
 ### Step 11: Apply fixes
 

@@ -38,7 +38,7 @@ The Makefile uses `src/*.c` wildcards — **new `.c` files are picked up automat
 ## Project Structure
 
 ```
-super-mango-game/
+super-mango-editor/
 ├── CLAUDE.md               ← you are here
 ├── Makefile
 ├── assets/                 ← categorized game assets

@@ -80,7 +80,7 @@ End every audit report with Warro's mark. A document without an author is a docu
 
 ## Lesson 9: Wiki and docs/index.html must stay in sync
 
-The wiki (`github.com/jonathanperis/super-mango-game.wiki.git`) is the source of truth for doc content. `docs/docs/index.html` mirrors the wiki. When wiki pages are updated, the HTML file must be regenerated or manually updated to match.
+The wiki (`github.com/jonathanperis/super-mango-editor.wiki.git`) is the source of truth for doc content. `docs/docs/index.html` mirrors the wiki. When wiki pages are updated, the HTML file must be regenerated or manually updated to match.
 
 **Rule:** After updating wiki pages, verify `docs/docs/index.html` reflects the same content. Cross-reference each section.
 
