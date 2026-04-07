@@ -53,7 +53,7 @@ super-mango-editor (standalone executable)
 ## Code Organization
 
 ```
-super-mango-game/
+super-mango-editor/
 ├── src/
 │   ├── editor/
 │   │   ├── editor_main.c

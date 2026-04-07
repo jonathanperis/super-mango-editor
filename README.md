@@ -1,10 +1,10 @@
-# super-mango-game
+# super-mango-editor
 
 > 2D side-scrolling platformer written in C using SDL2 -- browser-playable via WebAssembly
 
-[![Build Check](https://github.com/jonathanperis/super-mango-game/actions/workflows/build.yml/badge.svg?event=pull_request)](https://github.com/jonathanperis/super-mango-game/actions/workflows/build.yml) [![Main Release](https://github.com/jonathanperis/super-mango-game/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/jonathanperis/super-mango-game/actions/workflows/build.yml) [![CodeQL](https://github.com/jonathanperis/super-mango-game/actions/workflows/codeql.yml/badge.svg)](https://github.com/jonathanperis/super-mango-game/actions/workflows/codeql.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Build Check](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml/badge.svg?event=pull_request)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml) [![Main Release](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml) [![CodeQL](https://github.com/jonathanperis/super-mango-editor/actions/workflows/codeql.yml/badge.svg)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/codeql.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**[Live demo →](https://jonathanperis.github.io/super-mango-game/)** | **[Documentation →](https://jonathanperis.github.io/super-mango-game/docs/)**
+**[Live demo →](https://jonathanperis.github.io/super-mango-editor/)** | **[Documentation →](https://jonathanperis.github.io/super-mango-editor/docs/)**
 
 ---
 
@@ -138,12 +138,12 @@ make web                              # build to WebAssembly (requires Emscripte
 make clean                            # remove all build artifacts
 ```
 
-Or just **[play in your browser](https://jonathanperis.github.io/super-mango-game/)** -- no build required. Full project documentation is available at the **[docs site](https://jonathanperis.github.io/super-mango-game/docs/)**.
+Or just **[play in your browser](https://jonathanperis.github.io/super-mango-editor/)** -- no build required. Full project documentation is available at the **[docs site](https://jonathanperis.github.io/super-mango-editor/docs/)**.
 
 ## Project Structure
 
 ```
-super-mango-game/
+super-mango-editor/
 ├── Makefile                          Build system (clang, sdl2-config, ad-hoc codesign)
 ├── levels/                           TOML level definitions
 │   └── sandbox_00.toml              Level data loaded at runtime
