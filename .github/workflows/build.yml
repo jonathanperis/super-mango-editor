@@ -267,24 +267,37 @@ jobs:
           name: super-mango-wasm
           path: wasm-build/
 
-      # Assemble the final site: copy docs/ as the base, then layer the
-      # WASM files alongside index.html so the JS loader can find them.
-      - name: Assemble site
+      # Build the Next.js docs site (static export to docs/out/).
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install docs dependencies
+        run: npm ci
+        working-directory: docs
+
+      - name: Build docs site
+        run: npm run build
+        working-directory: docs
+
+      # Layer the WASM files into the built docs site so the JS loader
+      # can find them at the site root (alongside index.html).
+      - name: Copy WASM artifacts into docs output
         run: |
-          mkdir -p _site/docs
-          cp docs/index.html _site/
-          cp -r docs/docs/* _site/docs/
-          cp wasm-build/super-mango.js   _site/
-          cp wasm-build/super-mango.wasm _site/
-          cp wasm-build/super-mango.data _site/
-          cp wasm-build/super-mango-debug.html _site/ 2>/dev/null || true
-          cp wasm-build/super-mango-debug.js   _site/ 2>/dev/null || true
-          cp wasm-build/super-mango-debug.wasm _site/ 2>/dev/null || true
+          cp wasm-build/super-mango.js   docs/out/
+          cp wasm-build/super-mango.wasm docs/out/
+          cp wasm-build/super-mango.data docs/out/
+          cp wasm-build/super-mango-debug.html docs/out/ 2>/dev/null || true
+          cp wasm-build/super-mango-debug.js   docs/out/ 2>/dev/null || true
+          cp wasm-build/super-mango-debug.wasm docs/out/ 2>/dev/null || true
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: _site/
+          path: docs/out/
 
       - name: Deploy to GitHub Pages
         id: deployment
