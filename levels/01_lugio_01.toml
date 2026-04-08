@@ -24,17 +24,17 @@ score_per_life = 1000
 coin_score = 100
 
 [physics]
-walk_max_speed       = 0.0
-run_max_speed        = 0.0
-walk_ground_accel    = 0.0
-run_ground_accel     = 0.0
-ground_friction      = 0.0
-ground_counter_accel = 0.0
-air_accel_walk       = 0.0
-air_accel_run        = 0.0
-air_friction         = 0.0
-cam_lookahead_vx_factor = 0.0
-cam_lookahead_max    = 0.0
+walk_max_speed       = -1.0
+run_max_speed        = -1.0
+walk_ground_accel    = -1.0
+run_ground_accel     = -1.0
+ground_friction      = -1.0
+ground_counter_accel = -1.0
+air_accel_walk       = -1.0
+air_accel_run        = -1.0
+air_friction         = -1.0
+cam_lookahead_vx_factor = -1.0
+cam_lookahead_max    = -1.0
 
 floor_gaps = [0, 352, 640, 960, 1280, 1520, 1920, 2240, 2560, 2880]
 
