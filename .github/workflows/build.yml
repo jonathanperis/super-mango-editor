@@ -283,7 +283,7 @@ jobs:
         run: npm run build
         working-directory: docs
         env:
-          NEXT_PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}
+          PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}
 
       # Layer the WASM files into the built docs site so the JS loader
       # can find them at the site root (alongside index.html).
