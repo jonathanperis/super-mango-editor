@@ -239,9 +239,6 @@ static void start_menu_frame(void *arg) {
         draw_text_centered(menu->renderer, menu->font,
                            "Press Enter or click Play",
                            MENU_GAME_W / 2, 220, grey);
-        draw_text_centered(menu->renderer, menu->font,
-                           "ESC to quit",
-                           MENU_GAME_W / 2, 238, grey);
     }
 
     SDL_RenderPresent(menu->renderer);
