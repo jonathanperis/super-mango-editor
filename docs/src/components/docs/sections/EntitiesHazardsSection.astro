@@ -1,0 +1,260 @@
+---
+---
+<section id="entities-hazards" class="doc-section">
+  <h1 class="page-title">Entities &amp; Hazards</h1>
+  <p><a href="#home">&#8592; Home</a></p>
+  <hr />
+  <p>Super Mango has six enemy types and seven hazard types. All are stored as fixed-size arrays inside <code>GameState</code> and managed via the standard <code>init / update / render</code> lifecycle. Positions are in <strong>logical pixels</strong> (400&#215;300 space).</p>
+  <hr />
+
+  <h2>Enemies</h2>
+
+  <h3>Spider</h3>
+  <p><strong>File:</strong> <code>src/entities/spider.c</code> / <code>spider.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/entities/spider.png</code> — 192&#215;48 px, 3 frames of 64&#215;48 px<br />
+  <strong>Behaviour:</strong> Horizontal ground patrol. Walks back and forth between <code>patrol_x0</code> and <code>patrol_x1</code>. No gravity — stays on the ground floor. Reverses direction and flips sprite when it hits a patrol boundary.</p>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>MAX_SPIDERS</code></td><td>16</td><td>Slots in the <code>GameState</code> array</td></tr>
+      <tr><td><code>SPIDER_FRAMES</code></td><td>3</td><td>Animation frames</td></tr>
+      <tr><td><code>SPIDER_FRAME_W</code></td><td>64</td><td>Width of one frame slot in px</td></tr>
+      <tr><td><code>SPIDER_ART_W</code></td><td>25</td><td>Width of visible art (cols 20–44)</td></tr>
+      <tr><td><code>SPIDER_ART_H</code></td><td>10</td><td>Height of visible art (rows 22–31)</td></tr>
+      <tr><td><code>SPIDER_SPEED</code></td><td>50.0</td><td>Walk speed in logical px/s</td></tr>
+      <tr><td><code>SPIDER_FRAME_MS</code></td><td>150</td><td>ms per animation frame</td></tr>
+    </tbody>
+  </table>
+  <p><strong>TOML placement:</strong></p>
+  <pre><code class="language-toml">[[spiders]]
+x          = 600.0
+vx         = 50.0        # positive = starts moving right
+patrol_x0  = 592.0
+patrol_x1  = 750.0
+frame_index = 0          # starting animation frame (0-2)</code></pre>
+  <hr />
+
+  <h3>Jumping Spider</h3>
+  <p><strong>File:</strong> <code>src/entities/jumping_spider.c</code> / <code>jumping_spider.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/entities/jumping_spider.png</code><br />
+  <strong>Behaviour:</strong> Like the spider but can leap across sea gaps. Detects approaching floor gaps and jumps before reaching them, allowing it to follow the player across openings where a normal spider would fall.</p>
+  <p><strong>TOML placement:</strong></p>
+  <pre><code class="language-toml">[[jumping_spiders]]
+x          = 130.0
+vx         = 55.0
+patrol_x0  = 46.0
+patrol_x1  = 310.0</code></pre>
+  <hr />
+
+  <h3>Bird</h3>
+  <p><strong>File:</strong> <code>src/entities/bird.c</code> / <code>bird.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/entities/bird.png</code> — 144&#215;48 px, 3 frames of 48&#215;48 px<br />
+  <strong>Behaviour:</strong> Slow sine-wave sky patrol. Flies horizontally while oscillating vertically around <code>base_y</code> using a sine curve. The wing-flap sound effect plays once per animation cycle with distance-based volume.</p>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>MAX_BIRDS</code></td><td>16</td><td>Slots in <code>GameState</code></td></tr>
+      <tr><td><code>BIRD_FRAMES</code></td><td>3</td><td>Animation frames</td></tr>
+      <tr><td><code>BIRD_FRAME_W</code></td><td>48</td><td>Frame slot width in px</td></tr>
+      <tr><td><code>BIRD_ART_W</code></td><td>15</td><td>Visible art width (cols 17–31)</td></tr>
+      <tr><td><code>BIRD_ART_H</code></td><td>14</td><td>Visible art height (rows 17–30)</td></tr>
+      <tr><td><code>BIRD_SPEED</code></td><td>45.0</td><td>Horizontal speed in px/s</td></tr>
+      <tr><td><code>BIRD_WAVE_AMP</code></td><td>20.0</td><td>Sine-wave vertical amplitude in px</td></tr>
+      <tr><td><code>BIRD_WAVE_FREQ</code></td><td>0.015</td><td>Sine cycles per horizontal px of travel</td></tr>
+      <tr><td><code>BIRD_FRAME_MS</code></td><td>140</td><td>ms per animation frame</td></tr>
+    </tbody>
+  </table>
+  <p><strong>TOML placement:</strong></p>
+  <pre><code class="language-toml">[[birds]]
+x          = 100.0
+base_y     = 60.0    # vertical centre of the sine wave
+vx         = 45.0
+patrol_x0  = 0.0
+patrol_x1  = 700.0
+frame_index = 0</code></pre>
+  <hr />
+
+  <h3>Faster Bird</h3>
+  <p><strong>File:</strong> <code>src/entities/faster_bird.c</code> / <code>faster_bird.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/entities/faster_bird.png</code><br />
+  <strong>Behaviour:</strong> Aggressive sky patrol with higher speed and a tighter wave. Same schema as <code>Bird</code> but uses <code>[[faster_birds]]</code> in TOML. Typical <code>vx</code> is 70–100 px/s vs. the bird's 45 px/s.</p>
+  <pre><code class="language-toml">[[faster_birds]]
+x          = 600.0
+base_y     = 50.0
+vx         = -80.0
+patrol_x0  = 300.0
+patrol_x1  = 1100.0
+frame_index = 0</code></pre>
+  <hr />
+
+  <h3>Fish</h3>
+  <p><strong>File:</strong> <code>src/entities/fish.c</code> / <code>fish.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/entities/fish.png</code> — 96&#215;48 px, 2 frames of 48&#215;48 px<br />
+  <strong>Behaviour:</strong> Patrols horizontally in the water lane at the bottom of the screen. Periodically performs a random upward jump (impulse &#8722;280 px/s) that can reach the player on the ground floor. Jump interval is randomised between 1.4 s and 3.0 s.</p>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>MAX_FISH</code></td><td>16</td><td>Slots in <code>GameState</code></td></tr>
+      <tr><td><code>FISH_FRAMES</code></td><td>2</td><td>Animation frames</td></tr>
+      <tr><td><code>FISH_FRAME_W</code></td><td>48</td><td>Frame slot width in px</td></tr>
+      <tr><td><code>FISH_SPEED</code></td><td>70.0</td><td>Horizontal patrol speed in px/s</td></tr>
+      <tr><td><code>FISH_JUMP_VY</code></td><td>&#8722;280.0</td><td>Upward jump impulse in px/s</td></tr>
+      <tr><td><code>FISH_JUMP_MIN</code></td><td>1.4</td><td>Minimum seconds between jumps</td></tr>
+      <tr><td><code>FISH_JUMP_MAX</code></td><td>3.0</td><td>Maximum seconds between jumps</td></tr>
+      <tr><td><code>FISH_HITBOX_PAD_X</code></td><td>16</td><td>Left/right inset for collision</td></tr>
+      <tr><td><code>FISH_HITBOX_PAD_Y</code></td><td>13</td><td>Top inset for collision</td></tr>
+      <tr><td><code>FISH_FRAME_MS</code></td><td>120</td><td>ms per animation frame</td></tr>
+    </tbody>
+  </table>
+  <pre><code class="language-toml">[[fish]]
+x          = 700.0
+vx         = 70.0
+patrol_x0  = 500.0
+patrol_x1  = 950.0</code></pre>
+  <hr />
+
+  <h3>Faster Fish</h3>
+  <p><strong>File:</strong> <code>src/entities/faster_fish.c</code> / <code>faster_fish.h</code><br />
+  <strong>Behaviour:</strong> Same as fish but patrols at 120 px/s and jumps more frequently. Uses <code>[[faster_fish]]</code> in TOML.</p>
+  <pre><code class="language-toml">[[faster_fish]]
+x          = 1100.0
+vx         = 120.0
+patrol_x0  = 900.0
+patrol_x1  = 1400.0</code></pre>
+  <hr />
+
+  <h2>Hazards</h2>
+  <p>All hazards deal <strong>1 heart of damage</strong> on contact with knockback (same <code>apply_damage</code> path in <code>player.c</code>).</p>
+  <hr />
+
+  <h3>Spike Row</h3>
+  <p><strong>File:</strong> <code>src/hazards/spike.c</code> / <code>spike.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/hazards/spike.png</code> — 16&#215;16 px per tile<br />
+  <strong>Behaviour:</strong> Static horizontal strip of spike tiles sitting on the ground floor. No movement or animation. Damages the player on any overlap.</p>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>MAX_SPIKE_ROWS</code></td><td>16</td><td>Rows in <code>GameState</code></td></tr>
+      <tr><td><code>MAX_SPIKE_TILES</code></td><td>16</td><td>Max tiles per row</td></tr>
+      <tr><td><code>SPIKE_TILE_W</code></td><td>16</td><td>Width of one spike tile in px</td></tr>
+      <tr><td><code>SPIKE_TILE_H</code></td><td>16</td><td>Height of one spike tile in px</td></tr>
+    </tbody>
+  </table>
+  <pre><code class="language-toml">[[spike_rows]]
+x     = 780.0   # left edge of the strip
+count = 4       # number of tiles</code></pre>
+  <hr />
+
+  <h3>Spike Block</h3>
+  <p><strong>File:</strong> <code>src/hazards/spike_block.c</code> / <code>spike_block.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/hazards/spike_block.png</code><br />
+  <strong>Behaviour:</strong> A rotating hazard that travels along a <code>Rail</code> path. References a rail by index and can be given an initial offset and speed. Visually rotates as it travels. The player is pushed on contact.</p>
+  <pre><code class="language-toml">[[spike_blocks]]
+rail_index = 0      # 0-based index into the [[rails]] list
+t_offset   = 0.0    # starting position on the rail (0.0 = first tile)
+speed      = 1.5    # traversal speed in tiles/s</code></pre>
+  <hr />
+
+  <h3>Spike Platform</h3>
+  <p><strong>File:</strong> <code>src/hazards/spike_platform.c</code> / <code>spike_platform.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/hazards/spike_platform.png</code><br />
+  <strong>Behaviour:</strong> Elevated static surface tiled across <code>tile_count</code> units. The player is damaged when landing on the top surface or touching the sides.</p>
+  <pre><code class="language-toml">[[spike_platforms]]
+x          = 370.0
+y          = 200.0   # top edge in logical pixels
+tile_count = 3</code></pre>
+  <hr />
+
+  <h3>Circular Saw</h3>
+  <p><strong>File:</strong> <code>src/hazards/circular_saw.c</code> / <code>circular_saw.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/hazards/circular_saw.png</code> — 32&#215;32 px<br />
+  <strong>Behaviour:</strong> Spins continuously and patrols a horizontal line at ground level. Does not ride a rail — it bounces between <code>patrol_x0</code> and <code>patrol_x1</code>. Faster than the player's walk speed. Pushes the player on contact.</p>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>SAW_FRAME_W/H</code></td><td>32</td><td>Sprite dimensions in px</td></tr>
+      <tr><td><code>SAW_SPIN_DEG_PER_SEC</code></td><td>720.0</td><td>Rotation speed (2 full rotations/s)</td></tr>
+      <tr><td><code>SAW_PATROL_SPEED</code></td><td>180.0</td><td>Horizontal patrol speed in px/s</td></tr>
+      <tr><td><code>SAW_PUSH_SPEED</code></td><td>220.0</td><td>Push impulse magnitude on contact</td></tr>
+      <tr><td><code>SAW_PUSH_VY</code></td><td>&#8722;150.0</td><td>Upward component of push</td></tr>
+    </tbody>
+  </table>
+  <pre><code class="language-toml">[[circular_saws]]
+x          = 1350.0
+y          = 0.0        # engine snaps to floor level
+patrol_x0  = 1350.0
+patrol_x1  = 1446.0
+direction  = 1          # 1 = starts right, -1 = starts left</code></pre>
+  <hr />
+
+  <h3>Axe Trap</h3>
+  <p><strong>File:</strong> <code>src/hazards/axe_trap.c</code> / <code>axe_trap.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/hazards/axe_trap.png</code> — 48&#215;64 px<br />
+  <strong>Behaviour:</strong> Swinging or spinning axe mounted at the top centre of a platform pillar. Two modes:</p>
+  <ul>
+    <li><strong>PENDULUM</strong> — sinusoidal swing from &#8722;60° to +60° over a 2 s cycle. SFX plays at each extreme.</li>
+    <li><strong>SPIN</strong> — continuous 360° clockwise rotation at 180°/s. SFX plays each full rotation.</li>
+  </ul>
+  <p>Collision uses the full rotated bounding box of the blade region.</p>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>AXE_FRAME_W/H</code></td><td>48 / 64</td><td>Sprite dimensions</td></tr>
+      <tr><td><code>AXE_SWING_AMPLITUDE</code></td><td>60.0°</td><td>Max angle from vertical</td></tr>
+      <tr><td><code>AXE_SWING_PERIOD</code></td><td>2.0 s</td><td>Full pendulum cycle duration</td></tr>
+      <tr><td><code>AXE_SPIN_SPEED</code></td><td>180.0°/s</td><td>Full-rotation variant speed</td></tr>
+    </tbody>
+  </table>
+  <pre><code class="language-toml">[[axe_traps]]
+pillar_x = 256.0    # centre x of the pillar column
+y        = 0.0      # pivot y (engine computes from pillar height)
+mode     = "PENDULUM"   # or "SPIN"</code></pre>
+  <hr />
+
+  <h3>Blue Flame</h3>
+  <p><strong>File:</strong> <code>src/hazards/blue_flame.c</code> / <code>blue_flame.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/hazards/blue_flame.png</code> — 96&#215;48 px, 2 frames of 48&#215;48 px<br />
+  <strong>Behaviour:</strong> Erupts from a sea gap in four phases:</p>
+  <table>
+    <thead><tr><th>Phase</th><th>Duration</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>WAITING</code></td><td>1.5 s</td><td>Hidden below the floor, counting down</td></tr>
+      <tr><td><code>RISING</code></td><td>Until apex (y = 60)</td><td>Launches at &#8722;550 px/s, decelerates at 800 px/s²</td></tr>
+      <tr><td><code>FLIPPING</code></td><td>0.12 s</td><td>Rotates 180° at the apex</td></tr>
+      <tr><td><code>FALLING</code></td><td>Until below floor</td><td>Descends upside-down, accelerating with gravity</td></tr>
+    </tbody>
+  </table>
+  <p>Blue flames are spawned automatically for each entry in <code>floor_gaps</code>. They can also be manually added via <code>[[blue_flames]]</code> to override position.</p>
+  <pre><code class="language-toml">[[blue_flames]]
+x = 192.0   # world-space x of the sea gap</code></pre>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>BLUE_FLAME_LAUNCH_VY</code></td><td>&#8722;550.0</td><td>Initial upward impulse in px/s</td></tr>
+      <tr><td><code>BLUE_FLAME_APEX_Y</code></td><td>60.0</td><td>Highest point in logical pixels</td></tr>
+      <tr><td><code>BLUE_FLAME_FLIP_DURATION</code></td><td>0.12 s</td><td>Time to rotate 180° at apex</td></tr>
+      <tr><td><code>BLUE_FLAME_WAIT_DURATION</code></td><td>1.5 s</td><td>Idle time between eruptions</td></tr>
+    </tbody>
+  </table>
+  <hr />
+
+  <h3>Fire Flame</h3>
+  <p><strong>File:</strong> <code>src/hazards/fire_flame.c</code> / <code>fire_flame.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/hazards/fire_flame.png</code><br />
+  <strong>Behaviour:</strong> Same eruption cycle as the blue flame but with a fire-colored sprite. Used in volcanic or lava-themed levels. Shares the same phase constants.</p>
+  <hr />
+
+  <h2>Collision Architecture</h2>
+  <p>All entity–player collision uses <strong>AABB (axis-aligned bounding box)</strong> overlap tests. Entity hitboxes are inset from the sprite frame to match visible art bounds only — transparent padding is excluded.</p>
+  <pre><code class="language-c">/* Example: is the player overlapping a coin? */
+static int aabb_overlap(float ax, float ay, int aw, int ah,
+                         float bx, float by, int bw, int bh) &#123;
+    return ax &lt; bx + bw &amp;&amp; ax + aw &gt; bx &amp;&amp;
+           ay &lt; by + bh &amp;&amp; ay + ah &gt; by;
+&#125;</code></pre>
+  <p>For entities with non-rectangular visible art (birds, fish, spiders), <code>get_hitbox()</code> functions return a pre-computed inset <code>SDL_Rect</code> that matches the actual art bounds. See each entity's header for <code>ART_X</code>, <code>ART_W</code>, <code>ART_Y</code>, <code>ART_H</code>, and <code>HITBOX_PAD_*</code> constants.</p>
+  <hr />
+
+  <h2>Adding a New Enemy or Hazard</h2>
+  <p>See the <a href="#developer-guide">Developer Guide</a> for the full entity template and step-by-step checklist.</p>
+</section>

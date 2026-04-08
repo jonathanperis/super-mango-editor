@@ -1,0 +1,229 @@
+---
+---
+<section id="collectibles-surfaces" class="doc-section">
+  <h1 class="page-title">Collectibles &amp; Surfaces</h1>
+  <p><a href="#home">&#8592; Home</a></p>
+  <hr />
+  <p>Collectibles are items the player can pick up. Surfaces are interactive terrain the player can stand on, jump from, or climb. All positions are in <strong>logical pixels</strong> (400&#215;300 space).</p>
+  <hr />
+
+  <h2>Collectibles</h2>
+
+  <h3>Coin</h3>
+  <p><strong>File:</strong> <code>src/collectibles/coin.c</code> / <code>coin.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/collectibles/coin.png</code> — 16&#215;16 px display size<br />
+  <strong>Pickup:</strong> AABB overlap with player. Plays <code>snd_coin</code> on collection.</p>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>MAX_COINS</code></td><td>64</td><td>Coin slots in <code>GameState</code></td></tr>
+      <tr><td><code>COIN_DISPLAY_W/H</code></td><td>16</td><td>Render size in logical px</td></tr>
+      <tr><td><code>COIN_SCORE</code></td><td>100</td><td>Points awarded per coin</td></tr>
+      <tr><td><code>SCORE_PER_LIFE</code></td><td>1000</td><td>Score threshold for a bonus life</td></tr>
+    </tbody>
+  </table>
+  <pre><code class="language-toml">[[coins]]
+x = 46.0
+y = 236.0   # top edge in logical pixels</code></pre>
+  <p>Every 1000 points (10 coins) the player earns a bonus life. The score threshold is configurable via <code>score_per_life</code> in the level file.</p>
+  <hr />
+
+  <h3>Star Yellow</h3>
+  <p><strong>File:</strong> <code>src/collectibles/star_yellow.c</code> / <code>star_yellow.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/collectibles/star_yellow.png</code> — 16&#215;16 px display size<br />
+  <strong>Pickup:</strong> AABB overlap. Restores 1 heart (up to <code>MAX_HEARTS</code>). No score awarded.</p>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>MAX_STAR_YELLOWS</code></td><td>16</td><td>Slots in <code>GameState</code></td></tr>
+      <tr><td><code>STAR_YELLOW_DISPLAY_W/H</code></td><td>16</td><td>Render size in logical px</td></tr>
+    </tbody>
+  </table>
+  <pre><code class="language-toml">[[star_yellows]]
+x = 272.0
+y = 108.0</code></pre>
+  <hr />
+
+  <h3>Star Green</h3>
+  <p><strong>File:</strong> <code>src/collectibles/star_green.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/collectibles/star_green.png</code> — 16&#215;16 px<br />
+  <strong>Pickup:</strong> Same as star yellow — restores 1 heart.</p>
+  <pre><code class="language-toml">[[star_greens]]
+x = 500.0
+y = 80.0</code></pre>
+  <hr />
+
+  <h3>Star Red</h3>
+  <p><strong>File:</strong> <code>src/collectibles/star_red.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/collectibles/star_red.png</code> — 16&#215;16 px<br />
+  <strong>Pickup:</strong> Same as star yellow — restores 1 heart.</p>
+  <pre><code class="language-toml">[[star_reds]]
+x = 800.0
+y = 100.0</code></pre>
+  <hr />
+
+  <h3>Last Star</h3>
+  <p><strong>File:</strong> <code>src/collectibles/last_star.c</code> / <code>last_star.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/screens/hud_coins.png</code> (reuses the HUD star icon)<br />
+  <strong>Display size:</strong> 24&#215;24 px<br />
+  <strong>Pickup:</strong> Collecting it sets <code>collected = 1</code> and triggers the level-complete event. Only one instance per level, defined with <code>[last_star]</code> (not <code>[[last_star]]</code>).</p>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>LAST_STAR_DISPLAY_W/H</code></td><td>24</td><td>Render size in logical px</td></tr>
+    </tbody>
+  </table>
+  <pre><code class="language-toml">[last_star]
+x = 1492.0
+y = 100.0</code></pre>
+  <hr />
+
+  <h2>Surfaces</h2>
+
+  <h3>Platform (Ground Pillar)</h3>
+  <p><strong>File:</strong> <code>src/surfaces/platform.c</code> / <code>platform.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/surfaces/Platform.png</code> — 48&#215;48 tile, 9-slice rendered<br />
+  <strong>Behaviour:</strong> Static ground pillar. The player can land on the top surface. Pillars are positioned on the floor and extend upward. Rendered before the floor so the pillar base sinks into the ground naturally.</p>
+  <pre><code class="language-toml">[[platforms]]
+x           = 80.0   # left edge in logical pixels
+tile_height = 2      # height in 48px tiles (1-3)
+tile_width  = 1      # width in 48px tiles (usually 1)</code></pre>
+  <p>Top surface Y for a pillar: <code>FLOOR_Y &#8722; (tile_height &#215; TILE_SIZE)</code> = <code>252 &#8722; (h &#215; 48)</code>.</p>
+  <table>
+    <thead><tr><th><code>tile_height</code></th><th>Top Y</th><th>Typical use</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>204</td><td>Step / obstacle</td></tr>
+      <tr><td>2</td><td>156</td><td>Standard platform — medium bouncepads clear this</td></tr>
+      <tr><td>3</td><td>108</td><td>Tall — only reachable via high bouncepad or vine</td></tr>
+    </tbody>
+  </table>
+  <hr />
+
+  <h3>Float Platform</h3>
+  <p><strong>File:</strong> <code>src/surfaces/float_platform.c</code> / <code>float_platform.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/surfaces/float_platform.png</code> — 48&#215;16 px, 3-slice (left cap | centre fill | right cap)<br />
+  <strong>Behaviour:</strong> Hovering one-way surface. Player lands on the top face only (one-way collision — can jump through from below). Three modes:</p>
+  <table>
+    <thead><tr><th>Mode</th><th>Behaviour</th></tr></thead>
+    <tbody>
+      <tr><td><code>STATIC</code></td><td>Fixed position, never moves</td></tr>
+      <tr><td><code>CRUMBLE</code></td><td>Begins falling after player stands on it for 0.75 s</td></tr>
+      <tr><td><code>RAIL</code></td><td>Travels along a rail path at constant speed</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>MAX_FLOAT_PLATFORMS</code></td><td>16</td><td>Slots in <code>GameState</code></td></tr>
+      <tr><td><code>FLOAT_PLATFORM_PIECE_W</code></td><td>16</td><td>Width of each 3-slice piece</td></tr>
+      <tr><td><code>FLOAT_PLATFORM_H</code></td><td>16</td><td>Platform height in px</td></tr>
+      <tr><td><code>CRUMBLE_STAND_LIMIT</code></td><td>0.75 s</td><td>Time before crumble fall starts</td></tr>
+      <tr><td><code>CRUMBLE_FALL_GRAVITY</code></td><td>250 px/s²</td><td>Downward acceleration during fall</td></tr>
+    </tbody>
+  </table>
+  <pre><code class="language-toml">[[float_platforms]]
+mode       = "STATIC"   # "STATIC" | "CRUMBLE" | "RAIL"
+x          = 172.0
+y          = 200.0
+tile_count = 4          # width in 16px pieces
+rail_index = 0          # RAIL mode only: index into [[rails]]
+t_offset   = 0.0        # RAIL mode only: starting position on rail
+speed      = 0.0        # RAIL mode only: traversal speed in tiles/s</code></pre>
+  <hr />
+
+  <h3>Bridge</h3>
+  <p><strong>File:</strong> <code>src/surfaces/bridge.c</code> / <code>bridge.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/surfaces/bridge.png</code> — 16&#215;16 px brick tile<br />
+  <strong>Behaviour:</strong> Tiled crumble walkway. Bricks fall individually when the player walks over them, creating a time-limited path. After falling they respawn when the player moves away.</p>
+  <pre><code class="language-toml">[[bridges]]
+x           = 1350.0
+y           = 172.0
+brick_count = 8   # number of 16x16 brick tiles</code></pre>
+  <hr />
+
+  <h3>Bouncepad</h3>
+  <p><strong>File:</strong> <code>src/surfaces/bouncepad.c</code> / <code>bouncepad.h</code><br />
+  <strong>Sprites:</strong> <code>bouncepad_small.png</code>, <code>bouncepad_medium.png</code> (wood), <code>bouncepad_high.png</code><br />
+  <strong>Sheet:</strong> 144&#215;48 px, 3 columns &#215; 1 row — Frame 0: extended, Frame 1: mid-compress, Frame 2: compressed (default idle state)<br />
+  <strong>Behaviour:</strong> Spring pad that launches the player upward on landing. Plays a 3-frame squash/release animation (2&#8594;1&#8594;0, 80 ms/frame) then resets to idle.</p>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>BOUNCEPAD_W/H</code></td><td>48</td><td>Display size in logical px</td></tr>
+      <tr><td><code>BOUNCEPAD_VY_SMALL</code></td><td>&#8722;380.0</td><td>Launch impulse for green pad</td></tr>
+      <tr><td><code>BOUNCEPAD_VY_MEDIUM</code></td><td>&#8722;536.25</td><td>Launch impulse for wood pad</td></tr>
+      <tr><td><code>BOUNCEPAD_VY_HIGH</code></td><td>&#8722;700.0</td><td>Launch impulse for red pad</td></tr>
+      <tr><td><code>BOUNCEPAD_FRAME_MS</code></td><td>80</td><td>ms per animation frame during release</td></tr>
+      <tr><td><code>BOUNCEPAD_SRC_Y</code></td><td>14</td><td>Art starts at row 14 (transparent above)</td></tr>
+      <tr><td><code>BOUNCEPAD_SRC_H</code></td><td>18</td><td>Art height = rows 14–31</td></tr>
+      <tr><td><code>BOUNCEPAD_ART_X</code></td><td>16</td><td>Art starts at col 16 (transparent outside)</td></tr>
+      <tr><td><code>BOUNCEPAD_ART_W</code></td><td>16</td><td>Hitbox width = cols 16–31</td></tr>
+    </tbody>
+  </table>
+  <pre><code class="language-toml">[[bouncepads_small]]
+x         = 734.0
+launch_vy = -380.0
+pad_type  = "GREEN"
+
+[[bouncepads_medium]]
+x         = 310.0
+launch_vy = -536.2
+pad_type  = "WOOD"
+
+[[bouncepads_high]]
+x         = 1420.0
+launch_vy = -700.0
+pad_type  = "RED"</code></pre>
+  <hr />
+
+  <h3>Rail</h3>
+  <p><strong>File:</strong> <code>src/surfaces/rail.c</code> / <code>rail.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/surfaces/rail.png</code> — 64&#215;64 px, 4&#215;4 grid of 16&#215;16 bitmask tiles<br />
+  <strong>Behaviour:</strong> A path of interconnected tiles that spike blocks and float platforms ride along. Each tile has a bitmask of connection directions (N/E/S/W) that drives the correct sprite selection. Objects riding a rail store a float <code>t &#8712; [0, tile_count)</code> and call <code>rail_get_world_pos()</code> each frame.</p>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>RAIL_N/E/S/W</code></td><td>1/2/4/8</td><td>Connection bitmask flags</td></tr>
+      <tr><td><code>RAIL_TILE_W/H</code></td><td>16</td><td>Tile size in the sprite sheet</td></tr>
+      <tr><td><code>MAX_RAIL_TILES</code></td><td>128</td><td>Max tiles per Rail instance</td></tr>
+      <tr><td><code>MAX_RAILS</code></td><td>16</td><td>Rail instances in <code>GameState</code></td></tr>
+    </tbody>
+  </table>
+  <pre><code class="language-toml">[[rails]]
+layout  = "RECT"   # "RECT" = closed rectangle | "HORIZ" = open horizontal line
+x       = 444      # top-left tile x
+y       = 35       # top-left tile y
+w       = 10       # width in tiles
+h       = 6        # height in tiles
+end_cap = 0        # 0 = open end (rider detaches), 1 = bouncing end</code></pre>
+  <hr />
+
+  <h3>Vine</h3>
+  <p><strong>File:</strong> <code>src/surfaces/vine.c</code> / <code>vine.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/surfaces/vine.png</code> — 16&#215;48 px per tile<br />
+  <strong>Behaviour:</strong> Climbable vertical surface. The player enters by touching the vine and pressing Up or Down. Press Left/Right to detach and jump away.</p>
+  <pre><code class="language-toml">[[vines]]
+x          = 88.0
+y          = 172.0   # top tile y in logical pixels
+tile_count = 2       # height in tiles (each tile = 16 px wide x 48 px tall)</code></pre>
+  <hr />
+
+  <h3>Ladder</h3>
+  <p><strong>File:</strong> <code>src/surfaces/ladder.c</code> / <code>ladder.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/surfaces/ladder.png</code><br />
+  <strong>Behaviour:</strong> Climbable ladder. The player enters by pressing Up at the base. Climbing is done with Up/Down. Jump or move left/right to exit.</p>
+  <pre><code class="language-toml">[[ladders]]
+x          = 1552.0
+y          = 0.0       # top tile y
+tile_count = 30        # height in tiles</code></pre>
+  <hr />
+
+  <h3>Rope</h3>
+  <p><strong>File:</strong> <code>src/surfaces/rope.c</code> / <code>rope.h</code><br />
+  <strong>Sprite:</strong> <code>assets/sprites/surfaces/rope.png</code><br />
+  <strong>Behaviour:</strong> Climbable rope. Same interaction model as the vine — touch and press Up to grab, Up/Down to climb, Left/Right to swing off.</p>
+  <pre><code class="language-toml">[[ropes]]
+x          = 460.0
+y          = 172.0
+tile_count = 1</code></pre>
+</section>

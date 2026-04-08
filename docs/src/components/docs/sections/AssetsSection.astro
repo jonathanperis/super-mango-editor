@@ -7,6 +7,21 @@
   <p>All visual assets live in the <code>assets/sprites/</code> directory, organized by category (backgrounds, collectibles, entities, foregrounds, hazards, levels, player, screens, surfaces). They are PNG files (loaded via <code>SDL2_image</code>). Fonts live in <code>assets/fonts/</code>.</p>
   <blockquote><p><strong>Coordinate note:</strong> All game objects use <strong>logical space (400x300)</strong>. SDL scales to the 800x600 OS window 2x. A 48x48 sprite appears as 96x96 physical pixels on screen.</p></blockquote>
   <hr />
+  <h2>Per-Level Asset Configuration</h2>
+  <p>Two visual elements are configurable per TOML level file, allowing different themes without changing code:</p>
+  <h3>Floor Tile</h3>
+  <pre><code class="language-toml">floor_tile_path = "assets/sprites/levels/grass_tileset.png"</code></pre>
+  <p>Any 48×48 PNG tile can be substituted. The engine 9-slice renders it across <code>FLOOR_Y</code> to form the ground.</p>
+  <h3>Parallax Background Layers</h3>
+  <pre><code class="language-toml">[[background_layers]]
+path  = "assets/sprites/backgrounds/sky_blue.png"
+speed = 0.0
+
+[[background_layers]]
+path  = "assets/sprites/backgrounds/glacial_mountains.png"
+speed = 0.2</code></pre>
+  <p>Layers are drawn in array order (first = furthest back). <code>speed</code> is the parallax scroll factor: <code>0.0</code> = static sky, <code>1.0</code> = locks to camera, <code>0.1</code>–<code>0.5</code> = typical mid-ground. Up to 8 layers supported. See <a href="#level-design">Level Design</a> for the full list of available backgrounds.</p>
+  <hr />
   <h2>Currently Used Assets</h2>
   <table>
     <thead><tr><th>File</th><th>GameState Field / Used By</th><th>Description</th></tr></thead>

@@ -1,8 +1,302 @@
 ---
 ---
 <section id="player-module" class="doc-section">
-  <h1>Player Module</h1>
+  <h1 class="page-title">Player Module</h1>
   <p><a href="#home">&#8592; Home</a></p>
   <hr />
-  <p>Documentation coming soon.</p>
+  <p>The player module spans <code>player.h</code> and <code>player.c</code> and owns the full lifecycle of the player character: texture loading, keyboard input, physics simulation, sprite animation, rendering, and cleanup.</p>
+  <hr />
+
+  <h2>Lifecycle at a Glance</h2>
+  <pre><code>player_init        &#8592; called once from game_init
+  &#9492;&#9472;&#9472; IMG_LoadTexture (player.png &#8594; GPU)
+  &#9492;&#9472;&#9472; set initial position, speed, animation state
+
+per frame (game_loop):
+  player_handle_input   &#8592; sample keyboard and gamepad, set vx / vy / on_ground
+  player_update         &#8592; apply gravity, integrate position, collide, animate
+  player_render         &#8592; draw the current frame to the renderer
+  player_get_hitbox     &#8592; return physics hitbox used by game_loop for collision
+
+player_reset       &#8592; called from game_loop when the player loses a life
+  &#9492;&#9472;&#9472; reset position, velocity, and animation state (texture is reused, not reloaded)
+
+player_cleanup     &#8592; called once from game_cleanup
+  &#9492;&#9472;&#9472; SDL_DestroyTexture</code></pre>
+  <hr />
+
+  <h2>Initialization — <code>player_init</code></h2>
+  <pre><code class="language-c">void player_init(Player *player, SDL_Renderer *renderer);</code></pre>
+  <table>
+    <thead><tr><th>Action</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td>Load texture</td><td><code>IMG_LoadTexture(renderer, "assets/player.png")</code> — 192x288 sheet</td></tr>
+      <tr><td>Frame rect</td><td><code>&#123;x=0, y=0, w=48, h=48&#125;</code> — first cell (row 0, col 0)</td></tr>
+      <tr><td>Display size</td><td><code>w = h = 48</code> px (logical coordinates)</td></tr>
+      <tr><td>Start position</td><td>On pillar 0: <code>x = 80.0f + (TILE_SIZE - 48) / 2.0f</code> = <code>80</code></td></tr>
+      <tr><td>Start Y</td><td><code>FLOOR_Y - 2*TILE_SIZE + 16 - 48 + FLOOR_SINK</code> = <code>172</code> (on top of 2-high pillar)</td></tr>
+      <tr><td>Speed</td><td><code>160.0f</code> px/s horizontal</td></tr>
+      <tr><td>Initial velocity</td><td><code>vx = vy = 0.0f</code></td></tr>
+      <tr><td><code>on_ground</code></td><td><code>1</code> (starts on the floor)</td></tr>
+      <tr><td>Animation</td><td><code>ANIM_IDLE</code>, frame 0, facing right</td></tr>
+    </tbody>
+  </table>
+  <p><strong><code>FLOOR_SINK = 16</code>:</strong> The sprite sheet has transparent padding at the bottom of each 48x48 frame. Sinking 16 px makes the character's feet visually rest on the grass, even though the physics edge (<code>y + h</code>) is 16 px above <code>FLOOR_Y</code>.</p>
+  <hr />
+
+  <h2>Input — <code>player_handle_input</code></h2>
+  <pre><code class="language-c">void player_handle_input(Player *player, Mix_Chunk *snd_jump,
+                         SDL_GameController *ctrl,
+                         const VineDecor *vines, int vine_count,
+                         const LadderDecor *ladders, int ladder_count,
+                         const RopeDecor *ropes, int rope_count);</code></pre>
+  <p>Called <strong>once per frame</strong> before <code>player_update</code>. Uses <code>SDL_GetKeyboardState</code> to read the instantaneous keyboard state (held keys), not events. This gives smooth, continuous movement. The <code>ctrl</code> parameter is the active gamepad handle; pass <code>NULL</code> when no controller is connected — keyboard input still works normally. The <code>vines</code>, <code>ladders</code>, and <code>ropes</code> arrays are used for climbable grab detection when the player presses UP.</p>
+
+  <h3>Key Bindings</h3>
+  <table>
+    <thead><tr><th>Input</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>Left Arrow / A</td><td>Move left (<code>vx -= speed</code>), <code>facing_left = 1</code></td></tr>
+      <tr><td>Right Arrow / D</td><td>Move right (<code>vx += speed</code>), <code>facing_left = 0</code></td></tr>
+      <tr><td>Up Arrow / W</td><td>Grab nearest vine / climb up on vine</td></tr>
+      <tr><td>Down Arrow / S</td><td>Climb down on vine</td></tr>
+      <tr><td>D-Pad left / right</td><td>Move left / right (gamepad)</td></tr>
+      <tr><td>D-Pad up / down</td><td>Grab vine / climb up / climb down (gamepad)</td></tr>
+      <tr><td>Left analog stick (X-axis)</td><td>Move left / right (dead-zone: 8000 / 32767)</td></tr>
+      <tr><td>Left analog stick (Y-axis)</td><td>Climb up / down on vine (gamepad)</td></tr>
+      <tr><td>Space</td><td>Jump (<code>-325</code> px/s impulse — ground and vine dismount)</td></tr>
+      <tr><td><code>A</code> button / Cross (gamepad)</td><td>Jump</td></tr>
+      <tr><td>ESC</td><td>Quit (handled in <code>game_loop</code>, not here)</td></tr>
+      <tr><td><code>Start</code> button (gamepad)</td><td>Quit (handled in <code>game_loop</code>, not here)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Jump Logic</h3>
+  <pre><code class="language-c">int want_jump = keys[SDL_SCANCODE_SPACE];
+if (ctrl) &#123;
+    want_jump |= SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A);
+&#125;
+if (player-&gt;on_ground &amp;&amp; want_jump) &#123;
+    player-&gt;vy        = -325.0f;   // upward impulse (negative = up in SDL)
+    player-&gt;on_ground  = 0;
+    if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
+&#125;</code></pre>
+  <ul>
+    <li>Keyboard jump impulse is <code>-325.0f</code> px/s (upward) for both ground and vine dismount.</li>
+    <li>Gamepad jump impulse is <code>-500.0f</code> px/s (upward) for both ground and vine dismount.</li>
+    <li><code>on_ground</code> is set to <code>0</code> immediately so the jump condition fires only once.</li>
+    <li>The sound is guarded by <code>if (snd_jump)</code> to tolerate a failed WAV load.</li>
+  </ul>
+
+  <h3>Vine Climbing</h3>
+  <p>When the player presses UP (and is not holding Space), the input handler searches for the nearest vine within grab range (<code>VINE_W + 2 x VINE_GRAB_PAD = 24 px</code> wide). If found:</p>
+  <ol>
+    <li><code>player-&gt;on_vine = 1</code>, <code>player-&gt;vine_index</code> is set to the vine's index.</li>
+    <li>The player snaps horizontally to centre on the vine.</li>
+    <li>Gravity is disabled while <code>on_vine == 1</code>.</li>
+    <li>UP/DOWN keys control vertical movement at <code>CLIMB_SPEED</code> (80 px/s).</li>
+    <li>LEFT/RIGHT keys allow horizontal drift at <code>CLIMB_H_SPEED</code> (80 px/s).</li>
+    <li>Pressing Space while on a vine triggers a dismount: <code>on_vine = 0</code>, <code>vy = -325.0f</code> (keyboard) or <code>-500.0f</code> (gamepad).</li>
+    <li>The <code>ANIM_CLIMB</code> state plays (row 4, 2 frames at 100 ms each); the animation freezes when the player is stationary on the vine.</li>
+  </ol>
+
+  <h3>Horizontal velocity reset</h3>
+  <p><code>player-&gt;vx</code> is reset to <code>0.0f</code> at the start of each call. The player stops instantly when no horizontal key is held — no friction/deceleration is applied in the current MVP.</p>
+  <hr />
+
+  <h2>Physics — <code>player_update</code></h2>
+  <pre><code class="language-c">void player_update(Player *player, float dt,
+                   const Platform *platforms, int platform_count,
+                   const FloatPlatform *float_platforms, int float_platform_count,
+                   const Bouncepad *bouncepads, int bouncepad_count,
+                   const VineDecor *vines, int vine_count,
+                   const LadderDecor *ladders, int ladder_count,
+                   const RopeDecor *ropes, int rope_count,
+                   const Bridge *bridges, int bridge_count,
+                   const SpikePlatform *spike_platforms, int spike_platform_count,
+                   const int *sea_gaps, int sea_gap_count,
+                   int *out_bounce_idx,
+                   int *out_fp_landed_idx,
+                   int prev_fp_landed_idx);</code></pre>
+  <p><code>dt</code> is the time in <strong>seconds</strong> since the last frame (e.g. <code>0.016</code> for 60 FPS). Multiplying speed by <code>dt</code> makes movement frame-rate independent. The function resolves collisions against the floor, one-way platforms, float platforms, bridges, spike platforms, bouncepads, vines, ladders, and ropes.</p>
+  <ul>
+    <li><code>*out_bounce_idx</code> is set to the bouncepad index if the player lands on one; callers initialise to <code>-1</code>.</li>
+    <li><code>*out_fp_landed_idx</code> is set to the float platform index if the player lands on one; used to drive the crumble timer and nudge the player along with moving rail platforms.</li>
+    <li><code>prev_fp_landed_idx</code> is the float platform the player was standing on last frame — needed for the "stay on" check when a platform moves upward.</li>
+  </ul>
+
+  <h3>Gravity</h3>
+  <pre><code class="language-c">player-&gt;on_ground = 0;          // reset every frame &#8212; walk-off edges start falling immediately
+player-&gt;vy += GRAVITY * dt;     // GRAVITY = 800.0f px/s&#178;; runs unconditionally</code></pre>
+  <p><code>on_ground</code> is cleared to <code>0</code> at the start of every <code>player_update</code> call so the player immediately begins falling when they walk off a platform edge. Gravity then runs unconditionally; the floor/platform snap below cancels the tiny fall each frame while the player stands on a surface, keeping them rock-solid on the ground.</p>
+
+  <h3>Position Integration</h3>
+  <pre><code class="language-c">player-&gt;x += player-&gt;vx * dt;
+player-&gt;y += player-&gt;vy * dt;</code></pre>
+
+  <h3>Floor Collision</h3>
+  <pre><code class="language-c">float floor_snap = (float)(FLOOR_Y - player-&gt;h + FLOOR_SINK);
+// = 252 - 48 + 16 = 220
+
+if (player-&gt;y &gt;= floor_snap) &#123;
+    player-&gt;y        = floor_snap;
+    player-&gt;vy       = 0.0f;
+    player-&gt;on_ground = 1;
+&#125;</code></pre>
+  <p>When the player's bottom edge reaches the floor surface, position is snapped, <code>vy</code> is zeroed, and <code>on_ground</code> becomes <code>1</code>.</p>
+
+  <h3>Horizontal Clamp</h3>
+  <pre><code class="language-c">if (player-&gt;x + PHYS_PAD_X &lt; 0.0f)
+    player-&gt;x = -(float)PHYS_PAD_X;
+if (player-&gt;x + player-&gt;w - PHYS_PAD_X &gt; WORLD_W)
+    player-&gt;x = (float)(WORLD_W - player-&gt;w + PHYS_PAD_X);</code></pre>
+  <p>Keeps the player's <strong>physics body</strong> (inset by <code>PHYS_PAD_X = 12</code> px on each side) inside the full <code>WORLD_W</code> (1600 px) scrollable world. The transparent side-padding of the sprite frame is allowed to slide off-screen while the visible character stays flush with the world border.</p>
+
+  <h3>Ceiling Clamp</h3>
+  <pre><code class="language-c">if (player-&gt;y + PHYS_PAD_TOP &lt; 0.0f) &#123;
+    player-&gt;y  = -(float)PHYS_PAD_TOP;
+    player-&gt;vy = 0.0f;
+&#125;</code></pre>
+  <p>Stops upward movement when the physics top edge (<code>y + PHYS_PAD_TOP</code>) hits the canvas ceiling. <code>PHYS_PAD_TOP = 18</code> lets the transparent head-room of the sprite frame slide above <code>y = 0</code> before the physics edge triggers.</p>
+  <hr />
+
+  <h2>Animation — <code>player_animate</code> (static)</h2>
+  <p>Called at the end of <code>player_update</code>. Selects the correct <code>AnimState</code> based on physics state, advances the frame timer, and updates <code>player-&gt;frame</code> (the source rect cutting into the sprite sheet).</p>
+
+  <h3>State Selection</h3>
+  <pre><code class="language-c">AnimState target;
+if (player-&gt;on_vine) &#123;
+    target = ANIM_CLIMB;
+&#125; else if (!player-&gt;on_ground) &#123;
+    target = (player-&gt;vy &lt; 0.0f) ? ANIM_JUMP : ANIM_FALL;
+&#125; else if (player-&gt;vx != 0.0f) &#123;
+    target = ANIM_WALK;
+&#125; else &#123;
+    target = ANIM_IDLE;
+&#125;</code></pre>
+  <table>
+    <thead><tr><th>Condition</th><th>Selected State</th></tr></thead>
+    <tbody>
+      <tr><td>Climbing a vine (<code>on_vine == 1</code>)</td><td><code>ANIM_CLIMB</code></td></tr>
+      <tr><td>Airborne + moving up (<code>vy &lt; 0</code>)</td><td><code>ANIM_JUMP</code></td></tr>
+      <tr><td>Airborne + moving down (<code>vy &gt;= 0</code>)</td><td><code>ANIM_FALL</code></td></tr>
+      <tr><td>On ground + horizontal velocity</td><td><code>ANIM_WALK</code></td></tr>
+      <tr><td>On ground + no movement</td><td><code>ANIM_IDLE</code></td></tr>
+    </tbody>
+  </table>
+  <blockquote><p><strong>Climb freeze:</strong> When <code>ANIM_CLIMB</code> is active but the player has zero vertical velocity (stationary on vine), the animation timer is paused — the climb sprite holds its current frame.</p></blockquote>
+
+  <h3>Frame Timer</h3>
+  <pre><code class="language-c">player-&gt;anim_timer_ms += dt_ms;
+if (player-&gt;anim_timer_ms &gt;= frame_duration) &#123;
+    player-&gt;anim_timer_ms -= frame_duration;   // carry-over, not reset
+    player-&gt;anim_frame_index =
+        (player-&gt;anim_frame_index + 1) % ANIM_FRAME_COUNT[state];
+&#125;</code></pre>
+  <p>Leftover time carries into the next frame to keep animation speed accurate across variable frame rates.</p>
+
+  <h3>Animation Table</h3>
+  <table>
+    <thead><tr><th>State</th><th>Row</th><th>Frames</th><th>ms/frame</th><th>Total cycle</th></tr></thead>
+    <tbody>
+      <tr><td><code>ANIM_IDLE</code></td><td>0</td><td>4</td><td>150</td><td>600 ms</td></tr>
+      <tr><td><code>ANIM_WALK</code></td><td>1</td><td>4</td><td>100</td><td>400 ms</td></tr>
+      <tr><td><code>ANIM_JUMP</code></td><td>2</td><td>2</td><td>150</td><td>300 ms</td></tr>
+      <tr><td><code>ANIM_FALL</code></td><td>3</td><td>1</td><td>200</td><td>200 ms</td></tr>
+      <tr><td><code>ANIM_CLIMB</code></td><td>4</td><td>2</td><td>100</td><td>200 ms</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Source Rect Update</h3>
+  <pre><code class="language-c">player-&gt;frame.x = player-&gt;anim_frame_index * FRAME_W;   // col x 48
+player-&gt;frame.y = ANIM_ROW[player-&gt;anim_state]  * FRAME_H;  // row x 48</code></pre>
+  <hr />
+
+  <h2>Rendering — <code>player_render</code></h2>
+  <pre><code class="language-c">void player_render(Player *player, SDL_Renderer *renderer, int cam_x);</code></pre>
+  <pre><code class="language-c">/* Invincibility blink: skip every alternate 100 ms window */
+if (player-&gt;hurt_timer &gt; 0.0f) &#123;
+    int interval = (int)(player-&gt;hurt_timer * 1000.0f) / 100;
+    if (interval % 2 == 1) return;   /* blink off &#8212; skip this frame */
+&#125;
+
+SDL_Rect dst = &#123;
+    .x = (int)player-&gt;x - cam_x,  // world &#8594; screen: subtract camera offset
+    .y = (int)player-&gt;y,
+    .w = player-&gt;w,         // 48
+    .h = player-&gt;h          // 48
+&#125;;
+
+SDL_RendererFlip flip = player-&gt;facing_left
+    ? SDL_FLIP_HORIZONTAL
+    : SDL_FLIP_NONE;
+
+SDL_RenderCopyEx(renderer, player-&gt;texture, &amp;player-&gt;frame, &amp;dst,
+                 0.0, NULL, flip);</code></pre>
+  <p><code>SDL_RenderCopyEx</code> is used (instead of <code>SDL_RenderCopy</code>) to support horizontal flipping. Angle and center are <code>0</code> / <code>NULL</code> so no rotation is applied.</p>
+  <blockquote><p><strong>Invincibility blink:</strong> While <code>player-&gt;hurt_timer &gt; 0</code>, <code>player_render</code> converts the remaining time into a 100 ms cadence — <code>interval = (int)(player-&gt;hurt_timer * 1000.0f) / 100</code>. On odd intervals the function returns early, skipping the draw call and making the sprite flash to indicate temporary invincibility.</p></blockquote>
+  <hr />
+
+  <h2>Hitbox — <code>player_get_hitbox</code></h2>
+  <pre><code class="language-c">SDL_Rect player_get_hitbox(const Player *player);</code></pre>
+  <p>Returns an <code>SDL_Rect</code> representing the player's tightly-inset physics hitbox in logical pixels. The hitbox is smaller than the full 48x48 display frame to exclude transparent padding in the sprite sheet. It is used by <code>game_loop</code> for AABB intersection tests against spider enemies.</p>
+  <table>
+    <thead><tr><th>Inset</th><th>Constant</th><th>Value</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td>Left and Right</td><td><code>PHYS_PAD_X</code></td><td><code>15</code> px</td><td>Physics width = 48 - 30 = 18 px</td></tr>
+      <tr><td>Top</td><td><code>PHYS_PAD_TOP</code></td><td><code>18</code> px</td><td>Physics top tracks the character's head</td></tr>
+      <tr><td>Bottom</td><td><code>FLOOR_SINK</code></td><td><code>16</code> px</td><td>Physics bottom tracks the character's feet</td></tr>
+    </tbody>
+  </table>
+  <pre><code class="language-c">SDL_Rect r;
+r.x = (int)(player-&gt;x) + PHYS_PAD_X;
+r.y = (int)(player-&gt;y) + PHYS_PAD_TOP;
+r.w = player-&gt;w - 2 * PHYS_PAD_X;
+r.h = player-&gt;h - PHYS_PAD_TOP - FLOOR_SINK;
+return r;</code></pre>
+  <p><code>game_loop</code> calls <code>player_get_hitbox</code> each frame (when <code>hurt_timer == 0</code>) and passes the result to <code>SDL_HasIntersection</code> alongside each spider's rect. On overlap, <code>hurt_timer</code> is set to <code>1.5</code> seconds.</p>
+  <hr />
+
+  <h2>Cleanup — <code>player_cleanup</code></h2>
+  <pre><code class="language-c">void player_cleanup(Player *player) &#123;
+    if (player-&gt;texture) &#123;
+        SDL_DestroyTexture(player-&gt;texture);
+        player-&gt;texture = NULL;
+    &#125;
+&#125;</code></pre>
+  <p>Must be called <strong>before</strong> <code>SDL_DestroyRenderer</code>, because textures are owned by the renderer.</p>
+  <hr />
+
+  <h2>Reset — <code>player_reset</code></h2>
+  <pre><code class="language-c">void player_reset(Player *player);</code></pre>
+  <p>Resets the player's position and state to the starting values <strong>without reloading the texture</strong>. Called by <code>game_loop</code> when the player loses a life (hearts reach 0). Because the GPU texture is already loaded, only the position, velocity, <code>on_ground</code>, and animation fields need to be re-initialised — the same <code>player.png</code> texture handle is reused directly.</p>
+  <table>
+    <thead><tr><th>Action</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td>Position</td><td>Reset to pillar 0 (x=80), snapped to pillar top surface</td></tr>
+      <tr><td>Velocity</td><td><code>vx = vy = 0.0f</code></td></tr>
+      <tr><td><code>on_ground</code></td><td><code>1</code></td></tr>
+      <tr><td><code>hurt_timer</code></td><td><code>0.0f</code> (no invincibility)</td></tr>
+      <tr><td>Animation</td><td><code>ANIM_IDLE</code>, frame 0</td></tr>
+      <tr><td>Texture</td><td><strong>unchanged</strong> — reuses the already-loaded handle</td></tr>
+    </tbody>
+  </table>
+  <hr />
+
+  <h2>Physics Constants Reference</h2>
+  <table>
+    <thead><tr><th>Constant</th><th>Value</th><th>Location</th></tr></thead>
+    <tbody>
+      <tr><td><code>GRAVITY</code></td><td><code>800.0f</code> px/s²</td><td><code>game.h</code></td></tr>
+      <tr><td><code>FLOOR_Y</code></td><td><code>252</code> px</td><td><code>game.h</code> (<code>GAME_H - TILE_SIZE</code>)</td></tr>
+      <tr><td>Jump impulse <code>vy</code> (keyboard)</td><td><code>-325.0f</code> px/s</td><td><code>player.c</code> (hard-coded)</td></tr>
+      <tr><td>Jump impulse <code>vy</code> (gamepad)</td><td><code>-500.0f</code> px/s</td><td><code>player.c</code> (hard-coded)</td></tr>
+      <tr><td><code>CLIMB_SPEED</code></td><td><code>80.0f</code> px/s</td><td><code>player.c</code> (local <code>#define</code>)</td></tr>
+      <tr><td><code>CLIMB_H_SPEED</code></td><td><code>80.0f</code> px/s</td><td><code>player.c</code> (local <code>#define</code>)</td></tr>
+      <tr><td><code>VINE_GRAB_PAD</code></td><td><code>4</code> px</td><td><code>player.c</code> (local <code>#define</code>)</td></tr>
+      <tr><td>Horizontal speed</td><td><code>160.0f</code> px/s</td><td><code>player.c</code> (<code>player-&gt;speed</code>)</td></tr>
+      <tr><td><code>FLOOR_SINK</code></td><td><code>16</code> px</td><td><code>player.c</code> (local <code>#define</code>)</td></tr>
+      <tr><td><code>FRAME_W</code> / <code>FRAME_H</code></td><td><code>48</code> px</td><td><code>player.c</code> (local <code>#define</code>)</td></tr>
+    </tbody>
+  </table>
 </section>

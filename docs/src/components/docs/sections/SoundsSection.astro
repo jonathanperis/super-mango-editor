@@ -1,8 +1,150 @@
 ---
 ---
 <section id="sounds" class="doc-section">
-  <h1>Sounds</h1>
+  <h1 class="page-title">Sounds</h1>
   <p><a href="#home">&#8592; Home</a></p>
   <hr />
-  <p>Documentation coming soon.</p>
+  <p>All audio files live in the <code>assets/sounds/</code> directory, organized into categorized subdirectories. All sound files use the <code>.wav</code> format. SDL2_mixer handles both short sound effects (<code>Mix_Chunk</code> via <code>Mix_LoadWAV</code>) and streaming music (<code>Mix_Music</code> via <code>Mix_LoadMUS</code>).</p>
+  <hr />
+
+  <h2>Currently Used Sounds</h2>
+
+  <h3>Player — <code>assets/sounds/player/</code></h3>
+  <table>
+    <thead><tr><th>File</th><th>Type</th><th>GameState Field</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>player_jump.wav</code></td><td><code>Mix_Chunk</code></td><td><code>gs-&gt;snd_jump</code></td><td>Played on Space press when <code>on_ground == 1</code></td></tr>
+      <tr><td><code>player_hit.wav</code></td><td><code>Mix_Chunk</code></td><td><code>gs-&gt;snd_hit</code></td><td>Played when the player takes damage</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Collectibles — <code>assets/sounds/collectibles/</code></h3>
+  <table>
+    <thead><tr><th>File</th><th>Type</th><th>GameState Field</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>coin.wav</code></td><td><code>Mix_Chunk</code></td><td><code>gs-&gt;snd_coin</code></td><td>Played when the player collects a coin</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Entities — <code>assets/sounds/entities/</code></h3>
+  <table>
+    <thead><tr><th>File</th><th>Type</th><th>GameState Field</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>bird.wav</code></td><td><code>Mix_Chunk</code></td><td><code>gs-&gt;snd_flap</code></td><td>Played for bird enemy wing flap</td></tr>
+      <tr><td><code>spider.wav</code></td><td><code>Mix_Chunk</code></td><td><code>gs-&gt;snd_spider_attack</code></td><td>Played for spider enemy attack</td></tr>
+      <tr><td><code>fish.wav</code></td><td><code>Mix_Chunk</code></td><td><code>gs-&gt;snd_dive</code></td><td>Played for fish enemy dive</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Hazards — <code>assets/sounds/hazards/</code></h3>
+  <table>
+    <thead><tr><th>File</th><th>Type</th><th>GameState Field</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>axe_trap.wav</code></td><td><code>Mix_Chunk</code></td><td><code>gs-&gt;snd_axe</code></td><td>Played for axe trap swing</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Surfaces — <code>assets/sounds/surfaces/</code></h3>
+  <table>
+    <thead><tr><th>File</th><th>Type</th><th>GameState Field</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>bouncepad.wav</code></td><td><code>Mix_Chunk</code></td><td><code>gs-&gt;snd_spring</code></td><td>Played when the player lands on a bouncepad</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Screens — <code>assets/sounds/screens/</code></h3>
+  <table>
+    <thead><tr><th>File</th><th>Type</th><th>GameState Field</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>confirm_ui.wav</code></td><td><code>Mix_Chunk</code></td><td><code>menu-&gt;snd_confirm</code></td><td>Played on menu confirmation</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Levels — <code>assets/sounds/levels/</code></h3>
+  <table>
+    <thead><tr><th>File</th><th>Type</th><th>GameState Field</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>water.wav</code></td><td><code>Mix_Music</code></td><td><code>gs-&gt;music</code></td><td>Background music for water-themed levels, loaded via <code>Mix_LoadMUS</code> (streaming)</td></tr>
+      <tr><td><code>lava.wav</code></td><td><code>Mix_Music</code></td><td><code>gs-&gt;music</code></td><td>Background music for lava-themed levels, loaded via <code>Mix_LoadMUS</code> (streaming)</td></tr>
+      <tr><td><code>winds.wav</code></td><td><code>Mix_Music</code></td><td><code>gs-&gt;music</code></td><td>Background music for wind-themed levels, loaded via <code>Mix_LoadMUS</code> (streaming)</td></tr>
+    </tbody>
+  </table>
+  <hr />
+
+  <h2>Unused Sounds</h2>
+  <p>The following sounds are stored in <code>assets/sounds/unused/</code> and are not loaded by the game. They are available as reserves for future use.</p>
+  <table>
+    <thead><tr><th>File</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>fireball.wav</code></td><td>Projectile / fireball effect</td></tr>
+      <tr><td><code>saw.wav</code></td><td>Circular saw spinning</td></tr>
+    </tbody>
+  </table>
+  <hr />
+
+  <h2>Audio Configuration</h2>
+  <p>SDL2_mixer is opened in <code>main.c</code> with:</p>
+  <pre><code class="language-c">Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);</code></pre>
+  <table>
+    <thead><tr><th>Parameter</th><th>Value</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>Frequency</td><td><code>44100</code> Hz</td><td>CD quality</td></tr>
+      <tr><td>Format</td><td><code>MIX_DEFAULT_FORMAT</code></td><td>16-bit signed samples</td></tr>
+      <tr><td>Channels</td><td><code>2</code></td><td>Stereo</td></tr>
+      <tr><td>Chunk size</td><td><code>2048</code> samples</td><td>~46 ms buffer at 44100 Hz</td></tr>
+    </tbody>
+  </table>
+  <hr />
+
+  <h2>Sound Effects vs. Music</h2>
+  <table>
+    <thead><tr><th>Aspect</th><th><code>Mix_Chunk</code> (sound effects)</th><th><code>Mix_Music</code> (background music)</th></tr></thead>
+    <tbody>
+      <tr><td>API</td><td><code>Mix_LoadWAV</code>, <code>Mix_PlayChannel</code></td><td><code>Mix_LoadMUS</code>, <code>Mix_PlayMusic</code></td></tr>
+      <tr><td>Loading</td><td>Fully decoded into RAM</td><td>Streamed from disk</td></tr>
+      <tr><td>Best for</td><td>Short, triggered sounds</td><td>Long looping tracks</td></tr>
+      <tr><td>Simultaneous</td><td>Multiple channels</td><td>One at a time</td></tr>
+      <tr><td>Volume</td><td><code>Mix_VolumeChunk</code></td><td><code>Mix_VolumeMusic</code></td></tr>
+    </tbody>
+  </table>
+  <p>All sound effects use <code>Mix_LoadWAV</code> and are fully loaded into memory. The background music tracks (<code>water.wav</code>, <code>lava.wav</code>, <code>winds.wav</code>) use <code>Mix_LoadMUS</code> which streams from disk, keeping memory usage low. Music is assigned per level via the TOML level definition's <code>music_path</code> field.</p>
+  <hr />
+
+  <h2>Adding a New Sound Effect</h2>
+  <ol>
+    <li>Place the <code>.wav</code> file in the appropriate <code>assets/sounds/&lt;category&gt;/</code> subdirectory.</li>
+    <li>Add a <code>Mix_Chunk *snd_&lt;name&gt;</code> field to <code>GameState</code> in <code>game.h</code>.</li>
+    <li>Load it in <code>game_init</code>:</li>
+  </ol>
+  <pre><code class="language-c">gs-&gt;snd_&lt;name&gt; = Mix_LoadWAV("assets/sounds/&lt;category&gt;/&lt;name&gt;.wav");
+if (!gs-&gt;snd_&lt;name&gt;) &#123;
+    fprintf(stderr, "Warning: failed to load &lt;name&gt;.wav: %s\n", Mix_GetError());
+    /* Non-fatal &#8212; game continues without this sound */
+&#125;</code></pre>
+  <p>4. Free it in <code>game_cleanup</code> (before <code>SDL_DestroyRenderer</code>):</p>
+  <pre><code class="language-c">if (gs-&gt;snd_&lt;name&gt;) &#123;
+    Mix_FreeChunk(gs-&gt;snd_&lt;name&gt;);
+    gs-&gt;snd_&lt;name&gt; = NULL;
+&#125;</code></pre>
+  <p>5. Play it wherever the event occurs:</p>
+  <pre><code class="language-c">if (gs-&gt;snd_&lt;name&gt;) Mix_PlayChannel(-1, gs-&gt;snd_&lt;name&gt;, 0);</code></pre>
+  <p>The <code>if</code> guard is important: if the WAV fails to load for any reason, the game continues without crashing.</p>
+  <hr />
+
+  <h2>Adding a New Music Track</h2>
+  <pre><code class="language-c">// Load (streaming &#8212; not fully decoded into RAM)
+gs-&gt;music = Mix_LoadMUS("assets/sounds/levels/new_track.wav");
+if (!gs-&gt;music) &#123; /* handle error */ &#125;
+
+// Start (loop forever)
+Mix_PlayMusic(gs-&gt;music, -1);
+
+// Volume (0-128)
+Mix_VolumeMusic(64);  // 50%
+
+// Stop and free
+Mix_HaltMusic();
+Mix_FreeMusic(gs-&gt;music);
+gs-&gt;music = NULL;</code></pre>
+  <p><code>Mix_Music</code> <strong>streams</strong> from disk; it does not load the entire file into RAM. This keeps memory usage low for large audio files.</p>
 </section>
