@@ -453,7 +453,13 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
      *
      * Both sources can be active simultaneously; the velocity accumulates.
      * Keyboard and gamepad also work at the same time — no mode switching.
+     *
+     * DISABLED ON WEBASSEMBLY: Emscripten's SDL gamepad implementation may
+     * report a "virtual" controller with non-zero axis values, causing the
+     * player to auto-move or override keyboard input. Skip gamepad entirely
+     * on __EMSCRIPTEN__ to ensure keyboard controls work correctly.
      * ---------------------------------------------------------------- */
+#ifndef __EMSCRIPTEN__
     if (ctrl) {
         /*
          * Vine grab via D-Pad UP — same logic as keyboard UP above.
@@ -581,6 +587,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
             }
         }
     }
+#endif /* __EMSCRIPTEN__ */
 }
 
 /* ------------------------------------------------------------------ */
