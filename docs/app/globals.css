@@ -68,6 +68,14 @@ body::before {
     animation: ambient-drift 20s ease-in-out infinite alternate;
 }
 
+section {
+    padding: 5rem 2rem;
+    max-width: 1000px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 5;
+}
+
 a { text-decoration: none; color: var(--accent); transition: color 0.2s; }
 a:hover { color: var(--green); }
 
