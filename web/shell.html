@@ -91,6 +91,14 @@
     window.onerror = function() {
       Module.setStatus('Error — check the browser console.');
     };
+
+    /* Prevent browser from intercepting game keys (arrows, space, shift). */
+    document.addEventListener('keydown', function(e) {
+      /* Arrow keys, Space, Shift, WASD, W/A/S/D keys */
+      if ([32, 37, 38, 39, 40, 16, 65, 68, 83, 87].includes(e.keyCode)) {
+        e.preventDefault();
+      }
+    }, false);
   </script>
   {{{ SCRIPT }}}
 </body>

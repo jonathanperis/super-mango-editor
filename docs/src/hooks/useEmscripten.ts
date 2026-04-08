@@ -75,6 +75,14 @@ export function useEmscripten() {
 
         window.Module = Module;
 
+        // Prevent browser from intercepting game keys (arrows, space, shift, WASD).
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ([32, 37, 38, 39, 40, 16, 65, 68, 83, 87].includes(e.keyCode)) {
+                e.preventDefault();
+            }
+        };
+        document.addEventListener("keydown", handleKeyDown, false);
+
         const script = document.createElement("script");
         script.src = "super-mango.js";
         script.onerror = () => {
@@ -82,6 +90,7 @@ export function useEmscripten() {
             btn.style.display = "inline-block";
             btn.disabled = false;
             btn.textContent = "Retry (~43 MB)";
+            document.removeEventListener("keydown", handleKeyDown);
         };
         document.body.appendChild(script);
     }, []);
