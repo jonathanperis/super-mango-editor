@@ -37,7 +37,9 @@ export function useEmscripten() {
 
         statusEl.innerHTML = '<span class="spinner"></span>Downloading game data...';
 
-        const args: string[] = [];
+        // Always pass --sandbox to skip start menu and load the sandbox level.
+        // For debug mode, also pass --debug.
+        const args: string[] = ["--sandbox"];
         if (debug) args.push("--debug");
 
         canvas.addEventListener(
