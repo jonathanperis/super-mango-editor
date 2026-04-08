@@ -22,7 +22,7 @@ export default function Sidebar({
     sectionLabels,
     activeSection,
 }: SidebarProps) {
-    const base = import.meta.env?.BASE_URL ?? "";
+    const base = (import.meta.env?.BASE_URL ?? "").replace(/\/$/, '');
     return (
         <aside className={`sidebar${menuOpen ? " open" : ""}`}>
             <div className="sidebar-header">
