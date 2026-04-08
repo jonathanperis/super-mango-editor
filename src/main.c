@@ -36,13 +36,16 @@ int main(int argc, char *argv[]) {
     /*
      * Scan command-line arguments for flags:
      *   --debug        → enable debug overlays
-     *   --level <path> → load a JSON level file (also skips the start menu)
+     *   --level <path> → load a TOML level file (also skips the start menu)
+     *   --sandbox      → load the sandbox level (alias for --level levels/00_sandbox_01.toml)
      */
     int debug_mode  = 0;
     const char *level_path = NULL;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--debug") == 0)
             debug_mode = 1;
+        else if (strcmp(argv[i], "--sandbox") == 0)
+            level_path = "levels/00_sandbox_01.toml";
         else if (strcmp(argv[i], "--level") == 0 && i + 1 < argc)
             level_path = argv[i + 1];   /* next arg is consumed by the flag */
     }
