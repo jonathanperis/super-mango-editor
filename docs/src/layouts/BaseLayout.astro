@@ -1,0 +1,89 @@
+---
+import "../styles/globals.css";
+
+interface Props {
+    title?: string;
+    description?: string;
+}
+
+const {
+    title = "Super Mango - 2D Pixel Art Platformer",
+    description = "A 2D pixel art platformer written in C11 + SDL2. Play in your browser via WebAssembly or download for macOS, Linux, and Windows.",
+} = Astro.props;
+
+const GA_ID = import.meta.env.PUBLIC_GA_ID;
+
+const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "VideoGame",
+    name: "Super Mango",
+    description,
+    url: "https://jonathanperis.github.io/super-mango-editor/",
+    genre: ["Platformer", "Indie", "Pixel Art"],
+    gamePlatform: ["Web Browser", "macOS", "Linux", "Windows"],
+    applicationCategory: "Game",
+    operatingSystem: ["macOS", "Linux", "Windows", "Web"],
+    programmingLanguage: "C11",
+    author: [
+        { "@type": "Person", name: "Jonathan Peris", url: "https://github.com/jonathanperis" },
+        { "@type": "Person", name: "Fernando Santos", url: "https://github.com/fersantos" },
+    ],
+    isAccessibleForFree: true,
+    license: "https://github.com/jonathanperis/super-mango-editor/blob/master/LICENSE",
+    codeRepository: "https://github.com/jonathanperis/super-mango-editor",
+};
+---
+
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#0f0e17" />
+        <meta name="description" content={description} />
+        <meta name="keywords" content="Super Mango, platformer, 2D game, pixel art, SDL2, C11, WebAssembly, indie game, side-scroller, open source, game development" />
+
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:url" content="https://jonathanperis.github.io/super-mango-editor/" />
+        <meta property="og:site_name" content="Super Mango" />
+        <meta property="og:locale" content="en_US" />
+
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={description} />
+        <meta name="twitter:creator" content="@jperis_silva" />
+
+        <link rel="canonical" href="https://jonathanperis.github.io/super-mango-editor/" />
+        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+
+        <!-- Google Fonts: Pixelify Sans + DM Mono -->
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+
+        <title>{title}</title>
+
+        <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    </head>
+    <body>
+        {GA_ID && (
+            <script
+                async
+                src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+                is:inline
+            />
+            <script define:vars={{ GA_ID }} is:inline>
+                window.dataLayer = window.dataLayer || [];
+                function gtag() { dataLayer.push(arguments); }
+                gtag('js', new Date());
+                gtag('config', GA_ID);
+            </script>
+        )}
+        <slot />
+    </body>
+</html>

@@ -1,0 +1,57 @@
+---
+const base = import.meta.env.BASE_URL;
+---
+<section id="docs" class="docs-section">
+    <h2 class="section-title">DOCUMENTATION</h2>
+    <div style="text-align:center; margin-bottom:2rem">
+        <a
+            href={`${base}/docs`}
+            class="docs-view-btn"
+            style="display:inline-block; padding:0.75rem 2rem; background:var(--accent); color:var(--bg); font-family:var(--pixel); font-size:1.1rem; font-weight:700; text-decoration:none; border-radius:6px; letter-spacing:0.02em; transition:background 0.2s;"
+        >
+            View full documentation &rarr;
+        </a>
+    </div>
+    <div class="docs-grid">
+        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor#readme" target="_blank" rel="noreferrer noopener" aria-label="Read the project README on GitHub">
+            <h3>README</h3>
+            <p>Project overview, build instructions for all platforms, controls reference, architecture diagram, and full project structure.</p>
+        </a>
+        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki" target="_blank" rel="noreferrer noopener" aria-label="Visit the Wiki home page">
+            <h3>Wiki &mdash; Home</h3>
+            <p>Landing page with quick-start guide, project-at-a-glance, and navigation to all wiki pages.</p>
+        </a>
+        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/architecture" target="_blank" rel="noreferrer noopener" aria-label="Read the Architecture wiki page">
+            <h3>Wiki &mdash; Architecture</h3>
+            <p>Startup sequence, game loop phases, coordinate system, GameState struct, and error handling strategy.</p>
+        </a>
+        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/build_system" target="_blank" rel="noreferrer noopener" aria-label="Read the Build System wiki page">
+            <h3>Wiki &mdash; Build System</h3>
+            <p>Makefile overview, compiler flags, build targets, prerequisites, and adding new source files.</p>
+        </a>
+        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/developer_guide" target="_blank" rel="noreferrer noopener" aria-label="Read the Developer Guide wiki page">
+            <h3>Wiki &mdash; Developer Guide</h3>
+            <p>Coding conventions, naming rules, memory safety, and step-by-step entity addition walkthrough.</p>
+        </a>
+        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/player_module" target="_blank" rel="noreferrer noopener" aria-label="Read the Player Module wiki page">
+            <h3>Wiki &mdash; Player Module</h3>
+            <p>Player lifecycle, input handling, jump and climb logic, physics update, animation state machine.</p>
+        </a>
+        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/source_files" target="_blank" rel="noreferrer noopener" aria-label="Read the Source Files wiki page">
+            <h3>Wiki &mdash; Source Files</h3>
+            <p>Complete file map of all 48 source files with descriptions of main.c, game.h, and game.c roles.</p>
+        </a>
+        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/assets" target="_blank" rel="noreferrer noopener" aria-label="Read the Assets wiki page">
+            <h3>Wiki &mdash; Assets</h3>
+            <p>Asset catalog with 57 sprites, player sprite sheet analysis, animation row mapping, and unused assets.</p>
+        </a>
+        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/sounds" target="_blank" rel="noreferrer noopener" aria-label="Read the Sounds wiki page">
+            <h3>Wiki &mdash; Sounds</h3>
+            <p>Sound effects catalog, audio configuration, Mix_Chunk vs Mix_Music, and adding new sound effects.</p>
+        </a>
+        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/constants_reference" target="_blank" rel="noreferrer noopener" aria-label="Read the Constants Reference wiki page">
+            <h3>Wiki &mdash; Constants</h3>
+            <p>All compile-time constants: window, canvas, timing, tiles, physics, camera, and player locals.</p>
+        </a>
+    </div>
+</section>
