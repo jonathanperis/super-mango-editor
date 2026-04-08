@@ -28,19 +28,10 @@ export default function PlaySection({
             tabIndex={-1}
           ></canvas>
           <p id="game-status" ref={statusRef}>
-            <button
-              id="play-btn"
-              ref={playBtnRef}
-              onClick={onPlay}
-            >
+            <button id="play-btn" ref={playBtnRef} onClick={onPlay}>
               Play (~43 MB)
             </button>
-            <button
-              id="debug-btn"
-              ref={debugBtnRef}
-              onClick={onDebug}
-              style={{ marginLeft: "8px", fontSize: "0.85em", opacity: 0.7 }}
-            >
+            <button id="debug-btn" ref={debugBtnRef} onClick={onDebug}>
               Debug Mode
             </button>
           </p>
