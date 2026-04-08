@@ -2,7 +2,7 @@
 ---
 <section id="developer-guide" class="doc-section">
   <h1 class="page-title">Developer Guide</h1>
-  <p><a href="home">&#8592; Home</a></p>
+  <p><a href="#home">&#8592; Home</a></p>
   <hr />
   <p>This guide covers the patterns and conventions used in Super Mango and explains how to extend the game safely and consistently.</p>
   <hr />
@@ -35,7 +35,7 @@
   </ul>
   <h3>Coordinate System</h3>
   <p>All game-object positions and sizes live in <strong>logical space (400x300)</strong>. Never use <code>WINDOW_W</code> / <code>WINDOW_H</code> for game math -- SDL scales the logical canvas to the OS window automatically.</p>
-  <p>See <a href="constants_reference">Constants Reference</a> for all defined constants.</p>
+  <p>See <a href="#constants-reference">Constants Reference</a> for all defined constants.</p>
   <hr />
   <h2>Adding a New Entity</h2>
   <p>Every entity follows the same lifecycle pattern:</p>
@@ -158,7 +158,7 @@ if (entity-&gt;y + entity-&gt;h &gt;= FLOOR_Y) &#123;
 /* Horizontal clamp */
 if (entity-&gt;x &lt; 0.0f)                entity-&gt;x = 0.0f;
 if (entity-&gt;x &gt; GAME_W - entity-&gt;w)  entity-&gt;x = (float)(GAME_W - entity-&gt;w);</code></pre>
-  <p><code>GRAVITY</code>, <code>FLOOR_Y</code>, <code>GAME_W</code>, and <code>GAME_H</code> are all defined in <code>game.h</code> and available to any file that includes it. See <a href="constants_reference">Constants Reference</a> for values.</p>
+  <p><code>GRAVITY</code>, <code>FLOOR_Y</code>, <code>GAME_W</code>, and <code>GAME_H</code> are all defined in <code>game.h</code> and available to any file that includes it. See <a href="#constants-reference">Constants Reference</a> for values.</p>
   <hr />
   <h2>Adding a New Sound Effect</h2>
   <p>All sound files are <code>.wav</code> format, named with the convention <code>component_descriptor.wav</code>:</p>
@@ -189,7 +189,7 @@ if (!gs-&gt;snd_&lt;name&gt;) &#123;
   <pre><code class="language-c">if (gs-&gt;snd_&lt;name&gt;) &#123; Mix_FreeChunk(gs-&gt;snd_&lt;name&gt;); gs-&gt;snd_&lt;name&gt; = NULL; &#125;</code></pre>
   <ol start="5"><li>Play wherever needed:</li></ol>
   <pre><code class="language-c">if (gs-&gt;snd_&lt;name&gt;) Mix_PlayChannel(-1, gs-&gt;snd_&lt;name&gt;, 0);</code></pre>
-  <p>See <a href="sounds">Sounds</a> for the full list of available sound files.</p>
+  <p>See <a href="#sounds">Sounds</a> for the full list of available sound files.</p>
   <hr />
   <h2>Adding Background Music</h2>
   <p>Background music is loaded via <code>Mix_LoadMUS</code> (not <code>Mix_LoadWAV</code>). The track path is configured per level via <code>music_path</code> in the TOML file:</p>
@@ -263,7 +263,7 @@ TTF_CloseFont(font);</code></pre>
 33. Fog                    (fog_background_1/2.png sliding overlay)
 34. HUD                    (hearts, lives, score -- always on top)
 35. Debug overlay          (FPS, hitboxes, event log -- when --debug)</code></pre>
-  <p>See <a href="architecture">Architecture</a> for details on the render pipeline.</p>
+  <p>See <a href="#architecture">Architecture</a> for details on the render pipeline.</p>
   <hr />
   <h2>Sprite Sheet Workflow</h2>
   <p>To analyze a new sprite sheet:</p>
@@ -283,7 +283,7 @@ source_y = (frame_index / num_cols) * frame_h</code></pre>
       <tr><td>5</td><td>Death / Hurt</td><td>4-6 frames, one-shot</td></tr>
     </tbody>
   </table>
-  <p>See <a href="assets">Assets</a> for sprite sheet dimensions and <a href="player_module">Player Module</a> for animation state machine details.</p>
+  <p>See <a href="#assets">Assets</a> for sprite sheet dimensions and <a href="#player-module">Player Module</a> for animation state machine details.</p>
   <hr />
   <h2>Checklist: Adding a New Entity</h2>
   <ul>
@@ -306,13 +306,13 @@ source_y = (frame_index / num_cols) * frame_h</code></pre>
   <hr />
   <h2>Related Pages</h2>
   <ul>
-    <li><a href="home">Home</a> -- project overview</li>
-    <li><a href="architecture">Architecture</a> -- system design and game loop</li>
-    <li><a href="build_system">Build System</a> -- compiling and running</li>
-    <li><a href="source_files">Source Files</a> -- module-by-module reference</li>
-    <li><a href="assets">Assets</a> -- sprite sheets and textures</li>
-    <li><a href="sounds">Sounds</a> -- audio files and music</li>
-    <li><a href="player_module">Player Module</a> -- player-specific details</li>
-    <li><a href="constants_reference">Constants Reference</a> -- all defined constants</li>
+    <li><a href="#home">Home</a> -- project overview</li>
+    <li><a href="#architecture">Architecture</a> -- system design and game loop</li>
+    <li><a href="#build-system">Build System</a> -- compiling and running</li>
+    <li><a href="#source-files">Source Files</a> -- module-by-module reference</li>
+    <li><a href="#assets">Assets</a> -- sprite sheets and textures</li>
+    <li><a href="#sounds">Sounds</a> -- audio files and music</li>
+    <li><a href="#player-module">Player Module</a> -- player-specific details</li>
+    <li><a href="#constants-reference">Constants Reference</a> -- all defined constants</li>
   </ul>
 </section>
