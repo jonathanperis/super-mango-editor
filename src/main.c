@@ -179,11 +179,12 @@ int main(int argc, char *argv[]) {
          *
          * game_init creates its own window and renderer, so we destroy
          * the menu's first to avoid having two windows open at once.
-         * No --level was given, so the game starts with an empty level.
+         * Default level is sandbox_01 when starting from the Play button.
          */
         if (result == MENU_PLAY) {
             GameState gs = {0};
             gs.debug_mode = debug_mode;
+            strncpy(gs.level_path, "levels/00_sandbox_01.toml", sizeof(gs.level_path) - 1);
             game_init(&gs);
             game_loop(&gs);
             game_cleanup(&gs);
