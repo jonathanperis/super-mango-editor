@@ -363,14 +363,6 @@ a:hover { color: var(--green); }
     gap: 0.5rem;
     transition: all 0.3s;
 }
-.nav-logo::before {
-    content: '';
-    display: inline-block;
-    width: 8px; height: 8px;
-    background: #ffb700;
-    border-radius: 2px;
-    box-shadow: 0 0 8px #ffb700;
-}
 
 .nav-links {
     display: flex;
