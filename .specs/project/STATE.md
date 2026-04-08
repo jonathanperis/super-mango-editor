@@ -68,6 +68,7 @@ Game reads only compiled `const LevelDef`. Play-test: Ctrl+E export → `make ru
 | MAX_SPIKE_ROWS | 4 |
 | MAX_SPIKE_PLATFORMS | 4 |
 | MAX_SPIKE_BLOCKS | 4 |
+| MAX_BLUE_FLAMES | 16 |
 | MAX_FLOAT_PLATFORMS | 6 |
 | MAX_BRIDGES | 2 |
 | MAX_BOUNCEPADS_SMALL | 4 |

@@ -13,7 +13,7 @@ A 2D pixel art platformer written in C11 + SDL2, designed as a learning resource
 
 ## Current State
 
-- Single-level game with full player mechanics, 6 enemy types, 6 hazard types, collectibles, and climbable surfaces
+- Single-level game with full player mechanics, 6 enemy types, 7 hazard types, collectibles, and climbable surfaces
 - 1600px scrolling world (4 screens), 32 render layers, delta-time physics at 60 FPS
 - Start menu, HUD, lives system, debug overlay
 - Keyboard and gamepad support with hot-plug
