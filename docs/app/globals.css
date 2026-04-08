@@ -51,9 +51,21 @@ html { scroll-behavior: smooth; }
 body {
     background: var(--bg);
     color: var(--text);
+    font-family: var(--mono);
     font-size: 15px;
     line-height: 1.6;
     overflow-x: hidden;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at 30% 20%, rgba(255, 183, 0, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(255, 183, 0, 0.15) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -2;
+    animation: ambient-drift 20s ease-in-out infinite alternate;
 }
 
 a { text-decoration: none; color: var(--accent); transition: color 0.2s; }
@@ -650,18 +662,6 @@ a:hover { color: var(--green); }
 .landing-footer p { margin-bottom: 0.5rem; }
 .landing-footer a { transition: color 0.2s; }
 .landing-footer a:hover { color: var(--text); }
-
-/* ── Ambient Background ────────────────────────────────────────────── */
-.ambient-bg::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: radial-gradient(ellipse at 30% 20%, rgba(255, 183, 0, 0.08) 0%, transparent 50%),
-                radial-gradient(ellipse at 70% 80%, rgba(255, 183, 0, 0.15) 0%, transparent 50%);
-    pointer-events: none;
-    z-index: -2;
-    animation: ambient-drift 20s ease-in-out infinite alternate;
-}
 
 /* ── Floating Particles ────────────────────────────────────────────── */
 .particles {
