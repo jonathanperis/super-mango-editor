@@ -27,8 +27,7 @@ export default function PlaySection() {
                 </div>
                 <div className="cabinet-controls">
                     <kbd>WASD</kbd> / <kbd>Arrows</kbd> Move &nbsp;&middot;&nbsp;
-                    <kbd>Space</kbd> Jump &nbsp;&middot;&nbsp;
-                    <kbd>ESC</kbd> Quit
+                    <kbd>Space</kbd> Jump
                 </div>
                 <div className="cabinet-base"></div>
             </div>
