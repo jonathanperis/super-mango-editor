@@ -768,14 +768,6 @@ a:hover { color: var(--green); }
     align-items: center;
     gap: 8px;
 }
-.docs-layout .repo-title::before {
-    content: '';
-    display: block;
-    width: 16px;
-    height: 16px;
-    background: var(--accent);
-    border-radius: 4px;
-}
 
 .docs-layout .repo-description {
     font-size: 13px;
