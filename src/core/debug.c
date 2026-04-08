@@ -632,7 +632,7 @@ static void draw_performance(const DebugOverlay *dbg, TTF_Font *font,
     SDL_Color red    = { 255,  80,  80, 255 };
     SDL_Color cyan   = { 100, 220, 255, 255 };
 
-    int y = HUD_MARGIN + 13;  /* start just below the top edge, right-aligned */
+    int y = HUD_MARGIN + HUD_ROW_H + 2;  /* start below HUD row */
     char buf[48];
     int text_w;
 
