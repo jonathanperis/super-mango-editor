@@ -474,6 +474,10 @@ a:hover { color: var(--green); }
     z-index: 30;
     text-align: center;
     color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
 }
 
 #play-btn {
@@ -499,6 +503,24 @@ a:hover { color: var(--green); }
     transform: none;
     cursor: wait;
 }
+
+#debug-btn {
+    font-family: var(--pixel);
+    font-size: 0.75rem;
+    padding: 0.5em 1.2em;
+    background: transparent;
+    color: var(--accent-dim);
+    border: 2px solid var(--accent-dim);
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.1s;
+    margin-top: 0.75rem;
+    display: block;
+}
+#debug-btn:hover { color: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px rgba(255,183,0,0.3); }
+#debug-btn:active { transform: scale(0.95); }
+#debug-btn:disabled { opacity: 0.4; cursor: wait; }
 
 .spinner {
     display: inline-block;
