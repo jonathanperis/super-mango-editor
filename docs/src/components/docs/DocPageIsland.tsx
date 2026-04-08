@@ -6,17 +6,40 @@ import Sidebar from "./Sidebar";
 
 const SECTION_LABELS: Record<string, string> = {
     home: "Home",
+    /* Engine & Code */
     architecture: "Architecture",
-    assets: "Assets",
-    "build-system": "Build System",
-    "constants-reference": "Constants Reference",
-    "developer-guide": "Developer Guide",
-    "player-module": "Player Module",
-    sounds: "Sounds",
     "source-files": "Source Files",
+    "player-module": "Player Module",
+    "constants-reference": "Constants Reference",
+    /* Content & Assets */
+    "entities-hazards": "Entities & Hazards",
+    "collectibles-surfaces": "Collectibles & Surfaces",
+    assets: "Assets",
+    sounds: "Sounds",
+    /* Building & Contributing */
+    "build-system": "Build System",
+    "level-design": "Level Design",
+    "level-editor": "Level Editor",
+    "developer-guide": "Developer Guide",
 };
 
-const SECTION_IDS = Object.keys(SECTION_LABELS);
+export const SECTION_CATEGORIES: { label: string | null; ids: string[] }[] = [
+    { label: null, ids: ["home"] },
+    {
+        label: "Engine & Code",
+        ids: ["architecture", "source-files", "player-module", "constants-reference"],
+    },
+    {
+        label: "Content & Assets",
+        ids: ["entities-hazards", "collectibles-surfaces", "assets", "sounds"],
+    },
+    {
+        label: "Building & Contributing",
+        ids: ["build-system", "level-design", "level-editor", "developer-guide"],
+    },
+];
+
+const SECTION_IDS = SECTION_CATEGORIES.flatMap((c) => c.ids);
 
 export default function DocPageIsland() {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -58,7 +81,7 @@ export default function DocPageIsland() {
                 toggleMenu={toggleMenu}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
-                sectionIds={SECTION_IDS}
+                categories={SECTION_CATEGORIES}
                 sectionLabels={SECTION_LABELS}
                 activeSection={activeSection}
             />

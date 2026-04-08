@@ -1,9 +1,14 @@
+interface Category {
+    label: string | null;
+    ids: string[];
+}
+
 interface SidebarProps {
     menuOpen: boolean;
     toggleMenu: () => void;
     searchQuery: string;
     onSearchChange: (v: string) => void;
-    sectionIds: string[];
+    categories: Category[];
     sectionLabels: Record<string, string>;
     activeSection: string;
 }
@@ -13,7 +18,7 @@ export default function Sidebar({
     toggleMenu,
     searchQuery,
     onSearchChange,
-    sectionIds,
+    categories,
     sectionLabels,
     activeSection,
 }: SidebarProps) {
@@ -34,21 +39,28 @@ export default function Sidebar({
                 />
             </div>
             <div className="sidebar-nav-container">
-                <ul>
-                    {sectionIds.map((id) => (
-                        <li key={id}>
-                            <a
-                                href={`#${id}`}
-                                className={`nav-item${activeSection === id ? " active" : ""}`}
-                                onClick={() => {
-                                    if (window.innerWidth <= 768) toggleMenu();
-                                }}
-                            >
-                                {sectionLabels[id]}
-                            </a>
-                        </li>
-                    ))}
-                </ul>
+                {categories.map((cat, i) => (
+                    <div key={i}>
+                        {cat.label && (
+                            <div className="sidebar-category">{cat.label}</div>
+                        )}
+                        <ul>
+                            {cat.ids.map((id) => (
+                                <li key={id}>
+                                    <a
+                                        href={`#${id}`}
+                                        className={`nav-item${activeSection === id ? " active" : ""}`}
+                                        onClick={() => {
+                                            if (window.innerWidth <= 768) toggleMenu();
+                                        }}
+                                    >
+                                        {sectionLabels[id]}
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ))}
             </div>
             <div className="sidebar-footer">
                 <a href={base} className="back-home">&#8592; Back to home</a>

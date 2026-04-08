@@ -1,15 +1,26 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import DocPageIsland from "@/components/docs/DocPageIsland";
+
 import HomeSection from "@/components/docs/sections/HomeSection.astro";
+
+/* Engine & Code */
 import ArchitectureSection from "@/components/docs/sections/ArchitectureSection.astro";
-import AssetsSection from "@/components/docs/sections/AssetsSection.astro";
-import BuildSystemSection from "@/components/docs/sections/BuildSystemSection.astro";
-import ConstantsSection from "@/components/docs/sections/ConstantsSection.astro";
-import DeveloperGuideSection from "@/components/docs/sections/DeveloperGuideSection.astro";
-import PlayerModuleSection from "@/components/docs/sections/PlayerModuleSection.astro";
-import SoundsSection from "@/components/docs/sections/SoundsSection.astro";
 import SourceFilesSection from "@/components/docs/sections/SourceFilesSection.astro";
+import PlayerModuleSection from "@/components/docs/sections/PlayerModuleSection.astro";
+import ConstantsSection from "@/components/docs/sections/ConstantsSection.astro";
+
+/* Content & Assets */
+import EntitiesHazardsSection from "@/components/docs/sections/EntitiesHazardsSection.astro";
+import CollectiblesSurfacesSection from "@/components/docs/sections/CollectiblesSurfacesSection.astro";
+import AssetsSection from "@/components/docs/sections/AssetsSection.astro";
+import SoundsSection from "@/components/docs/sections/SoundsSection.astro";
+
+/* Building & Contributing */
+import BuildSystemSection from "@/components/docs/sections/BuildSystemSection.astro";
+import LevelDesignSection from "@/components/docs/sections/LevelDesignSection.astro";
+import LevelEditorSection from "@/components/docs/sections/LevelEditorSection.astro";
+import DeveloperGuideSection from "@/components/docs/sections/DeveloperGuideSection.astro";
 ---
 
 <BaseLayout title="Documentation - Super Mango Editor">
@@ -21,14 +32,24 @@ import SourceFilesSection from "@/components/docs/sections/SourceFilesSection.as
         <div class="content-wrapper">
             <main class="content" id="mainContent">
                 <HomeSection />
+
+                <!-- Engine & Code -->
                 <ArchitectureSection />
-                <AssetsSection />
-                <BuildSystemSection />
-                <ConstantsSection />
-                <DeveloperGuideSection />
-                <PlayerModuleSection />
-                <SoundsSection />
                 <SourceFilesSection />
+                <PlayerModuleSection />
+                <ConstantsSection />
+
+                <!-- Content & Assets -->
+                <EntitiesHazardsSection />
+                <CollectiblesSurfacesSection />
+                <AssetsSection />
+                <SoundsSection />
+
+                <!-- Building & Contributing -->
+                <BuildSystemSection />
+                <LevelDesignSection />
+                <LevelEditorSection />
+                <DeveloperGuideSection />
             </main>
         </div>
     </div>
