@@ -8,7 +8,7 @@ name: Build & Release
 # This means:
 #   • Every PR from a feature branch gets a build check (the "build" job).
 #   • Every merge/push to main gets a build check AND a new release (the
-#     "release" job), versioned as v0.0.<run_number>.
+#     "release" job), versioned as v1.0.<run_number>.
 # ──────────────────────────────────────────────────────────────────────────────
 on:
   push:
@@ -154,7 +154,7 @@ jobs:
   # RELEASE JOB
   # Runs ONLY when a commit is pushed to main (not on pull_request events).
   # Waits for all four build matrix legs to succeed, then creates a GitHub
-  # Release tagged v0.0.<run_number> with all platform binaries attached.
+  # Release tagged v1.0.<run_number> with all platform binaries attached.
   # ────────────────────────────────────────────────────────────────────────────
   release:
     name: Create Release
@@ -212,8 +212,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "v0.0.${{ github.run_number }}"
-          name: "Super Mango v0.0.${{ github.run_number }}"
+          tag_name: "v1.0.${{ github.run_number }}"
+          name: "Super Mango v1.0.${{ github.run_number }}"
           body: |
             Automated release built from commit [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
 
