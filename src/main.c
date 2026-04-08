@@ -50,6 +50,22 @@ int main(int argc, char *argv[]) {
             level_path = argv[i + 1];   /* next arg is consumed by the flag */
     }
     /*
+     * WebAssembly: attach SDL2's keyboard listeners to the canvas element
+     * instead of the document.  Without this hint, SDL2 registers keydown/keyup
+     * on the document and can miss the matching keyup when the canvas loses
+     * focus (e.g. user opens DevTools).  The missing keyup leaves the key
+     * "stuck" as pressed in SDL's state table, causing the player to walk or
+     * jump without input.  By binding to "#canvas", events only arrive while
+     * the canvas has focus and SDL naturally clears keys on blur.
+     *
+     * Must be called before SDL_Init so the hint is in place when SDL2
+     * registers its JavaScript event listeners during video initialisation.
+     */
+#ifdef __EMSCRIPTEN__
+    SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas");
+#endif
+
+    /*
      * SDL_Init — start the SDL core.
      * Flags tell SDL which subsystems to activate:
      *   SDL_INIT_VIDEO  → creates the event queue, window, and renderer support.
