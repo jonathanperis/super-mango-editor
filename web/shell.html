@@ -99,6 +99,52 @@
         e.preventDefault();
       }
     }, false);
+
+    /*
+     * Stuck-key fix: fire synthetic keyup events for every game input key
+     * whenever the canvas (or the whole window) loses focus.
+     *
+     * SDL2 registers keydown/keyup listeners and maintains an internal key-
+     * state table.  When focus moves away (DevTools, address bar, alt-tab)
+     * the browser may deliver a keydown without the matching keyup, leaving
+     * the key permanently "pressed" in SDL's table.  The player then walks
+     * or jumps without any physical input.
+     *
+     * Dispatching synthetic keyup events on the canvas flushes SDL's state
+     * for all relevant keys.  bubbles:true lets the events reach SDL whether
+     * it is listening on the canvas element (SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT)
+     * or higher up the DOM (document/window default).
+     */
+    (function() {
+      var GAME_KEYS = [
+        'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+        'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyS',
+        'ShiftLeft', 'ShiftRight'
+      ];
+
+      function releaseGameKeys() {
+        var c = document.getElementById('canvas');
+        if (!c) return;
+        GAME_KEYS.forEach(function(code) {
+          c.dispatchEvent(new KeyboardEvent('keyup', {
+            code: code,
+            bubbles: true,
+            cancelable: true
+          }));
+        });
+      }
+
+      /* Canvas blur: covers DevTools, address bar, any in-page focus shift. */
+      document.getElementById('canvas').addEventListener('blur', releaseGameKeys);
+
+      /* Window blur: covers alt-tab, clicking another application. */
+      window.addEventListener('blur', releaseGameKeys);
+
+      /* Tab hidden: covers switching browser tabs. */
+      document.addEventListener('visibilitychange', function() {
+        if (document.hidden) releaseGameKeys();
+      });
+    }());
   </script>
   {{{ SCRIPT }}}
 </body>
