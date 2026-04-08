@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://jonathanperis.github.io/super-mango-editor/sitemap.xml
