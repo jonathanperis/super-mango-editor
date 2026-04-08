@@ -191,13 +191,6 @@ static void start_menu_frame(void *arg) {
         SDL_RenderCopy(menu->renderer, menu->logo_tex, NULL, &logo_dst);
     }
 
-    /* Title text below logo */
-    {
-        SDL_Color white = {255, 255, 255, 255};
-        draw_text_centered(menu->renderer, menu->font,
-                           "Super Mango", MENU_GAME_W / 2, 130, white);
-    }
-
     /* ---- Play button ---- */
     {
         /*
