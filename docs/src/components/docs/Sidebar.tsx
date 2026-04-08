@@ -51,7 +51,7 @@ export default function Sidebar({
                 </ul>
             </div>
             <div className="sidebar-footer">
-                <a href={`${base}/`} className="back-home">&#8592; Back to home</a>
+                <a href={base} className="back-home">&#8592; Back to home</a>
                 <a href="https://github.com/jonathanperis/super-mango-editor" target="_blank" rel="noopener noreferrer">View on GitHub</a>
                 <div>Built by Jonathan Peris</div>
             </div>
