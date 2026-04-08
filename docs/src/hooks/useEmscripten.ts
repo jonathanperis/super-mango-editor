@@ -31,6 +31,10 @@ export function useEmscripten() {
         if (dbgBtn) dbgBtn.disabled = true;
         btn.textContent = "Loading...";
 
+        // Set tabIndex programmatically so the canvas is only keyboard-focusable
+        // once the game is actually interactive (avoids static a11y linter warning).
+        canvas.tabIndex = -1;
+
         statusEl.innerHTML = '<span class="spinner"></span>Downloading game data...';
 
         const args: string[] = [];

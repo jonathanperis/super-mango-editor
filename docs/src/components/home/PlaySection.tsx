@@ -13,7 +13,6 @@ export default function PlaySection() {
                         id="canvas"
                         ref={canvasRef}
                         onContextMenu={(e) => e.preventDefault()}
-                        tabIndex={-1}
                         role="application"
                         aria-label="Super Mango game canvas — press Play to start"
                     ></canvas>
