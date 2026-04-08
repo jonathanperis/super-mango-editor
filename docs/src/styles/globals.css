@@ -46,6 +46,21 @@
 /* ── Reset & Base ──────────────────────────────────────────────────── */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* ── Custom scrollbar ───────────────────────────────────────────────────── */
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: var(--accent-dim) var(--bg-card); }
+
+/* Webkit (Chrome, Safari, Edge) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-card); border-radius: 4px; }
+::-webkit-scrollbar-thumb {
+    background: var(--accent-dim);
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+::-webkit-scrollbar-corner { background: var(--bg-card); }
+
 html { scroll-behavior: smooth; }
 
 body {
