@@ -13,45 +13,60 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         </a>
     </div>
     <div class="docs-grid">
-        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor#readme" target="_blank" rel="noreferrer noopener" aria-label="Read the project README on GitHub">
-            <h3>README</h3>
-            <p>Project overview, build instructions for all platforms, controls reference, architecture diagram, and full project structure.</p>
-        </a>
         <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki" target="_blank" rel="noreferrer noopener" aria-label="Visit the Wiki home page">
             <h3>Wiki &mdash; Home</h3>
             <p>Landing page with quick-start guide, project-at-a-glance, and navigation to all wiki pages.</p>
         </a>
-        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/architecture" target="_blank" rel="noreferrer noopener" aria-label="Read the Architecture wiki page">
-            <h3>Wiki &mdash; Architecture</h3>
+        <!-- Engine & Code -->
+        <a class="doc-card" href={`${base}/docs#architecture`} aria-label="Read the Architecture section">
+            <h3>Architecture</h3>
             <p>Startup sequence, game loop phases, coordinate system, GameState struct, and error handling strategy.</p>
         </a>
-        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/build_system" target="_blank" rel="noreferrer noopener" aria-label="Read the Build System wiki page">
-            <h3>Wiki &mdash; Build System</h3>
-            <p>Makefile overview, compiler flags, build targets, prerequisites, and adding new source files.</p>
+        <a class="doc-card" href={`${base}/docs#source-files`} aria-label="Read the Source Files section">
+            <h3>Source Files</h3>
+            <p>Complete file map of all source files with descriptions of main.c, game.h, game.c, and every module role.</p>
         </a>
-        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/developer_guide" target="_blank" rel="noreferrer noopener" aria-label="Read the Developer Guide wiki page">
-            <h3>Wiki &mdash; Developer Guide</h3>
-            <p>Coding conventions, naming rules, memory safety, and step-by-step entity addition walkthrough.</p>
-        </a>
-        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/player_module" target="_blank" rel="noreferrer noopener" aria-label="Read the Player Module wiki page">
-            <h3>Wiki &mdash; Player Module</h3>
+        <a class="doc-card" href={`${base}/docs#player-module`} aria-label="Read the Player Module section">
+            <h3>Player Module</h3>
             <p>Player lifecycle, input handling, jump and climb logic, physics update, animation state machine.</p>
         </a>
-        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/source_files" target="_blank" rel="noreferrer noopener" aria-label="Read the Source Files wiki page">
-            <h3>Wiki &mdash; Source Files</h3>
-            <p>Complete file map of all 48 source files with descriptions of main.c, game.h, and game.c roles.</p>
+        <a class="doc-card" href={`${base}/docs#constants`} aria-label="Read the Constants section">
+            <h3>Constants</h3>
+            <p>All compile-time constants: window, canvas, timing, tiles, physics, camera, and player locals.</p>
         </a>
-        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/assets" target="_blank" rel="noreferrer noopener" aria-label="Read the Assets wiki page">
-            <h3>Wiki &mdash; Assets</h3>
-            <p>Asset catalog with 57 sprites, player sprite sheet analysis, animation row mapping, and unused assets.</p>
+        <!-- Content & Assets -->
+        <a class="doc-card" href={`${base}/docs#entities-hazards`} aria-label="Read the Entities & Hazards section">
+            <h3>Entities & Hazards</h3>
+            <p>Six enemy types and seven hazard types: spider, bird, fish, spikes, circular saw, axe trap, and more.</p>
         </a>
-        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/sounds" target="_blank" rel="noreferrer noopener" aria-label="Read the Sounds wiki page">
-            <h3>Wiki &mdash; Sounds</h3>
+        <a class="doc-card" href={`${base}/docs#collectibles-surfaces`} aria-label="Read the Collectibles & Surfaces section">
+            <h3>Collectibles & Surfaces</h3>
+            <p>Coins, stars, platforms, bouncepads, vines, ladders, ropes — everything the player collects or stands on.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs#assets`} aria-label="Read the Assets section">
+            <h3>Assets</h3>
+            <p>Sprite catalog, player sprite sheet analysis, animation row mapping, and asset organization.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs#sounds`} aria-label="Read the Sounds section">
+            <h3>Sounds</h3>
             <p>Sound effects catalog, audio configuration, Mix_Chunk vs Mix_Music, and adding new sound effects.</p>
         </a>
-        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor/wiki/constants_reference" target="_blank" rel="noreferrer noopener" aria-label="Read the Constants Reference wiki page">
-            <h3>Wiki &mdash; Constants</h3>
-            <p>All compile-time constants: window, canvas, timing, tiles, physics, camera, and player locals.</p>
+        <!-- Building & Contributing -->
+        <a class="doc-card" href={`${base}/docs#build-system`} aria-label="Read the Build System section">
+            <h3>Build System</h3>
+            <p>Makefile overview, compiler flags, build targets for macOS, Linux, Windows, and WebAssembly.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs#level-design`} aria-label="Read the Level Design section">
+            <h3>Level Design</h3>
+            <p>TOML level file format reference: entities, collectibles, hazards, surfaces, and level metadata.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs#level-editor`} aria-label="Read the Level Editor section">
+            <h3>Level Editor</h3>
+            <p>Visual level editor guide: canvas, palette, tools, properties panel, undo history, and export.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs#developer-guide`} aria-label="Read the Developer Guide section">
+            <h3>Developer Guide</h3>
+            <p>Coding conventions, naming rules, memory safety, and step-by-step entity addition walkthrough.</p>
         </a>
     </div>
 </section>
