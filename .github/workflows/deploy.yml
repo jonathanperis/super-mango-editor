@@ -1,0 +1,91 @@
+name: Deploy to GitHub Pages
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Triggers:
+#   workflow_run → runs after Build & Release workflow completes successfully
+#
+# This workflow:
+#   1. Downloads the WebAssembly build artifacts from the latest build
+#   2. Builds the docs site
+#   3. Copies WASM files into docs output
+#   4. Deploys to GitHub Pages
+# ──────────────────────────────────────────────────────────────────────────────
+on:
+  workflow_run:
+    workflows: ["Build & Release"]
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  pages: write
+  id-token: write
+  contents: read
+  actions: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Only run if the Build & Release workflow succeeded
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # Check out the repository to get the docs/ folder.
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      # Download the WebAssembly build artifacts from the completed workflow_run.
+      - name: Download WebAssembly build
+        uses: actions/download-artifact@v8
+        with:
+          name: super-mango-wasm
+          path: wasm-build/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      # Build the docs site (Astro static export to docs/out/).
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install docs dependencies
+        run: npm ci
+        working-directory: docs
+
+      - name: Build docs site
+        run: npm run build
+        working-directory: docs
+        env:
+          PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}
+
+      # Layer the WASM files into the built docs site so the JS loader
+      # can find them at the site root (alongside index.html).
+      - name: Copy WASM artifacts into docs output
+        run: |
+          cp wasm-build/super-mango.js   docs/out/
+          cp wasm-build/super-mango.wasm docs/out/
+          cp wasm-build/super-mango.data docs/out/
+          cp wasm-build/super-mango-debug.html docs/out/ 2>/dev/null || true
+          cp wasm-build/super-mango-debug.js   docs/out/ 2>/dev/null || true
+          cp wasm-build/super-mango-debug.wasm docs/out/ 2>/dev/null || true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: docs/out/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
