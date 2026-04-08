@@ -1,6 +1,6 @@
 export default function Footer() {
   return (
-    <footer>
+    <footer className="landing-footer">
       <p>
         <a
           href="https://github.com/jonathanperis/super-mango-editor"
