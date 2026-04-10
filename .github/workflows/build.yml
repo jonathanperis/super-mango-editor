@@ -92,7 +92,7 @@ jobs:
       # from source by Emscripten automatically via -s USE_SDL=2 flags.
       - name: Install Emscripten SDK
         if: matrix.target == 'wasm'
-        uses: mymindstorm/setup-emsdk@v14
+        uses: mymindstorm/setup-emsdk@v16
         with:
           version: latest
 
