@@ -1,5 +1,6 @@
 ---
 import "../styles/globals.css";
+import Analytics from '../components/Analytics.astro';
 
 interface Props {
     title?: string;
@@ -10,8 +11,6 @@ const {
     title = "Super Mango - 2D Pixel Art Platformer",
     description = "A 2D pixel art platformer written in C11 + SDL2. Play in your browser via WebAssembly or download for macOS, Linux, and Windows.",
 } = Astro.props;
-
-const GA_ID = import.meta.env.PUBLIC_GA_ID;
 
 const jsonLd = {
     "@context": "https://schema.org",
@@ -67,23 +66,11 @@ const jsonLd = {
         />
 
         <title>{title}</title>
+        <Analytics />
 
         <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     </head>
     <body>
-        {GA_ID && (
-            <script
-                async
-                src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
-                is:inline
-            />
-            <script define:vars={{ GA_ID }} is:inline>
-                window.dataLayer = window.dataLayer || [];
-                function gtag() { dataLayer.push(arguments); }
-                gtag('js', new Date());
-                gtag('config', GA_ID);
-            </script>
-        )}
         <slot />
     </body>
 </html>
