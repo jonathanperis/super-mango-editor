@@ -2,6 +2,12 @@
  * game.c — Window, renderer, background, and main game loop.
  */
 
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 700
+#endif
+#endif
+
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_mixer.h>
@@ -15,6 +21,9 @@
 #include <windows.h> /* GetFullPathNameA */
 #elif !defined(__EMSCRIPTEN__)
 #include <limits.h>  /* PATH_MAX */
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 #endif
 
 #include "game.h"
@@ -369,10 +378,9 @@ void game_init(GameState *gs) {
             path_valid = 1;
         }
 #else
-        char *resolved = realpath(gs->level_path, NULL);
-        if (resolved) {
+    char resolved[PATH_MAX];
+    if (realpath(gs->level_path, resolved) != NULL) {
             strncpy(safe_path, resolved, sizeof(safe_path) - 1);
-            free(resolved);
             path_valid = 1;
         }
 #endif
