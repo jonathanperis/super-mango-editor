@@ -210,7 +210,7 @@ jobs:
       # Create the GitHub Release. The tag is auto-created by the action.
       # softprops/action-gh-release picks up GITHUB_TOKEN automatically.
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: "v1.0.${{ github.run_number }}"
           name: "Super Mango v1.0.${{ github.run_number }}"
