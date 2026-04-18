@@ -461,6 +461,16 @@ void properties_render(EditorState *es, int start_y, int available_h)
         if (ui_float_field(&es->ui, FIELD_ID(ENT_LAST_STAR, 1),
                            FIELD_X, y, FIELD_W, &p->y))
             es->modified = 1;
+        y += ROW_H;
+
+        /* Next phase path for level linking */
+        ui_label(&es->ui, CONTENT_X, y, "next phase:");
+        y += ROW_H;
+        if (ui_text_field(&es->ui, FIELD_ID(ENT_LAST_STAR, 2),
+                          CONTENT_X, y, FIELD_W * 2,
+                          es->level.next_phase,
+                          sizeof(es->level.next_phase)))
+            es->modified = 1;
         break;
     }
 

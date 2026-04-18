@@ -5,6 +5,7 @@
  */
 
 #include "game_render.h"
+#include "../levels/level.h"  /* LevelDef for next_phase check */
 
 #include <SDL_ttf.h>
 #include <stdio.h>  /* snprintf */
@@ -22,10 +23,15 @@ void render_level_complete_overlay(GameState *gs)
     SDL_RenderFillRect(gs->renderer, &overlay);
     SDL_SetRenderDrawBlendMode(gs->renderer, SDL_BLENDMODE_NONE);
 
-    /* Level Complete title */
+    /* Determine if this is the final level (no next_phase set) */
+    const LevelDef *def = (const LevelDef *)gs->current_level;
+    int is_final_level = (def && def->next_phase[0] == '\0');
+
+    /* Level Complete title - show "Game Complete!" for final level */
     if (gs->hud.font) {
         SDL_Color gold = { 255, 215, 0, 255 };
-        SDL_Surface *title_surf = TTF_RenderText_Solid(gs->hud.font, "Level Complete!", gold);
+        const char *title_text = is_final_level ? "Game Complete!" : "Level Complete!";
+        SDL_Surface *title_surf = TTF_RenderText_Solid(gs->hud.font, title_text, gold);
         if (title_surf) {
             SDL_Texture *title_tex = SDL_CreateTextureFromSurface(gs->renderer, title_surf);
             if (title_tex) {
@@ -55,8 +61,26 @@ void render_level_complete_overlay(GameState *gs)
             SDL_FreeSurface(score_surf);
         }
 
+        /* Congratulations message for final level */
+        if (is_final_level) {
+            SDL_Color green = { 100, 255, 100, 255 };
+            SDL_Surface *congrats_surf = TTF_RenderText_Solid(gs->hud.font, "Congratulations!", green);
+            if (congrats_surf) {
+                SDL_Texture *congrats_tex = SDL_CreateTextureFromSurface(gs->renderer, congrats_surf);
+                if (congrats_tex) {
+                    int cw, ch;
+                    SDL_QueryTexture(congrats_tex, NULL, NULL, &cw, &ch);
+                    SDL_Rect dst = { (GAME_W - cw) / 2, GAME_H / 2 + 32, cw, ch };
+                    SDL_RenderCopy(gs->renderer, congrats_tex, NULL, &dst);
+                    SDL_DestroyTexture(congrats_tex);
+                }
+                SDL_FreeSurface(congrats_surf);
+            }
+        }
+
         /* Exit hint */
-        SDL_Surface *hint_surf = TTF_RenderText_Solid(gs->hud.font, "Press ESC or Start to exit", white);
+        const char *exit_text = is_final_level ? "Press ESC or Start to return to menu" : "Press ESC or Start to exit";
+        SDL_Surface *hint_surf = TTF_RenderText_Solid(gs->hud.font, exit_text, white);
         if (hint_surf) {
             SDL_Texture *hint_tex = SDL_CreateTextureFromSurface(gs->renderer, hint_surf);
             if (hint_tex) {
