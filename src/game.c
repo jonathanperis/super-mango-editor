@@ -662,422 +662,263 @@ static int ctrl_init_worker(void *data) {
 /* ------------------------------------------------------------------ */
 
 /*
+ * Collision helper macros — reduce repetitive boilerplate in game_collide.
+ */
+
+/* Test all entities in an array against player; apply damage on hit.
+ * Usage: COLLIDE_DAMAGE(gs->spiders, gs->spider_count, spider_get_hitbox, "spider")
+ */
+#define COLLIDE_DAMAGE(arr, count, get_hitbox_fn, name) \
+    for (int i = 0; i < (count) && gs->player.hurt_timer == 0.0f; i++) { \
+        SDL_Rect ehit = get_hitbox_fn(&(arr)[i]); \
+        if (SDL_HasIntersection(&phit, &ehit)) { \
+            if (gs->debug_mode) debug_log(&gs->debug, "HIT %s[%d]", name, i); \
+            float sx = ehit.x + ehit.w * 0.5f; \
+            float sy = ehit.y + ehit.h * 0.5f; \
+            apply_damage(gs, 1, 1, sx, sy); \
+            break; \
+        } \
+    }
+
+/* Test all entities in an array with 'active' field; apply damage on hit.
+ * Usage: COLLIDE_DAMAGE_ACTIVE(gs->axe_traps, gs->axe_trap_count, axe_trap_get_hitbox, "axe")
+ */
+#define COLLIDE_DAMAGE_ACTIVE(arr, count, get_hitbox_fn, name) \
+    for (int i = 0; i < (count) && gs->player.hurt_timer == 0.0f; i++) { \
+        if (!(arr)[i].active) continue; \
+        SDL_Rect ehit = get_hitbox_fn(&(arr)[i]); \
+        if (SDL_HasIntersection(&phit, &ehit)) { \
+            if (gs->debug_mode) debug_log(&gs->debug, "HIT %s[%d]", name, i); \
+            float sx = ehit.x + ehit.w * 0.5f; \
+            float sy = ehit.y + ehit.h * 0.5f; \
+            apply_damage(gs, 1, 1, sx, sy); \
+            break; \
+        } \
+    }
+
+/*
+ * Spider hitbox builders — inline since they need FLOOR_Y calculations.
+ */
+static SDL_Rect spider_build_hitbox(const Spider *s)
+{
+    return (SDL_Rect){
+        (int)s->x + SPIDER_ART_X,
+        FLOOR_Y - SPIDER_ART_H,
+        SPIDER_ART_W,
+        SPIDER_ART_H
+    };
+}
+
+static SDL_Rect jumping_spider_build_hitbox(const JumpingSpider *js)
+{
+    return (SDL_Rect){
+        (int)js->x + JSPIDER_ART_X,
+        FLOOR_Y - JSPIDER_ART_H + (int)js->y,
+        JSPIDER_ART_W,
+        JSPIDER_ART_H
+    };
+}
+
+/*
  * game_collide — Test all player–entity collisions for this frame.
  *
  * Counts down the invincibility timer then checks the player's physics
  * hitbox (AABB) against every active enemy, hazard, and collectible.
  * Damage is applied through apply_damage(); coins/stars are collected
- * directly.  Extracted from game_loop_frame for readability.
+ * directly.  Refactored to use helper macros for readability.
  */
 static void game_collide(GameState *gs, float dt)
 {
-    /*
-     * Player–spider collision.
-     *
-     * Count down the invincibility timer first.  While it is positive the
-     * player is still blinking from a previous hit and cannot be hurt again.
-     * When the timer reaches zero, test each spider's render rect against
-     * the player's physics hitbox (AABB overlap).  On contact, start a new
-     * 1.5-second invincibility window.
-     */
+    /* Count down invincibility timer */
     if (gs->player.hurt_timer > 0.0f) {
         gs->player.hurt_timer -= dt;
         if (gs->player.hurt_timer < 0.0f)
             gs->player.hurt_timer = 0.0f;
-    } else {
-        SDL_Rect phit = player_get_hitbox(&gs->player);
-        for (int i = 0; i < gs->spider_count; i++) {
-            const Spider *s = &gs->spiders[i];
-            SDL_Rect shit = {
-                (int)s->x + SPIDER_ART_X,
-                FLOOR_Y - SPIDER_ART_H,
-                SPIDER_ART_W,
-                SPIDER_ART_H
+        return;  /* No collisions while invincible */
+    }
+
+    SDL_Rect phit = player_get_hitbox(&gs->player);
+
+    /* ---- Enemy collisions ---------------------------------------- */
+    for (int i = 0; i < gs->spider_count && gs->player.hurt_timer == 0.0f; i++) {
+        SDL_Rect shit = spider_build_hitbox(&gs->spiders[i]);
+        if (SDL_HasIntersection(&phit, &shit)) {
+            if (gs->debug_mode) debug_log(&gs->debug, "HIT spider[%d]", i);
+            float sx = shit.x + shit.w * 0.5f;
+            float sy = shit.y + shit.h * 0.5f;
+            apply_damage(gs, 1, 1, sx, sy);
+        }
+    }
+
+    for (int i = 0; i < gs->jumping_spider_count && gs->player.hurt_timer == 0.0f; i++) {
+        SDL_Rect jhit = jumping_spider_build_hitbox(&gs->jumping_spiders[i]);
+        if (SDL_HasIntersection(&phit, &jhit)) {
+            if (gs->debug_mode) debug_log(&gs->debug, "HIT jspider[%d]", i);
+            float sx = jhit.x + jhit.w * 0.5f;
+            float sy = jhit.y + jhit.h * 0.5f;
+            apply_damage(gs, 1, 1, sx, sy);
+        }
+    }
+
+    COLLIDE_DAMAGE(gs->birds, gs->bird_count, bird_get_hitbox, "bird");
+    COLLIDE_DAMAGE(gs->faster_birds, gs->faster_bird_count, faster_bird_get_hitbox, "fbird");
+    COLLIDE_DAMAGE(gs->fish, gs->fish_count, fish_get_hitbox, "fish");
+    COLLIDE_DAMAGE(gs->faster_fish, gs->faster_fish_count, faster_fish_get_hitbox, "ffish");
+
+    /* ---- Hazard collisions --------------------------------------- */
+    COLLIDE_DAMAGE_ACTIVE(gs->axe_traps, gs->axe_trap_count, axe_trap_get_hitbox, "axe");
+    COLLIDE_DAMAGE_ACTIVE(gs->circular_saws, gs->circular_saw_count, circular_saw_get_hitbox, "saw");
+    COLLIDE_DAMAGE_ACTIVE(gs->spike_blocks, gs->spike_block_count, spike_block_get_hitbox, "spike_block");
+
+    /* Ground spikes — nested loop for tiles */
+    if (gs->player.hurt_timer == 0.0f) {
+        for (int i = 0; i < gs->spike_row_count; i++) {
+            if (!gs->spike_rows[i].active) continue;
+            for (int t = 0; t < gs->spike_rows[i].count; t++) {
+                int tx = (int)gs->spike_rows[i].x + t * SPIKE_TILE_W;
+                SDL_Rect stile = { tx, (int)gs->spike_rows[i].y,
+                                   SPIKE_TILE_W, SPIKE_TILE_H };
+                if (SDL_HasIntersection(&phit, &stile)) {
+                    if (gs->debug_mode) debug_log(&gs->debug, "HIT spike[%d]", i);
+                    float sx = stile.x + stile.w * 0.5f;
+                    float sy = stile.y + stile.h * 0.5f;
+                    apply_damage(gs, 1, 1, sx, sy);
+                    goto next_spike_row;
+                }
+            }
+        next_spike_row:;
+        }
+    }
+
+    /* Spike platforms — inline hitbox construction */
+    if (gs->player.hurt_timer == 0.0f) {
+        for (int i = 0; i < gs->spike_platform_count; i++) {
+            if (!gs->spike_platforms[i].active) continue;
+            SDL_Rect sphit = {
+                (int)gs->spike_platforms[i].x,
+                (int)gs->spike_platforms[i].y,
+                gs->spike_platforms[i].w,
+                SPIKE_PLAT_SRC_H
             };
-            /* SDL_HasIntersection returns SDL_TRUE when the two rects overlap */
-            if (SDL_HasIntersection(&phit, &shit)) {
-                if (gs->debug_mode) debug_log(&gs->debug, "HIT spider[%d]", i);
-                float sx = shit.x + shit.w * 0.5f;
-                float sy = shit.y + shit.h * 0.5f;
+            if (SDL_HasIntersection(&phit, &sphit)) {
+                if (gs->debug_mode) debug_log(&gs->debug, "HIT spike_platform[%d]", i);
+                float sx = sphit.x + sphit.w * 0.5f;
+                float sy = sphit.y + sphit.h * 0.5f;
                 apply_damage(gs, 1, 1, sx, sy);
                 break;
             }
         }
+    }
 
-        /* Jumping spiders use the same damage pattern as regular spiders. */
-        if (gs->player.hurt_timer == 0.0f) {
-            for (int i = 0; i < gs->jumping_spider_count; i++) {
-                const JumpingSpider *js = &gs->jumping_spiders[i];
-                SDL_Rect jhit = {
-                    (int)js->x + JSPIDER_ART_X,
-                    FLOOR_Y - JSPIDER_ART_H + (int)js->y,
-                    JSPIDER_ART_W,
-                    JSPIDER_ART_H
-                };
-                if (SDL_HasIntersection(&phit, &jhit)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT jspider[%d]", i);
-                    float sx = jhit.x + jhit.w * 0.5f;
-                    float sy = jhit.y + jhit.h * 0.5f;
-                    apply_damage(gs, 1, 1, sx, sy);
-                    break;
-                }
-            }
-        }
-
-        /* Bird collision — slow birds in the sky. */
-        if (gs->player.hurt_timer == 0.0f) {
-            for (int i = 0; i < gs->bird_count; i++) {
-                SDL_Rect bhit = bird_get_hitbox(&gs->birds[i]);
-                if (SDL_HasIntersection(&phit, &bhit)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT bird[%d]", i);
-                    float sx = bhit.x + bhit.w * 0.5f;
-                    float sy = bhit.y + bhit.h * 0.5f;
-                    apply_damage(gs, 1, 1, sx, sy);
-                    break;
-                }
-            }
-        }
-
-        /* Faster bird collision. */
-        if (gs->player.hurt_timer == 0.0f) {
-            for (int i = 0; i < gs->faster_bird_count; i++) {
-                SDL_Rect fbhit = faster_bird_get_hitbox(&gs->faster_birds[i]);
-                if (SDL_HasIntersection(&phit, &fbhit)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT fbird[%d]", i);
-                    float sx = fbhit.x + fbhit.w * 0.5f;
-                    float sy = fbhit.y + fbhit.h * 0.5f;
-                    apply_damage(gs, 1, 1, sx, sy);
-                    break;
-                }
-            }
-        }
-
-        /* Fish can hurt the player both while swimming and while jumping. */
-        if (gs->player.hurt_timer == 0.0f) {
-            for (int i = 0; i < gs->fish_count; i++) {
-                SDL_Rect fhit = fish_get_hitbox(&gs->fish[i]);
-                if (SDL_HasIntersection(&phit, &fhit)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT fish[%d]", i);
-                    float sx = fhit.x + fhit.w * 0.5f;
-                    float sy = fhit.y + fhit.h * 0.5f;
-                    apply_damage(gs, 1, 1, sx, sy);
-                    break;
-                }
-            }
-        }
-
-        /* ---- Faster fish collision --------------------------------- */
-        if (gs->player.hurt_timer == 0.0f) {
-            for (int i = 0; i < gs->faster_fish_count; i++) {
-                SDL_Rect ffhit = faster_fish_get_hitbox(&gs->faster_fish[i]);
-                if (SDL_HasIntersection(&phit, &ffhit)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT ffish[%d]", i);
-                    float sx = ffhit.x + ffhit.w * 0.5f;
-                    float sy = ffhit.y + ffhit.h * 0.5f;
-                    apply_damage(gs, 1, 1, sx, sy);
-                    break;
-                }
-            }
-        }
-
-        /* ---- Spike-block collision ---------------------------------- */
-        /*
-         * Spike blocks deal the same damage as spiders and fish, but also
-         * apply a push impulse opposite to the player's movement direction.
-         * The invincibility timer (hurt_timer) from the spider/fish check
-         * above is re-used here: if it is still > 0 this block is skipped.
-         */
-        if (gs->player.hurt_timer == 0.0f) {
-            for (int i = 0; i < gs->spike_block_count; i++) {
-                if (!gs->spike_blocks[i].active) continue;
-                SDL_Rect sbhit = spike_block_get_hitbox(&gs->spike_blocks[i]);
-                if (SDL_HasIntersection(&phit, &sbhit)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT spike[%d]", i);
-                    float sx = sbhit.x + sbhit.w * 0.5f;
-                    float sy = sbhit.y + sbhit.h * 0.5f;
-                    apply_damage(gs, 1, 1, sx, sy);
-                    break;
-                }
-            }
-        }
-
-        /* ---- Axe-trap collision ------------------------------------ */
-        /*
-         * Axe traps deal the same damage as other enemies (1 heart).
-         * The hitbox follows the blade's rotated position so the player
-         * must dodge the swinging arc, not just the resting sprite rect.
-         */
-        if (gs->player.hurt_timer == 0.0f) {
-            for (int i = 0; i < gs->axe_trap_count; i++) {
-                if (!gs->axe_traps[i].active) continue;
-                SDL_Rect ahit = axe_trap_get_hitbox(&gs->axe_traps[i]);
-                if (SDL_HasIntersection(&phit, &ahit)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT axe[%d]", i);
-                    float sx = ahit.x + ahit.w * 0.5f;
-                    float sy = ahit.y + ahit.h * 0.5f;
-                    apply_damage(gs, 1, 1, sx, sy);
-                    break;
-                }
-            }
-        }
-
-        /* ---- Circular-saw collision -------------------------------- */
-        /*
-         * Circular saws deal the same damage as other hazards (1 heart).
-         * The hitbox is a slightly inset square centred on the blade.
-         */
-        if (gs->player.hurt_timer == 0.0f) {
-            for (int i = 0; i < gs->circular_saw_count; i++) {
-                if (!gs->circular_saws[i].active) continue;
-                SDL_Rect shit = circular_saw_get_hitbox(&gs->circular_saws[i]);
-                if (SDL_HasIntersection(&phit, &shit)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT saw[%d]", i);
-                    float sx = shit.x + shit.w * 0.5f;
-                    float sy = shit.y + shit.h * 0.5f;
-                    apply_damage(gs, 1, 1, sx, sy);
-                    break;
-                }
-            }
-        }
-
-        /* ---- Blue flame collision --------------------------------- */
-        /*
-         * Blue flames deal the same damage as other hazards (1 heart).
-         * Only check visible blue flames (not in WAITING state).
-         */
-        if (gs->player.hurt_timer == 0.0f) {
-            for (int i = 0; i < gs->blue_flame_count; i++) {
-                if (!gs->blue_flames[i].active) continue;
-                if (gs->blue_flames[i].state == BLUE_FLAME_WAITING) continue;
-                SDL_Rect fhit = blue_flame_get_hitbox(&gs->blue_flames[i]);
-                if (SDL_HasIntersection(&phit, &fhit)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT blue_flame[%d]", i);
-                    float sx = fhit.x + fhit.w * 0.5f;
-                    float sy = fhit.y + fhit.h * 0.5f;
-                    apply_damage(gs, 1, 1, sx, sy);
-                    break;
-                }
-            }
-        }
-
-        /* ---- Fire flame collision --------------------------------- */
-        /*
-         * Fire flames use the same BlueFlame struct and mechanics.
-         * Only check visible fire flames (not in WAITING state).
-         */
-        if (gs->player.hurt_timer == 0.0f) {
-            for (int i = 0; i < gs->fire_flame_count; i++) {
-                if (!gs->fire_flames[i].active) continue;
-                if (gs->fire_flames[i].state == BLUE_FLAME_WAITING) continue;
-                SDL_Rect fhit = blue_flame_get_hitbox(&gs->fire_flames[i]);
-                if (SDL_HasIntersection(&phit, &fhit)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT fire_flame[%d]", i);
-                    float sx = fhit.x + fhit.w * 0.5f;
-                    float sy = fhit.y + fhit.h * 0.5f;
-                    apply_damage(gs, 1, 1, sx, sy);
-                    break;
-                }
-            }
-        }
-
-        /* ---- Spike row collision ---------------------------------- */
-        /*
-         * Ground spikes deal 1 heart of damage on contact.
-         * Check the player hitbox against each spike row's full rect.
-         */
-        if (gs->player.hurt_timer == 0.0f) {
-            for (int i = 0; i < gs->spike_row_count; i++) {
-                if (!gs->spike_rows[i].active) continue;
-                if (spike_row_hit_test(&gs->spike_rows[i], &phit)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT spike_row[%d]", i);
-                    SDL_Rect sr = spike_row_get_rect(&gs->spike_rows[i]);
-                    float sx = sr.x + sr.w * 0.5f;
-                    float sy = sr.y + sr.h * 0.5f;
-                    apply_damage(gs, 1, 1, sx, sy);
-                    break;
-                }
-            }
-        }
-
-        /* ---- Spike platform collision ----------------------------- */
-        /*
-         * Spike platforms deal 1 heart of damage only when the player
-         * touches the spike side (top surface).  The smooth underside
-         * acts as a barrier (blocks upward movement in player_update)
-         * without dealing damage.
-         *
-         * We use a narrow damage zone covering only the spike tips
-         * (the top ~5 px of the platform) so that approaching from
-         * below or from the sides never triggers damage.
-         */
-        if (gs->player.hurt_timer == 0.0f) {
-            for (int i = 0; i < gs->spike_platform_count; i++) {
-                if (!gs->spike_platforms[i].active) continue;
-                const SpikePlatform *sp = &gs->spike_platforms[i];
-                /*
-                 * spike_zone — narrow rect covering only the spike tips
-                 * at the top of the platform (the 2 px upward extension
-                 * plus the first few content rows where the tips live).
-                 * A player hitting from below will never reach this zone.
-                 */
-                SDL_Rect spike_zone = {
-                    .x = (int)sp->x,
-                    .y = (int)sp->y - 2,  /* match the 2 px upward extension */
-                    .w = sp->w,
-                    .h = 5,               /* just the spike tips ~5 px tall  */
-                };
-                if (SDL_HasIntersection(&phit, &spike_zone)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT spike_plat[%d]", i);
-                    float sx = sp->x + sp->w * 0.5f;
-                    float sy = sp->y;
-                    apply_damage(gs, 1, 1, sx, sy);
-                    break;
-                }
+    /* Blue flames — skip if in WAITING state */
+    if (gs->player.hurt_timer == 0.0f) {
+        for (int i = 0; i < gs->blue_flame_count; i++) {
+            if (!gs->blue_flames[i].active) continue;
+            if (gs->blue_flames[i].state == BLUE_FLAME_WAITING) continue;
+            SDL_Rect bfhit = blue_flame_get_hitbox(&gs->blue_flames[i]);
+            if (SDL_HasIntersection(&phit, &bfhit)) {
+                if (gs->debug_mode) debug_log(&gs->debug, "HIT blue_flame[%d]", i);
+                float sx = bfhit.x + bfhit.w * 0.5f;
+                float sy = bfhit.y + bfhit.h * 0.5f;
+                apply_damage(gs, 1, 1, sx, sy);
+                break;
             }
         }
     }
 
-    /*
-     * Coin collection.
-     *
-     * Test the player's physics hitbox against every active coin.
-     * On overlap: deactivate the coin, award COIN_SCORE points, and
-     * increment the coins-toward-heart counter.  When the counter
-     * reaches COINS_PER_HEART, restore one heart (if below max).
-     */
-    {
-        SDL_Rect phit = player_get_hitbox(&gs->player);
-        for (int i = 0; i < gs->coin_count; i++) {
-            if (!gs->coins[i].active) continue;
-            SDL_Rect cbox = {
-                (int)gs->coins[i].x, (int)gs->coins[i].y,
-                COIN_DISPLAY_W, COIN_DISPLAY_H
-            };
-            if (SDL_HasIntersection(&phit, &cbox)) {
-                gs->coins[i].active = 0;
-
-                /* Play coin SFX immediately when a coin is collected. */
-                if (gs->snd_coin) {
-                    Mix_PlayChannel(-1, gs->snd_coin, 0);
-                }
-
-                gs->score += gs->coin_score;
-                if (gs->debug_mode) debug_log(&gs->debug, "COIN [%d] score=%d", i, gs->score);
-
-                /*
-                 * Bonus life — every SCORE_PER_LIFE (1000) points the
-                 * player earns an extra life.  score_life_next tracks the
-                 * next threshold so the reward fires exactly once per
-                 * milestone regardless of how many coins are collected at
-                 * once (e.g. rapid-fire collection in the same frame).
-                 */
-                if (gs->score >= gs->score_life_next) {
-                    gs->lives++;
-                    gs->score_life_next += gs->score_per_life;
-                    if (gs->debug_mode) debug_log(&gs->debug, "1UP! lives=%d", gs->lives);
-                }
+    /* Fire flames — same logic as blue flames */
+    if (gs->player.hurt_timer == 0.0f) {
+        for (int i = 0; i < gs->fire_flame_count; i++) {
+            if (!gs->fire_flames[i].active) continue;
+            if (gs->fire_flames[i].state == BLUE_FLAME_WAITING) continue;
+            SDL_Rect ffhit = blue_flame_get_hitbox(&gs->fire_flames[i]);
+            if (SDL_HasIntersection(&phit, &ffhit)) {
+                if (gs->debug_mode) debug_log(&gs->debug, "HIT fire_flame[%d]", i);
+                float sx = ffhit.x + ffhit.w * 0.5f;
+                float sy = ffhit.y + ffhit.h * 0.5f;
+                apply_damage(gs, 1, 1, sx, sy);
+                break;
             }
         }
     }
 
-    /* ---- Red star collision ------------------------------------- */
-    /*
-     * Red stars restore one heart (star) immediately on pickup.
-     * They do not award score — they are purely a health pickup.
-     */
-    {
-        SDL_Rect phit = player_get_hitbox(&gs->player);
-        for (int i = 0; i < gs->star_yellow_count; i++) {
-            if (!gs->star_yellows[i].active) continue;
-            SDL_Rect sbox = {
-                (int)gs->star_yellows[i].x, (int)gs->star_yellows[i].y,
-                STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
-            };
-            if (SDL_HasIntersection(&phit, &sbox)) {
-                gs->star_yellows[i].active = 0;
-
-                if (gs->snd_coin) {
-                    Mix_PlayChannel(-1, gs->snd_coin, 0);
-                }
-
-                if (gs->hearts < MAX_HEARTS) {
-                    gs->hearts++;
-                    if (gs->debug_mode) debug_log(&gs->debug, "YELLOW STAR [%d] hearts=%d", i, gs->hearts);
-                }
+    /* ---- Collectible collisions ---------------------------------- */
+    /* Coins — add score, possible bonus life */
+    for (int i = 0; i < gs->coin_count; i++) {
+        if (!gs->coins[i].active) continue;
+        SDL_Rect cbox = {
+            (int)gs->coins[i].x, (int)gs->coins[i].y,
+            COIN_DISPLAY_W, COIN_DISPLAY_H
+        };
+        if (SDL_HasIntersection(&phit, &cbox)) {
+            gs->coins[i].active = 0;
+            gs->score += gs->coin_score;
+            if (gs->snd_coin) Mix_PlayChannel(-1, gs->snd_coin, 0);
+            if (gs->score >= gs->score_life_next) {
+                gs->lives++;
+                gs->score_life_next += gs->score_per_life;
             }
+            if (gs->debug_mode) debug_log(&gs->debug, "COIN[%d] collected", i);
         }
     }
 
-    /* ---- Green star collision ---------------------------------- */
-    /*
-     * Green stars restore one heart immediately on pickup.
-     * Same mechanics as yellow stars — purely a health pickup.
-     */
-    {
-        SDL_Rect phit = player_get_hitbox(&gs->player);
-        for (int i = 0; i < gs->star_green_count; i++) {
-            if (!gs->star_greens[i].active) continue;
-            SDL_Rect sbox = {
-                (int)gs->star_greens[i].x, (int)gs->star_greens[i].y,
-                STAR_GREEN_DISPLAY_W, STAR_GREEN_DISPLAY_H
-            };
-            if (SDL_HasIntersection(&phit, &sbox)) {
-                gs->star_greens[i].active = 0;
-
-                if (gs->snd_coin) {
-                    Mix_PlayChannel(-1, gs->snd_coin, 0);
-                }
-
-                if (gs->hearts < MAX_HEARTS) {
-                    gs->hearts++;
-                    if (gs->debug_mode) debug_log(&gs->debug, "GREEN STAR [%d] hearts=%d", i, gs->hearts);
-                }
-            }
+    /* Stars — restore health, same pattern for all colors */
+    for (int i = 0; i < gs->star_yellow_count; i++) {
+        if (!gs->star_yellows[i].active) continue;
+        SDL_Rect sbox = {
+            (int)gs->star_yellows[i].x, (int)gs->star_yellows[i].y,
+            STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
+        };
+        if (SDL_HasIntersection(&phit, &sbox)) {
+            gs->star_yellows[i].active = 0;
+            if (gs->hearts < MAX_HEARTS) gs->hearts++;
+            if (gs->snd_coin) Mix_PlayChannel(-1, gs->snd_coin, 0);
+            if (gs->debug_mode) debug_log(&gs->debug, "STAR_YELLOW[%d] collected", i);
         }
     }
 
-    /* ---- Red star collision ------------------------------------ */
-    /*
-     * Red stars restore one heart immediately on pickup.
-     * Same mechanics as yellow/green stars — purely a health pickup.
-     */
-    {
-        SDL_Rect phit = player_get_hitbox(&gs->player);
-        for (int i = 0; i < gs->star_red_count; i++) {
-            if (!gs->star_reds[i].active) continue;
-            SDL_Rect sbox = {
-                (int)gs->star_reds[i].x, (int)gs->star_reds[i].y,
-                STAR_RED_DISPLAY_W, STAR_RED_DISPLAY_H
-            };
-            if (SDL_HasIntersection(&phit, &sbox)) {
-                gs->star_reds[i].active = 0;
-
-                if (gs->snd_coin) {
-                    Mix_PlayChannel(-1, gs->snd_coin, 0);
-                }
-
-                if (gs->hearts < MAX_HEARTS) {
-                    gs->hearts++;
-                    if (gs->debug_mode) debug_log(&gs->debug, "RED STAR [%d] hearts=%d", i, gs->hearts);
-                }
-            }
+    for (int i = 0; i < gs->star_green_count; i++) {
+        if (!gs->star_greens[i].active) continue;
+        SDL_Rect sbox = {
+            (int)gs->star_greens[i].x, (int)gs->star_greens[i].y,
+            STAR_GREEN_DISPLAY_W, STAR_GREEN_DISPLAY_H
+        };
+        if (SDL_HasIntersection(&phit, &sbox)) {
+            gs->star_greens[i].active = 0;
+            if (gs->hearts < MAX_HEARTS) gs->hearts++;
+            if (gs->snd_coin) Mix_PlayChannel(-1, gs->snd_coin, 0);
+            if (gs->debug_mode) debug_log(&gs->debug, "STAR_GREEN[%d] collected", i);
         }
     }
 
-    /* ---- Last star collection (end-phase trigger) --------------- */
+    for (int i = 0; i < gs->star_red_count; i++) {
+        if (!gs->star_reds[i].active) continue;
+        SDL_Rect sbox = {
+            (int)gs->star_reds[i].x, (int)gs->star_reds[i].y,
+            STAR_RED_DISPLAY_W, STAR_RED_DISPLAY_H
+        };
+        if (SDL_HasIntersection(&phit, &sbox)) {
+            gs->star_reds[i].active = 0;
+            if (gs->hearts < MAX_HEARTS) gs->hearts++;
+            if (gs->snd_coin) Mix_PlayChannel(-1, gs->snd_coin, 0);
+            if (gs->debug_mode) debug_log(&gs->debug, "STAR_RED[%d] collected", i);
+        }
+    }
+
+    /* Last star — triggers level completion */
     if (gs->last_star.active) {
-        SDL_Rect phit = player_get_hitbox(&gs->player);
         SDL_Rect lsbox = last_star_get_hitbox(&gs->last_star);
         if (SDL_HasIntersection(&phit, &lsbox)) {
-            gs->last_star.active    = 0;
+            gs->last_star.active = 0;
             gs->last_star.collected = 1;
-            if (gs->snd_coin) {
-                Mix_PlayChannel(-1, gs->snd_coin, 0);
-            }
-            if (gs->debug_mode) debug_log(&gs->debug, "LAST STAR collected — phase passed!");
+            if (gs->snd_coin) Mix_PlayChannel(-1, gs->snd_coin, 0);
+            if (gs->debug_mode) debug_log(&gs->debug, "LAST STAR collected");
             gs->level_complete = 1;
         }
     }
+
+#undef COLLIDE_DAMAGE
+#undef COLLIDE_DAMAGE_ACTIVE
 }
 
 /* ------------------------------------------------------------------ */
