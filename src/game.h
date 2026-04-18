@@ -300,6 +300,7 @@ typedef struct {
     Camera        camera;      /* viewport scroll position; updated every frame*/
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
     int           paused;      /* 1 = window lost focus; physics/music frozen */
+    int           level_complete; /* 1 = last star collected, show end screen  */
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
     char          level_path[256]; /* JSON level to load (--level flag)      */
     DebugOverlay  debug;       /* FPS counter, collision vis, event log      */
