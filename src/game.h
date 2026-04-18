@@ -38,6 +38,8 @@
 #include "entities/bird.h"          /* Bird — slow sine-wave sky patrol */
 #include "entities/faster_bird.h"   /* FasterBird — fast sine-wave sky patrol */
 #include "collectibles/star_yellow.h"/* StarYellow — health-restoring collectible */
+#include "collectibles/star_green.h" /* StarGreen  — health-restoring collectible */
+#include "collectibles/star_red.h"   /* StarRed    — health-restoring collectible */
 #include "hazards/axe_trap.h"       /* AxeTrap — swinging/spinning axe hazard */
 #include "hazards/circular_saw.h"   /* CircularSaw — fast rotating patrol hazard */
 #include "hazards/blue_flame.h"     /* BlueFlame — erupting fire hazard from sea gaps */
@@ -260,9 +262,9 @@ typedef struct {
     SDL_Texture  *last_star_tex;         /* dedicated texture for end-of-level star*/
     StarYellow    star_yellows[MAX_STAR_YELLOWS]; /* health-restoring collectibles */
     int           star_yellow_count;     /* number of star yellows placed       */
-    StarYellow    star_greens[MAX_STAR_YELLOWS]; /* green health-restoring collectibles */
+    StarGreen     star_greens[MAX_STAR_GREENS]; /* green health-restoring collectibles */
     int           star_green_count;      /* number of star greens placed        */
-    StarYellow    star_reds[MAX_STAR_YELLOWS]; /* red health-restoring collectibles */
+    StarRed       star_reds[MAX_STAR_REDS]; /* red health-restoring collectibles */
     int           star_red_count;        /* number of star reds placed          */
     SDL_Texture  *axe_trap_tex;          /* shared texture for axe trap hazards*/
     AxeTrap       axe_traps[MAX_AXE_TRAPS]; /* swinging/spinning axe hazards  */
