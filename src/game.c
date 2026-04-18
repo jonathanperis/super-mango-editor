@@ -542,6 +542,80 @@ void game_init(GameState *gs) {
 /* ------------------------------------------------------------------ */
 
 /*
+ * game_load_next_phase — Load the next level when last_star is collected.
+ *
+ * Called from game_collide when the player touches the last_star and
+ * next_phase is set. Reloads the level while preserving score, lives, and
+ * hearts. Resets checkpoint and player position to the new level start.
+ *
+ * Returns 0 on success, -1 on failure (level not found or load error).
+ */
+int game_load_next_phase(GameState *gs)
+{
+    const LevelDef *current = (const LevelDef *)gs->current_level;
+    if (!current || current->next_phase[0] == '\0') {
+        return -1;
+    }
+
+    /* Save player progress */
+    int saved_score = gs->score;
+    int saved_lives = gs->lives;
+    int saved_hearts = gs->hearts;
+    int saved_score_life_next = gs->score_life_next;
+
+    /* Load the next level */
+    memset(&s_level, 0, sizeof(s_level));
+
+    char safe_path[512] = {0};
+    strncpy(safe_path, current->next_phase, sizeof(safe_path) - 1);
+
+    if (level_load_toml(safe_path, &s_level) != 0) {
+        fprintf(stderr, "Error: Failed to load next phase: %s\n", safe_path);
+        return -1;
+    }
+
+    /* Update the level path for the game state */
+    strncpy(gs->level_path, current->next_phase, sizeof(gs->level_path) - 1);
+
+    /* Load the new level */
+    level_load(gs, &s_level);
+
+    /* Restore player progress */
+    gs->score = saved_score;
+    gs->lives = saved_lives;
+    gs->hearts = saved_hearts;
+    gs->score_life_next = saved_score_life_next;
+
+    /* Reset checkpoint and completion flag */
+    gs->checkpoint_x = 0.0f;
+    gs->level_complete = 0;
+
+    /* Re-initialize parallax if the new level has different background layers */
+    if (s_level.background_layer_count > 0) {
+        parallax_cleanup(&gs->parallax);
+        char paths[MAX_BACKGROUND_LAYERS][64];
+        float speeds[MAX_BACKGROUND_LAYERS];
+        int n = s_level.background_layer_count;
+        if (n > MAX_BACKGROUND_LAYERS) n = MAX_BACKGROUND_LAYERS;
+        for (int i = 0; i < n; i++) {
+            strncpy(paths[i], s_level.background_layers[i].path, 63);
+            paths[i][63] = '\0';
+            speeds[i] = s_level.background_layers[i].speed;
+        }
+        parallax_init_from_def(&gs->parallax, gs->renderer,
+                               (const char (*)[64])paths, speeds, n);
+    }
+
+    if (gs->debug_mode) {
+        debug_log(&gs->debug, "PHASE TRANSITION to: %s", safe_path);
+    }
+
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+
+/*
  * game_loop_frame — Execute one frame of the game loop.
  *
  * Extracted from game_loop so it can be called either in a blocking

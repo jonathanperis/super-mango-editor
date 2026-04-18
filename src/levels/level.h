@@ -376,6 +376,7 @@ typedef struct {
     StarRedPlacement     star_reds[MAX_STAR_REDS];
     int                  star_red_count;
     LastStarPlacement    last_star;
+    char                 next_phase[256]; /* path to next level TOML (optional) */
 
     /* ---- Enemies ----------------------------------------------------- */
     SpiderPlacement        spiders[MAX_SPIDERS];

@@ -333,3 +333,6 @@ void game_loop(GameState *gs);
 
 /* Free every resource owned by the game in reverse-init order. */
 void game_cleanup(GameState *gs);
+
+/* Load the next phase/level when last_star is collected with next_phase set. */
+int game_load_next_phase(GameState *gs);

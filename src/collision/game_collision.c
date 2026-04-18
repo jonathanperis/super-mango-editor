@@ -9,6 +9,8 @@
 #include "game_collision.h"
 #include "collision_damage.h"
 
+#include "../game.h"           /* game_load_next_phase for phase transition */
+#include "../levels/level.h"   /* LevelDef for next_phase check */
 #include "../player/player.h"
 #include "../core/debug.h"
 
@@ -272,7 +274,7 @@ void game_collide(GameState *gs, float dt)
         }
     }
 
-    /* Last star — triggers level completion */
+    /* Last star — triggers phase transition or level completion */
     if (gs->last_star.active) {
         SDL_Rect lsbox = last_star_get_hitbox(&gs->last_star);
         if (SDL_HasIntersection(&phit, &lsbox)) {
@@ -280,7 +282,17 @@ void game_collide(GameState *gs, float dt)
             gs->last_star.collected = 1;
             if (gs->snd_coin) Mix_PlayChannel(-1, gs->snd_coin, 0);
             if (gs->debug_mode) debug_log(&gs->debug, "LAST STAR collected");
-            gs->level_complete = 1;
+            
+            /* Check if there's a next phase to load */
+            const LevelDef *def = (const LevelDef *)gs->current_level;
+            if (def && def->next_phase[0] != '\0') {
+                /* Attempt phase transition; fall back to level_complete on failure */
+                if (game_load_next_phase(gs) != 0) {
+                    gs->level_complete = 1;
+                }
+            } else {
+                gs->level_complete = 1;
+            }
         }
     }
 

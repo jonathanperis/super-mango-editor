@@ -347,6 +347,9 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "[last_star]\n");
         fprintf(fp, "x = %s\n", fmt_float(ls->x));
         fprintf(fp, "y = %s\n", fmt_float(ls->y));
+        if (def->next_phase[0] != '\0') {
+            fprintf(fp, "next_phase = \"%s\"\n", def->next_phase);
+        }
         fprintf(fp, "\n");
     }
 
@@ -792,6 +795,13 @@ int level_load_toml(const char *path, LevelDef *def) {
         if (ls.type == TOML_TABLE) {
             def->last_star.x = get_float(ls, "x", 0);
             def->last_star.y = get_float(ls, "y", 0);
+            /* Optional next_phase for level linking */
+            toml_datum_t np = toml_get(ls, "next_phase");
+            if (np.type == TOML_STRING) {
+                strncpy(def->next_phase, np.u.s, sizeof(def->next_phase) - 1);
+                def->next_phase[sizeof(def->next_phase) - 1] = '\0';
+                free((void *)np.u.s); /* cast required: toml returns const char* */
+            }
         }
     }
 

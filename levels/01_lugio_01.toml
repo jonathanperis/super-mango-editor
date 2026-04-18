@@ -257,6 +257,7 @@ y = 108.0
 [last_star]
 x = 3132.0
 y = 44.0
+next_phase = "levels/02_lugio_02.toml"
 
 [[spiders]]
 x = 260.0
