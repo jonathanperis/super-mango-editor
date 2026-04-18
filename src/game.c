@@ -519,6 +519,7 @@ void game_init(GameState *gs) {
     gs->running = 1;
     gs->paused  = 0;
     gs->level_complete = 0;
+    gs->checkpoint_x = 0.0f;
 }
 
 /* ------------------------------------------------------------------ */
@@ -548,6 +549,10 @@ void game_init(GameState *gs) {
  * exists after the reset.
  */
 static void reset_current_level(GameState *gs, int *fp_prev_riding) {
+    /* Apply checkpoint offset to spawn position if set */
+    if (gs->checkpoint_x > 0.0f) {
+        gs->player.spawn_x = gs->checkpoint_x;
+    }
     level_reset(gs, &s_level);
     *fp_prev_riding = -1;
 }
@@ -1764,6 +1769,22 @@ static void game_loop_frame(void *arg) {
                        gs->player.x + gs->player.w / 2.0f);
 
         game_collide(gs, dt);
+
+        /*
+         * Checkpoint update — save progress at each screen boundary.
+         * When player crosses into a new screen (every GAME_W pixels),
+         * update checkpoint_x to the left edge of that screen.
+         */
+        {
+            int current_screen = (int)(gs->player.x / GAME_W);
+            float new_checkpoint = current_screen * GAME_W;
+            if (new_checkpoint > gs->checkpoint_x) {
+                gs->checkpoint_x = new_checkpoint;
+                if (gs->debug_mode) {
+                    debug_log(&gs->debug, "CHECKPOINT saved at x=%.0f", gs->checkpoint_x);
+                }
+            }
+        }
 
         /* Advance the water scroll offset (if water is enabled for this level) */
         if (gs->water_enabled) water_update(&gs->water, dt);
