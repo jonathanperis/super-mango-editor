@@ -97,19 +97,27 @@ $(SRCDIR)/surfaces/%.o: $(SRCDIR)/surfaces/%.c
 
 -include $(DEPS)
 
-SDL_DLL_PATH = /c/msys64/ucrt64/bin
+# ── Run targets (cross-platform) ─────────────────────────────────────
+# Windows needs SDL DLL path in PATH; Linux/macOS use system libs.
+
+ifeq ($(OS),Windows_NT)
+SDL_DLL_PATH ?= /c/msys64/ucrt64/bin
+RUN_PREFIX = PATH="$(SDL_DLL_PATH):$$PATH"
+else
+RUN_PREFIX =
+endif
 
 run: all
-	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET)
+	$(RUN_PREFIX) ./$(TARGET)
 
 run-debug: all
-	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --debug
+	$(RUN_PREFIX) ./$(TARGET) --debug
 
 run-level: all
-	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --level $(LEVEL)
+	$(RUN_PREFIX) ./$(TARGET) --level $(LEVEL)
 
 run-level-debug: all
-	PATH="$(SDL_DLL_PATH):$$PATH" ./$(TARGET) --debug --level $(LEVEL)
+	$(RUN_PREFIX) ./$(TARGET) --debug --level $(LEVEL)
 
 # ── Editor targets ───────────────────────────────────────────────────
 editor: $(OUTDIR) $(EDITOR_TARGET)
