@@ -321,15 +321,15 @@ x = 1350.0
 y = 172.0
 brick_count = 8
 
-[[bouncepads_small]]
-x = 734.0
-launch_vy = -380.0
-pad_type = "GREEN"
-
 [[bouncepads_medium]]
-x = 310.0
+x = 734.0
 launch_vy = -536.2
 pad_type = "WOOD"
+
+[[bouncepads_small]]
+x = 310.0
+launch_vy = -380.0
+pad_type = "GREEN"
 
 [[bouncepads_high]]
 x = 1420.0
