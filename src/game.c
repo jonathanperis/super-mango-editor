@@ -60,6 +60,8 @@
 #include "collision/game_collision.h"  /* game_collide, hitbox builders               */
 #include "collision/collision_damage.h" /* apply_damage                               */
 #include "render/game_render.h"        /* game_render_frame, render overlays         */
+#include "core/game_state.h"           /* reset_current_level                        */
+#include "input/game_input.h"          /* ctrl_init_worker                           */
 
 /* ------------------------------------------------------------------ */
 /* Level data — loaded once from TOML, reused on player death resets    */
@@ -69,7 +71,7 @@
  * File-scoped level definition.  Populated once from TOML in game_init,
  * then referenced by reset_current_level on player death.
  */
-static LevelDef s_level;
+LevelDef s_level;
 
 /*
  * File-scoped combined bouncepad array — avoids allocating 48 structs
@@ -536,57 +538,6 @@ void game_init(GameState *gs) {
  *   3. Update game state (player position, etc.).
  *   4. Draw everything to the screen.
  */
-
-/* ------------------------------------------------------------------ */
-
-/*
- * reset_current_level — centralised "player died, restart level" handler.
- *
- * Resets every entity array and the player to their initial state.
- * Called from every hearts<=0 branch so all sources of death produce
- * an identical reset — no entity is accidentally left in a stale state.
- *
- * fp_prev_riding is passed by pointer because it lives as a local
- * variable inside game_loop; resetting it here keeps the float-platform
- * stay-on logic from snapping the player to a platform that no longer
- * exists after the reset.
- */
-void reset_current_level(GameState *gs, int *fp_prev_riding) {
-    /* Apply checkpoint offset to spawn position if set */
-    if (gs->checkpoint_x > 0.0f) {
-        gs->player.spawn_x = gs->checkpoint_x;
-    }
-    level_reset(gs, &s_level);
-    *fp_prev_riding = -1;
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
- * ctrl_init_worker — background thread that calls SDL_InitSubSystem.
- *
- * SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) enumerates HID devices and
- * can block for 20-30 seconds on Windows when antivirus software is active.
- * Running it in a separate thread keeps the main loop responsive so the OS
- * does not show "application not responding" and the game continues drawing.
- *
- * Only SDL_InitSubSystem is called here — SDL gamepad functions
- * (SDL_NumJoysticks, SDL_GameControllerOpen) are not thread-safe and must
- * be called from the main thread after this thread finishes.
- */
-static int ctrl_init_worker(void *data) {
-    GameState *gs = (GameState *)data;
-    if (SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) != 0) {
-        fprintf(stderr, "Warning: SDL_INIT_GAMECONTROLLER failed: %s — "
-                        "gamepad support unavailable\n", SDL_GetError());
-    }
-    /*
-     * Atomic write: signal the main thread that the subsystem is ready.
-     * volatile ensures the compiler does not cache this value in a register.
-     */
-    gs->ctrl_init_done = 1;
-    return 0;
-}
 
 /* ------------------------------------------------------------------ */
 

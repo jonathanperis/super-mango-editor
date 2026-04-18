@@ -33,6 +33,7 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(wildcard $(SRCDIR)/effects/*.c) \
           $(wildcard $(SRCDIR)/entities/*.c) \
           $(wildcard $(SRCDIR)/hazards/*.c) \
+          $(wildcard $(SRCDIR)/input/*.c) \
           $(wildcard $(SRCDIR)/levels/*.c) \
           $(wildcard $(SRCDIR)/player/*.c) \
           $(wildcard $(SRCDIR)/render/*.c) \
@@ -86,6 +87,9 @@ $(SRCDIR)/entities/%.o: $(SRCDIR)/entities/%.c
 	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
 
 $(SRCDIR)/hazards/%.o: $(SRCDIR)/hazards/%.c
+	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
+
+$(SRCDIR)/input/%.o: $(SRCDIR)/input/%.c
 	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
 
 $(SRCDIR)/levels/%.o: $(SRCDIR)/levels/%.c
@@ -176,6 +180,7 @@ clean:
 	rm -f $(SRCDIR)/effects/*.o $(SRCDIR)/effects/*.d
 	rm -f $(SRCDIR)/entities/*.o $(SRCDIR)/entities/*.d
 	rm -f $(SRCDIR)/hazards/*.o $(SRCDIR)/hazards/*.d
+	rm -f $(SRCDIR)/input/*.o $(SRCDIR)/input/*.d
 	rm -f $(SRCDIR)/levels/*.o $(SRCDIR)/levels/*.d
 	rm -f $(SRCDIR)/player/*.o $(SRCDIR)/player/*.d
 	rm -f $(SRCDIR)/render/*.o $(SRCDIR)/render/*.d
