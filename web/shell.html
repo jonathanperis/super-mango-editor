@@ -1,151 +1,76 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Super Mango</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #1a1a2e;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      font-family: 'Courier New', monospace;
-      color: #e0e0e0;
-    }
-    h1 {
-      font-size: 1.4rem;
-      margin-bottom: 0.5rem;
-      color: #f5c542;
-    }
-    #canvas {
-      border: 2px solid #f5c542;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-      cursor: default;
-    }
-    .info {
-      margin-top: 0.5rem;
-      font-size: 0.75rem;
-      color: #888;
-    }
-    #status {
-      margin-top: 0.25rem;
-      font-size: 0.8rem;
-      color: #aaa;
-    }
-    .spinner {
-      display: inline-block;
-      width: 1em;
-      height: 1em;
-      border: 2px solid #555;
-      border-top-color: #f5c542;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      vertical-align: middle;
-      margin-right: 0.5em;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Mango</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        #canvas-container {
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 18px;
+            text-align: center;
+            pointer-events: none;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #333;
+            border-top-color: #ffd700;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-  <h1>Super Mango</h1>
-  <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
-  <p id="status"><span class="spinner"></span>Loading...</p>
-  <p class="info">WASD / Arrows to move &middot; Space to jump &middot; ESC to quit</p>
+    <div id="canvas-container">
+        <canvas id="canvas"></canvas>
+        <div id="status">
+            <div class="spinner"></div>
+            <div>Loading Super Mango...</div>
+        </div>
+    </div>
 
-  <script>
-    var Module = {
-      /* Launch directly into the sandbox gameplay phase (skip start menu). */
-      arguments: ['--sandbox'],
-      canvas: (function() {
-        var c = document.getElementById('canvas');
-        c.addEventListener('webglcontextlost', function(e) {
-          alert('WebGL context lost — please reload the page.');
-          e.preventDefault();
-        }, false);
-        return c;
-      })(),
-      setStatus: function(text) {
-        var el = document.getElementById('status');
-        if (!text) {
-          el.style.display = 'none';
-        } else {
-          el.innerHTML = text.includes('Downloading')
-            ? '<span class="spinner"></span>' + text
-            : text;
-          el.style.display = '';
-        }
-      },
-      monitorRunDependencies: function(left) {
-        if (left === 0) {
-          Module.setStatus('');
-          document.getElementById('canvas').focus();
-        }
-      }
-    };
-    Module.setStatus('Loading...');
-    window.onerror = function() {
-      Module.setStatus('Error — check the browser console.');
-    };
-
-    /* Prevent browser from intercepting game keys (arrows, space, shift). */
-    document.addEventListener('keydown', function(e) {
-      /* Arrow keys, Space, Shift, WASD, W/A/S/D keys */
-      if ([32, 37, 38, 39, 40, 16, 65, 68, 83, 87].includes(e.keyCode)) {
-        e.preventDefault();
-      }
-    }, false);
-
-    /*
-     * Stuck-key fix: fire synthetic keyup events for every game input key
-     * whenever the canvas (or the whole window) loses focus.
-     *
-     * SDL2 registers keydown/keyup listeners and maintains an internal key-
-     * state table.  When focus moves away (DevTools, address bar, alt-tab)
-     * the browser may deliver a keydown without the matching keyup, leaving
-     * the key permanently "pressed" in SDL's table.  The player then walks
-     * or jumps without any physical input.
-     *
-     * Dispatching synthetic keyup events on the canvas flushes SDL's state
-     * for all relevant keys.  bubbles:true lets the events reach SDL whether
-     * it is listening on the canvas element (SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT)
-     * or higher up the DOM (document/window default).
-     */
-    (function() {
-      var GAME_KEYS = [
-        'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-        'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyS',
-        'ShiftLeft', 'ShiftRight'
-      ];
-
-      function releaseGameKeys() {
-        var c = document.getElementById('canvas');
-        if (!c) return;
-        GAME_KEYS.forEach(function(code) {
-          c.dispatchEvent(new KeyboardEvent('keyup', {
-            code: code,
-            bubbles: true,
-            cancelable: true
-          }));
-        });
-      }
-
-      /* Canvas blur: covers DevTools, address bar, any in-page focus shift. */
-      document.getElementById('canvas').addEventListener('blur', releaseGameKeys);
-
-      /* Window blur: covers alt-tab, clicking another application. */
-      window.addEventListener('blur', releaseGameKeys);
-
-      /* Tab hidden: covers switching browser tabs. */
-      document.addEventListener('visibilitychange', function() {
-        if (document.hidden) releaseGameKeys();
-      });
-    }());
-  </script>
-  {{{ SCRIPT }}}
+    <script>
+        var Module = {
+            canvas: document.getElementById('canvas'),
+            onRuntimeInitialized: function() {
+                document.getElementById('status').style.display = 'none';
+            },
+            print: function(text) {
+                console.log(text);
+            },
+            printErr: function(text) {
+                console.error(text);
+            }
+        };
+    </script>
+    {{{ SCRIPT }}}
 </body>
 </html>
