@@ -706,4 +706,5 @@ void level_reset(GameState *gs, const LevelDef *def)
     /* Surfaces */
     load_float_platforms(gs, def);
     load_bridges(gs, def);
+    load_bouncepads(gs, def);
 }
