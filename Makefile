@@ -35,6 +35,7 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(wildcard $(SRCDIR)/hazards/*.c) \
           $(wildcard $(SRCDIR)/levels/*.c) \
           $(wildcard $(SRCDIR)/player/*.c) \
+          $(wildcard $(SRCDIR)/render/*.c) \
           $(wildcard $(SRCDIR)/screens/*.c) \
           $(wildcard $(SRCDIR)/surfaces/*.c) \
           $(SRCDIR)/editor/serializer.c \
@@ -91,6 +92,9 @@ $(SRCDIR)/levels/%.o: $(SRCDIR)/levels/%.c
 	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
 
 $(SRCDIR)/player/%.o: $(SRCDIR)/player/%.c
+	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
+
+$(SRCDIR)/render/%.o: $(SRCDIR)/render/%.c
 	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
 
 $(SRCDIR)/screens/%.o: $(SRCDIR)/screens/%.c
@@ -174,6 +178,7 @@ clean:
 	rm -f $(SRCDIR)/hazards/*.o $(SRCDIR)/hazards/*.d
 	rm -f $(SRCDIR)/levels/*.o $(SRCDIR)/levels/*.d
 	rm -f $(SRCDIR)/player/*.o $(SRCDIR)/player/*.d
+	rm -f $(SRCDIR)/render/*.o $(SRCDIR)/render/*.d
 	rm -f $(SRCDIR)/screens/*.o $(SRCDIR)/screens/*.d
 	rm -f $(SRCDIR)/surfaces/*.o $(SRCDIR)/surfaces/*.d
 	rm -f $(EDITOR_DIR)/*.o $(EDITOR_DIR)/*.d
