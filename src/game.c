@@ -68,6 +68,12 @@
  */
 static LevelDef s_level;
 
+/*
+ * File-scoped combined bouncepad array — avoids allocating 48 structs
+ * on the stack every frame.  Populated once per frame in game_loop_frame.
+ */
+static Bouncepad s_all_pads[MAX_BOUNCEPADS_MEDIUM + MAX_BOUNCEPADS_SMALL + MAX_BOUNCEPADS_HIGH];
+
 /* ------------------------------------------------------------------ */
 
 /*
@@ -128,12 +134,6 @@ void game_init(GameState *gs) {
      * giving every pixel a 2×2 block on screen — the chunky pixel-art look.
      */
     SDL_RenderSetLogicalSize(gs->renderer, GAME_W, GAME_H);
-
-    /*
-     * Parallax background is now initialised AFTER level_load, so that
-     * the LevelDef can specify per-level layer paths and speeds.
-     * See the "Apply level-wide configuration" block below level_load.
-     */
 
     /*
      * Load the grass tile. This single 48×48 texture will be repeated
@@ -256,7 +256,7 @@ void game_init(GameState *gs) {
 
     /* ---- Load all sound effects ----------------------------------- */
     gs->snd_spring = Mix_LoadWAV("assets/sounds/surfaces/bouncepad.wav");
-    if (!gs->snd_spring) fprintf(stderr, "Warning: Failed to load bouncepad.mp3: %s\n", Mix_GetError());
+    if (!gs->snd_spring) fprintf(stderr, "Warning: Failed to load bouncepad.wav: %s\n", Mix_GetError());
 
     /*
      * Load the swinging axe sound effect.
@@ -265,7 +265,7 @@ void game_init(GameState *gs) {
      */
     gs->snd_axe = Mix_LoadWAV("assets/sounds/hazards/axe_trap.wav");
     if (!gs->snd_axe) {
-        fprintf(stderr, "Warning: Failed to load swinging-axe.mp3: %s\n", Mix_GetError());
+        fprintf(stderr, "Warning: Failed to load axe_trap.wav: %s\n", Mix_GetError());
     }
 
     /*
@@ -278,7 +278,7 @@ void game_init(GameState *gs) {
     }
 
     /*
-     * Load the jumping spider attack sound effect.
+     * Load the spider sound effect (used by jumping spider attack).
      * Non-fatal: gameplay continues without audio if loading fails.
      */
     gs->snd_spider_attack = Mix_LoadWAV("assets/sounds/entities/spider.wav");
@@ -332,10 +332,6 @@ void game_init(GameState *gs) {
         fprintf(stderr, "Warning: Failed to load hit.wav: %s\n", Mix_GetError());
     }
 
-    /*
-     * Music is now loaded AFTER level_load, so that the LevelDef can
-     * specify per-level music path and volume.  See the block below.
-     */
     gs->music = NULL;
 
     /* Set up the player (loads texture, sets initial position on the floor) */
@@ -378,8 +374,8 @@ void game_init(GameState *gs) {
             path_valid = 1;
         }
 #else
-    char resolved[PATH_MAX];
-    if (realpath(gs->level_path, resolved) != NULL) {
+        char resolved[PATH_MAX];
+        if (realpath(gs->level_path, resolved) != NULL) {
             strncpy(safe_path, resolved, sizeof(safe_path) - 1);
             path_valid = 1;
         }
@@ -1017,7 +1013,7 @@ static void game_collide(GameState *gs, float dt)
             if (!gs->star_greens[i].active) continue;
             SDL_Rect sbox = {
                 (int)gs->star_greens[i].x, (int)gs->star_greens[i].y,
-                STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
+                STAR_GREEN_DISPLAY_W, STAR_GREEN_DISPLAY_H
             };
             if (SDL_HasIntersection(&phit, &sbox)) {
                 gs->star_greens[i].active = 0;
@@ -1037,7 +1033,7 @@ static void game_collide(GameState *gs, float dt)
     /* ---- Red star collision ------------------------------------ */
     /*
      * Red stars restore one heart immediately on pickup.
-     * Same mechanics as yellow stars — purely a health pickup.
+     * Same mechanics as yellow/green stars — purely a health pickup.
      */
     {
         SDL_Rect phit = player_get_hitbox(&gs->player);
@@ -1045,7 +1041,7 @@ static void game_collide(GameState *gs, float dt)
             if (!gs->star_reds[i].active) continue;
             SDL_Rect sbox = {
                 (int)gs->star_reds[i].x, (int)gs->star_reds[i].y,
-                STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
+                STAR_RED_DISPLAY_W, STAR_RED_DISPLAY_H
             };
             if (SDL_HasIntersection(&phit, &sbox)) {
                 gs->star_reds[i].active = 0;
@@ -1272,12 +1268,12 @@ static void game_render_frame(GameState *gs, int cam_x, float dt)
                      gs->renderer, gs->star_yellow_tex, cam_x);
 
     /* Draw star greens — same mechanics and display size as yellow stars */
-    star_yellows_render(gs->star_greens, gs->star_green_count,
-                     gs->renderer, gs->star_green_tex, cam_x);
+    star_greens_render(gs->star_greens, gs->star_green_count,
+                      gs->renderer, gs->star_green_tex, cam_x);
 
     /* Draw star reds — same mechanics and display size as yellow stars */
-    star_yellows_render(gs->star_reds, gs->star_red_count,
-                     gs->renderer, gs->star_red_tex, cam_x);
+    star_reds_render(gs->star_reds, gs->star_red_count,
+                      gs->renderer, gs->star_red_tex, cam_x);
 
     /* Draw the end-of-level last star using its dedicated sprite */
     last_star_render(&gs->last_star, gs->renderer,
@@ -1525,22 +1521,22 @@ static void game_loop_frame(void *arg) {
          * Build a combined bouncepad array for player_update collision.
          * The three separate arrays (medium, small, high) are concatenated
          * so player_update sees all pads in one flat array.
+         * Uses file-static s_all_pads to avoid stack allocation every frame.
          */
-        Bouncepad all_pads[MAX_BOUNCEPADS_MEDIUM + MAX_BOUNCEPADS_SMALL + MAX_BOUNCEPADS_HIGH];
         int all_pad_count = 0;
         for (int i = 0; i < gs->bouncepad_medium_count; i++)
-            all_pads[all_pad_count++] = gs->bouncepads_medium[i];
+            s_all_pads[all_pad_count++] = gs->bouncepads_medium[i];
         for (int i = 0; i < gs->bouncepad_small_count; i++)
-            all_pads[all_pad_count++] = gs->bouncepads_small[i];
+            s_all_pads[all_pad_count++] = gs->bouncepads_small[i];
         for (int i = 0; i < gs->bouncepad_high_count; i++)
-            all_pads[all_pad_count++] = gs->bouncepads_high[i];
+            s_all_pads[all_pad_count++] = gs->bouncepads_high[i];
 
         int bounce_idx    = -1;
         int fp_landed_idx = -1;
         player_update(&gs->player, dt,
                       gs->platforms, gs->platform_count,
                       gs->float_platforms, gs->float_platform_count,
-                      all_pads, all_pad_count,
+                      s_all_pads, all_pad_count,
                       gs->vines, gs->vine_count,
                       gs->ladders, gs->ladder_count,
                       gs->ropes, gs->rope_count,

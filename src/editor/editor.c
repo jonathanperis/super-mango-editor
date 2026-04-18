@@ -1968,7 +1968,7 @@ static void render_status_bar(EditorState *es) {
               + es->level.ladder_count
               + es->level.rope_count;
 
-    char info_text[128];
+    char info_text[512];
     if (es->file_path[0] != '\0') {
         /*
          * Show the file path with a modified indicator.
