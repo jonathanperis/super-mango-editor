@@ -371,9 +371,9 @@ typedef struct {
     int                  coin_count;
     StarYellowPlacement  star_yellows[MAX_STAR_YELLOWS];
     int                  star_yellow_count;
-    StarGreenPlacement   star_greens[MAX_STAR_YELLOWS];
+    StarGreenPlacement   star_greens[MAX_STAR_GREENS];
     int                  star_green_count;
-    StarRedPlacement     star_reds[MAX_STAR_YELLOWS];
+    StarRedPlacement     star_reds[MAX_STAR_REDS];
     int                  star_red_count;
     LastStarPlacement    last_star;
 
