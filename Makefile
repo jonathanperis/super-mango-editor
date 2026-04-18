@@ -28,6 +28,7 @@ TARGET  = $(OUTDIR)/super-mango
 SRCDIR  = src
 SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(wildcard $(SRCDIR)/collectibles/*.c) \
+          $(wildcard $(SRCDIR)/collision/*.c) \
           $(wildcard $(SRCDIR)/core/*.c) \
           $(wildcard $(SRCDIR)/effects/*.c) \
           $(wildcard $(SRCDIR)/entities/*.c) \
@@ -69,6 +70,9 @@ $(SRCDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
 
 $(SRCDIR)/collectibles/%.o: $(SRCDIR)/collectibles/%.c
+	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
+
+$(SRCDIR)/collision/%.o: $(SRCDIR)/collision/%.c
 	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
 
 $(SRCDIR)/core/%.o: $(SRCDIR)/core/%.c
@@ -163,6 +167,7 @@ web: $(OUTDIR)
 clean:
 	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.d
 	rm -f $(SRCDIR)/collectibles/*.o $(SRCDIR)/collectibles/*.d
+	rm -f $(SRCDIR)/collision/*.o $(SRCDIR)/collision/*.d
 	rm -f $(SRCDIR)/core/*.o $(SRCDIR)/core/*.d
 	rm -f $(SRCDIR)/effects/*.o $(SRCDIR)/effects/*.d
 	rm -f $(SRCDIR)/entities/*.o $(SRCDIR)/entities/*.d
