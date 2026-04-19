@@ -325,7 +325,11 @@ void game_render_frame(GameState *gs, int cam_x, float dt)
      * in the state machine below) and reused each frame until init completes
      * (state 2→0).  This avoids calling TTF_RenderText_Solid and uploading
      * to GPU memory on every frame for the duration of the init window.
+     *
+     * Guarded for WebAssembly: ctrl_pending_init is never set on WASM so this
+     * block is dead code there, but the guard makes the intent explicit.
      */
+#ifndef __EMSCRIPTEN__
     if (gs->ctrl_pending_init == 2 && gs->ctrl_init_msg_tex) {
         int tw, th;
         SDL_QueryTexture(gs->ctrl_init_msg_tex, NULL, NULL, &tw, &th);
@@ -333,6 +337,7 @@ void game_render_frame(GameState *gs, int cam_x, float dt)
         SDL_Rect dst = { GAME_W - tw - 6, GAME_H - th - 6, tw, th };
         SDL_RenderCopy(gs->renderer, gs->ctrl_init_msg_tex, NULL, &dst);
     }
+#endif
 
     /* Level complete overlay — rendered last on top of everything */
     if (gs->level_complete) {
