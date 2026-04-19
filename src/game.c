@@ -1178,21 +1178,23 @@ void game_loop(GameState *gs) {
      * SDL_FlushEvents then discards the resulting SDL_KEYUP entries queued by
      * those listeners so they do not appear as noise on frame 1.
      */
-    EM_ASM(
-        (function() {
-            var GAME_KEYS = [
-                'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-                'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyS',
-                'ShiftLeft', 'ShiftRight'
-            ];
-            var canvas = document.getElementById('canvas');
-            if (!canvas) return;
-            GAME_KEYS.forEach(function(code) {
-                canvas.dispatchEvent(new KeyboardEvent('keyup', {
-                    code: code, bubbles: true, cancelable: true
-                }));
-            });
-        })();
+    /*
+     * emscripten_run_script — plain C function (no GNU extension required),
+     * compatible with -std=c11 unlike EM_ASM which needs -std=gnu*.
+     * Evaluates the JavaScript string synchronously in the browser context.
+     */
+    emscripten_run_script(
+        "(function(){"
+        "  var K=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',"
+        "    'Space','KeyA','KeyD','KeyW','KeyS','ShiftLeft','ShiftRight'];"
+        "  var c=document.getElementById('canvas');"
+        "  if(!c)return;"
+        "  K.forEach(function(code){"
+        "    c.dispatchEvent(new KeyboardEvent('keyup',{"
+        "      code:code,bubbles:true,cancelable:true"
+        "    }));"
+        "  });"
+        "})();"
     );
     SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
 
