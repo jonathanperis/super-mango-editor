@@ -159,16 +159,20 @@ void game_collide(GameState *gs, float dt)
         }
     }
 
-    /* Spike platforms — inline hitbox construction */
+    /* Spike platforms — use spike_platform_get_rect() for the extended hitbox.
+     *
+     * The inline hitbox (y = sp->y, h = SPIKE_PLAT_SRC_H) placed the top edge
+     * exactly at sp->y.  When the player stands on top, the physics engine snaps
+     * their bottom to sp->y as well, so SDL_HasIntersection's strict less-than
+     * test evaluates phit.bottom > sphit.top as sp->y > sp->y — false — and no
+     * damage fires.  spike_platform_get_rect() extends the hitbox 2 px upward
+     * (y = sp->y - 2) so the standing player's hitbox always overlaps, making
+     * top-landing damage work correctly.
+     */
     if (gs->player.hurt_timer == 0.0f) {
         for (int i = 0; i < gs->spike_platform_count; i++) {
             if (!gs->spike_platforms[i].active) continue;
-            SDL_Rect sphit = {
-                (int)gs->spike_platforms[i].x,
-                (int)gs->spike_platforms[i].y,
-                gs->spike_platforms[i].w,
-                SPIKE_PLAT_SRC_H
-            };
+            SDL_Rect sphit = spike_platform_get_rect(&gs->spike_platforms[i]);
             if (SDL_HasIntersection(&phit, &sphit)) {
                 if (gs->debug_mode) debug_log(&gs->debug, "HIT spike_platform[%d]", i);
                 float sx = sphit.x + sphit.w * 0.5f;
