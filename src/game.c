@@ -517,8 +517,17 @@ void game_init(GameState *gs) {
      * SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) enumerates HID devices,
      * which can block for 20-30 seconds on Windows when antivirus software
      * is active. Deferring keeps game_init fast so the window appears immediately.
+     *
+     * Disabled on WebAssembly: Emscripten has no real pthreads support in this
+     * build, SDL_CreateThread would run synchronously, and initialising the
+     * gamepad subsystem via the browser Gamepad API can generate unexpected SDL
+     * events that corrupt the keyboard state before the first frame. Controller
+     * input is already disabled on WASM (see #ifndef __EMSCRIPTEN__ in
+     * player_handle_input), so there is nothing to gain from running this here.
      */
+#ifndef __EMSCRIPTEN__
     gs->ctrl_pending_init = 1;
+#endif
 
     /* Signal the loop to start running; game starts in the foreground */
     gs->running = 1;
@@ -1056,7 +1065,12 @@ static void game_loop_frame(void *arg) {
          * State 2: thread running — check each frame if it has finished.
          *          When done, open the controller on the main thread (thread-safe)
          *          and clear ctrl_pending_init so the HUD message disappears.
+         *
+         * Disabled on WebAssembly: ctrl_pending_init is never set to 1 on WASM
+         * (guarded in game_init), so this block is dead code there. The explicit
+         * #ifndef makes the intent clear and prevents future regressions.
          */
+#ifndef __EMSCRIPTEN__
         if (gs->ctrl_pending_init == 1) {
             gs->ctrl_init_done   = 0;
             gs->ctrl_init_thread = SDL_CreateThread(ctrl_init_worker, "ctrl_init", gs);
@@ -1106,6 +1120,7 @@ static void game_loop_frame(void *arg) {
                 gs->ctrl_init_msg_tex = NULL;
             }
         }
+#endif
 
         /*
          * Manual frame cap fallback: if the frame finished before frame_ms ms
@@ -1143,6 +1158,44 @@ void game_loop(GameState *gs) {
     gs->fp_prev_riding  = -1;
 
 #ifdef __EMSCRIPTEN__
+    /*
+     * Flush stale keyboard state before the first game frame.
+     *
+     * SDL2 registers JavaScript keydown/keyup listeners on #canvas during
+     * SDL_Init and maintains an internal keystate[] array directly (not just
+     * the SDL event queue).  If any spurious keydown fired during Emscripten
+     * module initialisation — e.g. from a browser navigation/focus event when
+     * INVOKE_RUN=1 calls main() synchronously — the matching keyup is never
+     * delivered and that scancode stays SDL_PRESSED for the entire session.
+     * SDL_PollEvent drains the event queue but does NOT reset keystate[], so
+     * the stuck key persists across all frames, causing the player to walk
+     * indefinitely without any physical input.
+     *
+     * Fix: dispatch synthetic keyup events for every game input key on the
+     * canvas immediately before the Emscripten main loop starts.
+     * dispatchEvent() is synchronous — SDL's listener runs immediately and
+     * sets those scancodes to SDL_RELEASED before the first frame fires.
+     * SDL_FlushEvents then discards the resulting SDL_KEYUP entries queued by
+     * those listeners so they do not appear as noise on frame 1.
+     */
+    EM_ASM(
+        (function() {
+            var GAME_KEYS = [
+                'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+                'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyS',
+                'ShiftLeft', 'ShiftRight'
+            ];
+            var canvas = document.getElementById('canvas');
+            if (!canvas) return;
+            GAME_KEYS.forEach(function(code) {
+                canvas.dispatchEvent(new KeyboardEvent('keyup', {
+                    code: code, bubbles: true, cancelable: true
+                }));
+            });
+        })();
+    );
+    SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
+
     /*
      * emscripten_set_main_loop_arg — register a per-frame callback.
      *   arg 1: callback function (receives void* user data)
