@@ -6,7 +6,7 @@ name: Deploy to GitHub Pages
 #
 # This workflow:
 #   1. Downloads the WebAssembly build artifacts from the latest build
-#   2. Builds the docs site
+#   2. Builds the docs site (Astro)
 #   3. Copies WASM files into docs output
 #   4. Deploys to GitHub Pages
 # ──────────────────────────────────────────────────────────────────────────────
@@ -39,11 +39,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      # Check out the repository to get the docs/ folder.
       - name: Checkout source
         uses: actions/checkout@v6
 
-      # Download the WebAssembly build artifacts from the completed workflow_run.
       - name: Download WebAssembly build
         uses: actions/download-artifact@v8
         with:
@@ -52,16 +50,18 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
 
-      # Build the docs site (Astro static export to docs/out/).
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      # Node 22 — Astro 6+ checks process.versions.node
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: docs/package-lock.json
+          node-version: '22'
+
+      # Bun for install (CLAUDE.md convention for Pages projects)
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: Install docs dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
         working-directory: docs
 
       - name: Build docs site
@@ -70,8 +70,6 @@ jobs:
         env:
           PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}
 
-      # Layer the WASM files into the built docs site so the JS loader
-      # can find them at the site root (alongside index.html).
       - name: Copy WASM artifacts into docs output
         run: |
           cp wasm-build/super-mango.js   docs/out/
@@ -88,4 +86,4 @@ jobs:
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v4
