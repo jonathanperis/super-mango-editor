@@ -70,20 +70,15 @@ const sectionsToRender = isRoot
 
 /* getStaticPaths is hoisted by Astro — must be self-contained */
 export function getStaticPaths() {
+    const order = [
+        'index', 'architecture', 'source-files', 'player-module',
+        'constants-reference', 'entities-and-hazards', 'collectibles-and-surfaces',
+        'assets', 'sounds', 'build-system', 'level-design',
+        'level-editor', 'developer-guide',
+    ];
     return [
         { params: { slug: undefined } },
-        { params: { slug: 'architecture' } },
-        { params: { slug: 'source-files' } },
-        { params: { slug: 'player-module' } },
-        { params: { slug: 'constants-reference' } },
-        { params: { slug: 'entities-and-hazards' } },
-        { params: { slug: 'collectibles-and-surfaces' } },
-        { params: { slug: 'assets' } },
-        { params: { slug: 'sounds' } },
-        { params: { slug: 'build-system' } },
-        { params: { slug: 'level-design' } },
-        { params: { slug: 'level-editor' } },
-        { params: { slug: 'developer-guide' } },
+        ...order.filter(s => s !== 'index').map(slug => ({ params: { slug } })),
     ];
 }
 
