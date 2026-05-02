@@ -114,7 +114,7 @@ const backHomeUrl = base.replace(/\/$/, '') + '/';
         <div class="sidebar-header">
             <h1 class="repo-title">Super Mango Editor</h1>
             <p class="repo-description">2D side-scrolling platformer written in C using SDL2 — browser-playable via WebAssembly</p>
-            <input type="text" id="searchInput" class="search-box" placeholder="Search documentation..." aria-label="Search documentation">
+            <input type="text" id="searchInput" class="search-box" placeholder="Search documentation..." aria-label="Search documentation" hidden={!isRoot}>
         </div>
         <div class="sidebar-nav-container">
             {SECTION_CATEGORIES.map((cat, i) => (
