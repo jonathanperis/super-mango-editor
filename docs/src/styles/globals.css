@@ -870,8 +870,8 @@ a:hover { color: var(--green); }
 
 .docs-layout .content {
     width: 100%;
-    max-width: 860px;
-    padding: 48px 64px;
+    max-width: 1100px;
+    padding: 48px 48px;
 }
 
 /* ── Docs Typography ───────────────────────────────────────────────── */
