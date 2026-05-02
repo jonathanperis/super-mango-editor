@@ -12,8 +12,8 @@ const SECTION_LABELS: Record<string, string> = {
     "player-module": "Player Module",
     "constants-reference": "Constants Reference",
     /* Content & Assets */
-    "entities-hazards": "Entities & Hazards",
-    "collectibles-surfaces": "Collectibles & Surfaces",
+    "entities-and-hazards": "Entities & Hazards",
+    "collectibles-and-surfaces": "Collectibles & Surfaces",
     assets: "Assets",
     sounds: "Sounds",
     /* Building & Contributing */
@@ -31,7 +31,7 @@ export const SECTION_CATEGORIES: { label: string | null; ids: string[] }[] = [
     },
     {
         label: "Content & Assets",
-        ids: ["entities-hazards", "collectibles-surfaces", "assets", "sounds"],
+        ids: ["entities-and-hazards", "collectibles-and-surfaces", "assets", "sounds"],
     },
     {
         label: "Building & Contributing",
