@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD051 -- fragment anchors resolve on the combined /docs/ page -->
-# super-mango-editor
+# Super Mango Editor
 
 > 2D side-scrolling platformer written in C using SDL2 -- browser-playable via WebAssembly
 
