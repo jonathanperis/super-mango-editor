@@ -68,5 +68,4 @@ src/levels/exported/*.h
 levels/_playtest.toml
 
 # Docs generation
-wiki/
 node_modules/
