@@ -891,6 +891,7 @@ a:hover { color: var(--green); }
     padding-bottom: 8px;
     border-bottom: 1px solid var(--border);
     color: var(--text-primary);
+    scroll-margin-top: 80px;
 }
 
 .docs-layout h3 {
@@ -898,6 +899,7 @@ a:hover { color: var(--green); }
     font-weight: 600;
     margin: 32px 0 12px;
     color: var(--text-primary);
+    scroll-margin-top: 80px;
 }
 
 .docs-layout p {

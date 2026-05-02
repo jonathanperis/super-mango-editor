@@ -111,4 +111,54 @@ const pageTitle = firstPage?.frontmatter?.title
             </main>
         </div>
     </div>
+
+    {/* Search filter — plain script, no React hydration timing issues */}
+    <script is:inline>
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('searchInput');
+            if (!searchInput) return;
+
+            const sections = document.querySelectorAll('section.doc-section');
+            const navItems = document.querySelectorAll('.nav-item');
+
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+
+                if (query === '') {
+                    sections.forEach(s => s.classList.remove('hidden-section'));
+                    navItems.forEach(item => {
+                        item.parentElement.style.display = '';
+                        // Also unhide category labels
+                        const catLabel = item.closest('div')?.querySelector('.sidebar-category');
+                        if (catLabel) catLabel.style.display = '';
+                    });
+                    return;
+                }
+
+                sections.forEach(section => {
+                    const text = section.textContent?.toLowerCase() ?? '';
+                    const navItem = document.querySelector(`.nav-item[href="#${section.id}"]`);
+                    const li = navItem ? navItem.parentElement : null;
+                    const parentDiv = li ? li.closest('div') : null;
+
+                    if (text.includes(query)) {
+                        section.classList.remove('hidden-section');
+                        if (li) li.style.display = '';
+                    } else {
+                        section.classList.add('hidden-section');
+                        if (li) li.style.display = 'none';
+                    }
+
+                    // Hide category label if all its items are hidden
+                    if (parentDiv) {
+                        const catLabel = parentDiv.querySelector('.sidebar-category');
+                        if (catLabel) {
+                            const visibleItems = parentDiv.querySelectorAll('ul li:not([style*="display: none"])');
+                            catLabel.style.display = visibleItems.length === 0 ? 'none' : '';
+                        }
+                    }
+                });
+            });
+        });
+    </script>
 </BaseLayout>

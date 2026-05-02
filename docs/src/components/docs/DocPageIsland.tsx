@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useScrollspy } from "@/hooks/useScrollspy";
 import Sidebar from "./Sidebar";
 
@@ -46,23 +46,6 @@ export default function DocPageIsland() {
     const [searchQuery, setSearchQuery] = useState("");
     const { activeSection } = useScrollspy(SECTION_IDS);
     const toggleMenu = useCallback(() => setMenuOpen((p) => !p), []);
-
-    /* Apply search filtering by toggling hidden-section class on DOM sections */
-    useEffect(() => {
-        if (!searchQuery) {
-            SECTION_IDS.forEach((id) => {
-                document.getElementById(id)?.classList.remove("hidden-section");
-            });
-            return;
-        }
-        const q = searchQuery.toLowerCase();
-        SECTION_IDS.forEach((id) => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            const visible = el.textContent?.toLowerCase().includes(q) ?? true;
-            el.classList.toggle("hidden-section", !visible);
-        });
-    }, [searchQuery]);
 
     return (
         <>

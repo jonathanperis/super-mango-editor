@@ -32,8 +32,10 @@ export default function Sidebar({
                 </p>
                 <input
                     type="text"
+                    id="searchInput"
                     className="search-box"
                     placeholder="Search documentation..."
+                    aria-label="Search documentation"
                     value={searchQuery}
                     onChange={(e) => onSearchChange(e.target.value)}
                 />
