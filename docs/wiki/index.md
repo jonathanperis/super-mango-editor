@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD051 -- fragment anchors resolve on the combined /docs/ page -->
 # super-mango-editor
 
 > 2D side-scrolling platformer written in C using SDL2 -- browser-playable via WebAssembly
@@ -21,8 +22,8 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 
 | Page | Description |
 |------|-------------|
-| [Entities & Hazards](#entities-hazards) | All 6 enemy types and 7 hazard types: behaviour, constants, TOML placement |
-| [Collectibles & Surfaces](#collectibles-surfaces) | Coins, stars, bouncepads, rails, float platforms, climbable surfaces |
+| [Entities & Hazards](#entities-and-hazards) | All 6 enemy types and 7 hazard types: behaviour, constants, TOML placement |
+| [Collectibles & Surfaces](#collectibles-and-surfaces) | Coins, stars, bouncepads, rails, float platforms, climbable surfaces |
 | [Assets](#assets) | All sprite sheets, tilesets, and fonts in `assets/` |
 | [Sounds](#sounds) | All audio files in `assets/sounds/` |
 
