@@ -1,6 +1,6 @@
 # Source Files
 
-[← Home](index.md)
+<a id="home"></a>
 
 ---
 
@@ -94,7 +94,7 @@ On failure at any step, all previously-succeeded subsystems are torn down before
 
 ### Constants
 
-See [Constants Reference](constants_reference) for full details.
+See [Constants Reference](#constants-reference) for full details.
 
 ```c
 #define WINDOW_TITLE  "Super Mango"
@@ -190,7 +190,7 @@ Frees all resources in reverse init order.
 
 ## `player/player.h` / `player/player.c`
 
-**Role:** Player character lifecycle. See [Player Module](player_module) for the deep dive.
+**Role:** Player character lifecycle. See [Player Module](#player-module) for the deep dive.
 
 **Key functions:** `player_init`, `player_handle_input`, `player_update`, `player_render`, `player_get_hitbox`, `player_reset`, `player_cleanup`
 

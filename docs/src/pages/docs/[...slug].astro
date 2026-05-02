@@ -1,0 +1,114 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import DocPageIsland from "@/components/docs/DocPageIsland";
+import type { MarkdownInstance } from "astro";
+
+/* Load all wiki markdown files dynamically */
+const allWikiPages = Object.values(
+    import.meta.glob<MarkdownInstance<Record<string, any>>>("../../../wiki/*.md", { eager: true })
+);
+
+/* Build a lookup: slug → wiki page */
+const wikiBySlug: Record<string, MarkdownInstance<Record<string, any>>> = {};
+for (const page of allWikiPages) {
+    /* Extract filename without extension, normalize to hyphenated slug */
+    const fileName = page.file.split("/").pop()!.replace(/\.md$/, "");
+    const slug = fileName.replace(/_/g, "-");
+    wikiBySlug[slug] = page;
+}
+
+/* Ordered section list matching DocPageIsland SECTION_CATEGORIES */
+/* Note: "index" wiki file maps to "home" section ID for scrollspy compatibility */
+const SECTION_ORDER = [
+    "home",
+    "architecture",
+    "source-files",
+    "player-module",
+    "constants-reference",
+    "entities-and-hazards",
+    "collectibles-and-surfaces",
+    "assets",
+    "sounds",
+    "build-system",
+    "level-design",
+    "level-editor",
+    "developer-guide",
+];
+
+/* Slug → wiki file mapping (index.md → home section) */
+const SLUG_TO_FILE: Record<string, string> = {
+    home: "index",
+    architecture: "architecture",
+    "source-files": "source-files",
+    "player-module": "player-module",
+    "constants-reference": "constants-reference",
+    "entities-and-hazards": "entities-and-hazards",
+    "collectibles-and-surfaces": "collectibles-and-surfaces",
+    assets: "assets",
+    sounds: "sounds",
+    "build-system": "build-system",
+    "level-design": "level-design",
+    "level-editor": "level-editor",
+    "developer-guide": "developer-guide",
+};
+
+/* Generate static paths: root (undefined slug) + one per wiki file */
+export function getStaticPaths() {
+    const order = [
+        "architecture", "source-files", "player-module", "constants-reference",
+        "entities-and-hazards", "collectibles-and-surfaces", "assets", "sounds",
+        "build-system", "level-design", "level-editor", "developer-guide",
+    ];
+    return [
+        { params: { slug: undefined } },
+        ...order.map((s) => ({ params: { slug: s } })),
+    ];
+}
+
+/* Resolve which sections to render */
+const { slug } = Astro.params;
+
+let sectionsToRender: { slug: string; page: MarkdownInstance<Record<string, any>> }[] = [];
+
+if (!slug) {
+    /* No slug → render all sections in order (single-page docs) */
+    sectionsToRender = SECTION_ORDER
+        .map((s) => ({ slug: s, page: wikiBySlug[SLUG_TO_FILE[s]] }))
+        .filter((s) => s.page !== undefined);
+} else {
+    /* Specific slug → render just that section */
+    const wikiFile = SLUG_TO_FILE[slug];
+    const page = wikiFile ? wikiBySlug[wikiFile] : undefined;
+    if (!page) {
+        return Astro.redirect("/docs/");
+    }
+    sectionsToRender = [{ slug, page }];
+}
+
+/* Page title: frontmatter → humanized slug → "Documentation" */
+function humanizeSlug(s: string): string {
+    return s
+        .split("-")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+}
+
+const firstPage = sectionsToRender[0]?.page;
+const pageTitle = firstPage?.frontmatter?.title
+    ?? (slug ? humanizeSlug(slug) : "Documentation");
+---
+
+<BaseLayout title={`${pageTitle} - Super Mango Editor`}>
+    <div class="docs-layout">
+        <DocPageIsland client:load />
+        <div class="content-wrapper">
+            <main class="content" id="mainContent">
+                {sectionsToRender.map(({ slug: sectionSlug, page: wikiPage }) => (
+                    <section id={sectionSlug} class="doc-section">
+                        <wikiPage.Content />
+                    </section>
+                ))}
+            </main>
+        </div>
+    </div>
+</BaseLayout>

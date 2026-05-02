@@ -1,6 +1,6 @@
 # Architecture
 
-[← Home](index.md)
+<a id="home"></a>
 
 ---
 
@@ -216,7 +216,7 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 | 31 | HUD | `hud_render`: hearts, lives, score -- always drawn on top |
 | 32 | Debug | `debug_render`: FPS counter, collision boxes, event log — when `--debug` active |
 
-> **Note:** Additional foreground layers (fog, water overlays) can be added per-level via `[foreground_layers](Lforeground_layersE.md)` in the TOML file, adding up to 8 extra layers above the HUD. The base 32 layers are always present.
+> **Note:** Additional foreground layers (fog, water overlays) can be added per-level via `[foreground_layers]` in the TOML file, adding up to 8 extra layers above the HUD. The base 32 layers are always present.
 
 ---
 

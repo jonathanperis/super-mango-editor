@@ -1,6 +1,6 @@
 # Build System
 
-[← Home](index.md)
+<a id="home"></a>
 
 ---
 
@@ -247,7 +247,7 @@ touch src/entities/new_enemy.c src/entities/new_enemy.h
 make   # new_enemy.c is compiled automatically
 ```
 
-See [Developer Guide](developer_guide) for the full new-entity workflow.
+See [Developer Guide](#developer-guide) for the full new-entity workflow.
 
 ---
 

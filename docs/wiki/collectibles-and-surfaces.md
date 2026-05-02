@@ -1,6 +1,6 @@
 # Collectibles & Surfaces
 
-[← Home](index.md)
+<a id="home"></a>
 
 ---
 
@@ -24,7 +24,7 @@ Collectibles are items the player can pick up. Surfaces are interactive terrain 
 | `SCORE_PER_LIFE` | 1000 | Score threshold for a bonus life |
 
 ```toml
-[coins](LcoinsE.md)
+[coins]
 x = 46.0
 y = 236.0   # top edge in logical pixels
 ```
@@ -45,7 +45,7 @@ Every 1000 points (10 coins) the player earns a bonus life. The score threshold 
 | `STAR_YELLOW_DISPLAY_W/H` | 16 | Render size in logical px |
 
 ```toml
-[star_yellows](Lstar_yellowsE.md)
+[star_yellows]
 x = 272.0
 y = 108.0
 ```
@@ -59,7 +59,7 @@ y = 108.0
 **Pickup:** Same as star yellow — restores 1 heart.
 
 ```toml
-[star_greens](Lstar_greensE.md)
+[star_greens]
 x = 500.0
 y = 80.0
 ```
@@ -73,7 +73,7 @@ y = 80.0
 **Pickup:** Same as star yellow — restores 1 heart.
 
 ```toml
-[star_reds](Lstar_redsE.md)
+[star_reds]
 x = 800.0
 y = 100.0
 ```
@@ -85,7 +85,7 @@ y = 100.0
 **File:** `src/collectibles/last_star.c` / `last_star.h`  
 **Sprite:** `assets/sprites/screens/hud_coins.png` (reuses the HUD star icon)  
 **Display size:** 24×24 px  
-**Pickup:** Collecting it sets `collected = 1` and triggers the level-complete event. Only one instance per level, defined with `[last_star]` (not `[last_star](Llast_starE.md)`).
+**Pickup:** Collecting it sets `collected = 1` and triggers the level-complete event. Only one instance per level, defined with `[last_star]` (not `[last_star]`).
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -108,7 +108,7 @@ y = 100.0
 **Behaviour:** Static ground pillar. The player can land on the top surface. Pillars are positioned on the floor and extend upward. Rendered before the floor so the pillar base sinks into the ground naturally.
 
 ```toml
-[platforms](LplatformsE.md)
+[platforms]
 x           = 80.0   # left edge in logical pixels
 tile_height = 2      # height in 48px tiles (1–3)
 tile_width  = 1      # width in 48px tiles (usually 1)
@@ -145,12 +145,12 @@ Top surface Y for a pillar: `FLOOR_Y − (tile_height × TILE_SIZE)` = `252 − 
 | `CRUMBLE_FALL_GRAVITY` | 250 px/s² | Downward acceleration during fall |
 
 ```toml
-[float_platforms](Lfloat_platformsE.md)
+[float_platforms]
 mode       = "STATIC"   # "STATIC" | "CRUMBLE" | "RAIL"
 x          = 172.0
 y          = 200.0
 tile_count = 4          # width in 16px pieces
-rail_index = 0          # RAIL mode only: index into [rails](LrailsE.md)
+rail_index = 0          # RAIL mode only: index into [rails]
 t_offset   = 0.0        # RAIL mode only: starting position on rail
 speed      = 0.0        # RAIL mode only: traversal speed in tiles/s
 ```
@@ -164,7 +164,7 @@ speed      = 0.0        # RAIL mode only: traversal speed in tiles/s
 **Behaviour:** Tiled crumble walkway. Bricks fall individually when the player walks over them, creating a time-limited path. After falling they respawn when the player moves away.
 
 ```toml
-[bridges](LbridgesE.md)
+[bridges]
 x           = 1350.0
 y           = 172.0
 brick_count = 8   # number of 16×16 brick tiles
@@ -192,17 +192,17 @@ brick_count = 8   # number of 16×16 brick tiles
 | `BOUNCEPAD_ART_W` | 16 | Hitbox width = cols 16–31 |
 
 ```toml
-[bouncepads_small](Lbouncepads_smallE.md)
+[bouncepads_small]
 x         = 734.0
 launch_vy = -380.0
 pad_type  = "GREEN"
 
-[bouncepads_medium](Lbouncepads_mediumE.md)
+[bouncepads_medium]
 x         = 310.0
 launch_vy = -536.2
 pad_type  = "WOOD"
 
-[bouncepads_high](Lbouncepads_highE.md)
+[bouncepads_high]
 x         = 1420.0
 launch_vy = -700.0
 pad_type  = "RED"
@@ -224,7 +224,7 @@ pad_type  = "RED"
 | `MAX_RAILS` | 16 | Rail instances in `GameState` |
 
 ```toml
-[rails](LrailsE.md)
+[rails]
 layout  = "RECT"   # "RECT" = closed rectangle | "HORIZ" = open horizontal line
 x       = 444      # top-left tile x
 y       = 35       # top-left tile y
@@ -242,7 +242,7 @@ end_cap = 0        # 0 = open end (rider detaches), 1 = bouncing end
 **Behaviour:** Climbable vertical surface. The player enters by touching the vine and pressing Up or Down. Press Left/Right to detach and jump away.
 
 ```toml
-[vines](LvinesE.md)
+[vines]
 x          = 88.0
 y          = 172.0   # top tile y in logical pixels
 tile_count = 2       # height in tiles (each tile = 16 px wide × 48 px tall)
@@ -257,7 +257,7 @@ tile_count = 2       # height in tiles (each tile = 16 px wide × 48 px tall)
 **Behaviour:** Climbable ladder. The player enters by pressing Up at the base. Climbing is done with Up/Down. Jump or move left/right to exit.
 
 ```toml
-[ladders](LladdersE.md)
+[ladders]
 x          = 1552.0
 y          = 0.0       # top tile y
 tile_count = 30        # height in tiles
@@ -272,7 +272,7 @@ tile_count = 30        # height in tiles
 **Behaviour:** Climbable rope. Same interaction model as the vine — touch and press Up to grab, Up/Down to climb, Left/Right to swing off.
 
 ```toml
-[ropes](LropesE.md)
+[ropes]
 x          = 460.0
 y          = 172.0
 tile_count = 1

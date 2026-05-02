@@ -1,6 +1,6 @@
 # Assets
 
-[← Home](index.md)
+<a id="home"></a>
 
 ---
 
@@ -50,16 +50,16 @@ Any 48×48 PNG tile can be substituted here. The engine 9-slice renders it acros
 ### Parallax Background Layers
 
 ```toml
-[background_layers](Lbackground_layersE.md)
+[background_layers]
 path  = "assets/sprites/backgrounds/sky_blue.png"
 speed = 0.0
 
-[background_layers](Lbackground_layersE.md)
+[background_layers]
 path  = "assets/sprites/backgrounds/glacial_mountains.png"
 speed = 0.2
 ```
 
-Layers are drawn in array order (first = furthest back). `speed` is the parallax scroll factor: `0.0` = static sky, `1.0` = locks to camera, `0.1`–`0.5` = typical mid-ground parallax. Up to 8 layers are supported. See [Level Design](level_design) for the full list of available background images and suggested speeds.
+Layers are drawn in array order (first = furthest back). `speed` is the parallax scroll factor: `0.0` = static sky, `1.0` = locks to camera, `0.1`–`0.5` = typical mid-ground parallax. Up to 8 layers are supported. See [Level Design](#level-design) for the full list of available background images and suggested speeds.
 
 ---
 

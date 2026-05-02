@@ -12,28 +12,28 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 
 | Page | Description |
 |------|-------------|
-| [Architecture](architecture) | Game loop, init/loop/cleanup pattern, GameState container, 32-layer render order |
-| [Source Files](source_files) | Module-by-module reference for every `.c` / `.h` file |
-| [Player Module](player_module) | Input, physics, animation — deep dive into `player.c` |
-| [Constants Reference](constants_reference) | Every `#define` in `game.h` and entity headers explained |
+| [Architecture](#architecture) | Game loop, init/loop/cleanup pattern, GameState container, 32-layer render order |
+| [Source Files](#source-files) | Module-by-module reference for every `.c` / `.h` file |
+| [Player Module](#player-module) | Input, physics, animation — deep dive into `player.c` |
+| [Constants Reference](#constants-reference) | Every `#define` in `game.h` and entity headers explained |
 
 ### Content & Assets
 
 | Page | Description |
 |------|-------------|
-| [Entities & Hazards](entities_and_hazards) | All 6 enemy types and 7 hazard types: behaviour, constants, TOML placement |
-| [Collectibles & Surfaces](collectibles_and_surfaces) | Coins, stars, bouncepads, rails, float platforms, climbable surfaces |
-| [Assets](assets) | All sprite sheets, tilesets, and fonts in `assets/` |
-| [Sounds](sounds) | All audio files in `assets/sounds/` |
+| [Entities & Hazards](#entities-hazards) | All 6 enemy types and 7 hazard types: behaviour, constants, TOML placement |
+| [Collectibles & Surfaces](#collectibles-surfaces) | Coins, stars, bouncepads, rails, float platforms, climbable surfaces |
+| [Assets](#assets) | All sprite sheets, tilesets, and fonts in `assets/` |
+| [Sounds](#sounds) | All audio files in `assets/sounds/` |
 
 ### Building & Contributing
 
 | Page | Description |
 |------|-------------|
-| [Build System](build_system) | Makefile, compiler flags, build targets, prerequisites for all platforms |
-| [Level Design — TOML Reference](level_design) | Full TOML schema for every entity type; minimum level template |
-| [Level Editor](level_editor) | Visual editor: canvas, palette, properties, undo, play-test, file I/O |
-| [Developer Guide](developer_guide) | Coding conventions, adding new entities, sound effects workflow |
+| [Build System](#build-system) | Makefile, compiler flags, build targets, prerequisites for all platforms |
+| [Level Design — TOML Reference](#level-design) | Full TOML schema for every entity type; minimum level template |
+| [Level Editor](#level-editor) | Visual editor: canvas, palette, properties, undo, play-test, file I/O |
+| [Developer Guide](#developer-guide) | Coding conventions, adding new entities, sound effects workflow |
 
 ---
 
@@ -52,7 +52,7 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 - Keyboard and gamepad (hot-plug) controls
 - Builds natively on macOS, Linux, Windows; WebAssembly via Emscripten
 
-**[Play in browser →L(https://jonathanperis.github.io/super-mango-editor/.md)**
+**[Play in browser →](https://jonathanperis.github.io/super-mango-editor/)**
 
 ---
 
@@ -90,4 +90,4 @@ make run-level LEVEL=levels/00_sandbox_01.toml
 make web
 ```
 
-See [Build System](build_system) for Linux and Windows instructions.
+See [Build System](#build-system) for Linux and Windows instructions.

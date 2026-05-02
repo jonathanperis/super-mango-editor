@@ -1,6 +1,6 @@
 # Sounds
 
-[← Home](index.md)
+<a id="home"></a>
 
 ---
 

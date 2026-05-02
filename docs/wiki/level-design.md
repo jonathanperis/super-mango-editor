@@ -1,12 +1,12 @@
 # Level Design — TOML Reference
 
-[← Home](index.md)
+<a id="home"></a>
 
 ---
 
 Super Mango levels are defined as [TOML](https://toml.io) files inside the `levels/` directory. The game engine loads them at startup via `level_loader.c`; the level editor reads and writes the same format. All positions are in **logical pixels** (400×300 coordinate space).
 
-> **TOML rule:** All scalar key-value pairs must appear **before** any `[array tables](Larray tablesE.md)` in the file. The parser (`tomlc17`) will fail silently or error if arrays precede scalars.
+> **TOML rule:** All scalar key-value pairs must appear **before** any `[array tables]` in the file. The parser (`tomlc17`) will fail silently or error if arrays precede scalars.
 
 ---
 
@@ -62,7 +62,7 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 Rails define closed or open tracks that spike blocks and float platforms ride on.
 
 ```toml
-[rails](LrailsE.md)
+[rails]
 layout  = "RECT"    # "RECT" = rectangular loop, "HORIZ" = horizontal line
 x       = 444       # top-left tile x in logical pixels
 y       = 35        # top-left tile y in logical pixels
@@ -87,7 +87,7 @@ The `end_cap` flag only applies to open (`HORIZ`) rails. With `end_cap = 1` the 
 Ground-level pillar columns. The player can land on the top surface only.
 
 ```toml
-[platforms](LplatformsE.md)
+[platforms]
 x           = 80.0   # left edge of the pillar in logical pixels
 tile_height = 2      # pillar height in 48px tiles (1 = 48px, 2 = 96px, 3 = 144px)
 tile_width  = 1      # pillar width in 48px tiles (usually 1)
@@ -106,7 +106,7 @@ Pillar top Y: `FLOOR_Y − (tile_height × TILE_SIZE)` = `252 − (tile_height �
 ## Coins
 
 ```toml
-[coins](LcoinsE.md)
+[coins]
 x = 46.0    # centre-ish x in logical pixels (render width = 16px)
 y = 236.0   # top edge y in logical pixels
 ```
@@ -118,15 +118,15 @@ Each coin is worth `coin_score` points (default 100). Every `score_per_life` poi
 ## Stars
 
 ```toml
-[star_yellows](Lstar_yellowsE.md)
+[star_yellows]
 x = 272.0
 y = 108.0
 
-[star_greens](Lstar_greensE.md)
+[star_greens]
 x = 500.0
 y = 80.0
 
-[star_reds](Lstar_redsE.md)
+[star_reds]
 x = 800.0
 y = 100.0
 ```
@@ -154,7 +154,7 @@ Single-instance. Triggers the level-complete event when collected. Displayed at 
 Ground patrol enemy. Walks back and forth between `patrol_x0` and `patrol_x1`.
 
 ```toml
-[spiders](LspidersE.md)
+[spiders]
 x          = 600.0   # starting x in logical pixels
 vx         = 50.0    # initial horizontal speed (px/s); sign sets direction
 patrol_x0  = 592.0   # left patrol boundary
@@ -167,7 +167,7 @@ frame_index = 0      # starting animation frame (0–2)
 Variant that leaps across sea gaps. Same fields as spider.
 
 ```toml
-[jumping_spiders](Ljumping_spidersE.md)
+[jumping_spiders]
 x          = 130.0
 vx         = 55.0
 patrol_x0  = 46.0
@@ -179,7 +179,7 @@ patrol_x1  = 310.0
 Slow sine-wave sky patrol. `base_y` is the vertical centre of the wave.
 
 ```toml
-[birds](LbirdsE.md)
+[birds]
 x          = 100.0
 base_y     = 60.0    # vertical centre of the sine wave in logical pixels
 vx         = 45.0    # horizontal speed (px/s)
@@ -190,10 +190,10 @@ frame_index = 0
 
 ### Faster Birds
 
-Same schema as `[birds](LbirdsE.md)`. Higher `vx` for more aggressive patrol.
+Same schema as `[birds]`. Higher `vx` for more aggressive patrol.
 
 ```toml
-[faster_birds](Lfaster_birdsE.md)
+[faster_birds]
 x          = 600.0
 base_y     = 50.0
 vx         = -80.0
@@ -207,7 +207,7 @@ frame_index = 0
 Water-lane patrol with random upward jumps.
 
 ```toml
-[fish](LfishE.md)
+[fish]
 x          = 700.0
 vx         = 70.0
 patrol_x0  = 500.0
@@ -216,10 +216,10 @@ patrol_x1  = 950.0
 
 ### Faster Fish
 
-Same schema as `[fish](LfishE.md)`. Higher `vx`.
+Same schema as `[fish]`. Higher `vx`.
 
 ```toml
-[faster_fish](Lfaster_fishE.md)
+[faster_fish]
 x          = 1100.0
 vx         = 120.0
 patrol_x0  = 900.0
@@ -235,7 +235,7 @@ patrol_x1  = 1400.0
 Swinging or spinning axe mounted at the top of a platform pillar.
 
 ```toml
-[axe_traps](Laxe_trapsE.md)
+[axe_traps]
 pillar_x = 256.0    # x of the platform column the axe is mounted on
 y        = 0.0      # pivot y (0 = top of pillar; engine computes exact Y from pillar)
 mode     = "PENDULUM"  # "PENDULUM" = sinusoidal ±60° swing | "SPIN" = full 360°
@@ -251,7 +251,7 @@ mode     = "PENDULUM"  # "PENDULUM" = sinusoidal ±60° swing | "SPIN" = full 36
 Fast horizontal patrol with constant spin. Does not use a rail.
 
 ```toml
-[circular_saws](Lcircular_sawsE.md)
+[circular_saws]
 x          = 1350.0
 y          = 0.0      # engine snaps to floor level
 patrol_x0  = 1350.0
@@ -266,7 +266,7 @@ Patrol speed: 180 px/s. Spin speed: 720°/s. Pushes player on contact (220 px/s 
 Static strip of 16×16 spike tiles placed on the ground floor.
 
 ```toml
-[spike_rows](Lspike_rowsE.md)
+[spike_rows]
 x     = 780.0   # left edge of the strip in logical pixels
 count = 4       # number of 16×16 tiles in the row
 ```
@@ -276,7 +276,7 @@ count = 4       # number of 16×16 tiles in the row
 Elevated spike hazard surface.
 
 ```toml
-[spike_platforms](Lspike_platformsE.md)
+[spike_platforms]
 x          = 370.0
 y          = 200.0   # top edge in logical pixels
 tile_count = 3       # number of tiles wide
@@ -284,11 +284,11 @@ tile_count = 3       # number of tiles wide
 
 ### Spike Blocks
 
-Rail-riding hazard. References a rail by index (0-based order of `[rails](LrailsE.md)` in the file).
+Rail-riding hazard. References a rail by index (0-based order of `[rails]` in the file).
 
 ```toml
-[spike_blocks](Lspike_blocksE.md)
-rail_index = 0      # which rail to ride (0 = first [rails](LrailsE.md) entry)
+[spike_blocks]
+rail_index = 0      # which rail to ride (0 = first [rails] entry)
 t_offset   = 0.0    # starting position on the rail (0.0 = first tile)
 speed      = 1.5    # traversal speed in tiles per second
 ```
@@ -298,7 +298,7 @@ speed      = 1.5    # traversal speed in tiles per second
 Erupts from a sea gap. The engine automatically places one per gap; use this entry to override or add extras.
 
 ```toml
-[blue_flames](Lblue_flamesE.md)
+[blue_flames]
 x = 192.0   # world-space x of the sea gap centre
 ```
 
@@ -313,7 +313,7 @@ Eruption cycle: **waiting** (1.5 s) → **rising** (−550 px/s launch) → **fl
 Hovering surfaces with three behaviour modes.
 
 ```toml
-[float_platforms](Lfloat_platformsE.md)
+[float_platforms]
 mode       = "STATIC"   # "STATIC" | "CRUMBLE" | "RAIL"
 x          = 172.0
 y          = 200.0
@@ -334,7 +334,7 @@ speed      = 0.0        # rail traversal speed in tiles/s (RAIL mode)
 Tiled crumble walkway. Bricks fall when the player walks across.
 
 ```toml
-[bridges](LbridgesE.md)
+[bridges]
 x           = 1350.0
 y           = 172.0
 brick_count = 8       # number of 16×16 brick tiles
@@ -345,17 +345,17 @@ brick_count = 8       # number of 16×16 brick tiles
 Spring pads that launch the player vertically. Three size tiers.
 
 ```toml
-[bouncepads_small](Lbouncepads_smallE.md)
+[bouncepads_small]
 x         = 734.0
 launch_vy = -380.0    # upward impulse in px/s (negative = up)
 pad_type  = "GREEN"
 
-[bouncepads_medium](Lbouncepads_mediumE.md)
+[bouncepads_medium]
 x         = 310.0
 launch_vy = -536.2
 pad_type  = "WOOD"
 
-[bouncepads_high](Lbouncepads_highE.md)
+[bouncepads_high]
 x         = 1420.0
 launch_vy = -700.0
 pad_type  = "RED"
@@ -372,17 +372,17 @@ pad_type  = "RED"
 Vines, ladders, and ropes are placed as vertical stacks of 16px tiles.
 
 ```toml
-[vines](LvinesE.md)
+[vines]
 x          = 88.0
 y          = 172.0   # top tile y in logical pixels
 tile_count = 2       # height in 16px tiles
 
-[ladders](LladdersE.md)
+[ladders]
 x          = 1552.0
 y          = 0.0
 tile_count = 30
 
-[ropes](LropesE.md)
+[ropes]
 x          = 460.0
 y          = 172.0
 tile_count = 1
@@ -395,15 +395,15 @@ The player can climb all three by pressing Up/Down while overlapping the surface
 ## Background & Foreground Layers
 
 ```toml
-[background_layers](Lbackground_layersE.md)
+[background_layers]
 path  = "assets/sprites/backgrounds/sky_blue.png"
 speed = 0.0    # parallax scroll factor: 0.0 = static, 1.0 = locks to camera
 
-[background_layers](Lbackground_layersE.md)
+[background_layers]
 path  = "assets/sprites/backgrounds/glacial_mountains.png"
 speed = 0.2
 
-[foreground_layers](Lforeground_layersE.md)
+[foreground_layers]
 path  = "assets/sprites/foregrounds/fog_1.png"
 speed = 0.6
 ```
@@ -442,7 +442,7 @@ score_per_life  = 1000
 coin_score      = 100
 floor_gaps      = []
 
-[background_layers](Lbackground_layersE.md)
+[background_layers]
 path  = "assets/sprites/backgrounds/sky_blue.png"
 speed = 0.0
 

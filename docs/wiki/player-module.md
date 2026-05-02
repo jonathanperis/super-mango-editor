@@ -1,6 +1,6 @@
 # Player Module
 
-[← Home](index.md)
+<a id="home"></a>
 
 ---
 
@@ -130,10 +130,11 @@ void player_update(Player *player, float dt,
                    const RopeDecor *ropes, int rope_count,
                    const Bridge *bridges, int bridge_count,
                    const SpikePlatform *spike_platforms, int spike_platform_count,
-                   const int *sea_gaps, int sea_gap_count,
+                   const int *floor_gaps, int floor_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
-                   int prev_fp_landed_idx);
+                   int prev_fp_landed_idx,
+                   int world_w);
 ```
 
 `dt` is the time in **seconds** since the last frame (e.g. `0.016` for 60 FPS). Multiplying speed by `dt` makes movement frame-rate independent. The function resolves collisions against the floor, one-way platforms, float platforms, bridges, spike platforms, bouncepads, vines, ladders, and ropes.
@@ -182,7 +183,7 @@ if (player->x + player->w - PHYS_PAD_X > WORLD_W)
     player->x = (float)(WORLD_W - player->w + PHYS_PAD_X);
 ```
 
-Keeps the player's **physics body** (inset by `PHYS_PAD_X = 12` px on each side) inside the full `WORLD_W` (1600 px) scrollable world. The transparent side-padding of the sprite frame is allowed to slide off-screen while the visible character stays flush with the world border.
+Keeps the player's **physics body** (inset by `PHYS_PAD_X = 15` px on each side) inside the full `world_w` scrollable world. The transparent side-padding of the sprite frame is allowed to slide off-screen while the visible character stays flush with the world border.
 
 ### Ceiling Clamp
 

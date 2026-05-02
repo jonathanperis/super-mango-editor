@@ -1,6 +1,6 @@
 # Entities & Hazards
 
-[← Home](index.md)
+<a id="home"></a>
 
 ---
 
@@ -28,7 +28,7 @@ Super Mango has six enemy types and seven hazard types. All are stored as fixed-
 
 **TOML placement:**
 ```toml
-[spiders](LspidersE.md)
+[spiders]
 x          = 600.0
 vx         = 50.0        # positive = starts moving right
 patrol_x0  = 592.0
@@ -46,7 +46,7 @@ frame_index = 0          # starting animation frame (0–2)
 
 **TOML placement:**
 ```toml
-[jumping_spiders](Ljumping_spidersE.md)
+[jumping_spiders]
 x          = 130.0
 vx         = 55.0
 patrol_x0  = 46.0
@@ -75,7 +75,7 @@ patrol_x1  = 310.0
 
 **TOML placement:**
 ```toml
-[birds](LbirdsE.md)
+[birds]
 x          = 100.0
 base_y     = 60.0    # vertical centre of the sine wave
 vx         = 45.0
@@ -90,10 +90,10 @@ frame_index = 0
 
 **File:** `src/entities/faster_bird.c` / `faster_bird.h`  
 **Sprite:** `assets/sprites/entities/faster_bird.png`  
-**Behaviour:** Aggressive sky patrol with higher speed and a tighter wave. Same schema as `Bird` but uses `[faster_birds](Lfaster_birdsE.md)` in TOML. Typical `vx` is 70–100 px/s vs. the bird's 45 px/s.
+**Behaviour:** Aggressive sky patrol with higher speed and a tighter wave. Same schema as `Bird` but uses `[faster_birds]` in TOML. Typical `vx` is 70–100 px/s vs. the bird's 45 px/s.
 
 ```toml
-[faster_birds](Lfaster_birdsE.md)
+[faster_birds]
 x          = 600.0
 base_y     = 50.0
 vx         = -80.0
@@ -124,7 +124,7 @@ frame_index = 0
 | `FISH_FRAME_MS` | 120 | ms per animation frame |
 
 ```toml
-[fish](LfishE.md)
+[fish]
 x          = 700.0
 vx         = 70.0
 patrol_x0  = 500.0
@@ -136,10 +136,10 @@ patrol_x1  = 950.0
 ### Faster Fish
 
 **File:** `src/entities/faster_fish.c` / `faster_fish.h`  
-**Behaviour:** Same as fish but patrols at 120 px/s and jumps more frequently. Uses `[faster_fish](Lfaster_fishE.md)` in TOML.
+**Behaviour:** Same as fish but patrols at 120 px/s and jumps more frequently. Uses `[faster_fish]` in TOML.
 
 ```toml
-[faster_fish](Lfaster_fishE.md)
+[faster_fish]
 x          = 1100.0
 vx         = 120.0
 patrol_x0  = 900.0
@@ -168,7 +168,7 @@ All hazards deal **1 heart of damage** on contact with knockback (same `apply_da
 | `SPIKE_TILE_H` | 16 | Height of one spike tile in px |
 
 ```toml
-[spike_rows](Lspike_rowsE.md)
+[spike_rows]
 x     = 780.0   # left edge of the strip
 count = 4       # number of tiles
 ```
@@ -182,8 +182,8 @@ count = 4       # number of tiles
 **Behaviour:** A rotating hazard that travels along a `Rail` path. References a rail by index and can be given an initial offset and speed. Visually rotates as it travels. The player is pushed on contact.
 
 ```toml
-[spike_blocks](Lspike_blocksE.md)
-rail_index = 0      # 0-based index into the [rails](LrailsE.md) list
+[spike_blocks]
+rail_index = 0      # 0-based index into the [rails] list
 t_offset   = 0.0    # starting position on the rail (0.0 = first tile)
 speed      = 1.5    # traversal speed in tiles/s
 ```
@@ -197,7 +197,7 @@ speed      = 1.5    # traversal speed in tiles/s
 **Behaviour:** Elevated static surface tiled across `tile_count` units. The player is damaged when landing on the top surface or touching the sides.
 
 ```toml
-[spike_platforms](Lspike_platformsE.md)
+[spike_platforms]
 x          = 370.0
 y          = 200.0   # top edge in logical pixels
 tile_count = 3
@@ -220,7 +220,7 @@ tile_count = 3
 | `SAW_PUSH_VY` | −150.0 | Upward component of push |
 
 ```toml
-[circular_saws](Lcircular_sawsE.md)
+[circular_saws]
 x          = 1350.0
 y          = 0.0        # engine snaps to floor level
 patrol_x0  = 1350.0
@@ -249,7 +249,7 @@ Collision uses the full rotated bounding box of the blade region.
 | `AXE_SPIN_SPEED` | 180.0°/s | Full-rotation variant speed |
 
 ```toml
-[axe_traps](Laxe_trapsE.md)
+[axe_traps]
 pillar_x = 256.0    # centre x of the pillar column
 y        = 0.0      # pivot y (engine computes from pillar height)
 mode     = "PENDULUM"   # or "SPIN"
@@ -270,10 +270,10 @@ mode     = "PENDULUM"   # or "SPIN"
 | `FLIPPING` | 0.12 s | Rotates 180° at the apex |
 | `FALLING` | Until below floor | Descends upside-down, accelerating with gravity |
 
-Blue flames are spawned automatically for each entry in `floor_gaps`. They can also be manually added via `[blue_flames](Lblue_flamesE.md)` to override position.
+Blue flames are spawned automatically for each entry in `floor_gaps`. They can also be manually added via `[blue_flames]` to override position.
 
 ```toml
-[blue_flames](Lblue_flamesE.md)
+[blue_flames]
 x = 192.0   # world-space x of the sea gap
 ```
 
@@ -313,4 +313,4 @@ For entities with non-rectangular visible art (birds, fish, spiders), `get_hitbo
 
 ## Adding a New Enemy or Hazard
 
-See the [Developer Guide](developer_guide) for the full entity template and step-by-step checklist.
+See the [Developer Guide](#developer-guide) for the full entity template and step-by-step checklist.

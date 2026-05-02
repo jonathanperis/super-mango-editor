@@ -1,6 +1,6 @@
 # Level Editor
 
-[← Home](index.md)
+<a id="home"></a>
 
 ---
 
@@ -205,4 +205,4 @@ The editor shares the `LevelDef` struct and `level_loader` with the game. This m
 - The serializer (`serializer.c`) only needs to be updated in one place when a new entity type is added.
 - The editor's canvas draws entities using the same sprite paths as the game — adding a new entity type requires adding its texture to `EntityTextures` and a render call in `canvas_render`.
 
-See [Level Design — TOML Reference](level_design) for the full schema of every entity type.
+See [Level Design — TOML Reference](#level-design) for the full schema of every entity type.

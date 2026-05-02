@@ -1,6 +1,6 @@
 # Developer Guide
 
-[← Home](index.md)
+<a id="home"></a>
 
 ---
 
@@ -40,7 +40,7 @@ This guide covers the patterns and conventions used in Super Mango and explains 
 All game-object positions and sizes live in **logical space (400x300)**.
 Never use `WINDOW_W` / `WINDOW_H` for game math -- SDL scales the logical canvas to the OS window automatically.
 
-See [Constants Reference](constants_reference) for all defined constants.
+See [Constants Reference](#constants-reference) for all defined constants.
 
 ---
 
@@ -162,16 +162,16 @@ Entity spawn positions are defined in TOML level files in the `levels/` director
 
 ```toml
 # In levels/your_level.toml:
-[coins](LcoinsE.md)
+[coins]
 x = 120.0
 y = 180.0
 
-[coins](LcoinsE.md)
+[coins]
 x = 200.0
 y = 140.0
 ```
 
-Then extend `level_loader.c` to parse the new array table and call your `_init` function for each entry. See `level_design` for the full TOML schema and [Level Design — TOML Reference](level_design) for placement examples for every entity type.
+Then extend `level_loader.c` to parse the new array table and call your `_init` function for each entry. See `level_design` for the full TOML schema and [Level Design — TOML Reference](#level-design) for placement examples for every entity type.
 
 You can also use the visual level editor (`make run-editor`) to place entities interactively without writing TOML by hand.
 
@@ -222,7 +222,7 @@ if (entity->x < 0.0f)                entity->x = 0.0f;
 if (entity->x > GAME_W - entity->w)  entity->x = (float)(GAME_W - entity->w);
 ```
 
-`GRAVITY`, `FLOOR_Y`, `GAME_W`, and `GAME_H` are all defined in `game.h` and available to any file that includes it. See [Constants Reference](constants_reference) for values.
+`GRAVITY`, `FLOOR_Y`, `GAME_W`, and `GAME_H` are all defined in `game.h` and available to any file that includes it. See [Constants Reference](#constants-reference) for values.
 
 ---
 
@@ -387,7 +387,7 @@ Standard animation row layout (most assets in this pack):
 | 4 | Attack | 4-8 frames, one-shot |
 | 5 | Death / Hurt | 4-6 frames, one-shot |
 
-See [Assets](assets) for sprite sheet dimensions and [Player Module](player_module) for animation state machine details.
+See [Assets](assets) for sprite sheet dimensions and [Player Module](#player-module) for animation state machine details.
 
 ---
 
@@ -413,11 +413,11 @@ See [Assets](assets) for sprite sheet dimensions and [Player Module](player_modu
 
 ## Related Pages
 
-- [Home](index.md) -- project overview
-- [Architecture](architecture) -- system design and game loop
-- [Build System](build_system) -- compiling and running
-- [Source Files](source_files) -- module-by-module reference
+- [#home](#home) -- project overview
+- [#architecture](#architecture) -- system design and game loop
+- [#build-system](#build-system) -- compiling and running
+- [#source-files](#source-files) -- module-by-module reference
 - [Assets](assets) -- sprite sheets and textures
 - [Sounds](sounds) -- audio files and music
-- [Player Module](player_module) -- player-specific details
-- [Constants Reference](constants_reference) -- all defined constants
+- [Player Module](#player-module) -- player-specific details
+- [Constants Reference](#constants-reference) -- all defined constants
