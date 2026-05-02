@@ -171,6 +171,7 @@ const backHomeUrl = base.replace(/\/$/, '') + '/';
             if (overlay) overlay.addEventListener('click', toggleMenu);
 
             const isRoot = window.__isRoot !== false;
+            const prefersReducedMotion = !window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
             const sections = document.querySelectorAll('section.doc-section');
             const navItems = document.querySelectorAll('.nav-item');
 
@@ -182,7 +183,7 @@ const backHomeUrl = base.replace(/\/$/, '') + '/';
                 if (sectionId) {
                     const target = document.getElementById(sectionId);
                     if (target) {
-                        setTimeout(() => target.scrollIntoView({ behavior: 'smooth' }), 100);
+                        setTimeout(() => target.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth' }), 100);
                     }
                 }
             }
@@ -196,7 +197,7 @@ const backHomeUrl = base.replace(/\/$/, '') + '/';
                             navItems.forEach(item => {
                                 item.classList.toggle('active', item.dataset.section === sectionId);
                                 if (item.dataset.section === sectionId) {
-                                    item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                    item.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'nearest' });
                                 }
                             });
                         }
