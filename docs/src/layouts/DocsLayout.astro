@@ -12,12 +12,15 @@ const {
     description = "Documentation for Super Mango — a 2D pixel art platformer written in C11 + SDL2. Play in your browser via WebAssembly or download for macOS, Linux, and Windows.",
 } = Astro.props;
 
+/* Per-page canonical/og URL from Astro runtime */
+const pageUrl = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : `https://jonathanperis.github.io${Astro.url.pathname}`;
+
 const jsonLd = {
     "@context": "https://schema.org",
     "@type": "VideoGame",
     name: "Super Mango Editor",
     description,
-    url: "https://jonathanperis.github.io/super-mango-editor/",
+    url: pageUrl,
     genre: ["Platformer", "Indie", "Pixel Art"],
     gamePlatform: ["Web Browser", "macOS", "Linux", "Windows"],
     applicationCategory: "Game",
@@ -45,7 +48,7 @@ const jsonLd = {
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content="https://jonathanperis.github.io/super-mango-editor/" />
+    <meta property="og:url" content={pageUrl} />
     <meta property="og:site_name" content="Super Mango Editor" />
     <meta property="og:locale" content="en_US" />
 
@@ -54,7 +57,7 @@ const jsonLd = {
     <meta name="twitter:description" content={description} />
     <meta name="twitter:creator" content="@jperis_silva" />
 
-    <link rel="canonical" href="https://jonathanperis.github.io/super-mango-editor/" />
+    <link rel="canonical" href={pageUrl} />
     <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
 
     <!-- Google Fonts: Pixelify Sans + DM Mono -->

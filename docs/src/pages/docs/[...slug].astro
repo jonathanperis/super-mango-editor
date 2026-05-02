@@ -49,27 +49,43 @@ for (const [path, module] of Object.entries(globResult)) {
     pagesBySlug[slug] = module;
 }
 
-const sectionsToRender = ORDER
-    .map(slug => {
-        const key = slug === 'index' ? 'home' : slug;
-        return { slug, page: pagesBySlug[key] };
-    })
-    .filter(s => s.page);
-
-export function getStaticPaths() {
-    const order = [
-        'architecture', 'source-files', 'player-module', 'constants-reference',
-        'entities-and-hazards', 'collectibles-and-surfaces', 'assets', 'sounds',
-        'build-system', 'level-design', 'level-editor', 'developer-guide',
-    ];
-    return [
-        { params: { slug: undefined } },
-        ...order.map(slug => ({ params: { slug } })),
-    ];
-}
-
+/* Derive requested section key from route params */
 const requestedSlug = Astro.params.slug;
 const isRoot = requestedSlug === undefined;
+const requestedKey = requestedSlug === 'index' ? 'home' : (requestedSlug ?? 'home');
+
+/* Root renders all sections; individual routes render only the requested one */
+const sectionsToRender = isRoot
+    ? ORDER
+        .map(slug => {
+            const key = slug === 'index' ? 'home' : slug;
+            return { slug, page: pagesBySlug[key] };
+        })
+        .filter(s => s.page)
+    : (() => {
+        const page = pagesBySlug[requestedKey];
+        if (!page) return [];
+        return [{ slug: requestedSlug!, page }];
+    })();
+
+/* getStaticPaths is hoisted by Astro — must be self-contained */
+export function getStaticPaths() {
+    return [
+        { params: { slug: undefined } },
+        { params: { slug: 'architecture' } },
+        { params: { slug: 'source-files' } },
+        { params: { slug: 'player-module' } },
+        { params: { slug: 'constants-reference' } },
+        { params: { slug: 'entities-and-hazards' } },
+        { params: { slug: 'collectibles-and-surfaces' } },
+        { params: { slug: 'assets' } },
+        { params: { slug: 'sounds' } },
+        { params: { slug: 'build-system' } },
+        { params: { slug: 'level-design' } },
+        { params: { slug: 'level-editor' } },
+        { params: { slug: 'developer-guide' } },
+    ];
+}
 
 function humanizeSlug(s: string): string {
     return s
@@ -81,7 +97,7 @@ function humanizeSlug(s: string): string {
 const firstPage = sectionsToRender[0]?.page;
 const pageTitle = isRoot
     ? 'Super Mango Editor - Documentation'
-    : (firstPage?.frontmatter?.title ?? humanizeSlug(requestedSlug === 'index' ? 'home' : requestedSlug!));
+    : (firstPage?.frontmatter?.title ?? humanizeSlug(requestedKey));
 
 const base = import.meta.env.BASE_URL;
 const docsBase = base.replace(/\/$/, '') + '/docs';
