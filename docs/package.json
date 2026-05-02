@@ -10,7 +10,6 @@
         "lint": "eslint"
     },
     "dependencies": {
-        "@astrojs/mdx": "^5",
         "@astrojs/react": "^4",
         "@astrojs/sitemap": "^3",
         "astro": "^6",
