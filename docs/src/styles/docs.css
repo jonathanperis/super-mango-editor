@@ -304,7 +304,10 @@ section.doc-section.hidden-section { display: none; }
 }
 
 /* Custom scrollbar */
-* { scrollbar-width: thin; scrollbar-color: var(--accent-dim) var(--bg-card); }
+html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-dim) var(--bg-card);
+}
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-card); border-radius: 4px; }
 ::-webkit-scrollbar-thumb {
@@ -313,6 +316,19 @@ section.doc-section.hidden-section { display: none; }
     transition: background 0.2s;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+::-webkit-scrollbar-corner { background: var(--bg-card); }
+
+.sidebar-category-group {
+    display: block;
+    margin-bottom: 8px;
+}
+.sidebar-category-group ul {
+    display: block;
+    margin-top: 4px;
+}
+.sidebar-category-group li {
+    display: block;
+}
 
 @media (max-width: 768px) {
     .sidebar { transform: translateX(-100%); }
