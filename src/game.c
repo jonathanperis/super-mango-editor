@@ -11,7 +11,6 @@
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_mixer.h>
-#include <SDL_ttf.h>    /* TTF_RenderText_Solid — gamepad init HUD message */
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -1068,62 +1067,10 @@ static void game_loop_frame(void *arg) {
          *          When done, open the controller on the main thread (thread-safe)
          *          and clear ctrl_pending_init so the HUD message disappears.
          *
-         * Disabled on WebAssembly: ctrl_pending_init is never set to 1 on WASM
-         * (guarded in game_init), so this block is dead code there. The explicit
-         * #ifndef makes the intent clear and prevents future regressions.
+         * WebAssembly is handled inside gamepad_update_deferred_init(); native
+         * builds run the deferred SDL_INIT_GAMECONTROLLER path there.
          */
-#ifndef __EMSCRIPTEN__
-        if (gs->ctrl_pending_init == 1) {
-            SDL_AtomicSet(&gs->ctrl_init_done, 0);
-            gs->ctrl_init_thread = SDL_CreateThread(ctrl_init_worker, "ctrl_init", gs);
-            if (!gs->ctrl_init_thread) {
-                fprintf(stderr, "Warning: could not start gamepad init thread: %s\n",
-                        SDL_GetError());
-                gs->ctrl_pending_init = 0;  /* give up gracefully */
-            } else {
-                gs->ctrl_pending_init = 2;
-                /*
-                 * Pre-render the init HUD message once at state 1→2.
-                 * Storing it in textures.ctrl_init_msg avoids TTF rasterisation and a
-                 * GPU texture upload on every frame for the ~100–200 ms window
-                 * while the gamepad subsystem initialises in the background.
-                 */
-                if (gs->hud.font) {
-                    SDL_Color white = {255, 255, 255, 200};
-                    SDL_Surface *surf = TTF_RenderText_Solid(
-                        gs->hud.font, "A inicializar controle...", white);
-                    if (surf) {
-                        gs->textures.ctrl_init_msg =
-                            SDL_CreateTextureFromSurface(gs->renderer, surf);
-                        SDL_FreeSurface(surf);
-                    }
-                }
-            }
-        } else if (gs->ctrl_pending_init == 2 &&
-                   SDL_AtomicGet(&gs->ctrl_init_done)) {
-            /*
-             * SDL_WaitThread — join the thread and free its resources.
-             * Safe to call here because ctrl_init_done guarantees the thread
-             * has already returned.
-             */
-            SDL_WaitThread(gs->ctrl_init_thread, NULL);
-            gs->ctrl_init_thread = NULL;
-
-            /* Open the first available gamepad on the main thread. */
-            for (int i = 0; i < SDL_NumJoysticks(); i++) {
-                if (SDL_IsGameController(i)) {
-                    gs->controller = SDL_GameControllerOpen(i);
-                    if (gs->controller) break;
-                }
-            }
-            gs->ctrl_pending_init = 0;
-            /* Release the cached HUD message texture — no longer needed. */
-            if (gs->textures.ctrl_init_msg) {
-                SDL_DestroyTexture(gs->textures.ctrl_init_msg);
-                gs->textures.ctrl_init_msg = NULL;
-            }
-        }
-#endif
+        gamepad_update_deferred_init(gs);
 
         /*
          * Manual frame cap fallback: if the frame finished before frame_ms ms
@@ -1244,20 +1191,7 @@ void game_cleanup(GameState *gs) {
      * Both calls are safe when their argument is NULL / the subsystem is
      * not active, so no extra guard is needed beyond the pointer check.
      */
-#ifndef __EMSCRIPTEN__
-    if (gs->ctrl_init_thread) {
-        SDL_WaitThread(gs->ctrl_init_thread, NULL);
-        gs->ctrl_init_thread = NULL;
-        gs->ctrl_pending_init = 0;
-        SDL_AtomicSet(&gs->ctrl_init_done, 0);
-    }
-#endif
-
-    if (gs->controller) {
-        SDL_GameControllerClose(gs->controller);
-        gs->controller = NULL;
-    }
-    SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+    gamepad_cleanup(gs);
 
     /* Free HUD resources (font + star texture, renderer-dependent) */
     hud_cleanup(&gs->hud);
