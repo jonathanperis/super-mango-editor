@@ -24,7 +24,7 @@ void render_level_complete_overlay(GameState *gs)
     SDL_SetRenderDrawBlendMode(gs->renderer, SDL_BLENDMODE_NONE);
 
     /* Determine if this is the final level (no next_phase set) */
-    const LevelDef *def = (const LevelDef *)gs->current_level;
+    const LevelDef *def = (const LevelDef *)gs->runtime.current_level;
     int is_final_level = (def && def->next_phase[0] == '\0');
 
     /* Level Complete title - show "Game Complete!" for final level */

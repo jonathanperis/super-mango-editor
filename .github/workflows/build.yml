@@ -106,6 +106,10 @@ jobs:
         if: matrix.target == 'native' && runner.os != 'Windows'
         run: make
 
+      - name: Test (Linux / macOS)
+        if: matrix.target == 'native' && runner.os != 'Windows'
+        run: make test
+
       # ── Compile (Windows) ───────────────────────────────────────────────────
       # The msys2 shell is required so the UCRT64 toolchain and sdl2-config
       # are on PATH. We pass CC=gcc and override the output name to include
@@ -114,6 +118,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make CC=gcc
+
+      - name: Test (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make test CC=gcc
 
       # ── Compile (WebAssembly) ───────────────────────────────────────────────
       # Uses the 'web' Makefile target with emcc. Assets are bundled into

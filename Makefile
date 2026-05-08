@@ -53,8 +53,9 @@ EDITOR_OBJS   = $(EDITOR_SRCS:.c=.o)
 EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor
 EDITOR_LIBS   = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lm
+TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test
 
-.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor
+.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test
 
 all: $(OUTDIR) $(TARGET)
 
@@ -151,6 +152,17 @@ run-editor: editor
 	./$(EDITOR_TARGET)
 
 -include $(EDITOR_DEPS)
+
+# ── Tests ────────────────────────────────────────────────────────────
+test: $(OUTDIR) $(TEST_TARGETS)
+	./$(OUTDIR)/level-serializer-test
+	./$(OUTDIR)/level-validate-test
+
+$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(EDITOR_DIR)/serializer.o $(VENDOR_DIR)/tomlc17.o
+	$(CC) $(CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
+
+$(OUTDIR)/level-validate-test: tests/level_validate_test.c $(SRCDIR)/levels/level_validate.o
+	$(CC) $(CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
 
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
 # Requires the Emscripten SDK (emcc on PATH).

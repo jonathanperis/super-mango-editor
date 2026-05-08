@@ -179,6 +179,23 @@ typedef struct {
 } Camera;
 
 typedef struct {
+    const void *current_level;  /* pointer to the active LevelDef          */
+    int         fog_enabled;    /* 1 = fog rendering active, 0 = disabled */
+    int         water_enabled;  /* 1 = water strip rendered, 0 = disabled */
+    int         world_w;        /* level width in pixels                  */
+} LevelRuntime;
+
+typedef struct {
+    int score_per_life;  /* score threshold for bonus life      */
+    int coin_score;      /* points awarded per coin collected   */
+} GameRules;
+
+typedef struct {
+    Uint64 prev_ticks;     /* timestamp of previous frame              */
+    int    fp_prev_riding; /* float platform player stood on last frame*/
+} GameLoopState;
+
+typedef struct {
     SDL_Window         *window;     /* the OS window (created by SDL)              */
     SDL_Renderer       *renderer;  /* GPU-accelerated 2D drawing context          */
     SDL_GameController *controller;  /* first connected gamepad; NULL = none          */
@@ -303,20 +320,12 @@ typedef struct {
     int           level_complete; /* 1 = last star collected, show end screen  */
     float         checkpoint_x;   /* respawn x position (updated per screen)   */
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
-    char          level_path[256]; /* JSON level to load (--level flag)      */
+    char          level_path[256]; /* TOML level to load (--level flag)      */
     DebugOverlay  debug;       /* FPS counter, collision vis, event log      */
 
-    /* ---- Level-wide configuration (set by level_load from LevelDef) -- */
-    const void   *current_level;    /* pointer to the active LevelDef          */
-    int           fog_enabled;      /* 1 = fog rendering active, 0 = disabled  */
-    int           water_enabled;    /* 1 = water strip rendered, 0 = disabled  */
-    int           world_w;         /* level width in pixels (screen_count * GAME_W) */
-    int           score_per_life;   /* score threshold for bonus life           */
-    int           coin_score;       /* points awarded per coin collected        */
-
-    /* ---- Loop state (persists across frames for emscripten callback) - */
-    Uint64        loop_prev_ticks;  /* timestamp of previous frame         */
-    int           fp_prev_riding;   /* float platform player stood on last frame */
+    LevelRuntime runtime; /* active LevelDef pointer, level width, effect flags */
+    GameRules    rules;   /* score/life and collectible rule values             */
+    GameLoopState loop;   /* frame loop scratch state for native/WASM loops     */
 } GameState;
 
 /* ------------------------------------------------------------------ */

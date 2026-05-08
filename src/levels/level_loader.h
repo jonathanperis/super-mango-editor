@@ -11,8 +11,13 @@
  */
 #pragma once
 
+#include <stddef.h>     /* size_t */
+
 #include "level.h"      /* LevelDef */
 #include "../game.h"    /* GameState */
+
+/* Validate LevelDef count fields before fixed-size GameState array copies. */
+int level_validate_counts(const LevelDef *def, char *err, size_t err_size);
 
 /* Load all entities defined in def into gs.  Builds rails, then all entities. */
 void level_load(GameState *gs, const LevelDef *def);

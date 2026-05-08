@@ -304,4 +304,8 @@ void fog_cleanup(FogSystem *fog) {
             fog->textures[i] = NULL;
         }
     }
+    for (int i = 0; i < FOG_MAX; i++) {
+        fog->instances[i].active = 0;
+    }
+    fog->tex_count = 0;
 }

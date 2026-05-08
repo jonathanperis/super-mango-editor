@@ -776,14 +776,14 @@ int level_load_toml(const char *path, LevelDef *def) {
 
     /* ---- Star greens ---------------------------------------------- */
 
-    PARSE_ARRAY("star_greens", star_green_count, MAX_STAR_YELLOWS, {
+    PARSE_ARRAY("star_greens", star_green_count, MAX_STAR_GREENS, {
         def->star_greens[idx].x = get_float(elem, "x", 0);
         def->star_greens[idx].y = get_float(elem, "y", 0);
     });
 
     /* ---- Star reds ------------------------------------------------ */
 
-    PARSE_ARRAY("star_reds", star_red_count, MAX_STAR_YELLOWS, {
+    PARSE_ARRAY("star_reds", star_red_count, MAX_STAR_REDS, {
         def->star_reds[idx].x = get_float(elem, "x", 0);
         def->star_reds[idx].y = get_float(elem, "y", 0);
     });
@@ -800,7 +800,6 @@ int level_load_toml(const char *path, LevelDef *def) {
             if (np.type == TOML_STRING) {
                 strncpy(def->next_phase, np.u.s, sizeof(def->next_phase) - 1);
                 def->next_phase[sizeof(def->next_phase) - 1] = '\0';
-                free((void *)np.u.s); /* cast required: toml returns const char* */
             }
         }
     }
