@@ -56,6 +56,7 @@
 #include "hazards/spike_platform.h"
 #include "levels/level.h"         /* LevelDef struct                                    */
 #include "levels/level_loader.h"  /* level_load, level_reset                            */
+#include "levels/phase_transition.h" /* phase next path/progress helpers                 */
 #include "editor/serializer.h"    /* level_load_toml                                    */
 #include "collision/game_collision.h"  /* game_collide, hitbox builders               */
 #include "collision/collision_damage.h" /* apply_damage                               */
@@ -519,18 +520,12 @@ void game_init(GameState *gs) {
 int game_load_next_phase(GameState *gs)
 {
     const LevelDef *current = (const LevelDef *)gs->runtime.current_level;
-    if (!current || current->next_phase[0] == '\0') {
-        return -1;
-    }
-
-    char next_path[sizeof(current->next_phase)] = {0};
-    strncpy(next_path, current->next_phase, sizeof(next_path) - 1);
+    char next_path[256] = {0};
+    if (phase_next_path(current, next_path, sizeof(next_path)) != 0) return -1;
 
     /* Save player progress */
-    int saved_score = gs->score;
-    int saved_lives = gs->lives;
-    int saved_hearts = gs->hearts;
-    int saved_score_life_next = gs->score_life_next;
+    PhaseProgress saved_progress;
+    phase_progress_save(gs, &saved_progress);
 
     /* Load the next level */
     memset(&s_level, 0, sizeof(s_level));
@@ -552,10 +547,7 @@ int game_load_next_phase(GameState *gs)
     game_apply_level_resources(gs, &s_level);
 
     /* Restore player progress */
-    gs->score = saved_score;
-    gs->lives = saved_lives;
-    gs->hearts = saved_hearts;
-    gs->score_life_next = saved_score_life_next;
+    phase_progress_restore(gs, &saved_progress);
 
     /* Reset checkpoint and completion flag */
     gs->checkpoint_x = 0.0f;
