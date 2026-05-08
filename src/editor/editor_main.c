@@ -5,7 +5,8 @@
  *   1. Boot the SDL subsystems the editor needs (video, image, TTF).
  *   2. Initialise the EditorState via editor_init().
  *   3. Optionally load a level file passed as a command-line argument.
- *   4. Run the editor's main loop until the user quits.
+ *   4. Run the editor's main loop until the user quits, or exit immediately
+ *      when --smoke-test is passed.
  *   5. Tear every subsystem back down before exiting.
  *
  * The editor does NOT use SDL_mixer — it has no audio playback.  Only the
@@ -30,6 +31,17 @@
 /* ------------------------------------------------------------------ */
 
 int main(int argc, char *argv[]) {
+    int smoke_test = 0;
+    const char *level_path = NULL;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--smoke-test") == 0) {
+            smoke_test = 1;
+        } else {
+            level_path = argv[i];
+        }
+    }
+
     /*
      * SDL_Init — start the SDL core.
      *
@@ -106,10 +118,10 @@ int main(int argc, char *argv[]) {
      * even if the argument is longer than the buffer (truncation is safe
      * here — the save dialog will use the stored path as-is).
      */
-    if (argc > 1) {
-        if (editor_load_level(&es, argv[1]) != 0) {
+    if (level_path) {
+        if (editor_load_level(&es, level_path) != 0) {
             fprintf(stderr, "Warning: could not load '%s' — starting empty\n",
-                    argv[1]);
+                    level_path);
         }
     }
 
@@ -118,7 +130,9 @@ int main(int argc, char *argv[]) {
      *
      * This blocks until es.running is set to 0 (window close or Escape).
      */
-    editor_loop(&es);
+    if (!smoke_test) {
+        editor_loop(&es);
+    }
 
     /*
      * editor_cleanup — free all editor resources in reverse init order.

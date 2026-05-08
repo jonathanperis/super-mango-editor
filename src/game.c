@@ -211,6 +211,10 @@ void game_init(GameState *gs) {
         SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
     );
     if (!gs->renderer) {
+        /* Dummy/headless drivers may not expose accelerated renderers. */
+        gs->renderer = SDL_CreateRenderer(gs->window, -1, SDL_RENDERER_SOFTWARE);
+    }
+    if (!gs->renderer) {
         game_init_fail(gs, "SDL_CreateRenderer error", SDL_GetError());
     }
 
@@ -1074,6 +1078,13 @@ static void game_loop_frame(void *arg) {
             SDL_Delay((Uint32)(frame_ms - elapsed));
         }
 #endif
+
+        if (gs->smoke_test_frames > 0) {
+            gs->smoke_test_frames--;
+            if (gs->smoke_test_frames == 0) {
+                gs->running = 0;
+            }
+        }
     }
 }
 

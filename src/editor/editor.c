@@ -140,6 +140,10 @@ int editor_init(EditorState *es) {
         SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
     );
     if (!es->renderer) {
+        /* Dummy/headless drivers may not expose accelerated renderers. */
+        es->renderer = SDL_CreateRenderer(es->window, -1, SDL_RENDERER_SOFTWARE);
+    }
+    if (!es->renderer) {
         fprintf(stderr, "SDL_CreateRenderer error: %s\n", SDL_GetError());
         SDL_DestroyWindow(es->window);
         es->window = NULL;

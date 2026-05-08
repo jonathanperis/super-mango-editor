@@ -320,6 +320,7 @@ typedef struct {
     int           level_complete; /* 1 = last star collected, show end screen  */
     float         checkpoint_x;   /* respawn x position (updated per screen)   */
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
+    int           smoke_test_frames; /* >0 = exit after this many frames     */
     char          level_path[256]; /* TOML level to load (--level flag)      */
     DebugOverlay  debug;       /* FPS counter, collision vis, event log      */
 
