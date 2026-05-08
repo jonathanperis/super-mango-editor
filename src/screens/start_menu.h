@@ -35,6 +35,8 @@ typedef struct {
     Mix_Chunk    *snd_confirm; /* SFX played when Play is clicked   */
     int           running;    /* 1 = menu loop active, 0 = done   */
     MenuResult    result;     /* what the user chose               */
+    int           selected_level;      /* selected campaign level index      */
+    char          selected_level_path[256]; /* TOML path selected for Play     */
 } StartMenu;
 
 /* Initialise the start menu: load font and logo. */
