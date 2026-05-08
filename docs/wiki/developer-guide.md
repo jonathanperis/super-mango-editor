@@ -48,7 +48,7 @@ See [Constants Reference](#constants-reference) for all defined constants.
 
 Most active entities follow this lifecycle pattern:
 
-```
+```text
 entity_init    -> set initial state (textures often live shared in GameState)
 entity_update  -> move, apply physics, detect events
 entity_render  -> draw to renderer
@@ -59,7 +59,7 @@ Collectibles and simple decorations may use lighter helpers. For example, coins 
 
 Active entities may also expose:
 
-```
+```text
 entity_handle_input   -> if player-controlled
 entity_animate        -> static helper, called from entity_update
 ```
@@ -163,7 +163,7 @@ x = 200.0
 y = 140.0
 ```
 
-Then extend `level_loader.c` to parse the new array table and populate the `GameState` array (or call your `_init` function when the entity owns richer runtime state). See `level_design` for the full TOML schema and [Level Design — TOML Reference](#level-design) for placement examples for every entity type.
+Then extend `level_loader.c` to parse the new array table and populate the `GameState` array (or call your `_init` function when the entity owns richer runtime state). See `level_design` for the full TOML schema and [Level Design — TOML Reference](level-design) for placement examples for every entity type.
 
 You can also use the visual level editor (`make run-editor`) to place entities interactively without writing TOML by hand.
 

@@ -40,7 +40,7 @@ Game loads TOML levels directly at runtime via `--level <path>` / `make run-leve
 | Enemy types | 6 | spider, jumping_spider, bird, faster_bird, fish, faster_fish |
 | Hazard types | 7 | axe_trap, circular_saw, spike_row, spike_platform, spike_block, blue_flame, fire_flame |
 | Collectible types | 5 | coin, star_yellow, star_green, star_red, last_star |
-| Surface/climbable types | 8 | platform, float_platform, bridge, bouncepad small/medium/high, vine, ladder, rope |
+| Surface/climbable types | 9 | platform, float_platform, bridge, bouncepad small/medium/high, vine, ladder, rope |
 | Effect systems | 3 | fog, parallax, water |
 | TOML level files | 3 | `levels/*.toml` |
 
