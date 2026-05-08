@@ -43,6 +43,7 @@ initial_hearts  = 3                     # starting hit points
 initial_lives   = 3                     # starting lives
 score_per_life  = 1000                  # score at which a bonus life is awarded
 coin_score      = 100                   # points per coin collected
+next_phase      = "levels/01_lugio_01.toml"  # optional level loaded after completion
 floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 ```
 
@@ -53,6 +54,7 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 | `music_path` | string | Path to WAV/OGG, relative to repo root. |
 | `music_volume` | int | SDL_mixer channel volume: 0 (silent) – 128 (full). |
 | `floor_tile_path` | string | PNG used to tile the ground. Per-level theming. |
+| `next_phase` | string | Optional TOML path loaded after the completion summary is confirmed. |
 | `floor_gaps` | int array | Sea gap x-positions. Blue flames spawn at each gap automatically. |
 
 ---
@@ -144,6 +146,8 @@ y = 100.0
 ```
 
 Single-instance. Triggers the level-complete event when collected. Displayed at 24×24 px.
+
+Collecting the last star snapshots elapsed time and coin totals, then shows the level-completion summary. If `next_phase` is set, pressing Enter/Start after the summary loads the next TOML level; otherwise confirmation exits the run.
 
 ---
 

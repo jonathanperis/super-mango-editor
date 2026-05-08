@@ -13,12 +13,14 @@ A 2D pixel art platformer written in C11 + SDL2, designed as a learning resource
 
 ## Current State
 
-- Single-level game with full player mechanics, 6 enemy types, 7 hazard types, collectibles, and climbable surfaces
-- 1600px scrolling world (4 screens), 32 render layers, delta-time physics at 60 FPS
-- Start menu, HUD, lives system, debug overlay
-- Keyboard and gamepad support with hot-plug
-- Builds natively on macOS + WebAssembly via Emscripten
+- Three TOML levels in `levels/`, runtime TOML loader via vendored `tomlc17`, and `next_phase` transitions
+- Full player mechanics, 6 enemy types, 7 hazard types, collectibles, climbable surfaces, and level-completion summary
+- Dynamic multi-screen worlds, 32 render layers, delta-time physics at 60 FPS
+- Start menu, HUD, lives system, debug overlay, keyboard/gamepad hot-plug support
+- Builds natively on macOS, Linux, Windows, plus WebAssembly via Emscripten
+- Standalone SDL2 level editor is shipped with TOML save/load, exporter, validation blocking, playtest, recent files, autosave, and smoke-test mode
+- CI runs native builds, editor builds, 8-test suite, level validation, native smoke, WebAssembly artifact smoke, docs lint/build, and CodeQL
 
 ## Next Milestone
 
-- **Level Editor**: standalone visual editor for creating and editing levels, removing the need for manual C struct definitions
+- **Editor Quality + Campaign Flow**: richer validation diagnostics, metadata editing, autosave recovery, and multi-level campaign tooling on top of the shipped editor

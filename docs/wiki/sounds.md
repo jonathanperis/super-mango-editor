@@ -14,34 +14,34 @@ All audio files live in the `assets/sounds/` directory, organized into categoriz
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `player_jump.wav` | `Mix_Chunk` | `gs->snd_jump` | Played on Space press when `on_ground == 1` |
-| `player_hit.wav` | `Mix_Chunk` | `gs->snd_hit` | Played when the player takes damage |
+| `player_jump.wav` | `Mix_Chunk` | `gs->audio.jump` | Played on Space press when `on_ground == 1` |
+| `player_hit.wav` | `Mix_Chunk` | `gs->audio.hit` | Played when the player takes damage |
 
 ### Collectibles — `assets/sounds/collectibles/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `coin.wav` | `Mix_Chunk` | `gs->snd_coin` | Played when the player collects a coin |
+| `coin.wav` | `Mix_Chunk` | `gs->audio.coin` | Played when the player collects a coin |
 
 ### Entities — `assets/sounds/entities/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `bird.wav` | `Mix_Chunk` | `gs->snd_flap` | Played for bird enemy wing flap |
-| `spider.wav` | `Mix_Chunk` | `gs->snd_spider_attack` | Played for spider enemy attack |
-| `fish.wav` | `Mix_Chunk` | `gs->snd_dive` | Played for fish enemy dive |
+| `bird.wav` | `Mix_Chunk` | `gs->audio.flap` | Played for bird enemy wing flap |
+| `spider.wav` | `Mix_Chunk` | `gs->audio.spider_attack` | Played for spider enemy attack |
+| `fish.wav` | `Mix_Chunk` | `gs->audio.dive` | Played for fish enemy dive |
 
 ### Hazards — `assets/sounds/hazards/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `axe_trap.wav` | `Mix_Chunk` | `gs->snd_axe` | Played for axe trap swing |
+| `axe_trap.wav` | `Mix_Chunk` | `gs->audio.axe` | Played for axe trap swing |
 
 ### Surfaces — `assets/sounds/surfaces/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `bouncepad.wav` | `Mix_Chunk` | `gs->snd_spring` | Played when the player lands on a bouncepad |
+| `bouncepad.wav` | `Mix_Chunk` | `gs->audio.spring` | Played when the player lands on a bouncepad |
 
 ### Screens — `assets/sounds/screens/`
 
@@ -53,9 +53,9 @@ All audio files live in the `assets/sounds/` directory, organized into categoriz
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `water.wav` | `Mix_Music` | `gs->music` | Background music for water-themed levels, loaded via `Mix_LoadMUS` (streaming) |
-| `lava.wav` | `Mix_Music` | `gs->music` | Background music for lava-themed levels, loaded via `Mix_LoadMUS` (streaming) |
-| `winds.wav` | `Mix_Music` | `gs->music` | Background music for wind-themed levels, loaded via `Mix_LoadMUS` (streaming) |
+| `water.wav` | `Mix_Music` | `gs->audio.music` | Background music for water-themed levels, loaded via `Mix_LoadMUS` (streaming) |
+| `lava.wav` | `Mix_Music` | `gs->audio.music` | Background music for lava-themed levels, loaded via `Mix_LoadMUS` (streaming) |
+| `winds.wav` | `Mix_Music` | `gs->audio.music` | Background music for wind-themed levels, loaded via `Mix_LoadMUS` (streaming) |
 
 ---
 
@@ -104,12 +104,12 @@ All sound effects use `Mix_LoadWAV` and are fully loaded into memory. The backgr
 ## Adding a New Sound Effect
 
 1. Place the `.wav` file in the appropriate `assets/sounds/<category>/` subdirectory.
-2. Add a `Mix_Chunk *snd_<name>` field to `GameState` in `game.h`.
+2. Add a `Mix_Chunk *<name>` field to `AudioResources` in `game.h`.
 3. Load it in `game_init`:
 
 ```c
-gs->snd_<name> = Mix_LoadWAV("assets/sounds/<category>/<name>.wav");
-if (!gs->snd_<name>) {
+gs->audio.<name> = Mix_LoadWAV("assets/sounds/<category>/<name>.wav");
+if (!gs->audio.<name>) {
     fprintf(stderr, "Warning: failed to load <name>.wav: %s\n", Mix_GetError());
     /* Non-fatal — game continues without this sound */
 }
@@ -118,16 +118,13 @@ if (!gs->snd_<name>) {
 4. Free it in `game_cleanup` (before `SDL_DestroyRenderer`):
 
 ```c
-if (gs->snd_<name>) {
-    Mix_FreeChunk(gs->snd_<name>);
-    gs->snd_<name> = NULL;
-}
+FREE_CHUNK(gs->audio.<name>);
 ```
 
 5. Play it wherever the event occurs:
 
 ```c
-if (gs->snd_<name>) Mix_PlayChannel(-1, gs->snd_<name>, 0);
+if (gs->audio.<name>) Mix_PlayChannel(-1, gs->audio.<name>, 0);
 ```
 
 The `if` guard is important: if the WAV fails to load for any reason, the game continues without crashing.
@@ -138,19 +135,19 @@ The `if` guard is important: if the WAV fails to load for any reason, the game c
 
 ```c
 // Load (streaming — not fully decoded into RAM)
-gs->music = Mix_LoadMUS("assets/sounds/levels/new_track.wav");
-if (!gs->music) { /* handle error */ }
+gs->audio.music = Mix_LoadMUS("assets/sounds/levels/new_track.wav");
+if (!gs->audio.music) { /* handle error */ }
 
 // Start (loop forever)
-Mix_PlayMusic(gs->music, -1);
+Mix_PlayMusic(gs->audio.music, -1);
 
 // Volume (0-128)
 Mix_VolumeMusic(64);  // 50%
 
 // Stop and free
 Mix_HaltMusic();
-Mix_FreeMusic(gs->music);
-gs->music = NULL;
+Mix_FreeMusic(gs->audio.music);
+gs->audio.music = NULL;
 ```
 
 `Mix_Music` **streams** from disk; it does not load the entire file into RAM. This keeps memory usage low for large audio files.

@@ -288,7 +288,7 @@ x = 192.0   # world-space x of the sea gap
 
 ### Fire Flame
 
-**File:** `src/hazards/fire_flame.c` / `fire_flame.h`  
+**File:** `src/hazards/blue_flame.c` / `blue_flame.h` (fire variant uses the shared blue-flame runtime type)  
 **Sprite:** `assets/sprites/hazards/fire_flame.png`  
 **Behaviour:** Same eruption cycle as the blue flame but with a fire-colored sprite. Used in volcanic or lava-themed levels. Shares the same phase constants.
 

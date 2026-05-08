@@ -97,55 +97,56 @@ Layers are drawn in array order (first = furthest back). `speed` is the parallax
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `spider.png` | `gs->spider_tex` | Spider enemy sprite sheet (ground patrol) |
-| `jumping_spider.png` | `gs->jumping_spider_tex` | Jumping spider enemy sprite sheet |
-| `bird.png` | `gs->bird_tex` | Slow sine-wave bird enemy sprite sheet |
-| `faster_bird.png` | `gs->faster_bird_tex` | Fast aggressive bird enemy sprite sheet |
-| `fish.png` | `gs->fish_tex` | Jumping fish enemy sprite sheet |
-| `faster_fish.png` | `gs->faster_fish_tex` | Faster fish enemy sprite sheet |
+| `spider.png` | `gs->textures.spider` | Spider enemy sprite sheet (ground patrol) |
+| `jumping_spider.png` | `gs->textures.jumping_spider` | Jumping spider enemy sprite sheet |
+| `bird.png` | `gs->textures.bird` | Slow sine-wave bird enemy sprite sheet |
+| `faster_bird.png` | `gs->textures.faster_bird` | Fast aggressive bird enemy sprite sheet |
+| `fish.png` | `gs->textures.fish` | Jumping fish enemy sprite sheet |
+| `faster_fish.png` | `gs->textures.faster_fish` | Faster fish enemy sprite sheet |
 
 ### Collectibles — `assets/sprites/collectibles/`
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `coin.png` | `gs->coin_tex` | 16x16 coin collectible sprite |
-| `star_yellow.png` | `gs->star_yellow_tex` | Yellow star collectible sprite |
-| `star_green.png` | `gs->star_green_tex` | Green star collectible sprite |
-| `star_red.png` | `gs->star_red_tex` | Red star collectible sprite |
-| `last_star.png` | `last_star.c` | Last star goal collectible sprite |
+| `coin.png` | `gs->textures.coin` | 16x16 coin collectible sprite |
+| `star_yellow.png` | `gs->textures.star_yellow` | Yellow star collectible sprite |
+| `star_green.png` | `gs->textures.star_green` | Green star collectible sprite |
+| `star_red.png` | `gs->textures.star_red` | Red star collectible sprite |
+| `last_star.png` | `gs->textures.last_star` | Last star goal collectible sprite |
 
 ### Hazards — `assets/sprites/hazards/`
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `spike.png` | `gs->spike_tex` | Floor/ceiling spike hazard |
-| `spike_block.png` | `gs->spike_block_tex` | Rail-riding rotating hazard sprite |
-| `spike_platform.png` | `gs->spike_platform_tex` | Spiked platform hazard sprite |
-| `circular_saw.png` | `gs->circular_saw_tex` | Rotating saw blade hazard |
-| `axe_trap.png` | `gs->axe_trap_tex` | Swinging axe trap hazard |
-| `blue_flame.png` | `gs->blue_flame_tex` | Blue flame hazard sprite |
-| `fire_flame.png` | `gs->fire_flame_tex` | Fire flame hazard sprite |
+| `spike.png` | `gs->textures.spike` | Floor/ceiling spike hazard |
+| `spike_block.png` | `gs->textures.spike_block` | Rail-riding rotating hazard sprite |
+| `spike_platform.png` | `gs->textures.spike_platform` | Spiked platform hazard sprite |
+| `circular_saw.png` | `gs->textures.circular_saw` | Rotating saw blade hazard |
+| `axe_trap.png` | `gs->textures.axe_trap` | Swinging axe trap hazard |
+| `blue_flame.png` | `gs->textures.blue_flame` | Blue flame hazard sprite |
+| `fire_flame.png` | `gs->textures.fire_flame` | Fire flame hazard sprite |
 
 ### Surfaces — `assets/sprites/surfaces/`
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `float_platform.png` | `gs->float_platform_tex` | 48x16 sprite, 3-slice horizontal strip (left cap, centre fill, right cap) |
-| `bridge.png` | `gs->bridge_tex` | 16x16 single-frame brick tile for crumble walkways |
-| `bouncepad_small.png` | `gs->bouncepad_small_tex` | Small bouncepad sprite (low launch) |
-| `bouncepad_medium.png` | `gs->bouncepad_medium_tex` | Medium bouncepad sprite (standard launch) |
-| `bouncepad_high.png` | `gs->bouncepad_high_tex` | High bouncepad sprite (max launch) |
-| `rail.png` | `gs->rail_tex` | 64x64 sprite sheet, 4x4 grid of 16x16 bitmask rail tiles |
-| `vine.png` | `gs->vine_tex` | 16x48 single-frame plant sprite for climbable vines |
-| `ladder.png` | `gs->ladder_tex` | Climbable ladder sprite |
-| `rope.png` | `gs->rope_tex` | Climbable rope sprite |
+| `float_platform.png` | `gs->textures.float_platform` | 48x16 sprite, 3-slice horizontal strip (left cap, centre fill, right cap) |
+| `bridge.png` | `gs->textures.bridge` | 16x16 single-frame brick tile for crumble walkways |
+| `bouncepad_small.png` | `gs->textures.bouncepad_small` | Small bouncepad sprite (low launch) |
+| `bouncepad_medium.png` | `gs->textures.bouncepad_medium` | Medium bouncepad sprite (standard launch) |
+| `bouncepad_high.png` | `gs->textures.bouncepad_high` | High bouncepad sprite (max launch) |
+| `rail.png` | `gs->textures.rail` | 64x64 sprite sheet, 4x4 grid of 16x16 bitmask rail tiles |
+| `vine_green.png` | `gs->textures.vine_green` | 16x48 green climbable vine sprite |
+| `vine_brown.png` | `gs->textures.vine_brown` | 16x48 brown climbable vine sprite |
+| `ladder.png` | `gs->textures.ladder` | Climbable ladder sprite |
+| `rope.png` | `gs->textures.rope` | Climbable rope sprite |
 
 ### Levels — `assets/sprites/levels/`
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `grass_tileset.png` | `gs->floor_tile` | 48x48 tile, 9-slice rendered across `FLOOR_Y` to form the floor |
-| `grass_platform.png` | `gs->platform_tex` | 48x48 tile, 9-slice rendered as one-way platform pillars |
+| `grass_tileset.png` | `gs->textures.floor_tile` | 48x48 tile, 9-slice rendered across `FLOOR_Y` to form the floor |
+| `grass_platform.png` | `gs->textures.platform` | 48x48 tile, 9-slice rendered as one-way platform pillars |
 
 ### Screens — `assets/sprites/screens/`
 

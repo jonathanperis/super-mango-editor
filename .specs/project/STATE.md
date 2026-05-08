@@ -8,6 +8,7 @@
 | Runtime level loader | Shipped | Game loads TOML files through `tomlc17`; `make run-level LEVEL=levels/00_sandbox_01.toml`. |
 | Level editor | Shipped baseline | Standalone SDL2 editor builds with `make editor` / runs with `make run-editor`; reads/writes TOML-backed `LevelDef` data. |
 | Level validation | Shipped baseline | `tools/validate_levels.py`, `make validate-levels`, CI validation, and C validation tests exist. |
+| CI smoke/docs gates | Shipped baseline | Native editor builds, game/editor smoke tests, WebAssembly artifact smoke, and docs lint/build run in CI. |
 
 ## Current Repository Reality
 
@@ -18,8 +19,9 @@
 - Parser: vendored `vendor/tomlc17/tomlc17.c`.
 - Game target includes `src/editor/serializer.c` for TOML loading support plus `vendor/tomlc17/tomlc17.c`.
 - Editor target is separate: `out/super-mango-editor`; no SDL2_mixer link.
-- Tests: `make test` runs serializer and level validation tests.
+- Tests: `make test` runs 8 C test binaries: serializer, level validation, rail, entity-utils, collision, phase-transition, exporter, and editor-validation.
 - Validation: `make validate-levels` runs `python3 tools/validate_levels.py` against current TOML levels.
+- Editor safeguards: in-memory validation blocks save/export/playtest on errors, status bar shows validation summary, autosave writes valid dirty levels under `out/autosave/`, recent files are tracked, and `--smoke-test` supports CI.
 
 ## Decisions (Current)
 
@@ -80,11 +82,10 @@ Game loads TOML levels directly at runtime via `--level <path>` / `make run-leve
 
 ## Deferred Ideas
 
-- Editor validation panel with inline TOML diagnostics.
-- Metadata editor for level name, description, author, phase links, music, rules, and physics overrides.
-- Playtest button that saves/validates then launches current TOML level.
-- Exporter regression tests to protect generated output paths.
-- Recent files and autosave/crash recovery.
+- Rich editor validation panel with clickable inline TOML diagnostics.
+- Richer metadata editor for full background/foreground/fog arrays and physics overrides.
+- Exporter/serializer fixture expansion beyond current regression tests.
+- Autosave crash-recovery prompt and cleanup policy.
 - Tilemap painting for custom floor layouts.
 - Multi-level campaign editor with level ordering.
 

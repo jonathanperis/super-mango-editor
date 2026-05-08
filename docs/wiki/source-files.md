@@ -27,6 +27,7 @@ src/
 ├── editor/
 │   ├── editor_main.c             Standalone editor entry point
 │   ├── editor.h / .c             Editor state, events, render loop
+│   ├── editor_validation.h / .c  Level validation report helpers
 │   ├── canvas.h / .c             Scrollable zoomable editing canvas
 │   ├── palette.h / .c            Entity palette
 │   ├── properties.h / .c         Per-entity property editing
@@ -59,6 +60,7 @@ src/
 ├── levels/
 │   ├── level.h                   Shared level definitions
 │   ├── level_loader.h / .c       TOML level loading and switching
+│   ├── phase_transition.h / .c   next_phase resolution and progress helpers
 │   ├── level_validate.c          LevelDef count validation
 │   └── exported/                 Generated C level exports
 ├── player/
@@ -93,9 +95,9 @@ New `.c` files in `src/` or recognized source subdirectories are picked up by Ma
 
 ### Responsibilities
 
-- Parse CLI flags: `--debug` and `--sandbox`
+- Parse CLI flags: `--debug`, `--sandbox`, `--level <path>`, and `--smoke-test-frames N`
 - Call `SDL_Init`, `IMG_Init`, `TTF_Init`, `Mix_OpenAudio` in order
-- Route to start menu or sandbox (game) mode
+- Route to start menu, sandbox, or direct TOML level mode
 - Tear down SDL subsystems in reverse order before returning
 
 ### Subsystem Init Order
@@ -183,6 +185,8 @@ See [Constants Reference](#constants-reference) for full details.
 void game_init(GameState *gs);
 void game_loop(GameState *gs);
 void game_cleanup(GameState *gs);
+int  game_load_next_phase(GameState *gs);
+void game_complete_level(GameState *gs);
 ```
 
 ---
@@ -226,9 +230,11 @@ Frees all resources in reverse init order.
 **Role:** Level schema, TOML loading, phase switching, and count validation.
 
 **Key functions:**
-- `level_load(const char *path, LevelDef *out)` -- parse a TOML level into `LevelDef`
+- `level_load(GameState *gs, const LevelDef *def)` -- copy a parsed level definition into runtime `GameState`
+- `level_reset(GameState *gs, const LevelDef *def)` -- restore mutable level state after death/retry
+- `level_load_toml(const char *path, LevelDef *def)` -- parse a TOML level into `LevelDef`
 - `level_validate_counts(const LevelDef *level, char *err, size_t err_sz)` -- reject out-of-range array counts
-- `level_free(LevelDef *level)` -- release owned strings/textures in a level definition
+- `phase_has_next`, `phase_next_path`, `phase_resolve_path` -- resolve level-completion next-phase paths
 
 ---
 

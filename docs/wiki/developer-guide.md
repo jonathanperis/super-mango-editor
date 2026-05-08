@@ -112,16 +112,16 @@ void coins_render(const Coin *coins, int count,
 
 The Makefile picks up `coin.c` automatically from the `src/collectibles/` subdirectory -- **no Makefile changes needed**.
 
-#### 3. Add texture to `GameState` in `game.h`
+#### 3. Add texture to `TextureResources` in `game.h`
 
-Textures are loaded in `game_init()` and stored in `GameState`. The entity array and count also live in `GameState`:
+Textures are loaded in `game_init()` and stored under `gs->textures`. The entity array and count live directly in `GameState`:
 
 ```c
 #include "collectibles/coin.h"
 
 typedef struct {
     // ... existing fields ...
-    SDL_Texture *coin_tex;    /* shared texture, loaded in game_init */
+    TextureResources textures; /* contains SDL_Texture *coin */
     Coin coins[MAX_COINS];    /* fixed-size array -- simple and cache-friendly */
     int  coin_count;          /* how many are currently active */
 } GameState;
@@ -131,8 +131,8 @@ typedef struct {
 
 ```c
 // game_init -- load shared texture:
-gs->coin_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/coin.png");
-if (!gs->coin_tex) {
+gs->textures.coin = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/coin.png");
+if (!gs->textures.coin) {
     fprintf(stderr, "Failed to load coin.png: %s\n", IMG_GetError());
     exit(EXIT_FAILURE);
 }
@@ -142,10 +142,10 @@ gs->coins[i] = (Coin){ .x = def->coins[i].x, .y = def->coins[i].y, .active = 1 }
 gs->coin_count = def->coin_count;
 
 // game_loop render section (correct layer order):
-coins_render(gs->coins, gs->coin_count, gs->renderer, gs->coin_tex, (int)gs->camera.x);
+coins_render(gs->coins, gs->coin_count, gs->renderer, gs->textures.coin, (int)gs->camera.x);
 
 // game_cleanup (before SDL_DestroyRenderer):
-DESTROY_TEX(gs->coin_tex);
+DESTROY_TEX(gs->textures.coin);
 ```
 
 #### 5. Add to a TOML level file
@@ -236,12 +236,12 @@ All sound files are `.wav` format, named with the convention `component_descript
 Steps to add a new sound:
 
 1. Place `.wav` in `assets/sounds/<category>/`.
-2. Add `Mix_Chunk *snd_<name>;` to `GameState` in `game.h`.
+2. Add `Mix_Chunk *<name>;` to `AudioResources` in `game.h`.
 3. Load in `game_init` (non-fatal -- warn but continue):
 
 ```c
-gs->snd_<name> = Mix_LoadWAV("assets/sounds/<category>/<name>.wav");
-if (!gs->snd_<name>) {
+gs->audio.<name> = Mix_LoadWAV("assets/sounds/<category>/<name>.wav");
+if (!gs->audio.<name>) {
     fprintf(stderr, "Warning: could not load <name>.wav: %s\n", Mix_GetError());
 }
 ```
@@ -249,13 +249,13 @@ if (!gs->snd_<name>) {
 4. Free in `game_cleanup`:
 
 ```c
-if (gs->snd_<name>) { Mix_FreeChunk(gs->snd_<name>); gs->snd_<name> = NULL; }
+FREE_CHUNK(gs->audio.<name>);
 ```
 
 5. Play wherever needed:
 
 ```c
-if (gs->snd_<name>) Mix_PlayChannel(-1, gs->snd_<name>, 0);
+if (gs->audio.<name>) Mix_PlayChannel(-1, gs->audio.<name>, 0);
 ```
 
 See [Sounds](sounds) for the full list of available sound files.
@@ -268,16 +268,16 @@ Background music is loaded via `Mix_LoadMUS` (not `Mix_LoadWAV`). Runtime levels
 
 ```c
 // Load from current LevelDef
-gs->music = Mix_LoadMUS(def->music_path);
+gs->audio.music = Mix_LoadMUS(def->music_path);
 
 // Play (looping)
-Mix_PlayMusic(gs->music, -1);
+Mix_PlayMusic(gs->audio.music, -1);
 Mix_VolumeMusic(64);  // 50% -- adjust as needed
 
 // Cleanup
 Mix_HaltMusic();
-Mix_FreeMusic(gs->music);
-gs->music = NULL;
+Mix_FreeMusic(gs->audio.music);
+gs->audio.music = NULL;
 ```
 
 ---
@@ -390,7 +390,7 @@ See [Assets](assets) for sprite sheet dimensions and [Player Module](#player-mod
 - [ ] Create `src/<category>/<entity>.h` with struct and function declarations (e.g. `src/entities/`, `src/collectibles/`, `src/hazards/`, `src/surfaces/`)
 - [ ] Create `src/<category>/<entity>.c` with init, update, render, cleanup
 - [ ] Add `#include "<category>/<entity>.h"` to `game.h`
-- [ ] Add texture pointer, entity array, and count to `GameState` (by value, not pointer)
+- [ ] Add texture pointer to `TextureResources`, plus entity array and count to `GameState` (by value, not pointer)
 - [ ] Load texture in `game_init` in `game.c`
 - [ ] Call `<entity>_init` in `game_init`
 - [ ] Call `<entity>_update` in `game_loop` update section

@@ -10,7 +10,7 @@
 
 ## About
 
-Super Mango is a 2D side-scrolling platformer built in C11 with SDL2, designed as an educational project with well-commented source code that can be read as a learning resource for C + SDL2 game development. The game features a multi-screen forest stage with parallax backgrounds, one-way platforms, floating platforms, crumble bridges, floor gaps, collectible coins, climbable vines/ladders/ropes, six enemy types, seven hazard types, bouncepads, animated water, fog overlays, a start menu, and an HUD with hearts, lives, and score. Levels are defined in TOML and loaded at runtime, with a standalone visual level editor for creating and editing levels. It renders at a 400x300 logical resolution scaled 2x to an 800x600 window for a chunky pixel-art look, with frame-rate-independent movement via delta-time physics. The project builds natively on macOS, Linux, and Windows, and compiles to WebAssembly via Emscripten for browser play.
+Super Mango is a 2D side-scrolling platformer built in C11 with SDL2, designed as an educational project with well-commented source code that can be read as a learning resource for C + SDL2 game development. The game features multi-screen TOML levels with parallax backgrounds, one-way platforms, floating platforms, crumble bridges, floor gaps, collectible coins, climbable vines/ladders/ropes, six enemy types, seven hazard types, bouncepads, animated water, fog overlays, a start menu, HUD, level-completion summary, and next-phase flow. Levels are defined in TOML and loaded at runtime, with a standalone visual level editor for creating and editing levels. It renders at a 400x300 logical resolution scaled 2x to an 800x600 window for a chunky pixel-art look, with frame-rate-independent movement via delta-time physics. The project builds natively on macOS, Linux, and Windows, and compiles to WebAssembly via Emscripten for browser play.
 
 ## Tech Stack
 
@@ -33,7 +33,8 @@ Super Mango is a 2D side-scrolling platformer built in C11 with SDL2, designed a
 - Seven hazard types: spike rows, spike blocks, spike platforms, circular saws, axe traps, blue flames, fire flames
 - Collectibles: coins (100 pts each, 3 coins restore a heart), star yellow, star green, star red health pickups, end-of-level last star
 - Climbable vines, ladders, and ropes; three bouncepad variants (small, medium, high)
-- TOML-based level format with runtime level loading (`--level path/to/level.toml`)
+- TOML-based level format with runtime level loading (`--level path/to/level.toml`) and `next_phase` transitions
+- End-of-level summary overlay showing elapsed time and coins collected; Enter/Start continues to the next phase when configured
 - Start menu, HUD (hearts/lives/score), lives system, invincibility blink on damage
 - Keyboard and gamepad (hot-plug) controls
 - Debug overlay (`--debug` flag): FPS counter, CPU frame time, memory usage, collision hitbox visualization, scrolling event log
@@ -45,13 +46,15 @@ Super Mango includes a standalone visual level editor built with C11 and SDL2. T
 
 Editor features:
 
-- Scrollable canvas with zoom, grid snapping, and multi-select
+- Scrollable canvas with zoom, grid snapping, and select/place/delete tools
 - Entity palette with all game objects: platforms, enemies, hazards, collectibles, surfaces, effects
 - Per-entity property editing (position, size, speed, animation, behavior)
 - TOML serialization (save/load `.toml` level files)
 - C code exporter (generates `.c`/`.h` files for compiled-in levels)
-- Undo/redo history
-- Native file dialogs (macOS)
+- Undo/redo history, copy/paste, recent files, autosave, and dirty-state indicators
+- Validation status for the active level; validation errors block save, export, and playtest
+- Native file dialogs
+- Headless smoke mode for CI (`--smoke-test`)
 
 Build and run the editor:
 
@@ -134,6 +137,8 @@ make run-level LEVEL=levels/00_sandbox_01.toml         # run a specific TOML lev
 make run-level-debug LEVEL=levels/00_sandbox_01.toml   # run a level with debug overlay
 make editor                           # build the level editor
 make run-editor                       # build and run the level editor
+make test                             # build and run 8 native regression tests
+make validate-levels                  # validate all levels/*.toml files
 make web                              # build to WebAssembly (requires Emscripten)
 make clean                            # remove all build artifacts
 ```
@@ -149,7 +154,7 @@ super-mango-editor/
 │   ├── 00_sandbox_01.toml           Level data loaded at runtime
 │   ├── 01_lugio_01.toml             Level data loaded at runtime
 │   └── 02_lugio_02.toml             Level data loaded at runtime
-├── src/                              55 C source files + 55 headers
+├── src/                              57 C source files + 57 headers
 │   ├── main.c                        Entry point: SDL init/teardown
 │   ├── game.h / game.c               GameState struct, window, renderer, game loop
 │   ├── collectibles/                  Pickup items
@@ -196,6 +201,7 @@ super-mango-editor/
 │   ├── levels/                        Level system
 │   │   ├── level.h                    Shared level definitions (LevelDef struct)
 │   │   ├── level_loader.h / .c       TOML level loading and switching
+│   │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
 │   │   ├── level_validate.c          LevelDef count validation
 │   │   └── exported/                  Auto-generated C level data
 │   │       └── 00_sandbox_01.h / .c  Generated C level export
@@ -250,15 +256,16 @@ super-mango-editor/
 
 ## CI/CD
 
-Three GitHub Actions workflows:
+Four GitHub Actions workflows:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
 | Build & Release | `build.yml` | Push to `main`, pull requests | Multi-platform build (Linux x86_64, macOS arm64, Windows x86_64, WebAssembly); on main push: GitHub Release creation |
+| Docs | `docs.yml` | Docs pull requests, manual | Bun install, docs lint, and Astro docs build |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly | Automated code security and quality analysis |
-| Deploy Pages | `deploy.yml` | Push to `main`, manual | Deploys the WebAssembly build to GitHub Pages for browser play |
+| Deploy Pages | `deploy.yml` | Successful main Build & Release workflow | Builds docs, copies WebAssembly artifacts, and deploys GitHub Pages |
 
-All workflows install SDL2 dependencies per platform and compile with the project Makefile. The Build & Release workflow creates versioned GitHub Releases. The Deploy Pages workflow publishes the docs/ directory to GitHub Pages.
+The Build & Release workflow runs `make`, `make test`, `make validate-levels`, `make editor`, native smoke tests for the game/editor, WebAssembly build, and WebAssembly artifact checks. The Docs workflow runs `bun run lint` and `bun run build` for PRs touching `docs/`. The Deploy Pages workflow publishes the Astro docs output plus WebAssembly artifacts to GitHub Pages.
 
 ## License
 
