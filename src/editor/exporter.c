@@ -221,6 +221,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     if (def->generated_by[0] != '\0') {
         fprintf(f, "    .generated_by = \"%s\",\n", def->generated_by);
     }
+    fprintf(f, "    .screen_count = %d,\n", def->screen_count);
 
     /* ---- 2. Floor gaps ---- */
     write_section(f, "Floor gaps");
@@ -313,6 +314,9 @@ static int write_source(const LevelDef *def, const char *var_name,
     write_section(f, "Last star");
     fprintf(f, "    .last_star = { .x = %.1ff, .y = %.1ff },\n",
             def->last_star.x, def->last_star.y);
+    if (def->next_phase[0] != '\0') {
+        fprintf(f, "    .next_phase = \"%s\",\n", def->next_phase);
+    }
 
     /* ---- 8. Spiders ---- */
     write_section(f, "Spiders");
@@ -639,11 +643,29 @@ static int write_source(const LevelDef *def, const char *var_name,
     fprintf(f, "\n    .music_path   = \"%s\",\n", def->music_path);
     fprintf(f, "    .music_volume = %d,\n", def->music_volume);
 
+    /* Floor tile */
+    fprintf(f, "\n    .floor_tile_path = \"%s\",\n", def->floor_tile_path);
+
     /* Game rules */
     fprintf(f, "\n    .initial_hearts  = %d,\n", def->initial_hearts);
     fprintf(f, "    .initial_lives   = %d,\n", def->initial_lives);
     fprintf(f, "    .score_per_life  = %d,\n", def->score_per_life);
     fprintf(f, "    .coin_score      = %d,\n", def->coin_score);
+
+    /* Player physics overrides */
+    fprintf(f, "\n    .physics = {\n");
+    fprintf(f, "        .walk_max_speed = %.2ff,\n", (double)def->physics.walk_max_speed);
+    fprintf(f, "        .run_max_speed = %.2ff,\n", (double)def->physics.run_max_speed);
+    fprintf(f, "        .walk_ground_accel = %.2ff,\n", (double)def->physics.walk_ground_accel);
+    fprintf(f, "        .run_ground_accel = %.2ff,\n", (double)def->physics.run_ground_accel);
+    fprintf(f, "        .ground_friction = %.2ff,\n", (double)def->physics.ground_friction);
+    fprintf(f, "        .ground_counter_accel = %.2ff,\n", (double)def->physics.ground_counter_accel);
+    fprintf(f, "        .air_accel_walk = %.2ff,\n", (double)def->physics.air_accel_walk);
+    fprintf(f, "        .air_accel_run = %.2ff,\n", (double)def->physics.air_accel_run);
+    fprintf(f, "        .air_friction = %.2ff,\n", (double)def->physics.air_friction);
+    fprintf(f, "        .cam_lookahead_vx_factor = %.2ff,\n", (double)def->physics.cam_lookahead_vx_factor);
+    fprintf(f, "        .cam_lookahead_max = %.2ff,\n", (double)def->physics.cam_lookahead_max);
+    fprintf(f, "    },\n");
 
     /* ---- Close the struct ---- */
     fprintf(f, "};\n");

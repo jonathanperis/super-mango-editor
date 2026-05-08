@@ -56,12 +56,17 @@ EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor
 EDITOR_LIBS   = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lm
 TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
-                $(OUTDIR)/rail-test $(OUTDIR)/entity-utils-test
+                $(OUTDIR)/rail-test $(OUTDIR)/entity-utils-test \
+                $(OUTDIR)/collision-test $(OUTDIR)/phase-transition-test \
+                $(OUTDIR)/exporter-test
 TEST_SERIALIZER_OBJ = $(OUTDIR)/test-serializer.o
+TEST_EXPORTER_OBJ   = $(OUTDIR)/test-exporter.o
 TEST_VALIDATE_OBJ   = $(OUTDIR)/test-level-validate.o
 TEST_TOMLC_OBJ      = $(OUTDIR)/test-tomlc17.o
 TEST_RAIL_OBJ       = $(OUTDIR)/test-rail.o
 TEST_ENTITY_UTILS_OBJ = $(OUTDIR)/test-entity-utils.o
+TEST_SPIKE_PLATFORM_OBJ = $(OUTDIR)/test-spike-platform.o
+TEST_PHASE_OBJ      = $(OUTDIR)/test-phase-transition.o
 TEST_LIBS           = $(shell $(SDL2CFG) --libs) -lm
 
 .PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels
@@ -168,11 +173,17 @@ test: $(OUTDIR) $(TEST_TARGETS)
 	./$(OUTDIR)/level-validate-test
 	./$(OUTDIR)/rail-test
 	./$(OUTDIR)/entity-utils-test
+	./$(OUTDIR)/collision-test
+	./$(OUTDIR)/phase-transition-test
+	./$(OUTDIR)/exporter-test
 
 validate-levels:
 	python3 tools/validate_levels.py
 
 $(TEST_SERIALIZER_OBJ): $(EDITOR_DIR)/serializer.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_EXPORTER_OBJ): $(EDITOR_DIR)/exporter.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
 $(TEST_VALIDATE_OBJ): $(SRCDIR)/levels/level_validate.c
@@ -182,6 +193,12 @@ $(TEST_RAIL_OBJ): $(SRCDIR)/surfaces/rail.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
 $(TEST_ENTITY_UTILS_OBJ): $(SRCDIR)/core/entity_utils.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_SPIKE_PLATFORM_OBJ): $(SRCDIR)/hazards/spike_platform.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_PHASE_OBJ): $(SRCDIR)/levels/phase_transition.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
 $(TEST_TOMLC_OBJ): $(VENDOR_DIR)/tomlc17.c
@@ -197,6 +214,15 @@ $(OUTDIR)/rail-test: tests/rail_test.c $(TEST_RAIL_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
 $(OUTDIR)/entity-utils-test: tests/entity_utils_test.c $(TEST_ENTITY_UTILS_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
+
+$(OUTDIR)/collision-test: tests/collision_test.c $(TEST_SPIKE_PLATFORM_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+
+$(OUTDIR)/phase-transition-test: tests/phase_transition_test.c $(TEST_PHASE_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+
+$(OUTDIR)/exporter-test: tests/exporter_test.c $(TEST_EXPORTER_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
 
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
