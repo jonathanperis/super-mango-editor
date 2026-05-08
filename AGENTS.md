@@ -1,4 +1,4 @@
-# Super Mango — Claude Code Guide
+# Super Mango — Codex Guide
 
 @.claude/commands/bosser-engineer.md
 
@@ -39,7 +39,7 @@ The Makefile uses explicit per-directory wildcards — **new `.c` files in exist
 
 ```
 super-mango-editor/
-├── CLAUDE.md               ← you are here
+├── AGENTS.md               ← you are here
 ├── Makefile
 ├── assets/                 ← categorized game assets
 │   ├── fonts/              ← TrueType fonts (round9x13.ttf)

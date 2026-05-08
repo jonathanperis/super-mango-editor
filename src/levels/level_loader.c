@@ -10,7 +10,7 @@
  *               geometry that never changes (platforms, rails, sea gaps).
  */
 
-#include <stdlib.h>  /* rand(), RAND_MAX */
+#include <stdlib.h>  /* exit, rand(), RAND_MAX */
 #include <SDL_image.h> /* IMG_LoadTexture, IMG_GetError */
 #include <stdio.h>     /* fprintf, stderr */
 /* string.h no longer needed — foreground detection is count-based */
@@ -97,6 +97,13 @@ static void load_rails(GameState *gs, const LevelDef *def)
  */
 static void load_platforms(GameState *gs, const LevelDef *def)
 {
+    for (int i = 0; i < gs->platform_count; i++) {
+        if (gs->platforms[i].tex) {
+            SDL_DestroyTexture(gs->platforms[i].tex);
+            gs->platforms[i].tex = NULL;
+        }
+    }
+
     for (int i = 0; i < def->platform_count; i++) {
         const PlatformPlacement *p = &def->platforms[i];
         int tw = (p->tile_width > 0) ? p->tile_width : 1;
@@ -562,12 +569,18 @@ static void load_ropes(GameState *gs, const LevelDef *def)
  */
 void level_load(GameState *gs, const LevelDef *def)
 {
+    char err[128];
+    if (level_validate_counts(def, err, sizeof(err)) != 0) {
+        fprintf(stderr, "level_load: invalid level definition: %s\n", err);
+        exit(EXIT_FAILURE);
+    }
+
     /* Store a pointer to the active level definition for game.c to read */
-    gs->current_level = def;
+    gs->runtime.current_level = def;
 
     /* Set world width from screen_count (default 4 screens if not specified) */
     int screens = (def->screen_count > 0) ? def->screen_count : 4;
-    gs->world_w = screens * GAME_W;
+    gs->runtime.world_w = screens * GAME_W;
 
     /* ---- Static geometry ------------------------------------------ */
     load_floor_gaps(gs, def);
@@ -630,8 +643,8 @@ void level_load(GameState *gs, const LevelDef *def)
      * Water/lava strip is driven by foreground_layers (the animated bottom strip).
      * Each system is independent — a level can have fog without water, or vice versa.
      */
-    gs->fog_enabled   = (def->fog_layer_count > 0) ? 1 : 0;
-    gs->water_enabled = (def->foreground_layer_count > 0) ? 1 : 0;
+    gs->runtime.fog_enabled   = (def->fog_layer_count > 0) ? 1 : 0;
+    gs->runtime.water_enabled = (def->foreground_layer_count > 0) ? 1 : 0;
 
     /*
      * Game rules — use level-defined values if set (>0), otherwise fall
@@ -640,9 +653,9 @@ void level_load(GameState *gs, const LevelDef *def)
     gs->hearts          = def->initial_hearts  > 0 ? def->initial_hearts  : MAX_HEARTS;
     gs->lives           = def->initial_lives   > 0 ? def->initial_lives   : DEFAULT_LIVES;
     gs->score           = 0;
-    gs->score_per_life  = def->score_per_life  > 0 ? def->score_per_life  : SCORE_PER_LIFE;
-    gs->score_life_next = gs->score_per_life;
-    gs->coin_score      = def->coin_score     > 0 ? def->coin_score      : COIN_SCORE;
+    gs->rules.score_per_life  = def->score_per_life  > 0 ? def->score_per_life  : SCORE_PER_LIFE;
+    gs->score_life_next = gs->rules.score_per_life;
+    gs->rules.coin_score      = def->coin_score     > 0 ? def->coin_score      : COIN_SCORE;
 
     /*
      * Player physics overrides — apply level-defined values if >= 0,

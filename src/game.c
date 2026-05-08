@@ -81,6 +81,90 @@ static Bouncepad s_all_pads[MAX_BOUNCEPADS_MEDIUM + MAX_BOUNCEPADS_SMALL + MAX_B
 
 /* ------------------------------------------------------------------ */
 
+static void game_apply_level_resources(GameState *gs, const LevelDef *def)
+{
+    if (!def) return;
+
+    parallax_cleanup(&gs->parallax);
+    if (def->background_layer_count > 0) {
+        char  paths[MAX_BACKGROUND_LAYERS][64];
+        float speeds[MAX_BACKGROUND_LAYERS];
+        int   n = def->background_layer_count;
+        if (n > MAX_BACKGROUND_LAYERS) n = MAX_BACKGROUND_LAYERS;
+        for (int i = 0; i < n; i++) {
+            SDL_strlcpy(paths[i], def->background_layers[i].path, 64);
+            speeds[i] = def->background_layers[i].speed;
+        }
+        parallax_init_from_def(&gs->parallax, gs->renderer,
+                               (const char (*)[64])paths, speeds, n);
+    } else {
+        parallax_init(&gs->parallax, gs->renderer);
+    }
+
+    {
+        const char *floor_path = def->floor_tile_path[0] != '\0'
+                               ? def->floor_tile_path
+                               : "assets/sprites/levels/grass_tileset.png";
+        SDL_Texture *new_floor = IMG_LoadTexture(gs->renderer, floor_path);
+        if (!new_floor) {
+            fprintf(stderr, "Warning: failed to load floor tile %s: %s\n",
+                    floor_path, IMG_GetError());
+            new_floor = IMG_LoadTexture(gs->renderer,
+                                        "assets/sprites/levels/grass_tileset.png");
+        }
+        if (new_floor) {
+            if (gs->floor_tile) SDL_DestroyTexture(gs->floor_tile);
+            gs->floor_tile = new_floor;
+        }
+    }
+
+    {
+        const char *strip = "assets/sprites/foregrounds/water.png";
+        if (def->foreground_layer_count > 0) {
+            const char *level_strip =
+                def->foreground_layers[def->foreground_layer_count - 1].path;
+            if (level_strip[0] != '\0') strip = level_strip;
+        }
+        water_reload_texture(&gs->water, gs->renderer, strip);
+    }
+
+    fog_cleanup(&gs->fog);
+    if (def->fog_layer_count > 0) {
+        char fog_paths[MAX_FOG_TEXTURES][64];
+        int  n = def->fog_layer_count;
+        if (n > MAX_FOG_TEXTURES) n = MAX_FOG_TEXTURES;
+        for (int i = 0; i < n; i++) {
+            SDL_strlcpy(fog_paths[i], def->fog_layers[i].path, 64);
+        }
+        fog_init(&gs->fog, gs->renderer, (const char (*)[64])fog_paths, n);
+    }
+
+    if (gs->music) {
+        Mix_HaltMusic();
+        Mix_FreeMusic(gs->music);
+        gs->music = NULL;
+    }
+    if (def->music_path[0] != '\0') {
+        gs->music = Mix_LoadMUS(def->music_path);
+        if (!gs->music) {
+            fprintf(stderr, "Warning: failed to load %s: %s\n",
+                    def->music_path, Mix_GetError());
+        } else {
+            Mix_PlayMusic(gs->music, -1);
+            Mix_VolumeMusic(def->music_volume > 0 ? def->music_volume : 13);
+        }
+    }
+}
+
+static void game_init_fail(GameState *gs, const char *label, const char *detail)
+{
+    fprintf(stderr, "%s: %s\n", label, detail);
+    game_cleanup(gs);
+    exit(EXIT_FAILURE);
+}
+
+/* ------------------------------------------------------------------ */
+
 /*
  * game_init — Set up everything the game needs before the loop starts.
  *
@@ -102,8 +186,7 @@ void game_init(GameState *gs) {
         SDL_WINDOW_SHOWN
     );
     if (!gs->window) {
-        fprintf(stderr, "SDL_CreateWindow error: %s\n", SDL_GetError());
-        exit(EXIT_FAILURE);
+        game_init_fail(gs, "SDL_CreateWindow error", SDL_GetError());
     }
 
     /*
@@ -127,9 +210,7 @@ void game_init(GameState *gs) {
         SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
     );
     if (!gs->renderer) {
-        fprintf(stderr, "SDL_CreateRenderer error: %s\n", SDL_GetError());
-        SDL_DestroyWindow(gs->window);
-        exit(EXIT_FAILURE);
+        game_init_fail(gs, "SDL_CreateRenderer error", SDL_GetError());
     }
 
     /*
@@ -146,11 +227,7 @@ void game_init(GameState *gs) {
      */
     gs->floor_tile = IMG_LoadTexture(gs->renderer, "assets/sprites/levels/grass_tileset.png");
     if (!gs->floor_tile) {
-        fprintf(stderr, "Failed to load Grass_Tileset.png: %s\n", IMG_GetError());
-        parallax_cleanup(&gs->parallax);
-        SDL_DestroyRenderer(gs->renderer);
-        SDL_DestroyWindow(gs->window);
-        exit(EXIT_FAILURE);
+        game_init_fail(gs, "Failed to load Grass_Tileset.png", IMG_GetError());
     }
 
     /*
@@ -161,12 +238,7 @@ void game_init(GameState *gs) {
      */
     gs->platform_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/levels/grass_platform.png");
     if (!gs->platform_tex) {
-        fprintf(stderr, "Failed to load Grass_Oneway.png: %s\n", IMG_GetError());
-        SDL_DestroyTexture(gs->floor_tile);
-        parallax_cleanup(&gs->parallax);
-        SDL_DestroyRenderer(gs->renderer);
-        SDL_DestroyWindow(gs->window);
-        exit(EXIT_FAILURE);
+        game_init_fail(gs, "Failed to load Grass_Oneway.png", IMG_GetError());
     }
 
     /* Load the animated water strip texture and reset scroll state */
@@ -178,13 +250,7 @@ void game_init(GameState *gs) {
      */
     gs->spider_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/spider.png");
     if (!gs->spider_tex) {
-        fprintf(stderr, "Failed to load Spider_1.png: %s\n", IMG_GetError());
-        SDL_DestroyTexture(gs->platform_tex);
-        SDL_DestroyTexture(gs->floor_tile);
-        parallax_cleanup(&gs->parallax);
-        SDL_DestroyRenderer(gs->renderer);
-        SDL_DestroyWindow(gs->window);
-        exit(EXIT_FAILURE);
+        game_init_fail(gs, "Failed to load Spider_1.png", IMG_GetError());
     }
 
     /*
@@ -193,27 +259,20 @@ void game_init(GameState *gs) {
      */
     gs->jumping_spider_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/jumping_spider.png");
     if (!gs->jumping_spider_tex) {
-        fprintf(stderr, "Failed to load Spider_2.png: %s\n", IMG_GetError());
-        SDL_DestroyTexture(gs->spider_tex);
-        SDL_DestroyTexture(gs->platform_tex);
-        SDL_DestroyTexture(gs->floor_tile);
-        parallax_cleanup(&gs->parallax);
-        SDL_DestroyRenderer(gs->renderer);
-        SDL_DestroyWindow(gs->window);
-        exit(EXIT_FAILURE);
+        game_init_fail(gs, "Failed to load Spider_2.png", IMG_GetError());
     }
 
     /* ---- Load all entity textures (engine resources) --------------- */
     gs->bird_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/bird.png");
-    if (!gs->bird_tex) { fprintf(stderr, "Failed to load Bird_2.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
+    if (!gs->bird_tex) game_init_fail(gs, "Failed to load Bird_2.png", IMG_GetError());
     gs->faster_bird_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/faster_bird.png");
-    if (!gs->faster_bird_tex) { fprintf(stderr, "Failed to load Bird_1.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
+    if (!gs->faster_bird_tex) game_init_fail(gs, "Failed to load Bird_1.png", IMG_GetError());
     gs->fish_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/entities/fish.png");
-    if (!gs->fish_tex) { fprintf(stderr, "Failed to load Fish_2.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
+    if (!gs->fish_tex) game_init_fail(gs, "Failed to load Fish_2.png", IMG_GetError());
     gs->coin_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/coin.png");
-    if (!gs->coin_tex) { fprintf(stderr, "Failed to load Coin.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
+    if (!gs->coin_tex) game_init_fail(gs, "Failed to load Coin.png", IMG_GetError());
     gs->bouncepad_medium_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/bouncepad_medium.png");
-    if (!gs->bouncepad_medium_tex) { fprintf(stderr, "Failed to load Bouncepad_Wood.png: %s\n", IMG_GetError()); exit(EXIT_FAILURE); }
+    if (!gs->bouncepad_medium_tex) game_init_fail(gs, "Failed to load Bouncepad_Wood.png", IMG_GetError());
 
     /* Non-fatal textures — game runs without them */
     gs->vine_green_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/surfaces/vine_green.png");
@@ -307,16 +366,7 @@ void game_init(GameState *gs) {
      */
     gs->snd_jump = Mix_LoadWAV("assets/sounds/player/player_jump.wav");
     if (!gs->snd_jump) {
-        fprintf(stderr, "Failed to load jump.wav: %s\n", Mix_GetError());
-        SDL_DestroyTexture(gs->coin_tex);
-        SDL_DestroyTexture(gs->fish_tex);
-        SDL_DestroyTexture(gs->spider_tex);
-        SDL_DestroyTexture(gs->platform_tex);
-        SDL_DestroyTexture(gs->floor_tile);
-        parallax_cleanup(&gs->parallax);
-        SDL_DestroyRenderer(gs->renderer);
-        SDL_DestroyWindow(gs->window);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: Failed to load jump.wav: %s\n", Mix_GetError());
     }
 
     /*
@@ -356,7 +406,7 @@ void game_init(GameState *gs) {
     /* Initialise the debug overlay if --debug was passed on the CLI */
     if (gs->debug_mode) debug_init(&gs->debug);
 
-    /* Load level from JSON if a path was provided via --level */
+    /* Load level from TOML if a path was provided via --level */
     memset(&s_level, 0, sizeof(s_level));
 
     /*
@@ -398,100 +448,7 @@ void game_init(GameState *gs) {
     }
     level_load(gs, &s_level);
 
-    /* ---- Apply level-wide configuration from the LevelDef ----------- */
-    {
-        const LevelDef *def = (const LevelDef *)gs->current_level;
-
-        /*
-         * Background layers — initialise from level definition if layers are
-         * defined; fall back to the hardcoded LAYER_CONFIG table otherwise.
-         */
-        if (def && def->background_layer_count > 0) {
-            /*
-             * Extract paths and speeds into flat arrays so we can pass them
-             * to parallax_init_from_def.  The anonymous struct in LevelDef
-             * stores them interleaved; we need separate pointers.
-             */
-            char  paths[MAX_BACKGROUND_LAYERS][64];
-            float speeds[MAX_BACKGROUND_LAYERS];
-            int   n = def->background_layer_count;
-            if (n > MAX_BACKGROUND_LAYERS) n = MAX_BACKGROUND_LAYERS;
-            for (int i = 0; i < n; i++) {
-                SDL_strlcpy(paths[i], def->background_layers[i].path, 64);
-                speeds[i] = def->background_layers[i].speed;
-            }
-            parallax_init_from_def(&gs->parallax, gs->renderer,
-                                   (const char (*)[64])paths, speeds, n);
-        } else {
-            /* No level-defined layers — use the hardcoded defaults */
-            parallax_init(&gs->parallax, gs->renderer);
-        }
-
-        /*
-         * Floor tile — reload from level definition if a custom path is set.
-         * This allows different levels to use different floor themes (grass,
-         * stone, sand, etc.) without changing engine code.
-         */
-        if (def && def->floor_tile_path[0] != '\0') {
-            if (gs->floor_tile) {
-                SDL_DestroyTexture(gs->floor_tile);
-                gs->floor_tile = NULL;
-            }
-            gs->floor_tile = IMG_LoadTexture(gs->renderer, def->floor_tile_path);
-            if (!gs->floor_tile) {
-                fprintf(stderr, "Warning: failed to load floor tile %s: %s\n",
-                        def->floor_tile_path, IMG_GetError());
-                /* Fall back to default grass tileset */
-                gs->floor_tile = IMG_LoadTexture(gs->renderer,
-                                                 "assets/sprites/levels/grass_tileset.png");
-            }
-        }
-
-        /*
-         * Foreground strip texture — the LAST foreground layer is used as
-         * the animated strip at the bottom of the screen (water, lava,
-         * clouds, etc.).  This is a convention: designers put the strip
-         * layer last in the foreground_layers list.
-         */
-        if (def && def->foreground_layer_count > 0) {
-            const char *strip = def->foreground_layers[def->foreground_layer_count - 1].path;
-            if (strip[0] != '\0')
-                water_reload_texture(&gs->water, gs->renderer, strip);
-        }
-
-        /*
-         * Fog layers — load fog textures from the level definition.
-         * Each level specifies its own fog overlay assets in [[fog_layers]].
-         * If no fog layers are defined, the fog system is left uninitialised
-         * and fog_enabled stays 0 — no fog renders for this level.
-         */
-        if (def && def->fog_layer_count > 0) {
-            char  fog_paths[MAX_FOG_TEXTURES][64];
-            int   n = def->fog_layer_count;
-            if (n > MAX_FOG_TEXTURES) n = MAX_FOG_TEXTURES;
-            for (int i = 0; i < n; i++) {
-                SDL_strlcpy(fog_paths[i], def->fog_layers[i].path, 64);
-            }
-            fog_init(&gs->fog, gs->renderer,
-                     (const char (*)[64])fog_paths, n);
-        }
-
-        /*
-         * Music — load and play from level definition if a path is specified.
-         * Mix_Music streams from disk; Mix_PlayMusic(-1) loops indefinitely.
-         * Non-fatal: game runs without music if the file is missing.
-         */
-        if (def && def->music_path[0] != '\0') {
-            gs->music = Mix_LoadMUS(def->music_path);
-            if (!gs->music) {
-                fprintf(stderr, "Warning: failed to load %s: %s\n",
-                        def->music_path, Mix_GetError());
-            } else {
-                Mix_PlayMusic(gs->music, -1);
-                Mix_VolumeMusic(def->music_volume > 0 ? def->music_volume : 13);
-            }
-        }
-    }
+    game_apply_level_resources(gs, (const LevelDef *)gs->runtime.current_level);
 
     /*
      * Health/lives/score are now set by level_load() from LevelDef fields
@@ -561,10 +518,13 @@ void game_init(GameState *gs) {
  */
 int game_load_next_phase(GameState *gs)
 {
-    const LevelDef *current = (const LevelDef *)gs->current_level;
+    const LevelDef *current = (const LevelDef *)gs->runtime.current_level;
     if (!current || current->next_phase[0] == '\0') {
         return -1;
     }
+
+    char next_path[sizeof(current->next_phase)] = {0};
+    strncpy(next_path, current->next_phase, sizeof(next_path) - 1);
 
     /* Save player progress */
     int saved_score = gs->score;
@@ -576,7 +536,7 @@ int game_load_next_phase(GameState *gs)
     memset(&s_level, 0, sizeof(s_level));
 
     char safe_path[512] = {0};
-    strncpy(safe_path, current->next_phase, sizeof(safe_path) - 1);
+    strncpy(safe_path, next_path, sizeof(safe_path) - 1);
 
     if (level_load_toml(safe_path, &s_level) != 0) {
         fprintf(stderr, "Error: Failed to load next phase: %s\n", safe_path);
@@ -584,10 +544,12 @@ int game_load_next_phase(GameState *gs)
     }
 
     /* Update the level path for the game state */
-    strncpy(gs->level_path, current->next_phase, sizeof(gs->level_path) - 1);
+    strncpy(gs->level_path, next_path, sizeof(gs->level_path) - 1);
+    gs->level_path[sizeof(gs->level_path) - 1] = '\0';
 
     /* Load the new level */
     level_load(gs, &s_level);
+    game_apply_level_resources(gs, &s_level);
 
     /* Restore player progress */
     gs->score = saved_score;
@@ -598,22 +560,6 @@ int game_load_next_phase(GameState *gs)
     /* Reset checkpoint and completion flag */
     gs->checkpoint_x = 0.0f;
     gs->level_complete = 0;
-
-    /* Re-initialize parallax if the new level has different background layers */
-    if (s_level.background_layer_count > 0) {
-        parallax_cleanup(&gs->parallax);
-        char paths[MAX_BACKGROUND_LAYERS][64];
-        float speeds[MAX_BACKGROUND_LAYERS];
-        int n = s_level.background_layer_count;
-        if (n > MAX_BACKGROUND_LAYERS) n = MAX_BACKGROUND_LAYERS;
-        for (int i = 0; i < n; i++) {
-            strncpy(paths[i], s_level.background_layers[i].path, 63);
-            paths[i][63] = '\0';
-            speeds[i] = s_level.background_layers[i].speed;
-        }
-        parallax_init_from_def(&gs->parallax, gs->renderer,
-                               (const char (*)[64])paths, speeds, n);
-    }
 
     if (gs->debug_mode) {
         debug_log(&gs->debug, "PHASE TRANSITION to: %s", safe_path);
@@ -644,8 +590,8 @@ static void game_loop_frame(void *arg) {
          * We multiply velocities by dt so movement is frame-rate independent.
          */
         Uint64 now = SDL_GetTicks64();
-        float  dt  = (float)(now - gs->loop_prev_ticks) / 1000.0f;
-        gs->loop_prev_ticks = now;
+        float  dt  = (float)(now - gs->loop.prev_ticks) / 1000.0f;
+        gs->loop.prev_ticks = now;
 
         /*
          * Delta-time guard — cap to 100 ms (≈ 10 fps minimum).
@@ -738,7 +684,7 @@ static void game_loop_frame(void *arg) {
                 } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
                     gs->paused = 0;
                     Mix_ResumeMusic();
-                    gs->loop_prev_ticks = SDL_GetTicks64();
+                    gs->loop.prev_ticks = SDL_GetTicks64();
                 }
             }
         }
@@ -800,8 +746,8 @@ static void game_loop_frame(void *arg) {
                       gs->spike_platforms, gs->spike_platform_count,
                       gs->floor_gaps, gs->floor_gap_count,
                       &bounce_idx, &fp_landed_idx,
-                      gs->fp_prev_riding,
-                      gs->world_w);
+                      gs->loop.fp_prev_riding,
+                      gs->runtime.world_w);
 
         /*
          * Bouncepad landing response: start the release animation and play
@@ -876,9 +822,9 @@ static void game_loop_frame(void *arg) {
         faster_birds_update(gs->faster_birds, gs->faster_bird_count, dt, gs->snd_flap,
                             gs->player.x + gs->player.w / 2.0f, cam_x);
         /* Move fish through the water lane and trigger random jump arcs */
-        fish_update(gs->fish, gs->fish_count, dt, gs->world_w);
+        fish_update(gs->fish, gs->fish_count, dt, gs->runtime.world_w);
         /* Move faster fish through the water lane with higher jumps */
-        faster_fish_update(gs->faster_fish, gs->faster_fish_count, dt, gs->world_w);
+        faster_fish_update(gs->faster_fish, gs->faster_fish_count, dt, gs->runtime.world_w);
         /* Advance each spike block along its rail path (cam_x needed for
          * the waiting-until-visible check on fall-off rails) */
         spike_blocks_update(gs->spike_blocks, gs->spike_block_count, dt, cam_x);
@@ -910,12 +856,12 @@ static void game_loop_frame(void *arg) {
         }
 
         /*
-         * Update gs->fp_prev_riding so next frame's player_update knows which
+         * Update gs->loop.fp_prev_riding so next frame's player_update knows which
          * float platform (if any) the player is currently standing on.
          * Reset to -1 whenever the game resets so the stay-on check doesn't
          * reference a stale index after a respawn.
          */
-        gs->fp_prev_riding = fp_landed_idx;
+        gs->loop.fp_prev_riding = fp_landed_idx;
 
         /*
          * Bridge landing check — detect if the player is standing on any
@@ -974,10 +920,10 @@ static void game_loop_frame(void *arg) {
         }
 
         /* Advance the water scroll offset (if water is enabled for this level) */
-        if (gs->water_enabled) water_update(&gs->water, dt);
+        if (gs->runtime.water_enabled) water_update(&gs->water, dt);
         /* Advance the fog wave positions and spawn the next wave if it is time.
          * Only active when the level definition enables fog. */
-        if (gs->fog_enabled) fog_update(&gs->fog, dt);
+        if (gs->runtime.fog_enabled) fog_update(&gs->fog, dt);
         /* Advance the bouncepad release animation (frame 1 → 0 → back to 2) */
         bouncepads_update(gs->bouncepads_medium, gs->bouncepad_medium_count, (Uint32)(dt * 1000.0f));
         bouncepads_update(gs->bouncepads_small, gs->bouncepad_small_count, (Uint32)(dt * 1000.0f));
@@ -1009,7 +955,7 @@ static void game_loop_frame(void *arg) {
          * CAM_LOOKAHEAD_MAX caps the offset so it never grows unboundedly.
          */
         /* Use level-defined camera params if set, otherwise fall back to macros. */
-        const LevelDef *cam_def = (const LevelDef *)gs->current_level;
+        const LevelDef *cam_def = (const LevelDef *)gs->runtime.current_level;
         float cam_vx_factor = (cam_def && cam_def->physics.cam_lookahead_vx_factor != 0.0f)
                                 ? cam_def->physics.cam_lookahead_vx_factor
                                 : CAM_LOOKAHEAD_VX_FACTOR;
@@ -1032,7 +978,7 @@ static void game_loop_frame(void *arg) {
          * walks freely within the screen until facing back toward open space.
          */
         if (cam_target < 0.0f)               cam_target = 0.0f;
-        if (cam_target > gs->world_w - GAME_W) cam_target = (float)(gs->world_w - GAME_W);
+        if (cam_target > gs->runtime.world_w - GAME_W) cam_target = (float)(gs->runtime.world_w - GAME_W);
 
         /*
          * Smooth follow: close a fraction of the remaining gap each frame.
@@ -1154,8 +1100,8 @@ static void game_loop_frame(void *arg) {
 #endif
 
 void game_loop(GameState *gs) {
-    gs->loop_prev_ticks = SDL_GetTicks64();
-    gs->fp_prev_riding  = -1;
+    gs->loop.prev_ticks = SDL_GetTicks64();
+    gs->loop.fp_prev_riding  = -1;
 
 #ifdef __EMSCRIPTEN__
     /*

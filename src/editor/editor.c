@@ -789,7 +789,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                 /*
                  * F5 — Play-test: export the level and launch the game.
                  *
-                 * Exports the current level as sandbox_00 C source, compiles
+                 * Exports the current level as C source, compiles
                  * and runs the game in a background process.  The editor
                  * stays open so the designer can keep editing while testing.
                  */
@@ -1516,7 +1516,7 @@ static void paste_clipboard(EditorState *es) {
  * play_test — Export the level, compile the game, and launch it.
  *
  * Workflow:
- *   1. Export the current level as src/levels/sandbox_00.c/.h.
+ *   1. Export the current level as src/levels/exported/<name>.c/.h.
  *   2. Auto-save TOML if a path is set.
  *   3. Compile the game (blocking — we wait for make to finish).
  *   4. Fork the game as a child process.

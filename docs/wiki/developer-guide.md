@@ -272,11 +272,11 @@ See [Sounds](sounds) for the full list of available sound files.
 
 ## Adding Background Music
 
-Background music is loaded via `Mix_LoadMUS` (not `Mix_LoadWAV`). The current track is `game_music.wav`:
+Background music is loaded via `Mix_LoadMUS` (not `Mix_LoadWAV`). Runtime levels provide the active music path through TOML:
 
 ```c
-// Load
-gs->music = Mix_LoadMUS("sounds/game_music.wav");
+// Load from current LevelDef
+gs->music = Mix_LoadMUS(def->music_path);
 
 // Play (looping)
 Mix_PlayMusic(gs->music, -1);
@@ -324,8 +324,8 @@ Always draw in painter's algorithm order (back to front). The game currently use
 
 ```
  1. Parallax background    (7 parallax_*.png layers from assets/)
- 2. Platforms              (platform.png 9-slice pillars)
- 3. Floor tiles            (grass_tileset.png at FLOOR_Y, with sea-gap openings)
+ 2. Platforms              (level platform tile, 9-slice pillars)
+ 3. Floor tiles            (level floor tile at FLOOR_Y, with floor-gap openings)
  4. Float platforms        (float_platform.png 3-slice hovering surfaces)
  5. Spike rows             (spike.png ground-level spike strips)
  6. Spike platforms        (spike_platform.png elevated spike hazards)
@@ -334,13 +334,13 @@ Always draw in painter's algorithm order (back to front). The game currently use
  9. Bouncepads small       (bouncepad_small.png low spring pads)
 10. Bouncepads high        (bouncepad_high.png tall spring pads)
 11. Rails                  (rail.png bitmask tile tracks)
-12. Vines                  (vine.png climbable)
+12. Vines                  (vine_green.png / vine_brown.png climbable)
 13. Ladders                (ladder.png climbable)
 14. Ropes                  (rope.png climbable)
 15. Coins                  (coin.png collectibles)
-16. Yellow stars           (yellow_star.png health pickups)
+16. Yellow stars           (star_yellow.png health pickups)
 17. Last star              (end-of-level star using HUD star sprite)
-18. Blue flames            (blue_flame.png erupting from sea gaps)
+18. Blue/fire flames       (blue_flame.png / fire_flame.png erupting from floor gaps)
 19. Fish                   (fish.png jumping water enemies)
 20. Faster fish            (faster_fish.png fast jumping enemies)
 21. Water                  (water.png animated strip)
@@ -366,7 +366,7 @@ See [Architecture](architecture) for details on the render pipeline.
 To analyze a new sprite sheet:
 
 ```sh
-python3 .claude/scripts/analyze_sprite.py assets/<sprite>.png
+python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png
 ```
 
 Frame math:

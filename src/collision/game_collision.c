@@ -225,11 +225,11 @@ void game_collide(GameState *gs, float dt)
         };
         if (SDL_HasIntersection(&phit, &cbox)) {
             gs->coins[i].active = 0;
-            gs->score += gs->coin_score;
+            gs->score += gs->rules.coin_score;
             if (gs->snd_coin) Mix_PlayChannel(-1, gs->snd_coin, 0);
             if (gs->score >= gs->score_life_next) {
                 gs->lives++;
-                gs->score_life_next += gs->score_per_life;
+                gs->score_life_next += gs->rules.score_per_life;
             }
             if (gs->debug_mode) debug_log(&gs->debug, "COIN[%d] collected", i);
         }
@@ -288,7 +288,7 @@ void game_collide(GameState *gs, float dt)
             if (gs->debug_mode) debug_log(&gs->debug, "LAST STAR collected");
             
             /* Check if there's a next phase to load */
-            const LevelDef *def = (const LevelDef *)gs->current_level;
+            const LevelDef *def = (const LevelDef *)gs->runtime.current_level;
             if (def && def->next_phase[0] != '\0') {
                 /* Attempt phase transition; fall back to level_complete on failure */
                 if (game_load_next_phase(gs) != 0) {
