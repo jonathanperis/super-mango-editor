@@ -239,8 +239,8 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `MAX_VINES` | `24` | `int` | Maximum number of vine instances |
 | `VINE_W` | `16` | `int` | Sprite width in logical pixels |
 | `VINE_H` | `32` | `int` | Content height after removing transparent padding |
-| `VINE_SRC_Y` | `8` | `int` | First pixel row with content in vine.png |
-| `VINE_SRC_H` | `32` | `int` | Height of content area in vine.png |
+| `VINE_SRC_Y` | `8` | `int` | First pixel row with content in vine textures |
+| `VINE_SRC_H` | `32` | `int` | Height of content area in vine textures |
 | `VINE_STEP` | `19` | `int` | Vertical spacing between stacked tiles (px) |
 
 ---

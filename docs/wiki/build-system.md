@@ -151,6 +151,8 @@ make web
 
 Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). SDL2 ports are compiled from source by Emscripten on first build; subsequent builds reuse cached port libraries. Uses a custom shell template from `web/shell.html`.
 
+The target also produces debug boot artifacts (`out/super-mango-debug.html` and companions) used by the browser debug button.
+
 ### `make test`
 
 Builds and runs native regression harnesses for pure logic that does not require opening an SDL window.
@@ -159,10 +161,24 @@ Builds and runs native regression harnesses for pure logic that does not require
 make test
 ```
 
-Current test binaries:
+Current test binaries (8):
 
 - `out/level-serializer-test`
 - `out/level-validate-test`
+- `out/rail-test`
+- `out/entity-utils-test`
+- `out/collision-test`
+- `out/phase-transition-test`
+- `out/exporter-test`
+- `out/editor-validation-test`
+
+### `make validate-levels`
+
+Runs the Python TOML validator against every `levels/*.toml` file. It checks parsing, referenced asset paths, `next_phase` links, and array counts against the C `MAX_*` constants.
+
+```sh
+make validate-levels
+```
 
 ### `make clean`
 
@@ -238,15 +254,16 @@ make
 
 ## CI/CD Pipelines
 
-Three GitHub Actions workflows handle automated builds:
+Four GitHub Actions workflows handle automated builds and docs checks:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests | Multi-platform build (Linux x86_64, macOS arm64, Windows x86_64, WebAssembly); on main push: GitHub Release creation + Pages deployment of WebAssembly build |
+| Build & Release | `build.yml` | Push to `main`, pull requests | Multi-platform native build, `make test`, `make validate-levels`, `make editor`, native game/editor smoke, WebAssembly build, WebAssembly artifact smoke; on main push: GitHub Release creation |
+| Docs | `docs.yml` | Docs pull requests, manual | `bun install --frozen-lockfile`, `bun run lint`, `bun run build` under `docs/` |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly | Automated code security and quality analysis |
-| Deploy | `deploy.yml` | Push to `main`, manual | Deploys `docs/` to GitHub Pages via actions/deploy-pages |
+| Deploy | `deploy.yml` | Successful main Build & Release workflow | Builds docs, copies WebAssembly artifacts, and deploys `docs/out/` to GitHub Pages |
 
-All workflows install SDL2 dependencies per platform and compile with the project Makefile.
+Native smoke uses dummy SDL drivers where supported: `./out/super-mango --level levels/00_sandbox_01.toml --smoke-test-frames 5` and `./out/super-mango-editor --smoke-test`. WebAssembly smoke asserts `out/super-mango.html`, `.js`, `.wasm`, and `.data` exist.
 
 ---
 

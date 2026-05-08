@@ -2,7 +2,7 @@
 
 ## Status
 
-Baseline editor is shipped. Old JSON/cJSON implementation tasks are closed as historical planning and no longer describe current work. Current work should be grouped into fewer PRs around validation, metadata, playtest, regressions, and session safety.
+Baseline editor is shipped. Old JSON/cJSON implementation tasks are closed as historical planning and no longer describe current work. Current work should be grouped into fewer PRs around validation polish, metadata coverage, playtest UX, regression fixtures, and session recovery.
 
 ## Completed Baseline
 
@@ -12,23 +12,30 @@ Baseline editor is shipped. Old JSON/cJSON implementation tasks are closed as hi
 | SDL2/SDL2_ttf UI shell | Complete | `src/editor/ui.*`, `editor.*` |
 | Canvas/palette/properties/tools | Complete baseline | `src/editor/canvas.*`, `palette.*`, `properties.*`, `tools.*` |
 | Undo/redo | Complete baseline | `src/editor/undo.*` |
+| Copy/paste | Complete baseline | `src/editor/tools.*`, `src/editor/undo.*` |
 | TOML serializer | Complete baseline | `src/editor/serializer.*`, `vendor/tomlc17/` |
 | Runtime TOML levels | Complete | `levels/*.toml`, `make run-level LEVEL=...` |
 | Level validation tool | Complete baseline | `tools/validate_levels.py`, `make validate-levels`, CI |
-| C validation tests | Complete baseline | `make test` |
+| C validation tests | Complete baseline | `make test` runs 8 binaries |
+| Editor trust safeguards | Complete baseline | Validation blocks save/export/playtest; status summary shown |
+| Playtest launch | Complete baseline | Editor saves, validates, and launches game with `--level` |
+| Recent files + autosave | Complete baseline | Recent paths and valid dirty-level autosave under `out/autosave/` |
+| Smoke gates | Complete baseline | Game/editor native smoke and WebAssembly artifact smoke in CI |
+| Docs checks | Complete baseline | `docs.yml` runs docs lint/build |
 
 ## Next Task Groups
 
-### G-001: Editor Validation Panel
+### G-001: Editor Validation Panel Polish
 
 **Goal:** make validation visible before playtest.
 
 **Work:**
-- Run same checks as `make validate-levels` for active level.
+- Build on shipped `editor_validate_level` status/blocking.
+- Surface same classes of checks as `make validate-levels` for active level where practical.
 - Display parse/schema/count/path diagnostics in editor panel.
 - Classify severity: error/warning/info.
 - Select entity/property from issue row where mapping exists.
-- Block playtest on errors.
+- Keep save/export/playtest blocked on errors.
 
 **Verify:** malformed TOML, missing asset path, over-MAX entity count, bad `next_phase`, and valid shipped levels produce expected panel states.
 
@@ -46,14 +53,12 @@ Baseline editor is shipped. Old JSON/cJSON implementation tasks are closed as hi
 
 **Verify:** editing metadata, saving, reloading, and running validation preserves all fields.
 
-### G-003: Playtest Button
+### G-003: Playtest UX Polish
 
 **Goal:** reduce editor-to-game loop to one action.
 
 **Work:**
-- Save active level or prompt for path.
-- Run validation.
-- Launch game with current TOML level (`--level <path>` semantics).
+- Preserve shipped save + validation + game launch with current TOML level (`--level <path>` semantics).
 - Show launch result and validation output in status/panel.
 
 **Verify:** valid level launches; invalid level blocks with actionable error list.
@@ -70,14 +75,12 @@ Baseline editor is shipped. Old JSON/cJSON implementation tasks are closed as hi
 
 **Verify:** intentional schema mismatch fails tests; current shipped levels pass.
 
-### G-005: Recent Files + Autosave
+### G-005: Recent Files + Autosave Recovery
 
 **Goal:** safer editor sessions.
 
 **Work:**
-- Add recent-files menu/list.
-- Track dirty state accurately.
-- Autosave dirty buffer on interval.
+- Build on shipped recent-files list, dirty indicator, and autosave interval.
 - Recovery prompt when autosave is newer than saved file.
 - Confirm unsaved changes on new/open/quit.
 
@@ -91,9 +94,8 @@ Run targeted checks before PR:
 make test
 make validate-levels
 make editor
+cd docs && bun run lint && bun run build   # when docs changed
 ```
-
-If docs changed, also run relevant docs lint/build command when available for the changed docs surface.
 
 ## References
 

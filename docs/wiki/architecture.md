@@ -26,44 +26,16 @@ main()
   │     │
   │     │   ── Load all textures (engine resources) ──
   │     ├── parallax_init(&gs.parallax, gs.renderer)  (multi-layer background)
-  │     ├── IMG_LoadTexture → gs.floor_tile        (grass_tileset.png — fatal)
-  │     ├── IMG_LoadTexture → gs.platform_tex      (platform.png — fatal)
+  │     ├── IMG_LoadTexture → gs.textures.floor_tile (grass_tileset.png)
+  │     ├── IMG_LoadTexture → gs.textures.platform   (grass_platform.png)
   │     ├── water_init(&gs.water, gs.renderer)      (water.png)
-  │     ├── IMG_LoadTexture → gs.spider_tex        (spider.png — fatal)
-  │     ├── IMG_LoadTexture → gs.jumping_spider_tex (jumping_spider.png — fatal)
-  │     ├── IMG_LoadTexture → gs.bird_tex          (bird.png — fatal)
-  │     ├── IMG_LoadTexture → gs.faster_bird_tex   (faster_bird.png — fatal)
-  │     ├── IMG_LoadTexture → gs.fish_tex          (fish.png — fatal)
-  │     ├── IMG_LoadTexture → gs.coin_tex          (coin.png — fatal)
-  │     ├── IMG_LoadTexture → gs.bouncepad_medium_tex (bouncepad_medium.png — fatal)
-  │     ├── IMG_LoadTexture → gs.vine_tex          (vine_green.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.ladder_tex        (ladder.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.rope_tex          (rope.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.bouncepad_small_tex  (bouncepad_small.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.bouncepad_high_tex   (bouncepad_high.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.rail_tex          (rail.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.spike_block_tex   (spike_block.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.float_platform_tex (float_platform.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.bridge_tex        (bridge.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.star_yellow_tex   (star_yellow.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.axe_trap_tex      (axe_trap.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.circular_saw_tex  (circular_saw.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.blue_flame_tex    (blue_flame.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.faster_fish_tex   (faster_fish.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.spike_tex         (spike.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.spike_platform_tex (spike_platform.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.textures.*         (entities, hazards, collectibles, surfaces)
+  │     ├── level resource reload → parallax/floor/water/fog/music from active LevelDef
   │     │
   │     │   ── Load all sound effects ──
-  │     ├── Mix_LoadWAV     → gs.snd_spring        (bouncepad.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_axe           (axe_trap.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_flap          (bird.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_spider_attack (spider.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_dive          (fish.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_jump          (player_jump.wav — fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_coin          (coin.wav — non-fatal)
-  │     ├── Mix_LoadWAV     → gs.snd_hit           (player_hit.wav — non-fatal)
-  │     ├── Mix_LoadMUS     → gs.music             (from active LevelDef music_path)
-  │     ├── Mix_PlayMusic(gs.music, -1)            (loop forever at level volume)
+  │     ├── Mix_LoadWAV     → gs.audio.*           (jump, coin, hit, spring, axe, flap, spider_attack, dive)
+  │     ├── Mix_LoadMUS     → gs.audio.music       (from active LevelDef music_path)
+  │     ├── Mix_PlayMusic(gs.audio.music, -1)      (loop forever at level volume)
   │     │
   │     │   ── Initialise game objects ──
   │     ├── player_init(&gs.player, gs.renderer)
@@ -83,42 +55,10 @@ main()
         ├── hud_cleanup
         ├── fog_cleanup
         ├── player_cleanup
-        ├── Mix_HaltMusic + Mix_FreeMusic
-        ├── Mix_FreeChunk (snd_jump)
-        ├── Mix_FreeChunk (snd_coin)
-        ├── Mix_FreeChunk (snd_hit)
-        ├── Mix_FreeChunk (snd_spring)
-        ├── Mix_FreeChunk (snd_axe)
-        ├── Mix_FreeChunk (snd_flap)
-        ├── Mix_FreeChunk (snd_spider_attack)
-        ├── Mix_FreeChunk (snd_dive)
+        ├── Mix_HaltMusic + Mix_FreeMusic (gs.audio.music)
+        ├── FREE_CHUNK(gs.audio.*)
         ├── water_cleanup
-        ├── SDL_DestroyTexture (blue_flame_tex)
-        ├── SDL_DestroyTexture (axe_trap_tex)
-        ├── SDL_DestroyTexture (circular_saw_tex)
-        ├── SDL_DestroyTexture (spike_platform_tex)
-        ├── SDL_DestroyTexture (spike_tex)
-        ├── SDL_DestroyTexture (spike_block_tex)
-        ├── SDL_DestroyTexture (bridge_tex)
-        ├── SDL_DestroyTexture (float_platform_tex)
-        ├── SDL_DestroyTexture (rail_tex)
-        ├── SDL_DestroyTexture (bouncepad_high_tex)
-        ├── SDL_DestroyTexture (bouncepad_medium_tex)
-        ├── SDL_DestroyTexture (bouncepad_small_tex)
-        ├── SDL_DestroyTexture (rope_tex)
-        ├── SDL_DestroyTexture (ladder_tex)
-        ├── SDL_DestroyTexture (vine_tex)
-        ├── last_star_cleanup
-        ├── SDL_DestroyTexture (star_yellow_tex)
-        ├── SDL_DestroyTexture (coin_tex)
-        ├── SDL_DestroyTexture (faster_fish_tex)
-        ├── SDL_DestroyTexture (fish_tex)
-        ├── SDL_DestroyTexture (faster_bird_tex)
-        ├── SDL_DestroyTexture (bird_tex)
-        ├── SDL_DestroyTexture (jumping_spider_tex)
-        ├── SDL_DestroyTexture (spider_tex)
-        ├── SDL_DestroyTexture (platform_tex)
-        ├── SDL_DestroyTexture (floor_tile)
+        ├── DESTROY_TEX(gs.textures.*)
         ├── parallax_cleanup
         ├── SDL_DestroyRenderer
         └── SDL_DestroyWindow
@@ -154,6 +94,7 @@ while (gs.running) {
                     → axe_trap collision → blue_flame collision
                     → sea gap fall detection (instant death)
                     → coin-player collision → star-player collision → last_star-player collision
+                    → completion summary snapshot / next_phase pending state when last_star is collected
                     → heart/lives/score_life_next logic
                     → water_update → fog_update → bouncepads_update (small, medium, high)
                     → debug_update (if --debug)
@@ -218,6 +159,10 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 
 > **Note:** Additional foreground layers (fog, water overlays) can be added per-level via `[foreground_layers]` in the TOML file, adding up to 8 extra layers above the HUD. The base 32 layers are always present.
 
+### Level Completion Flow
+
+Collecting `last_star` calls `game_complete_level()`. The game snapshots elapsed time, coins collected, total coins, and the resolved `next_phase` path (if any), then shows a completion overlay. While the overlay is active, gameplay update pauses; pressing Enter or Start calls `game_load_next_phase()` when `next_phase` is configured, otherwise it exits the run.
+
 ---
 
 ## Coordinate System
@@ -249,147 +194,41 @@ Defined in `game.h`. The **single container** for every runtime resource.
 
 ```c
 typedef struct {
-    SDL_Window         *window;      // OS window handle
-    SDL_Renderer       *renderer;    // GPU drawing context
-    SDL_GameController *controller;  // first connected gamepad; NULL = none
-    ParallaxSystem      parallax;    // multi-layer scrolling background
+    SDL_Window         *window;
+    SDL_Renderer       *renderer;
+    SDL_GameController *controller;
+    TextureResources    textures;  /* all owned SDL_Texture pointers */
+    AudioResources      audio;     /* all Mix_Chunk plus Mix_Music */
 
-    SDL_Texture   *floor_tile;       // grass_tileset.png (GPU)
-    SDL_Texture   *platform_tex;     // Shared tile for platform pillars (GPU)
-
-    SDL_Texture   *spider_tex;       // Shared texture for all spiders (GPU)
-    Spider         spiders[MAX_SPIDERS];
-    int            spider_count;
-
-    SDL_Texture   *jumping_spider_tex;  // Shared texture for jumping spiders (GPU)
-    JumpingSpider  jumping_spiders[MAX_JUMPING_SPIDERS];
-    int            jumping_spider_count;
-
-    SDL_Texture   *bird_tex;         // Shared texture for Bird enemies (GPU)
-    Bird           birds[MAX_BIRDS];
-    int            bird_count;
-
-    SDL_Texture   *faster_bird_tex;  // Shared texture for FasterBird (GPU)
-    FasterBird     faster_birds[MAX_FASTER_BIRDS];
-    int            faster_bird_count;
-
-    SDL_Texture   *fish_tex;         // Shared texture for all fish enemies (GPU)
-    Fish           fish[MAX_FISH];
-    int            fish_count;
-
-    SDL_Texture   *faster_fish_tex;  // Shared texture for faster fish enemies (GPU)
-    FasterFish     faster_fish[MAX_FASTER_FISH];
-    int            faster_fish_count;
-
-    SDL_Texture   *coin_tex;         // Shared texture for all coin collectibles (GPU)
-    Coin           coins[MAX_COINS];
-    int            coin_count;
-
-    SDL_Texture   *star_yellow_tex;  // Shared texture for yellow star pickups (GPU)
-    StarYellow     star_yellows[MAX_STAR_YELLOWS];
-    int            star_yellow_count;
-
-    LastStar       last_star;        // Special end-of-level star collectible
-
-    SDL_Texture   *vine_tex;         // Shared texture for vine decorations (GPU)
-    VineDecor      vines[MAX_VINES];
-    int            vine_count;
-
-    SDL_Texture   *ladder_tex;       // Shared texture for ladders (GPU)
-    LadderDecor    ladders[MAX_LADDERS];
-    int            ladder_count;
-
-    SDL_Texture   *rope_tex;         // Shared texture for ropes (GPU)
-    RopeDecor      ropes[MAX_ROPES];
-    int            rope_count;
-
-    SDL_Texture   *bouncepad_small_tex;    // Shared texture for small bouncepads (GPU)
-    Bouncepad      bouncepads_small[MAX_BOUNCEPADS_SMALL];
-    int            bouncepad_small_count;
-
-    SDL_Texture   *bouncepad_medium_tex;   // Shared texture for medium bouncepads (GPU)
-    Bouncepad      bouncepads_medium[MAX_BOUNCEPADS_MEDIUM];
-    int            bouncepad_medium_count;
-
-    SDL_Texture   *bouncepad_high_tex;     // Shared texture for high bouncepads (GPU)
-    Bouncepad      bouncepads_high[MAX_BOUNCEPADS_HIGH];
-    int            bouncepad_high_count;
-
-    SDL_Texture   *rail_tex;         // Shared texture for all rail tiles (GPU)
-    Rail           rails[MAX_RAILS];
-    int            rail_count;
-
-    SDL_Texture   *spike_block_tex;  // Shared texture for spike blocks (GPU)
-    SpikeBlock     spike_blocks[MAX_SPIKE_BLOCKS];
-    int            spike_block_count;
-
-    SDL_Texture   *spike_tex;        // Shared texture for ground spikes (GPU)
-    SpikeRow       spike_rows[MAX_SPIKE_ROWS];
-    int            spike_row_count;
-
-    SDL_Texture   *spike_platform_tex;  // Shared texture for spike platforms (GPU)
-    SpikePlatform  spike_platforms[MAX_SPIKE_PLATFORMS];
-    int            spike_platform_count;
-
-    SDL_Texture   *circular_saw_tex;    // Shared texture for circular saws (GPU)
-    CircularSaw    circular_saws[MAX_CIRCULAR_SAWS];
-    int            circular_saw_count;
-
-    SDL_Texture   *axe_trap_tex;        // Shared texture for axe traps (GPU)
-    AxeTrap        axe_traps[MAX_AXE_TRAPS];
-    int            axe_trap_count;
-
-    SDL_Texture   *blue_flame_tex;      // Shared texture for blue flames (GPU)
-    BlueFlame      blue_flames[MAX_BLUE_FLAMES];
-    int            blue_flame_count;
-
-    SDL_Texture   *float_platform_tex;  // float_platform.png 3-slice (GPU)
-    FloatPlatform  float_platforms[MAX_FLOAT_PLATFORMS];
-    int            float_platform_count;
-
-    SDL_Texture   *bridge_tex;       // bridge.png tile (GPU)
-    Bridge         bridges[MAX_BRIDGES];
-    int            bridge_count;
-
-    Mix_Chunk     *snd_jump;         // Player jump sound effect (WAV)
-    Mix_Chunk     *snd_coin;         // Coin collect sound effect (WAV)
-    Mix_Chunk     *snd_hit;          // Player hurt sound effect (WAV)
-    Mix_Chunk     *snd_spring;       // Bouncepad spring sound effect (WAV)
-    Mix_Chunk     *snd_axe;          // Axe trap swing sound effect (WAV)
-    Mix_Chunk     *snd_flap;         // Bird flap sound effect (WAV)
-    Mix_Chunk     *snd_spider_attack;// Spider attack sound effect (WAV)
-    Mix_Chunk     *snd_dive;         // Fish dive sound effect (WAV)
-    Mix_Music     *music;            // Background music stream (WAV)
-
-    Player         player;           // Player data — stored by value
+    ParallaxSystem parallax;
+    Player         player;
     Platform       platforms[MAX_PLATFORMS];
-    int            platform_count;
-    Water          water;            // Animated water strip at the bottom
-    FogSystem      fog;              // Atmospheric fog overlay — topmost layer
+    Water          water;
+    FogSystem      fog;
+    /* fixed-size arrays + counts for every enemy, hazard, collectible, surface */
 
-    int            floor_gaps[MAX_FLOOR_GAPS];
-    int            floor_gap_count;
+    Hud     hud;
+    Camera  camera;
+    int     hearts, lives, score, score_life_next;
+    int     level_complete;
+    float   level_elapsed;
+    int     level_coin_total;
+    int     completion_coins_collected, completion_coin_total;
+    float   completion_elapsed;
+    int     completion_pending_next_phase;
+    char    completion_next_phase[256];
+    char    level_path[256];
 
-    Hud            hud;              // HUD display: hearts, lives, score
-    int            hearts;           // Current hit points (0-MAX_HEARTS)
-    int            lives;            // Remaining lives; <0 triggers game over
-    int            score;            // Cumulative score from collecting coins/stars
-    int            score_life_next;  // Score threshold for next bonus life
-
-    Camera         camera;           // Viewport scroll position; updated every frame
-    int            running;          // Loop flag: 1 = keep going, 0 = quit
-    int            paused;           // 1 = window lost focus; physics/music frozen
-    int            debug_mode;       // 1 = debug overlays active (--debug flag)
-    DebugOverlay   debug;            // FPS counter, collision vis, event log
-
-    // ---- Loop state (persists across frames for emscripten callback) ----
-    Uint64         loop_prev_ticks;  // timestamp of previous frame
-    int            fp_prev_riding;   // float platform player stood on last frame
+    LevelRuntime  runtime;
+    GameRules     rules;
+    GameLoopState loop;
+    DebugOverlay  debug;
 } GameState;
 ```
 
 **Key design decisions:**
 
+- Textures are grouped in `TextureResources` (`gs->textures.*`) and audio in `AudioResources` (`gs->audio.*`) so cleanup can be centralized.
 - `Player` is **embedded by value**, not a pointer. This avoids a heap allocation and keeps the struct self-contained. The same applies to `Platform`, `Water`, `FogSystem`, and all entity arrays.
 - Every pointer is set to `NULL` after freeing, making accidental double-frees safe.
 - Initialised with `GameState gs = {0}` so every field starts as `0` / `NULL`.
@@ -402,7 +241,7 @@ typedef struct {
 |-----------|--------|
 | SDL subsystem init failure (in `main`) | `fprintf(stderr, ...)` → clean up already-inited subsystems → `return EXIT_FAILURE` |
 | Resource load failure (in `game_init`) | `fprintf(stderr, ...)` → destroy already-created resources → `exit(EXIT_FAILURE)` |
-| Sound load failure (non-fatal pattern) | `fprintf(stderr, ...)` then continue -- play is guarded by `if (snd_jump)` |
+| Sound load failure (non-fatal pattern) | `fprintf(stderr, ...)` then continue -- play is guarded by `if (gs->audio.<name>)` |
 | Optional texture load failure (non-fatal) | `fprintf(stderr, ...)` then continue -- render is guarded by `if (texture)` |
 
 All SDL error strings are retrieved with `SDL_GetError()`, `IMG_GetError()`, or `Mix_GetError()` and printed to `stderr`.
