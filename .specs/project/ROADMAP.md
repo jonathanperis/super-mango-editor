@@ -4,7 +4,7 @@
 
 Branch: `quality/level-validation-docs-cleanup`
 
-Goal: keep specs and contributor docs aligned with shipped TOML runtime loading, standalone editor, tests, validation tooling, and current entity inventory.
+Goal: keep specs and contributor docs aligned with shipped TOML runtime loading, standalone editor, tests, validation tooling, CI smoke/docs gates, and current entity inventory.
 
 ## Shipped Baseline
 
@@ -15,17 +15,19 @@ Goal: keep specs and contributor docs aligned with shipped TOML runtime loading,
 | Standalone editor | Shipped | `make editor`, `make run-editor` |
 | Tests | Shipped | `make test` |
 | Level validation | Shipped | `make validate-levels` |
+| CI smoke gates | Shipped | Native game/editor smoke and WebAssembly artifact smoke in `build.yml` |
+| Docs checks | Shipped | `docs.yml` runs docs lint/build |
 | Web build | Shipped target | `make web` |
 
 ## Near-Term Work Groups
 
 | Group | Scope | Deliverable |
 |-------|-------|-------------|
-| Validation UX | Editor validation panel; surface `tools/validate_levels.py` output in UI. | Designers see errors before playtest. |
-| Metadata Editing | Level name, description, `generated_by`, `next_phase`, music, rules, physics override fields. | Editor can maintain full TOML header/schema. |
-| Playtest Flow | Save, validate, then launch game with current TOML level. | One-button editor-to-game loop. |
-| Exporter Regression | Add coverage around serializer/exporter paths and representative levels. | Future schema edits fail tests when output drifts. |
-| Recent Files + Autosave | MRU list, periodic save, recovery prompt. | Safer long editing sessions. |
+| Validation UX | Expand current validation status/blocking into clickable diagnostics. | Designers jump from issues to fields/entities. |
+| Metadata Editing | Broaden metadata editing for background/foreground/fog arrays and physics override fields. | Editor can maintain full TOML schema comfortably. |
+| Playtest Flow | Polish shipped save/validate/launch loop with richer output and failure UX. | One-button editor-to-game loop remains safe and informative. |
+| Exporter Regression | Expand current exporter test with representative level fixtures. | Future schema edits fail tests when output drifts. |
+| Recent Files + Autosave | Add recovery prompt and cleanup around shipped MRU/autosave baseline. | Safer long editing sessions. |
 
 ## Specs
 

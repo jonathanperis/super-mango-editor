@@ -59,7 +59,7 @@ Three interaction modes are available via the toolbar or keyboard shortcuts:
 
 ## Entity Palette
 
-The right panel lists all **30 placeable entity types**, grouped by category:
+The right panel lists all **30 placeable entity types** (`ENT_COUNT`), grouped by category:
 
 | Category | Entities |
 |----------|----------|
@@ -134,6 +134,8 @@ The editor maintains a full undo stack for all placement, deletion, and property
 
 The undo stack is in-memory only — it is cleared when a new file is opened or created.
 
+The editor also keeps recent files and writes autosaves for modified valid levels under `out/autosave/`.
+
 ---
 
 ## Copy / Paste
@@ -149,7 +151,7 @@ Only one entity can be in the clipboard at a time. The pasted entity appears off
 
 ## Play-Test Integration
 
-The **Play** button in the toolbar launches the game engine as a child process, loading the currently open level file. The editor hides its window while the game is running. Clicking **Stop** (or closing the game window) returns to the editor.
+The **Play** button validates and saves the active TOML level, then launches the game engine as a child process with `--level <path>`. Validation errors block playtest; the first error is shown in the status bar and printed to `stderr`. Clicking **Stop** (or closing the game window) returns to the editor.
 
 ```sh
 # Equivalent to clicking Play in the editor:
@@ -173,6 +175,14 @@ The title bar shows an asterisk (`*`) after the filename when there are unsaved 
 
 Saved files are plain TOML — they can be edited in any text editor and immediately reloaded in the editor or game.
 
+Save and Export run `editor_validate_level()` first. Errors such as bad counts, invalid paths, missing `next_phase` files, or invalid `screen_count` block persistence so the editor does not write or launch levels known to be unsafe. The status bar always shows the current validation summary.
+
+CI can start and immediately exit the editor with:
+
+```sh
+./out/super-mango-editor --smoke-test
+```
+
 ---
 
 ## Architecture
@@ -183,6 +193,7 @@ The editor is built from these modules in `src/editor/`:
 |------|---------------|
 | `editor_main.c` | Entry point — SDL init, `EditorState` lifecycle |
 | `editor.c` / `editor.h` | Core state struct, init/loop/cleanup, `EntityType` enum (30 types), `EditorTool`, `EditorCamera`, `Selection` |
+| `editor_validation.c` / `editor_validation.h` | In-memory level validation report used by status, save/export, autosave, and playtest |
 | `canvas.c` / `canvas.h` | Level preview rendering, `canvas_screen_to_world`, grid overlay |
 | `palette.c` / `palette.h` | Entity palette panel — thumbnails, type selection |
 | `properties.c` / `properties.h` | Property inspector panel — per-type field editing |

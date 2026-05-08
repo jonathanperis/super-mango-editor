@@ -14,7 +14,7 @@ Collectibles are items the player can pick up. Surfaces are interactive terrain 
 
 **File:** `src/collectibles/coin.c` / `coin.h`  
 **Sprite:** `assets/sprites/collectibles/coin.png` — 16×16 px display size  
-**Pickup:** AABB overlap with player. Plays `snd_coin` on collection.
+**Pickup:** AABB overlap with player. Plays `gs->audio.coin` on collection.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -83,9 +83,9 @@ y = 100.0
 ### Last Star
 
 **File:** `src/collectibles/last_star.c` / `last_star.h`  
-**Sprite:** `assets/sprites/screens/hud_coins.png` (reuses the HUD star icon)  
+**Sprite:** `assets/sprites/collectibles/last_star.png`  
 **Display size:** 24×24 px  
-**Pickup:** Collecting it sets `collected = 1` and triggers the level-complete event. Only one instance per level, defined with `[last_star]` (not `[last_star]`).
+**Pickup:** Collecting it sets `collected = 1`, snapshots the level-completion summary, and shows the completion overlay. If `next_phase` is configured, Enter/Start loads that TOML level; otherwise confirmation exits. Only one instance per level, defined with `[last_star]`.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -104,7 +104,7 @@ y = 100.0
 ### Platform (Ground Pillar)
 
 **File:** `src/surfaces/platform.c` / `platform.h`  
-**Sprite:** `assets/sprites/surfaces/Platform.png` — 48×48 tile, 9-slice rendered  
+**Sprite:** `assets/sprites/levels/grass_platform.png` — 48×48 tile, 9-slice rendered  
 **Behaviour:** Static ground pillar. The player can land on the top surface. Pillars are positioned on the floor and extend upward. Rendered before the floor so the pillar base sinks into the ground naturally.
 
 ```toml
@@ -238,7 +238,7 @@ end_cap = 0        # 0 = open end (rider detaches), 1 = bouncing end
 ### Vine
 
 **File:** `src/surfaces/vine.c` / `vine.h`  
-**Sprite:** `assets/sprites/surfaces/vine.png` — 16×48 px per tile  
+**Sprites:** `assets/sprites/surfaces/vine_green.png`, `assets/sprites/surfaces/vine_brown.png` — 16×48 px per tile  
 **Behaviour:** Climbable vertical surface. The player enters by touching the vine and pressing Up or Down. Press Left/Right to detach and jump away.
 
 ```toml

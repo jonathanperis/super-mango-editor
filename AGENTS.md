@@ -2,7 +2,7 @@
 
 @.claude/commands/bosser-engineer.md
 
-A 2D pixel art platformer written in C11 + SDL2, targeting macOS (Apple Silicon).
+A 2D pixel art platformer written in C11 + SDL2, targeting macOS, Linux, Windows, and WebAssembly.
 
 ---
 
@@ -25,10 +25,15 @@ A 2D pixel art platformer written in C11 + SDL2, targeting macOS (Apple Silicon)
 ```sh
 make              # compile → out/super-mango
 make run          # compile + run
+make run-debug    # compile + run with debug overlay
 make run-level LEVEL=levels/00_sandbox_01.toml  # run a specific TOML level
-make clean        # remove .o files and out/
+make run-level-debug LEVEL=levels/00_sandbox_01.toml  # run a TOML level with debug overlay
 make editor       # compile → out/super-mango-editor
 make run-editor   # compile + run the level editor
+make test         # compile + run native regression tests
+make validate-levels  # validate levels/*.toml paths/counts/schema
+make web          # compile WebAssembly artifacts
+make clean        # remove .o/.d files and out/
 ```
 
 The Makefile uses explicit per-directory wildcards — **new `.c` files in existing source directories are picked up automatically**. New source directories need Makefile entries.
@@ -73,13 +78,16 @@ super-mango-editor/
     ├── main.c              ← SDL init/teardown, entry point
     ├── game.h / game.c     ← GameState, window, renderer, game loop
     ├── collectibles/       ← coin, star_yellow, star_green, star_red, last_star
-    ├── core/               ← debug overlay, entity utilities
-    ├── editor/             ← standalone visual level editor (editor_main, canvas, tools, palette, …)
+    ├── collision/          ← collision passes and damage helpers
+    ├── core/               ← debug overlay, entity utilities, reset helpers
+    ├── editor/             ← standalone visual level editor (editor_main, canvas, tools, palette, validation, …)
     ├── effects/            ← fog, parallax, water
     ├── entities/           ← bird, faster_bird, fish, faster_fish, spider, jumping_spider
     ├── hazards/            ← spike, spike_block, spike_platform, circular_saw, axe_trap, blue_flame, fire_flame
-    ├── levels/             ← level.h (LevelDef), level_loader.h/.c, level_validate.c, exported/
+    ├── input/              ← keyboard/gamepad event handling
+    ├── levels/             ← level.h (LevelDef), level_loader, validation, phase transitions, exported/
     ├── player/             ← player input, physics, animation
+    ├── render/             ← frame rendering and overlays
     ├── screens/            ← start_menu, hud
     └── surfaces/           ← platform, float_platform, bridge, bouncepad*, vine, ladder, rope, rail
 ```
@@ -144,16 +152,18 @@ main()
 - Multi-screen forest stage (dynamic width via screen_count, default 1600px / 4 screens)
 - 32 render layers: parallax background → platforms → floor → enemies → player → fog → HUD → debug
 - Delta-time physics at 60 FPS (VSync + manual fallback)
-- TOML-based level format with runtime loader and optional C exporter
-- Standalone visual level editor (canvas, palette, tools, properties, undo, serializer, exporter)
+- TOML-based level format with runtime loader, `next_phase` transitions, and optional C exporter
+- Standalone visual level editor (canvas, palette, tools, properties, undo, serializer, exporter, validation, recent files, autosave, playtest)
 - 6 enemy types (spider, jumping spider, bird, faster bird, fish, faster fish)
 - 7 hazard types (spike, spike block, spike platform, circular saw, axe trap, blue flame, fire flame)
 - Collectibles: coins (100 pts, 3 restore a heart), star_yellow, star_green, star_red, end-of-level last_star
 - Floor gaps (configurable voids in the ground)
 - Climbable vines, ladders, ropes; 3 bouncepad variants (small, medium, high)
 - Start menu, HUD (hearts/lives/score), lives system, invincibility blink on damage
+- Level-completion summary captures elapsed time and coin totals; Enter/Start continues to `next_phase` when configured
 - Keyboard and gamepad (hot-plug) controls
 - Debug overlay (`--debug`): FPS/CPU counters, hitbox visualization, scrolling event log
+- CI gates: multi-platform builds, editor native build, 8-test `make test` suite, TOML level validation, native game/editor smoke, WebAssembly artifact smoke, docs lint/build
 - Builds natively on macOS, Linux, Windows; WebAssembly via Emscripten
 
 ---
@@ -195,10 +205,10 @@ if (player->x > GAME_W - player->w) player->x = (float)(GAME_W - player->w);
 ### Adding sound effects
 
 1. Place `.wav` files in `assets/sounds/<category>/` (categories: collectibles, entities, hazards, levels, player, screens, surfaces).
-2. Add `Mix_Chunk *snd_<name>` to `GameState` in `game.h`.
-3. Load: `gs->snd_<name> = Mix_LoadWAV("assets/sounds/<category>/<name>.wav");` — non-fatal (warn, don't exit).
-4. Free: `if (gs->snd_<name>) { Mix_FreeChunk(gs->snd_<name>); gs->snd_<name> = NULL; }`
-5. Play: `Mix_PlayChannel(-1, gs->snd_<name>, 0);`
+2. Add `Mix_Chunk *<name>` to `AudioResources` in `game.h`.
+3. Load: `gs->audio.<name> = Mix_LoadWAV("assets/sounds/<category>/<name>.wav");` — non-fatal (warn, don't exit).
+4. Free with `FREE_CHUNK(gs->audio.<name>);` in `game_cleanup`.
+5. Play guarded: `if (gs->audio.<name>) Mix_PlayChannel(-1, gs->audio.<name>, 0);`
 
 ---
 
