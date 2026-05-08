@@ -22,7 +22,8 @@ CC      ?= clang
 endif
 
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(shell $(SDL2CFG) --cflags)
-TEST_CFLAGS = $(filter-out -Dmain=SDL_main,$(CFLAGS))
+# Tests provide their own main(), so stop SDL from remapping it to SDL_main on Windows.
+TEST_CFLAGS = $(filter-out -Dmain=SDL_main,$(CFLAGS)) -DSDL_MAIN_HANDLED
 LIBS    = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
 OUTDIR  = out
 TARGET  = $(OUTDIR)/super-mango
