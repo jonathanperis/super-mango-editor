@@ -37,7 +37,7 @@ The Makefile uses explicit per-directory wildcards — **new `.c` files in exist
 
 ## Project Structure
 
-```
+```text
 super-mango-editor/
 ├── AGENTS.md               ← you are here
 ├── Makefile
@@ -106,7 +106,7 @@ super-mango-editor/
 
 ## Architecture
 
-```
+```text
 main()
   └── SDL / IMG / TTF / Mix init
        └── game_init(gs)       ← load window, renderer, textures, sound, entities
@@ -212,7 +212,7 @@ python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png
 
 ### Frame math
 
-```
+```text
 Sheet width  = cols × frame_w
 Sheet height = rows × frame_h
 
