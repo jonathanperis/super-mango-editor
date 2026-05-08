@@ -25,6 +25,8 @@
 /* SDL2_ttf: render TrueType fonts to textures */
 #include <SDL_ttf.h>
 /* Standard C I/O (fprintf, stderr) and exit codes (EXIT_FAILURE/SUCCESS) */
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>    /* strcmp — used to match CLI flags */
@@ -49,20 +51,43 @@ int main(int argc, char *argv[]) {
 
     for (int i = 1; i < argc; i++) {
         if (expect_level_path) {
+            if (argv[i][0] == '-') {
+                fprintf(stderr, "Error: --level requires a path\n");
+                return EXIT_FAILURE;
+            }
             level_path = argv[i];
             expect_level_path = 0;
         } else if (expect_smoke_frames) {
-            smoke_test_frames = atoi(argv[i]);
-            if (smoke_test_frames < 0) smoke_test_frames = 0;
+            char *end = NULL;
+            long parsed = 0;
+
+            errno = 0;
+            parsed = strtol(argv[i], &end, 10);
+            if (errno != 0 || end == argv[i] || *end != '\0' ||
+                parsed <= 0 || parsed > INT_MAX) {
+                fprintf(stderr,
+                        "Error: --smoke-test-frames requires a positive integer\n");
+                return EXIT_FAILURE;
+            }
+            smoke_test_frames = (int)parsed;
             expect_smoke_frames = 0;
         } else if (strcmp(argv[i], "--debug") == 0)
             debug_mode = 1;
         else if (strcmp(argv[i], "--sandbox") == 0)
             level_path = "levels/00_sandbox_01.toml";
-        else if (strcmp(argv[i], "--level") == 0 && i + 1 < argc)
+        else if (strcmp(argv[i], "--level") == 0)
             expect_level_path = 1;
-        else if (strcmp(argv[i], "--smoke-test-frames") == 0 && i + 1 < argc)
+        else if (strcmp(argv[i], "--smoke-test-frames") == 0)
             expect_smoke_frames = 1;
+    }
+
+    if (expect_level_path) {
+        fprintf(stderr, "Error: --level requires a path\n");
+        return EXIT_FAILURE;
+    }
+    if (expect_smoke_frames) {
+        fprintf(stderr, "Error: --smoke-test-frames requires a positive integer\n");
+        return EXIT_FAILURE;
     }
 
     if (smoke_test_frames > 0 && !level_path) {
