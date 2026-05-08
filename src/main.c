@@ -233,6 +233,9 @@ int main(int argc, char *argv[]) {
         start_menu_init(&menu, window, renderer);
         start_menu_loop(&menu);
         MenuResult result = menu.result;
+        char selected_level_path[256] = {0};
+        strncpy(selected_level_path, menu.selected_level_path,
+                sizeof(selected_level_path) - 1);
         start_menu_cleanup(&menu);
 
         SDL_DestroyRenderer(renderer);
@@ -243,13 +246,14 @@ int main(int argc, char *argv[]) {
          *
          * game_init creates its own window and renderer, so we destroy
          * the menu's first to avoid having two windows open at once.
-         * Default level is sandbox_01 when starting from the Play button.
+         * Start menu owns selected_level_path so players can choose a level
+         * before launching the full game window.
          */
         if (result == MENU_PLAY) {
             GameState gs = {0};
             gs.debug_mode = debug_mode;
             gs.smoke_test_frames = smoke_test_frames;
-            strncpy(gs.level_path, "levels/00_sandbox_01.toml", sizeof(gs.level_path) - 1);
+            strncpy(gs.level_path, selected_level_path, sizeof(gs.level_path) - 1);
             game_init(&gs);
             game_loop(&gs);
             game_cleanup(&gs);
