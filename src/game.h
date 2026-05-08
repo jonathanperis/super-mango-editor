@@ -326,6 +326,13 @@ typedef struct {
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
     int           paused;      /* 1 = window lost focus; physics/music frozen */
     int           level_complete; /* 1 = last star collected, show end screen  */
+    float         level_elapsed;  /* active level timer in seconds             */
+    int           level_coin_total; /* coins present when current level loaded  */
+    int           completion_coins_collected; /* coins collected at summary    */
+    int           completion_coin_total; /* total coins at summary             */
+    float         completion_elapsed; /* elapsed seconds shown on summary     */
+    int           completion_pending_next_phase; /* Enter/Start loads next phase */
+    char          completion_next_phase[256]; /* next TOML path shown/loaded    */
     float         checkpoint_x;   /* respawn x position (updated per screen)   */
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
     int           smoke_test_frames; /* >0 = exit after this many frames     */
@@ -354,3 +361,6 @@ void game_cleanup(GameState *gs);
 
 /* Load the next phase/level when last_star is collected with next_phase set. */
 int game_load_next_phase(GameState *gs);
+
+/* Snapshot end-of-level stats and show the completion summary overlay. */
+void game_complete_level(GameState *gs);

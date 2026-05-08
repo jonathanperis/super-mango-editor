@@ -46,6 +46,19 @@ static int rejects_missing_next_phase(void)
     return 0;
 }
 
+static int detects_next_phase_presence(void)
+{
+    LevelDef def = {0};
+
+    if (expect_int("null has next", phase_has_next(NULL), 0) != 0) return 1;
+    if (expect_int("empty has next", phase_has_next(&def), 0) != 0) return 1;
+
+    strncpy(def.next_phase, "levels/02_lugio_02.toml", sizeof(def.next_phase) - 1);
+    if (expect_int("set has next", phase_has_next(&def), 1) != 0) return 1;
+
+    return 0;
+}
+
 static int truncates_path_safely(void)
 {
     LevelDef def = {0};
@@ -88,6 +101,7 @@ int main(void)
 {
     if (copies_next_phase_path() != 0) return 1;
     if (rejects_missing_next_phase() != 0) return 1;
+    if (detects_next_phase_presence() != 0) return 1;
     if (truncates_path_safely() != 0) return 1;
     if (preserves_progress_across_reload() != 0) return 1;
 
