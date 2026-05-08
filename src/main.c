@@ -7,6 +7,7 @@
  *        default                → start_menu (title screen with Play button)
  *        --level <path>         → load a TOML level and start gameplay directly
  *        --level <path> --debug → same, with debug overlays
+ *        --smoke-test-frames N  → run N frames and exit 0
  *   3. Tear every subsystem back down before exiting.
  *
  * The order of init and teardown is intentional:
@@ -38,8 +39,10 @@ int main(int argc, char *argv[]) {
      *   --debug        → enable debug overlays
      *   --level <path> → load a TOML level file (also skips the start menu)
      *   --sandbox      → load the sandbox level (alias for --level levels/00_sandbox_01.toml)
+     *   --smoke-test-frames N → deterministic CI smoke exit after N frames
      */
     int debug_mode  = 0;
+    int smoke_test_frames = 0;
     const char *level_path = NULL;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--debug") == 0)
@@ -47,7 +50,15 @@ int main(int argc, char *argv[]) {
         else if (strcmp(argv[i], "--sandbox") == 0)
             level_path = "levels/00_sandbox_01.toml";
         else if (strcmp(argv[i], "--level") == 0 && i + 1 < argc)
-            level_path = argv[i + 1];   /* next arg is consumed by the flag */
+            level_path = argv[++i];   /* next arg is consumed by the flag */
+        else if (strcmp(argv[i], "--smoke-test-frames") == 0 && i + 1 < argc) {
+            smoke_test_frames = atoi(argv[++i]);
+            if (smoke_test_frames < 0) smoke_test_frames = 0;
+        }
+    }
+
+    if (smoke_test_frames > 0 && !level_path) {
+        level_path = "levels/00_sandbox_01.toml";
     }
     /*
      * WebAssembly: attach SDL2's keyboard listeners to the canvas element
@@ -134,6 +145,7 @@ int main(int argc, char *argv[]) {
          */
         GameState gs = {0};
         gs.debug_mode = debug_mode;
+        gs.smoke_test_frames = smoke_test_frames;
         strncpy(gs.level_path, level_path, sizeof(gs.level_path) - 1);
         game_init(&gs);
         game_loop(&gs);
@@ -203,6 +215,7 @@ int main(int argc, char *argv[]) {
         if (result == MENU_PLAY) {
             GameState gs = {0};
             gs.debug_mode = debug_mode;
+            gs.smoke_test_frames = smoke_test_frames;
             strncpy(gs.level_path, "levels/00_sandbox_01.toml", sizeof(gs.level_path) - 1);
             game_init(&gs);
             game_loop(&gs);

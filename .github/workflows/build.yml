@@ -118,6 +118,15 @@ jobs:
         if: matrix.target == 'native' && runner.os != 'Windows'
         run: make editor
 
+      - name: Smoke test (Linux / macOS)
+        if: matrix.target == 'native' && runner.os != 'Windows'
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          ./out/super-mango --level levels/00_sandbox_01.toml --smoke-test-frames 5
+          ./out/super-mango-editor --smoke-test
+
       # ── Compile (Windows) ───────────────────────────────────────────────────
       # The msys2 shell is required so the UCRT64 toolchain and sdl2-config
       # are on PATH. We pass CC=gcc and override the output name to include
@@ -137,12 +146,27 @@ jobs:
         shell: msys2 {0}
         run: make editor CC=gcc
 
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./out/super-mango.exe --level levels/00_sandbox_01.toml --smoke-test-frames 5
+          SDL_VIDEODRIVER=dummy ./out/super-mango-editor.exe --smoke-test
+
       # ── Compile (WebAssembly) ───────────────────────────────────────────────
       # Uses the 'web' Makefile target with emcc. Assets are bundled into
       # the .data file via --preload-file.
       - name: Build (WebAssembly)
         if: matrix.target == 'wasm'
         run: make web
+
+      - name: Smoke test (WebAssembly artifacts)
+        if: matrix.target == 'wasm'
+        run: |
+          test -f out/super-mango.html
+          test -f out/super-mango.js
+          test -f out/super-mango.wasm
+          test -f out/super-mango.data
 
       # ── Bundle SDL2 DLLs for Windows ────────────────────────────────────────
       # On Windows, SDL2 is dynamically linked. The DLLs must ship alongside
