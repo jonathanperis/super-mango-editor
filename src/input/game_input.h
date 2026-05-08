@@ -26,3 +26,9 @@
  * This function is designed to be passed to SDL_CreateThread.
  */
 int ctrl_init_worker(void *data);
+
+/* Advance deferred gamepad initialization from the main thread. */
+void gamepad_update_deferred_init(GameState *gs);
+
+/* Join pending gamepad init and close controller resources. */
+void gamepad_cleanup(GameState *gs);
