@@ -26,7 +26,6 @@
 #include <string.h>    /* strncpy — safe string copy for file path        */
 
 #include "editor.h"       /* EditorState, editor_init/loop/cleanup */
-#include "serializer.h"   /* level_load_toml — load a .toml level file     */
 
 /* ------------------------------------------------------------------ */
 
@@ -108,11 +107,7 @@ int main(int argc, char *argv[]) {
      * here — the save dialog will use the stored path as-is).
      */
     if (argc > 1) {
-        if (level_load_toml(argv[1], &es.level) == 0) {
-            strncpy(es.file_path, argv[1], sizeof(es.file_path) - 1);
-            es.file_path[sizeof(es.file_path) - 1] = '\0';
-            es.modified = 0;
-        } else {
+        if (editor_load_level(&es, argv[1]) != 0) {
             fprintf(stderr, "Warning: could not load '%s' — starting empty\n",
                     argv[1]);
         }
