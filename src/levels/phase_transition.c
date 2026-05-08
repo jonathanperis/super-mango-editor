@@ -17,6 +17,11 @@ int phase_next_path(const LevelDef *current, char *out, size_t out_size)
     return 0;
 }
 
+int phase_has_next(const LevelDef *current)
+{
+    return current && current->next_phase[0] != '\0';
+}
+
 void phase_progress_save(const GameState *gs, PhaseProgress *progress)
 {
     if (!gs || !progress) return;

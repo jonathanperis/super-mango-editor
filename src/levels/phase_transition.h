@@ -16,5 +16,6 @@ typedef struct {
 } PhaseProgress;
 
 int phase_next_path(const LevelDef *current, char *out, size_t out_size);
+int phase_has_next(const LevelDef *current);
 void phase_progress_save(const GameState *gs, PhaseProgress *progress);
 void phase_progress_restore(GameState *gs, const PhaseProgress *progress);

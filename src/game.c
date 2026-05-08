@@ -164,6 +164,56 @@ static void game_init_fail(GameState *gs, const char *label, const char *detail)
     exit(EXIT_FAILURE);
 }
 
+static int game_count_collected_coins(const GameState *gs)
+{
+    int collected = 0;
+
+    for (int i = 0; i < gs->coin_count; i++) {
+        if (!gs->coins[i].active) collected++;
+    }
+
+    return collected;
+}
+
+static void game_reset_completion_summary(GameState *gs)
+{
+    gs->level_elapsed = 0.0f;
+    gs->level_coin_total = gs->coin_count;
+    gs->completion_coins_collected = 0;
+    gs->completion_coin_total = gs->coin_count;
+    gs->completion_elapsed = 0.0f;
+    gs->completion_pending_next_phase = 0;
+    gs->completion_next_phase[0] = '\0';
+}
+
+void game_complete_level(GameState *gs)
+{
+    const LevelDef *def = (const LevelDef *)gs->runtime.current_level;
+
+    gs->completion_coins_collected = game_count_collected_coins(gs);
+    gs->completion_coin_total = gs->level_coin_total;
+    gs->completion_elapsed = gs->level_elapsed;
+    gs->completion_pending_next_phase = 0;
+    gs->completion_next_phase[0] = '\0';
+
+    if (phase_has_next(def) &&
+        phase_next_path(def, gs->completion_next_phase,
+                        sizeof(gs->completion_next_phase)) == 0) {
+        gs->completion_pending_next_phase = 1;
+    }
+
+    gs->level_complete = 1;
+}
+
+static void game_continue_after_completion(GameState *gs)
+{
+    if (gs->completion_pending_next_phase) {
+        if (game_load_next_phase(gs) == 0) return;
+    }
+
+    gs->running = 0;
+}
+
 /* ------------------------------------------------------------------ */
 
 /*
@@ -452,6 +502,7 @@ void game_init(GameState *gs) {
         strncpy(s_level.name, "Untitled", sizeof(s_level.name) - 1);
     }
     level_load(gs, &s_level);
+    game_reset_completion_summary(gs);
 
     game_apply_level_resources(gs, (const LevelDef *)gs->runtime.current_level);
 
@@ -548,6 +599,7 @@ int game_load_next_phase(GameState *gs)
 
     /* Load the new level */
     level_load(gs, &s_level);
+    game_reset_completion_summary(gs);
     game_apply_level_resources(gs, &s_level);
 
     /* Restore player progress */
@@ -618,6 +670,10 @@ static void game_loop_frame(void *arg) {
                 /* A key was pressed this frame */
                 if (event.key.keysym.sym == SDLK_ESCAPE) {
                     gs->running = 0;
+                } else if (gs->level_complete &&
+                           (event.key.keysym.sym == SDLK_RETURN ||
+                            event.key.keysym.sym == SDLK_SPACE)) {
+                    game_continue_after_completion(gs);
                 }
 
             } else if (event.type == SDL_CONTROLLERDEVICEADDED) {
@@ -650,12 +706,12 @@ static void game_loop_frame(void *arg) {
 
             } else if (event.type == SDL_CONTROLLERBUTTONDOWN) {
                 /*
-                 * Start (Xbox) / Options (DualSense / DS4) → quit.
-                 * Mirrors the ESC key behaviour so the player can exit
-                 * from the couch without reaching for the keyboard.
+                 * Start (Xbox) / Options (DualSense / DS4) continues the
+                 * completion summary when visible, otherwise exits.
                  */
                 if (event.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
-                    gs->running = 0;
+                    if (gs->level_complete) game_continue_after_completion(gs);
+                    else gs->running = 0;
                 }
 
             } else if (event.type == SDL_WINDOWEVENT) {
@@ -701,6 +757,8 @@ static void game_loop_frame(void *arg) {
          * Also skip updates when level is complete (overlay showing).
          */
         if (gs->paused || gs->level_complete) goto render;
+
+        gs->level_elapsed += dt;
 
         /* Read keyboard and gamepad; set the player's velocity for this frame */
         player_handle_input(&gs->player, gs->audio.jump, gs->controller,
