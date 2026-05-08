@@ -42,7 +42,8 @@ main()
   │     ├── fog_init(&gs.fog, gs.renderer)         (fog_background_1.png, fog_background_2.png)
   │     ├── hud_init(&gs.hud, gs.renderer)
   │     ├── if (debug_mode) debug_init(&gs.debug)
-  │     ├── level_load(level_path, &level)          (TOML level file → entity data, floor gaps, backgrounds, music)
+  │     ├── level_load_toml(level_path, &def)       (parse TOML file into LevelDef)
+  │     ├── level_load(&gs, &def)                   (apply LevelDef to runtime GameState)
   │     ├── hearts/lives/score/score_life_next initialisation
   │     ├── SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) — lazy init, non-fatal
   │     └── scan joysticks for first connected gamepad
