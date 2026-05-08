@@ -22,6 +22,7 @@ CC      ?= clang
 endif
 
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(shell $(SDL2CFG) --cflags)
+TEST_CFLAGS = $(filter-out -Dmain=SDL_main,$(CFLAGS))
 LIBS    = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
 OUTDIR  = out
 TARGET  = $(OUTDIR)/super-mango
@@ -54,6 +55,9 @@ EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor
 EDITOR_LIBS   = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lm
 TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test
+TEST_SERIALIZER_OBJ = $(OUTDIR)/test-serializer.o
+TEST_VALIDATE_OBJ   = $(OUTDIR)/test-level-validate.o
+TEST_TOMLC_OBJ      = $(OUTDIR)/test-tomlc17.o
 
 .PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test
 
@@ -158,11 +162,20 @@ test: $(OUTDIR) $(TEST_TARGETS)
 	./$(OUTDIR)/level-serializer-test
 	./$(OUTDIR)/level-validate-test
 
-$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(EDITOR_DIR)/serializer.o $(VENDOR_DIR)/tomlc17.o
-	$(CC) $(CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
+$(TEST_SERIALIZER_OBJ): $(EDITOR_DIR)/serializer.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(OUTDIR)/level-validate-test: tests/level_validate_test.c $(SRCDIR)/levels/level_validate.o
-	$(CC) $(CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
+$(TEST_VALIDATE_OBJ): $(SRCDIR)/levels/level_validate.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_TOMLC_OBJ): $(VENDOR_DIR)/tomlc17.c
+	$(CC) -std=c11 -MMD -MP -c -o $@ $<
+
+$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER_OBJ) $(TEST_TOMLC_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
+
+$(OUTDIR)/level-validate-test: tests/level_validate_test.c $(TEST_VALIDATE_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
 
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
 # Requires the Emscripten SDK (emcc on PATH).
