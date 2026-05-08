@@ -17,6 +17,7 @@
 #include <SDL_ttf.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "start_menu.h"
 
@@ -38,6 +39,20 @@
 #define BTN_H   28
 #define BTN_X  ((MENU_GAME_W - BTN_W) / 2)
 #define BTN_Y  170
+
+static const char *MENU_LEVEL_NAMES[] = {
+    "Sandbox 01",
+    "Lugio 01",
+    "Lugio 02"
+};
+
+static const char *MENU_LEVEL_PATHS[] = {
+    "levels/00_sandbox_01.toml",
+    "levels/01_lugio_01.toml",
+    "levels/02_lugio_02.toml"
+};
+
+#define MENU_LEVEL_COUNT ((int)(sizeof(MENU_LEVEL_PATHS) / sizeof(MENU_LEVEL_PATHS[0])))
 
 /* ---- Helpers -------------------------------------------------------- */
 
@@ -68,6 +83,16 @@ static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh) {
     return px >= rx && px < rx + rw && py >= ry && py < ry + rh;
 }
 
+static void start_menu_set_selected_level(StartMenu *menu, int index) {
+    if (index < 0) index = MENU_LEVEL_COUNT - 1;
+    if (index >= MENU_LEVEL_COUNT) index = 0;
+
+    menu->selected_level = index;
+    strncpy(menu->selected_level_path, MENU_LEVEL_PATHS[index],
+            sizeof(menu->selected_level_path) - 1);
+    menu->selected_level_path[sizeof(menu->selected_level_path) - 1] = '\0';
+}
+
 /* ------------------------------------------------------------------ */
 
 void start_menu_init(StartMenu *menu, SDL_Window *window, SDL_Renderer *renderer) {
@@ -75,6 +100,7 @@ void start_menu_init(StartMenu *menu, SDL_Window *window, SDL_Renderer *renderer
     menu->renderer = renderer;
     menu->running  = 1;
     menu->result   = MENU_QUIT;
+    start_menu_set_selected_level(menu, 0);
 
     /*
      * Load the same bitmap font used by the HUD (Round9x13.ttf at size 13).
@@ -127,6 +153,14 @@ static void start_menu_frame(void *arg) {
             case SDLK_ESCAPE:
                 menu->result  = MENU_QUIT;
                 menu->running = 0;
+                break;
+            case SDLK_LEFT:
+            case SDLK_a:
+                start_menu_set_selected_level(menu, menu->selected_level - 1);
+                break;
+            case SDLK_RIGHT:
+            case SDLK_d:
+                start_menu_set_selected_level(menu, menu->selected_level + 1);
                 break;
             case SDLK_RETURN:
             case SDLK_SPACE:
@@ -229,9 +263,19 @@ static void start_menu_frame(void *arg) {
     /* Hint text at the bottom */
     {
         SDL_Color grey = {120, 120, 120, 255};
+        char level_text[96];
+
+        snprintf(level_text, sizeof(level_text), "Level: < %s >",
+                 MENU_LEVEL_NAMES[menu->selected_level]);
         draw_text_centered(menu->renderer, menu->font,
-                           "Press Enter or click Play",
-                           MENU_GAME_W / 2, 220, grey);
+                           level_text,
+                           MENU_GAME_W / 2, 214, grey);
+        draw_text_centered(menu->renderer, menu->font,
+                           "Left/Right selects level",
+                           MENU_GAME_W / 2, 232, grey);
+        draw_text_centered(menu->renderer, menu->font,
+                           "Enter or click Play",
+                           MENU_GAME_W / 2, 250, grey);
     }
 
     SDL_RenderPresent(menu->renderer);
