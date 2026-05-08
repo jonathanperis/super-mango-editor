@@ -20,13 +20,13 @@ This guide covers the patterns and conventions used in Super Mango and explains 
 | Category | Convention | Example |
 |----------|------------|---------|
 | Files | `snake_case` | `player.c`, `coin.h` |
-| Functions | `module_verb` | `player_init`, `coin_update` |
+| Functions | `module_verb` | `player_init`, `coins_render` |
 | Struct types | `PascalCase` via `typedef` | `Player`, `GameState`, `Coin` |
 | Enum values | `UPPER_SNAKE_CASE` | `ANIM_IDLE`, `ANIM_WALK` |
 | Constants (`#define`) | `UPPER_SNAKE_CASE` | `FLOOR_Y`, `TILE_SIZE` |
 | Local variables | `snake_case` | `dt`, `frame_ms`, `elapsed` |
-| Assets | `snake_case` | `player.png`, `coin.png`, `spider.png` |
-| Sounds | `component_descriptor.wav` | `player_jump.wav`, `coin.wav`, `bird.wav` |
+| Assets | `snake_case` under `assets/sprites/<category>/` | `player/player.png`, `collectibles/coin.png`, `entities/spider.png` |
+| Sounds | `component_descriptor.wav` under `assets/sounds/<category>/` | `player/player_jump.wav`, `collectibles/coin.wav`, `entities/bird.wav` |
 
 ### Memory and Safety Rules
 
@@ -46,16 +46,18 @@ See [Constants Reference](#constants-reference) for all defined constants.
 
 ## Adding a New Entity
 
-Every entity follows the same lifecycle pattern:
+Most active entities follow this lifecycle pattern:
 
 ```
-entity_init    -> load texture, set initial state
+entity_init    -> set initial state (textures often live shared in GameState)
 entity_update  -> move, apply physics, detect events
 entity_render  -> draw to renderer
 entity_cleanup -> SDL_DestroyTexture, set to NULL
 ```
 
-And optionally:
+Collectibles and simple decorations may use lighter helpers. For example, coins store only placement state in `Coin` and render through `coins_render()` using a shared texture from `GameState`.
+
+Active entities may also expose:
 
 ```
 entity_handle_input   -> if player-controlled
@@ -64,56 +66,46 @@ entity_animate        -> static helper, called from entity_update
 
 ### Step-by-Step
 
-#### 1. Create the header -- `src/collectibles/coin.h`
+#### 1. Create the header -- coin-like collectible example
 
 ```c
 #pragma once
 #include <SDL.h>
 
+#define MAX_COINS       64
+#define COIN_DISPLAY_W  16
+#define COIN_DISPLAY_H  16
+#define COIN_SCORE     100
+
 typedef struct {
-    float        x, y;    /* logical position (top-left) */
-    int          w, h;    /* display size in logical px  */
-    int          active;  /* 1 = visible, 0 = collected  */
-    SDL_Texture *texture;
+    float x;      /* logical position (top-left) */
+    float y;
+    int   active; /* 1 = visible, 0 = collected */
 } Coin;
 
-void coin_init(Coin *coin, SDL_Renderer *renderer, float x, float y);
-void coin_update(Coin *coin, float dt);
-void coin_render(Coin *coin, SDL_Renderer *renderer);
-void coin_cleanup(Coin *coin);
+void coins_render(const Coin *coins, int count,
+                  SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
 ```
 
 #### 2. Create the implementation -- `src/collectibles/coin.c`
 
 ```c
-#include <SDL_image.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include "collectibles/coin.h"
 
-void coin_init(Coin *coin, SDL_Renderer *renderer, float x, float y) {
-    coin->texture = IMG_LoadTexture(renderer, "assets/coin.png");
-    if (!coin->texture) {
-        fprintf(stderr, "Failed to load coin.png: %s\n", IMG_GetError());
-        exit(EXIT_FAILURE);
-    }
-    coin->x = x;
-    coin->y = y;
-    coin->w = 48;
-    coin->h = 48;
-    coin->active = 1;
-}
+void coins_render(const Coin *coins, int count,
+                  SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+    if (!tex) return;
 
-void coin_render(Coin *coin, SDL_Renderer *renderer) {
-    if (!coin->active) return;
-    SDL_Rect dst = { (int)coin->x, (int)coin->y, coin->w, coin->h };
-    SDL_RenderCopy(renderer, coin->texture, NULL, &dst);
-}
+    for (int i = 0; i < count; i++) {
+        if (!coins[i].active) continue;
 
-void coin_cleanup(Coin *coin) {
-    if (coin->texture) {
-        SDL_DestroyTexture(coin->texture);
-        coin->texture = NULL;
+        SDL_Rect dst = {
+            (int)(coins[i].x - cam_x),
+            (int)coins[i].y,
+            COIN_DISPLAY_W,
+            COIN_DISPLAY_H
+        };
+        SDL_RenderCopy(renderer, tex, NULL, &dst);
     }
 }
 ```
@@ -129,8 +121,8 @@ Textures are loaded in `game_init()` and stored in `GameState`. The entity array
 
 typedef struct {
     // ... existing fields ...
-    SDL_Texture *tex_coin;    /* GPU texture, loaded in game_init */
-    Coin coins[32];           /* fixed-size array -- simple and cache-friendly */
+    SDL_Texture *coin_tex;    /* shared texture, loaded in game_init */
+    Coin coins[MAX_COINS];    /* fixed-size array -- simple and cache-friendly */
     int  coin_count;          /* how many are currently active */
 } GameState;
 ```
@@ -138,22 +130,22 @@ typedef struct {
 #### 4. Wire up in `game.c`
 
 ```c
-// game_init -- load texture and init entities:
-gs->tex_coin = IMG_LoadTexture(gs->renderer, "assets/coin.png");
-coin_init(&gs->coins[0L, gs->tex_coin, 200.0f, 100.0f.md);
-gs->coin_count = 1;
+// game_init -- load shared texture:
+gs->coin_tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/coin.png");
+if (!gs->coin_tex) {
+    fprintf(stderr, "Failed to load coin.png: %s\n", IMG_GetError());
+    exit(EXIT_FAILURE);
+}
 
-// game_loop update section:
-for (int i = 0; i < gs->coin_count; i++)
-    coin_update(&gs->coins[i], dt);
+// level_loader.c -- populate array from TOML placements:
+gs->coins[i] = (Coin){ .x = def->coins[i].x, .y = def->coins[i].y, .active = 1 };
+gs->coin_count = def->coin_count;
 
 // game_loop render section (correct layer order):
-for (int i = 0; i < gs->coin_count; i++)
-    coin_render(&gs->coins[iL, gs->renderer.md);
+coins_render(gs->coins, gs->coin_count, gs->renderer, gs->coin_tex, (int)gs->camera.x);
 
 // game_cleanup (before SDL_DestroyRenderer):
-for (int i = 0; i < gs->coin_count; i++)
-    coin_cleanup(&gs->coins[i]);
+DESTROY_TEX(gs->coin_tex);
 ```
 
 #### 5. Add to a TOML level file
@@ -162,16 +154,16 @@ Entity spawn positions are defined in TOML level files in the `levels/` director
 
 ```toml
 # In levels/your_level.toml:
-[coins]
+[[coins]]
 x = 120.0
 y = 180.0
 
-[coins]
+[[coins]]
 x = 200.0
 y = 140.0
 ```
 
-Then extend `level_loader.c` to parse the new array table and call your `_init` function for each entry. See `level_design` for the full TOML schema and [Level Design — TOML Reference](#level-design) for placement examples for every entity type.
+Then extend `level_loader.c` to parse the new array table and populate the `GameState` array (or call your `_init` function when the entity owns richer runtime state). See `level_design` for the full TOML schema and [Level Design — TOML Reference](#level-design) for placement examples for every entity type.
 
 You can also use the visual level editor (`make run-editor`) to place entities interactively without writing TOML by hand.
 
@@ -184,7 +176,7 @@ Every entity must have hitbox visualization in `core/debug.c`:
 for (int i = 0; i < gs->coin_count; i++) {
     if (!gs->coins[i].active) continue;
     SDL_Rect hb = { (int)gs->coins[i].x, (int)gs->coins[i].y,
-                     gs->coins[i].w, gs->coins[i].h };
+                    COIN_DISPLAY_W, COIN_DISPLAY_H };
     SDL_SetRenderDrawColor(gs->renderer, 255, 255, 0, 128);
     SDL_RenderDrawRect(gs->renderer, &hb);
 }
@@ -243,12 +235,12 @@ All sound files are `.wav` format, named with the convention `component_descript
 
 Steps to add a new sound:
 
-1. Place `.wav` in `sounds/`.
+1. Place `.wav` in `assets/sounds/<category>/`.
 2. Add `Mix_Chunk *snd_<name>;` to `GameState` in `game.h`.
 3. Load in `game_init` (non-fatal -- warn but continue):
 
 ```c
-gs->snd_<name> = Mix_LoadWAV("sounds/<name>.wav");
+gs->snd_<name> = Mix_LoadWAV("assets/sounds/<category>/<name>.wav");
 if (!gs->snd_<name>) {
     fprintf(stderr, "Warning: could not load <name>.wav: %s\n", Mix_GetError());
 }
@@ -292,21 +284,23 @@ gs->music = NULL;
 
 ## Adding HUD / Text Rendering
 
-`SDL2_ttf` is already initialized in `main.c`. The font `round9x13.ttf` is in `assets/`.
+`SDL2_ttf` is already initialized in `main.c`. The font is in `assets/fonts/`.
 
 ```c
 // Load font
-TTF_Font *font = TTF_OpenFont("assets/round9x13.ttf", 13);
+TTF_Font *font = TTF_OpenFont("assets/fonts/round9x13.ttf", 13);
 if (!font) { fprintf(stderr, "TTF_OpenFont: %s\n", TTF_GetError()); }
 
 // Render text to a surface, then upload to a texture
 SDL_Color white = {255, 255, 255, 255};
 SDL_Surface *surf = TTF_RenderText_Solid(font, "Score: 0", white);
 SDL_Texture *tex  = SDL_CreateTextureFromSurface(renderer, surf);
+int text_w = surf->w;
+int text_h = surf->h;
 SDL_FreeSurface(surf);
 
 // Draw the texture
-SDL_Rect dst = {10, 10, surf->w, surf->h};
+SDL_Rect dst = {10, 10, text_w, text_h};
 SDL_RenderCopy(renderer, tex, NULL, &dst);
 
 // Cleanup
@@ -323,36 +317,36 @@ The HUD renders hearts (lives), life counter, and score. It is drawn after all g
 Always draw in painter's algorithm order (back to front). The game currently uses 32 layers:
 
 ```
- 1. Parallax background    (7 parallax_*.png layers from assets/)
- 2. Platforms              (level platform tile, 9-slice pillars)
+ 1. Parallax background    (`assets/sprites/backgrounds/*.png` layers)
+ 2. Platforms              (`assets/sprites/levels/*_platform.png`, 9-slice pillars)
  3. Floor tiles            (level floor tile at FLOOR_Y, with floor-gap openings)
- 4. Float platforms        (float_platform.png 3-slice hovering surfaces)
- 5. Spike rows             (spike.png ground-level spike strips)
- 6. Spike platforms        (spike_platform.png elevated spike hazards)
- 7. Bridges                (bridge.png tiled crumble walkways)
- 8. Bouncepads medium      (bouncepad_medium.png standard spring pads)
- 9. Bouncepads small       (bouncepad_small.png low spring pads)
-10. Bouncepads high        (bouncepad_high.png tall spring pads)
-11. Rails                  (rail.png bitmask tile tracks)
-12. Vines                  (vine_green.png / vine_brown.png climbable)
-13. Ladders                (ladder.png climbable)
-14. Ropes                  (rope.png climbable)
-15. Coins                  (coin.png collectibles)
-16. Yellow stars           (star_yellow.png health pickups)
-17. Last star              (end-of-level star using HUD star sprite)
-18. Blue/fire flames       (blue_flame.png / fire_flame.png erupting from floor gaps)
-19. Fish                   (fish.png jumping water enemies)
-20. Faster fish            (faster_fish.png fast jumping enemies)
-21. Water                  (water.png animated strip)
-22. Spike blocks           (spike_block.png rail-riding hazards)
-23. Axe traps              (axe_trap.png swinging hazards)
-24. Circular saws          (circular_saw.png patrol hazards)
-25. Spiders                (spider.png ground patrol)
-26. Jumping spiders        (jumping_spider.png jumping patrol)
-27. Birds                  (bird.png slow sine-wave)
-28. Faster birds           (faster_bird.png fast sine-wave)
-29. Player                 (player.png animated)
-30. Fog                    (fog_background_1/2.png sliding overlay)
+ 4. Float platforms        (`assets/sprites/surfaces/float_platform.png`)
+ 5. Spike rows             (`assets/sprites/hazards/spike.png`)
+ 6. Spike platforms        (`assets/sprites/hazards/spike_platform.png`)
+ 7. Bridges                (`assets/sprites/surfaces/bridge.png`)
+ 8. Bouncepads medium      (`assets/sprites/surfaces/bouncepad_medium.png`)
+ 9. Bouncepads small       (`assets/sprites/surfaces/bouncepad_small.png`)
+10. Bouncepads high        (`assets/sprites/surfaces/bouncepad_high.png`)
+11. Rails                  (`assets/sprites/surfaces/rail.png`)
+12. Vines                  (`assets/sprites/surfaces/vine_green.png` / `vine_brown.png`)
+13. Ladders                (`assets/sprites/surfaces/ladder.png`)
+14. Ropes                  (`assets/sprites/surfaces/rope.png`)
+15. Coins                  (`assets/sprites/collectibles/coin.png`)
+16. Yellow stars           (`assets/sprites/collectibles/star_yellow.png`)
+17. Last star              (`assets/sprites/collectibles/last_star.png`)
+18. Blue/fire flames       (`assets/sprites/hazards/blue_flame.png` / `fire_flame.png`)
+19. Fish                   (`assets/sprites/entities/fish.png`)
+20. Faster fish            (`assets/sprites/entities/faster_fish.png`)
+21. Water                  (`assets/sprites/foregrounds/water.png`)
+22. Spike blocks           (`assets/sprites/hazards/spike_block.png`)
+23. Axe traps              (`assets/sprites/hazards/axe_trap.png`)
+24. Circular saws          (`assets/sprites/hazards/circular_saw.png`)
+25. Spiders                (`assets/sprites/entities/spider.png`)
+26. Jumping spiders        (`assets/sprites/entities/jumping_spider.png`)
+27. Birds                  (`assets/sprites/entities/bird.png`)
+28. Faster birds           (`assets/sprites/entities/faster_bird.png`)
+29. Player                 (`assets/sprites/player/player.png`)
+30. Fog                    (`assets/sprites/foregrounds/fog_1.png` / `fog_2.png`)
 31. HUD                    (hearts, lives, score -- always on top)
 32. Debug overlay          (FPS, hitboxes, event log -- when --debug)
 ```
@@ -406,8 +400,12 @@ See [Assets](assets) for sprite sheet dimensions and [Player Module](#player-mod
 - [ ] Add entity placement to a TOML level file in `levels/` (or use the visual level editor)
 - [ ] Add hitbox visualization in `core/debug.c`
 - [ ] Add `debug_log` calls in `game.c` for significant entity events
-- [ ] Build with `make` -- no Makefile changes needed
+- [ ] Build game with `make` -- no Makefile changes needed for new `.c` files in existing source directories
+- [ ] Build editor with `make editor` if editor placement/schema behavior changed
+- [ ] Run `make test`
+- [ ] Run `make validate-levels` after any level/schema/editor serializer change
 - [ ] Test with `--debug` flag to verify hitboxes render correctly
+- [ ] Run relevant docs lint/build command when documentation pages changed
 
 ---
 
