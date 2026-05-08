@@ -539,7 +539,9 @@ void game_init(GameState *gs) {
      * player_handle_input), so there is nothing to gain from running this here.
      */
 #ifndef __EMSCRIPTEN__
-    gs->ctrl_pending_init = 1;
+    if (gs->smoke_test_frames == 0) {
+        gs->ctrl_pending_init = 1;
+    }
 #endif
 
     /* Signal the loop to start running; game starts in the foreground */
@@ -1072,7 +1074,7 @@ static void game_loop_frame(void *arg) {
          */
 #ifndef __EMSCRIPTEN__
         if (gs->ctrl_pending_init == 1) {
-            gs->ctrl_init_done   = 0;
+            SDL_AtomicSet(&gs->ctrl_init_done, 0);
             gs->ctrl_init_thread = SDL_CreateThread(ctrl_init_worker, "ctrl_init", gs);
             if (!gs->ctrl_init_thread) {
                 fprintf(stderr, "Warning: could not start gamepad init thread: %s\n",
@@ -1097,7 +1099,8 @@ static void game_loop_frame(void *arg) {
                     }
                 }
             }
-        } else if (gs->ctrl_pending_init == 2 && gs->ctrl_init_done) {
+        } else if (gs->ctrl_pending_init == 2 &&
+                   SDL_AtomicGet(&gs->ctrl_init_done)) {
             /*
              * SDL_WaitThread — join the thread and free its resources.
              * Safe to call here because ctrl_init_done guarantees the thread
@@ -1241,6 +1244,15 @@ void game_cleanup(GameState *gs) {
      * Both calls are safe when their argument is NULL / the subsystem is
      * not active, so no extra guard is needed beyond the pointer check.
      */
+#ifndef __EMSCRIPTEN__
+    if (gs->ctrl_init_thread) {
+        SDL_WaitThread(gs->ctrl_init_thread, NULL);
+        gs->ctrl_init_thread = NULL;
+        gs->ctrl_pending_init = 0;
+        SDL_AtomicSet(&gs->ctrl_init_done, 0);
+    }
+#endif
+
     if (gs->controller) {
         SDL_GameControllerClose(gs->controller);
         gs->controller = NULL;
