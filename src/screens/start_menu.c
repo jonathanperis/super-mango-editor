@@ -54,6 +54,11 @@ static const char *MENU_LEVEL_PATHS[] = {
 
 #define MENU_LEVEL_COUNT ((int)(sizeof(MENU_LEVEL_PATHS) / sizeof(MENU_LEVEL_PATHS[0])))
 
+_Static_assert(
+    (sizeof(MENU_LEVEL_NAMES) / sizeof(MENU_LEVEL_NAMES[0])) ==
+    (sizeof(MENU_LEVEL_PATHS) / sizeof(MENU_LEVEL_PATHS[0])),
+    "MENU_LEVEL_NAMES and MENU_LEVEL_PATHS count mismatch");
+
 /* ---- Helpers -------------------------------------------------------- */
 
 /*
