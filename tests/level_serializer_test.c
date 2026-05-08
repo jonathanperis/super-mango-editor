@@ -1,5 +1,12 @@
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 
 #include "editor/serializer.h"
 #include "levels/level.h"
@@ -8,6 +15,18 @@ static int fail(const char *msg)
 {
     fprintf(stderr, "level_serializer_test: %s\n", msg);
     return 1;
+}
+
+static int ensure_out_dir(void)
+{
+#ifdef _WIN32
+    if (_mkdir("out") != 0 && errno != EEXIST)
+        return fail("could not create out directory");
+#else
+    if (mkdir("out", 0755) != 0 && errno != EEXIST)
+        return fail("could not create out directory");
+#endif
+    return 0;
 }
 
 static int write_too_many_coins_fixture(const char *path)
@@ -103,6 +122,7 @@ static int rejects_oversized_arrays(void)
 
 int main(void)
 {
+    if (ensure_out_dir() != 0) return 1;
     if (load_all_repo_levels() != 0) return 1;
     if (roundtrip_sandbox() != 0) return 1;
     if (rejects_oversized_arrays() != 0) return 1;

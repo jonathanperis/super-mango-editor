@@ -48,7 +48,7 @@ int level_validate_counts(const LevelDef *def, char *err, size_t err_size)
     CHECK_COUNT(spike_platform_count, MAX_SPIKE_PLATFORMS);
     CHECK_COUNT(spike_block_count, MAX_SPIKE_BLOCKS);
     CHECK_COUNT(blue_flame_count, MAX_BLUE_FLAMES);
-    CHECK_COUNT(fire_flame_count, MAX_BLUE_FLAMES);
+    CHECK_COUNT(fire_flame_count, MAX_BLUE_FLAMES);  /* shares BlueFlame limit */
 
     CHECK_COUNT(float_platform_count, MAX_FLOAT_PLATFORMS);
     CHECK_COUNT(bridge_count, MAX_BRIDGES);
@@ -61,7 +61,7 @@ int level_validate_counts(const LevelDef *def, char *err, size_t err_size)
     CHECK_COUNT(rope_count, MAX_ROPES);
 
     CHECK_COUNT(background_layer_count, MAX_BACKGROUND_LAYERS);
-    CHECK_COUNT(foreground_layer_count, MAX_BACKGROUND_LAYERS);
+    CHECK_COUNT(foreground_layer_count, MAX_BACKGROUND_LAYERS);  /* shares layer limit */
     CHECK_COUNT(fog_layer_count, MAX_FOG_TEXTURES);
 
     if (err && err_size > 0) err[0] = '\0';

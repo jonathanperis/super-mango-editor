@@ -63,7 +63,7 @@ main()
   │     ├── Mix_LoadWAV     → gs.snd_coin          (coin.wav — non-fatal)
   │     ├── Mix_LoadWAV     → gs.snd_hit           (player_hit.wav — non-fatal)
   │     ├── Mix_LoadMUS     → gs.music             (from active LevelDef music_path)
-  │     ├── Mix_PlayMusic(-1)                      (loop forever at level volume)
+  │     ├── Mix_PlayMusic(gs.music, -1)            (loop forever at level volume)
   │     │
   │     │   ── Initialise game objects ──
   │     ├── player_init(&gs.player, gs.renderer)
