@@ -169,13 +169,13 @@ run-editor: editor
 
 # ── Tests ────────────────────────────────────────────────────────────
 test: $(OUTDIR) $(TEST_TARGETS)
-	./$(OUTDIR)/level-serializer-test
-	./$(OUTDIR)/level-validate-test
-	./$(OUTDIR)/rail-test
-	./$(OUTDIR)/entity-utils-test
-	./$(OUTDIR)/collision-test
-	./$(OUTDIR)/phase-transition-test
-	./$(OUTDIR)/exporter-test
+	$(RUN_PREFIX) ./$(OUTDIR)/level-serializer-test
+	$(RUN_PREFIX) ./$(OUTDIR)/level-validate-test
+	$(RUN_PREFIX) ./$(OUTDIR)/rail-test
+	$(RUN_PREFIX) ./$(OUTDIR)/entity-utils-test
+	$(RUN_PREFIX) ./$(OUTDIR)/collision-test
+	$(RUN_PREFIX) ./$(OUTDIR)/phase-transition-test
+	$(RUN_PREFIX) ./$(OUTDIR)/exporter-test
 
 validate-levels:
 	python3 tools/validate_levels.py
