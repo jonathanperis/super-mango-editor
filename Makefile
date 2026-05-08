@@ -55,10 +55,14 @@ EDITOR_OBJS   = $(EDITOR_SRCS:.c=.o)
 EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor
 EDITOR_LIBS   = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lm
-TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test
+TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
+                $(OUTDIR)/rail-test $(OUTDIR)/entity-utils-test
 TEST_SERIALIZER_OBJ = $(OUTDIR)/test-serializer.o
 TEST_VALIDATE_OBJ   = $(OUTDIR)/test-level-validate.o
 TEST_TOMLC_OBJ      = $(OUTDIR)/test-tomlc17.o
+TEST_RAIL_OBJ       = $(OUTDIR)/test-rail.o
+TEST_ENTITY_UTILS_OBJ = $(OUTDIR)/test-entity-utils.o
+TEST_LIBS           = $(shell $(SDL2CFG) --libs) -lm
 
 .PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels
 
@@ -162,6 +166,8 @@ run-editor: editor
 test: $(OUTDIR) $(TEST_TARGETS)
 	./$(OUTDIR)/level-serializer-test
 	./$(OUTDIR)/level-validate-test
+	./$(OUTDIR)/rail-test
+	./$(OUTDIR)/entity-utils-test
 
 validate-levels:
 	python3 tools/validate_levels.py
@@ -172,6 +178,12 @@ $(TEST_SERIALIZER_OBJ): $(EDITOR_DIR)/serializer.c
 $(TEST_VALIDATE_OBJ): $(SRCDIR)/levels/level_validate.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
+$(TEST_RAIL_OBJ): $(SRCDIR)/surfaces/rail.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_ENTITY_UTILS_OBJ): $(SRCDIR)/core/entity_utils.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
 $(TEST_TOMLC_OBJ): $(VENDOR_DIR)/tomlc17.c
 	$(CC) -std=c11 -MMD -MP -c -o $@ $<
 
@@ -179,6 +191,12 @@ $(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
 
 $(OUTDIR)/level-validate-test: tests/level_validate_test.c $(TEST_VALIDATE_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
+
+$(OUTDIR)/rail-test: tests/rail_test.c $(TEST_RAIL_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+
+$(OUTDIR)/entity-utils-test: tests/entity_utils_test.c $(TEST_ENTITY_UTILS_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
 
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
