@@ -226,7 +226,7 @@ void game_collide(GameState *gs, float dt)
         if (SDL_HasIntersection(&phit, &cbox)) {
             gs->coins[i].active = 0;
             gs->score += gs->rules.coin_score;
-            if (gs->snd_coin) Mix_PlayChannel(-1, gs->snd_coin, 0);
+            if (gs->audio.coin) Mix_PlayChannel(-1, gs->audio.coin, 0);
             if (gs->score >= gs->score_life_next) {
                 gs->lives++;
                 gs->score_life_next += gs->rules.score_per_life;
@@ -245,7 +245,7 @@ void game_collide(GameState *gs, float dt)
         if (SDL_HasIntersection(&phit, &sbox)) {
             gs->star_yellows[i].active = 0;
             if (gs->hearts < MAX_HEARTS) gs->hearts++;
-            if (gs->snd_coin) Mix_PlayChannel(-1, gs->snd_coin, 0);
+            if (gs->audio.coin) Mix_PlayChannel(-1, gs->audio.coin, 0);
             if (gs->debug_mode) debug_log(&gs->debug, "STAR_YELLOW[%d] collected", i);
         }
     }
@@ -259,7 +259,7 @@ void game_collide(GameState *gs, float dt)
         if (SDL_HasIntersection(&phit, &sbox)) {
             gs->star_greens[i].active = 0;
             if (gs->hearts < MAX_HEARTS) gs->hearts++;
-            if (gs->snd_coin) Mix_PlayChannel(-1, gs->snd_coin, 0);
+            if (gs->audio.coin) Mix_PlayChannel(-1, gs->audio.coin, 0);
             if (gs->debug_mode) debug_log(&gs->debug, "STAR_GREEN[%d] collected", i);
         }
     }
@@ -273,7 +273,7 @@ void game_collide(GameState *gs, float dt)
         if (SDL_HasIntersection(&phit, &sbox)) {
             gs->star_reds[i].active = 0;
             if (gs->hearts < MAX_HEARTS) gs->hearts++;
-            if (gs->snd_coin) Mix_PlayChannel(-1, gs->snd_coin, 0);
+            if (gs->audio.coin) Mix_PlayChannel(-1, gs->audio.coin, 0);
             if (gs->debug_mode) debug_log(&gs->debug, "STAR_RED[%d] collected", i);
         }
     }
@@ -284,7 +284,7 @@ void game_collide(GameState *gs, float dt)
         if (SDL_HasIntersection(&phit, &lsbox)) {
             gs->last_star.active = 0;
             gs->last_star.collected = 1;
-            if (gs->snd_coin) Mix_PlayChannel(-1, gs->snd_coin, 0);
+            if (gs->audio.coin) Mix_PlayChannel(-1, gs->audio.coin, 0);
             if (gs->debug_mode) debug_log(&gs->debug, "LAST STAR collected");
             
             /* Check if there's a next phase to load */
