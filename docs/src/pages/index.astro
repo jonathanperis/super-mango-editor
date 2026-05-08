@@ -1,21 +1,15 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import Hero from "@/components/home/Hero.astro";
-import Nav from "@/components/home/Nav.astro";
-import PlaySection from "@/components/home/PlaySection";
-import AboutSection from "@/components/home/AboutSection.astro";
-import DocsSection from "@/components/home/DocsSection.astro";
-import DownloadsSection from "@/components/home/DownloadsSection.astro";
+import Navbar from "@/components/home/Navbar.astro";
+import Dashboard from "@/components/home/Dashboard.astro";
 import Footer from "@/components/home/Footer.astro";
 ---
 
 <BaseLayout>
     <Hero />
-    <Nav />
-    <PlaySection client:visible />
-    <AboutSection />
-    <DocsSection />
-    <DownloadsSection />
+    <Navbar />
+    <Dashboard />
     <Footer />
 </BaseLayout>
 

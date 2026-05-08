@@ -1,5 +1,5 @@
 ---
-import DocsLayout from '@/layouts/DocsLayout.astro';
+import BaseLayout from '@/layouts/BaseLayout.astro';
 import '../../styles/docs.css';
 import { SECTION_CATEGORIES, SECTION_ORDER } from './sidebar.config';
 
@@ -83,7 +83,7 @@ const docsBase = base.replace(/\/$/, '') + '/docs';
 const backHomeUrl = base.replace(/\/$/, '') + '/';
 ---
 
-<DocsLayout title={pageTitle}>
+<BaseLayout title={pageTitle}>
     <div class="mobile-header">
         <button class="menu-toggle" id="menuToggle" aria-label="Toggle Menu" aria-controls="sidebar" aria-expanded="false">
             <span></span><span></span><span></span>
@@ -256,4 +256,4 @@ const backHomeUrl = base.replace(/\/$/, '') + '/';
             }
         });
     </script>
-</DocsLayout>
+</BaseLayout>
