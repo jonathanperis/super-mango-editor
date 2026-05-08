@@ -50,10 +50,12 @@ void gamepad_update_deferred_init(GameState *gs)
         SDL_WaitThread(gs->ctrl_init_thread, NULL);
         gs->ctrl_init_thread = NULL;
 
-        for (int i = 0; i < SDL_NumJoysticks(); i++) {
-            if (SDL_IsGameController(i)) {
-                gs->controller = SDL_GameControllerOpen(i);
-                if (gs->controller) break;
+        if (!gs->controller) {
+            for (int i = 0; i < SDL_NumJoysticks(); i++) {
+                if (SDL_IsGameController(i)) {
+                    gs->controller = SDL_GameControllerOpen(i);
+                    if (gs->controller) break;
+                }
             }
         }
         gs->ctrl_pending_init = 0;
