@@ -124,7 +124,14 @@ def validate_counts(level_path: Path, data: dict, constants: dict[str, int]) -> 
             errors.append(f"{constant} not found while validating {field}")
             continue
 
-        count = len(data[field]) if isinstance(data[field], list) else 1
+        if not isinstance(data[field], list):
+            errors.append(
+                f"{level_path.relative_to(ROOT)}: {field} must be an array "
+                f"(found {type(data[field]).__name__})"
+            )
+            continue
+
+        count = len(data[field])
         max_count = constants[constant]
         if count > max_count:
             errors.append(
@@ -139,7 +146,7 @@ def validate_level(level_path: Path, constants: dict[str, int]) -> list[str]:
     data = load_level(level_path)
 
     screen_count = data.get("screen_count")
-    if not isinstance(screen_count, int) or screen_count <= 0:
+    if isinstance(screen_count, bool) or not isinstance(screen_count, int) or screen_count <= 0:
         errors.append(f"{level_path.relative_to(ROOT)}: screen_count must be a positive integer")
 
     errors.extend(validate_paths(level_path, data))
