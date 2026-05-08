@@ -253,7 +253,7 @@ typedef struct {
      */
     int         ctrl_pending_init;
     SDL_Thread *ctrl_init_thread;    /* background thread for SDL_InitSubSystem call   */
-    volatile int ctrl_init_done;     /* set to 1 by thread when subsystem is ready     */
+    SDL_atomic_t ctrl_init_done;     /* set to 1 by thread when subsystem is ready     */
     TextureResources textures;       /* owned SDL_Texture resources                 */
     AudioResources   audio;          /* owned SDL_mixer resources                   */
     ParallaxSystem      parallax;  /* multi-layer scrolling background            */

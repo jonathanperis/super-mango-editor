@@ -15,10 +15,7 @@ int ctrl_init_worker(void *data)
         fprintf(stderr, "Warning: SDL_INIT_GAMECONTROLLER failed: %s — "
                         "gamepad support unavailable\n", SDL_GetError());
     }
-    /*
-     * Atomic write: signal the main thread that the subsystem is ready.
-     * volatile ensures the compiler does not cache this value in a register.
-     */
-    gs->ctrl_init_done = 1;
+    /* Atomic write: signal the main thread that the subsystem is ready. */
+    SDL_AtomicSet(&gs->ctrl_init_done, 1);
     return 0;
 }
