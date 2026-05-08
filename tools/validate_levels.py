@@ -141,6 +141,41 @@ def validate_counts(level_path: Path, data: dict, constants: dict[str, int]) -> 
     return errors
 
 
+def validate_rail_links(level_path: Path, data: dict) -> list[str]:
+    errors: list[str] = []
+    rails = data.get("rails", [])
+    rail_count = len(rails) if isinstance(rails, list) else 0
+
+    def check_rail_index(field: str, index: int, value) -> None:
+        if not isinstance(value, dict):
+            return
+        rail_index = value.get("rail_index")
+        if isinstance(rail_index, bool) or not isinstance(rail_index, int):
+            errors.append(
+                f"{level_path.relative_to(ROOT)}: {field}[{index}].rail_index "
+                "must be an integer"
+            )
+            return
+        if rail_index < 0 or rail_index >= rail_count:
+            errors.append(
+                f"{level_path.relative_to(ROOT)}: {field}[{index}].rail_index "
+                f"{rail_index} out of range (rails: {rail_count})"
+            )
+
+    spike_blocks = data.get("spike_blocks", [])
+    if isinstance(spike_blocks, list):
+        for index, spike_block in enumerate(spike_blocks):
+            check_rail_index("spike_blocks", index, spike_block)
+
+    float_platforms = data.get("float_platforms", [])
+    if isinstance(float_platforms, list):
+        for index, platform in enumerate(float_platforms):
+            if isinstance(platform, dict) and platform.get("mode") == "RAIL":
+                check_rail_index("float_platforms", index, platform)
+
+    return errors
+
+
 def validate_level(level_path: Path, constants: dict[str, int]) -> list[str]:
     errors: list[str] = []
     data = load_level(level_path)
@@ -151,6 +186,7 @@ def validate_level(level_path: Path, constants: dict[str, int]) -> list[str]:
 
     errors.extend(validate_paths(level_path, data))
     errors.extend(validate_counts(level_path, data, constants))
+    errors.extend(validate_rail_links(level_path, data))
 
     return errors
 
