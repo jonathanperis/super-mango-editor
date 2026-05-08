@@ -276,7 +276,7 @@ static void start_menu_frame(void *arg) {
                            level_text,
                            MENU_GAME_W / 2, 214, grey);
         draw_text_centered(menu->renderer, menu->font,
-                           "Left/Right selects level",
+                           "Left/Right or A/D selects level",
                            MENU_GAME_W / 2, 232, grey);
         draw_text_centered(menu->renderer, menu->font,
                            "Enter or click Play",
