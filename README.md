@@ -251,6 +251,7 @@ super-mango-editor/
 └── .github/workflows/                 CI/CD pipelines
     ├── build.yml                      Build check (PRs) + release + Pages deploy (main)
     ├── codeql.yml                     Code security analysis
+    ├── docs.yml                       Docs lint/build checks
     └── deploy.yml                     GitHub Pages deployment
 ```
 
