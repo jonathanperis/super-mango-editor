@@ -110,6 +110,10 @@ jobs:
         if: matrix.target == 'native' && runner.os != 'Windows'
         run: make test
 
+      - name: Build editor (Linux / macOS)
+        if: matrix.target == 'native' && runner.os != 'Windows'
+        run: make editor
+
       # ── Compile (Windows) ───────────────────────────────────────────────────
       # The msys2 shell is required so the UCRT64 toolchain and sdl2-config
       # are on PATH. We pass CC=gcc and override the output name to include
@@ -123,6 +127,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make test CC=gcc
+
+      - name: Build editor (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make editor CC=gcc
 
       # ── Compile (WebAssembly) ───────────────────────────────────────────────
       # Uses the 'web' Makefile target with emcc. Assets are bundled into
@@ -148,6 +157,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: mv out/super-mango.exe out/super-mango
+
+      - name: Remove editor binary from release artifacts (Linux / macOS)
+        if: matrix.target == 'native' && runner.os != 'Windows'
+        run: rm -f out/super-mango-editor
+
+      - name: Remove editor binary from release artifacts (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: rm -f out/super-mango-editor.exe out/super-mango-editor
 
       # Upload the compiled binary (and, on Windows, the DLLs) as a workflow
       # artifact. retention-days: 1 keeps storage low for PR build checks.
