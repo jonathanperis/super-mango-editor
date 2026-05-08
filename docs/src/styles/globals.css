@@ -920,7 +920,7 @@ a:hover { color: var(--green); }
     position: relative;
 }
 
-.docs-layout pre code {
+.docs-layout pre > code {
     background: transparent;
     padding: 0;
     border-radius: 0;
@@ -928,7 +928,7 @@ a:hover { color: var(--green); }
     font-size: 13px;
 }
 
-.docs-layout code {
+.docs-layout :not(pre) > code {
     background: var(--code-bg);
     color: var(--code-text);
     border-radius: 4px;
