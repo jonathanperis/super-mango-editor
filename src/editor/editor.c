@@ -22,11 +22,15 @@
 #include <SDL_ttf.h>      /* TTF_OpenFont, TTF_CloseFont — text rendering  */
 #include <stdio.h>        /* fprintf, stderr, snprintf — error and status  */
 #include <string.h>       /* memset, strncpy, strrchr — string operations  */
+#include <stdarg.h>       /* va_list — status message formatting            */
 
 #ifndef _WIN32
 #include <unistd.h>       /* fork, execl, _exit — POSIX process control    */
 #include <signal.h>       /* kill — send signal to child process            */
 #include <sys/wait.h>     /* waitpid, WNOHANG — non-blocking child check   */
+#include <sys/stat.h>     /* mkdir, stat — autosave/recent file support     */
+#else
+#include <direct.h>       /* _mkdir — autosave/recent file support          */
 #endif
 
 #include "editor.h"       /* EditorState, constants, EntityType, EditorTool */
@@ -39,6 +43,12 @@
 #include "exporter.h"     /* level_export_c — write .h/.c from LevelDef    */
 #include "ui.h"           /* UIState, ui_init, ui_begin_frame, ui_button    */
 #include "file_dialog.h"  /* file_dialog_open — native OS file picker       */
+#include "editor_validation.h" /* editor_validate_level                       */
+
+#define EDITOR_AUTOSAVE_PATH "out/autosave/editor_autosave.toml"
+#define EDITOR_RECENT_PATH   "out/editor_recent.txt"
+#define EDITOR_RECENT_MAX    5
+#define EDITOR_AUTOSAVE_MS   30000u
 
 /* ------------------------------------------------------------------ */
 /* Forward declarations for static helpers                             */
@@ -50,7 +60,18 @@ static void render_toolbar(EditorState *es);
 static void render_status_bar(EditorState *es);
 static void apply_undo_command(EditorState *es, const Command *cmd, int reverse);
 static void open_level_file(EditorState *es);
-static void load_level_from_path(EditorState *es, const char *path);
+static void set_status(EditorState *es, const char *fmt, ...);
+static void update_window_title(EditorState *es);
+static void reset_new_level(EditorState *es);
+static int save_current_level(EditorState *es);
+static int export_current_level(EditorState *es);
+static int can_persist(EditorState *es, const char *action);
+static void maybe_autosave(EditorState *es);
+static void load_recent_files(EditorState *es);
+static void save_recent_files(const EditorState *es);
+static void add_recent_file(EditorState *es, const char *path);
+static int file_exists(const char *path);
+static void ensure_out_dirs(void);
 static void copy_selected(EditorState *es);
 static void paste_clipboard(EditorState *es);
 static void play_test(EditorState *es);
@@ -205,6 +226,10 @@ int editor_init(EditorState *es) {
      */
     ui_init(&es->ui, es->renderer, es->font);
 
+    strncpy(es->autosave_path, EDITOR_AUTOSAVE_PATH,
+            sizeof(es->autosave_path) - 1);
+    load_recent_files(es);
+
     /* ---- Entity textures -------------------------------------------- */
     /*
      * Load every entity sprite sheet from the shared assets/ directory.
@@ -235,6 +260,12 @@ int editor_init(EditorState *es) {
      * Escape key, window close, or SDL_QUIT event) exits the loop.
      */
     es->running = 1;
+    es->last_autosave_ms = SDL_GetTicks();
+    if (file_exists(es->autosave_path)) {
+        set_status(es, "Autosave found: Ctrl+R to recover");
+    } else {
+        set_status(es, "Ready");
+    }
 
     return 0;
 }
@@ -416,6 +447,9 @@ void editor_loop(EditorState *es) {
             check_play_status(es);
         }
 
+        editor_validate_level(&es->level, &es->validation_report);
+        maybe_autosave(es);
+
         /* ---- Clear the screen --------------------------------------- */
         SDL_SetRenderDrawColor(es->renderer, 0x1A, 0x1A, 0x1A, 0xFF);
         SDL_RenderClear(es->renderer);
@@ -474,7 +508,10 @@ void editor_loop(EditorState *es) {
                     extern int g_fg_open;
                     extern int g_fog_open;
                     extern int g_phys_open;
-                    config_h_total = 28 + 8 + 24 + 24 + 24 + 22 + 24 + 30
+                    int validation_h = 24 + es->validation_report.message_count * 18;
+                    int recent_h = es->recent_file_count > 0
+                                 ? 20 + es->recent_file_count * 18 : 0;
+                    config_h_total = 28 + validation_h + recent_h + 8 + 24 + 24 + 24 + 24 + 22 + 24 + 30
                                    + 6 + 22 + 24 + 24 + 24 + 24 + 10;
                     if (g_plx_open)
                         config_h_total += es->level.background_layer_count * 20 + 24;
@@ -605,28 +642,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  * clear the modified flag and update the window title to
                  * reflect the saved state.
                  */
-                if (es->file_path[0] == '\0') {
-                    strncpy(es->file_path, "levels/untitled.toml",
-                            sizeof(es->file_path) - 1);
-                    es->file_path[sizeof(es->file_path) - 1] = '\0';
-                }
-                if (level_save_toml(&es->level, es->file_path) == 0) {
-                    es->modified = 0;
-                    /*
-                     * SDL_SetWindowTitle — update the title bar text.
-                     *
-                     * Show the file path so the designer always knows
-                     * which file is open.  The asterisk (*) that was
-                     * appended while modified is gone now.
-                     */
-                    char title[300];
-                    snprintf(title, sizeof(title), "Super Mango Editor - %s",
-                             es->file_path);
-                    SDL_SetWindowTitle(es->window, title);
-                } else {
-                    fprintf(stderr, "Error: failed to save %s\n",
-                            es->file_path);
-                }
+                (void)save_current_level(es);
                 break;
             }
 
@@ -653,20 +669,10 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  * memset zeroes every byte: all counts become 0, all
                  * positions become 0.0f, and all pointers become NULL.
                  */
-                memset(&es->level, 0, sizeof(es->level));
-                strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
-                es->level.player_start_x = 48.0f;
-                es->level.player_start_y = 205.0f;
-                es->level.last_star.x = 145.0f;
-                es->level.last_star.y = 167.0f;
-                es->file_path[0] = '\0';
-                undo_clear(es->undo);
-                es->modified        = 0;
-                es->selection.index = -1;
-                SDL_SetWindowTitle(es->window, "Super Mango Editor");
+                reset_new_level(es);
                 break;
 
-            case SDLK_e: {
+            case SDLK_e:
                 /*
                  * Ctrl+E — Export the level as compilable C source files.
                  *
@@ -679,35 +685,26 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  *   src/levels/<var_name>.h  — extern declaration
                  *   src/levels/<var_name>.c  — full const LevelDef initialiser
                  */
-                const char *var_name = "untitled";
-                char name_buf[128] = {0};
+                (void)export_current_level(es);
+                break;
 
-                if (es->file_path[0] != '\0') {
-                    /*
-                     * strrchr — find the last '/' in the path to isolate
-                     * the filename.  If no slash exists, use the whole path.
-                     */
-                    const char *base = strrchr(es->file_path, '/');
-                    base = base ? base + 1 : es->file_path;
-
-                    /*
-                     * Copy the filename (without extension) into name_buf.
-                     * We find the '.' and truncate there; if no dot, copy all.
-                     */
-                    strncpy(name_buf, base, sizeof(name_buf) - 1);
-                    name_buf[sizeof(name_buf) - 1] = '\0';
-                    char *dot = strrchr(name_buf, '.');
-                    if (dot) *dot = '\0';
-
-                    var_name = name_buf;
-                }
-
-                if (level_export_c(&es->level, var_name, "src/levels/exported") == 0) {
-                    fprintf(stderr, "Exported to src/levels/exported/%s.h/.c\n",
-                            var_name);
+            case SDLK_r:
+                if (file_exists(es->autosave_path)) {
+                    (void)editor_load_level(es, es->autosave_path);
+                    set_status(es, "Recovered autosave");
                 } else {
-                    fprintf(stderr, "Error: export failed for '%s'\n",
-                            var_name);
+                    set_status(es, "No autosave to recover");
+                }
+                break;
+
+            case SDLK_1:
+            case SDLK_2:
+            case SDLK_3:
+            case SDLK_4:
+            case SDLK_5: {
+                int recent_idx = (int)(key - SDLK_1);
+                if (recent_idx >= 0 && recent_idx < es->recent_file_count) {
+                    (void)editor_load_level(es, es->recent_files[recent_idx]);
                 }
                 break;
             }
@@ -981,7 +978,10 @@ static void handle_event(EditorState *es, SDL_Event *event) {
             int sc_cfg_total   = sc_section_hdr;
             if (es->config_open) {
                 extern int g_plx_open, g_fg_open, g_fog_open, g_phys_open;
-                sc_cfg_total = 28 + 8 + 24 + 24 + 24 + 22 + 24 + 30
+                int validation_h = 24 + es->validation_report.message_count * 18;
+                int recent_h = es->recent_file_count > 0
+                             ? 20 + es->recent_file_count * 18 : 0;
+                sc_cfg_total = 28 + validation_h + recent_h + 8 + 24 + 24 + 24 + 24 + 22 + 24 + 30
                              + 6 + 22 + 24 + 24 + 24 + 24 + 10;
                 if (g_plx_open) sc_cfg_total += es->level.background_layer_count * 20 + 24;
                 if (g_fg_open)  sc_cfg_total += es->level.foreground_layer_count  * 20 + 24;
@@ -1081,13 +1081,14 @@ static void handle_event(EditorState *es, SDL_Event *event) {
  * updates the file path and window title.  Called by both open_level_file
  * (from the dialog) and editor_main.c (from argv[1]).
  */
-static void load_level_from_path(EditorState *es, const char *path) {
+int editor_load_level(EditorState *es, const char *path) {
     LevelDef new_level;
     memset(&new_level, 0, sizeof(new_level));
 
     if (level_load_toml(path, &new_level) != 0) {
         fprintf(stderr, "Error: failed to load %s\n", path);
-        return;
+        set_status(es, "Load failed: %s", path);
+        return -1;
     }
 
     /*
@@ -1101,6 +1102,7 @@ static void load_level_from_path(EditorState *es, const char *path) {
     undo_clear(es->undo);
     es->selection.index = -1;
     es->modified = 0;
+    add_recent_file(es, path);
 
     /*
      * Reload theme-dependent textures so the editor preview matches the
@@ -1148,6 +1150,8 @@ static void load_level_from_path(EditorState *es, const char *path) {
             es->level.coin_count + es->level.spider_count +
             es->level.platform_count + es->level.rail_count +
             es->level.bird_count + es->level.fish_count);
+    set_status(es, "Loaded %s", path);
+    return 0;
 }
 
 /*
@@ -1165,9 +1169,231 @@ static void open_level_file(EditorState *es) {
     char path[256];
 
     if (file_dialog_open(path, sizeof(path))) {
-        load_level_from_path(es, path);
+        (void)editor_load_level(es, path);
     }
     /* User cancelled — do nothing */
+}
+
+static void set_status(EditorState *es, const char *fmt, ...)
+{
+    va_list ap;
+
+    if (!es || !fmt) return;
+    va_start(ap, fmt);
+    vsnprintf(es->status_message, sizeof(es->status_message), fmt, ap);
+    va_end(ap);
+}
+
+static void update_window_title(EditorState *es)
+{
+    char title[300];
+
+    if (es->file_path[0] != '\0') {
+        snprintf(title, sizeof(title), "Super Mango Editor - %s%s",
+                 es->file_path, es->modified ? " *" : "");
+    } else {
+        snprintf(title, sizeof(title), "Super Mango Editor%s",
+                 es->modified ? " *" : "");
+    }
+    SDL_SetWindowTitle(es->window, title);
+}
+
+static void reset_new_level(EditorState *es)
+{
+    memset(&es->level, 0, sizeof(es->level));
+    strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
+    es->level.screen_count = 4;
+    es->level.player_start_x = 48.0f;
+    es->level.player_start_y = 205.0f;
+    es->level.last_star.x = 145.0f;
+    es->level.last_star.y = 167.0f;
+    strncpy(es->level.floor_tile_path, "assets/sprites/levels/grass_tileset.png",
+            sizeof(es->level.floor_tile_path) - 1);
+    es->file_path[0] = '\0';
+    undo_clear(es->undo);
+    es->modified        = 0;
+    es->selection.index = -1;
+    set_status(es, "New level");
+    update_window_title(es);
+}
+
+static int can_persist(EditorState *es, const char *action)
+{
+    editor_validate_level(&es->level, &es->validation_report);
+    if (es->validation_report.error_count > 0) {
+        const char *msg = es->validation_report.message_count > 0
+                        ? es->validation_report.messages[0]
+                        : "validation failed";
+        set_status(es, "%s blocked: %s", action, msg);
+        fprintf(stderr, "%s blocked: %s\n", action, msg);
+        return 0;
+    }
+    return 1;
+}
+
+static int save_current_level(EditorState *es)
+{
+    if (!can_persist(es, "Save")) return -1;
+
+    if (es->file_path[0] == '\0') {
+        strncpy(es->file_path, "levels/untitled.toml",
+                sizeof(es->file_path) - 1);
+        es->file_path[sizeof(es->file_path) - 1] = '\0';
+    }
+    if (level_save_toml(&es->level, es->file_path) == 0) {
+        es->modified = 0;
+        add_recent_file(es, es->file_path);
+        update_window_title(es);
+        set_status(es, "Saved %s", es->file_path);
+        return 0;
+    }
+
+    fprintf(stderr, "Error: failed to save %s\n", es->file_path);
+    set_status(es, "Save failed: %s", es->file_path);
+    return -1;
+}
+
+static int export_current_level(EditorState *es)
+{
+    const char *var_name = "untitled";
+    char name_buf[128] = {0};
+
+    if (!can_persist(es, "Export")) return -1;
+
+    if (es->file_path[0] != '\0') {
+        const char *base = strrchr(es->file_path, '/');
+        base = base ? base + 1 : es->file_path;
+        strncpy(name_buf, base, sizeof(name_buf) - 1);
+        name_buf[sizeof(name_buf) - 1] = '\0';
+        char *dot = strrchr(name_buf, '.');
+        if (dot) *dot = '\0';
+        var_name = name_buf;
+    }
+
+    if (level_export_c(&es->level, var_name, "src/levels/exported") == 0) {
+        fprintf(stderr, "Exported to src/levels/exported/%s.h/.c\n", var_name);
+        set_status(es, "Exported %s", var_name);
+        return 0;
+    }
+
+    fprintf(stderr, "Error: export failed for '%s'\n", var_name);
+    set_status(es, "Export failed: %s", var_name);
+    return -1;
+}
+
+static int file_exists(const char *path)
+{
+    FILE *fp;
+
+    if (!path || path[0] == '\0') return 0;
+    fp = fopen(path, "rb");
+    if (!fp) return 0;
+    fclose(fp);
+    return 1;
+}
+
+static void ensure_out_dirs(void)
+{
+#ifdef _WIN32
+    _mkdir("out");
+    _mkdir("out\\autosave");
+#else
+    mkdir("out", 0755);
+    mkdir("out/autosave", 0755);
+#endif
+}
+
+static void maybe_autosave(EditorState *es)
+{
+    Uint32 now = SDL_GetTicks();
+
+    if (!es->modified) return;
+    if (now - es->last_autosave_ms < EDITOR_AUTOSAVE_MS) return;
+
+    es->last_autosave_ms = now;
+    editor_validate_level(&es->level, &es->validation_report);
+    if (es->validation_report.error_count > 0) return;
+
+    ensure_out_dirs();
+    if (level_save_toml(&es->level, es->autosave_path) == 0) {
+        set_status(es, "Autosaved %s", es->autosave_path);
+    }
+}
+
+static void load_recent_files(EditorState *es)
+{
+    FILE *fp = fopen(EDITOR_RECENT_PATH, "r");
+    char line[256];
+
+    es->recent_file_count = 0;
+    if (!fp) return;
+
+    while (es->recent_file_count < EDITOR_RECENT_MAX &&
+           fgets(line, sizeof(line), fp)) {
+        size_t len = strlen(line);
+        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+            line[--len] = '\0';
+        }
+        if (line[0] == '\0') continue;
+        strncpy(es->recent_files[es->recent_file_count], line,
+                sizeof(es->recent_files[0]) - 1);
+        es->recent_files[es->recent_file_count][sizeof(es->recent_files[0]) - 1] = '\0';
+        es->recent_file_count++;
+    }
+    fclose(fp);
+}
+
+static void save_recent_files(const EditorState *es)
+{
+    FILE *fp;
+
+    ensure_out_dirs();
+    fp = fopen(EDITOR_RECENT_PATH, "w");
+    if (!fp) return;
+
+    for (int i = 0; i < es->recent_file_count; i++) {
+        fprintf(fp, "%s\n", es->recent_files[i]);
+    }
+    fclose(fp);
+}
+
+static void add_recent_file(EditorState *es, const char *path)
+{
+    int existing = -1;
+
+    if (!path || path[0] == '\0') return;
+    for (int i = 0; i < es->recent_file_count; i++) {
+        if (strcmp(es->recent_files[i], path) == 0) {
+            existing = i;
+            break;
+        }
+    }
+
+    if (existing > 0) {
+        char tmp[256];
+        strncpy(tmp, es->recent_files[existing], sizeof(tmp) - 1);
+        tmp[sizeof(tmp) - 1] = '\0';
+        for (int i = existing; i > 0; i--) {
+            strncpy(es->recent_files[i], es->recent_files[i - 1],
+                    sizeof(es->recent_files[i]) - 1);
+            es->recent_files[i][sizeof(es->recent_files[i]) - 1] = '\0';
+        }
+        strncpy(es->recent_files[0], tmp, sizeof(es->recent_files[0]) - 1);
+        es->recent_files[0][sizeof(es->recent_files[0]) - 1] = '\0';
+    } else if (existing < 0) {
+        int limit = es->recent_file_count < EDITOR_RECENT_MAX
+                  ? es->recent_file_count : EDITOR_RECENT_MAX - 1;
+        for (int i = limit; i > 0; i--) {
+            strncpy(es->recent_files[i], es->recent_files[i - 1],
+                    sizeof(es->recent_files[i]) - 1);
+            es->recent_files[i][sizeof(es->recent_files[i]) - 1] = '\0';
+        }
+        strncpy(es->recent_files[0], path, sizeof(es->recent_files[0]) - 1);
+        es->recent_files[0][sizeof(es->recent_files[0]) - 1] = '\0';
+        if (es->recent_file_count < EDITOR_RECENT_MAX) es->recent_file_count++;
+    }
+
+    save_recent_files(es);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1528,6 +1754,7 @@ static void paste_clipboard(EditorState *es) {
  */
 static void play_test(EditorState *es) {
     if (es->playing) return;   /* already running */
+    if (!can_persist(es, "Playtest")) return;
 
     /*
      * Step 1 — Save the level as TOML.
@@ -1808,50 +2035,12 @@ static void render_toolbar(EditorState *es) {
 
     rx -= 64 + 4;
     if (ui_button(&es->ui, rx, by, 64, bh, "Export")) {
-        /*
-         * Duplicate the Ctrl+E export logic inline.
-         * Derive variable name from file path, then call level_export_c.
-         */
-        const char *var_name = "untitled";
-        char name_buf[128] = {0};
-
-        if (es->file_path[0] != '\0') {
-            const char *base = strrchr(es->file_path, '/');
-            base = base ? base + 1 : es->file_path;
-            strncpy(name_buf, base, sizeof(name_buf) - 1);
-            name_buf[sizeof(name_buf) - 1] = '\0';
-            char *dot = strrchr(name_buf, '.');
-            if (dot) *dot = '\0';
-            var_name = name_buf;
-        }
-
-        if (level_export_c(&es->level, var_name, "src/levels/exported") == 0) {
-            fprintf(stderr, "Exported to src/levels/exported/%s.h/.c\n", var_name);
-        } else {
-            fprintf(stderr, "Error: export failed for '%s'\n", var_name);
-        }
+        (void)export_current_level(es);
     }
 
     rx -= 64 + 4;
     if (ui_button(&es->ui, rx, by, 64, bh, "Save")) {
-        /*
-         * Duplicate the Ctrl+S save logic inline.
-         * Default to "levels/untitled.toml" if no path has been set.
-         */
-        if (es->file_path[0] == '\0') {
-            strncpy(es->file_path, "levels/untitled.toml",
-                    sizeof(es->file_path) - 1);
-            es->file_path[sizeof(es->file_path) - 1] = '\0';
-        }
-        if (level_save_toml(&es->level, es->file_path) == 0) {
-            es->modified = 0;
-            char title[300];
-            snprintf(title, sizeof(title), "Super Mango Editor - %s",
-                     es->file_path);
-            SDL_SetWindowTitle(es->window, title);
-        } else {
-            fprintf(stderr, "Error: failed to save %s\n", es->file_path);
-        }
+        (void)save_current_level(es);
     }
 
     rx -= 64 + 4;
@@ -1865,21 +2054,7 @@ static void render_toolbar(EditorState *es) {
 
     rx -= 64 + 4;
     if (ui_button(&es->ui, rx, by, 64, bh, "New")) {
-        /*
-         * Duplicate the Ctrl+N new-level logic inline.
-         * Reset level, path, undo stack, and selection.
-         */
-        memset(&es->level, 0, sizeof(es->level));
-        strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
-        es->level.player_start_x = 48.0f;
-        es->level.player_start_y = 205.0f;
-        es->level.last_star.x = 145.0f;
-        es->level.last_star.y = 167.0f;
-        es->file_path[0] = '\0';
-        undo_clear(es->undo);
-        es->modified        = 0;
-        es->selection.index = -1;
-        SDL_SetWindowTitle(es->window, "Super Mango Editor");
+        reset_new_level(es);
     }
 }
 
@@ -1932,7 +2107,12 @@ static void render_status_bar(EditorState *es) {
 
     char tool_text[64];
     snprintf(tool_text, sizeof(tool_text), "Tool: %s", tool_name);
-    ui_label(&es->ui, 240, bar_y + 8, tool_text);
+    ui_label(&es->ui, 210, bar_y + 8, tool_text);
+
+    ui_label_color(&es->ui, 330, bar_y + 8,
+                   editor_validation_summary(&es->validation_report),
+                   es->validation_report.error_count > 0 ?
+                   (SDL_Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
 
     /* ---- Right: entity count and file info --------------------------- */
     /*
@@ -1981,7 +2161,10 @@ static void render_status_bar(EditorState *es) {
         snprintf(info_text, sizeof(info_text), "Entities: %d  |  (untitled)%s",
                  total, es->modified ? " *" : "");
     }
-    ui_label(&es->ui, 450, bar_y + 8, info_text);
+    ui_label(&es->ui, 600, bar_y + 8, info_text);
+    if (es->status_message[0] != '\0') {
+        ui_label_color(&es->ui, 920, bar_y + 8, es->status_message, UI_TEXT_DIM);
+    }
 }
 
 /* ------------------------------------------------------------------ */
