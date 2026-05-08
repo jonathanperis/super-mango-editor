@@ -233,9 +233,10 @@ int main(int argc, char *argv[]) {
         start_menu_init(&menu, window, renderer);
         start_menu_loop(&menu);
         MenuResult result = menu.result;
-        char selected_level_path[256] = {0};
+        char selected_level_path[sizeof(menu.selected_level_path)] = {0};
         strncpy(selected_level_path, menu.selected_level_path,
                 sizeof(selected_level_path) - 1);
+        selected_level_path[sizeof(selected_level_path) - 1] = '\0';
         start_menu_cleanup(&menu);
 
         SDL_DestroyRenderer(renderer);
@@ -254,6 +255,7 @@ int main(int argc, char *argv[]) {
             gs.debug_mode = debug_mode;
             gs.smoke_test_frames = smoke_test_frames;
             strncpy(gs.level_path, selected_level_path, sizeof(gs.level_path) - 1);
+            gs.level_path[sizeof(gs.level_path) - 1] = '\0';
             game_init(&gs);
             game_loop(&gs);
             game_cleanup(&gs);
