@@ -105,6 +105,44 @@ static int roundtrip_sandbox(void)
     return 0;
 }
 
+static int escaped_strings_roundtrip(void)
+{
+    const char *path = "out/test_escaped_strings.toml";
+    LevelDef before;
+    LevelDef after;
+
+    memset(&before, 0, sizeof(before));
+    before.screen_count = 1;
+    strncpy(before.name, "Quote \"Mango\"", sizeof(before.name) - 1);
+    strncpy(before.description, "Line one\\path\nLine \"two\"\tTabbed",
+            sizeof(before.description) - 1);
+    strncpy(before.generated_by, "Bosser \\ QA", sizeof(before.generated_by) - 1);
+    strncpy(before.music_path, "assets/sounds/screens/confirm_ui.wav",
+            sizeof(before.music_path) - 1);
+    strncpy(before.floor_tile_path, "assets/sprites/levels/grass_tileset.png",
+            sizeof(before.floor_tile_path) - 1);
+
+    if (level_save_toml(&before, path) != 0)
+        return fail("could not save escaped string fixture");
+
+    if (level_load_toml(path, &after) != 0)
+        return fail("could not reload escaped string fixture");
+
+    if (strcmp(before.name, after.name) != 0)
+        return fail("escaped roundtrip changed name");
+    if (strcmp(before.description, after.description) != 0)
+        return fail("escaped roundtrip changed description");
+    if (strcmp(before.generated_by, after.generated_by) != 0)
+        return fail("escaped roundtrip changed generated_by");
+    if (strcmp(before.music_path, after.music_path) != 0)
+        return fail("escaped roundtrip changed music_path");
+    if (strcmp(before.floor_tile_path, after.floor_tile_path) != 0)
+        return fail("escaped roundtrip changed floor_tile_path");
+
+    remove(path);
+    return 0;
+}
+
 static int rejects_oversized_arrays(void)
 {
     const char *path = "out/test_too_many_coins.toml";
@@ -125,6 +163,7 @@ int main(void)
     if (ensure_out_dir() != 0) return 1;
     if (load_all_repo_levels() != 0) return 1;
     if (roundtrip_sandbox() != 0) return 1;
+    if (escaped_strings_roundtrip() != 0) return 1;
     if (rejects_oversized_arrays() != 0) return 1;
 
     puts("level_serializer_test: ok");

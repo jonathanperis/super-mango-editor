@@ -65,6 +65,41 @@ static const char *fmt_float(double val) {
     return buf;
 }
 
+/*
+ * write_toml_string — Emit a TOML basic string with required escaping.
+ *
+ * Level text can come from editor fields or hand-edited TOML.  Writing it back
+ * with raw "%s" breaks as soon as a quote, backslash, or newline appears.
+ * TOML basic strings use JSON-like escapes, so keep it boring and explicit.
+ */
+static void write_toml_string(FILE *fp, const char *s) {
+    fputc('"', fp);
+    if (s) {
+        for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
+            switch (*p) {
+                case '"': fputs("\\\"", fp); break;
+                case '\\': fputs("\\\\", fp); break;
+                case '\b': fputs("\\b", fp); break;
+                case '\t': fputs("\\t", fp); break;
+                case '\n': fputs("\\n", fp); break;
+                case '\f': fputs("\\f", fp); break;
+                case '\r': fputs("\\r", fp); break;
+                default:
+                    if (*p < 0x20) fprintf(fp, "\\u%04x", *p);
+                    else fputc(*p, fp);
+                    break;
+            }
+        }
+    }
+    fputc('"', fp);
+}
+
+static void write_toml_key_string(FILE *fp, const char *key, const char *value) {
+    fprintf(fp, "%s = ", key);
+    write_toml_string(fp, value);
+    fputc('\n', fp);
+}
+
 /* ================================================================== */
 /* Enum <-> string conversion helpers                                  */
 /* ================================================================== */
@@ -207,21 +242,14 @@ int level_save_toml(const LevelDef *def, const char *path) {
 
     /* ---- Header fields ------------------------------------------- */
 
-    fprintf(fp, "name = \"%s\"\n", def->name[0] ? def->name : "Untitled");
+    write_toml_key_string(fp, "name", def->name[0] ? def->name : "Untitled");
 
     if (def->description[0] != '\0') {
-        /* Strip trailing newlines from the description, then add exactly
-         * one so the TOML multiline literal has a clean closing """ */
-        const char *desc = def->description;
-        int len = (int)strlen(desc);
-        while (len > 0 && desc[len - 1] == '\n') len--;
-        fprintf(fp, "description = \"\"\"\n");
-        fwrite(desc, 1, len, fp);
-        fprintf(fp, "\n\"\"\"\n");
+        write_toml_key_string(fp, "description", def->description);
     }
 
     if (def->generated_by[0] != '\0') {
-        fprintf(fp, "generated_by = \"%s\"\n", def->generated_by);
+        write_toml_key_string(fp, "generated_by", def->generated_by);
     }
 
     fprintf(fp, "screen_count = %d\n", def->screen_count);
@@ -230,9 +258,9 @@ int level_save_toml(const LevelDef *def, const char *path) {
 
     fprintf(fp, "player_start_x = %s\n", fmt_float(def->player_start_x));
     fprintf(fp, "player_start_y = %s\n", fmt_float(def->player_start_y));
-    fprintf(fp, "music_path = \"%s\"\n", def->music_path);
+    write_toml_key_string(fp, "music_path", def->music_path);
     fprintf(fp, "music_volume = %d\n", def->music_volume);
-    fprintf(fp, "floor_tile_path = \"%s\"\n", def->floor_tile_path);
+    write_toml_key_string(fp, "floor_tile_path", def->floor_tile_path);
     fprintf(fp, "initial_hearts = %d\n", def->initial_hearts);
     fprintf(fp, "initial_lives = %d\n", def->initial_lives);
     fprintf(fp, "score_per_life = %d\n", def->score_per_life);
@@ -277,7 +305,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->rail_count; i++) {
         const RailPlacement *r = &def->rails[i];
         fprintf(fp, "[[rails]]\n");
-        fprintf(fp, "layout = \"%s\"\n", rail_layout_to_str(r->layout));
+        write_toml_key_string(fp, "layout", rail_layout_to_str(r->layout));
         fprintf(fp, "x = %d\n", r->x);
         fprintf(fp, "y = %d\n", r->y);
         fprintf(fp, "w = %d\n", r->w);
@@ -295,7 +323,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "tile_height = %d\n", p->tile_height);
         fprintf(fp, "tile_width = %d\n", p->tile_width);
         if (p->tile_path[0] != '\0') {
-            fprintf(fp, "tile_path = \"%s\"\n", p->tile_path);
+            write_toml_key_string(fp, "tile_path", p->tile_path);
         }
         fprintf(fp, "\n");
     }
@@ -348,7 +376,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "x = %s\n", fmt_float(ls->x));
         fprintf(fp, "y = %s\n", fmt_float(ls->y));
         if (def->next_phase[0] != '\0') {
-            fprintf(fp, "next_phase = \"%s\"\n", def->next_phase);
+            write_toml_key_string(fp, "next_phase", def->next_phase);
         }
         fprintf(fp, "\n");
     }
@@ -437,7 +465,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "[[axe_traps]]\n");
         fprintf(fp, "pillar_x = %s\n", fmt_float(a->pillar_x));
         fprintf(fp, "y = %s\n", fmt_float(a->y));
-        fprintf(fp, "mode = \"%s\"\n", axe_mode_to_str(a->mode));
+        write_toml_key_string(fp, "mode", axe_mode_to_str(a->mode));
         fprintf(fp, "\n");
     }
 
@@ -507,7 +535,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->float_platform_count; i++) {
         const FloatPlatformPlacement *fl = &def->float_platforms[i];
         fprintf(fp, "[[float_platforms]]\n");
-        fprintf(fp, "mode = \"%s\"\n", float_mode_to_str(fl->mode));
+        write_toml_key_string(fp, "mode", float_mode_to_str(fl->mode));
         fprintf(fp, "x = %s\n", fmt_float(fl->x));
         fprintf(fp, "y = %s\n", fmt_float(fl->y));
         fprintf(fp, "tile_count = %d\n", fl->tile_count);
@@ -535,7 +563,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "[[bouncepads_small]]\n");
         fprintf(fp, "x = %s\n", fmt_float(bp->x));
         fprintf(fp, "launch_vy = %s\n", fmt_float(bp->launch_vy));
-        fprintf(fp, "pad_type = \"%s\"\n", bouncepad_type_to_str(bp->pad_type));
+        write_toml_key_string(fp, "pad_type", bouncepad_type_to_str(bp->pad_type));
         fprintf(fp, "\n");
     }
 
@@ -546,7 +574,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "[[bouncepads_medium]]\n");
         fprintf(fp, "x = %s\n", fmt_float(bp->x));
         fprintf(fp, "launch_vy = %s\n", fmt_float(bp->launch_vy));
-        fprintf(fp, "pad_type = \"%s\"\n", bouncepad_type_to_str(bp->pad_type));
+        write_toml_key_string(fp, "pad_type", bouncepad_type_to_str(bp->pad_type));
         fprintf(fp, "\n");
     }
 
@@ -557,7 +585,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "[[bouncepads_high]]\n");
         fprintf(fp, "x = %s\n", fmt_float(bp->x));
         fprintf(fp, "launch_vy = %s\n", fmt_float(bp->launch_vy));
-        fprintf(fp, "pad_type = \"%s\"\n", bouncepad_type_to_str(bp->pad_type));
+        write_toml_key_string(fp, "pad_type", bouncepad_type_to_str(bp->pad_type));
         fprintf(fp, "\n");
     }
 
@@ -601,7 +629,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
 
     for (int i = 0; i < def->background_layer_count; i++) {
         fprintf(fp, "[[background_layers]]\n");
-        fprintf(fp, "path = \"%s\"\n", def->background_layers[i].path);
+        write_toml_key_string(fp, "path", def->background_layers[i].path);
         fprintf(fp, "speed = %s\n", fmt_float(def->background_layers[i].speed));
         fprintf(fp, "\n");
     }
@@ -610,7 +638,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
 
     for (int i = 0; i < def->foreground_layer_count; i++) {
         fprintf(fp, "[[foreground_layers]]\n");
-        fprintf(fp, "path = \"%s\"\n", def->foreground_layers[i].path);
+        write_toml_key_string(fp, "path", def->foreground_layers[i].path);
         fprintf(fp, "speed = %s\n", fmt_float(def->foreground_layers[i].speed));
         fprintf(fp, "\n");
     }
@@ -619,7 +647,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
 
     for (int i = 0; i < def->fog_layer_count; i++) {
         fprintf(fp, "[[fog_layers]]\n");
-        fprintf(fp, "path = \"%s\"\n", def->fog_layers[i].path);
+        write_toml_key_string(fp, "path", def->fog_layers[i].path);
         fprintf(fp, "speed = %s\n", fmt_float(def->fog_layers[i].speed));
         fprintf(fp, "\n");
     }
