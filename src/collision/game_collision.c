@@ -9,8 +9,7 @@
 #include "game_collision.h"
 #include "collision_damage.h"
 
-#include "../game.h"           /* game_load_next_phase for phase transition */
-#include "../levels/level.h"   /* LevelDef for next_phase check */
+#include "../game.h"           /* game_complete_level for summary flow */
 #include "../player/player.h"
 #include "../core/debug.h"
 
@@ -287,16 +286,7 @@ void game_collide(GameState *gs, float dt)
             if (gs->audio.coin) Mix_PlayChannel(-1, gs->audio.coin, 0);
             if (gs->debug_mode) debug_log(&gs->debug, "LAST STAR collected");
             
-            /* Check if there's a next phase to load */
-            const LevelDef *def = (const LevelDef *)gs->runtime.current_level;
-            if (def && def->next_phase[0] != '\0') {
-                /* Attempt phase transition; fall back to level_complete on failure */
-                if (game_load_next_phase(gs) != 0) {
-                    gs->level_complete = 1;
-                }
-            } else {
-                gs->level_complete = 1;
-            }
+            game_complete_level(gs);
         }
     }
 

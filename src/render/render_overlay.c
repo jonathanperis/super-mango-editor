@@ -5,7 +5,6 @@
  */
 
 #include "game_render.h"
-#include "../levels/level.h"  /* LevelDef for next_phase check */
 
 #include <SDL_ttf.h>
 #include <stdio.h>  /* snprintf */
@@ -13,6 +12,23 @@
 /* ------------------------------------------------------------------ */
 /* Level complete overlay                                             */
 /* ------------------------------------------------------------------ */
+
+static void render_centered_text(GameState *gs, const char *text,
+                                 SDL_Color color, int y)
+{
+    SDL_Surface *surf = TTF_RenderText_Solid(gs->hud.font, text, color);
+    if (surf) {
+        SDL_Texture *tex = SDL_CreateTextureFromSurface(gs->renderer, surf);
+        if (tex) {
+            int tw, th;
+            SDL_QueryTexture(tex, NULL, NULL, &tw, &th);
+            SDL_Rect dst = { (GAME_W - tw) / 2, y, tw, th };
+            SDL_RenderCopy(gs->renderer, tex, NULL, &dst);
+            SDL_DestroyTexture(tex);
+        }
+        SDL_FreeSurface(surf);
+    }
+}
 
 void render_level_complete_overlay(GameState *gs)
 {
@@ -23,74 +39,46 @@ void render_level_complete_overlay(GameState *gs)
     SDL_RenderFillRect(gs->renderer, &overlay);
     SDL_SetRenderDrawBlendMode(gs->renderer, SDL_BLENDMODE_NONE);
 
-    /* Determine if this is the final level (no next_phase set) */
-    const LevelDef *def = (const LevelDef *)gs->runtime.current_level;
-    int is_final_level = (def && def->next_phase[0] == '\0');
+    const int has_next_level = gs->completion_pending_next_phase;
 
     /* Level Complete title - show "Game Complete!" for final level */
     if (gs->hud.font) {
         SDL_Color gold = { 255, 215, 0, 255 };
-        const char *title_text = is_final_level ? "Game Complete!" : "Level Complete!";
-        SDL_Surface *title_surf = TTF_RenderText_Solid(gs->hud.font, title_text, gold);
-        if (title_surf) {
-            SDL_Texture *title_tex = SDL_CreateTextureFromSurface(gs->renderer, title_surf);
-            if (title_tex) {
-                int tw, th;
-                SDL_QueryTexture(title_tex, NULL, NULL, &tw, &th);
-                SDL_Rect dst = { (GAME_W - tw) / 2, GAME_H / 2 - 40, tw, th };
-                SDL_RenderCopy(gs->renderer, title_tex, NULL, &dst);
-                SDL_DestroyTexture(title_tex);
-            }
-            SDL_FreeSurface(title_surf);
-        }
-
-        /* Score display */
-        char score_text[64];
-        snprintf(score_text, sizeof(score_text), "Score: %d", gs->score);
         SDL_Color white = { 255, 255, 255, 255 };
-        SDL_Surface *score_surf = TTF_RenderText_Solid(gs->hud.font, score_text, white);
-        if (score_surf) {
-            SDL_Texture *score_tex = SDL_CreateTextureFromSurface(gs->renderer, score_surf);
-            if (score_tex) {
-                int sw, sh;
-                SDL_QueryTexture(score_tex, NULL, NULL, &sw, &sh);
-                SDL_Rect dst = { (GAME_W - sw) / 2, GAME_H / 2 + 10, sw, sh };
-                SDL_RenderCopy(gs->renderer, score_tex, NULL, &dst);
-                SDL_DestroyTexture(score_tex);
-            }
-            SDL_FreeSurface(score_surf);
-        }
+        SDL_Color green = { 100, 255, 100, 255 };
+        SDL_Color dim = { 190, 190, 190, 255 };
+        const char *title_text = has_next_level ? "Level Complete!" : "Game Complete!";
+        char line[96];
+        int elapsed = (int)(gs->completion_elapsed + 0.5f);
+        int minutes = elapsed / 60;
+        int seconds = elapsed % 60;
 
-        /* Congratulations message for final level */
-        if (is_final_level) {
-            SDL_Color green = { 100, 255, 100, 255 };
-            SDL_Surface *congrats_surf = TTF_RenderText_Solid(gs->hud.font, "Congratulations!", green);
-            if (congrats_surf) {
-                SDL_Texture *congrats_tex = SDL_CreateTextureFromSurface(gs->renderer, congrats_surf);
-                if (congrats_tex) {
-                    int cw, ch;
-                    SDL_QueryTexture(congrats_tex, NULL, NULL, &cw, &ch);
-                    SDL_Rect dst = { (GAME_W - cw) / 2, GAME_H / 2 + 32, cw, ch };
-                    SDL_RenderCopy(gs->renderer, congrats_tex, NULL, &dst);
-                    SDL_DestroyTexture(congrats_tex);
-                }
-                SDL_FreeSurface(congrats_surf);
-            }
+        render_centered_text(gs, title_text, gold, 70);
+
+        snprintf(line, sizeof(line), "Score: %d", gs->score);
+        render_centered_text(gs, line, white, 112);
+
+        snprintf(line, sizeof(line), "Coins: %d/%d",
+                 gs->completion_coins_collected,
+                 gs->completion_coin_total);
+        render_centered_text(gs, line, white, 132);
+
+        snprintf(line, sizeof(line), "Lives: %d", gs->lives);
+        render_centered_text(gs, line, white, 152);
+
+        snprintf(line, sizeof(line), "Time: %02d:%02d", minutes, seconds);
+        render_centered_text(gs, line, white, 172);
+
+        if (!has_next_level) {
+            render_centered_text(gs, "Congratulations!", green, 198);
         }
 
         /* Exit hint */
-        const char *exit_text = is_final_level ? "Press ESC or Start to return to menu" : "Press ESC or Start to exit";
-        SDL_Surface *hint_surf = TTF_RenderText_Solid(gs->hud.font, exit_text, white);
-        if (hint_surf) {
-            SDL_Texture *hint_tex = SDL_CreateTextureFromSurface(gs->renderer, hint_surf);
-            if (hint_tex) {
-                int hw, hh;
-                SDL_QueryTexture(hint_tex, NULL, NULL, &hw, &hh);
-                SDL_Rect dst = { (GAME_W - hw) / 2, GAME_H / 2 + 50, hw, hh };
-                SDL_RenderCopy(gs->renderer, hint_tex, NULL, &dst);
-                SDL_DestroyTexture(hint_tex);
-            }
-            SDL_FreeSurface(hint_surf);
-        }
+        render_centered_text(gs,
+                             has_next_level
+                                 ? "Enter/Space/Start: next level"
+                                 : "Enter/Space/Start: finish",
+                             dim, 228);
+        render_centered_text(gs, "Esc: exit", dim, 246);
     }
 }
