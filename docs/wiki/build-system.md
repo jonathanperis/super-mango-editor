@@ -6,7 +6,7 @@
 
 ## Makefile Overview
 
-The project uses a **GNU Makefile** that auto-discovers source files via a wildcard -- no manual edits required when adding new `.c` files.
+The project uses a **GNU Makefile** with explicit per-directory wildcards. New `.c` files in recognized source directories are compiled automatically; new source directories need matching `SRCS` and pattern-rule entries.
 
 ```makefile
 CC      = clang
@@ -17,12 +17,15 @@ TARGET  = $(OUTDIR)/super-mango
 SRCDIR  = src
 SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(wildcard $(SRCDIR)/collectibles/*.c) \
+          $(wildcard $(SRCDIR)/collision/*.c) \
           $(wildcard $(SRCDIR)/core/*.c) \
           $(wildcard $(SRCDIR)/effects/*.c) \
           $(wildcard $(SRCDIR)/entities/*.c) \
           $(wildcard $(SRCDIR)/hazards/*.c) \
+          $(wildcard $(SRCDIR)/input/*.c) \
           $(wildcard $(SRCDIR)/levels/*.c) \
           $(wildcard $(SRCDIR)/player/*.c) \
+          $(wildcard $(SRCDIR)/render/*.c) \
           $(wildcard $(SRCDIR)/screens/*.c) \
           $(wildcard $(SRCDIR)/surfaces/*.c) \
           $(SRCDIR)/editor/serializer.c \
@@ -39,9 +42,9 @@ DEPS    = $(OBJS:.o=.d)
 | `CFLAGS` | see below | Compiler flags |
 | `LIBS` | see below | Linker flags |
 | `TARGET` | `out/super-mango` | Output binary path |
-| `SRCS` | `src/*.c + src/**/*.c` | All C source files (auto-discovered from src/ and subdirectories) |
-| `OBJS` | `src/*.o` | Object files, placed next to sources |
-| `DEPS` | `src/*.d` | Auto-generated dependency files (tracks header changes) |
+| `SRCS` | explicit per-directory wildcards | Game C sources from recognized source directories, plus TOML serializer and tomlc17 |
+| `OBJS` | `$(SRCS:.c=.o)` | Object files, placed next to their source files |
+| `DEPS` | `$(OBJS:.o=.d)` | Auto-generated dependency files next to object files |
 
 ### Compiler Flags Explained
 
@@ -71,7 +74,7 @@ DEPS    = $(OBJS:.o=.d)
 
 ### `make` / `make all`
 
-Compiles all `src/*.c` files to `.o` objects, then links them into `out/super-mango`.
+Compiles game source files from the Makefile's source directory list to `.o` objects, then links them into `out/super-mango`.
 
 ```sh
 make
@@ -79,7 +82,7 @@ make
 
 **Steps:**
 1. Creates `out/` directory if it does not exist
-2. Compiles each `src/*.c` → `src/*.o`
+2. Compiles each listed source file → `.o`
 3. Links all `.o` files → `out/super-mango`
 4. On macOS (`uname -s == Darwin`), ad-hoc code signs the binary with `codesign --force --sign - $@` (required on Apple Silicon to avoid `Killed: 9` errors). On other platforms this step is skipped
 
@@ -111,7 +114,7 @@ make run-debug
 Builds (if out of date) then runs the binary with the `--level` flag, loading a specific TOML level file.
 
 ```sh
-make run-level LEVEL=src/levels/exported/sandbox_00.toml
+make run-level LEVEL=levels/00_sandbox_01.toml
 ```
 
 ### `make run-level-debug LEVEL=path`
@@ -119,7 +122,7 @@ make run-level LEVEL=src/levels/exported/sandbox_00.toml
 Builds (if out of date) then runs the binary with both `--debug` and `--level` flags, loading a specific TOML level file with the debug overlay enabled.
 
 ```sh
-make run-level-debug LEVEL=src/levels/exported/sandbox_00.toml
+make run-level-debug LEVEL=levels/00_sandbox_01.toml
 ```
 
 ### `make editor`
@@ -148,6 +151,19 @@ make web
 
 Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). SDL2 ports are compiled from source by Emscripten on first build; subsequent builds reuse cached port libraries. Uses a custom shell template from `web/shell.html`.
 
+### `make test`
+
+Builds and runs native regression harnesses for pure logic that does not require opening an SDL window.
+
+```sh
+make test
+```
+
+Current test binaries:
+
+- `out/level-serializer-test`
+- `out/level-validate-test`
+
 ### `make clean`
 
 Removes all build artifacts.
@@ -156,10 +172,7 @@ Removes all build artifacts.
 make clean
 ```
 
-Deletes:
-- `src/*.o` and `src/**/*.o` -- all object files
-- `src/*.d` and `src/**/*.d` -- all generated dependency files
-- `out/` -- the output directory and binary
+Deletes all Makefile-generated `.o` and `.d` files from recognized source directories plus `out/`.
 
 ---
 
@@ -239,7 +252,7 @@ All workflows install SDL2 dependencies per platform and compile with the projec
 
 ## Adding New Source Files
 
-Because the Makefile uses per-subdirectory wildcards, any new `.c` file placed in `src/` or its recognized subdirectories is compiled automatically on the next `make` invocation. No Makefile changes required.
+Because the Makefile uses per-subdirectory wildcards, any new `.c` file placed in `src/` or a recognized source subdirectory is compiled automatically on the next `make` invocation. New source directories require adding a wildcard, compile rule, and clean entry.
 
 ```sh
 # Example: adding an entity in a subdirectory

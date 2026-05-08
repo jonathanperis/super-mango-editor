@@ -25,13 +25,13 @@ A 2D pixel art platformer written in C11 + SDL2, targeting macOS (Apple Silicon)
 ```sh
 make              # compile → out/super-mango
 make run          # compile + run
-make run-level LEVEL=levels/sandbox_00.toml  # run a specific TOML level
+make run-level LEVEL=levels/00_sandbox_01.toml  # run a specific TOML level
 make clean        # remove .o files and out/
 make editor       # compile → out/super-mango-editor
 make run-editor   # compile + run the level editor
 ```
 
-The Makefile uses `src/*.c` wildcards — **new `.c` files are picked up automatically**, no Makefile changes needed.
+The Makefile uses explicit per-directory wildcards — **new `.c` files in existing source directories are picked up automatically**. New source directories need Makefile entries.
 
 ---
 
@@ -56,18 +56,18 @@ super-mango-editor/
 │       ├── backgrounds/    ← sky, clouds, mountains parallax layers
 │       ├── collectibles/   ← coin, stars, last_star
 │       ├── entities/       ← bird, fish, spider variants
-│       ├── foregrounds/    ← fog overlays
+│       ├── foregrounds/    ← fog, water, lava, cloud foreground layers
 │       ├── hazards/        ← spikes, saws, flames
 │       ├── levels/         ← tilesets and platforms
 │       ├── player/         ← player sprite sheet
 │       ├── screens/        ← HUD icons, start menu logo
-│       ├── surfaces/       ← (currently empty)
+│       ├── surfaces/       ← bouncepads, bridges, vines, ladders, ropes, rails
 │       └── unused/         ← unused sprites for future use
-├── levels/                 ← TOML level definitions (sandbox_00.toml, …)
+├── levels/                 ← TOML level definitions (00_sandbox_01.toml, …)
 ├── vendor/                 ← vendored third-party libraries
 │   └── tomlc17/            ← TOML parser (C11)
 ├── .claude/                ← slash commands, references, scripts, skills
-├── docs/                   ← GitHub Pages shell (index.html)
+├── docs/                   ← Astro GitHub Pages documentation site
 ├── web/                    ← Emscripten shell template (shell.html)
 └── src/
     ├── main.c              ← SDL init/teardown, entry point
@@ -78,7 +78,7 @@ super-mango-editor/
     ├── effects/            ← fog, parallax, water
     ├── entities/           ← bird, faster_bird, fish, faster_fish, spider, jumping_spider
     ├── hazards/            ← spike, spike_block, spike_platform, circular_saw, axe_trap, blue_flame, fire_flame
-    ├── levels/             ← level.h (LevelDef), level_loader.h/.c, exported/ (C level exports)
+    ├── levels/             ← level.h (LevelDef), level_loader.h/.c, level_validate.c, exported/
     ├── player/             ← player input, physics, animation
     ├── screens/            ← start_menu, hud
     └── surfaces/           ← platform, float_platform, bridge, bouncepad*, vine, ladder, rope, rail
@@ -98,7 +98,7 @@ super-mango-editor/
 | `effects/`       | Fog overlays, parallax backgrounds, animated water           |
 | `entities/`      | Enemies: spiders, birds, fish (normal + faster variants)     |
 | `hazards/`       | Spikes, circular saws, axe traps, blue flames, fire flames   |
-| `levels/`        | TOML-based level definitions (LevelDef), loader, and C exports |
+| `levels/`        | TOML-based level definitions (LevelDef), loader, validator, and generated C exports |
 | `screens/`       | Start menu, HUD (hearts/lives/score)                         |
 | `surfaces/`      | Platforms, bridges, bouncepads, vines, ladders, ropes, rails |
 
@@ -144,7 +144,7 @@ main()
 - Multi-screen forest stage (dynamic width via screen_count, default 1600px / 4 screens)
 - 32 render layers: parallax background → platforms → floor → enemies → player → fog → HUD → debug
 - Delta-time physics at 60 FPS (VSync + manual fallback)
-- TOML-based level format with C-exported level loader
+- TOML-based level format with runtime loader and optional C exporter
 - Standalone visual level editor (canvas, palette, tools, properties, undo, serializer, exporter)
 - 6 enemy types (spider, jumping spider, bird, faster bird, fish, faster fish)
 - 7 hazard types (spike, spike block, spike platform, circular saw, axe trap, blue flame, fire flame)

@@ -229,7 +229,7 @@ Additional tilesets are stored in `assets/sprites/levels/`:
 To inspect any sprite sheet's exact dimensions and pixel layout:
 
 ```sh
-python3 .claude/scripts/analyze_sprite.py assets/<sprite>.png
+python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png
 ```
 
 ### Frame Math Reference

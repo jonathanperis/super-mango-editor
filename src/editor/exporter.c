@@ -5,7 +5,7 @@
  *   {var_name}.h  — #pragma once, #include "level.h", extern declaration
  *   {var_name}.c  — full designated-initialiser definition with every field
  *
- * The output style matches sandbox_00.c exactly: section separators, one array
+ * The output style matches exported level sources: section separators, one array
  * entry per line, trailing commas, float literals with %.1ff formatting, and
  * enum identifiers instead of raw integers.
  *
@@ -89,7 +89,7 @@ static const char *bouncepad_type_str(BouncepadType pad_type)
 /*
  * write_section — Print a visual separator comment between field groups.
  *
- * Matches the sandbox_00.c style: blank line, then "/ * ---- Name ---- * /"
+ * Matches the exported level style: blank line, then "/ * ---- Name ---- * /"
  */
 static void write_section(FILE *f, const char *name)
 {
@@ -103,7 +103,7 @@ static void write_section(FILE *f, const char *name)
 /*
  * write_header — Generate the {var_name}.h file.
  *
- * The header mirrors sandbox_00.h: pragma-once guard, include level.h,
+ * The header mirrors exported level headers: pragma-once guard, include level.h,
  * and an extern declaration for the const LevelDef.
  */
 static int write_header(const char *var_name, const char *dir_path)
@@ -177,7 +177,7 @@ static int write_source(const LevelDef *def, const char *var_name,
 
     /* ---- Include block ---- */
     /*
-     * The include list matches sandbox_00.c exactly.  Every header that defines
+     * The include list matches exported level sources.  Every header that defines
      * a speed constant, enum, or display size used in the initialiser must be
      * present so the generated file compiles stand-alone.
      */

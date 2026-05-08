@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
 
     /*
      * Optional level load from command line:
-     *   ./editor levels/sandbox_00.toml
+     *   ./editor levels/00_sandbox_01.toml
      *
      * argv[0] is the executable name; argv[1] (if present) is treated as
      * a path to a TOML level file.  If the file fails to load we warn but

@@ -36,7 +36,7 @@ main()
   │     ├── IMG_LoadTexture → gs.fish_tex          (fish.png — fatal)
   │     ├── IMG_LoadTexture → gs.coin_tex          (coin.png — fatal)
   │     ├── IMG_LoadTexture → gs.bouncepad_medium_tex (bouncepad_medium.png — fatal)
-  │     ├── IMG_LoadTexture → gs.vine_tex          (vine.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.vine_tex          (vine_green.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.ladder_tex        (ladder.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.rope_tex          (rope.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.bouncepad_small_tex  (bouncepad_small.png — non-fatal)
@@ -45,7 +45,7 @@ main()
   │     ├── IMG_LoadTexture → gs.spike_block_tex   (spike_block.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.float_platform_tex (float_platform.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.bridge_tex        (bridge.png — non-fatal)
-  │     ├── IMG_LoadTexture → gs.yellow_star_tex   (yellow_star.png — non-fatal)
+  │     ├── IMG_LoadTexture → gs.star_yellow_tex   (star_yellow.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.axe_trap_tex      (axe_trap.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.circular_saw_tex  (circular_saw.png — non-fatal)
   │     ├── IMG_LoadTexture → gs.blue_flame_tex    (blue_flame.png — non-fatal)
@@ -62,15 +62,15 @@ main()
   │     ├── Mix_LoadWAV     → gs.snd_jump          (player_jump.wav — fatal)
   │     ├── Mix_LoadWAV     → gs.snd_coin          (coin.wav — non-fatal)
   │     ├── Mix_LoadWAV     → gs.snd_hit           (player_hit.wav — non-fatal)
-  │     ├── Mix_LoadMUS     → gs.music             (game_music.wav — fatal)
-  │     ├── Mix_PlayMusic(-1)                      (loop forever, 10% volume)
+  │     ├── Mix_LoadMUS     → gs.music             (from active LevelDef music_path)
+  │     ├── Mix_PlayMusic(-1)                      (loop forever at level volume)
   │     │
   │     │   ── Initialise game objects ──
   │     ├── player_init(&gs.player, gs.renderer)
   │     ├── fog_init(&gs.fog, gs.renderer)         (fog_background_1.png, fog_background_2.png)
   │     ├── hud_init(&gs.hud, gs.renderer)
   │     ├── if (debug_mode) debug_init(&gs.debug)
-  │     ├── level_load(&gs, level_path)             (TOML level file → entity inits, sea gaps, backgrounds, music)
+  │     ├── level_load(level_path, &level)          (TOML level file → entity data, floor gaps, backgrounds, music)
   │     ├── hearts/lives/score/score_life_next initialisation
   │     ├── SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) — lazy init, non-fatal
   │     └── scan joysticks for first connected gamepad
@@ -109,7 +109,7 @@ main()
         ├── SDL_DestroyTexture (ladder_tex)
         ├── SDL_DestroyTexture (vine_tex)
         ├── last_star_cleanup
-        ├── SDL_DestroyTexture (yellow_star_tex)
+        ├── SDL_DestroyTexture (star_yellow_tex)
         ├── SDL_DestroyTexture (coin_tex)
         ├── SDL_DestroyTexture (faster_fish_tex)
         ├── SDL_DestroyTexture (fish_tex)
@@ -153,7 +153,7 @@ while (gs.running) {
                     → spike collision → spike_platform collision → circular_saw collision
                     → axe_trap collision → blue_flame collision
                     → sea gap fall detection (instant death)
-                    → coin–player collision → yellow_star–player collision → last_star–player collision
+                    → coin-player collision → star-player collision → last_star-player collision
                     → heart/lives/score_life_next logic
                     → water_update → fog_update → bouncepads_update (small, medium, high)
                     → debug_update (if --debug)
@@ -184,8 +184,8 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 | Layer | What | How |
 |-------|------|-----|
 | 1 | Background | 7 layers from `assets/` (parallax_sky.png, parallax_clouds_bg.png, parallax_glacial_mountains.png, parallax_clouds_mg_1/2/3.png, parallax_cloud_lonely.png) tiled horizontally, each scrolling at a different speed fraction of `cam_x` |
-| 2 | Platforms | `platform.png` 9-slice tiled pillar stacks (drawn before floor so pillars sink into ground) |
-| 3 | Floor | `grass_tileset.png` 9-slice tiled across world width at `FLOOR_Y`, with sea-gap openings |
+| 2 | Platforms | active level platform tile, 9-slice tiled pillar stacks (drawn before floor so pillars sink into ground) |
+| 3 | Floor | active level floor tile tiled across world width at `FLOOR_Y`, with floor-gap openings |
 | 4 | Float platforms | `float_platform.png` 3-slice hovering surfaces (static, crumble, rail modes) |
 | 5 | Spike rows | `spike.png` ground-level spike strips on the floor surface |
 | 6 | Spike platforms | `spike_platform.png` elevated spike hazard surfaces |
@@ -194,13 +194,13 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 | 9 | Bouncepads (small) | `bouncepad_small.png` low-launch spring pads |
 | 10 | Bouncepads (high) | `bouncepad_high.png` high-launch spring pads |
 | 11 | Rails | `rail.png` bitmask tile tracks for spike blocks and float platforms |
-| 12 | Vines | `vine.png` climbable plant decorations hanging from platforms |
+| 12 | Vines | `vine_green.png` / `vine_brown.png` climbable plant decorations hanging from platforms |
 | 13 | Ladders | `ladder.png` climbable ladder structures |
 | 14 | Ropes | `rope.png` climbable rope segments |
 | 15 | Coins | `coin.png` collectible sprites drawn on top of platforms |
-| 16 | Yellow stars | `yellow_star.png` collectible star pickups |
+| 16 | Yellow stars | `star_yellow.png` collectible star pickups |
 | 17 | Last star | end-of-level star collectible (uses HUD star sprite) |
-| 18 | Blue flames | `blue_flame.png` animated flame hazards erupting from sea gaps |
+| 18 | Blue/fire flames | `blue_flame.png` / `fire_flame.png` animated flame hazards erupting from floor gaps |
 | 19 | Fish | `fish.png` animated jumping enemies, drawn before water for submerged look |
 | 20 | Faster fish | `faster_fish.png` fast aggressive jumping fish enemies |
 | 21 | Water | `water.png` animated scrolling strip at the bottom |
@@ -285,9 +285,9 @@ typedef struct {
     Coin           coins[MAX_COINS];
     int            coin_count;
 
-    SDL_Texture   *yellow_star_tex;  // Shared texture for yellow star pickups (GPU)
-    YellowStar     yellow_stars[MAX_YELLOW_STARS];
-    int            yellow_star_count;
+    SDL_Texture   *star_yellow_tex;  // Shared texture for yellow star pickups (GPU)
+    StarYellow     star_yellows[MAX_STAR_YELLOWS];
+    int            star_yellow_count;
 
     LastStar       last_star;        // Special end-of-level star collectible
 
@@ -367,8 +367,8 @@ typedef struct {
     Water          water;            // Animated water strip at the bottom
     FogSystem      fog;              // Atmospheric fog overlay — topmost layer
 
-    int            sea_gaps[MAX_SEA_GAPS];
-    int            sea_gap_count;
+    int            floor_gaps[MAX_FLOOR_GAPS];
+    int            floor_gap_count;
 
     Hud            hud;              // HUD display: hearts, lives, score
     int            hearts;           // Current hit points (0-MAX_HEARTS)

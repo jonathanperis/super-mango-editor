@@ -65,7 +65,7 @@ jobs:
         working-directory: docs
 
       - name: Build docs site
-        run: npm run build
+        run: bun run build
         working-directory: docs
         env:
           PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}

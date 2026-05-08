@@ -146,7 +146,7 @@ void game_render_frame(GameState *gs, int cam_x, float dt)
 
             /* World boundaries */
             if (tx <= 0)                at_left_edge  = 1;
-            if (tx + P >= gs->world_w)  at_right_edge = 1;
+            if (tx + P >= gs->runtime.world_w)  at_right_edge = 1;
 
             /* Gap boundaries: piece is a right-cap if next piece is gap,
              * left-cap if previous piece was gap. */
@@ -273,7 +273,7 @@ void game_render_frame(GameState *gs, int cam_x, float dt)
      * Draw the water strip on top of the floor/platforms and fish.
      * The full 384-px sheet scrolls rightward as a seamless loop.
      */
-    if (gs->water_enabled) water_render(&gs->water, gs->renderer);
+    if (gs->runtime.water_enabled) water_render(&gs->water, gs->renderer);
 
     /* Draw spike blocks above the water strip but below the player */
     if (gs->spike_block_tex) {
@@ -307,7 +307,7 @@ void game_render_frame(GameState *gs, int cam_x, float dt)
 
     /* Draw fog/mist as the topmost layer — rendered after the player.
      * Only active when the level definition enables fog (fog_enabled == 1). */
-    if (gs->fog_enabled) fog_render(&gs->fog, gs->renderer);
+    if (gs->runtime.fog_enabled) fog_render(&gs->fog, gs->renderer);
 
     /* Draw the HUD overlay on top of everything (hearts, lives, score) */
     hud_render(&gs->hud, gs->renderer,

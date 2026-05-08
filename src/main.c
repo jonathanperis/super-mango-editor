@@ -5,7 +5,7 @@
  *   1. Boot every SDL subsystem the game needs.
  *   2. Route to the appropriate screen based on CLI arguments:
  *        default                → start_menu (title screen with Play button)
- *        --level <path>         → load a JSON level and start gameplay directly
+ *        --level <path>         → load a TOML level and start gameplay directly
  *        --level <path> --debug → same, with debug overlays
  *   3. Tear every subsystem back down before exiting.
  *

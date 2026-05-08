@@ -130,8 +130,8 @@ pacman -S mingw-w64-ucrt-x86_64-clang \
 make                                  # build the game binary into out/
 make run                              # build and run
 make run-debug                        # build and run with debug overlay
-make run-level LEVEL=levels/sandbox_00.toml         # run a specific TOML level
-make run-level-debug LEVEL=levels/sandbox_00.toml   # run a level with debug overlay
+make run-level LEVEL=levels/00_sandbox_01.toml         # run a specific TOML level
+make run-level-debug LEVEL=levels/00_sandbox_01.toml   # run a level with debug overlay
 make editor                           # build the level editor
 make run-editor                       # build and run the level editor
 make web                              # build to WebAssembly (requires Emscripten)
@@ -146,14 +146,19 @@ Or just **[play in your browser](https://jonathanperis.github.io/super-mango-edi
 super-mango-editor/
 ├── Makefile                          Build system (clang, sdl2-config, ad-hoc codesign)
 ├── levels/                           TOML level definitions
-│   └── sandbox_00.toml              Level data loaded at runtime
-├── src/                              46 C source files + 48 headers
+│   ├── 00_sandbox_01.toml           Level data loaded at runtime
+│   ├── 01_lugio_01.toml             Level data loaded at runtime
+│   └── 02_lugio_02.toml             Level data loaded at runtime
+├── src/                              55 C source files + 55 headers
 │   ├── main.c                        Entry point: SDL init/teardown
 │   ├── game.h / game.c               GameState struct, window, renderer, game loop
 │   ├── collectibles/                  Pickup items
 │   │   ├── coin.h / .c               Coin (100 pts, 3 restore a heart)
 │   │   ├── star_yellow.h / .c        Yellow star health pickup
+│   │   ├── star_green.h / .c         Green star health pickup
+│   │   ├── star_red.h / .c           Red star health pickup
 │   │   └── last_star.h / .c          End-of-level star
+│   ├── collision/                     Gameplay collision and damage passes
 │   ├── core/                          Shared utilities
 │   │   ├── debug.h / .c              Debug overlay (FPS, CPU, memory, hitboxes, event log)
 │   │   └── entity_utils.h / .c       Shared entity helper functions
@@ -187,13 +192,16 @@ super-mango-editor/
 │   │   ├── circular_saw.h / .c       Rotating saw
 │   │   ├── axe_trap.h / .c           Swinging axe
 │   │   └── blue_flame.h / .c         Blue flame / fire flame
+│   ├── input/                         SDL keyboard/gamepad input handling
 │   ├── levels/                        Level system
 │   │   ├── level.h                    Shared level definitions (LevelDef struct)
 │   │   ├── level_loader.h / .c       TOML level loading and switching
+│   │   ├── level_validate.c          LevelDef count validation
 │   │   └── exported/                  Auto-generated C level data
-│   │       └── sandbox_00.h / .c     Compiled-in level (exported from editor)
+│   │       └── 00_sandbox_01.h / .c  Generated C level export
 │   ├── player/                        Player module
 │   │   └── player.h / .c             Input, physics, animation, render
+│   ├── render/                        Frame rendering and overlays
 │   ├── screens/                       Game screens
 │   │   ├── start_menu.h / .c         Start menu
 │   │   └── hud.h / .c                HUD (hearts, lives, score)
@@ -231,7 +239,8 @@ super-mango-editor/
 │       └── round9x13.ttf            Debug overlay font
 ├── vendor/                            Vendored third-party libraries
 │   └── tomlc17/                      TOML v1.1 parser (tomlc17.c/.h)
-├── docs/                              GitHub Pages shell (index.html)
+├── tests/                             Native regression test harnesses
+├── docs/                              Astro GitHub Pages documentation site
 ├── web/                               Emscripten shell template
 └── .github/workflows/                 CI/CD pipelines
     ├── build.yml                      Build check (PRs) + release + Pages deploy (main)

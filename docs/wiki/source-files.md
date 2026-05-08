@@ -13,18 +13,36 @@ src/
 ├── game.c                        Window, renderer, textures, sounds, game loop
 ├── collectibles/
 │   ├── coin.h / .c               Coin collectible: placement, AABB collection, render
-│   ├── yellow_star.h / .c        Yellow star health pickup
+│   ├── star_yellow.h / .c        Yellow star health pickup
+│   ├── star_green.h / .c         Green star health pickup
+│   ├── star_red.h / .c           Red star health pickup
 │   └── last_star.h / .c          End-of-level star collectible
+├── collision/
+│   ├── collision_damage.h / .c   Damage checks against hazards and enemies
+│   └── game_collision.h / .c     Gameplay collision passes and pickups
 ├── core/
 │   ├── debug.h / .c              Debug overlay: FPS counter, collision hitboxes, event log
-│   └── entity_utils.h / .c      Shared entity helper functions
+│   ├── entity_utils.h / .c       Shared entity helper functions
+│   └── game_state.h / .c         GameState reset helpers
+├── editor/
+│   ├── editor_main.c             Standalone editor entry point
+│   ├── editor.h / .c             Editor state, events, render loop
+│   ├── canvas.h / .c             Scrollable zoomable editing canvas
+│   ├── palette.h / .c            Entity palette
+│   ├── properties.h / .c         Per-entity property editing
+│   ├── tools.h / .c              Selection and placement tools
+│   ├── ui.h / .c                 Immediate-mode editor widgets
+│   ├── serializer.h / .c         TOML save/load
+│   ├── exporter.h / .c           Generated C level export
+│   ├── file_dialog.h / .c        Native file dialogs
+│   └── undo.h / .c               Undo/redo history
 ├── effects/
 │   ├── fog.h / .c                Atmospheric fog overlay: init, slide, spawn, render
 │   ├── parallax.h / .c           Multi-layer scrolling background: init, tiled render, cleanup
 │   └── water.h / .c              Animated water strip: init, scroll, tile render
 ├── entities/
 │   ├── spider.h / .c             Spider enemy: ground patrol, animation, render
-│   ├── jumping_spider.h / .c     Jumping spider: patrol, jump arcs, sea-gap awareness
+│   ├── jumping_spider.h / .c     Jumping spider: patrol, jump arcs, floor-gap awareness
 │   ├── bird.h / .c               Slow bird enemy: sine-wave sky patrol, animation
 │   ├── faster_bird.h / .c        Fast bird enemy: tighter sine-wave, faster animation
 │   ├── fish.h / .c               Fish enemy: patrol, random jump arcs, render
@@ -35,32 +53,37 @@ src/
 │   ├── spike_platform.h / .c     Elevated spike surface hazard
 │   ├── circular_saw.h / .c       Fast rotating patrol saw hazard
 │   ├── axe_trap.h / .c           Swinging/spinning axe hazard
-│   └── blue_flame.h / .c         Blue flame hazard: erupts from sea gaps, rise/flip/fall cycle
+│   └── blue_flame.h / .c         Blue/fire flame hazards: rise/flip/fall cycle
+├── input/
+│   └── game_input.h / .c         SDL keyboard/gamepad event handling
 ├── levels/
 │   ├── level.h                   Shared level definitions
-│   ├── level_01.h / .c           Level 1 data
-│   └── level_loader.h / .c       Level loading and switching
+│   ├── level_loader.h / .c       TOML level loading and switching
+│   ├── level_validate.c          LevelDef count validation
+│   └── exported/                 Generated C level exports
 ├── player/
 │   └── player.h / .c             Player input, physics, animation, rendering
+├── render/
+│   ├── game_render.h / .c        Frame render order and layer drawing
+│   └── render_overlay.c          Foreground/overlay render helpers
 ├── screens/
 │   ├── start_menu.h / .c         Start menu screen with logo
-│   ├── sandbox.h / .c            Level layout and entity placement
 │   └── hud.h / .c                HUD renderer: hearts, lives counter, score text
 └── surfaces/
     ├── platform.h / .c           One-way platform pillar init and 9-slice rendering
     ├── float_platform.h / .c     Hovering platform: static, crumble, and rail behaviours
     ├── bridge.h / .c             Tiled crumble walkway: init, cascade-fall, render
     ├── bouncepad.h / .c          Shared bouncepad mechanics (squash/release animation)
-    ├── bouncepad_small.h / .c    Green bouncepad (small jump)
-    ├── bouncepad_medium.h / .c   Wood bouncepad (medium jump)
-    ├── bouncepad_high.h / .c     Red bouncepad (high jump)
+    ├── bouncepad_small.h         Green bouncepad placement helper
+    ├── bouncepad_medium.h        Wood bouncepad placement helper
+    ├── bouncepad_high.h          Red bouncepad placement helper
     ├── rail.h / .c               Rail path builder, bitmask tile render, position interpolation
     ├── vine.h / .c               Climbable vine decoration
     ├── ladder.h / .c             Climbable ladder decoration
     └── rope.h / .c               Climbable rope decoration
 ```
 
-Every `.c` file in `src/` and its subdirectories is automatically picked up by the Makefile wildcards -- no changes to the build system are needed when adding new source files.
+New `.c` files in `src/` or recognized source subdirectories are picked up by Makefile wildcards. New source directories need Makefile wildcard, compile-rule, and clean-rule entries.
 
 ---
 
@@ -107,11 +130,12 @@ See [Constants Reference](#constants-reference) for full details.
 #define FLOOR_Y       (GAME_H - TILE_SIZE)   // = 252
 #define GRAVITY       800.0f
 #define WORLD_W       1600
-#define CAM_LOOKAHEAD  40
-#define CAM_SMOOTHING  8.0f
-#define CAM_SNAP_THRESHOLD  0.5f
-#define SEA_GAP_W     32
-#define MAX_SEA_GAPS  8
+#define FLOOR_GAP_W         32
+#define MAX_FLOOR_GAPS      16
+#define CAM_LOOKAHEAD_VX_FACTOR  0.20f
+#define CAM_LOOKAHEAD_MAX  50.0f
+#define CAM_SMOOTHING      8.0f
+#define CAM_SNAP_THRESHOLD 0.5f
 ```
 
 ### Includes
@@ -138,7 +162,9 @@ See [Constants Reference](#constants-reference) for full details.
 #include "entities/jumping_spider.h"    // JumpingSpider
 #include "entities/bird.h"              // Bird
 #include "entities/faster_bird.h"       // FasterBird
-#include "collectibles/yellow_star.h"   // YellowStar
+#include "collectibles/star_yellow.h"   // StarYellow
+#include "collectibles/star_green.h"    // StarGreen
+#include "collectibles/star_red.h"      // StarRed
 #include "hazards/axe_trap.h"           // AxeTrap
 #include "hazards/circular_saw.h"       // CircularSaw
 #include "hazards/blue_flame.h"         // BlueFlame
@@ -170,13 +196,12 @@ void game_cleanup(GameState *gs);
 Creates all runtime resources:
 
 1. Window + renderer + logical size (400x300)
-2. Parallax background (7 layers)
-3. Floor tile (`grass_tileset.png`) and platform tile (`platform.png`)
-4. Entity textures: `spider.png`, `jumping_spider.png`, `bird.png`, `faster_bird.png`, `fish.png`, `faster_fish.png`, `coin.png`, `bouncepad_medium.png`, `bouncepad_small.png`, `bouncepad_high.png`, `vine.png`, `ladder.png`, `rope.png`, `rail.png`, `spike_block.png`, `float_platform.png`, `bridge.png`, `yellow_star.png`, `axe_trap.png`, `circular_saw.png`, `blue_flame.png`, `spike.png`, `spike_platform.png`
-5. Sound effects: `bouncepad.wav`, `axe_trap.wav`, `bird.wav`, `spider.wav`, `fish.wav`, `player_jump.wav`, `coin.wav`, `player_hit.wav`
-6. Background music: `game_music.wav` (via `Mix_LoadMUS`)
-7. Entity init: player, water, fog, HUD, debug, level (via sandbox)
-8. Gamepad controller init
+2. Shared textures for player, entities, hazards, collectibles, surfaces, HUD, and debug overlay
+3. Sound effects for player actions, pickups, entities, hazards, and surface interactions
+4. TOML level load from `--level` or the default `levels/00_sandbox_01.toml`
+5. Level-wide resources: parallax, floor/platform tiles, foreground strip, fog, water, and music
+6. Entity init: player, water, fog, HUD, debug, and level contents
+7. Gamepad controller init
 
 ### `game_loop(GameState *gs)`
 
@@ -196,13 +221,14 @@ Frees all resources in reverse init order.
 
 ---
 
-## `screens/sandbox.h` / `screens/sandbox.c`
+## `levels/level.h`, `levels/level_loader.c`, `levels/level_validate.c`
 
-**Role:** Level layout and entity placement. Separates content (WHERE entities are placed) from engine logic (HOW they behave).
+**Role:** Level schema, TOML loading, phase switching, and count validation.
 
 **Key functions:**
-- `sandbox_load_level(GameState *gs)` -- place all entities, define sea gaps, set up the level (called once from `game_init`)
-- `sandbox_reset_level(GameState *gs, int *fp_prev_riding)` -- reset all entities on player death
+- `level_load(const char *path, LevelDef *out)` -- parse a TOML level into `LevelDef`
+- `level_validate_counts(const LevelDef *level, char *err, size_t err_sz)` -- reject out-of-range array counts
+- `level_free(LevelDef *level)` -- release owned strings/textures in a level definition
 
 ---
 
@@ -246,7 +272,7 @@ Fast fish variant with higher jumps and faster patrol speed. Asset: `faster_fish
 
 ### `hazards/blue_flame.h` / `hazards/blue_flame.c`
 
-Erupting fire hazard from sea gaps. Cycles through waiting -> rising -> flipping (180 degree rotation at apex) -> falling. 2-frame animation. Asset: `blue_flame.png`.
+Erupting flame hazard from floor gaps. Cycles through waiting -> rising -> flipping (180 degree rotation at apex) -> falling. Blue and fire visual variants use `blue_flame.png` and `fire_flame.png`.
 
 ### `hazards/spike.h` / `hazards/spike.c`
 
@@ -276,9 +302,17 @@ Swinging pendulum or spinning axe hazard. Two behaviour modes: swing (60 degree 
 
 Gold coin collectible. AABB pickup awards 100 points. Every 3 coins restores one heart. Asset: `coin.png`.
 
-### `collectibles/yellow_star.h` / `collectibles/yellow_star.c`
+### `collectibles/star_yellow.h` / `collectibles/star_yellow.c`
 
-Yellow star health pickup that restores hearts. Asset: `yellow_star.png`.
+Yellow star health pickup that restores hearts. Asset: `star_yellow.png`.
+
+### `collectibles/star_green.h` / `collectibles/star_green.c`
+
+Green star health pickup. Asset: `star_green.png`.
+
+### `collectibles/star_red.h` / `collectibles/star_red.c`
+
+Red star health pickup. Asset: `star_red.png`.
 
 ### `collectibles/last_star.h` / `collectibles/last_star.c`
 
@@ -290,7 +324,7 @@ End-of-level star collectible. Asset: `last_star.png`.
 
 ### `surfaces/platform.h` / `surfaces/platform.c`
 
-One-way pillar platforms built from 9-slice tiled grass blocks. Player can jump through from below and land on top. Asset: `platform.png`.
+One-way pillar platforms built from 9-slice platform tiles. Player can jump through from below and land on top. Default asset: `grass_platform.png`.
 
 ### `surfaces/float_platform.h` / `surfaces/float_platform.c`
 
@@ -304,15 +338,15 @@ Tiled crumble walkway. Bricks cascade-fall outward from the player's feet after 
 
 Shared bouncepad mechanics: squash/release 3-frame animation.
 
-### `surfaces/bouncepad_small.h` / `surfaces/bouncepad_small.c`
+### `surfaces/bouncepad_small.h`
 
 Green bouncepad -- small jump height. Asset: `bouncepad_small.png`.
 
-### `surfaces/bouncepad_medium.h` / `surfaces/bouncepad_medium.c`
+### `surfaces/bouncepad_medium.h`
 
 Wood bouncepad -- medium jump height. Asset: `bouncepad_medium.png`.
 
-### `surfaces/bouncepad_high.h` / `surfaces/bouncepad_high.c`
+### `surfaces/bouncepad_high.h`
 
 Red bouncepad -- high jump height. Asset: `bouncepad_high.png`.
 
@@ -322,7 +356,7 @@ Rail path system. Builds closed-loop and open-line rail paths from tile definiti
 
 ### `surfaces/vine.h` / `surfaces/vine.c`
 
-Climbable vine decoration. Player can grab, climb up/down, drift horizontally, and dismount with a jump. Asset: `vine.png`.
+Climbable vine decoration. Player can grab, climb up/down, drift horizontally, and dismount with a jump. Assets: `vine_green.png`, `vine_brown.png`.
 
 ### `surfaces/ladder.h` / `surfaces/ladder.c`
 
@@ -354,7 +388,7 @@ Multi-layer scrolling background. 7 layers tiled horizontally, each at a differe
 
 ### `screens/hud.h` / `screens/hud.c`
 
-HUD renderer. Draws heart icons (health), player icon + lives counter, coin icon + score. Assets: `yellow_star.png` (hearts), `hud_coins.png` (coin icon), `player.png` (lives icon), `round9x13.ttf` (font).
+HUD renderer. Draws heart icons (health), player icon + lives counter, coin icon + score. Assets: `star_yellow.png` (hearts), `hud_coins.png` (coin icon), `player.png` (lives icon), `round9x13.ttf` (font).
 
 ### `core/debug.h` / `core/debug.c`
 
@@ -368,10 +402,10 @@ Shared entity helper functions used across multiple modules.
 
 Shared level definitions and constants.
 
-### `levels/level_01.h` / `levels/level_01.c`
-
-Level 1 data definitions.
-
 ### `levels/level_loader.h` / `levels/level_loader.c`
 
-Level loading and switching system.
+TOML level loading and switching system.
+
+### `levels/level_validate.c`
+
+Bounds validation for `LevelDef` counts before runtime data is copied into `GameState`.

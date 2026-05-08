@@ -41,19 +41,19 @@ void apply_damage(GameState *gs, int amount, int push,
         gs->lives--;
         if (gs->lives < 0) {
             /* Game over — reset to level-defined starting values */
-            const LevelDef *def = (const LevelDef *)gs->current_level;
+            const LevelDef *def = (const LevelDef *)gs->runtime.current_level;
             gs->lives           = def && def->initial_lives  > 0
                                 ? def->initial_lives  : DEFAULT_LIVES;
             gs->score           = 0;
-            gs->score_life_next = gs->score_per_life;
+            gs->score_life_next = gs->rules.score_per_life;
             if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
         }
         if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
         {
-            const LevelDef *def = (const LevelDef *)gs->current_level;
+            const LevelDef *def = (const LevelDef *)gs->runtime.current_level;
             gs->hearts = def && def->initial_hearts > 0
                        ? def->initial_hearts : MAX_HEARTS;
         }
-        reset_current_level(gs, &gs->fp_prev_riding);
+        reset_current_level(gs, &gs->loop.fp_prev_riding);
     }
 }

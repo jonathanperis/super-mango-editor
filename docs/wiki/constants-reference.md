@@ -46,15 +46,15 @@ Used to compute `frame_ms = 1000 / TARGET_FPS` (approximately 16 ms), which is t
 | `TILE_SIZE` | `48` | literal | Width and height of one grass tile (px) |
 | `FLOOR_Y` | `252` | `GAME_H - TILE_SIZE` | Y coordinate of the floor's top edge |
 
-The floor is drawn by repeating the 48x48 grass tile across the full `WORLD_W` at `y=FLOOR_Y`, with gaps cut out at each `sea_gaps[]` position.
+The floor is drawn by repeating the active 48x48 floor tile across the full level width at `y=FLOOR_Y`, with gaps cut out at each floor-gap position.
 
 ### Physics
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
 | `GRAVITY` | `800.0f` | `float` | Downward acceleration in px/s^2 |
-| `SEA_GAP_W` | `32` | `int` | Width of each sea gap in logical pixels |
-| `MAX_SEA_GAPS` | `8` | `int` | Maximum number of sea gaps per level |
+| `FLOOR_GAP_W` | `32` | `int` | Width of each floor gap in logical pixels |
+| `MAX_FLOOR_GAPS` | `16` | `int` | Maximum number of floor gaps per level |
 
 Every frame while airborne: `player->vy += GRAVITY * dt`.
 
@@ -65,7 +65,8 @@ At 60 FPS (`dt` approximately 0.016s) gravity adds ~12.8 px/s per frame. The jum
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
 | `WORLD_W` | `1600` | `int` | Total logical level width (4 x GAME_W) |
-| `CAM_LOOKAHEAD` | `40` | `int` | Forward-look offset in px added in the player's facing direction |
+| `CAM_LOOKAHEAD_VX_FACTOR` | `0.20f` | `float` | Camera lookahead pixels per px/s of player horizontal velocity |
+| `CAM_LOOKAHEAD_MAX` | `50.0f` | `float` | Maximum lookahead offset in either direction |
 | `CAM_SMOOTHING` | `8.0f` | `float` | Lerp speed factor (per second); higher = snappier follow |
 | `CAM_SNAP_THRESHOLD` | `0.5f` | `float` | Sub-pixel distance at which the camera snaps exactly to target |
 
@@ -423,13 +424,13 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 ---
 
-## `yellow_star.h` Constants
+## `star_yellow.h` Constants
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_YELLOW_STARS` | `3` | `int` | Maximum yellow star instances per level |
-| `YELLOW_STAR_DISPLAY_W` | `16` | `int` | Display width (logical px) |
-| `YELLOW_STAR_DISPLAY_H` | `16` | `int` | Display height (logical px) |
+| `MAX_STAR_YELLOWS` | `16` | `int` | Maximum yellow star instances per level |
+| `STAR_YELLOW_DISPLAY_W` | `16` | `int` | Display width (logical px) |
+| `STAR_YELLOW_DISPLAY_H` | `16` | `int` | Display height (logical px) |
 
 ---
 

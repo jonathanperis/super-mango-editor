@@ -225,5 +225,9 @@ void parallax_cleanup(ParallaxSystem *ps)
             SDL_DestroyTexture(ps->layers[i].texture);
             ps->layers[i].texture = NULL;
         }
+        ps->layers[i].tex_w = 0;
+        ps->layers[i].tex_h = 0;
+        ps->layers[i].speed = 0.0f;
     }
+    ps->count = 0;
 }
