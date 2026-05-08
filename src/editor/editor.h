@@ -29,6 +29,7 @@
 #include "../levels/level.h" /* LevelDef — the data-driven level definition we edit */
 #include "ui.h"            /* UIState — immediate-mode UI widget state            */
 #include "undo.h"          /* UndoStack, PlacementData — undo system + clipboard */
+#include "editor_validation.h" /* EditorValidationReport                         */
 
 /* ------------------------------------------------------------------ */
 /* Constants — editor window layout                                    */
@@ -315,6 +316,11 @@ typedef struct {
      * An empty string (file_path[0] == '\0') means "untitled, never saved".
      */
     char           file_path[256];
+    char           autosave_path[256];
+    char           recent_files[5][256];
+    int            recent_file_count;
+    char           status_message[160];
+    Uint32         last_autosave_ms;
 
     /*
      * modified — dirty flag, set to 1 whenever the level changes.
@@ -322,6 +328,8 @@ typedef struct {
      * quit handler prompts to save when modified is true.
      */
     int            modified;
+
+    EditorValidationReport validation_report;
 
     /* ---- UI toggles --------------------------------------------------- */
     int            show_grid;     /* 1 = draw grid lines on the canvas         */
@@ -387,6 +395,8 @@ typedef struct {
  * Returns 0 on success, non-zero on fatal error.
  */
 int editor_init(EditorState *es);
+
+int editor_load_level(EditorState *es, const char *path);
 
 /*
  * editor_loop — Run the editor's main event/render loop until exit.

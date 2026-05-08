@@ -1166,6 +1166,36 @@ void level_config_render(EditorState *es, int start_y, int available_h,
      */
     int y = content_top + 8 - cfg_scroll_y;
 
+    /* ---- Inline validation panel ----------------------------------- */
+    ui_label_color(&es->ui, x + 8, y,
+                   editor_validation_summary(&es->validation_report),
+                   es->validation_report.error_count > 0 ?
+                   (SDL_Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
+    y += 20;
+    for (int i = 0; i < es->validation_report.message_count; i++) {
+        SDL_Color msg_color = i < es->validation_report.error_count
+                            ? (SDL_Color){0xFF,0x70,0x70,0xFF}
+                            : (SDL_Color){0xFF,0xC0,0x60,0xFF};
+        ui_label_color(&es->ui, x + 16, y,
+                       es->validation_report.messages[i], msg_color);
+        y += 18;
+    }
+    ui_separator(&es->ui, x + 4, y, PROP_W - 8);
+    y += 8;
+
+    if (es->recent_file_count > 0) {
+        ui_label_color(&es->ui, x + 8, y, "Recent files (Ctrl+1..5):", UI_TEXT_DIM);
+        y += 18;
+        for (int i = 0; i < es->recent_file_count; i++) {
+            char recent[320];
+            snprintf(recent, sizeof(recent), "%d: %s", i + 1, es->recent_files[i]);
+            ui_label_color(&es->ui, x + 16, y, recent, UI_TEXT_DIM);
+            y += 18;
+        }
+        ui_separator(&es->ui, x + 4, y, PROP_W - 8);
+        y += 8;
+    }
+
     /* ---- Level name ---- */
     ui_label(&es->ui, x + 8, y, "Name:");
     if (ui_text_field(&es->ui, 9000, x + 55, y, 310, es->level.name,
@@ -1187,6 +1217,13 @@ void level_config_render(EditorState *es, int start_y, int available_h,
                  es->level.screen_count * GAME_W);
         ui_label_color(&es->ui, x + 140, y, width_text, UI_TEXT_DIM);
     }
+    y += 24;
+
+    /* ---- Next phase path ---- */
+    ui_label(&es->ui, x + 8, y, "Next:");
+    if (ui_text_field(&es->ui, 9031, x + 55, y, 310, es->level.next_phase,
+                      (int)sizeof(es->level.next_phase)))
+        es->modified = 1;
     y += 24;
 
     /* ---- Background Sound ---- */
