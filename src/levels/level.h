@@ -414,8 +414,8 @@ typedef struct {
     BridgePlacement        bridges[MAX_BRIDGES];
     int                    bridge_count;
     /*
-     * Bouncepads are split by variant to match the three texture slots in
-     * GameState (bouncepad_small_tex, bouncepad_medium_tex, bouncepad_high_tex).
+     * Bouncepads are split by variant to match TextureResources' three
+     * bouncepad slots (small, medium, high).
      */
     BouncepadPlacement bouncepads_small[MAX_BOUNCEPADS_SMALL];
     int                bouncepad_small_count;

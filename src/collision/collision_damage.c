@@ -34,7 +34,7 @@ void apply_damage(GameState *gs, int amount, int push,
     (void)src_cy;   /* reserved for future vertical-push logic */
 
     gs->player.hurt_timer = 1.5f;
-    if (gs->snd_hit) Mix_PlayChannel(-1, gs->snd_hit, 0);
+    if (gs->audio.hit) Mix_PlayChannel(-1, gs->audio.hit, 0);
 
     gs->hearts -= amount;
     if (gs->hearts <= 0) {
