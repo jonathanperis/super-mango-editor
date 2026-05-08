@@ -110,6 +110,10 @@ jobs:
         if: matrix.target == 'native' && runner.os != 'Windows'
         run: make test
 
+      - name: Validate levels (Linux / macOS)
+        if: matrix.target == 'native' && runner.os != 'Windows'
+        run: make validate-levels
+
       - name: Build editor (Linux / macOS)
         if: matrix.target == 'native' && runner.os != 'Windows'
         run: make editor

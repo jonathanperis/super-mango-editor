@@ -60,7 +60,7 @@ TEST_SERIALIZER_OBJ = $(OUTDIR)/test-serializer.o
 TEST_VALIDATE_OBJ   = $(OUTDIR)/test-level-validate.o
 TEST_TOMLC_OBJ      = $(OUTDIR)/test-tomlc17.o
 
-.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test
+.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels
 
 all: $(OUTDIR) $(TARGET)
 
@@ -162,6 +162,9 @@ run-editor: editor
 test: $(OUTDIR) $(TEST_TARGETS)
 	./$(OUTDIR)/level-serializer-test
 	./$(OUTDIR)/level-validate-test
+
+validate-levels:
+	python3 tools/validate_levels.py
 
 $(TEST_SERIALIZER_OBJ): $(EDITOR_DIR)/serializer.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<

@@ -2,127 +2,85 @@
 
 ## Summary
 
-Standalone SDL2/C application that provides a visual interface for creating, editing, and exporting game levels. Replaces manual `const LevelDef` C struct authoring with a point-and-click editor.
+Standalone SDL2/C editor for creating and editing Super Mango TOML levels. Baseline editor is shipped: `make editor` builds `out/super-mango-editor`, and `make run-editor` launches it. Current work is hardening validation, metadata editing, playtest flow, exporter regressions, and editing-session safety.
 
-The editor must be capable of recreating the existing Sandbox level (sandbox_00) with pixel-perfect fidelity — every entity at the exact same position and visual appearance as the running game.
+## Current Architecture Decisions
 
-## Motivation
+| ID | Decision | Current choice |
+|----|----------|----------------|
+| D-001 | Level format | TOML is canonical. Runtime/editor serialization uses vendored `tomlc17`. |
+| D-002 | UI framework | Custom immediate-mode SDL2 + SDL2_ttf. No external UI library. |
+| D-003 | Runtime loading | Game loads TOML directly through `--level <path>` / `make run-level LEVEL=...`. |
+| D-004 | Validation | `tools/validate_levels.py`, `make validate-levels`, C validation tests, and CI validation protect shipped levels. |
 
-- Hand-coding level definitions in C is error-prone and slow
-- Positioning entities by guessing pixel coordinates leads to constant compile-test cycles
-- No visual feedback until the game runs — impossible to see the level layout during design
-- Blocks non-programmers from contributing level designs
-- Many entity Y positions and display sizes are derived by the game's loader code; the editor must replicate these derivations visually
+Historical note: early planning described JSON/cJSON plus C export as canonical. That pipeline is obsolete; keep references only when explaining migration history.
 
-## Architectural Decisions (Finalized)
-
-| ID | Decision | Choice |
-|----|----------|--------|
-| D-001 | Serialization | JSON as canonical format + C code export pipeline. Game never links cJSON. |
-| D-002 | UI Framework | Custom immediate-mode SDL2 + SDL2_ttf. No external UI library. |
-| D-003 | Game JSON Loader | No. Game only reads compiled `const LevelDef`. Play-test via export → `make run`. |
-
-## Requirements
+## Shipped Baseline Requirements
 
 ### R-001: Standalone Executable
-The editor MUST be a separate executable built with `make editor`, outputting to `out/super-mango-editor`. It shares headers (`level.h`, `game.h` constants) with the game but has its own main loop and event handling. The game build (`make`) MUST remain unaffected.
+Editor builds as separate executable with `make editor` and runs with `make run-editor`. Game build remains separate.
 
-### R-002: Full Entity Support
-The editor MUST support placing, moving, and configuring all 25 entity placement types currently defined in `LevelDef`:
+### R-002: TOML Level Support
+Editor and runtime operate on TOML-backed `LevelDef` data. Current level files:
 
-| Category | Types | Placement Struct | Stored Fields | Derived by Loader (editor must compute for preview) |
-|----------|-------|-----------------|---------------|-----------------------------------------------------|
-| World Geometry | sea_gaps | `int` | x | — |
-| World Geometry | rails | `RailPlacement` | layout, x, y, w, h, end_cap | Rail tile positions (for path preview) |
-| Static Geometry | platforms | `PlatformPlacement` | x, tile_height | y = FLOOR_Y - tile_height*TILE_SIZE + 16 |
-| Collectibles | coins | `CoinPlacement` | x, y | — |
-| Collectibles | star_yellows | `StarYellowPlacement` | x, y | — |
-| Collectibles | last_star | `LastStarPlacement` | x, y | Single struct, not array |
-| Enemies | spiders | `SpiderPlacement` | x, vx, patrol_x0, patrol_x1, frame_index | y = FLOOR_Y - 10 (SPIDER_ART_H) |
-| Enemies | jumping_spiders | `JumpingSpiderPlacement` | x, vx, patrol_x0, patrol_x1 | y = FLOOR_Y - 10 (same art height as spider) |
-| Enemies | birds | `BirdPlacement` | x, base_y, vx, patrol_x0, patrol_x1, frame_index | y_preview = base_y (sine wave at runtime) |
-| Enemies | faster_birds | `BirdPlacement` | same as birds | y_preview = base_y |
-| Enemies | fish | `FishPlacement` | x, vx, patrol_x0, patrol_x1 | y = 245 (GAME_H - WATER_ART_H - RENDER_H/2) |
-| Enemies | faster_fish | `FishPlacement` | same as fish | y = 245 |
-| Hazards | axe_traps | `AxeTrapPlacement` | pillar_x, mode | x = pillar_x + TILE_SIZE/2, y = FLOOR_Y - 3*TILE_SIZE + 16 |
-| Hazards | circular_saws | `CircularSawPlacement` | x, patrol_x0, patrol_x1, direction | y = FLOOR_Y - 2*TILE_SIZE + 16 - 32 (SAW_DISPLAY_H) |
-| Hazards | spike_rows | `SpikeRowPlacement` | x, count | y = FLOOR_Y - 16 (SPIKE_TILE_H) |
-| Hazards | spike_platforms | `SpikePlatformPlacement` | x, y, tile_count | — |
-| Hazards | spike_blocks | `SpikeBlockPlacement` | rail_index, t_offset, speed | x,y = rail interpolation at t_offset |
-| Surfaces | float_platforms | `FloatPlatformPlacement` | mode, x, y, tile_count, rail_index, t_offset, speed | RAIL mode: x,y from rail interpolation |
-| Surfaces | bridges | `BridgePlacement` | x, y, brick_count | — |
-| Surfaces | bouncepads_small | `BouncepadPlacement` | x, launch_vy, pad_type=GREEN | y = FLOOR_Y - 18 (BOUNCEPAD_SRC_H) |
-| Surfaces | bouncepads_medium | `BouncepadPlacement` | x, launch_vy, pad_type=WOOD | y = 234 |
-| Surfaces | bouncepads_high | `BouncepadPlacement` | x, launch_vy, pad_type=RED | y = 234 |
-| Decorations | vines | `VinePlacement` | x, y, tile_count | — |
-| Decorations | ladders | `LadderPlacement` | x, y, tile_count | — |
-| Decorations | ropes | `RopePlacement` | x, y, tile_count | — |
+- `levels/00_sandbox_01.toml`
+- `levels/01_lugio_01.toml`
+- `levels/02_lugio_02.toml`
 
-**Auto-derived entities (NOT placed by editor, shown as preview):**
-- **Blue flames** (MAX=8): positions derived from sea_gaps array by `blue_flames_init()`. Editor renders them as ghost preview only.
+### R-003: Entity Coverage
+Editor placeable inventory matches `ENT_COUNT` in `src/editor/editor.h`: 30 types.
 
-### R-003: Visual Canvas
-The editor MUST display a scrollable, zoomable viewport showing the 1600x300 logical world with:
-- 9-slice floor rendering matching the game's `grass_tileset.png` algorithm (edge caps at sea gaps and world boundaries)
-- Static water strips in sea-gap regions (simplified: no scroll animation)
-- Grid overlay at TILE_SIZE (48px) intervals
-- Screen boundary markers at x = 0, 400, 800, 1200
-- FLOOR_Y (252px) reference line
-- Entity sprites rendered at their actual display sizes (NOT raw frame sizes — many entities crop/scale)
-- Blue flame ghost previews auto-derived from sea gap positions
+| Category | Types |
+|----------|-------|
+| World | floor_gap, rail, platform |
+| Collectibles | coin, star_yellow, star_green, star_red, last_star |
+| Enemies | spider, jumping_spider, bird, faster_bird, fish, faster_fish |
+| Hazards | axe_trap, circular_saw, spike_row, spike_platform, spike_block, blue_flame, fire_flame |
+| Surfaces | float_platform, bridge, bouncepad_small, bouncepad_medium, bouncepad_high |
+| Climbables/decor | vine, ladder, rope |
+| Spawn | player_spawn |
 
-### R-004: Entity Palette
-The editor MUST provide a categorized palette panel listing all placeable entity types, rendered with SDL2_ttf text and sprite thumbnails. Selecting a type from the palette enables placement mode with a ghost preview at cursor position.
+### R-004: Visual Canvas
+Editor previews level geometry, floor gaps, rails, platform surfaces, collectibles, enemies, hazards, climbables, player spawn, grid/reference lines, and theming assets from `assets/sprites/...` paths.
 
-### R-005: Property Editing
-The editor MUST allow editing entity-specific properties after placement via SDL2_ttf-rendered input fields. See design.md for per-entity field mapping.
+### R-005: Editing Operations
+Editor supports baseline selection, placement, deletion, property inspection/editing, undo/redo, save/load, and exporter-related workflows already present in `src/editor/` modules.
 
-### R-006: JSON Serialization
-The editor MUST save and load levels in JSON format using cJSON (vendor library, editor-only). The JSON schema maps 1:1 to `LevelDef` struct fields. Serializer validates array counts against MAX_* bounds.
+### R-006: Validation Commands
+Contributor validation commands are:
 
-### R-007: C Code Export
-The editor MUST export a level as a valid C source file (`level_XX.c` + `level_XX.h`) that compiles and runs identically to a hand-written level. Generated code MUST follow `sandbox_00.c` style exactly.
+```sh
+make test
+make validate-levels
+```
 
-### R-008: Core Editing Operations
-Place, select, move, delete — with correct entity display sizes for hit testing.
+## Next Requirements
 
-### R-009: Undo/Redo
-Command stack (max 256). Tracked: place, delete, move, property change.
+### N-001: Validation Panel
+Editor should expose level validation results inline: TOML parse errors, schema/count bounds, missing assets, bad paths, invalid next-phase links, and gameplay-dangerous placement warnings.
 
-### R-010: Camera Navigation
-WASD scroll, middle-mouse drag, scroll-wheel zoom (1x, 2x, 4x).
+### N-002: Metadata Editor
+Editor should edit full top-level TOML metadata: `name`, `description`, `generated_by`, `screen_count`, `next_phase`, music path/volume, floor tile, lives/hearts/scoring, player spawn, background/foreground/fog layers, and physics overrides.
 
-## Out of Scope (v1)
+### N-003: Playtest Button
+Editor should save, run validation, then launch game with current file using `--level <path>` semantics. Failed validation blocks playtest unless user explicitly chooses a debug override.
 
-- Play-testing from within the editor
-- Game executable loading JSON directly
-- Tilemap painting for custom floor layouts
-- Multi-level campaign management
-- Copy/paste and multi-select
-- Native file dialog (v1 uses text input)
-- Minimap widget
-- Animated entity previews (v1 shows static first frame)
+### N-004: Exporter Regression
+Add regression coverage for serializer/exporter paths and representative TOML levels so schema changes do not silently corrupt saved data.
 
-## Constraints
+### N-005: Recent Files + Autosave
+Add MRU list, autosave interval, recovery prompt, and dirty-state safety around open/new/quit.
 
-- Must compile with `clang -std=c11 -Wall -Wextra -Wpedantic`
-- Must use SDL2 + SDL2_image + SDL2_ttf (SDL2_mixer not needed)
-- Editor window: 1280x720
-- cJSON linked only into editor target
-- Must not break existing game build
-- Font: `assets/round9x13.ttf`
+## Out of Scope for This Cleanup
+
+- Modifying C source, Makefile, tools, or workflows.
+- Replacing the current editor UI toolkit.
+- Changing gameplay rules or entity behavior.
+- Full build/run validation.
 
 ## Success Criteria
 
-1. `make editor` builds without affecting `make` (game)
-2. Load sandbox_00.json → visual layout matches game screenshot pixel-for-pixel:
-   - All 8 platforms at correct heights and positions
-   - All 5 sea gaps with correct floor edge caps and water strips
-   - All 16 coins at correct positions (ground and platform tops)
-   - All enemies visible at their derived Y positions
-   - All hazards at correct positions
-   - 3 rail paths visible as connected lines
-   - Spike blocks and float platforms shown at rail positions
-   - Blue flames shown as ghost preview at sea gap positions
-3. Round-trip: sandbox_00 → JSON → LevelDef → all fields match
-4. C export: sandbox_00 → JSON → C export → compile → game behavior identical
+1. Specs describe shipped TOML/tomlc17 state, not JSON/cJSON-era plan.
+2. `make editor`, `make test`, and `make validate-levels` are documented in relevant contributor guidance.
+3. Current entity counts and current TOML level file names appear correctly.
+4. Next editor tasks are grouped for fewer, larger PRs.
