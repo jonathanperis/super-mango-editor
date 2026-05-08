@@ -1,0 +1,233 @@
+---
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<section id="play" class="play-section">
+    <div class="cabinet-frame">
+        <div class="cabinet-bezel">
+            <canvas
+                id="canvas"
+                oncontextmenu="event.preventDefault()"
+                role="application"
+                aria-label="Super Mango game canvas - press Play to start"
+            ></canvas>
+            <p id="game-status">
+                <button id="play-btn" type="button">Play (~43 MB)</button>
+                <button id="debug-btn" type="button">Debug Mode</button>
+            </p>
+        </div>
+        <div class="cabinet-controls">
+            <kbd>WASD</kbd> / <kbd>Arrows</kbd> Move &nbsp;&middot;&nbsp;
+            <kbd>Space</kbd> Jump
+        </div>
+        <div class="cabinet-base"></div>
+    </div>
+</section>
+
+<section id="about" class="about-section">
+    <h2 class="section-title">ABOUT THE GAME</h2>
+    <p>
+        Super Mango is a classic side-scrolling platformer built as a
+        <strong>learning resource</strong> for C and SDL2 game programming. Every line
+        of code is commented to explain the <em>why</em>, not just the what - making it
+        ideal for developers who want to learn how 2D games work under the hood.
+    </p>
+    <p>
+        The game renders at 400&times;300 logical pixels scaled 2&times; to an
+        800&times;600 window, uses delta-time physics for frame-rate-independent
+        movement, and follows a clean init &rarr; loop &rarr; cleanup architecture.
+    </p>
+
+    <div class="feature-grid">
+        <div class="feature-card">
+            <h3>Platforming</h3>
+            <p>One-way platforms, float platforms, crumble bridges, and floor gaps with animated water.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Enemies</h3>
+            <p>6 enemy types: spiders, jumping spiders, birds, faster birds, fish, and faster fish.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Hazards</h3>
+            <p>Spike rows, spike platforms, axe traps, circular saws, blue flames, fire flames, and spike blocks on rails.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Mechanics</h3>
+            <p>Bouncepads, climbable vines, ladders, ropes, collectible coins and stars, lives and hearts system.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Visual Polish</h3>
+            <p>Parallax scrolling, 5-state player animation, scrolling camera, fog overlay, and pixel-perfect rendering.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Cross-Platform</h3>
+            <p>Builds natively for macOS, Linux, Windows, and WebAssembly.</p>
+        </div>
+    </div>
+</section>
+
+<section id="docs" class="docs-section">
+    <h2 class="section-title">DOCUMENTATION</h2>
+    <div style="text-align:center; margin-bottom:2rem">
+        <a
+            href={`${base}/docs`}
+            class="docs-view-btn"
+            style="display:inline-block; padding:0.75rem 2rem; background:var(--accent); color:var(--bg); font-family:var(--pixel); font-size:1.1rem; font-weight:700; text-decoration:none; border-radius:6px; letter-spacing:0.02em; transition:background 0.2s;"
+        >
+            View full documentation &rarr;
+        </a>
+    </div>
+    <div class="docs-grid">
+        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor#readme" target="_blank" rel="noreferrer noopener" aria-label="Read the project README on GitHub">
+            <h3>README</h3>
+            <p>Project overview, build instructions for all platforms, controls reference, architecture diagram, and full project structure.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs/architecture/`} aria-label="Read the Architecture section">
+            <h3>Architecture</h3>
+            <p>Startup sequence, game loop phases, coordinate system, GameState struct, and error handling strategy.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs/source-files/`} aria-label="Read the Source Files section">
+            <h3>Source Files</h3>
+            <p>Complete file map of all source files with module roles.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs/player-module/`} aria-label="Read the Player Module section">
+            <h3>Player Module</h3>
+            <p>Player lifecycle, input handling, jump and climb logic, physics update, animation state machine.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs/constants-reference/`} aria-label="Read the Constants Reference section">
+            <h3>Constants Reference</h3>
+            <p>All compile-time constants: window, canvas, timing, tiles, physics, camera, and player locals.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs/entities-and-hazards/`} aria-label="Read the Entities & Hazards section">
+            <h3>Entities & Hazards</h3>
+            <p>Enemy and hazard types: spider, bird, fish, spikes, circular saw, axe trap, and more.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs/collectibles-and-surfaces/`} aria-label="Read the Collectibles & Surfaces section">
+            <h3>Collectibles & Surfaces</h3>
+            <p>Coins, stars, platforms, bouncepads, vines, ladders, and ropes.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs/assets/`} aria-label="Read the Assets section">
+            <h3>Assets</h3>
+            <p>Sprite catalog, player sprite sheet analysis, animation row mapping, and asset organization.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs/sounds/`} aria-label="Read the Sounds section">
+            <h3>Sounds</h3>
+            <p>Sound effects catalog, audio configuration, and adding new sound effects.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs/build-system/`} aria-label="Read the Build System section">
+            <h3>Build System</h3>
+            <p>Makefile overview, compiler flags, build targets for macOS, Linux, Windows, and WebAssembly.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs/level-design/`} aria-label="Read the Level Design section">
+            <h3>Level Design</h3>
+            <p>TOML level file format reference: entities, collectibles, hazards, surfaces, and metadata.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs/level-editor/`} aria-label="Read the Level Editor section">
+            <h3>Level Editor</h3>
+            <p>Visual level editor guide: canvas, palette, tools, properties panel, undo history, and export.</p>
+        </a>
+        <a class="doc-card" href={`${base}/docs/developer-guide/`} aria-label="Read the Developer Guide section">
+            <h3>Developer Guide</h3>
+            <p>Coding conventions, memory safety, and step-by-step entity addition walkthrough.</p>
+        </a>
+    </div>
+</section>
+
+<section id="downloads" class="downloads-section">
+    <h2 class="section-title">ITEM DROP</h2>
+    <p>
+        Grab the latest release from
+        <a href="https://github.com/jonathanperis/super-mango-editor/releases/latest" style="color:var(--accent)" target="_blank" rel="noreferrer noopener">
+            GitHub Releases
+        </a>.
+        Native builds must be run from the repository root so they can find the <code>assets/</code> folder.
+    </p>
+    <div class="download-grid">
+        <a class="download-card" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for Linux x86_64">
+            <div class="platform">Linux</div>
+            <div class="arch">x86_64</div>
+        </a>
+        <a class="download-card" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for macOS Apple Silicon">
+            <div class="platform">macOS</div>
+            <div class="arch">arm64 (Apple Silicon)</div>
+        </a>
+        <a class="download-card" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for Windows x86_64">
+            <div class="platform">Windows</div>
+            <div class="arch">x86_64 (SDL2 DLLs included)</div>
+        </a>
+        <a class="download-card" href="#play" style="border-color:var(--green)">
+            <div class="platform" style="color:var(--green)">WebAssembly</div>
+            <div class="arch">Play in browser above!</div>
+        </a>
+    </div>
+</section>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const statusEl = document.getElementById('game-status');
+    const playBtn = document.getElementById('play-btn');
+    const debugBtn = document.getElementById('debug-btn');
+
+    function startGame(debug) {
+        if (!canvas || !statusEl || !playBtn) return;
+
+        playBtn.disabled = true;
+        if (debugBtn) debugBtn.disabled = true;
+        playBtn.textContent = 'Loading...';
+        canvas.tabIndex = -1;
+        statusEl.innerHTML = '<span class="spinner"></span>Downloading game data...';
+
+        const args = ['--sandbox'];
+        if (debug) args.push('--debug');
+
+        canvas.addEventListener('webglcontextlost', (event) => {
+            alert('WebGL context lost - please reload the page.');
+            event.preventDefault();
+        }, false);
+
+        const handleKeyDown = (event) => {
+            if ([32, 37, 38, 39, 40, 16, 65, 68, 83, 87].includes(event.keyCode)) {
+                event.preventDefault();
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown, false);
+
+        const Module = {
+            arguments: args,
+            canvas,
+            setStatus(text) {
+                if (!text) {
+                    statusEl.style.display = 'none';
+                    playBtn.style.display = 'none';
+                } else {
+                    statusEl.innerHTML = text.includes('Downloading')
+                        ? '<span class="spinner"></span>' + text
+                        : text;
+                    statusEl.style.display = '';
+                }
+            },
+            monitorRunDependencies(left) {
+                if (left === 0) {
+                    Module.setStatus('');
+                    canvas.focus();
+                }
+            },
+        };
+
+        window.Module = Module;
+
+        const script = document.createElement('script');
+        script.src = 'super-mango.js';
+        script.onerror = () => {
+            statusEl.innerHTML = 'Failed to load game files. Try refreshing the page.';
+            playBtn.style.display = 'inline-block';
+            playBtn.disabled = false;
+            playBtn.textContent = 'Retry (~43 MB)';
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+        document.body.appendChild(script);
+    }
+
+    playBtn?.addEventListener('click', () => startGame(false));
+    debugBtn?.addEventListener('click', () => startGame(true));
+</script>
