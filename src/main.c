@@ -44,17 +44,25 @@ int main(int argc, char *argv[]) {
     int debug_mode  = 0;
     int smoke_test_frames = 0;
     const char *level_path = NULL;
+    int expect_level_path = 0;
+    int expect_smoke_frames = 0;
+
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--debug") == 0)
+        if (expect_level_path) {
+            level_path = argv[i];
+            expect_level_path = 0;
+        } else if (expect_smoke_frames) {
+            smoke_test_frames = atoi(argv[i]);
+            if (smoke_test_frames < 0) smoke_test_frames = 0;
+            expect_smoke_frames = 0;
+        } else if (strcmp(argv[i], "--debug") == 0)
             debug_mode = 1;
         else if (strcmp(argv[i], "--sandbox") == 0)
             level_path = "levels/00_sandbox_01.toml";
         else if (strcmp(argv[i], "--level") == 0 && i + 1 < argc)
-            level_path = argv[++i];   /* next arg is consumed by the flag */
-        else if (strcmp(argv[i], "--smoke-test-frames") == 0 && i + 1 < argc) {
-            smoke_test_frames = atoi(argv[++i]);
-            if (smoke_test_frames < 0) smoke_test_frames = 0;
-        }
+            expect_level_path = 1;
+        else if (strcmp(argv[i], "--smoke-test-frames") == 0 && i + 1 < argc)
+            expect_smoke_frames = 1;
     }
 
     if (smoke_test_frames > 0 && !level_path) {
