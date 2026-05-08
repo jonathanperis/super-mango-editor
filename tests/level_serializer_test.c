@@ -117,7 +117,7 @@ static int escaped_strings_roundtrip(void)
     strncpy(before.description, "Line one\\path\nLine \"two\"\tTabbed",
             sizeof(before.description) - 1);
     strncpy(before.generated_by, "Bosser \\ QA", sizeof(before.generated_by) - 1);
-    strncpy(before.music_path, "assets/sounds/screens/confirm_ui.wav",
+    strncpy(before.music_path, "assets\\sounds\\screens\\confirm_ui.wav",
             sizeof(before.music_path) - 1);
     strncpy(before.floor_tile_path, "assets/sprites/levels/grass_tileset.png",
             sizeof(before.floor_tile_path) - 1);
