@@ -110,6 +110,10 @@ jobs:
         if: matrix.target == 'native' && runner.os != 'Windows'
         run: make test
 
+      - name: Sanitizer tests (Linux)
+        if: matrix.target == 'native' && runner.os == 'Linux'
+        run: make sanitize
+
       - name: Validate levels (Linux / macOS)
         if: matrix.target == 'native' && runner.os != 'Windows'
         run: make validate-levels
@@ -125,7 +129,7 @@ jobs:
           SDL_AUDIODRIVER: dummy
         run: |
           for level in levels/*.toml; do
-            ./out/super-mango --level "$level" --smoke-test-frames 5
+            ./out/super-mango --level "$level" --smoke-test-frames 5 --seed 1
           done
           ./out/super-mango-editor --smoke-test
 
@@ -153,7 +157,7 @@ jobs:
         shell: msys2 {0}
         run: |
           for level in levels/*.toml; do
-            SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./out/super-mango.exe --level "$level" --smoke-test-frames 5
+            SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./out/super-mango.exe --level "$level" --smoke-test-frames 5 --seed 1
           done
           SDL_VIDEODRIVER=dummy ./out/super-mango-editor.exe --smoke-test
 

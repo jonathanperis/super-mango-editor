@@ -109,6 +109,87 @@ static int expect_physics_defaults_are_sentinels(void)
     return 0;
 }
 
+static int expect_rejected_floor_gap_outside_world(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.floor_gap_count = 1;
+    def.floor_gaps[0] = GAME_W;
+
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: out-of-world floor gap should fail\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int expect_rejected_platform_outside_world(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.platform_count = 1;
+    def.platforms[0].x = (float)(GAME_W - 16);
+    def.platforms[0].tile_height = 1;
+    def.platforms[0].tile_width = 1;
+
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: out-of-world platform should fail\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int expect_rejected_reversed_patrol(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.spider_count = 1;
+    def.spiders[0].x = 120.0f;
+    def.spiders[0].patrol_x0 = 160.0f;
+    def.spiders[0].patrol_x1 = 80.0f;
+
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: reversed patrol should fail\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int expect_rejected_bad_rule_values(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.initial_hearts = MAX_HEARTS + 1;
+
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: oversized initial_hearts should fail\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.music_volume = 129;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: oversized music_volume should fail\n");
+        return 1;
+    }
+
+    return 0;
+}
+
 int main(void)
 {
     if (expect_valid_level() != 0) return 1;
@@ -117,6 +198,10 @@ int main(void)
     if (expect_rejected_oversized_rail() != 0) return 1;
     if (expect_rejected_bridge_overflow() != 0) return 1;
     if (expect_physics_defaults_are_sentinels() != 0) return 1;
+    if (expect_rejected_floor_gap_outside_world() != 0) return 1;
+    if (expect_rejected_platform_outside_world() != 0) return 1;
+    if (expect_rejected_reversed_patrol() != 0) return 1;
+    if (expect_rejected_bad_rule_values() != 0) return 1;
 
     puts("level_validate_test: ok");
     return 0;

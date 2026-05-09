@@ -8,6 +8,7 @@
  *        --level <path>         → load a TOML level and start gameplay directly
  *        --level <path> --debug → same, with debug overlays
  *        --smoke-test-frames N  → run N frames and exit 0
+ *        --seed N               → seed rand() for deterministic smoke/replay
  *   3. Tear every subsystem back down before exiting.
  *
  * The order of init and teardown is intentional:
@@ -42,12 +43,16 @@ int main(int argc, char *argv[]) {
      *   --level <path> → load a TOML level file (also skips the start menu)
      *   --sandbox      → load the sandbox level (alias for --level levels/00_sandbox_01.toml)
      *   --smoke-test-frames N → deterministic CI smoke exit after N frames
+     *   --seed N              → seed rand() for deterministic smoke/replay
      */
     int debug_mode  = 0;
     int smoke_test_frames = 0;
+    unsigned int rng_seed = 0;
+    int rng_seed_set = 0;
     const char *level_path = NULL;
     int expect_level_path = 0;
     int expect_smoke_frames = 0;
+    int expect_seed = 0;
 
     for (int i = 1; i < argc; i++) {
         if (expect_level_path) {
@@ -71,6 +76,20 @@ int main(int argc, char *argv[]) {
             }
             smoke_test_frames = (int)parsed;
             expect_smoke_frames = 0;
+        } else if (expect_seed) {
+            char *end = NULL;
+            unsigned long parsed = 0;
+
+            errno = 0;
+            parsed = strtoul(argv[i], &end, 10);
+            if (errno != 0 || end == argv[i] || *end != '\0' ||
+                parsed > (unsigned long)UINT_MAX) {
+                fprintf(stderr, "Error: --seed requires an unsigned integer\n");
+                return EXIT_FAILURE;
+            }
+            rng_seed = (unsigned int)parsed;
+            rng_seed_set = 1;
+            expect_seed = 0;
         } else if (strcmp(argv[i], "--debug") == 0)
             debug_mode = 1;
         else if (strcmp(argv[i], "--sandbox") == 0)
@@ -79,6 +98,8 @@ int main(int argc, char *argv[]) {
             expect_level_path = 1;
         else if (strcmp(argv[i], "--smoke-test-frames") == 0)
             expect_smoke_frames = 1;
+        else if (strcmp(argv[i], "--seed") == 0)
+            expect_seed = 1;
     }
 
     if (expect_level_path) {
@@ -87,6 +108,10 @@ int main(int argc, char *argv[]) {
     }
     if (expect_smoke_frames) {
         fprintf(stderr, "Error: --smoke-test-frames requires a positive integer\n");
+        return EXIT_FAILURE;
+    }
+    if (expect_seed) {
+        fprintf(stderr, "Error: --seed requires an unsigned integer\n");
         return EXIT_FAILURE;
     }
 
@@ -164,12 +189,11 @@ int main(int argc, char *argv[]) {
     }
 
     /*
-     * Seed the C standard library RNG so vine layout (and any other
-     * rand()-driven decoration) differs each run.  SDL_GetTicks() returns
-     * milliseconds since SDL_Init, which varies by OS scheduling jitter
-     * and gives a different seed on every launch.
+     * Seed the C standard library RNG. Normal runs use SDL_GetTicks() so
+     * rand()-driven decoration differs each launch; tests can pass --seed
+     * for deterministic smoke/replay behavior.
      */
-    srand((unsigned int)SDL_GetTicks());
+    srand(rng_seed_set ? rng_seed : (unsigned int)SDL_GetTicks());
 
     if (level_path) {
         /*

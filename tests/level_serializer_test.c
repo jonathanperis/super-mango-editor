@@ -238,7 +238,7 @@ static void fill_rich_roundtrip_fixture(LevelDef *def)
     def->music_volume = 42;
     strncpy(def->floor_tile_path, "assets/sprites/levels/grass_tileset.png",
             sizeof(def->floor_tile_path) - 1);
-    def->initial_hearts = 4;
+    def->initial_hearts = 3;
     def->initial_lives = 5;
     def->score_per_life = 1500;
     def->coin_score = 125;
