@@ -129,8 +129,6 @@ void game_resources_cleanup(GameState *gs)
     FREE_CHUNK(gs->audio.coin);
     FREE_CHUNK(gs->audio.hit);
 
-    water_cleanup(&gs->water);
-
     DESTROY_TEX(gs->textures.ctrl_init_msg);
 
     DESTROY_TEX(gs->textures.spike_block);
@@ -179,6 +177,8 @@ void game_resources_cleanup(GameState *gs)
     }
     DESTROY_TEX(gs->textures.platform);
     DESTROY_TEX(gs->textures.floor_tile);
+
+    water_cleanup(&gs->water);
 
     parallax_cleanup(&gs->parallax);
 }
