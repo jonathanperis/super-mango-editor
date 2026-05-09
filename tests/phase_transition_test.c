@@ -136,10 +136,19 @@ static int ignores_null_progress_args(void)
     phase_progress_save(NULL, &progress);
     if (expect_int("null save score", progress.score, 900) != 0) return 1;
     if (expect_int("null save lives", progress.lives, 5) != 0) return 1;
+    if (expect_int("null save hearts", progress.hearts, 4) != 0) return 1;
+    if (expect_int("null save next", progress.score_life_next, 2000) != 0)
+        return 1;
 
     phase_progress_save(&gs, NULL);
     phase_progress_restore(NULL, &progress);
     phase_progress_restore(&gs, NULL);
+
+    if (expect_int("null progress score", progress.score, 900) != 0) return 1;
+    if (expect_int("null progress lives", progress.lives, 5) != 0) return 1;
+    if (expect_int("null progress hearts", progress.hearts, 4) != 0) return 1;
+    if (expect_int("null progress next", progress.score_life_next, 2000) != 0)
+        return 1;
 
     if (expect_int("null restore score", gs.score, 300) != 0) return 1;
     if (expect_int("null restore lives", gs.lives, 2) != 0) return 1;
