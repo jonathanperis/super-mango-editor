@@ -505,7 +505,7 @@ void editor_loop(EditorState *es) {
                 int config_y = right_top;
                 int config_h_total; /* uncapped full content height */
                 if (es->config_open) {
-                    /* Base: header(28) + margin(8) + name(24) + screens(24)
+                    /* Base: header(28) + margin(8) + metadata(72) + screens(24)
                      * + music(24+22+24) + floor(30)
                      * + hearts/lives(6+22) + pts/life(24)
                      * + bg header(24) + fg header(24) + fog header(24)
@@ -517,7 +517,7 @@ void editor_loop(EditorState *es) {
                     int validation_h = 24 + es->validation_report.message_count * 18;
                     int recent_h = es->recent_file_count > 0
                                  ? 20 + es->recent_file_count * 18 : 0;
-                    config_h_total = 28 + validation_h + recent_h + 8 + 24 + 24 + 24 + 24 + 22 + 24 + 30
+                    config_h_total = 28 + validation_h + recent_h + 8 + 72 + 24 + 24 + 24 + 22 + 24 + 30
                                    + 6 + 22 + 24 + 24 + 24 + 24 + 10;
                     if (g_plx_open)
                         config_h_total += es->level.background_layer_count * 20 + 24;
