@@ -68,6 +68,7 @@
 #include "core/game_camera.h"          /* game_camera_update                         */
 #include "core/game_bouncepads.h"      /* combined bouncepad list/hit response       */
 #include "core/game_checkpoint.h"      /* game_checkpoint_update                     */
+#include "core/game_bridges.h"         /* game_bridges_update                        */
 
 /* ------------------------------------------------------------------ */
 /* Level data — loaded once from TOML, reused on player death resets    */
@@ -528,43 +529,7 @@ static void game_loop_frame(void *arg) {
          */
         gs->loop.fp_prev_riding = fp_landed_idx;
 
-        /*
-         * Bridge landing check — detect if the player is standing on any
-         * active bridge using the same physics-bottom logic as platforms.
-         * The bridge_landed_idx drives the crumble timer in bridges_update.
-         */
-        int bridge_landed_idx = -1;
-        if (gs->player.on_ground) {
-            float pcx = gs->player.x + gs->player.w / 2.0f;
-            SDL_Rect phit = player_get_hitbox(&gs->player);
-            int player_bottom = phit.y + phit.h;
-            for (int i = 0; i < gs->bridge_count; i++) {
-                const Bridge *br = &gs->bridges[i];
-                SDL_Rect brect = bridge_get_rect(br);
-                /* Player's bottom is within 4 px of the bridge top,
-                 * overlaps horizontally, AND the brick under feet is solid */
-                if (player_bottom >= brect.y && player_bottom <= brect.y + 4 &&
-                    phit.x + phit.w > brect.x && phit.x < brect.x + brect.w &&
-                    bridge_has_solid_at(br, pcx)) {
-                    bridge_landed_idx = i;
-                    break;
-                }
-            }
-        }
-        /* Log the first frame the player touches a bridge brick */
-        if (bridge_landed_idx >= 0 && gs->debug_mode) {
-            float pcx = gs->player.x + gs->player.w / 2.0f;
-            const Bridge *br = &gs->bridges[bridge_landed_idx];
-            int idx = (int)((pcx - br->x) / BRIDGE_TILE_W);
-            if (idx >= 0 && idx < br->brick_count) {
-                const BridgeBrick *bk = &br->bricks[idx];
-                if (bk->active && !bk->falling && bk->fall_delay < 0.0f) {
-                    debug_log(&gs->debug, "BRIDGE brick[%d] touched", idx);
-                }
-            }
-        }
-        bridges_update(gs->bridges, gs->bridge_count, dt, bridge_landed_idx,
-                       gs->player.x + gs->player.w / 2.0f);
+        game_bridges_update(gs, dt);
 
         game_collide(gs, dt);
 
