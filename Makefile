@@ -67,6 +67,8 @@ TEST_TOMLC_OBJ      = $(OUTDIR)/test-tomlc17.o
 TEST_RAIL_OBJ       = $(OUTDIR)/test-rail.o
 TEST_ENTITY_UTILS_OBJ = $(OUTDIR)/test-entity-utils.o
 TEST_SPIKE_PLATFORM_OBJ = $(OUTDIR)/test-spike-platform.o
+TEST_FISH_OBJ      = $(OUTDIR)/test-fish.o
+TEST_CIRCULAR_SAW_OBJ = $(OUTDIR)/test-circular-saw.o
 TEST_PHASE_OBJ      = $(OUTDIR)/test-phase-transition.o
 TEST_EDITOR_VALIDATION_OBJ = $(OUTDIR)/test-editor-validation.o
 TEST_LIBS           = $(shell $(SDL2CFG) --libs) -lm
@@ -218,6 +220,12 @@ $(TEST_ENTITY_UTILS_OBJ): $(SRCDIR)/core/entity_utils.c
 $(TEST_SPIKE_PLATFORM_OBJ): $(SRCDIR)/hazards/spike_platform.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
+$(TEST_FISH_OBJ): $(SRCDIR)/entities/fish.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_CIRCULAR_SAW_OBJ): $(SRCDIR)/hazards/circular_saw.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
 $(TEST_PHASE_OBJ): $(SRCDIR)/levels/phase_transition.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
@@ -239,7 +247,8 @@ $(OUTDIR)/rail-test: tests/rail_test.c $(TEST_RAIL_OBJ)
 $(OUTDIR)/entity-utils-test: tests/entity_utils_test.c $(TEST_ENTITY_UTILS_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
 
-$(OUTDIR)/collision-test: tests/collision_test.c $(TEST_SPIKE_PLATFORM_OBJ)
+$(OUTDIR)/collision-test: tests/collision_test.c $(TEST_SPIKE_PLATFORM_OBJ) \
+		$(TEST_FISH_OBJ) $(TEST_CIRCULAR_SAW_OBJ) $(TEST_ENTITY_UTILS_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
 $(OUTDIR)/phase-transition-test: tests/phase_transition_test.c $(TEST_PHASE_OBJ)
