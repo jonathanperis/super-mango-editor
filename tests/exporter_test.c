@@ -26,7 +26,8 @@ static int expect_file_contains(const char *path, const char *needle)
 
 static int exports_minimal_level_files(void)
 {
-    LevelDef def = {0};
+    LevelDef def;
+    level_def_init_defaults(&def);
     strncpy(def.name, "Exporter Fixture", sizeof(def.name) - 1);
     def.screen_count = 2;
     def.player_start_x = 12.0f;
@@ -38,8 +39,6 @@ static int exports_minimal_level_files(void)
     def.initial_lives = 5;
     def.score_per_life = 1000;
     def.coin_score = 100;
-    def.physics.walk_max_speed = -1.0f;
-    def.physics.run_max_speed = -1.0f;
     def.physics.cam_lookahead_max = 50.0f;
     def.coin_count = 1;
     def.coins[0].x = 42.0f;
