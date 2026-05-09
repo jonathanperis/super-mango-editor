@@ -18,8 +18,8 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
 
     parallax_cleanup(&gs->parallax);
     if (def->background_layer_count > 0) {
-        char  paths[MAX_BACKGROUND_LAYERS][64];
-        float speeds[MAX_BACKGROUND_LAYERS];
+        char  paths[MAX_BACKGROUND_LAYERS][64] = {{0}};
+        float speeds[MAX_BACKGROUND_LAYERS] = {0.0f};
         int   n = def->background_layer_count;
 
         if (n > MAX_BACKGROUND_LAYERS) n = MAX_BACKGROUND_LAYERS;
@@ -64,7 +64,7 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
 
     fog_cleanup(&gs->fog);
     if (def->fog_layer_count > 0) {
-        char fog_paths[MAX_FOG_TEXTURES][64];
+        char fog_paths[MAX_FOG_TEXTURES][64] = {{0}};
         int  n = def->fog_layer_count;
 
         if (n > MAX_FOG_TEXTURES) n = MAX_FOG_TEXTURES;
