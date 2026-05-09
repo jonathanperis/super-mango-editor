@@ -102,57 +102,6 @@ static const ChunkLoadSpec s_optional_chunks[] = {
     { CHUNK_FIELD(hit), "assets/sounds/player/player_hit.wav", "hit.wav" }
 };
 
-static const size_t s_transient_texture_cleanup_order[] = {
-    TEX_FIELD(ctrl_init_msg)
-};
-
-static const size_t s_boot_texture_cleanup_order[] = {
-    TEX_FIELD(platform),
-    TEX_FIELD(floor_tile)
-};
-
-static const size_t s_core_chunk_cleanup_order[] = {
-    CHUNK_FIELD(hit),
-    CHUNK_FIELD(coin),
-    CHUNK_FIELD(jump),
-    CHUNK_FIELD(dive),
-    CHUNK_FIELD(spider_attack),
-    CHUNK_FIELD(flap),
-    CHUNK_FIELD(axe),
-    CHUNK_FIELD(spring)
-};
-
-static const size_t s_core_texture_cleanup_order[] = {
-    TEX_FIELD(spike_platform),
-    TEX_FIELD(spike),
-    TEX_FIELD(faster_fish),
-    TEX_FIELD(fire_flame),
-    TEX_FIELD(blue_flame),
-    TEX_FIELD(circular_saw),
-    TEX_FIELD(axe_trap),
-    TEX_FIELD(last_star),
-    TEX_FIELD(star_red),
-    TEX_FIELD(star_green),
-    TEX_FIELD(star_yellow),
-    TEX_FIELD(bridge),
-    TEX_FIELD(float_platform),
-    TEX_FIELD(spike_block),
-    TEX_FIELD(rail),
-    TEX_FIELD(bouncepad_high),
-    TEX_FIELD(bouncepad_small),
-    TEX_FIELD(rope),
-    TEX_FIELD(ladder),
-    TEX_FIELD(vine_brown),
-    TEX_FIELD(vine_green),
-    TEX_FIELD(bouncepad_medium),
-    TEX_FIELD(coin),
-    TEX_FIELD(fish),
-    TEX_FIELD(faster_bird),
-    TEX_FIELD(bird),
-    TEX_FIELD(jumping_spider),
-    TEX_FIELD(spider)
-};
-
 static SDL_Texture **texture_slot(GameState *gs, size_t offset)
 {
     return (SDL_Texture **)((char *)&gs->textures + offset);
@@ -198,7 +147,7 @@ static Mix_Chunk *load_optional_chunk(const char *path, const char *label)
 }
 
 static void load_required_texture_specs(GameState *gs,
-    const TextureLoadSpec *specs, int count)
+                                        const TextureLoadSpec *specs, int count)
 {
     for (int i = 0; i < count; i++) {
         *texture_slot(gs, specs[i].offset) =
@@ -224,18 +173,27 @@ static void load_optional_chunk_specs(GameState *gs, const ChunkLoadSpec *specs,
     }
 }
 
-static void destroy_texture_slots(GameState *gs, const size_t *offsets, int count)
+static void destroy_texture_offset(GameState *gs, size_t offset)
 {
-    for (int i = 0; i < count; i++) {
-        SDL_Texture **slot = texture_slot(gs, offsets[i]);
+    SDL_Texture **slot = texture_slot(gs, offset);
+    DESTROY_TEX(*slot);
+}
+
+static void destroy_texture_specs_reverse(GameState *gs,
+                                          const TextureLoadSpec *specs,
+                                          int count)
+{
+    for (int i = count - 1; i >= 0; i--) {
+        SDL_Texture **slot = texture_slot(gs, specs[i].offset);
         DESTROY_TEX(*slot);
     }
 }
 
-static void free_chunk_slots(GameState *gs, const size_t *offsets, int count)
+static void free_chunk_specs_reverse(GameState *gs, const ChunkLoadSpec *specs,
+                                     int count)
 {
-    for (int i = 0; i < count; i++) {
-        Mix_Chunk **slot = chunk_slot(gs, offsets[i]);
+    for (int i = count - 1; i >= 0; i--) {
+        Mix_Chunk **slot = chunk_slot(gs, specs[i].offset);
         FREE_CHUNK(*slot);
     }
 }
@@ -264,13 +222,7 @@ void game_resources_cleanup(GameState *gs)
         gs->audio.music = NULL;
     }
 
-    destroy_texture_slots(gs, s_transient_texture_cleanup_order,
-                          ARRAY_LEN(s_transient_texture_cleanup_order));
-
-    water_cleanup(&gs->water);
-
-    destroy_texture_slots(gs, s_boot_texture_cleanup_order,
-                          ARRAY_LEN(s_boot_texture_cleanup_order));
+    destroy_texture_offset(gs, TEX_FIELD(ctrl_init_msg));
 
     parallax_cleanup(&gs->parallax);
 
@@ -282,10 +234,15 @@ void game_resources_cleanup(GameState *gs)
     }
 
     /* Core audio chunks: reverse order of game_resources_load(). */
-    free_chunk_slots(gs, s_core_chunk_cleanup_order,
-                     ARRAY_LEN(s_core_chunk_cleanup_order));
+    free_chunk_specs_reverse(gs, s_optional_chunks, ARRAY_LEN(s_optional_chunks));
 
     /* Core textures: reverse order of game_resources_load(). */
-    destroy_texture_slots(gs, s_core_texture_cleanup_order,
-                          ARRAY_LEN(s_core_texture_cleanup_order));
+    destroy_texture_specs_reverse(gs, s_optional_textures,
+                                  ARRAY_LEN(s_optional_textures));
+    destroy_texture_specs_reverse(gs, s_required_textures,
+                                  ARRAY_LEN(s_required_textures));
+
+    water_cleanup(&gs->water);
+
+    destroy_texture_specs_reverse(gs, s_boot_textures, ARRAY_LEN(s_boot_textures));
 }
