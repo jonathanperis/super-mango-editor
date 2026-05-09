@@ -72,6 +72,33 @@ static int rejects_bad_count_and_path(void)
     return 0;
 }
 
+static int rejects_missing_phase_and_layer_paths(void)
+{
+    LevelDef def;
+    EditorValidationReport report;
+
+    fill_valid_minimal(&def);
+    strncpy(def.next_phase, "levels/missing_next.toml", sizeof(def.next_phase) - 1);
+    def.background_layer_count = 1;
+    strncpy(def.background_layers[0].path,
+            "assets/sprites/backgrounds/missing.png",
+            sizeof(def.background_layers[0].path) - 1);
+    def.foreground_layer_count = 1;
+    strncpy(def.foreground_layers[0].path,
+            "assets/sprites/foregrounds/missing.png",
+            sizeof(def.foreground_layers[0].path) - 1);
+    def.fog_layer_count = 1;
+    strncpy(def.fog_layers[0].path,
+            "assets/sprites/foregrounds/missing_fog.png",
+            sizeof(def.fog_layers[0].path) - 1);
+
+    if (expect_int("missing paths result", editor_validate_level(&def, &report), -1) != 0)
+        return 1;
+    if (expect_int("missing paths errors", report.error_count, 4) != 0) return 1;
+
+    return 0;
+}
+
 static int warns_without_blocking(void)
 {
     LevelDef def;
@@ -92,6 +119,7 @@ int main(void)
 {
     if (accepts_valid_level() != 0) return 1;
     if (rejects_bad_count_and_path() != 0) return 1;
+    if (rejects_missing_phase_and_layer_paths() != 0) return 1;
     if (rejects_bad_runtime_link() != 0) return 1;
     if (warns_without_blocking() != 0) return 1;
 
