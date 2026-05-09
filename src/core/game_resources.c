@@ -138,55 +138,20 @@ void game_resources_load(GameState *gs)
 
 void game_resources_cleanup(GameState *gs)
 {
+    /* Level-specific resources are applied after core resources; release first. */
     if (gs->audio.music) {
         Mix_HaltMusic();
         Mix_FreeMusic(gs->audio.music);
         gs->audio.music = NULL;
     }
 
-    FREE_CHUNK(gs->audio.jump);
-    FREE_CHUNK(gs->audio.coin);
-    FREE_CHUNK(gs->audio.hit);
-
     DESTROY_TEX(gs->textures.ctrl_init_msg);
 
-    DESTROY_TEX(gs->textures.spike_block);
-    DESTROY_TEX(gs->textures.bridge);
-    DESTROY_TEX(gs->textures.float_platform);
-    DESTROY_TEX(gs->textures.rail);
-    DESTROY_TEX(gs->textures.vine_green);
-    DESTROY_TEX(gs->textures.vine_brown);
-    DESTROY_TEX(gs->textures.ladder);
-    DESTROY_TEX(gs->textures.rope);
+    water_cleanup(&gs->water);
 
-    FREE_CHUNK(gs->audio.spring);
-    DESTROY_TEX(gs->textures.bouncepad_medium);
-    DESTROY_TEX(gs->textures.bouncepad_small);
-    DESTROY_TEX(gs->textures.bouncepad_high);
+    DESTROY_TEX(gs->textures.floor_tile);
 
-    DESTROY_TEX(gs->textures.coin);
-    DESTROY_TEX(gs->textures.star_yellow);
-    DESTROY_TEX(gs->textures.star_green);
-    DESTROY_TEX(gs->textures.star_red);
-    DESTROY_TEX(gs->textures.last_star);
-
-    FREE_CHUNK(gs->audio.dive);
-    FREE_CHUNK(gs->audio.spider_attack);
-    FREE_CHUNK(gs->audio.flap);
-    FREE_CHUNK(gs->audio.axe);
-
-    DESTROY_TEX(gs->textures.axe_trap);
-    DESTROY_TEX(gs->textures.circular_saw);
-    DESTROY_TEX(gs->textures.blue_flame);
-    DESTROY_TEX(gs->textures.fire_flame);
-    DESTROY_TEX(gs->textures.faster_fish);
-    DESTROY_TEX(gs->textures.spike);
-    DESTROY_TEX(gs->textures.spike_platform);
-    DESTROY_TEX(gs->textures.fish);
-    DESTROY_TEX(gs->textures.faster_bird);
-    DESTROY_TEX(gs->textures.bird);
-    DESTROY_TEX(gs->textures.jumping_spider);
-    DESTROY_TEX(gs->textures.spider);
+    parallax_cleanup(&gs->parallax);
 
     for (int i = 0; i < gs->platform_count; i++) {
         if (gs->platforms[i].tex) {
@@ -194,10 +159,45 @@ void game_resources_cleanup(GameState *gs)
             gs->platforms[i].tex = NULL;
         }
     }
+
+    /* Core audio chunks: reverse order of game_resources_load(). */
+    FREE_CHUNK(gs->audio.hit);
+    FREE_CHUNK(gs->audio.coin);
+    FREE_CHUNK(gs->audio.jump);
+    FREE_CHUNK(gs->audio.dive);
+    FREE_CHUNK(gs->audio.spider_attack);
+    FREE_CHUNK(gs->audio.flap);
+    FREE_CHUNK(gs->audio.axe);
+    FREE_CHUNK(gs->audio.spring);
+
+    /* Core textures: reverse order of game_resources_load(). */
+    DESTROY_TEX(gs->textures.spike_platform);
+    DESTROY_TEX(gs->textures.spike);
+    DESTROY_TEX(gs->textures.faster_fish);
+    DESTROY_TEX(gs->textures.fire_flame);
+    DESTROY_TEX(gs->textures.blue_flame);
+    DESTROY_TEX(gs->textures.circular_saw);
+    DESTROY_TEX(gs->textures.axe_trap);
+    DESTROY_TEX(gs->textures.last_star);
+    DESTROY_TEX(gs->textures.star_red);
+    DESTROY_TEX(gs->textures.star_green);
+    DESTROY_TEX(gs->textures.star_yellow);
+    DESTROY_TEX(gs->textures.bridge);
+    DESTROY_TEX(gs->textures.float_platform);
+    DESTROY_TEX(gs->textures.spike_block);
+    DESTROY_TEX(gs->textures.rail);
+    DESTROY_TEX(gs->textures.bouncepad_high);
+    DESTROY_TEX(gs->textures.bouncepad_small);
+    DESTROY_TEX(gs->textures.rope);
+    DESTROY_TEX(gs->textures.ladder);
+    DESTROY_TEX(gs->textures.vine_brown);
+    DESTROY_TEX(gs->textures.vine_green);
+    DESTROY_TEX(gs->textures.bouncepad_medium);
+    DESTROY_TEX(gs->textures.coin);
+    DESTROY_TEX(gs->textures.fish);
+    DESTROY_TEX(gs->textures.faster_bird);
+    DESTROY_TEX(gs->textures.bird);
+    DESTROY_TEX(gs->textures.jumping_spider);
+    DESTROY_TEX(gs->textures.spider);
     DESTROY_TEX(gs->textures.platform);
-    DESTROY_TEX(gs->textures.floor_tile);
-
-    water_cleanup(&gs->water);
-
-    parallax_cleanup(&gs->parallax);
 }
