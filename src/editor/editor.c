@@ -751,8 +751,11 @@ static void handle_event(EditorState *es, SDL_Event *event) {
             case SDLK_r:
                 if (file_exists(es->autosave_path)) {
                     if (confirm_discard_changes(es, "recover autosave")) {
-                        (void)editor_load_level(es, es->autosave_path);
-                        set_status(es, "Recovered autosave");
+                        if (editor_load_level(es, es->autosave_path) == 0) {
+                            set_status(es, "Recovered autosave");
+                        } else {
+                            set_status(es, "Failed to recover autosave");
+                        }
                     }
                 } else {
                     set_status(es, "No autosave to recover");
