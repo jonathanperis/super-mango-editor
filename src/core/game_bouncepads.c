@@ -55,3 +55,15 @@ void game_bouncepads_handle_hit(GameState *gs, int bounce_idx)
         debug_log(&gs->debug, "BOUNCE %s", name);
     }
 }
+
+void game_bouncepads_update_animations(GameState *gs, float dt)
+{
+    Uint32 elapsed_ms = (Uint32)(dt * 1000.0f);
+
+    bouncepads_update(gs->bouncepads_medium, gs->bouncepad_medium_count,
+                      elapsed_ms);
+    bouncepads_update(gs->bouncepads_small, gs->bouncepad_small_count,
+                      elapsed_ms);
+    bouncepads_update(gs->bouncepads_high, gs->bouncepad_high_count,
+                      elapsed_ms);
+}
