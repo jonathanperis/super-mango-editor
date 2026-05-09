@@ -63,6 +63,7 @@
 #include "render/game_render.h"        /* game_render_frame, render overlays         */
 #include "core/game_state.h"           /* reset_current_level                        */
 #include "input/game_input.h"          /* ctrl_init_worker                           */
+#include "input/game_events.h"         /* game_handle_events                         */
 #include "core/game_resources.h"       /* game_resources_load/cleanup                */
 #include "core/game_camera.h"          /* game_camera_update                         */
 
@@ -130,15 +131,6 @@ void game_complete_level(GameState *gs)
     }
 
     gs->level_complete = 1;
-}
-
-static void game_continue_after_completion(GameState *gs)
-{
-    if (gs->completion_pending_next_phase) {
-        if (game_load_next_phase(gs) == 0) return;
-    }
-
-    gs->running = 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -419,92 +411,7 @@ static void game_loop_frame(void *arg) {
         if (dt > 0.1f) dt = 0.1f;
 
         /* ---- 1. Events ------------------------------------------- */
-        /*
-         * SDL_PollEvent — drain the event queue one event at a time.
-         * Events are things the OS tells us about: key presses, mouse clicks,
-         * the user clicking the window's close button, etc.
-         * Returns 1 while there are events to process, 0 when the queue is empty.
-         */
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                /* User clicked the window's X button */
-                gs->running = 0;
-
-            } else if (event.type == SDL_KEYDOWN) {
-                /* A key was pressed this frame */
-                if (event.key.keysym.sym == SDLK_ESCAPE) {
-                    gs->running = 0;
-                } else if (gs->level_complete &&
-                           (event.key.keysym.sym == SDLK_RETURN ||
-                            event.key.keysym.sym == SDLK_SPACE)) {
-                    game_continue_after_completion(gs);
-                }
-
-            } else if (event.type == SDL_CONTROLLERDEVICEADDED) {
-                /*
-                 * A new gamepad was plugged in while the game is running.
-                 * Open it only if we don't already have one active.
-                 * event.cdevice.which is the joystick device index (not
-                 * an instance ID), so it can be passed directly to
-                 * SDL_GameControllerOpen.
-                 */
-                if (!gs->controller) {
-                    gs->controller = SDL_GameControllerOpen(event.cdevice.which);
-                }
-
-            } else if (event.type == SDL_CONTROLLERDEVICEREMOVED) {
-                /*
-                 * A gamepad was unplugged.  Check whether it is the one we
-                 * have open by comparing instance IDs.
-                 * SDL_GameControllerGetJoystick + SDL_JoystickInstanceID
-                 * retrieves the runtime ID of our open controller so we can
-                 * compare it against the event's which field.
-                 */
-                if (gs->controller) {
-                    SDL_Joystick *joy = SDL_GameControllerGetJoystick(gs->controller);
-                    if (SDL_JoystickInstanceID(joy) == event.cdevice.which) {
-                        SDL_GameControllerClose(gs->controller);
-                        gs->controller = NULL;
-                    }
-                }
-
-            } else if (event.type == SDL_CONTROLLERBUTTONDOWN) {
-                /*
-                 * Start (Xbox) / Options (DualSense / DS4) continues the
-                 * completion summary when visible, otherwise exits.
-                 */
-                if (event.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
-                    if (gs->level_complete) game_continue_after_completion(gs);
-                    else gs->running = 0;
-                }
-
-            } else if (event.type == SDL_WINDOWEVENT) {
-                /*
-                 * SDL_WINDOWEVENT carries several sub-types that describe
-                 * changes to the OS window state.  We use two of them:
-                 *
-                 * FOCUS_LOST  — the window moved to the background (user
-                 *               switched to another app, minimised, etc.).
-                 *               We pause physics and music so the game
-                 *               doesn't advance while unattended and the
-                 *               audio doesn't play into the background.
-                 *
-                 * FOCUS_GAINED — the window came back to the foreground.
-                 *               We resume music and reset the frame timestamp
-                 *               so the first resumed frame gets a normal dt
-                 *               instead of a spike from the pause duration.
-                 */
-                if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-                    gs->paused = 1;
-                    Mix_PauseMusic();
-                } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-                    gs->paused = 0;
-                    Mix_ResumeMusic();
-                    gs->loop.prev_ticks = SDL_GetTicks64();
-                }
-            }
-        }
+        game_handle_events(gs);
 
         /* ---- 2. Update ------------------------------------------- */
         /*
