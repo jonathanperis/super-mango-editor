@@ -1196,10 +1196,22 @@ void level_config_render(EditorState *es, int start_y, int available_h,
         y += 8;
     }
 
-    /* ---- Level name ---- */
+    /* ---- Basic metadata ---- */
     ui_label(&es->ui, x + 8, y, "Name:");
     if (ui_text_field(&es->ui, 9000, x + 55, y, 310, es->level.name,
                       (int)sizeof(es->level.name)))
+        es->modified = 1;
+    y += 24;
+
+    ui_label(&es->ui, x + 8, y, "Desc:");
+    if (ui_text_field(&es->ui, 9001, x + 55, y, 310, es->level.description,
+                      (int)sizeof(es->level.description)))
+        es->modified = 1;
+    y += 24;
+
+    ui_label(&es->ui, x + 8, y, "By:");
+    if (ui_text_field(&es->ui, 9002, x + 55, y, 310, es->level.generated_by,
+                      (int)sizeof(es->level.generated_by)))
         es->modified = 1;
     y += 24;
 
