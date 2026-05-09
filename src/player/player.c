@@ -550,7 +550,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
             /* A / Cross button → jump dismount */
             if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
                 player->on_vine   = 0;
-                player->vy        = -500.0f;
+                player->vy        = JUMP_VY;
                 player->on_ground = 0;
                 if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
             }
