@@ -1225,8 +1225,8 @@ void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
         if (player->coyote_timer < 0.0f) player->coyote_timer = 0.0f;
     }
 
-    if (player->jump_buffer_timer > 0.0f &&
-        (player->on_ground || player->coyote_timer > 0.0f)) {
+    const int landed_this_frame = !was_on_ground && player->on_ground;
+    if (player->jump_buffer_timer > 0.0f && landed_this_frame) {
         player_start_jump(player, snd_jump);
     } else if (player->jump_buffer_timer > 0.0f) {
         player->jump_buffer_timer -= dt;
