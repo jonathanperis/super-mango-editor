@@ -14,7 +14,7 @@
 
 void level_resources_apply(GameState *gs, const LevelDef *def)
 {
-    if (!def) return;
+    if (!gs || !def) return;
 
     parallax_cleanup(&gs->parallax);
     if (def->background_layer_count > 0) {
