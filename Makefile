@@ -188,7 +188,7 @@ smoke: all editor
 		echo "smoke: $$level"; \
 		SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) ./$(TARGET) --level "$$level" --smoke-test-frames 5 || exit 1; \
 	done
-	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./$(EDITOR_TARGET) --smoke-test
+	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) ./$(EDITOR_TARGET) --smoke-test
 
 $(TEST_SERIALIZER_OBJ): $(EDITOR_DIR)/serializer.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
