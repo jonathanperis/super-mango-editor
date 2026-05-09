@@ -59,6 +59,7 @@ TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
                 $(OUTDIR)/rail-test $(OUTDIR)/entity-utils-test \
                 $(OUTDIR)/collision-test $(OUTDIR)/phase-transition-test \
                 $(OUTDIR)/exporter-test $(OUTDIR)/editor-validation-test
+SMOKE_LEVELS  = $(wildcard levels/*.toml)
 TEST_SERIALIZER_OBJ = $(OUTDIR)/test-serializer.o
 TEST_EXPORTER_OBJ   = $(OUTDIR)/test-exporter.o
 TEST_VALIDATE_OBJ   = $(OUTDIR)/test-level-validate.o
@@ -70,7 +71,7 @@ TEST_PHASE_OBJ      = $(OUTDIR)/test-phase-transition.o
 TEST_EDITOR_VALIDATION_OBJ = $(OUTDIR)/test-editor-validation.o
 TEST_LIBS           = $(shell $(SDL2CFG) --libs) -lm
 
-.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels
+.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels smoke
 
 all: $(OUTDIR) $(TARGET)
 
@@ -181,6 +182,13 @@ test: $(OUTDIR) $(TEST_TARGETS)
 
 validate-levels:
 	python3 tools/validate_levels.py
+
+smoke: all editor
+	@for level in $(SMOKE_LEVELS); do \
+		echo "smoke: $$level"; \
+		SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) ./$(TARGET) --level "$$level" --smoke-test-frames 5 || exit 1; \
+	done
+	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./$(EDITOR_TARGET) --smoke-test
 
 $(TEST_SERIALIZER_OBJ): $(EDITOR_DIR)/serializer.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
