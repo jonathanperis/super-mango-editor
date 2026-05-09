@@ -29,6 +29,337 @@ static int ensure_out_dir(void)
     return 0;
 }
 
+static int expect_int_value(const char *name, int actual, int expected)
+{
+    if (actual != expected) {
+        fprintf(stderr, "level_serializer_test: %s got %d expected %d\n",
+                name, actual, expected);
+        return 1;
+    }
+    return 0;
+}
+
+static int expect_float_value(const char *name, float actual, float expected)
+{
+    float diff = actual - expected;
+    if (diff < 0.0f) diff = -diff;
+    if (diff > 0.001f) {
+        fprintf(stderr, "level_serializer_test: %s got %.3f expected %.3f\n",
+                name, actual, expected);
+        return 1;
+    }
+    return 0;
+}
+
+static int expect_str_value(const char *name, const char *actual,
+                            const char *expected)
+{
+    if (strcmp(actual, expected) != 0) {
+        fprintf(stderr, "level_serializer_test: %s got '%s' expected '%s'\n",
+                name, actual, expected);
+        return 1;
+    }
+    return 0;
+}
+
+static void fill_rich_roundtrip_fixture(LevelDef *def)
+{
+    level_def_init_defaults(def);
+
+    strncpy(def->name, "Rich Serializer Fixture", sizeof(def->name) - 1);
+    strncpy(def->description, "Roundtrip every major LevelDef field.",
+            sizeof(def->description) - 1);
+    strncpy(def->generated_by, "serializer-test", sizeof(def->generated_by) - 1);
+    def->screen_count = 2;
+
+    def->floor_gaps[0] = 320;
+    def->floor_gaps[1] = 704;
+    def->floor_gap_count = 2;
+
+    def->rail_count = 2;
+    def->rails[0].layout = RAIL_LAYOUT_RECT;
+    def->rails[0].x = 240;
+    def->rails[0].y = 96;
+    def->rails[0].w = 4;
+    def->rails[0].h = 3;
+    def->rails[0].end_cap = 0;
+    def->rails[1].layout = RAIL_LAYOUT_HORIZ;
+    def->rails[1].x = 560;
+    def->rails[1].y = 144;
+    def->rails[1].w = 5;
+    def->rails[1].h = 0;
+    def->rails[1].end_cap = 1;
+
+    def->platform_count = 1;
+    def->platforms[0].x = 180.25f;
+    def->platforms[0].tile_height = 3;
+    def->platforms[0].tile_width = 2;
+    strncpy(def->platforms[0].tile_path,
+            "assets/sprites/levels/grass_tileset.png",
+            sizeof(def->platforms[0].tile_path) - 1);
+
+    def->coin_count = 1;
+    def->coins[0].x = 64.5f;
+    def->coins[0].y = 128.25f;
+    def->star_yellow_count = 1;
+    def->star_yellows[0].x = 90.0f;
+    def->star_yellows[0].y = 120.0f;
+    def->star_green_count = 1;
+    def->star_greens[0].x = 120.0f;
+    def->star_greens[0].y = 130.0f;
+    def->star_red_count = 1;
+    def->star_reds[0].x = 150.0f;
+    def->star_reds[0].y = 140.0f;
+    def->last_star.x = 760.0f;
+    def->last_star.y = 160.0f;
+    strncpy(def->next_phase, "levels/02_lugio_02.toml",
+            sizeof(def->next_phase) - 1);
+
+    def->spider_count = 1;
+    def->spiders[0].x = 210.0f;
+    def->spiders[0].vx = -24.5f;
+    def->spiders[0].patrol_x0 = 190.0f;
+    def->spiders[0].patrol_x1 = 260.0f;
+    def->spiders[0].frame_index = 2;
+    def->jumping_spider_count = 1;
+    def->jumping_spiders[0].x = 300.0f;
+    def->jumping_spiders[0].vx = 32.0f;
+    def->jumping_spiders[0].patrol_x0 = 280.0f;
+    def->jumping_spiders[0].patrol_x1 = 360.0f;
+    def->bird_count = 1;
+    def->birds[0].x = 420.0f;
+    def->birds[0].base_y = 72.0f;
+    def->birds[0].vx = 38.0f;
+    def->birds[0].patrol_x0 = 390.0f;
+    def->birds[0].patrol_x1 = 510.0f;
+    def->birds[0].frame_index = 1;
+    def->faster_bird_count = 1;
+    def->faster_birds[0].x = 520.0f;
+    def->faster_birds[0].base_y = 82.0f;
+    def->faster_birds[0].vx = -62.0f;
+    def->faster_birds[0].patrol_x0 = 480.0f;
+    def->faster_birds[0].patrol_x1 = 620.0f;
+    def->faster_birds[0].frame_index = 3;
+    def->fish_count = 1;
+    def->fish[0].x = 340.0f;
+    def->fish[0].vx = 18.0f;
+    def->fish[0].patrol_x0 = 320.0f;
+    def->fish[0].patrol_x1 = 380.0f;
+    def->faster_fish_count = 1;
+    def->faster_fish[0].x = 440.0f;
+    def->faster_fish[0].vx = -28.0f;
+    def->faster_fish[0].patrol_x0 = 400.0f;
+    def->faster_fish[0].patrol_x1 = 500.0f;
+
+    def->axe_trap_count = 1;
+    def->axe_traps[0].pillar_x = 288.0f;
+    def->axe_traps[0].y = 112.0f;
+    def->axe_traps[0].mode = AXE_MODE_SPIN;
+    def->circular_saw_count = 1;
+    def->circular_saws[0].x = 500.0f;
+    def->circular_saws[0].y = 184.0f;
+    def->circular_saws[0].patrol_x0 = 460.0f;
+    def->circular_saws[0].patrol_x1 = 560.0f;
+    def->circular_saws[0].direction = -1;
+    def->spike_row_count = 1;
+    def->spike_rows[0].x = 600.0f;
+    def->spike_rows[0].count = 4;
+    def->spike_platform_count = 1;
+    def->spike_platforms[0].x = 660.0f;
+    def->spike_platforms[0].y = 190.0f;
+    def->spike_platforms[0].tile_count = 3;
+    def->spike_block_count = 1;
+    def->spike_blocks[0].rail_index = 0;
+    def->spike_blocks[0].t_offset = 1.5f;
+    def->spike_blocks[0].speed = 2.25f;
+    def->blue_flame_count = 1;
+    def->blue_flames[0].x = 320.0f;
+    def->fire_flame_count = 1;
+    def->fire_flames[0].x = 704.0f;
+
+    def->float_platform_count = 1;
+    def->float_platforms[0].mode = FLOAT_PLATFORM_RAIL;
+    def->float_platforms[0].x = 560.0f;
+    def->float_platforms[0].y = 144.0f;
+    def->float_platforms[0].tile_count = 4;
+    def->float_platforms[0].rail_index = 1;
+    def->float_platforms[0].t_offset = 0.75f;
+    def->float_platforms[0].speed = 1.5f;
+    def->bridge_count = 1;
+    def->bridges[0].x = 220.0f;
+    def->bridges[0].y = 192.0f;
+    def->bridges[0].brick_count = 5;
+    def->bouncepad_small_count = 1;
+    def->bouncepads_small[0].x = 260.0f;
+    def->bouncepads_small[0].launch_vy = -320.0f;
+    def->bouncepads_small[0].pad_type = BOUNCEPAD_GREEN;
+    def->bouncepad_medium_count = 1;
+    def->bouncepads_medium[0].x = 300.0f;
+    def->bouncepads_medium[0].launch_vy = -420.0f;
+    def->bouncepads_medium[0].pad_type = BOUNCEPAD_WOOD;
+    def->bouncepad_high_count = 1;
+    def->bouncepads_high[0].x = 340.0f;
+    def->bouncepads_high[0].launch_vy = -520.0f;
+    def->bouncepads_high[0].pad_type = BOUNCEPAD_RED;
+    def->vine_count = 1;
+    def->vines[0].x = 180.0f;
+    def->vines[0].y = 96.0f;
+    def->vines[0].tile_count = 3;
+    def->vines[0].vine_type = 1;
+    def->ladder_count = 1;
+    def->ladders[0].x = 400.0f;
+    def->ladders[0].y = 120.0f;
+    def->ladders[0].tile_count = 4;
+    def->rope_count = 1;
+    def->ropes[0].x = 480.0f;
+    def->ropes[0].y = 80.0f;
+    def->ropes[0].tile_count = 5;
+
+    def->background_layer_count = 1;
+    strncpy(def->background_layers[0].path,
+            "assets/sprites/backgrounds/sky.png",
+            sizeof(def->background_layers[0].path) - 1);
+    def->background_layers[0].speed = 0.25f;
+    def->foreground_layer_count = 1;
+    strncpy(def->foreground_layers[0].path,
+            "assets/sprites/foregrounds/water.png",
+            sizeof(def->foreground_layers[0].path) - 1);
+    def->foreground_layers[0].speed = 1.0f;
+    def->fog_layer_count = 1;
+    strncpy(def->fog_layers[0].path,
+            "assets/sprites/foregrounds/fog.png",
+            sizeof(def->fog_layers[0].path) - 1);
+    def->fog_layers[0].speed = 0.1f;
+
+    def->player_start_x = 24.0f;
+    def->player_start_y = 176.0f;
+    strncpy(def->music_path, "assets/sounds/levels/water.wav",
+            sizeof(def->music_path) - 1);
+    def->music_volume = 42;
+    strncpy(def->floor_tile_path, "assets/sprites/levels/grass_tileset.png",
+            sizeof(def->floor_tile_path) - 1);
+    def->initial_hearts = 4;
+    def->initial_lives = 5;
+    def->score_per_life = 1500;
+    def->coin_score = 125;
+    def->physics.walk_max_speed = 82.0f;
+    def->physics.run_max_speed = 136.0f;
+    def->physics.walk_ground_accel = 720.0f;
+    def->physics.run_ground_accel = 980.0f;
+    def->physics.ground_friction = 840.0f;
+    def->physics.ground_counter_accel = 1100.0f;
+    def->physics.air_accel_walk = 390.0f;
+    def->physics.air_accel_run = 300.0f;
+    def->physics.air_friction = 42.0f;
+    def->physics.cam_lookahead_vx_factor = 0.08f;
+    def->physics.cam_lookahead_max = 18.0f;
+}
+
+static int compare_rich_roundtrip(const LevelDef *before, const LevelDef *after)
+{
+    if (expect_str_value("rich name", after->name, before->name) != 0) return 1;
+    if (expect_str_value("rich description", after->description,
+                         before->description) != 0) return 1;
+    if (expect_str_value("rich generated_by", after->generated_by,
+                         before->generated_by) != 0) return 1;
+    if (expect_int_value("rich screen_count", after->screen_count,
+                         before->screen_count) != 0) return 1;
+    if (expect_int_value("rich floor_gap_count", after->floor_gap_count,
+                         before->floor_gap_count) != 0) return 1;
+    if (expect_int_value("rich floor_gaps[1]", after->floor_gaps[1],
+                         before->floor_gaps[1]) != 0) return 1;
+    if (expect_int_value("rich rail_count", after->rail_count,
+                         before->rail_count) != 0) return 1;
+    if (expect_int_value("rich rails[1].layout", after->rails[1].layout,
+                         before->rails[1].layout) != 0) return 1;
+    if (expect_int_value("rich rails[1].end_cap", after->rails[1].end_cap,
+                         before->rails[1].end_cap) != 0) return 1;
+    if (expect_float_value("rich platform x", after->platforms[0].x,
+                           before->platforms[0].x) != 0) return 1;
+    if (expect_str_value("rich platform tile_path", after->platforms[0].tile_path,
+                         before->platforms[0].tile_path) != 0) return 1;
+
+    if (expect_float_value("rich coin y", after->coins[0].y,
+                           before->coins[0].y) != 0) return 1;
+    if (expect_int_value("rich star_green_count", after->star_green_count,
+                         before->star_green_count) != 0) return 1;
+    if (expect_float_value("rich star_red x", after->star_reds[0].x,
+                           before->star_reds[0].x) != 0) return 1;
+    if (expect_str_value("rich next_phase", after->next_phase,
+                         before->next_phase) != 0) return 1;
+
+    if (expect_int_value("rich spider frame", after->spiders[0].frame_index,
+                         before->spiders[0].frame_index) != 0) return 1;
+    if (expect_float_value("rich jumping spider vx", after->jumping_spiders[0].vx,
+                           before->jumping_spiders[0].vx) != 0) return 1;
+    if (expect_float_value("rich bird base_y", after->birds[0].base_y,
+                           before->birds[0].base_y) != 0) return 1;
+    if (expect_float_value("rich faster bird vx", after->faster_birds[0].vx,
+                           before->faster_birds[0].vx) != 0) return 1;
+    if (expect_float_value("rich fish patrol_x1", after->fish[0].patrol_x1,
+                           before->fish[0].patrol_x1) != 0) return 1;
+    if (expect_float_value("rich faster fish vx", after->faster_fish[0].vx,
+                           before->faster_fish[0].vx) != 0) return 1;
+
+    if (expect_int_value("rich axe mode", after->axe_traps[0].mode,
+                         before->axe_traps[0].mode) != 0) return 1;
+    if (expect_int_value("rich saw direction", after->circular_saws[0].direction,
+                         before->circular_saws[0].direction) != 0) return 1;
+    if (expect_int_value("rich spike row count", after->spike_rows[0].count,
+                         before->spike_rows[0].count) != 0) return 1;
+    if (expect_int_value("rich spike platform tile_count",
+                         after->spike_platforms[0].tile_count,
+                         before->spike_platforms[0].tile_count) != 0) return 1;
+    if (expect_float_value("rich spike block speed", after->spike_blocks[0].speed,
+                           before->spike_blocks[0].speed) != 0) return 1;
+    if (expect_float_value("rich blue flame x", after->blue_flames[0].x,
+                           before->blue_flames[0].x) != 0) return 1;
+    if (expect_float_value("rich fire flame x", after->fire_flames[0].x,
+                           before->fire_flames[0].x) != 0) return 1;
+
+    if (expect_int_value("rich float platform mode", after->float_platforms[0].mode,
+                         before->float_platforms[0].mode) != 0) return 1;
+    if (expect_int_value("rich bridge brick_count", after->bridges[0].brick_count,
+                         before->bridges[0].brick_count) != 0) return 1;
+    if (expect_int_value("rich small pad type", after->bouncepads_small[0].pad_type,
+                         before->bouncepads_small[0].pad_type) != 0) return 1;
+    if (expect_float_value("rich medium pad launch",
+                           after->bouncepads_medium[0].launch_vy,
+                           before->bouncepads_medium[0].launch_vy) != 0) return 1;
+    if (expect_int_value("rich high pad type", after->bouncepads_high[0].pad_type,
+                         before->bouncepads_high[0].pad_type) != 0) return 1;
+    if (expect_int_value("rich vine type", after->vines[0].vine_type,
+                         before->vines[0].vine_type) != 0) return 1;
+    if (expect_int_value("rich ladder tile_count", after->ladders[0].tile_count,
+                         before->ladders[0].tile_count) != 0) return 1;
+    if (expect_int_value("rich rope tile_count", after->ropes[0].tile_count,
+                         before->ropes[0].tile_count) != 0) return 1;
+
+    if (expect_str_value("rich background path", after->background_layers[0].path,
+                         before->background_layers[0].path) != 0) return 1;
+    if (expect_float_value("rich foreground speed", after->foreground_layers[0].speed,
+                           before->foreground_layers[0].speed) != 0) return 1;
+    if (expect_str_value("rich fog path", after->fog_layers[0].path,
+                         before->fog_layers[0].path) != 0) return 1;
+
+    if (expect_float_value("rich player_start_x", after->player_start_x,
+                           before->player_start_x) != 0) return 1;
+    if (expect_str_value("rich music_path", after->music_path,
+                         before->music_path) != 0) return 1;
+    if (expect_int_value("rich music_volume", after->music_volume,
+                         before->music_volume) != 0) return 1;
+    if (expect_int_value("rich coin_score", after->coin_score,
+                         before->coin_score) != 0) return 1;
+    if (expect_float_value("rich physics air_friction",
+                           after->physics.air_friction,
+                           before->physics.air_friction) != 0) return 1;
+    if (expect_float_value("rich physics cam lookahead",
+                           after->physics.cam_lookahead_vx_factor,
+                           before->physics.cam_lookahead_vx_factor) != 0) return 1;
+
+    return 0;
+}
+
 static int write_too_many_coins_fixture(const char *path)
 {
     FILE *fp = fopen(path, "w");
@@ -159,6 +490,26 @@ static int escaped_strings_roundtrip(void)
     return 0;
 }
 
+static int rich_level_roundtrip(void)
+{
+    const char *path = "out/test_rich_level_roundtrip.toml";
+    LevelDef before;
+    LevelDef after;
+
+    fill_rich_roundtrip_fixture(&before);
+
+    if (level_save_toml(&before, path) != 0)
+        return fail("could not save rich roundtrip fixture");
+
+    if (level_load_toml(path, &after) != 0)
+        return fail("could not reload rich roundtrip fixture");
+
+    if (compare_rich_roundtrip(&before, &after) != 0) return 1;
+
+    remove(path);
+    return 0;
+}
+
 static int missing_physics_uses_engine_defaults(void)
 {
     const char *path = "out/test_no_physics.toml";
@@ -220,6 +571,7 @@ int main(void)
     if (load_all_repo_levels() != 0) return 1;
     if (roundtrip_sandbox() != 0) return 1;
     if (escaped_strings_roundtrip() != 0) return 1;
+    if (rich_level_roundtrip() != 0) return 1;
     if (missing_physics_uses_engine_defaults() != 0) return 1;
     if (rejects_oversized_arrays() != 0) return 1;
     if (rejects_bad_runtime_links() != 0) return 1;
