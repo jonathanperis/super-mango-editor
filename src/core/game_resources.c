@@ -149,6 +149,7 @@ void game_resources_cleanup(GameState *gs)
 
     water_cleanup(&gs->water);
 
+    DESTROY_TEX(gs->textures.platform);
     DESTROY_TEX(gs->textures.floor_tile);
 
     parallax_cleanup(&gs->parallax);
@@ -199,5 +200,4 @@ void game_resources_cleanup(GameState *gs)
     DESTROY_TEX(gs->textures.bird);
     DESTROY_TEX(gs->textures.jumping_spider);
     DESTROY_TEX(gs->textures.spider);
-    DESTROY_TEX(gs->textures.platform);
 }
