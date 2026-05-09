@@ -56,10 +56,13 @@ EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor
 EDITOR_LIBS   = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lm
 TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
-                $(OUTDIR)/rail-test $(OUTDIR)/entity-utils-test \
-                $(OUTDIR)/collision-test $(OUTDIR)/phase-transition-test \
-                $(OUTDIR)/exporter-test $(OUTDIR)/editor-validation-test
+                 $(OUTDIR)/rail-test $(OUTDIR)/entity-utils-test \
+                 $(OUTDIR)/collision-test $(OUTDIR)/phase-transition-test \
+                 $(OUTDIR)/exporter-test $(OUTDIR)/editor-validation-test \
+                 $(OUTDIR)/gameplay-damage-test
 SMOKE_LEVELS  = $(wildcard levels/*.toml)
+SMOKE_FRAMES  ?= 5
+SMOKE_SEED    ?= 1
 TEST_SERIALIZER_OBJ = $(OUTDIR)/test-serializer.o
 TEST_EXPORTER_OBJ   = $(OUTDIR)/test-exporter.o
 TEST_VALIDATE_OBJ   = $(OUTDIR)/test-level-validate.o
@@ -69,6 +72,7 @@ TEST_ENTITY_UTILS_OBJ = $(OUTDIR)/test-entity-utils.o
 TEST_SPIKE_PLATFORM_OBJ = $(OUTDIR)/test-spike-platform.o
 TEST_FISH_OBJ      = $(OUTDIR)/test-fish.o
 TEST_CIRCULAR_SAW_OBJ = $(OUTDIR)/test-circular-saw.o
+TEST_COLLISION_DAMAGE_OBJ = $(OUTDIR)/test-collision-damage.o
 TEST_PHASE_OBJ      = $(OUTDIR)/test-phase-transition.o
 TEST_EDITOR_VALIDATION_OBJ = $(OUTDIR)/test-editor-validation.o
 TEST_LIBS           = $(shell $(SDL2CFG) --libs) -lm
@@ -183,6 +187,7 @@ test: $(OUTDIR) $(TEST_TARGETS)
 	$(RUN_PREFIX) ./$(OUTDIR)/phase-transition-test
 	$(RUN_PREFIX) ./$(OUTDIR)/exporter-test
 	$(RUN_PREFIX) ./$(OUTDIR)/editor-validation-test
+	$(RUN_PREFIX) ./$(OUTDIR)/gameplay-damage-test
 
 validate-levels:
 	python3 tools/validate_levels.py
@@ -190,7 +195,7 @@ validate-levels:
 smoke: all editor
 	@for level in $(SMOKE_LEVELS); do \
 		echo "smoke: $$level"; \
-		SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) ./$(TARGET) --level "$$level" --smoke-test-frames 5 || exit 1; \
+		SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) ./$(TARGET) --level "$$level" --smoke-test-frames $(SMOKE_FRAMES) --seed $(SMOKE_SEED) || exit 1; \
 	done
 	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) ./$(EDITOR_TARGET) --smoke-test
 
@@ -226,6 +231,9 @@ $(TEST_FISH_OBJ): $(SRCDIR)/entities/fish.c
 $(TEST_CIRCULAR_SAW_OBJ): $(SRCDIR)/hazards/circular_saw.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
+$(TEST_COLLISION_DAMAGE_OBJ): $(SRCDIR)/collision/collision_damage.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
 $(TEST_PHASE_OBJ): $(SRCDIR)/levels/phase_transition.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
@@ -259,6 +267,9 @@ $(OUTDIR)/exporter-test: tests/exporter_test.c $(TEST_EXPORTER_OBJ)
 
 $(OUTDIR)/editor-validation-test: tests/editor_validation_test.c $(TEST_EDITOR_VALIDATION_OBJ) $(TEST_VALIDATE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
+
+$(OUTDIR)/gameplay-damage-test: tests/gameplay_damage_test.c $(TEST_COLLISION_DAMAGE_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
 
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
 # Requires the Emscripten SDK (emcc on PATH).
