@@ -59,7 +59,7 @@
 #include "levels/phase_transition.h" /* phase next path/progress helpers                 */
 #include "editor/serializer.h"    /* level_load_toml                                    */
 #include "collision/game_collision.h"  /* game_collide, hitbox builders               */
-#include "collision/collision_damage.h" /* apply_damage                               */
+#include "collision/floor_gap_collision.h" /* floor_gap_handle_collision              */
 #include "render/game_render.h"        /* game_render_frame, render overlays         */
 #include "core/game_state.h"           /* reset_current_level                        */
 #include "input/game_input.h"          /* ctrl_init_worker                           */
@@ -470,31 +470,7 @@ static void game_loop_frame(void *arg) {
          * inside player_update so the player is already moving upward.
          */
         game_bouncepads_handle_hit(gs, bounce_idx);
-        /*
-         * Floor gap collision — instant life loss.
-         *
-         * Each floor gap is a FLOOR_GAP_W-wide hole in the floor.  The player
-         * falls through into the water below.  Once the player's physics
-         * centre drops below FLOOR_Y + 16 (the water surface) inside any
-         * gap, they lose a life (not a heart) and respawn.  This check
-         * ignores the invincibility timer — falling into the gap is fatal.
-         */
-        {
-            float pcx = gs->player.x + gs->player.w / 2.0f;
-            float pcy = gs->player.y + gs->player.h / 2.0f;
-            for (int g = 0; g < gs->floor_gap_count; g++) {
-                float gx = (float)gs->floor_gaps[g];
-                if (pcx >= gx && pcx < gx + (float)FLOOR_GAP_W &&
-                    pcy > (float)(GAME_H - WATER_ART_H)) {
-                    if (gs->debug_mode) debug_log(&gs->debug, "HIT floor gap[%d]", g);
-                    /* Play the dive/splash SFX */
-                    if (gs->audio.dive) Mix_PlayChannel(-1, gs->audio.dive, 0);
-                    /* Floor gap is always lethal — drain all remaining hearts, no push */
-                    apply_damage(gs, gs->hearts, 0, 0.0f, 0.0f);
-                    break;
-                }
-            }
-        }
+        floor_gap_handle_collision(gs);
 
         /* Move spiders along their patrol paths and advance their animation */
         spiders_update(gs->spiders, gs->spider_count, dt,
