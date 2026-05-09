@@ -12,6 +12,20 @@
 #include "../effects/water.h"
 #include "../effects/parallax.h"
 
+#define ARRAY_LEN(arr) ((int)(sizeof(arr) / sizeof((arr)[0])))
+
+typedef struct {
+    SDL_Texture **slot;
+    const char  *path;
+    const char  *label;
+} TextureLoadSpec;
+
+typedef struct {
+    Mix_Chunk  **slot;
+    const char  *path;
+    const char  *label;
+} ChunkLoadSpec;
+
 static void game_resources_fail(GameState *gs, const char *label, const char *detail)
 {
     fprintf(stderr, "%s: %s\n", label, detail);
@@ -46,92 +60,113 @@ static Mix_Chunk *load_optional_chunk(const char *path, const char *label)
     return chunk;
 }
 
+static void load_required_texture_specs(GameState *gs,
+                                        const TextureLoadSpec *specs, int count)
+{
+    for (int i = 0; i < count; i++) {
+        *specs[i].slot = load_required_texture(gs, specs[i].path, specs[i].label);
+    }
+}
+
+static void load_optional_texture_specs(GameState *gs,
+                                        const TextureLoadSpec *specs, int count)
+{
+    for (int i = 0; i < count; i++) {
+        *specs[i].slot = load_optional_texture(gs, specs[i].path, specs[i].label);
+    }
+}
+
+static void load_optional_chunk_specs(const ChunkLoadSpec *specs, int count)
+{
+    for (int i = 0; i < count; i++) {
+        *specs[i].slot = load_optional_chunk(specs[i].path, specs[i].label);
+    }
+}
+
 void game_resources_load(GameState *gs)
 {
-    gs->textures.floor_tile = load_required_texture(gs,
-        "assets/sprites/levels/grass_tileset.png",
-        "Failed to load Grass_Tileset.png");
-    gs->textures.platform = load_required_texture(gs,
-        "assets/sprites/levels/grass_platform.png",
-        "Failed to load Grass_Oneway.png");
+    const TextureLoadSpec boot_textures[] = {
+        { &gs->textures.floor_tile, "assets/sprites/levels/grass_tileset.png",
+          "Failed to load Grass_Tileset.png" },
+        { &gs->textures.platform, "assets/sprites/levels/grass_platform.png",
+          "Failed to load Grass_Oneway.png" }
+    };
+
+    load_required_texture_specs(gs, boot_textures, ARRAY_LEN(boot_textures));
 
     water_init(&gs->water, gs->renderer);
 
-    gs->textures.spider = load_required_texture(gs,
-        "assets/sprites/entities/spider.png", "Failed to load Spider_1.png");
-    gs->textures.jumping_spider = load_required_texture(gs,
-        "assets/sprites/entities/jumping_spider.png", "Failed to load Spider_2.png");
-    gs->textures.bird = load_required_texture(gs,
-        "assets/sprites/entities/bird.png", "Failed to load Bird_2.png");
-    gs->textures.faster_bird = load_required_texture(gs,
-        "assets/sprites/entities/faster_bird.png", "Failed to load Bird_1.png");
-    gs->textures.fish = load_required_texture(gs,
-        "assets/sprites/entities/fish.png", "Failed to load Fish_2.png");
-    gs->textures.coin = load_required_texture(gs,
-        "assets/sprites/collectibles/coin.png", "Failed to load Coin.png");
-    gs->textures.bouncepad_medium = load_required_texture(gs,
-        "assets/sprites/surfaces/bouncepad_medium.png",
-        "Failed to load Bouncepad_Wood.png");
+    const TextureLoadSpec required_textures[] = {
+        { &gs->textures.spider, "assets/sprites/entities/spider.png",
+          "Failed to load Spider_1.png" },
+        { &gs->textures.jumping_spider, "assets/sprites/entities/jumping_spider.png",
+          "Failed to load Spider_2.png" },
+        { &gs->textures.bird, "assets/sprites/entities/bird.png",
+          "Failed to load Bird_2.png" },
+        { &gs->textures.faster_bird, "assets/sprites/entities/faster_bird.png",
+          "Failed to load Bird_1.png" },
+        { &gs->textures.fish, "assets/sprites/entities/fish.png",
+          "Failed to load Fish_2.png" },
+        { &gs->textures.coin, "assets/sprites/collectibles/coin.png",
+          "Failed to load Coin.png" },
+        { &gs->textures.bouncepad_medium,
+          "assets/sprites/surfaces/bouncepad_medium.png",
+          "Failed to load Bouncepad_Wood.png" }
+    };
+    const TextureLoadSpec optional_textures[] = {
+        { &gs->textures.vine_green, "assets/sprites/surfaces/vine_green.png",
+          "Vine_Green.png" },
+        { &gs->textures.vine_brown, "assets/sprites/surfaces/vine_brown.png",
+          "Vine_Brown.png" },
+        { &gs->textures.ladder, "assets/sprites/surfaces/ladder.png", "Ladder.png" },
+        { &gs->textures.rope, "assets/sprites/surfaces/rope.png", "Rope.png" },
+        { &gs->textures.bouncepad_small, "assets/sprites/surfaces/bouncepad_small.png",
+          "Bouncepad_Green.png" },
+        { &gs->textures.bouncepad_high, "assets/sprites/surfaces/bouncepad_high.png",
+          "Bouncepad_Red.png" },
+        { &gs->textures.rail, "assets/sprites/surfaces/rail.png", "Rails.png" },
+        { &gs->textures.spike_block, "assets/sprites/hazards/spike_block.png",
+          "Spike_Block.png" },
+        { &gs->textures.float_platform, "assets/sprites/surfaces/float_platform.png",
+          "Platform.png" },
+        { &gs->textures.bridge, "assets/sprites/surfaces/bridge.png", "Bridge.png" },
+        { &gs->textures.star_yellow, "assets/sprites/collectibles/star_yellow.png",
+          "star_yellow.png" },
+        { &gs->textures.star_green, "assets/sprites/collectibles/star_green.png",
+          "star_green.png" },
+        { &gs->textures.star_red, "assets/sprites/collectibles/star_red.png",
+          "star_red.png" },
+        { &gs->textures.last_star, "assets/sprites/collectibles/last_star.png",
+          "last_star.png" },
+        { &gs->textures.axe_trap, "assets/sprites/hazards/axe_trap.png",
+          "Axe_Trap.png" },
+        { &gs->textures.circular_saw, "assets/sprites/hazards/circular_saw.png",
+          "Circular_Saw.png" },
+        { &gs->textures.blue_flame, "assets/sprites/hazards/blue_flame.png",
+          "blue_flame.png" },
+        { &gs->textures.fire_flame, "assets/sprites/hazards/fire_flame.png",
+          "fire_flame.png" },
+        { &gs->textures.faster_fish, "assets/sprites/entities/faster_fish.png",
+          "Fish_1.png" },
+        { &gs->textures.spike, "assets/sprites/hazards/spike.png", "Spike.png" },
+        { &gs->textures.spike_platform, "assets/sprites/hazards/spike_platform.png",
+          "Spike_Platform.png" }
+    };
+    const ChunkLoadSpec optional_chunks[] = {
+        { &gs->audio.spring, "assets/sounds/surfaces/bouncepad.wav", "bouncepad.wav" },
+        { &gs->audio.axe, "assets/sounds/hazards/axe_trap.wav", "axe_trap.wav" },
+        { &gs->audio.flap, "assets/sounds/entities/bird.wav", "flapping.wav" },
+        { &gs->audio.spider_attack, "assets/sounds/entities/spider.wav",
+          "spider-attack.mp3" },
+        { &gs->audio.dive, "assets/sounds/entities/fish.wav", "dive.wav" },
+        { &gs->audio.jump, "assets/sounds/player/player_jump.wav", "jump.wav" },
+        { &gs->audio.coin, "assets/sounds/collectibles/coin.wav", "coin.wav" },
+        { &gs->audio.hit, "assets/sounds/player/player_hit.wav", "hit.wav" }
+    };
 
-    gs->textures.vine_green = load_optional_texture(gs,
-        "assets/sprites/surfaces/vine_green.png", "Vine_Green.png");
-    gs->textures.vine_brown = load_optional_texture(gs,
-        "assets/sprites/surfaces/vine_brown.png", "Vine_Brown.png");
-    gs->textures.ladder = load_optional_texture(gs,
-        "assets/sprites/surfaces/ladder.png", "Ladder.png");
-    gs->textures.rope = load_optional_texture(gs,
-        "assets/sprites/surfaces/rope.png", "Rope.png");
-    gs->textures.bouncepad_small = load_optional_texture(gs,
-        "assets/sprites/surfaces/bouncepad_small.png", "Bouncepad_Green.png");
-    gs->textures.bouncepad_high = load_optional_texture(gs,
-        "assets/sprites/surfaces/bouncepad_high.png", "Bouncepad_Red.png");
-    gs->textures.rail = load_optional_texture(gs,
-        "assets/sprites/surfaces/rail.png", "Rails.png");
-    gs->textures.spike_block = load_optional_texture(gs,
-        "assets/sprites/hazards/spike_block.png", "Spike_Block.png");
-    gs->textures.float_platform = load_optional_texture(gs,
-        "assets/sprites/surfaces/float_platform.png", "Platform.png");
-    gs->textures.bridge = load_optional_texture(gs,
-        "assets/sprites/surfaces/bridge.png", "Bridge.png");
-    gs->textures.star_yellow = load_optional_texture(gs,
-        "assets/sprites/collectibles/star_yellow.png", "star_yellow.png");
-    gs->textures.star_green = load_optional_texture(gs,
-        "assets/sprites/collectibles/star_green.png", "star_green.png");
-    gs->textures.star_red = load_optional_texture(gs,
-        "assets/sprites/collectibles/star_red.png", "star_red.png");
-    gs->textures.last_star = load_optional_texture(gs,
-        "assets/sprites/collectibles/last_star.png", "last_star.png");
-    gs->textures.axe_trap = load_optional_texture(gs,
-        "assets/sprites/hazards/axe_trap.png", "Axe_Trap.png");
-    gs->textures.circular_saw = load_optional_texture(gs,
-        "assets/sprites/hazards/circular_saw.png", "Circular_Saw.png");
-    gs->textures.blue_flame = load_optional_texture(gs,
-        "assets/sprites/hazards/blue_flame.png", "blue_flame.png");
-    gs->textures.fire_flame = load_optional_texture(gs,
-        "assets/sprites/hazards/fire_flame.png", "fire_flame.png");
-    gs->textures.faster_fish = load_optional_texture(gs,
-        "assets/sprites/entities/faster_fish.png", "Fish_1.png");
-    gs->textures.spike = load_optional_texture(gs,
-        "assets/sprites/hazards/spike.png", "Spike.png");
-    gs->textures.spike_platform = load_optional_texture(gs,
-        "assets/sprites/hazards/spike_platform.png", "Spike_Platform.png");
-
-    gs->audio.spring = load_optional_chunk(
-        "assets/sounds/surfaces/bouncepad.wav", "bouncepad.wav");
-    gs->audio.axe = load_optional_chunk(
-        "assets/sounds/hazards/axe_trap.wav", "axe_trap.wav");
-    gs->audio.flap = load_optional_chunk(
-        "assets/sounds/entities/bird.wav", "flapping.wav");
-    gs->audio.spider_attack = load_optional_chunk(
-        "assets/sounds/entities/spider.wav", "spider-attack.mp3");
-    gs->audio.dive = load_optional_chunk(
-        "assets/sounds/entities/fish.wav", "dive.wav");
-    gs->audio.jump = load_optional_chunk(
-        "assets/sounds/player/player_jump.wav", "jump.wav");
-    gs->audio.coin = load_optional_chunk(
-        "assets/sounds/collectibles/coin.wav", "coin.wav");
-    gs->audio.hit = load_optional_chunk(
-        "assets/sounds/player/player_hit.wav", "hit.wav");
+    load_required_texture_specs(gs, required_textures, ARRAY_LEN(required_textures));
+    load_optional_texture_specs(gs, optional_textures, ARRAY_LEN(optional_textures));
+    load_optional_chunk_specs(optional_chunks, ARRAY_LEN(optional_chunks));
 
     gs->audio.music = NULL;
 }
