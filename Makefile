@@ -70,6 +70,8 @@ TEST_SPIKE_PLATFORM_OBJ = $(OUTDIR)/test-spike-platform.o
 TEST_PHASE_OBJ      = $(OUTDIR)/test-phase-transition.o
 TEST_EDITOR_VALIDATION_OBJ = $(OUTDIR)/test-editor-validation.o
 TEST_LIBS           = $(shell $(SDL2CFG) --libs) -lm
+SANITIZE_CFLAGS     = -fsanitize=address,undefined -fno-omit-frame-pointer
+SANITIZE_LDFLAGS    = -fsanitize=address,undefined
 
 .PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels smoke sanitize
 
@@ -193,10 +195,10 @@ smoke: all editor
 sanitize:
 	rm -rf out-sanitize
 	$(MAKE) test OUTDIR=out-sanitize \
-		CFLAGS="$(CFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer" \
-		TEST_CFLAGS="$(TEST_CFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer" \
-		LIBS="$(LIBS) -fsanitize=address,undefined" \
-		TEST_LIBS="$(TEST_LIBS) -fsanitize=address,undefined"
+		CFLAGS="$(CFLAGS) $(SANITIZE_CFLAGS)" \
+		TEST_CFLAGS="$(TEST_CFLAGS) $(SANITIZE_CFLAGS)" \
+		LIBS="$(LIBS) $(SANITIZE_LDFLAGS)" \
+		TEST_LIBS="$(TEST_LIBS) $(SANITIZE_LDFLAGS)"
 
 $(TEST_SERIALIZER_OBJ): $(EDITOR_DIR)/serializer.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
