@@ -52,9 +52,11 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
 
     {
         const char *strip = "assets/sprites/foregrounds/water.png";
-        if (def->foreground_layer_count > 0) {
+        int n = def->foreground_layer_count;
+        if (n > MAX_BACKGROUND_LAYERS) n = MAX_BACKGROUND_LAYERS;
+        if (n > 0) {
             const char *level_strip =
-                def->foreground_layers[def->foreground_layer_count - 1].path;
+                def->foreground_layers[n - 1].path;
             if (level_strip[0] != '\0') strip = level_strip;
         }
         water_reload_texture(&gs->water, gs->renderer, strip);
