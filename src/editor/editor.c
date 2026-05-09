@@ -57,6 +57,7 @@
 
 static void load_textures(EditorState *es);
 static void handle_event(EditorState *es, SDL_Event *event);
+static int compute_config_total_height(const EditorState *es);
 static void render_toolbar(EditorState *es);
 static void render_status_bar(EditorState *es);
 static void apply_undo_command(EditorState *es, const Command *cmd, int reverse);
@@ -78,6 +79,32 @@ static void paste_clipboard(EditorState *es);
 static void play_test(EditorState *es);
 static void stop_play(EditorState *es);
 static void check_play_status(EditorState *es);
+
+/*
+ * compute_config_total_height — Measure expanded Level Config content.
+ *
+ * The render path and mouse-wheel hit-test both need the same height so panel
+ * scrolling matches the visible section bounds. Keep every row constant here.
+ */
+static int compute_config_total_height(const EditorState *es) {
+    extern int g_plx_open, g_fg_open, g_fog_open, g_phys_open;
+    int validation_h = 24 + es->validation_report.message_count * 18;
+    int recent_h = es->recent_file_count > 0
+                 ? 20 + es->recent_file_count * 18 : 0;
+    int total = 28 + validation_h + recent_h + 8 + 72 + 24 + 24 + 24
+              + 22 + 24 + 30 + 6 + 22 + 24 + 24 + 24 + 24 + 10;
+
+    if (g_plx_open)
+        total += es->level.background_layer_count * 20 + 24;
+    if (g_fg_open)
+        total += es->level.foreground_layer_count * 20 + 24;
+    if (g_fog_open)
+        total += es->level.fog_layer_count * 20 + 24;
+    if (g_phys_open)
+        total += 6 * 22;
+
+    return total;
+}
 
 /* ------------------------------------------------------------------ */
 /* editor_init                                                         */
@@ -510,23 +537,7 @@ void editor_loop(EditorState *es) {
                      * + hearts/lives(6+22) + pts/life(24)
                      * + bg header(24) + fg header(24) + fog header(24)
                      * + margin(10) */
-                    extern int g_plx_open;
-                    extern int g_fg_open;
-                    extern int g_fog_open;
-                    extern int g_phys_open;
-                    int validation_h = 24 + es->validation_report.message_count * 18;
-                    int recent_h = es->recent_file_count > 0
-                                 ? 20 + es->recent_file_count * 18 : 0;
-                    config_h_total = 28 + validation_h + recent_h + 8 + 72 + 24 + 24 + 24 + 22 + 24 + 30
-                                   + 6 + 22 + 24 + 24 + 24 + 24 + 10;
-                    if (g_plx_open)
-                        config_h_total += es->level.background_layer_count * 20 + 24;
-                    if (g_fg_open)
-                        config_h_total += es->level.foreground_layer_count * 20 + 24;
-                    if (g_fog_open)
-                        config_h_total += es->level.fog_layer_count * 20 + 24;
-                    if (g_phys_open)
-                        config_h_total += 6 * 22;
+                    config_h_total = compute_config_total_height(es);
                 } else {
                     config_h_total = section_hdr;
                 }
@@ -983,16 +994,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
             int sc_section_hdr = 28;
             int sc_cfg_total   = sc_section_hdr;
             if (es->config_open) {
-                extern int g_plx_open, g_fg_open, g_fog_open, g_phys_open;
-                int validation_h = 24 + es->validation_report.message_count * 18;
-                int recent_h = es->recent_file_count > 0
-                             ? 20 + es->recent_file_count * 18 : 0;
-                sc_cfg_total = 28 + validation_h + recent_h + 8 + 24 + 24 + 24 + 24 + 22 + 24 + 30
-                             + 6 + 22 + 24 + 24 + 24 + 24 + 10;
-                if (g_plx_open) sc_cfg_total += es->level.background_layer_count * 20 + 24;
-                if (g_fg_open)  sc_cfg_total += es->level.foreground_layer_count  * 20 + 24;
-                if (g_fog_open) sc_cfg_total += es->level.fog_layer_count         * 20 + 24;
-                if (g_phys_open) sc_cfg_total += 6 * 22;
+                sc_cfg_total = compute_config_total_height(es);
             }
             int sc_cfg_max = (EDITOR_H - STATUS_H - TOOLBAR_H) / 2;
             int sc_cfg_h   = sc_cfg_total < sc_cfg_max ? sc_cfg_total : sc_cfg_max;
