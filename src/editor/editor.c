@@ -25,6 +25,7 @@
 #include <stdarg.h>       /* va_list — status message formatting            */
 
 #ifndef _WIN32
+#include <errno.h>        /* errno, ECHILD — waitpid error handling         */
 #include <unistd.h>       /* fork, execl, _exit — POSIX process control    */
 #include <signal.h>       /* kill — send signal to child process            */
 #include <sys/wait.h>     /* waitpid, WNOHANG — non-blocking child check   */
@@ -1821,10 +1822,16 @@ static void play_test(EditorState *es) {
     /* Windows: use system() with start to launch non-blocking */
     {
         char cmd[512];
+        int rc;
         snprintf(cmd, sizeof(cmd),
                  "start /B .\\out\\super-mango.exe --level \"%s\"%s",
                  save_path, es->debug_play ? " --debug" : "");
-        system(cmd);
+        rc = system(cmd);
+        if (rc != 0) {
+            fprintf(stderr, "Play: launch failed for %s (rc=%d)\n", save_path, rc);
+            set_status(es, "Play failed: launch %s", save_path);
+            return;
+        }
     }
     es->playing = 1;
     set_status(es, "Play launched %s", save_path);
@@ -1896,13 +1903,11 @@ static void check_play_status(EditorState *es) {
          * return to editor mode.
          */
         pid_t result = waitpid((pid_t)es->play_pid, &status, WNOHANG);
-        if (result != 0) {
+        if (result > 0) {
             /* Child exited (either normally or via signal) */
             es->play_pid = 0;
             es->playing = 0;
-            if (result < 0) {
-                set_status(es, "Play ended: process check failed");
-            } else if (WIFEXITED(status)) {
+            if (WIFEXITED(status)) {
                 set_status(es, "Play exited: code %d", WEXITSTATUS(status));
             } else if (WIFSIGNALED(status)) {
                 set_status(es, "Play exited: signal %d", WTERMSIG(status));
@@ -1918,6 +1923,24 @@ static void check_play_status(EditorState *es) {
                 SDL_SetWindowTitle(es->window, title);
             } else {
                 SDL_SetWindowTitle(es->window, "Super Mango Editor");
+            }
+        } else if (result < 0) {
+            if (errno == ECHILD) {
+                es->play_pid = 0;
+                es->playing = 0;
+                set_status(es, "Play ended: process already reaped");
+
+                /* Restore the editor title */
+                if (es->file_path[0] != '\0') {
+                    char title[300];
+                    snprintf(title, sizeof(title), "Super Mango Editor - %s%s",
+                             es->file_path, es->modified ? " *" : "");
+                    SDL_SetWindowTitle(es->window, title);
+                } else {
+                    SDL_SetWindowTitle(es->window, "Super Mango Editor");
+                }
+            } else {
+                set_status(es, "Play status check failed");
             }
         }
     }
