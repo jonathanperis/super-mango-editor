@@ -266,6 +266,8 @@ static int compare_rich_roundtrip(const LevelDef *before, const LevelDef *after)
                          before->screen_count) != 0) return 1;
     if (expect_int_value("rich floor_gap_count", after->floor_gap_count,
                          before->floor_gap_count) != 0) return 1;
+    if (expect_int_value("rich floor_gaps[0]", after->floor_gaps[0],
+                         before->floor_gaps[0]) != 0) return 1;
     if (expect_int_value("rich floor_gaps[1]", after->floor_gaps[1],
                          before->floor_gaps[1]) != 0) return 1;
     if (expect_int_value("rich rail_count", after->rail_count,
