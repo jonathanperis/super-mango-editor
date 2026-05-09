@@ -267,6 +267,17 @@ int level_save_toml(const LevelDef *def, const char *path) {
     fprintf(fp, "score_per_life = %d\n", def->score_per_life);
     fprintf(fp, "coin_score = %d\n", def->coin_score);
 
+    /* ---- Floor gaps (plain integer array) ------------------------- */
+
+    if (def->floor_gap_count > 0) {
+        fprintf(fp, "floor_gaps = [");
+        for (int i = 0; i < def->floor_gap_count; i++) {
+            if (i > 0) fprintf(fp, ", ");
+            fprintf(fp, "%d", def->floor_gaps[i]);
+        }
+        fprintf(fp, "]\n");
+    }
+
     /* ---- Player movement physics ---------------------------------- */
     /*
      * Always written as a [physics] table so the level file documents the
@@ -286,19 +297,6 @@ int level_save_toml(const LevelDef *def, const char *path) {
     fprintf(fp, "air_friction         = %s\n", fmt_float(def->physics.air_friction));
     fprintf(fp, "cam_lookahead_vx_factor = %s\n", fmt_float(def->physics.cam_lookahead_vx_factor));
     fprintf(fp, "cam_lookahead_max    = %s\n", fmt_float(def->physics.cam_lookahead_max));
-    fprintf(fp, "\n");
-
-    /* ---- Floor gaps (plain integer array) ------------------------- */
-
-    if (def->floor_gap_count > 0) {
-        fprintf(fp, "floor_gaps = [");
-        for (int i = 0; i < def->floor_gap_count; i++) {
-            if (i > 0) fprintf(fp, ", ");
-            fprintf(fp, "%d", def->floor_gaps[i]);
-        }
-        fprintf(fp, "]\n");
-    }
-
     fprintf(fp, "\n");
 
     /* ---- Rails --------------------------------------------------- */
