@@ -71,7 +71,7 @@ TEST_PHASE_OBJ      = $(OUTDIR)/test-phase-transition.o
 TEST_EDITOR_VALIDATION_OBJ = $(OUTDIR)/test-editor-validation.o
 TEST_LIBS           = $(shell $(SDL2CFG) --libs) -lm
 
-.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels smoke
+.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels smoke sanitize
 
 all: $(OUTDIR) $(TARGET)
 
@@ -189,6 +189,13 @@ smoke: all editor
 		SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) ./$(TARGET) --level "$$level" --smoke-test-frames 5 || exit 1; \
 	done
 	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) ./$(EDITOR_TARGET) --smoke-test
+
+sanitize: clean
+	$(MAKE) test \
+		CFLAGS="$(CFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer" \
+		TEST_CFLAGS="$(TEST_CFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer" \
+		LIBS="$(LIBS) -fsanitize=address,undefined" \
+		TEST_LIBS="$(TEST_LIBS) -fsanitize=address,undefined"
 
 $(TEST_SERIALIZER_OBJ): $(EDITOR_DIR)/serializer.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
