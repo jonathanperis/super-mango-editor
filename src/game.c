@@ -792,7 +792,7 @@ static void game_loop_frame(void *arg) {
 
         int bounce_idx    = -1;
         int fp_landed_idx = -1;
-        player_update(&gs->player, dt,
+        player_update(&gs->player, dt, gs->audio.jump,
                       gs->platforms, gs->platform_count,
                       gs->float_platforms, gs->float_platform_count,
                       s_all_pads, all_pad_count,

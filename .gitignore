@@ -3,6 +3,7 @@
 
 # Build output
 out/
+out-sanitize/
 
 # Object files
 *.o

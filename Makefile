@@ -190,8 +190,9 @@ smoke: all editor
 	done
 	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) ./$(EDITOR_TARGET) --smoke-test
 
-sanitize: clean
-	$(MAKE) test \
+sanitize:
+	rm -rf out-sanitize
+	$(MAKE) test OUTDIR=out-sanitize \
 		CFLAGS="$(CFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer" \
 		TEST_CFLAGS="$(TEST_CFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer" \
 		LIBS="$(LIBS) -fsanitize=address,undefined" \
