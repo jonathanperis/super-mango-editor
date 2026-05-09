@@ -30,6 +30,7 @@
 #include "surfaces/platform.h"
 #include "effects/water.h"
 #include "effects/fog.h"
+#include "effects/game_effects.h"
 #include "entities/spider.h"
 #include "entities/fish.h"
 #include "collectibles/coin.h"
@@ -504,11 +505,7 @@ static void game_loop_frame(void *arg) {
 
         game_checkpoint_update(gs);
 
-        /* Advance the water scroll offset (if water is enabled for this level) */
-        if (gs->runtime.water_enabled) water_update(&gs->water, dt);
-        /* Advance the fog wave positions and spawn the next wave if it is time.
-         * Only active when the level definition enables fog. */
-        if (gs->runtime.fog_enabled) fog_update(&gs->fog, dt);
+        game_effects_update(gs, dt);
         game_bouncepads_update_animations(gs, dt);
         /* Advance axe trap swing/spin animation and trigger distance-scaled sound */
         axe_traps_update(gs->axe_traps, gs->axe_trap_count, dt, gs->audio.axe,
