@@ -69,6 +69,7 @@
 #include "core/game_bouncepads.h"      /* combined bouncepad list/hit response       */
 #include "core/game_checkpoint.h"      /* game_checkpoint_update                     */
 #include "core/game_bridges.h"         /* game_bridges_update                        */
+#include "core/game_float_platforms.h" /* game_float_platforms_update                */
 
 /* ------------------------------------------------------------------ */
 /* Level data — loaded once from TOML, reused on player death resets    */
@@ -495,39 +496,7 @@ static void game_loop_frame(void *arg) {
          * the waiting-until-visible check on fall-off rails) */
         spike_blocks_update(gs->spike_blocks, gs->spike_block_count, dt, cam_x);
 
-        /*
-         * Advance float platforms: drives crumble timers and rail movement.
-         * fp_landed_idx tells which platform (if any) the player is standing
-         * on this frame, so the crumble timer only accumulates while the
-         * player is in contact.
-         */
-        float_platforms_update(gs->float_platforms, gs->float_platform_count,
-                               dt, fp_landed_idx);
-
-        /*
-         * Rail-platform player nudge — push the player sideways by the
-         * distance the rail platform moved this frame.
-         *
-         * float_platforms_update has already advanced fp->x to the new
-         * position and saved the old position in fp->prev_x, so the delta
-         * (fp->x − fp->prev_x) is the exact horizontal displacement for
-         * this frame.  Applying it to the player keeps them riding smoothly
-         * as the platform orbits the rail loop.
-         */
-        if (fp_landed_idx >= 0) {
-            const FloatPlatform *fp = &gs->float_platforms[fp_landed_idx];
-            if (fp->mode == FLOAT_PLATFORM_RAIL) {
-                gs->player.x += fp->x - fp->prev_x;
-            }
-        }
-
-        /*
-         * Update gs->loop.fp_prev_riding so next frame's player_update knows which
-         * float platform (if any) the player is currently standing on.
-         * Reset to -1 whenever the game resets so the stay-on check doesn't
-         * reference a stale index after a respawn.
-         */
-        gs->loop.fp_prev_riding = fp_landed_idx;
+        game_float_platforms_update(gs, dt, fp_landed_idx);
 
         game_bridges_update(gs, dt);
 
