@@ -48,7 +48,7 @@ void game_bouncepads_handle_hit(GameState *gs, int bounce_idx)
     if (gs->debug_mode) {
         static const char *pad_names[] = { "GREEN(small)", "WOOD(medium)",
                                            "RED(high)" };
-        const char *name = pad_names[1];
+        const char *name;
         if (bounce_idx < mc) name = pad_names[1];
         else if (bounce_idx < mc + sc) name = pad_names[0];
         else name = pad_names[2];
