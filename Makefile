@@ -165,7 +165,7 @@ $(VENDOR_DIR)/%.o: $(VENDOR_DIR)/%.c
 	$(CC) -std=c11 -MMD -MP -c -o $@ $<
 
 run-editor: editor
-	./$(EDITOR_TARGET)
+	$(RUN_PREFIX) ./$(EDITOR_TARGET)
 
 -include $(EDITOR_DEPS)
 
