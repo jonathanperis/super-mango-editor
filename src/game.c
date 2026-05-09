@@ -64,6 +64,7 @@
 #include "core/game_state.h"           /* reset_current_level                        */
 #include "input/game_input.h"          /* ctrl_init_worker                           */
 #include "core/game_resources.h"       /* game_resources_load/cleanup                */
+#include "core/game_camera.h"          /* game_camera_update                         */
 
 /* ------------------------------------------------------------------ */
 /* Level data — loaded once from TOML, reused on player death resets    */
@@ -757,66 +758,7 @@ static void game_loop_frame(void *arg) {
         blue_flames_update(gs->fire_flames, gs->fire_flame_count, dt);
 
         /* ---- Camera update --------------------------------------- */
-        /*
-         * Velocity-driven lookahead: the camera shifts ahead of the player
-         * proportionally to their current horizontal velocity (vx).
-         *
-         *   lookahead = vx × CAM_LOOKAHEAD_VX_FACTOR
-         *
-         * This means:
-         *   vx = 0  → lookahead = 0  → player perfectly centred.
-         *   vx = max run speed       → lookahead ≈ CAM_LOOKAHEAD_MAX,
-         *                              revealing more terrain ahead.
-         *   reversing direction      → lookahead crosses 0 and builds in the
-         *                              new direction as speed increases again.
-         *
-         * CAM_LOOKAHEAD_MAX caps the offset so it never grows unboundedly.
-         */
-        /* Use level-defined camera params if set, otherwise fall back to macros. */
-        const LevelDef *cam_def = (const LevelDef *)gs->runtime.current_level;
-        float cam_vx_factor = (cam_def && cam_def->physics.cam_lookahead_vx_factor != 0.0f)
-                                ? cam_def->physics.cam_lookahead_vx_factor
-                                : CAM_LOOKAHEAD_VX_FACTOR;
-        float cam_max = (cam_def && cam_def->physics.cam_lookahead_max != 0.0f)
-                          ? cam_def->physics.cam_lookahead_max
-                          : CAM_LOOKAHEAD_MAX;
-
-        float lookahead = gs->player.vx * cam_vx_factor;
-        if (lookahead >  cam_max) lookahead =  cam_max;
-        if (lookahead < -cam_max) lookahead = -cam_max;
-
-        float cam_target = (gs->player.x + gs->player.w * 0.5f)
-                           - (GAME_W * 0.5f)
-                           + lookahead;
-
-        /*
-         * Clamp the target to the world boundaries so the camera never
-         * shows the void beyond the left or right edge of the level.
-         * When the target is clamped, the camera stops moving and the player
-         * walks freely within the screen until facing back toward open space.
-         */
-        if (cam_target < 0.0f)               cam_target = 0.0f;
-        if (cam_target > gs->runtime.world_w - GAME_W) cam_target = (float)(gs->runtime.world_w - GAME_W);
-
-        /*
-         * Smooth follow: close a fraction of the remaining gap each frame.
-         * CAM_SMOOTHING × dt gives the fraction: at 60 fps (dt≈0.016) and
-         * CAM_SMOOTHING=8, each frame closes 8×0.016 ≈ 13% of the gap.
-         * When the gap is tiny (< CAM_SNAP_THRESHOLD px), snap exactly to
-         * prevent endless sub-pixel drift.
-         */
-        float cam_diff = cam_target - gs->camera.x;
-        if (cam_diff > CAM_SNAP_THRESHOLD || cam_diff < -CAM_SNAP_THRESHOLD)
-            gs->camera.x += cam_diff * CAM_SMOOTHING * dt;
-        else
-            gs->camera.x = cam_target;
-
-        /*
-         * Convert to integer pixels for this frame's render calls.
-         * All world-space render functions subtract cam_x from their dst.x
-         * to convert from world coordinates to screen coordinates.
-         */
-        cam_x = (int)gs->camera.x;
+        cam_x = game_camera_update(gs, dt);
 
         /* ---- 3. Render ------------------------------------------- */
         render:
