@@ -66,6 +66,7 @@
 #include "input/game_events.h"         /* game_handle_events                         */
 #include "core/game_resources.h"       /* game_resources_load/cleanup                */
 #include "core/game_camera.h"          /* game_camera_update                         */
+#include "core/game_bouncepads.h"      /* combined bouncepad list/hit response       */
 
 /* ------------------------------------------------------------------ */
 /* Level data — loaded once from TOML, reused on player death resets    */
@@ -445,19 +446,7 @@ static void game_loop_frame(void *arg) {
          * fp_landed_idx is set to the float platform the player landed on,
          * or -1 if none.  Both must be initialised to -1 before the call.
          */
-        /*
-         * Build a combined bouncepad array for player_update collision.
-         * The three separate arrays (medium, small, high) are concatenated
-         * so player_update sees all pads in one flat array.
-         * Uses file-static s_all_pads to avoid stack allocation every frame.
-         */
-        int all_pad_count = 0;
-        for (int i = 0; i < gs->bouncepad_medium_count; i++)
-            s_all_pads[all_pad_count++] = gs->bouncepads_medium[i];
-        for (int i = 0; i < gs->bouncepad_small_count; i++)
-            s_all_pads[all_pad_count++] = gs->bouncepads_small[i];
-        for (int i = 0; i < gs->bouncepad_high_count; i++)
-            s_all_pads[all_pad_count++] = gs->bouncepads_high[i];
+        int all_pad_count = game_bouncepads_collect(gs, s_all_pads);
 
         int bounce_idx    = -1;
         int fp_landed_idx = -1;
@@ -480,34 +469,7 @@ static void game_loop_frame(void *arg) {
          * the spring sound.  The launch impulse itself was already applied
          * inside player_update so the player is already moving upward.
          */
-        if (bounce_idx >= 0) {
-            /*
-             * Map the combined-array index back to the correct sub-array.
-             * Order: medium (0..mc-1), small (mc..mc+sc-1), high (mc+sc..).
-             */
-            Bouncepad *bp = NULL;
-            int mc = gs->bouncepad_medium_count;
-            int sc = gs->bouncepad_small_count;
-            if (bounce_idx < mc) {
-                bp = &gs->bouncepads_medium[bounce_idx];
-            } else if (bounce_idx < mc + sc) {
-                bp = &gs->bouncepads_small[bounce_idx - mc];
-            } else {
-                bp = &gs->bouncepads_high[bounce_idx - mc - sc];
-            }
-            bp->state           = BOUNCE_ACTIVE;
-            bp->anim_frame      = 1;
-            bp->anim_timer_ms   = 0;
-            if (gs->audio.spring) Mix_PlayChannel(-1, gs->audio.spring, 0);
-            if (gs->debug_mode) {
-                static const char *pad_names[] = { "GREEN(small)", "WOOD(medium)", "RED(high)" };
-                const char *name = pad_names[1]; /* default medium */
-                if (bounce_idx < mc) name = pad_names[1];
-                else if (bounce_idx < mc + sc) name = pad_names[0];
-                else name = pad_names[2];
-                debug_log(&gs->debug, "BOUNCE %s", name);
-            }
-        }
+        game_bouncepads_handle_hit(gs, bounce_idx);
         /*
          * Floor gap collision — instant life loss.
          *
