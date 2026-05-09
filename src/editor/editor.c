@@ -1774,9 +1774,11 @@ static void play_test(EditorState *es) {
 
     if (level_save_toml(&es->level, save_path) != 0) {
         fprintf(stderr, "Play: failed to save %s\n", save_path);
+        set_status(es, "Play failed: save %s", save_path);
         return;
     }
     es->modified = 0;
+    set_status(es, "Play saved %s", save_path);
 
     /* Step 4 — Launch the game as a child process */
     fprintf(stderr, "Play: launching game...\n");
@@ -1809,9 +1811,11 @@ static void play_test(EditorState *es) {
         /* Parent process — record the child and enter play mode */
         es->play_pid = (int)pid;
         es->playing = 1;
+        set_status(es, "Play launched %s", save_path);
         SDL_SetWindowTitle(es->window, "Super Mango Editor - Playing...");
     } else {
         fprintf(stderr, "Play: fork() failed\n");
+        set_status(es, "Play failed: fork");
     }
 #else
     /* Windows: use system() with start to launch non-blocking */
@@ -1823,6 +1827,7 @@ static void play_test(EditorState *es) {
         system(cmd);
     }
     es->playing = 1;
+    set_status(es, "Play launched %s", save_path);
     SDL_SetWindowTitle(es->window, "Super Mango Editor - Playing...");
 #endif
 }
@@ -1857,6 +1862,7 @@ static void stop_play(EditorState *es) {
 #endif
 
     es->playing = 0;
+    set_status(es, "Play stopped");
 
     /* Restore the editor title bar */
     if (es->file_path[0] != '\0') {
@@ -1894,6 +1900,15 @@ static void check_play_status(EditorState *es) {
             /* Child exited (either normally or via signal) */
             es->play_pid = 0;
             es->playing = 0;
+            if (result < 0) {
+                set_status(es, "Play ended: process check failed");
+            } else if (WIFEXITED(status)) {
+                set_status(es, "Play exited: code %d", WEXITSTATUS(status));
+            } else if (WIFSIGNALED(status)) {
+                set_status(es, "Play exited: signal %d", WTERMSIG(status));
+            } else {
+                set_status(es, "Play ended");
+            }
 
             /* Restore the editor title */
             if (es->file_path[0] != '\0') {
