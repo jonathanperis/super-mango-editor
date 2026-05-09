@@ -426,31 +426,204 @@ static int load_all_repo_levels(void)
     return 0;
 }
 
-static int roundtrip_sandbox(void)
+static int compare_shipped_roundtrip(const char *label, const LevelDef *before,
+                                     const LevelDef *after)
 {
-    const char *path = "out/test_roundtrip_level.toml";
-    LevelDef before;
-    LevelDef after;
+#define CHECK_INT(field) \
+    do { \
+        if ((after)->field != (before)->field) { \
+            fprintf(stderr, "level_serializer_test: %s changed %s\n", \
+                    label, #field); \
+            return 1; \
+        } \
+    } while (0)
 
-    if (level_load_toml("levels/00_sandbox_01.toml", &before) != 0)
-        return fail("could not load sandbox for roundtrip");
+#define CHECK_FLOAT(field) \
+    do { \
+        float diff = (after)->field - (before)->field; \
+        if (diff < 0.0f) diff = -diff; \
+        if (diff > 0.001f) { \
+            fprintf(stderr, "level_serializer_test: %s changed %s\n", \
+                    label, #field); \
+            return 1; \
+        } \
+    } while (0)
 
-    if (level_save_toml(&before, path) != 0)
-        return fail("could not save roundtrip fixture");
+#define CHECK_STR(field) \
+    do { \
+        if (strcmp((after)->field, (before)->field) != 0) { \
+            fprintf(stderr, "level_serializer_test: %s changed %s\n", \
+                    label, #field); \
+            return 1; \
+        } \
+    } while (0)
 
-    if (level_load_toml(path, &after) != 0)
-        return fail("could not reload roundtrip fixture");
+    CHECK_STR(name);
+    CHECK_STR(description);
+    CHECK_STR(generated_by);
+    CHECK_INT(screen_count);
+    CHECK_STR(next_phase);
+    CHECK_STR(music_path);
+    CHECK_INT(music_volume);
+    CHECK_STR(floor_tile_path);
+    CHECK_INT(initial_hearts);
+    CHECK_INT(initial_lives);
+    CHECK_INT(score_per_life);
+    CHECK_INT(coin_score);
+    CHECK_FLOAT(player_start_x);
+    CHECK_FLOAT(player_start_y);
 
-    if (strcmp(before.name, after.name) != 0)
-        return fail("roundtrip changed level name");
-    if (before.coin_count != after.coin_count)
-        return fail("roundtrip changed coin count");
-    if (before.platform_count != after.platform_count)
-        return fail("roundtrip changed platform count");
-    if (before.background_layer_count != after.background_layer_count)
-        return fail("roundtrip changed background layer count");
+    CHECK_INT(floor_gap_count);
+    CHECK_INT(rail_count);
+    CHECK_INT(platform_count);
+    CHECK_INT(coin_count);
+    CHECK_INT(star_yellow_count);
+    CHECK_INT(star_green_count);
+    CHECK_INT(star_red_count);
+    CHECK_INT(spider_count);
+    CHECK_INT(jumping_spider_count);
+    CHECK_INT(bird_count);
+    CHECK_INT(faster_bird_count);
+    CHECK_INT(fish_count);
+    CHECK_INT(faster_fish_count);
+    CHECK_INT(axe_trap_count);
+    CHECK_INT(circular_saw_count);
+    CHECK_INT(spike_row_count);
+    CHECK_INT(spike_platform_count);
+    CHECK_INT(spike_block_count);
+    CHECK_INT(blue_flame_count);
+    CHECK_INT(fire_flame_count);
+    CHECK_INT(float_platform_count);
+    CHECK_INT(bridge_count);
+    CHECK_INT(bouncepad_small_count);
+    CHECK_INT(bouncepad_medium_count);
+    CHECK_INT(bouncepad_high_count);
+    CHECK_INT(vine_count);
+    CHECK_INT(ladder_count);
+    CHECK_INT(rope_count);
+    CHECK_INT(background_layer_count);
+    CHECK_INT(foreground_layer_count);
+    CHECK_INT(fog_layer_count);
 
-    remove(path);
+    if (before->floor_gap_count > 0) {
+        int last = before->floor_gap_count - 1;
+        CHECK_INT(floor_gaps[0]);
+        CHECK_INT(floor_gaps[last]);
+    }
+    if (before->rail_count > 0) {
+        int last = before->rail_count - 1;
+        CHECK_INT(rails[0].layout);
+        CHECK_INT(rails[last].end_cap);
+        CHECK_INT(rails[last].w);
+    }
+    if (before->platform_count > 0) {
+        int last = before->platform_count - 1;
+        CHECK_FLOAT(platforms[0].x);
+        CHECK_INT(platforms[last].tile_height);
+        CHECK_STR(platforms[last].tile_path);
+    }
+    if (before->coin_count > 0) {
+        int last = before->coin_count - 1;
+        CHECK_FLOAT(coins[0].x);
+        CHECK_FLOAT(coins[last].y);
+    }
+    if (before->star_yellow_count > 0) CHECK_FLOAT(star_yellows[0].x);
+    if (before->star_green_count > 0) CHECK_FLOAT(star_greens[0].y);
+    if (before->star_red_count > 0) CHECK_FLOAT(star_reds[0].x);
+    CHECK_FLOAT(last_star.x);
+    CHECK_FLOAT(last_star.y);
+
+    if (before->spider_count > 0) CHECK_FLOAT(spiders[0].patrol_x1);
+    if (before->jumping_spider_count > 0) CHECK_FLOAT(jumping_spiders[0].vx);
+    if (before->bird_count > 0) CHECK_FLOAT(birds[0].base_y);
+    if (before->faster_bird_count > 0) CHECK_FLOAT(faster_birds[0].vx);
+    if (before->fish_count > 0) CHECK_FLOAT(fish[0].patrol_x0);
+    if (before->faster_fish_count > 0) CHECK_FLOAT(faster_fish[0].patrol_x1);
+
+    if (before->axe_trap_count > 0) CHECK_INT(axe_traps[0].mode);
+    if (before->circular_saw_count > 0) CHECK_INT(circular_saws[0].direction);
+    if (before->spike_row_count > 0) CHECK_INT(spike_rows[0].count);
+    if (before->spike_platform_count > 0) CHECK_INT(spike_platforms[0].tile_count);
+    if (before->spike_block_count > 0) CHECK_FLOAT(spike_blocks[0].speed);
+    if (before->blue_flame_count > 0) CHECK_FLOAT(blue_flames[0].x);
+    if (before->fire_flame_count > 0) CHECK_FLOAT(fire_flames[0].x);
+
+    if (before->float_platform_count > 0) CHECK_INT(float_platforms[0].mode);
+    if (before->bridge_count > 0) CHECK_INT(bridges[0].brick_count);
+    if (before->bouncepad_small_count > 0) CHECK_INT(bouncepads_small[0].pad_type);
+    if (before->bouncepad_medium_count > 0) CHECK_FLOAT(bouncepads_medium[0].launch_vy);
+    if (before->bouncepad_high_count > 0) CHECK_INT(bouncepads_high[0].pad_type);
+    if (before->vine_count > 0) CHECK_INT(vines[0].vine_type);
+    if (before->ladder_count > 0) CHECK_INT(ladders[0].tile_count);
+    if (before->rope_count > 0) CHECK_INT(ropes[0].tile_count);
+
+    if (before->background_layer_count > 0) {
+        int last = before->background_layer_count - 1;
+        CHECK_STR(background_layers[0].path);
+        CHECK_FLOAT(background_layers[last].speed);
+    }
+    if (before->foreground_layer_count > 0) {
+        int last = before->foreground_layer_count - 1;
+        CHECK_STR(foreground_layers[0].path);
+        CHECK_FLOAT(foreground_layers[last].speed);
+    }
+    if (before->fog_layer_count > 0) {
+        int last = before->fog_layer_count - 1;
+        CHECK_STR(fog_layers[0].path);
+        CHECK_FLOAT(fog_layers[last].speed);
+    }
+
+    CHECK_FLOAT(physics.walk_max_speed);
+    CHECK_FLOAT(physics.run_max_speed);
+    CHECK_FLOAT(physics.walk_ground_accel);
+    CHECK_FLOAT(physics.run_ground_accel);
+    CHECK_FLOAT(physics.ground_friction);
+    CHECK_FLOAT(physics.ground_counter_accel);
+    CHECK_FLOAT(physics.air_accel_walk);
+    CHECK_FLOAT(physics.air_accel_run);
+    CHECK_FLOAT(physics.air_friction);
+    CHECK_FLOAT(physics.cam_lookahead_vx_factor);
+    CHECK_FLOAT(physics.cam_lookahead_max);
+
+#undef CHECK_INT
+#undef CHECK_FLOAT
+#undef CHECK_STR
+
+    return 0;
+}
+
+static int roundtrip_repo_levels(void)
+{
+    const char *levels[] = {
+        "levels/00_sandbox_01.toml",
+        "levels/01_lugio_01.toml",
+        "levels/02_lugio_02.toml",
+    };
+    const char *paths[] = {
+        "out/test_roundtrip_00.toml",
+        "out/test_roundtrip_01.toml",
+        "out/test_roundtrip_02.toml",
+    };
+
+    for (int i = 0; i < (int)(sizeof(levels) / sizeof(levels[0])); i++) {
+        LevelDef before;
+        LevelDef after;
+
+        if (level_load_toml(levels[i], &before) != 0)
+            return fail("could not load repo level for roundtrip");
+
+        if (level_save_toml(&before, paths[i]) != 0)
+            return fail("could not save repo roundtrip fixture");
+
+        if (level_load_toml(paths[i], &after) != 0)
+            return fail("could not reload repo roundtrip fixture");
+
+        if (compare_shipped_roundtrip(levels[i], &before, &after) != 0)
+            return 1;
+
+        remove(paths[i]);
+    }
+
     return 0;
 }
 
@@ -571,7 +744,7 @@ int main(void)
 {
     if (ensure_out_dir() != 0) return 1;
     if (load_all_repo_levels() != 0) return 1;
-    if (roundtrip_sandbox() != 0) return 1;
+    if (roundtrip_repo_levels() != 0) return 1;
     if (escaped_strings_roundtrip() != 0) return 1;
     if (rich_level_roundtrip() != 0) return 1;
     if (missing_physics_uses_engine_defaults() != 0) return 1;
