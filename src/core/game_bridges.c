@@ -4,7 +4,7 @@
 
 #include "game_bridges.h"
 
-#include "player/player.h"
+#include "../player/player.h"
 
 static int game_bridge_find_landing(const GameState *gs, float player_cx,
                                     const SDL_Rect *player_hitbox)
