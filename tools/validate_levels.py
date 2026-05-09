@@ -176,6 +176,72 @@ def validate_rail_links(level_path: Path, data: dict) -> list[str]:
     return errors
 
 
+def validate_rail_geometry(level_path: Path, data: dict, constants: dict[str, int]) -> list[str]:
+    errors: list[str] = []
+    rails = data.get("rails", [])
+    max_tiles = constants.get("MAX_RAIL_TILES", 128)
+
+    if not isinstance(rails, list):
+        return errors
+
+    for index, rail in enumerate(rails):
+        if not isinstance(rail, dict):
+            continue
+        layout = rail.get("layout", "RECT")
+        w = rail.get("w")
+        h = rail.get("h")
+        if not isinstance(w, int) or isinstance(w, bool):
+            errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].w must be an integer")
+            continue
+        if layout == "RECT":
+            if not isinstance(h, int) or isinstance(h, bool):
+                errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].h must be an integer")
+                continue
+            if w < 2 or w > max_tiles:
+                errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].w {w} out of range (2..{max_tiles})")
+            if h < 2 or h > max_tiles:
+                errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].h {h} out of range (2..{max_tiles})")
+            tile_count = w * 2 + (h - 2) * 2
+            if tile_count > max_tiles:
+                errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}] has {tile_count} tiles (max {max_tiles})")
+        elif layout == "HORIZ":
+            if w < 2 or w > max_tiles:
+                errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].w {w} out of range (2..{max_tiles})")
+            end_cap = rail.get("end_cap", 0)
+            if end_cap not in (0, 1):
+                errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].end_cap must be 0 or 1")
+        else:
+            errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].layout invalid: {layout}")
+
+    return errors
+
+
+def validate_nested_dimensions(level_path: Path, data: dict, constants: dict[str, int]) -> list[str]:
+    errors: list[str] = []
+    max_spike_tiles = constants.get("MAX_SPIKE_TILES", 16)
+    max_bridge_bricks = constants.get("MAX_BRIDGE_BRICKS", 16)
+
+    def check_range(array_name: str, key: str, lo: int, hi: int) -> None:
+        items = data.get(array_name, [])
+        if not isinstance(items, list):
+            return
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+            value = item.get(key)
+            if isinstance(value, bool) or not isinstance(value, int):
+                errors.append(f"{level_path.relative_to(ROOT)}: {array_name}[{index}].{key} must be an integer")
+            elif value < lo or value > hi:
+                errors.append(f"{level_path.relative_to(ROOT)}: {array_name}[{index}].{key} {value} out of range ({lo}..{hi})")
+
+    check_range("spike_rows", "count", 1, max_spike_tiles)
+    check_range("spike_platforms", "tile_count", 1, max_spike_tiles)
+    check_range("float_platforms", "tile_count", 1, max_spike_tiles)
+    check_range("bridges", "brick_count", 1, max_bridge_bricks)
+
+    return errors
+
+
 def validate_level(level_path: Path, constants: dict[str, int]) -> list[str]:
     errors: list[str] = []
     data = load_level(level_path)
@@ -186,7 +252,9 @@ def validate_level(level_path: Path, constants: dict[str, int]) -> list[str]:
 
     errors.extend(validate_paths(level_path, data))
     errors.extend(validate_counts(level_path, data, constants))
+    errors.extend(validate_rail_geometry(level_path, data, constants))
     errors.extend(validate_rail_links(level_path, data))
+    errors.extend(validate_nested_dimensions(level_path, data, constants))
 
     return errors
 

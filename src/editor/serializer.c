@@ -26,6 +26,7 @@
 #include "serializer.h"
 #include "../../vendor/tomlc17/tomlc17.h" /* tomlc17 API */
 #include "../levels/level.h"              /* LevelDef, all placement types */
+#include "../levels/level_loader.h"       /* level_validate_runtime */
 #include "../game.h"                      /* MAX_* constants */
 
 /* ================================================================== */
@@ -710,11 +711,11 @@ int level_load_toml(const char *path, LevelDef *def) {
     }
 
     /*
-     * Zero the entire struct first.  This sets all counts to 0, all
-     * floats to 0.0, and all pointers to NULL — a clean starting state.
-     * Any arrays missing from the TOML will naturally have count = 0.
+     * Reset the entire struct first. Most fields naturally default to 0,
+     * while physics fields use -1.0 so they keep engine defaults unless a
+     * level explicitly overrides them.
      */
-    memset(def, 0, sizeof(*def));
+    level_def_init_defaults(def);
 
     toml_datum_t top = r.toptab;
 
@@ -1031,7 +1032,12 @@ int level_load_toml(const char *path, LevelDef *def) {
         toml_datum_t plx = toml_get(top, "background_layers");
         if (plx.type == TOML_ARRAY) {
             int n = plx.u.arr.size;
-            if (n > MAX_BACKGROUND_LAYERS) n = MAX_BACKGROUND_LAYERS;
+            if (n > MAX_BACKGROUND_LAYERS) {
+                fprintf(stderr, "serializer: background_layers array has %d items "
+                        "(max %d)\n", n, MAX_BACKGROUND_LAYERS);
+                toml_free(r);
+                return -1;
+            }
             def->background_layer_count = n;
             for (int i = 0; i < n; i++) {
                 toml_datum_t elem = plx.u.arr.elem[i];
@@ -1048,7 +1054,12 @@ int level_load_toml(const char *path, LevelDef *def) {
         toml_datum_t fg = toml_get(top, "foreground_layers");
         if (fg.type == TOML_ARRAY) {
             int n = fg.u.arr.size;
-            if (n > MAX_BACKGROUND_LAYERS) n = MAX_BACKGROUND_LAYERS;
+            if (n > MAX_BACKGROUND_LAYERS) {
+                fprintf(stderr, "serializer: foreground_layers array has %d items "
+                        "(max %d)\n", n, MAX_BACKGROUND_LAYERS);
+                toml_free(r);
+                return -1;
+            }
             def->foreground_layer_count = n;
             for (int i = 0; i < n; i++) {
                 toml_datum_t elem = fg.u.arr.elem[i];
@@ -1065,7 +1076,12 @@ int level_load_toml(const char *path, LevelDef *def) {
         toml_datum_t fl = toml_get(top, "fog_layers");
         if (fl.type == TOML_ARRAY) {
             int n = fl.u.arr.size;
-            if (n > MAX_FOG_TEXTURES) n = MAX_FOG_TEXTURES;
+            if (n > MAX_FOG_TEXTURES) {
+                fprintf(stderr, "serializer: fog_layers array has %d items "
+                        "(max %d)\n", n, MAX_FOG_TEXTURES);
+                toml_free(r);
+                return -1;
+            }
             def->fog_layer_count = n;
             for (int i = 0; i < n; i++) {
                 toml_datum_t elem = fl.u.arr.elem[i];
@@ -1117,6 +1133,15 @@ int level_load_toml(const char *path, LevelDef *def) {
             def->physics.air_friction            = get_float(ph, "air_friction",            -1.0f);
             def->physics.cam_lookahead_vx_factor = get_float(ph, "cam_lookahead_vx_factor", -1.0f);
             def->physics.cam_lookahead_max       = get_float(ph, "cam_lookahead_max",       -1.0f);
+        }
+    }
+
+    {
+        char err[128];
+        if (level_validate_runtime(def, err, sizeof(err)) != 0) {
+            fprintf(stderr, "serializer: invalid level '%s': %s\n", path, err);
+            toml_free(r);
+            return -1;
         }
     }
 
