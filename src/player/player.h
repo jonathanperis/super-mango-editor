@@ -54,6 +54,7 @@ typedef struct {
     int       climb_source;     /* 0 = vine, 1 = ladder, 2 = rope                */
     int       jump_held;         /* 1 = jump key still held from last jump; prevents re-jump */
     float     coyote_timer;      /* seconds of post-edge jump grace remaining                 */
+    float     jump_buffer_timer; /* seconds of pre-landing jump input grace remaining         */
     int       move_dir;          /* input direction this frame: -1 = left, 0 = none, +1 = right */
     int       is_running;        /* 1 if run key (Shift / RB) is held this frame, 0 = walking  */
     int       air_is_running;    /* run state captured when the player last left the ground;
@@ -105,7 +106,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
  *   moved upward this frame — without it, the crossing test misses because the
  *   surface escaped upward past the player's feet before they could cross it.
  */
-void player_update(Player *player, float dt,
+void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
                    const Platform *platforms, int platform_count,
                    const FloatPlatform *float_platforms, int float_platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
