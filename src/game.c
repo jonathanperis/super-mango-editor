@@ -67,6 +67,7 @@
 #include "core/game_resources.h"       /* game_resources_load/cleanup                */
 #include "core/game_camera.h"          /* game_camera_update                         */
 #include "core/game_bouncepads.h"      /* combined bouncepad list/hit response       */
+#include "core/game_checkpoint.h"      /* game_checkpoint_update                     */
 
 /* ------------------------------------------------------------------ */
 /* Level data — loaded once from TOML, reused on player death resets    */
@@ -567,21 +568,7 @@ static void game_loop_frame(void *arg) {
 
         game_collide(gs, dt);
 
-        /*
-         * Checkpoint update — save progress at each screen boundary.
-         * When player crosses into a new screen (every GAME_W pixels),
-         * update checkpoint_x to the left edge of that screen.
-         */
-        {
-            int current_screen = (int)(gs->player.x / GAME_W);
-            float new_checkpoint = current_screen * GAME_W;
-            if (new_checkpoint > gs->checkpoint_x) {
-                gs->checkpoint_x = new_checkpoint;
-                if (gs->debug_mode) {
-                    debug_log(&gs->debug, "CHECKPOINT saved at x=%.0f", gs->checkpoint_x);
-                }
-            }
-        }
+        game_checkpoint_update(gs);
 
         /* Advance the water scroll offset (if water is enabled for this level) */
         if (gs->runtime.water_enabled) water_update(&gs->water, dt);
