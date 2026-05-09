@@ -95,6 +95,7 @@ static void reset_new_level(EditorState *es);
 static int save_current_level(EditorState *es);
 static int export_current_level(EditorState *es);
 static int can_persist(EditorState *es, const char *action);
+static int confirm_discard_changes(EditorState *es, const char *action);
 static void maybe_autosave(EditorState *es);
 static void load_recent_files(EditorState *es);
 static void save_recent_files(const EditorState *es);
@@ -668,7 +669,9 @@ static void handle_event(EditorState *es, SDL_Event *event) {
     switch (event->type) {
     /* ---- Window close (the X button or Alt+F4) ---------------------- */
     case SDL_QUIT:
-        es->running = 0;
+        if (confirm_discard_changes(es, "quit")) {
+            es->running = 0;
+        }
         break;
 
     /* ---- Keyboard --------------------------------------------------- */
@@ -707,7 +710,9 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  * osascript, Linux: zenity, Windows: PowerShell OpenFileDialog).
                  * If the user selects a .toml file, load it into the editor.
                  */
-                open_level_file(es);
+                if (confirm_discard_changes(es, "open another level")) {
+                    open_level_file(es);
+                }
                 break;
 
             case SDLK_n:
@@ -722,7 +727,9 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  * memset zeroes every byte: all counts become 0, all
                  * positions become 0.0f, and all pointers become NULL.
                  */
-                reset_new_level(es);
+                if (confirm_discard_changes(es, "create a new level")) {
+                    reset_new_level(es);
+                }
                 break;
 
             case SDLK_e:
@@ -743,8 +750,10 @@ static void handle_event(EditorState *es, SDL_Event *event) {
 
             case SDLK_r:
                 if (file_exists(es->autosave_path)) {
-                    (void)editor_load_level(es, es->autosave_path);
-                    set_status(es, "Recovered autosave");
+                    if (confirm_discard_changes(es, "recover autosave")) {
+                        (void)editor_load_level(es, es->autosave_path);
+                        set_status(es, "Recovered autosave");
+                    }
                 } else {
                     set_status(es, "No autosave to recover");
                 }
@@ -757,7 +766,9 @@ static void handle_event(EditorState *es, SDL_Event *event) {
             case SDLK_5: {
                 int recent_idx = (int)(key - SDLK_1);
                 if (recent_idx >= 0 && recent_idx < es->recent_file_count) {
-                    (void)editor_load_level(es, es->recent_files[recent_idx]);
+                    if (confirm_discard_changes(es, "open a recent level")) {
+                        (void)editor_load_level(es, es->recent_files[recent_idx]);
+                    }
                 }
                 break;
             }
@@ -1273,6 +1284,47 @@ static int can_persist(EditorState *es, const char *action)
         return 0;
     }
     return 1;
+}
+
+/*
+ * confirm_discard_changes — Ask before replacing unsaved editor state.
+ *
+ * Returns 1 when it is safe to continue the destructive action. Clean levels
+ * continue immediately; dirty levels show a native SDL warning dialog.
+ */
+static int confirm_discard_changes(EditorState *es, const char *action)
+{
+    SDL_MessageBoxButtonData buttons[2] = {
+        { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Cancel" },
+        { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Discard" },
+    };
+    SDL_MessageBoxData data;
+    char message[256];
+    int button_id = 0;
+
+    if (!es || !es->modified) return 1;
+
+    snprintf(message, sizeof(message),
+             "Unsaved changes will be lost. Discard changes and %s?", action);
+
+    memset(&data, 0, sizeof(data));
+    data.flags = SDL_MESSAGEBOX_WARNING;
+    data.window = es->window;
+    data.title = "Unsaved Changes";
+    data.message = message;
+    data.numbuttons = 2;
+    data.buttons = buttons;
+
+    if (SDL_ShowMessageBox(&data, &button_id) != 0) {
+        fprintf(stderr, "SDL_ShowMessageBox error: %s\n", SDL_GetError());
+        set_status(es, "%s cancelled: confirmation failed", action);
+        return 0;
+    }
+
+    if (button_id == 1) return 1;
+
+    set_status(es, "%s cancelled", action);
+    return 0;
 }
 
 static int save_current_level(EditorState *es)
@@ -2130,12 +2182,16 @@ static void render_toolbar(EditorState *es) {
          * Open button — show the native file dialog and load the selected
          * TOML level file.  Same behaviour as Ctrl+O.
          */
-        open_level_file(es);
+        if (confirm_discard_changes(es, "open another level")) {
+            open_level_file(es);
+        }
     }
 
     rx -= 64 + 4;
     if (ui_button(&es->ui, rx, by, 64, bh, "New")) {
-        reset_new_level(es);
+        if (confirm_discard_changes(es, "create a new level")) {
+            reset_new_level(es);
+        }
     }
 }
 
