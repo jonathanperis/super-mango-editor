@@ -8,3 +8,4 @@
 
 int game_bouncepads_collect(const GameState *gs, Bouncepad *out_pads);
 void game_bouncepads_handle_hit(GameState *gs, int bounce_idx);
+void game_bouncepads_update_animations(GameState *gs, float dt);
