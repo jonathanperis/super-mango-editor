@@ -491,6 +491,8 @@ void game_init(GameState *gs) {
 #endif
     }
 
+    level_def_init_defaults(&s_level);
+
     if (path_valid &&
         level_load_toml(safe_path, &s_level) == 0) {
         /* Successfully loaded from the resolved path */
@@ -584,7 +586,7 @@ int game_load_next_phase(GameState *gs)
     phase_progress_save(gs, &saved_progress);
 
     /* Load the next level */
-    memset(&s_level, 0, sizeof(s_level));
+    level_def_init_defaults(&s_level);
 
     char safe_path[512] = {0};
     strncpy(safe_path, next_path, sizeof(safe_path) - 1);

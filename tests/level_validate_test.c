@@ -92,6 +92,23 @@ static int expect_rejected_bridge_overflow(void)
     return 0;
 }
 
+static int expect_physics_defaults_are_sentinels(void)
+{
+    LevelDef def;
+
+    level_def_init_defaults(&def);
+
+    if (def.physics.walk_max_speed >= 0.0f ||
+        def.physics.run_max_speed >= 0.0f ||
+        def.physics.air_friction >= 0.0f ||
+        def.physics.cam_lookahead_max >= 0.0f) {
+        fprintf(stderr, "level_validate_test: physics defaults should use negative sentinels\n");
+        return 1;
+    }
+
+    return 0;
+}
+
 int main(void)
 {
     if (expect_valid_level() != 0) return 1;
@@ -99,6 +116,7 @@ int main(void)
     if (expect_rejected_bad_rail_index() != 0) return 1;
     if (expect_rejected_oversized_rail() != 0) return 1;
     if (expect_rejected_bridge_overflow() != 0) return 1;
+    if (expect_physics_defaults_are_sentinels() != 0) return 1;
 
     puts("level_validate_test: ok");
     return 0;

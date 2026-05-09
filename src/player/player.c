@@ -106,6 +106,12 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 #define AIR_FRICTION            80.0f   /* px/s² */
 #define WALK_ANIM_MIN_VX         8.0f   /* px/s  */
 
+/* Jump feel helpers. Coyote time gives a tiny grace window after leaving
+ * ground; jump cut shortens ascent when the jump button is released early. */
+#define JUMP_VY              -325.0f
+#define COYOTE_TIME             0.10f
+#define JUMP_CUT_FACTOR         0.45f
+
 void player_init(Player *player, SDL_Renderer *renderer) {
     /*
      * IMG_LoadTexture — decode the PNG sprite sheet and upload it to the GPU.
@@ -166,6 +172,7 @@ void player_init(Player *player, SDL_Renderer *renderer) {
     player->vine_index   = 0;
     player->climb_source = 0;
     player->jump_held   = 0;
+    player->coyote_timer = COYOTE_TIME;
     player->move_dir       = 0;   /* no direction pressed at startup */
     player->is_running     = 0;   /* not running at startup          */
     player->air_is_running = 0;   /* starts on the ground, no run momentum */
@@ -394,7 +401,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
         /* Jump dismount — leap off the vine with a normal upward impulse */
         if (keys[SDL_SCANCODE_SPACE]) {
             player->on_vine   = 0;
-            player->vy        = -325.0f;
+            player->vy        = JUMP_VY;
             player->on_ground = 0;
             if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
         }
@@ -424,18 +431,22 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
         }
 
         /*
-         * Jump: Space only — requires on_ground AND the key was not already
-         * held from a previous jump.  jump_held prevents auto-repeat: the
-         * player must release Space and press it again to jump again.
+         * Jump: Space only — requires ground contact or remaining coyote time,
+         * and the key must be a fresh press. Releasing Space during upward
+         * motion cuts the jump short for controllable hop height.
          */
         if (keys[SDL_SCANCODE_SPACE]) {
-            if (player->on_ground && !player->jump_held) {
-                player->vy         = -325.0f;
+            if ((player->on_ground || player->coyote_timer > 0.0f) && !player->jump_held) {
+                player->vy         = JUMP_VY;
                 player->on_ground  = 0;
                 player->jump_held  = 1;
+                player->coyote_timer = 0.0f;
                 if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
             }
         } else {
+            if (player->jump_held && player->vy < 0.0f) {
+                player->vy *= JUMP_CUT_FACTOR;
+            }
             player->jump_held = 0;
         }
     }
@@ -576,13 +587,17 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
             }
 
             if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
-                if (player->on_ground && !player->jump_held) {
-                    player->vy         = -325.0f;
+                if ((player->on_ground || player->coyote_timer > 0.0f) && !player->jump_held) {
+                    player->vy         = JUMP_VY;
                     player->on_ground  = 0;
                     player->jump_held  = 1;
+                    player->coyote_timer = 0.0f;
                     if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
                 }
             } else {
+                if (player->jump_held && player->vy < 0.0f) {
+                    player->vy *= JUMP_CUT_FACTOR;
+                }
                 player->jump_held = 0;
             }
         }
@@ -722,6 +737,7 @@ void player_update(Player *player, float dt,
      * their feet drop below the climbable bottom.
      */
     if (player->on_vine) {
+        player->coyote_timer = 0.0f;
         player->x += player->vx * dt;
         player->y += player->vy * dt;
 
@@ -1189,6 +1205,15 @@ void player_update(Player *player, float dt,
         player->vy = 0.0f;
     }
 
+    if (player->on_ground) {
+        player->coyote_timer = COYOTE_TIME;
+    } else if (was_on_ground && player->vy >= 0.0f) {
+        player->coyote_timer = COYOTE_TIME;
+    } else if (player->coyote_timer > 0.0f) {
+        player->coyote_timer -= dt;
+        if (player->coyote_timer < 0.0f) player->coyote_timer = 0.0f;
+    }
+
     /*
      * Advance the sprite animation based on the resolved physics state.
      * Convert dt (seconds) to milliseconds for the frame timer.
@@ -1282,6 +1307,7 @@ void player_reset(Player *player) {
     player->vine_index       = 0;
     player->climb_source     = 0;
     player->jump_held        = 0;
+    player->coyote_timer     = COYOTE_TIME;
     player->move_dir         = 0;
     player->is_running       = 0;
     player->air_is_running   = 0;
