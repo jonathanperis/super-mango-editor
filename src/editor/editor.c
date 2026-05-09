@@ -247,6 +247,7 @@ int editor_init(EditorState *es) {
      * Set a default level name so the title bar and status bar have
      * something to display before the user saves or loads a file.
      */
+    level_def_init_defaults(&es->level);
     strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
 
     /* Sensible defaults so new levels have a visible player and last star */
@@ -1204,7 +1205,7 @@ static void update_window_title(EditorState *es)
 
 static void reset_new_level(EditorState *es)
 {
-    memset(&es->level, 0, sizeof(es->level));
+    level_def_init_defaults(&es->level);
     strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
     es->level.screen_count = 4;
     es->level.player_start_x = 48.0f;

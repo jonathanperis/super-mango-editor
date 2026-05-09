@@ -15,13 +15,29 @@ static int expect_int(const char *name, int actual, int expected)
 
 static void fill_valid_minimal(LevelDef *def)
 {
-    memset(def, 0, sizeof(*def));
+    level_def_init_defaults(def);
     strncpy(def->name, "Validation Fixture", sizeof(def->name) - 1);
     def->screen_count = 1;
     strncpy(def->floor_tile_path, "assets/sprites/levels/grass_tileset.png",
             sizeof(def->floor_tile_path) - 1);
     def->last_star.x = 100.0f;
     def->last_star.y = 100.0f;
+}
+
+static int rejects_bad_runtime_link(void)
+{
+    LevelDef def;
+    EditorValidationReport report;
+
+    fill_valid_minimal(&def);
+    def.spike_block_count = 1;
+    def.spike_blocks[0].rail_index = 0;
+
+    if (expect_int("bad link result", editor_validate_level(&def, &report), -1) != 0)
+        return 1;
+    if (expect_int("bad link errors", report.error_count, 1) != 0) return 1;
+
+    return 0;
 }
 
 static int accepts_valid_level(void)
@@ -76,6 +92,7 @@ int main(void)
 {
     if (accepts_valid_level() != 0) return 1;
     if (rejects_bad_count_and_path() != 0) return 1;
+    if (rejects_bad_runtime_link() != 0) return 1;
     if (warns_without_blocking() != 0) return 1;
 
     puts("editor_validation_test: ok");

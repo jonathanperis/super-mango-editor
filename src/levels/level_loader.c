@@ -570,7 +570,7 @@ static void load_ropes(GameState *gs, const LevelDef *def)
 void level_load(GameState *gs, const LevelDef *def)
 {
     char err[128];
-    if (level_validate_counts(def, err, sizeof(err)) != 0) {
+    if (level_validate_runtime(def, err, sizeof(err)) != 0) {
         fprintf(stderr, "level_load: invalid level definition: %s\n", err);
         exit(EXIT_FAILURE);
     }

@@ -63,7 +63,7 @@ int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
         return -1;
     }
 
-    if (level_validate_counts(def, err, sizeof(err)) != 0) {
+    if (level_validate_runtime(def, err, sizeof(err)) != 0) {
         report_add(report, 1, "%s", err, NULL);
     }
 

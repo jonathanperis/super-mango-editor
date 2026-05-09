@@ -209,7 +209,7 @@ $(TEST_EDITOR_VALIDATION_OBJ): $(EDITOR_DIR)/editor_validation.c
 $(TEST_TOMLC_OBJ): $(VENDOR_DIR)/tomlc17.c
 	$(CC) -std=c11 -MMD -MP -c -o $@ $<
 
-$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER_OBJ) $(TEST_TOMLC_OBJ)
+$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER_OBJ) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
 
 $(OUTDIR)/level-validate-test: tests/level_validate_test.c $(TEST_VALIDATE_OBJ)

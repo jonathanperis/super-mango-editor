@@ -18,6 +18,7 @@
 #pragma once
 
 #include <SDL.h>                       /* Uint32 */
+#include <string.h>                    /* memset */
 #include "../surfaces/bouncepad.h"     /* BouncepadType, MAX_BOUNCEPADS_* */
 #include "../hazards/axe_trap.h"       /* AxeTrapMode, MAX_AXE_TRAPS */
 #include "../hazards/blue_flame.h"     /* MAX_BLUE_FLAMES */
@@ -496,6 +497,31 @@ typedef struct {
         float cam_lookahead_max;       /* maximum lookahead offset in pixels            */
     } physics;
 } LevelDef;
+
+/*
+ * level_def_init_defaults — Reset a LevelDef and apply non-zero sentinels.
+ *
+ * Most LevelDef fields naturally default to 0 after memset, but physics uses
+ * -1.0f as "engine default" so 0.0f remains a valid override.  Every creator
+ * of a fresh LevelDef should use this helper instead of raw memset.
+ */
+static inline void level_def_init_defaults(LevelDef *def)
+{
+    if (!def) return;
+
+    memset(def, 0, sizeof(*def));
+    def->physics.walk_max_speed          = -1.0f;
+    def->physics.run_max_speed           = -1.0f;
+    def->physics.walk_ground_accel       = -1.0f;
+    def->physics.run_ground_accel        = -1.0f;
+    def->physics.ground_friction         = -1.0f;
+    def->physics.ground_counter_accel    = -1.0f;
+    def->physics.air_accel_walk          = -1.0f;
+    def->physics.air_accel_run           = -1.0f;
+    def->physics.air_friction            = -1.0f;
+    def->physics.cam_lookahead_vx_factor = -1.0f;
+    def->physics.cam_lookahead_max       = -1.0f;
+}
 
 /* ------------------------------------------------------------------ */
 /* Rail builder — declared here so RailPlacement is fully visible      */

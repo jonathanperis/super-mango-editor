@@ -56,6 +56,22 @@ static int write_too_many_coins_fixture(const char *path)
     return 0;
 }
 
+static int write_bad_rail_link_fixture(const char *path)
+{
+    FILE *fp = fopen(path, "w");
+    if (!fp) return -1;
+
+    fprintf(fp, "name = \"Bad Rail Link\"\n");
+    fprintf(fp, "screen_count = 1\n\n");
+    fprintf(fp, "[[spike_blocks]]\n");
+    fprintf(fp, "rail_index = 0\n");
+    fprintf(fp, "t_offset = 0.0\n");
+    fprintf(fp, "speed = 1.0\n");
+
+    fclose(fp);
+    return 0;
+}
+
 static int load_all_repo_levels(void)
 {
     const char *levels[] = {
@@ -111,7 +127,7 @@ static int escaped_strings_roundtrip(void)
     LevelDef before;
     LevelDef after;
 
-    memset(&before, 0, sizeof(before));
+    level_def_init_defaults(&before);
     before.screen_count = 1;
     strncpy(before.name, "Quote \"Mango\"", sizeof(before.name) - 1);
     strncpy(before.description, "Line one\\path\nLine \"two\"\tTabbed",
@@ -143,6 +159,31 @@ static int escaped_strings_roundtrip(void)
     return 0;
 }
 
+static int missing_physics_uses_engine_defaults(void)
+{
+    const char *path = "out/test_no_physics.toml";
+    FILE *fp = fopen(path, "w");
+    LevelDef def;
+
+    if (!fp) return fail("could not write no-physics fixture");
+    fprintf(fp, "name = \"No Physics\"\n");
+    fprintf(fp, "screen_count = 1\n");
+    fclose(fp);
+
+    if (level_load_toml(path, &def) != 0)
+        return fail("could not load no-physics fixture");
+
+    if (def.physics.walk_max_speed != -1.0f)
+        return fail("missing physics walk_max_speed should default to -1");
+    if (def.physics.run_max_speed != -1.0f)
+        return fail("missing physics run_max_speed should default to -1");
+    if (def.physics.cam_lookahead_max != -1.0f)
+        return fail("missing physics cam_lookahead_max should default to -1");
+
+    remove(path);
+    return 0;
+}
+
 static int rejects_oversized_arrays(void)
 {
     const char *path = "out/test_too_many_coins.toml";
@@ -158,13 +199,30 @@ static int rejects_oversized_arrays(void)
     return 0;
 }
 
+static int rejects_bad_runtime_links(void)
+{
+    const char *path = "out/test_bad_rail_link.toml";
+    LevelDef def;
+
+    if (write_bad_rail_link_fixture(path) != 0)
+        return fail("could not write bad rail link fixture");
+
+    if (level_load_toml(path, &def) == 0)
+        return fail("bad rail link should fail");
+
+    remove(path);
+    return 0;
+}
+
 int main(void)
 {
     if (ensure_out_dir() != 0) return 1;
     if (load_all_repo_levels() != 0) return 1;
     if (roundtrip_sandbox() != 0) return 1;
     if (escaped_strings_roundtrip() != 0) return 1;
+    if (missing_physics_uses_engine_defaults() != 0) return 1;
     if (rejects_oversized_arrays() != 0) return 1;
+    if (rejects_bad_runtime_links() != 0) return 1;
 
     puts("level_serializer_test: ok");
     return 0;
