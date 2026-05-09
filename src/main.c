@@ -80,6 +80,11 @@ int main(int argc, char *argv[]) {
             char *end = NULL;
             unsigned long parsed = 0;
 
+            if (argv[i][0] == '-') {
+                fprintf(stderr, "Error: --seed requires an unsigned integer\n");
+                return EXIT_FAILURE;
+            }
+
             errno = 0;
             parsed = strtoul(argv[i], &end, 10);
             if (errno != 0 || end == argv[i] || *end != '\0' ||
