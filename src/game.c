@@ -509,10 +509,7 @@ static void game_loop_frame(void *arg) {
         /* Advance the fog wave positions and spawn the next wave if it is time.
          * Only active when the level definition enables fog. */
         if (gs->runtime.fog_enabled) fog_update(&gs->fog, dt);
-        /* Advance the bouncepad release animation (frame 1 → 0 → back to 2) */
-        bouncepads_update(gs->bouncepads_medium, gs->bouncepad_medium_count, (Uint32)(dt * 1000.0f));
-        bouncepads_update(gs->bouncepads_small, gs->bouncepad_small_count, (Uint32)(dt * 1000.0f));
-        bouncepads_update(gs->bouncepads_high, gs->bouncepad_high_count, (Uint32)(dt * 1000.0f));
+        game_bouncepads_update_animations(gs, dt);
         /* Advance axe trap swing/spin animation and trigger distance-scaled sound */
         axe_traps_update(gs->axe_traps, gs->axe_trap_count, dt, gs->audio.axe,
                          gs->player.x + gs->player.w / 2.0f, cam_x);
