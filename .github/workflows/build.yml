@@ -127,11 +127,7 @@ jobs:
         env:
           SDL_VIDEODRIVER: dummy
           SDL_AUDIODRIVER: dummy
-        run: |
-          for level in levels/*.toml; do
-            ./out/super-mango --level "$level" --smoke-test-frames 5 --seed 1
-          done
-          ./out/super-mango-editor --smoke-test
+        run: make smoke SMOKE_FRAMES=5 SMOKE_SEED=1
 
       # ── Compile (Windows) ───────────────────────────────────────────────────
       # The msys2 shell is required so the UCRT64 toolchain and sdl2-config
@@ -155,11 +151,7 @@ jobs:
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: |
-          for level in levels/*.toml; do
-            SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./out/super-mango.exe --level "$level" --smoke-test-frames 5 --seed 1
-          done
-          SDL_VIDEODRIVER=dummy ./out/super-mango-editor.exe --smoke-test
+        run: make smoke CC=gcc SMOKE_FRAMES=5 SMOKE_SEED=1
 
       # ── Compile (WebAssembly) ───────────────────────────────────────────────
       # Uses the 'web' Makefile target with emcc. Assets are bundled into

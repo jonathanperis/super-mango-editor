@@ -121,10 +121,16 @@ static int validate_world_rect(char *err, size_t err_size,
                                const char *field, float x, float y,
                                float w, float h, float world_w)
 {
-    if (x < 0.0f || x + w > world_w) {
+    if (x < 0.0f) {
+        return fail_float_range(err, err_size, field, x, 0.0f, world_w);
+    }
+    if (x + w > world_w) {
         return fail_float_range(err, err_size, field, x + w, 0.0f, world_w);
     }
-    if (y < 0.0f || y + h > (float)GAME_H) {
+    if (y < 0.0f) {
+        return fail_float_range(err, err_size, field, y, 0.0f, (float)GAME_H);
+    }
+    if (y + h > (float)GAME_H) {
         return fail_float_range(err, err_size, field, y + h, 0.0f, (float)GAME_H);
     }
     return 0;
@@ -452,20 +458,13 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
     }
     for (int i = 0; i < def->circular_saw_count; i++) {
         snprintf(field, sizeof(field), "circular_saws[%d]", i);
-        if (validate_world_x(err, err_size, field,
-                             def->circular_saws[i].x, world_w) != 0) return -1;
         if (def->circular_saws[i].y != 0.0f &&
             validate_world_y(err, err_size, "circular_saws[].y",
                              def->circular_saws[i].y) != 0) return -1;
-        if (def->circular_saws[i].patrol_x0 > def->circular_saws[i].patrol_x1) {
-            return fail_value(err, err_size, field, "has reversed patrol bounds");
-        }
-        if (validate_world_x(err, err_size, "circular_saws[].patrol_x0",
-                             def->circular_saws[i].patrol_x0, world_w) != 0)
-            return -1;
-        if (validate_world_x(err, err_size, "circular_saws[].patrol_x1",
-                             def->circular_saws[i].patrol_x1, world_w) != 0)
-            return -1;
+        if (validate_patrol(err, err_size, field, def->circular_saws[i].x,
+                            def->circular_saws[i].patrol_x0,
+                            def->circular_saws[i].patrol_x1,
+                            world_w) != 0) return -1;
     }
 
     for (int i = 0; i < def->blue_flame_count; i++) {

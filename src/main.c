@@ -100,6 +100,10 @@ int main(int argc, char *argv[]) {
             expect_smoke_frames = 1;
         else if (strcmp(argv[i], "--seed") == 0)
             expect_seed = 1;
+        else if (argv[i][0] == '-') {
+            fprintf(stderr, "Error: unknown option '%s'\n", argv[i]);
+            return EXIT_FAILURE;
+        }
     }
 
     if (expect_level_path) {
