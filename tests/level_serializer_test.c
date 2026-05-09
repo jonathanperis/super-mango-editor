@@ -426,6 +426,12 @@ static int load_all_repo_levels(void)
     return 0;
 }
 
+/*
+ * compare_shipped_roundtrip — Verify shipped LevelDef data survives TOML save/load.
+ *
+ * Compares top-level metadata, all entity counts, representative active entity
+ * fields, layer paths/speeds, game rules, spawn data, and physics overrides.
+ */
 static int compare_shipped_roundtrip(const char *label, const LevelDef *before,
                                      const LevelDef *after)
 {
@@ -592,6 +598,12 @@ static int compare_shipped_roundtrip(const char *label, const LevelDef *before,
     return 0;
 }
 
+/*
+ * roundtrip_repo_levels — Save and reload every committed level file.
+ *
+ * This protects shipped TOML fixtures from serializer drift without requiring
+ * level designers to maintain hand-written expected output copies.
+ */
 static int roundtrip_repo_levels(void)
 {
     const char *levels[] = {
