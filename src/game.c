@@ -72,6 +72,7 @@
 #include "core/game_bridges.h"         /* game_bridges_update                        */
 #include "core/game_float_platforms.h" /* game_float_platforms_update                */
 #include "core/game_actors.h"          /* game_actors_update                         */
+#include "core/game_hazards.h"         /* game_hazards_update                        */
 
 /* ------------------------------------------------------------------ */
 /* Level data — loaded once from TOML, reused on player death resets    */
@@ -489,15 +490,7 @@ static void game_loop_frame(void *arg) {
 
         game_effects_update(gs, dt);
         game_bouncepads_update_animations(gs, dt);
-        /* Advance axe trap swing/spin animation and trigger distance-scaled sound */
-        axe_traps_update(gs->axe_traps, gs->axe_trap_count, dt, gs->audio.axe,
-                         gs->player.x + gs->player.w / 2.0f, cam_x);
-        /* Advance circular saw patrol and spin animation */
-        circular_saws_update(gs->circular_saws, gs->circular_saw_count, dt);
-        /* Advance blue flame eruption cycles (rise, flip, fall, wait) */
-        blue_flames_update(gs->blue_flames, gs->blue_flame_count, dt);
-        /* Advance fire flame eruption cycles (same mechanics, fire variant) */
-        blue_flames_update(gs->fire_flames, gs->fire_flame_count, dt);
+        game_hazards_update(gs, dt, cam_x);
 
         /* ---- Camera update --------------------------------------- */
         cam_x = game_camera_update(gs, dt);
