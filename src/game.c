@@ -227,7 +227,10 @@ int game_load_next_phase(GameState *gs)
     level_def_init_defaults(&s_level);
 
     char safe_path[512] = {0};
-    strncpy(safe_path, next_path, sizeof(safe_path) - 1);
+    if (level_resolve_path(next_path, safe_path, sizeof(safe_path)) != 0) {
+        fprintf(stderr, "Error: Failed to resolve next phase path: %s\n", next_path);
+        return -1;
+    }
 
     if (level_load_toml(safe_path, &s_level) != 0) {
         fprintf(stderr, "Error: Failed to load next phase: %s\n", safe_path);
