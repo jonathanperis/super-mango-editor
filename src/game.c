@@ -71,6 +71,7 @@
 #include "core/game_checkpoint.h"      /* game_checkpoint_update                     */
 #include "core/game_bridges.h"         /* game_bridges_update                        */
 #include "core/game_float_platforms.h" /* game_float_platforms_update                */
+#include "core/game_actors.h"          /* game_actors_update                         */
 
 /* ------------------------------------------------------------------ */
 /* Level data — loaded once from TOML, reused on player death resets    */
@@ -476,26 +477,7 @@ static void game_loop_frame(void *arg) {
         game_bouncepads_handle_hit(gs, bounce_idx);
         floor_gap_handle_collision(gs);
 
-        /* Move spiders along their patrol paths and advance their animation */
-        spiders_update(gs->spiders, gs->spider_count, dt,
-                       gs->floor_gaps, gs->floor_gap_count);
-        /* Move jumping spiders: patrol + periodic jump arcs */
-        jumping_spiders_update(gs->jumping_spiders, gs->jumping_spider_count, dt,
-                               gs->floor_gaps, gs->floor_gap_count,
-                               gs->audio.spider_attack,
-                               gs->player.x + gs->player.w / 2.0f, cam_x);
-        /* Move birds along their sine-wave patrol paths */
-        birds_update(gs->birds, gs->bird_count, dt, gs->audio.flap,
-                     gs->player.x + gs->player.w / 2.0f, cam_x);
-        faster_birds_update(gs->faster_birds, gs->faster_bird_count, dt, gs->audio.flap,
-                            gs->player.x + gs->player.w / 2.0f, cam_x);
-        /* Move fish through the water lane and trigger random jump arcs */
-        fish_update(gs->fish, gs->fish_count, dt, gs->runtime.world_w);
-        /* Move faster fish through the water lane with higher jumps */
-        faster_fish_update(gs->faster_fish, gs->faster_fish_count, dt, gs->runtime.world_w);
-        /* Advance each spike block along its rail path (cam_x needed for
-         * the waiting-until-visible check on fall-off rails) */
-        spike_blocks_update(gs->spike_blocks, gs->spike_block_count, dt, cam_x);
+        game_actors_update(gs, dt, cam_x);
 
         game_float_platforms_update(gs, dt, fp_landed_idx);
 
