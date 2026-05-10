@@ -2,26 +2,11 @@
  * game.c — Window, renderer, background, and main game loop.
  */
 
-#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
-#ifndef _XOPEN_SOURCE
-#define _XOPEN_SOURCE 700
-#endif
-#endif
-
 #include <SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <string.h> /* strncpy, memset */
-
-#if defined(_WIN32)
-#include <windows.h> /* GetFullPathNameA */
-#elif !defined(__EMSCRIPTEN__)
-#include <limits.h>  /* PATH_MAX */
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
-#endif
 
 #include "game.h"
 #include "player/player.h"
@@ -29,6 +14,7 @@
 #include "screens/hud.h"
 #include "levels/level.h"         /* LevelDef struct                                    */
 #include "levels/level_loader.h"  /* level_load, level_reset                            */
+#include "levels/level_path.h"    /* level_resolve_path                                */
 #include "levels/level_resources.h" /* level-specific resource reloads                  */
 #include "levels/phase_transition.h" /* phase next path/progress helpers                 */
 #include "editor/serializer.h"    /* level_load_toml                                    */
@@ -140,33 +126,8 @@ void game_init(GameState *gs) {
     /* Load level from TOML if a path was provided via --level */
     memset(&s_level, 0, sizeof(s_level));
 
-    /*
-     * Validate the level path before opening.  Resolve the path to its
-     * canonical form with realpath() so symbolic links and ".." are
-     * eliminated, then pass only the resolved path to fopen.
-     * This satisfies CodeQL's taint analysis for user-controlled paths.
-     */
     char safe_path[512] = {0};
-    int path_valid = 0;
-    if (gs->level_path[0] != '\0') {
-#if defined(__EMSCRIPTEN__)
-        /* Emscripten has no realpath — use the path as-is */
-        strncpy(safe_path, gs->level_path, sizeof(safe_path) - 1);
-        path_valid = 1;
-#elif defined(_WIN32)
-        char resolved[260];  /* MAX_PATH */
-        if (GetFullPathNameA(gs->level_path, 260, resolved, NULL)) {
-            strncpy(safe_path, resolved, sizeof(safe_path) - 1);
-            path_valid = 1;
-        }
-#else
-        char resolved[PATH_MAX];
-        if (realpath(gs->level_path, resolved) != NULL) {
-            strncpy(safe_path, resolved, sizeof(safe_path) - 1);
-            path_valid = 1;
-        }
-#endif
-    }
+    int path_valid = (level_resolve_path(gs->level_path, safe_path, sizeof(safe_path)) == 0);
 
     level_def_init_defaults(&s_level);
 
