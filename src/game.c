@@ -74,6 +74,7 @@
 #include "core/game_actors.h"          /* game_actors_update                         */
 #include "core/game_hazards.h"         /* game_hazards_update                        */
 #include "core/game_player_step.h"     /* game_player_step                           */
+#include "core/game_update.h"          /* game_update_active                         */
 
 /* ------------------------------------------------------------------ */
 /* Level data — loaded once from TOML, reused on player death resets    */
@@ -432,26 +433,7 @@ static void game_loop_frame(void *arg) {
          */
         if (gs->paused || gs->level_complete) goto render;
 
-        gs->level_elapsed += dt;
-
-        int fp_landed_idx = game_player_step(gs, dt);
-
-        game_actors_update(gs, dt, cam_x);
-
-        game_float_platforms_update(gs, dt, fp_landed_idx);
-
-        game_bridges_update(gs, dt);
-
-        game_collide(gs, dt);
-
-        game_checkpoint_update(gs);
-
-        game_effects_update(gs, dt);
-        game_bouncepads_update_animations(gs, dt);
-        game_hazards_update(gs, dt, cam_x);
-
-        /* ---- Camera update --------------------------------------- */
-        cam_x = game_camera_update(gs, dt);
+        cam_x = game_update_active(gs, dt, cam_x);
 
         /* ---- 3. Render ------------------------------------------- */
         render:
