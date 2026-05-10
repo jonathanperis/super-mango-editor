@@ -19,7 +19,7 @@
 #include "levels/phase_transition.h" /* phase next path/progress helpers                 */
 #include "editor/serializer.h"    /* level_load_toml                                    */
 #include "render/game_render.h"        /* game_render_frame, render overlays         */
-#include "input/game_input.h"          /* ctrl_init_worker                           */
+#include "input/game_input.h"          /* gamepad deferred init/cleanup              */
 #include "input/game_events.h"         /* game_handle_events                         */
 #include "core/game_resources.h"       /* game_resources_load/cleanup                */
 #include "core/game_update.h"          /* game_update_active                         */
@@ -151,37 +151,7 @@ void game_init(GameState *gs) {
      * needed here — level_load handles it.
      */
 
-    /*
-     * Lazy gamepad initialisation — deferred from SDL_Init on purpose.
-     *
-     * SDL_InitSubSystem activates one SDL subsystem after the main SDL_Init
-     * call.  We do this here, after the window is already visible, instead of
-     * at process startup.  Antivirus software applies stricter heuristics to
-     * code that enumerates HID / XInput devices during the very first frames
-     * of a new process; waiting until the game window exists sidesteps those
-     * false-positive triggers.
-     *
-     * Non-fatal: if the subsystem fails to start (e.g. driver issue) the game
-     * continues with keyboard-only input.
-     */
-    /*
-     * Gamepad init is deferred to the first frame of the game loop.
-     * SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) enumerates HID devices,
-     * which can block for 20-30 seconds on Windows when antivirus software
-     * is active. Deferring keeps game_init fast so the window appears immediately.
-     *
-     * Disabled on WebAssembly: Emscripten has no real pthreads support in this
-     * build, SDL_CreateThread would run synchronously, and initialising the
-     * gamepad subsystem via the browser Gamepad API can generate unexpected SDL
-     * events that corrupt the keyboard state before the first frame. Controller
-     * input is already disabled on WASM (see #ifndef __EMSCRIPTEN__ in
-     * player_handle_input), so there is nothing to gain from running this here.
-     */
-#ifndef __EMSCRIPTEN__
-    if (gs->smoke_test_frames == 0) {
-        gs->ctrl_pending_init = 1;
-    }
-#endif
+    gamepad_schedule_deferred_init(gs);
 
     /* Signal the loop to start running; game starts in the foreground */
     gs->running = 1;

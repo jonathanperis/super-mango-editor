@@ -30,5 +30,8 @@ int ctrl_init_worker(void *data);
 /* Advance deferred gamepad initialization from the main thread. */
 void gamepad_update_deferred_init(GameState *gs);
 
+/* Schedule lazy gamepad initialization after the first rendered frame. */
+void gamepad_schedule_deferred_init(GameState *gs);
+
 /* Join pending gamepad init and close controller resources. */
 void gamepad_cleanup(GameState *gs);
