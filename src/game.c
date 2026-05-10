@@ -73,6 +73,7 @@
 #include "core/game_float_platforms.h" /* game_float_platforms_update                */
 #include "core/game_actors.h"          /* game_actors_update                         */
 #include "core/game_hazards.h"         /* game_hazards_update                        */
+#include "core/game_player_step.h"     /* game_player_step                           */
 
 /* ------------------------------------------------------------------ */
 /* Level data — loaded once from TOML, reused on player death resets    */
@@ -83,12 +84,6 @@
  * then referenced by reset_current_level on player death.
  */
 LevelDef s_level;
-
-/*
- * File-scoped combined bouncepad array — avoids allocating 48 structs
- * on the stack every frame.  Populated once per frame in game_loop_frame.
- */
-static Bouncepad s_all_pads[MAX_BOUNCEPADS_MEDIUM + MAX_BOUNCEPADS_SMALL + MAX_BOUNCEPADS_HIGH];
 
 /* ------------------------------------------------------------------ */
 
@@ -439,44 +434,7 @@ static void game_loop_frame(void *arg) {
 
         gs->level_elapsed += dt;
 
-        /* Read keyboard and gamepad; set the player's velocity for this frame */
-        player_handle_input(&gs->player, gs->audio.jump, gs->controller,
-                            gs->vines, gs->vine_count,
-                            gs->ladders, gs->ladder_count,
-                            gs->ropes, gs->rope_count);
-
-        /*
-         * Move the player, resolve floor + platform + float-platform +
-         * bouncepad collisions.
-         * bounce_idx is set to the bouncepad hit this frame, or -1.
-         * fp_landed_idx is set to the float platform the player landed on,
-         * or -1 if none.  Both must be initialised to -1 before the call.
-         */
-        int all_pad_count = game_bouncepads_collect(gs, s_all_pads);
-
-        int bounce_idx    = -1;
-        int fp_landed_idx = -1;
-        player_update(&gs->player, dt, gs->audio.jump,
-                      gs->platforms, gs->platform_count,
-                      gs->float_platforms, gs->float_platform_count,
-                      s_all_pads, all_pad_count,
-                      gs->vines, gs->vine_count,
-                      gs->ladders, gs->ladder_count,
-                      gs->ropes, gs->rope_count,
-                      gs->bridges, gs->bridge_count,
-                      gs->spike_platforms, gs->spike_platform_count,
-                      gs->floor_gaps, gs->floor_gap_count,
-                      &bounce_idx, &fp_landed_idx,
-                      gs->loop.fp_prev_riding,
-                      gs->runtime.world_w);
-
-        /*
-         * Bouncepad landing response: start the release animation and play
-         * the spring sound.  The launch impulse itself was already applied
-         * inside player_update so the player is already moving upward.
-         */
-        game_bouncepads_handle_hit(gs, bounce_idx);
-        floor_gap_handle_collision(gs);
+        int fp_landed_idx = game_player_step(gs, dt);
 
         game_actors_update(gs, dt, cam_x);
 
