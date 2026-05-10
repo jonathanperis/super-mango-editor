@@ -14,6 +14,9 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+#ifndef MAX_PATH
+#define MAX_PATH 260
+#endif
 #elif !defined(__EMSCRIPTEN__)
 #include <limits.h>
 #include <stdlib.h>
@@ -41,7 +44,7 @@ int level_resolve_path(const char *path, char *resolved_path, size_t resolved_pa
     return 0;
 #elif defined(_WIN32)
     {
-        char resolved[260]; /* MAX_PATH */
+        char resolved[MAX_PATH];
         DWORD len = GetFullPathNameA(path, (DWORD)sizeof(resolved), resolved, NULL);
         if (len == 0 || len >= (DWORD)sizeof(resolved)) return -1;
         level_path_copy(resolved_path, resolved_path_size, resolved);
