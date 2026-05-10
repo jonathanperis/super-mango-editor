@@ -70,6 +70,17 @@ void gamepad_update_deferred_init(GameState *gs)
 #endif
 }
 
+void gamepad_schedule_deferred_init(GameState *gs)
+{
+#ifndef __EMSCRIPTEN__
+    if (gs->smoke_test_frames == 0) {
+        gs->ctrl_pending_init = 1;
+    }
+#else
+    (void)gs;
+#endif
+}
+
 void gamepad_cleanup(GameState *gs)
 {
 #ifndef __EMSCRIPTEN__
