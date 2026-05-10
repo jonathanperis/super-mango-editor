@@ -37,6 +37,7 @@
 #include "input/game_events.h"         /* game_handle_events                         */
 #include "core/game_resources.h"       /* game_resources_load/cleanup                */
 #include "core/game_update.h"          /* game_update_active                         */
+#include "core/game_completion.h"      /* game_completion_reset_summary              */
 
 /* ------------------------------------------------------------------ */
 /* Level data — loaded once from TOML, reused on player death resets    */
@@ -56,49 +57,6 @@ static void game_init_fail(GameState *gs, const char *label, const char *detail)
     game_cleanup(gs);
     exit(EXIT_FAILURE);
 }
-
-static int game_count_collected_coins(const GameState *gs)
-{
-    int collected = 0;
-
-    for (int i = 0; i < gs->coin_count; i++) {
-        if (!gs->coins[i].active) collected++;
-    }
-
-    return collected;
-}
-
-static void game_reset_completion_summary(GameState *gs)
-{
-    gs->level_elapsed = 0.0f;
-    gs->level_coin_total = gs->coin_count;
-    gs->completion_coins_collected = 0;
-    gs->completion_coin_total = gs->coin_count;
-    gs->completion_elapsed = 0.0f;
-    gs->completion_pending_next_phase = 0;
-    gs->completion_next_phase[0] = '\0';
-}
-
-void game_complete_level(GameState *gs)
-{
-    const LevelDef *def = (const LevelDef *)gs->runtime.current_level;
-
-    gs->completion_coins_collected = game_count_collected_coins(gs);
-    gs->completion_coin_total = gs->level_coin_total;
-    gs->completion_elapsed = gs->level_elapsed;
-    gs->completion_pending_next_phase = 0;
-    gs->completion_next_phase[0] = '\0';
-
-    if (phase_has_next(def) &&
-        phase_next_path(def, gs->completion_next_phase,
-                        sizeof(gs->completion_next_phase)) == 0) {
-        gs->completion_pending_next_phase = 1;
-    }
-
-    gs->level_complete = 1;
-}
-
-/* ------------------------------------------------------------------ */
 
 /*
  * game_init — Set up everything the game needs before the loop starts.
@@ -222,7 +180,7 @@ void game_init(GameState *gs) {
         strncpy(s_level.name, "Untitled", sizeof(s_level.name) - 1);
     }
     level_load(gs, &s_level);
-    game_reset_completion_summary(gs);
+    game_completion_reset_summary(gs);
 
     level_resources_apply(gs, (const LevelDef *)gs->runtime.current_level);
 
@@ -321,7 +279,7 @@ int game_load_next_phase(GameState *gs)
 
     /* Load the new level */
     level_load(gs, &s_level);
-    game_reset_completion_summary(gs);
+    game_completion_reset_summary(gs);
     level_resources_apply(gs, &s_level);
 
     /* Restore player progress */
