@@ -9,8 +9,6 @@
 #endif
 
 #include <SDL.h>
-#include <SDL_image.h>
-#include <SDL_mixer.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -27,53 +25,17 @@
 
 #include "game.h"
 #include "player/player.h"
-#include "surfaces/platform.h"
-#include "effects/water.h"
 #include "effects/fog.h"
-#include "effects/game_effects.h"
-#include "entities/spider.h"
-#include "entities/fish.h"
-#include "collectibles/coin.h"
-#include "surfaces/vine.h"
-#include "surfaces/bouncepad.h"
-#include "surfaces/bouncepad_small.h"
-#include "surfaces/bouncepad_medium.h"
-#include "surfaces/bouncepad_high.h"
 #include "screens/hud.h"
-#include "effects/parallax.h"
-#include "surfaces/rail.h"
-#include "hazards/spike_block.h"
-#include "surfaces/float_platform.h"
-#include "collectibles/star_yellow.h"
-#include "hazards/axe_trap.h"
-#include "hazards/circular_saw.h"
-#include "hazards/blue_flame.h"
-#include "surfaces/ladder.h"
-#include "surfaces/rope.h"
-#include "entities/faster_fish.h"
-#include "collectibles/last_star.h"
-#include "hazards/spike.h"
-#include "hazards/spike_platform.h"
 #include "levels/level.h"         /* LevelDef struct                                    */
 #include "levels/level_loader.h"  /* level_load, level_reset                            */
 #include "levels/level_resources.h" /* level-specific resource reloads                  */
 #include "levels/phase_transition.h" /* phase next path/progress helpers                 */
 #include "editor/serializer.h"    /* level_load_toml                                    */
-#include "collision/game_collision.h"  /* game_collide, hitbox builders               */
-#include "collision/floor_gap_collision.h" /* floor_gap_handle_collision              */
 #include "render/game_render.h"        /* game_render_frame, render overlays         */
-#include "core/game_state.h"           /* reset_current_level                        */
 #include "input/game_input.h"          /* ctrl_init_worker                           */
 #include "input/game_events.h"         /* game_handle_events                         */
 #include "core/game_resources.h"       /* game_resources_load/cleanup                */
-#include "core/game_camera.h"          /* game_camera_update                         */
-#include "core/game_bouncepads.h"      /* combined bouncepad list/hit response       */
-#include "core/game_checkpoint.h"      /* game_checkpoint_update                     */
-#include "core/game_bridges.h"         /* game_bridges_update                        */
-#include "core/game_float_platforms.h" /* game_float_platforms_update                */
-#include "core/game_actors.h"          /* game_actors_update                         */
-#include "core/game_hazards.h"         /* game_hazards_update                        */
-#include "core/game_player_step.h"     /* game_player_step                           */
 #include "core/game_update.h"          /* game_update_active                         */
 
 /* ------------------------------------------------------------------ */
