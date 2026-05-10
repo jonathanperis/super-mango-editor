@@ -24,6 +24,7 @@
 #include "core/game_resources.h"       /* game_resources_load/cleanup                */
 #include "core/game_update.h"          /* game_update_active                         */
 #include "core/game_completion.h"      /* game_completion_reset_summary              */
+#include "core/game_timing.h"          /* frame timing and smoke-test helpers         */
 
 /* ------------------------------------------------------------------ */
 /* Level data — loaded once from TOML, reused on player death resets    */
@@ -245,27 +246,8 @@ static void game_loop_frame(void *arg) {
     const Uint32 frame_ms = 1000 / TARGET_FPS;
 
     {
-        /*
-         * Delta time (dt) — seconds elapsed since the previous frame.
-         * SDL_GetTicks64() returns milliseconds since SDL was initialised.
-         * Dividing by 1000 converts to seconds (a float like 0.016).
-         * We multiply velocities by dt so movement is frame-rate independent.
-         */
-        Uint64 now = SDL_GetTicks64();
-        float  dt  = (float)(now - gs->loop.prev_ticks) / 1000.0f;
-        gs->loop.prev_ticks = now;
-
-        /*
-         * Delta-time guard — cap to 100 ms (≈ 10 fps minimum).
-         * When the OS moves the window to the background it can pause or
-         * throttle the process for hundreds of milliseconds.  Without this
-         * cap the first frame after a focus-loss produces a huge dt that
-         * sends physics haywire (entities teleport, hurt_timer expires
-         * instantly, collisions pile up) and resets the game state.
-         * The same spike happens on Windows when the user drags the window,
-         * which blocks the event loop for the duration of the drag.
-         */
-        if (dt > 0.1f) dt = 0.1f;
+        Uint64 frame_start_ticks = 0;
+        float dt = game_timing_step(gs, &frame_start_ticks);
 
         /* ---- 1. Events ------------------------------------------- */
         game_handle_events(gs);
@@ -306,27 +288,8 @@ static void game_loop_frame(void *arg) {
          */
         gamepad_update_deferred_init(gs);
 
-        /*
-         * Manual frame cap fallback: if the frame finished before frame_ms ms
-         * (e.g. VSync is off), sleep for the remaining time.
-         * SDL_Delay sleeps the CPU so we don't burn 100% for no reason.
-         */
-        /*
-         * Manual frame cap fallback (native only — Emscripten controls timing).
-         */
-#ifndef __EMSCRIPTEN__
-        Uint64 elapsed = SDL_GetTicks64() - now;
-        if (elapsed < frame_ms) {
-            SDL_Delay((Uint32)(frame_ms - elapsed));
-        }
-#endif
-
-        if (gs->smoke_test_frames > 0) {
-            gs->smoke_test_frames--;
-            if (gs->smoke_test_frames == 0) {
-                gs->running = 0;
-            }
-        }
+        game_timing_cap_frame(frame_start_ticks, frame_ms);
+        game_timing_tick_smoke(gs);
     }
 }
 
