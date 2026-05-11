@@ -14,6 +14,7 @@
 #include <string.h>  /* strcmp, memset, strncpy */
 
 #include "serializer.h"
+#include "serializer_load_collectibles.h"
 #include "serializer_load_config.h"
 #include "serializer_load_header.h"
 #include "serializer_load_layers.h"
@@ -118,48 +119,9 @@ int level_load_toml(const char *path, LevelDef *def) {
         def->platforms[idx].tile_path[sizeof(def->platforms[idx].tile_path) - 1] = '\0';
     });
 
-    /* ---- Coins --------------------------------------------------- */
-
-    PARSE_ARRAY("coins", coin_count, MAX_COINS, {
-        def->coins[idx].x = get_float(elem, "x", 0);
-        def->coins[idx].y = get_float(elem, "y", 0);
-    });
-
-    /* ---- Star yellows --------------------------------------------- */
-
-    PARSE_ARRAY("star_yellows", star_yellow_count, MAX_STAR_YELLOWS, {
-        def->star_yellows[idx].x = get_float(elem, "x", 0);
-        def->star_yellows[idx].y = get_float(elem, "y", 0);
-    });
-
-    /* ---- Star greens ---------------------------------------------- */
-
-    PARSE_ARRAY("star_greens", star_green_count, MAX_STAR_GREENS, {
-        def->star_greens[idx].x = get_float(elem, "x", 0);
-        def->star_greens[idx].y = get_float(elem, "y", 0);
-    });
-
-    /* ---- Star reds ------------------------------------------------ */
-
-    PARSE_ARRAY("star_reds", star_red_count, MAX_STAR_REDS, {
-        def->star_reds[idx].x = get_float(elem, "x", 0);
-        def->star_reds[idx].y = get_float(elem, "y", 0);
-    });
-
-    /* ---- Last star (single table, not array) --------------------- */
-
-    {
-        toml_datum_t ls = toml_get(top, "last_star");
-        if (ls.type == TOML_TABLE) {
-            def->last_star.x = get_float(ls, "x", 0);
-            def->last_star.y = get_float(ls, "y", 0);
-            /* Optional next_phase for level linking */
-            toml_datum_t np = toml_get(ls, "next_phase");
-            if (np.type == TOML_STRING) {
-                strncpy(def->next_phase, np.u.s, sizeof(def->next_phase) - 1);
-                def->next_phase[sizeof(def->next_phase) - 1] = '\0';
-            }
-        }
+    if (serializer_load_collectibles(top, def) != 0) {
+        toml_free(r);
+        return -1;
     }
 
     /* ---- Spiders ------------------------------------------------- */
