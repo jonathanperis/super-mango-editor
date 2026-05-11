@@ -200,6 +200,8 @@ void editor_paste_clipboard(EditorState *es)
         d.last_star.y += PASTE_OFFSET;
         push_singleton_move(es, t, before, d.last_star);
         es->level.last_star = d.last_star;
+        es->selection.type = t;
+        es->selection.index = 0;
         es->modified = 1;
         break;
     }
@@ -211,6 +213,8 @@ void editor_paste_clipboard(EditorState *es)
         push_singleton_move(es, t, before, after);
         es->level.player_start_x = after.x;
         es->level.player_start_y = after.y;
+        es->selection.type = t;
+        es->selection.index = 0;
         es->modified = 1;
         break;
     }
@@ -319,7 +323,7 @@ void editor_paste_clipboard(EditorState *es)
         PASTE_INTO(ropes, rope_count, MAX_ROPES, rope);
         break;
     case ENT_FLOOR_GAP:
-        d.floor_gap += (int)PASTE_OFFSET;
+        d.floor_gap += FLOOR_GAP_W;
         if (es->level.floor_gap_count < MAX_FLOOR_GAPS) {
             int idx = es->level.floor_gap_count;
             es->level.floor_gaps[idx] = d.floor_gap;
