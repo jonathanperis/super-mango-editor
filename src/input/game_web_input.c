@@ -23,30 +23,33 @@ void game_web_input_flush_stale_keys(void)
 {
 #ifdef __EMSCRIPTEN__
     /*
-     * emscripten_run_script evaluates this JavaScript synchronously in the
-     * browser context.  EM_ASM would require GNU C extensions; this function
-     * keeps the project compatible with -std=c11.
+     * emscripten_run_script_int evaluates this JavaScript synchronously and
+     * returns 1 only when #canvas existed and synthetic keyups were dispatched.
+     * EM_ASM would require GNU C extensions; this keeps -std=c11 compatibility.
      */
-    emscripten_run_script(
+    int repaired = emscripten_run_script_int(
         "(function(){"
         "  var K=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',"
         "    'Space','KeyA','KeyD','KeyW','KeyS','ShiftLeft','ShiftRight'];"
         "  var c=document.getElementById('canvas');"
-        "  if(!c)return;"
+        "  if(!c)return 0;"
         "  K.forEach(function(code){"
         "    c.dispatchEvent(new KeyboardEvent('keyup',{"
         "      code:code,bubbles:true,cancelable:true"
         "    }));"
         "  });"
-        "})();"
+        "  return 1;"
+        "})()"
     );
 
     /*
-     * SDL_FlushEvents removes the queued synthetic SDL_KEYUP events.  The
-     * keystate[] reset already happened synchronously in SDL's browser
-     * listener, so keeping the events would only add noise to frame 1.
+     * SDL_FlushEvents removes only queued keyboard events after the repair.
+     * The keystate[] reset already happened synchronously in SDL's browser
+     * listener, so unrelated startup events must stay in the queue.
      */
-    SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
+    if (repaired) {
+        SDL_FlushEvents(SDL_KEYDOWN, SDL_KEYUP);
+    }
 #else
     /* Native builds never see browser key state, so this helper is inert. */
 #endif
