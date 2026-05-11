@@ -127,6 +127,76 @@
 #define RAIL_TILE_W        16
 #define RAIL_TILE_H        16
 
+static int rail_placement_tile_count(const RailPlacement *rp)
+{
+    if (rp->layout == RAIL_LAYOUT_RECT) {
+        return rp->w * 2 + (rp->h - 2) * 2;
+    }
+    return rp->w;
+}
+
+static void rail_rect_tile_position(const RailPlacement *rp, int idx,
+                                    float *x, float *y)
+{
+    int w = rp->w;
+    int h = rp->h;
+
+    if (idx < w) {
+        *x = (float)(rp->x + idx * RAIL_TILE_W);
+        *y = (float)rp->y;
+        return;
+    }
+
+    idx -= w;
+    if (idx < h - 2) {
+        *x = (float)(rp->x + (w - 1) * RAIL_TILE_W);
+        *y = (float)(rp->y + (idx + 1) * RAIL_TILE_H);
+        return;
+    }
+
+    idx -= h - 2;
+    if (idx < w) {
+        *x = (float)(rp->x + (w - 1 - idx) * RAIL_TILE_W);
+        *y = (float)(rp->y + (h - 1) * RAIL_TILE_H);
+        return;
+    }
+
+    idx -= w;
+    *x = (float)rp->x;
+    *y = (float)(rp->y + (h - 2 - idx) * RAIL_TILE_H);
+}
+
+static void rail_placement_position_at(const RailPlacement *rp, float t,
+                                       float *x, float *y)
+{
+    int count = rail_placement_tile_count(rp);
+
+    if (count <= 0) {
+        *x = (float)rp->x;
+        *y = (float)rp->y;
+        return;
+    }
+
+    if (rp->layout == RAIL_LAYOUT_HORIZ) {
+        *x = (float)rp->x + t * (float)RAIL_TILE_W;
+        *y = (float)rp->y;
+        return;
+    }
+
+    while (t < 0.0f) t += (float)count;
+    while (t >= (float)count) t -= (float)count;
+
+    int tile = (int)t;
+    int next = (tile + 1) % count;
+    float frac = t - (float)tile;
+    float ax, ay, bx, by;
+
+    rail_rect_tile_position(rp, tile, &ax, &ay);
+    rail_rect_tile_position(rp, next, &bx, &by);
+    *x = ax + (bx - ax) * frac;
+    *y = ay + (by - ay) * frac;
+}
+
 /* Blue flame — 48x48 display, erupts from sea gaps */
 #define BLUE_FLAME_W       48
 #define BLUE_FLAME_H       48
@@ -1446,13 +1516,7 @@ static void render_selection(EditorState *es) {
         int ri = sb->rail_index;
         if (ri >= 0 && ri < es->level.rail_count) {
             const RailPlacement *rp = &es->level.rails[ri];
-            if (rp->layout == RAIL_LAYOUT_RECT) {
-                wx = (float)rp->x;
-                wy = (float)rp->y;
-            } else {
-                wx = (float)rp->x + sb->t_offset * (float)RAIL_TILE_W;
-                wy = (float)rp->y;
-            }
+            rail_placement_position_at(rp, sb->t_offset, &wx, &wy);
         }
         ww = SPIKE_DISPLAY_W;
         wh = SPIKE_DISPLAY_H;
