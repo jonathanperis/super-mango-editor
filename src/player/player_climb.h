@@ -62,3 +62,15 @@ void player_climb_get_bounds(const Player *player,
                              const RopeDecor *ropes,
                              SDL_Rect *out_grab, float *out_top,
                              float *out_bottom);
+
+/*
+ * player_update_climbing — Run one frame of climb-only movement.
+ *
+ * Returns 1 when the player was climbing and normal gravity/platform physics
+ * should be skipped.  Returns 0 when the player is not climbing.
+ */
+int player_update_climbing(Player *player, float dt,
+                           const VineDecor *vines,
+                           const LadderDecor *ladders,
+                           const RopeDecor *ropes,
+                           int world_w);
