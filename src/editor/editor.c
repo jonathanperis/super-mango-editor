@@ -8,8 +8,6 @@
  *
  * Also contains static helpers that only this file calls:
  *   handle_event       — dispatch one SDL event to the correct handler.
- *   render_toolbar     — draw the top toolbar (tools, zoom, file buttons).
- *   render_status_bar  — draw the bottom status bar (cursor, tool, file info).
  *   apply_undo_command — apply or reverse an undo command on the level.
  *
  * The editor follows the same single-struct-by-pointer pattern as the game:
@@ -29,6 +27,7 @@
 #include "undo.h"         /* UndoStack, undo_create/destroy/push/pop/clear  */
 #include "ui.h"           /* UIState, ui_init, ui_begin_frame, ui_button    */
 #include "editor_validation.h" /* editor_validate_level                       */
+#include "editor_chrome.h" /* editor toolbar/status rendering helpers        */
 #include "editor_clipboard.h" /* editor clipboard copy/paste helpers          */
 #include "editor_files.h" /* editor file/save/export/autosave helpers       */
 #include "editor_layout.h" /* editor layout measurement helpers             */
@@ -42,8 +41,6 @@
 /* ------------------------------------------------------------------ */
 
 static void handle_event(EditorState *es, SDL_Event *event);
-static void render_toolbar(EditorState *es);
-static void render_status_bar(EditorState *es);
 static void apply_undo_command(EditorState *es, const Command *cmd, int reverse);
 
 /* ------------------------------------------------------------------ */
@@ -346,7 +343,7 @@ void editor_loop(EditorState *es) {
         } else {
             /* ---- Normal editor rendering ----------------------------- */
             canvas_render(es);
-            render_toolbar(es);
+            editor_render_toolbar(es);
 
             /* ---- Right panel layout — three stacked sections ---- */
             /*
@@ -418,7 +415,7 @@ void editor_loop(EditorState *es) {
                 }
             }
 
-            render_status_bar(es);
+            editor_render_status_bar(es);
         }
 
         /* ---- Present the frame -------------------------------------- */
@@ -922,271 +919,6 @@ static void handle_event(EditorState *es, SDL_Event *event) {
 
     default:
         break;
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/* render_toolbar — static helper                                      */
-/* ------------------------------------------------------------------ */
-
-/*
- * render_toolbar — Draw the top toolbar (32 px tall, full width).
- *
- * Layout from left to right:
- *   [Select] [Place] [Delete]  |  Zoom: 2x  |  [Grid]  |  [New] [Open] [Save] [Export]
- *
- * Tool buttons highlight in the accent colour (blue) when active.
- * File buttons use the default button style.
- */
-static void render_toolbar(EditorState *es) {
-    /*
-     * Draw the toolbar background panel.
-     *
-     * ui_panel fills a rectangle with the UI_BG colour, providing a
-     * visual separation between the toolbar and the canvas below.
-     */
-    ui_panel(&es->ui, 0, 0, EDITOR_W, TOOLBAR_H);
-
-    /* ---- Tool selection buttons ------------------------------------- */
-    /*
-     * Each button is 64x24, starting 4px from the left edge and 4px from
-     * the top (centred vertically in the 32px toolbar).  Buttons are
-     * spaced with a 4px gap between them.
-     *
-     * When a tool is active we draw it with UI_BTN_ACTIVE colour by
-     * temporarily checking if the current tool matches.  ui_button
-     * returns 1 on the click frame, so we update es->tool when clicked.
-     */
-    int bx = 4;
-    int by = 4;
-    int bw = 64;
-    int bh = 24;
-
-    if (ui_button(&es->ui, bx, by, bw, bh, "Select")) {
-        es->tool = TOOL_SELECT;
-    }
-    if (es->tool == TOOL_SELECT) {
-        /*
-         * Draw a 2px accent-colour underline below the active tool button.
-         * This gives a clear visual indicator of which tool is selected.
-         */
-        SDL_SetRenderDrawColor(es->renderer,
-                               UI_BTN_ACTIVE.r, UI_BTN_ACTIVE.g,
-                               UI_BTN_ACTIVE.b, UI_BTN_ACTIVE.a);
-        SDL_Rect underline = { bx, by + bh, bw, 2 };
-        SDL_RenderFillRect(es->renderer, &underline);
-    }
-
-    bx += bw + 4;
-    if (ui_button(&es->ui, bx, by, bw, bh, "Place")) {
-        es->tool = TOOL_PLACE;
-    }
-    if (es->tool == TOOL_PLACE) {
-        SDL_SetRenderDrawColor(es->renderer,
-                               UI_BTN_ACTIVE.r, UI_BTN_ACTIVE.g,
-                               UI_BTN_ACTIVE.b, UI_BTN_ACTIVE.a);
-        SDL_Rect underline = { bx, by + bh, bw, 2 };
-        SDL_RenderFillRect(es->renderer, &underline);
-    }
-
-    bx += bw + 4;
-    if (ui_button(&es->ui, bx, by, bw, bh, "Delete")) {
-        es->tool = TOOL_DELETE;
-    }
-    if (es->tool == TOOL_DELETE) {
-        SDL_SetRenderDrawColor(es->renderer,
-                               UI_BTN_ACTIVE.r, UI_BTN_ACTIVE.g,
-                               UI_BTN_ACTIVE.b, UI_BTN_ACTIVE.a);
-        SDL_Rect underline = { bx, by + bh, bw, 2 };
-        SDL_RenderFillRect(es->renderer, &underline);
-    }
-
-    /* ---- Grid toggle button ----------------------------------------- */
-    bx += bw + 20;
-    const char *grid_label = es->show_grid ? "[Grid]" : " Grid ";
-    if (ui_button(&es->ui, bx, by, 56, bh, grid_label)) {
-        es->show_grid ^= 1;
-    }
-
-    /* ---- Debug toggle button ---------------------------------------- */
-    bx += 60;
-    {
-        const char *dbg_label = es->debug_play ? "[Debug]" : " Debug ";
-        if (ui_button(&es->ui, bx, by, 56, bh, dbg_label)) {
-            es->debug_play ^= 1;
-        }
-    }
-
-    /* ---- Zoom dropdown ---------------------------------------------- */
-    bx += 60;
-    {
-        static const char *zoom_opts[] = { "Zoom: 1x", "Zoom: 2x", "Zoom: 3x", "Zoom: 5x" };
-        static const float zoom_vals[] = { 1.0f, 2.0f, 3.0f, 5.0f };
-        static const int zoom_count = 4;
-
-        int sel = 1;
-        for (int zi = 0; zi < zoom_count; zi++) {
-            if (es->camera.zoom == zoom_vals[zi]) { sel = zi; break; }
-        }
-        if (ui_dropdown(&es->ui, 8888, bx, by + 2, 80,
-                         zoom_opts, zoom_count, &sel)) {
-            es->camera.zoom = zoom_vals[sel];
-        }
-    }
-
-    /* ---- File and play buttons (right-aligned) ------------------------ */
-    /*
-     * Play, Export, Save, Open, New — placed at the right side of the toolbar.
-     * We compute positions from the right edge of the window minus the
-     * button widths and spacing.
-     */
-    int rx = EDITOR_W - 4 - 52;   /* rightmost button */
-    if (es->playing) {
-        /* While the game is running, show Stop instead of Play */
-        if (ui_button(&es->ui, rx, by, 52, bh, "Stop")) {
-            editor_stop_play(es);
-        }
-    } else {
-        if (ui_button(&es->ui, rx, by, 52, bh, "Play")) {
-            editor_play_test(es);
-        }
-    }
-
-    rx -= 64 + 4;
-    if (ui_button(&es->ui, rx, by, 64, bh, "Export")) {
-        (void)editor_export_current_level(es);
-    }
-
-    rx -= 64 + 4;
-    if (ui_button(&es->ui, rx, by, 64, bh, "Save")) {
-        (void)editor_save_current_level(es);
-    }
-
-    rx -= 64 + 4;
-    if (ui_button(&es->ui, rx, by, 64, bh, "Open")) {
-        /*
-         * Open button — show the native file dialog and load the selected
-         * TOML level file.  Same behaviour as Ctrl+O.
-         */
-        if (editor_confirm_discard_changes(es, "open another level")) {
-            editor_open_level_file(es);
-        }
-    }
-
-    rx -= 64 + 4;
-    if (ui_button(&es->ui, rx, by, 64, bh, "New")) {
-        if (editor_confirm_discard_changes(es, "create a new level")) {
-            editor_reset_new_level(es);
-        }
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/* render_status_bar — static helper                                   */
-/* ------------------------------------------------------------------ */
-
-/*
- * render_status_bar — Draw the bottom status bar (32 px tall, full width).
- *
- * Layout from left to right:
- *   Mouse: (worldX, worldY)  |  Tool: Select  |  Entities: 42  |  path.toml *
- *
- * The status bar gives the designer constant feedback about cursor position,
- * active tool, total entity count, and file state (path + modified indicator).
- */
-static void render_status_bar(EditorState *es) {
-    /*
-     * Draw the status bar background panel at the bottom of the window.
-     */
-    int bar_y = EDITOR_H - STATUS_H;
-    ui_panel(&es->ui, 0, bar_y, EDITOR_W, STATUS_H);
-
-    /* ---- Left: mouse world coordinates ------------------------------ */
-    /*
-     * Convert the current mouse position from screen pixels to world-space
-     * logical pixels, then display as "Mouse: (X, Y)".  This helps the
-     * designer place entities at precise world coordinates.
-     *
-     * The same screen-to-world formula used by the tool system:
-     *   world_x = screen_x / zoom + camera.x
-     *   world_y = (screen_y - TOOLBAR_H) / zoom
-     */
-    float wx = (float)es->mouse_x / es->camera.zoom + es->camera.x;
-    float wy = (float)(es->mouse_y - TOOLBAR_H) / es->camera.zoom;
-
-    char mouse_text[64];
-    snprintf(mouse_text, sizeof(mouse_text), "Mouse: (%.0f, %.0f)", wx, wy);
-    ui_label(&es->ui, 8, bar_y + 8, mouse_text);
-
-    /* ---- Centre: current tool name ---------------------------------- */
-    /*
-     * Display the active tool name so the designer always knows what
-     * clicking will do, even without looking at the toolbar.
-     */
-    const char *tool_names[] = { "Select", "Place", "Delete" };
-    const char *tool_name = (es->tool >= 0 && es->tool < 3)
-                            ? tool_names[es->tool]
-                            : "Unknown";
-
-    char tool_text[64];
-    snprintf(tool_text, sizeof(tool_text), "Tool: %s", tool_name);
-    ui_label(&es->ui, 210, bar_y + 8, tool_text);
-
-    ui_label_color(&es->ui, 330, bar_y + 8,
-                   editor_validation_summary(&es->validation_report),
-                   es->validation_report.error_count > 0 ?
-                   (SDL_Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
-
-    /* ---- Right: entity count and file info --------------------------- */
-    /*
-     * Sum up all entity counts in the LevelDef to show the total number
-     * of placed entities.  This gives a quick sense of level complexity.
-     */
-    int total = es->level.floor_gap_count
-              + es->level.rail_count
-              + es->level.platform_count
-              + es->level.coin_count
-              + es->level.star_yellow_count
-              + es->level.star_green_count
-              + es->level.star_red_count
-              + (es->level.last_star.x != 0.0f || es->level.last_star.y != 0.0f
-                 ? 1 : 0)
-              + es->level.spider_count
-              + es->level.jumping_spider_count
-              + es->level.bird_count
-              + es->level.faster_bird_count
-              + es->level.fish_count
-              + es->level.faster_fish_count
-              + es->level.axe_trap_count
-              + es->level.circular_saw_count
-              + es->level.spike_row_count
-              + es->level.spike_platform_count
-              + es->level.spike_block_count
-              + es->level.float_platform_count
-              + es->level.bridge_count
-              + es->level.bouncepad_small_count
-              + es->level.bouncepad_medium_count
-              + es->level.bouncepad_high_count
-              + es->level.vine_count
-              + es->level.ladder_count
-              + es->level.rope_count;
-
-    char info_text[512];
-    if (es->file_path[0] != '\0') {
-        /*
-         * Show the file path with a modified indicator.
-         * The asterisk (*) after the path tells the designer that unsaved
-         * changes exist — a universal convention in text/level editors.
-         */
-        snprintf(info_text, sizeof(info_text), "Entities: %d  |  %s%s",
-                 total, es->file_path, es->modified ? " *" : "");
-    } else {
-        snprintf(info_text, sizeof(info_text), "Entities: %d  |  (untitled)%s",
-                 total, es->modified ? " *" : "");
-    }
-    ui_label(&es->ui, 600, bar_y + 8, info_text);
-    if (es->status_message[0] != '\0') {
-        ui_label_color(&es->ui, 920, bar_y + 8, es->status_message, UI_TEXT_DIM);
     }
 }
 
