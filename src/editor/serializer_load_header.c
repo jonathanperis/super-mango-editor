@@ -53,9 +53,14 @@ int serializer_load_header(toml_datum_t top, LevelDef *def) {
             def->floor_gap_count = n;
             for (int i = 0; i < n; i++) {
                 toml_datum_t v = sg.u.arr.elem[i];
-                if (v.type == TOML_INT64)     def->floor_gaps[i] = (int)v.u.int64;
-                else if (v.type == TOML_FP64) def->floor_gaps[i] = (int)v.u.fp64;
-                else                          def->floor_gaps[i] = 0;
+                if (v.type == TOML_INT64) {
+                    def->floor_gaps[i] = (int)v.u.int64;
+                } else if (v.type == TOML_FP64) {
+                    def->floor_gaps[i] = (int)v.u.fp64;
+                } else {
+                    fprintf(stderr, "serializer: floor_gaps[%d] must be numeric\n", i);
+                    return -1;
+                }
             }
         }
     }
