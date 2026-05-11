@@ -6,6 +6,8 @@
  */
 
 #include <SDL.h>      /* SDL_Event, SDL_GetTicks, SDL_RenderPresent */
+#include <stdio.h>    /* fprintf, stderr */
+#include <stdlib.h>   /* exit, EXIT_FAILURE */
 
 #include "editor_frame.h"
 
@@ -87,8 +89,14 @@ void editor_run_frame(EditorState *es) {
     editor_maybe_autosave(es);
 
     /* ---- Clear the screen --------------------------------------- */
-    SDL_SetRenderDrawColor(es->renderer, 0x1A, 0x1A, 0x1A, 0xFF);
-    SDL_RenderClear(es->renderer);
+    if (SDL_SetRenderDrawColor(es->renderer, 0x1A, 0x1A, 0x1A, 0xFF) != 0) {
+        fprintf(stderr, "SDL_SetRenderDrawColor failed: %s\n", SDL_GetError());
+        exit(EXIT_FAILURE);
+    }
+    if (SDL_RenderClear(es->renderer) != 0) {
+        fprintf(stderr, "SDL_RenderClear failed: %s\n", SDL_GetError());
+        exit(EXIT_FAILURE);
+    }
 
     if (es->playing) {
         editor_render_play_overlay(es);
