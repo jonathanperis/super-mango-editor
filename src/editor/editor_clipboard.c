@@ -9,6 +9,7 @@
 #include "../surfaces/rail.h" /* RAIL_TILE_W */
 #include "undo.h"   /* Command, undo_push */
 
+/* Record undo state for singleton placements that move instead of append. */
 static void push_singleton_move(EditorState *es,
                                 EntityType type,
                                 LastStarPlacement before,

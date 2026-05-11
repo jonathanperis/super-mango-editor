@@ -120,6 +120,7 @@
 /* Water art height — needed for fish Y derivation */
 #define WATER_ART_H        31
 
+/* Return tile count for a rail placement path. */
 static int rail_placement_tile_count(const RailPlacement *rp)
 {
     if (rp->layout == RAIL_LAYOUT_RECT) {
@@ -128,6 +129,7 @@ static int rail_placement_tile_count(const RailPlacement *rp)
     return rp->w;
 }
 
+/* Return centre position for one rectangular rail path tile. */
 static void rail_rect_tile_position(const RailPlacement *rp, int idx,
                                     float *x, float *y)
 {
@@ -135,30 +137,31 @@ static void rail_rect_tile_position(const RailPlacement *rp, int idx,
     int h = rp->h;
 
     if (idx < w) {
-        *x = (float)(rp->x + idx * RAIL_TILE_W);
-        *y = (float)rp->y;
+        *x = (float)(rp->x + idx * RAIL_TILE_W + RAIL_TILE_W / 2);
+        *y = (float)(rp->y + RAIL_TILE_H / 2);
         return;
     }
 
     idx -= w;
     if (idx < h - 2) {
-        *x = (float)(rp->x + (w - 1) * RAIL_TILE_W);
-        *y = (float)(rp->y + (idx + 1) * RAIL_TILE_H);
+        *x = (float)(rp->x + (w - 1) * RAIL_TILE_W + RAIL_TILE_W / 2);
+        *y = (float)(rp->y + (idx + 1) * RAIL_TILE_H + RAIL_TILE_H / 2);
         return;
     }
 
     idx -= h - 2;
     if (idx < w) {
-        *x = (float)(rp->x + (w - 1 - idx) * RAIL_TILE_W);
-        *y = (float)(rp->y + (h - 1) * RAIL_TILE_H);
+        *x = (float)(rp->x + (w - 1 - idx) * RAIL_TILE_W + RAIL_TILE_W / 2);
+        *y = (float)(rp->y + (h - 1) * RAIL_TILE_H + RAIL_TILE_H / 2);
         return;
     }
 
     idx -= w;
-    *x = (float)rp->x;
-    *y = (float)(rp->y + (h - 2 - idx) * RAIL_TILE_H);
+    *x = (float)(rp->x + RAIL_TILE_W / 2);
+    *y = (float)(rp->y + (h - 2 - idx) * RAIL_TILE_H + RAIL_TILE_H / 2);
 }
 
+/* Return interpolated rail centre position for a placement offset. */
 static void rail_placement_position_at(const RailPlacement *rp, float t,
                                        float *x, float *y)
 {
@@ -171,8 +174,8 @@ static void rail_placement_position_at(const RailPlacement *rp, float t,
     }
 
     if (rp->layout == RAIL_LAYOUT_HORIZ) {
-        *x = (float)rp->x + t * (float)RAIL_TILE_W;
-        *y = (float)rp->y;
+        *x = (float)rp->x + t * (float)RAIL_TILE_W + (float)RAIL_TILE_W / 2.0f;
+        *y = (float)rp->y + (float)RAIL_TILE_H / 2.0f;
         return;
     }
 
@@ -318,6 +321,8 @@ static void get_entity_pos(const LevelDef *level, EntityType type, int index,
         if (ri >= 0 && ri < level->rail_count) {
             const RailPlacement *rp = &level->rails[ri];
             rail_placement_position_at(rp, sb->t_offset, x, y);
+            *x -= (float)SPIKE_DISPLAY_W / 2.0f;
+            *y -= (float)SPIKE_DISPLAY_H / 2.0f;
         } else {
             *x = 0.0f;
             *y = 0.0f;
@@ -876,6 +881,8 @@ static Selection hit_test(const LevelDef *level, float wx, float wy)
         if (ri < 0 || ri >= level->rail_count) continue;
         const RailPlacement *rp = &level->rails[ri];
         rail_placement_position_at(rp, sb->t_offset, &ex, &ey);
+        ex -= (float)SPIKE_DISPLAY_W / 2.0f;
+        ey -= (float)SPIKE_DISPLAY_H / 2.0f;
         ew = SPIKE_DISPLAY_W;
         eh = SPIKE_DISPLAY_H;
         if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
