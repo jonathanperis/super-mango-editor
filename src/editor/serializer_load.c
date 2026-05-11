@@ -16,6 +16,7 @@
 #include "serializer.h"
 #include "serializer_load_collectibles.h"
 #include "serializer_load_config.h"
+#include "serializer_load_geometry.h"
 #include "serializer_load_header.h"
 #include "serializer_load_layers.h"
 #include "serializer_parse.h"
@@ -95,29 +96,10 @@ int level_load_toml(const char *path, LevelDef *def) {
         return -1;
     }
 
-    /* ---- Rails --------------------------------------------------- */
-
-    PARSE_ARRAY("rails", rail_count, MAX_RAILS, {
-        def->rails[idx].layout  = serializer_rail_layout_from_str(
-            get_str(elem, "layout", "RECT"));
-        def->rails[idx].x       = get_int(elem, "x", 0);
-        def->rails[idx].y       = get_int(elem, "y", 0);
-        def->rails[idx].w       = get_int(elem, "w", 0);
-        def->rails[idx].h       = get_int(elem, "h", 0);
-        def->rails[idx].end_cap = get_int(elem, "end_cap", 0);
-    });
-
-    /* ---- Platforms ------------------------------------------------ */
-
-    PARSE_ARRAY("platforms", platform_count, MAX_PLATFORMS, {
-        def->platforms[idx].x           = get_float(elem, "x", 0);
-        def->platforms[idx].tile_height = get_int(elem, "tile_height", 1);
-        def->platforms[idx].tile_width  = get_int(elem, "tile_width", 1);
-        const char *tp = get_str(elem, "tile_path", "");
-        strncpy(def->platforms[idx].tile_path, tp,
-                sizeof(def->platforms[idx].tile_path) - 1);
-        def->platforms[idx].tile_path[sizeof(def->platforms[idx].tile_path) - 1] = '\0';
-    });
+    if (serializer_load_geometry(top, def) != 0) {
+        toml_free(r);
+        return -1;
+    }
 
     if (serializer_load_collectibles(top, def) != 0) {
         toml_free(r);
