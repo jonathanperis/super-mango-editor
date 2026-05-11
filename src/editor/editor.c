@@ -7,7 +7,6 @@
  *   editor_cleanup — free every resource in reverse init order.
  *
  * Also contains static helpers that only this file calls:
- *   load_textures      — load all entity sprite sheets from assets/.
  *   handle_event       — dispatch one SDL event to the correct handler.
  *   render_toolbar     — draw the top toolbar (tools, zoom, file buttons).
  *   render_status_bar  — draw the bottom status bar (cursor, tool, file info).
@@ -45,6 +44,7 @@
 #include "ui.h"           /* UIState, ui_init, ui_begin_frame, ui_button    */
 #include "file_dialog.h"  /* file_dialog_open — native OS file picker       */
 #include "editor_validation.h" /* editor_validate_level                       */
+#include "editor_textures.h" /* editor_textures_load/cleanup                 */
 
 #define EDITOR_AUTOSAVE_PATH "out/autosave/editor_autosave.toml"
 #define EDITOR_RECENT_PATH   "out/editor_recent.txt"
@@ -82,7 +82,6 @@ enum {
 /* Forward declarations for static helpers                             */
 /* ------------------------------------------------------------------ */
 
-static void load_textures(EditorState *es);
 static void handle_event(EditorState *es, SDL_Event *event);
 static int compute_config_total_height(const EditorState *es);
 static void render_toolbar(EditorState *es);
@@ -305,7 +304,7 @@ int editor_init(EditorState *es) {
      * These are the same PNGs the game engine uses, so the editor shows
      * exactly what will appear in-game (WYSIWYG).
      */
-    load_textures(es);
+    editor_textures_load(es);
 
     /* ---- Default level ---------------------------------------------- */
     /*
@@ -340,102 +339,6 @@ int editor_init(EditorState *es) {
     return 0;
 }
 
-/* ------------------------------------------------------------------ */
-/* load_textures — static helper                                       */
-/* ------------------------------------------------------------------ */
-
-/*
- * load_textures — Load all entity sprite sheets from assets/.
- *
- * Called once from editor_init after the renderer is created.  Each texture
- * is loaded with IMG_LoadTexture which decodes the PNG and uploads it to
- * GPU memory.  The returned SDL_Texture* lives on the GPU until destroyed.
- *
- * All loads are NON-FATAL: if a sprite sheet is missing (e.g. the designer
- * deleted an asset), the editor logs a warning and sets the pointer to NULL.
- * Canvas rendering checks for NULL and draws a placeholder rectangle instead.
- * This lets the editor remain usable even with incomplete asset directories.
- *
- * The macro LOAD_TEX reduces boilerplate: it calls IMG_LoadTexture and
- * prints a warning if the result is NULL.
- */
-static void load_textures(EditorState *es) {
-    /*
-     * LOAD_TEX — attempt to load a texture; warn on failure but continue.
-     *
-     * field : member of es->textures to assign (e.g. floor_tile).
-     * path  : file path relative to the working directory (repo root).
-     *
-     * IMG_GetError() returns the SDL_image error string for the most recent
-     * failure — we include it in the warning so the designer can diagnose
-     * missing or corrupted files.
-     */
-    #define LOAD_TEX(field, path) \
-        do { \
-            es->textures.field = IMG_LoadTexture(es->renderer, path); \
-            if (!es->textures.field) { \
-                fprintf(stderr, "Warning: could not load %s: %s\n", \
-                        path, IMG_GetError()); \
-            } \
-        } while (0)
-
-    /* Environment textures — sky, floor, water (reloaded per-level) */
-    LOAD_TEX(sky,              "assets/sprites/backgrounds/sky_blue.png");
-    LOAD_TEX(floor_tile,       "assets/sprites/levels/grass_tileset.png");
-    LOAD_TEX(water,            "assets/sprites/foregrounds/water.png");
-
-    /* Static geometry */
-    LOAD_TEX(platform,         "assets/sprites/levels/grass_platform.png");
-    LOAD_TEX(platform_stone,   "assets/sprites/levels/stone_platform.png");
-    LOAD_TEX(platform_leaf,    "assets/sprites/levels/leaf_platform.png");
-
-    /* Enemies — ground, air, and water patrol types */
-    LOAD_TEX(spider,           "assets/sprites/entities/spider.png");
-    LOAD_TEX(jumping_spider,   "assets/sprites/entities/jumping_spider.png");
-    LOAD_TEX(bird,             "assets/sprites/entities/bird.png");
-    LOAD_TEX(faster_bird,      "assets/sprites/entities/faster_bird.png");
-    LOAD_TEX(fish,             "assets/sprites/entities/fish.png");
-    LOAD_TEX(faster_fish,      "assets/sprites/entities/faster_fish.png");
-
-    /* Collectibles — coins, stars */
-    LOAD_TEX(coin,             "assets/sprites/collectibles/coin.png");
-    LOAD_TEX(star_yellow,      "assets/sprites/collectibles/star_yellow.png");
-    LOAD_TEX(star_green,       "assets/sprites/collectibles/star_green.png");
-    LOAD_TEX(star_red,         "assets/sprites/collectibles/star_red.png");
-    LOAD_TEX(last_star,        "assets/sprites/collectibles/last_star.png");
-
-    /* Hazards — traps that damage the player on contact */
-    LOAD_TEX(axe_trap,         "assets/sprites/hazards/axe_trap.png");
-    LOAD_TEX(circular_saw,     "assets/sprites/hazards/circular_saw.png");
-    LOAD_TEX(blue_flame,       "assets/sprites/hazards/blue_flame.png");
-    LOAD_TEX(fire_flame,       "assets/sprites/hazards/fire_flame.png");
-    LOAD_TEX(spike,            "assets/sprites/hazards/spike.png");
-    LOAD_TEX(spike_platform,   "assets/sprites/hazards/spike_platform.png");
-    LOAD_TEX(spike_block,      "assets/sprites/hazards/spike_block.png");
-
-    /* Surfaces — platforms, bridges, bouncepads */
-    LOAD_TEX(float_platform,   "assets/sprites/surfaces/float_platform.png");
-    LOAD_TEX(bridge,           "assets/sprites/surfaces/bridge.png");
-    LOAD_TEX(bouncepad_small,  "assets/sprites/surfaces/bouncepad_small.png");
-    LOAD_TEX(bouncepad_medium, "assets/sprites/surfaces/bouncepad_medium.png");
-    LOAD_TEX(bouncepad_high,   "assets/sprites/surfaces/bouncepad_high.png");
-
-    /* Climbables — vertical traversal */
-    LOAD_TEX(vine_green,       "assets/sprites/surfaces/vine_green.png");
-    LOAD_TEX(vine_brown,       "assets/sprites/surfaces/vine_brown.png");
-    LOAD_TEX(ladder,           "assets/sprites/surfaces/ladder.png");
-    LOAD_TEX(rope,             "assets/sprites/surfaces/rope.png");
-
-    /* Rail paths — spike blocks and platforms ride on these */
-    LOAD_TEX(rail,             "assets/sprites/surfaces/rail.png");
-
-    /* Player — used for spawn point preview in the editor */
-    LOAD_TEX(player,           "assets/sprites/player/player.png");
-
-    #undef LOAD_TEX
-}
-
-/* ------------------------------------------------------------------ */
 /* editor_loop                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -2600,49 +2503,8 @@ static void apply_undo_command(EditorState *es, const Command *cmd,
  * no-ops, so a redundant cleanup call will not crash.
  */
 void editor_cleanup(EditorState *es) {
-    /* ---- Destroy all entity textures -------------------------------- */
-    /*
-     * DESTROY_TEX — macro from game.h: checks for NULL, calls
-     * SDL_DestroyTexture, then sets the pointer to NULL.
-     *
-     * Textures must be destroyed BEFORE the renderer because they live
-     * on the GPU and are associated with the renderer that created them.
-     */
-    DESTROY_TEX(es->textures.sky);
-    DESTROY_TEX(es->textures.floor_tile);
-    DESTROY_TEX(es->textures.water);
-    DESTROY_TEX(es->textures.platform);
-    DESTROY_TEX(es->textures.platform_stone);
-    DESTROY_TEX(es->textures.platform_leaf);
-    DESTROY_TEX(es->textures.spider);
-    DESTROY_TEX(es->textures.jumping_spider);
-    DESTROY_TEX(es->textures.bird);
-    DESTROY_TEX(es->textures.faster_bird);
-    DESTROY_TEX(es->textures.fish);
-    DESTROY_TEX(es->textures.faster_fish);
-    DESTROY_TEX(es->textures.coin);
-    DESTROY_TEX(es->textures.star_yellow);
-    DESTROY_TEX(es->textures.star_green);
-    DESTROY_TEX(es->textures.star_red);
-    DESTROY_TEX(es->textures.last_star);
-    DESTROY_TEX(es->textures.axe_trap);
-    DESTROY_TEX(es->textures.circular_saw);
-    DESTROY_TEX(es->textures.blue_flame);
-    DESTROY_TEX(es->textures.fire_flame);
-    DESTROY_TEX(es->textures.spike);
-    DESTROY_TEX(es->textures.spike_platform);
-    DESTROY_TEX(es->textures.spike_block);
-    DESTROY_TEX(es->textures.float_platform);
-    DESTROY_TEX(es->textures.bridge);
-    DESTROY_TEX(es->textures.bouncepad_small);
-    DESTROY_TEX(es->textures.bouncepad_medium);
-    DESTROY_TEX(es->textures.bouncepad_high);
-    DESTROY_TEX(es->textures.vine_green);
-    DESTROY_TEX(es->textures.vine_brown);
-    DESTROY_TEX(es->textures.ladder);
-    DESTROY_TEX(es->textures.rope);
-    DESTROY_TEX(es->textures.rail);
-    DESTROY_TEX(es->textures.player);
+    /* Destroy all renderer-owned preview textures before the renderer. */
+    editor_textures_cleanup(es);
 
     /* ---- Font ------------------------------------------------------- */
     /*
