@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 #include "player.h"
+#include "player_internal.h"
 #include "../surfaces/bouncepad.h"      /* Bouncepad, BOUNCEPAD_VY — for bouncepad landing collision */
 #include "../surfaces/float_platform.h" /* FloatPlatform — for one-way landing collision             */
 #include "../surfaces/bridge.h"         /* Bridge — for one-way landing collision on bridges         */
@@ -20,37 +21,6 @@
 /*
  * player_init — Load the sprite and place the player in the center of the window.
  */
-/* Width and height of one sprite frame in the sheet (pixels). */
-#define FRAME_W 48
-#define FRAME_H 48
-
-/*
- * FLOOR_SINK — extra pixels the player overlaps with the top of the floor tile.
- * The sprite sheet has transparent padding at the bottom of each frame, so the
- * physics edge (y + h = FLOOR_Y) leaves the character visually floating.
- * Sinking by this many pixels makes the feet appear to rest on the grass.
- */
-#define FLOOR_SINK 16
-
-/*
- * Physics-box insets — how many pixels to trim from each side of the 48×48
- * sprite frame to reach the visible character boundary.
- *
- * The character art is centred in the frame with significant transparent
- * padding, especially on the left and right. Using the raw frame size for
- * collisions creates an invisible wall well outside the art.
- *
- * PHYS_PAD_X : pixels trimmed from the LEFT and RIGHT edges (each side).
- *              Physics width  = FRAME_W − 2 × PHYS_PAD_X  = 48 − 30 = 18 px.
- * PHYS_PAD_TOP : pixels trimmed from the TOP edge.
- *              Combined with FLOOR_SINK at the bottom the physics box
- *              tracks the drawn character art closely on all four sides.
- *
- * Pixel analysis: art occupies x=15..32 (18 px), y=18..33 (16 px).
- */
-#define PHYS_PAD_X   15
-#define PHYS_PAD_TOP 18
-
 /*
  * Animation tables — indexed by AnimState (0=IDLE, 1=WALK, 2=JUMP, 3=FALL).
  *
@@ -109,7 +79,6 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 /* Jump feel helpers. Coyote time gives a tiny grace window after leaving
  * ground; jump cut shortens ascent when the jump button is released early. */
 #define JUMP_VY              -325.0f
-#define COYOTE_TIME             0.10f
 #define JUMP_BUFFER_TIME        0.10f
 #define JUMP_CUT_FACTOR         0.45f
 
@@ -138,16 +107,16 @@ void player_init(Player *player, SDL_Renderer *renderer) {
     /*
      * frame — the source rectangle: which 48×48 cell to cut from the sheet.
      * {x=0, y=0} → top-left cell, which is the first idle/standing pose.
-     * We keep frame.w and frame.h constant at FRAME_W/FRAME_H for now.
+     * We keep frame.w and frame.h constant at PLAYER_FRAME_W/H for now.
      */
     player->frame.x = 0;
     player->frame.y = 0;
-    player->frame.w = FRAME_W;
-    player->frame.h = FRAME_H;
+    player->frame.w = PLAYER_FRAME_W;
+    player->frame.h = PLAYER_FRAME_H;
 
     /* The on-screen display size matches the frame size exactly. */
-    player->w = FRAME_W;
-    player->h = FRAME_H;
+    player->w = PLAYER_FRAME_W;
+    player->h = PLAYER_FRAME_H;
 
     /*
      * Place the player horizontally centered, sitting on top of the floor.
@@ -166,7 +135,7 @@ void player_init(Player *player, SDL_Renderer *renderer) {
     player->spawn_x  = 80.0f;
     player->spawn_y  = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);
     player->x        = player->spawn_x + (TILE_SIZE - player->w) / 2.0f;
-    player->y        = player->spawn_y - player->h + FLOOR_SINK;
+    player->y        = player->spawn_y - player->h + PLAYER_FLOOR_SINK;
     player->vx       = 0.0f;
     player->vy       = 0.0f;   /* start stationary; gravity will pull down   */
     player->speed    = 160.0f; /* horizontal speed: 160 logical px per second */
@@ -183,7 +152,7 @@ void player_init(Player *player, SDL_Renderer *renderer) {
     player->vine_index   = 0;
     player->climb_source = 0;
     player->jump_held   = 0;
-    player->coyote_timer = COYOTE_TIME;
+    player->coyote_timer = PLAYER_COYOTE_TIME;
     player->jump_buffer_timer = 0.0f;
     player->move_dir       = 0;   /* no direction pressed at startup */
     player->is_running     = 0;   /* not running at startup          */
@@ -1238,116 +1207,4 @@ void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
      * Convert dt (seconds) to milliseconds for the frame timer.
      */
     player_animate(player, (Uint32)(dt * 1000.0f));
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
- * player_render — Draw the player sprite at its current position.
- *
- * While hurt_timer > 0 the sprite blinks on/off every 100 ms to give
- * visual feedback that the player was hit and is temporarily invincible.
- */
-void player_render(Player *player, SDL_Renderer *renderer, int cam_x) {
-    /*
-     * Blink effect: during invincibility, convert the remaining hurt time
-     * into a 100-ms cadence.  On odd intervals the sprite is hidden,
-     * creating a flash / blink pattern.
-     */
-    if (player->hurt_timer > 0.0f) {
-        int interval = (int)(player->hurt_timer * 1000.0f) / 100;
-        if (interval % 2 != 0) return;   /* skip this frame — blink off */
-    }
-
-    /*
-     * dst — where on screen the sprite will appear.
-     * x/y are cast from float to int because SDL works in whole pixels.
-     * w/h match the frame size (FRAME_W × FRAME_H = 48×48).
-     */
-    SDL_Rect dst = {
-        .x = (int)player->x - cam_x,  /* world → screen: subtract camera offset */
-        .y = (int)player->y,
-        .w = player->w,
-        .h = player->h
-    };
-
-    /*
-     * SDL_RenderCopyEx — like SDL_RenderCopy but supports rotation and flipping.
-     * We pass angle=0 and center=NULL (no rotation), and flip the texture
-     * horizontally when the player last moved left, so the character always
-     * faces the correct direction regardless of which animation is playing.
-     */
-    SDL_RendererFlip flip = player->facing_left ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
-    SDL_RenderCopyEx(renderer, player->texture, &player->frame, &dst,
-                     0.0, NULL, flip);
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
- * player_get_hitbox — Return the player's physics hitbox as an SDL_Rect.
- *
- * The hitbox is inset from the full 48×48 sprite frame on every side
- * to match the visible character art.  Used by game.c for collision
- * checks against enemies.
- */
-SDL_Rect player_get_hitbox(const Player *player) {
-    SDL_Rect r;
-    r.x = (int)(player->x) + PHYS_PAD_X;
-    r.y = (int)(player->y) + PHYS_PAD_TOP;
-    r.w = player->w - 2 * PHYS_PAD_X;
-    r.h = player->h - PHYS_PAD_TOP - FLOOR_SINK;
-    return r;
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
- * player_reset — Reset position, velocity, and animation to the initial
- *                state without reloading the texture from disk.
- *
- * Called when the player loses all hearts and a life is consumed.
- * The texture and display dimensions (w/h/speed) are left untouched
- * because they were set once in player_init and don't change.
- */
-void player_reset(Player *player) {
-    /* Respawn at the level-defined spawn point (set by level_load). */
-    player->x         = player->spawn_x + (TILE_SIZE - player->w) / 2.0f;
-    player->y         = player->spawn_y - player->h + FLOOR_SINK;
-    player->vx        = 0.0f;
-    player->vy        = 0.0f;
-    player->on_ground = 1;
-
-    player->anim_state       = ANIM_IDLE;
-    player->anim_frame_index = 0;
-    player->anim_timer_ms    = 0;
-    player->facing_left      = 0;
-    player->on_vine          = 0;
-    player->vine_index       = 0;
-    player->climb_source     = 0;
-    player->jump_held        = 0;
-    player->coyote_timer     = COYOTE_TIME;
-    player->jump_buffer_timer = 0.0f;
-    player->move_dir         = 0;
-    player->is_running       = 0;
-    player->air_is_running   = 0;
-    player->hurt_timer       = 0.0f;
-
-    player->frame.x = 0;
-    player->frame.y = 0;
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
- * player_cleanup — Release GPU memory held by the player's texture.
- *
- * Must be called before the renderer is destroyed, because SDL_Texture
- * objects are owned by the renderer that created them.
- */
-void player_cleanup(Player *player) {
-    if (player->texture) {
-        SDL_DestroyTexture(player->texture);
-        player->texture = NULL;   /* guard against accidental double-free */
-    }
 }
