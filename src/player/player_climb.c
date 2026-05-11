@@ -167,8 +167,10 @@ int player_update_climbing(Player *player, float dt,
                             &grab, &climb_top, &climb_bottom);
     SDL_Rect phit = player_get_hitbox(player);
 
-    /* Horizontal detach — player drifted out of the grab zone. */
-    if (!SDL_HasIntersection(&phit, &grab)) {
+    /* Horizontal detach — vertical bounds are handled below. */
+    const int x_overlap =
+        (phit.x < grab.x + grab.w) && (phit.x + phit.w > grab.x);
+    if (!x_overlap) {
         player->on_vine = 0;
         player->vy      = 0.0f;
         player_animate(player, (Uint32)(dt * 1000.0f));
