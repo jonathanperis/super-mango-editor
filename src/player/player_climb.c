@@ -24,7 +24,11 @@ SDL_Rect player_vine_grab_rect(const VineDecor *v) {
 }
 
 /*
- * player_ladder_grab_rect — Return the grab zone for a ladder.
+ * player_ladder_grab_rect — Return the axis-aligned grab zone for a ladder.
+ *
+ * The ladder sprite uses its own width and vertical step constants, but the
+ * horizontal forgiveness matches vines so grabbing either climbable feels the
+ * same to the player.
  */
 SDL_Rect player_ladder_grab_rect(const LadderDecor *ld) {
     int total_h = (ld->tile_count - 1) * LADDER_STEP + LADDER_H;
@@ -37,7 +41,10 @@ SDL_Rect player_ladder_grab_rect(const LadderDecor *ld) {
 }
 
 /*
- * player_rope_grab_rect — Return the grab zone for a rope.
+ * player_rope_grab_rect — Return the axis-aligned grab zone for a rope.
+ *
+ * Ropes share the same forgiving horizontal pad as vines and ladders while
+ * using rope-specific tile spacing to cover the full climbable height.
  */
 SDL_Rect player_rope_grab_rect(const RopeDecor *rp) {
     int total_h = (rp->tile_count - 1) * ROPE_STEP + ROPE_H;
@@ -52,6 +59,11 @@ SDL_Rect player_rope_grab_rect(const RopeDecor *rp) {
 /*
  * player_climb_get_bounds — Return the grab rect, top y, and bottom y of the
  * currently climbed object, regardless of its type (vine/ladder/rope).
+ *
+ * player->climb_source selects which climbable array to read, and
+ * player->vine_index selects the active element inside that array.  The update
+ * path uses the outputs to clamp the player at the top and detach at the
+ * bottom or when drifting outside the grab rectangle.
  */
 void player_climb_get_bounds(const Player *player,
                              const VineDecor *vines,
