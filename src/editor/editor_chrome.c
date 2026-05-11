@@ -201,3 +201,20 @@ void editor_render_status_bar(EditorState *es)
                        es->status_message, UI_TEXT_DIM);
     }
 }
+
+/*
+ * editor_render_play_overlay — Draw play-test mode message and stop button.
+ */
+void editor_render_play_overlay(EditorState *es)
+{
+    ui_label(&es->ui, EDITOR_W / 2 - 60, EDITOR_H / 2 - 40,
+             "Playing level...");
+    ui_label_color(&es->ui, EDITOR_W / 2 - 80, EDITOR_H / 2 - 10,
+                   "Close the game window or click Stop",
+                   UI_TEXT_DIM);
+
+    if (ui_button(&es->ui, EDITOR_W / 2 - 40, EDITOR_H / 2 + 30,
+                  80, 28, "Stop")) {
+        editor_stop_play(es);
+    }
+}
