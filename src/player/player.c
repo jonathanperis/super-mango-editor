@@ -255,22 +255,7 @@ void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
 
     player_resolve_world_bounds(player, world_w);
 
-    if (player->on_ground) {
-        player->coyote_timer = COYOTE_TIME;
-    } else if (was_on_ground && player->vy >= 0.0f) {
-        player->coyote_timer = COYOTE_TIME;
-    } else if (player->coyote_timer > 0.0f) {
-        player->coyote_timer -= dt;
-        if (player->coyote_timer < 0.0f) player->coyote_timer = 0.0f;
-    }
-
-    const int landed_this_frame = !was_on_ground && player->on_ground;
-    if (player->jump_buffer_timer > 0.0f && landed_this_frame) {
-        player_start_jump(player, snd_jump);
-    } else if (player->jump_buffer_timer > 0.0f) {
-        player->jump_buffer_timer -= dt;
-        if (player->jump_buffer_timer < 0.0f) player->jump_buffer_timer = 0.0f;
-    }
+    player_update_jump_timers(player, dt, was_on_ground, snd_jump);
 
     /*
      * Advance the sprite animation based on the resolved physics state.
