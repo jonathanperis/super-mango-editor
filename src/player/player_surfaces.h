@@ -20,3 +20,20 @@ void player_resolve_platform_collisions(Player *player,
                                         float prev_bottom,
                                         int *out_fp_landed_idx,
                                         int prev_fp_landed_idx);
+
+/* Resolve one-way bridge landings. */
+void player_resolve_bridge_collision(Player *player,
+                                     const Bridge *bridges, int bridge_count,
+                                     float prev_bottom);
+
+/* Resolve one-way spike-platform top landings. */
+void player_resolve_spike_platform_top_collision(Player *player,
+                                                 const SpikePlatform *spike_platforms,
+                                                 int spike_platform_count,
+                                                 float prev_bottom);
+
+/* Resolve spike-platform underside ceiling collisions. */
+void player_resolve_spike_platform_ceiling_collision(Player *player,
+                                                     const SpikePlatform *spike_platforms,
+                                                     int spike_platform_count,
+                                                     float prev_top);
