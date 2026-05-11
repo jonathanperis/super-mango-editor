@@ -30,7 +30,8 @@
 #include "editor_chrome.h" /* editor toolbar/status rendering helpers        */
 #include "editor_clipboard.h" /* editor clipboard copy/paste helpers          */
 #include "editor_files.h" /* editor file/save/export/autosave helpers       */
-#include "editor_layout.h" /* editor layout measurement helpers             */
+#include "editor_layout.h" /* editor_config_total_height                    */
+#include "editor_panels.h" /* editor side panel layout/render helpers       */
 #include "editor_playtest.h" /* editor playtest process helpers              */
 #include "editor_session.h" /* editor status/title/session helpers           */
 #include "editor_textures.h" /* editor_textures_load/cleanup                 */
@@ -344,77 +345,7 @@ void editor_loop(EditorState *es) {
             /* ---- Normal editor rendering ----------------------------- */
             canvas_render(es);
             editor_render_toolbar(es);
-
-            /* ---- Right panel layout — three stacked sections ---- */
-            /*
-             * The right column (x = CANVAS_W to EDITOR_W) is divided into
-             * up to three vertical sections that share the available space:
-             *
-             *   1. Level Config — collapsible; always visible at top.
-             *   2. Palette      — collapsible; scrollable entity categories.
-             *   3. Properties   — only shown when an entity is selected.
-             *
-             * Each section starts where the previous one ends.  Heights
-             * are computed dynamically based on collapse state and whether
-             * an entity is selected.
-             */
-            {
-                int right_top    = TOOLBAR_H;
-                int right_bottom = EDITOR_H - STATUS_H;
-                int section_hdr  = 28;  /* matches palette TITLE_H */
-
-                /* Section 1: Level Config */
-                int config_y = right_top;
-                int config_h_total; /* uncapped full content height */
-                if (es->config_open) {
-                    /* Base: header(28) + margin(8) + metadata(72) + screens(24)
-                     * + music(24+22+24) + floor(30)
-                     * + hearts/lives(6+22) + pts/life(24)
-                     * + bg header(24) + fg header(24) + fog header(24)
-                     * + margin(10) */
-                    config_h_total = editor_config_total_height(es);
-                } else {
-                    config_h_total = section_hdr;
-                }
-
-                /*
-                 * Cap the config panel so it never consumes more than half
-                 * the right column, leaving room for the palette.  When
-                 * content exceeds the cap, level_config_render clips and
-                 * scrolls it.
-                 */
-                int config_h_max = (right_bottom - right_top) / 2;
-                int config_h = config_h_total < config_h_max
-                             ? config_h_total : config_h_max;
-
-                /* Section 3 height (computed early so palette knows remaining space) */
-                int props_h = 0;
-                if (es->selection.index >= 0) {
-                    props_h = es->panel_open ? 200 : section_hdr;
-                }
-
-                /* Section 2: Palette */
-                int palette_y = config_y + config_h;
-                int palette_h;
-                if (es->palette_open) {
-                    /* Palette gets remaining space minus properties */
-                    palette_h = right_bottom - palette_y - props_h;
-                    if (palette_h < section_hdr + 50) palette_h = section_hdr + 50;
-                } else {
-                    palette_h = section_hdr;  /* just the header */
-                }
-
-                /* Section 3: Properties (positioned after palette) */
-                int props_y = palette_y + palette_h;
-
-                /* Render in top-to-bottom order */
-                level_config_render(es, config_y, config_h, config_h_total);
-                palette_render(es, palette_y, palette_h);
-                if (es->selection.index >= 0) {
-                    properties_render(es, props_y, props_h);
-                }
-            }
-
+            editor_render_side_panels(es);
             editor_render_status_bar(es);
         }
 
