@@ -1188,20 +1188,14 @@ static void render_faster_fish(EditorState *es) {
  * This is approximate but sufficient for visual level editing.
  */
 static void render_spike_blocks(EditorState *es) {
-    /* Build rail paths to compute actual spike block positions */
-    Rail tmp_rails[MAX_RAILS];
-    int  tmp_rail_count = 0;
-    rail_init_from_placements(tmp_rails, &tmp_rail_count,
-                              es->level.rails, es->level.rail_count);
-
     for (int i = 0; i < es->level.spike_block_count; i++) {
         const SpikeBlockPlacement *sb = &es->level.spike_blocks[i];
         int ri = sb->rail_index;
 
-        if (ri < 0 || ri >= tmp_rail_count) continue;
+        if (ri < 0 || ri >= es->level.rail_count) continue;
 
         float sx, sy;
-        rail_get_world_pos(&tmp_rails[ri], sb->t_offset, &sx, &sy);
+        rail_placement_position_at(&es->level.rails[ri], sb->t_offset, &sx, &sy);
         sx -= SPIKE_DISPLAY_W / 2.0f;
         sy -= SPIKE_DISPLAY_H / 2.0f;
 
