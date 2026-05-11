@@ -6,35 +6,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <string.h> /* strncpy, memset */
-
 #include "game.h"
 #include "player/player.h"
 #include "effects/fog.h"
 #include "screens/hud.h"
-#include "levels/level.h"         /* LevelDef struct                                    */
-#include "levels/level_loader.h"  /* level_load, level_reset                            */
-#include "levels/level_path.h"    /* level_resolve_path                                */
-#include "levels/level_resources.h" /* level-specific resource reloads                  */
-#include "levels/phase_transition.h" /* phase next path/progress helpers                 */
-#include "editor/serializer.h"    /* level_load_toml                                    */
+#include "levels/level_session.h"     /* initial level load                              */
 #include "render/game_render.h"        /* game_render_frame, render overlays         */
 #include "input/game_input.h"          /* gamepad deferred init/cleanup              */
 #include "input/game_events.h"         /* game_handle_events                         */
 #include "core/game_resources.h"       /* game_resources_load/cleanup                */
 #include "core/game_update.h"          /* game_update_active                         */
-#include "core/game_completion.h"      /* game_completion_reset_summary              */
 #include "core/game_timing.h"          /* frame timing and smoke-test helpers         */
-
-/* ------------------------------------------------------------------ */
-/* Level data — loaded once from TOML, reused on player death resets    */
-/* ------------------------------------------------------------------ */
-
-/*
- * File-scoped level definition.  Populated once from TOML in game_init,
- * then referenced by reset_current_level on player death.
- */
-LevelDef s_level;
 
 /* ------------------------------------------------------------------ */
 
@@ -124,27 +106,7 @@ void game_init(GameState *gs) {
     /* Initialise the debug overlay if --debug was passed on the CLI */
     if (gs->debug_mode) debug_init(&gs->debug);
 
-    /* Load level from TOML if a path was provided via --level */
-    memset(&s_level, 0, sizeof(s_level));
-
-    char safe_path[512] = {0};
-    int path_valid = (level_resolve_path(gs->level_path, safe_path, sizeof(safe_path)) == 0);
-
-    level_def_init_defaults(&s_level);
-
-    if (path_valid &&
-        level_load_toml(safe_path, &s_level) == 0) {
-        /* Successfully loaded from the resolved path */
-    } else {
-        if (gs->level_path[0] != '\0')
-            fprintf(stderr, "Warning: could not load %s — starting empty level\n",
-                    gs->level_path);
-        strncpy(s_level.name, "Untitled", sizeof(s_level.name) - 1);
-    }
-    level_load(gs, &s_level);
-    game_completion_reset_summary(gs);
-
-    level_resources_apply(gs, (const LevelDef *)gs->runtime.current_level);
+    game_level_load_initial(gs);
 
     /*
      * Health/lives/score are now set by level_load() from LevelDef fields
@@ -172,64 +134,6 @@ void game_init(GameState *gs) {
  *   3. Update game state (player position, etc.).
  *   4. Draw everything to the screen.
  */
-
-/* ------------------------------------------------------------------ */
-
-/*
- * game_load_next_phase — Load the next level when last_star is collected.
- *
- * Called from game_collide when the player touches the last_star and
- * next_phase is set. Reloads the level while preserving score, lives, and
- * hearts. Resets checkpoint and player position to the new level start.
- *
- * Returns 0 on success, -1 on failure (level not found or load error).
- */
-int game_load_next_phase(GameState *gs)
-{
-    const LevelDef *current = (const LevelDef *)gs->runtime.current_level;
-    char next_path[256] = {0};
-    if (phase_next_path(current, next_path, sizeof(next_path)) != 0) return -1;
-
-    /* Save player progress */
-    PhaseProgress saved_progress;
-    phase_progress_save(gs, &saved_progress);
-
-    char safe_path[512] = {0};
-    if (level_resolve_path(next_path, safe_path, sizeof(safe_path)) != 0) {
-        fprintf(stderr, "Error: Failed to resolve next phase path: %s\n", next_path);
-        return -1;
-    }
-
-    /* Load the next level */
-    level_def_init_defaults(&s_level);
-
-    if (level_load_toml(safe_path, &s_level) != 0) {
-        fprintf(stderr, "Error: Failed to load next phase: %s\n", safe_path);
-        return -1;
-    }
-
-    /* Update the level path for the game state */
-    strncpy(gs->level_path, next_path, sizeof(gs->level_path) - 1);
-    gs->level_path[sizeof(gs->level_path) - 1] = '\0';
-
-    /* Load the new level */
-    level_load(gs, &s_level);
-    game_completion_reset_summary(gs);
-    level_resources_apply(gs, &s_level);
-
-    /* Restore player progress */
-    phase_progress_restore(gs, &saved_progress);
-
-    /* Reset checkpoint and completion flag */
-    gs->checkpoint_x = 0.0f;
-    gs->level_complete = 0;
-
-    if (gs->debug_mode) {
-        debug_log(&gs->debug, "PHASE TRANSITION to: %s", safe_path);
-    }
-
-    return 0;
-}
 
 /* ------------------------------------------------------------------ */
 
