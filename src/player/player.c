@@ -3,7 +3,7 @@
  */
 
 #include <SDL_image.h>  /* IMG_LoadTexture */
-#include <SDL_mixer.h>  /* Mix_Chunk, Mix_PlayChannel */
+#include <SDL_mixer.h>  /* Mix_Chunk */
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -11,6 +11,7 @@
 #include "player_animation.h"
 #include "player_climb.h"
 #include "player_internal.h"
+#include "player_jump.h"
 #include "player_motion.h"
 #include "../surfaces/bouncepad.h"      /* Bouncepad, BOUNCEPAD_VY — for bouncepad landing collision */
 #include "../surfaces/float_platform.h" /* FloatPlatform — for one-way landing collision             */
@@ -58,22 +59,6 @@
 #define AIR_ACCEL_WALK         350.0f   /* px/s² */
 #define AIR_ACCEL_RUN          180.0f   /* px/s² */
 #define AIR_FRICTION            80.0f   /* px/s² */
-
-/* Jump feel helpers. Coyote time gives a tiny grace window after leaving
- * ground; jump cut shortens ascent when the jump button is released early. */
-#define JUMP_VY              -325.0f
-#define JUMP_BUFFER_TIME        0.10f
-#define JUMP_CUT_FACTOR         0.45f
-
-static void player_start_jump(Player *player, Mix_Chunk *snd_jump)
-{
-    player->vy                = JUMP_VY;
-    player->on_ground         = 0;
-    player->jump_held         = 1;
-    player->coyote_timer      = 0.0f;
-    player->jump_buffer_timer = 0.0f;
-    if (snd_jump) Mix_PlayChannel(-1, snd_jump, 0);
-}
 
 void player_init(Player *player, SDL_Renderer *renderer) {
     /*
@@ -317,18 +302,10 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
          */
         if (keys[SDL_SCANCODE_SPACE]) {
             if (!player->jump_held) {
-                player->jump_buffer_timer = JUMP_BUFFER_TIME;
-                if (player->on_ground || player->coyote_timer > 0.0f) {
-                    player_start_jump(player, snd_jump);
-                } else {
-                    player->jump_held = 1;
-                }
+                player_press_jump(player, snd_jump);
             }
         } else {
-            if (player->jump_held && player->vy < 0.0f) {
-                player->vy *= JUMP_CUT_FACTOR;
-            }
-            player->jump_held = 0;
+            player_release_jump(player);
         }
     }
 
@@ -467,18 +444,10 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
 
             if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
                 if (!player->jump_held) {
-                    player->jump_buffer_timer = JUMP_BUFFER_TIME;
-                    if (player->on_ground || player->coyote_timer > 0.0f) {
-                        player_start_jump(player, snd_jump);
-                    } else {
-                        player->jump_held = 1;
-                    }
+                    player_press_jump(player, snd_jump);
                 }
             } else {
-                if (player->jump_held && player->vy < 0.0f) {
-                    player->vy *= JUMP_CUT_FACTOR;
-                }
-                player->jump_held = 0;
+                player_release_jump(player);
             }
         }
     }
