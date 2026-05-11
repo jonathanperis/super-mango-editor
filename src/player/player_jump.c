@@ -6,6 +6,8 @@
 
 #include <SDL_mixer.h>  /* Mix_PlayChannel */
 
+#include "player_internal.h"
+
 /* Jump feel helpers. Coyote time gives a tiny grace window after leaving
  * ground; jump cut shortens ascent when the jump button is released early. */
 #define JUMP_VY              -325.0f
@@ -35,4 +37,24 @@ void player_release_jump(Player *player) {
         player->vy *= JUMP_CUT_FACTOR;
     }
     player->jump_held = 0;
+}
+
+void player_update_jump_timers(Player *player, float dt, int was_on_ground,
+                               Mix_Chunk *snd_jump) {
+    if (player->on_ground) {
+        player->coyote_timer = COYOTE_TIME;
+    } else if (was_on_ground && player->vy >= 0.0f) {
+        player->coyote_timer = COYOTE_TIME;
+    } else if (player->coyote_timer > 0.0f) {
+        player->coyote_timer -= dt;
+        if (player->coyote_timer < 0.0f) player->coyote_timer = 0.0f;
+    }
+
+    const int landed_this_frame = !was_on_ground && player->on_ground;
+    if (player->jump_buffer_timer > 0.0f && landed_this_frame) {
+        player_start_jump(player, snd_jump);
+    } else if (player->jump_buffer_timer > 0.0f) {
+        player->jump_buffer_timer -= dt;
+        if (player->jump_buffer_timer < 0.0f) player->jump_buffer_timer = 0.0f;
+    }
 }
