@@ -253,26 +253,7 @@ void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
                                                     spike_platform_count,
                                                     prev_top);
 
-    /*
-     * Horizontal clamp — keep the PHYSICS body inside the logical canvas.
-     * We clamp the inset edge (x + PHYS_PAD_X), not the sprite left edge,
-     * so the transparent side-padding can slide off-screen while the visible
-     * character stays flush with the border instead of stopping early.
-     */
-    if (player->x + PHYS_PAD_X < 0.0f)
-        player->x = -(float)PHYS_PAD_X;
-    if (player->x + player->w - PHYS_PAD_X > world_w)
-        player->x = (float)(world_w - player->w + PHYS_PAD_X);
-
-    /*
-     * Ceiling clamp — stop upward movement when the physics top hits the
-     * canvas ceiling.  PHYS_PAD_TOP lets the transparent head-room of the
-     * sprite frame slide above y=0 before the physics edge triggers.
-     */
-    if (player->y + PHYS_PAD_TOP < 0.0f) {
-        player->y  = -(float)PHYS_PAD_TOP;
-        player->vy = 0.0f;
-    }
+    player_resolve_world_bounds(player, world_w);
 
     if (player->on_ground) {
         player->coyote_timer = COYOTE_TIME;

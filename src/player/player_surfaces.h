@@ -37,3 +37,6 @@ void player_resolve_spike_platform_ceiling_collision(Player *player,
                                                      const SpikePlatform *spike_platforms,
                                                      int spike_platform_count,
                                                      float prev_top);
+
+/* Clamp player physics body inside world horizontal bounds and ceiling. */
+void player_resolve_world_bounds(Player *player, int world_w);
