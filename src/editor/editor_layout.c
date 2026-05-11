@@ -4,6 +4,8 @@
 
 #include "editor_layout.h"
 
+#include "properties.h"  /* g_plx_open/g_fg_open/g_fog_open/g_phys_open */
+
 enum {
     CFG_H_HEADER          = 28,
     CFG_H_MARGIN_TOP      = 8,
@@ -33,7 +35,6 @@ enum {
 
 int editor_config_total_height(const EditorState *es)
 {
-    extern int g_plx_open, g_fg_open, g_fog_open, g_phys_open;
     int validation_h = CFG_H_VALIDATION_BASE
                      + es->validation_report.message_count * CFG_H_VALIDATION_ROW;
     int recent_h = es->recent_file_count > 0
