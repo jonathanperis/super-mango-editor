@@ -18,6 +18,7 @@
 #include "serializer_load_config.h"
 #include "serializer_load_enemies.h"
 #include "serializer_load_geometry.h"
+#include "serializer_load_hazards.h"
 #include "serializer_load_header.h"
 #include "serializer_load_layers.h"
 #include "serializer_parse.h"
@@ -112,60 +113,10 @@ int level_load_toml(const char *path, LevelDef *def) {
         return -1;
     }
 
-    /* ---- Axe traps ----------------------------------------------- */
-
-    PARSE_ARRAY("axe_traps", axe_trap_count, MAX_AXE_TRAPS, {
-        def->axe_traps[idx].pillar_x = get_float(elem, "pillar_x", 0);
-        def->axe_traps[idx].y        = get_float(elem, "y", 0);
-        def->axe_traps[idx].mode     = serializer_axe_mode_from_str(
-            get_str(elem, "mode", "PENDULUM"));
-    });
-
-    /* ---- Circular saws ------------------------------------------- */
-
-    PARSE_ARRAY("circular_saws", circular_saw_count, MAX_CIRCULAR_SAWS, {
-        def->circular_saws[idx].x         = get_float(elem, "x", 0);
-        def->circular_saws[idx].y         = get_float(elem, "y", 0);
-        def->circular_saws[idx].patrol_x0 = get_float(elem, "patrol_x0", 0);
-        def->circular_saws[idx].patrol_x1 = get_float(elem, "patrol_x1", 0);
-        def->circular_saws[idx].direction = get_int(elem, "direction", 1);
-    });
-
-    /* ---- Spike rows ---------------------------------------------- */
-
-    PARSE_ARRAY("spike_rows", spike_row_count, MAX_SPIKE_ROWS, {
-        def->spike_rows[idx].x     = get_float(elem, "x", 0);
-        def->spike_rows[idx].count = get_int(elem, "count", 1);
-    });
-
-    /* ---- Spike platforms ----------------------------------------- */
-
-    PARSE_ARRAY("spike_platforms", spike_platform_count,
-                MAX_SPIKE_PLATFORMS, {
-        def->spike_platforms[idx].x          = get_float(elem, "x", 0);
-        def->spike_platforms[idx].y          = get_float(elem, "y", 0);
-        def->spike_platforms[idx].tile_count = get_int(elem, "tile_count", 1);
-    });
-
-    /* ---- Spike blocks -------------------------------------------- */
-
-    PARSE_ARRAY("spike_blocks", spike_block_count, MAX_SPIKE_BLOCKS, {
-        def->spike_blocks[idx].rail_index = get_int(elem, "rail_index", 0);
-        def->spike_blocks[idx].t_offset   = get_float(elem, "t_offset", 0);
-        def->spike_blocks[idx].speed      = get_float(elem, "speed", 0);
-    });
-
-    /* ---- Blue flames --------------------------------------------- */
-
-    PARSE_ARRAY("blue_flames", blue_flame_count, MAX_BLUE_FLAMES, {
-        def->blue_flames[idx].x = get_float(elem, "x", 0);
-    });
-
-    /* ---- Fire flames --------------------------------------------- */
-
-    PARSE_ARRAY("fire_flames", fire_flame_count, MAX_BLUE_FLAMES, {
-        def->fire_flames[idx].x = get_float(elem, "x", 0);
-    });
+    if (serializer_load_hazards(top, def) != 0) {
+        toml_free(r);
+        return -1;
+    }
 
     /* ---- Float platforms ----------------------------------------- */
 
