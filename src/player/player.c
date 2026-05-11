@@ -11,6 +11,7 @@
 #include "player_animation.h"
 #include "player_climb.h"
 #include "player_internal.h"
+#include "player_motion.h"
 #include "../surfaces/bouncepad.h"      /* Bouncepad, BOUNCEPAD_VY — for bouncepad landing collision */
 #include "../surfaces/float_platform.h" /* FloatPlatform — for one-way landing collision             */
 #include "../surfaces/bridge.h"         /* Bridge — for one-way landing collision on bridges         */
@@ -633,92 +634,7 @@ void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
      */
     player->vy += GRAVITY * dt;
 
-    /* ---- Horizontal acceleration / friction (momentum system) ------------ */
-    /*
-     * player_handle_input sets move_dir (-1/0/+1) and is_running each frame.
-     * Here we translate those intentions into a smoothly accelerating vx,
-     * rather than snapping instantly to top speed.
-     *
-     * Ground vs air:
-     *   was_on_ground == 1  → use ground accel + strong friction (tight, skiddy).
-     *   was_on_ground == 0  → use air accel   + weak   friction  (committed arc).
-     *
-     * Walk vs run (is_running flag set by Shift / RB):
-     *   Walk: moderate max speed, faster accel  → precise, easy to control.
-     *   Run:  high    max speed, slower accel   → powerful but takes time to ramp;
-     *         air accel is dramatically reduced → mid-air direction changes are hard.
-     */
-    {
-        /*
-         * air_is_running — "snapshot" of is_running taken while on the ground.
-         *
-         * Every frame the player stands on the ground we refresh this value.
-         * The moment they leave (jump or walk off an edge), air_is_running
-         * freezes at whatever it was on the last ground frame.
-         *
-         * This means holding or releasing Shift mid-air has no effect on
-         * physics: the momentum built on the ground is what carries the arc.
-         */
-        if (was_on_ground)
-            player->air_is_running = player->is_running;
-
-        /* Ground physics uses live is_running; air uses the frozen snapshot. */
-        int running = was_on_ground ? player->is_running : player->air_is_running;
-
-        float max_spd = running ? player->run_max_speed    : player->walk_max_speed;
-        float accel   = was_on_ground
-                          ? (running ? player->run_ground_accel  : player->walk_ground_accel)
-                          : (running ? player->air_accel_run     : player->air_accel_walk);
-        float friction = was_on_ground ? player->ground_friction : player->air_friction;
-
-        if (player->move_dir != 0) {
-            /*
-             * Direction key held — accelerate toward the target speed.
-             *
-             * Counter-direction bonus: when the pressed direction is opposite
-             * to current vx (e.g. moving right but pressing left), the player
-             * is actively fighting their own momentum.  On the ground we add
-             * ground_counter_accel to brake harder, giving a snappier reversal
-             * feel without reducing the passive skid (ground_friction).
-             *
-             * step = how many px/s to add this frame (accel × dt).
-             * We clamp to target_vx so we never overshoot in a single frame.
-             */
-            int counter = was_on_ground &&
-                          ((player->move_dir > 0 && player->vx < 0.0f) ||
-                           (player->move_dir < 0 && player->vx > 0.0f));
-            float effective_accel = accel + (counter ? player->ground_counter_accel : 0.0f);
-
-            float target_vx = (float)player->move_dir * max_spd;
-            float step       = effective_accel * dt;
-            if (player->move_dir > 0) {
-                /* Moving right: increase vx but don't exceed +target_vx */
-                player->vx += step;
-                if (player->vx > target_vx) player->vx = target_vx;
-            } else {
-                /* Moving left: decrease vx but don't go below -target_vx */
-                player->vx -= step;
-                if (player->vx < target_vx) player->vx = target_vx;
-            }
-        } else {
-            /*
-             * No direction key held — friction decelerates vx toward 0.
-             * This is what produces the skid on the ground and the gentle
-             * float-through in the air.
-             *
-             * We apply friction symmetrically so it always moves vx toward 0
-             * regardless of sign, and clamp to 0 to avoid oscillation.
-             */
-            float step = friction * dt;
-            if (player->vx > 0.0f) {
-                player->vx -= step;
-                if (player->vx < 0.0f) player->vx = 0.0f;
-            } else if (player->vx < 0.0f) {
-                player->vx += step;
-                if (player->vx > 0.0f) player->vx = 0.0f;
-            }
-        }
-    }
+    player_apply_horizontal_motion(player, dt, was_on_ground);
 
     player->x += player->vx * dt;   /* move horizontally */
     player->y += player->vy * dt;   /* move vertically   */
