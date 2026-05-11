@@ -24,6 +24,7 @@
 #endif
 
 #include "serializer.h"
+#include "serializer_types.h"                    /* enum/string conversion helpers */
 #include "../../vendor/tomlc17/tomlc17.h" /* tomlc17 API */
 #include "../levels/level.h"              /* LevelDef, all placement types */
 #include "../levels/level_loader.h"       /* level_validate_runtime */
@@ -99,80 +100,6 @@ static void write_toml_key_string(FILE *fp, const char *key, const char *value) 
     fprintf(fp, "%s = ", key);
     write_toml_string(fp, value);
     fputc('\n', fp);
-}
-
-/* ================================================================== */
-/* Enum <-> string conversion helpers                                  */
-/* ================================================================== */
-
-/*
- * Each enum has a pair of functions: one converts the C enum value to a
- * human-readable string for TOML output; the other parses a string back
- * into the enum value.  This keeps the TOML portable and self-documenting.
- */
-
-/* ---- RailLayout -------------------------------------------------- */
-
-static const char *rail_layout_to_str(RailLayout layout) {
-    switch (layout) {
-        case RAIL_LAYOUT_RECT:  return "RECT";
-        case RAIL_LAYOUT_HORIZ: return "HORIZ";
-        default:                return "RECT";
-    }
-}
-
-static RailLayout rail_layout_from_str(const char *s) {
-    if (s && strcmp(s, "HORIZ") == 0) return RAIL_LAYOUT_HORIZ;
-    return RAIL_LAYOUT_RECT;  /* default to RECT for unknown values */
-}
-
-/* ---- AxeTrapMode ------------------------------------------------- */
-
-static const char *axe_mode_to_str(AxeTrapMode mode) {
-    switch (mode) {
-        case AXE_MODE_PENDULUM: return "PENDULUM";
-        case AXE_MODE_SPIN:     return "SPIN";
-        default:                return "PENDULUM";
-    }
-}
-
-static AxeTrapMode axe_mode_from_str(const char *s) {
-    if (s && strcmp(s, "SPIN") == 0) return AXE_MODE_SPIN;
-    return AXE_MODE_PENDULUM;  /* default to PENDULUM for unknown values */
-}
-
-/* ---- FloatPlatformMode ------------------------------------------- */
-
-static const char *float_mode_to_str(FloatPlatformMode mode) {
-    switch (mode) {
-        case FLOAT_PLATFORM_STATIC:  return "STATIC";
-        case FLOAT_PLATFORM_CRUMBLE: return "CRUMBLE";
-        case FLOAT_PLATFORM_RAIL:    return "RAIL";
-        default:                     return "STATIC";
-    }
-}
-
-static FloatPlatformMode float_mode_from_str(const char *s) {
-    if (s && strcmp(s, "CRUMBLE") == 0) return FLOAT_PLATFORM_CRUMBLE;
-    if (s && strcmp(s, "RAIL") == 0)    return FLOAT_PLATFORM_RAIL;
-    return FLOAT_PLATFORM_STATIC;  /* default to STATIC for unknown values */
-}
-
-/* ---- BouncepadType ----------------------------------------------- */
-
-static const char *bouncepad_type_to_str(BouncepadType type) {
-    switch (type) {
-        case BOUNCEPAD_GREEN: return "GREEN";
-        case BOUNCEPAD_WOOD:  return "WOOD";
-        case BOUNCEPAD_RED:   return "RED";
-        default:              return "GREEN";
-    }
-}
-
-static BouncepadType bouncepad_type_from_str(const char *s) {
-    if (s && strcmp(s, "WOOD") == 0) return BOUNCEPAD_WOOD;
-    if (s && strcmp(s, "RED") == 0)  return BOUNCEPAD_RED;
-    return BOUNCEPAD_GREEN;  /* default to GREEN for unknown values */
 }
 
 /* ================================================================== */
@@ -304,7 +231,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->rail_count; i++) {
         const RailPlacement *r = &def->rails[i];
         fprintf(fp, "[[rails]]\n");
-        write_toml_key_string(fp, "layout", rail_layout_to_str(r->layout));
+        write_toml_key_string(fp, "layout", serializer_rail_layout_to_str(r->layout));
         fprintf(fp, "x = %d\n", r->x);
         fprintf(fp, "y = %d\n", r->y);
         fprintf(fp, "w = %d\n", r->w);
@@ -464,7 +391,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "[[axe_traps]]\n");
         fprintf(fp, "pillar_x = %s\n", fmt_float(a->pillar_x));
         fprintf(fp, "y = %s\n", fmt_float(a->y));
-        write_toml_key_string(fp, "mode", axe_mode_to_str(a->mode));
+        write_toml_key_string(fp, "mode", serializer_axe_mode_to_str(a->mode));
         fprintf(fp, "\n");
     }
 
@@ -534,7 +461,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
     for (int i = 0; i < def->float_platform_count; i++) {
         const FloatPlatformPlacement *fl = &def->float_platforms[i];
         fprintf(fp, "[[float_platforms]]\n");
-        write_toml_key_string(fp, "mode", float_mode_to_str(fl->mode));
+        write_toml_key_string(fp, "mode", serializer_float_mode_to_str(fl->mode));
         fprintf(fp, "x = %s\n", fmt_float(fl->x));
         fprintf(fp, "y = %s\n", fmt_float(fl->y));
         fprintf(fp, "tile_count = %d\n", fl->tile_count);
@@ -562,7 +489,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "[[bouncepads_small]]\n");
         fprintf(fp, "x = %s\n", fmt_float(bp->x));
         fprintf(fp, "launch_vy = %s\n", fmt_float(bp->launch_vy));
-        write_toml_key_string(fp, "pad_type", bouncepad_type_to_str(bp->pad_type));
+        write_toml_key_string(fp, "pad_type", serializer_bouncepad_type_to_str(bp->pad_type));
         fprintf(fp, "\n");
     }
 
@@ -573,7 +500,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "[[bouncepads_medium]]\n");
         fprintf(fp, "x = %s\n", fmt_float(bp->x));
         fprintf(fp, "launch_vy = %s\n", fmt_float(bp->launch_vy));
-        write_toml_key_string(fp, "pad_type", bouncepad_type_to_str(bp->pad_type));
+        write_toml_key_string(fp, "pad_type", serializer_bouncepad_type_to_str(bp->pad_type));
         fprintf(fp, "\n");
     }
 
@@ -584,7 +511,7 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "[[bouncepads_high]]\n");
         fprintf(fp, "x = %s\n", fmt_float(bp->x));
         fprintf(fp, "launch_vy = %s\n", fmt_float(bp->launch_vy));
-        write_toml_key_string(fp, "pad_type", bouncepad_type_to_str(bp->pad_type));
+        write_toml_key_string(fp, "pad_type", serializer_bouncepad_type_to_str(bp->pad_type));
         fprintf(fp, "\n");
     }
 
@@ -766,7 +693,7 @@ int level_load_toml(const char *path, LevelDef *def) {
     /* ---- Rails --------------------------------------------------- */
 
     PARSE_ARRAY("rails", rail_count, MAX_RAILS, {
-        def->rails[idx].layout  = rail_layout_from_str(
+        def->rails[idx].layout  = serializer_rail_layout_from_str(
             get_str(elem, "layout", "RECT"));
         def->rails[idx].x       = get_int(elem, "x", 0);
         def->rails[idx].y       = get_int(elem, "y", 0);
@@ -896,7 +823,7 @@ int level_load_toml(const char *path, LevelDef *def) {
     PARSE_ARRAY("axe_traps", axe_trap_count, MAX_AXE_TRAPS, {
         def->axe_traps[idx].pillar_x = get_float(elem, "pillar_x", 0);
         def->axe_traps[idx].y        = get_float(elem, "y", 0);
-        def->axe_traps[idx].mode     = axe_mode_from_str(
+        def->axe_traps[idx].mode     = serializer_axe_mode_from_str(
             get_str(elem, "mode", "PENDULUM"));
     });
 
@@ -950,7 +877,7 @@ int level_load_toml(const char *path, LevelDef *def) {
 
     PARSE_ARRAY("float_platforms", float_platform_count,
                 MAX_FLOAT_PLATFORMS, {
-        def->float_platforms[idx].mode       = float_mode_from_str(
+        def->float_platforms[idx].mode       = serializer_float_mode_from_str(
             get_str(elem, "mode", "STATIC"));
         def->float_platforms[idx].x          = get_float(elem, "x", 0);
         def->float_platforms[idx].y          = get_float(elem, "y", 0);
@@ -974,7 +901,7 @@ int level_load_toml(const char *path, LevelDef *def) {
                 MAX_BOUNCEPADS_SMALL, {
         def->bouncepads_small[idx].x         = get_float(elem, "x", 0);
         def->bouncepads_small[idx].launch_vy = get_float(elem, "launch_vy", 0);
-        def->bouncepads_small[idx].pad_type  = bouncepad_type_from_str(
+        def->bouncepads_small[idx].pad_type  = serializer_bouncepad_type_from_str(
             get_str(elem, "pad_type", "GREEN"));
     });
 
@@ -984,7 +911,7 @@ int level_load_toml(const char *path, LevelDef *def) {
                 MAX_BOUNCEPADS_MEDIUM, {
         def->bouncepads_medium[idx].x         = get_float(elem, "x", 0);
         def->bouncepads_medium[idx].launch_vy = get_float(elem, "launch_vy", 0);
-        def->bouncepads_medium[idx].pad_type  = bouncepad_type_from_str(
+        def->bouncepads_medium[idx].pad_type  = serializer_bouncepad_type_from_str(
             get_str(elem, "pad_type", "WOOD"));
     });
 
@@ -994,7 +921,7 @@ int level_load_toml(const char *path, LevelDef *def) {
                 MAX_BOUNCEPADS_HIGH, {
         def->bouncepads_high[idx].x         = get_float(elem, "x", 0);
         def->bouncepads_high[idx].launch_vy = get_float(elem, "launch_vy", 0);
-        def->bouncepads_high[idx].pad_type  = bouncepad_type_from_str(
+        def->bouncepads_high[idx].pad_type  = serializer_bouncepad_type_from_str(
             get_str(elem, "pad_type", "RED"));
     });
 
