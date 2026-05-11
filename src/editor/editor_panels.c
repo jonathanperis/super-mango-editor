@@ -8,6 +8,30 @@
 #include "palette.h"       /* palette_render */
 #include "properties.h"    /* level_config_render, properties_render */
 
+typedef struct {
+    int y;
+    int total_h;
+    int visible_h;
+    int bottom_y;
+} ConfigPanelGeometry;
+
+static ConfigPanelGeometry config_panel_geometry(EditorState *es)
+{
+    const int section_hdr = 28;
+
+    ConfigPanelGeometry g;
+    g.y = TOOLBAR_H;
+    g.total_h = es->config_open
+              ? editor_config_total_height(es)
+              : section_hdr;
+
+    int max_h = (EDITOR_H - STATUS_H - TOOLBAR_H) / 2;
+    g.visible_h = g.total_h < max_h ? g.total_h : max_h;
+    g.bottom_y = g.y + g.visible_h;
+
+    return g;
+}
+
 /*
  * editor_render_side_panels — Draw level config, palette, and properties.
  *
@@ -17,28 +41,17 @@
  */
 void editor_render_side_panels(EditorState *es)
 {
-    int right_top    = TOOLBAR_H;
     int right_bottom = EDITOR_H - STATUS_H;
     int section_hdr  = 28;  /* matches palette TITLE_H */
 
-    int config_y = right_top;
-    int config_h_total;
-    if (es->config_open) {
-        config_h_total = editor_config_total_height(es);
-    } else {
-        config_h_total = section_hdr;
-    }
-
-    int config_h_max = (right_bottom - right_top) / 2;
-    int config_h = config_h_total < config_h_max
-                 ? config_h_total : config_h_max;
+    ConfigPanelGeometry config = config_panel_geometry(es);
 
     int props_h = 0;
     if (es->selection.index >= 0) {
         props_h = es->panel_open ? 200 : section_hdr;
     }
 
-    int palette_y = config_y + config_h;
+    int palette_y = config.bottom_y;
     int palette_h;
     if (es->palette_open) {
         palette_h = right_bottom - palette_y - props_h;
@@ -49,7 +62,7 @@ void editor_render_side_panels(EditorState *es)
 
     int props_y = palette_y + palette_h;
 
-    level_config_render(es, config_y, config_h, config_h_total);
+    level_config_render(es, config.y, config.visible_h, config.total_h);
     palette_render(es, palette_y, palette_h);
     if (es->selection.index >= 0) {
         properties_render(es, props_y, props_h);
@@ -69,17 +82,9 @@ int editor_handle_side_panel_scroll(EditorState *es, int mx, int my, int wheel_y
         return 0;
     }
 
-    int section_hdr = 28;
-    int cfg_total = section_hdr;
-    if (es->config_open) {
-        cfg_total = editor_config_total_height(es);
-    }
+    ConfigPanelGeometry config = config_panel_geometry(es);
 
-    int cfg_max = (EDITOR_H - STATUS_H - TOOLBAR_H) / 2;
-    int cfg_h = cfg_total < cfg_max ? cfg_total : cfg_max;
-    int cfg_bot = TOOLBAR_H + cfg_h;
-
-    if (my < cfg_bot) {
+    if (my < config.bottom_y) {
         cfg_scroll(-wheel_y * 20);
     } else {
         palette_scroll(-wheel_y * 20);
