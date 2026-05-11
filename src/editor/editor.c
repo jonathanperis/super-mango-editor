@@ -306,17 +306,7 @@ int editor_init(EditorState *es) {
      * Set a default level name so the title bar and status bar have
      * something to display before the user saves or loads a file.
      */
-    level_def_init_defaults(&es->level);
-    strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
-
-    /* Sensible defaults so new levels have a visible player and last star */
-    es->level.screen_count = 4;
-    es->level.player_start_x = 48.0f;
-    es->level.player_start_y = 205.0f;
-    es->level.last_star.x = 145.0f;
-    es->level.last_star.y = 167.0f;
-    strncpy(es->level.floor_tile_path, "assets/sprites/levels/grass_tileset.png",
-            sizeof(es->level.floor_tile_path) - 1);
+    editor_level_init_defaults(&es->level);
 
     /* ---- Start the loop --------------------------------------------- */
     /*
