@@ -1511,12 +1511,11 @@ static void render_selection(EditorState *es) {
         const SpikeBlockPlacement *sb =
             &es->level.spike_blocks[es->selection.index];
         int ri = sb->rail_index;
-        if (ri >= 0 && ri < es->level.rail_count) {
-            const RailPlacement *rp = &es->level.rails[ri];
-            rail_placement_position_at(rp, sb->t_offset, &wx, &wy);
-            wx -= (float)SPIKE_DISPLAY_W / 2.0f;
-            wy -= (float)SPIKE_DISPLAY_H / 2.0f;
-        }
+        if (ri < 0 || ri >= es->level.rail_count) return;
+        const RailPlacement *rp = &es->level.rails[ri];
+        rail_placement_position_at(rp, sb->t_offset, &wx, &wy);
+        wx -= (float)SPIKE_DISPLAY_W / 2.0f;
+        wy -= (float)SPIKE_DISPLAY_H / 2.0f;
         ww = SPIKE_DISPLAY_W;
         wh = SPIKE_DISPLAY_H;
         break;
