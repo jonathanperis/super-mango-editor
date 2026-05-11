@@ -284,7 +284,7 @@ void editor_paste_clipboard(EditorState *es)
         break;
     case ENT_FIRE_FLAME:
         d.fire_flame.x += PASTE_OFFSET;
-        PASTE_INTO(fire_flames, fire_flame_count, MAX_BLUE_FLAMES, fire_flame);
+        PASTE_INTO(fire_flames, fire_flame_count, MAX_FIRE_FLAMES, fire_flame);
         break;
     case ENT_FLOAT_PLATFORM:
         d.float_platform.x += PASTE_OFFSET;

@@ -579,7 +579,7 @@ static int get_max_count(EntityType type)
     case ENT_SPIKE_PLATFORM:   return MAX_SPIKE_PLATFORMS;
     case ENT_SPIKE_BLOCK:      return MAX_SPIKE_BLOCKS;
     case ENT_BLUE_FLAME:       return MAX_BLUE_FLAMES;
-    case ENT_FIRE_FLAME:       return MAX_BLUE_FLAMES;
+    case ENT_FIRE_FLAME:       return MAX_FIRE_FLAMES;
     case ENT_FLOAT_PLATFORM:   return MAX_FLOAT_PLATFORMS;
     case ENT_BRIDGE:           return MAX_BRIDGES;
     case ENT_BOUNCEPAD_SMALL:  return MAX_BOUNCEPADS_SMALL;
