@@ -11,6 +11,8 @@ void player_resolve_floor_collision(Player *player,
                                     const Bouncepad *bouncepads, int bouncepad_count,
                                     const int *floor_gaps, int floor_gap_count,
                                     int *out_bounce_idx) {
+    *out_bounce_idx = -1;
+
     /*
      * Floor collision — snap to the grass surface.
      *
