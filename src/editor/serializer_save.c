@@ -8,6 +8,7 @@
 #include "serializer_emit.h"
 #include "serializer_io.h"
 #include "serializer_types.h"
+#include "../levels/level_loader.h"
 
 /* ================================================================== */
 /* level_save_toml — Write a LevelDef to a human-readable TOML file    */
@@ -15,6 +16,14 @@
 
 int level_save_toml(const LevelDef *def, const char *path) {
     if (!def || !path) return -1;
+
+    {
+        char err[128];
+        if (level_validate_runtime(def, err, sizeof(err)) != 0) {
+            fprintf(stderr, "serializer: invalid level for save '%s': %s\n", path, err);
+            return -1;
+        }
+    }
 
     FILE *fp = serializer_open_write(path);
     if (!fp) {
@@ -432,7 +441,9 @@ int level_save_toml(const LevelDef *def, const char *path) {
         fprintf(fp, "\n");
     }
 
-    fclose(fp);
+    if (fclose(fp) != 0) {
+        fprintf(stderr, "serializer: failed to flush/close '%s'\n", path);
+        return -1;
+    }
     return 0;
 }
-
