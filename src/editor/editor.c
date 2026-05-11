@@ -21,7 +21,6 @@
 #include <SDL_ttf.h>      /* TTF_OpenFont, TTF_CloseFont — text rendering  */
 #include <stdio.h>        /* fprintf, stderr, snprintf — error and status  */
 #include <string.h>       /* memset, strncpy, strrchr — string operations  */
-#include <stdarg.h>       /* va_list — status message formatting            */
 
 #ifndef _WIN32
 #include <errno.h>        /* errno, ECHILD — waitpid error handling         */
@@ -44,6 +43,7 @@
 #include "ui.h"           /* UIState, ui_init, ui_begin_frame, ui_button    */
 #include "file_dialog.h"  /* file_dialog_open — native OS file picker       */
 #include "editor_validation.h" /* editor_validate_level                       */
+#include "editor_session.h" /* editor status/title/session helpers           */
 #include "editor_textures.h" /* editor_textures_load/cleanup                 */
 
 #define EDITOR_AUTOSAVE_PATH "out/autosave/editor_autosave.toml"
@@ -88,13 +88,8 @@ static void render_toolbar(EditorState *es);
 static void render_status_bar(EditorState *es);
 static void apply_undo_command(EditorState *es, const Command *cmd, int reverse);
 static void open_level_file(EditorState *es);
-static void set_status(EditorState *es, const char *fmt, ...);
-static void update_window_title(EditorState *es);
-static void reset_new_level(EditorState *es);
 static int save_current_level(EditorState *es);
 static int export_current_level(EditorState *es);
-static int can_persist(EditorState *es, const char *action);
-static int confirm_discard_changes(EditorState *es, const char *action);
 static void maybe_autosave(EditorState *es);
 static void load_recent_files(EditorState *es);
 static void save_recent_files(const EditorState *es);
@@ -331,9 +326,9 @@ int editor_init(EditorState *es) {
     es->running = 1;
     es->last_autosave_ms = SDL_GetTicks();
     if (file_exists(es->autosave_path)) {
-        set_status(es, "Autosave found: Ctrl+R to recover");
+        editor_set_status(es, "Autosave found: Ctrl+R to recover");
     } else {
-        set_status(es, "Ready");
+        editor_set_status(es, "Ready");
     }
 
     return 0;
@@ -572,7 +567,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
     switch (event->type) {
     /* ---- Window close (the X button or Alt+F4) ---------------------- */
     case SDL_QUIT:
-        if (confirm_discard_changes(es, "quit")) {
+        if (editor_confirm_discard_changes(es, "quit")) {
             es->running = 0;
         }
         break;
@@ -613,7 +608,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  * osascript, Linux: zenity, Windows: PowerShell OpenFileDialog).
                  * If the user selects a .toml file, load it into the editor.
                  */
-                if (confirm_discard_changes(es, "open another level")) {
+                if (editor_confirm_discard_changes(es, "open another level")) {
                     open_level_file(es);
                 }
                 break;
@@ -630,8 +625,8 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  * memset zeroes every byte: all counts become 0, all
                  * positions become 0.0f, and all pointers become NULL.
                  */
-                if (confirm_discard_changes(es, "create a new level")) {
-                    reset_new_level(es);
+                if (editor_confirm_discard_changes(es, "create a new level")) {
+                    editor_reset_new_level(es);
                 }
                 break;
 
@@ -653,15 +648,15 @@ static void handle_event(EditorState *es, SDL_Event *event) {
 
             case SDLK_r:
                 if (file_exists(es->autosave_path)) {
-                    if (confirm_discard_changes(es, "recover autosave")) {
+                    if (editor_confirm_discard_changes(es, "recover autosave")) {
                         if (editor_load_level(es, es->autosave_path) == 0) {
-                            set_status(es, "Recovered autosave");
+                            editor_set_status(es, "Recovered autosave");
                         } else {
-                            set_status(es, "Failed to recover autosave");
+                            editor_set_status(es, "Failed to recover autosave");
                         }
                     }
                 } else {
-                    set_status(es, "No autosave to recover");
+                    editor_set_status(es, "No autosave to recover");
                 }
                 break;
 
@@ -672,7 +667,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
             case SDLK_5: {
                 int recent_idx = (int)(key - SDLK_1);
                 if (recent_idx >= 0 && recent_idx < es->recent_file_count) {
-                    if (confirm_discard_changes(es, "open a recent level")) {
+                    if (editor_confirm_discard_changes(es, "open a recent level")) {
                         (void)editor_load_level(es, es->recent_files[recent_idx]);
                     }
                 }
@@ -1048,7 +1043,7 @@ int editor_load_level(EditorState *es, const char *path) {
 
     if (level_load_toml(path, &new_level) != 0) {
         fprintf(stderr, "Error: failed to load %s\n", path);
-        set_status(es, "Load failed: %s", path);
+        editor_set_status(es, "Load failed: %s", path);
         return -1;
     }
 
@@ -1102,16 +1097,14 @@ int editor_load_level(EditorState *es, const char *path) {
         }
     }
 
-    /* Update the title bar to show the loaded file */
-    char title[300];
-    snprintf(title, sizeof(title), "Super Mango Editor - %s", es->file_path);
-    SDL_SetWindowTitle(es->window, title);
+    /* Update the title bar to show the loaded file. */
+    editor_update_window_title(es);
 
     fprintf(stderr, "Loaded %s (%d entities)\n", path,
             es->level.coin_count + es->level.spider_count +
             es->level.platform_count + es->level.rail_count +
             es->level.bird_count + es->level.fish_count);
-    set_status(es, "Loaded %s", path);
+    editor_set_status(es, "Loaded %s", path);
     return 0;
 }
 
@@ -1135,107 +1128,9 @@ static void open_level_file(EditorState *es) {
     /* User cancelled — do nothing */
 }
 
-static void set_status(EditorState *es, const char *fmt, ...)
-{
-    va_list ap;
-
-    if (!es || !fmt) return;
-    va_start(ap, fmt);
-    vsnprintf(es->status_message, sizeof(es->status_message), fmt, ap);
-    va_end(ap);
-}
-
-static void update_window_title(EditorState *es)
-{
-    char title[300];
-
-    if (es->file_path[0] != '\0') {
-        snprintf(title, sizeof(title), "Super Mango Editor - %s%s",
-                 es->file_path, es->modified ? " *" : "");
-    } else {
-        snprintf(title, sizeof(title), "Super Mango Editor%s",
-                 es->modified ? " *" : "");
-    }
-    SDL_SetWindowTitle(es->window, title);
-}
-
-static void reset_new_level(EditorState *es)
-{
-    level_def_init_defaults(&es->level);
-    strncpy(es->level.name, "Untitled", sizeof(es->level.name) - 1);
-    es->level.screen_count = 4;
-    es->level.player_start_x = 48.0f;
-    es->level.player_start_y = 205.0f;
-    es->level.last_star.x = 145.0f;
-    es->level.last_star.y = 167.0f;
-    strncpy(es->level.floor_tile_path, "assets/sprites/levels/grass_tileset.png",
-            sizeof(es->level.floor_tile_path) - 1);
-    es->file_path[0] = '\0';
-    undo_clear(es->undo);
-    es->modified        = 0;
-    es->selection.index = -1;
-    set_status(es, "New level");
-    update_window_title(es);
-}
-
-static int can_persist(EditorState *es, const char *action)
-{
-    editor_validate_level(&es->level, &es->validation_report);
-    if (es->validation_report.error_count > 0) {
-        const char *msg = es->validation_report.message_count > 0
-                        ? es->validation_report.messages[0]
-                        : "validation failed";
-        set_status(es, "%s blocked: %s", action, msg);
-        fprintf(stderr, "%s blocked: %s\n", action, msg);
-        return 0;
-    }
-    return 1;
-}
-
-/*
- * confirm_discard_changes — Ask before replacing unsaved editor state.
- *
- * Returns 1 when it is safe to continue the destructive action. Clean levels
- * continue immediately; dirty levels show a native SDL warning dialog.
- */
-static int confirm_discard_changes(EditorState *es, const char *action)
-{
-    SDL_MessageBoxButtonData buttons[2] = {
-        { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Cancel" },
-        { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Discard" },
-    };
-    SDL_MessageBoxData data;
-    char message[256];
-    int button_id = 0;
-
-    if (!es || !es->modified) return 1;
-
-    snprintf(message, sizeof(message),
-             "Unsaved changes will be lost. Discard changes and %s?", action);
-
-    memset(&data, 0, sizeof(data));
-    data.flags = SDL_MESSAGEBOX_WARNING;
-    data.window = es->window;
-    data.title = "Unsaved Changes";
-    data.message = message;
-    data.numbuttons = 2;
-    data.buttons = buttons;
-
-    if (SDL_ShowMessageBox(&data, &button_id) != 0) {
-        fprintf(stderr, "SDL_ShowMessageBox error: %s\n", SDL_GetError());
-        set_status(es, "%s cancelled: confirmation failed", action);
-        return 0;
-    }
-
-    if (button_id == 1) return 1;
-
-    set_status(es, "%s cancelled", action);
-    return 0;
-}
-
 static int save_current_level(EditorState *es)
 {
-    if (!can_persist(es, "Save")) return -1;
+    if (!editor_can_persist(es, "Save")) return -1;
 
     if (es->file_path[0] == '\0') {
         strncpy(es->file_path, "levels/untitled.toml",
@@ -1245,13 +1140,13 @@ static int save_current_level(EditorState *es)
     if (level_save_toml(&es->level, es->file_path) == 0) {
         es->modified = 0;
         add_recent_file(es, es->file_path);
-        update_window_title(es);
-        set_status(es, "Saved %s", es->file_path);
+        editor_update_window_title(es);
+        editor_set_status(es, "Saved %s", es->file_path);
         return 0;
     }
 
     fprintf(stderr, "Error: failed to save %s\n", es->file_path);
-    set_status(es, "Save failed: %s", es->file_path);
+    editor_set_status(es, "Save failed: %s", es->file_path);
     return -1;
 }
 
@@ -1260,7 +1155,7 @@ static int export_current_level(EditorState *es)
     const char *var_name = "untitled";
     char name_buf[128] = {0};
 
-    if (!can_persist(es, "Export")) return -1;
+    if (!editor_can_persist(es, "Export")) return -1;
 
     if (es->file_path[0] != '\0') {
         const char *base = strrchr(es->file_path, '/');
@@ -1274,12 +1169,12 @@ static int export_current_level(EditorState *es)
 
     if (level_export_c(&es->level, var_name, "src/levels/exported") == 0) {
         fprintf(stderr, "Exported to src/levels/exported/%s.h/.c\n", var_name);
-        set_status(es, "Exported %s", var_name);
+        editor_set_status(es, "Exported %s", var_name);
         return 0;
     }
 
     fprintf(stderr, "Error: export failed for '%s'\n", var_name);
-    set_status(es, "Export failed: %s", var_name);
+    editor_set_status(es, "Export failed: %s", var_name);
     return -1;
 }
 
@@ -1318,7 +1213,7 @@ static void maybe_autosave(EditorState *es)
 
     ensure_out_dirs();
     if (level_save_toml(&es->level, es->autosave_path) == 0) {
-        set_status(es, "Autosaved %s", es->autosave_path);
+        editor_set_status(es, "Autosaved %s", es->autosave_path);
     }
 }
 
@@ -1756,7 +1651,7 @@ static void paste_clipboard(EditorState *es) {
  */
 static void play_test(EditorState *es) {
     if (es->playing) return;   /* already running */
-    if (!can_persist(es, "Playtest")) return;
+    if (!editor_can_persist(es, "Playtest")) return;
 
     /*
      * Step 1 — Save the level as TOML.
@@ -1771,11 +1666,11 @@ static void play_test(EditorState *es) {
 
     if (level_save_toml(&es->level, save_path) != 0) {
         fprintf(stderr, "Play: failed to save %s\n", save_path);
-        set_status(es, "Play failed: save %s", save_path);
+        editor_set_status(es, "Play failed: save %s", save_path);
         return;
     }
     es->modified = 0;
-    set_status(es, "Play saved %s", save_path);
+    editor_set_status(es, "Play saved %s", save_path);
 
     /* Step 4 — Launch the game as a child process */
     fprintf(stderr, "Play: launching game...\n");
@@ -1808,11 +1703,11 @@ static void play_test(EditorState *es) {
         /* Parent process — record the child and enter play mode */
         es->play_pid = (int)pid;
         es->playing = 1;
-        set_status(es, "Play launched %s", save_path);
+        editor_set_status(es, "Play launched %s", save_path);
         SDL_SetWindowTitle(es->window, "Super Mango Editor - Playing...");
     } else {
         fprintf(stderr, "Play: fork() failed\n");
-        set_status(es, "Play failed: fork");
+        editor_set_status(es, "Play failed: fork");
     }
 #else
     /* Windows: use system() with start to launch non-blocking */
@@ -1825,12 +1720,12 @@ static void play_test(EditorState *es) {
         rc = system(cmd);
         if (rc != 0) {
             fprintf(stderr, "Play: launch failed for %s (rc=%d)\n", save_path, rc);
-            set_status(es, "Play failed: launch %s", save_path);
+            editor_set_status(es, "Play failed: launch %s", save_path);
             return;
         }
     }
     es->playing = 1;
-    set_status(es, "Play launched %s", save_path);
+    editor_set_status(es, "Play launched %s", save_path);
     SDL_SetWindowTitle(es->window, "Super Mango Editor - Playing...");
 #endif
 }
@@ -1865,17 +1760,10 @@ static void stop_play(EditorState *es) {
 #endif
 
     es->playing = 0;
-    set_status(es, "Play stopped");
+    editor_set_status(es, "Play stopped");
 
-    /* Restore the editor title bar */
-    if (es->file_path[0] != '\0') {
-        char title[300];
-        snprintf(title, sizeof(title), "Super Mango Editor - %s%s",
-                 es->file_path, es->modified ? " *" : "");
-        SDL_SetWindowTitle(es->window, title);
-    } else {
-        SDL_SetWindowTitle(es->window, "Super Mango Editor");
-    }
+    /* Restore the editor title bar. */
+    editor_update_window_title(es);
 }
 
 /*
@@ -1904,39 +1792,25 @@ static void check_play_status(EditorState *es) {
             es->play_pid = 0;
             es->playing = 0;
             if (WIFEXITED(status)) {
-                set_status(es, "Play exited: code %d", WEXITSTATUS(status));
+                editor_set_status(es, "Play exited: code %d", WEXITSTATUS(status));
             } else if (WIFSIGNALED(status)) {
-                set_status(es, "Play exited: signal %d", WTERMSIG(status));
+                editor_set_status(es, "Play exited: signal %d", WTERMSIG(status));
             } else {
-                set_status(es, "Play ended");
+                editor_set_status(es, "Play ended");
             }
 
-            /* Restore the editor title */
-            if (es->file_path[0] != '\0') {
-                char title[300];
-                snprintf(title, sizeof(title), "Super Mango Editor - %s%s",
-                         es->file_path, es->modified ? " *" : "");
-                SDL_SetWindowTitle(es->window, title);
-            } else {
-                SDL_SetWindowTitle(es->window, "Super Mango Editor");
-            }
+            /* Restore the editor title. */
+            editor_update_window_title(es);
         } else if (result < 0) {
             if (errno == ECHILD) {
                 es->play_pid = 0;
                 es->playing = 0;
-                set_status(es, "Play ended: process already reaped");
+                editor_set_status(es, "Play ended: process already reaped");
 
-                /* Restore the editor title */
-                if (es->file_path[0] != '\0') {
-                    char title[300];
-                    snprintf(title, sizeof(title), "Super Mango Editor - %s%s",
-                             es->file_path, es->modified ? " *" : "");
-                    SDL_SetWindowTitle(es->window, title);
-                } else {
-                    SDL_SetWindowTitle(es->window, "Super Mango Editor");
-                }
+                /* Restore the editor title. */
+                editor_update_window_title(es);
             } else {
-                set_status(es, "Play status check failed");
+                editor_set_status(es, "Play status check failed");
             }
         }
     }
@@ -2088,15 +1962,15 @@ static void render_toolbar(EditorState *es) {
          * Open button — show the native file dialog and load the selected
          * TOML level file.  Same behaviour as Ctrl+O.
          */
-        if (confirm_discard_changes(es, "open another level")) {
+        if (editor_confirm_discard_changes(es, "open another level")) {
             open_level_file(es);
         }
     }
 
     rx -= 64 + 4;
     if (ui_button(&es->ui, rx, by, 64, bh, "New")) {
-        if (confirm_discard_changes(es, "create a new level")) {
-            reset_new_level(es);
+        if (editor_confirm_discard_changes(es, "create a new level")) {
+            editor_reset_new_level(es);
         }
     }
 }
