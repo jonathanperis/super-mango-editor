@@ -45,6 +45,7 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(SRCDIR)/editor/serializer_emit.c \
           $(SRCDIR)/editor/serializer_io.c \
           $(SRCDIR)/editor/serializer_load.c \
+          $(SRCDIR)/editor/serializer_load_climbables.c \
           $(SRCDIR)/editor/serializer_load_collectibles.c \
           $(SRCDIR)/editor/serializer_load_config.c \
           $(SRCDIR)/editor/serializer_load_enemies.c \
@@ -81,6 +82,7 @@ TEST_SERIALIZER_OBJ = $(OUTDIR)/test-serializer.o
 TEST_SERIALIZER_EMIT_OBJ = $(OUTDIR)/test-serializer-emit.o
 TEST_SERIALIZER_IO_OBJ = $(OUTDIR)/test-serializer-io.o
 TEST_SERIALIZER_LOAD_OBJ = $(OUTDIR)/test-serializer-load.o
+TEST_SERIALIZER_LOAD_CLIMBABLES_OBJ = $(OUTDIR)/test-serializer-load-climbables.o
 TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ = $(OUTDIR)/test-serializer-load-collectibles.o
 TEST_SERIALIZER_LOAD_CONFIG_OBJ = $(OUTDIR)/test-serializer-load-config.o
 TEST_SERIALIZER_LOAD_ENEMIES_OBJ = $(OUTDIR)/test-serializer-load-enemies.o
@@ -247,6 +249,9 @@ $(TEST_SERIALIZER_IO_OBJ): $(EDITOR_DIR)/serializer_io.c
 $(TEST_SERIALIZER_LOAD_OBJ): $(EDITOR_DIR)/serializer_load.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
+$(TEST_SERIALIZER_LOAD_CLIMBABLES_OBJ): $(EDITOR_DIR)/serializer_load_climbables.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
 $(TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ): $(EDITOR_DIR)/serializer_load_collectibles.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
@@ -313,7 +318,7 @@ $(TEST_EDITOR_VALIDATION_OBJ): $(EDITOR_DIR)/editor_validation.c
 $(TEST_TOMLC_OBJ): $(VENDOR_DIR)/tomlc17.c
 	$(CC) -std=c11 -MMD -MP -c -o $@ $<
 
-$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER_OBJ) $(TEST_SERIALIZER_EMIT_OBJ) $(TEST_SERIALIZER_IO_OBJ) $(TEST_SERIALIZER_LOAD_OBJ) $(TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ) $(TEST_SERIALIZER_LOAD_CONFIG_OBJ) $(TEST_SERIALIZER_LOAD_ENEMIES_OBJ) $(TEST_SERIALIZER_LOAD_GEOMETRY_OBJ) $(TEST_SERIALIZER_LOAD_HAZARDS_OBJ) $(TEST_SERIALIZER_LOAD_HEADER_OBJ) $(TEST_SERIALIZER_LOAD_LAYERS_OBJ) $(TEST_SERIALIZER_LOAD_SURFACES_OBJ) $(TEST_SERIALIZER_PARSE_OBJ) $(TEST_SERIALIZER_SAVE_OBJ) $(TEST_SERIALIZER_TYPES_OBJ) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
+$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER_OBJ) $(TEST_SERIALIZER_EMIT_OBJ) $(TEST_SERIALIZER_IO_OBJ) $(TEST_SERIALIZER_LOAD_OBJ) $(TEST_SERIALIZER_LOAD_CLIMBABLES_OBJ) $(TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ) $(TEST_SERIALIZER_LOAD_CONFIG_OBJ) $(TEST_SERIALIZER_LOAD_ENEMIES_OBJ) $(TEST_SERIALIZER_LOAD_GEOMETRY_OBJ) $(TEST_SERIALIZER_LOAD_HAZARDS_OBJ) $(TEST_SERIALIZER_LOAD_HEADER_OBJ) $(TEST_SERIALIZER_LOAD_LAYERS_OBJ) $(TEST_SERIALIZER_LOAD_SURFACES_OBJ) $(TEST_SERIALIZER_PARSE_OBJ) $(TEST_SERIALIZER_SAVE_OBJ) $(TEST_SERIALIZER_TYPES_OBJ) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
 
 $(OUTDIR)/level-validate-test: tests/level_validate_test.c $(TEST_VALIDATE_OBJ)
