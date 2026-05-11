@@ -42,7 +42,7 @@ main()
   │     ├── fog_init(&gs.fog, gs.renderer)         (fog_background_1.png, fog_background_2.png)
   │     ├── hud_init(&gs.hud, gs.renderer)
   │     ├── if (debug_mode) debug_init(&gs.debug)
-  │     ├── level_load_toml(level_path, &def)       (parse TOML file into LevelDef)
+  │     ├── level_load_toml(level_path, &def)       (staged TOML parse → runtime validation → cleanup → caller assignment)
   │     ├── level_load(&gs, &def)                   (apply LevelDef to runtime GameState)
   │     ├── hearts/lives/score/score_life_next initialisation
   │     ├── SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) — lazy init, non-fatal
@@ -92,7 +92,7 @@ while (gs.running) {
                     → spider collision → jumping_spider collision → bird collision → faster_bird collision
                     → fish collision → faster_fish collision → spike_block collision (+ push impulse)
                     → spike collision → spike_platform collision → circular_saw collision
-                    → axe_trap collision → blue_flame collision
+                    → axe_trap collision → blue_flame collision → fire_flame collision
                     → sea gap fall detection (instant death)
                     → coin-player collision → star-player collision → last_star-player collision
                     → completion summary snapshot / next_phase pending state when last_star is collected
@@ -103,7 +103,7 @@ while (gs.running) {
                     → float platforms → spike rows → spike platforms → bridges
                     → bouncepads (medium, small, high) → rails
                     → vines → ladders → ropes → coins → yellow stars → last star
-                    → blue flames → fish → faster fish → water
+                    → blue flames → fire flames → fish → faster fish → water
                     → spike blocks → axe traps → circular saws
                     → spiders → jumping spiders → birds → faster birds
                     → player → fog → hud

@@ -261,7 +261,7 @@ mode     = "PENDULUM"   # or "SPIN"
 
 **File:** `src/hazards/blue_flame.c` / `blue_flame.h`  
 **Sprite:** `assets/sprites/hazards/blue_flame.png` — 96×48 px, 2 frames of 48×48 px  
-**Behaviour:** Erupts from a sea gap in four phases:
+**Behaviour:** Erupts from a manually placed floor-gap position in four phases:
 
 | Phase | Duration | Description |
 |-------|----------|-------------|
@@ -270,10 +270,10 @@ mode     = "PENDULUM"   # or "SPIN"
 | `FLIPPING` | 0.12 s | Rotates 180° at the apex |
 | `FALLING` | Until below floor | Descends upside-down, accelerating with gravity |
 
-Blue flames are spawned automatically for each entry in `floor_gaps`. They can also be manually added via `[blue_flames]` to override position.
+Blue flames are placed explicitly with `[[blue_flames]]`. `x` normally matches a `floor_gaps` entry so the flame erupts from the opening.
 
 ```toml
-[blue_flames]
+[[blue_flames]]
 x = 192.0   # world-space x of the sea gap
 ```
 
@@ -283,6 +283,8 @@ x = 192.0   # world-space x of the sea gap
 | `BLUE_FLAME_APEX_Y` | 60.0 | Highest point in logical pixels |
 | `BLUE_FLAME_FLIP_DURATION` | 0.12 s | Time to rotate 180° at apex |
 | `BLUE_FLAME_WAIT_DURATION` | 1.5 s | Idle time between eruptions |
+| `MAX_BLUE_FLAMES` | 16 | Maximum blue flame instances per level |
+| `MAX_FIRE_FLAMES` | 16 | Maximum fire flame instances per level |
 
 ---
 
@@ -290,7 +292,7 @@ x = 192.0   # world-space x of the sea gap
 
 **File:** `src/hazards/blue_flame.c` / `blue_flame.h` (fire variant uses the shared blue-flame runtime type)  
 **Sprite:** `assets/sprites/hazards/fire_flame.png`  
-**Behaviour:** Same eruption cycle as the blue flame but with a fire-colored sprite. Used in volcanic or lava-themed levels. Shares the same phase constants.
+**Behaviour:** Same eruption cycle as the blue flame but with a fire-colored sprite. Used in volcanic or lava-themed levels. Shares the same phase constants, but stores placement in `fire_flames[MAX_FIRE_FLAMES]`.
 
 ---
 

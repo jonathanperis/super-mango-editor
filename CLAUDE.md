@@ -80,7 +80,7 @@ super-mango-editor/
     ├── collectibles/       ← coin, star_yellow, star_green, star_red, last_star
     ├── collision/          ← collision passes and damage helpers
     ├── core/               ← debug overlay, entity utilities, reset helpers
-    ├── editor/             ← standalone visual level editor (editor_main, canvas, tools, palette, validation, …)
+    ├── editor/             ← standalone visual level editor (editor_main, canvas, tools, palette, validation, serializer_load_* helpers, …)
     ├── effects/            ← fog, parallax, water
     ├── entities/           ← bird, faster_bird, fish, faster_fish, spider, jumping_spider
     ├── hazards/            ← spike, spike_block, spike_platform, circular_saw, axe_trap, blue_flame, fire_flame
@@ -102,7 +102,7 @@ super-mango-editor/
 | `player/`        | Player lifecycle: init, input, update, render, cleanup       |
 | `collectibles/`  | Coins, colored stars, last star — pickup items               |
 | `core/`          | Debug overlay (`--debug`), shared entity utilities           |
-| `editor/`        | Standalone visual level editor (canvas, tools, palette, properties, serializer, exporter, undo) |
+| `editor/`        | Standalone visual level editor (canvas, tools, palette, properties, serializer save/load helpers, exporter, undo) |
 | `effects/`       | Fog overlays, parallax backgrounds, animated water           |
 | `entities/`      | Enemies: spiders, birds, fish (normal + faster variants)     |
 | `hazards/`       | Spikes, circular saws, axe traps, blue flames, fire flames   |
