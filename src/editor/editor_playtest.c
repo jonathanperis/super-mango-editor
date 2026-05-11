@@ -86,19 +86,32 @@ void editor_play_test(EditorState *es)
 
 void editor_stop_play(EditorState *es)
 {
+    int stopped = 1;
+
     if (!es->playing) return;
 
 #ifndef _WIN32
     if (es->play_pid > 0) {
         pid_t result;
 
-        kill((pid_t)es->play_pid, SIGTERM);
+        if (kill((pid_t)es->play_pid, SIGTERM) < 0 && errno != ESRCH) {
+            stopped = 0;
+        }
         result = waitpid((pid_t)es->play_pid, NULL, WNOHANG);
-        if (result > 0 || (result < 0 && errno == ECHILD)) {
+        if (result == 0) {
+            stopped = 0;
+        } else if (result > 0 || (result < 0 && errno == ECHILD)) {
             es->play_pid = 0;
+        } else {
+            stopped = 0;
         }
     }
 #endif
+
+    if (!stopped) {
+        editor_set_status(es, "Stopping play...");
+        return;
+    }
 
     es->playing = 0;
     editor_set_status(es, "Play stopped");
