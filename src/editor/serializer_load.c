@@ -14,6 +14,7 @@
 #include <string.h>  /* strcmp, memset, strncpy */
 
 #include "serializer.h"
+#include "serializer_load_layers.h"
 #include "serializer_parse.h"
 #include "serializer_types.h"                    /* enum/string conversion helpers */
 #include "../../vendor/tomlc17/tomlc17.h" /* tomlc17 API */
@@ -392,78 +393,9 @@ int level_load_toml(const char *path, LevelDef *def) {
         def->ropes[idx].tile_count = get_int(elem, "tile_count", 1);
     });
 
-    /* ---- Level-wide configuration -------------------------------- */
-
-    /* Background layers */
-    {
-        toml_datum_t plx = toml_get(top, "background_layers");
-        if (plx.type == TOML_ARRAY) {
-            int n = plx.u.arr.size;
-            if (n > MAX_BACKGROUND_LAYERS) {
-                fprintf(stderr, "serializer: background_layers array has %d items "
-                        "(max %d)\n", n, MAX_BACKGROUND_LAYERS);
-                toml_free(r);
-                return -1;
-            }
-            def->background_layer_count = n;
-            for (int i = 0; i < n; i++) {
-                toml_datum_t elem = plx.u.arr.elem[i];
-                const char *p = get_str(elem, "path", "");
-                strncpy(def->background_layers[i].path, p,
-                        sizeof(def->background_layers[i].path) - 1);
-                def->background_layers[i].path[
-                    sizeof(def->background_layers[i].path) - 1] = '\0';
-                def->background_layers[i].speed = get_float(elem, "speed", 0);
-            }
-        }
-    }
-
-    /* Foreground layers */
-    {
-        toml_datum_t fg = toml_get(top, "foreground_layers");
-        if (fg.type == TOML_ARRAY) {
-            int n = fg.u.arr.size;
-            if (n > MAX_BACKGROUND_LAYERS) {
-                fprintf(stderr, "serializer: foreground_layers array has %d items "
-                        "(max %d)\n", n, MAX_BACKGROUND_LAYERS);
-                toml_free(r);
-                return -1;
-            }
-            def->foreground_layer_count = n;
-            for (int i = 0; i < n; i++) {
-                toml_datum_t elem = fg.u.arr.elem[i];
-                const char *p = get_str(elem, "path", "");
-                strncpy(def->foreground_layers[i].path, p,
-                        sizeof(def->foreground_layers[i].path) - 1);
-                def->foreground_layers[i].path[
-                    sizeof(def->foreground_layers[i].path) - 1] = '\0';
-                def->foreground_layers[i].speed = get_float(elem, "speed", 0);
-            }
-        }
-    }
-
-    /* Fog layers */
-    {
-        toml_datum_t fl = toml_get(top, "fog_layers");
-        if (fl.type == TOML_ARRAY) {
-            int n = fl.u.arr.size;
-            if (n > MAX_FOG_TEXTURES) {
-                fprintf(stderr, "serializer: fog_layers array has %d items "
-                        "(max %d)\n", n, MAX_FOG_TEXTURES);
-                toml_free(r);
-                return -1;
-            }
-            def->fog_layer_count = n;
-            for (int i = 0; i < n; i++) {
-                toml_datum_t elem = fl.u.arr.elem[i];
-                const char *p = get_str(elem, "path", "");
-                strncpy(def->fog_layers[i].path, p,
-                        sizeof(def->fog_layers[i].path) - 1);
-                def->fog_layers[i].path[
-                    sizeof(def->fog_layers[i].path) - 1] = '\0';
-                def->fog_layers[i].speed = get_float(elem, "speed", 0);
-            }
-        }
+    if (serializer_load_layers(top, def) != 0) {
+        toml_free(r);
+        return -1;
     }
 
     /* Player spawn */
