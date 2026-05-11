@@ -60,6 +60,9 @@
 int level_load_toml(const char *path, LevelDef *def) {
     if (!path || !def) return -1;
 
+    LevelDef loaded;
+    LevelDef *caller_def = def;
+
     /*
      * toml_parse_file_ex — open and parse a TOML file in one call.
      *
@@ -75,10 +78,10 @@ int level_load_toml(const char *path, LevelDef *def) {
     }
 
     /*
-     * Reset the entire struct first. Most fields naturally default to 0,
-     * while physics fields use -1.0 so they keep engine defaults unless a
-     * level explicitly overrides them.
+     * Parse into staging storage so failed validation never leaves the caller
+     * with a partially-loaded LevelDef.
      */
+    def = &loaded;
     level_def_init_defaults(def);
 
     toml_datum_t top = r.toptab;
@@ -521,6 +524,8 @@ int level_load_toml(const char *path, LevelDef *def) {
      * the TOML tree is safe to destroy.
      */
     toml_free(r);
+
+    *caller_def = loaded;
 
     return 0;
 }
