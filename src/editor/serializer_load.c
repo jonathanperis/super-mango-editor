@@ -406,8 +406,10 @@ int level_load_toml(const char *path, LevelDef *def) {
             for (int i = 0; i < n; i++) {
                 toml_datum_t elem = plx.u.arr.elem[i];
                 const char *p = get_str(elem, "path", "");
-                strncpy(def->background_layers[i].path, p, 63);
-                def->background_layers[i].path[63] = '\0';
+                strncpy(def->background_layers[i].path, p,
+                        sizeof(def->background_layers[i].path) - 1);
+                def->background_layers[i].path[
+                    sizeof(def->background_layers[i].path) - 1] = '\0';
                 def->background_layers[i].speed = get_float(elem, "speed", 0);
             }
         }
@@ -428,8 +430,10 @@ int level_load_toml(const char *path, LevelDef *def) {
             for (int i = 0; i < n; i++) {
                 toml_datum_t elem = fg.u.arr.elem[i];
                 const char *p = get_str(elem, "path", "");
-                strncpy(def->foreground_layers[i].path, p, 63);
-                def->foreground_layers[i].path[63] = '\0';
+                strncpy(def->foreground_layers[i].path, p,
+                        sizeof(def->foreground_layers[i].path) - 1);
+                def->foreground_layers[i].path[
+                    sizeof(def->foreground_layers[i].path) - 1] = '\0';
                 def->foreground_layers[i].speed = get_float(elem, "speed", 0);
             }
         }
@@ -450,8 +454,10 @@ int level_load_toml(const char *path, LevelDef *def) {
             for (int i = 0; i < n; i++) {
                 toml_datum_t elem = fl.u.arr.elem[i];
                 const char *p = get_str(elem, "path", "");
-                strncpy(def->fog_layers[i].path, p, 63);
-                def->fog_layers[i].path[63] = '\0';
+                strncpy(def->fog_layers[i].path, p,
+                        sizeof(def->fog_layers[i].path) - 1);
+                def->fog_layers[i].path[
+                    sizeof(def->fog_layers[i].path) - 1] = '\0';
                 def->fog_layers[i].speed = get_float(elem, "speed", 0);
             }
         }
