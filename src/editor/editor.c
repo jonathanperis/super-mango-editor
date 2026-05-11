@@ -395,7 +395,7 @@ void editor_loop(EditorState *es) {
          * When the editor is in play-test mode, check each frame whether
          * the game process has exited.  If it has, return to editor mode.
          */
-        if (es->playing) {
+        if (es->playing || es->play_pid > 0) {
             editor_check_play_status(es);
         }
 
