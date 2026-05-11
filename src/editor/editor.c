@@ -39,6 +39,7 @@
 #include "ui.h"           /* UIState, ui_init, ui_begin_frame, ui_button    */
 #include "file_dialog.h"  /* file_dialog_open — native OS file picker       */
 #include "editor_validation.h" /* editor_validate_level                       */
+#include "editor_layout.h" /* editor layout measurement helpers             */
 #include "editor_playtest.h" /* editor playtest process helpers              */
 #include "editor_session.h" /* editor status/title/session helpers           */
 #include "editor_textures.h" /* editor_textures_load/cleanup                 */
@@ -48,39 +49,11 @@
 #define EDITOR_RECENT_MAX    5
 #define EDITOR_AUTOSAVE_MS   30000u
 
-enum {
-    CFG_H_HEADER          = 28,
-    CFG_H_MARGIN_TOP      = 8,
-    CFG_H_VALIDATION_BASE = 24,
-    CFG_H_VALIDATION_ROW  = 18,
-    CFG_H_RECENT_HEADER   = 20,
-    CFG_H_RECENT_ROW      = 18,
-    CFG_H_METADATA        = 72,
-    CFG_H_SCREENS         = 24,
-    CFG_H_NEXT_PHASE      = 24,
-    CFG_H_MUSIC_LABEL     = 24,
-    CFG_H_MUSIC_DROPDOWN  = 22,
-    CFG_H_MUSIC_VOLUME    = 24,
-    CFG_H_FLOOR_TILE      = 30,
-    CFG_H_HEARTS_SPACER   = 6,
-    CFG_H_HEARTS_ROW      = 22,
-    CFG_H_SCORE_ROW       = 24,
-    CFG_H_PHYS_HEADER     = 24,
-    CFG_H_BG_HEADER       = 24,
-    CFG_H_FG_HEADER       = 24,
-    CFG_H_FOG_HEADER      = 24,
-    CFG_H_MARGIN_BOTTOM   = 10,
-    CFG_H_LAYER_ROW       = 20,
-    CFG_H_LAYER_ACTIONS   = 24,
-    CFG_H_PHYS_ROWS       = 6 * 22
-};
-
 /* ------------------------------------------------------------------ */
 /* Forward declarations for static helpers                             */
 /* ------------------------------------------------------------------ */
 
 static void handle_event(EditorState *es, SDL_Event *event);
-static int compute_config_total_height(const EditorState *es);
 static void render_toolbar(EditorState *es);
 static void render_status_bar(EditorState *es);
 static void apply_undo_command(EditorState *es, const Command *cmd, int reverse);
@@ -95,41 +68,6 @@ static int file_exists(const char *path);
 static void ensure_out_dirs(void);
 static void copy_selected(EditorState *es);
 static void paste_clipboard(EditorState *es);
-
-/*
- * compute_config_total_height — Measure expanded Level Config content.
- *
- * The render path and mouse-wheel hit-test both need the same height so panel
- * scrolling matches the visible section bounds. Keep every row constant here.
- */
-static int compute_config_total_height(const EditorState *es) {
-    extern int g_plx_open, g_fg_open, g_fog_open, g_phys_open;
-    int validation_h = CFG_H_VALIDATION_BASE
-                     + es->validation_report.message_count * CFG_H_VALIDATION_ROW;
-    int recent_h = es->recent_file_count > 0
-                 ? CFG_H_RECENT_HEADER + es->recent_file_count * CFG_H_RECENT_ROW
-                 : 0;
-    int total = CFG_H_HEADER + validation_h + recent_h + CFG_H_MARGIN_TOP
-              + CFG_H_METADATA + CFG_H_SCREENS + CFG_H_NEXT_PHASE
-              + CFG_H_MUSIC_LABEL + CFG_H_MUSIC_DROPDOWN + CFG_H_MUSIC_VOLUME
-              + CFG_H_FLOOR_TILE + CFG_H_HEARTS_SPACER + CFG_H_HEARTS_ROW
-              + CFG_H_SCORE_ROW + CFG_H_PHYS_HEADER + CFG_H_BG_HEADER
-              + CFG_H_FG_HEADER + CFG_H_FOG_HEADER + CFG_H_MARGIN_BOTTOM;
-
-    if (g_plx_open)
-        total += es->level.background_layer_count * CFG_H_LAYER_ROW
-               + CFG_H_LAYER_ACTIONS;
-    if (g_fg_open)
-        total += es->level.foreground_layer_count * CFG_H_LAYER_ROW
-               + CFG_H_LAYER_ACTIONS;
-    if (g_fog_open)
-        total += es->level.fog_layer_count * CFG_H_LAYER_ROW
-               + CFG_H_LAYER_ACTIONS;
-    if (g_phys_open)
-        total += CFG_H_PHYS_ROWS;
-
-    return total;
-}
 
 /* ------------------------------------------------------------------ */
 /* editor_init                                                         */
@@ -460,7 +398,7 @@ void editor_loop(EditorState *es) {
                      * + hearts/lives(6+22) + pts/life(24)
                      * + bg header(24) + fg header(24) + fog header(24)
                      * + margin(10) */
-                    config_h_total = compute_config_total_height(es);
+                    config_h_total = editor_config_total_height(es);
                 } else {
                     config_h_total = section_hdr;
                 }
@@ -930,7 +868,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
             int sc_section_hdr = 28;
             int sc_cfg_total   = sc_section_hdr;
             if (es->config_open) {
-                sc_cfg_total = compute_config_total_height(es);
+                sc_cfg_total = editor_config_total_height(es);
             }
             int sc_cfg_max = (EDITOR_H - STATUS_H - TOOLBAR_H) / 2;
             int sc_cfg_h   = sc_cfg_total < sc_cfg_max ? sc_cfg_total : sc_cfg_max;
