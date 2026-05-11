@@ -104,6 +104,8 @@ void player_resolve_platform_collisions(Player *player,
                                         float prev_bottom,
                                         int *out_fp_landed_idx,
                                         int prev_fp_landed_idx) {
+    *out_fp_landed_idx = -1;
+
     /*
      * One-way platform collision -- top surface only.
      *
