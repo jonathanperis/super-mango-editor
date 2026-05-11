@@ -29,6 +29,8 @@
 static void editor_ensure_out_dirs(void);
 static void editor_save_recent_files(const EditorState *es);
 static void editor_add_recent_file(EditorState *es, const char *path);
+static void editor_replace_texture(SDL_Texture **slot, SDL_Renderer *renderer,
+                                   const char *path);
 
 int editor_load_level(EditorState *es, const char *path)
 {
@@ -49,38 +51,16 @@ int editor_load_level(EditorState *es, const char *path)
     es->modified = 0;
     editor_add_recent_file(es, path);
 
-    if (es->level.background_layer_count > 0) {
-        const char *sky_path = es->level.background_layers[0].path;
-        if (sky_path[0] != '\0') {
-            SDL_Texture *new_sky = IMG_LoadTexture(es->renderer, sky_path);
-            if (new_sky) {
-                if (es->textures.sky)
-                    SDL_DestroyTexture(es->textures.sky);
-                es->textures.sky = new_sky;
-            }
-        }
-    }
-    if (es->level.floor_tile_path[0] != '\0') {
-        SDL_Texture *new_floor = IMG_LoadTexture(es->renderer,
-                                                  es->level.floor_tile_path);
-        if (new_floor) {
-            if (es->textures.floor_tile)
-                SDL_DestroyTexture(es->textures.floor_tile);
-            es->textures.floor_tile = new_floor;
-        }
-    }
-    if (es->level.foreground_layer_count > 0) {
-        const char *strip = es->level.foreground_layers[
-            es->level.foreground_layer_count - 1].path;
-        if (strip[0] != '\0') {
-            SDL_Texture *new_water = IMG_LoadTexture(es->renderer, strip);
-            if (new_water) {
-                if (es->textures.water)
-                    SDL_DestroyTexture(es->textures.water);
-                es->textures.water = new_water;
-            }
-        }
-    }
+    editor_replace_texture(&es->textures.sky, es->renderer,
+                           es->level.background_layer_count > 0
+                           ? es->level.background_layers[0].path : NULL);
+    editor_replace_texture(&es->textures.floor_tile, es->renderer,
+                           es->level.floor_tile_path);
+    editor_replace_texture(&es->textures.water, es->renderer,
+                           es->level.foreground_layer_count > 0
+                           ? es->level.foreground_layers[
+                                 es->level.foreground_layer_count - 1].path
+                           : NULL);
 
     editor_update_window_title(es);
 
@@ -90,6 +70,19 @@ int editor_load_level(EditorState *es, const char *path)
             es->level.bird_count + es->level.fish_count);
     editor_set_status(es, "Loaded %s", path);
     return 0;
+}
+
+static void editor_replace_texture(SDL_Texture **slot, SDL_Renderer *renderer,
+                                   const char *path)
+{
+    if (*slot) {
+        SDL_DestroyTexture(*slot);
+        *slot = NULL;
+    }
+
+    if (path && path[0] != '\0') {
+        *slot = IMG_LoadTexture(renderer, path);
+    }
 }
 
 void editor_open_level_file(EditorState *es)
@@ -131,7 +124,10 @@ int editor_export_current_level(EditorState *es)
     if (!editor_can_persist(es, "Export")) return -1;
 
     if (es->file_path[0] != '\0') {
-        const char *base = strrchr(es->file_path, '/');
+        const char *slash = strrchr(es->file_path, '/');
+        const char *backslash = strrchr(es->file_path, '\\');
+        const char *base = slash;
+        if (!base || (backslash && backslash > base)) base = backslash;
         base = base ? base + 1 : es->file_path;
         strncpy(name_buf, base, sizeof(name_buf) - 1);
         name_buf[sizeof(name_buf) - 1] = '\0';
