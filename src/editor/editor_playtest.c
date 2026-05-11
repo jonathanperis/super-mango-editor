@@ -13,7 +13,9 @@
 #include <sys/wait.h>  /* waitpid, WNOHANG */
 #include <unistd.h>    /* fork, execl, _exit */
 #else
-#include <stdlib.h>    /* system */
+#include <errno.h>     /* errno */
+#include <process.h>   /* _spawnv, _P_NOWAIT */
+#include <stdint.h>    /* intptr_t */
 #endif
 
 #include "editor_session.h" /* editor status/title/persist helpers */
@@ -59,17 +61,21 @@ void editor_play_test(EditorState *es)
     }
 #else
     {
-        char cmd[512];
-        int rc;
-        snprintf(cmd, sizeof(cmd),
-                 "start /B .\\out\\super-mango.exe --level \"%s\"%s",
-                 save_path, es->debug_play ? " --debug" : "");
-        rc = system(cmd);
-        if (rc != 0) {
-            fprintf(stderr, "Play: launch failed for %s (rc=%d)\n", save_path, rc);
+        const char *argv_debug[] = {
+            ".\\out\\super-mango.exe", "--level", save_path, "--debug", NULL
+        };
+        const char *argv_normal[] = {
+            ".\\out\\super-mango.exe", "--level", save_path, NULL
+        };
+        const char *const *argv = es->debug_play ? argv_debug : argv_normal;
+        intptr_t child = _spawnv(_P_NOWAIT, argv[0], argv);
+        if (child == -1) {
+            fprintf(stderr, "Play: launch failed for %s (errno=%d)\n",
+                    save_path, errno);
             editor_set_status(es, "Play failed: launch %s", save_path);
             return;
         }
+        es->play_pid = (int)child;
     }
     es->playing = 1;
     editor_set_status(es, "Play launched %s", save_path);
@@ -83,9 +89,13 @@ void editor_stop_play(EditorState *es)
 
 #ifndef _WIN32
     if (es->play_pid > 0) {
+        pid_t result;
+
         kill((pid_t)es->play_pid, SIGTERM);
-        waitpid((pid_t)es->play_pid, NULL, 0);
-        es->play_pid = 0;
+        result = waitpid((pid_t)es->play_pid, NULL, WNOHANG);
+        if (result > 0 || (result < 0 && errno == ECHILD)) {
+            es->play_pid = 0;
+        }
     }
 #endif
 
