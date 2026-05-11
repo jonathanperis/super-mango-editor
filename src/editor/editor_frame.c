@@ -44,11 +44,6 @@ void editor_run_frame(EditorState *es) {
      * this reset a single click would register on multiple frames.
      */
     ui_begin_frame(&es->ui);
-    es->ui.mouse_clicked  = 0;
-    es->ui.key_backspace  = 0;
-    es->ui.key_return     = 0;
-    es->ui.key_escape     = 0;
-    es->ui.has_text_input = 0;
 
     /* ---- Event polling ------------------------------------------ */
     /*
