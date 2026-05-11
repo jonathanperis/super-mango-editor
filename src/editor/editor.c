@@ -321,23 +321,7 @@ void editor_loop(EditorState *es) {
         SDL_RenderClear(es->renderer);
 
         if (es->playing) {
-            /* ---- Play-test mode: show minimal overlay --------------- */
-            /*
-             * While the game is running, the editor shows a dark screen
-             * with a centered "Playing..." message and a [Stop] button.
-             * This makes it clear the game is active and provides a way
-             * to terminate it without switching windows.
-             */
-            ui_label(&es->ui, EDITOR_W / 2 - 60, EDITOR_H / 2 - 40,
-                     "Playing level...");
-            ui_label_color(&es->ui, EDITOR_W / 2 - 80, EDITOR_H / 2 - 10,
-                           "Close the game window or click Stop",
-                           UI_TEXT_DIM);
-
-            if (ui_button(&es->ui, EDITOR_W / 2 - 40, EDITOR_H / 2 + 30,
-                          80, 28, "Stop")) {
-                editor_stop_play(es);
-            }
+            editor_render_play_overlay(es);
         } else {
             /* ---- Normal editor rendering ----------------------------- */
             canvas_render(es);

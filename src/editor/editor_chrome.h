@@ -9,5 +9,6 @@
 
 void editor_render_toolbar(EditorState *es);
 void editor_render_status_bar(EditorState *es);
+void editor_render_play_overlay(EditorState *es);
 
 #endif /* EDITOR_CHROME_H */
