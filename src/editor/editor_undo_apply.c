@@ -13,6 +13,7 @@
  */
 void editor_apply_undo_command(EditorState *es, const Command *cmd, int reverse)
 {
+    #define LEVEL_ARRAY_LEN(arr) ((int)(sizeof(arr) / sizeof((arr)[0])))
     #define APPLY_ARRAY(arr, cnt, union_field, max_count) \
         do { \
             int idx = cmd->entity_index; \
@@ -149,12 +150,12 @@ void editor_apply_undo_command(EditorState *es, const Command *cmd, int reverse)
 
     case ENT_BLUE_FLAME:
         APPLY_ARRAY(es->level.blue_flames, es->level.blue_flame_count,
-                     blue_flame, MAX_BLUE_FLAMES);
+                     blue_flame, LEVEL_ARRAY_LEN(es->level.blue_flames));
         break;
 
     case ENT_FIRE_FLAME:
         APPLY_ARRAY(es->level.fire_flames, es->level.fire_flame_count,
-                     fire_flame, MAX_BLUE_FLAMES);
+                     fire_flame, LEVEL_ARRAY_LEN(es->level.fire_flames));
         break;
 
     case ENT_FLOAT_PLATFORM:
@@ -221,4 +222,5 @@ void editor_apply_undo_command(EditorState *es, const Command *cmd, int reverse)
     }
 
     #undef APPLY_ARRAY
+    #undef LEVEL_ARRAY_LEN
 }
