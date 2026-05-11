@@ -44,6 +44,7 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(SRCDIR)/editor/serializer.c \
           $(SRCDIR)/editor/serializer_emit.c \
           $(SRCDIR)/editor/serializer_io.c \
+          $(SRCDIR)/editor/serializer_load.c \
           $(SRCDIR)/editor/serializer_parse.c \
           $(SRCDIR)/editor/serializer_save.c \
           $(SRCDIR)/editor/serializer_types.c \
@@ -71,6 +72,7 @@ SMOKE_SEED    ?= 1
 TEST_SERIALIZER_OBJ = $(OUTDIR)/test-serializer.o
 TEST_SERIALIZER_EMIT_OBJ = $(OUTDIR)/test-serializer-emit.o
 TEST_SERIALIZER_IO_OBJ = $(OUTDIR)/test-serializer-io.o
+TEST_SERIALIZER_LOAD_OBJ = $(OUTDIR)/test-serializer-load.o
 TEST_SERIALIZER_PARSE_OBJ = $(OUTDIR)/test-serializer-parse.o
 TEST_SERIALIZER_SAVE_OBJ = $(OUTDIR)/test-serializer-save.o
 TEST_SERIALIZER_TYPES_OBJ = $(OUTDIR)/test-serializer-types.o
@@ -226,6 +228,9 @@ $(TEST_SERIALIZER_EMIT_OBJ): $(EDITOR_DIR)/serializer_emit.c
 $(TEST_SERIALIZER_IO_OBJ): $(EDITOR_DIR)/serializer_io.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
+$(TEST_SERIALIZER_LOAD_OBJ): $(EDITOR_DIR)/serializer_load.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
 $(TEST_SERIALIZER_PARSE_OBJ): $(EDITOR_DIR)/serializer_parse.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
@@ -268,7 +273,7 @@ $(TEST_EDITOR_VALIDATION_OBJ): $(EDITOR_DIR)/editor_validation.c
 $(TEST_TOMLC_OBJ): $(VENDOR_DIR)/tomlc17.c
 	$(CC) -std=c11 -MMD -MP -c -o $@ $<
 
-$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER_OBJ) $(TEST_SERIALIZER_EMIT_OBJ) $(TEST_SERIALIZER_IO_OBJ) $(TEST_SERIALIZER_PARSE_OBJ) $(TEST_SERIALIZER_SAVE_OBJ) $(TEST_SERIALIZER_TYPES_OBJ) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
+$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER_OBJ) $(TEST_SERIALIZER_EMIT_OBJ) $(TEST_SERIALIZER_IO_OBJ) $(TEST_SERIALIZER_LOAD_OBJ) $(TEST_SERIALIZER_PARSE_OBJ) $(TEST_SERIALIZER_SAVE_OBJ) $(TEST_SERIALIZER_TYPES_OBJ) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
 
 $(OUTDIR)/level-validate-test: tests/level_validate_test.c $(TEST_VALIDATE_OBJ)
