@@ -245,100 +245,13 @@ void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
                                        prev_bottom, out_fp_landed_idx,
                                        prev_fp_landed_idx);
 
-    /*
-     * Bridge collision — same one-way crossing test as static platforms.
-     * Only land if the brick under the player's centre is still solid
-     * (not already falling or deactivated).
-     */
-    if (!player->on_ground && player->vy >= 0.0f) {
-        const float bottom = player->y + player->h - FLOOR_SINK;
-        float pcx = player->x + player->w / 2.0f;
-
-        for (int i = 0; i < bridge_count; i++) {
-            const Bridge *br = &bridges[i];
-
-            int h_overlap = (player->x + player->w - PHYS_PAD_X > br->x) &&
-                            (player->x + PHYS_PAD_X < br->x + br->brick_count * BRIDGE_TILE_W);
-            if (!h_overlap) continue;
-
-            if (!bridge_has_solid_at(br, pcx)) continue;
-
-            if (prev_bottom <= br->base_y && bottom >= br->base_y) {
-                player->y         = br->base_y - player->h + FLOOR_SINK;
-                player->vy        = 0.0f;
-                player->on_ground = 1;
-                break;
-            }
-        }
-    }
-
-    /*
-     * Spike platform collision — same one-way crossing test as bridges.
-     * The player can land on top (solid surface) but will take damage
-     * from the spike hitbox check in game.c.
-     */
-    if (!player->on_ground && player->vy >= 0.0f) {
-        const float bottom = player->y + player->h - FLOOR_SINK;
-        for (int i = 0; i < spike_platform_count; i++) {
-            const SpikePlatform *sp = &spike_platforms[i];
-            if (!sp->active) continue;
-
-            int h_overlap = (player->x + player->w - PHYS_PAD_X > sp->x) &&
-                            (player->x + PHYS_PAD_X < sp->x + sp->w);
-            if (!h_overlap) continue;
-
-            if (prev_bottom <= sp->y && bottom >= sp->y) {
-                player->y         = sp->y - player->h + FLOOR_SINK;
-                player->vy        = 0.0f;
-                player->on_ground = 1;
-                break;
-            }
-        }
-    }
-
-    /*
-     * Spike platform smooth-underside barrier — blocks upward movement.
-     *
-     * The top surface (spikes) already handles downward landing above.
-     * Here we handle the smooth underside: when the player jumps up and
-     * their physical head crosses through the platform bottom, stop them
-     * and zero vy, just like hitting a solid ceiling.  No damage is dealt —
-     * damage only comes from the spike tips (handled in game.c).
-     *
-     * We use the PHYSICAL top (player->y + PHYS_PAD_TOP) rather than the
-     * raw sprite top so the head snaps flush with the platform underside
-     * instead of leaving an 18 px visible gap caused by the transparent
-     * top padding in the player sprite.
-     *
-     * Crossing test (going upward, vy < 0):
-     *   prev_phys_top >= sp_bottom  — physical head was at or below underside
-     *   curr_phys_top  < sp_bottom  — physical head is now above underside
-     */
-    if (!player->on_ground && player->vy < 0.0f) {
-        const float prev_phys_top = prev_top    + PHYS_PAD_TOP;
-        const float curr_phys_top = player->y   + PHYS_PAD_TOP;
-        for (int i = 0; i < spike_platform_count; i++) {
-            const SpikePlatform *sp = &spike_platforms[i];
-            if (!sp->active) continue;
-
-            int h_overlap = (player->x + player->w - PHYS_PAD_X > sp->x) &&
-                            (player->x + PHYS_PAD_X < sp->x + sp->w);
-            if (!h_overlap) continue;
-
-            /*
-             * sp_bottom — the physical underside of the spike platform.
-             * SPIKE_PLAT_SRC_H (11 px) is the rendered content height,
-             * matching the downward landing check which uses sp->y as top.
-             */
-            float sp_bottom = sp->y + SPIKE_PLAT_SRC_H;
-            if (prev_phys_top >= sp_bottom && curr_phys_top < sp_bottom) {
-                /* Snap sprite top so that physical head sits at sp_bottom */
-                player->y  = sp_bottom - PHYS_PAD_TOP;
-                player->vy = 0.0f;
-                break;
-            }
-        }
-    }
+    player_resolve_bridge_collision(player, bridges, bridge_count, prev_bottom);
+    player_resolve_spike_platform_top_collision(player, spike_platforms,
+                                                spike_platform_count,
+                                                prev_bottom);
+    player_resolve_spike_platform_ceiling_collision(player, spike_platforms,
+                                                    spike_platform_count,
+                                                    prev_top);
 
     /*
      * Horizontal clamp — keep the PHYSICS body inside the logical canvas.
