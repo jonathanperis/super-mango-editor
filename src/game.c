@@ -2,20 +2,13 @@
  * game.c — Window, renderer, background, and main game loop.
  */
 
-#include <SDL.h>
-
 #include "game.h"
 #include "player/player.h"
 #include "effects/fog.h"
 #include "screens/hud.h"
 #include "levels/level_session.h"     /* initial level load                              */
-#include "render/game_render.h"        /* game_render_frame, render overlays         */
 #include "input/game_input.h"          /* gamepad deferred init/cleanup              */
-#include "input/game_events.h"         /* game_handle_events                         */
-#include "input/game_web_input.h"      /* browser keyboard state repair              */
 #include "core/game_resources.h"       /* game_resources_load/cleanup                */
-#include "core/game_update.h"          /* game_update_active                         */
-#include "core/game_timing.h"          /* frame timing and smoke-test helpers         */
 #include "core/game_window.h"          /* SDL window and renderer lifecycle           */
 
 /*
@@ -62,118 +55,6 @@ void game_init(GameState *gs) {
     gs->level_complete = 0;
     gs->checkpoint_x = 0.0f;
 }
-
-/* ------------------------------------------------------------------ */
-
-/*
- * game_loop — The heart of the game. Runs until gs->running == 0.
- *
- * Every iteration of the while loop is one "frame". Each frame:
- *   1. Calculate how much time has passed (delta time).
- *   2. Process all pending OS/input events.
- *   3. Update game state (player position, etc.).
- *   4. Draw everything to the screen.
- */
-
-/* ------------------------------------------------------------------ */
-
-/*
- * game_loop_frame — Execute one frame of the game loop.
- *
- * Extracted from game_loop so it can be called either in a blocking
- * while loop (native) or as an emscripten_set_main_loop_arg callback
- * (WebAssembly).  The void* parameter is cast back to GameState*.
- */
-static void game_loop_frame(void *arg) {
-    GameState *gs = (GameState *)arg;
-
-    const Uint32 frame_ms = 1000 / TARGET_FPS;
-
-    {
-        Uint64 frame_start_ticks = 0;
-        float dt = game_timing_step(gs, &frame_start_ticks);
-
-        /* ---- 1. Events ------------------------------------------- */
-        game_handle_events(gs);
-
-        /* ---- 2. Update ------------------------------------------- */
-        /*
-         * cam_x is declared here so it is in scope for both the paused and
-         * the active paths.  When paused we jump straight to render with the
-         * camera frozen at its last position; when active the camera-update
-         * block below overwrites it with the new smoothed value.
-         */
-        int cam_x = (int)gs->camera.x;
-
-        /*
-         * Skip all physics and game-logic updates while the window is in the
-         * background.  The render step still runs so the last frame stays
-         * visible in the taskbar thumbnail and on the screen.
-         * Also skip updates when level is complete (overlay showing).
-         */
-        if (gs->paused || gs->level_complete) goto render;
-
-        cam_x = game_update_active(gs, dt, cam_x);
-
-        /* ---- 3. Render ------------------------------------------- */
-        render:
-        game_render_frame(gs, cam_x, dt);
-
-        /*
-         * Gamepad init state machine — runs non-blocking across multiple frames.
-         *
-         * State 1: first frame just presented — spawn the background thread.
-         * State 2: thread running — check each frame if it has finished.
-         *          When done, open the controller on the main thread (thread-safe)
-         *          and clear ctrl_pending_init so the HUD message disappears.
-         *
-         * WebAssembly is handled inside gamepad_update_deferred_init(); native
-         * builds run the deferred SDL_INIT_GAMECONTROLLER path there.
-         */
-        gamepad_update_deferred_init(gs);
-
-        game_timing_cap_frame(frame_start_ticks, frame_ms);
-        game_timing_tick_smoke(gs);
-    }
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
- * game_loop — Run the game until gs->running becomes 0.
- *
- * On native platforms this is a blocking while loop.
- * On Emscripten (WebAssembly) we hand control to the browser's
- * requestAnimationFrame via emscripten_set_main_loop_arg, which
- * calls game_loop_frame once per vsync.
- */
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
-
-void game_loop(GameState *gs) {
-    gs->loop.prev_ticks = SDL_GetTicks64();
-    gs->loop.fp_prev_riding  = -1;
-
-#ifdef __EMSCRIPTEN__
-    game_web_input_flush_stale_keys();
-
-    /*
-     * emscripten_set_main_loop_arg — register a per-frame callback.
-     *   arg 1: callback function (receives void* user data)
-     *   arg 2: user data pointer (our GameState)
-     *   arg 3: target FPS (0 = use requestAnimationFrame, recommended)
-     *   arg 4: simulate_infinite_loop (1 = never return from this call)
-     */
-    emscripten_set_main_loop_arg(game_loop_frame, gs, 0, 1);
-#else
-    while (gs->running) {
-        game_loop_frame(gs);
-    }
-#endif
-}
-
-/* ------------------------------------------------------------------ */
 
 /*
  * game_cleanup — Free every resource owned by the game.
