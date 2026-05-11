@@ -16,6 +16,7 @@
 #include <errno.h>     /* errno */
 #include <process.h>   /* _spawnv, _P_NOWAIT */
 #include <stdint.h>    /* intptr_t */
+#include <windows.h>   /* CloseHandle, HANDLE */
 #endif
 
 #include "editor_session.h" /* editor status/title/persist helpers */
@@ -75,7 +76,7 @@ void editor_play_test(EditorState *es)
             editor_set_status(es, "Play failed: launch %s", save_path);
             return;
         }
-        es->play_pid = (int)child;
+        CloseHandle((HANDLE)child);
     }
     es->playing = 1;
     editor_set_status(es, "Play launched %s", save_path);
