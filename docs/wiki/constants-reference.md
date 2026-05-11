@@ -489,7 +489,8 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `BLUE_FLAME_APEX_Y` | `60.0f` | `float` | World-space y coordinate at apex (px) |
 | `BLUE_FLAME_FLIP_DURATION` | `0.12f` | `float` | Time to rotate 180 degrees at apex (s) |
 | `BLUE_FLAME_WAIT_DURATION` | `1.5f` | `float` | Time hidden below floor before next eruption (s) |
-| `MAX_BLUE_FLAMES` | `8` | `int` | Maximum blue flame instances per level |
+| `MAX_BLUE_FLAMES` | `16` | `int` | Maximum blue flame instances per level |
+| `MAX_FIRE_FLAMES` | `16` | `int` | Maximum fire flame instances per level |
 
 ---
 

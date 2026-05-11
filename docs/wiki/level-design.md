@@ -299,11 +299,16 @@ speed      = 1.5    # traversal speed in tiles per second
 
 ### Blue Flames
 
-Erupts from a sea gap. The engine automatically places one per gap; use this entry to override or add extras.
+Erupts from a manually placed floor-gap position. `x` normally matches a `floor_gaps` entry so the flame rises from the opening. Blue and fire flame placements have separate capacities: `MAX_BLUE_FLAMES` and `MAX_FIRE_FLAMES`.
 
 ```toml
-[blue_flames]
+[[blue_flames]]
 x = 192.0   # world-space x of the sea gap centre
+```
+
+```toml
+[[fire_flames]]
+x = 560.0   # same mechanics, fire-colored sprite
 ```
 
 Eruption cycle: **waiting** (1.5 s) → **rising** (−550 px/s launch) → **flipping** (180° over 0.12 s at apex) → **falling** → repeat.

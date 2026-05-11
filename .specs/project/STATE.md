@@ -69,6 +69,7 @@ Game loads TOML levels directly at runtime via `--level <path>` / `make run-leve
 | `MAX_SPIKE_PLATFORMS` | 16 |
 | `MAX_SPIKE_BLOCKS` | 16 |
 | `MAX_BLUE_FLAMES` | 16 |
+| `MAX_FIRE_FLAMES` | 16 |
 | `MAX_FLOAT_PLATFORMS` | 16 |
 | `MAX_BRIDGES` | 16 |
 | `MAX_BOUNCEPADS_SMALL` | 16 |
