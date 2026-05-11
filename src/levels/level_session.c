@@ -5,6 +5,7 @@
 #include "level_session.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "level.h"
@@ -15,30 +16,41 @@
 #include "../core/game_completion.h"
 #include "../editor/serializer.h"
 
-/* Cached LevelDef backing the active runtime level pointer. */
-static LevelDef s_level;
+static LevelDef *game_level_storage(GameState *gs)
+{
+    if (!gs->level_def) {
+        gs->level_def = (LevelDef *)calloc(1, sizeof(LevelDef));
+        if (!gs->level_def) {
+            fprintf(stderr, "Error: Failed to allocate active level storage\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    gs->runtime.current_level = gs->level_def;
+    return (LevelDef *)gs->level_def;
+}
 
 void game_level_load_initial(GameState *gs)
 {
-    memset(&s_level, 0, sizeof(s_level));
+    LevelDef *level = game_level_storage(gs);
+    memset(level, 0, sizeof(*level));
 
     char safe_path[512] = {0};
     int path_valid = (level_resolve_path(gs->level_path, safe_path, sizeof(safe_path)) == 0);
 
-    level_def_init_defaults(&s_level);
+    level_def_init_defaults(level);
 
     if (path_valid &&
-        level_load_toml(safe_path, &s_level) == 0) {
+        level_load_toml(safe_path, level) == 0) {
         /* Successfully loaded from the resolved path. */
     } else {
         if (gs->level_path[0] != '\0') {
             fprintf(stderr, "Warning: could not load %s — starting empty level\n",
                     gs->level_path);
         }
-        strncpy(s_level.name, "Untitled", sizeof(s_level.name) - 1);
+        strncpy(level->name, "Untitled", sizeof(level->name) - 1);
     }
 
-    level_load(gs, &s_level);
+    level_load(gs, level);
     game_completion_reset_summary(gs);
     level_resources_apply(gs, (const LevelDef *)gs->runtime.current_level);
 }
@@ -58,19 +70,23 @@ int game_load_next_phase(GameState *gs)
         return -1;
     }
 
-    level_def_init_defaults(&s_level);
+    LevelDef next_level;
+    level_def_init_defaults(&next_level);
 
-    if (level_load_toml(safe_path, &s_level) != 0) {
+    if (level_load_toml(safe_path, &next_level) != 0) {
         fprintf(stderr, "Error: Failed to load next phase: %s\n", safe_path);
         return -1;
     }
 
+    LevelDef *level = game_level_storage(gs);
+    *level = next_level;
+
     strncpy(gs->level_path, next_path, sizeof(gs->level_path) - 1);
     gs->level_path[sizeof(gs->level_path) - 1] = '\0';
 
-    level_load(gs, &s_level);
+    level_load(gs, level);
     game_completion_reset_summary(gs);
-    level_resources_apply(gs, &s_level);
+    level_resources_apply(gs, level);
 
     phase_progress_restore(gs, &saved_progress);
 
@@ -82,4 +98,13 @@ int game_load_next_phase(GameState *gs)
     }
 
     return 0;
+}
+
+void game_level_session_cleanup(GameState *gs)
+{
+    if (gs->level_def) {
+        free(gs->level_def);
+        gs->level_def = NULL;
+    }
+    gs->runtime.current_level = NULL;
 }

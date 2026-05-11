@@ -16,6 +16,7 @@
 
 #include <SDL.h>        /* SDL_Window, SDL_Renderer, SDL_Texture */
 #include <SDL_mixer.h>  /* Mix_Chunk */
+
 #include "player/player.h"          /* Player struct — embedded by value in GameState */
 #include "surfaces/platform.h"      /* Platform struct + MAX_PLATFORMS constant */
 #include "effects/water.h"          /* Water struct — animated bottom strip */
@@ -337,6 +338,7 @@ typedef struct {
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
     int           smoke_test_frames; /* >0 = exit after this many frames     */
     char          level_path[256]; /* TOML level to load (--level flag)      */
+    void         *level_def;   /* owned active LevelDef backing storage   */
     DebugOverlay  debug;       /* FPS counter, collision vis, event log      */
 
     LevelRuntime runtime; /* active LevelDef pointer, level width, effect flags */

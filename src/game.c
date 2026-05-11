@@ -294,6 +294,8 @@ void game_cleanup(GameState *gs) {
      */
     gamepad_cleanup(gs);
 
+    game_level_session_cleanup(gs);
+
     /* Free HUD resources (font + star texture, renderer-dependent) */
     hud_cleanup(&gs->hud);
 
