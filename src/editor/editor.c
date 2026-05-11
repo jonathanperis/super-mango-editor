@@ -17,16 +17,9 @@
  */
 
 #include <SDL.h>          /* SDL_Window, SDL_Renderer, SDL_Event, etc.     */
-#include <SDL_image.h>    /* IMG_LoadTexture — load PNG sprite sheets      */
 #include <SDL_ttf.h>      /* TTF_OpenFont, TTF_CloseFont — text rendering  */
 #include <stdio.h>        /* fprintf, stderr, snprintf — error and status  */
-#include <string.h>       /* memset, strncpy, strrchr — string operations  */
-
-#ifndef _WIN32
-#include <sys/stat.h>     /* mkdir, stat — autosave/recent file support     */
-#else
-#include <direct.h>       /* _mkdir — autosave/recent file support          */
-#endif
+#include <string.h>       /* strncpy — string operations                    */
 
 #include "editor.h"       /* EditorState, constants, EntityType, EditorTool */
 #include "canvas.h"       /* canvas_render — draw the level preview         */
@@ -34,21 +27,15 @@
 #include "properties.h"   /* properties_render — draw the selection inspector */
 #include "tools.h"        /* tools_mouse_down/up/drag/right_click/delete    */
 #include "undo.h"         /* UndoStack, undo_create/destroy/push/pop/clear  */
-#include "serializer.h"   /* level_save_toml, level_load_toml               */
-#include "exporter.h"     /* level_export_c — write .h/.c from LevelDef    */
 #include "ui.h"           /* UIState, ui_init, ui_begin_frame, ui_button    */
-#include "file_dialog.h"  /* file_dialog_open — native OS file picker       */
 #include "editor_validation.h" /* editor_validate_level                       */
+#include "editor_files.h" /* editor file/save/export/autosave helpers       */
 #include "editor_layout.h" /* editor layout measurement helpers             */
 #include "editor_playtest.h" /* editor playtest process helpers              */
 #include "editor_session.h" /* editor status/title/session helpers           */
 #include "editor_textures.h" /* editor_textures_load/cleanup                 */
 
 #define EDITOR_AUTOSAVE_PATH "out/autosave/editor_autosave.toml"
-#define EDITOR_RECENT_PATH   "out/editor_recent.txt"
-#define EDITOR_RECENT_MAX    5
-#define EDITOR_AUTOSAVE_MS   30000u
-
 /* ------------------------------------------------------------------ */
 /* Forward declarations for static helpers                             */
 /* ------------------------------------------------------------------ */
@@ -57,15 +44,6 @@ static void handle_event(EditorState *es, SDL_Event *event);
 static void render_toolbar(EditorState *es);
 static void render_status_bar(EditorState *es);
 static void apply_undo_command(EditorState *es, const Command *cmd, int reverse);
-static void open_level_file(EditorState *es);
-static int save_current_level(EditorState *es);
-static int export_current_level(EditorState *es);
-static void maybe_autosave(EditorState *es);
-static void load_recent_files(EditorState *es);
-static void save_recent_files(const EditorState *es);
-static void add_recent_file(EditorState *es, const char *path);
-static int file_exists(const char *path);
-static void ensure_out_dirs(void);
 static void copy_selected(EditorState *es);
 static void paste_clipboard(EditorState *es);
 
@@ -223,7 +201,7 @@ int editor_init(EditorState *es) {
 
     strncpy(es->autosave_path, EDITOR_AUTOSAVE_PATH,
             sizeof(es->autosave_path) - 1);
-    load_recent_files(es);
+    editor_load_recent_files(es);
 
     /* ---- Entity textures -------------------------------------------- */
     /*
@@ -247,7 +225,7 @@ int editor_init(EditorState *es) {
      */
     es->running = 1;
     es->last_autosave_ms = SDL_GetTicks();
-    if (file_exists(es->autosave_path)) {
+    if (editor_file_exists(es->autosave_path)) {
         editor_set_status(es, "Autosave found: Ctrl+R to recover");
     } else {
         editor_set_status(es, "Ready");
@@ -342,7 +320,7 @@ void editor_loop(EditorState *es) {
         }
 
         editor_validate_level(&es->level, &es->validation_report);
-        maybe_autosave(es);
+        editor_maybe_autosave(es);
 
         /* ---- Clear the screen --------------------------------------- */
         SDL_SetRenderDrawColor(es->renderer, 0x1A, 0x1A, 0x1A, 0xFF);
@@ -522,7 +500,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  * clear the modified flag and update the window title to
                  * reflect the saved state.
                  */
-                (void)save_current_level(es);
+                (void)editor_save_current_level(es);
                 break;
             }
 
@@ -535,7 +513,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  * If the user selects a .toml file, load it into the editor.
                  */
                 if (editor_confirm_discard_changes(es, "open another level")) {
-                    open_level_file(es);
+                    editor_open_level_file(es);
                 }
                 break;
 
@@ -569,11 +547,11 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  *   src/levels/<var_name>.h  — extern declaration
                  *   src/levels/<var_name>.c  — full const LevelDef initialiser
                  */
-                (void)export_current_level(es);
+                (void)editor_export_current_level(es);
                 break;
 
             case SDLK_r:
-                if (file_exists(es->autosave_path)) {
+                if (editor_file_exists(es->autosave_path)) {
                     if (editor_confirm_discard_changes(es, "recover autosave")) {
                         if (editor_load_level(es, es->autosave_path) == 0) {
                             editor_set_status(es, "Recovered autosave");
@@ -946,277 +924,6 @@ static void handle_event(EditorState *es, SDL_Event *event) {
     default:
         break;
     }
-}
-
-/* ------------------------------------------------------------------ */
-/* render_toolbar — static helper                                      */
-/* ------------------------------------------------------------------ */
-
-/* ------------------------------------------------------------------ */
-/* open_level_file / load_level_from_path — file import helpers        */
-/* ------------------------------------------------------------------ */
-
-/*
- * load_level_from_path — Load a TOML level file into the editor.
- *
- * Replaces the current level data, clears undo history, resets selection,
- * updates the file path and window title.  Called by both open_level_file
- * (from the dialog) and editor_main.c (from argv[1]).
- */
-int editor_load_level(EditorState *es, const char *path) {
-    LevelDef new_level;
-    memset(&new_level, 0, sizeof(new_level));
-
-    if (level_load_toml(path, &new_level) != 0) {
-        fprintf(stderr, "Error: failed to load %s\n", path);
-        editor_set_status(es, "Load failed: %s", path);
-        return -1;
-    }
-
-    /*
-     * Replace the current level with the loaded data.
-     * Clear undo/redo history because the commands reference the old level
-     * state and would corrupt data if applied to the new level.
-     */
-    es->level = new_level;
-    strncpy(es->file_path, path, sizeof(es->file_path) - 1);
-    es->file_path[sizeof(es->file_path) - 1] = '\0';
-    undo_clear(es->undo);
-    es->selection.index = -1;
-    es->modified = 0;
-    add_recent_file(es, path);
-
-    /*
-     * Reload theme-dependent textures so the editor preview matches the
-     * level's visual identity (floor tileset, foreground strip).
-     */
-    if (es->level.background_layer_count > 0) {
-        const char *sky_path = es->level.background_layers[0].path;
-        if (sky_path[0] != '\0') {
-            SDL_Texture *new_sky = IMG_LoadTexture(es->renderer, sky_path);
-            if (new_sky) {
-                if (es->textures.sky)
-                    SDL_DestroyTexture(es->textures.sky);
-                es->textures.sky = new_sky;
-            }
-        }
-    }
-    if (es->level.floor_tile_path[0] != '\0') {
-        SDL_Texture *new_floor = IMG_LoadTexture(es->renderer,
-                                                  es->level.floor_tile_path);
-        if (new_floor) {
-            if (es->textures.floor_tile)
-                SDL_DestroyTexture(es->textures.floor_tile);
-            es->textures.floor_tile = new_floor;
-        }
-    }
-    if (es->level.foreground_layer_count > 0) {
-        const char *strip = es->level.foreground_layers[
-            es->level.foreground_layer_count - 1].path;
-        if (strip[0] != '\0') {
-            SDL_Texture *new_water = IMG_LoadTexture(es->renderer, strip);
-            if (new_water) {
-                if (es->textures.water)
-                    SDL_DestroyTexture(es->textures.water);
-                es->textures.water = new_water;
-            }
-        }
-    }
-
-    /* Update the title bar to show the loaded file. */
-    editor_update_window_title(es);
-
-    fprintf(stderr, "Loaded %s (%d entities)\n", path,
-            es->level.coin_count + es->level.spider_count +
-            es->level.platform_count + es->level.rail_count +
-            es->level.bird_count + es->level.fish_count);
-    editor_set_status(es, "Loaded %s", path);
-    return 0;
-}
-
-/*
- * open_level_file — Show the native OS file picker and load the selected file.
- *
- * Uses file_dialog_open() which invokes the platform's file dialog:
- *   macOS  → osascript (AppleScript NSOpenPanel)
- *   Linux  → zenity --file-selection
- *   Windows → PowerShell OpenFileDialog
- *
- * If the user cancels the dialog, nothing happens.
- * If the user selects a file, it's loaded into the editor.
- */
-static void open_level_file(EditorState *es) {
-    char path[256];
-
-    if (file_dialog_open(path, sizeof(path))) {
-        (void)editor_load_level(es, path);
-    }
-    /* User cancelled — do nothing */
-}
-
-static int save_current_level(EditorState *es)
-{
-    if (!editor_can_persist(es, "Save")) return -1;
-
-    if (es->file_path[0] == '\0') {
-        strncpy(es->file_path, "levels/untitled.toml",
-                sizeof(es->file_path) - 1);
-        es->file_path[sizeof(es->file_path) - 1] = '\0';
-    }
-    if (level_save_toml(&es->level, es->file_path) == 0) {
-        es->modified = 0;
-        add_recent_file(es, es->file_path);
-        editor_update_window_title(es);
-        editor_set_status(es, "Saved %s", es->file_path);
-        return 0;
-    }
-
-    fprintf(stderr, "Error: failed to save %s\n", es->file_path);
-    editor_set_status(es, "Save failed: %s", es->file_path);
-    return -1;
-}
-
-static int export_current_level(EditorState *es)
-{
-    const char *var_name = "untitled";
-    char name_buf[128] = {0};
-
-    if (!editor_can_persist(es, "Export")) return -1;
-
-    if (es->file_path[0] != '\0') {
-        const char *base = strrchr(es->file_path, '/');
-        base = base ? base + 1 : es->file_path;
-        strncpy(name_buf, base, sizeof(name_buf) - 1);
-        name_buf[sizeof(name_buf) - 1] = '\0';
-        char *dot = strrchr(name_buf, '.');
-        if (dot) *dot = '\0';
-        var_name = name_buf;
-    }
-
-    if (level_export_c(&es->level, var_name, "src/levels/exported") == 0) {
-        fprintf(stderr, "Exported to src/levels/exported/%s.h/.c\n", var_name);
-        editor_set_status(es, "Exported %s", var_name);
-        return 0;
-    }
-
-    fprintf(stderr, "Error: export failed for '%s'\n", var_name);
-    editor_set_status(es, "Export failed: %s", var_name);
-    return -1;
-}
-
-static int file_exists(const char *path)
-{
-    FILE *fp;
-
-    if (!path || path[0] == '\0') return 0;
-    fp = fopen(path, "rb");
-    if (!fp) return 0;
-    fclose(fp);
-    return 1;
-}
-
-static void ensure_out_dirs(void)
-{
-#ifdef _WIN32
-    _mkdir("out");
-    _mkdir("out\\autosave");
-#else
-    mkdir("out", 0755);
-    mkdir("out/autosave", 0755);
-#endif
-}
-
-static void maybe_autosave(EditorState *es)
-{
-    Uint32 now = SDL_GetTicks();
-
-    if (!es->modified) return;
-    if (now - es->last_autosave_ms < EDITOR_AUTOSAVE_MS) return;
-
-    es->last_autosave_ms = now;
-    editor_validate_level(&es->level, &es->validation_report);
-    if (es->validation_report.error_count > 0) return;
-
-    ensure_out_dirs();
-    if (level_save_toml(&es->level, es->autosave_path) == 0) {
-        editor_set_status(es, "Autosaved %s", es->autosave_path);
-    }
-}
-
-static void load_recent_files(EditorState *es)
-{
-    FILE *fp = fopen(EDITOR_RECENT_PATH, "r");
-    char line[256];
-
-    es->recent_file_count = 0;
-    if (!fp) return;
-
-    while (es->recent_file_count < EDITOR_RECENT_MAX &&
-           fgets(line, sizeof(line), fp)) {
-        size_t len = strlen(line);
-        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
-            line[--len] = '\0';
-        }
-        if (line[0] == '\0') continue;
-        strncpy(es->recent_files[es->recent_file_count], line,
-                sizeof(es->recent_files[0]) - 1);
-        es->recent_files[es->recent_file_count][sizeof(es->recent_files[0]) - 1] = '\0';
-        es->recent_file_count++;
-    }
-    fclose(fp);
-}
-
-static void save_recent_files(const EditorState *es)
-{
-    FILE *fp;
-
-    ensure_out_dirs();
-    fp = fopen(EDITOR_RECENT_PATH, "w");
-    if (!fp) return;
-
-    for (int i = 0; i < es->recent_file_count; i++) {
-        fprintf(fp, "%s\n", es->recent_files[i]);
-    }
-    fclose(fp);
-}
-
-static void add_recent_file(EditorState *es, const char *path)
-{
-    int existing = -1;
-
-    if (!path || path[0] == '\0') return;
-    for (int i = 0; i < es->recent_file_count; i++) {
-        if (strcmp(es->recent_files[i], path) == 0) {
-            existing = i;
-            break;
-        }
-    }
-
-    if (existing > 0) {
-        char tmp[256];
-        strncpy(tmp, es->recent_files[existing], sizeof(tmp) - 1);
-        tmp[sizeof(tmp) - 1] = '\0';
-        for (int i = existing; i > 0; i--) {
-            strncpy(es->recent_files[i], es->recent_files[i - 1],
-                    sizeof(es->recent_files[i]) - 1);
-            es->recent_files[i][sizeof(es->recent_files[i]) - 1] = '\0';
-        }
-        strncpy(es->recent_files[0], tmp, sizeof(es->recent_files[0]) - 1);
-        es->recent_files[0][sizeof(es->recent_files[0]) - 1] = '\0';
-    } else if (existing < 0) {
-        int limit = es->recent_file_count < EDITOR_RECENT_MAX
-                  ? es->recent_file_count : EDITOR_RECENT_MAX - 1;
-        for (int i = limit; i > 0; i--) {
-            strncpy(es->recent_files[i], es->recent_files[i - 1],
-                    sizeof(es->recent_files[i]) - 1);
-            es->recent_files[i][sizeof(es->recent_files[i]) - 1] = '\0';
-        }
-        strncpy(es->recent_files[0], path, sizeof(es->recent_files[0]) - 1);
-        es->recent_files[0][sizeof(es->recent_files[0]) - 1] = '\0';
-        if (es->recent_file_count < EDITOR_RECENT_MAX) es->recent_file_count++;
-    }
-
-    save_recent_files(es);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1686,12 +1393,12 @@ static void render_toolbar(EditorState *es) {
 
     rx -= 64 + 4;
     if (ui_button(&es->ui, rx, by, 64, bh, "Export")) {
-        (void)export_current_level(es);
+        (void)editor_export_current_level(es);
     }
 
     rx -= 64 + 4;
     if (ui_button(&es->ui, rx, by, 64, bh, "Save")) {
-        (void)save_current_level(es);
+        (void)editor_save_current_level(es);
     }
 
     rx -= 64 + 4;
@@ -1701,7 +1408,7 @@ static void render_toolbar(EditorState *es) {
          * TOML level file.  Same behaviour as Ctrl+O.
          */
         if (editor_confirm_discard_changes(es, "open another level")) {
-            open_level_file(es);
+            editor_open_level_file(es);
         }
     }
 
