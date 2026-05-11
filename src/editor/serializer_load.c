@@ -15,6 +15,7 @@
 
 #include "serializer.h"
 #include "serializer_load_config.h"
+#include "serializer_load_header.h"
 #include "serializer_load_layers.h"
 #include "serializer_parse.h"
 #include "serializer_types.h"                    /* enum/string conversion helpers */
@@ -88,50 +89,9 @@ int level_load_toml(const char *path, LevelDef *def) {
 
     toml_datum_t top = r.toptab;
 
-    /* ---- Name ---------------------------------------------------- */
-
-    {
-        const char *name_str = get_str(top, "name", "Untitled");
-        strncpy(def->name, name_str, sizeof(def->name) - 1);
-        def->name[sizeof(def->name) - 1] = '\0';
-    }
-
-    /* Description — multi-line string or single-line */
-    {
-        const char *desc = get_str(top, "description", "");
-        strncpy(def->description, desc, sizeof(def->description) - 1);
-        def->description[sizeof(def->description) - 1] = '\0';
-    }
-
-    /* Author attribution */
-    {
-        const char *gen = get_str(top, "generated_by", "");
-        strncpy(def->generated_by, gen, sizeof(def->generated_by) - 1);
-        def->generated_by[sizeof(def->generated_by) - 1] = '\0';
-    }
-
-    def->screen_count = get_int(top, "screen_count", 4);
-
-    /* ---- Floor gaps ----------------------------------------------- */
-
-    {
-        toml_datum_t sg = toml_get(top, "floor_gaps");
-        if (sg.type == TOML_ARRAY) {
-            int n = sg.u.arr.size;
-            if (n > MAX_FLOOR_GAPS) {
-                fprintf(stderr, "serializer: floor_gaps array has %d items "
-                        "(max %d)\n", n, MAX_FLOOR_GAPS);
-                toml_free(r);
-                return -1;
-            }
-            def->floor_gap_count = n;
-            for (int i = 0; i < n; i++) {
-                toml_datum_t v = sg.u.arr.elem[i];
-                if (v.type == TOML_INT64)     def->floor_gaps[i] = (int)v.u.int64;
-                else if (v.type == TOML_FP64) def->floor_gaps[i] = (int)v.u.fp64;
-                else                          def->floor_gaps[i] = 0;
-            }
-        }
+    if (serializer_load_header(top, def) != 0) {
+        toml_free(r);
+        return -1;
     }
 
     /* ---- Rails --------------------------------------------------- */
