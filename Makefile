@@ -42,6 +42,7 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(wildcard $(SRCDIR)/screens/*.c) \
           $(wildcard $(SRCDIR)/surfaces/*.c) \
           $(SRCDIR)/editor/serializer.c \
+          $(SRCDIR)/editor/serializer_types.c \
           vendor/tomlc17/tomlc17.c
 OBJS    = $(SRCS:.c=.o)
 DEPS    = $(OBJS:.o=.d)
@@ -64,6 +65,7 @@ SMOKE_LEVELS  = $(wildcard levels/*.toml)
 SMOKE_FRAMES  ?= 5
 SMOKE_SEED    ?= 1
 TEST_SERIALIZER_OBJ = $(OUTDIR)/test-serializer.o
+TEST_SERIALIZER_TYPES_OBJ = $(OUTDIR)/test-serializer-types.o
 TEST_EXPORTER_OBJ   = $(OUTDIR)/test-exporter.o
 TEST_VALIDATE_OBJ   = $(OUTDIR)/test-level-validate.o
 TEST_TOMLC_OBJ      = $(OUTDIR)/test-tomlc17.o
@@ -210,6 +212,9 @@ sanitize:
 $(TEST_SERIALIZER_OBJ): $(EDITOR_DIR)/serializer.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
+$(TEST_SERIALIZER_TYPES_OBJ): $(EDITOR_DIR)/serializer_types.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
 $(TEST_EXPORTER_OBJ): $(EDITOR_DIR)/exporter.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
@@ -243,7 +248,7 @@ $(TEST_EDITOR_VALIDATION_OBJ): $(EDITOR_DIR)/editor_validation.c
 $(TEST_TOMLC_OBJ): $(VENDOR_DIR)/tomlc17.c
 	$(CC) -std=c11 -MMD -MP -c -o $@ $<
 
-$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER_OBJ) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
+$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER_OBJ) $(TEST_SERIALIZER_TYPES_OBJ) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
 
 $(OUTDIR)/level-validate-test: tests/level_validate_test.c $(TEST_VALIDATE_OBJ)
