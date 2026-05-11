@@ -39,8 +39,7 @@ void player_release_jump(Player *player) {
     player->jump_held = 0;
 }
 
-void player_update_jump_timers(Player *player, float dt, int was_on_ground,
-                               Mix_Chunk *snd_jump) {
+int player_update_jump_timers(Player *player, float dt, int was_on_ground) {
     if (player->on_ground) {
         player->coyote_timer = COYOTE_TIME;
     } else if (was_on_ground && player->vy >= 0.0f) {
@@ -52,9 +51,11 @@ void player_update_jump_timers(Player *player, float dt, int was_on_ground,
 
     const int landed_this_frame = !was_on_ground && player->on_ground;
     if (player->jump_buffer_timer > 0.0f && landed_this_frame) {
-        player_start_jump(player, snd_jump);
+        return 1;
     } else if (player->jump_buffer_timer > 0.0f) {
         player->jump_buffer_timer -= dt;
         if (player->jump_buffer_timer < 0.0f) player->jump_buffer_timer = 0.0f;
     }
+
+    return 0;
 }

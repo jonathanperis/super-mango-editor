@@ -18,6 +18,5 @@ void player_press_jump(Player *player, Mix_Chunk *snd_jump);
 /* Handle jump-button release, including short-hop cut while rising. */
 void player_release_jump(Player *player);
 
-/* Update coyote time and consume buffered jump after landing. */
-void player_update_jump_timers(Player *player, float dt, int was_on_ground,
-                               Mix_Chunk *snd_jump);
+/* Update coyote time; return nonzero when buffered jump should start. */
+int player_update_jump_timers(Player *player, float dt, int was_on_ground);
