@@ -4,6 +4,9 @@
 
 #include "player_climb.h"
 
+#include "player_animation.h"
+#include "player_internal.h"
+
 /* Extra pixels on each side of the climbable sprite that count as grabbable. */
 #define PLAYER_CLIMB_GRAB_PAD 4
 
@@ -142,4 +145,55 @@ void player_climb_get_bounds(const Player *player,
     *out_grab   = grab;
     *out_top    = top;
     *out_bottom = bot;
+}
+
+int player_update_climbing(Player *player, float dt,
+                           const VineDecor *vines,
+                           const LadderDecor *ladders,
+                           const RopeDecor *ropes,
+                           int world_w) {
+    if (!player->on_vine) {
+        return 0;
+    }
+
+    player->coyote_timer = 0.0f;
+    player->jump_buffer_timer = 0.0f;
+    player->x += player->vx * dt;
+    player->y += player->vy * dt;
+
+    SDL_Rect grab;
+    float climb_top, climb_bottom;
+    player_climb_get_bounds(player, vines, ladders, ropes,
+                            &grab, &climb_top, &climb_bottom);
+    SDL_Rect phit = player_get_hitbox(player);
+
+    /* Horizontal detach — player drifted out of the grab zone. */
+    if (!SDL_HasIntersection(&phit, &grab)) {
+        player->on_vine = 0;
+        player->vy      = 0.0f;
+        player_animate(player, (Uint32)(dt * 1000.0f));
+        return 1;
+    }
+
+    /* Vertical clamp at climbable top. */
+    if (player->y + PHYS_PAD_TOP < climb_top) {
+        player->y  = climb_top - (float)PHYS_PAD_TOP;
+        player->vy = 0.0f;
+    }
+
+    /* Bottom detach — feet below climbable bottom → release and fall. */
+    float player_bottom = player->y + player->h - FLOOR_SINK;
+    if (player_bottom > climb_bottom) {
+        player->on_vine = 0;
+        player->vy      = 0.0f;
+    }
+
+    /* Horizontal world clamp (same logic as normal path). */
+    if (player->x + PHYS_PAD_X < 0.0f)
+        player->x = -(float)PHYS_PAD_X;
+    if (player->x + player->w - PHYS_PAD_X > world_w)
+        player->x = (float)(world_w - player->w + PHYS_PAD_X);
+
+    player_animate(player, (Uint32)(dt * 1000.0f));
+    return 1;
 }
