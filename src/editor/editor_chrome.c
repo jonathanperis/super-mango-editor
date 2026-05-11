@@ -171,6 +171,8 @@ void editor_render_status_bar(EditorState *es)
               + es->level.faster_bird_count
               + es->level.fish_count
               + es->level.faster_fish_count
+              + es->level.blue_flame_count
+              + es->level.fire_flame_count
               + es->level.axe_trap_count
               + es->level.circular_saw_count
               + es->level.spike_row_count
