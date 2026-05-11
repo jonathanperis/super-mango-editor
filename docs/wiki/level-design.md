@@ -55,7 +55,7 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 | `music_volume` | int | SDL_mixer channel volume: 0 (silent) – 128 (full). |
 | `floor_tile_path` | string | PNG used to tile the ground. Per-level theming. |
 | `next_phase` | string | Optional TOML path loaded after the completion summary is confirmed. |
-| `floor_gaps` | int array | Sea gap x-positions. Blue flames spawn at each gap automatically. |
+| `floor_gaps` | int array | Sea gap x-positions. Blue/fire flames are placed manually; flame `x` values normally match these openings. |
 
 ---
 
