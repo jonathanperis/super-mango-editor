@@ -18,12 +18,8 @@
 #include <stdlib.h>  /* malloc, free, exit */
 #include <string.h>  /* strcmp, memset, strncpy */
 
-#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
-#include <sys/stat.h> /* open, O_WRONLY, O_CREAT, O_TRUNC */
-#include <fcntl.h>
-#endif
-
 #include "serializer.h"
+#include "serializer_io.h"
 #include "serializer_types.h"                    /* enum/string conversion helpers */
 #include "../../vendor/tomlc17/tomlc17.h" /* tomlc17 API */
 #include "../levels/level.h"              /* LevelDef, all placement types */
@@ -153,16 +149,7 @@ static const char *get_str(toml_datum_t tab, const char *key,
 int level_save_toml(const LevelDef *def, const char *path) {
     if (!def || !path) return -1;
 
-    /*
-     * Open the output file.  On POSIX we use open() with explicit
-     * 0644 permissions so the file is owner-writable only, not world-writable.
-     */
-#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
-    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    FILE *fp = fd >= 0 ? fdopen(fd, "w") : NULL;
-#else
-    FILE *fp = fopen(path, "w");
-#endif
+    FILE *fp = serializer_open_write(path);
     if (!fp) {
         fprintf(stderr, "serializer: cannot open '%s' for writing\n", path);
         return -1;
