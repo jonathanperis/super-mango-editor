@@ -66,3 +66,9 @@ void level_config_render(EditorState *es, int start_y, int available_h,
  * the Level Config section.  Clamping happens inside level_config_render.
  */
 void cfg_scroll(int delta);
+
+/* Level Config foldout state shared with layout measurement. */
+extern int g_plx_open;
+extern int g_fg_open;
+extern int g_fog_open;
+extern int g_phys_open;
