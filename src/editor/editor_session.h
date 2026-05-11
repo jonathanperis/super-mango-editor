@@ -8,6 +8,9 @@
 /* Format the editor status bar message. */
 void editor_set_status(EditorState *es, const char *fmt, ...);
 
+/* Fill a LevelDef with the editor's blank-level defaults. */
+void editor_level_init_defaults(LevelDef *level);
+
 /* Refresh the window title from file path and modified flag. */
 void editor_update_window_title(EditorState *es);
 
