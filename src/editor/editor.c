@@ -1299,12 +1299,12 @@ static void apply_undo_command(EditorState *es, const Command *cmd,
 
     case ENT_STAR_GREEN:
         APPLY_ARRAY(es->level.star_greens, es->level.star_green_count,
-                     star_green, MAX_STAR_YELLOWS);
+                     star_green, MAX_STAR_GREENS);
         break;
 
     case ENT_STAR_RED:
         APPLY_ARRAY(es->level.star_reds, es->level.star_red_count,
-                     star_red, MAX_STAR_YELLOWS);
+                     star_red, MAX_STAR_REDS);
         break;
 
     case ENT_LAST_STAR:

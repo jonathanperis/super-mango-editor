@@ -6,7 +6,24 @@
 
 #include <string.h>  /* memset */
 
+#include "../surfaces/rail.h" /* RAIL_TILE_W */
 #include "undo.h"   /* Command, undo_push */
+
+static void push_singleton_move(EditorState *es,
+                                EntityType type,
+                                LastStarPlacement before,
+                                LastStarPlacement after)
+{
+    Command cmd;
+
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.type = CMD_MOVE;
+    cmd.entity_type = (int)type;
+    cmd.entity_index = 0;
+    cmd.before.last_star = before;
+    cmd.after.last_star = after;
+    undo_push(es->undo, cmd);
+}
 
 /*
  * editor_copy_selected — Snapshot the currently selected entity into the clipboard.
@@ -170,24 +187,33 @@ void editor_paste_clipboard(EditorState *es)
     case ENT_STAR_GREEN:
         d.star_green.x += PASTE_OFFSET;
         d.star_green.y += PASTE_OFFSET;
-        PASTE_INTO(star_greens, star_green_count, MAX_STAR_YELLOWS, star_green);
+        PASTE_INTO(star_greens, star_green_count, MAX_STAR_GREENS, star_green);
         break;
     case ENT_STAR_RED:
         d.star_red.x += PASTE_OFFSET;
         d.star_red.y += PASTE_OFFSET;
-        PASTE_INTO(star_reds, star_red_count, MAX_STAR_YELLOWS, star_red);
+        PASTE_INTO(star_reds, star_red_count, MAX_STAR_REDS, star_red);
         break;
-    case ENT_LAST_STAR:
+    case ENT_LAST_STAR: {
+        LastStarPlacement before = es->level.last_star;
         d.last_star.x += PASTE_OFFSET;
         d.last_star.y += PASTE_OFFSET;
+        push_singleton_move(es, t, before, d.last_star);
         es->level.last_star = d.last_star;
         es->modified = 1;
         break;
-    case ENT_PLAYER_SPAWN:
-        es->level.player_start_x = d.last_star.x + PASTE_OFFSET;
-        es->level.player_start_y = d.last_star.y + PASTE_OFFSET;
+    }
+    case ENT_PLAYER_SPAWN: {
+        LastStarPlacement before = { es->level.player_start_x,
+                                     es->level.player_start_y };
+        LastStarPlacement after = { d.last_star.x + PASTE_OFFSET,
+                                    d.last_star.y + PASTE_OFFSET };
+        push_singleton_move(es, t, before, after);
+        es->level.player_start_x = after.x;
+        es->level.player_start_y = after.y;
         es->modified = 1;
         break;
+    }
     case ENT_SPIDER:
         d.spider.x += PASTE_OFFSET;
         d.spider.patrol_x0 += PASTE_OFFSET;
@@ -244,6 +270,7 @@ void editor_paste_clipboard(EditorState *es)
         PASTE_INTO(spike_platforms, spike_platform_count, MAX_SPIKE_PLATFORMS, spike_platform);
         break;
     case ENT_SPIKE_BLOCK:
+        d.spike_block.t_offset += PASTE_OFFSET / (float)RAIL_TILE_W;
         PASTE_INTO(spike_blocks, spike_block_count, MAX_SPIKE_BLOCKS, spike_block);
         break;
     case ENT_BLUE_FLAME:
