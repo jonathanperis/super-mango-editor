@@ -3,8 +3,6 @@
  */
 
 #include <SDL.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 #include "game.h"
 #include "player/player.h"
@@ -17,15 +15,7 @@
 #include "core/game_resources.h"       /* game_resources_load/cleanup                */
 #include "core/game_update.h"          /* game_update_active                         */
 #include "core/game_timing.h"          /* frame timing and smoke-test helpers         */
-
-/* ------------------------------------------------------------------ */
-
-static void game_init_fail(GameState *gs, const char *label, const char *detail)
-{
-    fprintf(stderr, "%s: %s\n", label, detail);
-    game_cleanup(gs);
-    exit(EXIT_FAILURE);
-}
+#include "core/game_window.h"          /* SDL window and renderer lifecycle           */
 
 /*
  * game_init — Set up everything the game needs before the loop starts.
@@ -34,58 +24,7 @@ static void game_init_fail(GameState *gs, const char *label, const char *detail)
  * loads the background image, and initialises the player.
  */
 void game_init(GameState *gs) {
-    /*
-     * SDL_CreateWindow — ask the OS to create a window.
-     *   WINDOW_TITLE            → text shown in the title bar
-     *   SDL_WINDOWPOS_CENTERED  → center the window on the monitor (x and y)
-     *   WINDOW_W / WINDOW_H     → 800×600 pixels
-     *   SDL_WINDOW_SHOWN        → make it visible immediately
-     */
-    gs->window = SDL_CreateWindow(
-        WINDOW_TITLE,
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        WINDOW_W, WINDOW_H,
-        SDL_WINDOW_SHOWN
-    );
-    if (!gs->window) {
-        game_init_fail(gs, "SDL_CreateWindow error", SDL_GetError());
-    }
-
-    /*
-     * Nearest-neighbour pixel scaling — must be set before SDL_CreateRenderer.
-     * Value "0" = SDL_ScaleModeNearest: each source pixel maps to an exact
-     * NxN block of destination pixels, preserving the crisp look of pixel art.
-     * The default ("linear") blurs sprites when they are scaled, which makes
-     * small pixel-art sprites (e.g. 16×16 fish → 48×48 on screen) look wrong.
-     */
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
-
-    /*
-     * SDL_CreateRenderer — create a 2D drawing context tied to the window.
-     *   -1 → let SDL pick the best available GPU driver automatically
-     *   SDL_RENDERER_ACCELERATED  → use the GPU (not software fallback)
-     *   SDL_RENDERER_PRESENTVSYNC → lock present() to the monitor refresh rate
-     *                               (prevents screen tearing and runaway CPU)
-     */
-    gs->renderer = SDL_CreateRenderer(
-        gs->window, -1,
-        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
-    );
-    if (!gs->renderer) {
-        /* Dummy/headless drivers may not expose accelerated renderers. */
-        gs->renderer = SDL_CreateRenderer(gs->window, -1, SDL_RENDERER_SOFTWARE);
-    }
-    if (!gs->renderer) {
-        game_init_fail(gs, "SDL_CreateRenderer error", SDL_GetError());
-    }
-
-    /*
-     * SDL_RenderSetLogicalSize — define the internal canvas resolution.
-     * All SDL render calls now use GAME_W × GAME_H coordinates (400×300).
-     * SDL scales this canvas up to the OS window size (800×600) automatically,
-     * giving every pixel a 2×2 block on screen — the chunky pixel-art look.
-     */
-    SDL_RenderSetLogicalSize(gs->renderer, GAME_W, GAME_H);
+    game_window_init(gs);
 
     game_resources_load(gs);
 
@@ -307,13 +246,5 @@ void game_cleanup(GameState *gs) {
 
     game_resources_cleanup(gs);
 
-    if (gs->renderer) {
-        SDL_DestroyRenderer(gs->renderer);
-        gs->renderer = NULL;
-    }
-
-    if (gs->window) {
-        SDL_DestroyWindow(gs->window);
-        gs->window = NULL;
-    }
+    game_window_cleanup(gs);
 }
