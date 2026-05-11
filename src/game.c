@@ -12,6 +12,7 @@
 #include "render/game_render.h"        /* game_render_frame, render overlays         */
 #include "input/game_input.h"          /* gamepad deferred init/cleanup              */
 #include "input/game_events.h"         /* game_handle_events                         */
+#include "input/game_web_input.h"      /* browser keyboard state repair              */
 #include "core/game_resources.h"       /* game_resources_load/cleanup                */
 #include "core/game_update.h"          /* game_update_active                         */
 #include "core/game_timing.h"          /* frame timing and smoke-test helpers         */
@@ -155,45 +156,7 @@ void game_loop(GameState *gs) {
     gs->loop.fp_prev_riding  = -1;
 
 #ifdef __EMSCRIPTEN__
-    /*
-     * Flush stale keyboard state before the first game frame.
-     *
-     * SDL2 registers JavaScript keydown/keyup listeners on #canvas during
-     * SDL_Init and maintains an internal keystate[] array directly (not just
-     * the SDL event queue).  If any spurious keydown fired during Emscripten
-     * module initialisation — e.g. from a browser navigation/focus event when
-     * INVOKE_RUN=1 calls main() synchronously — the matching keyup is never
-     * delivered and that scancode stays SDL_PRESSED for the entire session.
-     * SDL_PollEvent drains the event queue but does NOT reset keystate[], so
-     * the stuck key persists across all frames, causing the player to walk
-     * indefinitely without any physical input.
-     *
-     * Fix: dispatch synthetic keyup events for every game input key on the
-     * canvas immediately before the Emscripten main loop starts.
-     * dispatchEvent() is synchronous — SDL's listener runs immediately and
-     * sets those scancodes to SDL_RELEASED before the first frame fires.
-     * SDL_FlushEvents then discards the resulting SDL_KEYUP entries queued by
-     * those listeners so they do not appear as noise on frame 1.
-     */
-    /*
-     * emscripten_run_script — plain C function (no GNU extension required),
-     * compatible with -std=c11 unlike EM_ASM which needs -std=gnu*.
-     * Evaluates the JavaScript string synchronously in the browser context.
-     */
-    emscripten_run_script(
-        "(function(){"
-        "  var K=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',"
-        "    'Space','KeyA','KeyD','KeyW','KeyS','ShiftLeft','ShiftRight'];"
-        "  var c=document.getElementById('canvas');"
-        "  if(!c)return;"
-        "  K.forEach(function(code){"
-        "    c.dispatchEvent(new KeyboardEvent('keyup',{"
-        "      code:code,bubbles:true,cancelable:true"
-        "    }));"
-        "  });"
-        "})();"
-    );
-    SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
+    game_web_input_flush_stale_keys();
 
     /*
      * emscripten_set_main_loop_arg — register a per-frame callback.
