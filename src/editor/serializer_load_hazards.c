@@ -74,7 +74,7 @@ int serializer_load_hazards(toml_datum_t top, LevelDef *def) {
     });
 
     /* Fire flames */
-    LOAD_ARRAY("fire_flames", fire_flame_count, MAX_BLUE_FLAMES, {
+    LOAD_ARRAY("fire_flames", fire_flame_count, MAX_FIRE_FLAMES, {
         def->fire_flames[idx].x = get_float(elem, "x", 0);
     });
 

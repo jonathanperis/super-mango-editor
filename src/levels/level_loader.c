@@ -423,7 +423,7 @@ static void load_fire_flames(GameState *gs, const LevelDef *def)
      * Initialisation is identical to load_blue_flames.
      */
     int n = 0;
-    for (int i = 0; i < def->fire_flame_count && n < MAX_BLUE_FLAMES; i++) {
+    for (int i = 0; i < def->fire_flame_count && n < MAX_FIRE_FLAMES; i++) {
         float gap_x = def->fire_flames[i].x;
         if (gap_x <= 0.0f) continue;
 

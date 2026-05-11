@@ -309,7 +309,7 @@ typedef struct {
     int           circular_saw_count;    /* number of circular saws placed     */
     BlueFlame     blue_flames[MAX_BLUE_FLAMES]; /* erupting fire hazards from gaps */
     int           blue_flame_count;     /* number of blue flames placed        */
-    BlueFlame     fire_flames[MAX_BLUE_FLAMES]; /* erupting fire hazards (fire variant) */
+    BlueFlame     fire_flames[MAX_FIRE_FLAMES]; /* erupting fire hazards (fire variant) */
     int           fire_flame_count;     /* number of fire flames placed        */
     FasterFish    faster_fish[MAX_FASTER_FISH]; /* fast jumping fish enemies   */
     int           faster_fish_count;     /* number of faster fish placed       */

@@ -21,7 +21,7 @@
 #include <string.h>                    /* memset */
 #include "../surfaces/bouncepad.h"     /* BouncepadType, MAX_BOUNCEPADS_* */
 #include "../hazards/axe_trap.h"       /* AxeTrapMode, MAX_AXE_TRAPS */
-#include "../hazards/blue_flame.h"     /* MAX_BLUE_FLAMES */
+#include "../hazards/blue_flame.h"     /* MAX_BLUE_FLAMES, MAX_FIRE_FLAMES */
 #include "../surfaces/float_platform.h"/* FloatPlatformMode, MAX_FLOAT_PLATFORMS */
 #include "../surfaces/rail.h"          /* MAX_RAILS */
 #include "../game.h"                   /* MAX_* constants, FLOOR_Y, TILE_SIZE, etc. */
@@ -406,7 +406,7 @@ typedef struct {
     int                    spike_block_count;
     BlueFlamePlacement     blue_flames[MAX_BLUE_FLAMES];
     int                    blue_flame_count;
-    FireFlamePlacement     fire_flames[MAX_BLUE_FLAMES];
+    FireFlamePlacement     fire_flames[MAX_FIRE_FLAMES];
     int                    fire_flame_count;
 
     /* ---- Surfaces ---------------------------------------------------- */
