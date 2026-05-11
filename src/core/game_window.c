@@ -39,7 +39,9 @@ void game_window_init(GameState *gs)
         game_window_fail(gs, "SDL_CreateRenderer error", SDL_GetError());
     }
 
-    SDL_RenderSetLogicalSize(gs->renderer, GAME_W, GAME_H);
+    if (SDL_RenderSetLogicalSize(gs->renderer, GAME_W, GAME_H) < 0) {
+        game_window_fail(gs, "SDL_RenderSetLogicalSize error", SDL_GetError());
+    }
 }
 
 void game_window_cleanup(GameState *gs)
