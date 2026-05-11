@@ -52,16 +52,23 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
      * Passing NULL means "use SDL's internal state array".
      */
     const Uint8 *keys = SDL_GetKeyboardState(NULL);
+    int jump_down = keys[SDL_SCANCODE_SPACE] ? 1 : 0;
+
+#ifndef __EMSCRIPTEN__
+    if (ctrl && SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
+        jump_down = 1;
+    }
+#endif
 
     /*
      * Vine grab — if the player is not already climbing and presses UP
      * while overlapping a vine's grab zone, enter climbing mode.
      *
-     * Ignore the grab when Space is held — otherwise holding Space + UP
+     * Ignore the grab when jump is held — otherwise holding jump + UP
      * causes the player to grab and immediately jump-dismount every frame,
      * spamming the jump action and accumulating height.
      */
-    if (!player->on_vine && !keys[SDL_SCANCODE_SPACE] &&
+    if (!player->on_vine && !jump_down &&
         (keys[SDL_SCANCODE_UP] || keys[SDL_SCANCODE_W])) {
         player_try_grab_climbable(player, vines, vine_count,
                                   ladders, ladder_count,
@@ -88,7 +95,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
         }
 
         /* Jump dismount — leap off the vine with a normal upward impulse */
-        if (keys[SDL_SCANCODE_SPACE]) {
+        if (jump_down) {
             player->on_vine   = 0;
             player_start_jump(player, snd_jump);
         }
@@ -118,11 +125,12 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
         }
 
         /*
-         * Jump: Space only — fresh presses are buffered briefly so a press just
-         * before landing still jumps on contact. Releasing Space during upward
-         * motion cuts the jump short for controllable hop height.
+         * Jump: Space or A/Cross — fresh presses are buffered briefly so a
+         * press just before landing still jumps on contact. Releasing all jump
+         * inputs during upward motion cuts the jump short for controllable hop
+         * height.
          */
-        if (keys[SDL_SCANCODE_SPACE]) {
+        if (jump_down) {
             if (!player->jump_held) {
                 player_press_jump(player, snd_jump);
             }
@@ -157,7 +165,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
          * Skip when A / Cross is held to prevent grab-dismount spam.
          */
         if (!player->on_vine &&
-            !SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A) &&
+            !jump_down &&
             SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_UP)) {
             player_try_grab_climbable(player, vines, vine_count,
                                       ladders, ladder_count,
@@ -195,12 +203,6 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                 player->vx = CLIMB_H_SPEED;
                 player->facing_left = 0;
             }
-
-            /* A / Cross button → jump dismount */
-            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
-                player->on_vine   = 0;
-                player_start_jump(player, snd_jump);
-            }
         } else {
             /*
              * Normal gamepad controls — D-Pad and analog stick for horizontal
@@ -231,14 +233,6 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
             } else if (axis_x > AXIS_DEAD_ZONE) {
                 player->move_dir    = 1;
                 player->facing_left = 0;
-            }
-
-            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
-                if (!player->jump_held) {
-                    player_press_jump(player, snd_jump);
-                }
-            } else {
-                player_release_jump(player);
             }
         }
     }
