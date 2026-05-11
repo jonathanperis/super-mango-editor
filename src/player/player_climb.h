@@ -13,12 +13,37 @@
 
 #include "player.h"  /* Player, VineDecor, LadderDecor, RopeDecor */
 
-/* Return the padded grab zone for each climbable type. */
+/*
+ * player_vine_grab_rect — Return the padded grab zone for one vine.
+ *
+ * The rectangle spans the full vine height and extends a small horizontal
+ * grace pad around the visual sprite so climbing grabs feel forgiving.
+ */
 SDL_Rect player_vine_grab_rect(const VineDecor *v);
+
+/*
+ * player_ladder_grab_rect — Return the padded grab zone for one ladder.
+ *
+ * Uses the same horizontal grace pad as vines so ladder grabs feel identical
+ * even though the ladder sprite has its own width and step constants.
+ */
 SDL_Rect player_ladder_grab_rect(const LadderDecor *ld);
+
+/*
+ * player_rope_grab_rect — Return the padded grab zone for one rope.
+ *
+ * Uses the rope tile count and sprite dimensions to build the full climbable
+ * region checked by keyboard and gamepad input.
+ */
 SDL_Rect player_rope_grab_rect(const RopeDecor *rp);
 
-/* Return grab rect and vertical bounds for the player's active climbable. */
+/*
+ * player_climb_get_bounds — Return geometry for the active climbable.
+ *
+ * player->climb_source selects vines, ladders, or ropes; player->vine_index
+ * selects the active item inside that array.  Outputs the grab rect plus top
+ * and bottom y bounds used to clamp or detach while climbing.
+ */
 void player_climb_get_bounds(const Player *player,
                              const VineDecor *vines,
                              const LadderDecor *ladders,
