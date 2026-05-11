@@ -127,6 +127,7 @@
 #define RAIL_TILE_W        16
 #define RAIL_TILE_H        16
 
+/* Return tile count for a rail placement path. */
 static int rail_placement_tile_count(const RailPlacement *rp)
 {
     if (rp->layout == RAIL_LAYOUT_RECT) {
@@ -135,6 +136,7 @@ static int rail_placement_tile_count(const RailPlacement *rp)
     return rp->w;
 }
 
+/* Return centre position for one rectangular rail path tile. */
 static void rail_rect_tile_position(const RailPlacement *rp, int idx,
                                     float *x, float *y)
 {
@@ -142,30 +144,31 @@ static void rail_rect_tile_position(const RailPlacement *rp, int idx,
     int h = rp->h;
 
     if (idx < w) {
-        *x = (float)(rp->x + idx * RAIL_TILE_W);
-        *y = (float)rp->y;
+        *x = (float)(rp->x + idx * RAIL_TILE_W + RAIL_TILE_W / 2);
+        *y = (float)(rp->y + RAIL_TILE_H / 2);
         return;
     }
 
     idx -= w;
     if (idx < h - 2) {
-        *x = (float)(rp->x + (w - 1) * RAIL_TILE_W);
-        *y = (float)(rp->y + (idx + 1) * RAIL_TILE_H);
+        *x = (float)(rp->x + (w - 1) * RAIL_TILE_W + RAIL_TILE_W / 2);
+        *y = (float)(rp->y + (idx + 1) * RAIL_TILE_H + RAIL_TILE_H / 2);
         return;
     }
 
     idx -= h - 2;
     if (idx < w) {
-        *x = (float)(rp->x + (w - 1 - idx) * RAIL_TILE_W);
-        *y = (float)(rp->y + (h - 1) * RAIL_TILE_H);
+        *x = (float)(rp->x + (w - 1 - idx) * RAIL_TILE_W + RAIL_TILE_W / 2);
+        *y = (float)(rp->y + (h - 1) * RAIL_TILE_H + RAIL_TILE_H / 2);
         return;
     }
 
     idx -= w;
-    *x = (float)rp->x;
-    *y = (float)(rp->y + (h - 2 - idx) * RAIL_TILE_H);
+    *x = (float)(rp->x + RAIL_TILE_W / 2);
+    *y = (float)(rp->y + (h - 2 - idx) * RAIL_TILE_H + RAIL_TILE_H / 2);
 }
 
+/* Return interpolated rail centre position for a placement offset. */
 static void rail_placement_position_at(const RailPlacement *rp, float t,
                                        float *x, float *y)
 {
@@ -178,8 +181,8 @@ static void rail_placement_position_at(const RailPlacement *rp, float t,
     }
 
     if (rp->layout == RAIL_LAYOUT_HORIZ) {
-        *x = (float)rp->x + t * (float)RAIL_TILE_W;
-        *y = (float)rp->y;
+        *x = (float)rp->x + t * (float)RAIL_TILE_W + (float)RAIL_TILE_W / 2.0f;
+        *y = (float)rp->y + (float)RAIL_TILE_H / 2.0f;
         return;
     }
 
@@ -1517,6 +1520,8 @@ static void render_selection(EditorState *es) {
         if (ri >= 0 && ri < es->level.rail_count) {
             const RailPlacement *rp = &es->level.rails[ri];
             rail_placement_position_at(rp, sb->t_offset, &wx, &wy);
+            wx -= (float)SPIKE_DISPLAY_W / 2.0f;
+            wy -= (float)SPIKE_DISPLAY_H / 2.0f;
         }
         ww = SPIKE_DISPLAY_W;
         wh = SPIKE_DISPLAY_H;
