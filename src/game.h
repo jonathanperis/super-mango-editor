@@ -346,8 +346,8 @@ typedef struct {
 
 /* ------------------------------------------------------------------ */
 /* Function declarations                                               */
-/* These tell the compiler "these functions exist; their bodies are    */
-/* in game.c". Any file that includes this header can call them.       */
+/* These tell the compiler "these functions exist". Any file that       */
+/* includes this header can call them.                                  */
 /* ------------------------------------------------------------------ */
 
 /* Create the window, renderer, and load all textures. */
