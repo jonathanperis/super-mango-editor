@@ -139,7 +139,9 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
                 int recent_idx = (int)(key - SDLK_1);
                 if (recent_idx >= 0 && recent_idx < es->recent_file_count) {
                     if (editor_confirm_discard_changes(es, "open a recent level")) {
-                        (void)editor_load_level(es, es->recent_files[recent_idx]);
+                        if (editor_load_level(es, es->recent_files[recent_idx]) != 0) {
+                            editor_set_status(es, "Failed to load recent file");
+                        }
                     }
                 }
                 break;
