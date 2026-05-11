@@ -255,7 +255,9 @@ void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
 
     player_resolve_world_bounds(player, world_w);
 
-    player_update_jump_timers(player, dt, was_on_ground, snd_jump);
+    if (player_update_jump_timers(player, dt, was_on_ground)) {
+        player_start_jump(player, snd_jump);
+    }
 
     /*
      * Advance the sprite animation based on the resolved physics state.
