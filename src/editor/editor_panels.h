@@ -8,5 +8,6 @@
 #include "editor.h" /* EditorState */
 
 void editor_render_side_panels(EditorState *es);
+int editor_handle_side_panel_scroll(EditorState *es, int mx, int my, int wheel_y);
 
 #endif /* EDITOR_PANELS_H */

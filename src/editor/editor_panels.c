@@ -55,3 +55,35 @@ void editor_render_side_panels(EditorState *es)
         properties_render(es, props_y, props_h);
     }
 }
+
+/*
+ * editor_handle_side_panel_scroll — Route scroll wheel to config or palette.
+ *
+ * Returns 1 when the mouse is over the right panel and the event was handled.
+ * The config height calculation mirrors editor_render_side_panels so hit tests
+ * match what the user sees.
+ */
+int editor_handle_side_panel_scroll(EditorState *es, int mx, int my, int wheel_y)
+{
+    if (mx < CANVAS_W || my <= TOOLBAR_H || my >= EDITOR_H - STATUS_H) {
+        return 0;
+    }
+
+    int section_hdr = 28;
+    int cfg_total = section_hdr;
+    if (es->config_open) {
+        cfg_total = editor_config_total_height(es);
+    }
+
+    int cfg_max = (EDITOR_H - STATUS_H - TOOLBAR_H) / 2;
+    int cfg_h = cfg_total < cfg_max ? cfg_total : cfg_max;
+    int cfg_bot = TOOLBAR_H + cfg_h;
+
+    if (my < cfg_bot) {
+        cfg_scroll(-wheel_y * 20);
+    } else {
+        palette_scroll(-wheel_y * 20);
+    }
+
+    return 1;
+}
