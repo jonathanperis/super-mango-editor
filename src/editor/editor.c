@@ -23,10 +23,6 @@
 #include <string.h>       /* memset, strncpy, strrchr — string operations  */
 
 #ifndef _WIN32
-#include <errno.h>        /* errno, ECHILD — waitpid error handling         */
-#include <unistd.h>       /* fork, execl, _exit — POSIX process control    */
-#include <signal.h>       /* kill — send signal to child process            */
-#include <sys/wait.h>     /* waitpid, WNOHANG — non-blocking child check   */
 #include <sys/stat.h>     /* mkdir, stat — autosave/recent file support     */
 #else
 #include <direct.h>       /* _mkdir — autosave/recent file support          */
@@ -43,6 +39,7 @@
 #include "ui.h"           /* UIState, ui_init, ui_begin_frame, ui_button    */
 #include "file_dialog.h"  /* file_dialog_open — native OS file picker       */
 #include "editor_validation.h" /* editor_validate_level                       */
+#include "editor_playtest.h" /* editor playtest process helpers              */
 #include "editor_session.h" /* editor status/title/session helpers           */
 #include "editor_textures.h" /* editor_textures_load/cleanup                 */
 
@@ -98,9 +95,6 @@ static int file_exists(const char *path);
 static void ensure_out_dirs(void);
 static void copy_selected(EditorState *es);
 static void paste_clipboard(EditorState *es);
-static void play_test(EditorState *es);
-static void stop_play(EditorState *es);
-static void check_play_status(EditorState *es);
 
 /*
  * compute_config_total_height — Measure expanded Level Config content.
@@ -402,7 +396,7 @@ void editor_loop(EditorState *es) {
          * the game process has exited.  If it has, return to editor mode.
          */
         if (es->playing) {
-            check_play_status(es);
+            editor_check_play_status(es);
         }
 
         editor_validate_level(&es->level, &es->validation_report);
@@ -428,7 +422,7 @@ void editor_loop(EditorState *es) {
 
             if (ui_button(&es->ui, EDITOR_W / 2 - 40, EDITOR_H / 2 + 30,
                           80, 28, "Stop")) {
-                stop_play(es);
+                editor_stop_play(es);
             }
         } else {
             /* ---- Normal editor rendering ----------------------------- */
@@ -745,7 +739,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
                  * and runs the game in a background process.  The editor
                  * stays open so the designer can keep editing while testing.
                  */
-                play_test(es);
+                editor_play_test(es);
                 break;
 
             case SDLK_g:
@@ -1622,194 +1616,6 @@ static void paste_clipboard(EditorState *es) {
 }
 
 /* ------------------------------------------------------------------ */
-/* play_test / stop_play / check_play_status                           */
-/* ------------------------------------------------------------------ */
-
-/*
- * play_test — Export the level, compile the game, and launch it.
- *
- * Workflow:
- *   1. Export the current level as src/levels/exported/<name>.c/.h.
- *   2. Auto-save TOML if a path is set.
- *   3. Compile the game (blocking — we wait for make to finish).
- *   4. Fork the game as a child process.
- *   5. Switch the editor to "playing" mode: the Play button becomes
- *      Stop, and the editor shows a waiting screen.
- *
- * When the user closes the game window (or clicks Stop in the editor),
- * the editor returns to normal editing mode.
- */
-static void play_test(EditorState *es) {
-    if (es->playing) return;   /* already running */
-    if (!editor_can_persist(es, "Playtest")) return;
-
-    /*
-     * Step 1 — Save the level as TOML.
-     *
-     * The game accepts --level <path> to load any TOML file.
-     * If the editor has a file path, save and play from there.
-     * Otherwise save to a temporary file so the game has something to load.
-     */
-    const char *save_path = es->file_path[0] != '\0'
-                          ? es->file_path
-                          : "levels/_playtest.toml";
-
-    if (level_save_toml(&es->level, save_path) != 0) {
-        fprintf(stderr, "Play: failed to save %s\n", save_path);
-        editor_set_status(es, "Play failed: save %s", save_path);
-        return;
-    }
-    es->modified = 0;
-    editor_set_status(es, "Play saved %s", save_path);
-
-    /* Step 4 — Launch the game as a child process */
-    fprintf(stderr, "Play: launching game...\n");
-
-#ifndef _WIN32
-    /*
-     * fork() — create a child process that is a copy of the editor.
-     *
-     * The child calls execl() to replace itself with the game binary.
-     * The parent (editor) records the child's PID so it can monitor
-     * the game and kill it when the user clicks Stop.
-     *
-     * execl replaces the child's memory with the game — it never returns
-     * on success.  If it fails, _exit(1) terminates the child immediately
-     * (using _exit instead of exit avoids running atexit handlers that
-     * could corrupt the editor's SDL state in the parent).
-     */
-    pid_t pid = fork();
-    if (pid == 0) {
-        /* Child process — become the game, passing the level file */
-        if (es->debug_play)
-            execl("./out/super-mango", "super-mango",
-                  "--level", save_path, "--debug", (char *)NULL);
-        else
-            execl("./out/super-mango", "super-mango",
-                  "--level", save_path, (char *)NULL);
-        /* execl only returns on error */
-        _exit(1);
-    } else if (pid > 0) {
-        /* Parent process — record the child and enter play mode */
-        es->play_pid = (int)pid;
-        es->playing = 1;
-        editor_set_status(es, "Play launched %s", save_path);
-        SDL_SetWindowTitle(es->window, "Super Mango Editor - Playing...");
-    } else {
-        fprintf(stderr, "Play: fork() failed\n");
-        editor_set_status(es, "Play failed: fork");
-    }
-#else
-    /* Windows: use system() with start to launch non-blocking */
-    {
-        char cmd[512];
-        int rc;
-        snprintf(cmd, sizeof(cmd),
-                 "start /B .\\out\\super-mango.exe --level \"%s\"%s",
-                 save_path, es->debug_play ? " --debug" : "");
-        rc = system(cmd);
-        if (rc != 0) {
-            fprintf(stderr, "Play: launch failed for %s (rc=%d)\n", save_path, rc);
-            editor_set_status(es, "Play failed: launch %s", save_path);
-            return;
-        }
-    }
-    es->playing = 1;
-    editor_set_status(es, "Play launched %s", save_path);
-    SDL_SetWindowTitle(es->window, "Super Mango Editor - Playing...");
-#endif
-}
-
-/*
- * stop_play — Terminate the game process and return to editor mode.
- *
- * Sends SIGTERM to the game child process (a graceful termination
- * signal that SDL handles by posting an SDL_QUIT event).  Then waits
- * briefly for the child to exit.  If it doesn't exit within a short
- * window, SIGKILL forces termination.
- */
-static void stop_play(EditorState *es) {
-    if (!es->playing) return;
-
-#ifndef _WIN32
-    if (es->play_pid > 0) {
-        /*
-         * SIGTERM asks the game to quit gracefully.  Most SDL applications
-         * handle this by posting SDL_QUIT, which exits the game loop.
-         */
-        kill((pid_t)es->play_pid, SIGTERM);
-
-        /*
-         * waitpid with 0 options blocks until the child exits.
-         * This is brief since SIGTERM usually exits the game within
-         * one frame (~16ms).
-         */
-        waitpid((pid_t)es->play_pid, NULL, 0);
-        es->play_pid = 0;
-    }
-#endif
-
-    es->playing = 0;
-    editor_set_status(es, "Play stopped");
-
-    /* Restore the editor title bar. */
-    editor_update_window_title(es);
-}
-
-/*
- * check_play_status — Non-blocking check if the game process has exited.
- *
- * Called every frame while es->playing == 1.  Uses waitpid with WNOHANG
- * to check without blocking.  If the child has exited (user closed the
- * game window), automatically returns to editor mode.
- */
-static void check_play_status(EditorState *es) {
-#ifndef _WIN32
-    if (es->play_pid > 0) {
-        int status;
-        /*
-         * waitpid with WNOHANG returns immediately:
-         *   > 0 : child has exited (returns the child's PID).
-         *   0   : child is still running.
-         *   -1  : error (child doesn't exist).
-         *
-         * If the child has exited, we call stop_play to clean up and
-         * return to editor mode.
-         */
-        pid_t result = waitpid((pid_t)es->play_pid, &status, WNOHANG);
-        if (result > 0) {
-            /* Child exited (either normally or via signal) */
-            es->play_pid = 0;
-            es->playing = 0;
-            if (WIFEXITED(status)) {
-                editor_set_status(es, "Play exited: code %d", WEXITSTATUS(status));
-            } else if (WIFSIGNALED(status)) {
-                editor_set_status(es, "Play exited: signal %d", WTERMSIG(status));
-            } else {
-                editor_set_status(es, "Play ended");
-            }
-
-            /* Restore the editor title. */
-            editor_update_window_title(es);
-        } else if (result < 0) {
-            if (errno == ECHILD) {
-                es->play_pid = 0;
-                es->playing = 0;
-                editor_set_status(es, "Play ended: process already reaped");
-
-                /* Restore the editor title. */
-                editor_update_window_title(es);
-            } else {
-                editor_set_status(es, "Play status check failed");
-            }
-        }
-    }
-#else
-    (void)es; /* Windows: no PID tracking in this simple implementation */
-#endif
-}
-
-/* ------------------------------------------------------------------ */
 /* render_toolbar — static helper                                      */
 /* ------------------------------------------------------------------ */
 
@@ -1928,11 +1734,11 @@ static void render_toolbar(EditorState *es) {
     if (es->playing) {
         /* While the game is running, show Stop instead of Play */
         if (ui_button(&es->ui, rx, by, 52, bh, "Stop")) {
-            stop_play(es);
+            editor_stop_play(es);
         }
     } else {
         if (ui_button(&es->ui, rx, by, 52, bh, "Play")) {
-            play_test(es);
+            editor_play_test(es);
         }
     }
 
