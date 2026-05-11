@@ -21,8 +21,6 @@
 
 #include "editor.h"       /* EditorState, constants, EntityType, EditorTool */
 #include "canvas.h"       /* canvas_render — draw the level preview         */
-#include "palette.h"      /* palette_render — draw the entity palette panel */
-#include "properties.h"   /* properties_render — draw the selection inspector */
 #include "tools.h"        /* tools_mouse_down/up/drag/right_click/delete    */
 #include "undo.h"         /* UndoStack, undo_create/destroy/push/pop/clear  */
 #include "ui.h"           /* UIState, ui_init, ui_begin_frame, ui_button    */
@@ -30,7 +28,6 @@
 #include "editor_chrome.h" /* editor toolbar/status rendering helpers        */
 #include "editor_clipboard.h" /* editor clipboard copy/paste helpers          */
 #include "editor_files.h" /* editor file/save/export/autosave helpers       */
-#include "editor_layout.h" /* editor_config_total_height                    */
 #include "editor_panels.h" /* editor side panel layout/render helpers       */
 #include "editor_playtest.h" /* editor playtest process helpers              */
 #include "editor_session.h" /* editor status/title/session helpers           */
@@ -769,20 +766,7 @@ static void handle_event(EditorState *es, SDL_Event *event) {
          * We recompute config_h here using the same logic as the render
          * path so the hit-test matches what the user sees.
          */
-        if (mx >= CANVAS_W && my > TOOLBAR_H && my < EDITOR_H - STATUS_H) {
-            int sc_section_hdr = 28;
-            int sc_cfg_total   = sc_section_hdr;
-            if (es->config_open) {
-                sc_cfg_total = editor_config_total_height(es);
-            }
-            int sc_cfg_max = (EDITOR_H - STATUS_H - TOOLBAR_H) / 2;
-            int sc_cfg_h   = sc_cfg_total < sc_cfg_max ? sc_cfg_total : sc_cfg_max;
-            int sc_cfg_bot = TOOLBAR_H + sc_cfg_h;
-
-            if (my < sc_cfg_bot)
-                cfg_scroll(-event->wheel.y * 20);
-            else
-                palette_scroll(-event->wheel.y * 20);
+        if (editor_handle_side_panel_scroll(es, mx, my, event->wheel.y)) {
             break;
         }
 
