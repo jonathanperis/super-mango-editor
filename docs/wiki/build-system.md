@@ -29,6 +29,21 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(wildcard $(SRCDIR)/screens/*.c) \
           $(wildcard $(SRCDIR)/surfaces/*.c) \
           $(SRCDIR)/editor/serializer.c \
+          $(SRCDIR)/editor/serializer_emit.c \
+          $(SRCDIR)/editor/serializer_io.c \
+          $(SRCDIR)/editor/serializer_load.c \
+          $(SRCDIR)/editor/serializer_load_climbables.c \
+          $(SRCDIR)/editor/serializer_load_collectibles.c \
+          $(SRCDIR)/editor/serializer_load_config.c \
+          $(SRCDIR)/editor/serializer_load_enemies.c \
+          $(SRCDIR)/editor/serializer_load_geometry.c \
+          $(SRCDIR)/editor/serializer_load_hazards.c \
+          $(SRCDIR)/editor/serializer_load_header.c \
+          $(SRCDIR)/editor/serializer_load_layers.c \
+          $(SRCDIR)/editor/serializer_load_surfaces.c \
+          $(SRCDIR)/editor/serializer_parse.c \
+          $(SRCDIR)/editor/serializer_save.c \
+          $(SRCDIR)/editor/serializer_types.c \
           vendor/tomlc17/tomlc17.c
 OBJS    = $(SRCS:.c=.o)
 DEPS    = $(OBJS:.o=.d)
@@ -42,7 +57,7 @@ DEPS    = $(OBJS:.o=.d)
 | `CFLAGS` | see below | Compiler flags |
 | `LIBS` | see below | Linker flags |
 | `TARGET` | `out/super-mango` | Output binary path |
-| `SRCS` | explicit per-directory wildcards | Game C sources from recognized source directories, plus TOML serializer and tomlc17 |
+| `SRCS` | explicit per-directory wildcards plus editor serializer files | Game C sources from recognized source directories, TOML serializer modules, and tomlc17 |
 | `OBJS` | `$(SRCS:.c=.o)` | Object files, placed next to their source files |
 | `DEPS` | `$(OBJS:.o=.d)` | Auto-generated dependency files next to object files |
 
@@ -161,7 +176,7 @@ Builds and runs native regression harnesses for pure logic that does not require
 make test
 ```
 
-Current test binaries (8):
+Current test binaries (9):
 
 - `out/level-serializer-test`
 - `out/level-validate-test`
@@ -171,6 +186,7 @@ Current test binaries (8):
 - `out/phase-transition-test`
 - `out/exporter-test`
 - `out/editor-validation-test`
+- `out/gameplay-damage-test`
 
 ### `make validate-levels`
 

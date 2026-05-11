@@ -175,7 +175,8 @@ super-mango-editor/
 │   │   ├── properties.h / .c         Per-entity property editing
 │   │   ├── tools.h / .c              Selection, placement, and manipulation tools
 │   │   ├── ui.h / .c                 Immediate-mode UI widgets
-│   │   ├── serializer.h / .c         TOML save/load
+│   │   ├── serializer.h / .c         TOML save/load orchestration
+│   │   ├── serializer_load_*.h / .c  Staged TOML load helpers (header, geometry, collectibles, enemies, hazards, surfaces, climbables, layers, config)
 │   │   ├── exporter.h / .c           C code export (.c/.h generation)
 │   │   ├── file_dialog.h / .c        Native file dialogs
 │   │   └── undo.h / .c               Undo/redo history

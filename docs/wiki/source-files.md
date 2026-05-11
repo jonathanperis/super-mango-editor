@@ -33,7 +33,22 @@ src/
 │   ├── properties.h / .c         Per-entity property editing
 │   ├── tools.h / .c              Selection and placement tools
 │   ├── ui.h / .c                 Immediate-mode editor widgets
-│   ├── serializer.h / .c         TOML save/load
+│   ├── serializer.h / .c         TOML save/load public API anchor
+│   ├── serializer_emit.h / .c    TOML emission helpers
+│   ├── serializer_io.h / .c      File I/O helpers for serializer
+│   ├── serializer_load.c         `level_load_toml` staged parse orchestration
+│   ├── serializer_load_header.h / .c        TOML header/meta and floor-gap parsing
+│   ├── serializer_load_geometry.h / .c      Rails and platforms parsing
+│   ├── serializer_load_collectibles.h / .c  Coin, star, last-star, next-phase parsing
+│   ├── serializer_load_enemies.h / .c       Enemy placement parsing
+│   ├── serializer_load_hazards.h / .c       Hazard placement parsing
+│   ├── serializer_load_surfaces.h / .c      Surface placement parsing
+│   ├── serializer_load_climbables.h / .c    Vine, ladder, rope parsing
+│   ├── serializer_load_layers.h / .c        Background/fog/foreground layer parsing
+│   ├── serializer_load_config.h / .c        Optional rule/config parsing
+│   ├── serializer_parse.h / .c  Shared TOML parse utilities
+│   ├── serializer_save.h / .c   TOML save implementation
+│   ├── serializer_types.h / .c  Enum/string conversion helpers
 │   ├── exporter.h / .c           Generated C level export
 │   ├── file_dialog.h / .c        Native file dialogs
 │   └── undo.h / .c               Undo/redo history
@@ -232,7 +247,7 @@ Frees all resources in reverse init order.
 **Key functions:**
 - `level_load(GameState *gs, const LevelDef *def)` -- copy a parsed level definition into runtime `GameState`
 - `level_reset(GameState *gs, const LevelDef *def)` -- restore mutable level state after death/retry
-- `level_load_toml(const char *path, LevelDef *def)` -- parse a TOML level into `LevelDef`
+- `level_load_toml(const char *path, LevelDef *def)` -- parse TOML into staging storage, run runtime validation, free TOML data, then assign the validated `LevelDef` to the caller
 - `level_validate_counts(const LevelDef *level, char *err, size_t err_sz)` -- reject out-of-range array counts
 - `phase_has_next`, `phase_next_path`, `phase_resolve_path` -- resolve level-completion next-phase paths
 
