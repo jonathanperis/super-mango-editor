@@ -56,6 +56,53 @@ SDL_Rect player_rope_grab_rect(const RopeDecor *rp) {
     };
 }
 
+int player_try_grab_climbable(Player *player,
+                              const VineDecor *vines, int vine_count,
+                              const LadderDecor *ladders, int ladder_count,
+                              const RopeDecor *ropes, int rope_count) {
+    SDL_Rect phit = player_get_hitbox(player);
+    int grabbed = 0;
+
+    /* Check vines first so existing level ordering remains unchanged. */
+    for (int i = 0; i < vine_count && !grabbed; i++) {
+        SDL_Rect vgrab = player_vine_grab_rect(&vines[i]);
+        if (SDL_HasIntersection(&phit, &vgrab)) {
+            player->on_vine      = 1;
+            player->vine_index   = i;
+            player->climb_source = 0;
+            grabbed = 1;
+        }
+    }
+
+    for (int i = 0; i < ladder_count && !grabbed; i++) {
+        SDL_Rect lgrab = player_ladder_grab_rect(&ladders[i]);
+        if (SDL_HasIntersection(&phit, &lgrab)) {
+            player->on_vine      = 1;
+            player->vine_index   = i;
+            player->climb_source = 1;
+            grabbed = 1;
+        }
+    }
+
+    for (int i = 0; i < rope_count && !grabbed; i++) {
+        SDL_Rect rgrab = player_rope_grab_rect(&ropes[i]);
+        if (SDL_HasIntersection(&phit, &rgrab)) {
+            player->on_vine      = 1;
+            player->vine_index   = i;
+            player->climb_source = 2;
+            grabbed = 1;
+        }
+    }
+
+    if (grabbed) {
+        player->on_ground = 0;
+        player->vy        = 0.0f;
+        player->vx        = 0.0f;
+    }
+
+    return grabbed;
+}
+
 /*
  * player_climb_get_bounds — Return the grab rect, top y, and bottom y of the
  * currently climbed object, regardless of its type (vine/ladder/rope).

@@ -38,6 +38,18 @@ SDL_Rect player_ladder_grab_rect(const LadderDecor *ld);
 SDL_Rect player_rope_grab_rect(const RopeDecor *rp);
 
 /*
+ * player_try_grab_climbable — Enter climbing mode if the player overlaps one.
+ *
+ * Checks vines, then ladders, then ropes using the current player hitbox.  On
+ * success this sets on_vine, vine_index, climb_source, clears ground contact,
+ * and zeroes velocity so input can drive climbing movement immediately.
+ */
+int player_try_grab_climbable(Player *player,
+                              const VineDecor *vines, int vine_count,
+                              const LadderDecor *ladders, int ladder_count,
+                              const RopeDecor *ropes, int rope_count);
+
+/*
  * player_climb_get_bounds — Return geometry for the active climbable.
  *
  * player->climb_source selects vines, ladders, or ropes; player->vine_index
