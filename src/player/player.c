@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 #include "player.h"
+#include "player_climb.h"
 #include "player_internal.h"
 #include "../surfaces/bouncepad.h"      /* Bouncepad, BOUNCEPAD_VY — for bouncepad landing collision */
 #include "../surfaces/float_platform.h" /* FloatPlatform — for one-way landing collision             */
@@ -208,95 +209,13 @@ void player_init(Player *player, SDL_Renderer *renderer) {
 #define AXIS_DEAD_ZONE  8000
 
 /*
- * Vine climbing constants.
+ * Climbing movement constants.
  *
  * CLIMB_SPEED   : vertical speed while climbing, in logical px/s (half of walk).
  * CLIMB_H_SPEED : horizontal drift speed while on vine (half of walk).
- * VINE_GRAB_PAD : extra pixels on each side of the vine sprite that count as
- *                 the "grab zone".  The visual vine is VINE_W (16 px); the
- *                 grab zone is VINE_W + 2 × VINE_GRAB_PAD = 24 px.
  */
 #define CLIMB_SPEED     80.0f
 #define CLIMB_H_SPEED   80.0f
-#define VINE_GRAB_PAD   4
-
-/*
- * vine_grab_rect — Return the axis-aligned grab zone for a vine.
- *
- * The grab zone is wider than the 16 px visual sprite (padded by
- * VINE_GRAB_PAD on each side) and spans the full vine height.
- */
-static SDL_Rect vine_grab_rect(const VineDecor *v) {
-    int vine_total_h = (v->tile_count - 1) * VINE_STEP + VINE_H;
-    return (SDL_Rect){
-        (int)v->x - VINE_GRAB_PAD,
-        (int)v->y,
-        VINE_W + 2 * VINE_GRAB_PAD,
-        vine_total_h
-    };
-}
-
-/*
- * ladder_grab_rect — Return the grab zone for a ladder (same concept as vine).
- */
-static SDL_Rect ladder_grab_rect(const LadderDecor *ld) {
-    int total_h = (ld->tile_count - 1) * LADDER_STEP + LADDER_H;
-    return (SDL_Rect){
-        (int)ld->x - VINE_GRAB_PAD,
-        (int)ld->y,
-        LADDER_W + 2 * VINE_GRAB_PAD,
-        total_h
-    };
-}
-
-/*
- * rope_grab_rect — Return the grab zone for a rope (same concept as vine).
- */
-static SDL_Rect rope_grab_rect(const RopeDecor *rp) {
-    int total_h = (rp->tile_count - 1) * ROPE_STEP + ROPE_H;
-    return (SDL_Rect){
-        (int)rp->x - VINE_GRAB_PAD,
-        (int)rp->y,
-        ROPE_W + 2 * VINE_GRAB_PAD,
-        total_h
-    };
-}
-
-/*
- * climb_get_bounds — Return the grab rect, top y, and bottom y of the
- * currently climbed object, regardless of its type (vine/ladder/rope).
- */
-static void climb_get_bounds(const Player *player,
-                             const VineDecor *vines,
-                             const LadderDecor *ladders,
-                             const RopeDecor *ropes,
-                             SDL_Rect *out_grab, float *out_top,
-                             float *out_bottom) {
-    SDL_Rect grab = {0, 0, 0, 0};
-    float top = 0.0f, bot = 0.0f;
-    int idx = player->vine_index;
-
-    if (player->climb_source == 0) {
-        grab = vine_grab_rect(&vines[idx]);
-        int vh = (vines[idx].tile_count - 1) * VINE_STEP + VINE_H;
-        top = vines[idx].y;
-        bot = vines[idx].y + (float)vh;
-    } else if (player->climb_source == 1) {
-        grab = ladder_grab_rect(&ladders[idx]);
-        int lh = (ladders[idx].tile_count - 1) * LADDER_STEP + LADDER_H;
-        top = ladders[idx].y;
-        bot = ladders[idx].y + (float)lh;
-    } else {
-        grab = rope_grab_rect(&ropes[idx]);
-        int rh = (ropes[idx].tile_count - 1) * ROPE_STEP + ROPE_H;
-        top = ropes[idx].y;
-        bot = ropes[idx].y + (float)rh;
-    }
-
-    *out_grab   = grab;
-    *out_top    = top;
-    *out_bottom = bot;
-}
 
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                          SDL_GameController *ctrl,
@@ -325,7 +244,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
         int grabbed = 0;
         /* Check vines */
         for (int i = 0; i < vine_count && !grabbed; i++) {
-            SDL_Rect vgrab = vine_grab_rect(&vines[i]);
+            SDL_Rect vgrab = player_vine_grab_rect(&vines[i]);
             if (SDL_HasIntersection(&phit, &vgrab)) {
                 player->on_vine      = 1;
                 player->vine_index   = i;
@@ -335,7 +254,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
         }
         /* Check ladders */
         for (int i = 0; i < ladder_count && !grabbed; i++) {
-            SDL_Rect lgrab = ladder_grab_rect(&ladders[i]);
+            SDL_Rect lgrab = player_ladder_grab_rect(&ladders[i]);
             if (SDL_HasIntersection(&phit, &lgrab)) {
                 player->on_vine      = 1;
                 player->vine_index   = i;
@@ -345,7 +264,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
         }
         /* Check ropes */
         for (int i = 0; i < rope_count && !grabbed; i++) {
-            SDL_Rect rgrab = rope_grab_rect(&ropes[i]);
+            SDL_Rect rgrab = player_rope_grab_rect(&ropes[i]);
             if (SDL_HasIntersection(&phit, &rgrab)) {
                 player->on_vine      = 1;
                 player->vine_index   = i;
@@ -462,7 +381,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
             SDL_Rect phit = player_get_hitbox(player);
             int grabbed = 0;
             for (int i = 0; i < vine_count && !grabbed; i++) {
-                SDL_Rect vgrab = vine_grab_rect(&vines[i]);
+                SDL_Rect vgrab = player_vine_grab_rect(&vines[i]);
                 if (SDL_HasIntersection(&phit, &vgrab)) {
                     player->on_vine      = 1;
                     player->vine_index   = i;
@@ -471,7 +390,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                 }
             }
             for (int i = 0; i < ladder_count && !grabbed; i++) {
-                SDL_Rect lgrab = ladder_grab_rect(&ladders[i]);
+                SDL_Rect lgrab = player_ladder_grab_rect(&ladders[i]);
                 if (SDL_HasIntersection(&phit, &lgrab)) {
                     player->on_vine      = 1;
                     player->vine_index   = i;
@@ -480,7 +399,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                 }
             }
             for (int i = 0; i < rope_count && !grabbed; i++) {
-                SDL_Rect rgrab = rope_grab_rect(&ropes[i]);
+                SDL_Rect rgrab = player_rope_grab_rect(&ropes[i]);
                 if (SDL_HasIntersection(&phit, &rgrab)) {
                     player->on_vine      = 1;
                     player->vine_index   = i;
@@ -723,8 +642,8 @@ void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
 
         SDL_Rect grab;
         float climb_top, climb_bottom;
-        climb_get_bounds(player, vines, ladders, ropes,
-                         &grab, &climb_top, &climb_bottom);
+        player_climb_get_bounds(player, vines, ladders, ropes,
+                                &grab, &climb_top, &climb_bottom);
         SDL_Rect phit = player_get_hitbox(player);
 
         /* Horizontal detach — player drifted out of the grab zone */
