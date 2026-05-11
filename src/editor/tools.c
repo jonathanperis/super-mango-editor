@@ -494,8 +494,8 @@ static int get_max_count(EntityType type)
     case ENT_RAIL:             return MAX_RAILS;
     case ENT_COIN:             return MAX_COINS;
     case ENT_STAR_YELLOW:      return MAX_STAR_YELLOWS;
-    case ENT_STAR_GREEN:       return MAX_STAR_YELLOWS;
-    case ENT_STAR_RED:         return MAX_STAR_YELLOWS;
+    case ENT_STAR_GREEN:       return MAX_STAR_GREENS;
+    case ENT_STAR_RED:         return MAX_STAR_REDS;
     case ENT_LAST_STAR:        return 1;
     case ENT_PLAYER_SPAWN:     return 1;
     case ENT_SPIDER:           return MAX_SPIDERS;
