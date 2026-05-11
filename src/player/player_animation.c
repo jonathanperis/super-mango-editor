@@ -9,9 +9,10 @@
 /*
  * Animation tables — indexed by AnimState (0=IDLE, 1=WALK, 2=JUMP, 3=FALL).
  *
- * ANIM_FRAME_COUNT : how many frames the animation has.
- * ANIM_FRAME_MS    : how long each frame is shown, in milliseconds.
- * ANIM_ROW         : which row of the sprite sheet the animation lives on.
+ * PLAYER_SHEET_COLS : number of frame columns in the sprite sheet.
+ * ANIM_FRAME_COUNT  : how many frames the animation has.
+ * ANIM_FRAME_MS     : how long each frame is shown, in milliseconds.
+ * ANIM_FIRST_FRAME  : first global frame index for each animation row.
  *
  * Frame layout confirmed from Player.png (192×288, 4 cols × 6 rows, 48×48 each):
  *   Row 0 — Idle : 4 frames  (cols 0–3)
@@ -19,9 +20,11 @@
  *   Row 2 — Jump : 2 frames  (cols 0–1, rising-phase poses)
  *   Row 3 — Fall : 1 frame   (col 0, descent pose)
  */
+#define PLAYER_SHEET_COLS 4
+
 static const int ANIM_FRAME_COUNT[5] = { 4,   4,   2,   1,   2   };
 static const int ANIM_FRAME_MS[5]    = { 150, 100, 150, 200, 100 };
-static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
+static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 
 /* Below this horizontal speed, show idle rather than walking. */
 #define WALK_ANIM_MIN_VX 8.0f
@@ -77,7 +80,7 @@ void player_animate(Player *player, Uint32 dt_ms) {
     } else {
         player->anim_timer_ms += dt_ms;
         Uint32 frame_duration = (Uint32)ANIM_FRAME_MS[player->anim_state];
-        if (player->anim_timer_ms >= frame_duration) {
+        while (player->anim_timer_ms >= frame_duration) {
             player->anim_timer_ms -= frame_duration;
             player->anim_frame_index =
                 (player->anim_frame_index + 1) % ANIM_FRAME_COUNT[player->anim_state];
@@ -85,10 +88,12 @@ void player_animate(Player *player, Uint32 dt_ms) {
     }
 
     /*
-     * Update the source rectangle to point at the correct cell on the sheet.
-     *   frame.x = column × FRAME_W  (horizontal offset into the sheet)
-     *   frame.y = row    × FRAME_H  (vertical  offset into the sheet)
+     * Update the source rectangle using the standard sheet-frame formula:
+     *   source_x = (frame_index % cols) * frame_w
+     *   source_y = (frame_index / cols) * frame_h
      */
-    player->frame.x = player->anim_frame_index * FRAME_W;
-    player->frame.y = ANIM_ROW[player->anim_state] * FRAME_H;
+    int sheet_frame_index = ANIM_FIRST_FRAME[player->anim_state] +
+                            player->anim_frame_index;
+    player->frame.x = (sheet_frame_index % PLAYER_SHEET_COLS) * FRAME_W;
+    player->frame.y = (sheet_frame_index / PLAYER_SHEET_COLS) * FRAME_H;
 }
