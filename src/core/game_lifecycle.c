@@ -70,6 +70,11 @@ void game_cleanup(GameState *gs)
     /* Close gamepad handle, join pending init thread, and quit subsystem. */
     gamepad_cleanup(gs);
 
+    /* Tear down debug overlay state after the loop has stopped using it. */
+    if (gs->debug_mode) {
+        debug_cleanup(&gs->debug);
+    }
+
     /* Free level storage owned by GameState before renderer-backed assets. */
     game_level_session_cleanup(gs);
 

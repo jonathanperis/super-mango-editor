@@ -85,6 +85,9 @@ typedef struct {
 /* Reset all debug overlay state (FPS counters, log buffer). */
 void debug_init(DebugOverlay *dbg);
 
+/* Release debug overlay resources; currently a no-op because it owns none. */
+void debug_cleanup(DebugOverlay *dbg);
+
 /*
  * Advance FPS sample timer and age log entries.
  * dt is in seconds (same value used by game physics).

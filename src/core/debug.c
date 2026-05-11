@@ -799,6 +799,21 @@ void debug_init(DebugOverlay *dbg)
 /* ------------------------------------------------------------------ */
 
 /*
+ * debug_cleanup — Lifecycle mirror for debug_init.
+ *
+ * DebugOverlay currently owns no SDL textures, fonts, audio chunks, or heap
+ * memory; it borrows HUD font resources during rendering.  Keep this function
+ * as the single teardown hook so future debug-owned resources have an obvious
+ * cleanup point.
+ */
+void debug_cleanup(DebugOverlay *dbg)
+{
+    (void)dbg;
+}
+
+/* ------------------------------------------------------------------ */
+
+/*
  * debug_update — Advance FPS measurement and age log entries.
  *
  * Called once per frame (even while paused) so the FPS counter stays
