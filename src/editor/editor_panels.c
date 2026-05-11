@@ -15,6 +15,9 @@ typedef struct {
     int bottom_y;
 } ConfigPanelGeometry;
 
+/*
+ * config_panel_geometry — Compute config panel full and visible bounds.
+ */
 static ConfigPanelGeometry config_panel_geometry(EditorState *es)
 {
     const int section_hdr = 28;
