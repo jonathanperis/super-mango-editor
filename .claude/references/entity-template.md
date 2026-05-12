@@ -2,11 +2,11 @@
 
 Use this template whenever adding a new game entity: coins, enemies, platforms, projectiles, power-ups, etc.
 
-The Makefile `src/*.c` wildcard picks up new files automatically — no Makefile change needed.
+The Makefile uses explicit per-directory wildcards. New `.c` files in existing recognized source directories (for example `src/entities/`, `src/hazards/`, `src/collectibles/`, `src/surfaces/`) are picked up automatically. New source directories need Makefile entries.
 
 ---
 
-## 1. Header file — `src/<entity>.h`
+## 1. Header file — `src/<category>/<entity>.h`
 
 ```c
 /*
@@ -54,7 +54,7 @@ void <entity>_cleanup(<Entity> *e);
 
 ---
 
-## 2. Source file — `src/<entity>.c`
+## 2. Source file — `src/<category>/<entity>.c`
 
 ```c
 /*
@@ -65,7 +65,7 @@ void <entity>_cleanup(<Entity> *e);
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "<entity>.h"
+#include "<category>/<entity>.h"
 #include "game.h"   /* GAME_W, GAME_H, FLOOR_Y, GRAVITY, TILE_SIZE */
 
 /* Width and height of one animation frame in the sprite sheet (pixels). */
@@ -86,7 +86,7 @@ void <entity>_init(<Entity> *e, SDL_Renderer *renderer, float x, float y) {
      * The returned SDL_Texture* lives on the GPU until SDL_DestroyTexture.
      * Path is relative to the working directory (repo root when using make run).
      */
-    e->texture = IMG_LoadTexture(renderer, "assets/<entity>.png");
+    e->texture = IMG_LoadTexture(renderer, "assets/sprites/<category>/<entity>.png");
     if (!e->texture) {
         fprintf(stderr, "Failed to load <Entity>.png: %s\n", IMG_GetError());
         exit(EXIT_FAILURE);

@@ -163,6 +163,13 @@ speed      = 0.0        # RAIL mode only: traversal speed in tiles/s
 **Sprite:** `assets/sprites/surfaces/bridge.png` — 16×16 px brick tile  
 **Behaviour:** Tiled crumble walkway. Bricks fall individually when the player walks over them, creating a time-limited path. After falling they respawn when the player moves away.
 
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_BRIDGES` | 16 | Bridge slots in `GameState` |
+| `MAX_BRIDGE_BRICKS` | 16 | Maximum bricks in one bridge |
+| `BRIDGE_FALL_DELAY` | 0.2 s | Delay before first touched brick falls |
+| `BRIDGE_CASCADE_DELAY` | 0.06 s | Extra delay per neighbouring brick |
+
 ```toml
 [bridges]
 x           = 1350.0
@@ -190,6 +197,9 @@ brick_count = 8   # number of 16×16 brick tiles
 | `BOUNCEPAD_SRC_H` | 18 | Art height = rows 14–31 |
 | `BOUNCEPAD_ART_X` | 16 | Art starts at col 16 (transparent outside) |
 | `BOUNCEPAD_ART_W` | 16 | Hitbox width = cols 16–31 |
+| `MAX_BOUNCEPADS_SMALL` | 16 | Small bouncepad slots |
+| `MAX_BOUNCEPADS_MEDIUM` | 16 | Medium bouncepad slots |
+| `MAX_BOUNCEPADS_HIGH` | 16 | High bouncepad slots |
 
 ```toml
 [bouncepads_small]
@@ -256,6 +266,12 @@ tile_count = 2       # height in tiles (each tile = 16 px wide × 48 px tall)
 **Sprite:** `assets/sprites/surfaces/ladder.png`  
 **Behaviour:** Climbable ladder. The player enters by pressing Up at the base. Climbing is done with Up/Down. Jump or move left/right to exit.
 
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_LADDERS` | 16 | Ladder slots in `GameState` |
+| `LADDER_W/H` | 16×22 | Cropped climbable art size |
+| `LADDER_STEP` | 8 | Vertical overlap when tiling |
+
 ```toml
 [ladders]
 x          = 1552.0
@@ -270,6 +286,13 @@ tile_count = 30        # height in tiles
 **File:** `src/surfaces/rope.c` / `rope.h`  
 **Sprite:** `assets/sprites/surfaces/rope.png`  
 **Behaviour:** Climbable rope. Same interaction model as the vine — touch and press Up to grab, Up/Down to climb, Left/Right to swing off.
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_ROPES` | 16 | Rope slots in `GameState` |
+| `ROPE_W/H` | 16×36 | Cropped climbable art size |
+| `ROPE_SRC_X/Y/W/H` | 0 / 6 / 16 / 36 | Source crop from the 16×48 sprite |
+| `ROPE_STEP` | 23 | Vertical spacing for stacked rope tiles |
 
 ```toml
 [ropes]

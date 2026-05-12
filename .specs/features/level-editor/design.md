@@ -26,10 +26,10 @@ super-mango-editor
 |--------|---------|
 | `make editor` | Build `out/super-mango-editor`. |
 | `make run-editor` | Build and run editor. |
-| `make test` | Run 10 native C regression tests. |
+| `make test` | Run 11 native C regression tests. |
 | `make validate-levels` | Run `python3 tools/validate_levels.py`. |
 
-`make test` currently runs 10 binaries: serializer, level validation, rail, entity-utils, collision, phase-transition, exporter, editor-validation, gameplay-damage, and gameplay-config.
+`make test` currently runs 11 binaries: serializer, level validation, runtime load, rail, entity-utils, collision, phase-transition, exporter, editor-validation, gameplay-damage, and gameplay-config.
 
 CI also builds the editor natively, runs game/editor smoke tests, checks WebAssembly artifacts, and runs docs lint/build for docs PRs.
 
