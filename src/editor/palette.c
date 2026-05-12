@@ -1,7 +1,7 @@
 /*
  * palette.c — Entity palette panel for the Super Mango level editor.
  *
- * Renders a scrollable, categorised list of all 25 placeable entity types
+ * Renders a scrollable, categorised list of all placeable entity types
  * on the right side of the editor window.  The palette lets designers pick
  * which entity type to stamp onto the canvas when the Place tool is active.
  *
@@ -29,116 +29,8 @@
 #include <stdio.h>     /* snprintf */
 
 #include "editor.h"    /* EditorState, EntityType, EditorTool, CANVAS_W, etc.  */
+#include "entity_meta.h" /* shared palette names/categories                    */
 #include "ui.h"        /* UIState, ui_panel, ui_label_color, UI_* colours      */
-
-/* ------------------------------------------------------------------ */
-/* PaletteEntry — describes one row in the palette list                */
-/* ------------------------------------------------------------------ */
-
-/*
- * PaletteEntry — associates a human-readable name with an EntityType
- * and assigns it to a category for visual grouping.
- *
- * name     : display label shown in the palette row.
- * type     : the EntityType enum value from editor.h.
- * category : index into category_names[] (0..5).
- *
- * All entries are const — this table is read-only data built at compile time.
- */
-typedef struct {
-    const char *name;     /* display label for this entity                  */
-    EntityType  type;     /* EntityType enum value (defined in editor.h)    */
-    int         category; /* category index: 0=World .. 5=Decorations       */
-} PaletteEntry;
-
-/* ------------------------------------------------------------------ */
-/* Static data — category names and the full entry table               */
-/* ------------------------------------------------------------------ */
-
-/*
- * category_names — human-readable labels for each category section.
- *
- * Index 0 = "World" (environment structure),
- * Index 1 = "Collectibles" (items the player picks up),
- * Index 2 = "Enemies" (AI-controlled hostile entities),
- * Index 3 = "Hazards" (static or scripted damage sources),
- * Index 4 = "Surfaces" (platforms, bridges, bouncepads the player stands on),
- * Index 5 = "Decorations" (climbable vines, ladders, ropes).
- */
-static const char *category_names[] = {
-    "World", "Collectibles", "Enemies", "Hazards", "Surfaces", "Decorations"
-};
-
-/*
- * NUM_CATEGORIES — total number of category groups.
- *
- * Computed from the array size so adding a new category automatically
- * updates the loop bounds without a manual constant change.
- */
-#define NUM_CATEGORIES ((int)(sizeof(category_names) / sizeof(category_names[0])))
-
-/*
- * entries[] — the complete palette listing, sorted by category.
- *
- * Each entry maps a display name to an EntityType (from the enum in editor.h)
- * and a category index.  Entries within the same category are rendered
- * together under a shared header.
- *
- * The order here determines the display order within each category.
- */
-static const PaletteEntry entries[] = {
-    /* ---- Category 0: World ---- */
-    { "Player Spawn",     ENT_PLAYER_SPAWN,     0 },
-    { "Floor Gap",        ENT_FLOOR_GAP,        0 },
-    { "Rail",             ENT_RAIL,             0 },
-
-    /* ---- Category 1: Collectibles ---- */
-    { "Coin",             ENT_COIN,             1 },
-    { "Star Yellow",      ENT_STAR_YELLOW,      1 },
-    { "Star Green",       ENT_STAR_GREEN,       1 },
-    { "Star Red",         ENT_STAR_RED,         1 },
-    { "Last Star",        ENT_LAST_STAR,        1 },
-
-    /* ---- Category 2: Enemies ---- */
-    { "Spider",           ENT_SPIDER,           2 },
-    { "Jumping Spider",   ENT_JUMPING_SPIDER,   2 },
-    { "Bird",             ENT_BIRD,             2 },
-    { "Faster Bird",      ENT_FASTER_BIRD,      2 },
-    { "Fish",             ENT_FISH,             2 },
-    { "Faster Fish",      ENT_FASTER_FISH,      2 },
-
-    /* ---- Category 3: Hazards ---- */
-    { "Axe Trap",         ENT_AXE_TRAP,         3 },
-    { "Circular Saw",     ENT_CIRCULAR_SAW,     3 },
-    { "Spike Row",        ENT_SPIKE_ROW,        3 },
-    { "Spike Platform",   ENT_SPIKE_PLATFORM,   3 },
-    { "Spike Block",      ENT_SPIKE_BLOCK,      3 },
-    { "Blue Flame",       ENT_BLUE_FLAME,       3 },
-    { "Fire Flame",       ENT_FIRE_FLAME,       3 },
-
-    /* ---- Category 4: Surfaces ---- */
-    { "Platform",         ENT_PLATFORM,         4 },
-    { "Float Platform",   ENT_FLOAT_PLATFORM,   4 },
-    { "Bridge",           ENT_BRIDGE,           4 },
-    { "Bouncepad Small",  ENT_BOUNCEPAD_SMALL,  4 },
-    { "Bouncepad Medium", ENT_BOUNCEPAD_MEDIUM, 4 },
-    { "Bouncepad High",   ENT_BOUNCEPAD_HIGH,   4 },
-
-    /* ---- Category 5: Decorations ---- */
-    { "Vine",             ENT_VINE,             5 },
-    { "Ladder",           ENT_LADDER,           5 },
-    { "Rope",             ENT_ROPE,             5 },
-};
-
-/*
- * ENTRY_COUNT — total number of palette entries.
- *
- * Computed from the array size with the sizeof(array)/sizeof(element)
- * idiom so adding new entries to the table above automatically updates
- * the count.  This is safer than a hand-written constant that can
- * drift out of sync.
- */
-#define ENTRY_COUNT ((int)(sizeof(entries) / sizeof(entries[0])))
 
 /* ------------------------------------------------------------------ */
 /* Layout constants                                                    */
@@ -187,9 +79,9 @@ static int scroll_y = 0;
 
 /*
  * category_open — tracks which categories are expanded (1) or collapsed (0).
- * All start expanded.  Clicking a category header toggles it.
+ * All start collapsed.  Clicking a category header toggles it.
  */
-static int category_open[6] = { 0, 0, 0, 0, 0, 0 };
+static int category_open[EDITOR_ENTITY_CATEGORY_COUNT] = { 0 };
 
 /*
  * palette_scroll — Adjust the palette scroll offset by a pixel delta.
@@ -279,11 +171,14 @@ void palette_render(EditorState *es, int start_y, int available_h)
      * for expanded categories.
      */
     int total_content_h = TITLE_H;
-    for (int cat = 0; cat < NUM_CATEGORIES; cat++) {
+    for (int cat = 0; cat < EDITOR_ENTITY_CATEGORY_COUNT; cat++) {
+        EditorEntityCategory category = (EditorEntityCategory)cat;
         total_content_h += CATEGORY_H;
         if (category_open[cat]) {
-            for (int i = 0; i < ENTRY_COUNT; i++) {
-                if (entries[i].category == cat)
+            int entry_count = editor_entity_palette_entry_count();
+            for (int i = 0; i < entry_count; i++) {
+                EntityType type = editor_entity_palette_entry_type(i);
+                if (editor_entity_category(type) == category)
                     total_content_h += ROW_H;
             }
         }
@@ -391,7 +286,8 @@ void palette_render(EditorState *es, int start_y, int available_h)
      * Iterate through categories in order (0..5).  For each category,
      * draw its header, then draw every entry that belongs to it.
      */
-    for (int cat = 0; cat < NUM_CATEGORIES; cat++) {
+    for (int cat = 0; cat < EDITOR_ENTITY_CATEGORY_COUNT; cat++) {
+        EditorEntityCategory category = (EditorEntityCategory)cat;
 
         /* ---- Category header ---- */
 
@@ -415,7 +311,7 @@ void palette_render(EditorState *es, int start_y, int available_h)
             ui_label_color(ui, panel_x + PAD_X, cursor_y + 7,
                            cat_sym, UI_ACCENT);
             ui_label_color(ui, panel_x + PAD_X + cat_sym_w, cursor_y + 7,
-                           category_names[cat],
+                           editor_entity_category_name(category),
                            hdr_hovered ? UI_TEXT : UI_TEXT_DIM);
 
             ui_separator(ui,
@@ -431,8 +327,10 @@ void palette_render(EditorState *es, int start_y, int available_h)
 
         if (!category_open[cat]) continue;
 
-        for (int i = 0; i < ENTRY_COUNT; i++) {
-            if (entries[i].category != cat) continue;
+        int entry_count = editor_entity_palette_entry_count();
+        for (int i = 0; i < entry_count; i++) {
+            EntityType type = editor_entity_palette_entry_type(i);
+            if (editor_entity_category(type) != category) continue;
 
             /*
              * Determine if this row is within the visible vertical clip
@@ -453,7 +351,7 @@ void palette_render(EditorState *es, int start_y, int available_h)
                  * (#4A90D9) so the designer immediately sees which entity
                  * type will be placed on the next canvas click.
                  */
-                int is_selected = (entries[i].type == es->palette_type &&
+                int is_selected = (type == es->palette_type &&
                                    es->tool == TOOL_PLACE);
 
                 /*
@@ -505,8 +403,8 @@ void palette_render(EditorState *es, int start_y, int available_h)
                 ui_label_color(ui,
                                panel_x + PAD_X + 8,  /* extra indent under category */
                                cursor_y + 4,
-                               entries[i].name,
-                               UI_TEXT);
+                                editor_entity_palette_name(type),
+                                UI_TEXT);
 
                 /* ---- Handle click on this row ---- */
 
@@ -521,7 +419,7 @@ void palette_render(EditorState *es, int start_y, int available_h)
                  * from a single press.
                  */
                 if (hovered && ui->mouse_clicked) {
-                    es->palette_type = entries[i].type;
+                    es->palette_type = type;
                     es->tool         = TOOL_PLACE;
                 }
             }

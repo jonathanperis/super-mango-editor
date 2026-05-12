@@ -3,7 +3,26 @@
  */
 #pragma once
 
+#include "editor.h"
 #include "../levels/level.h"
+
+typedef enum {
+    EDITOR_ENTITY_CATEGORY_WORLD = 0,
+    EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
+    EDITOR_ENTITY_CATEGORY_ENEMIES,
+    EDITOR_ENTITY_CATEGORY_HAZARDS,
+    EDITOR_ENTITY_CATEGORY_SURFACES,
+    EDITOR_ENTITY_CATEGORY_DECORATIONS,
+    EDITOR_ENTITY_CATEGORY_COUNT
+} EditorEntityCategory;
+
+const char *editor_entity_type_name(EntityType type);
+const char *editor_entity_palette_name(EntityType type);
+EditorEntityCategory editor_entity_category(EntityType type);
+const char *editor_entity_category_name(EditorEntityCategory category);
+int editor_entity_palette_entry_count(void);
+EntityType editor_entity_palette_entry_type(int index);
+int editor_entity_type_is_singleton(EntityType type);
 
 /* Spider / Jumping Spider — 64-px frame slot, visible art crop. */
 #define SPIDER_FRAME_W     64

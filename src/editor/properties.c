@@ -21,6 +21,7 @@
 
 #include "properties.h"
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, PANEL_W, etc. */
+#include "entity_meta.h" /* editor_entity_type_name/is_singleton             */
 #include "ui.h"         /* ui_panel, ui_label, ui_separator, ui_float_field,
                            ui_int_field, ui_dropdown                         */
 #include "../levels/level.h" /* LevelDef, all *Placement structs            */
@@ -76,49 +77,6 @@ void cfg_scroll(int delta) {
     cfg_scroll_y += delta;
     if (cfg_scroll_y < 0) cfg_scroll_y = 0;
 }
-
-/* ------------------------------------------------------------------ */
-/* Human-readable entity type names                                    */
-/* ------------------------------------------------------------------ */
-
-/*
- * entity_type_names — display string for each EntityType enum value.
- *
- * Indexed by the EntityType enum (0 .. ENT_COUNT-1).  Used in the panel
- * header to show e.g. "Spider #2" when the user selects the third spider.
- */
-static const char *entity_type_names[ENT_COUNT] = {
-    [ENT_FLOOR_GAP]        = "Floor Gap",
-    [ENT_RAIL]             = "Rail",
-    [ENT_PLATFORM]         = "Platform",
-    [ENT_COIN]             = "Coin",
-    [ENT_STAR_YELLOW]      = "Star Yellow",
-    [ENT_STAR_GREEN]       = "Star Green",
-    [ENT_STAR_RED]         = "Star Red",
-    [ENT_LAST_STAR]        = "Last Star",
-    [ENT_SPIDER]           = "Spider",
-    [ENT_JUMPING_SPIDER]   = "Jumping Spider",
-    [ENT_BIRD]             = "Bird",
-    [ENT_FASTER_BIRD]      = "Faster Bird",
-    [ENT_FISH]             = "Fish",
-    [ENT_FASTER_FISH]      = "Faster Fish",
-    [ENT_AXE_TRAP]         = "Axe Trap",
-    [ENT_CIRCULAR_SAW]     = "Circular Saw",
-    [ENT_SPIKE_ROW]        = "Spike Row",
-    [ENT_SPIKE_PLATFORM]   = "Spike Platform",
-    [ENT_SPIKE_BLOCK]      = "Spike Block",
-    [ENT_BLUE_FLAME]       = "Blue Flame",
-    [ENT_FIRE_FLAME]       = "Fire Flame",
-    [ENT_FLOAT_PLATFORM]   = "Float Platform",
-    [ENT_BRIDGE]           = "Bridge",
-    [ENT_BOUNCEPAD_SMALL]  = "Bouncepad (S)",
-    [ENT_BOUNCEPAD_MEDIUM] = "Bouncepad (M)",
-    [ENT_BOUNCEPAD_HIGH]   = "Bouncepad (H)",
-    [ENT_VINE]             = "Vine",
-    [ENT_LADDER]           = "Ladder",
-    [ENT_ROPE]             = "Rope",
-    [ENT_PLAYER_SPAWN]     = "Player Spawn",
-};
 
 /* ------------------------------------------------------------------ */
 /* Dropdown option arrays                                              */
@@ -203,13 +161,12 @@ void properties_render(EditorState *es, int start_y, int available_h)
      * match the existing header style.
      */
     char header[64];
-    if (es->selection.type == ENT_PLAYER_SPAWN ||
-        es->selection.type == ENT_LAST_STAR) {
+    if (editor_entity_type_is_singleton(es->selection.type)) {
         snprintf(header, sizeof(header), " %s",
-                 entity_type_names[es->selection.type]);
+                 editor_entity_type_name(es->selection.type));
     } else {
         snprintf(header, sizeof(header), " %s #%d",
-                 entity_type_names[es->selection.type],
+                 editor_entity_type_name(es->selection.type),
                  es->selection.index);
     }
 
