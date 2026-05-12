@@ -91,7 +91,7 @@ int game_load_next_phase(GameState *gs)
     phase_progress_restore(gs, &saved_progress);
 
     gs->checkpoint_x = 0.0f;
-    gs->level_complete = 0;
+    gs->completion.complete = 0;
 
     if (gs->debug_mode) {
         debug_log(&gs->debug, "PHASE TRANSITION to: %s", safe_path);

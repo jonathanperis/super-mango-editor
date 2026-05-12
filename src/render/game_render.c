@@ -340,7 +340,7 @@ void game_render_frame(GameState *gs, int cam_x, float dt)
 #endif
 
     /* Level complete overlay — rendered last on top of everything */
-    if (gs->level_complete) {
+    if (gs->completion.complete) {
         render_level_complete_overlay(gs);
     }
 

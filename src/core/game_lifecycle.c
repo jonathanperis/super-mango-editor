@@ -54,7 +54,7 @@ void game_init(GameState *gs)
     /* Signal the loop to start running; game starts in the foreground. */
     gs->running = 1;
     gs->paused = 0;
-    gs->level_complete = 0;
+    gs->completion.complete = 0;
     gs->checkpoint_x = 0.0f;
 }
 

@@ -30,6 +30,6 @@ void game_render_frame(GameState *gs, int cam_x, float dt);
  *
  * Shows semi-transparent black overlay with "Level Complete!" title,
  * final score, and exit hint. Called from game_render_frame when
- * gs->level_complete is true.
+ * gs->completion.complete is true.
  */
 void render_level_complete_overlay(GameState *gs);
