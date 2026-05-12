@@ -197,6 +197,17 @@ typedef struct {
 } GameLoopState;
 
 typedef struct {
+    int   complete;           /* 1 = last star collected; show overlay     */
+    float level_elapsed;      /* active level timer in seconds             */
+    int   level_coin_total;   /* coins present when current level loaded   */
+    int   coins_collected;    /* coins collected at completion summary     */
+    int   coin_total;         /* total coins shown at completion summary   */
+    float elapsed;            /* elapsed seconds shown at summary          */
+    int   pending_next_phase; /* Enter/Start loads next phase              */
+    char  next_phase[256];    /* next TOML path shown/loaded               */
+} GameCompletionState;
+
+typedef struct {
     SDL_Texture *ctrl_init_msg;      /* cached gamepad init HUD text       */
     SDL_Texture *floor_tile;         /* repeated floor tile texture         */
     SDL_Texture *platform;           /* shared one-way platform tile        */
@@ -326,14 +337,6 @@ typedef struct {
     Camera        camera;      /* viewport scroll position; updated every frame*/
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
     int           paused;      /* 1 = window lost focus; physics/music frozen */
-    int           level_complete; /* 1 = last star collected, show end screen  */
-    float         level_elapsed;  /* active level timer in seconds             */
-    int           level_coin_total; /* coins present when current level loaded  */
-    int           completion_coins_collected; /* coins collected at summary    */
-    int           completion_coin_total; /* total coins at summary             */
-    float         completion_elapsed; /* elapsed seconds shown on summary     */
-    int           completion_pending_next_phase; /* Enter/Start loads next phase */
-    char          completion_next_phase[256]; /* next TOML path shown/loaded    */
     float         checkpoint_x;   /* respawn x position (updated per screen)   */
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
     int           smoke_test_frames; /* >0 = exit after this many frames     */
@@ -344,6 +347,7 @@ typedef struct {
     LevelRuntime runtime; /* active LevelDef pointer, level width, effect flags */
     GameRules    rules;   /* score/life and collectible rule values             */
     GameLoopState loop;   /* frame loop scratch state for native/WASM loops     */
+    GameCompletionState completion; /* timer, summary, and next-phase state   */
 } GameState;
 
 /* ------------------------------------------------------------------ */

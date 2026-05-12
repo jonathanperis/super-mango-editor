@@ -44,7 +44,7 @@ static void game_loop_frame(void *arg)
      * is showing. Rendering still runs so the last visible frame remains on
      * screen and in OS thumbnails.
      */
-    if (!gs->paused && !gs->level_complete) {
+    if (!gs->paused && !gs->completion.complete) {
         cam_x = game_update_active(gs, dt, cam_x);
     }
 

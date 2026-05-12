@@ -119,6 +119,7 @@ TEST_EDITOR_SESSION_OBJ = $(OBJDIR)/tests/test-editor-session.o
 TEST_FILE_DIALOG_OBJ = $(OBJDIR)/tests/test-file-dialog.o
 TEST_UNDO_OBJ      = $(OBJDIR)/tests/test-undo.o
 TEST_LIBS           = $(shell $(SDL2CFG) --libs) -lm
+TEST_DEPS           = $(wildcard $(OBJDIR)/tests/*.d)
 SANITIZE_CFLAGS     = -fsanitize=address,undefined -fno-omit-frame-pointer
 SANITIZE_LDFLAGS    = -fsanitize=address,undefined
 
@@ -182,6 +183,7 @@ run-editor: editor
 	$(RUN_PREFIX) ./$(EDITOR_TARGET)
 
 -include $(EDITOR_DEPS)
+-include $(TEST_DEPS)
 
 # ── Tests ────────────────────────────────────────────────────────────
 test: $(OUTDIR) $(TEST_TARGETS)

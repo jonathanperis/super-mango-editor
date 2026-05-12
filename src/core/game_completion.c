@@ -20,30 +20,30 @@ static int game_count_collected_coins(const GameState *gs)
 
 void game_completion_reset_summary(GameState *gs)
 {
-    gs->level_elapsed = 0.0f;
-    gs->level_coin_total = gs->coin_count;
-    gs->completion_coins_collected = 0;
-    gs->completion_coin_total = gs->coin_count;
-    gs->completion_elapsed = 0.0f;
-    gs->completion_pending_next_phase = 0;
-    gs->completion_next_phase[0] = '\0';
+    gs->completion.level_elapsed = 0.0f;
+    gs->completion.level_coin_total = gs->coin_count;
+    gs->completion.coins_collected = 0;
+    gs->completion.coin_total = gs->coin_count;
+    gs->completion.elapsed = 0.0f;
+    gs->completion.pending_next_phase = 0;
+    gs->completion.next_phase[0] = '\0';
 }
 
 void game_complete_level(GameState *gs)
 {
     const LevelDef *def = (const LevelDef *)gs->runtime.current_level;
 
-    gs->completion_coins_collected = game_count_collected_coins(gs);
-    gs->completion_coin_total = gs->level_coin_total;
-    gs->completion_elapsed = gs->level_elapsed;
-    gs->completion_pending_next_phase = 0;
-    gs->completion_next_phase[0] = '\0';
+    gs->completion.coins_collected = game_count_collected_coins(gs);
+    gs->completion.coin_total = gs->completion.level_coin_total;
+    gs->completion.elapsed = gs->completion.level_elapsed;
+    gs->completion.pending_next_phase = 0;
+    gs->completion.next_phase[0] = '\0';
 
     if (phase_has_next(def) &&
-        phase_next_path(def, gs->completion_next_phase,
-                        sizeof(gs->completion_next_phase)) == 0) {
-        gs->completion_pending_next_phase = 1;
+        phase_next_path(def, gs->completion.next_phase,
+                        sizeof(gs->completion.next_phase)) == 0) {
+        gs->completion.pending_next_phase = 1;
     }
 
-    gs->level_complete = 1;
+    gs->completion.complete = 1;
 }

@@ -9,7 +9,7 @@
 
 static void continue_after_completion(GameState *gs)
 {
-    if (gs->completion_pending_next_phase) {
+    if (gs->completion.pending_next_phase) {
         if (game_load_next_phase(gs) == 0) return;
     }
 
@@ -49,7 +49,7 @@ void game_handle_events(GameState *gs)
         } else if (event.type == SDL_KEYDOWN) {
             if (event.key.keysym.sym == SDLK_ESCAPE) {
                 gs->running = 0;
-            } else if (gs->level_complete &&
+            } else if (gs->completion.complete &&
                        (event.key.keysym.sym == SDLK_RETURN ||
                         event.key.keysym.sym == SDLK_SPACE)) {
                 continue_after_completion(gs);
@@ -65,7 +65,7 @@ void game_handle_events(GameState *gs)
 
         } else if (event.type == SDL_CONTROLLERBUTTONDOWN) {
             if (event.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
-                if (gs->level_complete) continue_after_completion(gs);
+                if (gs->completion.complete) continue_after_completion(gs);
                 else gs->running = 0;
             }
 

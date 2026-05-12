@@ -19,7 +19,7 @@ int game_update_active(GameState *gs, float dt, int cam_x)
 {
     int fp_landed_idx;
 
-    gs->level_elapsed += dt;
+    gs->completion.level_elapsed += dt;
 
     fp_landed_idx = game_player_step(gs, dt);
     game_actors_update(gs, dt, cam_x);
