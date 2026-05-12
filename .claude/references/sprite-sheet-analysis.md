@@ -13,7 +13,7 @@
 ```python
 from PIL import Image
 
-img = Image.open("assets/player.png")
+img = Image.open("assets/sprites/player/player.png")
 w, h = img.size
 print(f"Sheet: {w}×{h}")
 

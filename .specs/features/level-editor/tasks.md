@@ -16,7 +16,7 @@ Baseline editor is shipped. Old JSON/cJSON implementation tasks are closed as hi
 | TOML serializer | Complete baseline | `src/editor/serializer.*`, `vendor/tomlc17/` |
 | Runtime TOML levels | Complete | `levels/*.toml`, `make run-level LEVEL=...` |
 | Level validation tool | Complete baseline | `tools/validate_levels.py`, `make validate-levels`, CI |
-| C validation tests | Complete baseline | `make test` runs 10 binaries |
+| C validation tests | Complete baseline | `make test` runs 11 binaries |
 | Editor trust safeguards | Complete baseline | Validation blocks save/export/playtest; status summary shown |
 | Playtest launch | Complete baseline | Editor saves, validates, and launches game with `--level` |
 | Recent files + autosave | Complete baseline | Recent paths and valid dirty-level autosave under `out/autosave/` |

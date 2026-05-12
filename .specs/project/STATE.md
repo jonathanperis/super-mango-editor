@@ -19,7 +19,7 @@
 - Parser: vendored `vendor/tomlc17/tomlc17.c`.
 - Game target includes `src/editor/serializer.c` for TOML loading support plus `vendor/tomlc17/tomlc17.c`.
 - Editor target is separate: `out/super-mango-editor`; no SDL2_mixer link.
-- Tests: `make test` runs 10 C test binaries: serializer, level validation, rail, entity-utils, collision, phase-transition, exporter, editor-validation, gameplay-damage, and gameplay-config.
+- Tests: `make test` runs 11 C test binaries: serializer, level validation, runtime load, rail, entity-utils, collision, phase-transition, exporter, editor-validation, gameplay-damage, and gameplay-config.
 - Validation: `make validate-levels` runs `python3 tools/validate_levels.py` against current TOML levels.
 - Editor safeguards: in-memory validation blocks save/export/playtest on errors, status bar shows validation summary, autosave writes valid dirty levels under `out/autosave/`, recent files are tracked, and `--smoke-test` supports CI.
 

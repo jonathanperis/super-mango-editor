@@ -74,24 +74,25 @@ At 60 FPS (`dt` approximately 0.016s) gravity adds ~12.8 px/s per frame. The jum
 
 ---
 
-## `player.c` Local Constants
+## Player Constants
 
-These are `#define`s local to `player.c` (not visible to other files).
+Frame/hitbox constants live in `player_internal.h`; movement defaults live in `player_lifecycle.c`; jump/climb constants live in focused helper files.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `FRAME_W` | `48` | Width of one sprite frame in the sheet (px) |
-| `FRAME_H` | `48` | Height of one sprite frame in the sheet (px) |
-| `FLOOR_SINK` | `16` | Visual overlap onto the floor tile to prevent floating feet |
-| `PHYS_PAD_X` | `15` | Pixels trimmed from each horizontal side of the frame for the physics box (physics width = 48 - 30 = 18 px) |
-| `PHYS_PAD_TOP` | `18` | Pixels trimmed from the top of the frame for the physics box (physics height = 48 - 18 - 16 = 14; combined with FLOOR_SINK gives a 30 px tall box) |
+| `PLAYER_FRAME_W` | `48` | Width of one sprite frame in the sheet (px) |
+| `PLAYER_FRAME_H` | `48` | Height of one sprite frame in the sheet (px) |
+| `PLAYER_FLOOR_SINK` | `16` | Visual overlap onto the floor tile to prevent floating feet |
+| `PLAYER_PHYS_PAD_X` | `15` | Pixels trimmed from each horizontal side of the frame for the physics box (physics width = 48 - 30 = 18 px) |
+| `PLAYER_PHYS_PAD_TOP` | `18` | Pixels trimmed from the top of the frame |
+| `PLAYER_COYOTE_TIME` | `0.10f` | Post-edge jump grace window |
 
-### Why `FLOOR_SINK`?
+### Why `PLAYER_FLOOR_SINK`?
 
-The `player.png` sprite sheet has transparent padding at the **bottom** of each 48x48 frame. Without the sink offset, the physics floor edge (`y + h = FLOOR_Y`) would leave the character visually floating 16 px above the grass. `FLOOR_SINK` compensates:
+The `player.png` sprite sheet has transparent padding at the **bottom** of each 48x48 frame. Without the sink offset, the physics floor edge (`y + h = FLOOR_Y`) would leave the character visually floating 16 px above the grass. `PLAYER_FLOOR_SINK` compensates:
 
 ```
-floor_snap = FLOOR_Y - player->h + FLOOR_SINK
+floor_snap = FLOOR_Y - player->h + PLAYER_FLOOR_SINK
            = 252      - 48        + 16
            = 220
 ```
@@ -100,43 +101,50 @@ The character's sprite appears to rest naturally on the grass at that Y.
 
 ---
 
-## Animation Tables in `player.c`
+## Animation Tables in `player_animation.c`
 
 Static arrays indexed by `AnimState` (0 = `ANIM_IDLE`, 1 = `ANIM_WALK`, 2 = `ANIM_JUMP`, 3 = `ANIM_FALL`, 4 = `ANIM_CLIMB`):
 
 ```c
 static const int ANIM_FRAME_COUNT[5] = { 4,   4,   2,   1,   2   };
 static const int ANIM_FRAME_MS[5]    = { 150, 100, 150, 200, 100 };
-static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
+static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 ```
 
-| Index | State | Frames | ms/frame | Sheet row |
-|-------|-------|--------|----------|-----------|
-| 0 | `ANIM_IDLE` | 4 | 150 | Row 0 |
-| 1 | `ANIM_WALK` | 4 | 100 | Row 1 |
-| 2 | `ANIM_JUMP` | 2 | 150 | Row 2 |
-| 3 | `ANIM_FALL` | 1 | 200 | Row 3 |
-| 4 | `ANIM_CLIMB` | 2 | 100 | Row 4 |
+| Index | State | Frames | ms/frame | First frame | Sheet row |
+|-------|-------|--------|----------|-------------|-----------|
+| 0 | `ANIM_IDLE` | 4 | 150 | 0 | Row 0 |
+| 1 | `ANIM_WALK` | 4 | 100 | 4 | Row 1 |
+| 2 | `ANIM_JUMP` | 2 | 150 | 8 | Row 2 |
+| 3 | `ANIM_FALL` | 1 | 200 | 12 | Row 3 |
+| 4 | `ANIM_CLIMB` | 2 | 100 | 16 | Row 4 |
 
 ---
 
-## Hard-Coded Values in `player.c`
+## Movement Defaults in `player_lifecycle.c`
 
-| Value | Location | Description |
-|-------|----------|-------------|
-| `160.0f` | `player_init` | `player->speed` -- horizontal max speed (px/s) |
-| `-325.0f` | `player_handle_input` | Jump vertical impulse -- keyboard (ground + vine dismount) |
-| `-500.0f` | `player_handle_input` | Jump vertical impulse -- gamepad (ground + vine dismount) |
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `WALK_MAX_SPEED` | `100.0f` | Walking speed cap (px/s) |
+| `RUN_MAX_SPEED` | `250.0f` | Running speed cap (px/s) |
+| `WALK_GROUND_ACCEL` | `750.0f` | Ground walk acceleration (px/s²) |
+| `RUN_GROUND_ACCEL` | `600.0f` | Ground run acceleration (px/s²) |
+| `GROUND_FRICTION` | `550.0f` | Ground braking with no input (px/s²) |
+| `GROUND_COUNTER_ACCEL` | `100.0f` | Extra braking when reversing (px/s²) |
+| `AIR_ACCEL_WALK` | `350.0f` | Air walk acceleration (px/s²) |
+| `AIR_ACCEL_RUN` | `180.0f` | Air run acceleration (px/s²) |
+| `AIR_FRICTION` | `80.0f` | Passive air drag (px/s²) |
 
-## Vine Climbing Constants in `player.c`
+## Jump / Climb Constants
 
-| Constant | Value | Type | Description |
-|----------|-------|------|-------------|
-| `CLIMB_SPEED` | `80.0f` | `float` | Vertical climbing speed on vines (px/s) |
-| `CLIMB_H_SPEED` | `80.0f` | `float` | Horizontal drift speed while on vine (px/s) |
-| `VINE_GRAB_PAD` | `4` | `int` | Extra pixels on each side of vine sprite that count as the grab zone (total grab width = VINE_W + 2 x 4 = 24 px) |
-
----
+| Constant | Value | Location | Description |
+|----------|-------|----------|-------------|
+| `JUMP_VY` | `-325.0f` | `player_jump.c` | Jump impulse |
+| `JUMP_BUFFER_TIME` | `0.10f` | `player_jump.c` | Pre-landing jump input buffer |
+| `JUMP_CUT_FACTOR` | `0.45f` | `player_jump.c` | Jump shortening when input released |
+| `CLIMB_SPEED` | `80.0f` | `player_input.c` | Vertical climb speed |
+| `CLIMB_H_SPEED` | `80.0f` | `player_input.c` | Horizontal climb drift |
+| `PLAYER_CLIMB_GRAB_PAD` | `4` | `player_climb.c` | Extra grab width around climbables |
 
 ## Audio Constants in `main.c`
 
@@ -158,7 +166,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `GAME_H / WINDOW_H` | `2x` | Pixel scale factor |
 | `1000 / TARGET_FPS` | `~16 ms` | Frame budget |
 | `GAME_H - TILE_SIZE` | `252` | `FLOOR_Y` |
-| `FLOOR_Y - FRAME_H + FLOOR_SINK` | `220` | Player start / floor snap Y |
+| `FLOOR_Y - PLAYER_FRAME_H + PLAYER_FLOOR_SINK` | `220` | Player start / floor snap Y |
 | `GAME_W / TILE_SIZE` | `~8.3` | Tiles needed to fill the floor |
 | `WATER_FRAMES x WATER_ART_W` | `128` | `WATER_PERIOD` -- seamless repeat distance |
 
@@ -168,7 +176,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `MAX_PLATFORMS` | `8` | Maximum number of platforms in the game |
+| `MAX_PLATFORMS` | `32` | Maximum platform placements per level |
 
 ---
 
@@ -191,7 +199,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_SPIDERS` | `4` | `int` | Maximum simultaneous spider enemies |
+| `MAX_SPIDERS` | `16` | `int` | Maximum spider placements per level |
 | `SPIDER_FRAMES` | `3` | `int` | Animation frames in `spider.png` (192/64 = 3) |
 | `SPIDER_FRAME_W` | `64` | `int` | Width of one frame slot in the sheet (px) |
 | `SPIDER_ART_X` | `20` | `int` | First visible col within each frame slot |
@@ -224,7 +232,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_COINS` | `24` | `int` | Maximum simultaneous coins on screen |
+| `MAX_COINS` | `64` | `int` | Maximum coin placements per level |
 | `COIN_DISPLAY_W` | `16` | `int` | Render width in logical pixels |
 | `COIN_DISPLAY_H` | `16` | `int` | Render height in logical pixels |
 | `COIN_SCORE` | `100` | `int` | Score awarded per coin collected |
@@ -249,7 +257,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_FISH` | `4` | `int` | Maximum simultaneous fish instances |
+| `MAX_FISH` | `16` | `int` | Maximum fish placements per level |
 | `FISH_FRAMES` | `2` | `int` | Horizontal frames in `fish.png` (96x48 sheet) |
 | `FISH_FRAME_W` | `48` | `int` | Width of one frame slot in the sheet (px) |
 | `FISH_FRAME_H` | `48` | `int` | Height of one frame slot in the sheet (px) |
@@ -311,7 +319,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `RAIL_TILE_W` | `16` | `int` | Width of one tile in the sprite sheet (px) |
 | `RAIL_TILE_H` | `16` | `int` | Height of one tile in the sprite sheet (px) |
 | `MAX_RAIL_TILES` | `128` | `int` | Maximum tiles in a single Rail path |
-| `MAX_RAILS` | `4` | `int` | Maximum Rail instances per level |
+| `MAX_RAILS` | `16` | `int` | Maximum Rail instances per level |
 
 ---
 
@@ -327,7 +335,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `SPIKE_SPEED_FAST` | `6.0f` | `float` | Rail traversal: 6.0 tiles/s |
 | `SPIKE_PUSH_SPEED` | `220.0f` | `float` | Horizontal push impulse magnitude (px/s) |
 | `SPIKE_PUSH_VY` | `-150.0f` | `float` | Upward push component on collision (px/s) |
-| `MAX_SPIKE_BLOCKS` | `4` | `int` | Maximum spike block instances per level |
+| `MAX_SPIKE_BLOCKS` | `16` | `int` | Maximum spike block instances per level |
 
 ---
 
@@ -346,7 +354,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_JUMPING_SPIDERS` | `4` | `int` | Maximum simultaneous jumping spider instances |
+| `MAX_JUMPING_SPIDERS` | `16` | `int` | Maximum jumping spider placements per level |
 | `JSPIDER_FRAMES` | `3` | `int` | Animation frames in `jumping_spider.png` (192/64 = 3) |
 | `JSPIDER_FRAME_W` | `64` | `int` | Width of one frame slot in the sheet (px) |
 | `JSPIDER_ART_X` | `20` | `int` | First visible col within each frame |
@@ -364,7 +372,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_BIRDS` | `4` | `int` | Maximum simultaneous bird instances |
+| `MAX_BIRDS` | `16` | `int` | Maximum bird placements per level |
 | `BIRD_FRAMES` | `3` | `int` | Animation frames in `bird.png` (144/48 = 3) |
 | `BIRD_FRAME_W` | `48` | `int` | Width of one frame slot in the sheet (px) |
 | `BIRD_ART_X` | `17` | `int` | First visible col within each frame |
@@ -382,7 +390,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_FASTER_BIRDS` | `4` | `int` | Maximum simultaneous faster bird instances |
+| `MAX_FASTER_BIRDS` | `16` | `int` | Maximum faster bird placements per level |
 | `FBIRD_FRAMES` | `3` | `int` | Animation frames in `faster_bird.png` (144/48 = 3) |
 | `FBIRD_FRAME_W` | `48` | `int` | Width of one frame slot in the sheet (px) |
 | `FBIRD_ART_X` | `17` | `int` | First visible col within each frame |
@@ -402,7 +410,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 |----------|-------|------|-------------|
 | `FLOAT_PLATFORM_PIECE_W` | `16` | `int` | Width of each 3-slice piece (px) |
 | `FLOAT_PLATFORM_H` | `16` | `int` | Height of the platform sprite (px) |
-| `MAX_FLOAT_PLATFORMS` | `6` | `int` | Maximum float platform instances per level |
+| `MAX_FLOAT_PLATFORMS` | `16` | `int` | Maximum float platform instances per level |
 | `CRUMBLE_STAND_LIMIT` | `0.75f` | `float` | Seconds of standing before crumble-fall starts |
 | `CRUMBLE_FALL_GRAVITY` | `250.0f` | `float` | Downward acceleration during crumble fall (px/s^2) |
 | `CRUMBLE_FALL_INITIAL_VY` | `20.0f` | `float` | Initial downward velocity on crumble-start (px/s) |
@@ -413,11 +421,11 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_BRIDGES` | `2` | `int` | Maximum bridge instances per level |
+| `MAX_BRIDGES` | `16` | `int` | Maximum bridge instances per level |
 | `MAX_BRIDGE_BRICKS` | `16` | `int` | Maximum bricks in a single bridge |
 | `BRIDGE_TILE_W` | `16` | `int` | Width of one bridge.png tile (px) |
 | `BRIDGE_TILE_H` | `16` | `int` | Height of one bridge.png tile (px) |
-| `BRIDGE_FALL_DELAY` | `0.1f` | `float` | Seconds between touch and first brick falling |
+| `BRIDGE_FALL_DELAY` | `0.2f` | `float` | Seconds between touch and first brick falling |
 | `BRIDGE_CASCADE_DELAY` | `0.06f` | `float` | Extra seconds between successive bricks cascading outward |
 | `BRIDGE_FALL_GRAVITY` | `250.0f` | `float` | Downward acceleration per brick during fall (px/s^2) |
 | `BRIDGE_FALL_INITIAL_VY` | `20.0f` | `float` | Initial downward velocity on fall-start (px/s) |
@@ -454,7 +462,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `AXE_SWING_AMPLITUDE` | `60.0f` | `float` | Maximum pendulum angle from vertical (degrees) |
 | `AXE_SWING_PERIOD` | `2.0f` | `float` | Time for one full pendulum cycle (s) |
 | `AXE_SPIN_SPEED` | `180.0f` | `float` | Rotation speed for spin variant (degrees/s) |
-| `MAX_AXE_TRAPS` | `4` | `int` | Maximum axe trap instances per level |
+| `MAX_AXE_TRAPS` | `16` | `int` | Maximum axe trap instances per level |
 
 ---
 
@@ -470,7 +478,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 | `SAW_PATROL_SPEED` | `180.0f` | `float` | Horizontal patrol speed (px/s) |
 | `SAW_PUSH_SPEED` | `220.0f` | `float` | Push impulse magnitude (px/s) |
 | `SAW_PUSH_VY` | `-150.0f` | `float` | Upward bounce component on collision (px/s) |
-| `MAX_CIRCULAR_SAWS` | `4` | `int` | Maximum circular saw instances per level |
+| `MAX_CIRCULAR_SAWS` | `16` | `int` | Maximum circular saw instances per level |
 
 ---
 
@@ -498,7 +506,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_FASTER_FISH` | `4` | `int` | Maximum faster fish instances per level |
+| `MAX_FASTER_FISH` | `16` | `int` | Maximum faster fish instances per level |
 | `FFISH_FRAMES` | `2` | `int` | Number of animation frames |
 | `FFISH_FRAME_W` | `48` | `int` | Frame width (px) |
 | `FFISH_FRAME_H` | `48` | `int` | Frame height (px) |
@@ -518,7 +526,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_SPIKE_ROWS` | `4` | `int` | Maximum spike row instances per level |
+| `MAX_SPIKE_ROWS` | `16` | `int` | Maximum spike row instances per level |
 | `MAX_SPIKE_TILES` | `16` | `int` | Maximum tiles in a single spike row |
 | `SPIKE_TILE_W` | `16` | `int` | Spike tile width (px) |
 | `SPIKE_TILE_H` | `16` | `int` | Spike tile height (px) |
@@ -529,7 +537,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_SPIKE_PLATFORMS` | `4` | `int` | Maximum spike platform instances per level |
+| `MAX_SPIKE_PLATFORMS` | `16` | `int` | Maximum spike platform instances per level |
 | `SPIKE_PLAT_PIECE_W` | `16` | `int` | Width of one 3-slice piece (px) |
 | `SPIKE_PLAT_H` | `16` | `int` | Full frame height (px) |
 | `SPIKE_PLAT_SRC_Y` | `5` | `int` | First content row in each piece (px) |
@@ -541,7 +549,7 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_LADDERS` | `8` | `int` | Maximum ladder instances per level |
+| `MAX_LADDERS` | `16` | `int` | Maximum ladder instances per level |
 | `LADDER_W` | `16` | `int` | Sprite width (px) |
 | `LADDER_H` | `22` | `int` | Content height after cropping padding (px) |
 | `LADDER_SRC_Y` | `13` | `int` | First pixel row with content |
@@ -554,14 +562,14 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_ROPES` | `8` | `int` | Maximum rope instances per level |
-| `ROPE_W` | `12` | `int` | Display width with padding (px) |
+| `MAX_ROPES` | `16` | `int` | Maximum rope instances per level |
+| `ROPE_W` | `16` | `int` | Display width (full sprite width, px) |
 | `ROPE_H` | `36` | `int` | Display height with padding (px) |
-| `ROPE_SRC_X` | `2` | `int` | Source crop x offset (px) |
+| `ROPE_SRC_X` | `0` | `int` | Source crop x offset (px) |
 | `ROPE_SRC_Y` | `6` | `int` | Source crop y offset (px) |
-| `ROPE_SRC_W` | `12` | `int` | Source crop width (px) |
+| `ROPE_SRC_W` | `16` | `int` | Source crop width (full sprite width, px) |
 | `ROPE_SRC_H` | `36` | `int` | Source crop height (px) |
-| `ROPE_STEP` | `34` | `int` | Vertical spacing between stacked tiles (px) |
+| `ROPE_STEP` | `23` | `int` | Vertical spacing between stacked tiles (px) |
 
 ---
 
@@ -569,6 +577,6 @@ static const int ANIM_ROW[5]         = { 0,   1,   2,   3,   4   };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_BOUNCEPADS_SMALL` | `4` | `int` | Maximum small bouncepad instances |
-| `MAX_BOUNCEPADS_MEDIUM` | `4` | `int` | Maximum medium bouncepad instances |
-| `MAX_BOUNCEPADS_HIGH` | `4` | `int` | Maximum high bouncepad instances |
+| `MAX_BOUNCEPADS_SMALL` | `16` | `int` | Maximum small bouncepad instances |
+| `MAX_BOUNCEPADS_MEDIUM` | `16` | `int` | Maximum medium bouncepad instances |
+| `MAX_BOUNCEPADS_HIGH` | `16` | `int` | Maximum high bouncepad instances |
