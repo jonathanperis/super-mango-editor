@@ -130,5 +130,7 @@ void bird_variant_render(const BirdVariantSpec *spec,
     dst.h = spec->art_h;
 
     flip = (vx > 0.0f) ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
-    SDL_RenderCopyEx(renderer, tex, &src, &dst, 0.0, NULL, flip);
+    if (SDL_RenderCopyEx(renderer, tex, &src, &dst, 0.0, NULL, flip) != 0) {
+        SDL_Log("bird_variant_render: SDL_RenderCopyEx failed: %s", SDL_GetError());
+    }
 }
