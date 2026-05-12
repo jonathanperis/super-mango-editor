@@ -12,7 +12,7 @@ Standalone SDL2/C editor for creating and editing Super Mango TOML levels. Basel
 | D-002 | UI framework | Custom immediate-mode SDL2 + SDL2_ttf. No external UI library. |
 | D-003 | Runtime loading | Game loads TOML directly through `--level <path>` / `make run-level LEVEL=...`. |
 | D-004 | Validation | `tools/validate_levels.py`, `make validate-levels`, C validation tests, editor in-memory validation, and CI validation protect shipped levels. |
-| D-005 | CI quality gates | Native game/editor builds, 8-test suite, TOML validation, game/editor smoke, WebAssembly artifact smoke, and docs lint/build are CI-gated. |
+| D-005 | CI quality gates | Native game/editor builds, 10-test suite, TOML validation, game/editor smoke, WebAssembly artifact smoke, and docs lint/build are CI-gated. |
 
 Historical note: early planning described JSON/cJSON plus C export as canonical. That pipeline is obsolete; keep references only when explaining migration history.
 
@@ -58,7 +58,7 @@ make test
 make validate-levels
 ```
 
-`make test` currently runs 8 regression binaries, including serializer, level validation, rail, entity-utils, collision, phase-transition, exporter, and editor-validation tests.
+`make test` currently runs 10 regression binaries, including serializer, level validation, rail, entity-utils, collision, phase-transition, exporter, editor-validation, gameplay-damage, and gameplay-config tests.
 
 ## Next Requirements
 

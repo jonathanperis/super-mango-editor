@@ -21,177 +21,10 @@
 
 #include "tools.h"
 #include "editor.h"  /* EditorState, EntityType, Selection, EditorTool    */
+#include "entity_meta.h" /* Editor display dimensions and rail helpers     */
 #include "undo.h"    /* Command, PlacementData, undo_push                 */
 #include "../game.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE, WORLD_W,
                         FLOOR_GAP_W, MAX_* constants                      */
-
-/* ------------------------------------------------------------------ */
-/* Entity display dimensions — duplicated from canvas.c                */
-/* ------------------------------------------------------------------ */
-/*
- * These constants define the on-screen bounding box of each entity type
- * in logical pixels.  They must match the values used by canvas.c for
- * rendering so that hit-testing aligns with what the designer sees.
- */
-
-/* Spider / Jumping Spider — 64-px frame slot, only bottom 10 rows visible */
-#define SPIDER_FRAME_W     64
-#define SPIDER_ART_H       10
-
-/* Bird / Faster Bird — 48-px frame slot, 14 rows of visible art */
-#define BIRD_FRAME_W       48
-#define BIRD_ART_H         14
-
-/* Fish / Faster Fish — full 48x48 frame */
-#define FISH_FRAME_W       48
-#define FISH_FRAME_H       48
-
-/* Collectibles */
-#define COIN_DISPLAY_W     16
-#define COIN_DISPLAY_H     16
-#define YSTAR_DISPLAY_W    16
-#define YSTAR_DISPLAY_H    16
-#define LSTAR_DISPLAY_W    24
-#define LSTAR_DISPLAY_H    24
-
-/* Axe trap — 48x64 frame rendered at computed pivot point */
-#define AXE_FRAME_W        48
-#define AXE_FRAME_H        64
-
-/* Circular saw — 32x32 display */
-#define SAW_DISPLAY_W      32
-#define SAW_DISPLAY_H      32
-
-/* Spike row — 16x16 tiles */
-#define SPIKE_TILE_W       16
-#define SPIKE_TILE_H       16
-
-/* Spike platform — 16-px pieces, 11 px visible height */
-#define SPIKE_PLAT_PIECE_W 16
-#define SPIKE_PLAT_SRC_H   11
-
-/* Spike block — 24x24 display, rides rails */
-#define SPIKE_DISPLAY_W    24
-#define SPIKE_DISPLAY_H    24
-
-/* Blue flame — 48x48 display, erupts from sea gaps */
-#define BLUE_FLAME_W       48
-#define BLUE_FLAME_H       48
-
-/* Fire flame — 48x48 display, erupts from sea gaps (fire variant) */
-#define FIRE_FLAME_W       48
-#define FIRE_FLAME_H       48
-
-/* Floating platform — 16x16 pieces */
-#define FPLAT_PIECE_W      16
-#define FPLAT_PIECE_H      16
-
-/* Bridge — 16x16 tiles */
-#define BRIDGE_TILE_W      16
-#define BRIDGE_TILE_H      16
-
-/* Bouncepad — all three variants share crop dimensions */
-#define BP_SRC_H           18
-#define BP_FRAME_W         48
-
-/* Vine — stacked tiles with overlap */
-#define VINE_W             16
-#define VINE_H             32
-#define VINE_STEP          19
-
-/* Ladder — tightly stacked tiles */
-#define LADDER_W           16
-#define LADDER_H           22
-#define LADDER_STEP         8
-
-/* Rope — stacked tiles with step */
-#define ROPE_W             16
-#define ROPE_H             36
-#define ROPE_STEP          23
-
-/* Rail — 16x16 tiles */
-#define RAIL_TILE_W        16
-#define RAIL_TILE_H        16
-
-/* Player spawn — full 48x48 idle frame used as preview */
-#define PLAYER_SPAWN_W     48
-#define PLAYER_SPAWN_H     48
-
-/* Water art height — needed for fish Y derivation */
-#define WATER_ART_H        31
-
-/* Return tile count for a rail placement path. */
-static int rail_placement_tile_count(const RailPlacement *rp)
-{
-    if (rp->layout == RAIL_LAYOUT_RECT) {
-        return rp->w * 2 + (rp->h - 2) * 2;
-    }
-    return rp->w;
-}
-
-/* Return centre position for one rectangular rail path tile. */
-static void rail_rect_tile_position(const RailPlacement *rp, int idx,
-                                    float *x, float *y)
-{
-    int w = rp->w;
-    int h = rp->h;
-
-    if (idx < w) {
-        *x = (float)(rp->x + idx * RAIL_TILE_W + RAIL_TILE_W / 2);
-        *y = (float)(rp->y + RAIL_TILE_H / 2);
-        return;
-    }
-
-    idx -= w;
-    if (idx < h - 2) {
-        *x = (float)(rp->x + (w - 1) * RAIL_TILE_W + RAIL_TILE_W / 2);
-        *y = (float)(rp->y + (idx + 1) * RAIL_TILE_H + RAIL_TILE_H / 2);
-        return;
-    }
-
-    idx -= h - 2;
-    if (idx < w) {
-        *x = (float)(rp->x + (w - 1 - idx) * RAIL_TILE_W + RAIL_TILE_W / 2);
-        *y = (float)(rp->y + (h - 1) * RAIL_TILE_H + RAIL_TILE_H / 2);
-        return;
-    }
-
-    idx -= w;
-    *x = (float)(rp->x + RAIL_TILE_W / 2);
-    *y = (float)(rp->y + (h - 2 - idx) * RAIL_TILE_H + RAIL_TILE_H / 2);
-}
-
-/* Return interpolated rail centre position for a placement offset. */
-static void rail_placement_position_at(const RailPlacement *rp, float t,
-                                       float *x, float *y)
-{
-    int count = rail_placement_tile_count(rp);
-
-    if (count <= 0) {
-        *x = (float)rp->x;
-        *y = (float)rp->y;
-        return;
-    }
-
-    if (rp->layout == RAIL_LAYOUT_HORIZ) {
-        *x = (float)rp->x + t * (float)RAIL_TILE_W + (float)RAIL_TILE_W / 2.0f;
-        *y = (float)rp->y + (float)RAIL_TILE_H / 2.0f;
-        return;
-    }
-
-    while (t < 0.0f) t += (float)count;
-    while (t >= (float)count) t -= (float)count;
-
-    int tile = (int)t;
-    int next = (tile + 1) % count;
-    float frac = t - (float)tile;
-    float ax, ay, bx, by;
-
-    rail_rect_tile_position(rp, tile, &ax, &ay);
-    rail_rect_tile_position(rp, next, &bx, &by);
-    *x = ax + (bx - ax) * frac;
-    *y = ay + (by - ay) * frac;
-}
 
 /* ------------------------------------------------------------------ */
 /* Utility: generic array element removal                              */
@@ -320,7 +153,7 @@ static void get_entity_pos(const LevelDef *level, EntityType type, int index,
         int ri = sb->rail_index;
         if (ri >= 0 && ri < level->rail_count) {
             const RailPlacement *rp = &level->rails[ri];
-            rail_placement_position_at(rp, sb->t_offset, x, y);
+            editor_rail_placement_position_at(rp, sb->t_offset, x, y);
             *x -= (float)SPIKE_DISPLAY_W / 2.0f;
             *y -= (float)SPIKE_DISPLAY_H / 2.0f;
         } else {
@@ -880,7 +713,7 @@ static Selection hit_test(const LevelDef *level, float wx, float wy)
         int ri = sb->rail_index;
         if (ri < 0 || ri >= level->rail_count) continue;
         const RailPlacement *rp = &level->rails[ri];
-        rail_placement_position_at(rp, sb->t_offset, &ex, &ey);
+        editor_rail_placement_position_at(rp, sb->t_offset, &ex, &ey);
         ex -= (float)SPIKE_DISPLAY_W / 2.0f;
         ey -= (float)SPIKE_DISPLAY_H / 2.0f;
         ew = SPIKE_DISPLAY_W;

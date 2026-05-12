@@ -7,13 +7,14 @@
         "dev": "astro dev",
         "build": "astro build",
         "preview": "astro preview",
-        "lint": "astro build"
+        "lint": "astro check"
     },
     "dependencies": {
         "@astrojs/sitemap": "^3",
         "astro": "^6"
     },
     "devDependencies": {
+        "@astrojs/check": "^0.9.4",
         "@tailwindcss/vite": "^4",
         "tailwindcss": "^4",
         "typescript": "^6"

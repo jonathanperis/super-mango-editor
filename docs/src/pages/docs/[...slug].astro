@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import '../../styles/docs.css';
-import { SECTION_CATEGORIES, SECTION_ORDER } from './sidebar.config';
+import { SECTION_CATEGORIES, SECTION_ORDER } from '@/lib/docsSidebar';
 
 const SLUG_LABEL: Record<string, string> = {
     home: 'Home',
@@ -44,13 +44,12 @@ for (const cat of SECTION_CATEGORIES) {
 
 const requestedSlug = Astro.params.slug;
 const isRoot = requestedSlug === undefined;
-const requestedKey = requestedSlug === 'index' ? 'home' : (requestedSlug ?? 'home');
+const requestedKey = requestedSlug ?? 'home';
 
 const sectionsToRender = isRoot
     ? SECTION_ORDER
         .map(slug => {
-            const key = slug === 'index' ? 'home' : slug;
-            return { slug, page: pagesBySlug[key] };
+            return { slug, page: pagesBySlug[slug] };
         })
         .filter(s => s.page)
     : (() => {
@@ -128,7 +127,7 @@ const backHomeUrl = base.replace(/\/$/, '') + '/';
     <div class="content-wrapper">
         <main class="content" id="mainContent">
             {sectionsToRender.map(({ slug, page: wikiPage }) => {
-                const sectionId = slug === 'index' ? 'home' : slug;
+                const sectionId = slug;
                 const Content = wikiPage.default ?? wikiPage;
                 return (
                     <section id={sectionId} class="doc-section">
@@ -139,7 +138,7 @@ const backHomeUrl = base.replace(/\/$/, '') + '/';
         </main>
     </div>
 
-    {requestedSlug && <script is:inline define:vars={{ slug: requestedSlug === 'index' ? 'home' : requestedSlug, isRoot: isRoot }}>window.__docsSlug = slug; window.__isRoot = isRoot;</script>}
+    {requestedSlug && <script is:inline define:vars={{ slug: requestedSlug, isRoot: isRoot }}>window.__docsSlug = slug; window.__isRoot = isRoot;</script>}
 
     <script is:inline>
         document.addEventListener('DOMContentLoaded', () => {

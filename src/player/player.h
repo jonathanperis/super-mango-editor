@@ -82,6 +82,9 @@ typedef struct {
 /* Load the player texture and set its initial position. */
 void player_init(Player *player, SDL_Renderer *renderer);
 
+/* Restore tunable movement physics to engine defaults. */
+void player_apply_default_physics(Player *player);
+
 /* Sample keyboard and gamepad every frame and set vx/vy accordingly.
  * ctrl may be NULL when no controller is connected; keyboard still works. */
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
