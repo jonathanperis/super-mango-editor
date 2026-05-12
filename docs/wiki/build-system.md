@@ -176,7 +176,7 @@ Builds and runs native regression harnesses for pure logic that does not require
 make test
 ```
 
-Current test binaries (9):
+Current test binaries (10):
 
 - `out/level-serializer-test`
 - `out/level-validate-test`
@@ -187,6 +187,7 @@ Current test binaries (9):
 - `out/exporter-test`
 - `out/editor-validation-test`
 - `out/gameplay-damage-test`
+- `out/gameplay-config-test`
 
 ### `make validate-levels`
 

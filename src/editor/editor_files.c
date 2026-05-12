@@ -80,7 +80,7 @@ static void editor_replace_texture(SDL_Texture **slot, SDL_Renderer *renderer,
         *slot = NULL;
     }
 
-    if (path && path[0] != '\0') {
+    if (renderer && path && path[0] != '\0') {
         *slot = IMG_LoadTexture(renderer, path);
     }
 }

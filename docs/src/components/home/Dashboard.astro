@@ -7,7 +7,6 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <div class="cabinet-bezel">
             <canvas
                 id="canvas"
-                oncontextmenu="event.preventDefault()"
                 role="application"
                 aria-label="Super Mango game canvas - press Play to start"
             ></canvas>
@@ -162,11 +161,13 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     </div>
 </section>
 
-<script>
+<script is:inline>
     const canvas = document.getElementById('canvas');
     const statusEl = document.getElementById('game-status');
     const playBtn = document.getElementById('play-btn');
     const debugBtn = document.getElementById('debug-btn');
+
+    canvas?.addEventListener('contextmenu', (event) => event.preventDefault());
 
     function startGame(debug) {
         if (!canvas || !statusEl || !playBtn) return;
@@ -214,7 +215,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
             },
         };
 
-        window.Module = Module;
+        window['Module'] = Module;
 
         const script = document.createElement('script');
         script.src = 'super-mango.js';

@@ -41,6 +41,8 @@ void editor_update_window_title(EditorState *es)
 {
     char title[300];
 
+    if (!es || !es->window) return;
+
     if (es->file_path[0] != '\0') {
         snprintf(title, sizeof(title), "Super Mango Editor - %s%s",
                  es->file_path, es->modified ? " *" : "");

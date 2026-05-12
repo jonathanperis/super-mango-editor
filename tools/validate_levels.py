@@ -42,7 +42,7 @@ COUNT_LIMITS = {
     "spike_platforms": "MAX_SPIKE_PLATFORMS",
     "spike_blocks": "MAX_SPIKE_BLOCKS",
     "blue_flames": "MAX_BLUE_FLAMES",
-    "fire_flames": "MAX_BLUE_FLAMES",
+    "fire_flames": "MAX_FIRE_FLAMES",
     "float_platforms": "MAX_FLOAT_PLATFORMS",
     "bridges": "MAX_BRIDGES",
     "bouncepads_small": "MAX_BOUNCEPADS_SMALL",

@@ -5,16 +5,13 @@
 #include "game_camera.h"
 
 #include "../levels/level.h"
+#include "../levels/level_physics.h"
 
 int game_camera_update(GameState *gs, float dt)
 {
     const LevelDef *cam_def = (const LevelDef *)gs->runtime.current_level;
-    float cam_vx_factor = (cam_def && cam_def->physics.cam_lookahead_vx_factor != 0.0f)
-                          ? cam_def->physics.cam_lookahead_vx_factor
-                          : CAM_LOOKAHEAD_VX_FACTOR;
-    float cam_max = (cam_def && cam_def->physics.cam_lookahead_max != 0.0f)
-                    ? cam_def->physics.cam_lookahead_max
-                    : CAM_LOOKAHEAD_MAX;
+    float cam_vx_factor = level_camera_lookahead_vx_factor(cam_def);
+    float cam_max = level_camera_lookahead_max(cam_def);
 
     float lookahead = gs->player.vx * cam_vx_factor;
     if (lookahead >  cam_max) lookahead =  cam_max;

@@ -16,6 +16,7 @@
 /* string.h no longer needed — foreground detection is count-based */
 
 #include "level_loader.h"
+#include "level_physics.h"
 
 /* Include every entity header so we can fill their structs directly. */
 #include "../player/player.h"
@@ -657,28 +658,8 @@ void level_load(GameState *gs, const LevelDef *def)
     gs->score_life_next = gs->rules.score_per_life;
     gs->rules.coin_score      = def->coin_score     > 0 ? def->coin_score      : COIN_SCORE;
 
-    /*
-     * Player physics overrides — apply level-defined values if >= 0,
-     * otherwise the defaults set by player_init (#define macros) remain.
-     *
-     * -1.0 (and any negative value) means "use engine default" — this lets
-     * level designers set a field to 0.0 without it being misread as "unset".
-     *
-     * This lets a level tune movement feel without touching any .c file:
-     * just set the relevant [physics] field in the .toml and reload.
-     */
-#define PHYS_OVERRIDE(field) \
-    if (def->physics.field >= 0.0f) gs->player.field = def->physics.field
-    PHYS_OVERRIDE(walk_max_speed);
-    PHYS_OVERRIDE(run_max_speed);
-    PHYS_OVERRIDE(walk_ground_accel);
-    PHYS_OVERRIDE(run_ground_accel);
-    PHYS_OVERRIDE(ground_friction);
-    PHYS_OVERRIDE(ground_counter_accel);
-    PHYS_OVERRIDE(air_accel_walk);
-    PHYS_OVERRIDE(air_accel_run);
-    PHYS_OVERRIDE(air_friction);
-#undef PHYS_OVERRIDE
+    /* Negative physics values mean engine default; never inherit stale phases. */
+    level_apply_player_physics(&gs->player, def);
 }
 
 /*

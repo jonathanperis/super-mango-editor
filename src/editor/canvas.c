@@ -27,6 +27,7 @@
 #include <string.h>    /* strcmp for platform texture selection          */
 
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, TOOLBAR_H, etc. */
+#include "entity_meta.h" /* Editor display dimensions and rail helpers          */
 #include "../game.h"    /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE,
                            FLOOR_GAP_W, MAX_* constants, GRAVITY            */
 
@@ -35,187 +36,6 @@
 #define EDITOR_WORLD_W(es) \
     (((es)->level.screen_count > 0 ? (es)->level.screen_count : 4) * GAME_W)
 
-/* Entity display dimensions — extracted from game source headers       */
-/* ------------------------------------------------------------------ */
-/*
- * These constants mirror the values defined in each entity's header file.
- * They describe how big entities appear on screen in logical pixels.
- * We duplicate them here (rather than including 20+ headers) to keep the
- * editor's include graph shallow and compilation fast.
- */
-
-/* Spider / Jumping Spider — 64-px frame slot, only rows 22..31 visible */
-#define SPIDER_FRAME_W     64
-#define SPIDER_ART_H       10
-#define SPIDER_ART_Y       22   /* source rect crop y offset within frame */
-
-/* Bird / Faster Bird — 48-px frame slot, only rows 17..30 visible */
-#define BIRD_FRAME_W       48
-#define BIRD_ART_H         14
-#define BIRD_ART_Y         17   /* source rect crop y offset within frame */
-
-/* Fish / Faster Fish — rendered at full 48x48 frame */
-#define FISH_FRAME_W       48
-#define FISH_FRAME_H       48
-
-/* Collectibles — small sprites at logical pixel sizes */
-#define COIN_DISPLAY_W     16
-#define COIN_DISPLAY_H     16
-#define YSTAR_DISPLAY_W    16
-#define YSTAR_DISPLAY_H    16
-#define LSTAR_DISPLAY_W    24
-#define LSTAR_DISPLAY_H    24
-
-/* Axe trap — tall 48x64 frame rendered at pivot point */
-#define AXE_FRAME_W        48
-#define AXE_FRAME_H        64
-
-/* Circular saw — 32x32 display on screen */
-#define SAW_DISPLAY_W      32
-#define SAW_DISPLAY_H      32
-
-/* Spike row — 16x16 tiles lined up horizontally on the floor */
-#define SPIKE_TILE_W       16
-#define SPIKE_TILE_H       16
-
-/* Spike platform — 16-px wide pieces, cropped vertically */
-#define SPIKE_PLAT_PIECE_W 16
-#define SPIKE_PLAT_SRC_Y    5   /* first content row in each piece  */
-#define SPIKE_PLAT_SRC_H   11   /* content height (rows 5-15)       */
-
-/* Spike block — 24x24 display on screen, rides rails */
-#define SPIKE_DISPLAY_W    24
-#define SPIKE_DISPLAY_H    24
-
-/* Floating platform — 16-px wide pieces, 16 px tall */
-#define FPLAT_PIECE_W      16
-#define FPLAT_PIECE_H      16
-
-/* Bridge — 16x16 tiles forming a crumble walkway */
-#define BRIDGE_TILE_W      16
-#define BRIDGE_TILE_H      16
-
-/* Bouncepad — all three variants share the same frame/crop dimensions */
-#define BP_SRC_Y           14   /* first non-transparent row in the frame */
-#define BP_SRC_H           18   /* height of art region (rows 14-31)      */
-#define BP_FRAME_W         48   /* width of one frame slot in the sheet   */
-
-/* Vine — stacked tiles with overlapping vertical step */
-#define VINE_W             16
-#define VINE_SRC_Y          8   /* content starts at row 8                */
-#define VINE_SRC_H         32   /* content height within the tile         */
-#define VINE_H             32   /* display height of one tile segment     */
-#define VINE_STEP          19   /* vertical spacing between stacked tiles */
-
-/* Ladder — tightly stacked tiles */
-#define LADDER_W           16
-#define LADDER_SRC_Y       13   /* content starts at row 13               */
-#define LADDER_SRC_H       22   /* content height within the tile         */
-#define LADDER_H           22   /* display height of one tile segment     */
-#define LADDER_STEP         8   /* tight overlap for seamless stacking    */
-
-/* Rope — stacked tiles with vertical step */
-#define ROPE_SRC_X          0   /* no crop, use full sprite width         */
-#define ROPE_SRC_Y          6   /* 6 px top padding in source             */
-#define ROPE_SRC_W         16   /* source crop width (full sprite)        */
-#define ROPE_SRC_H         36   /* source crop height                     */
-#define ROPE_W             16   /* display width                          */
-#define ROPE_H             36   /* display height of one tile segment     */
-#define ROPE_STEP          23   /* vertical spacing for 13px overlap       */
-
-/* Rail — 16x16 tiles forming a closed or open track path */
-#define RAIL_TILE_W        16
-#define RAIL_TILE_H        16
-
-/* Return tile count for a rail placement path. */
-static int rail_placement_tile_count(const RailPlacement *rp)
-{
-    if (rp->layout == RAIL_LAYOUT_RECT) {
-        return rp->w * 2 + (rp->h - 2) * 2;
-    }
-    return rp->w;
-}
-
-/* Return centre position for one rectangular rail path tile. */
-static void rail_rect_tile_position(const RailPlacement *rp, int idx,
-                                    float *x, float *y)
-{
-    int w = rp->w;
-    int h = rp->h;
-
-    if (idx < w) {
-        *x = (float)(rp->x + idx * RAIL_TILE_W + RAIL_TILE_W / 2);
-        *y = (float)(rp->y + RAIL_TILE_H / 2);
-        return;
-    }
-
-    idx -= w;
-    if (idx < h - 2) {
-        *x = (float)(rp->x + (w - 1) * RAIL_TILE_W + RAIL_TILE_W / 2);
-        *y = (float)(rp->y + (idx + 1) * RAIL_TILE_H + RAIL_TILE_H / 2);
-        return;
-    }
-
-    idx -= h - 2;
-    if (idx < w) {
-        *x = (float)(rp->x + (w - 1 - idx) * RAIL_TILE_W + RAIL_TILE_W / 2);
-        *y = (float)(rp->y + (h - 1) * RAIL_TILE_H + RAIL_TILE_H / 2);
-        return;
-    }
-
-    idx -= w;
-    *x = (float)(rp->x + RAIL_TILE_W / 2);
-    *y = (float)(rp->y + (h - 2 - idx) * RAIL_TILE_H + RAIL_TILE_H / 2);
-}
-
-/* Return interpolated rail centre position for a placement offset. */
-static void rail_placement_position_at(const RailPlacement *rp, float t,
-                                       float *x, float *y)
-{
-    int count = rail_placement_tile_count(rp);
-
-    if (count <= 0) {
-        *x = (float)rp->x;
-        *y = (float)rp->y;
-        return;
-    }
-
-    if (rp->layout == RAIL_LAYOUT_HORIZ) {
-        *x = (float)rp->x + t * (float)RAIL_TILE_W + (float)RAIL_TILE_W / 2.0f;
-        *y = (float)rp->y + (float)RAIL_TILE_H / 2.0f;
-        return;
-    }
-
-    while (t < 0.0f) t += (float)count;
-    while (t >= (float)count) t -= (float)count;
-
-    int tile = (int)t;
-    int next = (tile + 1) % count;
-    float frac = t - (float)tile;
-    float ax, ay, bx, by;
-
-    rail_rect_tile_position(rp, tile, &ax, &ay);
-    rail_rect_tile_position(rp, next, &bx, &by);
-    *x = ax + (bx - ax) * frac;
-    *y = ay + (by - ay) * frac;
-}
-
-/* Blue flame — 48x48 display, erupts from sea gaps */
-#define BLUE_FLAME_W       48
-#define BLUE_FLAME_H       48
-
-/* Fire flame — 48x48 display, erupts from sea gaps (fire variant) */
-#define FIRE_FLAME_W       48
-#define FIRE_FLAME_H       48
-
-/* Player spawn — full 48x48 idle frame */
-#define PLAYER_SPAWN_W     48
-#define PLAYER_SPAWN_H     48
-
-/* Water art strip height — matches water.h constant */
-#define WATER_ART_H        31
-
-/* ------------------------------------------------------------------ */
 /* World-to-screen coordinate transform helpers                        */
 /* ------------------------------------------------------------------ */
 
@@ -1195,7 +1015,7 @@ static void render_spike_blocks(EditorState *es) {
         if (ri < 0 || ri >= es->level.rail_count) continue;
 
         float sx, sy;
-        rail_placement_position_at(&es->level.rails[ri], sb->t_offset, &sx, &sy);
+        editor_rail_placement_position_at(&es->level.rails[ri], sb->t_offset, &sx, &sy);
         sx -= SPIKE_DISPLAY_W / 2.0f;
         sy -= SPIKE_DISPLAY_H / 2.0f;
 
@@ -1513,7 +1333,7 @@ static void render_selection(EditorState *es) {
         int ri = sb->rail_index;
         if (ri < 0 || ri >= es->level.rail_count) return;
         const RailPlacement *rp = &es->level.rails[ri];
-        rail_placement_position_at(rp, sb->t_offset, &wx, &wy);
+        editor_rail_placement_position_at(rp, sb->t_offset, &wx, &wy);
         wx -= (float)SPIKE_DISPLAY_W / 2.0f;
         wy -= (float)SPIKE_DISPLAY_H / 2.0f;
         ww = SPIKE_DISPLAY_W;

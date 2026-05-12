@@ -75,6 +75,7 @@ src/
 ├── levels/
 │   ├── level.h                   Shared level definitions
 │   ├── level_loader.h / .c       TOML level loading and switching
+│   ├── level_physics.h / .c      Level physics override/default helpers
 │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
 │   ├── level_validate.c          LevelDef count validation
 │   └── exported/                 Generated C level exports
@@ -240,14 +241,15 @@ Frees all resources in reverse init order.
 
 ---
 
-## `levels/level.h`, `levels/level_loader.c`, `levels/level_validate.c`
+## `levels/level.h`, `levels/level_loader.c`, `levels/level_physics.c`, `levels/level_validate.c`
 
-**Role:** Level schema, TOML loading, phase switching, and count validation.
+**Role:** Level schema, TOML loading, physics override application, phase switching, and count validation.
 
 **Key functions:**
 - `level_load(GameState *gs, const LevelDef *def)` -- copy a parsed level definition into runtime `GameState`
 - `level_reset(GameState *gs, const LevelDef *def)` -- restore mutable level state after death/retry
 - `level_load_toml(const char *path, LevelDef *def)` -- parse TOML into staging storage, run runtime validation, free TOML data, then assign the validated `LevelDef` to the caller
+- `level_apply_player_physics(Player *player, const LevelDef *def)` -- reset player movement tunables to engine defaults, then apply non-negative level overrides
 - `level_validate_counts(const LevelDef *level, char *err, size_t err_sz)` -- reject out-of-range array counts
 - `phase_has_next`, `phase_next_path`, `phase_resolve_path` -- resolve level-completion next-phase paths
 
@@ -426,6 +428,10 @@ Shared level definitions and constants.
 ### `levels/level_loader.h` / `levels/level_loader.c`
 
 TOML level loading and switching system.
+
+### `levels/level_physics.h` / `levels/level_physics.c`
+
+Shared physics override/default helpers for player movement and camera lookahead.
 
 ### `levels/level_validate.c`
 
