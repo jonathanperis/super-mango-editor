@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Validate TOML level files before runtime.
 
-Checks stay deliberately boring: parse every repo level, verify referenced files
-exist, validate phase links, and enforce the same MAX_* array bounds the C loader
-uses. If this fails in CI, a level is wrong. Fix the level, not the validator.
+Checks stay deliberately boring: parse every repo level, verify referenced assets
+against the repo asset manifest, validate phase links, and enforce the same MAX_*
+array bounds the C loader uses. If this fails in CI, a level is wrong. Fix the
+level, not the validator.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ except ModuleNotFoundError:  # pragma: no cover - CI uses Python 3.11+
 
 ROOT = Path(__file__).resolve().parents[1]
 LEVEL_DIR = ROOT / "levels"
+ASSET_DIR = ROOT / "assets"
 
 COUNT_LIMITS = {
     "floor_gaps": "MAX_FLOOR_GAPS",
@@ -58,6 +60,15 @@ COUNT_LIMITS = {
 
 PATH_KEYS = {"music_path", "floor_tile_path", "tile_path", "path", "next_phase"}
 
+ASSET_PATH_RULES = {
+    "music_path": (("assets/sounds/",), {".wav"}),
+    "floor_tile_path": (("assets/sprites/levels/",), {".png"}),
+    "tile_path": (("assets/sprites/levels/",), {".png"}),
+    "path": (("assets/sprites/",), {".png"}),
+}
+
+ASSET_LITERAL_RE = re.compile(r'"(assets/[^"\n]+\.(?:png|wav|ttf))"')
+
 
 def load_max_constants() -> dict[str, int]:
     constants: dict[str, int] = {}
@@ -80,36 +91,120 @@ def load_level(path: Path) -> dict:
         raise ValueError(f"{path.relative_to(ROOT)}: TOML parse failed: {exc}") from exc
 
 
-def validate_relative_file(level_path: Path, field: str, value: str) -> list[str]:
+def load_asset_manifest() -> set[str]:
+    manifest: set[str] = set()
+
+    for path in ASSET_DIR.rglob("*"):
+        if not path.is_file() or path.name.startswith("."):
+            continue
+        manifest.add(path.relative_to(ROOT).as_posix())
+
+    return manifest
+
+
+def field_leaf(field: str) -> str:
+    return field.rsplit(".", 1)[-1]
+
+
+def validate_safe_repo_path(level_path: Path, field: str, value: str) -> tuple[str | None, list[str]]:
     errors: list[str] = []
     if value == "":
-        return errors
+        return None, errors
+
+    if "\\" in value:
+        errors.append(f"{level_path.relative_to(ROOT)}: {field} must use forward slashes: {value}")
+        return None, errors
 
     candidate = Path(value)
     if candidate.is_absolute() or ".." in candidate.parts:
         errors.append(f"{level_path.relative_to(ROOT)}: {field} must stay inside repo: {value}")
+        return None, errors
+
+    return candidate.as_posix(), errors
+
+
+def validate_asset_reference(
+    level_path: Path,
+    field: str,
+    value: str,
+    asset_manifest: set[str],
+) -> list[str]:
+    repo_path, errors = validate_safe_repo_path(level_path, field, value)
+    if repo_path is None:
         return errors
 
-    full_path = ROOT / candidate
+    leaf = field_leaf(field)
+    rule = ASSET_PATH_RULES.get(leaf)
+    if rule:
+        prefixes, suffixes = rule
+        if not any(repo_path.startswith(prefix) for prefix in prefixes):
+            allowed = " or ".join(prefixes)
+            errors.append(
+                f"{level_path.relative_to(ROOT)}: {field} must live under {allowed}: {value}"
+            )
+        suffix = Path(repo_path).suffix
+        if suffix not in suffixes:
+            allowed = ", ".join(sorted(suffixes))
+            errors.append(
+                f"{level_path.relative_to(ROOT)}: {field} must use {allowed}: {value}"
+            )
+
+    if repo_path not in asset_manifest:
+        errors.append(f"{level_path.relative_to(ROOT)}: {field} not in asset manifest: {value}")
+
+    return errors
+
+
+def validate_phase_reference(level_path: Path, field: str, value: str) -> list[str]:
+    repo_path, errors = validate_safe_repo_path(level_path, field, value)
+    if repo_path is None:
+        return errors
+
+    if not repo_path.startswith("levels/") or Path(repo_path).suffix != ".toml":
+        errors.append(f"{level_path.relative_to(ROOT)}: {field} must reference levels/*.toml: {value}")
+        return errors
+
+    full_path = ROOT / repo_path
     if not full_path.is_file():
         errors.append(f"{level_path.relative_to(ROOT)}: {field} missing file: {value}")
 
     return errors
 
 
-def validate_paths(level_path: Path, value, field_path: str = "") -> list[str]:
+def validate_paths(
+    level_path: Path,
+    value,
+    asset_manifest: set[str],
+    field_path: str = "",
+) -> list[str]:
     errors: list[str] = []
 
     if isinstance(value, dict):
         for key, child in value.items():
             child_path = f"{field_path}.{key}" if field_path else key
             if key in PATH_KEYS and isinstance(child, str):
-                errors.extend(validate_relative_file(level_path, child_path, child))
+                if key == "next_phase":
+                    errors.extend(validate_phase_reference(level_path, child_path, child))
+                else:
+                    errors.extend(validate_asset_reference(level_path, child_path, child, asset_manifest))
             else:
-                errors.extend(validate_paths(level_path, child, child_path))
+                errors.extend(validate_paths(level_path, child, asset_manifest, child_path))
     elif isinstance(value, list):
         for index, child in enumerate(value):
-            errors.extend(validate_paths(level_path, child, f"{field_path}[{index}]"))
+            errors.extend(validate_paths(level_path, child, asset_manifest, f"{field_path}[{index}]"))
+
+    return errors
+
+
+def validate_source_asset_literals(asset_manifest: set[str]) -> list[str]:
+    errors: list[str] = []
+
+    for source_path in sorted((ROOT / "src").rglob("*.[ch]")):
+        rel_source = source_path.relative_to(ROOT)
+        for line_no, line in enumerate(source_path.read_text(encoding="utf-8").splitlines(), 1):
+            for value in ASSET_LITERAL_RE.findall(line):
+                if value not in asset_manifest:
+                    errors.append(f"{rel_source}:{line_no}: asset literal not in manifest: {value}")
 
     return errors
 
@@ -242,7 +337,7 @@ def validate_nested_dimensions(level_path: Path, data: dict, constants: dict[str
     return errors
 
 
-def validate_level(level_path: Path, constants: dict[str, int]) -> list[str]:
+def validate_level(level_path: Path, constants: dict[str, int], asset_manifest: set[str]) -> list[str]:
     errors: list[str] = []
     data = load_level(level_path)
 
@@ -250,7 +345,7 @@ def validate_level(level_path: Path, constants: dict[str, int]) -> list[str]:
     if isinstance(screen_count, bool) or not isinstance(screen_count, int) or screen_count <= 0:
         errors.append(f"{level_path.relative_to(ROOT)}: screen_count must be a positive integer")
 
-    errors.extend(validate_paths(level_path, data))
+    errors.extend(validate_paths(level_path, data, asset_manifest))
     errors.extend(validate_counts(level_path, data, constants))
     errors.extend(validate_rail_geometry(level_path, data, constants))
     errors.extend(validate_rail_links(level_path, data))
@@ -261,25 +356,31 @@ def validate_level(level_path: Path, constants: dict[str, int]) -> list[str]:
 
 def main() -> int:
     constants = load_max_constants()
+    asset_manifest = load_asset_manifest()
     level_paths = sorted(LEVEL_DIR.glob("*.toml"))
 
     if not level_paths:
         sys.stderr.write("validate_levels: no levels/*.toml files found\n")
         return 1
+    if not asset_manifest:
+        sys.stderr.write("validate_levels: no assets found\n")
+        return 1
 
     errors: list[str] = []
     for level_path in level_paths:
         try:
-            errors.extend(validate_level(level_path, constants))
+            errors.extend(validate_level(level_path, constants, asset_manifest))
         except ValueError as exc:
             errors.append(str(exc))
+
+    errors.extend(validate_source_asset_literals(asset_manifest))
 
     if errors:
         for error in errors:
             sys.stderr.write(f"validate_levels: {error}\n")
         return 1
 
-    print(f"validate_levels: ok ({len(level_paths)} levels)")
+    print(f"validate_levels: ok ({len(level_paths)} levels, {len(asset_manifest)} assets)")
     return 0
 
 

@@ -103,7 +103,7 @@ int editor_init(EditorState *es) {
     /*
      * TTF_OpenFont — load a TrueType font file for text rendering.
      *
-     * "assets/round9x13.ttf" is the same monospaced pixel font the game's
+     * "assets/fonts/round9x13.ttf" is the same monospaced pixel font the game's
      * debug overlay uses.  Size 13 gives clear, compact text at 1x scale.
      *
      * Font loading is fatal because the editor is unusable without text —
