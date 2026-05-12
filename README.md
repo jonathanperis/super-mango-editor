@@ -137,7 +137,7 @@ make run-level LEVEL=levels/00_sandbox_01.toml         # run a specific TOML lev
 make run-level-debug LEVEL=levels/00_sandbox_01.toml   # run a level with debug overlay
 make editor                           # build the level editor
 make run-editor                       # build and run the level editor
-make test                             # build and run 8 native regression tests
+make test                             # build and run 10 native regression tests
 make validate-levels                  # validate all levels/*.toml files
 make web                              # build to WebAssembly (requires Emscripten)
 make clean                            # remove all build artifacts
@@ -154,7 +154,7 @@ super-mango-editor/
 │   ├── 00_sandbox_01.toml           Level data loaded at runtime
 │   ├── 01_lugio_01.toml             Level data loaded at runtime
 │   └── 02_lugio_02.toml             Level data loaded at runtime
-├── src/                              57 C source files + 57 headers
+├── src/                              C source files and headers
 │   ├── main.c                        Entry point: SDL init/teardown
 │   ├── game.h / game.c               GameState struct, window, renderer, game loop
 │   ├── collectibles/                  Pickup items
@@ -202,6 +202,7 @@ super-mango-editor/
 │   ├── levels/                        Level system
 │   │   ├── level.h                    Shared level definitions (LevelDef struct)
 │   │   ├── level_loader.h / .c       TOML level loading and switching
+│   │   ├── level_physics.h / .c      Level physics override/default helpers
 │   │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
 │   │   ├── level_validate.c          LevelDef count validation
 │   │   └── exported/                  Auto-generated C level data

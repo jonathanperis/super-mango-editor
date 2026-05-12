@@ -26,6 +26,7 @@ CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(shell $(SDL2CFG) --cflags)
 TEST_CFLAGS = $(filter-out -Dmain=SDL_main,$(CFLAGS)) -DSDL_MAIN_HANDLED
 LIBS    = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
 OUTDIR  = out
+OBJDIR  = $(OUTDIR)/obj
 TARGET  = $(OUTDIR)/super-mango
 SRCDIR  = src
 SRCS    = $(wildcard $(SRCDIR)/*.c) \
@@ -58,7 +59,7 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(SRCDIR)/editor/serializer_save.c \
           $(SRCDIR)/editor/serializer_types.c \
           vendor/tomlc17/tomlc17.c
-OBJS    = $(SRCS:.c=.o)
+OBJS    = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
 DEPS    = $(OBJS:.o=.d)
 
 # ── Editor (standalone level editor) ─────────────────────────────────
@@ -66,7 +67,7 @@ EDITOR_DIR    = src/editor
 VENDOR_DIR    = vendor/tomlc17
 EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(VENDOR_DIR)/tomlc17.c \
                 src/surfaces/rail.c src/levels/level_validate.c
-EDITOR_OBJS   = $(EDITOR_SRCS:.c=.o)
+EDITOR_OBJS   = $(patsubst %.c,$(OBJDIR)/%.o,$(EDITOR_SRCS))
 EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor
 EDITOR_LIBS   = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lm
@@ -74,37 +75,44 @@ TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
                  $(OUTDIR)/rail-test $(OUTDIR)/entity-utils-test \
                  $(OUTDIR)/collision-test $(OUTDIR)/phase-transition-test \
                  $(OUTDIR)/exporter-test $(OUTDIR)/editor-validation-test \
-                 $(OUTDIR)/gameplay-damage-test
+                 $(OUTDIR)/gameplay-damage-test $(OUTDIR)/gameplay-config-test
 SMOKE_LEVELS  = $(wildcard levels/*.toml)
 SMOKE_FRAMES  ?= 5
 SMOKE_SEED    ?= 1
-TEST_SERIALIZER_OBJ = $(OUTDIR)/test-serializer.o
-TEST_SERIALIZER_EMIT_OBJ = $(OUTDIR)/test-serializer-emit.o
-TEST_SERIALIZER_IO_OBJ = $(OUTDIR)/test-serializer-io.o
-TEST_SERIALIZER_LOAD_OBJ = $(OUTDIR)/test-serializer-load.o
-TEST_SERIALIZER_LOAD_CLIMBABLES_OBJ = $(OUTDIR)/test-serializer-load-climbables.o
-TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ = $(OUTDIR)/test-serializer-load-collectibles.o
-TEST_SERIALIZER_LOAD_CONFIG_OBJ = $(OUTDIR)/test-serializer-load-config.o
-TEST_SERIALIZER_LOAD_ENEMIES_OBJ = $(OUTDIR)/test-serializer-load-enemies.o
-TEST_SERIALIZER_LOAD_GEOMETRY_OBJ = $(OUTDIR)/test-serializer-load-geometry.o
-TEST_SERIALIZER_LOAD_HAZARDS_OBJ = $(OUTDIR)/test-serializer-load-hazards.o
-TEST_SERIALIZER_LOAD_HEADER_OBJ = $(OUTDIR)/test-serializer-load-header.o
-TEST_SERIALIZER_LOAD_LAYERS_OBJ = $(OUTDIR)/test-serializer-load-layers.o
-TEST_SERIALIZER_LOAD_SURFACES_OBJ = $(OUTDIR)/test-serializer-load-surfaces.o
-TEST_SERIALIZER_PARSE_OBJ = $(OUTDIR)/test-serializer-parse.o
-TEST_SERIALIZER_SAVE_OBJ = $(OUTDIR)/test-serializer-save.o
-TEST_SERIALIZER_TYPES_OBJ = $(OUTDIR)/test-serializer-types.o
-TEST_EXPORTER_OBJ   = $(OUTDIR)/test-exporter.o
-TEST_VALIDATE_OBJ   = $(OUTDIR)/test-level-validate.o
-TEST_TOMLC_OBJ      = $(OUTDIR)/test-tomlc17.o
-TEST_RAIL_OBJ       = $(OUTDIR)/test-rail.o
-TEST_ENTITY_UTILS_OBJ = $(OUTDIR)/test-entity-utils.o
-TEST_SPIKE_PLATFORM_OBJ = $(OUTDIR)/test-spike-platform.o
-TEST_FISH_OBJ      = $(OUTDIR)/test-fish.o
-TEST_CIRCULAR_SAW_OBJ = $(OUTDIR)/test-circular-saw.o
-TEST_COLLISION_DAMAGE_OBJ = $(OUTDIR)/test-collision-damage.o
-TEST_PHASE_OBJ      = $(OUTDIR)/test-phase-transition.o
-TEST_EDITOR_VALIDATION_OBJ = $(OUTDIR)/test-editor-validation.o
+TEST_SERIALIZER_OBJ = $(OBJDIR)/tests/test-serializer.o
+TEST_SERIALIZER_EMIT_OBJ = $(OBJDIR)/tests/test-serializer-emit.o
+TEST_SERIALIZER_IO_OBJ = $(OBJDIR)/tests/test-serializer-io.o
+TEST_SERIALIZER_LOAD_OBJ = $(OBJDIR)/tests/test-serializer-load.o
+TEST_SERIALIZER_LOAD_CLIMBABLES_OBJ = $(OBJDIR)/tests/test-serializer-load-climbables.o
+TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ = $(OBJDIR)/tests/test-serializer-load-collectibles.o
+TEST_SERIALIZER_LOAD_CONFIG_OBJ = $(OBJDIR)/tests/test-serializer-load-config.o
+TEST_SERIALIZER_LOAD_ENEMIES_OBJ = $(OBJDIR)/tests/test-serializer-load-enemies.o
+TEST_SERIALIZER_LOAD_GEOMETRY_OBJ = $(OBJDIR)/tests/test-serializer-load-geometry.o
+TEST_SERIALIZER_LOAD_HAZARDS_OBJ = $(OBJDIR)/tests/test-serializer-load-hazards.o
+TEST_SERIALIZER_LOAD_HEADER_OBJ = $(OBJDIR)/tests/test-serializer-load-header.o
+TEST_SERIALIZER_LOAD_LAYERS_OBJ = $(OBJDIR)/tests/test-serializer-load-layers.o
+TEST_SERIALIZER_LOAD_SURFACES_OBJ = $(OBJDIR)/tests/test-serializer-load-surfaces.o
+TEST_SERIALIZER_PARSE_OBJ = $(OBJDIR)/tests/test-serializer-parse.o
+TEST_SERIALIZER_SAVE_OBJ = $(OBJDIR)/tests/test-serializer-save.o
+TEST_SERIALIZER_TYPES_OBJ = $(OBJDIR)/tests/test-serializer-types.o
+TEST_EXPORTER_OBJ   = $(OBJDIR)/tests/test-exporter.o
+TEST_VALIDATE_OBJ   = $(OBJDIR)/tests/test-level-validate.o
+TEST_TOMLC_OBJ      = $(OBJDIR)/tests/test-tomlc17.o
+TEST_RAIL_OBJ       = $(OBJDIR)/tests/test-rail.o
+TEST_ENTITY_UTILS_OBJ = $(OBJDIR)/tests/test-entity-utils.o
+TEST_SPIKE_PLATFORM_OBJ = $(OBJDIR)/tests/test-spike-platform.o
+TEST_FISH_OBJ      = $(OBJDIR)/tests/test-fish.o
+TEST_CIRCULAR_SAW_OBJ = $(OBJDIR)/tests/test-circular-saw.o
+TEST_COLLISION_DAMAGE_OBJ = $(OBJDIR)/tests/test-collision-damage.o
+TEST_GAME_CAMERA_OBJ = $(OBJDIR)/tests/test-game-camera.o
+TEST_LEVEL_PHYSICS_OBJ = $(OBJDIR)/tests/test-level-physics.o
+TEST_PLAYER_LIFECYCLE_OBJ = $(OBJDIR)/tests/test-player-lifecycle.o
+TEST_PHASE_OBJ      = $(OBJDIR)/tests/test-phase-transition.o
+TEST_EDITOR_VALIDATION_OBJ = $(OBJDIR)/tests/test-editor-validation.o
+TEST_EDITOR_FILES_OBJ = $(OBJDIR)/tests/test-editor-files.o
+TEST_EDITOR_SESSION_OBJ = $(OBJDIR)/tests/test-editor-session.o
+TEST_FILE_DIALOG_OBJ = $(OBJDIR)/tests/test-file-dialog.o
+TEST_UNDO_OBJ      = $(OBJDIR)/tests/test-undo.o
 TEST_LIBS           = $(shell $(SDL2CFG) --libs) -lm
 SANITIZE_CFLAGS     = -fsanitize=address,undefined -fno-omit-frame-pointer
 SANITIZE_LDFLAGS    = -fsanitize=address,undefined
@@ -114,53 +122,18 @@ SANITIZE_LDFLAGS    = -fsanitize=address,undefined
 all: $(OUTDIR) $(TARGET)
 
 $(OUTDIR):
-	mkdir -p $(OUTDIR)
+	mkdir -p $(OUTDIR) $(OBJDIR) $(OBJDIR)/tests
 
-$(TARGET): $(OBJS)
+$(TARGET): $(OBJS) | $(OUTDIR)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 ifeq ($(OS),Windows_NT)
 else ifeq ($(shell uname -s),Darwin)
 	codesign --force --sign - $@
 endif
 
-$(SRCDIR)/%.o: $(SRCDIR)/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
-
-$(SRCDIR)/collectibles/%.o: $(SRCDIR)/collectibles/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
-
-$(SRCDIR)/collision/%.o: $(SRCDIR)/collision/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
-
-$(SRCDIR)/core/%.o: $(SRCDIR)/core/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
-
-$(SRCDIR)/effects/%.o: $(SRCDIR)/effects/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
-
-$(SRCDIR)/entities/%.o: $(SRCDIR)/entities/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
-
-$(SRCDIR)/hazards/%.o: $(SRCDIR)/hazards/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
-
-$(SRCDIR)/input/%.o: $(SRCDIR)/input/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
-
-$(SRCDIR)/levels/%.o: $(SRCDIR)/levels/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
-
-$(SRCDIR)/player/%.o: $(SRCDIR)/player/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
-
-$(SRCDIR)/render/%.o: $(SRCDIR)/render/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
-
-$(SRCDIR)/screens/%.o: $(SRCDIR)/screens/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
-
-$(SRCDIR)/surfaces/%.o: $(SRCDIR)/surfaces/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -MMD -MP -c -o $@ $<
+$(OBJDIR)/$(SRCDIR)/%.o: $(SRCDIR)/%.c | $(OUTDIR)
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
 -include $(DEPS)
 
@@ -189,17 +162,15 @@ run-level-debug: all
 # ── Editor targets ───────────────────────────────────────────────────
 editor: $(OUTDIR) $(EDITOR_TARGET)
 
-$(EDITOR_TARGET): $(EDITOR_OBJS)
+$(EDITOR_TARGET): $(EDITOR_OBJS) | $(OUTDIR)
 	$(CC) $(CFLAGS) -o $@ $^ $(EDITOR_LIBS)
 ifeq ($(OS),Windows_NT)
 else ifeq ($(shell uname -s),Darwin)
 	codesign --force --sign - $@
 endif
 
-$(EDITOR_DIR)/%.o: $(EDITOR_DIR)/%.c
-	$(CC) $(CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(VENDOR_DIR)/%.o: $(VENDOR_DIR)/%.c
+$(OBJDIR)/$(VENDOR_DIR)/%.o: $(VENDOR_DIR)/%.c | $(OUTDIR)
+	@mkdir -p $(@D)
 	$(CC) -std=c11 -MMD -MP -c -o $@ $<
 
 run-editor: editor
@@ -218,6 +189,9 @@ test: $(OUTDIR) $(TEST_TARGETS)
 	$(RUN_PREFIX) ./$(OUTDIR)/exporter-test
 	$(RUN_PREFIX) ./$(OUTDIR)/editor-validation-test
 	$(RUN_PREFIX) ./$(OUTDIR)/gameplay-damage-test
+	$(RUN_PREFIX) ./$(OUTDIR)/gameplay-config-test
+
+$(TEST_TARGETS): | $(OUTDIR)
 
 validate-levels:
 	python3 tools/validate_levels.py
@@ -309,10 +283,31 @@ $(TEST_CIRCULAR_SAW_OBJ): $(SRCDIR)/hazards/circular_saw.c
 $(TEST_COLLISION_DAMAGE_OBJ): $(SRCDIR)/collision/collision_damage.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
+$(TEST_GAME_CAMERA_OBJ): $(SRCDIR)/core/game_camera.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_LEVEL_PHYSICS_OBJ): $(SRCDIR)/levels/level_physics.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_PLAYER_LIFECYCLE_OBJ): $(SRCDIR)/player/player_lifecycle.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
 $(TEST_PHASE_OBJ): $(SRCDIR)/levels/phase_transition.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
 $(TEST_EDITOR_VALIDATION_OBJ): $(EDITOR_DIR)/editor_validation.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_EDITOR_FILES_OBJ): $(EDITOR_DIR)/editor_files.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_EDITOR_SESSION_OBJ): $(EDITOR_DIR)/editor_session.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_FILE_DIALOG_OBJ): $(EDITOR_DIR)/file_dialog.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_UNDO_OBJ): $(EDITOR_DIR)/undo.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
 $(TEST_TOMLC_OBJ): $(VENDOR_DIR)/tomlc17.c
@@ -340,10 +335,13 @@ $(OUTDIR)/phase-transition-test: tests/phase_transition_test.c $(TEST_PHASE_OBJ)
 $(OUTDIR)/exporter-test: tests/exporter_test.c $(TEST_EXPORTER_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
 
-$(OUTDIR)/editor-validation-test: tests/editor_validation_test.c $(TEST_EDITOR_VALIDATION_OBJ) $(TEST_VALIDATE_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
+$(OUTDIR)/editor-validation-test: tests/editor_validation_test.c $(TEST_EDITOR_VALIDATION_OBJ) $(TEST_EDITOR_FILES_OBJ) $(TEST_EDITOR_SESSION_OBJ) $(TEST_FILE_DIALOG_OBJ) $(TEST_UNDO_OBJ) $(TEST_SERIALIZER_OBJ) $(TEST_SERIALIZER_EMIT_OBJ) $(TEST_SERIALIZER_IO_OBJ) $(TEST_SERIALIZER_LOAD_OBJ) $(TEST_SERIALIZER_LOAD_CLIMBABLES_OBJ) $(TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ) $(TEST_SERIALIZER_LOAD_CONFIG_OBJ) $(TEST_SERIALIZER_LOAD_ENEMIES_OBJ) $(TEST_SERIALIZER_LOAD_GEOMETRY_OBJ) $(TEST_SERIALIZER_LOAD_HAZARDS_OBJ) $(TEST_SERIALIZER_LOAD_HEADER_OBJ) $(TEST_SERIALIZER_LOAD_LAYERS_OBJ) $(TEST_SERIALIZER_LOAD_SURFACES_OBJ) $(TEST_SERIALIZER_PARSE_OBJ) $(TEST_SERIALIZER_SAVE_OBJ) $(TEST_SERIALIZER_TYPES_OBJ) $(TEST_EXPORTER_OBJ) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(EDITOR_LIBS)
 
 $(OUTDIR)/gameplay-damage-test: tests/gameplay_damage_test.c $(TEST_COLLISION_DAMAGE_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
+
+$(OUTDIR)/gameplay-config-test: tests/gameplay_config_test.c $(TEST_GAME_CAMERA_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
 
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────

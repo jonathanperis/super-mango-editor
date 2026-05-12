@@ -19,7 +19,7 @@ A 2D pixel art platformer written in C11 + SDL2, designed as a learning resource
 - Start menu, HUD, lives system, debug overlay, keyboard/gamepad hot-plug support
 - Builds natively on macOS, Linux, Windows, plus WebAssembly via Emscripten
 - Standalone SDL2 level editor is shipped with TOML save/load, exporter, validation blocking, playtest, recent files, autosave, and smoke-test mode
-- CI runs native builds, editor builds, 8-test suite, level validation, native smoke, WebAssembly artifact smoke, docs lint/build, and CodeQL
+- CI runs native builds, editor builds, 10-test suite, level validation, native smoke, WebAssembly artifact smoke, docs lint/build, and CodeQL
 
 ## Next Milestone
 

@@ -45,6 +45,21 @@
 #define AIR_ACCEL_RUN          180.0f   /* px/s² */
 #define AIR_FRICTION            80.0f   /* px/s² */
 
+void player_apply_default_physics(Player *player)
+{
+    if (!player) return;
+
+    player->walk_max_speed       = WALK_MAX_SPEED;
+    player->run_max_speed        = RUN_MAX_SPEED;
+    player->walk_ground_accel    = WALK_GROUND_ACCEL;
+    player->run_ground_accel     = RUN_GROUND_ACCEL;
+    player->ground_friction      = GROUND_FRICTION;
+    player->ground_counter_accel = GROUND_COUNTER_ACCEL;
+    player->air_accel_walk       = AIR_ACCEL_WALK;
+    player->air_accel_run        = AIR_ACCEL_RUN;
+    player->air_friction         = AIR_FRICTION;
+}
+
 /*
  * player_init — Load the sprite and place the player in the center of the window.
  */
@@ -120,15 +135,7 @@ void player_init(Player *player, SDL_Renderer *renderer)
      * level_load may override these after player_init if the LevelDef
      * specifies non-zero physics values for finetuning per level.
      */
-    player->walk_max_speed       = WALK_MAX_SPEED;
-    player->run_max_speed        = RUN_MAX_SPEED;
-    player->walk_ground_accel    = WALK_GROUND_ACCEL;
-    player->run_ground_accel     = RUN_GROUND_ACCEL;
-    player->ground_friction      = GROUND_FRICTION;
-    player->ground_counter_accel = GROUND_COUNTER_ACCEL;
-    player->air_accel_walk       = AIR_ACCEL_WALK;
-    player->air_accel_run        = AIR_ACCEL_RUN;
-    player->air_friction         = AIR_FRICTION;
+    player_apply_default_physics(player);
 
     /* Not hurt at startup; timer counts down to 0 during invincibility */
     player->hurt_timer = 0.0f;
