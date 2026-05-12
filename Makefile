@@ -72,6 +72,7 @@ EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor
 EDITOR_LIBS   = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lm
 TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
+                 $(OUTDIR)/runtime-load-test \
                  $(OUTDIR)/rail-test $(OUTDIR)/entity-utils-test \
                  $(OUTDIR)/collision-test $(OUTDIR)/phase-transition-test \
                  $(OUTDIR)/exporter-test $(OUTDIR)/editor-validation-test \
@@ -97,9 +98,11 @@ TEST_SERIALIZER_SAVE_OBJ = $(OBJDIR)/tests/test-serializer-save.o
 TEST_SERIALIZER_TYPES_OBJ = $(OBJDIR)/tests/test-serializer-types.o
 TEST_EXPORTER_OBJ   = $(OBJDIR)/tests/test-exporter.o
 TEST_VALIDATE_OBJ   = $(OBJDIR)/tests/test-level-validate.o
+TEST_LEVEL_LOADER_OBJ = $(OBJDIR)/tests/test-level-loader.o
 TEST_TOMLC_OBJ      = $(OBJDIR)/tests/test-tomlc17.o
 TEST_RAIL_OBJ       = $(OBJDIR)/tests/test-rail.o
 TEST_ENTITY_UTILS_OBJ = $(OBJDIR)/tests/test-entity-utils.o
+TEST_SPIKE_BLOCK_OBJ = $(OBJDIR)/tests/test-spike-block.o
 TEST_SPIKE_PLATFORM_OBJ = $(OBJDIR)/tests/test-spike-platform.o
 TEST_FISH_OBJ      = $(OBJDIR)/tests/test-fish.o
 TEST_CIRCULAR_SAW_OBJ = $(OBJDIR)/tests/test-circular-saw.o
@@ -107,6 +110,8 @@ TEST_COLLISION_DAMAGE_OBJ = $(OBJDIR)/tests/test-collision-damage.o
 TEST_GAME_CAMERA_OBJ = $(OBJDIR)/tests/test-game-camera.o
 TEST_LEVEL_PHYSICS_OBJ = $(OBJDIR)/tests/test-level-physics.o
 TEST_PLAYER_LIFECYCLE_OBJ = $(OBJDIR)/tests/test-player-lifecycle.o
+TEST_FLOAT_PLATFORM_OBJ = $(OBJDIR)/tests/test-float-platform.o
+TEST_BOUNCEPAD_OBJ = $(OBJDIR)/tests/test-bouncepad.o
 TEST_PHASE_OBJ      = $(OBJDIR)/tests/test-phase-transition.o
 TEST_EDITOR_VALIDATION_OBJ = $(OBJDIR)/tests/test-editor-validation.o
 TEST_EDITOR_FILES_OBJ = $(OBJDIR)/tests/test-editor-files.o
@@ -182,6 +187,7 @@ run-editor: editor
 test: $(OUTDIR) $(TEST_TARGETS)
 	$(RUN_PREFIX) ./$(OUTDIR)/level-serializer-test
 	$(RUN_PREFIX) ./$(OUTDIR)/level-validate-test
+	$(RUN_PREFIX) ./$(OUTDIR)/runtime-load-test
 	$(RUN_PREFIX) ./$(OUTDIR)/rail-test
 	$(RUN_PREFIX) ./$(OUTDIR)/entity-utils-test
 	$(RUN_PREFIX) ./$(OUTDIR)/collision-test
@@ -265,10 +271,16 @@ $(TEST_EXPORTER_OBJ): $(EDITOR_DIR)/exporter.c
 $(TEST_VALIDATE_OBJ): $(SRCDIR)/levels/level_validate.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
+$(TEST_LEVEL_LOADER_OBJ): $(SRCDIR)/levels/level_loader.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
 $(TEST_RAIL_OBJ): $(SRCDIR)/surfaces/rail.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
 $(TEST_ENTITY_UTILS_OBJ): $(SRCDIR)/core/entity_utils.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_SPIKE_BLOCK_OBJ): $(SRCDIR)/hazards/spike_block.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
 $(TEST_SPIKE_PLATFORM_OBJ): $(SRCDIR)/hazards/spike_platform.c
@@ -290,6 +302,12 @@ $(TEST_LEVEL_PHYSICS_OBJ): $(SRCDIR)/levels/level_physics.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
 $(TEST_PLAYER_LIFECYCLE_OBJ): $(SRCDIR)/player/player_lifecycle.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_FLOAT_PLATFORM_OBJ): $(SRCDIR)/surfaces/float_platform.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_BOUNCEPAD_OBJ): $(SRCDIR)/surfaces/bouncepad.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
 $(TEST_PHASE_OBJ): $(SRCDIR)/levels/phase_transition.c
@@ -318,6 +336,12 @@ $(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER
 
 $(OUTDIR)/level-validate-test: tests/level_validate_test.c $(TEST_VALIDATE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
+
+$(OUTDIR)/runtime-load-test: tests/runtime_load_test.c $(TEST_LEVEL_LOADER_OBJ) \
+		$(TEST_VALIDATE_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_RAIL_OBJ) \
+		$(TEST_SPIKE_BLOCK_OBJ) $(TEST_FLOAT_PLATFORM_OBJ) \
+		$(TEST_BOUNCEPAD_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
 
 $(OUTDIR)/rail-test: tests/rail_test.c $(TEST_RAIL_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
