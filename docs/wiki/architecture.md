@@ -39,7 +39,7 @@ main()
   │     │
   │     │   ── Initialise game objects ──
   │     ├── player_init(&gs.player, gs.renderer)
-  │     ├── fog_init(&gs.fog, gs.renderer)         (fog_background_1.png, fog_background_2.png)
+  │     ├── fog_init(&gs.fog, gs.renderer)         (level fog layers, e.g. fog_1.png/fog_2.png)
   │     ├── hud_init(&gs.hud, gs.renderer)
   │     ├── if (debug_mode) debug_init(&gs.debug)
   │     ├── level_load_toml(level_path, &def)       (staged TOML parse → runtime validation → cleanup → caller assignment)
@@ -125,7 +125,7 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 
 | Layer | What | How |
 |-------|------|-----|
-| 1 | Background | 7 layers from `assets/` (parallax_sky.png, parallax_clouds_bg.png, parallax_glacial_mountains.png, parallax_clouds_mg_1/2/3.png, parallax_cloud_lonely.png) tiled horizontally, each scrolling at a different speed fraction of `cam_x` |
+| 1 | Background | Per-level `background_layers` from `assets/sprites/backgrounds/`, tiled horizontally with each layer's configured scroll speed |
 | 2 | Platforms | active level platform tile, 9-slice tiled pillar stacks (drawn before floor so pillars sink into ground) |
 | 3 | Floor | active level floor tile tiled across world width at `FLOOR_Y`, with floor-gap openings |
 | 4 | Float platforms | `float_platform.png` 3-slice hovering surfaces (static, crumble, rail modes) |
@@ -154,7 +154,7 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 | 27 | Birds | `bird.png` slow sine-wave sky patrol enemies |
 | 28 | Faster birds | `faster_bird.png` fast aggressive sky patrol enemies |
 | 29 | Player | Animated sprite sheet, drawn on top of environment |
-| 30 | Fog | `fog_background_1.png` / `fog_background_2.png` semi-transparent sliding overlay |
+| 30 | Fog | Per-level `fog_layers` from `assets/sprites/foregrounds/` (for example `fog_1.png`, `fog_2.png`, `fog_fire_1.png`, `fog_fire_2.png`, `smoke.png`) |
 | 31 | HUD | `hud_render`: hearts, lives, score -- always drawn on top |
 | 32 | Debug | `debug_render`: FPS counter, collision boxes, event log — when `--debug` active |
 

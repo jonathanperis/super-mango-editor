@@ -137,7 +137,7 @@ make run-level LEVEL=levels/00_sandbox_01.toml         # run a specific TOML lev
 make run-level-debug LEVEL=levels/00_sandbox_01.toml   # run a level with debug overlay
 make editor                           # build the level editor
 make run-editor                       # build and run the level editor
-make test                             # build and run 10 native regression tests
+make test                             # build and run 11 native regression tests
 make validate-levels                  # validate all levels/*.toml files
 make web                              # build to WebAssembly (requires Emscripten)
 make clean                            # remove all build artifacts
@@ -251,7 +251,7 @@ super-mango-editor/
 ├── docs/                              Astro GitHub Pages documentation site
 ├── web/                               Emscripten shell template
 └── .github/workflows/                 CI/CD pipelines
-    ├── build.yml                      Build check (PRs) + release + Pages deploy (main)
+    ├── build.yml                      Build check (PRs) + release creation (main)
     ├── codeql.yml                     Code security analysis
     ├── docs.yml                       Docs lint/build checks
     └── deploy.yml                     GitHub Pages deployment
@@ -268,7 +268,7 @@ Four GitHub Actions workflows:
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly | Automated code security and quality analysis |
 | Deploy Pages | `deploy.yml` | Successful main Build & Release workflow | Builds docs, copies WebAssembly artifacts, and deploys GitHub Pages |
 
-The Build & Release workflow runs `make`, `make test`, `make validate-levels`, `make editor`, native smoke tests for the game/editor, WebAssembly build, and WebAssembly artifact checks. The Docs workflow runs `bun run lint` and `bun run build` for PRs touching `docs/`. The Deploy Pages workflow publishes the Astro docs output plus WebAssembly artifacts to GitHub Pages.
+The Build & Release workflow runs `make`, `make test`, `make validate-levels`, `make editor`, native smoke tests for the game/editor, WebAssembly build, WebAssembly artifact checks, and release creation on `main`. The Docs workflow runs `bun run lint` and `bun run build` for PRs touching `docs/`. The Deploy Pages workflow publishes the Astro docs output plus WebAssembly artifacts to GitHub Pages.
 
 ## License
 

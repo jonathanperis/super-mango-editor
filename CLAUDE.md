@@ -163,7 +163,7 @@ main()
 - Level-completion summary captures elapsed time and coin totals; Enter/Start continues to `next_phase` when configured
 - Keyboard and gamepad (hot-plug) controls
 - Debug overlay (`--debug`): FPS/CPU counters, hitbox visualization, scrolling event log
-- CI gates: multi-platform builds, editor native build, 10-test `make test` suite, TOML level validation, native game/editor smoke, WebAssembly artifact smoke, docs lint/build
+- CI gates: multi-platform builds, editor native build, 11-test `make test` suite, TOML level validation, native game/editor smoke, WebAssembly artifact smoke, docs lint/build
 - Builds natively on macOS, Linux, Windows; WebAssembly via Emscripten
 
 ---

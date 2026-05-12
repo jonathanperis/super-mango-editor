@@ -10,7 +10,7 @@
 src/
 ├── main.c                        Entry point -- SDL subsystem lifecycle
 ├── game.h                        Shared constants + GameState struct (included everywhere)
-├── game.c                        Window, renderer, textures, sounds, game loop
+├── game.c                        Thin public wrapper that includes split core implementation
 ├── collectibles/
 │   ├── coin.h / .c               Coin collectible: placement, AABB collection, render
 │   ├── star_yellow.h / .c        Yellow star health pickup
@@ -21,18 +21,45 @@ src/
 │   ├── collision_damage.h / .c   Damage checks against hazards and enemies
 │   └── game_collision.h / .c     Gameplay collision passes and pickups
 ├── core/
-│   ├── debug.h / .c              Debug overlay: FPS counter, collision hitboxes, event log
+│   ├── debug.h / .c              Debug overlay: FPS/CPU/memory, hitboxes, event log
 │   ├── entity_utils.h / .c       Shared entity helper functions
-│   └── game_state.h / .c         GameState reset helpers
+│   ├── game_state.h / .c         GameState reset helpers
+│   ├── game_window.h / .c        Window/renderer setup helpers
+│   ├── game_timing.h / .c        Frame timing helpers
+│   ├── game_lifecycle.c          `game_init` / `game_cleanup` implementation
+│   ├── game_loop.c               Main native/WASM frame loop
+│   ├── game_update.h / .c        Top-level update orchestration
+│   ├── game_player_step.h / .c   Player update/collision step wrapper
+│   ├── game_actors.h / .c        Enemy update/render helpers
+│   ├── game_hazards.h / .c       Hazard update/render helpers
+│   ├── game_bouncepads.h / .c    Bouncepad update/render helpers
+│   ├── game_float_platforms.h / .c Float-platform update helpers
+│   ├── game_bridges.h / .c       Bridge update helpers
+│   ├── game_checkpoint.h / .c    Checkpoint/respawn helpers
+│   ├── game_camera.h / .c        Camera follow/lookahead helpers
+│   ├── game_resources.h / .c     Texture/audio/level resource loading
+│   └── game_completion.h / .c    Last-star completion and next-phase flow
 ├── editor/
 │   ├── editor_main.c             Standalone editor entry point
 │   ├── editor.h / .c             Editor state, events, render loop
-│   ├── editor_validation.h / .c  Level validation report helpers
 │   ├── canvas.h / .c             Scrollable zoomable editing canvas
 │   ├── palette.h / .c            Entity palette
 │   ├── properties.h / .c         Per-entity property editing
 │   ├── tools.h / .c              Selection and placement tools
 │   ├── ui.h / .c                 Immediate-mode editor widgets
+│   ├── entity_meta.h / .c        Palette/display metadata for entity types
+│   ├── editor_frame.h / .c       Per-frame editor orchestration
+│   ├── editor_events.h / .c      SDL event dispatch
+│   ├── editor_chrome.h / .c      Toolbar/status/panel chrome
+│   ├── editor_panels.h / .c      Palette/properties panel rendering
+│   ├── editor_layout.h / .c      Editor layout metrics
+│   ├── editor_textures.h / .c    Editor texture loading/cleanup
+│   ├── editor_files.h / .c       Open/save/recent file workflows
+│   ├── editor_session.h / .c     Session/autosave state
+│   ├── editor_playtest.h / .c    Launch playtest from editor
+│   ├── editor_clipboard.h / .c   Copy/paste support
+│   ├── editor_validation.h / .c  Level validation report helpers
+│   ├── editor_undo_apply.h / .c  Undo operation application
 │   ├── serializer.h / .c         TOML save/load public API anchor
 │   ├── serializer_emit.h / .c    TOML emission helpers
 │   ├── serializer_io.h / .c      File I/O helpers for serializer
@@ -57,6 +84,7 @@ src/
 │   ├── parallax.h / .c           Multi-layer scrolling background: init, tiled render, cleanup
 │   └── water.h / .c              Animated water strip: init, scroll, tile render
 ├── entities/
+│   ├── bird_variant.h / .c       Shared bird/faster-bird sine-wave helpers
 │   ├── spider.h / .c             Spider enemy: ground patrol, animation, render
 │   ├── jumping_spider.h / .c     Jumping spider: patrol, jump arcs, floor-gap awareness
 │   ├── bird.h / .c               Slow bird enemy: sine-wave sky patrol, animation
@@ -71,7 +99,9 @@ src/
 │   ├── axe_trap.h / .c           Swinging/spinning axe hazard
 │   └── blue_flame.h / .c         Blue/fire flame hazards: rise/flip/fall cycle
 ├── input/
-│   └── game_input.h / .c         SDL keyboard/gamepad event handling
+│   ├── game_input.h / .c         SDL keyboard/gamepad input helpers
+│   ├── game_events.h / .c        SDL event handling
+│   └── game_web_input.h / .c     Browser/WebAssembly input bridge
 ├── levels/
 │   ├── level.h                   Shared level definitions
 │   ├── level_loader.h / .c       TOML level loading and switching
@@ -80,7 +110,15 @@ src/
 │   ├── level_validate.c          LevelDef count validation
 │   └── exported/                 Generated C level exports
 ├── player/
-│   └── player.h / .c             Player input, physics, animation, rendering
+│   ├── player.h / .c             Public API + high-level glue
+│   ├── player_internal.h         Private frame/hitbox/coyote constants
+│   ├── player_lifecycle.c        Init/render/hitbox/reset/cleanup/default physics
+│   ├── player_input.c            Keyboard/gamepad/climb input sampling
+│   ├── player_motion.h / .c      Horizontal acceleration/friction
+│   ├── player_jump.h / .c        Jump buffering, coyote time, jump cut
+│   ├── player_climb.h / .c       Vine/ladder/rope grab and climb helpers
+│   ├── player_surfaces.h / .c    Surface collision helpers
+│   └── player_animation.h / .c   Animation state/frame selection
 ├── render/
 │   ├── game_render.h / .c        Frame render order and layer drawing
 │   └── render_overlay.c          Foreground/overlay render helpers
@@ -207,9 +245,9 @@ void game_complete_level(GameState *gs);
 
 ---
 
-## `game.c`
+## `game.c` and `core/game_lifecycle.c`
 
-**Role:** Implements the three game lifecycle functions.
+**Role:** `game.c` is the public translation unit anchor; the lifecycle implementation lives in `core/game_lifecycle.c`, with the loop/update/resource helpers split across `src/core/`.
 
 ### `game_init(GameState *gs)`
 
@@ -233,15 +271,15 @@ Frees all resources in reverse init order.
 
 ---
 
-## `player/player.h` / `player/player.c`
+## Player Module (`player/`)
 
-**Role:** Player character lifecycle. See [Player Module](#player-module) for the deep dive.
+**Role:** Player character lifecycle, input, horizontal motion, jumps, climbables, surface collision, animation, rendering, hitbox, and reset. Public declarations live in `player.h`; private constants live in `player_internal.h`; implementation is split across focused `.c` files. See [Player Module](#player-module) for the deep dive.
 
-**Key functions:** `player_init`, `player_handle_input`, `player_update`, `player_render`, `player_get_hitbox`, `player_reset`, `player_cleanup`
+**Key functions:** `player_init`, `player_apply_default_physics`, `player_handle_input`, `player_update`, `player_render`, `player_get_hitbox`, `player_reset`, `player_cleanup`
 
 ---
 
-## `levels/level.h`, `levels/level_loader.c`, `levels/level_physics.c`, `levels/level_validate.c`
+## `levels/level.h`, `levels/level_loader.c`, `levels/level_physics.c`, `levels/level_validate.c`, `levels/phase_transition.c`
 
 **Role:** Level schema, TOML loading, physics override application, phase switching, and count validation.
 
@@ -399,11 +437,11 @@ Animated scrolling water strip at the bottom of the screen. 8 frames tiled seaml
 
 ### `effects/fog.h` / `effects/fog.c`
 
-Atmospheric fog overlay. Two semi-transparent sky layers slide across the screen with random direction, duration, and fade-in/out. Assets: `fog_background_1.png`, `fog_background_2.png`.
+Atmospheric fog overlay. Semi-transparent foreground layers slide across the screen with random direction, duration, and fade-in/out. Default assets: `assets/sprites/foregrounds/fog_1.png`, `fog_2.png`; volcanic levels can use `fog_fire_1.png`, `fog_fire_2.png`, and `smoke.png`.
 
 ### `effects/parallax.h` / `effects/parallax.c`
 
-Multi-layer scrolling background. 7 layers tiled horizontally, each at a different scroll speed. Assets: `parallax_sky.png`, `parallax_clouds_bg.png`, `parallax_glacial_mountains.png`, `parallax_clouds_mg_1/2/3.png`, `parallax_cloud_lonely.png`.
+Multi-layer scrolling background configured per TOML level. Current assets include blue-sky/cloud/glacial layers plus volcanic sky, mountains, and smoke layers under `assets/sprites/backgrounds/`.
 
 ---
 

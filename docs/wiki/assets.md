@@ -69,13 +69,18 @@ Layers are drawn in array order (first = furthest back). `speed` is the parallax
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `sky_blue.png` | `parallax.c` (layer 0, speed 0.00) | Static sky gradient backdrop |
-| `clouds_bg.png` | `parallax.c` (layer 1, speed 0.08) | Background cloud layer, slow scroll |
-| `glacial_mountains.png` | `parallax.c` (layer 2, speed 0.15) | Distant mountains |
-| `clouds_mg_3.png` | `parallax.c` (layer 3, speed 0.25) | Midground cloud layer 3 |
-| `clouds_mg_2.png` | `parallax.c` (layer 4, speed 0.38) | Midground cloud layer 2 |
-| `clouds_lonely.png` | `parallax.c` (layer 5, speed 0.44) | Single lonely cloud |
-| `clouds_mg_1.png` | `parallax.c` (layer 6, speed 0.50) | Foreground cloud layer |
+| `sky_blue.png` | `levels/00_sandbox_01.toml` | Static sky gradient backdrop |
+| `clouds_bg.png` | `levels/00_sandbox_01.toml` | Background cloud layer |
+| `glacial_mountains.png` | `levels/00_sandbox_01.toml` | Distant mountains |
+| `clouds_mg_3.png` | `levels/00_sandbox_01.toml` | Midground cloud layer 3 |
+| `clouds_mg_2.png` | `levels/00_sandbox_01.toml` | Midground cloud layer 2 |
+| `clouds_lonely.png` | `levels/00_sandbox_01.toml` | Single cloud layer |
+| `clouds_mg_1.png` | `levels/00_sandbox_01.toml` | Foreground cloud layer |
+| `sky_fire.png` | `levels/01_lugio_01.toml`, `02_lugio_02.toml` | Volcanic sky backdrop |
+| `sky_fire_lightened.png` | `levels/01_lugio_01.toml`, `02_lugio_02.toml` | Lightened volcanic sky variant |
+| `volcanic_mountains.png` | `levels/01_lugio_01.toml`, `02_lugio_02.toml` | Volcanic mountain layer |
+| `volcanic_mountains_lightened.png` | `levels/01_lugio_01.toml`, `02_lugio_02.toml` | Lightened volcanic mountains |
+| `smoke_bg.png`, `smoke_mg_1.png`, `smoke_mg_2.png`, `smoke_mg_3.png`, `smoke_lonely.png` | Volcanic levels | Smoke parallax layers |
 
 ### Foregrounds — `assets/sprites/foregrounds/`
 
@@ -86,6 +91,7 @@ Layers are drawn in array order (first = furthest back). `speed` is the parallax
 | `water.png` | `water->texture` | 384x64 sprite sheet, 8 frames of 48x64 with 16x31 art crop |
 | `lava.png` | `lava->texture` | Lava hazard foreground |
 | `clouds.png` | foreground clouds | Decorative cloud layer |
+| `fog_fire_1.png`, `fog_fire_2.png`, `smoke.png` | Volcanic levels | Fire fog / smoke overlay layers |
 
 ### Player — `assets/sprites/player/`
 
@@ -147,6 +153,12 @@ Layers are drawn in array order (first = furthest back). `speed` is the parallax
 |------|---------|-------------|
 | `grass_tileset.png` | `gs->textures.floor_tile` | 48x48 tile, 9-slice rendered across `FLOOR_Y` to form the floor |
 | `grass_platform.png` | `gs->textures.platform` | 48x48 tile, 9-slice rendered as one-way platform pillars |
+| `stone_tileset.png` | Volcanic levels | 48x48 stone floor tileset |
+| `stone_platform.png` | Volcanic levels | Stone platform pillar tile |
+| `grass_rock_tileset.png`, `grass_rock_platform.png` | Reserve / level theming | Grass-rock floor/platform variants |
+| `brick_tileset.png`, `brick_platform.png` | Reserve / level theming | Brick floor/platform variants |
+| `leaf_tileset.png`, `leaf_platform.png` | Reserve / level theming | Forest leaf floor/platform variants |
+| `cloud_tileset.png` | Reserve / level theming | Cloud tileset |
 
 ### Screens — `assets/sprites/screens/`
 
@@ -220,7 +232,9 @@ Additional tilesets are stored in `assets/sprites/levels/`:
 | `cloud_tileset.png` | Cloud platform tile |
 | `grass_rock_platform.png` | Grass + rock platform tile |
 | `grass_rock_tileset.png` | Grass + rock mixed tileset |
+| `leaf_platform.png` | Leaf / foliage platform tile |
 | `leaf_tileset.png` | Leaf / foliage platform tile |
+| `stone_platform.png` | Stone platform tile |
 | `stone_tileset.png` | Stone floor / wall tile |
 
 ---

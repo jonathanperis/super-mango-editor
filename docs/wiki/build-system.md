@@ -13,6 +13,7 @@ CC      = clang
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(shell sdl2-config --cflags)
 LIBS    = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
 OUTDIR  = out
+OBJDIR  = $(OUTDIR)/obj
 TARGET  = $(OUTDIR)/super-mango
 SRCDIR  = src
 SRCS    = $(wildcard $(SRCDIR)/*.c) \
@@ -45,7 +46,7 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(SRCDIR)/editor/serializer_save.c \
           $(SRCDIR)/editor/serializer_types.c \
           vendor/tomlc17/tomlc17.c
-OBJS    = $(SRCS:.c=.o)
+OBJS    = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
 DEPS    = $(OBJS:.o=.d)
 ```
 
@@ -58,8 +59,9 @@ DEPS    = $(OBJS:.o=.d)
 | `LIBS` | see below | Linker flags |
 | `TARGET` | `out/super-mango` | Output binary path |
 | `SRCS` | explicit per-directory wildcards plus editor serializer files | Game C sources from recognized source directories, TOML serializer modules, and tomlc17 |
-| `OBJS` | `$(SRCS:.c=.o)` | Object files, placed next to their source files |
-| `DEPS` | `$(OBJS:.o=.d)` | Auto-generated dependency files next to object files |
+| `OBJDIR` | `out/obj` | Object/dependency root that mirrors source paths |
+| `OBJS` | `$(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))` | Object files under `out/obj/...` |
+| `DEPS` | `$(OBJS:.o=.d)` | Auto-generated dependency files beside object files under `out/obj/...` |
 
 ### Compiler Flags Explained
 
@@ -176,10 +178,11 @@ Builds and runs native regression harnesses for pure logic that does not require
 make test
 ```
 
-Current test binaries (10):
+Current test binaries (11):
 
 - `out/level-serializer-test`
 - `out/level-validate-test`
+- `out/runtime-load-test`
 - `out/rail-test`
 - `out/entity-utils-test`
 - `out/collision-test`
@@ -197,6 +200,22 @@ Runs the Python TOML validator against every `levels/*.toml` file. It checks par
 make validate-levels
 ```
 
+### `make smoke`
+
+Builds the game and editor, then runs every `levels/*.toml` with dummy SDL video/audio drivers for a bounded number of frames. It also runs the editor's headless smoke mode.
+
+```sh
+make smoke SMOKE_FRAMES=5 SMOKE_SEED=1
+```
+
+### `make sanitize`
+
+Runs `make test` in a separate `out-sanitize/` tree with AddressSanitizer and UndefinedBehaviorSanitizer enabled.
+
+```sh
+make sanitize
+```
+
 ### `make clean`
 
 Removes all build artifacts.
@@ -205,7 +224,7 @@ Removes all build artifacts.
 make clean
 ```
 
-Deletes all Makefile-generated `.o` and `.d` files from recognized source directories plus `out/`.
+Deletes legacy in-source `.o` / `.d` files from recognized source directories and removes `out/`.
 
 ---
 
@@ -305,83 +324,12 @@ After a successful build:
 ```
 out/
 ├── super-mango                          ← the game binary
-└── super-mango-editor                   ← the editor binary (make editor)
-src/
-├── main.o
-├── game.o
-├── collectibles/
-│   ├── coin.o
-│   ├── star_yellow.o
-│   └── last_star.o
-├── core/
-│   ├── debug.o
-│   └── entity_utils.o
-├── effects/
-│   ├── fog.o
-│   ├── parallax.o
-│   └── water.o
-├── entities/
-│   ├── spider.o
-│   ├── jumping_spider.o
-│   ├── bird.o
-│   ├── faster_bird.o
-│   ├── fish.o
-│   └── faster_fish.o
-├── hazards/
-│   ├── spike.o
-│   ├── spike_block.o
-│   ├── spike_platform.o
-│   ├── circular_saw.o
-│   ├── axe_trap.o
-│   └── blue_flame.o
-├── levels/
-│   └── level_loader.o
-├── player/
-│   └── player.o
-├── screens/
-│   ├── start_menu.o
-│   └── hud.o
-├── surfaces/
-│   ├── platform.o
-│   ├── float_platform.o
-│   ├── bridge.o
-│   ├── bouncepad.o
-│   ├── bouncepad_small.o
-│   ├── bouncepad_medium.o
-│   ├── bouncepad_high.o
-│   ├── rail.o
-│   ├── vine.o
-│   ├── ladder.o
-│   └── rope.o
-├── editor/
-│   ├── canvas.o
-│   ├── editor.o
-│   ├── editor_main.o
-│   ├── exporter.o
-│   ├── file_dialog.o
-│   ├── palette.o
-│   ├── properties.o
-│   ├── serializer.o
-│   ├── serializer_emit.o
-│   ├── serializer_io.o
-│   ├── serializer_load.o
-│   ├── serializer_load_climbables.o
-│   ├── serializer_load_collectibles.o
-│   ├── serializer_load_config.o
-│   ├── serializer_load_enemies.o
-│   ├── serializer_load_geometry.o
-│   ├── serializer_load_hazards.o
-│   ├── serializer_load_header.o
-│   ├── serializer_load_layers.o
-│   ├── serializer_load_surfaces.o
-│   ├── serializer_parse.o
-│   ├── serializer_save.o
-│   ├── serializer_types.o
-│   ├── tools.o
-│   ├── ui.o
-│   └── undo.o
-vendor/
-└── tomlc17/
-    └── tomlc17.o
-(plus corresponding .d dependency files in each directory)
+├── super-mango-editor                   ← the editor binary (make editor)
+└── obj/
+    ├── src/                             ← game/editor objects mirror source paths
+    │   ├── core/*.o / *.d
+    │   ├── editor/*.o / *.d
+    │   ├── player/*.o / *.d
+    │   └── ...
+    └── vendor/tomlc17/tomlc17.o / .d
 ```
