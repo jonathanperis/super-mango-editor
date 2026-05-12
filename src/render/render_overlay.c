@@ -39,7 +39,7 @@ void render_level_complete_overlay(GameState *gs)
     SDL_RenderFillRect(gs->renderer, &overlay);
     SDL_SetRenderDrawBlendMode(gs->renderer, SDL_BLENDMODE_NONE);
 
-    const int has_next_level = gs->completion_pending_next_phase;
+    const int has_next_level = gs->completion.pending_next_phase;
 
     /* Level Complete title - show "Game Complete!" for final level */
     if (gs->hud.font) {
@@ -49,7 +49,7 @@ void render_level_complete_overlay(GameState *gs)
         SDL_Color dim = { 190, 190, 190, 255 };
         const char *title_text = has_next_level ? "Level Complete!" : "Game Complete!";
         char line[96];
-        int elapsed = (int)(gs->completion_elapsed + 0.5f);
+        int elapsed = (int)(gs->completion.elapsed + 0.5f);
         int minutes = elapsed / 60;
         int seconds = elapsed % 60;
 
@@ -59,8 +59,8 @@ void render_level_complete_overlay(GameState *gs)
         render_centered_text(gs, line, white, 112);
 
         snprintf(line, sizeof(line), "Coins: %d/%d",
-                 gs->completion_coins_collected,
-                 gs->completion_coin_total);
+                 gs->completion.coins_collected,
+                 gs->completion.coin_total);
         render_centered_text(gs, line, white, 132);
 
         snprintf(line, sizeof(line), "Lives: %d", gs->lives);
