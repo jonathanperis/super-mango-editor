@@ -91,7 +91,7 @@ Frame/hitbox constants live in `player_internal.h`; movement defaults live in `p
 
 The `player.png` sprite sheet has transparent padding at the **bottom** of each 48x48 frame. Without the sink offset, the physics floor edge (`y + h = FLOOR_Y`) would leave the character visually floating 16 px above the grass. `PLAYER_FLOOR_SINK` compensates:
 
-```
+```text
 floor_snap = FLOOR_Y - player->h + PLAYER_FLOOR_SINK
            = 252      - 48        + 16
            = 220
