@@ -1,7 +1,7 @@
 /*
  * tools.c --- Implementation of the editor's interactive tools.
  *
- * Implements SELECT, PLACE, MOVE, and DELETE tool interactions for all 25
+ * Implements SELECT, PLACE, MOVE, and DELETE tool interactions for all
  * entity types.  Every function operates on EditorState, modifying the
  * LevelDef in place and pushing undo commands for reversibility.
  *
