@@ -95,7 +95,8 @@ def load_asset_manifest() -> set[str]:
     manifest: set[str] = set()
 
     for path in ASSET_DIR.rglob("*"):
-        if not path.is_file() or path.name.startswith("."):
+        rel_parts = path.relative_to(ASSET_DIR).parts
+        if not path.is_file() or any(part.startswith(".") for part in rel_parts):
             continue
         manifest.add(path.relative_to(ROOT).as_posix())
 
