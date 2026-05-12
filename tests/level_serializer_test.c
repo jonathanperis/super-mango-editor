@@ -697,6 +697,53 @@ static int rich_level_roundtrip(void)
     return 0;
 }
 
+static int independent_star_color_counts_roundtrip(void)
+{
+    const char *path = "out/test_star_color_counts.toml";
+    LevelDef before;
+    LevelDef after;
+
+    level_def_init_defaults(&before);
+    before.screen_count = 1;
+    before.star_yellow_count = 1;
+    before.star_yellows[0].x = 64.0f;
+    before.star_yellows[0].y = 100.0f;
+    before.star_green_count = 2;
+    before.star_greens[0].x = 96.0f;
+    before.star_greens[0].y = 110.0f;
+    before.star_greens[1].x = 128.0f;
+    before.star_greens[1].y = 120.0f;
+    before.star_red_count = 3;
+    before.star_reds[0].x = 160.0f;
+    before.star_reds[0].y = 130.0f;
+    before.star_reds[1].x = 192.0f;
+    before.star_reds[1].y = 140.0f;
+    before.star_reds[2].x = 224.0f;
+    before.star_reds[2].y = 150.0f;
+
+    if (level_save_toml(&before, path) != 0)
+        return fail("could not save star color count fixture");
+
+    if (level_load_toml(path, &after) != 0)
+        return fail("could not reload star color count fixture");
+
+    if (expect_int_value("star yellow count", after.star_yellow_count, 1) != 0)
+        return 1;
+    if (expect_int_value("star green count", after.star_green_count, 2) != 0)
+        return 1;
+    if (expect_int_value("star red count", after.star_red_count, 3) != 0)
+        return 1;
+    if (expect_float_value("star green last x", after.star_greens[1].x,
+                           before.star_greens[1].x) != 0)
+        return 1;
+    if (expect_float_value("star red last y", after.star_reds[2].y,
+                           before.star_reds[2].y) != 0)
+        return 1;
+
+    remove(path);
+    return 0;
+}
+
 static int missing_physics_uses_engine_defaults(void)
 {
     const char *path = "out/test_no_physics.toml";
@@ -759,6 +806,7 @@ int main(void)
     if (roundtrip_repo_levels() != 0) return 1;
     if (escaped_strings_roundtrip() != 0) return 1;
     if (rich_level_roundtrip() != 0) return 1;
+    if (independent_star_color_counts_roundtrip() != 0) return 1;
     if (missing_physics_uses_engine_defaults() != 0) return 1;
     if (rejects_oversized_arrays() != 0) return 1;
     if (rejects_bad_runtime_links() != 0) return 1;
