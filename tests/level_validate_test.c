@@ -1,4 +1,7 @@
+#include <limits.h>
+#include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "levels/level_loader.h"
 
@@ -190,6 +193,221 @@ static int expect_rejected_bad_rule_values(void)
     return 0;
 }
 
+static int expect_rejected_rule_upper_bounds(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.initial_lives = 1000;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: oversized initial_lives should fail\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.score_per_life = 1000000;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: oversized score_per_life should fail\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.coin_score = 1000000;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: oversized coin_score should fail\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int expect_rejected_oversized_screen_count(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.screen_count = 100;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: screen_count above editor max should fail\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.screen_count = INT_MAX;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: overflow-sized screen_count should fail\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int expect_rejected_nonfinite_values(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.coin_count = 1;
+    def.coins[0].x = NAN;
+    def.coins[0].y = 32.0f;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: NaN coin coordinate should fail\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.platform_count = 1;
+    def.platforms[0].x = INFINITY;
+    def.platforms[0].tile_height = 1;
+    def.platforms[0].tile_width = 1;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: infinite platform coordinate should fail\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.physics.run_max_speed = INFINITY;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: infinite physics override should fail\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int expect_rejected_bad_enum_values(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.axe_trap_count = 1;
+    def.axe_traps[0].pillar_x = 16.0f;
+    def.axe_traps[0].mode = (AxeTrapMode)99;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: invalid axe mode should fail\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.circular_saw_count = 1;
+    def.circular_saws[0].x = 64.0f;
+    def.circular_saws[0].patrol_x0 = 32.0f;
+    def.circular_saws[0].patrol_x1 = 96.0f;
+    def.circular_saws[0].direction = 0;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+        strstr(err, "must be -1 or 1") == NULL) {
+        fprintf(stderr, "level_validate_test: invalid saw direction should fail clearly\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.float_platform_count = 1;
+    def.float_platforms[0].mode = (FloatPlatformMode)99;
+    def.float_platforms[0].x = 16.0f;
+    def.float_platforms[0].y = 16.0f;
+    def.float_platforms[0].tile_count = 1;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: invalid float-platform mode should fail\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.bouncepad_small_count = 1;
+    def.bouncepads_small[0].x = 16.0f;
+    def.bouncepads_small[0].pad_type = (BouncepadType)99;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: invalid bouncepad type should fail\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.vine_count = 1;
+    def.vines[0].x = 16.0f;
+    def.vines[0].y = 16.0f;
+    def.vines[0].tile_count = 1;
+    def.vines[0].vine_type = 99;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: invalid vine type should fail\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int expect_rejected_flame_gap_outside_world(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.blue_flame_count = 1;
+    def.blue_flames[0].x = (float)GAME_W;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: out-of-world blue flame gap should fail\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.fire_flame_count = 1;
+    def.fire_flames[0].x = (float)GAME_W;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: out-of-world fire flame gap should fail\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int expect_rejected_climbable_extents(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.vine_count = 1;
+    def.vines[0].x = 16.0f;
+    def.vines[0].y = (float)(GAME_H - 1);
+    def.vines[0].tile_count = 2;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: vine extending below screen should fail\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.ladder_count = 1;
+    def.ladders[0].x = 16.0f;
+    def.ladders[0].y = 16.0f;
+    def.ladders[0].tile_count = 10000;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: oversized ladder should fail\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.rope_count = 1;
+    def.ropes[0].x = 16.0f;
+    def.ropes[0].y = (float)(GAME_H - 1);
+    def.ropes[0].tile_count = 2;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: rope extending below screen should fail\n");
+        return 1;
+    }
+
+    return 0;
+}
+
 int main(void)
 {
     if (expect_valid_level() != 0) return 1;
@@ -202,6 +420,12 @@ int main(void)
     if (expect_rejected_platform_outside_world() != 0) return 1;
     if (expect_rejected_reversed_patrol() != 0) return 1;
     if (expect_rejected_bad_rule_values() != 0) return 1;
+    if (expect_rejected_rule_upper_bounds() != 0) return 1;
+    if (expect_rejected_oversized_screen_count() != 0) return 1;
+    if (expect_rejected_nonfinite_values() != 0) return 1;
+    if (expect_rejected_bad_enum_values() != 0) return 1;
+    if (expect_rejected_flame_gap_outside_world() != 0) return 1;
+    if (expect_rejected_climbable_extents() != 0) return 1;
 
     puts("level_validate_test: ok");
     return 0;

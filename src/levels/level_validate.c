@@ -1,6 +1,12 @@
+#include <math.h>
 #include <stdio.h>
 
 #include "level_loader.h"
+
+#define MAX_LEVEL_SCREENS 99
+#define MAX_INITIAL_LIVES 999
+#define MAX_SCORE_PER_LIFE 999999
+#define MAX_COIN_SCORE 999999
 
 static int fail_count(char *err, size_t err_size,
                       const char *field, int count, int max_count)
@@ -99,9 +105,19 @@ static int fail_float_range(char *err, size_t err_size, const char *field,
     return -1;
 }
 
+static int validate_finite_float(char *err, size_t err_size,
+                                 const char *field, float value)
+{
+    if (!isfinite(value)) {
+        return fail_value(err, err_size, field, "must be finite");
+    }
+    return 0;
+}
+
 static int validate_world_x(char *err, size_t err_size,
                             const char *field, float x, float world_w)
 {
+    if (validate_finite_float(err, err_size, field, x) != 0) return -1;
     if (x < 0.0f || x > world_w) {
         return fail_float_range(err, err_size, field, x, 0.0f, world_w);
     }
@@ -111,6 +127,7 @@ static int validate_world_x(char *err, size_t err_size,
 static int validate_world_y(char *err, size_t err_size,
                             const char *field, float y)
 {
+    if (validate_finite_float(err, err_size, field, y) != 0) return -1;
     if (y < 0.0f || y > (float)GAME_H) {
         return fail_float_range(err, err_size, field, y, 0.0f, (float)GAME_H);
     }
@@ -121,6 +138,10 @@ static int validate_world_rect(char *err, size_t err_size,
                                const char *field, float x, float y,
                                float w, float h, float world_w)
 {
+    if (validate_finite_float(err, err_size, field, x) != 0) return -1;
+    if (validate_finite_float(err, err_size, field, y) != 0) return -1;
+    if (validate_finite_float(err, err_size, field, w) != 0) return -1;
+    if (validate_finite_float(err, err_size, field, h) != 0) return -1;
     if (x < 0.0f) {
         return fail_float_range(err, err_size, field, x, 0.0f, world_w);
     }
@@ -134,6 +155,59 @@ static int validate_world_rect(char *err, size_t err_size,
         return fail_float_range(err, err_size, field, y + h, 0.0f, (float)GAME_H);
     }
     return 0;
+}
+
+static int validate_gap_x(char *err, size_t err_size,
+                          const char *field, float x, float world_w)
+{
+    if (validate_finite_float(err, err_size, field, x) != 0) return -1;
+    if (x < 0.0f || x + (float)FLOOR_GAP_W > world_w) {
+        return fail_float_range(err, err_size, field, x,
+                                0.0f, world_w - (float)FLOOR_GAP_W);
+    }
+    return 0;
+}
+
+static int validate_climbable_rect(char *err, size_t err_size,
+                                   const char *field, float x, float y,
+                                   int tile_count, int width,
+                                   int content_h, int step, float world_w)
+{
+    float h;
+
+    if (tile_count < 1) {
+        return fail_range(err, err_size, field, tile_count, 1, 999);
+    }
+
+    h = (float)content_h + (float)(tile_count - 1) * (float)step;
+    return validate_world_rect(err, err_size, field, x, y,
+                               (float)width, h, world_w);
+}
+
+static int validate_physics_finite(const LevelDef *def,
+                                   char *err, size_t err_size)
+{
+#define CHECK_PHYSICS_FIELD(field) \
+    do { \
+        if (validate_finite_float(err, err_size, "physics." #field, \
+                                  def->physics.field) != 0) return -1; \
+    } while (0)
+
+    CHECK_PHYSICS_FIELD(walk_max_speed);
+    CHECK_PHYSICS_FIELD(run_max_speed);
+    CHECK_PHYSICS_FIELD(walk_ground_accel);
+    CHECK_PHYSICS_FIELD(run_ground_accel);
+    CHECK_PHYSICS_FIELD(ground_friction);
+    CHECK_PHYSICS_FIELD(ground_counter_accel);
+    CHECK_PHYSICS_FIELD(air_accel_walk);
+    CHECK_PHYSICS_FIELD(air_accel_run);
+    CHECK_PHYSICS_FIELD(air_friction);
+    CHECK_PHYSICS_FIELD(cam_lookahead_vx_factor);
+    CHECK_PHYSICS_FIELD(cam_lookahead_max);
+
+    return 0;
+
+#undef CHECK_PHYSICS_FIELD
 }
 
 static int validate_rail(const RailPlacement *rail, int index,
@@ -196,6 +270,8 @@ static int validate_patrol(char *err, size_t err_size, const char *field,
 {
     char child[96];
 
+    snprintf(child, sizeof(child), "%s.x", field);
+    if (validate_finite_float(err, err_size, child, x) != 0) return -1;
     if (patrol_x0 > patrol_x1) {
         snprintf(child, sizeof(child), "%s.patrol", field);
         return fail_value(err, err_size, child, "has reversed bounds");
@@ -233,27 +309,33 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
 
     if (level_validate_counts(def, err, err_size) != 0) return -1;
 
-    screens = (def->screen_count > 0) ? def->screen_count : 4;
-    world_w = (float)(screens * GAME_W);
-
-    if (def->screen_count < 0) {
-        return fail_range(err, err_size, "screen_count", def->screen_count, 0, 999);
+    if (def->screen_count < 0 || def->screen_count > MAX_LEVEL_SCREENS) {
+        return fail_range(err, err_size, "screen_count", def->screen_count,
+                          0, MAX_LEVEL_SCREENS);
     }
+
+    screens = (def->screen_count > 0) ? def->screen_count : 4;
+    world_w = (float)screens * (float)GAME_W;
+
     if (def->music_volume < 0 || def->music_volume > 128) {
         return fail_range(err, err_size, "music_volume", def->music_volume, 0, 128);
     }
     if (def->initial_hearts < 0 || def->initial_hearts > MAX_HEARTS) {
         return fail_range(err, err_size, "initial_hearts", def->initial_hearts, 0, MAX_HEARTS);
     }
-    if (def->initial_lives < 0) {
-        return fail_range(err, err_size, "initial_lives", def->initial_lives, 0, 999);
+    if (def->initial_lives < 0 || def->initial_lives > MAX_INITIAL_LIVES) {
+        return fail_range(err, err_size, "initial_lives", def->initial_lives,
+                          0, MAX_INITIAL_LIVES);
     }
-    if (def->score_per_life < 0) {
-        return fail_range(err, err_size, "score_per_life", def->score_per_life, 0, 999999);
+    if (def->score_per_life < 0 || def->score_per_life > MAX_SCORE_PER_LIFE) {
+        return fail_range(err, err_size, "score_per_life", def->score_per_life,
+                          0, MAX_SCORE_PER_LIFE);
     }
-    if (def->coin_score < 0) {
-        return fail_range(err, err_size, "coin_score", def->coin_score, 0, 999999);
+    if (def->coin_score < 0 || def->coin_score > MAX_COIN_SCORE) {
+        return fail_range(err, err_size, "coin_score", def->coin_score,
+                          0, MAX_COIN_SCORE);
     }
+    if (validate_physics_finite(def, err, err_size) != 0) return -1;
 
     if (def->player_start_x != 0.0f || def->player_start_y != 0.0f) {
         if (validate_point(err, err_size, "player_start",
@@ -418,6 +500,12 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
 
     for (int i = 0; i < def->float_platform_count; i++) {
         const FloatPlatformPlacement *fp = &def->float_platforms[i];
+        if (fp->mode != FLOAT_PLATFORM_STATIC &&
+            fp->mode != FLOAT_PLATFORM_CRUMBLE &&
+            fp->mode != FLOAT_PLATFORM_RAIL) {
+            snprintf(field, sizeof(field), "float_platforms[%d].mode", i);
+            return fail_value(err, err_size, field, "is invalid");
+        }
         if (fp->tile_count < 1 || fp->tile_count > MAX_SPIKE_TILES) {
             snprintf(field, sizeof(field), "float_platforms[%d].tile_count", i);
             return fail_range(err, err_size, field, fp->tile_count,
@@ -431,7 +519,8 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         } else {
             snprintf(field, sizeof(field), "float_platforms[%d]", i);
             if (validate_world_rect(err, err_size, field, fp->x, fp->y,
-                                    (float)(fp->tile_count * 16), 16.0f,
+                                    (float)(fp->tile_count * FLOAT_PLATFORM_PIECE_W),
+                                    (float)FLOAT_PLATFORM_H,
                                     world_w) != 0) return -1;
         }
     }
@@ -455,12 +544,22 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         if (def->axe_traps[i].y != 0.0f &&
             validate_world_y(err, err_size, "axe_traps[].y",
                              def->axe_traps[i].y) != 0) return -1;
+        if (def->axe_traps[i].mode != AXE_MODE_PENDULUM &&
+            def->axe_traps[i].mode != AXE_MODE_SPIN) {
+            snprintf(field, sizeof(field), "axe_traps[%d].mode", i);
+            return fail_value(err, err_size, field, "is invalid");
+        }
     }
     for (int i = 0; i < def->circular_saw_count; i++) {
         snprintf(field, sizeof(field), "circular_saws[%d]", i);
         if (def->circular_saws[i].y != 0.0f &&
             validate_world_y(err, err_size, "circular_saws[].y",
                              def->circular_saws[i].y) != 0) return -1;
+        if (def->circular_saws[i].direction != -1 &&
+            def->circular_saws[i].direction != 1) {
+            snprintf(field, sizeof(field), "circular_saws[%d].direction", i);
+            return fail_value(err, err_size, field, "must be -1 or 1");
+        }
         if (validate_patrol(err, err_size, field, def->circular_saws[i].x,
                             def->circular_saws[i].patrol_x0,
                             def->circular_saws[i].patrol_x1,
@@ -469,56 +568,79 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
 
     for (int i = 0; i < def->blue_flame_count; i++) {
         snprintf(field, sizeof(field), "blue_flames[%d].x", i);
-        if (validate_world_x(err, err_size, field,
-                             def->blue_flames[i].x, world_w) != 0) return -1;
+        if (validate_gap_x(err, err_size, field,
+                           def->blue_flames[i].x, world_w) != 0) return -1;
     }
     for (int i = 0; i < def->fire_flame_count; i++) {
         snprintf(field, sizeof(field), "fire_flames[%d].x", i);
-        if (validate_world_x(err, err_size, field,
-                             def->fire_flames[i].x, world_w) != 0) return -1;
+        if (validate_gap_x(err, err_size, field,
+                           def->fire_flames[i].x, world_w) != 0) return -1;
     }
 
     for (int i = 0; i < def->bouncepad_small_count; i++) {
         snprintf(field, sizeof(field), "bouncepads_small[%d].x", i);
         if (validate_world_x(err, err_size, field,
                              def->bouncepads_small[i].x, world_w) != 0) return -1;
+        if (def->bouncepads_small[i].pad_type != BOUNCEPAD_GREEN &&
+            def->bouncepads_small[i].pad_type != BOUNCEPAD_WOOD &&
+            def->bouncepads_small[i].pad_type != BOUNCEPAD_RED) {
+            snprintf(field, sizeof(field), "bouncepads_small[%d].pad_type", i);
+            return fail_value(err, err_size, field, "is invalid");
+        }
     }
     for (int i = 0; i < def->bouncepad_medium_count; i++) {
         snprintf(field, sizeof(field), "bouncepads_medium[%d].x", i);
         if (validate_world_x(err, err_size, field,
                              def->bouncepads_medium[i].x, world_w) != 0) return -1;
+        if (def->bouncepads_medium[i].pad_type != BOUNCEPAD_GREEN &&
+            def->bouncepads_medium[i].pad_type != BOUNCEPAD_WOOD &&
+            def->bouncepads_medium[i].pad_type != BOUNCEPAD_RED) {
+            snprintf(field, sizeof(field), "bouncepads_medium[%d].pad_type", i);
+            return fail_value(err, err_size, field, "is invalid");
+        }
     }
     for (int i = 0; i < def->bouncepad_high_count; i++) {
         snprintf(field, sizeof(field), "bouncepads_high[%d].x", i);
         if (validate_world_x(err, err_size, field,
                              def->bouncepads_high[i].x, world_w) != 0) return -1;
+        if (def->bouncepads_high[i].pad_type != BOUNCEPAD_GREEN &&
+            def->bouncepads_high[i].pad_type != BOUNCEPAD_WOOD &&
+            def->bouncepads_high[i].pad_type != BOUNCEPAD_RED) {
+            snprintf(field, sizeof(field), "bouncepads_high[%d].pad_type", i);
+            return fail_value(err, err_size, field, "is invalid");
+        }
     }
 
     for (int i = 0; i < def->vine_count; i++) {
         snprintf(field, sizeof(field), "vines[%d]", i);
-        if (def->vines[i].tile_count < 1) {
-            return fail_range(err, err_size, field, def->vines[i].tile_count, 1, 999);
+        if (def->vines[i].vine_type != VINE_GREEN &&
+            def->vines[i].vine_type != VINE_BROWN) {
+            snprintf(field, sizeof(field), "vines[%d].vine_type", i);
+            return fail_value(err, err_size, field, "is invalid");
         }
-        if (validate_point(err, err_size, field,
-                           def->vines[i].x, def->vines[i].y, world_w) != 0)
+        if (validate_climbable_rect(err, err_size, field,
+                                    def->vines[i].x, def->vines[i].y,
+                                    def->vines[i].tile_count,
+                                    VINE_W, VINE_H, VINE_STEP,
+                                    world_w) != 0)
             return -1;
     }
     for (int i = 0; i < def->ladder_count; i++) {
         snprintf(field, sizeof(field), "ladders[%d]", i);
-        if (def->ladders[i].tile_count < 1) {
-            return fail_range(err, err_size, field, def->ladders[i].tile_count, 1, 999);
-        }
-        if (validate_point(err, err_size, field,
-                           def->ladders[i].x, def->ladders[i].y, world_w) != 0)
+        if (validate_climbable_rect(err, err_size, field,
+                                    def->ladders[i].x, def->ladders[i].y,
+                                    def->ladders[i].tile_count,
+                                    LADDER_W, LADDER_H, LADDER_STEP,
+                                    world_w) != 0)
             return -1;
     }
     for (int i = 0; i < def->rope_count; i++) {
         snprintf(field, sizeof(field), "ropes[%d]", i);
-        if (def->ropes[i].tile_count < 1) {
-            return fail_range(err, err_size, field, def->ropes[i].tile_count, 1, 999);
-        }
-        if (validate_point(err, err_size, field,
-                           def->ropes[i].x, def->ropes[i].y, world_w) != 0)
+        if (validate_climbable_rect(err, err_size, field,
+                                    def->ropes[i].x, def->ropes[i].y,
+                                    def->ropes[i].tile_count,
+                                    ROPE_W, ROPE_H, ROPE_STEP,
+                                    world_w) != 0)
             return -1;
     }
 
