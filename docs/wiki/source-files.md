@@ -10,7 +10,6 @@
 src/
 ├── main.c                        Entry point -- SDL subsystem lifecycle
 ├── game.h                        Shared constants + GameState struct (included everywhere)
-├── game.c                        Thin public wrapper that includes split core implementation
 ├── collectibles/
 │   ├── coin.h / .c               Coin collectible: placement, AABB collection, render
 │   ├── star_yellow.h / .c        Yellow star health pickup
@@ -245,9 +244,9 @@ void game_complete_level(GameState *gs);
 
 ---
 
-## `game.c` and `core/game_lifecycle.c`
+## Runtime Core (`core/game_lifecycle.c`, `core/game_loop.c`, `core/game_resources.c`)
 
-**Role:** `game.c` is the public translation unit anchor; the lifecycle implementation lives in `core/game_lifecycle.c`, with the loop/update/resource helpers split across `src/core/`.
+**Role:** Runtime lifecycle and game-loop implementation lives under `src/core/`. `game_lifecycle.c` owns `game_init` / `game_cleanup`, `game_loop.c` owns `game_loop`, and resource loading/reloading lives in `game_resources.c`.
 
 ### `game_init(GameState *gs)`
 

@@ -76,10 +76,10 @@ super-mango-editor/
 ├── web/                    ← Emscripten shell template (shell.html)
 └── src/
     ├── main.c              ← SDL init/teardown, entry point
-    ├── game.h / game.c     ← GameState, window, renderer, game loop
+    ├── game.h              ← GameState, shared constants, runtime declarations
     ├── collectibles/       ← coin, star_yellow, star_green, star_red, last_star
     ├── collision/          ← collision passes and damage helpers
-    ├── core/               ← debug overlay, entity utilities, reset helpers
+    ├── core/               ← lifecycle, resources, loop/update, camera, completion, debug helpers
     ├── editor/             ← standalone visual level editor (editor_main, canvas, tools, palette, validation, serializer_load_* helpers, …)
     ├── effects/            ← fog, parallax, water
     ├── entities/           ← bird, faster_bird, fish, faster_fish, spider, jumping_spider
@@ -98,10 +98,9 @@ super-mango-editor/
 |------------------|--------------------------------------------------------------|
 | `main.c`         | Calls SDL/IMG/TTF/Mix init + teardown; owns `main()`         |
 | `game.h`         | `GameState` struct + shared constants; included everywhere   |
-| `game.c`         | Implements `game_init`, `game_loop`, `game_cleanup`          |
+| `core/`          | Implements runtime lifecycle, resources, game loop/update, camera, completion, and debug helpers |
 | `player/`        | Player lifecycle: init, input, update, render, cleanup       |
 | `collectibles/`  | Coins, colored stars, last star — pickup items               |
-| `core/`          | Debug overlay (`--debug`), shared entity utilities           |
 | `editor/`        | Standalone visual level editor (canvas, tools, palette, properties, serializer save/load helpers, exporter, undo) |
 | `effects/`       | Fog overlays, parallax backgrounds, animated water           |
 | `entities/`      | Enemies: spiders, birds, fish (normal + faster variants)     |
@@ -149,7 +148,7 @@ main()
 
 ## Current Game State
 
-- Multi-screen forest stage (dynamic width via screen_count, default 1600px / 4 screens)
+- Dynamic multi-screen TOML worlds, from the 4-screen sandbox to longer volcanic stages
 - 32 render layers: parallax background → platforms → floor → enemies → player → fog → HUD → debug
 - Delta-time physics at 60 FPS (VSync + manual fallback)
 - TOML-based level format with runtime loader, `next_phase` transitions, and optional C exporter
