@@ -79,15 +79,15 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 brew install sdl2 sdl2_image sdl2_ttf sdl2_mixer
 
 # Build and run the game
-make run
+make run CC=clang
 
 # Build and run the level editor
-make run-editor
+make run-editor CC=clang
 
 # Run a specific level file
-make run-level LEVEL=levels/00_sandbox_01.toml
+make run-level CC=clang LEVEL=levels/00_sandbox_01.toml
 
-# Build for WebAssembly
+# Build for WebAssembly (uses Emscripten/emcc)
 make web
 ```
 
