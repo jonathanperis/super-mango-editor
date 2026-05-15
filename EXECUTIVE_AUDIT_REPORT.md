@@ -2,6 +2,8 @@
 
 Audit date: 2026-05-08
 
+> **Current status note:** This report is retained as historical audit context. Current repository health should be verified with `make test CC=clang`, `make validate-levels`, `make smoke CC=clang`, `make web`, and `cd docs && bun run lint && bun run build`.
+
 Scope: native C11/SDL2 game, standalone level editor, TOML level pipeline, assets, documentation site, CI/CD, local build health.
 
 Remediation status: High-priority and medium-priority findings were addressed on 2026-05-08. The historical findings remain below as audit evidence; current code now has shared level resource reload logic, docs lint, docs route cleanup, stale-reference cleanup, `GameState` runtime/rules/loop subgroups, `LevelDef` count validation, unified game init failure cleanup, and `make test` regression targets wired into native CI.
@@ -22,9 +24,9 @@ Overall status: healthy prototype / early product codebase. Good foundation. Nee
 | Editor build | Pass: `make -B editor` produced `out/super-mango-editor` with no compiler warnings observed |
 | Docs build | Pass: `bun run build` produced the static docs site |
 | Docs warning | Resolved: sidebar config moved out of `pages` |
-| Docs lint | Pass: ESLint 9 flat config added |
-| Web build | Not run locally: `emcc` absent from PATH; CI installs Emscripten |
-| Source size | 55 `.c` files, 55 `.h` files |
+| Docs lint | Pass: `bun run lint` runs `astro check` |
+| Web build | Pass locally when emsdk is active; CI installs Emscripten |
+| Source size | 125 `.c` files, 110 `.h` files across `src/`, `tests/`, and `vendor/` |
 | Assets | 73 PNG sprites, 14 WAV sounds, 1 TTF font |
 | Levels | 3 TOML levels in `levels/` |
 | Editor palette | 30 placeable entity types (`ENT_COUNT`) |
@@ -34,12 +36,12 @@ Overall status: healthy prototype / early product codebase. Good foundation. Nee
 
 | Dimension | Score | Notes |
 |---|---:|---|
-| Build reliability | 8/10 | Native/editor/docs build locally. Web relies on CI/local Emscripten install. |
+| Build reliability | 8/10 | Native/editor/docs build locally. Web passes when a local Emscripten SDK is active, and CI installs Emscripten. |
 | Architecture | 7/10 | Clear module split exists, but `GameState` and `game_init` remain large central hubs. |
 | Content pipeline | 8/10 | TOML format, editor, exporter, assets, and docs are coherent. |
-| Runtime robustness | 7/10 | Shared level resource reload path and init cleanup are improved; runtime smoke coverage remains thin. |
+| Runtime robustness | 7/10 | Shared level resource reload path and init cleanup are improved; native runtime/editor smoke coverage now exists and should keep expanding. |
 | Documentation accuracy | 8/10 | Main drift register rows are resolved; keep targeted scans in release flow. |
-| Test coverage | 5/10 | Serializer and level-validation tests exist; gameplay/editor smoke tests remain next gap. |
+| Test coverage | 6/10 | Native regression tests, level validation, and game/editor smoke tests exist; deeper gameplay/editor assertions remain the next gap. |
 | Release posture | 8/10 | Multi-platform releases, Pages deploy, docs lint, and docs build are in place. |
 
 ## Architecture Assessment
@@ -50,21 +52,21 @@ Current architecture layers:
 
 | Layer | Modules |
 |---|---|
-| Entry/lifecycle | `src/main.c`, `src/game.c` |
+| Entry/lifecycle | `src/main.c`, `src/game.h`, `src/core/game_lifecycle.c`, `src/core/game_loop.c` |
 | State/core | `src/game.h`, `src/core/`, `src/input/`, `src/collision/`, `src/render/` |
 | Gameplay | `src/player/`, `src/entities/`, `src/hazards/`, `src/collectibles/`, `src/surfaces/` |
 | Level data | `src/levels/level.h`, `src/levels/level_loader.c`, `src/editor/serializer.c`, `levels/*.toml` |
 | Tools | `src/editor/` |
 | Presentation/docs | `docs/`, `web/`, `.github/workflows/` |
 
-Architecture is readable and source-commented heavily. The biggest resolved issue was level-wide resource drift between initial load and phase transition; remaining maintenance pressure comes from the size of `GameState` and `game_init()`.
+Architecture is readable and source-commented heavily. The biggest resolved issue was level-wide resource drift between initial load and phase transition; remaining maintenance pressure comes from the size of `GameState` and runtime lifecycle/resource orchestration.
 
 ## High-Priority Findings
 
 ### 1. Phase transitions do not reload all level-wide resources
 
 Evidence:
-- Initial load path applies background layers, floor tile override, foreground strip, fog layers, and music in `src/game.c`.
+- Historical finding: the initial load path applied background layers, floor tile override, foreground strip, fog layers, and music in the runtime lifecycle/resource path.
 - `game_load_next_phase()` calls `level_load()` and only reinitializes parallax afterward.
 
 Impact:
@@ -81,7 +83,7 @@ Recommendation:
 Evidence:
 - `README.md`, `AGENTS.md`, and `CLAUDE.md` referenced obsolete level paths.
 - Current levels are `levels/00_sandbox_01.toml`, `levels/01_lugio_01.toml`, and `levels/02_lugio_02.toml`.
-- `src/main.c`, `src/game.c`, and `src/game.h` comments still say JSON for `--level`.
+- Historical finding: `src/main.c`, the runtime lifecycle source, and `src/game.h` comments still said JSON for `--level`.
 - `docs/wiki/build-system.md` referenced an obsolete generated-level path that did not match current runtime TOML paths.
 
 Impact:
@@ -95,15 +97,15 @@ Status:
 ### 3. Docs lint command was dead
 
 Evidence:
-- `docs/package.json` defines `"lint": "eslint"`.
-- `bun run lint` fails because ESLint 9 requires `eslint.config.js`.
+- Historical finding: `docs/package.json` previously defined `"lint": "eslint"`.
+- Historical finding: `bun run lint` previously failed before the docs lint command was moved to Astro checking.
 
 Impact:
 - CI or contributors cannot rely on lint.
 - Type/style regressions in Astro/React docs are not checked.
 
 Status:
-- Resolved: `docs/eslint.config.js` exists and docs lint is wired into CI.
+- Resolved: `docs/package.json` now defines `"lint": "astro check"`, and docs lint is wired into CI.
 
 ### 4. Astro route warning from sidebar config
 
@@ -155,9 +157,9 @@ Recommendation: either assert counts or clamp with diagnostic in `level_load()`.
 
 Recommendation: use `MAX_STAR_GREENS` and `MAX_STAR_REDS`.
 
-### Documentation app build command differs from install tool convention
+### Documentation app build command differed from install tool convention
 
-Deploy workflow uses `bun install --frozen-lockfile`, then `npm run build`. This works, but project guidance says use Bun for GitHub Pages projects because npm install hangs. Safer consistency: `bun run build`.
+Historical finding: the deploy workflow used `bun install --frozen-lockfile`, then `npm run build`. This has been resolved; the deploy workflow now uses `bun run build`.
 
 ## Strengths
 
@@ -185,7 +187,7 @@ Deploy workflow uses `bun install --frozen-lockfile`, then `npm run build`. This
 | `docs/wiki/assets.md` | Resolved: sprite analysis path |
 | `docs/wiki/architecture.md` | Resolved: current star/floor-gap/resource names |
 | `src/main.c` | Resolved: comments say TOML level load |
-| `src/game.c` | Resolved: comments say TOML level load |
+| Runtime lifecycle source | Resolved: comments say TOML level load |
 | `src/game.h` | Resolved: `level_path` comment says TOML |
 | `src/levels/level.h` | Resolved: generated export comments updated |
 | `src/editor/*` exporter comments | Resolved: current generated export naming |
@@ -195,9 +197,9 @@ Deploy workflow uses `bun install --frozen-lockfile`, then `npm run build`. This
 ### Next 1-2 days
 
 1. Keep targeted docs drift search in release checklist.
-2. Add SDL dummy-driver smoke test for one level.
-3. Add editor save/load smoke test for a minimal TOML level.
-4. Re-run web build locally when `emcc` is available.
+2. Expand SDL dummy-driver smoke coverage beyond the current level/editor smoke paths.
+3. Add editor save/load assertions for richer multi-entity TOML workflows.
+4. Keep local WebAssembly verification in the release checklist when emsdk is active.
 
 ### Next sprint
 
@@ -234,7 +236,7 @@ Results:
 | `make -B editor` | Pass |
 | `bun run build` | Pass |
 | `bun run lint` | Pass |
-| `command -v emcc` | Not found |
+| `command -v emcc` | Historical result was not found; current local setup has emsdk available when activated |
 | Stale-doc search | Current targeted stale references resolved |
 | TODO/FIXME search | No project TODO/FIXME/HACK markers found |
 | Sprite file probe | Key player/entity/hazard PNGs readable |

@@ -26,7 +26,7 @@ Super Mango is a 2D side-scrolling platformer built in C11 with SDL2, designed a
 
 ## Features
 
-- 2D side-scrolling platformer with a multi-screen forest stage (1600px world, 4 screens wide)
+- 2D side-scrolling platformer with dynamic multi-screen TOML worlds, from the 4-screen sandbox to longer volcanic stages
 - 32 render layers drawn back-to-front: parallax background, platforms, floor, enemies, player, fog, HUD, debug overlay
 - Delta-time physics for frame-rate-independent movement at 60 FPS (VSync + manual fallback)
 - Six enemy types: spiders, jumping spiders, birds, faster birds, fish, faster fish
@@ -130,18 +130,20 @@ pacman -S mingw-w64-ucrt-x86_64-clang \
 ### Quick Start
 
 ```sh
-make                                  # build the game binary into out/
-make run                              # build and run
-make run-debug                        # build and run with debug overlay
-make run-level LEVEL=levels/00_sandbox_01.toml         # run a specific TOML level
-make run-level-debug LEVEL=levels/00_sandbox_01.toml   # run a level with debug overlay
-make editor                           # build the level editor
-make run-editor                       # build and run the level editor
-make test                             # build and run 11 native regression tests
+make CC=clang                         # build the game binary into out/
+make run CC=clang                     # build and run
+make run-debug CC=clang               # build and run with debug overlay
+make run-level CC=clang LEVEL=levels/00_sandbox_01.toml         # run a specific TOML level
+make run-level-debug CC=clang LEVEL=levels/00_sandbox_01.toml   # run a level with debug overlay
+make editor CC=clang                  # build the level editor
+make run-editor CC=clang              # build and run the level editor
+make test CC=clang                    # build and run 11 native regression tests
 make validate-levels                  # validate all levels/*.toml files
 make web                              # build to WebAssembly (requires Emscripten)
 make clean                            # remove all build artifacts
 ```
+
+> For local/CI parity, pass `CC=clang` explicitly. GNU Make has a built-in `CC=cc`, so the Makefile's `CC ?= clang` default may not select clang on every machine unless overridden.
 
 Or just **[play in your browser](https://jonathanperis.github.io/super-mango-editor/)** -- no build required. Full project documentation is available at the **[docs site](https://jonathanperis.github.io/super-mango-editor/docs/)**.
 
@@ -156,7 +158,7 @@ super-mango-editor/
 │   └── 02_lugio_02.toml             Level data loaded at runtime
 ├── src/                              C source files and headers
 │   ├── main.c                        Entry point: SDL init/teardown
-│   ├── game.h / game.c               GameState struct, window, renderer, game loop
+│   ├── game.h                        Shared GameState/constants declarations
 │   ├── collectibles/                  Pickup items
 │   │   ├── coin.h / .c               Coin (100 pts, 3 restore a heart)
 │   │   ├── star_yellow.h / .c        Yellow star health pickup
@@ -164,9 +166,12 @@ super-mango-editor/
 │   │   ├── star_red.h / .c           Red star health pickup
 │   │   └── last_star.h / .c          End-of-level star
 │   ├── collision/                     Gameplay collision and damage passes
-│   ├── core/                          Shared utilities
+│   ├── core/                          Runtime lifecycle, window/resources, loop, update, camera, completion
 │   │   ├── debug.h / .c              Debug overlay (FPS, CPU, memory, hitboxes, event log)
-│   │   └── entity_utils.h / .c       Shared entity helper functions
+│   │   ├── entity_utils.h / .c       Shared entity helper functions
+│   │   ├── game_lifecycle.c          game_init / game_cleanup orchestration
+│   │   ├── game_loop.c               Main native/WebAssembly game loop
+│   │   └── game_resources.h / .c     Texture, audio, and level resource loading
 │   ├── editor/                        Standalone visual level editor
 │   │   ├── editor_main.c             Editor entry point
 │   │   ├── editor.h / .c             Editor state, main loop, event handling
