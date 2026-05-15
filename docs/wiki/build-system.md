@@ -9,7 +9,7 @@
 The project uses a **GNU Makefile** with explicit per-directory wildcards. New `.c` files in recognized source directories are compiled automatically; new source directories need matching `SRCS` and pattern-rule entries.
 
 ```makefile
-CC      = clang
+CC      ?= clang
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(shell sdl2-config --cflags)
 LIBS    = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
 OUTDIR  = out
@@ -54,7 +54,7 @@ DEPS    = $(OBJS:.o=.d)
 
 | Variable | Value | Description |
 |----------|-------|-------------|
-| `CC` | `clang` | C compiler (override with `CC=gcc` if needed) |
+| `CC` | `clang` intended; pass explicitly for parity | C compiler. Use `CC=clang` for CI/local parity; GNU Make may otherwise use its built-in `CC=cc`. |
 | `CFLAGS` | see below | Compiler flags |
 | `LIBS` | see below | Linker flags |
 | `TARGET` | `out/super-mango` | Output binary path |
@@ -62,6 +62,17 @@ DEPS    = $(OBJS:.o=.d)
 | `OBJDIR` | `out/obj` | Object/dependency root that mirrors source paths |
 | `OBJS` | `$(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))` | Object files under `out/obj/...` |
 | `DEPS` | `$(OBJS:.o=.d)` | Auto-generated dependency files beside object files under `out/obj/...` |
+
+### Compiler Selection Caveat
+
+For reproducible local results, pass `CC=clang` explicitly:
+
+```sh
+make test CC=clang
+make smoke CC=clang
+```
+
+The Makefile uses `CC ?= clang`, but GNU Make defines a built-in `CC=cc`, so some local invocations resolve to `cc` unless the compiler is overridden on the command line.
 
 ### Compiler Flags Explained
 

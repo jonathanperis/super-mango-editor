@@ -127,10 +127,10 @@ typedef struct {
 } GameState;
 ```
 
-#### 4. Wire up in `game.c`
+#### 4. Wire up in the runtime core
 
 ```c
-// game_init -- load shared texture:
+// src/core/game_resources.c -- load shared texture:
 gs->textures.coin = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/coin.png");
 if (!gs->textures.coin) {
     fprintf(stderr, "Failed to load coin.png: %s\n", IMG_GetError());
@@ -141,12 +141,14 @@ if (!gs->textures.coin) {
 gs->coins[i] = (Coin){ .x = def->coins[i].x, .y = def->coins[i].y, .active = 1 };
 gs->coin_count = def->coin_count;
 
-// game_loop render section (correct layer order):
+// focused runtime helper render section, in the correct layer order:
 coins_render(gs->coins, gs->coin_count, gs->renderer, gs->textures.coin, (int)gs->camera.x);
 
-// game_cleanup (before SDL_DestroyRenderer):
+// src/core/game_lifecycle.c cleanup path, before SDL_DestroyRenderer:
 DESTROY_TEX(gs->textures.coin);
 ```
+
+Use the focused runtime module that owns the behavior: resource loading belongs in `src/core/game_resources.c`, lifecycle orchestration in `src/core/game_lifecycle.c`, per-frame update orchestration in `src/core/game_update.c` and its specialized helpers, and collision/pickup behavior in `src/collision/`.
 
 #### 5. Add to a TOML level file
 
@@ -182,7 +184,7 @@ for (int i = 0; i < gs->coin_count; i++) {
 }
 ```
 
-Also add `debug_log` calls in `game.c` for any significant entity events (collection, destruction, spawn).
+Also add `debug_log` calls in the module that owns the event, such as `src/collision/game_collision.c`, `src/core/game_update.c`, or the relevant focused runtime helper.
 
 ---
 
@@ -391,15 +393,15 @@ See [Assets](assets) for sprite sheet dimensions and [Player Module](#player-mod
 - [ ] Create `src/<category>/<entity>.c` with init, update, render, cleanup
 - [ ] Add `#include "<category>/<entity>.h"` to `game.h`
 - [ ] Add texture pointer to `TextureResources`, plus entity array and count to `GameState` (by value, not pointer)
-- [ ] Load texture in `game_init` in `game.c`
+- [ ] Load texture in the resource-loading path (`src/core/game_resources.c`)
 - [ ] Call `<entity>_init` in `game_init`
-- [ ] Call `<entity>_update` in `game_loop` update section
-- [ ] Call `<entity>_render` in `game_loop` render section (correct layer order)
+- [ ] Call `<entity>_update` from the relevant `src/core/` update helper
+- [ ] Call `<entity>_render` from the relevant `src/core/` render helper (correct layer order)
 - [ ] Call `<entity>_cleanup` in `game_cleanup` (before `SDL_DestroyRenderer`)
 - [ ] Set all freed pointers to `NULL`
 - [ ] Add entity placement to a TOML level file in `levels/` (or use the visual level editor)
 - [ ] Add hitbox visualization in `core/debug.c`
-- [ ] Add `debug_log` calls in `game.c` for significant entity events
+- [ ] Add `debug_log` calls in the module that owns significant entity events
 - [ ] Build game with `make` -- no Makefile changes needed for new `.c` files in existing source directories
 - [ ] Build editor with `make editor` if editor placement/schema behavior changed
 - [ ] Run `make test`

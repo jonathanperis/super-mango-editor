@@ -2,7 +2,7 @@
 
 > 2D side-scrolling platformer written in C using SDL2 -- browser-playable via WebAssembly
 
-Super Mango is a 2D platformer built in C11 with SDL2, designed as an educational project with well-commented source code for learning C + SDL2 game development. The game features a multi-screen forest stage with parallax backgrounds, enemies, hazards, collectibles, and delta-time physics, building natively on macOS/Linux/Windows and as WebAssembly for browser play.
+Super Mango is a 2D platformer built in C11 with SDL2, designed as an educational project with well-commented source code for learning C + SDL2 game development. The game features dynamic multi-screen TOML worlds with parallax backgrounds, enemies, hazards, collectibles, and delta-time physics, building natively on macOS/Linux/Windows and as WebAssembly for browser play.
 
 ---
 
@@ -62,7 +62,7 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 | Item | Detail |
 |------|--------|
 | Language | C11 |
-| Compiler | `clang` (default), `gcc` compatible |
+| Compiler | `clang` recommended for CI/local parity; `gcc` compatible |
 | Window size | 800 × 600 px (OS window) |
 | Logical canvas | 400 × 300 px (2× pixel scale) |
 | Target FPS | 60 |
