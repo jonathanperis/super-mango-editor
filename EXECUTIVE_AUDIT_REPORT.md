@@ -83,7 +83,7 @@ Recommendation:
 Evidence:
 - `README.md`, `AGENTS.md`, and `CLAUDE.md` referenced obsolete level paths.
 - Current levels are `levels/00_sandbox_01.toml`, `levels/01_lugio_01.toml`, and `levels/02_lugio_02.toml`.
-- Historical finding: `src/main.c`, the runtime lifecycle source, and `src/game.h` comments still said JSON for `--level`.
+- Historical finding: `src/main.c`, `src/core/game_lifecycle.c`, and `src/game.h` comments still said JSON for `--level`.
 - `docs/wiki/build-system.md` referenced an obsolete generated-level path that did not match current runtime TOML paths.
 
 Impact:
@@ -187,7 +187,7 @@ Historical finding: the deploy workflow used `bun install --frozen-lockfile`, th
 | `docs/wiki/assets.md` | Resolved: sprite analysis path |
 | `docs/wiki/architecture.md` | Resolved: current star/floor-gap/resource names |
 | `src/main.c` | Resolved: comments say TOML level load |
-| Runtime lifecycle source | Resolved: comments say TOML level load |
+| `src/core/game_lifecycle.c` | Resolved: comments say TOML level load |
 | `src/game.h` | Resolved: `level_path` comment says TOML |
 | `src/levels/level.h` | Resolved: generated export comments updated |
 | `src/editor/*` exporter comments | Resolved: current generated export naming |
@@ -236,7 +236,7 @@ Results:
 | `make -B editor` | Pass |
 | `bun run build` | Pass |
 | `bun run lint` | Pass |
-| `command -v emcc` | Historical result was not found; current local setup has emsdk available when activated |
+| `command -v emcc` | Not found during the 2026-05-08 audit; available when emsdk is activated in the current local setup |
 | Stale-doc search | Current targeted stale references resolved |
 | TODO/FIXME search | No project TODO/FIXME/HACK markers found |
 | Sprite file probe | Key player/entity/hazard PNGs readable |

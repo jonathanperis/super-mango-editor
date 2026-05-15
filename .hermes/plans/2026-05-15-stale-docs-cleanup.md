@@ -171,7 +171,7 @@ with:
 
 3. Add a small subsection after Key Variables:
 
-```md
+````md
 ### Compiler Selection Caveat
 
 For reproducible local results, pass `CC=clang` explicitly:
@@ -182,7 +182,7 @@ make smoke CC=clang
 ```
 
 The Makefile uses `CC ?= clang`, but GNU Make defines a built-in `CC=cc`, so some local invocations resolve to `cc` unless the compiler is overridden on the command line.
-```
+````
 
 **Verification:**
 
