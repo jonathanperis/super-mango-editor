@@ -10,6 +10,7 @@ GameOverlayState game_overlay_state(const GameState *gs)
 {
     if (!gs) return GAME_OVERLAY_NONE;
     if (gs->completion.complete) return GAME_OVERLAY_LEVEL_COMPLETE;
+    if (gs->game_over) return GAME_OVERLAY_GAME_OVER;
     if (gs->paused || gs->pause_reasons != 0) return GAME_OVERLAY_PAUSED;
     return GAME_OVERLAY_NONE;
 }
@@ -41,6 +42,7 @@ void game_overlay_toggle_pause(GameState *gs)
 {
     if (!gs) return;
     if (game_overlay_state(gs) == GAME_OVERLAY_LEVEL_COMPLETE) return;
+    if (game_overlay_state(gs) == GAME_OVERLAY_GAME_OVER) return;
     game_overlay_set_pause_reason(gs, GAME_PAUSE_REASON_PLAYER,
                                   (gs->pause_reasons & GAME_PAUSE_REASON_PLAYER) == 0);
 }

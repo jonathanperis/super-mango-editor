@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "collision/collision_damage.h"
+#include "core/game_overlay.h"
 #include "levels/level.h"
 
 void debug_log(DebugOverlay *dbg, const char *fmt, ...)
@@ -92,7 +93,7 @@ static int lethal_damage_consumes_life_and_resets_level(void)
     return 0;
 }
 
-static int game_over_restores_level_lives_and_score(void)
+static int game_over_sets_overlay_without_resetting_level(void)
 {
     GameState gs = {0};
     LevelDef def;
@@ -111,11 +112,85 @@ static int game_over_restores_level_lives_and_score(void)
 
     apply_damage(&gs, 1, 0, 0.0f, 0.0f);
 
+    if (expect_int("game over flag", gs.game_over, 1) != 0) return 1;
+    if (expect_int("game over overlay", game_overlay_state(&gs), GAME_OVERLAY_GAME_OVER) != 0)
+        return 1;
+    if (expect_int("lives stay depleted", gs.lives, -1) != 0) return 1;
+    if (expect_int("hearts stay depleted", gs.hearts, 0) != 0) return 1;
+    if (expect_int("score preserved for overlay", gs.score, 1200) != 0) return 1;
+    if (expect_int("next life preserved", gs.score_life_next, 2000) != 0) return 1;
+    if (expect_int("reset waits for confirmation", s_reset_calls, 0) != 0) return 1;
+
+    return 0;
+}
+
+static int confirming_game_over_restores_level_lives_and_score(void)
+{
+    GameState gs = {0};
+    LevelDef def;
+
+    s_reset_calls = 0;
+    level_def_init_defaults(&def);
+    def.initial_hearts = 3;
+    def.initial_lives = 5;
+    def.player_start_x = 80.0f;
+    def.player_start_y = 172.0f;
+
+    gs.runtime.current_level = &def;
+    gs.hearts = 0;
+    gs.lives = -1;
+    gs.game_over = 1;
+    gs.score = 1200;
+    gs.checkpoint_x = 320.0f;
+    gs.player.spawn_x = 320.0f;
+    gs.player.spawn_y = 172.0f;
+    gs.rules.score_per_life = 1000;
+    gs.score_life_next = 2000;
+
+    game_restart_after_game_over(&gs);
+
+    if (expect_int("game over cleared", gs.game_over, 0) != 0) return 1;
+    if (expect_int("overlay cleared", game_overlay_state(&gs), GAME_OVERLAY_NONE) != 0)
+        return 1;
     if (expect_int("lives restored", gs.lives, 5) != 0) return 1;
     if (expect_int("hearts restored", gs.hearts, 3) != 0) return 1;
     if (expect_int("score reset", gs.score, 0) != 0) return 1;
+    if (expect_int("checkpoint reset", (int)gs.checkpoint_x, 0) != 0) return 1;
+    if (expect_int("spawn x restored", (int)gs.player.spawn_x, 80) != 0) return 1;
+    if (expect_int("spawn y restored", (int)gs.player.spawn_y, 172) != 0) return 1;
     if (expect_int("next life reset", gs.score_life_next, 1000) != 0) return 1;
     if (expect_int("reset calls", s_reset_calls, 1) != 0) return 1;
+
+    return 0;
+}
+
+static int confirming_game_over_restores_default_spawn_when_level_start_unset(void)
+{
+    GameState gs = {0};
+    LevelDef def;
+    const int default_spawn_y = FLOOR_Y - 2 * TILE_SIZE + 16;
+
+    s_reset_calls = 0;
+    level_def_init_defaults(&def);
+    def.initial_hearts = 3;
+    def.initial_lives = 5;
+
+    gs.runtime.current_level = &def;
+    gs.hearts = 0;
+    gs.lives = -1;
+    gs.game_over = 1;
+    gs.checkpoint_x = 320.0f;
+    gs.player.spawn_x = 320.0f;
+    gs.player.spawn_y = 172.0f;
+    gs.rules.score_per_life = 1000;
+
+    game_restart_after_game_over(&gs);
+
+    if (expect_int("default spawn x restored", (int)gs.player.spawn_x, 80) != 0)
+        return 1;
+    if (expect_int("default spawn y restored", (int)gs.player.spawn_y, default_spawn_y) != 0)
+        return 1;
+    if (expect_int("default spawn reset calls", s_reset_calls, 1) != 0) return 1;
 
     return 0;
 }
@@ -124,7 +199,10 @@ int main(void)
 {
     if (nonlethal_damage_sets_invincibility_and_push() != 0) return 1;
     if (lethal_damage_consumes_life_and_resets_level() != 0) return 1;
-    if (game_over_restores_level_lives_and_score() != 0) return 1;
+    if (game_over_sets_overlay_without_resetting_level() != 0) return 1;
+    if (confirming_game_over_restores_level_lives_and_score() != 0) return 1;
+    if (confirming_game_over_restores_default_spawn_when_level_start_unset() != 0)
+        return 1;
 
     puts("gameplay_damage_test: ok");
     return 0;

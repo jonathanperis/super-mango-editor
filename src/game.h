@@ -336,6 +336,7 @@ typedef struct {
     int           score_life_next; /* score threshold for next bonus life     */
     Camera        camera;      /* viewport scroll position; updated every frame*/
     int           running;     /* loop flag: 1 = keep running, 0 = quit       */
+    int           game_over;   /* 1 = game-over overlay awaiting restart      */
     int           paused;      /* 1 = pause overlay active; physics/music frozen */
     unsigned int  pause_reasons; /* bitmask of active pause reasons             */
     float         checkpoint_x;   /* respawn x position (updated per screen)   */

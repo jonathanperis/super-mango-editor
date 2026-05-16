@@ -14,6 +14,32 @@
 #include <SDL_mixer.h>  /* Mix_PlayChannel */
 #include <math.h>       /* sqrtf */
 
+void game_restart_after_game_over(GameState *gs)
+{
+    const LevelDef *def;
+
+    if (!gs || !gs->game_over) return;
+
+    def = (const LevelDef *)gs->runtime.current_level;
+    gs->game_over = 0;
+    gs->completion.complete = 0;
+    gs->pause_reasons = 0;
+    gs->paused = 0;
+    gs->lives = def && def->initial_lives > 0 ? def->initial_lives : DEFAULT_LIVES;
+    gs->hearts = def && def->initial_hearts > 0 ? def->initial_hearts : MAX_HEARTS;
+    gs->score = 0;
+    gs->checkpoint_x = 0.0f;
+    if (def && (def->player_start_x != 0.0f || def->player_start_y != 0.0f)) {
+        gs->player.spawn_x = def->player_start_x;
+        gs->player.spawn_y = def->player_start_y;
+    } else {
+        gs->player.spawn_x = 80.0f;
+        gs->player.spawn_y = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);
+    }
+    gs->score_life_next = gs->rules.score_per_life;
+    reset_current_level(gs, &gs->loop.fp_prev_riding);
+}
+
 void apply_damage(GameState *gs, int amount, int push,
                   float src_cx, float src_cy)
 {
@@ -40,13 +66,11 @@ void apply_damage(GameState *gs, int amount, int push,
     if (gs->hearts <= 0) {
         gs->lives--;
         if (gs->lives < 0) {
-            /* Game over — reset to level-defined starting values */
-            const LevelDef *def = (const LevelDef *)gs->runtime.current_level;
-            gs->lives           = def && def->initial_lives  > 0
-                                ? def->initial_lives  : DEFAULT_LIVES;
-            gs->score           = 0;
-            gs->score_life_next = gs->rules.score_per_life;
-            if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER - reset");
+            gs->game_over = 1;
+            gs->pause_reasons = 0;
+            gs->paused = 0;
+            if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER");
+            return;
         }
         if (gs->debug_mode) debug_log(&gs->debug, "LIFE LOST lives=%d", gs->lives);
         {

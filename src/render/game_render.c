@@ -344,6 +344,8 @@ void game_render_frame(GameState *gs, int cam_x, float dt)
     GameOverlayState overlay = game_overlay_state(gs);
     if (overlay == GAME_OVERLAY_LEVEL_COMPLETE) {
         render_level_complete_overlay(gs);
+    } else if (overlay == GAME_OVERLAY_GAME_OVER) {
+        render_game_over_overlay(gs);
     } else if (overlay == GAME_OVERLAY_PAUSED) {
         render_pause_overlay(gs);
     }
