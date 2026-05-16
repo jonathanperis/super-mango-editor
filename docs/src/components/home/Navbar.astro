@@ -1,15 +1,25 @@
 ---
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
-<nav class="site-nav" id="site-nav">
-    <a href={base} class="nav-logo">Super Mango</a>
-    <ul class="nav-links">
-        <li><a href="#play">Play</a></li>
-        <li><a href="#about">Scoreboard</a></li>
-        <li><a href="#docs">Manual</a></li>
-        <li><a href={`${base}/docs`}>Full Docs</a></li>
-        <li><a href="#downloads">Downloads</a></li>
-    </ul>
+<nav class="site-nav" id="site-nav" aria-label="Primary navigation">
+    <a href={base || '#hero'} class="nav-logo" aria-label="Super Mango home">
+        <span class="nav-logo-mark" aria-hidden="true">SM</span>
+        <span class="nav-logo-copy">
+            <span>Super Mango</span>
+            <small>Arcade builder</small>
+        </span>
+    </a>
+    <div class="nav-rail" aria-label="Page sections">
+        <a href="#play">Play</a>
+        <a href="#about">Scoreboard</a>
+        <a href="#docs">Manual</a>
+        <a href={`${base}/docs`}>Full docs</a>
+        <a href="#downloads">Drops</a>
+    </div>
+    <a class="nav-start" href="#play">
+        <span>Insert coin</span>
+        <strong>Play</strong>
+    </a>
 </nav>
 <nav class="mobile-action-bar" aria-label="Mobile quick actions">
     <a href="#play">Play</a>
