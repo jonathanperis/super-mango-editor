@@ -37,7 +37,7 @@ assets/
 
 ## Per-Level Asset Configuration
 
-Two visual elements are configurable per TOML level file, allowing different themes without changing code:
+Several visual elements are configurable per TOML level file, allowing different themes without changing code:
 
 ### Floor Tile
 
@@ -50,16 +50,32 @@ Any 48×48 PNG tile can be substituted here. The engine 9-slice renders it acros
 ### Parallax Background Layers
 
 ```toml
-[background_layers]
+[[background_layers]]
 path  = "assets/sprites/backgrounds/sky_blue.png"
 speed = 0.0
 
-[background_layers]
+[[background_layers]]
 path  = "assets/sprites/backgrounds/glacial_mountains.png"
 speed = 0.2
 ```
 
-Layers are drawn in array order (first = furthest back). `speed` is the parallax scroll factor: `0.0` = static sky, `1.0` = locks to camera, `0.1`–`0.5` = typical mid-ground parallax. Up to 8 layers are supported. See [Level Design](#level-design) for the full list of available background images and suggested speeds.
+Layers are TOML array-of-tables and are drawn in array order (first = furthest back). `speed` is the parallax scroll factor: `0.0` = static sky, `1.0` = locks to camera, `0.1`–`0.5` = typical mid-ground parallax. Up to 8 layers are supported. See [Level Design](#level-design) for the full list of available background images and suggested speeds.
+
+### Foreground Strip and Fog Layers
+
+`foreground_layers` currently select the level foreground strip texture used by the water/lava renderer; the active runtime takes the last valid configured path. Atmospheric overlays are configured separately with `fog_layers` and loaded into the fog system.
+
+```toml
+[[foreground_layers]]
+path  = "assets/sprites/foregrounds/water.png"
+speed = 0.0
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_1.png"
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_2.png"
+```
 
 ---
 
@@ -86,10 +102,10 @@ Layers are drawn in array order (first = furthest back). `speed` is the parallax
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `fog_1.png` | `fog.c` (`fog->textures[0]`) | Fog overlay layer, semi-transparent sliding effect |
-| `fog_2.png` | `fog.c` (`fog->textures[1]`) | Fog overlay layer, semi-transparent sliding effect |
-| `water.png` | `water->texture` | 384x64 sprite sheet, 8 frames of 48x64 with 16x31 art crop |
-| `lava.png` | `lava->texture` | Lava hazard foreground |
+| `fog_1.png` | `fog_layers` / `fog.c` (`fog->textures[0]`) | Fog overlay layer, semi-transparent sliding effect |
+| `fog_2.png` | `fog_layers` / `fog.c` (`fog->textures[1]`) | Fog overlay layer, semi-transparent sliding effect |
+| `water.png` | `foreground_layers` / `water->texture` | 384x64 sprite sheet, 8 frames of 48x64 with 16x31 art crop |
+| `lava.png` | `foreground_layers` / `water->texture` | Lava-themed foreground strip |
 | `clouds.png` | foreground clouds | Decorative cloud layer |
 | `fog_fire_1.png`, `fog_fire_2.png`, `smoke.png` | Volcanic levels | Fire fog / smoke overlay layers |
 

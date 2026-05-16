@@ -77,7 +77,7 @@ TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
                  $(OUTDIR)/collision-test $(OUTDIR)/phase-transition-test \
                  $(OUTDIR)/exporter-test $(OUTDIR)/editor-validation-test \
                  $(OUTDIR)/gameplay-damage-test $(OUTDIR)/gameplay-config-test \
-                 $(OUTDIR)/game-overlay-test
+                 $(OUTDIR)/game-overlay-test $(OUTDIR)/game-events-test
 SMOKE_LEVELS  = $(wildcard levels/*.toml)
 SMOKE_FRAMES  ?= 5
 SMOKE_SEED    ?= 1
@@ -115,6 +115,7 @@ TEST_FLOAT_PLATFORM_OBJ = $(OBJDIR)/tests/test-float-platform.o
 TEST_BOUNCEPAD_OBJ = $(OBJDIR)/tests/test-bouncepad.o
 TEST_PHASE_OBJ      = $(OBJDIR)/tests/test-phase-transition.o
 TEST_GAME_OVERLAY_OBJ = $(OBJDIR)/tests/test-game-overlay.o
+TEST_GAME_EVENTS_OBJ = $(OBJDIR)/tests/test-game-events.o
 TEST_EDITOR_VALIDATION_OBJ = $(OBJDIR)/tests/test-editor-validation.o
 TEST_EDITOR_FILES_OBJ = $(OBJDIR)/tests/test-editor-files.o
 TEST_EDITOR_SESSION_OBJ = $(OBJDIR)/tests/test-editor-session.o
@@ -125,7 +126,7 @@ TEST_DEPS           = $(wildcard $(OBJDIR)/tests/*.d)
 SANITIZE_CFLAGS     = -fsanitize=address,undefined -fno-omit-frame-pointer
 SANITIZE_LDFLAGS    = -fsanitize=address,undefined
 
-.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels smoke sanitize
+.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels docs-drift smoke sanitize sanitize-smoke
 
 all: $(OUTDIR) $(TARGET)
 
@@ -201,11 +202,15 @@ test: $(OUTDIR) $(TEST_TARGETS)
 	$(RUN_PREFIX) ./$(OUTDIR)/gameplay-damage-test
 	$(RUN_PREFIX) ./$(OUTDIR)/gameplay-config-test
 	$(RUN_PREFIX) ./$(OUTDIR)/game-overlay-test
+	$(RUN_PREFIX) ./$(OUTDIR)/game-events-test
 
 $(TEST_TARGETS): | $(OUTDIR)
 
 validate-levels:
 	python3 tools/validate_levels.py
+
+docs-drift:
+	python3 tools/check_docs_drift.py
 
 smoke: all editor
 	@for level in $(SMOKE_LEVELS); do \
@@ -221,6 +226,13 @@ sanitize:
 		TEST_CFLAGS="$(TEST_CFLAGS) $(SANITIZE_CFLAGS)" \
 		LIBS="$(LIBS) $(SANITIZE_LDFLAGS)" \
 		TEST_LIBS="$(TEST_LIBS) $(SANITIZE_LDFLAGS)"
+
+sanitize-smoke:
+	rm -rf out-sanitize
+	$(MAKE) smoke OUTDIR=out-sanitize \
+		CFLAGS="$(CFLAGS) $(SANITIZE_CFLAGS)" \
+		LIBS="$(LIBS) $(SANITIZE_LDFLAGS)" \
+		EDITOR_LIBS="$(EDITOR_LIBS) $(SANITIZE_LDFLAGS)"
 
 $(TEST_SERIALIZER_OBJ): $(EDITOR_DIR)/serializer.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
@@ -321,6 +333,9 @@ $(TEST_PHASE_OBJ): $(SRCDIR)/levels/phase_transition.c
 $(TEST_GAME_OVERLAY_OBJ): $(SRCDIR)/core/game_overlay.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
+$(TEST_GAME_EVENTS_OBJ): $(SRCDIR)/input/game_events.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
 $(TEST_EDITOR_VALIDATION_OBJ): $(EDITOR_DIR)/editor_validation.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
@@ -378,6 +393,9 @@ $(OUTDIR)/gameplay-config-test: tests/gameplay_config_test.c $(TEST_GAME_CAMERA_
 
 $(OUTDIR)/game-overlay-test: tests/game_overlay_test.c $(TEST_GAME_OVERLAY_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+
+$(OUTDIR)/game-events-test: tests/game_events_test.c $(TEST_GAME_EVENTS_OBJ) $(TEST_GAME_OVERLAY_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
 
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
 # Requires the Emscripten SDK (emcc on PATH).

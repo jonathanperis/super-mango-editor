@@ -83,6 +83,7 @@ while (gs.running) {
                     SDL_CONTROLLERDEVICEADDED   — opens a newly plugged-in controller
                     SDL_CONTROLLERDEVICEREMOVED — closes and NULLs gs->controller when unplugged
                     SDL_CONTROLLERBUTTONDOWN (START) — pauses/resumes, restarts game-over, or advances completion overlay
+                    SDL_CONTROLLERBUTTONDOWN (BACK)  — exits completion/game-over overlays
   3. Update       — player_handle_input → player_update (incl. bouncepad, float-platform, bridge landing)
                     → bouncepad response (animation + spring sound)
                     → spiders_update → jumping_spiders_update → birds_update → faster_birds_update
@@ -158,11 +159,11 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 | 31 | HUD | `hud_render`: hearts, lives, score -- always drawn on top |
 | 32 | Debug | `debug_render`: FPS counter, collision boxes, event log — when `--debug` active |
 
-> **Note:** Additional foreground layers (fog, water overlays) can be added per-level via `[foreground_layers]` in the TOML file, adding up to 8 extra layers above the HUD. The base 32 layers are always present.
+> **Note:** Per-level visual layers are split by role: `background_layers` feed the parallax renderer, `foreground_layers` select the water/lava foreground strip texture, and `fog_layers` feed the atmospheric fog system. Fog renders before the HUD so hearts/lives/score remain legible.
 
 ### Level Completion Flow
 
-Collecting `last_star` calls `game_complete_level()`. The game snapshots elapsed time, coins collected, total coins, and the resolved `next_phase` path (if any), then shows a completion overlay. While the overlay is active, gameplay update pauses; pressing Enter or Start calls `game_load_next_phase()` when `next_phase` is configured, otherwise it exits the run.
+Collecting `last_star` calls `game_complete_level()`. The game snapshots elapsed time, coins collected, total coins, and the resolved `next_phase` path (if any), then shows a completion overlay. While the overlay is active, gameplay update pauses; pressing Enter, Space, or controller Start calls `game_load_next_phase()` when `next_phase` is configured, otherwise it exits the run. Esc or controller Back exits the overlay/run without advancing.
 
 ### Pause Overlay Flow
 
@@ -170,7 +171,7 @@ During active gameplay, Esc or controller Start toggles the player pause reason 
 
 ### Game-Over Flow
 
-When lethal damage consumes the final life, `apply_damage()` sets `gs->game_over` and returns without resetting the level. The shared overlay helper reports `GAME_OVERLAY_GAME_OVER`, so the loop blocks gameplay updates and rendering draws a game-over overlay with the final score. Enter, Space, or controller Start confirms restart through `game_restart_after_game_over()`, which restores level-defined lives/hearts, resets score and bonus-life threshold, and reloads the current level. Esc exits the game-over overlay.
+When lethal damage consumes the final life, `apply_damage()` sets `gs->game_over` and returns without resetting the level. The shared overlay helper reports `GAME_OVERLAY_GAME_OVER`, so the loop blocks gameplay updates and rendering draws a game-over overlay with the final score. Enter, Space, or controller Start confirms restart through `game_restart_after_game_over()`, which restores level-defined lives/hearts, resets score and bonus-life threshold, and reloads the current level. Esc or controller Back exits the overlay/run.
 
 ---
 
@@ -219,19 +220,21 @@ typedef struct {
     Hud     hud;
     Camera  camera;
     int     hearts, lives, score, score_life_next;
-    int     level_complete;
-    float   level_elapsed;
-    int     level_coin_total;
-    int     completion_coins_collected, completion_coin_total;
-    float   completion_elapsed;
-    int     completion_pending_next_phase;
-    char    completion_next_phase[256];
+    int     running;
+    int     game_over;
+    int     paused;
+    unsigned int pause_reasons;
+    float   checkpoint_x;
+    int     debug_mode;
+    int     smoke_test_frames;
     char    level_path[256];
+    void   *level_def;      /* owned active LevelDef backing storage */
 
-    LevelRuntime  runtime;
-    GameRules     rules;
-    GameLoopState loop;
-    DebugOverlay  debug;
+    LevelRuntime        runtime;
+    GameRules           rules;
+    GameLoopState       loop;
+    GameCompletionState completion;
+    DebugOverlay        debug;
 } GameState;
 ```
 

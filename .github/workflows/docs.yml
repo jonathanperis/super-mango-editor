@@ -4,7 +4,10 @@ on:
   pull_request:
     paths:
       - 'docs/**'
-      - '.github/workflows/docs.yml'
+      - 'tools/check_docs_drift.py'
+      - 'Makefile'
+      - 'src/**'
+      - '.github/workflows/*.yml'
   workflow_dispatch:
 
 jobs:
@@ -25,6 +28,9 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Check semantic docs drift
+        run: make docs-drift
 
       - name: Install docs dependencies
         run: bun install --frozen-lockfile

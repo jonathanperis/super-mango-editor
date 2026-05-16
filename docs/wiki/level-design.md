@@ -54,6 +54,10 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 | `music_path` | string | Path to WAV/OGG, relative to repo root. |
 | `music_volume` | int | SDL_mixer channel volume: 0 (silent) – 128 (full). |
 | `floor_tile_path` | string | PNG used to tile the ground. Per-level theming. |
+| `initial_hearts` | int | Starting hit points for the level. |
+| `initial_lives` | int | Starting lives for the level. |
+| `score_per_life` | int | Score threshold spacing for bonus lives. |
+| `coin_score` | int | Points awarded for each collected coin. |
 | `next_phase` | string | Optional TOML path loaded after the completion summary is confirmed. |
 | `floor_gaps` | int array | Sea gap x-positions. Blue/fire flames are placed manually; flame `x` values normally match these openings. |
 
@@ -147,7 +151,7 @@ y = 100.0
 
 Single-instance. Triggers the level-complete event when collected. Displayed at 24×24 px.
 
-Collecting the last star snapshots elapsed time and coin totals, then shows the level-completion summary. If `next_phase` is set, pressing Enter/Start after the summary loads the next TOML level; otherwise confirmation exits the run.
+Collecting the last star snapshots elapsed time and coin totals, then shows the level-completion summary. If `next_phase` is set, pressing Enter, Space, or controller Start after the summary loads the next TOML level; otherwise confirmation exits the run. Esc or controller Back exits the overlay/run without advancing.
 
 ---
 
@@ -404,20 +408,26 @@ The player can climb all three by pressing Up/Down while overlapping the surface
 ## Background & Foreground Layers
 
 ```toml
-[background_layers]
+[[background_layers]]
 path  = "assets/sprites/backgrounds/sky_blue.png"
 speed = 0.0    # parallax scroll factor: 0.0 = static, 1.0 = locks to camera
 
-[background_layers]
+[[background_layers]]
 path  = "assets/sprites/backgrounds/glacial_mountains.png"
 speed = 0.2
 
-[foreground_layers]
-path  = "assets/sprites/foregrounds/fog_1.png"
-speed = 0.6
+[[foreground_layers]]
+path  = "assets/sprites/foregrounds/water.png"
+speed = 0.0
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_1.png"
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_2.png"
 ```
 
-Layers are drawn in array order (first = furthest back). Up to 8 background layers are supported. Speed `0.0` tiles the image but doesn't scroll; speed `1.0` would scroll at the same rate as the camera (appears fixed in world space). Most parallax layers use `0.1`–`0.5`.
+Background layers are drawn in array order (first = furthest back). Up to 8 background layers are supported. Speed `0.0` tiles the image but does not scroll; speed `1.0` would scroll at the same rate as the camera (appears fixed in world space). Most parallax layers use `0.1`–`0.5`. `foreground_layers` select the water/lava foreground strip texture, while `fog_layers` configure semi-transparent atmospheric overlays loaded by the fog system.
 
 Available background images in `assets/sprites/backgrounds/`:
 
@@ -451,7 +461,7 @@ score_per_life  = 1000
 coin_score      = 100
 floor_gaps      = []
 
-[background_layers]
+[[background_layers]]
 path  = "assets/sprites/backgrounds/sky_blue.png"
 speed = 0.0
 
