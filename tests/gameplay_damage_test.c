@@ -40,6 +40,19 @@ static int expect_float_positive(const char *name, float actual)
     return 0;
 }
 
+static int expect_float_near(const char *name, float actual, float expected, float eps)
+{
+    float diff = actual - expected;
+    if (diff < 0.0f) diff = -diff;
+    if (diff > eps) {
+        fprintf(stderr,
+                "gameplay_damage_test: %s got %.3f expected %.3f (eps %.3f)\n",
+                name, actual, expected, eps);
+        return 1;
+    }
+    return 0;
+}
+
 static int nonlethal_damage_sets_invincibility_and_push(void)
 {
     GameState gs = {0};
@@ -155,9 +168,12 @@ static int confirming_game_over_restores_level_lives_and_score(void)
     if (expect_int("lives restored", gs.lives, 5) != 0) return 1;
     if (expect_int("hearts restored", gs.hearts, 3) != 0) return 1;
     if (expect_int("score reset", gs.score, 0) != 0) return 1;
-    if (expect_int("checkpoint reset", (int)gs.checkpoint_x, 0) != 0) return 1;
-    if (expect_int("spawn x restored", (int)gs.player.spawn_x, 80) != 0) return 1;
-    if (expect_int("spawn y restored", (int)gs.player.spawn_y, 172) != 0) return 1;
+    if (expect_float_near("checkpoint reset", gs.checkpoint_x, 0.0f, 0.001f) != 0)
+        return 1;
+    if (expect_float_near("spawn x restored", gs.player.spawn_x, 80.0f, 0.001f) != 0)
+        return 1;
+    if (expect_float_near("spawn y restored", gs.player.spawn_y, 172.0f, 0.001f) != 0)
+        return 1;
     if (expect_int("next life reset", gs.score_life_next, 1000) != 0) return 1;
     if (expect_int("reset calls", s_reset_calls, 1) != 0) return 1;
 
@@ -186,9 +202,10 @@ static int confirming_game_over_restores_default_spawn_when_level_start_unset(vo
 
     game_restart_after_game_over(&gs);
 
-    if (expect_int("default spawn x restored", (int)gs.player.spawn_x, 80) != 0)
+    if (expect_float_near("default spawn x restored", gs.player.spawn_x, 80.0f, 0.001f) != 0)
         return 1;
-    if (expect_int("default spawn y restored", (int)gs.player.spawn_y, default_spawn_y) != 0)
+    if (expect_float_near("default spawn y restored", gs.player.spawn_y,
+                          (float)default_spawn_y, 0.001f) != 0)
         return 1;
     if (expect_int("default spawn reset calls", s_reset_calls, 1) != 0) return 1;
 

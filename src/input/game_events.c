@@ -112,7 +112,10 @@ void game_handle_events(GameState *gs)
             handle_controller_removed(gs, &event.cdevice);
 
         } else if (event.type == SDL_CONTROLLERBUTTONDOWN) {
-            if (event.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
+            if (event.cbutton.button == SDL_CONTROLLER_BUTTON_BACK &&
+                game_overlay_state(gs) == GAME_OVERLAY_GAME_OVER) {
+                gs->running = 0;
+            } else if (event.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
                 GameOverlayState overlay = game_overlay_state(gs);
                 if (overlay == GAME_OVERLAY_LEVEL_COMPLETE) continue_after_completion(gs);
                 else if (overlay == GAME_OVERLAY_GAME_OVER) confirm_game_over(gs);
