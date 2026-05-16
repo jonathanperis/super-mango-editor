@@ -6,12 +6,20 @@ from __future__ import annotations
 import argparse
 import os
 import shlex
+import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+REPLAY_DIR = ROOT / "out" / "replays-smoke"
+
+
+def replay_id(path: Path) -> str:
+    name = path.stem
+    if not name or any(not (ch.isalnum() or ch in "-_") for ch in name):
+        raise SystemExit(f"unsafe replay script name: {path}")
+    return name
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,6 +47,7 @@ def default_replay_scripts(workdir: Path) -> list[Path]:
         "pause-resume.replay": "0 tap escape\n2 tap enter\n4 tap space\n",
     }
     paths: list[Path] = []
+    workdir.mkdir(parents=True, exist_ok=True)
     for name, content in scripts.items():
         path = workdir / name
         path.write_text(content, encoding="utf-8")
@@ -48,12 +57,17 @@ def default_replay_scripts(workdir: Path) -> list[Path]:
 
 def selected_replays(args: argparse.Namespace, workdir: Path) -> list[Path]:
     if args.replays:
-        paths = [Path(item) for item in args.replays]
-        for path in paths:
-            full = path if path.is_absolute() else ROOT / path
+        paths = []
+        workdir.mkdir(parents=True, exist_ok=True)
+        for item in args.replays:
+            src = Path(item)
+            full = src if src.is_absolute() else ROOT / src
             if not full.exists():
-                raise SystemExit(f"replay script missing: {path}")
-        return [path if path.is_absolute() else ROOT / path for path in paths]
+                raise SystemExit(f"replay script missing: {src}")
+            dst = workdir / f"{replay_id(full)}.replay"
+            shutil.copyfile(full, dst)
+            paths.append(dst)
+        return paths
     return default_replay_scripts(workdir)
 
 
@@ -77,29 +91,27 @@ def main() -> int:
     env.setdefault("SDL_VIDEODRIVER", "dummy")
     env.setdefault("SDL_AUDIODRIVER", "dummy")
 
-    with tempfile.TemporaryDirectory(prefix="super-mango-replay-") as tmp:
-        replays = selected_replays(args, Path(tmp))
-        for level in levels:
-            level_path = level if level.is_absolute() else ROOT / level
-            if not level_path.exists():
-                raise SystemExit(f"level missing: {level}")
-            rel_level = level_path.relative_to(ROOT).as_posix()
-            for seed in args.seeds:
-                for replay in replays:
-                    rel_replay = replay.relative_to(ROOT).as_posix() if replay.is_relative_to(ROOT) else str(replay)
-                    run([
-                        str(binary),
-                        "--level",
-                        rel_level,
-                        "--smoke-test-frames",
-                        str(args.frames),
-                        "--seed",
-                        str(seed),
-                        "--replay-script",
-                        rel_replay,
-                    ], env)
+    replays = selected_replays(args, REPLAY_DIR)
+    for level in levels:
+        level_path = level if level.is_absolute() else ROOT / level
+        if not level_path.exists():
+            raise SystemExit(f"level missing: {level}")
+        rel_level = level_path.relative_to(ROOT).as_posix()
+        for seed in args.seeds:
+            for replay in replays:
+                run([
+                    str(binary),
+                    "--level",
+                    rel_level,
+                    "--smoke-test-frames",
+                    str(args.frames),
+                    "--seed",
+                    str(seed),
+                    "--replay-script",
+                    replay_id(replay),
+                ], env)
 
-        scenario_count = len(levels) * len(args.seeds) * len(replays)
+    scenario_count = len(levels) * len(args.seeds) * len(replays)
 
     if not args.skip_editor:
         run([str(editor), "--smoke-test"], env)

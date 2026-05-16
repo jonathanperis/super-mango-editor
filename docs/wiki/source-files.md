@@ -155,7 +155,7 @@ New `.c` files in `src/` or recognized source subdirectories are picked up by Ma
 
 ### Responsibilities
 
-- Parse CLI flags: `--debug`, `--sandbox`, `--level <path>`, `--smoke-test-frames N`, `--seed N`, and `--replay-script <path>`
+- Parse CLI flags: `--debug`, `--sandbox`, `--level <path>`, `--smoke-test-frames N`, `--seed N`, and `--replay-script <name>`
 - Call `SDL_Init`, `IMG_Init`, `TTF_Init`, `Mix_OpenAudio` in order
 - Route to start menu, sandbox, or direct TOML level mode
 - Tear down SDL subsystems in reverse order before returning
