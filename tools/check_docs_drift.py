@@ -13,12 +13,23 @@ import re
 import sys
 from pathlib import Path
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - CI uses Python 3.11+
+    sys.stderr.write("check_docs_drift: Python 3.11+ required for tomllib\n")
+    sys.exit(2)
+
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs" / "wiki"
 
 
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def load_level(path: Path) -> dict:
+    with path.open("rb") as fp:
+        return tomllib.load(fp)
 
 
 def fail(message: str) -> None:
@@ -139,6 +150,46 @@ def check_overlay_controls_doc() -> None:
             fail(f"{page_name}: overlay controls missing Enter/Space/Start confirmation docs")
 
 
+def check_level_catalog_doc() -> None:
+    catalog = read(DOCS / "level-catalog.md")
+    index = read(DOCS / "index.md")
+    sidebar = read(ROOT / "docs" / "src" / "lib" / "docsSidebar.ts")
+    labels = read(ROOT / "docs" / "src" / "pages" / "docs" / "[...slug].astro")
+    level_files = sorted((ROOT / "levels").glob("*.toml"))
+    for level in level_files:
+        rel = level.relative_to(ROOT).as_posix()
+        if rel not in catalog:
+            fail(f"docs/wiki/level-catalog.md: missing level entry for `{rel}`")
+        data = load_level(level)
+        last_star = data.get("last_star")
+        if isinstance(last_star, dict):
+            next_phase = str(last_star.get("next_phase") or "")
+            if next_phase and f"`{next_phase}`" not in catalog:
+                fail(f"docs/wiki/level-catalog.md: missing next_phase `{next_phase}` from {rel}")
+    if "`last_star`" not in catalog:
+        fail("docs/wiki/level-catalog.md: collectibles counts must include `last_star`")
+    if "tools/generate_level_catalog.py" not in catalog:
+        fail("docs/wiki/level-catalog.md: missing generated-file banner")
+    for page_name, text in [
+        ("docs/wiki/index.md", index),
+        ("docs/src/lib/docsSidebar.ts", sidebar),
+        ("docs/src/pages/docs/[...slug].astro", labels),
+    ]:
+        if "level-catalog" not in text:
+            fail(f"{page_name}: missing level-catalog navigation/reference")
+
+
+def check_agent_context_docs() -> None:
+    expected_count = len(makefile_test_targets())
+    for rel in ["AGENTS.md", "CLAUDE.md"]:
+        text = read(ROOT / rel)
+        if f"{expected_count}-test `make test` suite" not in text:
+            fail(f"{rel}: stale make test count; expected {expected_count}")
+        for token in ["Enter/Space/Start", "Esc/Back", "semantic docs drift"]:
+            if token not in text:
+                fail(f"{rel}: missing current project context token `{token}`")
+
+
 def main() -> int:
     check_test_targets_documented()
     check_source_file_map()
@@ -148,6 +199,8 @@ def main() -> int:
     check_level_schema_doc()
     check_cli_and_workflows()
     check_overlay_controls_doc()
+    check_level_catalog_doc()
+    check_agent_context_docs()
 
     if FAILURES:
         print("docs drift check failed:")
