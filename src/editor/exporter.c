@@ -8,8 +8,6 @@
  * The output style matches exported level sources: section separators, one array
  * entry per line, trailing commas, float literals with %.1ff formatting, and
  * enum identifiers instead of raw integers.
- *
- * All output is written with fprintf — no intermediate string buffers.
  */
 
 #include "exporter.h"
@@ -83,6 +81,100 @@ static const char *bouncepad_type_str(BouncepadType pad_type)
 }
 
 /* ------------------------------------------------------------------ */
+/* Helper: safe C output                                               */
+/* ------------------------------------------------------------------ */
+
+/*
+ * is_valid_c_identifier — Exported filenames are also used as C symbols.
+ *
+ * Keep this deliberately strict so generated files cannot smuggle preprocessor
+ * syntax, path separators, or invalid declaration text into the output.
+ */
+static int is_c_identifier_start(unsigned char c)
+{
+    return c == '_' || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+}
+
+static int is_c_identifier_continue(unsigned char c)
+{
+    return is_c_identifier_start(c) || (c >= '0' && c <= '9');
+}
+
+static int is_valid_c_identifier(const char *name)
+{
+    if (!name || name[0] == '\0') {
+        return 0;
+    }
+
+    if (!is_c_identifier_start((unsigned char)name[0])) {
+        return 0;
+    }
+
+    for (const unsigned char *p = (const unsigned char *)name + 1; *p; p++) {
+        if (!is_c_identifier_continue(*p)) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+/*
+ * build_export_path — Join output directory, identifier, and extension safely.
+ */
+static int build_export_path(char *path, size_t path_size,
+                             const char *dir_path, const char *var_name,
+                             const char *extension)
+{
+    int n = snprintf(path, path_size, "%s/%s.%s", dir_path, var_name, extension);
+    if (n < 0 || (size_t)n >= path_size) {
+        fprintf(stderr, "exporter: output path too long for '%s.%s'\n",
+                var_name, extension);
+        return -1;
+    }
+
+    return 0;
+}
+
+/*
+ * write_c_string_literal — Emit a quoted C string literal with escapes.
+ *
+ * Level metadata and asset paths can come from TOML/editor input, so every
+ * string literal in generated C must escape quotes, question marks (to avoid C
+ * trigraph rewriting), backslashes, control chars, DEL, and high-bit bytes
+ * instead of writing raw text inside quotes.
+ */
+static void write_c_string_literal(FILE *f, const char *s)
+{
+    fputc('"', f);
+    for (const unsigned char *p = (const unsigned char *)(s ? s : ""); *p; p++) {
+        switch (*p) {
+        case '\\': fputs("\\\\", f); break;
+        case '"':  fputs("\\\"", f); break;
+        case '?':  fputs("\\?", f); break;
+        case '\n': fputs("\\n", f); break;
+        case '\r': fputs("\\r", f); break;
+        case '\t': fputs("\\t", f); break;
+        default:
+            if (*p < 0x20 || *p == 0x7f || *p >= 0x80) {
+                fprintf(f, "\\%03o", *p);
+            } else {
+                fputc(*p, f);
+            }
+            break;
+        }
+    }
+    fputc('"', f);
+}
+
+static void write_c_string_field(FILE *f, const char *field, const char *value)
+{
+    fprintf(f, "    .%s = ", field);
+    write_c_string_literal(f, value);
+    fputs(",\n", f);
+}
+
+/* ------------------------------------------------------------------ */
 /* Helper: section separator                                           */
 /* ------------------------------------------------------------------ */
 
@@ -113,7 +205,9 @@ static int write_header(const char *var_name, const char *dir_path)
      * 512 bytes is generous for typical paths like "src/levels/exported/level_02.h".
      */
     char path[512];
-    snprintf(path, sizeof(path), "%s/%s.h", dir_path, var_name);
+    if (build_export_path(path, sizeof(path), dir_path, var_name, "h") != 0) {
+        return -1;
+    }
 
     /*
      * Open with restricted permissions (0644) on POSIX so generated files
@@ -162,7 +256,9 @@ static int write_source(const LevelDef *def, const char *var_name,
                          const char *dir_path)
 {
     char path[512];
-    snprintf(path, sizeof(path), "%s/%s.c", dir_path, var_name);
+    if (build_export_path(path, sizeof(path), dir_path, var_name, "c") != 0) {
+        return -1;
+    }
 
 #if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
     int fds = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -206,20 +302,12 @@ static int write_source(const LevelDef *def, const char *var_name,
     fprintf(f, "const LevelDef %s_def = {\n", var_name);
 
     /* ---- 1. name + description ---- */
-    fprintf(f, "    .name = \"%s\",\n", def->name[0] ? def->name : "Untitled");
+    write_c_string_field(f, "name", def->name[0] ? def->name : "Untitled");
     if (def->description[0] != '\0') {
-        /* Escape newlines for C string literal */
-        fprintf(f, "    .description = \"");
-        for (const char *p = def->description; *p; p++) {
-            if (*p == '\n')      fprintf(f, "\\n");
-            else if (*p == '"')  fprintf(f, "\\\"");
-            else if (*p == '\\') fprintf(f, "\\\\");
-            else                 fputc(*p, f);
-        }
-        fprintf(f, "\",\n");
+        write_c_string_field(f, "description", def->description);
     }
     if (def->generated_by[0] != '\0') {
-        fprintf(f, "    .generated_by = \"%s\",\n", def->generated_by);
+        write_c_string_field(f, "generated_by", def->generated_by);
     }
     fprintf(f, "    .screen_count = %d,\n", def->screen_count);
 
@@ -315,7 +403,7 @@ static int write_source(const LevelDef *def, const char *var_name,
     fprintf(f, "    .last_star = { .x = %.1ff, .y = %.1ff },\n",
             def->last_star.x, def->last_star.y);
     if (def->next_phase[0] != '\0') {
-        fprintf(f, "    .next_phase = \"%s\",\n", def->next_phase);
+        write_c_string_field(f, "next_phase", def->next_phase);
     }
 
     /* ---- 8. Spiders ---- */
@@ -603,9 +691,9 @@ static int write_source(const LevelDef *def, const char *var_name,
     if (def->background_layer_count > 0) {
         fprintf(f, "    .background_layers = {\n");
         for (int i = 0; i < def->background_layer_count; i++) {
-            fprintf(f, "        { \"%s\", %.2ff },\n",
-                    def->background_layers[i].path,
-                    (double)def->background_layers[i].speed);
+            fputs("        { ", f);
+            write_c_string_literal(f, def->background_layers[i].path);
+            fprintf(f, ", %.2ff },\n", (double)def->background_layers[i].speed);
         }
         fprintf(f, "    },\n");
     }
@@ -615,9 +703,9 @@ static int write_source(const LevelDef *def, const char *var_name,
     if (def->foreground_layer_count > 0) {
         fprintf(f, "    .foreground_layers = {\n");
         for (int i = 0; i < def->foreground_layer_count; i++) {
-            fprintf(f, "        { \"%s\", %.2ff },\n",
-                    def->foreground_layers[i].path,
-                    (double)def->foreground_layers[i].speed);
+            fputs("        { ", f);
+            write_c_string_literal(f, def->foreground_layers[i].path);
+            fprintf(f, ", %.2ff },\n", (double)def->foreground_layers[i].speed);
         }
         fprintf(f, "    },\n");
     }
@@ -627,9 +715,9 @@ static int write_source(const LevelDef *def, const char *var_name,
     if (def->fog_layer_count > 0) {
         fprintf(f, "    .fog_layers = {\n");
         for (int i = 0; i < def->fog_layer_count; i++) {
-            fprintf(f, "        { \"%s\", %.2ff },\n",
-                    def->fog_layers[i].path,
-                    (double)def->fog_layers[i].speed);
+            fputs("        { ", f);
+            write_c_string_literal(f, def->fog_layers[i].path);
+            fprintf(f, ", %.2ff },\n", (double)def->fog_layers[i].speed);
         }
         fprintf(f, "    },\n");
     }
@@ -640,11 +728,15 @@ static int write_source(const LevelDef *def, const char *var_name,
     fprintf(f, "    .player_start_y = %.1ff,\n", (double)def->player_start_y);
 
     /* Music */
-    fprintf(f, "\n    .music_path   = \"%s\",\n", def->music_path);
+    fputs("\n    .music_path   = ", f);
+    write_c_string_literal(f, def->music_path);
+    fputs(",\n", f);
     fprintf(f, "    .music_volume = %d,\n", def->music_volume);
 
     /* Floor tile */
-    fprintf(f, "\n    .floor_tile_path = \"%s\",\n", def->floor_tile_path);
+    fputs("\n    .floor_tile_path = ", f);
+    write_c_string_literal(f, def->floor_tile_path);
+    fputs(",\n", f);
 
     /* Game rules */
     fprintf(f, "\n    .initial_hearts  = %d,\n", def->initial_hearts);
@@ -685,10 +777,20 @@ static int write_source(const LevelDef *def, const char *var_name,
  * The .c file uses designated initialisers and includes all entity headers
  * so that symbolic speed/mode constants resolve at compile time.
  *
- * Returns 0 on success, -1 if either file could not be opened.
+ * Returns 0 on success, -1 if arguments are invalid or files cannot be opened.
  */
 int level_export_c(const LevelDef *def, const char *var_name, const char *dir_path)
 {
+    if (!def || !dir_path) {
+        fprintf(stderr, "exporter: invalid export arguments\n");
+        return -1;
+    }
+    if (!is_valid_c_identifier(var_name)) {
+        fprintf(stderr, "exporter: invalid export identifier '%s'\n",
+                var_name ? var_name : "(null)");
+        return -1;
+    }
+
     /*
      * Write the header first — if it fails there's no point writing the .c
      * file, since both are needed for a compilable level.
