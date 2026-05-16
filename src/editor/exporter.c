@@ -343,8 +343,13 @@ static int write_source(const LevelDef *def, const char *var_name,
         fprintf(f, "    .platforms = {\n");
         for (int i = 0; i < def->platform_count; i++) {
             const PlatformPlacement *p = &def->platforms[i];
-            fprintf(f, "        { .x = %.1ff, .tile_height = %d, .tile_width = %d },\n",
+            fprintf(f, "        { .x = %.1ff, .tile_height = %d, .tile_width = %d",
                     p->x, p->tile_height, p->tile_width);
+            if (p->tile_path[0] != '\0') {
+                fputs(", .tile_path = ", f);
+                write_c_string_literal(f, p->tile_path);
+            }
+            fputs(" },\n", f);
         }
         fprintf(f, "    },\n");
     }
