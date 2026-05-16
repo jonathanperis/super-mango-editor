@@ -4,6 +4,7 @@
 
 #include "../game.h"
 
+#include "game_overlay.h"
 #include "game_timing.h"
 #include "game_update.h"
 #include "../input/game_events.h"
@@ -40,11 +41,10 @@ static void game_loop_frame(void *arg)
     int cam_x = (int)gs->camera.x;
 
     /*
-     * Skip physics and game logic while paused or while the completion overlay
-     * is showing. Rendering still runs so the last visible frame remains on
-     * screen and in OS thumbnails.
+     * Skip physics and game logic while an overlay is showing. Rendering still
+     * runs so the last visible frame remains on screen and in OS thumbnails.
      */
-    if (!gs->paused && !gs->completion.complete) {
+    if (!game_overlay_blocks_update(gs)) {
         cam_x = game_update_active(gs, dt, cam_x);
     }
 

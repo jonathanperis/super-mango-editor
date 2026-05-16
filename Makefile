@@ -76,7 +76,8 @@ TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
                  $(OUTDIR)/rail-test $(OUTDIR)/entity-utils-test \
                  $(OUTDIR)/collision-test $(OUTDIR)/phase-transition-test \
                  $(OUTDIR)/exporter-test $(OUTDIR)/editor-validation-test \
-                 $(OUTDIR)/gameplay-damage-test $(OUTDIR)/gameplay-config-test
+                 $(OUTDIR)/gameplay-damage-test $(OUTDIR)/gameplay-config-test \
+                 $(OUTDIR)/game-overlay-test
 SMOKE_LEVELS  = $(wildcard levels/*.toml)
 SMOKE_FRAMES  ?= 5
 SMOKE_SEED    ?= 1
@@ -113,6 +114,7 @@ TEST_PLAYER_LIFECYCLE_OBJ = $(OBJDIR)/tests/test-player-lifecycle.o
 TEST_FLOAT_PLATFORM_OBJ = $(OBJDIR)/tests/test-float-platform.o
 TEST_BOUNCEPAD_OBJ = $(OBJDIR)/tests/test-bouncepad.o
 TEST_PHASE_OBJ      = $(OBJDIR)/tests/test-phase-transition.o
+TEST_GAME_OVERLAY_OBJ = $(OBJDIR)/tests/test-game-overlay.o
 TEST_EDITOR_VALIDATION_OBJ = $(OBJDIR)/tests/test-editor-validation.o
 TEST_EDITOR_FILES_OBJ = $(OBJDIR)/tests/test-editor-files.o
 TEST_EDITOR_SESSION_OBJ = $(OBJDIR)/tests/test-editor-session.o
@@ -198,6 +200,7 @@ test: $(OUTDIR) $(TEST_TARGETS)
 	$(RUN_PREFIX) ./$(OUTDIR)/editor-validation-test
 	$(RUN_PREFIX) ./$(OUTDIR)/gameplay-damage-test
 	$(RUN_PREFIX) ./$(OUTDIR)/gameplay-config-test
+	$(RUN_PREFIX) ./$(OUTDIR)/game-overlay-test
 
 $(TEST_TARGETS): | $(OUTDIR)
 
@@ -315,6 +318,9 @@ $(TEST_BOUNCEPAD_OBJ): $(SRCDIR)/surfaces/bouncepad.c
 $(TEST_PHASE_OBJ): $(SRCDIR)/levels/phase_transition.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
+$(TEST_GAME_OVERLAY_OBJ): $(SRCDIR)/core/game_overlay.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
 $(TEST_EDITOR_VALIDATION_OBJ): $(EDITOR_DIR)/editor_validation.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
@@ -369,6 +375,9 @@ $(OUTDIR)/gameplay-damage-test: tests/gameplay_damage_test.c $(TEST_COLLISION_DA
 
 $(OUTDIR)/gameplay-config-test: tests/gameplay_config_test.c $(TEST_GAME_CAMERA_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
+
+$(OUTDIR)/game-overlay-test: tests/game_overlay_test.c $(TEST_GAME_OVERLAY_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
 # Requires the Emscripten SDK (emcc on PATH).
