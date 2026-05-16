@@ -1,4 +1,5 @@
 ---
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 <!-- Floating particles -->
 <div class="particles" aria-hidden="true">
@@ -10,43 +11,66 @@
     <div class="particle"></div>
 </div>
 
-<!-- Parallax hero -->
 <section class="hero hero-overhaul" id="hero">
     <div class="parallax-layer sky-layer"></div>
     <div class="parallax-layer mountains-layer"></div>
     <div class="parallax-layer trees-far-layer"></div>
     <div class="parallax-layer trees-near-layer"></div>
     <div class="parallax-layer ground-layer"></div>
-    <div class="hero-content">
-        <div class="hero-badge">C11 &middot; SDL2 &middot; WebAssembly</div>
-        <h1 class="hero-title">
-            <span class="shimmer-text">
-                SUPER<br />MANGO
-            </span>
-        </h1>
-        <p class="hero-sub">Play the run. Open the source. Build the next level.</p>
-        <p class="hero-proof">An open-source pixel platformer you can play in browser, study in C11 + SDL2, and extend with TOML levels.</p>
-        <div class="hero-hud" aria-label="Project highlights">
-            <span>C11</span>
-            <span>SDL2</span>
-            <span>WASM</span>
-            <span>TOML</span>
-            <span>Level editor</span>
+
+    <div class="hero-stage">
+        <div class="hero-content">
+            <div class="hero-badge">OPEN SOURCE ARCADE KIT</div>
+            <h1 class="hero-title">
+                <span>SUPER</span>
+                <span>MANGO</span>
+            </h1>
+            <p class="hero-sub">Play the run. Open the source. Build the next level.</p>
+            <p class="hero-proof">A browser-playable C11 + SDL2 platformer with TOML worlds, a visual level editor, and a codebase built for learning how the cabinet works.</p>
+            <div class="hero-hud" aria-label="Project highlights">
+                <span>C11</span>
+                <span>SDL2</span>
+                <span>WASM</span>
+                <span>TOML worlds</span>
+                <span>Level editor</span>
+            </div>
+            <div class="hero-ctas" aria-label="Primary actions">
+                <a href="#play" class="btn-play">
+                    <span class="btn-kicker">Insert coin</span>
+                    <span class="btn-main">Play in browser</span>
+                </a>
+                <a href="#docs" class="btn-download">
+                    <span class="btn-kicker">Service panel</span>
+                    <span class="btn-main">Open manual</span>
+                </a>
+            </div>
         </div>
-        <div class="hero-ctas" aria-label="Primary actions">
-            <a href="#play" class="btn-play">
-                <span class="btn-kicker">Insert coin</span>
-                <span class="btn-main">Play in browser</span>
-            </a>
-            <a href="#docs" class="btn-download">
-                <span class="btn-kicker">Builder manual</span>
-                <span class="btn-main">Learn the engine</span>
-            </a>
-        </div>
+
+        <aside class="hero-attract-card" aria-label="Attract mode summary">
+            <div class="attract-marquee">
+                <span class="live-dot"></span>
+                <span>WEB BUILD READY</span>
+                <strong>~43 MB</strong>
+            </div>
+            <div class="mini-cabinet" aria-hidden="true">
+                <div class="mini-screen">
+                    <span class="mini-sun"></span>
+                    <span class="mini-platform one"></span>
+                    <span class="mini-platform two"></span>
+                    <span class="mini-player"></span>
+                </div>
+                <div class="mini-controls">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+            <div class="attract-scoreboard">
+                <div><span>LEVELS</span><strong>3</strong></div>
+                <div><span>SCREENS</span><strong>23</strong></div>
+                <div><span>ENEMIES</span><strong>41</strong></div>
+            </div>
+            <a href={`${base}/docs/developer-guide/`} class="attract-link">Read the engine route</a>
+        </aside>
     </div>
-    <div class="hero-cabinet-peek" aria-hidden="true">
-        <span></span>
-        <strong>READY</strong>
-    </div>
-    <div class="scroll-hint">CABINET BELOW &darr;</div>
+
+    <a class="scroll-hint" href="#play">CABINET BELOW &darr;</a>
 </section>
