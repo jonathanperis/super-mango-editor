@@ -7,7 +7,8 @@
         "dev": "astro dev",
         "build": "astro build",
         "preview": "astro preview",
-        "lint": "astro check"
+        "lint": "astro check",
+        "drift": "python3 ../tools/check_docs_drift.py"
     },
     "dependencies": {
         "@astrojs/sitemap": "^3",

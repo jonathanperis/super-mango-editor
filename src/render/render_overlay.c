@@ -70,7 +70,7 @@ void render_game_over_overlay(GameState *gs)
         render_centered_text(gs, line, white, 124);
 
         render_centered_text(gs, "Enter/Space/Start: restart", dim, 164);
-        render_centered_text(gs, "Esc: exit", dim, 184);
+        render_centered_text(gs, "Esc/Back: exit", dim, 184);
     }
 }
 
@@ -122,6 +122,6 @@ void render_level_complete_overlay(GameState *gs)
                                  ? "Enter/Space/Start: next level"
                                  : "Enter/Space/Start: finish",
                              dim, 228);
-        render_centered_text(gs, "Esc: exit", dim, 246);
+        render_centered_text(gs, "Esc/Back: exit", dim, 246);
     }
 }

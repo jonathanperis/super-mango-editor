@@ -14,8 +14,9 @@
  * speed = 0.5  → layer moves at half the camera speed
  * speed = 1.0  → layer moves with the world (not used for backgrounds)
  *
- * To add or remove layers, edit the LAYER_CONFIG table in parallax.c —
- * no changes needed anywhere else.
+ * To add or remove background layers, edit the `[[background_layers]]`
+ * entries in the active TOML level file; `parallax_init` loads those paths
+ * into this fixed-size runtime system.
  */
 #pragma once
 
