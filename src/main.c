@@ -9,6 +9,7 @@
  *        --level <path> --debug → same, with debug overlays
  *        --smoke-test-frames N  → run N frames and exit 0
  *        --seed N               → seed rand() for deterministic smoke/replay
+ *        --replay-script <path>  → inject frame/key events from a text replay
  *   3. Tear every subsystem back down before exiting.
  *
  * The order of init and teardown is intentional:
@@ -50,7 +51,9 @@ int main(int argc, char *argv[]) {
     unsigned int rng_seed = 0;
     int rng_seed_set = 0;
     const char *level_path = NULL;
+    const char *replay_script_path = NULL;
     int expect_level_path = 0;
+    int expect_replay_script = 0;
     int expect_smoke_frames = 0;
     int expect_seed = 0;
 
@@ -62,6 +65,13 @@ int main(int argc, char *argv[]) {
             }
             level_path = argv[i];
             expect_level_path = 0;
+        } else if (expect_replay_script) {
+            if (argv[i][0] == '-') {
+                fprintf(stderr, "Error: --replay-script requires a path\n");
+                return EXIT_FAILURE;
+            }
+            replay_script_path = argv[i];
+            expect_replay_script = 0;
         } else if (expect_smoke_frames) {
             char *end = NULL;
             long parsed = 0;
@@ -101,6 +111,8 @@ int main(int argc, char *argv[]) {
             level_path = "levels/00_sandbox_01.toml";
         else if (strcmp(argv[i], "--level") == 0)
             expect_level_path = 1;
+        else if (strcmp(argv[i], "--replay-script") == 0)
+            expect_replay_script = 1;
         else if (strcmp(argv[i], "--smoke-test-frames") == 0)
             expect_smoke_frames = 1;
         else if (strcmp(argv[i], "--seed") == 0)
@@ -113,6 +125,10 @@ int main(int argc, char *argv[]) {
 
     if (expect_level_path) {
         fprintf(stderr, "Error: --level requires a path\n");
+        return EXIT_FAILURE;
+    }
+    if (expect_replay_script) {
+        fprintf(stderr, "Error: --replay-script requires a path\n");
         return EXIT_FAILURE;
     }
     if (expect_smoke_frames) {
@@ -212,6 +228,10 @@ int main(int argc, char *argv[]) {
         GameState gs = {0};
         gs.debug_mode = debug_mode;
         gs.smoke_test_frames = smoke_test_frames;
+        if (replay_script_path) {
+            strncpy(gs.replay_script_path, replay_script_path,
+                    sizeof(gs.replay_script_path) - 1);
+        }
         strncpy(gs.level_path, level_path, sizeof(gs.level_path) - 1);
         game_init(&gs);
         game_loop(&gs);
@@ -287,6 +307,10 @@ int main(int argc, char *argv[]) {
             GameState gs = {0};
             gs.debug_mode = debug_mode;
             gs.smoke_test_frames = smoke_test_frames;
+            if (replay_script_path) {
+                strncpy(gs.replay_script_path, replay_script_path,
+                        sizeof(gs.replay_script_path) - 1);
+            }
             strncpy(gs.level_path, selected_level_path, sizeof(gs.level_path) - 1);
             gs.level_path[sizeof(gs.level_path) - 1] = '\0';
             game_init(&gs);

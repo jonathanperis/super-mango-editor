@@ -42,6 +42,7 @@
  */
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                          SDL_GameController *ctrl,
+                         unsigned int replay_input_mask,
                          const VineDecor *vines, int vine_count,
                          const LadderDecor *ladders, int ladder_count,
                          const RopeDecor *ropes, int rope_count) {
@@ -52,7 +53,13 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
      * Passing NULL means "use SDL's internal state array".
      */
     const Uint8 *keys = SDL_GetKeyboardState(NULL);
-    int jump_down = keys[SDL_SCANCODE_SPACE] ? 1 : 0;
+    const int replay_left = (replay_input_mask & PLAYER_INPUT_LEFT) != 0;
+    const int replay_right = (replay_input_mask & PLAYER_INPUT_RIGHT) != 0;
+    const int replay_up = (replay_input_mask & PLAYER_INPUT_UP) != 0;
+    const int replay_down = (replay_input_mask & PLAYER_INPUT_DOWN) != 0;
+    const int replay_jump = (replay_input_mask & PLAYER_INPUT_JUMP) != 0;
+    const int replay_run = (replay_input_mask & PLAYER_INPUT_RUN) != 0;
+    int jump_down = (keys[SDL_SCANCODE_SPACE] || replay_jump) ? 1 : 0;
 
 #ifndef __EMSCRIPTEN__
     if (ctrl && SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
@@ -69,7 +76,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
      * spamming the jump action and accumulating height.
      */
     if (!player->on_vine && !jump_down &&
-        (keys[SDL_SCANCODE_UP] || keys[SDL_SCANCODE_W])) {
+        (keys[SDL_SCANCODE_UP] || keys[SDL_SCANCODE_W] || replay_up)) {
         player_try_grab_climbable(player, vines, vine_count,
                                   ladders, ladder_count,
                                   ropes, rope_count);
@@ -81,15 +88,15 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
          * horizontal drift, and Space to jump-dismount.
          */
         player->vy = 0.0f;
-        if (keys[SDL_SCANCODE_UP]   || keys[SDL_SCANCODE_W]) player->vy = -CLIMB_SPEED;
-        if (keys[SDL_SCANCODE_DOWN] || keys[SDL_SCANCODE_S]) player->vy =  CLIMB_SPEED;
+        if (keys[SDL_SCANCODE_UP]   || keys[SDL_SCANCODE_W] || replay_up) player->vy = -CLIMB_SPEED;
+        if (keys[SDL_SCANCODE_DOWN] || keys[SDL_SCANCODE_S] || replay_down) player->vy =  CLIMB_SPEED;
 
         player->vx = 0.0f;
-        if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A]) {
+        if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A] || replay_left) {
             player->vx = -CLIMB_H_SPEED;
             player->facing_left = 1;
         }
-        if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) {
+        if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D] || replay_right) {
             player->vx = CLIMB_H_SPEED;
             player->facing_left = 0;
         }
@@ -113,13 +120,13 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
          *
          * Run key: Left or Right Shift → higher max speed, less air control.
          */
-        player->is_running = (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT]) ? 1 : 0;
+        player->is_running = (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT] || replay_run) ? 1 : 0;
         player->move_dir   = 0;
-        if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A]) {
+        if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A] || replay_left) {
             player->move_dir    = -1;
             player->facing_left = 1;
         }
-        if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) {
+        if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D] || replay_right) {
             player->move_dir    = 1;
             player->facing_left = 0;
         }

@@ -18,6 +18,7 @@ int game_player_step(GameState *gs, float dt)
     int fp_landed_idx = -1;
 
     player_handle_input(&gs->player, gs->audio.jump, gs->controller,
+                        gs->replay_input_mask,
                         gs->vines, gs->vine_count,
                         gs->ladders, gs->ladder_count,
                         gs->ropes, gs->rope_count);

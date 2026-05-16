@@ -9,6 +9,7 @@
 #include "game_update.h"
 #include "../input/game_events.h"
 #include "../input/game_input.h"
+#include "../input/game_replay.h"
 #include "../input/game_web_input.h"
 #include "../render/game_render.h"
 
@@ -31,6 +32,7 @@ static void game_loop_frame(void *arg)
     float dt = game_timing_step(gs, &frame_start_ticks);
 
     /* ---- 1. Events ----------------------------------------------- */
+    game_replay_inject_events(gs);
     game_handle_events(gs);
 
     /*
