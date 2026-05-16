@@ -13,12 +13,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REPLAY_DIR = ROOT / "out" / "replays-smoke"
+ALLOWED_REPLAY_IDS = {"move-right", "jump-right", "pause-resume"}
 
 
 def replay_id(path: Path) -> str:
     name = path.stem
-    if not name or any(not (ch.isalnum() or ch in "-_") for ch in name):
-        raise SystemExit(f"unsafe replay script name: {path}")
+    if name not in ALLOWED_REPLAY_IDS:
+        raise SystemExit(f"unsupported replay script name: {path} (allowed: {', '.join(sorted(ALLOWED_REPLAY_IDS))})")
     return name
 
 
