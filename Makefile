@@ -81,6 +81,7 @@ TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
 SMOKE_LEVELS  = $(wildcard levels/*.toml)
 SMOKE_FRAMES  ?= 5
 SMOKE_SEED    ?= 1
+SMOKE_SEEDS   ?= 1 7 23
 TEST_SERIALIZER_OBJ = $(OBJDIR)/tests/test-serializer.o
 TEST_SERIALIZER_EMIT_OBJ = $(OBJDIR)/tests/test-serializer-emit.o
 TEST_SERIALIZER_IO_OBJ = $(OBJDIR)/tests/test-serializer-io.o
@@ -126,7 +127,7 @@ TEST_DEPS           = $(wildcard $(OBJDIR)/tests/*.d)
 SANITIZE_CFLAGS     = -fsanitize=address,undefined -fno-omit-frame-pointer
 SANITIZE_LDFLAGS    = -fsanitize=address,undefined
 
-.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels level-catalog docs-drift smoke sanitize sanitize-smoke
+.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels level-catalog docs-drift roadmap-quality smoke scripted-smoke sanitize sanitize-smoke
 
 all: $(OUTDIR) $(TARGET)
 
@@ -215,6 +216,10 @@ level-catalog:
 docs-drift:
 	python3 tools/generate_level_catalog.py --check
 	python3 tools/check_docs_drift.py
+	python3 tools/check_roadmap_quality.py
+
+roadmap-quality:
+	python3 tools/check_roadmap_quality.py
 
 smoke: all editor
 	@for level in $(SMOKE_LEVELS); do \
@@ -222,6 +227,9 @@ smoke: all editor
 		SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) ./$(TARGET) --level "$$level" --smoke-test-frames $(SMOKE_FRAMES) --seed $(SMOKE_SEED) || exit 1; \
 	done
 	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) ./$(EDITOR_TARGET) --smoke-test
+
+scripted-smoke: all editor
+	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python3 tools/run_scripted_smoke.py --binary $(TARGET) --editor $(EDITOR_TARGET) --frames $(SMOKE_FRAMES) --seeds $(SMOKE_SEEDS)
 
 sanitize:
 	rm -rf out-sanitize

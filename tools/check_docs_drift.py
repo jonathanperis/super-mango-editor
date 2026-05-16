@@ -39,6 +39,7 @@ def fail(message: str) -> None:
 FAILURES: list[str] = []
 
 SCREEN_WORDS = {
+    "zero": 0,
     "one": 1,
     "two": 2,
     "three": 3,
@@ -55,7 +56,25 @@ SCREEN_WORDS = {
     "fourteen": 14,
     "fifteen": 15,
     "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+    "twenty": 20,
+    "thirty": 30,
+    "forty": 40,
+    "fifty": 50,
+    "sixty": 60,
+    "seventy": 70,
+    "eighty": 80,
+    "ninety": 90,
+    "hundred": 100,
 }
+
+SCREEN_WORD_PATTERN = "|".join(sorted(SCREEN_WORDS, key=len, reverse=True))
+SCREEN_COUNT_RE = re.compile(
+    rf"\b((?:\d+|(?:{SCREEN_WORD_PATTERN}))(?:[-\s]+(?:{SCREEN_WORD_PATTERN}))*)\s+screens?\b",
+    re.I,
+)
 
 
 def makefile_test_targets() -> list[str]:
@@ -198,14 +217,34 @@ def check_level_catalog_doc() -> None:
             fail(f"{page_name}: missing level-catalog navigation/reference")
 
 
+def parse_screen_count_token(token: str) -> int | None:
+    token = token.strip().lower()
+    if token.isdigit():
+        return int(token)
+    total = 0
+    current = 0
+    saw_word = False
+    for part in re.split(r"[-\s]+", token):
+        if not part:
+            continue
+        if part not in SCREEN_WORDS:
+            return None
+        saw_word = True
+        value = SCREEN_WORDS[part]
+        if value == 100:
+            current = max(current, 1) * 100
+        else:
+            current += value
+    total += current
+    return total if saw_word else None
+
+
 def screen_mentions(description: str) -> list[int]:
     mentions: list[int] = []
-    for match in re.finditer(r"\b([A-Za-z]+|\d+)\s+screens?\b", description, re.I):
-        token = match.group(1).lower()
-        if token.isdigit():
-            mentions.append(int(token))
-        elif token in SCREEN_WORDS:
-            mentions.append(SCREEN_WORDS[token])
+    for match in SCREEN_COUNT_RE.finditer(description):
+        parsed = parse_screen_count_token(match.group(1))
+        if parsed is not None:
+            mentions.append(parsed)
     return mentions
 
 
