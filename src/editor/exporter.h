@@ -31,7 +31,7 @@
  *               name, e.g. "level_02" produces level_02_def.
  *   dir_path  — directory where the two files are written; must already exist.
  *
- * Returns 0 on success, -1 on error (file open failure).
- * On error a message is printed to stderr.
+ * Returns 0 on success, -1 on error (invalid arguments/identifier or file open
+ * failure). On error a message is printed to stderr.
  */
 int level_export_c(const LevelDef *def, const char *var_name, const char *dir_path);
