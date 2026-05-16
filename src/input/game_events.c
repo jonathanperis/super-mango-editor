@@ -4,6 +4,7 @@
 
 #include "game_events.h"
 
+#include "../collision/collision_damage.h"
 #include "../core/game_overlay.h"
 
 #include <SDL.h>
@@ -16,6 +17,13 @@ static void continue_after_completion(GameState *gs)
     }
 
     gs->running = 0;
+}
+
+static void confirm_game_over(GameState *gs)
+{
+    game_restart_after_game_over(gs);
+    Mix_ResumeMusic();
+    gs->loop.prev_ticks = SDL_GetTicks64();
 }
 
 static void handle_controller_removed(GameState *gs, const SDL_ControllerDeviceEvent *event)
@@ -72,13 +80,21 @@ void game_handle_events(GameState *gs)
             gs->running = 0;
 
         } else if (event.type == SDL_KEYDOWN) {
+            GameOverlayState overlay = game_overlay_state(gs);
             if (event.key.repeat) continue;
-            if (gs->completion.complete) {
+            if (overlay == GAME_OVERLAY_LEVEL_COMPLETE) {
                 if (event.key.keysym.sym == SDLK_ESCAPE) {
                     gs->running = 0;
                 } else if (event.key.keysym.sym == SDLK_RETURN ||
                            event.key.keysym.sym == SDLK_SPACE) {
                     continue_after_completion(gs);
+                }
+            } else if (overlay == GAME_OVERLAY_GAME_OVER) {
+                if (event.key.keysym.sym == SDLK_ESCAPE) {
+                    gs->running = 0;
+                } else if (event.key.keysym.sym == SDLK_RETURN ||
+                           event.key.keysym.sym == SDLK_SPACE) {
+                    confirm_game_over(gs);
                 }
             } else if (event.key.keysym.sym == SDLK_ESCAPE) {
                 toggle_player_pause(gs);
@@ -97,7 +113,9 @@ void game_handle_events(GameState *gs)
 
         } else if (event.type == SDL_CONTROLLERBUTTONDOWN) {
             if (event.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
-                if (gs->completion.complete) continue_after_completion(gs);
+                GameOverlayState overlay = game_overlay_state(gs);
+                if (overlay == GAME_OVERLAY_LEVEL_COMPLETE) continue_after_completion(gs);
+                else if (overlay == GAME_OVERLAY_GAME_OVER) confirm_game_over(gs);
                 else toggle_player_pause(gs);
             }
 

@@ -67,6 +67,34 @@ static int completion_overlay_wins_over_pause(void)
     return 0;
 }
 
+static int game_over_overlay_blocks_update(void)
+{
+    GameState gs = {0};
+
+    gs.game_over = 1;
+
+    if (expect_int("game over overlay", game_overlay_state(&gs), GAME_OVERLAY_GAME_OVER) != 0)
+        return 1;
+    if (expect_int("game over blocks update", game_overlay_blocks_update(&gs), 1) != 0)
+        return 1;
+
+    return 0;
+}
+
+static int completion_overlay_wins_over_game_over(void)
+{
+    GameState gs = {0};
+
+    gs.game_over = 1;
+    gs.completion.complete = 1;
+
+    if (expect_int("completion priority over game over",
+                   game_overlay_state(&gs), GAME_OVERLAY_LEVEL_COMPLETE) != 0)
+        return 1;
+
+    return 0;
+}
+
 static int player_pause_toggle_pauses_and_resumes_active_gameplay(void)
 {
     GameState gs = {0};
@@ -165,6 +193,8 @@ int main(void)
     if (pause_overlay_blocks_update() != 0) return 1;
     if (completion_overlay_blocks_update() != 0) return 1;
     if (completion_overlay_wins_over_pause() != 0) return 1;
+    if (game_over_overlay_blocks_update() != 0) return 1;
+    if (completion_overlay_wins_over_game_over() != 0) return 1;
     if (player_pause_toggle_pauses_and_resumes_active_gameplay() != 0) return 1;
     if (pause_toggle_ignores_completion_overlay() != 0) return 1;
     if (resume_from_pause_only_clears_pause_overlay() != 0) return 1;

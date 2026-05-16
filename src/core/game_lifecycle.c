@@ -53,6 +53,7 @@ void game_init(GameState *gs)
 
     /* Signal the loop to start running; game starts in the foreground. */
     gs->running = 1;
+    gs->game_over = 0;
     gs->paused = 0;
     gs->pause_reasons = 0;
     gs->completion.complete = 0;

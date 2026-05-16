@@ -34,6 +34,13 @@ void game_render_frame(GameState *gs, int cam_x, float dt);
 void render_pause_overlay(GameState *gs);
 
 /*
+ * render_game_over_overlay — Draw the game-over restart screen.
+ *
+ * Shows the final score and waits for player confirmation before restarting.
+ */
+void render_game_over_overlay(GameState *gs);
+
+/*
  * render_level_complete_overlay — Draw the level complete screen.
  *
  * Shows semi-transparent black overlay with "Level Complete!" title,

@@ -34,3 +34,9 @@ void reset_current_level(GameState *gs, int *fp_prev_riding);
  */
 void apply_damage(GameState *gs, int amount, int push,
                   float src_cx, float src_cy);
+
+/*
+ * game_restart_after_game_over — Confirm the game-over overlay and restart
+ * the current level from its configured starting lives/hearts/score.
+ */
+void game_restart_after_game_over(GameState *gs);
