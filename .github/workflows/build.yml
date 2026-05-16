@@ -129,6 +129,13 @@ jobs:
           SDL_AUDIODRIVER: dummy
         run: make smoke SMOKE_FRAMES=5 SMOKE_SEED=1
 
+      - name: Scripted smoke scenarios (Linux)
+        if: matrix.target == 'native' && runner.os == 'Linux'
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: make scripted-smoke SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
+
       # ── Compile (Windows) ───────────────────────────────────────────────────
       # The msys2 shell is required so the UCRT64 toolchain and sdl2-config
       # are on PATH. We pass CC=gcc and override the output name to include

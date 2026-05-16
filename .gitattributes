@@ -1,1 +1,2 @@
 .github/workflows/*.lock.yml linguist-generated=true merge=ours
+levels/*.toml text eol=lf
