@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define REPLAY_SCRIPT_DIR "out/replays-smoke"
+
 static SDL_Keycode replay_keycode(const char *name)
 {
     if (strcmp(name, "left") == 0 || strcmp(name, "a") == 0) return SDLK_LEFT;
@@ -76,15 +78,46 @@ static void apply_replay_action(GameState *gs, SDL_Keycode key, const char *acti
     }
 }
 
+static int replay_script_name_is_safe(const char *name)
+{
+    if (!name || !name[0]) return 0;
+    for (size_t i = 0; name[i] != '\0'; i++) {
+        const char ch = name[i];
+        const int alnum = (ch >= 'a' && ch <= 'z') ||
+                          (ch >= 'A' && ch <= 'Z') ||
+                          (ch >= '0' && ch <= '9');
+        if (!alnum && ch != '-' && ch != '_') return 0;
+    }
+    return 1;
+}
+
+static int replay_script_path(char *dst, size_t dst_size, const char *name)
+{
+    if (!replay_script_name_is_safe(name)) return -1;
+    int written = snprintf(dst, dst_size, "%s/%s.replay", REPLAY_SCRIPT_DIR, name);
+    if (written < 0 || (size_t)written >= dst_size) return -1;
+    return 0;
+}
+
 void game_replay_inject_events(GameState *gs)
 {
     gs->replay_input_mask = gs->replay_held_mask;
     if (!gs->replay_script_path[0]) return;
 
-    FILE *fp = fopen(gs->replay_script_path, "r");
+    char replay_path[256];
+    if (replay_script_path(replay_path, sizeof(replay_path), gs->replay_script_path) != 0) {
+        fprintf(stderr, "Warning: unsafe replay script name '%s'\n",
+                gs->replay_script_path);
+        gs->replay_script_path[0] = '\0';
+        gs->replay_input_mask = 0;
+        gs->replay_held_mask = 0;
+        return;
+    }
+
+    FILE *fp = fopen(replay_path, "r");
     if (!fp) {
         fprintf(stderr, "Warning: could not open replay script '%s'\n",
-                gs->replay_script_path);
+                replay_path);
         gs->replay_script_path[0] = '\0';
         gs->replay_input_mask = 0;
         gs->replay_held_mask = 0;
