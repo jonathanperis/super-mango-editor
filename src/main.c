@@ -9,7 +9,7 @@
  *        --level <path> --debug → same, with debug overlays
  *        --smoke-test-frames N  → run N frames and exit 0
  *        --seed N               → seed rand() for deterministic smoke/replay
- *        --replay-script <path>  → inject frame/key events from a text replay
+ *        --replay-script <name>  → inject out/replays-smoke/<name>.replay
  *   3. Tear every subsystem back down before exiting.
  *
  * The order of init and teardown is intentional:
