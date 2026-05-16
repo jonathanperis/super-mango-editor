@@ -4,7 +4,7 @@
 
 ---
 
-A complete reference for every compile-time constant in the codebase.
+A curated reference for gameplay-facing compile-time constants in the codebase. Some local helper constants live beside their implementation and are intentionally summarized rather than exhaustively duplicated here.
 
 ---
 
@@ -162,8 +162,8 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 
 | Expression | Result | Meaning |
 |------------|--------|---------|
-| `GAME_W / WINDOW_W` | `2x` | Pixel scale factor |
-| `GAME_H / WINDOW_H` | `2x` | Pixel scale factor |
+| `WINDOW_W / GAME_W` | `2x` | Horizontal pixel scale factor |
+| `WINDOW_H / GAME_H` | `2x` | Vertical pixel scale factor |
 | `1000 / TARGET_FPS` | `~16 ms` | Frame budget |
 | `GAME_H - TILE_SIZE` | `252` | `FLOOR_Y` |
 | `FLOOR_Y - PLAYER_FRAME_H + PLAYER_FLOOR_SINK` | `220` | Player start / floor snap Y |
@@ -215,7 +215,7 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `FOG_TEX_COUNT` | `2` | `int` | Number of fog texture assets in rotation |
+| `MAX_FOG_TEXTURES` | `4` | `int` | Maximum fog texture paths loaded from `fog_layers` |
 | `FOG_MAX` | `4` | `int` | Maximum concurrent fog instances |
 
 ---
@@ -224,7 +224,7 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `PARALLAX_MAX_LAYERS` | `8` | `int` | Maximum number of background layers the system can hold |
+| `MAX_BACKGROUND_LAYERS` | `8` | `int` | Maximum number of background layers the system can hold |
 
 ---
 

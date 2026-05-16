@@ -85,7 +85,7 @@ y = 100.0
 **File:** `src/collectibles/last_star.c` / `last_star.h`  
 **Sprite:** `assets/sprites/collectibles/last_star.png`  
 **Display size:** 24×24 px  
-**Pickup:** Collecting it sets `collected = 1`, snapshots the level-completion summary, and shows the completion overlay. If `next_phase` is configured, Enter/Start loads that TOML level; otherwise confirmation exits. Only one instance per level, defined with `[last_star]`.
+**Pickup:** Collecting it sets `collected = 1`, snapshots the level-completion summary, and shows the completion overlay. If `next_phase` is configured, Enter/Space/Start loads that TOML level; otherwise confirmation exits. Esc/Back exits without advancing. Only one instance per level, defined with `[last_star]`.
 
 | Constant | Value | Description |
 |----------|-------|-------------|

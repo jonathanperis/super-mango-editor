@@ -189,7 +189,7 @@ Builds and runs native regression harnesses for pure logic that does not require
 make test
 ```
 
-Current test binaries (11):
+Current test binaries (13):
 
 - `out/level-serializer-test`
 - `out/level-validate-test`
@@ -202,6 +202,8 @@ Current test binaries (11):
 - `out/editor-validation-test`
 - `out/gameplay-damage-test`
 - `out/gameplay-config-test`
+- `out/game-overlay-test`
+- `out/game-events-test`
 
 ### `make validate-levels`
 
@@ -225,6 +227,22 @@ Runs `make test` in a separate `out-sanitize/` tree with AddressSanitizer and Un
 
 ```sh
 make sanitize
+```
+
+### `make sanitize-smoke`
+
+Builds sanitizer-instrumented native game/editor binaries in `out-sanitize/`, then runs the dummy SDL smoke pass against every TOML level plus the editor smoke mode. This complements `make sanitize` by covering SDL/resource startup paths, not just pure logic harnesses.
+
+```sh
+make sanitize-smoke SMOKE_FRAMES=5 SMOKE_SEED=1
+```
+
+### `make docs-drift`
+
+Runs `tools/check_docs_drift.py`, a semantic documentation drift check that compares Makefile test targets, source-file map entries, layer TOML snippets, workflow docs, runtime flags, and key constants against the current repository.
+
+```sh
+make docs-drift
 ```
 
 ### `make clean`
@@ -306,7 +324,7 @@ Four GitHub Actions workflows handle automated builds and docs checks:
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
 | Build & Release | `build.yml` | Push to `main`, pull requests | Multi-platform native build, `make test`, `make validate-levels`, `make editor`, native game/editor smoke, WebAssembly build, WebAssembly artifact smoke; on main push: GitHub Release creation |
-| Docs | `docs.yml` | Docs pull requests, manual | `bun install --frozen-lockfile`, `bun run lint`, `bun run build` under `docs/` |
+| Docs | `docs.yml` | Docs pull requests, manual | `make docs-drift`, `bun install --frozen-lockfile`, `bun run lint`, `bun run build` under `docs/` |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly | Automated code security and quality analysis |
 | Deploy | `deploy.yml` | Successful main Build & Release workflow | Builds docs, copies WebAssembly artifacts, and deploys `docs/out/` to GitHub Pages |
 

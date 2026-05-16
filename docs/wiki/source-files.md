@@ -18,6 +18,7 @@ src/
 │   └── last_star.h / .c          End-of-level star collectible
 ├── collision/
 │   ├── collision_damage.h / .c   Damage checks against hazards and enemies
+│   ├── floor_gap_collision.h / .c Sea-gap fall/death detection
 │   └── game_collision.h / .c     Gameplay collision passes and pickups
 ├── core/
 │   ├── debug.h / .c              Debug overlay: FPS/CPU/memory, hitboxes, event log
@@ -37,6 +38,7 @@ src/
 │   ├── game_checkpoint.h / .c    Checkpoint/respawn helpers
 │   ├── game_camera.h / .c        Camera follow/lookahead helpers
 │   ├── game_resources.h / .c     Texture/audio/level resource loading
+│   ├── game_overlay.h / .c       Canonical pause/game-over/completion overlay state
 │   └── game_completion.h / .c    Last-star completion and next-phase flow
 ├── editor/
 │   ├── editor_main.c             Standalone editor entry point
@@ -80,6 +82,7 @@ src/
 │   └── undo.h / .c               Undo/redo history
 ├── effects/
 │   ├── fog.h / .c                Atmospheric fog overlay: init, slide, spawn, render
+│   ├── game_effects.h / .c       Per-level effect reload/cleanup helpers
 │   ├── parallax.h / .c           Multi-layer scrolling background: init, tiled render, cleanup
 │   └── water.h / .c              Animated water strip: init, scroll, tile render
 ├── entities/
@@ -104,7 +107,10 @@ src/
 ├── levels/
 │   ├── level.h                   Shared level definitions
 │   ├── level_loader.h / .c       TOML level loading and switching
+│   ├── level_path.h / .c         Level path normalization and directory helpers
 │   ├── level_physics.h / .c      Level physics override/default helpers
+│   ├── level_resources.h / .c    Per-level resource reload wrappers
+│   ├── level_session.h / .c      Owned active LevelDef session storage
 │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
 │   ├── level_validate.c          LevelDef count validation
 │   └── exported/                 Generated C level exports
@@ -148,7 +154,7 @@ New `.c` files in `src/` or recognized source subdirectories are picked up by Ma
 
 ### Responsibilities
 
-- Parse CLI flags: `--debug`, `--sandbox`, `--level <path>`, and `--smoke-test-frames N`
+- Parse CLI flags: `--debug`, `--sandbox`, `--level <path>`, `--smoke-test-frames N`, and `--seed N`
 - Call `SDL_Init`, `IMG_Init`, `TTF_Init`, `Mix_OpenAudio` in order
 - Route to start menu, sandbox, or direct TOML level mode
 - Tear down SDL subsystems in reverse order before returning
