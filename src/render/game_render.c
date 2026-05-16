@@ -8,6 +8,7 @@
 #include "game_render.h"
 
 #include "../core/debug.h"
+#include "../core/game_overlay.h"
 #include "../screens/hud.h"
 
 /* Effect headers */
@@ -339,9 +340,12 @@ void game_render_frame(GameState *gs, int cam_x, float dt)
     }
 #endif
 
-    /* Level complete overlay — rendered last on top of everything */
-    if (gs->completion.complete) {
+    /* Player-facing overlays — rendered last on top of everything */
+    GameOverlayState overlay = game_overlay_state(gs);
+    if (overlay == GAME_OVERLAY_LEVEL_COMPLETE) {
         render_level_complete_overlay(gs);
+    } else if (overlay == GAME_OVERLAY_PAUSED) {
+        render_pause_overlay(gs);
     }
 
     /*
