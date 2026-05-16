@@ -1,7 +1,7 @@
 ---
 ---
 <!-- Floating particles -->
-<div class="particles">
+<div class="particles" aria-hidden="true">
     <div class="particle"></div>
     <div class="particle"></div>
     <div class="particle"></div>
@@ -11,7 +11,7 @@
 </div>
 
 <!-- Parallax hero -->
-<section class="hero" id="hero">
+<section class="hero hero-overhaul" id="hero">
     <div class="parallax-layer sky-layer"></div>
     <div class="parallax-layer mountains-layer"></div>
     <div class="parallax-layer trees-far-layer"></div>
@@ -24,11 +24,29 @@
                 SUPER<br />MANGO
             </span>
         </h1>
-        <p class="hero-sub">A 2D pixel art platformer. Play in your browser.</p>
-        <div class="hero-ctas">
-            <a href="#play" class="btn-play">&#9654; PLAY NOW</a>
-            <a href="#downloads" class="btn-download">&darr; DOWNLOAD</a>
+        <p class="hero-sub">Play the run. Open the source. Build the next level.</p>
+        <p class="hero-proof">An open-source pixel platformer you can play in browser, study in C11 + SDL2, and extend with TOML levels.</p>
+        <div class="hero-hud" aria-label="Project highlights">
+            <span>C11</span>
+            <span>SDL2</span>
+            <span>WASM</span>
+            <span>TOML</span>
+            <span>Level editor</span>
+        </div>
+        <div class="hero-ctas" aria-label="Primary actions">
+            <a href="#play" class="btn-play">
+                <span class="btn-kicker">Insert coin</span>
+                <span class="btn-main">Play in browser</span>
+            </a>
+            <a href="#docs" class="btn-download">
+                <span class="btn-kicker">Builder manual</span>
+                <span class="btn-main">Learn the engine</span>
+            </a>
         </div>
     </div>
-    <div class="scroll-hint">SCROLL &darr;</div>
+    <div class="hero-cabinet-peek" aria-hidden="true">
+        <span></span>
+        <strong>READY</strong>
+    </div>
+    <div class="scroll-hint">CABINET BELOW &darr;</div>
 </section>
