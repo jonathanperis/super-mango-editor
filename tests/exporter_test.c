@@ -49,6 +49,21 @@ static int exports_minimal_level_files(void)
     def.platforms[0].tile_width = 3;
     strncpy(def.platforms[0].tile_path, "assets/sprites/levels/stone_tileset.png",
             sizeof(def.platforms[0].tile_path) - 1);
+    def.axe_trap_count = 1;
+    def.axe_traps[0].pillar_x = 144.0f;
+    def.axe_traps[0].y = 88.0f;
+    def.axe_traps[0].mode = AXE_MODE_SPIN;
+    def.circular_saw_count = 1;
+    def.circular_saws[0].x = 222.0f;
+    def.circular_saws[0].y = 123.0f;
+    def.circular_saws[0].patrol_x0 = 210.0f;
+    def.circular_saws[0].patrol_x1 = 320.0f;
+    def.circular_saws[0].direction = -1;
+    def.vine_count = 1;
+    def.vines[0].x = 70.0f;
+    def.vines[0].y = 170.0f;
+    def.vines[0].tile_count = 3;
+    def.vines[0].vine_type = VINE_BROWN;
 
     if (level_export_c(&def, "test_export_level", "out") != 0) {
         fprintf(stderr, "exporter_test: export failed\n");
@@ -66,6 +81,12 @@ static int exports_minimal_level_files(void)
     if (expect_file_contains("out/test_export_level.c", ".floor_tile_path = \"assets/sprites/levels/grass_tileset.png\",") != 0)
         return 1;
     if (expect_file_contains("out/test_export_level.c", ".tile_path = \"assets/sprites/levels/stone_tileset.png\"") != 0)
+        return 1;
+    if (expect_file_contains("out/test_export_level.c", "{ .pillar_x = 144.0f, .y = 88.0f, .mode = AXE_MODE_SPIN },") != 0)
+        return 1;
+    if (expect_file_contains("out/test_export_level.c", "{ .x = 222.0f, .y = 123.0f, .patrol_x0 = 210.0f, .patrol_x1 = 320.0f, .direction = -1 },") != 0)
+        return 1;
+    if (expect_file_contains("out/test_export_level.c", "{ .x = 70.0f, .y = 170.0f, .tile_count = 3, .vine_type = VINE_BROWN },") != 0)
         return 1;
     if (expect_file_contains("out/test_export_level.c", ".coin_count = 1,") != 0)
         return 1;

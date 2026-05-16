@@ -13,6 +13,7 @@
 #include "exporter.h"
 
 #include "../levels/level.h"   /* LevelDef, all placement structs, enums */
+#include "../surfaces/vine.h"  /* VINE_GREEN, VINE_BROWN */
 #include "../game.h"           /* MAX_* constants (used by LevelDef)     */
 
 #include <stdio.h>             /* FILE, fopen, fprintf, fclose           */
@@ -77,6 +78,18 @@ static const char *bouncepad_type_str(BouncepadType pad_type)
     case BOUNCEPAD_WOOD:  return "BOUNCEPAD_WOOD";
     case BOUNCEPAD_RED:   return "BOUNCEPAD_RED";
     default:              return "BOUNCEPAD_GREEN";
+    }
+}
+
+/*
+ * vine_type_str — Convert a VineType-compatible value to its C identifier.
+ */
+static const char *vine_type_str(int vine_type)
+{
+    switch (vine_type) {
+    case VINE_GREEN: return "VINE_GREEN";
+    case VINE_BROWN: return "VINE_BROWN";
+    default:         return "VINE_GREEN";
     }
 }
 
@@ -501,8 +514,8 @@ static int write_source(const LevelDef *def, const char *var_name,
         fprintf(f, "    .axe_traps = {\n");
         for (int i = 0; i < def->axe_trap_count; i++) {
             const AxeTrapPlacement *at = &def->axe_traps[i];
-            fprintf(f, "        { .pillar_x = %.1ff, .mode = %s },\n",
-                    at->pillar_x, axe_mode_str(at->mode));
+            fprintf(f, "        { .pillar_x = %.1ff, .y = %.1ff, .mode = %s },\n",
+                    at->pillar_x, at->y, axe_mode_str(at->mode));
         }
         fprintf(f, "    },\n");
     }
@@ -514,8 +527,8 @@ static int write_source(const LevelDef *def, const char *var_name,
         fprintf(f, "    .circular_saws = {\n");
         for (int i = 0; i < def->circular_saw_count; i++) {
             const CircularSawPlacement *cs = &def->circular_saws[i];
-            fprintf(f, "        { .x = %.1ff, .patrol_x0 = %.1ff, .patrol_x1 = %.1ff, .direction = %d },\n",
-                    cs->x, cs->patrol_x0, cs->patrol_x1, cs->direction);
+            fprintf(f, "        { .x = %.1ff, .y = %.1ff, .patrol_x0 = %.1ff, .patrol_x1 = %.1ff, .direction = %d },\n",
+                    cs->x, cs->y, cs->patrol_x0, cs->patrol_x1, cs->direction);
         }
         fprintf(f, "    },\n");
     }
@@ -656,8 +669,8 @@ static int write_source(const LevelDef *def, const char *var_name,
         fprintf(f, "    .vines = {\n");
         for (int i = 0; i < def->vine_count; i++) {
             const VinePlacement *v = &def->vines[i];
-            fprintf(f, "        { .x = %.1ff, .y = %.1ff, .tile_count = %d },\n",
-                    v->x, v->y, v->tile_count);
+            fprintf(f, "        { .x = %.1ff, .y = %.1ff, .tile_count = %d, .vine_type = %s },\n",
+                    v->x, v->y, v->tile_count, vine_type_str(v->vine_type));
         }
         fprintf(f, "    },\n");
     }
