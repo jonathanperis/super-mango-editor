@@ -1,9 +1,97 @@
 ---
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const scoreboard = [
+    ['LEVELS', '3'],
+    ['SCREENS', '23'],
+    ['ENEMIES', '41'],
+    ['HAZARDS', '64'],
+    ['COLLECT', '80'],
+];
+
+const paths = [
+    {
+        label: 'PATH_01',
+        title: 'Play',
+        body: 'Start the WebAssembly build, learn the controls, and test the browser version without installing anything.',
+        action: 'START RUN ->',
+        href: '#play',
+    },
+    {
+        label: 'PATH_02',
+        title: 'Learn the engine',
+        body: 'Follow the C11 + SDL2 architecture, game loop, rendering, collision, input, and entity systems.',
+        action: 'OPEN GUIDE ->',
+        href: `${base}/docs/developer-guide/`,
+    },
+    {
+        label: 'PATH_03',
+        title: 'Build levels',
+        body: 'Inspect TOML worlds, asset rules, and the visual level editor workflow for extending the platformer.',
+        action: 'WORLD BUILDER ->',
+        href: `${base}/docs/level-editor/`,
+    },
+];
+
+const manualGroups = [
+    {
+        label: 'MANUAL_01',
+        title: 'Start here',
+        body: 'Project overview, codebase map, and the first walkthrough for new contributors.',
+        links: [
+            { title: 'README', href: 'https://github.com/jonathanperis/super-mango-editor#readme', external: true },
+            { title: 'Developer Guide', href: `${base}/docs/developer-guide/`, external: false },
+            { title: 'Architecture', href: `${base}/docs/architecture/`, external: false },
+        ],
+        action: 'OPEN STARTER ROUTE ->',
+    },
+    {
+        label: 'MANUAL_02',
+        title: 'Core systems',
+        body: 'Player lifecycle, entities, hazards, constants, collectibles, and platform surfaces.',
+        links: [
+            { title: 'Player Module', href: `${base}/docs/player-module/`, external: false },
+            { title: 'Entities & Hazards', href: `${base}/docs/entities-and-hazards/`, external: false },
+            { title: 'Constants', href: `${base}/docs/constants-reference/`, external: false },
+            { title: 'Collectibles', href: `${base}/docs/collectibles-and-surfaces/`, external: false },
+        ],
+        action: 'STUDY SYSTEMS ->',
+    },
+    {
+        label: 'MANUAL_03',
+        title: 'World builder',
+        body: 'Level format, visual editor, sprites, audio, and content authoring references.',
+        links: [
+            { title: 'Level Design', href: `${base}/docs/level-design/`, external: false },
+            { title: 'Level Editor', href: `${base}/docs/level-editor/`, external: false },
+            { title: 'Assets', href: `${base}/docs/assets/`, external: false },
+            { title: 'Sounds', href: `${base}/docs/sounds/`, external: false },
+        ],
+        action: 'BUILD A LEVEL ->',
+    },
+    {
+        label: 'MANUAL_04',
+        title: 'Build & source',
+        body: 'Make targets, source-file ownership, native builds, WebAssembly, and validation gates.',
+        links: [
+            { title: 'Build System', href: `${base}/docs/build-system/`, external: false },
+            { title: 'Source Files', href: `${base}/docs/source-files/`, external: false },
+            { title: 'Full Docs', href: `${base}/docs`, external: false },
+        ],
+        action: 'OPEN TOOLCHAIN ->',
+    },
+];
 ---
 
 <section id="play" class="play-section">
+    <div class="section-kicker">ARCADE CABINET</div>
+    <h2 class="section-title">INSERT COIN</h2>
+    <p class="section-lede">Launch the browser build below. It downloads about 43 MB, then the canvas takes keyboard focus for the run.</p>
     <div class="cabinet-frame">
+        <div class="cabinet-marquee">
+            <span>WEBASSEMBLY BUILD</span>
+            <strong>READY</strong>
+        </div>
         <div class="cabinet-bezel">
             <canvas
                 id="canvas"
@@ -16,147 +104,133 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
             </p>
         </div>
         <div class="cabinet-controls">
-            <kbd>WASD</kbd> / <kbd>Arrows</kbd> Move &nbsp;&middot;&nbsp;
-            <kbd>Space</kbd> Jump
+            <span class="control-group"><kbd>WASD</kbd> / <kbd>Arrows</kbd> Move</span>
+            <span class="control-group"><kbd>Space</kbd> Jump</span>
+            <span class="control-note">Keyboard recommended · scroll resumes after the canvas loses focus</span>
         </div>
         <div class="cabinet-base"></div>
     </div>
 </section>
 
 <section id="about" class="about-section">
-    <h2 class="section-title">ABOUT THE GAME</h2>
-    <p>
-        Super Mango is a classic side-scrolling platformer built as a
-        <strong>learning resource</strong> for C and SDL2 game programming. Every line
-        of code is commented to explain the <em>why</em>, not just the what - making it
-        ideal for developers who want to learn how 2D games work under the hood.
-    </p>
-    <p>
-        The game renders at 400&times;300 logical pixels scaled 2&times; to an
-        800&times;600 window, uses delta-time physics for frame-rate-independent
-        movement, and follows a clean init &rarr; loop &rarr; cleanup architecture.
+    <div class="section-kicker">SCOREBOARD</div>
+    <h2 class="section-title">PLAY, STUDY, REBUILD</h2>
+    <p class="section-lede">
+        Super Mango is a classic side-scrolling platformer and a commented learning resource for C and SDL2 game programming.
+        It keeps the game loop, rendering, input, collision, assets, WebAssembly build, and level tooling visible.
     </p>
 
-    <div class="feature-grid">
+    <div class="scoreboard-grid" aria-label="Project metrics">
+        {scoreboard.map(([label, value]) => (
+            <div class="score-tile">
+                <span>{label}</span>
+                <strong>{value}</strong>
+            </div>
+        ))}
+    </div>
+
+    <div class="path-grid">
+        {paths.map((path) => (
+            <a class="path-card" href={path.href}>
+                <span class="card-label">{path.label}</span>
+                <h3>{path.title}</h3>
+                <p>{path.body}</p>
+                <span class="card-action">{path.action}</span>
+            </a>
+        ))}
+    </div>
+
+    <div class="feature-grid inventory-grid">
         <div class="feature-card">
+            <span class="card-label">INV_01</span>
             <h3>Platforming</h3>
-            <p>One-way platforms, float platforms, crumble bridges, and floor gaps with animated water.</p>
+            <p>One-way platforms, float platforms, crumble bridges, floor gaps, bouncepads, vines, ladders, and ropes.</p>
         </div>
         <div class="feature-card">
+            <span class="card-label">INV_02</span>
             <h3>Enemies</h3>
-            <p>6 enemy types: spiders, jumping spiders, birds, faster birds, fish, and faster fish.</p>
+            <p>Spiders, jumping spiders, birds, faster birds, fish, and faster fish across hand-authored TOML levels.</p>
         </div>
         <div class="feature-card">
+            <span class="card-label">INV_03</span>
             <h3>Hazards</h3>
-            <p>Spike rows, spike platforms, axe traps, circular saws, blue flames, fire flames, and spike blocks on rails.</p>
+            <p>Spike rows, spike platforms, axe traps, circular saws, blue flames, fire flames, and rail blocks.</p>
         </div>
         <div class="feature-card">
-            <h3>Mechanics</h3>
-            <p>Bouncepads, climbable vines, ladders, ropes, collectible coins and stars, lives and hearts system.</p>
+            <span class="card-label">INV_04</span>
+            <h3>Visual polish</h3>
+            <p>Parallax scrolling, player animation states, camera tracking, fog overlay, HUD, and pixel-perfect rendering.</p>
         </div>
         <div class="feature-card">
-            <h3>Visual Polish</h3>
-            <p>Parallax scrolling, 5-state player animation, scrolling camera, fog overlay, and pixel-perfect rendering.</p>
+            <span class="card-label">INV_05</span>
+            <h3>Level editor</h3>
+            <p>Standalone SDL2 editor with canvas tools, palette, properties, validation, autosave, export, and play-test integration.</p>
         </div>
         <div class="feature-card">
-            <h3>Cross-Platform</h3>
-            <p>Builds natively for macOS, Linux, Windows, and WebAssembly.</p>
+            <span class="card-label">INV_06</span>
+            <h3>Cross-platform</h3>
+            <p>Native builds for macOS, Linux, and Windows, plus a browser-playable Emscripten/WebAssembly build.</p>
         </div>
     </div>
 </section>
 
 <section id="docs" class="docs-section">
-    <h2 class="section-title">DOCUMENTATION</h2>
-    <div style="text-align:center; margin-bottom:2rem">
-        <a
-            href={`${base}/docs`}
-            class="docs-view-btn"
-            style="display:inline-block; padding:0.75rem 2rem; background:var(--accent); color:var(--bg); font-family:var(--pixel); font-size:1.1rem; font-weight:700; text-decoration:none; border-radius:6px; letter-spacing:0.02em; transition:background 0.2s;"
-        >
-            View full documentation &rarr;
-        </a>
+    <div class="section-kicker">BUILDER MANUAL</div>
+    <h2 class="section-title">CHOOSE YOUR ROUTE</h2>
+    <p class="section-lede">The landing page now groups docs by intent. Use the full manual when you need the exhaustive index.</p>
+    <div class="docs-cta-row">
+        <a href={`${base}/docs`} class="docs-link-btn">View full documentation &rarr;</a>
     </div>
-    <div class="docs-grid">
-        <a class="doc-card" href="https://github.com/jonathanperis/super-mango-editor#readme" target="_blank" rel="noreferrer noopener" aria-label="Read the project README on GitHub">
-            <h3>README</h3>
-            <p>Project overview, build instructions for all platforms, controls reference, architecture diagram, and full project structure.</p>
-        </a>
-        <a class="doc-card" href={`${base}/docs/architecture/`} aria-label="Read the Architecture section">
-            <h3>Architecture</h3>
-            <p>Startup sequence, game loop phases, coordinate system, GameState struct, and error handling strategy.</p>
-        </a>
-        <a class="doc-card" href={`${base}/docs/source-files/`} aria-label="Read the Source Files section">
-            <h3>Source Files</h3>
-            <p>Complete file map of all source files with module roles.</p>
-        </a>
-        <a class="doc-card" href={`${base}/docs/player-module/`} aria-label="Read the Player Module section">
-            <h3>Player Module</h3>
-            <p>Player lifecycle, input handling, jump and climb logic, physics update, animation state machine.</p>
-        </a>
-        <a class="doc-card" href={`${base}/docs/constants-reference/`} aria-label="Read the Constants Reference section">
-            <h3>Constants Reference</h3>
-            <p>All compile-time constants: window, canvas, timing, tiles, physics, camera, and player locals.</p>
-        </a>
-        <a class="doc-card" href={`${base}/docs/entities-and-hazards/`} aria-label="Read the Entities & Hazards section">
-            <h3>Entities & Hazards</h3>
-            <p>Enemy and hazard types: spider, bird, fish, spikes, circular saw, axe trap, and more.</p>
-        </a>
-        <a class="doc-card" href={`${base}/docs/collectibles-and-surfaces/`} aria-label="Read the Collectibles & Surfaces section">
-            <h3>Collectibles & Surfaces</h3>
-            <p>Coins, stars, platforms, bouncepads, vines, ladders, and ropes.</p>
-        </a>
-        <a class="doc-card" href={`${base}/docs/assets/`} aria-label="Read the Assets section">
-            <h3>Assets</h3>
-            <p>Sprite catalog, player sprite sheet analysis, animation row mapping, and asset organization.</p>
-        </a>
-        <a class="doc-card" href={`${base}/docs/sounds/`} aria-label="Read the Sounds section">
-            <h3>Sounds</h3>
-            <p>Sound effects catalog, audio configuration, and adding new sound effects.</p>
-        </a>
-        <a class="doc-card" href={`${base}/docs/build-system/`} aria-label="Read the Build System section">
-            <h3>Build System</h3>
-            <p>Makefile overview, compiler flags, build targets for macOS, Linux, Windows, and WebAssembly.</p>
-        </a>
-        <a class="doc-card" href={`${base}/docs/level-design/`} aria-label="Read the Level Design section">
-            <h3>Level Design</h3>
-            <p>TOML level file format reference: entities, collectibles, hazards, surfaces, and metadata.</p>
-        </a>
-        <a class="doc-card" href={`${base}/docs/level-editor/`} aria-label="Read the Level Editor section">
-            <h3>Level Editor</h3>
-            <p>Visual level editor guide: canvas, palette, tools, properties panel, undo history, and export.</p>
-        </a>
-        <a class="doc-card" href={`${base}/docs/developer-guide/`} aria-label="Read the Developer Guide section">
-            <h3>Developer Guide</h3>
-            <p>Coding conventions, memory safety, and step-by-step entity addition walkthrough.</p>
-        </a>
+    <div class="docs-grid manual-grid">
+        {manualGroups.map((group) => (
+            <article class="doc-card manual-card">
+                <span class="card-label">{group.label}</span>
+                <h3>{group.title}</h3>
+                <p>{group.body}</p>
+                <ul class="manual-links">
+                    {group.links.map((link) => (
+                        <li>
+                            <a href={link.href} target={link.external ? '_blank' : undefined} rel={link.external ? 'noreferrer noopener' : undefined}>{link.title}</a>
+                        </li>
+                    ))}
+                </ul>
+                <span class="card-action">{group.action}</span>
+            </article>
+        ))}
     </div>
 </section>
 
 <section id="downloads" class="downloads-section">
-    <h2 class="section-title">ITEM DROP</h2>
-    <p>
-        Grab the latest release from
-        <a href="https://github.com/jonathanperis/super-mango-editor/releases/latest" style="color:var(--accent)" target="_blank" rel="noreferrer noopener">
-            GitHub Releases
-        </a>.
-        Native builds must be run from the repository root so they can find the <code>assets/</code> folder.
+    <div class="section-kicker">ITEM DROP</div>
+    <h2 class="section-title">CHOOSE YOUR CARTRIDGE</h2>
+    <p class="section-lede">
+        Download builds for your platform from GitHub Releases, or return to the WebAssembly cabinet for no-install browser play.
+        Native builds should run from the repository root so they can find <code>assets/</code>.
     </p>
     <div class="download-grid">
         <a class="download-card" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for Linux x86_64">
+            <span class="card-label">DROP_01</span>
             <div class="platform">Linux</div>
             <div class="arch">x86_64</div>
+            <span class="card-action">OPEN RELEASE -></span>
         </a>
         <a class="download-card" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for macOS Apple Silicon">
+            <span class="card-label">DROP_02</span>
             <div class="platform">macOS</div>
-            <div class="arch">arm64 (Apple Silicon)</div>
+            <div class="arch">arm64 Apple Silicon</div>
+            <span class="card-action">OPEN RELEASE -></span>
         </a>
         <a class="download-card" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for Windows x86_64">
+            <span class="card-label">DROP_03</span>
             <div class="platform">Windows</div>
-            <div class="arch">x86_64 (SDL2 DLLs included)</div>
+            <div class="arch">x86_64 + SDL2 DLLs</div>
+            <span class="card-action">OPEN RELEASE -></span>
         </a>
-        <a class="download-card" href="#play" style="border-color:var(--green)">
-            <div class="platform" style="color:var(--green)">WebAssembly</div>
-            <div class="arch">Play in browser above!</div>
+        <a class="download-card wasm-drop" href="#play" aria-label="Play Super Mango in browser using WebAssembly">
+            <span class="card-label">DROP_04</span>
+            <div class="platform">WebAssembly</div>
+            <div class="arch">No install · play above</div>
+            <span class="card-action">PLAY ABOVE -></span>
         </a>
     </div>
 </section>
