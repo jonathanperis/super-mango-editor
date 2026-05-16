@@ -75,7 +75,7 @@ Difficulty 4 - The mountain opened its throat and swallowed the sky. Eight scree
 - **Initial hearts/lives:** `3` / `3`
 - **Next phase:** —
 
-Difficulty 5 - You survived the first descent, but the mountain runs deeper still. Twelve screens of escalating fury await — the gaps widen, the platforms shrink, and the denizens of the dark have grown restless. Saw blades carve the air, axe traps guard the narrow passages, and the fish in the lava have learned to swim faster. Here, every jump is a promise to the void, and every star sits at the edge of catastrophe. The forge continues — if you have the courage to burn.
+Difficulty 5 - You survived the first descent, but the mountain runs deeper still. Eleven screens of escalating fury await — the gaps widen, the platforms shrink, and the denizens of the dark have grown restless. Saw blades carve the air, axe traps guard the narrow passages, and the fish in the lava have learned to swim faster. Here, every jump is a promise to the void, and every star sits at the edge of catastrophe. The forge continues — if you have the courage to burn.
 
 | Group | Count | Included TOML arrays |
 |-------|------:|----------------------|
