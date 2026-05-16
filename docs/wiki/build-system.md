@@ -221,6 +221,14 @@ Builds the game and editor, then runs every `levels/*.toml` with dummy SDL video
 make smoke SMOKE_FRAMES=5 SMOKE_SEED=1
 ```
 
+### `make scripted-smoke`
+
+Builds the game and editor, then runs `tools/run_scripted_smoke.py` against every `levels/*.toml` for each seed in `SMOKE_SEEDS`. This expands the basic smoke pass into deterministic replay-style coverage across multiple RNG seeds while still using dummy SDL video/audio in CI.
+
+```sh
+make scripted-smoke SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
+```
+
 ### `make sanitize`
 
 Runs `make test` in a separate `out-sanitize/` tree with AddressSanitizer and UndefinedBehaviorSanitizer enabled.
@@ -247,7 +255,7 @@ make level-catalog
 
 ### `make docs-drift`
 
-Runs the generated level-catalog freshness check plus `tools/check_docs_drift.py`, a semantic documentation drift check that compares Makefile test targets, source-file map entries, layer TOML snippets, workflow docs, runtime flags, and key constants against the current repository.
+Runs the generated level-catalog freshness check, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. Together they compare Makefile test targets, source-file map entries, layer TOML snippets, workflow docs, runtime flags, key constants, level prose counts, TOML line endings, overlay text snapshots, and scripted-smoke wiring against the current repository.
 
 ```sh
 make docs-drift
@@ -331,7 +339,7 @@ Four GitHub Actions workflows handle automated builds and docs checks:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests | Multi-platform native build, `make test`, `make validate-levels`, `make editor`, native game/editor smoke, WebAssembly build, WebAssembly artifact smoke; on main push: GitHub Release creation |
+| Build & Release | `build.yml` | Push to `main`, pull requests | Multi-platform native build, `make test`, `make validate-levels`, `make editor`, native game/editor smoke, Linux scripted smoke, WebAssembly build, WebAssembly artifact smoke; on main push: GitHub Release creation |
 | Docs | `docs.yml` | Docs pull requests, manual | `make docs-drift`, `bun install --frozen-lockfile`, `bun run lint`, `bun run build` under `docs/` |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly | Automated code security and quality analysis |
 | Deploy | `deploy.yml` | Successful main Build & Release workflow | Builds docs, copies WebAssembly artifacts, and deploys `docs/out/` to GitHub Pages |
