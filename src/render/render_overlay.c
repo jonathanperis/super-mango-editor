@@ -10,8 +10,17 @@
 #include <stdio.h>  /* snprintf */
 
 /* ------------------------------------------------------------------ */
-/* Level complete overlay                                             */
+/* Shared overlay drawing                                             */
 /* ------------------------------------------------------------------ */
+
+static void render_overlay_backdrop(GameState *gs, Uint8 alpha)
+{
+    SDL_SetRenderDrawBlendMode(gs->renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(gs->renderer, 0, 0, 0, alpha);
+    SDL_Rect overlay = { 0, 0, GAME_W, GAME_H };
+    SDL_RenderFillRect(gs->renderer, &overlay);
+    SDL_SetRenderDrawBlendMode(gs->renderer, SDL_BLENDMODE_NONE);
+}
 
 static void render_centered_text(GameState *gs, const char *text,
                                  SDL_Color color, int y)
@@ -30,14 +39,28 @@ static void render_centered_text(GameState *gs, const char *text,
     }
 }
 
+void render_pause_overlay(GameState *gs)
+{
+    render_overlay_backdrop(gs, 150);
+
+    if (gs->hud.font) {
+        SDL_Color gold = { 255, 215, 0, 255 };
+        SDL_Color white = { 255, 255, 255, 255 };
+        SDL_Color dim = { 190, 190, 190, 255 };
+
+        render_centered_text(gs, "Paused", gold, 92);
+        render_centered_text(gs, "Enter/Space/Esc/Start: resume", white, 134);
+        render_centered_text(gs, "Close window to quit", dim, 160);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Level complete overlay                                             */
+/* ------------------------------------------------------------------ */
+
 void render_level_complete_overlay(GameState *gs)
 {
-    /* Semi-transparent black overlay */
-    SDL_SetRenderDrawBlendMode(gs->renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(gs->renderer, 0, 0, 0, 180);
-    SDL_Rect overlay = { 0, 0, GAME_W, GAME_H };
-    SDL_RenderFillRect(gs->renderer, &overlay);
-    SDL_SetRenderDrawBlendMode(gs->renderer, SDL_BLENDMODE_NONE);
+    render_overlay_backdrop(gs, 180);
 
     const int has_next_level = gs->completion.pending_next_phase;
 

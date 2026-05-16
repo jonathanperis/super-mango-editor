@@ -26,6 +26,14 @@ void game_render_frame(GameState *gs, int cam_x, float dt);
 /* ------------------------------------------------------------------ */
 
 /*
+ * render_pause_overlay — Draw the gameplay pause screen.
+ *
+ * Shows a semi-transparent overlay on top of the last rendered gameplay frame
+ * with resume controls.
+ */
+void render_pause_overlay(GameState *gs);
+
+/*
  * render_level_complete_overlay — Draw the level complete screen.
  *
  * Shows semi-transparent black overlay with "Level Complete!" title,
