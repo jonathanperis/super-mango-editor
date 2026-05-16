@@ -34,7 +34,7 @@ Super Mango is a 2D side-scrolling platformer built in C11 with SDL2, designed a
 - Collectibles: coins (100 pts each, 3 coins restore a heart), star yellow, star green, star red health pickups, end-of-level last star
 - Climbable vines, ladders, and ropes; three bouncepad variants (small, medium, high)
 - TOML-based level format with runtime level loading (`--level path/to/level.toml`) and `next_phase` transitions
-- Pause and end-of-level overlays: Esc/Start pauses or resumes gameplay, and Enter/Start continues to the next phase when a completion overlay is shown
+- Pause, game-over, and end-of-level overlays: Esc/Start pauses or resumes gameplay, game over waits for Enter/Start before restarting, and Enter/Start continues to the next phase when a completion overlay is shown
 - Start menu, HUD (hearts/lives/score), lives system, invincibility blink on damage
 - Keyboard and gamepad (hot-plug) controls
 - Debug overlay (`--debug` flag): FPS counter, CPU frame time, memory usage, collision hitbox visualization, scrolling event log

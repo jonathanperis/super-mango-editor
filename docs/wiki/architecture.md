@@ -82,7 +82,7 @@ while (gs.running) {
   2. Events       — SDL_PollEvent (quit window / pause and overlay controls)
                     SDL_CONTROLLERDEVICEADDED   — opens a newly plugged-in controller
                     SDL_CONTROLLERDEVICEREMOVED — closes and NULLs gs->controller when unplugged
-                    SDL_CONTROLLERBUTTONDOWN (START) — pauses/resumes, or advances completion overlay
+                    SDL_CONTROLLERBUTTONDOWN (START) — pauses/resumes, restarts game-over, or advances completion overlay
   3. Update       — player_handle_input → player_update (incl. bouncepad, float-platform, bridge landing)
                     → bouncepad response (animation + spring sound)
                     → spiders_update → jumping_spiders_update → birds_update → faster_birds_update
@@ -107,7 +107,7 @@ while (gs.running) {
                     → spike blocks → axe traps → circular saws
                     → spiders → jumping spiders → birds → faster birds
                     → player → fog → hud
-                    → debug overlay (if --debug) → pause/completion overlay → present
+                    → debug overlay (if --debug) → pause/game-over/completion overlay → present
 }
 ```
 
@@ -166,7 +166,11 @@ Collecting `last_star` calls `game_complete_level()`. The game snapshots elapsed
 
 ### Pause Overlay Flow
 
-During active gameplay, Esc or controller Start toggles the player pause reason through the overlay helper in `src/core/game_overlay.c`. Paused frames keep rendering the last camera position, skip gameplay updates, pause music, and draw a semi-transparent pause overlay with resume hints. Enter, Space, Esc, or controller Start resumes gameplay. Window focus loss uses a separate focus pause reason, so regaining focus does not clear an intentional player pause. Completion overlays take priority over pause so the existing next-phase flow remains unchanged.
+During active gameplay, Esc or controller Start toggles the player pause reason through the overlay helper in `src/core/game_overlay.c`. Paused frames keep rendering the last camera position, skip gameplay updates, pause music, and draw a semi-transparent pause overlay with resume hints. Enter, Space, Esc, or controller Start resumes gameplay. Window focus loss uses a separate focus pause reason, so regaining focus does not clear an intentional player pause. Completion and game-over overlays take priority over pause.
+
+### Game-Over Flow
+
+When lethal damage consumes the final life, `apply_damage()` sets `gs->game_over` and returns without resetting the level. The shared overlay helper reports `GAME_OVERLAY_GAME_OVER`, so the loop blocks gameplay updates and rendering draws a game-over overlay with the final score. Enter, Space, or controller Start confirms restart through `game_restart_after_game_over()`, which restores level-defined lives/hearts, resets score and bonus-life threshold, and reloads the current level. Esc exits from the game-over overlay.
 
 ---
 

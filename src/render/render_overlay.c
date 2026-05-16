@@ -54,6 +54,26 @@ void render_pause_overlay(GameState *gs)
     }
 }
 
+void render_game_over_overlay(GameState *gs)
+{
+    render_overlay_backdrop(gs, 190);
+
+    if (gs->hud.font) {
+        SDL_Color red = { 255, 90, 90, 255 };
+        SDL_Color white = { 255, 255, 255, 255 };
+        SDL_Color dim = { 190, 190, 190, 255 };
+        char line[96];
+
+        render_centered_text(gs, "Game Over", red, 82);
+
+        snprintf(line, sizeof(line), "Final Score: %d", gs->score);
+        render_centered_text(gs, line, white, 124);
+
+        render_centered_text(gs, "Enter/Space/Start: restart", dim, 164);
+        render_centered_text(gs, "Esc: exit", dim, 184);
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /* Level complete overlay                                             */
 /* ------------------------------------------------------------------ */
