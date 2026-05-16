@@ -170,7 +170,7 @@ During active gameplay, Esc or controller Start toggles the player pause reason 
 
 ### Game-Over Flow
 
-When lethal damage consumes the final life, `apply_damage()` sets `gs->game_over` and returns without resetting the level. The shared overlay helper reports `GAME_OVERLAY_GAME_OVER`, so the loop blocks gameplay updates and rendering draws a game-over overlay with the final score. Enter, Space, or controller Start confirms restart through `game_restart_after_game_over()`, which restores level-defined lives/hearts, resets score and bonus-life threshold, and reloads the current level. Esc exits from the game-over overlay.
+When lethal damage consumes the final life, `apply_damage()` sets `gs->game_over` and returns without resetting the level. The shared overlay helper reports `GAME_OVERLAY_GAME_OVER`, so the loop blocks gameplay updates and rendering draws a game-over overlay with the final score. Enter, Space, or controller Start confirms restart through `game_restart_after_game_over()`, which restores level-defined lives/hearts, resets score and bonus-life threshold, and reloads the current level. Esc exits the game-over overlay.
 
 ---
 
