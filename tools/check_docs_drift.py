@@ -38,6 +38,25 @@ def fail(message: str) -> None:
 
 FAILURES: list[str] = []
 
+SCREEN_WORDS = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+}
+
 
 def makefile_test_targets() -> list[str]:
     makefile = read(ROOT / "Makefile")
@@ -179,6 +198,29 @@ def check_level_catalog_doc() -> None:
             fail(f"{page_name}: missing level-catalog navigation/reference")
 
 
+def screen_mentions(description: str) -> list[int]:
+    mentions: list[int] = []
+    for match in re.finditer(r"\b([A-Za-z]+|\d+)\s+screens?\b", description, re.I):
+        token = match.group(1).lower()
+        if token.isdigit():
+            mentions.append(int(token))
+        elif token in SCREEN_WORDS:
+            mentions.append(SCREEN_WORDS[token])
+    return mentions
+
+
+def check_level_prose_counts() -> None:
+    for level in sorted((ROOT / "levels").glob("*.toml")):
+        data = load_level(level)
+        expected = int(data.get("screen_count", 0))
+        for mentioned in screen_mentions(str(data.get("description", ""))):
+            if mentioned != expected:
+                fail(
+                    f"{level.relative_to(ROOT)}: description says {mentioned} screens, "
+                    f"but screen_count is {expected}"
+                )
+
+
 def check_agent_context_docs() -> None:
     expected_count = len(makefile_test_targets())
     for rel in ["AGENTS.md", "CLAUDE.md"]:
@@ -200,6 +242,7 @@ def main() -> int:
     check_cli_and_workflows()
     check_overlay_controls_doc()
     check_level_catalog_doc()
+    check_level_prose_counts()
     check_agent_context_docs()
 
     if FAILURES:
