@@ -85,10 +85,20 @@ void player_init(Player *player, SDL_Renderer *renderer);
 /* Restore tunable movement physics to engine defaults. */
 void player_apply_default_physics(Player *player);
 
-/* Sample keyboard and gamepad every frame and set vx/vy accordingly.
- * ctrl may be NULL when no controller is connected; keyboard still works. */
+enum {
+    PLAYER_INPUT_LEFT  = 1u << 0,
+    PLAYER_INPUT_RIGHT = 1u << 1,
+    PLAYER_INPUT_UP    = 1u << 2,
+    PLAYER_INPUT_DOWN  = 1u << 3,
+    PLAYER_INPUT_JUMP  = 1u << 4,
+    PLAYER_INPUT_RUN   = 1u << 5,
+};
+
+/* Sample keyboard, replay, and gamepad every frame and set vx/vy accordingly.
+ * ctrl may be NULL when no controller is connected; keyboard/replay still work. */
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                          SDL_GameController *ctrl,
+                         unsigned int replay_input_mask,
                          const VineDecor *vines, int vine_count,
                          const LadderDecor *ladders, int ladder_count,
                          const RopeDecor *ropes, int rope_count);

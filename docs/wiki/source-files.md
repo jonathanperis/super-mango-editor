@@ -103,6 +103,7 @@ src/
 ├── input/
 │   ├── game_input.h / .c         SDL keyboard/gamepad input helpers
 │   ├── game_events.h / .c        SDL event handling
+│   ├── game_replay.h / .c        Deterministic SDL key-event replay injection
 │   └── game_web_input.h / .c     Browser/WebAssembly input bridge
 ├── levels/
 │   ├── level.h                   Shared level definitions
@@ -154,7 +155,7 @@ New `.c` files in `src/` or recognized source subdirectories are picked up by Ma
 
 ### Responsibilities
 
-- Parse CLI flags: `--debug`, `--sandbox`, `--level <path>`, `--smoke-test-frames N`, and `--seed N`
+- Parse CLI flags: `--debug`, `--sandbox`, `--level <path>`, `--smoke-test-frames N`, `--seed N`, and `--replay-script <path>`
 - Call `SDL_Init`, `IMG_Init`, `TTF_Init`, `Mix_OpenAudio` in order
 - Route to start menu, sandbox, or direct TOML level mode
 - Tear down SDL subsystems in reverse order before returning

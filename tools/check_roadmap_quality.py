@@ -54,13 +54,14 @@ def check_level_line_endings() -> None:
             fail(f"{path.relative_to(ROOT)}: normalize level TOML line endings to LF")
 
 
-def overlay_literals() -> list[str]:
+def overlay_snapshot_tokens() -> list[str]:
     source = read(ROOT / "src" / "render" / "render_overlay.c")
-    literals = re.findall(r'render_centered_text\([^;]*?"([^"]+)"', source, re.S)
+    tokens = re.findall(r'render_centered_text\([^;]*?"([^"]+)"', source, re.S)
     dynamic_titles = re.findall(r'\?\s*"([^"]+)"\s*:\s*"([^"]+)"', source)
     for left, right in dynamic_titles:
-        literals.extend([left, right])
-    return sorted(set(literals))
+        tokens.extend([left, right])
+    tokens.extend(re.findall(r'snprintf\([^;]*?"([^"]+)"', source, re.S))
+    return sorted(set(tokens))
 
 
 def check_overlay_snapshot_doc() -> None:
@@ -69,11 +70,11 @@ def check_overlay_snapshot_doc() -> None:
         fail("docs/wiki/overlay-snapshots.md: missing overlay text snapshot doc")
         return
     text = read(path)
-    for literal in overlay_literals():
-        if literal not in text:
-            fail(f"docs/wiki/overlay-snapshots.md: missing overlay literal {literal!r}")
-    if "tools/check_roadmap_quality.py" not in text:
-        fail("docs/wiki/overlay-snapshots.md: missing generated/check source note")
+    for token in overlay_snapshot_tokens():
+        if token not in text:
+            fail(f"docs/wiki/overlay-snapshots.md: missing overlay source token {token!r}")
+    if "tools/generate_overlay_snapshots.py" not in text:
+        fail("docs/wiki/overlay-snapshots.md: missing generated-file source note")
 
 
 def check_scripted_smoke_target() -> None:
@@ -92,7 +93,19 @@ def check_scripted_smoke_target() -> None:
         fail("docs/wiki/build-system.md: missing make scripted-smoke docs")
     if "make scripted-smoke" not in workflow:
         fail(".github/workflows/build.yml: CI must run scripted smoke on Linux")
-    for needle in ["tools/check_roadmap_quality.py", "tools/run_scripted_smoke.py", ".gitattributes"]:
+    player_header = read(ROOT / "src" / "player" / "player.h")
+    player_input = read(ROOT / "src" / "player" / "player_input.c")
+    replay_runner = read(ROOT / "tools" / "run_scripted_smoke.py")
+    if "--replay-script" not in replay_runner:
+        fail("tools/run_scripted_smoke.py: scripted smoke must pass replay scripts to the game binary")
+    if "replay_input_mask" not in player_header or "replay_input_mask" not in player_input:
+        fail("player input: replay scripts must feed sampled movement/jump state, not only SDL events")
+    if "--replay-script" not in build_doc:
+        fail("docs/wiki/build-system.md: missing replay-script smoke docs")
+    replay_source = read(ROOT / "src" / "input" / "game_replay.c")
+    if "SDL_PushEvent" not in replay_source:
+        fail("src/input/game_replay.c: replay smoke must inject SDL events")
+    for needle in ["tools/check_roadmap_quality.py", "tools/generate_overlay_snapshots.py", "tools/run_scripted_smoke.py", ".gitattributes"]:
         if needle not in docs_workflow:
             fail(f".github/workflows/docs.yml: docs drift path filter must include `{needle}`")
 

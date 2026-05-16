@@ -223,7 +223,7 @@ make smoke SMOKE_FRAMES=5 SMOKE_SEED=1
 
 ### `make scripted-smoke`
 
-Builds the game and editor, then runs `tools/run_scripted_smoke.py` against every `levels/*.toml` for each seed in `SMOKE_SEEDS`. This expands the basic smoke pass into deterministic replay-style coverage across multiple RNG seeds while still using dummy SDL video/audio in CI.
+Builds the game and editor, then runs `tools/run_scripted_smoke.py` against every `levels/*.toml` for each seed in `SMOKE_SEEDS`. The runner creates deterministic replay scripts and passes them to the game with `--replay-script`, injecting SDL key events such as move-right, jump-right, and pause/resume while still using dummy SDL video/audio in CI.
 
 ```sh
 make scripted-smoke SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
@@ -255,7 +255,7 @@ make level-catalog
 
 ### `make docs-drift`
 
-Runs the generated level-catalog freshness check, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. Together they compare Makefile test targets, source-file map entries, layer TOML snippets, workflow docs, runtime flags, key constants, level prose counts, TOML line endings, overlay text snapshots, and scripted-smoke wiring against the current repository.
+Runs the generated level-catalog freshness check, generated overlay-snapshot freshness check, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. Together they compare Makefile test targets, source-file map entries, layer TOML snippets, workflow docs, runtime flags, key constants, level prose counts, TOML line endings, overlay text snapshots, and scripted-smoke wiring against the current repository.
 
 ```sh
 make docs-drift

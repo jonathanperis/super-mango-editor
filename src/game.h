@@ -342,6 +342,10 @@ typedef struct {
     float         checkpoint_x;   /* respawn x position (updated per screen)   */
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
     int           smoke_test_frames; /* >0 = exit after this many frames     */
+    char          replay_script_path[256]; /* optional frame/key replay file */
+    unsigned int  replay_input_mask; /* replay keys active for this frame    */
+    unsigned int  replay_held_mask;  /* replay keys held across frames       */
+    int           replay_frame; /* current deterministic replay frame     */
     char          level_path[256]; /* TOML level to load (--level flag)      */
     void         *level_def;   /* owned active LevelDef backing storage   */
     DebugOverlay  debug;       /* FPS counter, collision vis, event log      */

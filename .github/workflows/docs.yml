@@ -8,6 +8,7 @@ on:
       - 'tools/check_docs_drift.py'
       - 'tools/check_roadmap_quality.py'
       - 'tools/generate_level_catalog.py'
+      - 'tools/generate_overlay_snapshots.py'
       - 'tools/run_scripted_smoke.py'
       - '.gitattributes'
       - 'Makefile'

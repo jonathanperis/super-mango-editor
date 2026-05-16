@@ -127,7 +127,7 @@ TEST_DEPS           = $(wildcard $(OBJDIR)/tests/*.d)
 SANITIZE_CFLAGS     = -fsanitize=address,undefined -fno-omit-frame-pointer
 SANITIZE_LDFLAGS    = -fsanitize=address,undefined
 
-.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels level-catalog docs-drift roadmap-quality smoke scripted-smoke sanitize sanitize-smoke
+.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels level-catalog overlay-snapshots docs-drift roadmap-quality smoke scripted-smoke sanitize sanitize-smoke
 
 all: $(OUTDIR) $(TARGET)
 
@@ -213,8 +213,12 @@ validate-levels:
 level-catalog:
 	python3 tools/generate_level_catalog.py
 
+overlay-snapshots:
+	python3 tools/generate_overlay_snapshots.py
+
 docs-drift:
 	python3 tools/generate_level_catalog.py --check
+	python3 tools/generate_overlay_snapshots.py --check
 	python3 tools/check_docs_drift.py
 	python3 tools/check_roadmap_quality.py
 
