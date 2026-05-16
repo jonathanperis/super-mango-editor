@@ -25,6 +25,7 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 | [Collectibles & Surfaces](#collectibles-and-surfaces) | Coins, stars, bouncepads, rails, float platforms, climbable surfaces |
 | [Assets](#assets) | All sprite sheets, tilesets, and fonts in `assets/` |
 | [Sounds](#sounds) | All audio files in `assets/sounds/` |
+| [Level Catalog](#level-catalog) | Generated inventory of every `levels/*.toml` stage, progression link, and content count |
 
 ### Building & Contributing
 

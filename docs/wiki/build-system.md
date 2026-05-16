@@ -237,9 +237,17 @@ Builds sanitizer-instrumented native game/editor binaries in `out-sanitize/`, th
 make sanitize-smoke SMOKE_FRAMES=5 SMOKE_SEED=1
 ```
 
+### `make level-catalog`
+
+Regenerates `docs/wiki/level-catalog.md` from `levels/*.toml` using `tools/generate_level_catalog.py`. Use this after adding levels or changing level metadata/content counts.
+
+```sh
+make level-catalog
+```
+
 ### `make docs-drift`
 
-Runs `tools/check_docs_drift.py`, a semantic documentation drift check that compares Makefile test targets, source-file map entries, layer TOML snippets, workflow docs, runtime flags, and key constants against the current repository.
+Runs the generated level-catalog freshness check plus `tools/check_docs_drift.py`, a semantic documentation drift check that compares Makefile test targets, source-file map entries, layer TOML snippets, workflow docs, runtime flags, and key constants against the current repository.
 
 ```sh
 make docs-drift

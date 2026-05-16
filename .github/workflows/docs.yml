@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - 'docs/**'
+      - 'levels/**'
       - 'tools/check_docs_drift.py'
+      - 'tools/generate_level_catalog.py'
       - 'Makefile'
       - 'src/**'
       - '.github/workflows/*.yml'
