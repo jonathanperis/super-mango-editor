@@ -43,6 +43,12 @@ static int exports_minimal_level_files(void)
     def.coin_count = 1;
     def.coins[0].x = 42.0f;
     def.coins[0].y = 84.0f;
+    def.platform_count = 1;
+    def.platforms[0].x = 96.0f;
+    def.platforms[0].tile_height = 2;
+    def.platforms[0].tile_width = 3;
+    strncpy(def.platforms[0].tile_path, "assets/sprites/levels/stone_tileset.png",
+            sizeof(def.platforms[0].tile_path) - 1);
 
     if (level_export_c(&def, "test_export_level", "out") != 0) {
         fprintf(stderr, "exporter_test: export failed\n");
@@ -58,6 +64,8 @@ static int exports_minimal_level_files(void)
     if (expect_file_contains("out/test_export_level.c", ".screen_count = 2,") != 0)
         return 1;
     if (expect_file_contains("out/test_export_level.c", ".floor_tile_path = \"assets/sprites/levels/grass_tileset.png\",") != 0)
+        return 1;
+    if (expect_file_contains("out/test_export_level.c", ".tile_path = \"assets/sprites/levels/stone_tileset.png\"") != 0)
         return 1;
     if (expect_file_contains("out/test_export_level.c", ".coin_count = 1,") != 0)
         return 1;
@@ -79,6 +87,12 @@ static int exports_escaped_c_strings(void)
     strncpy(def.next_phase, "levels/next\"phase.toml", sizeof(def.next_phase) - 1);
     strncpy(def.music_path, "assets/sounds/levels/water\"x.wav", sizeof(def.music_path) - 1);
     strncpy(def.floor_tile_path, "assets/sprites/levels/grass\\tile.png", sizeof(def.floor_tile_path) - 1);
+    def.platform_count = 1;
+    def.platforms[0].x = 64.0f;
+    def.platforms[0].tile_height = 2;
+    def.platforms[0].tile_width = 4;
+    strncpy(def.platforms[0].tile_path, "assets/sprites/levels/path\"\\tile.png",
+            sizeof(def.platforms[0].tile_path) - 1);
     def.background_layer_count = 1;
     strncpy(def.background_layers[0].path, "assets/sprites/backgrounds/sky\"one.png", sizeof(def.background_layers[0].path) - 1);
     def.background_layers[0].speed = 0.25f;
@@ -101,6 +115,8 @@ static int exports_escaped_c_strings(void)
     if (expect_file_contains("out/test_export_escape.c", ".generated_by = \"tool \\\"name\\\" \\001A \\177f \\200Z \\?\\?/\\\\\\\"\",") != 0)
         return 1;
     if (expect_file_contains("out/test_export_escape.c", ".next_phase = \"levels/next\\\"phase.toml\",") != 0)
+        return 1;
+    if (expect_file_contains("out/test_export_escape.c", ".tile_path = \"assets/sprites/levels/path\\\"\\\\tile.png\"") != 0)
         return 1;
     if (expect_file_contains("out/test_export_escape.c", "{ \"assets/sprites/backgrounds/sky\\\"one.png\", 0.25f },") != 0)
         return 1;
