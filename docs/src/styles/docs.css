@@ -140,6 +140,12 @@ a:hover { color: var(--green); }
     font-family: var(--mono);
 }
 .search-box:focus { border-color: var(--accent); background: #0d1520; }
+.search-status {
+    margin: 0.45rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    line-height: 1.35;
+}
 
 .sidebar-nav-container {
     flex: 1;
@@ -580,4 +586,226 @@ html { scrollbar-width: thin; scrollbar-color: var(--accent-dim) var(--bg-card);
     .doc-pager { grid-template-columns: 1fr; }
     .pager-card.next { text-align: left; }
     table { display: block; overflow-x: auto; }
+}
+
+
+/* ── Impeccable Overdrive: Service Manual Command Center ───────────── */
+body {
+    --manual-ink: #030711;
+    --manual-panel: #08131f;
+    --manual-panel-2: #0f1d2b;
+    --manual-gold: #ffd447;
+    --manual-green: #3dff74;
+    --manual-cyan: #63e8ff;
+    --manual-body: #e5f0d2;
+    --manual-muted: #adc49a;
+    background:
+        linear-gradient(rgba(61,255,116,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(61,255,116,.035) 1px, transparent 1px),
+        radial-gradient(circle at 74% 8%, rgba(99,232,255,.10), transparent 26rem),
+        radial-gradient(circle at 20% 82%, rgba(255,212,71,.12), transparent 34rem),
+        var(--manual-ink);
+    background-size: 44px 44px, 44px 44px, auto, auto, auto;
+}
+
+.sidebar {
+    background:
+        linear-gradient(180deg, rgba(8,19,31,.98), rgba(3,7,17,.96)),
+        repeating-linear-gradient(0deg, rgba(61,255,116,.04) 0 1px, transparent 1px 20px);
+    border-right: 2px solid rgba(255,212,71,.22);
+    box-shadow: 18px 0 60px rgba(0,0,0,.28);
+}
+.repo-badge {
+    border: 1px solid rgba(255,212,71,.28);
+    background: rgba(255,212,71,.08);
+    box-shadow: 5px 5px 0 rgba(0,0,0,.35);
+}
+.repo-badge span { background: var(--manual-gold); color: #161002; }
+.repo-description { color: var(--manual-body); }
+.search-box {
+    border-color: rgba(99,232,255,.28);
+    background: rgba(3,7,17,.72);
+    color: var(--manual-body);
+    box-shadow: inset 0 0 20px rgba(99,232,255,.05);
+}
+.sidebar-category { color: var(--manual-cyan); }
+.nav-item {
+    background: rgba(255,255,255,.015);
+    box-shadow: inset 0 0 0 1px transparent;
+}
+.nav-item.active {
+    background: linear-gradient(90deg, rgba(61,255,116,.22), rgba(255,212,71,.08));
+    border-color: var(--manual-green);
+    color: var(--manual-green);
+    box-shadow: 0 0 22px rgba(61,255,116,.13);
+}
+
+.content { max-width: 1060px; }
+.mobile-header { background: rgba(3,7,17,.92); border-bottom-color: rgba(255,212,71,.24); }
+
+.manual-cover,
+.doc-route-header {
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 84% 12%, rgba(99,232,255,.18), transparent 18rem),
+        linear-gradient(135deg, rgba(255,212,71,.13), rgba(61,255,116,.06)),
+        var(--manual-panel);
+    border: 2px solid rgba(255,212,71,.28);
+    box-shadow: 0 0 0 6px rgba(255,212,71,.045), 0 26px 80px rgba(0,0,0,.34);
+    clip-path: polygon(0 0, calc(100% - 1.2rem) 0, 100% 1.2rem, 100% 100%, 1.2rem 100%, 0 calc(100% - 1.2rem));
+}
+.manual-cover::before,
+.doc-route-header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 6px);
+    pointer-events: none;
+    opacity: .24;
+}
+.manual-cover h1,
+.doc-route-header h1 {
+    font-size: clamp(3rem, 6.4vw, 5.8rem);
+    line-height: .88;
+    color: var(--manual-gold);
+    text-shadow: 0 5px 0 #4f2100, 0 0 42px rgba(255,212,71,.28);
+}
+.manual-cover p,
+.doc-route-header p { color: var(--manual-body); }
+.manual-diagnostics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .55rem;
+    margin: 1rem 0 1.25rem;
+}
+.manual-diagnostics span,
+.manual-diagnostics a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: .35rem .65rem;
+    border: 1px solid rgba(99,232,255,.28);
+    background: rgba(99,232,255,.07);
+    color: var(--manual-body);
+    font-family: var(--mono);
+    font-size: .76rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.manual-gauge {
+    background:
+        radial-gradient(circle, rgba(61,255,116,.16), transparent 65%),
+        #050a10;
+    border-color: rgba(61,255,116,.42);
+}
+.manual-gauge strong { color: var(--manual-green); text-shadow: 0 0 30px rgba(61,255,116,.46); }
+.manual-gauge-list {
+    display: grid;
+    gap: .45rem;
+    width: 100%;
+    margin: 1rem 0 0;
+}
+.manual-gauge-list div {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: .6rem;
+    padding: .42rem .5rem;
+    border: 1px solid rgba(99,232,255,.18);
+    background: rgba(99,232,255,.055);
+}
+.manual-gauge-list dt,
+.manual-gauge-list dd {
+    margin: 0;
+    font-family: var(--mono);
+    color: var(--manual-body);
+    font-size: .72rem;
+    text-align: left;
+}
+.manual-gauge-list dd {
+    color: var(--manual-green);
+    font-weight: 700;
+    text-align: right;
+}
+
+.service-routing-matrix {
+    position: relative;
+}
+.service-routing-matrix::before {
+    content: '';
+    position: absolute;
+    left: 8%; right: 8%; top: 50%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(61,255,116,.38), rgba(255,212,71,.38), transparent);
+    z-index: -1;
+}
+.route-card,
+.index-row,
+.pager-card {
+    background:
+        linear-gradient(135deg, rgba(61,255,116,.08), rgba(255,212,71,.055)),
+        var(--manual-panel);
+    border-color: rgba(255,212,71,.24);
+    box-shadow: 6px 6px 0 rgba(0,0,0,.34);
+}
+.route-card:hover,
+.index-row:hover,
+.pager-card:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 9px 9px 0 rgba(0,0,0,.45), 0 0 24px rgba(61,255,116,.16);
+}
+.route-card li a span,
+.index-row > span { color: #06110b; background: var(--manual-green); }
+
+.route-terminal {
+    border: 1px solid rgba(61,255,116,.24);
+    background: rgba(61,255,116,.06);
+    padding: .7rem .85rem;
+    margin-bottom: 1rem;
+    font-family: var(--mono);
+}
+.doc-route-header { padding: clamp(1.25rem, 3vw, 2rem); margin-bottom: 1.1rem; }
+.doc-route-header h1 { margin: .3rem 0 .65rem; }
+.service-page {
+    background:
+        linear-gradient(180deg, rgba(8,19,31,.95), rgba(8,19,31,.86)),
+        var(--manual-panel);
+    border: 1px solid rgba(255,212,71,.18);
+    box-shadow: 0 24px 80px rgba(0,0,0,.22);
+}
+.doc-page h1:first-child { display: none; }
+.doc-page h2 {
+    color: var(--manual-gold);
+    border-bottom: 1px dashed rgba(255,212,71,.28);
+    padding-bottom: .35rem;
+}
+.doc-page h3 { color: var(--manual-green); }
+.doc-page p,
+.doc-page li { color: var(--manual-body); }
+.doc-page table { border: 1px solid rgba(255,212,71,.22); box-shadow: 0 0 0 4px rgba(255,212,71,.035); }
+.doc-page th { background: rgba(255,212,71,.14); color: var(--manual-gold); }
+.doc-page td { background: rgba(3,7,17,.22); }
+.doc-page pre {
+    border: 1px solid rgba(99,232,255,.24);
+    background: #02070c;
+    box-shadow: inset 0 0 28px rgba(99,232,255,.04);
+}
+.doc-feedback {
+    background: rgba(255,212,71,.06);
+    border: 1px solid rgba(255,212,71,.18);
+    padding: 1rem;
+}
+
+@media (max-width: 768px) {
+    .manual-cover h1,
+    .doc-route-header h1 { font-size: clamp(2.6rem, 12vw, 4rem); }
+    .manual-diagnostics { display: grid; grid-template-columns: 1fr; }
+    .service-routing-matrix::before { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .route-card,
+    .index-row,
+    .pager-card { transition: none !important; }
 }
