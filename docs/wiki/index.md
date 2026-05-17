@@ -12,30 +12,30 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 
 | Page | Description |
 |------|-------------|
-| [Architecture](#architecture) | Game loop, init/loop/cleanup pattern, GameState container, 32-layer render order |
-| [Source Files](#source-files) | Module-by-module reference for every `.c` / `.h` file |
-| [Player Module](#player-module) | Input, physics, animation — deep dive into `player.c` |
-| [Constants Reference](#constants-reference) | Every `#define` in `game.h` and entity headers explained |
+| [Architecture](architecture/) | Game loop, init/loop/cleanup pattern, GameState container, 32-layer render order |
+| [Source Files](source-files/) | Module-by-module reference for every `.c` / `.h` file |
+| [Player Module](player-module/) | Input, physics, animation — deep dive into `player.c` |
+| [Constants Reference](constants-reference/) | Every `#define` in `game.h` and entity headers explained |
 
 ### Content & Assets
 
 | Page | Description |
 |------|-------------|
-| [Entities & Hazards](#entities-and-hazards) | All 6 enemy types and 7 hazard types: behaviour, constants, TOML placement |
-| [Collectibles & Surfaces](#collectibles-and-surfaces) | Coins, stars, bouncepads, rails, float platforms, climbable surfaces |
-| [Assets](#assets) | All sprite sheets, tilesets, and fonts in `assets/` |
-| [Sounds](#sounds) | All audio files in `assets/sounds/` |
-| [Level Catalog](#level-catalog) | Generated inventory of every `levels/*.toml` stage, progression link, and content count |
-| [Overlay Snapshots](#overlay-snapshots) | Text snapshots for pause, game-over, and completion overlays |
+| [Entities & Hazards](entities-and-hazards/) | All 6 enemy types and 7 hazard types: behaviour, constants, TOML placement |
+| [Collectibles & Surfaces](collectibles-and-surfaces/) | Coins, stars, bouncepads, rails, float platforms, climbable surfaces |
+| [Assets](assets/) | All sprite sheets, tilesets, and fonts in `assets/` |
+| [Sounds](sounds/) | All audio files in `assets/sounds/` |
+| [Level Catalog](level-catalog/) | Generated inventory of every `levels/*.toml` stage, progression link, and content count |
+| [Overlay Snapshots](overlay-snapshots/) | Text snapshots for pause, game-over, and completion overlays |
 
 ### Building & Contributing
 
 | Page | Description |
 |------|-------------|
-| [Build System](#build-system) | Makefile, compiler flags, build targets, prerequisites for all platforms |
-| [Level Design — TOML Reference](#level-design) | Full TOML schema for every entity type; minimum level template |
-| [Level Editor](#level-editor) | Visual editor: canvas, palette, properties, undo, play-test, file I/O |
-| [Developer Guide](#developer-guide) | Coding conventions, adding new entities, sound effects workflow |
+| [Build System](build-system/) | Makefile, compiler flags, build targets, prerequisites for all platforms |
+| [Level Design — TOML Reference](level-design/) | Full TOML schema for every entity type; minimum level template |
+| [Level Editor](level-editor/) | Visual editor: canvas, palette, properties, undo, play-test, file I/O |
+| [Developer Guide](developer-guide/) | Coding conventions, adding new entities, sound effects workflow |
 
 ---
 
@@ -93,4 +93,4 @@ make run-level CC=clang LEVEL=levels/00_sandbox_01.toml
 make web
 ```
 
-See [Build System](#build-system) for Linux and Windows instructions.
+See [Build System](build-system/) for Linux and Windows instructions.

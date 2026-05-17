@@ -40,7 +40,7 @@ This guide covers the patterns and conventions used in Super Mango and explains 
 All game-object positions and sizes live in **logical space (400x300)**.
 Never use `WINDOW_W` / `WINDOW_H` for game math -- SDL scales the logical canvas to the OS window automatically.
 
-See [Constants Reference](#constants-reference) for all defined constants.
+See [Constants Reference](../constants-reference/) for all defined constants.
 
 ---
 
@@ -216,7 +216,7 @@ if (entity->x < 0.0f)                entity->x = 0.0f;
 if (entity->x > GAME_W - entity->w)  entity->x = (float)(GAME_W - entity->w);
 ```
 
-`GRAVITY`, `FLOOR_Y`, `GAME_W`, and `GAME_H` are all defined in `game.h` and available to any file that includes it. See [Constants Reference](#constants-reference) for values.
+`GRAVITY`, `FLOOR_Y`, `GAME_W`, and `GAME_H` are all defined in `game.h` and available to any file that includes it. See [Constants Reference](../constants-reference/) for values.
 
 ---
 
@@ -353,7 +353,7 @@ Always draw in painter's algorithm order (back to front). The game currently use
 32. Debug overlay          (FPS, hitboxes, event log -- when --debug)
 ```
 
-See [Architecture](architecture) for details on the render pipeline.
+See [Architecture](../architecture/) for details on the render pipeline.
 
 ---
 
@@ -383,7 +383,7 @@ Standard animation row layout (most assets in this pack):
 | 4 | Attack | 4-8 frames, one-shot |
 | 5 | Death / Hurt | 4-6 frames, one-shot |
 
-See [Assets](assets) for sprite sheet dimensions and [Player Module](#player-module) for animation state machine details.
+See [Assets](../assets/) for sprite sheet dimensions and [Player Module](../player-module/) for animation state machine details.
 
 ---
 
@@ -413,11 +413,11 @@ See [Assets](assets) for sprite sheet dimensions and [Player Module](#player-mod
 
 ## Related Pages
 
-- [#home](#home) -- project overview
-- [#architecture](#architecture) -- system design and game loop
-- [#build-system](#build-system) -- compiling and running
-- [#source-files](#source-files) -- module-by-module reference
-- [Assets](assets) -- sprite sheets and textures
+- [Overview](../) -- project overview
+- [Architecture](../architecture/) -- system design and game loop
+- [Build System](../build-system/) -- compiling and running
+- [Source Files](../source-files/) -- module-by-module reference
+- [Assets](../assets/) -- sprite sheets and textures
 - [Sounds](sounds) -- audio files and music
-- [Player Module](#player-module) -- player-specific details
-- [Constants Reference](#constants-reference) -- all defined constants
+- [Player Module](../player-module/) -- player-specific details
+- [Constants Reference](../constants-reference/) -- all defined constants
