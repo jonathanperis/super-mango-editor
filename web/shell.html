@@ -62,6 +62,9 @@
             canvas: document.getElementById('canvas'),
             onRuntimeInitialized: function() {
                 document.getElementById('status').style.display = 'none';
+                setTimeout(function() {
+                    Module.callMain(Module.arguments || []);
+                }, 0);
             },
             print: function(text) {
                 console.log(text);
