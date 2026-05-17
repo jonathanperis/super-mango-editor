@@ -179,7 +179,6 @@ Historical finding: the deploy workflow used `bun install --frozen-lockfile`, th
 |---|---|
 | `README.md` | Resolved: current level path, source counts, docs site description, and module tree |
 | `AGENTS.md` | Resolved: `.agents` references, docs site description, loader/export wording |
-| `AGENTS.md` | Resolved: docs site description and loader/export wording |
 | `docs/wiki/build-system.md` | Resolved: explicit per-directory wildcard model, test target, clean behavior |
 | `docs/wiki/source-files.md` | Resolved: current module map, constants, loader/validator, star names, floor-gap wording |
 | `docs/wiki/constants-reference.md` | Resolved: floor-gap/camera/star constant names |
