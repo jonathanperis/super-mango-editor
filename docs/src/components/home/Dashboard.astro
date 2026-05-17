@@ -306,9 +306,15 @@ const manualGroups = [
             },
             monitorRunDependencies(left) {
                 if (left === 0) {
-                    Module.setStatus('');
-                    canvas.focus();
+                    Module.setStatus('Launching run...');
                 }
+            },
+            onRuntimeInitialized() {
+                canvas.focus();
+                Module.setStatus('');
+                window.setTimeout(() => {
+                    Module.callMain(args);
+                }, 0);
             },
         };
 

@@ -37,6 +37,32 @@
 #include "game.h"
 #include "screens/start_menu.h"
 
+static int run_game(const char *level_path,
+                    int debug_mode,
+                    int smoke_test_frames,
+                    const char *replay_script_path) {
+    GameState *gs = calloc(1, sizeof(*gs));
+    if (!gs) {
+        fprintf(stderr, "Error: unable to allocate game state\n");
+        return EXIT_FAILURE;
+    }
+
+    gs->debug_mode = debug_mode;
+    gs->smoke_test_frames = smoke_test_frames;
+    if (replay_script_path) {
+        strncpy(gs->replay_script_path, replay_script_path,
+                sizeof(gs->replay_script_path) - 1);
+    }
+    strncpy(gs->level_path, level_path, sizeof(gs->level_path) - 1);
+    gs->level_path[sizeof(gs->level_path) - 1] = '\0';
+
+    game_init(gs);
+    game_loop(gs);
+    game_cleanup(gs);
+    free(gs);
+    return EXIT_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     /*
      * Scan command-line arguments for flags:
@@ -225,17 +251,14 @@ int main(int argc, char *argv[]) {
          * Direct play — --level <path> skips the start menu.
          * Used by the editor's Play button and make run-level.
          */
-        GameState gs = {0};
-        gs.debug_mode = debug_mode;
-        gs.smoke_test_frames = smoke_test_frames;
-        if (replay_script_path) {
-            strncpy(gs.replay_script_path, replay_script_path,
-                    sizeof(gs.replay_script_path) - 1);
+        if (run_game(level_path, debug_mode, smoke_test_frames,
+                     replay_script_path) != EXIT_SUCCESS) {
+            Mix_CloseAudio();
+            TTF_Quit();
+            IMG_Quit();
+            SDL_Quit();
+            return EXIT_FAILURE;
         }
-        strncpy(gs.level_path, level_path, sizeof(gs.level_path) - 1);
-        game_init(&gs);
-        game_loop(&gs);
-        game_cleanup(&gs);
     } else {
         /*
          * Start Menu → Game flow.
@@ -304,18 +327,14 @@ int main(int argc, char *argv[]) {
          * before launching the full game window.
          */
         if (result == MENU_PLAY) {
-            GameState gs = {0};
-            gs.debug_mode = debug_mode;
-            gs.smoke_test_frames = smoke_test_frames;
-            if (replay_script_path) {
-                strncpy(gs.replay_script_path, replay_script_path,
-                        sizeof(gs.replay_script_path) - 1);
+            if (run_game(selected_level_path, debug_mode, smoke_test_frames,
+                         replay_script_path) != EXIT_SUCCESS) {
+                Mix_CloseAudio();
+                TTF_Quit();
+                IMG_Quit();
+                SDL_Quit();
+                return EXIT_FAILURE;
             }
-            strncpy(gs.level_path, selected_level_path, sizeof(gs.level_path) - 1);
-            gs.level_path[sizeof(gs.level_path) - 1] = '\0';
-            game_init(&gs);
-            game_loop(&gs);
-            game_cleanup(&gs);
         }
     }
 
