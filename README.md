@@ -34,7 +34,7 @@ Super Mango is a 2D side-scrolling platformer built in C11 with SDL2, designed a
 - Collectibles: coins (100 pts each, 3 coins restore a heart), star yellow, star green, star red health pickups, end-of-level last star
 - Climbable vines, ladders, and ropes; three bouncepad variants (small, medium, high)
 - TOML-based level format with runtime level loading (`--level path/to/level.toml`) and `next_phase` transitions
-- Pause, game-over, and end-of-level overlays: Esc/Start pauses or resumes gameplay, game over waits for Enter/Start before restarting, and Enter/Start continues to the next phase when a completion overlay is shown
+- Pause, game-over, and end-of-level overlays: Esc/Start pauses or resumes gameplay, game over waits for Enter/Space/Start before restarting, Enter/Space/Start continues to the next phase when a completion overlay is shown, and Esc/Back exits terminal overlays
 - Start menu, HUD (hearts/lives/score), lives system, invincibility blink on damage
 - Keyboard and gamepad (hot-plug) controls
 - Debug overlay (`--debug` flag): FPS counter, CPU frame time, memory usage, collision hitbox visualization, scrolling event log
@@ -137,7 +137,7 @@ make run-level CC=clang LEVEL=levels/00_sandbox_01.toml         # run a specific
 make run-level-debug CC=clang LEVEL=levels/00_sandbox_01.toml   # run a level with debug overlay
 make editor CC=clang                  # build the level editor
 make run-editor CC=clang              # build and run the level editor
-make test CC=clang                    # build and run 11 native regression tests
+make test CC=clang                    # build and run 13 native regression tests
 make validate-levels                  # validate all levels/*.toml files
 make web                              # build to WebAssembly (requires Emscripten)
 make clean                            # remove all build artifacts
@@ -166,25 +166,22 @@ super-mango-editor/
 │   │   ├── star_red.h / .c           Red star health pickup
 │   │   └── last_star.h / .c          End-of-level star
 │   ├── collision/                     Gameplay collision and damage passes
-│   ├── core/                          Runtime lifecycle, window/resources, loop, update, camera, completion
+│   ├── core/                          Runtime lifecycle, window/timing/resources, update, camera, checkpoint, completion, overlay, actor/hazard helpers
 │   │   ├── debug.h / .c              Debug overlay (FPS, CPU, memory, hitboxes, event log)
-│   │   ├── entity_utils.h / .c       Shared entity helper functions
 │   │   ├── game_lifecycle.c          game_init / game_cleanup orchestration
-│   │   ├── game_loop.c               Main native/WebAssembly game loop
-│   │   └── game_resources.h / .c     Texture, audio, and level resource loading
+│   │   ├── game_loop.c               Main native/WebAssembly frame loop
+│   │   ├── game_update.h / .c        Top-level update orchestration
+│   │   └── game_* helpers            Window, resources, timing, camera, checkpoint, overlay, actors, hazards, surfaces
 │   ├── editor/                        Standalone visual level editor
 │   │   ├── editor_main.c             Editor entry point
-│   │   ├── editor.h / .c             Editor state, main loop, event handling
-│   │   ├── canvas.h / .c             Scrollable canvas with zoom and grid
-│   │   ├── palette.h / .c            Entity palette panel
-│   │   ├── properties.h / .c         Per-entity property editing
-│   │   ├── tools.h / .c              Selection, placement, and manipulation tools
-│   │   ├── ui.h / .c                 Immediate-mode UI widgets
-│   │   ├── serializer.h / .c         TOML save/load orchestration
-│   │   ├── serializer_load_*.h / .c  Staged TOML load helpers (header, geometry, collectibles, enemies, hazards, surfaces, climbables, layers, config)
+│   │   ├── editor.h / .c             Editor state and high-level glue
+│   │   ├── canvas/palette/properties/tools/ui modules
+│   │   ├── editor_frame/events/chrome/panels/layout/textures modules
+│   │   ├── editor_files/session/playtest/clipboard/validation modules
+│   │   ├── serializer*.h / .c        TOML save/load orchestration and staged parsers
 │   │   ├── exporter.h / .c           C code export (.c/.h generation)
 │   │   ├── file_dialog.h / .c        Native file dialogs
-│   │   └── undo.h / .c               Undo/redo history
+│   │   └── undo*.h / .c              Undo/redo history and operation application
 │   ├── effects/                       Visual effects
 │   │   ├── fog.h / .c                Fog overlay
 │   │   ├── parallax.h / .c           Multi-layer scrolling background
@@ -203,18 +200,16 @@ super-mango-editor/
 │   │   ├── circular_saw.h / .c       Rotating saw
 │   │   ├── axe_trap.h / .c           Swinging axe
 │   │   └── blue_flame.h / .c         Blue flame / fire flame
-│   ├── input/                         SDL keyboard/gamepad input handling
+│   ├── input/                         SDL keyboard/gamepad events, browser input bridge, deterministic replay injection
 │   ├── levels/                        Level system
 │   │   ├── level.h                    Shared level definitions (LevelDef struct)
 │   │   ├── level_loader.h / .c       TOML level loading and switching
-│   │   ├── level_physics.h / .c      Level physics override/default helpers
+│   │   ├── level_path/resources/session/physics helpers
 │   │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
 │   │   ├── level_validate.c          LevelDef count validation
 │   │   └── exported/                  Auto-generated C level data
-│   │       └── 00_sandbox_01.h / .c  Generated C level export
-│   ├── player/                        Player module
-│   │   └── player.h / .c             Input, physics, animation, render
-│   ├── render/                        Frame rendering and overlays
+│   ├── player/                        Player module split into lifecycle, input, motion, jump, climb, surface, and animation files
+│   ├── render/                        `game_render` frame order and `render_overlay` foreground/overlay helpers
 │   ├── screens/                       Game screens
 │   │   ├── start_menu.h / .c         Start menu
 │   │   └── hud.h / .c                HUD (hearts, lives, score)
@@ -273,7 +268,7 @@ Four GitHub Actions workflows:
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly | Automated code security and quality analysis |
 | Deploy Pages | `deploy.yml` | Successful main Build & Release workflow | Builds docs, copies WebAssembly artifacts, and deploys GitHub Pages |
 
-The Build & Release workflow runs `make`, `make test`, `make validate-levels`, `make editor`, native smoke tests for the game/editor, WebAssembly build, WebAssembly artifact checks, and release creation on `main`. The Docs workflow runs `bun run lint` and `bun run build` for PRs touching `docs/`. The Deploy Pages workflow publishes the Astro docs output plus WebAssembly artifacts to GitHub Pages.
+The Build & Release workflow runs `make`, `make test`, `make validate-levels`, `make editor`, dummy-SDL smoke tests, scripted replay smoke on Linux, WebAssembly build, WebAssembly artifact checks, and release creation on `main`. The Docs workflow runs `bun run lint` and `bun run build` for PRs touching `docs/`. The Deploy Pages workflow publishes the Astro docs output plus WebAssembly artifacts to GitHub Pages.
 
 ## License
 

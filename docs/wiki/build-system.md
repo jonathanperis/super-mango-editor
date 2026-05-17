@@ -255,7 +255,7 @@ make level-catalog
 
 ### `make docs-drift`
 
-Runs the generated level-catalog freshness check, generated overlay-snapshot freshness check, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. Together they compare Makefile test targets, source-file map entries, layer TOML snippets, workflow docs, runtime flags, key constants, level prose counts, TOML line endings, overlay text snapshots, and scripted-smoke wiring against the current repository.
+Runs the generated level-catalog freshness check, generated overlay-snapshot freshness check, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. Together they compare Makefile test targets, README/agent/docs command summaries, source-file map entries, layer TOML snippets, workflow docs, runtime flags, key constants, level prose counts, TOML line endings, overlay text snapshots, and scripted-smoke wiring against the current repository.
 
 ```sh
 make docs-drift
