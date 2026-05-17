@@ -20,38 +20,50 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <div class="hero-stage">
         <div class="hero-content">
-            <div class="hero-badge">OPEN SOURCE ARCADE KIT</div>
-            <h1 class="hero-title">
+            <div class="hero-badge boot-badge"><span class="signal-light"></span> NIGHT ARCADE SERVICE BAY</div>
+            <div class="boot-readout" aria-label="Boot diagnostics">
+                <span>BOOT://C11</span>
+                <span>SDL2_PORTS:READY</span>
+                <span>WASM_PAYLOAD:43MB</span>
+            </div>
+            <h1 class="hero-title overdrive-title">
                 <span>SUPER</span>
                 <span>MANGO</span>
             </h1>
-            <p class="hero-sub">Play the run. Open the source. Build the next level.</p>
-            <p class="hero-proof">A browser-playable C11 + SDL2 platformer with TOML worlds, a visual level editor, and a codebase built for learning how the cabinet works.</p>
-            <div class="hero-hud" aria-label="Project highlights">
+            <p class="hero-sub">Insert coin, open the cabinet, rebuild the run.</p>
+            <p class="hero-proof">A browser-playable C11 + SDL2 platformer with TOML worlds, a visual level editor, and a source tree designed to be studied like a working arcade machine.</p>
+            <div class="hero-hud cabinet-ledger" aria-label="Project highlights">
                 <span>C11</span>
                 <span>SDL2</span>
                 <span>WASM</span>
-                <span>TOML worlds</span>
+                <span>3 levels</span>
+                <span>23 screens</span>
                 <span>Level editor</span>
             </div>
             <div class="hero-ctas" aria-label="Primary actions">
-                <a href="#play" class="btn-play">
+                <a href="#play" class="btn-play" data-start-game="play">
                     <span class="btn-kicker">Insert coin</span>
-                    <span class="btn-main">Play in browser</span>
+                    <span class="btn-main">Boot normal run</span>
                 </a>
                 <a href="#docs" class="btn-download">
                     <span class="btn-kicker">Service panel</span>
                     <span class="btn-main">Open manual</span>
                 </a>
             </div>
+            <div class="hero-console" aria-label="Cabinet service log">
+                <span>CHECKSUM: SOURCE-BACKED</span>
+                <span>ROUTES: PLAYER / ENGINE / BUILDER</span>
+                <span>STATUS: AWAITING COIN</span>
+            </div>
         </div>
 
         <aside class="hero-attract-card" aria-label="Attract mode summary">
-            <div class="attract-marquee">
+            <div class="attract-marquee diagnostic-marquee">
                 <span class="live-dot"></span>
                 <span>WEB BUILD READY</span>
                 <strong>~43 MB</strong>
             </div>
+            <div class="service-card-label">CABINET MONITOR</div>
             <div class="mini-cabinet" aria-hidden="true">
                 <div class="mini-screen">
                     <span class="mini-sun"></span>

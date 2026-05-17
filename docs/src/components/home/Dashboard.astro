@@ -2,11 +2,11 @@
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const scoreboard = [
-    ['LEVELS', '3'],
-    ['SCREENS', '23'],
-    ['ENEMIES', '41'],
-    ['HAZARDS', '64'],
-    ['COLLECT', '80'],
+    ['LEVELS', '3', 'TOML worlds'],
+    ['SCREENS', '23', 'side-scroll rooms'],
+    ['ENEMIES', '41', 'spawned threats'],
+    ['HAZARDS', '64', 'traps & rails'],
+    ['COLLECT', '80', 'coins, stars, hearts'],
 ];
 
 const paths = [
@@ -83,10 +83,15 @@ const manualGroups = [
 ];
 ---
 
-<section id="play" class="play-section">
-    <div class="section-kicker">ARCADE CABINET</div>
-    <h2 class="section-title">INSERT COIN</h2>
-    <p class="section-lede">Launch the browser build below. It downloads about 43 MB, then the canvas takes keyboard focus for the run.</p>
+<section id="play" class="play-section cabinet-bay" data-asset-base={`${base}/`}>
+    <div class="section-kicker">CABINET BAY</div>
+    <h2 class="section-title">BOOT THE RUN</h2>
+    <p class="section-lede">Normal Play now boots from every play CTA. Debug Mode is kept as a developer diagnostic path with the same WebAssembly payload plus <code>--debug</code>.</p>
+    <div class="boot-lanes" aria-label="Play modes">
+        <button class="boot-lane active" type="button" data-start-game="play"><span>PLAYER MODE</span><strong>Normal run</strong></button>
+        <button class="boot-lane" type="button" data-start-game="debug"><span>DEV MODE</span><strong>Hitboxes + FPS</strong></button>
+        <a class="boot-lane link" href="#docs"><span>SERVICE</span><strong>Open manual</strong></a>
+    </div>
     <div class="cabinet-frame">
         <div class="cabinet-marquee">
             <span>WEBASSEMBLY BUILD</span>
@@ -99,8 +104,10 @@ const manualGroups = [
                 aria-label="Super Mango game canvas - press Play to start"
             ></canvas>
             <p id="game-status">
-                <button id="play-btn" type="button">Play (~43 MB)</button>
-                <button id="debug-btn" type="button">Debug Mode</button>
+                <span class="cabinet-standby">WebAssembly cabinet ready</span>
+                <span class="cabinet-standby-note">Click to load the browser build and start the run.</span>
+                <button id="play-btn" type="button" data-start-game="play">Play normal run (~43 MB)</button>
+                <button id="debug-btn" type="button" data-start-game="debug">Debug mode: hitboxes + FPS</button>
             </p>
         </div>
         <div class="cabinet-controls">
@@ -120,16 +127,19 @@ const manualGroups = [
         It keeps the game loop, rendering, input, collision, assets, WebAssembly build, and level tooling visible.
     </p>
 
-    <div class="scoreboard-grid" aria-label="Project metrics">
-        {scoreboard.map(([label, value]) => (
+    <div class="world-map-rail" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="scoreboard-grid world-node-grid" aria-label="Project metrics">
+        {scoreboard.map(([label, value, note]) => (
             <div class="score-tile">
                 <span>{label}</span>
                 <strong>{value}</strong>
+                <em>{note}</em>
             </div>
         ))}
     </div>
 
-    <div class="path-grid">
+    <div class="section-kicker sub-kicker">PLAYER / ENGINE / BUILDER</div>
+    <div class="path-grid portal-grid">
         {paths.map((path) => (
             <a class="path-card" href={path.href}>
                 <span class="card-label">{path.label}</span>
@@ -240,17 +250,22 @@ const manualGroups = [
     const statusEl = document.getElementById('game-status');
     const playBtn = document.getElementById('play-btn');
     const debugBtn = document.getElementById('debug-btn');
+    const gameAssetBase = document.getElementById('play')?.dataset.assetBase || './';
 
     canvas?.addEventListener('contextmenu', (event) => event.preventDefault());
 
-    function startGame(debug) {
-        if (!canvas || !statusEl || !playBtn) return;
+    let gameBooted = false;
+
+    function startGame(debug = false) {
+        if (!canvas || !statusEl || !playBtn || gameBooted) return;
+        gameBooted = true;
 
         playBtn.disabled = true;
         if (debugBtn) debugBtn.disabled = true;
-        playBtn.textContent = 'Loading...';
+        playBtn.textContent = debug ? 'Loading diagnostics...' : 'Loading run...';
         canvas.tabIndex = -1;
-        statusEl.innerHTML = '<span class="spinner"></span>Downloading game data...';
+        statusEl.dataset.mode = debug ? 'debug' : 'play';
+        statusEl.innerHTML = `<span class="spinner"></span>${debug ? 'Booting developer diagnostics...' : 'Downloading normal game data...'}`;
 
         const args = ['--sandbox'];
         if (debug) args.push('--debug');
@@ -270,6 +285,14 @@ const manualGroups = [
         const Module = {
             arguments: args,
             canvas,
+            print(text) { console.log(`[Super Mango] ${text}`); },
+            printErr(text) {
+                console.error(`[Super Mango] ${text}`);
+                if (String(text).toLowerCase().includes('error')) {
+                    statusEl.style.display = '';
+                    statusEl.textContent = `Runtime error: ${text}`;
+                }
+            },
             setStatus(text) {
                 if (!text) {
                     statusEl.style.display = 'none';
@@ -292,17 +315,33 @@ const manualGroups = [
         window['Module'] = Module;
 
         const script = document.createElement('script');
-        script.src = 'super-mango.js';
+        script.src = `${gameAssetBase}super-mango.js`;
         script.onerror = () => {
+            gameBooted = false;
             statusEl.innerHTML = 'Failed to load game files. Try refreshing the page.';
             playBtn.style.display = 'inline-block';
             playBtn.disabled = false;
-            playBtn.textContent = 'Retry (~43 MB)';
+            playBtn.textContent = 'Retry normal run (~43 MB)';
+            if (debugBtn) {
+                debugBtn.style.display = 'inline-block';
+                debugBtn.disabled = false;
+            }
             document.removeEventListener('keydown', handleKeyDown);
         };
         document.body.appendChild(script);
     }
 
-    playBtn?.addEventListener('click', () => startGame(false));
-    debugBtn?.addEventListener('click', () => startGame(true));
+    function requestGameStart(debug = false) {
+        document.getElementById('play')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        window.setTimeout(() => startGame(debug), 120);
+    }
+
+    playBtn?.addEventListener('click', (event) => { event.preventDefault(); requestGameStart(false); });
+    debugBtn?.addEventListener('click', (event) => { event.preventDefault(); requestGameStart(true); });
+    document.querySelectorAll('[data-start-game]').forEach((control) => {
+        control.addEventListener('click', (event) => {
+            event.preventDefault();
+            requestGameStart(control.getAttribute('data-start-game') === 'debug');
+        });
+    });
 </script>

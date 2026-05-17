@@ -87,7 +87,8 @@ const CurrentContent = currentPage?.default ?? currentPage;
             </a>
             <p class="repo-description">Read the engine route, world-builder guide, and platform docs without one giant scroll.</p>
             <label class="search-label" for="searchInput">Filter pages</label>
-            <input type="search" id="searchInput" class="search-box" placeholder="Search manual pages..." aria-label="Filter manual pages">
+            <input type="search" id="searchInput" class="search-box" placeholder="Filter all 15 manual pages..." aria-label="Filter manual pages">
+            <p class="search-status" id="searchStatus" aria-live="polite">15 routes ready</p>
         </div>
         <nav class="sidebar-nav-container" aria-label="Documentation sections">
             {SECTION_CATEGORIES.map((cat) => (
@@ -121,24 +122,38 @@ const CurrentContent = currentPage?.default ?? currentPage;
         <main class:list={['content', { 'content-hub': isRoot }]} id="mainContent">
             {isRoot ? (
                 <>
-                    <section class="docs-hero" aria-labelledby="manual-title">
+                    <section class="docs-hero manual-cover" aria-labelledby="manual-title">
                         <div>
-                            <p class="docs-kicker">BUILDER MANUAL</p>
-                            <h1 id="manual-title">Choose your route through the cabinet</h1>
-                            <p>Super Mango docs are now paginated by reader intent. Start with the engine map, jump into world building, inspect content systems, or open the build and source references.</p>
+                            <p class="docs-kicker">SERVICE MANUAL / CABINET BACKPLANE</p>
+                            <h1 id="manual-title">Trace every wire inside Super Mango</h1>
+                            <p>Use the manual like a service bay: start with orientation, inspect the engine, open world-builder references, then verify builds and source ownership without one giant scroll.</p>
+                            <div class="manual-diagnostics" aria-label="Manual diagnostics">
+                                <span>15 routes indexed</span>
+                                <span>C11 + SDL2</span>
+                                <span>TOML levels</span>
+                                <span>WASM cabinet</span>
+                            </div>
                             <div class="docs-actions" aria-label="Primary manual actions">
-                                <a href={`${docsBase}/developer-guide/`}>Start with Developer Guide</a>
-                                <a href={playUrl}>Play before reading</a>
+                                <a href={`${docsBase}/developer-guide/`}>Start diagnostics</a>
+                                <a href={playUrl}>Boot the cabinet</a>
                             </div>
                         </div>
-                        <div class="manual-status" aria-label="Documentation stats">
+                        <div class="manual-status manual-gauge" aria-label="Documentation stats">
                             <span>ROUTES</span>
                             <strong>{allPages.length}</strong>
                             <small>focused manual pages</small>
+                            <dl class="manual-gauge-list">
+                                {SECTION_CATEGORIES.map(cat => (
+                                    <div>
+                                        <dt>{cat.label}</dt>
+                                        <dd>{cat.ids.length}</dd>
+                                    </div>
+                                ))}
+                            </dl>
                         </div>
                     </section>
 
-                    <section class="manual-route-grid" aria-label="Manual routes">
+                    <section class="manual-route-grid service-routing-matrix" aria-label="Manual routes">
                         {categoryCards.map((cat) => (
                             <article class="route-card" data-doc-card data-search-text={`${cat.label} ${cat.description} ${cat.pages.map(p => `${p.label} ${p.description}`).join(' ')}`}>
                                 <p class="card-kicker">{cat.kicker}</p>
@@ -179,12 +194,22 @@ const CurrentContent = currentPage?.default ?? currentPage;
                 </>
             ) : (
                 <>
-                    <div class="docs-breadcrumbs" aria-label="Breadcrumb">
+                    <div class="docs-breadcrumbs route-terminal" aria-label="Breadcrumb">
                         <a href={docsBase}>Builder Manual</a>
                         <span>/</span>
                         <span>{pageMeta?.label ?? pageTitle}</span>
                     </div>
-                    <section id={requestedKey} class="doc-section doc-page">
+                    <section class="doc-route-header" aria-label="Current manual route">
+                        <p class="docs-kicker">{pageMeta?.marker ?? 'ROUTE'} / {pageMeta?.label ?? pageTitle}</p>
+                        <h1>{pageMeta?.label ?? pageTitle}</h1>
+                        <p>{pageMeta?.description ?? 'Source-backed service notes for the Super Mango cabinet.'}</p>
+                        <div class="manual-diagnostics">
+                            <a href={playUrl}>Boot cabinet</a>
+                            <a href={docsBase}>Manual index</a>
+                            <a href={editorUrl} target="_blank" rel="noopener noreferrer">Source markdown</a>
+                        </div>
+                    </section>
+                    <section id={requestedKey} class="doc-section doc-page service-page">
                         <CurrentContent />
                     </section>
                     <nav class="doc-pager" aria-label="Documentation pagination">
@@ -216,6 +241,7 @@ const CurrentContent = currentPage?.default ?? currentPage;
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('overlay');
             const searchInput = document.getElementById('searchInput');
+            const searchStatus = document.getElementById('searchStatus');
             const navItems = Array.from(document.querySelectorAll('.nav-item'));
             const docCards = Array.from(document.querySelectorAll('[data-doc-card]'));
             const categoryGroups = Array.from(document.querySelectorAll('[data-category]'));
@@ -246,6 +272,12 @@ const CurrentContent = currentPage?.default ?? currentPage;
                     const match = !query || card.dataset.searchText?.toLowerCase().includes(query);
                     card.style.display = match ? '' : 'none';
                 });
+                const visibleRoutes = navItems.filter(item => item.parentElement.style.display !== 'none').length;
+                if (searchStatus) {
+                    searchStatus.textContent = query
+                        ? (visibleRoutes ? `${visibleRoutes} matching routes` : 'No routes found')
+                        : '15 routes ready';
+                }
             });
         });
     </script>
