@@ -32,5 +32,5 @@ type: project
 ## Analysis script
 
 ```sh
-python3 .claude/scripts/analyze_sprite.py assets/<sprite>.png
+python3 .agents/scripts/analyze_sprite.py assets/<sprite>.png
 ```

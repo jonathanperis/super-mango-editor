@@ -1,6 +1,6 @@
 # Memory Index — Super Mango Editor
 
-Project-level memory for Claude Code sessions working on this repository.
+Project-level memory for standardized agent harness sessions working on this repository.
 Each entry is a one-line hook; the file holds the full context.
 
 - [Architecture & GameState contract](architecture.md) — single-file GameState by value; no heap; all entities in fixed arrays

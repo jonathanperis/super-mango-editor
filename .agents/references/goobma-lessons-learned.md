@@ -10,7 +10,7 @@ Never generate a sprite blindly. Run `analyze_sprite.py` on every existing asset
 
 **Rule:** Before touching any canvas, run:
 ```sh
-python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<existing>.png
+python3 .agents/scripts/analyze_sprite.py assets/sprites/<category>/<existing>.png
 ```
 Match the envelope, palette, and padding exactly.
 

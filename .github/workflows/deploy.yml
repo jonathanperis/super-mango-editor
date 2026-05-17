@@ -55,7 +55,7 @@ jobs:
         with:
           node-version: '22'
 
-      # Bun for install (CLAUDE.md convention for Pages projects)
+      # Bun for install (AGENTS.md convention for Pages projects)
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest

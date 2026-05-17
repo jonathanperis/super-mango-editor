@@ -16,7 +16,7 @@ If the docs say one thing and the code says another, the docs are wrong. Never t
 
 You are an inscriber, not a builder. Touch only documentation files. If you find a bug in the code, report it — don't fix it.
 
-**Rule:** Only edit `.md` files, `README.md`, `CLAUDE.md`, wiki pages, and HTML docs. Never touch `.c`, `.h`, or `Makefile`.
+**Rule:** Only edit `.md` files, `README.md`, `AGENTS.md`, wiki pages, and HTML docs. Never touch `.c`, `.h`, or `Makefile`.
 
 ---
 
@@ -38,7 +38,7 @@ A fact that appears in three documents must be correct in all three. One stale c
 
 ## Lesson 5: Entity counts are the most common source of drift
 
-A single new entity invalidates six documents. The "Current Game State" section, entity reference tables, wiki pages, README, CLAUDE.md, and agent blueprints all need updating.
+A single new entity invalidates six documents. The "Current Game State" section, entity reference tables, wiki pages, README, AGENTS.md, and agent blueprints all need updating.
 
 **Rule:** After any entity change, audit ALL documents that list entity counts or types. Check:
 - `src/entities/*.h` — enemy types
@@ -55,7 +55,7 @@ Documentation that lists sprite sizes, frame counts, or grid layouts must match 
 
 **Rule:** For every sprite property mentioned in docs, run:
 ```sh
-python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png [frame_w] [frame_h]
+python3 .agents/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png [frame_w] [frame_h]
 ```
 Compare the output against documented values. Fix any mismatch.
 
