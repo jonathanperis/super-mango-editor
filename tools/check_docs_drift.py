@@ -271,6 +271,24 @@ def check_agent_context_docs() -> None:
                 fail(f"{rel}: missing current project context token `{token}`")
 
 
+def check_public_readme_docs() -> None:
+    expected_count = len(makefile_test_targets())
+    readme = read(ROOT / "README.md")
+    if f"{expected_count} native regression tests" not in readme:
+        fail(f"README.md: stale make test count; expected {expected_count}")
+    for token in ["Enter/Space/Start", "Esc/Back", "scripted replay smoke on Linux"]:
+        if token not in readme:
+            fail(f"README.md: missing current project context token `{token}`")
+
+    docs_readme = read(ROOT / "docs" / "README.md")
+    docs_package = read(ROOT / "docs" / "package.json")
+    for token in ["bun run lint", "bun run drift", "PUBLIC_GA_ID", "NEXT_PUBLIC_GA_ID"]:
+        if token not in docs_readme:
+            fail(f"docs/README.md: missing docs command/environment token `{token}`")
+    if '"drift": "cd .. && make docs-drift"' not in docs_package:
+        fail("docs/package.json: `bun run drift` must delegate to the full `make docs-drift` gate")
+
+
 def main() -> int:
     check_test_targets_documented()
     check_source_file_map()
@@ -283,6 +301,7 @@ def main() -> int:
     check_level_catalog_doc()
     check_level_prose_counts()
     check_agent_context_docs()
+    check_public_readme_docs()
 
     if FAILURES:
         print("docs drift check failed:")
