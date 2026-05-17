@@ -12,6 +12,12 @@ const {
     description = "A 2D pixel art platformer written in C11 + SDL2. Play in your browser via WebAssembly or download for macOS, Linux, and Windows.",
 } = Astro.props;
 
+const basePath = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+const faviconHref = `${basePath}favicon.ico`;
+const faviconPngHref = `${basePath}favicon.png`;
+const favicon32Href = `${basePath}favicon-32x32.png`;
+const appleTouchIconHref = `${basePath}apple-touch-icon.png`;
+
 const jsonLd = {
     "@context": "https://schema.org",
     "@type": "VideoGame",
@@ -55,6 +61,10 @@ const jsonLd = {
         <meta name="twitter:creator" content="@jperis_silva" />
 
         <link rel="canonical" href="https://jonathanperis.github.io/super-mango-editor/" />
+        <link rel="icon" href={faviconHref} sizes="any" />
+        <link rel="icon" type="image/png" href={faviconPngHref} />
+        <link rel="icon" type="image/png" sizes="32x32" href={favicon32Href} />
+        <link rel="apple-touch-icon" href={appleTouchIconHref} />
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
 
         <!-- Google Fonts: Pixelify Sans + DM Mono -->
