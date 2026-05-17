@@ -65,14 +65,14 @@ make run-editor   # build and run the editor
 
 ## Development Crew
 
-Super Mango is developed with the help of four specialized [Claude Code](https://docs.anthropic.com/en/docs/claude-code) agents, each owning a distinct part of the project. Call them by name with slash commands in any Claude Code session inside this repository.
+Super Mango is developed with four specialized AGENTS harness roles, each owning a distinct part of the project. The standardized instructions live in `AGENTS.md` and `.agents/`, so any compatible harness can read the same commands, references, scripts, and memory.
 
 | Agent | Command | Role | Owns |
 |-------|---------|------|------|
 | **Bosser** | `/bosser-engineer` | Chief Engineer | C source, SDL2 engine, editor, Makefile, architecture, bug fixes |
 | **Lugio** | `/lugio-creator` | Level Builder | TOML level files, entity placement, theming, difficulty balancing |
 | **Goobma** | `/goobma-designer` | Pixel Art Designer | Sprite assets, palette remapping, frame layout analysis |
-| **Warro** | `/warro-inscriber` | Documentation Inscriber | README, CLAUDE.md, wiki, GitHub Pages docs, cross-referencing |
+| **Warro** | `/warro-inscriber` | Documentation Inscriber | README, AGENTS.md, wiki, GitHub Pages docs, cross-referencing |
 
 ### When to call whom
 

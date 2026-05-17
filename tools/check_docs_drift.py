@@ -262,7 +262,7 @@ def check_level_prose_counts() -> None:
 
 def check_agent_context_docs() -> None:
     expected_count = len(makefile_test_targets())
-    for rel in ["AGENTS.md", "CLAUDE.md"]:
+    for rel in ["AGENTS.md"]:
         text = read(ROOT / rel)
         if f"{expected_count}-test `make test` suite" not in text:
             fail(f"{rel}: stale make test count; expected {expected_count}")

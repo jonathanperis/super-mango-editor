@@ -182,7 +182,7 @@ floor_gaps = [0, 192, 560]
 Use `analyze_sprite.py` to inspect any sprite before placing it. This tool tells you the real art bounds, hitbox dimensions, and animation frames — critical for placing entities precisely.
 
 ```sh
-python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png [frame_w] [frame_h]
+python3 .agents/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png [frame_w] [frame_h]
 ```
 
 **When to use it:**
@@ -203,15 +203,15 @@ python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png
 ```sh
 # Spider: 64×48 frames, art at (20,22) size 25×10
 # → Real spider width is ~25px, sits at floor level. Patrol range needs 25px clearance from gaps.
-python3 .claude/scripts/analyze_sprite.py assets/sprites/entities/spider.png 64 48
+python3 .agents/scripts/analyze_sprite.py assets/sprites/entities/spider.png 64 48
 
 # Bird: 48×48 frames, art at (17,17) size 15×14
 # → Bird visual is only 15px wide, 14px tall. base_y positions the frame, not the art.
-python3 .claude/scripts/analyze_sprite.py assets/sprites/entities/bird.png
+python3 .agents/scripts/analyze_sprite.py assets/sprites/entities/bird.png
 
 # Blue flame: 48×48 frames, hitbox at (17,17) size 14×15
 # → Flame art is small within the frame. Gap coverage is just 14px wide.
-python3 .claude/scripts/analyze_sprite.py assets/sprites/hazards/blue_flame.png
+python3 .agents/scripts/analyze_sprite.py assets/sprites/hazards/blue_flame.png
 ```
 
 **Key insight for patrol ranges:** The game flips sprites at patrol boundaries using the FRAME width, not the art width. A spider with FRAME_W=64 reverses when `x + 64 >= patrol_x1`. So the rightmost art edge is `patrol_x1 - FRAME_W + ART_X + ART_W`. Factor this in when making sure spiders don't visually walk over gaps.
@@ -314,7 +314,7 @@ If any conflicts are found, shift the platform away from the gap before deliveri
 
 ## Critical Rules
 
-These are Lugio's most essential level design rules. The full details are in `.claude/references/lugio-lessons-learned.md`.
+These are Lugio's most essential level design rules. The full details are in `.agents/references/lugio-lessons-learned.md`.
 
 1. **No comments in TOML** — The editor strips them on save. Use the `description` field for narrative, `generated_by` for attribution. Never write `# ...` inline.
 
@@ -340,7 +340,7 @@ These are Lugio's most essential level design rules. The full details are in `.c
 
 ## Lessons Learned
 
-See `.claude/references/lugio-lessons-learned.md` for the full list of hard-won level building rules. Always consult it before writing TOML.
+See `.agents/references/lugio-lessons-learned.md` for the full list of hard-won level building rules. Always consult it before writing TOML.
 
 ---
 

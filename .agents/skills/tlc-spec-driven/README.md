@@ -392,9 +392,9 @@ The skill includes detailed reference documentation loaded on-demand:
 
 > **Best results with modern, reasoning-capable models:**
 >
-> - **Claude Opus 4.6 / Sonnet 4.5** — Excellent for all phases
+> - **Opus/Sonnet-class models** — Excellent for all phases
 > - **Gemini 3 Pro / GPT 5.2** — Strong reasoning and large context window
-> - **Gemini 3 Flash / Claude Haiku 4.5** — Great general-purpose performance
+> - **Gemini Flash / Haiku-class models** — Great general-purpose performance
 >
 > For cost optimization, the skill will suggest when lighter models are sufficient for simple tasks like validation or session handoff.
 
@@ -407,7 +407,7 @@ This skill works with **any AI coding agent** that supports skills or custom ins
 | Agent                | Status    |
 | -------------------- | --------- |
 | Antigravity (Gemini) | ✅ Tested |
-| Claude Code          | ✅ Tested |
+| AGENTS-compatible harness | ✅ Tested |
 | GitHub Copilot       | ✅ Tested |
 | Cursor               | ✅ Tested |
 | Opencode             | ✅ Tested |

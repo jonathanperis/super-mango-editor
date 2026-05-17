@@ -362,7 +362,7 @@ See [Architecture](../architecture/) for details on the render pipeline.
 To analyze a new sprite sheet:
 
 ```sh
-python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png
+python3 .agents/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png
 ```
 
 Frame math:

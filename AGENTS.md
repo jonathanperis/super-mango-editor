@@ -1,6 +1,6 @@
-# Super Mango — Codex Guide
+# Super Mango — AGENTS Guide
 
-@.claude/commands/bosser-engineer.md
+@.agents/commands/bosser-engineer.md
 
 A 2D pixel art platformer written in C11 + SDL2, targeting macOS, Linux, Windows, and WebAssembly.
 
@@ -71,7 +71,7 @@ super-mango-editor/
 ├── levels/                 ← TOML level definitions (00_sandbox_01.toml, …)
 ├── vendor/                 ← vendored third-party libraries
 │   └── tomlc17/            ← TOML parser (C11)
-├── .claude/                ← slash commands, references, scripts, skills
+├── .agents/                ← standardized agent commands, references, scripts, skills
 ├── docs/                   ← Astro GitHub Pages documentation site
 ├── web/                    ← Emscripten shell template (shell.html)
 └── src/
@@ -171,11 +171,11 @@ main()
 
 ### Adding a new entity (coin, enemy, platform…)
 
-@.claude/references/entity-template.md
+@.agents/references/entity-template.md
 
 ### Coding standards and comment style
 
-@.claude/references/coding-standards.md
+@.agents/references/coding-standards.md
 
 ### Physics / collision pattern
 
@@ -216,7 +216,7 @@ if (player->x > GAME_W - player->w) player->x = (float)(GAME_W - player->w);
 ### Analyzing a sprite sheet
 
 ```sh
-python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png
+python3 .agents/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png
 ```
 
 ### Frame math
@@ -240,9 +240,9 @@ source_y = (frame_index / cols) * frame_h
 | 4   | Attack      | 4–8 frames, one-shot         |
 | 5   | Death / Hurt| 4–6 frames, one-shot         |
 
-Full animation reference: @.claude/references/animation-sequences.md
+Full animation reference: @.agents/references/animation-sequences.md
 
-Full sprite sheet analysis notes: @.claude/references/sprite-sheet-analysis.md
+Full sprite sheet analysis notes: @.agents/references/sprite-sheet-analysis.md
 
 ---
 

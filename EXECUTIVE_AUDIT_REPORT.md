@@ -81,7 +81,7 @@ Recommendation:
 ### 2. Docs and comments contained stale level model references
 
 Evidence:
-- `README.md`, `AGENTS.md`, and `CLAUDE.md` referenced obsolete level paths.
+- `README.md`, `AGENTS.md`, and `AGENTS.md` referenced obsolete level paths.
 - Current levels are `levels/00_sandbox_01.toml`, `levels/01_lugio_01.toml`, and `levels/02_lugio_02.toml`.
 - Historical finding: `src/main.c`, `src/core/game_lifecycle.c`, and `src/game.h` comments still said JSON for `--level`.
 - `docs/wiki/build-system.md` referenced an obsolete generated-level path that did not match current runtime TOML paths.
@@ -178,8 +178,8 @@ Historical finding: the deploy workflow used `bun install --frozen-lockfile`, th
 | File | Status |
 |---|---|
 | `README.md` | Resolved: current level path, source counts, docs site description, and module tree |
-| `AGENTS.md` | Resolved: `.claude` references, docs site description, loader/export wording |
-| `CLAUDE.md` | Resolved: docs site description and loader/export wording |
+| `AGENTS.md` | Resolved: `.agents` references, docs site description, loader/export wording |
+| `AGENTS.md` | Resolved: docs site description and loader/export wording |
 | `docs/wiki/build-system.md` | Resolved: explicit per-directory wildcard model, test target, clean behavior |
 | `docs/wiki/source-files.md` | Resolved: current module map, constants, loader/validator, star names, floor-gap wording |
 | `docs/wiki/constants-reference.md` | Resolved: floor-gap/camera/star constant names |

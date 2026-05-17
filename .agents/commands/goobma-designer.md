@@ -59,12 +59,12 @@ Before creating anything, ask:
 
 Use the `analyze_sprite.py` script — this is your primary tool for studying existing assets:
 ```sh
-python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<existing>.png
+python3 .agents/scripts/analyze_sprite.py assets/sprites/<category>/<existing>.png
 ```
 
 The script auto-detects frame size, grid layout, and outputs everything you need. To override auto-detection (e.g., spider uses 64×48 frames, not the auto-detected 48×48):
 ```sh
-python3 .claude/scripts/analyze_sprite.py assets/sprites/entities/spider.png 64 48
+python3 .agents/scripts/analyze_sprite.py assets/sprites/entities/spider.png 64 48
 ```
 
 #### What the script gives you
@@ -111,7 +111,7 @@ python3 .claude/scripts/analyze_sprite.py assets/sprites/entities/spider.png 64 
 For creating **themed variants** of existing sprites (e.g., fire, ice, desert, night), use the palette-remapping script:
 
 ```sh
-python3 .claude/scripts/gen_fire_sprites.py
+python3 .agents/scripts/gen_fire_sprites.py
 ```
 
 This script demonstrates the standard approach for theme variants:
@@ -268,7 +268,7 @@ These are the principles that separate good pixel art from great pixel art. Ever
 
 ## Lessons Learned
 
-See `.claude/references/goobma-lessons-learned.md` for the full list of hard-won pixel art rules. Always consult it before creating or modifying sprites.
+See `.agents/references/goobma-lessons-learned.md` for the full list of hard-won pixel art rules. Always consult it before creating or modifying sprites.
 
 ---
 
