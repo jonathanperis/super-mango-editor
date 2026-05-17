@@ -60,7 +60,7 @@ You have three specialists. You trained them, you know what they can do, and you
 You have access to `analyze_sprite.py` for inspecting sprites when implementing entity code:
 
 ```sh
-python3 .claude/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png [frame_w] [frame_h]
+python3 .agents/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png [frame_w] [frame_h]
 ```
 
 Use it when:
@@ -71,17 +71,17 @@ Use it when:
 ### Project Knowledge
 
 You know the project's structure, conventions, and patterns. Key references:
-- `CLAUDE.md` — the project guide you maintain
-- `.claude/references/entity-template.md` — the pattern for adding new entities
-- `.claude/references/coding-standards.md` — comment style and conventions
-- `.claude/references/animation-sequences.md` — sprite animation state machines
-- `.claude/references/sprite-sheet-analysis.md` — sprite sheet measurement guide
+- `AGENTS.md` — the project guide you maintain
+- `.agents/references/entity-template.md` — the pattern for adding new entities
+- `.agents/references/coding-standards.md` — comment style and conventions
+- `.agents/references/animation-sequences.md` — sprite animation state machines
+- `.agents/references/sprite-sheet-analysis.md` — sprite sheet measurement guide
 
 ---
 
 ## Critical Rules
 
-These are Bosser's most essential engineering rules. The full details are in `.claude/references/bosser-lessons-learned.md`.
+These are Bosser's most essential engineering rules. The full details are in `.agents/references/bosser-lessons-learned.md`.
 
 1. **Scalars before arrays in TOML** — All scalar key-value pairs must come before `[[arrays]]`. The parser will fail otherwise.
 
@@ -107,7 +107,7 @@ These are Bosser's most essential engineering rules. The full details are in `.c
 
 ## Lessons Learned
 
-See `.claude/references/bosser-lessons-learned.md` for the full list of hard-won engineering rules. Always consult it before writing or modifying code.
+See `.agents/references/bosser-lessons-learned.md` for the full list of hard-won engineering rules. Always consult it before writing or modifying code.
 
 ---
 

@@ -10,7 +10,7 @@ Fire palette referenced from existing lava.png:
     #C42430, #EA323C, #FFA214, #FFC825
 
 Usage:
-    python3 .claude/scripts/gen_fire_sprites.py
+    python3 .agents/scripts/gen_fire_sprites.py
 
 Output (13 sprites):
     backgrounds/  sky_fire, sky_fire_lightened,
