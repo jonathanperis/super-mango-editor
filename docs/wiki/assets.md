@@ -59,7 +59,7 @@ path  = "assets/sprites/backgrounds/glacial_mountains.png"
 speed = 0.2
 ```
 
-Layers are TOML array-of-tables and are drawn in array order (first = furthest back). `speed` is the parallax scroll factor: `0.0` = static sky, `1.0` = locks to camera, `0.1`–`0.5` = typical mid-ground parallax. Up to 8 layers are supported. See [Level Design](#level-design) for the full list of available background images and suggested speeds.
+Layers are TOML array-of-tables and are drawn in array order (first = furthest back). `speed` is the parallax scroll factor: `0.0` = static sky, `1.0` = locks to camera, `0.1`–`0.5` = typical mid-ground parallax. Up to 8 layers are supported. See [Level Design](../level-design/) for the full list of available background images and suggested speeds.
 
 ### Foreground Strip and Fog Layers
 

@@ -179,7 +179,7 @@ On failure at any step, all previously-succeeded subsystems are torn down before
 
 ### Constants
 
-See [Constants Reference](#constants-reference) for full details.
+See [Constants Reference](../constants-reference/) for full details.
 
 ```c
 #define WINDOW_TITLE  "Super Mango"
@@ -279,7 +279,7 @@ Frees all resources in reverse init order.
 
 ## Player Module (`player/`)
 
-**Role:** Player character lifecycle, input, horizontal motion, jumps, climbables, surface collision, animation, rendering, hitbox, and reset. Public declarations live in `player.h`; private constants live in `player_internal.h`; implementation is split across focused `.c` files. See [Player Module](#player-module-player) for the deep dive.
+**Role:** Player character lifecycle, input, horizontal motion, jumps, climbables, surface collision, animation, rendering, hitbox, and reset. Public declarations live in `player.h`; private constants live in `player_internal.h`; implementation is split across focused `.c` files. See [Player Module](../player-module/) for the deep dive.
 
 **Key functions:** `player_init`, `player_apply_default_physics`, `player_handle_input`, `player_update`, `player_render`, `player_get_hitbox`, `player_reset`, `player_cleanup`
 
