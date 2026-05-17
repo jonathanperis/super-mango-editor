@@ -8,7 +8,7 @@
         "build": "astro build",
         "preview": "astro preview",
         "lint": "astro check",
-        "drift": "python3 ../tools/generate_level_catalog.py --check && python3 ../tools/check_docs_drift.py",
+        "drift": "cd .. && make docs-drift",
         "level-catalog": "python3 ../tools/generate_level_catalog.py"
     },
     "dependencies": {
