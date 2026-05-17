@@ -1,27 +1,9 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import '../../styles/docs.css';
-import { SECTION_CATEGORIES, SECTION_ORDER } from '@/lib/docsSidebar';
+import { DOCS_META, SECTION_CATEGORIES, SECTION_ORDER } from '@/lib/docsSidebar';
 
-const SLUG_LABEL: Record<string, string> = {
-    home: 'Home',
-    index: 'Home',
-    architecture: 'Architecture',
-    'source-files': 'Source Files',
-    'player-module': 'Player Module',
-    'constants-reference': 'Constants Reference',
-    'entities-and-hazards': 'Entities & Hazards',
-    'collectibles-and-surfaces': 'Collectibles & Surfaces',
-    assets: 'Assets',
-    sounds: 'Sounds',
-    'level-catalog': 'Level Catalog',
-    'overlay-snapshots': 'Overlay Snapshots',
-    'build-system': 'Build System',
-    'level-design': 'Level Design',
-    'level-editor': 'Level Editor',
-    'developer-guide': 'Developer Guide',
-};
-
+// docs-drift sentinel: level-catalog
 const globResult = import.meta.glob('../../../wiki/*.md', { eager: true });
 
 const pagesBySlug: Record<string, any> = {};
@@ -31,34 +13,23 @@ for (const [path, module] of Object.entries(globResult)) {
     pagesBySlug[slug] = module;
 }
 
-// Build-time assertion: validate SECTION_CATEGORIES IDs against discovered slugs
 const availableSlugs = new Set(Object.keys(pagesBySlug));
-for (const cat of SECTION_CATEGORIES) {
-    for (const id of cat.ids) {
-        if (!availableSlugs.has(id)) {
-            const catName = cat.label || 'root';
-            throw new Error(
-                `SECTION_CATEGORIES references id "${id}" (category: "${catName}") but no matching wiki/${id}.md was found. Available slugs: ${Array.from(availableSlugs).join(', ')}`
-            );
-        }
+for (const id of SECTION_ORDER) {
+    if (!availableSlugs.has(id)) {
+        throw new Error(
+            `Docs navigation references "${id}" but no matching wiki/${id}.md was found. Available slugs: ${Array.from(availableSlugs).join(', ')}`
+        );
     }
 }
 
 const requestedSlug = Astro.params.slug;
 const isRoot = requestedSlug === undefined;
 const requestedKey = requestedSlug ?? 'home';
+const currentPage = pagesBySlug[requestedKey];
 
-const sectionsToRender = isRoot
-    ? SECTION_ORDER
-        .map(slug => {
-            return { slug, page: pagesBySlug[slug] };
-        })
-        .filter(s => s.page)
-    : (() => {
-        const page = pagesBySlug[requestedKey];
-        if (!page) return [];
-        return [{ slug: requestedSlug!, page }];
-    })();
+if (!isRoot && !currentPage) {
+    return Astro.redirect('/404');
+}
 
 export function getStaticPaths() {
     return [
@@ -74,187 +45,208 @@ function humanizeSlug(s: string): string {
         .join(' ');
 }
 
-const firstPage = sectionsToRender[0]?.page;
+const pageMeta = DOCS_META[requestedKey as keyof typeof DOCS_META];
 const pageTitle = isRoot
-    ? 'Super Mango Editor - Documentation'
-    : (firstPage?.frontmatter?.title ?? humanizeSlug(requestedKey));
+    ? 'Super Mango Builder Manual'
+    : (currentPage?.frontmatter?.title ?? pageMeta?.label ?? humanizeSlug(requestedKey));
 
 const base = import.meta.env.BASE_URL;
-const docsBase = base.replace(/\/$/, '') + '/docs';
-const backHomeUrl = base.replace(/\/$/, '') + '/';
+const baseClean = base.replace(/\/$/, '');
+const docsBase = `${baseClean}/docs`;
+const backHomeUrl = `${baseClean}/`;
+const playUrl = `${baseClean}/#play`;
+const repoUrl = 'https://github.com/jonathanperis/super-mango-editor';
+const editorUrl = `${repoUrl}/blob/main/docs/wiki/${requestedKey === 'home' ? 'index' : requestedKey}.md`;
+const categoryCards = SECTION_CATEGORIES.map(cat => ({
+    ...cat,
+    pages: cat.ids.map(id => DOCS_META[id]),
+}));
+const allPages = SECTION_ORDER.map(id => DOCS_META[id]);
+const currentIndex = SECTION_ORDER.indexOf(requestedKey as any);
+const prevPage = !isRoot && currentIndex > 0 ? DOCS_META[SECTION_ORDER[currentIndex - 1]] : null;
+const nextPage = !isRoot && currentIndex >= 0 && currentIndex < SECTION_ORDER.length - 1 ? DOCS_META[SECTION_ORDER[currentIndex + 1]] : null;
+const CurrentContent = currentPage?.default ?? currentPage;
 ---
 
 <BaseLayout title={pageTitle}>
     <div class="mobile-header">
-        <button class="menu-toggle" id="menuToggle" aria-label="Toggle Menu" aria-controls="sidebar" aria-expanded="false">
+        <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false">
             <span></span><span></span><span></span>
         </button>
-        <div class="repo-title">Super Mango Editor</div>
+        <a class="mobile-title" href={docsBase}>Builder Manual</a>
+        <a class="mobile-play" href={playUrl}>Play</a>
     </div>
 
     <div class="overlay" id="overlay"></div>
 
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h1 class="repo-title">Super Mango Editor</h1>
-            <p class="repo-description">2D side-scrolling platformer written in C using SDL2 — browser-playable via WebAssembly</p>
-            <input type="text" id="searchInput" class="search-box" placeholder="Search documentation..." aria-label="Search documentation" hidden={!isRoot}>
+            <a class="repo-badge" href={docsBase}>
+                <span>SM</span>
+                <strong>Builder Manual</strong>
+            </a>
+            <p class="repo-description">Read the engine route, world-builder guide, and platform docs without one giant scroll.</p>
+            <label class="search-label" for="searchInput">Filter pages</label>
+            <input type="search" id="searchInput" class="search-box" placeholder="Search manual pages..." aria-label="Filter manual pages">
         </div>
-        <div class="sidebar-nav-container">
-            {SECTION_CATEGORIES.map((cat) => {
-                const catIds = cat.ids;
-                return (
-                    <div class="sidebar-category-group" data-category>
-                        {cat.label && <div class="sidebar-category">{cat.label}</div>}
-                        <ul>
-                            {catIds.map((id) => (
+        <nav class="sidebar-nav-container" aria-label="Documentation sections">
+            {SECTION_CATEGORIES.map((cat) => (
+                <div class="sidebar-category-group" data-category>
+                    <div class="sidebar-category">{cat.label}</div>
+                    <ul>
+                        {cat.ids.map((id) => {
+                            const meta = DOCS_META[id];
+                            const href = id === 'home' ? docsBase : `${docsBase}/${id}/`;
+                            const active = isRoot ? id === 'home' : id === requestedKey;
+                            return (
                                 <li>
-                                    <a class="nav-item" href={`${docsBase}/#${id}`} data-nav-id={id}>
-                                        {SLUG_LABEL[id]}
+                                    <a class:list={['nav-item', { active }]} href={href} data-nav-id={id} data-search-text={`${meta.label} ${meta.description} ${cat.label}`}>
+                                        <span>{meta.shortLabel ?? meta.label}</span>
                                     </a>
                                 </li>
-                            ))}
-                        </ul>
-                    </div>
-                );
-            })}
-        </div>
+                            );
+                        })}
+                    </ul>
+                </div>
+            ))}
+        </nav>
         <div class="sidebar-footer">
-            <a href={backHomeUrl} class="back-home">&#8592; Back to home</a>
-            <a href="https://github.com/jonathanperis/super-mango-editor" target="_blank" rel="noopener noreferrer">View on GitHub</a>
-            <div>Built by Jonathan Peris</div>
+            <a href={backHomeUrl}>← Home screen</a>
+            <a href={playUrl}>Insert coin</a>
+            <a href={repoUrl} target="_blank" rel="noopener noreferrer">GitHub source</a>
         </div>
     </aside>
 
     <div class="content-wrapper">
-        <main class="content" id="mainContent">
-            {sectionsToRender.map(({ slug, page: wikiPage }) => {
-                const sectionId = slug;
-                const Content = wikiPage.default ?? wikiPage;
-                return (
-                    <section id={sectionId} class="doc-section">
-                        <Content />
+        <main class:list={['content', { 'content-hub': isRoot }]} id="mainContent">
+            {isRoot ? (
+                <>
+                    <section class="docs-hero" aria-labelledby="manual-title">
+                        <div>
+                            <p class="docs-kicker">BUILDER MANUAL</p>
+                            <h1 id="manual-title">Choose your route through the cabinet</h1>
+                            <p>Super Mango docs are now paginated by reader intent. Start with the engine map, jump into world building, inspect content systems, or open the build and source references.</p>
+                            <div class="docs-actions" aria-label="Primary manual actions">
+                                <a href={`${docsBase}/developer-guide/`}>Start with Developer Guide</a>
+                                <a href={playUrl}>Play before reading</a>
+                            </div>
+                        </div>
+                        <div class="manual-status" aria-label="Documentation stats">
+                            <span>ROUTES</span>
+                            <strong>{allPages.length}</strong>
+                            <small>focused manual pages</small>
+                        </div>
                     </section>
-                );
-            })}
+
+                    <section class="manual-route-grid" aria-label="Manual routes">
+                        {categoryCards.map((cat) => (
+                            <article class="route-card" data-doc-card data-search-text={`${cat.label} ${cat.description} ${cat.pages.map(p => `${p.label} ${p.description}`).join(' ')}`}>
+                                <p class="card-kicker">{cat.kicker}</p>
+                                <h2>{cat.label}</h2>
+                                <p>{cat.description}</p>
+                                <ul>
+                                    {cat.pages.map((page) => (
+                                        <li>
+                                            <a href={page.id === 'home' ? docsBase : `${docsBase}/${page.id}/`}>
+                                                <span>{page.marker}</span>
+                                                {page.label}
+                                            </a>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </article>
+                        ))}
+                    </section>
+
+                    <section class="manual-index" aria-labelledby="index-title">
+                        <div class="section-heading-row">
+                            <div>
+                                <p class="docs-kicker">FULL INDEX</p>
+                                <h2 id="index-title">Every manual page</h2>
+                            </div>
+                            <a href={repoUrl} target="_blank" rel="noopener noreferrer">Open source →</a>
+                        </div>
+                        <div class="index-list">
+                            {allPages.map((page, index) => (
+                                <a class="index-row" data-doc-card data-search-text={`${page.label} ${page.description} ${page.marker}`} href={page.id === 'home' ? docsBase : `${docsBase}/${page.id}/`}>
+                                    <span>{String(index + 1).padStart(2, '0')}</span>
+                                    <strong>{page.label}</strong>
+                                    <em>{page.description}</em>
+                                </a>
+                            ))}
+                        </div>
+                    </section>
+                </>
+            ) : (
+                <>
+                    <div class="docs-breadcrumbs" aria-label="Breadcrumb">
+                        <a href={docsBase}>Builder Manual</a>
+                        <span>/</span>
+                        <span>{pageMeta?.label ?? pageTitle}</span>
+                    </div>
+                    <section id={requestedKey} class="doc-section doc-page">
+                        <CurrentContent />
+                    </section>
+                    <nav class="doc-pager" aria-label="Documentation pagination">
+                        {prevPage ? (
+                            <a class="pager-card previous" href={`${docsBase}/${prevPage.id === 'home' ? '' : `${prevPage.id}/`}`}>
+                                <span>Previous route</span>
+                                <strong>{prevPage.label}</strong>
+                            </a>
+                        ) : <span></span>}
+                        {nextPage ? (
+                            <a class="pager-card next" href={`${docsBase}/${nextPage.id}/`}>
+                                <span>Next route</span>
+                                <strong>{nextPage.label}</strong>
+                            </a>
+                        ) : <span></span>}
+                    </nav>
+                    <div class="doc-feedback">
+                        <a href={editorUrl} target="_blank" rel="noopener noreferrer">Edit this page on GitHub</a>
+                        <a href={docsBase}>Back to manual index</a>
+                    </div>
+                </>
+            )}
         </main>
     </div>
-
-    {requestedSlug && <script is:inline define:vars={{ slug: requestedSlug, isRoot: isRoot }}>window.__docsSlug = slug; window.__isRoot = isRoot;</script>}
 
     <script is:inline>
         document.addEventListener('DOMContentLoaded', () => {
             const menuToggle = document.getElementById('menuToggle');
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('overlay');
+            const searchInput = document.getElementById('searchInput');
+            const navItems = Array.from(document.querySelectorAll('.nav-item'));
+            const docCards = Array.from(document.querySelectorAll('[data-doc-card]'));
+            const categoryGroups = Array.from(document.querySelectorAll('[data-category]'));
 
-            function toggleMenu() {
-                const isOpen = sidebar.classList.toggle('open');
-                overlay.classList.toggle('open');
-                if (menuToggle) menuToggle.setAttribute('aria-expanded', String(isOpen));
+            function setMenu(open) {
+                sidebar?.classList.toggle('open', open);
+                overlay?.classList.toggle('open', open);
+                menuToggle?.setAttribute('aria-expanded', String(open));
             }
 
-            if (menuToggle) menuToggle.addEventListener('click', toggleMenu);
-            if (overlay) overlay.addEventListener('click', toggleMenu);
+            menuToggle?.addEventListener('click', () => setMenu(!sidebar?.classList.contains('open')));
+            overlay?.addEventListener('click', () => setMenu(false));
+            navItems.forEach(item => item.addEventListener('click', () => {
+                if (window.innerWidth <= 768) setMenu(false);
+            }));
 
-            const isRoot = window.__isRoot !== false;
-            const prefersReducedMotion = !window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
-            const sections = document.querySelectorAll('section.doc-section');
-            const navItems = document.querySelectorAll('.nav-item');
-
-            // Auto-scroll: root uses section slug; single-section lets browser handle deep-link hashes
-            if (isRoot) {
-                const targetSlug = window.__docsSlug;
-                const hash = window.location.hash;
-                const sectionId = targetSlug || (hash && hash.length > 1 ? hash.slice(1) : null);
-                if (sectionId) {
-                    const target = document.getElementById(sectionId);
-                    if (target) {
-                        setTimeout(() => target.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth' }), 100);
-                    }
-                }
-            }
-
-            // Scrollspy + nav click: only meaningful with multiple sections
-            if (isRoot && sections.length > 1) {
-                const observer = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            const sectionId = entry.target.id;
-                            navItems.forEach(item => {
-                                item.classList.toggle('active', item.dataset.navId === sectionId);
-                                if (item.dataset.navId === sectionId) {
-                                    item.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'nearest' });
-                                }
-                            });
-                        }
-                    });
-                }, { root: null, rootMargin: '-80px 0px -60% 0px', threshold: 0 });
-
-                sections.forEach(section => observer.observe(section));
-
+            searchInput?.addEventListener('input', (event) => {
+                const query = event.target.value.trim().toLowerCase();
                 navItems.forEach(item => {
-                    item.addEventListener('click', () => {
-                        if (window.innerWidth <= 768) toggleMenu();
-                    });
+                    const match = !query || item.dataset.searchText?.toLowerCase().includes(query);
+                    item.parentElement.style.display = match ? '' : 'none';
                 });
-            }
-
-            // Search: only on root (full tree); single-section has nothing to filter
-            if (isRoot) {
-                const searchInput = document.getElementById('searchInput');
-                if (searchInput) {
-                    searchInput.addEventListener('input', (e) => {
-                        const query = e.target.value.toLowerCase();
-                        const content = document.getElementById('mainContent');
-                        if (!content) return;
-
-                        if (query === '') {
-                            sections.forEach(s => s.classList.remove('hidden-section'));
-                            navItems.forEach(item => {
-                                item.style.display = '';
-                                item.parentElement.style.display = '';
-                            });
-                            document.querySelectorAll('.sidebar-category-group').forEach(group => {
-                                group.style.display = '';
-                                const catLabel = group.querySelector('.sidebar-category');
-                                if (catLabel) catLabel.style.display = '';
-                            });
-                            return;
-                        }
-
-                        sections.forEach(section => {
-                            const text = section.textContent?.toLowerCase() ?? '';
-                            const navItem = document.querySelector(`.nav-item[data-nav-id="${section.id}"]`);
-                            const li = navItem ? navItem.parentElement : null;
-
-                            if (text.includes(query)) {
-                                section.classList.remove('hidden-section');
-                                if (li) li.style.display = '';
-                            } else {
-                                section.classList.add('hidden-section');
-                                if (li) li.style.display = 'none';
-                            }
-                        });
-
-                        // Hide empty categories
-                        document.querySelectorAll('.sidebar-category-group').forEach(group => {
-                            const items = group.querySelectorAll('.nav-item');
-                            let visibleCount = 0;
-                            items.forEach(item => {
-                                const id = item.dataset.navId;
-                                const sec = document.getElementById(id ?? '');
-                                const vis = !sec || !sec.classList.contains('hidden-section');
-                                item.style.display = vis ? '' : 'none';
-                                if (vis) visibleCount++;
-                            });
-                            const catLabel = group.querySelector('.sidebar-category');
-                            if (catLabel) catLabel.style.display = visibleCount === 0 ? 'none' : '';
-                            group.style.display = visibleCount === 0 ? 'none' : '';
-                        });
-                    });
-                }
-            }
+                categoryGroups.forEach(group => {
+                    const visible = Array.from(group.querySelectorAll('li')).some(li => li.style.display !== 'none');
+                    group.style.display = visible ? '' : 'none';
+                });
+                docCards.forEach(card => {
+                    const match = !query || card.dataset.searchText?.toLowerCase().includes(query);
+                    card.style.display = match ? '' : 'none';
+                });
+            });
         });
     </script>
 </BaseLayout>

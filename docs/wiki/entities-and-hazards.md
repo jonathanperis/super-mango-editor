@@ -315,4 +315,4 @@ For entities with non-rectangular visible art (birds, fish, spiders), `get_hitbo
 
 ## Adding a New Enemy or Hazard
 
-See the [Developer Guide](#developer-guide) for the full entity template and step-by-step checklist.
+See the [Developer Guide](../developer-guide/) for the full entity template and step-by-step checklist.
