@@ -51,7 +51,7 @@ jobs:
     steps:
       # Check out the repository so the runner has access to the source code.
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       # ── Linux dependency install ────────────────────────────────────────────
       # apt packages: build tools + SDL2 and all companion library dev headers.
@@ -74,7 +74,7 @@ jobs:
       # install MinGW-w64 gcc, make, and all SDL2 companion packages.
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
+        uses: msys2/setup-msys2@e9898307ac31d1a803454791be09ab9973336e1c # v2
         with:
           msystem: UCRT64
           update: true
@@ -92,13 +92,19 @@ jobs:
       # from source by Emscripten automatically via -s USE_SDL=2 flags.
       - name: Install Emscripten SDK
         if: matrix.target == 'wasm'
-        uses: mymindstorm/setup-emsdk@v16
+        uses: mymindstorm/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
         with:
-          version: latest
+          version: 4.0.23
 
       - name: Verify Emscripten
         if: matrix.target == 'wasm'
         run: emcc --version
+
+      - name: Install Node.js for WebAssembly smoke
+        if: matrix.target == 'wasm'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22.21.1'
 
       # ── Compile (Linux / macOS) ─────────────────────────────────────────────
       # Produces out/super-mango via the project Makefile.
@@ -174,6 +180,10 @@ jobs:
           test -f out/super-mango.js
           test -f out/super-mango.wasm
           test -f out/super-mango.data
+          test -s out/super-mango.wasm
+          test -s out/super-mango.data
+          node --check out/super-mango.js
+          node -e "const fs=require('fs'); WebAssembly.compile(fs.readFileSync('out/super-mango.wasm')).then(()=>console.log('wasm compile ok'))"
 
       # ── Bundle SDL2 DLLs for Windows ────────────────────────────────────────
       # On Windows, SDL2 is dynamically linked. The DLLs must ship alongside
@@ -259,25 +269,25 @@ jobs:
       # Download each platform's artifact into its own subdirectory so files
       # with the same name ("super-mango") don't overwrite each other.
       - name: Download Linux binary
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: super-mango-linux-x86_64
           path: dist/linux/
 
       - name: Download macOS binary
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: super-mango-macos-arm64
           path: dist/macos/
 
       - name: Download Windows binary
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: super-mango-windows-x86_64
           path: dist/windows/
 
       - name: Download WebAssembly build
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: super-mango-wasm
           path: dist/wasm/
