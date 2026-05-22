@@ -13,7 +13,8 @@ export type DocsSectionId =
   | 'sounds'
   | 'level-catalog'
   | 'overlay-snapshots'
-  | 'build-system';
+  | 'build-system'
+  | 'release-checklist';
 
 export type DocsPageMeta = {
   id: DocsSectionId;
@@ -140,6 +141,14 @@ export const DOCS_META: Record<DocsSectionId, DocsPageMeta> = {
     route: '/docs/build-system/',
     marker: 'BUILD',
   },
+  'release-checklist': {
+    id: 'release-checklist',
+    label: 'Release Checklist',
+    shortLabel: 'Release',
+    description: 'Pre-release source, docs, WebAssembly, archive, CI, and Pages verification gates.',
+    route: '/docs/release-checklist/',
+    marker: 'SHIP',
+  },
 };
 
 export const SECTION_CATEGORIES: DocsCategory[] = [
@@ -165,7 +174,7 @@ export const SECTION_CATEGORIES: DocsCategory[] = [
     label: 'Assets & Builds',
     kicker: 'MANUAL_04',
     description: 'Audit resources, generated catalogs, overlays, sounds, and platform build targets.',
-    ids: ['assets', 'sounds', 'level-catalog', 'overlay-snapshots', 'build-system'],
+    ids: ['assets', 'sounds', 'level-catalog', 'overlay-snapshots', 'build-system', 'release-checklist'],
   },
 ];
 

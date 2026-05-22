@@ -80,6 +80,19 @@ jobs:
           cp wasm-build/unpacked/super-mango-wasm/super-mango-debug.js   docs/out/ 2>/dev/null || true
           cp wasm-build/unpacked/super-mango-wasm/super-mango-debug.wasm docs/out/ 2>/dev/null || true
 
+      - name: Smoke Pages WASM assembly
+        run: |
+          test -s docs/out/super-mango.js
+          test -s docs/out/super-mango.wasm
+          test -s docs/out/super-mango.data
+          grep -R "super-mango.js" docs/out/index.html
+          python3 -m http.server 4173 --directory docs/out >/tmp/super-mango-pages.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid' EXIT
+          for path in / /super-mango.js /super-mango.wasm /super-mango.data; do
+            curl --retry 5 --retry-delay 1 --retry-connrefused -fsS "http://127.0.0.1:4173$path" >/dev/null
+          done
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:
