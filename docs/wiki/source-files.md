@@ -242,7 +242,7 @@ See [Constants Reference](../constants-reference/) for full details.
 ### Function Declarations
 
 ```c
-void game_init(GameState *gs);
+int  game_init(GameState *gs);
 void game_loop(GameState *gs);
 void game_cleanup(GameState *gs);
 int  game_load_next_phase(GameState *gs);
@@ -267,6 +267,8 @@ Creates all runtime resources:
 6. Entity init: player, water, fog, HUD, debug, and level contents
 7. Gamepad controller init
 
+Returns `0` on success. If a required window, texture, level, or subsystem resource fails, it cleans up the partially initialized `GameState` and returns `-1`; the top-level runner reports `EXIT_FAILURE`.
+
 ### `game_loop(GameState *gs)`
 
 60 FPS loop: delta time -> events -> update -> render. See [Architecture](architecture) for the full render order.
@@ -290,12 +292,12 @@ Frees all resources in reverse init order.
 **Role:** Level schema, TOML loading, physics override application, phase switching, and count validation.
 
 **Key functions:**
-- `level_load(GameState *gs, const LevelDef *def)` -- copy a parsed level definition into runtime `GameState`
+- `int level_load(GameState *gs, const LevelDef *def);` -- validate and copy a parsed level definition into runtime `GameState`; returns `-1` without mutating current runtime state when runtime counts are invalid
 - `level_reset(GameState *gs, const LevelDef *def)` -- restore mutable level state after death/retry
 - `level_load_toml(const char *path, LevelDef *def)` -- parse TOML into staging storage, run runtime validation, free TOML data, then assign the validated `LevelDef` to the caller
 - `level_apply_player_physics(Player *player, const LevelDef *def)` -- reset player movement tunables to engine defaults, then apply non-negative level overrides
 - `level_validate_counts(const LevelDef *level, char *err, size_t err_sz)` -- reject out-of-range array counts
-- `phase_has_next`, `phase_next_path`, `phase_resolve_path` -- resolve level-completion next-phase paths
+- `phase_has_next`, `phase_next_path`, `phase_progress_save`, `phase_progress_restore` -- resolve level-completion next-phase paths and protect progress when staging phase transitions
 
 ---
 

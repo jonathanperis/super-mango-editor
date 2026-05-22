@@ -282,7 +282,7 @@ source_y = (frame_index / cols) * frame_h
 SDL_Texture *tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/coin.png");
 if (!tex) {
     fprintf(stderr, "Failed to load coin.png: %s\n", IMG_GetError());
-    exit(EXIT_FAILURE);
+    return -1;
 }
 
 // At cleanup (reverse init order):

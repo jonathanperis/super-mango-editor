@@ -256,6 +256,6 @@ Full sprite sheet analysis notes: @.agents/references/sprite-sheet-analysis.md
 ## Safety Rules
 
 - Every pointer field must be set to `NULL` after freeing (double-free safety).
-- Error paths call `SDL_GetError()` / `IMG_GetError()` / `Mix_GetError()` then `exit(EXIT_FAILURE)`.
+- Error paths log `SDL_GetError()` / `IMG_GetError()` / `Mix_GetError()` and return failure to the caller; only the top-level runner returns `EXIT_FAILURE`.
 - Resources are always freed in **reverse init order**.
 - `float` for positions and velocities; cast to `int` only at render time (`SDL_Rect` requires int).
