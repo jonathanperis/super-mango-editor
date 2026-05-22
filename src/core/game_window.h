@@ -7,7 +7,7 @@
 #include "../game.h"
 
 /* Create the game window and renderer, then set the logical canvas size. */
-void game_window_init(GameState *gs);
+int game_window_init(GameState *gs);
 
 /* Destroy renderer and window resources owned by GameState. */
 void game_window_cleanup(GameState *gs);

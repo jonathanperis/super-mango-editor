@@ -5,7 +5,6 @@
 #include "bird_variant.h"
 
 #include <math.h>   /* fabsf, sinf */
-#include <stdlib.h> /* exit, EXIT_FAILURE */
 
 #include "bird.h"
 #include "faster_bird.h"
@@ -133,6 +132,5 @@ void bird_variant_render(const BirdVariantSpec *spec,
     flip = (vx > 0.0f) ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
     if (SDL_RenderCopyEx(renderer, tex, &src, &dst, 0.0, NULL, flip) != 0) {
         SDL_Log("bird_variant_render: SDL_RenderCopyEx failed: %s", SDL_GetError());
-        exit(EXIT_FAILURE);
     }
 }

@@ -16,7 +16,6 @@
 #include <SDL_image.h>
 #include <SDL_ttf.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "start_menu.h"
@@ -100,7 +99,7 @@ static void start_menu_set_selected_level(StartMenu *menu, int index) {
 
 /* ------------------------------------------------------------------ */
 
-void start_menu_init(StartMenu *menu, SDL_Window *window, SDL_Renderer *renderer) {
+int start_menu_init(StartMenu *menu, SDL_Window *window, SDL_Renderer *renderer) {
     menu->window   = window;
     menu->renderer = renderer;
     menu->running  = 1;
@@ -109,12 +108,12 @@ void start_menu_init(StartMenu *menu, SDL_Window *window, SDL_Renderer *renderer
 
     /*
      * Load the same bitmap font used by the HUD (Round9x13.ttf at size 13).
-     * Fatal if missing — we need it to render button and title text.
+     * Required for menu text; report failure to main.c if missing.
      */
     menu->font = TTF_OpenFont("assets/fonts/round9x13.ttf", 13);
     if (!menu->font) {
         fprintf(stderr, "Failed to load Round9x13.ttf: %s\n", TTF_GetError());
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     /*
@@ -133,6 +132,7 @@ void start_menu_init(StartMenu *menu, SDL_Window *window, SDL_Renderer *renderer
         fprintf(stderr, "Warning: Failed to load confirm_ui.wav: %s\n",
                 Mix_GetError());
     }
+    return 0;
 }
 
 /* ------------------------------------------------------------------ */

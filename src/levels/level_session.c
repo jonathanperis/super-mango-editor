@@ -22,16 +22,17 @@ static LevelDef *game_level_storage(GameState *gs)
         gs->level_def = (LevelDef *)calloc(1, sizeof(LevelDef));
         if (!gs->level_def) {
             fprintf(stderr, "Error: Failed to allocate active level storage\n");
-            exit(EXIT_FAILURE);
+            return NULL;
         }
     }
     gs->runtime.current_level = gs->level_def;
     return (LevelDef *)gs->level_def;
 }
 
-void game_level_load_initial(GameState *gs)
+int game_level_load_initial(GameState *gs)
 {
     LevelDef *level = game_level_storage(gs);
+    if (!level) return -1;
     memset(level, 0, sizeof(*level));
 
     char safe_path[512] = {0};
@@ -50,9 +51,10 @@ void game_level_load_initial(GameState *gs)
         strncpy(level->name, "Untitled", sizeof(level->name) - 1);
     }
 
-    level_load(gs, level);
+    if (level_load(gs, level) != 0) return -1;
     game_completion_reset_summary(gs);
     level_resources_apply(gs, (const LevelDef *)gs->runtime.current_level);
+    return 0;
 }
 
 int game_load_next_phase(GameState *gs)
@@ -78,13 +80,20 @@ int game_load_next_phase(GameState *gs)
         return -1;
     }
 
+    char err[128];
+    if (level_validate_runtime(&next_level, err, sizeof(err)) != 0) {
+        fprintf(stderr, "Error: Invalid next phase %s: %s\n", safe_path, err);
+        return -1;
+    }
+
     LevelDef *level = game_level_storage(gs);
+    if (!level) return -1;
     *level = next_level;
 
     strncpy(gs->level_path, next_path, sizeof(gs->level_path) - 1);
     gs->level_path[sizeof(gs->level_path) - 1] = '\0';
 
-    level_load(gs, level);
+    if (level_load(gs, level) != 0) return -1;
     game_completion_reset_summary(gs);
     level_resources_apply(gs, level);
 

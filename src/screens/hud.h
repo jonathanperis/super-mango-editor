@@ -42,8 +42,8 @@ typedef struct {
 } Hud;
 
 /* Load the font; accept shared textures from GameState to avoid duplicates. */
-void hud_init(Hud *hud, SDL_Renderer *renderer,
-              SDL_Texture *star_tex, SDL_Texture *player_tex);
+int hud_init(Hud *hud, SDL_Renderer *renderer,
+             SDL_Texture *star_tex, SDL_Texture *player_tex);
 
 /*
  * hud_render — Draw the full HUD overlay.

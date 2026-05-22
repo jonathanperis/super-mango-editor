@@ -8,7 +8,6 @@
 #include <SDL_mixer.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "../effects/water.h"
 #include "../effects/parallax.h"
@@ -112,18 +111,17 @@ static Mix_Chunk **chunk_slot(GameState *gs, size_t offset)
     return (Mix_Chunk **)((char *)&gs->audio + offset);
 }
 
-static void game_resources_fail(GameState *gs, const char *label, const char *detail)
+static int game_resources_fail(const char *label, const char *detail)
 {
     fprintf(stderr, "%s: %s\n", label, detail);
-    game_cleanup(gs);
-    exit(EXIT_FAILURE);
+    return -1;
 }
 
 static SDL_Texture *load_required_texture(GameState *gs, const char *path,
                                           const char *label)
 {
     SDL_Texture *tex = IMG_LoadTexture(gs->renderer, path);
-    if (!tex) game_resources_fail(gs, label, IMG_GetError());
+    if (!tex) game_resources_fail(label, IMG_GetError());
     return tex;
 }
 
@@ -146,13 +144,16 @@ static Mix_Chunk *load_optional_chunk(const char *path, const char *label)
     return chunk;
 }
 
-static void load_required_texture_specs(GameState *gs,
-                                        const TextureLoadSpec *specs, int count)
+static int load_required_texture_specs(GameState *gs,
+                                       const TextureLoadSpec *specs, int count)
 {
     for (int i = 0; i < count; i++) {
-        *texture_slot(gs, specs[i].offset) =
-            load_required_texture(gs, specs[i].path, specs[i].label);
+        SDL_Texture *tex = load_required_texture(gs, specs[i].path,
+                                                 specs[i].label);
+        if (!tex) return -1;
+        *texture_slot(gs, specs[i].offset) = tex;
     }
+    return 0;
 }
 
 static void load_optional_texture_specs(GameState *gs,
@@ -198,19 +199,25 @@ static void free_chunk_specs_reverse(GameState *gs, const ChunkLoadSpec *specs,
     }
 }
 
-void game_resources_load(GameState *gs)
+int game_resources_load(GameState *gs)
 {
-    load_required_texture_specs(gs, s_boot_textures, ARRAY_LEN(s_boot_textures));
+    if (load_required_texture_specs(gs, s_boot_textures,
+                                    ARRAY_LEN(s_boot_textures)) != 0) {
+        return -1;
+    }
 
-    water_init(&gs->water, gs->renderer);
+    if (water_init(&gs->water, gs->renderer) != 0) return -1;
 
-    load_required_texture_specs(gs, s_required_textures,
-                                ARRAY_LEN(s_required_textures));
+    if (load_required_texture_specs(gs, s_required_textures,
+                                    ARRAY_LEN(s_required_textures)) != 0) {
+        return -1;
+    }
     load_optional_texture_specs(gs, s_optional_textures,
                                 ARRAY_LEN(s_optional_textures));
     load_optional_chunk_specs(gs, s_optional_chunks, ARRAY_LEN(s_optional_chunks));
 
     gs->audio.music = NULL;
+    return 0;
 }
 
 void game_resources_cleanup(GameState *gs)
