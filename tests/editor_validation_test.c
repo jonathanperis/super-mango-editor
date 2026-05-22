@@ -161,6 +161,50 @@ static int warns_without_blocking(void)
     return 0;
 }
 
+static int rejects_unsafe_asset_paths(void)
+{
+    LevelDef def;
+    EditorValidationReport report;
+
+    fill_valid_minimal(&def);
+    strncpy(def.floor_tile_path, "/tmp/grass_tileset.png",
+            sizeof(def.floor_tile_path) - 1);
+    if (expect_int("unsafe floor path result",
+                   editor_validate_level(&def, &report), -1) != 0)
+        return 1;
+    if (report.error_count < 1) {
+        fprintf(stderr, "editor_validation_test: unsafe floor path should report error\n");
+        return 1;
+    }
+
+    fill_valid_minimal(&def);
+    def.platform_count = 1;
+    def.platforms[0].x = 64.0f;
+    def.platforms[0].tile_height = 1;
+    def.platforms[0].tile_width = 1;
+    strncpy(def.platforms[0].tile_path, "../secret.png",
+            sizeof(def.platforms[0].tile_path) - 1);
+    if (expect_int("unsafe platform path result",
+                   editor_validate_level(&def, &report), -1) != 0)
+        return 1;
+    if (report.error_count < 1) {
+        fprintf(stderr, "editor_validation_test: unsafe platform path should report error\n");
+        return 1;
+    }
+
+    fill_valid_minimal(&def);
+    strncpy(def.next_phase, "../levels/evil.toml", sizeof(def.next_phase) - 1);
+    if (expect_int("unsafe next phase result",
+                   editor_validate_level(&def, &report), -1) != 0)
+        return 1;
+    if (report.error_count < 1) {
+        fprintf(stderr, "editor_validation_test: unsafe next phase should report error\n");
+        return 1;
+    }
+
+    return 0;
+}
+
 static int save_and_load_resets_editor_session(void)
 {
     EditorState es;
@@ -270,6 +314,7 @@ int main(void)
     if (rejects_missing_phase_and_layer_paths() != 0) return 1;
     if (rejects_bad_runtime_link() != 0) return 1;
     if (warns_without_blocking() != 0) return 1;
+    if (rejects_unsafe_asset_paths() != 0) return 1;
     if (save_and_load_resets_editor_session() != 0) return 1;
     if (loads_recent_files_with_trim_and_limit() != 0) return 1;
 

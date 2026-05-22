@@ -408,6 +408,117 @@ static int expect_rejected_climbable_extents(void)
     return 0;
 }
 
+static int reject_path_case(const char *label, void (*set_path)(LevelDef *))
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    set_path(&def);
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: unsafe %s should fail\n", label);
+        return 1;
+    }
+    return 0;
+}
+
+static void set_unsafe_music_parent(LevelDef *def)
+{
+    strncpy(def->music_path, "../assets/sounds/levels/water.wav",
+            sizeof(def->music_path) - 1);
+}
+
+static void set_unsafe_floor_absolute(LevelDef *def)
+{
+    strncpy(def->floor_tile_path, "/tmp/grass_tileset.png",
+            sizeof(def->floor_tile_path) - 1);
+}
+
+static void set_unsafe_platform_tile(LevelDef *def)
+{
+    def->platform_count = 1;
+    def->platforms[0].x = 64.0f;
+    def->platforms[0].tile_height = 1;
+    def->platforms[0].tile_width = 1;
+    strncpy(def->platforms[0].tile_path, "../secret.png",
+            sizeof(def->platforms[0].tile_path) - 1);
+}
+
+static void set_wrong_music_type(LevelDef *def)
+{
+    strncpy(def->music_path, "assets/sprites/levels/grass_tileset.png",
+            sizeof(def->music_path) - 1);
+}
+
+static void set_wrong_floor_root(LevelDef *def)
+{
+    strncpy(def->floor_tile_path, "assets/sprites/player/player.png",
+            sizeof(def->floor_tile_path) - 1);
+}
+
+static void set_unsafe_background_absolute(LevelDef *def)
+{
+    def->background_layer_count = 1;
+    strncpy(def->background_layers[0].path, "/etc/passwd",
+            sizeof(def->background_layers[0].path) - 1);
+}
+
+static void set_unsafe_foreground_parent(LevelDef *def)
+{
+    def->foreground_layer_count = 1;
+    strncpy(def->foreground_layers[0].path, "assets/../secret.png",
+            sizeof(def->foreground_layers[0].path) - 1);
+}
+
+static void set_unsafe_fog_backslash(LevelDef *def)
+{
+    def->fog_layer_count = 1;
+    strncpy(def->fog_layers[0].path, "assets\\..\\secret.png",
+            sizeof(def->fog_layers[0].path) - 1);
+}
+
+static void set_unsafe_next_phase(LevelDef *def)
+{
+    strncpy(def->next_phase, "../levels/evil.toml",
+            sizeof(def->next_phase) - 1);
+}
+
+static void set_unsafe_windows_drive(LevelDef *def)
+{
+    strncpy(def->music_path, "C:/Users/Public/evil.wav",
+            sizeof(def->music_path) - 1);
+}
+
+static void set_unsafe_unc_path(LevelDef *def)
+{
+    strncpy(def->floor_tile_path, "//server/share/evil.png",
+            sizeof(def->floor_tile_path) - 1);
+}
+
+static void set_unsafe_control_char(LevelDef *def)
+{
+    strncpy(def->music_path, "assets/sounds/levels/bad\nname.wav",
+            sizeof(def->music_path) - 1);
+}
+
+static int expect_rejected_unsafe_paths(void)
+{
+    if (reject_path_case("music traversal", set_unsafe_music_parent) != 0) return 1;
+    if (reject_path_case("floor absolute path", set_unsafe_floor_absolute) != 0) return 1;
+    if (reject_path_case("platform tile traversal", set_unsafe_platform_tile) != 0) return 1;
+    if (reject_path_case("music wrong type", set_wrong_music_type) != 0) return 1;
+    if (reject_path_case("floor wrong root", set_wrong_floor_root) != 0) return 1;
+    if (reject_path_case("background absolute path", set_unsafe_background_absolute) != 0) return 1;
+    if (reject_path_case("foreground traversal", set_unsafe_foreground_parent) != 0) return 1;
+    if (reject_path_case("fog backslash traversal", set_unsafe_fog_backslash) != 0) return 1;
+    if (reject_path_case("next phase traversal", set_unsafe_next_phase) != 0) return 1;
+    if (reject_path_case("Windows drive path", set_unsafe_windows_drive) != 0) return 1;
+    if (reject_path_case("UNC-style path", set_unsafe_unc_path) != 0) return 1;
+    if (reject_path_case("control character path", set_unsafe_control_char) != 0) return 1;
+    return 0;
+}
+
 int main(void)
 {
     if (expect_valid_level() != 0) return 1;
@@ -426,6 +537,7 @@ int main(void)
     if (expect_rejected_bad_enum_values() != 0) return 1;
     if (expect_rejected_flame_gap_outside_world() != 0) return 1;
     if (expect_rejected_climbable_extents() != 0) return 1;
+    if (expect_rejected_unsafe_paths() != 0) return 1;
 
     puts("level_validate_test: ok");
     return 0;
