@@ -134,7 +134,7 @@ typedef struct {
 gs->textures.coin = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/coin.png");
 if (!gs->textures.coin) {
     fprintf(stderr, "Failed to load coin.png: %s\n", IMG_GetError());
-    exit(EXIT_FAILURE);
+    return -1;
 }
 
 // level_loader.c -- populate array from TOML placements:
