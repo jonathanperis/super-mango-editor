@@ -2,18 +2,17 @@ name: Build & Release
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Triggers:
-#   push → main    builds the game AND creates a versioned GitHub Release.
+#   push → main    builds the game as a check only; no release is created.
 #   pull_request   builds the game as a check only; no release is created.
-#
-# This means:
-#   • Every PR from a feature branch gets a build check (the "build" job).
-#   • Every merge/push to main gets a build check AND a new release (the
-#     "release" job), versioned as v1.0.<run_number>.
+#   push tag v*    builds and creates a GitHub Release for that tag.
+#   workflow_dispatch builds and creates a manually versioned GitHub Release.
 # ──────────────────────────────────────────────────────────────────────────────
 on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
   pull_request:
 
   workflow_dispatch:
@@ -81,6 +80,7 @@ jobs:
           update: true
           install: >
             mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-python
             make
             mingw-w64-ucrt-x86_64-SDL2
             mingw-w64-ucrt-x86_64-SDL2_image
@@ -202,27 +202,52 @@ jobs:
         shell: msys2 {0}
         run: rm -f out/super-mango-editor.exe out/super-mango-editor
 
-      # Upload the compiled binary (and, on Windows, the DLLs) as a workflow
-      # artifact. retention-days: 1 keeps storage low for PR build checks.
-      - name: Upload binary
+      # Package standalone release archives. Native archives include the game
+      # binary plus assets/, levels/, LICENSE, and a short run README so users
+      # do not need to clone the repository just to play. WebAssembly archives
+      # include the generated HTML/JS/WASM/data artifacts.
+      - name: Package release archive (Linux / macOS)
+        if: matrix.target == 'native' && runner.os != 'Windows'
+        env:
+          RELEASE_PLATFORM: ${{ matrix.artifact }}
+        run: make dist-native
+
+      - name: Package release archive (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          RELEASE_PLATFORM: ${{ matrix.artifact }}
+          RELEASE_DLL_DIR: /ucrt64/bin
+        run: make dist-native CC=gcc
+
+      - name: Package release archive (WebAssembly)
+        if: matrix.target == 'wasm'
+        env:
+          RELEASE_PLATFORM: ${{ matrix.artifact }}
+        run: make dist-wasm
+
+      # Upload the standalone zip as a workflow artifact. retention-days: 1 keeps
+      # PR build storage low; releases immediately reattach the zip assets.
+      - name: Upload release archive
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: out/
+          path: dist/${{ matrix.artifact }}.zip
           if-no-files-found: error
           retention-days: 1
 
   # ────────────────────────────────────────────────────────────────────────────
   # RELEASE JOB
-  # Runs ONLY when a commit is pushed to main (not on pull_request events).
+  # Runs only for explicit release events: pushed v* tags or manual dispatch.
   # Waits for all four build matrix legs to succeed, then creates a GitHub
-  # Release tagged v1.0.<run_number> with all platform binaries attached.
+  # Release with the standalone platform archives attached.
   # ────────────────────────────────────────────────────────────────────────────
   release:
     name: Create Release
     needs: build
-    # Guard: skip this job entirely for pull_request events and non-main pushes.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Guard: skip normal branch pushes and PR checks. Publish only from v* tags
+    # or an explicit manual workflow dispatch.
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     # The GITHUB_TOKEN must have write access to repository contents to create
@@ -257,25 +282,13 @@ jobs:
           name: super-mango-wasm
           path: dist/wasm/
 
-      # Rename platform binaries and zip bundles for release upload.
-      - name: Prepare release assets
-        run: |
-          mv dist/linux/super-mango  dist/super-mango-linux-x86_64
-          mv dist/macos/super-mango  dist/super-mango-macos-arm64
-          chmod +x dist/super-mango-linux-x86_64 dist/super-mango-macos-arm64
-          cd dist/windows
-          mv super-mango super-mango.exe
-          zip -r ../super-mango-windows-x86_64.zip .
-          cd ../wasm
-          zip -r ../super-mango-wasm.zip .
-
-      # Create the GitHub Release. The tag is auto-created by the action.
+      # Create the GitHub Release. The tag is auto-created by the action when
       # softprops/action-gh-release picks up GITHUB_TOKEN automatically.
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "v1.0.${{ github.run_number }}"
-          name: "Super Mango v1.0.${{ github.run_number }}"
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          name: Super Mango ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
           body: |
             Automated release built from commit [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
 
@@ -283,15 +296,15 @@ jobs:
 
             | Platform        | File                                  | Notes                              |
             |-----------------|---------------------------------------|------------------------------------|
-            | Linux x86_64    | `super-mango-linux-x86_64`            | Run from repo root                 |
-            | macOS arm64     | `super-mango-macos-arm64`             | Run from repo root                 |
-            | Windows x86_64  | `super-mango-windows-x86_64.zip`      | Extract zip; SDL2 DLLs are included|
-            | WebAssembly     | `super-mango-wasm.zip`                | Serve with any HTTP server         |
+            | Linux x86_64    | `super-mango-linux-x86_64.zip`        | Extract zip and run `./super-mango` |
+            | macOS arm64     | `super-mango-macos-arm64.zip`         | Extract zip and run `./super-mango` |
+            | Windows x86_64  | `super-mango-windows-x86_64.zip`      | Extract zip; SDL2 DLLs are included |
+            | WebAssembly     | `super-mango-wasm.zip`                | Serve with any HTTP server          |
 
-            > **Note:** Native binaries must be run from the repository root so they can find the `assets/` folder. The WebAssembly build bundles assets into the `.data` file.
+            Native archives include the executable, `assets/`, `levels/`, `LICENSE`, and a short README. Run the executable from inside the extracted folder. Linux and macOS builds still require compatible SDL2 runtime libraries on the host. Windows archives bundle the SDL/MSYS2 runtime DLLs discovered by CI. The WebAssembly archive bundles assets into the `.data` file.
           files: |
-            dist/super-mango-linux-x86_64
-            dist/super-mango-macos-arm64
-            dist/super-mango-windows-x86_64.zip
-            dist/super-mango-wasm.zip
+            dist/linux/super-mango-linux-x86_64.zip
+            dist/macos/super-mango-macos-arm64.zip
+            dist/windows/super-mango-windows-x86_64.zip
+            dist/wasm/super-mango-wasm.zip
           fail_on_unmatched_files: true

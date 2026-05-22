@@ -147,6 +147,10 @@ make clean                            # remove all build artifacts
 
 Or just **[play in your browser](https://jonathanperis.github.io/super-mango-editor/)** -- no build required. Full project documentation is available at the **[docs site](https://jonathanperis.github.io/super-mango-editor/docs/)**.
 
+### Release Downloads
+
+Tagged releases and manually dispatched release builds publish zip archives for Linux, macOS, Windows, and WebAssembly. Native archives include the `super-mango` executable, `assets/`, `levels/`, `LICENSE`, and a short run README; extract the archive and run the executable from inside the extracted folder. Linux and macOS builds still require compatible SDL2 runtime libraries on the host. Windows archives bundle the SDL/MSYS2 runtime DLLs discovered by CI. The WebAssembly archive contains the generated HTML/JS/WASM/data files and should be served with a static HTTP server.
+
 ## Project Structure
 
 ```
@@ -251,7 +255,7 @@ super-mango-editor/
 ├── docs/                              Astro GitHub Pages documentation site
 ├── web/                               Emscripten shell template
 └── .github/workflows/                 CI/CD pipelines
-    ├── build.yml                      Build check (PRs) + release creation (main)
+    ├── build.yml                      Build checks (PRs/main) + tagged/manual releases
     ├── codeql.yml                     Code security analysis
     ├── docs.yml                       Docs lint/build checks
     └── deploy.yml                     GitHub Pages deployment
@@ -263,12 +267,12 @@ Four GitHub Actions workflows:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests | Multi-platform build (Linux x86_64, macOS arm64, Windows x86_64, WebAssembly); on main push: GitHub Release creation |
+| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Multi-platform build (Linux x86_64, macOS arm64, Windows x86_64, WebAssembly); releases only for `v*` tags or manual dispatch |
 | Docs | `docs.yml` | Docs pull requests, manual | Bun install, docs lint, and Astro docs build |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly | Automated code security and quality analysis |
 | Deploy Pages | `deploy.yml` | Successful main Build & Release workflow | Builds docs, copies WebAssembly artifacts, and deploys GitHub Pages |
 
-The Build & Release workflow runs `make`, `make test`, `make validate-levels`, `make editor`, dummy-SDL smoke tests, scripted replay smoke on Linux, WebAssembly build, WebAssembly artifact checks, and release creation on `main`. The Docs workflow runs `bun run lint` and `bun run build` for PRs touching `docs/`. The Deploy Pages workflow publishes the Astro docs output plus WebAssembly artifacts to GitHub Pages.
+The Build & Release workflow runs `make`, `make test`, `make validate-levels`, `make editor`, dummy-SDL smoke tests, scripted replay smoke on Linux, WebAssembly build, WebAssembly artifact checks, and standalone archive packaging on all build events. Its release job is gated to `v*` tags and manual dispatches only, so ordinary `main` pushes remain build/deploy checks. The Docs workflow runs `bun run lint` and `bun run build` for PRs touching `docs/`. The Deploy Pages workflow publishes the Astro docs output plus WebAssembly artifacts to GitHub Pages.
 
 ## License
 
