@@ -139,11 +139,11 @@ Recommendation:
 
 Recommendation: introduce small resource groups over time, not as a big refactor. Good first split: `GameResources`, `LevelRuntime`, `GameRules`.
 
-### Resource init has uneven failure cleanup
+### Resource init now uses unified failure cleanup
 
-Early fatal texture failures sometimes clean partial resources; later fatal failures call `exit(EXIT_FAILURE)` directly. OS cleanup handles process exit, but pattern conflicts with stated cleanup discipline and gets risky if init ever becomes restartable.
+Required resource failures now propagate through return values instead of deep process exits. `game_init()` reports failure, runs `game_cleanup(gs)` for the partially initialized state, and returns `-1` so the top-level runner can return `EXIT_FAILURE`.
 
-Recommendation: use one failure path in `game_init()`: set error, jump to cleanup, return/fail. Keep `exit()` in `main()`.
+Status: resolved by the runtime error-handling hardening pass.
 
 ### `level_load()` trusts `LevelDef` counts
 
@@ -151,11 +151,11 @@ TOML parser bounds-checks arrays, but `level_load()` itself copies counts direct
 
 Recommendation: either assert counts or clamp with diagnostic in `level_load()`. Prefer failing loudly during dev builds.
 
-### Star parser uses yellow max constants for green/red arrays
+### Star parser uses per-color max constants
 
-`serializer.c` parses `star_greens` and `star_reds` using `MAX_STAR_YELLOWS`. Today all are 16, so no runtime bug now. It is still a drift trap if per-color limits change.
+Historical finding: `serializer.c` parsed `star_greens` and `star_reds` using `MAX_STAR_YELLOWS`. Current parser code uses `MAX_STAR_GREENS` and `MAX_STAR_REDS`, matching the per-color constants.
 
-Recommendation: use `MAX_STAR_GREENS` and `MAX_STAR_REDS`.
+Status: resolved; keep this covered by docs/source drift checks so future per-color limit changes do not regress.
 
 ### Documentation app build command differed from install tool convention
 

@@ -44,7 +44,7 @@ player_cleanup                   -> SDL_DestroyTexture
 ## Public API
 
 ```c
-void player_init(Player *player, SDL_Renderer *renderer);
+int player_init(Player *player, SDL_Renderer *renderer);
 void player_apply_default_physics(Player *player);
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                          SDL_GameController *ctrl,
@@ -83,6 +83,8 @@ void player_cleanup(Player *player);
 | Default spawn | `spawn_x = 80`, `spawn_y = FLOOR_Y - 2*TILE_SIZE + 16` |
 | Runtime spawn | `level_load` may override from `LevelDef.player_start_x/y` |
 | Physics defaults | `player_apply_default_physics`, then optional LevelDef overrides |
+
+`player_init` returns `0` after loading the required player texture and `-1` if the texture cannot be loaded, allowing `game_init` to clean up the partially initialized runtime.
 
 Default display size is 48×48 logical pixels. `PLAYER_FLOOR_SINK = 16` sinks the frame into the floor to compensate for transparent sprite padding.
 
