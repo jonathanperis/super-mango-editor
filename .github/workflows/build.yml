@@ -175,15 +175,7 @@ jobs:
 
       - name: Smoke test (WebAssembly artifacts)
         if: matrix.target == 'wasm'
-        run: |
-          test -f out/super-mango.html
-          test -f out/super-mango.js
-          test -f out/super-mango.wasm
-          test -f out/super-mango.data
-          test -s out/super-mango.wasm
-          test -s out/super-mango.data
-          node --check out/super-mango.js
-          node -e "const fs=require('fs'); WebAssembly.compile(fs.readFileSync('out/super-mango.wasm')).then(()=>console.log('wasm compile ok'))"
+        run: python3 tools/check_wasm_artifacts.py
 
       # ── Bundle SDL2 DLLs for Windows ────────────────────────────────────────
       # On Windows, SDL2 is dynamically linked. The DLLs must ship alongside
@@ -234,7 +226,9 @@ jobs:
         if: matrix.target == 'wasm'
         env:
           RELEASE_PLATFORM: ${{ matrix.artifact }}
-        run: make dist-wasm
+        run: |
+          make dist-wasm
+          python3 tools/check_wasm_artifacts.py --zip dist/${{ matrix.artifact }}.zip
 
       # Upload the standalone zip as a workflow artifact. retention-days: 1 keeps
       # PR build storage low; releases immediately reattach the zip assets.

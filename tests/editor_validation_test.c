@@ -278,6 +278,36 @@ cleanup:
     return result;
 }
 
+static int invalid_autosave_does_not_consume_autosave_interval(void)
+{
+    EditorState es;
+
+    ensure_out_dir();
+    memset(&es, 0, sizeof(es));
+    editor_level_init_defaults(&es.level);
+    strncpy(es.autosave_path, "out/autosave/test_editor_autosave.toml",
+            sizeof(es.autosave_path) - 1);
+    remove(es.autosave_path);
+
+    es.modified = 1;
+    es.last_autosave_ms = SDL_GetTicks() - 30001u;
+    es.level.coin_count = MAX_COINS + 1;
+
+    editor_maybe_autosave(&es);
+    if (expect_int("invalid autosave not written",
+                   editor_file_exists(es.autosave_path), 0) != 0)
+        return 1;
+
+    es.level.coin_count = 0;
+    editor_maybe_autosave(&es);
+    if (expect_int("fixed autosave written immediately",
+                   editor_file_exists(es.autosave_path), 1) != 0)
+        return 1;
+
+    remove(es.autosave_path);
+    return 0;
+}
+
 static int loads_recent_files_with_trim_and_limit(void)
 {
     EditorState es;
@@ -316,6 +346,7 @@ int main(void)
     if (warns_without_blocking() != 0) return 1;
     if (rejects_unsafe_asset_paths() != 0) return 1;
     if (save_and_load_resets_editor_session() != 0) return 1;
+    if (invalid_autosave_does_not_consume_autosave_interval() != 0) return 1;
     if (loads_recent_files_with_trim_and_limit() != 0) return 1;
 
     puts("editor_validation_test: ok");

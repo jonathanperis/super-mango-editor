@@ -78,6 +78,7 @@ TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
                  $(OUTDIR)/collision-test $(OUTDIR)/phase-transition-test \
                  $(OUTDIR)/exporter-test $(OUTDIR)/editor-validation-test \
                  $(OUTDIR)/gameplay-damage-test $(OUTDIR)/gameplay-config-test \
+                 $(OUTDIR)/gameplay-score-test \
                  $(OUTDIR)/game-overlay-test $(OUTDIR)/game-events-test
 SMOKE_LEVELS  = $(wildcard levels/*.toml)
 SMOKE_FRAMES  ?= 5
@@ -111,6 +112,7 @@ TEST_FISH_OBJ      = $(OBJDIR)/tests/test-fish.o
 TEST_CIRCULAR_SAW_OBJ = $(OBJDIR)/tests/test-circular-saw.o
 TEST_COLLISION_DAMAGE_OBJ = $(OBJDIR)/tests/test-collision-damage.o
 TEST_GAME_CAMERA_OBJ = $(OBJDIR)/tests/test-game-camera.o
+TEST_GAME_SCORE_OBJ = $(OBJDIR)/tests/test-game-score.o
 TEST_LEVEL_PHYSICS_OBJ = $(OBJDIR)/tests/test-level-physics.o
 TEST_PLAYER_LIFECYCLE_OBJ = $(OBJDIR)/tests/test-player-lifecycle.o
 TEST_FLOAT_PLATFORM_OBJ = $(OBJDIR)/tests/test-float-platform.o
@@ -203,6 +205,7 @@ test: $(OUTDIR) $(TEST_TARGETS)
 	$(RUN_PREFIX) ./$(OUTDIR)/editor-validation-test
 	$(RUN_PREFIX) ./$(OUTDIR)/gameplay-damage-test
 	$(RUN_PREFIX) ./$(OUTDIR)/gameplay-config-test
+	$(RUN_PREFIX) ./$(OUTDIR)/gameplay-score-test
 	$(RUN_PREFIX) ./$(OUTDIR)/game-overlay-test
 	$(RUN_PREFIX) ./$(OUTDIR)/game-events-test
 
@@ -332,6 +335,9 @@ $(TEST_COLLISION_DAMAGE_OBJ): $(SRCDIR)/collision/collision_damage.c
 $(TEST_GAME_CAMERA_OBJ): $(SRCDIR)/core/game_camera.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
+$(TEST_GAME_SCORE_OBJ): $(SRCDIR)/core/game_score.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
 $(TEST_LEVEL_PHYSICS_OBJ): $(SRCDIR)/levels/level_physics.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
@@ -407,6 +413,9 @@ $(OUTDIR)/gameplay-damage-test: tests/gameplay_damage_test.c $(TEST_COLLISION_DA
 
 $(OUTDIR)/gameplay-config-test: tests/gameplay_config_test.c $(TEST_GAME_CAMERA_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
+
+$(OUTDIR)/gameplay-score-test: tests/gameplay_score_test.c $(TEST_GAME_SCORE_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
 $(OUTDIR)/game-overlay-test: tests/game_overlay_test.c $(TEST_GAME_OVERLAY_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)

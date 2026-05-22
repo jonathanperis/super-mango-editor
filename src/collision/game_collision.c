@@ -12,6 +12,7 @@
 #include "../game.h"           /* game_complete_level for summary flow */
 #include "../player/player.h"
 #include "../core/debug.h"
+#include "../core/game_score.h"
 
 /* Entity headers for hitbox functions */
 #include "../entities/bird.h"
@@ -224,12 +225,8 @@ void game_collide(GameState *gs, float dt)
         };
         if (SDL_HasIntersection(&phit, &cbox)) {
             gs->coins[i].active = 0;
-            gs->score += gs->rules.coin_score;
+            game_award_score(gs, gs->rules.coin_score);
             if (gs->audio.coin) Mix_PlayChannel(-1, gs->audio.coin, 0);
-            if (gs->score >= gs->score_life_next) {
-                gs->lives++;
-                gs->score_life_next += gs->rules.score_per_life;
-            }
             if (gs->debug_mode) debug_log(&gs->debug, "COIN[%d] collected", i);
         }
     }

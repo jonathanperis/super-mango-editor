@@ -165,10 +165,10 @@ void editor_maybe_autosave(EditorState *es)
     if (!es->modified) return;
     if (now - es->last_autosave_ms < EDITOR_AUTOSAVE_MS) return;
 
-    es->last_autosave_ms = now;
     editor_validate_level(&es->level, &es->validation_report);
     if (es->validation_report.error_count > 0) return;
 
+    es->last_autosave_ms = now;
     editor_ensure_out_dirs();
     if (level_save_toml(&es->level, es->autosave_path) == 0) {
         editor_set_status(es, "Autosaved %s", es->autosave_path);

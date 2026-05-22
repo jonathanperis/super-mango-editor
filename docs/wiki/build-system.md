@@ -179,7 +179,7 @@ make web
 
 Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). SDL2 ports are compiled from source by Emscripten on first build; subsequent builds reuse cached port libraries. Uses a custom shell template from `web/shell.html`.
 
-The target also produces debug boot artifacts (`out/super-mango-debug.html` and companions) used by the browser debug button.
+The target also produces debug boot artifacts (`out/super-mango-debug.html` and companions) for direct debug HTML launches. The docs-site browser debug button uses the normal `super-mango.js` payload and passes `--debug` at boot.
 
 ### `make test`
 
@@ -189,7 +189,7 @@ Builds and runs native regression harnesses for pure logic that does not require
 make test
 ```
 
-Current test binaries (13):
+Current test binaries (14):
 
 - `out/level-serializer-test`
 - `out/level-validate-test`
@@ -202,6 +202,7 @@ Current test binaries (13):
 - `out/editor-validation-test`
 - `out/gameplay-damage-test`
 - `out/gameplay-config-test`
+- `out/gameplay-score-test`
 - `out/game-overlay-test`
 - `out/game-events-test`
 
@@ -339,7 +340,7 @@ Four GitHub Actions workflows handle automated builds and docs checks:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests | Multi-platform native build, `make test`, `make validate-levels`, `make editor`, native game/editor smoke, Linux scripted smoke, WebAssembly build, WebAssembly artifact smoke; on main push: GitHub Release creation |
+| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Multi-platform native build, `make test`, `make validate-levels`, `make editor`, native game/editor smoke, Linux scripted smoke, WebAssembly build, WebAssembly artifact/package smoke; GitHub Release creation is limited to `v*` tags and manual dispatches |
 | Docs | `docs.yml` | Docs pull requests, manual | `make docs-drift`, `bun install --frozen-lockfile`, `bun run lint`, `bun run build` under `docs/` |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly | Automated code security and quality analysis |
 | Deploy | `deploy.yml` | Successful main Build & Release workflow | Builds docs, copies WebAssembly artifacts, and deploys `docs/out/` to GitHub Pages |
