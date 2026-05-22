@@ -27,6 +27,7 @@ TEST_CFLAGS = $(filter-out -Dmain=SDL_main,$(CFLAGS)) -DSDL_MAIN_HANDLED
 LIBS    = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
 OUTDIR  = out
 OBJDIR  = $(OUTDIR)/obj
+DISTDIR = dist
 TARGET  = $(OUTDIR)/super-mango
 SRCDIR  = src
 SRCS    = $(wildcard $(SRCDIR)/*.c) \
@@ -127,7 +128,7 @@ TEST_DEPS           = $(wildcard $(OBJDIR)/tests/*.d)
 SANITIZE_CFLAGS     = -fsanitize=address,undefined -fno-omit-frame-pointer
 SANITIZE_LDFLAGS    = -fsanitize=address,undefined
 
-.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels level-catalog overlay-snapshots docs-drift roadmap-quality smoke scripted-smoke sanitize sanitize-smoke
+.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels level-catalog overlay-snapshots docs-drift roadmap-quality smoke scripted-smoke sanitize sanitize-smoke dist-native dist-wasm
 
 all: $(OUTDIR) $(TARGET)
 
@@ -434,6 +435,16 @@ web: $(OUTDIR)
 		-s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]' \
 		--post-js web/debug-boot.js
 
+dist-native: all
+	@if [ -n "$${RELEASE_DLL_DIR:-}" ]; then \
+		python3 tools/package_release.py --platform "$${RELEASE_PLATFORM:-super-mango-native}" --binary $(TARGET) --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-native}.zip" --dll-dir "$${RELEASE_DLL_DIR}"; \
+	else \
+		python3 tools/package_release.py --platform "$${RELEASE_PLATFORM:-super-mango-native}" --binary $(TARGET) --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-native}.zip"; \
+	fi
+
+dist-wasm: web
+	python3 tools/package_release.py --wasm --platform "$${RELEASE_PLATFORM:-super-mango-wasm}" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-wasm}.zip"
+
 clean:
 	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.d
 	rm -f $(SRCDIR)/collectibles/*.o $(SRCDIR)/collectibles/*.d
@@ -450,4 +461,4 @@ clean:
 	rm -f $(SRCDIR)/surfaces/*.o $(SRCDIR)/surfaces/*.d
 	rm -f $(EDITOR_DIR)/*.o $(EDITOR_DIR)/*.d
 	rm -f $(VENDOR_DIR)/*.o $(VENDOR_DIR)/*.d
-	rm -rf $(OUTDIR)
+	rm -rf $(OUTDIR) $(DISTDIR)

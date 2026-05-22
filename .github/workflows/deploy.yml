@@ -72,12 +72,13 @@ jobs:
 
       - name: Copy WASM artifacts into docs output
         run: |
-          cp wasm-build/super-mango.js   docs/out/
-          cp wasm-build/super-mango.wasm docs/out/
-          cp wasm-build/super-mango.data docs/out/
-          cp wasm-build/super-mango-debug.html docs/out/ 2>/dev/null || true
-          cp wasm-build/super-mango-debug.js   docs/out/ 2>/dev/null || true
-          cp wasm-build/super-mango-debug.wasm docs/out/ 2>/dev/null || true
+          unzip -q wasm-build/super-mango-wasm.zip -d wasm-build/unpacked
+          cp wasm-build/unpacked/super-mango-wasm/super-mango.js   docs/out/
+          cp wasm-build/unpacked/super-mango-wasm/super-mango.wasm docs/out/
+          cp wasm-build/unpacked/super-mango-wasm/super-mango.data docs/out/
+          cp wasm-build/unpacked/super-mango-wasm/super-mango-debug.html docs/out/ 2>/dev/null || true
+          cp wasm-build/unpacked/super-mango-wasm/super-mango-debug.js   docs/out/ 2>/dev/null || true
+          cp wasm-build/unpacked/super-mango-wasm/super-mango-debug.wasm docs/out/ 2>/dev/null || true
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
