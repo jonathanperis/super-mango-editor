@@ -651,7 +651,7 @@ static int escaped_strings_roundtrip(void)
     strncpy(before.description, "Line one\\path\nLine \"two\"\tTabbed",
             sizeof(before.description) - 1);
     strncpy(before.generated_by, "Bosser \\ QA", sizeof(before.generated_by) - 1);
-    strncpy(before.music_path, "assets\\sounds\\screens\\confirm_ui.wav",
+    strncpy(before.music_path, "assets/sounds/screens/confirm_ui.wav",
             sizeof(before.music_path) - 1);
     strncpy(before.floor_tile_path, "assets/sprites/levels/grass_tileset.png",
             sizeof(before.floor_tile_path) - 1);
@@ -799,6 +799,49 @@ static int rejects_bad_runtime_links(void)
     return 0;
 }
 
+static int write_unsafe_path_fixture(const char *path, const char *body)
+{
+    FILE *fp = fopen(path, "w");
+    if (!fp) return fail("could not write unsafe path fixture");
+    fputs("name = \"Unsafe Path\"\n", fp);
+    fputs("screen_count = 1\n", fp);
+    fputs(body, fp);
+    fclose(fp);
+    return 0;
+}
+
+static int expect_unsafe_toml_rejected(const char *path, const char *body)
+{
+    LevelDef def;
+    if (write_unsafe_path_fixture(path, body) != 0) return 1;
+    if (level_load_toml(path, &def) == 0) {
+        remove(path);
+        return fail("unsafe TOML path should fail");
+    }
+    remove(path);
+    return 0;
+}
+
+static int rejects_unsafe_toml_paths(void)
+{
+    if (expect_unsafe_toml_rejected("out/test_unsafe_music.toml",
+                                    "music_path = \"../assets/sounds/levels/water.wav\"\n") != 0)
+        return 1;
+    if (expect_unsafe_toml_rejected("out/test_unsafe_floor.toml",
+                                    "floor_tile_path = \"/tmp/grass.png\"\n") != 0)
+        return 1;
+    if (expect_unsafe_toml_rejected("out/test_unsafe_layer.toml",
+                                    "[[background_layers]]\npath = \"assets/../secret.png\"\nspeed = 0.25\n") != 0)
+        return 1;
+    if (expect_unsafe_toml_rejected("out/test_unsafe_platform.toml",
+                                    "[[platforms]]\nx = 64\ntile_height = 1\ntile_width = 1\ntile_path = \"../secret.png\"\n") != 0)
+        return 1;
+    if (expect_unsafe_toml_rejected("out/test_unsafe_phase.toml",
+                                    "[last_star]\nx = 100\ny = 100\nnext_phase = \"../levels/evil.toml\"\n") != 0)
+        return 1;
+    return 0;
+}
+
 int main(void)
 {
     if (ensure_out_dir() != 0) return 1;
@@ -810,6 +853,7 @@ int main(void)
     if (missing_physics_uses_engine_defaults() != 0) return 1;
     if (rejects_oversized_arrays() != 0) return 1;
     if (rejects_bad_runtime_links() != 0) return 1;
+    if (rejects_unsafe_toml_paths() != 0) return 1;
 
     puts("level_serializer_test: ok");
     return 0;

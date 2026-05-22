@@ -1,5 +1,7 @@
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "level_loader.h"
 
@@ -103,6 +105,126 @@ static int fail_float_range(char *err, size_t err_size, const char *field,
                  field, value, lo, hi);
     }
     return -1;
+}
+
+static int starts_with(const char *value, const char *prefix)
+{
+    size_t n = strlen(prefix);
+    return strncmp(value, prefix, n) == 0;
+}
+
+static int ends_with(const char *value, const char *suffix)
+{
+    size_t value_len = strlen(value);
+    size_t suffix_len = strlen(suffix);
+    if (value_len < suffix_len) return 0;
+    return strcmp(value + value_len - suffix_len, suffix) == 0;
+}
+
+static int has_parent_segment(const char *value)
+{
+    const char *p = value;
+    while (*p) {
+        const char *start = p;
+        const char *end;
+        while (*p && *p != '/') p++;
+        end = p;
+        if ((end - start) == 2 && start[0] == '.' && start[1] == '.') {
+            return 1;
+        }
+        if (*p == '/') p++;
+    }
+    return 0;
+}
+
+static int has_control_char(const char *value)
+{
+    const unsigned char *p = (const unsigned char *)value;
+    while (*p) {
+        if (iscntrl(*p)) return 1;
+        p++;
+    }
+    return 0;
+}
+
+static int validate_safe_repo_path(const char *field, const char *value,
+                                   char *err, size_t err_size)
+{
+    if (!value || value[0] == '\0') return 0;
+
+    if (value[0] == '/' || (value[0] == '\\' && value[1] == '\\') ||
+        strchr(value, '\\') != NULL ||
+        (isalpha((unsigned char)value[0]) && value[1] == ':')) {
+        return fail_value(err, err_size, field,
+                          "must be a repo-relative forward-slash path");
+    }
+    if (has_parent_segment(value)) {
+        return fail_value(err, err_size, field,
+                          "must not contain '..' path segments");
+    }
+    if (has_control_char(value)) {
+        return fail_value(err, err_size, field,
+                          "must not contain control characters");
+    }
+
+    return 0;
+}
+
+static int validate_typed_path(const char *field, const char *value,
+                               const char *prefix, const char *suffix,
+                               char *err, size_t err_size)
+{
+    if (!value || value[0] == '\0') return 0;
+    if (validate_safe_repo_path(field, value, err, err_size) != 0) return -1;
+    if (!starts_with(value, prefix) || !ends_with(value, suffix)) {
+        if (err && err_size > 0) {
+            snprintf(err, err_size, "%s must match %s*%s", field, prefix, suffix);
+        }
+        return -1;
+    }
+    return 0;
+}
+
+static int validate_level_paths(const LevelDef *def, char *err, size_t err_size)
+{
+    char field[64];
+
+    if (validate_typed_path("music_path", def->music_path,
+                            "assets/sounds/", ".wav", err, err_size) != 0)
+        return -1;
+    if (validate_typed_path("floor_tile_path", def->floor_tile_path,
+                            "assets/sprites/levels/", ".png", err, err_size) != 0)
+        return -1;
+    if (validate_typed_path("next_phase", def->next_phase,
+                            "levels/", ".toml", err, err_size) != 0)
+        return -1;
+
+    for (int i = 0; i < def->platform_count; i++) {
+        snprintf(field, sizeof(field), "platforms[%d].tile_path", i);
+        if (validate_typed_path(field, def->platforms[i].tile_path,
+                                "assets/sprites/levels/", ".png", err, err_size) != 0)
+            return -1;
+    }
+    for (int i = 0; i < def->background_layer_count; i++) {
+        snprintf(field, sizeof(field), "background_layers[%d].path", i);
+        if (validate_typed_path(field, def->background_layers[i].path,
+                                "assets/sprites/", ".png", err, err_size) != 0)
+            return -1;
+    }
+    for (int i = 0; i < def->foreground_layer_count; i++) {
+        snprintf(field, sizeof(field), "foreground_layers[%d].path", i);
+        if (validate_typed_path(field, def->foreground_layers[i].path,
+                                "assets/sprites/", ".png", err, err_size) != 0)
+            return -1;
+    }
+    for (int i = 0; i < def->fog_layer_count; i++) {
+        snprintf(field, sizeof(field), "fog_layers[%d].path", i);
+        if (validate_typed_path(field, def->fog_layers[i].path,
+                                "assets/sprites/", ".png", err, err_size) != 0)
+            return -1;
+    }
+
+    return 0;
 }
 
 static int validate_finite_float(char *err, size_t err_size,
@@ -335,6 +457,7 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         return fail_range(err, err_size, "coin_score", def->coin_score,
                           0, MAX_COIN_SCORE);
     }
+    if (validate_level_paths(def, err, err_size) != 0) return -1;
     if (validate_physics_finite(def, err, err_size) != 0) return -1;
 
     if (def->player_start_x != 0.0f || def->player_start_y != 0.0f) {

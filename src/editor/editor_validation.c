@@ -6,6 +6,7 @@
 
 #include "../levels/level_loader.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -18,6 +19,43 @@ static int path_exists(const char *path)
     fp = fopen(path, "rb");
     if (!fp) return 0;
     fclose(fp);
+    return 1;
+}
+
+static int has_parent_segment(const char *value)
+{
+    const char *p = value;
+    while (*p) {
+        const char *start = p;
+        const char *end;
+        while (*p && *p != '/') p++;
+        end = p;
+        if ((end - start) == 2 && start[0] == '.' && start[1] == '.') {
+            return 1;
+        }
+        if (*p == '/') p++;
+    }
+    return 0;
+}
+
+static int has_control_char(const char *value)
+{
+    const unsigned char *p = (const unsigned char *)value;
+    while (*p) {
+        if (iscntrl(*p)) return 1;
+        p++;
+    }
+    return 0;
+}
+
+static int is_safe_repo_path_shape(const char *path)
+{
+    if (!path || path[0] == '\0') return 1;
+    if (path[0] == '/' || strchr(path, '\\') != NULL ||
+        (isalpha((unsigned char)path[0]) && path[1] == ':')) {
+        return 0;
+    }
+    if (has_parent_segment(path) || has_control_char(path)) return 0;
     return 1;
 }
 
@@ -46,7 +84,12 @@ static void report_add(EditorValidationReport *report, int is_error,
 static void check_path(EditorValidationReport *report, const char *field,
                        const char *path)
 {
-    if (path && path[0] != '\0' && !path_exists(path)) {
+    if (!path || path[0] == '\0') return;
+    if (!is_safe_repo_path_shape(path)) {
+        report_add(report, 1, "%s unsafe: %s", field, path);
+        return;
+    }
+    if (!path_exists(path)) {
         report_add(report, 1, "%s missing: %s", field, path);
     }
 }
