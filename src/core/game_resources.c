@@ -8,6 +8,7 @@
 #include <SDL_mixer.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "../effects/water.h"
 #include "../effects/parallax.h"
@@ -199,8 +200,18 @@ static void free_chunk_specs_reverse(GameState *gs, const ChunkLoadSpec *specs,
     }
 }
 
+static void game_resources_reset_owned_slots(GameState *gs)
+{
+    memset(&gs->textures, 0, sizeof(gs->textures));
+    memset(&gs->audio, 0, sizeof(gs->audio));
+    gs->water.texture = NULL;
+    gs->water.scroll_x = 0.0f;
+}
+
 int game_resources_load(GameState *gs)
 {
+    game_resources_reset_owned_slots(gs);
+
     if (load_required_texture_specs(gs, s_boot_textures,
                                     ARRAY_LEN(s_boot_textures)) != 0) {
         return -1;
@@ -216,7 +227,6 @@ int game_resources_load(GameState *gs)
                                 ARRAY_LEN(s_optional_textures));
     load_optional_chunk_specs(gs, s_optional_chunks, ARRAY_LEN(s_optional_chunks));
 
-    gs->audio.music = NULL;
     return 0;
 }
 
