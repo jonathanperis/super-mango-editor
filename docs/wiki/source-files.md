@@ -38,6 +38,7 @@ src/
 │   ├── game_checkpoint.h / .c    Checkpoint/respawn helpers
 │   ├── game_camera.h / .c        Camera follow/lookahead helpers
 │   ├── game_resources.h / .c     Texture/audio/level resource loading
+│   ├── game_score.h / .c         Shared score and bonus-life helpers
 │   ├── game_overlay.h / .c       Canonical pause/game-over/completion overlay state
 │   └── game_completion.h / .c    Last-star completion and next-phase flow
 ├── editor/
@@ -466,6 +467,10 @@ Debug overlay (activated with `--debug` flag). FPS counter, collision hitbox vis
 ### `core/entity_utils.h` / `core/entity_utils.c`
 
 Shared entity helper functions used across multiple modules.
+
+### `core/game_score.h` / `core/game_score.c`
+
+Shared score-award helper. Adds points and grants one bonus life for every crossed `score_per_life` threshold while guarding invalid bonus-life cadence values.
 
 ### `levels/level.h`
 

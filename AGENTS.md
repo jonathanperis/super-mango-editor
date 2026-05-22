@@ -162,7 +162,7 @@ main()
 - Level-completion summary captures elapsed time and coin totals; Enter/Space/Start continues to `next_phase` when configured, Esc/Back exits terminal overlays
 - Keyboard and gamepad (hot-plug) controls
 - Debug overlay (`--debug`): FPS/CPU counters, hitbox visualization, scrolling event log
-- CI gates: multi-platform builds, editor native build, 13-test `make test` suite, TOML level validation, generated level-catalog freshness check, semantic docs drift, roadmap quality checks, native game/editor smoke, Linux scripted smoke, sanitizer smoke, WebAssembly artifact smoke, docs lint/build
+- CI gates: multi-platform builds, editor native build, 14-test `make test` suite, TOML level validation, generated level-catalog freshness check, semantic docs drift, roadmap quality checks, native game/editor smoke, Linux scripted smoke, sanitizer smoke, WebAssembly artifact smoke, docs lint/build
 - Builds natively on macOS, Linux, Windows; WebAssembly via Emscripten
 
 ---

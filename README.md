@@ -137,7 +137,7 @@ make run-level CC=clang LEVEL=levels/00_sandbox_01.toml         # run a specific
 make run-level-debug CC=clang LEVEL=levels/00_sandbox_01.toml   # run a level with debug overlay
 make editor CC=clang                  # build the level editor
 make run-editor CC=clang              # build and run the level editor
-make test CC=clang                    # build and run 13 native regression tests
+make test CC=clang                    # build and run 14 native regression tests
 make validate-levels                  # validate all levels/*.toml files
 make web                              # build to WebAssembly (requires Emscripten)
 make clean                            # remove all build artifacts

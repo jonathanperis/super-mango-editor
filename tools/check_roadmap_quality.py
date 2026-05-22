@@ -77,6 +77,43 @@ def check_overlay_snapshot_doc() -> None:
         fail("docs/wiki/overlay-snapshots.md: missing generated-file source note")
 
 
+def check_release_and_wasm_guardrails() -> None:
+    checklist_path = ROOT / "docs" / "wiki" / "release-checklist.md"
+    build_workflow = read(ROOT / ".github" / "workflows" / "build.yml")
+    deploy_workflow = read(ROOT / ".github" / "workflows" / "deploy.yml")
+    docs_workflow = read(ROOT / ".github" / "workflows" / "docs.yml")
+    build_doc = read(ROOT / "docs" / "wiki" / "build-system.md")
+
+    if not checklist_path.exists():
+        fail("docs/wiki/release-checklist.md: missing release checklist")
+    else:
+        checklist = read(checklist_path)
+        for needle in [
+            "make docs-drift",
+            "make test",
+            "make validate-levels",
+            "make scripted-smoke",
+            "make web",
+            "make dist-wasm",
+            "WebAssembly.compile",
+            "releases/latest",
+        ]:
+            if needle not in checklist:
+                fail(f"docs/wiki/release-checklist.md: missing `{needle}`")
+
+    if "tools/check_wasm_artifacts.py" not in build_workflow:
+        fail(".github/workflows/build.yml: WebAssembly job must run tools/check_wasm_artifacts.py")
+    if "tools/check_wasm_artifacts.py" not in docs_workflow:
+        fail(".github/workflows/docs.yml: docs path filter must include tools/check_wasm_artifacts.py")
+    if "docs/wiki/release-checklist.md" not in docs_workflow:
+        fail(".github/workflows/docs.yml: docs path filter must include release checklist")
+    for needle in ["docs/out/super-mango.js", "docs/out/super-mango.wasm", "docs/out/super-mango.data"]:
+        if needle not in deploy_workflow:
+            fail(f".github/workflows/deploy.yml: missing Pages WASM smoke for `{needle}`")
+    if "on main push: GitHub Release creation" in build_doc:
+        fail("docs/wiki/build-system.md: release trigger docs must not claim main pushes create releases")
+
+
 def check_scripted_smoke_target() -> None:
     makefile = read(ROOT / "Makefile")
     build_doc = read(ROOT / "docs" / "wiki" / "build-system.md")
@@ -114,6 +151,7 @@ def main() -> int:
     check_screen_word_parser()
     check_level_line_endings()
     check_overlay_snapshot_doc()
+    check_release_and_wasm_guardrails()
     check_scripted_smoke_target()
     if FAILURES:
         print("roadmap quality check failed:")
