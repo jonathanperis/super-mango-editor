@@ -6,5 +6,5 @@
 
 #include "../game.h"
 
-void game_resources_load(GameState *gs);
+int game_resources_load(GameState *gs);
 void game_resources_cleanup(GameState *gs);

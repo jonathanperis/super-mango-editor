@@ -23,7 +23,7 @@ int level_validate_counts(const LevelDef *def, char *err, size_t err_size);
 int level_validate_runtime(const LevelDef *def, char *err, size_t err_size);
 
 /* Load all entities defined in def into gs.  Builds rails, then all entities. */
-void level_load(GameState *gs, const LevelDef *def);
+int level_load(GameState *gs, const LevelDef *def);
 
 /*
  * Reset all mutable entities (enemies, collectibles, hazards) to their initial

@@ -8,7 +8,6 @@
 
 #include <SDL_image.h>  /* IMG_LoadTexture */
 #include <stdio.h>      /* snprintf, fprintf */
-#include <stdlib.h>     /* exit, EXIT_FAILURE */
 
 #include "hud.h"
 #include "../game.h"    /* GAME_W */
@@ -19,11 +18,11 @@
  * hud_init — Load the font and heart icon texture.
  *
  * The font (Round9x13.ttf) is opened at size 13, its native bitmap height.
- * Stars_Ui.png is loaded as the heart indicator icon.  Both are fatal if
- * missing — the HUD is essential for gameplay feedback.
+ * Star/player textures are shared from GameState.  The font is required;
+ * missing font data makes HUD initialisation return failure.
  */
-void hud_init(Hud *hud, SDL_Renderer *renderer,
-              SDL_Texture *star_tex, SDL_Texture *player_tex)
+int hud_init(Hud *hud, SDL_Renderer *renderer,
+             SDL_Texture *star_tex, SDL_Texture *player_tex)
 {
     /*
      * TTF_OpenFont — load a TrueType font file and set its point size.
@@ -33,7 +32,7 @@ void hud_init(Hud *hud, SDL_Renderer *renderer,
     hud->font = TTF_OpenFont("assets/fonts/round9x13.ttf", 13);
     if (!hud->font) {
         fprintf(stderr, "Failed to load Round9x13.ttf: %s\n", TTF_GetError());
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     /*
@@ -51,6 +50,7 @@ void hud_init(Hud *hud, SDL_Renderer *renderer,
     if (!hud->coin_icon) {
         fprintf(stderr, "Warning: Failed to load Coins_Ui.png: %s\n", IMG_GetError());
     }
+    return 0;
 }
 
 /* ------------------------------------------------------------------ */

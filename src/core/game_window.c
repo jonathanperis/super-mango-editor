@@ -5,16 +5,14 @@
 #include "game_window.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 
-static void game_window_fail(GameState *gs, const char *label, const char *detail)
+static int game_window_fail(const char *label, const char *detail)
 {
     fprintf(stderr, "%s: %s\n", label, detail);
-    game_cleanup(gs);
-    exit(EXIT_FAILURE);
+    return -1;
 }
 
-void game_window_init(GameState *gs)
+int game_window_init(GameState *gs)
 {
     gs->window = SDL_CreateWindow(
         WINDOW_TITLE,
@@ -23,7 +21,7 @@ void game_window_init(GameState *gs)
         SDL_WINDOW_SHOWN
     );
     if (!gs->window) {
-        game_window_fail(gs, "SDL_CreateWindow error", SDL_GetError());
+        return game_window_fail("SDL_CreateWindow error", SDL_GetError());
     }
 
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
@@ -36,12 +34,14 @@ void game_window_init(GameState *gs)
         gs->renderer = SDL_CreateRenderer(gs->window, -1, SDL_RENDERER_SOFTWARE);
     }
     if (!gs->renderer) {
-        game_window_fail(gs, "SDL_CreateRenderer error", SDL_GetError());
+        return game_window_fail("SDL_CreateRenderer error", SDL_GetError());
     }
 
     if (SDL_RenderSetLogicalSize(gs->renderer, GAME_W, GAME_H) < 0) {
-        game_window_fail(gs, "SDL_RenderSetLogicalSize error", SDL_GetError());
+        return game_window_fail("SDL_RenderSetLogicalSize error", SDL_GetError());
     }
+
+    return 0;
 }
 
 void game_window_cleanup(GameState *gs)

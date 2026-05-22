@@ -40,7 +40,7 @@ typedef struct {
 } StartMenu;
 
 /* Initialise the start menu: load font and logo. */
-void start_menu_init(StartMenu *menu, SDL_Window *window, SDL_Renderer *renderer);
+int start_menu_init(StartMenu *menu, SDL_Window *window, SDL_Renderer *renderer);
 
 /* Run the start menu loop until the user quits or clicks Play. */
 void start_menu_loop(StartMenu *menu);

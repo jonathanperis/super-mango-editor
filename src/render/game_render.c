@@ -71,7 +71,11 @@ void game_render_frame(GameState *gs, int cam_x, float dt)
      * We always clear before drawing to avoid leftover pixels from the
      * previous frame showing through.
      */
-    SDL_RenderClear(gs->renderer);
+    if (SDL_RenderClear(gs->renderer) != 0) {
+        SDL_Log("game_render_frame: SDL_RenderClear failed: %s", SDL_GetError());
+        gs->running = 0;
+        return;
+    }
 
     /*
      * Draw the multi-layer parallax background, back-to-front.

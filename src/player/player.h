@@ -80,7 +80,7 @@ typedef struct {
 } Player;
 
 /* Load the player texture and set its initial position. */
-void player_init(Player *player, SDL_Renderer *renderer);
+int player_init(Player *player, SDL_Renderer *renderer);
 
 /* Restore tunable movement physics to engine defaults. */
 void player_apply_default_physics(Player *player);

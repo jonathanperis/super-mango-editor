@@ -7,18 +7,18 @@
 #include "game.h"   /* GAME_W, GAME_H */
 #include <SDL_image.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 /* ─── public API ──────────────────────────────────────────────────── */
 
-void water_init(Water *w, SDL_Renderer *renderer)
+int water_init(Water *w, SDL_Renderer *renderer)
 {
     w->texture  = IMG_LoadTexture(renderer, "assets/sprites/foregrounds/water.png");
     if (!w->texture) {
         fprintf(stderr, "water_init: IMG_LoadTexture: %s\n", IMG_GetError());
-        exit(EXIT_FAILURE);
+        return -1;
     }
     w->scroll_x = 0.0f;
+    return 0;
 }
 
 /*

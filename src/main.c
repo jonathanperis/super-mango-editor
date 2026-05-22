@@ -56,7 +56,10 @@ static int run_game(const char *level_path,
     strncpy(gs->level_path, level_path, sizeof(gs->level_path) - 1);
     gs->level_path[sizeof(gs->level_path) - 1] = '\0';
 
-    game_init(gs);
+    if (game_init(gs) != 0) {
+        free(gs);
+        return EXIT_FAILURE;
+    }
     game_loop(gs);
     game_cleanup(gs);
     free(gs);
@@ -303,10 +306,28 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
 
-        SDL_RenderSetLogicalSize(renderer, 400, 300);
+        if (SDL_RenderSetLogicalSize(renderer, 400, 300) < 0) {
+            fprintf(stderr, "SDL_RenderSetLogicalSize error: %s\n", SDL_GetError());
+            SDL_DestroyRenderer(renderer);
+            SDL_DestroyWindow(window);
+            Mix_CloseAudio();
+            TTF_Quit();
+            IMG_Quit();
+            SDL_Quit();
+            return EXIT_FAILURE;
+        }
 
         StartMenu menu = {0};
-        start_menu_init(&menu, window, renderer);
+        if (start_menu_init(&menu, window, renderer) != 0) {
+            start_menu_cleanup(&menu);
+            SDL_DestroyRenderer(renderer);
+            SDL_DestroyWindow(window);
+            Mix_CloseAudio();
+            TTF_Quit();
+            IMG_Quit();
+            SDL_Quit();
+            return EXIT_FAILURE;
+        }
         start_menu_loop(&menu);
         MenuResult result = menu.result;
         char selected_level_path[sizeof(menu.selected_level_path)] = {0};
