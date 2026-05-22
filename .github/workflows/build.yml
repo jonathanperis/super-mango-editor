@@ -229,7 +229,7 @@ jobs:
       # Upload the standalone zip as a workflow artifact. retention-days: 1 keeps
       # PR build storage low; releases immediately reattach the zip assets.
       - name: Upload release archive
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.artifact }}.zip
@@ -285,7 +285,7 @@ jobs:
       # Create the GitHub Release. The tag is auto-created by the action when
       # softprops/action-gh-release picks up GITHUB_TOKEN automatically.
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
           name: Super Mango ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
