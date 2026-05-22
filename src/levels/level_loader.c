@@ -10,7 +10,7 @@
  *               geometry that never changes (platforms, rails, sea gaps).
  */
 
-#include <stdlib.h>  /* exit, rand(), RAND_MAX */
+#include <stdlib.h>  /* rand(), RAND_MAX */
 #include <SDL_image.h> /* IMG_LoadTexture, IMG_GetError */
 #include <stdio.h>     /* fprintf, stderr */
 /* string.h no longer needed — foreground detection is count-based */
@@ -568,12 +568,12 @@ static void load_ropes(GameState *gs, const LevelDef *def)
  *   2. Rails (must exist before spike_blocks / float_platforms reference them).
  *   3. Everything else can follow in any order.
  */
-void level_load(GameState *gs, const LevelDef *def)
+int level_load(GameState *gs, const LevelDef *def)
 {
     char err[128];
     if (level_validate_runtime(def, err, sizeof(err)) != 0) {
         fprintf(stderr, "level_load: invalid level definition: %s\n", err);
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     /* Store a pointer to the active level definition for game.c to read */
@@ -660,6 +660,7 @@ void level_load(GameState *gs, const LevelDef *def)
 
     /* Negative physics values mean engine default; never inherit stale phases. */
     level_apply_player_physics(&gs->player, def);
+    return 0;
 }
 
 /*

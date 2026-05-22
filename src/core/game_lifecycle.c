@@ -19,14 +19,14 @@
  * create renderer-owned textures. Level loading happens after HUD/player setup
  * because level_load() configures gameplay state against those live systems.
  */
-void game_init(GameState *gs)
+int game_init(GameState *gs)
 {
-    game_window_init(gs);
+    if (game_window_init(gs) != 0) goto fail;
 
-    game_resources_load(gs);
+    if (game_resources_load(gs) != 0) goto fail;
 
     /* Set up the player (loads texture, sets initial position on the floor). */
-    player_init(&gs->player, gs->renderer);
+    if (player_init(&gs->player, gs->renderer) != 0) goto fail;
 
     /* Camera starts at the far-left edge of the world. */
     gs->camera.x = 0.0f;
@@ -37,12 +37,15 @@ void game_init(GameState *gs)
      */
 
     /* Load HUD font and icon textures while the renderer is available. */
-    hud_init(&gs->hud, gs->renderer, gs->textures.star_yellow, gs->player.texture);
+    if (hud_init(&gs->hud, gs->renderer, gs->textures.star_yellow,
+                 gs->player.texture) != 0) {
+        goto fail;
+    }
 
     /* Initialise debug overlay if --debug was passed on the CLI. */
     if (gs->debug_mode) debug_init(&gs->debug);
 
-    game_level_load_initial(gs);
+    if (game_level_load_initial(gs) != 0) goto fail;
 
     /*
      * Health, lives, and scoring rules are set by level_load() from LevelDef
@@ -58,6 +61,11 @@ void game_init(GameState *gs)
     gs->pause_reasons = 0;
     gs->completion.complete = 0;
     gs->checkpoint_x = 0.0f;
+    return 0;
+
+fail:
+    game_cleanup(gs);
+    return -1;
 }
 
 /*

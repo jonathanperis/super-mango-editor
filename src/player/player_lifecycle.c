@@ -4,7 +4,6 @@
 
 #include <SDL_image.h>  /* IMG_LoadTexture */
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "player.h"
 #include "player_internal.h"
@@ -63,7 +62,7 @@ void player_apply_default_physics(Player *player)
 /*
  * player_init — Load the sprite and place the player in the center of the window.
  */
-void player_init(Player *player, SDL_Renderer *renderer)
+int player_init(Player *player, SDL_Renderer *renderer)
 {
     /*
      * IMG_LoadTexture — decode the PNG sprite sheet and upload it to the GPU.
@@ -73,7 +72,7 @@ void player_init(Player *player, SDL_Renderer *renderer)
     player->texture = IMG_LoadTexture(renderer, "assets/sprites/player/player.png");
     if (!player->texture) {
         fprintf(stderr, "Failed to load Player.png: %s\n", IMG_GetError());
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     /*
@@ -139,6 +138,7 @@ void player_init(Player *player, SDL_Renderer *renderer)
 
     /* Not hurt at startup; timer counts down to 0 during invincibility */
     player->hurt_timer = 0.0f;
+    return 0;
 }
 
 /*

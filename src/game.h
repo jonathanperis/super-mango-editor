@@ -363,7 +363,7 @@ typedef struct {
 /* ------------------------------------------------------------------ */
 
 /* Create the window, renderer, and load all textures. */
-void game_init(GameState *gs);
+int game_init(GameState *gs);
 
 /* Run the main game loop until gs->running becomes 0. */
 void game_loop(GameState *gs);
