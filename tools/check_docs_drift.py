@@ -211,6 +211,12 @@ def check_level_schema_doc() -> None:
     for token in ["initial_hearts", "initial_lives", "score_per_life", "coin_score", "fog_layers"]:
         if token not in doc:
             fail(f"docs/wiki/level-design.md: schema docs missing `{token}`")
+    top_scalar_block = doc.split("## Rails", 1)[0]
+    if "next_phase" in top_scalar_block:
+        fail("docs/wiki/level-design.md: `next_phase` is stale as a top-level scalar; document it under `[last_star]`")
+    last_star_section = doc.split("## Last Star", 1)[1].split("---", 1)[0]
+    if "next_phase" not in last_star_section or "serialized inside `[last_star]`" not in last_star_section:
+        fail("docs/wiki/level-design.md: `[last_star]` section must document nested `next_phase`")
 
 
 def check_cli_and_workflows() -> None:
@@ -341,6 +347,10 @@ def check_public_readme_docs() -> None:
     for token in ["Enter/Space/Start", "Esc/Back", "scripted replay smoke on Linux"]:
         if token not in readme:
             fail(f"README.md: missing current project context token `{token}`")
+    if "3 coins restore a heart" in readme:
+        fail("README.md: stale coin pickup docs; coins award score/bonus-life threshold, stars restore hearts")
+    if "GitHub CI is the authoritative WASM release verification" not in readme:
+        fail("README.md: missing current authoritative CI WebAssembly verification note")
 
     docs_readme = read(ROOT / "docs" / "README.md")
     docs_package = read(ROOT / "docs" / "package.json")
@@ -349,6 +359,29 @@ def check_public_readme_docs() -> None:
             fail(f"docs/README.md: missing docs command/environment token `{token}`")
     if '"drift": "cd .. && make docs-drift"' not in docs_package:
         fail("docs/package.json: `bun run drift` must delegate to the full `make docs-drift` gate")
+
+
+def check_wasm_authority_docs() -> None:
+    expectations = {
+        "docs/wiki/build-system.md": "GitHub Actions WebAssembly build is authoritative",
+        "docs/wiki/release-checklist.md": "The authoritative WebAssembly gate is GitHub CI",
+        "docs/wiki/index.md": "CI is authoritative for WASM releases",
+    }
+    for rel, token in expectations.items():
+        if token not in read(ROOT / rel):
+            fail(f"{rel}: missing current CI-authoritative WebAssembly verification note")
+
+
+def check_pages_metadata() -> None:
+    layout = read(ROOT / "docs" / "src" / "layouts" / "BaseLayout.astro")
+    if "const canonicalUrl = new URL(Astro.url.pathname, Astro.site).toString();" not in layout:
+        fail("docs/src/layouts/BaseLayout.astro: canonical URL must be derived from the current Astro page path")
+    for stale in [
+        '<meta property="og:url" content="https://jonathanperis.github.io/super-mango-editor/" />',
+        '<link rel="canonical" href="https://jonathanperis.github.io/super-mango-editor/" />',
+    ]:
+        if stale in layout:
+            fail("docs/src/layouts/BaseLayout.astro: stale root-only canonical/og URL remains")
 
 
 def main() -> int:
@@ -367,6 +400,8 @@ def main() -> int:
     check_level_prose_counts()
     check_agent_context_docs()
     check_public_readme_docs()
+    check_wasm_authority_docs()
+    check_pages_metadata()
 
     if FAILURES:
         print("docs drift check failed:")

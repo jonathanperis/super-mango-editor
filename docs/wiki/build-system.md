@@ -181,6 +181,8 @@ Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sou
 
 The target also produces debug boot artifacts (`out/super-mango-debug.html` and companions) for direct debug HTML launches. The docs-site browser debug button uses the normal `super-mango.js` payload and passes `--debug` at boot.
 
+For release confidence, the **GitHub Actions WebAssembly build is authoritative**. Some local/container Emscripten installs can fail before reaching Super Mango code when Emscripten 3.1.58 builds SDL_ttf's HarfBuzz port with newer Clang warnings (`-Wnontrivial-memcall`). If that host-toolchain issue appears locally, treat the CI `make web` + artifact smoke from `build.yml` and the Pages assembly smoke from `deploy.yml` as the trusted WASM verification path.
+
 ### `make test`
 
 Builds and runs native regression harnesses for pure logic that does not require opening an SDL window.
@@ -256,7 +258,7 @@ make level-catalog
 
 ### `make docs-drift`
 
-Runs the generated level-catalog freshness check, generated overlay-snapshot freshness check, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. Together they compare Makefile test targets, README/agent/docs command summaries, source-file map entries, layer TOML snippets, workflow docs, runtime flags, key constants, level prose counts, TOML line endings, overlay text snapshots, and scripted-smoke wiring against the current repository.
+Runs the generated level-catalog freshness check, generated overlay-snapshot freshness check, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. Together they compare Makefile test targets, README/agent/docs command summaries, source-file map entries, layer TOML snippets, workflow docs, runtime flags, key constants, level prose counts, TOML line endings, overlay text snapshots, local Emscripten caveats, and scripted-smoke wiring against the current repository.
 
 ```sh
 make docs-drift

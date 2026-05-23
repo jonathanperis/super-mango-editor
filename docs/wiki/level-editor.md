@@ -105,6 +105,7 @@ The Level Config section in the right panel exposes the top-level TOML scalars:
 - `floor_tile_path`
 - `initial_hearts`, `initial_lives`
 - `score_per_life`, `coin_score`
+- `next_phase` path (saved under `[last_star]` in TOML)
 - `floor_gaps` list (add / remove entries)
 
 ---

@@ -31,7 +31,7 @@ Super Mango is a 2D side-scrolling platformer built in C11 with SDL2, designed a
 - Delta-time physics for frame-rate-independent movement at 60 FPS (VSync + manual fallback)
 - Six enemy types: spiders, jumping spiders, birds, faster birds, fish, faster fish
 - Seven hazard types: spike rows, spike blocks, spike platforms, circular saws, axe traps, blue flames, fire flames
-- Collectibles: coins (100 pts each, 3 coins restore a heart), star yellow, star green, star red health pickups, end-of-level last star
+- Collectibles: coins (100 pts each, bonus life by score threshold), star yellow, star green, star red health pickups, end-of-level last star
 - Climbable vines, ladders, and ropes; three bouncepad variants (small, medium, high)
 - TOML-based level format with runtime level loading (`--level path/to/level.toml`) and `next_phase` transitions
 - Pause, game-over, and end-of-level overlays: Esc/Start pauses or resumes gameplay, game over waits for Enter/Space/Start before restarting, Enter/Space/Start continues to the next phase when a completion overlay is shown, and Esc/Back exits terminal overlays
@@ -125,7 +125,7 @@ pacman -S mingw-w64-ucrt-x86_64-clang \
           mingw-w64-ucrt-x86_64-SDL2_mixer
 ```
 
-**WebAssembly:** Install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) and ensure `emcc` is on `PATH`.
+**WebAssembly:** Install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) and ensure `emcc` is on `PATH` for optional local preflights. GitHub CI is the authoritative WASM release verification; if a local Emscripten/SDL port cache fails before Super Mango code compiles, trust the green CI WebAssembly build and Pages smoke instead of blocking on the local host toolchain.
 
 ### Quick Start
 
