@@ -43,7 +43,6 @@ initial_hearts  = 3                     # starting hit points
 initial_lives   = 3                     # starting lives
 score_per_life  = 1000                  # score at which a bonus life is awarded
 coin_score      = 100                   # points per coin collected
-next_phase      = "levels/01_lugio_01.toml"  # optional level loaded after completion
 floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 ```
 
@@ -58,7 +57,6 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 | `initial_lives` | int | Starting lives for the level. |
 | `score_per_life` | int | Score threshold spacing for bonus lives. |
 | `coin_score` | int | Points awarded for each collected coin. |
-| `next_phase` | string | Optional TOML path loaded after the completion summary is confirmed. |
 | `floor_gaps` | int array | Sea gap x-positions. Blue/fire flames are placed manually; flame `x` values normally match these openings. |
 
 ---
@@ -147,9 +145,10 @@ Each star variant restores 1 heart on pickup. All are 16×16 px display size.
 [last_star]
 x = 1492.0
 y = 100.0
+next_phase = "levels/01_lugio_01.toml"  # optional level loaded after completion
 ```
 
-Single-instance. Triggers the level-complete event when collected. Displayed at 24×24 px.
+Single-instance. Triggers the level-complete event when collected. Displayed at 24×24 px. `next_phase` is serialized inside `[last_star]` because phase progression is tied to collecting the end-of-level star.
 
 Collecting the last star snapshots elapsed time and coin totals, then shows the level-completion summary. If `next_phase` is set, pressing Enter, Space, or controller Start after the summary loads the next TOML level; otherwise confirmation exits the run. Esc or controller Back exits the overlay/run without advancing.
 

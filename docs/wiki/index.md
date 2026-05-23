@@ -89,7 +89,7 @@ make run-editor CC=clang
 # Run a specific level file
 make run-level CC=clang LEVEL=levels/00_sandbox_01.toml
 
-# Build for WebAssembly (uses Emscripten/emcc)
+# Optional local WebAssembly preflight (CI is authoritative for WASM releases)
 make web
 ```
 

@@ -37,7 +37,9 @@ Confirm the release copy still points players to the current GitHub release page
 
 ## 3. WebAssembly Gates
 
-When Emscripten is active locally:
+The authoritative WebAssembly gate is GitHub CI: the `build.yml` WebAssembly job runs `make web`, verifies artifacts with `tools/check_wasm_artifacts.py`, packages `super-mango-wasm.zip`, and `deploy.yml` smokes the unpacked Pages payload before publishing. Use local Emscripten only as an optional preflight when that host toolchain is healthy.
+
+Optional local preflight:
 
 ```sh
 make web
@@ -47,6 +49,8 @@ python3 tools/check_wasm_artifacts.py --zip dist/super-mango-wasm.zip
 ```
 
 The verifier checks that `out/super-mango.html`, `.js`, `.wasm`, and `.data` exist, that the generated JavaScript references the expected asset basenames, that Node accepts the generated JavaScript syntax, and that `WebAssembly.compile` can compile the generated `.wasm` binary. When a zip exists, it also verifies the WebAssembly release archive includes HTML, JS, WASM, data, `README.txt`, and `LICENSE`.
+
+If a local/container Emscripten install fails inside SDL_ttf/HarfBuzz before compiling Super Mango code (for example Emscripten 3.1.58 plus newer Clang `-Wnontrivial-memcall`), do not block the release on that host-specific cache/toolchain failure. Confirm the latest GitHub Actions WebAssembly build and Pages WASM smoke are green instead.
 
 ## 4. Native Release Archive Gates
 
