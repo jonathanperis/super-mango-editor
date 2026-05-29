@@ -12,8 +12,9 @@
         "level-catalog": "python3 ../tools/generate_level_catalog.py"
     },
     "dependencies": {
+        "@astrojs/markdown-satteri": "^0.2.1",
         "@astrojs/sitemap": "^3",
-        "astro": "^6"
+        "astro": "^6.4.2"
     },
     "devDependencies": {
         "@astrojs/check": "^0.9.4",
