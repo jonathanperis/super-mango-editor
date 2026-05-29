@@ -59,6 +59,41 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 | `coin_score` | int | Points awarded for each collected coin. |
 | `floor_gaps` | int array | Sea gap x-positions. Blue/fire flames are placed manually; flame `x` values normally match these openings. |
 
+### Optional `[physics]` Overrides
+
+Levels can override player movement and camera feel with a `[physics]` table. Every field is optional; omitted fields, or values below zero, keep the engine default from `player_lifecycle.c`, `player_motion.c`, and `game_camera.c`.
+
+```toml
+[physics]
+walk_max_speed          = 160.0
+run_max_speed           = 250.0
+walk_ground_accel       = 1200.0
+run_ground_accel        = 1600.0
+ground_friction         = 1800.0
+ground_counter_accel    = 2400.0
+air_accel_walk          = 600.0
+air_accel_run           = 450.0
+air_friction            = 80.0
+cam_lookahead_vx_factor = 0.20
+cam_lookahead_max       = 50.0
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `walk_max_speed` | float | Maximum horizontal walk speed in px/s. |
+| `run_max_speed` | float | Maximum horizontal run speed in px/s. |
+| `walk_ground_accel` | float | Ground acceleration when walking. |
+| `run_ground_accel` | float | Ground acceleration when running. |
+| `ground_friction` | float | Deceleration when no horizontal input is held on the ground. |
+| `ground_counter_accel` | float | Extra deceleration/turn force when reversing direction on the ground. |
+| `air_accel_walk` | float | Horizontal air-control acceleration for walk arcs. |
+| `air_accel_run` | float | Horizontal air-control acceleration for run arcs. |
+| `air_friction` | float | Air deceleration when no horizontal input is held. |
+| `cam_lookahead_vx_factor` | float | Camera lookahead multiplier based on player horizontal velocity. |
+| `cam_lookahead_max` | float | Maximum camera lookahead distance in logical pixels. |
+
+Use physics overrides sparingly: they are level-wide tuning knobs, not per-entity behaviour. After changing them, run the level directly and include `make scripted-smoke` in validation so deterministic replay input still behaves.
+
 ---
 
 ## Rails
@@ -388,6 +423,7 @@ Vines, ladders, and ropes are placed as vertical stacks of 16px tiles.
 x          = 88.0
 y          = 172.0   # top tile y in logical pixels
 tile_count = 2       # height in 16px tiles
+vine_type  = 0       # optional art variant: 0 = Green, 1 = Brown
 
 [ladders]
 x          = 1552.0
@@ -400,7 +436,7 @@ y          = 172.0
 tile_count = 1
 ```
 
-The player can climb all three by pressing Up/Down while overlapping the surface. Vines and ropes require the player to jump into them; ladders are entered by pressing Up at the base.
+The player can climb all three by pressing Up/Down while overlapping the surface. Vines and ropes require the player to jump into them; ladders are entered by pressing Up at the base. `vine_type` is preserved by the serializer and exposed by the editor as a visual-variant dropdown: `0` = Green, `1` = Brown.
 
 ---
 

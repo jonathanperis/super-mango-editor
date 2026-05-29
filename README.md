@@ -147,6 +147,13 @@ make clean                            # remove all build artifacts
 
 Or just **[play in your browser](https://jonathanperis.github.io/super-mango-editor/)** -- no build required. Full project documentation is available at the **[docs site](https://jonathanperis.github.io/super-mango-editor/docs/)**.
 
+Useful docs routes:
+
+- **[Controls & Input](https://jonathanperis.github.io/super-mango-editor/docs/controls/)** — keyboard, gamepad, browser/WASM, replay, smoke, and runtime flag reference.
+- **[Testing & Smoke Matrix](https://jonathanperis.github.io/super-mango-editor/docs/testing/)** — which local/CI checks to run for each kind of change.
+- **[Level Design — TOML Reference](https://jonathanperis.github.io/super-mango-editor/docs/level-design/)** — full level schema, including optional `[physics]` tuning.
+- **[Release Checklist](https://jonathanperis.github.io/super-mango-editor/docs/release-checklist/)** — source, docs, WebAssembly, archive, CI, and Pages gates before shipping.
+
 ### Release Downloads
 
 Tagged releases and manually dispatched release builds publish zip archives for Linux, macOS, Windows, and WebAssembly. Native archives include the `super-mango` executable, `assets/`, `levels/`, `LICENSE`, and a short run README; extract the archive and run the executable from inside the extracted folder. Linux and macOS builds still require compatible SDL2 runtime libraries on the host. Windows archives bundle the SDL/MSYS2 runtime DLLs discovered by CI. The WebAssembly archive contains the generated HTML/JS/WASM/data files and should be served with a static HTTP server.
@@ -260,6 +267,18 @@ super-mango-editor/
     ├── docs.yml                       Docs lint/build checks
     └── deploy.yml                     GitHub Pages deployment
 ```
+
+## Project Documents
+
+| File | Purpose |
+|------|---------|
+| `PRODUCT.md` | Product direction, player promise, and feature framing. |
+| `DESIGN.md` | Visual/UX design notes for the arcade-cabinet presentation. |
+| `EXECUTIVE_AUDIT_REPORT.md` | Historical audit snapshot and improvement roadmap reference. |
+| `AGENTS.md` and `.agents/` | Standardized agent instructions, lane ownership, and repo operating rules. |
+| `CODEOWNERS` | Review ownership hints for GitHub. |
+
+These files complement the public GH Pages manual. If they disagree with code, update the docs and source-backed checks together.
 
 ## CI/CD
 

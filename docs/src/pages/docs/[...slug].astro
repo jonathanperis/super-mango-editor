@@ -87,8 +87,8 @@ const CurrentContent = currentPage?.default ?? currentPage;
             </a>
             <p class="repo-description">Read the engine route, world-builder guide, and platform docs without one giant scroll.</p>
             <label class="search-label" for="searchInput">Filter pages</label>
-            <input type="search" id="searchInput" class="search-box" placeholder="Filter all 15 manual pages..." aria-label="Filter manual pages">
-            <p class="search-status" id="searchStatus" aria-live="polite">15 routes ready</p>
+            <input type="search" id="searchInput" class="search-box" placeholder={`Filter all ${allPages.length} manual pages...`} aria-label="Filter manual pages">
+            <p class="search-status" id="searchStatus" aria-live="polite">{allPages.length} routes ready</p>
         </div>
         <nav class="sidebar-nav-container" aria-label="Documentation sections">
             {SECTION_CATEGORIES.map((cat) => (
