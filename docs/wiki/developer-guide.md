@@ -165,7 +165,7 @@ x = 200.0
 y = 140.0
 ```
 
-Then extend `level_loader.c` to parse the new array table and populate the `GameState` array (or call your `_init` function when the entity owns richer runtime state). See `level_design` for the full TOML schema and [Level Design — TOML Reference](level-design) for placement examples for every entity type.
+Then extend `level_loader.c` to parse the new array table and populate the `GameState` array (or call your `_init` function when the entity owns richer runtime state). See `level_design` for the full TOML schema and [Level Design — TOML Reference](../level-design/) for placement examples for every entity type.
 
 You can also use the visual level editor (`make run-editor`) to place entities interactively without writing TOML by hand.
 
@@ -260,7 +260,7 @@ FREE_CHUNK(gs->audio.<name>);
 if (gs->audio.<name>) Mix_PlayChannel(-1, gs->audio.<name>, 0);
 ```
 
-See [Sounds](sounds) for the full list of available sound files.
+See [Sounds](../sounds/) for the full list of available sound files.
 
 ---
 
@@ -418,6 +418,6 @@ See [Assets](../assets/) for sprite sheet dimensions and [Player Module](../play
 - [Build System](../build-system/) -- compiling and running
 - [Source Files](../source-files/) -- module-by-module reference
 - [Assets](../assets/) -- sprite sheets and textures
-- [Sounds](sounds) -- audio files and music
+- [Sounds](../sounds/) -- audio files and music
 - [Player Module](../player-module/) -- player-specific details
 - [Constants Reference](../constants-reference/) -- all defined constants
