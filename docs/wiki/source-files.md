@@ -272,7 +272,7 @@ Returns `0` on success. If a required window, texture, level, or subsystem resou
 
 ### `game_loop(GameState *gs)`
 
-60 FPS loop: delta time -> events -> update -> render. See [Architecture](architecture) for the full render order.
+60 FPS loop: delta time -> events -> update -> render. See [Architecture](../architecture/) for the full render order.
 
 ### `game_cleanup(GameState *gs)`
 
