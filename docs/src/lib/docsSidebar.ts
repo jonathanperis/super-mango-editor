@@ -1,6 +1,8 @@
 export type DocsSectionId =
   | 'home'
   | 'developer-guide'
+  | 'controls'
+  | 'testing'
   | 'architecture'
   | 'source-files'
   | 'player-module'
@@ -46,6 +48,22 @@ export const DOCS_META: Record<DocsSectionId, DocsPageMeta> = {
     description: 'Coding conventions, safe extension patterns, entity workflow, and contribution rules.',
     route: '/docs/developer-guide/',
     marker: 'GUIDE',
+  },
+  controls: {
+    id: 'controls',
+    label: 'Controls & Input',
+    shortLabel: 'Controls',
+    description: 'Keyboard, gamepad, browser, replay, smoke, and runtime flag reference.',
+    route: '/docs/controls/',
+    marker: 'INPUT',
+  },
+  testing: {
+    id: 'testing',
+    label: 'Testing & Smoke Matrix',
+    shortLabel: 'Testing',
+    description: 'Which native, smoke, docs, WebAssembly, and release checks to run for each change.',
+    route: '/docs/testing/',
+    marker: 'TEST',
   },
   architecture: {
     id: 'architecture',
@@ -155,8 +173,8 @@ export const SECTION_CATEGORIES: DocsCategory[] = [
   {
     label: 'Start Here',
     kicker: 'MANUAL_01',
-    description: 'New to the cabinet? Start with the map, developer conventions, and architecture route.',
-    ids: ['home', 'developer-guide', 'architecture'],
+    description: 'New to the cabinet? Start with the map, developer conventions, controls, tests, and architecture route.',
+    ids: ['home', 'developer-guide', 'controls', 'testing', 'architecture'],
   },
   {
     label: 'Engine & Code',

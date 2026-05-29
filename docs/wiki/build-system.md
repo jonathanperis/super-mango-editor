@@ -256,6 +256,38 @@ Regenerates `docs/wiki/level-catalog.md` from `levels/*.toml` using `tools/gener
 make level-catalog
 ```
 
+### `make overlay-snapshots`
+
+Regenerates `docs/wiki/overlay-snapshots.md` from the canonical overlay strings in the runtime. Use this after changing pause, game-over, level-complete, or terminal overlay copy/controls.
+
+```sh
+make overlay-snapshots
+```
+
+### `make roadmap-quality`
+
+Runs `tools/check_roadmap_quality.py`, the extra semantic guardrail layer that complements `check_docs_drift.py`. It checks things like TOML line-ending policy, overlay snapshot coverage, release/WebAssembly guardrails, and scripted-smoke wiring.
+
+```sh
+make roadmap-quality
+```
+
+### `make dist-native`
+
+Builds native distribution archives under `dist/` using `tools/package_release.py`. The archive layout includes the game/editor binaries where applicable, assets, levels, license, and a short run README. CI uses this path for release artifacts.
+
+```sh
+make dist-native
+```
+
+### `make dist-wasm`
+
+Builds the WebAssembly payload and packages the static browser files into a release archive. The verifier expects the HTML, JavaScript, `.wasm`, `.data`, `README.txt`, and `LICENSE` entries.
+
+```sh
+make dist-wasm
+```
+
 ### `make docs-drift`
 
 Runs the generated level-catalog freshness check, generated overlay-snapshot freshness check, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. Together they compare Makefile test targets, README/agent/docs command summaries, source-file map entries, layer TOML snippets, workflow docs, runtime flags, key constants, level prose counts, TOML line endings, overlay text snapshots, local Emscripten caveats, and scripted-smoke wiring against the current repository.

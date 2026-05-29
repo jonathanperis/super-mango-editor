@@ -44,6 +44,20 @@ See [Constants Reference](../constants-reference/) for all defined constants.
 
 ---
 
+## Project Documents and Ownership
+
+| File | Purpose |
+|------|---------|
+| `PRODUCT.md` | Product direction and feature framing. |
+| `DESIGN.md` | Visual/UX design notes for the cabinet-style presentation. |
+| `EXECUTIVE_AUDIT_REPORT.md` | Historical audit snapshot and roadmap reference. |
+| `AGENTS.md` / `.agents/` | Standardized agent lane instructions and repo operating rules. |
+| `CODEOWNERS` | GitHub ownership hints for review routing. |
+
+Treat source and workflows as authoritative. When project documents, README, or GH Pages copy drift from implementation, update the docs and run [Testing & Smoke Matrix](../testing/) checks before shipping.
+
+---
+
 ## Adding a New Entity
 
 Most active entities follow this lifecycle pattern:

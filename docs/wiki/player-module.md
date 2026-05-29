@@ -106,7 +106,7 @@ Current movement uses acceleration and friction, not instant velocity reset.
 | `air_accel_run` | 180.0 px/s² | reduced air control for run jumps |
 | `air_friction` | 80.0 px/s² | passive air drag with no input |
 
-`LevelDef.physics` can override these values; `-1.0` keeps engine defaults and `0.0` is a valid override.
+`LevelDef.physics` can override these values; `-1.0` keeps engine defaults and `0.0` is a valid override. See [Level Design — TOML Reference](../level-design/#optional-physics-overrides) for the complete `[physics]` table syntax, including camera lookahead overrides.
 
 ---
 

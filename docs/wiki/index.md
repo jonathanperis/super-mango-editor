@@ -13,6 +13,8 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 | Page | Description |
 |------|-------------|
 | [Architecture](architecture/) | Game loop, init/loop/cleanup pattern, GameState container, 32-layer render order |
+| [Controls & Input](controls/) | Keyboard, gamepad, browser/WASM, replay, smoke, and runtime flag reference |
+| [Testing & Smoke Matrix](testing/) | Which local/CI checks to run for runtime, editor, docs, WASM, and release changes |
 | [Source Files](source-files/) | Module-by-module reference for every `.c` / `.h` file |
 | [Player Module](player-module/) | Input, physics, animation — deep dive into `player.c` |
 | [Constants Reference](constants-reference/) | Every `#define` in `game.h` and entity headers explained |
@@ -36,6 +38,7 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 | [Level Design — TOML Reference](level-design/) | Full TOML schema for every entity type; minimum level template |
 | [Level Editor](level-editor/) | Visual editor: canvas, palette, properties, undo, play-test, file I/O |
 | [Developer Guide](developer-guide/) | Coding conventions, adding new entities, sound effects workflow |
+| [Release Checklist](release-checklist/) | Source, docs, WebAssembly, archive, CI, and Pages gates before shipping |
 
 ---
 
