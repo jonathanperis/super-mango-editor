@@ -16,7 +16,7 @@
 
 | Level | Screens | Music | Next phase |
 |-------|--------:|-------|------------|
-| Creator's Playground | 4 | `assets/sounds/levels/water.wav` | — |
+| Creator's Playground | 4 | `assets/sounds/levels/water.wav` | `levels/01_lugio_01.toml` |
 | Volcanic Depths 1 | 8 | `assets/sounds/levels/lava.wav` | `levels/02_lugio_02.toml` |
 | Volcanic Depths 2 | 11 | `assets/sounds/levels/lava.wav` | — |
 
@@ -31,7 +31,7 @@
 - **Music:** `assets/sounds/levels/water.wav` at volume `13`
 - **Floor tiles:** `assets/sprites/levels/grass_tileset.png`
 - **Initial hearts/lives:** `3` / `3`
-- **Next phase:** —
+- **Next phase:** `levels/01_lugio_01.toml`
 
 The original sandbox — four screens of everything the engine can throw at you. Platforms, gaps, every enemy type, every hazard, every surface. This is where you learn to play, and where the engine proves it works.
 

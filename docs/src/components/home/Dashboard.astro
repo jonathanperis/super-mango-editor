@@ -262,7 +262,7 @@ const manualGroups = [
         statusEl.dataset.mode = debug ? 'debug' : 'play';
         statusEl.innerHTML = `<span class="spinner"></span>${debug ? 'Booting developer diagnostics...' : 'Downloading normal game data...'}`;
 
-        const args = ['--sandbox'];
+        const args = ['--level', 'levels/00_sandbox_01.toml'];
         if (debug) args.push('--debug');
 
         canvas.addEventListener('webglcontextlost', (event) => {
