@@ -296,6 +296,26 @@ Runs the generated level-catalog freshness check, generated overlay-snapshot fre
 make docs-drift
 ```
 
+---
+
+## Astro Docs Site Toolchain
+
+The public GitHub Pages documentation site lives under `docs/` and builds with **Astro 7**. The upgrade keeps the site fully static for GitHub Pages while taking the parts of Astro 7 that fit this repo:
+
+- Astro's Rust `.astro` compiler is now the default compiler, so malformed templates fail during `astro check`/`astro build` instead of being silently corrected.
+- Vite 8 and Rolldown are pulled in through Astro 7; the docs site keeps the existing Tailwind Vite plugin and does not depend on Vite internals.
+- The site already uses the Sätteri Markdown processor via `markdown.processor: satteri()`, so Markdown pages are rendered through the Rust-backed pipeline.
+- Queued rendering is enabled by Astro 7 by default and does not require config.
+
+Astro 7's route caching, CDN cache providers, and `src/fetch.ts` advanced-routing hooks are intentionally **not** configured here because this repo deploys static HTML/assets to GitHub Pages (`output: "static"`) and has no SSR adapter or request-time runtime.
+
+```sh
+cd docs
+bun install --frozen-lockfile
+bun run lint
+NODE_ENV=production bun run build
+```
+
 ### `make clean`
 
 Removes all build artifacts.
