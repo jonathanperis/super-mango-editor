@@ -227,6 +227,11 @@ def check_cli_and_workflows() -> None:
     for workflow in ["build.yml", "docs.yml", "deploy.yml", "codeql.yml"]:
         if workflow not in build_doc:
             fail(f"docs/wiki/build-system.md: workflow docs missing `{workflow}`")
+    for token in ["Astro 7", "Vite 8", "Rolldown", "Sätteri Markdown processor", "output: \"static\""]:
+        if token not in build_doc:
+            fail(f"docs/wiki/build-system.md: Astro 7 docs toolchain missing `{token}`")
+    if "src/fetch.ts" not in build_doc or "not" not in build_doc.split("src/fetch.ts", 1)[1][:120].lower():
+        fail("docs/wiki/build-system.md: must explain why Astro 7 advanced routing is not configured")
 
 
 def check_overlay_controls_doc() -> None:
