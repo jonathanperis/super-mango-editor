@@ -131,7 +131,7 @@ jobs:
         env:
           SDL_VIDEODRIVER: dummy
           SDL_AUDIODRIVER: dummy
-        run: lldb --batch -o run -o "thread backtrace all" -- out/session-test
+        run: lldb --batch -o run -k "thread backtrace all" -- out/session-test
 
       - name: Sanitizer tests (Linux)
         if: matrix.target == 'native' && runner.os == 'Linux'
@@ -170,6 +170,7 @@ jobs:
 
       - name: Test (Windows)
         if: runner.os == 'Windows'
+        timeout-minutes: 3
         shell: msys2 {0}
         run: make test CC=gcc
 
