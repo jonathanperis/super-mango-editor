@@ -99,8 +99,11 @@ static int settings_and_bindings(void)
     SettingsMenu *menu = calloc(1,sizeof(*menu));
     CHECK(profile && menu);
     game_profile_init(profile);
-    SDL_Event event={0}; event.type=SDL_KEYDOWN; event.key.keysym.sym=SDLK_F1;
-    CHECK(settings_menu_event(menu,profile,&event,SDL_CONTROLLER_BUTTON_BACK)==1 && menu->open);
+    SDL_Event event; SDL_zero(event); event.type=SDL_KEYDOWN; event.key.keysym.sym=SDLK_F1;
+    int handled = settings_menu_event(menu,profile,&event,SDL_CONTROLLER_BUTTON_BACK);
+    if (handled != 1 || !menu->open) fprintf(stderr,"settings input: type=%u key=%d repeat=%u handled=%d open=%d\n",
+        event.type,event.key.keysym.sym,event.key.repeat,handled,menu->open);
+    CHECK(handled==1 && menu->open);
     menu->page=1; menu->selected=BIND_JUMP;
     event.key.keysym.sym=SDLK_RETURN;
     CHECK(settings_menu_event(menu,profile,&event,SDL_CONTROLLER_BUTTON_BACK)==1 && menu->capture==1);
@@ -145,7 +148,7 @@ static int persistent_session(void)
     puts("profile session: create");
     AppSession *session=session_create(&config);
     CHECK(session);
-    SDL_Event event={0}; event.type=SDL_KEYDOWN; event.key.keysym.sym=SDLK_F1;
+    SDL_Event event; SDL_zero(event); event.type=SDL_KEYDOWN; event.key.keysym.sym=SDLK_F1;
     puts("profile session: open settings");
     SDL_PushEvent(&event); session_frame(session);
     CHECK(session->settings.open && session->game->completion.level_elapsed==0);
