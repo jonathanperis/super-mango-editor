@@ -1,9 +1,27 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "tomlc17.h"
 
-int parser_boundary_test(void)
+static size_t live_allocations;
+
+static void counted_free(void *pointer)
+{
+    if (pointer) live_allocations--;
+    free(pointer);
+}
+
+static void *counted_realloc(void *pointer, size_t size)
+{
+    if (!size) { counted_free(pointer); return NULL; }
+    int fresh = pointer == NULL;
+    void *result = realloc(pointer, size);
+    if (result && fresh) live_allocations++;
+    return result;
+}
+
+static int parser_cases(void)
 {
     static const struct { const char *text; int valid; } cases[] = {
         {"a={\"\"=1,b=2}",1}, {"a={b=1,b=2}",0},
@@ -53,6 +71,22 @@ int parser_boundary_test(void)
         toml_result_t parsed=toml_parse(text,(int)strlen(text));
         toml_free(parsed);
     }
-    puts("parser_boundary_test: ok (10000 bounded mutations)");
     return 0;
+}
+
+int parser_boundary_test(void)
+{
+    toml_option_t options = toml_default_option();
+    options.mem_realloc = counted_realloc;
+    options.mem_free = counted_free;
+    live_allocations = 0;
+    toml_set_option(options);
+    int result = parser_cases();
+    toml_set_option(toml_default_option());
+    if (live_allocations) {
+        fprintf(stderr, "parser leaked %zu allocations\n", live_allocations);
+        return 1;
+    }
+    if (!result) puts("parser_boundary_test: ok (10000 bounded mutations; allocations balanced)");
+    return result;
 }

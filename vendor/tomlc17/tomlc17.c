@@ -1210,13 +1210,14 @@ static int parse_inline_table(parser_t *pp, token_t tok,
     }
 
     // obtain the value
-    toml_datum_t value;
+    toml_datum_t value = DATUM_ZERO;
     DO(scan_value(&pp->scanner, &tok));
     DO(parse_val(pp, tok, &value));
 
     // Add the value to tab.
     const char *reason;
     if (tab_add(tab, lastkeypart, value, &reason)) {
+      datum_free(&value);
       return SETERROR(pp->ebuf, tok.lineno, "%s", reason);
     }
     need_comma = 1, was_comma = 0;
@@ -1246,10 +1247,16 @@ static int parse_val(parser_t *pp, token_t tok, toml_datum_t *ret) {
     return token_to_fp64(pp, tok, ret);
   case TOK_BOOL:
     return token_to_boolean(pp, tok, ret);
-  case TOK_LBRACK: // inline-array
-    return parse_inline_array(pp, tok, ret);
-  case TOK_LBRACE: // inline-table
-    return parse_inline_table(pp, tok, ret);
+  case TOK_LBRACK: { // inline-array
+    int status = parse_inline_array(pp, tok, ret);
+    if (status) datum_free(ret);
+    return status;
+  }
+  case TOK_LBRACE: { // inline-table
+    int status = parse_inline_table(pp, tok, ret);
+    if (status) datum_free(ret);
+    return status;
+  }
   default:
     break;
   }
@@ -1459,7 +1466,7 @@ static int parse_keyvalue_expr(parser_t *pp, token_t tok) {
   }
 
   // Obtain the value
-  toml_datum_t val;
+  toml_datum_t val = DATUM_ZERO;
   DO(scan_value(&pp->scanner, &tok));
   DO(parse_val(pp, tok, &val));
 
@@ -1470,12 +1477,14 @@ static int parse_keyvalue_expr(parser_t *pp, token_t tok) {
     int j = tab_find(tab, keypart.span[i]);
     if (j < 0) {
       if (i > 0 && (tab->flag & FLAG_EXPLICIT)) {
+        datum_free(&val);
         return SETERROR(
             pp->ebuf, keylineno,
             "cannot extend a previously defined table using dotted expression");
       }
       toml_datum_t newtab = mkdatum(TOML_TABLE);
       if (tab_add(tab, keypart.span[i], newtab, &reason)) {
+        datum_free(&val);
         return SETERROR(pp->ebuf, keylineno, "%s", reason);
       }
       tab = &tab->u.tab.value[tab->u.tab.size - 1];
@@ -1487,19 +1496,23 @@ static int parse_keyvalue_expr(parser_t *pp, token_t tok) {
       continue;
     }
     if (value->type == TOML_ARRAY) {
+      datum_free(&val);
       return SETERROR(pp->ebuf, keylineno,
                       "encountered previously declared array '%s'",
                       keypart.span[i].ptr);
     }
+    datum_free(&val);
     return SETERROR(pp->ebuf, keylineno, "cannot locate table at '%s'",
                     keypart.span[i].ptr);
   }
 
   // Check for disallowed situations.
   if (tab->flag & FLAG_INLINED) {
+    datum_free(&val);
     return SETERROR(pp->ebuf, keylineno, "inline table cannot be extended");
   }
   if (keypart.nspan > 1 && (tab->flag & FLAG_EXPLICIT)) {
+    datum_free(&val);
     return SETERROR(
         pp->ebuf, keylineno,
         "cannot extend a previously defined table using dotted expression");
@@ -1507,6 +1520,7 @@ static int parse_keyvalue_expr(parser_t *pp, token_t tok) {
 
   // Add a new key/value for tab.
   if (tab_add(tab, keypart.span[keypart.nspan - 1], val, &reason)) {
+    datum_free(&val);
     return SETERROR(pp->ebuf, keylineno, "%s", reason);
   }
 

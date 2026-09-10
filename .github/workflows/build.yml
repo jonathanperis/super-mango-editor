@@ -80,14 +80,21 @@ jobs:
         with:
           msystem: UCRT64
           update: true
-          install: >
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-python
-            make
-            mingw-w64-ucrt-x86_64-SDL2
-            mingw-w64-ucrt-x86_64-SDL2_image
-            mingw-w64-ucrt-x86_64-SDL2_ttf
-            mingw-w64-ucrt-x86_64-SDL2_mixer
+          path-type: inherit
+
+      - name: Download Windows toolchain and SDL packages
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          # Mirrors can time out after partially caching a transaction. Retry
+          # without bypassing package signatures or swallowing final failure.
+          for attempt in 1 2 3; do
+            if pacman --noconfirm -S --needed make mingw-w64-ucrt-x86_64-gcc \
+              mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-SDL2 \
+              mingw-w64-ucrt-x86_64-SDL2_image mingw-w64-ucrt-x86_64-SDL2_ttf \
+              mingw-w64-ucrt-x86_64-SDL2_mixer; then exit 0; fi
+          done
+          exit 1
 
       # ── Emscripten SDK install (WebAssembly) ────────────────────────────────
       # Provides emcc, the C-to-WebAssembly compiler. SDL2 ports are compiled
@@ -116,6 +123,15 @@ jobs:
       - name: Test (Linux / macOS)
         if: matrix.target == 'native' && runner.os != 'Windows'
         run: make test
+
+      - name: Diagnose macOS native test failure
+        if: failure() && runner.os == 'macOS'
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: lldb --batch -o run -o "thread backtrace all" -- out/session-test
 
       - name: Sanitizer tests (Linux)
         if: matrix.target == 'native' && runner.os == 'Linux'

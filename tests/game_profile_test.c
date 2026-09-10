@@ -189,7 +189,12 @@ fail:
 
 int game_profile_contract_test(void)
 {
-    if (codec_and_storage() || settings_and_bindings() || persistent_session()) return 1;
+    puts("profile: codec/storage");
+    if (codec_and_storage()) return 1;
+    puts("profile: settings/bindings");
+    if (settings_and_bindings()) return 1;
+    puts("profile: session integration");
+    if (persistent_session()) return 1;
     puts("game_profile_contract_test: ok");
     return 0;
 }
