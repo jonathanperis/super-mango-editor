@@ -138,9 +138,7 @@ static void session_controller_publish(AppSession *session, int result)
 static int session_controller_init_worker(void *data)
 {
     AppSession *session = (AppSession *)data;
-    int result = session->hooks.controller_init
-        ? session->hooks.controller_init(session->hooks.userdata)
-        : SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER);
+    int result = session->hooks.controller_init(session->hooks.userdata);
 
     SDL_AtomicSet(&session->controller_init_result, result);
     SDL_AtomicSet(&session->controller_init_done, 1);
@@ -199,6 +197,18 @@ static void session_controller_schedule(AppSession *session)
     session->controller_init_schedule_count++;
     SDL_AtomicSet(&session->controller_init_done, 0);
     SDL_AtomicSet(&session->controller_init_result, -1);
+    if (!session->hooks.controller_init) {
+        /* SDL2-compat/SDL3 HID backends retain the initializing thread's run
+         * loop. Keep real init and teardown on the app thread, but only after
+         * the first screen has been presented. Test hooks can still model a
+         * deferred operation without making SDL calls from their worker. */
+        int result = SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER);
+        SDL_AtomicSet(&session->controller_init_result, result);
+        SDL_AtomicSet(&session->controller_init_done, 1);
+        session_controller_publish(session, result);
+        if (session->game) session->game->loop.prev_ticks = SDL_GetTicks64();
+        return;
+    }
     session->controller_init_thread = SDL_CreateThread(
         session_controller_init_worker, "controller_init", session);
     if (!session->controller_init_thread) {
@@ -247,11 +257,7 @@ static int session_runtime_init(AppSession *session)
         session_emit(session, APP_SESSION_EVENT_CONTROLLER_SUBSYSTEM_READY, NULL);
     }
 #else
-    /* Native creation never performs the potentially blocking subsystem init. */
-#ifdef __APPLE__
-    /* SDL's legacy macOS IOKit backend is main-thread-only. */
-    SDL_SetHint(SDL_HINT_JOYSTICK_IOKIT, "0");
-#endif
+    /* Native creation defers real subsystem init until after first present. */
     if (SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 0) {
         SDL_AtomicSet(&session->controller_init_result, 0);
         SDL_AtomicSet(&session->controller_init_done, 1);

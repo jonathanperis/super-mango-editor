@@ -246,7 +246,7 @@ static int direct_game_boot_repairs_input_and_keeps_controller_runtime(void)
                     session->controller_init_state == APP_CONTROLLER_INIT_RUNNING; i++) {
         session_frame(session);
     }
-    if (expect_int("direct boot worker joined once", session->controller_init_join_count, 1) != 0)
+    if (expect_int("direct boot uses no transient SDL worker", session->controller_init_join_count, 0) != 0)
         goto fail;
     session_destroy(&session);
     game_input_test_clear_physical_state();
@@ -637,7 +637,7 @@ static int repeated_menu_game_ownership(void)
     if (expect_int("exit ends session", session->screen, APP_SCREEN_ENDED) != 0) return 1;
     if (expect_int("runtime cleanup once", session->runtime_cleanup_count, 1) != 0) return 1;
     if (expect_int("controller cleanup once", session->controller_subsystem_closed_count, 1) != 0 ||
-        expect_int("controller worker joined once", session->controller_init_join_count, 1) != 0 ||
+        expect_int("controller init stays on app thread", session->controller_init_join_count, 0) != 0 ||
         expect_int("controller worker scheduled once", session->controller_init_schedule_count, 1) != 0 ||
         expect_int("controller inactive after exit",
                    SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 0, 0) != 0)
@@ -975,7 +975,8 @@ static int menu_mouse_and_path_boundaries(void)
     StartMenu *menu = start_menu_create(&catalog);
     if (!menu) { campaign_catalog_cleanup(&catalog); return 1; }
     SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
-    SDL_Event event = {0};
+    SDL_Event event;
+    SDL_zero(event);
     event.type = SDL_MOUSEBUTTONDOWN;
     event.button.windowID = SDL_GetWindowID(menu->window);
     event.button.button = SDL_BUTTON_LEFT;

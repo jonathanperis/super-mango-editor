@@ -58,7 +58,7 @@ typedef struct {
     AppSessionLifecycleFn lifecycle;
     void *userdata;
     int force_callback_mode; /* narrow native lifecycle-test seam */
-    AppSessionControllerInitFn controller_init; /* narrow worker-test seam */
+    AppSessionControllerInitFn controller_init; /* non-SDL deferred worker-test seam */
 } AppSessionHooks;
 
 typedef struct {
