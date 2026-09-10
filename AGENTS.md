@@ -24,13 +24,13 @@ A 2D pixel art platformer written in C11 + SDL2, targeting macOS, Linux, Windows
 
 ```sh
 make              # compile → out/super-mango
-make run          # compile + run
+make run          # compile + open the campaign level selector
 make run-debug    # compile + run with debug overlay
-make run-level LEVEL=levels/00_sandbox_01.toml  # run a specific TOML level
-make run-level-debug LEVEL=levels/00_sandbox_01.toml  # run a TOML level with debug overlay
+make run-level LEVEL=levels/00_onboarding_01.toml  # run a specific TOML level
+make run-level-debug LEVEL=levels/00_onboarding_01.toml  # run a TOML level with debug overlay
 make editor       # compile → out/super-mango-editor
 make run-editor   # compile + run the level editor
-make test         # compile + run native regression tests
+make test         # compile + run 15 native regression binaries plus Python host checks
 make validate-levels  # validate levels/*.toml paths/counts/schema
 make web          # compile WebAssembly artifacts
 make clean        # remove .o/.d files and out/
@@ -68,7 +68,12 @@ super-mango-editor/
 │       ├── screens/        ← HUD icons, start menu logo
 │       ├── surfaces/       ← bouncepads, bridges, vines, ladders, ropes, rails
 │       └── unused/         ← unused sprites for future use
-├── levels/                 ← TOML level definitions (00_sandbox_01.toml, …)
+├── levels/                 ← playable TOML levels plus campaigns/main.toml catalog manifest
+│   ├── 00_onboarding_01.toml ← first v1 campaign stage; authored checkpoints
+│   ├── 00_sandbox_01.toml    ← second v1 campaign stage
+│   ├── 01_lugio_01.toml
+│   ├── 02_lugio_02.toml
+│   └── campaigns/main.toml   ← ordered v1 campaign manifest
 ├── vendor/                 ← vendored third-party libraries
 │   └── tomlc17/            ← TOML parser (C11)
 ├── .agents/                ← standardized agent commands, references, scripts, skills
@@ -79,13 +84,13 @@ super-mango-editor/
     ├── game.h              ← GameState, shared constants, runtime declarations
     ├── collectibles/       ← coin, star_yellow, star_green, star_red, last_star
     ├── collision/          ← collision passes and damage helpers
-    ├── core/               ← lifecycle, resources, loop/update, camera, completion, debug helpers
-    ├── editor/             ← standalone visual level editor (editor_main, canvas, tools, palette, validation, serializer_load_* helpers, …)
+    ├── core/               ← lifecycle, session/routes, resources, checkpoint, loop/update, camera, completion, debug helpers
+    ├── editor/             ← standalone visual TOML level editor (editor_main, canvas, tools, palette, validation, checkpoint-aware serializer_load_* helpers, …)
     ├── effects/            ← fog, parallax, water
     ├── entities/           ← bird, faster_bird, fish, faster_fish, spider, jumping_spider
     ├── hazards/            ← spike, spike_block, spike_platform, circular_saw, axe_trap, blue_flame, fire_flame
     ├── input/              ← keyboard/gamepad event handling
-    ├── levels/             ← level.h (LevelDef), level_loader, validation, phase transitions, exported/
+    ├── levels/             ← level.h (LevelDef), loader, campaign catalog, validation, phase transitions
     ├── player/             ← player input, physics, animation
     ├── render/             ← frame rendering and overlays
     ├── screens/            ← start_menu, hud
@@ -98,14 +103,14 @@ super-mango-editor/
 |------------------|--------------------------------------------------------------|
 | `main.c`         | Calls SDL/IMG/TTF/Mix init + teardown; owns `main()`         |
 | `game.h`         | `GameState` struct + shared constants; included everywhere   |
-| `core/`          | Implements runtime lifecycle, resources, game loop/update, camera, completion, and debug helpers |
+| `core/`          | Implements runtime lifecycle, session routes, resources, authored/legacy checkpoints, game loop/update, camera, completion, and debug helpers |
 | `player/`        | Player lifecycle: init, input, update, render, cleanup       |
 | `collectibles/`  | Coins, colored stars, last star — pickup items               |
-| `editor/`        | Standalone visual level editor (canvas, tools, palette, properties, serializer save/load helpers, exporter, undo) |
+| `editor/`        | Standalone visual TOML level editor (canvas, tools, palette, checkpoint properties, serializer save/load helpers, undo) |
 | `effects/`       | Fog overlays, parallax backgrounds, animated water           |
 | `entities/`      | Enemies: spiders, birds, fish (normal + faster variants)     |
 | `hazards/`       | Spikes, circular saws, axe traps, blue flames, fire flames   |
-| `levels/`        | TOML-based level definitions (LevelDef), loader, validator, and generated C exports |
+| `levels/`        | TOML level definitions (LevelDef), runtime loader, campaign catalog, validator, and phase transitions |
 | `screens/`       | Start menu, HUD (hearts/lives/score)                         |
 | `surfaces/`      | Platforms, bridges, bouncepads, vines, ladders, ropes, rails |
 
@@ -138,6 +143,7 @@ main()
 | `FLOOR_Y`       | GAME_H − TILE_SIZE | Y-coordinate of the floor top edge |
 | `FLOOR_GAP_W`   | 32       | Width of each floor gap in logical pixels    |
 | `MAX_FLOOR_GAPS`| 16       | Maximum number of floor gaps per level       |
+| `MAX_CHECKPOINTS`| 99      | Maximum authored respawn checkpoints per level |
 | `GRAVITY`       | 800 px/s² | Downward acceleration while airborne        |
 
 > **Important:** All game object positions and sizes live in **logical space (400×300)**.  
@@ -148,21 +154,23 @@ main()
 
 ## Current Game State
 
-- Dynamic multi-screen TOML worlds, from the 4-screen sandbox to longer volcanic stages
+- Dynamic multi-screen TOML worlds: 2-screen Forest First Steps onboarding → 4-screen sandbox → two volcanic stages
 - 32 render layers: parallax background → platforms → floor → enemies → player → fog → HUD → debug
 - Delta-time physics at 60 FPS (VSync + manual fallback)
-- TOML-based level format with runtime loader, `next_phase` transitions, and optional C exporter
-- Standalone visual level editor (canvas, palette, tools, properties, undo, serializer, exporter, validation, recent files, autosave, playtest)
+- TOML-only level workflow: v1 `levels/campaigns/main.toml` orders the native selector as onboarding → sandbox → Volcanic Depths 1 → Volcanic Depths 2; listed levels form the `next_phase` chain
+- `--level <path>` bypasses the campaign selector and loads that TOML level directly, including valid levels not listed in the manifest
+- Authored `[[checkpoints]]` respawns: finite `x`/`y` records choose the furthest crossed point; levels without records retain legacy screen-boundary respawns
+- Standalone visual TOML level editor (canvas, palette, checkpoint markers/properties, tools, undo, serializer, validation, recent files, autosave, playtest)
 - 6 enemy types (spider, jumping spider, bird, faster bird, fish, faster fish)
 - 7 hazard types (spike, spike block, spike platform, circular saw, axe trap, blue flame, fire flame)
-- Collectibles: coins (100 pts, 3 restore a heart), star_yellow, star_green, star_red, end-of-level last_star
+- Collectibles: coins (100 pts; bonus life at score threshold), star_yellow, star_green, star_red, end-of-level last_star
 - Floor gaps (configurable voids in the ground)
 - Climbable vines, ladders, ropes; 3 bouncepad variants (small, medium, high)
-- Start menu, HUD (hearts/lives/score), lives system, invincibility blink on damage
-- Level-completion summary captures elapsed time and coin totals; Enter/Space/Start continues to `next_phase` when configured, Esc/Back exits terminal overlays
+- Campaign-driven start menu and Level Select, HUD (hearts/lives/score), lives system, invincibility blink on damage
+- Level-completion summary captures elapsed time and coin totals; terminal actions are Next Level (when configured), Replay, Level Select, Exit; game over offers Retry, Level Select, Exit; Up/Down or D-pad selects, Enter/Space/Start confirms (A also confirms), Esc/Back exits (B also exits)
 - Keyboard and gamepad (hot-plug) controls
 - Debug overlay (`--debug`): FPS/CPU counters, hitbox visualization, scrolling event log
-- CI gates: multi-platform builds, editor native build, 14-test `make test` suite, TOML level validation, generated level-catalog freshness check, semantic docs drift, roadmap quality checks, native game/editor smoke, Linux scripted smoke, sanitizer smoke, WebAssembly artifact smoke, docs lint/build
+- CI gates: multi-platform builds, editor native build, 15-test `make test` suite (15 binaries plus Python host checks), TOML level and campaign-manifest validation, generated level-catalog freshness check, semantic docs drift, roadmap quality checks, native game/editor smoke, Linux scripted smoke, sanitizer smoke, WebAssembly artifact smoke, docs lint/build
 - Builds natively on macOS, Linux, Windows; WebAssembly via Emscripten
 
 ---

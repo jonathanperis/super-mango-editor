@@ -59,19 +59,18 @@ Three interaction modes are available via the toolbar or keyboard shortcuts:
 
 ## Entity Palette
 
-The right panel lists all **30 placeable entity types** (`ENT_COUNT`), grouped by category:
+The right panel lists all **31 placeable entity types** (`ENT_COUNT`), grouped by category:
 
 | Category | Entities |
 |----------|----------|
-| Layout | Floor Gap, Rail |
+| World | Player Spawn, Floor Gap, Checkpoint, Rail |
 | Terrain | Platform, Float Platform, Bridge |
 | Collectibles | Coin, Star Yellow, Star Green, Star Red, Last Star |
 | Enemies | Spider, Jumping Spider, Bird, Faster Bird, Fish, Faster Fish |
 | Hazards | Axe Trap, Circular Saw, Spike Row, Spike Platform, Spike Block, Blue Flame, Fire Flame |
 | Surfaces | Bouncepad Small, Bouncepad Medium, Bouncepad High, Vine, Ladder, Rope |
-| Special | Player Spawn |
 
-Each type is shown with its in-game sprite thumbnail so the palette is visually identical to what appears in game.
+Sprite-backed types use their in-game thumbnails. Checkpoints use the editor's primitive marker instead, because they have no sprite asset.
 
 ---
 
@@ -90,7 +89,19 @@ When an entity is selected with the Select tool, the Properties panel displays i
 - `pillar_x`, `y`
 - `mode` (dropdown: PENDULUM / SPIN)
 
+**Example — Checkpoint:**
+- `x`, `y`
+- `screen` is derived from `x`; the inspector labels its runtime purpose: “Respawn when crossed.”
+
 Changes take effect immediately on the canvas (WYSIWYG).
+
+### Checkpoint Workflow and Feedback
+
+1. Open the **World** palette category, choose **Checkpoint**, select **Place**, and click the intended respawn point.
+2. Use **Select** to drag it or edit its `x` and `y` fields. Delete, copy/paste, undo, and redo use the same workflow as other non-singleton placement records.
+3. Save or playtest only after validation succeeds. A checkpoint must be after the effective player start, must have a unique in-world `x`, and must have an in-world `y`; invalid records block save, autosave, and playtest.
+
+The canvas draws a labelled `CP n` marker. Valid markers are amber, hovered markers brighten, the selected marker is blue, and invalid markers are red. The status bar reports **Checkpoint placed**, **Checkpoint moved**, or **Checkpoint deleted**. In the running game, crossing a valid marker produces a brief `CHECKPOINT CP n` HUD notice; the active checkpoint stays visible as `CP n`, and a death respawn is labelled `RESPAWN CP n`.
 
 ---
 
@@ -135,7 +146,7 @@ The editor maintains a full undo stack for all placement, deletion, and property
 
 The undo stack is in-memory only — it is cleared when a new file is opened or created.
 
-The editor also keeps recent files and writes autosaves for modified valid levels under `out/autosave/`.
+The editor also keeps recent files and writes recovery snapshots for modified valid levels in its platform preference directory (`SDL_GetPrefPath("Super Mango", "Editor")`).
 
 ---
 
@@ -152,7 +163,7 @@ Only one entity can be in the clipboard at a time. The pasted entity appears off
 
 ## Play-Test Integration
 
-The **Play** button validates and saves the active TOML level, then launches the game engine as a child process with `--level <path>`. Validation errors block playtest; the first error is shown in the status bar and printed to `stderr`. Clicking **Stop** (or closing the game window) returns to the editor.
+The **Play** button validates the active `LevelDef`, serializes it to a private TOML snapshot in the editor preference directory, then launches the game engine as a child process with `--level <path>`. It does not overwrite the open source file. Validation errors block playtest and appear in the validation summary/status feedback. Clicking **Stop** (or closing the game window) returns to the editor and removes the temporary playtest file.
 
 ```sh
 # Equivalent to clicking Play in the editor:
@@ -176,7 +187,7 @@ The title bar shows an asterisk (`*`) after the filename when there are unsaved 
 
 Saved files are plain TOML — they can be edited in any text editor and immediately reloaded in the editor or game.
 
-Save and Export run `editor_validate_level()` first. Errors such as bad counts, invalid paths, missing `next_phase` files, or invalid `screen_count` block persistence so the editor does not write or launch levels known to be unsafe. The status bar always shows the current validation summary.
+Save, autosave, and Play run `editor_validate_level()` first. Errors such as bad counts, invalid paths, missing `next_phase` files, invalid `screen_count`, or invalid checkpoints block persistence and playtest so the editor does not write or launch levels known to be unsafe. The Level Config panel and status bar show the current validation summary.
 
 CI can start and immediately exit the editor with:
 
@@ -193,8 +204,8 @@ The editor is built from these modules in `src/editor/`:
 | File | Responsibility |
 |------|---------------|
 | `editor_main.c` | Entry point — SDL init, `EditorState` lifecycle |
-| `editor.c` / `editor.h` | Core state struct, init/loop/cleanup, `EntityType` enum (30 types), `EditorTool`, `EditorCamera`, `Selection` |
-| `editor_validation.c` / `editor_validation.h` | In-memory level validation report used by status, save/export, autosave, and playtest |
+| `editor.c` / `editor.h` | Core state struct, init/loop/cleanup, `EntityType` enum (31 types), `EditorTool`, `EditorCamera`, `Selection` |
+| `editor_validation.c` / `editor_validation.h` | In-memory level validation report used by status, save, autosave, and playtest |
 | `canvas.c` / `canvas.h` | Level preview rendering, `canvas_screen_to_world`, grid overlay |
 | `palette.c` / `palette.h` | Entity palette panel — thumbnails, type selection |
 | `properties.c` / `properties.h` | Property inspector panel — per-type field editing |
@@ -202,7 +213,8 @@ The editor is built from these modules in `src/editor/`:
 | `ui.c` / `ui.h` | Immediate-mode UI widget library (buttons, dropdowns, text fields) |
 | `undo.c` / `undo.h` | Undo stack and `PlacementData` clipboard union |
 | `serializer.c` / `serializer.h` | TOML deserialization: file → `LevelDef` |
-| `exporter.c` / `exporter.h` | TOML serialization: `LevelDef` → file |
+| `serializer_load_checkpoints.c` / `.h` | Strict `[[checkpoints]]` TOML parsing (`x`/`y` required) |
+| `serializer_save.c` / `serializer_save.h` | TOML serialization: `LevelDef` → file |
 | `file_dialog.c` / `file_dialog.h` | Native OS file picker (macOS / Linux / Windows) |
 
 The `EditorState` struct mirrors the game's `GameState` design: one container passed by pointer to every function, owning the SDL window, renderer, font, entity textures, level data, camera, tool state, undo stack, and UI state.

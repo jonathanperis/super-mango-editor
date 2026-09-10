@@ -13,8 +13,8 @@ Super Mango levels are defined as [TOML](https://toml.io) files inside the `leve
 ## Quick Start
 
 ```sh
-# Run a level file directly
-make run-level LEVEL=levels/00_sandbox_01.toml
+# Run the first campaign level directly
+make run-level LEVEL=levels/00_onboarding_01.toml
 
 # Open a level in the visual editor
 make run-editor
@@ -28,6 +28,7 @@ make run-editor
 Every level file begins with these key-value pairs. All are required unless marked optional.
 
 ```toml
+format_version = 1                       # required level-schema version
 name        = "Creator's Playground"
 description = """
 Optional multi-line description of the level.
@@ -48,9 +49,10 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `format_version` | int | Required level-schema version. Current value: `1`. |
 | `screen_count` | int | Number of 400px-wide screens. `4` → world is 1600px wide. |
 | `player_start_x/y` | float | Spawn position in logical pixels. |
-| `music_path` | string | Path to WAV/OGG, relative to repo root. |
+| `music_path` | string | Path to a WAV file, relative to repo root. |
 | `music_volume` | int | SDL_mixer channel volume: 0 (silent) – 128 (full). |
 | `floor_tile_path` | string | PNG used to tile the ground. Per-level theming. |
 | `initial_hearts` | int | Starting hit points for the level. |
@@ -58,6 +60,33 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 | `score_per_life` | int | Score threshold spacing for bonus lives. |
 | `coin_score` | int | Points awarded for each collected coin. |
 | `floor_gaps` | int array | Sea gap x-positions. Blue/fire flames are placed manually; flame `x` values normally match these openings. |
+
+## Authored Checkpoints
+
+`[[checkpoints]]` is optional level data for explicit respawn points. Each record requires finite numeric `x` and `y` values:
+
+```toml
+[[checkpoints]]
+x = 304.0
+y = 205.0
+
+[[checkpoints]]
+x = 448.0
+y = 205.0
+```
+
+| Rule | Requirement |
+|------|-------------|
+| Capacity | At most `MAX_CHECKPOINTS` (`99`) records. |
+| `x` | Finite, unique, strictly after the effective player-start x, and within `0..(screen_count × GAME_W − TILE_SIZE)`. |
+| `y` | Finite and within `0..GAME_H`. |
+| Placement order | Kept as authored. It controls the editor/HUD checkpoint number; records do not need to be sorted by x. |
+
+At runtime, the level definition remains immutable. After player movement and before lethal collision handling, the runtime resolves the furthest checkpoint whose `x` is at or behind the player. Its exact `x` and `y` become the respawn position; progress never moves backward. A brief bottom-left `CHECKPOINT CP n` notice confirms activation, then `CP n` remains while that authored checkpoint is active; a death respawn shows `RESPAWN CP n`.
+
+When a level has one or more authored records, they are the only checkpoint system: automatic screen-boundary checkpoints are disabled, including before the first authored record is crossed. When `[[checkpoints]]` is omitted or empty, the legacy automatic screen-boundary behavior remains unchanged. Loading a level, retrying after game over, replaying, or successfully advancing to the next phase starts from that level's effective player start again.
+
+The first catalog level, `levels/00_onboarding_01.toml`, demonstrates the schema with checkpoints at `(304.0, 205.0)` and `(448.0, 205.0)` before and after its flame-marked gap.
 
 ### Optional `[physics]` Overrides
 
@@ -101,7 +130,7 @@ Use physics overrides sparingly: they are level-wide tuning knobs, not per-entit
 Rails define closed or open tracks that spike blocks and float platforms ride on.
 
 ```toml
-[rails]
+[[rails]]
 layout  = "RECT"    # "RECT" = rectangular loop, "HORIZ" = horizontal line
 x       = 444       # top-left tile x in logical pixels
 y       = 35        # top-left tile y in logical pixels
@@ -126,7 +155,7 @@ The `end_cap` flag only applies to open (`HORIZ`) rails. With `end_cap = 1` the 
 Ground-level pillar columns. The player can land on the top surface only.
 
 ```toml
-[platforms]
+[[platforms]]
 x           = 80.0   # left edge of the pillar in logical pixels
 tile_height = 2      # pillar height in 48px tiles (1 = 48px, 2 = 96px, 3 = 144px)
 tile_width  = 1      # pillar width in 48px tiles (usually 1)
@@ -145,7 +174,7 @@ Pillar top Y: `FLOOR_Y − (tile_height × TILE_SIZE)` = `252 − (tile_height �
 ## Coins
 
 ```toml
-[coins]
+[[coins]]
 x = 46.0    # centre-ish x in logical pixels (render width = 16px)
 y = 236.0   # top edge y in logical pixels
 ```
@@ -157,15 +186,15 @@ Each coin is worth `coin_score` points (default 100). Every `score_per_life` poi
 ## Stars
 
 ```toml
-[star_yellows]
+[[star_yellows]]
 x = 272.0
 y = 108.0
 
-[star_greens]
+[[star_greens]]
 x = 500.0
 y = 80.0
 
-[star_reds]
+[[star_reds]]
 x = 800.0
 y = 100.0
 ```
@@ -185,7 +214,33 @@ next_phase = "levels/01_lugio_01.toml"  # optional level loaded after completion
 
 Single-instance. Triggers the level-complete event when collected. Displayed at 24×24 px. `next_phase` is serialized inside `[last_star]` because phase progression is tied to collecting the end-of-level star.
 
-Collecting the last star snapshots elapsed time and coin totals, then shows the level-completion summary. If `next_phase` is set, pressing Enter, Space, or controller Start after the summary loads the next TOML level; otherwise confirmation exits the run. Esc or controller Back exits the overlay/run without advancing.
+Collecting the last star snapshots elapsed time and coin totals, then shows the level-completion summary. With `next_phase`, its actions are **Next Level**, **Replay**, **Level Select**, and **Exit**; without one, the actions are **Replay**, **Level Select**, and **Exit**. Use Up/Down or D-pad to focus an action, Enter/Space/Start (or A) to confirm it, and Esc/Back (or B) to exit without advancing. See [Controls & Input](../controls/) for native level-select and browser-replay behavior.
+
+---
+
+## Campaign Manifest (v1)
+
+`levels/campaigns/main.toml` is the required native-menu catalog, not a playable level. It has exactly two top-level fields. The current v1 order starts with the onboarding level:
+
+```toml
+format_version = 1
+levels = [
+    "levels/00_onboarding_01.toml",
+    "levels/00_sandbox_01.toml",
+    "levels/01_lugio_01.toml",
+    "levels/02_lugio_02.toml",
+]
+```
+
+| Rule | Requirement |
+|------|-------------|
+| Version | `format_version` is integer `1`. |
+| Membership | `levels` is a nonempty, duplicate-free ordered array. |
+| Paths | Each item is a direct child path in the form `levels/<filename>.toml`; use forward slashes only. Nested paths, absolute paths, `:` and `\\` are rejected. |
+| Listed files | Every entry must resolve and load as a TOML level. The start menu uses that level's `name`, falling back to its filename stem. |
+| Progression | Each non-final listed level must set `[last_star].next_phase` to the next manifest entry. The final listed level must omit `next_phase`. |
+
+The manifest order drives the native selector and generated [Level Catalog](../level-catalog/). A bare native launch therefore selects **Forest First Steps** first; its `last_star` advances to Creator's Playground, then Volcanic Depths 1 and 2. `make validate-levels` validates both the manifest and all playable `levels/*.toml` files. `--level <path>` remains an explicit direct-load path: it skips the selector and may launch a valid TOML level not listed in the manifest.
 
 ---
 
@@ -196,7 +251,7 @@ Collecting the last star snapshots elapsed time and coin totals, then shows the 
 Ground patrol enemy. Walks back and forth between `patrol_x0` and `patrol_x1`.
 
 ```toml
-[spiders]
+[[spiders]]
 x          = 600.0   # starting x in logical pixels
 vx         = 50.0    # initial horizontal speed (px/s); sign sets direction
 patrol_x0  = 592.0   # left patrol boundary
@@ -209,7 +264,7 @@ frame_index = 0      # starting animation frame (0–2)
 Variant that leaps across sea gaps. Same fields as spider.
 
 ```toml
-[jumping_spiders]
+[[jumping_spiders]]
 x          = 130.0
 vx         = 55.0
 patrol_x0  = 46.0
@@ -221,7 +276,7 @@ patrol_x1  = 310.0
 Slow sine-wave sky patrol. `base_y` is the vertical centre of the wave.
 
 ```toml
-[birds]
+[[birds]]
 x          = 100.0
 base_y     = 60.0    # vertical centre of the sine wave in logical pixels
 vx         = 45.0    # horizontal speed (px/s)
@@ -235,7 +290,7 @@ frame_index = 0
 Same schema as `[birds]`. Higher `vx` for more aggressive patrol.
 
 ```toml
-[faster_birds]
+[[faster_birds]]
 x          = 600.0
 base_y     = 50.0
 vx         = -80.0
@@ -249,7 +304,7 @@ frame_index = 0
 Water-lane patrol with random upward jumps.
 
 ```toml
-[fish]
+[[fish]]
 x          = 700.0
 vx         = 70.0
 patrol_x0  = 500.0
@@ -261,7 +316,7 @@ patrol_x1  = 950.0
 Same schema as `[fish]`. Higher `vx`.
 
 ```toml
-[faster_fish]
+[[faster_fish]]
 x          = 1100.0
 vx         = 120.0
 patrol_x0  = 900.0
@@ -277,7 +332,7 @@ patrol_x1  = 1400.0
 Swinging or spinning axe mounted at the top of a platform pillar.
 
 ```toml
-[axe_traps]
+[[axe_traps]]
 pillar_x = 256.0    # x of the platform column the axe is mounted on
 y        = 0.0      # pivot y (0 = top of pillar; engine computes exact Y from pillar)
 mode     = "PENDULUM"  # "PENDULUM" = sinusoidal ±60° swing | "SPIN" = full 360°
@@ -293,7 +348,7 @@ mode     = "PENDULUM"  # "PENDULUM" = sinusoidal ±60° swing | "SPIN" = full 36
 Fast horizontal patrol with constant spin. Does not use a rail.
 
 ```toml
-[circular_saws]
+[[circular_saws]]
 x          = 1350.0
 y          = 0.0      # engine snaps to floor level
 patrol_x0  = 1350.0
@@ -308,7 +363,7 @@ Patrol speed: 180 px/s. Spin speed: 720°/s. Pushes player on contact (220 px/s 
 Static strip of 16×16 spike tiles placed on the ground floor.
 
 ```toml
-[spike_rows]
+[[spike_rows]]
 x     = 780.0   # left edge of the strip in logical pixels
 count = 4       # number of 16×16 tiles in the row
 ```
@@ -318,7 +373,7 @@ count = 4       # number of 16×16 tiles in the row
 Elevated spike hazard surface.
 
 ```toml
-[spike_platforms]
+[[spike_platforms]]
 x          = 370.0
 y          = 200.0   # top edge in logical pixels
 tile_count = 3       # number of tiles wide
@@ -329,7 +384,7 @@ tile_count = 3       # number of tiles wide
 Rail-riding hazard. References a rail by index (0-based order of `[rails]` in the file).
 
 ```toml
-[spike_blocks]
+[[spike_blocks]]
 rail_index = 0      # which rail to ride (0 = first [rails] entry)
 t_offset   = 0.0    # starting position on the rail (0.0 = first tile)
 speed      = 1.5    # traversal speed in tiles per second
@@ -360,7 +415,7 @@ Eruption cycle: **waiting** (1.5 s) → **rising** (−550 px/s launch) → **fl
 Hovering surfaces with three behaviour modes.
 
 ```toml
-[float_platforms]
+[[float_platforms]]
 mode       = "STATIC"   # "STATIC" | "CRUMBLE" | "RAIL"
 x          = 172.0
 y          = 200.0
@@ -381,7 +436,7 @@ speed      = 0.0        # rail traversal speed in tiles/s (RAIL mode)
 Tiled crumble walkway. Bricks fall when the player walks across.
 
 ```toml
-[bridges]
+[[bridges]]
 x           = 1350.0
 y           = 172.0
 brick_count = 8       # number of 16×16 brick tiles
@@ -392,17 +447,17 @@ brick_count = 8       # number of 16×16 brick tiles
 Spring pads that launch the player vertically. Three size tiers.
 
 ```toml
-[bouncepads_small]
+[[bouncepads_small]]
 x         = 734.0
 launch_vy = -380.0    # upward impulse in px/s (negative = up)
 pad_type  = "GREEN"
 
-[bouncepads_medium]
+[[bouncepads_medium]]
 x         = 310.0
 launch_vy = -536.2
 pad_type  = "WOOD"
 
-[bouncepads_high]
+[[bouncepads_high]]
 x         = 1420.0
 launch_vy = -700.0
 pad_type  = "RED"
@@ -419,18 +474,18 @@ pad_type  = "RED"
 Vines, ladders, and ropes are placed as vertical stacks of 16px tiles.
 
 ```toml
-[vines]
+[[vines]]
 x          = 88.0
 y          = 172.0   # top tile y in logical pixels
 tile_count = 2       # height in 16px tiles
 vine_type  = 0       # optional art variant: 0 = Green, 1 = Brown
 
-[ladders]
+[[ladders]]
 x          = 1552.0
 y          = 0.0
 tile_count = 30
 
-[ropes]
+[[ropes]]
 x          = 460.0
 y          = 172.0
 tile_count = 1
@@ -483,6 +538,7 @@ Available background images in `assets/sprites/backgrounds/`:
 ## Minimum Valid Level File
 
 ```toml
+format_version  = 1
 name            = "My Level"
 screen_count    = 2
 player_start_x  = 40.0
@@ -505,4 +561,4 @@ x = 760.0
 y = 200.0
 ```
 
-See `levels/00_sandbox_01.toml` for a full-featured reference level using every entity type.
+See `levels/00_onboarding_01.toml` for a compact checkpoint example and `levels/00_sandbox_01.toml` for a full-featured reference level using every entity type.

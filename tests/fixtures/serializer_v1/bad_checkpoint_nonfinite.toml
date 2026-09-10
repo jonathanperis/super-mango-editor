@@ -1,0 +1,6 @@
+format_version = 1
+screen_count = 1
+
+[[checkpoints]]
+x = nan
+y = 120.0

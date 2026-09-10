@@ -6,6 +6,7 @@
 
 #include <SDL.h>       /* SDL_SetWindowTitle */
 #include <stdio.h>     /* fprintf, snprintf, stderr */
+#include <string.h>    /* memset */
 
 #ifndef _WIN32
 #include <errno.h>     /* errno, ECHILD */
@@ -14,29 +15,47 @@
 #include <unistd.h>    /* fork, execl, _exit */
 #else
 #include <errno.h>     /* errno */
-#include <process.h>   /* _spawnv, _P_NOWAIT */
+#include <stdlib.h>   /* malloc, free */
 #include <stdint.h>    /* intptr_t */
-#include <windows.h>   /* CloseHandle, HANDLE */
+#include <windows.h>   /* CreateProcessW, HANDLE */
 #endif
 
+#include "editor_files.h"    /* private playtest snapshot lifecycle */
 #include "editor_session.h" /* editor status/title/persist helpers */
-#include "serializer.h"     /* level_save_toml */
+#include "serializer_io.h"
+
+int editor_playtest_binary_path(char *path, size_t size)
+{
+    char *base = SDL_GetBasePath();
+    if (!base || !path || size == 0) { SDL_free(base); return -1; }
+#ifdef _WIN32
+    const char *suffix = ".exe";
+#else
+    const char *suffix = "";
+#endif
+    int length = snprintf(path, size, "%ssuper-mango%s", base, suffix);
+    SDL_free(base);
+    if (length < 0 || (size_t)length >= size) { path[0] = '\0'; return -1; }
+    return 0;
+}
 
 void editor_play_test(EditorState *es)
 {
+    if (!es || !editor_finish_field_edit(es)) return;
     if (es->playing) return;   /* already running */
     if (!editor_can_persist(es, "Playtest")) return;
 
-    const char *save_path = es->file_path[0] != '\0'
-                          ? es->file_path
-                          : "levels/_playtest.toml";
-
-    if (level_save_toml(&es->level, save_path) != 0) {
-        fprintf(stderr, "Play: failed to save %s\n", save_path);
-        editor_set_status(es, "Play failed: save %s", save_path);
+    char save_path[EDITOR_PATH_MAX];
+    char binary_path[EDITOR_PATH_MAX];
+    if (editor_playtest_binary_path(binary_path, sizeof(binary_path)) != 0) {
+        editor_set_status(es, "Play failed: cannot locate sibling game executable");
         return;
     }
-    es->modified = 0;
+
+    if (editor_prepare_playtest_level(es, save_path, sizeof(save_path)) != 0) {
+        fprintf(stderr, "Play: failed to prepare private level\n");
+        return;
+    }
     editor_set_status(es, "Play saved %s", save_path);
 
     fprintf(stderr, "Play: launching game...\n");
@@ -45,10 +64,10 @@ void editor_play_test(EditorState *es)
     pid_t pid = fork();
     if (pid == 0) {
         if (es->debug_play)
-            execl("./out/super-mango", "super-mango",
+            execl(binary_path, "super-mango",
                   "--level", save_path, "--debug", (char *)NULL);
         else
-            execl("./out/super-mango", "super-mango",
+            execl(binary_path, "super-mango",
                   "--level", save_path, (char *)NULL);
         _exit(1);
     } else if (pid > 0) {
@@ -58,25 +77,42 @@ void editor_play_test(EditorState *es)
         SDL_SetWindowTitle(es->window, "Super Mango Editor - Playing...");
     } else {
         fprintf(stderr, "Play: fork() failed\n");
+        editor_retire_playtest_level(es);
         editor_set_status(es, "Play failed: fork");
     }
 #else
     {
-        const char *argv_debug[] = {
-            ".\\out\\super-mango.exe", "--level", save_path, "--debug", NULL
-        };
-        const char *argv_normal[] = {
-            ".\\out\\super-mango.exe", "--level", save_path, NULL
-        };
-        const char *const *argv = es->debug_play ? argv_debug : argv_normal;
-        intptr_t child = _spawnv(_P_NOWAIT, argv[0], argv);
-        if (child == -1) {
+        wchar_t *wide_level = serializer_utf8_to_wide(save_path);
+        wchar_t *wide_binary = serializer_utf8_to_wide(binary_path);
+        wchar_t command[EDITOR_PATH_MAX * 2 + 128];
+        STARTUPINFOW startup;
+        PROCESS_INFORMATION process;
+        int written;
+
+        memset(&startup, 0, sizeof(startup));
+        memset(&process, 0, sizeof(process));
+        startup.cb = sizeof(startup);
+        written = wide_level && wide_binary
+                  ? _snwprintf(command, sizeof(command) / sizeof(command[0]),
+                              L"\"%ls\" --level \"%ls\"%ls",
+                              wide_binary, wide_level,
+                              es->debug_play ? L" --debug" : L"")
+                 : -1;
+        if (written < 0 || (size_t)written >= sizeof(command) / sizeof(command[0]) ||
+            !CreateProcessW(wide_binary, command, NULL, NULL, FALSE, 0, NULL, NULL,
+                            &startup, &process)) {
             fprintf(stderr, "Play: launch failed for %s (errno=%d)\n",
                     save_path, errno);
+            free(wide_level);
+            free(wide_binary);
+            editor_retire_playtest_level(es);
             editor_set_status(es, "Play failed: launch %s", save_path);
             return;
         }
-        CloseHandle((HANDLE)child);
+        free(wide_level);
+        free(wide_binary);
+        CloseHandle(process.hThread);
+        es->play_process = (intptr_t)process.hProcess;
     }
     es->playing = 1;
     editor_set_status(es, "Play launched %s", save_path);
@@ -106,6 +142,26 @@ void editor_stop_play(EditorState *es)
             stopped = 0;
         }
     }
+#else
+    if (es->play_process) {
+        HANDLE process = (HANDLE)es->play_process;
+        DWORD wait_result = WaitForSingleObject(process, 0);
+
+        if (wait_result == WAIT_TIMEOUT) {
+            if (!TerminateProcess(process, 1)) {
+                stopped = 0;
+            } else {
+                wait_result = WaitForSingleObject(process, 2000);
+                if (wait_result != WAIT_OBJECT_0) stopped = 0;
+            }
+        } else if (wait_result != WAIT_OBJECT_0) {
+            stopped = 0;
+        }
+        if (stopped) {
+            CloseHandle(process);
+            es->play_process = 0;
+        }
+    }
 #endif
 
     if (!stopped) {
@@ -114,6 +170,7 @@ void editor_stop_play(EditorState *es)
     }
 
     es->playing = 0;
+    editor_retire_playtest_level(es);
     editor_set_status(es, "Play stopped");
     editor_update_window_title(es);
 }
@@ -127,6 +184,7 @@ void editor_check_play_status(EditorState *es)
         if (result > 0) {
             es->play_pid = 0;
             es->playing = 0;
+            editor_retire_playtest_level(es);
             if (WIFEXITED(status)) {
                 editor_set_status(es, "Play exited: code %d", WEXITSTATUS(status));
             } else if (WIFSIGNALED(status)) {
@@ -139,6 +197,7 @@ void editor_check_play_status(EditorState *es)
             if (errno == ECHILD) {
                 es->play_pid = 0;
                 es->playing = 0;
+                editor_retire_playtest_level(es);
                 editor_set_status(es, "Play ended: process already reaped");
                 editor_update_window_title(es);
             } else {
@@ -147,6 +206,23 @@ void editor_check_play_status(EditorState *es)
         }
     }
 #else
-    (void)es; /* Windows: no PID tracking in this simple implementation */
+    if (es->play_process) {
+        HANDLE process = (HANDLE)es->play_process;
+        DWORD wait_result = WaitForSingleObject(process, 0);
+
+        if (wait_result == WAIT_OBJECT_0) {
+            DWORD exit_code = 0;
+            (void)GetExitCodeProcess(process, &exit_code);
+            CloseHandle(process);
+            es->play_process = 0;
+            es->playing = 0;
+            editor_retire_playtest_level(es);
+            editor_set_status(es, "Play exited: code %lu",
+                              (unsigned long)exit_code);
+            editor_update_window_title(es);
+        } else if (wait_result == WAIT_FAILED) {
+            editor_set_status(es, "Play status check failed");
+        }
+    }
 #endif
 }

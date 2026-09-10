@@ -2,7 +2,7 @@
 
 ## Current Design
 
-`super-mango-editor` is standalone SDL2/C application under `src/editor/`. It shares `LevelDef` and game constants with runtime code, but owns its own window, renderer, UI state, canvas, palette, properties, tools, undo stack, serializer, exporter, validation, recent-file/autosave state, playtest launcher, and file-dialog helpers.
+`super-mango-editor` is standalone SDL2/C application under `src/editor/`. It shares `LevelDef` and game constants with runtime code, but owns its own window, renderer, UI state, canvas, palette, properties, tools, undo stack, TOML serializer, validation, recent-file/autosave state, playtest launcher, and file-dialog helpers.
 
 ```text
 super-mango-editor
@@ -15,7 +15,6 @@ super-mango-editor
 ├── undo.c/.h           undo/redo command stack
 ├── editor_validation.c/.h in-memory validation report
 ├── serializer.c/.h     LevelDef ↔ TOML data
-├── exporter.c/.h       export helpers
 ├── file_dialog.c/.h    file interactions
 └── ui.c/.h             immediate-mode SDL2_ttf widgets
 ```
@@ -26,10 +25,10 @@ super-mango-editor
 |--------|---------|
 | `make editor` | Build `out/super-mango-editor`. |
 | `make run-editor` | Build and run editor. |
-| `make test` | Run 11 native C regression tests. |
+| `make test` | Run 15 native regression binaries plus Python level-validation and web-host checks. |
 | `make validate-levels` | Run `python3 tools/validate_levels.py`. |
 
-`make test` currently runs 11 binaries: serializer, level validation, runtime load, rail, entity-utils, collision, phase-transition, exporter, editor-validation, gameplay-damage, and gameplay-config.
+`make test` currently runs 15 native binaries: level-serializer, level-validate, runtime-load, rail, entity-utils, collision, phase-transition, editor-validation, gameplay-damage, gameplay-config, gameplay-score, game-overlay, game-events, session, and game-checkpoint. `tests/validate_levels_test.py` and `tools/check_web_boot_contract.py` run as Python host checks in the same target.
 
 CI also builds the editor natively, runs game/editor smoke tests, checks WebAssembly artifacts, and runs docs lint/build for docs PRs.
 
@@ -41,19 +40,20 @@ TOML files in `levels/` are source of truth for shipped editable levels. `LevelD
 
 Current level files:
 
+- `levels/00_onboarding_01.toml`
 - `levels/00_sandbox_01.toml`
 - `levels/01_lugio_01.toml`
 - `levels/02_lugio_02.toml`
 
-Top-level TOML data includes metadata, screen count, player spawn, music, floor tile, game rules, physics overrides, background/foreground/fog layers, floor gaps, and entity array tables.
+Top-level TOML data includes metadata, screen count, player spawn, music, floor tile, game rules, physics overrides, background/foreground/fog layers, floor gaps, optional authored `[[checkpoints]]`, and entity array tables. Checkpoint records require finite numeric `x` and `y`; runtime resolves the furthest crossed record as respawn state, while levels without records keep legacy screen-boundary respawns.
 
 ## Editor Inventory
 
-`ENT_COUNT` currently covers 30 placeable types:
+`ENT_COUNT` currently covers 31 placeable types:
 
 | Category | Editor types |
 |----------|--------------|
-| World/static | `ENT_FLOOR_GAP`, `ENT_RAIL`, `ENT_PLATFORM` |
+| World/static | `ENT_PLAYER_SPAWN`, `ENT_FLOOR_GAP`, `ENT_CHECKPOINT`, `ENT_RAIL`, `ENT_PLATFORM` |
 | Collectibles | `ENT_COIN`, `ENT_STAR_YELLOW`, `ENT_STAR_GREEN`, `ENT_STAR_RED`, `ENT_LAST_STAR` |
 | Enemies | `ENT_SPIDER`, `ENT_JUMPING_SPIDER`, `ENT_BIRD`, `ENT_FASTER_BIRD`, `ENT_FISH`, `ENT_FASTER_FISH` |
 | Hazards | `ENT_AXE_TRAP`, `ENT_CIRCULAR_SAW`, `ENT_SPIKE_ROW`, `ENT_SPIKE_PLATFORM`, `ENT_SPIKE_BLOCK`, `ENT_BLUE_FLAME`, `ENT_FIRE_FLAME` |
@@ -84,7 +84,7 @@ Current validation exists in both CLI/CI and editor UI/status:
 ```text
 TOML file → tools/validate_levels.py → parse/schema/count/path checks → CI / make validate-levels
 LevelDef validation C tests → make test
-EditorState.level → editor_validate_level → status summary + save/export/autosave/playtest blocking
+EditorState.level → editor_validate_level → status/panel summary + save/autosave/playtest blocking
 ```
 
 Next design step: turn the shipped validation summary into a richer diagnostics panel with selectable issue rows.
@@ -96,32 +96,26 @@ Next design step: turn the shipped validation summary into a richer diagnostics 
 - Runs current validation against active file or in-memory serialized temp file.
 - Groups issues by severity: error, warning, info.
 - Links issue rows to entity/property selection when possible.
-- Preserve current blocking semantics for save, export, autosave, and playtest.
+- Preserve current blocking semantics for save, autosave, and playtest.
 
-### Metadata Editor
+### Metadata Editor UX
 
-- Dedicated tab for top-level TOML fields.
+- Preserve the shipped top-level TOML fields in the dense Level Config panel.
 - Validates asset paths using categorized `assets/` roots.
 - Preserves multiline `description` and author credit.
 - Edits arrays for backgrounds, foregrounds, fog layers.
 
 ### Playtest UX Polish
 
-- Preserve current save → validation → `out/super-mango --level <path>` launch flow.
+- Preserve current validation → private TOML snapshot → `out/super-mango --level <path>` launch flow.
 - Show status and stderr/stdout summary in editor.
 
-### Exporter Regression
+### TOML Serializer Regression
 
 - Add representative fixture levels.
 - Assert serializer round-trip preserves metadata, arrays, counts, paths, and enum strings.
-- Assert exporter output remains stable where exporter is used.
 
 ### Recent Files + Autosave
 
-- Build on current recent-file list and autosave to `out/autosave/`.
-- Prompt recovery on next launch when autosave is newer than explicit save.
-
-## Planning References
-
-- `EXECUTIVE_PROJECT_ENHANCEMENT_REPORT.md`
-- `EXECUTIVE_PROJECT_ACHIEVABLES_PLAN.md`
+- Build on the current recent-file list and recovery snapshots in the SDL preference directory.
+- Preserve the shipped recovery choice and improve its presentation when snapshots are available.

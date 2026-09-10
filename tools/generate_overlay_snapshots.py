@@ -11,6 +11,26 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src" / "render" / "render_overlay.c"
 OUT = ROOT / "docs" / "wiki" / "overlay-snapshots.md"
 
+REQUIRED_OVERLAYS = {
+    "render_game_over_overlay": {
+        "Game Over",
+        "Up/Down or D-pad: Select",
+        "Enter/Space/A/Start: Confirm",
+        "Esc/B/Back: Exit",
+    },
+    "render_level_complete_overlay": {
+        "Level Complete!",
+        "Game Complete!",
+        "Up/Down or D-pad: Select",
+        "Enter/Space/A/Start: Confirm",
+        "Esc/B/Back: Exit",
+    },
+    "render_pause_overlay": {
+        "Paused",
+        "Enter/Space/Esc/Start: resume",
+    },
+}
+
 
 def text_tokens(block: str) -> list[str]:
     tokens = re.findall(r'render_centered_text\([^;]*?"([^"]+)"', block, re.S)
@@ -28,6 +48,24 @@ def overlay_blocks() -> dict[str, list[str]]:
         end = starts[index + 1].start() if index + 1 < len(starts) else len(source)
         blocks[match.group(1)] = text_tokens(source[match.start():end])
     return blocks
+
+
+def validate_overlay_blocks(blocks: dict[str, list[str]]) -> list[str]:
+    """Return missing public overlay invariants.
+
+    Extraction deliberately follows public overlay functions only. Private
+    helpers such as render_terminal_actions may format intermediate strings
+    that never reach the snapshot document.
+    """
+    failures: list[str] = []
+    for name, required in REQUIRED_OVERLAYS.items():
+        if name not in blocks:
+            failures.append(f"missing public overlay function {name}")
+            continue
+        tokens = set(blocks[name])
+        for token in sorted(required - tokens):
+            failures.append(f"{name}: missing public text token {token!r}")
+    return failures
 
 
 def render() -> str:
@@ -61,6 +99,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="fail if snapshots are stale")
     args = parser.parse_args()
+
+    blocks = overlay_blocks()
+    failures = validate_overlay_blocks(blocks)
+    if failures:
+        print("overlay snapshots: invalid source")
+        for failure in failures:
+            print(f"- {failure}")
+        return 1
 
     text = render()
     if OUT.exists() and OUT.read_text(encoding="utf-8") == text:

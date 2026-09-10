@@ -9,6 +9,7 @@
 
 #include "../levels/level.h"
 #include "../core/debug.h"
+#include "../core/game_checkpoint.h"
 #include "../hazards/spike.h"  /* SPIKE_PUSH_SPEED, SPIKE_PUSH_VY */
 
 #include <SDL_mixer.h>  /* Mix_PlayChannel */
@@ -23,19 +24,19 @@ void game_restart_after_game_over(GameState *gs)
     def = (const LevelDef *)gs->runtime.current_level;
     gs->game_over = 0;
     gs->completion.complete = 0;
+    gs->completion.level_elapsed = 0.0f;
     gs->pause_reasons = 0;
     gs->paused = 0;
     gs->lives = def && def->initial_lives > 0 ? def->initial_lives : DEFAULT_LIVES;
     gs->hearts = def && def->initial_hearts > 0 ? def->initial_hearts : MAX_HEARTS;
     gs->score = 0;
-    gs->checkpoint_x = 0.0f;
-    if (def && (def->player_start_x != 0.0f || def->player_start_y != 0.0f)) {
-        gs->player.spawn_x = def->player_start_x;
-        gs->player.spawn_y = def->player_start_y;
-    } else {
-        gs->player.spawn_x = 80.0f;
-        gs->player.spawn_y = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);
-    }
+    gs->level_score_start = 0;
+    level_effective_spawn(def, &gs->respawn_x, &gs->respawn_y);
+    gs->checkpoint_index = -1;
+    game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_NONE, 0, 0);
+    gs->legacy_checkpoint_screen = 0;
+    gs->player.spawn_x = gs->respawn_x;
+    gs->player.spawn_y = gs->respawn_y;
     gs->score_life_next = gs->rules.score_per_life;
     reset_current_level(gs, &gs->loop.fp_prev_riding);
 }
@@ -67,6 +68,7 @@ void apply_damage(GameState *gs, int amount, int push,
         gs->lives--;
         if (gs->lives < 0) {
             gs->game_over = 1;
+            gs->terminal_action_index = 0;
             gs->pause_reasons = 0;
             gs->paused = 0;
             if (gs->debug_mode) debug_log(&gs->debug, "GAME OVER");
@@ -79,5 +81,7 @@ void apply_damage(GameState *gs, int amount, int push,
                        ? def->initial_hearts : MAX_HEARTS;
         }
         reset_current_level(gs, &gs->loop.fp_prev_riding);
+        game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_RESPAWN,
+                                      SDL_GetTicks(), 900);
     }
 }

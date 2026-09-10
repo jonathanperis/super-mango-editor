@@ -10,7 +10,7 @@
 
 ## About
 
-Super Mango is a 2D side-scrolling platformer built in C11 with SDL2, designed as an educational project with well-commented source code that can be read as a learning resource for C + SDL2 game development. The game features multi-screen TOML levels with parallax backgrounds, one-way platforms, floating platforms, crumble bridges, floor gaps, collectible coins, climbable vines/ladders/ropes, six enemy types, seven hazard types, bouncepads, animated water, fog overlays, a start menu, HUD, level-completion summary, and next-phase flow. Levels are defined in TOML and loaded at runtime, with a standalone visual level editor for creating and editing levels. It renders at a 400x300 logical resolution scaled 2x to an 800x600 window for a chunky pixel-art look, with frame-rate-independent movement via delta-time physics. The project builds natively on macOS, Linux, and Windows, and compiles to WebAssembly via Emscripten for browser play.
+Super Mango is a 2D side-scrolling platformer built in C11 with SDL2, designed as an educational project with well-commented source code that can be read as a learning resource for C + SDL2 game development. The game features multi-screen TOML levels with parallax backgrounds, one-way platforms, floating platforms, crumble bridges, floor gaps, collectible coins, climbable vines/ladders/ropes, six enemy types, seven hazard types, bouncepads, animated water, fog overlays, authored respawn checkpoints, a campaign-driven start menu, HUD, level-completion summary, and terminal action menus for progression, replay, level selection, and exit. Playable levels are TOML files; `levels/campaigns/main.toml` orders the menu catalog as Forest First Steps → Creator's Playground → Volcanic Depths 1 → Volcanic Depths 2. The standalone visual editor saves and loads those TOML files directly. It renders at a 400x300 logical resolution scaled 2x to an 800x600 window for a chunky pixel-art look, with frame-rate-independent movement via delta-time physics. The project builds natively on macOS, Linux, and Windows, and compiles to WebAssembly via Emscripten for browser play.
 
 ## Tech Stack
 
@@ -33,26 +33,28 @@ Super Mango is a 2D side-scrolling platformer built in C11 with SDL2, designed a
 - Seven hazard types: spike rows, spike blocks, spike platforms, circular saws, axe traps, blue flames, fire flames
 - Collectibles: coins (100 pts each, bonus life by score threshold), star yellow, star green, star red health pickups, end-of-level last star
 - Climbable vines, ladders, and ropes; three bouncepad variants (small, medium, high)
-- TOML-based level format with runtime level loading (`--level path/to/level.toml`) and `next_phase` transitions
-- Pause, game-over, and end-of-level overlays: Esc/Start pauses or resumes gameplay, game over waits for Enter/Space/Start before restarting, Enter/Space/Start continues to the next phase when a completion overlay is shown, and Esc/Back exits terminal overlays
-- Start menu, HUD (hearts/lives/score), lives system, invincibility blink on damage
+- TOML-only level workflow: `levels/campaigns/main.toml` starts with the Forest First Steps onboarding level and supplies the ordered native selector, while `--level path/to/level.toml` bypasses that selector and loads a TOML level directly
+- Authored `[[checkpoints]]` records give a level explicit respawn positions; no records preserves legacy automatic screen-boundary respawns
+- Pause, game-over, and end-of-level overlays: terminal action rows use Up/Down or D-pad to select, Enter/Space/Start (A also confirms) to confirm, and Esc/Back (B also exits) to exit
+- Completion actions: Next Level when `next_phase` exists, Replay, Level Select, Exit; game-over actions: Retry, Level Select, Exit
+- Campaign-driven native start menu and level select; HUD (hearts/lives/score), lives system, invincibility blink on damage
+- Browser Replay stores the current TOML path in session storage, tears down the active WebAssembly session, reloads the page, and boots that level again
 - Keyboard and gamepad (hot-plug) controls
 - Debug overlay (`--debug` flag): FPS counter, CPU frame time, memory usage, collision hitbox visualization, scrolling event log
 - Builds natively on macOS, Linux, and Windows; WebAssembly build via Emscripten
 
 ## Level Editor
 
-Super Mango includes a standalone visual level editor built with C11 and SDL2. The editor lets you create and edit levels with a point-and-click interface, then save them as TOML files or export them as C source for embedding.
+Super Mango includes a standalone visual level editor built with C11 and SDL2. The editor lets you create and edit levels with a point-and-click interface, then save and load TOML files used directly by the game.
 
 Editor features:
 
 - Scrollable canvas with zoom, grid snapping, and select/place/delete tools
-- Entity palette with all game objects: platforms, enemies, hazards, collectibles, surfaces, effects
+- Entity palette with world geometry and game objects, including authored checkpoint markers: platforms, enemies, hazards, collectibles, and surfaces
 - Per-entity property editing (position, size, speed, animation, behavior)
 - TOML serialization (save/load `.toml` level files)
-- C code exporter (generates `.c`/`.h` files for compiled-in levels)
 - Undo/redo history, copy/paste, recent files, autosave, and dirty-state indicators
-- Validation status for the active level; validation errors block save, export, and playtest
+- Validation status for the active level; validation errors block save and playtest
 - Native file dialogs
 - Headless smoke mode for CI (`--smoke-test`)
 
@@ -133,11 +135,11 @@ pacman -S mingw-w64-ucrt-x86_64-clang \
 make CC=clang                         # build the game binary into out/
 make run CC=clang                     # build and run
 make run-debug CC=clang               # build and run with debug overlay
-make run-level CC=clang LEVEL=levels/00_sandbox_01.toml         # run a specific TOML level
-make run-level-debug CC=clang LEVEL=levels/00_sandbox_01.toml   # run a level with debug overlay
+make run-level CC=clang LEVEL=levels/00_onboarding_01.toml      # run a specific TOML level
+make run-level-debug CC=clang LEVEL=levels/00_onboarding_01.toml # run a level with debug overlay
 make editor CC=clang                  # build the level editor
 make run-editor CC=clang              # build and run the level editor
-make test CC=clang                    # build and run 14 native regression tests
+make test CC=clang                    # build and run 15 native regression tests (binaries) plus Python host checks
 make validate-levels                  # validate all levels/*.toml files
 make web                              # build to WebAssembly (requires Emscripten)
 make clean                            # remove all build artifacts
@@ -164,14 +166,16 @@ Tagged releases and manually dispatched release builds publish zip archives for 
 super-mango-editor/
 ├── Makefile                          Build system (clang, sdl2-config, ad-hoc codesign)
 ├── levels/                           TOML level definitions
-│   ├── 00_sandbox_01.toml           Level data loaded at runtime
+│   ├── 00_onboarding_01.toml        Forest First Steps; first v1 campaign level
+│   ├── 00_sandbox_01.toml           Creator's Playground; second v1 campaign level
 │   ├── 01_lugio_01.toml             Level data loaded at runtime
-│   └── 02_lugio_02.toml             Level data loaded at runtime
+│   ├── 02_lugio_02.toml             Level data loaded at runtime
+│   └── campaigns/main.toml           v1 ordered campaign manifest for the native selector
 ├── src/                              C source files and headers
 │   ├── main.c                        Entry point: SDL init/teardown
 │   ├── game.h                        Shared GameState/constants declarations
 │   ├── collectibles/                  Pickup items
-│   │   ├── coin.h / .c               Coin (100 pts, 3 restore a heart)
+│   │   ├── coin.h / .c               Coin (100 pts; bonus life at score threshold)
 │   │   ├── star_yellow.h / .c        Yellow star health pickup
 │   │   ├── star_green.h / .c         Green star health pickup
 │   │   ├── star_red.h / .c           Red star health pickup
@@ -190,7 +194,6 @@ super-mango-editor/
 │   │   ├── editor_frame/events/chrome/panels/layout/textures modules
 │   │   ├── editor_files/session/playtest/clipboard/validation modules
 │   │   ├── serializer*.h / .c        TOML save/load orchestration and staged parsers
-│   │   ├── exporter.h / .c           C code export (.c/.h generation)
 │   │   ├── file_dialog.h / .c        Native file dialogs
 │   │   └── undo*.h / .c              Undo/redo history and operation application
 │   ├── effects/                       Visual effects
@@ -218,7 +221,6 @@ super-mango-editor/
 │   │   ├── level_path/resources/session/physics helpers
 │   │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
 │   │   ├── level_validate.c          LevelDef count validation
-│   │   └── exported/                  Auto-generated C level data
 │   ├── player/                        Player module split into lifecycle, input, motion, jump, climb, surface, and animation files
 │   ├── render/                        `game_render` frame order and `render_overlay` foreground/overlay helpers
 │   ├── screens/                       Game screens
@@ -274,7 +276,6 @@ super-mango-editor/
 |------|---------|
 | `PRODUCT.md` | Product direction, player promise, and feature framing. |
 | `DESIGN.md` | Visual/UX design notes for the arcade-cabinet presentation. |
-| `EXECUTIVE_AUDIT_REPORT.md` | Historical audit snapshot and improvement roadmap reference. |
 | `AGENTS.md` and `.agents/` | Standardized agent instructions, lane ownership, and repo operating rules. |
 | `CODEOWNERS` | Review ownership hints for GitHub. |
 

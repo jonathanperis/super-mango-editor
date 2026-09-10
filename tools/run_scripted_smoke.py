@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import json
+import math
 import os
 import shlex
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,10 +38,62 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run(cmd: list[str], env: dict[str, str]) -> None:
+def run(cmd: list[str], env: dict[str, str]) -> str:
     printable = " ".join(shlex.quote(part) for part in cmd)
     print(f"scripted-smoke: {printable}")
-    subprocess.run(cmd, cwd=ROOT, env=env, check=True)
+    result = subprocess.run(cmd, cwd=ROOT, env=env, text=True,
+                            capture_output=True, timeout=30)
+    if result.returncode:
+        print(result.stdout, result.stderr, file=sys.stderr)
+        result.check_returncode()
+    return result.stdout
+
+
+def smoke_state(output: str, frames: int) -> dict:
+    records = [line.removeprefix("SMOKE_STATE ") for line in output.splitlines()
+               if line.startswith("SMOKE_STATE ")]
+    if len(records) != 1:
+        raise AssertionError("smoke must report exactly one final state")
+    state = json.loads(records[0])
+    if state["frames"] != frames or not all(math.isfinite(value) for value in state.values()):
+        raise AssertionError(f"invalid simulation state: {state}")
+    return state
+
+
+def check_builtin_behavior(state: dict, replay: str, level: Path, frames: int) -> None:
+    if frames != 5:
+        return  # Longer/custom runs still verify determinism and finite state.
+    expected_active_frames = 3 if replay == "pause-resume" else 5
+    if not math.isclose(state["elapsed"], expected_active_frames / 60, abs_tol=1e-5):
+        raise AssertionError(f"incorrect active simulation time: {state}")
+    if state["paused"] or state["complete"]:
+        raise AssertionError(f"unexpected overlay after built-in replay: {state}")
+    data = tomllib.loads(level.read_text(encoding="utf-8"))
+    start_x = data.get("player_start_x", 0)
+    if start_x == 0 and data.get("player_start_y", 0) == 0:
+        start_x = 80
+    if replay == "move-right" and state["x"] <= start_x:
+        raise AssertionError("right input did not move the player")
+    if replay == "jump-right" and state["vy"] >= 0:
+        raise AssertionError("jump input did not launch the player")
+
+
+def check_replay_failures(binary: Path, level: str, replay: Path, env: dict[str, str]) -> None:
+    original = replay.read_text(encoding="utf-8")
+    cmd = [str(binary), "--level", level, "--smoke-test-frames", "5", "--seed", "1", "--replay-script"]
+    try:
+        for contents in (None, "", "-1 down right\n", "999999999999999999999999 down right\n",
+                         "0 down mystery\n", "2 down right\n1 up right\n"):
+            if contents is None:
+                replay.unlink()
+            else:
+                replay.write_text(contents, encoding="utf-8")
+            result = subprocess.run(cmd + [replay_id(replay)], cwd=ROOT, env=env,
+                                    capture_output=True, text=True, timeout=30)
+            if result.returncode == 0 or "Error:" not in result.stderr:
+                raise AssertionError("invalid replay did not fail explicitly")
+    finally:
+        replay.write_text(original, encoding="utf-8")
 
 
 def default_replay_scripts(workdir: Path) -> list[Path]:
@@ -100,7 +155,7 @@ def main() -> int:
         rel_level = level_path.relative_to(ROOT).as_posix()
         for seed in args.seeds:
             for replay in replays:
-                run([
+                cmd = [
                     str(binary),
                     "--level",
                     rel_level,
@@ -110,16 +165,37 @@ def main() -> int:
                     str(seed),
                     "--replay-script",
                     replay_id(replay),
-                ], env)
+                ]
+                first = smoke_state(run(cmd, env), args.frames)
+                second = smoke_state(run(cmd, env), args.frames)
+                if first != second:
+                    raise AssertionError(f"non-deterministic replay: {first} != {second}")
+                if not args.replays:
+                    check_builtin_behavior(first, replay_id(replay), level_path, args.frames)
 
     scenario_count = len(levels) * len(args.seeds) * len(replays)
+    if not args.replays:
+        first_level = levels[0] if levels[0].is_absolute() else ROOT / levels[0]
+        check_replay_failures(binary, first_level.relative_to(ROOT).as_posix(), replays[0], env)
+        # An explicit profile must still be ignored by smoke/replay. Use an
+        # intentionally invalid task-owned file to prove it is neither loaded nor overwritten.
+        profile = REPLAY_DIR / 'smoke-profile.toml'
+        contents = 'not a player profile\n'
+        profile.write_text(contents, encoding='utf-8')
+        try:
+            smoke_state(run([str(binary), '--level', first_level.relative_to(ROOT).as_posix(),
+                                      '--smoke-test-frames', '5', '--profile', str(profile)], env), 5)
+            if profile.read_text(encoding='utf-8') != contents:
+                raise AssertionError('smoke modified a profile')
+        finally:
+            profile.unlink()
 
     if not args.skip_editor:
         run([str(editor), "--smoke-test"], env)
 
     print(
         f"scripted-smoke: ok ({len(levels)} levels, {len(args.seeds)} seeds, "
-        f"{scenario_count} replay scenarios)"
+        f"{scenario_count} replay scenarios, each repeated with state assertions)"
     )
     return 0
 

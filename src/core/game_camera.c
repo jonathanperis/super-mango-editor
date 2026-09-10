@@ -6,6 +6,7 @@
 
 #include "../levels/level.h"
 #include "../levels/level_physics.h"
+#include "game_profile.h"
 
 int game_camera_update(GameState *gs, float dt)
 {
@@ -14,6 +15,7 @@ int game_camera_update(GameState *gs, float dt)
     float cam_max = level_camera_lookahead_max(cam_def);
 
     float lookahead = gs->player.vx * cam_vx_factor;
+    if (gs->profile && gs->profile->data.settings.reduced_motion) lookahead = 0.0f;
     if (lookahead >  cam_max) lookahead =  cam_max;
     if (lookahead < -cam_max) lookahead = -cam_max;
 

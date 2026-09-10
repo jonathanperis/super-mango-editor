@@ -50,6 +50,8 @@ OBJS    = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
 DEPS    = $(OBJS:.o=.d)
 ```
 
+The game source list also includes `src/editor/serializer_load_checkpoints.c`, so runtime TOML loading and the standalone editor share strict authored-checkpoint parsing.
+
 ### Key Variables
 
 | Variable | Value | Description |
@@ -116,7 +118,7 @@ make
 
 ### `make run`
 
-Builds (if out of date) then immediately executes the binary (no CLI flags).
+Builds (if out of date) then immediately executes the binary with no CLI flags. The native start menu loads the ordered v1 campaign catalog from `levels/campaigns/main.toml`; it displays the selected entry's TOML `name` (or its filename stem when `name` is empty).
 
 ```sh
 make run
@@ -139,10 +141,10 @@ make run-debug
 
 ### `make run-level LEVEL=path`
 
-Builds (if out of date) then runs the binary with the `--level` flag, loading a specific TOML level file.
+Builds (if out of date) then runs the binary with the `--level` flag, loading a specific TOML level file directly and skipping the campaign selector. The supplied valid TOML level does not need to be listed in `levels/campaigns/main.toml`.
 
 ```sh
-make run-level LEVEL=levels/00_sandbox_01.toml
+make run-level LEVEL=levels/00_onboarding_01.toml
 ```
 
 ### `make run-level-debug LEVEL=path`
@@ -150,7 +152,7 @@ make run-level LEVEL=levels/00_sandbox_01.toml
 Builds (if out of date) then runs the binary with both `--debug` and `--level` flags, loading a specific TOML level file with the debug overlay enabled.
 
 ```sh
-make run-level-debug LEVEL=levels/00_sandbox_01.toml
+make run-level-debug LEVEL=levels/00_onboarding_01.toml
 ```
 
 ### `make editor`
@@ -191,7 +193,7 @@ Builds and runs native regression harnesses for pure logic that does not require
 make test
 ```
 
-Current test binaries (14):
+Current test binaries (15):
 
 - `out/level-serializer-test`
 - `out/level-validate-test`
@@ -200,17 +202,20 @@ Current test binaries (14):
 - `out/entity-utils-test`
 - `out/collision-test`
 - `out/phase-transition-test`
-- `out/exporter-test`
 - `out/editor-validation-test`
 - `out/gameplay-damage-test`
 - `out/gameplay-config-test`
 - `out/gameplay-score-test`
 - `out/game-overlay-test`
 - `out/game-events-test`
+- `out/session-test`
+- `out/game-checkpoint-test`
+
+`make test` also runs two Python host checks: `tests/validate_levels_test.py` and `tools/check_web_boot_contract.py` (through the `web-host-contract` target). The native list above is the complete `TEST_TARGETS` inventory.
 
 ### `make validate-levels`
 
-Runs the Python TOML validator against every `levels/*.toml` file. It checks parsing, referenced asset paths, `next_phase` links, and array counts against the C `MAX_*` constants.
+Runs the Python TOML validator against every `levels/*.toml` file and the required v1 `levels/campaigns/main.toml` manifest. It checks parsing, referenced asset paths, `next_phase` links, array counts against the C `MAX_*` constants, manifest membership/order, and the linear campaign chain.
 
 ```sh
 make validate-levels
@@ -250,7 +255,7 @@ make sanitize-smoke SMOKE_FRAMES=5 SMOKE_SEED=1
 
 ### `make level-catalog`
 
-Regenerates `docs/wiki/level-catalog.md` from `levels/*.toml` using `tools/generate_level_catalog.py`. Use this after adding levels or changing level metadata/content counts.
+Regenerates `docs/wiki/level-catalog.md` from the ordered campaign manifest using `tools/generate_level_catalog.py`. Use this after changing manifest membership/order or listed-level metadata/content counts.
 
 ```sh
 make level-catalog
@@ -290,7 +295,7 @@ make dist-wasm
 
 ### `make docs-drift`
 
-Runs the generated level-catalog freshness check, generated overlay-snapshot freshness check, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. Together they compare Makefile test targets, README/agent/docs command summaries, source-file map entries, layer TOML snippets, workflow docs, runtime flags, key constants, level prose counts, TOML line endings, overlay text snapshots, local Emscripten caveats, and scripted-smoke wiring against the current repository.
+Runs the generated level-catalog freshness check, generated overlay-snapshot freshness check, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. Together they compare Makefile test targets, README/agent/docs command summaries, source-file map entries, campaign catalog coverage, layer TOML snippets, workflow docs, runtime flags, key constants, level prose counts, TOML line endings, overlay text snapshots, local Emscripten caveats, and scripted-smoke wiring against the current repository.
 
 ```sh
 make docs-drift
@@ -315,6 +320,15 @@ bun install --frozen-lockfile
 bun run lint
 NODE_ENV=production bun run build
 ```
+
+When Bun is unavailable but `docs/node_modules` has already been restored, the same package scripts can be checked with npm:
+
+```sh
+cd docs
+npm run lint && npm run build
+```
+
+Keep Bun and `bun.lock` as the CI dependency contract. The npm fallback runs the declared scripts; it does not replace the locked install step.
 
 ### `make clean`
 

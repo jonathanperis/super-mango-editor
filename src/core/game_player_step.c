@@ -1,11 +1,11 @@
 /*
- * game_player_step.c — Player input, movement, bounce, and gap response.
+ * game_player_step.c — Player input, movement, and bounce handling.
  */
 
 #include "game_player_step.h"
 
 #include "game_bouncepads.h"
-#include "../collision/floor_gap_collision.h"
+#include "../input/game_input.h"
 #include "../player/player.h"
 
 static Bouncepad s_all_pads[MAX_BOUNCEPADS_MEDIUM + MAX_BOUNCEPADS_SMALL +
@@ -19,6 +19,7 @@ int game_player_step(GameState *gs, float dt)
 
     player_handle_input(&gs->player, gs->audio.jump, gs->controller,
                         gs->replay_input_mask,
+                        game_input_sample(gs),
                         gs->vines, gs->vine_count,
                         gs->ladders, gs->ladder_count,
                         gs->ropes, gs->rope_count);
@@ -40,7 +41,6 @@ int game_player_step(GameState *gs, float dt)
                   gs->runtime.world_w);
 
     game_bouncepads_handle_hit(gs, bounce_idx);
-    floor_gap_handle_collision(gs);
 
     return fp_landed_idx;
 }

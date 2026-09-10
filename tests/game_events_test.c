@@ -3,6 +3,7 @@
 #include <SDL.h>
 
 #include "core/game_overlay.h"
+#include "core/game_terminal.h"
 #include "input/game_events.h"
 
 static int restart_calls;
@@ -65,7 +66,7 @@ static int controller_back_exits_game_over_overlay(void)
     if (push_controller_button(SDL_CONTROLLER_BUTTON_BACK) != 0) return 1;
     game_handle_events(&gs);
 
-    if (expect_int("Back exits game-over", gs.running, 0) != 0) return 1;
+    if (expect_int("Back routes game-over exit", gs.route, GAME_ROUTE_EXIT) != 0) return 1;
     if (expect_int("Back does not restart game-over", restart_calls, 0) != 0) return 1;
     return 0;
 }
@@ -80,7 +81,7 @@ static int controller_back_exits_completion_overlay(void)
     if (push_controller_button(SDL_CONTROLLER_BUTTON_BACK) != 0) return 1;
     game_handle_events(&gs);
 
-    if (expect_int("Back exits completion", gs.running, 0) != 0) return 1;
+    if (expect_int("Back routes completion exit", gs.route, GAME_ROUTE_EXIT) != 0) return 1;
     if (expect_int("Back does not load next phase", load_next_phase_calls, 0) != 0) return 1;
     return 0;
 }
@@ -96,8 +97,54 @@ static int controller_start_respects_completion_priority_over_game_over(void)
     if (push_controller_button(SDL_CONTROLLER_BUTTON_START) != 0) return 1;
     game_handle_events(&gs);
 
-    if (expect_int("Start exits completion without next phase", gs.running, 0) != 0) return 1;
+    if (expect_int("Start confirms replay", gs.route, GAME_ROUTE_REPLAY) != 0) return 1;
     if (expect_int("Start did not restart lower-priority game-over", restart_calls, 0) != 0) return 1;
+    return 0;
+}
+
+static int completion_navigation_and_first_route_wins(void)
+{
+    GameState gs = {0};
+    gs.completion.complete = 1;
+    gs.completion.pending_next_phase = 1;
+
+    if (push_key(SDLK_DOWN) != 0) return 1;
+    game_handle_events(&gs);
+    if (expect_int("down focuses replay", gs.terminal_action_index, 1) != 0) return 1;
+
+    if (push_key(SDLK_RETURN) != 0) return 1;
+    if (push_key(SDLK_ESCAPE) != 0) return 1;
+    game_handle_events(&gs);
+    if (expect_int("first confirm route wins", gs.route, GAME_ROUTE_REPLAY) != 0) return 1;
+    return 0;
+}
+
+static int failed_next_level_keeps_completion_overlay(void)
+{
+    GameState gs = {0};
+    gs.completion.complete = 1;
+    gs.completion.pending_next_phase = 1;
+    gs.terminal_action_index = 0;
+
+    if (push_key(SDLK_RETURN) != 0) return 1;
+    game_handle_events(&gs);
+    if (expect_int("next routes explicitly", gs.route, GAME_ROUTE_NEXT_LEVEL) != 0) return 1;
+    if (expect_int("completion remains after request",
+                   game_overlay_state(&gs), GAME_OVERLAY_LEVEL_COMPLETE) != 0) return 1;
+    return 0;
+}
+
+static int game_over_retry_stays_in_place(void)
+{
+    GameState gs = {0};
+    gs.game_over = 1;
+
+    reset_counters();
+    if (push_key(SDLK_RETURN) != 0) return 1;
+    game_handle_events(&gs);
+    if (expect_int("retry calls existing restart", restart_calls, 1) != 0) return 1;
+    if (expect_int("retry clears game over", gs.game_over, 0) != 0) return 1;
+    if (expect_int("retry has no cross-screen route", gs.route, GAME_ROUTE_NONE) != 0) return 1;
     return 0;
 }
 
@@ -117,7 +164,7 @@ static int keyboard_escape_toggles_pause_in_active_gameplay(void)
 
 int main(void)
 {
-    if (SDL_Init(SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER) != 0) {
+    if (SDL_Init(SDL_INIT_EVENTS) != 0) {
         fprintf(stderr, "game_events_test: SDL_Init failed: %s\n", SDL_GetError());
         return 1;
     }
@@ -125,6 +172,9 @@ int main(void)
     if (controller_back_exits_game_over_overlay() != 0) return 1;
     if (controller_back_exits_completion_overlay() != 0) return 1;
     if (controller_start_respects_completion_priority_over_game_over() != 0) return 1;
+    if (completion_navigation_and_first_route_wins() != 0) return 1;
+    if (failed_next_level_keeps_completion_overlay() != 0) return 1;
+    if (game_over_retry_stays_in_place() != 0) return 1;
     if (keyboard_escape_toggles_pause_in_active_gameplay() != 0) return 1;
 
     SDL_Quit();

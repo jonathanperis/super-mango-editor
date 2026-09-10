@@ -1,3 +1,4 @@
+format_version = 1
 name = "Creator's Playground"
 description = """
 The original sandbox — four screens of everything the engine can throw
@@ -7,7 +8,7 @@ This is where you learn to play, and where the engine proves it works.
 generated_by = "Jonathanperis and Fersantos, the Authors."
 screen_count = 4
 player_start_x = 79.0
-player_start_y = 124.5
+player_start_y = 172.0
 music_path = "assets/sounds/levels/water.wav"
 music_volume = 13
 floor_tile_path = "assets/sprites/levels/grass_tileset.png"
@@ -15,6 +16,7 @@ initial_hearts = 3
 initial_lives = 3
 score_per_life = 1000
 coin_score = 100
+floor_gaps = [0, 192, 560, 928, 1152, 1528]
 
 [physics]
 walk_max_speed       = -1.0
@@ -28,8 +30,6 @@ air_accel_run        = -1.0
 air_friction         = -1.0
 cam_lookahead_vx_factor = -1.0
 cam_lookahead_max    = -1.0
-
-floor_gaps = [0, 192, 560, 928, 1152]
 
 [[rails]]
 layout = "RECT"
@@ -120,8 +120,8 @@ x = 595.0
 y = 236.0
 
 [[coins]]
-x = 904.0
-y = 236.0
+x = 880.0
+y = 156.0
 
 [[coins]]
 x = 468.0
@@ -132,8 +132,8 @@ x = 855.0
 y = 236.0
 
 [[coins]]
-x = 965.0
-y = 236.0
+x = 1066.0
+y = 108.0
 
 [[coins]]
 x = 1130.0
@@ -264,11 +264,11 @@ patrol_x1 = 1446.0
 direction = 1
 
 [[spike_rows]]
-x = 780.0
+x = 1360.0
 count = 4
 
 [[spike_platforms]]
-x = 370.0
+x = 520.0
 y = 200.0
 tile_count = 3
 
@@ -298,6 +298,9 @@ x = 928.0
 
 [[blue_flames]]
 x = 1152.0
+
+[[blue_flames]]
+x = 1528.0
 
 [[float_platforms]]
 mode = "STATIC"
@@ -407,4 +410,3 @@ speed = 0.6
 [[foreground_layers]]
 path = "assets/sprites/foregrounds/water.png"
 speed = 0.0
-

@@ -67,6 +67,12 @@ __pycache__/
 src/levels/exported/*.c
 src/levels/exported/*.h
 levels/_playtest.toml
+compile_commands.json
 
 # Docs generation
 node_modules/
+
+# Local orchestration state
+.slim/deepwork/
+.specs/
+.cache/

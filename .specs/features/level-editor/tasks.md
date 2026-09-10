@@ -2,7 +2,7 @@
 
 ## Status
 
-Baseline editor is shipped. Old JSON/cJSON implementation tasks are closed as historical planning and no longer describe current work. Current work should be grouped into fewer PRs around validation polish, metadata coverage, playtest UX, regression fixtures, and session recovery.
+Baseline editor is shipped. TOML is the only level workflow; no C exporter remains. Current work should be grouped into fewer PRs around validation polish, metadata UX, playtest feedback, regression fixtures, and session recovery.
 
 ## Completed Baseline
 
@@ -15,11 +15,13 @@ Baseline editor is shipped. Old JSON/cJSON implementation tasks are closed as hi
 | Copy/paste | Complete baseline | `src/editor/tools.*`, `src/editor/undo.*` |
 | TOML serializer | Complete baseline | `src/editor/serializer.*`, `vendor/tomlc17/` |
 | Runtime TOML levels | Complete | `levels/*.toml`, `make run-level LEVEL=...` |
+| Authored checkpoints | Complete | `[[checkpoints]]`, runtime respawn resolution, palette/canvas/properties/undo/playtest support |
 | Level validation tool | Complete baseline | `tools/validate_levels.py`, `make validate-levels`, CI |
-| C validation tests | Complete baseline | `make test` runs 11 binaries |
-| Editor trust safeguards | Complete baseline | Validation blocks save/export/playtest; status summary shown |
-| Playtest launch | Complete baseline | Editor saves, validates, and launches game with `--level` |
-| Recent files + autosave | Complete baseline | Recent paths and valid dirty-level autosave under `out/autosave/` |
+| C validation tests | Complete baseline | `make test` runs 15 native binaries plus Python host checks |
+| Editor trust safeguards | Complete baseline | Validation blocks save/playtest; status summary shown |
+| Metadata editor | Complete baseline | Level Config edits current top-level TOML metadata, layers, and physics overrides |
+| Playtest launch | Complete baseline | Editor validates, writes a private TOML snapshot, and launches game with `--level` |
+| Recent files + recovery | Complete baseline | Recent paths and valid dirty-level recovery snapshots under the SDL preference directory |
 | Smoke gates | Complete baseline | Game/editor native smoke and WebAssembly artifact smoke in CI |
 | Docs checks | Complete baseline | `docs.yml` runs docs lint/build |
 
@@ -35,21 +37,16 @@ Baseline editor is shipped. Old JSON/cJSON implementation tasks are closed as hi
 - Display parse/schema/count/path diagnostics in editor panel.
 - Classify severity: error/warning/info.
 - Select entity/property from issue row where mapping exists.
-- Keep save/export/playtest blocked on errors.
+- Keep save/playtest blocked on errors.
 
 **Verify:** malformed TOML, missing asset path, over-MAX entity count, bad `next_phase`, and valid shipped levels produce expected panel states.
 
-### G-002: Metadata Editor
+### G-002: Metadata Editor UX
 
-**Goal:** editor can maintain full top-level TOML schema, not only entity arrays.
+**Goal:** improve use of the shipped full top-level TOML schema editor.
 
 **Work:**
-- Add UI for `name`, `description`, `generated_by`, `screen_count`, `next_phase`.
-- Add player spawn fields.
-- Add music path/volume and floor tile path fields.
-- Add game-rule fields: hearts, lives, score per life, coin score.
-- Add physics override fields.
-- Add background/foreground/fog layer array editor.
+- Improve discoverability of `name`, `description`, `generated_by`, `screen_count`, `next_phase`, player spawn, music/floor paths, game rules, physics overrides, and background/foreground/fog layer fields.
 
 **Verify:** editing metadata, saving, reloading, and running validation preserves all fields.
 
@@ -58,19 +55,18 @@ Baseline editor is shipped. Old JSON/cJSON implementation tasks are closed as hi
 **Goal:** reduce editor-to-game loop to one action.
 
 **Work:**
-- Preserve shipped save + validation + game launch with current TOML level (`--level <path>` semantics).
+- Preserve shipped validation + private snapshot + game launch with current TOML level (`--level <path>` semantics).
 - Show launch result and validation output in status/panel.
 
 **Verify:** valid level launches; invalid level blocks with actionable error list.
 
-### G-004: Serializer/Exporter Regression Coverage
+### G-004: TOML Serializer Regression Coverage
 
-**Goal:** prevent schema drift and generated-output regressions.
+**Goal:** prevent schema drift in saved TOML.
 
 **Work:**
 - Add fixtures for current shipped levels and edge-case level data.
 - Round-trip TOML through `LevelDef` and compare metadata, counts, arrays, paths, enum values.
-- Cover exporter path if exporter remains supported.
 - Include checks in `make test` where practical.
 
 **Verify:** intentional schema mismatch fails tests; current shipped levels pass.
@@ -80,9 +76,9 @@ Baseline editor is shipped. Old JSON/cJSON implementation tasks are closed as hi
 **Goal:** safer editor sessions.
 
 **Work:**
-- Build on shipped recent-files list, dirty indicator, and autosave interval.
-- Recovery prompt when autosave is newer than saved file.
-- Confirm unsaved changes on new/open/quit.
+- Build on shipped recent-files list, dirty indicator, recovery snapshots, and recovery choice UI.
+- Improve recovery presentation and cleanup feedback.
+- Preserve confirmation for unsaved changes on new/open/quit.
 
 **Verify:** crash/reopen path offers recovery; clean close removes stale recovery file.
 
@@ -96,8 +92,3 @@ make validate-levels
 make editor
 cd docs && bun run lint && bun run build   # when docs changed
 ```
-
-## References
-
-- `EXECUTIVE_PROJECT_ENHANCEMENT_REPORT.md`
-- `EXECUTIVE_PROJECT_ACHIEVABLES_PLAN.md`

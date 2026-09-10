@@ -1,19 +1,20 @@
 # Roadmap
 
-## Current: Level Validation + Editor Documentation Cleanup
+## Current: Authored Checkpoints + Onboarding Documentation Reconciliation
 
 Branch: `quality/level-validation-docs-cleanup`
 
-Goal: keep specs and contributor docs aligned with shipped TOML runtime loading, standalone editor, tests, validation tooling, CI smoke/docs gates, and current entity inventory.
+Goal: keep specs and contributor docs aligned with TOML-only runtime loading, authored checkpoint schema/runtime/editor feedback, the v1 onboarding-first campaign, the 15-binary native test inventory, validation tooling, CI smoke/docs gates, and current entity inventory.
 
 ## Shipped Baseline
 
 | Area | Status | Verification |
 |------|--------|--------------|
 | Game build | Shipped | `make` |
-| Runtime TOML loader | Shipped | `make run-level LEVEL=levels/00_sandbox_01.toml` |
-| Standalone editor | Shipped | `make editor`, `make run-editor` |
-| Tests | Shipped | `make test` |
+| Campaign selector + direct TOML load | Shipped | bare launch reads `levels/campaigns/main.toml` in onboarding → sandbox → Volcanic Depths 1 → 2 order; `make run-level LEVEL=levels/00_onboarding_01.toml` bypasses it |
+| Authored checkpoints | Shipped | Optional `[[checkpoints]]` use exact x/y respawns; records disable legacy screen-boundary fallback |
+| Standalone editor | Shipped | `make editor`, `make run-editor`; palette/canvas/properties/undo/playtest support checkpoints |
+| Tests | Shipped | `make test` runs 15 native binaries plus Python level-validation and web-host checks |
 | Level validation | Shipped | `make validate-levels` |
 | CI smoke gates | Shipped | Native game/editor smoke and WebAssembly artifact smoke in `build.yml` |
 | Docs checks | Shipped | `docs.yml` runs docs lint/build |
@@ -23,11 +24,11 @@ Goal: keep specs and contributor docs aligned with shipped TOML runtime loading,
 
 | Group | Scope | Deliverable |
 |-------|-------|-------------|
-| Validation UX | Expand current validation status/blocking into clickable diagnostics. | Designers jump from issues to fields/entities. |
-| Metadata Editing | Broaden metadata editing for background/foreground/fog arrays and physics override fields. | Editor can maintain full TOML schema comfortably. |
-| Playtest Flow | Polish shipped save/validate/launch loop with richer output and failure UX. | One-button editor-to-game loop remains safe and informative. |
-| Exporter Regression | Expand current exporter test with representative level fixtures. | Future schema edits fail tests when output drifts. |
-| Recent Files + Autosave | Add recovery prompt and cleanup around shipped MRU/autosave baseline. | Safer long editing sessions. |
+| Validation UX | Expand current validation status/blocking into clickable diagnostics. | Designers jump from issues to fields/entities, including checkpoints. |
+| Metadata Editing | Polish shipped metadata/layer/physics editing ergonomics. | Editor can maintain full TOML schema comfortably. |
+| Playtest Flow | Polish shipped validate/private-snapshot/launch loop with richer output and failure UX. | One-button editor-to-game loop remains safe and informative. |
+| Serializer Regression | Expand TOML serializer coverage with representative level fixtures. | Future schema edits fail tests when saved TOML drifts. |
+| Recent Files + Recovery | Improve recovery presentation and cleanup around shipped MRU/recovery baseline. | Safer long editing sessions. |
 
 ## Specs
 
@@ -37,12 +38,7 @@ Goal: keep specs and contributor docs aligned with shipped TOML runtime loading,
 
 ## Backlog
 
-- Multi-level campaign system.
+- Campaign-manifest editing in the visual editor.
 - Boss encounters.
 - Power-up system.
 - Mobile touch controls.
-
-## Planning References
-
-- `EXECUTIVE_PROJECT_ENHANCEMENT_REPORT.md`
-- `EXECUTIVE_PROJECT_ACHIEVABLES_PLAN.md`

@@ -26,10 +26,12 @@
 
 #include <SDL.h>           /* SDL_Window, SDL_Renderer, SDL_Texture */
 #include <SDL_ttf.h>       /* TTF_Font — for rendering panel labels and tooltips */
+#include <stdint.h>        /* uint64_t — document save-point fingerprint */
 #include "../levels/level.h" /* LevelDef — the data-driven level definition we edit */
 #include "ui.h"            /* UIState — immediate-mode UI widget state            */
 #include "undo.h"          /* UndoStack, PlacementData — undo system + clipboard */
 #include "editor_validation.h" /* EditorValidationReport                         */
+#include "serializer_io.h" /* SerializerFileFingerprint                         */
 
 /* ------------------------------------------------------------------ */
 /* Constants — editor window layout                                    */
@@ -76,6 +78,22 @@
 #define TOOLBAR_H      32
 #define STATUS_H       32
 #define CANVAS_H      (EDITOR_H - TOOLBAR_H - STATUS_H)
+#define EDITOR_PATH_MAX 1024
+#define EDITOR_MAX_RECOVERY_ENTRIES 32
+
+typedef struct {
+    uint64_t id;
+    uint64_t timestamp;
+    char source_path[EDITOR_PATH_MAX];
+    char snapshot_path[EDITOR_PATH_MAX];
+    char metadata_path[EDITOR_PATH_MAX];
+} EditorRecoveryEntry;
+
+typedef enum {
+    EDITOR_SOURCE_UNKNOWN = 0,
+    EDITOR_SOURCE_EXPECTED_MISSING,
+    EDITOR_SOURCE_EXPECTED_EXISTING
+} EditorSourceState;
 
 /* ------------------------------------------------------------------ */
 /* EntityType — identifies every kind of placeable level entity         */
@@ -95,6 +113,7 @@
  */
 typedef enum {
     ENT_FLOOR_GAP = 0,     /* hole in the ground floor (exposes water)      */
+    ENT_CHECKPOINT,        /* authored respawn marker                       */
     ENT_RAIL,              /* rail path (spike blocks / platforms ride on)  */
     ENT_PLATFORM,          /* ground pillar (static collision surface)      */
     ENT_COIN,              /* collectable coin (100 pts, 3 restore a heart) */
@@ -312,15 +331,30 @@ typedef struct {
     /* ---- File I/O ----------------------------------------------------- */
     /*
      * file_path — the path to the currently open level file.
-     * A fixed 256-byte buffer avoids heap allocation for a simple file path.
+     * A fixed 1024-byte buffer avoids heap allocation for a simple file path.
      * An empty string (file_path[0] == '\0') means "untitled, never saved".
      */
-    char           file_path[256];
-    char           autosave_path[256];
-    char           recent_files[5][256];
+    char           file_path[EDITOR_PATH_MAX];
+    char           autosave_path[EDITOR_PATH_MAX];
+    char           playtest_path[EDITOR_PATH_MAX];
+    char           recovery_original_path[EDITOR_PATH_MAX];
+    char           preference_root[EDITOR_PATH_MAX];
+    char           recovery_root_path[EDITOR_PATH_MAX];
+    uint64_t       recovery_document_id;
+    uint64_t       pending_recovery_id;
+    EditorRecoveryEntry recovery_entries[EDITOR_MAX_RECOVERY_ENTRIES];
+    int            recovery_entry_count;
+    char           recent_path[EDITOR_PATH_MAX];
+    char           recent_files[5][EDITOR_PATH_MAX];
     int            recent_file_count;
     char           status_message[160];
     Uint32         last_autosave_ms;
+
+    /* Save-point tracking.  Hash covers document content, not editor UI. */
+    uint64_t       saved_document_hash;
+    int            saved_document_hash_valid;
+    SerializerFileFingerprint source_fingerprint;
+    EditorSourceState source_state;
 
     /*
      * modified — dirty flag, set to 1 whenever the level changes.
@@ -329,7 +363,20 @@ typedef struct {
      */
     int            modified;
 
+    /* One UI commit in flight; owned by editor_undo_apply.c. */
+    int            change_tracking_kind;
+    int            pending_change_valid;
+    int            pending_widget_id;
+    int            pending_entity_type;
+    int            pending_entity_index;
+    PlacementData  pending_entity_before;
+    char           pending_text_before[256];
+    LevelConfigSnapshot pending_config_before;
+
     EditorValidationReport validation_report;
+    uint64_t validated_document_hash;
+    Uint32 last_validation_ms;
+    int validation_cache_valid;
 
     /* ---- UI toggles --------------------------------------------------- */
     int            show_grid;     /* 1 = draw grid lines on the canvas         */
@@ -364,6 +411,8 @@ typedef struct {
     int            playing;
 #ifndef _WIN32
     int            play_pid;       /* pid_t stored as int for portability */
+#else
+    intptr_t       play_process;   /* process handle while playtest runs */
 #endif
 
     /* ---- Immediate-mode UI state ------------------------------------- */

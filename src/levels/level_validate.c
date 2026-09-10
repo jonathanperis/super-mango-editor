@@ -5,7 +5,6 @@
 
 #include "level_loader.h"
 
-#define MAX_LEVEL_SCREENS 99
 #define MAX_INITIAL_LIVES 999
 #define MAX_SCORE_PER_LIFE 999999
 #define MAX_COIN_SCORE 999999
@@ -35,6 +34,7 @@ int level_validate_counts(const LevelDef *def, char *err, size_t err_size)
     }
 
     CHECK_COUNT(floor_gap_count, MAX_FLOOR_GAPS);
+    CHECK_COUNT(checkpoint_count, MAX_CHECKPOINTS);
     CHECK_COUNT(rail_count, MAX_RAILS);
     CHECK_COUNT(platform_count, MAX_PLATFORMS);
 
@@ -236,6 +236,14 @@ static int validate_finite_float(char *err, size_t err_size,
     return 0;
 }
 
+static int validate_motion(char *err, size_t err_size, const char *field, float value)
+{
+    if (!isfinite(value) || fabsf(value) > MAX_LEVEL_MOTION)
+        return fail_float_range(err, err_size, field, value,
+                                -MAX_LEVEL_MOTION, MAX_LEVEL_MOTION);
+    return 0;
+}
+
 static int validate_world_x(char *err, size_t err_size,
                             const char *field, float x, float world_w)
 {
@@ -311,7 +319,7 @@ static int validate_physics_finite(const LevelDef *def,
 {
 #define CHECK_PHYSICS_FIELD(field) \
     do { \
-        if (validate_finite_float(err, err_size, "physics." #field, \
+        if (validate_motion(err, err_size, "physics." #field, \
                                   def->physics.field) != 0) return -1; \
     } while (0)
 
@@ -423,6 +431,48 @@ static int validate_point(char *err, size_t err_size, const char *field,
     return 0;
 }
 
+static int validate_checkpoints(const LevelDef *def, char *err, size_t err_size,
+                                float world_w)
+{
+    float start_x;
+    float start_y;
+
+    if (def->checkpoint_count == 0) return 0;
+    level_effective_spawn(def, &start_x, &start_y);
+    (void)start_y;
+
+    for (int i = 0; i < def->checkpoint_count; i++) {
+        char field[64];
+        const CheckpointPlacement *checkpoint = &def->checkpoints[i];
+
+        snprintf(field, sizeof(field), "checkpoints[%d].x", i);
+        if (validate_finite_float(err, err_size, field, checkpoint->x) != 0)
+            return -1;
+        if (checkpoint->x <= start_x) {
+            return fail_value(err, err_size, field,
+                              "must be strictly after effective start x");
+        }
+        if (checkpoint->x < 0.0f ||
+            checkpoint->x > world_w - (float)TILE_SIZE) {
+            return fail_float_range(err, err_size, field, checkpoint->x,
+                                    0.0f, world_w - (float)TILE_SIZE);
+        }
+
+        snprintf(field, sizeof(field), "checkpoints[%d].y", i);
+        if (validate_world_y(err, err_size, field, checkpoint->y) != 0)
+            return -1;
+
+        for (int previous = 0; previous < i; previous++) {
+            if (checkpoint->x == def->checkpoints[previous].x) {
+                snprintf(field, sizeof(field), "checkpoints[%d].x", i);
+                return fail_value(err, err_size, field,
+                                  "has a duplicate x coordinate");
+            }
+        }
+    }
+    return 0;
+}
+
 int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
 {
     char field[64];
@@ -430,6 +480,14 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
     float world_w;
 
     if (level_validate_counts(def, err, err_size) != 0) return -1;
+
+    if (def->format_version != LEVEL_FORMAT_VERSION) {
+        if (err && err_size > 0) {
+            snprintf(err, err_size, "format_version is %d (expected %d)",
+                     def->format_version, LEVEL_FORMAT_VERSION);
+        }
+        return -1;
+    }
 
     if (def->screen_count < 0 || def->screen_count > MAX_LEVEL_SCREENS) {
         return fail_range(err, err_size, "screen_count", def->screen_count,
@@ -460,15 +518,37 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
     if (validate_level_paths(def, err, err_size) != 0) return -1;
     if (validate_physics_finite(def, err, err_size) != 0) return -1;
 
+#define CHECK_MOTION_ARRAY(array, count, member) \
+    for (int i = 0; i < def->count; i++) { \
+        if (validate_motion(err, err_size, #array "." #member, def->array[i].member) != 0) return -1; \
+    }
+    CHECK_MOTION_ARRAY(spiders, spider_count, vx);
+    CHECK_MOTION_ARRAY(jumping_spiders, jumping_spider_count, vx);
+    CHECK_MOTION_ARRAY(birds, bird_count, vx);
+    CHECK_MOTION_ARRAY(faster_birds, faster_bird_count, vx);
+    CHECK_MOTION_ARRAY(fish, fish_count, vx);
+    CHECK_MOTION_ARRAY(faster_fish, faster_fish_count, vx);
+    CHECK_MOTION_ARRAY(bouncepads_small, bouncepad_small_count, launch_vy);
+    CHECK_MOTION_ARRAY(bouncepads_medium, bouncepad_medium_count, launch_vy);
+    CHECK_MOTION_ARRAY(bouncepads_high, bouncepad_high_count, launch_vy);
+    CHECK_MOTION_ARRAY(background_layers, background_layer_count, speed);
+    CHECK_MOTION_ARRAY(foreground_layers, foreground_layer_count, speed);
+    CHECK_MOTION_ARRAY(fog_layers, fog_layer_count, speed);
+    CHECK_MOTION_ARRAY(spike_blocks, spike_block_count, speed);
+    CHECK_MOTION_ARRAY(float_platforms, float_platform_count, speed);
+#undef CHECK_MOTION_ARRAY
+
     if (def->player_start_x != 0.0f || def->player_start_y != 0.0f) {
         if (validate_point(err, err_size, "player_start",
                            def->player_start_x, def->player_start_y, world_w) != 0)
             return -1;
     }
 
+    if (validate_checkpoints(def, err, err_size, world_w) != 0) return -1;
+
     for (int i = 0; i < def->floor_gap_count; i++) {
         if (def->floor_gaps[i] < 0 ||
-            def->floor_gaps[i] + FLOOR_GAP_W > (int)world_w) {
+            def->floor_gaps[i] > (int)world_w - FLOOR_GAP_W) {
             snprintf(field, sizeof(field), "floor_gaps[%d]", i);
             return fail_range(err, err_size, field, def->floor_gaps[i],
                               0, (int)world_w - FLOOR_GAP_W);
@@ -503,11 +583,11 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
     for (int i = 0; i < def->platform_count; i++) {
         const PlatformPlacement *p = &def->platforms[i];
         int tw = p->tile_width > 0 ? p->tile_width : 1;
-        if (p->tile_height < 1) {
+        if (p->tile_height < 1 || p->tile_height > (FLOOR_Y + 16) / TILE_SIZE) {
             snprintf(field, sizeof(field), "platforms[%d].tile_height", i);
             return fail_range(err, err_size, field, p->tile_height, 1, 999);
         }
-        if (p->tile_width < 0) {
+        if (p->tile_width < 0 || p->tile_width > (int)world_w / TILE_SIZE) {
             snprintf(field, sizeof(field), "platforms[%d].tile_width", i);
             return fail_range(err, err_size, field, p->tile_width, 0, 999);
         }
@@ -548,6 +628,8 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
     }
 
     for (int i = 0; i < def->spider_count; i++) {
+        if (def->spiders[i].frame_index < 0 || def->spiders[i].frame_index >= SPIDER_FRAMES)
+            return fail_value(err, err_size, "spiders[].frame_index", "is outside the sprite sheet");
         snprintf(field, sizeof(field), "spiders[%d]", i);
         if (validate_patrol(err, err_size, field, def->spiders[i].x,
                             def->spiders[i].patrol_x0,
@@ -560,6 +642,8 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                             def->jumping_spiders[i].patrol_x1, world_w) != 0) return -1;
     }
     for (int i = 0; i < def->bird_count; i++) {
+        if (def->birds[i].frame_index < 0 || def->birds[i].frame_index >= BIRD_FRAMES)
+            return fail_value(err, err_size, "birds[].frame_index", "is outside the sprite sheet");
         snprintf(field, sizeof(field), "birds[%d]", i);
         if (validate_patrol(err, err_size, field, def->birds[i].x,
                             def->birds[i].patrol_x0,
@@ -568,6 +652,8 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                              def->birds[i].base_y) != 0) return -1;
     }
     for (int i = 0; i < def->faster_bird_count; i++) {
+        if (def->faster_birds[i].frame_index < 0 || def->faster_birds[i].frame_index >= FBIRD_FRAMES)
+            return fail_value(err, err_size, "faster_birds[].frame_index", "is outside the sprite sheet");
         snprintf(field, sizeof(field), "faster_birds[%d]", i);
         if (validate_patrol(err, err_size, field, def->faster_birds[i].x,
                             def->faster_birds[i].patrol_x0,
@@ -618,7 +704,16 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         snprintf(field, sizeof(field), "spike_blocks[%d].rail_index", i);
         if (validate_rail_index(err, err_size, field,
                                 def->spike_blocks[i].rail_index,
-                                def->rail_count) != 0) return -1;
+                                 def->rail_count) != 0) return -1;
+        const RailPlacement *rail = &def->rails[def->spike_blocks[i].rail_index];
+        int count = rail->layout == RAIL_LAYOUT_RECT
+                  ? 2 * rail->w + 2 * (rail->h - 2) : rail->w;
+        float t = def->spike_blocks[i].t_offset;
+        if (!isfinite(t) || t < 0.0f || t >= (float)count ||
+            (rail->layout == RAIL_LAYOUT_HORIZ && t > (float)(count - 1))) {
+            snprintf(field, sizeof(field), "spike_blocks[%d].t_offset", i);
+            return fail_value(err, err_size, field, "must lie on the referenced rail");
+        }
     }
 
     for (int i = 0; i < def->float_platform_count; i++) {
@@ -639,6 +734,14 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
             if (validate_rail_index(err, err_size, field,
                                     fp->rail_index, def->rail_count) != 0)
                 return -1;
+            const RailPlacement *rail = &def->rails[fp->rail_index];
+            int count = rail->layout == RAIL_LAYOUT_RECT
+                      ? 2 * rail->w + 2 * (rail->h - 2) : rail->w;
+            if (!isfinite(fp->t_offset) || fp->t_offset < 0.0f ||
+                fp->t_offset >= (float)count ||
+                (rail->layout == RAIL_LAYOUT_HORIZ && fp->t_offset > (float)(count - 1))) {
+                return fail_value(err, err_size, "float_platforms[].t_offset", "must lie on the referenced rail");
+            }
         } else {
             snprintf(field, sizeof(field), "float_platforms[%d]", i);
             if (validate_world_rect(err, err_size, field, fp->x, fp->y,

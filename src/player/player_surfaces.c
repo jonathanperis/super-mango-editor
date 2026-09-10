@@ -110,8 +110,8 @@ void player_resolve_platform_collisions(Player *player,
      * One-way platform collision -- top surface only.
      *
      * We only test when:
-     *   1. The player is not already on the floor (avoid double-snap).
-     *   2. The player is moving downward (vy >= 0), so upward jumps pass through.
+     * The player is moving downward (vy >= 0), so upward jumps pass through.
+     * Each candidate shortens the remaining fall to the nearest surface.
      *
      * Crossing test: compare where the player's bottom was BEFORE this frame's
      * movement (prev_bottom, captured above) with where it is NOW (bottom).
@@ -122,11 +122,11 @@ void player_resolve_platform_collisions(Player *player,
      * The "physics bottom" strips the FLOOR_SINK visual offset so contact
      * lands the sprite at the same apparent depth as on the main floor.
      */
-    if (player->on_ground || player->vy < 0.0f) {
+    if (player->vy < 0.0f) {
         return;
     }
 
-    const float bottom = player->y + player->h - FLOOR_SINK;
+    float bottom = player->y + player->h - FLOOR_SINK;
 
     for (int i = 0; i < platform_count; i++) {
         const Platform *plat = &platforms[i];
@@ -141,15 +141,15 @@ void player_resolve_platform_collisions(Player *player,
             player->y         = plat->y - player->h + FLOOR_SINK;
             player->vy        = 0.0f;
             player->on_ground = 1;
-            break;   /* first platform wins */
+            bottom = plat->y;  /* later candidates must be nearer, never lower */
         }
     }
 
     /*
      * Float-platform collision — same crossing test as above.
      *
-     * Only runs if the player hasn't already landed on a static platform
-     * or the floor.  The FLOAT_PLATFORM_H sprite (16 px) is a thin surface
+     * A float platform can replace a lower static surface candidate.
+     * The FLOAT_PLATFORM_H sprite (16 px) is a thin surface
      * so the crossing test is the correct approach: we check whether the
      * player's physics bottom crossed the platform's top surface y this
      * frame, rather than using a distance threshold.
@@ -163,7 +163,7 @@ void player_resolve_platform_collisions(Player *player,
      *   • *out_fp_landed_idx is set to the matching index so game_loop
      *     can drive the crumble timer and nudge the player on rail platforms.
      */
-    if (!player->on_ground) {
+    {
         for (int i = 0; i < float_platform_count; i++) {
             const FloatPlatform *fp = &float_platforms[i];
             if (!fp->active) continue;
@@ -179,7 +179,7 @@ void player_resolve_platform_collisions(Player *player,
                 player->vy         = 0.0f;
                 player->on_ground  = 1;
                 *out_fp_landed_idx = i;
-                break;   /* first float platform wins */
+                bottom = fp->y;
             }
         }
 
@@ -225,11 +225,11 @@ void player_resolve_bridge_collision(Player *player,
      * Only land if the brick under the player's centre is still solid
      * (not already falling or deactivated).
      */
-    if (player->on_ground || player->vy < 0.0f) {
+    if (player->vy < 0.0f) {
         return;
     }
 
-    const float bottom = player->y + player->h - FLOOR_SINK;
+    float bottom = player->y + player->h - FLOOR_SINK;
     float pcx = player->x + player->w / 2.0f;
 
     for (int i = 0; i < bridge_count; i++) {
@@ -245,7 +245,7 @@ void player_resolve_bridge_collision(Player *player,
             player->y         = br->base_y - player->h + FLOOR_SINK;
             player->vy        = 0.0f;
             player->on_ground = 1;
-            break;
+            bottom = br->base_y;
         }
     }
 }
@@ -259,11 +259,11 @@ void player_resolve_spike_platform_top_collision(Player *player,
      * The player can land on top (solid surface) but will take damage
      * from the spike hitbox check in game.c.
      */
-    if (player->on_ground || player->vy < 0.0f) {
+    if (player->vy < 0.0f) {
         return;
     }
 
-    const float bottom = player->y + player->h - FLOOR_SINK;
+    float bottom = player->y + player->h - FLOOR_SINK;
     for (int i = 0; i < spike_platform_count; i++) {
         const SpikePlatform *sp = &spike_platforms[i];
         if (!sp->active) continue;
@@ -276,7 +276,7 @@ void player_resolve_spike_platform_top_collision(Player *player,
             player->y         = sp->y - player->h + FLOOR_SINK;
             player->vy        = 0.0f;
             player->on_ground = 1;
-            break;
+            bottom = sp->y;
         }
     }
 }
@@ -308,7 +308,7 @@ void player_resolve_spike_platform_ceiling_collision(Player *player,
     }
 
     const float prev_phys_top = prev_top  + PHYS_PAD_TOP;
-    const float curr_phys_top = player->y + PHYS_PAD_TOP;
+    float curr_phys_top = player->y + PHYS_PAD_TOP;
     for (int i = 0; i < spike_platform_count; i++) {
         const SpikePlatform *sp = &spike_platforms[i];
         if (!sp->active) continue;
@@ -327,7 +327,7 @@ void player_resolve_spike_platform_ceiling_collision(Player *player,
             /* Snap sprite top so that physical head sits at sp_bottom. */
             player->y  = sp_bottom - PHYS_PAD_TOP;
             player->vy = 0.0f;
-            break;
+            curr_phys_top = sp_bottom;
         }
     }
 }

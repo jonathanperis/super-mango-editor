@@ -22,11 +22,9 @@
 #include "editor_frame.h" /* editor_run_frame — one frame of editor work    */
 #include "undo.h"         /* UndoStack, undo_create/destroy/push/pop/clear  */
 #include "ui.h"           /* UIState, ui_init, ui_begin_frame, ui_button    */
-#include "editor_files.h" /* editor file/save/export/autosave helpers       */
+#include "editor_files.h" /* editor file/save/autosave helpers              */
 #include "editor_session.h" /* editor status/title/session helpers           */
 #include "editor_textures.h" /* editor_textures_load/cleanup                 */
-
-#define EDITOR_AUTOSAVE_PATH "out/autosave/editor_autosave.toml"
 
 /* ------------------------------------------------------------------ */
 /* editor_init                                                         */
@@ -179,9 +177,10 @@ int editor_init(EditorState *es) {
      * input, mouse at origin).
      */
     ui_init(&es->ui, es->renderer, es->font);
+    es->ui.before_command = editor_before_command;
+    es->ui.before_command_context = es;
 
-    strncpy(es->autosave_path, EDITOR_AUTOSAVE_PATH,
-            sizeof(es->autosave_path) - 1);
+    (void)editor_init_persistence_paths(es);
     editor_load_recent_files(es);
 
     /* ---- Entity textures -------------------------------------------- */
@@ -198,6 +197,7 @@ int editor_init(EditorState *es) {
      * something to display before the user saves or loads a file.
      */
     editor_level_init_defaults(&es->level);
+    editor_set_document_save_point(es);
 
     /* ---- Start the loop --------------------------------------------- */
     /*
@@ -206,8 +206,10 @@ int editor_init(EditorState *es) {
      */
     es->running = 1;
     es->last_autosave_ms = SDL_GetTicks();
-    if (editor_file_exists(es->autosave_path)) {
-        editor_set_status(es, "Autosave found: Ctrl+R to recover");
+    if (es->recovery_entry_count > 1) {
+        editor_set_status(es, "Recovery copies found: Ctrl+R to choose");
+    } else if (es->recovery_entry_count == 1) {
+        editor_set_status(es, "Recovery copy found: Ctrl+R to recover");
     } else {
         editor_set_status(es, "Ready");
     }
@@ -256,6 +258,7 @@ void editor_loop(EditorState *es) {
  * no-ops, so a redundant cleanup call will not crash.
  */
 void editor_cleanup(EditorState *es) {
+    ui_cleanup(&es->ui);
     /* Destroy all renderer-owned preview textures before the renderer. */
     editor_textures_cleanup(es);
 

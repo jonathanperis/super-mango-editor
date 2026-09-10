@@ -155,7 +155,7 @@ Collect ground truth from the source code. Trust nothing but the files themselve
   - `assets/sounds/screens/` — UI confirm
   - `assets/sounds/surfaces/` — bouncepad
 - **Level files:** `ls levels/*.toml` — TOML level data files
-- **Editor:** scan `src/editor/` for all modules (editor, canvas, palette, properties, tools, ui, undo, serializer, exporter, file_dialog)
+- **Editor:** scan `src/editor/` for all modules (editor, canvas, palette, properties, tools, ui, undo, serializer, serializer_load_checkpoints, file_dialog)
 - **Vendor:** `ls vendor/` — tomlc17 (TOML parser)
 - **Sprite analysis:** run `analyze_sprite.py` on key sprites to verify documented dimensions:
   ```sh

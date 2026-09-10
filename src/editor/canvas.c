@@ -28,6 +28,7 @@
 
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, TOOLBAR_H, etc. */
 #include "entity_meta.h" /* Editor display dimensions and rail helpers          */
+#include "../levels/level_loader.h"
 #include "../game.h"    /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE,
                            FLOOR_GAP_W, MAX_* constants, GRAVITY            */
 
@@ -100,6 +101,7 @@ static void render_star_greens(EditorState *es);
 static void render_star_reds(EditorState *es);
 static void render_last_star(EditorState *es);
 static void render_player_spawn(EditorState *es);
+static void render_checkpoints(EditorState *es);
 static void render_blue_flames(EditorState *es);
 static void render_fire_flames(EditorState *es);
 static void render_fish(EditorState *es);
@@ -114,6 +116,8 @@ static void render_faster_birds(EditorState *es);
 static void render_selection(EditorState *es);
 static void render_ghost(EditorState *es);
 static void render_grid(EditorState *es);
+void canvas_screen_to_world(const EditorState *es, int sx, int sy,
+                            float *wx, float *wy);
 
 /* ------------------------------------------------------------------ */
 /* Helper — draw an outlined rectangle (selection / ghost highlight)    */
@@ -170,6 +174,14 @@ static void draw_tex(EditorState *es, SDL_Texture *tex, const SDL_Rect *src,
 /* ------------------------------------------------------------------ */
 
 void canvas_render(EditorState *es) {
+    char error[128];
+    /* Properties and Undo stay available while an invalid draft is corrected.
+     * Never feed rejected counts/dimensions into the preview's tile loops. */
+    if (level_validate_runtime(&es->level, error, sizeof(error)) != 0) {
+        ui_label(&es->ui, 12, TOOLBAR_H + 12, "Preview paused: correct properties or Undo");
+        ui_label(&es->ui, 12, TOOLBAR_H + 32, error);
+        return;
+    }
     /*
      * Set a clip rectangle so that nothing we draw bleeds outside the canvas
      * area into the toolbar, status bar, or side panel.
@@ -215,6 +227,7 @@ void canvas_render(EditorState *es) {
 
     /* Player spawn — draw idle frame at the spawn position */
     render_player_spawn(es);
+    render_checkpoints(es);
 
     /* Hazards */
     render_blue_flames(es);
@@ -605,6 +618,8 @@ static void render_float_platforms(EditorState *es) {
             fp->rail_index >= 0 && fp->rail_index < tmp_rail_count) {
             rail_get_world_pos(&tmp_rails[fp->rail_index],
                                fp->t_offset, &fx, &fy);
+            fx -= fp->tile_count * FPLAT_PIECE_W * 0.5f;
+            fy -= FPLAT_PIECE_H * 0.5f;
         }
         int   total_w = fp->tile_count * FPLAT_PIECE_W;
 
@@ -911,6 +926,64 @@ static void render_player_spawn(EditorState *es) {
     draw_tex(es, es->textures.player, &src,
              es->level.player_start_x, es->level.player_start_y,
              PLAYER_SPAWN_W, PLAYER_SPAWN_H);
+}
+
+/* ---- Authored checkpoints ---------------------------------------- */
+
+static void render_checkpoints(EditorState *es)
+{
+    for (int i = 0; i < es->level.checkpoint_count; i++) {
+        const CheckpointPlacement *cp = &es->level.checkpoints[i];
+        float cursor_x, cursor_y;
+        int hovered;
+        int selected = es->selection.type == ENT_CHECKPOINT &&
+                       es->selection.index == i;
+        int invalid = cp->x <= es->level.player_start_x ||
+                      cp->x > EDITOR_WORLD_W(es) - TILE_SIZE ||
+                      cp->y < 0.0f || cp->y > (float)GAME_H;
+
+        for (int previous = 0; previous < i; previous++) {
+            if (es->level.checkpoints[previous].x == cp->x) {
+                invalid = 1;
+                break;
+            }
+        }
+
+        canvas_screen_to_world(es, es->mouse_x, es->mouse_y,
+                               &cursor_x, &cursor_y);
+        hovered = cursor_x >= cp->x - 4.0f && cursor_x < cp->x + 5.0f &&
+                  cursor_y >= cp->y - 20.0f && cursor_y < cp->y + 4.0f;
+
+        /* Error red wins; hover/selection remain legible over the amber base. */
+        SDL_Color color = invalid ? (SDL_Color){220, 92, 78, 255}
+                                   : (selected ? (SDL_Color){74, 144, 217, 255}
+                                               : (SDL_Color){225, 169, 65, 255});
+        if (hovered && !invalid) color = (SDL_Color){255, 211, 104, 255};
+        SDL_SetRenderDrawColor(es->renderer, color.r, color.g, color.b, 255);
+        SDL_Rect line = { w2s_x(es, cp->x), w2s_y(es, cp->y - 18.0f),
+                          w2s_w(es, 2), w2s_h(es, 18) };
+        SDL_Rect tick = { w2s_x(es, cp->x - 5.0f), w2s_y(es, cp->y),
+                          w2s_w(es, 12), w2s_h(es, 2) };
+        SDL_RenderFillRect(es->renderer, &line);
+        SDL_RenderFillRect(es->renderer, &tick);
+
+        if (es->font) {
+            char label[16];
+            snprintf(label, sizeof(label), "CP %d", i + 1);
+            SDL_Surface *surface = TTF_RenderText_Solid(es->font, label, color);
+            if (surface) {
+                SDL_Texture *texture = SDL_CreateTextureFromSurface(es->renderer, surface);
+                if (texture) {
+                    SDL_Rect dst = { w2s_x(es, cp->x) + 4,
+                                     w2s_y(es, cp->y - 20.0f),
+                                     surface->w, surface->h };
+                    SDL_RenderCopy(es->renderer, texture, NULL, &dst);
+                    SDL_DestroyTexture(texture);
+                }
+                SDL_FreeSurface(surface);
+            }
+        }
+    }
 }
 
 /* ---- Blue flames ------------------------------------------------- */
@@ -1429,6 +1502,15 @@ static void render_selection(EditorState *es) {
         wh = (rp->tile_count - 1) * ROPE_STEP + ROPE_H;
         break;
     }
+    case ENT_CHECKPOINT: {
+        if (es->selection.index >= es->level.checkpoint_count) return;
+        const CheckpointPlacement *cp = &es->level.checkpoints[es->selection.index];
+        wx = cp->x - 5.0f;
+        wy = cp->y - 20.0f;
+        ww = 12;
+        wh = 22;
+        break;
+    }
     default:
         return;  /* unknown type — nothing to highlight */
     }
@@ -1611,6 +1693,18 @@ static void render_ghost(EditorState *es) {
         /* Floor gap: draw a blue outline (no texture) */
         dw = FLOOR_GAP_W; dh = GAME_H - FLOOR_Y;
         break;
+    case ENT_CHECKPOINT:
+        /* Checkpoints use the same no-asset primitive as the world marker. */
+        SDL_SetRenderDrawColor(es->renderer, 225, 169, 65, 128);
+        {
+            SDL_Rect line = { w2s_x(es, wx), w2s_y(es, wy - 18.0f),
+                              w2s_w(es, 2), w2s_h(es, 18) };
+            SDL_Rect tick = { w2s_x(es, wx - 5.0f), w2s_y(es, wy),
+                              w2s_w(es, 12), w2s_h(es, 2) };
+            SDL_RenderFillRect(es->renderer, &line);
+            SDL_RenderFillRect(es->renderer, &tick);
+        }
+        return;
     case ENT_RAIL:
         /* Rail: draw a green outline (no texture) */
         dw = 3 * RAIL_TILE_W; dh = 3 * RAIL_TILE_H;

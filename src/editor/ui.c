@@ -8,10 +8,8 @@
  *
  *   if (ui_button(&ui, 10, 10, 80, 24, "Save")) { save_level(); }
  *
- * Text rendering takes the simple path: each label call creates a
- * TTF texture, renders it, and destroys it.  This allocates GPU memory
- * every frame, which is fine for a level editor (low widget count, not
- * a 60 FPS game).  A production UI would cache glyph atlases.
+ * Repeated short labels reuse a bounded per-UI texture cache. Long strings
+ * remain transient so document paths cannot grow the cache without bound.
  *
  * Input fields (int, float) use a tiny retained-state mechanism:
  * UIState.active_id tracks which field is being edited, and edit_buf
@@ -22,7 +20,10 @@
 #include <SDL_ttf.h>   /* TTF_RenderText_Blended, TTF_SizeText                    */
 #include <stdio.h>     /* snprintf                                                 */
 #include <string.h>    /* strlen, strncpy, memset                                  */
-#include <stdlib.h>    /* atoi, atof                                               */
+#include <stdlib.h>    /* strtol, strtof                                           */
+#include <errno.h>     /* errno, ERANGE                                             */
+#include <limits.h>    /* INT_MIN, INT_MAX                                           */
+#include <math.h>      /* isfinite                                                   */
 
 #include "ui.h"
 
@@ -43,16 +44,11 @@ static void draw_rect(SDL_Renderer *r, int x, int y, int w, int h,
 /*
  * draw_text — Render a single line of text at (x, y).
  *
- * Uses the "create-render-destroy" pattern:
- *   1. TTF_RenderText_Blended  → CPU surface with anti-aliased glyphs
- *   2. SDL_CreateTextureFromSurface → upload to GPU
- *   3. SDL_RenderCopy           → draw the texture
- *   4. SDL_DestroyTexture + SDL_FreeSurface → release memory
- *
- * This is simple but allocates/frees every frame.  Acceptable for a
- * low-widget-count editor; a game HUD should cache textures instead.
+ * Short labels reuse a bounded renderer-owned texture cache keyed by text
+ * and color. Cache misses use TTF_RenderUTF8_Blended and upload once; long
+ * strings use transient textures. ui_cleanup releases the retained textures.
  */
-static void draw_text(SDL_Renderer *r, TTF_Font *font, int x, int y,
+static void draw_text(UIState *ui, int x, int y,
                        const char *text, SDL_Color c);
 
 /*
@@ -63,6 +59,153 @@ static void draw_text(SDL_Renderer *r, TTF_Font *font, int x, int y,
  *   py must be between ry and ry+rh  (vertical)
  */
 static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh);
+
+static void notify_before_change(UIState *ui, int id)
+{
+    if (ui->before_change) {
+        ui->before_change(ui->before_change_context, id);
+    }
+}
+
+static int parse_int_value(const char *text, int *value)
+{
+    char *end;
+    long parsed;
+
+    if (!text || !value || text[0] == '\0') return 0;
+    errno = 0;
+    parsed = strtol(text, &end, 10);
+    if (errno == ERANGE || end == text || *end != '\0' ||
+        parsed < INT_MIN || parsed > INT_MAX) return 0;
+    *value = (int)parsed;
+    return 1;
+}
+
+static int parse_float_value(const char *text, float *value)
+{
+    char *end;
+    float parsed;
+
+    if (!text || !value || text[0] == '\0') return 0;
+    errno = 0;
+    parsed = strtof(text, &end);
+    if (errno == ERANGE || end == text || *end != '\0' ||
+        !isfinite(parsed)) return 0;
+    *value = parsed;
+    return 1;
+}
+
+static void clear_active_edit(UIState *ui)
+{
+    ui->active_id = 0;
+    ui->edit_type = UI_EDIT_NONE;
+    ui->edit_target = NULL;
+    ui->edit_target_size = 0;
+    ui->edit_cursor = 0;
+    ui->edit_buf[0] = '\0';
+    ui->pending_text_length = 0;
+    ui->pending_text_input[0] = '\0';
+}
+
+static void apply_pending_text_input(UIState *ui)
+{
+    size_t i;
+    int max_len;
+
+    if (!ui || ui->active_id == 0 || ui->edit_target == NULL) return;
+    max_len = UI_EDIT_BUFFER_SIZE - 1;
+    if (ui->edit_type == UI_EDIT_TEXT) {
+        max_len = ui->edit_target_size - 1;
+        if (max_len > UI_EDIT_BUFFER_SIZE - 1) max_len = UI_EDIT_BUFFER_SIZE - 1;
+    }
+    if (max_len < 0) max_len = 0;
+
+    for (i = 0; i < ui->pending_text_length;) {
+        unsigned char ch = (unsigned char)ui->pending_text_input[i];
+        int accepted = ch >= ' ';
+        size_t bytes = 1;
+        if (ui->edit_type == UI_EDIT_TEXT) {
+            while (i + bytes < ui->pending_text_length &&
+                   ((unsigned char)ui->pending_text_input[i + bytes] & 0xc0) == 0x80) bytes++;
+        }
+
+        if (ui->edit_type == UI_EDIT_INT) {
+            accepted = (ch >= '0' && ch <= '9') || ch == '-';
+        } else if (ui->edit_type == UI_EDIT_FLOAT) {
+            accepted = (ch >= '0' && ch <= '9') || ch == '.' || ch == '-';
+        }
+        if (accepted && bytes <= (size_t)(max_len - ui->edit_cursor)) {
+            memcpy(ui->edit_buf + ui->edit_cursor, ui->pending_text_input + i, bytes);
+            ui->edit_cursor += (int)bytes;
+            ui->edit_buf[ui->edit_cursor] = '\0';
+        }
+        i += bytes;
+    }
+    ui->pending_text_length = 0;
+    ui->pending_text_input[0] = '\0';
+}
+
+static int command_allows_activation(UIState *ui, int id)
+{
+    if (ui->active_id == 0 || ui->active_id == id) return 1;
+    if (!ui->before_command) return 0;
+    return ui->before_command(ui->before_command_context) != 0;
+}
+
+int ui_apply_active_edit(UIState *ui)
+{
+    int changed = 0;
+
+    if (!ui || ui->active_id == 0 || !ui->edit_target) return 1;
+
+    apply_pending_text_input(ui);
+
+    switch (ui->edit_type) {
+    case UI_EDIT_INT: {
+        int value;
+        int *target = (int *)ui->edit_target;
+        if (!parse_int_value(ui->edit_buf, &value)) return 0;
+        if (value != *target) {
+            notify_before_change(ui, ui->active_id);
+            *target = value;
+            changed = 1;
+        }
+        break;
+    }
+    case UI_EDIT_FLOAT: {
+        float value;
+        float *target = (float *)ui->edit_target;
+        if (!parse_float_value(ui->edit_buf, &value)) return 0;
+        if (value != *target) {
+            notify_before_change(ui, ui->active_id);
+            *target = value;
+            changed = 1;
+        }
+        break;
+    }
+    case UI_EDIT_TEXT: {
+        char *target = (char *)ui->edit_target;
+        if (ui->edit_target_size <= 0) return 0;
+        if (strcmp(ui->edit_buf, target) != 0) {
+            notify_before_change(ui, ui->active_id);
+            strncpy(target, ui->edit_buf, (size_t)ui->edit_target_size - 1);
+            target[ui->edit_target_size - 1] = '\0';
+            changed = 1;
+        }
+        break;
+    }
+    case UI_EDIT_NONE:
+        break;
+    }
+
+    clear_active_edit(ui);
+    return changed ? 2 : 1;
+}
+
+void ui_cancel_active_edit(UIState *ui)
+{
+    if (ui) clear_active_edit(ui);
+}
 
 /* ------------------------------------------------------------------ */
 /* Helper implementations                                              */
@@ -87,53 +230,42 @@ static void draw_rect(SDL_Renderer *r, int x, int y, int w, int h,
     SDL_RenderFillRect(r, &rect);
 }
 
-static void draw_text(SDL_Renderer *r, TTF_Font *font, int x, int y,
+static void draw_text(UIState *ui, int x, int y,
                        const char *text, SDL_Color c)
 {
-    /*
-     * Guard: TTF_RenderText_Blended crashes on NULL or empty strings,
-     * so bail out early.
-     */
-    if (!text || text[0] == '\0') return;
-
-    /*
-     * TTF_RenderText_Blended — render UTF-8 text into a 32-bit ARGB surface.
-     * "Blended" means full anti-aliasing against a transparent background,
-     * which gives the best quality when composited onto any backdrop.
-     * The returned surface is allocated on the CPU heap.
-     */
-    SDL_Surface *surf = TTF_RenderText_Blended(font, text, c);
-    if (!surf) return;
-
-    /*
-     * SDL_CreateTextureFromSurface — upload the CPU surface to a GPU texture.
-     * After this call the surface data lives on the GPU; we free the CPU
-     * copy immediately after rendering.
-     */
-    SDL_Texture *tex = SDL_CreateTextureFromSurface(r, surf);
-    if (!tex) {
-        SDL_FreeSurface(surf);
-        return;
+    if (!ui->font || !ui->renderer || !text || !text[0]) return;
+    UITextCacheEntry *entry = NULL;
+    Uint32 color = (Uint32)c.r << 24 | (Uint32)c.g << 16 | (Uint32)c.b << 8 | c.a;
+    if (strlen(text) < UI_TEXT_CACHE_BYTES) {
+        entry = &ui->text_cache[0];
+        for (int i = 0; i < UI_TEXT_CACHE_COUNT; i++) {
+            UITextCacheEntry *candidate = &ui->text_cache[i];
+            if (candidate->texture && candidate->color == color && !strcmp(candidate->text, text)) {
+                candidate->used = ++ui->text_clock;
+                SDL_Rect dst = {x, y, candidate->w, candidate->h};
+                SDL_RenderCopy(ui->renderer, candidate->texture, NULL, &dst);
+                return;
+            }
+            if (candidate->used < entry->used) entry = candidate;
+        }
     }
-
-    /*
-     * Build the destination rect from the surface dimensions so the text
-     * renders at its natural pixel size (no scaling).
-     */
-    SDL_Rect dst = { x, y, surf->w, surf->h };
-
-    /*
-     * SDL_RenderCopy — blit the texture onto the back buffer.
-     * NULL source rect means "copy the entire texture".
-     */
-    SDL_RenderCopy(r, tex, NULL, &dst);
-
-    /*
-     * Clean up: destroy the GPU texture first, then free the CPU surface.
-     * We recreate both next frame — simple but correct.
-     */
-    SDL_DestroyTexture(tex);
-    SDL_FreeSurface(surf);
+    /* UTF-8 is the encoding supplied by SDL_TEXTINPUT and native paths. */
+    SDL_Surface *surface = TTF_RenderUTF8_Blended(ui->font, text, c);
+    if (!surface) return;
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(ui->renderer, surface);
+    SDL_Rect dst = {x, y, surface->w, surface->h};
+    SDL_FreeSurface(surface);
+    if (!texture) return;
+    SDL_RenderCopy(ui->renderer, texture, NULL, &dst);
+    if (entry) {
+        if (entry->texture) SDL_DestroyTexture(entry->texture);
+        entry->texture = texture;
+        memcpy(entry->text, text, strlen(text) + 1);
+        entry->color = color;
+        entry->used = ++ui->text_clock;
+        entry->w = dst.w;
+        entry->h = dst.h;
+    } else SDL_DestroyTexture(texture);
 }
 
 static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
@@ -159,6 +291,15 @@ void ui_init(UIState *ui, SDL_Renderer *renderer, TTF_Font *font)
     ui->font     = font;
 }
 
+void ui_cleanup(UIState *ui)
+{
+    for (int i = 0; i < UI_TEXT_CACHE_COUNT; i++) {
+        if (ui->text_cache[i].texture) SDL_DestroyTexture(ui->text_cache[i].texture);
+        ui->text_cache[i] = (UITextCacheEntry){0};
+    }
+    ui->text_clock = 0;
+}
+
 /* ------------------------------------------------------------------ */
 
 /*
@@ -177,6 +318,27 @@ void ui_begin_frame(UIState *ui)
     ui->key_escape     = 0;
     ui->has_text_input = 0;
     memset(ui->text_input, 0, sizeof(ui->text_input));
+    ui->pending_text_length = 0;
+    memset(ui->pending_text_input, 0, sizeof(ui->pending_text_input));
+}
+
+void ui_queue_text_input(UIState *ui, const char *text)
+{
+    size_t length;
+    size_t available;
+
+    if (!ui || !text || text[0] == '\0') return;
+    length = strlen(text);
+    available = sizeof(ui->pending_text_input) - 1 - ui->pending_text_length;
+    if (length > available) {
+        length = available;
+        while (length > 0 && ((unsigned char)text[length] & 0xc0) == 0x80) length--;
+    }
+    if (length == 0) return;
+    memcpy(ui->pending_text_input + ui->pending_text_length, text, length);
+    ui->pending_text_length += length;
+    ui->pending_text_input[ui->pending_text_length] = '\0';
+    ui->has_text_input = 1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -210,13 +372,19 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label)
      * to compute a horizontal offset that centres the text.
      */
     int tw = 0, th = 0;
-    TTF_SizeText(ui->font, label, &tw, &th);
+    TTF_SizeUTF8(ui->font, label, &tw, &th);
     int tx = x + (w - tw) / 2;   /* horizontal centre */
     int ty = y + (h - th) / 2;   /* vertical centre   */
-    draw_text(ui->renderer, ui->font, tx, ty, label, UI_TEXT);
+    draw_text(ui, tx, ty, label, UI_TEXT);
 
     /* Return 1 only on the click-down frame while hovering. */
-    return (hovered && ui->mouse_clicked) ? 1 : 0;
+    if (hovered && ui->mouse_clicked) {
+        if (ui->active_id != 0 && ui->before_command &&
+            !ui->before_command(ui->before_command_context)) return 0;
+        if (ui->active_id != 0) return 0;
+        return 1;
+    }
+    return 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -229,7 +397,7 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label)
  */
 void ui_label(UIState *ui, int x, int y, const char *text)
 {
-    draw_text(ui->renderer, ui->font, x, y, text, UI_TEXT);
+    draw_text(ui, x, y, text, UI_TEXT);
 }
 
 /* ------------------------------------------------------------------ */
@@ -243,7 +411,7 @@ void ui_label(UIState *ui, int x, int y, const char *text)
 void ui_label_color(UIState *ui, int x, int y, const char *text,
                     SDL_Color color)
 {
-    draw_text(ui->renderer, ui->font, x, y, text, color);
+    draw_text(ui, x, y, text, color);
 }
 
 /* ------------------------------------------------------------------ */
@@ -303,15 +471,20 @@ int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value)
 
     /* --- Activation on click --- */
     if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
-                                           x, y, w, h)) {
+                                           x, y, w, h) &&
+        command_allows_activation(ui, id)) {
         /*
          * Start editing: copy the current value into edit_buf so the user
          * sees the existing number and can modify it.  snprintf converts
          * the integer to its decimal string representation.
          */
         ui->active_id = id;
+        ui->edit_type = UI_EDIT_INT;
+        ui->edit_target = value;
+        ui->edit_target_size = sizeof(*value);
         snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%d", *value);
         ui->edit_cursor = (int)strlen(ui->edit_buf);
+        is_active = 1;
     }
 
     /*
@@ -319,12 +492,6 @@ int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value)
      * this field, and this field is currently active).  This is the
      * "click outside to cancel" behaviour.
      */
-    if (is_active && ui->mouse_clicked &&
-        !point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h)) {
-        ui->active_id = 0;
-        is_active = 0;
-    }
-
     /* --- Keyboard handling while active --- */
     if (is_active) {
         /*
@@ -333,18 +500,7 @@ int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value)
          * which gives raw key codes.  We only accept digits (0-9) and the
          * minus sign for negative numbers.
          */
-        if (ui->has_text_input) {
-            for (int i = 0; ui->text_input[i] != '\0'; i++) {
-                char ch = ui->text_input[i];
-                int is_digit = (ch >= '0' && ch <= '9');
-                int is_minus = (ch == '-');
-                if ((is_digit || is_minus) &&
-                    ui->edit_cursor < (int)sizeof(ui->edit_buf) - 1) {
-                    ui->edit_buf[ui->edit_cursor++] = ch;
-                    ui->edit_buf[ui->edit_cursor]   = '\0';
-                }
-            }
-        }
+        apply_pending_text_input(ui);
 
         /* Backspace — delete the character before the cursor. */
         if (ui->key_backspace && ui->edit_cursor > 0) {
@@ -353,23 +509,20 @@ int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value)
         }
 
         /*
-         * Return — confirm the edit.  Parse the buffer as an integer and
-         * write it back to *value.  atoi returns 0 for unparseable strings,
-         * which is a safe fallback.
+         * Return — confirm only a complete, in-range integer.  Invalid input
+         * leaves the caller's value unchanged.
          */
         if (ui->key_return) {
-            int new_val = atoi(ui->edit_buf);
-            if (new_val != *value) {
-                *value  = new_val;
-                changed = 1;
+            int result = ui_apply_active_edit(ui);
+            if (result != 0) {
+                changed = result == 2;
+                is_active = 0;
             }
-            ui->active_id = 0;
-            is_active = 0;
         }
 
         /* Escape — cancel: discard edits and deactivate. */
         if (ui->key_escape) {
-            ui->active_id = 0;
+            ui_cancel_active_edit(ui);
             is_active = 0;
         }
     }
@@ -387,12 +540,12 @@ int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value)
         int blink = (SDL_GetTicks() / 500) % 2;  /* 0 or 1 every 500 ms */
         snprintf(display, sizeof(display), "%s%s",
                  ui->edit_buf, blink ? "|" : "");
-        draw_text(ui->renderer, ui->font, x + 4, y + 3, display, UI_TEXT);
+        draw_text(ui, x + 4, y + 3, display, UI_TEXT);
     } else {
         /* Inactive: show the current value as a plain number. */
         char display[32];
         snprintf(display, sizeof(display), "%d", *value);
-        draw_text(ui->renderer, ui->font, x + 4, y + 3, display, UI_TEXT);
+        draw_text(ui, x + 4, y + 3, display, UI_TEXT);
     }
 
     return changed;
@@ -405,11 +558,8 @@ int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value)
  *
  * Identical interaction model to ui_int_field, but:
  *   - Accepts '.' (decimal point) in addition to digits and '-'.
- *   - Displays the value with one decimal place ("123.4").
- *   - Parses the edit buffer with atof instead of atoi.
- *
- * One decimal place is enough for game coordinates and speeds, and keeps
- * the field narrow.  The internal float retains full precision.
+ *   - Displays the value with nine significant digits ("%.9g").
+ *   - Parses the edit buffer with complete-input validation.
  */
 int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value)
 {
@@ -428,38 +578,25 @@ int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value)
 
     /* --- Activation on click --- */
     if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
-                                           x, y, w, h)) {
+                                           x, y, w, h) &&
+        command_allows_activation(ui, id)) {
         ui->active_id = id;
+        ui->edit_type = UI_EDIT_FLOAT;
+        ui->edit_target = value;
+        ui->edit_target_size = sizeof(*value);
         /*
-         * Format with 1 decimal place for a clean starting string.
-         * The "%.1f" format rounds the float to one digit past the point.
+         * Keep enough significant digits for a float to survive activation
+         * and a no-op Return unchanged.
          */
-        snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%.1f", *value);
+        snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%.9g", *value);
         ui->edit_cursor = (int)strlen(ui->edit_buf);
+        is_active = 1;
     }
 
     /* Deactivate on click outside. */
-    if (is_active && ui->mouse_clicked &&
-        !point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h)) {
-        ui->active_id = 0;
-        is_active = 0;
-    }
-
     /* --- Keyboard handling while active --- */
     if (is_active) {
-        if (ui->has_text_input) {
-            for (int i = 0; ui->text_input[i] != '\0'; i++) {
-                char ch = ui->text_input[i];
-                int is_digit = (ch >= '0' && ch <= '9');
-                int is_dot   = (ch == '.');
-                int is_minus = (ch == '-');
-                if ((is_digit || is_dot || is_minus) &&
-                    ui->edit_cursor < (int)sizeof(ui->edit_buf) - 1) {
-                    ui->edit_buf[ui->edit_cursor++] = ch;
-                    ui->edit_buf[ui->edit_cursor]   = '\0';
-                }
-            }
-        }
+        apply_pending_text_input(ui);
 
         if (ui->key_backspace && ui->edit_cursor > 0) {
             ui->edit_cursor--;
@@ -467,22 +604,19 @@ int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value)
         }
 
         /*
-         * Return — parse with atof (ASCII to float).  atof handles decimal
-         * points, negative signs, and returns 0.0 for invalid input.
-         * We cast to float because atof returns double.
+         * Return — parse only a complete, finite float.  Invalid input leaves
+         * the caller's value unchanged.
          */
         if (ui->key_return) {
-            float new_val = (float)atof(ui->edit_buf);
-            if (new_val != *value) {
-                *value  = new_val;
-                changed = 1;
+            int result = ui_apply_active_edit(ui);
+            if (result != 0) {
+                changed = result == 2;
+                is_active = 0;
             }
-            ui->active_id = 0;
-            is_active = 0;
         }
 
         if (ui->key_escape) {
-            ui->active_id = 0;
+            ui_cancel_active_edit(ui);
             is_active = 0;
         }
     }
@@ -491,13 +625,20 @@ int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value)
     if (is_active) {
         char display[80];
         int blink = (SDL_GetTicks() / 500) % 2;
+        size_t length = strlen(ui->edit_buf);
+        const char *visible = ui->edit_buf + (length > sizeof(display)-2 ? length-(sizeof(display)-2) : 0);
+        while (((unsigned char)*visible & 0xc0) == 0x80) visible++;
+        while (*visible && ui_text_width(ui, visible) > w - 16) {
+            visible++;
+            while (((unsigned char)*visible & 0xc0) == 0x80) visible++;
+        }
         snprintf(display, sizeof(display), "%s%s",
-                 ui->edit_buf, blink ? "|" : "");
-        draw_text(ui->renderer, ui->font, x + 4, y + 3, display, UI_TEXT);
+                 visible, blink ? "|" : "");
+        draw_text(ui, x + 4, y + 3, display, UI_TEXT);
     } else {
         char display[32];
-        snprintf(display, sizeof(display), "%.1f", *value);
-        draw_text(ui->renderer, ui->font, x + 4, y + 3, display, UI_TEXT);
+        snprintf(display, sizeof(display), "%.9g", *value);
+        draw_text(ui, x + 4, y + 3, display, UI_TEXT);
     }
 
     return changed;
@@ -533,45 +674,44 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
 
     /* --- Activation on click --- */
     if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
-                                           x, y, w, h)) {
+                                           x, y, w, h) &&
+        command_allows_activation(ui, id)) {
         ui->active_id = id;
+        ui->edit_type = UI_EDIT_TEXT;
+        ui->edit_target = buf;
+        ui->edit_target_size = buf_size;
         /*
          * Copy the current buffer contents into edit_buf so the user
          * sees the existing text and can modify it.
          */
-        strncpy(ui->edit_buf, buf, sizeof(ui->edit_buf) - 1);
-        ui->edit_buf[sizeof(ui->edit_buf) - 1] = '\0';
+        {
+            size_t source_limit = buf_size > 0 ? (size_t)buf_size - 1 : 0;
+            size_t copy_len = 0;
+            while (copy_len < source_limit &&
+                   copy_len < sizeof(ui->edit_buf) - 1 &&
+                   buf[copy_len] != '\0') {
+                copy_len++;
+            }
+            memcpy(ui->edit_buf, buf, copy_len);
+            ui->edit_buf[copy_len] = '\0';
+        }
         ui->edit_cursor = (int)strlen(ui->edit_buf);
+        is_active = 1;
     }
 
     /* Deactivate on click outside. */
-    if (is_active && ui->mouse_clicked &&
-        !point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h)) {
-        ui->active_id = 0;
-        is_active = 0;
-    }
-
     /* --- Keyboard handling while active --- */
     if (is_active) {
         /*
          * Accept any printable character (>= space).  The edit_buf capacity
-         * (64 chars) and the caller's buf_size both limit the length.
+         * and caller's buf_size both limit the length.
          */
-        if (ui->has_text_input) {
-            int max_len = buf_size - 1;
-            if (max_len > (int)sizeof(ui->edit_buf) - 1)
-                max_len = (int)sizeof(ui->edit_buf) - 1;
-            for (int i = 0; ui->text_input[i] != '\0'; i++) {
-                char ch = ui->text_input[i];
-                if (ch >= ' ' && ui->edit_cursor < max_len) {
-                    ui->edit_buf[ui->edit_cursor++] = ch;
-                    ui->edit_buf[ui->edit_cursor]   = '\0';
-                }
-            }
-        }
+        apply_pending_text_input(ui);
 
         if (ui->key_backspace && ui->edit_cursor > 0) {
             ui->edit_cursor--;
+            while (ui->edit_cursor > 0 &&
+                   ((unsigned char)ui->edit_buf[ui->edit_cursor] & 0xc0) == 0x80) ui->edit_cursor--;
             ui->edit_buf[ui->edit_cursor] = '\0';
         }
 
@@ -580,17 +720,15 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
          * buffer.  Only signal "changed" if the text actually differs.
          */
         if (ui->key_return) {
-            if (strcmp(ui->edit_buf, buf) != 0) {
-                strncpy(buf, ui->edit_buf, (size_t)(buf_size - 1));
-                buf[buf_size - 1] = '\0';
-                changed = 1;
+            int result = ui_apply_active_edit(ui);
+            if (result != 0) {
+                changed = result == 2;
+                is_active = 0;
             }
-            ui->active_id = 0;
-            is_active = 0;
         }
 
         if (ui->key_escape) {
-            ui->active_id = 0;
+            ui_cancel_active_edit(ui);
             is_active = 0;
         }
     }
@@ -601,9 +739,9 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
         int blink = (SDL_GetTicks() / 500) % 2;
         snprintf(display, sizeof(display), "%s%s",
                  ui->edit_buf, blink ? "|" : "");
-        draw_text(ui->renderer, ui->font, x + 4, y + 3, display, UI_TEXT);
+        draw_text(ui, x + 4, y + 3, display, UI_TEXT);
     } else {
-        draw_text(ui->renderer, ui->font, x + 4, y + 3,
+        draw_text(ui, x + 4, y + 3,
                   buf[0] ? buf : "Untitled", UI_TEXT_DIM);
     }
 
@@ -650,17 +788,22 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
     const char *current = (*selected >= 0 && *selected < count)
                           ? options[*selected]
                           : "---";
-    draw_text(ui->renderer, ui->font, x + 4, y + 3, current, UI_TEXT);
+    draw_text(ui, x + 4, y + 3, current, UI_TEXT);
 
     /*
      * Draw a small "▼" indicator on the right side of the header to signal
      * that this is a dropdown.  We use the "v" character as a simple stand-in;
      * the font may or may not have a real triangle glyph.
      */
-    draw_text(ui->renderer, ui->font, x + w - 14, y + 3, "v", UI_TEXT_DIM);
+    draw_text(ui, x + w - 14, y + 3, "v", UI_TEXT_DIM);
 
     /* --- Toggle open/closed on header click --- */
     if (ui->mouse_clicked && hovered_header) {
+        if (ui->active_id != 0 && ui->before_command &&
+            !ui->before_command(ui->before_command_context)) {
+            return 0;
+        }
+        if (ui->active_id != 0) return 0;
         if (is_open) {
             /* Already open — close it. */
             ui->dropdown_open_id = 0;
@@ -694,17 +837,22 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
                 opt_bg = UI_BTN;
             }
             draw_rect(ui->renderer, x, oy, w, h, opt_bg);
-            draw_text(ui->renderer, ui->font, x + 4, oy + 3,
+            draw_text(ui, x + 4, oy + 3,
                       options[i], UI_TEXT);
 
             /* Select this option on click. */
             if (ui->mouse_clicked && hovered_opt) {
+                if (ui->active_id != 0 && ui->before_command &&
+                    !ui->before_command(ui->before_command_context)) {
+                    return 0;
+                }
+                if (ui->active_id != 0) return 0;
                 if (i != *selected) {
+                    notify_before_change(ui, id);
                     *selected = i;
                     changed   = 1;
                 }
                 ui->dropdown_open_id = 0;   /* close after selection */
-                is_open = 0;
                 break;   /* stop processing further options this frame */
             }
         }
@@ -758,6 +906,6 @@ int ui_text_width(UIState *ui, const char *text)
 {
     if (!ui->font || !text || text[0] == '\0') return 0;
     int w = 0;
-    TTF_SizeText(ui->font, text, &w, NULL);
+    TTF_SizeUTF8(ui->font, text, &w, NULL);
     return w;
 }

@@ -1,0 +1,10 @@
+format_version = 1
+screen_count = 1
+
+[[checkpoints]]
+x = 160.0
+y = 120.0
+
+[[checkpoints]]
+x = 160.0
+y = 180.0

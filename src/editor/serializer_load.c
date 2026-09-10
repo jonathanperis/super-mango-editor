@@ -13,6 +13,7 @@
 
 #include "serializer.h"
 #include "serializer_load_climbables.h"
+#include "serializer_load_checkpoints.h"
 #include "serializer_load_collectibles.h"
 #include "serializer_load_config.h"
 #include "serializer_load_enemies.h"
@@ -20,6 +21,8 @@
 #include "serializer_load_hazards.h"
 #include "serializer_load_header.h"
 #include "serializer_load_layers.h"
+#include "serializer_parse.h"
+#include "serializer_io.h"
 #include "serializer_load_surfaces.h"
 #include "../../vendor/tomlc17/tomlc17.h" /* tomlc17 API */
 #include "../levels/level.h"              /* LevelDef, all placement types */
@@ -42,11 +45,28 @@ int level_load_toml(const char *path, LevelDef *def) {
      * r.errmsg contains a human-readable error description.  On success,
      * r.toptab is the root TOML table we can query with toml_get().
      */
-    toml_result_t r = toml_parse_file_ex(path);
+    FILE *fp = serializer_fopen_utf8(path, "rb");
+    if (!fp) {
+        fprintf(stderr, "serializer: cannot open '%s' for reading\n", path);
+        return -1;
+    }
+    toml_result_t r = toml_parse_file(fp);
+    fclose(fp);
     if (!r.ok) {
         fprintf(stderr, "serializer: TOML parse error in '%s': %s\n",
                 path, r.errmsg);
         return -1;
+    }
+
+    {
+        char schema_error[256];
+        if (serializer_validate_schema(r.toptab, NULL, schema_error,
+                                       sizeof(schema_error)) != 0) {
+            fprintf(stderr, "serializer: schema error in '%s': %s\n",
+                    path, schema_error);
+            toml_free(r);
+            return -1;
+        }
     }
 
     /*
@@ -64,6 +84,11 @@ int level_load_toml(const char *path, LevelDef *def) {
     }
 
     if (serializer_load_geometry(top, def) != 0) {
+        toml_free(r);
+        return -1;
+    }
+
+    if (serializer_load_checkpoints(top, def) != 0) {
         toml_free(r);
         return -1;
     }

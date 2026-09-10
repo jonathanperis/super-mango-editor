@@ -1,0 +1,4 @@
+format_version = 1
+
+[[rails]]
+layout = "RECT\u0000"

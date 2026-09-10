@@ -17,6 +17,10 @@ static const EditorEntityMeta s_entity_meta[ENT_COUNT] = {
         ENT_FLOOR_GAP, "Floor Gap", "Floor Gap",
         EDITOR_ENTITY_CATEGORY_WORLD, 0
     },
+    [ENT_CHECKPOINT] = {
+        ENT_CHECKPOINT, "Checkpoint", "Checkpoint",
+        EDITOR_ENTITY_CATEGORY_WORLD, 0
+    },
     [ENT_RAIL] = {
         ENT_RAIL, "Rail", "Rail", EDITOR_ENTITY_CATEGORY_WORLD, 0
     },
@@ -128,6 +132,7 @@ static const EditorEntityMeta s_entity_meta[ENT_COUNT] = {
 static const EntityType s_palette_order[] = {
     ENT_PLAYER_SPAWN,
     ENT_FLOOR_GAP,
+    ENT_CHECKPOINT,
     ENT_RAIL,
     ENT_COIN,
     ENT_STAR_YELLOW,
@@ -220,78 +225,142 @@ int editor_entity_type_is_singleton(EntityType type)
     return meta ? meta->singleton : 0;
 }
 
-int editor_rail_placement_tile_count(const RailPlacement *rp)
+static int editor_entity_capacity(EntityType type)
 {
-    if (!rp) return 0;
-    if (rp->layout == RAIL_LAYOUT_RECT) {
-        return rp->w * 2 + (rp->h - 2) * 2;
+    switch (type) {
+    case ENT_FLOOR_GAP:        return MAX_FLOOR_GAPS;
+    case ENT_CHECKPOINT:       return MAX_CHECKPOINTS;
+    case ENT_RAIL:             return MAX_RAILS;
+    case ENT_PLATFORM:         return MAX_PLATFORMS;
+    case ENT_COIN:             return MAX_COINS;
+    case ENT_STAR_YELLOW:      return MAX_STAR_YELLOWS;
+    case ENT_STAR_GREEN:       return MAX_STAR_GREENS;
+    case ENT_STAR_RED:         return MAX_STAR_REDS;
+    case ENT_LAST_STAR:        return 1;
+    case ENT_SPIDER:           return MAX_SPIDERS;
+    case ENT_JUMPING_SPIDER:   return MAX_JUMPING_SPIDERS;
+    case ENT_BIRD:             return MAX_BIRDS;
+    case ENT_FASTER_BIRD:      return MAX_FASTER_BIRDS;
+    case ENT_FISH:             return MAX_FISH;
+    case ENT_FASTER_FISH:      return MAX_FASTER_FISH;
+    case ENT_AXE_TRAP:         return MAX_AXE_TRAPS;
+    case ENT_CIRCULAR_SAW:     return MAX_CIRCULAR_SAWS;
+    case ENT_SPIKE_ROW:        return MAX_SPIKE_ROWS;
+    case ENT_SPIKE_PLATFORM:   return MAX_SPIKE_PLATFORMS;
+    case ENT_SPIKE_BLOCK:      return MAX_SPIKE_BLOCKS;
+    case ENT_BLUE_FLAME:       return MAX_BLUE_FLAMES;
+    case ENT_FIRE_FLAME:       return MAX_FIRE_FLAMES;
+    case ENT_FLOAT_PLATFORM:   return MAX_FLOAT_PLATFORMS;
+    case ENT_BRIDGE:            return MAX_BRIDGES;
+    case ENT_BOUNCEPAD_SMALL:  return MAX_BOUNCEPADS_SMALL;
+    case ENT_BOUNCEPAD_MEDIUM: return MAX_BOUNCEPADS_MEDIUM;
+    case ENT_BOUNCEPAD_HIGH:   return MAX_BOUNCEPADS_HIGH;
+    case ENT_VINE:              return MAX_VINES;
+    case ENT_LADDER:            return MAX_LADDERS;
+    case ENT_ROPE:              return MAX_ROPES;
+    case ENT_PLAYER_SPAWN:      return 1;
+    case ENT_COUNT:             return 0;
     }
-    return rp->w;
+    return 0;
 }
 
-static void rail_rect_tile_position(const RailPlacement *rp, int idx,
-                                    float *x, float *y)
+int editor_entity_count(const LevelDef *level, EntityType type)
 {
-    int w = rp->w;
-    int h = rp->h;
+    int count;
+    int capacity;
 
-    if (idx < w) {
-        *x = (float)(rp->x + idx * RAIL_TILE_W + RAIL_TILE_W / 2);
-        *y = (float)(rp->y + RAIL_TILE_H / 2);
-        return;
+    if (!level || type < 0 || type >= ENT_COUNT) return 0;
+
+    switch (type) {
+    case ENT_FLOOR_GAP:        count = level->floor_gap_count; break;
+    case ENT_CHECKPOINT:       count = level->checkpoint_count; break;
+    case ENT_RAIL:             count = level->rail_count; break;
+    case ENT_PLATFORM:         count = level->platform_count; break;
+    case ENT_COIN:             count = level->coin_count; break;
+    case ENT_STAR_YELLOW:      count = level->star_yellow_count; break;
+    case ENT_STAR_GREEN:       count = level->star_green_count; break;
+    case ENT_STAR_RED:         count = level->star_red_count; break;
+    case ENT_LAST_STAR:        count = 1; break;
+    case ENT_SPIDER:           count = level->spider_count; break;
+    case ENT_JUMPING_SPIDER:   count = level->jumping_spider_count; break;
+    case ENT_BIRD:             count = level->bird_count; break;
+    case ENT_FASTER_BIRD:      count = level->faster_bird_count; break;
+    case ENT_FISH:             count = level->fish_count; break;
+    case ENT_FASTER_FISH:      count = level->faster_fish_count; break;
+    case ENT_AXE_TRAP:         count = level->axe_trap_count; break;
+    case ENT_CIRCULAR_SAW:     count = level->circular_saw_count; break;
+    case ENT_SPIKE_ROW:        count = level->spike_row_count; break;
+    case ENT_SPIKE_PLATFORM:   count = level->spike_platform_count; break;
+    case ENT_SPIKE_BLOCK:      count = level->spike_block_count; break;
+    case ENT_BLUE_FLAME:       count = level->blue_flame_count; break;
+    case ENT_FIRE_FLAME:       count = level->fire_flame_count; break;
+    case ENT_FLOAT_PLATFORM:   count = level->float_platform_count; break;
+    case ENT_BRIDGE:           count = level->bridge_count; break;
+    case ENT_BOUNCEPAD_SMALL:  count = level->bouncepad_small_count; break;
+    case ENT_BOUNCEPAD_MEDIUM: count = level->bouncepad_medium_count; break;
+    case ENT_BOUNCEPAD_HIGH:   count = level->bouncepad_high_count; break;
+    case ENT_VINE:             count = level->vine_count; break;
+    case ENT_LADDER:           count = level->ladder_count; break;
+    case ENT_ROPE:             count = level->rope_count; break;
+    case ENT_PLAYER_SPAWN:     count = 1; break;
+    case ENT_COUNT:            count = 0; break;
     }
 
-    idx -= w;
-    if (idx < h - 2) {
-        *x = (float)(rp->x + (w - 1) * RAIL_TILE_W + RAIL_TILE_W / 2);
-        *y = (float)(rp->y + (idx + 1) * RAIL_TILE_H + RAIL_TILE_H / 2);
-        return;
-    }
+    capacity = editor_entity_capacity(type);
+    if (count < 0) return 0;
+    return count > capacity ? capacity : count;
+}
 
-    idx -= h - 2;
-    if (idx < w) {
-        *x = (float)(rp->x + (w - 1 - idx) * RAIL_TILE_W + RAIL_TILE_W / 2);
-        *y = (float)(rp->y + (h - 1) * RAIL_TILE_H + RAIL_TILE_H / 2);
-        return;
-    }
+int editor_selection_is_valid(const EditorState *es)
+{
+    return es && es->selection.index >= 0 &&
+           editor_entity_count(&es->level, es->selection.type) >
+           es->selection.index;
+}
 
-    idx -= w;
-    *x = (float)(rp->x + RAIL_TILE_W / 2);
-    *y = (float)(rp->y + (h - 2 - idx) * RAIL_TILE_H + RAIL_TILE_H / 2);
+void editor_selection_reconcile(EditorState *es)
+{
+    if (!es) return;
+    if (!editor_selection_is_valid(es)) es->selection.index = -1;
+}
+
+void editor_selection_after_remove(EditorState *es, EntityType type, int index)
+{
+    if (!es) return;
+    if (es->selection.type == type && es->selection.index >= 0) {
+        if (es->selection.index == index) {
+            es->selection.index = -1;
+        } else if (es->selection.index > index) {
+            es->selection.index--;
+        }
+    }
+    editor_selection_reconcile(es);
+}
+
+void editor_selection_after_insert(EditorState *es, EntityType type, int index,
+                                   int select_inserted)
+{
+    if (!es) return;
+    if (select_inserted) {
+        es->selection.type = type;
+        es->selection.index = index;
+    } else if (es->selection.type == type && es->selection.index >= index) {
+        es->selection.index++;
+    }
+    editor_selection_reconcile(es);
+}
+
+int editor_rail_placement_tile_count(const RailPlacement *rp)
+{
+    Rail rail;
+    return rail_build(&rail, rp) == 0 ? rail.count : 0;
 }
 
 void editor_rail_placement_position_at(const RailPlacement *rp, float t,
                                        float *x, float *y)
 {
-    int count;
-
-    if (!rp || !x || !y) return;
-
-    count = editor_rail_placement_tile_count(rp);
-    if (count <= 0) {
-        *x = (float)rp->x;
-        *y = (float)rp->y;
-        return;
-    }
-
-    if (rp->layout == RAIL_LAYOUT_HORIZ) {
-        *x = (float)rp->x + t * (float)RAIL_TILE_W + (float)RAIL_TILE_W / 2.0f;
-        *y = (float)rp->y + (float)RAIL_TILE_H / 2.0f;
-        return;
-    }
-
-    while (t < 0.0f) t += (float)count;
-    while (t >= (float)count) t -= (float)count;
-
-    {
-        int tile = (int)t;
-        int next = (tile + 1) % count;
-        float frac = t - (float)tile;
-        float ax, ay, bx, by;
-
-        rail_rect_tile_position(rp, tile, &ax, &ay);
-        rail_rect_tile_position(rp, next, &bx, &by);
-        *x = ax + (bx - ax) * frac;
-        *y = ay + (by - ay) * frac;
-    }
+    Rail rail;
+    if (!x || !y) return;
+    (void)rail_build(&rail, rp);
+    rail_get_world_pos(&rail, t, x, y);
 }

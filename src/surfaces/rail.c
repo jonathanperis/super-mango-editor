@@ -5,6 +5,8 @@
 #include <SDL.h>
 #include <SDL_image.h>
 #include <stdio.h>
+#include <math.h>
+#include <limits.h>
 
 #include "rail.h"
 #include "game.h"   /* WORLD_W, GAME_H — used for placement bounds */
@@ -235,16 +237,31 @@ void rail_init(Rail *rails, int *count) {
 void rail_init_from_placements(Rail *rails, int *count,
                                const RailPlacement *placements, int n)
 {
+    if (n < 0) n = 0;
+    if (n > MAX_RAILS) n = MAX_RAILS;
     for (int i = 0; i < n; i++) {
-        const RailPlacement *p = &placements[i];
-        if (p->layout == RAIL_LAYOUT_RECT) {
-            build_rect_rail(&rails[i], p->x, p->y, p->w, p->h);
-            rails[i].end_cap = 1;  /* closed loops always have end_cap = 1 */
-        } else {
-            build_horiz_rail(&rails[i], p->x, p->y, p->w, p->end_cap);
-        }
+        (void)rail_build(&rails[i], &placements[i]);
     }
     *count = n;
+}
+
+int rail_build(Rail *rail, const RailPlacement *p)
+{
+    *rail = (Rail){0};
+    if (!p || p->w < 2 || p->w > MAX_RAIL_TILES ||
+        p->x < 0 || p->x > INT_MAX - MAX_RAIL_TILES * RAIL_TILE_W ||
+        p->y < 0 || p->y > INT_MAX - MAX_RAIL_TILES * RAIL_TILE_H)
+        return -1;
+    if (p->layout == RAIL_LAYOUT_RECT) {
+        if (p->h < 2 || p->h > MAX_RAIL_TILES ||
+            p->w * 2 + (p->h - 2) * 2 > MAX_RAIL_TILES) return -1;
+        build_rect_rail(rail, p->x, p->y, p->w, p->h);
+        rail->end_cap = 1;
+    } else if (p->layout == RAIL_LAYOUT_HORIZ &&
+               (p->end_cap == 0 || p->end_cap == 1)) {
+        build_horiz_rail(rail, p->x, p->y, p->w, p->end_cap);
+    } else return -1;
+    return 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -293,9 +310,19 @@ void rail_render(const Rail *rails, int count,
  * Centre of tile k: (tiles[k].x + RAIL_TILE_W/2, tiles[k].y + RAIL_TILE_H/2)
  */
 void rail_get_world_pos(const Rail *r, float t, float *out_x, float *out_y) {
-    int   i    = (int)t % r->count;
+    *out_x = *out_y = 0.0f;
+    if (!r || r->count < 1 || r->count > MAX_RAIL_TILES || !isfinite(t)) return;
+    if (r->closed) {
+        t = fmodf(t, (float)r->count);
+        if (t < 0.0f) t += (float)r->count;
+        if (t >= (float)r->count) t = 0.0f;
+    } else {
+        if (t < 0.0f) t = 0.0f;
+        if (t > (float)(r->count - 1)) t = (float)(r->count - 1);
+    }
+    int   i    = (int)t;
     int   j    = (i + 1) % r->count;
-    float frac = t - (float)(int)t;     /* sub-tile interpolation factor */
+    float frac = t - (float)i;
 
     float cx_i = (float)(r->tiles[i].x + RAIL_TILE_W / 2);
     float cy_i = (float)(r->tiles[i].y + RAIL_TILE_H / 2);
@@ -321,16 +348,15 @@ void rail_get_world_pos(const Rail *r, float t, float *out_x, float *out_y) {
  * Returns the new t value, wrapped to [0, count) for closed rails.
  */
 float rail_advance(const Rail *r, float t, float speed, float dt) {
-    t += speed * dt;
+    if (!r || r->count < 1 || !isfinite(t) || !isfinite(speed) || !isfinite(dt)) return 0.0f;
+    double advanced = (double)t + (double)speed * (double)dt;
     if (r->closed) {
-        float n = (float)r->count;
-        /*
-         * fmodf keeps t in [0, n).  The extra while-loop handles the rare
-         * case where fmodf returns n due to floating-point rounding.
-         */
-        t = t - n * (float)(int)(t / n);
+        double n = (double)r->count;
+        t = (float)fmod(advanced, n);
         if (t < 0.0f) t += n;
         if (t >= n)   t  = 0.0f;
+    } else {
+        t = (float)advanced;
     }
     return t;
 }

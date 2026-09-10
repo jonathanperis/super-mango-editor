@@ -58,12 +58,55 @@
     </div>
 
     <script>
-        var Module = {
+        (function() {
+        var gameCanvas = document.getElementById('canvas');
+        document.addEventListener('keydown', function(event) {
+            if (document.activeElement === gameCanvas && !event.ctrlKey && !event.metaKey && event.code !== 'Tab')
+                event.preventDefault();
+        });
+        function showRestart(message) {
+            var status = document.getElementById('status');
+            status.textContent = message + ' ';
+            status.style.display = '';
+            status.style.pointerEvents = 'auto';
+            var retry = document.createElement('button');
+            retry.type = 'button';
+            retry.textContent = 'Reload game';
+            retry.onclick = function() { window.location.reload(); };
+            status.appendChild(retry);
+            retry.focus();
+        }
+        var moduleConfig = {
             canvas: document.getElementById('canvas'),
+            onAbort: function() { showRestart('Game startup failed.'); },
+            onGameEnded: function(fatal) {
+                showRestart(fatal ? 'Game ended with an error.' : 'Run ended.');
+            },
             onRuntimeInitialized: function() {
+                gameCanvas.tabIndex = 0;
+                gameCanvas.focus();
+                var replayLevel = null;
+                try {
+                    replayLevel = sessionStorage.getItem('super-mango-replay-level');
+                    if (replayLevel) {
+                        sessionStorage.removeItem('super-mango-replay-level');
+                        moduleConfig.arguments = ['--level', replayLevel];
+                    }
+                } catch (e) {
+                    console.error('Super Mango: replay boot intent unavailable', e);
+                }
+                if (moduleConfig.__superMangoDebug) moduleConfig.arguments.push('--debug');
                 document.getElementById('status').style.display = 'none';
                 setTimeout(function() {
-                    Module.callMain(Module.arguments || []);
+                    if (moduleConfig.__superMangoMainStarted) return;
+                    moduleConfig.__superMangoMainStarted = true;
+                    try {
+                        var result = moduleConfig.callMain(moduleConfig.arguments || []);
+                        if (result) showRestart('Game startup failed.');
+                    } catch (error) {
+                        console.error('Super Mango: startup failed', error);
+                        showRestart('Game startup failed.');
+                    }
                 }, 0);
             },
             print: function(text) {
@@ -73,6 +116,9 @@
                 console.error(text);
             }
         };
+        moduleConfig.arguments = ['--level', 'levels/00_sandbox_01.toml'];
+        window.Module = moduleConfig;
+        })();
     </script>
     {{{ SCRIPT }}}
 </body>

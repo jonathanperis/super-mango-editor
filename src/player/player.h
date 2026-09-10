@@ -99,6 +99,7 @@ enum {
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                          SDL_GameController *ctrl,
                          unsigned int replay_input_mask,
+                         unsigned int physical_input_mask,
                          const VineDecor *vines, int vine_count,
                          const LadderDecor *ladders, int ladder_count,
                          const RopeDecor *ropes, int rope_count);

@@ -35,36 +35,7 @@
 
 /* Our own modules */
 #include "game.h"
-#include "screens/start_menu.h"
-
-static int run_game(const char *level_path,
-                    int debug_mode,
-                    int smoke_test_frames,
-                    const char *replay_script_path) {
-    GameState *gs = calloc(1, sizeof(*gs));
-    if (!gs) {
-        fprintf(stderr, "Error: unable to allocate game state\n");
-        return EXIT_FAILURE;
-    }
-
-    gs->debug_mode = debug_mode;
-    gs->smoke_test_frames = smoke_test_frames;
-    if (replay_script_path) {
-        strncpy(gs->replay_script_path, replay_script_path,
-                sizeof(gs->replay_script_path) - 1);
-    }
-    strncpy(gs->level_path, level_path, sizeof(gs->level_path) - 1);
-    gs->level_path[sizeof(gs->level_path) - 1] = '\0';
-
-    if (game_init(gs) != 0) {
-        free(gs);
-        return EXIT_FAILURE;
-    }
-    game_loop(gs);
-    game_cleanup(gs);
-    free(gs);
-    return EXIT_SUCCESS;
-}
+#include "core/app_session.h"
 
 int main(int argc, char *argv[]) {
     /*
@@ -81,13 +52,18 @@ int main(int argc, char *argv[]) {
     int rng_seed_set = 0;
     const char *level_path = NULL;
     const char *replay_script_path = NULL;
+    const char *profile_path = NULL;
+    int no_save = 0, continue_last = 0, expect_profile = 0;
     int expect_level_path = 0;
     int expect_replay_script = 0;
     int expect_smoke_frames = 0;
     int expect_seed = 0;
 
     for (int i = 1; i < argc; i++) {
-        if (expect_level_path) {
+        if (expect_profile) {
+            if (!argv[i][0] || argv[i][0] == '-') { fprintf(stderr,"Error: --profile requires a path\n"); return EXIT_FAILURE; }
+            profile_path = argv[i]; expect_profile = 0;
+        } else if (expect_level_path) {
             if (argv[i][0] == '-') {
                 fprintf(stderr, "Error: --level requires a path\n");
                 return EXIT_FAILURE;
@@ -146,6 +122,20 @@ int main(int argc, char *argv[]) {
             expect_smoke_frames = 1;
         else if (strcmp(argv[i], "--seed") == 0)
             expect_seed = 1;
+        else if (strcmp(argv[i], "--no-save") == 0) no_save = 1;
+        else if (strcmp(argv[i], "--continue") == 0) continue_last = 1;
+        else if (strcmp(argv[i], "--profile") == 0) expect_profile = 1;
+        else if (strcmp(argv[i], "--help") == 0) {
+            puts("Super Mango: --level PATH | --continue | --sandbox\n"
+                 "  --profile PATH   explicit native player profile\n"
+                 "  --no-save        memory-only settings/results\n"
+                 "  --debug --seed N --smoke-test-frames N --replay-script NAME\n"
+                 "F1: settings (menu: gamepad Y; gameplay: Back).\n"
+                 "Continue opens the last stage, not a mid-level save.\n"
+                 "Profiles: SDL preference directory on native; localStorage on web.\n"
+                 "Smoke/replay never reads or writes personal profiles.");
+            return EXIT_SUCCESS;
+        }
         else if (argv[i][0] == '-') {
             fprintf(stderr, "Error: unknown option '%s'\n", argv[i]);
             return EXIT_FAILURE;
@@ -156,6 +146,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Error: --level requires a path\n");
         return EXIT_FAILURE;
     }
+    if (expect_profile) { fprintf(stderr,"Error: --profile requires a path\n"); return EXIT_FAILURE; }
     if (expect_replay_script) {
         fprintf(stderr, "Error: --replay-script requires a path\n");
         return EXIT_FAILURE;
@@ -194,11 +185,9 @@ int main(int argc, char *argv[]) {
      *   SDL_INIT_VIDEO  → creates the event queue, window, and renderer support.
      *   SDL_INIT_AUDIO  → sets up the platform audio device.
      *
-     * SDL_INIT_GAMECONTROLLER is intentionally omitted here.
-     * It is initialised lazily inside game_init via SDL_InitSubSystem, after
-     * the window is already visible.  Deferring the gamepad subsystem avoids
-     * triggering antivirus heuristics that flag programs enumerating HID /
-     * XInput devices during the very first moments of process startup.
+     * SDL_INIT_GAMECONTROLLER is owned by AppSession.  This keeps controller
+     * support alive while the menu and game screens replace each other, while
+     * avoiding screen-level init/quit pairs.
      * Returns 0 on success, negative on failure.
      */
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
@@ -249,42 +238,21 @@ int main(int argc, char *argv[]) {
      */
     srand(rng_seed_set ? rng_seed : (unsigned int)SDL_GetTicks());
 
-    if (level_path) {
-        /*
-         * Direct play — --level <path> skips the start menu.
-         * Used by the editor's Play button and make run-level.
-         */
-        if (run_game(level_path, debug_mode, smoke_test_frames,
-                     replay_script_path) != EXIT_SUCCESS) {
-            Mix_CloseAudio();
-            TTF_Quit();
-            IMG_Quit();
-            SDL_Quit();
-            return EXIT_FAILURE;
-        }
-    } else {
-        /*
-         * Start Menu → Game flow.
-         *
-         * The start menu creates its own window+renderer at 800×600 with
-         * a 400×300 logical canvas (matching the game's resolution).
-         *
-         * When the user clicks "Play" or presses Enter/Space, the menu
-         * sets result = MENU_PLAY.  The menu's window and renderer are
-         * then destroyed, and a fresh GameState is created for the game
-         * loop.  This clean separation avoids resource leaks and ensures
-         * the game gets a pristine renderer with all its own settings.
-         */
-        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+    {
+        AppSessionConfig config = {
+            .level_path = level_path,
+            .debug_mode = debug_mode,
+            .smoke_test_frames = smoke_test_frames,
+            .replay_script_path = replay_script_path,
+            .profile_enabled = !no_save,
+            .profile_path = profile_path,
+            .continue_last = continue_last
+        };
+        AppSession *session = session_create(&config);
+        int result;
 
-        SDL_Window *window = SDL_CreateWindow(
-            "Super Mango",
-            SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-            800, 600,
-            SDL_WINDOW_SHOWN
-        );
-        if (!window) {
-            fprintf(stderr, "SDL_CreateWindow error: %s\n", SDL_GetError());
+        if (!session) {
+            Mix_HaltChannel(-1);
             Mix_CloseAudio();
             TTF_Quit();
             IMG_Quit();
@@ -292,78 +260,10 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
 
-        SDL_Renderer *renderer = SDL_CreateRenderer(
-            window, -1,
-            SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
-        );
-        if (!renderer) {
-            fprintf(stderr, "SDL_CreateRenderer error: %s\n", SDL_GetError());
-            SDL_DestroyWindow(window);
-            Mix_CloseAudio();
-            TTF_Quit();
-            IMG_Quit();
-            SDL_Quit();
-            return EXIT_FAILURE;
-        }
-
-        if (SDL_RenderSetLogicalSize(renderer, 400, 300) < 0) {
-            fprintf(stderr, "SDL_RenderSetLogicalSize error: %s\n", SDL_GetError());
-            SDL_DestroyRenderer(renderer);
-            SDL_DestroyWindow(window);
-            Mix_CloseAudio();
-            TTF_Quit();
-            IMG_Quit();
-            SDL_Quit();
-            return EXIT_FAILURE;
-        }
-
-        StartMenu menu = {0};
-        if (start_menu_init(&menu, window, renderer) != 0) {
-            start_menu_cleanup(&menu);
-            SDL_DestroyRenderer(renderer);
-            SDL_DestroyWindow(window);
-            Mix_CloseAudio();
-            TTF_Quit();
-            IMG_Quit();
-            SDL_Quit();
-            return EXIT_FAILURE;
-        }
-        start_menu_loop(&menu);
-        MenuResult result = menu.result;
-        char selected_level_path[sizeof(menu.selected_level_path)] = {0};
-        strncpy(selected_level_path, menu.selected_level_path,
-                sizeof(selected_level_path) - 1);
-        selected_level_path[sizeof(selected_level_path) - 1] = '\0';
-        start_menu_cleanup(&menu);
-
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-
-        /*
-         * If the user clicked Play, launch the full game.
-         *
-         * game_init creates its own window and renderer, so we destroy
-         * the menu's first to avoid having two windows open at once.
-         * Start menu owns selected_level_path so players can choose a level
-         * before launching the full game window.
-         */
-        if (result == MENU_PLAY) {
-            if (run_game(selected_level_path, debug_mode, smoke_test_frames,
-                         replay_script_path) != EXIT_SUCCESS) {
-                Mix_CloseAudio();
-                TTF_Quit();
-                IMG_Quit();
-                SDL_Quit();
-                return EXIT_FAILURE;
-            }
-        }
+        result = session_run(session);
+#ifndef __EMSCRIPTEN__
+        session_destroy(&session);
+#endif
+        return result;
     }
-
-    /* Tear down SDL subsystems in reverse init order */
-    Mix_CloseAudio();
-    TTF_Quit();
-    IMG_Quit();
-    SDL_Quit();
-
-    return EXIT_SUCCESS;
 }

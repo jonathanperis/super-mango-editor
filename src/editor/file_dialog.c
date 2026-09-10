@@ -13,8 +13,42 @@
 
 #include <stdio.h>   /* popen, pclose, fgets, fprintf */
 #include <string.h>  /* strlen, strchr */
+#include <ctype.h>   /* tolower */
+#if defined(__APPLE__) || defined(__unix__)
+#include <sys/wait.h> /* WIFEXITED, WEXITSTATUS */
+#endif
 #include "file_dialog.h"
 
+#define FILE_DIALOG_TEST_PATH_MAX 4096
+
+static int file_dialog_test_open_result = -1;
+static int file_dialog_test_save_result = -1;
+static char file_dialog_test_open_path[FILE_DIALOG_TEST_PATH_MAX];
+static char file_dialog_test_save_path[FILE_DIALOG_TEST_PATH_MAX];
+
+void file_dialog_test_set_open_result(int result, const char *path)
+{
+    file_dialog_test_open_result = result;
+    if (path) {
+        strncpy(file_dialog_test_open_path, path,
+                sizeof(file_dialog_test_open_path) - 1);
+        file_dialog_test_open_path[sizeof(file_dialog_test_open_path) - 1] = '\0';
+    } else {
+        file_dialog_test_open_path[0] = '\0';
+    }
+}
+
+void file_dialog_test_set_save_result(int result, const char *path)
+{
+    file_dialog_test_save_result = result;
+    if (path) {
+        strncpy(file_dialog_test_save_path, path,
+                sizeof(file_dialog_test_save_path) - 1);
+        file_dialog_test_save_path[sizeof(file_dialog_test_save_path) - 1] = '\0';
+    } else {
+        file_dialog_test_save_path[0] = '\0';
+    }
+}
 /* ------------------------------------------------------------------ */
 
 /*
@@ -30,10 +64,19 @@
  *   2. Print the selected absolute path to stdout.
  *   3. Exit with code 0 on selection, non-zero on cancel.
  *
- * Returns 1 on success (path in buf), 0 on cancel/error.
+ * Returns FILE_DIALOG_SELECTED, FILE_DIALOG_CANCELLED, or FILE_DIALOG_ERROR.
  */
 int file_dialog_open(char *buf, int buf_size) {
-    if (!buf || buf_size < 2) return 0;
+    if (!buf || buf_size < 2) return FILE_DIALOG_ERROR;
+    if (file_dialog_test_open_result >= 0) {
+        int result = file_dialog_test_open_result;
+        file_dialog_test_open_result = -1;
+        if (result == FILE_DIALOG_SELECTED) {
+            strncpy(buf, file_dialog_test_open_path, (size_t)buf_size - 1);
+            buf[buf_size - 1] = '\0';
+        }
+        return result;
+    }
 
 #if defined(__APPLE__)
     /*
@@ -63,6 +106,7 @@ int file_dialog_open(char *buf, int buf_size) {
      */
     const char *cmd =
         "powershell -NoProfile -Command \""
+        "[Console]::OutputEncoding = [Text.Encoding]::UTF8;"
         "Add-Type -AssemblyName System.Windows.Forms;"
         "$d = New-Object System.Windows.Forms.OpenFileDialog;"
         "$d.Filter = 'TOML files (*.toml)|*.toml|All files (*.*)|*.*';"
@@ -95,7 +139,7 @@ int file_dialog_open(char *buf, int buf_size) {
     FILE *fp = popen(cmd, "r");
     if (!fp) {
         fprintf(stderr, "Warning: could not open file dialog\n");
-        return 0;
+        return FILE_DIALOG_ERROR;
     }
 
     /*
@@ -107,10 +151,18 @@ int file_dialog_open(char *buf, int buf_size) {
     char *result = fgets(buf, buf_size, fp);
     int status = pclose(fp);
 
-    if (!result || status != 0) {
-        /* User cancelled or command failed — no file selected */
-        return 0;
+    if (!result) {
+        /* PowerShell exits successfully without output on cancel. */
+        if (status == 0) return FILE_DIALOG_CANCELLED;
+#if defined(__APPLE__) || defined(__unix__)
+        if (status > 0 && WIFEXITED(status) && WEXITSTATUS(status) == 1)
+            return FILE_DIALOG_CANCELLED;
+#endif
+        return FILE_DIALOG_ERROR;
     }
+    if (status != 0) return FILE_DIALOG_ERROR;
+    if (!strchr(buf, '\n') && strlen(buf) == (size_t)buf_size - 1)
+        return FILE_DIALOG_ERROR;
 
     /*
      * Strip the trailing newline that fgets preserves.
@@ -124,7 +176,107 @@ int file_dialog_open(char *buf, int buf_size) {
     if (cr) *cr = '\0';
 
     /* Empty string means no selection */
-    if (buf[0] == '\0') return 0;
+    if (buf[0] == '\0') return FILE_DIALOG_CANCELLED;
 
+    return FILE_DIALOG_SELECTED;
+}
+
+static int file_dialog_add_toml_extension(char *buf, int buf_size)
+{
+    const char *slash;
+    const char *backslash;
+    const char *dot;
+    size_t len;
+
+    if (!buf || buf_size < 2 || buf[0] == '\0') return 0;
+    slash = strrchr(buf, '/');
+    backslash = strrchr(buf, '\\');
+    dot = strrchr(buf, '.');
+    if (backslash && (!slash || backslash > slash)) slash = backslash;
+
+    if (dot && (!slash || dot > slash) && strlen(dot) == 5 &&
+        tolower((unsigned char)dot[1]) == 't' &&
+        tolower((unsigned char)dot[2]) == 'o' &&
+        tolower((unsigned char)dot[3]) == 'm' &&
+        tolower((unsigned char)dot[4]) == 'l') {
+        return 1;
+    }
+
+    len = strlen(buf);
+    if (len + 5 >= (size_t)buf_size) return 0;
+    memcpy(buf + len, ".toml", 6);
     return 1;
+}
+
+int file_dialog_save(char *buf, int buf_size)
+{
+    if (!buf || buf_size < 2) return FILE_DIALOG_ERROR;
+    if (file_dialog_test_save_result >= 0) {
+        int result = file_dialog_test_save_result;
+        file_dialog_test_save_result = -1;
+        if (result == FILE_DIALOG_SELECTED) {
+            strncpy(buf, file_dialog_test_save_path, (size_t)buf_size - 1);
+            buf[buf_size - 1] = '\0';
+        }
+        return result;
+    }
+
+#if defined(__APPLE__)
+    const char *cmd =
+        "osascript -e '"
+        "set f to choose file name with prompt \"Save Level TOML\" "
+        "default name \"untitled.toml\"' "
+        "-e 'POSIX path of f' 2>/dev/null";
+#elif defined(_WIN32)
+    const char *cmd =
+        "powershell -NoProfile -Command \""
+        "[Console]::OutputEncoding = [Text.Encoding]::UTF8;"
+        "Add-Type -AssemblyName System.Windows.Forms;"
+        "$d = New-Object System.Windows.Forms.SaveFileDialog;"
+        "$d.Filter = 'TOML files (*.toml)|*.toml|All files (*.*)|*.*';"
+        "$d.DefaultExt = 'toml';"
+        "$d.AddExtension = $true;"
+        "$d.OverwritePrompt = $false;"
+        "$d.Title = 'Save Level TOML';"
+        "if ($d.ShowDialog() -eq 'OK') { $d.FileName }\"";
+#else
+    const char *cmd =
+        "zenity --file-selection --save "
+        "--title='Save Level TOML' "
+        "--file-filter='TOML files | *.toml' "
+        "--file-filter='All files | *' 2>/dev/null";
+#endif
+
+    FILE *fp = popen(cmd, "r");
+    char *result;
+    int status;
+    char *nl;
+    char *cr;
+
+    if (!fp) {
+        fprintf(stderr, "Warning: could not open save file dialog\n");
+        return FILE_DIALOG_ERROR;
+    }
+
+    result = fgets(buf, buf_size, fp);
+    status = pclose(fp);
+    if (!result) {
+        if (status == 0) return FILE_DIALOG_CANCELLED;
+#if defined(__APPLE__) || defined(__unix__)
+        if (status > 0 && WIFEXITED(status) && WEXITSTATUS(status) == 1)
+            return FILE_DIALOG_CANCELLED;
+#endif
+        return FILE_DIALOG_ERROR;
+    }
+    if (status != 0) return FILE_DIALOG_ERROR;
+    if (!strchr(buf, '\n') && strlen(buf) == (size_t)buf_size - 1)
+        return FILE_DIALOG_ERROR;
+
+    nl = strchr(buf, '\n');
+    if (nl) *nl = '\0';
+    cr = strchr(buf, '\r');
+    if (cr) *cr = '\0';
+    if (buf[0] == '\0') return FILE_DIALOG_CANCELLED;
+    if (!file_dialog_add_toml_extension(buf, buf_size)) return FILE_DIALOG_ERROR;
+    return FILE_DIALOG_SELECTED;
 }

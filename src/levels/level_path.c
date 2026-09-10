@@ -14,6 +14,8 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+#include <stdlib.h>
+#include "../editor/serializer_io.h"
 #ifndef MAX_PATH
 #define MAX_PATH 260
 #endif
@@ -25,11 +27,11 @@
 #endif
 #endif
 
-static void level_path_copy(char *dst, size_t dst_size, const char *src)
+static int level_path_copy(char *dst, size_t dst_size, const char *src)
 {
-    if (dst_size == 0) return;
-    strncpy(dst, src, dst_size - 1);
-    dst[dst_size - 1] = '\0';
+    if (strlen(src) >= dst_size) return -1;
+    memcpy(dst, src, strlen(src) + 1);
+    return 0;
 }
 
 int level_resolve_path(const char *path, char *resolved_path, size_t resolved_path_size)
@@ -40,22 +42,29 @@ int level_resolve_path(const char *path, char *resolved_path, size_t resolved_pa
 
 #if defined(__EMSCRIPTEN__)
     /* Emscripten has no realpath — use the path as-is. */
-    level_path_copy(resolved_path, resolved_path_size, path);
-    return 0;
+    return level_path_copy(resolved_path, resolved_path_size, path);
 #elif defined(_WIN32)
     {
-        char resolved[MAX_PATH];
-        DWORD len = GetFullPathNameA(path, (DWORD)sizeof(resolved), resolved, NULL);
-        if (len == 0 || len >= (DWORD)sizeof(resolved)) return -1;
-        level_path_copy(resolved_path, resolved_path_size, resolved);
-        return 0;
+        wchar_t *wide = serializer_utf8_to_wide(path);
+        if (!wide) return -1;
+        DWORD needed = GetFullPathNameW(wide, 0, NULL, NULL);
+        wchar_t *resolved = needed ? malloc((size_t)needed * sizeof(*resolved)) : NULL;
+        char *utf8 = NULL;
+        if (resolved) {
+            DWORD length = GetFullPathNameW(wide, needed, resolved, NULL);
+            if (length > 0 && length < needed) utf8 = serializer_wide_to_utf8(resolved);
+        }
+        int result = utf8 ? level_path_copy(resolved_path, resolved_path_size, utf8) : -1;
+        free(utf8);
+        free(resolved);
+        free(wide);
+        return result;
     }
 #else
     {
         char resolved[PATH_MAX];
         if (realpath(path, resolved) == NULL) return -1;
-        level_path_copy(resolved_path, resolved_path_size, resolved);
-        return 0;
+        return level_path_copy(resolved_path, resolved_path_size, resolved);
     }
 #endif
 }

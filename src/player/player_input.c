@@ -20,8 +20,6 @@
  * Raise this value if a specific controller drifts; lower it for more
  * sensitivity at the cost of accidental movement.
  */
-#define AXIS_DEAD_ZONE  8000
-
 /*
  * Climbing movement constants.
  *
@@ -36,36 +34,31 @@
  *
  * Called once per frame, before player_update.
  *
- * We use SDL_GetKeyboardState instead of key-press events because
- * it tells us which keys are held RIGHT NOW, giving smooth, continuous
- * movement rather than one-shot movement on the moment of press.
+ * Physical input arrives as a sampled mask. The game input module owns SDL
+ * state and route-release gating; this module only applies gameplay controls.
  */
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                          SDL_GameController *ctrl,
                          unsigned int replay_input_mask,
+                         unsigned int physical_input_mask,
                          const VineDecor *vines, int vine_count,
                          const LadderDecor *ladders, int ladder_count,
                          const RopeDecor *ropes, int rope_count) {
-    /*
-     * SDL_GetKeyboardState returns a pointer to an array of key states.
-     * Each element is 1 if that key is currently held, 0 if not.
-     * Indexed by SDL_SCANCODE_* values (hardware-based, layout-independent).
-     * Passing NULL means "use SDL's internal state array".
-     */
-    const Uint8 *keys = SDL_GetKeyboardState(NULL);
     const int replay_left = (replay_input_mask & PLAYER_INPUT_LEFT) != 0;
     const int replay_right = (replay_input_mask & PLAYER_INPUT_RIGHT) != 0;
     const int replay_up = (replay_input_mask & PLAYER_INPUT_UP) != 0;
     const int replay_down = (replay_input_mask & PLAYER_INPUT_DOWN) != 0;
     const int replay_jump = (replay_input_mask & PLAYER_INPUT_JUMP) != 0;
     const int replay_run = (replay_input_mask & PLAYER_INPUT_RUN) != 0;
-    int jump_down = (keys[SDL_SCANCODE_SPACE] || replay_jump) ? 1 : 0;
+    const int physical_left = (physical_input_mask & PLAYER_INPUT_LEFT) != 0;
+    const int physical_right = (physical_input_mask & PLAYER_INPUT_RIGHT) != 0;
+    const int physical_up = (physical_input_mask & PLAYER_INPUT_UP) != 0;
+    const int physical_down = (physical_input_mask & PLAYER_INPUT_DOWN) != 0;
+    const int physical_jump = (physical_input_mask & PLAYER_INPUT_JUMP) != 0;
+    const int physical_run = (physical_input_mask & PLAYER_INPUT_RUN) != 0;
+    int jump_down = (physical_jump || replay_jump) ? 1 : 0;
 
-#ifndef __EMSCRIPTEN__
-    if (ctrl && SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A)) {
-        jump_down = 1;
-    }
-#endif
+    (void)ctrl;
 
     /*
      * Vine grab — if the player is not already climbing and presses UP
@@ -76,7 +69,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
      * spamming the jump action and accumulating height.
      */
     if (!player->on_vine && !jump_down &&
-        (keys[SDL_SCANCODE_UP] || keys[SDL_SCANCODE_W] || replay_up)) {
+        (physical_up || replay_up)) {
         player_try_grab_climbable(player, vines, vine_count,
                                   ladders, ladder_count,
                                   ropes, rope_count);
@@ -88,15 +81,15 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
          * horizontal drift, and Space to jump-dismount.
          */
         player->vy = 0.0f;
-        if (keys[SDL_SCANCODE_UP]   || keys[SDL_SCANCODE_W] || replay_up) player->vy = -CLIMB_SPEED;
-        if (keys[SDL_SCANCODE_DOWN] || keys[SDL_SCANCODE_S] || replay_down) player->vy =  CLIMB_SPEED;
+        if (physical_up || replay_up) player->vy = -CLIMB_SPEED;
+        if (physical_down || replay_down) player->vy =  CLIMB_SPEED;
 
         player->vx = 0.0f;
-        if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A] || replay_left) {
+        if (physical_left || replay_left) {
             player->vx = -CLIMB_H_SPEED;
             player->facing_left = 1;
         }
-        if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D] || replay_right) {
+        if (physical_right || replay_right) {
             player->vx = CLIMB_H_SPEED;
             player->facing_left = 0;
         }
@@ -120,13 +113,13 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
          *
          * Run key: Left or Right Shift → higher max speed, less air control.
          */
-        player->is_running = (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT] || replay_run) ? 1 : 0;
+        player->is_running = (physical_run || replay_run) ? 1 : 0;
         player->move_dir   = 0;
-        if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A] || replay_left) {
+        if (physical_left || replay_left) {
             player->move_dir    = -1;
             player->facing_left = 1;
         }
-        if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D] || replay_right) {
+        if (physical_right || replay_right) {
             player->move_dir    = 1;
             player->facing_left = 0;
         }
@@ -146,102 +139,4 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
         }
     }
 
-    /* ----------------------------------------------------------------
-     * Gamepad input — only runs when a controller is connected (ctrl != NULL).
-     *
-     * SDL_GameController maps every supported device (DualSense, DualShock 4,
-     * Xbox Series / One / 360) to a unified button/axis layout regardless of
-     * the physical label on the device.  We read two input sources:
-     *
-     *   1. D-Pad buttons — digital on/off, perfect for precision platforming.
-     *   2. Left analog stick X axis — analog range; requires a dead zone check
-     *      to filter electrical noise when the stick is at rest.
-     *
-     * Both sources can be active simultaneously; the velocity accumulates.
-     * Keyboard and gamepad also work at the same time — no mode switching.
-     *
-     * DISABLED ON WEBASSEMBLY: Emscripten's SDL gamepad implementation may
-     * report a "virtual" controller with non-zero axis values, causing the
-     * player to auto-move or override keyboard input. Skip gamepad entirely
-     * on __EMSCRIPTEN__ to ensure keyboard controls work correctly.
-     * ---------------------------------------------------------------- */
-#ifndef __EMSCRIPTEN__
-    if (ctrl) {
-        /*
-         * Vine grab via D-Pad UP — same logic as keyboard UP above.
-         * Skip when A / Cross is held to prevent grab-dismount spam.
-         */
-        if (!player->on_vine &&
-            !jump_down &&
-            SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_UP)) {
-            player_try_grab_climbable(player, vines, vine_count,
-                                      ladders, ladder_count,
-                                      ropes, rope_count);
-        }
-
-        if (player->on_vine) {
-            /* D-Pad vertical climbing */
-            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_UP))
-                player->vy = -CLIMB_SPEED;
-            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_DOWN))
-                player->vy =  CLIMB_SPEED;
-
-            /* D-Pad horizontal drift (reduced speed) */
-            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_LEFT)) {
-                player->vx = -CLIMB_H_SPEED;
-                player->facing_left = 1;
-            }
-            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)) {
-                player->vx = CLIMB_H_SPEED;
-                player->facing_left = 0;
-            }
-
-            /* Left stick vertical climbing */
-            Sint16 axis_y = SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_LEFTY);
-            if (axis_y < -AXIS_DEAD_ZONE) player->vy = -CLIMB_SPEED;
-            else if (axis_y > AXIS_DEAD_ZONE) player->vy = CLIMB_SPEED;
-
-            /* Left stick horizontal drift */
-            Sint16 axis_x = SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_LEFTX);
-            if (axis_x < -AXIS_DEAD_ZONE) {
-                player->vx = -CLIMB_H_SPEED;
-                player->facing_left = 1;
-            } else if (axis_x > AXIS_DEAD_ZONE) {
-                player->vx = CLIMB_H_SPEED;
-                player->facing_left = 0;
-            }
-        } else {
-            /*
-             * Normal gamepad controls — D-Pad and analog stick for horizontal
-             * movement, A / Cross for jump.
-             *
-             * Right Bumper (RB / R1) → run, matching the keyboard Shift key.
-             * D-Pad and left stick both set move_dir; actual vx acceleration
-             * happens in player_update just like the keyboard path.
-             */
-
-            /* Right bumper → run mode */
-            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER))
-                player->is_running = 1;
-
-            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_LEFT)) {
-                player->move_dir    = -1;
-                player->facing_left = 1;
-            }
-            if (SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)) {
-                player->move_dir    = 1;
-                player->facing_left = 0;
-            }
-
-            Sint16 axis_x = SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_LEFTX);
-            if (axis_x < -AXIS_DEAD_ZONE) {
-                player->move_dir    = -1;
-                player->facing_left = 1;
-            } else if (axis_x > AXIS_DEAD_ZONE) {
-                player->move_dir    = 1;
-                player->facing_left = 0;
-            }
-        }
-    }
-#endif /* __EMSCRIPTEN__ */
 }

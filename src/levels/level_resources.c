@@ -86,7 +86,7 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
                     def->music_path, Mix_GetError());
         } else {
             Mix_PlayMusic(gs->audio.music, -1);
-            Mix_VolumeMusic(def->music_volume > 0 ? def->music_volume : 13);
+            Mix_VolumeMusic(def->music_volume); /* zero is an authored mute */
         }
     }
 }

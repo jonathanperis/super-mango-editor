@@ -17,6 +17,7 @@
 #include "editor_panels.h"     /* editor_render_side_panels */
 #include "editor_playtest.h"   /* editor_check_play_status */
 #include "editor_validation.h" /* editor_validate_level */
+#include "editor_session.h"
 #include "ui.h"                /* ui_begin_frame */
 
 /*
@@ -84,7 +85,17 @@ void editor_run_frame(EditorState *es) {
         editor_check_play_status(es);
     }
 
-    editor_validate_level(&es->level, &es->validation_report);
+    /* Recheck edits immediately, but do not reopen unchanged asset files at
+     * 60 Hz. External file changes are picked up within one second. Save and
+     * playtest still perform their own synchronous validation. */
+    uint64_t document_hash = editor_document_hash(&es->level);
+    if (!es->validation_cache_valid || document_hash != es->validated_document_hash ||
+        frame_start - es->last_validation_ms >= 1000u) {
+        editor_validate_level(&es->level, &es->validation_report);
+        es->validated_document_hash = document_hash;
+        es->last_validation_ms = frame_start;
+        es->validation_cache_valid = 1;
+    }
     editor_maybe_autosave(es);
 
     /* ---- Clear the screen --------------------------------------- */

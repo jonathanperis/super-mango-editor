@@ -47,13 +47,13 @@ Source-backed facts for design and copy:
 - Language and stack: C11, SDL2, SDL2_image, SDL2_ttf, SDL2_mixer, vendored tomlc17, Emscripten/WebAssembly.
 - Rendering: 400x300 logical resolution scaled to an 800x600 native window for chunky pixel rendering.
 - Current browser payload callout: Play button advertises approximately 43 MB.
-- Levels: 3 TOML levels, 23 screens total, 41 enemies, 64 hazards, 80 collectibles.
-- Level names: Creator's Playground, Volcanic Depths 1, Volcanic Depths 2.
-- Gameplay systems: one-way platforms, floating platforms, crumble bridges, floor gaps, animated water/lava, bouncepads, vines, ladders, ropes, coins, stars, hearts, lives, score, pause, game over, completion flow.
+- Levels: 4 playable TOML levels selected in order by v1 `levels/campaigns/main.toml`; 25 screens total, 41 enemies, 65 hazards, 91 collectibles.
+- Level names: Forest First Steps, Creator's Playground, Volcanic Depths 1, Volcanic Depths 2.
+- Gameplay systems: one-way platforms, floating platforms, crumble bridges, floor gaps, animated water/lava, authored checkpoints, bouncepads, vines, ladders, ropes, coins, stars, hearts, lives, score, pause, game over, completion flow.
 - Enemy set: spiders, jumping spiders, birds, faster birds, fish, faster fish.
 - Hazard set: spike rows, spike blocks, spike platforms, circular saws, axe traps, blue flames, fire flames.
 - Visual systems: parallax backgrounds, 32 render layers, scrolling camera, fog overlays, HUD, debug overlay.
-- Level editor: standalone SDL2 editor with canvas, palette, select/place/delete tools, properties inspector, level config, undo/redo, recent files, autosave, validation, export, and play-test integration.
+- Level editor: standalone SDL2 editor with canvas, checkpoint-aware palette and markers, select/place/delete tools, properties inspector, level config, undo/redo, recent files, autosave, validation, TOML save/load, and play-test integration.
 - Controls: keyboard controls are visible on the site: WASD or arrows to move, Space to jump. Docs also describe gamepad hot-plug support.
 - Authors: Jonathan Peris and Fernando Santos.
 - Art credit: Super Mango 2D Pixel Art Platformer Asset Pack by Juho.
@@ -71,7 +71,7 @@ Preferred copy moves:
 
 - Use game-world language for section labels when clarity remains intact: `START RUN`, `INSERT COIN`, `BUILDER MANUAL`, `ITEM DROP`, `CHOOSE YOUR CARTRIDGE`.
 - Pair playful labels with plain supporting text: `ITEM DROP` plus `Download builds for your platform`.
-- Use concrete proof over adjectives: `3 levels`, `23 screens`, `TOML levels`, `C11 + SDL2`, `visual level editor`.
+- Use concrete proof over adjectives: `4 levels`, `25 screens`, `TOML levels`, `C11 + SDL2`, `visual level editor`.
 
 Avoid:
 
@@ -123,7 +123,7 @@ Recommended page story:
 
 1. **Attract mode hero:** `SUPER MANGO`, browser-play CTA, short source-backed value prop.
 2. **Cabinet play panel:** game canvas, payload size, controls, debug mode tucked into a developer drawer.
-3. **Scoreboard proof strip:** C11, SDL2, WebAssembly, 3 levels, 23 screens, TOML levels, level editor.
+3. **Scoreboard proof strip:** C11, SDL2, WebAssembly, 4 levels, 25 screens, TOML levels, level editor.
 4. **What you can do:** Play, learn the engine, build levels.
 5. **Builder manual:** grouped docs by intent, not a flat list.
 6. **Item drop:** native builds and WebAssembly route with clear platform actions.

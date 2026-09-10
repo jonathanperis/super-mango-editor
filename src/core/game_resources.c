@@ -175,12 +175,6 @@ static void load_optional_chunk_specs(GameState *gs, const ChunkLoadSpec *specs,
     }
 }
 
-static void destroy_texture_offset(GameState *gs, size_t offset)
-{
-    SDL_Texture **slot = texture_slot(gs, offset);
-    DESTROY_TEX(*slot);
-}
-
 static void destroy_texture_specs_reverse(GameState *gs,
                                           const TextureLoadSpec *specs,
                                           int count)
@@ -232,14 +226,15 @@ int game_resources_load(GameState *gs)
 
 void game_resources_cleanup(GameState *gs)
 {
+    /* Stop every effect channel before freeing any chunk it may reference. */
+    Mix_HaltChannel(-1);
+
     /* Level-specific resources are applied after core resources; release first. */
     if (gs->audio.music) {
         Mix_HaltMusic();
         Mix_FreeMusic(gs->audio.music);
         gs->audio.music = NULL;
     }
-
-    destroy_texture_offset(gs, TEX_FIELD(ctrl_init_msg));
 
     parallax_cleanup(&gs->parallax);
 

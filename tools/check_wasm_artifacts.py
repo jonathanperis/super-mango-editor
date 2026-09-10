@@ -4,24 +4,17 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
+from package_release import WASM_FILES
 
 ROOT = Path(__file__).resolve().parents[1]
-REQUIRED_OUT = [
-    "super-mango.html",
-    "super-mango.js",
-    "super-mango.wasm",
-    "super-mango.data",
-]
-REQUIRED_ZIP = [
-    "super-mango-wasm/super-mango.html",
-    "super-mango-wasm/super-mango.js",
-    "super-mango-wasm/super-mango.wasm",
-    "super-mango-wasm/super-mango.data",
+REQUIRED_OUT = WASM_FILES
+REQUIRED_ZIP = [f"super-mango-wasm/{name}" for name in WASM_FILES] + [
     "super-mango-wasm/README.txt",
     "super-mango-wasm/LICENSE",
 ]
@@ -41,7 +34,7 @@ def require_nonempty(path: Path) -> int:
 
 
 def run_node_check(js_path: Path, wasm_path: Path) -> int:
-    node = shutil.which("node")
+    node = shutil.which(os.environ.get("NODE", "node"))
     if not node:
         return fail("node is required for JavaScript syntax and WebAssembly.compile checks")
 
@@ -61,7 +54,7 @@ def run_node_check(js_path: Path, wasm_path: Path) -> int:
 
 def check_js_asset_references(js_path: Path) -> int:
     text = js_path.read_text(encoding="utf-8", errors="ignore")
-    for basename in ["super-mango.wasm", "super-mango.data"]:
+    for basename in [f"{js_path.stem}.wasm", f"{js_path.stem}.data"]:
         if basename not in text:
             return fail(f"{js_path.relative_to(ROOT)} does not reference {basename}")
     return 0
@@ -95,12 +88,13 @@ def main() -> int:
         if rc != 0:
             return rc
 
-    rc = check_js_asset_references(out_dir / "super-mango.js")
-    if rc != 0:
-        return rc
-    rc = run_node_check(out_dir / "super-mango.js", out_dir / "super-mango.wasm")
-    if rc != 0:
-        return rc
+    for stem in ("super-mango", "super-mango-debug"):
+        rc = check_js_asset_references(out_dir / f"{stem}.js")
+        if rc != 0:
+            return rc
+        rc = run_node_check(out_dir / f"{stem}.js", out_dir / f"{stem}.wasm")
+        if rc != 0:
+            return rc
     rc = check_zip(zip_path, required=args.zip is not None)
     if rc != 0:
         return rc

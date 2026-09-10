@@ -8,6 +8,8 @@
 
 #include "../surfaces/rail.h" /* RAIL_TILE_W */
 #include "undo.h"   /* Command, undo_push */
+#include "editor_session.h" /* save-point dirty tracking */
+#include "entity_meta.h" /* central selection validity */
 
 /* Record undo state for singleton placements that move instead of append. */
 static void push_singleton_move(EditorState *es,
@@ -33,7 +35,9 @@ static void push_singleton_move(EditorState *es,
  */
 void editor_copy_selected(EditorState *es)
 {
-    if (es->selection.index < 0) return;
+    if (!es) return;
+    editor_selection_reconcile(es);
+    if (!editor_selection_is_valid(es)) return;
 
     EntityType t = es->selection.type;
     int i = es->selection.index;
@@ -44,6 +48,9 @@ void editor_copy_selected(EditorState *es)
     switch (t) {
     case ENT_FLOOR_GAP:
         es->clipboard_data.floor_gap = es->level.floor_gaps[i];
+        break;
+    case ENT_CHECKPOINT:
+        es->clipboard_data.checkpoint = es->level.checkpoints[i];
         break;
     case ENT_RAIL:
         es->clipboard_data.rail = es->level.rails[i];
@@ -150,7 +157,8 @@ void editor_copy_selected(EditorState *es)
  */
 void editor_paste_clipboard(EditorState *es)
 {
-    if (!es->has_clipboard) return;
+    if (!es || !es->has_clipboard) return;
+    editor_selection_reconcile(es);
 
     EntityType t = es->clipboard_type;
     PlacementData d = es->clipboard_data;
@@ -164,7 +172,7 @@ void editor_paste_clipboard(EditorState *es)
         es->level.count_field++;                                           \
         es->selection.type = t;                                            \
         es->selection.index = idx;                                         \
-        es->modified = 1;                                                  \
+        editor_refresh_dirty(es);                                          \
         Command cmd;                                                       \
         memset(&cmd, 0, sizeof(cmd));                                      \
         cmd.type = CMD_PLACE;                                              \
@@ -203,7 +211,7 @@ void editor_paste_clipboard(EditorState *es)
         es->level.last_star = d.last_star;
         es->selection.type = t;
         es->selection.index = 0;
-        es->modified = 1;
+        editor_refresh_dirty(es);
         break;
     }
     case ENT_PLAYER_SPAWN: {
@@ -216,7 +224,7 @@ void editor_paste_clipboard(EditorState *es)
         es->level.player_start_y = after.y;
         es->selection.type = t;
         es->selection.index = 0;
-        es->modified = 1;
+        editor_refresh_dirty(es);
         break;
     }
     case ENT_SPIDER:
@@ -331,7 +339,7 @@ void editor_paste_clipboard(EditorState *es)
             es->level.floor_gap_count++;
             es->selection.type = t;
             es->selection.index = idx;
-            es->modified = 1;
+            editor_refresh_dirty(es);
             Command cmd;
             memset(&cmd, 0, sizeof(cmd));
             cmd.type = CMD_PLACE;
@@ -340,6 +348,11 @@ void editor_paste_clipboard(EditorState *es)
             cmd.after.floor_gap = d.floor_gap;
             undo_push(es->undo, cmd);
         }
+        break;
+    case ENT_CHECKPOINT:
+        d.checkpoint.x += PASTE_OFFSET;
+        d.checkpoint.y += PASTE_OFFSET;
+        PASTE_INTO(checkpoints, checkpoint_count, MAX_CHECKPOINTS, checkpoint);
         break;
     case ENT_RAIL:
         d.rail.x += (int)PASTE_OFFSET;
@@ -351,4 +364,6 @@ void editor_paste_clipboard(EditorState *es)
 
 #undef PASTE_INTO
 #undef PASTE_OFFSET
+
+    editor_selection_reconcile(es);
 }

@@ -21,6 +21,7 @@
 
 #include "properties.h"
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, PANEL_W, etc. */
+#include "editor_undo_apply.h" /* committed property/config command tracking */
 #include "entity_meta.h" /* editor_entity_type_name/is_singleton             */
 #include "ui.h"         /* ui_panel, ui_label, ui_separator, ui_float_field,
                            ui_int_field, ui_dropdown                         */
@@ -129,7 +130,9 @@ static const char *vine_type_opts[] = { "Green", "Brown" };
 
 void properties_render(EditorState *es, int start_y, int available_h)
 {
-    if (es->selection.index < 0)
+    if (!es) return;
+    editor_selection_reconcile(es);
+    if (!editor_selection_is_valid(es))
         return;
 
     /*
@@ -188,6 +191,10 @@ void properties_render(EditorState *es, int start_y, int available_h)
 
     if (!es->panel_open) return;
 
+    editor_begin_change_tracking(es, 1);
+    es->ui.before_change = editor_before_change;
+    es->ui.before_change_context = es;
+
     /* Clip content below the title bar */
     SDL_Rect prop_clip = { prop_x, prop_y + ROW_H + 4, PROP_W, prop_h - ROW_H - 4 };
     SDL_RenderSetClipRect(es->ui.renderer, &prop_clip);
@@ -199,8 +206,8 @@ void properties_render(EditorState *es, int start_y, int available_h)
     /*
      * Each case accesses the selected placement struct by pointer so that
      * the ui_*_field widgets can read and write the value in place.
-     * When any widget returns 1 (value changed), we set es->modified = 1
-     * so the editor knows the level has unsaved changes.
+     * When any widget returns 1 (value changed), commit one property/config
+     * command so the editor can undo the complete committed field edit.
      */
     switch (es->selection.type) {
 
@@ -217,7 +224,30 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_FLOOR_GAP, 0),
                          FIELD_X, y, FIELD_W, p))
-            es->modified = 1;
+            editor_commit_change(es);
+        break;
+    }
+
+    case ENT_CHECKPOINT: {
+        CheckpointPlacement *p = &es->level.checkpoints[es->selection.index];
+        int screen = p->x >= 0.0f && p->x <= MAX_LEVEL_SCREENS * GAME_W
+                   ? (int)(p->x / GAME_W) : -1;
+        ui_label(&es->ui, CONTENT_X, y, "x:");
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_CHECKPOINT, 0),
+                           FIELD_X, y, FIELD_W, &p->x))
+            editor_commit_change(es);
+        y += ROW_H;
+        ui_label(&es->ui, CONTENT_X, y, "y:");
+        if (ui_float_field(&es->ui, FIELD_ID(ENT_CHECKPOINT, 1),
+                           FIELD_X, y, FIELD_W, &p->y))
+            editor_commit_change(es);
+        y += ROW_H;
+        ui_label(&es->ui, CONTENT_X, y, "screen:");
+        char screen_text[32];
+        snprintf(screen_text, sizeof(screen_text), "%d (derived)", screen);
+        ui_label_color(&es->ui, FIELD_X, y, screen_text, UI_TEXT_DIM);
+        y += ROW_H;
+        ui_label_color(&es->ui, CONTENT_X, y, "Respawn when crossed.", UI_TEXT_DIM);
         break;
     }
 
@@ -234,38 +264,38 @@ void properties_render(EditorState *es, int start_y, int available_h)
                         FIELD_X, y, FIELD_W,
                         rail_layout_opts, 2, &layout_sel)) {
             p->layout = (RailLayout)layout_sel;
-            es->modified = 1;
+            editor_commit_change(es);
         }
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 1),
                          FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 2),
                          FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "w:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 3),
                          FIELD_X, y, FIELD_W, &p->w))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "h:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 4),
                          FIELD_X, y, FIELD_W, &p->h))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "end_cap:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 5),
                          FIELD_X, y, FIELD_W, &p->end_cap))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -275,19 +305,19 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_PLATFORM, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "tile_height:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_PLATFORM, 1),
                          FIELD_X, y, FIELD_W, &p->tile_height))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "tile_width:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_PLATFORM, 2),
                          FIELD_X, y, FIELD_W, &p->tile_width))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         /* Tile path dropdown — select platform texture override */
@@ -324,7 +354,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
                             sizeof(p->tile_path) - 1);
                     p->tile_path[sizeof(p->tile_path) - 1] = '\0';
                 }
-                es->modified = 1;
+                editor_commit_change(es);
             }
         }
         break;
@@ -340,13 +370,13 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_COIN, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_COIN, 1),
                            FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -357,13 +387,13 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_YELLOW, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_YELLOW, 1),
                            FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -374,13 +404,13 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_GREEN, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_GREEN, 1),
                            FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -391,13 +421,13 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_RED, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_RED, 1),
                            FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -411,13 +441,13 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_LAST_STAR, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_LAST_STAR, 1),
                            FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         /* Next phase path for level linking */
@@ -427,7 +457,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
                           CONTENT_X, y, FIELD_W * 2,
                           es->level.next_phase,
                           sizeof(es->level.next_phase)))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -445,14 +475,14 @@ void properties_render(EditorState *es, int start_y, int available_h)
         if (ui_float_field(&es->ui, FIELD_ID(ENT_PLAYER_SPAWN, 0),
                            FIELD_X, y, FIELD_W,
                            &es->level.player_start_x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_PLAYER_SPAWN, 1),
                            FIELD_X, y, FIELD_W,
                            &es->level.player_start_y))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -466,31 +496,31 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "vx:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 1),
                            FIELD_X, y, FIELD_W, &p->vx))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 2),
                            FIELD_X, y, FIELD_W, &p->patrol_x0))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 3),
                            FIELD_X, y, FIELD_W, &p->patrol_x1))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "frame_index:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIDER, 4),
                          FIELD_X, y, FIELD_W, &p->frame_index))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -501,25 +531,25 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "vx:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 1),
                            FIELD_X, y, FIELD_W, &p->vx))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 2),
                            FIELD_X, y, FIELD_W, &p->patrol_x0))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 3),
                            FIELD_X, y, FIELD_W, &p->patrol_x1))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -529,37 +559,37 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "base_y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 1),
                            FIELD_X, y, FIELD_W, &p->base_y))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "vx:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 2),
                            FIELD_X, y, FIELD_W, &p->vx))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 3),
                            FIELD_X, y, FIELD_W, &p->patrol_x0))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 4),
                            FIELD_X, y, FIELD_W, &p->patrol_x1))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "frame_index:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_BIRD, 5),
                          FIELD_X, y, FIELD_W, &p->frame_index))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -573,37 +603,37 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "base_y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 1),
                            FIELD_X, y, FIELD_W, &p->base_y))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "vx:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 2),
                            FIELD_X, y, FIELD_W, &p->vx))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 3),
                            FIELD_X, y, FIELD_W, &p->patrol_x0))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 4),
                            FIELD_X, y, FIELD_W, &p->patrol_x1))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "frame_index:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 5),
                          FIELD_X, y, FIELD_W, &p->frame_index))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -613,25 +643,25 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "vx:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 1),
                            FIELD_X, y, FIELD_W, &p->vx))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 2),
                            FIELD_X, y, FIELD_W, &p->patrol_x0))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 3),
                            FIELD_X, y, FIELD_W, &p->patrol_x1))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -645,25 +675,25 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "vx:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 1),
                            FIELD_X, y, FIELD_W, &p->vx))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 2),
                            FIELD_X, y, FIELD_W, &p->patrol_x0))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 3),
                            FIELD_X, y, FIELD_W, &p->patrol_x1))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -677,13 +707,13 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "pillar_x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_AXE_TRAP, 0),
                            FIELD_X, y, FIELD_W, &p->pillar_x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_AXE_TRAP, 3),
                            FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         int mode_sel = (int)p->mode;
@@ -692,7 +722,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
                         FIELD_X, y, FIELD_W,
                         axe_mode_opts, 2, &mode_sel)) {
             p->mode = (AxeTrapMode)mode_sel;
-            es->modified = 1;
+            editor_commit_change(es);
         }
         break;
     }
@@ -704,31 +734,31 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 4),
                            FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 1),
                            FIELD_X, y, FIELD_W, &p->patrol_x0))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 2),
                            FIELD_X, y, FIELD_W, &p->patrol_x1))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "direction:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 3),
                          FIELD_X, y, FIELD_W, &p->direction))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -739,13 +769,13 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_ROW, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "count:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIKE_ROW, 1),
                          FIELD_X, y, FIELD_W, &p->count))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -756,19 +786,19 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_PLATFORM, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_PLATFORM, 1),
                            FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "tile_count:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIKE_PLATFORM, 2),
                          FIELD_X, y, FIELD_W, &p->tile_count))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -779,19 +809,19 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "rail_index:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 0),
                          FIELD_X, y, FIELD_W, &p->rail_index))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "t_offset:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 1),
                            FIELD_X, y, FIELD_W, &p->t_offset))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "speed:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 2),
                            FIELD_X, y, FIELD_W, &p->speed))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -802,7 +832,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BLUE_FLAME, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -813,7 +843,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FIRE_FLAME, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -835,44 +865,44 @@ void properties_render(EditorState *es, int start_y, int available_h)
                         FIELD_X, y, FIELD_W,
                         fplat_mode_opts, 3, &mode_sel)) {
             p->mode = (FloatPlatformMode)mode_sel;
-            es->modified = 1;
+            editor_commit_change(es);
         }
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 1),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 2),
                            FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "tile_count:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 3),
                          FIELD_X, y, FIELD_W, &p->tile_count))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "rail_index:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 4),
                          FIELD_X, y, FIELD_W, &p->rail_index))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "t_offset:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 5),
                            FIELD_X, y, FIELD_W, &p->t_offset))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "speed:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 6),
                            FIELD_X, y, FIELD_W, &p->speed))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -882,19 +912,19 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BRIDGE, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BRIDGE, 1),
                            FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "brick_count:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_BRIDGE, 2),
                          FIELD_X, y, FIELD_W, &p->brick_count))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -912,13 +942,13 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_SMALL, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_SMALL, 1),
                            FIELD_X, y, FIELD_W, &p->launch_vy))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -932,13 +962,13 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_MEDIUM, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_MEDIUM, 1),
                            FIELD_X, y, FIELD_W, &p->launch_vy))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -952,13 +982,13 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_HIGH, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_HIGH, 1),
                            FIELD_X, y, FIELD_W, &p->launch_vy))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -972,26 +1002,26 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_VINE, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_VINE, 1),
                            FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "tile_count:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_VINE, 2),
                          FIELD_X, y, FIELD_W, &p->tile_count))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "vine_type:");
         if (ui_dropdown(&es->ui, FIELD_ID(ENT_VINE, 3),
                         FIELD_X, y, FIELD_W,
                         vine_type_opts, 2, &p->vine_type))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -1001,19 +1031,19 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_LADDER, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_LADDER, 1),
                            FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "tile_count:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_LADDER, 2),
                          FIELD_X, y, FIELD_W, &p->tile_count))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -1023,19 +1053,19 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_label(&es->ui, CONTENT_X, y, "x:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_ROPE, 0),
                            FIELD_X, y, FIELD_W, &p->x))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "y:");
         if (ui_float_field(&es->ui, FIELD_ID(ENT_ROPE, 1),
                            FIELD_X, y, FIELD_W, &p->y))
-            es->modified = 1;
+            editor_commit_change(es);
         y += ROW_H;
 
         ui_label(&es->ui, CONTENT_X, y, "tile_count:");
         if (ui_int_field(&es->ui, FIELD_ID(ENT_ROPE, 2),
                          FIELD_X, y, FIELD_W, &p->tile_count))
-            es->modified = 1;
+            editor_commit_change(es);
         break;
     }
 
@@ -1045,6 +1075,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
     }
 
     SDL_RenderSetClipRect(es->ui.renderer, NULL);
+    editor_end_change_tracking(es);
 }
 
 /* ================================================================== */
@@ -1063,6 +1094,10 @@ void properties_render(EditorState *es, int start_y, int available_h)
  */
 void level_config_render(EditorState *es, int start_y, int available_h,
                          int total_content_h) {
+    editor_begin_change_tracking(es, 2);
+    es->ui.before_change = editor_before_change;
+    es->ui.before_change_context = es;
+
     int x     = PROP_X;
     int cfg_h = available_h;
 
@@ -1094,7 +1129,10 @@ void level_config_render(EditorState *es, int start_y, int available_h,
                        hdr_hovered ? UI_TEXT : UI_ACCENT);
     }
 
-    if (!es->config_open) return;
+    if (!es->config_open) {
+        editor_end_change_tracking(es);
+        return;
+    }
 
     /*
      * Scroll clamping — clamp cfg_scroll_y so we never scroll past the
@@ -1157,19 +1195,19 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     ui_label(&es->ui, x + 8, y, "Name:");
     if (ui_text_field(&es->ui, 9000, x + 55, y, 310, es->level.name,
                       (int)sizeof(es->level.name)))
-        es->modified = 1;
+        editor_commit_change(es);
     y += 24;
 
     ui_label(&es->ui, x + 8, y, "Desc:");
     if (ui_text_field(&es->ui, 9001, x + 55, y, 310, es->level.description,
                       (int)sizeof(es->level.description)))
-        es->modified = 1;
+        editor_commit_change(es);
     y += 24;
 
     ui_label(&es->ui, x + 8, y, "By:");
     if (ui_text_field(&es->ui, 9002, x + 55, y, 310, es->level.generated_by,
                       (int)sizeof(es->level.generated_by)))
-        es->modified = 1;
+        editor_commit_change(es);
     y += 24;
 
     /* ---- World Width (screen count) ---- */
@@ -1178,12 +1216,12 @@ void level_config_render(EditorState *es, int start_y, int available_h,
         /* Clamp to valid range 1-99 */
         if (es->level.screen_count < 1)  es->level.screen_count = 1;
         if (es->level.screen_count > 99) es->level.screen_count = 99;
-        es->modified = 1;
+        editor_commit_change(es);
     }
     {
         char width_text[32];
-        snprintf(width_text, sizeof(width_text), "= %dpx",
-                 es->level.screen_count * GAME_W);
+        snprintf(width_text, sizeof(width_text), "= %lldpx",
+                 (long long)es->level.screen_count * GAME_W);
         ui_label_color(&es->ui, x + 140, y, width_text, UI_TEXT_DIM);
     }
     y += 24;
@@ -1192,7 +1230,7 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     ui_label(&es->ui, x + 8, y, "Next:");
     if (ui_text_field(&es->ui, 9031, x + 55, y, 310, es->level.next_phase,
                       (int)sizeof(es->level.next_phase)))
-        es->modified = 1;
+        editor_commit_change(es);
     y += 24;
 
     /* ---- Background Sound ---- */
@@ -1223,7 +1261,7 @@ void level_config_render(EditorState *es, int start_y, int available_h,
             strncpy(es->level.music_path, music_paths[sel],
                     sizeof(es->level.music_path) - 1);
             es->level.music_path[sizeof(es->level.music_path) - 1] = '\0';
-            es->modified = 1;
+            editor_commit_change(es);
         }
     }
     y += 22;
@@ -1231,7 +1269,7 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     if (ui_int_field(&es->ui, 9003, x + 50, y, 80, &es->level.music_volume)) {
         if (es->level.music_volume < 0)  es->level.music_volume = 0;
         if (es->level.music_volume > 99) es->level.music_volume = 99;
-        es->modified = 1;
+        editor_commit_change(es);
     }
     y += 24;
 
@@ -1272,7 +1310,7 @@ void level_config_render(EditorState *es, int start_y, int available_h,
             strncpy(es->level.floor_tile_path, floor_tile_paths[sel],
                     sizeof(es->level.floor_tile_path) - 1);
             es->level.floor_tile_path[sizeof(es->level.floor_tile_path) - 1] = '\0';
-            es->modified = 1;
+            editor_commit_change(es);
         }
     }
     y += 24;
@@ -1285,21 +1323,21 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     if (ui_int_field(&es->ui, 9006, x + 70, y, 60, &es->level.initial_hearts)) {
         if (es->level.initial_hearts < 1) es->level.initial_hearts = 1;
         if (es->level.initial_hearts > 3) es->level.initial_hearts = 3;
-        es->modified = 1;
+        editor_commit_change(es);
     }
     ui_label(&es->ui, x + 150, y, "lives:");
     if (ui_int_field(&es->ui, 9007, x + 205, y, 60, &es->level.initial_lives)) {
         if (es->level.initial_lives < 0)  es->level.initial_lives = 0;
         if (es->level.initial_lives > 99) es->level.initial_lives = 99;
-        es->modified = 1;
+        editor_commit_change(es);
     }
     y += 22;
     ui_label(&es->ui, x + 8, y, "pts/life:");
     if (ui_int_field(&es->ui, 9008, x + 80, y, 80, &es->level.score_per_life))
-        es->modified = 1;
+        editor_commit_change(es);
     ui_label(&es->ui, x + 180, y, "coin pts:");
     if (ui_int_field(&es->ui, 9012, x + 240, y, 60, &es->level.coin_score))
-        es->modified = 1;
+        editor_commit_change(es);
     y += 24;
 
     /* ---- Movement Physics — collapsible subsection ---- */
@@ -1343,52 +1381,52 @@ void level_config_render(EditorState *es, int start_y, int available_h,
             /* -- Walk / Run speeds -- */
             ui_label(&es->ui, COL1_L, y, "walk spd:");
             if (ui_float_field(&es->ui, 9020, COL1_F, y, PHYS_FW, &es->level.physics.walk_max_speed))
-                es->modified = 1;
+                editor_commit_change(es);
             ui_label(&es->ui, COL2_L, y, "run spd:");
             if (ui_float_field(&es->ui, 9021, COL2_F, y, PHYS_FW, &es->level.physics.run_max_speed))
-                es->modified = 1;
+                editor_commit_change(es);
             y += 22;
 
             /* -- Ground acceleration -- */
             ui_label(&es->ui, COL1_L, y, "walk accel:");
             if (ui_float_field(&es->ui, 9022, COL1_F, y, PHYS_FW, &es->level.physics.walk_ground_accel))
-                es->modified = 1;
+                editor_commit_change(es);
             ui_label(&es->ui, COL2_L, y, "run accel:");
             if (ui_float_field(&es->ui, 9023, COL2_F, y, PHYS_FW, &es->level.physics.run_ground_accel))
-                es->modified = 1;
+                editor_commit_change(es);
             y += 22;
 
             /* -- Ground friction / counter -- */
             ui_label(&es->ui, COL1_L, y, "friction:");
             if (ui_float_field(&es->ui, 9024, COL1_F, y, PHYS_FW, &es->level.physics.ground_friction))
-                es->modified = 1;
+                editor_commit_change(es);
             ui_label(&es->ui, COL2_L, y, "counter:");
             if (ui_float_field(&es->ui, 9025, COL2_F, y, PHYS_FW, &es->level.physics.ground_counter_accel))
-                es->modified = 1;
+                editor_commit_change(es);
             y += 22;
 
             /* -- Air acceleration -- */
             ui_label(&es->ui, COL1_L, y, "air walk:");
             if (ui_float_field(&es->ui, 9026, COL1_F, y, PHYS_FW, &es->level.physics.air_accel_walk))
-                es->modified = 1;
+                editor_commit_change(es);
             ui_label(&es->ui, COL2_L, y, "air run:");
             if (ui_float_field(&es->ui, 9027, COL2_F, y, PHYS_FW, &es->level.physics.air_accel_run))
-                es->modified = 1;
+                editor_commit_change(es);
             y += 22;
 
             /* -- Air friction -- */
             ui_label(&es->ui, COL1_L, y, "air fric:");
             if (ui_float_field(&es->ui, 9028, COL1_F, y, PHYS_FW, &es->level.physics.air_friction))
-                es->modified = 1;
+                editor_commit_change(es);
             y += 22;
 
             /* -- Camera lookahead -- */
             ui_label(&es->ui, COL1_L, y, "cam vx:");
             if (ui_float_field(&es->ui, 9029, COL1_F, y, PHYS_FW, &es->level.physics.cam_lookahead_vx_factor))
-                es->modified = 1;
+                editor_commit_change(es);
             ui_label(&es->ui, COL2_L, y, "cam max:");
             if (ui_float_field(&es->ui, 9030, COL2_F, y, PHYS_FW, &es->level.physics.cam_lookahead_max))
-                es->modified = 1;
+                editor_commit_change(es);
             y += 22;
         }
 
@@ -1470,29 +1508,31 @@ void level_config_render(EditorState *es, int start_y, int available_h,
                              bg_names, bg_count, &sel)) {
                 strncpy(es->level.background_layers[i].path, bg_paths[sel],
                         sizeof(es->level.background_layers[i].path) - 1);
-                es->modified = 1;
+                editor_commit_change(es);
             }
             ui_label(&es->ui, x + 236, y, "spd:");
             if (ui_float_field(&es->ui, 9100 + i, x + 265, y, 60,
                                &es->level.background_layers[i].speed))
-                es->modified = 1;
+                editor_commit_change(es);
             y += 20;
         }
 
         if (es->level.background_layer_count < MAX_BACKGROUND_LAYERS) {
             if (ui_button(&es->ui, x + 8, y, 80, 20, "+ Add")) {
+                editor_capture_change_before(es, -1);
                 int idx = es->level.background_layer_count;
                 strncpy(es->level.background_layers[idx].path,
                         "assets/sprites/backgrounds/sky_blue.png", 63);
                 es->level.background_layers[idx].speed = 0.1f;
                 es->level.background_layer_count++;
-                es->modified = 1;
+                editor_commit_change(es);
             }
         }
         if (es->level.background_layer_count > 0) {
             if (ui_button(&es->ui, x + 96, y, 100, 20, "- Remove Last")) {
+                editor_capture_change_before(es, -1);
                 es->level.background_layer_count--;
-                es->modified = 1;
+                editor_commit_change(es);
             }
         }
         y += 24;
@@ -1555,29 +1595,31 @@ bg_done:
                              fg_names, fg_count, &sel)) {
                 strncpy(es->level.foreground_layers[i].path, fg_paths[sel],
                         sizeof(es->level.foreground_layers[i].path) - 1);
-                es->modified = 1;
+                editor_commit_change(es);
             }
             ui_label(&es->ui, x + 236, y, "spd:");
             if (ui_float_field(&es->ui, 9400 + i, x + 265, y, 60,
                                &es->level.foreground_layers[i].speed))
-                es->modified = 1;
+                editor_commit_change(es);
             y += 20;
         }
 
         if (es->level.foreground_layer_count < MAX_BACKGROUND_LAYERS) {
             if (ui_button(&es->ui, x + 8, y, 80, 20, "+ Add")) {
+                editor_capture_change_before(es, -1);
                 int idx = es->level.foreground_layer_count;
                 strncpy(es->level.foreground_layers[idx].path,
                         "assets/sprites/foregrounds/fog_1.png", 63);
                 es->level.foreground_layers[idx].speed = 0.5f;
                 es->level.foreground_layer_count++;
-                es->modified = 1;
+                editor_commit_change(es);
             }
         }
         if (es->level.foreground_layer_count > 0) {
             if (ui_button(&es->ui, x + 96, y, 100, 20, "- Remove Last")) {
+                editor_capture_change_before(es, -1);
                 es->level.foreground_layer_count--;
-                es->modified = 1;
+                editor_commit_change(es);
             }
         }
         y += 24;
@@ -1642,34 +1684,36 @@ fg_done:
                              fog_names, fog_opt_count, &sel)) {
                 strncpy(es->level.fog_layers[i].path, fog_paths[sel],
                         sizeof(es->level.fog_layers[i].path) - 1);
-                es->modified = 1;
+                editor_commit_change(es);
             }
             ui_label(&es->ui, x + 236, y, "spd:");
             if (ui_float_field(&es->ui, 9700 + i, x + 265, y, 60,
                                &es->level.fog_layers[i].speed))
-                es->modified = 1;
+                editor_commit_change(es);
             y += 20;
         }
 
         if (es->level.fog_layer_count < MAX_FOG_TEXTURES) {
             if (ui_button(&es->ui, x + 8, y, 80, 20, "+ Add")) {
+                editor_capture_change_before(es, -1);
                 int idx = es->level.fog_layer_count;
                 strncpy(es->level.fog_layers[idx].path,
                         "assets/sprites/foregrounds/fog_1.png", 63);
                 es->level.fog_layers[idx].speed = 0.5f;
                 es->level.fog_layer_count++;
-                es->modified = 1;
+                editor_commit_change(es);
             }
         }
         if (es->level.fog_layer_count > 0) {
             if (ui_button(&es->ui, x + 96, y, 100, 20, "- Remove Last")) {
+                editor_capture_change_before(es, -1);
                 es->level.fog_layer_count--;
-                es->modified = 1;
+                editor_commit_change(es);
             }
         }
-        y += 24;
     }
 
 fog_done:
     SDL_RenderSetClipRect(es->ui.renderer, NULL);
+    editor_end_change_tracking(es);
 }

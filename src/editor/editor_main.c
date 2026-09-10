@@ -27,6 +27,7 @@
 #include <string.h>    /* strncpy — safe string copy for file path        */
 
 #include "editor.h"       /* EditorState, editor_init/loop/cleanup */
+#include "editor_frame.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -114,9 +115,8 @@ int main(int argc, char *argv[]) {
      * a path to a TOML level file.  If the file fails to load we warn but
      * continue — the designer can start a fresh level instead.
      *
-     * strncpy with sizeof-1 ensures the path is always NUL-terminated
-     * even if the argument is longer than the buffer (truncation is safe
-     * here — the save dialog will use the stored path as-is).
+     * editor_load_level rejects arguments that exceed editor storage before
+     * opening them, so the active document identity is never truncated.
      */
     if (level_path) {
         if (editor_load_level(&es, level_path) != 0) {
@@ -132,7 +132,12 @@ int main(int argc, char *argv[]) {
      */
     if (!smoke_test) {
         editor_loop(&es);
+    } else {
+        /* Startup alone cannot detect preview/UI failures. */
+        for (int frame = 0; frame < 5 && es.running; frame++) editor_run_frame(&es);
     }
+
+    int result = smoke_test && !es.running ? EXIT_FAILURE : EXIT_SUCCESS;
 
     /*
      * editor_cleanup — free all editor resources in reverse init order.
@@ -152,5 +157,5 @@ int main(int argc, char *argv[]) {
     IMG_Quit();
     SDL_Quit();
 
-    return EXIT_SUCCESS;
+    return result;
 }

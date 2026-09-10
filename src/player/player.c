@@ -108,10 +108,6 @@ void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
     player->x += player->vx * dt;   /* move horizontally */
     player->y += player->vy * dt;   /* move vertically   */
 
-    player_resolve_floor_collision(player, bouncepads, bouncepad_count,
-                                   floor_gaps, floor_gap_count,
-                                   out_bounce_idx);
-
     player_resolve_platform_collisions(player, platforms, platform_count,
                                        float_platforms, float_platform_count,
                                        prev_bottom, out_fp_landed_idx,
@@ -124,6 +120,14 @@ void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
     player_resolve_spike_platform_ceiling_collision(player, spike_platforms,
                                                     spike_platform_count,
                                                     prev_top);
+
+    player_resolve_floor_collision(player, bouncepads, bouncepad_count,
+                                   floor_gaps, floor_gap_count, out_bounce_idx);
+    /* A nearer bridge/spike surface or the floor may have replaced the float
+     * platform candidate. Do not carry the player with the discarded support. */
+    if (*out_fp_landed_idx >= 0 &&
+        (player->vy != 0.0f || player->y + player->h - FLOOR_SINK !=
+         float_platforms[*out_fp_landed_idx].y)) *out_fp_landed_idx = -1;
 
     player_resolve_world_bounds(player, world_w);
 
