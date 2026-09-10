@@ -3,6 +3,11 @@
  */
 #pragma once
 
+#include <stddef.h>
+
+/* Resolve the game executable beside the editor, independent of OUTDIR/cwd. */
+int editor_playtest_binary_path(char *path, size_t size);
+
 #include "editor.h"  /* EditorState */
 
 /* Save and launch the current level in the game executable. */

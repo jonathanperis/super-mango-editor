@@ -7,14 +7,12 @@
 #include <string.h>  /* strchr, strlen */
 
 /*
- * fmt_float — Format a float with up to 2 decimal places, stripping
- * unnecessary trailing zeros but always keeping at least one decimal
- * digit so the TOML parser reads it as a float (not an integer).
+ * fmt_float — Format a float with enough significant digits for a float
+ * round trip, always keeping TOML's value classified as a float.
  *
  * Examples:  80.0f  → "80.0"     (not "80.00" or "80")
- *            0.08f  → "0.08"     (preserved — was lost with %.1f)
- *            536.2f → "536.2"    (not "536.20")
- *            0.50f  → "0.5"      (trailing zero stripped)
+ *            0.08f  → round-trippable decimal
+ *            536.2f → round-trippable decimal
  *           -380.0f → "-380.0"
  *
  * Returns a pointer to a static buffer — valid until the next call.
@@ -23,18 +21,15 @@
 const char *fmt_float(double val)
 {
     static char buf[64];
-    snprintf(buf, sizeof(buf), "%.2f", val);
+    snprintf(buf, sizeof(buf), "%.9g", val);
 
-    /* Find the decimal point. */
-    char *dot = strchr(buf, '.');
-    if (dot) {
-        /* Walk back from the end, stripping trailing '0' characters,
-         * but always keep at least one digit after the decimal point
-         * so "80.00" becomes "80.0" (not "80." or "80"). */
-        char *end = buf + strlen(buf) - 1;
-        while (end > dot + 1 && *end == '0') {
-            *end = '\0';
-            end--;
+    /* TOML parses a bare integer as an integer, not a float. */
+    if (!strchr(buf, '.') && !strchr(buf, 'e') && !strchr(buf, 'E')) {
+        size_t len = strlen(buf);
+        if (len + 2 < sizeof(buf)) {
+            buf[len] = '.';
+            buf[len + 1] = '0';
+            buf[len + 2] = '\0';
         }
     }
     return buf;

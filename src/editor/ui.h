@@ -17,8 +17,24 @@
  */
 #pragma once
 
+#include <stddef.h>     /* size_t */
 #include <SDL.h>       /* SDL_Renderer, SDL_Color, SDL_Rect */
 #include <SDL_ttf.h>   /* TTF_Font                          */
+
+typedef void (*UIBeforeChangeFn)(void *context, int widget_id);
+typedef int (*UIBeforeCommandFn)(void *context);
+
+typedef enum {
+    UI_EDIT_NONE = 0,
+    UI_EDIT_INT,
+    UI_EDIT_FLOAT,
+    UI_EDIT_TEXT
+} UIEditType;
+
+#include "../levels/level.h"
+/* Match the model and undo storage; do not truncate accepted metadata. */
+#define UI_EDIT_BUFFER_SIZE LEVEL_DESCRIPTION_CAPACITY
+#define UI_PENDING_TEXT_SIZE 4096
 
 /* ------------------------------------------------------------------ */
 /* Colour palette                                                      */
@@ -55,6 +71,17 @@
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
 
+#define UI_TEXT_CACHE_COUNT 64
+#define UI_TEXT_CACHE_BYTES 128
+
+typedef struct {
+    SDL_Texture *texture;
+    char text[UI_TEXT_CACHE_BYTES];
+    Uint32 color;
+    Uint64 used;
+    int w, h;
+} UITextCacheEntry;
+
 /*
  * UIState — everything the immediate-mode UI needs for one frame.
  *
@@ -69,6 +96,8 @@ typedef struct {
     /* --- Set once at init --- */
     SDL_Renderer *renderer;       /* GPU drawing context                     */
     TTF_Font     *font;           /* font used for all UI text               */
+    UITextCacheEntry text_cache[UI_TEXT_CACHE_COUNT];
+    Uint64 text_clock;
 
     /* --- Per-frame input (caller fills before widget calls) --- */
     int           mouse_x;        /* cursor X in logical pixels              */
@@ -80,11 +109,16 @@ typedef struct {
     int           key_escape;     /* 1 if escape pressed this frame          */
     char          text_input[32]; /* SDL_TEXTINPUT text received this frame  */
     int           has_text_input; /* 1 if text_input was filled this frame   */
+    char          pending_text_input[UI_PENDING_TEXT_SIZE];
+    size_t        pending_text_length;
 
     /* --- Retained state for active widgets --- */
     int           active_id;      /* ID of widget being edited, 0 = none     */
-    char          edit_buf[64];   /* buffer for the active text/number input */
+    char          edit_buf[UI_EDIT_BUFFER_SIZE];
     int           edit_cursor;    /* cursor position inside edit_buf         */
+    UIEditType    edit_type;
+    void          *edit_target;
+    int           edit_target_size;
 
     /*
      * dropdown_open_id — tracks which dropdown (if any) is expanded.
@@ -92,6 +126,12 @@ typedef struct {
      * this ID draws its option list and captures clicks.
      */
     int           dropdown_open_id;
+
+    /* Optional callback fired immediately before a committed widget change. */
+    UIBeforeChangeFn before_change;
+    void             *before_change_context;
+    UIBeforeCommandFn before_command;
+    void             *before_command_context;
 } UIState;
 
 /* ------------------------------------------------------------------ */
@@ -106,6 +146,9 @@ typedef struct {
  */
 void ui_init(UIState *ui, SDL_Renderer *renderer, TTF_Font *font);
 
+/* Release cached renderer-owned text before destroying the renderer/font. */
+void ui_cleanup(UIState *ui);
+
 /*
  * ui_begin_frame — Reset per-frame input state at the start of each frame.
  *
@@ -114,6 +157,14 @@ void ui_init(UIState *ui, SDL_Renderer *renderer, TTF_Font *font);
  * so that only the current frame's events are seen by widgets.
  */
 void ui_begin_frame(UIState *ui);
+
+/* Queue one SDL text event without overwriting earlier same-frame input. */
+void ui_queue_text_input(UIState *ui, const char *text);
+
+/* Apply/discard retained field edit at command boundary. Apply returns
+ * 0 invalid (edit remains active), 1 valid no-op, 2 valid changed. */
+int ui_apply_active_edit(UIState *ui);
+void ui_cancel_active_edit(UIState *ui);
 
 /* ---- Widgets ----------------------------------------------------- */
 
@@ -129,9 +180,8 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label);
 /*
  * ui_label — Draw a single line of text at (x, y) in the default colour.
  *
- * Uses TTF_RenderText_Blended to produce anti-aliased text, creates a
- * one-frame texture, renders it, then destroys the texture immediately.
- * Simple and correct for an editor; a shipped game would cache textures.
+ * Renders UTF-8 text. Repeated short labels reuse bounded cached textures;
+ * longer strings use transient textures. Release the cache with ui_cleanup.
  */
 void ui_label(UIState *ui, int x, int y, const char *text);
 
@@ -165,10 +215,10 @@ void ui_panel(UIState *ui, int x, int y, int w, int h);
 int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value);
 
 /*
- * ui_float_field — Editable floating-point field (1 decimal place display).
+ * ui_float_field — Editable floating-point field with round-trip-safe display.
  *
  * Same interaction model as ui_int_field, but also accepts '.' in input.
- * The displayed value is formatted with one decimal place ("123.4").
+ * The displayed value is formatted with nine significant digits.
  *
  * Returns 1 when the value changes (user pressed Return), else 0.
  */

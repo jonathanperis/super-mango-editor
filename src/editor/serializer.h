@@ -14,7 +14,15 @@
  */
 #pragma once
 
+#include <stddef.h> /* size_t */
+
 #include "../levels/level.h" /* LevelDef and all placement structs */
+#include "serializer_io.h"   /* SerializerFileFingerprint */
+
+typedef enum {
+    SERIALIZER_SAVE_REPLACE = 0,
+    SERIALIZER_SAVE_CREATE_ONLY = 1
+} SerializerSavePolicy;
 
 /* ------------------------------------------------------------------ */
 /* File I/O                                                            */
@@ -33,6 +41,22 @@
  * Returns 0 on success, -1 on error (serialization or file I/O failure).
  */
 int level_save_toml(const LevelDef *def, const char *path);
+
+/* Save with explicit create-only or replacement semantics. */
+int level_save_toml_with_policy(const LevelDef *def, const char *path,
+                                SerializerSavePolicy policy);
+
+/* Save with a final source fingerprint recheck before replacement. */
+int level_save_toml_checked(const LevelDef *def, const char *path,
+                            SerializerSavePolicy policy,
+                            const SerializerFileFingerprint *expected);
+
+/* Save a recovery copy with its known normal destination embedded as metadata. */
+int level_save_toml_recovery(const LevelDef *def, const char *path,
+                             const char *original_path);
+
+/* Read recovery destination metadata; empty output means destination unknown. */
+int level_read_recovery_path(const char *path, char *buf, size_t buf_size);
 
 /*
  * level_load_toml — Read a TOML file and deserialize it into a LevelDef.

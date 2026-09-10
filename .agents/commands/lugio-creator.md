@@ -156,6 +156,7 @@ Your personality: practical, confident, detail-oriented. You measure twice, plac
 ### Level Config
 
 ```toml
+format_version = 1
 name = "Level Name"
 description = """
 A short paragraph describing the level's story, flow, and what makes
@@ -174,6 +175,10 @@ score_per_life = 1000
 coin_score = 100
 floor_gaps = [0, 192, 560]
 ```
+
+### Campaign Catalog
+
+`levels/campaigns/main.toml` controls native menu membership and order. It is not a playable level. For a level that should appear in the selector, update its v1 `levels` array with a unique direct `levels/<file>.toml` path, keep `format_version = 1`, and update the adjacent `[last_star].next_phase` chain: every non-final entry points to its immediate successor; the final entry omits `next_phase`. Run `make validate-levels` after changing the manifest or any listed level. A level may still be playtested directly with `--level <path>` without adding it to the campaign.
 
 ### Sprite Analyzer — Know Your Entities
 
@@ -254,6 +259,7 @@ Write the complete `.toml` file to `levels/<name>.toml`. Include:
 
 **Header block** — every TOML file starts with a `description` field and a `generated_by` field:
 ```toml
+format_version = 1
 name = "<Level Name>"
 description = """
 <Description paragraph — written in Lugio's voice.>

@@ -21,6 +21,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+WASM_FILES = [f"{stem}.{extension}" for stem in ("super-mango", "super-mango-debug")
+              for extension in ("html", "js", "wasm", "data")]
 
 
 def copy_tree(src: Path, dst: Path) -> None:
@@ -120,13 +122,8 @@ def package_native(platform: str, binary: Path, output_zip: Path, dll_dir: Path 
         zip_dir(bundle, output_zip)
 
 
-def package_wasm(platform: str, output_zip: Path) -> None:
-    required = [
-        ROOT / "out" / "super-mango.html",
-        ROOT / "out" / "super-mango.js",
-        ROOT / "out" / "super-mango.wasm",
-        ROOT / "out" / "super-mango.data",
-    ]
+def package_wasm(platform: str, output_zip: Path, out_dir: Path = ROOT / "out") -> None:
+    required = [out_dir / name for name in WASM_FILES]
     missing = [str(path) for path in required if not path.is_file()]
     if missing:
         raise SystemExit("missing WebAssembly artifacts:\n" + "\n".join(missing))
@@ -151,10 +148,11 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--output", type=Path, required=True, help="Output .zip path")
     parser.add_argument("--dll-dir", type=Path, help="Directory containing SDL2*.dll files for Windows")
     parser.add_argument("--wasm", action="store_true", help="Package out/super-mango WebAssembly artifacts")
+    parser.add_argument("--out-dir", type=Path, default=ROOT / "out", help="WebAssembly build directory")
     args = parser.parse_args(argv)
 
     if args.wasm:
-        package_wasm(args.platform, args.output)
+        package_wasm(args.platform, args.output, args.out_dir)
     else:
         if args.binary is None:
             parser.error("--binary is required unless --wasm is used")

@@ -33,6 +33,15 @@
 
 #include <SDL_mixer.h>  /* Mix_PlayChannel for collectible sounds */
 
+/* A life loss replaces entities and the player position. End this pass so no
+ * remaining collision uses the hitbox sampled before that replacement. */
+static int damage_ends_pass(GameState *gs, float source_x, float source_y)
+{
+    int lives = gs->lives;
+    apply_damage(gs, 1, 1, source_x, source_y);
+    return gs->game_over || gs->lives != lives;
+}
+
 /* ------------------------------------------------------------------ */
 /* Collision helper macros                                            */
 /* ------------------------------------------------------------------ */
@@ -47,7 +56,7 @@
             if (gs->debug_mode) debug_log(&gs->debug, "HIT %s[%d]", name, i); \
             float sx = ehit.x + ehit.w * 0.5f; \
             float sy = ehit.y + ehit.h * 0.5f; \
-            apply_damage(gs, 1, 1, sx, sy); \
+            if (damage_ends_pass(gs, sx, sy)) return; \
             break; \
         } \
     }
@@ -63,7 +72,7 @@
             if (gs->debug_mode) debug_log(&gs->debug, "HIT %s[%d]", name, i); \
             float sx = ehit.x + ehit.w * 0.5f; \
             float sy = ehit.y + ehit.h * 0.5f; \
-            apply_damage(gs, 1, 1, sx, sy); \
+            if (damage_ends_pass(gs, sx, sy)) return; \
             break; \
         } \
     }
@@ -98,12 +107,12 @@ SDL_Rect jumping_spider_build_hitbox(const JumpingSpider *js)
 
 void game_collide(GameState *gs, float dt)
 {
+    if (gs->game_over || gs->completion.complete) return;
     /* Count down invincibility timer */
     if (gs->player.hurt_timer > 0.0f) {
         gs->player.hurt_timer -= dt;
         if (gs->player.hurt_timer < 0.0f)
             gs->player.hurt_timer = 0.0f;
-        return;  /* No collisions while invincible */
     }
 
     SDL_Rect phit = player_get_hitbox(&gs->player);
@@ -115,7 +124,7 @@ void game_collide(GameState *gs, float dt)
             if (gs->debug_mode) debug_log(&gs->debug, "HIT spider[%d]", i);
             float sx = shit.x + shit.w * 0.5f;
             float sy = shit.y + shit.h * 0.5f;
-            apply_damage(gs, 1, 1, sx, sy);
+            if (damage_ends_pass(gs, sx, sy)) return;
         }
     }
 
@@ -125,7 +134,7 @@ void game_collide(GameState *gs, float dt)
             if (gs->debug_mode) debug_log(&gs->debug, "HIT jspider[%d]", i);
             float sx = jhit.x + jhit.w * 0.5f;
             float sy = jhit.y + jhit.h * 0.5f;
-            apply_damage(gs, 1, 1, sx, sy);
+            if (damage_ends_pass(gs, sx, sy)) return;
         }
     }
 
@@ -141,7 +150,7 @@ void game_collide(GameState *gs, float dt)
 
     /* Ground spikes — nested loop for tiles */
     if (gs->player.hurt_timer == 0.0f) {
-        for (int i = 0; i < gs->spike_row_count; i++) {
+        for (int i = 0; i < gs->spike_row_count && gs->player.hurt_timer == 0.0f; i++) {
             if (!gs->spike_rows[i].active) continue;
             for (int t = 0; t < gs->spike_rows[i].count; t++) {
                 int tx = (int)gs->spike_rows[i].x + t * SPIKE_TILE_W;
@@ -151,7 +160,7 @@ void game_collide(GameState *gs, float dt)
                     if (gs->debug_mode) debug_log(&gs->debug, "HIT spike[%d]", i);
                     float sx = stile.x + stile.w * 0.5f;
                     float sy = stile.y + stile.h * 0.5f;
-                    apply_damage(gs, 1, 1, sx, sy);
+                    if (damage_ends_pass(gs, sx, sy)) return;
                     goto next_spike_row;
                 }
             }
@@ -177,7 +186,7 @@ void game_collide(GameState *gs, float dt)
                 if (gs->debug_mode) debug_log(&gs->debug, "HIT spike_platform[%d]", i);
                 float sx = sphit.x + sphit.w * 0.5f;
                 float sy = sphit.y + sphit.h * 0.5f;
-                apply_damage(gs, 1, 1, sx, sy);
+                if (damage_ends_pass(gs, sx, sy)) return;
                 break;
             }
         }
@@ -193,7 +202,7 @@ void game_collide(GameState *gs, float dt)
                 if (gs->debug_mode) debug_log(&gs->debug, "HIT blue_flame[%d]", i);
                 float sx = bfhit.x + bfhit.w * 0.5f;
                 float sy = bfhit.y + bfhit.h * 0.5f;
-                apply_damage(gs, 1, 1, sx, sy);
+                if (damage_ends_pass(gs, sx, sy)) return;
                 break;
             }
         }
@@ -209,7 +218,7 @@ void game_collide(GameState *gs, float dt)
                 if (gs->debug_mode) debug_log(&gs->debug, "HIT fire_flame[%d]", i);
                 float sx = ffhit.x + ffhit.w * 0.5f;
                 float sy = ffhit.y + ffhit.h * 0.5f;
-                apply_damage(gs, 1, 1, sx, sy);
+                if (damage_ends_pass(gs, sx, sy)) return;
                 break;
             }
         }

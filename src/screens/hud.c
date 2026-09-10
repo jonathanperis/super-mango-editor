@@ -12,6 +12,20 @@
 #include "hud.h"
 #include "../game.h"    /* GAME_W */
 
+int hud_checkpoint_feedback_visible(int feedback_kind, Uint32 deadline, Uint32 now)
+{
+    return feedback_kind != CHECKPOINT_FEEDBACK_NONE &&
+           (Sint32)(now - deadline) < 0;
+}
+
+const char *hud_checkpoint_feedback_label(int feedback_kind, int checkpoint_index)
+{
+    (void)checkpoint_index;
+    if (feedback_kind == CHECKPOINT_FEEDBACK_RESPAWN) return "RESPAWN";
+    if (feedback_kind == CHECKPOINT_FEEDBACK_SAVED) return "CHECKPOINT";
+    return "CP";
+}
+
 /* ------------------------------------------------------------------ */
 
 /*
@@ -102,7 +116,9 @@ static void render_text(TTF_Font *font, SDL_Renderer *renderer,
  * Score is right-aligned with HUD_MARGIN from the right edge.
  */
 void hud_render(const Hud *hud, SDL_Renderer *renderer,
-                int hearts, int lives, int score)
+                int hearts, int lives, int score,
+                int checkpoint_index, int feedback_kind, Uint32 feedback_until,
+                Uint32 now)
 {
     int hud_row_y = HUD_MARGIN;
 
@@ -191,6 +207,20 @@ void hud_render(const Hud *hud, SDL_Renderer *renderer,
             HUD_COIN_ICON_SIZE
         };
         SDL_RenderCopy(renderer, hud->coin_icon, NULL, &coin_dst);
+    }
+
+    /* Keep checkpoint feedback in its own quiet bottom-left HUD lane. */
+    if (hud_checkpoint_feedback_visible(feedback_kind, feedback_until, now)) {
+        char checkpoint_buf[32];
+        const char *label = hud_checkpoint_feedback_label(feedback_kind, checkpoint_index);
+        if (checkpoint_index >= 0) {
+            snprintf(checkpoint_buf, sizeof(checkpoint_buf), "%s CP %d",
+                     label, checkpoint_index + 1);
+        } else {
+            snprintf(checkpoint_buf, sizeof(checkpoint_buf), "%s", label);
+        }
+        render_text(hud->font, renderer, checkpoint_buf,
+                    HUD_MARGIN, GAME_H - HUD_MARGIN - 13);
     }
 }
 

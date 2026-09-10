@@ -108,8 +108,30 @@ static int advances_open_rail_without_wrap(void)
     return 0;
 }
 
+static int handles_invalid_geometry_and_offsets(void)
+{
+    Rail rail;
+    float x, y;
+    RailPlacement placement = {RAIL_LAYOUT_RECT, 100, 40, 4, 3, 1};
+    if (rail_build(&rail, &placement) != 0) return 1;
+    rail_get_world_pos(&rail, -1.0f, &x, &y);
+    if (expect_float("negative offset wraps x", x, 108.0f) ||
+        expect_float("negative offset wraps y", y, 64.0f)) return 1;
+    rail_get_world_pos(&rail, 1e30f, &x, &y);
+    if (!isfinite(x) || !isfinite(y)) return 1;
+    placement.w = 1000;
+    if (rail_build(&rail, &placement) == 0 || rail.count != 0) return 1;
+    rail_get_world_pos(&rail, 0, &x, &y);
+    if (x != 0 || y != 0) return 1;
+    placement = (RailPlacement){RAIL_LAYOUT_HORIZ, 100, 40, 4, 0, 1};
+    if (rail_build(&rail, &placement) != 0) return 1;
+    rail_get_world_pos(&rail, 3.0f, &x, &y);
+    return expect_float("open end exact", x, 156.0f);
+}
+
 int main(void)
 {
+    if (handles_invalid_geometry_and_offsets() != 0) return 1;
     if (builds_rect_rail_from_placement() != 0) return 1;
     if (builds_open_horizontal_rail_from_placement() != 0) return 1;
     if (interpolates_world_position() != 0) return 1;

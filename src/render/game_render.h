@@ -19,7 +19,8 @@
  * 'render:' goto on the paused path so the last frame stays visible.
  * cam_x is the integer camera offset (world → screen conversion).
  */
-void game_render_frame(GameState *gs, int cam_x, float dt);
+/* Returns 1 only when SDL_RenderPresent was reached successfully. */
+int game_render_frame(GameState *gs, int cam_x, float dt);
 
 /* ------------------------------------------------------------------ */
 /* Overlay rendering                                                  */

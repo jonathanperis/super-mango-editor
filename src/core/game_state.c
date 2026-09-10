@@ -17,9 +17,8 @@ void reset_current_level(GameState *gs, int *fp_prev_riding)
 
     if (!def) return;
 
-    /* Apply checkpoint offset to spawn position if set */
-    if (gs->checkpoint_x > 0.0f) {
-        gs->player.spawn_x = gs->checkpoint_x;
-    }
+    /* Runtime owns resolved respawn coordinates; LevelDef stays immutable. */
+    gs->player.spawn_x = gs->respawn_x;
+    gs->player.spawn_y = gs->respawn_y;
     level_reset(gs, def);
 }

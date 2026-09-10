@@ -46,4 +46,5 @@ void game_complete_level(GameState *gs)
     }
 
     gs->completion.complete = 1;
+    gs->terminal_action_index = 0;
 }

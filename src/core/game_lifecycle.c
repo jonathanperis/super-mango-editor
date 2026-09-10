@@ -8,6 +8,7 @@
 #include "game_window.h"
 #include "../effects/fog.h"
 #include "../input/game_input.h"
+#include "../input/game_replay.h"
 #include "../levels/level_session.h"
 #include "../player/player.h"
 #include "../screens/hud.h"
@@ -46,21 +47,23 @@ int game_init(GameState *gs)
     if (gs->debug_mode) debug_init(&gs->debug);
 
     if (game_level_load_initial(gs) != 0) goto fail;
+    if (game_replay_load(gs) != 0) goto fail;
 
     /*
      * Health, lives, and scoring rules are set by level_load() from LevelDef
      * fields, so no hardcoded gameplay defaults belong here.
      */
 
-    gamepad_schedule_deferred_init(gs);
+    if (!gs->controller_init_pending) gamepad_refresh_controller(gs);
 
     /* Signal the loop to start running; game starts in the foreground. */
     gs->running = 1;
+    gs->route = GAME_ROUTE_NONE;
     gs->game_over = 0;
     gs->paused = 0;
     gs->pause_reasons = 0;
     gs->completion.complete = 0;
-    gs->checkpoint_x = 0.0f;
+    game_input_arm_release_latch(gs, NULL);
     return 0;
 
 fail:
@@ -77,8 +80,9 @@ fail:
  */
 void game_cleanup(GameState *gs)
 {
-    /* Close gamepad handle, join pending init thread, and quit subsystem. */
-    gamepad_cleanup(gs);
+    game_replay_cleanup(gs);
+    /* Close only this screen's gamepad handle. AppSession owns the subsystem. */
+    gamepad_close_controller(gs);
 
     /* Tear down debug overlay state after the loop has stopped using it. */
     if (gs->debug_mode) {

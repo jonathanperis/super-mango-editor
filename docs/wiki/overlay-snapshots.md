@@ -11,11 +11,10 @@ true pixel golden-image testing is available.
 - `Close window to quit`
 - `Coins: %d/%d`
 - `Congratulations!`
+- `Enter/Space/A/Start: Confirm`
 - `Enter/Space/Esc/Start: resume`
-- `Enter/Space/Start: finish`
-- `Enter/Space/Start: next level`
-- `Enter/Space/Start: restart`
-- `Esc/Back: exit`
+- `Esc/B/Back: Exit`
+- `F1 / Back: settings`
 - `Final Score: %d`
 - `Game Complete!`
 - `Game Over`
@@ -24,31 +23,34 @@ true pixel golden-image testing is available.
 - `Paused`
 - `Score: %d`
 - `Time: %02d:%02d`
+- `Up/Down or D-pad: Select`
 
 ## Overlay function snapshots
 
 ### Game Over
 
-- `Enter/Space/Start: restart`
-- `Esc/Back: exit`
+- `Enter/Space/A/Start: Confirm`
+- `Esc/B/Back: Exit`
 - `Final Score: %d`
 - `Game Over`
+- `Up/Down or D-pad: Select`
 
 ### Level Complete
 
 - `Coins: %d/%d`
 - `Congratulations!`
-- `Enter/Space/Start: finish`
-- `Enter/Space/Start: next level`
-- `Esc/Back: exit`
+- `Enter/Space/A/Start: Confirm`
+- `Esc/B/Back: Exit`
 - `Game Complete!`
 - `Level Complete!`
 - `Lives: %d`
 - `Score: %d`
 - `Time: %02d:%02d`
+- `Up/Down or D-pad: Select`
 
 ### Pause
 
 - `Close window to quit`
 - `Enter/Space/Esc/Start: resume`
+- `F1 / Back: settings`
 - `Paused`

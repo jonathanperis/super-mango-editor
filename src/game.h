@@ -108,6 +108,18 @@
  */
 #define FLOOR_GAP_W         32
 #define MAX_FLOOR_GAPS      16
+#define MAX_CHECKPOINTS     99
+#define MAX_LEVEL_SCREENS   99
+/* Upper magnitude for authored motion values; keeps integration and render
+ * conversions bounded, well above the shipped speeds/accelerations. */
+#define MAX_LEVEL_MOTION    10000
+#define GAME_LEVEL_PATH_MAX 1024 /* UTF-8 native document path; matches editor capacity */
+
+typedef enum {
+    CHECKPOINT_FEEDBACK_NONE = 0,
+    CHECKPOINT_FEEDBACK_SAVED,
+    CHECKPOINT_FEEDBACK_RESPAWN
+} CheckpointFeedbackKind;
 
 /*
  * CAM_LOOKAHEAD_VX_FACTOR — how many pixels of lookahead per px/s of player
@@ -194,7 +206,24 @@ typedef struct {
 typedef struct {
     Uint64 prev_ticks;     /* timestamp of previous frame              */
     int    fp_prev_riding; /* float platform player stood on last frame*/
+    int    smoke_frames_run; /* frames actually executed by a smoke run */
 } GameLoopState;
+
+/*
+ * GameRoute — requests leaving the current GameState.
+ *
+ * GameState owns gameplay only.  AppSession consumes these requests after the
+ * frame has rendered and performs every cross-screen transition.
+ */
+typedef enum {
+    GAME_ROUTE_NONE = 0,
+    GAME_ROUTE_NEXT_LEVEL,
+    GAME_ROUTE_REPLAY,
+    GAME_ROUTE_LEVEL_SELECT,
+    GAME_ROUTE_EXIT,
+    GAME_ROUTE_FATAL,
+    GAME_ROUTE_SMOKE_EXIT
+} GameRoute;
 
 typedef struct {
     int   complete;           /* 1 = last star collected; show overlay     */
@@ -208,7 +237,6 @@ typedef struct {
 } GameCompletionState;
 
 typedef struct {
-    SDL_Texture *ctrl_init_msg;      /* cached gamepad init HUD text       */
     SDL_Texture *floor_tile;         /* repeated floor tile texture         */
     SDL_Texture *platform;           /* shared one-way platform tile        */
     SDL_Texture *spider;             /* ground spider enemy sheet           */
@@ -257,15 +285,6 @@ typedef struct {
     SDL_Window         *window;     /* the OS window (created by SDL)              */
     SDL_Renderer       *renderer;  /* GPU-accelerated 2D drawing context          */
     SDL_GameController *controller;  /* first connected gamepad; NULL = none          */
-    /*
-     * Gamepad init state machine (avoids blocking the main thread):
-     *   0 = idle / done
-     *   1 = first frame rendered — start background thread next
-     *   2 = thread running — show HUD message, check each frame
-     */
-    int         ctrl_pending_init;
-    SDL_Thread *ctrl_init_thread;    /* background thread for SDL_InitSubSystem call   */
-    SDL_atomic_t ctrl_init_done;     /* set to 1 by thread when subsystem is ready     */
     TextureResources textures;       /* owned SDL_Texture resources                 */
     AudioResources   audio;          /* owned SDL_mixer resources                   */
     ParallaxSystem      parallax;  /* multi-layer scrolling background            */
@@ -333,20 +352,29 @@ typedef struct {
     int           hearts;      /* current hit points (0–MAX_HEARTS)           */
     int           lives;       /* remaining lives; <0 triggers game over      */
     int           score;       /* cumulative score from collecting coins      */
-    int           score_life_next; /* score threshold for next bonus life     */
+    int           score_life_next; /* next bonus threshold; 0 = score ceiling reached */
     Camera        camera;      /* viewport scroll position; updated every frame*/
-    int           running;     /* loop flag: 1 = keep running, 0 = quit       */
+    int           running;     /* active game frame flag; session owns routes  */
+    GameRoute     route;       /* explicit request consumed by AppSession      */
     int           game_over;   /* 1 = game-over overlay awaiting restart      */
     int           paused;      /* 1 = pause overlay active; physics/music frozen */
     unsigned int  pause_reasons; /* bitmask of active pause reasons             */
-    float         checkpoint_x;   /* respawn x position (updated per screen)   */
+    float         respawn_x;      /* resolved respawn placement x               */
+    float         respawn_y;      /* resolved respawn placement y               */
+    int           checkpoint_index; /* authored checkpoint index, -1 before one */
+    CheckpointFeedbackKind checkpoint_feedback_kind; /* explicit HUD cue reason */
+    Uint32        checkpoint_feedback_until; /* cue expiry deadline             */
+    int           legacy_checkpoint_screen; /* last automatic screen boundary   */
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
     int           smoke_test_frames; /* >0 = exit after this many frames     */
     char          replay_script_path[256]; /* optional replay script name     */
     unsigned int  replay_input_mask; /* replay keys active for this frame    */
     unsigned int  replay_held_mask;  /* replay keys held across frames       */
     int           replay_frame; /* current deterministic replay frame     */
-    char          level_path[256]; /* TOML level to load (--level flag)      */
+    struct GameReplayEvent *replay_events; /* owned parsed replay, NULL in normal play */
+    int           replay_event_count;
+    int           replay_cursor;
+    char          level_path[GAME_LEVEL_PATH_MAX]; /* TOML level to load (--level flag) */
     void         *level_def;   /* owned active LevelDef backing storage   */
     DebugOverlay  debug;       /* FPS counter, collision vis, event log      */
 
@@ -354,6 +382,16 @@ typedef struct {
     GameRules    rules;   /* score/life and collectible rule values             */
     GameLoopState loop;   /* frame loop scratch state for native/WASM loops     */
     GameCompletionState completion; /* timer, summary, and next-phase state   */
+    int           terminal_action_index; /* focused terminal action row        */
+    unsigned int  input_release_keyboard_mask;   /* keys held across a route    */
+    unsigned int  input_release_controller_mask; /* buttons held across a route */
+    int           input_release_latched;         /* physical input gate active   */
+    int           controller_init_pending;        /* AppSession readiness gate    */
+    struct GameProfile *profile; /* borrowed from the owning AppSession */
+    struct SettingsMenu *settings_menu; /* borrowed; screen cleanup releases its textures */
+    char profile_level_key[256];
+    int profile_completion_recorded;
+    int level_score_start;
 } GameState;
 
 /* ------------------------------------------------------------------ */
@@ -365,8 +403,11 @@ typedef struct {
 /* Create the window, renderer, and load all textures. */
 int game_init(GameState *gs);
 
-/* Run the main game loop until gs->running becomes 0. */
+/* Run native game frames until gs->running becomes 0 (legacy direct helper). */
 void game_loop(GameState *gs);
+
+/* Execute one game frame. Returns 1 only after SDL_RenderPresent. */
+int game_frame(GameState *gs);
 
 /* Free every resource owned by the game in reverse-init order. */
 void game_cleanup(GameState *gs);

@@ -34,8 +34,8 @@
  * showing the entity type name and array index, and per-type editable
  * fields (floats, ints, dropdowns) that write directly into the LevelDef.
  *
- * When any field value changes, es->modified is set to 1 so the title bar
- * shows the unsaved-changes indicator.
+ * When any field commits, one undoable property command is recorded and the
+ * save-point dirty marker is refreshed.
  *
  * start_y     : top edge of the section in window pixels.
  * available_h : total height available for this section.

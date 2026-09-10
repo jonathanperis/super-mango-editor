@@ -24,6 +24,14 @@ int editor_entity_palette_entry_count(void);
 EntityType editor_entity_palette_entry_type(int index);
 int editor_entity_type_is_singleton(EntityType type);
 
+/* Central LevelDef count and selection safety helpers. */
+int editor_entity_count(const LevelDef *level, EntityType type);
+int editor_selection_is_valid(const EditorState *es);
+void editor_selection_reconcile(EditorState *es);
+void editor_selection_after_remove(EditorState *es, EntityType type, int index);
+void editor_selection_after_insert(EditorState *es, EntityType type, int index,
+                                   int select_inserted);
+
 /* Spider / Jumping Spider — 64-px frame slot, visible art crop. */
 #define SPIDER_FRAME_W     64
 #define SPIDER_ART_H       10

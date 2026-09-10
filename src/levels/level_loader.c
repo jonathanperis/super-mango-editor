@@ -630,12 +630,15 @@ int level_load(GameState *gs, const LevelDef *def)
      * FLOOR_SINK is 16 px (defined in player.c); we use the same literal
      * here to keep the spawn formula consistent with player_reset.
      */
-    if (def->player_start_x != 0.0f || def->player_start_y != 0.0f) {
-        gs->player.spawn_x = def->player_start_x;
-        gs->player.spawn_y = def->player_start_y;
-        gs->player.x = def->player_start_x + (TILE_SIZE - gs->player.w) / 2.0f;
-        gs->player.y = def->player_start_y - gs->player.h + 16;  /* 16 = FLOOR_SINK */
-    }
+    level_effective_spawn(def, &gs->respawn_x, &gs->respawn_y);
+    gs->checkpoint_index = -1;
+    gs->checkpoint_feedback_kind = CHECKPOINT_FEEDBACK_NONE;
+    gs->checkpoint_feedback_until = 0;
+    gs->legacy_checkpoint_screen = 0;
+    gs->player.spawn_x = gs->respawn_x;
+    gs->player.spawn_y = gs->respawn_y;
+    gs->player.x = gs->respawn_x + (TILE_SIZE - gs->player.w) / 2.0f;
+    gs->player.y = gs->respawn_y - gs->player.h + 16;  /* 16 = FLOOR_SINK */
 
     /* ---- Level-wide configuration ---------------------------------- */
     /*

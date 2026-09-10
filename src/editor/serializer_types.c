@@ -21,6 +21,11 @@ RailLayout serializer_rail_layout_from_str(const char *s)
     return RAIL_LAYOUT_RECT;
 }
 
+int serializer_rail_layout_is_valid(const char *s)
+{
+    return s && (strcmp(s, "RECT") == 0 || strcmp(s, "HORIZ") == 0);
+}
+
 const char *serializer_axe_mode_to_str(AxeTrapMode mode)
 {
     switch (mode) {
@@ -34,6 +39,11 @@ AxeTrapMode serializer_axe_mode_from_str(const char *s)
 {
     if (s && strcmp(s, "SPIN") == 0) return AXE_MODE_SPIN;
     return AXE_MODE_PENDULUM;
+}
+
+int serializer_axe_mode_is_valid(const char *s)
+{
+    return s && (strcmp(s, "PENDULUM") == 0 || strcmp(s, "SPIN") == 0);
 }
 
 const char *serializer_float_mode_to_str(FloatPlatformMode mode)
@@ -53,6 +63,12 @@ FloatPlatformMode serializer_float_mode_from_str(const char *s)
     return FLOAT_PLATFORM_STATIC;
 }
 
+int serializer_float_mode_is_valid(const char *s)
+{
+    return s && (strcmp(s, "STATIC") == 0 ||
+                 strcmp(s, "CRUMBLE") == 0 || strcmp(s, "RAIL") == 0);
+}
+
 const char *serializer_bouncepad_type_to_str(BouncepadType type)
 {
     switch (type) {
@@ -68,4 +84,10 @@ BouncepadType serializer_bouncepad_type_from_str(const char *s)
     if (s && strcmp(s, "WOOD") == 0) return BOUNCEPAD_WOOD;
     if (s && strcmp(s, "RED") == 0)  return BOUNCEPAD_RED;
     return BOUNCEPAD_GREEN;
+}
+
+int serializer_bouncepad_type_is_valid(const char *s)
+{
+    return s && (strcmp(s, "GREEN") == 0 ||
+                 strcmp(s, "WOOD") == 0 || strcmp(s, "RED") == 0);
 }

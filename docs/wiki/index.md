@@ -27,8 +27,8 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 | [Collectibles & Surfaces](collectibles-and-surfaces/) | Coins, stars, bouncepads, rails, float platforms, climbable surfaces |
 | [Assets](assets/) | All sprite sheets, tilesets, and fonts in `assets/` |
 | [Sounds](sounds/) | All audio files in `assets/sounds/` |
-| [Level Catalog](level-catalog/) | Generated inventory of every `levels/*.toml` stage, progression link, and content count |
-| [Overlay Snapshots](overlay-snapshots/) | Text snapshots for pause, game-over, and completion overlays |
+| [Level Catalog](level-catalog/) | Generated inventory of every stage selected by the v1 campaign manifest, its progression link, and content count |
+| [Overlay Snapshots](overlay-snapshots/) | Generated text snapshots for pause and terminal overlays |
 
 ### Building & Contributing
 
@@ -51,8 +51,9 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 - Seven hazard types (spike, spike block, spike platform, circular saw, axe trap, blue flame, fire flame)
 - Five collectible types (coin, star yellow/green/red, last star)
 - Climbable vines, ladders, ropes; three bouncepad tiers (small/medium/high); crumble bridges; float platforms (static/crumble/rail-riding)
-- TOML-based level format with per-level music, backgrounds, floor tileset, and `next_phase` transitions
-- Pause, game-over, and level-completion overlays: Esc/Start pauses or resumes gameplay, game over waits for Enter/Space/Start before restarting, Enter/Space/Start continues to the configured next phase after completion, and Esc/Back exits terminal overlays
+- TOML-only level workflow: v1 `levels/campaigns/main.toml` drives the native selector from Forest First Steps onboarding through the sandbox and two volcanic stages; `--level <path>` directly loads a TOML level outside that catalog when needed
+- Authored `[[checkpoints]]` supply explicit respawns; levels without records retain automatic screen-boundary respawns
+- Pause, game-over, and level-completion overlays: terminal menus support Next Level, Replay, Level Select, Exit, or Retry as applicable; Up/Down or D-pad selects, Enter/Space/Start confirms (A also confirms), Esc/Back exits (B also exits)
 - Standalone visual level editor with undo, copy/paste, validation blocking, recent files, autosave, and play-test integration
 - Start menu, HUD (hearts/lives/score), lives system, debug overlay (`--debug`)
 - Keyboard and gamepad (hot-plug) controls
@@ -90,7 +91,7 @@ make run CC=clang
 make run-editor CC=clang
 
 # Run a specific level file
-make run-level CC=clang LEVEL=levels/00_sandbox_01.toml
+make run-level CC=clang LEVEL=levels/00_onboarding_01.toml
 
 # Optional local WebAssembly preflight (CI is authoritative for WASM releases)
 make web

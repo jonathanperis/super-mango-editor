@@ -169,7 +169,7 @@ const manualGroups = [
         <div class="feature-card">
             <span class="card-label">INV_05</span>
             <h3>Level editor</h3>
-            <p>Standalone SDL2 editor with canvas tools, palette, properties, validation, autosave, export, and play-test integration.</p>
+            <p>Standalone SDL2 editor with canvas tools, palette, properties, TOML save/load, validation, autosave, and play-test integration.</p>
         </div>
         <div class="feature-card">
             <span class="card-label">INV_06</span>
@@ -245,89 +245,127 @@ const manualGroups = [
     const statusEl = document.getElementById('game-status');
     const playBtn = document.getElementById('play-btn');
     const debugBtn = document.getElementById('debug-btn');
+    const statusMessage = statusEl?.querySelector('.cabinet-standby');
+    const statusNote = statusEl?.querySelector('.cabinet-standby-note');
     const gameAssetBase = document.getElementById('play')?.dataset.assetBase || './';
 
     canvas?.addEventListener('contextmenu', (event) => event.preventDefault());
 
     let gameBooted = false;
+    let reloadRequired = false;
 
-    function startGame(debug = false) {
+    function consumeReplayLevel() {
+        try {
+            const level = window.sessionStorage.getItem('super-mango-replay-level');
+            if (!level) return null;
+            window.sessionStorage.removeItem('super-mango-replay-level');
+            return level;
+        } catch (error) {
+            console.error('[Super Mango] replay boot intent unavailable', error);
+            return null;
+        }
+    }
+
+    const replayBootLevel = consumeReplayLevel();
+
+    function startGame(debug = false, bootLevel = null) {
+        if (reloadRequired) { window.location.reload(); return; }
         if (!canvas || !statusEl || !playBtn || gameBooted) return;
         gameBooted = true;
 
         playBtn.disabled = true;
         if (debugBtn) debugBtn.disabled = true;
         playBtn.textContent = debug ? 'Loading diagnostics...' : 'Loading run...';
-        canvas.tabIndex = -1;
+        canvas.tabIndex = 0;
         statusEl.dataset.mode = debug ? 'debug' : 'play';
-        statusEl.innerHTML = `<span class="spinner"></span>${debug ? 'Booting developer diagnostics...' : 'Downloading normal game data...'}`;
+        playBtn.style.display = 'none';
+        if (debugBtn) debugBtn.style.display = 'none';
+        if (statusNote) statusNote.style.display = 'none';
+        if (statusMessage) statusMessage.textContent = debug ? 'Booting developer diagnostics...' : 'Downloading normal game data...';
 
-        const args = ['--level', 'levels/00_sandbox_01.toml'];
+        const replayLevel = bootLevel || consumeReplayLevel();
+        const args = ['--level', replayLevel || 'levels/00_sandbox_01.toml'];
         if (debug) args.push('--debug');
 
-        canvas.addEventListener('webglcontextlost', (event) => {
-            alert('WebGL context lost - please reload the page.');
+        const handleContextLoss = (event) => {
             event.preventDefault();
-        }, false);
+            showFailure('WebGL context lost. Reload to continue.', true);
+        };
+        canvas.addEventListener('webglcontextlost', handleContextLoss, false);
 
         const handleKeyDown = (event) => {
-            if ([32, 37, 38, 39, 40, 16, 65, 68, 83, 87].includes(event.keyCode)) {
+            // Gameplay keys are remappable. Preserve browser shortcuts and
+            // Tab navigation, but prevent focused game input from scrolling.
+            if (document.activeElement === canvas && !event.ctrlKey &&
+                !event.metaKey && event.code !== 'Tab') {
                 event.preventDefault();
             }
         };
         document.addEventListener('keydown', handleKeyDown, false);
 
-        const Module = {
+        function showFailure(message, needsReload) {
+            gameBooted = false;
+            reloadRequired = needsReload;
+            document.removeEventListener('keydown', handleKeyDown);
+            canvas.removeEventListener('webglcontextlost', handleContextLoss);
+            statusEl.style.display = '';
+            if (statusMessage) statusMessage.textContent = message;
+            playBtn.style.display = 'inline-block';
+            playBtn.disabled = false;
+            playBtn.textContent = needsReload ? 'Reload game' : 'Retry normal run';
+            if (debugBtn) { debugBtn.style.display = 'inline-block'; debugBtn.disabled = false; }
+            playBtn.focus();
+        }
+
+        const moduleConfig = {
             arguments: args,
             canvas,
             print(text) { console.log(`[Super Mango] ${text}`); },
             printErr(text) {
                 console.error(`[Super Mango] ${text}`);
-                if (String(text).toLowerCase().includes('error')) {
-                    statusEl.style.display = '';
-                    statusEl.textContent = `Runtime error: ${text}`;
-                }
+            },
+            onAbort() { showFailure('Game startup failed. Reload to retry.', true); },
+            onGameEnded(fatal) {
+                showFailure(fatal ? 'Game ended with an error.' : 'Run ended. Play again?', true);
             },
             setStatus(text) {
                 if (!text) {
                     statusEl.style.display = 'none';
                     playBtn.style.display = 'none';
                 } else {
-                    statusEl.innerHTML = text.includes('Downloading')
-                        ? '<span class="spinner"></span>' + text
-                        : text;
+                    if (statusMessage) statusMessage.textContent = text;
                     statusEl.style.display = '';
                 }
             },
             monitorRunDependencies(left) {
                 if (left === 0) {
-                    Module.setStatus('Launching run...');
+                    moduleConfig.setStatus('Launching run...');
                 }
             },
             onRuntimeInitialized() {
                 canvas.focus();
-                Module.setStatus('');
+                moduleConfig.setStatus('');
                 window.setTimeout(() => {
-                    Module.callMain(args);
+                    if (moduleConfig.__superMangoMainStarted) return;
+                    moduleConfig.__superMangoMainStarted = true;
+                    try {
+                        const code = moduleConfig.callMain(moduleConfig.arguments || []);
+                        if (code) showFailure('Game startup failed. Reload to retry.', true);
+                    } catch (error) {
+                        console.error('[Super Mango] startup failed', error);
+                        showFailure('Game startup failed. Reload to retry.', true);
+                    }
                 }, 0);
             },
         };
 
-        window['Module'] = Module;
+        window.Module = moduleConfig;
 
         const script = document.createElement('script');
         script.src = `${gameAssetBase}super-mango.js`;
         script.onerror = () => {
-            gameBooted = false;
-            statusEl.innerHTML = 'Failed to load game files. Try refreshing the page.';
-            playBtn.style.display = 'inline-block';
-            playBtn.disabled = false;
-            playBtn.textContent = 'Retry normal run (~43 MB)';
-            if (debugBtn) {
-                debugBtn.style.display = 'inline-block';
-                debugBtn.disabled = false;
-            }
-            document.removeEventListener('keydown', handleKeyDown);
+            script.remove();
+            showFailure('Failed to load game files. Retry the download.', false);
         };
         document.body.appendChild(script);
     }
@@ -337,12 +375,14 @@ const manualGroups = [
         window.setTimeout(() => startGame(debug), 120);
     }
 
-    playBtn?.addEventListener('click', (event) => { event.preventDefault(); requestGameStart(false); });
-    debugBtn?.addEventListener('click', (event) => { event.preventDefault(); requestGameStart(true); });
     document.querySelectorAll('[data-start-game]').forEach((control) => {
         control.addEventListener('click', (event) => {
             event.preventDefault();
             requestGameStart(control.getAttribute('data-start-game') === 'debug');
         });
     });
+
+    if (replayBootLevel) {
+        window.setTimeout(() => startGame(false, replayBootLevel), 0);
+    }
 </script>

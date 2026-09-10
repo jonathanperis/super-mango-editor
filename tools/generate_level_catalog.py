@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate docs/wiki/level-catalog.md from levels/*.toml.
+"""Generate docs/wiki/level-catalog.md from the campaign manifest.
 
 The catalog is intentionally derived from the same TOML files loaded by the game
 so docs can advertise level content without hand-maintained counts drifting.
@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+
+from validate_levels import campaign_manifest_entries
 
 try:
     import tomllib
@@ -105,8 +107,10 @@ def render_level(path: Path, data: dict) -> list[str]:
 
 
 def render_catalog() -> str:
-    levels = sorted(LEVEL_DIR.glob("*.toml"))
-    loaded = [(path, load_level(path)) for path in levels]
+    manifest_entries, errors = campaign_manifest_entries()
+    if errors:
+        raise ValueError("; ".join(errors))
+    loaded = [(path, data) for _, path, data in manifest_entries]
     total_screens = sum(int(data.get("screen_count", 0)) for _, data in loaded)
     total_collectibles = sum(total_for(data, COUNT_GROUPS[2][1]) for _, data in loaded)
     total_hazards = sum(total_for(data, COUNT_GROUPS[1][1]) for _, data in loaded)

@@ -5,6 +5,7 @@
 #include "editor_validation.h"
 
 #include "../levels/level_loader.h"
+#include "serializer_io.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -12,14 +13,8 @@
 
 static int path_exists(const char *path)
 {
-    FILE *fp;
-
     if (!path || path[0] == '\0') return 1;
-
-    fp = fopen(path, "rb");
-    if (!fp) return 0;
-    fclose(fp);
-    return 1;
+    return serializer_file_exists_utf8(path);
 }
 
 static int has_parent_segment(const char *value)
@@ -117,6 +112,10 @@ int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
     check_path(report, "music_path", def->music_path);
     check_path(report, "floor_tile_path", def->floor_tile_path);
     check_path(report, "next_phase", def->next_phase);
+
+    for (int i = 0; i < def->platform_count && i < MAX_PLATFORMS; i++) {
+        check_path(report, "platforms[].tile_path", def->platforms[i].tile_path);
+    }
 
     for (int i = 0; i < def->background_layer_count && i < MAX_BACKGROUND_LAYERS; i++) {
         check_path(report, "background_layers[].path", def->background_layers[i].path);

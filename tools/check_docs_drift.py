@@ -13,6 +13,8 @@ import re
 import sys
 from pathlib import Path
 
+from validate_levels import campaign_manifest_entries
+
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - CI uses Python 3.11+
@@ -240,7 +242,7 @@ def check_overlay_controls_doc() -> None:
     index = read(DOCS / "index.md")
     collectibles = read(DOCS / "collectibles-and-surfaces.md")
     level_design = read(DOCS / "level-design.md")
-    for label in ["Esc/Back: exit", "Enter/Space/Start"]:
+    for label in ["Esc/B/Back: Exit", "Enter/Space/A/Start: Confirm"]:
         if label not in render:
             fail(f"src/render/render_overlay.c: overlay hint missing `{label}`")
     for page_name, text in [
@@ -251,7 +253,7 @@ def check_overlay_controls_doc() -> None:
     ]:
         if "Back" not in text:
             fail(f"{page_name}: overlay controls missing controller Back exit docs")
-        if "Enter/Space/Start" not in text and "Enter, Space, or controller Start" not in text:
+        if "Enter/Space/Start" not in text and "Enter/Space/A/Start" not in text and "Enter, Space, or controller Start" not in text:
             fail(f"{page_name}: overlay controls missing Enter/Space/Start confirmation docs")
 
 
@@ -260,12 +262,12 @@ def check_level_catalog_doc() -> None:
     index = read(DOCS / "index.md")
     sidebar = read(ROOT / "docs" / "src" / "lib" / "docsSidebar.ts")
     labels = read(ROOT / "docs" / "src" / "pages" / "docs" / "[...slug].astro")
-    level_files = sorted((ROOT / "levels").glob("*.toml"))
-    for level in level_files:
-        rel = level.relative_to(ROOT).as_posix()
+    manifest_entries, manifest_errors = campaign_manifest_entries()
+    for error in manifest_errors:
+        fail(f"campaign manifest: {error}")
+    for rel, level, data in manifest_entries:
         if rel not in catalog:
             fail(f"docs/wiki/level-catalog.md: missing level entry for `{rel}`")
-        data = load_level(level)
         last_star = data.get("last_star")
         if isinstance(last_star, dict):
             next_phase = str(last_star.get("next_phase") or "")

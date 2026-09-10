@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <limits.h>
 
 #include "core/game_score.h"
 #include "game.h"
@@ -54,6 +55,18 @@ int main(void)
 {
     if (score_award_grants_every_crossed_bonus_life() != 0) return 1;
     if (score_award_ignores_invalid_bonus_cadence() != 0) return 1;
+
+    GameState gs = {0};
+    gs.score = INT_MAX - 100;
+    gs.score_life_next = INT_MAX - 100;
+    gs.rules.score_per_life = 1000;
+    gs.lives = INT_MAX;
+    game_award_score(&gs, 200);
+    if (expect_int("score saturates", gs.score, INT_MAX) ||
+        expect_int("lives saturate", gs.lives, INT_MAX) ||
+        expect_int("threshold exhausted", gs.score_life_next, 0)) return 1;
+    game_award_score(&gs, 200);
+    if (expect_int("exhausted does not wrap", gs.lives, INT_MAX)) return 1;
 
     puts("gameplay_score_test: ok");
     return 0;

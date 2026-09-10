@@ -72,6 +72,12 @@ static void fill_rich_roundtrip_fixture(LevelDef *def)
     strncpy(def->generated_by, "serializer-test", sizeof(def->generated_by) - 1);
     def->screen_count = 2;
 
+    def->checkpoint_count = 2;
+    def->checkpoints[0].x = 240.0f;
+    def->checkpoints[0].y = 104.0f;
+    def->checkpoints[1].x = 560.0f;
+    def->checkpoints[1].y = 196.0f;
+
     def->floor_gaps[0] = 320;
     def->floor_gaps[1] = 704;
     def->floor_gap_count = 2;
@@ -139,7 +145,7 @@ static void fill_rich_roundtrip_fixture(LevelDef *def)
     def->faster_birds[0].vx = -62.0f;
     def->faster_birds[0].patrol_x0 = 480.0f;
     def->faster_birds[0].patrol_x1 = 620.0f;
-    def->faster_birds[0].frame_index = 3;
+    def->faster_birds[0].frame_index = FBIRD_FRAMES - 1;
     def->fish_count = 1;
     def->fish[0].x = 340.0f;
     def->fish[0].vx = 18.0f;
@@ -266,6 +272,12 @@ static int compare_rich_roundtrip(const LevelDef *before, const LevelDef *after)
                          before->screen_count) != 0) return 1;
     if (expect_int_value("rich floor_gap_count", after->floor_gap_count,
                          before->floor_gap_count) != 0) return 1;
+    if (expect_int_value("rich checkpoint_count", after->checkpoint_count,
+                         before->checkpoint_count) != 0) return 1;
+    if (expect_float_value("rich checkpoint[0] x", after->checkpoints[0].x,
+                           before->checkpoints[0].x) != 0) return 1;
+    if (expect_float_value("rich checkpoint[1] y", after->checkpoints[1].y,
+                           before->checkpoints[1].y) != 0) return 1;
     if (expect_int_value("rich floor_gaps[0]", after->floor_gaps[0],
                          before->floor_gaps[0]) != 0) return 1;
     if (expect_int_value("rich floor_gaps[1]", after->floor_gaps[1],
@@ -389,6 +401,23 @@ static int write_too_many_coins_fixture(const char *path)
     return 0;
 }
 
+static int write_too_many_checkpoints_fixture(const char *path)
+{
+    FILE *fp = fopen(path, "w");
+    if (!fp) return -1;
+
+    fprintf(fp, "format_version = 1\n");
+    fprintf(fp, "name = \"Too Many Checkpoints\"\n");
+    fprintf(fp, "screen_count = 1\n\n");
+    for (int i = 0; i < MAX_CHECKPOINTS + 1; i++) {
+        fprintf(fp, "[[checkpoints]]\n");
+        fprintf(fp, "x = %d.0\n", 100 + i);
+        fprintf(fp, "y = 100.0\n\n");
+    }
+    fclose(fp);
+    return 0;
+}
+
 static int write_bad_rail_link_fixture(const char *path)
 {
     FILE *fp = fopen(path, "w");
@@ -405,18 +434,39 @@ static int write_bad_rail_link_fixture(const char *path)
     return 0;
 }
 
+typedef struct {
+    const char *level_path;
+    const char *roundtrip_path;
+} ShippedLevel;
+
+enum { EXPECTED_SHIPPED_LEVEL_COUNT = 4 };
+
+/* Keep this explicit inventory aligned with levels/campaigns/main.toml. */
+static const ShippedLevel shipped_levels[] = {
+    {"levels/00_onboarding_01.toml", "out/test_roundtrip_00.toml"},
+    {"levels/00_sandbox_01.toml", "out/test_roundtrip_01.toml"},
+    {"levels/01_lugio_01.toml", "out/test_roundtrip_02.toml"},
+    {"levels/02_lugio_02.toml", "out/test_roundtrip_03.toml"},
+};
+
+_Static_assert(sizeof(shipped_levels) / sizeof(shipped_levels[0]) ==
+                   EXPECTED_SHIPPED_LEVEL_COUNT,
+               "shipped level inventory count changed");
+
 static int load_all_repo_levels(void)
 {
-    const char *levels[] = {
-        "levels/00_sandbox_01.toml",
-        "levels/01_lugio_01.toml",
-        "levels/02_lugio_02.toml",
-    };
+    const int level_count = (int)(sizeof(shipped_levels) /
+                                  sizeof(shipped_levels[0]));
 
-    for (int i = 0; i < (int)(sizeof(levels) / sizeof(levels[0])); i++) {
+    if (expect_int_value("shipped level inventory", level_count,
+                         EXPECTED_SHIPPED_LEVEL_COUNT) != 0)
+        return 1;
+
+    for (int i = 0; i < level_count; i++) {
         LevelDef def;
-        if (level_load_toml(levels[i], &def) != 0) {
-            fprintf(stderr, "failed to load %s\n", levels[i]);
+        if (level_load_toml(shipped_levels[i].level_path, &def) != 0) {
+            fprintf(stderr, "failed to load %s\n",
+                    shipped_levels[i].level_path);
             return 1;
         }
         if (def.name[0] == '\0') return fail("level name should not be empty");
@@ -464,6 +514,7 @@ static int compare_shipped_roundtrip(const char *label, const LevelDef *before,
         } \
     } while (0)
 
+    CHECK_INT(format_version);
     CHECK_STR(name);
     CHECK_STR(description);
     CHECK_STR(generated_by);
@@ -480,6 +531,7 @@ static int compare_shipped_roundtrip(const char *label, const LevelDef *before,
     CHECK_FLOAT(player_start_y);
 
     CHECK_INT(floor_gap_count);
+    CHECK_INT(checkpoint_count);
     CHECK_INT(rail_count);
     CHECK_INT(platform_count);
     CHECK_INT(coin_count);
@@ -606,34 +658,27 @@ static int compare_shipped_roundtrip(const char *label, const LevelDef *before,
  */
 static int roundtrip_repo_levels(void)
 {
-    const char *levels[] = {
-        "levels/00_sandbox_01.toml",
-        "levels/01_lugio_01.toml",
-        "levels/02_lugio_02.toml",
-    };
-    const char *paths[] = {
-        "out/test_roundtrip_00.toml",
-        "out/test_roundtrip_01.toml",
-        "out/test_roundtrip_02.toml",
-    };
+    const int level_count = (int)(sizeof(shipped_levels) /
+                                  sizeof(shipped_levels[0]));
 
-    for (int i = 0; i < (int)(sizeof(levels) / sizeof(levels[0])); i++) {
+    for (int i = 0; i < level_count; i++) {
         LevelDef before;
         LevelDef after;
 
-        if (level_load_toml(levels[i], &before) != 0)
+        if (level_load_toml(shipped_levels[i].level_path, &before) != 0)
             return fail("could not load repo level for roundtrip");
 
-        if (level_save_toml(&before, paths[i]) != 0)
+        if (level_save_toml(&before, shipped_levels[i].roundtrip_path) != 0)
             return fail("could not save repo roundtrip fixture");
 
-        if (level_load_toml(paths[i], &after) != 0)
+        if (level_load_toml(shipped_levels[i].roundtrip_path, &after) != 0)
             return fail("could not reload repo roundtrip fixture");
 
-        if (compare_shipped_roundtrip(levels[i], &before, &after) != 0)
+        if (compare_shipped_roundtrip(shipped_levels[i].level_path, &before,
+                                      &after) != 0)
             return 1;
 
-        remove(paths[i]);
+        remove(shipped_levels[i].roundtrip_path);
     }
 
     return 0;
@@ -769,6 +814,190 @@ static int missing_physics_uses_engine_defaults(void)
     return 0;
 }
 
+static int write_format_version_fixture(const char *path, const char *version)
+{
+    FILE *fp = fopen(path, "w");
+    if (!fp) return -1;
+
+    if (version) fprintf(fp, "format_version = %s\n", version);
+    fprintf(fp, "name = \"Format Version Fixture\"\n");
+    fprintf(fp, "screen_count = 1\n");
+    if (fclose(fp) != 0) return -1;
+    return 0;
+}
+
+static int legacy_version_loads_as_current(void)
+{
+    const char *path = "out/test_legacy_format_version.toml";
+    LevelDef def;
+
+    if (write_format_version_fixture(path, NULL) != 0)
+        return fail("could not write legacy version fixture");
+    if (level_load_toml(path, &def) != 0) {
+        remove(path);
+        return fail("legacy level without format_version should load");
+    }
+    remove(path);
+
+    if (expect_int_value("legacy format_version", def.format_version,
+                         LEVEL_FORMAT_VERSION) != 0)
+        return 1;
+    return 0;
+}
+
+static int explicit_version_saves_first_and_roundtrips(void)
+{
+    const char *path = "out/test_explicit_format_version.toml";
+    LevelDef before;
+    LevelDef after;
+    FILE *fp;
+    char first_line[64];
+
+    level_def_init_defaults(&before);
+    strncpy(before.name, "Explicit Format Version", sizeof(before.name) - 1);
+    before.screen_count = 1;
+
+    if (level_save_toml(&before, path) != 0)
+        return fail("could not save explicit version fixture");
+
+    fp = fopen(path, "r");
+    if (!fp || !fgets(first_line, sizeof(first_line), fp)) {
+        if (fp) fclose(fp);
+        remove(path);
+        return fail("could not read saved format version");
+    }
+    fclose(fp);
+    if (strcmp(first_line, "format_version = 1\n") != 0) {
+        remove(path);
+        return fail("format_version must be first saved scalar");
+    }
+
+    if (level_load_toml(path, &after) != 0) {
+        remove(path);
+        return fail("could not reload explicit version fixture");
+    }
+    remove(path);
+
+    if (expect_int_value("explicit format_version", after.format_version,
+                         LEVEL_FORMAT_VERSION) != 0)
+        return 1;
+    if (expect_str_value("explicit version name", after.name, before.name) != 0)
+        return 1;
+    return 0;
+}
+
+static int rejects_invalid_format_versions_transactionally(void)
+{
+    const char *versions[] = {"0", "-1", "2", "\"1\"", "1.0", "true"};
+    LevelDef expected;
+
+    level_def_init_defaults(&expected);
+    strncpy(expected.name, "Destination Sentinel", sizeof(expected.name) - 1);
+    expected.screen_count = 7;
+
+    for (size_t i = 0; i < sizeof(versions) / sizeof(versions[0]); i++) {
+        char path[96];
+        LevelDef actual = expected;
+
+        snprintf(path, sizeof(path), "out/test_bad_format_version_%zu.toml", i);
+        if (write_format_version_fixture(path, versions[i]) != 0)
+            return fail("could not write invalid format version fixture");
+        if (level_load_toml(path, &actual) == 0) {
+            remove(path);
+            return fail("invalid format_version should be rejected");
+        }
+        remove(path);
+        if (memcmp(&actual, &expected, sizeof(actual)) != 0)
+            return fail("invalid format_version changed destination LevelDef");
+    }
+
+    return 0;
+}
+
+static int strict_v1_fixture_suite(void)
+{
+    static const char *const invalid_fixtures[] = {
+        "bad_version.toml",
+        "bad_scalar_type.toml",
+        "bad_fractional_integer.toml",
+        "bad_integer_overflow.toml",
+        "bad_string_type.toml",
+        "bad_numeric_string.toml",
+        "bad_nonfinite_number.toml",
+        "bad_wrong_array_container.toml",
+        "bad_non_table_element.toml",
+        "bad_invalid_enum.toml",
+        "bad_root_unknown.toml",
+        "bad_nested_unknown.toml",
+        "bad_floor_gaps.toml",
+        "bad_nested_table_type.toml",
+        "bad_root_key_embedded_nul.toml",
+        "bad_nested_key_embedded_nul.toml",
+        "bad_enum_embedded_nul.toml",
+        "bad_path_embedded_nul.toml",
+        "bad_string_embedded_nul.toml",
+        "bad_legacy_format_version_key_embedded_nul.toml",
+        "bad_checkpoint_missing_y.toml",
+        "bad_checkpoint_type.toml",
+        "bad_checkpoint_unknown.toml",
+        "bad_checkpoint_nonfinite.toml",
+        "bad_checkpoint_bounds.toml",
+        "bad_checkpoint_duplicate.toml",
+        "bad_checkpoint_array.toml",
+        "bad_screen_count_max_plus_one.toml",
+    };
+    const char *const fixture_dir = "tests/fixtures/serializer_v1/";
+    LevelDef expected;
+
+    if (level_load_toml("tests/fixtures/serializer_v1/valid_legacy.toml",
+                        &expected) != 0) {
+        return fail("valid legacy schema fixture should load");
+    }
+    if (expected.format_version != LEVEL_FORMAT_VERSION) {
+        return fail("legacy schema fixture should receive current version");
+    }
+
+    if (level_load_toml("tests/fixtures/serializer_v1/valid_v1.toml",
+                        &expected) != 0) {
+        return fail("valid v1 schema fixture should load");
+    }
+
+    if (level_load_toml("tests/fixtures/serializer_v1/valid_screen_count_max.toml",
+                        &expected) != 0 ||
+        expect_int_value("maximum screen count", expected.screen_count,
+                         MAX_LEVEL_SCREENS) != 0 ||
+        expect_float_value("maximum screen checkpoint x",
+                           expected.checkpoints[0].x,
+                           (float)(MAX_LEVEL_SCREENS * GAME_W - TILE_SIZE)) != 0) {
+        return fail("valid maximum screen-count fixture should load");
+    }
+
+    level_def_init_defaults(&expected);
+    strncpy(expected.name, "transaction sentinel", sizeof(expected.name) - 1);
+    expected.screen_count = 7;
+    expected.player_start_x = 33.5f;
+
+    for (size_t i = 0; i < sizeof(invalid_fixtures) / sizeof(invalid_fixtures[0]); i++) {
+        char path[160];
+        LevelDef actual = expected;
+
+        snprintf(path, sizeof(path), "%s%s", fixture_dir, invalid_fixtures[i]);
+        if (level_load_toml(path, &actual) == 0) {
+            fprintf(stderr, "level_serializer_test: accepted invalid fixture %s\n",
+                    invalid_fixtures[i]);
+            return 1;
+        }
+        if (memcmp(&actual, &expected, sizeof(actual)) != 0) {
+            fprintf(stderr,
+                    "level_serializer_test: invalid fixture changed LevelDef %s\n",
+                    invalid_fixtures[i]);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 static int rejects_oversized_arrays(void)
 {
     const char *path = "out/test_too_many_coins.toml";
@@ -781,6 +1010,28 @@ static int rejects_oversized_arrays(void)
         return fail("oversized coins array should fail");
 
     remove(path);
+    return 0;
+}
+
+static int rejects_oversized_checkpoints_transactionally(void)
+{
+    const char *path = "out/test_too_many_checkpoints.toml";
+    LevelDef expected;
+    LevelDef actual;
+
+    level_def_init_defaults(&expected);
+    strncpy(expected.name, "checkpoint sentinel", sizeof(expected.name) - 1);
+    expected.screen_count = 7;
+    actual = expected;
+    if (write_too_many_checkpoints_fixture(path) != 0)
+        return fail("could not write oversized checkpoint fixture");
+    if (level_load_toml(path, &actual) == 0) {
+        remove(path);
+        return fail("oversized checkpoints array should fail");
+    }
+    remove(path);
+    if (memcmp(&actual, &expected, sizeof(actual)) != 0)
+        return fail("oversized checkpoints changed destination LevelDef");
     return 0;
 }
 
@@ -842,16 +1093,53 @@ static int rejects_unsafe_toml_paths(void)
     return 0;
 }
 
+int parser_boundary_test(void);
+
+static int metadata_roundtrip_and_limits(void)
+{
+    const char *path="out/test_long_metadata.toml";
+    LevelDef before, after;
+    level_def_init_defaults(&before);
+    before.screen_count=1;
+    memset(before.description,'x',sizeof(before.description)-1);
+    before.description[sizeof(before.description)-1]='\0';
+    if (level_save_toml(&before,path) || level_load_toml(path,&after) ||
+        strcmp(before.description,after.description)) { remove(path); return 1; }
+    FILE *fp=fopen(path,"wb");
+    if (!fp) return 1;
+    fputs("description=\"",fp);
+    for (size_t i=0;i<sizeof(before.description);i++) fputc('x',fp);
+    fputs("\"\n",fp); fclose(fp);
+    int failed=level_load_toml(path,&after)==0 || strcmp(before.description,after.description);
+    remove(path);
+    return failed;
+}
+
 int main(void)
 {
     if (ensure_out_dir() != 0) return 1;
+    if (parser_boundary_test() || metadata_roundtrip_and_limits()) return 1;
+    const char *numeric_cases[] = {
+        "music_volume = nan\n", "music_volume = 1e30\n",
+        "music_volume = 9223372036854775807\n", "floor_gaps = [nan]\n",
+        "[[spiders]]\nx = 100\npatrol_x0 = 0\npatrol_x1 = 200\nvx = inf\n",
+        "description = \"\\u", "player_start_x = 1e100\n"
+    };
+    for (size_t i = 0; i < sizeof(numeric_cases) / sizeof(numeric_cases[0]); i++) {
+        if (expect_unsafe_toml_rejected("out/test_unsafe_numeric.toml", numeric_cases[i])) return 1;
+    }
     if (load_all_repo_levels() != 0) return 1;
     if (roundtrip_repo_levels() != 0) return 1;
     if (escaped_strings_roundtrip() != 0) return 1;
     if (rich_level_roundtrip() != 0) return 1;
     if (independent_star_color_counts_roundtrip() != 0) return 1;
     if (missing_physics_uses_engine_defaults() != 0) return 1;
+    if (legacy_version_loads_as_current() != 0) return 1;
+    if (explicit_version_saves_first_and_roundtrips() != 0) return 1;
+    if (rejects_invalid_format_versions_transactionally() != 0) return 1;
+    if (strict_v1_fixture_suite() != 0) return 1;
     if (rejects_oversized_arrays() != 0) return 1;
+    if (rejects_oversized_checkpoints_transactionally() != 0) return 1;
     if (rejects_bad_runtime_links() != 0) return 1;
     if (rejects_unsafe_toml_paths() != 0) return 1;
 

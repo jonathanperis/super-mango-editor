@@ -6,7 +6,7 @@
 
 ## Overview
 
-Super Mango follows a classic **init → loop → cleanup** pattern. A single `GameState` struct is the owner of every resource in the game and is passed by pointer to every function that needs to read or modify it.
+Super Mango follows a classic **init → loop → cleanup** pattern. `AppSession` owns the application runtime and one active screen (start menu or game); `GameState` owns resources and state for the active game screen. The session consumes explicit routes after a screen frame, so native and WebAssembly builds share one transition model.
 
 ---
 
@@ -18,72 +18,57 @@ main()
   ├── IMG_Init(IMG_INIT_PNG)
   ├── TTF_Init()
   ├── Mix_OpenAudio(44100, stereo, 2048 buffer)
-  │
-  ├── game_init(&gs)
-  │     ├── SDL_CreateWindow  → gs.window
-  │     ├── SDL_CreateRenderer → gs.renderer
-  │     ├── SDL_RenderSetLogicalSize(GAME_W, GAME_H)
-  │     │
-  │     │   ── Load all textures (engine resources) ──
-  │     ├── parallax_init(&gs.parallax, gs.renderer)  (multi-layer background)
-  │     ├── IMG_LoadTexture → gs.textures.floor_tile (grass_tileset.png)
-  │     ├── IMG_LoadTexture → gs.textures.platform   (grass_platform.png)
-  │     ├── water_init(&gs.water, gs.renderer)      (water.png)
-  │     ├── IMG_LoadTexture → gs.textures.*         (entities, hazards, collectibles, surfaces)
-  │     ├── level resource reload → parallax/floor/water/fog/music from active LevelDef
-  │     │
-  │     │   ── Load all sound effects ──
-  │     ├── Mix_LoadWAV     → gs.audio.*           (jump, coin, hit, spring, axe, flap, spider_attack, dive)
-  │     ├── Mix_LoadMUS     → gs.audio.music       (from active LevelDef music_path)
-  │     ├── Mix_PlayMusic(gs.audio.music, -1)      (loop forever at level volume)
-  │     │
-  │     │   ── Initialise game objects ──
-  │     ├── player_init(&gs.player, gs.renderer)
-  │     ├── fog_init(&gs.fog, gs.renderer)         (level fog layers, e.g. fog_1.png/fog_2.png)
-  │     ├── hud_init(&gs.hud, gs.renderer)
-  │     ├── if (debug_mode) debug_init(&gs.debug)
-  │     ├── level_load_toml(level_path, &def)       (staged TOML parse → runtime validation → cleanup → caller assignment)
-  │     ├── level_load(&gs, &def)                   (apply LevelDef to runtime GameState)
-  │     ├── hearts/lives/score/score_life_next initialisation
-  │     ├── SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) — lazy init, non-fatal
-  │     └── scan joysticks for first connected gamepad
-  │
-  ├── game_loop(&gs)          ← see Game Loop section below
-  │
-  └── game_cleanup(&gs)       ← reverse init order
-        ├── SDL_GameControllerClose(gs->controller)  ← if non-NULL
-        ├── SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER)
-        ├── hud_cleanup
-        ├── fog_cleanup
-        ├── player_cleanup
-        ├── Mix_HaltMusic + Mix_FreeMusic (gs.audio.music)
-        ├── FREE_CHUNK(gs.audio.*)
-        ├── water_cleanup
-        ├── DESTROY_TEX(gs.textures.*)
-        ├── parallax_cleanup
-        ├── SDL_DestroyRenderer
-        └── SDL_DestroyWindow
-  │
-  ├── Mix_CloseAudio
-  ├── TTF_Quit
-  ├── IMG_Quit
-  └── SDL_Quit
+  └── session_create(config)
+       ├── initialise AppSession runtime and controller ownership
+       │   └── native controller setup is deferred until a stable screen frame;
+       │       WebAssembly initializes it synchronously
+       ├── no `--level` → start_menu_create()
+       └── `--level` / `--sandbox` → session_open_game() → game_init(gs)
+            ├── create active game window and renderer
+            ├── load textures, audio, TOML level data, player, HUD, effects, and entities
+            └── arm release latch and repair browser keyboard state
+
+session_run(session)
+  ├── native: while active, call session_frame(session)
+  └── WebAssembly: register one Emscripten callback for session_frame(session)
+       ├── start menu frame → Play or Exit route
+       └── game_frame(gs) → Next Level, Replay, Level Select, or Exit route
+            ├── Next Level: load resolved phase in current GameState
+            ├── native Replay: replace active game with same TOML path
+            ├── browser Replay: persist path, cancel callback, clean up, reload
+            └── Level Select: close game only, open start menu
+
+session_destroy(session) / browser terminal cleanup
+  ├── close active menu or game screen
+  ├── join and close the AppSession-owned controller subsystem
+  ├── Mix_CloseAudio → TTF_Quit → IMG_Quit → SDL_Quit
+  └── free AppSession
 ```
 
 ---
 
-## Game Loop
+## App Session and Game Frame
 
-The loop runs at **60 FPS**, capped via VSync + a manual `SDL_Delay` fallback. Each frame has four distinct phases:
+`AppSession` is the sole production loop owner. It frames the active menu or game, then consumes that screen's route only after the frame. Active-game frames run at **60 FPS**, capped via VSync plus a manual `SDL_Delay` fallback:
 
 ```
-while (gs.running) {
+session_frame(session) {
+  if (session->screen == APP_SCREEN_MENU) {
+    start_menu_frame(menu);
+    apply MenuRoute;
+  } else if (session->screen == APP_SCREEN_GAME) {
+    game_frame(gs);
+    apply GameRoute;
+  }
+}
+
+game_frame(gs) {
   1. Delta Time   — measure ms since last frame → dt (seconds)
   2. Events       — SDL_PollEvent (quit window / pause and overlay controls)
-                    SDL_CONTROLLERDEVICEADDED   — opens a newly plugged-in controller
-                    SDL_CONTROLLERDEVICEREMOVED — closes and NULLs gs->controller when unplugged
-                    SDL_CONTROLLERBUTTONDOWN (START) — pauses/resumes, restarts game-over, or advances completion overlay
-                    SDL_CONTROLLERBUTTONDOWN (BACK)  — exits completion/game-over overlays
+                     SDL_CONTROLLERDEVICEADDED   — opens a newly plugged-in controller
+                     SDL_CONTROLLERDEVICEREMOVED — closes and NULLs gs->controller when unplugged
+                     terminal: Up/Down or D-pad selects; Enter/Space/Start (or A) confirms
+                     terminal: Esc/Back (or B) exits; Start toggles active-game pause
   3. Update       — player_handle_input → player_update (incl. bouncepad, float-platform, bridge landing)
                     → bouncepad response (animation + spring sound)
                     → spiders_update → jumping_spiders_update → birds_update → faster_birds_update
@@ -121,6 +106,8 @@ prev = now;
 ```
 
 All velocities are expressed in **pixels per second**. Multiplying by `dt` (seconds) gives the correct displacement per frame regardless of the actual frame rate.
+
+During an active game update, authored checkpoints are sampled after player movement and before lethal collision handling. Legacy screen-boundary checkpoint sampling runs only when the active level has no authored records.
 
 ### Render Order (back to front)
 
@@ -161,9 +148,11 @@ All velocities are expressed in **pixels per second**. Multiplying by `dt` (seco
 
 > **Note:** Per-level visual layers are split by role: `background_layers` feed the parallax renderer, `foreground_layers` select the water/lava foreground strip texture, and `fog_layers` feed the atmospheric fog system. Fog renders before the HUD so hearts/lives/score remain legible.
 
-### Level Completion Flow
+### Level Completion and Terminal Actions
 
-Collecting `last_star` calls `game_complete_level()`. The game snapshots elapsed time, coins collected, total coins, and the resolved `next_phase` path (if any), then shows a completion overlay. While the overlay is active, gameplay update pauses; pressing Enter, Space, or controller Start calls `game_load_next_phase()` when `next_phase` is configured, otherwise it exits the run. Esc or controller Back exits the overlay/run without advancing.
+Collecting `last_star` calls `game_complete_level()`. The game snapshots elapsed time, coins collected, total coins, and the resolved `next_phase` path (if any), then shows a completion overlay. While it is active, gameplay update pauses. Its action list is **Next Level**, **Replay**, **Level Select**, **Exit** when a phase is pending; otherwise it is **Replay**, **Level Select**, **Exit**. Up/Down or D-pad moves the focused row with wraparound. Enter/Space/Start confirms it (controller A also confirms). Esc/Back exits immediately (controller B is equivalent).
+
+Next Level uses `game_load_next_phase()` without replacing the game screen. If loading fails, the completion overlay remains visible and keeps its current focus. Level Select closes the game screen and opens the start menu in the same `AppSession`. Native Replay closes the game screen and opens the same TOML path in a new `GameState`; Browser Replay persists that path in session storage, cancels the Emscripten callback, tears down once, reloads, and then boots the stored level.
 
 ### Pause Overlay Flow
 
@@ -171,7 +160,7 @@ During active gameplay, Esc or controller Start toggles the player pause reason 
 
 ### Game-Over Flow
 
-When lethal damage consumes the final life, `apply_damage()` sets `gs->game_over` and returns without resetting the level. The shared overlay helper reports `GAME_OVERLAY_GAME_OVER`, so the loop blocks gameplay updates and rendering draws a game-over overlay with the final score. Enter, Space, or controller Start confirms restart through `game_restart_after_game_over()`, which restores level-defined lives/hearts, resets score and bonus-life threshold, and reloads the current level. Esc or controller Back exits the overlay/run.
+When lethal damage consumes the final life, `apply_damage()` sets `gs->game_over` and returns without resetting the level. The shared overlay helper reports `GAME_OVERLAY_GAME_OVER`, so the loop blocks gameplay updates and rendering draws a game-over overlay with the final score. Its terminal action list is **Retry**, **Level Select**, **Exit**. Retry calls `game_restart_after_game_over()` in place: it restores level-defined lives/hearts, resets score and bonus-life threshold, reloads the current level, resumes music, and clears its input latch after held controls are released. Level Select and Exit follow the session routes above.
 
 ---
 
@@ -200,7 +189,7 @@ SDL's Y-axis increases **downward**. The origin (0, 0) is at the **top-left** of
 
 ## GameState Struct
 
-Defined in `game.h`. The **single container** for every runtime resource.
+Defined in `game.h`. The **single container** for active-game resources; `AppSession` owns app-wide runtime state and the active screen.
 
 ```c
 typedef struct {
@@ -224,7 +213,10 @@ typedef struct {
     int     game_over;
     int     paused;
     unsigned int pause_reasons;
-    float   checkpoint_x;
+    float   respawn_x, respawn_y;
+    int     checkpoint_index;
+    Uint32  checkpoint_notice_until;
+    int     legacy_checkpoint_screen;
     int     debug_mode;
     int     smoke_test_frames;
     char    level_path[256];
@@ -244,6 +236,13 @@ typedef struct {
 - `Player` is **embedded by value**, not a pointer. This avoids a heap allocation and keeps the struct self-contained. The same applies to `Platform`, `Water`, `FogSystem`, and all entity arrays.
 - Every pointer is set to `NULL` after freeing, making accidental double-frees safe.
 - Initialised with `GameState gs = {0}` so every field starts as `0` / `NULL`.
+- `checkpoint_x` is no longer a `GameState` field. The resolved respawn state is `respawn_x`, `respawn_y`, and `checkpoint_index`; `legacy_checkpoint_screen` is used only when the active level has no authored records.
+
+### Authored Checkpoint Flow
+
+`LevelDef` owns optional immutable `CheckpointPlacement { x, y }` records. Each active frame samples authored records after player movement and before lethal collisions. The furthest record with `x <= player.x` becomes the resolved respawn point, so a death in the same frame preserves a crossed checkpoint. The runtime never regresses to an earlier record.
+
+Authored records disable automatic screen-boundary checkpoints for that level. A level with no records preserves the legacy boundary behavior. Retry, replay, and successful next-phase loads reset to the effective start of their respective level; a failed next-phase load retains the active level and its resolved checkpoint. The HUD shows a brief checkpoint notice, then the active `CP n`; a respawn displays `RESPAWN CP n`.
 
 ---
 

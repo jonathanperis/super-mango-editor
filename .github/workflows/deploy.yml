@@ -31,7 +31,10 @@ concurrency:
 jobs:
   deploy:
     # Only run if the Build & Release workflow succeeded
-    if: github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
     runs-on: ubuntu-latest
 
     environment:
@@ -41,6 +44,8 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Download WebAssembly build
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -73,12 +78,7 @@ jobs:
       - name: Copy WASM artifacts into docs output
         run: |
           unzip -q wasm-build/super-mango-wasm.zip -d wasm-build/unpacked
-          cp wasm-build/unpacked/super-mango-wasm/super-mango.js   docs/out/
-          cp wasm-build/unpacked/super-mango-wasm/super-mango.wasm docs/out/
-          cp wasm-build/unpacked/super-mango-wasm/super-mango.data docs/out/
-          cp wasm-build/unpacked/super-mango-wasm/super-mango-debug.html docs/out/ 2>/dev/null || true
-          cp wasm-build/unpacked/super-mango-wasm/super-mango-debug.js   docs/out/ 2>/dev/null || true
-          cp wasm-build/unpacked/super-mango-wasm/super-mango-debug.wasm docs/out/ 2>/dev/null || true
+          cp wasm-build/unpacked/super-mango-wasm/super-mango{,-debug}.{html,js,wasm,data} docs/out/
 
       - name: Smoke Pages WASM assembly
         run: |
@@ -89,7 +89,7 @@ jobs:
           python3 -m http.server 4173 --directory docs/out >/tmp/super-mango-pages.log 2>&1 &
           server_pid=$!
           trap 'kill $server_pid' EXIT
-          for path in / /super-mango.js /super-mango.wasm /super-mango.data; do
+          for path in / /super-mango{,-debug}.{html,js,wasm,data}; do
             curl --retry 5 --retry-delay 1 --retry-connrefused -fsS "http://127.0.0.1:4173$path" >/dev/null
           done
 

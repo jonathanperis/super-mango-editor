@@ -5,6 +5,7 @@
 #include "editor_panels.h"
 
 #include "editor_layout.h" /* editor_config_total_height */
+#include "entity_meta.h"   /* editor_selection_reconcile */
 #include "palette.h"       /* palette_render */
 #include "properties.h"    /* level_config_render, properties_render */
 
@@ -44,6 +45,7 @@ static ConfigPanelGeometry config_panel_geometry(EditorState *es)
  */
 void editor_render_side_panels(EditorState *es)
 {
+    editor_selection_reconcile(es);
     int right_bottom = EDITOR_H - STATUS_H;
     int section_hdr  = 28;  /* matches palette TITLE_H */
 

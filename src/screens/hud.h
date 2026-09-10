@@ -54,7 +54,12 @@ int hud_init(Hud *hud, SDL_Renderer *renderer,
  * score      : current score to display.
  */
 void hud_render(const Hud *hud, SDL_Renderer *renderer,
-                int hearts, int lives, int score);
+                int hearts, int lives, int score,
+                int checkpoint_index, int feedback_kind, Uint32 feedback_until,
+                Uint32 now);
+
+int hud_checkpoint_feedback_visible(int feedback_kind, Uint32 deadline, Uint32 now);
+const char *hud_checkpoint_feedback_label(int feedback_kind, int checkpoint_index);
 
 /* Release the font and heart texture. */
 void hud_cleanup(Hud *hud);

@@ -12,8 +12,8 @@ int phase_next_path(const LevelDef *current, char *out, size_t out_size)
         return -1;
     }
 
-    strncpy(out, current->next_phase, out_size - 1);
-    out[out_size - 1] = '\0';
+    if (strlen(current->next_phase) >= out_size) return -1;
+    memcpy(out, current->next_phase, strlen(current->next_phase) + 1);
     return 0;
 }
 

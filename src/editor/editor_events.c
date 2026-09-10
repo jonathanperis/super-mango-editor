@@ -13,7 +13,7 @@
 
 #include "canvas.h"           /* canvas_contains */
 #include "editor_clipboard.h" /* editor_copy_selected/paste_clipboard */
-#include "editor_files.h"     /* save/load/export/autosave helpers */
+#include "editor_files.h"     /* save/load/autosave helpers */
 #include "editor_panels.h"    /* editor_handle_side_panel_scroll */
 #include "editor_playtest.h"  /* editor_play_test */
 #include "editor_session.h"   /* editor_reset_new_level/set_status */
@@ -28,8 +28,8 @@
  * and window events to tool actions, file operations, and UI state updates.
  *
  * Keyboard shortcuts follow common conventions:
- *   Ctrl+S  → save     Ctrl+O  → load (stub)   Ctrl+N  → new level
- *   Ctrl+E  → export   Ctrl+Z  → undo          Ctrl+Shift+Z → redo
+ *   Ctrl+S  → save     Ctrl+Shift+S → Save As  Ctrl+O  → load
+ *   Ctrl+Z  → undo     Ctrl+Shift+Z/Ctrl+Y → redo
  *   1/2/3   → tool select/place/delete
  *   G       → toggle grid    Delete → delete selected entity
  *   Escape  → cancel tool or quit
@@ -39,6 +39,8 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
     /* ---- Window close (the X button or Alt+F4) ---------------------- */
     case SDL_QUIT:
         if (editor_confirm_discard_changes(es, "quit")) {
+            editor_retire_current_recovery(es);
+            if (es->playing) editor_stop_play(es);
             es->running = 0;
         }
         break;
@@ -52,22 +54,34 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
          * falling through to the unmodified key handlers.
          */
         SDL_Keycode key = event->key.keysym.sym;
-        int ctrl  = (event->key.keysym.mod & KMOD_CTRL)  != 0;
+        int ctrl  = (event->key.keysym.mod & (KMOD_CTRL | KMOD_GUI)) != 0;
         int shift = (event->key.keysym.mod & KMOD_SHIFT) != 0;
+
+        /* SDL_TEXTINPUT owns printable characters while a field is active.
+         * Digits and letters must not also act as canvas shortcuts. */
+        if (es->ui.active_id != 0 && !ctrl && key != SDLK_ESCAPE && key != SDLK_F5) {
+            if (key == SDLK_BACKSPACE) es->ui.key_backspace = 1;
+            if (key == SDLK_RETURN || key == SDLK_KP_ENTER) es->ui.key_return = 1;
+            break;
+        }
+        if (es->ui.active_id != 0 && ctrl && (key == SDLK_c || key == SDLK_v)) {
+            if (key == SDLK_c) SDL_SetClipboardText(es->ui.edit_buf);
+            else {
+                char *text = SDL_GetClipboardText();
+                if (text) { ui_queue_text_input(&es->ui, text); SDL_free(text); }
+            }
+            break;
+        }
 
         if (ctrl) {
             /* ---- Ctrl+key shortcuts (file I/O, undo/redo) ----------- */
             switch (key) {
             case SDLK_s: {
-                /*
-                 * Ctrl+S — Save the current level to disk as TOML.
-                 *
-                 * If no file path has been set yet (first save), default
-                 * to "levels/untitled.toml".  After a successful save,
-                 * clear the modified flag and update the window title to
-                 * reflect the saved state.
-                 */
-                (void)editor_save_current_level(es);
+                if (shift) {
+                    (void)editor_save_current_level_as(es);
+                } else {
+                    (void)editor_save_current_level(es);
+                }
                 break;
             }
 
@@ -101,33 +115,20 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
                 }
                 break;
 
-            case SDLK_e:
-                /*
-                 * Ctrl+E — Export the level as compilable C source files.
-                 *
-                 * Derives the variable name from the file path by stripping
-                 * the directory and extension.  For example:
-                 *   "levels/level_02.toml" → "level_02"
-                 *
-                 * If no file has been saved yet, uses "untitled" as the
-                 * variable name.  The export writes two files:
-                 *   src/levels/<var_name>.h  — extern declaration
-                 *   src/levels/<var_name>.c  — full const LevelDef initialiser
-                 */
-                (void)editor_export_current_level(es);
-                break;
-
             case SDLK_r:
-                if (editor_file_exists(es->autosave_path)) {
-                    if (editor_confirm_discard_changes(es, "recover autosave")) {
-                        if (editor_load_level(es, es->autosave_path) == 0) {
-                            editor_set_status(es, "Recovered autosave");
-                        } else {
-                            editor_set_status(es, "Failed to recover autosave");
-                        }
+                if (!editor_finish_field_edit(es)) break;
+                if (es->recovery_entry_count > 0) {
+                    int recovery_index = editor_choose_recovery(es);
+                    uint64_t recovery_id = recovery_index >= 0
+                                         ? es->pending_recovery_id : 0;
+                    if (recovery_id != 0 &&
+                        editor_confirm_discard_changes(es, "recover autosave")) {
+                        (void)editor_recover_entry_by_id(es, recovery_id);
+                    } else {
+                        es->pending_recovery_id = 0;
                     }
                 } else {
-                    editor_set_status(es, "No autosave to recover");
+                    editor_set_status(es, "Recovery copy not found");
                 }
                 break;
 
@@ -157,9 +158,10 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
                      * reverse=0 means "apply forward" (use the after snapshot).
                      */
                     Command cmd;
+                    if (!editor_finish_field_edit(es)) break;
                     if (redo_pop(es->undo, &cmd)) {
                         editor_apply_undo_command(es, &cmd, 0);
-                        es->modified = 1;
+                        editor_refresh_dirty(es);
                     }
                 } else {
                     /*
@@ -170,12 +172,23 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
                      * reverse=1 means "apply backward" (use the before snapshot).
                      */
                     Command cmd;
+                    if (!editor_finish_field_edit(es)) break;
                     if (undo_pop(es->undo, &cmd)) {
                         editor_apply_undo_command(es, &cmd, 1);
-                        es->modified = 1;
+                        editor_refresh_dirty(es);
                     }
                 }
                 break;
+
+            case SDLK_y: {
+                Command cmd;
+                if (!editor_finish_field_edit(es)) break;
+                if (redo_pop(es->undo, &cmd)) {
+                    editor_apply_undo_command(es, &cmd, 0);
+                    editor_refresh_dirty(es);
+                }
+                break;
+            }
 
             case SDLK_c:
                 /*
@@ -196,7 +209,7 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
                  * original.  The new entity is auto-selected for
                  * immediate repositioning.
                  */
-                editor_paste_clipboard(es);
+                if (editor_finish_field_edit(es)) editor_paste_clipboard(es);
                 break;
 
             default:
@@ -212,7 +225,9 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
                  *   2. If an entity is selected, deselect it (shows level config).
                  *   3. Otherwise, do nothing (editor stays open).
                  */
-                if (es->tool == TOOL_PLACE || es->tool == TOOL_DELETE) {
+                if (es->ui.active_id != 0) {
+                    ui_cancel_active_edit(&es->ui);
+                } else if (es->tool == TOOL_PLACE || es->tool == TOOL_DELETE) {
                     es->tool = TOOL_SELECT;
                 } else if (es->selection.index >= 0) {
                     es->selection.index = -1;
@@ -222,11 +237,9 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
 
             case SDLK_F5:
                 /*
-                 * F5 — Play-test: export the level and launch the game.
-                 *
-                 * Exports the current level as C source, compiles
-                 * and runs the game in a background process.  The editor
-                 * stays open so the designer can keep editing while testing.
+                 * F5 — Play-test: save a private TOML snapshot and launch
+                 * the game in a background process.  The editor stays open
+                 * so the designer can keep editing while testing.
                  */
                 editor_play_test(es);
                 break;
@@ -238,7 +251,7 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
                  * XOR with 1 flips 0↔1.  The canvas_render function checks
                  * show_grid each frame to decide whether to draw grid lines.
                  */
-                es->show_grid ^= 1;
+                if (editor_finish_field_edit(es)) es->show_grid ^= 1;
                 break;
 
             case SDLK_DELETE:
@@ -249,7 +262,7 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
                  * tools_delete_selected records the action on the undo stack
                  * and removes the entity from the appropriate LevelDef array.
                  */
-                if (es->selection.index >= 0) {
+                if (es->selection.index >= 0 && editor_finish_field_edit(es)) {
                     tools_delete_selected(es);
                 }
                 break;
@@ -260,13 +273,13 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
              * buttons and provides a fast keyboard-only workflow.
              */
             case SDLK_1:
-                es->tool = TOOL_SELECT;
+                if (editor_finish_field_edit(es)) es->tool = TOOL_SELECT;
                 break;
             case SDLK_2:
-                es->tool = TOOL_PLACE;
+                if (editor_finish_field_edit(es)) es->tool = TOOL_PLACE;
                 break;
             case SDLK_3:
-                es->tool = TOOL_DELETE;
+                if (editor_finish_field_edit(es)) es->tool = TOOL_DELETE;
                 break;
 
             /* ---- Text input keys forwarded to the UI system ---------- */
@@ -302,10 +315,7 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
          * event->text.text is a UTF-8 string (usually 1 character).
          * We copy up to 31 bytes + NUL to fit the UIState's 32-byte buffer.
          */
-        strncpy(es->ui.text_input, event->text.text,
-                sizeof(es->ui.text_input) - 1);
-        es->ui.text_input[sizeof(es->ui.text_input) - 1] = '\0';
-        es->ui.has_text_input = 1;
+        ui_queue_text_input(&es->ui, event->text.text);
         break;
 
     /* ---- Mouse button down ------------------------------------------ */
@@ -333,7 +343,8 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
              * properties) must not be interpreted as canvas actions —
              * otherwise clicking a property field deselects the entity.
              */
-            if (canvas_contains(event->button.x, event->button.y)) {
+            if (canvas_contains(event->button.x, event->button.y) &&
+                editor_finish_field_edit(es)) {
                 float world_x = (float)event->button.x / es->camera.zoom
                                 + es->camera.x;
                 float world_y = (float)(event->button.y - TOOLBAR_H)
@@ -352,7 +363,8 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
             es->mouse_right_down = 1;
 
             /* Only process right-clicks that land on the canvas */
-            if (canvas_contains(event->button.x, event->button.y)) {
+            if (canvas_contains(event->button.x, event->button.y) &&
+                editor_finish_field_edit(es)) {
                 float world_x = (float)event->button.x / es->camera.zoom
                                 + es->camera.x;
                 float world_y = (float)(event->button.y - TOOLBAR_H)
@@ -448,8 +460,12 @@ void editor_handle_event(EditorState *es, SDL_Event *event) {
                 es->camera.x -= event->wheel.y * scroll_step;
 
                 /* Clamp camera to world boundaries */
-                int eww = (es->level.screen_count > 0 ? es->level.screen_count : 4) * GAME_W;
+                int screens = es->level.screen_count;
+                if (screens <= 0) screens = 4;
+                if (screens > MAX_LEVEL_SCREENS) screens = MAX_LEVEL_SCREENS;
+                int eww = screens * GAME_W;
                 float max_x = (float)eww - (float)CANVAS_W / es->camera.zoom;
+                if (max_x < 0.0f) max_x = 0.0f;
                 if (es->camera.x < 0.0f) es->camera.x = 0.0f;
                 if (es->camera.x > max_x) es->camera.x = max_x;
             }

@@ -112,6 +112,23 @@ static int expect_physics_defaults_are_sentinels(void)
     return 0;
 }
 
+static int expect_rejected_format_version(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.format_version = 2;
+
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+        strstr(err, "format_version") == NULL) {
+        fprintf(stderr, "level_validate_test: unsupported format version should fail clearly\n");
+        return 1;
+    }
+
+    return 0;
+}
+
 static int expect_rejected_floor_gap_outside_world(void)
 {
     LevelDef def;
@@ -127,6 +144,57 @@ static int expect_rejected_floor_gap_outside_world(void)
         return 1;
     }
 
+    return 0;
+}
+
+static void checkpoint_fixture(LevelDef *def)
+{
+    level_def_init_defaults(def);
+    def->screen_count = 1;
+    def->checkpoint_count = 1;
+    def->checkpoints[0].x = 160.0f;
+    def->checkpoints[0].y = 120.0f;
+}
+
+static int expect_valid_authored_checkpoints(void)
+{
+    LevelDef def;
+    char err[128];
+
+    checkpoint_fixture(&def);
+    def.checkpoint_count = 2;
+    def.checkpoints[0].x = 320.0f;
+    def.checkpoints[0].y = 240.0f;
+    def.checkpoints[1].x = 160.0f;
+    def.checkpoints[1].y = 0.0f;
+    if (level_validate_runtime(&def, err, sizeof(err)) != 0) {
+        fprintf(stderr, "level_validate_test: valid checkpoints rejected: %s\n", err);
+        return 1;
+    }
+    return 0;
+}
+
+static int expect_rejected_authored_checkpoints(void)
+{
+    LevelDef def;
+    char err[128];
+
+    checkpoint_fixture(&def);
+    def.checkpoints[0].x = 80.0f;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) return 1;
+    checkpoint_fixture(&def);
+    def.checkpoints[0].x = (float)GAME_W - TILE_SIZE + 1.0f;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) return 1;
+    checkpoint_fixture(&def);
+    def.checkpoints[0].y = (float)GAME_H + 1.0f;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) return 1;
+    checkpoint_fixture(&def);
+    def.checkpoint_count = 2;
+    def.checkpoints[1] = def.checkpoints[0];
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0) return 1;
+    checkpoint_fixture(&def);
+    def.checkpoint_count = MAX_CHECKPOINTS + 1;
+    if (level_validate_counts(&def, err, sizeof(err)) == 0) return 1;
     return 0;
 }
 
@@ -519,15 +587,44 @@ static int expect_rejected_unsafe_paths(void)
     return 0;
 }
 
+static int rejects_numeric_boundaries(void)
+{
+    LevelDef def;
+    char error[128];
+    for (int test = 0; test < 7; test++) {
+        level_def_init_defaults(&def);
+        if (test == 0) { def.floor_gap_count = 1; def.floor_gaps[0] = 2147483647; }
+        if (test == 1) { def.platform_count = 1; def.platforms[0].tile_height = 1; def.platforms[0].tile_width = 89478486; }
+        if (test == 2) { def.platform_count = 1; def.platforms[0].tile_height = 89478486; }
+        if (test == 3 || test == 4) {
+            def.rail_count = 1;
+            def.rails[0] = (RailPlacement){RAIL_LAYOUT_RECT, 80, 40, 4, 3, 1};
+            def.spike_block_count = 1;
+            def.spike_blocks[0].t_offset = test == 3 ? -1.0f : 1e30f;
+        }
+        if (test == 5) def.physics.walk_max_speed = 1e30f;
+        if (test == 6) { def.faster_bird_count = 1; def.faster_birds[0].frame_index = FBIRD_FRAMES; }
+        if (level_validate_runtime(&def, error, sizeof(error)) == 0) {
+            fprintf(stderr, "accepted unsafe numeric case %d\n", test);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int main(void)
 {
+    if (rejects_numeric_boundaries() != 0) return 1;
     if (expect_valid_level() != 0) return 1;
     if (expect_rejected_level() != 0) return 1;
     if (expect_rejected_bad_rail_index() != 0) return 1;
     if (expect_rejected_oversized_rail() != 0) return 1;
     if (expect_rejected_bridge_overflow() != 0) return 1;
     if (expect_physics_defaults_are_sentinels() != 0) return 1;
+    if (expect_rejected_format_version() != 0) return 1;
     if (expect_rejected_floor_gap_outside_world() != 0) return 1;
+    if (expect_valid_authored_checkpoints() != 0) return 1;
+    if (expect_rejected_authored_checkpoints() != 0) return 1;
     if (expect_rejected_platform_outside_world() != 0) return 1;
     if (expect_rejected_reversed_patrol() != 0) return 1;
     if (expect_rejected_bad_rule_values() != 0) return 1;

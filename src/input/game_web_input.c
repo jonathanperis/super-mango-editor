@@ -30,7 +30,8 @@ void game_web_input_flush_stale_keys(void)
     int repaired = emscripten_run_script_int(
         "(function(){"
         "  var K=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',"
-        "    'Space','KeyA','KeyD','KeyW','KeyS','ShiftLeft','ShiftRight'];"
+        "    'Space','Enter','NumpadEnter','Escape','KeyA','KeyD','KeyW','KeyS',"
+        "    'ShiftLeft','ShiftRight'];"
         "  var c=document.getElementById('canvas');"
         "  if(!c)return 0;"
         "  K.forEach(function(code){"

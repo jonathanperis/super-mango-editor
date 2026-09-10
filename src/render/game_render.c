@@ -6,6 +6,7 @@
  */
 
 #include "game_render.h"
+#include "../screens/settings_menu.h"
 
 #include "../core/debug.h"
 #include "../core/game_overlay.h"
@@ -58,7 +59,7 @@
 /* Main render function                                               */
 /* ------------------------------------------------------------------ */
 
-void game_render_frame(GameState *gs, int cam_x, float dt)
+int game_render_frame(GameState *gs, int cam_x, float dt)
 {
     /*
      * Update the debug overlay even while paused so the FPS counter
@@ -73,8 +74,8 @@ void game_render_frame(GameState *gs, int cam_x, float dt)
      */
     if (SDL_RenderClear(gs->renderer) != 0) {
         SDL_Log("game_render_frame: SDL_RenderClear failed: %s", SDL_GetError());
-        gs->running = 0;
-        return;
+        if (gs->route == GAME_ROUTE_NONE) gs->route = GAME_ROUTE_FATAL;
+        return 0;
     }
 
     /*
@@ -82,7 +83,8 @@ void game_render_frame(GameState *gs, int cam_x, float dt)
      * Each layer scrolls at a fraction of cam_x to simulate depth.
      * cam_x is the integer camera offset computed above.
      */
-    parallax_render(&gs->parallax, gs->renderer, cam_x);
+    parallax_render(&gs->parallax, gs->renderer,
+                     gs->profile && gs->profile->data.settings.reduced_motion ? 0 : cam_x);
 
     /*
      * Draw the platforms BEFORE the floor so the floor tiles render
@@ -312,37 +314,29 @@ void game_render_frame(GameState *gs, int cam_x, float dt)
 
     /* Draw fog/mist as the topmost layer — rendered after the player.
      * Only active when the level definition enables fog (fog_enabled == 1). */
-    if (gs->runtime.fog_enabled) fog_render(&gs->fog, gs->renderer);
+    if (gs->runtime.fog_enabled && !(gs->profile && gs->profile->data.settings.reduced_motion)) fog_render(&gs->fog, gs->renderer);
+    if (gs->profile && gs->profile->data.settings.high_contrast) {
+        SDL_Rect hit = player_get_hitbox(&gs->player);
+        hit.x -= cam_x;
+        SDL_Rect outer = {hit.x-1,hit.y-1,hit.w+2,hit.h+2};
+        SDL_SetRenderDrawColor(gs->renderer, 0, 0, 0, 255); SDL_RenderDrawRect(gs->renderer, &outer);
+        SDL_SetRenderDrawColor(gs->renderer, 255, 255, 255, 255); SDL_RenderDrawRect(gs->renderer, &hit);
+        SDL_Rect backing = {0,0,GAME_W,22};
+        SDL_SetRenderDrawColor(gs->renderer, 0, 0, 0, 255); SDL_RenderFillRect(gs->renderer, &backing);
+    }
 
     /* Draw the HUD overlay on top of everything (hearts, lives, score) */
     hud_render(&gs->hud, gs->renderer,
-               gs->hearts, gs->lives, gs->score);
+               gs->hearts, gs->lives, gs->score,
+               gs->checkpoint_index,
+               gs->checkpoint_feedback_kind,
+               gs->checkpoint_feedback_until,
+               SDL_GetTicks());
 
     /* Draw debug overlays (collision boxes, FPS, event log) if active */
     if (gs->debug_mode) {
         debug_render(&gs->debug, gs->hud.font, gs->renderer, gs, cam_x);
     }
-
-    /*
-     * Gamepad init HUD message — shown while the background thread is running.
-     *
-     * The texture is pre-rendered once when the thread starts (state 1→2
-     * in the state machine below) and reused each frame until init completes
-     * (state 2→0).  This avoids calling TTF_RenderText_Solid and uploading
-     * to GPU memory on every frame for the duration of the init window.
-     *
-     * Guarded for WebAssembly: ctrl_pending_init is never set on WASM so this
-     * block is dead code there, but the guard makes the intent explicit.
-     */
-#ifndef __EMSCRIPTEN__
-    if (gs->ctrl_pending_init == 2 && gs->textures.ctrl_init_msg) {
-        int tw, th;
-        SDL_QueryTexture(gs->textures.ctrl_init_msg, NULL, NULL, &tw, &th);
-        /* Bottom-right corner, 6 px from each edge. */
-        SDL_Rect dst = { GAME_W - tw - 6, GAME_H - th - 6, tw, th };
-        SDL_RenderCopy(gs->renderer, gs->textures.ctrl_init_msg, NULL, &dst);
-    }
-#endif
 
     /* Player-facing overlays — rendered last on top of everything */
     GameOverlayState overlay = game_overlay_state(gs);
@@ -361,5 +355,7 @@ void game_render_frame(GameState *gs, int cam_x, float dt)
      * With VSync enabled, this call also blocks until the monitor
      * is ready for the next frame (typically ~16ms at 60 Hz).
      */
+    settings_menu_render(gs->settings_menu, gs->profile, gs->renderer, gs->hud.font);
     SDL_RenderPresent(gs->renderer);
+    return 1;
 }

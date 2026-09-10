@@ -225,6 +225,7 @@ static inline int min(int a, int b) { return a < b ? a : b; }
 // to dst.
 static void scan_copystr(scanner_t *sp, char *dst, int dstsz) {
   assert(dstsz > 0);
+  dst[0] = 0;
   int len = min(sp->endp - sp->cur, dstsz - 1); // account for NUL
   if (len > 0) {
     memcpy(dst, sp->cur, len);
@@ -242,18 +243,12 @@ struct parser_t {
   ebuf_t ebuf;
 };
 
-// Put key into tab dictionary. Return a place to
-// the datum for the key on success, or NULL otherwise.
-static toml_datum_t *tab_emplace(toml_datum_t *tab, span_t key,
-                                 const char **reason) {
+// Append a key already known to be absent. Separate insertion from lookup so
+// parsing a new key does not scan the complete table twice.
+static toml_datum_t *tab_append(toml_datum_t *tab, span_t key,
+                                  const char **reason) {
   assert(tab->type == TOML_TABLE);
   int N = tab->u.tab.size;
-  for (int i = 0; i < N; i++) {
-    if (tab->u.tab.len[i] == key.len &&
-        0 == memcmp(tab->u.tab.key[i], key.ptr, key.len)) {
-      return &tab->u.tab.value[i];
-    }
-  }
   // Expand pkey[], plen[] and value[]. The following does this
   // separately for pkey, plen and value, and it is safe on partial
   // failure, i.e. only the first one succeeded.
@@ -306,6 +301,13 @@ static int tab_find(toml_datum_t *tab, span_t key) {
 }
 
 // Add a new key in tab. Return 0 on success, -1 otherwise.
+static toml_datum_t *tab_emplace(toml_datum_t *tab, span_t key,
+                                const char **reason) {
+  int index = tab_find(tab, key);
+  return index < 0 ? tab_append(tab, key, reason) : &tab->u.tab.value[index];
+}
+
+// Add a new key in tab. Return 0 on success, -1 otherwise.
 // On error, *reason will point to an error message.
 static int tab_add(toml_datum_t *tab, span_t newkey, toml_datum_t newvalue,
                    const char **reason) {
@@ -314,7 +316,7 @@ static int tab_add(toml_datum_t *tab, span_t newkey, toml_datum_t newvalue,
     *reason = "duplicate key";
     return -1;
   }
-  toml_datum_t *pvalue = tab_emplace(tab, newkey, reason);
+  toml_datum_t *pvalue = tab_append(tab, newkey, reason);
   if (!pvalue) {
     return -1;
   }
@@ -1589,7 +1591,7 @@ static int parse_norm(parser_t *pp, token_t tok, span_t *ret_span) {
       p += 2;
       continue;
     case 'e':
-      *dst++ = '\e';
+      *dst++ = '\x1b';
       p += 2;
       continue;
     case 'x': {
@@ -1733,8 +1735,9 @@ static inline bool is_valid_char(int ch) {
 }
 
 static inline bool is_hex_char(int ch) {
-  ch = toupper(ch);
-  return ('0' <= ch && ch <= '9') || ('A' <= ch && ch <= 'F');
+  // The scanner can pass TOK_FIN, which is not a valid ctype argument.
+  return ('0' <= ch && ch <= '9') || ('A' <= ch && ch <= 'F') ||
+         ('a' <= ch && ch <= 'f');
 }
 
 // Initialize a scanner
@@ -2043,23 +2046,17 @@ static int read_int(const char *p, int *ret) {
 
 // Read a date as YYYY-MM-DD from p[]. Return #bytes consumed.
 static int read_date(const char *p, int *year, int *month, int *day) {
-  const char *pp = p;
-  int n;
-  n = read_int(p, year);
-  if (n != 4 || p[4] != '-') {
-    return 0;
+  // Check each character before looking further; NUL rejects a short date.
+  for (int i = 0; i < 10; i++) {
+    if (i == 4 || i == 7) {
+      if (p[i] != '-') return 0;
+    } else if (p[i] < '0' || p[i] > '9') return 0;
   }
-  n = read_int(p += n + 1, month);
-  if (n != 2 || p[2] != '-') {
-    return 0;
-  }
-  n = read_int(p += n + 1, day);
-  if (n != 2) {
-    return 0;
-  }
-  p += 2;
-  assert(p - pp == 10);
-  return p - pp;
+  if (p[10] >= '0' && p[10] <= '9') return 0;
+  *year = (p[0]-'0')*1000 + (p[1]-'0')*100 + (p[2]-'0')*10 + p[3]-'0';
+  *month = (p[5]-'0')*10 + p[6]-'0';
+  *day = (p[8]-'0')*10 + p[9]-'0';
+  return 10;
 }
 
 // Read a time as HH:MM:SS.subsec from p[]. Return #bytes consumed.

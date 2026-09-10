@@ -126,7 +126,8 @@ void fog_init(FogSystem *fog, SDL_Renderer *renderer,
      * Seed the random number generator with the current uptime so that
      * each game session produces a different sequence of fog waves.
      */
-    srand((unsigned int)SDL_GetTicks());
+    /* The runner seeds once. Reseeding here would discard --seed and also
+     * change enemy randomness whenever a level reloads its fog textures. */
 
     /* Zero-init the instance pool so every slot starts as inactive */
     for (int i = 0; i < FOG_MAX; i++) {

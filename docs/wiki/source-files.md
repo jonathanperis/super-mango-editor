@@ -21,13 +21,15 @@ src/
 │   ├── floor_gap_collision.h / .c Sea-gap fall/death detection
 │   └── game_collision.h / .c     Gameplay collision passes and pickups
 ├── core/
+│   ├── app_session.h / .c        Heap-owned application session: menu/game screens, routes, controller lifetime, browser replay
+│   ├── game_profile.h / .c       Versioned player settings/results and native/web persistence
 │   ├── debug.h / .c              Debug overlay: FPS/CPU/memory, hitboxes, event log
 │   ├── entity_utils.h / .c       Shared entity helper functions
 │   ├── game_state.h / .c         GameState reset helpers
 │   ├── game_window.h / .c        Window/renderer setup helpers
 │   ├── game_timing.h / .c        Frame timing helpers
 │   ├── game_lifecycle.c          `game_init` / `game_cleanup` implementation
-│   ├── game_loop.c               Main native/WASM frame loop
+│   ├── game_loop.c               Active-game frame runner and legacy direct loop
 │   ├── game_update.h / .c        Top-level update orchestration
 │   ├── game_player_step.h / .c   Player update/collision step wrapper
 │   ├── game_actors.h / .c        Enemy update/render helpers
@@ -40,7 +42,8 @@ src/
 │   ├── game_resources.h / .c     Texture/audio/level resource loading
 │   ├── game_score.h / .c         Shared score and bonus-life helpers
 │   ├── game_overlay.h / .c       Canonical pause/game-over/completion overlay state
-│   └── game_completion.h / .c    Last-star completion and next-phase flow
+│   ├── game_completion.h / .c    Last-star completion and next-phase flow
+│   └── game_terminal.h / .c      Shared terminal action list, focus movement, labels, and routes
 ├── editor/
 │   ├── editor_main.c             Standalone editor entry point
 │   ├── editor.h / .c             Editor state, events, render loop
@@ -67,6 +70,7 @@ src/
 │   ├── serializer_io.h / .c      File I/O helpers for serializer
 │   ├── serializer_load.c         `level_load_toml` staged parse orchestration
 │   ├── serializer_load_header.h / .c        TOML header/meta and floor-gap parsing
+│   ├── serializer_load_checkpoints.h / .c   Strict authored checkpoint parsing
 │   ├── serializer_load_geometry.h / .c      Rails and platforms parsing
 │   ├── serializer_load_collectibles.h / .c  Coin, star, last-star, next-phase parsing
 │   ├── serializer_load_enemies.h / .c       Enemy placement parsing
@@ -78,7 +82,6 @@ src/
 │   ├── serializer_parse.h / .c  Shared TOML parse utilities
 │   ├── serializer_save.h / .c   TOML save implementation
 │   ├── serializer_types.h / .c  Enum/string conversion helpers
-│   ├── exporter.h / .c           Generated C level export
 │   ├── file_dialog.h / .c        Native file dialogs
 │   └── undo.h / .c               Undo/redo history
 ├── effects/
@@ -102,20 +105,22 @@ src/
 │   ├── axe_trap.h / .c           Swinging/spinning axe hazard
 │   └── blue_flame.h / .c         Blue/fire flame hazards: rise/flip/fall cycle
 ├── input/
-│   ├── game_input.h / .c         SDL keyboard/gamepad input helpers
-│   ├── game_events.h / .c        SDL event handling
+│   ├── game_bindings.c           Reserved-key/button and configurable binding validation
+│   ├── game_input.h / .c         SDL keyboard/gamepad input helpers and cross-screen release latch
+│   ├── game_events.h / .c        SDL event handling and terminal action dispatch
 │   ├── game_replay.h / .c        Deterministic SDL key-event replay injection
-│   └── game_web_input.h / .c     Browser/WebAssembly input bridge
+│   └── game_web_input.h / .c     Browser/WebAssembly stale-key repair
 ├── levels/
 │   ├── level.h                   Shared level definitions
 │   ├── level_loader.h / .c       TOML level loading and switching
 │   ├── level_path.h / .c         Level path normalization and directory helpers
 │   ├── level_physics.h / .c      Level physics override/default helpers
 │   ├── level_resources.h / .c    Per-level resource reload wrappers
-│   ├── level_session.h / .c      Owned active LevelDef session storage
+│   ├── level_session.h / .c      Active LevelDef storage plus v1 campaign catalog loading/validation
 │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
 │   ├── level_validate.c          LevelDef count validation
-│   └── exported/                 Generated C level exports
+│   └── exported/00_sandbox_01.h / .c
+│                                  Ignored legacy generated C artifacts; no runtime or editor exporter generates or consumes them
 ├── player/
 │   ├── player.h / .c             Public API + high-level glue
 │   ├── player_internal.h         Private frame/hitbox/coyote constants
@@ -130,6 +135,7 @@ src/
 │   ├── game_render.h / .c        Frame render order and layer drawing
 │   └── render_overlay.c          Foreground/overlay render helpers
 ├── screens/
+│   ├── settings_menu.h / .c      Keyboard/gamepad options, remapping, and profile status
 │   ├── start_menu.h / .c         Start menu screen with logo
 │   └── hud.h / .c                HUD renderer: hearts, lives counter, score text
 └── surfaces/
@@ -152,14 +158,14 @@ New `.c` files in `src/` or recognized source subdirectories are picked up by Ma
 
 ## `main.c`
 
-**Role:** Owns the program entry point and every SDL subsystem's lifetime.
+**Role:** Parses program arguments, starts SDL core subsystems, constructs one `AppSession`, and returns the session result. `AppSession` owns runtime shutdown and cross-screen transitions.
 
 ### Responsibilities
 
 - Parse CLI flags: `--debug`, `--sandbox`, `--level <path>`, `--smoke-test-frames N`, `--seed N`, and `--replay-script <name>`
 - Call `SDL_Init`, `IMG_Init`, `TTF_Init`, `Mix_OpenAudio` in order
-- Route to start menu, sandbox, or direct TOML level mode
-- Tear down SDL subsystems in reverse order before returning
+- Route to the start menu, sandbox, or direct TOML level mode through `session_create()`
+- Run `session_run()`; native callers then destroy the session, while browser replay frees it before requesting a reload
 
 ### Subsystem Init Order
 
@@ -252,9 +258,9 @@ void game_complete_level(GameState *gs);
 
 ---
 
-## Runtime Core (`core/game_lifecycle.c`, `core/game_loop.c`, `core/game_resources.c`)
+## Runtime Core (`core/app_session.c`, `core/game_lifecycle.c`, `core/game_loop.c`, `core/game_resources.c`)
 
-**Role:** Runtime lifecycle and game-loop implementation lives under `src/core/`. `game_lifecycle.c` owns `game_init` / `game_cleanup`, `game_loop.c` owns `game_loop`, and resource loading/reloading lives in `game_resources.c`.
+**Role:** `app_session.c` owns the one app-level frame loop, menu/game screen swaps, controller subsystem lifetime, native replay, browser replay, and shutdown. `game_lifecycle.c` owns active-game `game_init` / `game_cleanup`; `game_loop.c` owns `game_frame`; resource loading/reloading lives in `game_resources.c`.
 
 ### `game_init(GameState *gs)`
 
@@ -263,16 +269,16 @@ Creates all runtime resources:
 1. Window + renderer + logical size (400x300)
 2. Shared textures for player, entities, hazards, collectibles, surfaces, HUD, and debug overlay
 3. Sound effects for player actions, pickups, entities, hazards, and surface interactions
-4. TOML level load from `--level` or the default `levels/00_sandbox_01.toml`
+4. TOML level load from the selected campaign entry or direct `--level` path
 5. Level-wide resources: parallax, floor/platform tiles, foreground strip, fog, water, and music
 6. Entity init: player, water, fog, HUD, debug, and level contents
-7. Gamepad controller init
+7. Discover an available gamepad handle after `AppSession` publishes controller readiness
 
 Returns `0` on success. If a required window, texture, level, or subsystem resource fails, it cleans up the partially initialized `GameState` and returns `-1`; the top-level runner reports `EXIT_FAILURE`.
 
-### `game_loop(GameState *gs)`
+### `game_frame(GameState *gs)` and `game_loop(GameState *gs)`
 
-60 FPS loop: delta time -> events -> update -> render. See [Architecture](../architecture/) for the full render order.
+`game_frame` performs one 60 FPS step: delta time -> events -> update -> render. `AppSession` is the production loop owner; `game_loop` remains a legacy direct native helper. See [Architecture](../architecture/) for routes and render order.
 
 ### `game_cleanup(GameState *gs)`
 
@@ -290,7 +296,7 @@ Frees all resources in reverse init order.
 
 ## `levels/level.h`, `levels/level_loader.c`, `levels/level_physics.c`, `levels/level_validate.c`, `levels/phase_transition.c`
 
-**Role:** Level schema, TOML loading, physics override application, phase switching, and count validation.
+**Role:** Level schema, TOML loading, authored-checkpoint validation, physics override application, phase switching, and count validation.
 
 **Key functions:**
 - `int level_load(GameState *gs, const LevelDef *def);` -- validate and copy a parsed level definition into runtime `GameState`; returns `-1` without mutating current runtime state when runtime counts are invalid
@@ -300,13 +306,27 @@ Frees all resources in reverse init order.
 - `level_validate_counts(const LevelDef *level, char *err, size_t err_sz)` -- reject out-of-range array counts
 - `phase_has_next`, `phase_next_path`, `phase_progress_save`, `phase_progress_restore` -- resolve level-completion next-phase paths and protect progress when staging phase transitions
 
+`LevelDef.checkpoints` stores optional immutable `CheckpointPlacement { x, y }` records. The serializer requires finite numeric `x` and `y`; runtime validation enforces a maximum of `MAX_CHECKPOINTS` (`99`), unique in-world x coordinates strictly after the effective player start, and y coordinates in the logical canvas.
+
+### `core/game_checkpoint.h` / `core/game_checkpoint.c`
+
+Resolves respawn state without mutating `LevelDef`. With authored records, the greatest crossed x coordinate becomes `GameState.respawn_x` / `respawn_y` before lethal collisions run. With no records, the legacy automatic screen-boundary checkpoint remains active.
+
 ---
 
 ## `screens/start_menu.h` / `screens/start_menu.c`
 
-**Role:** Start menu screen with centred title text and `start_menu_logo.png` logo.
+**Role:** Start menu screen with centred title text, `start_menu_logo.png`, and a wrapped selector backed by the validated ordered catalog from `levels/campaigns/main.toml`. The AppSession can reopen it after a terminal **Level Select** action without restarting the process.
 
-**Key functions:** `start_menu_init`, `start_menu_loop`, `start_menu_cleanup`
+**Key functions:** `start_menu_create`, `start_menu_frame`, `start_menu_get_input_state`, `start_menu_close`
+
+### `core/game_terminal.h` / `core/game_terminal.c`
+
+Builds the single valid terminal-action list used by both rendering and input. Completion lists Next Level when a phase is pending, then Replay, Level Select, and Exit; final completion omits Next Level; game over lists Retry, Level Select, and Exit. Focus wraps through this list.
+
+### `core/app_session.h` / `core/app_session.c`
+
+Owns one heap-allocated application session and its active menu or game screen. Without `--level`, it loads and retains the validated v1 campaign catalog; the menu uses the catalog's names and ordered paths. A direct `--level` session bypasses the catalog. The session consumes explicit game routes after each rendered frame: next level stays in the current game; native replay replaces the game with the same TOML path; level select returns to the menu; browser replay stores the path in `sessionStorage`, cleans up once, cancels the Emscripten callback, and reloads.
 
 ---
 
@@ -370,7 +390,7 @@ Swinging pendulum or spinning axe hazard. Two behaviour modes: swing (60 degree 
 
 ### `collectibles/coin.h` / `collectibles/coin.c`
 
-Gold coin collectible. AABB pickup awards 100 points. Every 3 coins restores one heart. Asset: `coin.png`.
+Gold coin collectible. AABB pickup awards the level's `coin_score` (100 by default); crossing `score_per_life` grants a bonus life. Asset: `coin.png`.
 
 ### `collectibles/star_yellow.h` / `collectibles/star_yellow.c`
 

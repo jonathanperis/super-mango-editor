@@ -18,9 +18,8 @@
  * Called from every hearts<=0 branch so all sources of death produce
  * an identical reset — no entity is accidentally left in a stale state.
  *
- * Applies checkpoint offset to spawn position if a checkpoint has been
- * reached (checkpoint_x > 0). This allows players to respawn at the
- * furthest screen they reached instead of always restarting at level start.
+ * Applies runtime-resolved respawn x/y. Authored levels use their furthest
+ * reached placement; legacy levels use their furthest reached screen.
  *
  * fp_prev_riding is passed by pointer because it lives as a local
  * variable inside game_loop; resetting it here keeps the float-platform

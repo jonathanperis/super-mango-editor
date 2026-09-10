@@ -52,6 +52,12 @@ static void fill_runtime_fixture(LevelDef *def)
     strncpy(def->name, "Runtime Fixture", sizeof(def->name) - 1);
     def->screen_count = 3;
 
+    def->checkpoint_count = 2;
+    def->checkpoints[0].x = 200.0f;
+    def->checkpoints[0].y = 96.0f;
+    def->checkpoints[1].x = 600.0f;
+    def->checkpoints[1].y = 208.0f;
+
     def->floor_gap_count = 1;
     def->floor_gaps[0] = 128;
 
@@ -109,7 +115,7 @@ static void fill_runtime_fixture(LevelDef *def)
     def->faster_birds[0].vx = -62.0f;
     def->faster_birds[0].patrol_x0 = 480.0f;
     def->faster_birds[0].patrol_x1 = 620.0f;
-    def->faster_birds[0].frame_index = 3;
+    def->faster_birds[0].frame_index = FBIRD_FRAMES - 1;
     def->fish_count = 1;
     def->fish[0].x = 340.0f;
     def->fish[0].vx = 18.0f;
@@ -229,6 +235,12 @@ static int load_applies_runtime_state(void)
     if (expect_ptr("current level", gs.runtime.current_level, &def) != 0)
         return 1;
     if (expect_int("world width", gs.runtime.world_w, 3 * GAME_W) != 0)
+        return 1;
+    if (expect_float("initial respawn x", gs.respawn_x, def.player_start_x) != 0)
+        return 1;
+    if (expect_float("initial respawn y", gs.respawn_y, def.player_start_y) != 0)
+        return 1;
+    if (expect_int("initial checkpoint index", gs.checkpoint_index, -1) != 0)
         return 1;
     if (expect_int("fog enabled", gs.runtime.fog_enabled, 1) != 0) return 1;
     if (expect_int("water enabled", gs.runtime.water_enabled, 1) != 0)

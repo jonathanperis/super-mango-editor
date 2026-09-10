@@ -7,7 +7,7 @@
 #include <SDL.h>   /* SDL_Rect, SDL_RenderFillRect */
 #include <stdio.h> /* snprintf */
 
-#include "editor_files.h"      /* editor file/save/export helpers */
+#include "editor_files.h"      /* editor file/save helpers */
 #include "editor_playtest.h"   /* editor_play_test/editor_stop_play */
 #include "editor_session.h"    /* editor reset/confirm helpers */
 #include "editor_validation.h" /* editor_validation_summary */
@@ -103,13 +103,13 @@ void editor_render_toolbar(EditorState *es)
     }
 
     rx -= 64 + 4;
-    if (ui_button(&es->ui, rx, by, 64, bh, "Export")) {
-        (void)editor_export_current_level(es);
+    if (ui_button(&es->ui, rx, by, 64, bh, "Save")) {
+        (void)editor_save_current_level(es);
     }
 
     rx -= 64 + 4;
-    if (ui_button(&es->ui, rx, by, 64, bh, "Save")) {
-        (void)editor_save_current_level(es);
+    if (ui_button(&es->ui, rx, by, 64, bh, "Save As")) {
+        (void)editor_save_current_level_as(es);
     }
 
     rx -= 64 + 4;

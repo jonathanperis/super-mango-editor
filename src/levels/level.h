@@ -1,19 +1,17 @@
 /*
  * level.h — Data-driven level definition system.
  *
- * A level is described entirely as a LevelDef constant: arrays of placement
- * structs that specify WHERE every entity lives and what variant/mode it uses.
- * No positions are hard-coded inside entity .c files — they only know HOW
- * entities behave.
+ * A level is loaded from a TOML document into LevelDef: arrays of placement
+ * structs specify WHERE every entity lives and what variant/mode it uses.  No
+ * positions are hard-coded inside entity .c files — they only know HOW entities
+ * behave.
  *
- * Adding a new level = creating one new levels/level_XX.c file with a filled
- * LevelDef.  No engine code needs to change.
+ * Adding a new level = creating one new TOML file under levels/.  No engine code
+ * needs to change.
  *
- * Usage:
- *   #include "level.h"
- *   #include "levels/exported/example_level.h"
- *   level_load(gs, &example_level_def);   // from level_loader.h
- *   level_reset(gs, &example_level_def);  // on player death
+ * Runtime usage:
+ *   level_load(gs, &level_def);   // from level_loader.h
+ *   level_reset(gs, &level_def);  // on player death
  */
 #pragma once
 
@@ -25,6 +23,9 @@
 #include "../surfaces/float_platform.h"/* FloatPlatformMode, MAX_FLOAT_PLATFORMS */
 #include "../surfaces/rail.h"          /* MAX_RAILS */
 #include "../game.h"                   /* MAX_* constants, FLOOR_Y, TILE_SIZE, etc. */
+
+/* Current TOML level document schema version. Missing TOML version means v1. */
+#define LEVEL_FORMAT_VERSION 1
 
 /* ------------------------------------------------------------------ */
 /* Rail placements                                                     */
@@ -330,6 +331,17 @@ typedef struct {
     int   tile_count;
 } RopePlacement;
 
+/*
+ * CheckpointPlacement — authored respawn point.
+ *
+ * Records are immutable level data. Runtime keeps the resolved point and
+ * advances through this ordered placement list without mutating it.
+ */
+typedef struct {
+    float x;
+    float y;
+} CheckpointPlacement;
+
 /* ------------------------------------------------------------------ */
 /* LevelDef — the complete description of one level                    */
 /* ------------------------------------------------------------------ */
@@ -337,9 +349,8 @@ typedef struct {
 /*
  * LevelDef — all data needed to load and reset a level.
  *
- * To create a new level, declare a const LevelDef in a new
- * src/levels/level_NN.c file and expose it via a header.
- * Then pass a pointer to level_load() / level_reset().
+ * To create a new level, add a TOML document under levels/, load it into a
+ * LevelDef, then pass a pointer to level_load() / level_reset().
  *
  * All arrays use the same MAX_* upper bounds as GameState so the
  * level_loader can safely fill GameState arrays directly.
@@ -347,13 +358,22 @@ typedef struct {
  * Blue flames are manually placed via the blue_flames[] array.
  * Each entry specifies the gap x position where a flame erupts.
  */
+#define LEVEL_NAME_CAPACITY 64
+#define LEVEL_DESCRIPTION_CAPACITY 4096
+#define LEVEL_AUTHOR_CAPACITY 128
+
 typedef struct {
-    char  name[64];          /* display name, e.g. "Sandbox" — editable buffer  */
-    char  description[512];  /* free-form level description — preserved as TOML
+    int   format_version;    /* serialized document schema; always current v1 */
+    char  name[LEVEL_NAME_CAPACITY]; /* display name */
+    char  description[LEVEL_DESCRIPTION_CAPACITY]; /* free-form description
                               * comment header and as a string field on save    */
-    char  generated_by[128]; /* author attribution, e.g. "Lugio, the Creator"
-                              * or "Bosser, the Engineer" — crew member sign    */
+    char  generated_by[LEVEL_AUTHOR_CAPACITY]; /* author attribution, e.g. "Lugio, the Creator"
+                               * or "Bosser, the Engineer" — crew member sign    */
     int   screen_count;      /* number of screens wide (0 = default 4)          */
+
+    /* ---- Authored checkpoints --------------------------------------- */
+    CheckpointPlacement checkpoints[MAX_CHECKPOINTS];
+    int                  checkpoint_count;
 
     /* ---- World geometry --------------------------------------------- */
     int floor_gaps[MAX_FLOOR_GAPS];
@@ -498,6 +518,21 @@ typedef struct {
     } physics;
 } LevelDef;
 
+/* Resolve the original spawn, including the legacy engine default. */
+static inline void level_effective_spawn(const LevelDef *def,
+                                         float *x, float *y)
+{
+    float resolved_x = 80.0f;
+    float resolved_y = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);
+
+    if (def && (def->player_start_x != 0.0f || def->player_start_y != 0.0f)) {
+        resolved_x = def->player_start_x;
+        resolved_y = def->player_start_y;
+    }
+    if (x) *x = resolved_x;
+    if (y) *y = resolved_y;
+}
+
 /*
  * level_def_init_defaults — Reset a LevelDef and apply non-zero sentinels.
  *
@@ -510,6 +545,7 @@ static inline void level_def_init_defaults(LevelDef *def)
     if (!def) return;
 
     memset(def, 0, sizeof(*def));
+    def->format_version = LEVEL_FORMAT_VERSION;
     def->physics.walk_max_speed          = -1.0f;
     def->physics.run_max_speed           = -1.0f;
     def->physics.walk_ground_accel       = -1.0f;
@@ -535,3 +571,6 @@ static inline void level_def_init_defaults(LevelDef *def)
  */
 void rail_init_from_placements(Rail *rails, int *count,
                                const RailPlacement *placements, int n);
+
+/* Build one bounded path. Invalid draft geometry leaves an empty rail. */
+int rail_build(Rail *rail, const RailPlacement *placement);

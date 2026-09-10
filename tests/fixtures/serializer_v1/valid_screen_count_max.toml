@@ -1,0 +1,7 @@
+format_version = 1
+name = "Maximum Screen Count"
+screen_count = 99
+
+[[checkpoints]]
+x = 39552.0
+y = 120.0

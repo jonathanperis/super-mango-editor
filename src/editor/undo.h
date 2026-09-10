@@ -54,7 +54,8 @@ typedef enum {
     CMD_PLACE,
     CMD_DELETE,
     CMD_MOVE,
-    CMD_PROPERTY
+    CMD_PROPERTY,
+    CMD_CONFIG
 } CommandType;
 
 /* ------------------------------------------------------------------ */
@@ -101,7 +102,61 @@ typedef union {
     RopePlacement           rope;
     RailPlacement           rail;
     int                     floor_gap;
+    CheckpointPlacement     checkpoint;
 } PlacementData;
+
+/*
+ * LevelConfigSnapshot — focused snapshot for level-wide editor settings.
+ * Entity arrays intentionally excluded: config undo must not restore
+ * unrelated entity edits.
+ */
+typedef struct {
+    char name[LEVEL_NAME_CAPACITY];
+    char description[LEVEL_DESCRIPTION_CAPACITY];
+    char generated_by[LEVEL_AUTHOR_CAPACITY];
+    int screen_count;
+    char next_phase[256];
+
+    struct {
+        char path[64];
+        float speed;
+    } background_layers[MAX_BACKGROUND_LAYERS];
+    int background_layer_count;
+
+    struct {
+        char path[64];
+        float speed;
+    } foreground_layers[MAX_BACKGROUND_LAYERS];
+    int foreground_layer_count;
+
+    struct {
+        char path[64];
+        float speed;
+    } fog_layers[MAX_FOG_TEXTURES];
+    int fog_layer_count;
+
+    char music_path[64];
+    int music_volume;
+    char floor_tile_path[64];
+    int initial_hearts;
+    int initial_lives;
+    int score_per_life;
+    int coin_score;
+
+    struct {
+        float walk_max_speed;
+        float run_max_speed;
+        float walk_ground_accel;
+        float run_ground_accel;
+        float ground_friction;
+        float ground_counter_accel;
+        float air_accel_walk;
+        float air_accel_run;
+        float air_friction;
+        float cam_lookahead_vx_factor;
+        float cam_lookahead_max;
+    } physics;
+} LevelConfigSnapshot;
 
 /* ------------------------------------------------------------------ */
 /* Command --- one recorded editor action                              */
@@ -130,6 +185,11 @@ typedef struct {
     int           entity_index;
     PlacementData before;
     PlacementData after;
+    int           property_field;
+    char          property_text_before[256];
+    char          property_text_after[256];
+    LevelConfigSnapshot config_before;
+    LevelConfigSnapshot config_after;
 } Command;
 
 /* ------------------------------------------------------------------ */

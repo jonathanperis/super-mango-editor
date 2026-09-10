@@ -9,6 +9,12 @@
 #include <SDL.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <limits.h>
+#include <errno.h>
+#include <ctype.h>
+
+#define MAX_REPLAY_EVENTS 4096
 
 static SDL_Keycode replay_keycode(const char *name)
 {
@@ -84,47 +90,73 @@ static const char *replay_script_path(const char *name)
     return NULL;
 }
 
+int game_replay_load(GameState *gs)
+{
+    if (!gs->replay_script_path[0]) return 0;
+    const char *replay_path = replay_script_path(gs->replay_script_path);
+    if (!replay_path) {
+        fprintf(stderr, "Error: unknown replay script '%s'\n", gs->replay_script_path);
+        return -1;
+    }
+    FILE *fp = fopen(replay_path, "r");
+    if (!fp) {
+        fprintf(stderr, "Error: could not open replay script '%s'\n", replay_path);
+        return -1;
+    }
+    gs->replay_events = calloc(MAX_REPLAY_EVENTS, sizeof(*gs->replay_events));
+    if (!gs->replay_events) { fclose(fp); return -1; }
+    char line[160];
+    while (fgets(line, sizeof(line), fp)) {
+        char *text = line, *end;
+        char action[16] = {0};
+        char key_name[32] = {0};
+        char extra;
+        if (!strchr(line, '\n') && !feof(fp)) goto invalid;
+        while (isspace((unsigned char)*text)) text++;
+        if (*text == '#' || *text == '\0') continue;
+        errno = 0;
+        long frame = strtol(text, &end, 10);
+        if (errno || end == text || frame < 0 || frame >= INT_MAX ||
+            !isspace((unsigned char)*end) ||
+            sscanf(end, "%15s %31s %c", action, key_name, &extra) != 2 ||
+            gs->replay_event_count >= MAX_REPLAY_EVENTS) goto invalid;
+        SDL_Keycode key = replay_keycode(key_name);
+        if (key == SDLK_UNKNOWN ||
+            (strcmp(action, "down") && strcmp(action, "press") &&
+             strcmp(action, "up") && strcmp(action, "release") && strcmp(action, "tap"))) goto invalid;
+        if (gs->replay_event_count && frame < gs->replay_events[gs->replay_event_count - 1].frame)
+            goto invalid;
+        GameReplayEvent *event = &gs->replay_events[gs->replay_event_count++];
+        event->frame = (int)frame;
+        event->key = key;
+        memcpy(event->action, action, sizeof(event->action));
+    }
+    if (ferror(fp) || gs->replay_event_count == 0) goto invalid;
+    fclose(fp);
+    return 0;
+invalid:
+    fprintf(stderr, "Error: malformed, empty, oversized, or unsorted replay '%s'\n", replay_path);
+    fclose(fp);
+    game_replay_cleanup(gs);
+    return -1;
+}
+
+void game_replay_cleanup(GameState *gs)
+{
+    free(gs->replay_events);
+    gs->replay_events = NULL;
+    gs->replay_event_count = gs->replay_cursor = 0;
+}
+
 void game_replay_inject_events(GameState *gs)
 {
     gs->replay_input_mask = gs->replay_held_mask;
-    if (!gs->replay_script_path[0]) return;
-
-    const char *replay_path = replay_script_path(gs->replay_script_path);
-    if (!replay_path) {
-        fprintf(stderr, "Warning: unknown replay script '%s'\n",
-                gs->replay_script_path);
-        gs->replay_script_path[0] = '\0';
-        gs->replay_input_mask = 0;
-        gs->replay_held_mask = 0;
-        return;
+    if (!gs->replay_events) return;
+    while (gs->replay_cursor < gs->replay_event_count &&
+           gs->replay_events[gs->replay_cursor].frame == gs->replay_frame) {
+        const GameReplayEvent *event = &gs->replay_events[gs->replay_cursor++];
+        apply_replay_action(gs, event->key, event->action);
     }
-
-    FILE *fp = fopen(replay_path, "r");
-    if (!fp) {
-        fprintf(stderr, "Warning: could not open replay script '%s'\n",
-                replay_path);
-        gs->replay_script_path[0] = '\0';
-        gs->replay_input_mask = 0;
-        gs->replay_held_mask = 0;
-        return;
-    }
-
-    char line[160];
-    while (fgets(line, sizeof(line), fp)) {
-        int frame = -1;
-        char action[16] = {0};
-        char key_name[32] = {0};
-        if (line[0] == '#' || line[0] == '\n') continue;
-        if (sscanf(line, "%d %15s %31s", &frame, action, key_name) != 3) continue;
-        if (frame != gs->replay_frame) continue;
-
-        SDL_Keycode key = replay_keycode(key_name);
-        if (key == SDLK_UNKNOWN) continue;
-
-        apply_replay_action(gs, key, action);
-    }
-
-    fclose(fp);
     gs->replay_input_mask |= gs->replay_held_mask;
-    gs->replay_frame++;
+    if (gs->replay_frame < INT_MAX) gs->replay_frame++;
 }

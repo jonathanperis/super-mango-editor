@@ -21,6 +21,16 @@
 
 #include "tools.h"
 #include "editor.h"  /* EditorState, EntityType, Selection, EditorTool    */
+#include "editor_session.h" /* save-point dirty tracking */
+#include "../levels/level_loader.h"
+
+static int tools_can_hit_test(EditorState *es)
+{
+    char error[128];
+    if (level_validate_runtime(&es->level, error, sizeof(error)) == 0) return 1;
+    editor_set_status(es, "Correct properties or Undo: %s", error);
+    return 0;
+}
 #include "entity_meta.h" /* Editor display dimensions and rail helpers     */
 #include "undo.h"    /* Command, PlacementData, undo_push                 */
 #include "../game.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE, WORLD_W,
@@ -75,6 +85,10 @@ static void get_entity_pos(const LevelDef *level, EntityType type, int index,
     case ENT_FLOOR_GAP:
         *x = (float)level->floor_gaps[index];
         *y = (float)FLOOR_Y;
+        break;
+    case ENT_CHECKPOINT:
+        *x = level->checkpoints[index].x;
+        *y = level->checkpoints[index].y;
         break;
     case ENT_RAIL:
         *x = (float)level->rails[index].x;
@@ -232,6 +246,10 @@ static void set_entity_pos(LevelDef *level, EntityType type, int index,
     case ENT_FLOOR_GAP:
         level->floor_gaps[index] = (int)x;
         break;
+    case ENT_CHECKPOINT:
+        level->checkpoints[index].x = x;
+        level->checkpoints[index].y = y;
+        break;
     case ENT_RAIL:
         level->rails[index].x = (int)x;
         level->rails[index].y = (int)y;
@@ -347,39 +365,7 @@ static void set_entity_pos(LevelDef *level, EntityType type, int index,
  */
 static int get_count(const LevelDef *level, EntityType type)
 {
-    switch (type) {
-    case ENT_PLATFORM:         return level->platform_count;
-    case ENT_FLOOR_GAP:        return level->floor_gap_count;
-    case ENT_RAIL:             return level->rail_count;
-    case ENT_COIN:             return level->coin_count;
-    case ENT_STAR_YELLOW:      return level->star_yellow_count;
-    case ENT_STAR_GREEN:       return level->star_green_count;
-    case ENT_STAR_RED:         return level->star_red_count;
-    case ENT_LAST_STAR:        return 1; /* always exactly one */
-    case ENT_PLAYER_SPAWN:     return 1; /* always exactly one */
-    case ENT_SPIDER:           return level->spider_count;
-    case ENT_JUMPING_SPIDER:   return level->jumping_spider_count;
-    case ENT_BIRD:             return level->bird_count;
-    case ENT_FASTER_BIRD:      return level->faster_bird_count;
-    case ENT_FISH:             return level->fish_count;
-    case ENT_FASTER_FISH:      return level->faster_fish_count;
-    case ENT_AXE_TRAP:         return level->axe_trap_count;
-    case ENT_CIRCULAR_SAW:     return level->circular_saw_count;
-    case ENT_SPIKE_ROW:        return level->spike_row_count;
-    case ENT_SPIKE_PLATFORM:   return level->spike_platform_count;
-    case ENT_SPIKE_BLOCK:      return level->spike_block_count;
-    case ENT_BLUE_FLAME:       return level->blue_flame_count;
-    case ENT_FIRE_FLAME:       return level->fire_flame_count;
-    case ENT_FLOAT_PLATFORM:   return level->float_platform_count;
-    case ENT_BRIDGE:           return level->bridge_count;
-    case ENT_BOUNCEPAD_SMALL:  return level->bouncepad_small_count;
-    case ENT_BOUNCEPAD_MEDIUM: return level->bouncepad_medium_count;
-    case ENT_BOUNCEPAD_HIGH:   return level->bouncepad_high_count;
-    case ENT_VINE:             return level->vine_count;
-    case ENT_LADDER:           return level->ladder_count;
-    case ENT_ROPE:             return level->rope_count;
-    default:                   return 0;
-    }
+    return editor_entity_count(level, type);
 }
 
 /*
@@ -393,6 +379,7 @@ static int get_max_count(EntityType type)
     switch (type) {
     case ENT_PLATFORM:         return MAX_PLATFORMS;
     case ENT_FLOOR_GAP:        return MAX_FLOOR_GAPS;
+    case ENT_CHECKPOINT:       return MAX_CHECKPOINTS;
     case ENT_RAIL:             return MAX_RAILS;
     case ENT_COIN:             return MAX_COINS;
     case ENT_STAR_YELLOW:      return MAX_STAR_YELLOWS;
@@ -436,10 +423,13 @@ static int get_max_count(EntityType type)
  * The caller must ensure index is valid before calling.
  */
 static PlacementData snapshot_entity(const LevelDef *level, EntityType type,
-                                     int index)
+                                      int index)
 {
     PlacementData pd;
     memset(&pd, 0, sizeof(pd));
+
+    if (!level || index < 0 || index >= editor_entity_count(level, type))
+        return pd;
 
     switch (type) {
     case ENT_PLATFORM:
@@ -447,6 +437,9 @@ static PlacementData snapshot_entity(const LevelDef *level, EntityType type,
         break;
     case ENT_FLOOR_GAP:
         pd.floor_gap = level->floor_gaps[index];
+        break;
+    case ENT_CHECKPOINT:
+        pd.checkpoint = level->checkpoints[index];
         break;
     case ENT_RAIL:
         pd.rail = level->rails[index];
@@ -986,6 +979,19 @@ static Selection hit_test(const LevelDef *level, float wx, float wy)
         }
     }
 
+    /* Checkpoints are thin markers, but retain a forgiving hit target. */
+    for (int i = level->checkpoint_count - 1; i >= 0; i--) {
+        ex = level->checkpoints[i].x - 4.0f;
+        ey = level->checkpoints[i].y - 20.0f;
+        ew = 9;
+        eh = 24;
+        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
+            sel.type = ENT_CHECKPOINT;
+            sel.index = i;
+            return sel;
+        }
+    }
+
     return sel;  /* no hit — index stays -1 */
 }
 
@@ -1002,7 +1008,12 @@ static Selection hit_test(const LevelDef *level, float wx, float wy)
  */
 static void delete_entity(EditorState *es, EntityType type, int index)
 {
-    LevelDef *level = &es->level;
+    LevelDef *level;
+
+    if (!es) return;
+    level = &es->level;
+    if (index < 0 || index >= editor_entity_count(level, type))
+        return;
 
     /* Snapshot entity data before deletion for undo */
     PlacementData before = snapshot_entity(level, type, index);
@@ -1019,6 +1030,10 @@ static void delete_entity(EditorState *es, EntityType type, int index)
     case ENT_FLOOR_GAP:
         array_remove(level->floor_gaps, &level->floor_gap_count,
                      index, sizeof(int));
+        break;
+    case ENT_CHECKPOINT:
+        array_remove(level->checkpoints, &level->checkpoint_count,
+                     index, sizeof(CheckpointPlacement));
         break;
     case ENT_RAIL:
         array_remove(level->rails, &level->rail_count,
@@ -1154,7 +1169,9 @@ static void delete_entity(EditorState *es, EntityType type, int index)
     cmd.before       = before;
     undo_push(es->undo, cmd);
 
-    es->modified = 1;
+    editor_selection_after_remove(es, type, index);
+    editor_refresh_dirty(es);
+    if (type == ENT_CHECKPOINT) editor_set_status(es, "Checkpoint deleted");
 }
 
 /* ------------------------------------------------------------------ */
@@ -1172,6 +1189,8 @@ static void place_entity(EditorState *es, float world_x, float world_y)
     LevelDef *level = &es->level;
     EntityType type  = es->palette_type;
 
+    editor_selection_reconcile(es);
+
     /* Check capacity — every entity type has a fixed-size array */
     int count = get_count(level, type);
     int max   = get_max_count(type);
@@ -1187,6 +1206,10 @@ static void place_entity(EditorState *es, float world_x, float world_y)
      * in starting position, velocity, patrol bounds, and mode flags.
      */
     int new_index = count;
+    int singleton = (type == ENT_LAST_STAR || type == ENT_PLAYER_SPAWN);
+    PlacementData before;
+    memset(&before, 0, sizeof(before));
+    if (singleton) before = snapshot_entity(level, type, 0);
 
     switch (type) {
     case ENT_SPIDER: {
@@ -1483,6 +1506,12 @@ static void place_entity(EditorState *es, float world_x, float world_y)
         level->floor_gap_count++;
         break;
     }
+    case ENT_CHECKPOINT: {
+        CheckpointPlacement cp = { world_x, world_y };
+        level->checkpoints[new_index] = cp;
+        level->checkpoint_count++;
+        break;
+    }
     case ENT_RAIL: {
         RailPlacement rpl = {
             .layout  = RAIL_LAYOUT_RECT,
@@ -1504,19 +1533,21 @@ static void place_entity(EditorState *es, float world_x, float world_y)
      * Push CMD_PLACE to undo stack.
      * "after" holds the newly placed entity data so redo can re-insert it.
      */
-    PlacementData after = snapshot_entity(level, type, new_index);
+    PlacementData after = snapshot_entity(level, type, singleton ? 0 : new_index);
     Command cmd;
     memset(&cmd, 0, sizeof(cmd));
-    cmd.type         = CMD_PLACE;
+    cmd.type         = singleton ? CMD_MOVE : CMD_PLACE;
     cmd.entity_type  = (int)type;
-    cmd.entity_index = new_index;
+    cmd.entity_index = singleton ? 0 : new_index;
+    if (singleton) cmd.before = before;
     cmd.after        = after;
     undo_push(es->undo, cmd);
 
     /* Select the newly placed entity for immediate inspection */
     es->selection.type  = type;
-    es->selection.index = new_index;
-    es->modified        = 1;
+    es->selection.index = singleton ? 0 : new_index;
+    editor_refresh_dirty(es);
+    if (type == ENT_CHECKPOINT) editor_set_status(es, "Checkpoint placed");
 }
 
 /* ================================================================== */
@@ -1536,6 +1567,10 @@ static void place_entity(EditorState *es, float world_x, float world_y)
  */
 void tools_mouse_down(EditorState *es, float world_x, float world_y)
 {
+    if (!es) return;
+    if (!tools_can_hit_test(es)) return;
+    editor_selection_reconcile(es);
+
     switch (es->tool) {
 
     case TOOL_SELECT: {
@@ -1567,8 +1602,6 @@ void tools_mouse_down(EditorState *es, float world_x, float world_y)
         Selection hit = hit_test(&es->level, world_x, world_y);
         if (hit.index >= 0) {
             delete_entity(es, hit.type, hit.index);
-            /* Clear selection since the clicked entity is now gone */
-            es->selection.index = -1;
         }
         break;
     }
@@ -1591,10 +1624,15 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
     (void)world_x;
     (void)world_y;
 
-    if (!es->dragging) return;
+    if (!es || !es->dragging) return;
     es->dragging = 0;
 
-    if (es->selection.index < 0) return;
+    /* Drag coordinates are bounded, but a property edit may have invalidated
+     * structural geometry while the mouse button was held. */
+    if (level_validate_counts(&es->level, NULL, 0) != 0) return;
+
+    editor_selection_reconcile(es);
+    if (!editor_selection_is_valid(es)) return;
 
     /* Read the entity's final position after the drag */
     float end_x, end_y;
@@ -1634,7 +1672,9 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
     cmd.after        = after;
     undo_push(es->undo, cmd);
 
-    es->modified = 1;
+    editor_refresh_dirty(es);
+    if (es->selection.type == ENT_CHECKPOINT)
+        editor_set_status(es, "Checkpoint moved");
 }
 
 /* ------------------------------------------------------------------ */
@@ -1650,8 +1690,9 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
  */
 void tools_mouse_drag(EditorState *es, float world_x, float world_y)
 {
-    if (!es->dragging) return;
-    if (es->selection.index < 0) return;
+    if (!es || !es->dragging) return;
+    editor_selection_reconcile(es);
+    if (!editor_selection_is_valid(es)) return;
 
     float nx = world_x;
     float ny = world_y;
@@ -1691,15 +1732,13 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
  */
 void tools_right_click(EditorState *es, float world_x, float world_y)
 {
+    if (!es) return;
+    if (!tools_can_hit_test(es)) return;
+    editor_selection_reconcile(es);
     Selection hit = hit_test(&es->level, world_x, world_y);
     if (hit.index < 0) return;
 
     delete_entity(es, hit.type, hit.index);
-
-    /* If the deleted entity was selected, clear the selection */
-    if (es->selection.type == hit.type && es->selection.index == hit.index) {
-        es->selection.index = -1;
-    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1714,8 +1753,9 @@ void tools_right_click(EditorState *es, float world_x, float world_y)
  */
 void tools_delete_selected(EditorState *es)
 {
-    if (es->selection.index < 0) return;
+    if (!es) return;
+    editor_selection_reconcile(es);
+    if (!editor_selection_is_valid(es)) return;
 
     delete_entity(es, es->selection.type, es->selection.index);
-    es->selection.index = -1;
 }

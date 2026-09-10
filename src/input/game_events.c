@@ -6,24 +6,45 @@
 
 #include "../collision/collision_damage.h"
 #include "../core/game_overlay.h"
+#include "../core/game_terminal.h"
+#include "game_input.h"
+#include "../screens/settings_menu.h"
 
 #include <SDL.h>
 #include <SDL_mixer.h>
 
-static void continue_after_completion(GameState *gs)
+static int terminal_overlay(const GameState *gs)
 {
-    if (gs->completion.pending_next_phase) {
-        if (game_load_next_phase(gs) == 0) return;
-    }
-
-    gs->running = 0;
+    GameOverlayState overlay = game_overlay_state(gs);
+    return overlay == GAME_OVERLAY_LEVEL_COMPLETE ||
+           overlay == GAME_OVERLAY_GAME_OVER;
 }
 
-static void confirm_game_over(GameState *gs)
+static void request_terminal_action(GameState *gs, GameTerminalAction action)
 {
-    game_restart_after_game_over(gs);
-    Mix_ResumeMusic();
-    gs->loop.prev_ticks = SDL_GetTicks64();
+    if (!gs || gs->route != GAME_ROUTE_NONE) return;
+
+    if (action == GAME_TERMINAL_ACTION_RETRY) {
+        game_restart_after_game_over(gs);
+        Mix_ResumeMusic();
+        gs->loop.prev_ticks = SDL_GetTicks64();
+        game_input_arm_release_latch(gs, NULL);
+        return;
+    }
+
+    gs->route = game_terminal_action_route(action);
+}
+
+static void confirm_terminal(GameState *gs)
+{
+    request_terminal_action(gs, game_terminal_focused_action(gs));
+}
+
+static void move_terminal(GameState *gs, int direction)
+{
+    if (gs && gs->route == GAME_ROUTE_NONE) {
+        game_terminal_move(gs, direction);
+    }
 }
 
 static void handle_controller_removed(GameState *gs, const SDL_ControllerDeviceEvent *event)
@@ -33,6 +54,7 @@ static void handle_controller_removed(GameState *gs, const SDL_ControllerDeviceE
         if (SDL_JoystickInstanceID(joy) == event->which) {
             SDL_GameControllerClose(gs->controller);
             gs->controller = NULL;
+            game_input_clear_controller_latch(gs);
         }
     }
 }
@@ -76,35 +98,49 @@ void game_handle_events(GameState *gs)
 {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        int was_open = gs->settings_menu && gs->settings_menu->open;
+        if (gs->route == GAME_ROUTE_NONE && settings_menu_event(gs->settings_menu, gs->profile, &event,
+                                 terminal_overlay(gs) ? -1 : SDL_CONTROLLER_BUTTON_BACK)) {
+            if (was_open && !gs->settings_menu->open) {
+                GameInputPhysicalState inherited = {0};
+                if (event.type == SDL_CONTROLLERBUTTONDOWN &&
+                    (event.cbutton.button == SDL_CONTROLLER_BUTTON_A || event.cbutton.button == SDL_CONTROLLER_BUTTON_START))
+                    inherited.controller_mask = GAME_INPUT_CONFIRM;
+                game_input_arm_release_latch(gs, &inherited);
+            }
+            continue;
+        }
         if (event.type == SDL_QUIT) {
-            gs->running = 0;
+            if (gs->route == GAME_ROUTE_NONE) gs->route = GAME_ROUTE_EXIT;
 
         } else if (event.type == SDL_KEYDOWN) {
-            GameOverlayState overlay = game_overlay_state(gs);
             if (event.key.repeat) continue;
-            if (overlay == GAME_OVERLAY_LEVEL_COMPLETE) {
-                if (event.key.keysym.sym == SDLK_ESCAPE) {
-                    gs->running = 0;
+            if (terminal_overlay(gs)) {
+                if (event.key.keysym.sym == SDLK_UP ||
+                    event.key.keysym.sym == SDLK_w) {
+                    move_terminal(gs, -1);
+                } else if (event.key.keysym.sym == SDLK_DOWN ||
+                           event.key.keysym.sym == SDLK_s) {
+                    move_terminal(gs, 1);
+                } else if (event.key.keysym.sym == SDLK_ESCAPE) {
+                    request_terminal_action(gs, GAME_TERMINAL_ACTION_EXIT);
                 } else if (event.key.keysym.sym == SDLK_RETURN ||
+                            event.key.keysym.sym == SDLK_KP_ENTER ||
                            event.key.keysym.sym == SDLK_SPACE) {
-                    continue_after_completion(gs);
-                }
-            } else if (overlay == GAME_OVERLAY_GAME_OVER) {
-                if (event.key.keysym.sym == SDLK_ESCAPE) {
-                    gs->running = 0;
-                } else if (event.key.keysym.sym == SDLK_RETURN ||
-                           event.key.keysym.sym == SDLK_SPACE) {
-                    confirm_game_over(gs);
+                    confirm_terminal(gs);
                 }
             } else if (event.key.keysym.sym == SDLK_ESCAPE) {
                 toggle_player_pause(gs);
             } else if (event.key.keysym.sym == SDLK_RETURN ||
+                        event.key.keysym.sym == SDLK_KP_ENTER ||
                        event.key.keysym.sym == SDLK_SPACE) {
                 resume_player_pause(gs);
             }
 
         } else if (event.type == SDL_CONTROLLERDEVICEADDED) {
-            if (!gs->controller) {
+            if (!gs->controller && !gs->controller_init_pending &&
+                SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 0 &&
+                SDL_IsGameController(event.cdevice.which)) {
                 gs->controller = SDL_GameControllerOpen(event.cdevice.which);
             }
 
@@ -112,17 +148,20 @@ void game_handle_events(GameState *gs)
             handle_controller_removed(gs, &event.cdevice);
 
         } else if (event.type == SDL_CONTROLLERBUTTONDOWN) {
-            if (event.cbutton.button == SDL_CONTROLLER_BUTTON_BACK) {
-                GameOverlayState overlay = game_overlay_state(gs);
-                if (overlay == GAME_OVERLAY_LEVEL_COMPLETE ||
-                    overlay == GAME_OVERLAY_GAME_OVER) {
-                    gs->running = 0;
+            if (terminal_overlay(gs)) {
+                if (event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_UP) {
+                    move_terminal(gs, -1);
+                } else if (event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_DOWN) {
+                    move_terminal(gs, 1);
+                } else if (event.cbutton.button == SDL_CONTROLLER_BUTTON_BACK ||
+                           event.cbutton.button == SDL_CONTROLLER_BUTTON_B) {
+                    request_terminal_action(gs, GAME_TERMINAL_ACTION_EXIT);
+                } else if (event.cbutton.button == SDL_CONTROLLER_BUTTON_A ||
+                           event.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
+                    confirm_terminal(gs);
                 }
             } else if (event.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
-                GameOverlayState overlay = game_overlay_state(gs);
-                if (overlay == GAME_OVERLAY_LEVEL_COMPLETE) continue_after_completion(gs);
-                else if (overlay == GAME_OVERLAY_GAME_OVER) confirm_game_over(gs);
-                else toggle_player_pause(gs);
+                toggle_player_pause(gs);
             }
 
         } else if (event.type == SDL_WINDOWEVENT) {

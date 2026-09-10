@@ -81,15 +81,15 @@ static int detects_next_phase_presence(void)
     return 0;
 }
 
-static int truncates_path_safely(void)
+static int rejects_truncating_path(void)
 {
     LevelDef def = {0};
     char path[8] = {0};
     strncpy(def.next_phase, "levels/02_lugio_02.toml", sizeof(def.next_phase) - 1);
 
-    if (expect_int("truncate result", phase_next_path(&def, path, sizeof(path)), 0) != 0)
+    if (expect_int("truncate rejected", phase_next_path(&def, path, sizeof(path)), -1) != 0)
         return 1;
-    if (expect_str("truncated path", path, "levels/") != 0) return 1;
+    if (expect_str("path unchanged", path, "") != 0) return 1;
 
     return 0;
 }
@@ -164,7 +164,7 @@ int main(void)
     if (rejects_missing_next_phase() != 0) return 1;
     if (rejects_invalid_next_phase_args() != 0) return 1;
     if (detects_next_phase_presence() != 0) return 1;
-    if (truncates_path_safely() != 0) return 1;
+    if (rejects_truncating_path() != 0) return 1;
     if (preserves_progress_across_reload() != 0) return 1;
     if (ignores_null_progress_args() != 0) return 1;
 

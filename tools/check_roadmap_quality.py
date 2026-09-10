@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import importlib.util
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +23,18 @@ def read(path: Path) -> str:
 def load_docs_drift_module():
     module_path = ROOT / "tools" / "check_docs_drift.py"
     spec = importlib.util.spec_from_file_location("check_docs_drift_for_roadmap", module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not import {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_overlay_snapshot_module():
+    module_path = ROOT / "tools" / "generate_overlay_snapshots.py"
+    spec = importlib.util.spec_from_file_location(
+        "generate_overlay_snapshots_for_roadmap", module_path
+    )
     if spec is None or spec.loader is None:
         raise RuntimeError(f"could not import {module_path}")
     module = importlib.util.module_from_spec(spec)
@@ -55,13 +66,11 @@ def check_level_line_endings() -> None:
 
 
 def overlay_snapshot_tokens() -> list[str]:
-    source = read(ROOT / "src" / "render" / "render_overlay.c")
-    tokens = re.findall(r'render_centered_text\([^;]*?"([^"]+)"', source, re.S)
-    dynamic_titles = re.findall(r'\?\s*"([^"]+)"\s*:\s*"([^"]+)"', source)
-    for left, right in dynamic_titles:
-        tokens.extend([left, right])
-    tokens.extend(re.findall(r'snprintf\([^;]*?"([^"]+)"', source, re.S))
-    return sorted(set(tokens))
+    module = load_overlay_snapshot_module()
+    blocks = module.overlay_blocks()
+    for failure in module.validate_overlay_blocks(blocks):
+        fail(f"docs/wiki/overlay-snapshots.md: {failure}")
+    return sorted({token for tokens in blocks.values() for token in tokens})
 
 
 def check_overlay_snapshot_doc() -> None:

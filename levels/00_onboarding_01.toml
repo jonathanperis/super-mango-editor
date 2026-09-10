@@ -1,0 +1,104 @@
+format_version = 1
+name = "Forest First Steps"
+description = """
+Difficulty 1 - A quiet forest trail for first steps. Follow the coin trail to
+practice moving and hopping onto short grass ledges. One flame-marked gap makes
+the fall-and-recovery lesson clear before the final star opens the playground.
+"""
+screen_count = 2
+player_start_x = 48.0
+player_start_y = 205.0
+music_path = "assets/sounds/levels/water.wav"
+music_volume = 13
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+initial_hearts = 3
+initial_lives = 3
+score_per_life = 1000
+coin_score = 100
+floor_gaps = [352]
+
+[[checkpoints]]
+x = 304.0
+y = 205.0
+
+[[checkpoints]]
+x = 448.0
+y = 205.0
+
+[[platforms]]
+x = 176.0
+tile_height = 1
+tile_width = 2
+tile_path = "assets/sprites/levels/grass_platform.png"
+
+[[platforms]]
+x = 512.0
+tile_height = 1
+tile_width = 2
+tile_path = "assets/sprites/levels/grass_platform.png"
+
+[[platforms]]
+x = 704.0
+tile_height = 2
+tile_width = 2
+tile_path = "assets/sprites/levels/grass_platform.png"
+
+[[coins]]
+x = 96.0
+y = 236.0
+
+[[coins]]
+x = 136.0
+y = 236.0
+
+[[coins]]
+x = 200.0
+y = 204.0
+
+[[coins]]
+x = 248.0
+y = 204.0
+
+[[coins]]
+x = 304.0
+y = 236.0
+
+[[coins]]
+x = 416.0
+y = 236.0
+
+[[coins]]
+x = 464.0
+y = 236.0
+
+[[coins]]
+x = 528.0
+y = 204.0
+
+[[coins]]
+x = 576.0
+y = 204.0
+
+[[coins]]
+x = 640.0
+y = 236.0
+
+[last_star]
+x = 672.0
+y = 228.0
+next_phase = "levels/00_sandbox_01.toml"
+
+[[blue_flames]]
+x = 352.0
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/sky_blue.png"
+speed = 0.0
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/forest_leafs.png"
+speed = 0.05
+
+[[foreground_layers]]
+path = "assets/sprites/foregrounds/water.png"
+speed = 0.0
