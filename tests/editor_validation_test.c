@@ -2023,6 +2023,7 @@ static int invalid_drafts_do_not_build_unsafe_previews(void)
 
 int main(void)
 {
+    setvbuf(stdout, NULL, _IONBF, 0);
     ensure_out_dir();
     if (orphan_recovery_does_not_poison_discovery()) return 1;
     char binary_path[EDITOR_PATH_MAX];
