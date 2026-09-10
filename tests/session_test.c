@@ -1101,6 +1101,7 @@ int game_profile_contract_test(void);
 
 int main(void)
 {
+    setvbuf(stdout, NULL, _IONBF, 0);
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0) {
         fprintf(stderr, "session_test: SDL_Init failed: %s\n", SDL_GetError());
         return 1;
