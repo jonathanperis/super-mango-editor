@@ -12,6 +12,7 @@
 #include "core/game_timing.h"
 #include "core/game_update.h"
 #include "input/game_input.h"
+#include "input/game_web_input.h"
 #include "levels/level.h"
 #include "levels/level_session.h"
 #include "levels/level_loader.h"
@@ -546,9 +547,11 @@ static int repeated_menu_game_ownership(void)
     session->game->completion.complete = 1;
     session->game->completion.pending_next_phase = 0;
     session->game->terminal_action_index = 0;
+    if (!game_web_input_touch(GAME_TOUCH_RIGHT, 1)) return 1;
     if (push_key(SDLK_DOWN) != 0 || push_confirm() != 0) return 1;
     session_frame(session);
     if (expect_int("level select opens menu", session->screen, APP_SCREEN_MENU) != 0) return 1;
+    if (expect_int("level select clears touch holds", game_web_input_take_touch_mask(), 0) != 0) return 1;
     if (expect_int("game closes once", session->game_close_count, 1) != 0) return 1;
     if (expect_int("level-select controller stays active",
                    SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 0, 1) != 0)
@@ -951,6 +954,40 @@ fail:
     return 1;
 }
 
+static int pending_profile_keeps_exit_alive(void)
+{
+    AppSessionConfig config = {.level_path = "levels/00_onboarding_01.toml"};
+    AppSession *session = session_create(&config);
+    if (!session) return 1;
+    session->profile.pending_text = malloc(PROFILE_TEXT_MAX);
+    if (!session->profile.pending_text ||
+        game_profile_encode(&session->profile.data, session->profile.pending_text, PROFILE_TEXT_MAX)) {
+        session_destroy(&session);
+        return 1;
+    }
+    session->profile.pending_revision = session->profile.revision;
+    session->attempted_save_revision = session->profile.revision;
+    session->game->route = GAME_ROUTE_EXIT;
+    session->game->loop.prev_ticks = SDL_GetTicks64() - 100;
+    float elapsed = session->game->completion.level_elapsed;
+    session_frame(session);
+    if (expect_int("pending save retains session", session->ended, 0) ||
+        expect_int("pending save retains game", session->game_close_count, 0) ||
+        expect_float("pending exit freezes gameplay", session->game->completion.level_elapsed, elapsed)) {
+        session_destroy(&session);
+        return 1;
+    }
+    game_profile_finish_save(&session->profile, PROFILE_SAVE_OK);
+    session_frame(session);
+    int result = expect_int("committed exit completes", session->ended, 1) ||
+                 expect_int("committed exit closes once", session->game_close_count, 1);
+    session_destroy(&session);
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0 ||
+        !(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) || TTF_Init() != 0 ||
+        Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) != 0) return 1;
+    return result;
+}
+
 static int native_replay_keeps_session_ownership(void)
 {
     LifecycleProbe probe = {.store_result = 1};
@@ -1121,6 +1158,7 @@ int main(void)
     }
 
     if (game_profile_contract_test()) return 1;
+    if (pending_profile_keeps_exit_alive()) return 1;
     if (native_replay_keeps_session_ownership()) return 1;
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0 ||
         !(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) || TTF_Init() != 0 ||

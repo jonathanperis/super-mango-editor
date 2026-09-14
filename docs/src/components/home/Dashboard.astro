@@ -92,6 +92,7 @@ const manualGroups = [
             <span>WEBASSEMBLY BUILD</span>
             <strong>READY</strong>
         </div>
+        <div id="game-viewport" class="game-viewport">
         <div class="cabinet-bezel">
             <canvas
                 id="canvas"
@@ -105,10 +106,12 @@ const manualGroups = [
                 <button id="debug-btn" type="button" data-start-game="debug">Debug mode: hitboxes + FPS</button>
             </p>
         </div>
+        <div id="touch-controls"></div>
+        </div>
         <div class="cabinet-controls">
             <span class="control-group"><kbd>WASD</kbd> / <kbd>Arrows</kbd> Move</span>
             <span class="control-group"><kbd>Space</kbd> Jump</span>
-            <span class="control-note">Keyboard recommended · scroll resumes after the canvas loses focus</span>
+            <span class="control-note">Keyboard, gamepad, or touch · Tab leaves the game</span>
         </div>
         <div class="cabinet-base"></div>
     </div>
@@ -245,6 +248,7 @@ const manualGroups = [
     const statusEl = document.getElementById('game-status');
     const playBtn = document.getElementById('play-btn');
     const debugBtn = document.getElementById('debug-btn');
+    const gameViewport = document.getElementById('game-viewport');
     const statusMessage = statusEl?.querySelector('.cabinet-standby');
     const statusNote = statusEl?.querySelector('.cabinet-standby-note');
     const gameAssetBase = document.getElementById('play')?.dataset.assetBase || './';
@@ -253,6 +257,7 @@ const manualGroups = [
 
     let gameBooted = false;
     let reloadRequired = false;
+    let touchControls = null;
 
     function consumeReplayLevel() {
         try {
@@ -294,19 +299,24 @@ const manualGroups = [
         canvas.addEventListener('webglcontextlost', handleContextLoss, false);
 
         const handleKeyDown = (event) => {
-            // Gameplay keys are remappable. Preserve browser shortcuts and
-            // Tab navigation, but prevent focused game input from scrolling.
-            if (document.activeElement === canvas && !event.ctrlKey &&
-                !event.metaKey && event.code !== 'Tab') {
-                event.preventDefault();
+            if (document.activeElement !== canvas) return;
+            // Run before SDL's target listeners: leaving default handling to
+            // them would consume Tab and trap focus inside the canvas.
+            const modifierOnly = /^(Control|Meta)(Left|Right)$/.test(event.code);
+            if (event.code === 'Tab' || ((event.ctrlKey || event.metaKey) && !modifierOnly)) {
+                event.stopImmediatePropagation();
+                return;
             }
+            if (!event.ctrlKey && !event.metaKey) event.preventDefault();
         };
-        document.addEventListener('keydown', handleKeyDown, false);
+        document.addEventListener('keydown', handleKeyDown, true);
 
         function showFailure(message, needsReload) {
+            if (touchControls) touchControls.setEnabled(false);
             gameBooted = false;
             reloadRequired = needsReload;
-            document.removeEventListener('keydown', handleKeyDown);
+            canvas.setAttribute('aria-label', 'Super Mango game canvas - not running');
+            document.removeEventListener('keydown', handleKeyDown, true);
             canvas.removeEventListener('webglcontextlost', handleContextLoss);
             statusEl.style.display = '';
             if (statusMessage) statusMessage.textContent = message;
@@ -325,8 +335,9 @@ const manualGroups = [
                 console.error(`[Super Mango] ${text}`);
             },
             onAbort() { showFailure('Game startup failed. Reload to retry.', true); },
-            onGameEnded(fatal) {
-                showFailure(fatal ? 'Game ended with an error.' : 'Run ended. Play again?', true);
+            onGameEnded(fatal, profileError) {
+                showFailure(fatal ? 'Game ended with an error.' : profileError
+                    ? 'Run ended. Profile changes were not saved.' : 'Run ended. Play again?', true);
             },
             setStatus(text) {
                 if (!text) {
@@ -343,7 +354,14 @@ const manualGroups = [
                 }
             },
             onRuntimeInitialized() {
-                canvas.focus();
+                if (!touchControls) touchControls = window.SuperMangoTouch.mount(
+                    document.getElementById('touch-controls'), canvas,
+                    (action, pressed) => {
+                        if (pressed) gameViewport?.scrollIntoView({block: 'start', behavior: 'instant'});
+                        return moduleConfig._game_web_input_touch(action, pressed);
+                    });
+                moduleConfig.clearTouchInput = () => touchControls.clear();
+                canvas.focus({preventScroll: true});
                 moduleConfig.setStatus('');
                 window.setTimeout(() => {
                     if (moduleConfig.__superMangoMainStarted) return;
@@ -351,6 +369,11 @@ const manualGroups = [
                     try {
                         const code = moduleConfig.callMain(moduleConfig.arguments || []);
                         if (code) showFailure('Game startup failed. Reload to retry.', true);
+                        else {
+                            touchControls.setEnabled(true);
+                            canvas.setAttribute('aria-label', 'Super Mango game canvas - running; F1 opens settings');
+                            gameViewport?.scrollIntoView({block: 'start', behavior: 'instant'});
+                        }
                     } catch (error) {
                         console.error('[Super Mango] startup failed', error);
                         showFailure('Game startup failed. Reload to retry.', true);
@@ -364,6 +387,7 @@ const manualGroups = [
         const script = document.createElement('script');
         script.src = `${gameAssetBase}super-mango.js`;
         script.onerror = () => {
+            if (touchControls) { touchControls.destroy(); touchControls = null; }
             script.remove();
             showFailure('Failed to load game files. Retry the download.', false);
         };

@@ -5,6 +5,7 @@
  */
 
 #include "game_input.h"
+#include "game_web_input.h"
 
 #include <SDL.h>
 
@@ -95,6 +96,7 @@ void game_input_arm_release_latch(GameState *gs,
     GameInputPhysicalState current;
 
     if (!gs) return;
+    game_web_input_clear_touch();
     game_input_read_bound(gs->controller, gs->profile ? &gs->profile->data.settings : NULL, &current);
     gs->input_release_keyboard_mask = current.keyboard_mask;
     gs->input_release_controller_mask = current.controller_mask;

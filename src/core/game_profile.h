@@ -43,9 +43,13 @@ typedef struct GameProfile {
     char path[PROFILE_PATH_MAX];
     char status[160];
     char *baseline; /* exact loaded/saved bytes; NULL means no saved profile */
+    char *pending_text; /* owned snapshot until save completion/cancellation */
+    unsigned int pending_revision;
     int enabled, writable, dirty, error;
     unsigned int revision;
 } GameProfile;
+
+enum { PROFILE_SAVE_ERROR = -1, PROFILE_SAVE_OK = 0, PROFILE_SAVE_PENDING = 1 };
 
 void game_profile_init(GameProfile *profile);
 void game_profile_close(GameProfile *profile);
@@ -58,6 +62,10 @@ int game_profile_encode(const GameProfileData *data, char *text, size_t capacity
 /* Explicit path overrides native prefs. NULL uses SDL prefs / web localStorage. */
 int game_profile_open(GameProfile *profile, const char *path);
 int game_profile_save(GameProfile *profile);
+/* Poll asynchronous browser writes; native writes complete synchronously. */
+int game_profile_poll(GameProfile *profile);
+/* Complete the owned snapshot, preserving dirty state for newer edits. */
+int game_profile_finish_save(GameProfile *profile, int result);
 void game_profile_select(GameProfile *profile, const char *key);
 int game_profile_record(GameProfile *profile, const char *key, int score, int coins, float elapsed);
 const GameProgress *game_profile_result(const GameProfile *profile, const char *key);

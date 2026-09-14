@@ -57,6 +57,9 @@ def check_js_asset_references(js_path: Path) -> int:
     for basename in [f"{js_path.stem}.wasm", f"{js_path.stem}.data"]:
         if basename not in text:
             return fail(f"{js_path.relative_to(ROOT)} does not reference {basename}")
+    for interface in ["SuperMangoTouch", "_game_web_input_touch", "super-mango-profile-v2", "navigator.locks"]:
+        if interface not in text:
+            return fail(f"{js_path.relative_to(ROOT)} is missing host interface {interface}")
     return 0
 
 

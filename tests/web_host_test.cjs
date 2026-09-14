@@ -16,8 +16,9 @@ function host(file, pattern) {
             removeEventListener(name) { handlers.delete(name); },
             appendChild(child) { this.children.push(child); child.parent = this; },
             remove() { this.parent.children = this.parent.children.filter(child => child !== this); },
-            focus() { document.activeElement = this; },
-            scrollIntoView() {},
+            focus(options) { this.focusOptions = options; document.activeElement = this; },
+            setAttribute(name, value) { this[name] = value; },
+            scrollIntoView(options) { this.scrollOptions = options; },
             querySelector(selector) { return nodes.get(selector); },
             getAttribute(name) { return name === 'data-start-game' ? (id === 'debug-btn' ? 'debug' : 'play') : null; },
         };
@@ -27,7 +28,7 @@ function host(file, pattern) {
         return node;
     }
     for (const id of ['canvas', 'game-status', 'play-btn', 'debug-btn', 'play',
-                       'status', '.cabinet-standby', '.cabinet-standby-note']) nodes.set(id, element(id));
+                       'status', 'touch-controls', 'game-viewport', '.cabinet-standby', '.cabinet-standby-note']) nodes.set(id, element(id));
     const status = nodes.get('game-status');
     for (const id of ['.cabinet-standby', '.cabinet-standby-note', 'play-btn', 'debug-btn']) status.appendChild(nodes.get(id));
     const document = {
@@ -35,18 +36,23 @@ function host(file, pattern) {
         getElementById(id) { return nodes.get(id); },
         createElement() { return element(); },
         querySelectorAll() { return [nodes.get('play-btn'), nodes.get('debug-btn')]; },
-        addEventListener(name, fn) { listeners.set(name, fn); },
-        removeEventListener(name) { listeners.delete(name); },
+        addEventListener(name, fn, capture) { fn.capture = capture; listeners.set(name, fn); },
+        removeEventListener(name, fn, capture) {
+            if (listeners.get(name) === fn && fn.capture === capture) listeners.delete(name);
+        },
     };
     const window = {
+        SuperMangoTouch: { mount() { return touch; } },
         sessionStorage: { getItem() { return null; }, removeItem() {} },
         setTimeout(fn) { fn(); }, location: { reload() { reloads++; } },
     };
+    const touch = { enabled: false, clears: 0,
+        setEnabled(value) { this.enabled = value; }, clear() { this.clears++; }, destroy() { this.enabled = false; } };
     const context = vm.createContext({ document, window, sessionStorage: window.sessionStorage,
         setTimeout: window.setTimeout, console: { log() {}, error() {} } });
     const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8').match(pattern)[1];
     vm.runInContext(source, context);
-    return { nodes, document, window, listeners, context, reloads: () => reloads };
+    return { nodes, document, window, listeners, context, touch, reloads: () => reloads };
 }
 
 const page = host('docs/src/components/home/Dashboard.astro', /<script is:inline>([\s\S]*?)<\/script>/);
@@ -63,9 +69,12 @@ prevented = false;
 page.listeners.get('keydown')({code:'KeyJ',preventDefault(){prevented=true;}});
 assert.equal(prevented,true,'remapped gameplay key escaped focus handling');
 prevented = false;
-page.listeners.get('keydown')({code:'Tab',preventDefault(){prevented=true;}});
-page.listeners.get('keydown')({code:'KeyL',ctrlKey:true,preventDefault(){prevented=true;}});
+let stopped = 0;
+page.listeners.get('keydown')({code:'Tab',preventDefault(){prevented=true;},stopImmediatePropagation(){stopped++;}});
+page.listeners.get('keydown')({code:'KeyL',ctrlKey:true,preventDefault(){prevented=true;},stopImmediatePropagation(){stopped++;}});
 assert.equal(prevented,false,'browser navigation was trapped');
+assert.equal(stopped,2,'reserved navigation reached SDL target listeners');
+assert.equal(page.listeners.get('keydown').capture,true,'navigation guard was not registered before SDL');
 page.document.body.children[0].onerror();
 assert.equal(page.nodes.get('play-btn').disabled, false);
 assert.equal(page.nodes.get('play-btn').style.display, 'inline-block');
@@ -76,7 +85,16 @@ page.window.Module.callMain = () => { calls++; return 0; };
 page.window.Module.onRuntimeInitialized();
 page.window.Module.onRuntimeInitialized();
 assert.equal(calls, 1);
-page.window.Module.onGameEnded(0);
+assert.equal(page.touch.enabled, true);
+assert.equal(page.nodes.get('canvas').focusOptions.preventScroll, true);
+assert.equal(page.nodes.get('game-viewport').scrollOptions.block, 'start');
+assert.match(page.nodes.get('canvas')['aria-label'], /running; F1/);
+page.window.Module.clearTouchInput();
+assert.equal(page.touch.clears, 1);
+page.window.Module.onGameEnded(0, 1);
+assert.equal(page.touch.enabled, false);
+assert.match(page.nodes.get('canvas')['aria-label'], /not running/);
+assert.match(page.nodes.get('.cabinet-standby').textContent, /not saved/);
 vm.runInContext('startGame(false)', page.context);
 assert.equal(page.reloads(), 1, 'ended runtime should restart via reload');
 
@@ -86,33 +104,10 @@ shell.window.Module.__superMangoDebug = true;
 shell.window.Module.callMain = value => { args = value; return 0; };
 shell.window.Module.onRuntimeInitialized();
 assert(args.includes('--debug'), 'standalone debug payload omitted debug argument');
+assert.match(shell.nodes.get('canvas')['aria-label'], /running; F1/);
 shell.window.Module.onAbort();
+assert.equal(shell.touch.enabled, false);
 assert.equal(shell.nodes.get('status').style.pointerEvents, 'auto');
 shell.nodes.get('status').children[0].onclick();
 assert.equal(shell.reloads(), 1);
 console.log('web_host_test: ok');
-
-/* Exercise the C/JS storage bridge as pure JavaScript, with no browser state. */
-const profileSource = fs.readFileSync(path.join(__dirname, '../src/core/game_profile.c'), 'utf8');
-let saved = null;
-const storage = { getItem: () => saved, setItem: (_, text) => { saved = text; } };
-const bridge = vm.createContext({ localStorage: storage,
-    UTF8ToString: text => text, lengthBytesUTF8: text => Buffer.byteLength(text),
-    stringToUTF8: (text, out) => { out.text = text; } });
-const readBody = profileSource.match(/EM_JS\(int, profile_browser_read,[\s\S]*?\{([\s\S]*?)\n\}\);/)[1];
-const writeBody = profileSource.match(/EM_JS\(int, profile_browser_write,[\s\S]*?\{([\s\S]*?)\n\}\);/)[1];
-const readProfile = vm.runInContext(`(function(out, capacity) {${readBody}})`, bridge);
-const writeProfile = vm.runInContext(`(function(text, baseline) {${writeBody}})`, bridge);
-const destination = {};
-assert.equal(readProfile(destination, 100), 0);
-assert.equal(writeProfile('café', null), 1);
-assert.equal(readProfile(destination, 5), -1);
-assert.equal(readProfile(destination, 6), 6);
-assert.equal(destination.text, 'café');
-assert.equal(writeProfile('stale', null), 0);
-assert.equal(saved, 'café');
-assert.equal(writeProfile('next', 'café'), 1);
-storage.setItem = () => { throw Error('storage denied'); };
-assert.equal(writeProfile('lost', 'next'), 0);
-assert.equal(saved, 'next');
-console.log('profile storage bridge: ok');

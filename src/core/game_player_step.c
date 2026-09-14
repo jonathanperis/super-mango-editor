@@ -6,6 +6,7 @@
 
 #include "game_bouncepads.h"
 #include "../input/game_input.h"
+#include "../input/game_web_input.h"
 #include "../player/player.h"
 
 static Bouncepad s_all_pads[MAX_BOUNCEPADS_MEDIUM + MAX_BOUNCEPADS_SMALL +
@@ -18,7 +19,7 @@ int game_player_step(GameState *gs, float dt)
     int fp_landed_idx = -1;
 
     player_handle_input(&gs->player, gs->audio.jump, gs->controller,
-                        gs->replay_input_mask,
+                        gs->replay_input_mask | game_web_input_take_touch_mask(),
                         game_input_sample(gs),
                         gs->vines, gs->vine_count,
                         gs->ladders, gs->ladder_count,
