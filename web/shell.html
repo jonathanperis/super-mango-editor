@@ -17,12 +17,16 @@
         }
         #canvas-container {
             position: relative;
+            width: min(800px, 100%, max(184px, calc((100svh - 132px) * 4 / 3)));
             box-shadow: 0 20px 60px rgba(0,0,0,0.5);
         }
         canvas {
             display: block;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+            max-width: 100%;
+            height: auto;
+            touch-action: none;
         }
         #status {
             position: absolute;
@@ -50,7 +54,8 @@
 </head>
 <body>
     <div id="canvas-container">
-        <canvas id="canvas"></canvas>
+        <canvas id="canvas" role="application" aria-label="Super Mango game canvas - loading"></canvas>
+        <div id="touch-controls"></div>
         <div id="status">
             <div class="spinner"></div>
             <div>Loading Super Mango...</div>
@@ -60,11 +65,19 @@
     <script>
         (function() {
         var gameCanvas = document.getElementById('canvas');
+        var touchControls = null;
         document.addEventListener('keydown', function(event) {
-            if (document.activeElement === gameCanvas && !event.ctrlKey && !event.metaKey && event.code !== 'Tab')
-                event.preventDefault();
-        });
+            if (document.activeElement !== gameCanvas) return;
+            var modifierOnly = /^(Control|Meta)(Left|Right)$/.test(event.code);
+            if (event.code === 'Tab' || ((event.ctrlKey || event.metaKey) && !modifierOnly)) {
+                event.stopImmediatePropagation();
+                return;
+            }
+            if (!event.ctrlKey && !event.metaKey) event.preventDefault();
+        }, true);
         function showRestart(message) {
+            if (touchControls) touchControls.setEnabled(false);
+            gameCanvas.setAttribute('aria-label', 'Super Mango game canvas - not running');
             var status = document.getElementById('status');
             status.textContent = message + ' ';
             status.style.display = '';
@@ -79,12 +92,17 @@
         var moduleConfig = {
             canvas: document.getElementById('canvas'),
             onAbort: function() { showRestart('Game startup failed.'); },
-            onGameEnded: function(fatal) {
-                showRestart(fatal ? 'Game ended with an error.' : 'Run ended.');
+            onGameEnded: function(fatal, profileError) {
+                showRestart(fatal ? 'Game ended with an error.' : profileError
+                    ? 'Run ended. Profile changes were not saved.' : 'Run ended.');
             },
             onRuntimeInitialized: function() {
+                if (!touchControls) touchControls = window.SuperMangoTouch.mount(
+                    document.getElementById('touch-controls'), gameCanvas,
+                    function(action, pressed) { return moduleConfig._game_web_input_touch(action, pressed); });
+                moduleConfig.clearTouchInput = function() { touchControls.clear(); };
                 gameCanvas.tabIndex = 0;
-                gameCanvas.focus();
+                gameCanvas.focus({preventScroll: true});
                 var replayLevel = null;
                 try {
                     replayLevel = sessionStorage.getItem('super-mango-replay-level');
@@ -103,6 +121,10 @@
                     try {
                         var result = moduleConfig.callMain(moduleConfig.arguments || []);
                         if (result) showRestart('Game startup failed.');
+                        else {
+                            touchControls.setEnabled(true);
+                            gameCanvas.setAttribute('aria-label', 'Super Mango game canvas - running; F1 opens settings');
+                        }
                     } catch (error) {
                         console.error('Super Mango: startup failed', error);
                         showRestart('Game startup failed.');

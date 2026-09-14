@@ -93,6 +93,44 @@ fail:
     return 1;
 }
 
+static int pending_snapshot_bookkeeping(void)
+{
+    GameProfile *profile = calloc(1, sizeof(*profile));
+    CHECK(profile);
+    game_profile_init(profile);
+    profile->baseline = malloc(16);
+    profile->pending_text = malloc(16);
+    CHECK(profile->baseline && profile->pending_text);
+    strcpy(profile->baseline, "old");
+    strcpy(profile->pending_text, "snapshot");
+    char *snapshot = profile->pending_text;
+    profile->dirty = 1;
+    profile->revision = profile->pending_revision = 1;
+    CHECK(game_profile_poll(profile) == PROFILE_SAVE_PENDING);
+    profile->data.settings.music_volume = 64;
+    profile->revision++;
+    CHECK(game_profile_finish_save(profile, PROFILE_SAVE_OK) == PROFILE_SAVE_OK);
+    CHECK(profile->baseline == snapshot && !profile->pending_text && profile->dirty);
+    CHECK(profile->data.settings.music_volume == 64);
+    CHECK(game_profile_finish_save(profile, PROFILE_SAVE_OK) == PROFILE_SAVE_ERROR);
+    profile->pending_text = malloc(16);
+    CHECK(profile->pending_text);
+    strcpy(profile->pending_text, "failed");
+    CHECK(game_profile_finish_save(profile, PROFILE_SAVE_ERROR) == PROFILE_SAVE_ERROR);
+    CHECK(profile->baseline == snapshot && profile->dirty && profile->error);
+    profile->pending_text = malloc(16);
+    CHECK(profile->pending_text);
+    game_profile_close(profile);
+    CHECK(!profile->pending_text && !profile->baseline);
+    game_profile_close(profile);
+    free(profile);
+    return 0;
+fail:
+    if (profile) game_profile_close(profile);
+    free(profile);
+    return 1;
+}
+
 static int settings_and_bindings(void)
 {
     GameProfile *profile = calloc(1,sizeof(*profile));
@@ -200,6 +238,7 @@ int game_profile_contract_test(void)
 {
     puts("profile: codec/storage");
     if (codec_and_storage()) return 1;
+    if (pending_snapshot_bookkeeping()) return 1;
     puts("profile: settings/bindings");
     if (settings_and_bindings()) return 1;
     puts("profile: session integration");

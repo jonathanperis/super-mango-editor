@@ -76,3 +76,7 @@ node_modules/
 .slim/deepwork/
 .specs/
 .cache/
+playwright-evidence/
+.playwright-auth/
+# Task-only MCP observation created before its output path was normalized.
+/mango-boundaries-20260914-settings-initial.png

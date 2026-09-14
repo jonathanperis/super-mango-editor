@@ -126,6 +126,7 @@ TEST_PHASE_OBJ      = $(OBJDIR)/tests/test-phase-transition.o
 TEST_GAME_OVERLAY_OBJ = $(OBJDIR)/tests/test-game-overlay.o
 TEST_GAME_EVENTS_OBJ = $(OBJDIR)/tests/test-game-events.o
 TEST_GAME_INPUT_OBJ = $(OBJDIR)/tests/test-game-input.o
+TEST_WEB_INPUT_OBJ = $(OBJDIR)/tests/test-web-input.o
 TEST_BINDINGS_OBJ = $(OBJDIR)/tests/test-game-bindings.o
 TEST_SETTINGS_OBJ = $(OBJDIR)/tests/test-settings-menu.o
 TEST_GAME_TERMINAL_OBJ = $(OBJDIR)/src/core/game_terminal.o
@@ -246,6 +247,8 @@ validate-levels:
 web-host-contract:
 	python3 tools/check_web_boot_contract.py
 	$(NODE) tests/web_host_test.cjs
+	$(NODE) tests/profile_storage_test.cjs
+	$(NODE) tests/touch_controls_test.cjs
 	python3 tests/package_release_test.py
 
 # clangd / IDE compile database from the same flags make uses (sdl2-config).
@@ -406,6 +409,9 @@ $(TEST_HUD_OBJ): $(SRCDIR)/screens/hud.c
 $(TEST_GAME_INPUT_OBJ): $(SRCDIR)/input/game_input.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
+$(TEST_WEB_INPUT_OBJ): $(SRCDIR)/input/game_web_input.c
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
 $(TEST_BINDINGS_OBJ): $(SRCDIR)/input/game_bindings.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
@@ -508,7 +514,7 @@ $(OUTDIR)/gameplay-score-test: tests/gameplay_score_test.c $(TEST_GAME_SCORE_OBJ
 $(OUTDIR)/game-overlay-test: tests/game_overlay_test.c $(TEST_GAME_OVERLAY_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
-$(OUTDIR)/game-events-test: tests/game_events_test.c $(TEST_GAME_EVENTS_OBJ) $(TEST_GAME_INPUT_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_TERMINAL_OBJ) $(TEST_SETTINGS_OBJ) $(TEST_BINDINGS_OBJ) $(TEST_EDITOR_UI_OBJ)
+$(OUTDIR)/game-events-test: tests/game_events_test.c $(TEST_GAME_EVENTS_OBJ) $(TEST_GAME_INPUT_OBJ) $(TEST_WEB_INPUT_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_TERMINAL_OBJ) $(TEST_SETTINGS_OBJ) $(TEST_BINDINGS_OBJ) $(TEST_EDITOR_UI_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
 
 $(OUTDIR)/session-test: tests/session_test.c tests/game_profile_test.c $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
@@ -527,6 +533,7 @@ $(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS)): Makefile
 # SDL2 ports are compiled from source by Emscripten on first build;
 # subsequent builds reuse the cached port libraries.
 WEB_FLAGS = -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='["png"]' \
+            --pre-js web/touch-controls.js \
             -s USE_SDL_TTF=2 -s USE_SDL_MIXER=2 \
             -s SDL2_MIXER_FORMATS='["wav"]' \
             -s ALLOW_MEMORY_GROWTH=1 \

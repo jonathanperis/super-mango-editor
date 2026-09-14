@@ -35,8 +35,8 @@ EM_JS(void, session_browser_reload, (const char *level_path), {
     window.location.reload();
 });
 
-EM_JS(void, session_browser_ended, (int fatal), {
-    if (typeof Module.onGameEnded === "function") Module.onGameEnded(fatal);
+EM_JS(void, session_browser_ended, (int fatal, int profile_error), {
+    if (typeof Module.onGameEnded === "function") Module.onGameEnded(fatal, profile_error);
 });
 #endif
 
@@ -80,6 +80,7 @@ static void session_emit(AppSession *session, AppSessionLifecycleEvent event,
 
 static void session_flush_input(void)
 {
+    game_web_input_clear_touch();
     SDL_FlushEvents(SDL_KEYDOWN, SDL_KEYUP);
     SDL_FlushEvents(SDL_CONTROLLERBUTTONDOWN, SDL_CONTROLLERBUTTONUP);
     SDL_FlushEvents(SDL_CONTROLLERAXISMOTION, SDL_CONTROLLERAXISMOTION);
@@ -286,9 +287,14 @@ static void session_controller_cleanup(AppSession *session)
 static void session_runtime_cleanup(AppSession *session)
 {
     if (!session || session->runtime_cleaned) return;
-    if (session->profile.dirty && game_profile_save(&session->profile)) SDL_Log("%s", session->profile.status);
+#ifndef __EMSCRIPTEN__
+    /* Native saves are synchronous. Browser routes flush before teardown;
+     * starting an asynchronous save from a destructor would lose ownership. */
+    if (session->profile.dirty && game_profile_save(&session->profile) < 0) SDL_Log("%s", session->profile.status);
+#endif
     session->runtime_cleaned = 1;
     session->runtime_cleanup_count++;
+    game_web_input_clear_touch();
     session_controller_cleanup(session);
     Mix_HaltChannel(-1);
     Mix_CloseAudio();
@@ -351,6 +357,7 @@ static void session_profile_key(GameState *game, const char *source)
 
 static void session_apply_preferences(AppSession *session)
 {
+    if (game_profile_poll(&session->profile) < 0) SDL_Log("%s", session->profile.status);
     GameSettings *s = &session->profile.data.settings;
     SDL_Window *window = session->game ? session->game->window : session->menu ? session->menu->window : NULL;
     if (!session->settings.open &&
@@ -383,11 +390,23 @@ static void session_apply_preferences(AppSession *session)
         else if (!session->game || !session->game->paused) Mix_ResumeMusic();
         session->settings_were_open = session->settings.open;
     }
-    if (!session->settings.open && session->profile.dirty &&
+    if (!session->settings.open && !session->profile.pending_text && session->profile.dirty &&
         session->attempted_save_revision != session->profile.revision) {
         session->attempted_save_revision = session->profile.revision;
-        if (game_profile_save(&session->profile)) SDL_Log("%s", session->profile.status);
+        if (game_profile_save(&session->profile) < 0) SDL_Log("%s", session->profile.status);
     }
+}
+
+static int session_profile_ready_to_leave(AppSession *session)
+{
+    int result = game_profile_poll(&session->profile);
+    if (result == PROFILE_SAVE_PENDING) return 0;
+    if (session->profile.dirty && session->attempted_save_revision != session->profile.revision) {
+        session->attempted_save_revision = session->profile.revision;
+        result = game_profile_save(&session->profile);
+        if (result < 0) SDL_Log("%s", session->profile.status);
+    }
+    return result != PROFILE_SAVE_PENDING;
 }
 
 static GameState *session_make_game(AppSession *session, const char *path,
@@ -478,7 +497,7 @@ static void session_end(AppSession *session, int fatal)
     session->ended = 1;
     session_runtime_cleanup(session);
 #ifdef __EMSCRIPTEN__
-    session_browser_ended(fatal);
+    session_browser_ended(fatal, session->profile.error);
 #endif
 }
 
@@ -490,6 +509,7 @@ static void session_apply_menu_route(AppSession *session)
     if (!session || !session->menu || session_controller_worker_running(session)) return;
     route = session->menu->route;
     if (route == MENU_ROUTE_NONE) return;
+    if (route == MENU_ROUTE_EXIT && !session_profile_ready_to_leave(session)) return;
 
     if (route == MENU_ROUTE_PLAY) {
         GameInputPhysicalState inherited;
@@ -595,6 +615,16 @@ static int session_apply_game_route(AppSession *session, int callback_owned)
     }
     if (route == GAME_ROUTE_NONE) return 0;
     if (session_controller_worker_running(session)) return 0;
+    if ((route == GAME_ROUTE_EXIT || route == GAME_ROUTE_REPLAY) &&
+        !session_profile_ready_to_leave(session)) return 0;
+    if (route == GAME_ROUTE_REPLAY && callback_owned && session->profile.enabled &&
+        session->profile.writable && session->profile.error && session->profile.dirty) {
+        copy_path(session->profile.status, sizeof(session->profile.status),
+                  "Replay blocked: profile not saved. Use Level Select or Exit.");
+        session->game->route = GAME_ROUTE_NONE;
+        session->route = APP_ROUTE_NONE;
+        return 0;
+    }
     session->game->route = GAME_ROUTE_NONE;
 
     switch (route) {
@@ -727,7 +757,7 @@ static void session_step(AppSession *session, int callback_owned)
         StartMenu *menu = session->menu;
 
         if (menu) {
-            menu->route_waiting_render = session_controller_worker_running(session);
+            menu->route_waiting_render = session_controller_worker_running(session) || session->profile.pending_text != NULL;
         }
         frame_presented = start_menu_frame(menu);
         if (menu) menu->route_waiting_render = 0;

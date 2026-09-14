@@ -4,6 +4,35 @@
 
 static const char *const actions[PROFILE_ACTION_COUNT] = {"Left", "Right", "Up", "Down", "Jump", "Run"};
 
+static void shorten_utf8(char *text)
+{
+    size_t size = strlen(text);
+    if (!size) return;
+    do { size--; } while (size && ((unsigned char)text[size] & 0xc0) == 0x80);
+    text[size] = '\0';
+}
+
+static void render_status(UIState *ui, const char *text)
+{
+    for (int row = 0; row < 2 && *text; row++) {
+        char line[160];
+        SDL_utf8strlcpy(line, text, sizeof(line));
+        while (line[0] && ui_text_width(ui, line) > 364) shorten_utf8(line);
+        size_t consumed = strlen(line);
+        if (row == 0 && text[consumed]) {
+            char *space = strrchr(line, ' ');
+            if (space && space != line) { *space = '\0'; consumed = (size_t)(space - line); }
+        } else if (row == 1 && text[consumed]) {
+            while (line[0] && (strlen(line) + 3 >= sizeof(line) ||
+                   ui_text_width(ui, line) + ui_text_width(ui, "...") > 364)) shorten_utf8(line);
+            strcat(line, "...");
+        }
+        ui_label_color(ui, 18, 265 + row * 15, line, (SDL_Color){255,190,90,255});
+        text += consumed;
+        while (*text == ' ') text++;
+    }
+}
+
 static void changed(GameProfile *profile)
 {
     profile->dirty = 1;
@@ -98,13 +127,13 @@ int settings_menu_event(SettingsMenu *menu, GameProfile *profile,
 void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
                            SDL_Renderer *renderer, TTF_Font *font)
 {
-    if (!menu || !profile || (!menu->open && !profile->error)) return;
+    if (!menu || !profile || (!menu->open && !profile->error && !profile->pending_text)) return;
     if (menu->ui.renderer != renderer || menu->ui.font != font) ui_init(&menu->ui, renderer, font);
     if (!menu->open) {
         SDL_Rect warning = {8,278,384,18};
         SDL_SetRenderDrawColor(renderer, 10, 12, 18, 255); SDL_RenderFillRect(renderer,&warning);
-        char message[64]; SDL_utf8strlcpy(message,profile->status,sizeof(message));
-        ui_label_color(&menu->ui,12,281,message,(SDL_Color){255,190,90,255});
+        ui_label_color(&menu->ui,12,281,profile->error ? "Profile issue - F1: details" : "Saving profile...",
+                       (SDL_Color){255,190,90,255});
         return;
     }
     SDL_SetRenderDrawColor(renderer, 10, 12, 18, 255);
@@ -139,13 +168,12 @@ void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
         }
         ui_label(&menu->ui, 20, y, label);
     }
-    ui_label(&menu->ui, 18, 249, menu->capture ? "Press a new binding. Esc cancels." : "Arrows/D-pad: choose/change. Enter/A: select.");
-    ui_label(&menu->ui, 18, 265, "Esc/B: close. Arrow keys stay available in game.");
     const char *status = menu->message[0] ? menu->message : profile->status;
+    ui_label(&menu->ui, 18, 249, menu->capture ? "Press a new binding. Esc cancels." :
+             status[0] ? "Esc/B: close. Arrows: choose. Enter/A: select." : "Arrows/D-pad: choose/change. Enter/A: select.");
     if (status[0]) {
-        char clipped[64]; SDL_utf8strlcpy(clipped, status, sizeof(clipped));
-        ui_label_color(&menu->ui, 18, 280, clipped, (SDL_Color){255,190,90,255});
-    }
+        render_status(&menu->ui, status);
+    } else ui_label(&menu->ui, 18, 265, "Esc/B: close. Arrow keys stay available in game.");
 }
 
 void settings_menu_cleanup(SettingsMenu *menu)

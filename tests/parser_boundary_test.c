@@ -5,6 +5,8 @@
 #include "tomlc17.h"
 
 static size_t live_allocations;
+static size_t allocation_calls;
+static size_t fail_allocation = SIZE_MAX;
 
 static void counted_free(void *pointer)
 {
@@ -15,6 +17,7 @@ static void counted_free(void *pointer)
 static void *counted_realloc(void *pointer, size_t size)
 {
     if (!size) { counted_free(pointer); return NULL; }
+    if (allocation_calls++ == fail_allocation) return NULL;
     int fresh = pointer == NULL;
     void *result = realloc(pointer, size);
     if (result && fresh) live_allocations++;
@@ -74,6 +77,61 @@ static int parser_cases(void)
     return 0;
 }
 
+static int allocation_failure_case(int merge, size_t fail, size_t *calls)
+{
+    const char *left = "section={before=1,items=[{id=1}],name=\"café\"}";
+    const char *right = "section={after=2,items=[{id=2}]}";
+    toml_result_t a = {0}, b = {0};
+    fail_allocation = SIZE_MAX;
+    if (merge) {
+        a = toml_parse(left, (int)strlen(left));
+        b = toml_parse(right, (int)strlen(right));
+        if (!a.ok || !b.ok) { toml_free(a); toml_free(b); return 1; }
+    }
+    allocation_calls = 0;
+    fail_allocation = fail;
+    toml_result_t result = merge ? toml_merge(&a, &b) : toml_parse(left, (int)strlen(left));
+    *calls = allocation_calls;
+    fail_allocation = SIZE_MAX;
+    int bad = fail == SIZE_MAX && !result.ok;
+    if (result.ok) {
+        toml_datum_t before = toml_seek(result.toptab, "section.before");
+        toml_datum_t items = toml_seek(result.toptab, "section.items");
+        toml_datum_t name = toml_seek(result.toptab, "section.name");
+        bad |= before.type != TOML_INT64 || before.u.int64 != 1 || items.type != TOML_ARRAY ||
+               items.u.arr.size != (merge ? 2 : 1) || name.type != TOML_STRING || strcmp(name.u.str.ptr, "café");
+        if (merge) {
+            toml_datum_t after = toml_seek(result.toptab, "section.after");
+            bad |= after.type != TOML_INT64 || after.u.int64 != 2;
+        }
+    }
+    toml_free(result);
+    toml_free(a);
+    toml_free(b);
+    if (bad || live_allocations) {
+        fprintf(stderr, "parser allocation case merge=%d fail=%zu: bad=%d live=%zu\n",
+                merge, fail, bad, live_allocations);
+        return 1;
+    }
+    return 0;
+}
+
+static int allocation_failure_sweep(void)
+{
+    size_t total = 0;
+    for (int merge = 0; merge < 2; merge++) {
+        size_t calls;
+        if (allocation_failure_case(merge, SIZE_MAX, &calls)) return 1;
+        for (size_t fail = 0; fail < calls; fail++) {
+            size_t attempted;
+            if (allocation_failure_case(merge, fail, &attempted)) return 1;
+            total++;
+        }
+    }
+    printf("parser allocation sweep: %zu failure points checked\n", total);
+    return 0;
+}
+
 int parser_boundary_test(void)
 {
     toml_option_t options = toml_default_option();
@@ -82,6 +140,7 @@ int parser_boundary_test(void)
     live_allocations = 0;
     toml_set_option(options);
     int result = parser_cases();
+    if (!result) result = allocation_failure_sweep();
     toml_set_option(toml_default_option());
     if (live_allocations) {
         fprintf(stderr, "parser leaked %zu allocations\n", live_allocations);

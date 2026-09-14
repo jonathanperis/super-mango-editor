@@ -10,6 +10,7 @@
 #include "../input/game_events.h"
 #include "../input/game_input.h"
 #include "../input/game_replay.h"
+#include "../input/game_web_input.h"
 #include "../render/game_render.h"
 #include "../screens/settings_menu.h"
 
@@ -38,8 +39,13 @@ int game_frame(GameState *gs)
      * Skip physics and game logic while an overlay is showing. Rendering still
      * runs so the last visible frame remains on screen and in OS thumbnails.
      */
-    if (!game_overlay_blocks_update(gs) && !(gs->settings_menu && gs->settings_menu->open)) {
+    if (gs->running && gs->route == GAME_ROUTE_NONE &&
+        !game_overlay_blocks_update(gs) && !(gs->settings_menu && gs->settings_menu->open)) {
         cam_x = game_update_active(gs, dt, cam_x);
+    } else {
+        /* Do not replay taps made while a pause/settings/terminal screen owns
+         * input. Still-held movement remains available when resuming. */
+        (void)game_web_input_take_touch_mask();
     }
 
     /* ---- 3. Render ----------------------------------------------- */

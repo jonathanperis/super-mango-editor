@@ -531,6 +531,24 @@ a:hover { color: var(--green); }
     z-index: 10;
 }
 
+/* Keep the entire game and its two control rows below the fixed navigation.
+ * Canvas size stays proportional to the engine's 400x300 logical viewport. */
+.game-viewport {
+    width: min(100%, 824px, max(184px, calc((100svh - 240px) * 4 / 3 + 24px)));
+    margin-inline: auto;
+    scroll-margin-top: 96px;
+}
+.game-viewport .cabinet-bezel { padding: 8px; border-width: 4px; }
+.game-viewport #canvas { width: 100%; height: auto; touch-action: none; }
+.game-viewport #touch-controls { padding-inline: 12px; }
+@media (max-width: 600px) {
+    /* Spend narrow-screen width on the game, not ornamental cabinet padding. */
+    #play.cabinet-bay { max-width: 100%; padding-inline: 8px; }
+    .cabinet-bay .cabinet-frame { padding: 8px 4px; border-width: 2px; }
+    .cabinet-bay .cabinet-bezel { padding: 0; border-width: 2px; }
+    .cabinet-bay #touch-controls { padding-inline: 2px; }
+}
+
 #game-status {
     position: absolute;
     top: 50%;

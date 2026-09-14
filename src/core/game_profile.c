@@ -28,21 +28,64 @@ typedef int ProfileLock;
 #include <emscripten.h>
 EM_JS(int, profile_browser_read, (char *out, int capacity), {
     try {
-        const text = localStorage.getItem('super-mango-profile-v1');
+        const current = localStorage.getItem('super-mango-profile-v2');
+        const text = current === null ? localStorage.getItem('super-mango-profile-v1') : current;
         if (text === null) return 0;
+        if (text.includes('\0')) return -1;
         const size = lengthBytesUTF8(text);
         if (size >= capacity) return -1;
         stringToUTF8(text, out, capacity);
         return size + 1;
     } catch (_) { return -1; }
 });
-EM_JS(int, profile_browser_write, (const char *text, const char *baseline), {
+EM_JS(int, profile_browser_begin_write, (const char *text, const char *baseline), {
+    if (typeof navigator === 'undefined' || !navigator.locks ||
+        typeof navigator.locks.request !== 'function' || typeof AbortController === 'undefined') return -1;
+    if (Module.__mangoProfileWrite && Module.__mangoProfileWrite.status === 1) return -1;
+    // Copy bytes now. Asynchronous work must never retain pointers into C memory.
+    const value = UTF8ToString(text);
+    const expected = baseline ? UTF8ToString(baseline) : null;
+    const operation = { status: 1, controller: new AbortController(), deadline: Date.now() + 5000 };
+    Module.__mangoProfileWrite = operation;
+    const timer = setTimeout(function() {
+        if (operation.status === 1) {
+            operation.status = -1;
+            operation.controller.abort();
+        }
+    }, 5000);
     try {
-        const expected = baseline ? UTF8ToString(baseline) : null;
-        if (localStorage.getItem('super-mango-profile-v1') !== expected) return 0;
-        localStorage.setItem('super-mango-profile-v1', UTF8ToString(text));
+        navigator.locks.request('super-mango-profile-v2', { signal: operation.controller.signal }, function() {
+            if (operation.status !== 1) return;
+            if (Date.now() >= operation.deadline) { operation.status = -1; return; }
+            const saved = localStorage.getItem('super-mango-profile-v2');
+            const current = saved === null ? localStorage.getItem('super-mango-profile-v1') : saved;
+            if (current !== expected) { operation.status = -1; return; }
+            localStorage.setItem('super-mango-profile-v2', value);
+            operation.status = 2; // confirmed commit, not merely a queued request
+        }).catch(function() {
+            if (operation.status === 1) operation.status = -1;
+        }).finally(function() { clearTimeout(timer); });
         return 1;
-    } catch (_) { return 0; }
+    } catch (_) {
+        clearTimeout(timer);
+        operation.status = -1;
+        return -1;
+    }
+});
+EM_JS(int, profile_browser_poll_write, (void), {
+    const operation = Module.__mangoProfileWrite;
+    if (!operation) return -1;
+    const status = operation.status;
+    if (status !== 1) Module.__mangoProfileWrite = null;
+    return status;
+});
+EM_JS(void, profile_browser_cancel_write, (void), {
+    const operation = Module.__mangoProfileWrite;
+    if (operation && operation.status === 1) {
+        operation.status = -1;
+        operation.controller.abort();
+    }
+    Module.__mangoProfileWrite = null;
 });
 #endif
 
@@ -54,6 +97,11 @@ void game_profile_init(GameProfile *profile)
 
 void game_profile_close(GameProfile *profile)
 {
+#ifdef __EMSCRIPTEN__
+    if (profile->pending_text) profile_browser_cancel_write();
+#endif
+    free(profile->pending_text);
+    profile->pending_text = NULL;
     free(profile->baseline);
     profile->baseline = NULL;
 }
@@ -303,6 +351,7 @@ int game_profile_open(GameProfile *profile, const char *path)
 
 int game_profile_save(GameProfile *profile)
 {
+    if (profile->pending_text) return PROFILE_SAVE_PENDING;
     if (!profile->enabled) return 0;
     if (!profile->writable) return -1;
     char *text = malloc(PROFILE_TEXT_MAX);
@@ -312,8 +361,18 @@ int game_profile_save(GameProfile *profile)
         return -1;
     }
     int result = game_profile_encode(&profile->data, text, PROFILE_TEXT_MAX);
+    profile->pending_text = text;
+    profile->pending_revision = profile->revision;
 #ifdef __EMSCRIPTEN__
-    if (!result && !profile_browser_write(text, profile->baseline)) result = -1;
+    if (result) return game_profile_finish_save(profile, PROFILE_SAVE_ERROR);
+    if (profile_browser_begin_write(text, profile->baseline) < 0) {
+        game_profile_finish_save(profile, PROFILE_SAVE_ERROR);
+        profile->writable = 0;
+        snprintf(profile->status, sizeof(profile->status), "Browser saving requires Web Locks in a secure supported browser.");
+        return PROFILE_SAVE_ERROR;
+    }
+    snprintf(profile->status, sizeof(profile->status), "Saving profile...");
+    return PROFILE_SAVE_PENDING;
 #else
     char temporary[SERIALIZER_IO_PATH_MAX] = "";
     ProfileLock lock = result ? PROFILE_LOCK_INVALID : lock_profile(profile->path);
@@ -334,8 +393,16 @@ int game_profile_save(GameProfile *profile)
     }
     serializer_remove_temp(temporary);
     unlock_profile(lock);
+    return game_profile_finish_save(profile, result);
 #endif
-    if (result) {
+}
+
+int game_profile_finish_save(GameProfile *profile, int result)
+{
+    if (!profile->pending_text) return PROFILE_SAVE_ERROR;
+    char *text = profile->pending_text;
+    profile->pending_text = NULL;
+    if (result != PROFILE_SAVE_OK) {
         free(text);
         profile->error = 1;
         snprintf(profile->status, sizeof(profile->status), "Profile save failed/changed elsewhere; existing file preserved.");
@@ -343,10 +410,21 @@ int game_profile_save(GameProfile *profile)
     }
     free(profile->baseline);
     profile->baseline = text;
-    profile->dirty = 0;
+    profile->dirty = profile->revision != profile->pending_revision;
     profile->error = 0;
     profile->status[0] = '\0';
     return 0;
+}
+
+int game_profile_poll(GameProfile *profile)
+{
+    if (!profile->pending_text) return PROFILE_SAVE_OK;
+#ifdef __EMSCRIPTEN__
+    int status = profile_browser_poll_write();
+    if (status != 1)
+        return game_profile_finish_save(profile, status == 2 ? PROFILE_SAVE_OK : PROFILE_SAVE_ERROR);
+#endif
+    return PROFILE_SAVE_PENDING;
 }
 
 void game_profile_select(GameProfile *profile, const char *key)
