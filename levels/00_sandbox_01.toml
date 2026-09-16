@@ -1,14 +1,10 @@
 format_version = 1
 name = "Creator's Playground"
-description = """
-The original sandbox — four screens of everything the engine can throw
-at you. Platforms, gaps, every enemy type, every hazard, every surface.
-This is where you learn to play, and where the engine proves it works.
-"""
+description = "The original sandbox — four screens of everything the engine can throw\nat you. Platforms, gaps, every enemy type, every hazard, every surface.\nThis is where you learn to play, and where the engine proves it works.\n"
 generated_by = "Jonathanperis and Fersantos, the Authors."
 screen_count = 4
-player_start_x = 79.0
-player_start_y = 172.0
+player_start_x = 80.0
+player_start_y = 123.5
 music_path = "assets/sounds/levels/water.wav"
 music_volume = 13
 floor_tile_path = "assets/sprites/levels/grass_tileset.png"
@@ -16,7 +12,7 @@ initial_hearts = 3
 initial_lives = 3
 score_per_life = 1000
 coin_score = 100
-floor_gaps = [0, 192, 560, 928, 1152, 1528]
+floor_gaps = [0, 192, 560, 928, 1152]
 
 [physics]
 walk_max_speed       = -1.0
@@ -104,10 +100,6 @@ x = 170.0
 y = 236.0
 
 [[coins]]
-x = 368.0
-y = 236.0
-
-[[coins]]
 x = 272.0
 y = 108.0
 
@@ -118,10 +110,6 @@ y = 236.0
 [[coins]]
 x = 595.0
 y = 236.0
-
-[[coins]]
-x = 880.0
-y = 156.0
 
 [[coins]]
 x = 468.0
@@ -263,15 +251,6 @@ patrol_x0 = 1350.0
 patrol_x1 = 1446.0
 direction = 1
 
-[[spike_rows]]
-x = 1360.0
-count = 4
-
-[[spike_platforms]]
-x = 520.0
-y = 200.0
-tile_count = 3
-
 [[spike_blocks]]
 rail_index = 0
 t_offset = 0.0
@@ -299,9 +278,6 @@ x = 928.0
 [[blue_flames]]
 x = 1152.0
 
-[[blue_flames]]
-x = 1528.0
-
 [[float_platforms]]
 mode = "STATIC"
 x = 172.0
@@ -325,18 +301,18 @@ x = 1350.0
 y = 172.0
 brick_count = 8
 
-[[bouncepads_medium]]
-x = 734.0
-launch_vy = -536.2
-pad_type = "WOOD"
-
 [[bouncepads_small]]
-x = 310.0
+x = 312.0
 launch_vy = -380.0
 pad_type = "GREEN"
 
+[[bouncepads_medium]]
+x = 743.5
+launch_vy = -536.200012
+pad_type = "WOOD"
+
 [[bouncepads_high]]
-x = 1420.0
+x = 1426.0
 launch_vy = -700.0
 pad_type = "RED"
 
@@ -381,23 +357,23 @@ speed = 0.0
 
 [[background_layers]]
 path = "assets/sprites/backgrounds/clouds_bg.png"
-speed = 0.1
+speed = 0.100000001
 
 [[background_layers]]
 path = "assets/sprites/backgrounds/glacial_mountains.png"
-speed = 0.2
+speed = 0.200000003
 
 [[background_layers]]
 path = "assets/sprites/backgrounds/clouds_mg_3.png"
-speed = 0.3
+speed = 0.300000012
 
 [[background_layers]]
 path = "assets/sprites/backgrounds/clouds_mg_2.png"
-speed = 0.4
+speed = 0.400000006
 
 [[background_layers]]
 path = "assets/sprites/backgrounds/clouds_lonely.png"
-speed = 0.4
+speed = 0.400000006
 
 [[background_layers]]
 path = "assets/sprites/backgrounds/clouds_mg_1.png"
@@ -405,8 +381,9 @@ speed = 0.5
 
 [[foreground_layers]]
 path = "assets/sprites/foregrounds/fog_1.png"
-speed = 0.6
+speed = 0.600000024
 
 [[foreground_layers]]
 path = "assets/sprites/foregrounds/water.png"
 speed = 0.0
+

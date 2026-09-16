@@ -1,21 +1,10 @@
 format_version = 1
 name = "Volcanic Depths 1"
-description = """
-Difficulty 4 - The mountain opened its throat and swallowed the sky.
-Eight screens of molten stone, choking smoke, and fire that never rests.
-Every gap belches flame. Every platform floats above a river of lava.
-The smoke rolls thick — you won't see the spiders until they're on you.
-This is the forge where platformers are made or broken. Survive the
-depths, reach the star, and earn the right to say you walked through
-fire.
-
-This is the first level in the Volcanic Depths series. The path
-continues deeper 
-"""
+description = "Difficulty 4 - The mountain opened its throat and swallowed the sky.\nEight screens of molten stone, choking smoke, and fire that never rests.\nEvery gap belches flame. Every platform floats above a river of lava.\nThe smoke rolls thick — you won't see the spiders until they're on you.\nThis is the forge where platformers are made or broken. Survive the\ndepths, reach the star, and earn the right to say you walked through\nfire.\n\nThis is the first level in the Volcanic Depths series. The path\ncontinues deeper \n"
 generated_by = "Lugio, the Creator."
 screen_count = 8
-player_start_x = 80.0
-player_start_y = 172.0
+player_start_x = 79.5
+player_start_y = 122.5
 music_path = "assets/sounds/levels/lava.wav"
 music_volume = 15
 floor_tile_path = "assets/sprites/levels/stone_tileset.png"
@@ -40,16 +29,16 @@ cam_lookahead_max    = -1.0
 
 [[rails]]
 layout = "RECT"
-x = 1700
-y = 40
+x = 1808
+y = 80
 w = 8
 h = 5
 end_cap = 0
 
 [[rails]]
 layout = "HORIZ"
-x = 2500
-y = 100
+x = 2351
+y = 174
 w = 12
 h = 0
 end_cap = 0
@@ -67,19 +56,7 @@ tile_width = 1
 tile_path = "assets/sprites/levels/stone_platform.png"
 
 [[platforms]]
-x = 450.0
-tile_height = 2
-tile_width = 1
-tile_path = "assets/sprites/levels/stone_platform.png"
-
-[[platforms]]
 x = 560.0
-tile_height = 2
-tile_width = 1
-tile_path = "assets/sprites/levels/stone_platform.png"
-
-[[platforms]]
-x = 704.0
 tile_height = 2
 tile_width = 1
 tile_path = "assets/sprites/levels/stone_platform.png"
@@ -115,12 +92,6 @@ tile_width = 1
 tile_path = "assets/sprites/levels/stone_platform.png"
 
 [[platforms]]
-x = 1560.0
-tile_height = 2
-tile_width = 1
-tile_path = "assets/sprites/levels/stone_platform.png"
-
-[[platforms]]
 x = 1680.0
 tile_height = 3
 tile_width = 1
@@ -133,20 +104,14 @@ tile_width = 1
 tile_path = "assets/sprites/levels/stone_platform.png"
 
 [[platforms]]
-x = 2050.0
+x = 2005.0
 tile_height = 2
 tile_width = 2
 tile_path = "assets/sprites/levels/stone_platform.png"
 
 [[platforms]]
-x = 2180.0
+x = 2157.5
 tile_height = 3
-tile_width = 1
-tile_path = "assets/sprites/levels/stone_platform.png"
-
-[[platforms]]
-x = 2450.0
-tile_height = 2
 tile_width = 1
 tile_path = "assets/sprites/levels/stone_platform.png"
 
@@ -157,25 +122,13 @@ tile_width = 1
 tile_path = "assets/sprites/levels/stone_platform.png"
 
 [[platforms]]
-x = 2920.0
-tile_height = 4
-tile_width = 1
-tile_path = "assets/sprites/levels/stone_platform.png"
-
-[[platforms]]
 x = 3050.0
 tile_height = 3
 tile_width = 1
 tile_path = "assets/sprites/levels/stone_platform.png"
 
-[[platforms]]
-x = 3120.0
-tile_height = 5
-tile_width = 1
-tile_path = "assets/sprites/levels/stone_platform.png"
-
 [[coins]]
-x = 130.0
+x = 155.0
 y = 236.0
 
 [[coins]]
@@ -191,15 +144,7 @@ x = 216.0
 y = 108.0
 
 [[coins]]
-x = 466.0
-y = 156.0
-
-[[coins]]
 x = 576.0
-y = 156.0
-
-[[coins]]
-x = 720.0
 y = 156.0
 
 [[coins]]
@@ -213,10 +158,6 @@ y = 156.0
 [[coins]]
 x = 1050.0
 y = 236.0
-
-[[coins]]
-x = 1116.0
-y = 156.0
 
 [[coins]]
 x = 1350.0
@@ -235,28 +176,12 @@ x = 1866.0
 y = 156.0
 
 [[coins]]
-x = 2066.0
-y = 156.0
-
-[[coins]]
-x = 2196.0
-y = 108.0
-
-[[coins]]
-x = 2466.0
-y = 156.0
+x = 2047.5
+y = 154.0
 
 [[coins]]
 x = 2750.0
 y = 236.0
-
-[[coins]]
-x = 2936.0
-y = 60.0
-
-[[coins]]
-x = 3066.0
-y = 108.0
 
 [[star_yellows]]
 x = 1116.0
@@ -266,9 +191,17 @@ y = 108.0
 x = 1866.0
 y = 108.0
 
+[[star_yellows]]
+x = 2172.0
+y = 106.0
+
+[[star_yellows]]
+x = 2885.0
+y = 126.5
+
 [last_star]
-x = 3132.0
-y = 4.0
+x = 3060.0
+y = 98.0
 next_phase = "levels/02_lugio_02.toml"
 
 [[spiders]]
@@ -279,7 +212,7 @@ patrol_x1 = 340.0
 frame_index = 0
 
 [[spiders]]
-x = 3050.0
+x = 3004.5
 vx = -50.0
 patrol_x0 = 3000.0
 patrol_x1 = 3160.0
@@ -335,24 +268,6 @@ patrol_x0 = 1500.0
 patrol_x1 = 2200.0
 frame_index = 1
 
-[[fish]]
-x = 700.0
-vx = 70.0
-patrol_x0 = 600.0
-patrol_x1 = 1000.0
-
-[[fish]]
-x = 1200.0
-vx = -70.0
-patrol_x0 = 1000.0
-patrol_x1 = 1500.0
-
-[[faster_fish]]
-x = 2300.0
-vx = -120.0
-patrol_x0 = 2100.0
-patrol_x1 = 2600.0
-
 [[axe_traps]]
 pillar_x = 200.0
 y = 0.0
@@ -367,37 +282,6 @@ mode = "SPIN"
 pillar_x = 2600.0
 y = 0.0
 mode = "PENDULUM"
-
-[[circular_saws]]
-x = 2050.0
-y = 0.0
-patrol_x0 = 2050.0
-patrol_x1 = 2200.0
-direction = 1
-
-[[circular_saws]]
-x = 2480.0
-y = 0.0
-patrol_x0 = 2480.0
-patrol_x1 = 2528.0
-direction = -1
-
-[[spike_rows]]
-x = 512.0
-count = 3
-
-[[spike_rows]]
-x = 1740.0
-count = 4
-
-[[spike_rows]]
-x = 2648.0
-count = 3
-
-[[spike_platforms]]
-x = 1700.0
-y = 180.0
-tile_count = 3
 
 [[spike_blocks]]
 rail_index = 0
@@ -443,8 +327,8 @@ x = 2880.0
 
 [[float_platforms]]
 mode = "STATIC"
-x = 380.0
-y = 190.0
+x = 442.5
+y = 186.5
 tile_count = 3
 rail_index = 0
 t_offset = 0.0
@@ -452,8 +336,8 @@ speed = 0.0
 
 [[float_platforms]]
 mode = "CRUMBLE"
-x = 1300.0
-y = 185.0
+x = 1344.0
+y = 184.0
 tile_count = 3
 rail_index = 0
 t_offset = 0.0
@@ -474,17 +358,22 @@ y = 172.0
 brick_count = 10
 
 [[bouncepads_small]]
-x = 500.0
+x = 504.5
 launch_vy = -380.0
 pad_type = "GREEN"
 
 [[bouncepads_medium]]
-x = 1850.0
+x = 1764.5
+launch_vy = -536.0
+pad_type = "WOOD"
+
+[[bouncepads_medium]]
+x = 2288.5
 launch_vy = -536.0
 pad_type = "WOOD"
 
 [[bouncepads_high]]
-x = 2950.0
+x = 3120.0
 launch_vy = -700.0
 pad_type = "RED"
 
@@ -507,18 +396,13 @@ tile_count = 2
 vine_type = 1
 
 [[vines]]
-x = 2188.0
-y = 124.0
+x = 2165.5
+y = 126.0
 tile_count = 3
 vine_type = 1
 
-[[ladders]]
-x = 3080.0
-y = 20.0
-tile_count = 28
-
 [[ropes]]
-x = 88.0
+x = 87.5
 y = 172.0
 tile_count = 2
 
@@ -548,11 +432,11 @@ speed = 0.0
 
 [[background_layers]]
 path = "assets/sprites/backgrounds/smoke_bg.png"
-speed = 0.08
+speed = 0.0799999982
 
 [[background_layers]]
 path = "assets/sprites/backgrounds/volcanic_mountains.png"
-speed = 0.15
+speed = 0.150000006
 
 [[background_layers]]
 path = "assets/sprites/backgrounds/smoke_mg_3.png"
@@ -560,11 +444,11 @@ speed = 0.25
 
 [[background_layers]]
 path = "assets/sprites/backgrounds/smoke_mg_2.png"
-speed = 0.38
+speed = 0.379999995
 
 [[background_layers]]
 path = "assets/sprites/backgrounds/smoke_lonely.png"
-speed = 0.44
+speed = 0.439999998
 
 [[background_layers]]
 path = "assets/sprites/backgrounds/smoke_mg_1.png"
@@ -580,4 +464,5 @@ speed = 0.5
 
 [[fog_layers]]
 path = "assets/sprites/foregrounds/fog_fire_2.png"
-speed = 0.7
+speed = 0.699999988
+
