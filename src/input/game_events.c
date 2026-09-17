@@ -7,6 +7,7 @@
 #include "../collision/collision_damage.h"
 #include "../core/game_overlay.h"
 #include "../core/game_terminal.h"
+#include "../core/game_inspector.h"
 #include "game_input.h"
 #include "../screens/settings_menu.h"
 
@@ -99,6 +100,13 @@ void game_handle_events(GameState *gs)
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         int was_open = gs->settings_menu && gs->settings_menu->open;
+        if (gs->debug_mode && was_open && gs->settings_menu->capture == 1 && event.type == SDL_KEYDOWN &&
+            ((event.key.keysym.sym >= SDLK_F2 && event.key.keysym.sym <= SDLK_F10) ||
+             event.key.keysym.sym == SDLK_MINUS || event.key.keysym.sym == SDLK_EQUALS)) {
+            SDL_strlcpy(gs->settings_menu->message, "Reserved for debug inspection; choose another key.",
+                        sizeof(gs->settings_menu->message));
+            continue;
+        }
         if (gs->route == GAME_ROUTE_NONE && settings_menu_event(gs->settings_menu, gs->profile, &event,
                                  terminal_overlay(gs) ? -1 : SDL_CONTROLLER_BUTTON_BACK)) {
             if (was_open && !gs->settings_menu->open) {
@@ -110,6 +118,7 @@ void game_handle_events(GameState *gs)
             }
             continue;
         }
+        if (game_inspector_event(gs, &event)) continue;
         if (event.type == SDL_QUIT) {
             if (gs->route == GAME_ROUTE_NONE) gs->route = GAME_ROUTE_EXIT;
 

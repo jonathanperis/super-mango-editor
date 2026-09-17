@@ -5,6 +5,7 @@
 #include "../game.h"
 
 #include "game_resources.h"
+#include "game_experiment.h"
 #include "game_window.h"
 #include "../effects/fog.h"
 #include "../input/game_input.h"
@@ -80,6 +81,8 @@ fail:
  */
 void game_cleanup(GameState *gs)
 {
+    game_experiment_cleanup(gs);
+    game_inspector_cleanup(gs);
     game_replay_cleanup(gs);
     /* Close only this screen's gamepad handle. AppSession owns the subsystem. */
     gamepad_close_controller(gs);

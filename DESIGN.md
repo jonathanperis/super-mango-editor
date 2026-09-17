@@ -1,5 +1,10 @@
 # DESIGN.md
 
+> Historical website design plan. Counts, payload examples and “current” findings
+> below describe the earlier design assessment. Several changes have since shipped.
+> Use `docs/src/generated/project.json`, the public manual and current source for
+> present facts. Sandbox School and the Mechanics Museum are now primary learning routes.
+
 ## Design Intent
 
 Super Mango's website should feel like a playable arcade attract screen attached to a builder's manual. The overhaul should keep the current dark pixel-art atmosphere, mango-gold title energy, green terminal accents, and arcade-cabinet game frame while improving hierarchy, readability, accessibility, and conversion paths.

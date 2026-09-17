@@ -5,7 +5,7 @@
  * a stronger jump impulse (-420 px/s), and shorter delay between jumps.
  */
 
-#include <stdlib.h>   /* rand */
+#include "../core/game_random.h"
 
 #include "faster_fish.h"
 #include "../game.h"               /* FLOOR_Y, GRAVITY */
@@ -15,7 +15,7 @@
 /* ------------------------------------------------------------------ */
 
 static float ffish_random_delay(float min_s, float max_s) {
-    float t = (float)(rand() % 1001) / 1000.0f;
+    float t = game_random_unit();
     return min_s + (max_s - min_s) * t;
 }
 

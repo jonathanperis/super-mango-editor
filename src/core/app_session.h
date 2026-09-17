@@ -70,6 +70,8 @@ typedef struct {
     int profile_enabled; /* opt-in; tests/smoke default to memory-only */
     int continue_last;
     const char *profile_path; /* optional native profile override */
+    unsigned int random_seed;
+    const char *experiment_path; /* explicit native capture import */
 } AppSessionConfig;
 
 typedef struct AppSession {
@@ -119,6 +121,7 @@ typedef struct AppSession {
     char status_message[160];
     char replay_script_path[256];
     char boot_level_path[GAME_LEVEL_PATH_MAX];
+    unsigned int random_seed;
 } AppSession;
 
 /* Heap-allocate a session and its initial menu or game screen. */

@@ -1,0 +1,11 @@
+{
+  "levels": 3,
+  "screens": 23,
+  "labs": 6,
+  "assetBytes": 35802693,
+  "assetMiB": 34.1,
+  "assetBudgetBytes": 41943040,
+  "enemies": 38,
+  "hazards": 56,
+  "collectibles": 71
+}

@@ -15,7 +15,9 @@
 #include "level_resources.h"
 #include "phase_transition.h"
 #include "../core/game_completion.h"
-#include "../editor/serializer.h"
+#include "../core/game_resources.h"
+#include "../core/game_experiment.h"
+#include "../shared/serializer.h"
 #include "../../vendor/tomlc17/tomlc17.h"
 
 static int campaign_key_matches(const char *supplied, int supplied_len,
@@ -368,6 +370,18 @@ static LevelDef *game_level_storage(GameState *gs)
     return (LevelDef *)gs->level_def;
 }
 
+static int read_stable_level(const char *path, LevelDef *level, Uint64 *hash)
+{
+    SerializerFileFingerprint before, after;
+    if (serializer_fingerprint_utf8(path, &before) != 1 || level_load_toml(path, level) != 0 ||
+        serializer_fingerprint_utf8(path, &after) != 1 || !serializer_fingerprint_equal(&before, &after)) {
+        fprintf(stderr, "Error: cannot read stable level bytes: %s\n", path);
+        return -1;
+    }
+    *hash = after.content_hash;
+    return 0;
+}
+
 int game_level_load_initial(GameState *gs)
 {
     LevelDef loaded;
@@ -386,15 +400,18 @@ int game_level_load_initial(GameState *gs)
     }
 
     level_def_init_defaults(&loaded);
-    if (level_load_toml(safe_path, &loaded) != 0) {
+    Uint64 source_hash;
+    if (read_stable_level(safe_path, &loaded, &source_hash) != 0) {
         fprintf(stderr, "Error: could not load initial level: %s\n", safe_path);
         return -1;
     }
 
-    /* Parse and validation happen before replacing active level storage. */
+    if (game_resources_require_level_textures(gs, &loaded) != 0) return -1;
+    /* Parse and required sprites are checked before replacing active storage. */
     level = game_level_storage(gs);
     if (!level) return -1;
     *level = loaded;
+    gs->source_level_hash = source_hash;
 
     if (level_load(gs, level) != 0) return -1;
     game_completion_reset_summary(gs);
@@ -420,7 +437,8 @@ int game_load_next_phase(GameState *gs)
     LevelDef next_level;
     level_def_init_defaults(&next_level);
 
-    if (level_load_toml(safe_path, &next_level) != 0) {
+    Uint64 source_hash;
+    if (read_stable_level(safe_path, &next_level, &source_hash) != 0) {
         fprintf(stderr, "Error: Failed to load next phase: %s\n", safe_path);
         return -1;
     }
@@ -431,9 +449,12 @@ int game_load_next_phase(GameState *gs)
         return -1;
     }
 
+    if (game_resources_require_level_textures(gs, &next_level) != 0) return -1;
+    game_experiment_cleanup(gs);
     LevelDef *level = game_level_storage(gs);
     if (!level) return -1;
     *level = next_level;
+    gs->source_level_hash = source_hash;
 
     strncpy(gs->level_path, next_path, sizeof(gs->level_path) - 1);
     gs->level_path[sizeof(gs->level_path) - 1] = '\0';

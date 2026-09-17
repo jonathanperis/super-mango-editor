@@ -1,0 +1,27 @@
+format_version = 1
+name = "Lab: Climbing state"
+description = "Hold Up near the ladder, rope or vine. Jump off and inspect the change from climbing to airborne movement."
+screen_count = 2
+player_start_x = 48.0
+player_start_y = 252.0
+initial_lives = 9
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+[[ladders]]
+x = 128.0
+y = 128.0
+tile_count = 14
+[[ropes]]
+x = 256.0
+y = 128.0
+tile_count = 6
+[[vines]]
+x = 384.0
+y = 128.0
+tile_count = 7
+vine_type = 0
+[last_star]
+x = 704.0
+y = 228.0
+[[background_layers]]
+path = "assets/sprites/backgrounds/sky_blue.png"
+speed = 0.0

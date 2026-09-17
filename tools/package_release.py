@@ -25,10 +25,23 @@ WASM_FILES = [f"{stem}.{extension}" for stem in ("super-mango", "super-mango-deb
               for extension in ("html", "js", "wasm", "data")]
 
 
-def copy_tree(src: Path, dst: Path) -> None:
+def copy_tree(src: Path, dst: Path, *, playable_assets: bool = False) -> None:
     if not src.is_dir():
         raise SystemExit(f"required directory missing: {src}")
-    shutil.copytree(src, dst, ignore=shutil.ignore_patterns(".DS_Store"))
+    ignored = [".DS_Store", ".gitkeep"] + (["unused"] if playable_assets else [])
+    shutil.copytree(src, dst, ignore=shutil.ignore_patterns(*ignored))
+
+
+def copy_notices(bundle: Path, dll_dir: Path | None = None) -> None:
+    shutil.copy2(ROOT / "LICENSE", bundle / "LICENSE")
+    shutil.copy2(ROOT / "THIRD_PARTY_NOTICES.md", bundle / "THIRD_PARTY_NOTICES.md")
+    licenses = bundle / "licenses"
+    licenses.mkdir()
+    shutil.copy2(ROOT / "vendor/tomlc17/LICENSE", licenses / "tomlc17.txt")
+    if dll_dir is not None:
+        system_notices = dll_dir.parent / "share/licenses"
+        if system_notices.is_dir():
+            shutil.copytree(system_notices, licenses / "msys2")
 
 
 def make_executable(path: Path) -> None:
@@ -38,7 +51,7 @@ def make_executable(path: Path) -> None:
 
 def write_native_readme(bundle: Path, executable: str) -> None:
     (bundle / "README.txt").write_text(
-        f"""Super Mango native release\n\nRun from this directory so the game can find assets/ and levels/.\n\nLinux/macOS:\n  ./{executable}\n\nWindows:\n  {executable}\n\nControls and development documentation:\n  https://jonathanperis.github.io/super-mango-editor/docs/\n\nSource and license:\n  https://github.com/jonathanperis/super-mango-editor\n""",
+        f"""Super Mango builder release\n\nRun from this directory so both programs can find assets/ and levels/.\n\nGame: ./{executable}\nEditor: ./super-mango-editor{'.exe' if executable.endswith('.exe') else ''}\n\nLinux/macOS require compatible SDL2 runtime libraries. Linux file dialogs require zenity.\nWindows runtime DLLs are included. Playtest starts the sibling game without saving a personal profile.\n\nLearning manual:\n  https://jonathanperis.github.io/super-mango-editor/docs/learning-path/\n\nSource:\n  https://github.com/jonathanperis/super-mango-editor\nSee LICENSE, THIRD_PARTY_NOTICES.md and licenses/.\n""",
         encoding="utf-8",
     )
 
@@ -95,8 +108,13 @@ def zip_dir(src_dir: Path, output_zip: Path) -> None:
 
 def package_native(platform: str, binary: Path, output_zip: Path, dll_dir: Path | None) -> None:
     binary = binary.resolve()
+    if platform.startswith("super-mango-windows") and binary.suffix != ".exe":
+        binary = binary.with_name(binary.name + ".exe")
     if not binary.is_file():
         raise SystemExit(f"binary missing: {binary}")
+    editor = binary.with_name("super-mango-editor" + binary.suffix)
+    if not editor.is_file():
+        raise SystemExit(f"editor missing: {editor}; run make builder")
 
     with tempfile.TemporaryDirectory(prefix="super-mango-release-") as tmp:
         bundle = Path(tmp) / platform
@@ -105,8 +123,11 @@ def package_native(platform: str, binary: Path, output_zip: Path, dll_dir: Path 
         executable = "super-mango.exe" if platform.startswith("super-mango-windows") else "super-mango"
         bundled_binary = bundle / executable
         shutil.copy2(binary, bundled_binary)
+        bundled_editor = bundle / editor.name
+        shutil.copy2(editor, bundled_editor)
         if not executable.endswith(".exe"):
             make_executable(bundled_binary)
+            make_executable(bundled_editor)
 
         if dll_dir is not None:
             dlls = collect_windows_dlls(binary, dll_dir)
@@ -115,9 +136,9 @@ def package_native(platform: str, binary: Path, output_zip: Path, dll_dir: Path 
             for dll in dlls:
                 shutil.copy2(dll, bundle / dll.name)
 
-        copy_tree(ROOT / "assets", bundle / "assets")
+        copy_tree(ROOT / "assets", bundle / "assets", playable_assets=True)
         copy_tree(ROOT / "levels", bundle / "levels")
-        shutil.copy2(ROOT / "LICENSE", bundle / "LICENSE")
+        copy_notices(bundle, dll_dir)
         write_native_readme(bundle, executable)
         zip_dir(bundle, output_zip)
 
@@ -137,7 +158,7 @@ def package_wasm(platform: str, output_zip: Path, out_dir: Path = ROOT / "out") 
             """Super Mango WebAssembly release\n\nServe this directory with any static HTTP server, then open super-mango.html.\n\nExample:\n  python3 -m http.server 8000\n\nThen browse to http://localhost:8000/super-mango.html\n""",
             encoding="utf-8",
         )
-        shutil.copy2(ROOT / "LICENSE", bundle / "LICENSE")
+        copy_notices(bundle)
         zip_dir(bundle, output_zip)
 
 

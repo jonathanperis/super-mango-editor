@@ -1,6 +1,6 @@
 #pragma once
 #include "../core/game_profile.h"
-#include "../editor/ui.h"
+#include "../shared/ui.h"
 
 typedef struct SettingsMenu {
     int open, page, selected, capture; /* capture: 0 none, 1 keyboard, 2 gamepad */

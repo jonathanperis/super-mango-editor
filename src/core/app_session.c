@@ -15,6 +15,7 @@
 #include "../levels/level_session.h"
 #include "../levels/level_path.h"
 #include "game_overlay.h"
+#include "game_experiment.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -422,6 +423,7 @@ static GameState *session_make_game(AppSession *session, const char *path,
         return NULL;
     }
     game->debug_mode = session->debug_mode;
+    game->random_seed = session->random_seed;
     game->smoke_test_frames = session->smoke_test_frames;
     game_input_set_controller_init_pending(
         game, session_controller_is_pending(session));
@@ -710,7 +712,8 @@ AppSession *session_create(const AppSessionConfig *config)
         free(session);
         return NULL;
     }
-    session->debug_mode = config ? config->debug_mode : 0;
+    session->debug_mode = config && (config->debug_mode || config->experiment_path);
+    session->random_seed = config ? config->random_seed : 1;
     session->smoke_test_frames = config ? config->smoke_test_frames : 0;
     if (config && config->hooks) session->hooks = *config->hooks;
     SDL_AtomicSet(&session->controller_init_done, 0);
@@ -724,7 +727,8 @@ AppSession *session_create(const AppSessionConfig *config)
         return NULL;
     }
 
-    if (config && config->profile_enabled && !session->smoke_test_frames && !session->replay_script_path[0]) {
+    if (config && config->profile_enabled && !session->debug_mode && !config->experiment_path &&
+        !session->smoke_test_frames && !session->replay_script_path[0]) {
         if (game_profile_open(&session->profile, config->profile_path)) SDL_Log("%s", session->profile.status);
     } else copy_path(session->profile.status, sizeof(session->profile.status), "Saving disabled; settings apply to this run.");
     if (!level_path && config && config->continue_last && session->profile.data.last_level[0])
@@ -738,6 +742,14 @@ AppSession *session_create(const AppSessionConfig *config)
             return NULL;
         }
     } else if (session_open_menu(session) != 0) {
+        session_controller_cleanup(session);
+        session_free_owned(session);
+        return NULL;
+    }
+    if (config && config->experiment_path &&
+        (!session->game || game_experiment_load(session->game, config->experiment_path) != 0)) {
+        session_close_game(session);
+        session_close_menu(session);
         session_controller_cleanup(session);
         session_free_owned(session);
         return NULL;

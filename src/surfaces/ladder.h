@@ -6,7 +6,7 @@
  * VineDecor-compatible struct layout so the climbing code in player.c
  * can treat vines, ladders, and ropes uniformly.
  *
- * Sprite: assets/Ladder.png — 16×48 RGBA, a single ladder frame.
+ * Sprite: assets/sprites/surfaces/ladder.png — 16×48 RGBA, one frame.
  */
 #pragma once
 

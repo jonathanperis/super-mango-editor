@@ -53,6 +53,16 @@ def load_fixture(name: str) -> dict:
 def main() -> int:
     constants = validate_levels.load_max_constants()
     asset_manifest = validate_levels.load_asset_manifest()
+    for array, valid_count, invalid_count in (("ropes", 6, 7), ("ladders", 14, 22), ("vines", 7, 9)):
+        for count, rejected in ((valid_count, False), (invalid_count, True)):
+            kind = {"ropes": "ROPE", "ladders": "LADDER", "vines": "VINE"}[array]
+            height = constants[f"{kind}_H"] + (count - 1) * constants[f"{kind}_STEP"]
+            y = 128 if rejected else 300 - height + 1e-7  # C narrows this to the exact edge.
+            errors = validate_levels.validate_nested_dimensions(
+                FIXTURE_DIR / "valid_v1.toml",
+                {array: [{"x": 128, "y": y, "tile_count": count}]}, constants)
+            if bool(errors) != rejected:
+                raise AssertionError(f"climbable rendered bounds mismatch: {array}, {count}, {errors}")
 
     if validate_levels.validate_schema(load_fixture("valid_legacy.toml")):
         raise AssertionError("valid legacy fixture rejected")

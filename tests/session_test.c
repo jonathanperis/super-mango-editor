@@ -135,31 +135,28 @@ static int campaign_manifest_is_ordered_and_transactional(void)
         fprintf(stderr, "session_test: campaign manifest failed to load\n");
         return 1;
     }
-    if (expect_int("campaign level count", (int)catalog.count, 4) != 0 ||
+    if (expect_int("campaign level count", (int)catalog.count, 3) != 0 ||
         expect_int("campaign first path",
                    strcmp(catalog.levels[0].path,
-                          "levels/00_onboarding_01.toml") == 0, 1) != 0 ||
+                          "levels/00_sandbox_01.toml") == 0, 1) != 0 ||
         expect_int("campaign first display name",
                    strcmp(catalog.levels[0].display_name,
-                          "Forest First Steps") == 0, 1) != 0 ||
-        expect_int("campaign onboarding successor chain",
-                   strcmp(catalog.levels[0].level.next_phase,
-                          "levels/00_sandbox_01.toml") == 0, 1) != 0 ||
+                          "Creator's Playground") == 0, 1) != 0 ||
         expect_int("campaign sandbox successor chain",
-                   strcmp(catalog.levels[1].level.next_phase,
+                   strcmp(catalog.levels[0].level.next_phase,
                           "levels/01_lugio_01.toml") == 0, 1) != 0 ||
         expect_int("campaign Lugio successor chain",
-                   strcmp(catalog.levels[2].level.next_phase,
+                   strcmp(catalog.levels[1].level.next_phase,
                           "levels/02_lugio_02.toml") == 0, 1) != 0 ||
         expect_int("campaign terminal chain",
-                   catalog.levels[3].level.next_phase[0] == '\0', 1) != 0)
+                   catalog.levels[2].level.next_phase[0] == '\0', 1) != 0)
         goto fail;
 
     original_levels = catalog.levels;
     if (campaign_catalog_load("levels/campaigns/missing.toml", &catalog) == 0 ||
         expect_int("failed campaign load preserves catalog",
                    catalog.levels == original_levels, 1) != 0 ||
-        expect_int("failed campaign load preserves count", (int)catalog.count, 4) != 0)
+        expect_int("failed campaign load preserves count", (int)catalog.count, 3) != 0)
         goto fail;
 
     campaign_catalog_cleanup(&catalog);
@@ -516,7 +513,7 @@ static int repeated_menu_game_ownership(void)
     if (expect_int("starts in menu", session->screen, APP_SCREEN_MENU) != 0 ||
         expect_int("default menu owns campaign", session->catalog_loaded, 1) != 0 ||
         expect_int("menu consumes campaign", session->menu->catalog == &session->catalog, 1) != 0 ||
-        expect_int("menu campaign count", (int)session->catalog.count, 4) != 0 ||
+        expect_int("menu campaign count", (int)session->catalog.count, 3) != 0 ||
         expect_int("menu controller pending",
                    session->controller_init_state, APP_CONTROLLER_INIT_PENDING) != 0 ||
         expect_int("menu controller inactive",
@@ -530,7 +527,7 @@ static int repeated_menu_game_ownership(void)
     session_frame(session);
     if (expect_int("menu D-pad selects next level",
                    strcmp(session->menu->selected_level_path,
-                           "levels/00_sandbox_01.toml") == 0, 1) != 0)
+                            session->catalog.levels[1].path) == 0, 1) != 0)
         return 1;
     for (int i = 0; i < 100 &&
                     session->controller_init_state == APP_CONTROLLER_INIT_RUNNING; i++)
@@ -956,7 +953,7 @@ fail:
 
 static int pending_profile_keeps_exit_alive(void)
 {
-    AppSessionConfig config = {.level_path = "levels/00_onboarding_01.toml"};
+    AppSessionConfig config = {.level_path = "tests/fixtures/runtime/transition.toml"};
     AppSession *session = session_create(&config);
     if (!session) return 1;
     session->profile.pending_text = malloc(PROFILE_TEXT_MAX);
@@ -993,7 +990,7 @@ static int native_replay_keeps_session_ownership(void)
     LifecycleProbe probe = {.store_result = 1};
     AppSessionHooks hooks = {.store_replay = probe_store_replay,
                             .reload = probe_reload, .userdata = &probe};
-    AppSessionConfig config = {.level_path = "levels/00_onboarding_01.toml",
+    AppSessionConfig config = {.level_path = "tests/fixtures/runtime/transition.toml",
                                .smoke_test_frames = 1, .hooks = &hooks};
     AppSession *session = session_create(&config);
     if (!session) return 1;
@@ -1027,7 +1024,7 @@ static int menu_mouse_and_path_boundaries(void)
     campaign_catalog_cleanup(&catalog);
     char short_path[8];
     if (expect_int("reject resolved path truncation",
-                   level_resolve_path("levels/00_onboarding_01.toml", short_path, sizeof(short_path)), -1)) result = 1;
+                   level_resolve_path("tests/fixtures/runtime/transition.toml", short_path, sizeof(short_path)), -1)) result = 1;
     return result;
 }
 
@@ -1109,7 +1106,7 @@ static int phase_resets_transient_state(void)
 {
     GameState gs = {0};
     gs.controller_init_pending = 1;
-    strcpy(gs.level_path, "levels/00_onboarding_01.toml");
+    strcpy(gs.level_path, "tests/fixtures/runtime/transition.toml");
     if (game_init(&gs)) return 1;
     gs.player.vx = 123;
     gs.player.vy = -222;
@@ -1136,10 +1133,10 @@ static int phase_resets_transient_state(void)
 }
 
 int game_profile_contract_test(void);
+int game_simulation_contract_test(void);
 
-int main(void)
+static int setup_sdl(void)
 {
-    setvbuf(stdout, NULL, _IONBF, 0);
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0) {
         fprintf(stderr, "session_test: SDL_Init failed: %s\n", SDL_GetError());
         return 1;
@@ -1157,63 +1154,39 @@ int main(void)
         return 1;
     }
 
-    if (game_profile_contract_test()) return 1;
-    if (pending_profile_keeps_exit_alive()) return 1;
-    if (native_replay_keeps_session_ownership()) return 1;
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0 ||
-        !(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) || TTF_Init() != 0 ||
-        Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) != 0) return 1;
-    if (menu_mouse_and_path_boundaries()) return 1;
-    if (collision_lifetime_and_pickups() || nearest_surface_is_order_independent() ||
-        phase_resets_transient_state()) return 1;
-    if (campaign_manifest_is_ordered_and_transactional() != 0) return 1;
-    if (campaign_manifest_nul_fixtures_reject_transactionally() != 0) return 1;
-    if (physical_release_latch_blocks_transition_input() != 0) return 1;
-    if (failed_initial_level_does_not_create_session() != 0) return 1;
-    if (direct_game_boot_repairs_input_and_keeps_controller_runtime() != 0) return 1;
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0 ||
-        !(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) || TTF_Init() != 0 ||
-        Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) != 0) {
-        fprintf(stderr, "session_test: failed to reinitialize after direct boot\n");
-        return 1;
-    }
-    if (immediate_play_waits_for_present_before_controller_worker() != 0) return 1;
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0 ||
-        !(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) || TTF_Init() != 0 ||
-        Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) != 0) {
-        fprintf(stderr, "session_test: failed to reinitialize after deferred controller test\n");
-        return 1;
-    }
-    if (blocked_menu_route_waits_without_teardown() != 0) return 1;
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0 ||
-        !(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) || TTF_Init() != 0 ||
-        Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) != 0) {
-        fprintf(stderr, "session_test: failed to reinitialize after blocked menu test\n");
-        return 1;
-    }
-    if (blocked_terminal_exit_waits_with_overlay_visible() != 0) return 1;
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0 ||
-        !(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) || TTF_Init() != 0 ||
-        Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) != 0) {
-        fprintf(stderr, "session_test: failed to reinitialize after blocked terminal test\n");
-        return 1;
-    }
-    if (repeated_menu_game_ownership() != 0) return 1;
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0 ||
-        !(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) || TTF_Init() != 0 ||
-        Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) != 0) {
-        fprintf(stderr, "session_test: failed to reinitialize after menu ownership test\n");
-        return 1;
-    }
-    if (checkpoint_transitions_use_production_paths() != 0) return 1;
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0 ||
-        !(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) || TTF_Init() != 0 ||
-        Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) != 0) {
-        fprintf(stderr, "session_test: failed to reinitialize after checkpoint integration\n");
-        return 1;
-    }
-    if (replay_storage_failure_retains_session_and_success_orders_cleanup() != 0)
-        return 1;
-    puts("session_test: ok");
     return 0;
+}
+
+int main(void)
+{
+    setvbuf(stdout, NULL, _IONBF, 0);
+    const struct { const char *name; int (*run)(void); } cases[] = {
+#define CASE(fn) {#fn, fn}
+        CASE(game_simulation_contract_test), CASE(game_profile_contract_test),
+        CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),
+        CASE(menu_mouse_and_path_boundaries), CASE(collision_lifetime_and_pickups),
+        CASE(nearest_surface_is_order_independent), CASE(phase_resets_transient_state),
+        CASE(campaign_manifest_is_ordered_and_transactional),
+        CASE(campaign_manifest_nul_fixtures_reject_transactionally),
+        CASE(physical_release_latch_blocks_transition_input),
+        CASE(failed_initial_level_does_not_create_session),
+        CASE(direct_game_boot_repairs_input_and_keeps_controller_runtime),
+        CASE(immediate_play_waits_for_present_before_controller_worker),
+        CASE(blocked_menu_route_waits_without_teardown),
+        CASE(blocked_terminal_exit_waits_with_overlay_visible),
+        CASE(repeated_menu_game_ownership), CASE(checkpoint_transitions_use_production_paths),
+        CASE(replay_storage_failure_retains_session_and_success_orders_cleanup)
+#undef CASE
+    };
+    int failures = 0;
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        if (setup_sdl()) return 1;
+        int result = cases[i].run();
+        printf("session: %s %s\n", cases[i].name, result ? "FAIL" : "PASS");
+        failures += result != 0;
+        game_input_test_clear_physical_state();
+        Mix_CloseAudio(); TTF_Quit(); IMG_Quit(); SDL_Quit();
+    }
+    printf("session_test: %d failing cases\n", failures);
+    return failures ? 1 : 0;
 }

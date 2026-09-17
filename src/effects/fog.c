@@ -11,7 +11,7 @@
 
 #include <SDL_image.h>  /* IMG_LoadTexture                  */
 #include <stdio.h>
-#include <stdlib.h>     /* rand(), srand()                  */
+#include "../core/game_random.h"
 
 #include "fog.h"
 #include "game.h"       /* GAME_W, GAME_H (logical canvas)  */
@@ -73,17 +73,16 @@ static void fog_spawn(FogSystem *fog) {
         FogInstance *inst = &fog->instances[i];
 
         /* Random texture: pick from however many were loaded for this level */
-        inst->tex_index = rand() % fog->tex_count;
+        inst->tex_index = (int)(game_random() % (unsigned int)fog->tex_count);
 
         /* Random direction: +1 (left→right) or -1 (right→left) */
-        inst->dir = (rand() % 2) ? +1 : -1;
+        inst->dir = (game_random() % 2) ? +1 : -1;
 
         /*
          * Random duration between FOG_DURATION_MIN and FOG_DURATION_MAX.
-         * rand() % 1001 gives an integer 0..1000; dividing by 1000.0f maps
-         * it to the float range 0.0..1.0, then we scale to the desired range.
+         * Scale the reproducible unit interval to the desired duration range.
          */
-        float t      = (float)(rand() % 1001) / 1000.0f;
+        float t      = game_random_unit();
         inst->duration = FOG_DURATION_MIN + t * (FOG_DURATION_MAX - FOG_DURATION_MIN);
 
         /*

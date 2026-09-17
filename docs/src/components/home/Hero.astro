@@ -1,4 +1,5 @@
 ---
+import facts from '../../generated/project.json';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 <!-- Floating particles -->
@@ -24,7 +25,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
             <div class="boot-readout" aria-label="Boot diagnostics">
                 <span>BOOT://C11</span>
                 <span>SDL2_PORTS:READY</span>
-                <span>WASM_PAYLOAD:43MB</span>
+                <span>ASSETS:{facts.assetMiB}MiB</span>
             </div>
             <h1 class="hero-title overdrive-title">
                 <span>SUPER</span>
@@ -36,8 +37,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
                 <span>C11</span>
                 <span>SDL2</span>
                 <span>WASM</span>
-                <span>3 levels</span>
-                <span>23 screens</span>
+                <span>{facts.levels} campaign levels</span>
+                <span>{facts.labs} learning labs</span>
                 <span>Level editor</span>
             </div>
             <div class="hero-ctas" aria-label="Primary actions">
@@ -61,7 +62,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
             <div class="attract-marquee diagnostic-marquee">
                 <span class="live-dot"></span>
                 <span>WEB BUILD READY</span>
-                <strong>~43 MB</strong>
+                <strong>{facts.assetMiB} MiB assets</strong>
             </div>
             <div class="service-card-label">CABINET MONITOR</div>
             <div class="mini-cabinet" aria-hidden="true">
@@ -76,11 +77,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
                 </div>
             </div>
             <div class="attract-scoreboard">
-                <div><span>LEVELS</span><strong>3</strong></div>
-                <div><span>SCREENS</span><strong>23</strong></div>
-                <div><span>ENEMIES</span><strong>41</strong></div>
+                <div><span>LEVELS</span><strong>{facts.levels}</strong></div>
+                <div><span>SCREENS</span><strong>{facts.screens}</strong></div>
+                <div><span>LABS</span><strong>{facts.labs}</strong></div>
             </div>
-            <a href={`${base}/docs/developer-guide/`} class="attract-link">Read the engine route</a>
+            <a href={`${base}/docs/learning-path/`} class="attract-link">Start Sandbox School</a>
         </aside>
     </div>
 

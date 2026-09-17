@@ -216,7 +216,10 @@ void editor_commit_change(EditorState *es)
             cmd.type = CMD_CONFIG;
             cmd.config_before = es->pending_config_before;
             cmd.config_after = after;
-            undo_push(es->undo, cmd);
+            if (!undo_push(es->undo, cmd)) {
+                editor_apply_config_snapshot(&es->level, &cmd.config_before);
+                editor_set_status(es, "Config edit cancelled: cannot allocate undo history");
+            }
             editor_sync_config_resources(es);
             editor_refresh_dirty(es);
         }

@@ -14,7 +14,7 @@ Super Mango levels are defined as [TOML](https://toml.io) files inside the `leve
 
 ```sh
 # Run the first campaign level directly
-make run-level LEVEL=levels/00_onboarding_01.toml
+make run-level LEVEL=levels/labs/01_collision.toml
 
 # Open a level in the visual editor
 make run-editor
@@ -86,7 +86,7 @@ At runtime, the level definition remains immutable. After player movement and be
 
 When a level has one or more authored records, they are the only checkpoint system: automatic screen-boundary checkpoints are disabled, including before the first authored record is crossed. When `[[checkpoints]]` is omitted or empty, the legacy automatic screen-boundary behavior remains unchanged. Loading a level, retrying after game over, replaying, or successfully advancing to the next phase starts from that level's effective player start again.
 
-The first catalog level, `levels/00_onboarding_01.toml`, demonstrates the schema with checkpoints at `(304.0, 205.0)` and `(448.0, 205.0)` before and after its flame-marked gap.
+The standalone `levels/labs/03_checkpoints.toml` example places checkpoints before and after one gap. It is independent of the campaign catalog.
 
 ### Optional `[physics]` Overrides
 
@@ -225,7 +225,6 @@ Collecting the last star snapshots elapsed time and coin totals, then shows the 
 ```toml
 format_version = 1
 levels = [
-    "levels/00_onboarding_01.toml",
     "levels/00_sandbox_01.toml",
     "levels/01_lugio_01.toml",
     "levels/02_lugio_02.toml",
@@ -240,7 +239,7 @@ levels = [
 | Listed files | Every entry must resolve and load as a TOML level. The start menu uses that level's `name`, falling back to its filename stem. |
 | Progression | Each non-final listed level must set `[last_star].next_phase` to the next manifest entry. The final listed level must omit `next_phase`. |
 
-The manifest order drives the native selector and generated [Level Catalog](../level-catalog/). A bare native launch therefore selects **Forest First Steps** first; its `last_star` advances to Creator's Playground, then Volcanic Depths 1 and 2. `make validate-levels` validates both the manifest and all playable `levels/*.toml` files. `--level <path>` remains an explicit direct-load path: it skips the selector and may launch a valid TOML level not listed in the manifest.
+The manifest order drives the native selector and generated [Level Catalog](../level-catalog/): Creator's Playground, then Volcanic Depths 1 and 2. `make validate-levels` checks the manifest, campaign levels and `levels/labs/*.toml`. `--level <path>` bypasses the selector and can open a valid TOML file outside the campaign. The mechanics museum remains a separate collection of standalone examples.
 
 ---
 
@@ -561,4 +560,4 @@ x = 760.0
 y = 200.0
 ```
 
-See `levels/00_onboarding_01.toml` for a compact checkpoint example and `levels/00_sandbox_01.toml` for a full-featured reference level using every entity type.
+See `levels/labs/03_checkpoints.toml` for a compact checkpoint example and `levels/00_sandbox_01.toml` for a combined showcase. Use the generated catalog for its actual entity inventory.

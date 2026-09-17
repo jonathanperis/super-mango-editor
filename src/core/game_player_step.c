@@ -5,6 +5,7 @@
 #include "game_player_step.h"
 
 #include "game_bouncepads.h"
+#include "game_experiment.h"
 #include "../input/game_input.h"
 #include "../input/game_web_input.h"
 #include "../player/player.h"
@@ -18,9 +19,10 @@ int game_player_step(GameState *gs, float dt)
     int bounce_idx = -1;
     int fp_landed_idx = -1;
 
+    unsigned int input = gs->replay_input_mask | game_web_input_take_touch_mask() | game_input_sample(gs);
+    input = game_experiment_input(gs, dt, input);
     player_handle_input(&gs->player, gs->audio.jump, gs->controller,
-                        gs->replay_input_mask | game_web_input_take_touch_mask(),
-                        game_input_sample(gs),
+                        input, 0,
                         gs->vines, gs->vine_count,
                         gs->ladders, gs->ladder_count,
                         gs->ropes, gs->rope_count);

@@ -11,7 +11,7 @@
 #include "editor_playtest.h"   /* editor_play_test/editor_stop_play */
 #include "editor_session.h"    /* editor reset/confirm helpers */
 #include "editor_validation.h" /* editor_validation_summary */
-#include "ui.h"                /* ui_panel, ui_button, ui_label */
+#include "../shared/ui.h"      /* ui_panel, ui_button, ui_label */
 
 /*
  * editor_render_toolbar — Draw the top toolbar (32 px tall, full width).

@@ -1,12 +1,14 @@
 ---
+import facts from '../../generated/project.json';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const scoreboard = [
-    ['LEVELS', '3', 'TOML worlds'],
-    ['SCREENS', '23', 'side-scroll rooms'],
-    ['ENEMIES', '41', 'spawned threats'],
-    ['HAZARDS', '64', 'traps & rails'],
-    ['COLLECT', '80', 'coins, stars, hearts'],
+    ['LEVELS', facts.levels, 'campaign worlds'],
+    ['SCREENS', facts.screens, 'side-scroll rooms'],
+    ['ENEMIES', facts.enemies, 'spawned threats'],
+    ['HAZARDS', facts.hazards, 'traps & rails'],
+    ['COLLECT', facts.collectibles, 'coins & stars'],
+    ['LABS', facts.labs, 'focused experiments'],
 ];
 
 const paths = [
@@ -22,7 +24,7 @@ const paths = [
         title: 'Learn the engine',
         body: 'Follow the C11 + SDL2 architecture, game loop, rendering, collision, input, and entity systems.',
         action: 'OPEN GUIDE ->',
-        href: `${base}/docs/developer-guide/`,
+        href: `${base}/docs/learning-path/`,
     },
     {
         label: 'PATH_03',
@@ -39,6 +41,8 @@ const manualGroups = [
         title: 'Start here',
         body: 'Project overview, codebase map, and the first walkthrough for new contributors.',
         links: [
+            { title: 'Sandbox School', href: `${base}/docs/learning-path/`, external: false },
+            { title: 'Mechanics Museum', href: `${base}/docs/mechanics-museum/`, external: false },
             { title: 'README', href: 'https://github.com/jonathanperis/super-mango-editor#readme', external: true },
             { title: 'Developer Guide', href: `${base}/docs/developer-guide/`, external: false },
             { title: 'Architecture', href: `${base}/docs/architecture/`, external: false },
@@ -102,7 +106,7 @@ const manualGroups = [
             <p id="game-status">
                 <span class="cabinet-standby">WebAssembly cabinet ready</span>
                 <span class="cabinet-standby-note">Click to load the browser build and start the run.</span>
-                <button id="play-btn" type="button" data-start-game="play">Play normal run (~43 MB)</button>
+                <button id="play-btn" type="button" data-start-game="play">Play normal run ({facts.assetMiB} MiB assets + engine)</button>
                 <button id="debug-btn" type="button" data-start-game="debug">Debug mode: hitboxes + FPS</button>
             </p>
         </div>
@@ -213,7 +217,7 @@ const manualGroups = [
     <h2 class="section-title">CHOOSE YOUR CARTRIDGE</h2>
     <p class="section-lede">
         Download builds for your platform from GitHub Releases, or return to the WebAssembly cabinet for no-install browser play.
-        Native builds should run from the repository root so they can find <code>assets/</code>.
+        Builder archives include the game and editor. Run them from the extracted folder so they can find <code>assets/</code> and <code>levels/</code>.
     </p>
     <div class="download-grid">
         <a class="download-card" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for Linux x86_64">
@@ -395,7 +399,8 @@ const manualGroups = [
     }
 
     function requestGameStart(debug = false) {
-        document.getElementById('play')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        document.getElementById('play')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
         window.setTimeout(() => startGame(debug), 120);
     }
 

@@ -22,7 +22,23 @@ The gamepad path uses SDL's `SDL_GameController` mapping layer, so Xbox, DualSho
 
 ## Start Menu and Level Select
 
-Without `--level`, the native executable loads the v1 manifest at `levels/campaigns/main.toml` and starts at a selector built from its ordered `levels` array. The first selection is `levels/00_onboarding_01.toml` (**Forest First Steps**), followed by Creator's Playground and the two Volcanic Depths stages. Each entry displays the linked level's TOML `name`; an empty name falls back to the filename stem. This is not a hardcoded list. Selecting **Level Select** from a terminal overlay closes only the active game screen and returns to this menu; the session and its controller subsystem remain active.
+Without `--level`, the native executable loads `levels/campaigns/main.toml`: Creator's Playground, then the two Volcanic Depths stages. The selector reads each TOML `name` (falling back to the filename). **Level Select** closes the active game screen and reopens that catalog in the same session. Separate mechanics examples use `--level levels/labs/NAME.toml`.
+
+## Debug experiments
+
+`--debug` opens the simulation inspector and disables personal-profile persistence.
+F2 freezes/resumes simulation; F3 advances one 1/60-second step; F4 cycles 1×,
+0.25× and 0.1× speed. F6 selects a movement field, minus/equal adjusts it, and F7
+restores authored values. Focus/settings/player pause and terminal screens retain
+priority over these controls.
+
+F8 restarts the current level and records semantic inputs, actual simulation dt,
+movement tuning and seed. F9 explicitly exports the capture (native working
+directory or browser download), preserving existing files. Use
+`--level PATH --experiment CAPTURE.toml` to replay with unchanged level bytes and
+the same engine revision. Live movement is ignored during replay, which freezes
+at the last recorded step. Captures are bounded to 36,000 simulation steps and
+do not span level transitions. See [Mechanics Museum](../mechanics-museum/).
 
 `--level <path>` and `--sandbox` start gameplay directly and skip the selector. `--level` has no campaign-membership check, so a valid TOML level may be launched even when it is not listed in the manifest. The current catalog is documented in the generated [Level Catalog](../level-catalog/).
 

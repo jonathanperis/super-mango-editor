@@ -23,8 +23,8 @@
 #include "editor_session.h"    /* editor status/title/persist helpers */
 #include "editor_validation.h" /* editor_validate_level */
 #include "file_dialog.h"       /* file_dialog_open */
-#include "serializer.h"        /* level_load_toml, level_save_toml */
-#include "serializer_io.h"     /* UTF-8-aware editor path I/O */
+#include "../shared/serializer.h"    /* shared level format */
+#include "../shared/serializer_io.h" /* UTF-8 file I/O */
 #include "undo.h"              /* undo_clear */
 
 #define EDITOR_RECENT_MAX    5

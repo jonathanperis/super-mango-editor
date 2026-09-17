@@ -401,7 +401,10 @@ def load_max_constants() -> dict[str, int]:
     define_re = re.compile(
         r"^\s*#define\s+([A-Z][A-Z0-9_]*)\s+([0-9]+)\b"
     )
-    shared_names = {"GAME_W", "GAME_H", "TILE_SIZE"}
+    shared_names = {"GAME_W", "GAME_H", "TILE_SIZE"} | {
+        f"{kind}_{dimension}" for kind in ("VINE", "LADDER", "ROPE")
+        for dimension in ("W", "H", "STEP")
+    }
 
     for header in (ROOT / "src").rglob("*.h"):
         for line in header.read_text(encoding="utf-8").splitlines():
@@ -781,6 +784,27 @@ def validate_nested_dimensions(level_path: Path, data: dict, constants: dict[str
 
     screens = data.get("screen_count", 4)
     screens = screens if isinstance(screens, int) and 0 < screens <= 99 else 4
+    # Match level_validate.c's rendered climbable rectangles, not just counts.
+    for array, kind in (("vines", "VINE"), ("ladders", "LADDER"), ("ropes", "ROPE")):
+        items = data.get(array, [])
+        if not isinstance(items, list):
+            continue
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+            count = item.get("tile_count", 1)
+            x, y = item.get("x", 0), item.get("y", 0)
+            if not isinstance(count, int) or isinstance(count, bool) or not _is_finite_number(x) or not _is_finite_number(y):
+                continue  # Type errors are reported by the schema pass.
+            x, y = ctypes.c_float(float(x)).value, ctypes.c_float(float(y)).value
+            height = constants[f"{kind}_H"] + (count - 1) * constants[f"{kind}_STEP"]
+            field = f"{level_path.relative_to(ROOT)}: {array}[{index}]"
+            if count < 1:
+                errors.append(f"{field}.tile_count must be positive")
+            elif x < 0 or x + constants[f"{kind}_W"] > screens * constants["GAME_W"]:
+                errors.append(f"{field}.x plus width is outside world bounds")
+            elif y < 0 or y + height > constants["GAME_H"]:
+                errors.append(f"{field}.y plus rendered height {height} is outside world bounds")
     check_range("platforms", "tile_height", 1, (300 - 48 + 16) // 48)
     # Width may be omitted/zero (one tile), unlike height.
     for item in data.get("platforms", []) if isinstance(data.get("platforms", []), list) else []:
@@ -921,7 +945,7 @@ def validate_level(
 def main() -> int:
     constants = load_max_constants()
     asset_manifest = load_asset_manifest()
-    level_paths = sorted(LEVEL_DIR.glob("*.toml"))
+    level_paths = sorted(LEVEL_DIR.glob("*.toml")) + sorted((LEVEL_DIR / "labs").glob("*.toml"))
 
     if not level_paths:
         sys.stderr.write("validate_levels: no levels/*.toml files found\n")

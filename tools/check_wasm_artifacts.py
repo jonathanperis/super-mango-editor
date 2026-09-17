@@ -17,6 +17,8 @@ REQUIRED_OUT = WASM_FILES
 REQUIRED_ZIP = [f"super-mango-wasm/{name}" for name in WASM_FILES] + [
     "super-mango-wasm/README.txt",
     "super-mango-wasm/LICENSE",
+    "super-mango-wasm/THIRD_PARTY_NOTICES.md",
+    "super-mango-wasm/licenses/tomlc17.txt",
 ]
 
 

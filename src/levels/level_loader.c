@@ -10,7 +10,7 @@
  *               geometry that never changes (platforms, rails, sea gaps).
  */
 
-#include <stdlib.h>  /* rand(), RAND_MAX */
+#include "../core/game_random.h"
 #include <SDL_image.h> /* IMG_LoadTexture, IMG_GetError */
 #include <stdio.h>     /* fprintf, stderr */
 /* string.h no longer needed — foreground detection is count-based */
@@ -54,7 +54,7 @@
  * Used to stagger fish jump timers so they don't all leap simultaneously.
  */
 static float rand_range(float lo, float hi) {
-    return lo + (float)rand() / (float)RAND_MAX * (hi - lo);
+    return lo + game_random_unit() * (hi - lo);
 }
 
 /* ------------------------------------------------------------------ */

@@ -195,33 +195,8 @@ jobs:
         if: matrix.target == 'wasm'
         run: python3 tools/check_wasm_artifacts.py
 
-      # ── Bundle SDL2 DLLs for Windows ────────────────────────────────────────
-      # On Windows, SDL2 is dynamically linked. The DLLs must ship alongside
-      # the .exe or it will fail to start on any machine without SDL2 installed.
-      # We copy every SDL2*.dll from the UCRT64 bin directory into out/.
-      - name: Bundle SDL2 DLLs (Windows)
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
-        run: cp /ucrt64/bin/SDL2*.dll out/
-
-      # ── Rename .exe for upload (Windows) ────────────────────────────────────
-      # The Makefile produces "super-mango" on all platforms; on Windows the
-      # linker names it "super-mango.exe". We normalise the name here so the
-      # upload-artifact path is consistent.
-      - name: Rename binary (Windows)
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
-        run: mv out/super-mango.exe out/super-mango
-
-      - name: Remove editor binary from release artifacts (Linux / macOS)
-        if: matrix.target == 'native' && runner.os != 'Windows'
-        run: rm -f out/super-mango-editor
-
-      - name: Remove editor binary from release artifacts (Windows)
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
-        run: rm -f out/super-mango-editor.exe out/super-mango-editor
-
+      # dist-native builds isolated optimized game/editor binaries and collects
+      # Windows runtime DLLs and notices directly into the builder archive.
       # Package standalone release archives. Native archives include the game
       # binary plus assets/, levels/, LICENSE, and a short run README so users
       # do not need to clone the repository just to play. WebAssembly archives
@@ -323,7 +298,7 @@ jobs:
             | Windows x86_64  | `super-mango-windows-x86_64.zip`      | Extract zip; SDL2 DLLs are included |
             | WebAssembly     | `super-mango-wasm.zip`                | Serve with any HTTP server          |
 
-            Native archives include the executable, `assets/`, `levels/`, `LICENSE`, and a short README. Run the executable from inside the extracted folder. Linux and macOS builds still require compatible SDL2 runtime libraries on the host. Windows archives bundle the SDL/MSYS2 runtime DLLs discovered by CI. The WebAssembly archive bundles assets into the `.data` file.
+            Native builder archives include the game and editor, playable `assets/`, campaign/lab `levels/`, project and third-party notices, and a short README. Run from the extracted folder. Linux/macOS require compatible SDL2 runtimes; Linux dialogs need zenity. Windows bundles runtime DLLs and available package notices. Reserve assets are excluded; WebAssembly uses the verified `.data` payloads.
           files: |
             dist/linux/super-mango-linux-x86_64.zip
             dist/macos/super-mango-macos-arm64.zip

@@ -258,3 +258,46 @@ void game_resources_cleanup(GameState *gs)
 
     destroy_texture_specs_reverse(gs, s_boot_textures, ARRAY_LEN(s_boot_textures));
 }
+
+static int missing_level_texture(size_t offset)
+{
+    for (int i = 0; i < ARRAY_LEN(s_optional_textures); i++) {
+        if (s_optional_textures[i].offset == offset) {
+            fprintf(stderr, "Required gameplay texture unavailable: %s\n",
+                    s_optional_textures[i].path);
+            break;
+        }
+    }
+    return -1;
+}
+
+int game_resources_require_level_textures(const GameState *gs, const LevelDef *def)
+{
+#define REQUIRE(member, used) \
+    do { if ((used) && !gs->textures.member) return missing_level_texture(TEX_FIELD(member)); } while (0)
+    REQUIRE(last_star, 1);
+    REQUIRE(star_yellow, 1); /* Also used by the HUD. */
+    REQUIRE(star_green, def->star_green_count);
+    REQUIRE(star_red, def->star_red_count);
+    REQUIRE(faster_fish, def->faster_fish_count);
+    REQUIRE(spike, def->spike_row_count);
+    REQUIRE(spike_platform, def->spike_platform_count);
+    REQUIRE(spike_block, def->spike_block_count);
+    REQUIRE(circular_saw, def->circular_saw_count);
+    REQUIRE(axe_trap, def->axe_trap_count);
+    REQUIRE(blue_flame, def->blue_flame_count);
+    REQUIRE(fire_flame, def->fire_flame_count);
+    REQUIRE(float_platform, def->float_platform_count);
+    REQUIRE(bridge, def->bridge_count);
+    REQUIRE(bouncepad_small, def->bouncepad_small_count);
+    REQUIRE(bouncepad_high, def->bouncepad_high_count);
+    REQUIRE(ladder, def->ladder_count);
+    REQUIRE(rope, def->rope_count);
+    REQUIRE(rail, def->rail_count);
+    for (int i = 0; i < def->vine_count; i++) {
+        REQUIRE(vine_green, def->vines[i].vine_type == 0);
+        REQUIRE(vine_brown, def->vines[i].vine_type != 0);
+    }
+#undef REQUIRE
+    return 0;
+}

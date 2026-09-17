@@ -24,7 +24,8 @@
  *
  * dt (delta time) is the time in seconds since the last frame (e.g. 0.016).
  * Multiplying velocity (px/s) by dt (s) gives displacement in pixels.
- * This makes movement speed identical regardless of frame rate.
+ * This expresses speed independently of frame rate. Numerical integration and
+ * discrete collision sampling still have timestep-dependent error.
  *
  * One-way platforms:
  *   Only the TOP SURFACE of each platform triggers a landing.  The player

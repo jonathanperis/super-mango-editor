@@ -4,6 +4,12 @@ on:
   pull_request:
     paths:
       - 'docs/**'
+      - 'README.md'
+      - 'PRODUCT.md'
+      - 'DESIGN.md'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'assets/**'
+      - 'tools/content_inventory.py'
       - 'levels/**'
       - 'tools/check_docs_drift.py'
       - 'tools/check_roadmap_quality.py'

@@ -2,7 +2,7 @@
  * fish.c — Jumping fish enemy that patrols the water lane.
  */
 
-#include <stdlib.h>   /* rand */
+#include "../core/game_random.h"
 
 #include "fish.h"
 #include "../game.h"               /* FLOOR_Y, GRAVITY */
@@ -14,7 +14,7 @@
 /* Return a random float in the inclusive range [min_s, max_s]. */
 static float fish_random_jump_delay(float min_s, float max_s)
 {
-    float t = (float)(rand() % 1001) / 1000.0f;
+    float t = game_random_unit();
     return min_s + (max_s - min_s) * t;
 }
 

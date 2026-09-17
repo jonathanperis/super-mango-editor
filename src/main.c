@@ -36,6 +36,7 @@
 /* Our own modules */
 #include "game.h"
 #include "core/app_session.h"
+#include "core/game_random.h"
 
 int main(int argc, char *argv[]) {
     /*
@@ -53,6 +54,7 @@ int main(int argc, char *argv[]) {
     const char *level_path = NULL;
     const char *replay_script_path = NULL;
     const char *profile_path = NULL;
+    const char *experiment_path = NULL;
     int no_save = 0, continue_last = 0, expect_profile = 0;
     int expect_level_path = 0;
     int expect_replay_script = 0;
@@ -125,10 +127,18 @@ int main(int argc, char *argv[]) {
         else if (strcmp(argv[i], "--no-save") == 0) no_save = 1;
         else if (strcmp(argv[i], "--continue") == 0) continue_last = 1;
         else if (strcmp(argv[i], "--profile") == 0) expect_profile = 1;
+        else if (strcmp(argv[i], "--experiment") == 0) {
+            if (i + 1 >= argc || argv[i+1][0] == '-') {
+                fprintf(stderr, "Error: --experiment requires a path\n"); return EXIT_FAILURE;
+            }
+            experiment_path = argv[++i]; debug_mode = 1; no_save = 1;
+        }
         else if (strcmp(argv[i], "--help") == 0) {
             puts("Super Mango: --level PATH | --continue | --sandbox\n"
                  "  --profile PATH   explicit native player profile\n"
-                 "  --no-save        memory-only settings/results\n"
+                  "  --no-save        memory-only settings/results\n"
+                  "  --experiment PATH --level PATH   replay a captured experiment\n"
+                  "Debug: F2 freeze, F3 step, F4 slow, F6 field, -/+ tune, F7 reset, F8 record, F9 export.\n"
                  "  --debug --seed N --smoke-test-frames N --replay-script NAME\n"
                  "F1: settings (menu: gamepad Y; gameplay: Back).\n"
                  "Continue opens the last stage, not a mid-level save.\n"
@@ -160,6 +170,10 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    if (experiment_path && (!level_path || replay_script_path)) {
+        fprintf(stderr, "Error: --experiment requires --level and cannot combine with --replay-script\n");
+        return EXIT_FAILURE;
+    }
     if (smoke_test_frames > 0 && !level_path) {
         level_path = "levels/00_sandbox_01.toml";
     }
@@ -232,11 +246,11 @@ int main(int argc, char *argv[]) {
     }
 
     /*
-     * Seed the C standard library RNG. Normal runs use SDL_GetTicks() so
-     * rand()-driven decoration differs each launch; tests can pass --seed
-     * for deterministic smoke/replay behavior.
+     * Seed the explicit unsigned PRNG. Normal runs use SDL_GetTicks(); tests
+     * and experiments use --seed to reproduce enemy timers and decoration.
      */
-    srand(rng_seed_set ? rng_seed : (unsigned int)SDL_GetTicks());
+    if (!rng_seed_set) rng_seed = (unsigned int)SDL_GetTicks();
+    game_random_seed(rng_seed);
 
     {
         AppSessionConfig config = {
@@ -246,7 +260,9 @@ int main(int argc, char *argv[]) {
             .replay_script_path = replay_script_path,
             .profile_enabled = !no_save,
             .profile_path = profile_path,
-            .continue_last = continue_last
+            .continue_last = continue_last,
+            .random_seed = rng_seed,
+            .experiment_path = experiment_path
         };
         AppSession *session = session_create(&config);
         int result;

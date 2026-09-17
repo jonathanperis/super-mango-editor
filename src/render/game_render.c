@@ -9,6 +9,7 @@
 #include "../screens/settings_menu.h"
 
 #include "../core/debug.h"
+#include "../core/game_inspector.h"
 #include "../core/game_overlay.h"
 #include "../screens/hud.h"
 
@@ -336,6 +337,7 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
     /* Draw debug overlays (collision boxes, FPS, event log) if active */
     if (gs->debug_mode) {
         debug_render(&gs->debug, gs->hud.font, gs->renderer, gs, cam_x);
+        game_inspector_render(gs);
     }
 
     /* Player-facing overlays — rendered last on top of everything */
