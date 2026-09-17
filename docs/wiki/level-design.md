@@ -4,16 +4,16 @@
 
 ---
 
-Super Mango levels are defined as [TOML](https://toml.io) files inside the `levels/` directory. The game engine loads them at startup via `level_loader.c`; the level editor reads and writes the same format. All positions are in **logical pixels** (400×300 coordinate space).
+Super Mango levels are defined as [TOML](https://toml.io) files inside the `levels/` directory. The shared serializer parses them; `level_loader.c` creates runtime objects from the validated data. The editor reads and writes the same format. Positions use **logical world pixels**: the viewport is 400×300, while world width is `screen_count × 400`.
 
-> **TOML rule:** All scalar key-value pairs must appear **before** any `[array tables]` in the file. The parser (`tomlc17`) will fail silently or error if arrays precede scalars.
+> **TOML scope:** Put root fields before the first table header. A key after `[physics]` or `[[coins]]` belongs to that table until another header begins; it does not return to the root. Use `[[...]]` for repeated placements and `[last_star]` / `[physics]` for singleton tables. Strict v1 validation rejects misplaced or unknown fields.
 
 ---
 
 ## Quick Start
 
 ```sh
-# Run the first campaign level directly
+# Run a focused collision lab directly
 make run-level LEVEL=levels/labs/01_collision.toml
 
 # Open a level in the visual editor
@@ -25,7 +25,7 @@ make run-editor
 
 ## Top-Level Scalars
 
-Every level file begins with these key-value pairs. All are required unless marked optional.
+New checked-in levels must declare `format_version = 1`. Other root fields have loader defaults, but should be authored explicitly when they matter to the level. Files without a version use the legacy reader; new examples use strict v1.
 
 ```toml
 format_version = 1                       # required level-schema version
@@ -49,9 +49,9 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `format_version` | int | Required level-schema version. Current value: `1`. |
+| `format_version` | int | Required for checked-in levels and new v1 documents: `1`. |
 | `screen_count` | int | Number of 400px-wide screens. `4` → world is 1600px wide. |
-| `player_start_x/y` | float | Spawn position in logical pixels. |
+| `player_start_x/y` | float | Spawn x and foot/landing y in logical pixels; y is not the sprite's top edge. |
 | `music_path` | string | Path to a WAV file, relative to repo root. |
 | `music_volume` | int | SDL_mixer channel volume: 0 (silent) – 128 (full). |
 | `floor_tile_path` | string | PNG used to tile the ground. Per-level theming. |
@@ -167,7 +167,7 @@ Pillar top Y: `FLOOR_Y − (tile_height × TILE_SIZE)` = `252 − (tile_height �
 |---------------|---------------|-------|
 | 1 | 204 | Short hop |
 | 2 | 156 | Standard — medium bouncepads clear this |
-| 3 | 108 | Tall — requires high bouncepad or triple-jump |
+| 3 | 108 | Tall — use a bouncepad, climbable, or intermediate ledge |
 
 ---
 
@@ -175,7 +175,7 @@ Pillar top Y: `FLOOR_Y − (tile_height × TILE_SIZE)` = `252 − (tile_height �
 
 ```toml
 [[coins]]
-x = 46.0    # centre-ish x in logical pixels (render width = 16px)
+x = 46.0    # left edge in logical pixels (render width = 16px)
 y = 236.0   # top edge y in logical pixels
 ```
 
@@ -220,7 +220,7 @@ Collecting the last star snapshots elapsed time and coin totals, then shows the 
 
 ## Campaign Manifest (v1)
 
-`levels/campaigns/main.toml` is the required native-menu catalog, not a playable level. It has exactly two top-level fields. The current v1 order starts with the onboarding level:
+`levels/campaigns/main.toml` is the required native-menu catalog, not a playable level. It has exactly two top-level fields. The v1 order starts with Creator's Playground:
 
 ```toml
 format_version = 1
@@ -260,7 +260,7 @@ frame_index = 0      # starting animation frame (0–2)
 
 ### Jumping Spiders
 
-Variant that leaps across sea gaps. Same fields as spider.
+Variant that leaps across sea gaps. Uses the spider's position, velocity and patrol fields, but has no authored `frame_index`.
 
 ```toml
 [[jumping_spiders]]
@@ -286,7 +286,7 @@ frame_index = 0
 
 ### Faster Birds
 
-Same schema as `[birds]`. Higher `vx` for more aggressive patrol.
+Same schema as `[[birds]]`. Higher `vx` for faster patrol.
 
 ```toml
 [[faster_birds]]
@@ -312,7 +312,7 @@ patrol_x1  = 950.0
 
 ### Faster Fish
 
-Same schema as `[fish]`. Higher `vx`.
+Same schema as `[[fish]]`. Higher `vx`.
 
 ```toml
 [[faster_fish]]
@@ -380,11 +380,11 @@ tile_count = 3       # number of tiles wide
 
 ### Spike Blocks
 
-Rail-riding hazard. References a rail by index (0-based order of `[rails]` in the file).
+Rail-riding hazard. References a rail by index (0-based order of `[[rails]]` in the file).
 
 ```toml
 [[spike_blocks]]
-rail_index = 0      # which rail to ride (0 = first [rails] entry)
+rail_index = 0      # which rail to ride (0 = first [[rails]] entry)
 t_offset   = 0.0    # starting position on the rail (0.0 = first tile)
 speed      = 1.5    # traversal speed in tiles per second
 ```
@@ -470,13 +470,13 @@ pad_type  = "RED"
 
 ### Climbable Surfaces
 
-Vines, ladders, and ropes are placed as vertical stacks of 16px tiles.
+Climbables are 16px wide, with overlapping cropped segments. Total height is `H + (tile_count - 1) × STEP`: vines use `H=32, STEP=19`, ladders `H=22, STEP=8`, and ropes `H=36, STEP=23`. The complete stack must fit within the 300px world height.
 
 ```toml
 [[vines]]
 x          = 88.0
 y          = 172.0   # top tile y in logical pixels
-tile_count = 2       # height in 16px tiles
+tile_count = 2       # 51px total cropped height
 vine_type  = 0       # optional art variant: 0 = Green, 1 = Brown
 
 [[ladders]]
@@ -490,7 +490,7 @@ y          = 172.0
 tile_count = 1
 ```
 
-The player can climb all three by pressing Up/Down while overlapping the surface. Vines and ropes require the player to jump into them; ladders are entered by pressing Up at the base. `vine_type` is preserved by the serializer and exposed by the editor as a visual-variant dropdown: `0` = Green, `1` = Brown.
+Press Up while overlapping any climbable to grab it, without holding Jump. Up/Down climbs, Left/Right drifts, and Jump dismounts. `vine_type` is preserved by the serializer and exposed by the editor as a visual-variant dropdown: `0` = Green, `1` = Brown.
 
 ---
 

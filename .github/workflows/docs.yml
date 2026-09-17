@@ -12,6 +12,9 @@ on:
       - 'tools/content_inventory.py'
       - 'levels/**'
       - 'tools/check_docs_drift.py'
+      - 'tools/check_docs_site.py'
+      - 'tests/docs_checks_test.py'
+      - 'tools/validate_levels.py'
       - 'tools/check_roadmap_quality.py'
       - 'tools/check_wasm_artifacts.py'
       - 'tools/generate_level_catalog.py'
@@ -65,4 +68,8 @@ jobs:
 
       - name: Build docs site
         run: bun run build
+        working-directory: docs
+
+      - name: Check built docs links and metadata
+        run: bun run check-site
         working-directory: docs

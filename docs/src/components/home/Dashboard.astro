@@ -90,7 +90,7 @@ const manualGroups = [
 <section id="play" class="play-section cabinet-bay" data-asset-base={`${base}/`}>
     <div class="section-kicker">CABINET BAY</div>
     <h2 class="section-title">BOOT THE RUN</h2>
-    <p class="section-lede">Normal Play now boots from every play CTA. Debug Mode is kept as a developer diagnostic path with the same WebAssembly payload plus <code>--debug</code>.</p>
+    <p class="section-lede">Start in Creator's Playground. Debug Mode adds hitboxes, freeze/step controls, live movement tuning and experiment capture using the same WebAssembly payload.</p>
     <div class="cabinet-frame">
         <div class="cabinet-marquee">
             <span>WEBASSEMBLY BUILD</span>
@@ -107,7 +107,7 @@ const manualGroups = [
                 <span class="cabinet-standby">WebAssembly cabinet ready</span>
                 <span class="cabinet-standby-note">Click to load the browser build and start the run.</span>
                 <button id="play-btn" type="button" data-start-game="play">Play normal run ({facts.assetMiB} MiB assets + engine)</button>
-                <button id="debug-btn" type="button" data-start-game="debug">Debug mode: hitboxes + FPS</button>
+                <button id="debug-btn" type="button" data-start-game="debug">Debug mode: simulation inspector</button>
             </p>
         </div>
         <div id="touch-controls"></div>
@@ -189,7 +189,7 @@ const manualGroups = [
 <section id="docs" class="docs-section">
     <div class="section-kicker">BUILDER MANUAL</div>
     <h2 class="section-title">CHOOSE YOUR ROUTE</h2>
-    <p class="section-lede">The landing page now groups docs by intent. Use the full manual when you need the exhaustive index.</p>
+    <p class="section-lede">Start with Sandbox School, trace the engine, or build your first level. The full manual includes controls, testing, asset provenance and release guidance.</p>
     <div class="docs-cta-row">
         <a href={`${base}/docs`} class="docs-link-btn">View full documentation &rarr;</a>
     </div>
@@ -216,8 +216,9 @@ const manualGroups = [
     <div class="section-kicker">ITEM DROP</div>
     <h2 class="section-title">CHOOSE YOUR CARTRIDGE</h2>
     <p class="section-lede">
-        Download builds for your platform from GitHub Releases, or return to the WebAssembly cabinet for no-install browser play.
-        Builder archives include the game and editor. Run them from the extracted folder so they can find <code>assets/</code> and <code>levels/</code>.
+        Browse published builds on GitHub Releases, or play the current browser build above.
+        Check each release's asset list: older releases predate the game-and-editor builder bundles.
+        For the current editor and learning labs, <a href={`${base}/docs/build-system/`}>build from source with <code>make builder</code></a>.
     </p>
     <div class="download-grid">
         <a class="download-card" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for Linux x86_64">

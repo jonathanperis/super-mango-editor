@@ -27,6 +27,7 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy make sanitize-smoke CC=clang SMOKE_F
 cd docs
 bun run lint
 bun run build
+bun run check-site
 ```
 
 Confirm the release copy still points players to the current GitHub release page:
@@ -34,6 +35,11 @@ Confirm the release copy still points players to the current GitHub release page
 - `README.md` release section
 - docs build/deploy notes
 - `https://github.com/jonathanperis/super-mango-editor/releases/latest`
+
+Inspect the actual release assets, not just the workflow definition. Older
+published releases may predate builder archives; avoid promising the current
+editor/labs until a release containing them is published. Pages tracks successful
+main builds independently of releases.
 
 ## 3. WebAssembly Gates
 
@@ -63,25 +69,32 @@ RELEASE_PLATFORM=super-mango-native make dist-native
 Inspect the zip and confirm it contains:
 
 - `super-mango` executable, or `super-mango.exe` on Windows
-- `assets/`
-- `levels/`
+- `super-mango-editor` executable, or `super-mango-editor.exe` on Windows
+- playable `assets/` (no `unused/` reserve files)
+- `levels/`, including campaign manifest and learning labs
 - `README.txt`
 - `LICENSE`
-- Windows only: SDL2 runtime DLLs
+- `THIRD_PARTY_NOTICES.md` and `licenses/tomlc17.txt`
+- Windows only: runtime DLLs and available package notices under `licenses/msys2/`
 
 ## 5. CI and Publishing Gates
 
-Before creating a release, confirm the latest `main` branch checks are green:
+Before creating a release, confirm checks for the intended source commit are green:
 
 - Build & Release
 - CodeQL
-- Docs
+- Docs (relevant PR check or an explicit manual run; it does not run on main pushes)
 - Deploy to GitHub Pages
 
 Publishing rules:
 
 - push a `v*` tag to create a tagged GitHub Release, or
-- use `workflow_dispatch` for a manually versioned release.
+- use `workflow_dispatch` **on `main`** for a manually versioned release.
+
+The release job creates a draft, uploads all four archives without overwriting
+existing assets, then publishes it. A dispatch on another branch builds/checks
+but does not publish. Verify the release event's own build matrix, not an older
+green run.
 
 Normal `main` pushes are build/deploy checks only; they do not publish a GitHub Release.
 

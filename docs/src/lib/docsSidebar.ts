@@ -92,7 +92,7 @@ export const DOCS_META: Record<DocsSectionId, DocsPageMeta> = {
   'player-module': {
     id: 'player-module',
     label: 'Player Module',
-    description: 'Input, physics, animation, collisions, and player lifecycle in player.c.',
+    description: 'Sampled input, physics, animation, collisions, and lifecycle across src/player/.',
     route: '/docs/player-module/',
     marker: 'PLAYER',
   },
@@ -150,7 +150,7 @@ export const DOCS_META: Record<DocsSectionId, DocsPageMeta> = {
   'level-catalog': {
     id: 'level-catalog',
     label: 'Level Catalog',
-    description: 'Generated inventory of each TOML level, screens, counts, and progression links.',
+    description: 'Generated campaign inventory: screens, content counts, and progression links.',
     route: '/docs/level-catalog/',
     marker: 'LEVELS',
   },

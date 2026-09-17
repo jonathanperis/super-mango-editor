@@ -11,7 +11,7 @@ The player module is split across focused files under `src/player/`. `player.h` 
 | `player.h` | `Player` struct, `AnimState`, public function declarations |
 | `player.c` | High-level `player_update` orchestration |
 | `player_lifecycle.c` | init, render, hitbox, reset, cleanup, default physics |
-| `player_input.c` | keyboard/gamepad intent, run state, climb input |
+| `player_input.c` | apply sampled physical/replay intent, run state and climb input |
 | `player_motion.c` | acceleration, friction, counter-accel, air control |
 | `player_jump.c` | jump buffer, coyote time, jump cut |
 | `player_climb.c` | vine/ladder/rope grab detection and climbing helpers |
@@ -48,6 +48,8 @@ int player_init(Player *player, SDL_Renderer *renderer);
 void player_apply_default_physics(Player *player);
 void player_handle_input(Player *player, Mix_Chunk *snd_jump,
                          SDL_GameController *ctrl,
+                         unsigned int replay_input_mask,
+                         unsigned int physical_input_mask,
                          const VineDecor *vines, int vine_count,
                          const LadderDecor *ladders, int ladder_count,
                          const RopeDecor *ropes, int rope_count);

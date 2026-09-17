@@ -28,7 +28,7 @@ Super Mango has six enemy types and seven hazard types. All are stored as fixed-
 
 **TOML placement:**
 ```toml
-[spiders]
+[[spiders]]
 x          = 600.0
 vx         = 50.0        # positive = starts moving right
 patrol_x0  = 592.0
@@ -42,11 +42,11 @@ frame_index = 0          # starting animation frame (0–2)
 
 **File:** `src/entities/jumping_spider.c` / `jumping_spider.h`  
 **Sprite:** `assets/sprites/entities/jumping_spider.png`  
-**Behaviour:** Like the spider but can leap across sea gaps. Detects approaching floor gaps and jumps before reaching them, allowing it to follow the player across openings where a normal spider would fall.
+**Behaviour:** Like the spider but leaps when its art centre reaches a floor gap. Normal spiders reverse at gaps; jumping spiders continue across them. Neither variant follows the player.
 
 **TOML placement:**
 ```toml
-[jumping_spiders]
+[[jumping_spiders]]
 x          = 130.0
 vx         = 55.0
 patrol_x0  = 46.0
@@ -70,12 +70,12 @@ patrol_x1  = 310.0
 | `BIRD_ART_H` | 14 | Visible art height (rows 17–30) |
 | `BIRD_SPEED` | 45.0 | Horizontal speed in px/s |
 | `BIRD_WAVE_AMP` | 20.0 | Sine-wave vertical amplitude in px |
-| `BIRD_WAVE_FREQ` | 0.015 | Sine cycles per horizontal px of travel |
+| `BIRD_WAVE_FREQ` | 0.015 | Sine phase in radians per horizontal px |
 | `BIRD_FRAME_MS` | 140 | ms per animation frame |
 
 **TOML placement:**
 ```toml
-[birds]
+[[birds]]
 x          = 100.0
 base_y     = 60.0    # vertical centre of the sine wave
 vx         = 45.0
@@ -90,10 +90,10 @@ frame_index = 0
 
 **File:** `src/entities/faster_bird.c` / `faster_bird.h`  
 **Sprite:** `assets/sprites/entities/faster_bird.png`  
-**Behaviour:** Aggressive sky patrol with higher speed and a tighter wave. Same schema as `Bird` but uses `[faster_birds]` in TOML. Typical `vx` is 70–100 px/s vs. the bird's 45 px/s.
+**Behaviour:** Faster sky patrol with a tighter wave. Same schema as `Bird` but uses `[[faster_birds]]` in TOML. Typical `vx` is 70–100 px/s vs. the bird's 45 px/s.
 
 ```toml
-[faster_birds]
+[[faster_birds]]
 x          = 600.0
 base_y     = 50.0
 vx         = -80.0
@@ -124,7 +124,7 @@ frame_index = 0
 | `FISH_FRAME_MS` | 120 | ms per animation frame |
 
 ```toml
-[fish]
+[[fish]]
 x          = 700.0
 vx         = 70.0
 patrol_x0  = 500.0
@@ -136,10 +136,10 @@ patrol_x1  = 950.0
 ### Faster Fish
 
 **File:** `src/entities/faster_fish.c` / `faster_fish.h`  
-**Behaviour:** Same as fish but patrols at 120 px/s and jumps more frequently. Uses `[faster_fish]` in TOML.
+**Behaviour:** Same as fish but defaults to 120 px/s and jumps more frequently. Uses `[[faster_fish]]` in TOML.
 
 ```toml
-[faster_fish]
+[[faster_fish]]
 x          = 1100.0
 vx         = 120.0
 patrol_x0  = 900.0
@@ -150,7 +150,7 @@ patrol_x1  = 1400.0
 
 ## Hazards
 
-All hazards deal **1 heart of damage** on contact with knockback (same `apply_damage` path in `player.c`).
+Active hazard hitboxes deal **1 heart of damage** on contact with knockback, subject to hurt immunity. `game_collision.c` routes hits through `apply_damage()` in `src/collision/collision_damage.c`; waiting flames have no active damage hitbox.
 
 ---
 
@@ -168,7 +168,7 @@ All hazards deal **1 heart of damage** on contact with knockback (same `apply_da
 | `SPIKE_TILE_H` | 16 | Height of one spike tile in px |
 
 ```toml
-[spike_rows]
+[[spike_rows]]
 x     = 780.0   # left edge of the strip
 count = 4       # number of tiles
 ```
@@ -182,8 +182,8 @@ count = 4       # number of tiles
 **Behaviour:** A rotating hazard that travels along a `Rail` path. References a rail by index and can be given an initial offset and speed. Visually rotates as it travels. The player is pushed on contact.
 
 ```toml
-[spike_blocks]
-rail_index = 0      # 0-based index into the [rails] list
+[[spike_blocks]]
+rail_index = 0      # 0-based index into the [[rails]] list
 t_offset   = 0.0    # starting position on the rail (0.0 = first tile)
 speed      = 1.5    # traversal speed in tiles/s
 ```
@@ -197,7 +197,7 @@ speed      = 1.5    # traversal speed in tiles/s
 **Behaviour:** Elevated static surface tiled across `tile_count` units. The player is damaged when landing on the top surface or touching the sides.
 
 ```toml
-[spike_platforms]
+[[spike_platforms]]
 x          = 370.0
 y          = 200.0   # top edge in logical pixels
 tile_count = 3
@@ -220,7 +220,7 @@ tile_count = 3
 | `SAW_PUSH_VY` | −150.0 | Upward component of push |
 
 ```toml
-[circular_saws]
+[[circular_saws]]
 x          = 1350.0
 y          = 0.0        # engine snaps to floor level
 patrol_x0  = 1350.0
@@ -249,8 +249,8 @@ Collision uses the full rotated bounding box of the blade region.
 | `AXE_SPIN_SPEED` | 180.0°/s | Full-rotation variant speed |
 
 ```toml
-[axe_traps]
-pillar_x = 256.0    # centre x of the pillar column
+[[axe_traps]]
+pillar_x = 256.0    # left x of the pillar column
 y        = 0.0      # pivot y (engine computes from pillar height)
 mode     = "PENDULUM"   # or "SPIN"
 ```

@@ -2,7 +2,7 @@
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 <nav class="site-nav" id="site-nav" aria-label="Primary navigation">
-    <a href={base || '#hero'} class="nav-logo" aria-label="Super Mango home">
+    <a href={`${base}/#hero`} class="nav-logo" aria-label="Super Mango home">
         <span class="nav-logo-mark" aria-hidden="true">SM</span>
         <span class="nav-logo-copy">
             <span>Super Mango</span>

@@ -79,7 +79,12 @@ path = "assets/sprites/foregrounds/fog_2.png"
 
 ---
 
-## Currently Used Assets
+## Asset Reference
+
+These tables include runtime resources and available theme variants; being
+bundled does not mean a current level references a file. [Asset Inventory](../asset-inventory/)
+is the generated size/budget record. [Asset Provenance](../asset-provenance/)
+records attribution and unresolved license evidence.
 
 ### Backgrounds — `assets/sprites/backgrounds/`
 
@@ -239,7 +244,8 @@ Additional background variants are stored alongside used backgrounds in `assets/
 | `glacial_mountains_lightened.png` | Lightened mountain variant |
 | `sky_blue_lightened.png` | Lightened sky variant |
 
-Additional tilesets are stored in `assets/sprites/levels/`:
+Additional tilesets are stored in `assets/sprites/levels/`; the stone variants
+are already used by the volcanic campaign levels:
 
 | File | Description |
 |------|-------------|

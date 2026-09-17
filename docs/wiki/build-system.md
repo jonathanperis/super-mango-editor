@@ -35,6 +35,7 @@ OBJS    = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
 DEPS    = $(OBJS:.o=.d)
 ```
 
+This abbreviated source-list example omits platform detection and build-mode flags.
 Both applications include `src/shared/serializer_load_checkpoints.c` and the other shared serializer/UI modules.
 
 ### Key Variables
@@ -163,7 +164,7 @@ make editor
 
 ### `make run-editor`
 
-Builds the editor (if out of date) then immediately runs it.
+Builds both game and editor (if out of date), then runs the editor with its sibling game available for playtest.
 
 ```sh
 make run-editor
@@ -185,7 +186,7 @@ For release confidence, the **GitHub Actions WebAssembly build is authoritative*
 
 ### `make test`
 
-Builds and runs native regression harnesses for pure logic that does not require opening an SDL window.
+Builds and runs native regression harnesses, including dummy-SDL session/editor integration cases. No interactive window is required.
 
 ```sh
 make test
@@ -209,11 +210,15 @@ Current test binaries (15):
 - `out/session-test`
 - `out/game-checkpoint-test`
 
-`make test` also runs two Python host checks: `tests/validate_levels_test.py` and `tools/check_web_boot_contract.py` (through the `web-host-contract` target). The native list above is the complete `TEST_TARGETS` inventory.
+`make test` also runs `tests/validate_levels_test.py`. Its `web-host-contract`
+prerequisite runs the static boot check, JavaScript host/profile-storage/touch
+contracts and Python release-archive tests. The native list above is the complete
+`TEST_TARGETS` inventory; profile, simulation and parser-boundary cases are linked
+into existing harnesses rather than separate binaries.
 
 ### `make validate-levels`
 
-Runs the Python TOML validator against every `levels/*.toml` file and the required v1 `levels/campaigns/main.toml` manifest. It checks parsing, referenced asset paths, `next_phase` links, array counts against the C `MAX_*` constants, manifest membership/order, and the linear campaign chain.
+Runs the Python TOML validator against `levels/*.toml`, `levels/labs/*.toml` and the required v1 `levels/campaigns/main.toml` manifest. It checks schema, referenced asset paths, `next_phase` links, counts and geometry against C limits, checkpoints, manifest membership/order and the linear campaign chain.
 
 ```sh
 make validate-levels
@@ -221,7 +226,7 @@ make validate-levels
 
 ### `make smoke`
 
-Builds the game and editor, then runs every `levels/*.toml` with dummy SDL video/audio drivers for a bounded number of frames. It also runs the editor's headless smoke mode.
+Builds the game and editor, then runs every `levels/*.toml` and `levels/labs/*.toml` with dummy SDL video/audio drivers for a bounded number of frames. The editor smoke mode renders five frames before exiting.
 
 ```sh
 make smoke SMOKE_FRAMES=5 SMOKE_SEED=1
@@ -294,7 +299,7 @@ make dist-wasm
 
 ### `make docs-drift`
 
-Runs the generated level-catalog freshness check, generated overlay-snapshot freshness check, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. Together they compare Makefile test targets, README/developer-guide command summaries, source-file map entries, campaign catalog coverage, layer TOML snippets, workflow docs, runtime flags, key constants, level prose counts, TOML line endings, overlay text snapshots, local Emscripten caveats, and scripted-smoke wiring against the current repository.
+Runs generated content-inventory, level-catalog and overlay-snapshot freshness checks, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. They compare documented test targets, README/guide summaries, source-map entries, campaign coverage, TOML example schemas, player API declarations, runtime flags, selected constants, level prose, workflow references and scripted-smoke wiring. Run the separate built-site check below for emitted links and metadata.
 
 ```sh
 make docs-drift
@@ -318,6 +323,7 @@ cd docs
 bun install --frozen-lockfile
 bun run lint
 NODE_ENV=production bun run build
+bun run check-site
 ```
 
 When Bun is unavailable but `docs/node_modules` has already been restored, the same package scripts can be checked with npm:
@@ -325,19 +331,25 @@ When Bun is unavailable but `docs/node_modules` has already been restored, the s
 ```sh
 cd docs
 npm run lint && npm run build
+npm run check-site
 ```
 
 Keep Bun and `bun.lock` as the CI dependency contract. The npm fallback runs the declared scripts; it does not replace the locked install step.
 
+Astro requires Node.js 22.12+; CI uses Node 22.21.1 and Bun 1.3.11. Development
+uses `/`; production output uses `/super-mango-editor/`. Astro does not compile or
+copy WASM: see the [website maintainer guide](https://github.com/jonathanperis/super-mango-editor/blob/main/docs/README.md)
+for local game assembly, page registration and generated-content ownership.
+
 ### `make clean`
 
-Removes all build artifacts.
+Removes the selected `OUTDIR` and `DISTDIR` (default `out/` and `dist/`) and legacy in-source objects. Separate sanitizer and docs output directories are not covered by the default invocation.
 
 ```sh
 make clean
 ```
 
-Deletes legacy in-source `.o` / `.d` files from recognized source directories and removes `out/`.
+Override `OUTDIR`/`DISTDIR` only when you intend to remove those specific build outputs.
 
 ---
 
@@ -360,20 +372,20 @@ SDL2 libraries are installed to `/opt/homebrew/` on Apple Silicon. `sdl2-config`
 ```sh
 sudo apt update
 sudo apt install build-essential clang \
-    libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-mixer-dev
+    libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-mixer-dev zenity
 ```
 
 ### Linux -- Fedora / RHEL / CentOS
 
 ```sh
 sudo dnf install clang make \
-    SDL2-devel SDL2_image-devel SDL2_ttf-devel SDL2_mixer-devel
+    SDL2-devel SDL2_image-devel SDL2_ttf-devel SDL2_mixer-devel zenity
 ```
 
 ### Linux -- Arch Linux
 
 ```sh
-sudo pacman -S clang make sdl2 sdl2_image sdl2_ttf sdl2_mixer
+sudo pacman -S clang make sdl2 sdl2_image sdl2_ttf sdl2_mixer zenity
 ```
 
 ### Windows (MSYS2)
@@ -382,8 +394,7 @@ sudo pacman -S clang make sdl2 sdl2_image sdl2_ttf sdl2_mixer
 2. Open the **MSYS2 UCRT64** terminal:
 
 ```sh
-pacman -S mingw-w64-ucrt-x86_64-clang \
-          mingw-w64-ucrt-x86_64-make \
+pacman -S make mingw-w64-ucrt-x86_64-clang \
           mingw-w64-ucrt-x86_64-SDL2 \
           mingw-w64-ucrt-x86_64-SDL2_image \
           mingw-w64-ucrt-x86_64-SDL2_ttf \
@@ -397,7 +408,7 @@ cd /c/path/to/super-mango-editor
 make
 ```
 
-4. SDL2 DLLs must be in the same directory as the binary. Copy them from the MSYS2 prefix.
+4. Run through `make run` / `make run-editor`, which puts the UCRT64 DLL directory on `PATH`, or ensure runtime DLLs are discoverable when launching directly. Current Windows release packaging bundles runtime DLLs. CI uses GCC (`CC=gcc`) in UCRT64; the local Clang commands above are also supported.
 
 ---
 
@@ -407,10 +418,10 @@ Four GitHub Actions workflows handle automated builds and docs checks:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Multi-platform native build, `make test`, `make validate-levels`, `make editor`, native game/editor smoke, Linux scripted smoke, WebAssembly build, WebAssembly artifact/package smoke; GitHub Release creation is limited to `v*` tags and manual dispatches |
-| Docs | `docs.yml` | Docs pull requests, manual | `make docs-drift`, `bun install --frozen-lockfile`, `bun run lint`, `bun run build` under `docs/` |
-| CodeQL | `codeql.yml` | Push/PR to `main`, weekly | Automated code security and quality analysis |
-| Deploy | `deploy.yml` | Successful main Build & Release workflow | Builds docs, copies WebAssembly artifacts, and deploys `docs/out/` to GitHub Pages |
+| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Native game/editor tests, smoke and packaging; Linux sanitizers/scripted smoke; Linux/macOS level validation; WASM build/artifact/package checks. Releases only on `v*` tags or manual dispatch on `main` |
+| Docs | `docs.yml` | Relevant pull requests, manual | `make docs-drift`, frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows |
+| CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ and GitHub Actions security-and-quality analysis |
+| Deploy | `deploy.yml` | Successful same-repository main push/manual Build & Release run | Builds/checks docs from the run's exact commit, copies matching WASM, HTTP-smokes the assembly and deploys `docs/out/` |
 
 Native smoke uses dummy SDL drivers where supported: `./out/super-mango --level levels/00_sandbox_01.toml --smoke-test-frames 5` and `./out/super-mango-editor --smoke-test`. WebAssembly smoke asserts `out/super-mango.html`, `.js`, `.wasm`, and `.data` exist.
 

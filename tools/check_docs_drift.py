@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Semantic documentation drift checks for the Super Mango docs.
 
-Astro catches broken Markdown/routes. This script catches project-specific drift
-that otherwise shows up only during audits: undocumented test targets, missing
+Astro compiles Markdown; check_docs_site.py checks emitted links. This script
+catches project-specific drift: undocumented test targets, missing
 source-map entries, stale TOML snippets, stale constants, and omitted runtime
 flags/workflows.
 """
@@ -13,7 +13,7 @@ import re
 import sys
 from pathlib import Path
 
-from validate_levels import campaign_manifest_entries
+from validate_levels import campaign_manifest_entries, load_max_constants, validate_schema
 
 try:
     import tomllib
@@ -187,6 +187,42 @@ def check_layer_snippets() -> None:
     for required in ["[[background_layers]]", "[[foreground_layers]]", "[[fog_layers]]"]:
         if required not in level_design:
             fail(f"docs/wiki/level-design.md: missing {required} example")
+
+
+def check_toml_examples() -> None:
+    constants = load_max_constants()
+    for page in sorted(DOCS.glob("*.md")):
+        text = read(page)
+        for match in re.finditer(r"^```toml\n(.*?)^```", text, re.M | re.S):
+            line = text.count("\n", 0, match.start()) + 1
+            label = f"{page.relative_to(ROOT)}:{line}"
+            try:
+                data = tomllib.loads(match.group(1))
+            except tomllib.TOMLDecodeError as exc:
+                fail(f"{label}: invalid TOML example: {exc}")
+                continue
+            # Campaign snippets describe the actual ordered manifest.
+            if set(data) == {"format_version", "levels"}:
+                if data != load_level(ROOT / "levels/campaigns/main.toml"):
+                    fail(f"{label}: campaign example differs from the manifest")
+                continue
+            # Partial level snippets still need strict v1 types and table shape.
+            for error in validate_schema({"format_version": 1, **data}, constants=constants):
+                fail(f"{label}: {error}")
+
+
+def check_input_reference() -> None:
+    controls = read(DOCS / "controls.md")
+    for flag in set(re.findall(r'strcmp\(argv\[i\], "(--[a-z-]+)"\)', read(ROOT / "src/main.c"))):
+        if flag not in controls:
+            fail(f"docs/wiki/controls.md: missing runtime flag `{flag}`")
+    header = read(ROOT / "src/player/player.h")
+    doc = read(DOCS / "player-module.md")
+    declarations = r"\b(?:int|void|SDL_Rect)\s+player_\w+\([^;{}]*\);"
+    documented = {" ".join(item.split()) for item in re.findall(declarations, doc)}
+    for declaration in re.findall(declarations, header):
+        if " ".join(declaration.split()) not in documented:
+            fail(f"docs/wiki/player-module.md: missing/stale declaration `{declaration.split('(')[0]}`")
 
 
 def check_constants_doc() -> None:
@@ -397,6 +433,8 @@ def main() -> int:
     check_runtime_error_docs()
     check_collectible_source_guards()
     check_layer_snippets()
+    check_toml_examples()
+    check_input_reference()
     check_constants_doc()
     check_gamestate_doc()
     check_level_schema_doc()

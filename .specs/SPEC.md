@@ -6,6 +6,8 @@ Harden the audited working tree so invalid level/editor inputs cannot corrupt me
 
 Current follow-up (2026-09-16): implement the complete repository-audit roadmap authorized by the user's “go do it all”: a reliable, inspectable C11/SDL2 sandbox school. C6-C8, I14-I20, A19-A26 and T21-T29 define this follow-up. Earlier scope and publication/browser authorizations are historical.
 
+Current follow-up (2026-09-17): audit and refresh the README, public manual, static website and repository About metadata. User requested the audit/update plan and GitHub About enhancement via `gh`, then said “go”. C9, I21-I22, A27-A29 and T30-T32 define this task; earlier scopes are historical.
+
 ## §C CONSTRAINTS
 C1: Prior work is published at aa20236. Continue the user-authorized existing checkout locally on feature/browser-boundaries from that base. Keep this follow-up local unless publishing is requested again. User explicitly approved browser UI testing on the local build with an isolated profile: startup, settings/remapping, touch press/release, focus changes, cross-tab test-save conflicts, and exit. Use only task-owned http://127.0.0.1:4187 URLs and disposable UI-generated saves. No personal profiles, credentials/storage inspection, eval/run-code, request mocking, traces, installations, or new permissions without separate scope-specific approval. Preserve the unrelated local .ignore file.
 C2: Keep C11/SDL2, the existing ownership architecture, current shipped levels/assets, and compatible legacy numeric representations. Reject unsafe inputs instead of silently repairing documents.
@@ -15,6 +17,8 @@ C5: User explicitly selected the currently opened /Users/jonathanperis/Projetos/
 C6: Continue in the canonical checkout on feature/sandbox-school-roadmap from origin/main at 042003d. Preserve the existing instrumentation cleanup. This task supersedes earlier code/documentation/level-edit restrictions, but does not authorize commit, push, installations, browser interaction, or personal-data inspection. No autonomous delegation.
 C7: Preserve C11/SDL2 and explicit bounded-state architecture. Keep the three current showcase levels; restore their campaign manifest, place new mechanics examples in levels/labs/, and keep test-owned runtime fixtures independent of showcase edits. Avoid wholesale engine rewrites.
 C8: Implement teaching features as opt-in debug experiments. Normal play, pause/focus/settings ownership, profile isolation, atomic persistence, legacy level loading and native/web builds remain supported. Export must be explicit and must not silently overwrite files. Asset licensing claims require evidence; unknown art/audio/font terms stay identified rather than invented.
+C9: Use the canonical checkout on feature/documentation-refresh from origin/main at 16be4a1. Preserve runtime, levels, assets, historical reports and prior specifications. Update documentation/site presentation and focused documentation checks. The authorized remote write is repository About description/homepage/topics through gh; no commit, push, release, deployment, installation or browser interaction is authorized.
+C10: Publication follow-up authorized on 2026-09-17: user selected “Docs PR, then release” when asked whether to publish documentation only or also a game/editor release. This supersedes C9's publication restriction: commit/push the documentation branch, open and merge its PR after CI passes, verify Pages, then publish a builder release through the main-branch workflow and inspect its four archives. Browser interaction and local installations remain outside this authorization.
 
 ## §I INTERFACES
 id|surface|contract
@@ -38,6 +42,8 @@ I17|runtime assets and ordering|Missing gameplay-critical textures fail loading 
 I18|build and distribution|Debug/release modes isolate objects and expose intentional symbols/optimization. Builder startup builds both executables; native archives include editor, game, data and third-party notices. Distribution excludes unused assets, enforces a documented raw-asset budget and packages existing WASM output without rebuilding it.
 I19|ownership and undo|Shared level-format/file-I/O and UI modules have neutral ownership. Bounded undo history retains behavior while ordinary commands avoid redundant large config snapshots; allocation failure cannot silently lose a completed edit. Refactors preserve public contracts and stay responsibility-focused.
 I20|public facts|Generated campaign/lab metrics and asset inventory drive website/catalog counts and bundle callouts. Public root documents participate in drift checks. Historical design assessments are labeled, and asset provenance distinguishes known and unresolved licenses.
+I21|documentation and site|Published manual renders its overview, supplies route-specific metadata, resolves internal links and sitemap references, and accurately documents current schema, controls, source boundaries, build/CI and release availability. Reuse existing validator/schema and generated facts rather than duplicate contracts.
+I22|repository About|Description identifies the C11/SDL2 platformer, native visual level editor, TOML worlds and learning purpose; homepage remains the verified Pages entry point and topics include editor/learning discoverability.
 
 ## §A ACCEPTANCE
 id|criterion|verify
@@ -67,6 +73,9 @@ A23|Fresh debug/release and builder targets build appropriate executables; packa
 A24|Shared modules no longer belong to editor directories; undo/redo and dirty state preserve behavior with bounded storage and accurate measurements|compile, existing editor regressions, allocation/storage measurement
 A25|Website/catalog counts and payload facts derive from tracked content; root public docs trigger verification; provenance gaps remain explicit|generator freshness, docs drift/check/build, packaging tests
 A26|Applicable native/sanitizer/host/scenario/docs gates pass; final regression/spec review reports each criterion and genuine platform limitations|verification report and final scans
+A27|Audit inventory covers root public docs, all manual pages, site source/configuration and GitHub release/Pages/About evidence; observed stale claims are corrected and residual follow-ups recorded|source review and dated docs audit report
+A28|Documentation examples match the v1 schema; all built routes/anchors/assets and sitemap targets resolve; overview and per-page metadata appear; docs and host checks pass|make docs-drift, focused negative cases, Astro lint/build, built-site checker, web-host-contract
+A29|Authorized About settings are improved using gh and read back accurately|gh repo edit and gh repo view
 
 ## §V INVARIANTS
 id|rule|proof
@@ -81,6 +90,7 @@ V8|Asynchronous storage never owns a raw pointer to a destroyed C profile/sessio
 V9|Each held touch action has explicit pointer ownership and every terminal input boundary releases it|multi-pointer and lifecycle tests
 V10|Debug inspection cannot bypass focus/settings/terminal blockers or make normal play depend on debug state|simulation ownership tests
 V11|Packaging is a transformation of verified outputs and includes the notices for bundled vendored code|archive contract tests
+V12|A green Astro build alone is not proof of valid documentation links or examples; check emitted routes/anchors/sitemaps and parse example TOML against the level schema|built-site check and docs-drift
 
 ## §T TASKS
 id|status|task|cites|verify
@@ -113,6 +123,9 @@ T26|x|Move shared helpers to neutral ownership and simplify bounded undo storage
 T27|x|Generate shared public content facts and asset provenance/inventory; close drift-trigger gaps|I20,A25|freshness, docs and package checks
 T28|x|Add focused multi-frame scenario proofs and run the full applicable native/sanitizer/host/docs verification|I14,A19,A21,A22,A26|test, sanitize, smoke, scenarios, docs gates
 T29|x|Review final code/spec regressions and report the complete roadmap disposition and remaining evidence gaps|A26,C6|regression scan, spec audit, completion report
+T30|x|Audit public documentation and source-backed claims; refresh stale copy, examples, controls, workflows and maintainer instructions|I21,A27|source review, docs-drift
+T31|x|Fix overview/metadata/sitemap publishing gaps and add focused recurrence checks; verify affected docs and host contracts|I21,A28,V12|Astro lint/build, built-site check, negative cases, web-host-contract
+T32|x|Update About via gh, record dated audit/enhancement disposition and complete regression scan|I22,A27,A29|gh readback, final diff and regression review
 
 ## §R EVIDENCE
 id|question|finding|source|checked

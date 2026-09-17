@@ -122,9 +122,9 @@ src/
 │   ├── level_resources.h / .c    Per-level resource reload wrappers
 │   ├── level_session.h / .c      Active LevelDef storage plus v1 campaign catalog loading/validation
 │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
-│   ├── level_validate.c          LevelDef count validation
+│   ├── level_validate.c          LevelDef count, schema-range and geometry validation
 │   └── exported/00_sandbox_01.h / .c
-│                                  Ignored legacy generated C artifacts; no runtime or editor exporter generates or consumes them
+│                                  Optional ignored legacy artifacts; no runtime or editor exporter generates or consumes them
 ├── player/
 │   ├── player.h / .c             Public API + high-level glue
 │   ├── player_internal.h         Private frame/hitbox/coyote constants
@@ -166,7 +166,7 @@ New `.c` files in `src/` or recognized source subdirectories are picked up by Ma
 
 ### Responsibilities
 
-- Parse CLI flags: `--debug`, `--sandbox`, `--level <path>`, `--smoke-test-frames N`, `--seed N`, and `--replay-script <name>`
+- Parse startup, profile, experiment and smoke flags; see the complete [Controls reference](../controls/#runtime-flags-for-input-and-ci), including `--seed`, `--profile`, `--continue`, `--no-save` and `--experiment`
 - Call `SDL_Init`, `IMG_Init`, `TTF_Init`, `Mix_OpenAudio` in order
 - Route to the start menu, sandbox, or direct TOML level mode through `session_create()`
 - Run `session_run()`; native callers then destroy the session, while browser replay frees it before requesting a reload
@@ -342,7 +342,7 @@ Ground-patrol spider enemy with 3-frame walk animation. Reverses at patrol bound
 
 ### `entities/jumping_spider.h` / `entities/jumping_spider.c`
 
-Faster spider variant that periodically jumps in short arcs to clear sea gaps. Asset: `jumping_spider.png`.
+Spider variant whose jumps are triggered by floor-gap edges, not a periodic timer. Asset: `jumping_spider.png`.
 
 ### `entities/bird.h` / `entities/bird.c`
 

@@ -8,6 +8,7 @@
         "build": "astro build",
         "preview": "astro preview",
         "lint": "astro check",
+        "check-site": "python3 ../tools/check_docs_site.py && python3 ../tests/docs_checks_test.py",
         "drift": "cd .. && make docs-drift",
         "level-catalog": "python3 ../tools/generate_level_catalog.py"
     },

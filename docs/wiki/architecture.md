@@ -40,7 +40,7 @@ session_run(session)
 
 session_destroy(session) / browser terminal cleanup
   ├── close active menu or game screen
-  ├── join and close the AppSession-owned controller subsystem
+   ├── close the AppSession-owned controller subsystem on the app thread
   ├── Mix_CloseAudio → TTF_Quit → IMG_Quit → SDL_Quit
   └── free AppSession
 ```
@@ -69,31 +69,22 @@ game_frame(gs) {
                      SDL_CONTROLLERDEVICEREMOVED — closes and NULLs gs->controller when unplugged
                      terminal: Up/Down or D-pad selects; Enter/Space/Start (or A) confirms
                      terminal: Esc/Back (or B) exits; Start toggles active-game pause
-  3. Update       — player_handle_input → player_update (incl. bouncepad, float-platform, bridge landing)
-                    → bouncepad response (animation + spring sound)
-                    → spiders_update → jumping_spiders_update → birds_update → faster_birds_update
-                    → fish_update → faster_fish_update → spike_blocks_update → spikes_update
-                    → spike_platforms_update → circular_saws_update → axe_traps_update
-                    → blue_flames_update → float_platforms_update → bridges_update
-                    → spider collision → jumping_spider collision → bird collision → faster_bird collision
-                    → fish collision → faster_fish collision → spike_block collision (+ push impulse)
-                    → spike collision → spike_platform collision → circular_saw collision
-                    → axe_trap collision → blue_flame collision → fire_flame collision
-                    → sea gap fall detection (instant death)
-                    → coin-player collision → star-player collision → last_star-player collision
-                    → completion summary snapshot / next_phase pending state when last_star is collected
-                    → heart/lives/score_life_next logic
-                    → water_update → fog_update → bouncepads_update (small, medium, high)
-                    → debug_update (if --debug)
+   3. Update       — inspector selects simulation dt; pause/settings/terminal state can block it
+                     → game_player_step (sampled input, motion, surface landing, bounce response)
+                     → authored checkpoint sampling → lethal floor-gap detection
+                     → actors → moving platforms/rider carry → bridges → hazards
+                     → game_collide (enemy/hazard damage, coins/stars, completion)
+                     → legacy checkpoints → effects → bouncepad animation → camera
+                     Death/game-over returns early after camera update, avoiding stale collisions.
   4. Render       — clear → parallax background → platforms → floor tiles
                     → float platforms → spike rows → spike platforms → bridges
                     → bouncepads (medium, small, high) → rails
-                    → vines → ladders → ropes → coins → yellow stars → last star
+                     → vines → ladders → ropes → coins → yellow/green/red stars → last star
                     → blue flames → fire flames → fish → faster fish → water
                     → spike blocks → axe traps → circular saws
                     → spiders → jumping spiders → birds → faster birds
                     → player → fog → hud
-                    → debug overlay (if --debug) → pause/game-over/completion overlay → present
+                     → debug overlay/inspector → pause/game-over/completion → settings → present
 }
 ```
 
@@ -147,6 +138,9 @@ During an active game update, authored checkpoints are sampled after player move
 | 32 | Debug | `debug_render`: FPS counter, collision boxes, event log — when `--debug` active |
 
 > **Note:** Per-level visual layers are split by role: `background_layers` feed the parallax renderer, `foreground_layers` select the water/lava foreground strip texture, and `fog_layers` feed the atmospheric fog system. Fog renders before the HUD so hearts/lives/score remain legible.
+
+The 32 rows group rendering passes: green/red stars share the collectible pass;
+terminal and settings overlays render after the gameplay/debug layers.
 
 ### Level Completion and Terminal Actions
 
@@ -235,7 +229,7 @@ typedef struct {
 - Textures are grouped in `TextureResources` (`gs->textures.*`) and audio in `AudioResources` (`gs->audio.*`) so cleanup can be centralized.
 - `Player` is **embedded by value**, not a pointer. This avoids a heap allocation and keeps the struct self-contained. The same applies to `Platform`, `Water`, `FogSystem`, and all entity arrays.
 - Owning pointers are cleared after release. Borrowed pointers and aliases still require correct lifetime handling.
-- Initialised with `GameState gs = {0}` so every field starts as `0` / `NULL`.
+- Active-game storage is heap-owned and zero-initialized before initialization; the struct above is an abridged ownership map, not a complete declaration.
 - `checkpoint_x` is no longer a `GameState` field. The resolved respawn state is `respawn_x`, `respawn_y`, and `checkpoint_index`; `legacy_checkpoint_screen` is used only when the active level has no authored records.
 
 ### Authored Checkpoint Flow
