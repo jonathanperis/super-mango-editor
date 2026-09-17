@@ -1,4 +1,4 @@
-"""Release payload contract checks; no remote writes or native packaging."""
+"""Release payload contract checks using small fixtures; no remote writes."""
 from pathlib import Path
 import sys
 import tempfile
@@ -41,22 +41,28 @@ def main():
         (fixture / "vendor/tomlc17").mkdir(parents=True)
         for name in ("LICENSE", "THIRD_PARTY_NOTICES.md", "vendor/tomlc17/LICENSE"):
             shutil.copy2(ROOT / name, fixture / name)
+        windows = sys.platform == "win32"
+        platform = "super-mango-windows-x86_64" if windows else "super-mango-native"
+        suffix = ".exe" if windows else ""
         for name in ("super-mango", "super-mango-editor"):
-            (fixture / name).write_bytes(b"native fixture")
+            (fixture / f"{name}{suffix}").write_bytes(b"native fixture")
         original_root = package_release.ROOT
         try:
             package_release.ROOT = fixture
-            package_native("super-mango-native", fixture / "super-mango", archive, None)
+            package_native(platform, fixture / "super-mango", archive, None)
         finally:
             package_release.ROOT = original_root
         with zipfile.ZipFile(archive) as bundle:
             names = bundle.namelist()
-            assert "super-mango-native/super-mango-editor" in names
-            assert "super-mango-native/levels/labs/example.toml" in names
-            assert "super-mango-native/assets/sounds/used.wav" in names
+            for name in ("super-mango", "super-mango-editor"):
+                binary = bundle.getinfo(f"{platform}/{name}{suffix}")
+                # Windows executability comes from the .exe format, not POSIX mode bits.
+                if not windows:
+                    assert binary.external_attr >> 16 & 0o111
+            assert f"{platform}/levels/labs/example.toml" in names
+            assert f"{platform}/assets/sounds/used.wav" in names
             assert not any("/unused/" in name for name in names)
-            assert b"CK Tan" in bundle.read("super-mango-native/licenses/tomlc17.txt")
-            assert bundle.getinfo("super-mango-native/super-mango-editor").external_attr >> 16 & 0o111
+            assert b"CK Tan" in bundle.read(f"{platform}/licenses/tomlc17.txt")
     workflow = (ROOT / ".github/workflows/deploy.yml").read_text()
     assert "ref: ${{ github.event.workflow_run.head_sha }}" in workflow
     assert "github.event.workflow_run.head_repository.full_name == github.repository" in workflow
