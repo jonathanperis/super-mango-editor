@@ -9,8 +9,9 @@ Copyright (c) 2024–2026 CK Tan. MIT license.
 Source: https://github.com/cktan/tomlc17
 
 The complete notice is in `vendor/tomlc17/LICENSE` in the source checkout and
-`licenses/tomlc17.txt` in release archives. The vendored copy includes local parser
-hardening; review repository history when comparing it with upstream.
+`licenses/tomlc17.txt` in release archives. The vendored copy is based on upstream
+**R260821** with retained project hardening. `vendor/tomlc17/README.md` records the
+exact upstream commit and local patch inventory.
 
 ## SDL and native dependencies
 

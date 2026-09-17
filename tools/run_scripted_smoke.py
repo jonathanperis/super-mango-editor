@@ -11,8 +11,9 @@ import shlex
 import shutil
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
+
+from validate_levels import load_level
 
 ROOT = Path(__file__).resolve().parents[1]
 REPLAY_DIR = ROOT / "out" / "replays-smoke"
@@ -68,7 +69,7 @@ def check_builtin_behavior(state: dict, replay: str, level: Path, frames: int) -
         raise AssertionError(f"incorrect active simulation time: {state}")
     if state["paused"] or state["complete"]:
         raise AssertionError(f"unexpected overlay after built-in replay: {state}")
-    data = tomllib.loads(level.read_text(encoding="utf-8"))
+    data = load_level(level)
     start_x = data.get("player_start_x", 0)
     if start_x == 0 and data.get("player_start_y", 0) == 0:
         start_x = 80

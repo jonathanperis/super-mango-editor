@@ -23,8 +23,8 @@ Super Mango is a C11/SDL2 platformer and sandbox school: play the game, inspect 
 | SDL2_image | 2.x | PNG texture loading |
 | SDL2_ttf | 2.x | TrueType font rendering |
 | SDL2_mixer | 2.x | Sound effects and music |
-| tomlc17 | vendored | TOML v1.1 parser for level definitions |
-| Emscripten | 4.0.23 in CI | WebAssembly compilation for browser play |
+| tomlc17 | R260821 + project patches | TOML v1.1 parser; [upstream provenance and patch inventory](vendor/tomlc17/README.md) |
+| Emscripten | 6.0.9 in CI | WebAssembly compilation for browser play |
 
 ## Features
 
@@ -103,12 +103,13 @@ pacman -S make mingw-w64-ucrt-x86_64-clang \
           mingw-w64-ucrt-x86_64-SDL2_mixer
 ```
 
-**WebAssembly:** Install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) and ensure `emcc` is on `PATH` for optional local preflights. GitHub CI is the authoritative WASM release verification; if a local Emscripten/SDL port cache fails before Super Mango code compiles, trust the green CI WebAssembly build and Pages smoke instead of blocking on the local host toolchain.
+**WebAssembly:** Install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) at **6.0.9** and ensure `emcc` is on `PATH` for optional local preflights. GitHub CI is the authoritative WASM release verification; if a local Emscripten/SDL port cache fails before Super Mango code compiles, trust the green CI WebAssembly build and Pages smoke instead of blocking on the local host toolchain.
 
 ### Quick Start
 
 Full verification also needs Python 3.11+ and Node.js. Docs development requires
-Node.js 22.12+ and Bun with the frozen `docs/bun.lock` dependency set; see
+Node.js 22.12+ and Bun with the frozen `docs/bun.lock` dependency set (CI pins
+Node **26.9.0** and Bun **1.4.2**); see
 [website maintenance](docs/README.md).
 
 ```sh
