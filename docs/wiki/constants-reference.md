@@ -64,13 +64,15 @@ At 60 FPS (`dt` approximately 0.016s) gravity adds ~12.8 px/s per frame. The jum
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `WORLD_W` | `1600` | `int` | Total logical level width (4 x GAME_W) |
+| `WORLD_W` | `1600` | `int` | Legacy/default four-screen width; loaded levels use runtime width |
 | `CAM_LOOKAHEAD_VX_FACTOR` | `0.20f` | `float` | Camera lookahead pixels per px/s of player horizontal velocity |
 | `CAM_LOOKAHEAD_MAX` | `50.0f` | `float` | Maximum lookahead offset in either direction |
 | `CAM_SMOOTHING` | `8.0f` | `float` | Lerp speed factor (per second); higher = snappier follow |
 | `CAM_SNAP_THRESHOLD` | `0.5f` | `float` | Sub-pixel distance at which the camera snaps exactly to target |
 
-`WORLD_W` defines the full scrollable level width. The visible canvas is always `GAME_W` (400 px); the `Camera` struct tracks the left edge of the viewport in world coordinates.
+Loaded levels set `gs->runtime.world_w = screen_count × GAME_W`; `WORLD_W` is not
+the active width of every level. The visible canvas is `GAME_W` (400 px), and the
+camera tracks its left edge in world coordinates.
 
 ---
 
@@ -154,7 +156,9 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 | `MIX_DEFAULT_FORMAT` | 16-bit signed samples |
 | `2` | Stereo channels |
 | `2048` | Mixer buffer size (samples) |
-| `13` | Music volume (0-128, approximately 10%) set in `game_init` |
+
+Music volume is authored per level and multiplied by the saved music-volume
+preference; mute overrides it. It is not a fixed `main.c` audio constant.
 
 ---
 
@@ -293,7 +297,7 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_BOUNCEPADS` | `4` | `int` | Maximum simultaneous bouncepad instances |
+| `MAX_BOUNCEPADS` | `4` | `int` | Legacy helper capacity; runtime placement arrays use the per-variant limits below |
 | `BOUNCEPAD_W` | `48` | `int` | Display width of one bouncepad frame (px) |
 | `BOUNCEPAD_H` | `48` | `int` | Display height of one bouncepad frame (px) |
 | `BOUNCEPAD_VY_SMALL` | `-380.0f` | `float` | Small bouncepad launch impulse (px/s) |
@@ -382,7 +386,7 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 | `BIRD_SPEED` | `45.0f` | `float` | Horizontal flight speed (px/s) |
 | `BIRD_FRAME_MS` | `140` | `int` | Milliseconds per wing animation frame |
 | `BIRD_WAVE_AMP` | `20.0f` | `float` | Sine-wave amplitude in logical pixels |
-| `BIRD_WAVE_FREQ` | `0.015f` | `float` | Sine cycles per pixel of horizontal travel |
+| `BIRD_WAVE_FREQ` | `0.015f` | `float` | Sine phase in radians per pixel of horizontal travel |
 
 ---
 
@@ -554,7 +558,7 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 | `LADDER_H` | `22` | `int` | Content height after cropping padding (px) |
 | `LADDER_SRC_Y` | `13` | `int` | First pixel row with content |
 | `LADDER_SRC_H` | `22` | `int` | Height of content area (px) |
-| `LADDER_STEP` | `8` | `int` | Vertical overlap when tiling (px) |
+| `LADDER_STEP` | `8` | `int` | Vertical spacing between tile starts (px) |
 
 ---
 

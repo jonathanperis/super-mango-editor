@@ -1,38 +1,103 @@
-# Docs
+# Website and Builder Manual
 
-Astro static site deployed to GitHub Pages.
+Astro static site at <https://jonathanperis.github.io/super-mango-editor/>.
+The landing page hosts the game; `/docs/` publishes the manual from `wiki/`.
 
-## Commands
+## Requirements and Commands
 
-Run from this directory (`docs/`):
+Use Node.js **22.12+**, Bun and Python **3.11+**. CI pins Node 22.21.1 and Bun
+1.3.11. Restore dependencies with `bun install --frozen-lockfile` in this directory.
 
-| Command | Action |
+| Command (from `docs/`) | Action |
 |---|---|
-| `bun install` | Install dependencies |
-| `bun run dev` | Start dev server |
-| `bun run build` | Build to `./out/` |
-| `bun run preview` | Preview production build locally |
+| `bun run dev` | Start development server; routes have no repository base prefix |
 | `bun run lint` | Run `astro check` |
-| `bun run drift` | Run the repository semantic docs drift gate (`make docs-drift`) |
-| `npm run lint` | Run `astro check` when Bun is unavailable and dependencies are already restored |
-| `npm run build` | Build to `./out/` with the restored npm dependency tree |
+| `bun run drift` | Run `make docs-drift`, including generated freshness and roadmap checks |
+| `bun run build` | Build the production site to `docs/out/` with `/super-mango-editor/` base |
+| `bun run check-site` | Check built routes, Markdown content, links, anchors, metadata and sitemap |
+| `bun run preview` | Serve the production build; open `/super-mango-editor/` |
 
-For a documentation change, run the repository gates before the Astro commands:
+For a documentation change, from the repository root:
 
 ```sh
-cd ..
 make docs-drift
-make roadmap-quality
 cd docs
-npm run lint && npm run build
+bun run lint
+bun run build
+bun run check-site
 ```
 
-CI installs from `bun.lock` and runs the Bun scripts. The npm commands are a local fallback only; do not replace the locked Bun install step or commit a generated npm lockfile.
+`make docs-drift` already includes `make roadmap-quality`'s checks. When Bun is
+unavailable and dependencies are already restored, `npm run lint`, `npm run build`
+and `npm run check-site` run the same scripts. Keep `bun.lock` as the install
+contract; do not generate an npm lockfile.
 
-## Environment
+## Where to Edit
 
-Copy `.env.example` to `.env` and fill in local values when needed. Production Pages builds set `PUBLIC_GA_ID` from the repository secret currently named `NEXT_PUBLIC_GA_ID`.
-
-| Variable | Description |
+| Surface | Source |
 |---|---|
-| `PUBLIC_GA_ID` | Optional Google Analytics 4 Measurement ID |
+| Landing copy / cabinet host | `src/components/home/`, `src/pages/index.astro` |
+| Manual content | `wiki/*.md`; `wiki/index.md` renders on `/docs/` |
+| Page titles, descriptions, categories and order | `src/lib/docsSidebar.ts` |
+| Manual layout / routes | `src/pages/docs/[...slug].astro` |
+| SEO and shared page shell | `src/layouts/BaseLayout.astro` |
+| Styles | `src/styles/globals.css`, `src/styles/docs.css` |
+| Production origin/base | `astro.config.mjs`; keep `public/robots.txt` consistent |
+
+Add a manual page in `wiki/`, register its ID/metadata/category in `docsSidebar.ts`,
+then build and check it. Links in `wiki/` target **published routes**, not GitHub
+Markdown paths: use `../controls/` from a nested page and `controls/` from the
+overview. Include fragment IDs only when the target heading exists.
+
+### Generated Content
+
+Run these from the repository root after changing their inputs:
+
+| Command | Outputs |
+|---|---|
+| `make content-inventory` | `wiki/asset-inventory.md`, `src/generated/project.json` |
+| `make level-catalog` | `wiki/level-catalog.md` from the campaign manifest |
+| `make overlay-snapshots` | `wiki/overlay-snapshots.md` from overlay strings |
+
+Do not hand-edit generated counts. `make docs-drift` checks freshness, TOML
+example schema, public player declarations, CLI coverage and semantic references.
+Astro compilation alone does not check links; `check-site` validates emitted HTML.
+
+## Local Game Preview
+
+Astro does **not** compile or copy WebAssembly. A docs-only preview renders the
+site, but game startup needs the game artifacts. With a working Emscripten SDK,
+build and assemble from the repository root:
+
+```sh
+make web
+cd docs
+bun run build
+cd ..
+cp out/super-mango{,-debug}.{html,js,wasm,data} docs/out/
+cd docs
+bun run preview
+```
+
+Reassemble after rebuilding Astro, which replaces its output. Touch-control code
+is bundled into the generated game JavaScript. See the public
+[Build System](https://jonathanperis.github.io/super-mango-editor/docs/build-system/)
+for the CI-authoritative WebAssembly verification contract.
+
+## Deployment and Analytics
+
+`docs.yml` checks relevant pull requests (including source, level, root-doc and
+workflow changes). It runs drift, frozen install, Astro lint, dependency audit,
+build and built-site validation. It does not deploy.
+
+`deploy.yml` runs after a successful same-repository main push/manual Build &
+Release run. It checks out that run's exact commit, builds/checks the site, adds
+the matching normal/debug WASM artifact, performs HTTP assembly smoke checks and
+deploys `docs/out/` to Pages. Release tags are a separate publication path.
+
+Analytics is optional; see `.env.example`. With no `PUBLIC_GA_ID`, analytics
+scripts are omitted. Production builds map the repository secret
+`NEXT_PUBLIC_GA_ID` to `PUBLIC_GA_ID`. Local environment files stay untracked.
+
+See [AUDIT.md](AUDIT.md) for the dated audit and follow-up plan.
+`AUDIT_IMPLEMENTATION.md` is the historical Sandbox School delivery report.

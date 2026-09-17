@@ -1,10 +1,10 @@
 # super-mango-editor
 
-> 2D side-scrolling platformer written in C using SDL2 -- browser-playable via WebAssembly
+> C11 + SDL2 platformer, visual level editor, and hands-on game-development school — playable in the browser via WebAssembly.
 
-[![Build Check](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml/badge.svg?event=pull_request)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml) [![Main Release](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml) [![CodeQL](https://github.com/jonathanperis/super-mango-editor/actions/workflows/codeql.yml/badge.svg)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/codeql.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Build Check](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml/badge.svg?event=pull_request)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml) [![Main Build](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml) [![CodeQL](https://github.com/jonathanperis/super-mango-editor/actions/workflows/codeql.yml/badge.svg)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/codeql.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**[Live demo →](https://jonathanperis.github.io/super-mango-editor/)** | **[Documentation →](https://jonathanperis.github.io/super-mango-editor/docs/)**
+**[Play →](https://jonathanperis.github.io/super-mango-editor/)** | **[Learn →](https://jonathanperis.github.io/super-mango-editor/docs/learning-path/)** | **[Builder Manual →](https://jonathanperis.github.io/super-mango-editor/docs/)** | **[Releases →](https://github.com/jonathanperis/super-mango-editor/releases)**
 
 ---
 
@@ -24,7 +24,7 @@ Super Mango is a C11/SDL2 platformer and sandbox school: play the game, inspect 
 | SDL2_ttf | 2.x | TrueType font rendering |
 | SDL2_mixer | 2.x | Sound effects and music |
 | tomlc17 | vendored | TOML v1.1 parser for level definitions |
-| Emscripten | latest | WebAssembly compilation for browser play |
+| Emscripten | 4.0.23 in CI | WebAssembly compilation for browser play |
 
 ## Features
 
@@ -41,7 +41,8 @@ Super Mango is a C11/SDL2 platformer and sandbox school: play the game, inspect 
 - Completion actions: Next Level when `next_phase` exists, Replay, Level Select, Exit; game-over actions: Retry, Level Select, Exit
 - Campaign-driven native start menu and level select; HUD (hearts/lives/score), lives system, invincibility blink on damage
 - Browser Replay stores the current TOML path in session storage, tears down the active WebAssembly session, reloads the page, and boots that level again
-- Keyboard and gamepad (hot-plug) controls
+- Keyboard, hot-plug gamepad and browser touch controls; F1 settings with remapping, audio, dead-zone, native scale, high-contrast and reduced-motion options
+- Local settings and per-level best results; `--continue` opens the last played stage, while debug/smoke/playtest sessions remain profile-isolated
 - Debug inspector: FPS/frame interval, memory, hitboxes, velocity/state/contact display, freeze/step/slow motion, live movement tuning and explicit experiment capture/replay
 - Builds natively on macOS, Linux, and Windows; WebAssembly build via Emscripten
 
@@ -95,8 +96,7 @@ sudo apt install build-essential clang \
 **Windows (MSYS2 UCRT64):**
 
 ```sh
-pacman -S mingw-w64-ucrt-x86_64-clang \
-          mingw-w64-ucrt-x86_64-make \
+pacman -S make mingw-w64-ucrt-x86_64-clang \
           mingw-w64-ucrt-x86_64-SDL2 \
           mingw-w64-ucrt-x86_64-SDL2_image \
           mingw-w64-ucrt-x86_64-SDL2_ttf \
@@ -107,8 +107,9 @@ pacman -S mingw-w64-ucrt-x86_64-clang \
 
 ### Quick Start
 
-Full verification also needs Python 3.11+ and Node.js. Docs development uses Bun
-and the frozen `docs/bun.lock` dependency set.
+Full verification also needs Python 3.11+ and Node.js. Docs development requires
+Node.js 22.12+ and Bun with the frozen `docs/bun.lock` dependency set; see
+[website maintenance](docs/README.md).
 
 ```sh
 make CC=clang                         # build the game binary into out/
@@ -122,10 +123,10 @@ make release CC=clang                 # -O2 binaries in out/release/
 make timing-lab                       # quantitative timestep experiment
 make editor CC=clang                  # build the level editor
 make run-editor CC=clang              # build and run the level editor
-make test CC=clang                    # build and run 15 native regression tests (binaries) plus Python host checks
-make validate-levels                  # validate all levels/*.toml files
+make test CC=clang                    # 15 native regression tests (binaries) plus Python/JavaScript host checks
+make validate-levels                  # validate campaign, root levels and levels/labs/
 make web                              # build to WebAssembly (requires Emscripten)
-make clean                            # remove all build artifacts
+make clean                            # remove default out/ and dist/ build artifacts
 ```
 
 > The Makefile replaces GNU Make's built-in `CC=cc` with clang; explicit `CC=gcc`
@@ -134,7 +135,7 @@ make clean                            # remove all build artifacts
 
 In debug mode: **F2** freezes, **F3** steps once, **F4** changes speed, **F6** selects
 a movement property, **-/+** tunes it and **F7** resets it. **F8** restarts/records;
-**F9** exports a capture. Replay with `--level PATH --experiment CAPTURE.toml`.
+**F9** exports a capture; **F10** cycles inspected entities. Replay with `--level PATH --experiment CAPTURE.toml`.
 Debug/playtest sessions do not touch personal profiles. See the museum guide for
 capture limits and pause ownership.
 
@@ -149,7 +150,9 @@ Useful docs routes:
 
 ### Release Downloads
 
-Tagged/manual releases publish native builder archives with both `super-mango` and `super-mango-editor`, playable assets, campaign/lab levels, and third-party notices. Run from the extracted folder. Linux/macOS need compatible SDL2 runtimes; Linux dialogs also need zenity. Windows bundles runtime DLLs and available package notices. `unused/` assets stay in the source checkout. WebAssembly archives contain both normal/debug HTML/JS/WASM/data outputs; serve them with a static HTTP server. Build with `make web`, then package those verified outputs with `make dist-wasm`.
+Browse [published releases](https://github.com/jonathanperis/super-mango-editor/releases) and check each release's asset list. Older releases predate the current builder packaging; use `make builder` for the current editor and learning labs. The website tracks successful `main` builds independently of tagged releases.
+
+Releases built by the current workflow (a `v*` tag or manual dispatch on `main`) contain native builder archives with both `super-mango` and `super-mango-editor`, playable assets, campaign/lab levels, and third-party notices. Run from the extracted folder. Linux/macOS need compatible SDL2 runtimes; Linux dialogs also need zenity. Windows bundles runtime DLLs and available package notices. `unused/` assets stay in the source checkout. WebAssembly archives contain both normal/debug HTML/JS/WASM/data outputs; serve them with a static HTTP server. Build with `make web`, then package those verified outputs with `make dist-wasm`.
 
 ## Project Structure
 
@@ -269,6 +272,8 @@ super-mango-editor/
 | `PRODUCT.md` | Product direction, player promise, and feature framing. |
 | `DESIGN.md` | Visual/UX design notes for the arcade-cabinet presentation. |
 | `docs/wiki/developer-guide.md` | Coding conventions, entity integration, resource ownership, and verification. |
+| `docs/README.md` | Website setup, content ownership, generated facts and deployment. |
+| `docs/AUDIT.md` | Dated documentation audit, verification and enhancement follow-ups. |
 | `CODEOWNERS` | Review ownership hints for GitHub. |
 
 These files complement the public GH Pages manual. If they disagree with code, update the docs and source-backed checks together.
@@ -279,12 +284,12 @@ Four GitHub Actions workflows:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Multi-platform build (Linux x86_64, macOS arm64, Windows x86_64, WebAssembly); releases only for `v*` tags or manual dispatch |
-| Docs | `docs.yml` | Docs pull requests, manual | Bun install, docs lint, and Astro docs build |
-| CodeQL | `codeql.yml` | Push/PR to `main`, weekly | Automated code security and quality analysis |
-| Deploy Pages | `deploy.yml` | Successful main Build & Release workflow | Builds docs, copies WebAssembly artifacts, and deploys GitHub Pages |
+| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Linux x86_64, macOS arm64, Windows x86_64 and WebAssembly builds; releases only for `v*` tags or manual dispatch on `main` |
+| Docs | `docs.yml` | Relevant pull requests, manual | Source/content drift, frozen Bun install, Astro lint/build, dependency audit and built-site checks |
+| CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ and GitHub Actions security-and-quality analysis |
+| Deploy Pages | `deploy.yml` | Successful same-repository main push/manual Build & Release run | Builds/checks docs at the artifact's commit, copies matching WebAssembly files and deploys Pages |
 
-The Build & Release workflow runs `make`, `make test`, `make validate-levels`, `make editor`, dummy-SDL smoke tests, scripted replay smoke on Linux, WebAssembly build, WebAssembly artifact checks, and standalone archive packaging on all build events. Its release job is gated to `v*` tags and manual dispatches only, so ordinary `main` pushes remain build/deploy checks. The Docs workflow runs `bun run lint` and `bun run build` for PRs touching `docs/`. The Deploy Pages workflow publishes the Astro docs output plus WebAssembly artifacts to GitHub Pages.
+The native matrix runs game/editor builds, tests, dummy-SDL smoke and archive packaging. Additional checks include sanitizers and scripted replay smoke on Linux, plus `make validate-levels` on Linux/macOS. The WebAssembly leg builds and checks normal/debug artifacts and their archive. Releases upload assets to a draft before publishing it. The Docs path filter includes `docs/`, public root documents, source, levels, assets, tooling and workflows. The Deploy Pages workflow publishes the verified Astro output plus matching WebAssembly artifacts.
 
 ## License
 

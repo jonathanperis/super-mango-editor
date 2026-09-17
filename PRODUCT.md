@@ -77,7 +77,7 @@ Preferred copy moves:
 
 - Use game-world language for section labels when clarity remains intact: `START RUN`, `INSERT COIN`, `BUILDER MANUAL`, `ITEM DROP`, `CHOOSE YOUR CARTRIDGE`.
 - Pair playful labels with plain supporting text: `ITEM DROP` plus `Download builds for your platform`.
-- Use concrete proof over adjectives: `4 levels`, `25 screens`, `TOML levels`, `C11 + SDL2`, `visual level editor`.
+- Use concrete proof over adjectives: generated campaign/lab counts, `TOML levels`, `C11 + SDL2`, `visual level editor`.
 
 Avoid:
 
