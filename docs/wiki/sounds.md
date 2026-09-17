@@ -14,7 +14,7 @@ All audio files live in the `assets/sounds/` directory, organized into categoriz
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `player_jump.wav` | `Mix_Chunk` | `gs->audio.jump` | Played on Space press when `on_ground == 1` |
+| `player_jump.wav` | `Mix_Chunk` | `gs->audio.jump` | Played when a jump starts, including buffered/coyote jumps and climb dismounts |
 | `player_hit.wav` | `Mix_Chunk` | `gs->audio.hit` | Played when the player takes damage |
 
 ### Collectibles — `assets/sounds/collectibles/`
@@ -28,7 +28,7 @@ All audio files live in the `assets/sounds/` directory, organized into categoriz
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
 | `bird.wav` | `Mix_Chunk` | `gs->audio.flap` | Played for bird enemy wing flap |
-| `spider.wav` | `Mix_Chunk` | `gs->audio.spider_attack` | Played for spider enemy attack |
+| `spider.wav` | `Mix_Chunk` | `gs->audio.spider_attack` | Played when a jumping spider leaps at a gap |
 | `fish.wav` | `Mix_Chunk` | `gs->audio.dive` | Played for fish enemy dive |
 
 ### Hazards — `assets/sounds/hazards/`
@@ -55,7 +55,7 @@ All audio files live in the `assets/sounds/` directory, organized into categoriz
 |------|------|-----------------|-------------|
 | `water.wav` | `Mix_Music` | `gs->audio.music` | Background music for water-themed levels, loaded via `Mix_LoadMUS` (streaming) |
 | `lava.wav` | `Mix_Music` | `gs->audio.music` | Background music for lava-themed levels, loaded via `Mix_LoadMUS` (streaming) |
-| `winds.wav` | `Mix_Music` | `gs->audio.music` | Background music for wind-themed levels, loaded via `Mix_LoadMUS` (streaming) |
+| `winds.wav` | `Mix_Music` | `gs->audio.music` | Available theme track; no current campaign/lab level selects it |
 
 ---
 
@@ -92,12 +92,16 @@ Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
 | Aspect | `Mix_Chunk` (sound effects) | `Mix_Music` (background music) |
 |--------|----------------------------|-------------------------------|
 | API | `Mix_LoadWAV`, `Mix_PlayChannel` | `Mix_LoadMUS`, `Mix_PlayMusic` |
-| Loading | Fully decoded into RAM | Streamed from disk |
+| Loading | Fully decoded into RAM | Decoded on demand from the backing file/resource |
 | Best for | Short, triggered sounds | Long looping tracks |
 | Simultaneous | Multiple channels | One at a time |
 | Volume | `Mix_VolumeChunk` | `Mix_VolumeMusic` |
 
-All sound effects use `Mix_LoadWAV` and are fully loaded into memory. The background music tracks (`water.wav`, `lava.wav`, `winds.wav`) use `Mix_LoadMUS` which streams from disk, keeping memory usage low. Music is assigned per level via the TOML level definition's `music_path` field.
+Sound effects use `Mix_LoadWAV` and are fully loaded into memory. Music is selected
+by each level's `music_path` and loaded through `Mix_LoadMUS`. Native decoding can
+read incrementally from disk; WebAssembly preloads these WAV files into its
+virtual filesystem, so streaming playback does not remove their download or
+backing-storage cost. See [Asset Inventory](../asset-inventory/).
 
 ---
 
@@ -105,7 +109,7 @@ All sound effects use `Mix_LoadWAV` and are fully loaded into memory. The backgr
 
 1. Place the `.wav` file in the appropriate `assets/sounds/<category>/` subdirectory.
 2. Add a `Mix_Chunk *<name>` field to `AudioResources` in `game.h`.
-3. Load it in `game_init`:
+3. Load it in `src/core/game_resources.c`, called by `game_init`:
 
 ```c
 gs->audio.<name> = Mix_LoadWAV("assets/sounds/<category>/<name>.wav");
@@ -115,7 +119,7 @@ if (!gs->audio.<name>) {
 }
 ```
 
-4. Free it in `game_cleanup` (before `SDL_DestroyRenderer`):
+4. Free it in the resource cleanup called by `game_cleanup`:
 
 ```c
 FREE_CHUNK(gs->audio.<name>);
@@ -150,4 +154,6 @@ Mix_FreeMusic(gs->audio.music);
 gs->audio.music = NULL;
 ```
 
-`Mix_Music` **streams** from disk; it does not load the entire file into RAM. This keeps memory usage low for large audio files.
+The normal session applies authored `music_volume` scaled by the player's saved
+volume/mute preferences. Prefer that path to a hard-coded global music volume.
+Media licenses are documented separately in [Asset Provenance](../asset-provenance/).

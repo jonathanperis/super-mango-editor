@@ -8,7 +8,7 @@ Super Mango includes a standalone visual level editor (`out/super-mango-editor`)
 
 ```sh
 make editor        # build the editor binary → out/super-mango-editor
-make run-editor    # build and launch
+make run-editor    # build game + editor, then launch editor
 ```
 
 ---
@@ -51,9 +51,14 @@ Three interaction modes are available via the toolbar or keyboard shortcuts:
 
 | Tool | Key | Behaviour |
 |------|-----|-----------|
-| **Select** | `S` | Click an entity on the canvas to select it. Drag to reposition. Selected entity appears in the Properties panel. |
-| **Place** | `P` | Click empty canvas space to stamp a new entity of the type chosen in the palette. |
-| **Delete** | `D` | Click an entity to remove it from the level immediately. |
+| **Select** | `1` | Click an entity on the canvas to select it. Drag to reposition. Selected entity appears in the Properties panel. |
+| **Place** | `2` | Click empty canvas space to stamp a new entity of the type chosen in the palette. |
+| **Delete** | `3` | Click an entity to remove it from the level immediately. |
+
+Delete removes the selection; right-click quick-deletes an entity. Esc cancels a
+field edit, returns to Select, or clears the selection. Printable shortcuts do
+not switch tools while a text field is active. File/history shortcuts accept
+Command on macOS as well as Ctrl.
 
 ---
 
@@ -125,10 +130,9 @@ The Level Config section in the right panel exposes the top-level TOML scalars:
 
 | Action | Input |
 |--------|-------|
-| Pan left / right | Click-drag on empty canvas area |
-| Scroll horizontally | Mouse wheel |
-| Zoom in | `+` or `Ctrl + Mouse Wheel Up` |
-| Zoom out | `-` or `Ctrl + Mouse Wheel Down` |
+| Pan left / right | Mouse wheel over the canvas |
+| Cycle zoom | Toolbar dropdown or `Ctrl + Mouse Wheel` (1×, 2×, 3×, 5×) |
+| Snap a dragged entity | Hold Shift while dragging (48px grid) |
 | Toggle grid | `G` |
 
 The canvas renders the level in WYSIWYG — entity positions and sizes match the game exactly at zoom 1.0 (logical pixel = 1 canvas pixel). At zoom 2.0 each logical pixel maps to 2 canvas pixels.
@@ -163,11 +167,11 @@ Only one entity can be in the clipboard at a time. The pasted entity appears off
 
 ## Play-Test Integration
 
-The **Play** button validates the active `LevelDef`, serializes it to a private TOML snapshot in the editor preference directory, then launches the game engine as a child process with `--level <path>`. It does not overwrite the open source file. Validation errors block playtest and appear in the validation summary/status feedback. Clicking **Stop** (or closing the game window) returns to the editor and removes the temporary playtest file.
+The **Play** button or **F5** validates the active `LevelDef`, serializes it to a private TOML snapshot in the editor preference directory, then launches the sibling game executable with `--no-save --level <snapshot>`. It does not overwrite the open source file or use your personal game profile. Validation errors block playtest and appear in the validation summary/status feedback. Clicking **Stop** (or closing the game window) returns to the editor and removes the temporary playtest file.
 
 ```sh
-# Equivalent to clicking Play in the editor:
-make run-level LEVEL=levels/your_level.toml
+# Run an already-saved level with the same profile isolation:
+./out/super-mango --no-save --level levels/your_level.toml
 ```
 
 Enabling **Debug Mode** in the toolbar adds `--debug` to the game launch, showing collision boxes, FPS counter, and the event log.
@@ -182,6 +186,8 @@ Enabling **Debug Mode** in the toolbar adds `--debug` to the game launch, showin
 | Open | `Ctrl+O` / Open button | Opens a native file picker |
 | Save | `Ctrl+S` / Save button | Overwrites the current file |
 | Save As | `Ctrl+Shift+S` / Save As button | Native file picker for new path |
+| Recover autosave | `Ctrl+R` | Select an available recovery snapshot |
+| Recent file | `Ctrl+1` through `Ctrl+5` | Open a recent file |
 
 The title bar shows an asterisk (`*`) after the filename when there are unsaved changes. The editor prompts to save on quit if the level has been modified.
 
@@ -189,7 +195,7 @@ Saved files are plain TOML — they can be edited in any text editor and immedia
 
 Save, autosave, and Play run `editor_validate_level()` first. Errors such as bad counts, invalid paths, missing `next_phase` files, invalid `screen_count`, or invalid checkpoints block persistence and playtest so the editor does not write or launch levels known to be unsafe. The Level Config panel and status bar show the current validation summary.
 
-CI can start and immediately exit the editor with:
+CI can initialize the editor, render five bounded frames, and exit with:
 
 ```sh
 ./out/super-mango-editor --smoke-test
@@ -199,7 +205,7 @@ CI can start and immediately exit the editor with:
 
 ## Architecture
 
-The editor is built from these modules in `src/editor/`:
+The editor uses focused modules in `src/editor/` and shared persistence/UI code in `src/shared/`:
 
 | File | Responsibility |
 |------|---------------|
@@ -210,11 +216,10 @@ The editor is built from these modules in `src/editor/`:
 | `palette.c` / `palette.h` | Entity palette panel — thumbnails, type selection |
 | `properties.c` / `properties.h` | Property inspector panel — per-type field editing |
 | `tools.c` / `tools.h` | Mouse interaction for Select / Place / Delete tools |
-| `ui.c` / `ui.h` | Immediate-mode UI widget library (buttons, dropdowns, text fields) |
+| `src/shared/ui.c` / `ui.h` | Immediate-mode UI widget library shared with game settings |
 | `undo.c` / `undo.h` | Undo stack and `PlacementData` clipboard union |
-| `serializer.c` / `serializer.h` | TOML deserialization: file → `LevelDef` |
-| `serializer_load_checkpoints.c` / `.h` | Strict `[[checkpoints]]` TOML parsing (`x`/`y` required) |
-| `serializer_save.c` / `serializer_save.h` | TOML serialization: `LevelDef` → file |
+| `src/shared/serializer.h`, `serializer_load.c`, `serializer_load_*.c` | Public TOML API and staged parsing into `LevelDef`, including strict checkpoints |
+| `src/shared/serializer_save.c`, `serializer_emit.c`, `serializer_io.c` | TOML emission and atomic file persistence |
 | `file_dialog.c` / `file_dialog.h` | Native OS file picker (macOS / Linux / Windows) |
 
 The `EditorState` struct mirrors the game's `GameState` design: one container passed by pointer to every function, owning the SDL window, renderer, font, entity textures, level data, camera, tool state, undo stack, and UI state.
@@ -223,10 +228,10 @@ The `EditorState` struct mirrors the game's `GameState` design: one container pa
 
 ## Relationship to the Game Engine
 
-The editor shares the `LevelDef` struct and `level_loader` with the game. This means:
+The editor and game share `LevelDef`, the serializer and level validation. Runtime object loading in `src/levels/level_loader.c` belongs to the game. This means:
 
-- Any level that loads correctly in the editor will load correctly in the game.
-- The serializer (`serializer.c`) only needs to be updated in one place when a new entity type is added.
+- Both applications use the same file schema. Runtime texture availability and playability still need a playtest.
+- A new entity needs coordinated changes to shared schema/load/save modules, runtime and editor integrations; see [Entity Walkthrough](../entity-walkthrough/).
 - The editor's canvas draws entities using the same sprite paths as the game — adding a new entity type requires adding its texture to `EntityTextures` and a render call in `canvas_render`.
 
 See [Level Design — TOML Reference](../level-design/) for the full schema of every entity type.

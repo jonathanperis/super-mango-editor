@@ -180,7 +180,7 @@ gs->coin_count = def->coin_count;
 // focused runtime helper render section, in the correct layer order:
 coins_render(gs->coins, gs->coin_count, gs->renderer, gs->textures.coin, (int)gs->camera.x);
 
-// src/core/game_lifecycle.c cleanup path, before SDL_DestroyRenderer:
+// src/core/game_resources.c cleanup, before SDL_DestroyRenderer:
 DESTROY_TEX(gs->textures.coin);
 ```
 
@@ -247,12 +247,16 @@ if (entity->y + entity->h >= FLOOR_Y) {
     entity->on_ground = 0;
 }
 
-/* Horizontal clamp */
+/* Horizontal clamp to the active level width */
 if (entity->x < 0.0f)                entity->x = 0.0f;
-if (entity->x > GAME_W - entity->w)  entity->x = (float)(GAME_W - entity->w);
+if (entity->x > world_w - entity->w) entity->x = (float)(world_w - entity->w);
 ```
 
 `GRAVITY`, `FLOOR_Y`, `GAME_W`, and `GAME_H` are all defined in `game.h` and available to any file that includes it. See [Constants Reference](../constants-reference/) for values.
+
+This example is a simplified solid-floor integrator. Pass the active
+`gs->runtime.world_w` as `world_w`; real player movement also resolves gaps,
+one-way surfaces and the sprite's inset foot position in `player_surfaces.c`.
 
 ---
 
@@ -346,7 +350,7 @@ SDL_DestroyTexture(tex);
 TTF_CloseFont(font);
 ```
 
-The HUD renders hearts (lives), life counter, and score. It is drawn after all game entities so it always appears on top.
+The HUD renders hearts (health), life counter and score. It is drawn after game entities; terminal/settings overlays can cover it.
 
 For static labels, create the text texture once and reuse it rather than rendering a surface and uploading a texture every frame. Rebuild cached text only when its content or appearance changes, and release it before destroying its renderer.
 
@@ -436,7 +440,7 @@ Measure each sheet rather than assuming a common frame size or row layout. Advan
 - [ ] Load texture in the resource-loading path (`src/core/game_resources.c`)
 - [ ] Call `<entity>_init` in `game_init`
 - [ ] Call `<entity>_update` from the relevant `src/core/` update helper
-- [ ] Call `<entity>_render` from the relevant `src/core/` render helper (correct layer order)
+- [ ] Call `<entity>_render` from `src/render/game_render.c` or its focused render helper (correct layer order)
 - [ ] Call `<entity>_cleanup` in `game_cleanup` (before `SDL_DestroyRenderer`)
 - [ ] Set all freed pointers to `NULL`
 - [ ] Wire shared schema/parser/emitter, C/Python validation, and editor palette/tools/preview/properties/undo/clipboard/document hashing

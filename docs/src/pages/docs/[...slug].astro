@@ -68,7 +68,7 @@ const nextPage = !isRoot && currentIndex >= 0 && currentIndex < SECTION_ORDER.le
 const CurrentContent = currentPage?.default ?? currentPage;
 ---
 
-<BaseLayout title={pageTitle}>
+<BaseLayout title={isRoot ? pageTitle : `${pageTitle} — Super Mango Manual`} description={pageMeta.description} pageType="docs">
     <div class="mobile-header">
         <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false">
             <span></span><span></span><span></span>
@@ -101,7 +101,7 @@ const CurrentContent = currentPage?.default ?? currentPage;
                             const active = isRoot ? id === 'home' : id === requestedKey;
                             return (
                                 <li>
-                                    <a class:list={['nav-item', { active }]} href={href} data-nav-id={id} data-search-text={`${meta.label} ${meta.description} ${cat.label}`}>
+                                    <a class:list={['nav-item', { active }]} href={href} aria-current={active ? 'page' : undefined} data-nav-id={id} data-search-text={`${meta.label} ${meta.description} ${cat.label}`}>
                                         <span>{meta.shortLabel ?? meta.label}</span>
                                     </a>
                                 </li>
@@ -190,6 +190,9 @@ const CurrentContent = currentPage?.default ?? currentPage;
                                 </a>
                             ))}
                         </div>
+                    </section>
+                    <section id="overview" class="doc-section doc-page service-page" aria-label="Project overview and quick start">
+                        <CurrentContent />
                     </section>
                 </>
             ) : (
