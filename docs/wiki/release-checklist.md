@@ -102,5 +102,5 @@ After publish, verify:
 
 - the release asset table has Linux, macOS, Windows, and WebAssembly zip files;
 - archive downloads match the expected platform names;
-- Pages serves `/super-mango.js`, `/super-mango.wasm`, and `/super-mango.data`;
+- Pages serves `/super-mango-editor/super-mango.js`, `/super-mango-editor/super-mango.wasm`, and `/super-mango-editor/super-mango.data` under the production project base;
 - the public docs site and badges do not report stale status.
