@@ -25,6 +25,7 @@ C11: Wave 1 upgrades repository dependencies, vendored parser and toolchain/Acti
 C12: Use the canonical checkout on feature/latest-compatible-dependencies from origin/main at 3b3f528. Dependency/toolchain installation needed for the requested upgrades is scoped to this project. No new commit, push, PR, release, repository metadata write or browser interaction is authorized by the upgrade request.
 C13: User authorized parallel agents. Completed SDL3 source/docs work has been archived separately. Remaining bounded delegation may cover parser and SDL2-compatible dependency/docs work only; workers must not switch branches or overwrite another worker's files.
 C14: User explicitly requested “Open pr and merge to main” for wave 1 on 2026-09-17. This supersedes C12's commit/push/PR/merge restriction for the verified SDL2 dependency branch. Commit and push it, open its PR, merge after checks pass, and verify the resulting main/Pages workflows. SDL3 remains deferred; a new release or browser interaction is outside this request.
+C15: On 2026-09-17, the user selected “Allow canonical action” to resolve PR #303's startup failure. Add only emscripten-core/setup-emsdk@* to the existing repository Action allowlist, retain all other settings and required SHA pinning, verify readback, and retry the build. The approved settings change is complete; GitHub rejected retrying the startup-failed run, so the documentation follow-up commit triggers a fresh PR build.
 
 ## §I INTERFACES
 id|surface|contract
