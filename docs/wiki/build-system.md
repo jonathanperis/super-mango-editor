@@ -38,6 +38,10 @@ DEPS    = $(OBJS:.o=.d)
 This abbreviated source-list example omits platform detection and build-mode flags.
 Both applications include `src/shared/serializer_load_checkpoints.c` and the other shared serializer/UI modules.
 
+The vendored tomlc17 parser is based on upstream **R260821**. Its exact upstream
+commit and retained project-patch inventory are recorded in
+[`vendor/tomlc17/README.md`](https://github.com/jonathanperis/super-mango-editor/blob/main/vendor/tomlc17/README.md).
+
 ### Key Variables
 
 | Variable | Value | Description |
@@ -172,7 +176,7 @@ make run-editor
 
 ### `make web`
 
-Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). Requires Emscripten to be installed and `emcc` on `PATH`.
+Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). CI pins **6.0.9**; use that SDK with `emcc` on `PATH` for matching local builds.
 
 ```sh
 make web
@@ -215,6 +219,11 @@ prerequisite runs the static boot check, JavaScript host/profile-storage/touch
 contracts and Python release-archive tests. The native list above is the complete
 `TEST_TARGETS` inventory; profile, simulation and parser-boundary cases are linked
 into existing harnesses rather than separate binaries.
+
+`make test` also runs the standalone `parser-allocation-probe` and Python
+`parser-encoding-probe`. These focused targets verify allocation-growth limits
+and consistent UTF-8/BOM decoding across tools. `make sanitize` instruments the C
+probe and runs both alongside the existing regression suites.
 
 ### `make validate-levels`
 
@@ -321,6 +330,7 @@ Astro 7's route caching, CDN cache providers, and `src/fetch.ts` advanced-routin
 ```sh
 cd docs
 bun install --frozen-lockfile
+bun audit
 bun run lint
 NODE_ENV=production bun run build
 bun run check-site
@@ -336,8 +346,14 @@ npm run check-site
 
 Keep Bun and `bun.lock` as the CI dependency contract. The npm fallback runs the declared scripts; it does not replace the locked install step.
 
-Astro requires Node.js 22.12+; CI uses Node 22.21.1 and Bun 1.3.11. Development
-uses `/`; production output uses `/super-mango-editor/`. Astro does not compile or
+Astro requires Node.js 22.12+; CI uses Node **26.9.0** and Bun **1.4.2**. The
+supported frontend set is Astro **7.3.3**, `@astrojs/markdown-satteri` **0.4.1**,
+`@astrojs/sitemap` **3.7.4**, `@astrojs/check` **0.9.10**, Tailwind CSS and its Vite
+plugin **4.3.3**, and TypeScript **6.0.3**. TypeScript **7.0.2** is newer but outside
+Astro Check 0.9.10's `^5.0.0 || ^6.0.0` peer range; retain 6.0.3 until supported.
+Locked transitive dependencies respect their upstream version constraints.
+
+Development uses `/`; production output uses `/super-mango-editor/`. Astro does not compile or
 copy WASM: see the [website maintainer guide](https://github.com/jonathanperis/super-mango-editor/blob/main/docs/README.md)
 for local game assembly, page registration and generated-content ownership.
 
@@ -366,6 +382,18 @@ xcode-select --install
 ```
 
 SDL2 libraries are installed to `/opt/homebrew/` on Apple Silicon. `sdl2-config` resolves the correct paths automatically.
+
+Homebrew may provide SDL2 through `sdl2-compat`. If an ASan executable stalls in
+that library's startup error dialog before reaching `main`, verify its dynamic
+library search path. On Apple Silicon, the following scoped test command makes
+Homebrew's runtime dependencies discoverable while keeping sanitizers enabled:
+
+```sh
+make sanitize RUN_PREFIX='DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib'
+```
+
+Use the corresponding Homebrew library directory on other installations. This
+addresses a host loader configuration issue; it does not change the game's SDL2 API.
 
 ### Linux -- Debian / Ubuntu
 

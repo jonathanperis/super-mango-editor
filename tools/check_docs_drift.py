@@ -13,7 +13,7 @@ import re
 import sys
 from pathlib import Path
 
-from validate_levels import campaign_manifest_entries, load_max_constants, validate_schema
+from validate_levels import campaign_manifest_entries, load_level, load_max_constants, validate_schema
 
 try:
     import tomllib
@@ -27,11 +27,6 @@ DOCS = ROOT / "docs" / "wiki"
 
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
-
-
-def load_level(path: Path) -> dict:
-    with path.open("rb") as fp:
-        return tomllib.load(fp)
 
 
 def fail(message: str) -> None:

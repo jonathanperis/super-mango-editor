@@ -8,16 +8,9 @@ so docs can advertise level content without hand-maintained counts drifting.
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
-from validate_levels import campaign_manifest_entries
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - CI uses Python 3.11+
-    sys.stderr.write("generate_level_catalog: Python 3.11+ required for tomllib\n")
-    sys.exit(2)
+from validate_levels import campaign_manifest_entries, load_level
 
 ROOT = Path(__file__).resolve().parents[1]
 LEVEL_DIR = ROOT / "levels"
@@ -30,11 +23,6 @@ COUNT_GROUPS = [
     ("Surfaces", ["platforms", "float_platforms", "bridges", "bouncepads_small", "bouncepads_medium", "bouncepads_high", "vines", "ladders", "ropes", "rails"]),
     ("Visual layers", ["background_layers", "foreground_layers", "fog_layers"]),
 ]
-
-
-def load_level(path: Path) -> dict:
-    with path.open("rb") as fp:
-        return tomllib.load(fp)
 
 
 def count_value(value) -> int:

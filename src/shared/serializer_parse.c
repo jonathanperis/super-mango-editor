@@ -19,9 +19,9 @@
 /* ------------------------------------------------------------------ */
 
 /*
- * tomlc17's public lookup helper currently compares keys as C strings.  Keep
- * all serializer lookups length-aware so a parsed key containing an embedded
- * NUL cannot match a schema key by prefix.
+ * Match schema keys by exact byte length and reject embedded NULs explicitly.
+ * tomlc17's public lookup is also length-aware; these helpers additionally
+ * enforce the serializer's key-validation contract.
  */
 static int toml_key_matches(const char *supplied, int supplied_len,
                             const char *expected)

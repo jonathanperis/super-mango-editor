@@ -5,8 +5,15 @@ The landing page hosts the game; `/docs/` publishes the manual from `wiki/`.
 
 ## Requirements and Commands
 
-Use Node.js **22.12+**, Bun and Python **3.11+**. CI pins Node 22.21.1 and Bun
-1.3.11. Restore dependencies with `bun install --frozen-lockfile` in this directory.
+Use Node.js **22.12+**, Bun and Python **3.11+**. CI pins Node **26.9.0** and Bun
+**1.4.2**. Restore dependencies with `bun install --frozen-lockfile` in this directory.
+
+The supported frontend versions are Astro **7.3.3**, `@astrojs/markdown-satteri`
+**0.4.1**, `@astrojs/sitemap` **3.7.4**, `@astrojs/check` **0.9.10**, Tailwind CSS
+and its Vite plugin **4.3.3**, and TypeScript **6.0.3**. TypeScript **7.0.2** is
+newer, but Astro Check 0.9.10 requires `^5.0.0 || ^6.0.0`; retain 6.0.3 until the
+checker supports 7.x. Keep peer constraints enforced. After dependency updates,
+run frozen install, `bun audit`, lint, build and `check-site`.
 
 | Command (from `docs/`) | Action |
 |---|---|
@@ -66,7 +73,7 @@ Astro compilation alone does not check links; `check-site` validates emitted HTM
 ## Local Game Preview
 
 Astro does **not** compile or copy WebAssembly. A docs-only preview renders the
-site, but game startup needs the game artifacts. With a working Emscripten SDK,
+site, but game startup needs the game artifacts. With Emscripten **6.0.9**,
 build and assemble from the repository root:
 
 ```sh
@@ -98,6 +105,10 @@ deploys `docs/out/` to Pages. Release tags are a separate publication path.
 Analytics is optional; see `.env.example`. With no `PUBLIC_GA_ID`, analytics
 scripts are omitted. Production builds map the repository secret
 `NEXT_PUBLIC_GA_ID` to `PUBLIC_GA_ID`. Local environment files stay untracked.
+
+The browser game uses the SDL2 companion ports shipped with the pinned Emscripten
+SDK. Their versions can lag native packages; upgrading the SDK does not imply
+every SDK-managed library matches the latest standalone release.
 
 See [AUDIT.md](AUDIT.md) for the dated audit and follow-up plan.
 `AUDIT_IMPLEMENTATION.md` is the historical Sandbox School delivery report.
