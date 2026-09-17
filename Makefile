@@ -218,7 +218,7 @@ release:
 -include $(TEST_DEPS)
 
 # ── Tests ────────────────────────────────────────────────────────────
-test: $(OUTDIR) $(TEST_TARGETS) web-host-contract
+test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser-encoding-probe
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/level-serializer-test"
 	python3 tests/validate_levels_test.py
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/level-validate-test"
@@ -238,6 +238,17 @@ test: $(OUTDIR) $(TEST_TARGETS) web-host-contract
 
 $(TEST_TARGETS): | $(OUTDIR)
 $(TEST_OBJECTS): | $(OUTDIR)
+
+# Extra standalone parser probes; keep the 15-regression-binary inventory above.
+.PHONY: parser-allocation-probe parser-encoding-probe
+parser-allocation-probe: $(OUTDIR)/parser-allocation-probe
+	$(RUN_PREFIX) "$(abspath $<)"
+
+$(OUTDIR)/parser-allocation-probe: tests/parser_allocation_test.c $(VENDOR_DIR)/tomlc17.c $(VENDOR_DIR)/tomlc17.h Makefile | $(OUTDIR)
+	$(CC) $(TEST_CFLAGS) -o $@ $< -lm
+
+parser-encoding-probe:
+	python3 tests/parser_validator_test.py
 
 validate-levels:
 	python3 tools/validate_levels.py

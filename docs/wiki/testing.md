@@ -60,6 +60,13 @@ storage conflicts, touch ownership and native/WASM archive contracts without a
 browser. Native harnesses cover parser/serializer, validation, runtime, editor,
 profile, checkpoint, simulation and session behavior.
 
+Two extra standalone probes accompany the 15 regression binaries:
+`make parser-allocation-probe` checks parser buffer-growth limits without huge
+allocations, and `make parser-encoding-probe` checks all Python level readers.
+Both run under `make test`; `make sanitize` instruments the C probe as well.
+Level readers accept one leading UTF-8 BOM and preserve raw line endings so
+invalid CR-only documents remain rejected.
+
 ## Smoke Tests
 
 `make smoke` builds the game and editor, runs root and lab TOML levels for a bounded frame count with dummy video/audio drivers, then renders five editor frames. Use it when startup, asset loading, level data, or resource cleanup changed.

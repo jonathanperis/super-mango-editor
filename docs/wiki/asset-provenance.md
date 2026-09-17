@@ -7,7 +7,7 @@ MIT notice. See [Asset Inventory](../asset-inventory/) for generated file sizes.
 | Component | Source / evidence | Status |
 |-----------|-------------------|--------|
 | Project C/Python/JS | Repository `LICENSE` | MIT, Jonathan Peris |
-| tomlc17 | `vendor/tomlc17/LICENSE`; [upstream](https://github.com/cktan/tomlc17) | MIT, CK Tan; local hardening changes are recorded in Git history |
+| tomlc17 | [Upstream R260821](https://github.com/cktan/tomlc17/releases/tag/R260821); `vendor/tomlc17/LICENSE` | MIT, CK Tan; `vendor/tomlc17/README.md` records the exact upstream commit and retained project-patch inventory |
 | Original sprites | [JuhoSprite's Super Mango pack](https://juhosprite.itch.io/super-mango-2d-pixelart-platformer-asset-pack16x16), checked 2026-09-16 | Page metadata lists CC BY 4.0; page prose also says free use/no credit needed. Preserve attribution and the license link |
 | Recolored/derived sprites | `tools/gen_fire_sprites.py`, `tools/analyze_sprite.py`, repository history | Derived from the original sprites; retain JuhoSprite credit and identify modifications |
 | `round9x13.ttf` | Pack page identifies Round 9x13 and explicitly says the font was not made by JuhoSprite | Author/license evidence remains unresolved in this checkout |

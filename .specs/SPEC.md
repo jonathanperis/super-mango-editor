@@ -8,6 +8,8 @@ Current follow-up (2026-09-16): implement the complete repository-audit roadmap 
 
 Current follow-up (2026-09-17): audit and refresh the README, public manual, static website and repository About metadata. User requested the audit/update plan and GitHub About enhancement via `gh`, then said “go”. C9, I21-I22, A27-A29 and T30-T32 define this task; earlier scopes are historical.
 
+Current dependency follow-up (2026-09-17): user requested “update everything to the newest version”. After initially approving SDL3 and parallel agents, the user explicitly pivoted: “Do not work on sdl3 at the end. I’ll open another session just for this work after”. This session completes wave 1 on SDL2 only. The SDL3 implementation is preserved in stash 644f781c660a21b5b7d2389b283f1efe3ea7c068, named wave2-sdl3-migration-2026-09-17, for a separate session.
+
 ## §C CONSTRAINTS
 C1: Prior work is published at aa20236. Continue the user-authorized existing checkout locally on feature/browser-boundaries from that base. Keep this follow-up local unless publishing is requested again. User explicitly approved browser UI testing on the local build with an isolated profile: startup, settings/remapping, touch press/release, focus changes, cross-tab test-save conflicts, and exit. Use only task-owned http://127.0.0.1:4187 URLs and disposable UI-generated saves. No personal profiles, credentials/storage inspection, eval/run-code, request mocking, traces, installations, or new permissions without separate scope-specific approval. Preserve the unrelated local .ignore file.
 C2: Keep C11/SDL2, the existing ownership architecture, current shipped levels/assets, and compatible legacy numeric representations. Reject unsafe inputs instead of silently repairing documents.
@@ -19,6 +21,10 @@ C7: Preserve C11/SDL2 and explicit bounded-state architecture. Keep the three cu
 C8: Implement teaching features as opt-in debug experiments. Normal play, pause/focus/settings ownership, profile isolation, atomic persistence, legacy level loading and native/web builds remain supported. Export must be explicit and must not silently overwrite files. Asset licensing claims require evidence; unknown art/audio/font terms stay identified rather than invented.
 C9: Use the canonical checkout on feature/documentation-refresh from origin/main at 16be4a1. Preserve runtime, levels, assets, historical reports and prior specifications. Update documentation/site presentation and focused documentation checks. The authorized remote write is repository About description/homepage/topics through gh; no commit, push, release, deployment, installation or browser interaction is authorized.
 C10: Publication follow-up authorized on 2026-09-17: user selected “Docs PR, then release” when asked whether to publish documentation only or also a game/editor release. This supersedes C9's publication restriction: commit/push the documentation branch, open and merge its PR after CI passes, verify Pages, then publish a builder release through the main-branch workflow and inspect its four archives. Browser interaction and local installations remain outside this authorization.
+C11: Wave 1 upgrades repository dependencies, vendored parser and toolchain/Action pins to current stable supported versions while retaining SDL2. SDL3 work is deferred to a separate user-started session and must not resume here. Preserve C11, authored content, serialized level/profile formats, gameplay semantics and parser hardening. Report unsupported dependency majors rather than ignoring peer constraints.
+C12: Use the canonical checkout on feature/latest-compatible-dependencies from origin/main at 3b3f528. Dependency/toolchain installation needed for the requested upgrades is scoped to this project. No new commit, push, PR, release, repository metadata write or browser interaction is authorized by the upgrade request.
+C13: User authorized parallel agents. Completed SDL3 source/docs work has been archived separately. Remaining bounded delegation may cover parser and SDL2-compatible dependency/docs work only; workers must not switch branches or overwrite another worker's files.
+C14: User explicitly requested “Open pr and merge to main” for wave 1 on 2026-09-17. This supersedes C12's commit/push/PR/merge restriction for the verified SDL2 dependency branch. Commit and push it, open its PR, merge after checks pass, and verify the resulting main/Pages workflows. SDL3 remains deferred; a new release or browser interaction is outside this request.
 
 ## §I INTERFACES
 id|surface|contract
@@ -44,6 +50,9 @@ I19|ownership and undo|Shared level-format/file-I/O and UI modules have neutral 
 I20|public facts|Generated campaign/lab metrics and asset inventory drive website/catalog counts and bundle callouts. Public root documents participate in drift checks. Historical design assessments are labeled, and asset provenance distinguishes known and unresolved licenses.
 I21|documentation and site|Published manual renders its overview, supplies route-specific metadata, resolves internal links and sitemap references, and accurately documents current schema, controls, source boundaries, build/CI and release availability. Reuse existing validator/schema and generated facts rather than duplicate contracts.
 I22|repository About|Description identifies the C11/SDL2 platformer, native visual level editor, TOML worlds and learning purpose; homepage remains the verified Pages entry point and topics include editor/learning discoverability.
+I23|dependency inputs|Use verified latest supported stable packages/toolchains, full Action commit pins and a frozen lockfile. Keep SDL2 native and WebAssembly build contracts; TypeScript must satisfy Astro Check's declared peer range.
+I24|deferred SDL3 wave|Implementation snapshot remains in the named stash for a separate session. No SDL3 source, build or documentation migration ships in wave 1.
+I25|parser update|Integrate tomlc17 R260821 while retaining allocation cleanup, bounded parsing, experiment capacity and project API contracts. Record upstream/local modifications and align BOM handling across Python level readers without normalizing invalid line endings.
 
 ## §A ACCEPTANCE
 id|criterion|verify
@@ -76,6 +85,10 @@ A26|Applicable native/sanitizer/host/scenario/docs gates pass; final regression/
 A27|Audit inventory covers root public docs, all manual pages, site source/configuration and GitHub release/Pages/About evidence; observed stale claims are corrected and residual follow-ups recorded|source review and dated docs audit report
 A28|Documentation examples match the v1 schema; all built routes/anchors/assets and sitemap targets resolve; overview and per-page metadata appear; docs and host checks pass|make docs-drift, focused negative cases, Astro lint/build, built-site checker, web-host-contract
 A29|Authorized About settings are improved using gh and read back accurately|gh repo edit and gh repo view
+A30|Packages and pinned toolchain/Actions use latest supported stable versions, with compatibility exceptions recorded|registry/release evidence, frozen install, docs lint/build/site and dependency audit
+A31|SDL2 game/editor and existing regressions preserve behavior with the upgraded parser/dependencies|fresh native builder/test, sanitizer, smoke and scripted-smoke gates
+A32|Latest tomlc17 changes retain parser hardening and application behavior|upstream comparison, allocation/encoding probes, serializer/profile/session tests
+A33|Both SDL2 WebAssembly hosts and archives verify on the upgraded toolchain; docs match final pins|make web, WASM artifact/package checks, host contracts, docs drift and regression scan; platform/browser execution gaps remain explicit
 
 ## §V INVARIANTS
 id|rule|proof
@@ -126,6 +139,12 @@ T29|x|Review final code/spec regressions and report the complete roadmap disposi
 T30|x|Audit public documentation and source-backed claims; refresh stale copy, examples, controls, workflows and maintainer instructions|I21,A27|source review, docs-drift
 T31|x|Fix overview/metadata/sitemap publishing gaps and add focused recurrence checks; verify affected docs and host contracts|I21,A28,V12|Astro lint/build, built-site check, negative cases, web-host-contract
 T32|x|Update About via gh, record dated audit/enhancement disposition and complete regression scan|I22,A27,A29|gh readback, final diff and regression review
+T33|x|Inventory latest stable versions and preserve SDL3 work after the user's scope pivot|C11,I23,I24,A30|upstream evidence and named stash verification
+T34|.|Deferred to a separate user-started session: integrate the preserved SDL3 migration|I24,C11|future-session native/WASM migration verification
+T35|x|Integrate latest hardened tomlc17 and align level-reader/test contracts|I25,A31,A32|parser and application regression gates
+T36|x|Update pinned Actions/toolchains and wire parser probes into existing build gates|I23,A30,A31,A33|native/WASM builds and package checks
+T37|x|Refresh supported frontend packages and synchronize SDL2 documentation with final versions|I23,A30,A33|frozen install, docs lint/build/site, audit and drift
+T38|x|Run integrated wave 1 verification, regression scan and final upgrade/limitation report|A30,A31,A32,A33|native/sanitizer/smoke/host/WASM/docs gates
 
 ## §R EVIDENCE
 id|question|finding|source|checked
