@@ -105,7 +105,7 @@ float  dt  = (float)(now - prev) / 1000.0f;
 prev = now;
 ```
 
-All velocities are expressed in **pixels per second**. Multiplying by `dt` (seconds) gives the correct displacement per frame regardless of the actual frame rate.
+Velocities are expressed in **pixels per second**. Multiplication by `dt` gives a displacement, but discrete acceleration and collision sampling still introduce timestep-dependent error. `make timing-lab` demonstrates this distinction. Replay uses recorded steps; the inspector can freeze, single-step, slow and tune a simulation without overriding focus/settings/terminal blockers.
 
 During an active game update, authored checkpoints are sampled after player movement and before lethal collision handling. Legacy screen-boundary checkpoint sampling runs only when the active level has no authored records.
 
@@ -215,11 +215,11 @@ typedef struct {
     unsigned int pause_reasons;
     float   respawn_x, respawn_y;
     int     checkpoint_index;
-    Uint32  checkpoint_notice_until;
+    Uint32  checkpoint_feedback_until;
     int     legacy_checkpoint_screen;
     int     debug_mode;
     int     smoke_test_frames;
-    char    level_path[256];
+    char    level_path[GAME_LEVEL_PATH_MAX];
     void   *level_def;      /* owned active LevelDef backing storage */
 
     LevelRuntime        runtime;
@@ -234,7 +234,7 @@ typedef struct {
 
 - Textures are grouped in `TextureResources` (`gs->textures.*`) and audio in `AudioResources` (`gs->audio.*`) so cleanup can be centralized.
 - `Player` is **embedded by value**, not a pointer. This avoids a heap allocation and keeps the struct self-contained. The same applies to `Platform`, `Water`, `FogSystem`, and all entity arrays.
-- Every pointer is set to `NULL` after freeing, making accidental double-frees safe.
+- Owning pointers are cleared after release. Borrowed pointers and aliases still require correct lifetime handling.
 - Initialised with `GameState gs = {0}` so every field starts as `0` / `NULL`.
 - `checkpoint_x` is no longer a `GameState` field. The resolved respawn state is `respawn_x`, `respawn_y`, and `checkpoint_index`; `legacy_checkpoint_screen` is used only when the active level has no authored records.
 
@@ -253,6 +253,7 @@ Authored records disable automatic screen-boundary checkpoints for that level. A
 | SDL subsystem init failure (in `main`) | `fprintf(stderr, ...)` → clean up already-inited subsystems → `return EXIT_FAILURE` |
 | Resource load failure (in `game_init`) | `fprintf(stderr, ...)` → clean up partially-created `GameState` resources → return `-1`; the top-level runner returns `EXIT_FAILURE` |
 | Sound load failure (non-fatal pattern) | `fprintf(stderr, ...)` then continue -- play is guarded by `if (gs->audio.<name>)` |
-| Optional texture load failure (non-fatal) | `fprintf(stderr, ...)` then continue -- render is guarded by `if (texture)` |
+| Missing gameplay-critical shared sprite | Reject the level before replacing active level state; identify the required asset path |
+| Optional presentation texture load failure | Warn and preserve the documented visual fallback |
 
 All SDL error strings are retrieved with `SDL_GetError()`, `IMG_GetError()`, or `Mix_GetError()` and printed to `stderr`.

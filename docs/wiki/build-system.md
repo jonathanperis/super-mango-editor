@@ -29,38 +29,23 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(wildcard $(SRCDIR)/render/*.c) \
           $(wildcard $(SRCDIR)/screens/*.c) \
           $(wildcard $(SRCDIR)/surfaces/*.c) \
-          $(SRCDIR)/editor/serializer.c \
-          $(SRCDIR)/editor/serializer_emit.c \
-          $(SRCDIR)/editor/serializer_io.c \
-          $(SRCDIR)/editor/serializer_load.c \
-          $(SRCDIR)/editor/serializer_load_climbables.c \
-          $(SRCDIR)/editor/serializer_load_collectibles.c \
-          $(SRCDIR)/editor/serializer_load_config.c \
-          $(SRCDIR)/editor/serializer_load_enemies.c \
-          $(SRCDIR)/editor/serializer_load_geometry.c \
-          $(SRCDIR)/editor/serializer_load_hazards.c \
-          $(SRCDIR)/editor/serializer_load_header.c \
-          $(SRCDIR)/editor/serializer_load_layers.c \
-          $(SRCDIR)/editor/serializer_load_surfaces.c \
-          $(SRCDIR)/editor/serializer_parse.c \
-          $(SRCDIR)/editor/serializer_save.c \
-          $(SRCDIR)/editor/serializer_types.c \
+          $(wildcard $(SRCDIR)/shared/*.c) \
           vendor/tomlc17/tomlc17.c
 OBJS    = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
 DEPS    = $(OBJS:.o=.d)
 ```
 
-The game source list also includes `src/editor/serializer_load_checkpoints.c`, so runtime TOML loading and the standalone editor share strict authored-checkpoint parsing.
+Both applications include `src/shared/serializer_load_checkpoints.c` and the other shared serializer/UI modules.
 
 ### Key Variables
 
 | Variable | Value | Description |
 |----------|-------|-------------|
-| `CC` | `clang` intended; pass explicitly for parity | C compiler. Use `CC=clang` for CI/local parity; GNU Make may otherwise use its built-in `CC=cc`. |
+| `CC` | `clang` | Replaces Make's built-in default; explicit compiler overrides remain supported. |
 | `CFLAGS` | see below | Compiler flags |
 | `LIBS` | see below | Linker flags |
 | `TARGET` | `out/super-mango` | Output binary path |
-| `SRCS` | explicit per-directory wildcards plus editor serializer files | Game C sources from recognized source directories, TOML serializer modules, and tomlc17 |
+| `SRCS` | explicit per-directory wildcards including shared modules | Runtime, shared serializer/UI and tomlc17 sources |
 | `OBJDIR` | `out/obj` | Object/dependency root that mirrors source paths |
 | `OBJS` | `$(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))` | Object files under `out/obj/...` |
 | `DEPS` | `$(OBJS:.o=.d)` | Auto-generated dependency files beside object files under `out/obj/...` |
@@ -74,7 +59,20 @@ make test CC=clang
 make smoke CC=clang
 ```
 
-The Makefile uses `CC ?= clang`, but GNU Make defines a built-in `CC=cc`, so some local invocations resolve to `cc` unless the compiler is overridden on the command line.
+The Makefile detects GNU Make's built-in compiler default and replaces it with clang. An explicit command-line compiler takes precedence.
+
+### Builder and build modes
+
+`make builder` builds both executables. `make run-editor` also builds the sibling
+game needed for F5 playtest. The default build includes `-g -O0`; `make debug`
+isolates it under `out/debug/`, and `make release` builds `-O2` game/editor binaries
+under `out/release/`. Their object directories never overlap. For additional
+custom flag combinations, choose a separate `OUTDIR` to avoid reusing old objects.
+
+`make content-inventory` regenerates public counts and the raw asset inventory;
+`make asset-budget` checks freshness and the 40 MiB raw playable-asset budget.
+`make timing-lab` prints a small integration experiment for 30/60/144 Hz.
+Python 3.11+ and Node.js are required for host checks. Linux dialogs use zenity.
 
 ### Compiler Flags Explained
 
@@ -144,7 +142,7 @@ make run-debug
 Builds (if out of date) then runs the binary with the `--level` flag, loading a specific TOML level file directly and skipping the campaign selector. The supplied valid TOML level does not need to be listed in `levels/campaigns/main.toml`.
 
 ```sh
-make run-level LEVEL=levels/00_onboarding_01.toml
+make run-level LEVEL=levels/labs/01_collision.toml
 ```
 
 ### `make run-level-debug LEVEL=path`
@@ -152,7 +150,7 @@ make run-level LEVEL=levels/00_onboarding_01.toml
 Builds (if out of date) then runs the binary with both `--debug` and `--level` flags, loading a specific TOML level file with the debug overlay enabled.
 
 ```sh
-make run-level-debug LEVEL=levels/00_onboarding_01.toml
+make run-level-debug LEVEL=levels/labs/01_collision.toml
 ```
 
 ### `make editor`
@@ -279,7 +277,7 @@ make roadmap-quality
 
 ### `make dist-native`
 
-Builds native distribution archives under `dist/` using `tools/package_release.py`. The archive layout includes the game/editor binaries where applicable, assets, levels, license, and a short run README. CI uses this path for release artifacts.
+Builds optimized native builder archives under `dist/`. Both game and editor are included with playable assets, campaign/lab levels, project and third-party notices, and a run README. `unused/` assets are excluded. CI uses the same packaging path.
 
 ```sh
 make dist-native
@@ -287,15 +285,16 @@ make dist-native
 
 ### `make dist-wasm`
 
-Builds the WebAssembly payload and packages the static browser files into a release archive. The verifier expects the HTML, JavaScript, `.wasm`, `.data`, `README.txt`, and `LICENSE` entries.
+Packages an existing verified WebAssembly build without invoking emcc again. Missing normal/debug outputs are errors. Archives include HTML/JS/WASM/data files, README and third-party notices.
 
 ```sh
+make web
 make dist-wasm
 ```
 
 ### `make docs-drift`
 
-Runs the generated level-catalog freshness check, generated overlay-snapshot freshness check, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. Together they compare Makefile test targets, README/agent/docs command summaries, source-file map entries, campaign catalog coverage, layer TOML snippets, workflow docs, runtime flags, key constants, level prose counts, TOML line endings, overlay text snapshots, local Emscripten caveats, and scripted-smoke wiring against the current repository.
+Runs the generated level-catalog freshness check, generated overlay-snapshot freshness check, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. Together they compare Makefile test targets, README/developer-guide command summaries, source-file map entries, campaign catalog coverage, layer TOML snippets, workflow docs, runtime flags, key constants, level prose counts, TOML line endings, overlay text snapshots, local Emscripten caveats, and scripted-smoke wiring against the current repository.
 
 ```sh
 make docs-drift

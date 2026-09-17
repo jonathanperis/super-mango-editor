@@ -21,7 +21,7 @@
 #include "editor.h"       /* EditorState, constants, EntityType, EditorTool */
 #include "editor_frame.h" /* editor_run_frame — one frame of editor work    */
 #include "undo.h"         /* UndoStack, undo_create/destroy/push/pop/clear  */
-#include "ui.h"           /* UIState, ui_init, ui_begin_frame, ui_button    */
+#include "../shared/ui.h" /* Shared immediate-mode UI */
 #include "editor_files.h" /* editor file/save/autosave helpers              */
 #include "editor_session.h" /* editor status/title/session helpers           */
 #include "editor_textures.h" /* editor_textures_load/cleanup                 */
@@ -152,8 +152,8 @@ int editor_init(EditorState *es) {
     /*
      * undo_create — heap-allocate a zeroed UndoStack.
      *
-     * The undo stack is ~24 KB (two 256-entry Command arrays) — too large
-     * for the C stack on some platforms, so it lives on the heap.
+     * Entity history uses bounded compact entries; configuration snapshots
+     * allocate separately only when needed. Keep this storage on the heap.
      * The editor owns this pointer and frees it in editor_cleanup.
      */
     es->undo = undo_create();
@@ -283,8 +283,8 @@ void editor_cleanup(EditorState *es) {
     /* ---- Renderer --------------------------------------------------- */
     /*
      * SDL_DestroyRenderer — release the GPU drawing context.
-     * All textures that were created via this renderer must already be
-     * destroyed; calling this with live textures leaks GPU memory.
+     * SDL also frees associated textures here. Releasing owned textures first
+     * makes their lifetime explicit and prevents stale pointers in our state.
      */
     if (es->renderer) {
         SDL_DestroyRenderer(es->renderer);

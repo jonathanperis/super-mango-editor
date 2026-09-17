@@ -51,7 +51,7 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 - Seven hazard types (spike, spike block, spike platform, circular saw, axe trap, blue flame, fire flame)
 - Five collectible types (coin, star yellow/green/red, last star)
 - Climbable vines, ladders, ropes; three bouncepad tiers (small/medium/high); crumble bridges; float platforms (static/crumble/rail-riding)
-- TOML-only level workflow: v1 `levels/campaigns/main.toml` drives the native selector from Forest First Steps onboarding through the sandbox and two volcanic stages; `--level <path>` directly loads a TOML level outside that catalog when needed
+- TOML-only level workflow: `levels/campaigns/main.toml` orders the sandbox and two volcanic stages; `--level <path>` also opens the separate learning labs
 - Authored `[[checkpoints]]` supply explicit respawns; levels without records retain automatic screen-boundary respawns
 - Pause, game-over, and level-completion overlays: terminal menus support Next Level, Replay, Level Select, Exit, or Retry as applicable; Up/Down or D-pad selects, Enter/Space/Start confirms (A also confirms), Esc/Back exits (B also exits)
 - Standalone visual level editor with undo, copy/paste, validation blocking, recent files, autosave, and play-test integration
@@ -91,7 +91,7 @@ make run CC=clang
 make run-editor CC=clang
 
 # Run a specific level file
-make run-level CC=clang LEVEL=levels/00_onboarding_01.toml
+make run-level CC=clang LEVEL=levels/labs/01_collision.toml
 
 # Optional local WebAssembly preflight (CI is authoritative for WASM releases)
 make web

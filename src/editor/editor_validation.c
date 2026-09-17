@@ -5,7 +5,7 @@
 #include "editor_validation.h"
 
 #include "../levels/level_loader.h"
-#include "serializer_io.h"
+#include "../shared/serializer_io.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -91,7 +91,8 @@ static void check_path(EditorValidationReport *report, const char *field,
 
 int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
 {
-    char err[128];
+    char err[256];
+    char field[64];
 
     if (!report) return -1;
     memset(report, 0, sizeof(*report));
@@ -114,17 +115,21 @@ int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
     check_path(report, "next_phase", def->next_phase);
 
     for (int i = 0; i < def->platform_count && i < MAX_PLATFORMS; i++) {
-        check_path(report, "platforms[].tile_path", def->platforms[i].tile_path);
+        snprintf(field, sizeof(field), "platforms[%d].tile_path", i);
+        check_path(report, field, def->platforms[i].tile_path);
     }
 
     for (int i = 0; i < def->background_layer_count && i < MAX_BACKGROUND_LAYERS; i++) {
-        check_path(report, "background_layers[].path", def->background_layers[i].path);
+        snprintf(field, sizeof(field), "background_layers[%d].path", i);
+        check_path(report, field, def->background_layers[i].path);
     }
     for (int i = 0; i < def->foreground_layer_count && i < MAX_BACKGROUND_LAYERS; i++) {
-        check_path(report, "foreground_layers[].path", def->foreground_layers[i].path);
+        snprintf(field, sizeof(field), "foreground_layers[%d].path", i);
+        check_path(report, field, def->foreground_layers[i].path);
     }
     for (int i = 0; i < def->fog_layer_count && i < MAX_FOG_TEXTURES; i++) {
-        check_path(report, "fog_layers[].path", def->fog_layers[i].path);
+        snprintf(field, sizeof(field), "fog_layers[%d].path", i);
+        check_path(report, field, def->fog_layers[i].path);
     }
 
     if (def->name[0] == '\0') {

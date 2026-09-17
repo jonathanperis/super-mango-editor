@@ -644,8 +644,8 @@ static void draw_performance(const DebugOverlay *dbg, TTF_Font *font,
     render_debug_text(font, renderer, buf, GAME_W - HUD_MARGIN - text_w, y, fps_col);
     y += 13;
 
-    /* Frame time + CPU budget */
-    snprintf(buf, sizeof(buf), "CPU: %.1fms (%.0f%%)",
+    /* Frame delta includes pacing; it is not CPU utilization. */
+    snprintf(buf, sizeof(buf), "Frame: %.1fms (%.0f%%)",
              (double)dbg->frame_ms_display, (double)dbg->cpu_percent);
     SDL_Color cpu_col = dbg->frame_ms_display < 12.0f ? green
                       : dbg->frame_ms_display < 16.7f ? yellow : red;
@@ -825,7 +825,7 @@ void debug_cleanup(DebugOverlay *dbg)
  */
 void debug_update(DebugOverlay *dbg, float dt)
 {
-    /* ---- Frame time (CPU proxy) ------------------------------------ */
+    /* ---- Frame delta (includes pacing; synthetic in smoke mode) ----- */
     dbg->frame_ms = dt * 1000.0f;
 
     /* ---- FPS sampling ----------------------------------------------- */

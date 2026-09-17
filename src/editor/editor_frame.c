@@ -18,7 +18,7 @@
 #include "editor_playtest.h"   /* editor_check_play_status */
 #include "editor_validation.h" /* editor_validate_level */
 #include "editor_session.h"
-#include "ui.h"                /* ui_begin_frame */
+#include "../shared/ui.h"      /* ui_begin_frame */
 
 /*
  * editor_run_frame — Run one editor event/update/render frame.

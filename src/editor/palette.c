@@ -30,7 +30,7 @@
 
 #include "editor.h"    /* EditorState, EntityType, EditorTool, CANVAS_W, etc.  */
 #include "entity_meta.h" /* shared palette names/categories                    */
-#include "ui.h"        /* UIState, ui_panel, ui_label_color, UI_* colours      */
+#include "../shared/ui.h" /* UIState and shared widgets */
 
 /* ------------------------------------------------------------------ */
 /* Layout constants                                                    */

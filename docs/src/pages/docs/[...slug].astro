@@ -128,13 +128,13 @@ const CurrentContent = currentPage?.default ?? currentPage;
                             <h1 id="manual-title">Trace every wire inside Super Mango</h1>
                             <p>Use the manual like a service bay: start with orientation, inspect the engine, open world-builder references, then verify builds and source ownership without one giant scroll.</p>
                             <div class="manual-diagnostics" aria-label="Manual diagnostics">
-                                <span>15 routes indexed</span>
+                                <span>{allPages.length} routes indexed</span>
                                 <span>C11 + SDL2</span>
                                 <span>TOML levels</span>
                                 <span>WASM cabinet</span>
                             </div>
                             <div class="docs-actions" aria-label="Primary manual actions">
-                                <a href={`${docsBase}/developer-guide/`}>Start diagnostics</a>
+                                <a href={`${docsBase}/learning-path/`}>Start learning</a>
                                 <a href={playUrl}>Boot the cabinet</a>
                             </div>
                         </div>
@@ -276,7 +276,7 @@ const CurrentContent = currentPage?.default ?? currentPage;
                 if (searchStatus) {
                     searchStatus.textContent = query
                         ? (visibleRoutes ? `${visibleRoutes} matching routes` : 'No routes found')
-                        : '15 routes ready';
+                        : `${navItems.length} routes ready`;
                 }
             });
         });

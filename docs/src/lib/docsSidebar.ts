@@ -1,5 +1,10 @@
 export type DocsSectionId =
   | 'home'
+  | 'learning-path'
+  | 'mechanics-museum'
+  | 'entity-walkthrough'
+  | 'asset-inventory'
+  | 'asset-provenance'
   | 'developer-guide'
   | 'controls'
   | 'testing'
@@ -35,6 +40,11 @@ export type DocsCategory = {
 };
 
 export const DOCS_META: Record<DocsSectionId, DocsPageMeta> = {
+  'learning-path': { id: 'learning-path', label: 'Sandbox School', description: 'Eight guided experiments from first frame to reproducible replay.', route: '/docs/learning-path/', marker: 'LEARN' },
+  'mechanics-museum': { id: 'mechanics-museum', label: 'Mechanics Museum', description: 'Six focused levels and the simulation inspector.', route: '/docs/mechanics-museum/', marker: 'LABS' },
+  'entity-walkthrough': { id: 'entity-walkthrough', label: 'Entity Walkthrough', description: 'Trace a collectible through parser, runtime, editor, undo and tests.', route: '/docs/entity-walkthrough/', marker: 'EXTEND' },
+  'asset-inventory': { id: 'asset-inventory', label: 'Asset Inventory', description: 'Generated playable asset sizes and bundle budget.', route: '/docs/asset-inventory/', marker: 'SIZE' },
+  'asset-provenance': { id: 'asset-provenance', label: 'Asset Provenance', description: 'Sources, third-party notices and unresolved media license records.', route: '/docs/asset-provenance/', marker: 'CREDIT' },
   home: {
     id: 'home',
     label: 'Overview',
@@ -174,13 +184,13 @@ export const SECTION_CATEGORIES: DocsCategory[] = [
     label: 'Start Here',
     kicker: 'MANUAL_01',
     description: 'New to the cabinet? Start with the map, developer conventions, controls, tests, and architecture route.',
-    ids: ['home', 'developer-guide', 'controls', 'testing', 'architecture'],
+    ids: ['home', 'learning-path', 'mechanics-museum', 'developer-guide', 'controls', 'testing', 'architecture'],
   },
   {
     label: 'Engine & Code',
     kicker: 'MANUAL_02',
     description: 'Follow the C11 and SDL2 runtime, player module, constants, and source ownership.',
-    ids: ['source-files', 'player-module', 'constants-reference'],
+    ids: ['source-files', 'entity-walkthrough', 'player-module', 'constants-reference'],
   },
   {
     label: 'World Builder',
@@ -192,7 +202,7 @@ export const SECTION_CATEGORIES: DocsCategory[] = [
     label: 'Assets & Builds',
     kicker: 'MANUAL_04',
     description: 'Audit resources, generated catalogs, overlays, sounds, and platform build targets.',
-    ids: ['assets', 'sounds', 'level-catalog', 'overlay-snapshots', 'build-system', 'release-checklist'],
+    ids: ['assets', 'asset-inventory', 'asset-provenance', 'sounds', 'level-catalog', 'overlay-snapshots', 'build-system', 'release-checklist'],
   },
 ];
 

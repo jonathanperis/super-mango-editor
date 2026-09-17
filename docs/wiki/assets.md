@@ -260,8 +260,28 @@ Additional tilesets are stored in `assets/sprites/levels/`:
 To inspect any sprite sheet's exact dimensions and pixel layout:
 
 ```sh
-python3 .agents/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png
+python3 tools/analyze_sprite.py assets/sprites/<category>/<sprite>.png
 ```
+
+The tool requires Python and Pillow. Supply explicit frame dimensions when known, for example:
+
+```sh
+python3 tools/analyze_sprite.py assets/sprites/entities/spider.png 64 48
+```
+
+Without explicit dimensions, the analyzer looks for transparent gutters. Verify its result against the image: sheet width and height must divide into whole frame columns and rows. Frames are zero-indexed; transparent padding is not part of the visible art or collision hitbox. Measure the art bounds before setting `ART_X/Y/W/H` or hitbox padding, and check rows separately when their usable frame counts differ.
+
+### Theme Variants
+
+Match an existing asset's dimensions, frame grid, and silhouette before making a theme variant. Palette-only variants preserve pixel positions and transparency; use a limited palette and inspect silhouettes at game scale. Check 9-slice tilesets tiled together for seams.
+
+`tools/gen_fire_sprites.py` retains the fire-palette generation utility:
+
+```sh
+python3 tools/gen_fire_sprites.py
+```
+
+It also requires Pillow and resolves assets relative to the repository, not the working directory. Running it writes 13 background/foreground PNGs under `assets/sprites/`; run it only when intentionally regenerating those assets and review the resulting diff.
 
 ### Frame Math Reference
 

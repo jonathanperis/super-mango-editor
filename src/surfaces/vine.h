@@ -1,9 +1,8 @@
 /*
  * vine.h — Public interface for static vine/plant decorations.
  *
- * Vines are purely visual: no update step, no collision.
- * They are placed on the ground floor and on select platform tops
- * to add organic variety to the level scenery.
+ * Vines have no independent update step. Player climbing code uses their
+ * bounds as grab regions; they are not solid collision surfaces.
  *
  * Sprites:
  *   vine_green.png — forest/fertile themes (16×48 RGBA, single frame)

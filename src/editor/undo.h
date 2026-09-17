@@ -69,12 +69,12 @@ typedef enum {
  * so we don't need a separate undo struct for every entity type.
  *
  * The active member is determined by the Command's entity_type field.
- * In C, reading from the wrong union member is undefined behaviour, so
- * it's critical that entity_type is always set correctly.
+ * The tag identifies the meaningful member. C permits some union type-punning,
+ * but interpreting a placement through another member does not preserve its
+ * semantic meaning and can produce invalid values.
  *
- * Memory cost: the union is as large as its biggest member.  All our
- * placement structs are small (a few floats + ints), so this stays
- * well under 64 bytes --- negligible for 256 entries.
+ * Memory cost: the union is as large as its biggest member, including alignment.
+ * Measure sizeof(PlacementData) rather than assuming a fixed byte count.
  */
 typedef union {
     CoinPlacement           coin;
@@ -206,14 +206,24 @@ typedef struct {
  * slot, so the topmost element is at [top - 1].  When top == 0 the stack
  * is empty.
  *
- * This struct is heap-allocated via undo_create() because it's ~24 KB
- * (two 256-element arrays of Command) --- too large for the C stack on
- * some platforms and unnecessary to keep in GameState by value.
+ * Transfer Commands contain inline config snapshots for simple caller ownership.
+ * Stored entries allocate those snapshots only for CMD_CONFIG; ordinary entity
+ * actions use compact inline storage. Each config pair has exactly one owner as
+ * entries move between stacks. The total number of entries stays bounded.
  */
+typedef struct {
+    CommandType type;
+    int entity_type, entity_index;
+    PlacementData before, after;
+    int property_field;
+    char property_text_before[256], property_text_after[256];
+    LevelConfigSnapshot *config; /* owned pair: before, after; NULL for entities */
+} UndoEntry;
+
 typedef struct UndoStack {
-    Command commands[UNDO_MAX];
+    UndoEntry commands[UNDO_MAX];
     int     top;
-    Command redo_stack[UNDO_MAX];
+    UndoEntry redo_stack[UNDO_MAX];
     int     redo_top;
 } UndoStack;
 
@@ -247,7 +257,9 @@ void undo_destroy(UndoStack *stack);
  * is discarded by shifting the entire array left by one slot.  This
  * keeps memory bounded while preserving the most recent history.
  */
-void undo_push(UndoStack *stack, Command cmd);
+/* Returns 0 without changing history on allocation failure. The caller must
+ * roll back a config edit if its snapshot cannot be recorded. */
+int undo_push(UndoStack *stack, Command cmd);
 
 /*
  * undo_pop --- Pop the most recent command from the undo stack.

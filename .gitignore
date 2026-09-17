@@ -4,6 +4,8 @@
 # Build output
 out/
 out-sanitize/
+dist/
+mango-experiment-*.toml
 
 # Object files
 *.o
@@ -68,6 +70,10 @@ src/levels/exported/*.c
 src/levels/exported/*.h
 levels/_playtest.toml
 compile_commands.json
+.cache/clangd/
 
 # Docs generation
 node_modules/
+
+# Local specifications (existing tracked specifications remain tracked)
+.specs/

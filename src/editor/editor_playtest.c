@@ -22,7 +22,7 @@
 
 #include "editor_files.h"    /* private playtest snapshot lifecycle */
 #include "editor_session.h" /* editor status/title/persist helpers */
-#include "serializer_io.h"
+#include "../shared/serializer_io.h"
 
 int editor_playtest_binary_path(char *path, size_t size)
 {
@@ -51,6 +51,10 @@ void editor_play_test(EditorState *es)
         editor_set_status(es, "Play failed: cannot locate sibling game executable");
         return;
     }
+    if (!serializer_file_exists_utf8(binary_path)) {
+        editor_set_status(es, "Play failed: build both executables with make builder");
+        return;
+    }
 
     if (editor_prepare_playtest_level(es, save_path, sizeof(save_path)) != 0) {
         fprintf(stderr, "Play: failed to prepare private level\n");
@@ -65,10 +69,10 @@ void editor_play_test(EditorState *es)
     if (pid == 0) {
         if (es->debug_play)
             execl(binary_path, "super-mango",
-                  "--level", save_path, "--debug", (char *)NULL);
+                  "--level", save_path, "--debug", "--no-save", (char *)NULL);
         else
             execl(binary_path, "super-mango",
-                  "--level", save_path, (char *)NULL);
+                  "--level", save_path, "--no-save", (char *)NULL);
         _exit(1);
     } else if (pid > 0) {
         es->play_pid = (int)pid;
@@ -94,7 +98,7 @@ void editor_play_test(EditorState *es)
         startup.cb = sizeof(startup);
         written = wide_level && wide_binary
                   ? _snwprintf(command, sizeof(command) / sizeof(command[0]),
-                              L"\"%ls\" --level \"%ls\"%ls",
+                              L"\"%ls\" --no-save --level \"%ls\"%ls",
                               wide_binary, wide_level,
                               es->debug_play ? L" --debug" : L"")
                  : -1;

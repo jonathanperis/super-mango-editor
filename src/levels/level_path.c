@@ -15,7 +15,7 @@
 #if defined(_WIN32)
 #include <windows.h>
 #include <stdlib.h>
-#include "../editor/serializer_io.h"
+#include "../shared/serializer_io.h"
 #ifndef MAX_PATH
 #define MAX_PATH 260
 #endif

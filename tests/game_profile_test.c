@@ -6,7 +6,7 @@
 #include <SDL_ttf.h>
 #include "core/app_session.h"
 #include "core/game_profile.h"
-#include "editor/serializer_io.h"
+#include "shared/serializer_io.h"
 #include "input/game_input.h"
 #include "screens/settings_menu.h"
 #ifdef _WIN32
@@ -182,7 +182,7 @@ static int persistent_session(void)
     char lock_path[176];
     snprintf(path,sizeof(path),"out/profile-session-%llu.toml",(unsigned long long)SDL_GetPerformanceCounter());
     snprintf(lock_path,sizeof(lock_path),"%s.lock",path);
-    AppSessionConfig config={.level_path="levels/00_onboarding_01.toml",.profile_enabled=1,.profile_path=path};
+    AppSessionConfig config={.level_path="levels/00_sandbox_01.toml",.profile_enabled=1,.profile_path=path};
     puts("profile session: create");
     AppSession *session=session_create(&config);
     CHECK(session);
@@ -205,7 +205,7 @@ static int persistent_session(void)
     game_complete_level(session->game);
     puts("profile session: completion");
     session_frame(session);
-    CHECK(game_profile_result(&session->profile,"levels/00_onboarding_01.toml"));
+    CHECK(game_profile_result(&session->profile,"levels/00_sandbox_01.toml"));
     puts("profile session: destroy");
     session_destroy(&session);
     CHECK(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_EVENTS)==0);
@@ -214,12 +214,12 @@ static int persistent_session(void)
     puts("profile session: continue");
     session=session_create(&config);
     CHECK(session && session->game && session->profile.data.settings.muted==1);
-    CHECK(!strcmp(session->game->profile_level_key,"levels/00_onboarding_01.toml"));
+    CHECK(!strcmp(session->game->profile_level_key,"levels/00_sandbox_01.toml"));
     CHECK(session->profile.data.count==1);
     session_destroy(&session);
     CHECK(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_EVENTS)==0);
     CHECK((IMG_Init(IMG_INIT_PNG)&IMG_INIT_PNG) && TTF_Init()==0 && Mix_OpenAudio(44100,MIX_DEFAULT_FORMAT,2,2048)==0);
-    config.level_path="levels/00_onboarding_01.toml"; config.smoke_test_frames=1;
+    config.level_path="levels/00_sandbox_01.toml"; config.smoke_test_frames=1;
     session=session_create(&config);
     CHECK(session && !session->profile.enabled && !session->profile.baseline);
     CHECK(!session->profile.data.settings.muted);

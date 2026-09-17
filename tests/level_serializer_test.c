@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 #endif
 
-#include "editor/serializer.h"
+#include "shared/serializer.h"
 #include "levels/level.h"
 
 static int fail(const char *msg)
@@ -439,11 +439,10 @@ typedef struct {
     const char *roundtrip_path;
 } ShippedLevel;
 
-enum { EXPECTED_SHIPPED_LEVEL_COUNT = 4 };
+enum { EXPECTED_SHIPPED_LEVEL_COUNT = 3 };
 
 /* Keep this explicit inventory aligned with levels/campaigns/main.toml. */
 static const ShippedLevel shipped_levels[] = {
-    {"levels/00_onboarding_01.toml", "out/test_roundtrip_00.toml"},
     {"levels/00_sandbox_01.toml", "out/test_roundtrip_01.toml"},
     {"levels/01_lugio_01.toml", "out/test_roundtrip_02.toml"},
     {"levels/02_lugio_02.toml", "out/test_roundtrip_03.toml"},

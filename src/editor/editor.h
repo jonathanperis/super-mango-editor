@@ -28,10 +28,10 @@
 #include <SDL_ttf.h>       /* TTF_Font — for rendering panel labels and tooltips */
 #include <stdint.h>        /* uint64_t — document save-point fingerprint */
 #include "../levels/level.h" /* LevelDef — the data-driven level definition we edit */
-#include "ui.h"            /* UIState — immediate-mode UI widget state            */
+#include "../shared/ui.h"  /* UIState — shared immediate-mode widgets */
 #include "undo.h"          /* UndoStack, PlacementData — undo system + clipboard */
 #include "editor_validation.h" /* EditorValidationReport                         */
-#include "serializer_io.h" /* SerializerFileFingerprint                         */
+#include "../shared/serializer_io.h" /* SerializerFileFingerprint */
 
 /* ------------------------------------------------------------------ */
 /* Constants — editor window layout                                    */
@@ -116,7 +116,7 @@ typedef enum {
     ENT_CHECKPOINT,        /* authored respawn marker                       */
     ENT_RAIL,              /* rail path (spike blocks / platforms ride on)  */
     ENT_PLATFORM,          /* ground pillar (static collision surface)      */
-    ENT_COIN,              /* collectable coin (100 pts, 3 restore a heart) */
+    ENT_COIN,              /* score pickup; score thresholds grant lives */
     ENT_STAR_YELLOW,       /* health-restoring star pickup                  */
     ENT_STAR_GREEN,        /* green health-restoring star pickup             */
     ENT_STAR_RED,          /* red health-restoring star pickup               */

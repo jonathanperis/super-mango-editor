@@ -10,7 +10,9 @@
 
 ## About
 
-Super Mango is a 2D side-scrolling platformer built in C11 with SDL2, designed as an educational project with well-commented source code that can be read as a learning resource for C + SDL2 game development. The game features multi-screen TOML levels with parallax backgrounds, one-way platforms, floating platforms, crumble bridges, floor gaps, collectible coins, climbable vines/ladders/ropes, six enemy types, seven hazard types, bouncepads, animated water, fog overlays, authored respawn checkpoints, a campaign-driven start menu, HUD, level-completion summary, and terminal action menus for progression, replay, level selection, and exit. Playable levels are TOML files; `levels/campaigns/main.toml` orders the menu catalog as Forest First Steps → Creator's Playground → Volcanic Depths 1 → Volcanic Depths 2. The standalone visual editor saves and loads those TOML files directly. It renders at a 400x300 logical resolution scaled 2x to an 800x600 window for a chunky pixel-art look, with frame-rate-independent movement via delta-time physics. The project builds natively on macOS, Linux, and Windows, and compiles to WebAssembly via Emscripten for browser play.
+Super Mango is a C11/SDL2 platformer and sandbox school: play the game, inspect a running simulation, edit TOML worlds, and study the code that connects them. The campaign is Creator's Playground → Volcanic Depths 1 → Volcanic Depths 2. Six separate mechanics levels in `levels/labs/` support an eight-lab learning track. The standalone editor saves the same TOML data that the runtime loads. Rendering uses a 400×300 logical canvas, normally scaled to an 800×600 window. Native builds target macOS, Linux and Windows; Emscripten supplies browser play.
+
+**Start learning:** [Sandbox School](docs/wiki/learning-path.md) · [Mechanics Museum](docs/wiki/mechanics-museum.md) · [Entity Walkthrough](docs/wiki/entity-walkthrough.md).
 
 ## Tech Stack
 
@@ -28,19 +30,19 @@ Super Mango is a 2D side-scrolling platformer built in C11 with SDL2, designed a
 
 - 2D side-scrolling platformer with dynamic multi-screen TOML worlds, from the 4-screen sandbox to longer volcanic stages
 - 32 render layers drawn back-to-front: parallax background, platforms, floor, enemies, player, fog, HUD, debug overlay
-- Delta-time physics for frame-rate-independent movement at 60 FPS (VSync + manual fallback)
+- Delta-time physics with explicit numerical-integration tradeoffs; `make timing-lab` compares variable and fixed steps
 - Six enemy types: spiders, jumping spiders, birds, faster birds, fish, faster fish
 - Seven hazard types: spike rows, spike blocks, spike platforms, circular saws, axe traps, blue flames, fire flames
 - Collectibles: coins (100 pts each, bonus life by score threshold), star yellow, star green, star red health pickups, end-of-level last star
 - Climbable vines, ladders, and ropes; three bouncepad variants (small, medium, high)
-- TOML-only level workflow: `levels/campaigns/main.toml` starts with the Forest First Steps onboarding level and supplies the ordered native selector, while `--level path/to/level.toml` bypasses that selector and loads a TOML level directly
+- TOML-only level workflow: `levels/campaigns/main.toml` orders the three campaign stages; `--level path/to/level.toml` directly opens a campaign, museum or custom level
 - Authored `[[checkpoints]]` records give a level explicit respawn positions; no records preserves legacy automatic screen-boundary respawns
 - Pause, game-over, and end-of-level overlays: terminal action rows use Up/Down or D-pad to select, Enter/Space/Start (A also confirms) to confirm, and Esc/Back (B also exits) to exit
 - Completion actions: Next Level when `next_phase` exists, Replay, Level Select, Exit; game-over actions: Retry, Level Select, Exit
 - Campaign-driven native start menu and level select; HUD (hearts/lives/score), lives system, invincibility blink on damage
 - Browser Replay stores the current TOML path in session storage, tears down the active WebAssembly session, reloads the page, and boots that level again
 - Keyboard and gamepad (hot-plug) controls
-- Debug overlay (`--debug` flag): FPS counter, CPU frame time, memory usage, collision hitbox visualization, scrolling event log
+- Debug inspector: FPS/frame interval, memory, hitboxes, velocity/state/contact display, freeze/step/slow motion, live movement tuning and explicit experiment capture/replay
 - Builds natively on macOS, Linux, and Windows; WebAssembly build via Emscripten
 
 ## Level Editor
@@ -65,35 +67,9 @@ make editor       # build the editor binary into out/
 make run-editor   # build and run the editor
 ```
 
-## Development Crew
+## Development
 
-Super Mango is developed with four specialized AGENTS harness roles, each owning a distinct part of the project. The standardized instructions live in `AGENTS.md` and `.agents/`, so any compatible harness can read the same commands, references, scripts, and memory.
-
-| Agent | Command | Role | Owns |
-|-------|---------|------|------|
-| **Bosser** | `/bosser-engineer` | Chief Engineer | C source, SDL2 engine, editor, Makefile, architecture, bug fixes |
-| **Lugio** | `/lugio-creator` | Level Builder | TOML level files, entity placement, theming, difficulty balancing |
-| **Goobma** | `/goobma-designer` | Pixel Art Designer | Sprite assets, palette remapping, frame layout analysis |
-| **Warro** | `/warro-inscriber` | Documentation Inscriber | README, AGENTS.md, wiki, GitHub Pages docs, cross-referencing |
-
-### When to call whom
-
-| You want to... | Call |
-|----------------|------|
-| Add a new enemy, surface, or hazard type | `/bosser-engineer` |
-| Fix a bug or refactor engine code | `/bosser-engineer` |
-| Create a new level or redesign an existing one | `/lugio-creator` |
-| Design a new sprite or create a theme variant | `/goobma-designer` |
-| Update documentation or audit for accuracy | `/warro-inscriber` |
-
-### How to get the best results
-
-- **Be specific about what you want.** "Add a spider that jumps higher" gives Bosser a clear target. "Make the game better" does not.
-- **One agent at a time.** Each agent stays in their lane. If you ask Lugio to fix a bug, he'll tell you to call Bosser. That's by design.
-- **Bosser delegates.** If you're unsure who to call, start with `/bosser-engineer` -- he'll route the work to the right crew member or handle it himself.
-- **Lugio needs a theme.** When requesting a level, tell him the theme (forest, volcanic, sky), difficulty (easy/medium/hard), and length (number of screens). He'll ask if you don't.
-- **Goobma needs a reference.** When requesting a sprite, point him at an existing asset in the same category. He matches dimensions, palette, and style automatically.
-- **Warro verifies against code.** He reads source files and runs analysis tools before writing a single word. If the docs say one thing and the code says another, Warro trusts the code.
+Start with [Sandbox School](docs/wiki/learning-path.md), then use the [Developer Guide](docs/wiki/developer-guide.md) for conventions and ownership. [Level Design](docs/wiki/level-design.md) documents TOML; [Assets](docs/wiki/assets.md) covers sprite tools. [Asset Inventory](docs/wiki/asset-inventory.md) records the raw bundle budget and [Asset Provenance](docs/wiki/asset-provenance.md) distinguishes code/media licenses.
 
 ## Getting Started
 
@@ -113,7 +89,7 @@ xcode-select --install   # provides clang and make
 ```sh
 sudo apt update
 sudo apt install build-essential clang \
-    libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-mixer-dev
+    libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-mixer-dev zenity
 ```
 
 **Windows (MSYS2 UCRT64):**
@@ -131,12 +107,19 @@ pacman -S mingw-w64-ucrt-x86_64-clang \
 
 ### Quick Start
 
+Full verification also needs Python 3.11+ and Node.js. Docs development uses Bun
+and the frozen `docs/bun.lock` dependency set.
+
 ```sh
 make CC=clang                         # build the game binary into out/
 make run CC=clang                     # build and run
 make run-debug CC=clang               # build and run with debug overlay
-make run-level CC=clang LEVEL=levels/00_onboarding_01.toml      # run a specific TOML level
-make run-level-debug CC=clang LEVEL=levels/00_onboarding_01.toml # run a level with debug overlay
+make run-level CC=clang LEVEL=levels/labs/01_collision.toml      # run a focused lab
+make run-level-debug CC=clang LEVEL=levels/labs/01_collision.toml # inspect a lab
+make builder CC=clang                 # build game and editor together
+make debug CC=clang                   # -g -O0 binaries in out/debug/
+make release CC=clang                 # -O2 binaries in out/release/
+make timing-lab                       # quantitative timestep experiment
 make editor CC=clang                  # build the level editor
 make run-editor CC=clang              # build and run the level editor
 make test CC=clang                    # build and run 15 native regression tests (binaries) plus Python host checks
@@ -145,7 +128,15 @@ make web                              # build to WebAssembly (requires Emscripte
 make clean                            # remove all build artifacts
 ```
 
-> For local/CI parity, pass `CC=clang` explicitly. GNU Make has a built-in `CC=cc`, so the Makefile's `CC ?= clang` default may not select clang on every machine unless overridden.
+> The Makefile replaces GNU Make's built-in `CC=cc` with clang; explicit `CC=gcc`
+> remains supported. After moving source files between directories, use a fresh
+> `OUTDIR` or clean your old build's generated dependencies.
+
+In debug mode: **F2** freezes, **F3** steps once, **F4** changes speed, **F6** selects
+a movement property, **-/+** tunes it and **F7** resets it. **F8** restarts/records;
+**F9** exports a capture. Replay with `--level PATH --experiment CAPTURE.toml`.
+Debug/playtest sessions do not touch personal profiles. See the museum guide for
+capture limits and pause ownership.
 
 Or just **[play in your browser](https://jonathanperis.github.io/super-mango-editor/)** -- no build required. Full project documentation is available at the **[docs site](https://jonathanperis.github.io/super-mango-editor/docs/)**.
 
@@ -158,7 +149,7 @@ Useful docs routes:
 
 ### Release Downloads
 
-Tagged releases and manually dispatched release builds publish zip archives for Linux, macOS, Windows, and WebAssembly. Native archives include the `super-mango` executable, `assets/`, `levels/`, `LICENSE`, and a short run README; extract the archive and run the executable from inside the extracted folder. Linux and macOS builds still require compatible SDL2 runtime libraries on the host. Windows archives bundle the SDL/MSYS2 runtime DLLs discovered by CI. The WebAssembly archive contains the generated HTML/JS/WASM/data files and should be served with a static HTTP server.
+Tagged/manual releases publish native builder archives with both `super-mango` and `super-mango-editor`, playable assets, campaign/lab levels, and third-party notices. Run from the extracted folder. Linux/macOS need compatible SDL2 runtimes; Linux dialogs also need zenity. Windows bundles runtime DLLs and available package notices. `unused/` assets stay in the source checkout. WebAssembly archives contain both normal/debug HTML/JS/WASM/data outputs; serve them with a static HTTP server. Build with `make web`, then package those verified outputs with `make dist-wasm`.
 
 ## Project Structure
 
@@ -166,8 +157,8 @@ Tagged releases and manually dispatched release builds publish zip archives for 
 super-mango-editor/
 ├── Makefile                          Build system (clang, sdl2-config, ad-hoc codesign)
 ├── levels/                           TOML level definitions
-│   ├── 00_onboarding_01.toml        Forest First Steps; first v1 campaign level
-│   ├── 00_sandbox_01.toml           Creator's Playground; second v1 campaign level
+│   ├── labs/                        Six focused learning levels
+│   ├── 00_sandbox_01.toml           Creator's Playground; first campaign level
 │   ├── 01_lugio_01.toml             Level data loaded at runtime
 │   ├── 02_lugio_02.toml             Level data loaded at runtime
 │   └── campaigns/main.toml           v1 ordered campaign manifest for the native selector
@@ -193,9 +184,10 @@ super-mango-editor/
 │   │   ├── canvas/palette/properties/tools/ui modules
 │   │   ├── editor_frame/events/chrome/panels/layout/textures modules
 │   │   ├── editor_files/session/playtest/clipboard/validation modules
-│   │   ├── serializer*.h / .c        TOML save/load orchestration and staged parsers
+│   │   ├── shared serializer/UI consumers
 │   │   ├── file_dialog.h / .c        Native file dialogs
 │   │   └── undo*.h / .c              Undo/redo history and operation application
+│   ├── shared/                        TOML serializer, atomic UTF-8 I/O, shared UI
 │   ├── effects/                       Visual effects
 │   │   ├── fog.h / .c                Fog overlay
 │   │   ├── parallax.h / .c           Multi-layer scrolling background
@@ -276,7 +268,7 @@ super-mango-editor/
 |------|---------|
 | `PRODUCT.md` | Product direction, player promise, and feature framing. |
 | `DESIGN.md` | Visual/UX design notes for the arcade-cabinet presentation. |
-| `AGENTS.md` and `.agents/` | Standardized agent instructions, lane ownership, and repo operating rules. |
+| `docs/wiki/developer-guide.md` | Coding conventions, entity integration, resource ownership, and verification. |
 | `CODEOWNERS` | Review ownership hints for GitHub. |
 
 These files complement the public GH Pages manual. If they disagree with code, update the docs and source-backed checks together.
@@ -296,4 +288,5 @@ The Build & Release workflow runs `make`, `make test`, `make validate-levels`, `
 
 ## License
 
-MIT -- see [LICENSE](LICENSE)
+Project source: MIT — see [LICENSE](LICENSE). Third-party code and media have
+separate terms; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

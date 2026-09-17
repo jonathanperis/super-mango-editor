@@ -22,6 +22,18 @@ Use this page to choose the smallest useful verification set for a change. Run c
 
 ## Native Regression Tests
 
+The session suite also runs `tests/simulation_test.c`: 180-step capture/replay
+equivalence, inspection pause ownership, moving-platform carry, same-frame hazard
+damage, required sprite failure and checkpoint respawn. Stable geometry belongs
+in `tests/fixtures/runtime/`; showcase data is still checked separately for
+campaign ordering and round-trip validity. Editor regressions cover history
+ownership through overflow, undo/redo, branching and clearing.
+
+`make content-inventory` updates generated facts after intentional content changes;
+`make asset-budget`/`make docs-drift` verify freshness. The website consumes the
+generated JSON instead of maintaining its own counts. Packaging tests inspect
+archive contents, editor inclusion, reserve-asset exclusion and license notices.
+
 `make test` builds these 15 native binaries under `out/` and runs each one:
 
 - `level-serializer-test`
@@ -60,7 +72,7 @@ It also runs `tests/validate_levels_test.py` and `tools/check_web_boot_contract.
 - key constants and `GameState` fields;
 - overlay controls and snapshot text;
 - WebAssembly authority caveats;
-- Pages route metadata and agent-context docs.
+- Pages route metadata and developer-guide context.
 
 If this target fails, update the code-backed docs rather than weakening the check.
 

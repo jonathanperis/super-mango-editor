@@ -6,6 +6,10 @@
 
 This guide covers the patterns and conventions used in Super Mango and explains how to extend the game safely and consistently.
 
+For a guided sequence, start with [Sandbox School](../learning-path/). The
+[Entity Walkthrough](../entity-walkthrough/) traces all runtime, schema and editor
+integration points; the abbreviated examples here introduce conventions.
+
 ---
 
 ## Coding Conventions
@@ -14,6 +18,16 @@ This guide covers the patterns and conventions used in Super Mango and explains 
 
 - **C11** (`-std=c11`)
 - Compiler: `clang` (default), `gcc` compatible
+- Keep builds warning-free under `-Wall -Wextra -Wpedantic`; fix warnings rather than suppressing them.
+
+### Comments and Module Layout
+
+The source is a learning resource for C and SDL2. Comments should explain why a decision is needed, not just repeat the code:
+
+- Start headers and source files with a short module summary. Headers use `#pragma once` and expose constants, types, and public function declarations.
+- Explain nontrivial SDL calls, including important arguments, return values, and resource ownership.
+- Give numeric constants their units and origin, especially logical pixels, pixels per second, and animation durations.
+- Document pointer ownership, float-to-integer rendering casts, and cleanup order where they matter.
 
 ### Naming
 
@@ -30,8 +44,9 @@ This guide covers the patterns and conventions used in Super Mango and explains 
 
 ### Memory and Safety Rules
 
-- Every pointer must be set to `NULL` **immediately after freeing**. (`SDL_Destroy*` and `free()` on `NULL` are no-ops, preventing double-free crashes.)
+- Clear each owning pointer after releasing its resource. A NULL guard only protects an already-NULL pointer; aliases and borrowed pointers require explicit lifetime discipline.
 - Error paths call `SDL_GetError()` / `IMG_GetError()` / `Mix_GetError()` and write to `stderr`.
+- Required initialization failures return failure to the caller for cleanup; only the top-level runner returns `EXIT_FAILURE`. Optional sound-effect loads warn and continue, and playback checks for a non-NULL chunk.
 - Resources are **always freed in reverse init order**.
 - Use `float` for positions and velocities; cast to `int` only at render time (`SDL_Rect` fields are `int`).
 
@@ -50,11 +65,18 @@ See [Constants Reference](../constants-reference/) for all defined constants.
 |------|---------|
 | `PRODUCT.md` | Product direction and feature framing. |
 | `DESIGN.md` | Visual/UX design notes for the cabinet-style presentation. |
-| `EXECUTIVE_AUDIT_REPORT.md` | Historical audit snapshot and roadmap reference. |
-| `AGENTS.md` / `.agents/` | Standardized agent lane instructions and repo operating rules. |
+| `docs/wiki/developer-guide.md` | Coding conventions, entity integration, resource ownership, and verification. |
 | `CODEOWNERS` | GitHub ownership hints for review routing. |
 
 Treat source and workflows as authoritative. When project documents, README, or GH Pages copy drift from implementation, update the docs and run [Testing & Smoke Matrix](../testing/) checks before shipping.
+
+---
+
+## Verification and Runtime Controls
+
+Run the 15-test `make test` suite (15 native binaries plus Python and JavaScript host checks) for runtime/editor changes. `make validate-levels` checks level and campaign data; `make docs-drift` checks semantic docs drift, generated catalog freshness, and roadmap quality. For documentation changes, also run `bun run lint` and `bun run build` from `docs/`. See [Build System](../build-system/) and [Testing & Smoke Matrix](../testing/) for the full gates.
+
+Terminal overlays use Up/Down or D-pad to select, Enter/Space/Start to confirm (A also confirms), and Esc/Back to exit (B also exits). Completion offers Next Level when configured, Replay, Level Select, and Exit; game over offers Retry, Level Select, and Exit. See [Controls](../controls/) for the full input reference.
 
 ---
 
@@ -124,7 +146,7 @@ void coins_render(const Coin *coins, int count,
 }
 ```
 
-The Makefile picks up `coin.c` automatically from the `src/collectibles/` subdirectory -- **no Makefile changes needed**.
+The Makefile picks up `coin.c` automatically from the `src/collectibles/` subdirectory -- **no Makefile changes needed**. New source directories require an explicit wildcard entry in the Makefile.
 
 #### 3. Add texture to `TextureResources` in `game.h`
 
@@ -179,7 +201,7 @@ x = 200.0
 y = 140.0
 ```
 
-Then extend `level_loader.c` to parse the new array table and populate the `GameState` array (or call your `_init` function when the entity owns richer runtime state). See `level_design` for the full TOML schema and [Level Design — TOML Reference](../level-design/) for placement examples for every entity type.
+Register and parse the array in `src/shared/serializer_parse.c` and the relevant `serializer_load_*.c`; emit it in `serializer_save.c` and validate it in both `level_validate.c` and `tools/validate_levels.py`. Then extend `level_loader.c` to translate the validated placements into `GameState`. Complete palette/tools/preview/property/undo/clipboard/hash integration using the [Entity Walkthrough](../entity-walkthrough/).
 
 You can also use the visual level editor (`make run-editor`) to place entities interactively without writing TOML by hand.
 
@@ -191,7 +213,7 @@ Every entity must have hitbox visualization in `core/debug.c`:
 // In debug_render:
 for (int i = 0; i < gs->coin_count; i++) {
     if (!gs->coins[i].active) continue;
-    SDL_Rect hb = { (int)gs->coins[i].x, (int)gs->coins[i].y,
+    SDL_Rect hb = { (int)gs->coins[i].x - cam_x, (int)gs->coins[i].y,
                     COIN_DISPLAY_W, COIN_DISPLAY_H };
     SDL_SetRenderDrawColor(gs->renderer, 255, 255, 0, 128);
     SDL_RenderDrawRect(gs->renderer, &hb);
@@ -326,6 +348,8 @@ TTF_CloseFont(font);
 
 The HUD renders hearts (lives), life counter, and score. It is drawn after all game entities so it always appears on top.
 
+For static labels, create the text texture once and reuse it rather than rendering a surface and uploading a texture every frame. Rebuild cached text only when its content or appearance changes, and release it before destroying its renderer.
+
 ---
 
 ## Render Layer Order
@@ -376,7 +400,7 @@ See [Architecture](../architecture/) for details on the render pipeline.
 To analyze a new sprite sheet:
 
 ```sh
-python3 .agents/scripts/analyze_sprite.py assets/sprites/<category>/<sprite>.png
+python3 tools/analyze_sprite.py assets/sprites/<category>/<sprite>.png
 ```
 
 Frame math:
@@ -399,6 +423,8 @@ Standard animation row layout (most assets in this pack):
 
 See [Assets](../assets/) for sprite sheet dimensions and [Player Module](../player-module/) for animation state machine details.
 
+Measure each sheet rather than assuming a common frame size or row layout. Advance animation using accumulated elapsed time; reset the frame on state entry, loop repeating states, and clamp one-shot animations to their last frame. Reuse right-facing art with `SDL_RenderCopyEx` and `SDL_FLIP_HORIZONTAL` for left-facing rendering.
+
 ---
 
 ## Checklist: Adding a New Entity
@@ -413,6 +439,7 @@ See [Assets](../assets/) for sprite sheet dimensions and [Player Module](../play
 - [ ] Call `<entity>_render` from the relevant `src/core/` render helper (correct layer order)
 - [ ] Call `<entity>_cleanup` in `game_cleanup` (before `SDL_DestroyRenderer`)
 - [ ] Set all freed pointers to `NULL`
+- [ ] Wire shared schema/parser/emitter, C/Python validation, and editor palette/tools/preview/properties/undo/clipboard/document hashing
 - [ ] Add entity placement to a TOML level file in `levels/` (or use the visual level editor)
 - [ ] Add hitbox visualization in `core/debug.c`
 - [ ] Add `debug_log` calls in the module that owns significant entity events

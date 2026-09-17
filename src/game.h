@@ -392,6 +392,15 @@ typedef struct {
     char profile_level_key[256];
     int profile_completion_recorded;
     int level_score_start;
+    unsigned int random_seed;
+    Uint64 source_level_hash; /* source bytes corresponding to active LevelDef */
+    struct {
+        int frozen, step_requested, slow_mode, physics_field, entity_index;
+        SDL_Texture *labels[6]; /* cached renderer-owned inspector text */
+        char text[6][192];
+        int width[6], height[6];
+    } inspector;
+    struct GameExperiment *experiment; /* owned opt-in capture/replay */
 } GameState;
 
 /* ------------------------------------------------------------------ */

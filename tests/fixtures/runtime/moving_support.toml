@@ -1,0 +1,24 @@
+format_version = 1
+name = "Moving support regression fixture"
+screen_count = 2
+player_start_x = 128.0
+player_start_y = 172.0
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+[[rails]]
+layout = "HORIZ"
+x = 128
+y = 172
+w = 12
+h = 0
+end_cap = 0
+[[float_platforms]]
+mode = "RAIL"
+x = 128.0
+y = 172.0
+tile_count = 4
+rail_index = 0
+speed = 45.0
+t_offset = 0.0
+[last_star]
+x = 704.0
+y = 228.0

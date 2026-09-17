@@ -11,6 +11,12 @@
 static int restart_calls;
 static int load_next_phase_calls;
 
+/* Inspector ownership has production-path coverage in the simulation test. */
+int game_inspector_event(GameState *gs, const SDL_Event *event)
+{
+    (void)gs; (void)event; return 0;
+}
+
 int game_load_next_phase(GameState *gs)
 {
     (void)gs;

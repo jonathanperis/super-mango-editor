@@ -149,7 +149,6 @@ def check_public_api_docs() -> None:
 
 def check_runtime_error_docs() -> None:
     pages = [
-        "AGENTS.md",
         "docs/wiki/architecture.md",
         "docs/wiki/developer-guide.md",
         "docs/wiki/assets.md",
@@ -164,7 +163,7 @@ def check_runtime_error_docs() -> None:
 
 
 def check_collectible_source_guards() -> None:
-    parser = read(ROOT / "src" / "editor" / "serializer_load_collectibles.c")
+    parser = read(ROOT / "src" / "shared" / "serializer_load_collectibles.c")
     required_pairs = {
         "star_greens": "MAX_STAR_GREENS",
         "star_reds": "MAX_STAR_REDS",
@@ -172,7 +171,7 @@ def check_collectible_source_guards() -> None:
     for toml_key, max_token in required_pairs.items():
         pattern = rf'LOAD_XY_ARRAY\("{toml_key}",\s*[^,]+,\s*{max_token},'
         if not re.search(pattern, parser, re.S):
-            fail(f"src/editor/serializer_load_collectibles.c: `{toml_key}` must use `{max_token}`")
+            fail(f"src/shared/serializer_load_collectibles.c: `{toml_key}` must use `{max_token}`")
 
 
 def check_layer_snippets() -> None:
@@ -335,15 +334,15 @@ def check_level_prose_counts() -> None:
             )
 
 
-def check_agent_context_docs() -> None:
+def check_developer_context_docs() -> None:
     expected_count = len(makefile_test_targets())
-    for rel in ["AGENTS.md"]:
-        text = read(ROOT / rel)
-        if f"{expected_count}-test `make test` suite" not in text:
-            fail(f"{rel}: stale make test count; expected {expected_count}")
-        for token in ["Enter/Space/Start", "Esc/Back", "semantic docs drift"]:
-            if token not in text:
-                fail(f"{rel}: missing current project context token `{token}`")
+    rel = "docs/wiki/developer-guide.md"
+    text = read(ROOT / rel)
+    if f"{expected_count}-test `make test` suite" not in text:
+        fail(f"{rel}: stale make test count; expected {expected_count}")
+    for token in ["Enter/Space/Start", "Esc/Back", "semantic docs drift"]:
+        if token not in text:
+            fail(f"{rel}: missing current project context token `{token}`")
 
 
 def check_public_readme_docs() -> None:
@@ -405,7 +404,7 @@ def main() -> int:
     check_overlay_controls_doc()
     check_level_catalog_doc()
     check_level_prose_counts()
-    check_agent_context_docs()
+    check_developer_context_docs()
     check_public_readme_docs()
     check_wasm_authority_docs()
     check_pages_metadata()

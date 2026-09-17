@@ -23,6 +23,9 @@ src/
 ├── core/
 │   ├── app_session.h / .c        Heap-owned application session: menu/game screens, routes, controller lifetime, browser replay
 │   ├── game_profile.h / .c       Versioned player settings/results and native/web persistence
+│   ├── game_inspector.h / .c     Simulation stepping, slow motion, tuning and cached inspection UI
+│   ├── game_experiment.h / .c    Bounded capture/export/replay with level fingerprints
+│   ├── game_random.h / .c        Reproducible unsigned PRNG for native/WASM
 │   ├── debug.h / .c              Debug overlay: FPS/CPU/memory, hitboxes, event log
 │   ├── entity_utils.h / .c       Shared entity helper functions
 │   ├── game_state.h / .c         GameState reset helpers
@@ -51,7 +54,6 @@ src/
 │   ├── palette.h / .c            Entity palette
 │   ├── properties.h / .c         Per-entity property editing
 │   ├── tools.h / .c              Selection and placement tools
-│   ├── ui.h / .c                 Immediate-mode editor widgets
 │   ├── entity_meta.h / .c        Palette/display metadata for entity types
 │   ├── editor_frame.h / .c       Per-frame editor orchestration
 │   ├── editor_events.h / .c      SDL event dispatch
@@ -65,6 +67,10 @@ src/
 │   ├── editor_clipboard.h / .c   Copy/paste support
 │   ├── editor_validation.h / .c  Level validation report helpers
 │   ├── editor_undo_apply.h / .c  Undo operation application
+│   ├── file_dialog.h / .c        Native file dialogs
+│   └── undo.h / .c               Compact history with owned config snapshots
+├── shared/
+│   ├── ui.h / .c                 Immediate-mode widgets shared by editor and game settings
 │   ├── serializer.h / .c         TOML save/load public API anchor
 │   ├── serializer_emit.h / .c    TOML emission helpers
 │   ├── serializer_io.h / .c      File I/O helpers for serializer
@@ -80,10 +86,8 @@ src/
 │   ├── serializer_load_layers.h / .c        Background/fog/foreground layer parsing
 │   ├── serializer_load_config.h / .c        Optional rule/config parsing
 │   ├── serializer_parse.h / .c  Shared TOML parse utilities
-│   ├── serializer_save.h / .c   TOML save implementation
-│   ├── serializer_types.h / .c  Enum/string conversion helpers
-│   ├── file_dialog.h / .c        Native file dialogs
-│   └── undo.h / .c               Undo/redo history
+│   ├── serializer_save.c        TOML save implementation
+│   └── serializer_types.h / .c  Enum/string conversion helpers
 ├── effects/
 │   ├── fog.h / .c                Atmospheric fog overlay: init, slide, spawn, render
 │   ├── game_effects.h / .c       Per-level effect reload/cleanup helpers

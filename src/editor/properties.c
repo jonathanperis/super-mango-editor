@@ -23,7 +23,7 @@
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, PANEL_W, etc. */
 #include "editor_undo_apply.h" /* committed property/config command tracking */
 #include "entity_meta.h" /* editor_entity_type_name/is_singleton             */
-#include "ui.h"         /* ui_panel, ui_label, ui_separator, ui_float_field,
+#include "../shared/ui.h" /* ui_panel, ui_label, ui_separator, ui_float_field,
                            ui_int_field, ui_dropdown                         */
 #include "../levels/level.h" /* LevelDef, all *Placement structs            */
 

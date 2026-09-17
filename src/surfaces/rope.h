@@ -4,7 +4,7 @@
  * A Rope works identically to a vine for climbing purposes.
  * It is rendered on smaller (medium, 2-tile) columns.
  *
- * Sprite: assets/Rope.png — 16×48 RGBA, a single rope frame.
+ * Sprite: assets/sprites/surfaces/rope.png — 16×48 RGBA, one frame.
  */
 #pragma once
 

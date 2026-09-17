@@ -25,11 +25,11 @@
 #include "editor/editor_validation.h"
 #include "editor/entity_meta.h"
 #include "editor/file_dialog.h"
-#include "editor/serializer.h"
-#include "editor/serializer_io.h"
+#include "shared/serializer.h"
+#include "shared/serializer_io.h"
 #include "editor/tools.h"
 #include "editor/undo.h"
-#include "editor/ui.h"
+#include "shared/ui.h"
 #include "editor/canvas.h"
 #include "editor/editor_playtest.h"
 #include "editor/properties.h"
@@ -2021,10 +2021,35 @@ static int invalid_drafts_do_not_build_unsafe_previews(void)
     return 0;
 }
 
+static int compact_history_owns_config_snapshots(void)
+{
+    UndoStack *stack = undo_create();
+    if (!stack) return 1;
+    Command command = {0}, popped;
+    command.type = CMD_CONFIG;
+    int failed = 0;
+    for (int i = 0; i < UNDO_MAX + 2; i++) {
+        command.config_before.screen_count = i;
+        command.config_after.screen_count = i + 1;
+        if (!undo_push(stack, command)) { failed = 1; break; }
+    }
+    if (!failed && (stack->top != UNDO_MAX || !undo_pop(stack, &popped) ||
+        popped.config_after.screen_count != UNDO_MAX + 2 || !undo_pop(stack, &popped) ||
+        !redo_pop(stack, &popped))) failed = 1;
+    command.type = CMD_PLACE;
+    if (!undo_push(stack, command) || stack->redo_top != 0) failed = 1;
+    undo_clear(stack);
+    if (stack->top || stack->redo_top || sizeof(UndoStack) > 512 * 1024) failed = 1;
+    printf("undo storage: %zu bytes plus config snapshots only when used\n", sizeof(UndoStack));
+    undo_destroy(stack);
+    return failed;
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
     ensure_out_dir();
+    if (compact_history_owns_config_snapshots()) return 1;
     if (orphan_recovery_does_not_poison_discovery()) return 1;
     char binary_path[EDITOR_PATH_MAX];
     if (editor_playtest_binary_path(binary_path, sizeof(binary_path))) return 1;

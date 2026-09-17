@@ -22,7 +22,13 @@ else
 CC      ?= clang
 endif
 
-CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(shell $(SDL2CFG) --cflags)
+ifeq ($(origin CC),default)
+CC = clang
+endif
+BUILD_MODE ?= debug
+MODE_FLAGS_debug = -g -O0
+MODE_FLAGS_release = -O2
+CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(MODE_FLAGS_$(BUILD_MODE)) $(shell $(SDL2CFG) --cflags)
 # Tests provide their own main(), so stop SDL from remapping it to SDL_main on Windows.
 TEST_CFLAGS = $(filter-out -Dmain=SDL_main,$(CFLAGS)) -DSDL_MAIN_HANDLED
 LIBS    = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
@@ -44,24 +50,7 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(wildcard $(SRCDIR)/render/*.c) \
           $(wildcard $(SRCDIR)/screens/*.c) \
           $(wildcard $(SRCDIR)/surfaces/*.c) \
-          $(SRCDIR)/editor/serializer.c \
-          $(SRCDIR)/editor/serializer_emit.c \
-          $(SRCDIR)/editor/serializer_io.c \
-          $(SRCDIR)/editor/serializer_load.c \
-          $(SRCDIR)/editor/serializer_load_checkpoints.c \
-          $(SRCDIR)/editor/serializer_load_climbables.c \
-          $(SRCDIR)/editor/serializer_load_collectibles.c \
-          $(SRCDIR)/editor/serializer_load_config.c \
-          $(SRCDIR)/editor/serializer_load_enemies.c \
-          $(SRCDIR)/editor/serializer_load_geometry.c \
-          $(SRCDIR)/editor/serializer_load_hazards.c \
-          $(SRCDIR)/editor/serializer_load_header.c \
-          $(SRCDIR)/editor/serializer_load_layers.c \
-          $(SRCDIR)/editor/serializer_load_surfaces.c \
-          $(SRCDIR)/editor/serializer_parse.c \
-          $(SRCDIR)/editor/serializer_save.c \
-          $(SRCDIR)/editor/serializer_types.c \
-          $(SRCDIR)/editor/ui.c \
+          $(wildcard $(SRCDIR)/shared/*.c) \
           vendor/tomlc17/tomlc17.c
 OBJS    = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
 DEPS    = $(OBJS:.o=.d)
@@ -69,8 +58,9 @@ SESSION_RUNTIME_OBJS = $(filter-out $(OBJDIR)/src/main.o,$(OBJS))
 
 # ── Editor (standalone level editor) ─────────────────────────────────
 EDITOR_DIR    = src/editor
+SHARED_DIR    = src/shared
 VENDOR_DIR    = vendor/tomlc17
-EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(VENDOR_DIR)/tomlc17.c \
+EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(wildcard $(SHARED_DIR)/*.c) $(VENDOR_DIR)/tomlc17.c \
                 src/surfaces/rail.c src/levels/level_validate.c
 EDITOR_OBJS   = $(patsubst %.c,$(OBJDIR)/%.o,$(EDITOR_SRCS))
 EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
@@ -85,7 +75,7 @@ TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
                  $(OUTDIR)/gameplay-score-test \
                  $(OUTDIR)/game-overlay-test $(OUTDIR)/game-events-test \
                  $(OUTDIR)/session-test $(OUTDIR)/game-checkpoint-test
-SMOKE_LEVELS  = $(wildcard levels/*.toml)
+SMOKE_LEVELS  = $(wildcard levels/*.toml) $(wildcard levels/labs/*.toml)
 SMOKE_FRAMES  ?= 5
 SMOKE_SEED    ?= 1
 SMOKE_SEEDS   ?= 1 7 23
@@ -130,6 +120,7 @@ TEST_WEB_INPUT_OBJ = $(OBJDIR)/tests/test-web-input.o
 TEST_BINDINGS_OBJ = $(OBJDIR)/tests/test-game-bindings.o
 TEST_SETTINGS_OBJ = $(OBJDIR)/tests/test-settings-menu.o
 TEST_GAME_TERMINAL_OBJ = $(OBJDIR)/src/core/game_terminal.o
+TEST_GAME_RANDOM_OBJ = $(OBJDIR)/src/core/game_random.o
 TEST_GAME_CHECKPOINT_OBJ = $(OBJDIR)/tests/test-game-checkpoint.o
 TEST_HUD_OBJ = $(OBJDIR)/tests/test-hud.o
 TEST_EDITOR_VALIDATION_OBJ = $(OBJDIR)/tests/test-editor-validation.o
@@ -213,8 +204,15 @@ $(OBJDIR)/$(VENDOR_DIR)/%.o: $(VENDOR_DIR)/%.c | $(OUTDIR)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -MMD -MP -c -o $@ $<
 
-run-editor: editor
+run-editor: all editor
 	$(RUN_PREFIX) "$(abspath $(EDITOR_TARGET))"
+
+.PHONY: debug release builder
+builder: all editor
+debug:
+	$(MAKE) builder BUILD_MODE=debug OUTDIR="$(OUTDIR)/debug"
+release:
+	$(MAKE) builder BUILD_MODE=release OUTDIR="$(OUTDIR)/release"
 
 -include $(EDITOR_DEPS)
 -include $(TEST_DEPS)
@@ -263,6 +261,7 @@ overlay-snapshots:
 	python3 tools/generate_overlay_snapshots.py
 
 docs-drift:
+	python3 tools/content_inventory.py --check
 	python3 tools/generate_level_catalog.py --check
 	python3 tools/generate_overlay_snapshots.py --check
 	python3 tools/check_docs_drift.py
@@ -270,6 +269,16 @@ docs-drift:
 
 roadmap-quality:
 	python3 tools/check_roadmap_quality.py
+
+.PHONY: content-inventory asset-budget
+content-inventory:
+	python3 tools/content_inventory.py
+asset-budget:
+	python3 tools/content_inventory.py --check
+
+.PHONY: timing-lab
+timing-lab:
+	python3 tools/timing_lab.py
 
 smoke: all editor
 	@for level in $(SMOKE_LEVELS); do \
@@ -295,55 +304,55 @@ sanitize-smoke:
 		LIBS="$(LIBS) $(SANITIZE_LDFLAGS)" \
 		EDITOR_LIBS="$(EDITOR_LIBS) $(SANITIZE_LDFLAGS)"
 
-$(TEST_SERIALIZER_OBJ): $(EDITOR_DIR)/serializer.c
+$(TEST_SERIALIZER_OBJ): $(SHARED_DIR)/serializer.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_EMIT_OBJ): $(EDITOR_DIR)/serializer_emit.c
+$(TEST_SERIALIZER_EMIT_OBJ): $(SHARED_DIR)/serializer_emit.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_IO_OBJ): $(EDITOR_DIR)/serializer_io.c
+$(TEST_SERIALIZER_IO_OBJ): $(SHARED_DIR)/serializer_io.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_LOAD_OBJ): $(EDITOR_DIR)/serializer_load.c
+$(TEST_SERIALIZER_LOAD_OBJ): $(SHARED_DIR)/serializer_load.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_LOAD_CHECKPOINTS_OBJ): $(EDITOR_DIR)/serializer_load_checkpoints.c
+$(TEST_SERIALIZER_LOAD_CHECKPOINTS_OBJ): $(SHARED_DIR)/serializer_load_checkpoints.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_LOAD_CLIMBABLES_OBJ): $(EDITOR_DIR)/serializer_load_climbables.c
+$(TEST_SERIALIZER_LOAD_CLIMBABLES_OBJ): $(SHARED_DIR)/serializer_load_climbables.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ): $(EDITOR_DIR)/serializer_load_collectibles.c
+$(TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ): $(SHARED_DIR)/serializer_load_collectibles.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_LOAD_CONFIG_OBJ): $(EDITOR_DIR)/serializer_load_config.c
+$(TEST_SERIALIZER_LOAD_CONFIG_OBJ): $(SHARED_DIR)/serializer_load_config.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_LOAD_ENEMIES_OBJ): $(EDITOR_DIR)/serializer_load_enemies.c
+$(TEST_SERIALIZER_LOAD_ENEMIES_OBJ): $(SHARED_DIR)/serializer_load_enemies.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_LOAD_GEOMETRY_OBJ): $(EDITOR_DIR)/serializer_load_geometry.c
+$(TEST_SERIALIZER_LOAD_GEOMETRY_OBJ): $(SHARED_DIR)/serializer_load_geometry.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_LOAD_HAZARDS_OBJ): $(EDITOR_DIR)/serializer_load_hazards.c
+$(TEST_SERIALIZER_LOAD_HAZARDS_OBJ): $(SHARED_DIR)/serializer_load_hazards.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_LOAD_HEADER_OBJ): $(EDITOR_DIR)/serializer_load_header.c
+$(TEST_SERIALIZER_LOAD_HEADER_OBJ): $(SHARED_DIR)/serializer_load_header.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_LOAD_LAYERS_OBJ): $(EDITOR_DIR)/serializer_load_layers.c
+$(TEST_SERIALIZER_LOAD_LAYERS_OBJ): $(SHARED_DIR)/serializer_load_layers.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_LOAD_SURFACES_OBJ): $(EDITOR_DIR)/serializer_load_surfaces.c
+$(TEST_SERIALIZER_LOAD_SURFACES_OBJ): $(SHARED_DIR)/serializer_load_surfaces.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_PARSE_OBJ): $(EDITOR_DIR)/serializer_parse.c
+$(TEST_SERIALIZER_PARSE_OBJ): $(SHARED_DIR)/serializer_parse.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_SAVE_OBJ): $(EDITOR_DIR)/serializer_save.c
+$(TEST_SERIALIZER_SAVE_OBJ): $(SHARED_DIR)/serializer_save.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_TYPES_OBJ): $(EDITOR_DIR)/serializer_types.c
+$(TEST_SERIALIZER_TYPES_OBJ): $(SHARED_DIR)/serializer_types.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
 $(TEST_VALIDATE_OBJ): $(SRCDIR)/levels/level_validate.c
@@ -433,7 +442,7 @@ $(TEST_EDITOR_UNDO_APPLY_OBJ): $(EDITOR_DIR)/editor_undo_apply.c
 $(TEST_EDITOR_ENTITY_META_OBJ): $(EDITOR_DIR)/entity_meta.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
-$(TEST_EDITOR_UI_OBJ): $(EDITOR_DIR)/ui.c
+$(TEST_EDITOR_UI_OBJ): $(SHARED_DIR)/ui.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
 $(TEST_EDITOR_TOOLS_OBJ): $(EDITOR_DIR)/tools.c
@@ -481,6 +490,7 @@ $(OUTDIR)/level-validate-test: tests/level_validate_test.c $(TEST_VALIDATE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
 
 $(OUTDIR)/runtime-load-test: tests/runtime_load_test.c $(TEST_LEVEL_LOADER_OBJ) \
+		$(TEST_GAME_RANDOM_OBJ) \
 		$(TEST_VALIDATE_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_RAIL_OBJ) \
 		$(TEST_SPIKE_BLOCK_OBJ) $(TEST_FLOAT_PLATFORM_OBJ) \
 		$(TEST_BOUNCEPAD_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
@@ -493,7 +503,7 @@ $(OUTDIR)/entity-utils-test: tests/entity_utils_test.c $(TEST_ENTITY_UTILS_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
 
 $(OUTDIR)/collision-test: tests/collision_test.c $(TEST_SPIKE_PLATFORM_OBJ) \
-		$(TEST_FISH_OBJ) $(TEST_CIRCULAR_SAW_OBJ) $(TEST_ENTITY_UTILS_OBJ)
+		$(TEST_FISH_OBJ) $(TEST_CIRCULAR_SAW_OBJ) $(TEST_ENTITY_UTILS_OBJ) $(TEST_GAME_RANDOM_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
 $(OUTDIR)/phase-transition-test: tests/phase_transition_test.c $(TEST_PHASE_OBJ)
@@ -517,7 +527,7 @@ $(OUTDIR)/game-overlay-test: tests/game_overlay_test.c $(TEST_GAME_OVERLAY_OBJ)
 $(OUTDIR)/game-events-test: tests/game_events_test.c $(TEST_GAME_EVENTS_OBJ) $(TEST_GAME_INPUT_OBJ) $(TEST_WEB_INPUT_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_TERMINAL_OBJ) $(TEST_SETTINGS_OBJ) $(TEST_BINDINGS_OBJ) $(TEST_EDITOR_UI_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
 
-$(OUTDIR)/session-test: tests/session_test.c tests/game_profile_test.c $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
+$(OUTDIR)/session-test: tests/session_test.c tests/game_profile_test.c tests/simulation_test.c $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $(filter %.c %.o,$^) $(LIBS)
 
 $(OUTDIR)/game-checkpoint-test: tests/game_checkpoint_test.c $(TEST_GAME_CHECKPOINT_OBJ)
@@ -538,6 +548,9 @@ WEB_FLAGS = -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='["png"]' \
             -s SDL2_MIXER_FORMATS='["wav"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             --preload-file assets \
+            --exclude-file 'assets/sounds/unused/*' \
+            --exclude-file 'assets/sprites/unused/*' \
+            --exclude-file '*/.DS_Store' \
             --preload-file levels \
             --shell-file web/shell.html
 WEB_CFLAGS = -D_GNU_SOURCE
@@ -549,14 +562,14 @@ web: $(OUTDIR)
 		-s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]' \
 		--post-js web/debug-boot.js
 
-dist-native: all
+dist-native: release asset-budget
 	@if [ -n "$${RELEASE_DLL_DIR:-}" ]; then \
-		python3 tools/package_release.py --platform "$${RELEASE_PLATFORM:-super-mango-native}" --binary $(TARGET) --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-native}.zip" --dll-dir "$${RELEASE_DLL_DIR}"; \
+		python3 tools/package_release.py --platform "$${RELEASE_PLATFORM:-super-mango-native}" --binary "$(OUTDIR)/release/super-mango" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-native}.zip" --dll-dir "$${RELEASE_DLL_DIR}"; \
 	else \
-		python3 tools/package_release.py --platform "$${RELEASE_PLATFORM:-super-mango-native}" --binary $(TARGET) --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-native}.zip"; \
+		python3 tools/package_release.py --platform "$${RELEASE_PLATFORM:-super-mango-native}" --binary "$(OUTDIR)/release/super-mango" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-native}.zip"; \
 	fi
 
-dist-wasm: web
+dist-wasm: asset-budget
 	python3 tools/package_release.py --wasm --out-dir "$(OUTDIR)" --platform "$${RELEASE_PLATFORM:-super-mango-wasm}" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-wasm}.zip"
 
 clean:

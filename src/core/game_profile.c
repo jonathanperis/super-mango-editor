@@ -1,7 +1,7 @@
 /* Versioned player preferences/results. Persistence belongs to AppSession,
  * never to a render frame, entity, or smoke/replay run. */
 #include "game_profile.h"
-#include "../editor/serializer_io.h"
+#include "../shared/serializer_io.h"
 #include "tomlc17.h"
 #include <errno.h>
 #include <limits.h>
