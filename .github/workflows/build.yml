@@ -54,6 +54,8 @@ jobs:
       # Check out the repository so the runner has access to the source code.
       - name: Checkout source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       # ── Linux dependency install ────────────────────────────────────────────
       # apt packages: build tools + SDL2 and all companion library dev headers.
@@ -243,8 +245,8 @@ jobs:
     name: Create Release
     needs: build
     # Guard: skip normal branch pushes and PR checks. Publish only from v* tags
-    # or an explicit manual workflow dispatch.
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    # or an explicit manual workflow dispatch from the protected main branch.
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
 
     # The GITHUB_TOKEN must have write access to repository contents to create
@@ -285,6 +287,8 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          target_commitish: ${{ github.sha }}
+          draft: true
           name: Super Mango ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
           body: |
             Automated release built from commit [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
@@ -305,3 +309,11 @@ jobs:
             dist/windows/super-mango-windows-x86_64.zip
             dist/wasm/super-mango-wasm.zip
           fail_on_unmatched_files: true
+          overwrite_files: false
+
+      - name: Publish immutable release after asset upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
+        run: gh release edit "$RELEASE_TAG" --repo "$GH_REPO" --draft=false
