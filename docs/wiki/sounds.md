@@ -8,7 +8,10 @@ All audio files live in the `assets/sounds/` directory, organized into categoriz
 
 ---
 
-## Currently Used Sounds
+## Sound Reference
+
+The tables include runtime sounds and bundled theme tracks. A bundled track may
+be available for level authors without being selected by a current campaign or lab.
 
 ### Player — `assets/sounds/player/`
 
