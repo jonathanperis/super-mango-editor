@@ -4,6 +4,7 @@
 # Build output
 out/
 out-sanitize/
+out-security-audit/
 dist/
 mango-experiment-*.toml
 

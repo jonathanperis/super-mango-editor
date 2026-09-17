@@ -2,6 +2,10 @@
  * editor_files.c — Editor file, autosave, and recent-file helpers.
  */
 
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "editor_files.h"
 
 #include <SDL.h>        /* SDL_GetPrefPath, SDL_GetTicks */
@@ -1017,12 +1021,17 @@ int editor_choose_recovery(EditorState *es)
         char message[EDITOR_PATH_MAX + 128];
         char timestamp[64] = "unknown time";
         time_t raw_time = (time_t)es->recovery_entries[index].timestamp;
-        struct tm *tm_value = localtime(&raw_time);
+        struct tm time_value;
+#ifdef _WIN32
+        int time_valid = localtime_s(&time_value, &raw_time) == 0;
+#else
+        int time_valid = localtime_r(&raw_time, &time_value) != NULL;
+#endif
         const char *source = es->recovery_entries[index].source_path[0]
                            ? es->recovery_entries[index].source_path
                            : "(untitled)";
-        if (tm_value) strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S",
-                               tm_value);
+        if (time_valid) strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S",
+                                 &time_value);
         snprintf(message, sizeof(message), "Source: %s\nTimestamp: %s",
                  source, timestamp);
         memset(&data, 0, sizeof(data));

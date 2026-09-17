@@ -430,7 +430,7 @@ int game_profile_poll(GameProfile *profile)
 void game_profile_select(GameProfile *profile, const char *key)
 {
     if (!game_profile_key_valid(key) || !strcmp(profile->data.last_level, key)) return;
-    strcpy(profile->data.last_level, key);
+    SDL_strlcpy(profile->data.last_level, key, sizeof(profile->data.last_level));
     profile->dirty = 1;
     profile->revision++;
 }
@@ -451,7 +451,7 @@ int game_profile_record(GameProfile *profile, const char *key, int score, int co
     if (index == PROFILE_LEVEL_COUNT) return -1;
     GameProgress *result = &profile->data.levels[index];
     if (index == profile->data.count) {
-        strcpy(result->path, key);
+        SDL_strlcpy(result->path, key, sizeof(result->path));
         result->best_time = elapsed;
         profile->data.count++;
     }

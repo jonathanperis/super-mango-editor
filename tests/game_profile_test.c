@@ -93,6 +93,35 @@ fail:
     return 1;
 }
 
+static int level_key_boundaries(void)
+{
+    GameProfile *profile = calloc(1, sizeof(*profile));
+    char key[PROFILE_LEVEL_PATH + 1];
+    CHECK(profile);
+    for (size_t length = PROFILE_LEVEL_PATH - 1; length <= PROFILE_LEVEL_PATH; length++) {
+        game_profile_init(profile);
+        memset(key, 'a', length);
+        memcpy(key, "levels/", 7);
+        memcpy(key + length - 5, ".toml", 5);
+        key[length] = '\0';
+        game_profile_select(profile, key);
+        int result = game_profile_record(profile, key, 10, 1, 2.0f);
+        if (length < PROFILE_LEVEL_PATH) {
+            CHECK(result == 0 && profile->data.count == 1);
+            CHECK(!strcmp(profile->data.last_level, key));
+            CHECK(!strcmp(profile->data.levels[0].path, key));
+        } else {
+            CHECK(result == -1 && profile->data.count == 0);
+            CHECK(!profile->data.last_level[0] && !profile->revision && !profile->dirty);
+        }
+    }
+    free(profile);
+    return 0;
+fail:
+    free(profile);
+    return 1;
+}
+
 static int pending_snapshot_bookkeeping(void)
 {
     GameProfile *profile = calloc(1, sizeof(*profile));
@@ -238,6 +267,7 @@ int game_profile_contract_test(void)
 {
     puts("profile: codec/storage");
     if (codec_and_storage()) return 1;
+    if (level_key_boundaries()) return 1;
     if (pending_snapshot_bookkeeping()) return 1;
     puts("profile: settings/bindings");
     if (settings_and_bindings()) return 1;
