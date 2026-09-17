@@ -451,6 +451,13 @@ Four GitHub Actions workflows handle automated builds and docs checks:
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ and GitHub Actions security-and-quality analysis |
 | Deploy | `deploy.yml` | Successful same-repository main push/manual Build & Release run | Builds/checks docs from the run's exact commit, copies matching WASM, HTTP-smokes the assembly and deploys `docs/out/` |
 
+The repository restricts third-party Actions to an allowlist and requires full
+commit-SHA pins. A renamed or transferred Action can resolve through the GitHub
+API yet be rejected before any job starts if its new repository name is absent
+from that allowlist. The canonical `emscripten-core/setup-emsdk@*` entry is allowed
+alongside the existing integrations. Coordinate future owner/name changes with
+the repository settings rather than relaxing SHA pinning.
+
 Native smoke uses dummy SDL drivers where supported: `./out/super-mango --level levels/00_sandbox_01.toml --smoke-test-frames 5` and `./out/super-mango-editor --smoke-test`. WebAssembly smoke asserts `out/super-mango.html`, `.js`, `.wasm`, and `.data` exist.
 
 ---
