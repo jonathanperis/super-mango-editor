@@ -12,7 +12,7 @@ MIT notice. See [Asset Inventory](../asset-inventory/) for generated file sizes.
 | Recolored/derived sprites | `tools/gen_fire_sprites.py`, `tools/analyze_sprite.py`, repository history | Derived from the original sprites; retain JuhoSprite credit and identify modifications |
 | `round9x13.ttf` | Pack page identifies Round 9x13 and explicitly says the font was not made by JuhoSprite | Author/license evidence remains unresolved in this checkout |
 | WAV audio | `assets/sounds/` | Original source/license records remain unresolved in this checkout |
-| raylib and bundled dependencies | raylib 6.0 source/checksum pin in `vendor/raylib/manifest.json` | raylib/GLFW notices and original license-bearing external files are included in release archives; Windows runtime package notices accompany bundled DLLs |
+| raylib and bundled dependencies | raylib 6.0 source/checksum pin and documented `vendor/raylib/patches.json` fixes | raylib/GLFW notices and license-bearing external files are included in archives; marked miniaudio changes retain the original license text |
 
 The pack metadata links to [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
 This project modifies colors and organization for its biomes. The source page's
@@ -20,7 +20,8 @@ font caveat means its sprite attribution cannot establish the font's license.
 Resolve missing audio/font records from the original acquisition sources before
 claiming a complete media-license inventory. Do not relabel them MIT.
 
-Windows builder archives copy the MSYS2 environment's available package notices
-under `licenses/msys2/`. macOS/Linux use separately installed runtime libraries.
+Windows builder archives inspect both executables' required DLLs and copy their
+owning MSYS2 packages' available notices under `licenses/msys2/`. raylib is linked
+statically; macOS/Linux still use OS graphics/audio interfaces and system libraries.
 Reserve assets remain in the checkout for learning, but `unused/` files are not
 included in game/editor release bundles or WebAssembly preload data.

@@ -12,6 +12,8 @@
 
 static void editor_history(EditorState *es, int redo)
 {
+    /* Finish the staged field edit before moving history. Otherwise Undo could
+     * change the document while a widget still points at its previous value. */
     Command command;
     if (!editor_finish_field_edit(es)) return;
     if (redo ? redo_pop(es->undo, &command) : undo_pop(es->undo, &command)) {
@@ -25,6 +27,8 @@ static void editor_key(EditorState *es, const InputEvent *event)
     int key = event->key;
     int ctrl = (event->mods & (INPUT_CTRL | INPUT_SUPER)) != 0;
     int shift = (event->mods & INPUT_SHIFT) != 0;
+    /* An active text field owns ordinary typing. The digit '2' in a field
+     * must not also select the Place tool. Modifiers come from this event. */
     if (es->ui.active_id && !ctrl && key != KEY_ESCAPE && key != KEY_F5) {
         if (key == KEY_BACKSPACE) es->ui.key_backspace = 1;
         if (key == KEY_ENTER || key == KEY_KP_ENTER) es->ui.key_return = 1;
@@ -33,7 +37,7 @@ static void editor_key(EditorState *es, const InputEvent *event)
     if (es->ui.active_id && ctrl && (key == KEY_C || key == KEY_V)) {
         if (key == KEY_C) SetClipboardText(es->ui.edit_buf);
         else {
-            const char *text = GetClipboardText(); /* borrowed by raylib */
+            const char *text = GetClipboardText(); /* borrowed by raylib; do not free */
             if (text) ui_queue_text_input(&es->ui, text);
         }
         return;
@@ -55,9 +59,12 @@ static void editor_key(EditorState *es, const InputEvent *event)
             if (es->recovery_entry_count) {
                 int selected = editor_choose_recovery(es);
                 uint64_t id = selected >= 0 ? es->pending_recovery_id : 0;
-                if (id && editor_confirm_discard_changes(es, "recover autosave")) (void)editor_recover_entry_by_id(es, id);
-                else es->pending_recovery_id = 0;
-            } else editor_set_status(es, "Recovery copy not found");
+                if (id && editor_confirm_discard_changes(es, "recover autosave"))
+                    (void)editor_recover_entry_by_id(es, id);
+                else
+                    es->pending_recovery_id = 0;
+            } else
+                editor_set_status(es, "Recovery copy not found");
             break;
         case KEY_ONE: case KEY_TWO: case KEY_THREE: case KEY_FOUR: case KEY_FIVE: {
             int index = key-KEY_ONE;
@@ -65,11 +72,20 @@ static void editor_key(EditorState *es, const InputEvent *event)
                 if (editor_load_level(es, es->recent_files[index])) editor_set_status(es, "Failed to load recent file");
             break;
         }
-        case KEY_Z: editor_history(es, shift); break;
-        case KEY_Y: editor_history(es, 1); break;
-        case KEY_C: editor_copy_selected(es); break;
-        case KEY_V: if (editor_finish_field_edit(es)) editor_paste_clipboard(es); break;
-        default: break;
+        case KEY_Z:
+            editor_history(es, shift);
+            break;
+        case KEY_Y:
+            editor_history(es, 1);
+            break;
+        case KEY_C:
+            editor_copy_selected(es);
+            break;
+        case KEY_V:
+            if (editor_finish_field_edit(es)) editor_paste_clipboard(es);
+            break;
+        default:
+            break;
         }
         return;
     }
@@ -77,28 +93,48 @@ static void editor_key(EditorState *es, const InputEvent *event)
     case KEY_ESCAPE:
         if (es->ui.active_id) ui_cancel_active_edit(&es->ui);
         else if (es->tool == TOOL_PLACE || es->tool == TOOL_DELETE) es->tool = TOOL_SELECT;
-        else if (es->selection.index >= 0) { es->selection.index = -1; es->panel_scroll = 0; }
+        else if (es->selection.index >= 0) {
+            es->selection.index = -1;
+            es->panel_scroll = 0;
+        }
         break;
-    case KEY_F5: editor_play_test(es); break;
-    case KEY_G: if (editor_finish_field_edit(es)) es->show_grid ^= 1; break;
+    case KEY_F5:
+        editor_play_test(es);
+        break;
+    case KEY_G:
+        if (editor_finish_field_edit(es)) es->show_grid ^= 1;
+        break;
     case KEY_DELETE:
         if (es->selection.index >= 0 && editor_finish_field_edit(es)) tools_delete_selected(es);
         break;
-    case KEY_ONE: if (editor_finish_field_edit(es)) es->tool = TOOL_SELECT; break;
-    case KEY_TWO: if (editor_finish_field_edit(es)) es->tool = TOOL_PLACE; break;
-    case KEY_THREE: if (editor_finish_field_edit(es)) es->tool = TOOL_DELETE; break;
-    case KEY_BACKSPACE: es->ui.key_backspace = 1; break;
-    case KEY_ENTER: es->ui.key_return = 1; break;
-    default: break;
+    case KEY_ONE:
+        if (editor_finish_field_edit(es)) es->tool = TOOL_SELECT;
+        break;
+    case KEY_TWO:
+        if (editor_finish_field_edit(es)) es->tool = TOOL_PLACE;
+        break;
+    case KEY_THREE:
+        if (editor_finish_field_edit(es)) es->tool = TOOL_DELETE;
+        break;
+    case KEY_BACKSPACE:
+        es->ui.key_backspace = 1;
+        break;
+    case KEY_ENTER:
+        es->ui.key_return = 1;
+        break;
+    default:
+        break;
     }
 }
 
 void editor_handle_event(EditorState *es, const InputEvent *event)
 {
     float wx = 0, wy = 0;
+    /* Input already maps window pixels to the logical editor canvas. Tools
+     * need world coordinates: undo zoom, add camera X, and remove toolbar Y. */
     if (event->type >= INPUT_MOUSE_DOWN && event->type <= INPUT_WHEEL) {
-        wx = (float)event->x/es->camera.zoom + es->camera.x;
-        wy = (float)(event->y-TOOLBAR_H)/es->camera.zoom;
+        wx = (float)event->x / es->camera.zoom + es->camera.x;
+        wy = (float)(event->y - TOOLBAR_H) / es->camera.zoom;
     }
     switch (event->type) {
     case INPUT_QUIT:
@@ -108,19 +144,28 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
             es->running = 0;
         }
         break;
-    case INPUT_KEY_DOWN: editor_key(es, event); break;
-    case INPUT_TEXT: ui_queue_text_input(&es->ui, event->text); break;
+    case INPUT_KEY_DOWN:
+        editor_key(es, event);
+        break;
+    case INPUT_TEXT:
+        ui_queue_text_input(&es->ui, event->text);
+        break;
     case INPUT_MOUSE_DOWN:
         if (event->button == MOUSE_BUTTON_LEFT) {
             es->mouse_down = es->ui.mouse_clicked = 1;
-            if (canvas_contains(event->x,event->y) && editor_finish_field_edit(es)) tools_mouse_down(es,wx,wy);
+            if (canvas_contains(event->x, event->y) && editor_finish_field_edit(es))
+                tools_mouse_down(es, wx, wy);
         } else if (event->button == MOUSE_BUTTON_RIGHT) {
             es->mouse_right_down = 1;
-            if (canvas_contains(event->x,event->y) && editor_finish_field_edit(es)) tools_right_click(es,wx,wy);
+            if (canvas_contains(event->x, event->y) && editor_finish_field_edit(es))
+                tools_right_click(es, wx, wy);
         }
         break;
     case INPUT_MOUSE_UP:
-        if (event->button == MOUSE_BUTTON_LEFT) { es->mouse_down = 0; tools_mouse_up(es,wx,wy); }
+        if (event->button == MOUSE_BUTTON_LEFT) {
+            es->mouse_down = 0;
+            tools_mouse_up(es, wx, wy);
+        }
         else if (event->button == MOUSE_BUTTON_RIGHT) es->mouse_right_down = 0;
         break;
     case INPUT_MOUSE_MOVE:
@@ -130,14 +175,22 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         if (editor_handle_side_panel_scroll(es,event->x,event->y,(int)event->wheel)) break;
         if (event->x < CANVAS_W && event->y > TOOLBAR_H && event->y < EDITOR_H-STATUS_H) {
             if (event->mods & INPUT_CTRL) {
-                static const float zooms[] = {1,2,3,5};
+                /* These exact integer presets are assigned by startup, the
+                 * toolbar and this wheel handler; zoom is not accumulated. */
+                static const float zooms[] = {1, 2, 3, 5};
                 int index = 1;
-                for (int i = 0; i < 4; i++) if (es->camera.zoom == zooms[i]) { index = i; break; }
+                for (int i = 0; i < 4; i++)
+                    if (es->camera.zoom == zooms[i]) {
+                        index = i;
+                        break;
+                    }
                 if (event->wheel > 0) index = (index+1)%4;
                 else if (event->wheel < 0) index = (index+3)%4;
                 es->camera.zoom = zooms[index];
             } else {
-                es->camera.x -= event->wheel*48/es->camera.zoom;
+                /* Convert a 48-canvas-pixel pan to world distance. Clamp so
+                 * the viewport cannot scroll beyond either world boundary. */
+                es->camera.x -= event->wheel * 48 / es->camera.zoom;
                 int screens = es->level.screen_count;
                 if (screens <= 0) screens = 4;
                 if (screens > MAX_LEVEL_SCREENS) screens = MAX_LEVEL_SCREENS;

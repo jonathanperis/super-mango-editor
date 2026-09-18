@@ -75,6 +75,8 @@ Inspect the zip and confirm it contains:
 - `README.txt`
 - `LICENSE`
 - `THIRD_PARTY_NOTICES.md` and `licenses/tomlc17.txt`
+- `licenses/raylib.txt`, `licenses/raylib-dependencies/glfw.txt` and the bundled
+  components' license-bearing source/header files, including marked source fixes
 - Windows only: runtime DLLs and available package notices under `licenses/msys2/`
 
 ## 5. CI and Publishing Gates

@@ -1,6 +1,19 @@
-/* AppSession owns the process window/audio and the only native/web frame loop.
- * Screens own render targets and assets, so a failed candidate level can leave
- * the existing menu alive without recreating the global raylib context. */
+/*
+ * app_session.c — Own the application, not just one level.
+ *
+ * main → session_create → session_run → session_destroy is the native path.
+ * A browser registers a frame callback instead of blocking in a while loop.
+ * Both paths use the same screen routes below.
+ *
+ * Ownership hierarchy:
+ *   session: one window/context, audio device, profile and campaign catalog
+ *     screen: menu OR GameState, its render target, textures/fonts/sounds
+ *
+ * A transition can prepare a candidate game before releasing the old menu.
+ * Resources outlive neither their owning screen nor the shared GPU/audio
+ * context. Read session_apply_*_route for transitions and session_step for
+ * the frame order; low-level drawing belongs to the screens/render modules.
+ */
 #include "app_session.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -61,6 +74,8 @@ static void session_repair_web_input(AppSession *session)
 
 static void session_runtime_cleanup(AppSession *session)
 {
+    /* Several failure/exit routes meet here. The flag makes teardown happen
+     * once even when a caller later destroys an already-ended session. */
     if (session->runtime_cleaned) return;
 #ifndef __EMSCRIPTEN__
     if (session->profile.dirty && game_profile_save(&session->profile) < 0)
@@ -99,6 +114,8 @@ static void session_close_game(AppSession *session)
     if (!session->game) return;
     settings_menu_cleanup(&session->settings);
     GameState *game = session->game;
+    /* Detach the owner first, then release its contents and the allocation.
+     * game_cleanup releases members; it does not free the GameState itself. */
     session->game = NULL;
     game_cleanup(game);
     free(game);
@@ -125,6 +142,8 @@ static void session_profile_key(GameState *game, const char *source)
 
 static void session_apply_preferences(AppSession *session)
 {
+    /* Settings edit a profile in memory. Apply a changed revision after the
+     * panel closes, rather than resizing/reconfiguring on every draw call. */
     if (game_profile_poll(&session->profile) < 0) TraceLog(LOG_WARNING, "%s", session->profile.status);
     GameSettings *s = &session->profile.data.settings;
     if (!session->settings.open && (!session->preferences_applied ||
@@ -133,8 +152,14 @@ static void session_apply_preferences(AppSession *session)
         if (session->game) {
             GameState *game = session->game;
 #define VOLUME(member) sound_set_volume(game->audio.member, volume)
-            VOLUME(coin); VOLUME(jump); VOLUME(hit); VOLUME(spring);
-            VOLUME(axe); VOLUME(flap); VOLUME(spider_attack); VOLUME(dive);
+            VOLUME(coin);
+            VOLUME(jump);
+            VOLUME(hit);
+            VOLUME(spring);
+            VOLUME(axe);
+            VOLUME(flap);
+            VOLUME(spider_attack);
+            VOLUME(dive);
 #undef VOLUME
             const LevelDef *level = game->runtime.current_level;
             music_set_volume(s->muted ? 0 : level->music_volume*s->music_volume/128);
@@ -152,6 +177,8 @@ static void session_apply_preferences(AppSession *session)
         else if (!session->game || !session->game->paused) music_resume();
         session->settings_were_open = session->settings.open;
     }
+    /* A failed save is visible to the user. Retry only after another edit,
+     * not every frame; a pending browser save retains its own snapshot. */
     if (!session->settings.open && !session->profile.pending_text && session->profile.dirty &&
         session->attempted_save_revision != session->profile.revision) {
         session->attempted_save_revision = session->profile.revision;
@@ -161,6 +188,8 @@ static void session_apply_preferences(AppSession *session)
 
 static int session_profile_ready_to_leave(AppSession *session)
 {
+    /* Native saves complete synchronously. Browser saves may still hold a
+     * Web Lock; keep rendering until their acknowledgement settles. */
     int result = game_profile_poll(&session->profile);
     if (result == PROFILE_SAVE_PENDING) return 0;
     if (session->profile.dirty && session->attempted_save_revision != session->profile.revision) {
@@ -180,15 +209,22 @@ static GameState *session_make_game(AppSession *session, const char *path, const
     game->smoke_test_frames = session->smoke_test_frames;
     copy_path(game->level_path, sizeof(game->level_path), path);
     copy_path(game->replay_script_path, sizeof(game->replay_script_path), session->replay_script_path);
-    if (game_init(game)) { free(game); return NULL; }
+    if (game_init(game)) {
+        free(game);
+        return NULL;
+    }
     game->loop.prev_ticks = clock_millis();
     game->profile = &session->profile;
     game->settings_menu = &session->settings;
+    /* These two pointers are borrowed from the longer-lived session. The
+     * screen must not free them when a replay replaces its GameState. */
     session_profile_key(game, path);
     game_profile_select(&session->profile, game->profile_level_key);
     session->preferences_applied = 0;
     game->loop.fp_prev_riding = -1;
     session_repair_web_input(session);
+    /* A confirm held on the old screen cannot immediately jump/confirm on
+     * the new one. The latch waits for those physical controls to release. */
     game_input_arm_release_latch(game, inherited);
     session->game_open_count++;
     return game;
@@ -246,6 +282,8 @@ static void session_apply_menu_route(AppSession *session)
     MenuRoute route = session->menu->route;
     if (route == MENU_ROUTE_EXIT && !session_profile_ready_to_leave(session)) return;
     if (route == MENU_ROUTE_PLAY) {
+        /* Prepare before commit: a bad level leaves the menu usable, with an
+         * error message, rather than destroying the only reachable screen. */
         GameInputPhysicalState inherited;
         session->route = APP_ROUTE_MENU_PLAY;
         start_menu_get_input_state(session->menu, &inherited);
@@ -268,6 +306,8 @@ static void session_apply_menu_route(AppSession *session)
 
 static int session_browser_replay(AppSession *session, const char *path)
 {
+    /* Save the one-shot replay path before freeing anything. If storage is
+     * unavailable, retain the current completion screen so the user can act. */
     int stored = 0;
     if (session->hooks.store_replay) stored = session->hooks.store_replay(path, session->hooks.userdata);
 #ifdef __EMSCRIPTEN__
@@ -282,6 +322,8 @@ static int session_browser_replay(AppSession *session, const char *path)
         return 0;
     }
     session->replay_storage_successes++;
+    /* Copy callbacks before releasing their containing session. Nothing may
+     * dereference session after session_free_owned below. */
     AppSessionHooks hooks = session->hooks;
     session_cancel_callback(session);
     session_close_game(session);
@@ -299,6 +341,8 @@ static int session_browser_replay(AppSession *session, const char *path)
 
 static int session_apply_game_route(AppSession *session, int callback_owned)
 {
+    /* Routes are requests, not nested main loops. Consume them after the
+     * screen frame, when its event/update/render code is no longer running. */
     GameState *game = session->game;
     if (!game) return 0;
     GameRoute route = game->route;
@@ -330,6 +374,7 @@ static int session_apply_game_route(AppSession *session, int callback_owned)
         break;
     case GAME_ROUTE_REPLAY:
         session->route = APP_ROUTE_GAME_REPLAY;
+        /* Keep an independent path before the old GameState is freed. */
         copy_path(path, sizeof(path), game->level_path);
         if (callback_owned) return session_browser_replay(session, path);
         {
@@ -362,23 +407,31 @@ static int session_apply_game_route(AppSession *session, int callback_owned)
 
 AppSession *session_create(const AppSessionConfig *config)
 {
+    /* calloc gives each owned resource slot an empty initial state. This
+     * makes the fail label valid after any partially completed startup. */
     AppSession *session = calloc(1, sizeof(*session));
     const char *level = config ? config->level_path : NULL;
     if (!session) return NULL;
     game_profile_init(&session->profile);
     if ((level && strlen(level) >= sizeof(session->boot_level_path)) ||
         (config && config->replay_script_path && strlen(config->replay_script_path) >= sizeof(session->replay_script_path))) {
-        free(session); return NULL;
+        free(session);
+        return NULL;
     }
     session->debug_mode = config && (config->debug_mode || config->experiment_path);
     session->random_seed = config ? config->random_seed : 1;
     session->smoke_test_frames = config ? config->smoke_test_frames : 0;
     if (config && config->hooks) session->hooks = *config->hooks;
     copy_path(session->replay_script_path, sizeof(session->replay_script_path), config ? config->replay_script_path : NULL);
+    /* Acquire process resources before a screen loads GPU/audio assets. Tests
+     * can supply a context; production creates one here and retains it across
+     * menu/game transitions. The game requires an audio device to start. */
     if (!IsWindowReady() && display_open(WINDOW_W, WINDOW_H, WINDOW_TITLE,
         session->smoke_test_frames > 0 || getenv("MANGO_TEST_WINDOW") != NULL)) goto fail;
     input_open(GAME_W, GAME_H);
     if (!IsAudioDeviceReady() && audio_open()) goto fail;
+    /* Debug, smoke and replay are experiments, not personal progress. Keep
+     * their settings in memory instead of opening the user's profile. */
     if (config && config->profile_enabled && !session->debug_mode && !config->experiment_path &&
         !session->smoke_test_frames && !session->replay_script_path[0]) {
         if (game_profile_open(&session->profile, config->profile_path)) TraceLog(LOG_WARNING, "%s", session->profile.status);
@@ -402,6 +455,9 @@ static void session_step(AppSession *session, int callback_owned)
 {
     if (!session || session->ended) return;
     session_apply_preferences(session);
+    /* EndDrawing captured backend commands at the end of the previous frame.
+     * Add sampled focus/gamepad changes, then let the active screen consume
+     * the queue. Music decoding must be pumped even while an overlay is up. */
     input_collect();
     music_update();
     if (session->screen == APP_SCREEN_MENU) {
@@ -417,10 +473,14 @@ static void session_step(AppSession *session, int callback_owned)
             game_profile_record(&session->profile, game->profile_level_key, game->score-game->level_score_start,
                                 game->completion.coins_collected, game->completion.elapsed);
         }
+        /* Browser replay can free the session. Its return value tells us to
+         * stop immediately, before the common end-of-frame work below. */
         if (session_apply_game_route(session, callback_owned)) return;
     } else session_end(session, 1);
     if (!session->ended) session_apply_preferences(session);
     if (session->ended && callback_owned) {
+        /* The callback owns terminal teardown; a native blocking loop leaves
+         * final destruction to main after session_run returns. */
         session_emit(session, APP_SESSION_EVENT_SESSION_FREED, NULL);
         session_free_owned(session);
     }
@@ -444,6 +504,8 @@ int session_run(AppSession *session)
         session->callback_registered = 1;
         session->callback_registration_count++;
         session_emit(session, APP_SESSION_EVENT_CALLBACK_REGISTERED, NULL);
+        /* fps=0 follows browser animation frames; simulate_infinite_loop=0
+         * returns to the host. Keep session alive for subsequent callbacks. */
         emscripten_set_main_loop_arg(session_frame, session, 0, 0);
     }
     return EXIT_SUCCESS;
@@ -456,7 +518,8 @@ int session_run(AppSession *session)
         }
         return EXIT_SUCCESS;
     }
-    while (!session->ended) session_step(session, 0);
+    while (!session->ended)
+        session_step(session, 0);
     return session->fatal ? EXIT_FAILURE : EXIT_SUCCESS;
 #endif
 }

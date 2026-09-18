@@ -83,7 +83,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 | Window size | 800 × 600 px (OS window) |
 | Logical canvas | 400 × 300 px (2× pixel scale) |
 | Target FPS | 60 |
-| Audio | 44100 Hz, stereo, 16-bit |
+| Audio | raylib/miniaudio-negotiated device format; decoded effects and streamed WAV music |
 | Libraries | raylib 6.0 (bundled GLFW on desktop), tomlc17 (TOML parser) |
 | Level format | TOML (`.toml` files in `levels/`) |
 
@@ -93,7 +93,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 
 ```sh
 # macOS — install dependencies
-brew install cmake
+brew install cmake python
 
 # Build and run the game
 make run CC=clang

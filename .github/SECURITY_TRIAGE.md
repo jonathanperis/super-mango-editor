@@ -37,9 +37,12 @@ Alert #103 identifies the playtest path copy. Its preceding length check already
 rejects insufficient capacity; the copy now also takes the explicit destination
 capacity through `str_copy`, preserving failure-before-save and full-path copying.
 Alert #104 prompted documentation of the debug overlay's collision/interaction
-coordinate conventions. The two advisory findings are intentional: #81 enumerates
-the supported legacy binding ranges; #82 compares zoom values selected from the
-exactly representable set `{1, 2, 3, 5}`, not accumulated floating-point estimates.
+coordinate conventions. The learning/readability follow-up addresses #81 with
+one early return per supported legacy binding range. A differential check retains
+the same accepted IDs, rejected holes and integer extremes.
+
+Alert #82 compares zoom values selected from the exactly representable set
+`{1, 2, 3, 5}`, not accumulated floating-point estimates. It was dismissed as a
+false positive after separate explicit maintainer authorization.
 Initialization, toolbar selection and wheel input are the only production zoom
-assignments. Their review threads were resolved after this contract check; the
-two advisory scan alerts remain open.
+assignments. Their review threads were resolved after this contract check.
