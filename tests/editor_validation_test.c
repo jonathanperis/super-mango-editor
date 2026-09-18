@@ -1717,12 +1717,14 @@ static int widget_commit_paths_preserve_values(void)
         expect_string("text widget config value", es.level.description, "after") != 0)
         goto fail_with_undo;
 
+    texture_unload(es.textures.floor_tile);
     undo_destroy(es.undo);
     ui_cleanup(&ui);
     editor_widget_test_context_cleanup(&context);
     return 0;
 
 fail_with_undo:
+    texture_unload(es.textures.floor_tile);
     undo_destroy(es.undo);
 fail:
     ui_cleanup(&ui);

@@ -18,6 +18,9 @@ use the tag and commit above to identify this import.
 The C source differs from R260821 in these places:
 
 - `scan_copystr` initializes the destination even when no bytes remain.
+- `page_create` computes its allocation size with standard `offsetof` plus the
+  checked payload size. Taking a member address through a null page pointer
+  triggered Linux UBSan even though the intended byte count was correct.
 - `is_hex_char` uses explicit ASCII ranges rather than passing scanner sentinel
   values through character classification.
 - `read_date` validates the fixed-width date incrementally, rejects short input
