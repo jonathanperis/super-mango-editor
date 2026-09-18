@@ -6,8 +6,8 @@ functions, structs and pointers; raylib experience is optional.
 
 ## First successful build
 
-Install the dependencies in the repository README. Python **3.11+** and Node.js
-are also needed for the full verification tools. Linux editor dialogs use
+Install the dependencies in the repository README, including CMake and a current
+Python (**3.12+ recommended**). Node.js is needed for the full verification tools. Linux editor dialogs use
 `zenity`. From the repository root:
 
 ```sh
@@ -22,6 +22,31 @@ make run-level-debug LEVEL=levels/labs/01_collision.toml
 `make debug` for debugger symbols in `out/debug/`, or `make release` for optimized
 executables in `out/release/`. Keep runtime working directories at the repository
 root (or the extracted release directory) so asset paths resolve.
+
+## Read the code as a lesson
+
+Simple loops and explanatory comments are deliberate. Follow one concrete frame
+before trying to generalize the engine:
+
+1. `src/main.c` chooses configuration; `src/core/app_session.c` owns the window,
+   audio device and active screen. A menu/game transition changes the screen,
+   not the process-wide graphics context.
+2. `src/input/input_backend.c` collects ordered commands. `game_events.c`
+   decides who handles them; held movement is sampled separately in `game_input.c`.
+3. `src/core/game_loop.c` updates the model and asks `src/render/game_render.c`
+   to draw. `src/shared/graphics.c` presents the logical canvas in the window.
+4. `src/editor/editor_frame.c` shows the same sequence for immediate-mode
+   widgets. `src/shared/ui.h` explains staging an edit before changing the model.
+
+`BeginDrawing`, `DrawTexturePro` and `UpdateMusicStream` are raylib APIs.
+`display_present`, `sprite_draw`, `font_load` and `sound_play` are small **project
+helpers**; read their headers for ownership, units and failure behavior. This
+distinction matters when comparing the project with raylib's own examples.
+
+After each experiment, prefer one clear change over a compact rewrite. Keep the
+comments that explain an unfamiliar C operation or a resource's lifetime, and
+update them when the behavior changes. The [Developer Guide](../developer-guide/)
+describes the conventions used by the rest of the code.
 
 ## How to use each lab
 

@@ -106,7 +106,7 @@ Changes take effect immediately on the canvas (WYSIWYG).
 2. Use **Select** to drag it or edit its `x` and `y` fields. Delete, copy/paste, undo, and redo use the same workflow as other non-singleton placement records.
 3. Save or playtest only after validation succeeds. A checkpoint must be after the effective player start, must have a unique in-world `x`, and must have an in-world `y`; invalid records block save, autosave, and playtest.
 
-The canvas draws a labelled `CP n` marker. Valid markers are amber, hovered markers brighten, the selected marker is blue, and invalid markers are red. The status bar reports **Checkpoint placed**, **Checkpoint moved**, or **Checkpoint deleted**. In the running game, crossing a valid marker produces a brief `CHECKPOINT CP n` HUD notice; the active checkpoint stays visible as `CP n`, and a death respawn is labelled `RESPAWN CP n`.
+The canvas draws a labelled `CP n` marker. Valid markers are amber, hovered markers brighten, the selected marker is blue, and invalid markers are red. The status bar reports **Checkpoint placed**, **Checkpoint moved**, or **Checkpoint deleted**. In the running game, crossing a valid marker produces a brief `CHECKPOINT CP n` HUD notice; a death respawn is labelled `RESPAWN CP n`. The debug inspector exposes the current checkpoint index after those temporary notices expire.
 
 ---
 

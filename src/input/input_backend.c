@@ -1,3 +1,11 @@
+/*
+ * input_backend.c — Adapt raylib/GLFW input without moving gameplay into it.
+ *
+ * Callbacks preserve ordered commands (including text and quick clicks).
+ * Sampled state answers "is this control still held?". Saved bindings use a
+ * separate legacy number space, translated explicitly below. Read the header
+ * for queue lifecycle; gameplay routing lives in game_events/game_input.
+ */
 #include "input_backend.h"
 #include <stdio.h>
 #include <string.h>
@@ -39,6 +47,8 @@ static GLFWscrollfun prior_scroll;
 
 static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
+    /* Let raylib update its held-key state first. Our additional command keeps
+     * the event's modifiers/repeat bit instead of sampling them later. */
     if (prior_key) prior_key(window, key, scancode, action, mods);
     if (key <= 0 || key >= 512) return;
     if (action == GLFW_RELEASE) suppressed[key] = 0;
@@ -51,7 +61,10 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 static void char_callback(GLFWwindow *window, unsigned int codepoint)
 {
     if (prior_char) prior_char(window, codepoint);
-    InputEvent event = {.type=INPUT_TEXT};
+    /* Key identity and typed text differ on non-US layouts. GLFW delivers a
+     * Unicode codepoint; encode it as UTF-8 bytes for the editor's text queue.
+     * Aggregate initialization supplies the trailing NUL in the empty bytes. */
+    InputEvent event = {.type = INPUT_TEXT};
     int bytes = 0;
     const char *text = CodepointToUTF8((int)codepoint, &bytes);
     if (bytes > 0 && bytes < (int)sizeof(event.text)) {
@@ -118,8 +131,16 @@ static void callbacks_open(void)
 
 int input_binding_known(int b)
 {
-    return (b >= 4 && b <= 129) || (b >= 133 && b <= 164) ||
-        (b >= 176 && b <= 221) || (b >= 224 && b <= 231) || (b >= 257 && b <= 290);
+    /* These are version-1 profile wire IDs, not raylib key constants. Keep
+     * each valid range explicit: holes are invalid, but a saved key may be
+     * valid even when the current backend cannot deliver it. The settings
+     * screen warns about those unavailable keys instead of resetting them. */
+    if (b >= 4 && b <= 129) return 1;
+    if (b >= 133 && b <= 164) return 1;
+    if (b >= 176 && b <= 221) return 1;
+    if (b >= 224 && b <= 231) return 1;
+    if (b >= 257 && b <= 290) return 1;
+    return 0;
 }
 
 int input_key_from_binding(int b)
@@ -208,11 +229,23 @@ const char *input_pad_name(int b)
     return b >= 0 && b < PAD_COUNT ? names[b] : "?";
 }
 
-int input_ready(void) { return ready; }
-void input_clear(void) { first = count = 0; }
+int input_ready(void)
+{
+    return ready;
+}
+
+void input_clear(void)
+{
+    first = count = 0;
+}
+
 void input_open(int w, int h)
 {
-    width = w; height = h; ready = 1; focused = 1; gamepad = 0;
+    width = w;
+    height = h;
+    ready = 1;
+    focused = 1;
+    gamepad = 0;
     memset(suppressed, 0, sizeof(suppressed));
     input_clear();
 #ifndef MANGO_RAYLIB_MEMORY
@@ -230,10 +263,14 @@ void input_close(void)
 #ifdef __EMSCRIPTEN__
     input_web_scope_close();
 #endif
-    input_clear(); ready = 0; gamepad = 0;
+    input_clear();
+    ready = 0;
+    gamepad = 0;
 }
 int input_push(const InputEvent *event)
 {
+    /* Copy the event by value: callers can safely pass a stack-local event.
+     * Modulo wraps around the fixed ring; no allocation occurs per command. */
     if (!ready || !event || count == INPUT_CAPACITY) return 0;
     events[(first+count++) % INPUT_CAPACITY] = *event;
     return 1;
@@ -275,6 +312,8 @@ Vector2 input_mouse(void)
 
 Vector2 input_pointer_to_logical(Vector2 mouse)
 {
+    /* Invert display_present: remove letterbox margins, then divide by the
+     * smaller scale ratio. Do this once before widgets/world hit testing. */
     float sx = (float)GetScreenWidth()/width, sy = (float)GetScreenHeight()/height;
     float scale = sx < sy ? sx : sy;
     if (scale <= 0) return (Vector2){-1, -1};
@@ -292,6 +331,8 @@ int input_modifiers(void)
 
 int input_first_gamepad(void)
 {
+    /* Keep the selected controller while it exists. A lower-index device
+     * appearing later must not steal the current player's controls. */
     if (!IsWindowReady()) return 0;
     if (gamepad && IsGamepadAvailable(gamepad-1)) return gamepad;
     for (int i = 0; i < 4; i++) if (IsGamepadAvailable(i)) return i+1;
@@ -305,7 +346,9 @@ void input_collect(void)
     int current_focus = IsWindowHidden() ? 1 : IsWindowFocused();
     if (current_focus != focused) {
         focused = current_focus;
-        if (!focused) for (int key = 1; key < 512; key++) suppressed[key] = IsKeyDown(key);
+        if (!focused)
+            for (int key = 1; key < 512; key++)
+                suppressed[key] = IsKeyDown(key);
         input_push(&(InputEvent){.type=INPUT_FOCUS, .focused=focused});
     }
     if (WindowShouldClose()) input_push(&(InputEvent){.type=INPUT_QUIT});

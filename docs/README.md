@@ -70,6 +70,12 @@ Do not hand-edit generated counts. `make docs-drift` checks freshness, TOML
 example schema, public player declarations, CLI coverage and semantic references.
 Astro compilation alone does not check links; `check-site` validates emitted HTML.
 
+The manual and source comments are teaching material. Preserve the explanations
+of ownership, units and frame order when updating library calls. Review examples
+against their actual declarations and callers; do not only replace backend names.
+`wiki/learning-path.md` gives the beginner's reading order and
+`wiki/developer-guide.md` records the deliberately readable code style.
+
 ## Local Game Preview
 
 Astro does **not** compile or copy WebAssembly. A docs-only preview renders the
@@ -101,6 +107,11 @@ build and built-site validation. It does not deploy.
 Release run. It checks out that run's exact commit, builds/checks the site, adds
 the matching normal/debug WASM artifact, performs HTTP assembly smoke checks and
 deploys `docs/out/` to Pages. Release tags are a separate publication path.
+
+A passing documentation PR checks the proposed manual, not the deployed site.
+Pages continues to serve the previous successful `main` revision until the PR
+is merged and the matching build/deploy finishes. Keep website prose and WASM
+from the same revision when verifying a migration.
 
 Analytics is optional; see `.env.example`. With no `PUBLIC_GA_ID`, analytics
 scripts are omitted. Production builds map the repository secret

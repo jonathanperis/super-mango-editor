@@ -2,7 +2,7 @@
  * hud.h — Public interface for the heads-up display module.
  *
  * The HUD renders at the top of the screen as an overlay:
- *   Left  : heart icons (Stars_Ui.png) showing remaining hit points.
+ *   Left  : borrowed yellow-star icons showing remaining hit points.
  *   Center: player icon + "x{lives}" showing remaining lives.
  *   Right : "SCORE: {n}" showing the player's current score.
  *
@@ -24,8 +24,10 @@
 /*
  * Hud — resources needed by the HUD renderer.
  *
- * font     : Round9x13.ttf loaded at its native bitmap size.
- * star_tex : Stars_Ui.png used as a heart/health indicator icon.
+ * font     : owned round9x13.ttf font loaded at 13 logical pixels.
+ * star_tex : borrowed star_yellow.png used as the health indicator.
+ * coin_icon: owned hud_coins.png texture beside the score.
+ * player_icon: borrowed player sprite sheet, cropped for the lives counter.
  */
 /*
  * HUD_COIN_ICON_SIZE — display size of the coin icon next to the score.
@@ -45,10 +47,11 @@ int hud_init(Hud *hud, Texture2D *star_tex, Texture2D *player_tex);
 /*
  * hud_render — Draw the full HUD overlay.
  *
- * player_tex : the player's sprite sheet; first frame is used as the icon.
  * hearts     : current hit points (0–MAX_HEARTS).
  * lives      : remaining extra lives.
  * score      : current score to display.
+ * checkpoint_index is zero-based; temporary feedback labels display index+1.
+ * feedback_until/now use the same wrapping millisecond clock.
  */
 void hud_render(const Hud *hud,
                 int hearts, int lives, int score,
@@ -58,5 +61,5 @@ void hud_render(const Hud *hud,
 int hud_checkpoint_feedback_visible(int feedback_kind, uint32_t deadline, uint32_t now);
 const char *hud_checkpoint_feedback_label(int feedback_kind, int checkpoint_index);
 
-/* Release the font and heart texture. */
+/* Release the owned font/coin icon; leave borrowed star/player textures alive. */
 void hud_cleanup(Hud *hud);

@@ -14,7 +14,7 @@ Use this page to choose the smallest useful verification set for a change. Run c
 | Level TOML, campaign manifest, or level schema | `make validate-levels` and `make docs-drift` | Validates root and lab levels, the v1 campaign manifest, generated facts, schema docs and prose counts. |
 | Player/world runtime startup | `make smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEED=1` | Renders every TOML level plus the editor in bounded hidden windows. |
 | Replay or event handling | `make scripted-smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"` | Generates deterministic commands/action masks and checks movement/jump/pause results. |
-| Editor behaviour | `make editor CC=clang` and `./out/super-mango-editor --smoke-test` | Builds the standalone editor and checks headless startup/exit. |
+| Editor behaviour | `make editor CC=clang` and `./out/super-mango-editor --smoke-test` | Builds the editor and renders five hidden-window frames; a desktop context is still required. |
 | Memory/UB-sensitive C changes | `make sanitize CC=clang` and, when startup paths changed, `make sanitize-smoke CC=clang` | Runs AddressSanitizer/UBSan over tests and optionally smoke startup. |
 | Docs, README, Pages routes | `make docs-drift`, then from `docs/`: `bun run lint`, `bun run build`, `bun run check-site` | Checks generated facts, TOML examples, API/CLI references, Astro compilation and emitted routes/links/metadata/sitemap. Uses the frozen `bun.lock` dependency set. |
 | WebAssembly payload | `make web`, artifact checks and green GitHub Actions WebAssembly + Pages smoke | Build raylib and the application with the same pinned SDK; distinguish toolchain failures from application failures. |
@@ -85,6 +85,11 @@ desktop suite additionally checks actual OS resize. The context-lifetime test
 normalizes raylib 6.0 Memory's bottom-origin/BGRA framebuffer readback. Software
 tests do not prove GPU presentation, clipboard/dialog behavior, audible output
 or physical input devices. They are explicit builds, never a runtime fallback.
+
+For comment/layout-only teaching changes, compare executable tokens and review
+the explanations against their callers before rebuilding. Do not change gameplay
+expectations to make a readability pass look green. Saved-binding translations,
+units and owner/borrower contracts still need their existing regression checks.
 
 `make scripted-smoke` drives the runtime with generated replay scripts. The runner writes files under `out/replays-smoke/`, then invokes the game with `--replay-script`, `--seed`, and `--smoke-test-frames` to exercise deterministic movement, jumping, and pause/resume paths. Each subprocess has a 30-second limit; use the default five-frame scenarios for slow sanitizer/software-renderer runs.
 

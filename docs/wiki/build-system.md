@@ -39,11 +39,19 @@ This abbreviated source-list example omits platform detection and build-mode fla
 Both applications include `src/shared/serializer_load_checkpoints.c` and the other shared serializer/UI modules.
 
 raylib **6.0** is fetched from the source/checksum pin in `vendor/raylib/manifest.json`.
-`tools/build_raylib.py` verifies the archive and uses CMake for an out-of-source
-static build. Desktop uses bundled GLFW; Web uses the same Emscripten toolchain
+`tools/build_raylib.py` verifies the archive, applies the documented replacements
+in `vendor/raylib/patches.json`, and uses CMake for an out-of-source static build.
+The patches release alias converter caches and WAV decoders and avoid miniaudio
+null-pointer arithmetic; the bootstrap rejects unfamiliar patch contexts.
+Desktop uses bundled GLFW; Web uses the same Emscripten toolchain
 as the application. `RAYLIB_BUILD` defaults to `$(OUTDIR)/raylib`; web uses
 `$(OUTDIR)/raylib-web`. Keep build modes/toolchains in separate directories.
 Use `EXTRA_CFLAGS` and `EXTRA_LDFLAGS` for additional flags.
+
+Application objects depend on the built raylib library as well as their own
+sources/headers. A dependency or patch change therefore recompiles consumers and
+relinks executables; preserved upstream header timestamps cannot leave old code
+silently linked. `vendor/raylib/README.md` records the source and patch provenance.
 
 `RAYLIB_PLATFORM=memory` selects raylib's software framebuffer and miniaudio's
 null backend for explicit headless tests. Use a dedicated `OUTDIR`, such as
@@ -90,7 +98,9 @@ custom flag combinations, choose a separate `OUTDIR` to avoid reusing old object
 `make content-inventory` regenerates public counts and the raw asset inventory;
 `make asset-budget` checks freshness and the 40 MiB raw playable-asset budget.
 `make timing-lab` prints a small integration experiment for 30/60/144 Hz.
-Python 3.11+ and Node.js are required for host checks. Linux dialogs use zenity.
+Python 3.11+ and Node.js are required for host checks. Use a current Python
+(3.12+ recommended) for the raylib bootstrap, which also uses `tarfile` extraction
+filters. Linux dialogs use zenity.
 
 ### Compiler Flags Explained
 
@@ -126,9 +136,10 @@ make
 
 **Steps:**
 1. Creates `out/` directory if it does not exist
-2. Compiles each listed source file → `.o`
-3. Links all `.o` files → `out/super-mango`
-4. On macOS (`uname -s == Darwin`), ad-hoc code signs the binary with `codesign --force --sign - $@` (required on Apple Silicon to avoid `Killed: 9` errors). On other platforms this step is skipped
+2. Downloads/checks/patches raylib and builds its static library if needed
+3. Compiles each listed source file → `.o`
+4. Links all `.o` files and raylib → `out/super-mango`
+5. On macOS (`uname -s == Darwin`), ad-hoc code signs the binary with `codesign --force --sign - $@` (required on Apple Silicon to avoid `Killed: 9` errors). On other platforms this step is skipped
 
 ### `make run`
 
@@ -227,7 +238,7 @@ Current test binaries (15):
 
 `make test` also runs `tests/validate_levels_test.py`. Its `web-host-contract`
 prerequisite runs the static boot check, JavaScript host/profile-storage/touch
-contracts and Python release-archive tests. The native list above is the complete
+and canvas-keyboard contracts and Python release-archive tests. The native list above is the complete
 `TEST_TARGETS` inventory; profile, simulation and parser-boundary cases are linked
 into existing harnesses rather than separate binaries.
 
@@ -386,13 +397,13 @@ Override `OUTDIR`/`DISTDIR` only when you intend to remove those specific build 
 
 ```sh
 # Install Homebrew if needed: https://brew.sh
-brew install cmake
+brew install cmake python
 
 # Xcode Command Line Tools (provides clang and make)
 xcode-select --install
 ```
 
-Python 3.11+ downloads/verifies the pinned raylib archive. The native library
+The current Python downloads/verifies the pinned raylib archive. The native library
 links against macOS frameworks. Rendered tests need an available desktop session;
 a hidden window is not a display-less renderer. Report missing display/audio
 devices as environment blockers, rather than disabling sanitizer checks.
@@ -484,6 +495,7 @@ After a successful build:
 out/
 ├── super-mango                          ← the game binary
 ├── super-mango-editor                   ← the editor binary (make editor)
+├── raylib/                              ← verified source, applied patches and CMake build
 └── obj/
     ├── src/                             ← game/editor objects mirror source paths
     │   ├── core/*.o / *.d

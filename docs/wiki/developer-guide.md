@@ -22,12 +22,24 @@ integration points; the abbreviated examples here introduce conventions.
 
 ### Comments and Module Layout
 
-The source is a learning resource for C and raylib. Comments should explain why a decision is needed, not just repeat the code:
+The source is a learning resource for C and raylib. Readable layout and teaching
+comments are intentional, even when shorter code could do the same job:
 
 - Start headers and source files with a short module summary. Headers use `#pragma once` and expose constants, types, and public function declarations.
 - Explain nontrivial raylib calls, including important arguments, return values, and resource ownership.
 - Give numeric constants their units and origin, especially logical pixels, pixels per second, and animation durations.
 - Document pointer ownership, float-to-integer rendering casts, and cleanup order where they matter.
+- Keep separate actions and nontrivial `switch` cases on separate lines. Prefer
+  an explicit loop or early return to a dense expression when it helps a learner
+  trace the state change. Share genuinely repeated behavior without hiding each
+  small step behind a new helper.
+- Explain unfamiliar C idioms when useful: designated initializers, borrowed
+  pointers, bounds-before-casts, and frame-time unit conversions. Do not remove
+  a useful explanation solely because the implementation is now shorter.
+
+raylib APIs use names such as `LoadTexture` and `DrawTexturePro`. The snake-case
+helpers in `src/shared/` and `src/input/input_backend.*` belong to this project;
+they preserve explicit ownership, logical coordinates and saved-binding IDs.
 
 ### Naming
 
@@ -46,13 +58,17 @@ The source is a learning resource for C and raylib. Comments should explain why 
 
 - Clear each owning pointer after releasing its resource. A NULL guard only protects an already-NULL pointer; aliases and borrowed pointers require explicit lifetime discipline.
 - Error paths identify the failing operation and asset path; raylib warnings provide backend detail.
-- Required initialization failures return failure to the caller for cleanup; only the top-level runner returns `EXIT_FAILURE`. Optional sound-effect loads warn and continue, and playback checks for a non-NULL chunk.
-- Resources are **always freed in reverse init order**.
+- Required initialization failures return failure to the caller for cleanup; only the top-level runner returns `EXIT_FAILURE`. Optional sound-effect loads warn and continue; `sound_play` accepts an empty `SoundEffect` slot.
+- Release dependents before owners: aliases before samples, cached labels before
+  fonts, and all screen resources before the graphics/audio context. Reverse
+  initialization order is a useful way to achieve this, not a reason to free a
+  borrowed resource twice.
 - Use `float` for positions and velocities. Preserve integer `IntRect` hitbox construction and edge rules; convert to raylib `Rectangle` at drawing boundaries.
 
 ### Coordinate System
 
-All game-object positions and sizes live in **logical space (400x300)**.
+Game-object positions and sizes use **logical pixels**. The viewport is 400×300,
+but world X can extend across `screen_count` screens; rendering subtracts camera X.
 Never use `WINDOW_W` / `WINDOW_H` for game math. The shared presentation helper scales the logical render target to the OS window with nearest filtering and an inverse pointer transform.
 
 See [Constants Reference](../constants-reference/) for all defined constants.
@@ -74,7 +90,7 @@ Treat source and workflows as authoritative. When project documents, README, or 
 
 ## Verification and Runtime Controls
 
-Run the 15-test `make test` suite (15 native binaries plus Python and JavaScript host checks) for runtime/editor changes. `make validate-levels` checks level and campaign data; `make docs-drift` checks semantic docs drift, generated catalog freshness, and roadmap quality. For documentation changes, also run `bun run lint` and `bun run build` from `docs/`. See [Build System](../build-system/) and [Testing & Smoke Matrix](../testing/) for the full gates.
+Run the 15-test `make test` suite (15 native binaries plus Python and JavaScript host checks) for runtime/editor changes. `make validate-levels` checks level and campaign data; `make docs-drift` checks semantic docs drift, generated catalog freshness, and roadmap quality. For documentation changes, also run `bun run lint`, `bun run build` and `bun run check-site` from `docs/`; compilation alone does not verify links. See [Build System](../build-system/) and [Testing & Smoke Matrix](../testing/) for the full gates.
 
 Terminal overlays use Up/Down or D-pad to select, Enter/Space/Start to confirm (A also confirms), and Esc/Back to exit (B also exits). Completion offers Next Level when configured, Replay, Level Select, and Exit; game over offers Retry, Level Select, and Exit. See [Controls](../controls/) for the full input reference.
 
@@ -88,10 +104,12 @@ Most active entities follow this lifecycle pattern:
 entity_init    -> set initial state (textures often live shared in GameState)
 entity_update  -> move, apply physics, detect events
 entity_render  -> draw to the active raylib target
-entity_cleanup -> texture_unload, clear the owning slot
+entity_cleanup -> release only owned resources, then clear their slots
 ```
 
 Collectibles and simple decorations may use lighter helpers. For example, coins store only placement state in `Coin` and render through `coins_render()` using a shared texture from `GameState`.
+The coin renderer borrows that texture; it must not unload it. Resource cleanup
+in `game_resources.c` owns the shared slot.
 
 Active entities may also expose:
 
@@ -159,7 +177,7 @@ typedef struct {
     // ... existing fields ...
     TextureResources textures; /* contains Texture2D *coin */
     Coin coins[MAX_COINS];    /* fixed-size array -- simple and cache-friendly */
-    int  coin_count;          /* how many are currently active */
+    int  coin_count;          /* populated slots; each Coin has its own active flag */
 } GameState;
 ```
 
@@ -324,8 +342,9 @@ gs->audio.music = NULL;
 
 ## Adding HUD / Text Rendering
 
-The graphics context must exist before loading fonts. `TextFont` preserves
-UTF-8 glyph coverage as text changes; font atlases and cached label textures have
+The graphics context must exist before loading fonts. `TextFont` requests additional
+UTF-8 glyphs as text changes; unavailable glyphs still use the font fallback.
+Font atlases and cached label textures have
 explicit owners. The font is in `assets/fonts/`.
 
 ```c

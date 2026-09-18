@@ -98,7 +98,7 @@ Memory test build uses miniaudio's null backend and does not prove audible outpu
 | Project API | `sound_load`, `sound_play` | `music_load`, `music_play`, `music_update` |
 | Loading | Fully decoded into RAM | Decoded on demand from the backing file/resource |
 | Best for | Short, triggered sounds | Long looping tracks |
-| Simultaneous | Eight independent raylib sound aliases | One active stream |
+| Simultaneous | One shared pool of eight independent raylib sound aliases | One active stream |
 | Volume | Sample/user volume multiplied by each voice's distance volume | Authored level volume multiplied by user volume/mute |
 
 Sound effects use raylib `LoadSound` and are fully decoded into memory. Music is selected
@@ -138,6 +138,14 @@ sound_play(gs->audio.<name>, 128);
 `sound_play` accepts an empty optional slot. Volume remains in the existing
 0–128 authored units and is normalized at the raylib boundary. Voices have
 independent playback/volume; aliases are stopped and unloaded before their sample.
+If all eight voices are busy, a new effect is dropped rather than interrupting
+one already playing. `sound_set_volume` updates a sample's multiplier and its
+live aliases; the per-play multiplier remains independent.
+
+The pinned dependency includes three documented audio fixes: alias converter
+cache release, WAV decoder release, and miniaudio's zero-allocation passthrough
+initialization. They are applied on every platform by `tools/build_raylib.py`;
+see `vendor/raylib/README.md` and the [Build System](../build-system/).
 
 ---
 

@@ -1,4 +1,10 @@
-/* Start menu screen. AppSession owns the window, frame loop and transitions. */
+/*
+ * start_menu.c — A small screen with input, drawing and explicit ownership.
+ *
+ * The menu borrows the session's catalog/profile/settings. It owns its logical
+ * render target, font, logo and confirmation sound. Choosing Play sets a route;
+ * AppSession performs the transition after this frame rather than nesting loops.
+ */
 #include "start_menu.h"
 #include "settings_menu.h"
 #include <stdio.h>
@@ -21,6 +27,8 @@ static int point_in_rect(int x, int y, int rx, int ry, int w, int h)
 
 static void centered(TextFont *font, const char *text, int cx, int y, Color color)
 {
+    /* cx is the desired center, not the left edge. Measure this exact label
+     * because different glyphs and score strings need different offsets. */
     int width = 0;
     if (font_measure(font, text, &width, NULL)) return;
     font_draw(font, text, cx-width/2, y, color);
@@ -28,6 +36,8 @@ static void centered(TextFont *font, const char *text, int cx, int y, Color colo
 
 static void select_level(StartMenu *menu, int index)
 {
+    /* Wrap at the catalog ends; the manifest, not a directory scan, owns the
+     * level order. Copy the path because later transitions outlive this menu. */
     if (!menu->catalog || !menu->catalog->count) return;
     if (index < 0) index = (int)menu->catalog->count-1;
     if ((size_t)index >= menu->catalog->count) index = 0;
@@ -49,6 +59,8 @@ static int confirm_held(const StartMenu *menu)
 
 static void play(StartMenu *menu)
 {
+    /* A confirm carried from a prior screen must be released before this
+     * menu can act on another press. Sound playback accepts a missing slot. */
     if (menu->route != MENU_ROUTE_NONE) return;
     if (menu->confirm_release_required && confirm_held(menu)) return;
     menu->confirm_release_required = 0;
@@ -75,7 +87,10 @@ StartMenu *start_menu_create(const CampaignCatalog *catalog)
     StartMenu *menu = calloc(1, sizeof(*menu));
     if (!menu) return NULL;
     menu->catalog = catalog;
-    if (start_menu_init(menu)) { start_menu_close(&menu); return NULL; }
+    if (start_menu_init(menu)) {
+        start_menu_close(&menu);
+        return NULL;
+    }
     return menu;
 }
 
@@ -96,6 +111,8 @@ int start_menu_frame(StartMenu *menu)
     if (!menu || !menu->catalog || !menu->catalog->count) return 0;
     if (menu->route != MENU_ROUTE_NONE && !menu->route_waiting_render) return 0;
     start_menu_refresh_controller(menu);
+    /* The settings panel gets first refusal. A consumed command must not
+     * also change the level selector or start a game underneath that panel. */
     InputEvent event;
     while (input_poll(&event)) {
         if (event.type == INPUT_QUIT) {
@@ -108,7 +125,8 @@ int start_menu_frame(StartMenu *menu)
             if (menu->settings_menu && point_in_rect(event.x,event.y,125,270,150,24)) {
                 menu->settings_menu->open = 1;
                 menu->settings_menu->page = menu->settings_menu->selected = menu->settings_menu->capture = 0;
-            } else if (point_in_rect(event.x,event.y,BTN_X,BTN_Y,BTN_W,BTN_H)) play(menu);
+            } else if (point_in_rect(event.x, event.y, BTN_X, BTN_Y, BTN_W, BTN_H))
+                play(menu);
         } else if ((event.type == INPUT_KEY_DOWN || event.type == INPUT_PAD_DOWN) && !event.repeat) {
             int key = event.type == INPUT_KEY_DOWN ? event.key : KEY_NULL;
             int button = event.type == INPUT_PAD_DOWN ? event.button : -1;
@@ -123,25 +141,29 @@ int start_menu_frame(StartMenu *menu)
     }
     if (menu->route != MENU_ROUTE_NONE && !menu->route_waiting_render) return 0;
     if (menu->confirm_release_required && !confirm_held(menu)) menu->confirm_release_required = 0;
+    /* Draw in logical 400x300 coordinates. Window scaling happens only when
+     * display_present copies the completed target to the OS framebuffer. */
     BeginDrawing();
     BeginTextureMode(menu->frame_target);
     ClearBackground(BLACK);
-    IntRect logo = {(MENU_GAME_W-LOGO_DISPLAY_W)/2,20,LOGO_DISPLAY_W,LOGO_DISPLAY_H};
-    sprite_draw(menu->logo_tex,NULL,&logo,0,SPRITE_NORMAL,WHITE);
+    IntRect logo = {(MENU_GAME_W - LOGO_DISPLAY_W) / 2, 20, LOGO_DISPLAY_W, LOGO_DISPLAY_H};
+    sprite_draw(menu->logo_tex, NULL, &logo, 0, SPRITE_NORMAL, WHITE);
     Vector2 mouse = input_mouse();
     int hovering = point_in_rect((int)mouse.x,(int)mouse.y,BTN_X,BTN_Y,BTN_W,BTN_H);
     Color color = hovering ? (Color){74,144,217,255} : (Color){77,77,77,255};
-    DrawRectangle(BTN_X,BTN_Y,BTN_W,BTN_H,color);
-    DrawRectangleLines(BTN_X,BTN_Y,BTN_W,BTN_H,(Color){224,224,224,255});
-    centered(menu->font,"Play",BTN_X+BTN_W/2,BTN_Y+7,WHITE);
+    DrawRectangle(BTN_X, BTN_Y, BTN_W, BTN_H, color);
+    DrawRectangleLines(BTN_X, BTN_Y, BTN_W, BTN_H, (Color){224, 224, 224, 255});
+    centered(menu->font, "Play", BTN_X + BTN_W/2, BTN_Y + 7, WHITE);
     char text[160];
     Color grey = {120,120,120,255};
     snprintf(text,sizeof(text),"Level: < %s >",menu->catalog->levels[menu->selected_level].display_name);
     centered(menu->font,text,MENU_GAME_W/2,214,grey);
-    if (menu->error_message[0]) centered(menu->font,menu->error_message,MENU_GAME_W/2,232,(Color){220,120,120,255});
+    if (menu->error_message[0])
+        centered(menu->font, menu->error_message, MENU_GAME_W/2, 232, (Color){220,120,120,255});
     const GameProgress *best = game_profile_result(menu->profile,menu->selected_level_path);
     if (best && !menu->error_message[0]) {
-        snprintf(text,sizeof(text),"Best: %d pts / %.2fs / %d coins",best->best_score,best->best_time,best->best_coins);
+        snprintf(text, sizeof(text), "Best: %d pts / %.2fs / %d coins",
+                 best->best_score, best->best_time, best->best_coins);
         centered(menu->font,text,MENU_GAME_W/2,232,grey);
     }
     centered(menu->font,"Arrows/D-pad: level  Enter/A: play  Esc: exit",MENU_GAME_W/2,250,grey);
@@ -157,10 +179,16 @@ int start_menu_frame(StartMenu *menu)
 void start_menu_cleanup(StartMenu *menu)
 {
     if (!menu) return;
-    sound_unload(menu->snd_confirm); menu->snd_confirm = NULL;
-    texture_unload(menu->logo_tex); menu->logo_tex = NULL;
-    font_unload(menu->font); menu->font = NULL;
-    if (IsRenderTextureValid(menu->frame_target)) UnloadRenderTexture(menu->frame_target);
+    /* Free owned screen resources while the shared context is still alive.
+     * Clearing slots prevents another cleanup from reusing released handles. */
+    sound_unload(menu->snd_confirm);
+    menu->snd_confirm = NULL;
+    texture_unload(menu->logo_tex);
+    menu->logo_tex = NULL;
+    font_unload(menu->font);
+    menu->font = NULL;
+    if (IsRenderTextureValid(menu->frame_target))
+        UnloadRenderTexture(menu->frame_target);
     menu->frame_target = (RenderTexture2D){0};
     menu->controller = 0;
 }
