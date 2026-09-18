@@ -576,7 +576,7 @@ $(OUTDIR)/game-overlay-test: tests/game_overlay_test.c $(TEST_GAME_OVERLAY_OBJ)
 $(OUTDIR)/game-events-test: tests/game_events_test.c $(TEST_GAME_EVENTS_OBJ) $(TEST_GAME_INPUT_OBJ) $(TEST_WEB_INPUT_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_TERMINAL_OBJ) $(TEST_SETTINGS_OBJ) $(TEST_BINDINGS_OBJ) $(TEST_EDITOR_UI_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
 
-$(OUTDIR)/session-test: tests/session_test.c tests/game_profile_test.c tests/simulation_test.c tests/audio_contract_test.c $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
+$(OUTDIR)/session-test: tests/session_test.c tests/game_profile_test.c tests/simulation_test.c tests/audio_contract_test.c tests/web_frame_pacing_test.c $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $(filter %.c %.o,$^) $(LIBS)
 
 $(OUTDIR)/game-checkpoint-test: tests/game_checkpoint_test.c $(TEST_GAME_CHECKPOINT_OBJ)

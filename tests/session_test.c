@@ -919,6 +919,7 @@ static int phase_resets_transient_state(void)
 int game_profile_contract_test(void);
 int game_simulation_contract_test(void);
 int audio_contract_test(void);
+int web_frame_pacing_contract_test(void);
 
 static int setup_raylib(void)
 {
@@ -934,6 +935,7 @@ int main(void)
     const struct { const char *name; int (*run)(void); } cases[] = {
 #define CASE(fn) {#fn, fn}
         CASE(audio_contract_test),
+        CASE(web_frame_pacing_contract_test),
         CASE(game_simulation_contract_test), CASE(game_profile_contract_test),
         CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),
         CASE(menu_mouse_and_path_boundaries), CASE(collision_lifetime_and_pickups),

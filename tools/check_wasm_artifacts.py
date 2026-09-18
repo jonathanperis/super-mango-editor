@@ -56,6 +56,11 @@ def run_node_check(js_path: Path, wasm_path: Path) -> int:
 
 def check_js_asset_references(js_path: Path) -> int:
     text = js_path.read_text(encoding="utf-8", errors="ignore")
+    # This non-Asyncify app returns each frame to the browser. raylib's Web
+    # WindowShouldClose pulls in this unsupported sleep even though the files
+    # compile and download correctly; reject that dependency before shipping.
+    if "_emscripten_sleep" in text:
+        return fail(f"{js_path.relative_to(ROOT)} depends on unsupported emscripten_sleep")
     for basename in [f"{js_path.stem}.wasm", f"{js_path.stem}.data"]:
         if basename not in text:
             return fail(f"{js_path.relative_to(ROOT)} does not reference {basename}")
