@@ -14,17 +14,12 @@ Super Mango follows a classic **init → loop → cleanup** pattern. `AppSession
 
 ```
 main()
-  ├── SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)
-  ├── IMG_Init(IMG_INIT_PNG)
-  ├── TTF_Init()
-  ├── Mix_OpenAudio(44100, stereo, 2048 buffer)
   └── session_create(config)
-       ├── initialise AppSession runtime and controller ownership
-       │   └── native controller setup is deferred until a stable screen frame;
-       │       WebAssembly initializes it synchronously
+       ├── initialise one raylib window/context, semantic input and audio device
+       │   └── device polling and platform teardown stay on the application thread
        ├── no `--level` → start_menu_create()
        └── `--level` / `--sandbox` → session_open_game() → game_init(gs)
-            ├── create active game window and renderer
+            ├── create a screen-owned logical render target
             ├── load textures, audio, TOML level data, player, HUD, effects, and entities
             └── arm release latch and repair browser keyboard state
 
@@ -40,8 +35,8 @@ session_run(session)
 
 session_destroy(session) / browser terminal cleanup
   ├── close active menu or game screen
-   ├── close the AppSession-owned controller subsystem on the app thread
-  ├── Mix_CloseAudio → TTF_Quit → IMG_Quit → SDL_Quit
+  ├── clear input handlers and sound voices after screen assets are released
+  ├── CloseAudioDevice → CloseWindow
   └── free AppSession
 ```
 
@@ -49,7 +44,7 @@ session_destroy(session) / browser terminal cleanup
 
 ## App Session and Game Frame
 
-`AppSession` is the sole production loop owner. It frames the active menu or game, then consumes that screen's route only after the frame. Active-game frames run at **60 FPS**, capped via VSync plus a manual `SDL_Delay` fallback:
+`AppSession` is the sole production loop owner. It samples physical input, pumps the music stream, frames the active screen, then consumes its route. raylib's `EndDrawing` owns presentation, event polling and normal **60 FPS** pacing. Hidden smoke runs are uncapped and retain fixed simulation steps.
 
 ```
 session_frame(session) {
@@ -64,9 +59,8 @@ session_frame(session) {
 
 game_frame(gs) {
   1. Delta Time   — measure ms since last frame → dt (seconds)
-  2. Events       — SDL_PollEvent (quit window / pause and overlay controls)
-                     SDL_CONTROLLERDEVICEADDED   — opens a newly plugged-in controller
-                     SDL_CONTROLLERDEVICEREMOVED — closes and NULLs gs->controller when unplugged
+  2. Events       — drain project-owned InputEvent commands (quit / pause / overlays)
+                     INPUT_PAD_ADDED / INPUT_PAD_REMOVED — update selected gamepad index
                      terminal: Up/Down or D-pad selects; Enter/Space/Start (or A) confirms
                      terminal: Esc/Back (or B) exits; Start toggles active-game pause
    3. Update       — inspector selects simulation dt; pause/settings/terminal state can block it
@@ -91,7 +85,7 @@ game_frame(gs) {
 ### Delta Time
 
 ```c
-Uint64 now = SDL_GetTicks64();
+uint64_t now = clock_millis();
 float  dt  = (float)(now - prev) / 1000.0f;
 prev = now;
 ```
@@ -160,7 +154,7 @@ When lethal damage consumes the final life, `apply_damage()` sets `gs->game_over
 
 ## Coordinate System
 
-SDL's Y-axis increases **downward**. The origin (0, 0) is at the **top-left** of the logical canvas.
+The 2D Y-axis increases **downward**. The origin (0, 0) is at the **top-left** of the logical canvas.
 
 ```
 (0,0) ──────────────────► x  (GAME_W = 400)
@@ -177,7 +171,7 @@ SDL's Y-axis increases **downward**. The origin (0, 0) is at the **top-left** of
               └──────────────────────────────────────────┘
 ```
 
-`SDL_RenderSetLogicalSize(renderer, 400, 300)` makes SDL scale this canvas **2x** to fill the 800x600 OS window automatically, giving the chunky pixel-art look with no changes to game logic.
+The game renders to a **400×300 `RenderTexture2D`**. `display_present` applies point filtering, aspect-preserving scaling and the render-texture Y correction. At 800×600 this gives a **2x** pixel scale. `input_pointer_to_logical` applies the inverse viewport transform once. Gameplay hitboxes remain integer `IntRect` values; raylib's floating `Rectangle` is a drawing boundary type.
 
 ---
 
@@ -187,11 +181,10 @@ Defined in `game.h`. The **single container** for active-game resources; `AppSes
 
 ```c
 typedef struct {
-    SDL_Window         *window;
-    SDL_Renderer       *renderer;
-    SDL_GameController *controller;
-    TextureResources    textures;  /* all owned SDL_Texture pointers */
-    AudioResources      audio;     /* all Mix_Chunk plus Mix_Music */
+    RenderTexture2D frame_target;  /* screen owns target; session owns window */
+    int controller;               /* raylib index + 1; zero means none */
+    TextureResources textures;    /* owned Texture2D slots */
+    AudioResources audio;         /* owned SoundEffect / MusicTrack slots */
 
     ParallaxSystem parallax;
     Player         player;
@@ -201,7 +194,7 @@ typedef struct {
     /* fixed-size arrays + counts for every enemy, hazard, collectible, surface */
 
     Hud     hud;
-    Camera  camera;
+    GameCamera camera;
     int     hearts, lives, score, score_life_next;
     int     running;
     int     game_over;
@@ -209,7 +202,7 @@ typedef struct {
     unsigned int pause_reasons;
     float   respawn_x, respawn_y;
     int     checkpoint_index;
-    Uint32  checkpoint_feedback_until;
+    uint32_t checkpoint_feedback_until;
     int     legacy_checkpoint_screen;
     int     debug_mode;
     int     smoke_test_frames;
@@ -244,10 +237,20 @@ Authored records disable automatic screen-boundary checkpoints for that level. A
 
 | Situation | Action |
 |-----------|--------|
-| SDL subsystem init failure (in `main`) | `fprintf(stderr, ...)` → clean up already-inited subsystems → `return EXIT_FAILURE` |
+| Window/audio initialization failure | Session creation fails and releases initialized resources; the top-level runner returns `EXIT_FAILURE` |
 | Resource load failure (in `game_init`) | `fprintf(stderr, ...)` → clean up partially-created `GameState` resources → return `-1`; the top-level runner returns `EXIT_FAILURE` |
 | Sound load failure (non-fatal pattern) | `fprintf(stderr, ...)` then continue -- play is guarded by `if (gs->audio.<name>)` |
 | Missing gameplay-critical shared sprite | Reject the level before replacing active level state; identify the required asset path |
 | Optional presentation texture load failure | Warn and preserve the documented visual fallback |
 
-All SDL error strings are retrieved with `SDL_GetError()`, `IMG_GetError()`, or `Mix_GetError()` and printed to `stderr`.
+Application errors identify the failing asset/path or lifecycle operation. raylib's
+warnings provide backend detail. Fonts, textures and sound aliases are released
+before their owning context/sample/device. Menu/game transitions retain the same
+window, including when a candidate level fails to load.
+
+Version-1 profile binding numbers are translated explicitly. Unsupported legacy
+media/paddle/touchpad bindings retain their stored values and show a remap warning;
+fixed keyboard navigation remains available. Native preference paths retain both
+organization and application components. Browser input handlers are scoped to
+`Module.canvas`; save namespaces and asynchronous commit/teardown ownership stay
+unchanged.

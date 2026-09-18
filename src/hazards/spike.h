@@ -11,7 +11,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 /* ---- Constants ---------------------------------------------------------- */
 
@@ -44,16 +44,16 @@ void spike_rows_init(SpikeRow *rows, int *count);
 
 /* Draw all active spike rows as tiled 16×16 blocks. */
 void spike_rows_render(const SpikeRow *rows, int count,
-                       SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                       Texture2D *tex, int cam_x);
 
 /*
  * spike_row_get_rect — Return the full bounding rectangle of a spike row
  * in world space (for collision detection).
  */
-SDL_Rect spike_row_get_rect(const SpikeRow *row);
+IntRect spike_row_get_rect(const SpikeRow *row);
 
 /*
  * spike_row_hit_test — Return 1 if the given player rect overlaps any
  * spike tile in the row.
  */
-int spike_row_hit_test(const SpikeRow *row, const SDL_Rect *prect);
+int spike_row_hit_test(const SpikeRow *row, const IntRect *prect);

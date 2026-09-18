@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 #define MAX_ROPES    16
 #define ROPE_W       16              /* display width (full sprite width)       */
@@ -33,4 +33,4 @@ void rope_init(RopeDecor *ropes, int *count);
 
 /* Blit every rope with world-to-screen camera offset applied. */
 void rope_render(const RopeDecor *ropes, int count,
-                 SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                 Texture2D *tex, int cam_x);

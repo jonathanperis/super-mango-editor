@@ -28,7 +28,7 @@ int game_init(GameState *gs)
     if (game_resources_load(gs) != 0) goto fail;
 
     /* Set up the player (loads texture, sets initial position on the floor). */
-    if (player_init(&gs->player, gs->renderer) != 0) goto fail;
+    if (player_init(&gs->player) != 0) goto fail;
 
     /* Camera starts at the far-left edge of the world. */
     gs->camera.x = 0.0f;
@@ -39,7 +39,7 @@ int game_init(GameState *gs)
      */
 
     /* Load HUD font and icon textures while the renderer is available. */
-    if (hud_init(&gs->hud, gs->renderer, gs->textures.star_yellow,
+    if (hud_init(&gs->hud, gs->textures.star_yellow,
                  gs->player.texture) != 0) {
         goto fail;
     }
@@ -55,7 +55,7 @@ int game_init(GameState *gs)
      * fields, so no hardcoded gameplay defaults belong here.
      */
 
-    if (!gs->controller_init_pending) gamepad_refresh_controller(gs);
+    gamepad_refresh_controller(gs);
 
     /* Signal the loop to start running; game starts in the foreground. */
     gs->running = 1;

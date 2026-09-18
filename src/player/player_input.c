@@ -11,7 +11,7 @@
  * AXIS_DEAD_ZONE — minimum absolute value an analog axis must exceed before
  * it is treated as intentional input.
  *
- * SDL reports axis values in the range [-32768, +32767].  Physical sticks
+ * Saved dead-zone units span [-32768, +32767]. Physical sticks
  * produce small non-zero readings even when untouched (electrical noise,
  * mechanical centre offset).  Ignoring anything below this threshold
  * prevents the player from drifting without touching the controller.
@@ -34,11 +34,10 @@
  *
  * Called once per frame, before player_update.
  *
- * Physical input arrives as a sampled mask. The game input module owns SDL
+ * Physical input arrives as a sampled mask. The game input module owns device
  * state and route-release gating; this module only applies gameplay controls.
  */
-void player_handle_input(Player *player, Mix_Chunk *snd_jump,
-                         SDL_GameController *ctrl,
+void player_handle_input(Player *player, SoundEffect *snd_jump,
                          unsigned int replay_input_mask,
                          unsigned int physical_input_mask,
                          const VineDecor *vines, int vine_count,
@@ -57,8 +56,6 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
     const int physical_jump = (physical_input_mask & PLAYER_INPUT_JUMP) != 0;
     const int physical_run = (physical_input_mask & PLAYER_INPUT_RUN) != 0;
     int jump_down = (physical_jump || replay_jump) ? 1 : 0;
-
-    (void)ctrl;
 
     /*
      * Vine grab — if the player is not already climbing and presses UP

@@ -1,5 +1,5 @@
 /*
- * game_events.h — SDL event handling for the game loop.
+ * game_events.h — Semantic input handling for the game loop.
  */
 
 #pragma once

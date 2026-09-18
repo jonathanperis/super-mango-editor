@@ -20,7 +20,7 @@ Outputs:
     - Per-row frame transparency map (which frames are blank/used)
     - Per-frame art bounding box (the tight crop around visible pixels)
     - Suggested hitbox constants (ART_X, ART_Y, ART_W, ART_H or PAD style)
-    - SDL_Rect C snippets for frame access and hitbox computation
+    - IntRect C snippets for frame access and hitbox computation
 """
 
 import sys
@@ -516,8 +516,8 @@ def analyze(path, frame_w=None, frame_h=None):
               f"    /* height of visible art */")
         print()
         print("  /* Hitbox using ART offset style (matches debug.c convention): */")
-        print(f"  SDL_Rect hitbox_get(const Entity *e) {{")
-        print(f"      return (SDL_Rect){{")
+        print(f"  IntRect hitbox_get(const Entity *e) {{")
+        print(f"      return (IntRect){{")
         print(f"          .x = (int)e->x + {prefix}_ART_X,")
         print(f"          .y = (int)e->y + {prefix}_ART_Y,")
         print(f"          .w = {prefix}_ART_W,")
@@ -540,8 +540,8 @@ def analyze(path, frame_w=None, frame_h=None):
               f"    /* top inset           */")
         print()
         print(f"  /* Resulting hitbox: {rw} x {rh} px */")
-        print(f"  SDL_Rect hitbox_get(const Entity *e) {{")
-        print(f"      return (SDL_Rect){{")
+        print(f"  IntRect hitbox_get(const Entity *e) {{")
+        print(f"      return (IntRect){{")
         print(f"          .x = (int)e->x + {prefix}_HITBOX_PAD_X,")
         print(f"          .y = (int)e->y + {prefix}_HITBOX_PAD_Y,")
         print(f"          .w = {prefix}_FRAME_W - 2 * {prefix}_HITBOX_PAD_X,")
@@ -551,15 +551,15 @@ def analyze(path, frame_w=None, frame_h=None):
 
     print()
 
-    # ── SDL_Rect source rect snippet ────────────────────────────────
+    # ── IntRect source rect snippet ─────────────────────────────────
     print("-" * 60)
-    print("  SDL_Rect C Snippets")
+    print("  IntRect C Snippets (include shared/geometry.h)")
     print("-" * 60)
     print()
     print("  /* Source rect for frame (col, row): */")
     print(f"  #define FRAME_W  {fw}")
     print(f"  #define FRAME_H  {fh}")
-    print(f"  SDL_Rect src = {{")
+    print(f"  IntRect src = {{")
     print(f"      .x = col * FRAME_W,")
     print(f"      .y = row * FRAME_H,")
     print(f"      .w = FRAME_W,")

@@ -10,7 +10,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 #define MAX_VINES   24              /* upper bound on decoration instances   */
 #define VINE_W      16              /* sprite width  (natural size)          */
@@ -50,6 +50,5 @@ void vine_init(VineDecor *vines, int *count);
 
 /* Blit every vine with world-to-screen camera offset applied. */
 void vine_render(const VineDecor *vines, int count,
-                 SDL_Renderer *renderer,
-                 SDL_Texture *green_tex, SDL_Texture *brown_tex,
+                 Texture2D *green_tex, Texture2D *brown_tex,
                  int cam_x);

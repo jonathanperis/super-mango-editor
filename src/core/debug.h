@@ -11,8 +11,7 @@
  */
 #pragma once
 
-#include <SDL.h>       /* SDL_Renderer, Uint64 */
-#include <SDL_ttf.h>   /* TTF_Font             */
+#include "../shared/text.h"
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -60,7 +59,7 @@ typedef struct {
  */
 typedef struct {
     /* FPS measurement */
-    Uint64 fps_prev_ticks;    /* SDL_GetTicks64 value at the last sample  */
+    uint64_t fps_prev_ticks;  /* monotonic milliseconds at the last sample */
     int    fps_frame_count;   /* frames rendered since the last sample    */
     int    fps_display;       /* the FPS number currently shown on screen */
 
@@ -104,11 +103,10 @@ void debug_log(DebugOverlay *dbg, const char *fmt, ...);
  * debug_render — Draw all debug overlays on top of everything else.
  *
  * Draws collision boxes, the FPS counter, and the event log.
- *   font     — the TTF_Font from Hud (borrowed, not owned).
- *   renderer — the SDL renderer.
+ *   font     — the TextFont from Hud (borrowed, not owned).
  *   gs_ptr   — opaque pointer to GameState (cast inside debug.c to
  *              break the circular include between debug.h and game.h).
  *   cam_x    — current camera offset for world-to-screen conversion.
  */
-void debug_render(const DebugOverlay *dbg, TTF_Font *font,
-                  SDL_Renderer *renderer, const void *gs_ptr, int cam_x);
+void debug_render(const DebugOverlay *dbg, TextFont *font,
+                  const void *gs_ptr, int cam_x);

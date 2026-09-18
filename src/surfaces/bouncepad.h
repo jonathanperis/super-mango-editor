@@ -13,7 +13,7 @@
  */
 #pragma once
 
-#include <SDL.h>   /* SDL_Renderer, SDL_Texture, SDL_Rect */
+#include "../shared/graphics.h"
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -33,7 +33,7 @@
  * BOUNCEPAD_VY_MEDIUM : standard launch — clears 2-tile pillars comfortably.
  * BOUNCEPAD_VY_HIGH   : powerful launch — clears 3-tile pillars with margin.
  *
- * Negative because SDL's Y axis increases downward (up = negative vy).
+ * Negative because screen Y increases downward (up = negative vy).
  */
 #define BOUNCEPAD_VY_SMALL   -380.0f
 #define BOUNCEPAD_VY_MEDIUM  -536.25f
@@ -97,7 +97,7 @@ typedef enum {
  * Bouncepad — all data needed for one bouncepad instance.
  *
  * Positions use float for consistency with the rest of the physics system;
- * they are cast to int at render time when building SDL_Rect.
+ * they are cast to int at render time when building IntRect.
  */
 typedef struct {
     float        x;             /* left edge in world-space logical pixels   */
@@ -106,7 +106,7 @@ typedef struct {
     int          h;             /* display height (BOUNCEPAD_H = 48 px)      */
     BounceState  state;         /* IDLE or ACTIVE                            */
     int          anim_frame;    /* current displayed frame index (0, 1, or 2)*/
-    Uint32       anim_timer_ms; /* ms accumulated in the current anim frame  */
+    uint32_t     anim_timer_ms; /* ms accumulated in the current anim frame */
     float        launch_vy;     /* upward impulse applied to player on land  */
     BouncepadType pad_type;     /* GREEN / WOOD / RED — selects texture      */
 } Bouncepad;
@@ -135,8 +135,8 @@ void bouncepad_place(Bouncepad *pad, float x, float launch_vy, BouncepadType pad
  * Advance the release animation for every ACTIVE pad.
  * dt_ms is delta time converted to milliseconds (dt * 1000).
  */
-void bouncepads_update(Bouncepad *pads, int count, Uint32 dt_ms);
+void bouncepads_update(Bouncepad *pads, int count, uint32_t dt_ms);
 
 /* Draw each bouncepad at its current animation frame, offset by cam_x. */
 void bouncepads_render(const Bouncepad *pads, int count,
-                       SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                       Texture2D *tex, int cam_x);

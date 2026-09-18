@@ -9,7 +9,6 @@
  * one ends.
  */
 
-#include <SDL_image.h>  /* IMG_LoadTexture                  */
 #include <stdio.h>
 #include "../core/game_random.h"
 
@@ -118,7 +117,7 @@ static void fog_spawn(FogSystem *fog) {
  * If count is 0, no textures are loaded and no fog waves will spawn —
  * fog_update and fog_render become safe no-ops.
  */
-void fog_init(FogSystem *fog, SDL_Renderer *renderer,
+void fog_init(FogSystem *fog,
               const char (*paths)[64], int count)
 {
     /*
@@ -144,22 +143,16 @@ void fog_init(FogSystem *fog, SDL_Renderer *renderer,
 
     for (int i = 0; i < count; i++) {
         /*
-         * IMG_LoadTexture — decode the PNG and upload it to GPU memory.
+         * Decode the PNG and upload it to GPU memory.
          * Returns NULL on failure (file not found, corrupt PNG, etc.).
          */
-        fog->textures[i] = IMG_LoadTexture(renderer, paths[i]);
+        fog->textures[i] = texture_load(paths[i]);
         if (!fog->textures[i]) {
-            fprintf(stderr, "Warning: fog layer %s not loaded: %s\n",
-                    paths[i], IMG_GetError());
+            fprintf(stderr, "Warning: fog layer %s not loaded\n", paths[i]);
             continue;
         }
 
-        /*
-         * SDL_BLENDMODE_BLEND — enable alpha blending for this texture.
-         * Without this mode, SDL_SetTextureAlphaMod has no visible effect:
-         * the texture would always render as fully opaque.
-         */
-        SDL_SetTextureBlendMode(fog->textures[i], SDL_BLENDMODE_BLEND);
+        /* Alpha blending is selected by the frame owner. */
     }
 
     /* Spawn the very first fog wave so the effect starts immediately */
@@ -237,12 +230,12 @@ void fog_update(FogSystem *fog, float dt) {
  *   FOG_FADE_TIME .. (d-fade)  → alpha stays at FOG_ALPHA_MAX   (full)
  *   (d-fade) .. d              → alpha ramps FOG_ALPHA_MAX → 0  (fade out)
  */
-void fog_render(FogSystem *fog, SDL_Renderer *renderer) {
+void fog_render(FogSystem *fog) {
     for (int i = 0; i < FOG_MAX; i++) {
         FogInstance *inst = &fog->instances[i];
         if (!inst->active) continue;
 
-        SDL_Texture *tex = fog->textures[inst->tex_index];
+        Texture2D *tex = fog->textures[inst->tex_index];
         if (!tex) continue;   /* asset failed to load — skip silently */
 
         /* Fade window in seconds: 40% of this instance's total duration */
@@ -263,14 +256,8 @@ void fog_render(FogSystem *fog, SDL_Renderer *renderer) {
             alpha_f = (float)FOG_ALPHA_MAX;
         }
 
-        /*
-         * SDL_SetTextureAlphaMod — multiply every pixel's alpha by this value.
-         *   255 → no change (fully opaque)
-         *   128 → 50% transparent
-         *     0 → fully transparent
-         * The cast to Uint8 safely clamps the value to the 0..255 range.
-         */
-        SDL_SetTextureAlphaMod(tex, (Uint8)alpha_f);
+        /* Per-draw tint leaves the shared texture unchanged. */
+        Color tint = {255, 255, 255, (unsigned char)alpha_f};
 
         /*
          * Draw the fog texture at its current horizontal offset.
@@ -278,13 +265,13 @@ void fog_render(FogSystem *fog, SDL_Renderer *renderer) {
          * screen; only a GAME_W-wide interior strip is ever visible at once.
          * Height fills the full canvas.
          */
-        SDL_Rect dst = {
+        IntRect dst = {
             .x = (int)inst->x,
             .y = 0,
             .w = FOG_W,
             .h = GAME_H,
         };
-        SDL_RenderCopy(renderer, tex, NULL, &dst);
+        sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, tint);
     }
 }
 
@@ -295,12 +282,12 @@ void fog_render(FogSystem *fog, SDL_Renderer *renderer) {
  *
  * Must be called before the renderer is destroyed. Setting each pointer
  * to NULL after freeing makes accidental double-frees safe, because
- * SDL_DestroyTexture(NULL) is a documented no-op.
+ * texture_unload(NULL) is a no-op.
  */
 void fog_cleanup(FogSystem *fog) {
     for (int i = 0; i < fog->tex_count; i++) {
         if (fog->textures[i]) {
-            SDL_DestroyTexture(fog->textures[i]);
+            texture_unload(fog->textures[i]);
             fog->textures[i] = NULL;
         }
     }

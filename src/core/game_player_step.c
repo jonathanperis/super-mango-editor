@@ -21,7 +21,7 @@ int game_player_step(GameState *gs, float dt)
 
     unsigned int input = gs->replay_input_mask | game_web_input_take_touch_mask() | game_input_sample(gs);
     input = game_experiment_input(gs, dt, input);
-    player_handle_input(&gs->player, gs->audio.jump, gs->controller,
+    player_handle_input(&gs->player, gs->audio.jump,
                         input, 0,
                         gs->vines, gs->vine_count,
                         gs->ladders, gs->ladder_count,

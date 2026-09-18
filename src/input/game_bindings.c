@@ -1,19 +1,23 @@
 #include "../core/game_profile.h"
 
-int game_settings_key_allowed(SDL_Scancode key)
+int game_settings_key_allowed(int key)
 {
-    if (key <= SDL_SCANCODE_UNKNOWN || key >= SDL_NUM_SCANCODES || !SDL_GetScancodeName(key)[0]) return 0;
-    return key != SDL_SCANCODE_ESCAPE && key != SDL_SCANCODE_F1 && key != SDL_SCANCODE_TAB &&
-           key != SDL_SCANCODE_RETURN && key != SDL_SCANCODE_KP_ENTER &&
-           key != SDL_SCANCODE_LEFT && key != SDL_SCANCODE_RIGHT &&
-           key != SDL_SCANCODE_UP && key != SDL_SCANCODE_DOWN && key != SDL_SCANCODE_RSHIFT;
+    if (!input_binding_known(key)) return 0;
+    return key != 41 && key != 58 && key != 43 && key != 40 && key != 88 &&
+           key != 80 && key != 79 && key != 82 && key != 81 && key != 229;
 }
 
-int game_settings_button_allowed(SDL_GameControllerButton button)
+int game_settings_button_allowed(int button)
 {
-    return button >= 0 && button < SDL_CONTROLLER_BUTTON_MAX &&
-           button != SDL_CONTROLLER_BUTTON_BACK && button != SDL_CONTROLLER_BUTTON_START &&
-           button != SDL_CONTROLLER_BUTTON_GUIDE && button != SDL_CONTROLLER_BUTTON_B;
+    return button >= 0 && button < PAD_COUNT && button != PAD_BACK &&
+           button != PAD_START && button != PAD_GUIDE && button != PAD_B;
+}
+
+int game_settings_has_unavailable_binding(const GameSettings *settings)
+{
+    for (int i = 0; i < PROFILE_ACTION_COUNT; i++)
+        if (!input_key_from_binding(settings->keys[i]) || !input_pad_button(settings->buttons[i])) return 1;
+    return 0;
 }
 
 int game_settings_valid(const GameSettings *s)

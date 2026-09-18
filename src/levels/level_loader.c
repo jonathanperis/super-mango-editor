@@ -11,7 +11,6 @@
  */
 
 #include "../core/game_random.h"
-#include <SDL_image.h> /* IMG_LoadTexture, IMG_GetError */
 #include <stdio.h>     /* fprintf, stderr */
 /* string.h no longer needed — foreground detection is count-based */
 
@@ -100,7 +99,7 @@ static void load_platforms(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < gs->platform_count; i++) {
         if (gs->platforms[i].tex) {
-            SDL_DestroyTexture(gs->platforms[i].tex);
+            texture_unload(gs->platforms[i].tex);
             gs->platforms[i].tex = NULL;
         }
     }
@@ -116,10 +115,10 @@ static void load_platforms(GameState *gs, const LevelDef *def)
 
         /* Load per-platform tileset texture if specified */
         if (p->tile_path[0] != '\0') {
-            gs->platforms[i].tex = IMG_LoadTexture(gs->renderer, p->tile_path);
+            gs->platforms[i].tex = texture_load(p->tile_path);
             if (!gs->platforms[i].tex) {
                 fprintf(stderr, "Warning: Failed to load platform tile %s: %s\n",
-                        p->tile_path, IMG_GetError());
+                        p->tile_path, "texture unavailable");
             }
         }
     }

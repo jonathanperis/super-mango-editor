@@ -4,8 +4,6 @@
 
 #include "level_resources.h"
 
-#include <SDL_image.h>
-#include <SDL_mixer.h>
 #include <stdio.h>
 
 #include "../effects/fog.h"
@@ -24,28 +22,26 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
 
         if (n > MAX_BACKGROUND_LAYERS) n = MAX_BACKGROUND_LAYERS;
         for (int i = 0; i < n; i++) {
-            SDL_strlcpy(paths[i], def->background_layers[i].path, 64);
+            str_copy(paths[i], def->background_layers[i].path, 64);
             speeds[i] = def->background_layers[i].speed;
         }
-        parallax_init_from_def(&gs->parallax, gs->renderer,
+        parallax_init_from_def(&gs->parallax,
                                (const char (*)[64])paths, speeds, n);
     } else {
-        parallax_init(&gs->parallax, gs->renderer);
+        parallax_init(&gs->parallax);
     }
 
     {
         const char *floor_path = def->floor_tile_path[0] != '\0'
                                ? def->floor_tile_path
                                : "assets/sprites/levels/grass_tileset.png";
-        SDL_Texture *new_floor = IMG_LoadTexture(gs->renderer, floor_path);
+        Texture2D *new_floor = texture_load(floor_path);
         if (!new_floor) {
-            fprintf(stderr, "Warning: failed to load floor tile %s: %s\n",
-                    floor_path, IMG_GetError());
-            new_floor = IMG_LoadTexture(gs->renderer,
-                                        "assets/sprites/levels/grass_tileset.png");
+            fprintf(stderr, "Warning: failed to load floor tile %s\n", floor_path);
+            new_floor = texture_load("assets/sprites/levels/grass_tileset.png");
         }
         if (new_floor) {
-            if (gs->textures.floor_tile) SDL_DestroyTexture(gs->textures.floor_tile);
+            texture_unload(gs->textures.floor_tile);
             gs->textures.floor_tile = new_floor;
         }
     }
@@ -59,7 +55,7 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
                 def->foreground_layers[n - 1].path;
             if (level_strip[0] != '\0') strip = level_strip;
         }
-        water_reload_texture(&gs->water, gs->renderer, strip);
+        water_reload_texture(&gs->water, strip);
     }
 
     fog_cleanup(&gs->fog);
@@ -69,24 +65,22 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
 
         if (n > MAX_FOG_TEXTURES) n = MAX_FOG_TEXTURES;
         for (int i = 0; i < n; i++) {
-            SDL_strlcpy(fog_paths[i], def->fog_layers[i].path, 64);
+            str_copy(fog_paths[i], def->fog_layers[i].path, 64);
         }
-        fog_init(&gs->fog, gs->renderer, (const char (*)[64])fog_paths, n);
+        fog_init(&gs->fog, (const char (*)[64])fog_paths, n);
     }
 
     if (gs->audio.music) {
-        Mix_HaltMusic();
-        Mix_FreeMusic(gs->audio.music);
+        music_unload(gs->audio.music);
         gs->audio.music = NULL;
     }
     if (def->music_path[0] != '\0') {
-        gs->audio.music = Mix_LoadMUS(def->music_path);
+        gs->audio.music = music_load(def->music_path);
         if (!gs->audio.music) {
-            fprintf(stderr, "Warning: failed to load %s: %s\n",
-                    def->music_path, Mix_GetError());
+            fprintf(stderr, "Warning: failed to load %s\n", def->music_path);
         } else {
-            Mix_PlayMusic(gs->audio.music, -1);
-            Mix_VolumeMusic(def->music_volume); /* zero is an authored mute */
+            music_play(gs->audio.music);
+            music_set_volume(def->music_volume); /* zero is an authored mute */
         }
     }
 }

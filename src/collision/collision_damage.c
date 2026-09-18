@@ -12,7 +12,7 @@
 #include "../core/game_checkpoint.h"
 #include "../hazards/spike.h"  /* SPIKE_PUSH_SPEED, SPIKE_PUSH_VY */
 
-#include <SDL_mixer.h>  /* Mix_PlayChannel */
+#include "../shared/audio.h"
 #include <math.h>       /* sqrtf */
 
 void game_restart_after_game_over(GameState *gs)
@@ -61,7 +61,7 @@ void apply_damage(GameState *gs, int amount, int push,
     (void)src_cy;   /* reserved for future vertical-push logic */
 
     gs->player.hurt_timer = 1.5f;
-    if (gs->audio.hit) Mix_PlayChannel(-1, gs->audio.hit, 0);
+    sound_play(gs->audio.hit, 128);
 
     gs->hearts -= amount;
     if (gs->hearts <= 0) {
@@ -82,6 +82,6 @@ void apply_damage(GameState *gs, int amount, int push,
         }
         reset_current_level(gs, &gs->loop.fp_prev_riding);
         game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_RESPAWN,
-                                      SDL_GetTicks(), 900);
+                                      (uint32_t)clock_millis(), 900);
     }
 }

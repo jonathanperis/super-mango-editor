@@ -33,7 +33,7 @@
  *   is moving downward (vy >= 0) and their bottom edge crosses the platform
  *   top surface this frame (crossing test prevents tunnelling at high speed).
  */
-void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
+void player_update(Player *player, float dt, SoundEffect *snd_jump,
                    const Platform *platforms, int platform_count,
                    const FloatPlatform *float_platforms, int float_platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
@@ -140,5 +140,5 @@ void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
      * Advance the sprite animation based on the resolved physics state.
      * Convert dt (seconds) to milliseconds for the frame timer.
      */
-    player_animate(player, (Uint32)(dt * 1000.0f));
+    player_animate(player, (uint32_t)(dt * 1000.0f));
 }

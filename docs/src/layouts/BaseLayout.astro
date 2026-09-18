@@ -10,7 +10,7 @@ interface Props {
 
 const {
     title = "Super Mango — Platformer, Level Editor & Sandbox School",
-    description = "Play a C11 + SDL2 platformer in your browser, build TOML worlds with the native visual editor, and learn game development through Sandbox School.",
+    description = "Play a C11 + raylib platformer in your browser, build TOML worlds with the native visual editor, and learn game development through Sandbox School.",
     pageType = 'game',
 } = Astro.props;
 
@@ -55,7 +55,7 @@ const jsonLd = pageType === 'docs' ? {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#0f0e17" />
         <meta name="description" content={description} />
-        <meta name="keywords" content="Super Mango, platformer, 2D game, pixel art, SDL2, C11, WebAssembly, indie game, side-scroller, open source, game development" />
+        <meta name="keywords" content="Super Mango, platformer, 2D game, pixel art, raylib, C11, WebAssembly, indie game, side-scroller, open source, game development" />
 
         <meta property="og:type" content="website" />
         <meta property="og:title" content={title} />

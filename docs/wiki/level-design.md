@@ -38,7 +38,7 @@ screen_count  = 4                       # world width = screen_count × 400 px
 player_start_x = 79.0                   # player spawn x in logical pixels
 player_start_y = 124.5                  # player spawn y in logical pixels
 music_path    = "assets/sounds/levels/water.wav"
-music_volume  = 13                      # SDL_mixer volume 0–128
+music_volume  = 13                      # authored volume units 0–128
 floor_tile_path = "assets/sprites/levels/grass_tileset.png"
 initial_hearts  = 3                     # starting hit points
 initial_lives   = 3                     # starting lives
@@ -53,7 +53,7 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 | `screen_count` | int | Number of 400px-wide screens. `4` → world is 1600px wide. |
 | `player_start_x/y` | float | Spawn x and foot/landing y in logical pixels; y is not the sprite's top edge. |
 | `music_path` | string | Path to a WAV file, relative to repo root. |
-| `music_volume` | int | SDL_mixer channel volume: 0 (silent) – 128 (full). |
+| `music_volume` | int | Authored music volume: 0 (silent) – 128 (full), converted to raylib's normalized volume at playback. |
 | `floor_tile_path` | string | PNG used to tile the ground. Per-level theming. |
 | `initial_hearts` | int | Starting hit points for the level. |
 | `initial_lives` | int | Starting lives for the level. |

@@ -34,48 +34,48 @@ void game_inspector_reset_physics(GameState *gs)
     level_apply_player_physics(&gs->player, gs->runtime.current_level);
 }
 
-int game_inspector_event(GameState *gs, const SDL_Event *event)
+int game_inspector_event(GameState *gs, const InputEvent *event)
 {
-    if (!gs->debug_mode || event->type != SDL_KEYDOWN || event->key.repeat ||
+    if (!gs->debug_mode || event->type != INPUT_KEY_DOWN || event->repeat ||
         (gs->settings_menu && gs->settings_menu->open)) return 0;
-    SDL_Keycode key = event->key.keysym.sym;
+    int key = event->key;
     /* Export remains available on completion/game-over screens. */
-    if (key == SDLK_F9) { game_experiment_export(gs); return 1; }
+    if (key == KEY_F9) { game_experiment_export(gs); return 1; }
     if (game_overlay_blocks_update(gs) || gs->route != GAME_ROUTE_NONE) return 0;
     switch (key) {
-    case SDLK_F2:
+    case KEY_F2:
         gs->inspector.frozen = !gs->inspector.frozen;
         gs->inspector.step_requested = 0;
         return 1;
-    case SDLK_F3:
+    case KEY_F3:
         gs->inspector.frozen = 1;
         gs->inspector.step_requested = 1;
         return 1;
-    case SDLK_F4:
+    case KEY_F4:
         if (gs->experiment && gs->experiment->replaying) {
             debug_log(&gs->debug, "Replay uses recorded step durations");
             return 1;
         }
         gs->inspector.slow_mode = (gs->inspector.slow_mode + 1) % 3;
         return 1;
-    case SDLK_F6:
+    case KEY_F6:
         gs->inspector.physics_field = (gs->inspector.physics_field + 1) % INSPECTOR_PHYSICS_COUNT;
         return 1;
-    case SDLK_F10:
+    case KEY_F10:
         gs->inspector.entity_index = (gs->inspector.entity_index + 1) %
             (1 + gs->fish_count + gs->float_platform_count + gs->circular_saw_count);
         return 1;
-    case SDLK_F7:
+    case KEY_F7:
         if (!gs->experiment || !gs->experiment->replaying) game_inspector_reset_physics(gs);
         return 1;
-    case SDLK_F8:
+    case KEY_F8:
         if (game_experiment_begin(gs)) debug_log(&gs->debug, "Cannot start experiment");
         return 1;
-    case SDLK_MINUS:
-    case SDLK_EQUALS: {
+    case KEY_MINUS:
+    case KEY_EQUAL: {
         if (gs->experiment && gs->experiment->replaying) return 1;
         float *value = (float *)((char *)&gs->player + fields[gs->inspector.physics_field].offset);
-        float next = *value + (key == SDLK_EQUALS ? 25.0f : -25.0f);
+        float next = *value + (key == KEY_EQUAL ? 25.0f : -25.0f);
         if (next >= 0 && next <= MAX_LEVEL_MOTION) *value = next;
         return 1;
     }
@@ -129,37 +129,31 @@ void game_inspector_render(GameState *gs)
         snprintf(entity, sizeof(entity), "Player ground %d climb %d hurt %.2f", gs->player.on_ground, gs->player.on_vine, gs->player.hurt_timer);
     }
     lines[5] = entity;
-    SDL_SetRenderDrawColor(gs->renderer, 8, 12, 20, 235);
-    SDL_Rect panel = {0, 28, GAME_W, 88};
-    SDL_RenderFillRect(gs->renderer, &panel);
+    DrawRectangle(0,28,GAME_W,88,(Color){8,12,20,235});
     for (int i = 0; i < 6; i++) {
         if (!gs->inspector.labels[i] || strcmp(gs->inspector.text[i], lines[i])) {
-            SDL_Surface *surface = TTF_RenderUTF8_Solid(gs->hud.font, lines[i], (SDL_Color){240,240,200,255});
-            if (!surface) continue;
-            SDL_Texture *texture = SDL_CreateTextureFromSurface(gs->renderer, surface);
+            Texture2D *texture = font_texture(gs->hud.font, lines[i], (Color){240,240,200,255});
             if (texture) {
-                SDL_DestroyTexture(gs->inspector.labels[i]);
+                texture_unload(gs->inspector.labels[i]);
                 gs->inspector.labels[i] = texture;
-                gs->inspector.width[i] = surface->w;
-                gs->inspector.height[i] = surface->h;
-                SDL_strlcpy(gs->inspector.text[i], lines[i], sizeof(gs->inspector.text[i]));
+                gs->inspector.width[i] = texture->width;
+                gs->inspector.height[i] = texture->height;
+                str_copy(gs->inspector.text[i], lines[i], sizeof(gs->inspector.text[i]));
             }
-            SDL_FreeSurface(surface);
         }
-        SDL_Rect dst = {4, 30 + 14*i, gs->inspector.width[i], gs->inspector.height[i]};
-        if (gs->inspector.labels[i]) SDL_RenderCopy(gs->renderer, gs->inspector.labels[i], NULL, &dst);
+        IntRect dst = {4, 30 + 14*i, gs->inspector.width[i], gs->inspector.height[i]};
+        sprite_draw(gs->inspector.labels[i], NULL, &dst, 0, SPRITE_NORMAL, WHITE);
     }
     /* Highlight the resolved contact surface and show the physical foot point. */
     int x = (int)(gs->player.x + gs->player.w / 2) - (int)gs->camera.x;
     int y = (int)(gs->player.y + gs->player.h - PLAYER_FLOOR_SINK);
-    SDL_SetRenderDrawColor(gs->renderer, gs->player.on_ground ? 0 : 255, 255, 255, 255);
-    SDL_RenderDrawLine(gs->renderer, x - 5, y, x + 5, y);
+    DrawLine(x-5,y,x+5,y,(Color){gs->player.on_ground ? 0 : 255,255,255,255});
 }
 
 void game_inspector_cleanup(GameState *gs)
 {
     for (int i = 0; i < 6; i++) {
-        SDL_DestroyTexture(gs->inspector.labels[i]);
+        texture_unload(gs->inspector.labels[i]);
         gs->inspector.labels[i] = NULL;
     }
 }

@@ -5,16 +5,15 @@
  */
 #include "water.h"
 #include "game.h"   /* GAME_W, GAME_H */
-#include <SDL_image.h>
 #include <stdio.h>
 
 /* ─── public API ──────────────────────────────────────────────────── */
 
-int water_init(Water *w, SDL_Renderer *renderer)
+int water_init(Water *w)
 {
-    w->texture  = IMG_LoadTexture(renderer, "assets/sprites/foregrounds/water.png");
+    w->texture = texture_load("assets/sprites/foregrounds/water.png");
     if (!w->texture) {
-        fprintf(stderr, "water_init: IMG_LoadTexture: %s\n", IMG_GetError());
+        fprintf(stderr, "water_init: cannot load assets/sprites/foregrounds/water.png\n");
         return -1;
     }
     w->scroll_x = 0.0f;
@@ -26,16 +25,16 @@ int water_init(Water *w, SDL_Renderer *renderer)
  * Used when the level's foreground layers specify lava or another strip
  * instead of the default water.  Keeps scroll state intact.
  */
-void water_reload_texture(Water *w, SDL_Renderer *renderer, const char *path)
+void water_reload_texture(Water *w, const char *path)
 {
     if (!path || path[0] == '\0') return;
 
-    SDL_Texture *new_tex = IMG_LoadTexture(renderer, path);
+    Texture2D *new_tex = texture_load(path);
     if (new_tex) {
-        if (w->texture) SDL_DestroyTexture(w->texture);
+        texture_unload(w->texture);
         w->texture = new_tex;
     } else {
-        fprintf(stderr, "water_reload_texture: %s: %s\n", path, IMG_GetError());
+        fprintf(stderr, "water_reload_texture: cannot load %s\n", path);
     }
 }
 
@@ -47,7 +46,7 @@ void water_update(Water *w, float dt)
         w->scroll_x -= (float)WATER_PERIOD;
 }
 
-void water_render(const Water *w, SDL_Renderer *renderer)
+void water_render(const Water *w)
 {
     /*
      * Each frame in Water.png has its 16-px art at x=16..31 inside a 48-px
@@ -69,14 +68,14 @@ void water_render(const Water *w, SDL_Renderer *renderer)
             if (dest_x + WATER_ART_W <= 0) continue;   /* off left edge   */
             if (dest_x >= GAME_W)          break;       /* off right edge  */
 
-            SDL_Rect src = {
+            IntRect src = {
                 f * WATER_FRAME_W + WATER_ART_DX,
                 WATER_ART_Y,
                 WATER_ART_W,
                 WATER_ART_H
             };
-            SDL_Rect dst = { dest_x, dest_y, WATER_ART_W, WATER_ART_H };
-            SDL_RenderCopy(renderer, w->texture, &src, &dst);
+            IntRect dst = { dest_x, dest_y, WATER_ART_W, WATER_ART_H };
+            sprite_draw(w->texture, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }
         pattern_x += period;
     }
@@ -85,7 +84,7 @@ void water_render(const Water *w, SDL_Renderer *renderer)
 void water_cleanup(Water *w)
 {
     if (w->texture) {
-        SDL_DestroyTexture(w->texture);
+        texture_unload(w->texture);
         w->texture = NULL;
     }
 }

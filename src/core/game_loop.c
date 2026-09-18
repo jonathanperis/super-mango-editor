@@ -18,12 +18,10 @@
 /* Execute one frame. AppSession is the only cross-platform loop owner. */
 int game_frame(GameState *gs)
 {
-    const Uint32 frame_ms = 1000 / TARGET_FPS;
-    Uint64 frame_start_ticks = 0;
+    uint64_t frame_start_ticks = 0;
     float dt = game_timing_step(gs, &frame_start_ticks);
 
-    /* AppSession publishes readiness; game code only discovers an open handle. */
-    if (!gs->controller_init_pending) gamepad_refresh_controller(gs);
+    gamepad_refresh_controller(gs);
 
     /* ---- 1. Events ----------------------------------------------- */
     game_replay_inject_events(gs);
@@ -52,7 +50,6 @@ int game_frame(GameState *gs)
     /* ---- 3. Render ----------------------------------------------- */
     int presented = game_render_frame(gs, cam_x, dt);
 
-    if (gs->smoke_test_frames == 0) game_timing_cap_frame(frame_start_ticks, frame_ms);
     game_timing_tick_smoke(gs);
     return presented;
 }
@@ -63,9 +60,11 @@ int game_frame(GameState *gs)
  */
 void game_loop(GameState *gs)
 {
-    gs->loop.prev_ticks = SDL_GetTicks64();
+    gs->loop.prev_ticks = clock_millis();
     gs->loop.fp_prev_riding = -1;
     while (gs->running && gs->route == GAME_ROUTE_NONE) {
+        input_collect();
+        music_update();
         game_frame(gs);
     }
 }

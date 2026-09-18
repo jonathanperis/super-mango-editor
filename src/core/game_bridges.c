@@ -7,13 +7,13 @@
 #include "../player/player.h"
 
 static int game_bridge_find_landing(const GameState *gs, float player_cx,
-                                    const SDL_Rect *player_hitbox)
+                                    const IntRect *player_hitbox)
 {
     int player_bottom = player_hitbox->y + player_hitbox->h;
 
     for (int i = 0; i < gs->bridge_count; i++) {
         const Bridge *br = &gs->bridges[i];
-        SDL_Rect brect = bridge_get_rect(br);
+        IntRect brect = bridge_get_rect(br);
 
         if (player_bottom >= brect.y && player_bottom <= brect.y + 4 &&
             player_hitbox->x + player_hitbox->w > brect.x &&
@@ -48,7 +48,7 @@ void game_bridges_update(GameState *gs, float dt)
     int bridge_landed_idx = -1;
 
     if (gs->player.on_ground) {
-        SDL_Rect player_hitbox = player_get_hitbox(&gs->player);
+        IntRect player_hitbox = player_get_hitbox(&gs->player);
         bridge_landed_idx = game_bridge_find_landing(gs, player_cx,
                                                      &player_hitbox);
     }

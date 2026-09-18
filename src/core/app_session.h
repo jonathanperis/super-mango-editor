@@ -31,26 +31,14 @@ typedef enum {
     APP_SESSION_EVENT_RUNTIME_CLEANED,
     APP_SESSION_EVENT_SESSION_FREED,
     APP_SESSION_EVENT_RELOAD_REQUESTED,
-    APP_SESSION_EVENT_CONTROLLER_SUBSYSTEM_READY,
-    APP_SESSION_EVENT_CONTROLLER_SUBSYSTEM_FAILED,
-    APP_SESSION_EVENT_CONTROLLER_SUBSYSTEM_CLOSED,
     APP_SESSION_EVENT_WEB_INPUT_REPAIRED
 } AppSessionLifecycleEvent;
-
-typedef enum {
-    APP_CONTROLLER_INIT_IDLE = 0,
-    APP_CONTROLLER_INIT_PENDING,
-    APP_CONTROLLER_INIT_RUNNING,
-    APP_CONTROLLER_INIT_READY,
-    APP_CONTROLLER_INIT_FAILED
-} AppControllerInitState;
 
 typedef int (*AppSessionReplayStoreFn)(const char *level_path, void *userdata);
 typedef void (*AppSessionReloadFn)(const char *level_path, void *userdata);
 typedef void (*AppSessionLifecycleFn)(AppSessionLifecycleEvent event,
                                       const char *level_path,
                                       void *userdata);
-typedef int (*AppSessionControllerInitFn)(void *userdata);
 
 typedef struct {
     AppSessionReplayStoreFn store_replay;
@@ -58,7 +46,6 @@ typedef struct {
     AppSessionLifecycleFn lifecycle;
     void *userdata;
     int force_callback_mode; /* narrow native lifecycle-test seam */
-    AppSessionControllerInitFn controller_init; /* non-SDL deferred worker-test seam */
 } AppSessionHooks;
 
 typedef struct {
@@ -97,26 +84,15 @@ typedef struct AppSession {
     int callback_cancelled;
     int callback_registration_count;
     int callback_cancellation_count;
-    AppControllerInitState controller_init_state;
-    SDL_Thread *controller_init_thread;
-    SDL_atomic_t controller_init_done;
-    SDL_atomic_t controller_init_result;
-    int controller_init_schedule_count;
-    int controller_init_join_count;
-    int controller_init_failure_count;
-    int controller_subsystem_ready_count;
-    int controller_subsystem_closed_count;
     int web_input_repair_count;
     int menu_presented_count;
     int game_presented_count;
     int game_open_count;
-    SDL_atomic_t game_open_in_progress;
     int browser_reload_requested;
     int replay_storage_attempts;
     int replay_storage_successes;
     int debug_mode;
     int smoke_test_frames;
-    int controller_subsystem_owned;
     AppSessionHooks hooks;
     char status_message[160];
     char replay_script_path[256];

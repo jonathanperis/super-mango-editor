@@ -8,5 +8,5 @@
 /* Load all editor preview textures from assets/. Missing textures are non-fatal. */
 void editor_textures_load(EditorState *es);
 
-/* Destroy every SDL_Texture owned by EditorState::textures. */
+/* Unload every raylib texture slot owned by EditorState::textures. */
 void editor_textures_cleanup(EditorState *es);

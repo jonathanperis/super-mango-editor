@@ -58,24 +58,35 @@ jobs:
           persist-credentials: false
 
       # ── Linux dependency install ────────────────────────────────────────────
-      # apt packages: build tools + SDL2 and all companion library dev headers.
+      # Build the pinned raylib source against GLFW/OpenGL system interfaces.
       - name: Install dependencies (Linux)
         if: matrix.target == 'native' && runner.os == 'Linux'
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y clang \
-            libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-mixer-dev
+          sudo apt-get install -y clang cmake libgl1-mesa-dev libx11-dev \
+            libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            xvfb libgl1-mesa-dri pulseaudio zenity
+
+      - name: Start rendered-test display and audio (Linux)
+        if: matrix.target == 'native' && runner.os == 'Linux'
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          echo "LIBGL_ALWAYS_SOFTWARE=1" >> "$GITHUB_ENV"
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=mango
+          pactl set-default-sink mango
 
       # ── macOS dependency install ────────────────────────────────────────────
       # Homebrew is pre-installed on macOS GitHub runners.
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
-        run: brew install sdl2 sdl2_image sdl2_ttf sdl2_mixer
+        run: cmake --version
 
       # ── Windows dependency install ──────────────────────────────────────────
       # MSYS2 is pre-installed on windows-latest runners. We use the
       # msys2/setup-msys2 action to configure the UCRT64 environment and
-      # install MinGW-w64 gcc, make, and all SDL2 companion packages.
+      # install MinGW-w64 gcc and the pinned-source build tools.
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
@@ -84,7 +95,7 @@ jobs:
           update: true
           path-type: inherit
 
-      - name: Download Windows toolchain and SDL packages
+      - name: Download Windows toolchain and build tools
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
@@ -92,15 +103,13 @@ jobs:
           # without bypassing package signatures or swallowing final failure.
           for attempt in 1 2 3; do
             if pacman --noconfirm -S --needed make mingw-w64-ucrt-x86_64-gcc \
-              mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-SDL2 \
-              mingw-w64-ucrt-x86_64-SDL2_image mingw-w64-ucrt-x86_64-SDL2_ttf \
-              mingw-w64-ucrt-x86_64-SDL2_mixer; then exit 0; fi
+              mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-cmake \
+              mingw-w64-ucrt-x86_64-make; then exit 0; fi
           done
           exit 1
 
       # ── Emscripten SDK install (WebAssembly) ────────────────────────────────
-      # Provides emcc, the C-to-WebAssembly compiler. SDL2 ports are compiled
-      # from source by Emscripten automatically via -s USE_SDL=2 flags.
+      # The same emcc toolchain builds raylib's Web backend and the application.
       - name: Install Emscripten SDK
         if: matrix.target == 'wasm'
         uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
@@ -122,18 +131,21 @@ jobs:
         if: matrix.target == 'native' && runner.os != 'Windows'
         run: make
 
-      - name: Test (Linux / macOS)
-        if: matrix.target == 'native' && runner.os != 'Windows'
+      - name: Desktop tests (Linux virtual display)
+        if: matrix.target == 'native' && runner.os == 'Linux'
         run: make test
+
+      - name: Software-rendered tests (macOS)
+        if: runner.os == 'macOS'
+        run: make test OUTDIR=out/headless RAYLIB_PLATFORM=memory
 
       - name: Diagnose macOS native test failure
         if: failure() && runner.os == 'macOS'
         continue-on-error: true
         timeout-minutes: 2
         env:
-          SDL_VIDEODRIVER: dummy
-          SDL_AUDIODRIVER: dummy
-        run: lldb --batch -o run -k "thread backtrace all" -- out/session-test
+          MANGO_TEST_WINDOW: '1'
+        run: lldb --batch -o run -k "thread backtrace all" -- out/headless/session-test
 
       - name: Sanitizer tests (Linux)
         if: matrix.target == 'native' && runner.os == 'Linux'
@@ -147,44 +159,40 @@ jobs:
         if: matrix.target == 'native' && runner.os != 'Windows'
         run: make editor
 
-      - name: Smoke test (Linux / macOS)
-        if: matrix.target == 'native' && runner.os != 'Windows'
-        env:
-          SDL_VIDEODRIVER: dummy
-          SDL_AUDIODRIVER: dummy
+      - name: Desktop smoke (Linux virtual display)
+        if: matrix.target == 'native' && runner.os == 'Linux'
         run: make smoke SMOKE_FRAMES=5 SMOKE_SEED=1
+
+      - name: Software-rendered smoke (macOS)
+        if: runner.os == 'macOS'
+        run: make smoke OUTDIR=out/headless RAYLIB_PLATFORM=memory SMOKE_FRAMES=5 SMOKE_SEED=1
 
       - name: Scripted smoke scenarios (Linux)
         if: matrix.target == 'native' && runner.os == 'Linux'
-        env:
-          SDL_VIDEODRIVER: dummy
-          SDL_AUDIODRIVER: dummy
         run: make scripted-smoke SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
 
       # ── Compile (Windows) ───────────────────────────────────────────────────
-      # The msys2 shell is required so the UCRT64 toolchain and sdl2-config
-      # are on PATH. We pass CC=gcc and override the output name to include
-      # the .exe extension.
+      # The msys2 shell keeps the UCRT64 compiler/CMake/MinGW make on PATH.
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make CC=gcc
 
-      - name: Test (Windows)
+      - name: Software-rendered tests (Windows)
         if: runner.os == 'Windows'
         timeout-minutes: 3
         shell: msys2 {0}
-        run: make test CC=gcc
+        run: make test CC=gcc OUTDIR=out/headless RAYLIB_PLATFORM=memory
 
       - name: Build editor (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make editor CC=gcc
 
-      - name: Smoke test (Windows)
+      - name: Software-rendered smoke (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make smoke CC=gcc SMOKE_FRAMES=5 SMOKE_SEED=1
+        run: make smoke CC=gcc OUTDIR=out/headless RAYLIB_PLATFORM=memory SMOKE_FRAMES=5 SMOKE_SEED=1
 
       # ── Compile (WebAssembly) ───────────────────────────────────────────────
       # Uses the 'web' Makefile target with emcc. Assets are bundled into
@@ -299,10 +307,10 @@ jobs:
             |-----------------|---------------------------------------|------------------------------------|
             | Linux x86_64    | `super-mango-linux-x86_64.zip`        | Extract zip and run `./super-mango` |
             | macOS arm64     | `super-mango-macos-arm64.zip`         | Extract zip and run `./super-mango` |
-            | Windows x86_64  | `super-mango-windows-x86_64.zip`      | Extract zip; SDL2 DLLs are included |
+            | Windows x86_64  | `super-mango-windows-x86_64.zip`      | Extract zip; required toolchain DLLs are included |
             | WebAssembly     | `super-mango-wasm.zip`                | Serve with any HTTP server          |
 
-            Native builder archives include the game and editor, playable `assets/`, campaign/lab `levels/`, project and third-party notices, and a short README. Run from the extracted folder. Linux/macOS require compatible SDL2 runtimes; Linux dialogs need zenity. Windows bundles runtime DLLs and available package notices. Reserve assets are excluded; WebAssembly uses the verified `.data` payloads.
+            Native builder archives include the game and editor, playable `assets/`, campaign/lab `levels/`, project and third-party notices, and a short README. Run from the extracted folder. raylib is linked statically; native OS graphics/audio support is required, and Linux dialogs need zenity. Windows bundles required non-system runtime DLLs and their package notices. Reserve assets are excluded; WebAssembly uses the verified `.data` payloads.
           files: |
             dist/linux/super-mango-linux-x86_64.zip
             dist/macos/super-mango-macos-arm64.zip

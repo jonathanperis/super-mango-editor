@@ -10,7 +10,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 /* ---- Constants ---------------------------------------------------------- */
 
@@ -72,10 +72,10 @@ void bridges_update(Bridge *bridges, int count, float dt,
                     int landed_idx, float player_cx);
 
 void bridges_render(const Bridge *bridges, int count,
-                    SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                    Texture2D *tex, int cam_x);
 
 /* Return the world-space bounding rectangle (full bridge, for debug). */
-SDL_Rect bridge_get_rect(const Bridge *b);
+IntRect bridge_get_rect(const Bridge *b);
 
 /*
  * bridge_brick_active_at — Return 1 if the bridge has an active (not fallen)

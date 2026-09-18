@@ -3,8 +3,8 @@
  */
 #pragma once
 
-#include <SDL.h>
-#include <SDL_mixer.h>
+#include "../shared/graphics.h"
+#include "../shared/audio.h"
 
 typedef enum {
     BIRD_VARIANT_REGULAR = 0,
@@ -19,7 +19,7 @@ typedef struct {
     int    art_y;
     int    art_w;
     int    art_h;
-    Uint32 frame_ms;
+    uint32_t frame_ms;
     float  speed;
     float  wave_amp;
     float  wave_freq;
@@ -32,14 +32,14 @@ const BirdVariantSpec *bird_variant_spec(BirdVariantKind kind);
 void bird_variant_update(const BirdVariantSpec *spec,
                          float *x, float *vx,
                          float patrol_x0, float patrol_x1,
-                         int *frame_index, Uint32 *anim_timer_ms,
-                         float dt, Mix_Chunk *snd_flap,
+                         int *frame_index, uint32_t *anim_timer_ms,
+                         float dt, SoundEffect *snd_flap,
                          float player_x, int cam_x);
 
 float bird_variant_screen_y(const BirdVariantSpec *spec, float x, float base_y);
 
-SDL_Rect bird_variant_hitbox(const BirdVariantSpec *spec, float x, float base_y);
+IntRect bird_variant_hitbox(const BirdVariantSpec *spec, float x, float base_y);
 
 void bird_variant_render(const BirdVariantSpec *spec,
                          float x, float base_y, float vx, int frame_index,
-                         SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                         Texture2D *tex, int cam_x);

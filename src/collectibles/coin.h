@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 #define MAX_COINS       64     /* coin slots across the full world         */
 #define COIN_DISPLAY_W  16     /* render width  in logical pixels          */
@@ -37,4 +37,4 @@ typedef struct {
  * to convert world coordinates to screen coordinates.
  */
 void coins_render(const Coin *coins, int count,
-                  SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                  Texture2D *tex, int cam_x);

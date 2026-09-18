@@ -10,7 +10,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 #define MAX_LADDERS   16
 #define LADDER_W      16              /* sprite width  (px)                    */
@@ -37,4 +37,4 @@ void ladder_init(LadderDecor *ladders, int *count);
 
 /* Blit every ladder with world-to-screen camera offset applied. */
 void ladder_render(const LadderDecor *ladders, int count,
-                   SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                   Texture2D *tex, int cam_x);

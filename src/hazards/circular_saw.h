@@ -11,7 +11,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 #include "../player/player.h"  /* Player — for the push response signature */
 
 /* ------------------------------------------------------------------ */
@@ -54,7 +54,7 @@
  * Push impulse constants — applied to the player on contact.
  *
  * SAW_PUSH_SPEED : magnitude of the push velocity vector (px/s).
- * SAW_PUSH_VY    : upward bounce component (negative = up in SDL).
+ * SAW_PUSH_VY    : upward bounce component (negative = up on screen).
  */
 #define SAW_PUSH_SPEED  220.0f
 #define SAW_PUSH_VY    -150.0f
@@ -93,12 +93,12 @@ void circular_saws_init(CircularSaw *saws, int *count);
 /* Advance patrol movement and spin animation for all saws. */
 void circular_saws_update(CircularSaw *saws, int count, float dt);
 
-/* Draw all active saws using SDL_RenderCopyEx rotation. */
+/* Draw all active saws around their centre pivot. */
 void circular_saws_render(const CircularSaw *saws, int count,
-                          SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                          Texture2D *tex, int cam_x);
 
 /* Return the collision rectangle in world space. */
-SDL_Rect circular_saw_get_hitbox(const CircularSaw *saw);
+IntRect circular_saw_get_hitbox(const CircularSaw *saw);
 
 /* Apply push impulse to the player on contact. */
 void circular_saw_push_player(const CircularSaw *saw, Player *player);

@@ -10,9 +10,8 @@
  */
 #pragma once
 
-#include <SDL.h>
-#include <SDL_ttf.h>
-#include <SDL_mixer.h>
+#include "../shared/text.h"
+#include "../shared/audio.h"
 
 #include "../input/game_input.h"
 #include "../levels/level_session.h"
@@ -33,13 +32,11 @@ typedef MenuRoute MenuResult;
  * StartMenu — resources and state for the start menu screen.
  */
 typedef struct {
-    SDL_Window   *window;
-    SDL_Renderer *renderer;
-    TTF_Font     *font;
-    SDL_Texture  *logo_tex;
-    Mix_Chunk    *snd_confirm; /* SFX played when Play is clicked   */
-    SDL_GameController *controller;
-    int controller_ready;
+    RenderTexture2D frame_target;
+    TextFont *font;
+    Texture2D *logo_tex;
+    SoundEffect *snd_confirm;
+    int controller; /* raylib device index + 1 */
     int           confirm_release_required;
     int           route_waiting_render;
     MenuRoute     route;
@@ -52,7 +49,7 @@ typedef struct {
 } StartMenu;
 
 /* Initialise the start menu: load font and logo. */
-int start_menu_init(StartMenu *menu, SDL_Window *window, SDL_Renderer *renderer);
+int start_menu_init(StartMenu *menu);
 
 /* Allocate, initialise, and own a complete menu screen. */
 StartMenu *start_menu_create(const CampaignCatalog *catalog);
@@ -64,13 +61,10 @@ void start_menu_set_error(StartMenu *menu, const char *message);
 void start_menu_get_input_state(const StartMenu *menu,
                                 GameInputPhysicalState *state);
 
-/* Discover a controller after AppSession publishes subsystem readiness. */
+/* Discover the first available raylib gamepad. */
 void start_menu_refresh_controller(StartMenu *menu);
 
-/* Publish AppSession controller readiness without initializing the subsystem. */
-void start_menu_set_controller_ready(StartMenu *menu, int ready);
-
-/* Execute one menu frame. Returns 1 only after SDL_RenderPresent. */
+/* Execute one menu frame. Returns 1 only after presentation. */
 int start_menu_frame(StartMenu *menu);
 
 /* Release all start menu resources. */

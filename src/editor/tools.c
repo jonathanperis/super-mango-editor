@@ -1702,8 +1702,8 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
      * nearest TILE_SIZE (48 px) grid point.  This makes alignment easy
      * without needing to toggle a separate grid-snap mode.
      */
-    SDL_Keymod mods = SDL_GetModState();
-    if (mods & KMOD_SHIFT) {
+    int mods = IsWindowReady() ? input_modifiers() : 0;
+    if (mods & INPUT_SHIFT) {
         nx = (float)((int)(nx / TILE_SIZE) * TILE_SIZE);
         ny = (float)((int)(ny / TILE_SIZE) * TILE_SIZE);
     }

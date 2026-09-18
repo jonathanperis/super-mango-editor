@@ -1,8 +1,8 @@
 # Super Mango Editor
 
-> Play a C11/SDL2 platformer, build TOML worlds, and learn how the engine works.
+> Play a C11/raylib platformer, build TOML worlds, and learn how the engine works.
 
-Super Mango is a 2D platformer built in C11 with SDL2, designed as an educational project with well-commented source code for learning C + SDL2 game development. The game features dynamic multi-screen TOML worlds with parallax backgrounds, enemies, hazards, collectibles, and delta-time physics, building natively on macOS/Linux/Windows and as WebAssembly for browser play.
+Super Mango is a 2D platformer built in C11 with raylib, designed as an educational project for learning game development. The game features dynamic multi-screen TOML worlds with parallax backgrounds, enemies, hazards, collectibles, and delta-time physics, building natively on macOS/Linux/Windows and as WebAssembly for browser play.
 
 ---
 
@@ -84,7 +84,7 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 | Logical canvas | 400 × 300 px (2× pixel scale) |
 | Target FPS | 60 |
 | Audio | 44100 Hz, stereo, 16-bit |
-| Libraries | SDL2, SDL2_image, SDL2_ttf, SDL2_mixer, tomlc17 (TOML parser) |
+| Libraries | raylib 6.0 (bundled GLFW on desktop), tomlc17 (TOML parser) |
 | Level format | TOML (`.toml` files in `levels/`) |
 
 ---
@@ -93,7 +93,7 @@ Super Mango is a 2D platformer built in C11 with SDL2, designed as an educationa
 
 ```sh
 # macOS — install dependencies
-brew install sdl2 sdl2_image sdl2_ttf sdl2_mixer
+brew install cmake
 
 # Build and run the game
 make run CC=clang

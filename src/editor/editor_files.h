@@ -22,7 +22,7 @@ void editor_maybe_autosave(EditorState *es);
 /* Load recovery content as dirty without adding it to recents. */
 int editor_recover_autosave(EditorState *es);
 
-/* Resolve SDL preference-storage paths used by editor persistence. */
+/* Resolve OS preference-storage paths used by editor persistence. */
 int editor_init_persistence_paths(EditorState *es);
 
 /* Inject a preference root before persistence initialization (tests/tools). */

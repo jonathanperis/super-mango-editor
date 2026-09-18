@@ -10,7 +10,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -40,7 +40,7 @@ void last_star_init(LastStar *star);
 
 /* Draw the star if still active. */
 void last_star_render(const LastStar *star,
-                      SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                      Texture2D *tex, int cam_x);
 
 /* Return the collision rectangle in world space. */
-SDL_Rect last_star_get_hitbox(const LastStar *star);
+IntRect last_star_get_hitbox(const LastStar *star);

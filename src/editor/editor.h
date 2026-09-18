@@ -3,7 +3,7 @@
  *
  * The level editor is a standalone executable that shares data types with the
  * game (LevelDef, placement structs) but has its own window, main loop, and
- * SDL renderer.  It lets designers visually place entities on a scrollable
+ * raylib render target. It lets designers visually place entities on a scrollable
  * canvas, then save / load LevelDef files that the game engine can consume.
  *
  * This header defines:
@@ -24,8 +24,9 @@
  */
 #pragma once
 
-#include <SDL.h>           /* SDL_Window, SDL_Renderer, SDL_Texture */
-#include <SDL_ttf.h>       /* TTF_Font — for rendering panel labels and tooltips */
+#include "../shared/text.h"
+#include "../shared/platform.h"
+#include "../input/input_backend.h"
 #include <stdint.h>        /* uint64_t — document save-point fingerprint */
 #include "../levels/level.h" /* LevelDef — the data-driven level definition we edit */
 #include "../shared/ui.h"  /* UIState — shared immediate-mode widgets */
@@ -189,53 +190,53 @@ typedef struct {
 /* ------------------------------------------------------------------ */
 
 /*
- * EntityTextures — one SDL_Texture pointer per visual entity type.
+ * EntityTextures — one owned raylib texture slot per visual entity type.
  *
  * Loaded once at editor startup and shared across the palette panel,
  * canvas entity rendering, and tooltip previews.  Each texture is the
  * same sprite sheet used by the game engine, so WYSIWYG: what designers
  * see in the editor is exactly what appears in-game.
  *
- * SDL_Texture lives on the GPU; it is created by IMG_LoadTexture() and
- * must be freed with SDL_DestroyTexture() before the renderer is destroyed.
+ * texture_load creates a GPU texture, released by texture_unload before
+ * closing the graphics context.
  * All pointers are NULL until editor_init runs; cleanup sets them back to NULL.
  */
 typedef struct {
-    SDL_Texture *sky;               /* first background layer — sky/backdrop        */
-    SDL_Texture *floor_tile;        /* grass tile — floor surface texture           */
-    SDL_Texture *water;             /* animated water — bottom strip texture        */
-    SDL_Texture *platform;          /* ground pillar — default grass platform       */
-    SDL_Texture *platform_stone;    /* ground pillar — stone platform (volcanic)     */
-    SDL_Texture *platform_leaf;      /* ground pillar — leaf platform (forest)       */
-    SDL_Texture *spider;            /* spider enemy sprite sheet                    */
-    SDL_Texture *jumping_spider;    /* jumping spider sprite sheet                  */
-    SDL_Texture *bird;              /* slow bird sprite sheet                       */
-    SDL_Texture *faster_bird;       /* fast bird sprite sheet                       */
-    SDL_Texture *fish;              /* slow fish sprite sheet                       */
-    SDL_Texture *faster_fish;       /* fast fish sprite sheet                       */
-    SDL_Texture *coin;              /* coin collectible sprite sheet                */
-    SDL_Texture *star_yellow;       /* star yellow collectible sprite sheet         */
-    SDL_Texture *star_green;        /* star green collectible sprite sheet          */
-    SDL_Texture *star_red;          /* star red collectible sprite sheet            */
-    SDL_Texture *last_star;         /* end-of-level star sprite sheet               */
-    SDL_Texture *axe_trap;          /* axe hazard sprite sheet                      */
-    SDL_Texture *circular_saw;      /* circular saw hazard sprite sheet             */
-    SDL_Texture *blue_flame;        /* blue flame hazard sprite sheet               */
-    SDL_Texture *fire_flame;        /* fire flame hazard sprite sheet               */
-    SDL_Texture *spike;             /* ground spike tile texture                    */
-    SDL_Texture *spike_platform;    /* elevated spike surface texture               */
-    SDL_Texture *spike_block;       /* rail-riding spike block texture              */
-    SDL_Texture *float_platform;    /* floating / crumble platform texture          */
-    SDL_Texture *bridge;            /* crumble bridge tile texture                  */
-    SDL_Texture *bouncepad_small;   /* green bouncepad (small jump) texture         */
-    SDL_Texture *bouncepad_medium;  /* wood bouncepad (medium jump) texture         */
-    SDL_Texture *bouncepad_high;    /* red bouncepad (high jump) texture            */
-    SDL_Texture *vine_green;        /* green vine climbable texture                 */
-    SDL_Texture *vine_brown;        /* brown/dried vine climbable texture           */
-    SDL_Texture *ladder;            /* ladder climbable texture                     */
-    SDL_Texture *rope;              /* rope climbable texture                       */
-    SDL_Texture *rail;              /* rail path tile texture                       */
-    SDL_Texture *player;            /* player sprite for spawn point preview        */
+    Texture2D *sky;
+    Texture2D *floor_tile;
+    Texture2D *water;
+    Texture2D *platform;
+    Texture2D *platform_stone;
+    Texture2D *platform_leaf;
+    Texture2D *spider;
+    Texture2D *jumping_spider;
+    Texture2D *bird;
+    Texture2D *faster_bird;
+    Texture2D *fish;
+    Texture2D *faster_fish;
+    Texture2D *coin;
+    Texture2D *star_yellow;
+    Texture2D *star_green;
+    Texture2D *star_red;
+    Texture2D *last_star;
+    Texture2D *axe_trap;
+    Texture2D *circular_saw;
+    Texture2D *blue_flame;
+    Texture2D *fire_flame;
+    Texture2D *spike;
+    Texture2D *spike_platform;
+    Texture2D *spike_block;
+    Texture2D *float_platform;
+    Texture2D *bridge;
+    Texture2D *bouncepad_small;
+    Texture2D *bouncepad_medium;
+    Texture2D *bouncepad_high;
+    Texture2D *vine_green;
+    Texture2D *vine_brown;
+    Texture2D *ladder;
+    Texture2D *rope;
+    Texture2D *rail;
+    Texture2D *player;
 } EntityTextures;
 
 /* ------------------------------------------------------------------ */
@@ -276,16 +277,9 @@ typedef struct {
  * the function would receive a copy and changes would be lost.
  */
 typedef struct {
-    /* ---- SDL resources (created at init, destroyed at cleanup) ------- */
-    SDL_Window   *window;    /* the OS window for the editor                 */
-    SDL_Renderer *renderer;  /* GPU drawing context — all rendering goes here */
-
-    /*
-     * TTF_Font — a TrueType font handle used by SDL_ttf to render text.
-     * SDL2 has no built-in text rendering; SDL_ttf rasterises glyph outlines
-     * from a .ttf file into SDL_Textures we can blit to the screen.
-     */
-    TTF_Font     *font;
+    /* Editor owns its process-wide context and logical render target. */
+    RenderTexture2D frame_target;
+    TextFont *font;
 
     /* ---- Level data (the document being edited) ---------------------- */
     /*
@@ -348,7 +342,7 @@ typedef struct {
     char           recent_files[5][EDITOR_PATH_MAX];
     int            recent_file_count;
     char           status_message[160];
-    Uint32         last_autosave_ms;
+    uint32_t       last_autosave_ms;
 
     /* Save-point tracking.  Hash covers document content, not editor UI. */
     uint64_t       saved_document_hash;
@@ -375,7 +369,7 @@ typedef struct {
 
     EditorValidationReport validation_report;
     uint64_t validated_document_hash;
-    Uint32 last_validation_ms;
+    uint32_t last_validation_ms;
     int validation_cache_valid;
 
     /* ---- UI toggles --------------------------------------------------- */
@@ -387,7 +381,7 @@ typedef struct {
     int            palette_open;  /* 1 = palette panel expanded, 0 = collapsed      */
     int            debug_play;   /* 1 = launch game with --debug when playing      */
 
-    /* ---- Mouse state (updated every frame from SDL events) ------------ */
+    /* ---- Mouse state (updated every frame from input commands) -------- */
     int            mouse_x;       /* current cursor x in window pixels         */
     int            mouse_y;       /* current cursor y in window pixels         */
     int            mouse_down;    /* 1 while left mouse button is held         */
@@ -436,21 +430,21 @@ typedef struct {
  * editor_init — Create the editor window, renderer, and load all textures.
  *
  * Called once at startup.  Initialises every field in EditorState, opens
- * an SDL window at EDITOR_W x EDITOR_H, loads entity textures from the
+ * a raylib window at EDITOR_W x EDITOR_H, loads entity textures from the
  * shared assets/ directory, and opens the default font.
  *
  * es : pointer to the EditorState to initialise (caller allocates).
  *
  * Returns 0 on success, non-zero on fatal error.
  */
-int editor_init(EditorState *es);
+int editor_init(EditorState *es, int hidden);
 
 int editor_load_level(EditorState *es, const char *path);
 
 /*
  * editor_loop — Run the editor's main event/render loop until exit.
  *
- * Polls SDL events (mouse, keyboard, window), updates tool interactions,
+ * Polls input commands (mouse, keyboard, window), updates tool interactions,
  * redraws the canvas and panel, and handles file I/O commands.
  * Returns when es->running is set to 0 (user closes the window or quits).
  *

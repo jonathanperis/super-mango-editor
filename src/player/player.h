@@ -6,8 +6,8 @@
  */
 #pragma once
 
-#include <SDL.h>           /* SDL_Texture, SDL_Renderer, SDL_Rect */
-#include <SDL_mixer.h>     /* Mix_Chunk */
+#include "../shared/graphics.h"
+#include "../shared/audio.h"
 #include "../surfaces/platform.h"       /* Platform, MAX_PLATFORMS — needed for player_update signature */
 #include "../surfaces/bouncepad.h"      /* Bouncepad — needed for player_update signature */
 #include "../surfaces/float_platform.h" /* FloatPlatform — needed for player_update signature */
@@ -47,7 +47,7 @@ typedef struct {
     int   on_ground;    /* 1 if standing on the floor, 0 if airborne         */
     AnimState anim_state;       /* which animation is active (idle/walk/jump/fall) */
     int       anim_frame_index; /* current frame index within the animation       */
-    Uint32    anim_timer_ms;    /* ms accumulated in the current frame            */
+    uint32_t  anim_timer_ms;    /* ms accumulated in the current frame */
     int       facing_left;      /* 1 = mirror sprite horizontally                 */
     int       on_vine;          /* 1 = currently climbing a climbable, 0 = normal  */
     int       vine_index;       /* index into the climbable array being climbed   */
@@ -75,12 +75,12 @@ typedef struct {
     float     hurt_timer;        /* seconds remaining of invincibility blink; 0 = normal */
     float     spawn_x;          /* level-defined spawn x (platform top-left)           */
     float     spawn_y;          /* level-defined spawn y (platform top; adjusted by -h + FLOOR_SINK) */
-    SDL_Rect     frame;   /* source rect: which part of the sheet to draw    */
-    SDL_Texture *texture; /* GPU image handle; NULL until player_init runs   */
+    IntRect      frame;   /* source rect: which part of the sheet to draw */
+    Texture2D   *texture; /* owned GPU image handle; NULL until initialized */
 } Player;
 
 /* Load the player texture and set its initial position. */
-int player_init(Player *player, SDL_Renderer *renderer);
+int player_init(Player *player);
 
 /* Restore tunable movement physics to engine defaults. */
 void player_apply_default_physics(Player *player);
@@ -95,9 +95,8 @@ enum {
 };
 
 /* Sample keyboard, replay, and gamepad every frame and set vx/vy accordingly.
- * ctrl may be NULL when no controller is connected; keyboard/replay still work. */
-void player_handle_input(Player *player, Mix_Chunk *snd_jump,
-                         SDL_GameController *ctrl,
+ * Device sampling belongs to the input module; replay uses the same action bits. */
+void player_handle_input(Player *player, SoundEffect *snd_jump,
                          unsigned int replay_input_mask,
                          unsigned int physical_input_mask,
                          const VineDecor *vines, int vine_count,
@@ -120,7 +119,7 @@ void player_handle_input(Player *player, Mix_Chunk *snd_jump,
  *   moved upward this frame — without it, the crossing test misses because the
  *   surface escaped upward past the player's feet before they could cross it.
  */
-void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
+void player_update(Player *player, float dt, SoundEffect *snd_jump,
                    const Platform *platforms, int platform_count,
                    const FloatPlatform *float_platforms, int float_platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
@@ -136,10 +135,10 @@ void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
                    int world_w);
 
 /* Draw the player sprite at its current position, offset by the camera. */
-void player_render(Player *player, SDL_Renderer *renderer, int cam_x);
+void player_render(Player *player, int cam_x);
 
 /* Return the player's tightly-inset physics hitbox (logical pixels). */
-SDL_Rect player_get_hitbox(const Player *player);
+IntRect player_get_hitbox(const Player *player);
 
 /* Reset the player's position and state without reloading the texture. */
 void player_reset(Player *player);
