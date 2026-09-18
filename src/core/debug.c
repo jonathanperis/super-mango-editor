@@ -49,6 +49,8 @@ static void outline(IntRect r, int camera, Color color)
 
 static void draw_collision_boxes(const GameState *gs, int cam)
 {
+    /* Draw world-space collision extents, not entire transparent sprite slots.
+     * The same helpers feed collision detection; outline applies camera X. */
     outline(player_get_hitbox(&gs->player),cam,(Color){0,255,0,255});
     for (int i=0;i<gs->floor_gap_count;i++)
         outline((IntRect){gs->floor_gaps[i],GAME_H-WATER_ART_H,FLOOR_GAP_W,WATER_ART_H},cam,(Color){0,50,200,255});
@@ -123,6 +125,7 @@ static void draw_collision_boxes(const GameState *gs, int cam)
         outline(circular_saw_get_hitbox(&gs->circular_saws[i]),cam,(Color){255,140,0,255});
     for (int i=0;i<gs->faster_fish_count;i++) outline(faster_fish_get_hitbox(&gs->faster_fish[i]),cam,(Color){220,100,180,255});
     if (gs->last_star.active) outline(last_star_get_hitbox(&gs->last_star),cam,(Color){255,215,0,255});
+    /* Climbables show their full interaction spans, including tile overlap. */
     for (int i=0;i<gs->ladder_count;i++) {
         const LadderDecor *d=&gs->ladders[i];
         outline((IntRect){(int)d->x,(int)d->y,LADDER_W,(d->tile_count-1)*LADDER_STEP+LADDER_H},cam,(Color){180,120,60,255});
