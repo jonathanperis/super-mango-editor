@@ -26,7 +26,7 @@ src/
 │   ├── game_inspector.h / .c     Simulation stepping, slow motion, tuning and cached inspection UI
 │   ├── game_experiment.h / .c    Bounded capture/export/replay with level fingerprints
 │   ├── game_random.h / .c        Reproducible unsigned PRNG for native/WASM
-│   ├── debug.h / .c              Debug overlay: FPS/CPU/memory, hitboxes, event log
+│   ├── debug.h / .c              Debug overlay: FPS/frame budget/memory, hitboxes, event log
 │   ├── entity_utils.h / .c       Shared entity helper functions
 │   ├── game_state.h / .c         GameState reset helpers
 │   ├── game_window.h / .c        Screen-owned logical render target
@@ -49,7 +49,7 @@ src/
 │   └── game_terminal.h / .c      Shared terminal action list, focus movement, labels, and routes
 ├── editor/
 │   ├── editor_main.c             Standalone editor entry point
-│   ├── editor.h / .c             Editor state, events, render loop
+│   ├── editor.h / .c             Editor state, resource startup/cleanup and loop delegation
 │   ├── canvas.h / .c             Scrollable zoomable editing canvas
 │   ├── palette.h / .c            Entity palette
 │   ├── properties.h / .c         Per-entity property editing
@@ -63,7 +63,7 @@ src/
 │   ├── editor_layout.h / .c      Editor layout metrics
 │   ├── editor_textures.h / .c    Editor texture loading/cleanup
 │   ├── editor_files.h / .c       Open/save/recent file workflows
-│   ├── editor_session.h / .c     Session/autosave state
+│   ├── editor_session.h / .c     Dirty state, staged-edit/save decisions and document hashing
 │   ├── editor_playtest.h / .c    Launch playtest from editor
 │   ├── editor_clipboard.h / .c   Copy/paste support
 │   ├── editor_validation.h / .c  Level validation report helpers
@@ -74,7 +74,7 @@ src/
 │   ├── graphics.h / .c          raylib texture slots, sprite pivots and logical presentation
 │   ├── geometry.h              Integer hitboxes and half-open intersection
 │   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
-│   ├── text.h / .c              Font/glyph ownership, UTF-8 measurement and cached text textures
+│   ├── text.h / .c              Font/glyph ownership, UTF-8 measurement and label texture creation
 │   ├── platform.h / .c          Monotonic time, UTF-8 copying and OS preference/executable paths
 │   ├── ui.h / .c                 Immediate-mode widgets shared by editor and game settings
 │   ├── serializer.h / .c         TOML save/load public API anchor
@@ -171,6 +171,11 @@ New `.c` files in `src/` or recognized source subdirectories are picked up by Ma
 
 **Role:** Parses program arguments, constructs one `AppSession`, and returns the session result. `AppSession` owns raylib startup/shutdown and cross-screen transitions.
 
+For a beginner's reading order, continue through `core/app_session.c`,
+`core/game_loop.c`, `render/game_render.c`, then a small entity such as
+`collectibles/coin.c`. The editor's parallel entry points are `editor_main.c`,
+`editor.c`, `editor_frame.c` and `editor_events.c`.
+
 ### Responsibilities
 
 - Parse startup, profile, experiment and smoke flags; see the complete [Controls reference](../controls/#runtime-flags-for-input-and-ci), including `--seed`, `--profile`, `--continue`, `--no-save` and `--experiment`
@@ -192,7 +197,9 @@ On failure at any step, all previously-succeeded subsystems are torn down before
 
 ## `game.h`
 
-**Role:** The single shared header. Defines constants and `GameState`. Included by all other `.c` files.
+**Role:** Gameplay's umbrella header: constants, shared resource groups and
+`GameState`. Gameplay modules use it; smaller shared helpers and editor modules
+also have their own focused headers.
 
 ### Constants
 
@@ -288,7 +295,11 @@ Returns `0` on success. If a required window, texture, level, or subsystem resou
 
 ### `game_frame(GameState *gs)` and `game_loop(GameState *gs)`
 
-`game_frame` performs one 60 FPS step: delta time -> events -> update -> render. `AppSession` is the production loop owner; `game_loop` remains a legacy direct native helper. See [Architecture](../architecture/) for routes and render order.
+`game_frame` performs one frame: delta time -> events -> update -> render.
+Normal rendering targets 60 FPS with measured/clamped `dt`; smoke and scripted
+replays use a fixed step. `AppSession` is the production loop owner; `game_loop`
+remains a legacy direct native helper. See [Architecture](../architecture/) for
+routes and render order.
 
 ### `game_cleanup(GameState *gs)`
 
@@ -493,6 +504,20 @@ HUD renderer. Draws heart icons (health), player icon + lives counter, coin icon
 ### `core/debug.h` / `core/debug.c`
 
 Debug overlay (activated with `--debug` flag). FPS counter, collision hitbox visualization for all entities, and a scrolling event log.
+The displayed frame percentage is a `dt`-based fraction of a 60 Hz frame budget,
+not measured CPU utilization. The resident-memory sample comes from the OS.
+
+### Shared raylib boundaries (`shared/` and `input/input_backend.*`)
+
+| Read | Learning purpose |
+|---|---|
+| `shared/graphics.h`, `shared/graphics.c` | Texture ownership, sprite pivots/flips and logical-canvas presentation |
+| `shared/geometry.h` | Integer, half-open hitboxes; overflow-safe edge arithmetic |
+| `shared/audio.h`, `shared/audio.c` | Owned samples, borrowed alias data, per-play volume and music pumping |
+| `shared/text.h`, `shared/text.c` | CPU image versus GPU texture; dynamic glyph atlas ownership |
+| `shared/ui.h`, `shared/ui.c` | Immediate-mode calls, stable widget IDs, staged edits and bounded label cache |
+| `shared/platform.h`, `shared/platform.c` | Monotonic elapsed time, UTF-8 copying and caller-owned OS paths |
+| `input/input_backend.h`, `input/input_backend.c` | Ordered events versus held state, logical pointer mapping and saved-binding translation |
 
 ### `core/entity_utils.h` / `core/entity_utils.c`
 

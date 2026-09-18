@@ -18,6 +18,8 @@ static int font_prepare(TextFont *font, const char *text)
         for (int i = 0; i < font->count; i++)
             if (font->codepoints[i] == codepoint) { found = 1; break; }
         if (found) continue;
+        /* Keep requested codepoints, including unavailable glyphs, so the
+         * same missing character does not trigger an atlas rebuild each frame. */
         if (font->count == INT_MAX / (int)sizeof(int) - 1) return -1;
         int *points = realloc(font->codepoints, (size_t)(font->count + 1) * sizeof(int));
         if (!points) return -1;
@@ -33,6 +35,8 @@ static int font_prepare(TextFont *font, const char *text)
             UnloadFont(replacement); /* Also releases partially loaded glyph data. */
             return -1;
         }
+        /* raylib batches drawing. Flush commands that reference the old atlas
+         * before releasing it, even if this replacement happens mid-frame. */
         rlDrawRenderBatchActive();
         UnloadFont(font->font);
         font->font = replacement;
@@ -48,10 +52,16 @@ TextFont *font_load(const char *path, int size)
     if (!font) return NULL;
     font->size = size;
     font->bytes = LoadFileData(path, &font->byte_count);
-    if (!font->bytes) { free(font); return NULL; }
+    if (!font->bytes) {
+        free(font);
+        return NULL;
+    }
     font->count = 95;
     font->codepoints = malloc((size_t)font->count * sizeof(int));
-    if (!font->codepoints) { font_unload(font); return NULL; }
+    if (!font->codepoints) {
+        font_unload(font);
+        return NULL;
+    }
     for (int i = 0; i < font->count; i++) font->codepoints[i] = i + 32;
     font->font = LoadFontFromMemory(".ttf", font->bytes, font->byte_count,
                                    size, font->codepoints, font->count);
@@ -88,13 +98,18 @@ int font_measure(TextFont *font, const char *text, int *width, int *height)
 Texture2D *font_texture(TextFont *font, const char *text, Color color)
 {
     if (!text || !text[0] || font_prepare(font, text)) return NULL;
+    /* Image owns CPU pixels; Texture2D owns their GPU upload. Once uploaded,
+     * release the Image. This label texture survives later atlas replacements. */
     Image image = ImageTextEx(font->font, text, (float)font->size, 0, color);
     if (!IsImageValid(image)) return NULL;
     Texture2D value = LoadTextureFromImage(image);
     UnloadImage(image);
     if (!IsTextureValid(value)) return NULL;
     Texture2D *texture = malloc(sizeof(*texture));
-    if (!texture) { UnloadTexture(value); return NULL; }
+    if (!texture) {
+        UnloadTexture(value);
+        return NULL;
+    }
     *texture = value;
     SetTextureFilter(value, TEXTURE_FILTER_POINT);
     return texture;

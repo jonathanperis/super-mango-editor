@@ -46,6 +46,18 @@ session_destroy(session) / browser terminal cleanup
 
 `AppSession` is the sole production loop owner. It samples physical input, pumps the music stream, frames the active screen, then consumes its route. raylib's `EndDrawing` owns presentation, event polling and normal **60 FPS** pacing. Hidden smoke runs are uncapped and retain fixed simulation steps.
 
+There are two distinct notions of input. GLFW callbacks capture **ordered
+commands** (typing, clicks, pause) during raylib's end-of-frame poll; the next
+frame drains them. **Held state** answers whether movement remains pressed.
+`input_collect` adds focus/gamepad changes without polling the OS again. The
+editor drains text before command boundaries, so typing followed by Ctrl+S in
+one frame saves the edited value instead of invoking shortcuts for those letters.
+
+The drawing sequence is `BeginDrawing` → `BeginTextureMode` → screen draw calls
+→ `display_present`. The final helper ends texture mode, copies the logical
+image to the window and calls `EndDrawing` once. The window is a process resource;
+a render target is a screen-owned off-screen image, not another OS window.
+
 ```
 session_frame(session) {
   if (session->screen == APP_SCREEN_MENU) {
@@ -91,6 +103,11 @@ prev = now;
 ```
 
 Velocities are expressed in **pixels per second**. Multiplication by `dt` gives a displacement, but discrete acceleration and collision sampling still introduce timestep-dependent error. `make timing-lab` demonstrates this distinction. Replay uses recorded steps; the inspector can freeze, single-step, slow and tune a simulation without overriding focus/settings/terminal blockers.
+
+Targeting 60 rendered frames per second does not make normal gameplay a fixed
+step: `game_timing_step` measures elapsed time and clamps it to 0.1 seconds.
+Smoke/scripted input uses `1 / TARGET_FPS`; captured experiments use their
+recorded durations. These choices are separate from presentation pacing.
 
 During an active game update, authored checkpoints are sampled after player movement and before lethal collision handling. Legacy screen-boundary checkpoint sampling runs only when the active level has no authored records.
 
@@ -171,7 +188,12 @@ The 2D Y-axis increases **downward**. The origin (0, 0) is at the **top-left** o
               └──────────────────────────────────────────┘
 ```
 
-The game renders to a **400×300 `RenderTexture2D`**. `display_present` applies point filtering, aspect-preserving scaling and the render-texture Y correction. At 800×600 this gives a **2x** pixel scale. `input_pointer_to_logical` applies the inverse viewport transform once. Gameplay hitboxes remain integer `IntRect` values; raylib's floating `Rectangle` is a drawing boundary type.
+The game renders to a **400×300 `RenderTexture2D`**, configured with point
+filtering when the screen creates it. `display_present` applies aspect-preserving
+scaling and the render-texture Y correction. At 800×600 this gives a **2x** pixel
+scale. `input_pointer_to_logical` applies the inverse viewport transform once.
+Gameplay hitboxes remain integer `IntRect` values; raylib's floating `Rectangle`
+is a drawing boundary type. Two hitboxes that merely touch edges do not overlap.
 
 ---
 
@@ -229,7 +251,7 @@ typedef struct {
 
 `LevelDef` owns optional immutable `CheckpointPlacement { x, y }` records. Each active frame samples authored records after player movement and before lethal collisions. The furthest record with `x <= player.x` becomes the resolved respawn point, so a death in the same frame preserves a crossed checkpoint. The runtime never regresses to an earlier record.
 
-Authored records disable automatic screen-boundary checkpoints for that level. A level with no records preserves the legacy boundary behavior. Retry, replay, and successful next-phase loads reset to the effective start of their respective level; a failed next-phase load retains the active level and its resolved checkpoint. The HUD shows a brief checkpoint notice, then the active `CP n`; a respawn displays `RESPAWN CP n`.
+Authored records disable automatic screen-boundary checkpoints for that level. A level with no records preserves the legacy boundary behavior. Retry, replay, and successful next-phase loads reset to the effective start of their respective level; a failed next-phase load retains the active level and its resolved checkpoint. The HUD shows brief `CHECKPOINT CP n` and `RESPAWN CP n` notices. The debug inspector exposes the stored checkpoint index; the regular HUD does not keep a permanent checkpoint label after the notice expires.
 
 ---
 
@@ -239,7 +261,7 @@ Authored records disable automatic screen-boundary checkpoints for that level. A
 |-----------|--------|
 | Window/audio initialization failure | Session creation fails and releases initialized resources; the top-level runner returns `EXIT_FAILURE` |
 | Resource load failure (in `game_init`) | `fprintf(stderr, ...)` → clean up partially-created `GameState` resources → return `-1`; the top-level runner returns `EXIT_FAILURE` |
-| Sound load failure (non-fatal pattern) | `fprintf(stderr, ...)` then continue -- play is guarded by `if (gs->audio.<name>)` |
+| Optional sound load failure | Warn and retain an empty slot; `sound_play` accepts NULL |
 | Missing gameplay-critical shared sprite | Reject the level before replacing active level state; identify the required asset path |
 | Optional presentation texture load failure | Warn and preserve the documented visual fallback |
 

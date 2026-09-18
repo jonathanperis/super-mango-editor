@@ -148,17 +148,17 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 | `CLIMB_H_SPEED` | `80.0f` | `player_input.c` | Horizontal climb drift |
 | `PLAYER_CLIMB_GRAB_PAD` | `4` | `player_climb.c` | Extra grab width around climbables |
 
-## Audio Constants in `main.c`
+## Audio Units and Voice Limit
 
-| Value | Description |
-|-------|-------------|
-| `44100` | Audio sample rate (Hz) |
-| `MIX_DEFAULT_FORMAT` | 16-bit signed samples |
-| `2` | Stereo channels |
-| `2048` | Mixer buffer size (samples) |
+| Value | Location | Description |
+|-------|----------|-------------|
+| `EFFECT_VOICES = 8` | `src/shared/audio.c` | Global pool of simultaneous effect aliases; a new play is dropped when all are busy |
+| `0..128` | level/profile audio settings | Authored/saved volume units; normalized to raylib's `0..1` at the audio boundary |
 
-Music volume is authored per level and multiplied by the saved music-volume
-preference; mute overrides it. It is not a fixed `main.c` audio constant.
+raylib/miniaudio negotiates the device's format, channels and sample rate;
+`main.c` does not hard-code a sample format or mixer buffer size. Music volume
+is authored per level and multiplied by the saved music-volume preference;
+mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownership.
 
 ---
 

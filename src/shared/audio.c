@@ -1,10 +1,21 @@
+/*
+ * audio.c — Explicit sample/voice ownership and streamed music.
+ *
+ * A SoundEffect owns decoded bytes. Each play borrows those bytes through a
+ * raylib alias with its own cursor and volume. Music instead decodes chunks
+ * while AppSession calls music_update; PlayMusicStream alone is insufficient.
+ */
 #include "audio.h"
 #include <stdlib.h>
 
 /* The original mixer used its default eight effect channels. Each alias owns
  * independent playback state while sharing its owner's decoded sample. */
 #define EFFECT_VOICES 8
-typedef struct { Sound alias; SoundEffect *owner; float volume; } EffectVoice;
+typedef struct {
+    Sound alias;
+    SoundEffect *owner;
+    float volume;
+} EffectVoice;
 static EffectVoice voices[EFFECT_VOICES];
 static MusicTrack *current_music;
 
@@ -16,6 +27,8 @@ int audio_open(void)
 
 static void voice_clear(EffectVoice *voice)
 {
+    /* An alias must stop before its sample owner can disappear. Clearing the
+     * slot also makes repeated cleanup harmless and permits its next use. */
     if (!voice->owner) return;
     StopSound(voice->alias);
     UnloadSoundAlias(voice->alias);
@@ -40,7 +53,10 @@ SoundEffect *sound_load(const char *path)
     Sound sample = LoadSound(path);
     if (!IsSoundValid(sample)) return NULL;
     SoundEffect *sound = malloc(sizeof(*sound));
-    if (!sound) { UnloadSound(sample); return NULL; }
+    if (!sound) {
+        UnloadSound(sample);
+        return NULL;
+    }
     *sound = (SoundEffect){sample, 1.0f};
     return sound;
 }
@@ -48,6 +64,8 @@ SoundEffect *sound_load(const char *path)
 void sound_unload(SoundEffect *sound)
 {
     if (!sound) return;
+    /* Release every alias referencing this sample before freeing the sample
+     * itself; otherwise an audio callback could still read the shared bytes. */
     for (int i = 0; i < EFFECT_VOICES; i++)
         if (voices[i].owner == sound) voice_clear(&voices[i]);
     UnloadSound(sound->sample);
@@ -59,11 +77,15 @@ void sound_play(SoundEffect *sound, int volume)
     if (!sound) return;
     for (int i = 0; i < EFFECT_VOICES; i++) {
         EffectVoice *voice = &voices[i];
+        /* Reuse only an idle voice. If all eight are busy, drop this new
+         * effect rather than interrupting a sound already in progress. */
         if (voice->owner && IsSoundPlaying(voice->alias)) continue;
         voice_clear(voice);
         Sound alias = LoadSoundAlias(sound->sample);
         if (!IsSoundValid(alias)) return;
         *voice = (EffectVoice){alias, sound, volume / 128.0f};
+        /* Multiplication combines user/sample loudness with this play's
+         * distance attenuation. Dividing by 128 maps saved units to 0..1. */
         SetSoundVolume(alias, sound->volume * voice->volume);
         PlaySound(alias);
         return;
@@ -85,7 +107,10 @@ MusicTrack *music_load(const char *path)
     Music stream = LoadMusicStream(path);
     if (!IsMusicValid(stream)) return NULL;
     MusicTrack *music = malloc(sizeof(*music));
-    if (!music) { UnloadMusicStream(stream); return NULL; }
+    if (!music) {
+        UnloadMusicStream(stream);
+        return NULL;
+    }
     stream.looping = true;
     music->stream = stream;
     return music;
@@ -112,9 +137,20 @@ void music_play(MusicTrack *music)
     if (music) PlayMusicStream(music->stream);
 }
 
-void music_pause(void) { if (current_music) PauseMusicStream(current_music->stream); }
-void music_resume(void) { if (current_music) ResumeMusicStream(current_music->stream); }
-void music_update(void) { if (current_music) UpdateMusicStream(current_music->stream); }
+void music_pause(void)
+{
+    if (current_music) PauseMusicStream(current_music->stream);
+}
+
+void music_resume(void)
+{
+    if (current_music) ResumeMusicStream(current_music->stream);
+}
+
+void music_update(void)
+{
+    if (current_music) UpdateMusicStream(current_music->stream);
+}
 void music_set_volume(int volume)
 {
     if (current_music) SetMusicVolume(current_music->stream, volume / 128.0f);

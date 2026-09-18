@@ -14,6 +14,11 @@ Super Mango is a C11/raylib platformer and sandbox school: play the game, inspec
 
 **Start learning:** [Sandbox School](docs/wiki/learning-path.md) · [Mechanics Museum](docs/wiki/mechanics-museum.md) · [Entity Walkthrough](docs/wiki/entity-walkthrough.md).
 
+The source is part of the lesson. Explicit update/draw steps, simple loops and
+comments about units, ownership and library calls are intentional. Favor code
+that a learner can trace over reducing line count or hiding a small operation
+behind another abstraction.
+
 ## Tech Stack
 
 | Technology | Version | Purpose |
@@ -74,14 +79,15 @@ Start with [Sandbox School](docs/wiki/learning-path.md), then use the [Developer
 
 ### Prerequisites
 
-A C11-compatible compiler (`clang` or `gcc`), `make`, CMake and Python 3.11+.
+A C11-compatible compiler (`clang` or `gcc`), `make`, CMake and a current Python 3
+(3.12+ recommended for the build walkthrough).
 The first build downloads and verifies the pinned raylib 6.0 source archive;
 no system raylib installation is required. See [dependency provenance](vendor/raylib/README.md).
 
 **macOS:**
 
 ```sh
-brew install cmake
+brew install cmake python
 xcode-select --install   # provides clang and make
 ```
 
@@ -110,7 +116,9 @@ a desktop check. Release packaging rejects the Memory backend.
 
 ### Quick Start
 
-Full verification also needs Python 3.11+ and Node.js. Docs development requires
+The documentation tools require Python 3.11+; the raylib bootstrap also needs
+`tarfile` extraction-filter support. Use the current Python recommended above.
+Full verification also needs Node.js. Docs development requires
 Node.js 22.12+ and Bun with the frozen `docs/bun.lock` dependency set (CI pins
 Node **26.9.0** and Bun **1.4.2**); see
 [website maintenance](docs/README.md).
@@ -180,7 +188,7 @@ super-mango-editor/
 │   │   └── last_star.h / .c          End-of-level star
 │   ├── collision/                     Gameplay collision and damage passes
 │   ├── core/                          Runtime lifecycle, window/timing/resources, update, camera, checkpoint, completion, overlay, actor/hazard helpers
-│   │   ├── debug.h / .c              Debug overlay (FPS, CPU, memory, hitboxes, event log)
+│   │   ├── debug.h / .c              Debug overlay (FPS, frame budget, memory, hitboxes, event log)
 │   │   ├── game_lifecycle.c          game_init / game_cleanup orchestration
 │   │   ├── game_loop.c               Main native/WebAssembly frame loop
 │   │   ├── game_update.h / .c        Top-level update orchestration
@@ -194,7 +202,7 @@ super-mango-editor/
 │   │   ├── shared serializer/UI consumers
 │   │   ├── file_dialog.h / .c        Native file dialogs
 │   │   └── undo*.h / .c              Undo/redo history and operation application
-│   ├── shared/                        TOML serializer, atomic UTF-8 I/O, shared UI
+│   ├── shared/                        Graphics/audio/text/OS helpers, TOML serializer, atomic UTF-8 I/O, shared UI
 │   ├── effects/                       Visual effects
 │   │   ├── fog.h / .c                Fog overlay
 │   │   ├── parallax.h / .c           Multi-layer scrolling background

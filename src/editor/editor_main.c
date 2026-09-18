@@ -1,4 +1,10 @@
-/* The standalone editor owns a raylib window and deliberately opens no audio. */
+/*
+ * editor_main.c — Standalone editor entry point.
+ *
+ * Initialize one EditorState, optionally load a TOML document, run frames,
+ * and clean up. editor_init owns graphics setup; this silent tool needs no
+ * audio device. --smoke-test renders five frames rather than opening a loop.
+ */
 #include "editor.h"
 #include "editor_frame.h"
 #include "editor_files.h"
@@ -16,6 +22,8 @@ int main(int argc, char **argv)
         if (!strcmp(argv[i], "--smoke-test")) smoke = 1;
         else path = argv[i];
     }
+    /* Aggregate initialization gives pointers NULL and numeric members zero.
+     * That lets startup failure use the same cleanup path as normal exit. */
     EditorState editor = {0};
     if (editor_init(&editor, smoke)) return EXIT_FAILURE;
     if (path) {
@@ -29,11 +37,16 @@ int main(int argc, char **argv)
                 editor_sync_config_resources(&editor);
                 editor_set_document_save_point(&editor);
             }
-        } else result = editor_load_level(&editor, path);
-        if (result) fprintf(stderr, "Warning: could not load '%s' — starting empty\n", path);
+        } else
+            result = editor_load_level(&editor, path);
+        if (result)
+            fprintf(stderr, "Warning: could not load '%s' — starting empty\n", path);
     }
-    if (!smoke) editor_loop(&editor);
-    else for (int frame = 0; frame < 5 && editor.running; frame++) editor_run_frame(&editor);
+    if (!smoke)
+        editor_loop(&editor);
+    else
+        for (int frame = 0; frame < 5 && editor.running; frame++)
+            editor_run_frame(&editor);
     int result = smoke && !editor.running ? EXIT_FAILURE : EXIT_SUCCESS;
     editor_cleanup(&editor);
     return result;
