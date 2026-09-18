@@ -8,12 +8,12 @@
 #include "star_yellow.h"
 
 void star_greens_render(const StarGreen *stars, int count,
-                        SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                        Texture2D *tex, int cam_x) {
     if (!tex) return;
     for (int i = 0; i < count; i++) {
         if (!stars[i].active) continue;
-        SDL_Rect dst = { (int)stars[i].x - cam_x, (int)stars[i].y,
+        IntRect dst = { (int)stars[i].x - cam_x, (int)stars[i].y,
                          STAR_GREEN_DISPLAY_W, STAR_GREEN_DISPLAY_H };
-        SDL_RenderCopy(renderer, tex, NULL, &dst);
+        sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
     }
 }

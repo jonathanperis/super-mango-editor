@@ -8,8 +8,6 @@
 
 #include "editor_files.h"
 
-#include <SDL.h>        /* SDL_GetPrefPath, SDL_GetTicks */
-#include <SDL_image.h>  /* IMG_LoadTexture */
 #include <stdio.h>      /* FILE, fopen, fprintf, stderr */
 #include <stdint.h>     /* uint64_t */
 #include <time.h>       /* time */
@@ -18,7 +16,11 @@
 #include <string.h>     /* memset, strcmp, strlen, strncpy, strrchr */
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOGDI
+#define NOUSER
 #include <windows.h>    /* GetCurrentProcessId */
+#include <bcrypt.h>
 #else
 #include <dirent.h>     /* directory discovery */
 #include <unistd.h>     /* getpid */
@@ -40,6 +42,7 @@
 
 static unsigned long editor_playtest_sequence;
 static uint64_t editor_recovery_sequence;
+static int editor_recovery_seeded;
 static int editor_test_recovery_choice = -1;
 
 void editor_test_set_recovery_choice(int button_id)
@@ -49,7 +52,7 @@ void editor_test_set_recovery_choice(int button_id)
 
 static void editor_save_recent_files(const EditorState *es);
 static void editor_add_recent_file(EditorState *es, const char *path);
-static void editor_replace_texture(SDL_Texture **slot, SDL_Renderer *renderer,
+static void editor_replace_texture(Texture2D **slot,
                                    const char *path);
 static int editor_preference_file_path(const EditorState *es, const char *name,
                                        char *buf,
@@ -191,25 +194,24 @@ static void editor_apply_loaded_level(EditorState *es, const LevelDef *level,
     editor_update_window_title(es);
 }
 
-static void editor_replace_texture(SDL_Texture **slot, SDL_Renderer *renderer,
+static void editor_replace_texture(Texture2D **slot,
                                    const char *path)
 {
     if (!slot) return;
     if (!path || path[0] == '\0') {
-        if (*slot) SDL_DestroyTexture(*slot);
+        texture_unload(*slot);
         *slot = NULL;
         return;
     }
-    if (!renderer) return;
+    if (!IsWindowReady()) return;
 
     {
-        SDL_Texture *replacement = IMG_LoadTexture(renderer, path);
+        Texture2D *replacement = texture_load(path);
         if (replacement) {
-            if (*slot) SDL_DestroyTexture(*slot);
+            texture_unload(*slot);
             *slot = replacement;
         } else {
-            fprintf(stderr, "Warning: keeping preview texture for %s: %s\n",
-                    path, IMG_GetError());
+            fprintf(stderr, "Warning: keeping preview texture; cannot load %s\n", path);
         }
     }
 }
@@ -217,12 +219,12 @@ static void editor_replace_texture(SDL_Texture **slot, SDL_Renderer *renderer,
 void editor_sync_config_resources(EditorState *es)
 {
     if (!es) return;
-    editor_replace_texture(&es->textures.sky, es->renderer,
+    editor_replace_texture(&es->textures.sky,
                            es->level.background_layer_count > 0
                            ? es->level.background_layers[0].path : NULL);
-    editor_replace_texture(&es->textures.floor_tile, es->renderer,
+    editor_replace_texture(&es->textures.floor_tile,
                            es->level.floor_tile_path);
-    editor_replace_texture(&es->textures.water, es->renderer,
+    editor_replace_texture(&es->textures.water,
                            es->level.foreground_layer_count > 0
                            ? es->level.foreground_layers[
                                  es->level.foreground_layer_count - 1].path
@@ -480,10 +482,10 @@ void editor_retire_current_recovery(EditorState *es)
 
 void editor_maybe_autosave(EditorState *es)
 {
-    Uint32 now;
+    uint32_t now;
 
     if (!es || !es->modified) return;
-    now = SDL_GetTicks();
+    now = (uint32_t)clock_millis();
     if (now - es->last_autosave_ms < EDITOR_AUTOSAVE_MS) return;
 
     editor_validate_level(&es->level, &es->validation_report);
@@ -1012,12 +1014,7 @@ int editor_choose_recovery(EditorState *es)
     }
     if (es->recovery_entry_count == 0) return -1;
     for (;;) {
-        SDL_MessageBoxButtonData buttons[3] = {
-            { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Cancel" },
-            { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Recover" },
-            { 0, 2, "Next" }
-        };
-        SDL_MessageBoxData data;
+        const char *buttons[] = {"Cancel", "Recover", "Next"};
         char message[EDITOR_PATH_MAX + 128];
         char timestamp[64] = "unknown time";
         time_t raw_time = (time_t)es->recovery_entries[index].timestamp;
@@ -1034,19 +1031,12 @@ int editor_choose_recovery(EditorState *es)
                                  &time_value);
         snprintf(message, sizeof(message), "Source: %s\nTimestamp: %s",
                  source, timestamp);
-        memset(&data, 0, sizeof(data));
-        data.flags = SDL_MESSAGEBOX_WARNING;
-        data.window = es->window;
-        data.title = "Recover Editor Snapshot";
-        data.message = message;
-        data.numbuttons = 3;
-        data.buttons = buttons;
         {
             int button_id = 0;
             if (editor_test_recovery_choice >= 0) {
                 button_id = editor_test_recovery_choice;
                 editor_test_recovery_choice = -1;
-            } else if (SDL_ShowMessageBox(&data, &button_id) != 0) {
+            } else if (dialog_choice("Recover Editor Snapshot", message, buttons, 3, 1, 0, &button_id) != 0) {
                 editor_set_status(es, "Recovery cancelled");
                 return -1;
             }
@@ -1204,14 +1194,14 @@ static int editor_preference_root_path(const EditorState *es, char *buf,
         memcpy(buf, es->preference_root, strlen(es->preference_root) + 1);
         return 0;
     }
-    pref_path = SDL_GetPrefPath(EDITOR_PREF_ORG, EDITOR_PREF_APP);
+    pref_path = preference_path(EDITOR_PREF_ORG, EDITOR_PREF_APP);
     if (!pref_path) return -1;
     if (strlen(pref_path) >= buf_size) {
-        SDL_free(pref_path);
+        free(pref_path);
         return -1;
     }
     memcpy(buf, pref_path, strlen(pref_path) + 1);
-    SDL_free(pref_path);
+    free(pref_path);
     return 0;
 }
 
@@ -1247,20 +1237,25 @@ static int editor_preference_file_path(const EditorState *es, const char *name,
 
 static uint64_t editor_new_recovery_id(const EditorState *es)
 {
-    uint64_t process_id;
     uint64_t id;
-
+    /* Seed once, then allocate monotonically within this process. Mixing a
+     * changing clock with an incrementing counter using XOR can repeat an ID
+     * even for consecutive documents that have not written snapshots yet. */
+    if (!editor_recovery_seeded) {
 #ifdef _WIN32
-    process_id = (uint64_t)GetCurrentProcessId();
+        if (BCryptGenRandom(NULL, (PUCHAR)&editor_recovery_sequence,
+                            sizeof(editor_recovery_sequence), BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) return 0;
 #else
-    process_id = (uint64_t)getpid();
+        FILE *random = fopen("/dev/urandom", "rb");
+        if (!random) return 0;
+        int read_ok = fread(&editor_recovery_sequence, sizeof(editor_recovery_sequence), 1, random) == 1;
+        fclose(random);
+        if (!read_ok) return 0;
 #endif
+        editor_recovery_seeded = 1;
+    }
     do {
-        editor_recovery_sequence++;
-        id = ((uint64_t)time(NULL) << 32) ^
-             (SDL_GetPerformanceCounter() & UINT64_C(0xffffffff)) ^
-             (process_id << 16) ^ editor_recovery_sequence;
-        if (id == 0) id = editor_recovery_sequence;
+        id = ++editor_recovery_sequence;
         for (int i = 0; es && i < es->recovery_entry_count; i++) {
             if (es->recovery_entries[i].id == id) {
                 id = 0;
@@ -1281,6 +1276,7 @@ static int editor_set_recovery_path(EditorState *es, const char *document_path)
         editor_preference_root_path(es, es->recovery_root_path,
                                     sizeof(es->recovery_root_path)) != 0) return -1;
     es->recovery_document_id = editor_new_recovery_id(es);
+    if (!es->recovery_document_id) return -1;
     written = snprintf(name, sizeof(name), "editor_recovery_%016llx.toml",
                        (unsigned long long)es->recovery_document_id);
     if (written < 0 || (size_t)written >= sizeof(name) ||
@@ -1338,7 +1334,7 @@ static int editor_make_playtest_path(EditorState *es)
         editor_playtest_sequence++;
         written = snprintf(name, sizeof(name),
                            "editor_playtest_%lu_%u_%lu.toml",
-                           process_id, (unsigned)SDL_GetTicks(),
+                           process_id, (unsigned)clock_millis(),
                            editor_playtest_sequence);
         if (written < 0 || (size_t)written >= sizeof(name)) return -1;
         if (editor_preference_file_path(es, name, es->playtest_path,

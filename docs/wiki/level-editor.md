@@ -150,7 +150,7 @@ The editor maintains a full undo stack for all placement, deletion, and property
 
 The undo stack is in-memory only — it is cleared when a new file is opened or created.
 
-The editor also keeps recent files and writes recovery snapshots for modified valid levels in its platform preference directory (`SDL_GetPrefPath("Super Mango", "Editor")`).
+The editor keeps recent files and recovery snapshots for modified valid levels in its OS preference directory, retaining the `Super Mango/Editor/` organization/application suffix.
 
 ---
 
@@ -209,7 +209,7 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 
 | File | Responsibility |
 |------|---------------|
-| `editor_main.c` | Entry point — SDL init, `EditorState` lifecycle |
+| `editor_main.c` | Entry point — raylib-backed `EditorState` lifecycle |
 | `editor.c` / `editor.h` | Core state struct, init/loop/cleanup, `EntityType` enum (31 types), `EditorTool`, `EditorCamera`, `Selection` |
 | `editor_validation.c` / `editor_validation.h` | In-memory level validation report used by status, save, autosave, and playtest |
 | `canvas.c` / `canvas.h` | Level preview rendering, `canvas_screen_to_world`, grid overlay |
@@ -222,7 +222,7 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 | `src/shared/serializer_save.c`, `serializer_emit.c`, `serializer_io.c` | TOML emission and atomic file persistence |
 | `file_dialog.c` / `file_dialog.h` | Native OS file picker (macOS / Linux / Windows) |
 
-The `EditorState` struct mirrors the game's `GameState` design: one container passed by pointer to every function, owning the SDL window, renderer, font, entity textures, level data, camera, tool state, undo stack, and UI state.
+The `EditorState` struct mirrors the game's `GameState` design: one container passed by pointer to every function, owning its raylib render target, font, textures, level data, camera, tools, undo history and UI state. The standalone editor owns its process window; native file pickers and confirmations use the existing OS-dialog boundary.
 
 ---
 

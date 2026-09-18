@@ -2,7 +2,6 @@
  * player_lifecycle.c — Player init, rendering, reset, hitbox, and cleanup helpers.
  */
 
-#include <SDL_image.h>  /* IMG_LoadTexture */
 #include <stdio.h>
 
 #include "player.h"
@@ -62,16 +61,16 @@ void player_apply_default_physics(Player *player)
 /*
  * player_init — Load the sprite and place the player in the center of the window.
  */
-int player_init(Player *player, SDL_Renderer *renderer)
+int player_init(Player *player)
 {
     /*
-     * IMG_LoadTexture — decode the PNG sprite sheet and upload it to the GPU.
+     * Decode the PNG sprite sheet and upload it to the GPU.
      * The sheet is 192×288 px and contains a 4-column × 6-row grid of 48×48
      * frames. We only draw one frame at a time using a source clipping rect.
      */
-    player->texture = IMG_LoadTexture(renderer, "assets/sprites/player/player.png");
+    player->texture = texture_load("assets/sprites/player/player.png");
     if (!player->texture) {
-        fprintf(stderr, "Failed to load Player.png: %s\n", IMG_GetError());
+        fprintf(stderr, "Failed to load assets/sprites/player/player.png\n");
         return -1;
     }
 
@@ -147,7 +146,7 @@ int player_init(Player *player, SDL_Renderer *renderer)
  * While hurt_timer > 0 the sprite blinks on/off every 100 ms to give visual
  * feedback that the player was hit and is temporarily invincible.
  */
-void player_render(Player *player, SDL_Renderer *renderer, int cam_x)
+void player_render(Player *player, int cam_x)
 {
     if (player->hurt_timer > 0.0f) {
         int interval = (int)(player->hurt_timer * 1000.0f) / 100;
@@ -155,16 +154,15 @@ void player_render(Player *player, SDL_Renderer *renderer, int cam_x)
     }
 
     /* Cast float world position to integer screen pixels at render time. */
-    SDL_Rect dst = {
+    IntRect dst = {
         .x = (int)player->x - cam_x,
         .y = (int)player->y,
         .w = player->w,
         .h = player->h
     };
 
-    SDL_RendererFlip flip = player->facing_left ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
-    SDL_RenderCopyEx(renderer, player->texture, &player->frame, &dst,
-                     0.0, NULL, flip);
+    int flip = player->facing_left ? SPRITE_FLIP_X : SPRITE_NORMAL;
+    sprite_draw(player->texture, &player->frame, &dst, 0, flip, WHITE);
 }
 
 /*
@@ -173,9 +171,9 @@ void player_render(Player *player, SDL_Renderer *renderer, int cam_x)
  * The hitbox trims transparent sprite padding so enemy and hazard collision
  * matches the visible character instead of the full 48×48 frame.
  */
-SDL_Rect player_get_hitbox(const Player *player)
+IntRect player_get_hitbox(const Player *player)
 {
-    SDL_Rect r;
+    IntRect r;
     r.x = (int)(player->x) + PLAYER_PHYS_PAD_X;
     r.y = (int)(player->y) + PLAYER_PHYS_PAD_TOP;
     r.w = player->w - 2 * PLAYER_PHYS_PAD_X;
@@ -220,13 +218,12 @@ void player_reset(Player *player)
 /*
  * player_cleanup — Release GPU memory held by the player's texture.
  *
- * Must run before the renderer is destroyed, because SDL_Texture objects are
- * owned by the renderer that created them.
+ * Must run before closing the graphics context that owns the GPU texture.
  */
 void player_cleanup(Player *player)
 {
     if (player->texture) {
-        SDL_DestroyTexture(player->texture);
+        texture_unload(player->texture);
         player->texture = NULL;
     }
 }

@@ -25,7 +25,6 @@
  * is no persistent widget tree.
  */
 
-#include <SDL.h>       /* SDL_Rect, SDL_SetRenderDrawColor, SDL_RenderFillRect */
 #include <stdio.h>     /* snprintf */
 
 #include "editor.h"    /* EditorState, EntityType, EditorTool, CANVAS_W, etc.  */
@@ -205,13 +204,6 @@ void palette_render(EditorState *es, int start_y, int available_h)
      * the palette panel.  This prevents accidental scrolling when the
      * designer is interacting with the canvas or other panels.
      *
-     * SDL tracks the mouse wheel via SDL_MouseWheelEvent, but our
-     * immediate-mode UI doesn't expose raw SDL events.  Instead we
-     * read the mouse position and check SDL's wheel state directly.
-     * The editor main loop typically pumps SDL_GetMouseState and wheel
-     * events into UIState; here we use SDL_GetMouseState as a fallback
-     * for the position check.
-     *
      * For now, scroll_y is only modified externally (the editor main loop
      * should call palette_scroll or set scroll_y via a public API if
      * mouse wheel events are needed).  The clamp below keeps it in range.
@@ -230,11 +222,7 @@ void palette_render(EditorState *es, int start_y, int available_h)
      */
     /* ---- Collapsible title bar ---- */
     {
-        SDL_Color title_bg = UI_TITLE_BG;
-        SDL_SetRenderDrawColor(ui->renderer,
-                               title_bg.r, title_bg.g, title_bg.b, title_bg.a);
-        SDL_Rect title_rect = { panel_x, panel_y, PANEL_W, TITLE_H };
-        SDL_RenderFillRect(ui->renderer, &title_rect);
+        DrawRectangle(panel_x, panel_y, PANEL_W, TITLE_H, UI_TITLE_BG);
 
         /* Click header to toggle expand/collapse */
         int hdr_hovered = (ui->mouse_x >= panel_x &&
@@ -261,8 +249,7 @@ void palette_render(EditorState *es, int start_y, int available_h)
 
     int content_top = panel_y + TITLE_H;
 
-    SDL_Rect pal_clip = { panel_x, content_top, PANEL_W, panel_h - TITLE_H };
-    SDL_RenderSetClipRect(ui->renderer, &pal_clip);
+    BeginScissorMode(panel_x, content_top, PANEL_W, panel_h-TITLE_H);
 
     /*
      * clip_bottom — the Y coordinate of the panel's bottom edge.
@@ -370,23 +357,14 @@ void palette_render(EditorState *es, int start_y, int available_h)
                      * stand out.  UI_ACCENT is a blue (#4A90D9) that contrasts
                      * well against the dark panel background.
                      */
-                    SDL_Color accent = UI_ACCENT;
-                    SDL_SetRenderDrawColor(ui->renderer,
-                                           accent.r, accent.g, accent.b,
-                                           accent.a);
-                    SDL_Rect row_rect = { panel_x, cursor_y, PANEL_W, ROW_H };
-                    SDL_RenderFillRect(ui->renderer, &row_rect);
+                    DrawRectangle(panel_x, cursor_y, PANEL_W, ROW_H, UI_ACCENT);
 
                 } else if (hovered) {
                     /*
                      * Hovered row — draw with the button-hover colour to
                      * provide visual feedback before the click.
                      */
-                    SDL_Color hot = UI_BTN_HOT;
-                    SDL_SetRenderDrawColor(ui->renderer,
-                                           hot.r, hot.g, hot.b, hot.a);
-                    SDL_Rect row_rect = { panel_x, cursor_y, PANEL_W, ROW_H };
-                    SDL_RenderFillRect(ui->renderer, &row_rect);
+                    DrawRectangle(panel_x, cursor_y, PANEL_W, ROW_H, UI_BTN_HOT);
                 }
                 /* Else: no background drawn — the panel's UI_BG shows through. */
 
@@ -430,5 +408,5 @@ void palette_render(EditorState *es, int start_y, int available_h)
     }
 
     /* Remove clip rect so other panels are not affected */
-    SDL_RenderSetClipRect(ui->renderer, NULL);
+    EndScissorMode();
 }

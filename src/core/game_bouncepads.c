@@ -4,7 +4,7 @@
 
 #include "game_bouncepads.h"
 
-#include <SDL_mixer.h>
+#include "../shared/audio.h"
 
 int game_bouncepads_collect(const GameState *gs, Bouncepad *out_pads)
 {
@@ -43,7 +43,7 @@ void game_bouncepads_handle_hit(GameState *gs, int bounce_idx)
     bp->anim_frame    = 1;
     bp->anim_timer_ms = 0;
 
-    if (gs->audio.spring) Mix_PlayChannel(-1, gs->audio.spring, 0);
+    sound_play(gs->audio.spring, 128);
 
     if (gs->debug_mode) {
         static const char *pad_names[] = { "GREEN(small)", "WOOD(medium)",
@@ -58,7 +58,7 @@ void game_bouncepads_handle_hit(GameState *gs, int bounce_idx)
 
 void game_bouncepads_update_animations(GameState *gs, float dt)
 {
-    Uint32 elapsed_ms = (Uint32)(dt * 1000.0f);
+    uint32_t elapsed_ms = (uint32_t)(dt * 1000.0f);
 
     bouncepads_update(gs->bouncepads_medium, gs->bouncepad_medium_count,
                       elapsed_ms);

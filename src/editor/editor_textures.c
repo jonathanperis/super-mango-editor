@@ -4,7 +4,6 @@
 
 #include "editor_textures.h"
 
-#include <SDL_image.h>  /* IMG_LoadTexture, IMG_GetError */
 #include <stdio.h>     /* fprintf, stderr */
 
 #include "../game.h"   /* DESTROY_TEX */
@@ -20,10 +19,9 @@ void editor_textures_load(EditorState *es)
 {
     #define LOAD_TEX(field, path) \
         do { \
-            es->textures.field = IMG_LoadTexture(es->renderer, path); \
+            es->textures.field = texture_load(path); \
             if (!es->textures.field) { \
-                fprintf(stderr, "Warning: could not load %s: %s\n", \
-                        path, IMG_GetError()); \
+                fprintf(stderr, "Warning: could not load %s\n", path); \
             } \
         } while (0)
 
@@ -86,8 +84,8 @@ void editor_textures_load(EditorState *es)
 /*
  * editor_textures_cleanup — Destroy all editor preview textures.
  *
- * Textures must be destroyed before the renderer because each SDL_Texture is
- * owned by the renderer that created it. DESTROY_TEX nulls pointers after free.
+ * Textures must be released before the graphics context. DESTROY_TEX clears
+ * owned slots after unloading their GPU handles.
  */
 void editor_textures_cleanup(EditorState *es)
 {

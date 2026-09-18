@@ -6,7 +6,7 @@
  * knockback, just like spike blocks and axe traps.
  */
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 #include <math.h>   /* sqrtf */
 #include <stdio.h>
 
@@ -89,13 +89,13 @@ void circular_saws_update(CircularSaw *saws, int count, float dt) {
  * circular_saws_render — Draw each active saw with rotation.
  *
  * Circular_Saw.png is a single 32×32 frame.  We pass NULL as the source
- * rect to SDL_RenderCopyEx so the entire texture is used.
+ * rect so the entire texture is used.
  *
- * SDL_RenderCopyEx rotates around the sprite's centre (NULL pivot = centre),
+ * The draw helper rotates around the sprite's centre,
  * which is natural for a circular saw blade.
  */
 void circular_saws_render(const CircularSaw *saws, int count,
-                          SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                          Texture2D *tex, int cam_x) {
     if (!tex) return;
 
     for (int i = 0; i < count; i++) {
@@ -114,23 +114,14 @@ void circular_saws_render(const CircularSaw *saws, int count,
          * dst — destination on screen.
          * x − cam_x converts world space to screen space.
          */
-        SDL_Rect dst = {
+        IntRect dst = {
             .x = (int)s->x - cam_x,
             .y = (int)s->y,
             .w = s->w,
             .h = s->h,
         };
 
-        /*
-         * SDL_RenderCopyEx — blit the full texture with rotation.
-         *
-         *   angle  : spin_angle in degrees, advances each frame.
-         *   center : NULL = rotate around the rect's own centre — natural
-         *            for a circular blade.
-         *   flip   : SDL_FLIP_NONE — rotation alone drives the spin.
-         */
-        SDL_RenderCopyEx(renderer, tex, NULL, &dst,
-                         (double)s->spin_angle, NULL, SDL_FLIP_NONE);
+        sprite_draw(tex, NULL, &dst, s->spin_angle, SPRITE_NORMAL, WHITE);
     }
 }
 
@@ -144,8 +135,8 @@ void circular_saws_render(const CircularSaw *saws, int count,
  * This makes collisions feel fair — the player must overlap the actual
  * blade, not just the bounding square.
  */
-SDL_Rect circular_saw_get_hitbox(const CircularSaw *saw) {
-    SDL_Rect r = {
+IntRect circular_saw_get_hitbox(const CircularSaw *saw) {
+    IntRect r = {
         .x = (int)saw->x + 4,
         .y = (int)saw->y + 4,
         .w = saw->w - 8,

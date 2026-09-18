@@ -12,7 +12,6 @@
  *   Loop runs while dx < GAME_W, guaranteeing full coverage with no gaps.
  */
 
-#include <SDL_image.h>  /* IMG_LoadTexture                        */
 #include <stdio.h>      /* fprintf, stderr                        */
 
 #include "parallax.h"
@@ -63,11 +62,11 @@ static const struct {
  * or corrupt, a warning is printed and that layer's texture is left NULL.
  * The game continues running; NULL layers are simply skipped at render time.
  *
- * SDL_QueryTexture retrieves the natural pixel dimensions of each loaded
+ * Texture metadata supplies the natural pixel dimensions of each loaded
  * texture, which the render function uses to compute the tile offset and
  * ensure full horizontal coverage of the canvas.
  */
-void parallax_init(ParallaxSystem *ps, SDL_Renderer *renderer)
+void parallax_init(ParallaxSystem *ps)
 {
     ps->count = LAYER_COUNT;
 
@@ -80,23 +79,22 @@ void parallax_init(ParallaxSystem *ps, SDL_Renderer *renderer)
         layer->texture = NULL;
 
         /*
-         * IMG_LoadTexture — decode the PNG and upload it to GPU memory.
+         * Decode the PNG and upload it to GPU memory.
          * Returns NULL on failure (file not found, unsupported format, etc.).
          */
-        layer->texture = IMG_LoadTexture(renderer, LAYER_CONFIG[i].path);
+        layer->texture = texture_load(LAYER_CONFIG[i].path);
         if (!layer->texture) {
-            fprintf(stderr, "Warning: parallax layer %s not loaded: %s\n",
-                    LAYER_CONFIG[i].path, IMG_GetError());
+            fprintf(stderr, "Warning: parallax layer %s not loaded\n", LAYER_CONFIG[i].path);
             continue;   /* leave tex_w/tex_h at 0; render will skip this layer */
         }
 
         /*
-         * SDL_QueryTexture — read the texture dimensions back from the GPU.
-         * We pass NULL for format and access because we only need w and h.
+         * Read the dimensions retained with the texture handle.
          * These are stored per-layer so the render function can compute the
          * correct tile repeat period without knowing the source asset size.
          */
-        SDL_QueryTexture(layer->texture, NULL, NULL, &layer->tex_w, &layer->tex_h);
+        layer->tex_w = layer->texture->width;
+        layer->tex_h = layer->texture->height;
     }
 }
 
@@ -109,7 +107,7 @@ void parallax_init(ParallaxSystem *ps, SDL_Renderer *renderer)
  * of the internal LAYER_CONFIG table.  Used when the LevelDef provides its
  * own parallax configuration.  count is clamped to MAX_BACKGROUND_LAYERS.
  */
-void parallax_init_from_def(ParallaxSystem *ps, SDL_Renderer *renderer,
+void parallax_init_from_def(ParallaxSystem *ps,
                             const char (*paths)[64], const float *speeds, int count)
 {
     if (count > MAX_BACKGROUND_LAYERS) count = MAX_BACKGROUND_LAYERS;
@@ -123,14 +121,14 @@ void parallax_init_from_def(ParallaxSystem *ps, SDL_Renderer *renderer,
         layer->tex_h   = 0;
         layer->texture = NULL;
 
-        layer->texture = IMG_LoadTexture(renderer, paths[i]);
+        layer->texture = texture_load(paths[i]);
         if (!layer->texture) {
-            fprintf(stderr, "Warning: parallax layer %s not loaded: %s\n",
-                    paths[i], IMG_GetError());
+            fprintf(stderr, "Warning: parallax layer %s not loaded\n", paths[i]);
             continue;
         }
 
-        SDL_QueryTexture(layer->texture, NULL, NULL, &layer->tex_w, &layer->tex_h);
+        layer->tex_w = layer->texture->width;
+        layer->tex_h = layer->texture->height;
     }
 }
 
@@ -156,12 +154,12 @@ void parallax_init_from_def(ParallaxSystem *ps, SDL_Renderer *renderer,
  * Tiles are drawn from x = -offset (the partial tile peeking in from the
  * left) stepping by tex_w until dx >= GAME_W.  The first tile covers the
  * left edge; the last covers whatever gap remains at the right edge.
- * SDL's internal clipping discards anything drawn outside [0, GAME_W).
+ * The render target clips anything drawn outside [0, GAME_W).
  *
  * The destination rect stretches each tile to tex_w × GAME_H so the layer
  * fills the full canvas height.  (Natural height is 216 px; GAME_H is 300 px.)
  */
-void parallax_render(const ParallaxSystem *ps, SDL_Renderer *renderer, int cam_x)
+void parallax_render(const ParallaxSystem *ps, int cam_x)
 {
     for (int i = 0; i < ps->count; i++) {
         const ParallaxLayer *layer = &ps->layers[i];
@@ -198,13 +196,12 @@ void parallax_render(const ParallaxSystem *ps, SDL_Renderer *renderer, int cam_x
              *   w = layer->tex_w : natural width; no horizontal scaling
              *   h = GAME_H    : stretch to full canvas height (216 → 300 px)
              */
-            SDL_Rect dst = { dx, 0, layer->tex_w, GAME_H };
+            IntRect dst = { dx, 0, layer->tex_w, GAME_H };
 
             /*
-             * SDL_RenderCopy — blit the full texture (NULL src = entire image)
-             * onto the destination rect.  SDL clips anything outside the canvas.
+             * Draw the full texture (NULL src = entire image) onto the canvas.
              */
-            SDL_RenderCopy(renderer, layer->texture, NULL, &dst);
+            sprite_draw(layer->texture, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
         }
     }
 }
@@ -214,15 +211,14 @@ void parallax_render(const ParallaxSystem *ps, SDL_Renderer *renderer, int cam_x
 /*
  * parallax_cleanup — Destroy every GPU texture owned by the parallax system.
  *
- * Must be called before SDL_DestroyRenderer.  NULL texture pointers (layers
- * that failed to load) are safe to pass to SDL_DestroyTexture because we
- * guard with an explicit NULL check before calling it.
+ * Must be called before closing the graphics context. Failed asset slots
+ * remain NULL and are skipped during cleanup.
  */
 void parallax_cleanup(ParallaxSystem *ps)
 {
     for (int i = 0; i < ps->count; i++) {
         if (ps->layers[i].texture) {
-            SDL_DestroyTexture(ps->layers[i].texture);
+            texture_unload(ps->layers[i].texture);
             ps->layers[i].texture = NULL;
         }
         ps->layers[i].tex_w = 0;

@@ -10,7 +10,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 /* ---- Constants ---------------------------------------------------------- */
 
@@ -35,4 +35,4 @@ typedef struct {
 /* ---- Function declarations ---------------------------------------------- */
 
 void star_yellows_render(const StarYellow *stars, int count,
-                         SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                         Texture2D *tex, int cam_x);

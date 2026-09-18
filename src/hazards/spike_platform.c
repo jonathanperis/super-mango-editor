@@ -6,7 +6,7 @@
  * but touching the spikes from sides or below deals damage.
  */
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 #include <stdio.h>
 
 #include "spike_platform.h"
@@ -42,7 +42,7 @@ void spike_platforms_init(SpikePlatform *sps, int *count) {
  *   piece 2 (src.x = 32): right end cap
  */
 void spike_platforms_render(const SpikePlatform *sps, int count,
-                            SDL_Renderer *renderer, SDL_Texture *tex,
+                            Texture2D *tex,
                             int cam_x) {
     if (!tex) return;
 
@@ -60,11 +60,11 @@ void spike_platforms_render(const SpikePlatform *sps, int count,
             else if (p == n_pieces-1) piece = 2;
             else                      piece = 1;
 
-            SDL_Rect src = { piece * SPIKE_PLAT_PIECE_W, SPIKE_PLAT_SRC_Y,
+            IntRect src = { piece * SPIKE_PLAT_PIECE_W, SPIKE_PLAT_SRC_Y,
                              SPIKE_PLAT_PIECE_W, SPIKE_PLAT_SRC_H };
-            SDL_Rect dst = { screen_x + p * SPIKE_PLAT_PIECE_W, (int)sp->y,
+            IntRect dst = { screen_x + p * SPIKE_PLAT_PIECE_W, (int)sp->y,
                              SPIKE_PLAT_PIECE_W, SPIKE_PLAT_SRC_H };
-            SDL_RenderCopy(renderer, tex, &src, &dst);
+            sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }
     }
 }
@@ -77,15 +77,15 @@ void spike_platforms_render(const SpikePlatform *sps, int count,
  * The hitbox extends 4 px above the visual platform so that a player
  * standing on top (whose physics bottom sits exactly at sp->y due to
  * FLOOR_SINK snapping) still registers an overlap.  Without this
- * extension, SDL_HasIntersection's strict less-than test would miss
+ * extension, the strict rectangle overlap test would miss
  * the edge-aligned case and no damage would ever trigger.
  */
-SDL_Rect spike_platform_get_rect(const SpikePlatform *sp) {
+IntRect spike_platform_get_rect(const SpikePlatform *sp) {
     /*
      * The hitbox matches the cropped content (11 px tall) plus a 2 px
      * upward extension so a player standing on top still registers overlap.
      */
-    SDL_Rect r = {
+    IntRect r = {
         .x = (int)sp->x,
         .y = (int)sp->y - 2,
         .w = sp->w,

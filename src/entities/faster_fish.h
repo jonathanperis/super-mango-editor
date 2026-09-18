@@ -7,7 +7,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 #define MAX_FASTER_FISH        16
 #define FFISH_FRAMES            2
@@ -36,7 +36,7 @@ typedef struct {
     float  jump_timer;
     float  water_y;
     int    frame_index;
-    Uint32 anim_timer_ms;
+    uint32_t anim_timer_ms;
 } FasterFish;
 
 /* Place initial faster fish instances. */
@@ -47,7 +47,7 @@ void faster_fish_update(FasterFish *fish, int count, float dt, int world_w);
 
 /* Draw all faster fish with camera offset. */
 void faster_fish_render(const FasterFish *fish, int count,
-                        SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                        Texture2D *tex, int cam_x);
 
 /* Return a slightly inset collision box. */
-SDL_Rect faster_fish_get_hitbox(const FasterFish *fish);
+IntRect faster_fish_get_hitbox(const FasterFish *fish);

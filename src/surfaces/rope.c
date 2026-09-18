@@ -36,7 +36,7 @@ void rope_init(RopeDecor *ropes, int *count) {
  * (ROPE_STEP = 46) for seamless stacking.
  */
 void rope_render(const RopeDecor *ropes, int count,
-                 SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                 Texture2D *tex, int cam_x) {
     if (!tex) return;
 
     for (int i = 0; i < count; i++) {
@@ -50,9 +50,9 @@ void rope_render(const RopeDecor *ropes, int count,
 
             if (tile_y >= FLOOR_Y) break;
 
-            SDL_Rect src = { ROPE_SRC_X, ROPE_SRC_Y, ROPE_SRC_W, ROPE_SRC_H };
-            SDL_Rect dst = { screen_x, tile_y, ROPE_W, ROPE_H };
-            SDL_RenderCopy(renderer, tex, &src, &dst);
+            IntRect src = { ROPE_SRC_X, ROPE_SRC_Y, ROPE_SRC_W, ROPE_SRC_H };
+            IntRect dst = { screen_x, tile_y, ROPE_W, ROPE_H };
+            sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }
     }
 }

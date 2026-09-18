@@ -16,10 +16,10 @@
  * 18 ms instead of 16 ms, the leftover 2 ms roll into the next frame's count
  * so animations stay perfectly on beat over time.
  */
-int animate_frame_ms(int *frame_index, Uint32 *timer_ms,
-                     float dt, Uint32 frame_ms, int frame_count)
+int animate_frame_ms(int *frame_index, uint32_t *timer_ms,
+                     float dt, uint32_t frame_ms, int frame_count)
 {
-    *timer_ms += (Uint32)(dt * 1000.0f);
+    *timer_ms += (uint32_t)(dt * 1000.0f);
     if (*timer_ms >= frame_ms) {
         *timer_ms -= frame_ms;
         *frame_index = (*frame_index + 1) % frame_count;

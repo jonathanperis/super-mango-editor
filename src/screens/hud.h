@@ -6,13 +6,11 @@
  *   Center: player icon + "x{lives}" showing remaining lives.
  *   Right : "SCORE: {n}" showing the player's current score.
  *
- * All rendering uses the 400×300 logical coordinate space; SDL's logical
- * size scaling handles the 2× magnification automatically.
+ * All rendering uses the 400×300 logical render target, scaled on presentation.
  */
 #pragma once
 
-#include <SDL.h>       /* SDL_Renderer, SDL_Texture, SDL_Rect */
-#include <SDL_ttf.h>   /* TTF_Font for score and lives text   */
+#include "../shared/text.h"
 
 #define MAX_HEARTS      3     /* maximum hearts the player can have        */
 #define DEFAULT_LIVES   3     /* lives the player starts with              */
@@ -35,15 +33,14 @@
 #define HUD_COIN_ICON_SIZE  12
 
 typedef struct {
-    TTF_Font    *font;        /* bitmap font for HUD text                  */
-    SDL_Texture *star_tex;    /* heart indicator icon (Star_Yellow.png)    */
-    SDL_Texture *coin_icon;   /* coin icon next to score (Coins_Ui.png)    */
-    SDL_Texture *player_icon; /* small player icon for lives (Player.png)  */
+    TextFont *font;           /* owned HUD font */
+    Texture2D *star_tex;      /* borrowed heart indicator */
+    Texture2D *coin_icon;     /* owned coin icon */
+    Texture2D *player_icon;   /* borrowed player sprite sheet */
 } Hud;
 
 /* Load the font; accept shared textures from GameState to avoid duplicates. */
-int hud_init(Hud *hud, SDL_Renderer *renderer,
-             SDL_Texture *star_tex, SDL_Texture *player_tex);
+int hud_init(Hud *hud, Texture2D *star_tex, Texture2D *player_tex);
 
 /*
  * hud_render — Draw the full HUD overlay.
@@ -53,12 +50,12 @@ int hud_init(Hud *hud, SDL_Renderer *renderer,
  * lives      : remaining extra lives.
  * score      : current score to display.
  */
-void hud_render(const Hud *hud, SDL_Renderer *renderer,
+void hud_render(const Hud *hud,
                 int hearts, int lives, int score,
-                int checkpoint_index, int feedback_kind, Uint32 feedback_until,
-                Uint32 now);
+                int checkpoint_index, int feedback_kind, uint32_t feedback_until,
+                uint32_t now);
 
-int hud_checkpoint_feedback_visible(int feedback_kind, Uint32 deadline, Uint32 now);
+int hud_checkpoint_feedback_visible(int feedback_kind, uint32_t deadline, uint32_t now);
 const char *hud_checkpoint_feedback_label(int feedback_kind, int checkpoint_index);
 
 /* Release the font and heart texture. */

@@ -1,253 +1,70 @@
-/*
- * hud.c — HUD rendering: hearts, lives counter, and score display.
- *
- * The HUD is drawn as the topmost layer each frame, after fog and before
- * SDL_RenderPresent.  Text is rendered with TTF_RenderText_Solid (no
- * anti-aliasing) to maintain the crisp pixel-art aesthetic.
- */
-
-#include <SDL_image.h>  /* IMG_LoadTexture */
-#include <stdio.h>      /* snprintf, fprintf */
-
+/* Hearts, lives, score and checkpoint feedback in the 400x300 logical canvas. */
 #include "hud.h"
-#include "../game.h"    /* GAME_W */
+#include "../game.h"
+#include <stdio.h>
 
-int hud_checkpoint_feedback_visible(int feedback_kind, Uint32 deadline, Uint32 now)
+int hud_checkpoint_feedback_visible(int kind, uint32_t deadline, uint32_t now)
 {
-    return feedback_kind != CHECKPOINT_FEEDBACK_NONE &&
-           (Sint32)(now - deadline) < 0;
+    return kind != CHECKPOINT_FEEDBACK_NONE && (int32_t)(now - deadline) < 0;
 }
 
-const char *hud_checkpoint_feedback_label(int feedback_kind, int checkpoint_index)
+const char *hud_checkpoint_feedback_label(int kind, int index)
 {
-    (void)checkpoint_index;
-    if (feedback_kind == CHECKPOINT_FEEDBACK_RESPAWN) return "RESPAWN";
-    if (feedback_kind == CHECKPOINT_FEEDBACK_SAVED) return "CHECKPOINT";
+    (void)index;
+    if (kind == CHECKPOINT_FEEDBACK_RESPAWN) return "RESPAWN";
+    if (kind == CHECKPOINT_FEEDBACK_SAVED) return "CHECKPOINT";
     return "CP";
 }
 
-/* ------------------------------------------------------------------ */
-
-/*
- * hud_init — Load the font and heart icon texture.
- *
- * The font (Round9x13.ttf) is opened at size 13, its native bitmap height.
- * Star/player textures are shared from GameState.  The font is required;
- * missing font data makes HUD initialisation return failure.
- */
-int hud_init(Hud *hud, SDL_Renderer *renderer,
-             SDL_Texture *star_tex, SDL_Texture *player_tex)
+int hud_init(Hud *hud, Texture2D *star, Texture2D *player)
 {
-    /*
-     * TTF_OpenFont — load a TrueType font file and set its point size.
-     * 13 matches the font's designed pixel height (9×13 character cells),
-     * giving the crispest rendering without fractional scaling.
-     */
-    hud->font = TTF_OpenFont("assets/fonts/round9x13.ttf", 13);
+    hud->font = font_load("assets/fonts/round9x13.ttf", 13);
     if (!hud->font) {
-        fprintf(stderr, "Failed to load Round9x13.ttf: %s\n", TTF_GetError());
+        fprintf(stderr, "Failed to load assets/fonts/round9x13.ttf\n");
         return -1;
     }
-
-    /*
-     * Reuse shared textures from GameState — avoids loading the same
-     * PNGs twice (star_yellow.png and player.png are already on the GPU).
-     */
-    hud->star_tex    = star_tex;
-    hud->player_icon = player_tex;
-
-    /*
-     * Load the coin icon for the score display (HUD-only asset).
-     * Non-fatal: the score still shows without the icon.
-     */
-    hud->coin_icon = IMG_LoadTexture(renderer, "assets/sprites/screens/hud_coins.png");
-    if (!hud->coin_icon) {
-        fprintf(stderr, "Warning: Failed to load Coins_Ui.png: %s\n", IMG_GetError());
-    }
+    hud->star_tex = star;
+    hud->player_icon = player;
+    hud->coin_icon = texture_load("assets/sprites/screens/hud_coins.png");
     return 0;
 }
 
-/* ------------------------------------------------------------------ */
-
-/*
- * render_text — Helper: draw a string at (x, y) using the HUD font.
- *
- * Creates a temporary SDL_Surface via TTF_RenderText_Solid (no anti-aliasing,
- * ideal for pixel art), uploads it to a GPU texture, blits it, then frees
- * both.  The per-frame allocation is negligible for HUD-sized strings.
- */
-static void render_text(TTF_Font *font, SDL_Renderer *renderer,
-                        const char *text, int x, int y)
+void hud_render(const Hud *hud, int hearts, int lives, int score,
+                int checkpoint_index, int feedback_kind, uint32_t feedback_until,
+                uint32_t now)
 {
-    SDL_Color white = {255, 255, 255, 255};
-
-    /*
-     * TTF_RenderText_Solid — rasterise the text into an 8-bit palettised
-     * surface with transparent background.  Fast and sharp, no blending.
-     */
-    SDL_Surface *surf = TTF_RenderText_Solid(font, text, white);
-    if (!surf) return;
-
-    /*
-     * SDL_CreateTextureFromSurface — upload the surface pixels to the GPU
-     * so we can draw the text with SDL_RenderCopy.
-     */
-    SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, surf);
-    if (tex) {
-        SDL_Rect dst = {x, y, surf->w, surf->h};
-        SDL_RenderCopy(renderer, tex, NULL, &dst);
-        SDL_DestroyTexture(tex);
-    }
-    SDL_FreeSurface(surf);
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
- * hud_render — Draw hearts, player icon + lives, and score.
- *
- * Layout in logical 400×300 space:
- *
- *   [★][★][★]  [P] x3                        SCORE: 0
- *    4,4        50,3                       right-aligned
- *
- * Hearts are repeated `hearts` times (0–MAX_HEARTS).
- * The player icon uses the first idle frame (row 0, col 0, 48×48 px).
- * Score is right-aligned with HUD_MARGIN from the right edge.
- */
-void hud_render(const Hud *hud, SDL_Renderer *renderer,
-                int hearts, int lives, int score,
-                int checkpoint_index, int feedback_kind, Uint32 feedback_until,
-                Uint32 now)
-{
-    int hud_row_y = HUD_MARGIN;
-
-    /* ---- Hearts (top-left) ---------------------------------------- */
-    /*
-     * Draw one star icon per current heart.  Missing hearts are simply
-     * not drawn, so the number of visible stars equals the player's HP.
-     */
     for (int i = 0; i < hearts; i++) {
-        SDL_Rect dst = {
-            HUD_MARGIN + i * (HUD_HEART_SIZE + HUD_HEART_GAP),
-            hud_row_y + (HUD_ROW_H - HUD_HEART_SIZE) / 2,
-            HUD_HEART_SIZE,
-            HUD_HEART_SIZE
-        };
-        SDL_RenderCopy(renderer, hud->star_tex, NULL, &dst);
+        IntRect dst = {HUD_MARGIN + i*(HUD_HEART_SIZE + HUD_HEART_GAP),
+                       HUD_MARGIN, HUD_HEART_SIZE, HUD_HEART_SIZE};
+        sprite_draw(hud->star_tex, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
     }
-
-    /* ---- Player icon + lives counter ------------------------------ */
-    /*
-     * Position the player icon after the last possible heart slot so it
-     * doesn't shift when hearts are lost.
-     */
-    int icon_x = HUD_MARGIN + MAX_HEARTS * (HUD_HEART_SIZE + HUD_HEART_GAP) + 6;
-
-    /*
-     * Source rect: crop to just the visible character art within the
-     * 48×48 idle frame.  The art occupies x=16..31, y=19..31 (16×13 px);
-     * the rest is transparent padding.  Displaying at HUD_ICON_W × HUD_ICON_H
-     * gives a 1:1 pixel-crisp icon that aligns with the hearts and text.
-     */
-    SDL_Rect icon_src = {16, 19, 16, 13};
-    SDL_Rect icon_dst = {
-        icon_x,
-        hud_row_y + (HUD_ROW_H - HUD_ICON_H) / 2,
-        HUD_ICON_W,
-        HUD_ICON_H
-    };
-    if (hud->player_icon) {
-        SDL_RenderCopy(renderer, hud->player_icon, &icon_src, &icon_dst);
-    }
-
-    /*
-     * "x3" — lives counter text, rendered right next to the player icon.
-     * snprintf formats the number; render_text draws it in white.
-     * Aligned to HUD_ROW_H so it sits level with hearts and score.
-     */
-    char lives_buf[8];
-    snprintf(lives_buf, sizeof(lives_buf), "x%d", lives);
-    render_text(hud->font, renderer, lives_buf,
-                icon_x + HUD_ICON_W + 4,
-                hud_row_y + (HUD_ROW_H - 13) / 2);
-
-    /* ---- Score (top-right) ---------------------------------------- */
-    /*
-     * Format the score and right-align it.  TTF_SizeText returns the pixel
-     * width of the rendered string so we can position the left edge correctly.
-     */
-    char score_buf[32];
-    snprintf(score_buf, sizeof(score_buf), "SCORE: %d", score);
-
-    int text_w = 0;
-    if (TTF_SizeText(hud->font, score_buf, &text_w, NULL) != 0) {
-        fprintf(stderr, "TTF_SizeText failed for score text: %s\n", TTF_GetError());
-        text_w = 0;  /* Fallback: draw at GAME_W - HUD_MARGIN, as before */
-    }
-    /*
-     * Compute score text x position, leaving room for the coin icon after it.
-     * Layout: [SCORE: 123] [coin_icon]
-     * The coin icon sits immediately to the right of the score text.
-     */
-    int coin_gap = 3;  /* px gap between score text and coin icon */
-    int total_score_w = text_w + coin_gap + HUD_COIN_ICON_SIZE;
-    int score_x = GAME_W - HUD_MARGIN - total_score_w;
-
-    render_text(hud->font, renderer, score_buf,
-                score_x,
-                hud_row_y + (HUD_ROW_H - 13) / 2);
-
-    /* Draw the coin icon right after the score text */
-    if (hud->coin_icon) {
-        SDL_Rect coin_dst = {
-            score_x + text_w + coin_gap,
-            hud_row_y + (HUD_ROW_H - HUD_COIN_ICON_SIZE) / 2,
-            HUD_COIN_ICON_SIZE,
-            HUD_COIN_ICON_SIZE
-        };
-        SDL_RenderCopy(renderer, hud->coin_icon, NULL, &coin_dst);
-    }
-
-    /* Keep checkpoint feedback in its own quiet bottom-left HUD lane. */
+    int icon_x = HUD_MARGIN + MAX_HEARTS*(HUD_HEART_SIZE + HUD_HEART_GAP) + 6;
+    IntRect src = {16, 19, 16, 13};
+    IntRect dst = {icon_x, HUD_MARGIN + (HUD_ROW_H-HUD_ICON_H)/2, HUD_ICON_W, HUD_ICON_H};
+    sprite_draw(hud->player_icon, &src, &dst, 0, SPRITE_NORMAL, WHITE);
+    char text[32];
+    snprintf(text, sizeof(text), "x%d", lives);
+    int text_y = HUD_MARGIN + (HUD_ROW_H-13)/2;
+    font_draw(hud->font, text, icon_x+HUD_ICON_W+4, text_y, WHITE);
+    snprintf(text, sizeof(text), "SCORE: %d", score);
+    int width = 0;
+    font_measure(hud->font, text, &width, NULL);
+    int score_x = GAME_W-HUD_MARGIN-width-3-HUD_COIN_ICON_SIZE;
+    font_draw(hud->font, text, score_x, text_y, WHITE);
+    dst = (IntRect){score_x+width+3, HUD_MARGIN+(HUD_ROW_H-HUD_COIN_ICON_SIZE)/2,
+                    HUD_COIN_ICON_SIZE, HUD_COIN_ICON_SIZE};
+    sprite_draw(hud->coin_icon, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
     if (hud_checkpoint_feedback_visible(feedback_kind, feedback_until, now)) {
-        char checkpoint_buf[32];
         const char *label = hud_checkpoint_feedback_label(feedback_kind, checkpoint_index);
-        if (checkpoint_index >= 0) {
-            snprintf(checkpoint_buf, sizeof(checkpoint_buf), "%s CP %d",
-                     label, checkpoint_index + 1);
-        } else {
-            snprintf(checkpoint_buf, sizeof(checkpoint_buf), "%s", label);
-        }
-        render_text(hud->font, renderer, checkpoint_buf,
-                    HUD_MARGIN, GAME_H - HUD_MARGIN - 13);
+        if (checkpoint_index >= 0) snprintf(text, sizeof(text), "%s CP %d", label, checkpoint_index+1);
+        else snprintf(text, sizeof(text), "%s", label);
+        font_draw(hud->font, text, HUD_MARGIN, GAME_H-HUD_MARGIN-13, WHITE);
     }
 }
 
-/* ------------------------------------------------------------------ */
-
-/*
- * hud_cleanup — Release the font and heart texture.
- *
- * TTF_CloseFont releases FreeType memory; SDL_DestroyTexture releases
- * GPU memory.  Both are set to NULL for double-free safety.
- */
 void hud_cleanup(Hud *hud)
 {
-    /*
-     * star_tex and player_icon are shared textures owned by GameState —
-     * they are destroyed in game_cleanup, not here.  Only NULL the
-     * pointers so no stale references remain.
-     */
-    hud->star_tex    = NULL;
-    hud->player_icon = NULL;
-
-    if (hud->coin_icon) {
-        SDL_DestroyTexture(hud->coin_icon);
-        hud->coin_icon = NULL;
-    }
-    if (hud->font) {
-        TTF_CloseFont(hud->font);
-        hud->font = NULL;
-    }
+    texture_unload(hud->coin_icon);
+    font_unload(hud->font);
+    *hud = (Hud){0};
 }

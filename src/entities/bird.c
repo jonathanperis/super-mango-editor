@@ -42,7 +42,7 @@ void birds_init(Bird *birds, int *count, int world_w)
 /* ------------------------------------------------------------------ */
 
 void birds_update(Bird *birds, int count, float dt,
-                  Mix_Chunk *snd_flap, float player_x, int cam_x)
+                  SoundEffect *snd_flap, float player_x, int cam_x)
 {
     const BirdVariantSpec *spec = bird_variant_spec(BIRD_VARIANT_REGULAR);
 
@@ -55,7 +55,7 @@ void birds_update(Bird *birds, int count, float dt,
     }
 }
 
-SDL_Rect bird_get_hitbox(const Bird *b)
+IntRect bird_get_hitbox(const Bird *b)
 {
     const BirdVariantSpec *spec = bird_variant_spec(BIRD_VARIANT_REGULAR);
     return bird_variant_hitbox(spec, b->x, b->base_y);
@@ -64,13 +64,13 @@ SDL_Rect bird_get_hitbox(const Bird *b)
 /* ------------------------------------------------------------------ */
 
 void birds_render(const Bird *birds, int count,
-                  SDL_Renderer *renderer, SDL_Texture *tex, int cam_x)
+                  Texture2D *tex, int cam_x)
 {
     const BirdVariantSpec *spec = bird_variant_spec(BIRD_VARIANT_REGULAR);
 
     for (int i = 0; i < count; i++) {
         const Bird *b = &birds[i];
         bird_variant_render(spec, b->x, b->base_y, b->vx, b->frame_index,
-                            renderer, tex, cam_x);
+                            tex, cam_x);
     }
 }

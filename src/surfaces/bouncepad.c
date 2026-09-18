@@ -7,7 +7,7 @@
  * game_loop then sets state = BOUNCE_ACTIVE here to start the animation.
  */
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 #include <stdio.h>
 
 #include "bouncepad.h"
@@ -46,7 +46,7 @@ void bouncepad_place(Bouncepad *pad, float x, float launch_vy, BouncepadType pad
  * dt_ms is the frame delta time in milliseconds, consistent with how
  * the rest of the animation timers in this codebase work.
  */
-void bouncepads_update(Bouncepad *pads, int count, Uint32 dt_ms) {
+void bouncepads_update(Bouncepad *pads, int count, uint32_t dt_ms) {
     for (int i = 0; i < count; i++) {
         Bouncepad *p = &pads[i];
         if (p->state != BOUNCE_ACTIVE) continue;
@@ -81,7 +81,7 @@ void bouncepads_update(Bouncepad *pads, int count, Uint32 dt_ms) {
  * World → screen conversion: dst.x = (int)pad->x - cam_x.
  */
 void bouncepads_render(const Bouncepad *pads, int count,
-                       SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                       Texture2D *tex, int cam_x) {
     if (!tex) return;   /* texture failed to load; skip silently */
 
     for (int i = 0; i < count; i++) {
@@ -97,7 +97,7 @@ void bouncepads_render(const Bouncepad *pads, int count,
          *
          * anim_frame 0 → src.x=0, frame 1 → src.x=48, frame 2 → src.x=96.
          */
-        SDL_Rect src = {
+        IntRect src = {
             p->anim_frame * BOUNCEPAD_W,  /* column within the sheet */
             BOUNCEPAD_SRC_Y,              /* skip transparent top padding */
             BOUNCEPAD_W,
@@ -109,13 +109,13 @@ void bouncepads_render(const Bouncepad *pads, int count,
          * the camera exactly like every other world-space object.
          * Height matches the cropped src so the scale stays 1:1.
          */
-        SDL_Rect dst = {
+        IntRect dst = {
             (int)p->x - cam_x,
             (int)p->y,
             p->w,
             p->h
         };
 
-        SDL_RenderCopy(renderer, tex, &src, &dst);
+        sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
     }
 }

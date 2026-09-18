@@ -10,7 +10,7 @@ typedef struct SettingsMenu {
 
 /* Returns 1 only for events consumed by settings; quit/hot-plug still propagate. */
 int settings_menu_event(SettingsMenu *menu, GameProfile *profile,
-                         const SDL_Event *event, int open_button);
+                         const InputEvent *event, int open_button);
 void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
-                           SDL_Renderer *renderer, TTF_Font *font);
+                           TextFont *font);
 void settings_menu_cleanup(SettingsMenu *menu);

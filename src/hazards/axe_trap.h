@@ -12,8 +12,8 @@
  */
 #pragma once
 
-#include <SDL.h>       /* SDL_Texture, SDL_Renderer, SDL_Rect */
-#include <SDL_mixer.h> /* Mix_Chunk — swinging-axe sound       */
+#include "../shared/graphics.h"
+#include "../shared/audio.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -120,15 +120,15 @@ void axe_traps_init(AxeTrap *traps, int *count);
  * cam_x is the camera left edge — axes off-screen are silent.
  */
 void axe_traps_update(AxeTrap *traps, int count, float dt,
-                      Mix_Chunk *snd_axe, float player_x, int cam_x);
+                      SoundEffect *snd_axe, float player_x, int cam_x);
 
 /*
- * axe_traps_render — Draw all active traps using SDL_RenderCopyEx rotation.
+ * axe_traps_render — Draw all active traps around the handle pivot.
  *
  * tex is the shared Axe_Trap.png texture.  cam_x converts world → screen.
  */
 void axe_traps_render(const AxeTrap *traps, int count,
-                      SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                      Texture2D *tex, int cam_x);
 
 /*
  * axe_trap_get_hitbox — Return the collision rectangle in world space.
@@ -137,4 +137,4 @@ void axe_traps_render(const AxeTrap *traps, int count,
  * For simplicity we use the full rotated bounding box of the lower half
  * of the sprite (the blade region).
  */
-SDL_Rect axe_trap_get_hitbox(const AxeTrap *trap);
+IntRect axe_trap_get_hitbox(const AxeTrap *trap);

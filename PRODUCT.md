@@ -2,9 +2,9 @@
 
 ## Product Identity
 
-Super Mango is an open-source 2D side-scrolling pixel platformer and learning project. It is written in C11 with SDL2, runs natively on macOS, Linux, and Windows, and ships a browser-playable WebAssembly build.
+Super Mango is an open-source 2D side-scrolling pixel platformer and learning project. It is written in C11 with raylib, runs natively on macOS, Linux, and Windows, and ships a browser-playable WebAssembly build.
 
-The public website is not only a download page. It is the attract screen for a playable game, the front door to the codebase, and a guided entrance into learning C and SDL2 game development.
+The public website is not only a download page. It is the attract screen for a playable game, the front door to the codebase, and a guided entrance into learning C and raylib game development.
 
 ## Register
 
@@ -16,7 +16,7 @@ brand
 
 People who arrive from GitHub, social links, or a search result and want to try the game immediately. They are curious, impatient, and deciding within seconds whether the page is playable or only documentation.
 
-### C and SDL2 learners
+### C and raylib learners
 
 Developers who want a readable game codebase with real systems: input, game loop, collision, rendering, audio, assets, WebAssembly build, and level loading. They need proof that the project is approachable and well documented.
 
@@ -35,7 +35,7 @@ The page should feel like a night-time arcade cabinet that also happens to be a 
 ## Core Value Propositions
 
 1. **Play instantly in the browser.** The website hosts the WebAssembly build and loads the game into an embedded canvas.
-2. **Learn from a real C11 and SDL2 game.** The project is positioned as an educational resource with commented code and architecture docs.
+2. **Learn from a real C11 and raylib game.** The project is positioned as an educational resource with commented code and architecture docs.
 3. **Build and inspect levels.** Levels are TOML data files, and the repo includes a standalone visual level editor.
 4. **Study a complete platformer stack.** The codebase includes rendering layers, physics, collision, enemies, hazards, pickups, overlays, audio, and native/WebAssembly builds.
 5. **Run anywhere.** The project targets Linux, macOS, Windows, and browser play.
@@ -50,7 +50,7 @@ simulation inspector with reproducible experiment capture.
 
 Source-backed facts for design and copy:
 
-- Language and stack: C11, SDL2, SDL2_image, SDL2_ttf, SDL2_mixer, vendored tomlc17, Emscripten/WebAssembly.
+- Language and stack: C11, pinned raylib 6.0, vendored tomlc17, Emscripten/WebAssembly.
 - Rendering: 400x300 logical resolution scaled to an 800x600 native window for chunky pixel rendering.
 - Browser payload callout: generated raw playable-asset size plus engine overhead; not an unmeasured compressed-transfer claim.
 - Campaign: the ordered v1 `levels/campaigns/main.toml`; separate focused examples live in `levels/labs/`.
@@ -59,7 +59,7 @@ Source-backed facts for design and copy:
 - Enemy set: spiders, jumping spiders, birds, faster birds, fish, faster fish.
 - Hazard set: spike rows, spike blocks, spike platforms, circular saws, axe traps, blue flames, fire flames.
 - Visual systems: parallax backgrounds, 32 render layers, scrolling camera, fog overlays, HUD, debug overlay.
-- Level editor: standalone SDL2 editor with canvas, checkpoint-aware palette and markers, select/place/delete tools, properties inspector, level config, undo/redo, recent files, autosave, validation, TOML save/load, and play-test integration.
+- Level editor: standalone raylib editor with canvas, checkpoint-aware palette and markers, select/place/delete tools, properties inspector, level config, undo/redo, recent files, autosave, validation, TOML save/load, and play-test integration.
 - Controls: keyboard controls are visible on the site: WASD or arrows to move, Space to jump. Docs also describe gamepad hot-plug support.
 - Authors: Jonathan Peris and Fernando Santos.
 - Art credit: Super Mango 2D Pixel Art Platformer Asset Pack by Juho.
@@ -77,7 +77,7 @@ Preferred copy moves:
 
 - Use game-world language for section labels when clarity remains intact: `START RUN`, `INSERT COIN`, `BUILDER MANUAL`, `ITEM DROP`, `CHOOSE YOUR CARTRIDGE`.
 - Pair playful labels with plain supporting text: `ITEM DROP` plus `Download builds for your platform`.
-- Use concrete proof over adjectives: generated campaign/lab counts, `TOML levels`, `C11 + SDL2`, `visual level editor`.
+- Use concrete proof over adjectives: generated campaign/lab counts, `TOML levels`, `C11 + raylib`, `visual level editor`.
 
 Avoid:
 
