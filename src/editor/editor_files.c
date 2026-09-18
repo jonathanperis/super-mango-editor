@@ -689,7 +689,7 @@ static int editor_read_recovery_metadata(const EditorState *es,
     char *timestamp_text;
     char *source_text;
     char *end;
-    unsigned long long id;
+    uint64_t id;
     unsigned long long timestamp;
     FILE *fp;
 

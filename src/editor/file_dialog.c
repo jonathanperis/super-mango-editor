@@ -11,6 +11,10 @@
  * file dialog — the user expects the editor to pause while they pick a file.
  */
 
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <stdio.h>   /* popen, pclose, fgets, fprintf */
 #include <string.h>  /* strlen, strchr */
 #include <ctype.h>   /* tolower */
