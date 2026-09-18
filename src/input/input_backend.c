@@ -351,7 +351,12 @@ void input_collect(void)
                 suppressed[key] = IsKeyDown(key);
         input_push(&(InputEvent){.type=INPUT_FOCUS, .focused=focused});
     }
+#ifndef __EMSCRIPTEN__
+    /* Only desktop windows have an OS close request. raylib's Web version
+     * of WindowShouldClose sleeps through Asyncify; calling it from our
+     * browser-owned frame callback aborts the non-Asyncify build. */
     if (WindowShouldClose()) input_push(&(InputEvent){.type=INPUT_QUIT});
+#endif
     int device = input_first_gamepad();
     if (device != gamepad) {
         if (gamepad) input_push(&(InputEvent){.type=INPUT_PAD_REMOVED,.device=gamepad});

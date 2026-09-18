@@ -78,3 +78,6 @@ node_modules/
 
 # Local specifications (existing tracked specifications remain tracked)
 .specs/
+
+# Task-owned browser verification artifacts
+playwright-evidence/

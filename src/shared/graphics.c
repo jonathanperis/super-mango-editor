@@ -11,7 +11,14 @@ int display_open(int width, int height, const char *title, int hidden)
     if (!IsWindowReady()) return -1;
     /* Escape belongs to pause/cancel/menu actions, not automatic raylib exit. */
     SetExitKey(KEY_NULL);
+#ifdef __EMSCRIPTEN__
+    /* Emscripten schedules frames through requestAnimationFrame. A second,
+     * blocking limiter would occupy the browser's main thread in EndDrawing.
+     * Return control to the browser instead of waiting inside its callback. */
+    SetTargetFPS(0);
+#else
     SetTargetFPS(hidden ? 0 : 60);
+#endif
     return 0;
 }
 

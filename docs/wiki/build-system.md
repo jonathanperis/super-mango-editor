@@ -209,6 +209,11 @@ make web
 
 Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). The pinned raylib Web library is built separately with `emcmake`; the application links it with `USE_GLFW=3`. Uses a custom shell template from `web/shell.html`.
 
+The Web frame callback returns to Emscripten's animation-frame scheduler rather
+than using raylib's blocking FPS limiter. Asyncify is not required by this loop.
+Artifact compilation and HTTP delivery checks do not execute browser frames;
+startup/render changes also need the browser checks in [Testing](../testing/).
+
 The target also produces debug boot artifacts (`out/super-mango-debug.html` and companions) for direct debug HTML launches. The docs-site browser debug button uses the normal `super-mango.js` payload and passes `--debug` at boot.
 
 For release confidence, the **GitHub Actions WebAssembly build is authoritative**. Report local SDK/cache failures separately from application failures, and require the CI `make web`, artifact checks and Pages assembly checks. JavaScript syntax/WASM validation requires real Node.js; if a local `node` wrapper launches Bun, set `NODE` to the Node executable explicitly.
