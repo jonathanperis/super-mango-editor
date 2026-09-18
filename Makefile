@@ -165,10 +165,10 @@ SANITIZE_LDFLAGS    = -fsanitize=address,undefined
 
 all: $(OUTDIR) $(TARGET)
 
-$(RAYLIB_LIB): vendor/raylib/manifest.json tools/build_raylib.py Makefile
+$(RAYLIB_LIB): vendor/raylib/manifest.json vendor/raylib/patches.json tools/build_raylib.py Makefile
 	python3 tools/build_raylib.py --build-dir "$(RAYLIB_BUILD)" --platform $(RAYLIB_PLATFORM) --cc "$(CC)" --mode $(BUILD_MODE) $(if $(findstring -fsanitize,$(CFLAGS)),--sanitize,)
 
-$(WEB_RAYLIB_LIB): vendor/raylib/manifest.json tools/build_raylib.py Makefile
+$(WEB_RAYLIB_LIB): vendor/raylib/manifest.json vendor/raylib/patches.json tools/build_raylib.py Makefile
 	python3 tools/build_raylib.py --build-dir "$(WEB_RAYLIB_BUILD)" --platform web --mode release
 
 $(OUTDIR):
