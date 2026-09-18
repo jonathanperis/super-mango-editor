@@ -46,3 +46,8 @@ Alert #82 compares zoom values selected from the exactly representable set
 false positive after separate explicit maintainer authorization.
 Initialization, toolbar selection and wheel input are the only production zoom
 assignments. Their review threads were resolved after this contract check.
+
+After token-preserving formatting, CodeQL reissued the zoom finding as `#105`
+and the previously reviewed command-line editor path (`#85`) as `#106`.
+Both replacement IDs were separately authorized for dismissal with the same
+verified rationale. The PR alert readback reports no open scanning alerts.
