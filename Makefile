@@ -1,19 +1,6 @@
-# ── Compiler + SDL2 detection ────────────────────────────────────────
-# Both CC and SDL2CFG can be overridden on the command line:
-#   make CC=gcc
-#   make CC=gcc SDL2CFG=/custom/sdl2-config
-#
-# SDL2CFG always resolves from PATH so it works in any MSYS2/UCRT64
-# shell (local or CI) without needing a hardcoded install location.
-#
-# CC defaults to the MSYS2 UCRT64 clang when running on Windows outside
-# an MSYS2 shell (e.g. Git Bash), where the wrong clang from Git for
-# Windows would otherwise be picked up first.  Inside an MSYS2 shell
-# (CI: shell: msys2 {0}, or local: launched from MSYS2 terminal) the
-# right gcc/clang is already first on PATH, so the ?= default is ignored
-# and only the SDL2CFG path matters — which is just "sdl2-config".
-
-SDL2CFG ?= sdl2-config
+# ── Compiler and pinned raylib build ─────────────────────────────────
+# Make remains the application entry point; CMake builds the pinned dependency.
+# Native and web libraries have separate build directories and never use SDL.
 NODE ?= node
 
 ifeq ($(OS),Windows_NT)
@@ -28,12 +15,34 @@ endif
 BUILD_MODE ?= debug
 MODE_FLAGS_debug = -g -O0
 MODE_FLAGS_release = -O2
-CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(MODE_FLAGS_$(BUILD_MODE)) $(shell $(SDL2CFG) --cflags)
-# Tests provide their own main(), so stop SDL from remapping it to SDL_main on Windows.
-TEST_CFLAGS = $(filter-out -Dmain=SDL_main,$(CFLAGS)) -DSDL_MAIN_HANDLED
-LIBS    = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
+CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(MODE_FLAGS_$(BUILD_MODE)) -I$(RAYLIB_BUILD)/build/raylib/include $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_RAYLIB_MEMORY,) $(EXTRA_CFLAGS)
+TEST_CFLAGS = $(CFLAGS) $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_MEMORY_TESTS,)
+LIBS    = $(RAYLIB_LIB) $(PLATFORM_LIBS) $(EXTRA_LDFLAGS)
 OUTDIR  = out
+RAYLIB_BUILD ?= $(OUTDIR)/raylib
+RAYLIB_PLATFORM ?= native
+RAYLIB_LIB = $(RAYLIB_BUILD)/build/raylib/libraylib.a
+WEB_RAYLIB_BUILD = $(OUTDIR)/raylib-web
+WEB_RAYLIB_LIB = $(WEB_RAYLIB_BUILD)/build/raylib/libraylib.a
+RELEASE_RAYLIB_BUILD = $(if $(filter command line environment,$(origin RAYLIB_BUILD)),$(RAYLIB_BUILD),$(OUTDIR)/release/raylib)
+ifeq ($(OS),Windows_NT)
+PLATFORM_LIBS = -lopengl32 -lgdi32 -lwinmm -lshell32 -lole32 -lpsapi -lbcrypt -lm
+else ifeq ($(shell uname -s),Darwin)
+PLATFORM_LIBS = -framework OpenGL -framework Cocoa -framework IOKit -framework CoreAudio -framework CoreVideo -lm
+else
+PLATFORM_LIBS = -lGL -lX11 -lpthread -ldl -lrt -lm
+endif
 OBJDIR  = $(OUTDIR)/obj
+ifeq ($(RAYLIB_PLATFORM),memory)
+ifeq ($(OS),Windows_NT)
+PLATFORM_LIBS = -lshell32 -lole32 -lpsapi -lwinmm -lbcrypt -lm
+else
+PLATFORM_LIBS = -lm -lpthread
+endif
+ifneq ($(filter release dist-native,$(MAKECMDGOALS)),)
+$(error Memory is a test backend; native releases require RAYLIB_PLATFORM=native)
+endif
+endif
 DISTDIR = dist
 TARGET  = $(OUTDIR)/super-mango
 SRCDIR  = src
@@ -54,18 +63,18 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           vendor/tomlc17/tomlc17.c
 OBJS    = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
 DEPS    = $(OBJS:.o=.d)
-SESSION_RUNTIME_OBJS = $(filter-out $(OBJDIR)/src/main.o,$(OBJS))
+SESSION_RUNTIME_OBJS = $(filter-out $(OBJDIR)/src/main.o $(OBJDIR)/src/shared/audio.o $(OBJDIR)/src/core/app_session.o,$(OBJS)) $(TEST_AUDIO_OBJ) $(TEST_SESSION_OBJ)
 
 # ── Editor (standalone level editor) ─────────────────────────────────
 EDITOR_DIR    = src/editor
 SHARED_DIR    = src/shared
 VENDOR_DIR    = vendor/tomlc17
 EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(wildcard $(SHARED_DIR)/*.c) $(VENDOR_DIR)/tomlc17.c \
-                src/surfaces/rail.c src/levels/level_validate.c
+                src/surfaces/rail.c src/levels/level_validate.c src/input/input_backend.c
 EDITOR_OBJS   = $(patsubst %.c,$(OBJDIR)/%.o,$(EDITOR_SRCS))
 EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor
-EDITOR_LIBS   = $(shell $(SDL2CFG) --libs) -lSDL2_image -lSDL2_ttf -lm
+EDITOR_LIBS   = $(LIBS)
 TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
                  $(OUTDIR)/runtime-load-test \
                  $(OUTDIR)/rail-test $(OUTDIR)/entity-utils-test \
@@ -140,7 +149,11 @@ TEST_EDITOR_PROPERTIES_OBJ = $(OBJDIR)/tests/test-editor-properties.o
 TEST_EDITOR_PLAYTEST_OBJ = $(OBJDIR)/tests/test-editor-playtest.o
 TEST_FILE_DIALOG_OBJ = $(OBJDIR)/tests/test-file-dialog.o
 TEST_UNDO_OBJ      = $(OBJDIR)/tests/test-undo.o
-TEST_LIBS           = $(shell $(SDL2CFG) --libs) -lm
+TEST_AUDIO_OBJ     = $(OBJDIR)/tests/test-audio.o
+TEST_SESSION_OBJ   = $(OBJDIR)/tests/test-app-session.o
+TEST_INPUT_BACKEND_OBJ = $(OBJDIR)/tests/test-input-backend.o
+TEST_LIBS           = $(LIBS)
+PLATFORM_OBJS = $(addprefix $(OBJDIR)/src/shared/,audio.o graphics.o platform.o text.o) $(OBJDIR)/src/input/input_backend.o
 TEST_DEPS           = $(wildcard $(OBJDIR)/tests/*.d)
 # Test objects have explicit recipes; order their directory creation too,
 # including when an individual test is built in parallel from a fresh OUTDIR.
@@ -151,6 +164,12 @@ SANITIZE_LDFLAGS    = -fsanitize=address,undefined
 .PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels web-host-contract level-catalog overlay-snapshots docs-drift roadmap-quality smoke scripted-smoke sanitize sanitize-smoke dist-native dist-wasm compile-commands
 
 all: $(OUTDIR) $(TARGET)
+
+$(RAYLIB_LIB): vendor/raylib/manifest.json tools/build_raylib.py Makefile
+	python3 tools/build_raylib.py --build-dir "$(RAYLIB_BUILD)" --platform $(RAYLIB_PLATFORM) --cc "$(CC)" --mode $(BUILD_MODE) $(if $(findstring -fsanitize,$(CFLAGS)),--sanitize,)
+
+$(WEB_RAYLIB_LIB): vendor/raylib/manifest.json tools/build_raylib.py Makefile
+	python3 tools/build_raylib.py --build-dir "$(WEB_RAYLIB_BUILD)" --platform web --mode release
 
 $(OUTDIR):
 	mkdir -p $(OUTDIR) $(OBJDIR) $(OBJDIR)/tests
@@ -169,11 +188,11 @@ $(OBJDIR)/$(SRCDIR)/%.o: $(SRCDIR)/%.c | $(OUTDIR)
 -include $(DEPS)
 
 # ── Run targets (cross-platform) ─────────────────────────────────────
-# Windows needs SDL DLL path in PATH; Linux/macOS use system libs.
+# Windows toolchain runtime DLLs must be on PATH for local builds.
 
 ifeq ($(OS),Windows_NT)
-SDL_DLL_PATH ?= /c/msys64/ucrt64/bin
-RUN_PREFIX = PATH="$(SDL_DLL_PATH):$$PATH"
+RUNTIME_DLL_PATH ?= /c/msys64/ucrt64/bin
+RUN_PREFIX = PATH="$(RUNTIME_DLL_PATH):$$PATH"
 else
 RUN_PREFIX =
 endif
@@ -227,17 +246,23 @@ test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/entity-utils-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/collision-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/phase-transition-test"
-	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) "$(abspath $(OUTDIR))/editor-validation-test"
+	MANGO_TEST_WINDOW=1 $(RUN_PREFIX) "$(abspath $(OUTDIR))/editor-validation-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/gameplay-damage-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/gameplay-config-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/gameplay-score-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/game-overlay-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/game-events-test"
-	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) "$(abspath $(OUTDIR))/session-test"
+	MANGO_TEST_WINDOW=1 $(RUN_PREFIX) "$(abspath $(OUTDIR))/session-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/game-checkpoint-test"
 
 $(TEST_TARGETS): | $(OUTDIR)
 $(TEST_OBJECTS): | $(OUTDIR)
+$(filter-out $(OUTDIR)/session-test $(OUTDIR)/game-events-test,$(TEST_TARGETS)): $(PLATFORM_OBJS)
+$(OUTDIR)/game-events-test: $(filter-out $(OBJDIR)/src/input/input_backend.o,$(PLATFORM_OBJS)) $(TEST_INPUT_BACKEND_OBJ) tests/input_backend_test.c
+$(OUTDIR)/editor-validation-test: $(OBJDIR)/src/editor/dialog_choice.o
+# A rebuilt dependency must refresh consumers and relink executables. Exported
+# headers retain upstream timestamps, so header mtimes alone are insufficient.
+$(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS)): $(RAYLIB_LIB)
 
 # Extra standalone parser probes; keep the 15-regression-binary inventory above.
 .PHONY: parser-allocation-probe parser-encoding-probe
@@ -258,12 +283,12 @@ web-host-contract:
 	$(NODE) tests/web_host_test.cjs
 	$(NODE) tests/profile_storage_test.cjs
 	$(NODE) tests/touch_controls_test.cjs
+	$(NODE) tests/keyboard_scope_test.cjs
 	python3 tests/package_release_test.py
 
-# clangd / IDE compile database from the same flags make uses (sdl2-config).
-# Output is machine-local — gitignored. Re-run after SDL install path changes.
+# clangd / IDE compile database uses the same pinned dependency headers.
 compile-commands:
-	CC="$(CC)" SDL2CFG="$(SDL2CFG)" python3 tools/gen_compile_commands.py
+	CC="$(CC)" RAYLIB_BUILD="$(RAYLIB_BUILD)" python3 tools/gen_compile_commands.py
 
 level-catalog:
 	python3 tools/generate_level_catalog.py
@@ -294,26 +319,22 @@ timing-lab:
 smoke: all editor
 	@for level in $(SMOKE_LEVELS); do \
 		echo "smoke: $$level"; \
-		SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) "$(abspath $(TARGET))" --level "$$level" --smoke-test-frames $(SMOKE_FRAMES) --seed $(SMOKE_SEED) || exit 1; \
+		$(RUN_PREFIX) "$(abspath $(TARGET))" --level "$$level" --smoke-test-frames $(SMOKE_FRAMES) --seed $(SMOKE_SEED) || exit 1; \
 	done
-	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $(RUN_PREFIX) "$(abspath $(EDITOR_TARGET))" --smoke-test
+	$(RUN_PREFIX) "$(abspath $(EDITOR_TARGET))" --smoke-test
 
 scripted-smoke: all editor
-	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python3 tools/run_scripted_smoke.py --binary $(TARGET) --editor $(EDITOR_TARGET) --frames $(SMOKE_FRAMES) --seeds $(SMOKE_SEEDS)
+	python3 tools/run_scripted_smoke.py --binary $(TARGET) --editor $(EDITOR_TARGET) --frames $(SMOKE_FRAMES) --seeds $(SMOKE_SEEDS)
 
 sanitize:
 	$(MAKE) all editor test OUTDIR="$(OUTDIR)-sanitize" \
-		CFLAGS="$(CFLAGS) $(SANITIZE_CFLAGS)" \
-		TEST_CFLAGS="$(TEST_CFLAGS) $(SANITIZE_CFLAGS)" \
-		LIBS="$(LIBS) $(SANITIZE_LDFLAGS)" \
-		TEST_LIBS="$(TEST_LIBS) $(SANITIZE_LDFLAGS)" \
-		EDITOR_LIBS="$(EDITOR_LIBS) $(SANITIZE_LDFLAGS)"
+		EXTRA_CFLAGS="$(EXTRA_CFLAGS) $(SANITIZE_CFLAGS)" \
+		EXTRA_LDFLAGS="$(EXTRA_LDFLAGS) $(SANITIZE_LDFLAGS)"
 
 sanitize-smoke:
 	$(MAKE) smoke OUTDIR="$(OUTDIR)-sanitize" \
-		CFLAGS="$(CFLAGS) $(SANITIZE_CFLAGS)" \
-		LIBS="$(LIBS) $(SANITIZE_LDFLAGS)" \
-		EDITOR_LIBS="$(EDITOR_LIBS) $(SANITIZE_LDFLAGS)"
+		EXTRA_CFLAGS="$(EXTRA_CFLAGS) $(SANITIZE_CFLAGS)" \
+		EXTRA_LDFLAGS="$(EXTRA_LDFLAGS) $(SANITIZE_LDFLAGS)"
 
 $(TEST_SERIALIZER_OBJ): $(SHARED_DIR)/serializer.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
@@ -489,16 +510,33 @@ $(TEST_FILE_DIALOG_OBJ): $(EDITOR_DIR)/file_dialog.c
 $(TEST_UNDO_OBJ): $(EDITOR_DIR)/undo.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
 
+$(TEST_AUDIO_OBJ): $(SHARED_DIR)/audio.c
+	$(CC) $(TEST_CFLAGS) -DSetMusicVolume=test_SetMusicVolume \
+		-DLoadSoundAlias=test_LoadSoundAlias -DSetSoundVolume=test_SetSoundVolume \
+		-DUnloadSoundAlias=test_UnloadSoundAlias -DUnloadSound=test_UnloadSound \
+		-I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_SESSION_OBJ): $(SRCDIR)/core/app_session.c
+	$(CC) $(TEST_CFLAGS) -DSetWindowSize=test_SetWindowSize -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+$(TEST_INPUT_BACKEND_OBJ): $(SRCDIR)/input/input_backend.c
+	$(CC) $(TEST_CFLAGS) -UMANGO_RAYLIB_MEMORY \
+		-DIsWindowReady=test_input_window_ready -DGetScreenWidth=test_input_screen_width -DGetScreenHeight=test_input_screen_height \
+		-DglfwGetCurrentContext=test_input_current_context -DglfwGetCursorPos=test_input_cursor_pos \
+		-DglfwSetKeyCallback=test_input_set_key -DglfwSetCharCallback=test_input_set_char \
+		-DglfwSetMouseButtonCallback=test_input_set_button -DglfwSetCursorPosCallback=test_input_set_cursor \
+		-DglfwSetScrollCallback=test_input_set_scroll -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
 $(TEST_TOMLC_OBJ): $(VENDOR_DIR)/tomlc17.c
 	$(CC) $(TEST_CFLAGS) -MMD -MP -c -o $@ $<
 
 $(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER_OBJ) $(TEST_SERIALIZER_EMIT_OBJ) $(TEST_SERIALIZER_IO_OBJ) $(TEST_SERIALIZER_LOAD_OBJ) $(TEST_SERIALIZER_LOAD_CHECKPOINTS_OBJ) $(TEST_SERIALIZER_LOAD_CLIMBABLES_OBJ) $(TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ) $(TEST_SERIALIZER_LOAD_CONFIG_OBJ) $(TEST_SERIALIZER_LOAD_ENEMIES_OBJ) $(TEST_SERIALIZER_LOAD_GEOMETRY_OBJ) $(TEST_SERIALIZER_LOAD_HAZARDS_OBJ) $(TEST_SERIALIZER_LOAD_HEADER_OBJ) $(TEST_SERIALIZER_LOAD_LAYERS_OBJ) $(TEST_SERIALIZER_LOAD_SURFACES_OBJ) $(TEST_SERIALIZER_PARSE_OBJ) $(TEST_SERIALIZER_SAVE_OBJ) $(TEST_SERIALIZER_TYPES_OBJ) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ -lm
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
 $(OUTDIR)/level-serializer-test: tests/parser_boundary_test.c
 
 $(OUTDIR)/level-validate-test: tests/level_validate_test.c $(TEST_VALIDATE_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
 $(OUTDIR)/runtime-load-test: tests/runtime_load_test.c $(TEST_LEVEL_LOADER_OBJ) \
 		$(TEST_GAME_RANDOM_OBJ) \
@@ -511,7 +549,7 @@ $(OUTDIR)/rail-test: tests/rail_test.c $(TEST_RAIL_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
 $(OUTDIR)/entity-utils-test: tests/entity_utils_test.c $(TEST_ENTITY_UTILS_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
 $(OUTDIR)/collision-test: tests/collision_test.c $(TEST_SPIKE_PLATFORM_OBJ) \
 		$(TEST_FISH_OBJ) $(TEST_CIRCULAR_SAW_OBJ) $(TEST_ENTITY_UTILS_OBJ) $(TEST_GAME_RANDOM_OBJ)
@@ -538,7 +576,7 @@ $(OUTDIR)/game-overlay-test: tests/game_overlay_test.c $(TEST_GAME_OVERLAY_OBJ)
 $(OUTDIR)/game-events-test: tests/game_events_test.c $(TEST_GAME_EVENTS_OBJ) $(TEST_GAME_INPUT_OBJ) $(TEST_WEB_INPUT_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_TERMINAL_OBJ) $(TEST_SETTINGS_OBJ) $(TEST_BINDINGS_OBJ) $(TEST_EDITOR_UI_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
 
-$(OUTDIR)/session-test: tests/session_test.c tests/game_profile_test.c tests/simulation_test.c $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
+$(OUTDIR)/session-test: tests/session_test.c tests/game_profile_test.c tests/simulation_test.c tests/audio_contract_test.c $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $(filter %.c %.o,$^) $(LIBS)
 
 $(OUTDIR)/game-checkpoint-test: tests/game_checkpoint_test.c $(TEST_GAME_CHECKPOINT_OBJ)
@@ -551,12 +589,10 @@ $(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS)): Makefile
 # Requires the Emscripten SDK (emcc on PATH).
 # Produces out/super-mango.html, .js, .wasm, and .data (bundled assets).
 #
-# SDL2 ports are compiled from source by Emscripten on first build;
-# subsequent builds reuse the cached port libraries.
-WEB_FLAGS = -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='["png"]' \
+# raylib is built with the same Emscripten toolchain as the application.
+WEB_FLAGS = -s USE_GLFW=3 \
             --pre-js web/touch-controls.js \
-            -s USE_SDL_TTF=2 -s USE_SDL_MIXER=2 \
-            -s SDL2_MIXER_FORMATS='["wav"]' \
+            --pre-js web/keyboard-scope.js \
             -s ALLOW_MEMORY_GROWTH=1 \
             --preload-file assets \
             --exclude-file 'assets/sounds/unused/*' \
@@ -566,22 +602,22 @@ WEB_FLAGS = -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='["png"]' \
             --shell-file web/shell.html
 WEB_CFLAGS = -D_GNU_SOURCE
 
-web: $(OUTDIR)
-	emcc -std=c11 -O2 $(WEB_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) $(SRCS) -o $(OUTDIR)/super-mango.html $(WEB_FLAGS) \
+web: $(OUTDIR) $(WEB_RAYLIB_LIB)
+	emcc -std=c11 -O2 $(WEB_CFLAGS) -I$(WEB_RAYLIB_BUILD)/build/raylib/include -I$(SRCDIR) -I$(VENDOR_DIR) $(SRCS) $(WEB_RAYLIB_LIB) -o $(OUTDIR)/super-mango.html $(WEB_FLAGS) \
 		-s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]'
-	emcc -std=c11 -O2 $(WEB_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) $(SRCS) -o $(OUTDIR)/super-mango-debug.html $(WEB_FLAGS) \
+	emcc -std=c11 -O2 $(WEB_CFLAGS) -I$(WEB_RAYLIB_BUILD)/build/raylib/include -I$(SRCDIR) -I$(VENDOR_DIR) $(SRCS) $(WEB_RAYLIB_LIB) -o $(OUTDIR)/super-mango-debug.html $(WEB_FLAGS) \
 		-s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]' \
 		--post-js web/debug-boot.js
 
 dist-native: release asset-budget
 	@if [ -n "$${RELEASE_DLL_DIR:-}" ]; then \
-		python3 tools/package_release.py --platform "$${RELEASE_PLATFORM:-super-mango-native}" --binary "$(OUTDIR)/release/super-mango" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-native}.zip" --dll-dir "$${RELEASE_DLL_DIR}"; \
+		python3 tools/package_release.py --platform "$${RELEASE_PLATFORM:-super-mango-native}" --binary "$(OUTDIR)/release/super-mango" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-native}.zip" --dll-dir "$${RELEASE_DLL_DIR}" --raylib-build "$(RELEASE_RAYLIB_BUILD)"; \
 	else \
-		python3 tools/package_release.py --platform "$${RELEASE_PLATFORM:-super-mango-native}" --binary "$(OUTDIR)/release/super-mango" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-native}.zip"; \
+		python3 tools/package_release.py --platform "$${RELEASE_PLATFORM:-super-mango-native}" --binary "$(OUTDIR)/release/super-mango" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-native}.zip" --raylib-build "$(RELEASE_RAYLIB_BUILD)"; \
 	fi
 
 dist-wasm: asset-budget
-	python3 tools/package_release.py --wasm --out-dir "$(OUTDIR)" --platform "$${RELEASE_PLATFORM:-super-mango-wasm}" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-wasm}.zip"
+	python3 tools/package_release.py --wasm --out-dir "$(OUTDIR)" --platform "$${RELEASE_PLATFORM:-super-mango-wasm}" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-wasm}.zip" --raylib-build "$(WEB_RAYLIB_BUILD)"
 
 clean:
 	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.d

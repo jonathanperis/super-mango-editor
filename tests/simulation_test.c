@@ -15,10 +15,9 @@
 #define CHECK(test) do { if (!(test)) { fprintf(stderr, "simulation_test:%d: %s\n", __LINE__, #test); failed = 1; goto done; } } while (0)
 #define NEAR(a,b) (fabsf((a)-(b)) < 0.001f)
 
-static void key(GameState *gs, SDL_Keycode keycode)
+static void key(GameState *gs, int keycode)
 {
-    SDL_Event event; SDL_zero(event);
-    event.type = SDL_KEYDOWN; event.key.keysym.sym = keycode;
+    InputEvent event = {.type=INPUT_KEY_DOWN,.key=keycode};
     (void)game_inspector_event(gs, &event);
 }
 
@@ -26,37 +25,36 @@ static int inspection_and_replay(void)
 {
     int failed = 0;
     GameState gs = {0};
-    gs.debug_mode = gs.controller_init_pending = 1;
+    gs.debug_mode = 1;
     gs.random_seed = 7;
     strcpy(gs.level_path, "tests/fixtures/runtime/transition.toml");
     CHECK(game_init(&gs) == 0);
-    SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
-    key(&gs, SDLK_F2);
+    input_clear();
+    key(&gs, KEY_F2);
     CHECK(game_inspector_step(&gs, 0.04f) == 0);
-    key(&gs, SDLK_F3);
+    key(&gs, KEY_F3);
     CHECK(NEAR(game_inspector_step(&gs, 0.04f), 1.0f / 60));
     CHECK(game_inspector_step(&gs, 0.04f) == 0);
-    key(&gs, SDLK_F3);
+    key(&gs, KEY_F3);
     game_overlay_set_pause_reason(&gs, GAME_PAUSE_REASON_FOCUS, 1);
     CHECK(game_inspector_step(&gs, 0.04f) == 0 && !gs.inspector.step_requested);
     game_overlay_set_pause_reason(&gs, GAME_PAUSE_REASON_FOCUS, 0);
     CHECK(game_inspector_step(&gs, 0.04f) == 0);
-    key(&gs, SDLK_F2); key(&gs, SDLK_F4);
+    key(&gs, KEY_F2); key(&gs, KEY_F4);
     CHECK(NEAR(game_inspector_step(&gs, 0.04f), 0.01f));
     SettingsMenu settings = {.open = 1};
     gs.settings_menu = &settings;
-    key(&gs, SDLK_F3);
+    key(&gs, KEY_F3);
     CHECK(game_inspector_step(&gs, 0.04f) == 0);
     settings.capture = 1;
-    SDL_Event reserved; SDL_zero(reserved);
-    reserved.type = SDL_KEYDOWN; reserved.key.keysym.sym = SDLK_F3;
-    SDL_PushEvent(&reserved); game_handle_events(&gs);
+    InputEvent reserved = {.type=INPUT_KEY_DOWN,.key=KEY_F3};
+    input_push(&reserved); game_handle_events(&gs);
     CHECK(settings.capture == 1 && strstr(settings.message, "Reserved for debug") != NULL);
     gs.settings_menu = NULL;
     float speed = gs.player.walk_max_speed;
-    key(&gs, SDLK_EQUALS);
+    key(&gs, KEY_EQUAL);
     CHECK(gs.player.walk_max_speed == speed + 25);
-    key(&gs, SDLK_F7);
+    key(&gs, KEY_F7);
     CHECK(gs.player.walk_max_speed == speed);
     CHECK(game_experiment_begin(&gs) == 0);
     for (int i = 0; i < 180; i++) {
@@ -116,7 +114,6 @@ static int moving_support_and_damage(void)
 {
     int failed = 0;
     GameState gs = {0};
-    gs.controller_init_pending = 1;
     strcpy(gs.level_path, "tests/fixtures/runtime/moving_support.toml");
     CHECK(game_init(&gs) == 0);
     gs.player.x = gs.float_platforms[0].x;
@@ -130,7 +127,7 @@ static int moving_support_and_damage(void)
     /* A saw starts one pixel outside the player and enters during this step. */
     gs.player.x = 48; gs.player.y = FLOOR_Y - gs.player.h + PLAYER_FLOOR_SINK;
     gs.player.vx = gs.player.vy = gs.player.hurt_timer = 0;
-    SDL_Rect hit = player_get_hitbox(&gs.player);
+    IntRect hit = player_get_hitbox(&gs.player);
     gs.circular_saw_count = 1;
     gs.circular_saws[0] = (CircularSaw){.x = hit.x + hit.w - 3, .y = 220,
         .w = 32, .h = 32, .active = 1, .direction = -1, .patrol_x0 = 0, .patrol_x1 = 300};
@@ -139,7 +136,7 @@ static int moving_support_and_damage(void)
     CHECK(gs.hearts == hearts - 1);
     LevelDef *def = gs.level_def;
     def->circular_saw_count = 1;
-    SDL_Texture *texture = gs.textures.circular_saw;
+    Texture2D *texture = gs.textures.circular_saw;
     gs.textures.circular_saw = NULL;
     int missing = game_resources_require_level_textures(&gs, def);
     gs.textures.circular_saw = texture;

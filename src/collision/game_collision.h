@@ -31,7 +31,7 @@ void game_collide(GameState *gs, float dt);
 
 /*
  * Spider hitbox builders — inline helpers since they need FLOOR_Y calculations.
- * These construct SDL_Rect hitboxes from entity state for collision testing.
+ * These construct integer hitboxes from entity state for collision testing.
  */
-SDL_Rect spider_build_hitbox(const Spider *s);
-SDL_Rect jumping_spider_build_hitbox(const JumpingSpider *js);
+IntRect spider_build_hitbox(const Spider *s);
+IntRect jumping_spider_build_hitbox(const JumpingSpider *js);

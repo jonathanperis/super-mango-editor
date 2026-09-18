@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 #define MAX_FISH           16       /* maximum simultaneous fish instances     */
 #define FISH_FRAMES         2       /* horizontal frames in Fish_2.png (96×48) */
@@ -48,7 +48,7 @@ typedef struct {
     float  jump_timer;
     float  water_y;
     int    frame_index;
-    Uint32 anim_timer_ms;
+    uint32_t anim_timer_ms;
 } Fish;
 
 /* Place the initial fish instances and reset their movement state. */
@@ -59,7 +59,7 @@ void fish_update(Fish *fish, int count, float dt, int world_w);
 
 /* Draw all fish with camera-aware world-to-screen conversion. */
 void fish_render(const Fish *fish, int count,
-                 SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                 Texture2D *tex, int cam_x);
 
 /* Return a slightly inset collision box for fair player contact. */
-SDL_Rect fish_get_hitbox(const Fish *fish);
+IntRect fish_get_hitbox(const Fish *fish);

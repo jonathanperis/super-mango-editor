@@ -7,7 +7,7 @@
 #include "../levels/level.h"
 
 void game_checkpoint_feedback_set(GameState *gs, CheckpointFeedbackKind kind,
-                                  Uint32 now, Uint32 duration)
+                                  uint32_t now, uint32_t duration)
 {
     if (!gs) return;
     gs->checkpoint_feedback_kind = kind;
@@ -15,10 +15,10 @@ void game_checkpoint_feedback_set(GameState *gs, CheckpointFeedbackKind kind,
         ? 0 : now + duration;
 }
 
-void game_checkpoint_feedback_clear_expired(GameState *gs, Uint32 now)
+void game_checkpoint_feedback_clear_expired(GameState *gs, uint32_t now)
 {
     if (!gs || gs->checkpoint_feedback_kind == CHECKPOINT_FEEDBACK_NONE) return;
-    if ((Sint32)(now - gs->checkpoint_feedback_until) >= 0) {
+    if ((int32_t)(now - gs->checkpoint_feedback_until) >= 0) {
         game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_NONE, now, 0);
     }
 }
@@ -57,7 +57,7 @@ void game_checkpoint_update_authored(GameState *gs)
             gs->respawn_x = def->checkpoints[best_index].x;
             gs->respawn_y = def->checkpoints[best_index].y;
             game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_SAVED,
-                                          SDL_GetTicks(), 1200);
+                                          (uint32_t)clock_millis(), 1200);
             if (gs->debug_mode) {
                 debug_log(&gs->debug, "CHECKPOINT saved at x=%.0f y=%.0f",
                           gs->respawn_x, gs->respawn_y);
@@ -88,7 +88,7 @@ void game_checkpoint_update(GameState *gs)
             gs->legacy_checkpoint_screen = current_screen;
             gs->respawn_x = new_checkpoint;
             game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_SAVED,
-                                          SDL_GetTicks(), 1200);
+                                          (uint32_t)clock_millis(), 1200);
             if (gs->debug_mode) {
                 debug_log(&gs->debug, "CHECKPOINT saved at x=%.0f", gs->respawn_x);
             }

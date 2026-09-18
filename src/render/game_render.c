@@ -54,7 +54,6 @@
 /* Player header */
 #include "../player/player.h"
 
-#include <SDL_ttf.h>  /* TTF_RenderText_Solid for overlays */
 
 /* ------------------------------------------------------------------ */
 /* Main render function                                               */
@@ -69,22 +68,25 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
     if (gs->debug_mode) debug_update(&gs->debug, dt);
 
     /*
-     * SDL_RenderClear — fill the back buffer with the draw colour.
+     * Clear the logical render target.
      * We always clear before drawing to avoid leftover pixels from the
      * previous frame showing through.
      */
-    if (SDL_RenderClear(gs->renderer) != 0) {
-        SDL_Log("game_render_frame: SDL_RenderClear failed: %s", SDL_GetError());
+    if (!IsRenderTextureValid(gs->frame_target)) {
         if (gs->route == GAME_ROUTE_NONE) gs->route = GAME_ROUTE_FATAL;
         return 0;
     }
+
+    BeginDrawing();
+    BeginTextureMode(gs->frame_target);
+    ClearBackground(BLACK);
 
     /*
      * Draw the multi-layer parallax background, back-to-front.
      * Each layer scrolls at a fraction of cam_x to simulate depth.
      * cam_x is the integer camera offset computed above.
      */
-    parallax_render(&gs->parallax, gs->renderer,
+    parallax_render(&gs->parallax,
                      gs->profile && gs->profile->data.settings.reduced_motion ? 0 : cam_x);
 
     /*
@@ -93,7 +95,7 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
      * This makes the pillars look like they grow out of the ground.
      */
     platforms_render(gs->platforms, gs->platform_count,
-                     gs->renderer, gs->textures.platform, cam_x);
+                     gs->textures.platform, cam_x);
 
     /*
      * 9-slice floor rendering — camera-aware, world-wide.
@@ -172,12 +174,12 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
             /*
              * src  — the 16×16 region to cut from the tile sheet.
              * dst  — world → screen: dst.x = tx - cam_x.
-             *        Pieces outside the viewport are discarded by SDL's
+             *        Pieces outside the viewport are discarded by the target's
              *        internal clipping — no manual culling needed.
              */
-            SDL_Rect src = { piece_col * P, piece_row * P, P, P };
-            SDL_Rect dst = { tx - cam_x,    ty,            P, P };
-            SDL_RenderCopy(gs->renderer, gs->textures.floor_tile, &src, &dst);
+            IntRect src = { piece_col * P, piece_row * P, P, P };
+            IntRect dst = { tx - cam_x,    ty,            P, P };
+            sprite_draw(gs->textures.floor_tile, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }
     }
 
@@ -186,19 +188,19 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
      * bouncepads and entities, so they read as mid-air surfaces.
      */
     float_platforms_render(gs->float_platforms, gs->float_platform_count,
-                           gs->renderer, gs->textures.float_platform, cam_x);
+                           gs->textures.float_platform, cam_x);
 
     /* Draw ground spikes on the floor surface, same layer as platforms */
     spike_rows_render(gs->spike_rows, gs->spike_row_count,
-                      gs->renderer, gs->textures.spike, cam_x);
+                      gs->textures.spike, cam_x);
 
     /* Draw spike platforms in the same layer as float platforms */
     spike_platforms_render(gs->spike_platforms, gs->spike_platform_count,
-                           gs->renderer, gs->textures.spike_platform, cam_x);
+                           gs->textures.spike_platform, cam_x);
 
     /* Draw bridges in the same layer as float platforms */
     bridges_render(gs->bridges, gs->bridge_count,
-                   gs->renderer, gs->textures.bridge, cam_x);
+                   gs->textures.bridge, cam_x);
 
     /*
      * Draw bouncepads between the platform pillars and vine decorations.
@@ -207,14 +209,14 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
      */
     /* Render each bouncepad variant with its own texture */
     bouncepads_render(gs->bouncepads_medium, gs->bouncepad_medium_count,
-                      gs->renderer, gs->textures.bouncepad_medium, cam_x);
+                      gs->textures.bouncepad_medium, cam_x);
     if (gs->textures.bouncepad_small) {
         bouncepads_render(gs->bouncepads_small, gs->bouncepad_small_count,
-                          gs->renderer, gs->textures.bouncepad_small, cam_x);
+                          gs->textures.bouncepad_small, cam_x);
     }
     if (gs->textures.bouncepad_high) {
         bouncepads_render(gs->bouncepads_high, gs->bouncepad_high_count,
-                          gs->renderer, gs->textures.bouncepad_high, cam_x);
+                          gs->textures.bouncepad_high, cam_x);
     }
                       
     /*
@@ -223,120 +225,118 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
      */
     if (gs->textures.rail) {
         rail_render(gs->rails, gs->rail_count,
-                    gs->renderer, gs->textures.rail, cam_x);
+                    gs->textures.rail, cam_x);
     }
 
     /* Draw vine decorations on ground and platform tops, behind entities */
     if (gs->textures.vine_green || gs->textures.vine_brown) {
         vine_render(gs->vines, gs->vine_count,
-                    gs->renderer, gs->textures.vine_green, gs->textures.vine_brown, cam_x);
+                    gs->textures.vine_green, gs->textures.vine_brown, cam_x);
     }
 
     /* Draw ladders and ropes in the same layer as vines */
     if (gs->textures.ladder) {
         ladder_render(gs->ladders, gs->ladder_count,
-                      gs->renderer, gs->textures.ladder, cam_x);
+                      gs->textures.ladder, cam_x);
     }
     if (gs->textures.rope) {
         rope_render(gs->ropes, gs->rope_count,
-                    gs->renderer, gs->textures.rope, cam_x);
+                    gs->textures.rope, cam_x);
     }
 
     /* Draw coins on top of the platforms, before the water and player */
     coins_render(gs->coins, gs->coin_count,
-                 gs->renderer, gs->textures.coin, cam_x);
+                 gs->textures.coin, cam_x);
 
     /* Draw star yellows alongside coins — same layer, same visibility */
     star_yellows_render(gs->star_yellows, gs->star_yellow_count,
-                     gs->renderer, gs->textures.star_yellow, cam_x);
+                     gs->textures.star_yellow, cam_x);
 
     /* Draw star greens — same mechanics and display size as yellow stars */
     star_greens_render(gs->star_greens, gs->star_green_count,
-                      gs->renderer, gs->textures.star_green, cam_x);
+                      gs->textures.star_green, cam_x);
 
     /* Draw star reds — same mechanics and display size as yellow stars */
     star_reds_render(gs->star_reds, gs->star_red_count,
-                      gs->renderer, gs->textures.star_red, cam_x);
+                      gs->textures.star_red, cam_x);
 
     /* Draw the end-of-level last star using its dedicated sprite */
-    last_star_render(&gs->last_star, gs->renderer,
+    last_star_render(&gs->last_star,
                      gs->textures.last_star, cam_x);
 
     /* Draw blue flames behind the water and fish, in front of ground */
     blue_flames_render(gs->blue_flames, gs->blue_flame_count,
-                  gs->renderer, gs->textures.blue_flame, cam_x);
+                  gs->textures.blue_flame, cam_x);
     /* Draw fire flames in the same layer (fire variant texture) */
     blue_flames_render(gs->fire_flames, gs->fire_flame_count,
-                  gs->renderer, gs->textures.fire_flame, cam_x);
+                  gs->textures.fire_flame, cam_x);
 
     /* Draw fish behind the water strip (submerged look) but in front of
      * the ground, so the water wave art occludes the submerged portion. */
     fish_render(gs->fish, gs->fish_count,
-            gs->renderer, gs->textures.fish, cam_x);
+            gs->textures.fish, cam_x);
     /* Draw faster fish in the same layer as regular fish */
     faster_fish_render(gs->faster_fish, gs->faster_fish_count,
-                       gs->renderer, gs->textures.faster_fish, cam_x);
+                       gs->textures.faster_fish, cam_x);
 
     /*
      * Draw the water strip on top of the floor/platforms and fish.
      * The full 384-px sheet scrolls rightward as a seamless loop.
      */
-    if (gs->runtime.water_enabled) water_render(&gs->water, gs->renderer);
+    if (gs->runtime.water_enabled) water_render(&gs->water);
 
     /* Draw spike blocks above the water strip but below the player */
     if (gs->textures.spike_block) {
         spike_blocks_render(gs->spike_blocks, gs->spike_block_count,
-                            gs->renderer, gs->textures.spike_block, cam_x);
+                            gs->textures.spike_block, cam_x);
     }
 
     /* Draw axe traps above spike blocks and water, before spiders */
     axe_traps_render(gs->axe_traps, gs->axe_trap_count,
-                     gs->renderer, gs->textures.axe_trap, cam_x);
+                     gs->textures.axe_trap, cam_x);
 
     /* Draw circular saws in the same hazard layer as axe traps */
     circular_saws_render(gs->circular_saws, gs->circular_saw_count,
-                         gs->renderer, gs->textures.circular_saw, cam_x);
+                         gs->textures.circular_saw, cam_x);
 
     /* Draw spiders on top of the water strip, before the player */
     spiders_render(gs->spiders, gs->spider_count,
-                   gs->renderer, gs->textures.spider, cam_x);
+                   gs->textures.spider, cam_x);
     /* Draw jumping spiders in the same layer as regular spiders */
     jumping_spiders_render(gs->jumping_spiders, gs->jumping_spider_count,
-                           gs->renderer, gs->textures.jumping_spider, cam_x);
+                           gs->textures.jumping_spider, cam_x);
 
     /* Draw birds in the sky, in front of spiders but behind the player */
     birds_render(gs->birds, gs->bird_count,
-                 gs->renderer, gs->textures.bird, cam_x);
+                 gs->textures.bird, cam_x);
     faster_birds_render(gs->faster_birds, gs->faster_bird_count,
-                        gs->renderer, gs->textures.faster_bird, cam_x);
+                        gs->textures.faster_bird, cam_x);
 
     /* Draw the player sprite on top of everything */
-    player_render(&gs->player, gs->renderer, cam_x);
+    player_render(&gs->player, cam_x);
 
     /* Draw fog/mist as the topmost layer — rendered after the player.
      * Only active when the level definition enables fog (fog_enabled == 1). */
-    if (gs->runtime.fog_enabled && !(gs->profile && gs->profile->data.settings.reduced_motion)) fog_render(&gs->fog, gs->renderer);
+    if (gs->runtime.fog_enabled && !(gs->profile && gs->profile->data.settings.reduced_motion)) fog_render(&gs->fog);
     if (gs->profile && gs->profile->data.settings.high_contrast) {
-        SDL_Rect hit = player_get_hitbox(&gs->player);
+        IntRect hit = player_get_hitbox(&gs->player);
         hit.x -= cam_x;
-        SDL_Rect outer = {hit.x-1,hit.y-1,hit.w+2,hit.h+2};
-        SDL_SetRenderDrawColor(gs->renderer, 0, 0, 0, 255); SDL_RenderDrawRect(gs->renderer, &outer);
-        SDL_SetRenderDrawColor(gs->renderer, 255, 255, 255, 255); SDL_RenderDrawRect(gs->renderer, &hit);
-        SDL_Rect backing = {0,0,GAME_W,22};
-        SDL_SetRenderDrawColor(gs->renderer, 0, 0, 0, 255); SDL_RenderFillRect(gs->renderer, &backing);
+        DrawRectangleLines(hit.x-1,hit.y-1,hit.w+2,hit.h+2,BLACK);
+        DrawRectangleLines(hit.x,hit.y,hit.w,hit.h,WHITE);
+        DrawRectangle(0,0,GAME_W,22,BLACK);
     }
 
     /* Draw the HUD overlay on top of everything (hearts, lives, score) */
-    hud_render(&gs->hud, gs->renderer,
+    hud_render(&gs->hud,
                gs->hearts, gs->lives, gs->score,
                gs->checkpoint_index,
                gs->checkpoint_feedback_kind,
                gs->checkpoint_feedback_until,
-               SDL_GetTicks());
+               (uint32_t)clock_millis());
 
     /* Draw debug overlays (collision boxes, FPS, event log) if active */
     if (gs->debug_mode) {
-        debug_render(&gs->debug, gs->hud.font, gs->renderer, gs, cam_x);
+        debug_render(&gs->debug, gs->hud.font, gs, cam_x);
         game_inspector_render(gs);
     }
 
@@ -351,13 +351,13 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
     }
 
     /*
-     * SDL_RenderPresent — swap the back buffer to the screen.
-     * Everything drawn since RenderClear was on a hidden buffer.
+     * Present the logical render target to the screen.
+     * Everything drawn so far was on an off-screen buffer.
      * This call makes it visible instantly, preventing flicker.
      * With VSync enabled, this call also blocks until the monitor
      * is ready for the next frame (typically ~16ms at 60 Hz).
      */
-    settings_menu_render(gs->settings_menu, gs->profile, gs->renderer, gs->hud.font);
-    SDL_RenderPresent(gs->renderer);
+    settings_menu_render(gs->settings_menu, gs->profile, gs->hud.font);
+    display_present(gs->frame_target);
     return 1;
 }

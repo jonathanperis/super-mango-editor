@@ -25,7 +25,7 @@ static int expect_float(const char *name, float actual, float expected)
 static int advances_animation_and_preserves_leftover_time(void)
 {
     int frame = 0;
-    Uint32 timer = 0;
+    uint32_t timer = 0;
 
     if (expect_int("first advance wrap", animate_frame_ms(&frame, &timer, 0.120f, 100, 3), 0) != 0)
         return 1;

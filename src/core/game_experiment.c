@@ -47,7 +47,7 @@ static void restart(GameState *gs, unsigned int seed)
     gs->level_score_start = 0;
     gs->profile_completion_recorded = 1; /* Experiments never become best results. */
     gs->inspector.frozen = gs->inspector.step_requested = 0;
-    gs->loop.prev_ticks = SDL_GetTicks64();
+    gs->loop.prev_ticks = clock_millis();
 }
 
 int game_experiment_begin(GameState *gs)
@@ -59,7 +59,7 @@ int game_experiment_begin(GameState *gs)
         tape->fingerprint.content_hash != gs->source_level_hash) {
         free(tape->frames); free(tape); return -1;
     }
-    SDL_strlcpy(tape->level_path, gs->level_path, sizeof(tape->level_path));
+    str_copy(tape->level_path, gs->level_path, sizeof(tape->level_path));
     tape->seed = gs->random_seed;
     tape->recording = 1;
     game_experiment_cleanup(gs);
@@ -131,13 +131,13 @@ int game_experiment_save(GameState *gs, const char *path)
 void game_experiment_export(GameState *gs)
 {
     char path[128];
-    snprintf(path, sizeof(path), "mango-experiment-%llu.toml", (unsigned long long)SDL_GetPerformanceCounter());
+    snprintf(path, sizeof(path), "mango-experiment-%llu.toml", (unsigned long long)clock_millis());
     if (game_experiment_save(gs, path)) { debug_log(&gs->debug, "Export failed; F8 starts a recording"); return; }
 #ifdef __EMSCRIPTEN__
     experiment_download(path);
 #endif
     debug_log(&gs->debug, "Exported %s", path);
-    SDL_Log("Experiment exported: %s", path);
+    TraceLog(LOG_INFO, "Experiment exported: %s", path);
 }
 
 static int number(toml_datum_t datum, float *out)
@@ -183,7 +183,7 @@ int game_experiment_load(GameState *gs, const char *path)
     if (strcmp(expected, hash.u.str.ptr)) goto done;
     tape->count = frames.u.arr.size;
     tape->seed = (unsigned int)seed.u.int64;
-    SDL_strlcpy(tape->level_path, gs->level_path, sizeof(tape->level_path));
+    str_copy(tape->level_path, gs->level_path, sizeof(tape->level_path));
     tape->frames = calloc((size_t)tape->count, sizeof(*tape->frames));
     if (!tape->frames) goto done;
     for (int i = 0; i < tape->count; i++) {

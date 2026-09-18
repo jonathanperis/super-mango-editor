@@ -6,7 +6,7 @@
  * landing zone — collision logic lives in player_update (player.c).
  */
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 #include <stdio.h>
 
 #include "platform.h"
@@ -124,14 +124,14 @@ void platforms_init(Platform *platforms, int *count) {
  * corners instead of a stack of identical repeated tiles.
  */
 void platforms_render(const Platform *platforms, int count,
-                       SDL_Renderer *renderer, SDL_Texture *default_tex, int cam_x) {
+                       Texture2D *default_tex, int cam_x) {
     const int P = TILE_SIZE / 3;   /* 9-slice piece size: 16 px */
 
     for (int i = 0; i < count; i++) {
         const Platform *p = &platforms[i];
 
         /* Use per-platform texture if set, otherwise fall back to default */
-        SDL_Texture *tex = p->tex ? p->tex : default_tex;
+        Texture2D *tex = p->tex ? p->tex : default_tex;
         if (!tex) continue;
 
         /*
@@ -157,9 +157,9 @@ void platforms_render(const Platform *platforms, int count,
                  * dst — world → screen: subtract cam_x from the x coordinate
                  *       so the pillar scrolls with the camera.
                  */
-                SDL_Rect src = { piece_col * P, piece_row * P, P, P };
-                SDL_Rect dst = { (int)p->x + tx - cam_x, (int)p->y + ty, P, P };
-                SDL_RenderCopy(renderer, tex, &src, &dst);
+                IntRect src = { piece_col * P, piece_row * P, P, P };
+                IntRect dst = { (int)p->x + tx - cam_x, (int)p->y + ty, P, P };
+                sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
             }
         }
     }

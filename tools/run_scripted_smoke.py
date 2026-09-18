@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run deterministic multi-seed, multi-level SDL smoke scenarios."""
+"""Run deterministic multi-seed, multi-level raylib smoke scenarios."""
 
 from __future__ import annotations
 
@@ -145,8 +145,7 @@ def main() -> int:
         raise SystemExit("no levels selected for scripted smoke")
 
     env = os.environ.copy()
-    env.setdefault("SDL_VIDEODRIVER", "dummy")
-    env.setdefault("SDL_AUDIODRIVER", "dummy")
+    env.setdefault("MANGO_TEST_WINDOW", "1")
 
     replays = selected_replays(args, REPLAY_DIR)
     for level in levels:

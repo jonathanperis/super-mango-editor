@@ -2,7 +2,7 @@
  * editor_frame.h — One-frame update/render step for the editor.
  *
  * The core editor loop calls this once while running.  It resets per-frame
- * UI input, dispatches SDL events, updates editor state, renders the active
+ * UI input, dispatches commands, updates editor state, renders the active
  * view, presents the frame, and applies the fallback frame cap.
  */
 

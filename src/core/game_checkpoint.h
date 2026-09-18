@@ -12,5 +12,5 @@ void game_checkpoint_update_authored(GameState *gs);
 void game_checkpoint_update(GameState *gs);
 
 void game_checkpoint_feedback_set(GameState *gs, CheckpointFeedbackKind kind,
-                                  Uint32 now, Uint32 duration);
-void game_checkpoint_feedback_clear_expired(GameState *gs, Uint32 now);
+                                  uint32_t now, uint32_t duration);
+void game_checkpoint_feedback_clear_expired(GameState *gs, uint32_t now);

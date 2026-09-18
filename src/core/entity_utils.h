@@ -12,12 +12,12 @@
  *                          enters a sea-gap (hole in the ground floor).
  *
  * Include this header in any .c file that implements patrol-based movement
- * or frame-based animation.  No SDL2 types are needed here — the functions
+ * or frame-based animation. No graphics types are needed here — the functions
  * only operate on primitive C types.
  */
 #pragma once
 
-#include <SDL.h>  /* Uint32 */
+#include <stdint.h>
 
 /* ------------------------------------------------------------------ */
 /* Animation                                                           */
@@ -44,8 +44,8 @@
  *   int wrapped = animate_frame_ms(&s->frame_index, &s->anim_timer_ms,
  *                                  dt, SPIDER_FRAME_MS, SPIDER_FRAMES);
  */
-int animate_frame_ms(int *frame_index, Uint32 *timer_ms,
-                     float dt, Uint32 frame_ms, int frame_count);
+int animate_frame_ms(int *frame_index, uint32_t *timer_ms,
+                     float dt, uint32_t frame_ms, int frame_count);
 
 /* ------------------------------------------------------------------ */
 /* Horizontal patrol movement                                          */
@@ -85,7 +85,7 @@ void patrol_update(float *x, float *vx, float entity_w,
 /* ------------------------------------------------------------------ */
 
 /*
- * sound_volume_for_distance — compute a Mix_Chunk volume (0–max_volume)
+ * sound_volume_for_distance — compute an effect volume (0–max_volume)
  * that falls off linearly with horizontal distance.
  *
  * At dist == 0              → max_volume  (loudest).
@@ -100,8 +100,7 @@ void patrol_update(float *x, float *vx, float entity_w,
  * Usage:
  *   int vol = sound_volume_for_distance(fabsf(player_cx - source_cx),
  *                                       (float)GAME_W, 128);
- *   Mix_PlayChannel(-1, snd, 0);
- *   Mix_Volume(channel, vol);
+ *   sound_play(snd, vol);
  */
 int sound_volume_for_distance(float dist, float audible_range, int max_volume);
 

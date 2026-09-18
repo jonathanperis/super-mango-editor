@@ -5,9 +5,9 @@
 #include "game_timing.h"
 #include <stdio.h>
 
-float game_timing_step(GameState *gs, Uint64 *frame_start_ticks)
+float game_timing_step(GameState *gs, uint64_t *frame_start_ticks)
 {
-    Uint64 now = SDL_GetTicks64();
+    uint64_t now = clock_millis();
     float dt = (float)(now - gs->loop.prev_ticks) / 1000.0f;
     gs->loop.prev_ticks = now;
     if (frame_start_ticks) *frame_start_ticks = now;
@@ -20,12 +20,12 @@ float game_timing_step(GameState *gs, Uint64 *frame_start_ticks)
     return dt;
 }
 
-void game_timing_cap_frame(Uint64 frame_start_ticks, Uint32 frame_ms)
+void game_timing_cap_frame(uint64_t frame_start_ticks, uint32_t frame_ms)
 {
 #ifndef __EMSCRIPTEN__
-    Uint64 elapsed = SDL_GetTicks64() - frame_start_ticks;
+    uint64_t elapsed = clock_millis() - frame_start_ticks;
     if (elapsed < frame_ms) {
-        SDL_Delay((Uint32)(frame_ms - elapsed));
+        clock_wait((uint32_t)(frame_ms - elapsed));
     }
 #else
     (void)frame_start_ticks;

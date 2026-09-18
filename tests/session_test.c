@@ -1,9 +1,6 @@
 #include <stdio.h>
 
-#include <SDL.h>
-#include <SDL_image.h>
-#include <SDL_mixer.h>
-#include <SDL_ttf.h>
+#include "input/input_backend.h"
 
 #include "collision/collision_damage.h"
 #include "collision/game_collision.h"
@@ -20,6 +17,47 @@
 #include "levels/level_resources.h"
 #include "player/player_surfaces.h"
 #include "player/player_internal.h"
+
+extern float test_last_music_volume;
+
+/* A distinctive GPU/software texture must survive screen swaps. This proves
+ * context ownership on both real windows and raylib's Memory test backend. */
+static Texture2D context_probe_open(void)
+{
+    Image image = GenImageColor(3, 3, (Color){23,117,211,255});
+    Texture2D probe = LoadTextureFromImage(image);
+    UnloadImage(image);
+    return probe;
+}
+
+static int context_probe_alive(Texture2D probe)
+{
+    /* Memory supports framebuffer readback, not direct texture readback. */
+    BeginDrawing();
+    ClearBackground(BLACK);
+    DrawTexture(probe, 0, 0, WHITE);
+    rlDrawRenderBatchActive();
+    Image image = LoadImageFromScreen();
+    EndDrawing();
+    int ok = IsImageValid(image) && image.width > 1 && image.height > 1;
+    if (ok) {
+#ifdef MANGO_MEMORY_TESTS
+        /* raylib 6.0 Memory readback is bottom-origin/BGRA. Normalize only this
+         * test probe; desktop rendering/readback still has the RGBA contract. */
+        Color pixel = GetImageColor(image, 1, image.height-2);
+        unsigned char red = pixel.r;
+        pixel.r = pixel.b;
+        pixel.b = red;
+#else
+        Color pixel = GetImageColor(image, 1, 1);
+#endif
+        ok = pixel.r == 23 && pixel.g == 117 && pixel.b == 211 && pixel.a == 255;
+        if (!ok) fprintf(stderr, "context probe: texture %u, image %dx%d, pixel %u/%u/%u/%u\n",
+                         probe.id, image.width, image.height, pixel.r, pixel.g, pixel.b, pixel.a);
+    }
+    UnloadImage(image);
+    return ok;
+}
 
 static int expect_int(const char *name, int actual, int expected)
 {
@@ -45,32 +83,20 @@ static int expect_float(const char *name, float actual, float expected)
 
 static int push_confirm(void)
 {
-    SDL_Event event;
-    SDL_zero(event);
-    event.type = SDL_KEYDOWN;
-    event.key.type = SDL_KEYDOWN;
-    event.key.keysym.sym = SDLK_RETURN;
-    event.key.repeat = 0;
-    return SDL_PushEvent(&event) == 1 ? 0 : 1;
+    InputEvent event = {.type=INPUT_KEY_DOWN,.key=KEY_ENTER};
+    return input_push(&event) == 1 ? 0 : 1;
 }
 
-static int push_key(SDL_Keycode key)
+static int push_key(int key)
 {
-    SDL_Event event;
-    SDL_zero(event);
-    event.type = SDL_KEYDOWN;
-    event.key.keysym.sym = key;
-    event.key.repeat = 0;
-    return SDL_PushEvent(&event) == 1 ? 0 : 1;
+    InputEvent event = {.type=INPUT_KEY_DOWN,.key=key};
+    return input_push(&event) == 1 ? 0 : 1;
 }
 
-static int push_controller_button(Uint8 button)
+static int push_controller_button(int button)
 {
-    SDL_Event event;
-    SDL_zero(event);
-    event.type = SDL_CONTROLLERBUTTONDOWN;
-    event.cbutton.button = button;
-    return SDL_PushEvent(&event) == 1 ? 0 : 1;
+    InputEvent event = {.type=INPUT_PAD_DOWN,.button=button};
+    return input_push(&event) == 1 ? 0 : 1;
 }
 
 static int physical_release_latch_blocks_transition_input(void)
@@ -85,7 +111,7 @@ static int physical_release_latch_blocks_transition_input(void)
     if (expect_int("held Space is gated", sampled, 0) != 0 ||
         expect_int("Space latch armed", gs.input_release_latched, 1) != 0)
         goto fail;
-    player_handle_input(&player, NULL, NULL, 0, sampled,
+    player_handle_input(&player, NULL, 0, sampled,
                         NULL, 0, NULL, 0, NULL, 0);
     if (expect_int("held Space cannot jump", player.jump_held, 0) != 0)
         goto fail;
@@ -102,7 +128,6 @@ static int physical_release_latch_blocks_transition_input(void)
     game_input_test_set_physical_state(0, 0);
     (void)game_input_sample(&gs);
 
-    gs.controller_init_pending = 1;
     game_input_test_set_physical_state(0, PLAYER_INPUT_JUMP | GAME_INPUT_CONFIRM);
     game_input_arm_release_latch(&gs, NULL);
     if (expect_int("held controller A is gated", game_input_sample(&gs), 0) != 0)
@@ -217,19 +242,15 @@ static int direct_game_boot_repairs_input_and_keeps_controller_runtime(void)
     if (expect_int("direct boot opens game", session->screen, APP_SCREEN_GAME) != 0 ||
         expect_int("direct boot bypasses campaign", session->catalog_loaded, 0) != 0 ||
         expect_int("direct boot repairs web input", session->web_input_repair_count, 1) != 0 ||
-        expect_int("direct boot controller pending",
-                   session->controller_init_state, APP_CONTROLLER_INIT_PENDING) != 0 ||
-        expect_int("direct boot has no sync controller init",
-                   session->controller_subsystem_ready_count, 0) != 0 ||
-        expect_int("direct boot controller inactive",
-                   SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 0, 0) != 0 ||
+        expect_int("direct boot owns window", IsWindowReady(), 1) != 0 ||
+        expect_int("direct boot input ready", input_ready(), 1) != 0 ||
         expect_int("direct boot latch armed", session->game->input_release_latched, 1) != 0 ||
         expect_int("direct boot held input gated", game_input_sample(session->game), 0) != 0)
         goto fail;
 
     session_frame(session);
-    if (expect_int("direct boot schedules once", session->controller_init_schedule_count, 1) != 0 ||
-        expect_int("direct boot still renders before readiness",
+    if (expect_int("direct boot presents once", session->game_presented_count, 1) != 0 ||
+        expect_int("direct boot remains in game",
                    session->screen, APP_SCREEN_GAME) != 0)
         goto fail;
 
@@ -240,16 +261,10 @@ static int direct_game_boot_repairs_input_and_keeps_controller_runtime(void)
                    session->game->input_release_latched, 0) != 0)
         goto fail;
 
-    for (int i = 0; i < 100 &&
-                    session->controller_init_state == APP_CONTROLLER_INIT_RUNNING; i++) {
-        session_frame(session);
-    }
-    if (expect_int("direct boot uses no transient SDL worker", session->controller_init_join_count, 0) != 0)
-        goto fail;
     session_destroy(&session);
     game_input_test_clear_physical_state();
-    if (expect_int("direct boot controller cleanup",
-                   SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 0, 0) != 0)
+    if (expect_int("direct boot window cleanup", IsWindowReady(), 0) != 0 ||
+        expect_int("direct boot input cleanup", input_ready(), 0) != 0)
         return 1;
     return 0;
 
@@ -274,229 +289,32 @@ static int failed_initial_level_does_not_create_session(void)
     return 0;
 }
 
-typedef struct {
-    AppSession *session;
-    SDL_atomic_t worker_entered;
-    SDL_atomic_t worker_release;
-    int worker_calls;
-    int game_open_overlap;
-} DeferredControllerProbe;
-
-static int blocked_controller_init(void *userdata)
+static int immediate_play_preserves_window_and_input_latch(void)
 {
-    DeferredControllerProbe *probe = userdata;
-
-    probe->worker_calls++;
-    SDL_AtomicSet(&probe->worker_entered, 1);
-    while (!SDL_AtomicGet(&probe->worker_release)) {
-        if (probe->session &&
-            SDL_AtomicGet(&probe->session->game_open_in_progress)) {
-            probe->game_open_overlap = 1;
-        }
-        SDL_Delay(1);
-    }
-    return 0;
-}
-
-static void release_blocked_controller(AppSession *session,
-                                       DeferredControllerProbe *probe)
-{
-    SDL_AtomicSet(&probe->worker_release, 1);
-    for (int i = 0; session && i < 100 && session->controller_init_thread; i++) {
-        session_frame(session);
-    }
-}
-
-static int immediate_play_waits_for_present_before_controller_worker(void)
-{
-    DeferredControllerProbe probe = {0};
-    AppSessionHooks hooks = {0};
     AppSessionConfig config = {0};
-    AppSession *session;
-
-    hooks.controller_init = blocked_controller_init;
-    hooks.userdata = &probe;
-    config.hooks = &hooks;
-    session = session_create(&config);
-    if (!session) {
-        fprintf(stderr, "session_test: immediate Play session_create failed\n");
-        return 1;
-    }
-    probe.session = session;
-    SDL_AtomicSet(&probe.worker_entered, 0);
-    SDL_AtomicSet(&probe.worker_release, 0);
-
-    /* Simulate a held confirm arriving with the first menu route. */
+    AppSession *session = session_create(&config);
+    if (!session) return 1;
+    Texture2D window = context_probe_open();
+    if (!context_probe_alive(window)) { fprintf(stderr, "initial context probe failed\n"); goto fail; }
     session->menu->confirm_release_required = 0;
     game_input_test_set_physical_state(GAME_INPUT_CONFIRM, 0);
-    if (push_confirm() != 0) goto fail;
+    if (push_confirm()) goto fail;
     session_frame(session);
-    if (expect_int("immediate Play opens game", session->screen, APP_SCREEN_GAME) != 0 ||
-        expect_int("immediate Play has no menu present", session->menu_presented_count, 0) != 0 ||
-        expect_int("immediate Play has no game present yet", session->game_presented_count, 0) != 0 ||
-        expect_int("immediate Play has no worker schedule", session->controller_init_schedule_count, 0) != 0 ||
-        expect_int("immediate Play constructs one game", session->game_open_count, 1) != 0 ||
-        expect_int("immediate Play worker not entered", SDL_AtomicGet(&probe.worker_entered), 0) != 0)
-        goto fail;
-
+    if (expect_int("immediate Play opens game", session->screen, APP_SCREEN_GAME) ||
+        expect_int("immediate Play keeps context", context_probe_alive(window), 1) ||
+        expect_int("immediate Play has no menu present", session->menu_presented_count, 0) ||
+        expect_int("immediate Play constructs one game", session->game_open_count, 1) ||
+        expect_int("held confirmation stays gated", session->game->input_release_latched, 1)) goto fail;
     session_frame(session);
-    if (expect_int("game first frame presents", session->game_presented_count, 1) != 0 ||
-        expect_int("worker schedules after game present", session->controller_init_schedule_count, 1) != 0)
-        goto fail;
-
-    for (int i = 0; i < 100 && !SDL_AtomicGet(&probe.worker_entered); i++)
-        SDL_Delay(1);
-    if (expect_int("blocked worker entered after present",
-                   SDL_AtomicGet(&probe.worker_entered), 1) != 0 ||
-        expect_int("blocked worker never overlaps game construction",
-                   probe.game_open_overlap, 0) != 0)
-        goto fail;
-
-    release_blocked_controller(session, &probe);
-    if (expect_int("blocked worker joined", session->controller_init_join_count, 1) != 0 ||
-        expect_int("controller readiness published", session->controller_init_state,
-                   APP_CONTROLLER_INIT_READY) != 0)
-        goto fail;
-
+    if (expect_int("game first frame presents", session->game_presented_count, 1)) goto fail;
+    UnloadTexture(window);
     session_destroy(&session);
     game_input_test_clear_physical_state();
     return 0;
-
 fail:
-    release_blocked_controller(session, &probe);
+    UnloadTexture(window);
     session_destroy(&session);
     game_input_test_clear_physical_state();
-    return 1;
-}
-
-static int blocked_menu_route_waits_without_teardown(void)
-{
-    DeferredControllerProbe probe = {0};
-    AppSessionHooks hooks = {0};
-    AppSessionConfig config = {0};
-    AppSession *session;
-    StartMenu *menu;
-    int menu_frames;
-
-    hooks.controller_init = blocked_controller_init;
-    hooks.userdata = &probe;
-    config.hooks = &hooks;
-    session = session_create(&config);
-    if (!session) {
-        fprintf(stderr, "session_test: blocked menu session_create failed\n");
-        return 1;
-    }
-    probe.session = session;
-    session_frame(session);
-    if (expect_int("blocked menu schedules worker",
-                   session->controller_init_schedule_count, 1) != 0)
-        goto fail;
-    for (int i = 0; i < 100 && !SDL_AtomicGet(&probe.worker_entered); i++)
-        SDL_Delay(1);
-    if (expect_int("blocked menu worker entered",
-                   SDL_AtomicGet(&probe.worker_entered), 1) != 0)
-        goto fail;
-
-    menu = session->menu;
-    menu_frames = session->menu_presented_count;
-    menu->confirm_release_required = 0;
-    if (push_confirm() != 0) goto fail;
-    session_frame(session);
-    if (expect_int("blocked menu retains screen", session->screen, APP_SCREEN_MENU) != 0 ||
-        expect_int("blocked menu keeps menu alive", session->menu == menu, 1) != 0 ||
-        expect_int("blocked menu does not close menu", session->menu_close_count, 0) != 0 ||
-        expect_int("blocked menu does not construct game", session->game_open_count, 0) != 0 ||
-        expect_int("blocked menu still presents", session->menu_presented_count,
-                   menu_frames + 1) != 0 ||
-        expect_int("blocked menu has not joined worker", session->controller_init_join_count, 0) != 0)
-        goto fail;
-
-    release_blocked_controller(session, &probe);
-    if (expect_int("blocked menu joins worker", session->controller_init_join_count, 1) != 0 ||
-        expect_int("blocked menu publishes readiness", session->controller_init_state,
-                   APP_CONTROLLER_INIT_READY) != 0 ||
-        expect_int("blocked menu transitions once", session->screen, APP_SCREEN_GAME) != 0 ||
-        expect_int("blocked menu closes once", session->menu_close_count, 1) != 0 ||
-        expect_int("blocked menu constructs once", session->game_open_count, 1) != 0)
-        goto fail;
-
-    session_frame(session);
-    if (expect_int("blocked menu remains in game", session->screen, APP_SCREEN_GAME) != 0 ||
-        expect_int("blocked menu construction stays once", session->game_open_count, 1) != 0 ||
-        expect_int("blocked menu close stays once", session->menu_close_count, 1) != 0)
-        goto fail;
-
-    session_destroy(&session);
-    game_input_test_clear_physical_state();
-    return 0;
-
-fail:
-    release_blocked_controller(session, &probe);
-    session_destroy(&session);
-    game_input_test_clear_physical_state();
-    return 1;
-}
-
-static int blocked_terminal_exit_waits_with_overlay_visible(void)
-{
-    DeferredControllerProbe probe = {0};
-    AppSessionHooks hooks = {0};
-    AppSessionConfig config = {0};
-    AppSession *session;
-    GameState *game;
-    int game_frames;
-
-    hooks.controller_init = blocked_controller_init;
-    hooks.userdata = &probe;
-    config.level_path = "levels/00_sandbox_01.toml";
-    config.hooks = &hooks;
-    session = session_create(&config);
-    if (!session) {
-        fprintf(stderr, "session_test: blocked terminal session_create failed\n");
-        return 1;
-    }
-    probe.session = session;
-    session_frame(session);
-    if (expect_int("blocked terminal schedules worker",
-                   session->controller_init_schedule_count, 1) != 0)
-        goto fail;
-    for (int i = 0; i < 100 && !SDL_AtomicGet(&probe.worker_entered); i++)
-        SDL_Delay(1);
-    if (expect_int("blocked terminal worker entered",
-                   SDL_AtomicGet(&probe.worker_entered), 1) != 0)
-        goto fail;
-
-    game = session->game;
-    game_frames = session->game_presented_count;
-    game->completion.complete = 1;
-    game->completion.pending_next_phase = 0;
-    game->terminal_action_index = 2; /* Replay, Level Select, Exit. */
-    if (push_confirm() != 0) goto fail;
-    session_frame(session);
-    if (expect_int("blocked terminal retains game", session->screen, APP_SCREEN_GAME) != 0 ||
-        expect_int("blocked terminal keeps game alive", session->game == game, 1) != 0 ||
-        expect_int("blocked terminal does not close game", session->game_close_count, 0) != 0 ||
-        expect_int("blocked terminal presents overlay", session->game_presented_count,
-                   game_frames + 1) != 0 ||
-        expect_int("blocked terminal retains exit route", game->route, GAME_ROUTE_EXIT) != 0 ||
-        expect_int("blocked terminal has not joined worker", session->controller_init_join_count, 0) != 0)
-        goto fail;
-
-    release_blocked_controller(session, &probe);
-    if (expect_int("blocked terminal joins worker", session->controller_init_join_count, 1) != 0 ||
-        expect_int("blocked terminal publishes readiness", session->controller_init_state,
-                   APP_CONTROLLER_INIT_READY) != 0 ||
-        expect_int("blocked terminal ends once", session->screen, APP_SCREEN_ENDED) != 0 ||
-        expect_int("blocked terminal closes game once", session->game_close_count, 1) != 0 ||
-        expect_int("blocked terminal cleans runtime once", session->runtime_cleanup_count, 1) != 0)
-        goto fail;
-
-    session_destroy(&session);
-    return 0;
-
-fail:
-    release_blocked_controller(session, &probe);
-    session_destroy(&session);
     return 1;
 }
 
@@ -510,34 +328,27 @@ static int repeated_menu_game_ownership(void)
         fprintf(stderr, "session_test: session_create menu failed\n");
         return 1;
     }
+    Texture2D window = context_probe_open();
     if (expect_int("starts in menu", session->screen, APP_SCREEN_MENU) != 0 ||
         expect_int("default menu owns campaign", session->catalog_loaded, 1) != 0 ||
         expect_int("menu consumes campaign", session->menu->catalog == &session->catalog, 1) != 0 ||
         expect_int("menu campaign count", (int)session->catalog.count, 3) != 0 ||
-        expect_int("menu controller pending",
-                   session->controller_init_state, APP_CONTROLLER_INIT_PENDING) != 0 ||
-        expect_int("menu controller inactive",
-                   SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 0, 0) != 0 ||
-        expect_int("menu init has no sync worker", session->controller_init_schedule_count, 0) != 0)
+        expect_int("menu window ready", IsWindowReady(), 1) != 0)
         return 1;
     session_frame(session);
-    if (expect_int("menu schedules controller once", session->controller_init_schedule_count, 1) != 0)
+    if (expect_int("menu presents once", session->menu_presented_count, 1) != 0)
         return 1;
-    if (push_controller_button(SDL_CONTROLLER_BUTTON_DPAD_RIGHT) != 0) return 1;
+    if (push_controller_button(PAD_RIGHT) != 0) return 1;
     session_frame(session);
     if (expect_int("menu D-pad selects next level",
                    strcmp(session->menu->selected_level_path,
                             session->catalog.levels[1].path) == 0, 1) != 0)
         return 1;
-    for (int i = 0; i < 100 &&
-                    session->controller_init_state == APP_CONTROLLER_INIT_RUNNING; i++)
-        session_frame(session);
-    if (push_controller_button(SDL_CONTROLLER_BUTTON_A) != 0) return 1;
+    if (push_controller_button(PAD_A) != 0) return 1;
     session_frame(session);
     if (expect_int("menu opens game", session->screen, APP_SCREEN_GAME) != 0) return 1;
     if (expect_int("menu closes once", session->menu_close_count, 1) != 0) return 1;
-    if (expect_int("menu-to-game controller stays active",
-                   SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 0, 1) != 0 ||
+    if (expect_int("menu-to-game retains context", context_probe_alive(window), 1) != 0 ||
         expect_int("menu-to-game repairs web input", session->web_input_repair_count, 1) != 0)
         return 1;
 
@@ -545,13 +356,12 @@ static int repeated_menu_game_ownership(void)
     session->game->completion.pending_next_phase = 0;
     session->game->terminal_action_index = 0;
     if (!game_web_input_touch(GAME_TOUCH_RIGHT, 1)) return 1;
-    if (push_key(SDLK_DOWN) != 0 || push_confirm() != 0) return 1;
+    if (push_key(KEY_DOWN) != 0 || push_confirm() != 0) return 1;
     session_frame(session);
     if (expect_int("level select opens menu", session->screen, APP_SCREEN_MENU) != 0) return 1;
     if (expect_int("level select clears touch holds", game_web_input_take_touch_mask(), 0) != 0) return 1;
     if (expect_int("game closes once", session->game_close_count, 1) != 0) return 1;
-    if (expect_int("level-select controller stays active",
-                   SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 0, 1) != 0)
+    if (expect_int("level-select retains context", context_probe_alive(window), 1) != 0)
         return 1;
 
     {
@@ -583,8 +393,7 @@ static int repeated_menu_game_ownership(void)
     if (expect_int("second menu opens game", session->screen, APP_SCREEN_GAME) != 0) return 1;
     if (expect_int("menu closes twice", session->menu_close_count, 2) != 0) return 1;
     if (expect_int("second game repairs web input", session->web_input_repair_count, 2) != 0 ||
-        expect_int("second game controller stays active",
-                   SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 0, 1) != 0)
+        expect_int("second game retains context", context_probe_alive(window), 1) != 0)
         return 1;
     if (expect_int("held menu direction gated", game_input_sample(session->game), 0) != 0)
         return 1;
@@ -599,8 +408,7 @@ static int repeated_menu_game_ownership(void)
     if (expect_int("replay stays in game", session->screen, APP_SCREEN_GAME) != 0) return 1;
     if (expect_int("replay closes old game", session->game_close_count, 2) != 0) return 1;
     if (expect_int("replay repairs web input", session->web_input_repair_count, 3) != 0 ||
-        expect_int("replay controller stays active",
-                   SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 0, 1) != 0)
+        expect_int("replay retains context", context_probe_alive(window), 1) != 0)
         return 1;
 
     session->game->completion.complete = 1;
@@ -632,15 +440,14 @@ static int repeated_menu_game_ownership(void)
     if (expect_int("next failure keeps overlay", session->game->completion.complete, 1) != 0) return 1;
     if (expect_int("next failure clears request", session->game->route, GAME_ROUTE_NONE) != 0) return 1;
 
-    if (push_key(SDLK_ESCAPE) != 0) return 1;
+    UnloadTexture(window);
+    if (push_key(KEY_ESCAPE) != 0) return 1;
     session_frame(session);
     if (expect_int("exit ends session", session->screen, APP_SCREEN_ENDED) != 0) return 1;
     if (expect_int("runtime cleanup once", session->runtime_cleanup_count, 1) != 0) return 1;
-    if (expect_int("controller cleanup once", session->controller_subsystem_closed_count, 1) != 0 ||
-        expect_int("controller init stays on app thread", session->controller_init_join_count, 0) != 0 ||
-        expect_int("controller worker scheduled once", session->controller_init_schedule_count, 1) != 0 ||
-        expect_int("controller inactive after exit",
-                   SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 0, 0) != 0)
+    if (expect_int("window closed on exit", IsWindowReady(), 0) != 0 ||
+        expect_int("input closed on exit", input_ready(), 0) != 0 ||
+        expect_int("audio closed on exit", IsAudioDeviceReady(), 0) != 0)
         return 1;
     session_destroy(&session);
     if (session != NULL) {
@@ -677,16 +484,6 @@ static void disable_integration_dynamic_collisions(GameState *game)
     game->bouncepad_high_count = 0;
     game->floor_gap_count = 0;
     game->last_star.active = 0;
-}
-
-static void wait_for_controller_ready(AppSession *session)
-{
-    for (int i = 0; session && i < 100; i++) {
-        if (session->controller_init_state == APP_CONTROLLER_INIT_READY ||
-            session->controller_init_state == APP_CONTROLLER_INIT_FAILED)
-            return;
-        session_frame(session);
-    }
 }
 
 static int checkpoint_transitions_use_production_paths(void)
@@ -748,7 +545,6 @@ static int checkpoint_transitions_use_production_paths(void)
         goto fail;
     if (push_confirm() != 0) goto fail;
     session_frame(session);
-    wait_for_controller_ready(session);
     game = session->game;
     if (!game || expect_int("retry clears game-over", game->game_over, 0) != 0 ||
         expect_int("retry resets checkpoint", game->checkpoint_index, -1) != 0 ||
@@ -883,8 +679,7 @@ static int replay_storage_failure_retains_session_and_success_orders_cleanup(voi
         probe_reload,
         probe_lifecycle,
         &probe,
-        1,
-        NULL
+        1
     };
     AppSessionConfig config = {0};
     AppSession *session;
@@ -914,10 +709,6 @@ static int replay_storage_failure_retains_session_and_success_orders_cleanup(voi
     session->game->completion.complete = 1;
     session->game->route = GAME_ROUTE_REPLAY;
     session_frame(session);
-    for (int i = 0; i < 100 &&
-                    session->controller_init_state == APP_CONTROLLER_INIT_RUNNING; i++) {
-        session_frame(session);
-    }
     if (expect_int("storage failure keeps game screen", session->screen, APP_SCREEN_GAME) != 0 ||
         expect_int("storage failure keeps completion", session->game->completion.complete, 1) != 0 ||
         expect_int("storage failure leaves callback", session->callback_cancelled, 0) != 0 ||
@@ -965,7 +756,7 @@ static int pending_profile_keeps_exit_alive(void)
     session->profile.pending_revision = session->profile.revision;
     session->attempted_save_revision = session->profile.revision;
     session->game->route = GAME_ROUTE_EXIT;
-    session->game->loop.prev_ticks = SDL_GetTicks64() - 100;
+    session->game->loop.prev_ticks = clock_millis() - 100;
     float elapsed = session->game->completion.level_elapsed;
     session_frame(session);
     if (expect_int("pending save retains session", session->ended, 0) ||
@@ -979,9 +770,6 @@ static int pending_profile_keeps_exit_alive(void)
     int result = expect_int("committed exit completes", session->ended, 1) ||
                  expect_int("committed exit closes once", session->game_close_count, 1);
     session_destroy(&session);
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0 ||
-        !(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) || TTF_Init() != 0 ||
-        Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) != 0) return 1;
     return result;
 }
 
@@ -1008,16 +796,13 @@ static int menu_mouse_and_path_boundaries(void)
     if (campaign_catalog_load(CAMPAIGN_MANIFEST_PATH, &catalog)) return 1;
     StartMenu *menu = start_menu_create(&catalog);
     if (!menu) { campaign_catalog_cleanup(&catalog); return 1; }
-    SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
-    SDL_Event event;
-    SDL_zero(event);
-    event.type = SDL_MOUSEBUTTONDOWN;
-    event.button.windowID = SDL_GetWindowID(menu->window);
-    event.button.button = SDL_BUTTON_LEFT;
-    event.button.state = SDL_PRESSED;
-    event.button.x = 400;
-    event.button.y = 368;
-    SDL_PushEvent(&event);
+    input_clear();
+    Vector2 logical = input_pointer_to_logical((Vector2){400,368});
+    if (expect_float("physical pointer maps x once", logical.x, 200) ||
+        expect_float("physical pointer maps y once", logical.y, 184)) return 1;
+    InputEvent event = {.type=INPUT_MOUSE_DOWN,.button=MOUSE_BUTTON_LEFT,
+                        .x=(int)logical.x,.y=(int)logical.y};
+    input_push(&event);
     start_menu_frame(menu);
     int result = expect_int("physical Play click", menu->route, MENU_ROUTE_PLAY);
     start_menu_close(&menu);
@@ -1061,9 +846,9 @@ static int nearest_surface_is_order_independent(void)
 {
     GameState timing = {0};
     timing.smoke_test_frames = 5;
-    timing.loop.prev_ticks = SDL_GetTicks64();
+    timing.loop.prev_ticks = clock_millis();
     float first = game_timing_step(&timing, NULL);
-    SDL_Delay(20);
+    clock_wait(20);
     float delayed = game_timing_step(&timing, NULL);
     if (expect_float("smoke fixed step", first, 1.0f / TARGET_FPS) ||
         expect_float("wall time does not change replay physics", delayed, first)) return 1;
@@ -1105,7 +890,6 @@ static int nearest_surface_is_order_independent(void)
 static int phase_resets_transient_state(void)
 {
     GameState gs = {0};
-    gs.controller_init_pending = 1;
     strcpy(gs.level_path, "tests/fixtures/runtime/transition.toml");
     if (game_init(&gs)) return 1;
     gs.player.vx = 123;
@@ -1127,34 +911,21 @@ static int phase_resets_transient_state(void)
     LevelDef *active = gs.level_def;
     active->music_volume = 0;
     level_resources_apply(&gs, active);
-    if (gs.audio.music && expect_int("zero volume stays muted", Mix_VolumeMusic(-1), 0)) result = 1;
+    if (gs.audio.music && expect_float("zero volume stays muted", test_last_music_volume, 0)) result = 1;
     game_cleanup(&gs);
     return result;
 }
 
 int game_profile_contract_test(void);
 int game_simulation_contract_test(void);
+int audio_contract_test(void);
 
-static int setup_sdl(void)
+static int setup_raylib(void)
 {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0) {
-        fprintf(stderr, "session_test: SDL_Init failed: %s\n", SDL_GetError());
-        return 1;
-    }
-    if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) || TTF_Init() != 0) {
-        fprintf(stderr, "session_test: SDL image/font init failed\n");
-        SDL_Quit();
-        return 1;
-    }
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) != 0) {
-        fprintf(stderr, "session_test: Mix_OpenAudio failed: %s\n", Mix_GetError());
-        TTF_Quit();
-        IMG_Quit();
-        SDL_Quit();
-        return 1;
-    }
-
-    return 0;
+    if (display_open(WINDOW_W, WINDOW_H, "session regression", 1)) return 1;
+    input_open(GAME_W, GAME_H);
+    game_input_test_set_physical_state(0, 0);
+    return audio_open() != 0;
 }
 
 int main(void)
@@ -1162,6 +933,7 @@ int main(void)
     setvbuf(stdout, NULL, _IONBF, 0);
     const struct { const char *name; int (*run)(void); } cases[] = {
 #define CASE(fn) {#fn, fn}
+        CASE(audio_contract_test),
         CASE(game_simulation_contract_test), CASE(game_profile_contract_test),
         CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),
         CASE(menu_mouse_and_path_boundaries), CASE(collision_lifetime_and_pickups),
@@ -1171,21 +943,20 @@ int main(void)
         CASE(physical_release_latch_blocks_transition_input),
         CASE(failed_initial_level_does_not_create_session),
         CASE(direct_game_boot_repairs_input_and_keeps_controller_runtime),
-        CASE(immediate_play_waits_for_present_before_controller_worker),
-        CASE(blocked_menu_route_waits_without_teardown),
-        CASE(blocked_terminal_exit_waits_with_overlay_visible),
+        CASE(immediate_play_preserves_window_and_input_latch),
         CASE(repeated_menu_game_ownership), CASE(checkpoint_transitions_use_production_paths),
         CASE(replay_storage_failure_retains_session_and_success_orders_cleanup)
 #undef CASE
     };
     int failures = 0;
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        if (setup_sdl()) return 1;
+        if (setup_raylib()) return 1;
         int result = cases[i].run();
         printf("session: %s %s\n", cases[i].name, result ? "FAIL" : "PASS");
         failures += result != 0;
         game_input_test_clear_physical_state();
-        Mix_CloseAudio(); TTF_Quit(); IMG_Quit(); SDL_Quit();
+        input_close(); audio_close();
+        if (IsWindowReady()) CloseWindow();
     }
     printf("session_test: %d failing cases\n", failures);
     return failures ? 1 : 0;

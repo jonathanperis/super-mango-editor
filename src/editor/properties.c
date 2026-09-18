@@ -15,7 +15,6 @@
  * to track which widget is actively being edited.
  */
 
-#include <SDL.h>        /* SDL_Rect, SDL_RenderSetClipRect       */
 #include <stdio.h>      /* snprintf for header label formatting */
 #include <string.h>     /* strrchr for filename extraction       */
 
@@ -149,11 +148,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
 
     /* ---- Fixed title bar (same style as palette header) ------------- */
     {
-        SDL_Color title_bg = UI_TITLE_BG;
-        SDL_SetRenderDrawColor(es->ui.renderer,
-                               title_bg.r, title_bg.g, title_bg.b, title_bg.a);
-        SDL_Rect title_rect = { prop_x, prop_y, PROP_W, ROW_H + 4 };
-        SDL_RenderFillRect(es->ui.renderer, &title_rect);
+        DrawRectangle(prop_x, prop_y, PROP_W, ROW_H+4, UI_TITLE_BG);
     }
 
     /* ---- Collapsible header ----------------------------------------- */
@@ -196,8 +191,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
     es->ui.before_change_context = es;
 
     /* Clip content below the title bar */
-    SDL_Rect prop_clip = { prop_x, prop_y + ROW_H + 4, PROP_W, prop_h - ROW_H - 4 };
-    SDL_RenderSetClipRect(es->ui.renderer, &prop_clip);
+    BeginScissorMode(prop_x, prop_y+ROW_H+4, PROP_W, prop_h-ROW_H-4);
 
     int y = prop_y + ROW_H + 8;
 
@@ -1074,7 +1068,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
         break;
     }
 
-    SDL_RenderSetClipRect(es->ui.renderer, NULL);
+    EndScissorMode();
     editor_end_change_tracking(es);
 }
 
@@ -1106,11 +1100,7 @@ void level_config_render(EditorState *es, int start_y, int available_h,
 
     /* ---- Fixed title bar (same style as palette header) ------------- */
     {
-        SDL_Color title_bg = UI_TITLE_BG;
-        SDL_SetRenderDrawColor(es->ui.renderer,
-                               title_bg.r, title_bg.g, title_bg.b, title_bg.a);
-        SDL_Rect title_rect = { x, start_y, PROP_W, ROW_H + 4 };
-        SDL_RenderFillRect(es->ui.renderer, &title_rect);
+        DrawRectangle(x, start_y, PROP_W, ROW_H+4, UI_TITLE_BG);
     }
 
     /* ---- Collapsible header ---- */
@@ -1152,8 +1142,7 @@ void level_config_render(EditorState *es, int start_y, int available_h,
      * is invisible.  We clear the clip rect at the end of this function.
      */
     int content_top = start_y + title_h;
-    SDL_Rect cfg_clip = { x, content_top, PROP_W, content_visible_h };
-    SDL_RenderSetClipRect(es->ui.renderer, &cfg_clip);
+    BeginScissorMode(x, content_top, PROP_W, content_visible_h);
 
     /*
      * y — the running vertical cursor for content rendering.
@@ -1165,12 +1154,12 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     ui_label_color(&es->ui, x + 8, y,
                    editor_validation_summary(&es->validation_report),
                    es->validation_report.error_count > 0 ?
-                   (SDL_Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
+                   (Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
     y += 20;
     for (int i = 0; i < es->validation_report.message_count; i++) {
-        SDL_Color msg_color = i < es->validation_report.error_count
-                            ? (SDL_Color){0xFF,0x70,0x70,0xFF}
-                            : (SDL_Color){0xFF,0xC0,0x60,0xFF};
+        Color msg_color = i < es->validation_report.error_count
+                            ? (Color){0xFF,0x70,0x70,0xFF}
+                            : (Color){0xFF,0xC0,0x60,0xFF};
         ui_label_color(&es->ui, x + 16, y,
                        es->validation_report.messages[i], msg_color);
         y += 18;
@@ -1714,6 +1703,6 @@ fg_done:
     }
 
 fog_done:
-    SDL_RenderSetClipRect(es->ui.renderer, NULL);
+    EndScissorMode();
     editor_end_change_tracking(es);
 }

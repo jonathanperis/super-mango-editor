@@ -13,12 +13,19 @@ The complete notice is in `vendor/tomlc17/LICENSE` in the source checkout and
 **R260821** with retained project hardening. `vendor/tomlc17/README.md` records the
 exact upstream commit and local patch inventory.
 
-## SDL and native dependencies
+## raylib and native dependencies
 
-SDL2, SDL2_image, SDL2_mixer and SDL2_ttf use the zlib license. Native macOS/Linux
-builds use system libraries; Windows bundles runtime dependencies resolved by the
-build environment. Windows archives include available MSYS2 package license
-notices under `licenses/msys2/`.
+raylib 6.0 is built from the source/checksum pin in `vendor/raylib/manifest.json`.
+Source: https://github.com/raysan5/raylib/releases/tag/6.0
+Copyright (c) 2013–2026 Ramon Santamaria (@raysan5). zlib/libpng license.
+
+Native builds statically link raylib with bundled GLFW; browser builds use the
+Web backend. Archives include `licenses/raylib.txt`, GLFW's notice and the
+unmodified license-bearing external files under `licenses/raylib-dependencies/`.
+Those bundled components have their own terms, retained in those files.
+Native OS graphics/audio libraries remain required. Windows packaging resolves
+both executables' non-system runtime dependencies and includes their owning
+MSYS2 packages' available license files under `licenses/msys2/`.
 
 ## Artwork, audio and font
 

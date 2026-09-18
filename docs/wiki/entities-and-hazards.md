@@ -309,7 +309,7 @@ static int aabb_overlap(float ax, float ay, int aw, int ah,
 }
 ```
 
-For entities with non-rectangular visible art (birds, fish, spiders), `get_hitbox()` functions return a pre-computed inset `SDL_Rect` that matches the actual art bounds. See each entity's header for `ART_X`, `ART_W`, `ART_Y`, `ART_H`, and `HITBOX_PAD_*` constants.
+For entities with non-rectangular visible art (birds, fish, spiders), `get_hitbox()` functions return an inset integer `IntRect` matching the art bounds. See each entity's header for `ART_X`, `ART_W`, `ART_Y`, `ART_H`, and `HITBOX_PAD_*` constants.
 
 ---
 

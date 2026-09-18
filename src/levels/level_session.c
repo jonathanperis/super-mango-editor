@@ -370,7 +370,7 @@ static LevelDef *game_level_storage(GameState *gs)
     return (LevelDef *)gs->level_def;
 }
 
-static int read_stable_level(const char *path, LevelDef *level, Uint64 *hash)
+static int read_stable_level(const char *path, LevelDef *level, uint64_t *hash)
 {
     SerializerFileFingerprint before, after;
     if (serializer_fingerprint_utf8(path, &before) != 1 || level_load_toml(path, level) != 0 ||
@@ -400,7 +400,7 @@ int game_level_load_initial(GameState *gs)
     }
 
     level_def_init_defaults(&loaded);
-    Uint64 source_hash;
+    uint64_t source_hash;
     if (read_stable_level(safe_path, &loaded, &source_hash) != 0) {
         fprintf(stderr, "Error: could not load initial level: %s\n", safe_path);
         return -1;
@@ -437,7 +437,7 @@ int game_load_next_phase(GameState *gs)
     LevelDef next_level;
     level_def_init_defaults(&next_level);
 
-    Uint64 source_hash;
+    uint64_t source_hash;
     if (read_stable_level(safe_path, &next_level, &source_hash) != 0) {
         fprintf(stderr, "Error: Failed to load next phase: %s\n", safe_path);
         return -1;

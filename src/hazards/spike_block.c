@@ -2,7 +2,7 @@
  * spike_block.c — SpikeBlock: a rail-riding hazard that pushes the player.
  */
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 #include <math.h>   /* sqrtf */
 #include <stdio.h>
 
@@ -217,7 +217,7 @@ void spike_block_update(SpikeBlock *sb, float dt, int cam_x) {
     /*
      * Recompute world-space position.
      * rail_get_world_pos returns the interpolated centre; subtract half the
-     * display size to get the top-left corner for the SDL_Rect.
+     * display size to get the top-left corner for the drawing rectangle.
      */
     float cx, cy;
     rail_get_world_pos(sb->rail, t_safe, &cx, &cy);
@@ -236,11 +236,11 @@ void spike_blocks_update(SpikeBlock *blocks, int count, float dt, int cam_x) {
  * spike_block_render — Draw one SpikeBlock at its current world position.
  *
  * Spike_Block.png is a single 16×16 frame used as the full source texture.
- * Passing NULL as the source rect to SDL_RenderCopy means "use the entire
+ * Passing NULL as the source rect means "use the entire
  * texture", which is correct for a single-frame sprite.
  */
 void spike_block_render(const SpikeBlock *sb,
-                        SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                        Texture2D *tex, int cam_x) {
     if (!sb->active) return;
 
     /*
@@ -248,7 +248,7 @@ void spike_block_render(const SpikeBlock *sb,
      * x − cam_x converts world space to screen space.
      * w/h are SPIKE_DISPLAY_W × SPIKE_DISPLAY_H (24×24 logical px).
      */
-    SDL_Rect dst = {
+    IntRect dst = {
         .x = (int)sb->x - cam_x,
         .y = (int)sb->y,
         .w = sb->w,
@@ -256,23 +256,22 @@ void spike_block_render(const SpikeBlock *sb,
     };
 
     /*
-     * SDL_RenderCopyEx — blit the full texture into dst with rotation.
+     * Draw the full texture into dst with rotation.
      *
      *   angle  : spin_angle in degrees, advances each frame.
      *   center : NULL = rotate around the rect's own centre (natural pivot).
-     *   flip   : SDL_FLIP_NONE — no mirror; rotation alone drives the spin.
+     *   flip   : no mirror; rotation alone drives the spin.
      *
-     * SDL scales from 16×16 (source) to 24×24 (dst) using the nearest-
+     * The texture scales from 16×16 (source) to 24×24 (dst) using the nearest-
      * neighbour hint set in game_init, preserving the pixel-art look.
      */
-    SDL_RenderCopyEx(renderer, tex, NULL, &dst,
-                     (double)sb->spin_angle, NULL, SDL_FLIP_NONE);
+    sprite_draw(tex, NULL, &dst, sb->spin_angle, SPRITE_NORMAL, WHITE);
 }
 
 void spike_blocks_render(const SpikeBlock *blocks, int count,
-                         SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                         Texture2D *tex, int cam_x) {
     for (int i = 0; i < count; i++)
-        spike_block_render(&blocks[i], renderer, tex, cam_x);
+        spike_block_render(&blocks[i], tex, cam_x);
 }
 
 /* ------------------------------------------------------------------ */
@@ -283,8 +282,8 @@ void spike_blocks_render(const SpikeBlock *blocks, int count,
  * The hitbox matches the display rect (top-left x,y; size w×h).
  * No inset is applied because the spike art fills the entire frame.
  */
-SDL_Rect spike_block_get_hitbox(const SpikeBlock *sb) {
-    SDL_Rect r = {
+IntRect spike_block_get_hitbox(const SpikeBlock *sb) {
+    IntRect r = {
         .x = (int)sb->x,
         .y = (int)sb->y,
         .w = sb->w,

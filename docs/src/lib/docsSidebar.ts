@@ -189,7 +189,7 @@ export const SECTION_CATEGORIES: DocsCategory[] = [
   {
     label: 'Engine & Code',
     kicker: 'MANUAL_02',
-    description: 'Follow the C11 and SDL2 runtime, player module, constants, and source ownership.',
+    description: 'Follow the C11 and raylib runtime, player module, constants, and source ownership.',
     ids: ['source-files', 'entity-walkthrough', 'player-module', 'constants-reference'],
   },
   {

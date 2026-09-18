@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include <SDL.h>                       /* Uint32 */
+#include <stdint.h>
 #include <string.h>                    /* memset */
 #include "../surfaces/bouncepad.h"     /* BouncepadType, MAX_BOUNCEPADS_* */
 #include "../hazards/axe_trap.h"       /* AxeTrapMode, MAX_AXE_TRAPS */
@@ -486,7 +486,7 @@ typedef struct {
 
     /* Background sound */
     char  music_path[64];   /* path to .wav sound file, empty = no sound */
-    int   music_volume;     /* 0-128, SDL_mixer range */
+    int   music_volume;     /* authored 0-128 volume units */
 
     /* Floor tile texture */
     char  floor_tile_path[64]; /* 9-slice tileset PNG, e.g. "assets/sprites/levels/grass_tileset.png" */

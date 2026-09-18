@@ -12,12 +12,12 @@ Use this page to choose the smallest useful verification set for a change. Run c
 |--------------|-------------|-----|
 | C runtime, gameplay, collision, score, overlays, sessions | `make test CC=clang` | Builds and runs 15 native regression binaries plus Python level-validation and web-host checks. |
 | Level TOML, campaign manifest, or level schema | `make validate-levels` and `make docs-drift` | Validates root and lab levels, the v1 campaign manifest, generated facts, schema docs and prose counts. |
-| Player/world runtime startup | `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy make smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEED=1` | Boots every TOML level plus the editor in bounded dummy-SDL mode. |
-| Replay or event handling | `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy make scripted-smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"` | Generates deterministic replay inputs and injects movement/jump/pause events across levels. |
+| Player/world runtime startup | `make smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEED=1` | Renders every TOML level plus the editor in bounded hidden windows. |
+| Replay or event handling | `make scripted-smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"` | Generates deterministic commands/action masks and checks movement/jump/pause results. |
 | Editor behaviour | `make editor CC=clang` and `./out/super-mango-editor --smoke-test` | Builds the standalone editor and checks headless startup/exit. |
 | Memory/UB-sensitive C changes | `make sanitize CC=clang` and, when startup paths changed, `make sanitize-smoke CC=clang` | Runs AddressSanitizer/UBSan over tests and optionally smoke startup. |
 | Docs, README, Pages routes | `make docs-drift`, then from `docs/`: `bun run lint`, `bun run build`, `bun run check-site` | Checks generated facts, TOML examples, API/CLI references, Astro compilation and emitted routes/links/metadata/sitemap. Uses the frozen `bun.lock` dependency set. |
-| WebAssembly payload | `make web` when local Emscripten is healthy; otherwise trust green GitHub Actions WebAssembly + Pages smoke | CI is authoritative for Emscripten/SDL port-cache issues. |
+| WebAssembly payload | `make web`, artifact checks and green GitHub Actions WebAssembly + Pages smoke | Build raylib and the application with the same pinned SDK; distinguish toolchain failures from application failures. |
 | Release packaging | `make dist-native` and `make dist-wasm` or the `Build & Release` workflow | Produces native and WebAssembly archives using the same archive layout described in the release checklist. |
 
 ## Native Regression Tests
@@ -69,9 +69,24 @@ invalid CR-only documents remain rejected.
 
 ## Smoke Tests
 
-`make smoke` builds the game and editor, runs root and lab TOML levels for a bounded frame count with dummy video/audio drivers, then renders five editor frames. Use it when startup, asset loading, level data, or resource cleanup changed.
+`make smoke` builds the game and editor, runs root and lab TOML levels for a bounded frame count, then renders five editor frames. Desktop hidden windows still need graphics and audio devices. Linux CI supplies Xvfb/Mesa and a PulseAudio null sink. macOS/Windows CI uses a separate Memory/software-rendered test build while building and packaging normal GLFW desktop executables.
 
-`make scripted-smoke` drives the runtime with generated replay scripts. The runner writes files under `out/replays-smoke/`, then invokes the game with `--replay-script`, `--seed`, and `--smoke-test-frames` to exercise deterministic movement, jumping, and pause/resume paths.
+For display-less local verification:
+
+```sh
+make test OUTDIR=out/headless RAYLIB_PLATFORM=memory
+make sanitize OUTDIR=out/headless RAYLIB_PLATFORM=memory
+make smoke OUTDIR=out/headless RAYLIB_PLATFORM=memory
+```
+
+Memory tests render assets and exercise lifecycle/model/input-injection contracts
+with null audio. They verify requested window sizes at the API boundary; only the
+desktop suite additionally checks actual OS resize. The context-lifetime test
+normalizes raylib 6.0 Memory's bottom-origin/BGRA framebuffer readback. Software
+tests do not prove GPU presentation, clipboard/dialog behavior, audible output
+or physical input devices. They are explicit builds, never a runtime fallback.
+
+`make scripted-smoke` drives the runtime with generated replay scripts. The runner writes files under `out/replays-smoke/`, then invokes the game with `--replay-script`, `--seed`, and `--smoke-test-frames` to exercise deterministic movement, jumping, and pause/resume paths. Each subprocess has a 30-second limit; use the default five-frame scenarios for slow sanitizer/software-renderer runs.
 
 ## Documentation Drift Gate
 
@@ -111,7 +126,7 @@ interactive browser testing.
 
 ## WebAssembly and Pages
 
-`make web` produces `out/super-mango.html`, `out/super-mango.js`, `out/super-mango.wasm`, and `out/super-mango.data`. Local Emscripten preflights are useful, but GitHub Actions are the authoritative WebAssembly gate because host Emscripten/SDL port caches can fail before Super Mango code compiles.
+`make web` produces `out/super-mango.html`, `out/super-mango.js`, `out/super-mango.wasm`, and `out/super-mango.data`, plus the debug variants. Local Emscripten preflights are useful; GitHub Actions remain the authoritative WebAssembly gate. Use real Node.js for artifact syntax/module checks, including `NODE=/path/to/node` when another runtime shadows `node` on PATH.
 
 After a Pages deploy, smoke the live site with at least:
 

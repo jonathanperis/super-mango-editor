@@ -13,8 +13,8 @@
  */
 #pragma once
 
-#include <SDL.h>
-#include <SDL_mixer.h>
+#include "../shared/graphics.h"
+#include "../shared/audio.h"
 
 /* ---- Constants ---------------------------------------------------------- */
 
@@ -46,7 +46,7 @@ typedef struct {
     float  patrol_x0;      /* left patrol boundary                          */
     float  patrol_x1;      /* right patrol boundary                         */
     int    frame_index;    /* current animation frame (0–2)                  */
-    Uint32 anim_timer_ms;  /* accumulator for frame advances                */
+    uint32_t anim_timer_ms; /* accumulator for frame advances */
 } Bird;
 
 /* ---- Function declarations ---------------------------------------------- */
@@ -61,13 +61,13 @@ void birds_init(Bird *birds, int *count, int world_w);
  * cam_x     : camera left edge (sound only plays when bird is on-screen).
  */
 void birds_update(Bird *birds, int count, float dt,
-                  Mix_Chunk *snd_flap, float player_x, int cam_x);
+                  SoundEffect *snd_flap, float player_x, int cam_x);
 
 void birds_render(const Bird *birds, int count,
-                  SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                  Texture2D *tex, int cam_x);
 
 /*
  * bird_get_hitbox — Return the screen-space AABB for collision checks.
  * The hitbox matches the visible art bounds, offset by the sine-wave y.
  */
-SDL_Rect bird_get_hitbox(const Bird *b);
+IntRect bird_get_hitbox(const Bird *b);

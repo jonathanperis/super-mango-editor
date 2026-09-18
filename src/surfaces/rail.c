@@ -2,8 +2,7 @@
  * rail.c — Rail path building, rendering, and traversal helpers.
  */
 
-#include <SDL.h>
-#include <SDL_image.h>
+#include "../shared/graphics.h"
 #include <stdio.h>
 #include <math.h>
 #include <limits.h>
@@ -34,7 +33,7 @@
  *   (1,1) = col 0, row 0  →  SOUTH only    (vertical   top   end cap)
  *   (1,3) = col 2, row 0  →  NORTH only    (vertical   bot   end cap)
  */
-static SDL_Rect connection_to_src(int conn) {
+static IntRect connection_to_src(int conn) {
     int col, row;
     switch (conn & (RAIL_N | RAIL_E | RAIL_S | RAIL_W)) {
         /* ---- Two-direction: loop corners and straights ---- */
@@ -51,7 +50,7 @@ static SDL_Rect connection_to_src(int conn) {
         case RAIL_N:           col = 2; row = 0; break;  /* V bot   end cap  (1,3) */
         default:               col = 1; row = 3; break;  /* fallback: H left cap   */
     }
-    SDL_Rect src = { col * RAIL_TILE_W, row * RAIL_TILE_H, RAIL_TILE_W, RAIL_TILE_H };
+    IntRect src = { col * RAIL_TILE_W, row * RAIL_TILE_H, RAIL_TILE_W, RAIL_TILE_H };
     return src;
 }
 
@@ -270,11 +269,11 @@ int rail_build(Rail *rail, const RailPlacement *p)
  * rail_render — Draw every tile of every rail loop.
  *
  * For each tile we call connection_to_src() to pick the correct 16×16 cell
- * from Rails.png, then SDL_RenderCopy to blit it at its world position
+ * from Rails.png, then draws it at its world position
  * adjusted by the camera offset (world → screen: dst.x = tile.x − cam_x).
  */
 void rail_render(const Rail *rails, int count,
-                 SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                 Texture2D *tex, int cam_x) {
     for (int r = 0; r < count; r++) {
         const Rail *rail = &rails[r];
         for (int i = 0; i < rail->count; i++) {
@@ -284,16 +283,16 @@ void rail_render(const Rail *rails, int count,
              * src — the 16×16 region to cut from Rails.png.
              * Determined by the tile's connection bitmask.
              */
-            SDL_Rect src = connection_to_src(t->connections);
+            IntRect src = connection_to_src(t->connections);
 
             /*
              * dst — where to draw on screen.
              * Subtract cam_x so the rail scrolls with the camera.
              * Tile positions are already in logical pixels; no scaling needed.
              */
-            SDL_Rect dst = { t->x - cam_x, t->y, RAIL_TILE_W, RAIL_TILE_H };
+            IntRect dst = { t->x - cam_x, t->y, RAIL_TILE_W, RAIL_TILE_H };
 
-            SDL_RenderCopy(renderer, tex, &src, &dst);
+            sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }
     }
 }

@@ -4,7 +4,6 @@
 
 #include "editor_chrome.h"
 
-#include <SDL.h>   /* SDL_Rect, SDL_RenderFillRect */
 #include <stdio.h> /* snprintf */
 
 #include "editor_files.h"      /* editor file/save helpers */
@@ -32,11 +31,7 @@ void editor_render_toolbar(EditorState *es)
         es->tool = TOOL_SELECT;
     }
     if (es->tool == TOOL_SELECT) {
-        SDL_SetRenderDrawColor(es->renderer,
-                               UI_BTN_ACTIVE.r, UI_BTN_ACTIVE.g,
-                               UI_BTN_ACTIVE.b, UI_BTN_ACTIVE.a);
-        SDL_Rect underline = { bx, by + bh, bw, 2 };
-        SDL_RenderFillRect(es->renderer, &underline);
+        DrawRectangle(bx, by+bh, bw, 2, UI_BTN_ACTIVE);
     }
 
     bx += bw + 4;
@@ -44,11 +39,7 @@ void editor_render_toolbar(EditorState *es)
         es->tool = TOOL_PLACE;
     }
     if (es->tool == TOOL_PLACE) {
-        SDL_SetRenderDrawColor(es->renderer,
-                               UI_BTN_ACTIVE.r, UI_BTN_ACTIVE.g,
-                               UI_BTN_ACTIVE.b, UI_BTN_ACTIVE.a);
-        SDL_Rect underline = { bx, by + bh, bw, 2 };
-        SDL_RenderFillRect(es->renderer, &underline);
+        DrawRectangle(bx, by+bh, bw, 2, UI_BTN_ACTIVE);
     }
 
     bx += bw + 4;
@@ -56,11 +47,7 @@ void editor_render_toolbar(EditorState *es)
         es->tool = TOOL_DELETE;
     }
     if (es->tool == TOOL_DELETE) {
-        SDL_SetRenderDrawColor(es->renderer,
-                               UI_BTN_ACTIVE.r, UI_BTN_ACTIVE.g,
-                               UI_BTN_ACTIVE.b, UI_BTN_ACTIVE.a);
-        SDL_Rect underline = { bx, by + bh, bw, 2 };
-        SDL_RenderFillRect(es->renderer, &underline);
+        DrawRectangle(bx, by+bh, bw, 2, UI_BTN_ACTIVE);
     }
 
     bx += bw + 20;
@@ -154,7 +141,7 @@ void editor_render_status_bar(EditorState *es)
     ui_label_color(&es->ui, 330, bar_y + 8,
                    editor_validation_summary(&es->validation_report),
                    es->validation_report.error_count > 0 ?
-                   (SDL_Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
+                   (Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
 
     int total = es->level.floor_gap_count
               + es->level.rail_count

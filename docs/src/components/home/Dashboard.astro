@@ -22,7 +22,7 @@ const paths = [
     {
         label: 'PATH_02',
         title: 'Learn the engine',
-        body: 'Follow the C11 + SDL2 architecture, game loop, rendering, collision, input, and entity systems.',
+        body: 'Follow the C11 + raylib architecture, game loop, rendering, collision, input, and entity systems.',
         action: 'OPEN GUIDE ->',
         href: `${base}/docs/learning-path/`,
     },
@@ -125,7 +125,7 @@ const manualGroups = [
     <div class="section-kicker">SCOREBOARD</div>
     <h2 class="section-title">PLAY, STUDY, REBUILD</h2>
     <p class="section-lede">
-        Super Mango is a classic side-scrolling platformer and a commented learning resource for C and SDL2 game programming.
+        Super Mango is a classic side-scrolling platformer and a commented learning resource for C and raylib game programming.
         It keeps the game loop, rendering, input, collision, assets, WebAssembly build, and level tooling visible.
     </p>
 
@@ -176,7 +176,7 @@ const manualGroups = [
         <div class="feature-card">
             <span class="card-label">INV_05</span>
             <h3>Level editor</h3>
-            <p>Standalone SDL2 editor with canvas tools, palette, properties, TOML save/load, validation, autosave, and play-test integration.</p>
+            <p>Standalone raylib editor with canvas tools, palette, properties, TOML save/load, validation, autosave, and play-test integration.</p>
         </div>
         <div class="feature-card">
             <span class="card-label">INV_06</span>
@@ -236,7 +236,7 @@ const manualGroups = [
         <a class="download-card" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for Windows x86_64">
             <span class="card-label">DROP_03</span>
             <div class="platform">Windows</div>
-            <div class="arch">x86_64 + SDL2 DLLs</div>
+            <div class="arch">x86_64 + runtime DLLs</div>
             <span class="card-action">OPEN RELEASE -></span>
         </a>
         <a class="download-card wasm-drop" href="#play" aria-label="Play Super Mango in browser using WebAssembly">
@@ -305,7 +305,7 @@ const manualGroups = [
 
         const handleKeyDown = (event) => {
             if (document.activeElement !== canvas) return;
-            // Run before SDL's target listeners: leaving default handling to
+            // Run before the canvas backend listeners: leaving default handling to
             // them would consume Tab and trap focus inside the canvas.
             const modifierOnly = /^(Control|Meta)(Left|Right)$/.test(event.code);
             if (event.code === 'Tab' || ((event.ctrlKey || event.metaKey) && !modifierOnly)) {

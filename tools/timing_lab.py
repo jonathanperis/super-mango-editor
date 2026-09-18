@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Study the semi-implicit Euler equations used by player.c, without SDL.
+"""Study the semi-implicit Euler equations used by player.c, without graphics.
 
 This is a numerical model, not a game performance benchmark or collision test.
 Gravity is 800 px/s², initial velocity is zero, and the duration is one second.

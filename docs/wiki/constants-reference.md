@@ -29,7 +29,7 @@ These are available to every file that `#include "game.h"`.
 | `GAME_W` | `400` | Internal canvas width in logical pixels |
 | `GAME_H` | `300` | Internal canvas height in logical pixels |
 
-`SDL_RenderSetLogicalSize(renderer, GAME_W, GAME_H)` makes SDL scale every draw call from 400x300 up to 800x600 automatically, producing a **2x pixel scale** (each logical pixel = 2x2 physical pixels).
+The 400×300 raylib render target is presented with point filtering at 800×600, producing a **2x pixel scale** (each logical pixel = 2×2 physical pixels). `display_present` and `input_pointer_to_logical` share the aspect-preserving viewport mapping.
 
 ### Timing
 

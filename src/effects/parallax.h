@@ -20,7 +20,7 @@
  */
 #pragma once
 
-#include <SDL.h>   /* SDL_Texture, SDL_Renderer */
+#include "../shared/graphics.h"
 
 /*
  * MAX_BACKGROUND_LAYERS — maximum number of background layers the system can hold.
@@ -39,7 +39,7 @@
  *            0.0 = static, 0.5 = half speed, 1.0 = full world speed.
  */
 typedef struct {
-    SDL_Texture *texture;   /* GPU image handle; NULL = failed to load         */
+    Texture2D *texture;     /* GPU image handle; NULL = failed to load */
     int          tex_w;     /* natural width  of the loaded PNG in pixels      */
     int          tex_h;     /* natural height of the loaded PNG in pixels      */
     float        speed;     /* parallax fraction: how fast this layer scrolls  */
@@ -63,7 +63,7 @@ typedef struct {
  * parallax.c.  Each layer is non-fatal: a missing PNG prints a warning
  * and leaves that layer's texture NULL (it will be skipped at render time).
  */
-void parallax_init(ParallaxSystem *ps, SDL_Renderer *renderer);
+void parallax_init(ParallaxSystem *ps);
 
 /*
  * parallax_init_from_def — Load layers from level definition data.
@@ -75,7 +75,7 @@ void parallax_init(ParallaxSystem *ps, SDL_Renderer *renderer);
  *
  * count must be <= MAX_BACKGROUND_LAYERS; excess entries are silently ignored.
  */
-void parallax_init_from_def(ParallaxSystem *ps, SDL_Renderer *renderer,
+void parallax_init_from_def(ParallaxSystem *ps,
                             const char (*paths)[64], const float *speeds, int count);
 
 /*
@@ -85,7 +85,7 @@ void parallax_init_from_def(ParallaxSystem *ps, SDL_Renderer *renderer,
  * Each layer computes its own scroll offset as (int)(cam_x × speed) % tex_w,
  * then tiles the texture to cover the full GAME_W canvas width.
  */
-void parallax_render(const ParallaxSystem *ps, SDL_Renderer *renderer, int cam_x);
+void parallax_render(const ParallaxSystem *ps, int cam_x);
 
 /*
  * parallax_cleanup — Destroy all GPU textures owned by the parallax system.

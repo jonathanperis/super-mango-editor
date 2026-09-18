@@ -14,7 +14,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 #define WATER_FRAMES        8    /* frames in the sheet                    */
 #define WATER_FRAME_W      48    /* full slot width in the sheet (px)      */
@@ -26,18 +26,18 @@
 #define WATER_SCROLL_SPEED 40.0f /* rightward px/s                         */
 
 typedef struct {
-    SDL_Texture *texture;   /* GPU handle for Water.png                   */
+    Texture2D *texture;     /* GPU handle for Water.png */
     float        scroll_x;  /* rightward offset, wraps at WATER_PERIOD    */
 } Water;
 
-int water_init(Water *w, SDL_Renderer *renderer);
-void water_reload_texture(Water *w, SDL_Renderer *renderer, const char *path);
+int water_init(Water *w);
+void water_reload_texture(Water *w, const char *path);
 void water_update(Water *w, float dt);
-void water_render(const Water *w, SDL_Renderer *renderer);
+void water_render(const Water *w);
 void water_cleanup(Water *w);
 
 /* Draw the animated water strip across the bottom of the canvas. */
-void water_render(const Water *w, SDL_Renderer *renderer);
+void water_render(const Water *w);
 
 /* Release the GPU texture. */
 void water_cleanup(Water *w);

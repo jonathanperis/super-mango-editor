@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include <SDL.h>
+#include "shared/geometry.h"
 
 #include "entities/fish.h"
 #include "hazards/circular_saw.h"
@@ -15,15 +15,15 @@ static int expect_int(const char *name, int actual, int expected)
     return 0;
 }
 
-static int sdl_intersection_edges_are_strict(void)
+static int integer_intersection_edges_are_strict(void)
 {
-    SDL_Rect a = {10, 10, 16, 16};
-    SDL_Rect touching = {26, 10, 16, 16};
-    SDL_Rect overlapping = {25, 10, 16, 16};
+    IntRect a = {10, 10, 16, 16};
+    IntRect touching = {26, 10, 16, 16};
+    IntRect overlapping = {25, 10, 16, 16};
 
-    if (expect_int("touching edge", SDL_HasIntersection(&a, &touching), SDL_FALSE) != 0)
+    if (expect_int("touching edge", rect_intersects(&a, &touching), 0) != 0)
         return 1;
-    if (expect_int("one-pixel overlap", SDL_HasIntersection(&a, &overlapping), SDL_TRUE) != 0)
+    if (expect_int("one-pixel overlap", rect_intersects(&a, &overlapping), 1) != 0)
         return 1;
 
     return 0;
@@ -32,18 +32,18 @@ static int sdl_intersection_edges_are_strict(void)
 static int spike_platform_hitbox_extends_upward(void)
 {
     SpikePlatform sp = { .x = 120.0f, .y = 200.0f, .w = 48, .active = 1 };
-    SDL_Rect hitbox = spike_platform_get_rect(&sp);
-    SDL_Rect edge_aligned_player = {120, 187, 16, 11};
+    IntRect hitbox = spike_platform_get_rect(&sp);
+    IntRect edge_aligned_player = {120, 187, 16, 11};
 
     if (expect_int("spike x", hitbox.x, 120) != 0) return 1;
     if (expect_int("spike y", hitbox.y, 198) != 0) return 1;
     if (expect_int("spike w", hitbox.w, 48) != 0) return 1;
     if (expect_int("spike h", hitbox.h, SPIKE_PLAT_SRC_H + 2) != 0) return 1;
-    if (expect_int("standing overlap", SDL_HasIntersection(&edge_aligned_player, &hitbox), SDL_FALSE) != 0)
+    if (expect_int("standing overlap", rect_intersects(&edge_aligned_player, &hitbox), 0) != 0)
         return 1;
 
     edge_aligned_player.y = 188;
-    if (expect_int("extended top overlap", SDL_HasIntersection(&edge_aligned_player, &hitbox), SDL_TRUE) != 0)
+    if (expect_int("extended top overlap", rect_intersects(&edge_aligned_player, &hitbox), 1) != 0)
         return 1;
 
     return 0;
@@ -52,7 +52,7 @@ static int spike_platform_hitbox_extends_upward(void)
 static int fish_hitbox_trims_transparent_padding(void)
 {
     Fish fish = { .x = 100.0f, .y = 200.0f };
-    SDL_Rect hitbox = fish_get_hitbox(&fish);
+    IntRect hitbox = fish_get_hitbox(&fish);
 
     if (expect_int("fish hitbox x", hitbox.x, 100 + FISH_HITBOX_PAD_X) != 0)
         return 1;
@@ -77,7 +77,7 @@ static int circular_saw_hitbox_trims_corners(void)
         .h = SAW_DISPLAY_H,
         .active = 1
     };
-    SDL_Rect hitbox = circular_saw_get_hitbox(&saw);
+    IntRect hitbox = circular_saw_get_hitbox(&saw);
 
     if (expect_int("saw hitbox x", hitbox.x, 244) != 0) return 1;
     if (expect_int("saw hitbox y", hitbox.y, 164) != 0) return 1;
@@ -89,7 +89,7 @@ static int circular_saw_hitbox_trims_corners(void)
 
 int main(void)
 {
-    if (sdl_intersection_edges_are_strict() != 0) return 1;
+    if (integer_intersection_edges_are_strict() != 0) return 1;
     if (spike_platform_hitbox_extends_upward() != 0) return 1;
     if (fish_hitbox_trims_transparent_padding() != 0) return 1;
     if (circular_saw_hitbox_trims_corners() != 0) return 1;

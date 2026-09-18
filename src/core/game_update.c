@@ -21,7 +21,7 @@ int game_update_active(GameState *gs, float dt, int cam_x)
     int fp_landed_idx;
     const int lives_before = gs->lives;
 
-    game_checkpoint_feedback_clear_expired(gs, SDL_GetTicks());
+    game_checkpoint_feedback_clear_expired(gs, (uint32_t)clock_millis());
     gs->completion.level_elapsed += dt;
 
     fp_landed_idx = game_player_step(gs, dt);

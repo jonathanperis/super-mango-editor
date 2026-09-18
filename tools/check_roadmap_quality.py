@@ -145,12 +145,12 @@ def check_scripted_smoke_target() -> None:
     if "--replay-script" not in replay_runner:
         fail("tools/run_scripted_smoke.py: scripted smoke must pass replay scripts to the game binary")
     if "replay_input_mask" not in player_header or "replay_input_mask" not in player_input:
-        fail("player input: replay scripts must feed sampled movement/jump state, not only SDL events")
+        fail("player input: replay scripts must feed sampled movement/jump state, not only queued commands")
     if "--replay-script" not in build_doc:
         fail("docs/wiki/build-system.md: missing replay-script smoke docs")
     replay_source = read(ROOT / "src" / "input" / "game_replay.c")
-    if "SDL_PushEvent" not in replay_source:
-        fail("src/input/game_replay.c: replay smoke must inject SDL events")
+    if "input_push" not in replay_source:
+        fail("src/input/game_replay.c: replay smoke must inject semantic commands")
     for needle in ["tools/check_roadmap_quality.py", "tools/generate_overlay_snapshots.py", "tools/run_scripted_smoke.py", ".gitattributes"]:
         if needle not in docs_workflow:
             fail(f".github/workflows/docs.yml: docs drift path filter must include `{needle}`")

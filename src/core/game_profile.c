@@ -1,6 +1,7 @@
 /* Versioned player preferences/results. Persistence belongs to AppSession,
  * never to a render frame, entity, or smoke/replay run. */
 #include "game_profile.h"
+#include "../shared/platform.h"
 #include "../shared/serializer_io.h"
 #include "tomlc17.h"
 #include <errno.h>
@@ -12,6 +13,9 @@
 #include <string.h>
 #ifndef __EMSCRIPTEN__
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOGDI
+#define NOUSER
 #include <windows.h>
 typedef HANDLE ProfileLock;
 #define PROFILE_LOCK_INVALID INVALID_HANDLE_VALUE
@@ -140,8 +144,8 @@ static int bindings(toml_datum_t value, GameSettings *settings, int keyboard)
     for (int i = 0; i < PROFILE_ACTION_COUNT; i++) {
         int binding;
         if (integer(value.u.arr.elem[i], &binding)) return -1;
-        if (keyboard) settings->keys[i] = (SDL_Scancode)binding;
-        else settings->buttons[i] = (SDL_GameControllerButton)binding;
+        if (keyboard) settings->keys[i] = binding;
+        else settings->buttons[i] = binding;
     }
     return 0;
 }
@@ -333,10 +337,10 @@ int game_profile_open(GameProfile *profile, const char *path)
     else found = profile_browser_read(profile->baseline, PROFILE_TEXT_MAX);
     if (found == 0) game_profile_close(profile);
 #else
-    char *base = path ? NULL : SDL_GetPrefPath("SuperMango", "SuperMango");
+    char *base = path ? NULL : preference_path("SuperMango", "SuperMango");
     int size = (path || base) ? snprintf(profile->path, sizeof(profile->path), "%s%s", path ? path : base,
                                         path ? "" : "profile.toml") : -1;
-    SDL_free(base);
+    free(base);
     found = size < 0 || (size_t)size >= sizeof(profile->path) ? -1 : read_native(profile->path, &profile->baseline);
 #endif
     if (found < 0 || (found > 0 && game_profile_decode(&profile->data, profile->baseline))) {
@@ -430,7 +434,7 @@ int game_profile_poll(GameProfile *profile)
 void game_profile_select(GameProfile *profile, const char *key)
 {
     if (!game_profile_key_valid(key) || !strcmp(profile->data.last_level, key)) return;
-    SDL_strlcpy(profile->data.last_level, key, sizeof(profile->data.last_level));
+    str_copy(profile->data.last_level, key, sizeof(profile->data.last_level));
     profile->dirty = 1;
     profile->revision++;
 }
@@ -451,7 +455,7 @@ int game_profile_record(GameProfile *profile, const char *key, int score, int co
     if (index == PROFILE_LEVEL_COUNT) return -1;
     GameProgress *result = &profile->data.levels[index];
     if (index == profile->data.count) {
-        SDL_strlcpy(result->path, key, sizeof(result->path));
+        str_copy(result->path, key, sizeof(result->path));
         result->best_time = elapsed;
         profile->data.count++;
     }

@@ -106,9 +106,10 @@ Analytics is optional; see `.env.example`. With no `PUBLIC_GA_ID`, analytics
 scripts are omitted. Production builds map the repository secret
 `NEXT_PUBLIC_GA_ID` to `PUBLIC_GA_ID`. Local environment files stay untracked.
 
-The browser game uses the SDL2 companion ports shipped with the pinned Emscripten
-SDK. Their versions can lag native packages; upgrading the SDK does not imply
-every SDK-managed library matches the latest standalone release.
+The browser game builds the same checksum-pinned raylib source as native builds,
+using the pinned Emscripten SDK's Web/GLFW backend. `web/keyboard-scope.js` scopes
+that SDK's keyboard handlers to the canvas; revisit its integration when changing
+the SDK. Host contract tests do not replace real-browser/device verification.
 
 See [AUDIT.md](AUDIT.md) for the dated audit and follow-up plan.
 `AUDIT_IMPLEMENTATION.md` is the historical Sandbox School delivery report.

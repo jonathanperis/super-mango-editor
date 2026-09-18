@@ -4,7 +4,7 @@
 
 typedef struct GameReplayEvent {
     int frame;
-    SDL_Keycode key;
+    int key;
     char action[16];
 } GameReplayEvent;
 
@@ -12,5 +12,5 @@ typedef struct GameReplayEvent {
 int game_replay_load(GameState *gs);
 void game_replay_cleanup(GameState *gs);
 
-/* Inject deterministic SDL key events for the current replay frame. */
+/* Inject deterministic commands for the current replay frame. */
 void game_replay_inject_events(GameState *gs);

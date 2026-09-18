@@ -12,7 +12,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 /* ---- Constants ---------------------------------------------------------- */
 
@@ -45,8 +45,8 @@ void spike_platforms_init(SpikePlatform *sps, int *count);
 
 /* Draw all active spike platforms using 3-slice rendering. */
 void spike_platforms_render(const SpikePlatform *sps, int count,
-                            SDL_Renderer *renderer, SDL_Texture *tex,
+                            Texture2D *tex,
                             int cam_x);
 
 /* Return the full bounding rectangle in world space (for landing check). */
-SDL_Rect spike_platform_get_rect(const SpikePlatform *sp);
+IntRect spike_platform_get_rect(const SpikePlatform *sp);

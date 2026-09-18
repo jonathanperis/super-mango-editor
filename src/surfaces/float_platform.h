@@ -20,7 +20,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 #include "rail.h"   /* Rail — needed for the RAIL mode pointer */
 
 /* ---- Sprite constants ---------------------------------------------------- */
@@ -157,14 +157,14 @@ void float_platforms_update(FloatPlatform *fps, int count,
 
 /* Draw one platform using the 3-slice sprite. */
 void float_platform_render(const FloatPlatform *fp,
-                           SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                           Texture2D *tex, int cam_x);
 
 /* Draw all active platforms. */
 void float_platforms_render(const FloatPlatform *fps, int count,
-                            SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                            Texture2D *tex, int cam_x);
 
 /*
  * float_platform_get_rect — Return the world-space bounding rectangle.
  * Used for debug rendering; collision is driven by the y top-surface, not this rect.
  */
-SDL_Rect float_platform_get_rect(const FloatPlatform *fp);
+IntRect float_platform_get_rect(const FloatPlatform *fp);

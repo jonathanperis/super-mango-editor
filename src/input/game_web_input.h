@@ -12,7 +12,7 @@ enum {
     GAME_TOUCH_COUNT
 };
 
-/* Semantic touch actions plus matching SDL events for menu controls. */
+/* Semantic touch actions plus matching commands for menu controls. */
 int game_web_input_touch(int action, int pressed);
 unsigned int game_web_input_take_touch_mask(void);
 void game_web_input_clear_touch(void);

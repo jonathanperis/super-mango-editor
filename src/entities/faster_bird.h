@@ -13,8 +13,8 @@
  */
 #pragma once
 
-#include <SDL.h>
-#include <SDL_mixer.h>
+#include "../shared/graphics.h"
+#include "../shared/audio.h"
 
 /* ---- Constants ---------------------------------------------------------- */
 
@@ -43,7 +43,7 @@ typedef struct {
     float  patrol_x0;
     float  patrol_x1;
     int    frame_index;
-    Uint32 anim_timer_ms;
+    uint32_t anim_timer_ms;
 } FasterBird;
 
 /* ---- Function declarations ---------------------------------------------- */
@@ -51,9 +51,9 @@ typedef struct {
 void faster_birds_init(FasterBird *birds, int *count, int world_w);
 
 void faster_birds_update(FasterBird *birds, int count, float dt,
-                         Mix_Chunk *snd_flap, float player_x, int cam_x);
+                         SoundEffect *snd_flap, float player_x, int cam_x);
 
 void faster_birds_render(const FasterBird *birds, int count,
-                         SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                         Texture2D *tex, int cam_x);
 
-SDL_Rect faster_bird_get_hitbox(const FasterBird *b);
+IntRect faster_bird_get_hitbox(const FasterBird *b);

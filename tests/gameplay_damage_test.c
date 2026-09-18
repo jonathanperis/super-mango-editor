@@ -110,7 +110,7 @@ static int lethal_damage_consumes_life_and_resets_level(void)
     if (expect_int("HUD respawn visible",
                    hud_checkpoint_feedback_visible(gs.checkpoint_feedback_kind,
                                                    gs.checkpoint_feedback_until,
-                                                   SDL_GetTicks()), 1) != 0)
+                                                   (uint32_t)clock_millis()), 1) != 0)
         return 1;
     if (expect_int("HUD respawn label",
                    strcmp(hud_checkpoint_feedback_label(gs.checkpoint_feedback_kind, -1),

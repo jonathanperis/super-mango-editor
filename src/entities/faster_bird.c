@@ -44,7 +44,7 @@ void faster_birds_init(FasterBird *birds, int *count, int world_w)
 /* ------------------------------------------------------------------ */
 
 void faster_birds_update(FasterBird *birds, int count, float dt,
-                         Mix_Chunk *snd_flap, float player_x, int cam_x)
+                         SoundEffect *snd_flap, float player_x, int cam_x)
 {
     const BirdVariantSpec *spec = bird_variant_spec(BIRD_VARIANT_FAST);
 
@@ -59,7 +59,7 @@ void faster_birds_update(FasterBird *birds, int count, float dt,
 
 /* ------------------------------------------------------------------ */
 
-SDL_Rect faster_bird_get_hitbox(const FasterBird *b)
+IntRect faster_bird_get_hitbox(const FasterBird *b)
 {
     const BirdVariantSpec *spec = bird_variant_spec(BIRD_VARIANT_FAST);
     return bird_variant_hitbox(spec, b->x, b->base_y);
@@ -68,13 +68,13 @@ SDL_Rect faster_bird_get_hitbox(const FasterBird *b)
 /* ------------------------------------------------------------------ */
 
 void faster_birds_render(const FasterBird *birds, int count,
-                         SDL_Renderer *renderer, SDL_Texture *tex, int cam_x)
+                         Texture2D *tex, int cam_x)
 {
     const BirdVariantSpec *spec = bird_variant_spec(BIRD_VARIANT_FAST);
 
     for (int i = 0; i < count; i++) {
         const FasterBird *b = &birds[i];
         bird_variant_render(spec, b->x, b->base_y, b->vx, b->frame_index,
-                            renderer, tex, cam_x);
+                            tex, cam_x);
     }
 }

@@ -33,7 +33,7 @@ void fish_init(Fish *fish, int *count)
      *           = 269 - 24 = 245
      *
      * Safety check — fish hitbox top while swimming = 245 + 8 = 253.
-     * Player hitbox bottom = 252.  SDL intersection uses strict < so
+     * Player hitbox bottom = 252. Rectangle intersection uses strict < so
      * 253 < 252 is FALSE: the fish CANNOT hurt the player while swimming,
      * only during a jump (when y drops below ~244).
      */
@@ -123,7 +123,7 @@ void fish_update(Fish *fish, int count, float dt, int world_w)
         /*
          * Timed animation: cycle the two swim frames every FISH_FRAME_MS ms.
          * Both frames are left-facing in the sheet; direction is handled by
-         * SDL_FLIP_HORIZONTAL in fish_render, not by frame selection.
+         * horizontal flipping in fish_render, not by frame selection.
          * animate_frame_ms accumulates dt and advances frame_index on overflow.
          */
         animate_frame_ms(&f->frame_index, &f->anim_timer_ms,
@@ -134,34 +134,34 @@ void fish_update(Fish *fish, int count, float dt, int world_w)
 /* ------------------------------------------------------------------ */
 
 void fish_render(const Fish *fish, int count,
-                 SDL_Renderer *renderer, SDL_Texture *tex, int cam_x)
+                 Texture2D *tex, int cam_x)
 {
     for (int i = 0; i < count; i++) {
         const Fish *f = &fish[i];
 
-        SDL_Rect src = {
+        IntRect src = {
             f->frame_index * FISH_FRAME_W,
             0,
             FISH_FRAME_W,
             FISH_FRAME_H
         };
-        SDL_Rect dst = {
+        IntRect dst = {
             (int)f->x - cam_x,
             (int)f->y,
             FISH_RENDER_W,
             FISH_RENDER_H
         };
 
-        SDL_RenderCopyEx(renderer, tex, &src, &dst, 0.0, NULL,
-                         (f->vx > 0.0f) ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+        sprite_draw(tex, &src, &dst, 0,
+                    f->vx > 0.0f ? SPRITE_FLIP_X : SPRITE_NORMAL, WHITE);
     }
 }
 
 /* ------------------------------------------------------------------ */
 
-SDL_Rect fish_get_hitbox(const Fish *fish)
+IntRect fish_get_hitbox(const Fish *fish)
 {
-    SDL_Rect hitbox;
+    IntRect hitbox;
 
     hitbox.x = (int)fish->x + FISH_HITBOX_PAD_X;
     hitbox.y = (int)fish->y + FISH_HITBOX_PAD_Y;

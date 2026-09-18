@@ -6,7 +6,7 @@
  * a phase-passed event.
  */
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 #include "last_star.h"
 #include "game.h"   /* FLOOR_Y, TILE_SIZE, GAME_W */
@@ -38,7 +38,7 @@ void last_star_init(LastStar *star) {
  * Uses the full Stars_Ui.png texture (single 16×16 frame).
  */
 void last_star_render(const LastStar *star,
-                      SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                      Texture2D *tex, int cam_x) {
     if (!star->active || !tex) return;
 
     /* Off-screen culling */
@@ -46,23 +46,23 @@ void last_star_render(const LastStar *star,
         star->x > (float)(cam_x + GAME_W))
         return;
 
-    SDL_Rect dst = {
+    IntRect dst = {
         .x = (int)star->x - cam_x,
         .y = (int)star->y,
         .w = star->w,
         .h = star->h,
     };
-    SDL_RenderCopy(renderer, tex, NULL, &dst);
+    sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
 }
 
 /* ------------------------------------------------------------------ */
 
-SDL_Rect last_star_get_hitbox(const LastStar *star) {
+IntRect last_star_get_hitbox(const LastStar *star) {
     /*
      * Inset the hitbox by 2 px on each side so the player must visually
      * overlap the star's core, not just graze the edge.
      */
-    SDL_Rect r = {
+    IntRect r = {
         .x = (int)star->x + 2,
         .y = (int)star->y + 2,
         .w = star->w - 4,

@@ -4,7 +4,7 @@
 
 #include "editor_session.h"
 
-#include <SDL.h>          /* SDL_ShowMessageBox, SDL_GetError, SDL_SetWindowTitle */
+#include "file_dialog.h"
 #include <stdarg.h>       /* va_list */
 #include <stdio.h>        /* fprintf, snprintf, stderr, vsnprintf */
 #include <string.h>       /* memset, strncpy */
@@ -181,30 +181,18 @@ void editor_refresh_dirty(EditorState *es)
 
 int editor_finish_field_edit(EditorState *es)
 {
-    SDL_MessageBoxButtonData buttons[3] = {
-        { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Block" },
-        { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Apply" },
-        { 0, 2, "Discard" }
-    };
-    SDL_MessageBoxData data;
+    const char *buttons[] = {"Block", "Apply", "Discard"};
     int button_id = 0;
     int result;
     int kind;
 
     if (!es || es->ui.active_id == 0) return 1;
 
-    memset(&data, 0, sizeof(data));
-    data.flags = SDL_MESSAGEBOX_WARNING;
-    data.window = es->window;
-    data.title = "Finish Field Edit";
-    data.message = "Field edit is still active. Choose Apply, Discard, or Block.";
-    data.numbuttons = 3;
-    data.buttons = buttons;
-
     if (editor_test_finish_choice >= 0) {
         button_id = editor_test_finish_choice;
         editor_test_finish_choice = -1;
-    } else if (SDL_ShowMessageBox(&data, &button_id) != 0) {
+    } else if (dialog_choice("Finish Field Edit", "Field edit is still active. Choose Apply, Discard, or Block.",
+                             buttons, 3, 1, 0, &button_id) != 0) {
         editor_set_status(es, "Command blocked: field edit confirmation failed");
         return 0;
     }
@@ -258,7 +246,7 @@ void editor_update_window_title(EditorState *es)
 {
     char title[300];
 
-    if (!es || !es->window) return;
+    if (!es || !IsWindowReady()) return;
 
     if (es->file_path[0] != '\0') {
         snprintf(title, sizeof(title), "Super Mango Editor - %s%s",
@@ -267,7 +255,7 @@ void editor_update_window_title(EditorState *es)
         snprintf(title, sizeof(title), "Super Mango Editor%s",
                  es->modified ? " *" : "");
     }
-    SDL_SetWindowTitle(es->window, title);
+    SetWindowTitle(title);
 }
 
 void editor_reset_new_level(EditorState *es)
@@ -303,12 +291,7 @@ int editor_can_persist(EditorState *es, const char *action)
 
 int editor_confirm_discard_changes(EditorState *es, const char *action)
 {
-    SDL_MessageBoxButtonData buttons[3] = {
-        { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Cancel" },
-        { 0, 1, "Discard" },
-        { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 2, "Save" },
-    };
-    SDL_MessageBoxData data;
+    const char *buttons[] = {"Cancel", "Discard", "Save"};
     char message[256];
     int button_id = 0;
 
@@ -318,19 +301,10 @@ int editor_confirm_discard_changes(EditorState *es, const char *action)
     snprintf(message, sizeof(message),
              "Unsaved changes will be lost. Discard changes and %s?", action);
 
-    memset(&data, 0, sizeof(data));
-    data.flags = SDL_MESSAGEBOX_WARNING;
-    data.window = es->window;
-    data.title = "Unsaved Changes";
-    data.message = message;
-    data.numbuttons = 3;
-    data.buttons = buttons;
-
     if (editor_test_discard_choice >= 0) {
         button_id = editor_test_discard_choice;
         editor_test_discard_choice = -1;
-    } else if (SDL_ShowMessageBox(&data, &button_id) != 0) {
-        fprintf(stderr, "SDL_ShowMessageBox error: %s\n", SDL_GetError());
+    } else if (dialog_choice("Unsaved Changes", message, buttons, 3, 2, 0, &button_id) != 0) {
         editor_set_status(es, "%s cancelled: confirmation failed", action);
         return 0;
     }
@@ -347,11 +321,7 @@ int editor_confirm_discard_changes(EditorState *es, const char *action)
 
 int editor_confirm_overwrite(EditorState *es, const char *path)
 {
-    SDL_MessageBoxButtonData buttons[2] = {
-        { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Cancel" },
-        { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Replace" },
-    };
-    SDL_MessageBoxData data;
+    const char *buttons[] = {"Cancel", "Replace"};
     char message[256];
     int button_id = 0;
 
@@ -364,16 +334,7 @@ int editor_confirm_overwrite(EditorState *es, const char *path)
     }
 
     snprintf(message, sizeof(message), "Replace existing file?\n%s", path);
-    memset(&data, 0, sizeof(data));
-    data.flags = SDL_MESSAGEBOX_WARNING;
-    data.window = es->window;
-    data.title = "Replace Existing File?";
-    data.message = message;
-    data.numbuttons = 2;
-    data.buttons = buttons;
-
-    if (SDL_ShowMessageBox(&data, &button_id) != 0) {
-        fprintf(stderr, "SDL_ShowMessageBox error: %s\n", SDL_GetError());
+    if (dialog_choice("Replace Existing File?", message, buttons, 2, 1, 0, &button_id) != 0) {
         editor_set_status(es, "Save failed: confirmation failed");
         return 0;
     }
@@ -383,12 +344,7 @@ int editor_confirm_overwrite(EditorState *es, const char *path)
 
 EditorExternalChoice editor_confirm_external_change(EditorState *es)
 {
-    SDL_MessageBoxButtonData buttons[3] = {
-        { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Cancel" },
-        { 0, 1, "Replace" },
-        { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 2, "Save As" }
-    };
-    SDL_MessageBoxData data;
+    const char *buttons[] = {"Cancel", "Replace", "Save As"};
     int button_id = 0;
 
     if (!es) return EDITOR_EXTERNAL_CANCEL;
@@ -397,15 +353,8 @@ EditorExternalChoice editor_confirm_external_change(EditorState *es)
         editor_test_external_choice = (EditorExternalChoice)-1;
         return result;
     }
-    memset(&data, 0, sizeof(data));
-    data.flags = SDL_MESSAGEBOX_WARNING;
-    data.window = es->window;
-    data.title = "File Changed Externally";
-    data.message = "The source file changed on disk. Replace it, save as another file, or cancel.";
-    data.numbuttons = 3;
-    data.buttons = buttons;
-
-    if (SDL_ShowMessageBox(&data, &button_id) != 0) {
+    if (dialog_choice("File Changed Externally", "The source file changed on disk. Replace it, save as another file, or cancel.",
+                      buttons, 3, 2, 0, &button_id) != 0) {
         editor_set_status(es, "Save cancelled: external change confirmation failed");
         return EDITOR_EXTERNAL_CANCEL;
     }

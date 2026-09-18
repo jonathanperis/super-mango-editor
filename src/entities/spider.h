@@ -19,7 +19,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 #define MAX_SPIDERS     16     /* maximum simultaneous spiders on screen    */
 #define SPIDER_FRAMES    3     /* animation frames in Spider_1.png          */
@@ -46,7 +46,7 @@ typedef struct {
     float  patrol_x0;
     float  patrol_x1;
     int    frame_index;
-    Uint32 anim_timer_ms;
+    uint32_t anim_timer_ms;
 } Spider;
 
 /*
@@ -76,4 +76,4 @@ void spiders_update(Spider *spiders, int count, float dt,
  * to convert world coordinates to screen coordinates.
  */
 void spiders_render(const Spider *spiders, int count,
-                    SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                    Texture2D *tex, int cam_x);

@@ -32,12 +32,11 @@ that texture and must never free it.
 ```c
 /* src/collectibles/token.h */
 #pragma once
-#include <SDL.h>
+#include "../shared/graphics.h"
 #define MAX_TOKENS 32
 #define TOKEN_SCORE 250
 typedef struct { float x, y; int active; } Token;
-void tokens_render(const Token *items, int count, SDL_Renderer *renderer,
-                   SDL_Texture *texture, int camera_x);
+void tokens_render(const Token *items, int count, Texture2D *texture, int camera_x);
 ```
 
 Implement `tokens_render()` by following `coins_render()` in

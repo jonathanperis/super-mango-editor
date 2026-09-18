@@ -37,14 +37,14 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
  * should be playing, then advances the frame timer.  On state transitions the
  * frame index is reset to 0 so animations always start from the beginning.
  */
-void player_animate(Player *player, Uint32 dt_ms) {
+void player_animate(Player *player, uint32_t dt_ms) {
     /* Determine the target animation from current physics state */
     AnimState target;
     if (player->on_vine) {
         target = ANIM_CLIMB;
     } else if (!player->on_ground) {
         /*
-         * In the air: negative vy means moving upward (SDL y-axis is inverted),
+         * In the air: negative vy means moving upward (screen Y points down),
          * positive vy means falling down under gravity.
          */
         target = (player->vy < 0.0f) ? ANIM_JUMP : ANIM_FALL;
@@ -79,7 +79,7 @@ void player_animate(Player *player, Uint32 dt_ms) {
         /* Freeze — do not advance the timer or frame index */
     } else {
         player->anim_timer_ms += dt_ms;
-        Uint32 frame_duration = (Uint32)ANIM_FRAME_MS[player->anim_state];
+        uint32_t frame_duration = (uint32_t)ANIM_FRAME_MS[player->anim_state];
         while (player->anim_timer_ms >= frame_duration) {
             player->anim_timer_ms -= frame_duration;
             player->anim_frame_index =

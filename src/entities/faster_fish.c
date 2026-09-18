@@ -95,28 +95,28 @@ void faster_fish_update(FasterFish *fish, int count, float dt, int world_w) {
 /* ------------------------------------------------------------------ */
 
 void faster_fish_render(const FasterFish *fish, int count,
-                        SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                        Texture2D *tex, int cam_x) {
     for (int i = 0; i < count; i++) {
         const FasterFish *f = &fish[i];
 
-        SDL_Rect src = {
+        IntRect src = {
             f->frame_index * FFISH_FRAME_W, 0,
             FFISH_FRAME_W, FFISH_FRAME_H
         };
-        SDL_Rect dst = {
+        IntRect dst = {
             (int)f->x - cam_x, (int)f->y,
             FFISH_RENDER_W, FFISH_RENDER_H
         };
 
-        SDL_RenderCopyEx(renderer, tex, &src, &dst, 0.0, NULL,
-                         (f->vx > 0.0f) ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+        sprite_draw(tex, &src, &dst, 0,
+                    f->vx > 0.0f ? SPRITE_FLIP_X : SPRITE_NORMAL, WHITE);
     }
 }
 
 /* ------------------------------------------------------------------ */
 
-SDL_Rect faster_fish_get_hitbox(const FasterFish *fish) {
-    SDL_Rect hitbox;
+IntRect faster_fish_get_hitbox(const FasterFish *fish) {
+    IntRect hitbox;
     hitbox.x = (int)fish->x + FFISH_HITBOX_PAD_X;
     hitbox.y = (int)fish->y + FFISH_HITBOX_PAD_Y;
     hitbox.w = FFISH_RENDER_W - 2 * FFISH_HITBOX_PAD_X;

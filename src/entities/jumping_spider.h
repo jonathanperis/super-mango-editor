@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#include <SDL.h>
-#include <SDL_mixer.h>
+#include "../shared/graphics.h"
+#include "../shared/audio.h"
 
 /* ---- Constants ---------------------------------------------------------- */
 
@@ -51,7 +51,7 @@ typedef struct {
     float  jump_timer;     /* seconds until next jump; counts down each frame*/
     int    on_ground;       /* 1 = walking on floor, 0 = mid-jump           */
     int    frame_index;    /* current animation frame (0–2)                  */
-    Uint32 anim_timer_ms;  /* accumulator for frame advances                */
+    uint32_t anim_timer_ms; /* accumulator for frame advances */
 } JumpingSpider;
 
 /* ---- Function declarations ---------------------------------------------- */
@@ -62,9 +62,9 @@ void jumping_spiders_init(JumpingSpider *spiders, int *count);
 /* Move, jump, patrol, animate each jumping spider. */
 void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
                             const int *floor_gaps, int floor_gap_count,
-                            Mix_Chunk *snd_attack, float player_x, int cam_x);
+                            SoundEffect *snd_attack, float player_x, int cam_x);
 
 /* Draw all jumping spiders using the shared texture. */
 void jumping_spiders_render(const JumpingSpider *spiders, int count,
-                            SDL_Renderer *renderer, SDL_Texture *tex,
+                            Texture2D *tex,
                             int cam_x);

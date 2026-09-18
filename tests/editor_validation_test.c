@@ -2,9 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <SDL.h>
-#include <SDL_image.h>
-#include <SDL_ttf.h>
+#include "shared/graphics.h"
+#include "shared/text.h"
 
 #ifdef _WIN32
 #include <direct.h>
@@ -655,8 +654,8 @@ static int recovery_entries_survive_restart_and_sessions(void)
     editor_level_init_defaults(&second.level);
     first.modified = 1;
     second.modified = 1;
-    first.last_autosave_ms = SDL_GetTicks() - 30001u;
-    second.last_autosave_ms = SDL_GetTicks() - 30001u;
+    first.last_autosave_ms = (uint32_t)clock_millis() - 30001u;
+    second.last_autosave_ms = (uint32_t)clock_millis() - 30001u;
     if (editor_set_preference_root(&first, root) != 0 ||
         editor_set_preference_root(&second, root) != 0 ||
         editor_init_persistence_paths(&first) != 0 ||
@@ -719,7 +718,7 @@ static int recovery_entries_survive_restart_and_sessions(void)
         goto cleanup;
 
     {
-        SDL_Event recovery_event;
+        InputEvent recovery_event;
         char modal_save_path[] = "out/editor_recovery_modal_save.toml";
         remove(modal_save_path);
         editor_level_init_defaults(&restarted.level);
@@ -728,9 +727,9 @@ static int recovery_entries_survive_restart_and_sessions(void)
         editor_test_set_discard_choice(2);
         file_dialog_test_set_save_result(FILE_DIALOG_SELECTED, modal_save_path);
         memset(&recovery_event, 0, sizeof(recovery_event));
-        recovery_event.type = SDL_KEYDOWN;
-        recovery_event.key.keysym.sym = SDLK_r;
-        recovery_event.key.keysym.mod = KMOD_CTRL;
+        recovery_event.type = INPUT_KEY_DOWN;
+        recovery_event.key = KEY_R;
+        recovery_event.mods = INPUT_CTRL;
         editor_handle_event(&restarted, &recovery_event);
         if (expect_int("save during recovery selection preserves entries",
                        restarted.recovery_entry_count, 2) != 0 ||
@@ -848,6 +847,9 @@ static int recovery_metadata_and_failed_save_contract(void)
     editor_level_init_defaults(&es.level);
     strncpy(es.file_path, target, sizeof(es.file_path) - 1);
     strncpy(es.autosave_path, recovery, sizeof(es.autosave_path) - 1);
+    /* This fixture owns an absent destination; reach the injected write failure
+     * instead of relying on a headless native confirmation to fail first. */
+    es.source_state = EDITOR_SOURCE_EXPECTED_MISSING;
 
     if (level_save_toml(&es.level, valid) != 0 ||
         level_save_toml_recovery(&es.level, recovery, target) != 0)
@@ -1037,7 +1039,7 @@ static int autosave_recovery_preserves_destination(void)
     if (editor_set_preference_root(&es, root) != 0 ||
         editor_init_persistence_paths(&es) != 0) goto cleanup;
     es.modified = 1;
-    es.last_autosave_ms = SDL_GetTicks() - 30001u;
+    es.last_autosave_ms = (uint32_t)clock_millis() - 30001u;
 
     editor_maybe_autosave(&es);
     if (expect_int("autosave exists", editor_file_exists(es.autosave_path), 1) != 0)
@@ -1163,7 +1165,7 @@ static int invalid_autosave_does_not_consume_autosave_interval(void)
     remove(es.autosave_path);
 
     es.modified = 1;
-    es.last_autosave_ms = SDL_GetTicks() - 30001u;
+    es.last_autosave_ms = (uint32_t)clock_millis() - 30001u;
     es.level.coin_count = MAX_COINS + 1;
 
     editor_maybe_autosave(&es);
@@ -1529,48 +1531,29 @@ fail:
 }
 
 typedef struct {
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-    TTF_Font *font;
+    TextFont *font;
+    int drawing;
 } EditorWidgetTestContext;
 
 static int editor_widget_test_context_init(EditorWidgetTestContext *context)
 {
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) return -1;
-    if (TTF_Init() != 0) {
-        SDL_Quit();
-        return -1;
-    }
-    (void)IMG_Init(IMG_INIT_PNG);
-
-    context->window = SDL_CreateWindow("editor state test", 0, 0, 320, 240,
-                                       SDL_WINDOW_HIDDEN);
-    if (!context->window) return -1;
-    context->renderer = SDL_CreateRenderer(context->window, -1,
-                                           SDL_RENDERER_SOFTWARE);
-    if (!context->renderer) return -1;
-    context->font = TTF_OpenFont("assets/fonts/round9x13.ttf", 13);
+    memset(context, 0, sizeof(*context));
+    if (display_open(320, 240, "editor state test", 1)) return -1;
+    context->font = font_load("assets/fonts/round9x13.ttf", 13);
     if (!context->font) return -1;
+    BeginDrawing();
+    context->drawing = 1;
     return 0;
 }
 
 static void editor_widget_test_context_cleanup(EditorWidgetTestContext *context)
 {
     if (context->font) {
-        TTF_CloseFont(context->font);
+        font_unload(context->font);
         context->font = NULL;
     }
-    if (context->renderer) {
-        SDL_DestroyRenderer(context->renderer);
-        context->renderer = NULL;
-    }
-    if (context->window) {
-        SDL_DestroyWindow(context->window);
-        context->window = NULL;
-    }
-    IMG_Quit();
-    TTF_Quit();
-    SDL_Quit();
+    if (context->drawing) { EndDrawing(); context->drawing = 0; }
+    if (IsWindowReady()) CloseWindow();
 }
 
 static int widget_commit_paths_preserve_values(void)
@@ -1583,11 +1566,11 @@ static int widget_commit_paths_preserve_values(void)
 
     if (editor_widget_test_context_init(&context) != 0) {
         editor_widget_test_context_cleanup(&context);
-        fprintf(stderr, "editor_validation_test: widget SDL setup failed\n");
+        fprintf(stderr, "editor_validation_test: widget raylib setup failed\n");
         return 1;
     }
 
-    ui_init(&ui, context.renderer, context.font);
+    ui_init(&ui, context.font);
     memset(long_text, 'x', 200);
     long_text[200] = '\0';
     ui_begin_frame(&ui);
@@ -1735,12 +1718,14 @@ static int widget_commit_paths_preserve_values(void)
         goto fail_with_undo;
 
     undo_destroy(es.undo);
+    ui_cleanup(&ui);
     editor_widget_test_context_cleanup(&context);
     return 0;
 
 fail_with_undo:
     undo_destroy(es.undo);
 fail:
+    ui_cleanup(&ui);
     editor_widget_test_context_cleanup(&context);
     return 1;
 }
@@ -1749,7 +1734,7 @@ static int config_preview_sync_preserves_old_texture(void)
 {
     EditorWidgetTestContext context = {0};
     EditorState es;
-    SDL_Texture *old_texture;
+    Texture2D *old_texture;
 
     if (editor_widget_test_context_init(&context) != 0) {
         editor_widget_test_context_cleanup(&context);
@@ -1757,22 +1742,20 @@ static int config_preview_sync_preserves_old_texture(void)
     }
 
     memset(&es, 0, sizeof(es));
-    es.renderer = context.renderer;
-    old_texture = IMG_LoadTexture(context.renderer,
-                                  "assets/sprites/levels/grass_tileset.png");
+    old_texture = texture_load("assets/sprites/levels/grass_tileset.png");
     if (!old_texture) goto fail;
     es.textures.floor_tile = old_texture;
     strcpy(es.level.floor_tile_path, "assets/sprites/levels/does_not_exist.png");
     editor_sync_config_resources(&es);
     if (es.textures.floor_tile != old_texture) goto fail;
 
-    SDL_DestroyTexture(es.textures.floor_tile);
+    texture_unload(es.textures.floor_tile);
     es.textures.floor_tile = NULL;
     editor_widget_test_context_cleanup(&context);
     return 0;
 
 fail:
-    if (es.textures.floor_tile) SDL_DestroyTexture(es.textures.floor_tile);
+    texture_unload(es.textures.floor_tile);
     editor_widget_test_context_cleanup(&context);
     return 1;
 }
@@ -1786,7 +1769,7 @@ static int staged_edit_save_and_quit_boundaries(void)
     EditorWidgetTestContext context = {0};
     char root[EDITOR_PATH_MAX] = {0};
     LevelDef initial;
-    SDL_Event event;
+    InputEvent event;
 
     ensure_out_dir();
     if (editor_widget_test_context_init(&context) != 0) return 1;
@@ -1799,7 +1782,7 @@ static int staged_edit_save_and_quit_boundaries(void)
     if (level_save_toml(&initial, target) != 0) goto fail;
 
     save_state.level = initial;
-    ui_init(&save_state.ui, context.renderer, context.font);
+    ui_init(&save_state.ui, context.font);
     save_state.undo = undo_create();
     strncpy(save_state.file_path, target, sizeof(save_state.file_path) - 1);
     if (!save_state.undo || editor_set_preference_root(&save_state, root) != 0 ||
@@ -1818,16 +1801,16 @@ static int staged_edit_save_and_quit_boundaries(void)
     (void)ui_float_field(&save_state.ui, 301, 0, 0, 120,
                          &save_state.level.coins[0].x);
     memset(&event, 0, sizeof(event));
-    event.type = SDL_TEXTINPUT;
-    strncpy(event.text.text, "7", sizeof(event.text.text) - 1);
+    event.type = INPUT_TEXT;
+    strncpy(event.text, "7", sizeof(event.text) - 1);
     editor_handle_event(&save_state, &event);
-    event.text.text[0] = '2';
-    event.text.text[1] = '\0';
+    event.text[0] = '2';
+    event.text[1] = '\0';
     editor_handle_event(&save_state, &event);
     memset(&event, 0, sizeof(event));
-    event.type = SDL_KEYDOWN;
-    event.key.keysym.sym = SDLK_s;
-    event.key.keysym.mod = KMOD_CTRL;
+    event.type = INPUT_KEY_DOWN;
+    event.key = KEY_S;
+    event.mods = INPUT_CTRL;
     editor_test_set_finish_field_choice(1);
     editor_handle_event(&save_state, &event);
     if (expect_prefix("staged Save succeeds", save_state.status_message,
@@ -1841,7 +1824,7 @@ static int staged_edit_save_and_quit_boundaries(void)
     editor_level_init_defaults(&quit_state.level);
     quit_state.level.coin_count = 1;
     quit_state.level.coins[0].x = 0.0f;
-    ui_init(&quit_state.ui, context.renderer, context.font);
+    ui_init(&quit_state.ui, context.font);
     quit_state.undo = undo_create();
     if (!quit_state.undo || editor_set_preference_root(&quit_state, root) != 0 ||
         editor_init_persistence_paths(&quit_state) != 0) goto fail;
@@ -1855,16 +1838,16 @@ static int staged_edit_save_and_quit_boundaries(void)
     (void)ui_float_field(&quit_state.ui, 301, 0, 0, 120,
                          &quit_state.level.coins[0].x);
     memset(&event, 0, sizeof(event));
-    event.type = SDL_TEXTINPUT;
-    strncpy(event.text.text, "8", sizeof(event.text.text) - 1);
+    event.type = INPUT_TEXT;
+    strncpy(event.text, "8", sizeof(event.text) - 1);
     editor_handle_event(&quit_state, &event);
-    event.text.text[0] = '0';
-    event.text.text[1] = '\0';
+    event.text[0] = '0';
+    event.text[1] = '\0';
     editor_handle_event(&quit_state, &event);
     editor_test_set_finish_field_choice(1);
     editor_test_set_discard_choice(1);
     memset(&event, 0, sizeof(event));
-    event.type = SDL_QUIT;
+    event.type = INPUT_QUIT;
     quit_state.running = 1;
     editor_handle_event(&quit_state, &event);
     if (expect_int("staged Quit confirmation", quit_state.running, 0) != 0 ||
@@ -1877,7 +1860,7 @@ static int staged_edit_save_and_quit_boundaries(void)
     selection_state.level.coin_count = 1;
     selection_state.level.coins[0].x = 0.0f;
     selection_state.undo = undo_create();
-    ui_init(&selection_state.ui, context.renderer, context.font);
+    ui_init(&selection_state.ui, context.font);
     if (!selection_state.undo) goto fail;
     editor_set_document_save_point(&selection_state);
     selection_state.selection.type = ENT_COIN;
@@ -1889,12 +1872,12 @@ static int staged_edit_save_and_quit_boundaries(void)
     (void)ui_float_field(&selection_state.ui, 301, 0, 0, 120,
                          &selection_state.level.coins[0].x);
     memset(&event, 0, sizeof(event));
-    event.type = SDL_TEXTINPUT;
-    strncpy(event.text.text, "9", sizeof(event.text.text) - 1);
+    event.type = INPUT_TEXT;
+    strncpy(event.text, "9", sizeof(event.text) - 1);
     editor_handle_event(&selection_state, &event);
     memset(&event, 0, sizeof(event));
-    event.type = SDL_KEYDOWN;
-    event.key.keysym.sym = SDLK_2;
+    event.type = INPUT_KEY_DOWN;
+    event.key = KEY_TWO;
     editor_handle_event(&selection_state, &event);
     if (expect_float_value("typing leaves value staged",
                            selection_state.level.coins[0].x, 0.0f) != 0 ||
@@ -1904,6 +1887,9 @@ static int staged_edit_save_and_quit_boundaries(void)
     undo_destroy(save_state.undo);
     undo_destroy(quit_state.undo);
     undo_destroy(selection_state.undo);
+    ui_cleanup(&save_state.ui);
+    ui_cleanup(&quit_state.ui);
+    ui_cleanup(&selection_state.ui);
     cleanup_test_preference_root(root,
                                  (EditorState[]){save_state, quit_state,
                                                  selection_state}, 3);
@@ -1920,6 +1906,9 @@ fail:
     undo_destroy(save_state.undo);
     undo_destroy(quit_state.undo);
     undo_destroy(selection_state.undo);
+    ui_cleanup(&save_state.ui);
+    ui_cleanup(&quit_state.ui);
+    ui_cleanup(&selection_state.ui);
     editor_widget_test_context_cleanup(&context);
     remove(target);
     return 1;
@@ -1933,7 +1922,7 @@ static int orphan_recovery_does_not_poison_discovery(void)
     if (editor_set_preference_root(&es, root) || editor_init_persistence_paths(&es)) return 1;
     fill_valid_minimal(&es.level);
     es.modified = 1;
-    es.last_autosave_ms = SDL_GetTicks() - 30001;
+    es.last_autosave_ms = (uint32_t)clock_millis() - 30001;
     editor_maybe_autosave(&es);
     if (es.recovery_entry_count != 1) return 1;
     strcpy(metadata, es.recovery_entries[0].metadata_path);
@@ -1950,10 +1939,9 @@ static int invalid_drafts_do_not_build_unsafe_previews(void)
     EditorWidgetTestContext context;
     EditorState es = {0};
     if (editor_widget_test_context_init(&context) != 0) return 1;
-    es.renderer = context.renderer;
-    ui_init(&es.ui, context.renderer, context.font);
+    ui_init(&es.ui, context.font);
     ui_label(&es.ui, 0, 0, "cached label");
-    SDL_Texture *cached = es.ui.text_cache[0].texture;
+    Texture2D *cached = es.ui.text_cache[0].texture;
     if (!cached) { editor_widget_test_context_cleanup(&context); return 1; }
     for (int i = 0; i < 100; i++) ui_label(&es.ui, 0, 0, "cached label");
     if (es.ui.text_cache[0].texture != cached || es.ui.text_cache[1].texture) {
@@ -1963,15 +1951,15 @@ static int invalid_drafts_do_not_build_unsafe_previews(void)
     }
     if (getenv("MANGO_BENCHMARK")) {
         const int rounds=2000;
-        Uint64 start=SDL_GetPerformanceCounter();
+        double start=GetTime();
         for (int i=0;i<rounds;i++) ui_label(&es.ui,0,0,"cached label");
-        SDL_RenderFlush(context.renderer);
-        Uint64 warm=SDL_GetPerformanceCounter()-start;
-        start=SDL_GetPerformanceCounter();
+        rlDrawRenderBatchActive();
+        double warm=GetTime()-start;
+        start=GetTime();
         for (int i=0;i<rounds;i++) { ui_cleanup(&es.ui); ui_label(&es.ui,0,0,"cached label"); }
-        SDL_RenderFlush(context.renderer);
-        Uint64 cold=SDL_GetPerformanceCounter()-start;
-        double frequency=(double)SDL_GetPerformanceFrequency();
+        rlDrawRenderBatchActive();
+        double cold=GetTime()-start;
+        double frequency=1;
         printf("text benchmark: %d labels cached=%.3fms uncached=%.3fms ratio=%.2fx\n",rounds,
                warm*1000.0/frequency,cold*1000.0/frequency,(double)cold/(double)(warm?warm:1));
     }

@@ -1,13 +1,13 @@
 /*
  * game_input.c — Input system implementation.
  *
- * Handles background gamepad initialization and input-related utilities.
+ * Converts device samples into remappable gameplay action masks.
  */
 
 #include "game_input.h"
 #include "game_web_input.h"
 
-#include <SDL.h>
+#include "input_backend.h"
 
 static int s_test_physical_override;
 static GameInputPhysicalState s_test_physical_state;
@@ -27,7 +27,7 @@ void game_input_test_clear_physical_state(void)
     s_test_physical_state.controller_mask = 0;
 }
 
-unsigned int game_input_keyboard_mask(const Uint8 *keys, const GameSettings *settings)
+unsigned int game_input_keyboard_mask(const uint8_t *keys, const GameSettings *settings)
 {
     static const GameSettings defaults = GAME_SETTINGS_DEFAULTS;
     const GameSettings *s = settings ? settings : &defaults;
@@ -35,23 +35,23 @@ unsigned int game_input_keyboard_mask(const Uint8 *keys, const GameSettings *set
     /* Action order matches PLAYER_INPUT_* bit positions. Arrows remain fixed
      * alternatives so remapping can never strand menu/navigation controls. */
     for (int i = 0; i < PROFILE_ACTION_COUNT; i++) if (keys[s->keys[i]]) mask |= 1u << i;
-    if (keys[SDL_SCANCODE_LEFT]) mask |= PLAYER_INPUT_LEFT;
-    if (keys[SDL_SCANCODE_RIGHT]) mask |= PLAYER_INPUT_RIGHT;
-    if (keys[SDL_SCANCODE_UP]) mask |= PLAYER_INPUT_UP;
-    if (keys[SDL_SCANCODE_DOWN]) mask |= PLAYER_INPUT_DOWN;
-    if (keys[SDL_SCANCODE_RSHIFT]) mask |= PLAYER_INPUT_RUN;
-    if (keys[SDL_SCANCODE_SPACE] || keys[SDL_SCANCODE_RETURN] || keys[SDL_SCANCODE_KP_ENTER]) mask |= GAME_INPUT_CONFIRM;
+    if (keys[80]) mask |= PLAYER_INPUT_LEFT;
+    if (keys[79]) mask |= PLAYER_INPUT_RIGHT;
+    if (keys[82]) mask |= PLAYER_INPUT_UP;
+    if (keys[81]) mask |= PLAYER_INPUT_DOWN;
+    if (keys[229]) mask |= PLAYER_INPUT_RUN;
+    if (keys[44] || keys[40] || keys[88]) mask |= GAME_INPUT_CONFIRM;
     return mask;
 }
 
-unsigned int game_input_controller_mask(const Uint8 *buttons, Sint16 x, Sint16 y,
+unsigned int game_input_controller_mask(const uint8_t *buttons, int16_t x, int16_t y,
                                          const GameSettings *settings)
 {
     static const GameSettings defaults = GAME_SETTINGS_DEFAULTS;
     const GameSettings *s = settings ? settings : &defaults;
     unsigned int mask = 0;
     for (int i = 0; i < PROFILE_ACTION_COUNT; i++) if (buttons[s->buttons[i]]) mask |= 1u << i;
-    if (buttons[SDL_CONTROLLER_BUTTON_A] || buttons[SDL_CONTROLLER_BUTTON_START]) mask |= GAME_INPUT_CONFIRM;
+    if (buttons[PAD_A] || buttons[PAD_START]) mask |= GAME_INPUT_CONFIRM;
     if (x < -s->dead_zone) mask |= PLAYER_INPUT_LEFT;
     if (x > s->dead_zone) mask |= PLAYER_INPUT_RIGHT;
     if (y < -s->dead_zone) mask |= PLAYER_INPUT_UP;
@@ -59,10 +59,10 @@ unsigned int game_input_controller_mask(const Uint8 *buttons, Sint16 x, Sint16 y
     return mask;
 }
 
-void game_input_read_bound(SDL_GameController *controller, const GameSettings *settings,
+void game_input_read_bound(int controller, const GameSettings *settings,
                             GameInputPhysicalState *state)
 {
-    const Uint8 *keys;
+    uint8_t keys[512] = {0};
 
     if (!state) return;
     state->keyboard_mask = 0;
@@ -73,19 +73,23 @@ void game_input_read_bound(SDL_GameController *controller, const GameSettings *s
         return;
     }
 
-    keys = SDL_GetKeyboardState(NULL);
+    for (int binding = 4; binding <= 290; binding++) keys[binding] = (uint8_t)input_key_down(binding);
     state->keyboard_mask = game_input_keyboard_mask(keys, settings);
 
-    if (!controller) return;
-    Uint8 buttons[SDL_CONTROLLER_BUTTON_MAX];
-    for (int i = 0; i < SDL_CONTROLLER_BUTTON_MAX; i++)
-        buttons[i] = SDL_GameControllerGetButton(controller, (SDL_GameControllerButton)i);
+    if (!controller || !IsWindowReady() || !IsGamepadAvailable(controller-1)) return;
+    uint8_t buttons[PAD_COUNT] = {0};
+    for (int i = 0; i < PAD_COUNT; i++) {
+        int button = input_pad_button(i);
+        if (button) buttons[i] = IsGamepadButtonDown(controller-1, button);
+    }
+    float x = GetGamepadAxisMovement(controller-1, GAMEPAD_AXIS_LEFT_X);
+    float y = GetGamepadAxisMovement(controller-1, GAMEPAD_AXIS_LEFT_Y);
     state->controller_mask = game_input_controller_mask(buttons,
-        SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX),
-        SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY), settings);
+        (int16_t)(x*(x < 0 ? 32768.0f : 32767.0f)),
+        (int16_t)(y*(y < 0 ? 32768.0f : 32767.0f)), settings);
 }
 
-void game_input_read_physical(SDL_GameController *controller, GameInputPhysicalState *state)
+void game_input_read_physical(int controller, GameInputPhysicalState *state)
 {
     game_input_read_bound(controller, NULL, state);
 }
@@ -121,16 +125,7 @@ unsigned int game_input_sample(GameState *gs)
         return current.keyboard_mask | current.controller_mask;
 
     keyboard_held = (current.keyboard_mask & gs->input_release_keyboard_mask) != 0;
-    if (s_test_physical_override) {
-        controller_held =
-            (current.controller_mask & gs->input_release_controller_mask) != 0;
-    } else if (gs->input_release_controller_mask && !gs->controller) {
-        /* Keep the gate closed until AppSession publishes controller readiness. */
-        controller_held = gs->controller_init_pending != 0;
-    } else {
-        controller_held =
-            (current.controller_mask & gs->input_release_controller_mask) != 0;
-    }
+    controller_held = (current.controller_mask & gs->input_release_controller_mask) != 0;
 
     if (keyboard_held || controller_held) return 0;
 
@@ -147,29 +142,14 @@ void game_input_clear_controller_latch(GameState *gs)
     gs->input_release_latched = gs->input_release_keyboard_mask != 0;
 }
 
-void game_input_set_controller_init_pending(GameState *gs, int pending)
-{
-    if (gs) gs->controller_init_pending = pending != 0;
-}
-
 void gamepad_refresh_controller(GameState *gs)
 {
-    if (!gs || gs->controller || gs->controller_init_pending ||
-        SDL_WasInit(SDL_INIT_GAMECONTROLLER) == 0)
-        return;
-    for (int i = 0; i < SDL_NumJoysticks(); i++) {
-        if (SDL_IsGameController(i)) {
-            gs->controller = SDL_GameControllerOpen(i);
-            if (gs->controller) break;
-        }
-    }
+    /* Removal commands clear the old device/latch before adopting another. */
+    if (gs && !gs->controller) gs->controller = input_first_gamepad();
 }
 
 void gamepad_close_controller(GameState *gs)
 {
     if (!gs) return;
-    if (gs->controller) {
-        SDL_GameControllerClose(gs->controller);
-        gs->controller = NULL;
-    }
+    gs->controller = 0;
 }

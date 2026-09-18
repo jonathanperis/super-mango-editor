@@ -24,7 +24,7 @@ The player module is split across focused files under `src/player/`. `player.h` 
 
 ```text
 player_init
-  ├── IMG_LoadTexture("assets/sprites/player/player.png")
+  ├── texture_load("assets/sprites/player/player.png")
   ├── 48x48 frame setup from 192x288 sheet (4 cols x 6 rows)
   ├── default spawn (overridden by LevelDef)
   └── player_apply_default_physics
@@ -36,7 +36,7 @@ per frame
   └── player_get_hitbox          -> inset AABB for damage/collision checks
 
 player_reset                     -> restore spawn/state; keep texture + tunable physics
-player_cleanup                   -> SDL_DestroyTexture
+player_cleanup                   -> texture_unload
 ```
 
 ---
@@ -44,16 +44,15 @@ player_cleanup                   -> SDL_DestroyTexture
 ## Public API
 
 ```c
-int player_init(Player *player, SDL_Renderer *renderer);
+int player_init(Player *player);
 void player_apply_default_physics(Player *player);
-void player_handle_input(Player *player, Mix_Chunk *snd_jump,
-                         SDL_GameController *ctrl,
+void player_handle_input(Player *player, SoundEffect *snd_jump,
                          unsigned int replay_input_mask,
                          unsigned int physical_input_mask,
                          const VineDecor *vines, int vine_count,
                          const LadderDecor *ladders, int ladder_count,
                          const RopeDecor *ropes, int rope_count);
-void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
+void player_update(Player *player, float dt, SoundEffect *snd_jump,
                    const Platform *platforms, int platform_count,
                    const FloatPlatform *float_platforms, int float_platform_count,
                    const Bouncepad *bouncepads, int bouncepad_count,
@@ -67,8 +66,8 @@ void player_update(Player *player, float dt, Mix_Chunk *snd_jump,
                    int *out_fp_landed_idx,
                    int prev_fp_landed_idx,
                    int world_w);
-void player_render(Player *player, SDL_Renderer *renderer, int cam_x);
-SDL_Rect player_get_hitbox(const Player *player);
+void player_render(Player *player, int cam_x);
+IntRect player_get_hitbox(const Player *player);
 void player_reset(Player *player);
 void player_cleanup(Player *player);
 ```

@@ -1,8 +1,8 @@
 # Sandbox School: Start Here
 
-Super Mango is a working C11/SDL2 game you can take apart. Learn one mechanism at
+Super Mango is a working C11/raylib game you can take apart. Learn one mechanism at
 a time, then combine them in the playground. You need basic C expressions,
-functions, structs and pointers; SDL experience is optional.
+functions, structs and pointers; raylib experience is optional.
 
 ## First successful build
 

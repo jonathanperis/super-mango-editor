@@ -10,8 +10,8 @@ The project uses a **GNU Makefile** with explicit per-directory wildcards. New `
 
 ```makefile
 CC      ?= clang
-CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(shell sdl2-config --cflags)
-LIBS    = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
+CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic -I$(RAYLIB_BUILD)/build/raylib/include
+LIBS    = $(RAYLIB_LIB) $(PLATFORM_LIBS)
 OUTDIR  = out
 OBJDIR  = $(OUTDIR)/obj
 TARGET  = $(OUTDIR)/super-mango
@@ -37,6 +37,19 @@ DEPS    = $(OBJS:.o=.d)
 
 This abbreviated source-list example omits platform detection and build-mode flags.
 Both applications include `src/shared/serializer_load_checkpoints.c` and the other shared serializer/UI modules.
+
+raylib **6.0** is fetched from the source/checksum pin in `vendor/raylib/manifest.json`.
+`tools/build_raylib.py` verifies the archive and uses CMake for an out-of-source
+static build. Desktop uses bundled GLFW; Web uses the same Emscripten toolchain
+as the application. `RAYLIB_BUILD` defaults to `$(OUTDIR)/raylib`; web uses
+`$(OUTDIR)/raylib-web`. Keep build modes/toolchains in separate directories.
+Use `EXTRA_CFLAGS` and `EXTRA_LDFLAGS` for additional flags.
+
+`RAYLIB_PLATFORM=memory` selects raylib's software framebuffer and miniaudio's
+null backend for explicit headless tests. Use a dedicated `OUTDIR`, such as
+`out/headless`; `release` and `dist-native` reject this backend. Linux CI keeps
+the desktop GLFW test path under Xvfb/Mesa; macOS/Windows CI uses Memory tests
+and separately builds/packages the desktop applications.
 
 The vendored tomlc17 parser is based on upstream **R260821**. Its exact upstream
 commit and retained project-patch inventory are recorded in
@@ -89,16 +102,14 @@ Python 3.11+ and Node.js are required for host checks. Linux dialogs use zenity.
 | `-Wpedantic` | Strict ISO compliance warnings |
 | `-MMD` | Generate `.d` dependency files for each `.o` (tracks header changes) -- passed in compile rule, not in `CFLAGS` |
 | `-MP` | Add phony targets for each dependency (prevents errors when headers are deleted) -- passed in compile rule, not in `CFLAGS` |
-| `$(shell sdl2-config --cflags)` | SDL2 include paths (`-I/opt/homebrew/include/SDL2`) |
+| `-I$(RAYLIB_BUILD)/build/raylib/include` | Headers from the pinned raylib build |
 
 ### Linker Flags Explained
 
 | Flag | Meaning |
 |------|---------|
-| `$(shell sdl2-config --libs)` | SDL2 core library (`-L/opt/homebrew/lib -lSDL2`) |
-| `-lSDL2_image` | PNG/JPG texture loading |
-| `-lSDL2_ttf` | TrueType font rendering |
-| `-lSDL2_mixer` | Audio mixing (WAV, MP3, OGG) |
+| `$(RAYLIB_LIB)` | Static raylib library: graphics, image/font decoding, input and audio |
+| `$(PLATFORM_LIBS)` | Native OpenGL/OS frameworks and system libraries selected by platform |
 | `-lm` | Math library (`math.h` functions: `sinf`, `cosf`, `fmodf`, etc.) |
 
 ---
@@ -130,8 +141,8 @@ make run
 The binary must be run from the **repo root** because asset paths are relative:
 
 ```c
-IMG_LoadTexture(renderer, "assets/sprites/backgrounds/sky_blue.png");
-Mix_LoadWAV("assets/sounds/player/player_jump.wav");
+texture_load("assets/sprites/backgrounds/sky_blue.png");
+sound_load("assets/sounds/player/player_jump.wav");
 ```
 
 ### `make run-debug`
@@ -182,15 +193,15 @@ Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). CI pins **6.
 make web
 ```
 
-Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). SDL2 ports are compiled from source by Emscripten on first build; subsequent builds reuse cached port libraries. Uses a custom shell template from `web/shell.html`.
+Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). The pinned raylib Web library is built separately with `emcmake`; the application links it with `USE_GLFW=3`. Uses a custom shell template from `web/shell.html`.
 
 The target also produces debug boot artifacts (`out/super-mango-debug.html` and companions) for direct debug HTML launches. The docs-site browser debug button uses the normal `super-mango.js` payload and passes `--debug` at boot.
 
-For release confidence, the **GitHub Actions WebAssembly build is authoritative**. Some local/container Emscripten installs can fail before reaching Super Mango code when Emscripten 3.1.58 builds SDL_ttf's HarfBuzz port with newer Clang warnings (`-Wnontrivial-memcall`). If that host-toolchain issue appears locally, treat the CI `make web` + artifact smoke from `build.yml` and the Pages assembly smoke from `deploy.yml` as the trusted WASM verification path.
+For release confidence, the **GitHub Actions WebAssembly build is authoritative**. Report local SDK/cache failures separately from application failures, and require the CI `make web`, artifact checks and Pages assembly checks. JavaScript syntax/WASM validation requires real Node.js; if a local `node` wrapper launches Bun, set `NODE` to the Node executable explicitly.
 
 ### `make test`
 
-Builds and runs native regression harnesses, including dummy-SDL session/editor integration cases. No interactive window is required.
+Builds and runs native regression harnesses, including hidden-window session/editor integration cases. Rendering still requires a working desktop graphics context and audio device. Linux CI provides Xvfb/Mesa and a PulseAudio null sink; no human interaction is required.
 
 ```sh
 make test
@@ -235,7 +246,7 @@ make validate-levels
 
 ### `make smoke`
 
-Builds the game and editor, then runs every `levels/*.toml` and `levels/labs/*.toml` with dummy SDL video/audio drivers for a bounded number of frames. The editor smoke mode renders five frames before exiting.
+Builds the game and editor, then runs every `levels/*.toml` and `levels/labs/*.toml` in a hidden window for a bounded number of frames. The editor smoke mode renders five frames before exiting.
 
 ```sh
 make smoke SMOKE_FRAMES=5 SMOKE_SEED=1
@@ -243,7 +254,7 @@ make smoke SMOKE_FRAMES=5 SMOKE_SEED=1
 
 ### `make scripted-smoke`
 
-Builds the game and editor, then runs `tools/run_scripted_smoke.py` against every `levels/*.toml` for each seed in `SMOKE_SEEDS`. The runner writes deterministic replay scripts under `out/replays-smoke/` and passes sanitized replay names to the game with `--replay-script`, injecting SDL key events such as move-right, jump-right, and pause/resume while still using dummy SDL video/audio in CI.
+Builds the game and editor, then runs `tools/run_scripted_smoke.py` against every `levels/*.toml` for each seed in `SMOKE_SEEDS`. The runner writes deterministic replay scripts under `out/replays-smoke/` and passes validated replay names with `--replay-script`, injecting semantic commands and sampled action masks for movement, jumping and pause/resume. It checks observable results and repeats each scenario to verify deterministic state.
 
 ```sh
 make scripted-smoke SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
@@ -259,7 +270,7 @@ make sanitize
 
 ### `make sanitize-smoke`
 
-Builds sanitizer-instrumented native game/editor binaries in `out-sanitize/`, then runs the dummy SDL smoke pass against every TOML level plus the editor smoke mode. This complements `make sanitize` by covering SDL/resource startup paths, not just pure logic harnesses.
+Builds sanitizer-instrumented native game/editor binaries and raylib in `out-sanitize/`, then runs rendered smoke against every TOML level plus the editor. This complements `make sanitize` by covering graphics/resource startup and teardown, not just pure logic harnesses.
 
 ```sh
 make sanitize-smoke SMOKE_FRAMES=5 SMOKE_SEED=1
@@ -375,45 +386,36 @@ Override `OUTDIR`/`DISTDIR` only when you intend to remove those specific build 
 
 ```sh
 # Install Homebrew if needed: https://brew.sh
-brew install sdl2 sdl2_image sdl2_ttf sdl2_mixer
+brew install cmake
 
 # Xcode Command Line Tools (provides clang and make)
 xcode-select --install
 ```
 
-SDL2 libraries are installed to `/opt/homebrew/` on Apple Silicon. `sdl2-config` resolves the correct paths automatically.
-
-Homebrew may provide SDL2 through `sdl2-compat`. If an ASan executable stalls in
-that library's startup error dialog before reaching `main`, verify its dynamic
-library search path. On Apple Silicon, the following scoped test command makes
-Homebrew's runtime dependencies discoverable while keeping sanitizers enabled:
-
-```sh
-make sanitize RUN_PREFIX='DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib'
-```
-
-Use the corresponding Homebrew library directory on other installations. This
-addresses a host loader configuration issue; it does not change the game's SDL2 API.
+Python 3.11+ downloads/verifies the pinned raylib archive. The native library
+links against macOS frameworks. Rendered tests need an available desktop session;
+a hidden window is not a display-less renderer. Report missing display/audio
+devices as environment blockers, rather than disabling sanitizer checks.
 
 ### Linux -- Debian / Ubuntu
 
 ```sh
 sudo apt update
-sudo apt install build-essential clang \
-    libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-mixer-dev zenity
+sudo apt install build-essential clang cmake python3 libgl1-mesa-dev libx11-dev \
+    libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev zenity
 ```
 
 ### Linux -- Fedora / RHEL / CentOS
 
 ```sh
-sudo dnf install clang make \
-    SDL2-devel SDL2_image-devel SDL2_ttf-devel SDL2_mixer-devel zenity
+sudo dnf install clang make cmake python3 mesa-libGL-devel libX11-devel \
+    libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel zenity
 ```
 
 ### Linux -- Arch Linux
 
 ```sh
-sudo pacman -S clang make sdl2 sdl2_image sdl2_ttf sdl2_mixer zenity
+sudo pacman -S clang make cmake python mesa libx11 libxrandr libxinerama libxcursor libxi zenity
 ```
 
 ### Windows (MSYS2)
@@ -422,11 +424,9 @@ sudo pacman -S clang make sdl2 sdl2_image sdl2_ttf sdl2_mixer zenity
 2. Open the **MSYS2 UCRT64** terminal:
 
 ```sh
-pacman -S make mingw-w64-ucrt-x86_64-clang \
-          mingw-w64-ucrt-x86_64-SDL2 \
-          mingw-w64-ucrt-x86_64-SDL2_image \
-          mingw-w64-ucrt-x86_64-SDL2_ttf \
-          mingw-w64-ucrt-x86_64-SDL2_mixer
+pacman -S make mingw-w64-ucrt-x86_64-clang mingw-w64-ucrt-x86_64-gcc \
+          mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-cmake \
+          mingw-w64-ucrt-x86_64-make
 ```
 
 3. Build:
@@ -458,7 +458,7 @@ from that allowlist. The canonical `emscripten-core/setup-emsdk@*` entry is allo
 alongside the existing integrations. Coordinate future owner/name changes with
 the repository settings rather than relaxing SHA pinning.
 
-Native smoke uses dummy SDL drivers where supported: `./out/super-mango --level levels/00_sandbox_01.toml --smoke-test-frames 5` and `./out/super-mango-editor --smoke-test`. WebAssembly smoke asserts `out/super-mango.html`, `.js`, `.wasm`, and `.data` exist.
+Native rendered smoke uses `./out/super-mango --level levels/00_sandbox_01.toml --smoke-test-frames 5` and `./out/super-mango-editor --smoke-test`. Linux CI supplies a virtual display and audio sink. WebAssembly checks validate both normal/debug HTML/JS/WASM/data sets, JavaScript syntax, module compilation, host interfaces and archive contents.
 
 ---
 

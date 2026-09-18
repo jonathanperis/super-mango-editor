@@ -120,7 +120,7 @@ def check_public_api_docs() -> None:
     source_expectations = {
         "src/game.h": ["int  game_init(GameState *gs);"],
         "src/levels/level_loader.h": ["int level_load(GameState *gs, const LevelDef *def);"],
-        "src/player/player.h": ["int player_init(Player *player, SDL_Renderer *renderer);"],
+        "src/player/player.h": ["int player_init(Player *player);"],
     }
     source_doc_expectations = {
         "int  game_init(GameState *gs);",
@@ -134,9 +134,9 @@ def check_public_api_docs() -> None:
                 fail(f"{rel}: expected public signature `{signature}` in source")
             if signature in source_doc_expectations and normalized not in " ".join(source_doc.split()):
                 fail(f"docs/wiki/source-files.md: missing public signature `{signature}`")
-    if "int player_init(Player *player, SDL_Renderer *renderer);" not in player_doc:
+    if "int player_init(Player *player);" not in player_doc:
         fail("docs/wiki/player-module.md: stale or missing `int player_init(...)` signature")
-    for stale in ["void game_init(GameState *gs);", "void player_init(Player *player, SDL_Renderer *renderer);", "phase_resolve_path"]:
+    for stale in ["void game_init(GameState *gs);", "void player_init(Player *player);", "phase_resolve_path"]:
         for page, text in [("docs/wiki/source-files.md", source_doc), ("docs/wiki/player-module.md", player_doc)]:
             if stale in text:
                 fail(f"{page}: stale public API token `{stale}`")
@@ -208,12 +208,12 @@ def check_toml_examples() -> None:
 
 def check_input_reference() -> None:
     controls = read(DOCS / "controls.md")
-    for flag in set(re.findall(r'strcmp\(argv\[i\], "(--[a-z-]+)"\)', read(ROOT / "src/main.c"))):
+    for flag in set(re.findall(r'"(--[a-z-]+)"', read(ROOT / "src/main.c"))):
         if flag not in controls:
             fail(f"docs/wiki/controls.md: missing runtime flag `{flag}`")
     header = read(ROOT / "src/player/player.h")
     doc = read(DOCS / "player-module.md")
-    declarations = r"\b(?:int|void|SDL_Rect)\s+player_\w+\([^;{}]*\);"
+    declarations = r"\b(?:int|void|IntRect)\s+player_\w+\([^;{}]*\);"
     documented = {" ".join(item.split()) for item in re.findall(declarations, doc)}
     for declaration in re.findall(declarations, header):
         if " ".join(declaration.split()) not in documented:

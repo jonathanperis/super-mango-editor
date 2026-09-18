@@ -11,7 +11,7 @@
  * to give a flickering fire effect.
  */
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 #include <stdio.h>
 
 #include "blue_flame.h"
@@ -167,11 +167,10 @@ void blue_flames_update(BlueFlame *blue_flames, int count, float dt) {
  * blue_flame.png is a 96×48 sheet with two 48×48 frames side by side.
  * The source rect selects the current animation frame.
  *
- * SDL_RenderCopyEx applies the rotation angle around the sprite's centre
- * (NULL pivot), which creates a smooth flip at the apex.
+ * Rotation around the sprite's centre creates a smooth flip at the apex.
  */
 void blue_flames_render(const BlueFlame *blue_flames, int count,
-                        SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                        Texture2D *tex, int cam_x) {
     if (!tex) return;
 
     for (int i = 0; i < count; i++) {
@@ -190,7 +189,7 @@ void blue_flames_render(const BlueFlame *blue_flames, int count,
          * src — select the current animation frame from the 96×48 sheet.
          * Frame 0: {0, 0, 48, 48}    Frame 1: {48, 0, 48, 48}
          */
-        SDL_Rect src = {
+        IntRect src = {
             .x = f->anim_frame * BLUE_FLAME_FRAME_W,
             .y = 0,
             .w = BLUE_FLAME_FRAME_W,
@@ -201,22 +200,15 @@ void blue_flames_render(const BlueFlame *blue_flames, int count,
          * dst — destination on screen.
          * x − cam_x converts world space to screen space.
          */
-        SDL_Rect dst = {
+        IntRect dst = {
             .x = (int)f->x - cam_x,
             .y = (int)f->y,
             .w = f->w,
             .h = f->h,
         };
 
-        /*
-         * SDL_RenderCopyEx — blit with rotation.
-         *
-         *   angle  : 0° during rise, 0→180° during flip, 180° during fall.
-         *   center : NULL = rotate around the sprite's own centre.
-         *   flip   : SDL_FLIP_NONE — rotation handles the upside-down effect.
-         */
-        SDL_RenderCopyEx(renderer, tex, &src, &dst,
-                         (double)f->angle, NULL, SDL_FLIP_NONE);
+        /* Rise at 0°, rotate at the apex, then fall at 180°. */
+        sprite_draw(tex, &src, &dst, f->angle, SPRITE_NORMAL, WHITE);
     }
 }
 
@@ -228,12 +220,12 @@ void blue_flames_render(const BlueFlame *blue_flames, int count,
  * The hitbox is inset to match the visible blue flame
  * area (the outer pixels are mostly glow/transparent).
  */
-SDL_Rect blue_flame_get_hitbox(const BlueFlame *blue_flame) {
+IntRect blue_flame_get_hitbox(const BlueFlame *blue_flame) {
     /*
      * Content occupies x=17..30, y=17..31 within the 48×48 frame
      * (14×15 px art).  Inset the hitbox to match the visible blue flame core.
      */
-    SDL_Rect r = {
+    IntRect r = {
         .x = (int)blue_flame->x + 17,
         .y = (int)blue_flame->y + 17,
         .w = 14,

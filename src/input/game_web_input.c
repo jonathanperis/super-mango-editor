@@ -4,7 +4,7 @@
 
 #include "game_web_input.h"
 
-#include <SDL.h>  /* SDL_FlushEvents — discard synthetic keyup events */
+#include "input_backend.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>  /* emscripten_run_script — run JavaScript on canvas */
@@ -18,25 +18,19 @@ EMSCRIPTEN_KEEPALIVE
 #endif
 int game_web_input_touch(int action, int pressed)
 {
-    static const SDL_Keycode keys[GAME_TOUCH_COUNT] = {
-        SDLK_LEFT, SDLK_RIGHT, SDLK_UP, SDLK_DOWN,
-        SDLK_SPACE, SDLK_LSHIFT, SDLK_ESCAPE, SDLK_F1
+    static const int keys[GAME_TOUCH_COUNT] = {
+        KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN,
+        KEY_SPACE, KEY_LEFT_SHIFT, KEY_ESCAPE, KEY_F1
     };
     if (action < 0 || action >= GAME_TOUCH_COUNT || (pressed != 0 && pressed != 1)) return 0;
     unsigned int bit = 1u << action;
     if (!!(touch_buttons & bit) == pressed) return 1;
-    /* Releases must clear holds even if SDL has already shut down. */
+    /* Releases must clear holds even after the input owner has shut down. */
     if (!pressed) touch_buttons &= ~bit;
-    if (!SDL_WasInit(SDL_INIT_EVENTS)) return 0;
-    SDL_Event event;
-    SDL_zero(event);
-    event.type = pressed ? SDL_KEYDOWN : SDL_KEYUP;
-    event.key.state = pressed ? SDL_PRESSED : SDL_RELEASED;
-    event.key.keysym.sym = keys[action];
-    event.key.keysym.scancode = SDL_GetScancodeFromKey(keys[action]);
-    SDL_Window *window = SDL_GetKeyboardFocus();
-    if (window) event.key.windowID = SDL_GetWindowID(window);
-    if (SDL_PushEvent(&event) <= 0) return 0;
+    if (!input_ready()) return 0;
+    InputEvent event = {.type = pressed ? INPUT_KEY_DOWN : INPUT_KEY_UP,
+                        .key = keys[action], .binding = input_binding_from_key(keys[action])};
+    if (!input_push(&event)) return 0;
     if (pressed) {
         touch_buttons |= bit;
         if (action <= GAME_TOUCH_RUN) touch_pressed |= bit;
@@ -64,17 +58,12 @@ void game_web_input_clear_touch(void)
 /*
  * game_web_input_flush_stale_keys — Clear stuck movement keys on startup.
  *
- * SDL2's Emscripten backend can miss a keyup when focus moves away. Reset all
- * scancodes before a new scene, not just the default bindings. Touch holds and
+ * Browser focus changes can miss a keyup. Reset all held keys before a new
+ * scene, not just the default bindings. Touch holds and
  * buffered taps also belong to their originating scene and are released here.
  */
 void game_web_input_flush_stale_keys(void)
 {
     game_web_input_clear_touch();
-#ifdef __EMSCRIPTEN__
-    /* Reset every scancode, including user-remapped keys. The pinned SDL port
-     * supports SDL_ResetKeyboard; no DOM-code translation table is needed. */
-    SDL_ResetKeyboard();
-    SDL_FlushEvents(SDL_KEYDOWN, SDL_KEYUP);
-#endif
+    input_clear_keys();
 }

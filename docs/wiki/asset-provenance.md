@@ -12,7 +12,7 @@ MIT notice. See [Asset Inventory](../asset-inventory/) for generated file sizes.
 | Recolored/derived sprites | `tools/gen_fire_sprites.py`, `tools/analyze_sprite.py`, repository history | Derived from the original sprites; retain JuhoSprite credit and identify modifications |
 | `round9x13.ttf` | Pack page identifies Round 9x13 and explicitly says the font was not made by JuhoSprite | Author/license evidence remains unresolved in this checkout |
 | WAV audio | `assets/sounds/` | Original source/license records remain unresolved in this checkout |
-| SDL libraries | SDL2 and companion libraries; installed platform packages | zlib-licensed SDL code; transitive dependency notices are supplied by their packages |
+| raylib and bundled dependencies | raylib 6.0 source/checksum pin in `vendor/raylib/manifest.json` | raylib/GLFW notices and original license-bearing external files are included in release archives; Windows runtime package notices accompany bundled DLLs |
 
 The pack metadata links to [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
 This project modifies colors and organization for its biomes. The source page's

@@ -4,7 +4,7 @@
 
 #include "floor_gap_collision.h"
 
-#include <SDL_mixer.h>
+#include "../shared/audio.h"
 
 #include "collision_damage.h"
 #include "../effects/water.h"
@@ -19,7 +19,7 @@ void floor_gap_handle_collision(GameState *gs)
         if (pcx >= gx && pcx < gx + (float)FLOOR_GAP_W &&
             pcy > (float)(GAME_H - WATER_ART_H)) {
             if (gs->debug_mode) debug_log(&gs->debug, "HIT floor gap[%d]", g);
-            if (gs->audio.dive) Mix_PlayChannel(-1, gs->audio.dive, 0);
+            sound_play(gs->audio.dive, 128);
             apply_damage(gs, gs->hearts, 0, 0.0f, 0.0f);
             break;
         }

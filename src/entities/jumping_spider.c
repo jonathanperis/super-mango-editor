@@ -50,7 +50,7 @@ void jumping_spiders_init(JumpingSpider *spiders, int *count)
 
 void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
                             const int *floor_gaps, int floor_gap_count,
-                            Mix_Chunk *snd_attack, float player_x, int cam_x)
+                            SoundEffect *snd_attack, float player_x, int cam_x)
 {
     for (int i = 0; i < count; i++) {
         JumpingSpider *s = &spiders[i];
@@ -88,8 +88,7 @@ void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
                             float dist = fabsf(player_x - spider_cx);
                             int vol = sound_volume_for_distance(dist, JSPIDER_AUDIBLE_RANGE, JSPIDER_VOL_MAX);
                             if (vol > 0) {
-                                int ch = Mix_PlayChannel(-1, snd_attack, 0);
-                                if (ch >= 0) Mix_Volume(ch, vol);
+                                sound_play(snd_attack, vol);
                             }
                         }
                     }
@@ -121,7 +120,7 @@ void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
 /* ------------------------------------------------------------------ */
 
 void jumping_spiders_render(const JumpingSpider *spiders, int count,
-                            SDL_Renderer *renderer, SDL_Texture *tex,
+                            Texture2D *tex,
                             int cam_x)
 {
     for (int i = 0; i < count; i++) {
@@ -131,7 +130,7 @@ void jumping_spiders_render(const JumpingSpider *spiders, int count,
          * Source rect: the 10-px tall art band of the current frame.
          * Same layout as Spider_1.png — crop to visible art rows.
          */
-        SDL_Rect src = {
+        IntRect src = {
             s->frame_index * JSPIDER_FRAME_W,
             JSPIDER_ART_Y,
             JSPIDER_FRAME_W,
@@ -142,7 +141,7 @@ void jumping_spiders_render(const JumpingSpider *spiders, int count,
          * Destination rect: y uses FLOOR_Y minus art height, offset by
          * the vertical jump displacement (s->y is negative when airborne).
          */
-        SDL_Rect dst = {
+        IntRect dst = {
             (int)s->x - cam_x,
             FLOOR_Y - JSPIDER_ART_H + (int)s->y,
             JSPIDER_FRAME_W,
@@ -152,9 +151,7 @@ void jumping_spiders_render(const JumpingSpider *spiders, int count,
         /*
          * The base sprite faces left; flip horizontally when walking right.
          */
-        SDL_RendererFlip flip = (s->vx > 0.0f)
-                                 ? SDL_FLIP_HORIZONTAL
-                                 : SDL_FLIP_NONE;
-        SDL_RenderCopyEx(renderer, tex, &src, &dst, 0.0, NULL, flip);
+        int flip = s->vx > 0.0f ? SPRITE_FLIP_X : SPRITE_NORMAL;
+        sprite_draw(tex, &src, &dst, 0, flip, WHITE);
     }
 }

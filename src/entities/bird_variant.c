@@ -55,8 +55,8 @@ const BirdVariantSpec *bird_variant_spec(BirdVariantKind kind)
 void bird_variant_update(const BirdVariantSpec *spec,
                          float *x, float *vx,
                          float patrol_x0, float patrol_x1,
-                         int *frame_index, Uint32 *anim_timer_ms,
-                         float dt, Mix_Chunk *snd_flap,
+                         int *frame_index, uint32_t *anim_timer_ms,
+                         float dt, SoundEffect *snd_flap,
                          float player_x, int cam_x)
 {
     int wrapped;
@@ -80,8 +80,7 @@ void bird_variant_update(const BirdVariantSpec *spec,
         int vol = sound_volume_for_distance(dist, spec->audible_range,
                                             spec->volume_max);
         if (vol > 0) {
-            int ch = Mix_PlayChannel(-1, snd_flap, 0);
-            if (ch >= 0) Mix_Volume(ch, vol);
+            sound_play(snd_flap, vol);
         }
     }
 }
@@ -92,10 +91,10 @@ float bird_variant_screen_y(const BirdVariantSpec *spec, float x, float base_y)
     return base_y + sinf(x * spec->wave_freq) * spec->wave_amp;
 }
 
-SDL_Rect bird_variant_hitbox(const BirdVariantSpec *spec, float x, float base_y)
+IntRect bird_variant_hitbox(const BirdVariantSpec *spec, float x, float base_y)
 {
     float sy;
-    SDL_Rect r;
+    IntRect r;
 
     if (!spec) spec = bird_variant_spec(BIRD_VARIANT_REGULAR);
 
@@ -109,12 +108,12 @@ SDL_Rect bird_variant_hitbox(const BirdVariantSpec *spec, float x, float base_y)
 
 void bird_variant_render(const BirdVariantSpec *spec,
                          float x, float base_y, float vx, int frame_index,
-                         SDL_Renderer *renderer, SDL_Texture *tex, int cam_x)
+                         Texture2D *tex, int cam_x)
 {
     float sy;
-    SDL_Rect src;
-    SDL_Rect dst;
-    SDL_RendererFlip flip;
+    IntRect src;
+    IntRect dst;
+    int flip;
 
     if (!spec) spec = bird_variant_spec(BIRD_VARIANT_REGULAR);
 
@@ -129,8 +128,6 @@ void bird_variant_render(const BirdVariantSpec *spec,
     dst.w = spec->frame_w;
     dst.h = spec->art_h;
 
-    flip = (vx > 0.0f) ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
-    if (SDL_RenderCopyEx(renderer, tex, &src, &dst, 0.0, NULL, flip) != 0) {
-        SDL_Log("bird_variant_render: SDL_RenderCopyEx failed: %s", SDL_GetError());
-    }
+    flip = vx > 0.0f ? SPRITE_FLIP_X : SPRITE_NORMAL;
+    sprite_draw(tex, &src, &dst, 0, flip, WHITE);
 }

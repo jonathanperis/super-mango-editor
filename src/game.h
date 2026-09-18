@@ -14,8 +14,9 @@
  */
 #pragma once
 
-#include <SDL.h>        /* SDL_Window, SDL_Renderer, SDL_Texture */
-#include <SDL_mixer.h>  /* Mix_Chunk */
+#include "shared/graphics.h"
+#include "shared/audio.h"
+#include "shared/platform.h"
 
 #include "player/player.h"          /* Player struct — embedded by value in GameState */
 #include "surfaces/platform.h"      /* Platform struct + MAX_PLATFORMS constant */
@@ -65,7 +66,7 @@
  * GAME_W / GAME_H — the internal (logical) rendering resolution.
  *
  * All game objects are positioned and sized in this coordinate space.
- * SDL automatically scales this canvas up to fill the OS window, giving
+ * The render target scales this canvas up to fill the OS window, giving
  * a 2× pixel scale (800/400 = 2, 600/300 = 2). This makes every sprite
  * and tile appear twice as large on screen without changing any game logic.
  */
@@ -164,15 +165,13 @@ typedef enum {
  * for use inside game_cleanup() where ~35 identical if-guard-destroy-null
  * blocks would otherwise appear.
  *
- * SDL_DestroyTexture(NULL) and Mix_FreeChunk(NULL) are SDL-defined safe
- * no-ops, so the guard is a belt-and-suspenders layer that also clears
- * the pointer to prevent the same resource from being freed twice.
+ * Slot owners clear pointers after unloading; borrowers never call these.
  */
 #define DESTROY_TEX(tex) \
-    do { if (tex) { SDL_DestroyTexture(tex); (tex) = NULL; } } while (0)
+    do { texture_unload(tex); (tex) = NULL; } while (0)
 
 #define FREE_CHUNK(snd) \
-    do { if (snd) { Mix_FreeChunk(snd); (snd) = NULL; } } while (0)
+    do { sound_unload(snd); (snd) = NULL; } while (0)
 
 /* ------------------------------------------------------------------ */
 /* GameState — the single source of truth for everything the game owns */
@@ -189,7 +188,7 @@ typedef enum {
  */
 typedef struct {
     float x;   /* left edge of the visible window in world-space logical pixels */
-} Camera;
+} GameCamera;
 
 typedef struct {
     const void *current_level;  /* pointer to the active LevelDef          */
@@ -204,7 +203,7 @@ typedef struct {
 } GameRules;
 
 typedef struct {
-    Uint64 prev_ticks;     /* timestamp of previous frame              */
+    uint64_t prev_ticks;   /* timestamp of previous frame */
     int    fp_prev_riding; /* float platform player stood on last frame*/
     int    smoke_frames_run; /* frames actually executed by a smoke run */
 } GameLoopState;
@@ -237,56 +236,55 @@ typedef struct {
 } GameCompletionState;
 
 typedef struct {
-    SDL_Texture *floor_tile;         /* repeated floor tile texture         */
-    SDL_Texture *platform;           /* shared one-way platform tile        */
-    SDL_Texture *spider;             /* ground spider enemy sheet           */
-    SDL_Texture *jumping_spider;     /* jumping spider enemy sheet          */
-    SDL_Texture *bird;               /* slow bird enemy sheet               */
-    SDL_Texture *faster_bird;        /* fast bird enemy sheet               */
-    SDL_Texture *fish;               /* jumping fish enemy sheet            */
-    SDL_Texture *faster_fish;        /* fast fish enemy sheet               */
-    SDL_Texture *coin;               /* coin collectible sheet              */
-    SDL_Texture *vine_green;         /* green vine climbable/decor texture  */
-    SDL_Texture *vine_brown;         /* brown vine climbable/decor texture  */
-    SDL_Texture *ladder;             /* ladder climbable texture            */
-    SDL_Texture *rope;               /* rope climbable texture              */
-    SDL_Texture *bouncepad_medium;   /* medium bouncepad texture            */
-    SDL_Texture *bouncepad_small;    /* small bouncepad texture             */
-    SDL_Texture *bouncepad_high;     /* high bouncepad texture              */
-    SDL_Texture *rail;               /* rail tile texture                   */
-    SDL_Texture *spike_block;        /* rail-riding spike block texture     */
-    SDL_Texture *float_platform;     /* floating platform texture           */
-    SDL_Texture *bridge;             /* bridge tile texture                 */
-    SDL_Texture *star_yellow;        /* yellow star collectible texture     */
-    SDL_Texture *star_green;         /* green star collectible texture      */
-    SDL_Texture *star_red;           /* red star collectible texture        */
-    SDL_Texture *last_star;          /* end-of-level star texture           */
-    SDL_Texture *axe_trap;           /* axe trap hazard texture             */
-    SDL_Texture *circular_saw;       /* circular saw hazard texture         */
-    SDL_Texture *blue_flame;         /* blue flame hazard texture           */
-    SDL_Texture *fire_flame;         /* fire flame hazard texture           */
-    SDL_Texture *spike;              /* ground spike hazard texture         */
-    SDL_Texture *spike_platform;     /* elevated spike platform texture     */
+    Texture2D *floor_tile;
+    Texture2D *platform;
+    Texture2D *spider;
+    Texture2D *jumping_spider;
+    Texture2D *bird;
+    Texture2D *faster_bird;
+    Texture2D *fish;
+    Texture2D *faster_fish;
+    Texture2D *coin;
+    Texture2D *vine_green;
+    Texture2D *vine_brown;
+    Texture2D *ladder;
+    Texture2D *rope;
+    Texture2D *bouncepad_medium;
+    Texture2D *bouncepad_small;
+    Texture2D *bouncepad_high;
+    Texture2D *rail;
+    Texture2D *spike_block;
+    Texture2D *float_platform;
+    Texture2D *bridge;
+    Texture2D *star_yellow;
+    Texture2D *star_green;
+    Texture2D *star_red;
+    Texture2D *last_star;
+    Texture2D *axe_trap;
+    Texture2D *circular_saw;
+    Texture2D *blue_flame;
+    Texture2D *fire_flame;
+    Texture2D *spike;
+    Texture2D *spike_platform;
 } TextureResources;
 
 typedef struct {
-    Mix_Chunk *jump;          /* player jump SFX                         */
-    Mix_Chunk *coin;          /* collectible pickup SFX                   */
-    Mix_Chunk *hit;           /* player hurt SFX                          */
-    Mix_Chunk *spring;        /* bouncepad trigger SFX                    */
-    Mix_Chunk *axe;           /* axe trap swing SFX                       */
-    Mix_Chunk *flap;          /* bird wing flap SFX                       */
-    Mix_Chunk *spider_attack; /* jumping spider leap SFX                  */
-    Mix_Chunk *dive;          /* fall/splash SFX                          */
-    Mix_Music *music;         /* looping level music                      */
+    SoundEffect *jump;
+    SoundEffect *coin;
+    SoundEffect *hit;
+    SoundEffect *spring;
+    SoundEffect *axe;
+    SoundEffect *flap;
+    SoundEffect *spider_attack;
+    SoundEffect *dive;
+    MusicTrack *music;
 } AudioResources;
 
 typedef struct {
-    SDL_Window         *window;     /* the OS window (created by SDL)              */
-    SDL_Renderer       *renderer;  /* GPU-accelerated 2D drawing context          */
-    SDL_GameController *controller;  /* first connected gamepad; NULL = none          */
-    TextureResources textures;       /* owned SDL_Texture resources                 */
-    AudioResources   audio;          /* owned SDL_mixer resources                   */
+    RenderTexture2D frame_target; /* owned logical canvas; session owns window */
+    int controller;               /* raylib device index + 1; zero means none */
+    TextureResources textures;    /* owned GPU textures */
+    AudioResources audio;         /* owned samples and music stream */
     ParallaxSystem      parallax;  /* multi-layer scrolling background            */
     Player        player;      /* the player, stored by value (not a pointer) */
     Platform      platforms[MAX_PLATFORMS]; /* one-way pillar definitions     */
@@ -353,7 +351,7 @@ typedef struct {
     int           lives;       /* remaining lives; <0 triggers game over      */
     int           score;       /* cumulative score from collecting coins      */
     int           score_life_next; /* next bonus threshold; 0 = score ceiling reached */
-    Camera        camera;      /* viewport scroll position; updated every frame*/
+    GameCamera    camera;      /* viewport scroll position; updated every frame*/
     int           running;     /* active game frame flag; session owns routes  */
     GameRoute     route;       /* explicit request consumed by AppSession      */
     int           game_over;   /* 1 = game-over overlay awaiting restart      */
@@ -363,7 +361,7 @@ typedef struct {
     float         respawn_y;      /* resolved respawn placement y               */
     int           checkpoint_index; /* authored checkpoint index, -1 before one */
     CheckpointFeedbackKind checkpoint_feedback_kind; /* explicit HUD cue reason */
-    Uint32        checkpoint_feedback_until; /* cue expiry deadline             */
+    uint32_t      checkpoint_feedback_until; /* cue expiry deadline */
     int           legacy_checkpoint_screen; /* last automatic screen boundary   */
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
     int           smoke_test_frames; /* >0 = exit after this many frames     */
@@ -386,17 +384,16 @@ typedef struct {
     unsigned int  input_release_keyboard_mask;   /* keys held across a route    */
     unsigned int  input_release_controller_mask; /* buttons held across a route */
     int           input_release_latched;         /* physical input gate active   */
-    int           controller_init_pending;        /* AppSession readiness gate    */
     struct GameProfile *profile; /* borrowed from the owning AppSession */
     struct SettingsMenu *settings_menu; /* borrowed; screen cleanup releases its textures */
     char profile_level_key[256];
     int profile_completion_recorded;
     int level_score_start;
     unsigned int random_seed;
-    Uint64 source_level_hash; /* source bytes corresponding to active LevelDef */
+    uint64_t source_level_hash; /* source bytes corresponding to active LevelDef */
     struct {
         int frozen, step_requested, slow_mode, physics_field, entity_index;
-        SDL_Texture *labels[6]; /* cached renderer-owned inspector text */
+        Texture2D *labels[6]; /* cached inspector text */
         char text[6][192];
         int width[6], height[6];
     } inspector;
@@ -409,13 +406,13 @@ typedef struct {
 /* includes this header can call them.                                  */
 /* ------------------------------------------------------------------ */
 
-/* Create the window, renderer, and load all textures. */
+/* Create the logical render target and load screen-owned resources. */
 int game_init(GameState *gs);
 
 /* Run native game frames until gs->running becomes 0 (legacy direct helper). */
 void game_loop(GameState *gs);
 
-/* Execute one game frame. Returns 1 only after SDL_RenderPresent. */
+/* Execute one game frame. Returns 1 only after presentation. */
 int game_frame(GameState *gs);
 
 /* Free every resource owned by the game in reverse-init order. */

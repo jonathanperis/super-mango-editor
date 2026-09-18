@@ -22,10 +22,10 @@ integration points; the abbreviated examples here introduce conventions.
 
 ### Comments and Module Layout
 
-The source is a learning resource for C and SDL2. Comments should explain why a decision is needed, not just repeat the code:
+The source is a learning resource for C and raylib. Comments should explain why a decision is needed, not just repeat the code:
 
 - Start headers and source files with a short module summary. Headers use `#pragma once` and expose constants, types, and public function declarations.
-- Explain nontrivial SDL calls, including important arguments, return values, and resource ownership.
+- Explain nontrivial raylib calls, including important arguments, return values, and resource ownership.
 - Give numeric constants their units and origin, especially logical pixels, pixels per second, and animation durations.
 - Document pointer ownership, float-to-integer rendering casts, and cleanup order where they matter.
 
@@ -45,15 +45,15 @@ The source is a learning resource for C and SDL2. Comments should explain why a 
 ### Memory and Safety Rules
 
 - Clear each owning pointer after releasing its resource. A NULL guard only protects an already-NULL pointer; aliases and borrowed pointers require explicit lifetime discipline.
-- Error paths call `SDL_GetError()` / `IMG_GetError()` / `Mix_GetError()` and write to `stderr`.
+- Error paths identify the failing operation and asset path; raylib warnings provide backend detail.
 - Required initialization failures return failure to the caller for cleanup; only the top-level runner returns `EXIT_FAILURE`. Optional sound-effect loads warn and continue, and playback checks for a non-NULL chunk.
 - Resources are **always freed in reverse init order**.
-- Use `float` for positions and velocities; cast to `int` only at render time (`SDL_Rect` fields are `int`).
+- Use `float` for positions and velocities. Preserve integer `IntRect` hitbox construction and edge rules; convert to raylib `Rectangle` at drawing boundaries.
 
 ### Coordinate System
 
 All game-object positions and sizes live in **logical space (400x300)**.
-Never use `WINDOW_W` / `WINDOW_H` for game math -- SDL scales the logical canvas to the OS window automatically.
+Never use `WINDOW_W` / `WINDOW_H` for game math. The shared presentation helper scales the logical render target to the OS window with nearest filtering and an inverse pointer transform.
 
 See [Constants Reference](../constants-reference/) for all defined constants.
 
@@ -87,8 +87,8 @@ Most active entities follow this lifecycle pattern:
 ```text
 entity_init    -> set initial state (textures often live shared in GameState)
 entity_update  -> move, apply physics, detect events
-entity_render  -> draw to renderer
-entity_cleanup -> SDL_DestroyTexture, set to NULL
+entity_render  -> draw to the active raylib target
+entity_cleanup -> texture_unload, clear the owning slot
 ```
 
 Collectibles and simple decorations may use lighter helpers. For example, coins store only placement state in `Coin` and render through `coins_render()` using a shared texture from `GameState`.
@@ -106,7 +106,7 @@ entity_animate        -> static helper, called from entity_update
 
 ```c
 #pragma once
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 #define MAX_COINS       64
 #define COIN_DISPLAY_W  16
@@ -120,7 +120,7 @@ typedef struct {
 } Coin;
 
 void coins_render(const Coin *coins, int count,
-                  SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                  Texture2D *tex, int cam_x);
 ```
 
 #### 2. Create the implementation -- `src/collectibles/coin.c`
@@ -129,19 +129,19 @@ void coins_render(const Coin *coins, int count,
 #include "collectibles/coin.h"
 
 void coins_render(const Coin *coins, int count,
-                  SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                  Texture2D *tex, int cam_x) {
     if (!tex) return;
 
     for (int i = 0; i < count; i++) {
         if (!coins[i].active) continue;
 
-        SDL_Rect dst = {
+        IntRect dst = {
             (int)(coins[i].x - cam_x),
             (int)coins[i].y,
             COIN_DISPLAY_W,
             COIN_DISPLAY_H
         };
-        SDL_RenderCopy(renderer, tex, NULL, &dst);
+        sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
     }
 }
 ```
@@ -157,7 +157,7 @@ Textures are loaded in `game_init()` and stored under `gs->textures`. The entity
 
 typedef struct {
     // ... existing fields ...
-    TextureResources textures; /* contains SDL_Texture *coin */
+    TextureResources textures; /* contains Texture2D *coin */
     Coin coins[MAX_COINS];    /* fixed-size array -- simple and cache-friendly */
     int  coin_count;          /* how many are currently active */
 } GameState;
@@ -167,9 +167,9 @@ typedef struct {
 
 ```c
 // src/core/game_resources.c -- load shared texture:
-gs->textures.coin = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/coin.png");
+gs->textures.coin = texture_load("assets/sprites/collectibles/coin.png");
 if (!gs->textures.coin) {
-    fprintf(stderr, "Failed to load coin.png: %s\n", IMG_GetError());
+    fprintf(stderr, "Failed to load assets/sprites/collectibles/coin.png\n");
     return -1;
 }
 
@@ -178,9 +178,9 @@ gs->coins[i] = (Coin){ .x = def->coins[i].x, .y = def->coins[i].y, .active = 1 }
 gs->coin_count = def->coin_count;
 
 // focused runtime helper render section, in the correct layer order:
-coins_render(gs->coins, gs->coin_count, gs->renderer, gs->textures.coin, (int)gs->camera.x);
+coins_render(gs->coins, gs->coin_count, gs->textures.coin, (int)gs->camera.x);
 
-// src/core/game_resources.c cleanup, before SDL_DestroyRenderer:
+// src/core/game_resources.c cleanup, before closing the graphics context:
 DESTROY_TEX(gs->textures.coin);
 ```
 
@@ -213,10 +213,9 @@ Every entity must have hitbox visualization in `core/debug.c`:
 // In debug_render:
 for (int i = 0; i < gs->coin_count; i++) {
     if (!gs->coins[i].active) continue;
-    SDL_Rect hb = { (int)gs->coins[i].x - cam_x, (int)gs->coins[i].y,
+    IntRect hb = { (int)gs->coins[i].x - cam_x, (int)gs->coins[i].y,
                     COIN_DISPLAY_W, COIN_DISPLAY_H };
-    SDL_SetRenderDrawColor(gs->renderer, 255, 255, 0, 128);
-    SDL_RenderDrawRect(gs->renderer, &hb);
+    DrawRectangleLines(hb.x, hb.y, hb.w, hb.h, (Color){255,255,0,128});
 }
 ```
 
@@ -278,13 +277,13 @@ All sound files are `.wav` format, named with the convention `component_descript
 Steps to add a new sound:
 
 1. Place `.wav` in `assets/sounds/<category>/`.
-2. Add `Mix_Chunk *<name>;` to `AudioResources` in `game.h`.
+2. Add `SoundEffect *<name>;` to `AudioResources` in `game.h`.
 3. Load in `game_init` (non-fatal -- warn but continue):
 
 ```c
-gs->audio.<name> = Mix_LoadWAV("assets/sounds/<category>/<name>.wav");
+gs->audio.<name> = sound_load("assets/sounds/<category>/<name>.wav");
 if (!gs->audio.<name>) {
-    fprintf(stderr, "Warning: could not load <name>.wav: %s\n", Mix_GetError());
+    fprintf(stderr, "Warning: could not load assets/sounds/<category>/<name>.wav\n");
 }
 ```
 
@@ -297,7 +296,7 @@ FREE_CHUNK(gs->audio.<name>);
 5. Play wherever needed:
 
 ```c
-if (gs->audio.<name>) Mix_PlayChannel(-1, gs->audio.<name>, 0);
+sound_play(gs->audio.<name>, 128); // null-safe; per-play volume in authored units
 ```
 
 See [Sounds](../sounds/) for the full list of available sound files.
@@ -306,19 +305,18 @@ See [Sounds](../sounds/) for the full list of available sound files.
 
 ## Adding Background Music
 
-Background music is loaded via `Mix_LoadMUS` (not `Mix_LoadWAV`). Runtime levels provide the active music path through TOML:
+Background music uses raylib streams through the project `MusicTrack` owner. Runtime levels provide the active music path through TOML:
 
 ```c
 // Load from current LevelDef
-gs->audio.music = Mix_LoadMUS(def->music_path);
+gs->audio.music = music_load(def->music_path);
 
 // Play (looping)
-Mix_PlayMusic(gs->audio.music, -1);
-Mix_VolumeMusic(64);  // 50% -- adjust as needed
+music_play(gs->audio.music);
+music_set_volume(64); // 50%; normal sessions combine level/user/mute settings
 
 // Cleanup
-Mix_HaltMusic();
-Mix_FreeMusic(gs->audio.music);
+music_unload(gs->audio.music);
 gs->audio.music = NULL;
 ```
 
@@ -326,33 +324,28 @@ gs->audio.music = NULL;
 
 ## Adding HUD / Text Rendering
 
-`SDL2_ttf` is already initialized in `main.c`. The font is in `assets/fonts/`.
+The graphics context must exist before loading fonts. `TextFont` preserves
+UTF-8 glyph coverage as text changes; font atlases and cached label textures have
+explicit owners. The font is in `assets/fonts/`.
 
 ```c
 // Load font
-TTF_Font *font = TTF_OpenFont("assets/fonts/round9x13.ttf", 13);
-if (!font) { fprintf(stderr, "TTF_OpenFont: %s\n", TTF_GetError()); }
+TextFont *font = font_load("assets/fonts/round9x13.ttf", 13);
+if (!font) return -1;
 
-// Render text to a surface, then upload to a texture
-SDL_Color white = {255, 255, 255, 255};
-SDL_Surface *surf = TTF_RenderText_Solid(font, "Score: 0", white);
-SDL_Texture *tex  = SDL_CreateTextureFromSurface(renderer, surf);
-int text_w = surf->w;
-int text_h = surf->h;
-SDL_FreeSurface(surf);
+// Draw while the frame's render target is active
+font_draw(font, "Score: 0", 10, 10, WHITE);
 
-// Draw the texture
-SDL_Rect dst = {10, 10, text_w, text_h};
-SDL_RenderCopy(renderer, tex, NULL, &dst);
-
-// Cleanup
-SDL_DestroyTexture(tex);
-TTF_CloseFont(font);
+// Cleanup before closing the graphics context
+font_unload(font);
 ```
 
 The HUD renders hearts (health), life counter and score. It is drawn after game entities; terminal/settings overlays can cover it.
 
-For static labels, create the text texture once and reuse it rather than rendering a surface and uploading a texture every frame. Rebuild cached text only when its content or appearance changes, and release it before destroying its renderer.
+For repeated labels, reuse `UIState`'s bounded cache or `font_texture`. Rebuild
+only when content/appearance changes. `texture_unload` flushes pending raylib
+draws before freeing a texture, which matters when a cache entry is evicted
+within a frame. Release cached textures before their font and graphics context.
 
 ---
 
@@ -427,7 +420,7 @@ Standard animation row layout (most assets in this pack):
 
 See [Assets](../assets/) for sprite sheet dimensions and [Player Module](../player-module/) for animation state machine details.
 
-Measure each sheet rather than assuming a common frame size or row layout. Advance animation using accumulated elapsed time; reset the frame on state entry, loop repeating states, and clamp one-shot animations to their last frame. Reuse right-facing art with `SDL_RenderCopyEx` and `SDL_FLIP_HORIZONTAL` for left-facing rendering.
+Measure each sheet rather than assuming a common frame size or row layout. Advance animation using accumulated elapsed time; reset the frame on state entry, loop repeating states, and clamp one-shot animations to their last frame. Reuse right-facing art with `sprite_draw` and `SPRITE_FLIP_X` for left-facing rendering.
 
 ---
 
@@ -441,7 +434,7 @@ Measure each sheet rather than assuming a common frame size or row layout. Advan
 - [ ] Call `<entity>_init` in `game_init`
 - [ ] Call `<entity>_update` from the relevant `src/core/` update helper
 - [ ] Call `<entity>_render` from `src/render/game_render.c` or its focused render helper (correct layer order)
-- [ ] Call `<entity>_cleanup` in `game_cleanup` (before `SDL_DestroyRenderer`)
+- [ ] Call `<entity>_cleanup` in `game_cleanup` before the session closes the graphics context
 - [ ] Set all freed pointers to `NULL`
 - [ ] Wire shared schema/parser/emitter, C/Python validation, and editor palette/tools/preview/properties/undo/clipboard/document hashing
 - [ ] Add entity placement to a TOML level file in `levels/` (or use the visual level editor)

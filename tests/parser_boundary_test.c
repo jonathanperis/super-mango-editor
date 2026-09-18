@@ -224,7 +224,7 @@ static int allocation_failure_sweep(void)
 static int experiment_array_limit(void)
 {
     /* EXPERIMENT_MAX_FRAMES in src/core/game_experiment.h; keep this parser
-     * probe independent of the SDL headers pulled in by the runtime type. */
+     * probe independent of the graphics headers pulled in by the runtime type. */
     const int max_frames=36000;
     size_t capacity=(size_t)(max_frames+1)*2+16;
     char *text=malloc(capacity);

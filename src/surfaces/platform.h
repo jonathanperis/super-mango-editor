@@ -9,7 +9,7 @@
  */
 #pragma once
 
-#include <SDL.h>   /* SDL_Renderer, SDL_Texture, SDL_Rect */
+#include "../shared/graphics.h"
 
 /*
  * MAX_PLATFORMS — upper bound on how many platforms the game can hold.
@@ -34,7 +34,7 @@ typedef struct {
     float       y;   /* top  edge (landing surface) in logical pixels */
     int         w;   /* total width  in logical pixels                */
     int         h;   /* total height in logical pixels                */
-    SDL_Texture *tex; /* 9-slice tileset texture (NULL = use default) */
+    Texture2D *tex; /* 9-slice tileset texture (NULL = use default) */
 } Platform;
 
 /*
@@ -54,4 +54,4 @@ void platforms_init(Platform *platforms, int *count);
  * Called every frame from game_loop, after the background, before the player.
  */
 void platforms_render(const Platform *platforms, int count,
-                      SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                      Texture2D *tex, int cam_x);

@@ -7,7 +7,7 @@
  * extremes / rotation completion.
  */
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 #include <math.h>    /* sinf, fabsf, fmodf, M_PI */
 #include <stdio.h>
 
@@ -100,7 +100,7 @@ void axe_traps_init(AxeTrap *traps, int *count) {
  *   Sound fires once per full 360° rotation.
  */
 void axe_traps_update(AxeTrap *traps, int count, float dt,
-                      Mix_Chunk *snd_axe, float player_x, int cam_x) {
+                      SoundEffect *snd_axe, float player_x, int cam_x) {
     for (int i = 0; i < count; i++) {
         AxeTrap *t = &traps[i];
         if (!t->active) continue;
@@ -142,14 +142,13 @@ void axe_traps_update(AxeTrap *traps, int count, float dt,
              * it resets when the axe crosses back through centre (|angle| < 10°).
              *
              * The sound only plays when the axe is on-screen.  Volume is
-             * set per-channel immediately after Mix_PlayChannel returns,
+             * set per voice before playback starts,
              * using the distance-based value computed above.
              */
             if (fabsf(t->angle) > AXE_SWING_AMPLITUDE * 0.95f) {
                 if (!t->sound_played) {
                     if (snd_axe && on_screen && vol > 0) {
-                        int ch = Mix_PlayChannel(-1, snd_axe, 0);
-                        if (ch >= 0) Mix_Volume(ch, vol);
+                        sound_play(snd_axe, vol);
                     }
                     t->sound_played = 1;
                 }
@@ -171,8 +170,7 @@ void axe_traps_update(AxeTrap *traps, int count, float dt,
              */
             if (t->angle >= 360.0f) {
                 if (snd_axe && on_screen && vol > 0) {
-                    int ch = Mix_PlayChannel(-1, snd_axe, 0);
-                    if (ch >= 0) Mix_Volume(ch, vol);
+                    sound_play(snd_axe, vol);
                 }
             }
 
@@ -186,22 +184,21 @@ void axe_traps_update(AxeTrap *traps, int count, float dt,
 /*
  * axe_traps_render — Draw each active axe trap with rotation.
  *
- * SDL_RenderCopyEx is the rotated-blit variant of SDL_RenderCopy.
- * It takes a rotation angle (degrees, clockwise) and a pivot point
+ * The draw helper takes a rotation angle (degrees, clockwise) and a pivot point
  * relative to the destination rect's top-left corner.
  *
  * The pivot is set to the top-centre of the sprite (the handle tip),
  * so the axe swings around that point exactly like a real pendulum.
  */
 void axe_traps_render(const AxeTrap *traps, int count,
-                      SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                      Texture2D *tex, int cam_x) {
     if (!tex) return;
 
     /*
      * src — the entire 48×64 sprite (single image, no sub-frames).
      * We blit the full texture each time.
      */
-    SDL_Rect src = { 0, 0, AXE_FRAME_W, AXE_FRAME_H };
+    IntRect src = { 0, 0, AXE_FRAME_W, AXE_FRAME_H };
 
     for (int i = 0; i < count; i++) {
         const AxeTrap *t = &traps[i];
@@ -226,7 +223,7 @@ void axe_traps_render(const AxeTrap *traps, int count,
          *
          * cam_x is subtracted to convert from world space to screen space.
          */
-        SDL_Rect dst = {
+        IntRect dst = {
             .x = (int)t->x - AXE_DISPLAY_W / 2 - cam_x,
             .y = (int)t->y,
             .w = AXE_DISPLAY_W,
@@ -241,23 +238,12 @@ void axe_traps_render(const AxeTrap *traps, int count,
          * top edge.  A small offset of 4 px downward places the pivot
          * at the hook/nail point where the axe would be mounted.
          */
-        SDL_Point pivot = {
+        Vector2 pivot = {
             .x = AXE_DISPLAY_W / 2,  /* horizontal centre of the sprite */
             .y = 4,                   /* a few pixels below the very top */
         };
 
-        /*
-         * SDL_RenderCopyEx — blit with rotation.
-         *   renderer  → GPU drawing context
-         *   tex       → the Axe_Trap.png texture
-         *   &src      → full source image (48×64)
-         *   &dst      → where to draw on screen
-         *   t->angle  → rotation in degrees (clockwise)
-         *   &pivot    → the point around which to rotate (handle top)
-         *   SDL_FLIP_NONE → no horizontal/vertical mirroring
-         */
-        SDL_RenderCopyEx(renderer, tex, &src, &dst,
-                         (double)t->angle, &pivot, SDL_FLIP_NONE);
+        sprite_draw_pivot(tex, &src, &dst, t->angle, SPRITE_NORMAL, pivot, WHITE);
     }
 }
 
@@ -279,7 +265,7 @@ void axe_traps_render(const AxeTrap *traps, int count,
  *
  * (sin for x, cos for y because angle 0 = straight down in our convention)
  */
-SDL_Rect axe_trap_get_hitbox(const AxeTrap *trap) {
+IntRect axe_trap_get_hitbox(const AxeTrap *trap) {
     /* Distance from pivot to blade centre (approximately 3/4 of sprite height) */
     float arm = (float)(AXE_DISPLAY_H - 4) * 0.70f;
 
@@ -288,9 +274,9 @@ SDL_Rect axe_trap_get_hitbox(const AxeTrap *trap) {
     /*
      * Rotate the blade centre point around the pivot.
      *
-     * SDL_RenderCopyEx rotates clockwise: at +90° the blade (bottom of the
+     * Positive rotation is clockwise: at +90° the blade (bottom of the
      * sprite) points LEFT in screen space.  Standard sinf(+90°) returns +1
-     * (rightward), so we negate the sin term to match SDL's visual rotation.
+     * (rightward), so we negate the sin term to match the visual rotation.
      * cosf is correct as-is: at 0° the blade is straight down (max cos),
      * and at ±90° it is level with the pivot (cos = 0).
      */
@@ -300,7 +286,7 @@ SDL_Rect axe_trap_get_hitbox(const AxeTrap *trap) {
     /* Return a 28×28 hitbox centred on the blade */
     int hw = 14;
     int hh = 14;
-    SDL_Rect hit = {
+    IntRect hit = {
         .x = (int)(blade_cx - hw),
         .y = (int)(blade_cy - hh),
         .w = hw * 2,

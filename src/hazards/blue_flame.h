@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -151,7 +151,7 @@ void blue_flames_update(BlueFlame *blue_flames, int count, float dt);
 
 /* Draw all active blue flames using the 2-frame animation and rotation. */
 void blue_flames_render(const BlueFlame *blue_flames, int count,
-                        SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                        Texture2D *tex, int cam_x);
 
 /* Return the collision rectangle in world space. */
-SDL_Rect blue_flame_get_hitbox(const BlueFlame *blue_flame);
+IntRect blue_flame_get_hitbox(const BlueFlame *blue_flame);

@@ -13,7 +13,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 
 /* ---- Connection direction bitmask flags ---------------------------------- */
 
@@ -94,7 +94,7 @@ void rail_init(Rail *rails, int *count);
 
 /* Draw every tile of every rail using the given texture and camera offset. */
 void rail_render(const Rail *rails, int count,
-                 SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                 Texture2D *tex, int cam_x);
 
 /*
  * rail_get_world_pos — Interpolate the world-space centre of position t.

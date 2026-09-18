@@ -8,7 +8,7 @@
 
 ```
 src/
-├── main.c                        Entry point -- SDL subsystem lifecycle
+├── main.c                        CLI entry point; AppSession owns platform lifetime
 ├── game.h                        Shared constants + GameState struct (included everywhere)
 ├── collectibles/
 │   ├── coin.h / .c               Coin collectible: placement, AABB collection, render
@@ -21,7 +21,7 @@ src/
 │   ├── floor_gap_collision.h / .c Sea-gap fall/death detection
 │   └── game_collision.h / .c     Gameplay collision passes and pickups
 ├── core/
-│   ├── app_session.h / .c        Heap-owned application session: menu/game screens, routes, controller lifetime, browser replay
+│   ├── app_session.h / .c        Heap-owned session: window/audio lifetime, menu/game routes, browser replay
 │   ├── game_profile.h / .c       Versioned player settings/results and native/web persistence
 │   ├── game_inspector.h / .c     Simulation stepping, slow motion, tuning and cached inspection UI
 │   ├── game_experiment.h / .c    Bounded capture/export/replay with level fingerprints
@@ -29,7 +29,7 @@ src/
 │   ├── debug.h / .c              Debug overlay: FPS/CPU/memory, hitboxes, event log
 │   ├── entity_utils.h / .c       Shared entity helper functions
 │   ├── game_state.h / .c         GameState reset helpers
-│   ├── game_window.h / .c        Window/renderer setup helpers
+│   ├── game_window.h / .c        Screen-owned logical render target
 │   ├── game_timing.h / .c        Frame timing helpers
 │   ├── game_lifecycle.c          `game_init` / `game_cleanup` implementation
 │   ├── game_loop.c               Active-game frame runner and legacy direct loop
@@ -56,7 +56,8 @@ src/
 │   ├── tools.h / .c              Selection and placement tools
 │   ├── entity_meta.h / .c        Palette/display metadata for entity types
 │   ├── editor_frame.h / .c       Per-frame editor orchestration
-│   ├── editor_events.h / .c      SDL event dispatch
+│   ├── editor_events.h / .c      Semantic input dispatch
+│   ├── dialog_choice.c          Native confirmation/error/recovery decisions
 │   ├── editor_chrome.h / .c      Toolbar/status/panel chrome
 │   ├── editor_panels.h / .c      Palette/properties panel rendering
 │   ├── editor_layout.h / .c      Editor layout metrics
@@ -70,6 +71,11 @@ src/
 │   ├── file_dialog.h / .c        Native file dialogs
 │   └── undo.h / .c               Compact history with owned config snapshots
 ├── shared/
+│   ├── graphics.h / .c          raylib texture slots, sprite pivots and logical presentation
+│   ├── geometry.h              Integer hitboxes and half-open intersection
+│   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
+│   ├── text.h / .c              Font/glyph ownership, UTF-8 measurement and cached text textures
+│   ├── platform.h / .c          Monotonic time, UTF-8 copying and OS preference/executable paths
 │   ├── ui.h / .c                 Immediate-mode widgets shared by editor and game settings
 │   ├── serializer.h / .c         TOML save/load public API anchor
 │   ├── serializer_emit.h / .c    TOML emission helpers
@@ -109,10 +115,11 @@ src/
 │   ├── axe_trap.h / .c           Swinging/spinning axe hazard
 │   └── blue_flame.h / .c         Blue/fire flame hazards: rise/flip/fall cycle
 ├── input/
+│   ├── input_backend.h / .c     raylib device sampling, versioned binding translation and command queue
 │   ├── game_bindings.c           Reserved-key/button and configurable binding validation
-│   ├── game_input.h / .c         SDL keyboard/gamepad input helpers and cross-screen release latch
-│   ├── game_events.h / .c        SDL event handling and terminal action dispatch
-│   ├── game_replay.h / .c        Deterministic SDL key-event replay injection
+│   ├── game_input.h / .c         Keyboard/gamepad action masks and cross-screen release latch
+│   ├── game_events.h / .c        Semantic input and terminal action dispatch
+│   ├── game_replay.h / .c        Deterministic command/replay-mask injection
 │   └── game_web_input.h / .c     Browser/WebAssembly stale-key repair
 ├── levels/
 │   ├── level.h                   Shared level definitions
@@ -162,12 +169,12 @@ New `.c` files in `src/` or recognized source subdirectories are picked up by Ma
 
 ## `main.c`
 
-**Role:** Parses program arguments, starts SDL core subsystems, constructs one `AppSession`, and returns the session result. `AppSession` owns runtime shutdown and cross-screen transitions.
+**Role:** Parses program arguments, constructs one `AppSession`, and returns the session result. `AppSession` owns raylib startup/shutdown and cross-screen transitions.
 
 ### Responsibilities
 
 - Parse startup, profile, experiment and smoke flags; see the complete [Controls reference](../controls/#runtime-flags-for-input-and-ci), including `--seed`, `--profile`, `--continue`, `--no-save` and `--experiment`
-- Call `SDL_Init`, `IMG_Init`, `TTF_Init`, `Mix_OpenAudio` in order
+- Delegate window, input and audio initialization to `session_create`
 - Route to the start menu, sandbox, or direct TOML level mode through `session_create()`
 - Run `session_run()`; native callers then destroy the session, while browser replay frees it before requesting a reload
 
@@ -175,10 +182,9 @@ New `.c` files in `src/` or recognized source subdirectories are picked up by Ma
 
 | Order | Call | Purpose |
 |-------|------|---------|
-| 1 | `SDL_Init(SDL_INIT_VIDEO \| SDL_INIT_AUDIO)` | Core: window + audio device |
-| 2 | `IMG_Init(IMG_INIT_PNG)` | PNG decoder |
-| 3 | `TTF_Init()` | FreeType / font support |
-| 4 | `Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048)` | Audio mixer |
+| 1 | `display_open` / `InitWindow` | One raylib window/context for the session |
+| 2 | `input_open` | Semantic input queue and canvas-scoped browser keyboard handlers |
+| 3 | `audio_open` / `InitAudioDevice` | Audio device; screen assets load afterward |
 
 On failure at any step, all previously-succeeded subsystems are torn down before returning `EXIT_FAILURE`.
 
@@ -264,19 +270,19 @@ void game_complete_level(GameState *gs);
 
 ## Runtime Core (`core/app_session.c`, `core/game_lifecycle.c`, `core/game_loop.c`, `core/game_resources.c`)
 
-**Role:** `app_session.c` owns the one app-level frame loop, menu/game screen swaps, controller subsystem lifetime, native replay, browser replay, and shutdown. `game_lifecycle.c` owns active-game `game_init` / `game_cleanup`; `game_loop.c` owns `game_frame`; resource loading/reloading lives in `game_resources.c`.
+**Role:** `app_session.c` owns the app-level frame loop, window/audio lifetime, menu/game swaps, native/browser replay and shutdown. `game_lifecycle.c` owns active-game `game_init` / `game_cleanup`; `game_loop.c` owns `game_frame`; resource loading/reloading lives in `game_resources.c`.
 
 ### `game_init(GameState *gs)`
 
 Creates all runtime resources:
 
-1. Window + renderer + logical size (400x300)
+1. Screen-owned 400x300 render target in the existing session context
 2. Shared textures for player, entities, hazards, collectibles, surfaces, HUD, and debug overlay
 3. Sound effects for player actions, pickups, entities, hazards, and surface interactions
 4. TOML level load from the selected campaign entry or direct `--level` path
 5. Level-wide resources: parallax, floor/platform tiles, foreground strip, fog, water, and music
 6. Entity init: player, water, fog, HUD, debug, and level contents
-7. Discover an available gamepad handle after `AppSession` publishes controller readiness
+7. Discover the first available raylib gamepad index
 
 Returns `0` on success. If a required window, texture, level, or subsystem resource fails, it cleans up the partially initialized `GameState` and returns `-1`; the top-level runner reports `EXIT_FAILURE`.
 

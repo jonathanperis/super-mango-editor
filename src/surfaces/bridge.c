@@ -7,7 +7,7 @@
  * with a staggered CASCADE_DELAY, creating a domino ripple outward from
  * the contact point.
  */
-#include <SDL.h>
+#include "../shared/graphics.h"
 #include <math.h>   /* fabsf */
 
 #include "bridge.h"
@@ -100,9 +100,9 @@ void bridges_update(Bridge *bridges, int count, float dt,
 
 /* ------------------------------------------------------------------ */
 
-SDL_Rect bridge_get_rect(const Bridge *b)
+IntRect bridge_get_rect(const Bridge *b)
 {
-    SDL_Rect r;
+    IntRect r;
     r.x = (int)b->x;
     r.y = (int)b->base_y;
     r.w = b->brick_count * BRIDGE_TILE_W;
@@ -124,7 +124,7 @@ int bridge_has_solid_at(const Bridge *b, float wx)
 /* ------------------------------------------------------------------ */
 
 void bridges_render(const Bridge *bridges, int count,
-                    SDL_Renderer *renderer, SDL_Texture *tex, int cam_x)
+                    Texture2D *tex, int cam_x)
 {
     if (!tex) return;
 
@@ -135,14 +135,14 @@ void bridges_render(const Bridge *bridges, int count,
             const BridgeBrick *br = &b->bricks[i];
             if (!br->active) continue;
 
-            SDL_Rect src = { 0, 0, BRIDGE_TILE_W, BRIDGE_TILE_H };
-            SDL_Rect dst = {
+            IntRect src = { 0, 0, BRIDGE_TILE_W, BRIDGE_TILE_H };
+            IntRect dst = {
                 (int)b->x + i * BRIDGE_TILE_W - cam_x,
                 (int)(b->base_y + br->y_offset),
                 BRIDGE_TILE_W,
                 BRIDGE_TILE_H
             };
-            SDL_RenderCopy(renderer, tex, &src, &dst);
+            sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }
     }
 }

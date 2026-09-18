@@ -1,6 +1,6 @@
 # super-mango-editor
 
-> C11 + SDL2 platformer, visual level editor, and hands-on game-development school — playable in the browser via WebAssembly.
+> C11 + raylib platformer, visual level editor, and hands-on game-development school — playable in the browser via WebAssembly.
 
 [![Build Check](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml/badge.svg?event=pull_request)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml) [![Main Build](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml) [![CodeQL](https://github.com/jonathanperis/super-mango-editor/actions/workflows/codeql.yml/badge.svg)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/codeql.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -10,7 +10,7 @@
 
 ## About
 
-Super Mango is a C11/SDL2 platformer and sandbox school: play the game, inspect a running simulation, edit TOML worlds, and study the code that connects them. The campaign is Creator's Playground → Volcanic Depths 1 → Volcanic Depths 2. Six separate mechanics levels in `levels/labs/` support an eight-lab learning track. The standalone editor saves the same TOML data that the runtime loads. Rendering uses a 400×300 logical canvas, normally scaled to an 800×600 window. Native builds target macOS, Linux and Windows; Emscripten supplies browser play.
+Super Mango is a C11/raylib platformer and sandbox school: play the game, inspect a running simulation, edit TOML worlds, and study the code that connects them. The campaign is Creator's Playground → Volcanic Depths 1 → Volcanic Depths 2. Six separate mechanics levels in `levels/labs/` support an eight-lab learning track. The standalone editor saves the same TOML data that the runtime loads. Rendering uses a 400×300 logical canvas, normally scaled to an 800×600 window. Native builds target macOS, Linux and Windows; Emscripten supplies browser play.
 
 **Start learning:** [Sandbox School](docs/wiki/learning-path.md) · [Mechanics Museum](docs/wiki/mechanics-museum.md) · [Entity Walkthrough](docs/wiki/entity-walkthrough.md).
 
@@ -19,10 +19,8 @@ Super Mango is a C11/SDL2 platformer and sandbox school: play the game, inspect 
 | Technology | Version | Purpose |
 |-----------|---------|---------|
 | C | C11 | Language standard (`clang -std=c11`) |
-| SDL2 | 2.x | Window, renderer, input, events, timing |
-| SDL2_image | 2.x | PNG texture loading |
-| SDL2_ttf | 2.x | TrueType font rendering |
-| SDL2_mixer | 2.x | Sound effects and music |
+| raylib | 6.0, pinned source/checksum | Window, graphics, input, PNG/TrueType loading and audio; bundled GLFW on desktop |
+| CMake | Available platform version | Out-of-source raylib dependency build; Make remains the application entry point |
 | tomlc17 | R260821 + project patches | TOML v1.1 parser; [upstream provenance and patch inventory](vendor/tomlc17/README.md) |
 | Emscripten | 6.0.9 in CI | WebAssembly compilation for browser play |
 
@@ -48,7 +46,7 @@ Super Mango is a C11/SDL2 platformer and sandbox school: play the game, inspect 
 
 ## Level Editor
 
-Super Mango includes a standalone visual level editor built with C11 and SDL2. The editor lets you create and edit levels with a point-and-click interface, then save and load TOML files used directly by the game.
+Super Mango includes a standalone visual level editor built with C11 and raylib. The editor lets you create and edit levels with a point-and-click interface, then save and load TOML files used directly by the game.
 
 Editor features:
 
@@ -59,7 +57,7 @@ Editor features:
 - Undo/redo history, copy/paste, recent files, autosave, and dirty-state indicators
 - Validation status for the active level; validation errors block save and playtest
 - Native file dialogs
-- Headless smoke mode for CI (`--smoke-test`)
+- Bounded rendered smoke mode for CI (`--smoke-test`)
 
 Build and run the editor:
 
@@ -76,12 +74,14 @@ Start with [Sandbox School](docs/wiki/learning-path.md), then use the [Developer
 
 ### Prerequisites
 
-A C11-compatible compiler (`clang` or `gcc`), `make`, and the SDL2 development libraries.
+A C11-compatible compiler (`clang` or `gcc`), `make`, CMake and Python 3.11+.
+The first build downloads and verifies the pinned raylib 6.0 source archive;
+no system raylib installation is required. See [dependency provenance](vendor/raylib/README.md).
 
 **macOS:**
 
 ```sh
-brew install sdl2 sdl2_image sdl2_ttf sdl2_mixer
+brew install cmake
 xcode-select --install   # provides clang and make
 ```
 
@@ -89,21 +89,24 @@ xcode-select --install   # provides clang and make
 
 ```sh
 sudo apt update
-sudo apt install build-essential clang \
-    libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-mixer-dev zenity
+sudo apt install build-essential clang cmake python3 libgl1-mesa-dev libx11-dev \
+    libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev zenity
 ```
 
 **Windows (MSYS2 UCRT64):**
 
 ```sh
-pacman -S make mingw-w64-ucrt-x86_64-clang \
-          mingw-w64-ucrt-x86_64-SDL2 \
-          mingw-w64-ucrt-x86_64-SDL2_image \
-          mingw-w64-ucrt-x86_64-SDL2_ttf \
-          mingw-w64-ucrt-x86_64-SDL2_mixer
+pacman -S make mingw-w64-ucrt-x86_64-clang mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-python \
+          mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-make
 ```
 
-**WebAssembly:** Install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) at **6.0.9** and ensure `emcc` is on `PATH` for optional local preflights. GitHub CI is the authoritative WASM release verification; if a local Emscripten/SDL port cache fails before Super Mango code compiles, trust the green CI WebAssembly build and Pages smoke instead of blocking on the local host toolchain.
+**WebAssembly:** Install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) at **6.0.9** and ensure `emcc` and `emcmake` are on `PATH`. The same toolchain builds raylib's Web backend and both game variants. GitHub CI is the authoritative WASM release verification; local toolchain failures must be reported separately from application failures.
+
+**Rendered tests:** desktop hidden windows still require a graphics context and
+audio device. Linux CI uses Xvfb/Mesa and a PulseAudio null sink. On display-less
+hosts, use the explicit test backend: `make test OUTDIR=out/headless RAYLIB_PLATFORM=memory`.
+It renders in memory with null audio; OS resize/clipboard/device behavior remains
+a desktop check. Release packaging rejects the Memory backend.
 
 ### Quick Start
 
@@ -153,13 +156,13 @@ Useful docs routes:
 
 Browse [published releases](https://github.com/jonathanperis/super-mango-editor/releases) and check each release's asset list. Older releases predate the current builder packaging; use `make builder` for the current editor and learning labs. The website tracks successful `main` builds independently of tagged releases.
 
-Releases built by the current workflow (a `v*` tag or manual dispatch on `main`) contain native builder archives with both `super-mango` and `super-mango-editor`, playable assets, campaign/lab levels, and third-party notices. Run from the extracted folder. Linux/macOS need compatible SDL2 runtimes; Linux dialogs also need zenity. Windows bundles runtime DLLs and available package notices. `unused/` assets stay in the source checkout. WebAssembly archives contain both normal/debug HTML/JS/WASM/data outputs; serve them with a static HTTP server. Build with `make web`, then package those verified outputs with `make dist-wasm`.
+Releases built by the current workflow (a `v*` tag or manual dispatch on `main`) contain native builder archives with both `super-mango` and `super-mango-editor`, playable assets, campaign/lab levels, and third-party notices. Run from the extracted folder. raylib is linked statically; native OS graphics/audio support remains required. Linux dialogs need zenity. Windows bundles both executables' required non-system runtime DLLs and available package notices. `unused/` assets stay in the source checkout. WebAssembly archives contain both normal/debug HTML/JS/WASM/data outputs; serve them with a static HTTP server. Build with `make web`, then package those verified outputs with `make dist-wasm`.
 
 ## Project Structure
 
 ```
 super-mango-editor/
-├── Makefile                          Build system (clang, sdl2-config, ad-hoc codesign)
+├── Makefile                          Application build, pinned raylib bootstrap, ad-hoc codesign
 ├── levels/                           TOML level definitions
 │   ├── labs/                        Six focused learning levels
 │   ├── 00_sandbox_01.toml           Creator's Playground; first campaign level
@@ -167,7 +170,7 @@ super-mango-editor/
 │   ├── 02_lugio_02.toml             Level data loaded at runtime
 │   └── campaigns/main.toml           v1 ordered campaign manifest for the native selector
 ├── src/                              C source files and headers
-│   ├── main.c                        Entry point: SDL init/teardown
+│   ├── main.c                        CLI entry point; AppSession owns raylib lifetime
 │   ├── game.h                        Shared GameState/constants declarations
 │   ├── collectibles/                  Pickup items
 │   │   ├── coin.h / .c               Coin (100 pts; bonus life at score threshold)
@@ -210,7 +213,7 @@ super-mango-editor/
 │   │   ├── circular_saw.h / .c       Rotating saw
 │   │   ├── axe_trap.h / .c           Swinging axe
 │   │   └── blue_flame.h / .c         Blue flame / fire flame
-│   ├── input/                         SDL keyboard/gamepad events, browser input bridge, deterministic replay injection
+│   ├── input/                         raylib device sampling, semantic commands, browser bridge and replay injection
 │   ├── levels/                        Level system
 │   │   ├── level.h                    Shared level definitions (LevelDef struct)
 │   │   ├── level_loader.h / .c       TOML level loading and switching
@@ -290,7 +293,7 @@ Four GitHub Actions workflows:
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ and GitHub Actions security-and-quality analysis |
 | Deploy Pages | `deploy.yml` | Successful same-repository main push/manual Build & Release run | Builds/checks docs at the artifact's commit, copies matching WebAssembly files and deploys Pages |
 
-The native matrix runs game/editor builds, tests, dummy-SDL smoke and archive packaging. Additional checks include sanitizers and scripted replay smoke on Linux, plus `make validate-levels` on Linux/macOS. The WebAssembly leg builds and checks normal/debug artifacts and their archive. Releases upload assets to a draft before publishing it. The Docs path filter includes `docs/`, public root documents, source, levels, assets, tooling and workflows. The Deploy Pages workflow publishes the verified Astro output plus matching WebAssembly artifacts.
+The native matrix builds desktop game/editor binaries and archives. Linux runs GLFW tests/rendered smoke with a virtual display and audio sink; macOS/Windows run the same logical/resource suite and rendered smoke using a separate Memory test build. Additional checks include desktop sanitizers and scripted replay smoke on Linux, plus `make validate-levels` on Linux/macOS. The WebAssembly leg builds and checks normal/debug artifacts and their archive. Releases upload assets to a draft before publishing it. Docs and Pages gates validate the matching source/content and WebAssembly artifacts.
 
 ## License
 

@@ -6,7 +6,7 @@
  * they never fall or crumble — they are purely static hazards.
  */
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 #include <stdio.h>
 
 #include "spike.h"
@@ -48,7 +48,7 @@ void spike_rows_init(SpikeRow *rows, int *count) {
  * independently at sequential x positions, sharing the same texture.
  */
 void spike_rows_render(const SpikeRow *rows, int count,
-                       SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                       Texture2D *tex, int cam_x) {
     if (!tex) return;
 
     for (int i = 0; i < count; i++) {
@@ -67,13 +67,13 @@ void spike_rows_render(const SpikeRow *rows, int count,
              * dst — destination on screen.
              * NULL source rect = use the entire 16×16 texture.
              */
-            SDL_Rect dst = {
+            IntRect dst = {
                 .x = screen_x,
                 .y = ty,
                 .w = SPIKE_TILE_W,
                 .h = SPIKE_TILE_H,
             };
-            SDL_RenderCopy(renderer, tex, NULL, &dst);
+            sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
         }
     }
 }
@@ -83,8 +83,8 @@ void spike_rows_render(const SpikeRow *rows, int count,
 /*
  * spike_row_get_rect — Return the full bounding rect of the row.
  */
-SDL_Rect spike_row_get_rect(const SpikeRow *row) {
-    SDL_Rect r = {
+IntRect spike_row_get_rect(const SpikeRow *row) {
+    IntRect r = {
         .x = (int)row->x,
         .y = (int)row->y,
         .w = row->count * SPIKE_TILE_W,
@@ -100,8 +100,8 @@ SDL_Rect spike_row_get_rect(const SpikeRow *row) {
  *
  * Uses a simple AABB overlap against the full row bounding rectangle.
  */
-int spike_row_hit_test(const SpikeRow *row, const SDL_Rect *prect) {
+int spike_row_hit_test(const SpikeRow *row, const IntRect *prect) {
     if (!row->active) return 0;
-    SDL_Rect rr = spike_row_get_rect(row);
-    return SDL_HasIntersection(prect, &rr);
+    IntRect rr = spike_row_get_rect(row);
+    return rect_intersects(prect, &rr);
 }

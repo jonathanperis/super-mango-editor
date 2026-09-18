@@ -6,7 +6,7 @@
 
 #include "../player/player.h"
 
-#include <SDL.h>
+#include "input_backend.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -16,69 +16,62 @@
 
 #define MAX_REPLAY_EVENTS 4096
 
-static SDL_Keycode replay_keycode(const char *name)
+static int replay_keycode(const char *name)
 {
-    if (strcmp(name, "left") == 0 || strcmp(name, "a") == 0) return SDLK_LEFT;
-    if (strcmp(name, "right") == 0 || strcmp(name, "d") == 0) return SDLK_RIGHT;
-    if (strcmp(name, "up") == 0 || strcmp(name, "w") == 0) return SDLK_UP;
-    if (strcmp(name, "down") == 0 || strcmp(name, "s") == 0) return SDLK_DOWN;
-    if (strcmp(name, "space") == 0 || strcmp(name, "jump") == 0) return SDLK_SPACE;
-    if (strcmp(name, "enter") == 0 || strcmp(name, "return") == 0) return SDLK_RETURN;
-    if (strcmp(name, "escape") == 0 || strcmp(name, "esc") == 0) return SDLK_ESCAPE;
-    if (strcmp(name, "shift") == 0 || strcmp(name, "run") == 0) return SDLK_LSHIFT;
-    return SDLK_UNKNOWN;
+    if (strcmp(name, "left") == 0 || strcmp(name, "a") == 0) return KEY_LEFT;
+    if (strcmp(name, "right") == 0 || strcmp(name, "d") == 0) return KEY_RIGHT;
+    if (strcmp(name, "up") == 0 || strcmp(name, "w") == 0) return KEY_UP;
+    if (strcmp(name, "down") == 0 || strcmp(name, "s") == 0) return KEY_DOWN;
+    if (strcmp(name, "space") == 0 || strcmp(name, "jump") == 0) return KEY_SPACE;
+    if (strcmp(name, "enter") == 0 || strcmp(name, "return") == 0) return KEY_ENTER;
+    if (strcmp(name, "escape") == 0 || strcmp(name, "esc") == 0) return KEY_ESCAPE;
+    if (strcmp(name, "shift") == 0 || strcmp(name, "run") == 0) return KEY_LEFT_SHIFT;
+    return KEY_NULL;
 }
 
-static unsigned int replay_input_bit(SDL_Keycode key)
+static unsigned int replay_input_bit(int key)
 {
     switch (key) {
-    case SDLK_LEFT:
+    case KEY_LEFT:
         return PLAYER_INPUT_LEFT;
-    case SDLK_RIGHT:
+    case KEY_RIGHT:
         return PLAYER_INPUT_RIGHT;
-    case SDLK_UP:
+    case KEY_UP:
         return PLAYER_INPUT_UP;
-    case SDLK_DOWN:
+    case KEY_DOWN:
         return PLAYER_INPUT_DOWN;
-    case SDLK_SPACE:
+    case KEY_SPACE:
         return PLAYER_INPUT_JUMP;
-    case SDLK_LSHIFT:
+    case KEY_LEFT_SHIFT:
         return PLAYER_INPUT_RUN;
     default:
         return 0;
     }
 }
 
-static void push_key(SDL_Keycode key, Uint32 type)
+static void push_key(int key, InputKind type)
 {
-    SDL_Event event;
-    memset(&event, 0, sizeof(event));
-    event.type = type;
-    event.key.type = type;
-    event.key.state = (type == SDL_KEYDOWN) ? SDL_PRESSED : SDL_RELEASED;
-    event.key.repeat = 0;
-    event.key.keysym.sym = key;
-    event.key.keysym.scancode = SDL_GetScancodeFromKey(key);
-    SDL_PushEvent(&event);
+    InputEvent event = {.type=type,.key=key,.binding=input_binding_from_key(key)};
+    input_push(&event);
 }
 
-static void apply_replay_action(GameState *gs, SDL_Keycode key, const char *action)
+static void apply_replay_action(GameState *gs, int key, const char *action)
 {
     const unsigned int bit = replay_input_bit(key);
 
     if (strcmp(action, "down") == 0 || strcmp(action, "press") == 0) {
         if (bit) gs->replay_held_mask |= bit;
-        push_key(key, SDL_KEYDOWN);
+        push_key(key, INPUT_KEY_DOWN);
     } else if (strcmp(action, "up") == 0 || strcmp(action, "release") == 0) {
         if (bit) {
             gs->replay_held_mask &= ~bit;
             gs->replay_input_mask &= ~bit;
         }
-        push_key(key, SDL_KEYUP);
+        push_key(key, INPUT_KEY_UP);
     } else if (strcmp(action, "tap") == 0) {
         if (bit) gs->replay_input_mask |= bit;
-        push_key(key, SDL_KEYDOWN);
-        push_key(key, SDL_KEYUP);
+        push_key(key, INPUT_KEY_DOWN);
+        push_key(key, INPUT_KEY_UP);
     }
 }
 
@@ -120,8 +113,8 @@ int game_replay_load(GameState *gs)
             !isspace((unsigned char)*end) ||
             sscanf(end, "%15s %31s %c", action, key_name, &extra) != 2 ||
             gs->replay_event_count >= MAX_REPLAY_EVENTS) goto invalid;
-        SDL_Keycode key = replay_keycode(key_name);
-        if (key == SDLK_UNKNOWN ||
+        int key = replay_keycode(key_name);
+        if (key == KEY_NULL ||
             (strcmp(action, "down") && strcmp(action, "press") &&
              strcmp(action, "up") && strcmp(action, "release") && strcmp(action, "tap"))) goto invalid;
         if (gs->replay_event_count && frame < gs->replay_events[gs->replay_event_count - 1].frame)

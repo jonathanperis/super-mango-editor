@@ -4,7 +4,7 @@
 
 ---
 
-All visual assets live in the `assets/` directory, organized into categorized subdirectories. Sprites are PNG files (loaded via `SDL2_image`), sounds are WAV files in `assets/sounds/`, and fonts are in `assets/fonts/`.
+All visual assets live in the `assets/` directory, organized into categorized subdirectories. Sprites are PNG files loaded by raylib, sounds are WAV files in `assets/sounds/`, and fonts are in `assets/fonts/`.
 
 ```
 assets/
@@ -31,7 +31,7 @@ assets/
     └── unused/             ← Reserve assets for future use
 ```
 
-> **Coordinate note:** All game objects use **logical space (400x300)**. SDL scales to the 800x600 OS window 2x. A 48x48 sprite appears as 96x96 physical pixels on screen.
+> **Coordinate note:** All game objects use **logical space (400x300)**. The raylib render target scales to the 800×600 OS window at 2×. A 48×48 sprite appears as 96×96 physical pixels on screen.
 
 ---
 
@@ -222,7 +222,7 @@ frame.y = ANIM_ROW[anim_state] * FRAME_H; // row x 48
 
 ### Horizontal Flipping
 
-When `player->facing_left == 1`, the sprite is drawn with `SDL_FLIP_HORIZONTAL` via `SDL_RenderCopyEx`. This means the same right-facing animation frames are used for both directions -- no duplicate assets needed.
+When `player->facing_left == 1`, `sprite_draw` uses `SPRITE_FLIP_X`, expressed as a negative source width in raylib's `DrawTexturePro`. The same right-facing animation frames serve both directions.
 
 ---
 
@@ -305,12 +305,12 @@ source_y = (frame_index / cols) * frame_h
 
 ```c
 // In game_init or an entity's init function:
-SDL_Texture *tex = IMG_LoadTexture(gs->renderer, "assets/sprites/collectibles/coin.png");
+Texture2D *tex = texture_load("assets/sprites/collectibles/coin.png");
 if (!tex) {
-    fprintf(stderr, "Failed to load coin.png: %s\n", IMG_GetError());
+    fprintf(stderr, "Failed to load assets/sprites/collectibles/coin.png\n");
     return -1;
 }
 
 // At cleanup (reverse init order):
-if (tex) { SDL_DestroyTexture(tex); tex = NULL; }
+texture_unload(tex); tex = NULL;
 ```

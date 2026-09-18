@@ -10,7 +10,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 #include "../surfaces/rail.h"  /* Rail — the block needs a pointer to its rail */
 #include "../player/player.h"  /* Player — for the push response signature     */
 
@@ -60,7 +60,7 @@
  *                    Applied in the direction OPPOSITE to the player's movement.
  * SPIKE_PUSH_VY    : extra upward component added regardless of movement direction.
  *                    Gives a small bounce-back feel even when the player is
- *                    moving horizontally.  Negative = upward in SDL screen-space.
+ *                    moving horizontally. Negative = upward in screen-space.
  */
 #define SPIKE_PUSH_SPEED  220.0f
 #define SPIKE_PUSH_VY    -150.0f
@@ -131,11 +131,11 @@ void spike_blocks_update(SpikeBlock *blocks, int count, float dt, int cam_x);
 
 /* Draw one block at its current world position. */
 void spike_block_render(const SpikeBlock *sb,
-                        SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                        Texture2D *tex, int cam_x);
 
 /* Draw all active blocks. */
 void spike_blocks_render(const SpikeBlock *blocks, int count,
-                         SDL_Renderer *renderer, SDL_Texture *tex, int cam_x);
+                         Texture2D *tex, int cam_x);
 
 /*
  * spike_block_get_hitbox — Return the collision rectangle in world space.
@@ -143,7 +143,7 @@ void spike_blocks_render(const SpikeBlock *blocks, int count,
  * The hitbox matches the display rect exactly (no inset), because the
  * spike art fills the full sprite frame.
  */
-SDL_Rect spike_block_get_hitbox(const SpikeBlock *sb);
+IntRect spike_block_get_hitbox(const SpikeBlock *sb);
 
 /*
  * spike_block_push_player — Apply push impulse to the player.

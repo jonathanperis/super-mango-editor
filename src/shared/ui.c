@@ -16,8 +16,7 @@
  * holds the in-progress text.  Only one field can be active at a time.
  */
 
-#include <SDL.h>       /* SDL_Renderer, SDL_SetRenderDrawColor, SDL_RenderFillRect */
-#include <SDL_ttf.h>   /* TTF_RenderText_Blended, TTF_SizeText                    */
+#include "platform.h"
 #include <stdio.h>     /* snprintf                                                 */
 #include <string.h>    /* strlen, strncpy, memset                                  */
 #include <stdlib.h>    /* strtol, strtof                                           */
@@ -34,22 +33,19 @@
 /*
  * draw_rect — Fill a rectangle with a solid colour.
  *
- * SDL_SetRenderDrawColor sets the colour for subsequent draw calls.
- * SDL_RenderFillRect draws a filled rectangle using that colour.
- * We wrap both into one call because every widget needs this combo.
+ * A font-less UI model can process edits without a graphics context.
  */
-static void draw_rect(SDL_Renderer *r, int x, int y, int w, int h,
-                       SDL_Color c);
+static void draw_rect(int x, int y, int w, int h, Color c);
 
 /*
  * draw_text — Render a single line of text at (x, y).
  *
  * Short labels reuse a bounded renderer-owned texture cache keyed by text
- * and color. Cache misses use TTF_RenderUTF8_Blended and upload once; long
+ * and color. Cache misses rasterize UTF-8 and upload once; long
  * strings use transient textures. ui_cleanup releases the retained textures.
  */
 static void draw_text(UIState *ui, int x, int y,
-                       const char *text, SDL_Color c);
+                       const char *text, Color c);
 
 /*
  * point_in_rect — Test whether point (px, py) lies inside a rectangle.
@@ -211,61 +207,43 @@ void ui_cancel_active_edit(UIState *ui)
 /* Helper implementations                                              */
 /* ------------------------------------------------------------------ */
 
-static void draw_rect(SDL_Renderer *r, int x, int y, int w, int h,
-                       SDL_Color c)
+static void draw_rect(int x, int y, int w, int h, Color c)
 {
-    /*
-     * SDL_SetRenderDrawColor — set the draw colour used by subsequent
-     * SDL_RenderFillRect / SDL_RenderDrawRect / SDL_RenderDrawLine calls.
-     * The four values are red, green, blue, alpha (0–255 each).
-     */
-    SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
-
-    /*
-     * SDL_RenderFillRect — fill a rectangle on the current render target.
-     * The SDL_Rect uses integer coordinates; positions are in logical space
-     * because SDL_RenderSetLogicalSize handles the scaling for us.
-     */
-    SDL_Rect rect = { x, y, w, h };
-    SDL_RenderFillRect(r, &rect);
+    if (IsWindowReady()) DrawRectangle(x, y, w, h, c);
 }
 
 static void draw_text(UIState *ui, int x, int y,
-                       const char *text, SDL_Color c)
+                       const char *text, Color c)
 {
-    if (!ui->font || !ui->renderer || !text || !text[0]) return;
+    if (!ui->font || !text || !text[0]) return;
     UITextCacheEntry *entry = NULL;
-    Uint32 color = (Uint32)c.r << 24 | (Uint32)c.g << 16 | (Uint32)c.b << 8 | c.a;
+    uint32_t color = (uint32_t)c.r << 24 | (uint32_t)c.g << 16 | (uint32_t)c.b << 8 | c.a;
     if (strlen(text) < UI_TEXT_CACHE_BYTES) {
         entry = &ui->text_cache[0];
         for (int i = 0; i < UI_TEXT_CACHE_COUNT; i++) {
             UITextCacheEntry *candidate = &ui->text_cache[i];
             if (candidate->texture && candidate->color == color && !strcmp(candidate->text, text)) {
                 candidate->used = ++ui->text_clock;
-                SDL_Rect dst = {x, y, candidate->w, candidate->h};
-                SDL_RenderCopy(ui->renderer, candidate->texture, NULL, &dst);
+                IntRect dst = {x, y, candidate->w, candidate->h};
+                sprite_draw(candidate->texture, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
                 return;
             }
             if (candidate->used < entry->used) entry = candidate;
         }
     }
-    /* UTF-8 is the encoding supplied by SDL_TEXTINPUT and native paths. */
-    SDL_Surface *surface = TTF_RenderUTF8_Blended(ui->font, text, c);
-    if (!surface) return;
-    SDL_Texture *texture = SDL_CreateTextureFromSurface(ui->renderer, surface);
-    SDL_Rect dst = {x, y, surface->w, surface->h};
-    SDL_FreeSurface(surface);
+    Texture2D *texture = font_texture(ui->font, text, c);
     if (!texture) return;
-    SDL_RenderCopy(ui->renderer, texture, NULL, &dst);
+    IntRect dst = {x, y, texture->width, texture->height};
+    sprite_draw(texture, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
     if (entry) {
-        if (entry->texture) SDL_DestroyTexture(entry->texture);
+        texture_unload(entry->texture);
         entry->texture = texture;
         memcpy(entry->text, text, strlen(text) + 1);
         entry->color = color;
         entry->used = ++ui->text_clock;
         entry->w = dst.w;
         entry->h = dst.h;
-    } else SDL_DestroyTexture(texture);
+    } else texture_unload(texture);
 }
 
 static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
@@ -279,22 +257,21 @@ static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
 /* ------------------------------------------------------------------ */
 
 /*
- * ui_init — Store the renderer and font; zero-initialise everything else.
+ * ui_init — Borrow the font; zero-initialise everything else.
  *
  * memset ensures all per-frame and retained fields start at zero/NULL.
- * Then we set the two persistent pointers that every widget call needs.
+ * The caller releases any previous cache before reinitializing.
  */
-void ui_init(UIState *ui, SDL_Renderer *renderer, TTF_Font *font)
+void ui_init(UIState *ui, TextFont *font)
 {
     memset(ui, 0, sizeof(*ui));
-    ui->renderer = renderer;
     ui->font     = font;
 }
 
 void ui_cleanup(UIState *ui)
 {
     for (int i = 0; i < UI_TEXT_CACHE_COUNT; i++) {
-        if (ui->text_cache[i].texture) SDL_DestroyTexture(ui->text_cache[i].texture);
+        texture_unload(ui->text_cache[i].texture);
         ui->text_cache[i] = (UITextCacheEntry){0};
     }
     ui->text_clock = 0;
@@ -305,7 +282,7 @@ void ui_cleanup(UIState *ui)
 /*
  * ui_begin_frame — Clear per-frame input so stale events don't linger.
  *
- * Called at the very start of each frame, BEFORE the SDL event loop.
+ * Called at the very start of each frame, BEFORE consuming input commands.
  * Only the per-frame flags are cleared; retained fields (active_id,
  * edit_buf, edit_cursor, dropdown_open_id) persist across frames.
  */
@@ -361,18 +338,18 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label)
     int hovered = point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
 
     /* Choose background colour based on hover state. */
-    SDL_Color bg = hovered ? UI_BTN_HOT : UI_BTN;
-    draw_rect(ui->renderer, x, y, w, h, bg);
+    Color bg = hovered ? UI_BTN_HOT : UI_BTN;
+    draw_rect(x, y, w, h, bg);
 
     /*
      * Centre the label text inside the button rectangle.
      *
-     * TTF_SizeText — measure the pixel width and height that this string
+     * Measure the pixel width and height that this string
      * would occupy when rendered with the given font.  We use the width
      * to compute a horizontal offset that centres the text.
      */
     int tw = 0, th = 0;
-    TTF_SizeUTF8(ui->font, label, &tw, &th);
+    font_measure(ui->font, label, &tw, &th);
     int tx = x + (w - tw) / 2;   /* horizontal centre */
     int ty = y + (h - th) / 2;   /* vertical centre   */
     draw_text(ui, tx, ty, label, UI_TEXT);
@@ -409,7 +386,7 @@ void ui_label(UIState *ui, int x, int y, const char *text)
  * colour for active selections).
  */
 void ui_label_color(UIState *ui, int x, int y, const char *text,
-                    SDL_Color color)
+                    Color color)
 {
     draw_text(ui, x, y, text, color);
 }
@@ -424,7 +401,8 @@ void ui_label_color(UIState *ui, int x, int y, const char *text,
  */
 void ui_panel(UIState *ui, int x, int y, int w, int h)
 {
-    draw_rect(ui->renderer, x, y, w, h, UI_BG);
+    (void)ui;
+    draw_rect(x, y, w, h, UI_BG);
 }
 
 /* ------------------------------------------------------------------ */
@@ -441,9 +419,9 @@ void ui_panel(UIState *ui, int x, int y, int w, int h)
  *        └────────────────────────────────────┘
  *
  * While active:
- *   - SDL_TEXTINPUT characters are appended if they are digits or '-'.
+ *   - Text-input characters are appended if they are digits or '-'.
  *   - Backspace deletes the last character.
- *   - A blinking cursor (using SDL_GetTicks) provides visual feedback.
+ *   - A monotonic-clock blinking cursor provides visual feedback.
  *
  * The field height is fixed at 20 logical pixels (fits the 13 px font
  * with some padding).
@@ -455,19 +433,16 @@ int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value)
     int changed   = 0;
 
     /* --- Background and border --- */
-    draw_rect(ui->renderer, x, y, w, h, UI_INPUT_BG);
+    draw_rect(x, y, w, h, UI_INPUT_BG);
 
     /*
      * Draw a 1-pixel border around the field.  The accent colour indicates
      * the active (editing) field; dim grey marks inactive fields.
      *
-     * SDL_RenderDrawRect — draw the outline of a rectangle (no fill).
+     * Only the outline is drawn; the field background stays intact.
      */
-    SDL_Color border = is_active ? UI_ACCENT : UI_TEXT_DIM;
-    SDL_SetRenderDrawColor(ui->renderer, border.r, border.g, border.b,
-                           border.a);
-    SDL_Rect outline = { x, y, w, h };
-    SDL_RenderDrawRect(ui->renderer, &outline);
+    Color border = is_active ? UI_ACCENT : UI_TEXT_DIM;
+    if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
 
     /* --- Activation on click --- */
     if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
@@ -495,8 +470,8 @@ int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value)
     /* --- Keyboard handling while active --- */
     if (is_active) {
         /*
-         * Append typed text.  SDL_TEXTINPUT events deliver actual characters
-         * (respecting the OS keyboard layout and IME), unlike SDL_KEYDOWN
+         * Append typed text. Text events deliver actual characters
+         * (respecting the OS keyboard layout), unlike key-down commands
          * which gives raw key codes.  We only accept digits (0-9) and the
          * minus sign for negative numbers.
          */
@@ -532,12 +507,12 @@ int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value)
         /*
          * Active: show the edit buffer with a blinking cursor.
          *
-         * SDL_GetTicks returns milliseconds since SDL_Init.  By dividing
+         * The monotonic clock returns milliseconds. By dividing
          * by 500 and checking odd/even we get a half-second blink rate.
          * The cursor is drawn as a "|" appended to the display string.
          */
         char display[80];
-        int blink = (SDL_GetTicks() / 500) % 2;  /* 0 or 1 every 500 ms */
+        int blink = (int)((clock_millis() / 500) % 2);
         snprintf(display, sizeof(display), "%s%s",
                  ui->edit_buf, blink ? "|" : "");
         draw_text(ui, x + 4, y + 3, display, UI_TEXT);
@@ -568,13 +543,10 @@ int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value)
     int changed   = 0;
 
     /* --- Background and border --- */
-    draw_rect(ui->renderer, x, y, w, h, UI_INPUT_BG);
+    draw_rect(x, y, w, h, UI_INPUT_BG);
 
-    SDL_Color border = is_active ? UI_ACCENT : UI_TEXT_DIM;
-    SDL_SetRenderDrawColor(ui->renderer, border.r, border.g, border.b,
-                           border.a);
-    SDL_Rect outline = { x, y, w, h };
-    SDL_RenderDrawRect(ui->renderer, &outline);
+    Color border = is_active ? UI_ACCENT : UI_TEXT_DIM;
+    if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
 
     /* --- Activation on click --- */
     if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
@@ -624,7 +596,7 @@ int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value)
     /* --- Draw display text --- */
     if (is_active) {
         char display[80];
-        int blink = (SDL_GetTicks() / 500) % 2;
+        int blink = (int)((clock_millis() / 500) % 2);
         size_t length = strlen(ui->edit_buf);
         const char *visible = ui->edit_buf + (length > sizeof(display)-2 ? length-(sizeof(display)-2) : 0);
         while (((unsigned char)*visible & 0xc0) == 0x80) visible++;
@@ -664,13 +636,10 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
     int changed   = 0;
 
     /* --- Background and border --- */
-    draw_rect(ui->renderer, x, y, w, h, UI_INPUT_BG);
+    draw_rect(x, y, w, h, UI_INPUT_BG);
 
-    SDL_Color border = is_active ? UI_ACCENT : UI_TEXT_DIM;
-    SDL_SetRenderDrawColor(ui->renderer, border.r, border.g, border.b,
-                           border.a);
-    SDL_Rect outline = { x, y, w, h };
-    SDL_RenderDrawRect(ui->renderer, &outline);
+    Color border = is_active ? UI_ACCENT : UI_TEXT_DIM;
+    if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
 
     /* --- Activation on click --- */
     if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
@@ -736,7 +705,7 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
     /* --- Draw display text --- */
     if (is_active) {
         char display[80];
-        int blink = (SDL_GetTicks() / 500) % 2;
+        int blink = (int)((clock_millis() / 500) % 2);
         snprintf(display, sizeof(display), "%s%s",
                  ui->edit_buf, blink ? "|" : "");
         draw_text(ui, x + 4, y + 3, display, UI_TEXT);
@@ -781,8 +750,8 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
     /* --- Draw the header (always visible) --- */
     int hovered_header = point_in_rect(ui->mouse_x, ui->mouse_y,
                                        x, y, w, h);
-    SDL_Color header_bg = hovered_header ? UI_BTN_HOT : UI_BTN;
-    draw_rect(ui->renderer, x, y, w, h, header_bg);
+    Color header_bg = hovered_header ? UI_BTN_HOT : UI_BTN;
+    draw_rect(x, y, w, h, header_bg);
 
     /* Show the currently selected option text (or "---" if out of range). */
     const char *current = (*selected >= 0 && *selected < count)
@@ -828,7 +797,7 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
                                             x, oy, w, h);
 
             /* Highlight: accent colour for the selected item, hot for hover. */
-            SDL_Color opt_bg;
+            Color opt_bg;
             if (i == *selected) {
                 opt_bg = UI_BTN_ACTIVE;
             } else if (hovered_opt) {
@@ -836,7 +805,7 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
             } else {
                 opt_bg = UI_BTN;
             }
-            draw_rect(ui->renderer, x, oy, w, h, opt_bg);
+            draw_rect(x, oy, w, h, opt_bg);
             draw_text(ui, x + 4, oy + 3,
                       options[i], UI_TEXT);
 
@@ -884,14 +853,8 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
  */
 void ui_separator(UIState *ui, int x, int y, int w)
 {
-    SDL_Color c = UI_TEXT_DIM;
-    SDL_SetRenderDrawColor(ui->renderer, c.r, c.g, c.b, c.a);
-
-    /*
-     * SDL_RenderDrawLine — draw a single-pixel line between two points.
-     * Both endpoints are in logical coordinates.
-     */
-    SDL_RenderDrawLine(ui->renderer, x, y, x + w, y);
+    (void)ui;
+    if (IsWindowReady()) DrawLine(x, y, x + w, y, UI_TEXT_DIM);
 }
 
 /* ------------------------------------------------------------------ */
@@ -899,13 +862,13 @@ void ui_separator(UIState *ui, int x, int y, int w)
 /*
  * ui_text_width — Return the rendered pixel width of a string in the UI font.
  *
- * Uses TTF_SizeText to measure without actually drawing anything.
+ * Measures glyph advances without drawing anything.
  * Returns 0 if the font is NULL or the string is empty.
  */
 int ui_text_width(UIState *ui, const char *text)
 {
     if (!ui->font || !text || text[0] == '\0') return 0;
     int w = 0;
-    TTF_SizeUTF8(ui->font, text, &w, NULL);
+    font_measure(ui->font, text, &w, NULL);
     return w;
 }

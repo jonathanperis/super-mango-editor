@@ -31,7 +31,7 @@
 #include "../collectibles/star_green.h"
 #include "../collectibles/star_red.h"
 
-#include <SDL_mixer.h>  /* Mix_PlayChannel for collectible sounds */
+#include "../shared/audio.h"
 
 /* A life loss replaces entities and the player position. End this pass so no
  * remaining collision uses the hitbox sampled before that replacement. */
@@ -51,8 +51,8 @@ static int damage_ends_pass(GameState *gs, float source_x, float source_y)
  */
 #define COLLIDE_DAMAGE(arr, count, get_hitbox_fn, name) \
     for (int i = 0; i < (count) && gs->player.hurt_timer == 0.0f; i++) { \
-        SDL_Rect ehit = get_hitbox_fn(&(arr)[i]); \
-        if (SDL_HasIntersection(&phit, &ehit)) { \
+        IntRect ehit = get_hitbox_fn(&(arr)[i]); \
+        if (rect_intersects(&phit, &ehit)) { \
             if (gs->debug_mode) debug_log(&gs->debug, "HIT %s[%d]", name, i); \
             float sx = ehit.x + ehit.w * 0.5f; \
             float sy = ehit.y + ehit.h * 0.5f; \
@@ -67,8 +67,8 @@ static int damage_ends_pass(GameState *gs, float source_x, float source_y)
 #define COLLIDE_DAMAGE_ACTIVE(arr, count, get_hitbox_fn, name) \
     for (int i = 0; i < (count) && gs->player.hurt_timer == 0.0f; i++) { \
         if (!(arr)[i].active) continue; \
-        SDL_Rect ehit = get_hitbox_fn(&(arr)[i]); \
-        if (SDL_HasIntersection(&phit, &ehit)) { \
+        IntRect ehit = get_hitbox_fn(&(arr)[i]); \
+        if (rect_intersects(&phit, &ehit)) { \
             if (gs->debug_mode) debug_log(&gs->debug, "HIT %s[%d]", name, i); \
             float sx = ehit.x + ehit.w * 0.5f; \
             float sy = ehit.y + ehit.h * 0.5f; \
@@ -81,9 +81,9 @@ static int damage_ends_pass(GameState *gs, float source_x, float source_y)
 /* Hitbox builders                                                    */
 /* ------------------------------------------------------------------ */
 
-SDL_Rect spider_build_hitbox(const Spider *s)
+IntRect spider_build_hitbox(const Spider *s)
 {
-    return (SDL_Rect){
+    return (IntRect){
         (int)s->x + SPIDER_ART_X,
         FLOOR_Y - SPIDER_ART_H,
         SPIDER_ART_W,
@@ -91,9 +91,9 @@ SDL_Rect spider_build_hitbox(const Spider *s)
     };
 }
 
-SDL_Rect jumping_spider_build_hitbox(const JumpingSpider *js)
+IntRect jumping_spider_build_hitbox(const JumpingSpider *js)
 {
-    return (SDL_Rect){
+    return (IntRect){
         (int)js->x + JSPIDER_ART_X,
         FLOOR_Y - JSPIDER_ART_H + (int)js->y,
         JSPIDER_ART_W,
@@ -115,12 +115,12 @@ void game_collide(GameState *gs, float dt)
             gs->player.hurt_timer = 0.0f;
     }
 
-    SDL_Rect phit = player_get_hitbox(&gs->player);
+    IntRect phit = player_get_hitbox(&gs->player);
 
     /* ---- Enemy collisions ---------------------------------------- */
     for (int i = 0; i < gs->spider_count && gs->player.hurt_timer == 0.0f; i++) {
-        SDL_Rect shit = spider_build_hitbox(&gs->spiders[i]);
-        if (SDL_HasIntersection(&phit, &shit)) {
+        IntRect shit = spider_build_hitbox(&gs->spiders[i]);
+        if (rect_intersects(&phit, &shit)) {
             if (gs->debug_mode) debug_log(&gs->debug, "HIT spider[%d]", i);
             float sx = shit.x + shit.w * 0.5f;
             float sy = shit.y + shit.h * 0.5f;
@@ -129,8 +129,8 @@ void game_collide(GameState *gs, float dt)
     }
 
     for (int i = 0; i < gs->jumping_spider_count && gs->player.hurt_timer == 0.0f; i++) {
-        SDL_Rect jhit = jumping_spider_build_hitbox(&gs->jumping_spiders[i]);
-        if (SDL_HasIntersection(&phit, &jhit)) {
+        IntRect jhit = jumping_spider_build_hitbox(&gs->jumping_spiders[i]);
+        if (rect_intersects(&phit, &jhit)) {
             if (gs->debug_mode) debug_log(&gs->debug, "HIT jspider[%d]", i);
             float sx = jhit.x + jhit.w * 0.5f;
             float sy = jhit.y + jhit.h * 0.5f;
@@ -154,9 +154,9 @@ void game_collide(GameState *gs, float dt)
             if (!gs->spike_rows[i].active) continue;
             for (int t = 0; t < gs->spike_rows[i].count; t++) {
                 int tx = (int)gs->spike_rows[i].x + t * SPIKE_TILE_W;
-                SDL_Rect stile = { tx, (int)gs->spike_rows[i].y,
+                IntRect stile = { tx, (int)gs->spike_rows[i].y,
                                    SPIKE_TILE_W, SPIKE_TILE_H };
-                if (SDL_HasIntersection(&phit, &stile)) {
+                if (rect_intersects(&phit, &stile)) {
                     if (gs->debug_mode) debug_log(&gs->debug, "HIT spike[%d]", i);
                     float sx = stile.x + stile.w * 0.5f;
                     float sy = stile.y + stile.h * 0.5f;
@@ -172,7 +172,7 @@ void game_collide(GameState *gs, float dt)
      *
      * The inline hitbox (y = sp->y, h = SPIKE_PLAT_SRC_H) placed the top edge
      * exactly at sp->y.  When the player stands on top, the physics engine snaps
-     * their bottom to sp->y as well, so SDL_HasIntersection's strict less-than
+     * their bottom to sp->y as well, so the intersection's strict less-than
      * test evaluates phit.bottom > sphit.top as sp->y > sp->y — false — and no
      * damage fires.  spike_platform_get_rect() extends the hitbox 2 px upward
      * (y = sp->y - 2) so the standing player's hitbox always overlaps, making
@@ -181,8 +181,8 @@ void game_collide(GameState *gs, float dt)
     if (gs->player.hurt_timer == 0.0f) {
         for (int i = 0; i < gs->spike_platform_count; i++) {
             if (!gs->spike_platforms[i].active) continue;
-            SDL_Rect sphit = spike_platform_get_rect(&gs->spike_platforms[i]);
-            if (SDL_HasIntersection(&phit, &sphit)) {
+            IntRect sphit = spike_platform_get_rect(&gs->spike_platforms[i]);
+            if (rect_intersects(&phit, &sphit)) {
                 if (gs->debug_mode) debug_log(&gs->debug, "HIT spike_platform[%d]", i);
                 float sx = sphit.x + sphit.w * 0.5f;
                 float sy = sphit.y + sphit.h * 0.5f;
@@ -197,8 +197,8 @@ void game_collide(GameState *gs, float dt)
         for (int i = 0; i < gs->blue_flame_count; i++) {
             if (!gs->blue_flames[i].active) continue;
             if (gs->blue_flames[i].state == BLUE_FLAME_WAITING) continue;
-            SDL_Rect bfhit = blue_flame_get_hitbox(&gs->blue_flames[i]);
-            if (SDL_HasIntersection(&phit, &bfhit)) {
+            IntRect bfhit = blue_flame_get_hitbox(&gs->blue_flames[i]);
+            if (rect_intersects(&phit, &bfhit)) {
                 if (gs->debug_mode) debug_log(&gs->debug, "HIT blue_flame[%d]", i);
                 float sx = bfhit.x + bfhit.w * 0.5f;
                 float sy = bfhit.y + bfhit.h * 0.5f;
@@ -213,8 +213,8 @@ void game_collide(GameState *gs, float dt)
         for (int i = 0; i < gs->fire_flame_count; i++) {
             if (!gs->fire_flames[i].active) continue;
             if (gs->fire_flames[i].state == BLUE_FLAME_WAITING) continue;
-            SDL_Rect ffhit = blue_flame_get_hitbox(&gs->fire_flames[i]);
-            if (SDL_HasIntersection(&phit, &ffhit)) {
+            IntRect ffhit = blue_flame_get_hitbox(&gs->fire_flames[i]);
+            if (rect_intersects(&phit, &ffhit)) {
                 if (gs->debug_mode) debug_log(&gs->debug, "HIT fire_flame[%d]", i);
                 float sx = ffhit.x + ffhit.w * 0.5f;
                 float sy = ffhit.y + ffhit.h * 0.5f;
@@ -228,14 +228,14 @@ void game_collide(GameState *gs, float dt)
     /* Coins — add score, possible bonus life */
     for (int i = 0; i < gs->coin_count; i++) {
         if (!gs->coins[i].active) continue;
-        SDL_Rect cbox = {
+        IntRect cbox = {
             (int)gs->coins[i].x, (int)gs->coins[i].y,
             COIN_DISPLAY_W, COIN_DISPLAY_H
         };
-        if (SDL_HasIntersection(&phit, &cbox)) {
+        if (rect_intersects(&phit, &cbox)) {
             gs->coins[i].active = 0;
             game_award_score(gs, gs->rules.coin_score);
-            if (gs->audio.coin) Mix_PlayChannel(-1, gs->audio.coin, 0);
+            sound_play(gs->audio.coin, 128);
             if (gs->debug_mode) debug_log(&gs->debug, "COIN[%d] collected", i);
         }
     }
@@ -243,53 +243,53 @@ void game_collide(GameState *gs, float dt)
     /* Stars — restore health, same pattern for all colors */
     for (int i = 0; i < gs->star_yellow_count; i++) {
         if (!gs->star_yellows[i].active) continue;
-        SDL_Rect sbox = {
+        IntRect sbox = {
             (int)gs->star_yellows[i].x, (int)gs->star_yellows[i].y,
             STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
         };
-        if (SDL_HasIntersection(&phit, &sbox)) {
+        if (rect_intersects(&phit, &sbox)) {
             gs->star_yellows[i].active = 0;
             if (gs->hearts < MAX_HEARTS) gs->hearts++;
-            if (gs->audio.coin) Mix_PlayChannel(-1, gs->audio.coin, 0);
+            sound_play(gs->audio.coin, 128);
             if (gs->debug_mode) debug_log(&gs->debug, "STAR_YELLOW[%d] collected", i);
         }
     }
 
     for (int i = 0; i < gs->star_green_count; i++) {
         if (!gs->star_greens[i].active) continue;
-        SDL_Rect sbox = {
+        IntRect sbox = {
             (int)gs->star_greens[i].x, (int)gs->star_greens[i].y,
             STAR_GREEN_DISPLAY_W, STAR_GREEN_DISPLAY_H
         };
-        if (SDL_HasIntersection(&phit, &sbox)) {
+        if (rect_intersects(&phit, &sbox)) {
             gs->star_greens[i].active = 0;
             if (gs->hearts < MAX_HEARTS) gs->hearts++;
-            if (gs->audio.coin) Mix_PlayChannel(-1, gs->audio.coin, 0);
+            sound_play(gs->audio.coin, 128);
             if (gs->debug_mode) debug_log(&gs->debug, "STAR_GREEN[%d] collected", i);
         }
     }
 
     for (int i = 0; i < gs->star_red_count; i++) {
         if (!gs->star_reds[i].active) continue;
-        SDL_Rect sbox = {
+        IntRect sbox = {
             (int)gs->star_reds[i].x, (int)gs->star_reds[i].y,
             STAR_RED_DISPLAY_W, STAR_RED_DISPLAY_H
         };
-        if (SDL_HasIntersection(&phit, &sbox)) {
+        if (rect_intersects(&phit, &sbox)) {
             gs->star_reds[i].active = 0;
             if (gs->hearts < MAX_HEARTS) gs->hearts++;
-            if (gs->audio.coin) Mix_PlayChannel(-1, gs->audio.coin, 0);
+            sound_play(gs->audio.coin, 128);
             if (gs->debug_mode) debug_log(&gs->debug, "STAR_RED[%d] collected", i);
         }
     }
 
     /* Last star — triggers phase transition or level completion */
     if (gs->last_star.active) {
-        SDL_Rect lsbox = last_star_get_hitbox(&gs->last_star);
-        if (SDL_HasIntersection(&phit, &lsbox)) {
+        IntRect lsbox = last_star_get_hitbox(&gs->last_star);
+        if (rect_intersects(&phit, &lsbox)) {
             gs->last_star.active = 0;
             gs->last_star.collected = 1;
-            if (gs->audio.coin) Mix_PlayChannel(-1, gs->audio.coin, 0);
+            sound_play(gs->audio.coin, 128);
             if (gs->debug_mode) debug_log(&gs->debug, "LAST STAR collected");
             
             game_complete_level(gs);

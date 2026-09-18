@@ -1,13 +1,13 @@
 /*
- * game_window.h — SDL window and renderer lifecycle helpers.
+ * game_window.h — Screen-owned raylib render-target lifecycle.
  */
 
 #pragma once
 
 #include "../game.h"
 
-/* Create the game window and renderer, then set the logical canvas size. */
+/* Create the logical canvas in the AppSession-owned graphics context. */
 int game_window_init(GameState *gs);
 
-/* Destroy renderer and window resources owned by GameState. */
+/* Release the logical canvas owned by GameState. */
 void game_window_cleanup(GameState *gs);

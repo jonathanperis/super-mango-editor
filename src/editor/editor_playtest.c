@@ -4,7 +4,6 @@
 
 #include "editor_playtest.h"
 
-#include <SDL.h>       /* SDL_SetWindowTitle */
 #include <stdio.h>     /* fprintf, snprintf, stderr */
 #include <string.h>    /* memset */
 
@@ -17,6 +16,9 @@
 #include <errno.h>     /* errno */
 #include <stdlib.h>   /* malloc, free */
 #include <stdint.h>    /* intptr_t */
+#define WIN32_LEAN_AND_MEAN
+#define NOGDI
+#define NOUSER
 #include <windows.h>   /* CreateProcessW, HANDLE */
 #endif
 
@@ -26,15 +28,15 @@
 
 int editor_playtest_binary_path(char *path, size_t size)
 {
-    char *base = SDL_GetBasePath();
-    if (!base || !path || size == 0) { SDL_free(base); return -1; }
+    char *base = application_path();
+    if (!base || !path || size == 0) { free(base); return -1; }
 #ifdef _WIN32
     const char *suffix = ".exe";
 #else
     const char *suffix = "";
 #endif
     int length = snprintf(path, size, "%ssuper-mango%s", base, suffix);
-    SDL_free(base);
+    free(base);
     if (length < 0 || (size_t)length >= size) { path[0] = '\0'; return -1; }
     return 0;
 }
@@ -78,7 +80,7 @@ void editor_play_test(EditorState *es)
         es->play_pid = (int)pid;
         es->playing = 1;
         editor_set_status(es, "Play launched %s", save_path);
-        SDL_SetWindowTitle(es->window, "Super Mango Editor - Playing...");
+        SetWindowTitle("Super Mango Editor - Playing...");
     } else {
         fprintf(stderr, "Play: fork() failed\n");
         editor_retire_playtest_level(es);
@@ -120,7 +122,7 @@ void editor_play_test(EditorState *es)
     }
     es->playing = 1;
     editor_set_status(es, "Play launched %s", save_path);
-    SDL_SetWindowTitle(es->window, "Super Mango Editor - Playing...");
+    SetWindowTitle("Super Mango Editor - Playing...");
 #endif
 }
 

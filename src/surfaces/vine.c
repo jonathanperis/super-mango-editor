@@ -19,7 +19,7 @@
  *   Medium pillar (top y=172): 3 tiles — covers 172 → 268 (96 px / 32)
  *   Tall   pillar (top y=124): 4 tiles — covers 124 → 268 (144 px / 32)
  *
- * The sprite is rendered with SDL_FLIP_VERTICAL so the plant's base
+ * The sprite is rendered flipped vertically so the plant's base
  * (thicker, root end) attaches to the platform and the leafy tip
  * hangs toward the ground, matching the classic hanging-vine look.
  */
@@ -82,8 +82,7 @@ void vine_init(VineDecor *vines, int *count)
 /* ------------------------------------------------------------------ */
 
 void vine_render(const VineDecor *vines, int count,
-                 SDL_Renderer *renderer,
-                 SDL_Texture *green_tex, SDL_Texture *brown_tex,
+                 Texture2D *green_tex, Texture2D *brown_tex,
                  int cam_x)
 {
     for (int i = 0; i < count; i++) {
@@ -94,7 +93,7 @@ void vine_render(const VineDecor *vines, int count,
         if (screen_x + VINE_W < 0 || screen_x >= GAME_W) continue;
 
         /* Select texture by vine type — green for lush, brown for arid */
-        SDL_Texture *tex = (v->type == VINE_BROWN) ? brown_tex : green_tex;
+        Texture2D *tex = (v->type == VINE_BROWN) ? brown_tex : green_tex;
         if (!tex) continue;
 
         for (int t = 0; t < v->tile_count; t++) {
@@ -104,19 +103,18 @@ void vine_render(const VineDecor *vines, int count,
             /* Safety guard — tiles always stay within world bounds */
             if (tile_y >= FLOOR_Y) break;
 
-            SDL_Rect src = { 0, VINE_SRC_Y, VINE_W, VINE_SRC_H };
-            SDL_Rect dst = { screen_x, tile_y, VINE_W, VINE_H };
+            IntRect src = { 0, VINE_SRC_Y, VINE_W, VINE_SRC_H };
+            IntRect dst = { screen_x, tile_y, VINE_W, VINE_H };
 
             /*
-             * SDL_FLIP_VERTICAL — render the sprite upside-down.
+             * Render the sprite upside-down.
              * The Vine.png has its root/base at the bottom (upright plant).
              * Flipping puts the base at the TOP so it visually attaches to
              * the platform surface, while the leafy tip hangs downward.
              * src crops the 8 px transparent rows at top and bottom of the
              * sprite so tiles stack flush with no visible gap.
              */
-            SDL_RenderCopyEx(renderer, tex, &src, &dst,
-                             0.0, NULL, SDL_FLIP_VERTICAL);
+            sprite_draw(tex, &src, &dst, 0, SPRITE_FLIP_Y, WHITE);
         }
     }
 }

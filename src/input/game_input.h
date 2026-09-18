@@ -1,7 +1,7 @@
 /*
  * game_input.h — Input system public interface.
  *
- * Handles background gamepad initialization and input-related utilities.
+ * Converts sampled device state into gameplay action masks.
  */
 #pragma once
 
@@ -16,18 +16,17 @@ typedef struct {
     unsigned int controller_mask;
 } GameInputPhysicalState;
 
-/* AppSession owns subsystem initialization. These helpers only open/close handles. */
-void game_input_set_controller_init_pending(GameState *gs, int pending);
+/* The window owns device polling. GameState retains the selected device index. */
 void gamepad_refresh_controller(GameState *gs);
 void gamepad_close_controller(GameState *gs);
 
-/* Read physical controls without consuming SDL events. */
-void game_input_read_physical(SDL_GameController *controller,
+/* Read physical controls without consuming queued commands. */
+void game_input_read_physical(int controller,
                               GameInputPhysicalState *state);
-void game_input_read_bound(SDL_GameController *controller, const GameSettings *settings,
+void game_input_read_bound(int controller, const GameSettings *settings,
                             GameInputPhysicalState *state);
-unsigned int game_input_keyboard_mask(const Uint8 *keys, const GameSettings *settings);
-unsigned int game_input_controller_mask(const Uint8 *buttons, Sint16 x, Sint16 y,
+unsigned int game_input_keyboard_mask(const uint8_t *keys, const GameSettings *settings);
+unsigned int game_input_controller_mask(const uint8_t *buttons, int16_t x, int16_t y,
                                          const GameSettings *settings);
 
 /* Arm a route gate. Inherited state covers a controller closed during a swap. */

@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include <SDL.h>   /* SDL_Texture, SDL_Renderer */
+#include "../shared/graphics.h"
 
 /*
  * MAX_FOG_TEXTURES — maximum number of fog texture assets the system can hold.
@@ -47,7 +47,7 @@ typedef struct {
  * definition (may be less than MAX_FOG_TEXTURES).
  */
 typedef struct {
-    SDL_Texture *textures[MAX_FOG_TEXTURES]; /* GPU images for the fog assets  */
+    Texture2D *textures[MAX_FOG_TEXTURES]; /* GPU images for the fog assets */
     int          tex_count;                  /* number of textures loaded       */
     FogInstance  instances[FOG_MAX];         /* pool of simultaneous fog layers */
 } FogSystem;
@@ -64,14 +64,14 @@ typedef struct {
  * Each texture is non-fatal: a missing asset prints a warning and leaves
  * its pointer NULL (fog_render silently skips NULL entries).
  */
-void fog_init(FogSystem *fog, SDL_Renderer *renderer,
+void fog_init(FogSystem *fog,
               const char (*paths)[64], int count);
 
 /* Advance every active instance; spawn the next wave when it is time. */
 void fog_update(FogSystem *fog, float dt);
 
 /* Draw all active fog layers — call this after player_render (topmost). */
-void fog_render(FogSystem *fog, SDL_Renderer *renderer);
+void fog_render(FogSystem *fog);
 
 /* Release all GPU textures owned by the fog system. */
 void fog_cleanup(FogSystem *fog);

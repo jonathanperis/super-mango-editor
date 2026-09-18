@@ -48,7 +48,7 @@ void ladder_init(LadderDecor *ladders, int *count) {
  * (LADDER_STEP = 46) for seamless stacking.
  */
 void ladder_render(const LadderDecor *ladders, int count,
-                   SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                   Texture2D *tex, int cam_x) {
     if (!tex) return;
 
     for (int i = 0; i < count; i++) {
@@ -67,9 +67,9 @@ void ladder_render(const LadderDecor *ladders, int count,
              * Crop the transparent padding from Ladder.png.
              * Content occupies rows LADDER_SRC_Y..+(LADDER_SRC_H-1).
              */
-            SDL_Rect src = { 0, LADDER_SRC_Y, LADDER_W, LADDER_SRC_H };
-            SDL_Rect dst = { screen_x, tile_y, LADDER_W, LADDER_H };
-            SDL_RenderCopy(renderer, tex, &src, &dst);
+            IntRect src = { 0, LADDER_SRC_Y, LADDER_W, LADDER_SRC_H };
+            IntRect dst = { screen_x, tile_y, LADDER_W, LADDER_H };
+            sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }
     }
 }

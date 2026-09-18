@@ -2,7 +2,7 @@
  * float_platform.c — FloatPlatform: hovering, crumbling, and rail-riding surfaces.
  */
 
-#include <SDL.h>
+#include "../shared/graphics.h"
 #include <stdio.h>
 
 #include "float_platform.h"
@@ -249,7 +249,7 @@ void float_platforms_update(FloatPlatform *fps, int count,
  * the leftmost, rightmost, and all interior tiles.
  */
 void float_platform_render(const FloatPlatform *fp,
-                           SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                           Texture2D *tex, int cam_x) {
     if (!fp->active || !tex) return;
 
     int n_pieces = fp->w / FLOAT_PLATFORM_PIECE_W;   /* total horizontal pieces */
@@ -268,20 +268,20 @@ void float_platform_render(const FloatPlatform *fp,
          *       platform's screen-space y (world y − no cam_y since camera
          *       is horizontal-only).
          */
-        SDL_Rect src = { piece * FLOAT_PLATFORM_PIECE_W, 0,
+        IntRect src = { piece * FLOAT_PLATFORM_PIECE_W, 0,
                          FLOAT_PLATFORM_PIECE_W, FLOAT_PLATFORM_H };
-        SDL_Rect dst = { screen_x + i * FLOAT_PLATFORM_PIECE_W, (int)fp->y,
+        IntRect dst = { screen_x + i * FLOAT_PLATFORM_PIECE_W, (int)fp->y,
                          FLOAT_PLATFORM_PIECE_W, FLOAT_PLATFORM_H };
-        SDL_RenderCopy(renderer, tex, &src, &dst);
+        sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
     }
 }
 
 /* ------------------------------------------------------------------ */
 
 void float_platforms_render(const FloatPlatform *fps, int count,
-                            SDL_Renderer *renderer, SDL_Texture *tex, int cam_x) {
+                            Texture2D *tex, int cam_x) {
     for (int i = 0; i < count; i++)
-        float_platform_render(&fps[i], renderer, tex, cam_x);
+        float_platform_render(&fps[i], tex, cam_x);
 }
 
 /* ------------------------------------------------------------------ */
@@ -290,7 +290,7 @@ void float_platforms_render(const FloatPlatform *fps, int count,
  * float_platform_get_rect — Return the world-space bounding rectangle.
  * Used by the debug overlay to draw collision boxes.
  */
-SDL_Rect float_platform_get_rect(const FloatPlatform *fp) {
-    SDL_Rect r = { (int)fp->x, (int)fp->y, fp->w, fp->h };
+IntRect float_platform_get_rect(const FloatPlatform *fp) {
+    IntRect r = { (int)fp->x, (int)fp->y, fp->w, fp->h };
     return r;
 }

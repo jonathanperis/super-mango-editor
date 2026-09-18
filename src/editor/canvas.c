@@ -21,8 +21,6 @@
  *   8. Grid overlay (optional)
  */
 
-#include <SDL.h>
-#include <SDL_image.h>  /* IMG_LoadTexture (not used here, but available) */
 #include <stdio.h>      /* snprintf for debug labels                      */
 #include <string.h>    /* strcmp for platform texture selection          */
 
@@ -126,25 +124,17 @@ void canvas_screen_to_world(const EditorState *es, int sx, int sy,
 /*
  * draw_outline — Draw a rectangular outline with a given line thickness.
  *
- * Uses four SDL_RenderFillRect calls (top, bottom, left, right) instead
- * of SDL_RenderDrawRect, because SDL_RenderDrawRect only draws 1-pixel
- * lines and we need variable thickness for visibility at different zooms.
+ * Four filled edges preserve integer placement at every editor zoom level.
  */
-static void draw_outline(SDL_Renderer *r, int x, int y, int w, int h,
-                         int thickness) {
+static void draw_outline(int x, int y, int w, int h, int thickness, Color color) {
     /* Top edge */
-    SDL_Rect top    = { x, y, w, thickness };
-    SDL_RenderFillRect(r, &top);
+    DrawRectangle(x, y, w, thickness, color);
     /* Bottom edge */
-    SDL_Rect bottom = { x, y + h - thickness, w, thickness };
-    SDL_RenderFillRect(r, &bottom);
+    DrawRectangle(x, y+h-thickness, w, thickness, color);
     /* Left edge (between top and bottom) */
-    SDL_Rect left   = { x, y + thickness, thickness, h - 2 * thickness };
-    SDL_RenderFillRect(r, &left);
+    DrawRectangle(x, y+thickness, thickness, h-2*thickness, color);
     /* Right edge */
-    SDL_Rect right  = { x + w - thickness, y + thickness, thickness,
-                        h - 2 * thickness };
-    SDL_RenderFillRect(r, &right);
+    DrawRectangle(x+w-thickness, y+thickness, thickness, h-2*thickness, color);
 }
 
 /* ------------------------------------------------------------------ */
@@ -157,16 +147,16 @@ static void draw_outline(SDL_Renderer *r, int x, int y, int w, int h,
  * src can be NULL to draw the entire texture.  wx/wy are world-space
  * coordinates; dw/dh are world-space dimensions that get scaled to screen.
  */
-static void draw_tex(EditorState *es, SDL_Texture *tex, const SDL_Rect *src,
+static void draw_tex(EditorState *es, Texture2D *tex, const IntRect *src,
                      float wx, float wy, int dw, int dh) {
     if (!tex) return;
-    SDL_Rect dst = {
+    IntRect dst = {
         w2s_x(es, wx),
         w2s_y(es, wy),
         w2s_w(es, dw),
         w2s_h(es, dh)
     };
-    SDL_RenderCopy(es->renderer, tex, src, &dst);
+    sprite_draw(tex, src, &dst, 0, SPRITE_NORMAL, WHITE);
 }
 
 /* ------------------------------------------------------------------ */
@@ -186,8 +176,7 @@ void canvas_render(EditorState *es) {
      * Set a clip rectangle so that nothing we draw bleeds outside the canvas
      * area into the toolbar, status bar, or side panel.
      */
-    SDL_Rect clip = { 0, TOOLBAR_H, CANVAS_W, CANVAS_H };
-    SDL_RenderSetClipRect(es->renderer, &clip);
+    BeginScissorMode(0, TOOLBAR_H, CANVAS_W, CANVAS_H);
 
     /* ---- Layer 1: Sky background ---- */
     render_sky(es);
@@ -256,7 +245,7 @@ void canvas_render(EditorState *es) {
     }
 
     /* Remove the clip rectangle so other UI elements can draw freely */
-    SDL_RenderSetClipRect(es->renderer, NULL);
+    EndScissorMode();
 }
 
 /* ------------------------------------------------------------------ */
@@ -301,21 +290,18 @@ int canvas_contains(int sx, int sy) {
  */
 static void render_sky(EditorState *es) {
     if (es->textures.sky) {
-        int tex_w = 0, tex_h = 0;
-        SDL_QueryTexture(es->textures.sky, NULL, NULL, &tex_w, &tex_h);
+        int tex_w = es->textures.sky->width, tex_h = es->textures.sky->height;
         if (tex_w > 0 && tex_h > 0) {
             /* Tile the sky texture across the canvas area */
             for (int tx = 0; tx < CANVAS_W; tx += tex_w) {
-                SDL_Rect dst = { tx, TOOLBAR_H, tex_w, CANVAS_H };
-                SDL_RenderCopy(es->renderer, es->textures.sky, NULL, &dst);
+                IntRect dst = { tx, TOOLBAR_H, tex_w, CANVAS_H };
+                sprite_draw(es->textures.sky, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
             }
             return;
         }
     }
     /* Fallback: flat blue */
-    SDL_SetRenderDrawColor(es->renderer, 0x87, 0xCE, 0xEB, 0xFF);
-    SDL_Rect sky = { 0, TOOLBAR_H, CANVAS_W, CANVAS_H };
-    SDL_RenderFillRect(es->renderer, &sky);
+    DrawRectangle(0, TOOLBAR_H, CANVAS_W, CANVAS_H, (Color){0x87,0xCE,0xEB,255});
 }
 
 /* ---- Platforms (pillars) ----------------------------------------- */
@@ -349,7 +335,7 @@ static void render_platforms(EditorState *es) {
         float plat_y = (float)(FLOOR_Y - pp->tile_height * TILE_SIZE + 16);
 
         /* Select texture based on tile_path */
-        SDL_Texture *tex;
+        Texture2D *tex;
         if (pp->tile_path[0] != '\0') {
             if (strcmp(pp->tile_path, "assets/sprites/levels/stone_platform.png") == 0) {
                 tex = es->textures.platform_stone;
@@ -376,26 +362,25 @@ static void render_platforms(EditorState *es) {
                     else if (tx + P >= plat_w)   piece_col = 2;  /* right */
                     else                         piece_col = 1;  /* center*/
 
-                    SDL_Rect src = { piece_col * P, piece_row * P, P, P };
-                    SDL_Rect dst = {
+                    IntRect src = { piece_col * P, piece_row * P, P, P };
+                    IntRect dst = {
                         w2s_x(es, plat_x + (float)tx),
                         w2s_y(es, plat_y + (float)ty),
                         w2s_w(es, P),
                         w2s_h(es, P)
                     };
-                    SDL_RenderCopy(es->renderer, tex, &src, &dst);
+                    sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
                 }
             }
         } else {
             /* Fallback: solid brown rectangle */
-            SDL_SetRenderDrawColor(es->renderer, 0x8B, 0x6B, 0x4B, 0xFF);
-            SDL_Rect dst = {
+            IntRect dst = {
                 w2s_x(es, plat_x),
                 w2s_y(es, plat_y),
                 w2s_w(es, TILE_SIZE),
                 w2s_h(es, plat_h)
             };
-            SDL_RenderFillRect(es->renderer, &dst);
+            DrawRectangle(dst.x,dst.y,dst.w,dst.h,(Color){0x8B,0x6B,0x4B,255});
         }
     }
 }
@@ -462,15 +447,14 @@ static void render_floor(EditorState *es) {
             else if (at_right_edge)            piece_col = 2;
             else                               piece_col = 1;
 
-            SDL_Rect src = { piece_col * P, piece_row * P, P, P };
-            SDL_Rect dst = {
+            IntRect src = { piece_col * P, piece_row * P, P, P };
+            IntRect dst = {
                 w2s_x(es, (float)tx),
                 w2s_y(es, (float)ty),
                 w2s_w(es, P),
                 w2s_h(es, P)
             };
-            SDL_RenderCopy(es->renderer, es->textures.floor_tile,
-                           &src, &dst);
+            sprite_draw(es->textures.floor_tile, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }
     }
 }
@@ -486,19 +470,18 @@ static void render_floor(EditorState *es) {
  * that water exists in this gap.
  */
 static void render_water(EditorState *es) {
-    SDL_SetRenderDrawColor(es->renderer, 0x1A, 0x6B, 0xA0, 0xFF);
 
     for (int g = 0; g < es->level.floor_gap_count; g++) {
         float gx = (float)es->level.floor_gaps[g];
         float wy = (float)(GAME_H - WATER_ART_H);
 
-        SDL_Rect dst = {
+        IntRect dst = {
             w2s_x(es, gx),
             w2s_y(es, wy),
             w2s_w(es, FLOOR_GAP_W),
             w2s_h(es, WATER_ART_H)
         };
-        SDL_RenderFillRect(es->renderer, &dst);
+        DrawRectangle(dst.x,dst.y,dst.w,dst.h,(Color){0x1A,0x6B,0xA0,255});
     }
 }
 
@@ -513,7 +496,6 @@ static void render_water(EditorState *es) {
  * Both use green (#00AA00) with 2-pixel width for visibility.
  */
 static void render_rails(EditorState *es) {
-    SDL_SetRenderDrawColor(es->renderer, 0x00, 0xAA, 0x00, 0xFF);
 
     for (int i = 0; i < es->level.rail_count; i++) {
         const RailPlacement *rp = &es->level.rails[i];
@@ -529,7 +511,7 @@ static void render_rails(EditorState *es) {
             int sy = w2s_y(es, ry);
             int sw = w2s_w(es, rw);
             int sh = w2s_h(es, rh);
-            draw_outline(es->renderer, sx, sy, sw, sh, 2);
+            draw_outline(sx, sy, sw, sh, 2, (Color){0,0xAA,0,255});
         } else {
             /* RAIL_LAYOUT_HORIZ — horizontal line */
             int rw = rp->w * RAIL_TILE_W;
@@ -539,8 +521,7 @@ static void render_rails(EditorState *es) {
             int sy  = w2s_y(es, ry);
 
             /* Draw 2-pixel thick horizontal line */
-            SDL_Rect line = { sx0, sy, sx1 - sx0, 2 };
-            SDL_RenderFillRect(es->renderer, &line);
+            DrawRectangle(sx0,sy,sx1-sx0,2,(Color){0,0xAA,0,255});
         }
 
         /* Draw rail tile texture if available */
@@ -638,7 +619,7 @@ static void render_float_platforms(EditorState *es) {
                 else if (p == fp->tile_count - 1)     piece = 2; /* right  */
                 else                                  piece = 1; /* centre */
 
-                SDL_Rect src = { piece * FPLAT_PIECE_W, 0,
+                IntRect src = { piece * FPLAT_PIECE_W, 0,
                                  FPLAT_PIECE_W, FPLAT_PIECE_H };
                 draw_tex(es, es->textures.float_platform, &src,
                          fx + (float)(p * FPLAT_PIECE_W), fy,
@@ -646,12 +627,11 @@ static void render_float_platforms(EditorState *es) {
             }
         } else {
             /* Fallback: grey rectangle */
-            SDL_SetRenderDrawColor(es->renderer, 0x80, 0x80, 0x80, 0xFF);
-            SDL_Rect dst = {
+            IntRect dst = {
                 w2s_x(es, fx), w2s_y(es, fy),
                 w2s_w(es, total_w), w2s_h(es, FPLAT_PIECE_H)
             };
-            SDL_RenderFillRect(es->renderer, &dst);
+            DrawRectangle(dst.x,dst.y,dst.w,dst.h,(Color){128,128,128,255});
         }
     }
 }
@@ -702,7 +682,7 @@ static void render_spike_platforms(EditorState *es) {
             else if (t == sp->tile_count - 1)   piece = 2;
             else                                piece = 1;
 
-            SDL_Rect src = { piece * SPIKE_PLAT_PIECE_W, SPIKE_PLAT_SRC_Y,
+            IntRect src = { piece * SPIKE_PLAT_PIECE_W, SPIKE_PLAT_SRC_Y,
                              SPIKE_PLAT_PIECE_W, SPIKE_PLAT_SRC_H };
             draw_tex(es, es->textures.spike_platform, &src,
                      sp->x + (float)(t * SPIKE_PLAT_PIECE_W), sp->y,
@@ -723,7 +703,7 @@ static void render_bridges(EditorState *es) {
         const BridgePlacement *br = &es->level.bridges[i];
 
         for (int t = 0; t < br->brick_count; t++) {
-            SDL_Rect src = { 0, 0, BRIDGE_TILE_W, BRIDGE_TILE_H };
+            IntRect src = { 0, 0, BRIDGE_TILE_W, BRIDGE_TILE_H };
             draw_tex(es, es->textures.bridge, &src,
                      br->x + (float)(t * BRIDGE_TILE_W), br->y,
                      BRIDGE_TILE_W, BRIDGE_TILE_H);
@@ -745,7 +725,7 @@ static void render_bouncepads(EditorState *es) {
     float bp_y = (float)(FLOOR_Y - BP_SRC_H);
 
     /* Source rect for frame 2 (idle): x = 2 * BP_FRAME_W = 96 */
-    SDL_Rect src = { 2 * BP_FRAME_W, BP_SRC_Y, BP_FRAME_W, BP_SRC_H };
+    IntRect src = { 2 * BP_FRAME_W, BP_SRC_Y, BP_FRAME_W, BP_SRC_H };
 
     /* Small bouncepads (green) */
     for (int i = 0; i < es->level.bouncepad_small_count; i++) {
@@ -779,13 +759,13 @@ static void render_bouncepads(EditorState *es) {
  * Source rect crops to (0, VINE_SRC_Y, VINE_W, VINE_SRC_H).
  */
 static void render_vines(EditorState *es) {
-    SDL_Rect src = { 0, VINE_SRC_Y, VINE_W, VINE_SRC_H };
+    IntRect src = { 0, VINE_SRC_Y, VINE_W, VINE_SRC_H };
 
     for (int i = 0; i < es->level.vine_count; i++) {
         const VinePlacement *v = &es->level.vines[i];
 
         /* Select texture by vine type: 0 = green, 1 = brown */
-        SDL_Texture *tex = (v->vine_type == 1)
+        Texture2D *tex = (v->vine_type == 1)
             ? es->textures.vine_brown
             : es->textures.vine_green;
 
@@ -807,7 +787,7 @@ static void render_vines(EditorState *es) {
  * Source rect crops to (0, LADDER_SRC_Y, LADDER_W, LADDER_SRC_H).
  */
 static void render_ladders(EditorState *es) {
-    SDL_Rect src = { 0, LADDER_SRC_Y, LADDER_W, LADDER_SRC_H };
+    IntRect src = { 0, LADDER_SRC_Y, LADDER_W, LADDER_SRC_H };
 
     for (int i = 0; i < es->level.ladder_count; i++) {
         const LadderPlacement *ld = &es->level.ladders[i];
@@ -830,7 +810,7 @@ static void render_ladders(EditorState *es) {
  * Source rect crops to (ROPE_SRC_X, ROPE_SRC_Y, ROPE_SRC_W, ROPE_SRC_H).
  */
 static void render_ropes(EditorState *es) {
-    SDL_Rect src = { ROPE_SRC_X, ROPE_SRC_Y, ROPE_SRC_W, ROPE_SRC_H };
+    IntRect src = { ROPE_SRC_X, ROPE_SRC_Y, ROPE_SRC_W, ROPE_SRC_H };
 
     for (int i = 0; i < es->level.rope_count; i++) {
         const RopePlacement *rp = &es->level.ropes[i];
@@ -922,7 +902,7 @@ static void render_last_star(EditorState *es) {
 static void render_player_spawn(EditorState *es) {
     if (!es->textures.player) return;
 
-    SDL_Rect src = { 0, 0, PLAYER_SPAWN_W, PLAYER_SPAWN_H };
+    IntRect src = { 0, 0, PLAYER_SPAWN_W, PLAYER_SPAWN_H };
     draw_tex(es, es->textures.player, &src,
              es->level.player_start_x, es->level.player_start_y,
              PLAYER_SPAWN_W, PLAYER_SPAWN_H);
@@ -955,33 +935,21 @@ static void render_checkpoints(EditorState *es)
                   cursor_y >= cp->y - 20.0f && cursor_y < cp->y + 4.0f;
 
         /* Error red wins; hover/selection remain legible over the amber base. */
-        SDL_Color color = invalid ? (SDL_Color){220, 92, 78, 255}
-                                   : (selected ? (SDL_Color){74, 144, 217, 255}
-                                               : (SDL_Color){225, 169, 65, 255});
-        if (hovered && !invalid) color = (SDL_Color){255, 211, 104, 255};
-        SDL_SetRenderDrawColor(es->renderer, color.r, color.g, color.b, 255);
-        SDL_Rect line = { w2s_x(es, cp->x), w2s_y(es, cp->y - 18.0f),
+        Color color = invalid ? (Color){220, 92, 78, 255}
+                                   : (selected ? (Color){74, 144, 217, 255}
+                                               : (Color){225, 169, 65, 255});
+        if (hovered && !invalid) color = (Color){255, 211, 104, 255};
+        IntRect line = { w2s_x(es, cp->x), w2s_y(es, cp->y - 18.0f),
                           w2s_w(es, 2), w2s_h(es, 18) };
-        SDL_Rect tick = { w2s_x(es, cp->x - 5.0f), w2s_y(es, cp->y),
+        IntRect tick = { w2s_x(es, cp->x - 5.0f), w2s_y(es, cp->y),
                           w2s_w(es, 12), w2s_h(es, 2) };
-        SDL_RenderFillRect(es->renderer, &line);
-        SDL_RenderFillRect(es->renderer, &tick);
+        DrawRectangle(line.x,line.y,line.w,line.h,color);
+        DrawRectangle(tick.x,tick.y,tick.w,tick.h,color);
 
         if (es->font) {
             char label[16];
             snprintf(label, sizeof(label), "CP %d", i + 1);
-            SDL_Surface *surface = TTF_RenderText_Solid(es->font, label, color);
-            if (surface) {
-                SDL_Texture *texture = SDL_CreateTextureFromSurface(es->renderer, surface);
-                if (texture) {
-                    SDL_Rect dst = { w2s_x(es, cp->x) + 4,
-                                     w2s_y(es, cp->y - 20.0f),
-                                     surface->w, surface->h };
-                    SDL_RenderCopy(es->renderer, texture, NULL, &dst);
-                    SDL_DestroyTexture(texture);
-                }
-                SDL_FreeSurface(surface);
-            }
+            font_draw(es->font,label,w2s_x(es,cp->x)+4,w2s_y(es,cp->y-20.0f),color);
         }
     }
 }
@@ -1152,7 +1120,7 @@ static void render_circular_saws(EditorState *es) {
  */
 static void render_spiders(EditorState *es) {
     float spider_y = (float)(FLOOR_Y - SPIDER_ART_H);
-    SDL_Rect src = { 0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H };
+    IntRect src = { 0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H };
 
     for (int i = 0; i < es->level.spider_count; i++) {
         draw_tex(es, es->textures.spider, &src,
@@ -1171,7 +1139,7 @@ static void render_spiders(EditorState *es) {
  */
 static void render_jumping_spiders(EditorState *es) {
     float spider_y = (float)(FLOOR_Y - SPIDER_ART_H);
-    SDL_Rect src = { 0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H };
+    IntRect src = { 0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H };
 
     for (int i = 0; i < es->level.jumping_spider_count; i++) {
         draw_tex(es, es->textures.jumping_spider, &src,
@@ -1191,7 +1159,7 @@ static void render_jumping_spiders(EditorState *es) {
  * Displayed at BIRD_FRAME_W x BIRD_ART_H (48x14).
  */
 static void render_birds(EditorState *es) {
-    SDL_Rect src = { 0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H };
+    IntRect src = { 0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H };
 
     for (int i = 0; i < es->level.bird_count; i++) {
         draw_tex(es, es->textures.bird, &src,
@@ -1209,7 +1177,7 @@ static void render_birds(EditorState *es) {
  * Same crop and display dimensions as slow birds.
  */
 static void render_faster_birds(EditorState *es) {
-    SDL_Rect src = { 0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H };
+    IntRect src = { 0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H };
 
     for (int i = 0; i < es->level.faster_bird_count; i++) {
         draw_tex(es, es->textures.faster_bird, &src,
@@ -1516,12 +1484,11 @@ static void render_selection(EditorState *es) {
     }
 
     /* Draw 2-pixel accent outline around the selected entity */
-    SDL_SetRenderDrawColor(es->renderer, 0x4A, 0x90, 0xD9, 0xFF);
     int sx = w2s_x(es, wx) - 2;
     int sy = w2s_y(es, wy) - 2;
     int sw = w2s_w(es, ww) + 4;
     int sh = w2s_h(es, wh) + 4;
-    draw_outline(es->renderer, sx, sy, sw, sh, 2);
+    draw_outline(sx, sy, sw, sh, 2, UI_ACCENT);
 }
 
 /* ---- Ghost preview (placement mode) ------------------------------ */
@@ -1542,8 +1509,8 @@ static void render_ghost(EditorState *es) {
     canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &wx, &wy);
 
     /* Determine the texture and display size for the palette entity type */
-    SDL_Texture *tex = NULL;
-    SDL_Rect src_rect;
+    Texture2D *tex = NULL;
+    IntRect src_rect;
     int use_src = 0;  /* 1 = use src_rect crop, 0 = draw full texture */
     int dw = 0, dh = 0;
 
@@ -1570,31 +1537,31 @@ static void render_ghost(EditorState *es) {
         break;
     case ENT_PLAYER_SPAWN:
         tex = es->textures.player;
-        src_rect = (SDL_Rect){ 0, 0, PLAYER_SPAWN_W, PLAYER_SPAWN_H };
+        src_rect = (IntRect){ 0, 0, PLAYER_SPAWN_W, PLAYER_SPAWN_H };
         use_src = 1;
         dw = PLAYER_SPAWN_W; dh = PLAYER_SPAWN_H;
         break;
     case ENT_SPIDER:
         tex = es->textures.spider;
-        src_rect = (SDL_Rect){ 0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H };
+        src_rect = (IntRect){ 0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H };
         use_src = 1;
         dw = SPIDER_FRAME_W; dh = SPIDER_ART_H;
         break;
     case ENT_JUMPING_SPIDER:
         tex = es->textures.jumping_spider;
-        src_rect = (SDL_Rect){ 0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H };
+        src_rect = (IntRect){ 0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H };
         use_src = 1;
         dw = SPIDER_FRAME_W; dh = SPIDER_ART_H;
         break;
     case ENT_BIRD:
         tex = es->textures.bird;
-        src_rect = (SDL_Rect){ 0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H };
+        src_rect = (IntRect){ 0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H };
         use_src = 1;
         dw = BIRD_FRAME_W; dh = BIRD_ART_H;
         break;
     case ENT_FASTER_BIRD:
         tex = es->textures.faster_bird;
-        src_rect = (SDL_Rect){ 0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H };
+        src_rect = (IntRect){ 0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H };
         use_src = 1;
         dw = BIRD_FRAME_W; dh = BIRD_ART_H;
         break;
@@ -1620,7 +1587,7 @@ static void render_ghost(EditorState *es) {
         break;
     case ENT_SPIKE_PLATFORM:
         tex = es->textures.spike_platform;
-        src_rect = (SDL_Rect){ 0, SPIKE_PLAT_SRC_Y,
+        src_rect = (IntRect){ 0, SPIKE_PLAT_SRC_Y,
                                SPIKE_PLAT_PIECE_W, SPIKE_PLAT_SRC_H };
         use_src = 1;
         dw = SPIKE_PLAT_PIECE_W; dh = SPIKE_PLAT_SRC_H;
@@ -1647,40 +1614,40 @@ static void render_ghost(EditorState *es) {
         break;
     case ENT_BOUNCEPAD_SMALL:
         tex = es->textures.bouncepad_small;
-        src_rect = (SDL_Rect){ 2 * BP_FRAME_W, BP_SRC_Y,
+        src_rect = (IntRect){ 2 * BP_FRAME_W, BP_SRC_Y,
                                BP_FRAME_W, BP_SRC_H };
         use_src = 1;
         dw = BP_FRAME_W; dh = BP_SRC_H;
         break;
     case ENT_BOUNCEPAD_MEDIUM:
         tex = es->textures.bouncepad_medium;
-        src_rect = (SDL_Rect){ 2 * BP_FRAME_W, BP_SRC_Y,
+        src_rect = (IntRect){ 2 * BP_FRAME_W, BP_SRC_Y,
                                BP_FRAME_W, BP_SRC_H };
         use_src = 1;
         dw = BP_FRAME_W; dh = BP_SRC_H;
         break;
     case ENT_BOUNCEPAD_HIGH:
         tex = es->textures.bouncepad_high;
-        src_rect = (SDL_Rect){ 2 * BP_FRAME_W, BP_SRC_Y,
+        src_rect = (IntRect){ 2 * BP_FRAME_W, BP_SRC_Y,
                                BP_FRAME_W, BP_SRC_H };
         use_src = 1;
         dw = BP_FRAME_W; dh = BP_SRC_H;
         break;
     case ENT_VINE:
         tex = es->textures.vine_green;
-        src_rect = (SDL_Rect){ 0, VINE_SRC_Y, VINE_W, VINE_SRC_H };
+        src_rect = (IntRect){ 0, VINE_SRC_Y, VINE_W, VINE_SRC_H };
         use_src = 1;
         dw = VINE_W; dh = VINE_H;
         break;
     case ENT_LADDER:
         tex = es->textures.ladder;
-        src_rect = (SDL_Rect){ 0, LADDER_SRC_Y, LADDER_W, LADDER_SRC_H };
+        src_rect = (IntRect){ 0, LADDER_SRC_Y, LADDER_W, LADDER_SRC_H };
         use_src = 1;
         dw = LADDER_W; dh = LADDER_H;
         break;
     case ENT_ROPE:
         tex = es->textures.rope;
-        src_rect = (SDL_Rect){ ROPE_SRC_X, ROPE_SRC_Y,
+        src_rect = (IntRect){ ROPE_SRC_X, ROPE_SRC_Y,
                                ROPE_SRC_W, ROPE_SRC_H };
         use_src = 1;
         dw = ROPE_W; dh = ROPE_H;
@@ -1695,14 +1662,13 @@ static void render_ghost(EditorState *es) {
         break;
     case ENT_CHECKPOINT:
         /* Checkpoints use the same no-asset primitive as the world marker. */
-        SDL_SetRenderDrawColor(es->renderer, 225, 169, 65, 128);
         {
-            SDL_Rect line = { w2s_x(es, wx), w2s_y(es, wy - 18.0f),
+            IntRect line = { w2s_x(es, wx), w2s_y(es, wy - 18.0f),
                               w2s_w(es, 2), w2s_h(es, 18) };
-            SDL_Rect tick = { w2s_x(es, wx - 5.0f), w2s_y(es, wy),
+            IntRect tick = { w2s_x(es, wx - 5.0f), w2s_y(es, wy),
                               w2s_w(es, 12), w2s_h(es, 2) };
-            SDL_RenderFillRect(es->renderer, &line);
-            SDL_RenderFillRect(es->renderer, &tick);
+            DrawRectangle(line.x,line.y,line.w,line.h,(Color){225,169,65,128});
+            DrawRectangle(tick.x,tick.y,tick.w,tick.h,(Color){225,169,65,128});
         }
         return;
     case ENT_RAIL:
@@ -1713,32 +1679,21 @@ static void render_ghost(EditorState *es) {
         return;
     }
 
-    /* Set 50% alpha for the ghost preview */
-    if (tex) {
-        SDL_SetTextureAlphaMod(tex, 128);
-    }
-
     /* Center the ghost on the cursor */
     float ghost_x = wx - (float)dw / 2.0f;
     float ghost_y = wy - (float)dh / 2.0f;
 
     if (tex) {
-        draw_tex(es, tex, use_src ? &src_rect : NULL,
-                 ghost_x, ghost_y, dw, dh);
-        /* Restore full opacity */
-        SDL_SetTextureAlphaMod(tex, 255);
+        IntRect dst = {w2s_x(es,ghost_x),w2s_y(es,ghost_y),w2s_w(es,dw),w2s_h(es,dh)};
+        sprite_draw(tex,use_src ? &src_rect : NULL,&dst,0,SPRITE_NORMAL,(Color){255,255,255,128});
     } else {
         /* Fallback for non-textured entities (floor gaps, rails) */
-        if (es->palette_type == ENT_FLOOR_GAP) {
-            SDL_SetRenderDrawColor(es->renderer, 0x1A, 0x6B, 0xA0, 0x80);
-        } else {
-            SDL_SetRenderDrawColor(es->renderer, 0x00, 0xAA, 0x00, 0x80);
-        }
-        SDL_Rect dst = {
+        Color color = es->palette_type == ENT_FLOOR_GAP ? (Color){0x1A,0x6B,0xA0,128} : (Color){0,0xAA,0,128};
+        IntRect dst = {
             w2s_x(es, ghost_x), w2s_y(es, ghost_y),
             w2s_w(es, dw), w2s_h(es, dh)
         };
-        SDL_RenderFillRect(es->renderer, &dst);
+        DrawRectangle(dst.x,dst.y,dst.w,dst.h,color);
     }
 }
 
@@ -1760,15 +1715,14 @@ static void render_ghost(EditorState *es) {
  */
 static void render_grid(EditorState *es) {
     /* ---- TILE_SIZE grid ---- */
-    SDL_SetRenderDrawColor(es->renderer, 0x40, 0x40, 0x40, 0x40);
+    Color grid = {0x40,0x40,0x40,0x40};
 
     /* Vertical grid lines */
     for (int wx = 0; wx <= EDITOR_WORLD_W(es); wx += TILE_SIZE) {
         int sx = w2s_x(es, (float)wx);
         if (sx < 0 || sx > CANVAS_W) continue;
 
-        SDL_Rect line = { sx, TOOLBAR_H, 1, CANVAS_H };
-        SDL_RenderFillRect(es->renderer, &line);
+        DrawRectangle(sx,TOOLBAR_H,1,CANVAS_H,grid);
     }
 
     /* Horizontal grid lines */
@@ -1776,28 +1730,23 @@ static void render_grid(EditorState *es) {
         int sy = w2s_y(es, (float)wy);
         if (sy < TOOLBAR_H || sy > TOOLBAR_H + CANVAS_H) continue;
 
-        SDL_Rect line = { 0, sy, CANVAS_W, 1 };
-        SDL_RenderFillRect(es->renderer, &line);
+        DrawRectangle(0,sy,CANVAS_W,1,grid);
     }
 
     /* ---- Screen boundaries (blue, 2 px wide) ---- */
-    SDL_SetRenderDrawColor(es->renderer, 0x4A, 0x90, 0xD9, 0xFF);
 
     for (int screen = 0; screen < EDITOR_WORLD_W(es) / GAME_W; screen++) {
         int wx = screen * GAME_W;
         int sx = w2s_x(es, (float)wx);
         if (sx < -2 || sx > CANVAS_W + 2) continue;
 
-        SDL_Rect line = { sx, TOOLBAR_H, 2, CANVAS_H };
-        SDL_RenderFillRect(es->renderer, &line);
+        DrawRectangle(sx,TOOLBAR_H,2,CANVAS_H,UI_ACCENT);
     }
 
     /* ---- FLOOR_Y line (red, 2 px wide) ---- */
-    SDL_SetRenderDrawColor(es->renderer, 0xD9, 0x4A, 0x4A, 0xFF);
 
     int floor_sy = w2s_y(es, (float)FLOOR_Y);
     if (floor_sy >= TOOLBAR_H && floor_sy <= TOOLBAR_H + CANVAS_H) {
-        SDL_Rect line = { 0, floor_sy, CANVAS_W, 2 };
-        SDL_RenderFillRect(es->renderer, &line);
+        DrawRectangle(0,floor_sy,CANVAS_W,2,(Color){0xD9,0x4A,0x4A,255});
     }
 }

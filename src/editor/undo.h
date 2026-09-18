@@ -243,7 +243,7 @@ UndoStack *undo_create(void);
  * undo_destroy --- Free an UndoStack previously created by undo_create.
  *
  * Safe to call with NULL (no-op), following the same convention as
- * SDL_DestroyTexture(NULL).
+ * texture_unload(NULL).
  */
 void undo_destroy(UndoStack *stack);
 

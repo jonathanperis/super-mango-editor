@@ -18,4 +18,4 @@
  * target AnimState from Player velocity and contact flags, resets frame index
  * on state changes, advances the frame timer, and writes Player.frame.
  */
-void player_animate(Player *player, Uint32 dt_ms);
+void player_animate(Player *player, uint32_t dt_ms);
