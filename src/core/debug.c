@@ -209,7 +209,9 @@ void debug_update(DebugOverlay *dbg, float dt)
     dbg->fps_frame_count++;
     uint64_t now = clock_millis(), elapsed = now - dbg->fps_prev_ticks;
     if (elapsed >= DEBUG_FPS_SAMPLE_MS) {
-        dbg->fps_display = (int)(dbg->fps_frame_count * 1000 / elapsed);
+        /* Show the nearest measured FPS: truncation makes a healthy 59.99 Hz
+         * cadence read 59. This does not clamp slow frames to the target. */
+        dbg->fps_display = (int)(dbg->fps_frame_count * 1000.0 / elapsed + 0.5);
         dbg->fps_frame_count = 0;
         dbg->fps_prev_ticks = now;
         dbg->frame_ms_display = dbg->frame_ms;

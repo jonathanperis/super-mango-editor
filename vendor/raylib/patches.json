@@ -9,6 +9,12 @@
       "after": "        // Super Mango: drwav_uninit releases internals, not the allocated decoder.\n        else if (music.ctxType == MUSIC_AUDIO_WAV) { drwav_uninit((drwav *)music.ctxData); RL_FREE(music.ctxData); }"
     }
   ],
+  "src/rcore.c": [
+    {
+      "before": "    #if defined(__APPLE__)\n        usleep(sleepSeconds*1000000.0);\n    #endif",
+      "after": "    #if defined(__APPLE__)\n        #if SUPPORT_PARTIALBUSY_WAIT_LOOP\n            // Super Mango: macOS may coalesce usleep past the 5% wait margin.\n            // Wake 1 ms earlier; the existing short busy wait meets the deadline.\n            if (sleepSeconds > 0.001) usleep((sleepSeconds - 0.001)*1000000.0);\n        #else\n            usleep(sleepSeconds*1000000.0);\n        #endif\n    #endif"
+    }
+  ],
   "src/external/miniaudio.h": [
     {
       "before": "        result = ma_channel_converter_init_preallocated(&channelConverterConfig, ma_offset_ptr(pHeap, heapLayout.channelConverterOffset), &pConverter->channelConverter);",

@@ -42,7 +42,10 @@ raylib **6.0** is fetched from the source/checksum pin in `vendor/raylib/manifes
 `tools/build_raylib.py` verifies the archive, applies the documented replacements
 in `vendor/raylib/patches.json`, and uses CMake for an out-of-source static build.
 The patches release alias converter caches and WAV decoders and avoid miniaudio
-null-pointer arithmetic; the bootstrap rejects unfamiliar patch contexts.
+null-pointer arithmetic. A macOS-only timing patch gives the existing partial
+busy wait an extra 1 ms wakeup margin to reduce sleep overshoot at 60 FPS; it
+uses a little more CPU near the deadline, not a full-frame spin. The bootstrap
+rejects unfamiliar patch contexts.
 Desktop uses bundled GLFW; Web uses the same Emscripten toolchain
 as the application. `RAYLIB_BUILD` defaults to `$(OUTDIR)/raylib`; web uses
 `$(OUTDIR)/raylib-web`. Keep build modes/toolchains in separate directories.

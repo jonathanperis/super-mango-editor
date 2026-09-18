@@ -46,6 +46,13 @@ session_destroy(session) / browser terminal cleanup
 
 `AppSession` is the sole production loop owner. It samples physical input, pumps the music stream, frames the active screen, then consumes its route. raylib's `EndDrawing` owns presentation, event polling and normal **60 FPS** pacing. Hidden smoke runs are uncapped and retain fixed simulation steps.
 
+On native macOS, the pinned dependency wakes its partial-busy sleep 1 ms earlier
+so the existing short busy wait can meet the same frame deadline despite sleep
+coalescing. This does not change simulation time or add another limiter. The
+debug counter rounds **measured** FPS to the nearest integer; genuine slow frames
+remain visible. A 60 FPS target cannot prevent stalls caused by the OS or work
+that exceeds the frame budget.
+
 There are two distinct notions of input. GLFW callbacks capture **ordered
 commands** (typing, clicks, pause) during raylib's end-of-frame poll; the next
 frame drains them. **Held state** answers whether movement remains pressed.
