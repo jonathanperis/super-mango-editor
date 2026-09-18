@@ -21,8 +21,9 @@ Copyright (c) 2013–2026 Ramon Santamaria (@raysan5). zlib/libpng license.
 
 Native builds statically link raylib with bundled GLFW; browser builds use the
 Web backend. Archives include `licenses/raylib.txt`, GLFW's notice and the
-unmodified license-bearing external files under `licenses/raylib-dependencies/`.
+license-bearing external files under `licenses/raylib-dependencies/`.
 Those bundled components have their own terms, retained in those files.
+`vendor/raylib/README.md` documents the marked raylib/miniaudio source fixes.
 Native OS graphics/audio libraries remain required. Windows packaging resolves
 both executables' non-system runtime dependencies and includes their owning
 MSYS2 packages' available license files under `licenses/msys2/`.

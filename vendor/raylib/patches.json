@@ -1,0 +1,18 @@
+{
+  "src/raudio.c": [
+    {
+      "before": "        ma_data_converter_uninit(&alias.stream.buffer->converter, NULL);\n        RL_FREE(alias.stream.buffer);",
+      "after": "        ma_data_converter_uninit(&alias.stream.buffer->converter, NULL);\n        // Super Mango: the alias owns its converter cache, not the sample data.\n        RL_FREE(alias.stream.buffer->converterResidual);\n        RL_FREE(alias.stream.buffer);"
+    },
+    {
+      "before": "        else if (music.ctxType == MUSIC_AUDIO_WAV) drwav_uninit((drwav *)music.ctxData);",
+      "after": "        // Super Mango: drwav_uninit releases internals, not the allocated decoder.\n        else if (music.ctxType == MUSIC_AUDIO_WAV) { drwav_uninit((drwav *)music.ctxData); RL_FREE(music.ctxData); }"
+    }
+  ],
+  "src/external/miniaudio.h": [
+    {
+      "before": "        result = ma_channel_converter_init_preallocated(&channelConverterConfig, ma_offset_ptr(pHeap, heapLayout.channelConverterOffset), &pConverter->channelConverter);",
+      "after": "        /* Super Mango: passthrough conversion may have a null, zero-sized heap. */\n        result = ma_channel_converter_init_preallocated(&channelConverterConfig, pHeap != NULL ? ma_offset_ptr(pHeap, heapLayout.channelConverterOffset) : NULL, &pConverter->channelConverter);"
+    }
+  ]
+}

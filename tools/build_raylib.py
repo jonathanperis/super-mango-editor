@@ -41,6 +41,18 @@ def main() -> None:
     if not source.is_dir():
         with tarfile.open(archive, "r:gz") as package:
             package.extractall(build, filter="data")
+    patches = json.loads((ROOT / "vendor/raylib/patches.json").read_text())
+    for name, replacements in patches.items():
+        path = source / name
+        original = text = path.read_text(encoding="utf-8")
+        for replacement in replacements:
+            before, after = replacement["before"], replacement["after"]
+            if text.count(before) == 1:
+                text = text.replace(before, after, 1)
+            elif text.count(after) != 1:
+                raise SystemExit(f"raylib patch does not match pinned source: {name}")
+        if text != original:
+            path.write_text(text, encoding="utf-8", newline="\n")
     output = build / "build"
     generator = "MinGW Makefiles" if os.name == "nt" else "Unix Makefiles"
     command = ["cmake", "-G", generator, "-S", str(source), "-B", str(output),
