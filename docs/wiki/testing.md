@@ -17,7 +17,7 @@ Use this page to choose the smallest useful verification set for a change. Run c
 | Editor behaviour | `make editor CC=clang` and `./out/super-mango-editor --smoke-test` | Builds the editor and renders five hidden-window frames; a desktop context is still required. |
 | Memory/UB-sensitive C changes | `make sanitize CC=clang` and, when startup paths changed, `make sanitize-smoke CC=clang` | Runs AddressSanitizer/UBSan over tests and optionally smoke startup. |
 | Docs, README, Pages routes | `make docs-drift`, then from `docs/`: `bun run lint`, `bun run build`, `bun run check-site` | Checks generated facts, TOML examples, API/CLI references, Astro compilation and emitted routes/links/metadata/sitemap. Uses the frozen `bun.lock` dependency set. |
-| WebAssembly payload | `make web`, artifact checks and green GitHub Actions WebAssembly + Pages smoke | Build raylib and the application with the same pinned SDK; distinguish toolchain failures from application failures. |
+| WebAssembly payload | `make web`, artifact checks, green WebAssembly + Pages assembly checks, and actual browser startup for runtime changes | Build raylib and the application with the same pinned SDK. HTTP/module checks do not execute the browser frame loop. |
 | Release packaging | `make dist-native` and `make dist-wasm` or the `Build & Release` workflow | Produces native and WebAssembly archives using the same archive layout described in the release checklist. |
 
 ## Native Regression Tests
@@ -60,12 +60,33 @@ storage conflicts, touch ownership and native/WASM archive contracts without a
 browser. Native harnesses cover parser/serializer, validation, runtime, editor,
 profile, checkpoint, simulation and session behavior.
 
+The session harness compiles the production display boundary's Web path against
+test-owned platform calls. It verifies that visible and hidden Web windows leave
+raylib's blocking FPS limiter disabled. This guards the non-Asyncify browser loop
+without substituting for a real browser smoke check.
+The artifact check also rejects an `emscripten_sleep` dependency in the emitted
+glue: this catches native-only calls such as raylib's Web `WindowShouldClose`
+before a non-Asyncify build is deployed.
+
 Two extra standalone probes accompany the 15 regression binaries:
 `make parser-allocation-probe` checks parser buffer-growth limits without huge
 allocations, and `make parser-encoding-probe` checks all Python level readers.
 Both run under `make test`; `make sanitize` instruments the C probe as well.
 Level readers accept one leading UTF-8 BOM and preserve raw line endings so
 invalid CR-only documents remain rejected.
+
+## Browser Startup Check
+
+After frame-loop, graphics, audio or host-boot changes, serve the freshly built
+normal/debug WASM outputs over HTTP and exercise both the site host and standalone
+shells in an isolated browser session. Confirm rendered game frames and response
+to game controls, then inspect console/runtime errors. A successful download,
+`WebAssembly.compile`, `callMain` return or momentary “running” label is not enough:
+an abort can occur on the next animation frame.
+
+For agent-driven testing, obtain explicit browser-interaction permission first.
+Keep evidence task-owned and distinguish startup/input results from untested
+audible output or physical-device behavior.
 
 ## Smoke Tests
 
