@@ -2,6 +2,10 @@
  * editor_playtest.c — Editor playtest process helpers.
  */
 
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "editor_playtest.h"
 
 #include <stdio.h>     /* fprintf, snprintf, stderr */
