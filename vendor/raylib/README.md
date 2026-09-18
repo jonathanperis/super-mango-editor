@@ -40,6 +40,19 @@ These fixes retain the 6.0 public API, formats and playback behavior. Source
 modifications are marked in the affected files. The session/audio regressions
 exercise the real library, and Linux CI keeps leak detection enabled.
 
+### Native macOS frame pacing
+
+The macOS branch of raylib's partial-busy `WaitTime` wakes from `usleep` one
+millisecond earlier. Its existing short busy wait then waits until the original
+deadline. The upstream 5% margin alone allowed macOS sleep coalescing to overshoot
+the 60 Hz target even when debug-game work took less than a millisecond.
+
+This keeps normal `EndDrawing` timing, VSync hints, the 60 FPS cap and event
+polling intact. Windows/Linux/Web wait code is unchanged; hidden smoke remains
+uncapped. The tradeoff is up to roughly one additional millisecond of active
+waiting per capped frame, not a full-frame busy loop. OS scheduling or expensive
+frames can still miss a deadline; this is a target cadence, not a real-time guarantee.
+
 Upstream source and release: https://github.com/raysan5/raylib/releases/tag/6.0
 
 Release packaging includes raylib's license, the GLFW license, and the
