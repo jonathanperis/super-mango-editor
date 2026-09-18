@@ -1080,7 +1080,7 @@ int editor_prepare_playtest_level(EditorState *es, char *path, size_t path_size)
         editor_set_status(es, "Play failed: save temporary level");
         return -1;
     }
-    strcpy(path, es->playtest_path);
+    str_copy(path, es->playtest_path, path_size);
     return 0;
 }
 
