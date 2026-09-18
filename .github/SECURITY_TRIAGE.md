@@ -30,8 +30,8 @@ were reviewed against the same desktop permission boundary:
 | #86–#93 | `editor_files.c`: playtest, recent files, autosave and recovery below the preference root | The invoking user's `HOME`/`XDG_DATA_HOME` determines the private root. Fixed application suffixes and generated filenames select these files; level documents cannot redirect that root. |
 | #94–#102 | `editor_files.c`: selected-document fingerprints and saves | The document path originates from local selection. Existing baseline checks, create-only saves and explicit replacement decisions retain concurrent-write protection. |
 
-These 20 path-injection findings are false positives under the stated contract;
-GitHub dismissal requires maintainer authorization. No query or check is disabled.
+These 20 path-injection findings were dismissed as false positives after explicit
+maintainer authorization and saved-state verification. No query or check is disabled.
 
 Alert #103 identifies the playtest path copy. Its preceding length check already
 rejects insufficient capacity; the copy now also takes the explicit destination
@@ -40,3 +40,6 @@ Alert #104 prompted documentation of the debug overlay's collision/interaction
 coordinate conventions. The two advisory findings are intentional: #81 enumerates
 the supported legacy binding ranges; #82 compares zoom values selected from the
 exactly representable set `{1, 2, 3, 5}`, not accumulated floating-point estimates.
+Initialization, toolbar selection and wheel input are the only production zoom
+assignments. Their review threads were resolved after this contract check; the
+two advisory scan alerts remain open.
