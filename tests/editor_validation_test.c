@@ -3060,6 +3060,43 @@ static int display_paths_keep_the_file_name(void)
 }
 
 /*
+ * Text fields keep only valid UTF-8.  Pasted bytes (or a lone surrogate
+ * from a text event) that are not valid UTF-8 would be saved into the level
+ * and make it unloadable, so each bad byte is dropped and the valid
+ * characters around it are kept.
+ */
+static int text_fields_drop_invalid_utf8(void)
+{
+    static const struct {
+        const char *typed;
+        const char *kept;
+    } cases[] = {
+        {"a\xc0\xaf" "b", "ab"},                         /* overlong '/'          */
+        {"a\xed\xa0\x80" "b", "ab"},                     /* surrogate U+D800      */
+        {"a\xf4\x90\x80\x80" "b", "ab"},                 /* above U+10FFFF        */
+        {"a\xe2\x82" "b", "ab"},                         /* truncated euro sign   */
+        {"a\x80" "b", "ab"},                             /* stray continuation    */
+        {"\xc3\xa9\xe2\x82\xac\xf0\x9f\xa5\xad", "\xc3\xa9\xe2\x82\xac\xf0\x9f\xa5\xad"},
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        UIState ui;
+        char text[32] = "";
+
+        memset(&ui, 0, sizeof(ui));
+        ui.active_id = 1;
+        ui.edit_type = UI_EDIT_TEXT;
+        ui.edit_target = text;
+        ui.edit_target_size = sizeof(text);
+        ui_queue_text_input(&ui, cases[i].typed);
+        (void)ui_apply_active_edit(&ui);
+        if (expect_string("text field keeps valid UTF-8", text, cases[i].kept) != 0)
+            return 1;
+    }
+    return 0;
+}
+
+/*
  * Symlinks are followed only for the document the user opened.  Save As
  * onto a planted link must not touch the file it names; Save of a level
  * opened through a link updates that file, but not after the link is
@@ -3207,6 +3244,7 @@ int main(void)
     if (autosave_recovery_preserves_destination() != 0) return 1;
     if (editor_save_workflows_enforce_baselines() != 0) return 1;
     if (symlinks_are_followed_only_for_the_opened_document() != 0) return 1;
+    if (text_fields_drop_invalid_utf8() != 0) return 1;
     if (recovery_metadata_and_failed_save_contract() != 0) return 1;
     if (playtest_destination_isolated() != 0) return 1;
     if (autosave_backs_off_and_snapshots_last_valid_level() != 0) return 1;

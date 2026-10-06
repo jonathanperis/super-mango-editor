@@ -12,6 +12,7 @@
 #include <string.h>  /* memchr, memcmp, strlen */
 
 #include "serializer_types.h" /* enum validation */
+#include "utf8.h"             /* utf8_valid */
 #include "../game.h"          /* MAX_* array limits */
 
 /* ------------------------------------------------------------------ */
@@ -529,6 +530,14 @@ static int validate_scalar(toml_datum_t value, SerializerValueType expected,
         if (toml_string_has_embedded_nul(value)) {
             return schema_error(error, error_size,
                                 "%s contains an embedded NUL", path);
+        }
+        /* tomlc17 passes raw string bytes through unchecked.  Saving them
+         * back would write a file strict TOML readers (Python's tomllib in
+         * tools/validate_levels.py) refuse, so refuse it here first. */
+        if (value.u.str.len < 0 ||
+            !utf8_valid(value.u.str.ptr, (size_t)value.u.str.len)) {
+            return schema_error(error, error_size,
+                                "%s is not valid UTF-8", path);
         }
         const char *key = strrchr(path, '.');
         key = key ? key + 1 : path;
