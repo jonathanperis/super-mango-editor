@@ -116,6 +116,21 @@ static float clamp_rail_t(const LevelDef *level, int rail_index, float t)
     return clampf(t, 0.0f, (float)(count - 1));
 }
 
+/*
+ * editor_clamp_placement — Pull a new or moved placement back inside the world.
+ *
+ * Place, paste and drag all call this before a placement is written, so the
+ * editor never produces a level that the validator would reject for being
+ * out of bounds.  The world is world_w x GAME_H logical pixels.  The rules
+ * fall into a few families, each with its own helper:
+ *
+ *   points        : clamp (x, y) into [0, world_w] x [0, world_h]
+ *   patrols       : clamp_patrol moves x *and* its patrol range together
+ *   spans         : clamp_span keeps a whole width (spikes, platforms...) inside
+ *   custom y      : clamp_custom_y keeps "0 = default height" meaningful
+ *   rail riders   : clamp_rail_t keeps t_offset on the rail they ride
+ *   stacked tiles : vines/ladders/ropes keep every tile above the bottom edge
+ */
 void editor_clamp_placement(const LevelDef *level, EntityType type,
                             PlacementData *pd)
 {
@@ -126,6 +141,7 @@ void editor_clamp_placement(const LevelDef *level, EntityType type,
     world_w = editor_world_width(level);
 
     switch (type) {
+    /* ---- Points: pickups, singletons and checkpoints ---------------- */
     case ENT_COIN:
         pd->coin.x = clampf(pd->coin.x, 0.0f, world_w);
         pd->coin.y = clampf(pd->coin.y, 0.0f, world_h);
@@ -152,6 +168,7 @@ void editor_clamp_placement(const LevelDef *level, EntityType type,
         pd->checkpoint.x = clampf(pd->checkpoint.x, 0.0f, world_w - TILE_SIZE);
         pd->checkpoint.y = clampf(pd->checkpoint.y, 0.0f, world_h);
         break;
+    /* ---- Patrolling enemies: the range moves with the entity -------- */
     case ENT_SPIDER:
         clamp_patrol(&pd->spider.x, &pd->spider.patrol_x0,
                      &pd->spider.patrol_x1, world_w);
@@ -171,6 +188,7 @@ void editor_clamp_placement(const LevelDef *level, EntityType type,
         clamp_patrol(&pd->fish.x, &pd->fish.patrol_x0, &pd->fish.patrol_x1,
                      world_w);
         break;
+    /* ---- Hazards: y = 0 means "default height" for axes and saws ---- */
     case ENT_AXE_TRAP:
         pd->axe_trap.pillar_x = clampf(pd->axe_trap.pillar_x, 0.0f, world_w);
         clamp_custom_y(&pd->axe_trap.y);
@@ -191,6 +209,7 @@ void editor_clamp_placement(const LevelDef *level, EntityType type,
         pd->spike_platform.y = clampf(pd->spike_platform.y, 0.0f,
                                       world_h - SPIKE_PLAT_SRC_H);
         break;
+    /* A spike block's position comes from its rail: keep t on that rail. */
     case ENT_SPIKE_BLOCK:
         pd->spike_block.t_offset = clamp_rail_t(level, pd->spike_block.rail_index,
                                                 pd->spike_block.t_offset);
@@ -201,7 +220,9 @@ void editor_clamp_placement(const LevelDef *level, EntityType type,
     case ENT_FIRE_FLAME:
         clamp_span(&pd->fire_flame.x, FLOOR_GAP_W, world_w);
         break;
+    /* ---- Surfaces: keep the full width (and height) inside -------- */
     case ENT_FLOAT_PLATFORM:
+        /* RAIL mode ignores x/y (the rail positions it), like spike blocks. */
         if (pd->float_platform.mode == FLOAT_PLATFORM_RAIL) {
             pd->float_platform.t_offset =
                 clamp_rail_t(level, pd->float_platform.rail_index,
@@ -229,6 +250,7 @@ void editor_clamp_placement(const LevelDef *level, EntityType type,
         clamp_span(&pd->platform.x, (float)tile_w * TILE_SIZE, world_w);
         break;
     }
+    /* ---- Climbables: the last stacked tile must end above GAME_H --- */
     case ENT_VINE:
         clamp_span(&pd->vine.x, VINE_W, world_w);
         pd->vine.y = clampf(pd->vine.y, 0.0f, world_h -
@@ -244,6 +266,7 @@ void editor_clamp_placement(const LevelDef *level, EntityType type,
         pd->rope.y = clampf(pd->rope.y, 0.0f, world_h -
                             ((float)(pd->rope.tile_count - 1) * ROPE_STEP + ROPE_H));
         break;
+    /* ---- World geometry stored as integers -------------------------- */
     case ENT_FLOOR_GAP: {
         float gap_x = clampf((float)pd->floor_gap, 0.0f, world_w - FLOOR_GAP_W);
         pd->floor_gap = (int)gap_x;

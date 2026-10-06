@@ -51,3 +51,26 @@ After token-preserving formatting, CodeQL reissued the zoom finding as `#105`
 and the previously reviewed command-line editor path (`#85`) as `#106`.
 Both replacement IDs were separately authorized for dismissal with the same
 verified rationale. The PR alert readback reports no open scanning alerts.
+
+## Audit remediation findings (PR #306)
+
+The audit remediation moved and added local file operations, and the C/C++
+analysis reissued the same path-injection class at new locations. Each was
+reviewed against the desktop permission boundary above:
+
+| Alerts | Input and operation | Assessment |
+| --- | --- | --- |
+| #130 | `editor_files.c`: `editor_load_level` reads the symlink-resolved target of the user-selected document | Same intentional selection as #61/#84. Resolving once and reading that exact file is what lets plain Save refuse a link repointed after load. |
+| #127, #128, #129 | `editor_files.c`: plain Save fingerprints and replaces/creates the document's write target | Same as #94–#102. The target is the opened document, or the file behind its link only while the link still names the file this session read; Save As refuses symlinked destinations; private editor paths are rejected on the path actually written. |
+| #126 | `editor_files.c`: recovery snapshot below the preference root | Same as #86–#93: `HOME`/`XDG_DATA_HOME` select the private root, fixed suffixes and generated names select the file. |
+| #125 | `editor_files.c`: atomic recent-files temp file beside the recent list | Same preference root as #126; the temp name is the list path plus a pid suffix, created exclusively and renamed over the list. |
+| #131 | `serializer_io.c`: `open()` of the parent directory to fsync it after a save | Opens (read-only) only the directory of a file the same save just wrote; it adds no new path source. |
+
+Alert #122 is the zoom-preset equality check reissued after the editor event
+code moved; it is the same exactly-representable `{1, 2, 3, 5}` comparison as
+#82/#105. The two `cpp/poorly-documented-function` warnings (#123, #124) were
+fixed by documenting `editor_clamp_placement` and `editor_entity_array`.
+
+These findings are proposed for dismissal as false positives and await
+explicit maintainer authorization, as with the earlier rounds. No query or
+check is disabled.
