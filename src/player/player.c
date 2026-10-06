@@ -22,10 +22,12 @@
  * player_update -- Apply gravity and velocity to position, handle floor and
  *                  one-way platform collisions.
  *
- * dt (delta time) is the time in seconds since the last frame (e.g. 0.016).
+ * dt (delta time) is the length of one simulation step in seconds: always
+ * GAME_FIXED_STEP (1/60 s) in play, see core/game_timing.h.
  * Multiplying velocity (px/s) by dt (s) gives displacement in pixels.
- * This expresses speed independently of frame rate. Numerical integration and
- * discrete collision sampling still have timestep-dependent error.
+ * Numerical integration and discrete collision sampling still have
+ * timestep-dependent error, but because the step is fixed that error is the
+ * same at every frame rate (compare `make timing-lab`).
  *
  * One-way platforms:
  *   Only the TOP SURFACE of each platform triggers a landing.  The player

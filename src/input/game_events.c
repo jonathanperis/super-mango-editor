@@ -11,6 +11,7 @@
 #include "../core/game_overlay.h"
 #include "../core/game_terminal.h"
 #include "../core/game_inspector.h"
+#include "../core/game_timing.h"
 #include "../screens/settings_menu.h"
 
 static int terminal_overlay(const GameState *gs)
@@ -27,7 +28,7 @@ static void request_terminal_action(GameState *gs, GameTerminalAction action)
     if (action == GAME_TERMINAL_ACTION_RETRY) {
         game_restart_after_game_over(gs);
         game_music_sync(gs);
-        gs->loop.prev_ticks = clock_millis();
+        game_timing_restart_clock(gs);
         game_input_arm_release_latch(gs, NULL);
     } else
         gs->route = game_terminal_action_route(action);
@@ -39,7 +40,7 @@ static void sync_pause_music(GameState *gs)
      * window focus while settings are open must keep the music paused. */
     game_music_sync(gs);
     if (game_overlay_state(gs) != GAME_OVERLAY_PAUSED)
-        gs->loop.prev_ticks = clock_millis();
+        game_timing_restart_clock(gs);
 }
 
 void game_handle_events(GameState *gs)

@@ -2,7 +2,7 @@
 
 > Play a C11/raylib platformer, build TOML worlds, and learn how the engine works.
 
-Super Mango is a 2D platformer built in C11 with raylib, designed as an educational project for learning game development. The game features dynamic multi-screen TOML worlds with parallax backgrounds, enemies, hazards, collectibles, and delta-time physics, building natively on macOS/Linux/Windows and as WebAssembly for browser play.
+Super Mango is a 2D platformer built in C11 with raylib, designed as an educational project for learning game development. The game features dynamic multi-screen TOML worlds with parallax backgrounds, enemies, hazards, collectibles, and fixed-time-step physics, building natively on macOS/Linux/Windows and as WebAssembly for browser play.
 
 ---
 
@@ -56,7 +56,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 
 - 2D side-scrolling platformer with dynamic multi-screen worlds (configurable via `screen_count`)
 - 32 render layers drawn back-to-front with per-level configurable parallax backgrounds
-- Delta-time physics with timestep-dependent numerical tradeoffs; compare rates with `make timing-lab`
+- Fixed-time-step physics (1/60 s steps fed by an accumulator); `make timing-lab` shows why variable steps made results depend on the frame rate
 - Six enemy types (spider, jumping spider, bird, faster bird, fish, faster fish)
 - Seven hazard types (spike, spike block, spike platform, circular saw, axe trap, blue flame, fire flame)
 - Five collectible types (coin, star yellow/green/red, last star)

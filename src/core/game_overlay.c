@@ -61,6 +61,14 @@ void game_overlay_resume(GameState *gs)
     game_overlay_set_pause_reason(gs, GAME_PAUSE_REASON_PLAYER, 0);
 }
 
+int game_simulation_blocked(const GameState *gs)
+{
+    if (!gs) return 1;
+    return game_overlay_blocks_update(gs) ||
+           (gs->settings_menu && gs->settings_menu->open) ||
+           !gs->running || gs->route != GAME_ROUTE_NONE;
+}
+
 int game_music_should_play(const GameState *gs)
 {
     if (!gs) return 0;
