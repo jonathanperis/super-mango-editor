@@ -124,6 +124,73 @@ fail:
     return 1;
 }
 
+/*
+ * A profile written before the stricter level-reference rule can hold a key
+ * such as "levels/con.toml".  Only those entries (and such a last_level) are
+ * dropped; the rest loads, and the next save writes the cleaned profile.
+ * Every other kind of damage still rejects the whole file.
+ */
+static int legacy_level_keys_are_dropped(void)
+{
+    static const char legacy[] =
+        "format_version = 1\nlast_level = \"levels/con.toml\"\n"
+        "[[levels]]\npath = \"levels/con.toml\"\nscore = 5\ncoins = 1\ntime = 3\n"
+        "[[levels]]\npath = \"levels/kept.toml\"\nscore = 7\ncoins = 2\ntime = 4\n"
+        "[[levels]]\npath = \"levels/labs/01_collision.toml\"\nscore = 1\ncoins = 0\ntime = 1\n";
+    static const char *const still_rejected[] = {
+        /* A bad value next to a now-invalid key: the entry is malformed. */
+        "format_version = 1\n[[levels]]\npath = \"levels/con.toml\"\nscore = \"x\"\ncoins = 1\ntime = 3\n",
+        /* Missing field. */
+        "format_version = 1\n[[levels]]\npath = \"levels/con.toml\"\nscore = 1\ncoins = 1\n",
+        /* An embedded NUL is not a legacy key; it is damage. */
+        "format_version = 1\n[[levels]]\npath = \"levels/a\\u0000.toml\"\nscore = 1\ncoins = 1\ntime = 1\n",
+        /* Duplicates among the kept entries. */
+        "format_version = 1\n"
+        "[[levels]]\npath = \"levels/a.toml\"\nscore = 1\ncoins = 1\ntime = 1\n"
+        "[[levels]]\npath = \"levels/con.toml\"\nscore = 1\ncoins = 1\ntime = 1\n"
+        "[[levels]]\npath = \"levels/a.toml\"\nscore = 2\ncoins = 1\ntime = 1\n",
+    };
+    GameProfile *profile = calloc(1, sizeof(*profile));
+    GameProfileData *decoded = calloc(1, sizeof(*decoded));
+    char path[160];
+    char lock_path[176];
+    char *saved = NULL;
+    FILE *fp;
+
+    snprintf(path, sizeof(path), "out/profile-legacy-%llu.toml", (unsigned long long)clock_millis());
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+    CHECK(profile && decoded);
+    CHECK(game_profile_decode(decoded, legacy) == 0);
+    CHECK(decoded->count == 1 && !strcmp(decoded->levels[0].path, "levels/kept.toml"));
+    CHECK(decoded->levels[0].best_score == 7 && decoded->last_level[0] == '\0');
+    for (size_t i = 0; i < sizeof(still_rejected) / sizeof(still_rejected[0]); i++)
+        CHECK(game_profile_decode(decoded, still_rejected[i]) == -1);
+
+    /* The file loads writable, and the compare-and-swap baseline is the
+     * original text, so the next save replaces it with the cleaned data. */
+    fp = fopen(path, "wb");
+    CHECK(fp);
+    fputs(legacy, fp);
+    fclose(fp);
+    game_profile_init(profile);
+    CHECK(game_profile_open(profile, path) == 0 && profile->writable);
+    CHECK(profile->data.count == 1);
+    CHECK(game_profile_save(profile) == 0);
+    game_profile_close(profile);
+    game_profile_init(profile);
+    CHECK(game_profile_open(profile, path) == 0 && profile->data.count == 1);
+    saved = profile->baseline;
+    CHECK(saved && !strstr(saved, "con.toml") && !strstr(saved, "labs/"));
+    CHECK(strstr(saved, "levels/kept.toml") != NULL);
+    game_profile_close(profile);
+    free(profile); free(decoded); remove(path); remove(lock_path);
+    return 0;
+fail:
+    if (profile) game_profile_close(profile);
+    free(profile); free(decoded); remove(path); remove(lock_path);
+    return 1;
+}
+
 static int level_key_boundaries(void)
 {
     char *prefs = preference_path_at("out", "migration-path-test", "Application");
@@ -306,6 +373,7 @@ int game_profile_contract_test(void)
 {
     puts("profile: codec/storage");
     if (codec_and_storage()) return 1;
+    if (legacy_level_keys_are_dropped()) return 1;
     if (level_key_boundaries()) return 1;
     if (pending_snapshot_bookkeeping()) return 1;
     puts("profile: settings/bindings");
