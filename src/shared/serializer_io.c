@@ -1,5 +1,6 @@
 #ifndef _WIN32
 #define _POSIX_C_SOURCE 200809L
+#define _XOPEN_SOURCE 700  /* realpath is an XSI extension */
 #endif
 
 /*
@@ -10,8 +11,8 @@
 
 #include <errno.h>  /* errno, EEXIST */
 #include <stdio.h>  /* remove, snprintf */
-#include <stdlib.h> /* free, malloc */
-#include <string.h> /* strlen, memset */
+#include <stdlib.h> /* free, malloc, realpath */
+#include <string.h> /* memcpy, memset, strlen, strrchr */
 #include <stdint.h> /* uint64_t */
 
 #ifdef _WIN32
@@ -21,8 +22,8 @@
 #include <sys/stat.h> /* _S_IREAD, _S_IWRITE */
 #else
 #include <fcntl.h>    /* open, O_CREAT, O_EXCL */
-#include <sys/stat.h> /* stat, fchmod */
-#include <unistd.h>   /* getpid, fsync, fileno */
+#include <sys/stat.h> /* stat, lstat, fchmod */
+#include <unistd.h>   /* getpid, fsync, fileno, close */
 #endif
 
 static int serializer_test_failure = SERIALIZER_TEST_FAILURE_NONE;
@@ -342,6 +343,73 @@ int serializer_flush(FILE *fp)
     return serializer_stream_has_error(fp) ? -1 : 0;
 }
 
+/*
+ * serializer_sync_parent_dir — Make a completed rename/link durable.
+ *
+ * fsync(file) persists the bytes, but the new directory entry created by
+ * rename() or link() lives in the parent directory.  Without syncing that
+ * directory, a power loss right after "Saved" can bring back the old file.
+ * Some filesystems cannot fsync a directory and report EINVAL; nothing more
+ * can be done there, so that one error is treated as success.
+ */
+static int serializer_sync_parent_dir(const char *path)
+{
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
+    /* Windows uses MOVEFILE_WRITE_THROUGH; the browser has no real disk. */
+    (void)path;
+    return 0;
+#else
+    char dir[SERIALIZER_IO_PATH_MAX];
+    const char *slash = strrchr(path, '/');
+    size_t length;
+    int fd;
+    int result = 0;
+
+    if (!slash) {
+        memcpy(dir, ".", 2);            /* "level.toml" lives in "." */
+    } else if (slash == path) {
+        memcpy(dir, "/", 2);            /* "/level.toml" lives in "/" */
+    } else {
+        length = (size_t)(slash - path);
+        if (length >= sizeof(dir)) return -1;
+        memcpy(dir, path, length);
+        dir[length] = '\0';
+    }
+
+    fd = open(dir, O_RDONLY);
+    if (fd < 0) return -1;
+    if (fsync(fd) != 0 && errno != EINVAL) result = -1;
+    if (close(fd) != 0) result = -1;
+    return result;
+#endif
+}
+
+int serializer_resolve_save_target(const char *path, char *buf, size_t buf_size)
+{
+    if (!path || !buf || buf_size == 0) return -1;
+
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+    {
+        struct stat link_stat;
+        if (lstat(path, &link_stat) == 0 && S_ISLNK(link_stat.st_mode)) {
+            char *resolved = realpath(path, NULL);
+            if (resolved) {
+                size_t length = strlen(resolved);
+                int fits = length < buf_size;
+                if (fits) memcpy(buf, resolved, length + 1);
+                free(resolved);
+                return fits ? 0 : -1;
+            }
+            /* A dangling link has no target to update; replace the link. */
+        }
+    }
+#endif
+
+    if (strlen(path) >= buf_size) return -1;
+    memcpy(buf, path, strlen(path) + 1);
+    return 0;
+}
+
 int serializer_replace_file(const char *temp_path, const char *target_path)
 {
     if (!temp_path || !target_path) return -1;
@@ -373,8 +441,11 @@ int serializer_replace_file(const char *temp_path, const char *target_path)
     }
 #else
     /* POSIX rename is atomic within one filesystem, but this is not a
-     * compare-and-replace operation; callers recheck fingerprints first. */
-    return rename(temp_path, target_path) == 0 ? 0 : -1;
+     * compare-and-replace operation; callers recheck fingerprints first.
+     * rename() replaces a symlink itself, not the file it points to; level
+     * saves call serializer_resolve_save_target first to keep the link. */
+    if (rename(temp_path, target_path) != 0) return -1;
+    return serializer_sync_parent_dir(target_path);
 #endif
 }
 
@@ -407,7 +478,7 @@ int serializer_create_file(const char *temp_path, const char *target_path)
         (void)unlink(target_path);
         return -1;
     }
-    return 0;
+    return serializer_sync_parent_dir(target_path);
 #endif
 }
 
