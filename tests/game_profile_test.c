@@ -339,8 +339,17 @@ static int persistent_session(void)
     CHECK(applied_width==1200 && applied_height==900);
 #ifndef MANGO_MEMORY_TESTS
     /* Memory renders frames but has no OS resize implementation. The desktop
-     * suite additionally verifies that the real window applied the request. */
-    CHECK(GetScreenWidth()==1200 && GetScreenHeight()==900);
+     * suite additionally verifies that the real window applied the request.
+     * An OS may clamp a window to a smaller monitor (CI VMs often run at
+     * 1024x768), so the exact size is only required when it fits. */
+    {
+        int monitor = GetCurrentMonitor();
+        if (GetMonitorWidth(monitor) > 1200 && GetMonitorHeight(monitor) > 900)
+            CHECK(GetScreenWidth()==1200 && GetScreenHeight()==900);
+        else
+            CHECK(GetScreenWidth()>WINDOW_W/2 && GetScreenWidth()<=1200 &&
+                  GetScreenHeight()>0 && GetScreenHeight()<=900);
+    }
 #endif
     session->game->score=200;
     game_complete_level(session->game);
