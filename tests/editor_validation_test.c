@@ -1539,7 +1539,7 @@ static int editor_widget_test_context_init(EditorWidgetTestContext *context)
 {
     memset(context, 0, sizeof(*context));
     if (display_open(320, 240, "editor state test", 1)) return -1;
-    context->font = font_load("assets/fonts/round9x13.ttf", 13);
+    context->font = font_load();
     if (!context->font) return -1;
     BeginDrawing();
     context->drawing = 1;
