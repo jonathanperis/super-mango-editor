@@ -10,7 +10,9 @@ void game_terminal_actions(const GameState *gs, GameTerminalActionList *list)
     if (!gs) return;
 
     if (gs->completion.complete) {
-        if (gs->completion.pending_next_phase) {
+        /* After a failed load the next level is not reachable; offering it
+         * again would leave a dead button. The overlay explains why. */
+        if (gs->completion.pending_next_phase && !gs->completion.next_phase_failed) {
             list->items[list->count++] = GAME_TERMINAL_ACTION_NEXT_LEVEL;
         }
         list->items[list->count++] = GAME_TERMINAL_ACTION_REPLAY;

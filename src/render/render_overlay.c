@@ -98,7 +98,10 @@ void render_level_complete_overlay(GameState *gs)
         render_centered_text(gs, line, (Color){255, 255, 255, 255}, 120);
         snprintf(line, sizeof(line), "Time: %02d:%02d", minutes, seconds);
         render_centered_text(gs, line, (Color){255, 255, 255, 255}, 136);
-        if (!has_next_level) {
+        if (gs->completion.next_phase_failed) {
+            render_centered_text(gs, "Next level failed to load",
+                                 (Color){255, 90, 90, 255}, 154);
+        } else if (!has_next_level) {
             render_centered_text(gs, "Congratulations!",
                                  (Color){100, 255, 100, 255}, 154);
         }
