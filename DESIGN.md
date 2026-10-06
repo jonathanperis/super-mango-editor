@@ -4,6 +4,8 @@
 > below describe the earlier design assessment. Several changes have since shipped.
 > Use `docs/src/generated/project.json`, the public manual and current source for
 > present facts. Sandbox School and the Mechanics Museum are now primary learning routes.
+> The SDL2 references below predate the move to pinned raylib 6.0; the game no
+> longer uses SDL. They are kept unedited as a record of the original plan.
 
 ## Design Intent
 
