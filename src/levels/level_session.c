@@ -12,6 +12,7 @@
 #include "level.h"
 #include "level_loader.h"
 #include "level_path.h"
+#include "level_ref.h"
 #include "level_resources.h"
 #include "phase_transition.h"
 #include "../core/game_completion.h"
@@ -37,33 +38,16 @@ static int campaign_manifest_key_allowed(const char *key, int key_len)
            campaign_key_matches(key, key_len, "levels", sizeof("levels") - 1);
 }
 
+/*
+ * Manifest entries use the same levels/<name>.toml rule as next_phase and
+ * profile keys (level_ref.h); this wrapper only adds the storage limit.
+ * TOML strings carry an explicit length, so an embedded NUL is also rejected
+ * by level_ref_valid as a control byte.
+ */
 static int campaign_level_path_safe(const char *path, size_t length)
 {
-    static const char prefix[] = "levels/";
-    static const char suffix[] = ".toml";
-    const size_t prefix_len = sizeof(prefix) - 1;
-    const size_t suffix_len = sizeof(suffix) - 1;
-    const char *name;
-    size_t name_len;
-
-    if (!path || length == 0 || length >= CAMPAIGN_LEVEL_PATH_SIZE ||
-        memchr(path, '\0', length) != NULL)
-        return 0;
-    if (length <= prefix_len + suffix_len ||
-        memcmp(path, prefix, prefix_len) != 0 ||
-        memcmp(path + length - suffix_len, suffix, suffix_len) != 0 ||
-        memchr(path, '\\', length) != NULL ||
-        memchr(path, ':', length) != NULL)
-        return 0;
-
-    name = path + prefix_len;
-    name_len = length - prefix_len;
-    if (memchr(name, '/', name_len) != NULL ||
-        (name_len == suffix_len && memcmp(name, suffix, suffix_len) == 0) ||
-        (name_len == sizeof("..toml") - 1 &&
-         memcmp(name, "..toml", sizeof("..toml") - 1) == 0))
-        return 0;
-    return 1;
+    if (!path || length == 0 || length >= CAMPAIGN_LEVEL_PATH_SIZE) return 0;
+    return level_ref_valid(path, length);
 }
 
 static int campaign_cstring_length(const char *text, size_t capacity,

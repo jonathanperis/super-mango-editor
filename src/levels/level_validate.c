@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "level_loader.h"
+#include "level_ref.h"
 
 #define MAX_INITIAL_LIVES 999
 #define MAX_SCORE_PER_LIFE 999999
@@ -195,9 +196,19 @@ static int validate_level_paths(const LevelDef *def, char *err, size_t err_size)
     if (validate_typed_path("floor_tile_path", def->floor_tile_path,
                             "assets/sprites/levels/", ".png", err, err_size) != 0)
         return -1;
-    if (validate_typed_path("next_phase", def->next_phase,
-                            "levels/", ".toml", err, err_size) != 0)
-        return -1;
+    /*
+     * next_phase follows the shared level-reference rule (level_ref.h) so a
+     * chained phase is always one the campaign and profile can also name.
+     */
+    if (def->next_phase[0] != '\0') {
+        if (validate_safe_repo_path("next_phase", def->next_phase,
+                                    err, err_size) != 0)
+            return -1;
+        if (!level_ref_valid(def->next_phase, strlen(def->next_phase)))
+            return fail_value(err, err_size, "next_phase",
+                              "must be levels/<name>.toml without subdirectories, "
+                              "Windows-reserved characters or device names");
+    }
 
     for (int i = 0; i < def->platform_count; i++) {
         snprintf(field, sizeof(field), "platforms[%d].tile_path", i);

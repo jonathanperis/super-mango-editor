@@ -126,6 +126,7 @@ src/
 │   ├── level_loader.h / .c       TOML level loading and switching
 │   ├── level_path.h / .c         Level path normalization and directory helpers
 │   ├── level_physics.h / .c      Level physics override/default helpers
+│   ├── level_ref.h / .c          Shared levels/<name>.toml rule for next_phase, campaigns and profile keys
 │   ├── level_resources.h / .c    Per-level resource reload wrappers
 │   ├── level_session.h / .c      Active LevelDef storage plus v1 campaign catalog loading/validation
 │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
@@ -538,6 +539,10 @@ TOML level loading and switching system.
 ### `levels/level_physics.h` / `levels/level_physics.c`
 
 Shared physics override/default helpers for player movement and camera lookahead.
+
+### `levels/level_ref.h` / `levels/level_ref.c`
+
+`level_ref_valid()` defines the one level-reference rule shared by `[last_star].next_phase`, campaign manifest entries and profile result keys: a direct `levels/<name>.toml` child without subdirectories, Windows-reserved characters or device names. `tools/validate_levels.py` mirrors it.
 
 ### `levels/level_validate.c`
 
