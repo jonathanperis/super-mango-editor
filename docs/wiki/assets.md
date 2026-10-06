@@ -310,15 +310,18 @@ and exponential envelopes, seeded noise, one-pole low/high/band-pass filters,
 peak normalization and seamless loop crossfades.
 
 ```sh
-make sounds                          # rewrite assets/sounds/**/*.wav
+make sounds                          # rewrite WAVs that changed beyond 1 LSB
 python3 tools/gen_sounds.py --check  # exit 1 if a committed WAV drifts
 ```
 
-Output is mono 16-bit PCM at 22050 Hz and byte-identical on every run, because
-each recipe draws noise from its own fixed `random.Random` seed. `make
-docs-drift` runs `--check`, which requires identical WAV headers and frame
-counts but lets each sample differ by 1 LSB, because `math.sin`/`math.exp` come
-from the platform C library and may round differently on macOS and Linux. It
+Output is mono 16-bit PCM at 22050 Hz and byte-identical on every run on the
+same platform, because each recipe draws noise from its own fixed
+`random.Random` seed. `make docs-drift` runs `--check`, which requires
+identical WAV headers and frame counts but lets each sample differ by 1 LSB,
+because `math.sin`/`math.exp` come from the platform C library and may round
+differently on macOS and Linux. `make sounds` applies the same tolerance and
+reports such files as `unchanged` instead of rewriting them, so regenerating on
+another OS only touches sounds whose recipe actually changed. `--check`
 also rejects WAV files the generator does not produce; `make test` runs `tests/gen_sounds_test.py` (format, determinism, fade
 outs, loop seams and a 2 MiB sound budget). To change a sound, edit its recipe
 and seed/peak entry in the `SOUNDS` table, run `make sounds`, then listen and
