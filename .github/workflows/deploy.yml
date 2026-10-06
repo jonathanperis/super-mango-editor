@@ -8,7 +8,7 @@ name: Deploy to GitHub Pages
 #   1. Downloads the WebAssembly build artifacts from the latest build
 #   2. Builds the docs site (Astro)
 #   3. Copies WASM files into docs output
-#   4. Deploys to GitHub Pages
+#   4. Deploys to GitHub Pages from a separate job (only it can write Pages)
 # ──────────────────────────────────────────────────────────────────────────────
 on:
   workflow_run:
@@ -18,28 +18,29 @@ on:
     branches:
       - main
 
+# Workflow default is read-only; each job below grants only what it needs.
 permissions:
-  pages: write
-  id-token: write
   contents: read
-  actions: read
 
 concurrency:
   group: github-pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  # Builds the docs site with third-party npm code and assembles the WASM game.
+  # It cannot deploy: no pages/id-token permissions reach dependency code.
+  build:
     # Only run if the Build & Release workflow succeeded
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      actions: read   # download the WASM artifact from the triggering run
 
     steps:
       - name: Checkout source
@@ -74,6 +75,9 @@ jobs:
         run: bun run build
         working-directory: docs
         env:
+          # NEXT_PUBLIC_GA_ID is a legacy secret name from the former Next.js
+          # site; Astro reads PUBLIC_GA_ID. Renaming the mapping requires
+          # creating the new repository secret first, then updating this line.
           PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}
 
       - name: Check built docs links and metadata
@@ -104,6 +108,22 @@ jobs:
           path: docs/out/
           retention-days: 1
 
+  # Publishes the already-built Pages artifact. Only this job holds the Pages
+  # write and OIDC permissions, and it runs no repository or npm code.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
