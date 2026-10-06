@@ -74,7 +74,9 @@ int dialog_zenity_selection(int exit_code, const char *output,
  * FILE_DIALOG_ERROR (longer than buf), or FILE_DIALOG_INVALID_PATH when the
  * file name itself contains a line break: the picker prints such a name
  * across several lines, and keeping only the first would silently open or
- * overwrite a different file.  Reads fp to its end; does not close it.
+ * overwrite a different file.  The line ending is "\n", or "\r\n" on
+ * Windows only; any other '\r' counts as part of the name and is refused
+ * too.  Reads fp to its end; does not close it.
  */
 int file_dialog_read_path(FILE *fp, char *buf, int buf_size);
 

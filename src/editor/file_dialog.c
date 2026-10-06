@@ -173,7 +173,12 @@ int file_dialog_read_path(FILE *fp, char *buf, int buf_size)
     length = strlen(buf);
     ended = length > 0 && buf[length - 1] == '\n';
     if (ended) buf[--length] = '\0';
-    if (length > 0 && buf[length - 1] == '\r') buf[--length] = '\0';
+#ifdef _WIN32
+    /* Only Windows ends lines with "\r\n", and its file names cannot hold
+     * '\r'.  On macOS and Linux a name may really end in '\r'; stripping it
+     * would open a different file, so it is left for the check below. */
+    if (ended && length > 0 && buf[length - 1] == '\r') buf[--length] = '\0';
+#endif
 
     /*
      * Anything after the first line means the picked name itself contained
