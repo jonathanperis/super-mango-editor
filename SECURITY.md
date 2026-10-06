@@ -57,9 +57,13 @@ cannot be isolated, so the game treats stored values as untrusted input:
   or personal data. The browser bridge rejects text containing NUL or larger
   than the fixed profile buffer, then `game_profile_decode()` parses it with
   the same strict rules as native profiles: unknown keys, wrong types,
-  out-of-range settings, invalid level keys and duplicate entries reject the
-  whole profile. The game then runs with defaults for that session only and
-  leaves the stored text untouched (it is never overwritten).
+  out-of-range settings, malformed progress entries and duplicate entries
+  reject the whole profile. The game then runs with defaults for that session
+  only and leaves the stored text untouched (it is never overwritten). One
+  exception keeps older profiles usable: a well-formed progress entry (or
+  `last_level`) whose level key fails today's level-reference rule, such as
+  `levels/con.toml`, is dropped with a warning while the rest loads. The next
+  save then writes the profile without it, through the same compare-and-swap.
 - The replay intent is removed as soon as it is read. The page shell only
   forwards it as a `--level` argument when it matches a bundled level path
   (`levels/NAME.toml` or `levels/labs/NAME.toml`). It must fit the fixed

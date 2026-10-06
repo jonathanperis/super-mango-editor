@@ -147,16 +147,30 @@ static int bindings(toml_datum_t value, GameSettings *settings, int keyboard)
     return 0;
 }
 
+/* decode_result outcomes: a usable entry, a well-formed entry to drop, or a
+ * malformed one that rejects the whole profile. */
+enum { RESULT_KEEP = 0, RESULT_DROP = 1, RESULT_INVALID = -1 };
+
+/*
+ * The level-reference rule (level_ref.h) became stricter after profiles were
+ * already being written, so an older profile can hold a now-refused key
+ * such as "levels/con.toml".  Rejecting the whole file for that would load
+ * no progress and, with the profile read-only, never save again.  So an
+ * entry whose only fault is its key is dropped (with a warning) and the
+ * rest of the profile still loads.  Everything else stays strict.
+ */
 static int decode_result(toml_datum_t table, GameProgress *result)
 {
-    if (table.type != TOML_TABLE || table.u.tab.size != 4) return -1;
+    int drop = 0;
+    if (table.type != TOML_TABLE || table.u.tab.size != 4) return RESULT_INVALID;
     int mask = 0;
     for (int i = 0; i < table.u.tab.size; i++) {
         const char *key = table.u.tab.key[i];
         toml_datum_t value = table.u.tab.value[i];
         if (strlen(key) != (size_t)table.u.tab.len[i]) return -1;
         if (!strcmp(key, "path")) {
-            if (string(value, result->path, sizeof(result->path)) || !game_profile_key_valid(result->path)) return -1;
+            if (string(value, result->path, sizeof(result->path))) return -1;
+            drop = !game_profile_key_valid(result->path);
             mask |= 1;
         } else if (!strcmp(key, "score")) {
             if (integer(value, &result->best_score)) return -1;
@@ -172,7 +186,8 @@ static int decode_result(toml_datum_t table, GameProgress *result)
             mask |= 8;
         } else return -1;
     }
-    return mask == 15 ? 0 : -1;
+    if (mask != 15) return RESULT_INVALID;
+    return drop ? RESULT_DROP : RESULT_KEEP;
 }
 
 int game_profile_decode(GameProfileData *out, const char *text)
@@ -200,14 +215,30 @@ int game_profile_decode(GameProfileData *out, const char *text)
         else if (!strcmp(key, "keys")) { if (bindings(value, &data->settings, 1)) goto done; }
         else if (!strcmp(key, "buttons")) { if (bindings(value, &data->settings, 0)) goto done; }
         else if (!strcmp(key, "last_level")) {
-            if (string(value, data->last_level, sizeof(data->last_level)) ||
-                (data->last_level[0] && !game_profile_key_valid(data->last_level))) goto done;
+            if (string(value, data->last_level, sizeof(data->last_level))) goto done;
+            if (data->last_level[0] && !game_profile_key_valid(data->last_level)) {
+                /* Same legacy case as a progress key: forget the selection. */
+                fprintf(stderr, "Warning: profile last_level is no longer a valid "
+                        "level path; ignoring it\n");
+                data->last_level[0] = '\0';
+            }
         } else if (!strcmp(key, "levels")) {
             if (value.type != TOML_ARRAY || value.u.arr.size > PROFILE_LEVEL_COUNT) goto done;
-            data->count = value.u.arr.size;
-            for (int j = 0; j < data->count; j++) {
-                if (decode_result(value.u.arr.elem[j], &data->levels[j])) goto done;
-                for (int k = 0; k < j; k++) if (!strcmp(data->levels[k].path, data->levels[j].path)) goto done;
+            data->count = 0;
+            for (int j = 0; j < value.u.arr.size; j++) {
+                GameProgress *entry = &data->levels[data->count];
+                int outcome = decode_result(value.u.arr.elem[j], entry);
+                if (outcome == RESULT_INVALID) goto done;
+                if (outcome == RESULT_DROP) {
+                    /* The path is not echoed: it is untrusted text that
+                     * may hold terminal control characters. */
+                    fprintf(stderr, "Warning: dropping profile progress for a level "
+                            "path that is no longer valid\n");
+                    memset(entry, 0, sizeof(*entry));
+                    continue;
+                }
+                for (int k = 0; k < data->count; k++) if (!strcmp(data->levels[k].path, entry->path)) goto done;
+                data->count++;
             }
         } else goto done;
 #undef FIELD
