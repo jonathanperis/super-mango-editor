@@ -46,9 +46,7 @@
 
 /* Collectible headers */
 #include "../collectibles/coin.h"
-#include "../collectibles/star_yellow.h"
-#include "../collectibles/star_green.h"
-#include "../collectibles/star_red.h"
+#include "../collectibles/health_star.h"
 #include "../collectibles/last_star.h"
 
 /* Player header */
@@ -248,17 +246,14 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
     coins_render(gs->coins, gs->coin_count,
                  gs->textures.coin, cam_x);
 
-    /* Draw star yellows alongside coins — same layer, same visibility */
-    star_yellows_render(gs->star_yellows, gs->star_yellow_count,
-                     gs->textures.star_yellow, cam_x);
-
-    /* Draw star greens — same mechanics and display size as yellow stars */
-    star_greens_render(gs->star_greens, gs->star_green_count,
-                      gs->textures.star_green, cam_x);
-
-    /* Draw star reds — same mechanics and display size as yellow stars */
-    star_reds_render(gs->star_reds, gs->star_red_count,
-                      gs->textures.star_red, cam_x);
+    /* Draw health stars alongside coins — one renderer, the texture picks
+     * the colour (yellow, then green, then red). */
+    health_stars_render(gs->star_yellows, gs->star_yellow_count,
+                        gs->textures.star_yellow, cam_x);
+    health_stars_render(gs->star_greens, gs->star_green_count,
+                        gs->textures.star_green, cam_x);
+    health_stars_render(gs->star_reds, gs->star_red_count,
+                        gs->textures.star_red, cam_x);
 
     /* Draw the end-of-level last star using its dedicated sprite */
     last_star_render(&gs->last_star,

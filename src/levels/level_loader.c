@@ -23,7 +23,7 @@
 #include "../surfaces/platform.h"
 #include "../surfaces/rail.h"
 #include "../collectibles/coin.h"
-#include "../collectibles/star_yellow.h"
+#include "../collectibles/health_star.h"
 #include "../collectibles/last_star.h"
 #include "../entities/spider.h"
 #include "../entities/jumping_spider.h"

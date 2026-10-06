@@ -39,9 +39,7 @@
 #include "entities/jumping_spider.h"/* JumpingSpider — jumping patrol enemy */
 #include "entities/bird.h"          /* Bird — slow sine-wave sky patrol */
 #include "entities/faster_bird.h"   /* FasterBird — fast sine-wave sky patrol */
-#include "collectibles/star_yellow.h"/* StarYellow — health-restoring collectible */
-#include "collectibles/star_green.h" /* StarGreen  — health-restoring collectible */
-#include "collectibles/star_red.h"   /* StarRed    — health-restoring collectible */
+#include "collectibles/health_star.h"/* HealthStar — yellow/green/red heart pickups */
 #include "hazards/axe_trap.h"       /* AxeTrap — swinging/spinning axe hazard */
 #include "hazards/circular_saw.h"   /* CircularSaw — fast rotating patrol hazard */
 #include "hazards/blue_flame.h"     /* BlueFlame — erupting fire hazard from sea gaps */
@@ -335,11 +333,11 @@ typedef struct {
     int           bridge_count;        /* number of active bridges             */
     int           floor_gaps[MAX_FLOOR_GAPS]; /* left-edge x of each floor gap     */
     int           floor_gap_count;           /* number of active floor gaps       */
-    StarYellow    star_yellows[MAX_STAR_YELLOWS]; /* health-restoring collectibles */
+    HealthStar    star_yellows[MAX_STAR_YELLOWS]; /* yellow health stars           */
     int           star_yellow_count;     /* number of star yellows placed       */
-    StarGreen     star_greens[MAX_STAR_GREENS]; /* green health-restoring collectibles */
+    HealthStar    star_greens[MAX_STAR_GREENS];   /* green health stars            */
     int           star_green_count;      /* number of star greens placed        */
-    StarRed       star_reds[MAX_STAR_REDS]; /* red health-restoring collectibles */
+    HealthStar    star_reds[MAX_STAR_REDS];       /* red health stars              */
     int           star_red_count;        /* number of star reds placed          */
     AxeTrap       axe_traps[MAX_AXE_TRAPS]; /* swinging/spinning axe hazards  */
     int           axe_trap_count;        /* number of axe traps placed         */

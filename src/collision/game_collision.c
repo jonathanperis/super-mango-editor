@@ -27,9 +27,7 @@
 #include "../hazards/blue_flame.h"
 #include "../collectibles/coin.h"
 #include "../collectibles/last_star.h"
-#include "../collectibles/star_yellow.h"
-#include "../collectibles/star_green.h"
-#include "../collectibles/star_red.h"
+#include "../collectibles/health_star.h"
 
 #include "../shared/audio.h"
 
@@ -40,6 +38,26 @@ static int damage_ends_pass(GameState *gs, float source_x, float source_y)
     int lives = gs->lives;
     apply_damage(gs, 1, 1, source_x, source_y);
     return gs->game_over || gs->lives != lives;
+}
+
+/*
+ * collect_health_stars — Pick up every active star of one colour that the
+ * player's hitbox touches: restore one heart (capped at MAX_HEARTS), play the
+ * pickup sound and hide the star. `name` only labels the debug log.
+ */
+static void collect_health_stars(GameState *gs, const IntRect *phit,
+                                 HealthStar *stars, int count, const char *name)
+{
+    for (int i = 0; i < count; i++) {
+        if (!stars[i].active) continue;
+        IntRect sbox = health_star_get_hitbox(&stars[i]);
+        if (rect_intersects(phit, &sbox)) {
+            stars[i].active = 0;
+            if (gs->hearts < MAX_HEARTS) gs->hearts++;
+            sound_play(gs->audio.coin, 128);
+            if (gs->debug_mode) debug_log(&gs->debug, "%s[%d] collected", name, i);
+        }
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -240,48 +258,10 @@ void game_collide(GameState *gs, float dt)
         }
     }
 
-    /* Stars — restore health, same pattern for all colors */
-    for (int i = 0; i < gs->star_yellow_count; i++) {
-        if (!gs->star_yellows[i].active) continue;
-        IntRect sbox = {
-            (int)gs->star_yellows[i].x, (int)gs->star_yellows[i].y,
-            STAR_YELLOW_DISPLAY_W, STAR_YELLOW_DISPLAY_H
-        };
-        if (rect_intersects(&phit, &sbox)) {
-            gs->star_yellows[i].active = 0;
-            if (gs->hearts < MAX_HEARTS) gs->hearts++;
-            sound_play(gs->audio.coin, 128);
-            if (gs->debug_mode) debug_log(&gs->debug, "STAR_YELLOW[%d] collected", i);
-        }
-    }
-
-    for (int i = 0; i < gs->star_green_count; i++) {
-        if (!gs->star_greens[i].active) continue;
-        IntRect sbox = {
-            (int)gs->star_greens[i].x, (int)gs->star_greens[i].y,
-            STAR_GREEN_DISPLAY_W, STAR_GREEN_DISPLAY_H
-        };
-        if (rect_intersects(&phit, &sbox)) {
-            gs->star_greens[i].active = 0;
-            if (gs->hearts < MAX_HEARTS) gs->hearts++;
-            sound_play(gs->audio.coin, 128);
-            if (gs->debug_mode) debug_log(&gs->debug, "STAR_GREEN[%d] collected", i);
-        }
-    }
-
-    for (int i = 0; i < gs->star_red_count; i++) {
-        if (!gs->star_reds[i].active) continue;
-        IntRect sbox = {
-            (int)gs->star_reds[i].x, (int)gs->star_reds[i].y,
-            STAR_RED_DISPLAY_W, STAR_RED_DISPLAY_H
-        };
-        if (rect_intersects(&phit, &sbox)) {
-            gs->star_reds[i].active = 0;
-            if (gs->hearts < MAX_HEARTS) gs->hearts++;
-            sound_play(gs->audio.coin, 128);
-            if (gs->debug_mode) debug_log(&gs->debug, "STAR_RED[%d] collected", i);
-        }
-    }
+    /* Stars — every colour restores one heart; one loop serves all three. */
+    collect_health_stars(gs, &phit, gs->star_yellows, gs->star_yellow_count, "STAR_YELLOW");
+    collect_health_stars(gs, &phit, gs->star_greens, gs->star_green_count, "STAR_GREEN");
+    collect_health_stars(gs, &phit, gs->star_reds, gs->star_red_count, "STAR_RED");
 
     /* Last star — triggers phase transition or level completion */
     if (gs->last_star.active) {
