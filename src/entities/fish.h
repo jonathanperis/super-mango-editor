@@ -51,7 +51,26 @@ typedef struct {
     float  anim_timer_ms;  /* ms accumulated toward the next frame advance */
 } Fish;
 
-/* Move fish, trigger random jumps, and advance animation. */
+/*
+ * FishSpec — the tuning that differs between fish variants.
+ *
+ * The regular and faster fish share their state (Fish), sprite sheet, size,
+ * hitbox and behaviour; only these numbers change. faster_fish.c passes its
+ * own FishSpec to fish_variant_update instead of copying the update loop.
+ */
+typedef struct {
+    float    speed;     /* horizontal patrol speed in px/s (positive)      */
+    float    jump_vy;   /* upward jump impulse in px/s (negative = up)     */
+    float    jump_min;  /* shortest wait before the next jump, in seconds  */
+    float    jump_max;  /* longest wait before the next jump, in seconds   */
+    uint32_t frame_ms;  /* ms each swim animation frame is held            */
+} FishSpec;
+
+/* Move fish with the given tuning, trigger random jumps, and animate. */
+void fish_variant_update(const FishSpec *spec, Fish *fish, int count,
+                         float dt, int world_w);
+
+/* Move regular fish, trigger random jumps, and advance animation. */
 void fish_update(Fish *fish, int count, float dt, int world_w);
 
 /* Draw all fish with camera-aware world-to-screen conversion. */
