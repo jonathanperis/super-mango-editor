@@ -32,6 +32,7 @@
 #include "editor/canvas.h"
 #include "editor/editor_playtest.h"
 #include "editor/properties.h"
+#include "levels/level_loader.h"
 
 #define EDITOR_WORKFLOW_LEVEL_PATH "out/test_editor_workflow_level.toml"
 #define EDITOR_WORKFLOW_RECENT_PATH "out/editor_recent.txt"
@@ -1530,6 +1531,80 @@ fail:
     return 1;
 }
 
+/* Three valid rails; a spike block rides rail 2, a float platform rail 1. */
+static void fill_rail_level(LevelDef *level)
+{
+    editor_level_init_defaults(level);
+    level->rail_count = 3;
+    for (int i = 0; i < 3; i++)
+        level->rails[i] = (RailPlacement){RAIL_LAYOUT_RECT, 32 + i * 128, 32, 4, 4, 0};
+    level->spike_block_count = 1;
+    level->spike_blocks[0] = (SpikeBlockPlacement){2, 1.5f, 3.0f};
+    level->float_platform_count = 1;
+    level->float_platforms[0] = (FloatPlatformPlacement){
+        FLOAT_PLATFORM_RAIL, 0.0f, 0.0f, 3, 1, 2.0f, 1.0f};
+}
+
+static int level_is_valid(const char *name, const LevelDef *level)
+{
+    char error[128];
+    if (level_validate_runtime(level, error, sizeof(error)) != 0) {
+        fprintf(stderr, "editor_validation_test: %s invalid: %s\n", name, error);
+        return 1;
+    }
+    return 0;
+}
+
+static int rail_deletion_keeps_references_valid(void)
+{
+    EditorState es = {0};
+    LevelDef original;
+    Command cmd;
+
+    fill_rail_level(&es.level);
+    original = es.level;
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+    editor_set_document_save_point(&es);
+
+    /* A referenced rail is refused with an explanation. */
+    es.selection.type = ENT_RAIL;
+    es.selection.index = 1;
+    tools_delete_selected(&es);
+    if (expect_int("referenced rail kept", es.level.rail_count, 3) != 0 ||
+        expect_prefix("referenced rail status", es.status_message,
+                      "Rail 1 is used by 0 spike blocks and 1 float platform") != 0 ||
+        expect_int("refusal records no history", es.undo->top, 0) != 0) goto fail;
+
+    /* An unused rail is removed and later references shift down. */
+    es.selection.index = 0;
+    tools_delete_selected(&es);
+    if (expect_int("unused rail removed", es.level.rail_count, 2) != 0 ||
+        expect_int("spike block follows rail", es.level.spike_blocks[0].rail_index, 1) != 0 ||
+        expect_int("float platform follows rail",
+                   es.level.float_platforms[0].rail_index, 0) != 0 ||
+        level_is_valid("after rail delete", &es.level) != 0) goto fail;
+
+    /* Undo restores the exact document, so the save point is clean again. */
+    if (!undo_pop(es.undo, &cmd)) goto fail;
+    editor_apply_undo_command(&es, &cmd, 1);
+    if (expect_int("undo rail count", es.level.rail_count, 3) != 0 ||
+        expect_int("undo restores bytes",
+                   memcmp(&es.level, &original, sizeof(original)) == 0, 1) != 0 ||
+        expect_int("undo rail clean", es.modified, 0) != 0) goto fail;
+
+    if (!redo_pop(es.undo, &cmd)) goto fail;
+    editor_apply_undo_command(&es, &cmd, 0);
+    if (expect_int("redo spike index", es.level.spike_blocks[0].rail_index, 1) != 0 ||
+        level_is_valid("after rail redo", &es.level) != 0) goto fail;
+
+    undo_destroy(es.undo);
+    return 0;
+fail:
+    undo_destroy(es.undo);
+    return 1;
+}
+
 typedef struct {
     TextFont *font;
     int drawing;
@@ -2075,6 +2150,7 @@ int main(void)
     if (dirty_save_point_tracks_undo_redo() != 0) return 1;
     if (selection_structural_mutations_are_safe() != 0) return 1;
     if (checkpoint_editor_mutations_are_reversible() != 0) return 1;
+    if (rail_deletion_keeps_references_valid() != 0) return 1;
     if (widget_commit_paths_preserve_values() != 0) return 1;
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;
