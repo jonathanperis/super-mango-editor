@@ -811,6 +811,26 @@ static void delete_entity(EditorState *es, EntityType type, int index)
     if (index < 0 || index >= editor_entity_count(level, type))
         return;
 
+    /*
+     * Spike blocks and rail-mode float platforms store the *position* of
+     * their rail in the rails array.  Deleting a rail they ride would leave
+     * them pointing at a different rail (or past the end), so refuse and
+     * tell the designer what to fix first.  Deleting an unused rail is fine:
+     * editor_entity_remove renumbers references to the rails after it.
+     */
+    if (type == ENT_RAIL) {
+        int blocks = 0;
+        int platforms = 0;
+        if (editor_rail_reference_count(level, index, &blocks, &platforms) > 0) {
+            editor_set_status(es,
+                              "Rail %d is used by %d spike block%s and %d float "
+                              "platform%s; move or delete them first",
+                              index, blocks, blocks == 1 ? "" : "s",
+                              platforms, platforms == 1 ? "" : "s");
+            return;
+        }
+    }
+
     /* Snapshot entity data before deletion for undo */
     before = editor_snapshot_entity(level, type, index);
 
