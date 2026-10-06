@@ -46,11 +46,58 @@ INVALID_FIXTURES = (
 )
 
 
+# Mirrors level_reference_rule() in tests/level_validate_test.c.
+LEVEL_REFERENCE_CASES = (
+    ("levels/01_lugio_01.toml", True),
+    ("levels/café.toml", True),
+    ("levels/console.toml", True),
+    ("levels/com10.toml", True),
+    ("levels/x.y.toml", True),
+    ("levels/labs/01_collision.toml", False),
+    ("levels/con.toml", False),
+    ("levels/CON.toml", False),
+    ("levels/nul.x.toml", False),
+    ("levels/Aux .toml", False),
+    ("levels/prn.toml", False),
+    ("levels/com1.toml", False),
+    ("levels/LPT9.toml", False),
+    ("levels/com0.toml", False),
+    ("levels/com¹.toml", False),
+    ("levels/lpt³.toml", False),
+    ("levels/a:b.toml", False),
+    ("levels/a?.toml", False),
+    ("levels/a\x7f.toml", False),
+    ("levels/a\\b.toml", False),
+    ("levels/.toml", False),
+    ("levels/..toml", False),
+    ("levels/.hidden.toml", False),
+    ("levels/a.txt", False),
+    ("assets/a.toml", False),
+)
+
+
+def check_level_references() -> None:
+    level = FIXTURE_DIR / "valid_v1.toml"
+    for value, valid in LEVEL_REFERENCE_CASES:
+        if validate_levels.level_ref_valid(value) != valid:
+            raise AssertionError(f"level reference rule mismatch: {value!r}")
+        if (validate_levels.normalize_campaign_path(value) is not None) != valid:
+            raise AssertionError(f"campaign path rule mismatch: {value!r}")
+        # Valid names may not exist on disk; only shape errors matter here.
+        errors = [
+            error for error in validate_levels.validate_phase_reference(level, "next_phase", value)
+            if "missing file" not in error
+        ]
+        if (not errors) != valid:
+            raise AssertionError(f"next_phase rule mismatch: {value!r}: {errors}")
+
+
 def load_fixture(name: str) -> dict:
     return validate_levels.load_level(FIXTURE_DIR / name)
 
 
 def main() -> int:
+    check_level_references()
     constants = validate_levels.load_max_constants()
     asset_manifest = validate_levels.load_asset_manifest()
     for array, valid_count, invalid_count in (("ropes", 6, 7), ("ladders", 14, 22), ("vines", 7, 9)):

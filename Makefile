@@ -70,7 +70,8 @@ EDITOR_DIR    = src/editor
 SHARED_DIR    = src/shared
 VENDOR_DIR    = vendor/tomlc17
 EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(wildcard $(SHARED_DIR)/*.c) $(VENDOR_DIR)/tomlc17.c \
-                src/surfaces/rail.c src/levels/level_validate.c src/input/input_backend.c
+                src/surfaces/rail.c src/levels/level_validate.c src/levels/level_ref.c \
+                src/input/input_backend.c
 EDITOR_OBJS   = $(patsubst %.c,$(OBJDIR)/%.o,$(EDITOR_SRCS))
 EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor
@@ -541,6 +542,10 @@ $(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
 $(OUTDIR)/level-serializer-test: tests/parser_boundary_test.c
+
+# level_validate.c shares the levels/<name>.toml rule from level_ref.c.
+$(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
+$(OUTDIR)/runtime-load-test $(OUTDIR)/editor-validation-test: $(OBJDIR)/src/levels/level_ref.o
 
 $(OUTDIR)/level-validate-test: tests/level_validate_test.c $(TEST_VALIDATE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)

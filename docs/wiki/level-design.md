@@ -214,6 +214,14 @@ next_phase = "levels/01_lugio_01.toml"  # optional level loaded after completion
 
 Single-instance. Triggers the level-complete event when collected. Displayed at 24×24 px. `next_phase` is serialized inside `[last_star]` because phase progression is tied to collecting the end-of-level star.
 
+### Level references
+
+`next_phase`, campaign manifest entries and player-profile result keys all name a level with one rule (`src/levels/level_ref.c`, mirrored by `tools/validate_levels.py`):
+
+- The path is a direct child of `levels/` ending in `.toml`: `levels/<name>.toml`. Subdirectories such as `levels/labs/` are rejected, so every chained phase can also be listed in a campaign and record profile results. Labs are standalone examples opened with `--level`.
+- `<name>` must not contain `/`, `\`, control characters (including DEL) or the Windows-reserved characters `< > : " | ? *`.
+- The stem before the first dot must be nonempty and must not be a Windows device name, in any letter case: `CON`, `PRN`, `AUX`, `NUL`, `COM0`–`COM9`, `LPT0`–`LPT9`, or `COM`/`LPT` followed by `¹`, `²` or `³`. `levels/con.toml` and `levels/nul.x.toml` are both rejected; `levels/console.toml` is fine.
+
 Collecting the last star snapshots elapsed time and coin totals, then shows the level-completion summary. With `next_phase`, its actions are **Next Level**, **Replay**, **Level Select**, and **Exit**; without one, the actions are **Replay**, **Level Select**, and **Exit**. Use Up/Down or D-pad to focus an action, Enter/Space/Start (or A) to confirm it, and Esc/Back (or B) to exit without advancing. See [Controls & Input](../controls/) for native level-select and browser-replay behavior.
 
 ---
@@ -235,7 +243,7 @@ levels = [
 |------|-------------|
 | Version | `format_version` is integer `1`. |
 | Membership | `levels` is a nonempty, duplicate-free ordered array. |
-| Paths | Each item is a direct child path in the form `levels/<filename>.toml`; use forward slashes only. Nested paths, absolute paths, `:` and `\\` are rejected. |
+| Paths | Each item follows the [level reference](#level-references) rule: a direct child path in the form `levels/<filename>.toml` with forward slashes only. Nested paths, absolute paths, `:`, `\\` and Windows device names are rejected. |
 | Listed files | Every entry must resolve and load as a TOML level. The start menu uses that level's `name`, falling back to its filename stem. |
 | Progression | Each non-final listed level must set `[last_star].next_phase` to the next manifest entry. The final listed level must omit `next_phase`. |
 
