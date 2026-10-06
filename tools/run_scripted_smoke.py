@@ -128,13 +128,21 @@ def selected_replays(args: argparse.Namespace, workdir: Path) -> list[Path]:
     return default_replay_scripts(workdir)
 
 
+def executable(path: Path) -> Path:
+    """Return the built program, allowing for the .exe MinGW linkers append."""
+    windows_exe = path.with_name(path.name + ".exe")
+    if os.name == "nt" and not path.exists() and windows_exe.exists():
+        return windows_exe
+    return path
+
+
 def main() -> int:
     args = parse_args()
     if args.frames <= 0:
         raise SystemExit("--frames must be positive")
 
-    binary = ROOT / args.binary
-    editor = ROOT / args.editor
+    binary = executable(ROOT / args.binary)
+    editor = executable(ROOT / args.editor)
     if not binary.exists():
         raise SystemExit(f"game binary missing: {binary.relative_to(ROOT)}")
     if not args.skip_editor and not editor.exists():
