@@ -22,9 +22,36 @@ def decode(data):
         return struct.unpack(f"<{frames}h", clip.readframes(frames))
 
 
+def nudge(data, delta):
+    """Copy a WAV with its middle sample shifted by `delta` int16 steps."""
+    with wave.open(io.BytesIO(data)) as clip:
+        frames = clip.getnframes()
+    header = len(data) - 2 * frames
+    offset = header + 2 * (frames // 2)
+    value = struct.unpack_from("<h", data, offset)[0]
+    value += delta if abs(value + delta) <= 32767 else -delta
+    out = bytearray(data)
+    struct.pack_into("<h", out, offset, value)
+    return bytes(out)
+
+
+def check_tolerance(data):
+    # libm may differ by an ulp across platforms, so --check allows 1 LSB.
+    assert gen_sounds.wav_matches(data, data)
+    for delta in (1, -1):
+        assert gen_sounds.wav_matches(nudge(data, delta), data), delta
+    for delta in (2, -2):
+        assert not gen_sounds.wav_matches(nudge(data, delta), data), delta
+    assert not gen_sounds.wav_matches(data[:-2], data), "frame count must match"
+    header_changed = bytearray(data)
+    header_changed[24] ^= 1                     # sample-rate byte
+    assert not gen_sounds.wav_matches(bytes(header_changed), data), "header"
+
+
 def main():
     first = gen_sounds.render_all()
     assert first == gen_sounds.render_all(), "generation must be deterministic"
+    check_tolerance(first["player/player_jump.wav"])
     # The C code loads these exact paths; the generator owns all of them.
     committed = sorted(p.relative_to(gen_sounds.SOUND_DIR).as_posix()
                        for p in gen_sounds.SOUND_DIR.rglob("*.wav"))
