@@ -134,10 +134,15 @@ gh attestation verify super-mango-macos-arm64.zip --repo jonathanperis/super-man
 
 macOS archives are ad-hoc signed (`codesign --sign -`), not signed with a
 Developer ID or notarized, because the project has no Apple Developer account.
-Gatekeeper therefore blocks the first launch of a downloaded copy. After
-verifying the checksum or attestation, either right-click (Control-click)
-`super-mango` or `super-mango-editor` in Finder and choose **Open**, or remove
-the quarantine attribute from the extracted folder:
+Gatekeeper therefore blocks the first launch of a downloaded copy. The old
+right-click (Control-click) **Open** bypass no longer works on macOS 15
+(Sequoia) and later. First verify `SHA256SUMS` or the attestation as shown
+above, then either:
+
+- try to launch `super-mango` (or `super-mango-editor`) once, open **System
+  Settings › Privacy & Security**, and click **Open Anyway** next to the
+  blocked-app message (macOS asks for an administrator password); or
+- remove the quarantine attribute from the extracted folder:
 
 ```sh
 xattr -dr com.apple.quarantine super-mango-macos-arm64
