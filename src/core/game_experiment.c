@@ -4,6 +4,7 @@
  * variable dt in (0, 0.1] still load and replay with their recorded steps.
  * Replays require unchanged level bytes and the same engine version. */
 #include "game_experiment.h"
+#include "../shared/platform.h"  /* clock_millis, str_copy */
 #include "game_random.h"
 #include "game_completion.h"
 #include "game_timing.h"

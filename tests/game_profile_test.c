@@ -3,6 +3,7 @@
 #include <string.h>
 #include "core/app_session.h"
 #include "core/game_profile.h"
+#include "shared/platform.h"  /* clock_millis, preference_path_at */
 #include "shared/serializer_io.h"
 #include "input/game_input.h"
 #include "screens/settings_menu.h"

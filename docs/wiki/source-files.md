@@ -225,7 +225,17 @@ See [Constants Reference](../constants-reference/) for full details.
 
 ### Includes
 
+`GameState` is deliberately one struct that stores every entity array by
+value, so `game.h` includes exactly the headers whose structs or `MAX_*`
+constants that definition needs — nothing else. Call-only helpers such as
+`shared/platform.h` (`clock_millis`, `str_copy`) are included by the `.c` files
+that use them. Splitting `GameState` would hide less but also be harder to
+trace; the comment at the top of `game.h` explains the trade-off.
+
 ```c
+#include "shared/graphics.h"            // Texture2D, RenderTexture2D, IntRect
+#include "shared/audio.h"               // SoundEffect, MusicTrack
+#include <stdint.h>                     // uint32_t, uint64_t fields
 #include "player/player.h"              // Player struct
 #include "surfaces/platform.h"          // Platform struct + MAX_PLATFORMS
 #include "effects/water.h"              // Water struct

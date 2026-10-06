@@ -6,6 +6,7 @@
  */
 
 #include "collision_damage.h"
+#include "../shared/platform.h"  /* clock_millis */
 
 #include "../levels/level.h"
 #include "../core/debug.h"
