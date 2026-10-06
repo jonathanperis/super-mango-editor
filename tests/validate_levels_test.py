@@ -168,10 +168,25 @@ def main() -> int:
         if not errors:
             raise AssertionError(f"invalid fixture accepted: {name}")
 
+    # Campaign entries share the C loader's 256-byte buffer (255 + NUL),
+    # counted in UTF-8 bytes: "é" is two.
+    def campaign_path(size: int, fill: str = "a") -> str:
+        stem = fill * ((size - len("levels/.toml")) // len(fill.encode("utf-8")))
+        return f"levels/{stem}.toml"
+    longest = campaign_path(255)
+    if len(longest.encode("utf-8")) != 255 or validate_levels.normalize_campaign_path(longest) is None:
+        raise AssertionError("255-byte campaign path rejected")
+    for too_long in (campaign_path(256), campaign_path(256, "é")):
+        if len(too_long.encode("utf-8")) != 256:
+            raise AssertionError(f"bad test path length: {len(too_long.encode('utf-8'))}")
+        if validate_levels.normalize_campaign_path(too_long) is not None:
+            raise AssertionError("256-byte campaign path accepted")
+
     for name in (
         "bad_format_version_key_embedded_nul.toml",
         "bad_levels_key_embedded_nul.toml",
         "bad_path_embedded_nul.toml",
+        "bad_path_too_long.toml",
     ):
         _, errors = validate_levels.campaign_manifest_entries(
             CAMPAIGN_FIXTURE_DIR / name

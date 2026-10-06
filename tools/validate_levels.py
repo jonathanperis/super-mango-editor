@@ -29,6 +29,9 @@ CAMPAIGN_MANIFEST = LEVEL_DIR / "campaigns" / "main.toml"
 CURRENT_FORMAT_VERSION = 1
 CAMPAIGN_MANIFEST_VERSION = 1
 CAMPAIGN_MANIFEST_FIELDS = {"format_version", "levels"}
+# Mirrors CAMPAIGN_LEVEL_PATH_SIZE in src/levels/level_session.h: the game
+# keeps each entry in a 256-byte C buffer, so 255 UTF-8 bytes plus the NUL.
+CAMPAIGN_LEVEL_PATH_SIZE = 256
 
 COUNT_LIMITS = {
     "floor_gaps": "MAX_FLOOR_GAPS",
@@ -456,6 +459,9 @@ def level_ref_valid(value) -> bool:
 def normalize_campaign_path(value) -> str | None:
     if not level_ref_valid(value):
         return None
+    # Length is counted in UTF-8 bytes, as the C loader sees it.
+    if len(value.encode("utf-8")) >= CAMPAIGN_LEVEL_PATH_SIZE:
+        return None
     return value
 
 
@@ -502,7 +508,7 @@ def campaign_manifest_entries(
         if normalized is None:
             errors.append(
                 f"{manifest_label}: levels[{index}] must be a safe "
-                f"levels/*.toml path"
+                f"levels/*.toml path of at most {CAMPAIGN_LEVEL_PATH_SIZE - 1} bytes"
             )
             continue
         if normalized in seen:
