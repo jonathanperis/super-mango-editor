@@ -283,7 +283,11 @@ make scripted-smoke SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
 
 ### `make sanitize`
 
-Runs `make test` in a separate `out-sanitize/` tree with AddressSanitizer and UndefinedBehaviorSanitizer enabled.
+Runs `make test` in a separate `out-sanitize/` tree with AddressSanitizer and UndefinedBehaviorSanitizer enabled, then `make fuzz-corpus` in the same tree.
+
+### `make fuzz-corpus` / `make fuzz`
+
+`fuzz-corpus` replays the level and profile fuzz seeds under ASan/UBSan with a plain driver. `fuzz` runs coverage-guided libFuzzer for `FUZZ_SECONDS` per harness and needs a clang with libFuzzer (`FUZZ_CC`). See [Testing](../testing/#fuzzing).
 
 ```sh
 make sanitize

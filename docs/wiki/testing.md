@@ -75,6 +75,28 @@ Both run under `make test`; `make sanitize` instruments the C probe as well.
 Level readers accept one leading UTF-8 BOM and preserve raw line endings so
 invalid CR-only documents remain rejected.
 
+## Fuzzing
+
+Two harnesses feed untrusted text to the parsers the game uses
+(POSIX only):
+
+- `tests/fuzz_level_parse.c` writes the input to a temporary `.toml` file and
+  calls `level_load_toml()` (tomlc17, schema, loaders, `level_validate_runtime()`).
+  An accepted level must save, reload and save again to identical bytes.
+- `tests/fuzz_profile_decode.c` calls `game_profile_decode()`. An accepted
+  profile must encode, decode and encode again to identical text.
+
+Both define the libFuzzer entry point `LLVMFuzzerTestOneInput`.
+
+| Command | What it does |
+|---------|--------------|
+| `make fuzz-corpus` | Builds both harnesses with `tests/fuzz_replay_main.c` under ASan/UBSan and replays the seeds: `levels/`, `levels/labs/`, `tests/fixtures/serializer_v1/`, `tests/fixtures/runtime/`, `tests/fuzz/corpus/level/` and `tests/fuzz/corpus/profile/`. `make sanitize` runs it too. `FUZZ_MUTATIONS=N` adds N blind byte mutations per seed: this is slower and weaker than libFuzzer, but needs no extra toolchain. |
+| `make fuzz` | Coverage-guided libFuzzer run for `FUZZ_SECONDS` (default 60) per harness. New inputs go to `out/fuzz/level/` and `out/fuzz/profile/`, and crashes to `out/fuzz/*-crash-*`. Apple clang has no libFuzzer, so use `make fuzz FUZZ_CC=$(brew --prefix llvm)/bin/clang` on macOS. |
+
+Replay a crash with `out/fuzz-level-replay <file>` (or `out/fuzz-profile-replay`).
+If an input exposed a real bug, add it to `tests/fuzz/corpus/` after the fix.
+Keep that corpus small and hand-reviewed.
+
 ## Browser Startup Check
 
 After frame-loop, graphics, audio or host-boot changes, serve the freshly built

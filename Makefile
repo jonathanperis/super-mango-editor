@@ -338,11 +338,68 @@ sanitize:
 	$(MAKE) all editor test OUTDIR="$(OUTDIR)-sanitize" \
 		EXTRA_CFLAGS="$(EXTRA_CFLAGS) $(SANITIZE_CFLAGS)" \
 		EXTRA_LDFLAGS="$(EXTRA_LDFLAGS) $(SANITIZE_LDFLAGS)"
+	$(MAKE) fuzz-corpus OUTDIR="$(OUTDIR)-sanitize"
 
 sanitize-smoke:
 	$(MAKE) smoke OUTDIR="$(OUTDIR)-sanitize" \
 		EXTRA_CFLAGS="$(EXTRA_CFLAGS) $(SANITIZE_CFLAGS)" \
 		EXTRA_LDFLAGS="$(EXTRA_LDFLAGS) $(SANITIZE_LDFLAGS)"
+
+# ── Fuzzing (POSIX) ──────────────────────────────────────────────────
+# Each harness defines LLVMFuzzerTestOneInput.  fuzz-corpus links it with
+# tests/fuzz_replay_main.c under ASan/UBSan and replays the seed inputs
+# (FUZZ_MUTATIONS=N adds N blind mutations per seed).  fuzz links it with
+# libFuzzer for coverage-guided search; Apple clang lacks libFuzzer, so
+# point FUZZ_CC at Homebrew LLVM or a Linux clang.
+FUZZ_FLAGS = -std=c11 -g -O1 -Wall -Wextra -Wpedantic -I$(SRCDIR) -I$(VENDOR_DIR) \
+             -I$(RAYLIB_BUILD)/build/raylib/include \
+             $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_RAYLIB_MEMORY,) \
+             -fno-omit-frame-pointer -fsanitize=address,undefined \
+             -fno-sanitize-recover=undefined
+FUZZ_LEVEL_SRCS = tests/fuzz_level_parse.c $(wildcard $(SHARED_DIR)/serializer*.c) \
+                  src/levels/level_validate.c src/levels/level_ref.c $(VENDOR_DIR)/tomlc17.c
+FUZZ_PROFILE_SRCS = tests/fuzz_profile_decode.c src/core/game_profile.c \
+                    src/input/game_bindings.c src/input/input_backend.c \
+                    src/levels/level_ref.c src/shared/serializer_io.c \
+                    src/shared/platform.c $(VENDOR_DIR)/tomlc17.c
+FUZZ_HEADERS = $(wildcard $(SRCDIR)/*.h $(SRCDIR)/*/*.h $(VENDOR_DIR)/*.h)
+# Seeds are read in place: shipped levels, schema fixtures, extra edge cases.
+FUZZ_LEVEL_SEEDS = levels levels/labs tests/fixtures/serializer_v1 \
+                   tests/fixtures/runtime tests/fuzz/corpus/level
+FUZZ_PROFILE_SEEDS = tests/fuzz/corpus/profile
+FUZZ_MUTATIONS ?= 0
+FUZZ_SECONDS ?= 60
+FUZZ_CC ?= $(firstword $(wildcard /opt/homebrew/opt/llvm/bin/clang /usr/local/opt/llvm/bin/clang) clang)
+
+.PHONY: fuzz-corpus fuzz
+fuzz-corpus: $(OUTDIR)/fuzz-level-replay $(OUTDIR)/fuzz-profile-replay
+	"$(abspath $(OUTDIR))/fuzz-level-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_LEVEL_SEEDS)
+	"$(abspath $(OUTDIR))/fuzz-profile-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_PROFILE_SEEDS)
+
+$(OUTDIR)/fuzz-level-replay: tests/fuzz_replay_main.c $(FUZZ_LEVEL_SRCS) $(FUZZ_HEADERS) | $(OUTDIR)
+	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_LEVEL_SRCS) -lm
+
+$(OUTDIR)/fuzz-profile-replay: tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(FUZZ_HEADERS) $(RAYLIB_LIB) | $(OUTDIR)
+	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(LIBS)
+
+# -close_fd_mask=2 hides the loaders' per-input error lines; libFuzzer keeps
+# its own and the sanitizer reports.  Crashes land in $(OUTDIR)/fuzz/ and
+# replay with: $(OUTDIR)/fuzz-level-replay <crash-file>
+fuzz: $(RAYLIB_LIB) | $(OUTDIR)
+	@printf 'int LLVMFuzzerTestOneInput(const char *d, unsigned long n) { (void)d; (void)n; return 0; }\n' \
+		| $(FUZZ_CC) -x c -fsanitize=fuzzer -o /dev/null - 2>/dev/null || { \
+		echo "fuzz: '$(FUZZ_CC)' cannot link libFuzzer (Apple clang does not ship it)."; \
+		echo "fuzz: install LLVM (brew install llvm) and run"; \
+		echo "      make fuzz FUZZ_CC=\$$(brew --prefix llvm)/bin/clang"; \
+		echo "fuzz: without libFuzzer, 'make fuzz-corpus FUZZ_MUTATIONS=500' runs blind mutations."; \
+		exit 1; }
+	mkdir -p $(OUTDIR)/fuzz/level $(OUTDIR)/fuzz/profile
+	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/level-fuzzer $(FUZZ_LEVEL_SRCS) -lm
+	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/profile-fuzzer $(FUZZ_PROFILE_SRCS) $(LIBS)
+	"$(abspath $(OUTDIR))/fuzz/level-fuzzer" -max_total_time=$(FUZZ_SECONDS) -close_fd_mask=2 \
+		-artifact_prefix=$(OUTDIR)/fuzz/level- $(OUTDIR)/fuzz/level $(FUZZ_LEVEL_SEEDS)
+	"$(abspath $(OUTDIR))/fuzz/profile-fuzzer" -max_total_time=$(FUZZ_SECONDS) -close_fd_mask=2 \
+		-artifact_prefix=$(OUTDIR)/fuzz/profile- $(OUTDIR)/fuzz/profile $(FUZZ_PROFILE_SEEDS)
 
 $(TEST_SERIALIZER_OBJ): $(SHARED_DIR)/serializer.c
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
