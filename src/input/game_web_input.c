@@ -7,7 +7,13 @@
 #include "input_backend.h"
 
 #ifdef __EMSCRIPTEN__
-#include <emscripten.h>  /* emscripten_run_script — run JavaScript on canvas */
+#include <emscripten.h>  /* EM_JS — JavaScript compiled into the glue file */
+
+/* EM_JS bodies ship inside super-mango.js, unlike emscripten_run_script,
+ * which evaluates a string at runtime and so needs a CSP allowing eval. */
+EM_JS(void, web_input_clear_host_touch, (void), {
+    if (Module.clearTouchInput) Module.clearTouchInput();
+});
 #endif
 
 static unsigned int touch_buttons;
@@ -51,7 +57,7 @@ void game_web_input_clear_touch(void)
         if (touch_buttons & (1u << action)) (void)game_web_input_touch(action, 0);
     touch_buttons = touch_pressed = 0;
 #ifdef __EMSCRIPTEN__
-    emscripten_run_script("if (Module.clearTouchInput) Module.clearTouchInput();");
+    web_input_clear_host_touch();
 #endif
 }
 

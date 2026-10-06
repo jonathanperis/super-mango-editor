@@ -11,6 +11,7 @@ import sys
 import zipfile
 from pathlib import Path
 from package_release import WASM_FILES
+from web_csp import problems as csp_problems
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_OUT = WASM_FILES
@@ -99,6 +100,9 @@ def main() -> int:
             return rc
 
     for stem in ("super-mango", "super-mango-debug"):
+        html = out_dir / f"{stem}.html"
+        for problem in csp_problems(html.read_text(encoding="utf-8")):
+            return fail(f"{html.relative_to(ROOT)}: {problem}")
         rc = check_js_asset_references(out_dir / f"{stem}.js")
         if rc != 0:
             return rc

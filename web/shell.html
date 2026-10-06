@@ -2,6 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <!-- Same-origin only. 'wasm-unsafe-eval' allows WebAssembly compilation but
+         not JavaScript eval. emcc minifies this page, so tools/web_csp.py
+         replaces the placeholder hash with the built inline boot script's hash.
+         blob: images/audio cover Emscripten's preload decoders. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-MANGO_INLINE_SCRIPT_HASHES'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Super Mango</title>
     <style>
