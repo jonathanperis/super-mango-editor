@@ -69,20 +69,29 @@ jobs:
             platform: Linux x86_64
             artifact: super-mango-linux-x86_64
             target: native
+            extra_cflags: -Werror
           - os: macos-latest
             platform: macOS arm64
             artifact: super-mango-macos-arm64
             target: native
+            extra_cflags: -Werror
+          # GCC still reports -Wformat-truncation in editor/UI label formatting,
+          # so only the Clang legs build with -Werror until those are fixed.
           - os: windows-latest
             platform: Windows x86_64
             artifact: super-mango-windows-x86_64
             target: native
+            extra_cflags: ''
           - os: ubuntu-latest
             platform: WebAssembly
             artifact: super-mango-wasm
             target: wasm
+            extra_cflags: ''
 
     env:
+      # Warnings fail CI (see extra_cflags above); local builds stay tolerant.
+      EXTRA_CFLAGS: ${{ matrix.extra_cflags }}
+      EXTRA_WEB_CFLAGS: -Werror
       # One checksum-verified raylib source archive shared by every build
       # directory and restored from the Actions cache below.
       RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
