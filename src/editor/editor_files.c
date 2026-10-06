@@ -53,8 +53,8 @@ void editor_test_set_recovery_choice(int button_id)
 
 static void editor_save_recent_files(const EditorState *es);
 static void editor_add_recent_file(EditorState *es, const char *path);
-static void editor_replace_texture(Texture2D **slot,
-                                   const char *path);
+static void editor_replace_texture(Texture2D **slot, char *loaded_path,
+                                   size_t loaded_path_size, const char *path);
 static int editor_preference_file_path(const EditorState *es, const char *name,
                                        char *buf,
                                        size_t buf_size);
@@ -195,15 +195,26 @@ static void editor_apply_loaded_level(EditorState *es, const LevelDef *level,
     editor_update_window_title(es);
 }
 
-static void editor_replace_texture(Texture2D **slot,
-                                   const char *path)
+/*
+ * editor_replace_texture — Point a preview slot at the texture for `path`.
+ *
+ * loaded_path remembers which file the slot currently shows.  When the
+ * level still names that file, nothing is reloaded: decoding a PNG and
+ * uploading it to the GPU on every config edit (even a rename) is wasted
+ * work.  A failed load keeps the old texture and leaves loaded_path alone,
+ * so the next change tries again.
+ */
+static void editor_replace_texture(Texture2D **slot, char *loaded_path,
+                                   size_t loaded_path_size, const char *path)
 {
-    if (!slot) return;
+    if (!slot || !loaded_path || loaded_path_size == 0) return;
     if (!path || path[0] == '\0') {
         texture_unload(*slot);
         *slot = NULL;
+        loaded_path[0] = '\0';
         return;
     }
+    if (*slot && strcmp(loaded_path, path) == 0) return;  /* unchanged */
     if (!IsWindowReady()) return;
 
     {
@@ -211,6 +222,7 @@ static void editor_replace_texture(Texture2D **slot,
         if (replacement) {
             texture_unload(*slot);
             *slot = replacement;
+            str_copy(loaded_path, path, loaded_path_size);
         } else {
             fprintf(stderr, "Warning: keeping preview texture; cannot load %s\n", path);
         }
@@ -220,13 +232,17 @@ static void editor_replace_texture(Texture2D **slot,
 void editor_sync_config_resources(EditorState *es)
 {
     if (!es) return;
-    editor_replace_texture(&es->textures.sky,
+    editor_replace_texture(&es->textures.sky, es->preview_sky_path,
+                           sizeof(es->preview_sky_path),
                            es->level.background_layer_count > 0
                            ? es->level.background_layers[0].path : NULL);
-    editor_replace_texture(&es->textures.floor_tile,
+    editor_replace_texture(&es->textures.floor_tile, es->preview_floor_path,
+                           sizeof(es->preview_floor_path),
                            es->level.floor_tile_path);
-    editor_replace_texture(&es->textures.water,
-                           es->level.foreground_layer_count > 0
+    editor_replace_texture(&es->textures.water, es->preview_water_path,
+                           sizeof(es->preview_water_path),
+                           es->level.foreground_layer_count > 0 &&
+                           es->level.foreground_layer_count <= MAX_BACKGROUND_LAYERS
                            ? es->level.foreground_layers[
                                  es->level.foreground_layer_count - 1].path
                            : NULL);

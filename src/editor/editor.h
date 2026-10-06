@@ -299,6 +299,16 @@ typedef struct {
     /* ---- Preloaded textures for entity rendering --------------------- */
     EntityTextures textures;
 
+    /*
+     * Path each level-config preview texture (sky, floor, water) was last
+     * loaded from; "" until a level's path has been loaded.  A config edit
+     * such as renaming the level then reloads only textures whose path
+     * actually changed.  64 bytes matches the LevelDef path fields.
+     */
+    char           preview_sky_path[64];
+    char           preview_floor_path[64];
+    char           preview_water_path[64];
+
     /* ---- Viewport ---------------------------------------------------- */
     EditorCamera   camera;
 
