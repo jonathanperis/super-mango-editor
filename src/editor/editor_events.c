@@ -15,6 +15,7 @@ static void editor_history(EditorState *es, int redo)
     /* Finish the staged field edit before moving history. Otherwise Undo could
      * change the document while a widget still points at its previous value. */
     Command command;
+    if (es->dragging) return;  /* editor_key already explained why */
     if (!editor_finish_field_edit(es)) return;
     if (redo ? redo_pop(es->undo, &command) : undo_pop(es->undo, &command)) {
         editor_apply_undo_command(es, &command, redo ? 0 : 1);
@@ -27,6 +28,19 @@ static void editor_key(EditorState *es, const InputEvent *event)
     int key = event->key;
     int ctrl = (event->mods & (INPUT_CTRL | INPUT_SUPER)) != 0;
     int shift = (event->mods & INPUT_SHIFT) != 0;
+    /* While an entity is being dragged, the drag owns the document: Undo,
+     * Delete or Paste would shift array slots under it.  Only Esc (cancel
+     * the move) acts until the button is released.  Modifier keys stay
+     * silent because Shift is how a drag snaps to the grid. */
+    if (es->dragging) {
+        if (key == KEY_ESCAPE) tools_cancel_drag(es);
+        else if (key != KEY_LEFT_SHIFT && key != KEY_RIGHT_SHIFT &&
+                 key != KEY_LEFT_CONTROL && key != KEY_RIGHT_CONTROL &&
+                 key != KEY_LEFT_ALT && key != KEY_RIGHT_ALT &&
+                 key != KEY_LEFT_SUPER && key != KEY_RIGHT_SUPER)
+            editor_set_status(es, "Release the mouse to finish the move first (Esc cancels it)");
+        return;
+    }
     /* An active text field owns ordinary typing. The digit '2' in a field
      * must not also select the Place tool. Modifiers come from this event. */
     if (es->ui.active_id && !ctrl && key != KEY_ESCAPE && key != KEY_F5) {

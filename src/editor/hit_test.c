@@ -20,12 +20,12 @@
  * Axe traps and circular saws store y = 0 to mean "use the default height".
  * These helpers return the height the game (and canvas) actually uses.
  */
-static float axe_trap_y(const AxeTrapPlacement *at)
+float editor_axe_trap_y(const AxeTrapPlacement *at)
 {
     return (at->y != 0.0f) ? at->y : (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
 }
 
-static float circular_saw_y(const CircularSawPlacement *cs)
+float editor_circular_saw_y(const CircularSawPlacement *cs)
 {
     return (cs->y != 0.0f) ? cs->y
                            : (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H);
@@ -81,12 +81,12 @@ int editor_entity_bounds(const LevelDef *level, EntityType type, int index,
     /* ---- Hazards ---------------------------------------------------- */
     case ENT_AXE_TRAP: {
         const AxeTrapPlacement *at = &level->axe_traps[index];
-        *out = rect(at->pillar_x, axe_trap_y(at), AXE_FRAME_W, AXE_FRAME_H);
+        *out = rect(at->pillar_x, editor_axe_trap_y(at), AXE_FRAME_W, AXE_FRAME_H);
         return 1;
     }
     case ENT_CIRCULAR_SAW: {
         const CircularSawPlacement *cs = &level->circular_saws[index];
-        *out = rect(cs->x, circular_saw_y(cs), SAW_DISPLAY_W, SAW_DISPLAY_H);
+        *out = rect(cs->x, editor_circular_saw_y(cs), SAW_DISPLAY_W, SAW_DISPLAY_H);
         return 1;
     }
     case ENT_SPIKE_ROW: {

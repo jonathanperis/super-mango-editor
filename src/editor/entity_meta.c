@@ -251,6 +251,14 @@ int editor_entity_capacity(EntityType type)
     return meta ? meta->capacity : 0;
 }
 
+float editor_world_width(const LevelDef *level)
+{
+    int screens = (level && level->screen_count > 0) ? level->screen_count : 4;
+    /* A hand-edited file may hold any int; never let it overflow below. */
+    if (screens > MAX_LEVEL_SCREENS) screens = MAX_LEVEL_SCREENS;
+    return (float)screens * (float)GAME_W;
+}
+
 /* ------------------------------------------------------------------ */
 /* Where each entity type lives inside LevelDef                        */
 /* ------------------------------------------------------------------ */
