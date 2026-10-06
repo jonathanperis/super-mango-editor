@@ -510,20 +510,16 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 
 ## `faster_fish.h` Constants
 
+The faster fish shares the `FISH_*` sprite, render and hitbox sizes and the
+update code in `fish.c`; only this tuning differs (passed as a `FishSpec`).
+
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
 | `MAX_FASTER_FISH` | `16` | `int` | Maximum faster fish instances per level |
-| `FFISH_FRAMES` | `2` | `int` | Number of animation frames |
-| `FFISH_FRAME_W` | `48` | `int` | Frame width (px) |
-| `FFISH_FRAME_H` | `48` | `int` | Frame height (px) |
-| `FFISH_RENDER_W` | `48` | `int` | Render width (logical px) |
-| `FFISH_RENDER_H` | `48` | `int` | Render height (logical px) |
 | `FFISH_SPEED` | `120.0f` | `float` | Patrol speed (px/s) |
 | `FFISH_JUMP_VY` | `-420.0f` | `float` | Jump impulse (px/s) |
 | `FFISH_JUMP_MIN` | `1.0f` | `float` | Minimum delay between jumps (s) |
 | `FFISH_JUMP_MAX` | `2.2f` | `float` | Maximum delay between jumps (s) |
-| `FFISH_HITBOX_PAD_X` | `16` | `int` | Horizontal hitbox inset (px) |
-| `FFISH_HITBOX_PAD_Y` | `13` | `int` | Vertical hitbox inset (px) |
 | `FFISH_FRAME_MS` | `100` | `int` | Frame animation duration (ms) |
 
 ---

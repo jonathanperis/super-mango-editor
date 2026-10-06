@@ -3,100 +3,33 @@
  *
  * Same mechanics as the regular Fish but with higher speed (120 px/s),
  * a stronger jump impulse (-420 px/s), and shorter delay between jumps.
+ * The behaviour lives once, in fish.c; this file only supplies the tuning.
  */
 
-#include "../core/game_random.h"
-
 #include "faster_fish.h"
-#include "../game.h"               /* FLOOR_Y, GRAVITY */
-#include "../effects/water.h"      /* WATER_ART_H */
-#include "../core/entity_utils.h"  /* animate_frame_ms */
+
+static const FishSpec s_faster_fish = {
+    FFISH_SPEED,
+    FFISH_JUMP_VY,
+    FFISH_JUMP_MIN,
+    FFISH_JUMP_MAX,
+    FFISH_FRAME_MS
+};
 
 /* ------------------------------------------------------------------ */
 
-static float ffish_random_delay(float min_s, float max_s) {
-    float t = game_random_unit();
-    return min_s + (max_s - min_s) * t;
+void faster_fish_update(FasterFish *fish, int count, float dt, int world_w)
+{
+    fish_variant_update(&s_faster_fish, fish, count, dt, world_w);
 }
-
-/* ------------------------------------------------------------------ */
-
-void faster_fish_update(FasterFish *fish, int count, float dt, int world_w) {
-    for (int i = 0; i < count; i++) {
-        FasterFish *f = &fish[i];
-
-        /* Countdown to the next jump while swimming */
-        if (f->y >= f->water_y && f->vy == 0.0f) {
-            f->jump_timer -= dt;
-            if (f->jump_timer <= 0.0f) {
-                f->vy = FFISH_JUMP_VY;
-                f->jump_timer = ffish_random_delay(FFISH_JUMP_MIN, FFISH_JUMP_MAX);
-            }
-        }
-
-        /* Horizontal patrol */
-        f->x += f->vx * dt;
-
-        if (f->vx > 0.0f && f->x + FFISH_RENDER_W >= f->patrol_x1) {
-            f->x  = f->patrol_x1 - FFISH_RENDER_W;
-            f->vx = -FFISH_SPEED;
-        } else if (f->vx < 0.0f && f->x <= f->patrol_x0) {
-            f->x  = f->patrol_x0;
-            f->vx = FFISH_SPEED;
-        }
-
-        /* Clamp to world edges */
-        if (f->x < 0.0f) { f->x = 0.0f; f->vx = FFISH_SPEED; }
-        if (f->x > world_w - FFISH_RENDER_W) {
-            f->x = (float)(world_w - FFISH_RENDER_W);
-            f->vx = -FFISH_SPEED;
-        }
-
-        /* Gravity during jump arc */
-        if (f->y < f->water_y || f->vy != 0.0f) {
-            f->vy += GRAVITY * dt;
-            f->y  += f->vy * dt;
-
-            if (f->y >= f->water_y) {
-                f->y  = f->water_y;
-                f->vy = 0.0f;
-            }
-        }
-
-        /* Animation — delegates to the shared utility for consistency. */
-        animate_frame_ms(&f->frame_index, &f->anim_timer_ms,
-                         dt, FFISH_FRAME_MS, FFISH_FRAMES);
-    }
-}
-
-/* ------------------------------------------------------------------ */
 
 void faster_fish_render(const FasterFish *fish, int count,
-                        Texture2D *tex, int cam_x) {
-    for (int i = 0; i < count; i++) {
-        const FasterFish *f = &fish[i];
-
-        IntRect src = {
-            f->frame_index * FFISH_FRAME_W, 0,
-            FFISH_FRAME_W, FFISH_FRAME_H
-        };
-        IntRect dst = {
-            (int)f->x - cam_x, (int)f->y,
-            FFISH_RENDER_W, FFISH_RENDER_H
-        };
-
-        sprite_draw(tex, &src, &dst, 0,
-                    f->vx > 0.0f ? SPRITE_FLIP_X : SPRITE_NORMAL, WHITE);
-    }
+                        Texture2D *tex, int cam_x)
+{
+    fish_render(fish, count, tex, cam_x);
 }
 
-/* ------------------------------------------------------------------ */
-
-IntRect faster_fish_get_hitbox(const FasterFish *fish) {
-    IntRect hitbox;
-    hitbox.x = (int)fish->x + FFISH_HITBOX_PAD_X;
-    hitbox.y = (int)fish->y + FFISH_HITBOX_PAD_Y;
-    hitbox.w = FFISH_RENDER_W - 2 * FFISH_HITBOX_PAD_X;
-    hitbox.h = FFISH_RENDER_H - FFISH_HITBOX_PAD_Y - 16;
-    return hitbox;
+IntRect faster_fish_get_hitbox(const FasterFish *fish)
+{
+    return fish_get_hitbox(fish);
 }

@@ -1,13 +1,26 @@
 /*
- * fish.c — Jumping fish enemy that patrols the water lane.
+ * fish.c — Jumping fish enemies that patrol the water lane.
+ *
+ * This file owns the swim/jump behaviour for BOTH fish variants. The regular
+ * fish and the faster fish (faster_fish.c) differ only in tuning — patrol
+ * speed, jump impulse, delay between jumps and animation speed — which each
+ * variant passes in as a FishSpec. bird_variant.c does the same for birds.
  */
 
 #include "../core/game_random.h"
 
 #include "fish.h"
-#include "../game.h"               /* FLOOR_Y, GRAVITY */
-#include "../effects/water.h"      /* WATER_ART_H */
+#include "../game.h"               /* GRAVITY */
 #include "../core/entity_utils.h"  /* animate_frame_ms */
+
+/* Tuning for the regular fish; faster_fish.c defines its own FishSpec. */
+static const FishSpec s_regular_fish = {
+    FISH_SPEED,
+    FISH_JUMP_VY,
+    FISH_JUMP_MIN,
+    FISH_JUMP_MAX,
+    FISH_FRAME_MS
+};
 
 /* ------------------------------------------------------------------ */
 
@@ -20,7 +33,8 @@ static float fish_random_jump_delay(float min_s, float max_s)
 
 /* ------------------------------------------------------------------ */
 
-void fish_update(Fish *fish, int count, float dt, int world_w)
+void fish_variant_update(const FishSpec *spec, Fish *fish, int count,
+                         float dt, int world_w)
 {
     for (int i = 0; i < count; i++) {
         Fish *f = &fish[i];
@@ -29,8 +43,8 @@ void fish_update(Fish *fish, int count, float dt, int world_w)
         if (f->y >= f->water_y && f->vy == 0.0f) {
             f->jump_timer -= dt;
             if (f->jump_timer <= 0.0f) {
-                f->vy = FISH_JUMP_VY;
-                f->jump_timer = fish_random_jump_delay(FISH_JUMP_MIN, FISH_JUMP_MAX);
+                f->vy = spec->jump_vy;
+                f->jump_timer = fish_random_jump_delay(spec->jump_min, spec->jump_max);
             }
         }
 
@@ -39,20 +53,20 @@ void fish_update(Fish *fish, int count, float dt, int world_w)
 
         if (f->vx > 0.0f && f->x + FISH_RENDER_W >= f->patrol_x1) {
             f->x  = f->patrol_x1 - FISH_RENDER_W;
-            f->vx = -FISH_SPEED;
+            f->vx = -spec->speed;
         } else if (f->vx < 0.0f && f->x <= f->patrol_x0) {
             f->x  = f->patrol_x0;
-            f->vx = FISH_SPEED;
+            f->vx = spec->speed;
         }
 
         /* Clamp to world edges as a final safety net. */
         if (f->x < 0.0f) {
             f->x = 0.0f;
-            f->vx = FISH_SPEED;
+            f->vx = spec->speed;
         }
         if (f->x > world_w - FISH_RENDER_W) {
             f->x = (float)(world_w - FISH_RENDER_W);
-            f->vx = -FISH_SPEED;
+            f->vx = -spec->speed;
         }
 
         /* Gravity only affects the fish while it is in its jump arc. */
@@ -67,14 +81,19 @@ void fish_update(Fish *fish, int count, float dt, int world_w)
         }
 
         /*
-         * Timed animation: cycle the two swim frames every FISH_FRAME_MS ms.
+         * Timed animation: cycle the two swim frames every spec->frame_ms.
          * Both frames are left-facing in the sheet; direction is handled by
          * horizontal flipping in fish_render, not by frame selection.
          * animate_frame_ms accumulates dt and advances frame_index on overflow.
          */
         animate_frame_ms(&f->frame_index, &f->anim_timer_ms,
-                         dt, FISH_FRAME_MS, FISH_FRAMES);
+                         dt, spec->frame_ms, FISH_FRAMES);
     }
+}
+
+void fish_update(Fish *fish, int count, float dt, int world_w)
+{
+    fish_variant_update(&s_regular_fish, fish, count, dt, world_w);
 }
 
 /* ------------------------------------------------------------------ */
