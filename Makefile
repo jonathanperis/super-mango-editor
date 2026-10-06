@@ -240,6 +240,7 @@ release:
 test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser-encoding-probe
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/level-serializer-test"
 	python3 tests/validate_levels_test.py
+	python3 tests/gen_sounds_test.py
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/level-validate-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/runtime-load-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/rail-test"
@@ -296,8 +297,14 @@ level-catalog:
 overlay-snapshots:
 	python3 tools/generate_overlay_snapshots.py
 
+# Regenerate every assets/sounds WAV from tools/gen_sounds.py recipes.
+.PHONY: sounds
+sounds:
+	python3 tools/gen_sounds.py
+
 docs-drift:
 	python3 tools/content_inventory.py --check
+	python3 tools/gen_sounds.py --check
 	python3 tools/generate_level_catalog.py --check
 	python3 tools/generate_overlay_snapshots.py --check
 	python3 tools/check_docs_drift.py
@@ -595,7 +602,6 @@ WEB_FLAGS = -s USE_GLFW=3 \
             --pre-js web/keyboard-scope.js \
             -s ALLOW_MEMORY_GROWTH=1 \
             --preload-file assets \
-            --exclude-file 'assets/sounds/unused/*' \
             --exclude-file 'assets/sprites/unused/*' \
             --exclude-file '*/.DS_Store' \
             --preload-file levels \
