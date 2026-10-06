@@ -131,7 +131,7 @@ make run-level CC=clang LEVEL=levels/labs/01_collision.toml      # run a focused
 make run-level-debug CC=clang LEVEL=levels/labs/01_collision.toml # inspect a lab
 make builder CC=clang                 # build game and editor together
 make debug CC=clang                   # -g -O0 binaries in out/debug/
-make release CC=clang                 # -O2 binaries in out/release/
+make release CC=clang                 # -O2 hardened binaries in out/release/
 make timing-lab                       # quantitative timestep experiment
 make editor CC=clang                  # build the level editor
 make run-editor CC=clang              # build and run the level editor
