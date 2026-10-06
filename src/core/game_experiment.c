@@ -1,9 +1,12 @@
 /* Experiments record simulation steps, not wall-clock frames. Pauses therefore
  * do not consume tape; each step carries its own dt, semantic input and tuning.
+ * New recordings always store GAME_FIXED_STEP; older captures made with a
+ * variable dt in (0, 0.1] still load and replay with their recorded steps.
  * Replays require unchanged level bytes and the same engine version. */
 #include "game_experiment.h"
 #include "game_random.h"
 #include "game_completion.h"
+#include "game_timing.h"
 #include "../levels/level_loader.h"
 #include "../levels/level_resources.h"
 #include "../shared/serializer_emit.h"
@@ -47,7 +50,7 @@ static void restart(GameState *gs, unsigned int seed)
     gs->level_score_start = 0;
     gs->profile_completion_recorded = 1; /* Experiments never become best results. */
     gs->inspector.frozen = gs->inspector.step_requested = 0;
-    gs->loop.prev_ticks = clock_millis();
+    game_timing_restart_clock(gs);
 }
 
 int game_experiment_begin(GameState *gs)
@@ -74,8 +77,8 @@ float game_experiment_dt(const GameState *gs, float dt)
     const GameExperiment *tape = gs->experiment;
     if (tape && tape->replaying)
         return tape->cursor < tape->count ? tape->frames[tape->cursor].dt : 0;
-    /* Recording starts from a known state and uses reproducible steps. Slow
-     * mode/stepping still choose the actual captured duration. */
+    /* Recording starts from a known state. Every live step is the fixed step;
+     * slow mode and F3 only change how many steps run per rendered frame. */
     return dt;
 }
 

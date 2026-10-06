@@ -70,8 +70,8 @@ Use [the mechanics museum](../mechanics-museum/) for compact examples and
 - **Read:** `src/player/player_motion.c`, `src/player/player.c`, `src/core/game_timing.c`.
 - **Run:** `make run-level-debug LEVEL=levels/labs/06_camera.toml` and `make timing-lab`.
 - **Change:** select `ground_friction` with F6; use minus/equal to adjust it. F7 restores authored/default values.
-- **Observe:** releasing movement changes stopping distance. F4 slows simulated time; F2 freezes and F3 advances one 1/60-second step.
-- **Proof:** explain why multiplying by dt gives units of distance but does not eliminate numerical error. The timing lab compares 30/60/144 render rates and a fixed simulation step.
+- **Observe:** releasing movement changes stopping distance. F4 slows time (fewer fixed steps per second, each still 1/60 s); F2 freezes and F3 advances exactly one step.
+- **Proof:** explain why multiplying by dt gives units of distance but does not eliminate numerical error, and why the game therefore advances in fixed 1/60-second steps: the timing lab shows a variable dt landing at different heights for 30/60/144 Hz render rates, while the fixed step (what `game_timing.c` does with its accumulator) gives the same result at every rate.
 
 ### Lab 3 — One-way collisions
 

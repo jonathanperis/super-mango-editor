@@ -22,6 +22,13 @@ void game_overlay_toggle_pause(GameState *gs);
 void game_overlay_resume(GameState *gs);
 
 /*
+ * game_simulation_blocked — 1 when another screen owns this frame: a pause,
+ * game-over or completion overlay, the settings panel, a stopped game or a
+ * pending route. No gameplay step runs and touch taps belong to that screen.
+ */
+int game_simulation_blocked(const GameState *gs);
+
+/*
  * game_music_should_play — the single rule for gameplay music.
  *
  * Music is silent while the pause overlay is up (player pause or lost window

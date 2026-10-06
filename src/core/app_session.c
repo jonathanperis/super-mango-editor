@@ -24,6 +24,7 @@
 #include "../levels/level_path.h"
 #include "game_overlay.h"
 #include "game_experiment.h"
+#include "game_timing.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -216,7 +217,7 @@ static GameState *session_make_game(AppSession *session, const char *path, const
         free(game);
         return NULL;
     }
-    game->loop.prev_ticks = clock_millis();
+    game_timing_restart_clock(game);
     game->profile = &session->profile;
     game->settings_menu = &session->settings;
     /* These two pointers are borrowed from the longer-lived session. The
@@ -369,7 +370,7 @@ static int session_apply_game_route(AppSession *session, int callback_owned)
             session_profile_key(game, path);
             game_profile_select(&session->profile, game->profile_level_key);
             session->preferences_applied = 0;
-            game->loop.prev_ticks = clock_millis();
+            game_timing_restart_clock(game);
             game_input_arm_release_latch(game, NULL);
         } else {
             /* The current level is untouched, so Replay, Level Select and

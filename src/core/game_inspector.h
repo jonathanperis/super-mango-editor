@@ -6,7 +6,9 @@
 #define INSPECTOR_PHYSICS_COUNT 9
 
 int game_inspector_event(GameState *gs, const InputEvent *event);
-float game_inspector_step(GameState *gs, float elapsed);
+/* Fixed steps to simulate this frame: 0 when blocked or frozen, 1 for F3,
+ * otherwise real (or slowed) time through the fixed-step accumulator. */
+int game_inspector_steps(GameState *gs, float frame_seconds);
 void game_inspector_render(GameState *gs);
 void game_inspector_cleanup(GameState *gs);
 void game_inspector_reset_physics(GameState *gs);
