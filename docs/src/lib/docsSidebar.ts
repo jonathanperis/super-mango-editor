@@ -44,7 +44,7 @@ export const DOCS_META: Record<DocsSectionId, DocsPageMeta> = {
   'mechanics-museum': { id: 'mechanics-museum', label: 'Mechanics Museum', description: 'Six focused levels and the simulation inspector.', route: '/docs/mechanics-museum/', marker: 'LABS' },
   'entity-walkthrough': { id: 'entity-walkthrough', label: 'Entity Walkthrough', description: 'Trace a collectible through parser, runtime, editor, undo and tests.', route: '/docs/entity-walkthrough/', marker: 'EXTEND' },
   'asset-inventory': { id: 'asset-inventory', label: 'Asset Inventory', description: 'Generated playable asset sizes and bundle budget.', route: '/docs/asset-inventory/', marker: 'SIZE' },
-  'asset-provenance': { id: 'asset-provenance', label: 'Asset Provenance', description: 'Sources, third-party notices and unresolved media license records.', route: '/docs/asset-provenance/', marker: 'CREDIT' },
+  'asset-provenance': { id: 'asset-provenance', label: 'Asset Provenance', description: 'Sources, third-party notices and media license records.', route: '/docs/asset-provenance/', marker: 'CREDIT' },
   home: {
     id: 'home',
     label: 'Overview',

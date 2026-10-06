@@ -5,7 +5,9 @@
 ---
 
 All audio files live in `assets/sounds/`, organized into categorized subdirectories.
-The assets use `.wav`. raylib handles decoded `Sound` samples and streamed `Music`;
+They are mono 16-bit 22050 Hz `.wav` files synthesized by `tools/gen_sounds.py`
+(see [Generated Sounds](../assets/#generated-sounds)); run `make sounds` to
+regenerate them. raylib handles decoded `Sound` samples and streamed `Music`;
 the project-owned `SoundEffect` and `MusicTrack` types manage their lifetimes.
 
 ---
@@ -19,59 +21,56 @@ be available for level authors without being selected by a current campaign or l
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `player_jump.wav` | `SoundEffect` | `gs->audio.jump` | Played when a jump starts, including buffered/coyote jumps and climb dismounts |
-| `player_hit.wav` | `SoundEffect` | `gs->audio.hit` | Played when the player takes damage |
+| `player_jump.wav` | `SoundEffect` | `gs->audio.jump` | Rising square-wave blip; played when a jump starts, including buffered/coyote jumps and climb dismounts |
+| `player_hit.wav` | `SoundEffect` | `gs->audio.hit` | Noisy descending thud; played when the player takes damage |
 
 ### Collectibles — `assets/sounds/collectibles/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `coin.wav` | `SoundEffect` | `gs->audio.coin` | Played when the player collects a coin |
+| `coin.wav` | `SoundEffect` | `gs->audio.coin` | Two-tone chime (B5 then E6); played when the player collects a coin |
 
 ### Entities — `assets/sounds/entities/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `bird.wav` | `SoundEffect` | `gs->audio.flap` | Played for bird enemy wing flap |
-| `spider.wav` | `SoundEffect` | `gs->audio.spider_attack` | Played when a jumping spider leaps at a gap |
-| `fish.wav` | `SoundEffect` | `gs->audio.dive` | Played for fish enemy dive |
+| `bird.wav` | `SoundEffect` | `gs->audio.flap` | Two soft band-passed noise puffs; played for each bird wing flap |
+| `spider.wav` | `SoundEffect` | `gs->audio.spider_attack` | Hiss, rising zip and leg clicks; played when a jumping spider leaps at a gap |
+| `fish.wav` | `SoundEffect` | `gs->audio.dive` | Filtered noise splash plus rising bubbles; played when the player falls into a water gap |
 
 ### Hazards — `assets/sounds/hazards/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `axe_trap.wav` | `SoundEffect` | `gs->audio.axe` | Played for axe trap swing |
+| `axe_trap.wav` | `SoundEffect` | `gs->audio.axe` | Filter-swept noise whoosh; played for axe trap swing |
 
 ### Surfaces — `assets/sounds/surfaces/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `bouncepad.wav` | `SoundEffect` | `gs->audio.spring` | Played when the player lands on a bouncepad |
+| `bouncepad.wav` | `SoundEffect` | `gs->audio.spring` | Sine "boing" with fading vibrato; played when the player lands on a bouncepad |
 
 ### Screens — `assets/sounds/screens/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `confirm_ui.wav` | `SoundEffect` | `menu->snd_confirm` | Played on menu confirmation |
+| `confirm_ui.wav` | `SoundEffect` | `menu->snd_confirm` | Two quick square blips (E5, B5); played on menu confirmation |
 
 ### Levels — `assets/sounds/levels/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `water.wav` | `MusicTrack` | `gs->audio.music` | Streamed background music for water-themed levels |
-| `lava.wav` | `MusicTrack` | `gs->audio.music` | Streamed background music for lava-themed levels |
-| `winds.wav` | `MusicTrack` | `gs->audio.music` | Available theme track; no current campaign/lab level selects it |
+| `water.wav` | `MusicTrack` | `gs->audio.music` | 6 s seamless loop: filtered-noise wash and surf with slow swells and bubbles; water-themed levels |
+| `lava.wav` | `MusicTrack` | `gs->audio.music` | 6 s seamless loop: low brown-noise rumble, sizzle, slow bubbles and crackles; lava-themed levels |
+| `winds.wav` | `MusicTrack` | `gs->audio.music` | 8 s seamless loop: band-limited noise with drifting band and gusts; available, no current level selects it |
 
 ---
 
-## Unused Sounds
+## No Reserve Sounds
 
-The following sounds are stored in `assets/sounds/unused/` and are not loaded by the game. They are available as reserves for future use.
-
-| File | Description |
-|------|-------------|
-| `fireball.wav` | Projectile / fireball effect |
-| `saw.wav` | Circular saw spinning |
+There is no `assets/sounds/unused/` directory: every WAV is generated and
+loaded. `tools/gen_sounds.py --check` fails if a WAV appears that the generator
+does not produce, so unlicensed media cannot slip back into releases.
 
 ---
 
@@ -111,7 +110,8 @@ backing-storage cost. See [Asset Inventory](../asset-inventory/).
 
 ## Adding a New Sound Effect
 
-1. Place the `.wav` file in the appropriate `assets/sounds/<category>/` subdirectory.
+1. Add a recipe and a `SOUNDS` row to `tools/gen_sounds.py`, then run `make sounds`
+   to write `assets/sounds/<category>/<name>.wav`.
 2. Add a `SoundEffect *<name>` field to `AudioResources` in `game.h`.
 3. Load it in `src/core/game_resources.c`, called by `game_init`:
 
@@ -150,6 +150,9 @@ see `vendor/raylib/README.md` and the [Build System](../build-system/).
 ---
 
 ## Adding a New Music Track
+
+Ambient tracks are short loops: the generator crossfades each recording's tail
+into its head so `MusicTrack` can repeat it without a click.
 
 ```c
 // Load (streaming — not fully decoded into RAM)

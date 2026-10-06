@@ -74,7 +74,7 @@ src/
 │   ├── graphics.h / .c          raylib texture slots, sprite pivots and logical presentation
 │   ├── geometry.h              Integer hitboxes and half-open intersection
 │   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
-│   ├── text.h / .c              Font/glyph ownership, UTF-8 measurement and label texture creation
+│   ├── text.h / .c              Borrowed built-in font, text measurement and label texture creation
 │   ├── platform.h / .c          Monotonic time, UTF-8 copying and OS preference/executable paths
 │   ├── ui.h / .c                 Immediate-mode widgets shared by editor and game settings
 │   ├── serializer.h / .c         TOML save/load public API anchor
@@ -499,7 +499,7 @@ Multi-layer scrolling background configured per TOML level. Current assets inclu
 
 ### `screens/hud.h` / `screens/hud.c`
 
-HUD renderer. Draws heart icons (health), player icon + lives counter, coin icon + score. Assets: `star_yellow.png` (hearts), `hud_coins.png` (coin icon), `player.png` (lives icon), `round9x13.ttf` (font).
+HUD renderer. Draws heart icons (health), player icon + lives counter, coin icon + score. Assets: `star_yellow.png` (hearts), `hud_coins.png` (coin icon), `player.png` (lives icon); text uses raylib's built-in font.
 
 ### `core/debug.h` / `core/debug.c`
 
@@ -514,7 +514,7 @@ not measured CPU utilization. The resident-memory sample comes from the OS.
 | `shared/graphics.h`, `shared/graphics.c` | Texture ownership, sprite pivots/flips and logical-canvas presentation |
 | `shared/geometry.h` | Integer, half-open hitboxes; overflow-safe edge arithmetic |
 | `shared/audio.h`, `shared/audio.c` | Owned samples, borrowed alias data, per-play volume and music pumping |
-| `shared/text.h`, `shared/text.c` | CPU image versus GPU texture; dynamic glyph atlas ownership |
+| `shared/text.h`, `shared/text.c` | CPU image versus GPU texture; borrowing raylib's built-in font |
 | `shared/ui.h`, `shared/ui.c` | Immediate-mode calls, stable widget IDs, staged edits and bounded label cache |
 | `shared/platform.h`, `shared/platform.c` | Monotonic elapsed time, UTF-8 copying and caller-owned OS paths |
 | `input/input_backend.h`, `input/input_backend.c` | Ordered events versus held state, logical pointer mapping and saved-binding translation |

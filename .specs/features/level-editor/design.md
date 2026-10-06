@@ -74,7 +74,7 @@ Use categorized asset paths. Bare legacy paths such as `assets/<sprite>.png` are
 | Surfaces | `assets/sprites/surfaces/bouncepad_medium.png` |
 | Foregrounds | `assets/sprites/foregrounds/water.png` |
 | Backgrounds | `assets/sprites/backgrounds/sky_blue.png` |
-| Fonts | `assets/fonts/round9x13.ttf` |
+| Fonts | raylib built-in default font (no file) |
 | Sounds | `assets/sounds/<category>/<file>.wav` |
 
 ## Validation Flow
