@@ -1544,13 +1544,23 @@ static int dialog_quoting_and_picked_paths_stay_literal(void)
     free(quoted);
     if (failed) return 1;
 
-    /* A picked name containing a line break is refused, never truncated. */
+    /* A picked name containing a line break is refused, never truncated.
+     * "\r\n" is a line ending only on Windows; elsewhere the '\r' belongs
+     * to the name ("a.toml\r" is a different file from "a.toml"). */
     if (expect_int("plain path", read_picker_output("/tmp/a.toml\n", buf, sizeof(buf)),
                    FILE_DIALOG_SELECTED) != 0 ||
         expect_string("plain path text", buf, "/tmp/a.toml") != 0 ||
+#ifdef _WIN32
         expect_int("crlf path", read_picker_output("C:\\a.toml\r\n", buf, sizeof(buf)),
                    FILE_DIALOG_SELECTED) != 0 ||
         expect_string("crlf path text", buf, "C:\\a.toml") != 0 ||
+#else
+        expect_int("crlf path", read_picker_output("/tmp/a.toml\r\n", buf, sizeof(buf)),
+                   FILE_DIALOG_INVALID_PATH) != 0 ||
+#endif
+        expect_int("trailing carriage return without newline",
+                   read_picker_output("/tmp/a.toml\r", buf, sizeof(buf)),
+                   FILE_DIALOG_INVALID_PATH) != 0 ||
         expect_int("newline in name",
                    read_picker_output("/tmp/evil\nreal.toml\n", buf, sizeof(buf)),
                    FILE_DIALOG_INVALID_PATH) != 0 ||
