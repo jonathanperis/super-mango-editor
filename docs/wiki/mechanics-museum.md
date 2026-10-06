@@ -30,9 +30,12 @@ F8 restarts the level with its seed and records at most 36,000 active simulation
 steps. F9 exports the capture; it never overwrites an existing destination.
 Recording is scoped to one level. Export before choosing a terminal route;
 switching levels or replaying the game disposes of that screen's capture.
-The capture stores each step's dt, semantic input and movement settings, plus
-the seed and a content fingerprint of the source level. A changed level is
-rejected rather than silently producing a different run. If an external editor
+The capture (`format_version = 2`) stores one row per fixed 1/60 s step with
+that step's semantic input and movement settings, plus the seed and a content
+fingerprint of the source level. A changed level is rejected rather than
+silently producing a different run, and so is a `format_version = 1` capture:
+it was recorded by the earlier variable-timestep engine and cannot be replayed
+faithfully, so record it again. If an external editor
 changes the loaded file, reopen the game before starting a new capture. Captures are not save
 games and do not include pause duration, audio output or rendered pixels.
 

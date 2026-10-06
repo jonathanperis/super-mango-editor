@@ -427,7 +427,10 @@ static int repeated_menu_game_ownership(void)
         fprintf(stderr, "session_test: successful next level kept completion\n");
         return 1;
     }
-    if (expect_int("next level timing reset", session->game->loop.clock_started == 0 &&
+    /* The clock restarts at "now", so the next frame measures normal time
+     * (no hitch) and the 0.2 s pending above is not caught up. */
+    if (expect_int("next level timing reset", session->game->loop.clock_started == 1 &&
+                   GetTime() - session->game->loop.prev_time < 0.1 &&
                    session->game->loop.accumulator < GAME_FIXED_STEP, 1) != 0)
         return 1;
 

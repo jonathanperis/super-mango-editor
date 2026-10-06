@@ -28,9 +28,6 @@ typedef struct {
     int   tile_count;
 } RopeDecor;
 
-/* Populate the rope array with level placements. */
-void rope_init(RopeDecor *ropes, int *count);
-
 /* Blit every rope with world-to-screen camera offset applied. */
 void rope_render(const RopeDecor *ropes, int count,
                  Texture2D *tex, int cam_x);

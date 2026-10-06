@@ -72,8 +72,7 @@ static int inspection_and_replay(void)
         gs.replay_input_mask = i < 120 ? PLAYER_INPUT_RIGHT : 0;
         if (i == 30) gs.replay_input_mask |= PLAYER_INPUT_JUMP;
         if (i == 60) gs.player.walk_max_speed = 150;
-        float dt = i < 90 ? 1.0f / 60 : 1.0f / 120;
-        game_update_active(&gs, dt, (int)gs.camera.x);
+        game_update_active(&gs, GAME_FIXED_STEP, (int)gs.camera.x);
     }
     CHECK(gs.experiment->count == 180 && gs.player.x > 150);
     Player recorded = gs.player;
@@ -84,8 +83,7 @@ static int inspection_and_replay(void)
     CHECK(game_experiment_save(&gs, "out/school-experiment.toml") == -1);
     CHECK(game_experiment_load(&gs, "out/school-experiment.toml") == 0);
     /* Replay through the same frame loop shape as game_frame: real frames of
-     * 70 ms run several steps each; each step uses the recorded duration,
-     * including the older-style 1/120 s steps captured above. */
+     * 70 ms run several fixed steps each, one recorded row per step. */
     int replayed = 0;
     for (int frame = 0; frame < 400 && replayed < 180; frame++) {
         /* Opposite live input must not perturb replay. */
@@ -108,16 +106,20 @@ static int inspection_and_replay(void)
     fputs("format_version = 9\n", bad); fclose(bad);
     GameExperiment *before = gs.experiment;
     CHECK(game_experiment_load(&gs, "out/school-experiment-invalid.toml") == -1 && gs.experiment == before);
+    /* Rows are [input, 9 physics values]. Format 1 rows (with a leading
+     * frame duration) came from the variable-timestep engine: refused. */
     const char *bad_rows[] = {
-        "[nan, 0, 100, 250, 750, 600, 550, 100, 350, 180, 80]",
-        "[0.016, 64, 100, 250, 750, 600, 550, 100, 350, 180, 80]",
-        "[0.016, 0, 1e100, 250, 750, 600, 550, 100, 350, 180, 80]"
+        "[0, nan, 250, 750, 600, 550, 100, 350, 180, 80]",
+        "[64, 100, 250, 750, 600, 550, 100, 350, 180, 80]",
+        "[0, 1e100, 250, 750, 600, 550, 100, 350, 180, 80]",
+        "[0.016, 0, 100, 250, 750, 600, 550, 100, 350, 180, 80]"
     };
+    const int bad_versions[] = {2, 2, 2, 1};
     for (size_t i = 0; i < sizeof(bad_rows) / sizeof(bad_rows[0]); i++) {
         bad = fopen("out/school-experiment-invalid.toml", "w");
         CHECK(bad != NULL);
-        fprintf(bad, "format_version = 1\nlevel_path = \"fixture\"\nseed = 7\nlevel_hash = \"%016llx\"\nframes = [%s]\n",
-                (unsigned long long)gs.source_level_hash, bad_rows[i]);
+        fprintf(bad, "format_version = %d\nlevel_path = \"fixture\"\nseed = 7\nlevel_hash = \"%016llx\"\nframes = [%s]\n",
+                bad_versions[i], (unsigned long long)gs.source_level_hash, bad_rows[i]);
         fclose(bad);
         CHECK(game_experiment_load(&gs, "out/school-experiment-invalid.toml") == -1 && gs.experiment == before);
     }

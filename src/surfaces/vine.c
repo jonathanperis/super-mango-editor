@@ -2,82 +2,19 @@
  * vine.c — Hanging vine decorations that drape from platform tops toward
  *           the ground floor.
  *
- * Vines are placed once at init time and are purely visual — no state
- * changes, no collision.
+ * Vines are purely visual — no state changes, no collision. Their
+ * positions come from the level's [[vines]] records (see level_loader.c).
  *
- * One vine per pillar, placed at either the left or the right inset
- * position chosen randomly at startup.  VINE_BORDER keeps the vine
- * centred within the platform edge rather than flush against it.
- *
- * With TILE_SIZE=48, VINE_W=16, VINE_BORDER=8:
- *   Left  position: plat_x + VINE_BORDER          (= plat_x +  8)
- *   Right position: plat_x + TILE_SIZE - VINE_BORDER - VINE_W (= plat_x + 24)
- *
- * The vine always fills completely from the platform's top surface down to
- * FLOOR_Y — tile count = (FLOOR_Y − plat_y) / VINE_H:
- *
- *   Medium pillar (top y=172): 3 tiles — covers 172 → 268 (96 px / 32)
- *   Tall   pillar (top y=124): 4 tiles — covers 124 → 268 (144 px / 32)
+ * Each vine is drawn as tile_count stacked tiles, VINE_STEP px apart
+ * (19 px, so neighbouring tiles overlap and look continuous), and stops
+ * at FLOOR_Y so it never hangs into the ground.
  *
  * The sprite is rendered flipped vertically so the plant's base
  * (thicker, root end) attaches to the platform and the leafy tip
  * hangs toward the ground, matching the classic hanging-vine look.
  */
 #include "vine.h"
-#include "game.h"   /* FLOOR_Y, TILE_SIZE, GAME_W */
-#include <stdlib.h> /* rand */
-
-/* Horizontal inset from each edge of the platform. */
-#define VINE_BORDER 8
-/* VINE_STEP is defined in vine.h (19 px — tiles overlap for flush stacking). */
-
-/* ------------------------------------------------------------------ */
-
-void vine_init(VineDecor *vines, int *count)
-{
-    int n = 0;
-
-    /*
-     * Platform layout — mirrors platform.c.
-     *   x : left edge of the pillar in world pixels
-     *   y : top surface (landing surface) in world pixels
-     *
-     *   Index  Screen  Size    x      y
-     *     0      1     medium   80   172
-     *     1      1     tall    256   124
-     *     2      2     medium  452   172  ← rope goes here, skip vine
-     *     3      2     tall    680   124
-     *     4      3     medium  880   172
-     *     5      3     tall   1050   124
-     *     6      4     medium 1300   172
-     *     7      4     tall   1480   124
-     */
-    static const float plat_x[8] = {  80, 256, 452,  680,  880, 1050, 1300, 1480 };
-    static const float plat_y[8] = { 172, 124, 172,  124,  172,  124,  172,  124 };
-
-    /*
-     * Fixed vine placements — no randomness.
-     * Skip pillar 2 (x=452) because the rope is placed there.
-     *
-     * Vines on pillars: 0 (left), 1 (right), 3 (left), 5 (right), 6 (left).
-     */
-    /* Pillar 0 (medium, x=80) — left side, 2 tiles */
-    vines[n++] = (VineDecor){ plat_x[0] + VINE_BORDER, plat_y[0], 2, VINE_GREEN };
-
-    /* Pillar 1 (tall, x=256) — right side, 3 tiles */
-    vines[n++] = (VineDecor){ plat_x[1] + TILE_SIZE - VINE_BORDER - VINE_W, plat_y[1], 3, VINE_GREEN };
-
-    /* Pillar 3 (tall, x=680) — left side, 3 tiles */
-    vines[n++] = (VineDecor){ plat_x[3] + VINE_BORDER, plat_y[3], 3, VINE_GREEN };
-
-    /* Pillar 5 (tall, x=1050) — right side, 3 tiles */
-    vines[n++] = (VineDecor){ plat_x[5] + TILE_SIZE - VINE_BORDER - VINE_W, plat_y[5], 3, VINE_GREEN };
-
-    /* Pillar 6 (medium, x=1300) — left side, 2 tiles */
-    vines[n++] = (VineDecor){ plat_x[6] + VINE_BORDER, plat_y[6], 2, VINE_GREEN };
-
-    *count = n;
-}
+#include "game.h"   /* FLOOR_Y, GAME_W */
 
 /* ------------------------------------------------------------------ */
 

@@ -45,9 +45,6 @@ typedef struct {
     VineType type;
 } VineDecor;
 
-/* Populate the vine array with ground and platform placements. */
-void vine_init(VineDecor *vines, int *count);
-
 /* Blit every vine with world-to-screen camera offset applied. */
 void vine_render(const VineDecor *vines, int count,
                  Texture2D *green_tex, Texture2D *brown_tex,

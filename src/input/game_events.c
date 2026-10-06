@@ -97,6 +97,13 @@ void game_handle_events(GameState *gs)
             } else if (confirm && game_overlay_state(gs) == GAME_OVERLAY_PAUSED) {
                 game_overlay_resume(gs);
                 sync_pause_music(gs);
+                /* Space and A are also the default Jump bindings. Without a
+                 * latch, the key that resumed would still be held on the
+                 * first gameplay step and the player would jump. */
+                GameInputPhysicalState inherited = {0};
+                if (button == PAD_A || button == PAD_START)
+                    inherited.controller_mask = GAME_INPUT_CONFIRM;
+                game_input_arm_release_latch(gs, &inherited);
             }
         }
     }

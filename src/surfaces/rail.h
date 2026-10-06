@@ -84,9 +84,6 @@ typedef struct {
 
 /* ---- Function declarations ----------------------------------------------- */
 
-/* Build all rail instances from the sandbox level (legacy; positions baked in). */
-void rail_init(Rail *rails, int *count);
-
 /*
  * rail_init_from_placements is declared in level.h (after RailPlacement is defined).
  * Include level.h instead of calling this function via rail.h.

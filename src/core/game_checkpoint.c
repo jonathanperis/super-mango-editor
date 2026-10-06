@@ -102,6 +102,11 @@ static int spans_overlap(float a0, float a1, float b0, float b1)
  * stand on solid floor (no floor gap) and must not touch a static hazard:
  * ground spike rows, spike platforms (the player could land on one while
  * falling) or the blue/fire flames that erupt from the floor.
+ *
+ * Moving dangers (saws, axes, spike blocks, enemies) are deliberately not
+ * checked: where they are depends on the moment of respawn, not on the
+ * level layout. Levels that need a respawn clear of them should author
+ * [[checkpoints]] instead.
  */
 static int legacy_respawn_column_is_safe(const GameState *gs, float x)
 {

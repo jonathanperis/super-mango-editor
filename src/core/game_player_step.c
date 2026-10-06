@@ -17,7 +17,7 @@ int game_player_step(GameState *gs, float dt)
     int fp_landed_idx = -1;
 
     unsigned int input = gs->replay_input_mask | game_web_input_take_touch_mask() | game_input_sample(gs);
-    input = game_experiment_input(gs, dt, input);
+    input = game_experiment_input(gs, input);
     player_handle_input(&gs->player, gs->audio.jump,
                         input, 0,
                         gs->vines, gs->vine_count,
