@@ -223,6 +223,8 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 | `palette.c` / `palette.h` | Entity palette panel — thumbnails, type selection |
 | `properties.c` / `properties.h` | Property inspector panel — per-type field editing |
 | `tools.c` / `tools.h` | Mouse interaction for Select / Place / Delete tools |
+| `hit_test.c` / `hit_test.h` | Entity rectangles shared by click hit-testing and the selection outline |
+| `entity_meta.c` / `entity_meta.h` | Per-type names/capacities and the shared read/insert/remove helpers used by tools, undo and paste |
 | `src/shared/ui.c` / `ui.h` | Immediate-mode UI widget library shared with game settings |
 | `undo.c` / `undo.h` | Undo stack and `PlacementData` clipboard union |
 | `src/shared/serializer.h`, `serializer_load.c`, `serializer_load_*.c` | Public TOML API and staged parsing into `LevelDef`, including strict checkpoints |

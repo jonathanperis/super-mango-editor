@@ -6,23 +6,26 @@
  * LevelDef in place and pushing undo commands for reversibility.
  *
  * Key design decisions:
- *   - Hit-testing uses display-size bounding boxes (not sprite frame sizes)
- *     so click targets match what the designer sees on screen.
- *   - Entities are tested in reverse render order (topmost first) so
- *     overlapping entities resolve intuitively.
- *   - Array compaction on delete uses memmove to shift trailing elements
- *     left by one slot, maintaining contiguous storage.
+ *   - Which entity is under the mouse is answered by hit_test.c, the same
+ *     rectangles the selection outline uses.
+ *   - Adding and removing entities goes through entity_meta.c's shared
+ *     insert/remove helpers, the same path undo/redo uses.
  *   - PLACE provides sensible defaults for every entity type so the
  *     designer can immediately see and test the new entity.
  */
 
 #include <stdio.h>   /* fprintf for capacity warnings */
-#include <string.h>  /* memmove for array compaction  */
+#include <string.h>  /* memset */
 
 #include "tools.h"
 #include "editor.h"  /* EditorState, EntityType, Selection, EditorTool    */
 #include "editor_session.h" /* save-point dirty tracking */
-#include "../levels/level_loader.h"
+#include "entity_meta.h" /* Editor display dimensions and rail helpers     */
+#include "hit_test.h"    /* editor_hit_test                                */
+#include "undo.h"    /* Command, PlacementData, undo_push                 */
+#include "../levels/level_loader.h" /* level_validate_runtime            */
+#include "../game.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE, WORLD_W,
+                        FLOOR_GAP_W, MAX_* constants                      */
 
 static int tools_can_hit_test(EditorState *es)
 {
@@ -31,10 +34,6 @@ static int tools_can_hit_test(EditorState *es)
     editor_set_status(es, "Correct properties or Undo: %s", error);
     return 0;
 }
-#include "entity_meta.h" /* Editor display dimensions and rail helpers     */
-#include "undo.h"    /* Command, PlacementData, undo_push                 */
-#include "../game.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE, WORLD_W,
-                        FLOOR_GAP_W, MAX_* constants                      */
 
 /* ------------------------------------------------------------------ */
 /* Utility: get / set entity position by type and index                */
@@ -330,463 +329,6 @@ static void set_entity_pos(LevelDef *level, EntityType type, int index,
     default:
         break;
     }
-}
-
-/* ------------------------------------------------------------------ */
-/* Hit-test: find the topmost entity under a world-space point         */
-/* ------------------------------------------------------------------ */
-
-/*
- * hit_test --- Return the frontmost entity whose bounding box contains (wx, wy).
- *
- * Tests all 25 entity types in reverse render order (enemies and hazards
- * first, world geometry last) so that visually topmost entities are
- * selected first when multiple overlap.
- *
- * Returns a Selection with {type, index} of the first hit, or
- * {type=0, index=-1} if nothing is under the cursor.
- */
-static Selection hit_test(const LevelDef *level, float wx, float wy)
-{
-    Selection sel = { 0, -1 };
-    float ex, ey;
-    int ew, eh;
-
-    /*
-     * Test in reverse render order: enemies / hazards / collectibles first
-     * (drawn last = on top), then surfaces, then world geometry.
-     */
-
-    /* ---- Enemies ---------------------------------------------------- */
-
-    /* Spiders — ground patrol, sit at FLOOR_Y - SPIDER_ART_H */
-    for (int i = level->spider_count - 1; i >= 0; i--) {
-        ex = level->spiders[i].x;
-        ey = (float)(FLOOR_Y - SPIDER_ART_H);
-        ew = SPIDER_FRAME_W;
-        eh = SPIDER_ART_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_SPIDER;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Jumping spiders — same dimensions as spiders */
-    for (int i = level->jumping_spider_count - 1; i >= 0; i--) {
-        ex = level->jumping_spiders[i].x;
-        ey = (float)(FLOOR_Y - SPIDER_ART_H);
-        ew = SPIDER_FRAME_W;
-        eh = SPIDER_ART_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_JUMPING_SPIDER;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Birds — sine-wave patrol, y = base_y */
-    for (int i = level->bird_count - 1; i >= 0; i--) {
-        ex = level->birds[i].x;
-        ey = level->birds[i].base_y;
-        ew = BIRD_FRAME_W;
-        eh = BIRD_ART_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_BIRD;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Faster birds — same dimensions as birds */
-    for (int i = level->faster_bird_count - 1; i >= 0; i--) {
-        ex = level->faster_birds[i].x;
-        ey = level->faster_birds[i].base_y;
-        ew = BIRD_FRAME_W;
-        eh = BIRD_ART_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_FASTER_BIRD;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Fish — water lane, y derived from water strip position */
-    for (int i = level->fish_count - 1; i >= 0; i--) {
-        ex = level->fish[i].x;
-        ey = (float)(GAME_H - WATER_ART_H) - FISH_FRAME_H / 2.0f;
-        ew = FISH_FRAME_W;
-        eh = FISH_FRAME_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_FISH;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Faster fish — same dimensions and Y as fish */
-    for (int i = level->faster_fish_count - 1; i >= 0; i--) {
-        ex = level->faster_fish[i].x;
-        ey = (float)(GAME_H - WATER_ART_H) - FISH_FRAME_H / 2.0f;
-        ew = FISH_FRAME_W;
-        eh = FISH_FRAME_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_FASTER_FISH;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* ---- Hazards ---------------------------------------------------- */
-
-    /* Axe traps — centred on host pillar, y from pillar height */
-    for (int i = level->axe_trap_count - 1; i >= 0; i--) {
-        const AxeTrapPlacement *at = &level->axe_traps[i];
-        ex = at->pillar_x + (float)(TILE_SIZE / 2 - AXE_FRAME_W / 2);
-        ey = (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
-        ew = AXE_FRAME_W;
-        eh = AXE_FRAME_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_AXE_TRAP;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Circular saws — horizontal patrol at bridge height */
-    for (int i = level->circular_saw_count - 1; i >= 0; i--) {
-        ex = level->circular_saws[i].x;
-        ey = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H);
-        ew = SAW_DISPLAY_W;
-        eh = SAW_DISPLAY_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_CIRCULAR_SAW;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Spike rows — ground-level spikes */
-    for (int i = level->spike_row_count - 1; i >= 0; i--) {
-        const SpikeRowPlacement *sr = &level->spike_rows[i];
-        ex = sr->x;
-        ey = (float)(FLOOR_Y - SPIKE_TILE_H);
-        ew = sr->count * SPIKE_TILE_W;
-        eh = SPIKE_TILE_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_SPIKE_ROW;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Spike platforms — elevated spike strips */
-    for (int i = level->spike_platform_count - 1; i >= 0; i--) {
-        const SpikePlatformPlacement *sp = &level->spike_platforms[i];
-        ex = sp->x;
-        ey = sp->y;
-        ew = sp->tile_count * SPIKE_PLAT_PIECE_W;
-        eh = SPIKE_PLAT_SRC_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_SPIKE_PLATFORM;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Spike blocks — rail-riding hazards, position from rail data */
-    for (int i = level->spike_block_count - 1; i >= 0; i--) {
-        const SpikeBlockPlacement *sb = &level->spike_blocks[i];
-        int ri = sb->rail_index;
-        if (ri < 0 || ri >= level->rail_count) continue;
-        const RailPlacement *rp = &level->rails[ri];
-        editor_rail_placement_position_at(rp, sb->t_offset, &ex, &ey);
-        ex -= (float)SPIKE_DISPLAY_W / 2.0f;
-        ey -= (float)SPIKE_DISPLAY_H / 2.0f;
-        ew = SPIKE_DISPLAY_W;
-        eh = SPIKE_DISPLAY_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_SPIKE_BLOCK;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Blue flames — erupting fire hazards, preview centred in floor gap */
-    for (int i = level->blue_flame_count - 1; i >= 0; i--) {
-        float gap_x = level->blue_flames[i].x;
-        ex = gap_x + (float)(FLOOR_GAP_W - BLUE_FLAME_W) / 2.0f;
-        ey = (float)(FLOOR_Y - BLUE_FLAME_H);
-        ew = BLUE_FLAME_W;
-        eh = BLUE_FLAME_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_BLUE_FLAME;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Fire flames — erupting fire hazards (fire variant), same layout */
-    for (int i = level->fire_flame_count - 1; i >= 0; i--) {
-        float gap_x = level->fire_flames[i].x;
-        ex = gap_x + (float)(FLOOR_GAP_W - FIRE_FLAME_W) / 2.0f;
-        ey = (float)(FLOOR_Y - FIRE_FLAME_H);
-        ew = FIRE_FLAME_W;
-        eh = FIRE_FLAME_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_FIRE_FLAME;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* ---- Collectibles ----------------------------------------------- */
-
-    /* Coins — small 16x16 pickups */
-    for (int i = level->coin_count - 1; i >= 0; i--) {
-        ex = level->coins[i].x;
-        ey = level->coins[i].y;
-        ew = COIN_DISPLAY_W;
-        eh = COIN_DISPLAY_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_COIN;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Star yellows — 16x16 health pickups */
-    for (int i = level->star_yellow_count - 1; i >= 0; i--) {
-        ex = level->star_yellows[i].x;
-        ey = level->star_yellows[i].y;
-        ew = YSTAR_DISPLAY_W;
-        eh = YSTAR_DISPLAY_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_STAR_YELLOW;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Star greens — 16x16 health pickups */
-    for (int i = level->star_green_count - 1; i >= 0; i--) {
-        ex = level->star_greens[i].x;
-        ey = level->star_greens[i].y;
-        ew = YSTAR_DISPLAY_W;
-        eh = YSTAR_DISPLAY_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_STAR_GREEN;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Star reds — 16x16 health pickups */
-    for (int i = level->star_red_count - 1; i >= 0; i--) {
-        ex = level->star_reds[i].x;
-        ey = level->star_reds[i].y;
-        ew = YSTAR_DISPLAY_W;
-        eh = YSTAR_DISPLAY_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_STAR_RED;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Last star — single 24x24 end-of-level star */
-    {
-        ex = level->last_star.x;
-        ey = level->last_star.y;
-        ew = LSTAR_DISPLAY_W;
-        eh = LSTAR_DISPLAY_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_LAST_STAR;
-            sel.index = 0;
-            return sel;
-        }
-    }
-
-    /* Player spawn — single 48x48 idle frame at spawn position */
-    {
-        ex = level->player_start_x;
-        ey = level->player_start_y;
-        ew = PLAYER_SPAWN_W;
-        eh = PLAYER_SPAWN_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_PLAYER_SPAWN;
-            sel.index = 0;
-            return sel;
-        }
-    }
-
-    /* ---- Surfaces --------------------------------------------------- */
-
-    /* Bouncepads — all three variants sit at FLOOR_Y - BP_SRC_H */
-    for (int i = level->bouncepad_small_count - 1; i >= 0; i--) {
-        ex = level->bouncepads_small[i].x;
-        ey = (float)(FLOOR_Y - BP_SRC_H);
-        ew = BP_FRAME_W;
-        eh = BP_SRC_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_BOUNCEPAD_SMALL;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    for (int i = level->bouncepad_medium_count - 1; i >= 0; i--) {
-        ex = level->bouncepads_medium[i].x;
-        ey = (float)(FLOOR_Y - BP_SRC_H);
-        ew = BP_FRAME_W;
-        eh = BP_SRC_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_BOUNCEPAD_MEDIUM;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    for (int i = level->bouncepad_high_count - 1; i >= 0; i--) {
-        ex = level->bouncepads_high[i].x;
-        ey = (float)(FLOOR_Y - BP_SRC_H);
-        ew = BP_FRAME_W;
-        eh = BP_SRC_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_BOUNCEPAD_HIGH;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Float platforms — hovering / crumble / rail platforms */
-    for (int i = level->float_platform_count - 1; i >= 0; i--) {
-        const FloatPlatformPlacement *fp = &level->float_platforms[i];
-        ex = fp->x;
-        ey = fp->y;
-        ew = fp->tile_count * FPLAT_PIECE_W;
-        eh = FPLAT_PIECE_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_FLOAT_PLATFORM;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Bridges — tiled crumble walkways */
-    for (int i = level->bridge_count - 1; i >= 0; i--) {
-        const BridgePlacement *br = &level->bridges[i];
-        ex = br->x;
-        ey = br->y;
-        ew = br->brick_count * BRIDGE_TILE_W;
-        eh = BRIDGE_TILE_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_BRIDGE;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Vines — hanging climbable decoration */
-    for (int i = level->vine_count - 1; i >= 0; i--) {
-        const VinePlacement *v = &level->vines[i];
-        ex = v->x;
-        ey = v->y;
-        ew = VINE_W;
-        eh = (v->tile_count - 1) * VINE_STEP + VINE_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_VINE;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Ladders — climbable stacked tiles */
-    for (int i = level->ladder_count - 1; i >= 0; i--) {
-        const LadderPlacement *ld = &level->ladders[i];
-        ex = ld->x;
-        ey = ld->y;
-        ew = LADDER_W;
-        eh = (ld->tile_count - 1) * LADDER_STEP + LADDER_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_LADDER;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Ropes — climbable stacked tiles */
-    for (int i = level->rope_count - 1; i >= 0; i--) {
-        const RopePlacement *rp = &level->ropes[i];
-        ex = rp->x;
-        ey = rp->y;
-        ew = ROPE_W;
-        eh = (rp->tile_count - 1) * ROPE_STEP + ROPE_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_ROPE;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Rails — 16-px tile paths forming loops or lines */
-    for (int i = level->rail_count - 1; i >= 0; i--) {
-        const RailPlacement *r = &level->rails[i];
-        ex = (float)r->x;
-        ey = (float)r->y;
-        ew = r->w * RAIL_TILE_W;
-        eh = (r->layout == RAIL_LAYOUT_RECT) ? r->h * RAIL_TILE_H : RAIL_TILE_H;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_RAIL;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* ---- World geometry (lowest priority) --------------------------- */
-
-    /* Platforms — ground pillars */
-    for (int i = level->platform_count - 1; i >= 0; i--) {
-        const PlatformPlacement *p = &level->platforms[i];
-        int ptw = (p->tile_width > 0) ? p->tile_width : 1;
-        ex = p->x;
-        ey = (float)(FLOOR_Y - p->tile_height * TILE_SIZE + 16);
-        ew = ptw * TILE_SIZE;
-        eh = p->tile_height * TILE_SIZE;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_PLATFORM;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Floor gaps — holes in the floor */
-    for (int i = level->floor_gap_count - 1; i >= 0; i--) {
-        ex = (float)level->floor_gaps[i];
-        ey = (float)FLOOR_Y;
-        ew = FLOOR_GAP_W;
-        eh = GAME_H - FLOOR_Y;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_FLOOR_GAP;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    /* Checkpoints are thin markers, but retain a forgiving hit target. */
-    for (int i = level->checkpoint_count - 1; i >= 0; i--) {
-        ex = level->checkpoints[i].x - 4.0f;
-        ey = level->checkpoints[i].y - 20.0f;
-        ew = 9;
-        eh = 24;
-        if (wx >= ex && wx < ex + ew && wy >= ey && wy < ey + eh) {
-            sel.type = ENT_CHECKPOINT;
-            sel.index = i;
-            return sel;
-        }
-    }
-
-    return sel;  /* no hit — index stays -1 */
 }
 
 /* ------------------------------------------------------------------ */
@@ -1118,7 +660,7 @@ void tools_mouse_down(EditorState *es, float world_x, float world_y)
     switch (es->tool) {
 
     case TOOL_SELECT: {
-        Selection hit = hit_test(&es->level, world_x, world_y);
+        Selection hit = editor_hit_test(&es->level, world_x, world_y);
         if (hit.index >= 0) {
             /*
              * Hit an entity — select it and begin a drag so the user
@@ -1143,7 +685,7 @@ void tools_mouse_down(EditorState *es, float world_x, float world_y)
         break;
 
     case TOOL_DELETE: {
-        Selection hit = hit_test(&es->level, world_x, world_y);
+        Selection hit = editor_hit_test(&es->level, world_x, world_y);
         if (hit.index >= 0) {
             delete_entity(es, hit.type, hit.index);
         }
@@ -1279,7 +821,7 @@ void tools_right_click(EditorState *es, float world_x, float world_y)
     if (!es) return;
     if (!tools_can_hit_test(es)) return;
     editor_selection_reconcile(es);
-    Selection hit = hit_test(&es->level, world_x, world_y);
+    Selection hit = editor_hit_test(&es->level, world_x, world_y);
     if (hit.index < 0) return;
 
     delete_entity(es, hit.type, hit.index);
