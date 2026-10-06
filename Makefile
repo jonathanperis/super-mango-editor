@@ -735,17 +735,19 @@ WEB_DEBUG_HTML = $(OUTDIR)/super-mango-debug.html
 # input lets `web` (and dist-wasm through it) skip emcc only when fresh.
 WEB_INPUTS = $(SRCS) $(wildcard $(SRCDIR)/*.h $(SRCDIR)/*/*.h) $(VENDOR_DIR)/tomlc17.h \
              $(wildcard web/*) $(wildcard assets/* assets/*/* assets/*/*/*) \
-             $(wildcard levels/* levels/*/*) $(WEB_RAYLIB_LIB) Makefile
+             $(wildcard levels/* levels/*/*) $(WEB_RAYLIB_LIB) tools/web_csp.py Makefile
 
 web: $(WEB_HTML) $(WEB_DEBUG_HTML)
 
 $(WEB_HTML): $(WEB_INPUTS) | $(OUTDIR)
 	emcc $(WEB_CFLAGS) -I$(WEB_RAYLIB_BUILD)/build/raylib/include -I$(SRCDIR) -I$(VENDOR_DIR) $(SRCS) $(WEB_RAYLIB_LIB) -o $@ $(WEB_FLAGS) \
 		$(WEB_LINK_FLAGS)
+	python3 tools/web_csp.py $@
 
 $(WEB_DEBUG_HTML): $(WEB_INPUTS) | $(OUTDIR)
 	emcc $(WEB_CFLAGS) -I$(WEB_RAYLIB_BUILD)/build/raylib/include -I$(SRCDIR) -I$(VENDOR_DIR) $(SRCS) $(WEB_RAYLIB_LIB) -o $@ $(WEB_FLAGS) \
 		$(WEB_LINK_FLAGS) --post-js web/debug-boot.js
+	python3 tools/web_csp.py $@
 
 dist-native: release asset-budget
 	@if [ -n "$${RELEASE_DLL_DIR:-}" ]; then \
