@@ -2127,6 +2127,44 @@ cleanup:
     return result;
 }
 
+static int recovery_metadata_keeps_longest_source_path(void)
+{
+    EditorState es = {0};
+    EditorState restarted = {0};
+    char root[EDITOR_PATH_MAX] = {0};
+    char long_path[EDITOR_PATH_MAX];
+    size_t length = 1020;  /* just under EDITOR_PATH_MAX - 1 */
+    int result = 1;
+
+    ensure_out_dir();
+    memcpy(long_path, "out/", 4);
+    memset(long_path + 4, 'p', length - 4 - 5);
+    memcpy(long_path + length - 5, ".toml", 6);
+    if (strlen(long_path) != length || !editor_path_fits(long_path)) return 1;
+
+    if (make_test_preference_root(root, sizeof(root)) != 0 ||
+        editor_set_preference_root(&es, root) != 0 ||
+        editor_set_preference_root(&restarted, root) != 0) return 1;
+    editor_level_init_defaults(&es.level);
+    memcpy(es.file_path, long_path, length + 1);
+    if (editor_init_persistence_paths(&es) != 0) goto cleanup;
+    es.modified = 1;
+    es.last_autosave_ms = (uint32_t)clock_millis() - 30001u;
+    editor_maybe_autosave(&es);
+
+    /* A restarted editor must rediscover it with the full source path. */
+    if (editor_init_persistence_paths(&restarted) != 0 ||
+        expect_int("long path entry found", restarted.recovery_entry_count, 1) != 0 ||
+        expect_int("long path round trip",
+                   strcmp(restarted.recovery_entries[0].source_path, long_path) == 0,
+                   1) != 0) goto cleanup;
+    result = 0;
+
+cleanup:
+    cleanup_test_preference_root(root, (EditorState[]){es, restarted}, 2);
+    return result;
+}
+
 typedef struct {
     TextFont *font;
     int drawing;
@@ -2693,6 +2731,7 @@ int main(void)
     if (camera_scrolls_vertically_and_stays_clamped() != 0) return 1;
     if (playtest_blocks_editing_and_stop_cleans_up() != 0) return 1;
     if (load_fingerprints_the_bytes_it_parsed() != 0) return 1;
+    if (recovery_metadata_keeps_longest_source_path() != 0) return 1;
     if (widget_commit_paths_preserve_values() != 0) return 1;
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;
