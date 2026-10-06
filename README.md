@@ -291,12 +291,12 @@ Four GitHub Actions workflows:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Linux x86_64, macOS arm64, Windows x86_64 and WebAssembly builds; releases only for `v*` tags or manual dispatch on `main` |
+| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift`; Linux x86_64, macOS arm64, Windows x86_64 and WebAssembly builds; separate Windows Clang and `Desktop backend` jobs; release checksums/attestation; releases only for `v*` tags or manual dispatch on `main` |
 | Docs | `docs.yml` | Push to `main`, relevant pull requests, manual | Source/content drift, frozen Bun install, Astro lint/build, dependency audit and built-site checks |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis |
 | Deploy Pages | `deploy.yml` | Successful same-repository main push/manual Build & Release run | Builds/checks docs at the artifact's commit, copies matching WebAssembly files and deploys Pages |
 
-The native matrix builds desktop game/editor binaries and archives. Linux runs GLFW tests/rendered smoke with a virtual display and audio sink; macOS/Windows run the same logical/resource suite and rendered smoke using a separate Memory test build. Additional checks include desktop sanitizers and scripted replay smoke on Linux, plus `make validate-levels` on Linux/macOS. The WebAssembly leg builds and checks normal/debug artifacts and their archive. Releases upload assets to a draft before publishing it. Docs and Pages gates validate the matching source/content and WebAssembly artifacts.
+The build matrix builds desktop game/editor binaries and archives (Windows with GCC); native legs compile with `-Werror`, the WebAssembly leg with `EXTRA_WEB_CFLAGS=-Werror`. Linux runs GLFW tests/rendered smoke with a virtual display and audio sink; macOS/Windows run the same logical/resource suite and rendered smoke using a separate Memory test build. Additional checks include desktop sanitizers (with fuzz-seed replay) and scripted replay smoke on Linux; `make validate-levels` runs on Linux, macOS and Windows. The WebAssembly leg builds and checks normal/debug artifacts and their archive. Two jobs ship nothing and never block a release: Windows Clang (`-Werror` on the rolling MSYS2 toolchain) and `Desktop backend`, which runs the macOS and Windows (Mesa llvmpipe) suites on real GLFW/OpenGL. The always-on `Docs drift` job runs `make docs-drift` on every pull request. For releases, a `Checksums and provenance` job writes `SHA256SUMS` and a GitHub build provenance attestation for the four archives; the release job re-verifies them, uploads assets to a draft, then publishes it. Docs and Pages gates validate the matching source/content and WebAssembly artifacts.
 
 ## License
 
