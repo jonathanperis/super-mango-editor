@@ -209,7 +209,7 @@ Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). CI pins **6.
 make web
 ```
 
-Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). The pinned raylib Web library is built separately with `emcmake`; the application links it with `USE_GLFW=3`. Uses a custom shell template from `web/shell.html`.
+Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). The pinned raylib Web library is built separately with `emcmake`; the application links it with `USE_GLFW=3`. Uses a custom shell template from `web/shell.html`. Application sources compile with the native warning set (`-Wall -Wextra -Wpedantic`), minus the pedantic empty-declaration diagnostic that Emscripten's documented `EM_JS(...);` form triggers. `EXTRA_WEB_CFLAGS` appends flags (CI passes `-Werror`).
 
 The Web frame callback returns to Emscripten's animation-frame scheduler rather
 than using raylib's blocking FPS limiter. Asyncify is not required by this loop.
