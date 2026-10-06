@@ -339,11 +339,10 @@ make dist-native
 
 ### `make dist-wasm`
 
-Packages an existing verified WebAssembly build without invoking emcc again. Missing normal/debug outputs are errors. Archives include HTML/JS/WASM/data files, README and third-party notices.
+Depends on `make web`, whose HTML outputs are file targets over the sources, headers, `web/` host files, `assets/`, `levels/`, the Web raylib library and the Makefile; emcc only reruns when one of them is newer, so a stale WASM build is never packaged. Archives include HTML/JS/WASM/data files, README and third-party notices.
 
 ```sh
-make web
-make dist-wasm
+make dist-wasm   # runs make web first when its outputs are stale
 ```
 
 ### `make docs-drift`
