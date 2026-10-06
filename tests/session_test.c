@@ -5,6 +5,7 @@
 #include "collision/collision_damage.h"
 #include "collision/game_collision.h"
 #include "core/app_session.h"
+#include "core/game_completion.h"
 #include "core/game_overlay.h"
 #include "core/game_timing.h"
 #include "core/game_update.h"
@@ -842,6 +843,59 @@ static int collision_lifetime_and_pickups(void)
     return 0;
 }
 
+/* Dying must not bring coins back (score farming); Retry starts over. */
+static int coins_stay_collected_across_life_loss(void)
+{
+    GameState gs = {0};
+    LevelDef def;
+    level_def_init_defaults(&def);
+    def.player_start_x = 20;
+    def.player_start_y = FLOOR_Y;
+    def.coin_count = 2;
+    def.coins[0] = (CoinPlacement){30, 239};
+    def.coins[1] = (CoinPlacement){300, 239};
+    def.star_yellow_count = 1;
+    def.star_yellows[0] = (StarYellowPlacement){30, 230};
+    def.last_star = (LastStarPlacement){380, 100};
+    gs.player.w = gs.player.h = 48;
+    if (level_load(&gs, &def)) return 1;
+    game_completion_reset_summary(&gs); /* as level_session does after a load */
+
+    /* The player spawns over coin 0 and the star: one pass collects both. */
+    gs.hearts = 2;
+    game_collide(&gs, 1.0f / TARGET_FPS);
+    int score = gs.score;
+    if (expect_int("coin collected", gs.coins[0].active, 0) ||
+        expect_int("star collected", gs.star_yellows[0].active, 0) ||
+        expect_int("coin scored", score, gs.rules.coin_score)) return 1;
+
+    /* Lethal damage spends a life and respawns at the same spot. */
+    gs.player.hurt_timer = 0;
+    apply_damage(&gs, gs.hearts, 0, 0, 0);
+    if (expect_int("life spent", gs.lives, DEFAULT_LIVES - 1) ||
+        expect_int("coin stays gone after death", gs.coins[0].active, 0) ||
+        expect_int("uncollected coin remains", gs.coins[1].active, 1) ||
+        expect_int("star respawns for next life", gs.star_yellows[0].active, 1)) return 1;
+    game_collide(&gs, 1.0f / TARGET_FPS);
+    if (expect_int("no second award at respawn", gs.score, score)) return 1;
+
+    /* Completion counts every coin collected during the attempt. */
+    game_complete_level(&gs);
+    if (expect_int("summary counts coins across lives", gs.completion.coins_collected, 1) ||
+        expect_int("summary coin total", gs.completion.coin_total, 2)) return 1;
+
+    /* Game over, then Retry: a fresh attempt brings every coin back. */
+    gs.completion.complete = 0;
+    gs.lives = 0;
+    gs.player.hurt_timer = 0;
+    apply_damage(&gs, gs.hearts, 0, 0, 0);
+    if (expect_int("game over", gs.game_over, 1)) return 1;
+    game_restart_after_game_over(&gs);
+    if (expect_int("retry restores coins", gs.coins[0].active, 1) ||
+        expect_int("retry clears score", gs.score, 0)) return 1;
+    return 0;
+}
+
 static int nearest_surface_is_order_independent(void)
 {
     GameState timing = {0};
@@ -939,6 +993,7 @@ int main(void)
         CASE(game_simulation_contract_test), CASE(game_profile_contract_test),
         CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),
         CASE(menu_mouse_and_path_boundaries), CASE(collision_lifetime_and_pickups),
+        CASE(coins_stay_collected_across_life_loss),
         CASE(nearest_surface_is_order_independent), CASE(phase_resets_transient_state),
         CASE(campaign_manifest_is_ordered_and_transactional),
         CASE(campaign_manifest_nul_fixtures_reject_transactionally),

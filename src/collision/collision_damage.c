@@ -38,6 +38,9 @@ void game_restart_after_game_over(GameState *gs)
     gs->player.spawn_x = gs->respawn_x;
     gs->player.spawn_y = gs->respawn_y;
     gs->score_life_next = gs->rules.score_per_life;
+    /* Retry is a fresh attempt with score 0, so every coin returns. A life
+     * loss (reset_current_level alone) keeps collected coins gone. */
+    for (int i = 0; i < gs->coin_count; i++) gs->coins[i].active = 1;
     reset_current_level(gs, &gs->loop.fp_prev_riding);
 }
 

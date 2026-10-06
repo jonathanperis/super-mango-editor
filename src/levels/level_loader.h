@@ -4,7 +4,8 @@
  * level_load  : Populate all GameState entity arrays from a LevelDef.
  *               Called once from game_init (game startup).
  *
- * level_reset : Re-populate all mutable entity arrays and reset the player.
+ * level_reset : Re-populate mutable entity arrays and reset the player.
+ *               Collected coins stay collected (no score farming by dying).
  *               Called from reset_current_level (player death / level retry).
  *               Geometry (platforms, rails) and sea gaps are not re-applied
  *               because they never change during a play session.
@@ -26,8 +27,9 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size);
 int level_load(GameState *gs, const LevelDef *def);
 
 /*
- * Reset all mutable entities (enemies, collectibles, hazards) to their initial
- * placement state.  Static geometry (platforms, rails, sea gaps) is preserved.
+ * Reset mutable entities (enemies, stars, hazards, surfaces) to their initial
+ * placement state.  Static geometry (platforms, rails, sea gaps) and the
+ * coins already collected during this attempt are preserved.
  * Also resets the player to the spawn position.
  */
 void level_reset(GameState *gs, const LevelDef *def);
