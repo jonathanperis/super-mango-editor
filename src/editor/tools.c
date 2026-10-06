@@ -37,30 +37,6 @@ static int tools_can_hit_test(EditorState *es)
                         FLOOR_GAP_W, MAX_* constants                      */
 
 /* ------------------------------------------------------------------ */
-/* Utility: generic array element removal                              */
-/* ------------------------------------------------------------------ */
-
-/*
- * array_remove --- Remove element at `index` from a contiguous array.
- *
- * Uses memmove to shift all elements after the removed one left by one
- * slot, preserving order.  Decrements *count to reflect the new size.
- *
- * arr       : pointer to the first element of the array.
- * count     : pointer to the element count (decremented on return).
- * index     : zero-based index of the element to remove.
- * elem_size : sizeof one element (passed explicitly because arr is void*).
- */
-static void array_remove(void *arr, int *count, int index, size_t elem_size)
-{
-    char *base = (char *)arr;
-    memmove(base + index * elem_size,
-            base + (index + 1) * elem_size,
-            (*count - index - 1) * elem_size);
-    (*count)--;
-}
-
-/* ------------------------------------------------------------------ */
 /* Utility: get / set entity position by type and index                */
 /* ------------------------------------------------------------------ */
 
@@ -354,188 +330,6 @@ static void set_entity_pos(LevelDef *level, EntityType type, int index,
     default:
         break;
     }
-}
-
-/* ------------------------------------------------------------------ */
-/* Utility: get entity count and capacity by type                      */
-/* ------------------------------------------------------------------ */
-
-/*
- * get_count --- Return the current number of entities of the given type.
- */
-static int get_count(const LevelDef *level, EntityType type)
-{
-    return editor_entity_count(level, type);
-}
-
-/*
- * get_max_count --- Return the MAX_* capacity for the given entity type.
- *
- * Used by TOOL_PLACE to check whether there is room for a new entity
- * before inserting into the fixed-size array.
- */
-static int get_max_count(EntityType type)
-{
-    switch (type) {
-    case ENT_PLATFORM:         return MAX_PLATFORMS;
-    case ENT_FLOOR_GAP:        return MAX_FLOOR_GAPS;
-    case ENT_CHECKPOINT:       return MAX_CHECKPOINTS;
-    case ENT_RAIL:             return MAX_RAILS;
-    case ENT_COIN:             return MAX_COINS;
-    case ENT_STAR_YELLOW:      return MAX_STAR_YELLOWS;
-    case ENT_STAR_GREEN:       return MAX_STAR_GREENS;
-    case ENT_STAR_RED:         return MAX_STAR_REDS;
-    case ENT_LAST_STAR:        return 1;
-    case ENT_PLAYER_SPAWN:     return 1;
-    case ENT_SPIDER:           return MAX_SPIDERS;
-    case ENT_JUMPING_SPIDER:   return MAX_JUMPING_SPIDERS;
-    case ENT_BIRD:             return MAX_BIRDS;
-    case ENT_FASTER_BIRD:      return MAX_FASTER_BIRDS;
-    case ENT_FISH:             return MAX_FISH;
-    case ENT_FASTER_FISH:      return MAX_FASTER_FISH;
-    case ENT_AXE_TRAP:         return MAX_AXE_TRAPS;
-    case ENT_CIRCULAR_SAW:     return MAX_CIRCULAR_SAWS;
-    case ENT_SPIKE_ROW:        return MAX_SPIKE_ROWS;
-    case ENT_SPIKE_PLATFORM:   return MAX_SPIKE_PLATFORMS;
-    case ENT_SPIKE_BLOCK:      return MAX_SPIKE_BLOCKS;
-    case ENT_BLUE_FLAME:       return MAX_BLUE_FLAMES;
-    case ENT_FIRE_FLAME:       return MAX_FIRE_FLAMES;
-    case ENT_FLOAT_PLATFORM:   return MAX_FLOAT_PLATFORMS;
-    case ENT_BRIDGE:           return MAX_BRIDGES;
-    case ENT_BOUNCEPAD_SMALL:  return MAX_BOUNCEPADS_SMALL;
-    case ENT_BOUNCEPAD_MEDIUM: return MAX_BOUNCEPADS_MEDIUM;
-    case ENT_BOUNCEPAD_HIGH:   return MAX_BOUNCEPADS_HIGH;
-    case ENT_VINE:             return MAX_VINES;
-    case ENT_LADDER:           return MAX_LADDERS;
-    case ENT_ROPE:             return MAX_ROPES;
-    default:                   return 0;
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/* Utility: snapshot entity data into PlacementData for undo           */
-/* ------------------------------------------------------------------ */
-
-/*
- * snapshot_entity --- Copy one entity's placement data into a PlacementData union.
- *
- * The entity_type field in the Command selects which union member is active.
- * The caller must ensure index is valid before calling.
- */
-static PlacementData snapshot_entity(const LevelDef *level, EntityType type,
-                                      int index)
-{
-    PlacementData pd;
-    memset(&pd, 0, sizeof(pd));
-
-    if (!level || index < 0 || index >= editor_entity_count(level, type))
-        return pd;
-
-    switch (type) {
-    case ENT_PLATFORM:
-        pd.platform = level->platforms[index];
-        break;
-    case ENT_FLOOR_GAP:
-        pd.floor_gap = level->floor_gaps[index];
-        break;
-    case ENT_CHECKPOINT:
-        pd.checkpoint = level->checkpoints[index];
-        break;
-    case ENT_RAIL:
-        pd.rail = level->rails[index];
-        break;
-    case ENT_COIN:
-        pd.coin = level->coins[index];
-        break;
-    case ENT_STAR_YELLOW:
-        pd.star_yellow = level->star_yellows[index];
-        break;
-    case ENT_STAR_GREEN:
-        pd.star_green = level->star_greens[index];
-        break;
-    case ENT_STAR_RED:
-        pd.star_red = level->star_reds[index];
-        break;
-    case ENT_LAST_STAR:
-        pd.last_star = level->last_star;
-        break;
-    case ENT_PLAYER_SPAWN: {
-        /*
-         * Reuse the last_star union member for player spawn data.
-         * Both are simple {float x, float y} structs.
-         */
-        LastStarPlacement psp = { level->player_start_x,
-                                  level->player_start_y };
-        pd.last_star = psp;
-        break;
-    }
-    case ENT_SPIDER:
-        pd.spider = level->spiders[index];
-        break;
-    case ENT_JUMPING_SPIDER:
-        pd.jumping_spider = level->jumping_spiders[index];
-        break;
-    case ENT_BIRD:
-        pd.bird = level->birds[index];
-        break;
-    case ENT_FASTER_BIRD:
-        pd.bird = level->faster_birds[index];
-        break;
-    case ENT_FISH:
-        pd.fish = level->fish[index];
-        break;
-    case ENT_FASTER_FISH:
-        pd.fish = level->faster_fish[index];
-        break;
-    case ENT_AXE_TRAP:
-        pd.axe_trap = level->axe_traps[index];
-        break;
-    case ENT_CIRCULAR_SAW:
-        pd.circular_saw = level->circular_saws[index];
-        break;
-    case ENT_SPIKE_ROW:
-        pd.spike_row = level->spike_rows[index];
-        break;
-    case ENT_SPIKE_PLATFORM:
-        pd.spike_platform = level->spike_platforms[index];
-        break;
-    case ENT_SPIKE_BLOCK:
-        pd.spike_block = level->spike_blocks[index];
-        break;
-    case ENT_BLUE_FLAME:
-        pd.blue_flame = level->blue_flames[index];
-        break;
-    case ENT_FIRE_FLAME:
-        pd.fire_flame = level->fire_flames[index];
-        break;
-    case ENT_FLOAT_PLATFORM:
-        pd.float_platform = level->float_platforms[index];
-        break;
-    case ENT_BRIDGE:
-        pd.bridge = level->bridges[index];
-        break;
-    case ENT_BOUNCEPAD_SMALL:
-        pd.bouncepad = level->bouncepads_small[index];
-        break;
-    case ENT_BOUNCEPAD_MEDIUM:
-        pd.bouncepad = level->bouncepads_medium[index];
-        break;
-    case ENT_BOUNCEPAD_HIGH:
-        pd.bouncepad = level->bouncepads_high[index];
-        break;
-    case ENT_VINE:
-        pd.vine = level->vines[index];
-        break;
-    case ENT_LADDER:
-        pd.ladder = level->ladders[index];
-        break;
-    case ENT_ROPE:
-        pd.rope = level->ropes[index];
-        break;
-    default:
-        break;
-    }
-    return pd;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1002,13 +796,15 @@ static Selection hit_test(const LevelDef *level, float wx, float wy)
 /*
  * delete_entity --- Remove one entity from the level and push undo.
  *
- * Snapshots the entity data before removal, compacts the array with
- * memmove, decrements the count, pushes a CMD_DELETE command to the
- * undo stack, and sets the modified flag.
+ * Snapshots the entity data before removal, removes it through the shared
+ * editor_entity_remove helper (the same path undo/redo uses), pushes a
+ * CMD_DELETE command to the undo stack, and refreshes the dirty flag.
  */
 static void delete_entity(EditorState *es, EntityType type, int index)
 {
     LevelDef *level;
+    PlacementData before;
+    Command cmd;
 
     if (!es) return;
     level = &es->level;
@@ -1016,152 +812,22 @@ static void delete_entity(EditorState *es, EntityType type, int index)
         return;
 
     /* Snapshot entity data before deletion for undo */
-    PlacementData before = snapshot_entity(level, type, index);
+    before = editor_snapshot_entity(level, type, index);
 
-    /*
-     * Remove the entity from its array by shifting trailing elements
-     * left by one slot.  Each entity type has its own array and count.
-     */
-    switch (type) {
-    case ENT_PLATFORM:
-        array_remove(level->platforms, &level->platform_count,
-                     index, sizeof(PlatformPlacement));
-        break;
-    case ENT_FLOOR_GAP:
-        array_remove(level->floor_gaps, &level->floor_gap_count,
-                     index, sizeof(int));
-        break;
-    case ENT_CHECKPOINT:
-        array_remove(level->checkpoints, &level->checkpoint_count,
-                     index, sizeof(CheckpointPlacement));
-        break;
-    case ENT_RAIL:
-        array_remove(level->rails, &level->rail_count,
-                     index, sizeof(RailPlacement));
-        break;
-    case ENT_COIN:
-        array_remove(level->coins, &level->coin_count,
-                     index, sizeof(CoinPlacement));
-        break;
-    case ENT_STAR_YELLOW:
-        array_remove(level->star_yellows, &level->star_yellow_count,
-                     index, sizeof(StarYellowPlacement));
-        break;
-    case ENT_STAR_GREEN:
-        array_remove(level->star_greens, &level->star_green_count,
-                     index, sizeof(StarGreenPlacement));
-        break;
-    case ENT_STAR_RED:
-        array_remove(level->star_reds, &level->star_red_count,
-                     index, sizeof(StarRedPlacement));
-        break;
-    case ENT_LAST_STAR:
+    if (editor_entity_type_is_singleton(type)) {
         /*
-         * LastStar is a single entity, not an array.  "Deleting" it
-         * resets its position to (0, 0) as a sentinel.  There is always
-         * exactly one last star in a level.
+         * Last Star and Player Spawn are single positions, not arrays.
+         * "Deleting" one resets it to (0, 0), the "not placed" sentinel
+         * that validation and the runtime already understand.
          */
-        level->last_star.x = 0.0f;
-        level->last_star.y = 0.0f;
-        break;
-    case ENT_PLAYER_SPAWN:
-        /*
-         * Player spawn is a single position.  "Deleting" it resets to
-         * (0, 0) as a sentinel, same pattern as last_star.
-         */
-        level->player_start_x = 0.0f;
-        level->player_start_y = 0.0f;
-        break;
-    case ENT_SPIDER:
-        array_remove(level->spiders, &level->spider_count,
-                     index, sizeof(SpiderPlacement));
-        break;
-    case ENT_JUMPING_SPIDER:
-        array_remove(level->jumping_spiders, &level->jumping_spider_count,
-                     index, sizeof(JumpingSpiderPlacement));
-        break;
-    case ENT_BIRD:
-        array_remove(level->birds, &level->bird_count,
-                     index, sizeof(BirdPlacement));
-        break;
-    case ENT_FASTER_BIRD:
-        array_remove(level->faster_birds, &level->faster_bird_count,
-                     index, sizeof(BirdPlacement));
-        break;
-    case ENT_FISH:
-        array_remove(level->fish, &level->fish_count,
-                     index, sizeof(FishPlacement));
-        break;
-    case ENT_FASTER_FISH:
-        array_remove(level->faster_fish, &level->faster_fish_count,
-                     index, sizeof(FishPlacement));
-        break;
-    case ENT_AXE_TRAP:
-        array_remove(level->axe_traps, &level->axe_trap_count,
-                     index, sizeof(AxeTrapPlacement));
-        break;
-    case ENT_CIRCULAR_SAW:
-        array_remove(level->circular_saws, &level->circular_saw_count,
-                     index, sizeof(CircularSawPlacement));
-        break;
-    case ENT_SPIKE_ROW:
-        array_remove(level->spike_rows, &level->spike_row_count,
-                     index, sizeof(SpikeRowPlacement));
-        break;
-    case ENT_SPIKE_PLATFORM:
-        array_remove(level->spike_platforms, &level->spike_platform_count,
-                     index, sizeof(SpikePlatformPlacement));
-        break;
-    case ENT_SPIKE_BLOCK:
-        array_remove(level->spike_blocks, &level->spike_block_count,
-                     index, sizeof(SpikeBlockPlacement));
-        break;
-    case ENT_BLUE_FLAME:
-        array_remove(level->blue_flames, &level->blue_flame_count,
-                     index, sizeof(BlueFlamePlacement));
-        break;
-    case ENT_FIRE_FLAME:
-        array_remove(level->fire_flames, &level->fire_flame_count,
-                     index, sizeof(FireFlamePlacement));
-        break;
-    case ENT_FLOAT_PLATFORM:
-        array_remove(level->float_platforms, &level->float_platform_count,
-                     index, sizeof(FloatPlatformPlacement));
-        break;
-    case ENT_BRIDGE:
-        array_remove(level->bridges, &level->bridge_count,
-                     index, sizeof(BridgePlacement));
-        break;
-    case ENT_BOUNCEPAD_SMALL:
-        array_remove(level->bouncepads_small, &level->bouncepad_small_count,
-                     index, sizeof(BouncepadPlacement));
-        break;
-    case ENT_BOUNCEPAD_MEDIUM:
-        array_remove(level->bouncepads_medium, &level->bouncepad_medium_count,
-                     index, sizeof(BouncepadPlacement));
-        break;
-    case ENT_BOUNCEPAD_HIGH:
-        array_remove(level->bouncepads_high, &level->bouncepad_high_count,
-                     index, sizeof(BouncepadPlacement));
-        break;
-    case ENT_VINE:
-        array_remove(level->vines, &level->vine_count,
-                     index, sizeof(VinePlacement));
-        break;
-    case ENT_LADDER:
-        array_remove(level->ladders, &level->ladder_count,
-                     index, sizeof(LadderPlacement));
-        break;
-    case ENT_ROPE:
-        array_remove(level->ropes, &level->rope_count,
-                     index, sizeof(RopePlacement));
-        break;
-    default:
+        PlacementData cleared;
+        memset(&cleared, 0, sizeof(cleared));
+        (void)editor_entity_write(level, type, 0, &cleared);
+    } else if (editor_entity_remove(level, type, index) != 0) {
         return;
     }
 
     /* Push undo command — CMD_DELETE stores "before" so undo re-inserts */
-    Command cmd;
     memset(&cmd, 0, sizeof(cmd));
     cmd.type         = CMD_DELETE;
     cmd.entity_type  = (int)type;
@@ -1179,373 +845,231 @@ static void delete_entity(EditorState *es, EntityType type, int index)
 /* ------------------------------------------------------------------ */
 
 /*
- * place_entity --- Add one entity of the given type at (world_x, world_y).
+ * default_placement --- Fill *out with a new entity of `type` at (x, y).
  *
- * Checks capacity, fills in default values appropriate for the entity
- * type, increments the array count, and pushes a CMD_PLACE undo command.
+ * Each entity type needs different fields; the switch below fills in
+ * starting position, velocity, patrol bounds, and mode flags so the
+ * designer can immediately see and test the new entity.
+ *
+ * Returns 1 when `type` is placeable, 0 otherwise.
+ */
+static int default_placement(EntityType type, float world_x, float world_y,
+                             PlacementData *out)
+{
+    memset(out, 0, sizeof(*out));
+
+    switch (type) {
+    case ENT_SPIDER:
+        out->spider.x           = world_x;
+        out->spider.vx          = 50.0f;
+        out->spider.patrol_x0   = world_x - 50.0f;
+        out->spider.patrol_x1   = world_x + 50.0f;
+        out->spider.frame_index = 0;
+        return 1;
+    case ENT_JUMPING_SPIDER:
+        out->jumping_spider.x         = world_x;
+        out->jumping_spider.vx        = 55.0f;
+        out->jumping_spider.patrol_x0 = world_x - 50.0f;
+        out->jumping_spider.patrol_x1 = world_x + 50.0f;
+        return 1;
+    case ENT_BIRD:
+    case ENT_FASTER_BIRD:
+        /* Both bird variants share BirdPlacement; only the speed differs. */
+        out->bird.x           = world_x;
+        out->bird.base_y      = world_y;
+        out->bird.vx          = (type == ENT_BIRD) ? 45.0f : 80.0f;
+        out->bird.patrol_x0   = world_x - 80.0f;
+        out->bird.patrol_x1   = world_x + 80.0f;
+        out->bird.frame_index = 0;
+        return 1;
+    case ENT_FISH:
+    case ENT_FASTER_FISH:
+        out->fish.x         = world_x;
+        out->fish.vx        = (type == ENT_FISH) ? 70.0f : 120.0f;
+        out->fish.patrol_x0 = world_x - 60.0f;
+        out->fish.patrol_x1 = world_x + 60.0f;
+        return 1;
+    case ENT_AXE_TRAP:
+        out->axe_trap.pillar_x = world_x;
+        out->axe_trap.mode     = AXE_MODE_PENDULUM;
+        return 1;
+    case ENT_CIRCULAR_SAW:
+        out->circular_saw.x         = world_x;
+        out->circular_saw.patrol_x0 = world_x - 48.0f;
+        out->circular_saw.patrol_x1 = world_x + 48.0f;
+        out->circular_saw.direction = 1;
+        return 1;
+    case ENT_SPIKE_ROW:
+        out->spike_row.x     = world_x;
+        out->spike_row.count = 3;
+        return 1;
+    case ENT_SPIKE_PLATFORM:
+        out->spike_platform.x          = world_x;
+        out->spike_platform.y          = world_y;
+        out->spike_platform.tile_count = 3;
+        return 1;
+    case ENT_SPIKE_BLOCK:
+        out->spike_block.rail_index = 0;
+        out->spike_block.t_offset   = 0.0f;
+        out->spike_block.speed      = 3.0f;
+        return 1;
+    case ENT_BLUE_FLAME:
+        out->blue_flame.x = world_x;
+        return 1;
+    case ENT_FIRE_FLAME:
+        out->fire_flame.x = world_x;
+        return 1;
+    case ENT_FLOAT_PLATFORM:
+        out->float_platform.mode       = FLOAT_PLATFORM_STATIC;
+        out->float_platform.x          = world_x;
+        out->float_platform.y          = world_y;
+        out->float_platform.tile_count = 3;
+        out->float_platform.rail_index = 0;
+        out->float_platform.t_offset   = 0.0f;
+        out->float_platform.speed      = 0.0f;
+        return 1;
+    case ENT_BRIDGE:
+        out->bridge.x           = world_x;
+        out->bridge.y           = world_y;
+        out->bridge.brick_count = 8;
+        return 1;
+    case ENT_BOUNCEPAD_SMALL:
+        out->bouncepad.x         = world_x;
+        out->bouncepad.launch_vy = -380.0f;
+        out->bouncepad.pad_type  = BOUNCEPAD_GREEN;
+        return 1;
+    case ENT_BOUNCEPAD_MEDIUM:
+        out->bouncepad.x         = world_x;
+        out->bouncepad.launch_vy = -536.25f;
+        out->bouncepad.pad_type  = BOUNCEPAD_WOOD;
+        return 1;
+    case ENT_BOUNCEPAD_HIGH:
+        out->bouncepad.x         = world_x;
+        out->bouncepad.launch_vy = -700.0f;
+        out->bouncepad.pad_type  = BOUNCEPAD_RED;
+        return 1;
+    case ENT_PLATFORM:
+        out->platform.x           = world_x;
+        out->platform.tile_height = 2;
+        out->platform.tile_width  = 1;
+        return 1;
+    case ENT_VINE:
+        out->vine.x          = world_x;
+        out->vine.y          = world_y;
+        out->vine.tile_count = 3;
+        return 1;
+    case ENT_LADDER:
+        out->ladder.x          = world_x;
+        out->ladder.y          = world_y;
+        out->ladder.tile_count = 3;
+        return 1;
+    case ENT_ROPE:
+        out->rope.x          = world_x;
+        out->rope.y          = world_y;
+        out->rope.tile_count = 3;
+        return 1;
+    case ENT_COIN:
+        out->coin.x = world_x;
+        out->coin.y = world_y;
+        return 1;
+    case ENT_STAR_YELLOW:
+        out->star_yellow.x = world_x;
+        out->star_yellow.y = world_y;
+        return 1;
+    case ENT_STAR_GREEN:
+        out->star_green.x = world_x;
+        out->star_green.y = world_y;
+        return 1;
+    case ENT_STAR_RED:
+        out->star_red.x = world_x;
+        out->star_red.y = world_y;
+        return 1;
+    case ENT_LAST_STAR:
+    case ENT_PLAYER_SPAWN:
+        /* Singletons: "placing" moves the one existing position. */
+        out->last_star.x = world_x;
+        out->last_star.y = world_y;
+        return 1;
+    case ENT_FLOOR_GAP:
+        /*
+         * Floor gaps snap to a 32-px grid (FLOOR_GAP_W) so they align
+         * with the floor tile boundaries.
+         */
+        out->floor_gap = ((int)world_x / FLOOR_GAP_W) * FLOOR_GAP_W;
+        return 1;
+    case ENT_CHECKPOINT:
+        out->checkpoint.x = world_x;
+        out->checkpoint.y = world_y;
+        return 1;
+    case ENT_RAIL:
+        out->rail.layout  = RAIL_LAYOUT_RECT;
+        out->rail.x       = (int)world_x;
+        out->rail.y       = (int)world_y;
+        out->rail.w       = 4;
+        out->rail.h       = 4;
+        out->rail.end_cap = 0;
+        return 1;
+    case ENT_COUNT:
+        break;
+    }
+    return 0;
+}
+
+/*
+ * place_entity --- Add one entity of the palette type at (world_x, world_y).
+ *
+ * Checks capacity, builds the default placement, appends it with the shared
+ * editor_entity_insert helper, and pushes a CMD_PLACE undo command.  The two
+ * singletons are moved instead and record a CMD_MOVE.
  */
 static void place_entity(EditorState *es, float world_x, float world_y)
 {
     LevelDef *level = &es->level;
     EntityType type  = es->palette_type;
+    int singleton = editor_entity_type_is_singleton(type);
+    PlacementData before;
+    PlacementData after;
+    Command cmd;
+    int index;
 
     editor_selection_reconcile(es);
 
     /* Check capacity — every entity type has a fixed-size array */
-    int count = get_count(level, type);
-    int max   = get_max_count(type);
-    if (count >= max) {
+    int count = editor_entity_count(level, type);
+    int max   = editor_entity_capacity(type);
+    if (!singleton && count >= max) {
         fprintf(stderr, "Warning: cannot place more — %d/%d capacity reached\n",
                 count, max);
         return;
     }
 
-    /*
-     * Populate the new entry with sensible defaults.
-     * Each entity type needs different fields; the switch below fills
-     * in starting position, velocity, patrol bounds, and mode flags.
-     */
-    int new_index = count;
-    int singleton = (type == ENT_LAST_STAR || type == ENT_PLAYER_SPAWN);
-    PlacementData before;
+    if (!default_placement(type, world_x, world_y, &after)) return;
+
     memset(&before, 0, sizeof(before));
-    if (singleton) before = snapshot_entity(level, type, 0);
-
-    switch (type) {
-    case ENT_SPIDER: {
-        SpiderPlacement sp = {
-            .x           = world_x,
-            .vx          = 50.0f,
-            .patrol_x0   = world_x - 50.0f,
-            .patrol_x1   = world_x + 50.0f,
-            .frame_index = 0
-        };
-        level->spiders[new_index] = sp;
-        level->spider_count++;
-        break;
-    }
-    case ENT_JUMPING_SPIDER: {
-        JumpingSpiderPlacement jsp = {
-            .x         = world_x,
-            .vx        = 55.0f,
-            .patrol_x0 = world_x - 50.0f,
-            .patrol_x1 = world_x + 50.0f
-        };
-        level->jumping_spiders[new_index] = jsp;
-        level->jumping_spider_count++;
-        break;
-    }
-    case ENT_BIRD: {
-        BirdPlacement bp = {
-            .x           = world_x,
-            .base_y      = world_y,
-            .vx          = 45.0f,
-            .patrol_x0   = world_x - 80.0f,
-            .patrol_x1   = world_x + 80.0f,
-            .frame_index = 0
-        };
-        level->birds[new_index] = bp;
-        level->bird_count++;
-        break;
-    }
-    case ENT_FASTER_BIRD: {
-        BirdPlacement fbp = {
-            .x           = world_x,
-            .base_y      = world_y,
-            .vx          = 80.0f,
-            .patrol_x0   = world_x - 80.0f,
-            .patrol_x1   = world_x + 80.0f,
-            .frame_index = 0
-        };
-        level->faster_birds[new_index] = fbp;
-        level->faster_bird_count++;
-        break;
-    }
-    case ENT_FISH: {
-        FishPlacement fp = {
-            .x         = world_x,
-            .vx        = 70.0f,
-            .patrol_x0 = world_x - 60.0f,
-            .patrol_x1 = world_x + 60.0f
-        };
-        level->fish[new_index] = fp;
-        level->fish_count++;
-        break;
-    }
-    case ENT_FASTER_FISH: {
-        FishPlacement ffp = {
-            .x         = world_x,
-            .vx        = 120.0f,
-            .patrol_x0 = world_x - 60.0f,
-            .patrol_x1 = world_x + 60.0f
-        };
-        level->faster_fish[new_index] = ffp;
-        level->faster_fish_count++;
-        break;
-    }
-    case ENT_AXE_TRAP: {
-        AxeTrapPlacement atp = {
-            .pillar_x = world_x,
-            .mode     = AXE_MODE_PENDULUM
-        };
-        level->axe_traps[new_index] = atp;
-        level->axe_trap_count++;
-        break;
-    }
-    case ENT_CIRCULAR_SAW: {
-        CircularSawPlacement csp = {
-            .x         = world_x,
-            .patrol_x0 = world_x - 48.0f,
-            .patrol_x1 = world_x + 48.0f,
-            .direction = 1
-        };
-        level->circular_saws[new_index] = csp;
-        level->circular_saw_count++;
-        break;
-    }
-    case ENT_SPIKE_ROW: {
-        SpikeRowPlacement srp = {
-            .x     = world_x,
-            .count = 3
-        };
-        level->spike_rows[new_index] = srp;
-        level->spike_row_count++;
-        break;
-    }
-    case ENT_SPIKE_PLATFORM: {
-        SpikePlatformPlacement spp = {
-            .x          = world_x,
-            .y          = world_y,
-            .tile_count = 3
-        };
-        level->spike_platforms[new_index] = spp;
-        level->spike_platform_count++;
-        break;
-    }
-    case ENT_SPIKE_BLOCK: {
-        SpikeBlockPlacement sbp = {
-            .rail_index = 0,
-            .t_offset   = 0.0f,
-            .speed      = 3.0f
-        };
-        level->spike_blocks[new_index] = sbp;
-        level->spike_block_count++;
-        break;
-    }
-    case ENT_BLUE_FLAME: {
-        BlueFlamePlacement bfp = {
-            .x = world_x
-        };
-        level->blue_flames[new_index] = bfp;
-        level->blue_flame_count++;
-        break;
-    }
-    case ENT_FIRE_FLAME: {
-        FireFlamePlacement ffp = {
-            .x = world_x
-        };
-        level->fire_flames[new_index] = ffp;
-        level->fire_flame_count++;
-        break;
-    }
-    case ENT_FLOAT_PLATFORM: {
-        FloatPlatformPlacement fpp = {
-            .mode       = FLOAT_PLATFORM_STATIC,
-            .x          = world_x,
-            .y          = world_y,
-            .tile_count = 3,
-            .rail_index = 0,
-            .t_offset   = 0.0f,
-            .speed      = 0.0f
-        };
-        level->float_platforms[new_index] = fpp;
-        level->float_platform_count++;
-        break;
-    }
-    case ENT_BRIDGE: {
-        BridgePlacement brp = {
-            .x           = world_x,
-            .y           = world_y,
-            .brick_count = 8
-        };
-        level->bridges[new_index] = brp;
-        level->bridge_count++;
-        break;
-    }
-    case ENT_BOUNCEPAD_SMALL: {
-        BouncepadPlacement bps = {
-            .x         = world_x,
-            .launch_vy = -380.0f,
-            .pad_type  = BOUNCEPAD_GREEN
-        };
-        level->bouncepads_small[new_index] = bps;
-        level->bouncepad_small_count++;
-        break;
-    }
-    case ENT_BOUNCEPAD_MEDIUM: {
-        BouncepadPlacement bpm = {
-            .x         = world_x,
-            .launch_vy = -536.25f,
-            .pad_type  = BOUNCEPAD_WOOD
-        };
-        level->bouncepads_medium[new_index] = bpm;
-        level->bouncepad_medium_count++;
-        break;
-    }
-    case ENT_BOUNCEPAD_HIGH: {
-        BouncepadPlacement bph = {
-            .x         = world_x,
-            .launch_vy = -700.0f,
-            .pad_type  = BOUNCEPAD_RED
-        };
-        level->bouncepads_high[new_index] = bph;
-        level->bouncepad_high_count++;
-        break;
-    }
-    case ENT_PLATFORM: {
-        PlatformPlacement pp = {
-            .x           = world_x,
-            .tile_height = 2,
-            .tile_width  = 1
-        };
-        level->platforms[new_index] = pp;
-        level->platform_count++;
-        break;
-    }
-    case ENT_VINE: {
-        VinePlacement vp = {
-            .x          = world_x,
-            .y          = world_y,
-            .tile_count = 3
-        };
-        level->vines[new_index] = vp;
-        level->vine_count++;
-        break;
-    }
-    case ENT_LADDER: {
-        LadderPlacement lp = {
-            .x          = world_x,
-            .y          = world_y,
-            .tile_count = 3
-        };
-        level->ladders[new_index] = lp;
-        level->ladder_count++;
-        break;
-    }
-    case ENT_ROPE: {
-        RopePlacement rp = {
-            .x          = world_x,
-            .y          = world_y,
-            .tile_count = 3
-        };
-        level->ropes[new_index] = rp;
-        level->rope_count++;
-        break;
-    }
-    case ENT_COIN: {
-        CoinPlacement cp = {
-            .x = world_x,
-            .y = world_y
-        };
-        level->coins[new_index] = cp;
-        level->coin_count++;
-        break;
-    }
-    case ENT_STAR_YELLOW: {
-        StarYellowPlacement ysp = {
-            .x = world_x,
-            .y = world_y
-        };
-        level->star_yellows[new_index] = ysp;
-        level->star_yellow_count++;
-        break;
-    }
-    case ENT_STAR_GREEN: {
-        StarGreenPlacement gsp = {
-            .x = world_x,
-            .y = world_y
-        };
-        level->star_greens[new_index] = gsp;
-        level->star_green_count++;
-        break;
-    }
-    case ENT_STAR_RED: {
-        StarRedPlacement rsp = {
-            .x = world_x,
-            .y = world_y
-        };
-        level->star_reds[new_index] = rsp;
-        level->star_red_count++;
-        break;
-    }
-    case ENT_LAST_STAR: {
-        /*
-         * LastStar is a single entity — "placing" it overwrites the
-         * existing position rather than appending to an array.
-         */
-        level->last_star.x = world_x;
-        level->last_star.y = world_y;
-        break;
-    }
-    case ENT_PLAYER_SPAWN: {
-        /*
-         * Player spawn is a single position — "placing" it overwrites
-         * the existing spawn point, same pattern as last_star.
-         */
-        level->player_start_x = world_x;
-        level->player_start_y = world_y;
-        break;
-    }
-    case ENT_FLOOR_GAP: {
-        /*
-         * Floor gaps snap to a 32-px grid (FLOOR_GAP_W) so they align
-         * with the floor tile boundaries.
-         */
-        int snapped_x = ((int)world_x / FLOOR_GAP_W) * FLOOR_GAP_W;
-        level->floor_gaps[new_index] = snapped_x;
-        level->floor_gap_count++;
-        break;
-    }
-    case ENT_CHECKPOINT: {
-        CheckpointPlacement cp = { world_x, world_y };
-        level->checkpoints[new_index] = cp;
-        level->checkpoint_count++;
-        break;
-    }
-    case ENT_RAIL: {
-        RailPlacement rpl = {
-            .layout  = RAIL_LAYOUT_RECT,
-            .x       = (int)world_x,
-            .y       = (int)world_y,
-            .w       = 4,
-            .h       = 4,
-            .end_cap = 0
-        };
-        level->rails[new_index] = rpl;
-        level->rail_count++;
-        break;
-    }
-    default:
-        return;  /* unknown type — do nothing */
+    if (singleton) {
+        index = 0;
+        before = editor_snapshot_entity(level, type, 0);
+        (void)editor_entity_write(level, type, 0, &after);
+    } else {
+        index = count;  /* append: new entities draw on top of older ones */
+        if (editor_entity_insert(level, type, index, &after) != 0) return;
     }
 
     /*
-     * Push CMD_PLACE to undo stack.
-     * "after" holds the newly placed entity data so redo can re-insert it.
+     * Push the undo command.  "after" holds the new entity data so redo can
+     * re-insert it; singletons also keep "before" so undo can move them back.
      */
-    PlacementData after = snapshot_entity(level, type, singleton ? 0 : new_index);
-    Command cmd;
     memset(&cmd, 0, sizeof(cmd));
     cmd.type         = singleton ? CMD_MOVE : CMD_PLACE;
     cmd.entity_type  = (int)type;
-    cmd.entity_index = singleton ? 0 : new_index;
-    if (singleton) cmd.before = before;
+    cmd.entity_index = index;
+    cmd.before       = before;
     cmd.after        = after;
     undo_push(es->undo, cmd);
 
     /* Select the newly placed entity for immediate inspection */
     es->selection.type  = type;
-    es->selection.index = singleton ? 0 : new_index;
+    es->selection.index = index;
     editor_refresh_dirty(es);
     if (type == ENT_CHECKPOINT) editor_set_status(es, "Checkpoint placed");
 }
@@ -1649,7 +1173,7 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
     if (dx * dx + dy * dy < 0.5f) return;  /* less than ~0.7 px — no real move */
 
     /* Snapshot both the before and after states for undo/redo */
-    PlacementData after = snapshot_entity(&es->level, es->selection.type,
+    PlacementData after = editor_snapshot_entity(&es->level, es->selection.type,
                                           es->selection.index);
 
     /*
@@ -1658,7 +1182,7 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
      */
     set_entity_pos(&es->level, es->selection.type, es->selection.index,
                    es->drag_start_x, es->drag_start_y);
-    PlacementData before = snapshot_entity(&es->level, es->selection.type,
+    PlacementData before = editor_snapshot_entity(&es->level, es->selection.type,
                                            es->selection.index);
     set_entity_pos(&es->level, es->selection.type, es->selection.index,
                    end_x, end_y);

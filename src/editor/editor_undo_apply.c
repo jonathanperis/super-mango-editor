@@ -10,55 +10,6 @@
 #include "editor_files.h"
 #include "editor_session.h"
 
-PlacementData editor_snapshot_entity(const LevelDef *level,
-                                     EntityType type, int index)
-{
-    PlacementData pd;
-
-    memset(&pd, 0, sizeof(pd));
-    if (!level || index < 0 || index >= editor_entity_count(level, type))
-        return pd;
-
-    switch (type) {
-    case ENT_PLATFORM:         pd.platform = level->platforms[index]; break;
-    case ENT_FLOOR_GAP:        pd.floor_gap = level->floor_gaps[index]; break;
-    case ENT_CHECKPOINT:       pd.checkpoint = level->checkpoints[index]; break;
-    case ENT_RAIL:             pd.rail = level->rails[index]; break;
-    case ENT_COIN:             pd.coin = level->coins[index]; break;
-    case ENT_STAR_YELLOW:      pd.star_yellow = level->star_yellows[index]; break;
-    case ENT_STAR_GREEN:       pd.star_green = level->star_greens[index]; break;
-    case ENT_STAR_RED:         pd.star_red = level->star_reds[index]; break;
-    case ENT_LAST_STAR:        pd.last_star = level->last_star; break;
-    case ENT_PLAYER_SPAWN:
-        pd.last_star.x = level->player_start_x;
-        pd.last_star.y = level->player_start_y;
-        break;
-    case ENT_SPIDER:           pd.spider = level->spiders[index]; break;
-    case ENT_JUMPING_SPIDER:  pd.jumping_spider = level->jumping_spiders[index]; break;
-    case ENT_BIRD:             pd.bird = level->birds[index]; break;
-    case ENT_FASTER_BIRD:      pd.bird = level->faster_birds[index]; break;
-    case ENT_FISH:             pd.fish = level->fish[index]; break;
-    case ENT_FASTER_FISH:      pd.fish = level->faster_fish[index]; break;
-    case ENT_AXE_TRAP:         pd.axe_trap = level->axe_traps[index]; break;
-    case ENT_CIRCULAR_SAW:     pd.circular_saw = level->circular_saws[index]; break;
-    case ENT_SPIKE_ROW:        pd.spike_row = level->spike_rows[index]; break;
-    case ENT_SPIKE_PLATFORM:   pd.spike_platform = level->spike_platforms[index]; break;
-    case ENT_SPIKE_BLOCK:      pd.spike_block = level->spike_blocks[index]; break;
-    case ENT_BLUE_FLAME:       pd.blue_flame = level->blue_flames[index]; break;
-    case ENT_FIRE_FLAME:       pd.fire_flame = level->fire_flames[index]; break;
-    case ENT_FLOAT_PLATFORM:   pd.float_platform = level->float_platforms[index]; break;
-    case ENT_BRIDGE:            pd.bridge = level->bridges[index]; break;
-    case ENT_BOUNCEPAD_SMALL:  pd.bouncepad = level->bouncepads_small[index]; break;
-    case ENT_BOUNCEPAD_MEDIUM: pd.bouncepad = level->bouncepads_medium[index]; break;
-    case ENT_BOUNCEPAD_HIGH:   pd.bouncepad = level->bouncepads_high[index]; break;
-    case ENT_VINE:              pd.vine = level->vines[index]; break;
-    case ENT_LADDER:            pd.ladder = level->ladders[index]; break;
-    case ENT_ROPE:              pd.rope = level->ropes[index]; break;
-    case ENT_COUNT:             break;
-    }
-    return pd;
-}
-
 LevelConfigSnapshot editor_snapshot_config(const LevelDef *level)
 {
     LevelConfigSnapshot snapshot;
@@ -240,6 +191,25 @@ void editor_end_change_tracking(EditorState *es)
 }
 
 /*
+ * Structural undo steps.  A CMD_PLACE is undone by removing the entity and
+ * redone by inserting it again; CMD_DELETE is the mirror image.  Both use
+ * the same insert/remove helpers as the tools, so rail references are
+ * renumbered identically in every direction.
+ */
+static void editor_undo_insert(EditorState *es, EntityType type, int index,
+                               const PlacementData *data, int select_inserted)
+{
+    if (editor_entity_insert(&es->level, type, index, data) == 0)
+        editor_selection_after_insert(es, type, index, select_inserted);
+}
+
+static void editor_undo_remove(EditorState *es, EntityType type, int index)
+{
+    if (editor_entity_remove(&es->level, type, index) == 0)
+        editor_selection_after_remove(es, type, index);
+}
+
+/*
  * editor_apply_undo_command — Apply or reverse an undo command on the level.
  *
  * The undo system stores before/after snapshots for every action. Undo applies
@@ -248,6 +218,9 @@ void editor_end_change_tracking(EditorState *es)
  */
 void editor_apply_undo_command(EditorState *es, const Command *cmd, int reverse)
 {
+    EntityType type;
+    int index;
+
     if (!es || !cmd) return;
 
     if (cmd->type == CMD_CONFIG) {
@@ -261,82 +234,15 @@ void editor_apply_undo_command(EditorState *es, const Command *cmd, int reverse)
     }
 
     if (cmd->entity_type < 0 || cmd->entity_type >= ENT_COUNT) return;
+    type = (EntityType)cmd->entity_type;
+    index = cmd->entity_index;
 
-    #define LEVEL_ARRAY_LEN(arr) ((int)(sizeof(arr) / sizeof((arr)[0])))
-    #define APPLY_ARRAY(arr, cnt, union_field, max_count) \
-        do { \
-            int idx = cmd->entity_index; \
-            if (cmd->type == CMD_PLACE) { \
-                if (reverse) { \
-                    if (idx >= 0 && idx < cnt) { \
-                        for (int i = idx; i < cnt - 1; i++) \
-                            arr[i] = arr[i + 1]; \
-                        cnt--; \
-                        editor_selection_after_remove(es, \
-                                                      (EntityType)cmd->entity_type, idx); \
-                    } \
-                } else { \
-                    if (cnt < max_count && idx >= 0 && idx <= cnt) { \
-                        for (int i = cnt; i > idx; i--) \
-                            arr[i] = arr[i - 1]; \
-                        arr[idx] = cmd->after.union_field; \
-                        cnt++; \
-                        editor_selection_after_insert(es, \
-                                                      (EntityType)cmd->entity_type, idx, 1); \
-                    } \
-                } \
-            } else if (cmd->type == CMD_DELETE) { \
-                if (reverse) { \
-                    if (cnt < max_count && idx >= 0 && idx <= cnt) { \
-                        for (int i = cnt; i > idx; i--) \
-                            arr[i] = arr[i - 1]; \
-                        arr[idx] = cmd->before.union_field; \
-                        cnt++; \
-                        editor_selection_after_insert(es, \
-                                                      (EntityType)cmd->entity_type, idx, 0); \
-                    } \
-                } else { \
-                    if (idx >= 0 && idx < cnt) { \
-                        for (int i = idx; i < cnt - 1; i++) \
-                            arr[i] = arr[i + 1]; \
-                        cnt--; \
-                        editor_selection_after_remove(es, \
-                                                      (EntityType)cmd->entity_type, idx); \
-                    } \
-                } \
-            } else { \
-                if (idx >= 0 && idx < cnt) { \
-                    arr[idx] = reverse ? cmd->before.union_field \
-                                       : cmd->after.union_field; \
-                } \
-            } \
-        } while (0)
-
-    switch (cmd->entity_type) {
-    case ENT_COIN:
-        APPLY_ARRAY(es->level.coins, es->level.coin_count,
-                     coin, MAX_COINS);
-        break;
-
-    case ENT_STAR_YELLOW:
-        APPLY_ARRAY(es->level.star_yellows, es->level.star_yellow_count,
-                     star_yellow, MAX_STAR_YELLOWS);
-        break;
-
-    case ENT_STAR_GREEN:
-        APPLY_ARRAY(es->level.star_greens, es->level.star_green_count,
-                     star_green, MAX_STAR_GREENS);
-        break;
-
-    case ENT_STAR_RED:
-        APPLY_ARRAY(es->level.star_reds, es->level.star_red_count,
-                     star_red, MAX_STAR_REDS);
-        break;
-
-    case ENT_LAST_STAR:
-        es->level.last_star = reverse ? cmd->before.last_star
-                                      : cmd->after.last_star;
-        if (cmd->type == CMD_PROPERTY &&
+    if (editor_entity_type_is_singleton(type)) {
+        /* Last Star and Player Spawn always exist; "place" and "delete"
+         * only move them, so every command is a plain overwrite. */
+        (void)editor_entity_write(&es->level, type, 0,
+                                  reverse ? &cmd->before : &cmd->after);
+        if (type == ENT_LAST_STAR && cmd->type == CMD_PROPERTY &&
             cmd->property_field == EDITOR_LAST_STAR_NEXT_PHASE_WIDGET) {
             const char *text = reverse ? cmd->property_text_before
                                        : cmd->property_text_after;
@@ -344,156 +250,17 @@ void editor_apply_undo_command(EditorState *es, const Command *cmd, int reverse)
                     sizeof(es->level.next_phase) - 1);
             es->level.next_phase[sizeof(es->level.next_phase) - 1] = '\0';
         }
-        break;
-
-    case ENT_PLAYER_SPAWN:
-        if (reverse) {
-            es->level.player_start_x = cmd->before.last_star.x;
-            es->level.player_start_y = cmd->before.last_star.y;
-        } else {
-            es->level.player_start_x = cmd->after.last_star.x;
-            es->level.player_start_y = cmd->after.last_star.y;
-        }
-        break;
-
-    case ENT_SPIDER:
-        APPLY_ARRAY(es->level.spiders, es->level.spider_count,
-                     spider, MAX_SPIDERS);
-        break;
-
-    case ENT_JUMPING_SPIDER:
-        APPLY_ARRAY(es->level.jumping_spiders,
-                     es->level.jumping_spider_count,
-                     jumping_spider, MAX_JUMPING_SPIDERS);
-        break;
-
-    case ENT_BIRD:
-        APPLY_ARRAY(es->level.birds, es->level.bird_count,
-                     bird, MAX_BIRDS);
-        break;
-
-    case ENT_FASTER_BIRD:
-        APPLY_ARRAY(es->level.faster_birds, es->level.faster_bird_count,
-                     bird, MAX_FASTER_BIRDS);
-        break;
-
-    case ENT_FISH:
-        APPLY_ARRAY(es->level.fish, es->level.fish_count,
-                     fish, MAX_FISH);
-        break;
-
-    case ENT_FASTER_FISH:
-        APPLY_ARRAY(es->level.faster_fish, es->level.faster_fish_count,
-                     fish, MAX_FASTER_FISH);
-        break;
-
-    case ENT_AXE_TRAP:
-        APPLY_ARRAY(es->level.axe_traps, es->level.axe_trap_count,
-                     axe_trap, MAX_AXE_TRAPS);
-        break;
-
-    case ENT_CIRCULAR_SAW:
-        APPLY_ARRAY(es->level.circular_saws, es->level.circular_saw_count,
-                     circular_saw, MAX_CIRCULAR_SAWS);
-        break;
-
-    case ENT_SPIKE_ROW:
-        APPLY_ARRAY(es->level.spike_rows, es->level.spike_row_count,
-                     spike_row, MAX_SPIKE_ROWS);
-        break;
-
-    case ENT_SPIKE_PLATFORM:
-        APPLY_ARRAY(es->level.spike_platforms,
-                     es->level.spike_platform_count,
-                     spike_platform, MAX_SPIKE_PLATFORMS);
-        break;
-
-    case ENT_SPIKE_BLOCK:
-        APPLY_ARRAY(es->level.spike_blocks, es->level.spike_block_count,
-                     spike_block, MAX_SPIKE_BLOCKS);
-        break;
-
-    case ENT_BLUE_FLAME:
-        APPLY_ARRAY(es->level.blue_flames, es->level.blue_flame_count,
-                     blue_flame, LEVEL_ARRAY_LEN(es->level.blue_flames));
-        break;
-
-    case ENT_FIRE_FLAME:
-        APPLY_ARRAY(es->level.fire_flames, es->level.fire_flame_count,
-                     fire_flame, LEVEL_ARRAY_LEN(es->level.fire_flames));
-        break;
-
-    case ENT_FLOAT_PLATFORM:
-        APPLY_ARRAY(es->level.float_platforms,
-                     es->level.float_platform_count,
-                     float_platform, MAX_FLOAT_PLATFORMS);
-        break;
-
-    case ENT_BRIDGE:
-        APPLY_ARRAY(es->level.bridges, es->level.bridge_count,
-                     bridge, MAX_BRIDGES);
-        break;
-
-    case ENT_BOUNCEPAD_SMALL:
-        APPLY_ARRAY(es->level.bouncepads_small,
-                     es->level.bouncepad_small_count,
-                     bouncepad, MAX_BOUNCEPADS_SMALL);
-        break;
-
-    case ENT_BOUNCEPAD_MEDIUM:
-        APPLY_ARRAY(es->level.bouncepads_medium,
-                     es->level.bouncepad_medium_count,
-                     bouncepad, MAX_BOUNCEPADS_MEDIUM);
-        break;
-
-    case ENT_BOUNCEPAD_HIGH:
-        APPLY_ARRAY(es->level.bouncepads_high,
-                     es->level.bouncepad_high_count,
-                     bouncepad, MAX_BOUNCEPADS_HIGH);
-        break;
-
-    case ENT_PLATFORM:
-        APPLY_ARRAY(es->level.platforms, es->level.platform_count,
-                     platform, MAX_PLATFORMS);
-        break;
-
-    case ENT_VINE:
-        APPLY_ARRAY(es->level.vines, es->level.vine_count,
-                     vine, MAX_VINES);
-        break;
-
-    case ENT_LADDER:
-        APPLY_ARRAY(es->level.ladders, es->level.ladder_count,
-                     ladder, MAX_LADDERS);
-        break;
-
-    case ENT_ROPE:
-        APPLY_ARRAY(es->level.ropes, es->level.rope_count,
-                     rope, MAX_ROPES);
-        break;
-
-    case ENT_RAIL:
-        APPLY_ARRAY(es->level.rails, es->level.rail_count,
-                     rail, MAX_RAILS);
-        break;
-
-    case ENT_FLOOR_GAP:
-        APPLY_ARRAY(es->level.floor_gaps, es->level.floor_gap_count,
-                     floor_gap, MAX_FLOOR_GAPS);
-        break;
-
-    case ENT_CHECKPOINT:
-        APPLY_ARRAY(es->level.checkpoints, es->level.checkpoint_count,
-                     checkpoint, MAX_CHECKPOINTS);
-        break;
-
-    default:
-        break;
+    } else if (cmd->type == CMD_PLACE) {
+        if (reverse) editor_undo_remove(es, type, index);
+        else         editor_undo_insert(es, type, index, &cmd->after, 1);
+    } else if (cmd->type == CMD_DELETE) {
+        if (reverse) editor_undo_insert(es, type, index, &cmd->before, 0);
+        else         editor_undo_remove(es, type, index);
+    } else {
+        (void)editor_entity_write(&es->level, type, index,
+                                  reverse ? &cmd->before : &cmd->after);
     }
 
     editor_selection_reconcile(es);
     editor_refresh_dirty(es);
-
-    #undef APPLY_ARRAY
-    #undef LEVEL_ARRAY_LEN
 }
