@@ -182,9 +182,7 @@ super-mango-editor/
 │   ├── game.h                        Shared GameState/constants declarations
 │   ├── collectibles/                  Pickup items
 │   │   ├── coin.h / .c               Coin (100 pts; bonus life at score threshold)
-│   │   ├── star_yellow.h / .c        Yellow star health pickup
-│   │   ├── star_green.h / .c         Green star health pickup
-│   │   ├── star_red.h / .c           Red star health pickup
+│   │   ├── health_star.h / .c        Yellow/green/red star health pickups
 │   │   └── last_star.h / .c          End-of-level star
 │   ├── collision/                     Gameplay collision and damage passes
 │   ├── core/                          Runtime lifecycle, window/timing/resources, update, camera, checkpoint, completion, overlay, actor/hazard helpers

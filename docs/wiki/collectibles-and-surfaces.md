@@ -37,14 +37,14 @@ With defaults, every 1000 points (10 coins) earns a bonus life. Both `coin_score
 
 ### Star Yellow
 
-**File:** `src/collectibles/star_yellow.c` / `star_yellow.h`  
+**File:** `src/collectibles/health_star.c` / `health_star.h` (shared by all three star colours)  
 **Sprite:** `assets/sprites/collectibles/star_yellow.png` — 16×16 px display size  
 **Pickup:** AABB overlap. Restores 1 heart (up to `MAX_HEARTS`). No score awarded.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `MAX_STAR_YELLOWS` | 16 | Slots in `GameState` |
-| `STAR_YELLOW_DISPLAY_W/H` | 16 | Render size in logical px |
+| `HEALTH_STAR_DISPLAY_W/H` | 16 | Render size of every star colour in logical px |
 
 ```toml
 [[star_yellows]]
@@ -56,7 +56,7 @@ y = 108.0
 
 ### Star Green
 
-**File:** `src/collectibles/star_green.h`  
+**File:** `src/collectibles/health_star.h` (same `HealthStar` module as yellow)  
 **Sprite:** `assets/sprites/collectibles/star_green.png` — 16×16 px  
 **Pickup:** Same as star yellow — restores 1 heart.
 
@@ -70,7 +70,7 @@ y = 80.0
 
 ### Star Red
 
-**File:** `src/collectibles/star_red.h`  
+**File:** `src/collectibles/health_star.h` (same `HealthStar` module as yellow)  
 **Sprite:** `assets/sprites/collectibles/star_red.png` — 16×16 px  
 **Pickup:** Same as star yellow — restores 1 heart.
 

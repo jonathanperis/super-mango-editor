@@ -80,11 +80,11 @@ static void draw_collision_boxes(const GameState *gs, int cam)
     for (int i=0;i<gs->coin_count;i++) if (gs->coins[i].active)
         outline((IntRect){(int)gs->coins[i].x,(int)gs->coins[i].y,COIN_DISPLAY_W,COIN_DISPLAY_H},cam,(Color){255,255,0,255});
     for (int i=0;i<gs->star_yellow_count;i++) if (gs->star_yellows[i].active)
-        outline((IntRect){(int)gs->star_yellows[i].x,(int)gs->star_yellows[i].y,STAR_YELLOW_DISPLAY_W,STAR_YELLOW_DISPLAY_H},cam,(Color){255,0,255,255});
+        outline(health_star_get_hitbox(&gs->star_yellows[i]),cam,(Color){255,0,255,255});
     for (int i=0;i<gs->star_green_count;i++) if (gs->star_greens[i].active)
-        outline((IntRect){(int)gs->star_greens[i].x,(int)gs->star_greens[i].y,STAR_YELLOW_DISPLAY_W,STAR_YELLOW_DISPLAY_H},cam,(Color){0,200,0,255});
+        outline(health_star_get_hitbox(&gs->star_greens[i]),cam,(Color){0,200,0,255});
     for (int i=0;i<gs->star_red_count;i++) if (gs->star_reds[i].active)
-        outline((IntRect){(int)gs->star_reds[i].x,(int)gs->star_reds[i].y,STAR_YELLOW_DISPLAY_W,STAR_YELLOW_DISPLAY_H},cam,(Color){200,0,0,255});
+        outline(health_star_get_hitbox(&gs->star_reds[i]),cam,(Color){200,0,0,255});
 
     /* Patrol extents follow visible art, rather than transparent sprite slots. */
     for (int i=0;i<gs->spider_count;i++) {

@@ -12,9 +12,7 @@ src/
 ├── game.h                        Shared constants + GameState struct (included everywhere)
 ├── collectibles/
 │   ├── coin.h / .c               Coin collectible: placement, AABB collection, render
-│   ├── star_yellow.h / .c        Yellow star health pickup
-│   ├── star_green.h / .c         Green star health pickup
-│   ├── star_red.h / .c           Red star health pickup
+│   ├── health_star.h / .c        Yellow/green/red star health pickups (one module)
 │   └── last_star.h / .c          End-of-level star collectible
 ├── collision/
 │   ├── collision_damage.h / .c   Damage checks against hazards and enemies
@@ -249,9 +247,7 @@ See [Constants Reference](../constants-reference/) for full details.
 #include "entities/jumping_spider.h"    // JumpingSpider
 #include "entities/bird.h"              // Bird
 #include "entities/faster_bird.h"       // FasterBird
-#include "collectibles/star_yellow.h"   // StarYellow
-#include "collectibles/star_green.h"    // StarGreen
-#include "collectibles/star_red.h"      // StarRed
+#include "collectibles/health_star.h"   // HealthStar (yellow/green/red)
 #include "hazards/axe_trap.h"           // AxeTrap
 #include "hazards/circular_saw.h"       // CircularSaw
 #include "hazards/blue_flame.h"         // BlueFlame
@@ -412,17 +408,12 @@ Swinging pendulum or spinning axe hazard. Two behaviour modes: swing (60 degree 
 
 Gold coin collectible. AABB pickup awards the level's `coin_score` (100 by default); crossing `score_per_life` grants a bonus life. Asset: `coin.png`.
 
-### `collectibles/star_yellow.h` / `collectibles/star_yellow.c`
+### `collectibles/health_star.h` / `collectibles/health_star.c`
 
-Yellow star health pickup that restores hearts. Asset: `star_yellow.png`.
-
-### `collectibles/star_green.h` / `collectibles/star_green.c`
-
-Green star health pickup. Asset: `star_green.png`.
-
-### `collectibles/star_red.h` / `collectibles/star_red.c`
-
-Red star health pickup. Asset: `star_red.png`.
+Yellow, green and red star health pickups: one `HealthStar` struct, renderer and
+hitbox shared by the three `GameState` arrays (`star_yellows`, `star_greens`,
+`star_reds`); each restores one heart. The texture picks the colour. Assets:
+`star_yellow.png`, `star_green.png`, `star_red.png`.
 
 ### `collectibles/last_star.h` / `collectibles/last_star.c`
 
