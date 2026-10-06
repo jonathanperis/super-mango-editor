@@ -52,6 +52,14 @@ void game_checkpoint_update_authored(GameState *gs)
             }
         }
 
+        /*
+         * best_index is -1 when the player has not reached any placement yet
+         * (or the remembered index no longer matches the resolved respawn).
+         * Keep the current respawn; checkpoints[-1] would read before the
+         * start of the array.
+         */
+        if (best_index < 0) return;
+
         if (best_index != gs->checkpoint_index) {
             gs->checkpoint_index = best_index;
             gs->respawn_x = def->checkpoints[best_index].x;
