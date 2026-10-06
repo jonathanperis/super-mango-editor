@@ -81,14 +81,12 @@ jobs:
             package: true
           # The GCC leg keeps the historical check name and ships the release
           # archive; the Clang leg covers the Makefile's local Windows default.
-          # GCC still reports -Wformat-truncation in editor/UI label formatting,
-          # so only the Clang legs build with -Werror until those are fixed.
           - os: windows-latest
             platform: Windows x86_64
             artifact: super-mango-windows-x86_64
             target: native
             cc: gcc
-            extra_cflags: ''
+            extra_cflags: -Werror
             package: true
           - os: windows-latest
             platform: Windows x86_64 clang
@@ -358,7 +356,7 @@ jobs:
             extra_cflags: -Werror
           - os: windows-latest
             platform: Windows x86_64 Mesa
-            extra_cflags: ''   # GCC -Wformat-truncation; see the build matrix
+            extra_cflags: -Werror
 
     env:
       EXTRA_CFLAGS: ${{ matrix.extra_cflags }}
