@@ -28,6 +28,13 @@ typedef struct {
 } EditorRect;
 
 /*
+ * Axe traps and circular saws store y = 0 to mean "use the default height".
+ * These return the height the game and the canvas actually use.
+ */
+float editor_axe_trap_y(const AxeTrapPlacement *at);
+float editor_circular_saw_y(const CircularSawPlacement *cs);
+
+/*
  * editor_entity_bounds — Compute the on-canvas rectangle of one entity.
  *
  * Mirrors canvas.c: derived positions (spiders on the floor, flames centred

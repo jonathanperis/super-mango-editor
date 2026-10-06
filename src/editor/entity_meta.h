@@ -27,6 +27,10 @@ int editor_entity_type_is_singleton(EntityType type);
 /* MAX_* array length for a type (1 for singletons, 0 for invalid types). */
 int editor_entity_capacity(EntityType type);
 
+/* Level width in world pixels: screen_count screens (4 when unset) of
+ * GAME_W each, the same rule level validation uses. */
+float editor_world_width(const LevelDef *level);
+
 /* Central LevelDef count and selection safety helpers. */
 int editor_entity_count(const LevelDef *level, EntityType type);
 

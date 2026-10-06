@@ -43,10 +43,31 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y);
 /*
  * tools_mouse_drag --- Handle mouse motion while left button is held.
  *
- * If a drag is in progress (es->dragging), updates the selected entity's
- * position to (world_x, world_y).  Holding Shift snaps to TILE_SIZE grid.
+ * If a drag is in progress (es->dragging) and the cursor has moved past a
+ * small threshold, moves the dragged entity so the point grabbed at
+ * mouse-down follows the cursor.  Holding Shift snaps to TILE_SIZE grid.
+ * Patrolling enemies take their patrol range along; positions are clamped
+ * so the level stays valid.
  */
 void tools_mouse_drag(EditorState *es, float world_x, float world_y);
+
+/*
+ * tools_cancel_drag --- Abort a drag (Esc) and put the entity back where
+ * it was at mouse-down.  No undo entry is recorded.
+ */
+void tools_cancel_drag(EditorState *es);
+
+/*
+ * editor_clamp_placement --- Pull a placement back inside the level.
+ *
+ * Applies the world-bounds rules level validation enforces: positions
+ * within [0, world width] x [0, GAME_H], wide entities fully inside,
+ * patrol ranges inside the world (the entity slides with its range), and
+ * rail riders' t_offset on their rail (loops wrap, open rails stop).
+ * Used by place, paste and drag so none of them creates a rejected level.
+ */
+void editor_clamp_placement(const LevelDef *level, EntityType type,
+                            PlacementData *pd);
 
 /*
  * tools_right_click --- Handle a right-click at world position.
