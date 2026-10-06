@@ -55,6 +55,18 @@ char *dialog_quote_posix(const char *text);
 char *dialog_quote_powershell(const char *text);
 
 /*
+ * dialog_zenity_selection — Turn a finished zenity --question into a choice.
+ *
+ * exit_code 0 is the OK (default) button.  Exit code 1 is shared by Cancel
+ * and --extra-button; only the extra button prints its label, so output
+ * decides which.  Compiled everywhere so any OS can test it.  Returns the
+ * selected index, or -1 for any other exit code (dialog failure).
+ */
+int dialog_zenity_selection(int exit_code, const char *output,
+                            const char *const *labels, int count,
+                            int default_index, int cancel_index, int extra_index);
+
+/*
  * file_dialog_read_path — Read the one line a native picker prints.
  *
  * Stores the path without its line ending in buf.  Returns

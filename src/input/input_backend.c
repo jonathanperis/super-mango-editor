@@ -102,6 +102,8 @@ static void scroll_callback(GLFWwindow *window, double x, double y)
     if (prior_scroll) prior_scroll(window, x, y);
     InputEvent event = pointer_event(window, INPUT_WHEEL);
     event.wheel = (float)y;
+    /* macOS turns Shift+wheel into horizontal scrolling, so keep x too. */
+    event.wheel_x = (float)x;
     input_push(&event);
 }
 

@@ -335,15 +335,22 @@ static PlacementData move_placement(EntityType type, const PlacementData *from,
         pd.axe_trap.pillar_x += dx;
         /* y = 0 means "default height".  Keep that 0 for a purely
          * horizontal move so undo returns to the exact saved bytes;
-         * a vertical move stores the real height plus dy. */
-        if (dy != 0.0f) pd.axe_trap.y = editor_axe_trap_y(&from->axe_trap) + dy;
+         * a vertical move stores the real height plus dy.  A move that
+         * lands exactly on y = 0 (e.g. Shift-snap to the top row) is stored
+         * as 1 px so it is not read back as "default height". */
+        if (dy != 0.0f) {
+            pd.axe_trap.y = editor_axe_trap_y(&from->axe_trap) + dy;
+            if (pd.axe_trap.y <= 0.0f) pd.axe_trap.y = 1.0f;
+        }
         break;
     case ENT_CIRCULAR_SAW:
         pd.circular_saw.x += dx;
         pd.circular_saw.patrol_x0 += dx;
         pd.circular_saw.patrol_x1 += dx;
-        if (dy != 0.0f)
+        if (dy != 0.0f) {    /* same "0 = default height" rule as axes */
             pd.circular_saw.y = editor_circular_saw_y(&from->circular_saw) + dy;
+            if (pd.circular_saw.y <= 0.0f) pd.circular_saw.y = 1.0f;
+        }
         break;
     case ENT_SPIKE_ROW:      pd.spike_row.x += dx; break;
     case ENT_SPIKE_PLATFORM:
@@ -844,7 +851,6 @@ void tools_mouse_down(EditorState *es, float world_x, float world_y)
                                &anchor_x, &anchor_y)) break;
         es->dragging         = 1;
         es->drag_moved       = 0;
-        es->drag_level_valid = 1;  /* tools_can_hit_test just passed */
         es->drag_type        = hit.type;
         es->drag_index       = hit.index;
         es->drag_before      = editor_snapshot_entity(&es->level, hit.type,
@@ -985,8 +991,9 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
 
     previous = editor_snapshot_entity(&es->level, es->drag_type, es->drag_index);
     (void)editor_entity_write(&es->level, es->drag_type, es->drag_index, &moved);
-    if (es->drag_level_valid &&
-        level_validate_runtime(&es->level, NULL, 0) != 0) {
+    /* Drags only start on a valid level (tools_can_hit_test), so a step
+     * that would make it invalid is reverted to the last valid position. */
+    if (level_validate_runtime(&es->level, NULL, 0) != 0) {
         (void)editor_entity_write(&es->level, es->drag_type, es->drag_index,
                                   &previous);
     }

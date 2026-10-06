@@ -337,6 +337,13 @@ typedef struct {
     int            has_clipboard;
     EntityType     clipboard_type;
     PlacementData  clipboard_data;
+    /*
+     * A rail rider stores only a rail *index*, which goes stale when rails
+     * are deleted or the copy is pasted into another level.  So a copy also
+     * keeps the rail it rode; paste re-attaches it to the matching rail.
+     */
+    int            clipboard_has_rail;
+    RailPlacement  clipboard_rail;
 
     /* ---- File I/O ----------------------------------------------------- */
     /*
@@ -429,7 +436,6 @@ typedef struct {
      */
     int            dragging;      /* 1 while a drag operation is in progress   */
     int            drag_moved;    /* 1 once the cursor passed the threshold    */
-    int            drag_level_valid; /* level passed validation at mouse-down  */
     EntityType     drag_type;     /* entity being dragged                      */
     int            drag_index;
     PlacementData  drag_before;   /* placement at mouse-down (undo "before")   */

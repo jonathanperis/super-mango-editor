@@ -144,9 +144,11 @@ static void editor_key(EditorState *es, const InputEvent *event)
 /*
  * editor_canvas_wheel — Zoom or pan the canvas with the mouse wheel.
  *
- *   wheel        : pan left/right (the level is much wider than tall)
+ *   wheel        : pan left/right (the level is much wider than tall);
+ *                  a trackpad's sideways swipe pans left/right too
  *   Shift+wheel  : pan up/down (needed at 3x/5x, where the floor is
- *                  below the visible area)
+ *                  below the visible area).  macOS delivers Shift+wheel
+ *                  as horizontal scrolling, so either axis counts here.
  *   Ctrl+wheel   : step through the zoom presets, keeping the point under
  *                  the cursor in place
  */
@@ -170,10 +172,11 @@ static void editor_canvas_wheel(EditorState *es, const InputEvent *event)
         else if (event->wheel < 0) index = (index+3)%4;
         canvas_set_zoom(es, zooms[index], event->x, event->y);
     } else if (event->mods & INPUT_SHIFT) {
-        es->camera.y -= step;
+        float amount = event->wheel != 0.0f ? event->wheel : event->wheel_x;
+        es->camera.y -= amount * 48.0f / zoom;
         canvas_clamp_camera(es);
     } else {
-        es->camera.x -= step;
+        es->camera.x -= step + event->wheel_x * 48.0f / zoom;
         canvas_clamp_camera(es);
     }
 }
@@ -226,7 +229,11 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
                 tools_mouse_down(es, wx, wy);
         } else if (event->button == MOUSE_BUTTON_RIGHT) {
             es->mouse_right_down = 1;
-            if (canvas_contains(event->x, event->y) && editor_finish_field_edit(es))
+            /* Right-click deletes. During a left-button drag that would shift
+             * the array under drag_index, so the drag would then overwrite a
+             * different entity. Finish (release) the drag first. */
+            if (!es->dragging && canvas_contains(event->x, event->y) &&
+                editor_finish_field_edit(es))
                 tools_right_click(es, wx, wy);
         }
         break;

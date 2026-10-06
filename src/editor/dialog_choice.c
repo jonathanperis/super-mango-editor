@@ -71,6 +71,17 @@ char *dialog_quote_posix(const char *text)
     return out;
 }
 
+int dialog_zenity_selection(int exit_code, const char *output,
+                            const char *const *labels, int count,
+                            int default_index, int cancel_index, int extra_index)
+{
+    if (exit_code == 0) return default_index;
+    if (exit_code != 1) return -1;
+    if (count == 3 && extra_index >= 0 && extra_index < count &&
+        strcmp(output, labels[extra_index]) == 0) return extra_index;
+    return cancel_index;
+}
+
 static char *quote(const char *text)
 {
 #ifdef _WIN32
@@ -180,12 +191,10 @@ int dialog_choice(const char *title, const char *message, const char *const *lab
     if (WEXITSTATUS(status) == 0) for (int i = 0; i < count; i++)
         if (!strcmp(output,labels[i])) { *selected = i; result = 0; break; }
 #else
-    if (WEXITSTATUS(status) == 1) { *selected = cancel_index; result = 0; }
-    else if (WEXITSTATUS(status) == 0) {
-        *selected = default_index;
-        for (int i = 0; i < count; i++) if (!strcmp(output,labels[i])) *selected = i;
-        result = 0;
-    }
+    int choice = dialog_zenity_selection(WEXITSTATUS(status), output, labels,
+                                         count, default_index, cancel_index,
+                                         count == 3 ? extra : -1);
+    if (choice >= 0) { *selected = choice; result = 0; }
 #endif
 #endif
 done:
