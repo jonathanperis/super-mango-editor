@@ -721,6 +721,73 @@ static int escaped_strings_roundtrip(void)
     return 0;
 }
 
+/*
+ * TOML forbids raw control characters (except tab) in strings and comments,
+ * and DEL (0x7F) counts as one.  The loader accepts "\u007F", so the saver
+ * must write the escape back instead of the raw byte.
+ */
+static int file_has_raw_control_bytes(const char *path)
+{
+    FILE *fp = fopen(path, "rb");
+    int ch;
+    int found = 0;
+
+    if (!fp) return 1;
+    while ((ch = fgetc(fp)) != EOF) {
+        if ((ch < 0x20 && ch != '\n' && ch != '\r' && ch != '\t') || ch == 0x7F) {
+            found = 1;
+            break;
+        }
+    }
+    fclose(fp);
+    return found;
+}
+
+static int control_chars_roundtrip(void)
+{
+    const char *path = "out/test_control_chars.toml";
+    const char *recovery = "out/test_control_recovery.toml";
+    LevelDef before;
+    LevelDef after;
+    char destination[128];
+
+    level_def_init_defaults(&before);
+    before.screen_count = 1;
+    strncpy(before.name, "Del\x7F" "ete", sizeof(before.name) - 1);
+    strncpy(before.description, "bell\x07 unit\x1f del\x7f",
+            sizeof(before.description) - 1);
+
+    if (level_save_toml(&before, path) != 0)
+        return fail("could not save control character fixture");
+    if (file_has_raw_control_bytes(path))
+        return fail("saved TOML contains a raw control byte");
+    if (level_load_toml(path, &after) != 0)
+        return fail("could not reload control character fixture");
+    if (expect_str_value("DEL name", after.name, before.name) != 0 ||
+        expect_str_value("control description", after.description,
+                         before.description) != 0)
+        return 1;
+    remove(path);
+
+    /* The recovery comment must stay valid TOML for any destination path. */
+    if (level_save_toml_recovery(&before, recovery, "levels/del\x7f.toml") != 0)
+        return fail("could not save recovery with DEL destination");
+    if (file_has_raw_control_bytes(recovery))
+        return fail("recovery comment contains a raw control byte");
+    if (level_load_toml(recovery, &after) != 0)
+        return fail("recovery with DEL destination should still load");
+    if (level_read_recovery_path(recovery, destination, sizeof(destination)) != -1 ||
+        destination[0] != '\0')
+        return fail("control-byte recovery destination should be rejected");
+
+    if (level_save_toml_recovery(&before, recovery, "levels/plain \"q\".toml") != 0 ||
+        level_read_recovery_path(recovery, destination, sizeof(destination)) != 1 ||
+        strcmp(destination, "levels/plain \"q\".toml") != 0)
+        return fail("plain recovery destination should round-trip");
+    remove(recovery);
+    return 0;
+}
+
 static int rich_level_roundtrip(void)
 {
     const char *path = "out/test_rich_level_roundtrip.toml";
@@ -1130,6 +1197,7 @@ int main(void)
     if (load_all_repo_levels() != 0) return 1;
     if (roundtrip_repo_levels() != 0) return 1;
     if (escaped_strings_roundtrip() != 0) return 1;
+    if (control_chars_roundtrip() != 0) return 1;
     if (rich_level_roundtrip() != 0) return 1;
     if (independent_star_color_counts_roundtrip() != 0) return 1;
     if (missing_physics_uses_engine_defaults() != 0) return 1;
