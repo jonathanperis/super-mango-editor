@@ -28,7 +28,7 @@ Native OS graphics/audio libraries remain required. Windows packaging resolves
 both executables' non-system runtime dependencies and includes their owning
 MSYS2 packages' available license files under `licenses/msys2/`.
 
-## Artwork, audio and font
+## Artwork
 
 Artwork is credited to JuhoSprite's Super Mango 2D Pixel Art Platformer Asset Pack:
 https://juhosprite.itch.io/super-mango-2d-pixelart-platformer-asset-pack16x16
@@ -37,10 +37,18 @@ Checked 2026-09-16: page metadata lists Creative Commons Attribution 4.0
 credit needed. This project retains attribution. Some sprites are recolored or
 derived for additional biomes; those modifications are recorded in Git history.
 
-The pack author explicitly excludes authorship of the Round 9x13 font. This
-checkout lacks original audio-source/license records and a license for
-`round9x13.ttf`; those permissions remain unresolved. Do not assume the code's
-MIT license covers audio or the font.
+## Audio
 
-The documentation's Asset Provenance page records these evidence gaps. No new
-license or ownership claim is made for existing media.
+Every WAV under `assets/sounds/` is original project work, synthesized from
+code by `tools/gen_sounds.py` (oscillators, envelopes, seeded noise and simple
+filters; no recorded or sampled material). The generated files are covered by
+the project's MIT license in `LICENSE`. `make sounds` regenerates them;
+`make docs-drift` fails if a committed sound differs from the generator's output.
+
+## Font
+
+All game and editor text uses raylib's built-in default font, compiled into
+raylib and covered by raylib's zlib/libpng license above. No font file is
+bundled.
+
+The documentation's Asset Provenance page records each component's evidence.

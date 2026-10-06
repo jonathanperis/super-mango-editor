@@ -99,7 +99,9 @@ under `out/release/`. Their object directories never overlap. For additional
 custom flag combinations, choose a separate `OUTDIR` to avoid reusing old objects.
 
 `make content-inventory` regenerates public counts and the raw asset inventory;
-`make asset-budget` checks freshness and the 40 MiB raw playable-asset budget.
+`make asset-budget` checks freshness and the 4 MiB raw playable-asset budget
+(2 MiB of it for generated sounds). `make sounds` regenerates the WAV files
+from `tools/gen_sounds.py`; `make docs-drift` runs its `--check` mode.
 `make timing-lab` prints a small integration experiment for 30/60/144 Hz.
 Python 3.11+ and Node.js are required for host checks. Use a current Python
 (3.12+ recommended) for the raylib bootstrap, which also uses `tarfile` extraction
