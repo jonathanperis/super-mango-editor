@@ -6,21 +6,14 @@
 
 #include "../shared/audio.h"
 
-int game_bouncepads_collect(const GameState *gs, Bouncepad *out_pads)
+void game_bouncepads_lists(const GameState *gs,
+                           BouncepadList lists[GAME_BOUNCEPAD_LIST_COUNT])
 {
-    int count = 0;
-
-    for (int i = 0; i < gs->bouncepad_medium_count; i++) {
-        out_pads[count++] = gs->bouncepads_medium[i];
-    }
-    for (int i = 0; i < gs->bouncepad_small_count; i++) {
-        out_pads[count++] = gs->bouncepads_small[i];
-    }
-    for (int i = 0; i < gs->bouncepad_high_count; i++) {
-        out_pads[count++] = gs->bouncepads_high[i];
-    }
-
-    return count;
+    /* Views, not copies: the pads stay in their GameState arrays. The order
+     * (medium, small, high) is the one game_bouncepads_handle_hit decodes. */
+    lists[0] = (BouncepadList){gs->bouncepads_medium, gs->bouncepad_medium_count};
+    lists[1] = (BouncepadList){gs->bouncepads_small, gs->bouncepad_small_count};
+    lists[2] = (BouncepadList){gs->bouncepads_high, gs->bouncepad_high_count};
 }
 
 void game_bouncepads_handle_hit(GameState *gs, int bounce_idx)

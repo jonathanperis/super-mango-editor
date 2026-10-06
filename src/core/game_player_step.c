@@ -10,12 +10,9 @@
 #include "../input/game_web_input.h"
 #include "../player/player.h"
 
-static Bouncepad s_all_pads[MAX_BOUNCEPADS_MEDIUM + MAX_BOUNCEPADS_SMALL +
-                            MAX_BOUNCEPADS_HIGH];
-
 int game_player_step(GameState *gs, float dt)
 {
-    int all_pad_count;
+    BouncepadList pad_lists[GAME_BOUNCEPAD_LIST_COUNT];
     int bounce_idx = -1;
     int fp_landed_idx = -1;
 
@@ -27,12 +24,13 @@ int game_player_step(GameState *gs, float dt)
                         gs->ladders, gs->ladder_count,
                         gs->ropes, gs->rope_count);
 
-    all_pad_count = game_bouncepads_collect(gs, s_all_pads);
+    /* Pass the three pad arrays as views (no per-frame copy). */
+    game_bouncepads_lists(gs, pad_lists);
 
     player_update(&gs->player, dt, gs->audio.jump,
                   gs->platforms, gs->platform_count,
                   gs->float_platforms, gs->float_platform_count,
-                  s_all_pads, all_pad_count,
+                  pad_lists, GAME_BOUNCEPAD_LIST_COUNT,
                   gs->vines, gs->vine_count,
                   gs->ladders, gs->ladder_count,
                   gs->ropes, gs->rope_count,

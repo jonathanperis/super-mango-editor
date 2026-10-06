@@ -8,7 +8,7 @@
 
 /* Resolve floor landing and floor-level bouncepad launches. */
 void player_resolve_floor_collision(Player *player,
-                                    const Bouncepad *bouncepads, int bouncepad_count,
+                                    const BouncepadList *bouncepad_lists, int bouncepad_list_count,
                                     const int *floor_gaps, int floor_gap_count,
                                     int *out_bounce_idx);
 

@@ -108,7 +108,8 @@ void player_handle_input(Player *player, SoundEffect *snd_jump,
  * float-platform, and bouncepad collisions.
  *
  * If the player lands on a bouncepad, *out_bounce_idx is set to that pad's
- * index; otherwise it is left unchanged.  Callers should initialise it to -1.
+ * flat index across bouncepad_lists (see BouncepadList); otherwise it is
+ * left unchanged.  Callers should initialise it to -1.
  *
  * If the player lands on a float platform, *out_fp_landed_idx is set to that
  * platform's index; otherwise it is left at -1.  Used by game_float_platforms_update to drive
@@ -122,7 +123,7 @@ void player_handle_input(Player *player, SoundEffect *snd_jump,
 void player_update(Player *player, float dt, SoundEffect *snd_jump,
                    const Platform *platforms, int platform_count,
                    const FloatPlatform *float_platforms, int float_platform_count,
-                   const Bouncepad *bouncepads, int bouncepad_count,
+                   const BouncepadList *bouncepad_lists, int bouncepad_list_count,
                    const VineDecor *vines, int vine_count,
                    const LadderDecor *ladders, int ladder_count,
                    const RopeDecor *ropes, int rope_count,

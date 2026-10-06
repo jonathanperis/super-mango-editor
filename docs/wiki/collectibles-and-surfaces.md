@@ -186,7 +186,7 @@ brick_count = 8   # number of 16×16 brick tiles
 **File:** `src/surfaces/bouncepad.c` / `bouncepad.h`  
 **Sprites:** `bouncepad_small.png`, `bouncepad_medium.png` (wood), `bouncepad_high.png`  
 **Sheet:** 144×48 px, 3 columns × 1 row — Frame 0: extended, Frame 1: mid-compress, Frame 2: compressed (default idle state)  
-**Behaviour:** Spring pad that launches the player upward on landing. Plays a 3-frame squash/release animation (2→1→0, 80 ms/frame) then resets to idle.
+**Behaviour:** Spring pad that launches the player upward on landing. Plays a 3-frame squash/release animation (2→1→0, 80 ms/frame) then resets to idle. The small, medium and high pads stay in their three `GameState` arrays; `player_update` receives them as `BouncepadList` views (pointer + count) and reports the landed pad as a flat index across the lists, so nothing is copied per frame.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
