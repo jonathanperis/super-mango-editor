@@ -32,6 +32,7 @@
 #include "editor/canvas.h"
 #include "editor/editor_playtest.h"
 #include "editor/properties.h"
+#include "editor/hit_test.h"
 #include "levels/level_loader.h"
 
 #define EDITOR_WORKFLOW_LEVEL_PATH "out/test_editor_workflow_level.toml"
@@ -1605,6 +1606,126 @@ fail:
     return 1;
 }
 
+/* Press on (x, y), move to (x + dx, y + dy), release. */
+static void drag_by(EditorState *es, float x, float y, float dx, float dy)
+{
+    tools_mouse_down(es, x, y);
+    tools_mouse_drag(es, x + dx, y + dy);
+    tools_mouse_up(es, x + dx, y + dy);
+}
+
+static int undo_last(EditorState *es)
+{
+    Command cmd;
+    if (!undo_pop(es->undo, &cmd)) return 1;
+    editor_apply_undo_command(es, &cmd, 1);
+    return 0;
+}
+
+static int drag_round_trips_and_follows_grab_point(void)
+{
+    EditorState es = {0};
+    EditorRect r;
+    InputEvent event;
+
+    editor_level_init_defaults(&es.level);
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+    es.camera.zoom = 2.0f;
+    es.tool = TOOL_SELECT;
+    es.level.blue_flame_count = 1;
+    es.level.blue_flames[0].x = 64.0f;
+    es.level.axe_trap_count = 1;
+    es.level.axe_traps[0] = (AxeTrapPlacement){200.0f, 0.0f, AXE_MODE_PENDULUM};
+    es.level.coin_count = 1;
+    es.level.coins[0] = (CoinPlacement){100.0f, 100.0f};
+    es.level.spider_count = 1;
+    es.level.spiders[0] = (SpiderPlacement){100.0f, 50.0f, 50.0f, 150.0f, 0};
+    editor_set_document_save_point(&es);
+
+    /* A flame is drawn centred in its gap; dragging must move the gap by
+     * exactly the cursor distance, and undo must return to the save point. */
+    if (!editor_entity_bounds(&es.level, ENT_BLUE_FLAME, 0, &r)) goto fail;
+    drag_by(&es, r.x + 10.0f, r.y + 10.0f, 32.0f, 0.0f);
+    if (expect_float_value("flame drag exact", es.level.blue_flames[0].x, 96.0f) != 0 ||
+        undo_last(&es) != 0 ||
+        expect_float_value("flame undo", es.level.blue_flames[0].x, 64.0f) != 0 ||
+        expect_int("flame undo clean", es.modified, 0) != 0) goto fail;
+
+    /* Axe y = 0 means "default height"; a horizontal move keeps the 0. */
+    if (!editor_entity_bounds(&es.level, ENT_AXE_TRAP, 0, &r)) goto fail;
+    drag_by(&es, r.x + 5.0f, r.y + 5.0f, 40.0f, 0.0f);
+    if (expect_float_value("axe drag x", es.level.axe_traps[0].pillar_x, 240.0f) != 0 ||
+        expect_float_value("axe default y kept", es.level.axe_traps[0].y, 0.0f) != 0 ||
+        undo_last(&es) != 0 ||
+        expect_int("axe undo clean", es.modified, 0) != 0) goto fail;
+    drag_by(&es, r.x + 5.0f, r.y + 5.0f, 0.0f, 10.0f);
+    if (expect_float_value("axe vertical drag", es.level.axe_traps[0].y,
+                           editor_axe_trap_y(&(AxeTrapPlacement){0}) + 10.0f) != 0 ||
+        undo_last(&es) != 0 || expect_int("axe y undo clean", es.modified, 0) != 0)
+        goto fail;
+
+    /* A click, or a wobble under the threshold, changes nothing. */
+    tools_mouse_down(&es, 104.0f, 104.0f);
+    tools_mouse_drag(&es, 104.5f, 104.0f);
+    tools_mouse_up(&es, 104.5f, 104.0f);
+    if (expect_int("click records nothing", es.undo->top, 0) != 0 ||
+        expect_float_value("click keeps coin", es.level.coins[0].x, 100.0f) != 0 ||
+        expect_int("click selects coin", es.selection.type, ENT_COIN) != 0) goto fail;
+
+    /* The grabbed point follows the cursor: no jump to the corner. */
+    drag_by(&es, 104.0f, 104.0f, 10.0f, 0.0f);
+    if (expect_float_value("grab offset x", es.level.coins[0].x, 110.0f) != 0 ||
+        expect_float_value("grab offset y", es.level.coins[0].y, 100.0f) != 0 ||
+        undo_last(&es) != 0) goto fail;
+
+    /* Spiders take their patrol range along and stay inside the world. */
+    drag_by(&es, 110.0f, 245.0f, 40.0f, 0.0f);
+    if (expect_float_value("spider x", es.level.spiders[0].x, 140.0f) != 0 ||
+        expect_float_value("spider x0", es.level.spiders[0].patrol_x0, 90.0f) != 0 ||
+        expect_float_value("spider x1", es.level.spiders[0].patrol_x1, 190.0f) != 0)
+        goto fail;
+    drag_by(&es, 150.0f, 245.0f, 5000.0f, 0.0f);
+    if (expect_float_value("spider range clamped", es.level.spiders[0].patrol_x1,
+                           editor_world_width(&es.level)) != 0 ||
+        level_is_valid("after far spider drag", &es.level) != 0) goto fail;
+    undo_clear(es.undo);
+    editor_set_document_save_point(&es);
+
+    /* Undo is ignored mid-drag; Esc cancels the move without history. */
+    tools_mouse_down(&es, 104.0f, 104.0f);
+    tools_mouse_drag(&es, 140.0f, 104.0f);
+    memset(&event, 0, sizeof(event));
+    event.type = INPUT_KEY_DOWN;
+    event.key = KEY_Z;
+    event.mods = INPUT_CTRL;
+    editor_handle_event(&es, &event);
+    if (expect_float_value("undo blocked during drag", es.level.coins[0].x, 136.0f) != 0 ||
+        expect_prefix("drag blocks keys", es.status_message, "Release the mouse") != 0)
+        goto fail;
+    event.key = KEY_ESCAPE;
+    event.mods = 0;
+    editor_handle_event(&es, &event);
+    if (expect_float_value("esc restores", es.level.coins[0].x, 100.0f) != 0 ||
+        expect_int("esc ends drag", es.dragging, 0) != 0 ||
+        expect_int("esc records nothing", es.undo->top, 0) != 0) goto fail;
+
+    /* A level broken while the button is held puts the entity back. */
+    tools_mouse_down(&es, 104.0f, 104.0f);
+    tools_mouse_drag(&es, 140.0f, 104.0f);
+    es.level.music_volume = 999;
+    tools_mouse_up(&es, 140.0f, 104.0f);
+    es.level.music_volume = 0;
+    if (expect_float_value("invalid release restores", es.level.coins[0].x, 100.0f) != 0 ||
+        expect_int("invalid release records nothing", es.undo->top, 0) != 0) goto fail;
+
+    undo_destroy(es.undo);
+    return 0;
+fail:
+    undo_destroy(es.undo);
+    return 1;
+}
+
 typedef struct {
     TextFont *font;
     int drawing;
@@ -2151,6 +2272,7 @@ int main(void)
     if (selection_structural_mutations_are_safe() != 0) return 1;
     if (checkpoint_editor_mutations_are_reversible() != 0) return 1;
     if (rail_deletion_keeps_references_valid() != 0) return 1;
+    if (drag_round_trips_and_follows_grab_point() != 0) return 1;
     if (widget_commit_paths_preserve_values() != 0) return 1;
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;

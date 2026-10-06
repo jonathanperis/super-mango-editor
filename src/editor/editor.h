@@ -387,10 +387,30 @@ typedef struct {
     int            mouse_down;    /* 1 while left mouse button is held         */
     int            mouse_right_down; /* 1 while right mouse button is held     */
 
-    /* ---- Drag state (for moving entities or panning the camera) ------- */
+    /* ---- Drag state (moving one entity with the Select tool) ---------- */
+    /*
+     * A drag starts at mouse-down on an entity.  The entity is remembered by
+     * (drag_type, drag_index) and its original placement is kept in
+     * drag_before, so every motion event recomputes the position from the
+     * original (no drift) and mouse-up can record an exact undo "before".
+     *
+     * drag_grab_x/y is the cursor's offset from the entity's top-left corner
+     * at mouse-down, so the entity does not jump to put its corner under
+     * the cursor.  drag_moved stays 0 until the cursor travels a few pixels,
+     * so a plain click selects without changing anything.
+     */
     int            dragging;      /* 1 while a drag operation is in progress   */
-    float          drag_start_x;  /* world-space x where the drag began        */
-    float          drag_start_y;  /* world-space y where the drag began        */
+    int            drag_moved;    /* 1 once the cursor passed the threshold    */
+    int            drag_level_valid; /* level passed validation at mouse-down  */
+    EntityType     drag_type;     /* entity being dragged                      */
+    int            drag_index;
+    PlacementData  drag_before;   /* placement at mouse-down (undo "before")   */
+    float          drag_start_x;  /* entity top-left (world) at mouse-down     */
+    float          drag_start_y;
+    float          drag_grab_x;   /* cursor minus entity top-left at mouse-down */
+    float          drag_grab_y;
+    float          drag_mouse_x;  /* cursor world position at mouse-down       */
+    float          drag_mouse_y;
 
     /* ---- Play-test state ---------------------------------------------- */
     /*

@@ -55,6 +55,13 @@ Three interaction modes are available via the toolbar or keyboard shortcuts:
 | **Place** | `2` | Click empty canvas space to stamp a new entity of the type chosen in the palette. |
 | **Delete** | `3` | Click an entity to remove it from the level immediately. |
 
+Dragging keeps the point you grabbed under the cursor and starts only after the
+cursor moves a few pixels, so a plain click selects without moving anything.
+Patrolling enemies and saws carry their patrol range with them, and positions
+are clamped so a drag cannot produce a level that fails validation. While the
+button is held, keyboard commands (Undo, Delete, Paste…) wait; Esc cancels the
+move and puts the entity back.
+
 Spike blocks and rail-mode float platforms refer to rails by position, so the
 editor refuses to delete a rail that one of them rides (the status bar names
 what still uses it). Deleting an unused rail renumbers the references to later
