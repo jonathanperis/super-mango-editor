@@ -224,6 +224,7 @@ int editor_load_level(EditorState *es, const char *path)
 {
     LevelDef new_level;
     SerializerFileFingerprint fingerprint;
+    char target[EDITOR_PATH_MAX];
     int result;
     memset(&new_level, 0, sizeof(new_level));
 
@@ -232,7 +233,14 @@ int editor_load_level(EditorState *es, const char *path)
         return -1;
     }
 
-    result = editor_read_stable_level(path, &new_level, &fingerprint);
+    /* Resolve a symlink once and read that file, so file_target names
+     * exactly the bytes shown, even if the link is repointed meanwhile. */
+    if (serializer_resolve_save_target(path, target, sizeof(target)) != 0) {
+        editor_set_status(es, "Load failed: cannot resolve %s", path);
+        return -1;
+    }
+
+    result = editor_read_stable_level(target, &new_level, &fingerprint);
     if (result == EDITOR_LOAD_PARSE_ERROR) {
         fprintf(stderr, "Error: failed to load %s\n", path);
         editor_set_status(es, "Load failed: %s", path);
@@ -251,6 +259,7 @@ int editor_load_level(EditorState *es, const char *path)
     /* The load succeeded; only now retire the old session's recovery. */
     editor_retire_current_recovery(es);
     editor_apply_loaded_level(es, &new_level, path, 0, 1);
+    memcpy(es->file_target, target, strlen(target) + 1);
     if (editor_set_recovery_path(es, path) != 0) {
         editor_set_status(es, "Load failed: recovery path unavailable");
         return -1;
@@ -277,6 +286,8 @@ static void editor_apply_loaded_level(EditorState *es, const LevelDef *level,
     } else {
         es->file_path[0] = '\0';
     }
+    /* Only editor_load_level, which read the file, may vouch for a target. */
+    es->file_target[0] = '\0';
     memset(&es->source_fingerprint, 0, sizeof(es->source_fingerprint));
     es->source_state = EDITOR_SOURCE_UNKNOWN;
     undo_clear(es->undo);
@@ -368,15 +379,49 @@ void editor_open_level_file(EditorState *es)
     }
 }
 
+/*
+ * editor_document_write_target — Pick the file a plain Save will replace.
+ *
+ * Usually that is file_path itself.  When file_path is a symlink, Save
+ * writes the file behind it, keeping the link, but only while the link
+ * still points at file_target, the file this session actually read.  A link
+ * that was repointed, or a regular file swapped for a link, could aim the
+ * save at a file the user never opened, so that case returns -1 instead.
+ */
+static int editor_document_write_target(const EditorState *es,
+                                        char *target, size_t target_size)
+{
+    if (!serializer_path_is_symlink(es->file_path)) {
+        if (strlen(es->file_path) >= target_size) return -1;
+        memcpy(target, es->file_path, strlen(es->file_path) + 1);
+        return 0;
+    }
+    if (es->file_target[0] == '\0' ||
+        serializer_resolve_save_target(es->file_path, target, target_size) != 0 ||
+        strcmp(target, es->file_target) != 0) return -1;
+    return 0;
+}
+
 int editor_save_current_level(EditorState *es)
 {
     int source_status;
     EditorExternalChoice choice;
+    char target[EDITOR_PATH_MAX];
 
     if (!es || !editor_finish_field_edit(es)) return -1;
     if (!editor_can_persist(es, "Save")) return -1;
 
-    if (es->file_path[0] == '\0' || editor_path_is_private(es, es->file_path)) {
+    if (es->file_path[0] == '\0') {
+        return editor_save_current_level_as_validated(es);
+    }
+    if (editor_document_write_target(es, target, sizeof(target)) != 0) {
+        editor_set_status(es, "Save failed: %s links to a file this editor "
+                          "did not open; use Save As", es->file_path);
+        return -1;
+    }
+    /* Check the file that will really be written, not just the link name. */
+    if (editor_path_is_private(es, es->file_path) ||
+        editor_path_is_private(es, target)) {
         return editor_save_current_level_as_validated(es);
     }
 
@@ -393,13 +438,13 @@ int editor_save_current_level(EditorState *es)
         if (choice != EDITOR_EXTERNAL_REPLACE) return -1;
         {
             SerializerFileFingerprint replace_expected;
-            if (serializer_fingerprint_utf8(es->file_path,
+            if (serializer_fingerprint_utf8(target,
                                             &replace_expected) != 1) {
                 editor_set_status(es, "Save cancelled: source unavailable");
                 return -1;
             }
             /* Recheck occurs immediately before replacement. */
-            if (level_save_toml_checked(&es->level, es->file_path,
+            if (level_save_toml_checked(&es->level, target,
                                         SERIALIZER_SAVE_REPLACE,
                                         &replace_expected) != 0) {
                 editor_set_status(es, "Save failed: %s", es->file_path);
@@ -410,7 +455,7 @@ int editor_save_current_level(EditorState *es)
     }
 
     if (es->source_state == EDITOR_SOURCE_EXPECTED_MISSING) {
-        if (level_save_toml_with_policy(&es->level, es->file_path,
+        if (level_save_toml_with_policy(&es->level, target,
                                         SERIALIZER_SAVE_CREATE_ONLY) != 0) {
             editor_set_status(es, "Save failed: %s", es->file_path);
             return -1;
@@ -422,7 +467,7 @@ int editor_save_current_level(EditorState *es)
         editor_set_status(es, "Save failed: source baseline unavailable");
         return -1;
     }
-    if (level_save_toml_checked(&es->level, es->file_path,
+    if (level_save_toml_checked(&es->level, target,
                                 SERIALIZER_SAVE_REPLACE,
                                 &es->source_fingerprint) != 0) {
         editor_set_status(es, "Save failed: %s", es->file_path);
@@ -450,12 +495,27 @@ static int editor_save_current_level_as_validated(EditorState *es)
         editor_set_status(es, "Save failed: dialog error");
         return -1;
     }
-    if (editor_path_is_private(es, path)) {
-        editor_set_status(es, "Save failed: private editor path");
-        return -1;
-    }
     if (!editor_path_fits(path)) {
         editor_set_status(es, "Save failed: path too long");
+        return -1;
+    }
+    /*
+     * A new destination is never followed through a symlink.  Following it
+     * would write whatever file the link names (possibly a private editor
+     * file, or one the user never chose) while the overwrite prompt showed
+     * only the link's name.  Silently replacing the link with a regular file
+     * is no better: it detaches whatever relied on the link.  So refuse, and
+     * let the user pick another name or open the link to edit its target.
+     * The save itself still replaces, never follows, a link that appears
+     * after this check (see serializer_replace_file).
+     */
+    if (serializer_path_is_symlink(path)) {
+        editor_set_status(es, "Save failed: %s is a symbolic link; choose another name",
+                          path);
+        return -1;
+    }
+    if (editor_path_is_private(es, path)) {
+        editor_set_status(es, "Save failed: private editor path");
         return -1;
     }
     target_status = serializer_probe_path_utf8(path);
@@ -485,6 +545,7 @@ static int editor_save_current_level_as_validated(EditorState *es)
     }
 
     memcpy(es->file_path, path, strlen(path) + 1);
+    memcpy(es->file_target, path, strlen(path) + 1);  /* written; not a link */
     editor_retire_current_recovery(es);
     if (editor_set_recovery_path(es, es->file_path) != 0) {
         editor_set_status(es, "Saved but recovery path unavailable");
@@ -1565,11 +1626,15 @@ static int editor_make_playtest_path(EditorState *es)
 static int editor_path_is_private(const EditorState *es, const char *path)
 {
     if (!es || !path || path[0] == '\0') return 0;
+    /* The same-file checks catch another spelling of a private file, such
+     * as one reached through a symlinked folder. */
     return editor_path_is_recovery(path) ||
            (es->autosave_path[0] != '\0' &&
-            strcmp(path, es->autosave_path) == 0) ||
+            (strcmp(path, es->autosave_path) == 0 ||
+             serializer_same_file_utf8(path, es->autosave_path))) ||
            (es->playtest_path[0] != '\0' &&
-            strcmp(path, es->playtest_path) == 0);
+            (strcmp(path, es->playtest_path) == 0 ||
+             serializer_same_file_utf8(path, es->playtest_path)));
 }
 
 static int editor_path_is_recovery(const char *path)

@@ -386,6 +386,37 @@ static int serializer_sync_parent_dir(const char *path)
 }
 #endif /* !_WIN32 */
 
+int serializer_path_is_symlink(const char *path)
+{
+    if (!path || path[0] == '\0') return 0;
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+    {
+        struct stat link_stat;
+        /* lstat describes the link itself; stat would describe its target. */
+        return lstat(path, &link_stat) == 0 && S_ISLNK(link_stat.st_mode);
+    }
+#else
+    return 0;
+#endif
+}
+
+int serializer_same_file_utf8(const char *a, const char *b)
+{
+    if (!a || !b || a[0] == '\0' || b[0] == '\0') return 0;
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+    {
+        /* Two spellings of one file (a symlinked folder, "./x" against "x")
+         * share a device and inode number; comparing strings would miss it. */
+        struct stat a_stat;
+        struct stat b_stat;
+        return stat(a, &a_stat) == 0 && stat(b, &b_stat) == 0 &&
+               a_stat.st_dev == b_stat.st_dev && a_stat.st_ino == b_stat.st_ino;
+    }
+#else
+    return 0;
+#endif
+}
+
 int serializer_resolve_save_target(const char *path, char *buf, size_t buf_size)
 {
     if (!path || !buf || buf_size == 0) return -1;
@@ -444,8 +475,9 @@ int serializer_replace_file(const char *temp_path, const char *target_path)
 #else
     /* POSIX rename is atomic within one filesystem, but this is not a
      * compare-and-replace operation; callers recheck fingerprints first.
-     * rename() replaces a symlink itself, not the file it points to; level
-     * saves call serializer_resolve_save_target first to keep the link. */
+     * rename() replaces a symlink itself, never the file it points to, so a
+     * link planted at the destination cannot redirect the write.  The editor
+     * resolves a link first only when it saves back the file it opened. */
     if (rename(temp_path, target_path) != 0) return -1;
     return serializer_sync_parent_dir(target_path);
 #endif

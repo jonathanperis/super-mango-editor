@@ -2994,6 +2994,122 @@ static int display_paths_keep_the_file_name(void)
     return 0;
 }
 
+/*
+ * Symlinks are followed only for the document the user opened.  Save As
+ * onto a planted link must not touch the file it names; Save of a level
+ * opened through a link updates that file, but not after the link is
+ * repointed somewhere the user never looked.
+ */
+static int symlinks_are_followed_only_for_the_opened_document(void)
+{
+#ifdef _WIN32
+    return 0;
+#else
+    const char *victim = "out/editor_symlink_victim.toml";
+    const char *planted = "out/editor_symlink_planted.toml";
+    const char *document = "out/editor_symlink_document.toml";
+    const char *opened = "out/editor_symlink_opened.toml";
+    char alias_root[64];
+    char private_alias[EDITOR_PATH_MAX];
+    char planted_autosave[EDITOR_PATH_MAX] = {0};
+    char root[EDITOR_PATH_MAX] = {0};
+    EditorState es = {0};
+    LevelDef fixture;
+    LevelDef reloaded;
+    struct stat link_stat;
+    int result = 1;
+
+    ensure_out_dir();
+    remove(planted);
+    remove(opened);
+    snprintf(alias_root, sizeof(alias_root), "out/editor_symlink_alias_%ld",
+             (long)getpid());
+    remove(alias_root);
+    editor_level_init_defaults(&fixture);
+    if (write_text_file(victim, "victim bytes\n") != 0 ||
+        symlink("editor_symlink_victim.toml", planted) != 0 ||
+        level_save_toml(&fixture, document) != 0 ||
+        symlink("editor_symlink_document.toml", opened) != 0 ||
+        make_test_preference_root(root, sizeof(root)) != 0 ||
+        editor_set_preference_root(&es, root) != 0 ||
+        editor_init_persistence_paths(&es) != 0) goto cleanup;
+    es.undo = undo_create();
+    if (!es.undo) goto cleanup;
+
+    /* Save As onto a planted link: refused, victim and link untouched. */
+    editor_level_init_defaults(&es.level);
+    es.modified = 1;
+    file_dialog_test_set_save_result(FILE_DIALOG_SELECTED, planted);
+    editor_test_set_overwrite_choice(1);
+    if (expect_int("Save As onto symlink refused",
+                   editor_save_current_level_as(&es), -1) != 0 ||
+        expect_prefix("Save As symlink status", es.status_message,
+                      "Save failed:") != 0 ||
+        expect_int("victim untouched", file_equals_text(victim, "victim bytes\n"), 1) != 0 ||
+        expect_int("planted link kept", lstat(planted, &link_stat) == 0 &&
+                   S_ISLNK(link_stat.st_mode), 1) != 0) goto cleanup;
+
+    /* Save As to a private file spelled through a symlinked folder.
+     * Loading below picks a new autosave path, so remember this one. */
+    {
+        const char *base = strrchr(es.autosave_path, '/');
+        int written = snprintf(private_alias, sizeof(private_alias), "%s%s",
+                               alias_root, base ? base : "/missing");
+        if (written < 0 || (size_t)written >= sizeof(private_alias)) goto cleanup;
+    }
+    memcpy(planted_autosave, es.autosave_path, strlen(es.autosave_path) + 1);
+    if (write_text_file(planted_autosave, "autosave bytes\n") != 0 ||
+        symlink(root + strlen("out/"), alias_root) != 0) goto cleanup;
+    file_dialog_test_set_save_result(FILE_DIALOG_SELECTED, private_alias);
+    if (expect_int("Save As to aliased private file refused",
+                   editor_save_current_level_as(&es), -1) != 0 ||
+        expect_string("aliased private status", es.status_message,
+                      "Save failed: private editor path") != 0 ||
+        expect_int("autosave untouched",
+                   file_equals_text(planted_autosave, "autosave bytes\n"), 1) != 0)
+        goto cleanup;
+
+    /* Save of a level opened through a link updates the link's target. */
+    if (expect_int("open through symlink", editor_load_level(&es, opened), 0) != 0)
+        goto cleanup;
+    strncpy(es.level.name, "Through link", sizeof(es.level.name) - 1);
+    es.modified = 1;
+    if (expect_int("save through opened symlink",
+                   editor_save_current_level(&es), 0) != 0 ||
+        expect_int("opened link kept", lstat(opened, &link_stat) == 0 &&
+                   S_ISLNK(link_stat.st_mode), 1) != 0 ||
+        expect_int("target reload", level_load_toml(document, &reloaded), 0) != 0 ||
+        expect_string("target updated", reloaded.name, "Through link") != 0)
+        goto cleanup;
+
+    /* The same link repointed at another file is no longer followed. */
+    if (remove(opened) != 0 ||
+        symlink("editor_symlink_victim.toml", opened) != 0) goto cleanup;
+    es.level.coin_score++;
+    es.modified = 1;
+    editor_test_set_external_choice(EDITOR_EXTERNAL_REPLACE);
+    if (expect_int("repointed link refused", editor_save_current_level(&es), -1) != 0 ||
+        expect_prefix("repointed link status", es.status_message, "Save failed:") != 0 ||
+        expect_int("victim still untouched",
+                   file_equals_text(victim, "victim bytes\n"), 1) != 0) goto cleanup;
+    result = 0;
+
+cleanup:
+    file_dialog_test_set_save_result(-1, NULL);
+    editor_test_set_overwrite_choice(-1);
+    editor_test_set_external_choice((EditorExternalChoice)-1);
+    if (planted_autosave[0] != '\0') remove(planted_autosave);
+    cleanup_test_preference_root(root, &es, 1);
+    undo_destroy(es.undo);
+    remove(alias_root);
+    remove(planted);
+    remove(opened);
+    remove(victim);
+    remove(document);
+    return result;
+#endif
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -3024,6 +3140,7 @@ int main(void)
     if (failed_save_preserves_target_and_cleans_temp() != 0) return 1;
     if (autosave_recovery_preserves_destination() != 0) return 1;
     if (editor_save_workflows_enforce_baselines() != 0) return 1;
+    if (symlinks_are_followed_only_for_the_opened_document() != 0) return 1;
     if (recovery_metadata_and_failed_save_contract() != 0) return 1;
     if (playtest_destination_isolated() != 0) return 1;
     if (autosave_backs_off_and_snapshots_last_valid_level() != 0) return 1;

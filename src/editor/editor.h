@@ -352,6 +352,14 @@ typedef struct {
      * An empty string (file_path[0] == '\0') means "untitled, never saved".
      */
     char           file_path[EDITOR_PATH_MAX];
+    /*
+     * file_target — the real file read when file_path was opened.  It
+     * differs from file_path only when file_path is a symlink.  Save follows
+     * that link only while it still points here: the user loaded this file,
+     * so updating it is expected; any other target is a file they never saw.
+     * Empty when the document did not come from reading file_path.
+     */
+    char           file_target[EDITOR_PATH_MAX];
     char           autosave_path[EDITOR_PATH_MAX];
     char           playtest_path[EDITOR_PATH_MAX];
     char           recovery_original_path[EDITOR_PATH_MAX];
