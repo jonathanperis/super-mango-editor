@@ -25,6 +25,8 @@
 
 #define FILE_DIALOG_TEST_PATH_MAX 4096
 
+static int file_dialog_finish(FILE *fp, char *buf, int buf_size);
+
 static int file_dialog_test_open_result = -1;
 static int file_dialog_test_save_result = -1;
 static char file_dialog_test_open_path[FILE_DIALOG_TEST_PATH_MAX];
@@ -68,11 +70,12 @@ void file_dialog_test_set_save_result(int result, const char *path)
  *   2. Print the selected absolute path to stdout.
  *   3. Exit with code 0 on selection, non-zero on cancel.
  *
- * Returns FILE_DIALOG_SELECTED, FILE_DIALOG_CANCELLED, or FILE_DIALOG_ERROR.
+ * Returns FILE_DIALOG_SELECTED, FILE_DIALOG_CANCELLED, FILE_DIALOG_ERROR,
+ * or FILE_DIALOG_INVALID_PATH (see file_dialog_read_path).
  */
 int file_dialog_open(char *buf, int buf_size) {
     if (!buf || buf_size < 2) return FILE_DIALOG_ERROR;
-    if (file_dialog_test_open_result >= 0) {
+    if (file_dialog_test_open_result != -1) {  /* -1 = no injected result */
         int result = file_dialog_test_open_result;
         file_dialog_test_open_result = -1;
         if (result == FILE_DIALOG_SELECTED) {
@@ -146,16 +149,62 @@ int file_dialog_open(char *buf, int buf_size) {
         return FILE_DIALOG_ERROR;
     }
 
+    return file_dialog_finish(fp, buf, buf_size);
+}
+
+int file_dialog_read_path(FILE *fp, char *buf, int buf_size)
+{
+    size_t length;
+    int ended;
+
+    if (!fp || !buf || buf_size < 2) return FILE_DIALOG_ERROR;
+    buf[0] = '\0';
+
     /*
      * fgets — read one line from the command's stdout.
      *
      * The file dialog commands print the selected path as a single line.
-     * If the user cancelled, fgets returns NULL (no output).
+     * If the user cancelled, there is no output at all.
      */
-    char *result = fgets(buf, buf_size, fp);
+    if (!fgets(buf, buf_size, fp)) return FILE_DIALOG_CANCELLED;
+
+    /* Strip the line ending: osascript and zenity print "path\n",
+     * Windows PowerShell prints "path\r\n". */
+    length = strlen(buf);
+    ended = length > 0 && buf[length - 1] == '\n';
+    if (ended) buf[--length] = '\0';
+    if (length > 0 && buf[length - 1] == '\r') buf[--length] = '\0';
+
+    /*
+     * Anything after the first line means the picked name itself contained
+     * a line break (or did not fit in buf).  Read the rest so the picker can
+     * exit, then refuse: using just the first line would silently pick a
+     * different file.
+     */
+    if (fgetc(fp) != EOF) {
+        while (fgetc(fp) != EOF) { }
+        return ended ? FILE_DIALOG_INVALID_PATH : FILE_DIALOG_ERROR;
+    }
+    if (!ended && length == (size_t)buf_size - 1) return FILE_DIALOG_ERROR;
+    if (strchr(buf, '\r')) return FILE_DIALOG_INVALID_PATH;
+
+    /* Empty string means no selection */
+    if (buf[0] == '\0') return FILE_DIALOG_CANCELLED;
+    return FILE_DIALOG_SELECTED;
+}
+
+/*
+ * file_dialog_finish — Read the picker's answer, then close the pipe.
+ *
+ * pclose() waits for the picker and returns its exit status, which is
+ * how a cancel is told apart from a failure when nothing was printed.
+ */
+static int file_dialog_finish(FILE *fp, char *buf, int buf_size)
+{
+    int result = file_dialog_read_path(fp, buf, buf_size);
     int status = pclose(fp);
 
-    if (!result) {
+    if (result == FILE_DIALOG_CANCELLED) {
         /* PowerShell exits successfully without output on cancel. */
         if (status == 0) return FILE_DIALOG_CANCELLED;
 #if defined(__APPLE__) || defined(__unix__)
@@ -164,25 +213,8 @@ int file_dialog_open(char *buf, int buf_size) {
 #endif
         return FILE_DIALOG_ERROR;
     }
-    if (status != 0) return FILE_DIALOG_ERROR;
-    if (!strchr(buf, '\n') && strlen(buf) == (size_t)buf_size - 1)
-        return FILE_DIALOG_ERROR;
-
-    /*
-     * Strip the trailing newline that fgets preserves.
-     * osascript and zenity both output "path\n".
-     */
-    char *nl = strchr(buf, '\n');
-    if (nl) *nl = '\0';
-
-    /* Also strip trailing carriage return (Windows PowerShell outputs \r\n) */
-    char *cr = strchr(buf, '\r');
-    if (cr) *cr = '\0';
-
-    /* Empty string means no selection */
-    if (buf[0] == '\0') return FILE_DIALOG_CANCELLED;
-
-    return FILE_DIALOG_SELECTED;
+    if (result == FILE_DIALOG_SELECTED && status != 0) return FILE_DIALOG_ERROR;
+    return result;
 }
 
 static int file_dialog_add_toml_extension(char *buf, int buf_size)
@@ -215,7 +247,7 @@ static int file_dialog_add_toml_extension(char *buf, int buf_size)
 int file_dialog_save(char *buf, int buf_size)
 {
     if (!buf || buf_size < 2) return FILE_DIALOG_ERROR;
-    if (file_dialog_test_save_result >= 0) {
+    if (file_dialog_test_save_result != -1) {  /* -1 = no injected result */
         int result = file_dialog_test_save_result;
         file_dialog_test_save_result = -1;
         if (result == FILE_DIALOG_SELECTED) {
@@ -252,35 +284,15 @@ int file_dialog_save(char *buf, int buf_size)
 #endif
 
     FILE *fp = popen(cmd, "r");
-    char *result;
-    int status;
-    char *nl;
-    char *cr;
+    int result;
 
     if (!fp) {
         fprintf(stderr, "Warning: could not open save file dialog\n");
         return FILE_DIALOG_ERROR;
     }
 
-    result = fgets(buf, buf_size, fp);
-    status = pclose(fp);
-    if (!result) {
-        if (status == 0) return FILE_DIALOG_CANCELLED;
-#if defined(__APPLE__) || defined(__unix__)
-        if (status > 0 && WIFEXITED(status) && WEXITSTATUS(status) == 1)
-            return FILE_DIALOG_CANCELLED;
-#endif
-        return FILE_DIALOG_ERROR;
-    }
-    if (status != 0) return FILE_DIALOG_ERROR;
-    if (!strchr(buf, '\n') && strlen(buf) == (size_t)buf_size - 1)
-        return FILE_DIALOG_ERROR;
-
-    nl = strchr(buf, '\n');
-    if (nl) *nl = '\0';
-    cr = strchr(buf, '\r');
-    if (cr) *cr = '\0';
-    if (buf[0] == '\0') return FILE_DIALOG_CANCELLED;
+    result = file_dialog_finish(fp, buf, buf_size);
+    if (result != FILE_DIALOG_SELECTED) return result;
     if (!file_dialog_add_toml_extension(buf, buf_size)) return FILE_DIALOG_ERROR;
     return FILE_DIALOG_SELECTED;
 }
