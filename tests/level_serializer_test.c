@@ -1,3 +1,7 @@
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L  /* lstat, symlink */
+#endif
+
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -6,6 +10,7 @@
 #include <direct.h>
 #else
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 #include "shared/serializer.h"
@@ -788,6 +793,46 @@ static int control_chars_roundtrip(void)
     return 0;
 }
 
+/*
+ * Saving through a symlink updates the linked file and leaves the link in
+ * place.  A plain rename() over the link would replace it with a regular
+ * file and leave the original level stale.
+ */
+static int symlinked_save_updates_target(void)
+{
+#ifdef _WIN32
+    return 0;
+#else
+    const char *target = "out/test_symlink_target.toml";
+    const char *link_path = "out/test_symlink_link.toml";
+    LevelDef before;
+    LevelDef after;
+    struct stat link_stat;
+    int failed = 0;
+
+    level_def_init_defaults(&before);
+    before.screen_count = 1;
+    strncpy(before.name, "Original", sizeof(before.name) - 1);
+    remove(link_path);
+    if (level_save_toml(&before, target) != 0)
+        return fail("could not save symlink target fixture");
+    if (symlink("test_symlink_target.toml", link_path) != 0)
+        return fail("could not create symlink fixture");
+
+    strncpy(before.name, "Through link", sizeof(before.name) - 1);
+    if (level_save_toml(&before, link_path) != 0) failed = fail("save through symlink failed");
+    if (!failed && (lstat(link_path, &link_stat) != 0 || !S_ISLNK(link_stat.st_mode)))
+        failed = fail("save replaced the symlink instead of its target");
+    if (!failed && (level_load_toml(target, &after) != 0 ||
+                    strcmp(after.name, "Through link") != 0))
+        failed = fail("symlink target was not updated");
+
+    remove(link_path);
+    remove(target);
+    return failed;
+#endif
+}
+
 static int rich_level_roundtrip(void)
 {
     const char *path = "out/test_rich_level_roundtrip.toml";
@@ -1198,6 +1243,7 @@ int main(void)
     if (roundtrip_repo_levels() != 0) return 1;
     if (escaped_strings_roundtrip() != 0) return 1;
     if (control_chars_roundtrip() != 0) return 1;
+    if (symlinked_save_updates_target() != 0) return 1;
     if (rich_level_roundtrip() != 0) return 1;
     if (independent_star_color_counts_roundtrip() != 0) return 1;
     if (missing_physics_uses_engine_defaults() != 0) return 1;

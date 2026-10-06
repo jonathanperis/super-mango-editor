@@ -62,10 +62,18 @@ FILE *serializer_open_temp(const char *target_path, char *temp_path,
 /* Flush stdio buffers and request an OS-level file flush where supported. */
 int serializer_flush(FILE *fp);
 
-/* Replace target with a completed sibling temporary file. */
+/*
+ * Pick the file a save should replace.  A symlinked level resolves to its
+ * target (POSIX), so the atomic rename updates the real file and the link
+ * survives.  Other paths, and dangling links, are copied unchanged.
+ */
+int serializer_resolve_save_target(const char *path, char *buf, size_t buf_size);
+
+/* Replace target with a completed sibling temporary file, then sync its
+ * directory entry where the platform supports it. */
 int serializer_replace_file(const char *temp_path, const char *target_path);
 
-/* Install a completed sibling only when target is still absent. */
+/* Install a completed sibling only when target is still absent (also synced). */
 int serializer_create_file(const char *temp_path, const char *target_path);
 
 /* Remove a temporary file after an incomplete save. */
