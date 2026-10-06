@@ -2,14 +2,14 @@
 
 ## Summary
 
-Standalone SDL2/C editor for creating and editing Super Mango TOML levels. Baseline editor is shipped: `make editor` builds `out/super-mango-editor`, and `make run-editor` launches it. It includes TOML save/load, authored checkpoint placement, validation blocking for unsafe persistence/playtest, private-snapshot playtest launch, recent files, recovery snapshots, and smoke-test support. Current work is polish rather than format migration.
+Standalone C11/raylib editor for creating and editing Super Mango TOML levels. Baseline editor is shipped: `make editor` builds `out/super-mango-editor`, and `make run-editor` launches it. It includes TOML save/load, authored checkpoint placement, validation blocking for unsafe persistence/playtest, private-snapshot playtest launch, recent files, recovery snapshots, and smoke-test support. Current work is polish rather than format migration.
 
 ## Current Architecture Decisions
 
 | ID | Decision | Current choice |
 |----|----------|----------------|
 | D-001 | Level format | TOML is canonical. Runtime/editor serialization uses vendored `tomlc17`. |
-| D-002 | UI framework | Custom immediate-mode SDL2 + SDL2_ttf. No external UI library. |
+| D-002 | UI framework | Custom immediate-mode widgets drawn with raylib and its built-in font (originally SDL2 + SDL2_ttf). No external UI library. |
 | D-003 | Runtime loading | Bare launch selects from v1 `levels/campaigns/main.toml`; `--level <path>` / `make run-level LEVEL=...` loads TOML directly. |
 | D-004 | Validation | `tools/validate_levels.py`, `make validate-levels`, C validation tests, editor in-memory validation, and CI validation protect shipped levels. |
 | D-005 | CI quality gates | Native game/editor builds, 15 native test binaries plus Python host checks, TOML and campaign-manifest validation, game/editor smoke, WebAssembly artifact smoke, and docs lint/build are CI-gated. |
@@ -22,7 +22,6 @@ Editor builds as separate executable with `make editor` and runs with `make run-
 ### R-002: TOML Level Support
 Editor and runtime operate on TOML-backed `LevelDef` data. Current level files:
 
-- `levels/00_onboarding_01.toml`
 - `levels/00_sandbox_01.toml`
 - `levels/01_lugio_01.toml`
 - `levels/02_lugio_02.toml`
@@ -54,9 +53,9 @@ Editor validation runs before save, autosave, and playtest. Errors block unsafe 
 
 `[[checkpoints]]` is optional TOML data. Each record requires finite numeric `x` and `y`; at most 99 records are allowed. Runtime advances to the furthest checkpoint at or behind the player and respawns at its exact coordinates. Any authored record disables legacy automatic screen-boundary checkpoints; no records preserves the legacy behavior. Retry, replay, and successful phase transitions reset to the respective level start.
 
-### R-009: Onboarding Campaign Flow
+### R-009: Campaign Flow
 
-`levels/00_onboarding_01.toml` is first in `levels/campaigns/main.toml`. Its two authored checkpoints bracket the flame-marked gap, and its `[last_star].next_phase` advances to `levels/00_sandbox_01.toml`.
+`levels/campaigns/main.toml` orders the campaign: `levels/00_sandbox_01.toml` (Creator's Playground) → `levels/01_lugio_01.toml` → `levels/02_lugio_02.toml`. The former onboarding level was removed; focused mechanics lessons live in `levels/labs/`.
 
 ### R-007: Validation Commands
 Contributor validation commands are:

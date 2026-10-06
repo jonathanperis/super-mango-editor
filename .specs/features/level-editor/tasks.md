@@ -9,7 +9,7 @@ Baseline editor is shipped. TOML is the only level workflow; no C exporter remai
 | Area | Status | Verification |
 |------|--------|--------------|
 | Standalone editor executable | Complete | `make editor`, `make run-editor` |
-| SDL2/SDL2_ttf UI shell | Complete | `src/editor/ui.*`, `editor.*` |
+| raylib UI shell (originally SDL2/SDL2_ttf) | Complete | `src/shared/ui.*`, `src/editor/editor.*` |
 | Canvas/palette/properties/tools | Complete baseline | `src/editor/canvas.*`, `palette.*`, `properties.*`, `tools.*` |
 | Undo/redo | Complete baseline | `src/editor/undo.*` |
 | Copy/paste | Complete baseline | `src/editor/tools.*`, `src/editor/undo.*` |
@@ -21,7 +21,7 @@ Baseline editor is shipped. TOML is the only level workflow; no C exporter remai
 | Editor trust safeguards | Complete baseline | Validation blocks save/playtest; status summary shown |
 | Metadata editor | Complete baseline | Level Config edits current top-level TOML metadata, layers, and physics overrides |
 | Playtest launch | Complete baseline | Editor validates, writes a private TOML snapshot, and launches game with `--level` |
-| Recent files + recovery | Complete baseline | Recent paths and valid dirty-level recovery snapshots under the SDL preference directory |
+| Recent files + recovery | Complete baseline | Recent paths and valid dirty-level recovery snapshots under the per-user preference directory |
 | Smoke gates | Complete baseline | Game/editor native smoke and WebAssembly artifact smoke in CI |
 | Docs checks | Complete baseline | `docs.yml` runs docs lint/build |
 

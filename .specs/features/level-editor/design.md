@@ -2,21 +2,25 @@
 
 ## Current Design
 
-`super-mango-editor` is standalone SDL2/C application under `src/editor/`. It shares `LevelDef` and game constants with runtime code, but owns its own window, renderer, UI state, canvas, palette, properties, tools, undo stack, TOML serializer, validation, recent-file/autosave state, playtest launcher, and file-dialog helpers.
+`super-mango-editor` is a standalone C11/raylib application under `src/editor/`. It shares `LevelDef` and game constants with runtime code, but owns its own window, renderer, UI state, canvas, palette, properties, tools, undo stack, TOML serializer, validation, recent-file/autosave state, playtest launcher, and file-dialog helpers.
 
 ```text
 super-mango-editor
-├── editor_main.c       SDL/IMG/TTF init, entry point
+├── editor_main.c       raylib window/audio init, entry point
 ├── editor.c/.h         lifecycle, loop, global EditorState
-├── canvas.c/.h         world viewport, camera, render preview
+├── editor_frame/events/chrome/panels/layout.c   per-frame UI and input routing
+├── canvas.c/.h         world viewport, camera (x and y), render preview
+├── hit_test.c/.h       entity bounds and click priority (reverse draw order)
 ├── palette.c/.h        placeable entity palette
 ├── properties.c/.h     selected entity fields
-├── tools.c/.h          select/place/delete interactions
-├── undo.c/.h           undo/redo command stack
+├── tools.c/.h          select/place/delete/drag interactions
+├── entity_meta.c/.h    per-type names, capacities, shared read/insert/remove
+├── editor_clipboard.c/.h copy/paste (rail riders keep their rail)
+├── undo.c/.h, editor_undo_apply.c/.h  undo/redo command stack
+├── editor_files/session/playtest.c/.h  save/load, recovery, recent files, playtest
 ├── editor_validation.c/.h in-memory validation report
-├── serializer.c/.h     LevelDef ↔ TOML data
-├── file_dialog.c/.h    file interactions
-└── ui.c/.h             immediate-mode SDL2_ttf widgets
+├── file_dialog.c/.h, dialog_choice.c  native pickers and decision dialogs
+└── ../shared/ui.c/.h, serializer*.c/.h  immediate-mode widgets; LevelDef <-> TOML
 ```
 
 ## Build Integration
@@ -32,7 +36,7 @@ super-mango-editor
 
 CI also builds the editor natively, runs game/editor smoke tests, checks WebAssembly artifacts, and runs docs lint/build for docs PRs.
 
-Editor links SDL2, SDL2_image, SDL2_ttf, `tomlc17`, and `src/surfaces/rail.c`; it does not link SDL2_mixer.
+Editor links the pinned static raylib 6.0 build, `tomlc17`, and `src/surfaces/rail.c`. Text uses raylib's built-in font.
 
 ## Data Model
 
@@ -40,7 +44,6 @@ TOML files in `levels/` are source of truth for shipped editable levels. `LevelD
 
 Current level files:
 
-- `levels/00_onboarding_01.toml`
 - `levels/00_sandbox_01.toml`
 - `levels/01_lugio_01.toml`
 - `levels/02_lugio_02.toml`
@@ -117,5 +120,5 @@ Next design step: turn the shipped validation summary into a richer diagnostics 
 
 ### Recent Files + Autosave
 
-- Build on the current recent-file list and recovery snapshots in the SDL preference directory.
+- Build on the current recent-file list and recovery snapshots in the per-user preference directory.
 - Preserve the shipped recovery choice and improve its presentation when snapshots are available.
