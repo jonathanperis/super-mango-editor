@@ -176,7 +176,7 @@ Next Level uses `game_load_next_phase()` without replacing the game screen. If l
 
 ### Pause Overlay Flow
 
-During active gameplay, Esc or controller Start toggles the player pause reason through the overlay helper in `src/core/game_overlay.c`. Paused frames keep rendering the last camera position, skip gameplay updates, pause music, and draw a semi-transparent pause overlay with resume hints. Enter, Space, Esc, or controller Start resumes gameplay. Window focus loss uses a separate focus pause reason, so regaining focus does not clear an intentional player pause. Completion and game-over overlays take priority over pause.
+During active gameplay, Esc or controller Start toggles the player pause reason through the overlay helper in `src/core/game_overlay.c`. Paused frames keep rendering the last camera position, skip gameplay updates, pause music, and draw a semi-transparent pause overlay with resume hints. Enter, Space, Esc, or controller Start resumes gameplay. Window focus loss uses a separate focus pause reason, so regaining focus does not clear an intentional player pause. Music follows one predicate, `game_music_should_play()`: it is silent while the pause overlay or the settings panel is up and plays otherwise (including under completion and game-over screens), so regaining focus cannot resume music beneath open settings. Completion and game-over overlays take priority over pause.
 
 ### Game-Over Flow
 
