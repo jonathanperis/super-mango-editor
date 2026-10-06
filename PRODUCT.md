@@ -119,7 +119,7 @@ What works:
 Priority issues:
 
 1. **Play conversion is split.** The hero says `PLAY NOW`, but the actual launch happens after scrolling and clicking the cabinet button.
-2. **Hero copy undersells the learning resource.** It mentions browser play but not the open-source C11/SDL2 learning angle or level editor.
+2. **Hero copy undersells the learning resource.** It mentions browser play but not the open-source C11/raylib learning angle or level editor.
 3. **Documentation section is too flat.** Thirteen cards appear as equal peers, which makes it hard for new users to know where to start.
 4. **Feature cards are visually repetitive.** They communicate facts, but not in a game-native way.
 5. **Mobile navigation loses choices.** Nav links disappear under 600px without an equivalent compact menu or sticky CTA.
@@ -134,7 +134,7 @@ Recommended page story:
 
 1. **Attract mode hero:** `SUPER MANGO`, browser-play CTA, short source-backed value prop.
 2. **Cabinet play panel:** game canvas, payload size, controls, debug mode tucked into a developer drawer.
-3. **Scoreboard proof strip:** C11, SDL2, WebAssembly, 4 levels, 25 screens, TOML levels, level editor.
+3. **Scoreboard proof strip:** C11, raylib, WebAssembly, 4 levels, 25 screens, TOML levels, level editor.
 4. **What you can do:** Play, learn the engine, build levels.
 5. **Builder manual:** grouped docs by intent, not a flat list.
 6. **Item drop:** native builds and WebAssembly route with clear platform actions.
@@ -157,8 +157,8 @@ Treat A/B testing as controlled variation inside the same arcade aesthetic. Do n
 
 - **Hypothesis:** Adding source-backed proof to the hero improves trust and scroll depth without weakening the arcade mood.
 - **A/control:** `A 2D pixel art platformer. Play in your browser.`
-- **B:** `Open-source C11 + SDL2 platformer. Play in browser, study the engine, build TOML levels.`
-- **C:** Hero plus compact HUD chips: `C11`, `SDL2`, `WASM`, `TOML`, `LEVEL EDITOR`.
+- **B:** `Open-source C11 + raylib platformer. Play in browser, study the engine, build TOML levels.`
+- **C:** Hero plus compact HUD chips: `C11`, `raylib`, `WASM`, `TOML`, `LEVEL EDITOR`.
 - **Primary metric:** Scroll to About, Docs clicks, GitHub clicks.
 - **Recommendation:** Try C if the hero has room after spacing cleanup. Otherwise use B.
 
