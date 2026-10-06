@@ -2,6 +2,7 @@
  * rectangles subtract camera X exactly once; HUD rectangles stay in screen
  * space. Per-draw colors do not leak into the following render layer. */
 #include "debug.h"
+#include "../shared/platform.h"  /* clock_millis */
 #include "../game.h"
 #include "../collision/game_collision.h"
 #include <stdio.h>

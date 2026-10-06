@@ -3,6 +3,7 @@
  */
 
 #include "game_update.h"
+#include "../shared/platform.h"  /* clock_millis */
 
 #include "game_actors.h"
 #include "game_bouncepads.h"

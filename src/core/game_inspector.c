@@ -1,4 +1,5 @@
 #include "game_inspector.h"
+#include "../shared/platform.h"  /* str_copy */
 #include "game_experiment.h"
 #include "game_overlay.h"
 #include "game_timing.h"

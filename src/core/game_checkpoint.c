@@ -3,6 +3,7 @@
  */
 
 #include "game_checkpoint.h"
+#include "../shared/platform.h"  /* clock_millis */
 
 #include "../levels/level.h"
 #include "../hazards/spike.h"          /* SpikeRow, SPIKE_TILE_W */

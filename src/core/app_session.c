@@ -15,6 +15,7 @@
  * the frame order; low-level drawing belongs to the screens/render modules.
  */
 #include "app_session.h"
+#include "../shared/platform.h"  /* str_copy */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
