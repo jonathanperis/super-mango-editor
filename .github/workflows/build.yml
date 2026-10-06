@@ -18,7 +18,38 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+
+# A new push to a pull request cancels that PR's superseded run. Branch, tag and
+# manual runs are keyed by their unique run id, so main checks, the Pages
+# deploy that follows them, and releases are never cancelled or queued away.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # DOCS DRIFT
+  # docs.yml only runs for PRs touching docs-related paths, so a required check
+  # there would never report on other PRs. This cheap job always runs.
+  # ────────────────────────────────────────────────────────────────────────────
+  docs-drift:
+    name: Docs drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Check semantic docs drift
+        run: make docs-drift
+
   # ────────────────────────────────────────────────────────────────────────────
   # BUILD JOB
   # Compiles the game on Linux (x86_64), macOS (arm64), Windows (x86_64),
@@ -28,6 +59,7 @@ jobs:
   build:
     name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
 
     strategy:
       fail-fast: false   # let all platforms finish even if one fails
@@ -50,12 +82,32 @@ jobs:
             artifact: super-mango-wasm
             target: wasm
 
+    env:
+      # One checksum-verified raylib source archive shared by every build
+      # directory and restored from the Actions cache below.
+      RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+
     steps:
       # Check out the repository so the runner has access to the source code.
       - name: Checkout source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # MSYS2 provides its own Python on Windows; pin the runner Python elsewhere.
+      - name: Setup Python
+        if: runner.os != 'Windows'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      # The archive only changes with the pin; build_raylib.py re-verifies its
+      # SHA-256 on every use, so a restored copy cannot inject other sources.
+      - name: Cache pinned raylib source archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/raylib
+          key: raylib-source-${{ runner.os }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
 
       # ── Linux dependency install ────────────────────────────────────────────
       # Build the pinned raylib source against GLFW/OpenGL system interfaces.
@@ -225,13 +277,14 @@ jobs:
           RELEASE_DLL_DIR: /ucrt64/bin
         run: make dist-native CC=gcc
 
+      # dist-wasm depends on web, so this reuses the verified build above.
       - name: Package release archive (WebAssembly)
         if: matrix.target == 'wasm'
         env:
           RELEASE_PLATFORM: ${{ matrix.artifact }}
         run: |
           make dist-wasm
-          python3 tools/check_wasm_artifacts.py --zip dist/${{ matrix.artifact }}.zip
+          python3 tools/check_wasm_artifacts.py --zip "dist/$RELEASE_PLATFORM.zip"
 
       # Upload the standalone zip as a workflow artifact. retention-days: 1 keeps
       # PR build storage low; releases immediately reattach the zip assets.
@@ -256,6 +309,7 @@ jobs:
     # or an explicit manual workflow dispatch from the protected main branch.
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     # The GITHUB_TOKEN must have write access to repository contents to create
     # tags and releases. Scoping it here follows the principle of least privilege.

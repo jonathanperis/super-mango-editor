@@ -479,10 +479,17 @@ Four GitHub Actions workflows handle automated builds and docs checks:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Native game/editor tests, smoke and packaging; Linux sanitizers/scripted smoke; Linux/macOS level validation; WASM build/artifact/package checks. Releases only on `v*` tags or manual dispatch on `main` |
-| Docs | `docs.yml` | Relevant pull requests, manual | `make docs-drift`, frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows |
+| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job; native game/editor tests, smoke and packaging; Linux sanitizers/scripted smoke; Linux/macOS level validation; WASM build/artifact/package checks. Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` |
+| Docs | `docs.yml` | Push to `main`, relevant pull requests, manual | `make docs-drift`, frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis |
 | Deploy | `deploy.yml` | Successful same-repository main push/manual Build & Release run | Builds/checks docs from the run's exact commit, copies matching WASM, HTTP-smokes the assembly and deploys `docs/out/` |
+
+Every job sets `timeout-minutes`. Build jobs use Python 3.12 from
+`actions/setup-python` on Linux/macOS (MSYS2 supplies Python on Windows) and
+restore the pinned raylib source archive from `actions/cache` via
+`RAYLIB_ARCHIVE`; the archive is SHA-256 verified on every use. Build
+directories are not cached because CMake caches record absolute paths and
+per-compiler settings.
 
 The repository restricts third-party Actions to an allowlist and requires full
 commit-SHA pins. A renamed or transferred Action can resolve through the GitHub
