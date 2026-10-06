@@ -27,6 +27,7 @@ int editor_init(EditorState *es, int hidden)
     /* Camera coordinates describe the level, while toolbar/panel coordinates
      * describe the editor canvas. A -1 selection means no entity is selected. */
     es->camera.x = 0;
+    es->camera.y = 0;
     es->camera.zoom = 2;
     es->tool = TOOL_SELECT;
     es->selection.index = -1;

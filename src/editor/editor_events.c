@@ -141,15 +141,51 @@ static void editor_key(EditorState *es, const InputEvent *event)
     }
 }
 
+/*
+ * editor_canvas_wheel — Zoom or pan the canvas with the mouse wheel.
+ *
+ *   wheel        : pan left/right (the level is much wider than tall)
+ *   Shift+wheel  : pan up/down (needed at 3x/5x, where the floor is
+ *                  below the visible area)
+ *   Ctrl+wheel   : step through the zoom presets, keeping the point under
+ *                  the cursor in place
+ */
+static void editor_canvas_wheel(EditorState *es, const InputEvent *event)
+{
+    /* One wheel notch pans 48 canvas pixels; divide by zoom for world px. */
+    float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+    float step = event->wheel * 48.0f / zoom;
+
+    if (event->mods & INPUT_CTRL) {
+        /* These exact integer presets are assigned by startup, the
+         * toolbar and this wheel handler; zoom is not accumulated. */
+        static const float zooms[] = {1, 2, 3, 5};
+        int index = 1;
+        for (int i = 0; i < 4; i++)
+            if (es->camera.zoom == zooms[i]) {
+                index = i;
+                break;
+            }
+        if (event->wheel > 0) index = (index+1)%4;
+        else if (event->wheel < 0) index = (index+3)%4;
+        canvas_set_zoom(es, zooms[index], event->x, event->y);
+    } else if (event->mods & INPUT_SHIFT) {
+        es->camera.y -= step;
+        canvas_clamp_camera(es);
+    } else {
+        es->camera.x -= step;
+        canvas_clamp_camera(es);
+    }
+}
+
 void editor_handle_event(EditorState *es, const InputEvent *event)
 {
     float wx = 0, wy = 0;
     /* Input already maps window pixels to the logical editor canvas. Tools
-     * need world coordinates: undo zoom, add camera X, and remove toolbar Y. */
-    if (event->type >= INPUT_MOUSE_DOWN && event->type <= INPUT_WHEEL) {
-        wx = (float)event->x / es->camera.zoom + es->camera.x;
-        wy = (float)(event->y - TOOLBAR_H) / es->camera.zoom;
-    }
+     * need world coordinates; canvas_screen_to_world undoes zoom and adds
+     * the camera scroll in both axes. */
+    if (event->type >= INPUT_MOUSE_DOWN && event->type <= INPUT_WHEEL)
+        canvas_screen_to_world(es, event->x, event->y, &wx, &wy);
     switch (event->type) {
     case INPUT_QUIT:
         if (editor_confirm_discard_changes(es, "quit")) {
@@ -187,33 +223,7 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         break;
     case INPUT_WHEEL:
         if (editor_handle_side_panel_scroll(es,event->x,event->y,(int)event->wheel)) break;
-        if (event->x < CANVAS_W && event->y > TOOLBAR_H && event->y < EDITOR_H-STATUS_H) {
-            if (event->mods & INPUT_CTRL) {
-                /* These exact integer presets are assigned by startup, the
-                 * toolbar and this wheel handler; zoom is not accumulated. */
-                static const float zooms[] = {1, 2, 3, 5};
-                int index = 1;
-                for (int i = 0; i < 4; i++)
-                    if (es->camera.zoom == zooms[i]) {
-                        index = i;
-                        break;
-                    }
-                if (event->wheel > 0) index = (index+1)%4;
-                else if (event->wheel < 0) index = (index+3)%4;
-                es->camera.zoom = zooms[index];
-            } else {
-                /* Convert a 48-canvas-pixel pan to world distance. Clamp so
-                 * the viewport cannot scroll beyond either world boundary. */
-                es->camera.x -= event->wheel * 48 / es->camera.zoom;
-                int screens = es->level.screen_count;
-                if (screens <= 0) screens = 4;
-                if (screens > MAX_LEVEL_SCREENS) screens = MAX_LEVEL_SCREENS;
-                float max = screens*GAME_W-(float)CANVAS_W/es->camera.zoom;
-                if (max < 0) max = 0;
-                if (es->camera.x < 0) es->camera.x = 0;
-                if (es->camera.x > max) es->camera.x = max;
-            }
-        }
+        if (canvas_contains(event->x, event->y)) editor_canvas_wheel(es, event);
         break;
     default: break;
     }
