@@ -53,12 +53,12 @@ static inline int w2s_x(const EditorState *es, float wx) {
 /*
  * w2s_y — Convert a world-space y coordinate to a screen-space y.
  *
- * Applies zoom and adds TOOLBAR_H to offset below the toolbar strip.
- * The y axis is not scrolled (the game world is only 300 px tall and
- * always fits vertically in the canvas at reasonable zoom levels).
+ * Subtracts the vertical scroll, applies zoom and adds TOOLBAR_H to offset
+ * below the toolbar strip.  At 1x/2x the 300-px world fits and camera.y is
+ * 0; at 3x/5x camera.y lets the designer scroll down to the floor.
  */
 static inline int w2s_y(const EditorState *es, float wy) {
-    return (int)(wy * es->camera.zoom) + TOOLBAR_H;
+    return (int)((wy - es->camera.y) * es->camera.zoom) + TOOLBAR_H;
 }
 
 /*
@@ -257,15 +257,53 @@ void canvas_render(EditorState *es) {
  * Inverts the w2s_x / w2s_y transform.
  *
  *   world_x = screen_x / zoom + camera.x
- *   world_y = (screen_y - TOOLBAR_H) / zoom
+ *   world_y = (screen_y - TOOLBAR_H) / zoom + camera.y
  *
- * The caller uses this to map mouse clicks on the canvas to entity
- * positions in the level.
+ * This is the one place screen pixels become world pixels: mouse events,
+ * the status-bar readout and the placement ghost all call it.
  */
 void canvas_screen_to_world(const EditorState *es, int sx, int sy,
                             float *wx, float *wy) {
-    *wx = (float)sx / es->camera.zoom + es->camera.x;
-    *wy = (float)(sy - TOOLBAR_H) / es->camera.zoom;
+    /* A zeroed EditorState (tests, early startup) has zoom 0; treat it as
+     * 1x instead of dividing by zero. */
+    float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+    *wx = (float)sx / zoom + es->camera.x;
+    *wy = (float)(sy - TOOLBAR_H) / zoom + es->camera.y;
+}
+
+/* ------------------------------------------------------------------ */
+/* Camera clamping and zoom                                            */
+/* ------------------------------------------------------------------ */
+
+/* Clamp one camera axis so the view never scrolls past the world. */
+static float clamp_camera_axis(float value, float world_size, float view_size)
+{
+    float max = world_size - view_size;  /* negative when the world fits */
+    if (value > max) value = max;
+    if (value < 0.0f) value = 0.0f;
+    return value;
+}
+
+void canvas_clamp_camera(EditorState *es) {
+    float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+    /* editor_world_width caps a hand-edited screen_count, so this is safe
+     * to run every frame even while the level is invalid. */
+    float world_w = editor_world_width(&es->level);
+    es->camera.x = clamp_camera_axis(es->camera.x, world_w, CANVAS_W / zoom);
+    es->camera.y = clamp_camera_axis(es->camera.y, (float)GAME_H, CANVAS_H / zoom);
+}
+
+void canvas_set_zoom(EditorState *es, float zoom, int anchor_sx, int anchor_sy) {
+    float wx, wy;
+
+    if (zoom <= 0.0f) return;
+    /* Remember which world point is under the anchor, change zoom, then
+     * scroll so that same point is under the anchor again. */
+    canvas_screen_to_world(es, anchor_sx, anchor_sy, &wx, &wy);
+    es->camera.zoom = zoom;
+    es->camera.x = wx - (float)anchor_sx / zoom;
+    es->camera.y = wy - (float)(anchor_sy - TOOLBAR_H) / zoom;
+    canvas_clamp_camera(es);
 }
 
 /* ------------------------------------------------------------------ */

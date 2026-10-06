@@ -143,7 +143,8 @@ The Level Config section in the right panel exposes the top-level TOML scalars:
 | Action | Input |
 |--------|-------|
 | Pan left / right | Mouse wheel over the canvas |
-| Cycle zoom | Toolbar dropdown or `Ctrl + Mouse Wheel` (1×, 2×, 3×, 5×) |
+| Pan up / down | `Shift + Mouse Wheel` over the canvas (at 3× and 5× the 300 px world is taller than the canvas) |
+| Cycle zoom | Toolbar dropdown (zooms around the canvas centre) or `Ctrl + Mouse Wheel` (zooms around the cursor; 1×, 2×, 3×, 5×) |
 | Snap a dragged entity | Hold Shift while dragging (48px grid) |
 | Toggle grid | `G` |
 

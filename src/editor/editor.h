@@ -248,15 +248,21 @@ typedef struct {
  *
  * x    : horizontal scroll offset in world-space logical pixels.
  *         x = 0 shows the left edge of the level; increasing x pans right.
+ * y    : vertical scroll offset in world-space logical pixels.  At 1x and
+ *         2x the 300-px-tall world fits in the canvas and y stays 0; at 3x
+ *         and 5x it does not, and y lets the designer pan down to the floor.
  * zoom : scale factor for rendering (1.0 = native logical size, 2.0 = 2x).
  *         The canvas maps world coordinates to screen coordinates via:
  *           screen_x = (world_x - camera.x) * zoom
+ *           screen_y = (world_y - camera.y) * zoom + TOOLBAR_H
  *
- * Both fields use float because the camera can pan smoothly at sub-pixel
+ * All fields use float because the camera can pan smoothly at sub-pixel
  * granularity (same reason the game uses float for entity positions).
+ * canvas_clamp_camera keeps x and y inside the world.
  */
 typedef struct {
     float x;     /* horizontal scroll in world-space logical pixels */
+    float y;     /* vertical scroll in world-space logical pixels   */
     float zoom;  /* render scale factor (1.0 = 1:1, 2.0 = double size) */
 } EditorCamera;
 

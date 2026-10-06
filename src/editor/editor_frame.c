@@ -48,6 +48,9 @@ void editor_run_frame(EditorState *es)
         es->validation_cache_valid = 1;
     }
     editor_maybe_autosave(es);
+    /* Zoom, screen_count edits, undo and level loads can all change how
+     * much world there is to show; re-clamp before drawing every frame. */
+    canvas_clamp_camera(es);
     /* BeginDrawing resets raylib's frame state; BeginTextureMode redirects
      * subsequent draw calls to our logical editor canvas. Draw panels after
      * the world canvas so they appear above it (the painter's algorithm). */
