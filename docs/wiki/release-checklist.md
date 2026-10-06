@@ -93,8 +93,12 @@ Publishing rules:
 - push a `v*` tag to create a tagged GitHub Release, or
 - use `workflow_dispatch` **on `main`** for a manually versioned release.
 
-The release job creates a draft, uploads all four archives without overwriting
-existing assets, then publishes it. A dispatch on another branch builds/checks
+A separate `Checksums and provenance` job (the only one holding
+`attestations: write` and `id-token: write`) writes `SHA256SUMS` for the four
+archives and creates a GitHub build provenance attestation for each. The
+release job re-checks the archives against `SHA256SUMS`, creates a draft,
+uploads the four archives plus `SHA256SUMS` without overwriting existing
+assets, then publishes it. A dispatch on another branch builds/checks
 but does not publish. Verify the release event's own build matrix, not an older
 green run.
 
@@ -102,7 +106,42 @@ Normal `main` pushes are build/deploy checks only; they do not publish a GitHub 
 
 After publish, verify:
 
-- the release asset table has Linux, macOS, Windows, and WebAssembly zip files;
+- the release asset table has Linux, macOS, Windows, and WebAssembly zip files plus `SHA256SUMS`;
+- `gh attestation verify` succeeds for a downloaded archive (see below);
 - archive downloads match the expected platform names;
 - Pages serves `/super-mango-editor/super-mango.js`, `/super-mango-editor/super-mango.wasm`, and `/super-mango-editor/super-mango.data` under the production project base;
 - the public docs site and badges do not report stale status.
+
+<a id="verifying-a-download"></a>
+
+## 6. Verifying a Download
+
+Players and maintainers can check any downloaded archive against the release's
+`SHA256SUMS` and its build provenance attestation:
+
+```sh
+# Linux (GNU coreutils)
+sha256sum --check --ignore-missing SHA256SUMS
+# macOS
+shasum -a 256 --check --ignore-missing SHA256SUMS
+# Windows PowerShell: compare with the matching SHA256SUMS line
+Get-FileHash -Algorithm SHA256 super-mango-windows-x86_64.zip
+
+# Any platform with the GitHub CLI: proves the archive was built by this
+# repository's Build & Release workflow from the tagged commit
+gh attestation verify super-mango-macos-arm64.zip --repo jonathanperis/super-mango-editor
+```
+
+macOS archives are ad-hoc signed (`codesign --sign -`), not signed with a
+Developer ID or notarized, because the project has no Apple Developer account.
+Gatekeeper therefore blocks the first launch of a downloaded copy. After
+verifying the checksum or attestation, either right-click (Control-click)
+`super-mango` or `super-mango-editor` in Finder and choose **Open**, or remove
+the quarantine attribute from the extracted folder:
+
+```sh
+xattr -dr com.apple.quarantine super-mango-macos-arm64
+```
+
+Fixing this properly requires a Developer ID certificate plus notarization in
+the release job; until then, document the workaround in release notes.

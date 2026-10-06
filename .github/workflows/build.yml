@@ -465,14 +465,60 @@ jobs:
           make scripted-smoke CC=gcc SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
 
   # ────────────────────────────────────────────────────────────────────────────
+  # CHECKSUMS AND PROVENANCE JOB
+  # Only this job can mint OIDC tokens and write attestations. It runs no
+  # third-party actions and does not get repository write access.
+  # ────────────────────────────────────────────────────────────────────────────
+  provenance:
+    name: Checksums and provenance
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Download release archives
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: super-mango-*
+          merge-multiple: true
+          path: dist/
+
+      - name: Generate SHA256SUMS
+        working-directory: dist
+        run: |
+          sha256sum super-mango-linux-x86_64.zip super-mango-macos-arm64.zip \
+            super-mango-windows-x86_64.zip super-mango-wasm.zip > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS
+
+      - name: Upload SHA256SUMS
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: SHA256SUMS
+          path: dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 1
+
+  # ────────────────────────────────────────────────────────────────────────────
   # RELEASE JOB
   # Runs only for explicit release events: pushed v* tags or manual dispatch.
-  # Waits for all four build matrix legs to succeed, then creates a GitHub
-  # Release with the standalone platform archives attached.
+  # Waits for all build matrix legs and the provenance job to succeed, then
+  # creates a GitHub Release with the standalone platform archives and
+  # SHA256SUMS attached.
   # ────────────────────────────────────────────────────────────────────────────
   release:
     name: Create Release
-    needs: build
+    needs: [build, provenance]
     # Guard: skip normal branch pushes and PR checks. Publish only from v* tags
     # or an explicit manual workflow dispatch from the protected main branch.
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
@@ -485,31 +531,24 @@ jobs:
       contents: write
 
     steps:
-      # Download each platform's artifact into its own subdirectory so files
-      # with the same name ("super-mango") don't overwrite each other.
-      - name: Download Linux binary
+      # The four platform archives have distinct names, so they can share dist/.
+      - name: Download release archives
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: super-mango-linux-x86_64
-          path: dist/linux/
+          pattern: super-mango-*
+          merge-multiple: true
+          path: dist/
 
-      - name: Download macOS binary
+      - name: Download SHA256SUMS
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: super-mango-macos-arm64
-          path: dist/macos/
+          name: SHA256SUMS
+          path: dist/
 
-      - name: Download Windows binary
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: super-mango-windows-x86_64
-          path: dist/windows/
-
-      - name: Download WebAssembly build
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: super-mango-wasm
-          path: dist/wasm/
+      # The attested checksums must describe exactly the bytes being published.
+      - name: Verify archives against SHA256SUMS
+        working-directory: dist
+        run: sha256sum --check --strict SHA256SUMS
 
       # Create the GitHub Release. The tag is auto-created by the action when
       # softprops/action-gh-release picks up GITHUB_TOKEN automatically.
@@ -533,11 +572,23 @@ jobs:
             | WebAssembly     | `super-mango-wasm.zip`                | Serve with any HTTP server          |
 
             Native builder archives include the game and editor, playable `assets/`, campaign/lab `levels/`, project and third-party notices, and a short README. Run from the extracted folder. raylib is linked statically; native OS graphics/audio support is required, and Linux dialogs need zenity. Windows bundles required non-system runtime DLLs and their package notices. Reserve assets are excluded; WebAssembly uses the verified `.data` payloads.
+
+            ### Verify your download
+
+            `SHA256SUMS` lists every archive; each archive also has a GitHub build provenance attestation:
+
+            ```sh
+            sha256sum --check --ignore-missing SHA256SUMS   # macOS: shasum -a 256 --check --ignore-missing SHA256SUMS
+            gh attestation verify super-mango-linux-x86_64.zip --repo ${{ github.repository }}
+            ```
+
+            macOS binaries are ad-hoc signed, not notarized. If Gatekeeper blocks them, right-click the binary and choose **Open**, or run `xattr -dr com.apple.quarantine super-mango-macos-arm64` on the extracted folder after verifying the checksum.
           files: |
-            dist/linux/super-mango-linux-x86_64.zip
-            dist/macos/super-mango-macos-arm64.zip
-            dist/windows/super-mango-windows-x86_64.zip
-            dist/wasm/super-mango-wasm.zip
+            dist/super-mango-linux-x86_64.zip
+            dist/super-mango-macos-arm64.zip
+            dist/super-mango-windows-x86_64.zip
+            dist/super-mango-wasm.zip
+            dist/SHA256SUMS
           fail_on_unmatched_files: true
           overwrite_files: false
 
