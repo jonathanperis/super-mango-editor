@@ -52,8 +52,8 @@ jobs:
 
   # ────────────────────────────────────────────────────────────────────────────
   # BUILD JOB
-  # Compiles the game on Linux (x86_64), macOS (arm64), Windows (x86_64),
-  # and WebAssembly in parallel.
+  # Compiles the game on Linux (x86_64), macOS (arm64), Windows (x86_64, GCC and
+  # Clang), and WebAssembly in parallel.
   # Runs on every push to main AND every pull request.
   # ────────────────────────────────────────────────────────────────────────────
   build:
@@ -69,24 +69,41 @@ jobs:
             platform: Linux x86_64
             artifact: super-mango-linux-x86_64
             target: native
+            cc: clang
             extra_cflags: -Werror
+            package: true
           - os: macos-latest
             platform: macOS arm64
             artifact: super-mango-macos-arm64
             target: native
+            cc: clang
             extra_cflags: -Werror
+            package: true
+          # The GCC leg keeps the historical check name and ships the release
+          # archive; the Clang leg covers the Makefile's local Windows default.
           # GCC still reports -Wformat-truncation in editor/UI label formatting,
           # so only the Clang legs build with -Werror until those are fixed.
           - os: windows-latest
             platform: Windows x86_64
             artifact: super-mango-windows-x86_64
             target: native
+            cc: gcc
             extra_cflags: ''
+            package: true
+          - os: windows-latest
+            platform: Windows x86_64 clang
+            artifact: super-mango-windows-x86_64-clang
+            target: native
+            cc: clang
+            extra_cflags: -Werror
+            package: false
           - os: ubuntu-latest
             platform: WebAssembly
             artifact: super-mango-wasm
             target: wasm
+            cc: emcc
             extra_cflags: ''
+            package: true
 
     env:
       # Warnings fail CI (see extra_cflags above); local builds stay tolerant.
@@ -95,6 +112,7 @@ jobs:
       # One checksum-verified raylib source archive shared by every build
       # directory and restored from the Actions cache below.
       RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+      MANGO_CC: ${{ matrix.cc }}
 
     steps:
       # Check out the repository so the runner has access to the source code.
@@ -147,7 +165,7 @@ jobs:
       # ── Windows dependency install ──────────────────────────────────────────
       # MSYS2 is pre-installed on windows-latest runners. We use the
       # msys2/setup-msys2 action to configure the UCRT64 environment and
-      # install MinGW-w64 gcc and the pinned-source build tools.
+      # install the MinGW-w64 compiler and the pinned-source build tools.
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
@@ -160,12 +178,16 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
+          packages="make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-make"
+          if [ "$MANGO_CC" = clang ]; then
+            packages="$packages mingw-w64-ucrt-x86_64-clang"
+          fi
           # Mirrors can time out after partially caching a transaction. Retry
           # without bypassing package signatures or swallowing final failure.
           for attempt in 1 2 3; do
-            if pacman --noconfirm -S --needed make mingw-w64-ucrt-x86_64-gcc \
-              mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-cmake \
-              mingw-w64-ucrt-x86_64-make; then exit 0; fi
+            # shellcheck disable=SC2086 # intentional word splitting of package list
+            if pacman --noconfirm -S --needed $packages; then exit 0; fi
           done
           exit 1
 
@@ -196,6 +218,8 @@ jobs:
         if: matrix.target == 'native' && runner.os == 'Linux'
         run: make test
 
+      # The real macOS desktop backend runs in the separate "Desktop backend"
+      # job below; this gate keeps the deterministic software backend.
       - name: Software-rendered tests (macOS)
         if: runner.os == 'macOS'
         run: make test OUTDIR=out/headless RAYLIB_PLATFORM=memory
@@ -237,23 +261,28 @@ jobs:
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make CC=gcc
+        run: make CC="$MANGO_CC"
 
       - name: Software-rendered tests (Windows)
         if: runner.os == 'Windows'
-        timeout-minutes: 3
+        timeout-minutes: 5
         shell: msys2 {0}
-        run: make test CC=gcc OUTDIR=out/headless RAYLIB_PLATFORM=memory
+        run: make test CC="$MANGO_CC" OUTDIR=out/headless RAYLIB_PLATFORM=memory
+
+      - name: Validate levels (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make validate-levels
 
       - name: Build editor (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make editor CC=gcc
+        run: make editor CC="$MANGO_CC"
 
       - name: Software-rendered smoke (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make smoke CC=gcc OUTDIR=out/headless RAYLIB_PLATFORM=memory SMOKE_FRAMES=5 SMOKE_SEED=1
+        run: make smoke CC="$MANGO_CC" OUTDIR=out/headless RAYLIB_PLATFORM=memory SMOKE_FRAMES=5 SMOKE_SEED=1
 
       # ── Compile (WebAssembly) ───────────────────────────────────────────────
       # Uses the 'web' Makefile target with emcc. Assets are bundled into
@@ -279,12 +308,12 @@ jobs:
         run: make dist-native
 
       - name: Package release archive (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.package
         shell: msys2 {0}
         env:
           RELEASE_PLATFORM: ${{ matrix.artifact }}
           RELEASE_DLL_DIR: /ucrt64/bin
-        run: make dist-native CC=gcc
+        run: make dist-native CC="$MANGO_CC"
 
       # dist-wasm depends on web, so this reuses the verified build above.
       - name: Package release archive (WebAssembly)
@@ -298,12 +327,142 @@ jobs:
       # Upload the standalone zip as a workflow artifact. retention-days: 1 keeps
       # PR build storage low; releases immediately reattach the zip assets.
       - name: Upload release archive
+        if: matrix.package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.artifact }}.zip
           if-no-files-found: error
           retention-days: 1
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # DESKTOP BACKEND JOB
+  # The gating build legs above test macOS and Windows on raylib's Memory
+  # backend. This job runs the same suites on the real GLFW/OpenGL backend:
+  # macOS runners have a window server, and Windows uses Mesa's llvmpipe
+  # software OpenGL as an opengl32.dll drop-in beside the binaries. Runner audio devices
+  # are not guaranteed. Kept separate (and out of the release `needs`) so its
+  # results are visible before the owner decides to make it a required check.
+  # ────────────────────────────────────────────────────────────────────────────
+  desktop-backend:
+    name: Desktop backend (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macOS arm64
+            extra_cflags: -Werror
+          - os: windows-latest
+            platform: Windows x86_64 Mesa
+            extra_cflags: ''   # GCC -Wformat-truncation; see the build matrix
+
+    env:
+      EXTRA_CFLAGS: ${{ matrix.extra_cflags }}
+      RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        if: runner.os != 'Windows'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Cache pinned raylib source archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/raylib
+          key: raylib-source-${{ runner.os }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+
+      - name: Install Node.js for host contracts
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26.9.0'
+
+      - name: Install MSYS2 (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: inherit
+
+      - name: Download Windows toolchain and build tools
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          for attempt in 1 2 3; do
+            if pacman --noconfirm -S --needed make mingw-w64-ucrt-x86_64-gcc \
+              mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-cmake \
+              mingw-w64-ucrt-x86_64-make; then exit 0; fi
+          done
+          exit 1
+
+      # Third-party Actions are allowlisted for this repository, so Mesa is
+      # fetched directly from the pinned mesa-dist-win release and checked
+      # against its published SHA-256. Windows loads opengl32.dll from the
+      # executable's directory first, so the drop-in only affects out/.
+      - name: Install Mesa software OpenGL next to the binaries (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          MESA_VERSION: 26.0.3
+          MESA_SHA256: de1ec45c906164de2c046288a8969e83cf2d51d031dc8dfd1f9371bb31cd6755
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'mesa.7z'
+          $url = "https://github.com/pal1000/mesa-dist-win/releases/download/$env:MESA_VERSION/mesa3d-$env:MESA_VERSION-release-msvc.7z"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $hash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          if ($hash -ne $env:MESA_SHA256) { throw "Mesa archive checksum mismatch: $hash" }
+          $mesa = Join-Path $env:RUNNER_TEMP 'mesa'
+          7z x $archive "-o$mesa" -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "7z failed with $LASTEXITCODE" }
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          Copy-Item -Path (Join-Path $mesa 'x64\*.dll') -Destination out
+          if (-not (Test-Path out\opengl32.dll)) { throw 'Mesa opengl32.dll missing' }
+          "GALLIUM_DRIVER=llvmpipe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # Windows scripted smoke has no OpenGL dependency, so it runs first on
+      # the deterministic Memory backend.
+      - name: Scripted smoke scenarios (Windows, Memory backend)
+        if: runner.os == 'Windows'
+        timeout-minutes: 15
+        shell: msys2 {0}
+        run: make scripted-smoke CC=gcc OUTDIR=out/headless RAYLIB_PLATFORM=memory SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
+
+      - name: Desktop tests (macOS)
+        if: runner.os == 'macOS'
+        timeout-minutes: 15
+        run: make test
+
+      - name: Desktop smoke and scripted scenarios (macOS)
+        if: runner.os == 'macOS'
+        timeout-minutes: 15
+        run: |
+          make smoke SMOKE_FRAMES=5 SMOKE_SEED=1
+          make scripted-smoke SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
+
+      - name: Desktop tests (Windows, Mesa)
+        if: runner.os == 'Windows'
+        timeout-minutes: 15
+        shell: msys2 {0}
+        run: make test CC=gcc
+
+      - name: Desktop smoke and scripted scenarios (Windows, Mesa)
+        if: runner.os == 'Windows'
+        timeout-minutes: 15
+        shell: msys2 {0}
+        run: |
+          make smoke CC=gcc SMOKE_FRAMES=5 SMOKE_SEED=1
+          make scripted-smoke CC=gcc SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
 
   # ────────────────────────────────────────────────────────────────────────────
   # RELEASE JOB
