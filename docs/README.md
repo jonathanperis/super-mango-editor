@@ -99,8 +99,8 @@ for the CI-authoritative WebAssembly verification contract.
 
 ## Deployment and Analytics
 
-`docs.yml` checks relevant pull requests (including source, level, root-doc and
-workflow changes). It runs drift, frozen install, Astro lint, dependency audit,
+`docs.yml` checks every `main` push and relevant pull requests (including
+source, level, root-doc and workflow changes). It runs drift, frozen install, Astro lint, dependency audit,
 build and built-site validation. It does not deploy.
 
 `deploy.yml` runs after a successful same-repository main push/manual Build &

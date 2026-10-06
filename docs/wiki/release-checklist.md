@@ -85,7 +85,7 @@ Before creating a release, confirm checks for the intended source commit are gre
 
 - Build & Release
 - CodeQL
-- Docs (relevant PR check or an explicit manual run; it does not run on main pushes)
+- Docs (runs on every `main` push; PRs run it only for docs-related paths, while Build & Release's `Docs drift` job always runs)
 - Deploy to GitHub Pages
 
 Publishing rules:

@@ -294,7 +294,7 @@ Four GitHub Actions workflows:
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
 | Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Linux x86_64, macOS arm64, Windows x86_64 and WebAssembly builds; releases only for `v*` tags or manual dispatch on `main` |
-| Docs | `docs.yml` | Relevant pull requests, manual | Source/content drift, frozen Bun install, Astro lint/build, dependency audit and built-site checks |
+| Docs | `docs.yml` | Push to `main`, relevant pull requests, manual | Source/content drift, frozen Bun install, Astro lint/build, dependency audit and built-site checks |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis |
 | Deploy Pages | `deploy.yml` | Successful same-repository main push/manual Build & Release run | Builds/checks docs at the artifact's commit, copies matching WebAssembly files and deploys Pages |
 
