@@ -65,6 +65,10 @@ def main() -> None:
     else:
         command += ["-DPLATFORM=" + ("Memory" if args.platform == "memory" else "Desktop"),
                     "-DCMAKE_C_COMPILER=" + args.cc]
+        if args.mode == "release" and os.name != "nt":
+            # Release executables link as PIE on Linux; the static library
+            # must be position independent regardless of compiler defaults.
+            command += ["-DCMAKE_POSITION_INDEPENDENT_CODE=ON"]
     # config.h guards individual flags. Keep all upstream defaults, especially
     # EndDrawing's automatic polling/pacing; CMake's customization mode enables
     # additional features unless every option is explicitly pinned.
