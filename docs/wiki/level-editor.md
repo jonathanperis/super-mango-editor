@@ -59,15 +59,19 @@ Dragging keeps the point you grabbed under the cursor and starts only after the
 cursor moves a few pixels, so a plain click selects without moving anything.
 Patrolling enemies and saws carry their patrol range with them, and positions
 are clamped so a drag cannot produce a level that fails validation. While the
-button is held, keyboard commands (Undo, Delete, Paste…) wait; Esc cancels the
-move and puts the entity back.
+button is held, keyboard commands (Undo, Delete, Paste…) and right-click
+quick-delete wait; Esc cancels the move and puts the entity back. Axe traps and
+saws store `y = 0` for "default height", so dragging one to the very top row
+stores 1 px instead.
 
 Spike blocks and rail-mode float platforms refer to rails by position, so the
 editor refuses to delete a rail that one of them rides (the status bar names
 what still uses it). Deleting an unused rail renumbers the references to later
 rails, and undo restores the original numbering.
 
-Delete removes the selection; right-click quick-deletes an entity. Esc cancels a
+Delete removes the selection; right-click quick-deletes an entity. Clicks pick
+the entity drawn on top: the hit test walks the exact reverse of the canvas
+draw order. Esc cancels a
 field edit, returns to Select, or clears the selection. Printable shortcuts do
 not switch tools while a text field is active. File/history shortcuts accept
 Command on macOS as well as Ctrl.
@@ -142,8 +146,8 @@ The Level Config section in the right panel exposes the top-level TOML scalars:
 
 | Action | Input |
 |--------|-------|
-| Pan left / right | Mouse wheel over the canvas |
-| Pan up / down | `Shift + Mouse Wheel` over the canvas (at 3× and 5× the 300 px world is taller than the canvas) |
+| Pan left / right | Mouse wheel over the canvas, or a trackpad's sideways swipe |
+| Pan up / down | `Shift + Mouse Wheel` over the canvas (at 3× and 5× the 300 px world is taller than the canvas); macOS reports Shift+wheel as horizontal scroll, which also pans up/down here |
 | Cycle zoom | Toolbar dropdown (zooms around the canvas centre) or `Ctrl + Mouse Wheel` (zooms around the cursor; 1×, 2×, 3×, 5×) |
 | Snap a dragged entity | Hold Shift while dragging (48px grid) |
 | Toggle grid | `G` |
@@ -178,8 +182,11 @@ Only one entity can be in the clipboard at a time. The pasted entity appears off
 
 Place and Paste clamp new entities into the world (patrol ranges included, and a
 pasted spike block's `t_offset` wraps onto its rail). A new spike block attaches
-to the rail nearest the click. When an entity cannot be added — its array is
-full, its rail does not exist (a clipboard copied from another level), or the
+to the rail nearest the click. A copied rail rider remembers the rail it rode
+(its shape and position, not its index), so a paste re-attaches it to that rail
+even after other rails were deleted. When an entity cannot be added — its array
+is full, its rail is not in this level (a clipboard copied from another level),
+or the
 result would fail validation, such as a checkpoint behind the player start — the
 status bar explains why and the level is left unchanged. If a hand-edited file
 or a property field leaves the level invalid, the canvas pauses and names the

@@ -25,7 +25,8 @@ typedef struct {
     int key, binding, mods, repeat;
     int button, device, focused;
     int x, y;                 /* already converted to logical canvas pixels */
-    float wheel;
+    float wheel;               /* vertical scroll; + is away from the user  */
+    float wheel_x;             /* horizontal scroll (trackpads, tilt wheels) */
     char text[8];              /* one NUL-terminated UTF-8 codepoint */
 } InputEvent;
 

@@ -18,6 +18,24 @@
  *
  * Stores the entity type and a PlacementData union so paste can recreate it.
  */
+/*
+ * rider_rail_index — Point at the rail_index of an entity that rides a rail
+ * (every spike block; float platforms in RAIL mode), or return NULL.
+ */
+static int *rider_rail_index(EntityType type, PlacementData *d)
+{
+    if (type == ENT_SPIKE_BLOCK) return &d->spike_block.rail_index;
+    if (type == ENT_FLOAT_PLATFORM && d->float_platform.mode == FLOAT_PLATFORM_RAIL)
+        return &d->float_platform.rail_index;
+    return NULL;
+}
+
+static int same_rail(const RailPlacement *a, const RailPlacement *b)
+{
+    return a->layout == b->layout && a->x == b->x && a->y == b->y &&
+           a->w == b->w && a->h == b->h && a->end_cap == b->end_cap;
+}
+
 void editor_copy_selected(EditorState *es)
 {
     if (!es) return;
@@ -28,6 +46,13 @@ void editor_copy_selected(EditorState *es)
     es->clipboard_data = editor_snapshot_entity(&es->level, es->selection.type,
                                                 es->selection.index);
     es->has_clipboard = 1;
+
+    /* Remember the rail itself, not just its position in the rails array. */
+    int *rail_index = rider_rail_index(es->clipboard_type, &es->clipboard_data);
+    es->clipboard_has_rail = rail_index && *rail_index >= 0 &&
+                             *rail_index < es->level.rail_count;
+    if (es->clipboard_has_rail)
+        es->clipboard_rail = es->level.rails[*rail_index];
 }
 
 /*
@@ -109,8 +134,13 @@ static void offset_pasted_copy(EntityType type, PlacementData *d)
         d->fire_flame.x += PASTE_OFFSET;
         break;
     case ENT_FLOAT_PLATFORM:
-        d->float_platform.x += PASTE_OFFSET;
-        d->float_platform.y += PASTE_OFFSET;
+        /* RAIL mode ignores x/y (the rail positions it): move along it. */
+        if (d->float_platform.mode == FLOAT_PLATFORM_RAIL) {
+            d->float_platform.t_offset += PASTE_OFFSET / (float)RAIL_TILE_W;
+        } else {
+            d->float_platform.x += PASTE_OFFSET;
+            d->float_platform.y += PASTE_OFFSET;
+        }
         break;
     case ENT_BRIDGE:
         d->bridge.x += PASTE_OFFSET;
@@ -180,6 +210,23 @@ void editor_paste_clipboard(EditorState *es)
 
     type = es->clipboard_type;
     d = es->clipboard_data;
+
+    /* Re-attach a rail rider to the rail it was copied from, found by its
+     * shape and position.  Without that rail in this level, refuse instead
+     * of silently riding whichever rail now has the old index. */
+    int *rail_index = rider_rail_index(type, &d);
+    if (rail_index) {
+        int found = -1;
+        for (int i = 0; es->clipboard_has_rail && i < es->level.rail_count; i++) {
+            if (same_rail(&es->level.rails[i], &es->clipboard_rail)) { found = i; break; }
+        }
+        if (found < 0) {
+            editor_set_status(es, "Paste blocked: the copied %s's rail is not in this level",
+                              editor_entity_type_name(type));
+            return;
+        }
+        *rail_index = found;
+    }
     offset_pasted_copy(type, &d);
     editor_clamp_placement(&es->level, type, &d);
     (void)editor_add_placement(es, type, &d, "paste");
