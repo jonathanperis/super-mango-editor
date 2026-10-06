@@ -73,7 +73,7 @@ int start_menu_init(StartMenu *menu)
     menu->frame_target = LoadRenderTexture(MENU_GAME_W, MENU_GAME_H);
     if (!IsRenderTextureValid(menu->frame_target)) return -1;
     SetTextureFilter(menu->frame_target.texture, TEXTURE_FILTER_POINT);
-    menu->font = font_load("assets/fonts/round9x13.ttf", 13);
+    menu->font = font_load();
     if (!menu->font) return -1;
     menu->logo_tex = texture_load("assets/sprites/screens/start_menu_logo.png");
     menu->snd_confirm = sound_load("assets/sounds/screens/confirm_ui.wav");
@@ -153,7 +153,7 @@ int start_menu_frame(StartMenu *menu)
     Color color = hovering ? (Color){74,144,217,255} : (Color){77,77,77,255};
     DrawRectangle(BTN_X, BTN_Y, BTN_W, BTN_H, color);
     DrawRectangleLines(BTN_X, BTN_Y, BTN_W, BTN_H, (Color){224, 224, 224, 255});
-    centered(menu->font, "Play", BTN_X + BTN_W/2, BTN_Y + 7, WHITE);
+    centered(menu->font, "Play", BTN_X + BTN_W/2, BTN_Y + (BTN_H-TEXT_FONT_SIZE)/2, WHITE);
     char text[160];
     Color grey = {120,120,120,255};
     snprintf(text,sizeof(text),"Level: < %s >",menu->catalog->levels[menu->selected_level].display_name);
@@ -169,7 +169,7 @@ int start_menu_frame(StartMenu *menu)
     centered(menu->font,"Arrows/D-pad: level  Enter/A: play  Esc: exit",MENU_GAME_W/2,250,grey);
     if (menu->settings_menu) {
         DrawRectangle(125,270,150,24,(Color){50,65,85,255});
-        centered(menu->font,"Settings (F1 / Y)",MENU_GAME_W/2,274,WHITE);
+        centered(menu->font,"Settings (F1 / Y)",MENU_GAME_W/2,270+(24-TEXT_FONT_SIZE)/2,WHITE);
     }
     settings_menu_render(menu->settings_menu,menu->profile,menu->font);
     display_present(menu->frame_target);

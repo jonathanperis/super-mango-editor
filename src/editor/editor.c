@@ -21,7 +21,7 @@ int editor_init(EditorState *es, int hidden)
     es->frame_target = LoadRenderTexture(EDITOR_W, EDITOR_H);
     if (!IsRenderTextureValid(es->frame_target)) goto fail;
     SetTextureFilter(es->frame_target.texture, TEXTURE_FILTER_POINT);
-    es->font = font_load("assets/fonts/round9x13.ttf", 13);
+    es->font = font_load();
     if (!es->font) goto fail;
 
     /* Camera coordinates describe the level, while toolbar/panel coordinates

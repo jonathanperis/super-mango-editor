@@ -134,7 +134,7 @@ void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
     if (menu->ui.font != font) { ui_cleanup(&menu->ui); ui_init(&menu->ui, font); }
     if (!menu->open) {
         DrawRectangle(8, 278, 384, 18, (Color){10,12,18,255});
-        ui_label_color(&menu->ui,12,281,profile->error ? "Profile issue - F1: details" :
+        ui_label_color(&menu->ui,12,278+(18-TEXT_FONT_SIZE)/2,profile->error ? "Profile issue - F1: details" :
                        unavailable ? "Binding unavailable - F1: remap" : "Saving profile...",
                        (Color){255,190,90,255});
         return;
@@ -166,7 +166,8 @@ void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
         if (row == menu->selected) {
             DrawRectangle(16, y-1, 368, 16, (Color){40,70,105,255});
         }
-        ui_label(&menu->ui, 20, y, label);
+        /* Center the label inside the 16 px highlight that starts at y-1. */
+        ui_label(&menu->ui, 20, y - 1 + (16-TEXT_FONT_SIZE)/2, label);
     }
     const char *status = menu->message[0] ? menu->message :
         profile->error ? profile->status :

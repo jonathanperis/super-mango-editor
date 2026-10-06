@@ -26,9 +26,9 @@ const char *hud_checkpoint_feedback_label(int kind, int index)
 
 int hud_init(Hud *hud, Texture2D *star, Texture2D *player)
 {
-    hud->font = font_load("assets/fonts/round9x13.ttf", 13);
+    hud->font = font_load();
     if (!hud->font) {
-        fprintf(stderr, "Failed to load assets/fonts/round9x13.ttf\n");
+        fprintf(stderr, "Failed to prepare raylib's default font\n");
         return -1;
     }
     hud->star_tex = star;
@@ -57,7 +57,7 @@ void hud_render(const Hud *hud, int hearts, int lives, int score,
     sprite_draw(hud->player_icon, &src, &dst, 0, SPRITE_NORMAL, WHITE);
     char text[32];
     snprintf(text, sizeof(text), "x%d", lives);
-    int text_y = HUD_MARGIN + (HUD_ROW_H-13)/2;
+    int text_y = HUD_MARGIN + (HUD_ROW_H-TEXT_FONT_SIZE)/2;
     font_draw(hud->font, text, icon_x+HUD_ICON_W+4, text_y, WHITE);
     snprintf(text, sizeof(text), "SCORE: %d", score);
     /* Subtract the text width, gap and icon width from the right margin. */
@@ -74,7 +74,7 @@ void hud_render(const Hud *hud, int hearts, int lives, int score,
             snprintf(text, sizeof(text), "%s CP %d", label, checkpoint_index + 1);
         else
             snprintf(text, sizeof(text), "%s", label);
-        font_draw(hud->font, text, HUD_MARGIN, GAME_H-HUD_MARGIN-13, WHITE);
+        font_draw(hud->font, text, HUD_MARGIN, GAME_H-HUD_MARGIN-TEXT_FONT_SIZE, WHITE);
     }
 }
 

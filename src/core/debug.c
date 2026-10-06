@@ -166,17 +166,17 @@ static void draw_collision_boxes(const GameState *gs, int cam)
     /* HUD outlines intentionally use camera=0 and the HUD's measured text. */
     for (int i=0;i<gs->hearts;i++) outline((IntRect){HUD_MARGIN+i*(HUD_HEART_SIZE+HUD_HEART_GAP),HUD_MARGIN,HUD_HEART_SIZE,HUD_HEART_SIZE},0,WHITE);
     int icon_x=HUD_MARGIN+MAX_HEARTS*(HUD_HEART_SIZE+HUD_HEART_GAP)+6;
-    int y=HUD_MARGIN+(HUD_ROW_H-13)/2;
+    int y=HUD_MARGIN+(HUD_ROW_H-TEXT_FONT_SIZE)/2;
     outline((IntRect){icon_x,y,HUD_ICON_W,HUD_ICON_H},0,WHITE);
     char text[32];
     int width = 0;
     snprintf(text,sizeof(text),"x%d",gs->lives);
     font_measure(gs->hud.font,text,&width,NULL);
-    outline((IntRect){icon_x+HUD_ICON_W+4,y,width,13},0,WHITE);
+    outline((IntRect){icon_x+HUD_ICON_W+4,y,width,TEXT_FONT_SIZE},0,WHITE);
     snprintf(text,sizeof(text),"SCORE: %d",gs->score);
     font_measure(gs->hud.font,text,&width,NULL);
     int score_x=GAME_W-HUD_MARGIN-width-3-HUD_COIN_ICON_SIZE;
-    outline((IntRect){score_x,y,width,13},0,WHITE);
+    outline((IntRect){score_x,y,width,TEXT_FONT_SIZE},0,WHITE);
     outline((IntRect){score_x+width+3,HUD_MARGIN+(HUD_ROW_H-HUD_COIN_ICON_SIZE)/2,HUD_COIN_ICON_SIZE,HUD_COIN_ICON_SIZE},0,WHITE);
 }
 
