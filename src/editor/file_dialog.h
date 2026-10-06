@@ -11,6 +11,9 @@
  */
 #pragma once
 
+#include <stdio.h> /* FILE */
+
+#define FILE_DIALOG_INVALID_PATH (-2) /* picked name contains a line break */
 #define FILE_DIALOG_ERROR     (-1)
 #define FILE_DIALOG_CANCELLED  0
 #define FILE_DIALOG_SELECTED   1
@@ -38,6 +41,30 @@ int file_dialog_save(char *buf, int buf_size);
  * errors return -1 without granting a destructive action. */
 int dialog_choice(const char *title, const char *message, const char *const *labels,
                   int count, int default_index, int cancel_index, int *selected);
+
+/*
+ * Quote text as one literal single-quoted argument.  Only one of these is
+ * used on a given platform, but both are compiled everywhere so tests on
+ * any OS can check them.
+ *   dialog_quote_posix      : sh/osascript/zenity command lines
+ *   dialog_quote_powershell : PowerShell scripts; also doubles the Unicode
+ *                             quotation marks PowerShell treats as '
+ * Returns a malloc'd string the caller frees, or NULL when out of memory.
+ */
+char *dialog_quote_posix(const char *text);
+char *dialog_quote_powershell(const char *text);
+
+/*
+ * file_dialog_read_path — Read the one line a native picker prints.
+ *
+ * Stores the path without its line ending in buf.  Returns
+ * FILE_DIALOG_SELECTED, FILE_DIALOG_CANCELLED (no output),
+ * FILE_DIALOG_ERROR (longer than buf), or FILE_DIALOG_INVALID_PATH when the
+ * file name itself contains a line break: the picker prints such a name
+ * across several lines, and keeping only the first would silently open or
+ * overwrite a different file.  Reads fp to its end; does not close it.
+ */
+int file_dialog_read_path(FILE *fp, char *buf, int buf_size);
 
 /* Deterministic picker seam used by editor workflow tests. */
 void file_dialog_test_set_open_result(int result, const char *path);
