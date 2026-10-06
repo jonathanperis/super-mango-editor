@@ -15,7 +15,6 @@
  */
 
 #include <math.h>    /* floorf, fmodf, isfinite, roundf */
-#include <stdio.h>   /* fprintf for capacity warnings */
 #include <string.h>  /* memcmp, memset */
 
 #include "tools.h"
@@ -28,11 +27,20 @@
 #include "../game.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE, WORLD_W,
                         FLOOR_GAP_W, MAX_* constants                      */
 
+/*
+ * tools_can_hit_test --- Canvas clicks need a level that passes validation.
+ *
+ * The canvas stops drawing an invalid level (a hand-edited tile count could
+ * make its loops enormous), so clicking would act on invisible entities.
+ * The editor's own actions never produce such a level; it only arrives via
+ * a hand-edited file or a property field.  Tell the designer how to recover.
+ */
 static int tools_can_hit_test(EditorState *es)
 {
     char error[128];
     if (level_validate_runtime(&es->level, error, sizeof(error)) == 0) return 1;
-    editor_set_status(es, "Correct properties or Undo: %s", error);
+    editor_set_status(es, "Canvas paused: %s. Fix it in the side panel or press Ctrl+Z",
+                      error);
     return 0;
 }
 
@@ -418,6 +426,7 @@ static void delete_entity(EditorState *es, EntityType type, int index)
 
     /* Snapshot entity data before deletion for undo */
     before = editor_snapshot_entity(level, type, index);
+    int was_valid = level_validate_runtime(level, NULL, 0) == 0;
 
     if (editor_entity_type_is_singleton(type)) {
         /*
@@ -430,6 +439,24 @@ static void delete_entity(EditorState *es, EntityType type, int index)
         (void)editor_entity_write(level, type, 0, &cleared);
     } else if (editor_entity_remove(level, type, index) != 0) {
         return;
+    }
+
+    /*
+     * A delete must not turn a valid level into one the canvas refuses to
+     * draw (e.g. removing the player spawn moves the effective start past a
+     * checkpoint).  Put the entity back and explain instead.
+     */
+    {
+        char error[128];
+        if (was_valid && level_validate_runtime(level, error, sizeof(error)) != 0) {
+            if (editor_entity_type_is_singleton(type))
+                (void)editor_entity_write(level, type, 0, &before);
+            else
+                (void)editor_entity_insert(level, type, index, &before);
+            editor_set_status(es, "Cannot delete %s: %s",
+                              editor_entity_type_name(type), error);
+            return;
+        }
     }
 
     /* Push undo command — CMD_DELETE stores "before" so undo re-inserts */
@@ -621,43 +648,82 @@ static int default_placement(EntityType type, float world_x, float world_y,
 }
 
 /*
- * place_entity --- Add one entity of the palette type at (world_x, world_y).
- *
- * Checks capacity, builds the default placement, appends it with the shared
- * editor_entity_insert helper, and pushes a CMD_PLACE undo command.  The two
- * singletons are moved instead and record a CMD_MOVE.
+ * rail_rider_index --- The rail a placement rides, or -1 if it rides none.
+ * Spike blocks always ride a rail; float platforms only in RAIL mode.
  */
-static void place_entity(EditorState *es, float world_x, float world_y)
+static int rail_rider_index(EntityType type, const PlacementData *pd)
 {
-    LevelDef *level = &es->level;
-    EntityType type  = es->palette_type;
-    int singleton = editor_entity_type_is_singleton(type);
-    PlacementData before;
-    PlacementData after;
-    Command cmd;
-    int index;
+    if (type == ENT_SPIKE_BLOCK) return pd->spike_block.rail_index;
+    if (type == ENT_FLOAT_PLATFORM && pd->float_platform.mode == FLOAT_PLATFORM_RAIL)
+        return pd->float_platform.rail_index;
+    return -1;
+}
 
+int editor_add_placement(EditorState *es, EntityType type,
+                         const PlacementData *pd, const char *action)
+{
+    LevelDef *level;
+    int singleton;
+    int count;
+    int index;
+    int rail_index;
+    PlacementData before;
+    Command cmd;
+    char error[128];
+
+    if (!es || !pd || type < 0 || type >= ENT_COUNT) return -1;
+    if (!action) action = "add";
+    level = &es->level;
+    singleton = editor_entity_type_is_singleton(type);
     editor_selection_reconcile(es);
 
     /* Check capacity — every entity type has a fixed-size array */
-    int count = editor_entity_count(level, type);
-    int max   = editor_entity_capacity(type);
-    if (!singleton && count >= max) {
-        fprintf(stderr, "Warning: cannot place more — %d/%d capacity reached\n",
-                count, max);
-        return;
+    count = editor_entity_count(level, type);
+    if (!singleton && count >= editor_entity_capacity(type)) {
+        editor_set_status(es, "Cannot %s %s: limit of %d reached", action,
+                          editor_entity_type_name(type),
+                          editor_entity_capacity(type));
+        return -1;
     }
 
-    if (!default_placement(type, world_x, world_y, &after)) return;
+    /* A rail rider needs an existing rail; say so before validation would
+     * report it in schema terms. */
+    rail_index = rail_rider_index(type, pd);
+    if (rail_index >= 0 || type == ENT_SPIKE_BLOCK) {
+        if (level->rail_count == 0) {
+            editor_set_status(es, "Cannot %s %s: place a rail first", action,
+                              editor_entity_type_name(type));
+            return -1;
+        }
+        if (rail_index < 0 || rail_index >= level->rail_count) {
+            editor_set_status(es, "Cannot %s %s: rail %d does not exist in this level",
+                              action, editor_entity_type_name(type), rail_index);
+            return -1;
+        }
+    }
 
     memset(&before, 0, sizeof(before));
     if (singleton) {
         index = 0;
         before = editor_snapshot_entity(level, type, 0);
-        (void)editor_entity_write(level, type, 0, &after);
+        (void)editor_entity_write(level, type, 0, pd);
     } else {
         index = count;  /* append: new entities draw on top of older ones */
-        if (editor_entity_insert(level, type, index, &after) != 0) return;
+        if (editor_entity_insert(level, type, index, pd) != 0) return -1;
+    }
+
+    /*
+     * Callers clamp positions into the world, but some rules involve other
+     * entities (a checkpoint must be after the player start and must not
+     * share an x with another checkpoint).  Undo the change rather than
+     * leave a level the canvas refuses to draw.
+     */
+    if (level_validate_runtime(level, error, sizeof(error)) != 0) {
+        if (singleton) (void)editor_entity_write(level, type, 0, &before);
+        else (void)editor_entity_remove(level, type, index);
+        editor_set_status(es, "Cannot %s %s here: %s", action,
+                          editor_entity_type_name(type), error);
+        return -1;
     }
 
     /*
@@ -669,14 +735,61 @@ static void place_entity(EditorState *es, float world_x, float world_y)
     cmd.entity_type  = (int)type;
     cmd.entity_index = index;
     cmd.before       = before;
-    cmd.after        = after;
+    cmd.after        = *pd;
     undo_push(es->undo, cmd);
 
-    /* Select the newly placed entity for immediate inspection */
+    /* Select the new entity for immediate inspection */
     es->selection.type  = type;
     es->selection.index = index;
     editor_refresh_dirty(es);
     if (type == ENT_CHECKPOINT) editor_set_status(es, "Checkpoint placed");
+    return 0;
+}
+
+/*
+ * nearest_rail --- Index of the rail closest to (x, y), or -1 when the
+ * level has none.  Distance is measured to the rail's rectangle, so a click
+ * anywhere on or inside a rail loop picks that rail.
+ */
+static int nearest_rail(const LevelDef *level, float x, float y)
+{
+    int best = -1;
+    float best_distance = 0.0f;
+
+    for (int i = 0; i < editor_entity_count(level, ENT_RAIL); i++) {
+        EditorRect r;
+        if (!editor_entity_bounds(level, ENT_RAIL, i, &r)) continue;
+        float dx = clampf(x, r.x, r.x + r.w) - x;
+        float dy = clampf(y, r.y, r.y + r.h) - y;
+        float distance = dx * dx + dy * dy;
+        if (best < 0 || distance < best_distance) {
+            best = i;
+            best_distance = distance;
+        }
+    }
+    return best;
+}
+
+/*
+ * place_entity --- Add one entity of the palette type at (world_x, world_y).
+ *
+ * Builds the default placement, attaches spike blocks to the nearest rail,
+ * clamps the result into the world, and hands it to editor_add_placement,
+ * which checks capacity and validation and records the undo command.
+ */
+static void place_entity(EditorState *es, float world_x, float world_y)
+{
+    EntityType type = es->palette_type;
+    PlacementData pd;
+
+    if (!default_placement(type, world_x, world_y, &pd)) return;
+    if (type == ENT_SPIKE_BLOCK) {
+        int rail = nearest_rail(&es->level, world_x, world_y);
+        /* With no rail at all, editor_add_placement explains the refusal. */
+        pd.spike_block.rail_index = rail >= 0 ? rail : 0;
+    }
+    editor_clamp_placement(&es->level, type, &pd);
+    (void)editor_add_placement(es, type, &pd, "place");
 }
 
 /* ================================================================== */

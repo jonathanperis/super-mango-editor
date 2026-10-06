@@ -70,6 +70,20 @@ void editor_clamp_placement(const LevelDef *level, EntityType type,
                             PlacementData *pd);
 
 /*
+ * editor_add_placement --- Add one placement as a single undoable step.
+ *
+ * Shared by Place and Paste.  Appends pd (or moves a singleton), refuses
+ * with a status-bar message when the array is full, when a rail rider's
+ * rail does not exist, or when the result would fail level validation
+ * (the level is left unchanged).  On success it records the undo command,
+ * selects the new entity and returns 0; otherwise returns -1.
+ *
+ * action : verb for messages, e.g. "place" or "paste".
+ */
+int editor_add_placement(EditorState *es, EntityType type,
+                         const PlacementData *pd, const char *action);
+
+/*
  * tools_right_click --- Handle a right-click at world position.
  *
  * Convenience shortcut: right-clicking any entity deletes it regardless
