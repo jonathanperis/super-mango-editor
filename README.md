@@ -138,7 +138,7 @@ make run-editor CC=clang              # build and run the level editor
 make test CC=clang                    # 15 native regression tests (binaries) plus Python/JavaScript host checks
 make validate-levels                  # validate campaign, root levels and levels/labs/
 make web                              # build to WebAssembly (requires Emscripten)
-make clean                            # remove default out/ and dist/ build artifacts
+make clean                            # remove out/, out-sanitize/ and dist/ build artifacts
 ```
 
 > The Makefile replaces GNU Make's built-in `CC=cc` with clang; explicit `CC=gcc`

@@ -724,20 +724,7 @@ dist-native: release asset-budget
 dist-wasm: asset-budget
 	python3 tools/package_release.py --wasm --out-dir "$(OUTDIR)" --platform "$${RELEASE_PLATFORM:-super-mango-wasm}" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-wasm}.zip" --raylib-build "$(WEB_RAYLIB_BUILD)"
 
+# Every build product lives under OUTDIR/DISTDIR (objects in $(OBJDIR)), plus
+# the sibling sanitizer tree that `make sanitize` creates.
 clean:
-	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.d
-	rm -f $(SRCDIR)/collectibles/*.o $(SRCDIR)/collectibles/*.d
-	rm -f $(SRCDIR)/collision/*.o $(SRCDIR)/collision/*.d
-	rm -f $(SRCDIR)/core/*.o $(SRCDIR)/core/*.d
-	rm -f $(SRCDIR)/effects/*.o $(SRCDIR)/effects/*.d
-	rm -f $(SRCDIR)/entities/*.o $(SRCDIR)/entities/*.d
-	rm -f $(SRCDIR)/hazards/*.o $(SRCDIR)/hazards/*.d
-	rm -f $(SRCDIR)/input/*.o $(SRCDIR)/input/*.d
-	rm -f $(SRCDIR)/levels/*.o $(SRCDIR)/levels/*.d
-	rm -f $(SRCDIR)/player/*.o $(SRCDIR)/player/*.d
-	rm -f $(SRCDIR)/render/*.o $(SRCDIR)/render/*.d
-	rm -f $(SRCDIR)/screens/*.o $(SRCDIR)/screens/*.d
-	rm -f $(SRCDIR)/surfaces/*.o $(SRCDIR)/surfaces/*.d
-	rm -f $(EDITOR_DIR)/*.o $(EDITOR_DIR)/*.d
-	rm -f $(VENDOR_DIR)/*.o $(VENDOR_DIR)/*.d
-	rm -rf $(OUTDIR) $(DISTDIR)
+	rm -rf $(OUTDIR) $(OUTDIR)-sanitize $(DISTDIR)
