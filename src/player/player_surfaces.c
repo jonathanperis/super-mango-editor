@@ -27,7 +27,7 @@
 #define FLOAT_PLATFORM_STICK_TOL  16
 
 void player_resolve_floor_collision(Player *player,
-                                    const Bouncepad *bouncepads, int bouncepad_count,
+                                    const BouncepadList *bouncepad_lists, int bouncepad_list_count,
                                     const int *floor_gaps, int floor_gap_count,
                                     int *out_bounce_idx) {
     *out_bounce_idx = -1;
@@ -66,28 +66,32 @@ void player_resolve_floor_collision(Player *player,
         player->y = ground_snap;   /* snap to floor in all cases */
 
         int bounced = 0;
-        for (int i = 0; i < bouncepad_count; i++) {
-            const Bouncepad *bp = &bouncepads[i];
+        int flat_index = 0;   /* counts pads across all lists, in list order */
+        for (int l = 0; l < bouncepad_list_count && !bounced; l++) {
+            const BouncepadList *list = &bouncepad_lists[l];
+            for (int i = 0; i < list->count; i++, flat_index++) {
+                const Bouncepad *bp = &list->pads[i];
 
-            /*
-             * Horizontal overlap test: use the inset PHYS_PAD_X physics box
-             * so only the visible character art overlaps, not transparent padding.
-             */
-            int h_overlap = (player->x + player->w - PHYS_PAD_X > bp->x + BOUNCEPAD_ART_X) &&
-                            (player->x + PHYS_PAD_X < bp->x + BOUNCEPAD_ART_X + BOUNCEPAD_ART_W);
-            if (!h_overlap) continue;
+                /*
+                 * Horizontal overlap test: use the inset PHYS_PAD_X physics box
+                 * so only the visible character art overlaps, not transparent padding.
+                 */
+                int h_overlap = (player->x + player->w - PHYS_PAD_X > bp->x + BOUNCEPAD_ART_X) &&
+                                (player->x + PHYS_PAD_X < bp->x + BOUNCEPAD_ART_X + BOUNCEPAD_ART_W);
+                if (!h_overlap) continue;
 
-            /*
-             * The player's physics bottom has reached the floor inside the
-             * bouncepad's horizontal zone → launch them upward.
-             * BOUNCEPAD_VY (−875 px/s) is 75 % higher than the original
-             * −500 px/s jump impulse.
-             */
-            player->vy        = bouncepads[i].launch_vy;
-            player->on_ground = 0;
-            *out_bounce_idx   = i;
-            bounced           = 1;
-            break;   /* first pad wins */
+                /*
+                 * The player's physics bottom has reached the floor inside the
+                 * bouncepad's horizontal zone → launch them upward.
+                 * BOUNCEPAD_VY (−875 px/s) is 75 % higher than the original
+                 * −500 px/s jump impulse.
+                 */
+                player->vy        = bp->launch_vy;
+                player->on_ground = 0;
+                *out_bounce_idx   = flat_index;
+                bounced           = 1;
+                break;   /* first pad wins */
+            }
         }
 
         if (!bounced) {

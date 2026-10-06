@@ -111,6 +111,20 @@ typedef struct {
     BouncepadType pad_type;     /* GREEN / WOOD / RED — selects texture      */
 } Bouncepad;
 
+/*
+ * BouncepadList — a borrowed view of one bouncepad array and its length.
+ *
+ * GameState keeps medium, small and high pads in three separate arrays.
+ * Collision code receives them as a short list of these views instead of
+ * copying every pad into one combined scratch array each frame. A pad is
+ * identified by a "flat" index that counts through the lists in order:
+ * list 0's pads first, then list 1's, and so on.
+ */
+typedef struct {
+    const Bouncepad *pads;      /* first pad of the array (not owned)       */
+    int              count;     /* number of active pads in that array      */
+} BouncepadList;
+
 /* ------------------------------------------------------------------ */
 /* Function declarations                                               */
 /* ------------------------------------------------------------------ */
