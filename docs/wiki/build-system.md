@@ -61,8 +61,11 @@ silently linked. `vendor/raylib/README.md` records the source and patch provenan
 `RAYLIB_PLATFORM=memory` selects raylib's software framebuffer and miniaudio's
 null backend for explicit headless tests. Use a dedicated `OUTDIR`, such as
 `out/headless`; `release` and `dist-native` reject this backend. Linux CI keeps
-the desktop GLFW test path under Xvfb/Mesa; macOS/Windows CI uses Memory tests
-and separately builds/packages the desktop applications.
+the desktop GLFW test path under Xvfb/Mesa; the gating macOS/Windows legs use Memory
+tests and separately build/package the desktop applications. The non-gating
+`Desktop backend` job runs the same tests and smoke on real GLFW/OpenGL (macOS
+window server; Windows with a checksum-pinned Mesa llvmpipe `opengl32.dll`
+beside the binaries) until it proves stable enough to require.
 
 The vendored tomlc17 parser is based on upstream **R260821**. Its exact upstream
 commit and retained project-patch inventory are recorded in
@@ -469,7 +472,7 @@ cd /c/path/to/super-mango-editor
 make
 ```
 
-4. Run through `make run` / `make run-editor`, which puts the UCRT64 DLL directory on `PATH`, or ensure runtime DLLs are discoverable when launching directly. Current Windows release packaging bundles runtime DLLs. CI uses GCC (`CC=gcc`) in UCRT64; the local Clang commands above are also supported.
+4. Run through `make run` / `make run-editor`, which puts the UCRT64 DLL directory on `PATH`, or ensure runtime DLLs are discoverable when launching directly. Current Windows release packaging bundles runtime DLLs. CI builds and tests UCRT64 with both GCC (`CC=gcc`, release archives) and Clang (`CC=clang`).
 
 ---
 
@@ -479,7 +482,7 @@ Four GitHub Actions workflows handle automated builds and docs checks:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job; native game/editor tests, smoke and packaging; Linux sanitizers/scripted smoke; Linux/macOS level validation; WASM build/artifact/package checks. Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` |
+| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job; native game/editor tests, smoke and packaging (Windows with GCC and Clang); Linux sanitizers/scripted smoke; level validation on every native OS; WASM build/artifact/package checks; a separate `Desktop backend` job runs macOS and Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL. Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` |
 | Docs | `docs.yml` | Push to `main`, relevant pull requests, manual | `make docs-drift`, frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis |
 | Deploy | `deploy.yml` | Successful same-repository main push/manual Build & Release run | Builds/checks docs from the run's exact commit, copies matching WASM, HTTP-smokes the assembly and deploys `docs/out/` |
