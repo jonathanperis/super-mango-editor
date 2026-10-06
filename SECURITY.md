@@ -60,8 +60,10 @@ cannot be isolated, so the game treats stored values as untrusted input:
   out-of-range settings, invalid level keys and duplicate entries reject the
   whole profile. The game then runs with defaults for that session only and
   leaves the stored text untouched (it is never overwritten).
-- The replay intent is removed as soon as it is read and is passed as a
-  `--level` argument. It must fit the fixed level-path buffer, can only name
+- The replay intent is removed as soon as it is read. The page shell only
+  forwards it as a `--level` argument when it matches a bundled level path
+  (`levels/NAME.toml` or `levels/labs/NAME.toml`). It must fit the fixed
+  level-path buffer, can only name
   files inside the Emscripten in-memory filesystem (the preloaded `assets/`
   and `levels/`), and the selected file still goes through full TOML schema
   and level validation before use. It does not reach the host filesystem.
