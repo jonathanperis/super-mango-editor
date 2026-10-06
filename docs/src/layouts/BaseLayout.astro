@@ -85,7 +85,9 @@ const jsonLd = pageType === 'docs' ? {
         />
 
         <title>{title}</title>
-        <Analytics />
+        {/* Third-party analytics never runs in the document hosting the game,
+            whose profile lives in this origin's localStorage. Docs pages only. */}
+        {pageType !== 'game' && <Analytics />}
 
         <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     </head>

@@ -115,7 +115,12 @@ from the same revision when verifying a migration.
 
 Analytics is optional; see `.env.example`. With no `PUBLIC_GA_ID`, analytics
 scripts are omitted. Production builds map the repository secret
-`NEXT_PUBLIC_GA_ID` to `PUBLIC_GA_ID`. Local environment files stay untracked.
+`NEXT_PUBLIC_GA_ID` (a legacy Next.js-era name; renaming means creating a new
+repository secret and updating `deploy.yml`) to `PUBLIC_GA_ID`. Local
+environment files stay untracked. Analytics loads only on manual pages
+(`pageType="docs"`), never on the home page that hosts the game, so the
+third-party script does not share a document with the running game. The
+origin is still shared; see the repository `SECURITY.md`.
 
 The browser game builds the same checksum-pinned raylib source as native builds,
 using the pinned Emscripten SDK's Web/GLFW backend. `web/keyboard-scope.js` scopes
