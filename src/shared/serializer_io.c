@@ -10,7 +10,7 @@
 #include "serializer_io.h"
 
 #include <errno.h>  /* errno, EEXIST */
-#include <stdio.h>  /* remove, snprintf */
+#include <stdio.h>  /* fprintf, remove, snprintf */
 #include <stdlib.h> /* free, malloc, realpath */
 #include <string.h> /* memcpy, memset, strlen, strrchr */
 #include <stdint.h> /* uint64_t */
@@ -351,6 +351,12 @@ int serializer_flush(FILE *fp)
  * directory, a power loss right after "Saved" can bring back the old file.
  * Some filesystems cannot fsync a directory and report EINVAL; nothing more
  * can be done there, so that one error is treated as success.
+ *
+ * Callers run this after the new file is already in place, so a failure
+ * here is only a warning: the save happened and reads will see it.
+ * Reporting it as a failed save would leave the editor believing the old
+ * bytes are on disk, and a create-only save would then fail forever
+ * because its target now exists.
  */
 #ifndef _WIN32   /* Windows replaces files with MOVEFILE_WRITE_THROUGH. */
 static int serializer_sync_parent_dir(const char *path)
@@ -366,6 +372,10 @@ static int serializer_sync_parent_dir(const char *path)
     int fd;
     int result = 0;
 
+    if (serializer_test_failure == SERIALIZER_TEST_FAILURE_DIR_SYNC) {
+        serializer_test_failure = SERIALIZER_TEST_FAILURE_NONE;
+        return -1;
+    }
     if (!slash) {
         memcpy(dir, ".", 2);            /* "level.toml" lives in "." */
     } else if (slash == path) {
@@ -383,6 +393,16 @@ static int serializer_sync_parent_dir(const char *path)
     if (close(fd) != 0) result = -1;
     return result;
 #endif
+}
+
+/* The file is already installed; a failed directory sync only weakens
+ * crash durability, so warn and let the save succeed. */
+static void serializer_sync_parent_dir_or_warn(const char *path)
+{
+    if (serializer_sync_parent_dir(path) != 0) {
+        fprintf(stderr, "serializer: warning: saved '%s' but could not sync its "
+                "folder; a power loss now could undo the save\n", path);
+    }
 }
 #endif /* !_WIN32 */
 
@@ -479,7 +499,8 @@ int serializer_replace_file(const char *temp_path, const char *target_path)
      * link planted at the destination cannot redirect the write.  The editor
      * resolves a link first only when it saves back the file it opened. */
     if (rename(temp_path, target_path) != 0) return -1;
-    return serializer_sync_parent_dir(target_path);
+    serializer_sync_parent_dir_or_warn(target_path);
+    return 0;
 #endif
 }
 
@@ -512,7 +533,8 @@ int serializer_create_file(const char *temp_path, const char *target_path)
         (void)unlink(target_path);
         return -1;
     }
-    return serializer_sync_parent_dir(target_path);
+    serializer_sync_parent_dir_or_warn(target_path);
+    return 0;
 #endif
 }
 
