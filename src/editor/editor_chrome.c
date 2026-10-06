@@ -178,8 +178,12 @@ void editor_render_status_bar(EditorState *es)
 
     char info_text[512];
     if (es->file_path[0] != '\0') {
+        /* About 40 characters fit between x=600 and the status message at
+         * x=920; a longer path keeps its file name and starts with "...". */
+        char shown_path[40];
+        editor_path_for_display(es->file_path, shown_path, sizeof(shown_path));
         snprintf(info_text, sizeof(info_text), "Entities: %d  |  %s%s",
-                 total, es->file_path, es->modified ? " *" : "");
+                 total, shown_path, es->modified ? " *" : "");
     } else {
         snprintf(info_text, sizeof(info_text), "Entities: %d  |  (untitled)%s",
                  total, es->modified ? " *" : "");

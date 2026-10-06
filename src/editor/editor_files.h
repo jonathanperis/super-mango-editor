@@ -45,6 +45,10 @@ int editor_file_exists(const char *path);
 /* Reject paths that cannot fit without truncation in editor state. */
 int editor_path_fits(const char *path);
 
+/* Copy path into out for display. A path too long for out keeps its end
+ * (the file name) and starts with "..." instead of being cut mid-name. */
+void editor_path_for_display(const char *path, char *out, size_t out_size);
+
 /* Discover persistent recovery entries and update startup status. */
 int editor_discover_recoveries(EditorState *es);
 

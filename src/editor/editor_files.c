@@ -106,6 +106,27 @@ int editor_path_fits(const char *path)
     return path && strlen(path) < EDITOR_PATH_MAX;
 }
 
+void editor_path_for_display(const char *path, char *out, size_t out_size)
+{
+    if (!out || out_size == 0) return;
+    out[0] = '\0';
+    if (!path || out_size < 4) return;
+
+    size_t length = strlen(path);
+    if (length < out_size) {                 /* fits: copy with its NUL */
+        memcpy(out, path, length + 1);
+        return;
+    }
+    /* Keep the last (out_size - 4) bytes: 3 for "..." and 1 for the NUL.
+     * Then step past UTF-8 continuation bytes so the tail starts on a
+     * whole character. */
+    const char *tail = path + length - (out_size - 4);
+    while (((unsigned char)*tail & 0xc0) == 0x80) tail++;
+    size_t tail_length = strlen(tail);
+    memcpy(out, "...", 3);
+    memcpy(out + 3, tail, tail_length + 1);
+}
+
 int editor_set_preference_root(EditorState *es, const char *root)
 {
     if (!es || !root || !editor_path_fits(root) || root[0] == '\0') return -1;
@@ -1345,23 +1366,21 @@ static void editor_add_recent_file(EditorState *es, const char *path)
     }
 
     if (existing > 0) {
+        /* Every row is the same EDITOR_PATH_MAX array and already holds a
+         * terminated string, so whole-row memcpy moves entries exactly. */
         char tmp[EDITOR_PATH_MAX];
-        strncpy(tmp, es->recent_files[existing], sizeof(tmp) - 1);
-        tmp[sizeof(tmp) - 1] = '\0';
+        memcpy(tmp, es->recent_files[existing], sizeof(tmp));
         for (int i = existing; i > 0; i--) {
-            strncpy(es->recent_files[i], es->recent_files[i - 1],
-                    sizeof(es->recent_files[i]) - 1);
-            es->recent_files[i][sizeof(es->recent_files[i]) - 1] = '\0';
+            memcpy(es->recent_files[i], es->recent_files[i - 1],
+                   sizeof(es->recent_files[i]));
         }
-        strncpy(es->recent_files[0], tmp, sizeof(es->recent_files[0]) - 1);
-        es->recent_files[0][sizeof(es->recent_files[0]) - 1] = '\0';
+        memcpy(es->recent_files[0], tmp, sizeof(es->recent_files[0]));
     } else if (existing < 0) {
         int limit = es->recent_file_count < EDITOR_RECENT_MAX
                   ? es->recent_file_count : EDITOR_RECENT_MAX - 1;
         for (int i = limit; i > 0; i--) {
-            strncpy(es->recent_files[i], es->recent_files[i - 1],
-                    sizeof(es->recent_files[i]) - 1);
-            es->recent_files[i][sizeof(es->recent_files[i]) - 1] = '\0';
+            memcpy(es->recent_files[i], es->recent_files[i - 1],
+                   sizeof(es->recent_files[i]));
         }
         strncpy(es->recent_files[0], path, sizeof(es->recent_files[0]) - 1);
         es->recent_files[0][sizeof(es->recent_files[0]) - 1] = '\0';
