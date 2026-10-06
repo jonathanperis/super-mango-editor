@@ -705,14 +705,25 @@ WEB_FLAGS = -s USE_GLFW=3 \
             --exclude-file '*/.DS_Store' \
             --preload-file levels \
             --shell-file web/shell.html
-WEB_CFLAGS = -D_GNU_SOURCE
+WEB_CFLAGS = -std=c11 -O2 -D_GNU_SOURCE
+WEB_LINK_FLAGS = -s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]'
+WEB_HTML = $(OUTDIR)/super-mango.html
+WEB_DEBUG_HTML = $(OUTDIR)/super-mango-debug.html
+# The .js/.wasm/.data siblings are emitted with each HTML file. Listing every
+# input lets `web` (and dist-wasm through it) skip emcc only when fresh.
+WEB_INPUTS = $(SRCS) $(wildcard $(SRCDIR)/*.h $(SRCDIR)/*/*.h) $(VENDOR_DIR)/tomlc17.h \
+             $(wildcard web/*) $(wildcard assets/* assets/*/* assets/*/*/*) \
+             $(wildcard levels/* levels/*/*) $(WEB_RAYLIB_LIB) Makefile
 
-web: $(OUTDIR) $(WEB_RAYLIB_LIB)
-	emcc -std=c11 -O2 $(WEB_CFLAGS) -I$(WEB_RAYLIB_BUILD)/build/raylib/include -I$(SRCDIR) -I$(VENDOR_DIR) $(SRCS) $(WEB_RAYLIB_LIB) -o $(OUTDIR)/super-mango.html $(WEB_FLAGS) \
-		-s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]'
-	emcc -std=c11 -O2 $(WEB_CFLAGS) -I$(WEB_RAYLIB_BUILD)/build/raylib/include -I$(SRCDIR) -I$(VENDOR_DIR) $(SRCS) $(WEB_RAYLIB_LIB) -o $(OUTDIR)/super-mango-debug.html $(WEB_FLAGS) \
-		-s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]' \
-		--post-js web/debug-boot.js
+web: $(WEB_HTML) $(WEB_DEBUG_HTML)
+
+$(WEB_HTML): $(WEB_INPUTS) | $(OUTDIR)
+	emcc $(WEB_CFLAGS) -I$(WEB_RAYLIB_BUILD)/build/raylib/include -I$(SRCDIR) -I$(VENDOR_DIR) $(SRCS) $(WEB_RAYLIB_LIB) -o $@ $(WEB_FLAGS) \
+		$(WEB_LINK_FLAGS)
+
+$(WEB_DEBUG_HTML): $(WEB_INPUTS) | $(OUTDIR)
+	emcc $(WEB_CFLAGS) -I$(WEB_RAYLIB_BUILD)/build/raylib/include -I$(SRCDIR) -I$(VENDOR_DIR) $(SRCS) $(WEB_RAYLIB_LIB) -o $@ $(WEB_FLAGS) \
+		$(WEB_LINK_FLAGS) --post-js web/debug-boot.js
 
 dist-native: release asset-budget
 	@if [ -n "$${RELEASE_DLL_DIR:-}" ]; then \
@@ -721,7 +732,8 @@ dist-native: release asset-budget
 		python3 tools/package_release.py --platform "$${RELEASE_PLATFORM:-super-mango-native}" --binary "$(OUTDIR)/release/super-mango" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-native}.zip" --raylib-build "$(RELEASE_RAYLIB_BUILD)"; \
 	fi
 
-dist-wasm: asset-budget
+# Depends on web so a stale or missing WASM build is rebuilt, never packaged.
+dist-wasm: web asset-budget
 	python3 tools/package_release.py --wasm --out-dir "$(OUTDIR)" --platform "$${RELEASE_PLATFORM:-super-mango-wasm}" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-wasm}.zip" --raylib-build "$(WEB_RAYLIB_BUILD)"
 
 # Every build product lives under OUTDIR/DISTDIR (objects in $(OBJDIR)), plus
