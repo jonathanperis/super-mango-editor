@@ -342,20 +342,22 @@ gs->audio.music = NULL;
 
 ## Adding HUD / Text Rendering
 
-The graphics context must exist before loading fonts. `TextFont` requests additional
-UTF-8 glyphs as text changes; unavailable glyphs still use the font fallback.
-Font atlases and cached label textures have
-explicit owners. The font is in `assets/fonts/`.
+All text uses raylib's built-in bitmap font, so no font file is loaded. raylib
+creates it inside `InitWindow` and frees it in `CloseWindow`; `TextFont` only
+borrows it and must never pass it to `UnloadFont`. Text is drawn at the font's
+10 px base size (`TEXT_FONT_SIZE`) with point filtering, so every glyph pixel
+lands on one canvas pixel. Characters outside ASCII/Latin-1 draw as `?`.
+Cached label textures still have explicit owners.
 
 ```c
-// Load font
-TextFont *font = font_load("assets/fonts/round9x13.ttf", 13);
+// Borrow the default font (requires a live graphics context)
+TextFont *font = font_load();
 if (!font) return -1;
 
 // Draw while the frame's render target is active
 font_draw(font, "Score: 0", 10, 10, WHITE);
 
-// Cleanup before closing the graphics context
+// Cleanup before closing the graphics context (frees only the handle)
 font_unload(font);
 ```
 

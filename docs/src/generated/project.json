@@ -4,7 +4,7 @@
   "labs": 6,
   "assetBytes": 1121073,
   "assetMiB": 1.1,
-  "assetBudgetBytes": 41943040,
+  "assetBudgetBytes": 4194304,
   "enemies": 38,
   "hazards": 56,
   "collectibles": 71
