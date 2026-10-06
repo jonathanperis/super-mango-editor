@@ -6,6 +6,7 @@
  * not also jump or select an item on the screen underneath it.
  */
 #include "game_events.h"
+#include "../shared/platform.h"  /* str_copy */
 #include "game_input.h"
 #include "../collision/collision_damage.h"
 #include "../core/game_overlay.h"

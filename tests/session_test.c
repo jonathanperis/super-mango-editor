@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "input/input_backend.h"
+#include "shared/platform.h"  /* clock_wait */
 
 #include "collision/collision_damage.h"
 #include "collision/game_collision.h"

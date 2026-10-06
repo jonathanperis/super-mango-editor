@@ -14,9 +14,26 @@
  */
 #pragma once
 
-#include "shared/graphics.h"
-#include "shared/audio.h"
-#include "shared/platform.h"
+/*
+ * Why one big GameState (and so many includes here)?
+ *
+ * This project deliberately keeps every piece of live game data in one
+ * struct, stored by value: entity arrays, counts, timers, camera, input
+ * latches. A learner can find any value by following gs->..., the whole
+ * game can be reset or replaced by working on one object, and there is no
+ * hidden global state or heap graph to trace.
+ *
+ * The cost is visible below: to embed `Spider spiders[MAX_SPIDERS]` the
+ * compiler must know sizeof(Spider), so game.h has to include every header
+ * that defines a struct or MAX_* constant used by GameState. Those are the
+ * ONLY includes allowed here. Helpers a .c file merely calls (clock_millis,
+ * str_copy from shared/platform.h, collision helpers, ...) are included by
+ * that .c file itself, so its dependencies stay visible where they are used.
+ */
+
+#include "shared/graphics.h"        /* Texture2D, RenderTexture2D, IntRect */
+#include "shared/audio.h"           /* SoundEffect, MusicTrack pointers */
+#include <stdint.h>                 /* uint32_t, uint64_t fields */
 
 #include "player/player.h"          /* Player struct — embedded by value in GameState */
 #include "surfaces/platform.h"      /* Platform struct + MAX_PLATFORMS constant */

@@ -6,6 +6,7 @@
  */
 
 #include "game_render.h"
+#include "../shared/platform.h"  /* clock_millis */
 #include "../screens/settings_menu.h"
 
 #include "../core/debug.h"

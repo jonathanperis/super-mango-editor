@@ -5,6 +5,7 @@
 #include "core/game_overlay.h"
 #include "levels/level.h"
 #include "screens/hud.h"
+#include "shared/platform.h"  /* clock_millis */
 
 void debug_log(DebugOverlay *dbg, const char *fmt, ...)
 {

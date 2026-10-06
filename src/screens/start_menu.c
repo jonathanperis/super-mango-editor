@@ -6,6 +6,7 @@
  * AppSession performs the transition after this frame rather than nesting loops.
  */
 #include "start_menu.h"
+#include "../shared/platform.h"  /* str_copy */
 #include "settings_menu.h"
 #include <stdio.h>
 #include <stdlib.h>

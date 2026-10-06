@@ -6,6 +6,7 @@
  * Keeping those jobs separate lets native and browser builds share the game.
  */
 #include <errno.h>
+#include "shared/platform.h"  /* clock_millis */
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>

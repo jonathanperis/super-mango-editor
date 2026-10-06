@@ -3,6 +3,7 @@
  */
 
 #include "level_resources.h"
+#include "../shared/platform.h"  /* str_copy */
 
 #include <stdio.h>
 
