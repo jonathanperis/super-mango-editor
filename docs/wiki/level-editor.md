@@ -55,6 +55,11 @@ Three interaction modes are available via the toolbar or keyboard shortcuts:
 | **Place** | `2` | Click empty canvas space to stamp a new entity of the type chosen in the palette. |
 | **Delete** | `3` | Click an entity to remove it from the level immediately. |
 
+Spike blocks and rail-mode float platforms refer to rails by position, so the
+editor refuses to delete a rail that one of them rides (the status bar names
+what still uses it). Deleting an unused rail renumbers the references to later
+rails, and undo restores the original numbering.
+
 Delete removes the selection; right-click quick-deletes an entity. Esc cancels a
 field edit, returns to Select, or clears the selection. Printable shortcuts do
 not switch tools while a text field is active. File/history shortcuts accept
