@@ -169,7 +169,7 @@ void canvas_render(EditorState *es) {
     /* Properties and Undo stay available while an invalid draft is corrected.
      * Never feed rejected counts/dimensions into the preview's tile loops. */
     if (level_validate_runtime(&es->level, error, sizeof(error)) != 0) {
-        ui_label(&es->ui, 12, TOOLBAR_H + 12, "Preview paused: correct properties or Undo");
+        ui_label(&es->ui, 12, TOOLBAR_H + 12, "Preview paused: fix the field named below in the side panel, or press Ctrl+Z");
         ui_label(&es->ui, 12, TOOLBAR_H + 32, error);
         return;
     }

@@ -1726,6 +1726,142 @@ fail:
     return 1;
 }
 
+/*
+ * Every editor mutation must leave a level that passes validation: for each
+ * palette type, place at the world corners, paste repeatedly and drag far
+ * outside the world.  Refusals are fine; an invalid level is not.
+ */
+static int editor_mutations_keep_level_valid(void)
+{
+    char name[96];
+
+    for (int p = 0; p < editor_entity_palette_entry_count(); p++) {
+        EntityType type = editor_entity_palette_entry_type(p);
+        EditorState es = {0};
+        float world_w;
+        /* x = -1 stands for "half a pixel before the world's right edge". */
+        const float points[3][2] = {
+            {0.5f, 0.5f}, {200.0f, 150.0f}, {-1.0f, (float)GAME_H - 0.5f}
+        };
+
+        editor_level_init_defaults(&es.level);
+        es.level.rail_count = 1;  /* lets spike blocks attach */
+        es.level.rails[0] = (RailPlacement){RAIL_LAYOUT_RECT, 32, 32, 4, 4, 0};
+        es.undo = undo_create();
+        if (!es.undo) return 1;
+        es.camera.zoom = 1.0f;
+        es.palette_type = type;
+        world_w = editor_world_width(&es.level);
+
+        for (int i = 0; i < 3; i++) {
+            float x = points[i][0] < 0.0f ? world_w - 0.5f : points[i][0];
+            es.tool = TOOL_PLACE;
+            tools_mouse_down(&es, x, points[i][1]);
+            snprintf(name, sizeof(name), "place %s at %d",
+                     editor_entity_type_name(type), i);
+            if (level_is_valid(name, &es.level) != 0) goto fail;
+        }
+        if (es.selection.index < 0) {
+            fprintf(stderr, "editor_validation_test: %s was never placed (%s)\n",
+                    editor_entity_type_name(type), es.status_message);
+            goto fail;
+        }
+
+        editor_copy_selected(&es);
+        for (int i = 0; i < 4; i++) {
+            editor_paste_clipboard(&es);
+            snprintf(name, sizeof(name), "paste %s #%d",
+                     editor_entity_type_name(type), i);
+            if (level_is_valid(name, &es.level) != 0) goto fail;
+        }
+
+        {
+            EditorRect r;
+            if (editor_entity_bounds(&es.level, es.selection.type,
+                                     es.selection.index, &r)) {
+                es.tool = TOOL_SELECT;
+                drag_by(&es, r.x + 1.0f, r.y + 1.0f, 9000.0f, 9000.0f);
+                drag_by(&es, r.x + 1.0f, r.y + 1.0f, -9000.0f, -9000.0f);
+                snprintf(name, sizeof(name), "drag %s",
+                         editor_entity_type_name(type));
+                if (level_is_valid(name, &es.level) != 0) goto fail;
+            }
+        }
+        undo_destroy(es.undo);
+        continue;
+fail:
+        undo_destroy(es.undo);
+        return 1;
+    }
+    return 0;
+}
+
+static int refused_mutations_explain_why(void)
+{
+    EditorState es = {0};
+
+    editor_level_init_defaults(&es.level);
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+
+    /* Rail riders need a rail. */
+    es.tool = TOOL_PLACE;
+    es.palette_type = ENT_SPIKE_BLOCK;
+    tools_mouse_down(&es, 100.0f, 100.0f);
+    if (expect_int("no rail no spike block", es.level.spike_block_count, 0) != 0 ||
+        expect_string("no rail status", es.status_message,
+                      "Cannot place Spike Block: place a rail first") != 0) goto fail;
+
+    /* A full array is reported instead of silently ignored. */
+    es.palette_type = ENT_COIN;
+    es.level.coin_count = MAX_COINS;
+    for (int i = 0; i < MAX_COINS; i++)
+        es.level.coins[i] = (CoinPlacement){10.0f, 10.0f};
+    tools_mouse_down(&es, 100.0f, 100.0f);
+    if (expect_int("full coins", es.level.coin_count, MAX_COINS) != 0 ||
+        expect_prefix("full coin status", es.status_message,
+                      "Cannot place Coin: limit of") != 0) goto fail;
+    es.selection.type = ENT_COIN;
+    es.selection.index = 0;
+    editor_copy_selected(&es);
+    editor_paste_clipboard(&es);
+    if (expect_prefix("full paste status", es.status_message,
+                      "Cannot paste Coin: limit of") != 0) goto fail;
+    es.level.coin_count = 0;
+
+    /* Rules involving other entities are checked after clamping. */
+    es.palette_type = ENT_CHECKPOINT;
+    tools_mouse_down(&es, 20.0f, 100.0f);
+    if (expect_int("checkpoint behind start refused", es.level.checkpoint_count, 0) != 0 ||
+        expect_prefix("checkpoint status", es.status_message,
+                      "Cannot place Checkpoint here:") != 0) goto fail;
+
+    /* A clipboard from another level cannot reference a missing rail. */
+    es.has_clipboard = 1;
+    es.clipboard_type = ENT_SPIKE_BLOCK;
+    memset(&es.clipboard_data, 0, sizeof(es.clipboard_data));
+    es.clipboard_data.spike_block = (SpikeBlockPlacement){2, 0.0f, 3.0f};
+    es.level.rail_count = 1;
+    es.level.rails[0] = (RailPlacement){RAIL_LAYOUT_RECT, 32, 32, 4, 4, 0};
+    editor_paste_clipboard(&es);
+    if (expect_int("missing rail paste refused", es.level.spike_block_count, 0) != 0 ||
+        expect_string("missing rail status", es.status_message,
+                      "Cannot paste Spike Block: rail 2 does not exist in this level") != 0)
+        goto fail;
+
+    /* A t_offset past the end of a loop wraps onto the rail. */
+    es.clipboard_data.spike_block = (SpikeBlockPlacement){0, 11.5f, 3.0f};
+    editor_paste_clipboard(&es);
+    if (expect_int("wrapped paste count", es.level.spike_block_count, 1) != 0 ||
+        level_is_valid("wrapped spike block", &es.level) != 0) goto fail;
+
+    undo_destroy(es.undo);
+    return 0;
+fail:
+    undo_destroy(es.undo);
+    return 1;
+}
+
 typedef struct {
     TextFont *font;
     int drawing;
@@ -2273,6 +2409,8 @@ int main(void)
     if (checkpoint_editor_mutations_are_reversible() != 0) return 1;
     if (rail_deletion_keeps_references_valid() != 0) return 1;
     if (drag_round_trips_and_follows_grab_point() != 0) return 1;
+    if (editor_mutations_keep_level_valid() != 0) return 1;
+    if (refused_mutations_explain_why() != 0) return 1;
     if (widget_commit_paths_preserve_values() != 0) return 1;
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;

@@ -4,12 +4,11 @@
 
 #include "editor_clipboard.h"
 
-#include <string.h>  /* memset */
-
+#include "../levels/level_loader.h" /* level_validate_runtime */
 #include "../surfaces/rail.h" /* RAIL_TILE_W */
-#include "undo.h"   /* Command, undo_push */
-#include "editor_session.h" /* save-point dirty tracking */
+#include "editor_session.h" /* editor_set_status */
 #include "entity_meta.h" /* central selection validity and entity storage */
+#include "tools.h"       /* editor_clamp_placement, editor_add_placement */
 
 /* Paste lands 24 px right and down so the copy does not hide the original. */
 #define PASTE_OFFSET 24.0f
@@ -156,40 +155,32 @@ static void offset_pasted_copy(EntityType type, PlacementData *d)
  * 24px right and 24px down so it doesn't overlap the original. The new
  * entity is auto-selected for immediate repositioning.  The two singletons
  * (Last Star, Player Spawn) move instead and record a CMD_MOVE.
+ *
+ * The clipboard survives opening another level, so the copy may come from
+ * a document with a different width or different rails.  It is clamped
+ * into this level, and editor_add_placement refuses (with a status-bar
+ * message) a full array, a missing rail, or a result that fails validation.
  */
 void editor_paste_clipboard(EditorState *es)
 {
+    char error[128];
     EntityType type;
     PlacementData d;
-    Command cmd;
-    int index;
 
-    if (!es || !es->has_clipboard) return;
+    if (!es) return;
+    if (!es->has_clipboard) {
+        editor_set_status(es, "Nothing to paste: copy an entity with Ctrl+C first");
+        return;
+    }
+    if (level_validate_runtime(&es->level, error, sizeof(error)) != 0) {
+        editor_set_status(es, "Paste blocked: fix level errors first (%s)", error);
+        return;
+    }
     editor_selection_reconcile(es);
 
     type = es->clipboard_type;
     d = es->clipboard_data;
     offset_pasted_copy(type, &d);
-
-    memset(&cmd, 0, sizeof(cmd));
-    if (editor_entity_type_is_singleton(type)) {
-        index = 0;
-        cmd.type = CMD_MOVE;
-        cmd.before = editor_snapshot_entity(&es->level, type, 0);
-        (void)editor_entity_write(&es->level, type, 0, &d);
-    } else {
-        index = editor_entity_count(&es->level, type);
-        if (editor_entity_insert(&es->level, type, index, &d) != 0) return;
-        cmd.type = CMD_PLACE;
-    }
-
-    cmd.entity_type = (int)type;
-    cmd.entity_index = index;
-    cmd.after = d;
-    undo_push(es->undo, cmd);
-
-    es->selection.type = type;
-    es->selection.index = index;
-    editor_refresh_dirty(es);
-    editor_selection_reconcile(es);
+    editor_clamp_placement(&es->level, type, &d);
+    (void)editor_add_placement(es, type, &d, "paste");
 }

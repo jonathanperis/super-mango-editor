@@ -175,6 +175,15 @@ The editor keeps recent files and recovery snapshots for modified valid levels i
 
 Only one entity can be in the clipboard at a time. The pasted entity appears offset from the original so it does not overlap.
 
+Place and Paste clamp new entities into the world (patrol ranges included, and a
+pasted spike block's `t_offset` wraps onto its rail). A new spike block attaches
+to the rail nearest the click. When an entity cannot be added — its array is
+full, its rail does not exist (a clipboard copied from another level), or the
+result would fail validation, such as a checkpoint behind the player start — the
+status bar explains why and the level is left unchanged. If a hand-edited file
+or a property field leaves the level invalid, the canvas pauses and names the
+offending field; fix it in the side panel or press Ctrl+Z.
+
 ---
 
 ## Play-Test Integration
