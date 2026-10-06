@@ -345,6 +345,39 @@ sanitize-smoke:
 		EXTRA_CFLAGS="$(EXTRA_CFLAGS) $(SANITIZE_CFLAGS)" \
 		EXTRA_LDFLAGS="$(EXTRA_LDFLAGS) $(SANITIZE_LDFLAGS)"
 
+# ── Coverage (clang source-based) ───────────────────────────────────
+# Rebuild the native tests with profile instrumentation in their own tree,
+# run them, merge the per-process .profraw files and print a per-file
+# summary.  Reuses the already-built raylib; vendor and test code are hidden.
+COVERAGE_OUTDIR = $(OUTDIR)/coverage
+COVERAGE_FLAGS = -fprofile-instr-generate -fcoverage-mapping
+ifeq ($(shell uname -s),Darwin)
+LLVM_PROFDATA ?= xcrun llvm-profdata
+LLVM_COV ?= xcrun llvm-cov
+else
+LLVM_PROFDATA ?= llvm-profdata
+LLVM_COV ?= llvm-cov
+endif
+COVERAGE_BINS = $(patsubst $(OUTDIR)/%,$(COVERAGE_OUTDIR)/%,$(TEST_TARGETS)) \
+                $(COVERAGE_OUTDIR)/parser-allocation-probe
+COVERAGE_IGNORE = '(^|/)(vendor|tests|out)/'
+
+.PHONY: coverage
+coverage: $(RAYLIB_LIB)
+	rm -rf "$(COVERAGE_OUTDIR)/profiles"
+	mkdir -p "$(COVERAGE_OUTDIR)/profiles" "$(COVERAGE_OUTDIR)/obj/tests"
+	LLVM_PROFILE_FILE="$(abspath $(COVERAGE_OUTDIR))/profiles/%p-%m.profraw" \
+		$(MAKE) test OUTDIR="$(COVERAGE_OUTDIR)" RAYLIB_BUILD="$(RAYLIB_BUILD)" \
+		EXTRA_CFLAGS="$(EXTRA_CFLAGS) $(COVERAGE_FLAGS)" \
+		EXTRA_LDFLAGS="$(EXTRA_LDFLAGS) -fprofile-instr-generate"
+	$(LLVM_PROFDATA) merge -sparse "$(COVERAGE_OUTDIR)"/profiles/*.profraw \
+		-o "$(COVERAGE_OUTDIR)/tests.profdata"
+	$(LLVM_COV) report $(firstword $(COVERAGE_BINS)) \
+		$(addprefix -object ,$(wordlist 2,$(words $(COVERAGE_BINS)),$(COVERAGE_BINS))) \
+		-instr-profile="$(COVERAGE_OUTDIR)/tests.profdata" \
+		-ignore-filename-regex=$(COVERAGE_IGNORE)
+	@echo "coverage: per-line view: $(LLVM_COV) show $(firstword $(COVERAGE_BINS)) -instr-profile=$(COVERAGE_OUTDIR)/tests.profdata <file.c>"
+
 # ── Fuzzing (POSIX) ──────────────────────────────────────────────────
 # Each harness defines LLVMFuzzerTestOneInput.  fuzz-corpus links it with
 # tests/fuzz_replay_main.c under ASan/UBSan and replays the seed inputs

@@ -75,6 +75,24 @@ Both run under `make test`; `make sanitize` instruments the C probe as well.
 Level readers accept one leading UTF-8 BOM and preserve raw line endings so
 invalid CR-only documents remain rejected.
 
+## Coverage
+
+`make coverage CC=clang` rebuilds the native suite in `out/coverage/` with
+clang source-based coverage (`-fprofile-instr-generate -fcoverage-mapping`),
+runs `make test` there, merges the profiles with `llvm-profdata` and prints an
+`llvm-cov report` per source file. `vendor/` and `tests/` are excluded. macOS
+uses `xcrun llvm-profdata`/`xcrun llvm-cov`; Linux uses `llvm-profdata`/`llvm-cov`
+from `PATH`. Override them with `LLVM_PROFDATA=` / `LLVM_COV=`. For a
+line-by-line view of one file:
+
+```sh
+xcrun llvm-cov show out/coverage/level-serializer-test \
+    -instr-profile=out/coverage/tests.profdata src/levels/level_ref.c
+```
+
+Coverage only measures what the tests execute. Use it to find untested
+branches, not as a target number.
+
 ## Fuzzing
 
 Two harnesses feed untrusted text to the parsers the game uses

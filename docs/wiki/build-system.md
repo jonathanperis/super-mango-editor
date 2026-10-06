@@ -285,6 +285,10 @@ make scripted-smoke SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
 
 Runs `make test` in a separate `out-sanitize/` tree with AddressSanitizer and UndefinedBehaviorSanitizer enabled, then `make fuzz-corpus` in the same tree.
 
+### `make coverage`
+
+Rebuilds and runs `make test` in `out/coverage/` with clang source-based coverage, then prints an `llvm-cov` per-file summary. Requires clang plus `llvm-profdata`/`llvm-cov` (`xcrun` on macOS). See [Testing](../testing/#coverage).
+
 ### `make fuzz-corpus` / `make fuzz`
 
 `fuzz-corpus` replays the level and profile fuzz seeds under ASan/UBSan with a plain driver. `fuzz` runs coverage-guided libFuzzer for `FUZZ_SECONDS` per harness and needs a clang with libFuzzer (`FUZZ_CC`). See [Testing](../testing/#fuzzing).
