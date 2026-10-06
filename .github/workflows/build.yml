@@ -658,7 +658,7 @@ jobs:
             gh attestation verify super-mango-linux-x86_64.zip --repo ${{ github.repository }}
             ```
 
-            macOS binaries are ad-hoc signed, not notarized. If Gatekeeper blocks them, right-click the binary and choose **Open**, or run `xattr -dr com.apple.quarantine super-mango-macos-arm64` on the extracted folder after verifying the checksum.
+            macOS binaries are ad-hoc signed, not notarized, so Gatekeeper blocks the first launch (right-click **Open** no longer bypasses this on macOS 15+). First verify the archive with `SHA256SUMS` or `gh attestation verify` as above, then either launch the binary once and click **Open Anyway** in **System Settings › Privacy & Security**, or run `xattr -dr com.apple.quarantine super-mango-macos-arm64` on the extracted folder.
           files: |
             dist/super-mango-linux-x86_64.zip
             dist/super-mango-macos-arm64.zip
