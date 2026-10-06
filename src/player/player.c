@@ -38,7 +38,7 @@
 void player_update(Player *player, float dt, SoundEffect *snd_jump,
                    const Platform *platforms, int platform_count,
                    const FloatPlatform *float_platforms, int float_platform_count,
-                   const Bouncepad *bouncepads, int bouncepad_count,
+                   const BouncepadList *bouncepad_lists, int bouncepad_list_count,
                    const VineDecor *vines, int vine_count,
                    const LadderDecor *ladders, int ladder_count,
                    const RopeDecor *ropes, int rope_count,
@@ -124,7 +124,7 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
                                                     spike_platform_count,
                                                     prev_top);
 
-    player_resolve_floor_collision(player, bouncepads, bouncepad_count,
+    player_resolve_floor_collision(player, bouncepad_lists, bouncepad_list_count,
                                    floor_gaps, floor_gap_count, out_bounce_idx);
     /* A nearer bridge/spike surface or the floor may have replaced the float
      * platform candidate. Do not carry the player with the discarded support. */

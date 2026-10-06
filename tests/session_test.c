@@ -7,6 +7,7 @@
 #include "core/app_session.h"
 #include "core/game_completion.h"
 #include "core/game_overlay.h"
+#include "core/game_player_step.h"
 #include "core/game_terminal.h"
 #include "core/game_timing.h"
 #include "core/game_update.h"
@@ -940,6 +941,35 @@ static int coins_stay_collected_across_life_loss(void)
     return 0;
 }
 
+/* Pads are passed as views of the three GameState arrays; the flat index the
+ * player reports must still select the right pad in the right array. */
+static int bouncepad_lists_select_the_landed_pad(void)
+{
+    GameState gs = {0};
+    gs.runtime.world_w = 1600;
+    gs.player.w = gs.player.h = 48;
+    player_apply_default_physics(&gs.player);
+    bouncepad_place(&gs.bouncepads_medium[0], 0.0f, BOUNCEPAD_VY_MEDIUM, BOUNCEPAD_WOOD);
+    bouncepad_place(&gs.bouncepads_small[0], 100.0f, BOUNCEPAD_VY_SMALL, BOUNCEPAD_GREEN);
+    bouncepad_place(&gs.bouncepads_small[1], 150.0f, BOUNCEPAD_VY_SMALL, BOUNCEPAD_GREEN);
+    bouncepad_place(&gs.bouncepads_high[0], 300.0f, BOUNCEPAD_VY_HIGH, BOUNCEPAD_RED);
+    gs.bouncepad_medium_count = 1;
+    gs.bouncepad_small_count = 2;
+    gs.bouncepad_high_count = 1;
+
+    /* Drop the player onto the red (high) pad: flat index 3 of 4. */
+    gs.player.x = 300.0f;
+    gs.player.y = (float)(FLOOR_Y - gs.player.h + PLAYER_FLOOR_SINK) - 1.0f;
+    gs.player.vy = 200.0f;
+    gs.loop.fp_prev_riding = -1;
+    game_player_step(&gs, GAME_FIXED_STEP);
+    if (expect_int("high pad animates", gs.bouncepads_high[0].state, BOUNCE_ACTIVE) ||
+        expect_int("small pads untouched", gs.bouncepads_small[1].state, BOUNCE_IDLE) ||
+        expect_int("medium pad untouched", gs.bouncepads_medium[0].state, BOUNCE_IDLE) ||
+        expect_float("high pad launch", gs.player.vy, BOUNCEPAD_VY_HIGH)) return 1;
+    return 0;
+}
+
 static int fixed_step_accumulator_contract(void)
 {
     /* Smoke and scripted replays: one fixed step per frame, whatever the
@@ -1079,7 +1109,7 @@ int main(void)
         CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),
         CASE(menu_mouse_and_path_boundaries), CASE(collision_lifetime_and_pickups),
         CASE(coins_stay_collected_across_life_loss), CASE(settings_keep_music_paused_after_refocus),
-        CASE(fixed_step_accumulator_contract),
+        CASE(fixed_step_accumulator_contract), CASE(bouncepad_lists_select_the_landed_pad),
         CASE(nearest_surface_is_order_independent), CASE(phase_resets_transient_state),
         CASE(campaign_manifest_is_ordered_and_transactional),
         CASE(campaign_manifest_nul_fixtures_reject_transactionally),
