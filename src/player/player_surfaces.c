@@ -159,8 +159,8 @@ void player_resolve_platform_collisions(Player *player,
      *   • vy is zeroed to prevent continued falling.
      *   • on_ground is set so the animation state resolves to IDLE/WALK,
      *     not FALL — this is the main reason the check lives here inside
-     *     player_update rather than in game_loop after the fact.
-     *   • *out_fp_landed_idx is set to the matching index so game_loop
+     *     player_update rather than in the frame update after the fact.
+     *   • *out_fp_landed_idx is set to the matching index so the frame update
      *     can drive the crumble timer and nudge the player on rail platforms.
      */
     {

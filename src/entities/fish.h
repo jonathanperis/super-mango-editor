@@ -51,9 +51,6 @@ typedef struct {
     uint32_t anim_timer_ms;
 } Fish;
 
-/* Place the initial fish instances and reset their movement state. */
-void fish_init(Fish *fish, int *count);
-
 /* Move fish, trigger random jumps, and advance animation. */
 void fish_update(Fish *fish, int count, float dt, int world_w);
 

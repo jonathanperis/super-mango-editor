@@ -12,7 +12,6 @@
 #pragma once
 
 #include "../shared/graphics.h"
-#include "../player/player.h"  /* Player — for the push response signature */
 
 /* ------------------------------------------------------------------ */
 
@@ -87,9 +86,6 @@ typedef struct {
 
 /* ---- Function declarations ---------------------------------------- */
 
-/* Populate the circular saw array with level placements. */
-void circular_saws_init(CircularSaw *saws, int *count);
-
 /* Advance patrol movement and spin animation for all saws. */
 void circular_saws_update(CircularSaw *saws, int count, float dt);
 
@@ -99,6 +95,3 @@ void circular_saws_render(const CircularSaw *saws, int count,
 
 /* Return the collision rectangle in world space. */
 IntRect circular_saw_get_hitbox(const CircularSaw *saw);
-
-/* Apply push impulse to the player on contact. */
-void circular_saw_push_player(const CircularSaw *saw, Player *player);

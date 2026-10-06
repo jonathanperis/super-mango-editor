@@ -3,8 +3,8 @@
  *
  * The bouncepad sits on the floor and acts as a one-way launch surface.
  * Collision detection lives in player_update (player.c), which applies
- * BOUNCEPAD_VY on landing and returns the hit index to game_loop.
- * game_loop then sets state = BOUNCE_ACTIVE here to start the animation.
+ * BOUNCEPAD_VY on landing and returns the hit index to game_player_step.
+ * game_bouncepads_handle_hit then sets state = BOUNCE_ACTIVE here to start the animation.
  */
 
 #include "../shared/graphics.h"

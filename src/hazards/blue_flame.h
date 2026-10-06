@@ -137,15 +137,6 @@ typedef struct {
 
 /* ---- Function declarations ---------------------------------------- */
 
-/*
- * blue_flames_init — Populate the blue flame array, placing one blue flame per sea gap.
- *
- * gap_xs is the array of sea gap x positions; gap_count is its length.
- * Only gaps that are not at the world edge (x > 0) get a blue flame.
- */
-void blue_flames_init(BlueFlame *blue_flames, int *count,
-                      const int *gap_xs, int gap_count);
-
 /* Advance the eruption cycle (rise, flip, fall, wait) for all blue flames. */
 void blue_flames_update(BlueFlame *blue_flames, int count, float dt);
 

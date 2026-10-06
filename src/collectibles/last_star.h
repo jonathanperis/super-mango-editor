@@ -35,9 +35,6 @@ typedef struct {
 
 /* ---- Function declarations ---------------------------------------- */
 
-/* Place the last star at its end-phase position. */
-void last_star_init(LastStar *star);
-
 /* Draw the star if still active. */
 void last_star_render(const LastStar *star,
                       Texture2D *tex, int cam_x);

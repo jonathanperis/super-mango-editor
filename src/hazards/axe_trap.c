@@ -22,53 +22,6 @@
 /* ------------------------------------------------------------------ */
 
 /*
- * axe_traps_init — Place axe traps on the tall (3-tile) pillars.
- *
- * Tall pillars (platforms with h == 3 * TILE_SIZE = 144 px) exist at
- * indices 1, 3, 5 in the platforms array (see platform.c).
- *
- * We place two axe traps:
- *   Trap 0 — on platform 1 (x=256), pendulum mode (grandfather clock swing).
- *   Trap 1 — on platform 3 (x=680), full 360° rotation.
- *
- * The pivot point is positioned at the horizontal centre of the pillar,
- * vertically at the top of the pillar (platform y).
- */
-void axe_traps_init(AxeTrap *traps, int *count) {
-    /*
-     * Trap 0 — pendulum axe on the tall pillar at x=256 (screen 1).
-     *
-     * Pivot x: pillar left edge (256) + half pillar width (48/2 = 24) = 280.
-     * Pivot y: pillar top (124) — the axe hangs from the top surface.
-     */
-    traps[0].x            = 256.0f + TILE_SIZE / 2.0f;  /* 280 */
-    traps[0].y            = (float)(FLOOR_Y - 3 * TILE_SIZE + 16);  /* 124 */
-    traps[0].angle        = 0.0f;
-    traps[0].time         = 0.0f;
-    traps[0].mode         = AXE_MODE_PENDULUM;
-    traps[0].sound_played = 0;
-    traps[0].active       = 1;
-
-    /*
-     * Trap 1 — spinning axe on the tall pillar at x=680 (screen 2).
-     *
-     * Pivot x: 680 + 24 = 704.
-     * Pivot y: same height as other tall pillars = 124.
-     */
-    traps[1].x            = 680.0f + TILE_SIZE / 2.0f;  /* 704 */
-    traps[1].y            = (float)(FLOOR_Y - 3 * TILE_SIZE + 16);  /* 124 */
-    traps[1].angle        = 0.0f;
-    traps[1].time         = 0.0f;
-    traps[1].mode         = AXE_MODE_SPIN;
-    traps[1].sound_played = 0;
-    traps[1].active       = 1;
-
-    *count = 2;
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
  * AXE_VOLUME_MAX — the loudest the axe SFX can be (MIX_MAX_VOLUME = 128).
  * AXE_AUDIBLE_RANGE — maximum horizontal distance (px) at which the axe
  *                     is audible.  Set to GAME_W (the logical canvas width)

@@ -12,7 +12,6 @@
 
 #include "../shared/graphics.h"
 #include "../surfaces/rail.h"  /* Rail — the block needs a pointer to its rail */
-#include "../player/player.h"  /* Player — for the push response signature     */
 
 /* ------------------------------------------------------------------ */
 
@@ -120,9 +119,6 @@ typedef struct {
 /* Place one spike block on a specific rail at starting position t0. */
 void spike_block_init(SpikeBlock *sb, const Rail *rail, float t0, float speed);
 
-/* Initialise all spike block instances. */
-void spike_blocks_init(SpikeBlock *blocks, int *count, const Rail *rails);
-
 /* Advance one block along its rail. cam_x is the current camera left edge. */
 void spike_block_update(SpikeBlock *sb, float dt, int cam_x);
 
@@ -144,13 +140,3 @@ void spike_blocks_render(const SpikeBlock *blocks, int count,
  * spike art fills the full sprite frame.
  */
 IntRect spike_block_get_hitbox(const SpikeBlock *sb);
-
-/*
- * spike_block_push_player — Apply push impulse to the player.
- *
- * Called immediately after a hit is detected.  Reverses the player's
- * normalised movement direction and scales it to SPIKE_PUSH_SPEED,
- * then adds SPIKE_PUSH_VY upward.  If the player is stationary the push
- * is based on the relative position of the block vs. the player.
- */
-void spike_block_push_player(const SpikeBlock *sb, Player *player);

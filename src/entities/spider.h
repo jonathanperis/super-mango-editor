@@ -50,14 +50,6 @@ typedef struct {
 } Spider;
 
 /*
- * spiders_init — Fill the spider array with starting positions.
- *
- * Defines two patrol spiders on the ground floor.  Sets *count to the
- * number of active spiders so callers don't need to know MAX_SPIDERS.
- */
-void spiders_init(Spider *spiders, int *count);
-
-/*
  * spiders_update — Move spiders and advance their animation each frame.
  *
  * spiders : array of Spider structs (from GameState)

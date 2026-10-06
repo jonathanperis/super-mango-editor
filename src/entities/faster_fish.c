@@ -21,29 +21,6 @@ static float ffish_random_delay(float min_s, float max_s) {
 
 /* ------------------------------------------------------------------ */
 
-void faster_fish_init(FasterFish *fish, int *count) {
-    float water_y = (float)(GAME_H - WATER_ART_H) - FFISH_RENDER_H / 2.0f;
-
-    *count = 1;
-
-    /*
-     * FasterFish 0 — patrols the end of the world (screens 3–4).
-     * Faster and jumps much higher than the regular fish.
-     */
-    fish[0].x             = 1100.0f;
-    fish[0].y             = water_y;
-    fish[0].vx            = FFISH_SPEED;
-    fish[0].vy            = 0.0f;
-    fish[0].patrol_x0     = 900.0f;
-    fish[0].patrol_x1     = 1400.0f;
-    fish[0].jump_timer    = ffish_random_delay(FFISH_JUMP_MIN, FFISH_JUMP_MAX);
-    fish[0].water_y       = water_y;
-    fish[0].frame_index   = 0;
-    fish[0].anim_timer_ms = 0;
-}
-
-/* ------------------------------------------------------------------ */
-
 void faster_fish_update(FasterFish *fish, int count, float dt, int world_w) {
     for (int i = 0; i < count; i++) {
         FasterFish *f = &fish[i];

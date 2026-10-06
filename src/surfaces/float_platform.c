@@ -61,53 +61,6 @@ void float_platform_init(FloatPlatform *fp, FloatPlatformMode mode,
 /* ------------------------------------------------------------------ */
 
 /*
- * float_platforms_init — Place all three float-platform instances in the level.
- *
- * Three demonstrations, one per screen:
- *
- *   Platform 0 — STATIC, screen 1 (x 0–400).
- *     Hovers at (140, 200), 4 tiles wide (64 px).
- *     Placed between pillar 1 (x=80) and pillar 2 (x=256), within jumping
- *     reach from the floor — the player passes through from below on the
- *     way up and lands on the way down.
- *
- *   Platform 1 — CRUMBLE, screen 2 (x 400–800).
- *     Hovers at (540, 190), 3 tiles wide (48 px).
- *     Falls CRUMBLE_STAND_LIMIT seconds after the player lands on it.
- *     Placed between pillars 3 and 4, also within floor-jump reach.
- *
- *   Platform 2 — RAIL, screen 3 (x 800–1200).
- *     Attached to Rail 1 (closed 8×5 loop at world (852, 62)), starting at
- *     tile 14 — near the middle of the bottom row (world ≈ x=916, y=126).
- *     Speed 2.0 tiles/s so it orbits slower than the spike block (3.0 tiles/s)
- *     and the two stay separated.  Reachable by jumping from the medium
- *     pillar at x=880 (pillar 5).
- */
-void float_platforms_init(FloatPlatform *fps, int *count, const Rail *rails) {
-    /* Platform 0 — static hover, screen 1 */
-    float_platform_init(&fps[0], FLOAT_PLATFORM_STATIC,
-                        172.0f, 200.0f, 4,
-                        0.0f,           /* stand_limit: unused for STATIC */
-                        NULL, 0.0f, 0.0f);
-
-    /* Platform 1 — crumble, screen 2, right of the spike block rail */
-    float_platform_init(&fps[1], FLOAT_PLATFORM_CRUMBLE,
-                        570.0f, 190.0f, 3,
-                        CRUMBLE_STAND_LIMIT,
-                        NULL, 0.0f, 0.0f);
-
-    /* Platform 2 — rail-attached, screen 3, Rail 1, start at bottom row */
-    float_platform_init(&fps[2], FLOAT_PLATFORM_RAIL,
-                        0.0f, 0.0f, 3,  /* x/y overridden by rail position */
-                        0.0f,
-                        &rails[1], 14.0f, 2.0f);
-
-    *count = 3;
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
  * float_platform_update — Advance one platform for this frame.
  *
  * Three independent state machines, one per mode:
@@ -121,7 +74,7 @@ void float_platforms_init(FloatPlatform *fps, int *count, const Rail *rails) {
  *              If the player steps off before the limit, the timer resets —
  *              the platform only falls after continuous standing.
  *
- *   RAIL     — save prev_x for the nudge calculation in game_loop, then
+ *   RAIL     — save prev_x for the nudge calculation in game_float_platforms_update, then
  *              advance t along the rail.  Closed loops use rail_advance()
  *              (which wraps t).  Open rails advance manually with bounce
  *              at both endpoints (no fall-off — platforms never detach).

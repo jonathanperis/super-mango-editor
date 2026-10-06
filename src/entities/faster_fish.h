@@ -39,9 +39,6 @@ typedef struct {
     uint32_t anim_timer_ms;
 } FasterFish;
 
-/* Place initial faster fish instances. */
-void faster_fish_init(FasterFish *fish, int *count);
-
 /* Move fish, trigger jumps, and advance animation. */
 void faster_fish_update(FasterFish *fish, int count, float dt, int world_w);
 

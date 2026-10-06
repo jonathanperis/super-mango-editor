@@ -14,25 +14,6 @@
 /* ------------------------------------------------------------------ */
 
 /*
- * last_star_init — Place the star at the end phase.
- *
- * Positioned on top of the last tall pillar (x=1480, 3-tile tall).
- * Pillar top: FLOOR_Y − 3×TILE_SIZE + 16 = 124.
- * Star y: pillar_top − LAST_STAR_DISPLAY_H = 124 − 16 = 108.
- * Star x: centred on the pillar = 1480 + (48 − 16) / 2 = 1496.
- */
-void last_star_init(LastStar *star) {
-    star->x         = 1480.0f + (TILE_SIZE - LAST_STAR_DISPLAY_W) / 2.0f;
-    star->y         = (float)(FLOOR_Y - 3 * TILE_SIZE + 16 - LAST_STAR_DISPLAY_H);
-    star->w         = LAST_STAR_DISPLAY_W;
-    star->h         = LAST_STAR_DISPLAY_H;
-    star->active    = 1;
-    star->collected = 0;
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
  * last_star_render — Draw the star if still active.
  *
  * Uses the full Stars_Ui.png texture (single 16×16 frame).
