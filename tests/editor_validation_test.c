@@ -2068,6 +2068,65 @@ fail:
     return 1;
 }
 
+/* Load hook: append a TOML comment, as if another program saved the file
+ * while the editor was parsing it.  Only the first `touches_left` calls
+ * touch the file. */
+static int touches_left;
+static void touch_level_during_load(const char *path)
+{
+    FILE *fp;
+    if (touches_left <= 0) return;
+    touches_left--;
+    fp = fopen(path, "ab");
+    if (!fp) return;
+    fputs("# changed by another program\n", fp);
+    fclose(fp);
+}
+
+static int load_fingerprints_the_bytes_it_parsed(void)
+{
+    const char *path = "out/test_editor_load_race.toml";
+    EditorState es = {0};
+    LevelDef fixture;
+    SerializerFileFingerprint on_disk;
+    char root[EDITOR_PATH_MAX] = {0};
+    int result = 1;
+
+    ensure_out_dir();
+    editor_level_init_defaults(&fixture);
+    if (level_save_toml(&fixture, path) != 0 ||
+        make_test_preference_root(root, sizeof(root)) != 0 ||
+        editor_set_preference_root(&es, root) != 0) return 1;
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+
+    /* One change during the first read: the retry reads stable bytes and
+     * the Save baseline matches the file as it is now. */
+    touches_left = 1;
+    editor_test_set_load_hook(touch_level_during_load);
+    if (expect_int("load retries after change", editor_load_level(&es, path), 0) != 0 ||
+        serializer_fingerprint_utf8(path, &on_disk) != 1 ||
+        expect_int("baseline matches file",
+                   serializer_fingerprint_equal(&es.source_fingerprint, &on_disk), 1) != 0)
+        goto cleanup;
+
+    /* A file that keeps changing is refused rather than half-trusted. */
+    strncpy(es.level.name, "Kept", sizeof(es.level.name) - 1);
+    touches_left = 2;
+    if (expect_int("changing file refused", editor_load_level(&es, path), -1) != 0 ||
+        expect_prefix("changing file status", es.status_message, "Load failed:") != 0 ||
+        expect_int("status explains", strstr(es.status_message, "kept changing") != NULL, 1) != 0 ||
+        expect_string("document untouched", es.level.name, "Kept") != 0) goto cleanup;
+    result = 0;
+
+cleanup:
+    editor_test_set_load_hook(NULL);
+    cleanup_test_preference_root(root, &es, 1);
+    undo_destroy(es.undo);
+    remove(path);
+    return result;
+}
+
 typedef struct {
     TextFont *font;
     int drawing;
@@ -2633,6 +2692,7 @@ int main(void)
     if (refused_mutations_explain_why() != 0) return 1;
     if (camera_scrolls_vertically_and_stays_clamped() != 0) return 1;
     if (playtest_blocks_editing_and_stop_cleans_up() != 0) return 1;
+    if (load_fingerprints_the_bytes_it_parsed() != 0) return 1;
     if (widget_commit_paths_preserve_values() != 0) return 1;
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;
