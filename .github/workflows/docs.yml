@@ -2,7 +2,8 @@ name: Docs
 
 on:
   # Every main push runs the full docs check; PRs stay path-filtered. build.yml's
-  # always-on "Docs drift" job is the PR-required equivalent of `make docs-drift`.
+  # always-on "Docs drift" job runs `make docs-drift` on every PR and is the
+  # recommended required status check (an owner ruleset setting).
   push:
     branches: [main]
   pull_request:

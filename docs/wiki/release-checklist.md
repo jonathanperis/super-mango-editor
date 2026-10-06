@@ -86,6 +86,11 @@ Before creating a release, confirm checks for the intended source commit are gre
 - Build & Release
 - CodeQL
 - Docs (runs on every `main` push; PRs run it only for docs-related paths, while Build & Release's `Docs drift` job always runs)
+
+> **Owner action:** `Docs drift` is the recommended required status check for
+> pull requests, but it is not yet required by the repository ruleset. Until a
+> repository owner adds it under **Settings › Rules › Rulesets**, confirm it is
+> green manually; GitHub does not block a merge when it fails.
 - Deploy to GitHub Pages
 
 Publishing rules:
