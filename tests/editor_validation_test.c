@@ -1271,6 +1271,60 @@ static int loads_recent_files_with_trim_and_limit(void)
     return 0;
 }
 
+static int recent_files_skip_overlong_lines_and_line_breaks(void)
+{
+    const char *level_path = "out/test_editor_recent_level.toml";
+    EditorState es = {0};
+    LevelDef fixture;
+    char root[EDITOR_PATH_MAX] = {0};
+    FILE *fp;
+    int result = 1;
+
+    /* An over-long line is skipped without swallowing the next one, and a
+     * stored path with an embedded line break is ignored. */
+    ensure_out_dir();
+    fp = fopen(EDITOR_WORKFLOW_RECENT_PATH, "wb");
+    if (!fp) return 1;
+    fputs("levels/a.toml\n", fp);
+    for (int i = 0; i < EDITOR_PATH_MAX; i++) fputc('x', fp);
+    fputs("\nlevels/b.toml\nlevels/c\rd.toml\nlevels/e.toml\n", fp);
+    fclose(fp);
+    strncpy(es.recent_path, EDITOR_WORKFLOW_RECENT_PATH, sizeof(es.recent_path) - 1);
+    editor_load_recent_files(&es);
+    if (expect_int("recent after long line", es.recent_file_count, 3) != 0 ||
+        expect_string("recent keeps a", es.recent_files[0], "levels/a.toml") != 0 ||
+        expect_string("recent keeps b", es.recent_files[1], "levels/b.toml") != 0 ||
+        expect_string("recent skips CR path", es.recent_files[2], "levels/e.toml") != 0)
+        goto cleanup;
+
+    /* Saving never writes a path containing a line break. */
+    strcpy(es.recent_files[1], "levels/evil\nlevels/injected.toml");
+    editor_level_init_defaults(&fixture);
+    es.undo = undo_create();
+    if (!es.undo || level_save_toml(&fixture, level_path) != 0 ||
+        make_test_preference_root(root, sizeof(root)) != 0 ||
+        editor_set_preference_root(&es, root) != 0 ||
+        editor_load_level(&es, level_path) != 0) goto cleanup;
+    {
+        EditorState reloaded = {0};
+        strncpy(reloaded.recent_path, EDITOR_WORKFLOW_RECENT_PATH,
+                sizeof(reloaded.recent_path) - 1);
+        editor_load_recent_files(&reloaded);
+        if (expect_int("saved recent count", reloaded.recent_file_count, 3) != 0 ||
+            expect_string("saved recent newest", reloaded.recent_files[0], level_path) != 0 ||
+            expect_string("line break path dropped", reloaded.recent_files[2],
+                          "levels/e.toml") != 0) goto cleanup;
+    }
+    result = 0;
+
+cleanup:
+    cleanup_test_preference_root(root, &es, 1);
+    undo_destroy(es.undo);
+    remove(level_path);
+    remove(EDITOR_WORKFLOW_RECENT_PATH);
+    return result;
+}
+
 static int property_command_undo_redo(void)
 {
     EditorState es;
@@ -2732,6 +2786,7 @@ int main(void)
     if (playtest_blocks_editing_and_stop_cleans_up() != 0) return 1;
     if (load_fingerprints_the_bytes_it_parsed() != 0) return 1;
     if (recovery_metadata_keeps_longest_source_path() != 0) return 1;
+    if (recent_files_skip_overlong_lines_and_line_breaks() != 0) return 1;
     if (widget_commit_paths_preserve_values() != 0) return 1;
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;
