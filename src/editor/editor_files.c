@@ -67,8 +67,11 @@ void editor_test_set_recovery_choice(int button_id)
     editor_test_recovery_choice = button_id;
 }
 
-static void editor_save_recent_files(const EditorState *es);
+static int editor_save_recent_files(const EditorState *es);
+static int editor_recent_path_storable(const char *path);
 static void editor_add_recent_file(EditorState *es, const char *path);
+static int editor_commit_temp_file(FILE *fp, const char *temp_path,
+                                   const char *target_path);
 static void editor_replace_texture(Texture2D **slot, char *loaded_path,
                                    size_t loaded_path_size, const char *path);
 static int editor_preference_file_path(const EditorState *es, const char *name,
@@ -753,6 +756,34 @@ static int editor_recovery_entry_valid(const EditorRecoveryEntry *entry)
            entry->snapshot_path[0] != '\0';
 }
 
+/*
+ * editor_commit_temp_file — Finish an atomic replace begun with
+ * serializer_open_temp.
+ *
+ * Writing straight into the real file would leave it half-written if the
+ * editor crashed or the disk filled up mid-write.  Instead the content goes
+ * to a temporary file next to it; only when every write, the flush to disk
+ * and the close succeeded is the temp file renamed over the target, which
+ * the OS does in one step.  On any failure the temp file is deleted and the
+ * target keeps its previous contents.  Takes ownership of fp.
+ */
+static int editor_commit_temp_file(FILE *fp, const char *temp_path,
+                                   const char *target_path)
+{
+    int stream_error = serializer_stream_has_error(fp);
+    int flush_error = stream_error ? -1 : serializer_flush(fp);
+    int close_error = fclose(fp);
+    int replace_error = (stream_error || flush_error || close_error)
+                      ? -1
+                      : serializer_replace_file(temp_path, target_path);
+
+    if (stream_error || flush_error || close_error || replace_error) {
+        serializer_remove_temp(temp_path);
+        return -1;
+    }
+    return 0;
+}
+
 static int editor_write_recovery_metadata(const EditorRecoveryEntry *entry)
 {
     char temp_path[SERIALIZER_IO_PATH_MAX];
@@ -774,20 +805,7 @@ static int editor_write_recovery_metadata(const EditorRecoveryEntry *entry)
         serializer_remove_temp(temp_path);
         return -1;
     }
-    {
-        int stream_error = serializer_stream_has_error(fp);
-        int flush_error = stream_error ? -1 : serializer_flush(fp);
-        int close_error = fclose(fp);
-        int replace_error = (stream_error || flush_error || close_error)
-                          ? -1
-                          : serializer_replace_file(temp_path,
-                                                    entry->metadata_path);
-        if (stream_error || flush_error || close_error || replace_error) {
-            serializer_remove_temp(temp_path);
-            return -1;
-        }
-    }
-    return 0;
+    return editor_commit_temp_file(fp, temp_path, entry->metadata_path);
 }
 
 static int editor_recovery_name_id(const char *name, uint64_t *id,
@@ -1252,42 +1270,66 @@ void editor_load_recent_files(EditorState *es)
     while (es->recent_file_count < EDITOR_RECENT_MAX &&
            fgets(line, sizeof(line), fp)) {
         size_t len = strlen(line);
-        if (!strchr(line, '\n')) {
-            int ch = fgetc(fp);
-            if (ch != EOF) {
-                while ((ch = fgetc(fp)) != '\n' && ch != EOF) { }
-                continue;
-            }
+        /*
+         * No '\n' and not at end of file means the line did not fit in
+         * `line`: discard the rest of *this* line only, up to and
+         * including its newline, then read the next line normally.
+         */
+        if (!strchr(line, '\n') && !feof(fp)) {
+            int ch;
+            while ((ch = fgetc(fp)) != '\n' && ch != EOF) { }
+            continue;
         }
         while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
             line[--len] = '\0';
         }
-        if (line[0] == '\0' || !editor_path_fits(line)) continue;
+        if (line[0] == '\0' || !editor_path_fits(line) ||
+            !editor_recent_path_storable(line)) continue;
         memcpy(es->recent_files[es->recent_file_count], line, len + 1);
         es->recent_file_count++;
     }
     fclose(fp);
 }
 
-static void editor_save_recent_files(const EditorState *es)
+/*
+ * The recent list is one path per line, so a path that itself contains a
+ * line break would be split into two bogus entries on the next start.
+ * Such names are legal on most file systems; they are just never listed.
+ */
+static int editor_recent_path_storable(const char *path)
 {
+    return path && path[0] != '\0' && strpbrk(path, "\r\n") == NULL;
+}
+
+/* Rewrite the recent list atomically (temp file + rename), so a crash or a
+ * full disk mid-write can never leave a truncated list behind. */
+static int editor_save_recent_files(const EditorState *es)
+{
+    char temp_path[SERIALIZER_IO_PATH_MAX];
     FILE *fp;
 
-    if (!es || es->recent_path[0] == '\0') return;
-    fp = serializer_fopen_utf8(es->recent_path, "wb");
-    if (!fp) return;
+    if (!es || es->recent_path[0] == '\0') return -1;
+    if (serializer_make_temp_path(es->recent_path, temp_path,
+                                  sizeof(temp_path)) != 0) return -1;
+    fp = serializer_open_temp(es->recent_path, temp_path, sizeof(temp_path));
+    if (!fp) return -1;
 
     for (int i = 0; i < es->recent_file_count; i++) {
-        fprintf(fp, "%s\n", es->recent_files[i]);
+        if (!editor_recent_path_storable(es->recent_files[i])) continue;
+        if (fprintf(fp, "%s\n", es->recent_files[i]) < 0) {
+            fclose(fp);
+            serializer_remove_temp(temp_path);
+            return -1;
+        }
     }
-    fclose(fp);
+    return editor_commit_temp_file(fp, temp_path, es->recent_path);
 }
 
 static void editor_add_recent_file(EditorState *es, const char *path)
 {
     int existing = -1;
 
-    if (!path || path[0] == '\0' || !editor_path_fits(path) ||
+    if (!path || !editor_recent_path_storable(path) || !editor_path_fits(path) ||
         editor_path_is_private(es, path)) return;
     for (int i = 0; i < es->recent_file_count; i++) {
         if (strcmp(es->recent_files[i], path) == 0) {
@@ -1320,7 +1362,12 @@ static void editor_add_recent_file(EditorState *es, const char *path)
         if (es->recent_file_count < EDITOR_RECENT_MAX) es->recent_file_count++;
     }
 
-    editor_save_recent_files(es);
+    /* The in-memory list stays updated either way; only persistence for
+     * the next session is lost, so warn without interrupting the save or
+     * load that triggered this. */
+    if (es->recent_path[0] != '\0' && editor_save_recent_files(es) != 0)
+        fprintf(stderr, "Warning: could not write recent files to %s\n",
+                es->recent_path);
 }
 
 static int editor_preference_root_path(const EditorState *es, char *buf,
