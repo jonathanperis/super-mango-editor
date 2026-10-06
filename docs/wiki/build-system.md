@@ -95,7 +95,10 @@ The Makefile detects GNU Make's built-in compiler default and replaces it with c
 `make builder` builds both executables. `make run-editor` also builds the sibling
 game needed for F5 playtest. The default build includes `-g -O0`; `make debug`
 isolates it under `out/debug/`, and `make release` builds `-O2` game/editor binaries
-under `out/release/`. Their object directories never overlap. For additional
+under `out/release/`. Release builds on Linux/macOS add `-fstack-protector-strong` and
+`-D_FORTIFY_SOURCE=2`; Linux also links PIE with full RELRO (`-pie -Wl,-z,relro,-z,now`)
+against a position-independent release raylib. MSYS2/MinGW keeps plain `-O2`.
+Their object directories never overlap. For additional
 custom flag combinations, choose a separate `OUTDIR` to avoid reusing old objects.
 
 `make content-inventory` regenerates public counts and the raw asset inventory;

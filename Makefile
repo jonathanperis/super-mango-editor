@@ -14,10 +14,25 @@ CC = clang
 endif
 BUILD_MODE ?= debug
 MODE_FLAGS_debug = -g -O0
-MODE_FLAGS_release = -O2
+# Release builds add OS-supported exploit mitigations: stack canaries and
+# fortified libc calls everywhere POSIX, plus PIE and full RELRO on Linux.
+# -U first avoids a redefinition warning where the toolchain presets FORTIFY.
+# MSYS2/MinGW keeps plain -O2: its FORTIFY support needs libssp linkage.
+ifeq ($(OS),Windows_NT)
+HARDEN_CFLAGS  =
+HARDEN_LDFLAGS =
+else ifeq ($(shell uname -s),Darwin)
+HARDEN_CFLAGS  = -fstack-protector-strong -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
+HARDEN_LDFLAGS =
+else
+HARDEN_CFLAGS  = -fstack-protector-strong -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -fPIE
+HARDEN_LDFLAGS = -pie -Wl,-z,relro,-z,now
+endif
+MODE_FLAGS_release = -O2 $(HARDEN_CFLAGS)
+MODE_LDFLAGS_release = $(HARDEN_LDFLAGS)
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(MODE_FLAGS_$(BUILD_MODE)) -I$(RAYLIB_BUILD)/build/raylib/include $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_RAYLIB_MEMORY,) $(EXTRA_CFLAGS)
 TEST_CFLAGS = $(CFLAGS) $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_MEMORY_TESTS,)
-LIBS    = $(RAYLIB_LIB) $(PLATFORM_LIBS) $(EXTRA_LDFLAGS)
+LIBS    = $(RAYLIB_LIB) $(PLATFORM_LIBS) $(MODE_LDFLAGS_$(BUILD_MODE)) $(EXTRA_LDFLAGS)
 OUTDIR  = out
 RAYLIB_BUILD ?= $(OUTDIR)/raylib
 RAYLIB_PLATFORM ?= native
