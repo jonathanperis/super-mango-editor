@@ -52,6 +52,13 @@ class DocsChecksTest(unittest.TestCase):
             ("index.html", "</body>", '<a href="docs/controls/#missing">Missing</a></body>',
              "missing anchor docs/controls/#missing"),
             ("robots.txt", "sitemap-index.xml", "sitemap.xml", "missing sitemap"),
+            ("index.html", 'http-equiv="Content-Security-Policy"', 'http-equiv="X-Removed"',
+             "expected one Content-Security-Policy meta tag"),
+            ("index.html", "const canvas = document.getElementById('canvas');",
+             "const canvas = document.getElementById('canvas'); ",
+             "CSP does not allow inline script"),
+            ("index.html", "script-src 'self'", "script-src 'self' 'unsafe-inline'",
+             "script-src must be 'self' plus inline script hashes only"),
         ]
         original_read = Path.read_text
         for name, old, new, expected in cases:
