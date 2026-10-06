@@ -3,6 +3,12 @@
 # Native and web libraries have separate build directories and never use SDL.
 NODE ?= node
 
+# A recipe that fails part-way can leave its target newer than its inputs:
+# emcc writes the HTML, then tools/web_csp.py fails to pin its CSP.  Make
+# would then treat that unpinned page as up to date.  This deletes the
+# target of any failed recipe so the next run rebuilds it.
+.DELETE_ON_ERROR:
+
 ifeq ($(OS),Windows_NT)
 CC      ?= /c/msys64/ucrt64/bin/clang.exe
 else
