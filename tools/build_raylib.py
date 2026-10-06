@@ -28,13 +28,21 @@ def main() -> None:
     pin = json.loads((ROOT / "vendor/raylib/manifest.json").read_text())
     build = args.build_dir.resolve()
     build.mkdir(parents=True, exist_ok=True)
+    # --archive lets several build directories (and CI caches) share one
+    # download. It is still verified below, so a stale or corrupt shared copy
+    # fails closed instead of building unpinned code.
     archive = args.archive or build / "source.tar.gz"
     if not archive.is_file():
         with urllib.request.urlopen(pin["url"], timeout=120) as response:
             payload = response.read()
         if hashlib.sha256(payload).hexdigest() != pin["sha256"]:
             raise SystemExit("raylib archive checksum mismatch")
-        archive.write_bytes(payload)
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        # Write then rename so a concurrent or interrupted build never sees
+        # a truncated archive at the shared path.
+        partial = archive.with_name(archive.name + f".{os.getpid()}.part")
+        partial.write_bytes(payload)
+        os.replace(partial, archive)
     if hashlib.sha256(archive.read_bytes()).hexdigest() != pin["sha256"]:
         raise SystemExit("raylib archive checksum mismatch")
     source = build / ("raylib-" + pin["commit"])

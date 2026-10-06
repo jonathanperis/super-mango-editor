@@ -39,6 +39,10 @@ RAYLIB_PLATFORM ?= native
 RAYLIB_LIB = $(RAYLIB_BUILD)/build/raylib/libraylib.a
 WEB_RAYLIB_BUILD = $(OUTDIR)/raylib-web
 WEB_RAYLIB_LIB = $(WEB_RAYLIB_BUILD)/build/raylib/libraylib.a
+# Optional shared, checksum-verified source archive (CI caches this one file
+# instead of downloading it once per build directory).
+RAYLIB_ARCHIVE ?=
+RAYLIB_ARCHIVE_ARG = $(if $(RAYLIB_ARCHIVE),--archive "$(RAYLIB_ARCHIVE)",)
 RELEASE_RAYLIB_BUILD = $(if $(filter command line environment,$(origin RAYLIB_BUILD)),$(RAYLIB_BUILD),$(OUTDIR)/release/raylib)
 ifeq ($(OS),Windows_NT)
 PLATFORM_LIBS = -lopengl32 -lgdi32 -lwinmm -lshell32 -lole32 -lpsapi -lbcrypt -lm
@@ -182,10 +186,10 @@ SANITIZE_LDFLAGS    = -fsanitize=address,undefined
 all: $(OUTDIR) $(TARGET)
 
 $(RAYLIB_LIB): vendor/raylib/manifest.json vendor/raylib/patches.json tools/build_raylib.py Makefile
-	python3 tools/build_raylib.py --build-dir "$(RAYLIB_BUILD)" --platform $(RAYLIB_PLATFORM) --cc "$(CC)" --mode $(BUILD_MODE) $(if $(findstring -fsanitize,$(CFLAGS)),--sanitize,)
+	python3 tools/build_raylib.py --build-dir "$(RAYLIB_BUILD)" --platform $(RAYLIB_PLATFORM) --cc "$(CC)" --mode $(BUILD_MODE) $(if $(findstring -fsanitize,$(CFLAGS)),--sanitize,) $(RAYLIB_ARCHIVE_ARG)
 
 $(WEB_RAYLIB_LIB): vendor/raylib/manifest.json vendor/raylib/patches.json tools/build_raylib.py Makefile
-	python3 tools/build_raylib.py --build-dir "$(WEB_RAYLIB_BUILD)" --platform web --mode release
+	python3 tools/build_raylib.py --build-dir "$(WEB_RAYLIB_BUILD)" --platform web --mode release $(RAYLIB_ARCHIVE_ARG)
 
 $(OUTDIR):
 	mkdir -p $(OUTDIR) $(OBJDIR) $(OBJDIR)/tests
