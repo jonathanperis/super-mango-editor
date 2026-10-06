@@ -116,7 +116,7 @@ Changes take effect immediately on the canvas (WYSIWYG).
 
 1. Open the **World** palette category, choose **Checkpoint**, select **Place**, and click the intended respawn point.
 2. Use **Select** to drag it or edit its `x` and `y` fields. Delete, copy/paste, undo, and redo use the same workflow as other non-singleton placement records.
-3. Save or playtest only after validation succeeds. A checkpoint must be after the effective player start, must have a unique in-world `x`, and must have an in-world `y`; invalid records block save, autosave, and playtest.
+3. Save or playtest only after validation succeeds. A checkpoint must be after the effective player start, must have a unique in-world `x`, and must have an in-world `y`; invalid records block save and playtest (autosave keeps the last valid version).
 
 The canvas draws a labelled `CP n` marker. Valid markers are amber, hovered markers brighten, the selected marker is blue, and invalid markers are red. The status bar reports **Checkpoint placed**, **Checkpoint moved**, or **Checkpoint deleted**. In the running game, crossing a valid marker produces a brief `CHECKPOINT CP n` HUD notice; a death respawn is labelled `RESPAWN CP n`. The debug inspector exposes the current checkpoint index after those temporary notices expire.
 
@@ -163,7 +163,7 @@ The editor maintains a full undo stack for all placement, deletion, and property
 
 The undo stack is in-memory only — it is cleared when a new file is opened or created.
 
-The editor keeps recent files and recovery snapshots for modified valid levels in its OS preference directory, retaining the `Super Mango/Editor/` organization/application suffix.
+The editor keeps recent files and recovery snapshots for modified levels in its OS preference directory, retaining the `Super Mango/Editor/` organization/application suffix. Autosave runs every 30 seconds while the level is modified. Recovery snapshots must load through the same validation as any level, so while the current level has validation errors autosave writes the most recent valid version of the document instead. A failed autosave is reported once and retried after the next 30-second interval.
 
 ---
 
