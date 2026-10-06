@@ -110,7 +110,8 @@ custom flag combinations, choose a separate `OUTDIR` to avoid reusing old object
 `make asset-budget` checks freshness and the 4 MiB raw playable-asset budget
 (2 MiB of it for generated sounds). `make sounds` regenerates the WAV files
 from `tools/gen_sounds.py`; `make docs-drift` runs its `--check` mode.
-`make timing-lab` prints a small integration experiment for 30/60/144 Hz.
+`make timing-lab` prints a small integration experiment for 30/60/144 Hz that
+shows why the game simulates fixed 1/60 s steps instead of a variable frame dt.
 Python 3.11+ and Node.js are required for host checks. Use a current Python
 (3.12+ recommended) for the raylib bootstrap, which also uses `tarfile` extraction
 filters. Linux dialogs use zenity.

@@ -202,10 +202,19 @@ typedef struct {
     int coin_score;      /* points awarded per coin collected   */
 } GameRules;
 
+/*
+ * GameLoopState — bookkeeping for the fixed-step frame loop (game_timing.c).
+ *
+ * Real time between frames is added to `accumulator`; the simulation then
+ * consumes it in steps of exactly 1/TARGET_FPS seconds. Leftover time (less
+ * than one step) waits for the next frame.
+ */
 typedef struct {
-    uint64_t prev_ticks;   /* timestamp of previous frame */
-    int    fp_prev_riding; /* float platform player stood on last frame*/
-    int    smoke_frames_run; /* frames actually executed by a smoke run */
+    double prev_time;      /* GetTime() seconds when the previous frame began   */
+    double accumulator;    /* real seconds waiting to be simulated              */
+    int    clock_started;  /* 0 = next frame restarts the clock (no catch-up)   */
+    int    fp_prev_riding; /* float platform player stood on last step          */
+    int    smoke_frames_run; /* frames actually executed by a smoke run         */
 } GameLoopState;
 
 /*

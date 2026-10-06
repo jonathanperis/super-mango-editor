@@ -415,7 +415,8 @@ static int repeated_menu_game_ownership(void)
 
     session->game->completion.complete = 1;
     session->game->completion.pending_next_phase = 1;
-    session->game->loop.prev_ticks = 0;
+    session->game->loop.clock_started = 1;
+    session->game->loop.accumulator = 0.2; /* time that must not be caught up */
     session->game->terminal_action_index = 0;
     if (push_confirm() != 0) return 1;
     session_frame(session);
@@ -424,7 +425,8 @@ static int repeated_menu_game_ownership(void)
         fprintf(stderr, "session_test: successful next level kept completion\n");
         return 1;
     }
-    if (expect_int("next level timing reset", session->game->loop.prev_ticks != 0, 1) != 0)
+    if (expect_int("next level timing reset", session->game->loop.clock_started == 0 &&
+                   session->game->loop.accumulator < GAME_FIXED_STEP, 1) != 0)
         return 1;
 
     {
@@ -769,7 +771,8 @@ static int pending_profile_keeps_exit_alive(void)
     session->profile.pending_revision = session->profile.revision;
     session->attempted_save_revision = session->profile.revision;
     session->game->route = GAME_ROUTE_EXIT;
-    session->game->loop.prev_ticks = clock_millis() - 100;
+    session->game->loop.clock_started = 1;
+    session->game->loop.prev_time = GetTime() - 0.1; /* 100 ms pending */
     float elapsed = session->game->completion.level_elapsed;
     session_frame(session);
     if (expect_int("pending save retains session", session->ended, 0) ||
@@ -937,16 +940,57 @@ static int coins_stay_collected_across_life_loss(void)
     return 0;
 }
 
+static int fixed_step_accumulator_contract(void)
+{
+    /* Smoke and scripted replays: one fixed step per frame, whatever the
+     * wall clock says, so their results match on every machine. */
+    GameState smoke = {0};
+    smoke.smoke_test_frames = 5;
+    game_timing_restart_clock(&smoke);
+    float first = game_timing_frame_seconds(&smoke);
+    clock_wait(20);
+    float delayed = game_timing_frame_seconds(&smoke);
+    if (expect_float("smoke fixed step", first, GAME_FIXED_STEP) ||
+        expect_float("wall time does not change replay physics", delayed, first)) return 1;
+    for (int frame = 0; frame < 120; frame++)
+        if (expect_int("smoke runs one step per frame", game_timing_take_steps(&smoke, first), 1)) return 1;
+
+    /* A 144 Hz display still simulates 60 steps per second; most of its
+     * frames run zero steps and only redraw. */
+    GameState fast = {0};
+    game_timing_restart_clock(&fast);
+    int steps = 0, idle_frames = 0;
+    for (int frame = 0; frame < 144; frame++) {
+        int frame_steps = game_timing_take_steps(&fast, 1.0f / 144);
+        steps += frame_steps;
+        idle_frames += frame_steps == 0;
+    }
+    if (expect_int("144 Hz second simulates 60 steps", steps, 60) ||
+        expect_int("144 Hz frames without a step", idle_frames, 84)) return 1;
+
+    /* Measured 60 Hz frames jitter by a fraction of a millisecond; the
+     * half-step slack keeps that at exactly one step per frame. */
+    GameState jitter = {0};
+    game_timing_restart_clock(&jitter);
+    for (int frame = 0; frame < 600; frame++) {
+        float seconds = GAME_FIXED_STEP + (frame % 2 ? 0.0006f : -0.0006f);
+        if (expect_int("jittery 60 Hz runs one step", game_timing_take_steps(&jitter, seconds), 1)) return 1;
+    }
+
+    /* A stall is clamped, capped and then forgotten (no spiral of death). */
+    GameState stall = {0};
+    game_timing_restart_clock(&stall);
+    stall.loop.clock_started = 1;
+    stall.loop.prev_time = GetTime() - 5.0;
+    float stalled = game_timing_frame_seconds(&stall);
+    if (expect_float("stall clamped", stalled, (float)GAME_MAX_FRAME_SECONDS) ||
+        expect_int("stall capped", game_timing_take_steps(&stall, stalled), GAME_MAX_STEPS_PER_FRAME) ||
+        expect_int("excess dropped", game_timing_take_steps(&stall, GAME_FIXED_STEP), 1)) return 1;
+    return 0;
+}
+
 static int nearest_surface_is_order_independent(void)
 {
-    GameState timing = {0};
-    timing.smoke_test_frames = 5;
-    timing.loop.prev_ticks = clock_millis();
-    float first = game_timing_step(&timing, NULL);
-    clock_wait(20);
-    float delayed = game_timing_step(&timing, NULL);
-    if (expect_float("smoke fixed step", first, 1.0f / TARGET_FPS) ||
-        expect_float("wall time does not change replay physics", delayed, first)) return 1;
     for (int order = 0; order < 2; order++) {
         Platform platforms[2] = {{.x=0,.y=order ? 100 : 120,.w=100},
                                  {.x=0,.y=order ? 120 : 100,.w=100}};
@@ -1035,6 +1079,7 @@ int main(void)
         CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),
         CASE(menu_mouse_and_path_boundaries), CASE(collision_lifetime_and_pickups),
         CASE(coins_stay_collected_across_life_loss), CASE(settings_keep_music_paused_after_refocus),
+        CASE(fixed_step_accumulator_contract),
         CASE(nearest_surface_is_order_independent), CASE(phase_resets_transient_state),
         CASE(campaign_manifest_is_ordered_and_transactional),
         CASE(campaign_manifest_nul_fixtures_reject_transactionally),

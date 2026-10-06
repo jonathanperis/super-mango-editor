@@ -33,7 +33,7 @@ behind another abstraction.
 
 - 2D side-scrolling platformer with dynamic multi-screen TOML worlds, from the 4-screen sandbox to longer volcanic stages
 - 32 render layers drawn back-to-front: parallax background, platforms, floor, enemies, player, fog, HUD, debug overlay
-- Delta-time physics with explicit numerical-integration tradeoffs; `make timing-lab` compares variable and fixed steps
+- Fixed-time-step physics (1/60 s steps fed by an accumulator); `make timing-lab` compares variable and fixed steps
 - Six enemy types: spiders, jumping spiders, birds, faster birds, fish, faster fish
 - Seven hazard types: spike rows, spike blocks, spike platforms, circular saws, axe traps, blue flames, fire flames
 - Collectibles: coins (100 pts each, bonus life by score threshold), star yellow, star green, star red health pickups, end-of-level last star

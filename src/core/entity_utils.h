@@ -32,7 +32,7 @@
  * Parameters:
  *   frame_index  : pointer to the current frame index — updated in place.
  *   timer_ms     : pointer to the accumulated time counter — updated in place.
- *   dt           : seconds elapsed this frame (e.g. 0.016 at 60 FPS).
+ *   dt           : seconds simulated by this step (1/60 s in live play).
  *   frame_ms     : how many milliseconds each frame is shown before advancing.
  *   frame_count  : total number of frames in this animation loop.
  *
@@ -66,7 +66,7 @@ int animate_frame_ms(int *frame_index, uint32_t *timer_ms,
  *   patrol_x0  : left  boundary of the patrol range in world-space px.
  *   patrol_x1  : right boundary of the patrol range in world-space px.
  *   speed      : absolute patrol speed in px/s; always a positive value.
- *   dt         : seconds elapsed this frame.
+ *   dt         : seconds simulated by this step.
  *
  * Usage:
  *   patrol_update(&s->x, &s->vx, SPIDER_FRAME_W,

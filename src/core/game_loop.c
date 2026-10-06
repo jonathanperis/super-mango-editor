@@ -1,9 +1,15 @@
 /*
  * game_loop.c — Main frame loop and per-frame dispatch.
+ *
+ * One call to game_frame renders one picture, but the simulation inside it
+ * advances in fixed steps (game_timing.h explains why). On a 60 Hz display
+ * that is one step per frame; on 144 Hz most frames run zero steps and only
+ * redraw; after a slow frame several steps run before the next picture.
  */
 
 #include "../game.h"
 
+#include "game_experiment.h"
 #include "game_overlay.h"
 #include "game_timing.h"
 #include "game_update.h"
@@ -13,17 +19,18 @@
 #include "../input/game_replay.h"
 #include "../input/game_web_input.h"
 #include "../render/game_render.h"
-#include "../screens/settings_menu.h"
 
 /* Execute one frame. AppSession is the only cross-platform loop owner. */
 int game_frame(GameState *gs)
 {
-    uint64_t frame_start_ticks = 0;
-    float dt = game_timing_step(gs, &frame_start_ticks);
+    /* ---- 1. Time ------------------------------------------------- */
+    /* Real seconds since the last frame (clamped); smoke/replay runs get
+     * exactly one fixed step so they are identical on every machine. */
+    float frame_seconds = game_timing_frame_seconds(gs);
 
     gamepad_refresh_controller(gs);
 
-    /* ---- 1. Events ----------------------------------------------- */
+    /* ---- 2. Events ----------------------------------------------- */
     game_replay_inject_events(gs);
     game_handle_events(gs);
 
@@ -34,21 +41,30 @@ int game_frame(GameState *gs)
      */
     int cam_x = (int)gs->camera.x;
 
+    /* ---- 3. Fixed-step simulation -------------------------------- */
     /*
-     * Skip physics and game logic while an overlay is showing. Rendering still
-     * runs so the last visible frame remains on screen and in OS thumbnails.
+     * While a pause/settings/terminal screen owns input, drop its touch taps
+     * so they are not replayed into gameplay later; still-held movement is
+     * sampled again on resume. A frame that merely runs zero steps (a fast
+     * display between two steps) keeps its taps for the next step.
      */
-    float simulation_dt = game_inspector_step(gs, dt);
-    if (simulation_dt > 0) {
-        cam_x = game_update_active(gs, simulation_dt, cam_x);
-    } else {
-        /* Do not replay taps made while a pause/settings/terminal screen owns
-         * input. Still-held movement remains available when resuming. */
-        (void)game_web_input_take_touch_mask();
+    if (game_simulation_blocked(gs)) (void)game_web_input_take_touch_mask();
+
+    int steps = game_inspector_steps(gs, frame_seconds);
+    for (int i = 0; i < steps; i++) {
+        /* Live steps are GAME_FIXED_STEP; a replayed experiment supplies its
+         * recorded step and 0 once the tape has ended. */
+        float step_dt = game_experiment_dt(gs, GAME_FIXED_STEP);
+        if (step_dt <= 0.0f) break;
+        cam_x = game_update_active(gs, step_dt, cam_x);
+        /* Completion, game over or a route stops the remaining steps. */
+        if (game_simulation_blocked(gs)) break;
     }
 
-    /* ---- 3. Render ----------------------------------------------- */
-    int presented = game_render_frame(gs, cam_x, dt);
+    /* ---- 4. Render ----------------------------------------------- */
+    /* Rendering still runs on zero-step and blocked frames, so the last
+     * picture stays on screen. Render-only timers use real frame time. */
+    int presented = game_render_frame(gs, cam_x, frame_seconds);
 
     game_timing_tick_smoke(gs);
     return presented;

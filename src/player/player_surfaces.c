@@ -17,11 +17,12 @@
  * gap smaller than this tolerance between the player's physics bottom and the
  * platform's top surface.
  *
- * Worst-case gap in one frame at the dt cap (0.1 s):
+ * Worst-case gap in one step of the longest accepted dt (0.1 s, the limit
+ * for replayed experiment captures; live steps are only 1/60 s):
  *   platform moves up : 2 tiles/s × 16 px/tile × 0.1 s = 3.2 px
  *   player falls      : ½ × GRAVITY × dt²            = 4.0 px
  *   total gap                                          = 7.2 px
- * 16 px gives a safe margin over the dt-capped worst case.
+ * 16 px gives a safe margin over that worst case.
  */
 #define FLOAT_PLATFORM_STICK_TOL  16
 

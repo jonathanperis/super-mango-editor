@@ -48,8 +48,10 @@ session_destroy(session) / browser terminal cleanup
 
 On Web, Emscripten's animation-frame callback owns scheduling. `display_open`
 sets raylib's target FPS to zero so `EndDrawing` returns to the browser instead
-of sleeping on its main thread. Browser cadence follows animation frames; this
-does not require Asyncify or change fixed-step replay/smoke simulation. The input
+of sleeping on its main thread. Browser cadence follows animation frames; the
+fixed-step accumulator turns whatever rate the browser delivers (60, 120 or
+144 Hz) into 60 simulation steps per second. This does not require Asyncify or
+change fixed-step replay/smoke simulation. The input
 adapter also skips `WindowShouldClose` on Web: there is no native close button,
 and raylib's Web implementation calls `emscripten_sleep`, which aborts without
 Asyncify. In-game exit remains an application route handled by the host.
@@ -85,12 +87,13 @@ session_frame(session) {
 }
 
 game_frame(gs) {
-  1. Delta Time   — measure ms since last frame → dt (seconds)
+  1. Time         — real seconds since last frame (GetTime, clamped to 0.25 s)
   2. Events       — drain project-owned InputEvent commands (quit / pause / overlays)
                      INPUT_PAD_ADDED / INPUT_PAD_REMOVED — update selected gamepad index
                      terminal: Up/Down or D-pad selects; Enter/Space/Start (or A) confirms
                      terminal: Esc/Back (or B) exits; Start toggles active-game pause
-   3. Update       — inspector selects simulation dt; pause/settings/terminal state can block it
+   3. Update       — accumulator turns real time into 0..5 fixed 1/60 s steps; pause/settings/
+                     terminal state blocks them; each step runs, in order:
                      → game_player_step (sampled input, motion, surface landing, bounce response)
                      → authored checkpoint sampling → lethal floor-gap detection
                      → actors → moving platforms/rider carry → bridges → hazards
@@ -109,20 +112,43 @@ game_frame(gs) {
 }
 ```
 
-### Delta Time
+### Fixed Time Step
 
 ```c
-uint64_t now = clock_millis();
-float  dt  = (float)(now - prev) / 1000.0f;
-prev = now;
+accumulator += frame_seconds;              /* real time, clamped to 0.25 s  */
+while (accumulator >= GAME_FIXED_STEP && steps < GAME_MAX_STEPS_PER_FRAME) {
+    game_update_active(gs, GAME_FIXED_STEP, cam_x);   /* always 1/60 s    */
+    accumulator -= GAME_FIXED_STEP;
+}
+render();                                  /* every frame, even 0 steps    */
 ```
 
-Velocities are expressed in **pixels per second**. Multiplication by `dt` gives a displacement, but discrete acceleration and collision sampling still introduce timestep-dependent error. `make timing-lab` demonstrates this distinction. Replay uses recorded steps; the inspector can freeze, single-step, slow and tune a simulation without overriding focus/settings/terminal blockers.
+Velocities are expressed in **pixels per second**, and every simulation step
+multiplies them by the same `dt` of exactly `1 / TARGET_FPS`. Real frame time
+(raylib's `GetTime()`, a double in seconds) only decides *how many* steps run
+before the next picture (`src/core/game_timing.c`):
 
-Targeting 60 rendered frames per second does not make normal gameplay a fixed
-step: `game_timing_step` measures elapsed time and clamps it to 0.1 seconds.
-Smoke/scripted input uses `1 / TARGET_FPS`; captured experiments use their
-recorded durations. These choices are separate from presentation pacing.
+- **Frame-rate-independent results.** Discrete integration still has error
+  (`make timing-lab`), but it is the same error at 30, 60 or 144 Hz, so jump
+  heights and arcs no longer depend on the display.
+- **Bounded movement per step.** One step moves at most speed × 1/60 s, so a
+  slow frame cannot carry the player past a collision test.
+- **Replays behave like live play.** Live play, smoke tests, scripted replays
+  and captured experiments run the very same steps.
+
+A 60 Hz display runs one step per frame; a 120/144 Hz display (the browser
+follows `requestAnimationFrame`) runs zero steps on some frames and just
+redraws. The accumulator restarts half a step full after pauses and loads, which
+absorbs sub-millisecond vsync jitter. Frame time is clamped to 0.25 s and at most
+5 steps run per frame; excess time is dropped (below 12 FPS the game slows down
+instead of spiralling). Smoke and scripted replays feed exactly one step per
+frame regardless of the wall clock. Experiment captures record each step's
+duration (now always the fixed step; older captures with variable steps in
+(0, 0.1] still replay). The debug inspector only changes how much real time
+reaches the accumulator: F2 freezes, F3 runs exactly one step, F4 slows time to
+0.25x/0.1x. It never overrides focus/settings/terminal blockers, and touch taps
+are discarded only while such a screen owns input, not on zero-step frames.
+Render-only timers (debug FPS readout, log ages) use real frame time.
 
 During an active game update, authored checkpoints are sampled after player movement and before lethal collision handling. Legacy screen-boundary checkpoint sampling runs only when the active level has no authored records.
 

@@ -1,6 +1,7 @@
 #include "game_inspector.h"
 #include "game_experiment.h"
 #include "game_overlay.h"
+#include "game_timing.h"
 #include "../levels/level_physics.h"
 #include "../screens/settings_menu.h"
 #include "../player/player_internal.h"
@@ -83,20 +84,27 @@ int game_inspector_event(GameState *gs, const InputEvent *event)
     }
 }
 
-float game_inspector_step(GameState *gs, float elapsed)
+int game_inspector_steps(GameState *gs, float frame_seconds)
 {
-    if (game_overlay_blocks_update(gs) || (gs->settings_menu && gs->settings_menu->open) ||
-        !gs->running || gs->route != GAME_ROUTE_NONE) {
+    /* Overlays, settings and routes own the frame. Forget the time that
+     * passes meanwhile so resuming does not replay it as a burst of steps. */
+    if (game_simulation_blocked(gs)) {
         gs->inspector.step_requested = 0;
+        game_timing_restart_clock(gs);
         return 0;
     }
-    if (!gs->debug_mode) return elapsed;
+    if (!gs->debug_mode) return game_timing_take_steps(gs, frame_seconds);
+
+    /* Debug inspection changes only how much real time reaches the
+     * accumulator; every step it runs is still exactly GAME_FIXED_STEP. */
     int step = gs->inspector.step_requested;
     gs->inspector.step_requested = 0;
-    if (gs->inspector.frozen && !step) return 0;
+    if (step || gs->inspector.frozen) {
+        game_timing_restart_clock(gs);
+        return step ? 1 : 0;   /* F3 advances exactly one step */
+    }
     static const float speeds[] = {1.0f, 0.25f, 0.1f};
-    float dt = step ? 1.0f / TARGET_FPS : elapsed * speeds[gs->inspector.slow_mode];
-    return game_experiment_dt(gs, dt);
+    return game_timing_take_steps(gs, frame_seconds * speeds[gs->inspector.slow_mode]);
 }
 
 void game_inspector_render(GameState *gs)

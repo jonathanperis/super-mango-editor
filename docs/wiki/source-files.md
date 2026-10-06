@@ -30,7 +30,7 @@ src/
 │   ├── entity_utils.h / .c       Shared entity helper functions
 │   ├── game_state.h / .c         GameState reset helpers
 │   ├── game_window.h / .c        Screen-owned logical render target
-│   ├── game_timing.h / .c        Frame timing helpers
+│   ├── game_timing.h / .c        Fixed-step accumulator and frame clock
 │   ├── game_lifecycle.c          `game_init` / `game_cleanup` implementation
 │   ├── game_loop.c               Active-game frame runner (game_frame)
 │   ├── game_update.h / .c        Top-level update orchestration
@@ -295,9 +295,9 @@ Returns `0` on success. If a required window, texture, level, or subsystem resou
 
 ### `game_frame(GameState *gs)`
 
-`game_frame` performs one frame: delta time -> events -> update -> render.
-Normal rendering targets 60 FPS with measured/clamped `dt`; smoke and scripted
-replays use a fixed step. `AppSession` is the only loop owner. See
+`game_frame` performs one frame: real frame time -> events -> 0..5 fixed 1/60 s
+update steps -> render. Real time feeds an accumulator (`core/game_timing.c`), so
+every step, live or replayed, has the same `dt`. `AppSession` is the only loop owner. See
 [Architecture](../architecture/) for routes and render order.
 
 ### `game_cleanup(GameState *gs)`

@@ -3,6 +3,7 @@
 #include "core/game_inspector.h"
 #include "core/game_overlay.h"
 #include "core/game_resources.h"
+#include "core/game_timing.h"
 #include "core/game_update.h"
 #include "collision/collision_damage.h"
 #include "screens/settings_menu.h"
@@ -30,22 +31,30 @@ static int inspection_and_replay(void)
     strcpy(gs.level_path, "tests/fixtures/runtime/transition.toml");
     CHECK(game_init(&gs) == 0);
     input_clear();
+    /* Live play: 40 ms of real time holds two 1/60 s steps (+ the half-step
+     * slack a restarted clock starts with), never a 40 ms step. */
+    game_timing_restart_clock(&gs);
+    CHECK(game_inspector_steps(&gs, 0.04f) == 2);
     key(&gs, KEY_F2);
-    CHECK(game_inspector_step(&gs, 0.04f) == 0);
+    CHECK(game_inspector_steps(&gs, 0.04f) == 0);
     key(&gs, KEY_F3);
-    CHECK(NEAR(game_inspector_step(&gs, 0.04f), 1.0f / 60));
-    CHECK(game_inspector_step(&gs, 0.04f) == 0);
+    CHECK(game_inspector_steps(&gs, 0.04f) == 1);
+    CHECK(game_inspector_steps(&gs, 0.04f) == 0);
     key(&gs, KEY_F3);
     game_overlay_set_pause_reason(&gs, GAME_PAUSE_REASON_FOCUS, 1);
-    CHECK(game_inspector_step(&gs, 0.04f) == 0 && !gs.inspector.step_requested);
+    CHECK(game_inspector_steps(&gs, 0.04f) == 0 && !gs.inspector.step_requested);
     game_overlay_set_pause_reason(&gs, GAME_PAUSE_REASON_FOCUS, 0);
-    CHECK(game_inspector_step(&gs, 0.04f) == 0);
+    CHECK(game_inspector_steps(&gs, 0.04f) == 0);
+    /* Slow mode 0.25x: 40 ms of real time is 10 ms of game time, so steps
+     * arrive every other frame instead of becoming shorter. */
     key(&gs, KEY_F2); key(&gs, KEY_F4);
-    CHECK(NEAR(game_inspector_step(&gs, 0.04f), 0.01f));
+    CHECK(game_inspector_steps(&gs, 0.04f) == 1);
+    CHECK(game_inspector_steps(&gs, 0.04f) == 0);
+    CHECK(game_inspector_steps(&gs, 0.04f) == 1);
     SettingsMenu settings = {.open = 1};
     gs.settings_menu = &settings;
     key(&gs, KEY_F3);
-    CHECK(game_inspector_step(&gs, 0.04f) == 0);
+    CHECK(game_inspector_steps(&gs, 0.04f) == 0);
     settings.capture = 1;
     InputEvent reserved = {.type=INPUT_KEY_DOWN,.key=KEY_F3};
     input_push(&reserved); game_handle_events(&gs);
@@ -72,17 +81,26 @@ static int inspection_and_replay(void)
     CHECK(game_experiment_save(&gs, "out/school-experiment.toml") == 0);
     CHECK(game_experiment_save(&gs, "out/school-experiment.toml") == -1);
     CHECK(game_experiment_load(&gs, "out/school-experiment.toml") == 0);
-    for (int i = 0; i < 180; i++) {
+    /* Replay through the same frame loop shape as game_frame: real frames of
+     * 70 ms run several steps each; each step uses the recorded duration,
+     * including the older-style 1/120 s steps captured above. */
+    int replayed = 0;
+    for (int frame = 0; frame < 400 && replayed < 180; frame++) {
         /* Opposite live input must not perturb replay. */
         gs.replay_input_mask = PLAYER_INPUT_LEFT;
-        float dt = game_inspector_step(&gs, 0.07f);
-        CHECK(dt > 0);
-        game_update_active(&gs, dt, (int)gs.camera.x);
+        int steps = game_inspector_steps(&gs, 0.07f);
+        for (int s = 0; s < steps; s++) {
+            float dt = game_experiment_dt(&gs, GAME_FIXED_STEP);
+            if (dt <= 0) break;
+            game_update_active(&gs, dt, (int)gs.camera.x);
+            replayed++;
+        }
     }
+    CHECK(replayed == 180);
     CHECK(NEAR(gs.player.x, recorded.x) && NEAR(gs.player.y, recorded.y));
     CHECK(NEAR(gs.player.vx, recorded.vx) && NEAR(gs.player.vy, recorded.vy));
     CHECK(NEAR(gs.completion.level_elapsed, elapsed) && gs.score == score && gs.checkpoint_index == checkpoint);
-    CHECK(game_inspector_step(&gs, 0.04f) == 0);
+    CHECK(game_inspector_steps(&gs, 0.04f) == 0);
     FILE *bad = fopen("out/school-experiment-invalid.toml", "w");
     CHECK(bad != NULL);
     fputs("format_version = 9\n", bad); fclose(bad);
