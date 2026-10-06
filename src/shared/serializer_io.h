@@ -78,7 +78,8 @@ int serializer_same_file_utf8(const char *a, const char *b);
 int serializer_resolve_save_target(const char *path, char *buf, size_t buf_size);
 
 /* Replace target with a completed sibling temporary file, then sync its
- * directory entry where the platform supports it. */
+ * directory entry where the platform supports it.  A failed directory sync
+ * after the file is in place is a stderr warning, not a failed save. */
 int serializer_replace_file(const char *temp_path, const char *target_path);
 
 /* Install a completed sibling only when target is still absent (also synced). */
@@ -92,6 +93,7 @@ void serializer_remove_temp(const char *path);
 #define SERIALIZER_TEST_FAILURE_WRITE 1
 #define SERIALIZER_TEST_FAILURE_FLUSH 2
 #define SERIALIZER_TEST_FAILURE_TARGET_APPEARED 3
+#define SERIALIZER_TEST_FAILURE_DIR_SYNC 4 /* POSIX parent-folder fsync */
 void serializer_test_set_failure(int failure);
 
 /* Check stdio output state, including the internal write-failure seam. */

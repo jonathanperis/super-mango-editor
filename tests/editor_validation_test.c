@@ -616,6 +616,71 @@ fail:
     return 1;
 }
 
+/*
+ * A folder fsync that fails after rename/link has already installed the
+ * file is a warning, not a failed save.  Otherwise the editor would keep
+ * the old baseline, and a create-only Save As would fail on every retry
+ * because its target now exists.
+ */
+static int dir_sync_failure_after_install_still_saves(void)
+{
+#ifdef _WIN32
+    return 0;   /* Windows uses MOVEFILE_WRITE_THROUGH; no folder sync. */
+#else
+    const char *replaced = "out/editor_dir_sync_replace.toml";
+    const char *created = "out/editor_dir_sync_create.toml";
+    EditorState es = {0};
+    LevelDef def;
+    LevelDef reloaded;
+    SerializerFileFingerprint on_disk;
+    char root[EDITOR_PATH_MAX] = {0};
+    int result = 1;
+
+    ensure_out_dir();
+    remove(replaced);
+    remove(created);
+    fill_valid_minimal(&def);
+    if (level_save_toml(&def, replaced) != 0) return 1;
+    strncpy(def.name, "Synced later", sizeof(def.name) - 1);
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_DIR_SYNC);
+    if (expect_int("replace with failed folder sync",
+                   level_save_toml(&def, replaced), 0) != 0 ||
+        expect_int("replaced file reloads", level_load_toml(replaced, &reloaded), 0) != 0 ||
+        expect_string("replaced file updated", reloaded.name, "Synced later") != 0)
+        goto cleanup;
+
+    /* Editor Save As (create-only) keeps a correct baseline. */
+    if (make_test_preference_root(root, sizeof(root)) != 0 ||
+        editor_set_preference_root(&es, root) != 0 ||
+        editor_init_persistence_paths(&es) != 0) goto cleanup;
+    fill_valid_minimal(&es.level);
+    es.modified = 1;
+    file_dialog_test_set_save_result(FILE_DIALOG_SELECTED, created);
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_DIR_SYNC);
+    if (expect_int("create with failed folder sync",
+                   editor_save_current_level_as(&es), 0) != 0 ||
+        expect_int("baseline tracks created file",
+                   es.source_state, EDITOR_SOURCE_EXPECTED_EXISTING) != 0 ||
+        expect_int("created fingerprint", serializer_fingerprint_utf8(created, &on_disk), 1) != 0 ||
+        expect_int("baseline matches created bytes",
+                   serializer_fingerprint_equal(&es.source_fingerprint, &on_disk), 1) != 0)
+        goto cleanup;
+    es.level.coin_score++;
+    es.modified = 1;
+    if (expect_int("next save uses the baseline", editor_save_current_level(&es), 0) != 0)
+        goto cleanup;
+    result = 0;
+
+cleanup:
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+    file_dialog_test_set_save_result(-1, NULL);
+    cleanup_test_preference_root(root, &es, 1);
+    remove(replaced);
+    remove(created);
+    return result;
+#endif
+}
+
 static int unreadable_existing_probe_is_not_missing(void)
 {
     const char *target = "out/editor_unreadable_target.toml";
@@ -3130,6 +3195,7 @@ int main(void)
     if (invalid_save_preserves_existing_file() != 0) return 1;
     if (atomic_save_replaces_and_preserves_on_injected_errors() != 0) return 1;
     if (save_policy_and_fingerprint_seams() != 0) return 1;
+    if (dir_sync_failure_after_install_still_saves() != 0) return 1;
     if (unreadable_existing_probe_is_not_missing() != 0) return 1;
     if (recovery_entries_survive_restart_and_sessions() != 0) return 1;
     if (over_capacity_load_preserves_document() != 0) return 1;
