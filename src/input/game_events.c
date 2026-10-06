@@ -26,7 +26,7 @@ static void request_terminal_action(GameState *gs, GameTerminalAction action)
     if (!gs || gs->route != GAME_ROUTE_NONE) return;
     if (action == GAME_TERMINAL_ACTION_RETRY) {
         game_restart_after_game_over(gs);
-        music_resume();
+        game_music_sync(gs);
         gs->loop.prev_ticks = clock_millis();
         game_input_arm_release_latch(gs, NULL);
     } else
@@ -35,12 +35,11 @@ static void request_terminal_action(GameState *gs, GameTerminalAction action)
 
 static void sync_pause_music(GameState *gs)
 {
-    if (game_overlay_state(gs) == GAME_OVERLAY_PAUSED)
-        music_pause();
-    else {
-        music_resume();
+    /* game_music_should_play also honours the settings panel: regaining
+     * window focus while settings are open must keep the music paused. */
+    game_music_sync(gs);
+    if (game_overlay_state(gs) != GAME_OVERLAY_PAUSED)
         gs->loop.prev_ticks = clock_millis();
-    }
 }
 
 void game_handle_events(GameState *gs)

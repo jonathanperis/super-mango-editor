@@ -843,6 +843,35 @@ static int collision_lifetime_and_pickups(void)
     return 0;
 }
 
+/* Regaining window focus must not resume music under the settings panel. */
+static int settings_keep_music_paused_after_refocus(void)
+{
+    AppSessionConfig config = {.level_path = "levels/00_sandbox_01.toml"};
+    AppSession *session = session_create(&config);
+    int failed = 1;
+    if (!session || !session->game || !session->game->audio.music) goto done;
+    Music stream = session->game->audio.music->stream;
+    session_frame(session);
+    if (expect_int("music plays in game", IsMusicStreamPlaying(stream), 1)) goto done;
+    if (push_key(KEY_F1)) goto done;
+    session_frame(session);
+    if (expect_int("settings open", session->settings.open, 1) ||
+        expect_int("settings pause music", IsMusicStreamPlaying(stream), 0)) goto done;
+    InputEvent lost = {.type=INPUT_FOCUS,.focused=0};
+    InputEvent gained = {.type=INPUT_FOCUS,.focused=1};
+    if (input_push(&lost) != 1 || input_push(&gained) != 1) goto done;
+    session_frame(session);
+    if (expect_int("refocus keeps settings music paused", IsMusicStreamPlaying(stream), 0)) goto done;
+    if (push_key(KEY_ESCAPE)) goto done;
+    session_frame(session);
+    if (expect_int("settings closed", session->settings.open, 0) ||
+        expect_int("closing settings resumes music", IsMusicStreamPlaying(stream), 1)) goto done;
+    failed = 0;
+done:
+    session_destroy(&session);
+    return failed;
+}
+
 /* Dying must not bring coins back (score farming); Retry starts over. */
 static int coins_stay_collected_across_life_loss(void)
 {
@@ -993,7 +1022,7 @@ int main(void)
         CASE(game_simulation_contract_test), CASE(game_profile_contract_test),
         CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),
         CASE(menu_mouse_and_path_boundaries), CASE(collision_lifetime_and_pickups),
-        CASE(coins_stay_collected_across_life_loss),
+        CASE(coins_stay_collected_across_life_loss), CASE(settings_keep_music_paused_after_refocus),
         CASE(nearest_surface_is_order_independent), CASE(phase_resets_transient_state),
         CASE(campaign_manifest_is_ordered_and_transactional),
         CASE(campaign_manifest_nul_fixtures_reject_transactionally),
