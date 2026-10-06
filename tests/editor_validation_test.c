@@ -1464,6 +1464,16 @@ static int dialog_quoting_and_picked_paths_stay_literal(void)
     failed |= !quoted || expect_string("powershell all marks", quoted,
         "'it''s \xE2\x80\x9A\xE2\x80\x9A\xE2\x80\x9B\xE2\x80\x9B \xE2\x80\x9C'");
     free(quoted);
+    /* zenity: exit 1 is Cancel unless the extra button printed its label. */
+    {
+        const char *const labels[3] = {"Save", "Discard", "Cancel"};
+        failed |= expect_int("zenity ok", dialog_zenity_selection(0, "", labels, 3, 0, 2, 1), 0);
+        failed |= expect_int("zenity cancel", dialog_zenity_selection(1, "", labels, 3, 0, 2, 1), 2);
+        failed |= expect_int("zenity extra", dialog_zenity_selection(1, "Discard", labels, 3, 0, 2, 1), 1);
+        failed |= expect_int("zenity two-button ignores label",
+                             dialog_zenity_selection(1, "Discard", labels, 2, 0, 1, -1), 1);
+        failed |= expect_int("zenity failure", dialog_zenity_selection(5, "", labels, 3, 0, 2, 1), -1);
+    }
     quoted = dialog_quote_posix("it's <b>&amp;");
     failed |= !quoted || expect_string("posix quote", quoted, "'it'\\''s <b>&amp;'");
     free(quoted);
@@ -1875,6 +1885,22 @@ static int rail_deletion_keeps_references_valid(void)
     if (expect_int("redo spike index", es.level.spike_blocks[0].rail_index, 1) != 0 ||
         level_is_valid("after rail redo", &es.level) != 0) goto fail;
 
+    /* A copy made before the delete still pastes onto the rail it rode:
+     * undo the delete, copy the spike block (rail 2), redo the delete
+     * (that rail is now index 1), then paste. */
+    if (!undo_pop(es.undo, &cmd)) goto fail;
+    editor_apply_undo_command(&es, &cmd, 1);
+    es.selection.type = ENT_SPIKE_BLOCK;
+    es.selection.index = 0;
+    editor_copy_selected(&es);
+    if (!redo_pop(es.undo, &cmd)) goto fail;
+    editor_apply_undo_command(&es, &cmd, 0);
+    editor_paste_clipboard(&es);
+    if (expect_int("pasted copy added", es.level.spike_block_count, 2) != 0 ||
+        expect_int("pasted copy follows its rail",
+                   es.level.spike_blocks[1].rail_index, 1) != 0 ||
+        level_is_valid("after rail-rider paste", &es.level) != 0) goto fail;
+
     undo_destroy(es.undo);
     return 0;
 fail:
@@ -1940,6 +1966,11 @@ static int drag_round_trips_and_follows_grab_point(void)
                            editor_axe_trap_y(&(AxeTrapPlacement){0}) + 10.0f) != 0 ||
         undo_last(&es) != 0 || expect_int("axe y undo clean", es.modified, 0) != 0)
         goto fail;
+    /* Moving it up to exactly y = 0 must not read back as "default". */
+    drag_by(&es, r.x + 5.0f, r.y + 5.0f, 0.0f,
+            -editor_axe_trap_y(&(AxeTrapPlacement){0}));
+    if (expect_int("axe at top keeps a custom y", es.level.axe_traps[0].y > 0.0f, 1) != 0 ||
+        undo_last(&es) != 0) goto fail;
 
     /* A click, or a wobble under the threshold, changes nothing. */
     tools_mouse_down(&es, 104.0f, 104.0f);
@@ -2112,23 +2143,31 @@ static int refused_mutations_explain_why(void)
         expect_prefix("checkpoint status", es.status_message,
                       "Cannot place Checkpoint here:") != 0) goto fail;
 
-    /* A clipboard from another level cannot reference a missing rail. */
+    /* A clipboard from another level cannot ride a rail this level lacks:
+     * the copy remembers its rail's shape, and no rail here matches it. */
     es.has_clipboard = 1;
     es.clipboard_type = ENT_SPIKE_BLOCK;
     memset(&es.clipboard_data, 0, sizeof(es.clipboard_data));
     es.clipboard_data.spike_block = (SpikeBlockPlacement){2, 0.0f, 3.0f};
+    es.clipboard_has_rail = 1;
+    es.clipboard_rail = (RailPlacement){RAIL_LAYOUT_HORIZ, 200, 80, 6, 1, 1};
     es.level.rail_count = 1;
     es.level.rails[0] = (RailPlacement){RAIL_LAYOUT_RECT, 32, 32, 4, 4, 0};
     editor_paste_clipboard(&es);
     if (expect_int("missing rail paste refused", es.level.spike_block_count, 0) != 0 ||
         expect_string("missing rail status", es.status_message,
-                      "Cannot paste Spike Block: rail 2 does not exist in this level") != 0)
+                      "Paste blocked: the copied Spike Block's rail is not in this level") != 0)
         goto fail;
 
-    /* A t_offset past the end of a loop wraps onto the rail. */
-    es.clipboard_data.spike_block = (SpikeBlockPlacement){0, 11.5f, 3.0f};
+    /* The same copy re-attaches by rail shape, whatever index it had: the
+     * stored index 2 becomes 0, where the matching rail lives here. */
+    es.clipboard_rail = es.level.rails[0];
+    es.clipboard_data.spike_block = (SpikeBlockPlacement){2, 11.5f, 3.0f};
+    /* A t_offset past the end of a loop also wraps onto the rail. */
     editor_paste_clipboard(&es);
     if (expect_int("wrapped paste count", es.level.spike_block_count, 1) != 0 ||
+        expect_int("pasted rider re-attached by shape",
+                   es.level.spike_blocks[0].rail_index, 0) != 0 ||
         level_is_valid("wrapped spike block", &es.level) != 0) goto fail;
 
     undo_destroy(es.undo);
@@ -2181,6 +2220,16 @@ static int camera_scrolls_vertically_and_stays_clamped(void)
                            es.camera.y, (float)GAME_H - CANVAS_H / es.camera.zoom) != 0)
         goto fail;
 
+    /* macOS reports Shift+wheel as horizontal scroll; it still pans up/down. */
+    event.wheel = 0.0f;
+    event.wheel_x = 50.0f;
+    editor_handle_event(&es, &event);
+    if (expect_float_value("shift horizontal wheel pans vertically", es.camera.y, 0.0f) != 0)
+        goto fail;
+    event.wheel = -50.0f;
+    event.wheel_x = 0.0f;
+    editor_handle_event(&es, &event);
+
     /* Clicks use the vertical offset too. */
     es.tool = TOOL_PLACE;
     es.palette_type = ENT_COIN;
@@ -2193,6 +2242,19 @@ static int camera_scrolls_vertically_and_stays_clamped(void)
     if (expect_int("coin placed", es.level.coin_count, 1) != 0 ||
         expect_float_value("click world y", es.level.coins[0].y,
                            es.camera.y + 30.0f / es.camera.zoom) != 0) goto fail;
+
+    /* Right-click deletes, but not during a left-button drag: deleting
+     * would shift the array under the drag and overwrite another entity. */
+    es.tool = TOOL_SELECT;
+    tools_mouse_down(&es, es.level.coins[0].x + 4.0f, es.level.coins[0].y + 4.0f);
+    tools_mouse_drag(&es, es.level.coins[0].x + 40.0f, es.level.coins[0].y + 4.0f);
+    event.button = MOUSE_BUTTON_RIGHT;
+    editor_handle_event(&es, &event);
+    if (expect_int("right-click ignored during drag", es.level.coin_count, 1) != 0)
+        goto fail;
+    tools_mouse_up(&es, es.level.coins[0].x, es.level.coins[0].y);
+    event.type = INPUT_MOUSE_UP;
+    editor_handle_event(&es, &event);
 
     /* Zooming out or shrinking the level re-clamps the camera. */
     es.camera.x = 1000.0f;

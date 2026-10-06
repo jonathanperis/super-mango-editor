@@ -237,19 +237,22 @@ int editor_entity_bounds(const LevelDef *level, EntityType type, int index,
 }
 
 /*
- * Reverse render order: enemies and hazards are drawn last (on top), so
- * they are tested first; world geometry is drawn first and tested last.
+ * Exact reverse of canvas_render's draw order (src/editor/canvas.c): the
+ * entity drawn last is on top, so a click tests it first.  Enemies and
+ * hazards come first; floor gaps and ground pillars, drawn first, come last.
+ * Keep this list in step with canvas_render when either one changes.
  */
 static const EntityType s_hit_order[] = {
-    ENT_SPIDER, ENT_JUMPING_SPIDER, ENT_BIRD, ENT_FASTER_BIRD,
-    ENT_FISH, ENT_FASTER_FISH,
-    ENT_AXE_TRAP, ENT_CIRCULAR_SAW, ENT_SPIKE_ROW, ENT_SPIKE_PLATFORM,
-    ENT_SPIKE_BLOCK, ENT_BLUE_FLAME, ENT_FIRE_FLAME,
-    ENT_COIN, ENT_STAR_YELLOW, ENT_STAR_GREEN, ENT_STAR_RED,
-    ENT_LAST_STAR, ENT_PLAYER_SPAWN,
-    ENT_BOUNCEPAD_SMALL, ENT_BOUNCEPAD_MEDIUM, ENT_BOUNCEPAD_HIGH,
-    ENT_FLOAT_PLATFORM, ENT_BRIDGE, ENT_VINE, ENT_LADDER, ENT_ROPE, ENT_RAIL,
-    ENT_PLATFORM, ENT_FLOOR_GAP, ENT_CHECKPOINT
+    ENT_FASTER_BIRD, ENT_BIRD, ENT_JUMPING_SPIDER, ENT_SPIDER,
+    ENT_FASTER_FISH, ENT_FISH,
+    ENT_CIRCULAR_SAW, ENT_AXE_TRAP, ENT_SPIKE_BLOCK,
+    ENT_FIRE_FLAME, ENT_BLUE_FLAME,
+    ENT_CHECKPOINT, ENT_PLAYER_SPAWN,
+    ENT_LAST_STAR, ENT_STAR_RED, ENT_STAR_GREEN, ENT_STAR_YELLOW, ENT_COIN,
+    ENT_ROPE, ENT_LADDER, ENT_VINE,
+    ENT_BOUNCEPAD_HIGH, ENT_BOUNCEPAD_MEDIUM, ENT_BOUNCEPAD_SMALL,
+    ENT_BRIDGE, ENT_SPIKE_PLATFORM, ENT_SPIKE_ROW, ENT_FLOAT_PLATFORM,
+    ENT_RAIL, ENT_FLOOR_GAP, ENT_PLATFORM
 };
 
 _Static_assert(sizeof(s_hit_order) / sizeof(s_hit_order[0]) == ENT_COUNT,
