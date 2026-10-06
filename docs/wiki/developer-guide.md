@@ -243,7 +243,9 @@ Also add `debug_log` calls in the module that owns the event, such as `src/colli
 
 ## Adding Physics to an Entity
 
-Use the same pattern as `player_update`:
+Use the same pattern as `player_update`. `dt` is the simulation step passed
+down from `game_update_active`: the fixed 1/60 s step in live play (or a
+replayed capture's recorded step), never the measured frame time:
 
 ```c
 /* Apply gravity while airborne */

@@ -56,9 +56,9 @@ The floor is drawn by repeating the active 48x48 floor tile across the full leve
 | `FLOOR_GAP_W` | `32` | `int` | Width of each floor gap in logical pixels |
 | `MAX_FLOOR_GAPS` | `16` | `int` | Maximum number of floor gaps per level |
 
-Every frame while airborne: `player->vy += GRAVITY * dt`.
+Every simulation step while airborne: `player->vy += GRAVITY * dt`.
 
-At 60 FPS (`dt` approximately 0.016s) gravity adds ~12.8 px/s per frame. The jump impulse (`-325.0f` px/s) produces a moderate arc.
+Live play uses a fixed `dt` of exactly 1/60 s (see [Architecture](../architecture/)), so gravity adds ~13.3 px/s per step regardless of the display refresh rate; only replays of older experiment captures reuse their recorded variable steps. The jump impulse (`-325.0f` px/s) produces a moderate arc.
 
 ### Camera
 

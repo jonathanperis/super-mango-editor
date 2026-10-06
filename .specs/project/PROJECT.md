@@ -13,9 +13,9 @@ A 2D pixel art platformer written in C11 + raylib 6.0, designed as a learning re
 
 ## Current State
 
-- Four playable TOML levels in `levels/`, v1 `levels/campaigns/main.toml` menu catalog ordered from Forest First Steps onboarding through two volcanic stages, runtime TOML loading via vendored `tomlc17`, and `next_phase` transitions
+- Three playable TOML levels in `levels/` plus six learning labs in `levels/labs/`; the v1 `levels/campaigns/main.toml` menu catalog runs Creator's Playground → Volcanic Depths 1 → Volcanic Depths 2, with runtime TOML loading via vendored `tomlc17` and `next_phase` transitions
 - Full player mechanics, authored checkpoint respawns with legacy fallback, 6 enemy types, 7 hazard types, collectibles, climbable surfaces, and level-completion summary
-- Dynamic multi-screen worlds, 32 render layers, delta-time physics at 60 FPS
+- Dynamic multi-screen worlds, 32 render layers, fixed 1/60 s physics steps driven by a frame-time accumulator
 - Campaign-driven start menu, HUD, lives system, debug overlay, keyboard/gamepad hot-plug support
 - Builds natively on macOS, Linux, Windows, plus WebAssembly via Emscripten
 - Standalone raylib level editor is shipped with TOML save/load, checkpoint palette/canvas/properties feedback, validation blocking, private-snapshot playtest, recent files, recovery snapshots, and smoke-test mode
