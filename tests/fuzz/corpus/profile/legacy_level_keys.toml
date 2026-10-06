@@ -1,0 +1,17 @@
+format_version = 1
+last_level = "levels/con.toml"
+[[levels]]
+path = "levels/con.toml"
+score = 5
+coins = 1
+time = 3
+[[levels]]
+path = "levels/kept.toml"
+score = 7
+coins = 2
+time = 4
+[[levels]]
+path = "levels/labs/01_collision.toml"
+score = 1
+coins = 0
+time = 1

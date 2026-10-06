@@ -9,7 +9,9 @@
  *
  * Round trip: any level the loader accepts must also save, load again, and
  * save to the same bytes.  This is how a raw DEL in a saved name (accepted
- * on load, rejected on reload) shows up as a fuzz failure.
+ * on load, rejected on reload) shows up as a fuzz failure.  An accepted
+ * level's next_phase must also pass level_ref_valid, and quoted strings in
+ * the raw input are fed to level_ref_valid directly.
  *
  * See fuzz_replay_main.c for the standalone driver and the Makefile's
  * fuzz / fuzz-corpus targets for how it is built.  POSIX only.
@@ -27,6 +29,7 @@
 
 #include "shared/serializer.h"
 #include "levels/level.h"
+#include "levels/level_ref.h"
 
 static char input_path[1024];
 static char first_save[1024];
@@ -93,6 +96,26 @@ static void round_trip_failed(const char *step)
     abort();
 }
 
+/*
+ * Feed every double-quoted run in the input (the shape of a next_phase
+ * value) straight to level_ref_valid.  The rule reads raw bytes with an
+ * explicit length, so mutated text exercises it even when the TOML around
+ * it is broken.  Only crashes and sanitizer reports matter here.
+ */
+static void check_quoted_level_refs(const uint8_t *data, size_t size)
+{
+    size_t start = 0;
+    int inside = 0;
+
+    for (size_t i = 0; i < size; i++) {
+        if (data[i] == '\n') inside = 0;
+        if (data[i] != '"') continue;
+        if (inside) (void)level_ref_valid((const char *)data + start, i - start);
+        inside = !inside;
+        start = i + 1;
+    }
+}
+
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
     /* LevelDef is large; static storage keeps it off the fuzzer's stack. */
@@ -100,9 +123,15 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     static LevelDef reloaded;
 
     init_paths();
+    check_quoted_level_refs(data, size);
     if (write_bytes(input_path, data, size) != 0) return 0;
 
     if (level_load_toml(input_path, &loaded) != 0) return 0;  /* rejected */
+
+    /* An accepted level may only chain to a valid level reference. */
+    if (loaded.next_phase[0] != '\0' &&
+        !level_ref_valid(loaded.next_phase, strlen(loaded.next_phase)))
+        round_trip_failed("accepted next_phase");
 
     if (level_save_toml(&loaded, first_save) != 0) round_trip_failed("first save");
     if (level_load_toml(first_save, &reloaded) != 0) round_trip_failed("reload");
