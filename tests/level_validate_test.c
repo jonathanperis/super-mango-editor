@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "levels/level_loader.h"
+#include "levels/level_ref.h"
 
 static int expect_valid_level(void)
 {
@@ -587,6 +588,59 @@ static int expect_rejected_unsafe_paths(void)
     return 0;
 }
 
+/*
+ * One table drives both level_ref_valid and next_phase validation, so the
+ * shared rule cannot drift between them.  tests/validate_levels_test.py keeps
+ * the same cases for the Python validator.
+ */
+static int level_reference_rule(void)
+{
+    static const struct { const char *path; int valid; } cases[] = {
+        { "levels/01_lugio_01.toml", 1 },
+        { "levels/caf\xC3\xA9.toml", 1 },
+        { "levels/console.toml", 1 },
+        { "levels/com10.toml", 1 },
+        { "levels/x.y.toml", 1 },
+        { "levels/labs/01_collision.toml", 0 },
+        { "levels/con.toml", 0 },
+        { "levels/CON.toml", 0 },
+        { "levels/nul.x.toml", 0 },
+        { "levels/Aux .toml", 0 },
+        { "levels/prn.toml", 0 },
+        { "levels/com1.toml", 0 },
+        { "levels/LPT9.toml", 0 },
+        { "levels/com0.toml", 0 },
+        { "levels/com\xC2\xB9.toml", 0 },
+        { "levels/lpt\xC2\xB3.toml", 0 },
+        { "levels/a:b.toml", 0 },
+        { "levels/a?.toml", 0 },
+        { "levels/a\x7F.toml", 0 },
+        { "levels/a\\b.toml", 0 },
+        { "levels/.toml", 0 },
+        { "levels/..toml", 0 },
+        { "levels/.hidden.toml", 0 },
+        { "levels/a.txt", 0 },
+        { "assets/a.toml", 0 },
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        LevelDef def;
+        char err[160];
+        int ref_ok = level_ref_valid(cases[i].path, strlen(cases[i].path));
+
+        level_def_init_defaults(&def);
+        def.screen_count = 1;
+        strncpy(def.next_phase, cases[i].path, sizeof(def.next_phase) - 1);
+        if (ref_ok != cases[i].valid ||
+            (level_validate_runtime(&def, err, sizeof(err)) == 0) != cases[i].valid) {
+            fprintf(stderr, "level_validate_test: level reference '%s' expected %s\n",
+                    cases[i].path, cases[i].valid ? "valid" : "rejected");
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static int rejects_numeric_boundaries(void)
 {
     LevelDef def;
@@ -615,6 +669,7 @@ static int rejects_numeric_boundaries(void)
 int main(void)
 {
     if (rejects_numeric_boundaries() != 0) return 1;
+    if (level_reference_rule() != 0) return 1;
     if (expect_valid_level() != 0) return 1;
     if (expect_rejected_level() != 0) return 1;
     if (expect_rejected_bad_rail_index() != 0) return 1;

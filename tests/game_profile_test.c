@@ -52,6 +52,10 @@ static int codec_and_storage(void)
     a->data.settings.keys[BIND_JUMP] = 13; /* Existing version-1 wire ID for J. */
     a->data.settings.buttons[BIND_RUN] = PAD_X;
     a->data.settings.dead_zone = 10000;
+    /* Keys follow the shared level reference rule (level_ref.h). */
+    CHECK(game_profile_key_valid("levels/café.toml"));
+    CHECK(!game_profile_key_valid("levels/labs/01_collision.toml"));
+    CHECK(!game_profile_key_valid("levels/con.toml") && !game_profile_key_valid("levels/a:b.toml"));
     game_profile_select(a,"levels/café.toml");
     CHECK(game_profile_record(a,"levels/café.toml",100,3,12.5f)==0);
     CHECK(game_profile_record(a,"levels/café.toml",90,2,20.0f)==0);

@@ -425,25 +425,35 @@ def load_level(path: Path) -> dict:
         raise ValueError(f"{path.relative_to(ROOT)}: TOML parse failed: {exc}") from exc
 
 
+WINDOWS_RESERVED_CHARS = set('<>:"|?*\\/')
+WINDOWS_DEVICE_STEMS = {"CON", "PRN", "AUX", "NUL"} | {
+    f"{base}{digit}" for base in ("COM", "LPT") for digit in "0123456789¹²³"
+}
+
+
+def level_ref_valid(value) -> bool:
+    """Mirror src/levels/level_ref.c: a direct, Windows-safe levels/<name>.toml.
+
+    next_phase, campaign entries and profile keys all use this one rule, so a
+    chained phase can always be listed in a campaign and record a result.
+    """
+    if not isinstance(value, str) or not value.startswith("levels/") or not value.endswith(".toml"):
+        return False
+    name = value[len("levels/"):]
+    if len(name) <= len(".toml"):
+        return False
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F or ch in WINDOWS_RESERVED_CHARS for ch in name):
+        return False
+    stem = name.split(".", 1)[0]
+    # Windows ignores trailing spaces in the device-name stem; ASCII casing only.
+    folded = "".join(ch.upper() if "a" <= ch <= "z" else ch for ch in stem.rstrip(" "))
+    return stem != "" and folded not in WINDOWS_DEVICE_STEMS
+
+
 def normalize_campaign_path(value) -> str | None:
-    if (
-        not isinstance(value, str)
-        or not value
-        or "\x00" in value
-        or "\\" in value
-        or ":" in value
-    ):
+    if not level_ref_valid(value):
         return None
-    candidate = Path(value)
-    if (
-        candidate.is_absolute()
-        or candidate.parent.as_posix() != "levels"
-        or candidate.suffix != ".toml"
-        or candidate.name in {"", ".toml", "..toml"}
-        or candidate.as_posix() != value
-    ):
-        return None
-    return candidate.as_posix()
+    return value
 
 
 def campaign_manifest_entries(
@@ -598,8 +608,11 @@ def validate_phase_reference(level_path: Path, field: str, value: str) -> list[s
     if repo_path is None:
         return errors
 
-    if not repo_path.startswith("levels/") or Path(repo_path).suffix != ".toml":
-        errors.append(f"{level_path.relative_to(ROOT)}: {field} must reference levels/*.toml: {value}")
+    if not level_ref_valid(value):
+        errors.append(
+            f"{level_path.relative_to(ROOT)}: {field} must be levels/<name>.toml without "
+            f"subdirectories, Windows-reserved characters or device names: {value}"
+        )
         return errors
 
     full_path = ROOT / repo_path

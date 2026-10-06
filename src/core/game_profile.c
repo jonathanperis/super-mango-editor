@@ -1,6 +1,7 @@
 /* Versioned player preferences/results. Persistence belongs to AppSession,
  * never to a render frame, entity, or smoke/replay run. */
 #include "game_profile.h"
+#include "../levels/level_ref.h"
 #include "../shared/platform.h"
 #include "../shared/serializer_io.h"
 #include "tomlc17.h"
@@ -110,17 +111,13 @@ void game_profile_close(GameProfile *profile)
     profile->baseline = NULL;
 }
 
+/* Profile keys use the same levels/<name>.toml rule as next_phase and the
+ * campaign manifest (level_ref.h), plus this file's fixed key capacity. */
 int game_profile_key_valid(const char *path)
 {
     if (!path) return 0;
     size_t size = strlen(path);
-    if (size < 13 || size >= PROFILE_LEVEL_PATH || strncmp(path, "levels/", 7) ||
-        strcmp(path + size - 5, ".toml")) return 0;
-    for (size_t i = 7; i < size; i++) {
-        unsigned char c = (unsigned char)path[i];
-        if (c < 32 || c == 127 || c == '/' || c == '\\' || c == ':') return 0;
-    }
-    return 1;
+    return size < PROFILE_LEVEL_PATH && level_ref_valid(path, size);
 }
 
 static int integer(toml_datum_t value, int *out)
