@@ -50,6 +50,8 @@ Desktop uses bundled GLFW; Web uses the same Emscripten toolchain
 as the application. `RAYLIB_BUILD` defaults to `$(OUTDIR)/raylib`; web uses
 `$(OUTDIR)/raylib-web`. Keep build modes/toolchains in separate directories.
 Use `EXTRA_CFLAGS` and `EXTRA_LDFLAGS` for additional flags.
+Set `RAYLIB_ARCHIVE=path/source.tar.gz` to share one downloaded archive across build
+directories (CI caches `.cache/raylib/`); it is SHA-256 verified on every use.
 
 Application objects depend on the built raylib library as well as their own
 sources/headers. A dependency or patch change therefore recompiles consumers and
