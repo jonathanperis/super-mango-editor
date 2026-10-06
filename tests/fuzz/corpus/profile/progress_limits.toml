@@ -1,0 +1,17 @@
+format_version = 1
+last_level = "levels/02_lugio_02.toml"
+[[levels]]
+path = "levels/02_lugio_02.toml"
+score = 2147483647
+coins = 64
+time = 1000000000
+[[levels]]
+path = "levels/x.y.toml"
+score = 0
+coins = 0
+time = 0.1
+[[levels]]
+path = "levels/console.toml"
+score = 42
+coins = 7
+time = 12
