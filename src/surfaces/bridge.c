@@ -15,34 +15,6 @@
 
 /* ------------------------------------------------------------------ */
 
-void bridges_init(Bridge *bridges, int *count)
-{
-    *count = 1;
-
-    /*
-     * Bridge 0 — spans between the last two pillars (screen 4).
-     *
-     * Pillar 7: x=1300, w=48 → right edge 1348.
-     * Pillar 8: x=1480 → left edge 1480.
-     * 8 bricks × 16 px = 128 px, centred in the 132-px gap → x=1350.
-     * y matches the pillar top: FLOOR_Y − 2×TILE_SIZE + 16 = 172.
-     */
-    Bridge *b   = &bridges[0];
-    b->x          = 1350.0f;
-    b->base_y     = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);
-    b->brick_count = 8;
-
-    for (int i = 0; i < b->brick_count; i++) {
-        b->bricks[i].y_offset   = 0.0f;
-        b->bricks[i].fall_vy    = 0.0f;
-        b->bricks[i].falling    = 0;
-        b->bricks[i].active     = 1;
-        b->bricks[i].fall_delay = -1.0f;  /* untouched; set to 0 on first contact */
-    }
-}
-
-/* ------------------------------------------------------------------ */
-
 void bridges_update(Bridge *bridges, int count, float dt,
                     int landed_idx, float player_cx)
 {

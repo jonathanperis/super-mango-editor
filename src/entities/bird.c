@@ -8,37 +8,6 @@
 #include "bird.h"
 #include "bird_variant.h"
 
-void birds_init(Bird *birds, int *count, int world_w)
-{
-    const BirdVariantSpec *spec = bird_variant_spec(BIRD_VARIANT_REGULAR);
-
-    *count = 2;
-
-    /*
-     * Bird 0 — patrols across screens 1–2, slightly higher.
-     * Starts flying right.
-     */
-    birds[0].x             = 300.0f;
-    birds[0].base_y        = 70.0f;
-    birds[0].vx            = spec->speed;
-    birds[0].patrol_x0     = 100.0f;
-    birds[0].patrol_x1     = 700.0f;
-    birds[0].frame_index   = 0;
-    birds[0].anim_timer_ms = 0;
-
-    /*
-     * Bird 1 — patrols across screens 3–4, slightly lower.
-     * Starts flying left for variety.
-     */
-    birds[1].x             = 1100.0f;
-    birds[1].base_y        = 80.0f;
-    birds[1].vx            = -spec->speed;
-    birds[1].patrol_x0     = 800.0f;
-    birds[1].patrol_x1     = (float)(world_w - 1 * 400);  /* last screen boundary */
-    birds[1].frame_index   = 1;
-    birds[1].anim_timer_ms = 0;
-}
-
 /* ------------------------------------------------------------------ */
 
 void birds_update(Bird *birds, int count, float dt,

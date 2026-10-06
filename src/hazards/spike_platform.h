@@ -40,9 +40,6 @@ typedef struct {
 
 /* ---- Function declarations ---------------------------------------------- */
 
-/* Populate the spike platform array with level placements. */
-void spike_platforms_init(SpikePlatform *sps, int *count);
-
 /* Draw all active spike platforms using 3-slice rendering. */
 void spike_platforms_render(const SpikePlatform *sps, int count,
                             Texture2D *tex,

@@ -81,7 +81,7 @@ void parallax_init_from_def(ParallaxSystem *ps,
 /*
  * parallax_render — Draw all layers back-to-front with horizontal tiling.
  *
- * cam_x is the integer camera offset for this frame (from game_loop).
+ * cam_x is the integer camera offset for this frame (from game_frame).
  * Each layer computes its own scroll offset as (int)(cam_x × speed) % tex_w,
  * then tiles the texture to cover the full GAME_W canvas width.
  */

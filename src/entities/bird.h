@@ -51,8 +51,6 @@ typedef struct {
 
 /* ---- Function declarations ---------------------------------------------- */
 
-void birds_init(Bird *birds, int *count, int world_w);
-
 /*
  * birds_update — Move and animate birds.
  *

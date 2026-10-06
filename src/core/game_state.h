@@ -21,8 +21,8 @@
  * Applies runtime-resolved respawn x/y. Authored levels use their furthest
  * reached placement; legacy levels use their furthest reached screen.
  *
- * fp_prev_riding is passed by pointer because it lives as a local
- * variable inside game_loop; resetting it here keeps the float-platform
+ * fp_prev_riding is passed by pointer because it lives in the frame-loop
+ * scratch state (GameState.loop); resetting it here keeps the float-platform
  * stay-on logic from snapping the player to a platform that no longer
  * exists after the reset.
  */
