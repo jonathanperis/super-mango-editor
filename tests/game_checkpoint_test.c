@@ -131,6 +131,46 @@ static int legacy_checkpoints_keep_screen_boundary_behavior(void)
     return 0;
 }
 
+static int legacy_checkpoints_skip_gaps_and_hazards_at_screen_edge(void)
+{
+    GameState gs = {0};
+    LevelDef def;
+
+    level_def_init_defaults(&def);
+    gs.runtime.current_level = &def;
+    gs.respawn_x = 80.0f;
+    gs.respawn_y = 172.0f;
+
+    /* A floor gap starts exactly on the 400 px screen edge. Columns 400..360
+     * overlap it; 352..400 ends where the gap begins, so it is solid floor. */
+    gs.floor_gap_count = 1;
+    gs.floor_gaps[0] = 400;
+    gs.player.x = 450.0f;
+    game_checkpoint_update(&gs);
+    if (expect_float("gap at edge moves respawn left", gs.respawn_x, 352.0f) != 0) return 1;
+
+    /* Next edge: gap at 800 plus spikes at 744..776 just before it. */
+    gs.floor_gaps[1] = 800;
+    gs.floor_gap_count = 2;
+    gs.spike_row_count = 1;
+    gs.spike_rows[0] = (SpikeRow){.x = 744.0f, .y = 236.0f, .count = 2, .active = 1};
+    gs.player.x = 850.0f;
+    game_checkpoint_update(&gs);
+    if (expect_float("spikes before edge also skipped", gs.respawn_x, 696.0f) != 0) return 1;
+
+    /* No safe column between the previous checkpoint and the next edge:
+     * keep the previous checkpoint rather than respawning on spikes. */
+    for (int i = 0; i < 2; i++)
+        gs.spike_rows[1 + i] = (SpikeRow){.x = 704.0f + i * 256.0f, .y = 236.0f,
+                                          .count = 16, .active = 1};
+    gs.spike_row_count = 3;
+    gs.player.x = 1250.0f;
+    game_checkpoint_update(&gs);
+    if (expect_float("unsafe screen keeps previous", gs.respawn_x, 696.0f) != 0) return 1;
+    if (expect_int("unsafe screen still recorded", gs.legacy_checkpoint_screen, 3) != 0) return 1;
+    return 0;
+}
+
 static int feedback_save_and_expiry_are_explicit(void)
 {
     GameState gs = {0};
@@ -155,6 +195,7 @@ int main(void)
     if (authored_checkpoints_disable_legacy_fallback() != 0) return 1;
     if (stale_checkpoint_index_before_first_placement_is_ignored() != 0) return 1;
     if (legacy_checkpoints_keep_screen_boundary_behavior() != 0) return 1;
+    if (legacy_checkpoints_skip_gaps_and_hazards_at_screen_edge() != 0) return 1;
     if (feedback_save_and_expiry_are_explicit() != 0) return 1;
     puts("game_checkpoint_test: ok");
     return 0;
