@@ -85,6 +85,29 @@ static int authored_checkpoints_disable_legacy_fallback(void)
     return 0;
 }
 
+static int stale_checkpoint_index_before_first_placement_is_ignored(void)
+{
+    GameState gs = {0};
+    LevelDef def;
+
+    level_def_init_defaults(&def);
+    def.checkpoint_count = 1;
+    def.checkpoints[0].x = 300.0f;
+    def.checkpoints[0].y = 120.0f;
+    gs.runtime.current_level = &def;
+    /* Index 0 is remembered, but the respawn no longer matches it, and the
+     * player stands before every placement: no checkpoint qualifies. The
+     * update must not index checkpoints[-1] (ASan catches it in sanitize). */
+    gs.checkpoint_index = 0;
+    gs.respawn_x = 80.0f;
+    gs.respawn_y = 172.0f;
+    gs.player.x = 100.0f;
+    game_checkpoint_update(&gs);
+    if (expect_float("unreached respawn x", gs.respawn_x, 80.0f) != 0) return 1;
+    if (expect_float("unreached respawn y", gs.respawn_y, 172.0f) != 0) return 1;
+    return 0;
+}
+
 static int legacy_checkpoints_keep_screen_boundary_behavior(void)
 {
     GameState gs = {0};
@@ -130,6 +153,7 @@ int main(void)
 {
     if (authored_checkpoints_advance_by_highest_x() != 0) return 1;
     if (authored_checkpoints_disable_legacy_fallback() != 0) return 1;
+    if (stale_checkpoint_index_before_first_placement_is_ignored() != 0) return 1;
     if (legacy_checkpoints_keep_screen_boundary_behavior() != 0) return 1;
     if (feedback_save_and_expiry_are_explicit() != 0) return 1;
     puts("game_checkpoint_test: ok");
