@@ -27,7 +27,9 @@ export const HOME_CSP = [
     "form-action 'none'",
 ].join("; ");
 
-const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+// HTML ends a script at "</script" plus anything up to ">" (even
+// "</script\t\n foo>"), so the end tag accepts [^>]* rather than just spaces.
+const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi;
 const TYPE = /\btype\s*=\s*["']?([^"'\s>]+)/i;
 const JS_TYPES = new Set(["module", "text/javascript", "application/javascript"]);
 
