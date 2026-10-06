@@ -481,7 +481,7 @@ Four GitHub Actions workflows handle automated builds and docs checks:
 |----------|------|---------|---------|
 | Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Native game/editor tests, smoke and packaging; Linux sanitizers/scripted smoke; Linux/macOS level validation; WASM build/artifact/package checks. Releases only on `v*` tags or manual dispatch on `main` |
 | Docs | `docs.yml` | Relevant pull requests, manual | `make docs-drift`, frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows |
-| CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ and GitHub Actions security-and-quality analysis |
+| CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis |
 | Deploy | `deploy.yml` | Successful same-repository main push/manual Build & Release run | Builds/checks docs from the run's exact commit, copies matching WASM, HTTP-smokes the assembly and deploys `docs/out/` |
 
 The repository restricts third-party Actions to an allowlist and requires full

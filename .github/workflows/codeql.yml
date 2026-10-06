@@ -17,6 +17,7 @@ jobs:
   analyze:
     name: Analyze (c-cpp)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout Repository
@@ -49,17 +50,25 @@ jobs:
         with:
           category: "/language:c-cpp"
 
-  analyze-actions:
-    name: Analyze (actions)
+  # Interpreted languages need no build: CodeQL extracts the sources directly.
+  # Covers workflows, the Python build/docs tooling, and the web host/docs JS/TS.
+  analyze-interpreted:
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, python, javascript-typescript]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
-          languages: actions
+          languages: ${{ matrix.language }}
+          build-mode: none
           queries: security-and-quality
       - uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
-          category: /language:actions
+          category: /language:${{ matrix.language }}
