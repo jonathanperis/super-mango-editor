@@ -44,6 +44,12 @@ static int level_save_toml_internal(const LevelDef *def, const char *path,
     }
 
     if (original_path) {
+        /*
+         * A TOML comment may not contain raw control characters either, so
+         * the path goes through the same escaping as a basic string.  Control
+         * bytes become \u00XX escapes, which level_read_recovery_path rejects
+         * (destination unknown) while the recovered level itself still loads.
+         */
         fprintf(fp, "# super_mango_recovery_path = ");
         write_toml_string(fp, original_path);
         fputc('\n', fp);
@@ -556,16 +562,14 @@ int level_read_recovery_path(const char *path, char *buf, size_t buf_size)
         int closed = 0;
 
         if (len == sizeof(line) - 1 && line[len - 1] != '\n' && !feof(fp)) {
-            fclose(fp);
-            return -1;
+            goto fail;
         }
         while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
             line[--len] = '\0';
         }
         if (strncmp(line, prefix, prefix_len) != 0) continue;
         if (found || len < prefix_len + 1) {
-            fclose(fp);
-            return -1;
+            goto fail;
         }
 
         for (size_t i = prefix_len; i < len; i++) {
@@ -573,8 +577,7 @@ int level_read_recovery_path(const char *path, char *buf, size_t buf_size)
 
             if (!escaped && ch == '"') {
                 if (i + 1 != len) {
-                    fclose(fp);
-                    return -1;
+                    goto fail;
                 }
                 closed = 1;
                 break;
@@ -593,36 +596,36 @@ int level_read_recovery_path(const char *path, char *buf, size_t buf_size)
                 case '\\': break;
                 case '"': break;
                 default:
-                    fclose(fp);
-                    return -1;
+                    goto fail;
                 }
                 escaped = 0;
             }
-            if (ch < 0x20) {
-                fclose(fp);
-                return -1;
+            /* Destinations never contain control bytes, including DEL. */
+            if (ch < 0x20 || ch == 0x7F) {
+                goto fail;
             }
             if (out_len + 1 >= buf_size) {
-                fclose(fp);
-                buf[0] = '\0';
-                return -1;
+                goto fail;
             }
             buf[out_len++] = (char)ch;
         }
         if (!closed) {
             /* A metadata prefix without a closing quote is malformed. */
-            fclose(fp);
-            buf[0] = '\0';
-            return -1;
+            goto fail;
         }
         buf[out_len] = '\0';
         found = 1;
     }
 
     if (ferror(fp)) {
-        fclose(fp);
-        return -1;
+        goto fail;
     }
     fclose(fp);
     return found ? 1 : 0;
+
+fail:
+    /* Never leave a half-decoded destination behind for the caller. */
+    fclose(fp);
+    buf[0] = '\0';
+    return -1;
 }

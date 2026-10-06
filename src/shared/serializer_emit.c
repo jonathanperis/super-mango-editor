@@ -41,6 +41,11 @@ const char *fmt_float(double val)
  * Level text can come from editor fields or hand-edited TOML.  Writing it back
  * with raw "%s" breaks as soon as a quote, backslash, or newline appears.
  * TOML basic strings use JSON-like escapes, so keep it boring and explicit.
+ *
+ * TOML forbids every raw control character except tab inside a basic string:
+ * U+0000..U+001F and U+007F (DEL).  DEL is easy to forget because it sits at
+ * the top of ASCII instead of the bottom; a name such as "A\u007FB" loads
+ * fine, so it must save as the same escape or the next load fails.
  */
 void write_toml_string(FILE *fp, const char *s)
 {
@@ -56,7 +61,7 @@ void write_toml_string(FILE *fp, const char *s)
                 case '\f': fputs("\\f", fp); break;
                 case '\r': fputs("\\r", fp); break;
                 default:
-                    if (*p < 0x20) fprintf(fp, "\\u%04x", *p);
+                    if (*p < 0x20 || *p == 0x7F) fprintf(fp, "\\u%04x", *p);
                     else fputc(*p, fp);
                     break;
             }
