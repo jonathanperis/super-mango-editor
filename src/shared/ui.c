@@ -246,6 +246,52 @@ static void draw_text(UIState *ui, int x, int y,
     } else texture_unload(texture);
 }
 
+/*
+ * draw_active_edit — Draw the edit buffer of the active field with a
+ * blinking cursor, scrolled so the end (where typing happens) stays visible.
+ *
+ * The edit buffer can hold a 4 KiB description, but a field is only a few
+ * hundred pixels wide. Drawing from the first byte would hide the cursor
+ * once the text is longer than the field, so we draw the longest tail that
+ * fits instead.
+ *
+ * Text width only grows as the tail gets longer, so a binary search over the
+ * starting byte finds that tail with about 12 measurements instead of one
+ * measurement per character.
+ */
+static void draw_active_edit(UIState *ui, int x, int y, int w)
+{
+    char display[UI_EDIT_BUFFER_SIZE + 2];   /* edit text + "|" + NUL */
+    const size_t length = strlen(ui->edit_buf);
+    const int max_width = w - 8;             /* 4 px padding on each side */
+    size_t low = 0, high = length;           /* answer lies in [low, high] */
+
+    /* Measure the tail together with the cursor so it never overflows. */
+    while (low < high) {
+        size_t mid = low + (high - low) / 2;
+        size_t tail = length - mid;
+        memcpy(display, ui->edit_buf + mid, tail);
+        display[tail] = '|';
+        display[tail + 1] = '\0';
+        if (ui_text_width(ui, display) <= max_width) high = mid;
+        else low = mid + 1;
+    }
+    /* Never start drawing in the middle of a multi-byte UTF-8 character. */
+    while (low < length && ((unsigned char)ui->edit_buf[low] & 0xc0) == 0x80) low++;
+
+    size_t tail = length - low;
+    memcpy(display, ui->edit_buf + low, tail);
+    /*
+     * The monotonic clock returns milliseconds. Dividing by 500 and checking
+     * odd/even gives a half-second blink. The cursor is a "|" appended to
+     * the visible text; on "off" phases we end the string before it instead.
+     */
+    int blink = (int)((clock_millis() / 500) % 2);
+    display[tail] = blink ? '|' : '\0';
+    display[tail + 1] = '\0';
+    draw_text(ui, x + 4, y + 3, display, UI_TEXT);
+}
+
 static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
 {
     return px >= rx && px < rx + rw &&
@@ -504,18 +550,8 @@ int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value)
 
     /* --- Draw the display text --- */
     if (is_active) {
-        /*
-         * Active: show the edit buffer with a blinking cursor.
-         *
-         * The monotonic clock returns milliseconds. By dividing
-         * by 500 and checking odd/even we get a half-second blink rate.
-         * The cursor is drawn as a "|" appended to the display string.
-         */
-        char display[80];
-        int blink = (int)((clock_millis() / 500) % 2);
-        snprintf(display, sizeof(display), "%s%s",
-                 ui->edit_buf, blink ? "|" : "");
-        draw_text(ui, x + 4, y + 3, display, UI_TEXT);
+        /* Active: show the edit buffer with a blinking cursor. */
+        draw_active_edit(ui, x, y, w);
     } else {
         /* Inactive: show the current value as a plain number. */
         char display[32];
@@ -595,18 +631,7 @@ int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value)
 
     /* --- Draw display text --- */
     if (is_active) {
-        char display[80];
-        int blink = (int)((clock_millis() / 500) % 2);
-        size_t length = strlen(ui->edit_buf);
-        const char *visible = ui->edit_buf + (length > sizeof(display)-2 ? length-(sizeof(display)-2) : 0);
-        while (((unsigned char)*visible & 0xc0) == 0x80) visible++;
-        while (*visible && ui_text_width(ui, visible) > w - 16) {
-            visible++;
-            while (((unsigned char)*visible & 0xc0) == 0x80) visible++;
-        }
-        snprintf(display, sizeof(display), "%s%s",
-                 visible, blink ? "|" : "");
-        draw_text(ui, x + 4, y + 3, display, UI_TEXT);
+        draw_active_edit(ui, x, y, w);
     } else {
         char display[32];
         snprintf(display, sizeof(display), "%.9g", *value);
@@ -704,11 +729,7 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
 
     /* --- Draw display text --- */
     if (is_active) {
-        char display[80];
-        int blink = (int)((clock_millis() / 500) % 2);
-        snprintf(display, sizeof(display), "%s%s",
-                 ui->edit_buf, blink ? "|" : "");
-        draw_text(ui, x + 4, y + 3, display, UI_TEXT);
+        draw_active_edit(ui, x, y, w);
     } else {
         draw_text(ui, x + 4, y + 3,
                   buf[0] ? buf : "Untitled", UI_TEXT_DIM);

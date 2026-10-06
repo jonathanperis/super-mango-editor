@@ -352,10 +352,11 @@ int serializer_flush(FILE *fp)
  * Some filesystems cannot fsync a directory and report EINVAL; nothing more
  * can be done there, so that one error is treated as success.
  */
+#ifndef _WIN32   /* Windows replaces files with MOVEFILE_WRITE_THROUGH. */
 static int serializer_sync_parent_dir(const char *path)
 {
-#if defined(_WIN32) || defined(__EMSCRIPTEN__)
-    /* Windows uses MOVEFILE_WRITE_THROUGH; the browser has no real disk. */
+#if defined(__EMSCRIPTEN__)
+    /* The browser's in-memory filesystem has no real disk to flush. */
     (void)path;
     return 0;
 #else
@@ -383,6 +384,7 @@ static int serializer_sync_parent_dir(const char *path)
     return result;
 #endif
 }
+#endif /* !_WIN32 */
 
 int serializer_resolve_save_target(const char *path, char *buf, size_t buf_size)
 {
