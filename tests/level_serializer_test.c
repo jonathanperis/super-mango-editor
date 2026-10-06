@@ -794,9 +794,10 @@ static int control_chars_roundtrip(void)
 }
 
 /*
- * Saving through a symlink updates the linked file and leaves the link in
- * place.  A plain rename() over the link would replace it with a regular
- * file and leave the original level stale.
+ * A save never follows a symlink by itself: a link planted at a destination
+ * must not redirect the write to the file it names.  A caller that means to
+ * update the linked file (the editor saving the document it opened) resolves
+ * the link first; then the real file changes and the link stays in place.
  */
 static int symlinked_save_updates_target(void)
 {
@@ -805,6 +806,7 @@ static int symlinked_save_updates_target(void)
 #else
     const char *target = "out/test_symlink_target.toml";
     const char *link_path = "out/test_symlink_link.toml";
+    char resolved[SERIALIZER_IO_PATH_MAX];
     LevelDef before;
     LevelDef after;
     struct stat link_stat;
@@ -819,13 +821,25 @@ static int symlinked_save_updates_target(void)
     if (symlink("test_symlink_target.toml", link_path) != 0)
         return fail("could not create symlink fixture");
 
+    /* Resolved on purpose: the target changes and the link survives. */
     strncpy(before.name, "Through link", sizeof(before.name) - 1);
-    if (level_save_toml(&before, link_path) != 0) failed = fail("save through symlink failed");
+    if (serializer_resolve_save_target(link_path, resolved, sizeof(resolved)) != 0 ||
+        level_save_toml(&before, resolved) != 0) failed = fail("save through symlink failed");
     if (!failed && (lstat(link_path, &link_stat) != 0 || !S_ISLNK(link_stat.st_mode)))
         failed = fail("save replaced the symlink instead of its target");
     if (!failed && (level_load_toml(target, &after) != 0 ||
                     strcmp(after.name, "Through link") != 0))
         failed = fail("symlink target was not updated");
+
+    /* Unresolved: the link itself is replaced and its target is untouched. */
+    strncpy(before.name, "Replaced link", sizeof(before.name) - 1);
+    if (!failed && level_save_toml(&before, link_path) != 0)
+        failed = fail("save over symlink failed");
+    if (!failed && (lstat(link_path, &link_stat) != 0 || !S_ISREG(link_stat.st_mode)))
+        failed = fail("plain save followed the symlink");
+    if (!failed && (level_load_toml(target, &after) != 0 ||
+                    strcmp(after.name, "Through link") != 0))
+        failed = fail("plain save over a symlink modified its target");
 
     remove(link_path);
     remove(target);

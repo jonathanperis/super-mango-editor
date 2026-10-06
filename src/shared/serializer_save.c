@@ -20,7 +20,6 @@ static int level_save_toml_internal(const LevelDef *def, const char *path,
                                     SerializerSavePolicy policy,
                                     const SerializerFileFingerprint *expected) {
     char temp_path[SERIALIZER_IO_PATH_MAX];
-    char target[SERIALIZER_IO_PATH_MAX];
 
     if (!def || !path) return -1;
 
@@ -32,19 +31,15 @@ static int level_save_toml_internal(const LevelDef *def, const char *path,
         }
     }
 
-    /* Saving through a symlink must update the file it points to; renaming
-     * over the link itself would silently detach the two copies. */
-    if (serializer_resolve_save_target(path, target, sizeof(target)) != 0) {
-        fprintf(stderr, "serializer: cannot resolve save target '%s'\n", path);
-        return -1;
-    }
-
-    if (serializer_make_temp_path(target, temp_path, sizeof(temp_path)) != 0) {
+    /* The file written is `path` itself.  A symlink there is replaced, not
+     * followed (see serializer_replace_file); callers that mean to save
+     * through a link resolve it first with serializer_resolve_save_target. */
+    if (serializer_make_temp_path(path, temp_path, sizeof(temp_path)) != 0) {
         fprintf(stderr, "serializer: path too long for temporary save '%s'\n", path);
         return -1;
     }
 
-    FILE *fp = serializer_open_temp(target, temp_path, sizeof(temp_path));
+    FILE *fp = serializer_open_temp(path, temp_path, sizeof(temp_path));
     if (!fp) {
         fprintf(stderr, "serializer: cannot open '%s' for writing\n", path);
         serializer_remove_temp(temp_path);
@@ -500,7 +495,7 @@ static int level_save_toml_internal(const LevelDef *def, const char *path,
 
     if (expected) {
         SerializerFileFingerprint actual;
-        int fingerprint_result = serializer_fingerprint_utf8(target, &actual);
+        int fingerprint_result = serializer_fingerprint_utf8(path, &actual);
         if (fingerprint_result != 1 ||
             !serializer_fingerprint_equal(expected, &actual)) {
             fprintf(stderr, "serializer: source changed before replacement '%s'\n",
@@ -511,8 +506,8 @@ static int level_save_toml_internal(const LevelDef *def, const char *path,
     }
 
     if ((policy == SERIALIZER_SAVE_CREATE_ONLY
-             ? serializer_create_file(temp_path, target)
-             : serializer_replace_file(temp_path, target)) != 0) {
+             ? serializer_create_file(temp_path, path)
+             : serializer_replace_file(temp_path, path)) != 0) {
         fprintf(stderr, "serializer: failed to replace '%s'\n", path);
         serializer_remove_temp(temp_path);
         return -1;

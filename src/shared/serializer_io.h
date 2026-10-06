@@ -62,10 +62,18 @@ FILE *serializer_open_temp(const char *target_path, char *temp_path,
 /* Flush stdio buffers and request an OS-level file flush where supported. */
 int serializer_flush(FILE *fp);
 
+/* Non-zero when path itself is a symbolic link (POSIX; always 0 elsewhere). */
+int serializer_path_is_symlink(const char *path);
+
+/* Non-zero when both paths exist and name the same file (POSIX only). */
+int serializer_same_file_utf8(const char *a, const char *b);
+
 /*
- * Pick the file a save should replace.  A symlinked level resolves to its
- * target (POSIX), so the atomic rename updates the real file and the link
- * survives.  Other paths, and dangling links, are copied unchanged.
+ * Resolve a symlinked path to the file it points to (POSIX).  Other paths,
+ * and dangling links, are copied unchanged.  Saves never call this on their
+ * own: following a link planted at a destination would write a file the
+ * user never chose.  The editor uses it for the document it opened, so
+ * saving that document updates the real file and the link survives.
  */
 int serializer_resolve_save_target(const char *path, char *buf, size_t buf_size);
 
