@@ -71,12 +71,31 @@ cannot be isolated, so the game treats stored values as untrusted input:
   under a Web Lock, so a conflicting write from another tab is refused rather
   than silently overwritten.
 
-The standalone `super-mango.html` page ships a same-origin
-Content-Security-Policy (no remote scripts, no JavaScript `eval`; WebAssembly
-compilation only). Google Analytics, when configured, loads on manual pages
-but not on the home page that hosts the game. Pages on the shared origin can
-still access the game's storage, which is why the validation above is the
-security boundary.
+Both pages that run the game ship a Content-Security-Policy `<meta>` tag
+with no remote scripts and no JavaScript `eval` (`'wasm-unsafe-eval'` allows
+WebAssembly compilation only):
+
+- The docs-site home page (`index.html`), which players normally use.
+  `docs/integrations/home-csp.mjs` adds the policy after `astro build`, with
+  the SHA-256 hash of each inline script (Astro's inlined module script and the
+  game bootstrap). The game's `super-mango.js`, `.wasm` and `.data` load from
+  `'self'`. Styles allow `'self'`, inline styles (the game injects its
+  touch-control CSS) and Google Fonts; fonts allow `fonts.gstatic.com`.
+  `object-src`, `base-uri` and `form-action` are `'none'`.
+  `tools/check_docs_site.py` fails the docs build if a hash is missing, if
+  `script-src` gains `'unsafe-inline'` or a remote host, or if the tag no longer
+  precedes the scripts. Astro's built-in `security.csp` is not used because it
+  applies to every page and pins `style-src` to hashes, which would block the
+  game's injected styles.
+- The standalone `super-mango.html` shell, which `tools/web_csp.py` pins after
+  linking.
+
+A `<meta>` policy cannot set `frame-ancestors`, and GitHub Pages cannot send
+CSP headers. Google Analytics, when configured, loads on manual pages but not
+on the home page that hosts the game. `'self'` covers the whole
+`jonathanperis.github.io` origin, and pages on that shared origin can still
+access the game's storage, which is why the validation above is the security
+boundary.
 
 ## Verifying releases
 

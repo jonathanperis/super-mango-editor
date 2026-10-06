@@ -18,6 +18,7 @@ on:
       - 'levels/**'
       - 'tools/check_docs_drift.py'
       - 'tools/check_docs_site.py'
+      - 'tools/web_csp.py'
       - 'tests/docs_checks_test.py'
       - 'tools/validate_levels.py'
       - 'tools/check_roadmap_quality.py'

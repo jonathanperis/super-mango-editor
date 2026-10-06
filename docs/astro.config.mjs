@@ -2,11 +2,12 @@ import { defineConfig } from "astro/config";
 import { satteri } from "@astrojs/markdown-satteri";
 import sitemap from "@astrojs/sitemap";
 import tailwindcss from "@tailwindcss/vite";
+import { homeCsp } from "./integrations/home-csp.mjs";
 
 const isProd = process.env.NODE_ENV === "production";
 
 export default defineConfig({
-    integrations: [sitemap()],
+    integrations: [sitemap(), homeCsp()],
     output: "static",
     outDir: "out",
     site: "https://jonathanperis.github.io",
