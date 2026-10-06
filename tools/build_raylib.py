@@ -23,6 +23,9 @@ def main() -> None:
     parser.add_argument("--mode", choices=("debug", "release"), default="debug")
     parser.add_argument("--cc", default="clang")
     parser.add_argument("--sanitize", action="store_true")
+    # Test-only: real GLFW/OpenGL graphics with miniaudio's null playback
+    # device, for CI machines that have a display but no sound hardware.
+    parser.add_argument("--null-audio", action="store_true")
     parser.add_argument("--archive", type=Path)
     args = parser.parse_args()
     pin = json.loads((ROOT / "vendor/raylib/manifest.json").read_text())
@@ -81,7 +84,8 @@ def main() -> None:
     # EndDrawing's automatic polling/pacing; CMake's customization mode enables
     # additional features unless every option is explicitly pinned.
     flags = ["-DSUPPORT_SCREEN_CAPTURE=0"]
-    if args.platform == "memory":
+    if args.platform == "memory" or args.null_audio:
+        # Only miniaudio's null backend: playback "succeeds" without hardware.
         flags += ["-DMA_ENABLE_ONLY_SPECIFIC_BACKENDS", "-DMA_ENABLE_NULL"]
     if args.sanitize:
         flags += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
