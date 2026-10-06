@@ -2,12 +2,12 @@
 
 ## Overview
 
-A 2D pixel art platformer written in C11 + SDL2, designed as a learning resource for game development. Every line of code is documented for someone who knows basic programming but is new to C and SDL2.
+A 2D pixel art platformer written in C11 + raylib 6.0, designed as a learning resource for game development. Every line of code is documented for someone who knows basic programming but is new to C and raylib.
 
 ## Goals
 
 - Fun, polished 2D platformer experience
-- Serve as a teaching codebase for C/SDL2 game development
+- Serve as a teaching codebase for C/raylib game development
 - Multi-level design with increasing difficulty
 - Cross-platform: macOS (primary), Linux, Windows, WebAssembly
 
@@ -18,7 +18,7 @@ A 2D pixel art platformer written in C11 + SDL2, designed as a learning resource
 - Dynamic multi-screen worlds, 32 render layers, delta-time physics at 60 FPS
 - Campaign-driven start menu, HUD, lives system, debug overlay, keyboard/gamepad hot-plug support
 - Builds natively on macOS, Linux, Windows, plus WebAssembly via Emscripten
-- Standalone SDL2 level editor is shipped with TOML save/load, checkpoint palette/canvas/properties feedback, validation blocking, private-snapshot playtest, recent files, recovery snapshots, and smoke-test mode
+- Standalone raylib level editor is shipped with TOML save/load, checkpoint palette/canvas/properties feedback, validation blocking, private-snapshot playtest, recent files, recovery snapshots, and smoke-test mode
 - CI runs native builds, editor builds, 15-native-binary test suite plus Python host checks, level and campaign-manifest validation, native smoke, WebAssembly artifact smoke, docs lint/build, and CodeQL
 
 ## Next Milestone
