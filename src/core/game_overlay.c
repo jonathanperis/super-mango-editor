@@ -1,5 +1,8 @@
 #include "game_overlay.h"
 
+#include "../screens/settings_menu.h" /* SettingsMenu.open */
+#include "../shared/audio.h"          /* music_pause, music_resume */
+
 static void sync_pause_flag(GameState *gs)
 {
     if (!gs) return;
@@ -56,4 +59,19 @@ void game_overlay_resume(GameState *gs)
         return;
     }
     game_overlay_set_pause_reason(gs, GAME_PAUSE_REASON_PLAYER, 0);
+}
+
+int game_music_should_play(const GameState *gs)
+{
+    if (!gs) return 0;
+    if (gs->settings_menu && gs->settings_menu->open) return 0;
+    return game_overlay_state(gs) != GAME_OVERLAY_PAUSED;
+}
+
+void game_music_sync(const GameState *gs)
+{
+    /* Pausing an already paused stream (or resuming a playing one) is a
+     * no-op in raylib, so callers may sync after any state change. */
+    if (game_music_should_play(gs)) music_resume();
+    else music_pause();
 }

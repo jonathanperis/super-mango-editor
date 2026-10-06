@@ -7,6 +7,7 @@
 #include "input/game_events.h"
 #include "input/game_input.h"
 #include "input/game_web_input.h"
+#include "screens/settings_menu.h"
 
 static int restart_calls;
 static int load_next_phase_calls;
@@ -165,6 +166,29 @@ static int keyboard_escape_toggles_pause_in_active_gameplay(void)
     return 0;
 }
 
+static int focus_regain_keeps_music_paused_under_settings(void)
+{
+    GameState gs = {0};
+    SettingsMenu settings = {.open = 1};
+    gs.running = 1;
+    gs.settings_menu = &settings;
+
+    InputEvent lost = {.type=INPUT_FOCUS,.focused=0};
+    InputEvent gained = {.type=INPUT_FOCUS,.focused=1};
+    if (input_push(&lost) != 1 || input_push(&gained) != 1) return 1;
+    game_handle_events(&gs);
+    if (expect_int("focus returns to unpaused game", gs.paused, 0) != 0) return 1;
+    if (expect_int("settings still silence music", game_music_should_play(&gs), 0) != 0) return 1;
+    settings.open = 0;
+    if (expect_int("closing settings allows music", game_music_should_play(&gs), 1) != 0) return 1;
+    game_overlay_toggle_pause(&gs);
+    if (expect_int("pause overlay silences music", game_music_should_play(&gs), 0) != 0) return 1;
+    gs.paused = gs.pause_reasons = 0;
+    gs.game_over = 1;
+    if (expect_int("game over keeps music", game_music_should_play(&gs), 1) != 0) return 1;
+    return 0;
+}
+
 static int semantic_touch_input(void)
 {
     GameState gs = {0};
@@ -207,6 +231,7 @@ int main(void)
     if (failed_next_level_keeps_completion_overlay() != 0) return 1;
     if (game_over_retry_stays_in_place() != 0) return 1;
     if (keyboard_escape_toggles_pause_in_active_gameplay() != 0) return 1;
+    if (focus_regain_keeps_music_paused_under_settings() != 0) return 1;
 
     input_close();
     if (game_web_input_touch(GAME_TOUCH_JUMP, 1) != 0) return 1;

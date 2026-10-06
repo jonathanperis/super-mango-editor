@@ -173,8 +173,11 @@ static void session_apply_preferences(AppSession *session)
         session->applied_settings_revision = session->profile.revision;
     }
     if (session->settings.open != session->settings_were_open) {
-        if (session->settings.open) music_pause();
-        else if (!session->game || !session->game->paused) music_resume();
+        /* In a game, one predicate decides (pause overlay, focus, settings);
+         * the menu has no pause overlay, so only the panel matters there. */
+        if (session->game) game_music_sync(session->game);
+        else if (session->settings.open) music_pause();
+        else music_resume();
         session->settings_were_open = session->settings.open;
     }
     /* A failed save is visible to the user. Retry only after another edit,
