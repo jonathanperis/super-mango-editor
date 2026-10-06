@@ -414,11 +414,15 @@ jobs:
   # ────────────────────────────────────────────────────────────────────────────
   # DESKTOP BACKEND JOB
   # The gating build legs above test macOS and Windows on raylib's Memory
-  # backend. This job runs the same suites on the real GLFW/OpenGL backend:
-  # macOS runners have a window server, and Windows uses Mesa's llvmpipe
-  # software OpenGL as an opengl32.dll drop-in beside the binaries. Runner audio devices
-  # are not guaranteed. Kept separate (and out of the release `needs`) so its
-  # results are visible before the owner decides to make it a required check.
+  # backend. This job runs the same suites on the real GLFW/OpenGL backend on
+  # Windows, using Mesa's llvmpipe software OpenGL as an opengl32.dll drop-in
+  # beside the binaries. Runner audio devices are not guaranteed. Kept separate
+  # (and out of the release `needs`) so its results are visible before the
+  # owner decides to make it a required check.
+  #
+  # macOS is not included: GitHub's hosted macOS VMs have a window server but
+  # no OpenGL pixel format ("NSGL: Failed to find a suitable pixel format"), so
+  # GLFW cannot create the window. The real macOS backend is verified locally.
   # ────────────────────────────────────────────────────────────────────────────
   desktop-backend:
     name: Desktop backend (${{ matrix.platform }})
@@ -429,9 +433,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            platform: macOS arm64
-            extra_cflags: -Werror
           - os: windows-latest
             platform: Windows x86_64 Mesa
             extra_cflags: -Werror
@@ -513,18 +514,6 @@ jobs:
         timeout-minutes: 15
         shell: msys2 {0}
         run: make scripted-smoke CC=gcc OUTDIR=out/headless RAYLIB_PLATFORM=memory SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
-
-      - name: Desktop tests (macOS)
-        if: runner.os == 'macOS'
-        timeout-minutes: 15
-        run: make test
-
-      - name: Desktop smoke and scripted scenarios (macOS)
-        if: runner.os == 'macOS'
-        timeout-minutes: 15
-        run: |
-          make smoke SMOKE_FRAMES=5 SMOKE_SEED=1
-          make scripted-smoke SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
 
       - name: Desktop tests (Windows, Mesa)
         if: runner.os == 'Windows'

@@ -63,9 +63,10 @@ null backend for explicit headless tests. Use a dedicated `OUTDIR`, such as
 `out/headless`; `release` and `dist-native` reject this backend. Linux CI keeps
 the desktop GLFW test path under Xvfb/Mesa; the gating macOS/Windows legs use Memory
 tests and separately build/package the desktop applications. The non-gating
-`Desktop backend` job runs the same tests and smoke on real GLFW/OpenGL (macOS
-window server; Windows with a checksum-pinned Mesa llvmpipe `opengl32.dll`
-beside the binaries) until it proves stable enough to require.
+`Desktop backend` job runs the same tests and smoke on real GLFW/OpenGL on
+Windows (a checksum-pinned Mesa llvmpipe `opengl32.dll` beside the binaries)
+until it proves stable enough to require. Hosted macOS runners offer no OpenGL
+pixel format, so the real macOS backend is verified locally instead.
 
 The vendored tomlc17 parser is based on upstream **R260821**. Its exact upstream
 commit and retained project-patch inventory are recorded in
@@ -483,7 +484,7 @@ Four GitHub Actions workflows handle automated builds and docs checks:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job (recommended required check; see the [release checklist](../release-checklist/)); native game/editor tests, smoke and packaging (Windows with GCC); a separate `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` job builds and tests with Clang outside the release `needs`; Linux sanitizers/scripted smoke; level validation on every native OS; WASM build/artifact/package checks; a separate `Desktop backend` job runs macOS and Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL. Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` |
+| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job (recommended required check; see the [release checklist](../release-checklist/)); native game/editor tests, smoke and packaging (Windows with GCC); a separate `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` job builds and tests with Clang outside the release `needs`; Linux sanitizers/scripted smoke; level validation on every native OS; WASM build/artifact/package checks; a separate `Desktop backend` job runs Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL (hosted macOS runners have no OpenGL pixel format). Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` |
 | Docs | `docs.yml` | Push to `main`, relevant pull requests, manual | `make docs-drift`, frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis |
 | Deploy | `deploy.yml` | Successful same-repository main push/manual Build & Release run | Builds/checks docs from the run's exact commit, copies matching WASM, HTTP-smokes the assembly and deploys `docs/out/` |
