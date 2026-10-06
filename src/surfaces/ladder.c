@@ -10,36 +10,7 @@
 
 /* ------------------------------------------------------------------ */
 
-/*
- * ladder_init — Place ladders at their level positions.
- *
- * Ladder 0 — on the tall pillar at x=1480 (screen 4, end phase).
- *
- * Placed at the right side of the pillar, extending from the pillar
- * top (y=172 for medium pillar at 1480 — but it's actually a tall one
- * y=124) down toward the floor.  2 tiles = 96 px of climbable surface.
- */
-void ladder_init(LadderDecor *ladders, int *count) {
-    /*
-     * Ladder 0 — at the very end of the game, after the last column.
-     *
-     * Last pillar (pillar 7) right edge: 1480 + 48 = 1528.
-     * Place the ladder 8 px to the right of the pillar edge.
-     * Starts from the floor (FLOOR_Y) and stacks 15 tiles upward.
-     * y = FLOOR_Y − 15 × LADDER_STEP so it reaches high into the sky.
-     */
-    ladders[0].x          = 1528.0f + 24.0f;
-    /*
-     * y is set so the bottom tile's bottom edge sits exactly at FLOOR_Y.
-     * bottom = y + (count-1) * STEP + H = FLOOR_Y  →  y = FLOOR_Y - ((count-1)*STEP + H)
-     */
-    ladders[0].y          = (float)(FLOOR_Y - (149 * LADDER_STEP + LADDER_H));
-    ladders[0].tile_count = 150;
 
-    *count = 1;
-}
-
-/* ------------------------------------------------------------------ */
 
 /*
  * ladder_render — Draw each ladder as vertically stacked tiles.

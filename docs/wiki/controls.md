@@ -97,13 +97,14 @@ Selecting **Replay** on a completion overlay is deliberately a browser reload, n
 ## Debug Experiments
 
 `--debug` opens the simulation inspector and disables personal-profile persistence.
-F2 freezes/resumes; F3 advances one 1/60-second step (the recorded dt during replay);
+F2 freezes/resumes; F3 advances one 1/60-second step (also during replay);
 F4 cycles 1×, 0.25× and 0.1× speed. F6 selects a movement field, minus/equal adjusts
 it, F7 restores authored values, and F10 cycles player/fish/platform/saw inspection.
 Focus/settings/player pause and terminal screens retain priority.
 
-F8 restarts the current level and records semantic inputs, actual simulation dt,
-movement tuning and seed. F9 explicitly exports the capture to a native file or
+F8 restarts the current level and records, for every fixed 1/60 s step, the
+semantic inputs and movement tuning, plus the seed (capture `format_version = 2`;
+older version-1 captures from the variable-timestep engine are refused). F9 explicitly exports the capture to a native file or
 browser download, preserving existing files. Replay requires unchanged level
 bytes and the same engine revision. It ignores live movement and freezes at the
 last recorded step. Captures are bounded to 36,000 simulation steps and do not

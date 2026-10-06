@@ -227,7 +227,7 @@ typedef struct {
 typedef struct {
     double prev_time;      /* GetTime() seconds when the previous frame began   */
     double accumulator;    /* real seconds waiting to be simulated              */
-    int    clock_started;  /* 0 = next frame restarts the clock (no catch-up)   */
+    int    clock_started;  /* 0 = no previous frame time yet (first frame)      */
     int    fp_prev_riding; /* float platform player stood on last step          */
     int    smoke_frames_run; /* frames actually executed by a smoke run         */
 } GameLoopState;

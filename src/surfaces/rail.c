@@ -173,58 +173,7 @@ static void build_horiz_rail(Rail *r, int x0, int y0, int w_tiles, int end_cap) 
 
 /* ------------------------------------------------------------------ */
 
-/*
- * rail_init — Define all rails in the level.
- *
- *   Rail 0 — Screen 2 (world x ≈ 400–800), closed rectangular loop
- *     10 tiles wide × 6 tiles tall = 160 × 96 logical px
- *     World origin (444, 72).  28 tiles total.
- *     Spike block speed: SLOW (1.5 tiles/s, ~18.7 s per loop).
- *
- *   Rail 1 — Screen 3 (world x ≈ 800–1200), closed rectangular loop
- *     8 tiles wide × 5 tiles tall = 128 × 80 logical px
- *     World origin (852, 80).  22 tiles total.
- *     Spike block speed: NORMAL (3.0 tiles/s, ~7.3 s per loop).
- *
- *   Rail 2 — Screen 4 (world x ≈ 1200–1600 for default 4-screen world), open horizontal line
- *     14 tiles wide = 224 logical px
- *     World origin (1248, 112).  14 tiles total.
- *     Spike block speed: FAST (6.0 tiles/s, ~2.3 s per pass).
- *     The block bounces left↔right continuously.
- *
- * Note: Levels loaded from TOML can define any screen_count.
- * This default layout assumes 4 screens (1600 px world width).
- */
-void rail_init(Rail *rails, int *count) {
-    /*
-     * Rail 0 — closed loop, screen 2.
-     * end_cap is irrelevant for closed rails (the loop never terminates),
-     * but we set it to 1 as a safe default.
-     */
-    build_rect_rail(&rails[0], 444, 35, 10, 6);  /* bottom edge at y=131, clears 2-tile platform coins at y=140 */
-    rails[0].end_cap = 1;
 
-    /* Rail 1 — closed loop, screen 3. */
-    build_rect_rail(&rails[1], 852, 50, 8, 5);  /* bottom edge at y=130, clears 2-tile platform coins at y=140 */
-    rails[1].end_cap = 1;
-
-    /*
-     * Rail 2 — open horizontal line, screen 4.  end_cap = 0.
-     * 14 tiles × 16 px = 224 px wide, at world (1200, 112).
-     *
-     * With no right end-cap, the FAST spike block detaches when it reaches
-     * tile 13 and enters free-fall with its rail speed as initial vx.
-     * This demonstrates the "no end cap → fall off" mechanic.
-     *
-     * y=112 sits above the 2-tile pillar tops (y=172) and within jumping
-     * reach from the 3-tile pillar nearby (top at y=124).
-     */
-    build_horiz_rail(&rails[2], 1200, 112, 14, 0);
-
-    *count = 3;
-}
-
-/* ------------------------------------------------------------------ */
 
 /*
  * rail_init_from_placements — Build rails from a level-data array.

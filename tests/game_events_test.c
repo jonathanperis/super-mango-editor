@@ -217,6 +217,26 @@ static int semantic_touch_input(void)
     return 0;
 }
 
+/* Resuming with A (also a Jump button) must not jump on the first step:
+ * the press that resumed is latched until it is released. */
+static int confirm_resume_latches_the_jump_button(void)
+{
+    GameState gs = {0};
+    gs.running = 1;
+
+    if (push_key(KEY_ESCAPE) != 0) return 1;
+    game_handle_events(&gs);
+    if (expect_int("paused before resume", gs.paused, 1) != 0) return 1;
+    if (push_controller_button(PAD_A) != 0) return 1;
+    game_handle_events(&gs);
+    if (expect_int("A resumes", gs.paused, 0) != 0) return 1;
+    if (expect_int("resume press is latched", gs.input_release_latched, 1) != 0) return 1;
+    if (expect_int("A stays blocked until released",
+                   (int)(gs.input_release_controller_mask & GAME_INPUT_CONFIRM),
+                   (int)GAME_INPUT_CONFIRM) != 0) return 1;
+    return 0;
+}
+
 int main(void)
 {
     if (input_backend_contract_test()) return 1;
@@ -231,6 +251,7 @@ int main(void)
     if (failed_next_level_keeps_completion_overlay() != 0) return 1;
     if (game_over_retry_stays_in_place() != 0) return 1;
     if (keyboard_escape_toggles_pause_in_active_gameplay() != 0) return 1;
+    if (confirm_resume_latches_the_jump_button() != 0) return 1;
     if (focus_regain_keeps_music_paused_under_settings() != 0) return 1;
 
     input_close();

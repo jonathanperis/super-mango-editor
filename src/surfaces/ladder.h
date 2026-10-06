@@ -32,9 +32,6 @@ typedef struct {
     int   tile_count;
 } LadderDecor;
 
-/* Populate the ladder array with level placements. */
-void ladder_init(LadderDecor *ladders, int *count);
-
 /* Blit every ladder with world-to-screen camera offset applied. */
 void ladder_render(const LadderDecor *ladders, int count,
                    Texture2D *tex, int cam_x);

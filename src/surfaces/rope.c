@@ -10,24 +10,7 @@
 
 /* ------------------------------------------------------------------ */
 
-/*
- * rope_init — Place ropes at their level positions.
- *
- * Rope 0 — on the medium pillar at x=452 (screen 2).
- *
- * Medium pillars have top at FLOOR_Y − 2×TILE_SIZE + 16 = 172.
- * The rope hangs from the pillar top, 2 tiles tall (covers 172 → ~264).
- * Placed at the left side of the pillar.
- */
-void rope_init(RopeDecor *ropes, int *count) {
-    ropes[0].x          = 452.0f + 8.0f;   /* 8 px inset from pillar left edge */
-    ropes[0].y          = (float)(FLOOR_Y - 2 * TILE_SIZE + 16);
-    ropes[0].tile_count = 1;              /* single tile, no stacking        */
 
-    *count = 1;
-}
-
-/* ------------------------------------------------------------------ */
 
 /*
  * rope_render — Draw each rope as vertically stacked tiles.
