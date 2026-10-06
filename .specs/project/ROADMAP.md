@@ -1,17 +1,17 @@
 # Roadmap
 
-## Current: Authored Checkpoints + Onboarding Documentation Reconciliation
+## Current: Audit Remediation (2026-10-06)
 
-Branch: `quality/level-validation-docs-cleanup`
+Branch: `fix/audit-remediation`
 
-Goal: keep specs and contributor docs aligned with TOML-only runtime loading, authored checkpoint schema/runtime/editor feedback, the v1 onboarding-first campaign, the 15-binary native test inventory, validation tooling, CI smoke/docs gates, and current entity inventory.
+Goal: resolve both codebase audit rounds (security, runtime, editor, build/CI, assets) while keeping specs and contributor docs aligned with TOML-only runtime loading, fixed-step simulation, authored checkpoints, the sandbox-first campaign, the 15-binary native test inventory, validation tooling, and CI smoke/docs gates.
 
 ## Shipped Baseline
 
 | Area | Status | Verification |
 |------|--------|--------------|
 | Game build | Shipped | `make` |
-| Campaign selector + direct TOML load | Shipped | bare launch reads `levels/campaigns/main.toml` in onboarding → sandbox → Volcanic Depths 1 → 2 order; `make run-level LEVEL=levels/00_onboarding_01.toml` bypasses it |
+| Campaign selector + direct TOML load | Shipped | bare launch reads `levels/campaigns/main.toml` in Creator's Playground (sandbox) → Volcanic Depths 1 → 2 order; `make run-level LEVEL=levels/labs/01_collision.toml` bypasses it |
 | Authored checkpoints | Shipped | Optional `[[checkpoints]]` use exact x/y respawns; records disable legacy screen-boundary fallback |
 | Standalone editor | Shipped | `make editor`, `make run-editor`; palette/canvas/properties/undo/playtest support checkpoints |
 | Tests | Shipped | `make test` runs 15 native binaries plus Python level-validation and web-host checks |
