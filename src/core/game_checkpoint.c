@@ -5,6 +5,9 @@
 #include "game_checkpoint.h"
 
 #include "../levels/level.h"
+#include "../hazards/spike.h"          /* SpikeRow, SPIKE_TILE_W */
+#include "../hazards/spike_platform.h" /* SpikePlatform */
+#include "../hazards/blue_flame.h"     /* BlueFlame (blue and fire variants) */
 
 void game_checkpoint_feedback_set(GameState *gs, CheckpointFeedbackKind kind,
                                   uint32_t now, uint32_t duration)
@@ -75,6 +78,76 @@ void game_checkpoint_update_authored(GameState *gs)
     }
 }
 
+/*
+ * LEGACY_CHECKPOINT_STEP — spacing in logical pixels between candidate
+ * respawn columns tried by legacy_safe_respawn_x(). Eight pixels is half a
+ * spike tile, fine enough to find the gap between two hazards without
+ * testing every single pixel.
+ */
+#define LEGACY_CHECKPOINT_STEP 8.0f
+
+/* Do [a0, a1) and [b0, b1) share any x? Touching edges do not overlap. */
+static int spans_overlap(float a0, float a1, float b0, float b1)
+{
+    return a0 < b1 && b0 < a1;
+}
+
+/*
+ * legacy_respawn_column_is_safe — Can the player respawn with its left
+ * edge at x?
+ *
+ * player_reset centres the sprite in a TILE_SIZE-wide column starting at
+ * spawn_x and lets it fall onto the ground floor, so the whole column must
+ * stand on solid floor (no floor gap) and must not touch a static hazard:
+ * ground spike rows, spike platforms (the player could land on one while
+ * falling) or the blue/fire flames that erupt from the floor.
+ */
+static int legacy_respawn_column_is_safe(const GameState *gs, float x)
+{
+    float x1 = x + (float)TILE_SIZE;
+
+    for (int i = 0; i < gs->floor_gap_count; i++) {
+        float gap_x = (float)gs->floor_gaps[i];
+        if (spans_overlap(x, x1, gap_x, gap_x + (float)FLOOR_GAP_W)) return 0;
+    }
+    for (int i = 0; i < gs->spike_row_count; i++) {
+        const SpikeRow *row = &gs->spike_rows[i];
+        if (row->active && spans_overlap(x, x1, row->x,
+                row->x + (float)(row->count * SPIKE_TILE_W))) return 0;
+    }
+    for (int i = 0; i < gs->spike_platform_count; i++) {
+        const SpikePlatform *sp = &gs->spike_platforms[i];
+        if (sp->active && spans_overlap(x, x1, sp->x, sp->x + (float)sp->w)) return 0;
+    }
+    for (int i = 0; i < gs->blue_flame_count; i++) {
+        const BlueFlame *flame = &gs->blue_flames[i];
+        if (flame->active && spans_overlap(x, x1, flame->x, flame->x + (float)flame->w)) return 0;
+    }
+    for (int i = 0; i < gs->fire_flame_count; i++) {
+        const BlueFlame *flame = &gs->fire_flames[i];
+        if (flame->active && spans_overlap(x, x1, flame->x, flame->x + (float)flame->w)) return 0;
+    }
+    return 1;
+}
+
+/*
+ * legacy_safe_respawn_x — Pick the respawn x for a newly entered screen.
+ *
+ * The screen edge itself may sit over a gap or a spike row, and respawning
+ * there would cost another life at once. Walk left from the edge, over
+ * ground the player has already crossed, and return the first safe column.
+ * Candidates stop before the previous respawn: if none is safe, return -1
+ * and the caller keeps the previous checkpoint.
+ */
+static float legacy_safe_respawn_x(const GameState *gs, float boundary_x)
+{
+    for (float x = boundary_x; x > gs->respawn_x && x >= 0.0f;
+         x -= LEGACY_CHECKPOINT_STEP) {
+        if (legacy_respawn_column_is_safe(gs, x)) return x;
+    }
+    return -1.0f;
+}
+
 void game_checkpoint_update(GameState *gs)
 {
     const LevelDef *def;
@@ -87,13 +160,16 @@ void game_checkpoint_update(GameState *gs)
         return;
     }
 
-    /* Legacy levels retain automatic screen-boundary behavior exactly. */
+    /* Legacy levels save automatically at each newly entered screen. */
     {
         int current_screen = (int)(gs->player.x / GAME_W);
-        float new_checkpoint = current_screen * GAME_W;
 
         if (current_screen > gs->legacy_checkpoint_screen) {
+            /* Record the screen even when no safe column exists, so the
+             * search runs once per screen rather than every frame. */
             gs->legacy_checkpoint_screen = current_screen;
+            float new_checkpoint = legacy_safe_respawn_x(gs, (float)(current_screen * GAME_W));
+            if (new_checkpoint < 0.0f) return;
             gs->respawn_x = new_checkpoint;
             game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_SAVED,
                                           (uint32_t)clock_millis(), 1200);

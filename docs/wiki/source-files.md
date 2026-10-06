@@ -330,7 +330,7 @@ Frees all resources in reverse init order.
 
 ### `core/game_checkpoint.h` / `core/game_checkpoint.c`
 
-Resolves respawn state without mutating `LevelDef`. With authored records, the greatest crossed x coordinate becomes `GameState.respawn_x` / `respawn_y` before lethal collisions run. With no records, the legacy automatic screen-boundary checkpoint remains active.
+Resolves respawn state without mutating `LevelDef`. With authored records, the greatest crossed x coordinate becomes `GameState.respawn_x` / `respawn_y` before lethal collisions run. With no records, the legacy automatic screen-boundary checkpoint remains active; it walks left from the screen edge to the first column with solid floor and no static hazard, keeping the previous checkpoint when none is safe.
 
 ---
 
