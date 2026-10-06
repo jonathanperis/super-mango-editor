@@ -416,7 +416,8 @@ jobs:
   # The gating build legs above test macOS and Windows on raylib's Memory
   # backend. This job runs the same suites on the real GLFW/OpenGL backend on
   # Windows, using Mesa's llvmpipe software OpenGL as an opengl32.dll drop-in
-  # beside the binaries. Runner audio devices are not guaranteed. Kept separate
+  # beside the binaries and miniaudio's null playback device (RAYLIB_AUDIO=null)
+  # because the hosted VM has no sound hardware. Kept separate
   # (and out of the release `needs`) so its results are visible before the
   # owner decides to make it a required check.
   #
@@ -440,6 +441,10 @@ jobs:
     env:
       EXTRA_CFLAGS: ${{ matrix.extra_cflags }}
       RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+      # Hosted Windows VMs have no audio endpoint, and the game requires an
+      # audio device to start. Real GLFW/OpenGL graphics with miniaudio's null
+      # playback device keeps every test meaningful (see build-system.md).
+      RAYLIB_AUDIO: 'null'
 
     steps:
       - name: Checkout source

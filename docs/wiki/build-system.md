@@ -65,7 +65,10 @@ the desktop GLFW test path under Xvfb/Mesa; the gating macOS/Windows legs use Me
 tests and separately build/package the desktop applications. The non-gating
 `Desktop backend` job runs the same tests and smoke on real GLFW/OpenGL on
 Windows (a checksum-pinned Mesa llvmpipe `opengl32.dll` beside the binaries)
-until it proves stable enough to require. Hosted macOS runners offer no OpenGL
+until it proves stable enough to require. That VM has no sound hardware, so the
+job builds with `RAYLIB_AUDIO=null`: the normal desktop raylib backend with
+miniaudio's null playback device, in its own `raylib-nullaudio` build
+directory. `release` and `dist-native` refuse this test-only variant. Hosted macOS runners offer no OpenGL
 pixel format, so the real macOS backend is verified locally instead.
 
 The vendored tomlc17 parser is based on upstream **R260821**. Its exact upstream

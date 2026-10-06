@@ -40,7 +40,11 @@ CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(MODE_FLAGS_$(BUILD_MODE)) -I$(RAYL
 TEST_CFLAGS = $(CFLAGS) $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_MEMORY_TESTS,)
 LIBS    = $(RAYLIB_LIB) $(PLATFORM_LIBS) $(MODE_LDFLAGS_$(BUILD_MODE)) $(EXTRA_LDFLAGS)
 OUTDIR  = out
-RAYLIB_BUILD ?= $(OUTDIR)/raylib
+# RAYLIB_AUDIO=null is a test-only variant: the real desktop GLFW/OpenGL
+# backend with miniaudio's null playback device, for CI machines that have a
+# display but no sound hardware. It builds into its own raylib directory.
+RAYLIB_AUDIO ?= device
+RAYLIB_BUILD ?= $(OUTDIR)/raylib$(if $(filter null,$(RAYLIB_AUDIO)),-nullaudio,)
 RAYLIB_PLATFORM ?= native
 RAYLIB_LIB = $(RAYLIB_BUILD)/build/raylib/libraylib.a
 WEB_RAYLIB_BUILD = $(OUTDIR)/raylib-web
@@ -66,6 +70,11 @@ PLATFORM_LIBS = -lm -lpthread
 endif
 ifneq ($(filter release dist-native,$(MAKECMDGOALS)),)
 $(error Memory is a test backend; native releases require RAYLIB_PLATFORM=native)
+endif
+endif
+ifeq ($(RAYLIB_AUDIO),null)
+ifneq ($(filter release dist-native,$(MAKECMDGOALS)),)
+$(error RAYLIB_AUDIO=null is a test build; native releases need a real audio device)
 endif
 endif
 DISTDIR = dist
@@ -193,7 +202,7 @@ SANITIZE_LDFLAGS    = -fsanitize=address,undefined
 all: $(OUTDIR) $(TARGET)
 
 $(RAYLIB_LIB): vendor/raylib/manifest.json vendor/raylib/patches.json tools/build_raylib.py Makefile
-	python3 tools/build_raylib.py --build-dir "$(RAYLIB_BUILD)" --platform $(RAYLIB_PLATFORM) --cc "$(CC)" --mode $(BUILD_MODE) $(if $(findstring -fsanitize,$(CFLAGS)),--sanitize,) $(RAYLIB_ARCHIVE_ARG)
+	python3 tools/build_raylib.py --build-dir "$(RAYLIB_BUILD)" --platform $(RAYLIB_PLATFORM) --cc "$(CC)" --mode $(BUILD_MODE) $(if $(findstring -fsanitize,$(CFLAGS)),--sanitize,) $(if $(filter null,$(RAYLIB_AUDIO)),--null-audio,) $(RAYLIB_ARCHIVE_ARG)
 
 $(WEB_RAYLIB_LIB): vendor/raylib/manifest.json vendor/raylib/patches.json tools/build_raylib.py Makefile
 	python3 tools/build_raylib.py --build-dir "$(WEB_RAYLIB_BUILD)" --platform web --mode release $(RAYLIB_ARCHIVE_ARG)
