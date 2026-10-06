@@ -1,0 +1,6 @@
+# super_mango_recovery_path = "levels/x \"y\".toml"
+format_version = 1
+name = "Recovery comment"
+screen_count = 1
+player_start_x = 40.0
+player_start_y = 200.0
