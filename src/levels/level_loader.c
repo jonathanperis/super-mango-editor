@@ -280,7 +280,7 @@ static void load_fish(GameState *gs, const LevelDef *def)
 
 static void load_faster_fish(GameState *gs, const LevelDef *def)
 {
-    float water_y = (float)(GAME_H - WATER_ART_H) - FFISH_RENDER_H / 2.0f;
+    float water_y = (float)(GAME_H - WATER_ART_H) - FISH_RENDER_H / 2.0f; /* same sprite size */
 
     for (int i = 0; i < def->faster_fish_count; i++) {
         const FishPlacement *p = &def->faster_fish[i];

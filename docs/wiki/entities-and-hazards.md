@@ -136,7 +136,7 @@ patrol_x1  = 950.0
 ### Faster Fish
 
 **File:** `src/entities/faster_fish.c` / `faster_fish.h`  
-**Behaviour:** Same as fish but defaults to 120 px/s and jumps more frequently. Uses `[[faster_fish]]` in TOML.
+**Behaviour:** Same as fish (one shared implementation in `fish.c`, tuned by a `FishSpec`) but defaults to 120 px/s and jumps more frequently. Uses `[[faster_fish]]` in TOML.
 
 ```toml
 [[faster_fish]]

@@ -370,7 +370,7 @@ Jumping water enemy that patrols the bottom lane and leaps on random arcs. Asset
 
 ### `entities/faster_fish.h` / `entities/faster_fish.c`
 
-Fast fish variant with higher jumps and faster patrol speed. Asset: `faster_fish.png`.
+Fast fish variant with higher jumps and faster patrol speed. It is a `Fish` with different `FishSpec` tuning: update, render and hitbox code live once in `fish.c` (the fish counterpart of `bird_variant.c`). Asset: `faster_fish.png`.
 
 ---
 
