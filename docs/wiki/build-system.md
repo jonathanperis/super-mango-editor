@@ -483,13 +483,29 @@ Four GitHub Actions workflows handle automated builds and docs checks:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job; native game/editor tests, smoke and packaging (Windows with GCC and Clang); Linux sanitizers/scripted smoke; level validation on every native OS; WASM build/artifact/package checks; a separate `Desktop backend` job runs macOS and Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL. Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` |
+| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job; native game/editor tests, smoke and packaging (Windows with GCC); a separate `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` job builds and tests with Clang outside the release `needs`; Linux sanitizers/scripted smoke; level validation on every native OS; WASM build/artifact/package checks; a separate `Desktop backend` job runs macOS and Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL. Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` |
 | Docs | `docs.yml` | Push to `main`, relevant pull requests, manual | `make docs-drift`, frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis |
 | Deploy | `deploy.yml` | Successful same-repository main push/manual Build & Release run | Builds/checks docs from the run's exact commit, copies matching WASM, HTTP-smokes the assembly and deploys `docs/out/` |
 
 Every job sets `timeout-minutes`. Every native leg (Clang and GCC) passes
 `EXTRA_CFLAGS=-Werror` and the WebAssembly leg `EXTRA_WEB_CFLAGS=-Werror`.
+The release job needs only the legs that ship an archive (`build`) plus
+`provenance`; the Windows Clang and `Desktop backend` jobs report separately
+and never block a release.
+
+**Toolchain drift under `-Werror`.** Linux/macOS use the runner image's
+compilers and the WebAssembly leg pins Emscripten 6.0.9, but Windows uses
+MSYS2, a rolling distribution: `setup-msys2` runs with `update: true` and
+`pacman` installs the current GCC/Clang. MSYS2 cannot reliably install older
+package versions, so these are not pinned. A new compiler release can add a
+warning and fail a Windows leg with no source change. Each Windows job prints
+`--version` and `pacman -Q` output in its "Record ... toolchain versions" step;
+when a Windows-only `-Werror` failure appears, compare that output with the last
+green run before changing code. A Clang-only failure shows up in the job named
+`Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` and does not block
+releases; a GCC failure in `Build (Windows x86_64)` does, because that leg ships
+the Windows archive.
 GCC's `-Wformat-truncation` is stricter than Clang's: label code formats long
 paths through `editor_path_for_display()` and checks `snprintf` results where
 truncation would change behaviour. Build jobs use Python 3.12 from

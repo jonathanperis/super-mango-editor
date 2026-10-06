@@ -29,8 +29,9 @@ concurrency:
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
   # DOCS DRIFT
-  # docs.yml only runs for PRs touching docs-related paths, so a required check
-  # there would never report on other PRs. This cheap job always runs.
+  # docs.yml only runs for PRs touching docs-related paths, so a check there
+  # would never report on other PRs. This cheap job always runs, making it the
+  # recommended required status check (the owner must add it to the ruleset).
   # ────────────────────────────────────────────────────────────────────────────
   docs-drift:
     name: Docs drift
@@ -52,8 +53,10 @@ jobs:
 
   # ────────────────────────────────────────────────────────────────────────────
   # BUILD JOB
-  # Compiles the game on Linux (x86_64), macOS (arm64), Windows (x86_64, GCC and
-  # Clang), and WebAssembly in parallel.
+  # Compiles the game on Linux (x86_64), macOS (arm64), Windows (x86_64, GCC),
+  # and WebAssembly in parallel. Every leg here ships a release archive, so the
+  # release job waits for all of them; the Windows Clang check lives in the
+  # separate windows-clang job below.
   # Runs on every push to main AND every pull request.
   # ────────────────────────────────────────────────────────────────────────────
   build:
@@ -79,8 +82,8 @@ jobs:
             cc: clang
             extra_cflags: -Werror
             package: true
-          # The GCC leg keeps the historical check name and ships the release
-          # archive; the Clang leg covers the Makefile's local Windows default.
+          # Ships the Windows release archive. MSYS2 packages are rolling (see
+          # the windows-clang job note), so a new GCC warning can fail this leg.
           - os: windows-latest
             platform: Windows x86_64
             artifact: super-mango-windows-x86_64
@@ -88,13 +91,6 @@ jobs:
             cc: gcc
             extra_cflags: -Werror
             package: true
-          - os: windows-latest
-            platform: Windows x86_64 clang
-            artifact: super-mango-windows-x86_64-clang
-            target: native
-            cc: clang
-            extra_cflags: -Werror
-            package: false
           - os: ubuntu-latest
             platform: WebAssembly
             artifact: super-mango-wasm
@@ -176,18 +172,23 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
-          packages="make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-python
-            mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-make"
-          if [ "$MANGO_CC" = clang ]; then
-            packages="$packages mingw-w64-ucrt-x86_64-clang"
-          fi
           # Mirrors can time out after partially caching a transaction. Retry
           # without bypassing package signatures or swallowing final failure.
           for attempt in 1 2 3; do
-            # shellcheck disable=SC2086 # intentional word splitting of package list
-            if pacman --noconfirm -S --needed $packages; then exit 0; fi
+            if pacman --noconfirm -S --needed make mingw-w64-ucrt-x86_64-gcc \
+              mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-cmake \
+              mingw-w64-ucrt-x86_64-make; then exit 0; fi
           done
           exit 1
+
+      # MSYS2 is a rolling distribution; record the exact compiler so a new
+      # -Werror failure can be traced to a toolchain update.
+      - name: Record Windows toolchain versions
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          "$MANGO_CC" --version
+          pacman -Q mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake
 
       # ── Emscripten SDK install (WebAssembly) ────────────────────────────────
       # The same emcc toolchain builds raylib's Web backend and the application.
@@ -332,6 +333,83 @@ jobs:
           path: dist/${{ matrix.artifact }}.zip
           if-no-files-found: error
           retention-days: 1
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # WINDOWS CLANG JOB
+  # Builds and tests with UCRT64 Clang, the Makefile's local Windows default,
+  # under -Werror. It ships nothing, so it stays out of the release `needs`: a
+  # Clang-only warning reports here without blocking a release. MSYS2 is a
+  # rolling distribution (setup-msys2 `update: true`, unversioned pacman
+  # packages; old package versions are not reliably installable), so a new
+  # Clang release can introduce warnings with no source change. The versions
+  # step prints the exact compiler for triage.
+  # ────────────────────────────────────────────────────────────────────────────
+  windows-clang:
+    name: Windows x86_64 clang -Werror (rolling MSYS2 toolchain)
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    env:
+      EXTRA_CFLAGS: -Werror
+      RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Cache pinned raylib source archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/raylib
+          key: raylib-source-${{ runner.os }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+
+      - name: Install MSYS2
+        uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: inherit
+
+      - name: Download Windows Clang toolchain and build tools
+        run: |
+          for attempt in 1 2 3; do
+            if pacman --noconfirm -S --needed make mingw-w64-ucrt-x86_64-clang \
+              mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-python \
+              mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-make; then exit 0; fi
+          done
+          exit 1
+
+      - name: Record rolling MSYS2 toolchain versions
+        run: |
+          clang --version
+          pacman -Q mingw-w64-ucrt-x86_64-clang mingw-w64-ucrt-x86_64-cmake
+
+      - name: Install Node.js for host contracts
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26.9.0'
+
+      - name: Build with -Werror (Windows clang)
+        run: make CC=clang
+
+      - name: Software-rendered tests (Windows clang)
+        timeout-minutes: 5
+        run: make test CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
+
+      - name: Validate levels (Windows clang)
+        run: make validate-levels
+
+      - name: Build editor with -Werror (Windows clang)
+        run: make editor CC=clang
+
+      - name: Software-rendered smoke (Windows clang)
+        run: make smoke CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory SMOKE_FRAMES=5 SMOKE_SEED=1
 
   # ────────────────────────────────────────────────────────────────────────────
   # DESKTOP BACKEND JOB
