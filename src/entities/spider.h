@@ -46,7 +46,7 @@ typedef struct {
     float  patrol_x0;
     float  patrol_x1;
     int    frame_index;
-    uint32_t anim_timer_ms;
+    float  anim_timer_ms;  /* ms accumulated toward the next frame advance */
 } Spider;
 
 /*

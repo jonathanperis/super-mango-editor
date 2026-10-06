@@ -142,5 +142,5 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
      * Advance the sprite animation based on the resolved physics state.
      * Convert dt (seconds) to milliseconds for the frame timer.
      */
-    player_animate(player, (uint32_t)(dt * 1000.0f));
+    player_animate(player, dt * 1000.0f);
 }

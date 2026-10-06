@@ -441,7 +441,7 @@ Standard animation row layout (most assets in this pack):
 
 See [Assets](../assets/) for sprite sheet dimensions and [Player Module](../player-module/) for animation state machine details.
 
-Measure each sheet rather than assuming a common frame size or row layout. Advance animation using accumulated elapsed time; reset the frame on state entry, loop repeating states, and clamp one-shot animations to their last frame. Reuse right-facing art with `sprite_draw` and `SPRITE_FLIP_X` for left-facing rendering.
+Measure each sheet rather than assuming a common frame size or row layout. Advance animation using accumulated elapsed time (a `float` millisecond timer, so the 0.67 ms fraction of each 16.67 ms step is not truncated away); reset the frame on state entry, loop repeating states, and clamp one-shot animations to their last frame. Reuse right-facing art with `sprite_draw` and `SPRITE_FLIP_X` for left-facing rendering.
 
 ---
 

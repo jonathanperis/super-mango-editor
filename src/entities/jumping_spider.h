@@ -51,7 +51,7 @@ typedef struct {
     float  jump_timer;     /* seconds until next jump; counts down each frame*/
     int    on_ground;       /* 1 = walking on floor, 0 = mid-jump           */
     int    frame_index;    /* current animation frame (0–2)                  */
-    uint32_t anim_timer_ms; /* accumulator for frame advances */
+    float  anim_timer_ms;  /* ms accumulated toward the next frame advance */
 } JumpingSpider;
 
 /* ---- Function declarations ---------------------------------------------- */

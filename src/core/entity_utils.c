@@ -15,13 +15,16 @@
  * rather than resetting to zero.  This prevents drift: if a frame takes
  * 18 ms instead of 16 ms, the leftover 2 ms roll into the next frame's count
  * so animations stay perfectly on beat over time.
+ *
+ * The timer is a float: one 1/60 s step is 16.67 ms, and truncating it to a
+ * whole 16 ms would lose 0.67 ms per step and play every animation ~4% slow.
  */
-int animate_frame_ms(int *frame_index, uint32_t *timer_ms,
+int animate_frame_ms(int *frame_index, float *timer_ms,
                      float dt, uint32_t frame_ms, int frame_count)
 {
-    *timer_ms += (uint32_t)(dt * 1000.0f);
-    if (*timer_ms >= frame_ms) {
-        *timer_ms -= frame_ms;
+    *timer_ms += dt * 1000.0f;
+    if (*timer_ms >= (float)frame_ms) {
+        *timer_ms -= (float)frame_ms;
         *frame_index = (*frame_index + 1) % frame_count;
         /*
          * Report a wrap-around: the caller can use this to trigger a
