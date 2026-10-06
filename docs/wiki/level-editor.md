@@ -189,7 +189,7 @@ offending field; fix it in the side panel or press Ctrl+Z.
 
 ## Play-Test Integration
 
-The **Play** button or **F5** validates the active `LevelDef`, serializes it to a private TOML snapshot in the editor preference directory, then launches the sibling game executable with `--no-save --level <snapshot>`. It does not overwrite the open source file or use your personal game profile. Validation errors block playtest and appear in the validation summary/status feedback. Clicking **Stop** (or closing the game window) returns to the editor and removes the temporary playtest file.
+The **Play** button or **F5** validates the active `LevelDef`, serializes it to a private TOML snapshot in the editor preference directory, then launches the sibling game executable with `--no-save --level <snapshot>`. It does not overwrite the open source file or use your personal game profile. Validation errors block playtest and appear in the validation summary/status feedback. While the game runs, the editor shows only a Stop overlay and ignores editing input. Clicking **Stop** (or quitting the editor) asks the game to exit, waits up to one second, then force-stops it; closing the game window also returns to the editor. Either way the temporary playtest file is removed.
 
 ```sh
 # Run an already-saved level with the same profile isolation:
