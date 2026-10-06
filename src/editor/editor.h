@@ -348,7 +348,19 @@ typedef struct {
     char           recent_files[5][EDITOR_PATH_MAX];
     int            recent_file_count;
     char           status_message[160];
-    uint32_t       last_autosave_ms;
+    uint32_t       status_set_ms;    /* clock_millis() when status_message was set */
+    uint32_t       last_autosave_ms; /* last autosave *attempt*, success or not   */
+
+    /*
+     * The most recent version of this document that passed validation.
+     * Recovery snapshots must be loadable, and loading validates, so while
+     * the live level has errors autosave writes this copy instead.  The id
+     * ties it to one document: a copy from a previously open file is never
+     * written into another file's recovery slot.
+     */
+    LevelDef       last_valid_level;
+    uint64_t       last_valid_document_id;
+    int            last_valid_level_set;
 
     /* Save-point tracking.  Hash covers document content, not editor UI. */
     uint64_t       saved_document_hash;

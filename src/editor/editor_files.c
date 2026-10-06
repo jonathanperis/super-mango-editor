@@ -35,6 +35,7 @@
 
 #define EDITOR_RECENT_MAX    5
 #define EDITOR_AUTOSAVE_MS   30000u
+#define EDITOR_STATUS_HOLD_MS 5000u  /* keep a fresh status message this long */
 #define EDITOR_PREF_ORG      "Super Mango"
 #define EDITOR_PREF_APP      "Editor"
 #define EDITOR_RECENT_NAME   "editor_recent.txt"
@@ -480,30 +481,80 @@ void editor_retire_current_recovery(EditorState *es)
     }
 }
 
+void editor_remember_valid_level(EditorState *es)
+{
+    if (!es) return;
+    es->last_valid_level = es->level;
+    es->last_valid_document_id = es->recovery_document_id;
+    es->last_valid_level_set = 1;
+}
+
+/* Show a routine message only if the bar is not still showing a recent,
+ * probably unread one (e.g. why a placement was refused). */
+static void editor_set_background_status(EditorState *es, uint32_t now,
+                                         const char *message)
+{
+    if (es->status_message[0] != '\0' &&
+        now - es->status_set_ms < EDITOR_STATUS_HOLD_MS) return;
+    editor_set_status(es, "%s", message);
+}
+
 void editor_maybe_autosave(EditorState *es)
 {
+    const LevelDef *snapshot;
     uint32_t now;
 
     if (!es || !es->modified) return;
     now = (uint32_t)clock_millis();
     if (now - es->last_autosave_ms < EDITOR_AUTOSAVE_MS) return;
 
+    /*
+     * Count every attempt, successful or not.  If only successes moved the
+     * timestamp, a full disk or a level that stays invalid would retry (and
+     * rewrite the status bar) on every frame; now it waits a full interval.
+     */
+    es->last_autosave_ms = now;
+
+    /*
+     * Which version to snapshot?  Recovery files are read back with
+     * level_load_toml, which rejects levels that fail validation (and the
+     * writer refuses them too), so a snapshot of an invalid draft could
+     * never be recovered.  The safe choice is the newest *valid* version of
+     * this document: after a crash the designer loses only the edits made
+     * since the level last validated, instead of everything since the last
+     * save.
+     */
     editor_validate_level(&es->level, &es->validation_report);
-    if (es->validation_report.error_count > 0) {
-        editor_set_status(es, "Autosave skipped: level has validation errors");
+    if (es->validation_report.error_count == 0) {
+        editor_remember_valid_level(es);
+        snapshot = &es->level;
+    } else if (es->last_valid_level_set &&
+               es->last_valid_document_id == es->recovery_document_id &&
+               (!es->saved_document_hash_valid ||
+                editor_document_hash(&es->last_valid_level) !=
+                es->saved_document_hash)) {
+        snapshot = &es->last_valid_level;
+    } else {
+        /* Nothing newer than the saved file is valid yet. */
+        editor_set_background_status(es, now,
+                                     "Autosave skipped: level has validation errors");
         return;
     }
 
     if (es->autosave_path[0] != '\0' &&
-        level_save_toml_recovery(&es->level, es->autosave_path,
+        level_save_toml_recovery(snapshot, es->autosave_path,
                                  es->file_path) == 0 &&
         editor_add_recovery_entry(es, es->file_path) == 0) {
-        es->last_autosave_ms = now;
         memcpy(es->recovery_original_path, es->file_path,
                strlen(es->file_path) + 1);
-        editor_set_status(es, "Autosaved recovery copy");
+        editor_set_background_status(es, now, snapshot == &es->level
+            ? "Autosaved recovery copy"
+            : "Autosaved last valid version (current level has errors)");
     } else {
-        editor_set_status(es, "Autosave failed");
+        /* A failure matters more than whatever was shown; it repeats at
+         * most once per interval, so it cannot flood the bar. */
+        editor_set_status(es, "Autosave failed; retrying in %u s",
+                          EDITOR_AUTOSAVE_MS / 1000u);
     }
 }
 

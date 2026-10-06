@@ -46,6 +46,10 @@ void editor_run_frame(EditorState *es)
         es->validated_document_hash = hash;
         es->last_validation_ms = now;
         es->validation_cache_valid = 1;
+        /* Keep the newest valid version for autosave to fall back on if
+         * a later edit leaves the level invalid. */
+        if (es->validation_report.error_count == 0)
+            editor_remember_valid_level(es);
     }
     editor_maybe_autosave(es);
     /* Zoom, screen_count edits, undo and level loads can all change how

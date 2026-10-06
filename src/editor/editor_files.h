@@ -16,8 +16,13 @@ int editor_save_current_level(EditorState *es);
 /* Show Save As and save without changing the active path until success. */
 int editor_save_current_level_as(EditorState *es);
 
-/* Periodically write a valid dirty level to the recovery path. */
+/* Every 30 s while dirty, write a recovery snapshot.  An invalid level is
+ * not loadable, so its last valid version is snapshotted instead.  Failed
+ * attempts also wait a full interval before retrying. */
 void editor_maybe_autosave(EditorState *es);
+
+/* Record the current level as this document's newest valid version. */
+void editor_remember_valid_level(EditorState *es);
 
 /* Load recovery content as dirty without adding it to recents. */
 int editor_recover_autosave(EditorState *es);
