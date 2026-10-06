@@ -193,6 +193,8 @@ The title bar shows an asterisk (`*`) after the filename when there are unsaved 
 
 Saved files are plain TOML — they can be edited in any text editor and immediately reloaded in the editor or game.
 
+Saves write a sibling temporary file, flush it, then atomically rename it over the destination and (on macOS/Linux) sync the containing directory so the new entry survives a crash. Saving a symlinked level updates the file the link points to and keeps the link.
+
 Save, autosave, and Play run `editor_validate_level()` first. Errors such as bad counts, invalid paths, missing `next_phase` files, invalid `screen_count`, or invalid checkpoints block persistence and playtest so the editor does not write or launch levels known to be unsafe. The Level Config panel and status bar show the current validation summary.
 
 CI can initialize the editor, render five bounded frames, and exit with:
