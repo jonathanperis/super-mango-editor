@@ -3,6 +3,7 @@ from pathlib import Path
 import io
 import struct
 import sys
+import tempfile
 import wave
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,10 +49,29 @@ def check_tolerance(data):
     assert not gen_sounds.wav_matches(bytes(header_changed), data), "header"
 
 
+def check_write_skips_unchanged(rendered):
+    # `make sounds` on a platform whose libm rounds differently must not
+    # rewrite files that only differ by the tolerated 1 LSB.
+    path = "player/player_jump.wav"
+    subset = {path: rendered[path]}
+    with tempfile.TemporaryDirectory() as tmp:
+        out_dir = Path(tmp)
+        assert gen_sounds.write_sounds(subset, out_dir) == {path: "written"}
+        assert (out_dir / path).read_bytes() == rendered[path]
+        within = nudge(rendered[path], 1)
+        (out_dir / path).write_bytes(within)
+        assert gen_sounds.write_sounds(subset, out_dir) == {path: "unchanged"}
+        assert (out_dir / path).read_bytes() == within, "1-LSB file rewritten"
+        (out_dir / path).write_bytes(nudge(rendered[path], 2))
+        assert gen_sounds.write_sounds(subset, out_dir) == {path: "written"}
+        assert (out_dir / path).read_bytes() == rendered[path]
+
+
 def main():
     first = gen_sounds.render_all()
     assert first == gen_sounds.render_all(), "generation must be deterministic"
     check_tolerance(first["player/player_jump.wav"])
+    check_write_skips_unchanged(first)
     # The C code loads these exact paths; the generator owns all of them.
     committed = sorted(p.relative_to(gen_sounds.SOUND_DIR).as_posix()
                        for p in gen_sounds.SOUND_DIR.rglob("*.wav"))
