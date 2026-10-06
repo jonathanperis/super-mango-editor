@@ -7,14 +7,13 @@
 
 #include "editor.h" /* EditorState */
 #include "undo.h"   /* Command */
+#include "entity_meta.h" /* editor_snapshot_entity and insert/remove helpers */
 
 #define EDITOR_CHANGE_ENTITY 1
 #define EDITOR_CHANGE_CONFIG 2
 #define EDITOR_LAST_STAR_NEXT_PHASE_WIDGET ((int)ENT_LAST_STAR * 100 + 3)
 
-/* Snapshot helpers shared by tools, inspector commits, and tests. */
-PlacementData editor_snapshot_entity(const LevelDef *level,
-                                     EntityType type, int index);
+/* Level-wide settings snapshot shared by inspector commits and tests. */
 LevelConfigSnapshot editor_snapshot_config(const LevelDef *level);
 
 /* UI mutation tracking.  Capture happens before widget writes its value. */

@@ -52,7 +52,7 @@ src/
 │   ├── palette.h / .c            Entity palette
 │   ├── properties.h / .c         Per-entity property editing
 │   ├── tools.h / .c              Selection and placement tools
-│   ├── entity_meta.h / .c        Palette/display metadata for entity types
+│   ├── entity_meta.h / .c        Entity metadata plus shared read/insert/remove of placements
 │   ├── editor_frame.h / .c       Per-frame editor orchestration
 │   ├── editor_events.h / .c      Semantic input dispatch
 │   ├── dialog_choice.c          Native confirmation/error/recovery decisions

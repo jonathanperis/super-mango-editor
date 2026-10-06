@@ -24,8 +24,41 @@ int editor_entity_palette_entry_count(void);
 EntityType editor_entity_palette_entry_type(int index);
 int editor_entity_type_is_singleton(EntityType type);
 
+/* MAX_* array length for a type (1 for singletons, 0 for invalid types). */
+int editor_entity_capacity(EntityType type);
+
 /* Central LevelDef count and selection safety helpers. */
 int editor_entity_count(const LevelDef *level, EntityType type);
+
+/*
+ * One placement, addressed by (type, index).  These are the only functions
+ * that copy entity bytes in or out of LevelDef; tools, undo, clipboard and
+ * tests all use them so every type is handled the same way.
+ *
+ * editor_snapshot_entity : copy one placement into a zeroed PlacementData
+ *                          (all zeros when the index is out of range).
+ * editor_entity_write    : overwrite an existing placement (also singletons).
+ * editor_entity_insert   : open a slot at index (0..count) and store data.
+ * editor_entity_remove   : delete the slot at index and close the gap.
+ *
+ * Insert/remove only work for array types and return -1 when the array is
+ * full or the index is out of range.  For rails they also renumber
+ * spike_blocks[].rail_index and RAIL-mode float_platforms[].rail_index so
+ * every reference keeps naming the same rail.  Remove expects the caller to
+ * have refused deleting a rail that is still referenced.
+ */
+PlacementData editor_snapshot_entity(const LevelDef *level,
+                                     EntityType type, int index);
+int editor_entity_write(LevelDef *level, EntityType type, int index,
+                        const PlacementData *data);
+int editor_entity_insert(LevelDef *level, EntityType type, int index,
+                         const PlacementData *data);
+int editor_entity_remove(LevelDef *level, EntityType type, int index);
+
+/* Count spike blocks and RAIL-mode float platforms riding rail_index.
+ * Either output pointer may be NULL.  Returns the total. */
+int editor_rail_reference_count(const LevelDef *level, int rail_index,
+                                int *spike_blocks, int *float_platforms);
 int editor_selection_is_valid(const EditorState *es);
 void editor_selection_reconcile(EditorState *es);
 void editor_selection_after_remove(EditorState *es, EntityType type, int index);
