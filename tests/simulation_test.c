@@ -4,6 +4,8 @@
 #include "core/game_overlay.h"
 #include "core/game_resources.h"
 #include "core/game_timing.h"
+#include "core/game_player_step.h"
+#include "collision/game_collision.h"
 #include "core/game_update.h"
 #include "collision/collision_damage.h"
 #include "screens/settings_menu.h"
@@ -174,11 +176,122 @@ done:
     return failed;
 }
 
+/* A bare GameState with one player standing on the ground floor. */
+static void stand_player_on_floor(GameState *gs, float x)
+{
+    gs->runtime.world_w = 1600;
+    gs->player.w = gs->player.h = 48;
+    player_apply_default_physics(&gs->player);
+    gs->player.spawn_x = x;
+    gs->player.spawn_y = FLOOR_Y;
+    player_reset(&gs->player);
+    gs->loop.fp_prev_riding = -1;
+}
+
+/*
+ * Jump once while frames arrive at render_hz, through the same accumulator
+ * game_frame uses. Jump is held for the first 30 steps (a full jump); the
+ * input is indexed by step, not by frame, as it is for a recorded run.
+ * Returns how high the player rose above the floor, in pixels.
+ */
+static float jump_apex_height(float render_hz, float jitter)
+{
+    GameState gs = {0};
+    stand_player_on_floor(&gs, 100.0f);
+    float floor_y = gs.player.y, apex_y = gs.player.y;
+    int step_index = 0;
+    game_timing_restart_clock(&gs);
+    for (int frame = 0; frame < (int)(render_hz * 2.0f); frame++) {
+        float seconds = 1.0f / render_hz + (frame % 2 ? jitter : -jitter);
+        int steps = game_timing_take_steps(&gs, seconds);
+        for (int s = 0; s < steps; s++, step_index++) {
+            gs.replay_input_mask = step_index < 30 ? PLAYER_INPUT_JUMP : 0;
+            game_player_step(&gs, GAME_FIXED_STEP);
+            if (gs.player.y < apex_y) apex_y = gs.player.y;
+        }
+    }
+    return floor_y - apex_y;
+}
+
+static int jump_height_ignores_frame_rate(void)
+{
+    int failed = 0;
+    float at60 = jump_apex_height(60.0f, 0.0f);
+    /* JUMP_VY 325 px/s against GRAVITY 800 px/s² peaks near v²/2g = 66 px;
+     * semi-implicit Euler at 1/60 s lands a little below that. */
+    CHECK(at60 > 60.0f && at60 < 67.0f);
+    /* Exactly equal, not "close": every display rate runs the same steps. */
+    CHECK(jump_apex_height(30.0f, 0.0f) == at60);
+    CHECK(jump_apex_height(144.0f, 0.0f) == at60);
+    CHECK(jump_apex_height(60.0f, 0.0006f) == at60);
+done:
+    return failed;
+}
+
+static int fast_fall_does_not_tunnel_through_platform(void)
+{
+    int failed = 0;
+    /* A one-way pillar top at y=150 and a player falling at 3000 px/s:
+     * 50 px per step, far more than any surface is thick. The crossing test
+     * (bottom before vs. after the step) must still land the player. */
+    Platform pillar = {.x = 0, .y = 150, .w = 200, .h = 102};
+    Player player = {.x = 50, .y = 0, .w = 48, .h = 48, .vy = 3000};
+    player_apply_default_physics(&player);
+    int bounce = -1, support = -1;
+    for (int step = 0; step < 60 && !player.on_ground; step++)
+        player_update(&player, GAME_FIXED_STEP, NULL, &pillar, 1, NULL, 0,
+                      NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0,
+                      NULL, 0, NULL, 0, &bounce, &support, -1, 400);
+    CHECK(player.on_ground);
+    CHECK(NEAR(player.y + player.h - PLAYER_FLOOR_SINK, pillar.y));
+    CHECK(player.vy == 0.0f);
+done:
+    return failed;
+}
+
+static int collision_hurts_once_and_collects_coins(void)
+{
+    int failed = 0;
+    GameState gs = {0};
+    stand_player_on_floor(&gs, 100.0f);
+    gs.hearts = 3;
+    gs.lives = 3;
+    gs.rules.coin_score = 100;
+    gs.rules.score_per_life = 1000;
+    gs.score_life_next = 1000;
+    gs.coin_count = 1;
+    gs.coins[0] = (Coin){.x = 300, .y = 230, .active = 1};
+    gs.spike_row_count = 1;
+    gs.spike_rows[0] = (SpikeRow){.x = 110, .y = FLOOR_Y - SPIKE_TILE_H, .count = 2, .active = 1};
+
+    /* Standing in the spikes: one heart lost, knockback, invincibility. */
+    game_collide(&gs, GAME_FIXED_STEP);
+    CHECK(gs.hearts == 2 && gs.player.hurt_timer > 0.0f && gs.player.vx != 0.0f);
+    CHECK(gs.coins[0].active == 1 && gs.score == 0);
+    /* Still overlapping during invincibility: no second hit. */
+    game_collide(&gs, GAME_FIXED_STEP);
+    CHECK(gs.hearts == 2);
+
+    /* Overlapping the coin collects it exactly once. */
+    gs.player.x = 290.0f;
+    game_collide(&gs, GAME_FIXED_STEP);
+    game_collide(&gs, GAME_FIXED_STEP);
+    CHECK(gs.coins[0].active == 0 && gs.score == 100 && gs.hearts == 2);
+done:
+    return failed;
+}
+
 int game_simulation_contract_test(void)
 {
     int failures = inspection_and_replay();
     printf("simulation: inspection/export/replay %s\n", failures ? "FAIL" : "PASS");
     int scenario = moving_support_and_damage();
     printf("simulation: moving support/hazard/checkpoint %s\n", scenario ? "FAIL" : "PASS");
-    return failures + scenario;
+    int jump = jump_height_ignores_frame_rate();
+    printf("simulation: jump apex independent of frame rate %s\n", jump ? "FAIL" : "PASS");
+    int tunnel = fast_fall_does_not_tunnel_through_platform();
+    printf("simulation: fast fall lands on platform %s\n", tunnel ? "FAIL" : "PASS");
+    int collide = collision_hurts_once_and_collects_coins();
+    printf("simulation: hazard and coin collision %s\n", collide ? "FAIL" : "PASS");
+    return failures + scenario + jump + tunnel + collide;
 }
