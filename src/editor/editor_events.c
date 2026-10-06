@@ -186,6 +186,25 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
      * the camera scroll in both axes. */
     if (event->type >= INPUT_MOUSE_DOWN && event->type <= INPUT_WHEEL)
         canvas_screen_to_world(es, event->x, event->y, &wx, &wy);
+
+    /*
+     * While a playtest runs the editor shows only the "Playing" overlay and
+     * the game is running a snapshot of this level.  Edits now would change
+     * a document the designer cannot see, so input is limited to quitting
+     * and the overlay's Stop button (which reads ui.mouse_clicked).
+     */
+    if (es->playing && event->type != INPUT_QUIT) {
+        if (event->type == INPUT_MOUSE_DOWN && event->button == MOUSE_BUTTON_LEFT) {
+            es->ui.mouse_clicked = 1;
+        } else if (event->type == INPUT_MOUSE_UP) {
+            es->mouse_down = 0;  /* a press that started the playtest ends */
+            es->mouse_right_down = 0;
+        } else if (event->type == INPUT_KEY_DOWN) {
+            editor_set_status(es, "Playtest running: click Stop or close the game window to edit");
+        }
+        return;
+    }
+
     switch (event->type) {
     case INPUT_QUIT:
         if (editor_confirm_discard_changes(es, "quit")) {

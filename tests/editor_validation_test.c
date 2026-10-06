@@ -1,3 +1,7 @@
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L /* fork, kill, pipe, sigaction under -std=c11 */
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,7 +15,10 @@
 #include <io.h>
 #include <sys/stat.h>
 #else
+#include <errno.h>
+#include <signal.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #endif
 
@@ -1978,6 +1985,89 @@ fail:
     return 1;
 }
 
+static int playtest_blocks_editing_and_stop_cleans_up(void)
+{
+    EditorState es = {0};
+    InputEvent event;
+
+    editor_level_init_defaults(&es.level);
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+    es.camera.zoom = 1.0f;
+    es.playing = 1;
+
+    /* Canvas clicks and shortcuts do not edit while the game runs. */
+    es.tool = TOOL_PLACE;
+    es.palette_type = ENT_COIN;
+    memset(&event, 0, sizeof(event));
+    event.type = INPUT_MOUSE_DOWN;
+    event.button = MOUSE_BUTTON_LEFT;
+    event.x = 100;
+    event.y = TOOLBAR_H + 100;
+    editor_handle_event(&es, &event);
+    if (expect_int("no place while playing", es.level.coin_count, 0) != 0 ||
+        expect_int("stop button still sees click", es.ui.mouse_clicked, 1) != 0)
+        goto fail;
+    event.type = INPUT_KEY_DOWN;
+    event.key = KEY_V;
+    event.mods = INPUT_CTRL;
+    es.has_clipboard = 1;
+    es.clipboard_type = ENT_COIN;
+    es.clipboard_data.coin = (CoinPlacement){50.0f, 50.0f};
+    editor_handle_event(&es, &event);
+    if (expect_int("no paste while playing", es.level.coin_count, 0) != 0 ||
+        expect_prefix("playing status", es.status_message, "Playtest running") != 0)
+        goto fail;
+
+#ifndef _WIN32
+    {
+        /* A game that ignores SIGTERM is killed after the bounded wait,
+         * reaped (no zombie), and the private level file is removed. */
+        const char *level_path = "out/test_editor_playtest_stop.toml";
+        int ready[2];
+        char byte = 0;
+        pid_t pid;
+
+        if (write_text_file(level_path, "format_version = 1\n") != 0 ||
+            pipe(ready) != 0) goto fail;
+        pid = fork();
+        if (pid < 0) goto fail;
+        if (pid == 0) {
+            struct sigaction ignore;
+            memset(&ignore, 0, sizeof(ignore));
+            ignore.sa_handler = SIG_IGN;
+            sigaction(SIGTERM, &ignore, NULL);
+            if (write(ready[1], "r", 1) != 1) _exit(1);
+            for (;;) pause();
+        }
+        close(ready[1]);
+        /* Wait until the child ignores SIGTERM, so the SIGKILL path runs. */
+        if (read(ready[0], &byte, 1) != 1) byte = 0;
+        close(ready[0]);
+
+        es.play_pid = (int)pid;
+        strncpy(es.playtest_path, level_path, sizeof(es.playtest_path) - 1);
+        editor_stop_play(&es);
+        if (expect_int("stop clears playing", es.playing, 0) != 0 ||
+            expect_int("stop clears pid", es.play_pid, 0) != 0 ||
+            expect_int("child reaped", waitpid(pid, NULL, WNOHANG) == -1 &&
+                       errno == ECHILD, 1) != 0 ||
+            expect_int("playtest file removed", editor_file_exists(level_path), 0) != 0) {
+            kill(pid, SIGKILL);
+            waitpid(pid, NULL, 0);
+            remove(level_path);
+            goto fail;
+        }
+    }
+#endif
+
+    undo_destroy(es.undo);
+    return 0;
+fail:
+    undo_destroy(es.undo);
+    return 1;
+}
+
 typedef struct {
     TextFont *font;
     int drawing;
@@ -2528,6 +2618,7 @@ int main(void)
     if (editor_mutations_keep_level_valid() != 0) return 1;
     if (refused_mutations_explain_why() != 0) return 1;
     if (camera_scrolls_vertically_and_stays_clamped() != 0) return 1;
+    if (playtest_blocks_editing_and_stop_cleans_up() != 0) return 1;
     if (widget_commit_paths_preserve_values() != 0) return 1;
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;
