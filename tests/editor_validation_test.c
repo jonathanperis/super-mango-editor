@@ -1325,6 +1325,113 @@ cleanup:
     return result;
 }
 
+/*
+ * editor_document_hash lists LevelDef fields by hand; a forgotten field
+ * would make edits to it invisible to dirty tracking (no "*", no save
+ * prompt).  Entity coverage iterates the palette table, so a new entity
+ * type is checked automatically; each element's *content* must matter,
+ * not just the array count.
+ */
+static int expect_hash_changes(const char *name, uint64_t before,
+                               const LevelDef *level)
+{
+    if (editor_document_hash(level) == before) {
+        fprintf(stderr, "editor_validation_test: document hash ignores %s\n", name);
+        return 1;
+    }
+    return 0;
+}
+
+static int document_hash_covers_every_entity_and_config_field(void)
+{
+    LevelDef level;
+    uint64_t before;
+    PlacementData first, second;
+
+    memset(&first, 0x11, sizeof(first));
+    memset(&second, 0x22, sizeof(second));
+
+    for (int p = 0; p < editor_entity_palette_entry_count(); p++) {
+        EntityType type = editor_entity_palette_entry_type(p);
+        const char *name = editor_entity_type_name(type);
+
+        editor_level_init_defaults(&level);
+        before = editor_document_hash(&level);
+        if (editor_entity_type_is_singleton(type)) {
+            if (editor_entity_write(&level, type, 0, &first) != 0) return 1;
+        } else if (editor_entity_insert(&level, type, 0, &first) != 0) {
+            return 1;
+        }
+        if (expect_hash_changes(name, before, &level) != 0) return 1;
+
+        before = editor_document_hash(&level);
+        if (editor_entity_write(&level, type, 0, &second) != 0 ||
+            expect_hash_changes(name, before, &level) != 0) return 1;
+    }
+
+    /* Level-wide settings: take the hash, change one field, compare. */
+    editor_level_init_defaults(&level);
+    before = editor_document_hash(&level); level.name[0] = 'Z';
+    if (expect_hash_changes("name", before, &level)) return 1;
+    before = editor_document_hash(&level); strcpy(level.description, "d");
+    if (expect_hash_changes("description", before, &level)) return 1;
+    before = editor_document_hash(&level); strcpy(level.generated_by, "g");
+    if (expect_hash_changes("generated_by", before, &level)) return 1;
+    before = editor_document_hash(&level); level.screen_count++;
+    if (expect_hash_changes("screen_count", before, &level)) return 1;
+    before = editor_document_hash(&level); strcpy(level.next_phase, "levels/x.toml");
+    if (expect_hash_changes("next_phase", before, &level)) return 1;
+    before = editor_document_hash(&level); level.background_layer_count = 1;
+    if (expect_hash_changes("background_layer_count", before, &level)) return 1;
+    before = editor_document_hash(&level); level.background_layers[0].path[0] = 'b';
+    if (expect_hash_changes("background_layers.path", before, &level)) return 1;
+    before = editor_document_hash(&level); level.background_layers[0].speed = 0.5f;
+    if (expect_hash_changes("background_layers.speed", before, &level)) return 1;
+    before = editor_document_hash(&level); level.foreground_layer_count = 1;
+    if (expect_hash_changes("foreground_layer_count", before, &level)) return 1;
+    before = editor_document_hash(&level); level.foreground_layers[0].path[0] = 'f';
+    if (expect_hash_changes("foreground_layers.path", before, &level)) return 1;
+    before = editor_document_hash(&level); level.foreground_layers[0].speed = 0.5f;
+    if (expect_hash_changes("foreground_layers.speed", before, &level)) return 1;
+    before = editor_document_hash(&level); level.fog_layer_count = 1;
+    if (expect_hash_changes("fog_layer_count", before, &level)) return 1;
+    before = editor_document_hash(&level); level.fog_layers[0].path[0] = 'o';
+    if (expect_hash_changes("fog_layers.path", before, &level)) return 1;
+    before = editor_document_hash(&level); level.fog_layers[0].speed = 0.5f;
+    if (expect_hash_changes("fog_layers.speed", before, &level)) return 1;
+    before = editor_document_hash(&level); level.player_start_x += 1.0f;
+    if (expect_hash_changes("player_start_x", before, &level)) return 1;
+    before = editor_document_hash(&level); level.player_start_y += 1.0f;
+    if (expect_hash_changes("player_start_y", before, &level)) return 1;
+    before = editor_document_hash(&level); strcpy(level.music_path, "m");
+    if (expect_hash_changes("music_path", before, &level)) return 1;
+    before = editor_document_hash(&level); level.music_volume++;
+    if (expect_hash_changes("music_volume", before, &level)) return 1;
+    before = editor_document_hash(&level); level.floor_tile_path[0] = 'X';
+    if (expect_hash_changes("floor_tile_path", before, &level)) return 1;
+    before = editor_document_hash(&level); level.initial_hearts++;
+    if (expect_hash_changes("initial_hearts", before, &level)) return 1;
+    before = editor_document_hash(&level); level.initial_lives++;
+    if (expect_hash_changes("initial_lives", before, &level)) return 1;
+    before = editor_document_hash(&level); level.score_per_life++;
+    if (expect_hash_changes("score_per_life", before, &level)) return 1;
+    before = editor_document_hash(&level); level.coin_score++;
+    if (expect_hash_changes("coin_score", before, &level)) return 1;
+
+    /* physics is a block of floats: change each one in turn. */
+    for (size_t i = 0; i < sizeof(level.physics) / sizeof(float); i++) {
+        float value;
+        char label[32];
+        before = editor_document_hash(&level);
+        memcpy(&value, (char *)&level.physics + i * sizeof(float), sizeof(value));
+        value += 1.0f;
+        memcpy((char *)&level.physics + i * sizeof(float), &value, sizeof(value));
+        snprintf(label, sizeof(label), "physics float %zu", i);
+        if (expect_hash_changes(label, before, &level) != 0) return 1;
+    }
+    return 0;
+}
+
 /* Feed `output` to file_dialog_read_path as if a picker had printed it. */
 static int read_picker_output(const char *output, char *buf, int buf_size)
 {
@@ -2849,6 +2956,7 @@ int main(void)
     if (recovery_metadata_keeps_longest_source_path() != 0) return 1;
     if (recent_files_skip_overlong_lines_and_line_breaks() != 0) return 1;
     if (dialog_quoting_and_picked_paths_stay_literal() != 0) return 1;
+    if (document_hash_covers_every_entity_and_config_field() != 0) return 1;
     if (widget_commit_paths_preserve_values() != 0) return 1;
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;
