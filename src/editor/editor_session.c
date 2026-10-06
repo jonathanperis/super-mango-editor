@@ -47,6 +47,9 @@ void editor_set_status(EditorState *es, const char *fmt, ...)
     va_start(ap, fmt);
     vsnprintf(es->status_message, sizeof(es->status_message), fmt, ap);
     va_end(ap);
+    /* Background work (autosave) checks this so it does not replace a
+     * message the designer has probably not read yet. */
+    es->status_set_ms = (uint32_t)clock_millis();
 }
 
 static void editor_hash_bytes(uint64_t *hash, const void *data, size_t size)

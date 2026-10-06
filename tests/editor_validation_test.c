@@ -1154,9 +1154,11 @@ cleanup:
     return result;
 }
 
-static int invalid_autosave_does_not_consume_autosave_interval(void)
+static int autosave_backs_off_and_snapshots_last_valid_level(void)
 {
     EditorState es;
+    LevelDef recovered;
+    const uint32_t long_ago = (uint32_t)clock_millis() - 30001u;
 
     ensure_out_dir();
     memset(&es, 0, sizeof(es));
@@ -1166,25 +1168,67 @@ static int invalid_autosave_does_not_consume_autosave_interval(void)
     ensure_autosave_dir();
     remove(es.autosave_path);
 
+    /* An invalid level with no valid version yet writes nothing. */
     es.modified = 1;
-    es.last_autosave_ms = (uint32_t)clock_millis() - 30001u;
+    es.last_autosave_ms = long_ago;
     es.level.coin_count = MAX_COINS + 1;
-
     editor_maybe_autosave(&es);
     if (expect_string("invalid autosave status", es.status_message,
-                      "Autosave skipped: level has validation errors") != 0)
-        return 1;
-    if (expect_int("invalid autosave not written",
+                      "Autosave skipped: level has validation errors") != 0 ||
+        expect_int("invalid autosave not written",
                    editor_file_exists(es.autosave_path), 0) != 0)
         return 1;
 
-    es.level.coin_count = 0;
+    /* The attempt consumed the interval: no retry on the next frame. */
+    es.level.coin_count = 1;
+    es.level.coins[0] = (CoinPlacement){64.0f, 96.0f};
     editor_maybe_autosave(&es);
-    if (expect_int("fixed autosave written immediately",
-                   editor_file_exists(es.autosave_path), 1) != 0)
+    if (expect_int("no retry before interval",
+                   editor_file_exists(es.autosave_path), 0) != 0) return 1;
+
+    /* A valid level is written and remembered... */
+    es.last_autosave_ms = long_ago;
+    editor_maybe_autosave(&es);
+    if (expect_int("valid autosave written",
+                   editor_file_exists(es.autosave_path), 1) != 0) return 1;
+
+    /* ...so when it later breaks, crash recovery still gets a loadable
+     * snapshot: the last valid version. */
+    es.level.coin_count = MAX_COINS + 1;
+    remove(es.autosave_path);
+    es.status_message[0] = '\0';
+    es.last_autosave_ms = long_ago;
+    editor_maybe_autosave(&es);
+    memset(&recovered, 0, sizeof(recovered));
+    if (expect_int("last valid snapshot written",
+                   editor_file_exists(es.autosave_path), 1) != 0 ||
+        expect_int("last valid snapshot loads",
+                   level_load_toml(es.autosave_path, &recovered), 0) != 0 ||
+        expect_int("snapshot is last valid version", recovered.coin_count, 1) != 0 ||
+        expect_prefix("last valid status", es.status_message,
+                      "Autosaved last valid version") != 0) return 1;
+
+    /* Routine autosave messages do not replace a fresh, unread message. */
+    es.level.coin_count = 1;
+    editor_set_status(&es, "Cannot place Coin: limit reached");
+    es.last_autosave_ms = long_ago;
+    editor_maybe_autosave(&es);
+    if (expect_string("fresh status kept", es.status_message,
+                      "Cannot place Coin: limit reached") != 0) return 1;
+
+    /* Failures report once, then wait a full interval before retrying. */
+    strncpy(es.autosave_path, "out/no_such_dir/never/autosave.toml",
+            sizeof(es.autosave_path) - 1);
+    es.last_autosave_ms = long_ago;
+    editor_maybe_autosave(&es);
+    if (expect_prefix("failure status", es.status_message, "Autosave failed") != 0)
+        return 1;
+    editor_set_status(&es, "Other message");
+    editor_maybe_autosave(&es);
+    if (expect_string("failure backs off", es.status_message, "Other message") != 0)
         return 1;
 
-    remove(es.autosave_path);
+    remove("out/autosave/test_editor_autosave.toml");
     return 0;
 }
 
@@ -2471,7 +2515,7 @@ int main(void)
     if (editor_save_workflows_enforce_baselines() != 0) return 1;
     if (recovery_metadata_and_failed_save_contract() != 0) return 1;
     if (playtest_destination_isolated() != 0) return 1;
-    if (invalid_autosave_does_not_consume_autosave_interval() != 0) return 1;
+    if (autosave_backs_off_and_snapshots_last_valid_level() != 0) return 1;
     if (loads_recent_files_with_trim_and_limit() != 0) return 1;
     if (property_command_undo_redo() != 0) return 1;
     if (last_star_text_property_undo_redo() != 0) return 1;
