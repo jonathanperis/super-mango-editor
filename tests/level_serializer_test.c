@@ -1070,6 +1070,12 @@ static int strict_v1_fixture_suite(void)
         "bad_checkpoint_duplicate.toml",
         "bad_checkpoint_array.toml",
         "bad_screen_count_max_plus_one.toml",
+        "bad_utf8_overlong.toml",
+        "bad_utf8_surrogate.toml",
+        "bad_utf8_above_max.toml",
+        "bad_utf8_truncated.toml",
+        "bad_utf8_stray_continuation.toml",
+        "bad_utf8_legacy.toml",
     };
     const char *const fixture_dir = "tests/fixtures/serializer_v1/";
     LevelDef expected;
@@ -1085,6 +1091,14 @@ static int strict_v1_fixture_suite(void)
     if (level_load_toml("tests/fixtures/serializer_v1/valid_v1.toml",
                         &expected) != 0) {
         return fail("valid v1 schema fixture should load");
+    }
+
+    /* Two-, three- and four-byte characters are all fine; only malformed
+     * byte sequences (the bad_utf8_* fixtures) are refused. */
+    if (level_load_toml("tests/fixtures/serializer_v1/valid_utf8.toml",
+                        &expected) != 0 ||
+        strcmp(expected.name, "Mang\xc3\xa1 \xe2\x9c\x93 \xf0\x9f\xa5\xad") != 0) {
+        return fail("valid multi-byte UTF-8 fixture should load unchanged");
     }
 
     if (level_load_toml("tests/fixtures/serializer_v1/valid_screen_count_max.toml",

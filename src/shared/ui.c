@@ -25,6 +25,7 @@
 #include <math.h>      /* isfinite                                                   */
 
 #include "ui.h"
+#include "utf8.h"    /* utf8_sequence_length */
 
 /* ------------------------------------------------------------------ */
 /* Internal helper — forward declarations                              */
@@ -121,8 +122,16 @@ static void apply_pending_text_input(UIState *ui)
         int accepted = ch >= ' ';
         size_t bytes = 1;
         if (ui->edit_type == UI_EDIT_TEXT) {
-            while (i + bytes < ui->pending_text_length &&
-                   ((unsigned char)ui->pending_text_input[i + bytes] & 0xc0) == 0x80) bytes++;
+            /* Take one whole character.  Pasted text, or a lone surrogate
+             * from a text event, can carry bytes that are not valid UTF-8;
+             * dropping such a byte keeps the field from holding text that
+             * the level file could not load back. */
+            bytes = utf8_sequence_length(ui->pending_text_input + i,
+                                         ui->pending_text_length - i);
+            if (bytes == 0) {
+                accepted = 0;
+                bytes = 1;
+            }
         }
 
         if (ui->edit_type == UI_EDIT_INT) {

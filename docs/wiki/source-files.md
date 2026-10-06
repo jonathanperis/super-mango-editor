@@ -75,6 +75,7 @@ src/
 │   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
 │   ├── text.h / .c              Borrowed built-in font, text measurement and label texture creation
 │   ├── platform.h / .c          Monotonic time, UTF-8 copying and OS preference/executable paths
+│   ├── utf8.h                   Strict UTF-8 checks for loaded strings and typed text
 │   ├── ui.h / .c                 Immediate-mode widgets shared by editor and game settings
 │   ├── serializer.h / .c         TOML save/load public API anchor
 │   ├── serializer_emit.h / .c    TOML emission helpers
@@ -518,6 +519,7 @@ not measured CPU utilization. The resident-memory sample comes from the OS.
 | `shared/text.h`, `shared/text.c` | CPU image versus GPU texture; borrowing raylib's built-in font |
 | `shared/ui.h`, `shared/ui.c` | Immediate-mode calls, stable widget IDs, staged edits and bounded label cache |
 | `shared/platform.h`, `shared/platform.c` | Monotonic elapsed time, UTF-8 copying and caller-owned OS paths |
+| `shared/utf8.h` | What makes a UTF-8 byte sequence valid (overlong forms, surrogates, truncation) |
 | `input/input_backend.h`, `input/input_backend.c` | Ordered events versus held state, logical pointer mapping and saved-binding translation |
 
 ### `core/entity_utils.h` / `core/entity_utils.c`
