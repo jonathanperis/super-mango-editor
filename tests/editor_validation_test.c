@@ -1325,6 +1325,67 @@ cleanup:
     return result;
 }
 
+/* Feed `output` to file_dialog_read_path as if a picker had printed it. */
+static int read_picker_output(const char *output, char *buf, int buf_size)
+{
+    FILE *fp = tmpfile();
+    int result;
+    if (!fp) return -100;
+    fputs(output, fp);
+    rewind(fp);
+    result = file_dialog_read_path(fp, buf, buf_size);
+    fclose(fp);
+    return result;
+}
+
+static int dialog_quoting_and_picked_paths_stay_literal(void)
+{
+    char buf[64];
+    char *quoted;
+    int failed = 0;
+
+    /* PowerShell: ASCII and Unicode single quotes are all doubled, so the
+     * file name stays one literal string instead of ending it early. */
+    quoted = dialog_quote_powershell("x\xE2\x80\x99;Start-Process calc;\xE2\x80\x98.toml");
+    failed |= !quoted || expect_string("powershell smart quotes", quoted,
+        "'x\xE2\x80\x99\xE2\x80\x99;Start-Process calc;\xE2\x80\x98\xE2\x80\x98.toml'");
+    free(quoted);
+    quoted = dialog_quote_powershell("it's \xE2\x80\x9A\xE2\x80\x9B \xE2\x80\x9C");
+    failed |= !quoted || expect_string("powershell all marks", quoted,
+        "'it''s \xE2\x80\x9A\xE2\x80\x9A\xE2\x80\x9B\xE2\x80\x9B \xE2\x80\x9C'");
+    free(quoted);
+    quoted = dialog_quote_posix("it's <b>&amp;");
+    failed |= !quoted || expect_string("posix quote", quoted, "'it'\\''s <b>&amp;'");
+    free(quoted);
+    if (failed) return 1;
+
+    /* A picked name containing a line break is refused, never truncated. */
+    if (expect_int("plain path", read_picker_output("/tmp/a.toml\n", buf, sizeof(buf)),
+                   FILE_DIALOG_SELECTED) != 0 ||
+        expect_string("plain path text", buf, "/tmp/a.toml") != 0 ||
+        expect_int("crlf path", read_picker_output("C:\\a.toml\r\n", buf, sizeof(buf)),
+                   FILE_DIALOG_SELECTED) != 0 ||
+        expect_string("crlf path text", buf, "C:\\a.toml") != 0 ||
+        expect_int("newline in name",
+                   read_picker_output("/tmp/evil\nreal.toml\n", buf, sizeof(buf)),
+                   FILE_DIALOG_INVALID_PATH) != 0 ||
+        expect_int("carriage return in name",
+                   read_picker_output("/tmp/evil\rreal.toml\n", buf, sizeof(buf)),
+                   FILE_DIALOG_INVALID_PATH) != 0 ||
+        expect_int("no output", read_picker_output("", buf, sizeof(buf)),
+                   FILE_DIALOG_CANCELLED) != 0) return 1;
+
+    {
+        EditorState es = {0};
+        file_dialog_test_set_open_result(FILE_DIALOG_INVALID_PATH, NULL);
+        editor_open_level_file(&es);
+        if (expect_string("open line break status", es.status_message,
+                          "Open failed: file names with line breaks are not supported") != 0)
+            return 1;
+    }
+    return 0;
+}
+
 static int property_command_undo_redo(void)
 {
     EditorState es;
@@ -2787,6 +2848,7 @@ int main(void)
     if (load_fingerprints_the_bytes_it_parsed() != 0) return 1;
     if (recovery_metadata_keeps_longest_source_path() != 0) return 1;
     if (recent_files_skip_overlong_lines_and_line_breaks() != 0) return 1;
+    if (dialog_quoting_and_picked_paths_stay_literal() != 0) return 1;
     if (widget_commit_paths_preserve_values() != 0) return 1;
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;

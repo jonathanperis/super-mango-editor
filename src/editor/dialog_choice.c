@@ -10,8 +10,51 @@
 #endif
 
 /* Every dynamic string is a literal argument, never executable shell/script
- * text. Windows executes an encoded UTF-16 script to avoid cmd.exe reparsing. */
-static char *quote(const char *text)
+ * text. Windows executes an encoded UTF-16 script to avoid cmd.exe reparsing.
+ *
+ * Both quoting functions wrap text in single quotes, where neither a POSIX
+ * shell nor PowerShell expands anything; only the quote character itself
+ * needs care.  Worst case each input byte becomes 4 output bytes, plus two
+ * quotes and the NUL. */
+
+/*
+ * PowerShell treats four Unicode quotation marks exactly like the ASCII
+ * apostrophe: U+2018 ‘ U+2019 ’ U+201A ‚ U+201B ‛.  In UTF-8 they are
+ * E2 80 98..9B.  Returns the byte length of such a mark at text, else 0.
+ */
+static size_t powershell_quote_mark_length(const char *text)
+{
+    const unsigned char *s = (const unsigned char *)text;
+    if (s[0] == '\'') return 1;
+    if (s[0] == 0xE2 && s[1] == 0x80 && s[2] >= 0x98 && s[2] <= 0x9B) return 3;
+    return 0;
+}
+
+char *dialog_quote_powershell(const char *text)
+{
+    size_t length = strlen(text);
+    char *out = malloc(length*4+3);
+    if (!out) return NULL;
+    char *p = out;
+    *p++ = '\'';
+    while (*text) {
+        size_t mark = powershell_quote_mark_length(text);
+        if (mark) {
+            /* Inside '...' a doubled quote mark is one literal mark; a
+             * single one would end the string and let the rest of a file
+             * name such as  x’;Start-Process calc;’.toml  run as code. */
+            memcpy(p, text, mark); p += mark;
+            memcpy(p, text, mark); p += mark;
+            text += mark;
+        } else {
+            *p++ = *text++;
+        }
+    }
+    *p++ = '\''; *p = 0;
+    return out;
+}
+
+char *dialog_quote_posix(const char *text)
 {
     size_t length = strlen(text);
     char *out = malloc(length*4+3);
@@ -19,16 +62,22 @@ static char *quote(const char *text)
     char *p = out;
     *p++ = '\'';
     for (; *text; text++) {
-        if (*text == '\'') {
-#ifdef _WIN32
-            *p++ = '\''; *p++ = '\'';
-#else
-            memcpy(p, "'\\''", 4); p += 4;
-#endif
-        } else *p++ = *text;
+        /* A POSIX shell has no escape inside '...': close the quote, add
+         * an escaped apostrophe, and reopen:  it's  ->  'it'\''s'  */
+        if (*text == '\'') { memcpy(p, "'\\''", 4); p += 4; }
+        else *p++ = *text;
     }
     *p++ = '\''; *p = 0;
     return out;
+}
+
+static char *quote(const char *text)
+{
+#ifdef _WIN32
+    return dialog_quote_powershell(text);
+#else
+    return dialog_quote_posix(text);
+#endif
 }
 
 #ifdef _WIN32
@@ -104,7 +153,9 @@ int dialog_choice(const char *title, const char *message, const char *const *lab
 #else
     int extra = 0;
     while (extra == default_index || extra == cancel_index) extra++;
-    snprintf(command,capacity,"zenity --question --title=%s --text=%s --ok-label=%s --cancel-label=%s %s%s",
+    /* --no-markup: zenity otherwise parses --text as Pango markup, so a
+     * file name containing < or & would be mangled or hidden. */
+    snprintf(command,capacity,"zenity --question --no-markup --title=%s --text=%s --ok-label=%s --cancel-label=%s %s%s",
              quoted[0],quoted[1],quoted[default_index+2],quoted[cancel_index+2],
              count==3?"--extra-button=":"",count==3?quoted[extra+2]:"");
     FILE *pipe = popen(command,"r");

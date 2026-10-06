@@ -340,6 +340,8 @@ void editor_open_level_file(EditorState *es)
         }
     } else if (dialog_result == FILE_DIALOG_CANCELLED) {
         editor_set_status(es, "Open cancelled");
+    } else if (dialog_result == FILE_DIALOG_INVALID_PATH) {
+        editor_set_status(es, "Open failed: file names with line breaks are not supported");
     } else {
         editor_set_status(es, "Open failed: dialog error");
     }
@@ -419,7 +421,11 @@ static int editor_save_current_level_as_validated(EditorState *es)
         editor_set_status(es, "Save cancelled");
         return -1;
     }
-    if (dialog_result == FILE_DIALOG_ERROR) {
+    if (dialog_result == FILE_DIALOG_INVALID_PATH) {
+        editor_set_status(es, "Save failed: file names with line breaks are not supported");
+        return -1;
+    }
+    if (dialog_result != FILE_DIALOG_SELECTED) {
         editor_set_status(es, "Save failed: dialog error");
         return -1;
     }
