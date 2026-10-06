@@ -1862,6 +1862,78 @@ fail:
     return 1;
 }
 
+static int camera_scrolls_vertically_and_stays_clamped(void)
+{
+    EditorState es = {0};
+    InputEvent event;
+    float wx, wy;
+    int canvas_bottom = TOOLBAR_H + CANVAS_H - 1;
+
+    editor_level_init_defaults(&es.level);
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+    es.camera.zoom = 2.0f;
+
+    /* Ctrl+wheel near the bottom zooms to 3x around the cursor, so the
+     * floor that was under the cursor stays on screen. */
+    memset(&event, 0, sizeof(event));
+    event.type = INPUT_WHEEL;
+    event.x = 200;
+    event.y = canvas_bottom;
+    event.wheel = 1.0f;
+    event.mods = INPUT_CTRL;
+    canvas_screen_to_world(&es, event.x, event.y, &wx, &wy);
+    editor_handle_event(&es, &event);
+    {
+        float after_x, after_y;
+        canvas_screen_to_world(&es, event.x, event.y, &after_x, &after_y);
+        if (expect_float_value("zoom preset", es.camera.zoom, 3.0f) != 0 ||
+            expect_float_value("zoom keeps cursor x", after_x, wx) != 0 ||
+            expect_int("zoom scrolls down", es.camera.y > 0.0f, 1) != 0) goto fail;
+    }
+    {
+        float floor_screen = ((float)FLOOR_Y - es.camera.y) * es.camera.zoom + TOOLBAR_H;
+        if (expect_int("floor visible at 3x", floor_screen >= TOOLBAR_H &&
+                       floor_screen <= TOOLBAR_H + CANVAS_H, 1) != 0) goto fail;
+    }
+
+    /* Shift+wheel pans vertically and clamps at the world's bottom edge. */
+    event.mods = INPUT_SHIFT;
+    event.wheel = -50.0f;
+    editor_handle_event(&es, &event);
+    if (expect_float_value("vertical clamp",
+                           es.camera.y, (float)GAME_H - CANVAS_H / es.camera.zoom) != 0)
+        goto fail;
+
+    /* Clicks use the vertical offset too. */
+    es.tool = TOOL_PLACE;
+    es.palette_type = ENT_COIN;
+    event.type = INPUT_MOUSE_DOWN;
+    event.button = MOUSE_BUTTON_LEFT;
+    event.mods = 0;
+    event.x = 90;
+    event.y = TOOLBAR_H + 30;
+    editor_handle_event(&es, &event);
+    if (expect_int("coin placed", es.level.coin_count, 1) != 0 ||
+        expect_float_value("click world y", es.level.coins[0].y,
+                           es.camera.y + 30.0f / es.camera.zoom) != 0) goto fail;
+
+    /* Zooming out or shrinking the level re-clamps the camera. */
+    es.camera.x = 1000.0f;
+    canvas_set_zoom(&es, 1.0f, 0, TOOLBAR_H);
+    if (expect_float_value("1x has no vertical scroll", es.camera.y, 0.0f) != 0) goto fail;
+    es.level.screen_count = 3;
+    canvas_clamp_camera(&es);
+    if (expect_float_value("screen shrink clamps x", es.camera.x,
+                           3.0f * GAME_W - CANVAS_W) != 0) goto fail;
+
+    undo_destroy(es.undo);
+    return 0;
+fail:
+    undo_destroy(es.undo);
+    return 1;
+}
+
 typedef struct {
     TextFont *font;
     int drawing;
@@ -2411,6 +2483,7 @@ int main(void)
     if (drag_round_trips_and_follows_grab_point() != 0) return 1;
     if (editor_mutations_keep_level_valid() != 0) return 1;
     if (refused_mutations_explain_why() != 0) return 1;
+    if (camera_scrolls_vertically_and_stays_clamped() != 0) return 1;
     if (widget_commit_paths_preserve_values() != 0) return 1;
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;

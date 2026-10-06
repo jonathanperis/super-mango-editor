@@ -6,6 +6,7 @@
 
 #include <stdio.h> /* snprintf */
 
+#include "canvas.h"            /* canvas_set_zoom, canvas_screen_to_world */
 #include "editor_files.h"      /* editor file/save helpers */
 #include "editor_playtest.h"   /* editor_play_test/editor_stop_play */
 #include "editor_session.h"    /* editor reset/confirm helpers */
@@ -75,7 +76,8 @@ void editor_render_toolbar(EditorState *es)
     }
     if (ui_dropdown(&es->ui, 8888, bx, by + 2, 80,
                     zoom_opts, zoom_count, &sel)) {
-        es->camera.zoom = zoom_vals[sel];
+        /* Zoom around the canvas centre so the view stays on the same area. */
+        canvas_set_zoom(es, zoom_vals[sel], CANVAS_W / 2, TOOLBAR_H + CANVAS_H / 2);
     }
 
     int rx = EDITOR_W - 4 - 52;
@@ -122,8 +124,8 @@ void editor_render_status_bar(EditorState *es)
     int bar_y = EDITOR_H - STATUS_H;
     ui_panel(&es->ui, 0, bar_y, EDITOR_W, STATUS_H);
 
-    float wx = (float)es->mouse_x / es->camera.zoom + es->camera.x;
-    float wy = (float)(es->mouse_y - TOOLBAR_H) / es->camera.zoom;
+    float wx, wy;
+    canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &wx, &wy);
 
     char mouse_text[64];
     snprintf(mouse_text, sizeof(mouse_text), "Mouse: (%.0f, %.0f)", wx, wy);

@@ -46,6 +46,23 @@ void canvas_screen_to_world(const EditorState *es, int sx, int sy,
                             float *wx, float *wy);
 
 /*
+ * canvas_clamp_camera — Keep camera.x / camera.y inside the world.
+ *
+ * The view may not scroll past the right or bottom edge; when the whole
+ * world fits (e.g. its 300-px height at 1x/2x) the offset is 0.  Called
+ * every frame, so zoom, screen_count or level changes can never leave the
+ * camera looking at empty space.
+ */
+void canvas_clamp_camera(EditorState *es);
+
+/*
+ * canvas_set_zoom — Change zoom while keeping the world point under the
+ * screen pixel (anchor_sx, anchor_sy) fixed, then clamp the camera.
+ * Ctrl+wheel anchors at the cursor; the toolbar uses the canvas centre.
+ */
+void canvas_set_zoom(EditorState *es, float zoom, int anchor_sx, int anchor_sy);
+
+/*
  * canvas_contains — Test whether a screen point is inside the canvas area.
  *
  * Returns 1 if (sx, sy) falls within the canvas rectangle
