@@ -1,0 +1,10 @@
+format_version = 1
+name = "Del\u007Fete \"q\" \\ tab	end"
+description = "bell\u0007 unit\u001F nl\n"
+screen_count = 2
+floor_gaps = [64, 192]
+
+[last_star]
+x = 700.0
+y = 100.0
+next_phase = "levels/01_lugio_01.toml"

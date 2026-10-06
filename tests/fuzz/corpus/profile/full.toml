@@ -1,0 +1,22 @@
+format_version = 1
+music_volume = 64
+effects_volume = 100
+muted = 0
+dead_zone = 8000
+window_scale = 2
+high_contrast = 1
+reduced_motion = 0
+last_level = "levels/01_lugio_01.toml"
+keys = [4, 7, 26, 22, 44, 225]
+
+[[levels]]
+path = "levels/00_sandbox_01.toml"
+score = 1200
+coins = 12
+time = 63.25
+
+[[levels]]
+path = "levels/café.toml"
+score = 0
+coins = 0
+time = 0
