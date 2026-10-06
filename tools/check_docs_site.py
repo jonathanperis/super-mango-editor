@@ -11,6 +11,8 @@ from urllib.parse import unquote, urljoin, urlsplit
 from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+from web_csp import CSP_META, problems as csp_problems  # noqa: E402
 SITE = "https://jonathanperis.github.io/super-mango-editor/"
 OUT = ROOT / "docs/out"
 
@@ -60,6 +62,18 @@ def check_site(out: Path) -> list[str]:
             return None
         target = out / unquote(parsed.path[len(prefix):])
         return target / "index.html" if target.is_dir() else target
+
+    # The home page hosts the game; docs/integrations/home-csp.mjs pins its
+    # inline scripts. They must be hash-listed (never 'unsafe-inline'), every
+    # script must come from this origin, and the policy must precede them.
+    home = (out / "index.html").read_text(encoding="utf-8")
+    failures += [f"index.html: {problem}" for problem in csp_problems(home)]
+    policy = CSP_META.findall(home)
+    script_src = re.search(r"script-src([^;\"]*)", policy[0]) if policy else None
+    if not script_src or "'unsafe-inline'" in script_src.group(1) or "http" in script_src.group(1):
+        failures.append("index.html: CSP script-src must be 'self' plus inline script hashes only")
+    elif home.find(policy[0]) > home.find("<script"):
+        failures.append("index.html: CSP meta must precede every script")
 
     descriptions: set[str] = set()
     for path, page in pages.items():
@@ -129,7 +143,7 @@ def main() -> int:
     if failures:
         print("built docs check failed:\n" + "\n".join(f"- {item}" for item in failures))
         return 1
-    print("built docs check: ok (routes, content, links, anchors, metadata, sitemap)")
+    print("built docs check: ok (routes, content, links, anchors, metadata, sitemap, home CSP)")
     return 0
 
 

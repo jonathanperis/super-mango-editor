@@ -18,15 +18,21 @@ import sys
 from pathlib import Path
 
 PLACEHOLDER = "'sha256-MANGO_INLINE_SCRIPT_HASHES'"
-# Scripts with a src attribute are covered by 'self'; only inline bodies need hashes.
-INLINE_SCRIPT = re.compile(r"<script(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script\s*>", re.S | re.I)
+# Scripts with a src attribute are covered by 'self'; only inline bodies need
+# hashes. Data blocks such as JSON-LD never execute, so they need none.
+INLINE_SCRIPT = re.compile(r"<script((?![^>]*\bsrc\s*=)[^>]*)>(.*?)</script\s*>", re.S | re.I)
+SCRIPT_TYPE = re.compile(r"\btype\s*=\s*[\"']?([^\"'\s>]+)", re.I)
+JS_TYPES = {"module", "text/javascript", "application/javascript"}
 CSP_META = re.compile(r"<meta\b[^>]*\bhttp-equiv\s*=\s*\"?Content-Security-Policy\"?[^>]*>", re.I)
 
 
 def inline_script_hashes(html: str) -> list[str]:
     """Return CSP source expressions for each inline script, in page order."""
     hashes = []
-    for body in INLINE_SCRIPT.findall(html):
+    for attrs, body in INLINE_SCRIPT.findall(html):
+        script_type = SCRIPT_TYPE.search(attrs)
+        if script_type and script_type.group(1).lower() not in JS_TYPES:
+            continue
         digest = hashlib.sha256(body.encode("utf-8")).digest()
         hashes.append("'sha256-" + base64.b64encode(digest).decode("ascii") + "'")
     return hashes

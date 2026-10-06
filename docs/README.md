@@ -21,7 +21,7 @@ run frozen install, `bun audit`, lint, build and `check-site`.
 | `bun run lint` | Run `astro check` |
 | `bun run drift` | Run `make docs-drift`, including generated freshness and roadmap checks |
 | `bun run build` | Build the production site to `docs/out/` with `/super-mango-editor/` base |
-| `bun run check-site` | Check built routes, Markdown content, links, anchors, metadata and sitemap |
+| `bun run check-site` | Check built routes, Markdown content, links, anchors, metadata, sitemap and the landing-page CSP |
 | `bun run preview` | Serve the production build; open `/super-mango-editor/` |
 
 For a documentation change, from the repository root:
@@ -50,6 +50,7 @@ contract; do not generate an npm lockfile.
 | SEO and shared page shell | `src/layouts/BaseLayout.astro` |
 | Styles | `src/styles/globals.css`, `src/styles/docs.css` |
 | Production origin/base | `astro.config.mjs`; keep `public/robots.txt` consistent |
+| Landing-page Content-Security-Policy | `integrations/home-csp.mjs` (hashes inline scripts after build; see `SECURITY.md`) |
 
 Add a manual page in `wiki/`, register its ID/metadata/category in `docsSidebar.ts`,
 then build and check it. Links in `wiki/` target **published routes**, not GitHub
