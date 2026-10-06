@@ -7,6 +7,7 @@
 #include "core/app_session.h"
 #include "core/game_completion.h"
 #include "core/game_overlay.h"
+#include "core/game_terminal.h"
 #include "core/game_timing.h"
 #include "core/game_update.h"
 #include "input/game_input.h"
@@ -440,6 +441,17 @@ static int repeated_menu_game_ownership(void)
     if (expect_int("next failure keeps game", session->screen, APP_SCREEN_GAME) != 0) return 1;
     if (expect_int("next failure keeps overlay", session->game->completion.complete, 1) != 0) return 1;
     if (expect_int("next failure clears request", session->game->route, GAME_ROUTE_NONE) != 0) return 1;
+    {
+        /* The failure is visible and the dead Next Level row is gone. */
+        GameTerminalActionList actions;
+        game_terminal_actions(session->game, &actions);
+        if (expect_int("next failure flagged", session->game->completion.next_phase_failed, 1) != 0 ||
+            expect_int("next failure leaves three actions", actions.count, 3) != 0 ||
+            expect_int("next failure focuses replay", game_terminal_focused_action(session->game),
+                       GAME_TERMINAL_ACTION_REPLAY) != 0 ||
+            expect_int("next failure message", strcmp(session->status_message, "Next level failed to load"), 0) != 0)
+            return 1;
+    }
 
     UnloadTexture(window);
     if (push_key(KEY_ESCAPE) != 0) return 1;

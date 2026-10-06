@@ -20,6 +20,7 @@ true pixel golden-image testing is available.
 - `Game Over`
 - `Level Complete!`
 - `Lives: %d`
+- `Next level failed to load`
 - `Paused`
 - `Score: %d`
 - `Time: %02d:%02d`
@@ -44,6 +45,7 @@ true pixel golden-image testing is available.
 - `Game Complete!`
 - `Level Complete!`
 - `Lives: %d`
+- `Next level failed to load`
 - `Score: %d`
 - `Time: %02d:%02d`
 - `Up/Down or D-pad: Select`

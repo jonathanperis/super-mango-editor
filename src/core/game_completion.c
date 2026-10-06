@@ -26,6 +26,7 @@ void game_completion_reset_summary(GameState *gs)
     gs->completion.coin_total = gs->coin_count;
     gs->completion.elapsed = 0.0f;
     gs->completion.pending_next_phase = 0;
+    gs->completion.next_phase_failed = 0;
     gs->completion.next_phase[0] = '\0';
 }
 
@@ -37,6 +38,7 @@ void game_complete_level(GameState *gs)
     gs->completion.coin_total = gs->completion.level_coin_total;
     gs->completion.elapsed = gs->completion.level_elapsed;
     gs->completion.pending_next_phase = 0;
+    gs->completion.next_phase_failed = 0;
     gs->completion.next_phase[0] = '\0';
 
     if (phase_has_next(def) &&

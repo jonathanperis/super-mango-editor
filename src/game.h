@@ -232,6 +232,7 @@ typedef struct {
     int   coin_total;         /* total coins shown at completion summary   */
     float elapsed;            /* elapsed seconds shown at summary          */
     int   pending_next_phase; /* Enter/Start loads next phase              */
+    int   next_phase_failed;  /* 1 = Next Level load failed: hide it, say so */
     char  next_phase[256];    /* next TOML path shown/loaded               */
 } GameCompletionState;
 

@@ -371,6 +371,14 @@ static int session_apply_game_route(AppSession *session, int callback_owned)
             session->preferences_applied = 0;
             game->loop.prev_ticks = clock_millis();
             game_input_arm_release_latch(game, NULL);
+        } else {
+            /* The current level is untouched, so Replay, Level Select and
+             * Exit still work. Say what happened, drop the dead Next Level
+             * row and focus the first remaining action. */
+            game->completion.next_phase_failed = 1;
+            game->terminal_action_index = 0;
+            copy_path(session->status_message, sizeof(session->status_message), "Next level failed to load");
+            TraceLog(LOG_WARNING, "%s: %s", session->status_message, path);
         }
         game->route = GAME_ROUTE_NONE;
         session->route = APP_ROUTE_NONE;
