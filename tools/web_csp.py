@@ -20,7 +20,9 @@ from pathlib import Path
 PLACEHOLDER = "'sha256-MANGO_INLINE_SCRIPT_HASHES'"
 # Scripts with a src attribute are covered by 'self'; only inline bodies need
 # hashes. Data blocks such as JSON-LD never execute, so they need none.
-INLINE_SCRIPT = re.compile(r"<script((?![^>]*\bsrc\s*=)[^>]*)>(.*?)</script\s*>", re.S | re.I)
+# HTML ends a script at "</script" followed by any attributes or whitespace up
+# to ">" (e.g. "</script\t\n foo>"), so the end tag accepts [^>]* as well.
+INLINE_SCRIPT = re.compile(r"<script((?![^>]*\bsrc\s*=)[^>]*)>(.*?)</script\b[^>]*>", re.S | re.I)
 SCRIPT_TYPE = re.compile(r"\btype\s*=\s*[\"']?([^\"'\s>]+)", re.I)
 JS_TYPES = {"module", "text/javascript", "application/javascript"}
 CSP_META = re.compile(r"<meta\b[^>]*\bhttp-equiv\s*=\s*\"?Content-Security-Policy\"?[^>]*>", re.I)
