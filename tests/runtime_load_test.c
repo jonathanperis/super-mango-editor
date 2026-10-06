@@ -323,8 +323,8 @@ static int reset_restores_mutable_state_only(void)
     init_test_player(&gs);
     if (level_load(&gs, &def) != 0) return 1;
 
-    gs.coins[0].x = -10.0f;
     gs.coins[0].active = 0;
+    gs.star_yellows[0].active = 0;
     gs.last_star.active = 0;
     gs.last_star.collected = 1;
     gs.spiders[0].x = -20.0f;
@@ -344,9 +344,14 @@ static int reset_restores_mutable_state_only(void)
 
     level_reset(&gs, &def);
 
-    if (expect_float("reset coin x", gs.coins[0].x, def.coins[0].x) != 0)
+    /* A life-loss reset keeps coins collected (no score farming) but brings
+     * health stars back for the next life. */
+    if (expect_float("coin x untouched", gs.coins[0].x, def.coins[0].x) != 0)
         return 1;
-    if (expect_int("reset coin active", gs.coins[0].active, 1) != 0) return 1;
+    if (expect_int("collected coin stays collected", gs.coins[0].active, 0) != 0)
+        return 1;
+    if (expect_int("reset star active", gs.star_yellows[0].active, 1) != 0)
+        return 1;
     if (expect_int("reset last star active", gs.last_star.active, 1) != 0)
         return 1;
     if (expect_int("reset last star collected", gs.last_star.collected, 0) != 0)

@@ -7,7 +7,8 @@
  *
  * level_load  : called once at game_init.
  * level_reset : called on player death via reset_current_level; skips static
- *               geometry that never changes (platforms, rails, sea gaps).
+ *               geometry that never changes (platforms, rails, sea gaps) and
+ *               keeps coins collected during the current attempt.
  */
 
 #include "../core/game_random.h"
@@ -669,15 +670,24 @@ int level_load(GameState *gs, const LevelDef *def)
  * level_reset — Reset mutable state after a player death.
  *
  * Skips static geometry (platforms, rails, sea gaps, decorations) because
- * they never change during a play session.  Only enemies, collectibles,
- * hazards, and surfaces need to be reset for a clean restart.
+ * they never change during a play session.  Enemies, hazards, surfaces and
+ * most collectibles are reset for a clean restart.
+ *
+ * Collectible rule for one attempt at a level:
+ *   - Coins stay collected across life-loss respawns.  Score and the next
+ *     bonus-life threshold also survive a death, so re-activating coins
+ *     would let a player farm score (and bonus lives) by dying on purpose.
+ *     Only a fresh attempt brings them back: Retry after game over
+ *     (game_restart_after_game_over), Replay, or loading a level.
+ *   - Health stars and the last star DO respawn.  Stars award no score and
+ *     hearts are refilled on respawn anyway, so they cannot be farmed; each
+ *     life simply meets the same healing the level was designed with.
  */
 void level_reset(GameState *gs, const LevelDef *def)
 {
     player_reset(&gs->player);
 
-    /* Collectibles */
-    load_coins(gs, def);
+    /* Collectibles (coins intentionally kept — see the rule above) */
     load_star_yellows(gs, def);
     load_star_greens(gs, def);
     load_star_reds(gs, def);

@@ -31,6 +31,8 @@ y = 236.0   # top edge in logical pixels
 
 With defaults, every 1000 points (10 coins) earns a bonus life. Both `coin_score` and `score_per_life` are configurable in the level file.
 
+**Collected coins stay gone for the whole attempt.** Losing a life respawns enemies, hazards, surfaces and stars, but not coins: score and the bonus-life threshold survive a death, so returning coins would let a player farm points and lives by dying on purpose. Coins come back only for a fresh attempt — Retry after game over, Replay, or loading a level — and the completion summary counts every coin collected during the attempt. Health stars and the last star *do* respawn after a life loss: they award no score, so each life simply meets the healing the level was designed with.
+
 ---
 
 ### Star Yellow

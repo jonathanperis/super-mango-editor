@@ -14,7 +14,8 @@
 /*
  * reset_current_level — centralised "player died, restart level" handler.
  *
- * Resets every entity array and the player to their initial state.
+ * Resets every entity array and the player to their initial state, except
+ * that coins collected during this attempt stay collected (see level_reset).
  * Called from every hearts<=0 branch so all sources of death produce
  * an identical reset — no entity is accidentally left in a stale state.
  *
