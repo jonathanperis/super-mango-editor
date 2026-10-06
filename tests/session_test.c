@@ -592,7 +592,9 @@ static int checkpoint_transitions_use_production_paths(void)
 
     /* Next Level loads real phase data and must not carry old CP progress. */
     def = (LevelDef *)game->runtime.current_level;
-    strncpy(expected_next_path, def->next_phase, sizeof(expected_next_path) - 1);
+    _Static_assert(sizeof(expected_next_path) == sizeof(def->next_phase),
+                   "next phase copy uses the same buffer size");
+    memcpy(expected_next_path, def->next_phase, sizeof(expected_next_path));
     def->checkpoint_count = 1;
     def->checkpoints[0].x = 220.0f;
     def->checkpoints[0].y = 100.0f;

@@ -669,10 +669,9 @@ static int recovery_entries_survive_restart_and_sessions(void)
         editor_set_preference_root(&second, root) != 0 ||
         editor_init_persistence_paths(&first) != 0 ||
         editor_init_persistence_paths(&second) != 0) goto cleanup;
-    strncpy(first_snapshot, first.autosave_path, sizeof(first_snapshot) - 1);
-    strncpy(second_snapshot, second.autosave_path, sizeof(second_snapshot) - 1);
-    first_snapshot[sizeof(first_snapshot) - 1] = '\0';
-    second_snapshot[sizeof(second_snapshot) - 1] = '\0';
+    /* Same-size EDITOR_PATH_MAX arrays: copy the whole terminated path. */
+    memcpy(first_snapshot, first.autosave_path, sizeof(first_snapshot));
+    memcpy(second_snapshot, second.autosave_path, sizeof(second_snapshot));
     editor_maybe_autosave(&first);
     editor_maybe_autosave(&second);
     if (expect_int("session snapshots differ",
@@ -706,7 +705,10 @@ static int recovery_entries_survive_restart_and_sessions(void)
             goto cleanup;
     }
 
-    snprintf(malformed, sizeof(malformed), "%s/editor_recovery_bad.meta", root);
+    /* snprintf returns the length it needed; a temp root too long for the
+     * buffer would test the wrong file, so treat that as a failure. */
+    if (snprintf(malformed, sizeof(malformed), "%s/editor_recovery_bad.meta",
+                 root) >= (int)sizeof(malformed)) goto cleanup;
     if (write_text_file(malformed, "not-a-recovery-record\n") != 0) goto cleanup;
     if (expect_int("malformed recovery ignored",
                    editor_discover_recoveries(&restarted), 0) != 0 ||
@@ -748,13 +750,14 @@ static int recovery_entries_survive_restart_and_sessions(void)
         remove(modal_save_path);
     }
 
-    snprintf(blocked_root, sizeof(blocked_root), "%s/not-a-directory", root);
+    if (snprintf(blocked_root, sizeof(blocked_root), "%s/not-a-directory",
+                 root) >= (int)sizeof(blocked_root)) goto cleanup;
     if (write_text_file(blocked_root, "block discovery\n") != 0) goto cleanup;
     {
         char saved_root[EDITOR_PATH_MAX];
         memcpy(saved_root, restarted.recovery_root_path, sizeof(saved_root));
-        strncpy(restarted.recovery_root_path, blocked_root,
-                sizeof(restarted.recovery_root_path) - 1);
+        memcpy(restarted.recovery_root_path, blocked_root,
+               sizeof(restarted.recovery_root_path));
         editor_retire_current_recovery(&restarted);
         memcpy(restarted.recovery_root_path, saved_root, sizeof(saved_root));
     }
@@ -2906,6 +2909,29 @@ static int compact_history_owns_config_snapshots(void)
     return failed;
 }
 
+/* Long paths shown in the status bar, title and recent list keep their file
+ * name: the tail is kept, prefixed with "...", and never splits a UTF-8
+ * character. */
+static int display_paths_keep_the_file_name(void)
+{
+    char out[12];
+
+    editor_path_for_display("a/b.toml", out, sizeof(out));
+    if (expect_string("short path unchanged", out, "a/b.toml") != 0) return 1;
+
+    editor_path_for_display("levels/long_name.toml", out, sizeof(out));
+    /* 12-byte buffer: "..." + last 8 bytes + NUL. */
+    if (expect_string("long path keeps tail", out, "...ame.toml") != 0) return 1;
+
+    /* "\xc3\xa9" is UTF-8 for "e acute". This 17-byte path keeps its last
+     * 8 bytes starting at byte 9, the second half of the third character,
+     * so the helper must step forward to the fourth character. */
+    editor_path_for_display("dir/\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9.toml", out, sizeof(out));
+    if (expect_string("display path keeps whole UTF-8 characters", out,
+                      "...\xc3\xa9.toml") != 0) return 1;
+    return 0;
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -2960,6 +2986,7 @@ int main(void)
     if (widget_commit_paths_preserve_values() != 0) return 1;
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;
+    if (display_paths_keep_the_file_name() != 0) return 1;
 
     puts("editor_validation_test: ok");
     return 0;

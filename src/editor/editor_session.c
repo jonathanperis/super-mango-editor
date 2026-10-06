@@ -252,8 +252,11 @@ void editor_update_window_title(EditorState *es)
     if (!es || !IsWindowReady()) return;
 
     if (es->file_path[0] != '\0') {
+        /* 256 + the 21-byte prefix + " *" still fits title[300]. */
+        char shown_path[256];
+        editor_path_for_display(es->file_path, shown_path, sizeof(shown_path));
         snprintf(title, sizeof(title), "Super Mango Editor - %s%s",
-                 es->file_path, es->modified ? " *" : "");
+                 shown_path, es->modified ? " *" : "");
     } else {
         snprintf(title, sizeof(title), "Super Mango Editor%s",
                  es->modified ? " *" : "");

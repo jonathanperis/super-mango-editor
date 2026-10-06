@@ -163,7 +163,8 @@ int dialog_choice(const char *title, const char *message, const char *const *lab
     free(command);
     if (!pipe) goto done;
     char output[128] = {0};
-    (void)fgets(output,sizeof(output),pipe);
+    /* No output (for example a cancelled dialog) leaves an empty string. */
+    if (!fgets(output,sizeof(output),pipe)) output[0] = 0;
     output[strcspn(output,"\r\n")] = 0;
 #ifdef _WIN32
     int status = _pclose(pipe);

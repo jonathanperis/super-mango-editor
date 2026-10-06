@@ -632,7 +632,8 @@ static int validate_root_array(const SerializerRootSpec *field,
     }
 
     for (int i = 0; i < value.u.arr.size; i++) {
-        char item_path[256];
+        /* Parent path (up to 255 chars) + "[" + up to 10 digits + "]". */
+        char item_path[256 + 16];
         toml_datum_t item = value.u.arr.elem[i];
 
         if (field->type == SERIALIZER_ROOT_ARRAY_INTEGER) {

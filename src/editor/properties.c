@@ -21,6 +21,7 @@
 #include "properties.h"
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, PANEL_W, etc. */
 #include "editor_undo_apply.h" /* committed property/config command tracking */
+#include "editor_files.h"  /* editor_path_for_display for recent entries   */
 #include "entity_meta.h" /* editor_entity_type_name/is_singleton             */
 #include "../shared/ui.h" /* ui_panel, ui_label, ui_separator, ui_float_field,
                            ui_int_field, ui_dropdown                         */
@@ -1171,8 +1172,12 @@ void level_config_render(EditorState *es, int start_y, int available_h,
         ui_label_color(&es->ui, x + 8, y, "Recent files (Ctrl+1..5):", UI_TEXT_DIM);
         y += 18;
         for (int i = 0; i < es->recent_file_count; i++) {
-            char recent[320];
-            snprintf(recent, sizeof(recent), "%d: %s", i + 1, es->recent_files[i]);
+            /* Keep each entry to one panel-width line: the file name at the
+             * end of the path is the part that tells entries apart. */
+            char shown_path[48];
+            char recent[64];
+            editor_path_for_display(es->recent_files[i], shown_path, sizeof(shown_path));
+            snprintf(recent, sizeof(recent), "%d: %s", i + 1, shown_path);
             ui_label_color(&es->ui, x + 16, y, recent, UI_TEXT_DIM);
             y += 18;
         }

@@ -151,12 +151,19 @@ void editor_commit_change(EditorState *es)
             cmd.after = after;
             cmd.property_field = es->pending_widget_id;
             if (text_changed) {
-                strncpy(cmd.property_text_before, es->pending_text_before,
-                        sizeof(cmd.property_text_before) - 1);
-                strncpy(cmd.property_text_after, es->level.next_phase,
-                        sizeof(cmd.property_text_after) - 1);
-                cmd.property_text_before[sizeof(cmd.property_text_before) - 1] = '\0';
-                cmd.property_text_after[sizeof(cmd.property_text_after) - 1] = '\0';
+                /* All three buffers are char[256] holding terminated text,
+                 * so copying the whole array is exact; the assertions keep
+                 * that true if one size ever changes. */
+                _Static_assert(sizeof(cmd.property_text_before) ==
+                               sizeof(es->pending_text_before),
+                               "undo text matches pending text");
+                _Static_assert(sizeof(cmd.property_text_after) ==
+                               sizeof(es->level.next_phase),
+                               "undo text matches next_phase");
+                memcpy(cmd.property_text_before, es->pending_text_before,
+                       sizeof(cmd.property_text_before));
+                memcpy(cmd.property_text_after, es->level.next_phase,
+                       sizeof(cmd.property_text_after));
             }
             undo_push(es->undo, cmd);
             editor_refresh_dirty(es);
