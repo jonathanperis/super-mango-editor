@@ -705,7 +705,10 @@ WEB_FLAGS = -s USE_GLFW=3 \
             --exclude-file '*/.DS_Store' \
             --preload-file levels \
             --shell-file web/shell.html
-WEB_CFLAGS = -std=c11 -O2 -D_GNU_SOURCE
+# Same warning set as native builds so Web-only code paths stay warning-free.
+# Emscripten documents EM_JS(...); with a trailing semicolon, which pedantic C
+# reports as an empty file-scope declaration; that one diagnostic is disabled.
+WEB_CFLAGS = -std=c11 -Wall -Wextra -Wpedantic -Wno-extra-semi -O2 -D_GNU_SOURCE $(EXTRA_WEB_CFLAGS)
 WEB_LINK_FLAGS = -s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]'
 WEB_HTML = $(OUTDIR)/super-mango.html
 WEB_DEBUG_HTML = $(OUTDIR)/super-mango-debug.html
