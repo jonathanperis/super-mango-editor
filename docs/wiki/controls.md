@@ -56,7 +56,7 @@ The selected level wraps at either end of the manifest-defined catalog. A held c
 | Final completion | Replay, Level Select, Exit |
 | Game over | Retry, Level Select, Exit |
 
-**Next Level** loads the resolved `next_phase` in the current game session. A failed load leaves the completion overlay and its focus intact. **Retry** restarts the current level in place with level-defined hearts and lives, score reset, and music resumed. **Level Select** returns to the start menu. **Exit** ends the application session.
+**Next Level** loads the resolved `next_phase` in the current game session. A failed load keeps the completion overlay, shows "Next level failed to load", removes the Next Level row and focuses Replay; Replay, Level Select and Exit keep working. **Retry** restarts the current level in place with level-defined hearts and lives, score reset, and music resumed. **Level Select** returns to the start menu. **Exit** ends the application session.
 
 The overlay text is snapshotted in [Overlay Snapshots](../overlay-snapshots/) so docs drift checks catch stale copy and control hints.
 
