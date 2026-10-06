@@ -399,7 +399,7 @@ for local game assembly, page registration and generated-content ownership.
 
 ### `make clean`
 
-Removes the selected `OUTDIR` and `DISTDIR` (default `out/` and `dist/`) and legacy in-source objects. Separate sanitizer and docs output directories are not covered by the default invocation.
+Removes the selected `OUTDIR`, its `OUTDIR-sanitize` sibling created by `make sanitize`, and `DISTDIR` (default `out/`, `out-sanitize/` and `dist/`). Objects only ever live under `OUTDIR/obj`, so no in-tree `.o` files exist to delete. The docs site output (`docs/out/`) is not covered.
 
 ```sh
 make clean
