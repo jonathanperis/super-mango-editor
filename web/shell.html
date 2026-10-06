@@ -113,7 +113,13 @@
                     replayLevel = sessionStorage.getItem('super-mango-replay-level');
                     if (replayLevel) {
                         sessionStorage.removeItem('super-mango-replay-level');
-                        moduleConfig.arguments = ['--level', replayLevel];
+                        /* Session storage is shared with every page on this
+                         * origin. Only forward a bundled level path; the C
+                         * loader still validates the file it opens. */
+                        if (/^levels\/(labs\/)?[A-Za-z0-9_-]+\.toml$/.test(replayLevel))
+                            moduleConfig.arguments = ['--level', replayLevel];
+                        else
+                            console.warn('Super Mango: ignored unexpected replay level path');
                     }
                 } catch (e) {
                     console.error('Super Mango: replay boot intent unavailable', e);
