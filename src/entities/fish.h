@@ -48,7 +48,7 @@ typedef struct {
     float  jump_timer;
     float  water_y;
     int    frame_index;
-    uint32_t anim_timer_ms;
+    float  anim_timer_ms;  /* ms accumulated toward the next frame advance */
 } Fish;
 
 /* Move fish, trigger random jumps, and advance animation. */

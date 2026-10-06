@@ -25,12 +25,12 @@ static int expect_float(const char *name, float actual, float expected)
 static int advances_animation_and_preserves_leftover_time(void)
 {
     int frame = 0;
-    uint32_t timer = 0;
+    float timer = 0.0f;
 
     if (expect_int("first advance wrap", animate_frame_ms(&frame, &timer, 0.120f, 100, 3), 0) != 0)
         return 1;
     if (expect_int("first frame", frame, 1) != 0) return 1;
-    if (expect_int("leftover ms", (int)timer, 20) != 0) return 1;
+    if (expect_float("leftover ms", timer, 20.0f) != 0) return 1;
 
     if (expect_int("second advance wrap", animate_frame_ms(&frame, &timer, 0.100f, 100, 3), 0) != 0)
         return 1;
@@ -40,6 +40,19 @@ static int advances_animation_and_preserves_leftover_time(void)
         return 1;
     if (expect_int("wrapped frame", frame, 0) != 0) return 1;
 
+    return 0;
+}
+
+/* 61 fixed 1/60 s steps are 1016.7 ms: ten 100 ms frames. Truncating each
+ * step to 16 ms (976 ms total) would advance only nine, ~4% slow. */
+static int fixed_steps_keep_fractional_milliseconds(void)
+{
+    int frame = 0;
+    float timer = 0.0f;
+    for (int step = 0; step < 61; step++)
+        animate_frame_ms(&frame, &timer, 1.0f / 60.0f, 100, 1000);
+    if (expect_int("advances after 61 steps", frame, 10) != 0) return 1;
+    if (expect_float("carried remainder ms", timer, 16.667f) != 0) return 1;
     return 0;
 }
 
@@ -95,6 +108,7 @@ static int computes_sound_falloff(void)
 int main(void)
 {
     if (advances_animation_and_preserves_leftover_time() != 0) return 1;
+    if (fixed_steps_keep_fractional_milliseconds() != 0) return 1;
     if (reverses_patrol_at_boundaries() != 0) return 1;
     if (reverses_at_floor_gaps() != 0) return 1;
     if (computes_sound_falloff() != 0) return 1;

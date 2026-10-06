@@ -106,7 +106,7 @@ typedef struct {
     int          h;             /* display height (BOUNCEPAD_H = 48 px)      */
     BounceState  state;         /* IDLE or ACTIVE                            */
     int          anim_frame;    /* current displayed frame index (0, 1, or 2)*/
-    uint32_t     anim_timer_ms; /* ms accumulated in the current anim frame */
+    float        anim_timer_ms; /* ms accumulated in the current anim frame */
     float        launch_vy;     /* upward impulse applied to player on land  */
     BouncepadType pad_type;     /* GREEN / WOOD / RED — selects texture      */
 } Bouncepad;
@@ -133,9 +133,9 @@ void bouncepad_place(Bouncepad *pad, float x, float launch_vy, BouncepadType pad
 
 /*
  * Advance the release animation for every ACTIVE pad.
- * dt_ms is delta time converted to milliseconds (dt * 1000).
+ * dt_ms is the step duration converted to milliseconds (dt * 1000, unrounded).
  */
-void bouncepads_update(Bouncepad *pads, int count, uint32_t dt_ms);
+void bouncepads_update(Bouncepad *pads, int count, float dt_ms);
 
 /* Draw each bouncepad at its current animation frame, offset by cam_x. */
 void bouncepads_render(const Bouncepad *pads, int count,

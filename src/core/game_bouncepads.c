@@ -58,7 +58,7 @@ void game_bouncepads_handle_hit(GameState *gs, int bounce_idx)
 
 void game_bouncepads_update_animations(GameState *gs, float dt)
 {
-    uint32_t elapsed_ms = (uint32_t)(dt * 1000.0f);
+    float elapsed_ms = dt * 1000.0f;   /* keep the fraction: 16.67, not 16 */
 
     bouncepads_update(gs->bouncepads_medium, gs->bouncepad_medium_count,
                       elapsed_ms);

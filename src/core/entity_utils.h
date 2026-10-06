@@ -31,7 +31,8 @@
  *
  * Parameters:
  *   frame_index  : pointer to the current frame index — updated in place.
- *   timer_ms     : pointer to the accumulated time counter — updated in place.
+ *   timer_ms     : pointer to the accumulated milliseconds (a float, so the
+ *                  fractional 0.67 ms of a 16.67 ms step is kept) — updated in place.
  *   dt           : seconds simulated by this step (1/60 s in live play).
  *   frame_ms     : how many milliseconds each frame is shown before advancing.
  *   frame_count  : total number of frames in this animation loop.
@@ -44,7 +45,7 @@
  *   int wrapped = animate_frame_ms(&s->frame_index, &s->anim_timer_ms,
  *                                  dt, SPIDER_FRAME_MS, SPIDER_FRAMES);
  */
-int animate_frame_ms(int *frame_index, uint32_t *timer_ms,
+int animate_frame_ms(int *frame_index, float *timer_ms,
                      float dt, uint32_t frame_ms, int frame_count);
 
 /* ------------------------------------------------------------------ */

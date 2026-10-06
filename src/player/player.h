@@ -47,7 +47,7 @@ typedef struct {
     int   on_ground;    /* 1 if standing on the floor, 0 if airborne         */
     AnimState anim_state;       /* which animation is active (idle/walk/jump/fall) */
     int       anim_frame_index; /* current frame index within the animation       */
-    uint32_t  anim_timer_ms;    /* ms accumulated in the current frame */
+    float     anim_timer_ms;    /* ms accumulated in the current frame */
     int       facing_left;      /* 1 = mirror sprite horizontally                 */
     int       on_vine;          /* 1 = currently climbing a climbable, 0 = normal  */
     int       vine_index;       /* index into the climbable array being climbed   */

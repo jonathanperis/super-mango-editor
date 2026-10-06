@@ -173,7 +173,7 @@ int player_update_climbing(Player *player, float dt,
     if (!x_overlap) {
         player->on_vine = 0;
         player->vy      = 0.0f;
-        player_animate(player, (uint32_t)(dt * 1000.0f));
+        player_animate(player, dt * 1000.0f);
         return 1;
     }
 
@@ -196,6 +196,6 @@ int player_update_climbing(Player *player, float dt,
     if (player->x + player->w - PHYS_PAD_X > world_w)
         player->x = (float)(world_w - player->w + PHYS_PAD_X);
 
-    player_animate(player, (uint32_t)(dt * 1000.0f));
+    player_animate(player, dt * 1000.0f);
     return 1;
 }

@@ -46,7 +46,7 @@ typedef struct {
     float  patrol_x0;      /* left patrol boundary                          */
     float  patrol_x1;      /* right patrol boundary                         */
     int    frame_index;    /* current animation frame (0–2)                  */
-    uint32_t anim_timer_ms; /* accumulator for frame advances */
+    float  anim_timer_ms;  /* ms accumulated toward the next frame advance */
 } Bird;
 
 /* ---- Function declarations ---------------------------------------------- */
