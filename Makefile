@@ -258,7 +258,11 @@ test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/game-checkpoint-test"
 
 $(TEST_TARGETS): | $(OUTDIR)
-$(TEST_OBJECTS): | $(OUTDIR)
+# $(OUTDIR) is skipped once out/ exists, so test objects also order their own
+# directory; otherwise a deleted out/obj/tests breaks every later `make test`.
+$(TEST_OBJECTS): | $(OUTDIR) $(OBJDIR)/tests
+$(OBJDIR)/tests:
+	mkdir -p $@
 $(filter-out $(OUTDIR)/session-test $(OUTDIR)/game-events-test,$(TEST_TARGETS)): $(PLATFORM_OBJS)
 $(OUTDIR)/game-events-test: $(filter-out $(OBJDIR)/src/input/input_backend.o,$(PLATFORM_OBJS)) $(TEST_INPUT_BACKEND_OBJ) tests/input_backend_test.c
 $(OUTDIR)/editor-validation-test: $(OBJDIR)/src/editor/dialog_choice.o
