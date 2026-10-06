@@ -43,6 +43,12 @@ INVALID_FIXTURES = (
     "bad_checkpoint_duplicate.toml",
     "bad_checkpoint_array.toml",
     "bad_screen_count_max_plus_one.toml",
+    "bad_utf8_overlong.toml",
+    "bad_utf8_surrogate.toml",
+    "bad_utf8_above_max.toml",
+    "bad_utf8_truncated.toml",
+    "bad_utf8_stray_continuation.toml",
+    "bad_utf8_legacy.toml",
 )
 
 
@@ -128,6 +134,11 @@ def main() -> int:
     ):
         raise AssertionError("valid v1 fixture rejected")
     if validate_levels.validate_level(
+        FIXTURE_DIR / "valid_utf8.toml", constants, asset_manifest,
+        require_explicit_version=True,
+    ):
+        raise AssertionError("valid multi-byte UTF-8 fixture rejected")
+    if validate_levels.validate_level(
         FIXTURE_DIR / "valid_screen_count_max.toml", constants, asset_manifest,
         require_explicit_version=True,
     ):
@@ -145,12 +156,15 @@ def main() -> int:
         raise AssertionError("checkpoint count overflow accepted")
 
     for name in INVALID_FIXTURES:
-        errors = validate_levels.validate_level(
-            FIXTURE_DIR / name,
-            constants,
-            asset_manifest,
-            require_explicit_version=True,
-        )
+        try:
+            errors = validate_levels.validate_level(
+                FIXTURE_DIR / name,
+                constants,
+                asset_manifest,
+                require_explicit_version=True,
+            )
+        except ValueError as exc:  # unreadable file; main() reports it the same way
+            errors = [str(exc)]
         if not errors:
             raise AssertionError(f"invalid fixture accepted: {name}")
 

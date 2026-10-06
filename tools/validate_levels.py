@@ -421,6 +421,9 @@ def load_level(path: Path) -> dict:
         # tomlc17 accepts one leading UTF-8 BOM. Keep CLI/campaign validation
         # consistent without stripping U+FEFF elsewhere in the document.
         return tomllib.loads(path.read_bytes().decode("utf-8-sig"))
+    except UnicodeDecodeError as exc:
+        # The C loader reports the same files as "<field> is not valid UTF-8".
+        raise ValueError(f"{path.relative_to(ROOT)}: not valid UTF-8: {exc}") from exc
     except tomllib.TOMLDecodeError as exc:
         raise ValueError(f"{path.relative_to(ROOT)}: TOML parse failed: {exc}") from exc
 
