@@ -436,13 +436,15 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 
 ---
 
-## `star_yellow.h` Constants
+## `health_star.h` Constants
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
 | `MAX_STAR_YELLOWS` | `16` | `int` | Maximum yellow star instances per level |
-| `STAR_YELLOW_DISPLAY_W` | `16` | `int` | Display width (logical px) |
-| `STAR_YELLOW_DISPLAY_H` | `16` | `int` | Display height (logical px) |
+| `MAX_STAR_GREENS` | `16` | `int` | Maximum green star instances per level |
+| `MAX_STAR_REDS` | `16` | `int` | Maximum red star instances per level |
+| `HEALTH_STAR_DISPLAY_W` | `16` | `int` | Display width of every star colour (logical px) |
+| `HEALTH_STAR_DISPLAY_H` | `16` | `int` | Display height of every star colour (logical px) |
 
 ---
 
