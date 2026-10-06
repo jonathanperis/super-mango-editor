@@ -45,6 +45,7 @@ static unsigned long editor_playtest_sequence;
 static uint64_t editor_recovery_sequence;
 static int editor_recovery_seeded;
 static int editor_test_recovery_choice = -1;
+static void (*editor_test_load_hook)(const char *path);
 
 void editor_test_set_recovery_choice(int button_id)
 {
@@ -128,10 +129,63 @@ int editor_set_recovery_document(EditorState *es, const char *document_path)
     return editor_set_recovery_path(es, document_path);
 }
 
+void editor_test_set_load_hook(void (*hook)(const char *path))
+{
+    editor_test_load_hook = hook;
+}
+
+/*
+ * editor_read_stable_level — Parse a level and fingerprint the same bytes.
+ *
+ * The fingerprint is the baseline Save later uses to detect that someone
+ * else changed the file.  Another program (a text editor, a git checkout)
+ * may be rewriting the file while we read it, so a fingerprint taken
+ * before *or* after parsing alone could describe different bytes than the
+ * ones parsed.  Like the game's read_stable_level, fingerprint before and
+ * after and require both to match.  A writer usually finishes quickly, so
+ * one retry is allowed.
+ *
+ * Returns EDITOR_LOAD_OK, EDITOR_LOAD_PARSE_ERROR (stable but invalid
+ * bytes), EDITOR_LOAD_IO_ERROR (cannot fingerprint) or EDITOR_LOAD_CHANGING
+ * (the file changed during both attempts).
+ */
+enum {
+    EDITOR_LOAD_OK = 0,
+    EDITOR_LOAD_PARSE_ERROR,
+    EDITOR_LOAD_IO_ERROR,
+    EDITOR_LOAD_CHANGING
+};
+
+static int editor_read_stable_level(const char *path, LevelDef *level,
+                                    SerializerFileFingerprint *fingerprint)
+{
+    for (int attempt = 0; attempt < 2; attempt++) {
+        SerializerFileFingerprint before;
+        SerializerFileFingerprint after;
+        int parsed;
+
+        if (serializer_fingerprint_utf8(path, &before) != 1)
+            return EDITOR_LOAD_IO_ERROR;
+        parsed = level_load_toml(path, level) == 0;
+        if (editor_test_load_hook) editor_test_load_hook(path);
+        if (serializer_fingerprint_utf8(path, &after) != 1)
+            return EDITOR_LOAD_IO_ERROR;
+        if (serializer_fingerprint_equal(&before, &after)) {
+            if (!parsed) return EDITOR_LOAD_PARSE_ERROR;
+            *fingerprint = after;
+            return EDITOR_LOAD_OK;
+        }
+        /* The bytes changed under us (a parse error may just be a half-
+         * written file); try once more. */
+    }
+    return EDITOR_LOAD_CHANGING;
+}
+
 int editor_load_level(EditorState *es, const char *path)
 {
     LevelDef new_level;
     SerializerFileFingerprint fingerprint;
+    int result;
     memset(&new_level, 0, sizeof(new_level));
 
     if (!es || !editor_path_fits(path)) {
@@ -139,14 +193,19 @@ int editor_load_level(EditorState *es, const char *path)
         return -1;
     }
 
-    if (level_load_toml(path, &new_level) != 0) {
+    result = editor_read_stable_level(path, &new_level, &fingerprint);
+    if (result == EDITOR_LOAD_PARSE_ERROR) {
         fprintf(stderr, "Error: failed to load %s\n", path);
         editor_set_status(es, "Load failed: %s", path);
         return -1;
     }
-
-    if (serializer_fingerprint_utf8(path, &fingerprint) != 1) {
+    if (result == EDITOR_LOAD_IO_ERROR) {
         editor_set_status(es, "Load failed: cannot fingerprint %s", path);
+        return -1;
+    }
+    if (result == EDITOR_LOAD_CHANGING) {
+        editor_set_status(es, "Load failed: %s kept changing while it was read; try again",
+                          path);
         return -1;
     }
 

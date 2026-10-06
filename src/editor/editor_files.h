@@ -60,6 +60,10 @@ int editor_choose_recovery(EditorState *es);
 /* Native picker seam used by focused recovery tests. */
 void editor_test_set_recovery_choice(int button_id);
 
+/* Test seam: called after each parse inside editor_load_level, so a test
+ * can rewrite the file mid-load.  NULL (the default) disables it. */
+void editor_test_set_load_hook(void (*hook)(const char *path));
+
 /* Retire recovery only when metadata identifies the supplied document. */
 void editor_retire_matching_recovery(EditorState *es, const char *destination);
 
