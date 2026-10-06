@@ -2289,6 +2289,20 @@ static int config_preview_sync_preserves_old_texture(void)
     editor_sync_config_resources(&es);
     if (es.textures.floor_tile != old_texture) goto fail;
 
+    /* A config edit that keeps the paths (here a rename) reloads nothing;
+     * the replacement is loaded before the old one is freed, so a reload
+     * would always produce a different pointer. */
+    strcpy(es.level.floor_tile_path, "assets/sprites/levels/leaf_tileset.png");
+    editor_sync_config_resources(&es);
+    old_texture = es.textures.floor_tile;
+    if (!old_texture) goto fail;
+    strcpy(es.level.name, "Renamed");
+    editor_sync_config_resources(&es);
+    if (es.textures.floor_tile != old_texture) goto fail;
+    strcpy(es.level.floor_tile_path, "assets/sprites/levels/grass_tileset.png");
+    editor_sync_config_resources(&es);
+    if (es.textures.floor_tile == old_texture) goto fail;
+
     texture_unload(es.textures.floor_tile);
     es.textures.floor_tile = NULL;
     editor_widget_test_context_cleanup(&context);
