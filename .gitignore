@@ -72,6 +72,7 @@ src/levels/exported/*.h
 levels/_playtest.toml
 compile_commands.json
 .cache/clangd/
+.cache/raylib/
 
 # Docs generation
 node_modules/
