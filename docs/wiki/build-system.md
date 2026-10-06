@@ -488,9 +488,11 @@ Four GitHub Actions workflows handle automated builds and docs checks:
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis |
 | Deploy | `deploy.yml` | Successful same-repository main push/manual Build & Release run | Builds/checks docs from the run's exact commit, copies matching WASM, HTTP-smokes the assembly and deploys `docs/out/` |
 
-Every job sets `timeout-minutes`. Clang native legs pass `EXTRA_CFLAGS=-Werror` and the
-WebAssembly leg `EXTRA_WEB_CFLAGS=-Werror`; the Windows GCC leg does not yet, because GCC
-reports `-Wformat-truncation`/`-Wstringop-truncation` in editor and UI label formatting. Build jobs use Python 3.12 from
+Every job sets `timeout-minutes`. Every native leg (Clang and GCC) passes
+`EXTRA_CFLAGS=-Werror` and the WebAssembly leg `EXTRA_WEB_CFLAGS=-Werror`.
+GCC's `-Wformat-truncation` is stricter than Clang's: label code formats long
+paths through `editor_path_for_display()` and checks `snprintf` results where
+truncation would change behaviour. Build jobs use Python 3.12 from
 `actions/setup-python` on Linux/macOS (MSYS2 supplies Python on Windows) and
 restore the pinned raylib source archive from `actions/cache` via
 `RAYLIB_ARCHIVE`; the archive is SHA-256 verified on every use. Build
