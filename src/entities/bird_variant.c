@@ -55,7 +55,7 @@ const BirdVariantSpec *bird_variant_spec(BirdVariantKind kind)
 void bird_variant_update(const BirdVariantSpec *spec,
                          float *x, float *vx,
                          float patrol_x0, float patrol_x1,
-                         int *frame_index, uint32_t *anim_timer_ms,
+                         int *frame_index, float *anim_timer_ms,
                          float dt, SoundEffect *snd_flap,
                          float player_x, int cam_x)
 {

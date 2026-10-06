@@ -43,18 +43,19 @@ void bouncepad_place(Bouncepad *pad, float x, float launch_vy, BouncepadType pad
  * Only ACTIVE pads move through the sequence.  The sequence is:
  *   frame 1 (80 ms) → frame 0 (80 ms) → IDLE (frame 2)
  *
- * dt_ms is the frame delta time in milliseconds, consistent with how
+ * dt_ms is the step duration in milliseconds (a float, so the 0.67 ms
+ * fraction of a 16.67 ms step is not lost), consistent with how
  * the rest of the animation timers in this codebase work.
  */
-void bouncepads_update(Bouncepad *pads, int count, uint32_t dt_ms) {
+void bouncepads_update(Bouncepad *pads, int count, float dt_ms) {
     for (int i = 0; i < count; i++) {
         Bouncepad *p = &pads[i];
         if (p->state != BOUNCE_ACTIVE) continue;
 
         p->anim_timer_ms += dt_ms;
 
-        if (p->anim_timer_ms >= BOUNCEPAD_FRAME_MS) {
-            p->anim_timer_ms -= BOUNCEPAD_FRAME_MS;  /* carry over remainder */
+        if (p->anim_timer_ms >= (float)BOUNCEPAD_FRAME_MS) {
+            p->anim_timer_ms -= (float)BOUNCEPAD_FRAME_MS;  /* carry over remainder */
             p->anim_frame--;                          /* 1 → 0               */
 
             if (p->anim_frame < 0) {
