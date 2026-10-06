@@ -103,14 +103,6 @@ typedef struct {
 /* ---- Function declarations ---------------------------------------- */
 
 /*
- * axe_traps_init — Populate the axe trap array with level placements.
- *
- * Places axe traps centred on the tall (3-tile) platform pillars.
- * Writes into `traps[]` and sets *count to the number placed.
- */
-void axe_traps_init(AxeTrap *traps, int *count);
-
-/*
  * axe_traps_update — Advance the swing/spin animation for all traps.
  *
  * dt is delta time in seconds.  snd_axe is played when the axe reaches

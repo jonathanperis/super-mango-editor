@@ -15,25 +15,6 @@
 /* ------------------------------------------------------------------ */
 
 /*
- * spike_platforms_init — Place spike platforms at their level positions.
- *
- * Platform 0 — in the middle phase (screen 2), elevated between pillars.
- *
- * Placed at x=520, y=200 (above the floor, between pillar 3 at x=452
- * and the sea gap at x=560).  3 pieces × 16 px = 48 px wide.
- */
-void spike_platforms_init(SpikePlatform *sps, int *count) {
-    sps[0].x      = 370.0f;
-    sps[0].y      = 200.0f;
-    sps[0].w      = 3 * SPIKE_PLAT_PIECE_W;  /* 48 px */
-    sps[0].active = 1;
-
-    *count = 1;
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
  * spike_platforms_render — Draw each active platform using 3-slice rendering.
  *
  * Spike_Platform.png is 48×16 px divided into three 16×16 pieces:

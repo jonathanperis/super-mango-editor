@@ -134,9 +134,6 @@ void float_platform_init(FloatPlatform *fp, FloatPlatformMode mode,
                          float stand_limit,
                          const Rail *rail, float t, float speed);
 
-/* Populate the level's float-platform array. */
-void float_platforms_init(FloatPlatform *fps, int *count, const Rail *rails);
-
 /*
  * float_platform_update — Advance one platform for this frame.
  *

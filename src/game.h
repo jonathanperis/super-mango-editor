@@ -409,9 +409,6 @@ typedef struct {
 /* Create the logical render target and load screen-owned resources. */
 int game_init(GameState *gs);
 
-/* Run native game frames until gs->running becomes 0 (legacy direct helper). */
-void game_loop(GameState *gs);
-
 /* Execute one game frame. Returns 1 only after presentation. */
 int game_frame(GameState *gs);
 

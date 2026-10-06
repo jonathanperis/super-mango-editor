@@ -32,7 +32,7 @@ src/
 │   ├── game_window.h / .c        Screen-owned logical render target
 │   ├── game_timing.h / .c        Frame timing helpers
 │   ├── game_lifecycle.c          `game_init` / `game_cleanup` implementation
-│   ├── game_loop.c               Active-game frame runner and legacy direct loop
+│   ├── game_loop.c               Active-game frame runner (game_frame)
 │   ├── game_update.h / .c        Top-level update orchestration
 │   ├── game_player_step.h / .c   Player update/collision step wrapper
 │   ├── game_actors.h / .c        Enemy update/render helpers
@@ -268,7 +268,6 @@ See [Constants Reference](../constants-reference/) for full details.
 
 ```c
 int  game_init(GameState *gs);
-void game_loop(GameState *gs);
 void game_cleanup(GameState *gs);
 int  game_load_next_phase(GameState *gs);
 void game_complete_level(GameState *gs);
@@ -294,13 +293,12 @@ Creates all runtime resources:
 
 Returns `0` on success. If a required window, texture, level, or subsystem resource fails, it cleans up the partially initialized `GameState` and returns `-1`; the top-level runner reports `EXIT_FAILURE`.
 
-### `game_frame(GameState *gs)` and `game_loop(GameState *gs)`
+### `game_frame(GameState *gs)`
 
 `game_frame` performs one frame: delta time -> events -> update -> render.
 Normal rendering targets 60 FPS with measured/clamped `dt`; smoke and scripted
-replays use a fixed step. `AppSession` is the production loop owner; `game_loop`
-remains a legacy direct native helper. See [Architecture](../architecture/) for
-routes and render order.
+replays use a fixed step. `AppSession` is the only loop owner. See
+[Architecture](../architecture/) for routes and render order.
 
 ### `game_cleanup(GameState *gs)`
 

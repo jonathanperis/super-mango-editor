@@ -66,8 +66,6 @@ typedef struct {
 
 /* ---- Function declarations ---------------------------------------------- */
 
-void bridges_init(Bridge *bridges, int *count);
-
 void bridges_update(Bridge *bridges, int count, float dt,
                     int landed_idx, float player_cx);
 

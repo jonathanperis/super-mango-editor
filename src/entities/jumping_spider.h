@@ -56,9 +56,6 @@ typedef struct {
 
 /* ---- Function declarations ---------------------------------------------- */
 
-/* Place all jumping spiders at their initial world positions. */
-void jumping_spiders_init(JumpingSpider *spiders, int *count);
-
 /* Move, jump, patrol, animate each jumping spider. */
 void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
                             const int *floor_gaps, int floor_gap_count,

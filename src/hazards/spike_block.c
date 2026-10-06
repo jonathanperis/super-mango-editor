@@ -3,12 +3,10 @@
  */
 
 #include "../shared/graphics.h"
-#include <math.h>   /* sqrtf */
 #include <stdio.h>
 
 #include "spike_block.h"
 #include "../surfaces/rail.h"
-#include "../player/player.h"
 #include "../game.h"   /* GAME_W, GAME_H — used only for potential bounds checks */
 
 /* ------------------------------------------------------------------ */
@@ -50,46 +48,6 @@ void spike_block_init(SpikeBlock *sb, const Rail *rail, float t0, float speed) {
     rail_get_world_pos(rail, t0, &cx, &cy);
     sb->x = cx - sb->w * 0.5f;
     sb->y = cy - sb->h * 0.5f;
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
- * spike_blocks_init — Create one SpikeBlock per rail, each at a different speed.
- *
- * The three speed tiers (SLOW / NORMAL / FAST) are distributed across the
- * three rails so the player encounters progressively more challenging hazards
- * as they traverse the level left to right.
- *
- *   Block 0 — Rail 0 (screen 2, closed loop): SLOW  — easiest to avoid.
- *   Block 1 — Rail 1 (screen 3, closed loop): NORMAL.
- *   Block 2 — Rail 2 (screen 4, open line)  : FAST  — bounces end-to-end.
- *
- * Blocks 1 and 2 start at offset positions so they are not all clustered
- * at tile 0 when the player first enters their screen.
- */
-void spike_blocks_init(SpikeBlock *blocks, int *count, const Rail *rails) {
-    /*
-     * Block 0 — Rail 0, SLOW.  Starts at tile 0 (top-left corner).
-     * At 1.5 tiles/s the 28-tile loop takes ~18.7 s — very readable.
-     */
-    spike_block_init(&blocks[0], &rails[0], 0.0f, SPIKE_SPEED_SLOW);
-
-    /*
-     * Block 1 — Rail 1, NORMAL.  Starts halfway around the 22-tile loop
-     * (≈ tile 11) so it is never synchronised with block 0.
-     */
-    spike_block_init(&blocks[1], &rails[1],
-                     (float)(rails[1].count / 2), SPIKE_SPEED_NORMAL);
-
-    /*
-     * Block 2 — Rail 2, FAST.  The horizontal open rail uses bounce
-     * movement (direction flips at each endpoint).  Starts at tile 0
-     * (left end) moving rightward.
-     */
-    spike_block_init(&blocks[2], &rails[2], 0.0f, SPIKE_SPEED_FAST);
-
-    *count = 3;
 }
 
 /* ------------------------------------------------------------------ */
@@ -293,50 +251,3 @@ IntRect spike_block_get_hitbox(const SpikeBlock *sb) {
 }
 
 /* ------------------------------------------------------------------ */
-
-/*
- * spike_block_push_player — Apply a push impulse opposite to player movement.
- *
- * Algorithm:
- *   1. If the player has a non-zero velocity, normalise it, negate the
- *      direction, and scale to SPIKE_PUSH_SPEED.  This reverses the player
- *      directly back along their movement vector.
- *   2. If the player is stationary, push based on the relative horizontal
- *      position of the block vs. the player (away from the block).
- *   3. In both cases add SPIKE_PUSH_VY upward so there is always a visible
- *      bounce-back effect even during horizontal movement.
- *   4. Clear on_ground so gravity immediately continues (prevents the player
- *      from being "stuck" on the ground while the push is applied).
- */
-void spike_block_push_player(const SpikeBlock *sb, Player *player) {
-    float vx = player->vx;
-    float vy = player->vy;
-    float len = sqrtf(vx * vx + vy * vy);
-
-    if (len > 1.0f) {
-        /*
-         * Normalise the player's velocity and reverse it to get the push
-         * direction.  Scale to SPIKE_PUSH_SPEED for a consistent impulse
-         * regardless of how fast the player was moving before impact.
-         */
-        player->vx = -(vx / len) * SPIKE_PUSH_SPEED;
-        player->vy = -(vy / len) * SPIKE_PUSH_SPEED + SPIKE_PUSH_VY;
-    } else {
-        /*
-         * Player was stationary: push horizontally away from the block's
-         * centre, plus a fixed upward component.
-         */
-        float block_cx = sb->x + sb->w * 0.5f;
-        float player_cx = player->x + player->w * 0.5f;
-        float dir = (player_cx >= block_cx) ? 1.0f : -1.0f;
-        player->vx = dir * SPIKE_PUSH_SPEED;
-        player->vy = SPIKE_PUSH_VY;
-    }
-
-    /*
-     * Lift the player off the ground so the upward component takes effect.
-     * Without this, player_update would immediately snap them back to the
-     * floor on the same frame.
-     */
-    player->on_ground = 0;
-}

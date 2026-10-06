@@ -22,32 +22,6 @@
 
 /* ------------------------------------------------------------------ */
 
-void jumping_spiders_init(JumpingSpider *spiders, int *count)
-{
-    *count = 1;
-
-    /*
-     * Jumping Spider 0 — patrols screen 1 across the sea gap at x=192–224.
-     *
-     * Patrol range 46–310 spans from the first ground coin to just before
-     * the bouncepad at x=310.  The spider walks right from x=130, reaches
-     * the gap at 192, jumps over, continues to 310, reverses, walks back,
-     * jumps over the gap again at 224, and repeats.
-     */
-    spiders[0].x             = 130.0f;
-    spiders[0].y             = 0.0f;      /* on the ground */
-    spiders[0].vx            = JSPIDER_SPEED;
-    spiders[0].vy            = 0.0f;
-    spiders[0].patrol_x0     = 46.0f;     /* after first coin */
-    spiders[0].patrol_x1     = 310.0f;    /* before bouncepad at 310 */
-    spiders[0].jump_timer    = 0.0f;      /* unused — jumps are gap-triggered */
-    spiders[0].on_ground     = 1;
-    spiders[0].frame_index   = 0;
-    spiders[0].anim_timer_ms = 0;
-}
-
-/* ------------------------------------------------------------------ */
-
 void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
                             const int *floor_gaps, int floor_gap_count,
                             SoundEffect *snd_attack, float player_x, int cam_x)

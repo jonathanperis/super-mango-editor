@@ -10,7 +10,7 @@
 #include "../levels/level.h"
 #include "../core/debug.h"
 #include "../core/game_checkpoint.h"
-#include "../hazards/spike.h"  /* SPIKE_PUSH_SPEED, SPIKE_PUSH_VY */
+#include "../hazards/spike_block.h"  /* SPIKE_PUSH_SPEED, SPIKE_PUSH_VY */
 
 #include "../shared/audio.h"
 #include <math.h>       /* sqrtf */
@@ -44,6 +44,16 @@ void game_restart_after_game_over(GameState *gs)
 void apply_damage(GameState *gs, int amount, int push,
                   float src_cx, float src_cy)
 {
+    /*
+     * Knockback, shared by every hazard and enemy:
+     *   1. A moving player is pushed straight back along the reverse of the
+     *      normalised velocity, scaled to SPIKE_PUSH_SPEED, so the impulse is
+     *      the same size however fast they ran in.
+     *   2. A (nearly) stationary player is pushed horizontally away from the
+     *      damage source's centre instead.
+     *   3. Both cases add SPIKE_PUSH_VY upward and clear on_ground; otherwise
+     *      the next floor snap would cancel the bounce on the same frame.
+     */
     if (push) {
         float vx  = gs->player.vx;
         float vy  = gs->player.vy;

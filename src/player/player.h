@@ -111,7 +111,7 @@ void player_handle_input(Player *player, SoundEffect *snd_jump,
  * index; otherwise it is left unchanged.  Callers should initialise it to -1.
  *
  * If the player lands on a float platform, *out_fp_landed_idx is set to that
- * platform's index; otherwise it is left at -1.  Used by game_loop to drive
+ * platform's index; otherwise it is left at -1.  Used by game_float_platforms_update to drive
  * the crumble timer and to nudge the player along with a moving rail platform.
  *
  * prev_fp_landed_idx : the index that *out_fp_landed_idx was set to last frame

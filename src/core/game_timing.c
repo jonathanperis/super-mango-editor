@@ -20,19 +20,6 @@ float game_timing_step(GameState *gs, uint64_t *frame_start_ticks)
     return dt;
 }
 
-void game_timing_cap_frame(uint64_t frame_start_ticks, uint32_t frame_ms)
-{
-#ifndef __EMSCRIPTEN__
-    uint64_t elapsed = clock_millis() - frame_start_ticks;
-    if (elapsed < frame_ms) {
-        clock_wait((uint32_t)(frame_ms - elapsed));
-    }
-#else
-    (void)frame_start_ticks;
-    (void)frame_ms;
-#endif
-}
-
 void game_timing_tick_smoke(GameState *gs)
 {
     if (gs->smoke_test_frames > 0) {

@@ -15,33 +15,6 @@
 /* ------------------------------------------------------------------ */
 
 /*
- * spike_rows_init — Place spike rows at their level positions.
- *
- * Spike Row 0 — on the ground in the middle phase (screen 2–3 boundary),
- * placed in a gap between platforms where the player must navigate.
- *
- * y is set so the spikes sit ON TOP of the floor surface:
- * FLOOR_Y − SPIKE_TILE_H = 252 − 16 = 236.
- */
-void spike_rows_init(SpikeRow *rows, int *count) {
-    /*
-     * Row 0 — ground spikes at x=580, screen 2.
-     *
-     * 4 tiles × 16 px = 64 px wide.  Positioned between the sea gap at
-     * x=560 (right edge 592) and pillar 4 at x=680.  The spikes start at
-     * x=600 to leave a safe landing zone after the gap.
-     */
-    rows[0].x      = 780.0f;
-    rows[0].y      = (float)(FLOOR_Y - SPIKE_TILE_H);  /* 236 */
-    rows[0].count  = 4;
-    rows[0].active = 1;
-
-    *count = 1;
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
  * spike_rows_render — Draw each active spike row as tiled 16×16 blocks.
  *
  * Spike.png is a single 16×16 image.  Each tile in the row is rendered

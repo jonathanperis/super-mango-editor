@@ -53,18 +53,3 @@ int game_frame(GameState *gs)
     game_timing_tick_smoke(gs);
     return presented;
 }
-
-/*
- * game_loop — Legacy direct native helper. The application uses AppSession so
- * menu and game share one callback and one frame owner.
- */
-void game_loop(GameState *gs)
-{
-    gs->loop.prev_ticks = clock_millis();
-    gs->loop.fp_prev_riding = -1;
-    while (gs->running && gs->route == GAME_ROUTE_NONE) {
-        input_collect();
-        music_update();
-        game_frame(gs);
-    }
-}

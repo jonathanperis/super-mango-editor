@@ -20,60 +20,6 @@ static float fish_random_jump_delay(float min_s, float max_s)
 
 /* ------------------------------------------------------------------ */
 
-void fish_init(Fish *fish, int *count)
-{
-    /*
-     * water_y is the y coordinate of the fish's top-left corner while swimming.
-     *
-     * The water art surface sits at y = GAME_H - WATER_ART_H = 269.
-     * We want the fish centred on that surface so exactly half of the 48-px
-     * sprite is visible above the waterline and half is submerged:
-     *
-     *   water_y = water_surface - FISH_RENDER_H / 2
-     *           = 269 - 24 = 245
-     *
-     * Safety check — fish hitbox top while swimming = 245 + 8 = 253.
-     * Player hitbox bottom = 252. Rectangle intersection uses strict < so
-     * 253 < 252 is FALSE: the fish CANNOT hurt the player while swimming,
-     * only during a jump (when y drops below ~244).
-     */
-    float water_y = (float)(GAME_H - WATER_ART_H) - FISH_RENDER_H / 2.0f;
-
-    *count = 2;
-
-    /*
-     * Fish 0 — patrols the middle of the world (screens 2–3).
-     * Starts swimming right with a short random delay before its first jump.
-     */
-    fish[0].x          = 700.0f;
-    fish[0].y          = water_y;
-    fish[0].vx         = FISH_SPEED;
-    fish[0].vy         = 0.0f;
-    fish[0].patrol_x0  = 500.0f;
-    fish[0].patrol_x1  = 950.0f;
-    fish[0].jump_timer = fish_random_jump_delay(FISH_JUMP_MIN, FISH_JUMP_MAX);
-    fish[0].water_y    = water_y;
-    fish[0].frame_index   = 0;
-    fish[0].anim_timer_ms = 0;
-
-    /*
-     * Fish 1 — patrols the end of the world (screens 3–4).
-     * Starts swimming left to create variety in movement direction.
-     */
-    fish[1].x          = 1200.0f;
-    fish[1].y          = water_y;
-    fish[1].vx         = -FISH_SPEED;
-    fish[1].vy         = 0.0f;
-    fish[1].patrol_x0  = 1000.0f;
-    fish[1].patrol_x1  = 1500.0f;
-    fish[1].jump_timer = fish_random_jump_delay(FISH_JUMP_MIN, FISH_JUMP_MAX);
-    fish[1].water_y    = water_y;
-    fish[1].frame_index   = 0;
-    fish[1].anim_timer_ms = 0;
-}
-
-/* ------------------------------------------------------------------ */
-
 void fish_update(Fish *fish, int count, float dt, int world_w)
 {
     for (int i = 0; i < count; i++) {

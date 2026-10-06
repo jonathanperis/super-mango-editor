@@ -39,9 +39,6 @@ typedef struct {
 
 /* ---- Function declarations ---------------------------------------------- */
 
-/* Populate the spike row array with level placements. */
-void spike_rows_init(SpikeRow *rows, int *count);
-
 /* Draw all active spike rows as tiled 16×16 blocks. */
 void spike_rows_render(const SpikeRow *rows, int count,
                        Texture2D *tex, int cam_x);

@@ -7,47 +7,10 @@
  */
 
 #include "../shared/graphics.h"
-#include <math.h>   /* sqrtf */
 #include <stdio.h>
 
 #include "circular_saw.h"
 #include "../game.h"   /* FLOOR_Y, TILE_SIZE, GAME_W */
-
-/* ------------------------------------------------------------------ */
-
-/*
- * circular_saws_init — Place circular saws at their level positions.
- *
- * Saw 0 — patrols on top of the bridge at the end phase (screen 4).
- *
- * The bridge spans x=1350 to x=1478 (8 bricks × 16 px = 128 px).
- * Bridge top y = FLOOR_Y − 2×TILE_SIZE + 16 = 172.
- * The saw sits on top of the bridge surface, so its bottom aligns with
- * bridge top: saw_y = bridge_y − SAW_DISPLAY_H = 172 − 32 = 140.
- *
- * Patrol limits are inset slightly from the bridge edges so the saw
- * doesn't overhang visually.
- */
-void circular_saws_init(CircularSaw *saws, int *count) {
-    /*
-     * Saw 0 — bridge patrol (screen 4, end phase).
-     *
-     * Bridge left edge: 1350, right edge: 1350 + 128 = 1478.
-     * Patrol from 1350 to (1478 − SAW_DISPLAY_W) = 1446 so the saw
-     * stays visually within the bridge bounds.
-     */
-    saws[0].x          = 1350.0f;
-    saws[0].y          = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H);
-    saws[0].w          = SAW_DISPLAY_W;
-    saws[0].h          = SAW_DISPLAY_H;
-    saws[0].patrol_x0  = 1350.0f;
-    saws[0].patrol_x1  = 1478.0f - SAW_DISPLAY_W;
-    saws[0].direction   = 1;
-    saws[0].spin_angle  = 0.0f;
-    saws[0].active      = 1;
-
-    *count = 1;
-}
 
 /* ------------------------------------------------------------------ */
 
@@ -146,44 +109,3 @@ IntRect circular_saw_get_hitbox(const CircularSaw *saw) {
 }
 
 /* ------------------------------------------------------------------ */
-
-/*
- * circular_saw_push_player — Apply push impulse opposite to player movement.
- *
- * Same algorithm as spike_block_push_player:
- *   1. If the player is moving, reverse and normalise their velocity,
- *      then scale to SAW_PUSH_SPEED.
- *   2. If stationary, push horizontally away from the saw's centre.
- *   3. Always add SAW_PUSH_VY upward for a visible bounce-back effect.
- *   4. Clear on_ground so the upward component takes effect immediately.
- */
-void circular_saw_push_player(const CircularSaw *saw, Player *player) {
-    float vx = player->vx;
-    float vy = player->vy;
-    float len = sqrtf(vx * vx + vy * vy);
-
-    if (len > 1.0f) {
-        /*
-         * Normalise the player's velocity, reverse it, and scale to
-         * SAW_PUSH_SPEED for a consistent knockback impulse.
-         */
-        player->vx = -(vx / len) * SAW_PUSH_SPEED;
-        player->vy = -(vy / len) * SAW_PUSH_SPEED + SAW_PUSH_VY;
-    } else {
-        /*
-         * Player was stationary: push horizontally away from the saw's
-         * centre, plus a fixed upward component.
-         */
-        float saw_cx = saw->x + saw->w * 0.5f;
-        float player_cx = player->x + player->w * 0.5f;
-        float dir = (player_cx >= saw_cx) ? 1.0f : -1.0f;
-        player->vx = dir * SAW_PUSH_SPEED;
-        player->vy = SAW_PUSH_VY;
-    }
-
-    /*
-     * Lift the player off the ground so the upward push takes effect.
-     * Without this, player_update would snap them back to the floor.
-     */
-    player->on_ground = 0;
-}

@@ -12,35 +12,6 @@
 
 /* ------------------------------------------------------------------ */
 
-void spiders_init(Spider *spiders, int *count)
-{
-    *count = 2;
-
-    /*
-     * Spider 0 — patrols screen 2–3, east of the sea gap at x=560–592.
-     * Patrol starts after the gap so the debug range matches movement.
-     */
-    spiders[0].x             = 600.0f;
-    spiders[0].vx            = SPIDER_SPEED;
-    spiders[0].patrol_x0     = 592.0f;
-    spiders[0].patrol_x1     = 750.0f;
-    spiders[0].frame_index   = 0;
-    spiders[0].anim_timer_ms = 0;
-
-    /*
-     * Spider 1 — patrols screen 3–4, west of the sea gap at x=1152–1184.
-     * Patrol ends before the gap so the debug range matches movement.
-     */
-    spiders[1].x             = 1100.0f;
-    spiders[1].vx            = -SPIDER_SPEED;
-    spiders[1].patrol_x0     = 1000.0f;
-    spiders[1].patrol_x1     = 1152.0f;
-    spiders[1].frame_index   = 1;
-    spiders[1].anim_timer_ms = 0;
-}
-
-/* ------------------------------------------------------------------ */
-
 void spiders_update(Spider *spiders, int count, float dt,
                     const int *floor_gaps, int floor_gap_count)
 {

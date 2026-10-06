@@ -20,57 +20,6 @@
 /* ------------------------------------------------------------------ */
 
 /*
- * blue_flames_init — Place one blue flame per floor gap (except the world-edge gap).
- *
- * Each blue flame is centred horizontally within its floor gap.  The start_y
- * is set just below the floor so the blue flame begins hidden and rises up.
- *
- * Staggered initial timers prevent all blue flames from erupting at the same
- * moment — each subsequent blue flame waits an extra 0.5 s.
- */
-void blue_flames_init(BlueFlame *blue_flames, int *count,
-                      const int *gap_xs, int gap_count) {
-    int n = 0;
-    for (int i = 0; i < gap_count && n < MAX_BLUE_FLAMES; i++) {
-        /*
-         * Skip the world-edge gap at x=0 — the player can't see it and
-         * a blue flame there would erupt off-screen to the left.
-         */
-        if (gap_xs[i] <= 0) continue;
-
-        BlueFlame *f = &blue_flames[n];
-
-        f->gap_x    = (float)gap_xs[i];
-        /*
-         * Centre the blue flame within the floor gap.
-         * gap centre = gap_x + FLOOR_GAP_W/2; blue flame left = centre − DISPLAY_W/2.
-         */
-        f->x        = (float)gap_xs[i] + (FLOOR_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f;
-        f->start_y  = (float)(FLOOR_Y + TILE_SIZE);  /* below the floor, hidden */
-        f->y        = f->start_y;
-        f->vy       = 0.0f;
-        f->w        = BLUE_FLAME_DISPLAY_W;
-        f->h        = BLUE_FLAME_DISPLAY_H;
-        f->angle    = 0.0f;
-        f->state    = BLUE_FLAME_WAITING;
-        /*
-         * Stagger eruption times: each blue flame waits (n × 0.5) extra seconds
-         * so they don't all fire simultaneously.  The first blue flame waits the
-         * minimum (BLUE_FLAME_WAIT_DURATION − 0 s), the second slightly longer, etc.
-         */
-        f->timer      = BLUE_FLAME_WAIT_DURATION - (float)n * 0.5f;
-        f->anim_timer = 0.0f;
-        f->anim_frame = 0;
-        f->active     = 1;
-
-        n++;
-    }
-    *count = n;
-}
-
-/* ------------------------------------------------------------------ */
-
-/*
  * blue_flames_update — Advance all blue flames through their eruption cycle.
  *
  * State transitions:
