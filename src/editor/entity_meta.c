@@ -300,7 +300,12 @@ static EditorEntityArray entity_array(void *items, size_t item_size, int *count)
 static int editor_entity_array(LevelDef *level, EntityType type,
                                EditorEntityArray *out)
 {
+    /*
+     * Each case pairs an array with its element size and its count field.
+     * sizeof(array[0]) keeps the size correct if a placement struct grows.
+     */
     switch (type) {
+    /* ---- World geometry ------------------------------------------- */
     case ENT_FLOOR_GAP:
         *out = entity_array(level->floor_gaps, sizeof(level->floor_gaps[0]),
                             &level->floor_gap_count);
@@ -317,6 +322,7 @@ static int editor_entity_array(LevelDef *level, EntityType type,
         *out = entity_array(level->platforms, sizeof(level->platforms[0]),
                             &level->platform_count);
         return 1;
+    /* ---- Collectibles --------------------------------------------- */
     case ENT_COIN:
         *out = entity_array(level->coins, sizeof(level->coins[0]),
                             &level->coin_count);
@@ -333,6 +339,7 @@ static int editor_entity_array(LevelDef *level, EntityType type,
         *out = entity_array(level->star_reds, sizeof(level->star_reds[0]),
                             &level->star_red_count);
         return 1;
+    /* ---- Enemies -------------------------------------------------- */
     case ENT_SPIDER:
         *out = entity_array(level->spiders, sizeof(level->spiders[0]),
                             &level->spider_count);
@@ -358,6 +365,7 @@ static int editor_entity_array(LevelDef *level, EntityType type,
         *out = entity_array(level->faster_fish, sizeof(level->faster_fish[0]),
                             &level->faster_fish_count);
         return 1;
+    /* ---- Hazards -------------------------------------------------- */
     case ENT_AXE_TRAP:
         *out = entity_array(level->axe_traps, sizeof(level->axe_traps[0]),
                             &level->axe_trap_count);
@@ -388,6 +396,7 @@ static int editor_entity_array(LevelDef *level, EntityType type,
         *out = entity_array(level->fire_flames, sizeof(level->fire_flames[0]),
                             &level->fire_flame_count);
         return 1;
+    /* ---- Surfaces and bouncepads (three separate arrays) ---------- */
     case ENT_FLOAT_PLATFORM:
         *out = entity_array(level->float_platforms,
                             sizeof(level->float_platforms[0]),
@@ -412,6 +421,7 @@ static int editor_entity_array(LevelDef *level, EntityType type,
                             sizeof(level->bouncepads_high[0]),
                             &level->bouncepad_high_count);
         return 1;
+    /* ---- Climbables ----------------------------------------------- */
     case ENT_VINE:
         *out = entity_array(level->vines, sizeof(level->vines[0]),
                             &level->vine_count);
@@ -424,6 +434,7 @@ static int editor_entity_array(LevelDef *level, EntityType type,
         *out = entity_array(level->ropes, sizeof(level->ropes[0]),
                             &level->rope_count);
         return 1;
+    /* Singletons are plain LevelDef fields, not arrays. */
     case ENT_LAST_STAR:
     case ENT_PLAYER_SPAWN:
     case ENT_COUNT:
