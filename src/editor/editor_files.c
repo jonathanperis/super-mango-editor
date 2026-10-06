@@ -41,6 +41,21 @@
 #define EDITOR_RECENT_NAME   "editor_recent.txt"
 #define EDITOR_RECOVERY_PREFIX "editor_recovery_"
 
+/*
+ * A recovery metadata file holds one line:
+ *     1 \t <id: 16 hex> \t <timestamp: decimal> \t <source path: hex> \n
+ * The path is hex-encoded (2 characters per byte) so tabs and newlines in
+ * a file name cannot break the format.  Buffers are sized from that layout
+ * so the longest path the editor accepts (EDITOR_PATH_MAX - 1 bytes)
+ * survives a write/read round trip:
+ *     source hex : 2 * (EDITOR_PATH_MAX - 1) digits + NUL
+ *     whole line : "1\t" (2) + id (16) + "\t" (1) + largest uint64 (20)
+ *                  + "\t" (1) + hex digits + "\n" (1) + NUL (1)
+ */
+#define EDITOR_RECOVERY_SOURCE_HEX_MAX (2 * (EDITOR_PATH_MAX - 1) + 1)
+#define EDITOR_RECOVERY_LINE_MAX \
+    (2 + 16 + 1 + 20 + 1 + (EDITOR_RECOVERY_SOURCE_HEX_MAX - 1) + 1 + 1)
+
 static unsigned long editor_playtest_sequence;
 static uint64_t editor_recovery_sequence;
 static int editor_recovery_seeded;
@@ -741,7 +756,7 @@ static int editor_recovery_entry_valid(const EditorRecoveryEntry *entry)
 static int editor_write_recovery_metadata(const EditorRecoveryEntry *entry)
 {
     char temp_path[SERIALIZER_IO_PATH_MAX];
-    char source_hex[EDITOR_PATH_MAX * 2];
+    char source_hex[EDITOR_RECOVERY_SOURCE_HEX_MAX];
     FILE *fp;
 
     if (!editor_recovery_entry_valid(entry) ||
@@ -809,7 +824,7 @@ static int editor_read_recovery_metadata(const EditorState *es,
 {
     char metadata_path[EDITOR_PATH_MAX];
     char snapshot_path[EDITOR_PATH_MAX];
-    char line[EDITOR_PATH_MAX * 2];
+    char line[EDITOR_RECOVERY_LINE_MAX];
     char *version;
     char *id_text;
     char *timestamp_text;
