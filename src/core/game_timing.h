@@ -50,8 +50,13 @@ float game_timing_frame_seconds(GameState *gs);
 int game_timing_take_steps(GameState *gs, float seconds);
 
 /*
- * Forget pending time and restart the clock on the next frame. Call after a
- * pause, a load or any other wait so it is not "caught up" in one burst.
+ * Forget pending time and restart the clock now. Call after a pause, a load
+ * or any other wait so it is not "caught up" in one burst.
+ *
+ * Restarting at the current time (rather than "on the next frame") matters:
+ * this runs in the middle of a frame, after that frame was measured. If the
+ * next frame instead measured 0 s, it would run no step and the game would
+ * hitch once after every unpause, retry or level change.
  *
  * The accumulator restarts half a step full, not empty. A 60 Hz display
  * measures frames of 16.67 ms give or take a fraction of a millisecond; from
@@ -62,7 +67,8 @@ int game_timing_take_steps(GameState *gs, float seconds);
  */
 static inline void game_timing_restart_clock(GameState *gs)
 {
-    gs->loop.clock_started = 0;
+    gs->loop.prev_time = GetTime();
+    gs->loop.clock_started = 1;
     gs->loop.accumulator = GAME_FIXED_STEP * 0.5;
 }
 

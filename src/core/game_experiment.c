@@ -76,14 +76,13 @@ int game_experiment_begin(GameState *gs)
 float game_experiment_dt(const GameState *gs, float dt)
 {
     const GameExperiment *tape = gs->experiment;
-    if (tape && tape->replaying)
-        return tape->cursor < tape->count ? tape->frames[tape->cursor].dt : 0;
-    /* Recording starts from a known state. Every live step is the fixed step;
-     * slow mode and F3 only change how many steps run per rendered frame. */
+    /* Every step, live or replayed, is the fixed step; slow mode and F3 only
+     * change how many steps run per rendered frame. A finished replay stops. */
+    if (tape && tape->replaying && tape->cursor >= tape->count) return 0;
     return dt;
 }
 
-unsigned int game_experiment_input(GameState *gs, float dt, unsigned int input)
+unsigned int game_experiment_input(GameState *gs, unsigned int input)
 {
     GameExperiment *tape = gs->experiment;
     if (!tape) return input;
@@ -96,7 +95,7 @@ unsigned int game_experiment_input(GameState *gs, float dt, unsigned int input)
     }
     if (tape->recording) {
         ExperimentFrame *frame = &tape->frames[tape->count++];
-        frame->dt = dt; frame->input = input & 63u;
+        frame->input = input & 63u;
         game_inspector_physics(&gs->player, frame->physics, 0);
         if (tape->count == EXPERIMENT_MAX_FRAMES) {
             tape->recording = 0;
@@ -113,13 +112,15 @@ int game_experiment_save(GameState *gs, const char *path)
     char temporary[SERIALIZER_IO_PATH_MAX];
     FILE *fp = serializer_open_temp(path, temporary, sizeof(temporary));
     if (!fp) return -1;
-    fprintf(fp, "# Super Mango simulation experiment. Replay with the same engine revision.\nformat_version = 1\n");
+    fprintf(fp, "# Super Mango simulation experiment: one row per fixed %.0f Hz step.\n"
+                "# Replay with the same engine revision.\nformat_version = %d\n",
+            (double)TARGET_FPS, EXPERIMENT_FORMAT_VERSION);
     write_toml_key_string(fp, "level_path", tape->level_path);
     fprintf(fp, "seed = %u\nlevel_hash = \"%016llx\"\nframes = [\n", tape->seed,
             (unsigned long long)tape->fingerprint.content_hash);
     for (int i = 0; i < tape->count; i++) {
         const ExperimentFrame *frame = &tape->frames[i];
-        fprintf(fp, "  [%.9g, %u", (double)frame->dt, frame->input);
+        fprintf(fp, "  [%u", frame->input);
         for (int j = 0; j < INSPECTOR_PHYSICS_COUNT; j++) fprintf(fp, ", %.9g", (double)frame->physics[j]);
         fprintf(fp, "],\n");
     }
@@ -174,7 +175,14 @@ int game_experiment_load(GameState *gs, const char *path)
     toml_datum_t version = toml_get(top, "format_version"), seed = toml_get(top, "seed");
     toml_datum_t level = toml_get(top, "level_path"), hash = toml_get(top, "level_hash");
     toml_datum_t frames = toml_get(top, "frames");
-    if (version.type != TOML_INT64 || version.u.int64 != 1 ||
+    if (version.type == TOML_INT64 && version.u.int64 == 1) {
+        /* Recorded by the variable-timestep engine: its rows hold frame
+         * durations that the fixed-step engine cannot reproduce. */
+        fprintf(stderr, "Error: %s was recorded before fixed-step simulation "
+                        "(format_version 1); record it again\n", path);
+        goto done;
+    }
+    if (version.type != TOML_INT64 || version.u.int64 != EXPERIMENT_FORMAT_VERSION ||
         seed.type != TOML_INT64 || seed.u.int64 < 0 || seed.u.int64 > UINT_MAX ||
         level.type != TOML_STRING || level.u.str.len <= 0 || level.u.str.len >= GAME_LEVEL_PATH_MAX ||
         strlen(level.u.str.ptr) != (size_t)level.u.str.len ||
@@ -192,14 +200,14 @@ int game_experiment_load(GameState *gs, const char *path)
     if (!tape->frames) goto done;
     for (int i = 0; i < tape->count; i++) {
         toml_datum_t row = frames.u.arr.elem[i];
-        if (row.type != TOML_ARRAY || row.u.arr.size != INSPECTOR_PHYSICS_COUNT + 2) goto done;
+        /* Row: [input bits, physics values...] for one fixed step. */
+        if (row.type != TOML_ARRAY || row.u.arr.size != INSPECTOR_PHYSICS_COUNT + 1) goto done;
         toml_datum_t *values = row.u.arr.elem;
         ExperimentFrame *frame = &tape->frames[i];
-        if (number(values[0], &frame->dt) || frame->dt <= 0 || frame->dt > 0.1f ||
-            values[1].type != TOML_INT64 || values[1].u.int64 < 0 || values[1].u.int64 > 63) goto done;
-        frame->input = (unsigned int)values[1].u.int64;
+        if (values[0].type != TOML_INT64 || values[0].u.int64 < 0 || values[0].u.int64 > 63) goto done;
+        frame->input = (unsigned int)values[0].u.int64;
         for (int j = 0; j < INSPECTOR_PHYSICS_COUNT; j++)
-            if (number(values[j + 2], &frame->physics[j])) goto done;
+            if (number(values[j + 1], &frame->physics[j])) goto done;
     }
     tape->replaying = 1;
     game_experiment_cleanup(gs);
