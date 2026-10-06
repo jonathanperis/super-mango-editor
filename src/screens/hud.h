@@ -24,7 +24,7 @@
 /*
  * Hud — resources needed by the HUD renderer.
  *
- * font     : owned round9x13.ttf font loaded at 13 logical pixels.
+ * font     : owned handle to raylib's built-in font at TEXT_FONT_SIZE px.
  * star_tex : borrowed star_yellow.png used as the health indicator.
  * coin_icon: owned hud_coins.png texture beside the score.
  * player_icon: borrowed player sprite sheet, cropped for the lives counter.
