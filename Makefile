@@ -407,12 +407,13 @@ coverage: $(RAYLIB_LIB)
 # tests/fuzz_replay_main.c under ASan/UBSan and replays the seed inputs
 # (FUZZ_MUTATIONS=N adds N blind mutations per seed).  fuzz links it with
 # libFuzzer for coverage-guided search; Apple clang lacks libFuzzer, so
-# point FUZZ_CC at Homebrew LLVM or a Linux clang.
+# point FUZZ_CC at Homebrew LLVM or a Linux clang.  Both honour
+# EXTRA_CFLAGS, so CI's -Werror covers the harnesses under `make sanitize`.
 FUZZ_FLAGS = -std=c11 -g -O1 -Wall -Wextra -Wpedantic -I$(SRCDIR) -I$(VENDOR_DIR) \
              -I$(RAYLIB_BUILD)/build/raylib/include \
              $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_RAYLIB_MEMORY,) \
              -fno-omit-frame-pointer -fsanitize=address,undefined \
-             -fno-sanitize-recover=undefined
+             -fno-sanitize-recover=undefined $(EXTRA_CFLAGS)
 FUZZ_LEVEL_SRCS = tests/fuzz_level_parse.c $(wildcard $(SHARED_DIR)/serializer*.c) \
                   src/levels/level_validate.c src/levels/level_ref.c $(VENDOR_DIR)/tomlc17.c
 FUZZ_PROFILE_SRCS = tests/fuzz_profile_decode.c src/core/game_profile.c \
