@@ -124,6 +124,58 @@ static const char *vine_type_opts[] = { "Green", "Brown" };
  */
 #define FIELD_ID(type, field)  ((int)(type) * 100 + (field) + 1)
 
+/*
+ * draw_rail_properties — Fields for one rail: layout, position (x, y in
+ * pixels), size (w, h in rail tiles) and end_cap.  Kept in its own function
+ * so the per-type switch in properties_render stays short; every change is
+ * committed through editor_commit_change like the other entity fields.
+ */
+static void draw_rail_properties(EditorState *es, RailPlacement *p, int y)
+{
+    /*
+     * layout — dropdown that selects between Rect and Horiz rail types.
+     * Cast the enum to int for the dropdown, then cast back on change.
+     */
+    int layout_sel = (int)p->layout;
+    ui_label(&es->ui, CONTENT_X, y, "layout:");
+    if (ui_dropdown(&es->ui, FIELD_ID(ENT_RAIL, 0),
+                    FIELD_X, y, FIELD_W,
+                    rail_layout_opts, 2, &layout_sel)) {
+        p->layout = (RailLayout)layout_sel;
+        editor_commit_change(es);
+    }
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 1),
+                     FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 2),
+                     FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "w:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 3),
+                     FIELD_X, y, FIELD_W, &p->w))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "h:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 4),
+                     FIELD_X, y, FIELD_W, &p->h))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "end_cap:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 5),
+                     FIELD_X, y, FIELD_W, &p->end_cap))
+        editor_commit_change(es);
+}
+
 /* ------------------------------------------------------------------ */
 /* properties_render                                                   */
 /* ------------------------------------------------------------------ */
@@ -246,53 +298,9 @@ void properties_render(EditorState *es, int start_y, int available_h)
         break;
     }
 
-    case ENT_RAIL: {
-        RailPlacement *p = &es->level.rails[es->selection.index];
-
-        /*
-         * layout — dropdown that selects between Rect and Horiz rail types.
-         * Cast the enum to int for the dropdown, then cast back on change.
-         */
-        int layout_sel = (int)p->layout;
-        ui_label(&es->ui, CONTENT_X, y, "layout:");
-        if (ui_dropdown(&es->ui, FIELD_ID(ENT_RAIL, 0),
-                        FIELD_X, y, FIELD_W,
-                        rail_layout_opts, 2, &layout_sel)) {
-            p->layout = (RailLayout)layout_sel;
-            editor_commit_change(es);
-        }
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 1),
-                         FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 2),
-                         FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "w:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 3),
-                         FIELD_X, y, FIELD_W, &p->w))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "h:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 4),
-                         FIELD_X, y, FIELD_W, &p->h))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "end_cap:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 5),
-                         FIELD_X, y, FIELD_W, &p->end_cap))
-            editor_commit_change(es);
+    case ENT_RAIL:
+        draw_rail_properties(es, &es->level.rails[es->selection.index], y);
         break;
-    }
 
     case ENT_PLATFORM: {
         PlatformPlacement *p = &es->level.platforms[es->selection.index];

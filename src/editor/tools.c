@@ -495,7 +495,7 @@ static void delete_entity(EditorState *es, EntityType type, int index)
     cmd.entity_type  = (int)type;
     cmd.entity_index = index;
     cmd.before       = before;
-    undo_push(es->undo, cmd);
+    undo_push(es->undo, &cmd);
 
     editor_selection_after_remove(es, type, index);
     editor_refresh_dirty(es);
@@ -766,7 +766,7 @@ int editor_add_placement(EditorState *es, EntityType type,
     cmd.entity_index = index;
     cmd.before       = before;
     cmd.after        = *pd;
-    undo_push(es->undo, cmd);
+    undo_push(es->undo, &cmd);
 
     /* Select the new entity for immediate inspection */
     es->selection.type  = type;
@@ -839,6 +839,44 @@ static void place_entity(EditorState *es, float world_x, float world_y)
 /* ------------------------------------------------------------------ */
 
 /*
+ * select_and_arm_drag — TOOL_SELECT press: select what is under the cursor
+ * and remember everything a drag needs.
+ *
+ * Clicking empty space clears the selection.  Clicking an entity selects it
+ * and records its original placement (for undo), its anchor point, and where
+ * inside it the cursor grabbed it, so motion events can move it without a
+ * jump.  The drag only counts as a move once the cursor travels a few pixels
+ * (see tools_mouse_drag).
+ */
+static void select_and_arm_drag(EditorState *es, float world_x, float world_y)
+{
+    Selection hit = editor_hit_test(&es->level, world_x, world_y);
+    float anchor_x, anchor_y;
+
+    es->dragging = 0;
+    if (hit.index < 0) {
+        es->selection.index = -1;   /* clicked empty space */
+        return;
+    }
+
+    es->selection = hit;
+    if (!get_entity_anchor(&es->level, hit.type, hit.index,
+                           &anchor_x, &anchor_y)) return;
+    es->dragging         = 1;
+    es->drag_moved       = 0;
+    es->drag_type        = hit.type;
+    es->drag_index       = hit.index;
+    es->drag_before      = editor_snapshot_entity(&es->level, hit.type,
+                                                  hit.index);
+    es->drag_start_x     = anchor_x;
+    es->drag_start_y     = anchor_y;
+    es->drag_grab_x      = world_x - anchor_x;
+    es->drag_grab_y      = world_y - anchor_y;
+    es->drag_mouse_x     = world_x;
+    es->drag_mouse_y     = world_y;
+}
+
+/*
  * tools_mouse_down --- Dispatch a left-click to the active tool handler.
  *
  * TOOL_SELECT : hit-test and select/deselect, optionally start a drag.
@@ -853,39 +891,9 @@ void tools_mouse_down(EditorState *es, float world_x, float world_y)
 
     switch (es->tool) {
 
-    case TOOL_SELECT: {
-        Selection hit = editor_hit_test(&es->level, world_x, world_y);
-        float anchor_x, anchor_y;
-
-        es->dragging = 0;
-        if (hit.index < 0) {
-            /* Clicked empty space — clear the current selection */
-            es->selection.index = -1;
-            break;
-        }
-
-        /*
-         * Hit an entity — select it and arm a drag.  Remember the original
-         * placement and where inside the entity the cursor grabbed it, so
-         * motion events can move it without a jump.
-         */
-        es->selection = hit;
-        if (!get_entity_anchor(&es->level, hit.type, hit.index,
-                               &anchor_x, &anchor_y)) break;
-        es->dragging         = 1;
-        es->drag_moved       = 0;
-        es->drag_type        = hit.type;
-        es->drag_index       = hit.index;
-        es->drag_before      = editor_snapshot_entity(&es->level, hit.type,
-                                                      hit.index);
-        es->drag_start_x     = anchor_x;
-        es->drag_start_y     = anchor_y;
-        es->drag_grab_x      = world_x - anchor_x;
-        es->drag_grab_y      = world_y - anchor_y;
-        es->drag_mouse_x     = world_x;
-        es->drag_mouse_y     = world_y;
+    case TOOL_SELECT:
+        select_and_arm_drag(es, world_x, world_y);
         break;
-    }
 
     case TOOL_PLACE:
         place_entity(es, world_x, world_y);
@@ -952,7 +960,7 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
     cmd.entity_index = es->drag_index;
     cmd.before       = es->drag_before;
     cmd.after        = after;
-    undo_push(es->undo, cmd);
+    undo_push(es->undo, &cmd);
 
     editor_refresh_dirty(es);
     if (es->drag_type == ENT_CHECKPOINT)

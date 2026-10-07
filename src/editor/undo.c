@@ -33,35 +33,41 @@ void undo_destroy(UndoStack *stack)
     free(stack); /* The caller must clear its owning pointer after this call. */
 }
 
-static void append_entry(UndoEntry *entries, int *count, UndoEntry entry)
+static void append_entry(UndoEntry *entries, int *count, const UndoEntry *entry)
 {
     if (*count == UNDO_MAX) {
         free(entries[0].config);
         memmove(entries, entries + 1, (UNDO_MAX - 1) * sizeof(*entries));
         (*count)--;
     }
-    entries[(*count)++] = entry;
+    entries[(*count)++] = *entry;
 }
 
-int undo_push(UndoStack *stack, Command cmd)
+/*
+ * A Command is about 13 KB (two full placement snapshots plus config
+ * snapshots), so it is passed by const pointer: copying it onto the stack for
+ * every call would be wasted work, and const promises the caller's command is
+ * only read.
+ */
+int undo_push(UndoStack *stack, const Command *cmd)
 {
-    if (!stack) return 0;
+    if (!stack || !cmd) return 0;
     UndoEntry entry = {
-        .type = cmd.type, .entity_type = cmd.entity_type,
-        .entity_index = cmd.entity_index, .before = cmd.before, .after = cmd.after,
-        .property_field = cmd.property_field
+        .type = cmd->type, .entity_type = cmd->entity_type,
+        .entity_index = cmd->entity_index, .before = cmd->before, .after = cmd->after,
+        .property_field = cmd->property_field
     };
-    memcpy(entry.property_text_before, cmd.property_text_before, sizeof(entry.property_text_before));
-    memcpy(entry.property_text_after, cmd.property_text_after, sizeof(entry.property_text_after));
-    if (cmd.type == CMD_CONFIG) {
+    memcpy(entry.property_text_before, cmd->property_text_before, sizeof(entry.property_text_before));
+    memcpy(entry.property_text_after, cmd->property_text_after, sizeof(entry.property_text_after));
+    if (cmd->type == CMD_CONFIG) {
         entry.config = malloc(2 * sizeof(*entry.config));
         if (!entry.config) return 0; /* History remains intact. */
-        entry.config[0] = cmd.config_before;
-        entry.config[1] = cmd.config_after;
+        entry.config[0] = cmd->config_before;
+        entry.config[1] = cmd->config_after;
     }
     release_entries(stack->redo_stack, stack->redo_top);
     stack->redo_top = 0;
-    append_entry(stack->commands, &stack->top, entry);
+    append_entry(stack->commands, &stack->top, &entry);
     return 1;
 }
 
@@ -84,7 +90,7 @@ static int transfer(UndoEntry *from, int *from_count,
         out->config_before = entry.config[0];
         out->config_after = entry.config[1];
     }
-    append_entry(to, to_count, entry);
+    append_entry(to, to_count, &entry);
     return 1;
 }
 
