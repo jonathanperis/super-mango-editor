@@ -432,6 +432,9 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 
 ## `faster_bird.h` Constants
 
+The faster bird is a `Bird` run by the same code in `bird.c`; only this
+tuning differs (passed as a `BirdSpec`).
+
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
 | `MAX_FASTER_BIRDS` | `16` | `int` | Maximum faster bird placements per level |
