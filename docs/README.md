@@ -44,16 +44,18 @@ contract; do not generate an npm lockfile.
 | Surface | Source |
 |---|---|
 | Landing copy / cabinet host | `src/components/home/`, `src/pages/index.astro` |
-| Manual content | `wiki/*.md`; `wiki/index.md` renders on `/docs/` |
-| Page titles, descriptions, categories and order | `src/lib/docsSidebar.ts` |
-| Manual layout / routes | `src/pages/docs/[...slug].astro` |
+| Manual content | `wiki/*.md`, loaded as the `docs` content collection (`src/content.config.ts`); `wiki/index.md` renders on `/docs/` |
+| Page titles, descriptions, categories and order | `src/lib/docsSidebar.ts` (optional `title`/`description` frontmatter overrides) |
+| Manual layout / routes | `src/pages/docs/[...slug].astro` (`getCollection('docs')` + `render()`) |
 | SEO and shared page shell | `src/layouts/BaseLayout.astro` |
 | Styles | `src/styles/globals.css`, `src/styles/docs.css` |
 | Production origin/base | `astro.config.mjs`; keep `public/robots.txt` consistent |
 | Landing-page Content-Security-Policy | `integrations/home-csp.mjs` (hashes inline scripts after build; see `SECURITY.md`) |
 
 Add a manual page in `wiki/`, register its ID/metadata/category in `docsSidebar.ts`,
-then build and check it. Links in `wiki/` target **published routes**, not GitHub
+then build and check it. The collection's glob loader picks up every `wiki/*.md`;
+the build fails if a listed page has no file or a file is missing from
+`SECTION_ORDER`, and frontmatter accepts only `title` and `description`. Links in `wiki/` target **published routes**, not GitHub
 Markdown paths: use `../controls/` from a nested page and `controls/` from the
 overview. Include fragment IDs only when the target heading exists.
 
