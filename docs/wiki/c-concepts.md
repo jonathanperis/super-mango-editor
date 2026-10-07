@@ -60,13 +60,16 @@ pairs in a table and writes the logic once.
 | The same trick for tuning values | the `fields` table and its `FIELD` macro in `src/core/game_inspector.c` | `#name` turns the field name into a string for the inspector's label, and `offsetof(Player, name)` finds the value. |
 | Macros that build a schema | `ROOT_TABLE_ARRAY` in `src/shared/serializer_parse.c` | `ROOT_FIELDS` lists every key a level file may contain, with its type and maximum count. The parser walks that table, so adding a key is one line. |
 | A macro wrapped in `do { ... } while (0)` | `LOAD_XY_ARRAY` in `src/shared/serializer_load_collectibles.c` | The wrapper makes a multi-line macro behave like one statement, so it is safe after an `if` without braces. |
-| Per-type metadata | `s_entity_meta` in `src/editor/entity_meta.c` | The editor's names, categories and capacities for every entity type live in one array indexed by `EntityType`. |
+| Per-type metadata | `s_entity_meta` in `src/editor/entity_meta.c` | The editor's names, categories, capacities, `LevelDef` storage and placement preview for every entity type live in one array indexed by `EntityType`, one row per type written with designated initializers (`[ENT_COIN] = { .type_name = "Coin", ... }`). |
+| `offsetof` in a table | `STORED_IN` in `src/editor/entity_meta.c` | A static table cannot point into a `LevelDef` that does not exist yet, so each row stores `offsetof(LevelDef, coins)`; `editor_entity_array()` adds that to a real level's address. `sizeof(((LevelDef *)0)->coins[0])` gets an element's size without evaluating the null pointer. |
+| A table of function pointers | `s_property_panels` in `src/editor/properties.c` | Indexed by `EntityType`, it replaces a 30-case `switch`: `properties_render()` looks up the selected type's `draw_<type>_properties` function and calls it. |
 
 ## Checks the compiler does for us
 
 | Idea | Where to read it | What to notice |
 |------|------------------|----------------|
-| `_Static_assert` on a table's length | `s_hit_order` in `src/editor/hit_test.c` | `sizeof(s_hit_order) / sizeof(s_hit_order[0]) == ENT_COUNT`: add an entity type and forget this list, and the build fails instead of the editor silently ignoring clicks on it. The same check guards `s_palette_order` in `entity_meta.c` and the inspector's `fields` table. |
+| `_Static_assert` on a table's length | `s_hit_order` in `src/editor/hit_test.c` | `sizeof(s_hit_order) / sizeof(s_hit_order[0]) == ENT_COUNT`: add an entity type and forget this list, and the build fails instead of the editor silently ignoring clicks on it. The same check guards `s_palette_order` and `s_entity_meta` in `entity_meta.c`, `s_property_panels` in `properties.c` and the inspector's `fields` table. |
+| Letting the compiler check `printf` formats | `PRINTF_FORMAT` in `src/shared/printf_format.h`, used by `editor_set_status()` | A function taking `const char *fmt, ...` hides its arguments from the compiler; GCC and Clang's `format(printf, ...)` attribute makes `-Wformat` check each call as it does `printf`. |
 | `static` at file scope | `s_required_textures` in `game_resources.c`; `state` in `src/core/game_random.c` | `static` outside a function means "visible only in this file". Other files cannot reach the random generator's state; they call `game_random_seed()` and `game_random()`. Helpers like `texture_slot()` are `static` for the same reason. |
 | Warnings as a safety net | `-Wall -Wextra -Wpedantic` in the Makefile | The code is kept warning-free; see the [Developer Guide](../developer-guide/). |
 

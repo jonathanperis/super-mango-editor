@@ -59,10 +59,10 @@ src/
 │   ├── editor.h / .c             Editor state, resource startup/cleanup and loop delegation
 │   ├── canvas.h / .c             Zoomable editing canvas with horizontal and vertical camera scrolling
 │   ├── palette.h / .c            Entity palette
-│   ├── properties.h / .c         Property panels: one draw_<type>_properties function per entity type, plus level config
+│   ├── properties.h / .c         Property panels: one draw_<type>_properties function per entity type (picked from a table), plus level config
 │   ├── tools.h / .c              Selection and placement tools
 │   ├── hit_test.h / .c           Entity rectangles and click hit-testing
-│   ├── entity_meta.h / .c        Entity metadata plus shared read/insert/remove of placements
+│   ├── entity_meta.h / .c        One table row per entity type (names, capacity, LevelDef storage, placement preview) plus shared read/insert/remove of placements
 │   ├── editor_frame.h / .c       Per-frame editor orchestration
 │   ├── editor_events.h / .c      Semantic input dispatch
 │   ├── dialog_choice.c          Native confirmation/error/recovery decisions
@@ -70,7 +70,8 @@ src/
 │   ├── editor_panels.h / .c      Palette/properties panel rendering
 │   ├── editor_layout.h / .c      Editor layout metrics
 │   ├── editor_textures.h / .c    Editor texture loading/cleanup
-│   ├── editor_files.h / .c       Open/save, autosave and recovery, recent files; saving through a symlink keeps the link
+│   ├── editor_files.h / .c       Open/save, playtest copies, recent files; saving through a symlink keeps the link
+│   ├── editor_recovery.h / .c    Autosave snapshots and crash recovery (find, offer, load and retire them)
 │   ├── editor_session.h / .c     Dirty state, staged-edit/save decisions and document hashing
 │   ├── editor_playtest.h / .c    Save and launch a playtest, poll it, stop (kill) it
 │   ├── editor_clipboard.h / .c   Copy/paste; a rail rider re-attaches to its rail by shape and position
@@ -85,6 +86,7 @@ src/
 │   ├── text.h / .c              Borrowed built-in font, text measurement and label texture creation
 │   ├── platform.h / .c          Monotonic time, UTF-8 copying and OS preference/executable paths
 │   ├── utf8.h                   Strict UTF-8 checks for loaded strings and typed text
+│   ├── printf_format.h          PRINTF_FORMAT: lets GCC/Clang check printf-style format arguments
 │   ├── ui.h / .c                 Immediate-mode widgets shared by editor and game settings
 │   ├── serializer.h / .c         TOML save/load public API anchor
 │   ├── serializer_emit.h / .c    TOML emission helpers; control bytes and DEL are written as \uXXXX escapes
