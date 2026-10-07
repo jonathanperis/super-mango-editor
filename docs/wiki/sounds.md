@@ -7,7 +7,9 @@
 All audio files live in `assets/sounds/`, organized into categorized subdirectories.
 They are mono 16-bit 22050 Hz `.wav` files synthesized by `tools/gen_sounds.py`
 (see [Generated Sounds](../assets/#generated-sounds)); run `make sounds` to
-regenerate them. raylib handles decoded `Sound` samples and streamed `Music`;
+regenerate them. Regeneration skips files whose samples are within 1 LSB of the
+new output, and `make docs-drift` runs `tools/gen_sounds.py --check` with the same
+tolerance. raylib handles decoded `Sound` samples and streamed `Music`;
 the project-owned `SoundEffect` and `MusicTrack` types manage their lifetimes.
 
 ---
@@ -113,23 +115,18 @@ backing-storage cost. See [Asset Inventory](../asset-inventory/).
 1. Add a recipe and a `SOUNDS` row to `tools/gen_sounds.py`, then run `make sounds`
    to write `assets/sounds/<category>/<name>.wav`.
 2. Add a `SoundEffect *<name>` field to `AudioResources` in `game.h`.
-3. Load it in `src/core/game_resources.c`, called by `game_init`:
+3. Add a row to the `s_optional_chunks` table in `src/core/game_resources.c`:
 
 ```c
-gs->audio.<name> = sound_load("assets/sounds/<category>/<name>.wav");
-if (!gs->audio.<name>) {
-    fprintf(stderr, "Warning: failed to load assets/sounds/<category>/<name>.wav\n");
-    /* Non-fatal — game continues without this sound */
-}
+{ CHUNK_FIELD(<name>), "assets/sounds/<category>/<name>.wav", "<name>.wav" },
 ```
 
-4. Free it in the resource cleanup called by `game_cleanup`:
+   `game_resources_load` (called by `game_init`) loads every row through
+   `sound_load`, printing a warning and leaving the slot `NULL` when a file is
+   missing (non-fatal). `game_resources_cleanup` walks the same table in reverse
+   with `FREE_CHUNK`, so no separate free call is needed.
 
-```c
-FREE_CHUNK(gs->audio.<name>);
-```
-
-5. Play it wherever the event occurs:
+4. Play it wherever the event occurs:
 
 ```c
 sound_play(gs->audio.<name>, 128);

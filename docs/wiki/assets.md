@@ -88,7 +88,7 @@ records attribution and unresolved license evidence.
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `sky_blue.png` | `levels/00_sandbox_01.toml` | Static sky gradient backdrop |
+| `sky_blue.png` | `levels/00_sandbox_01.toml`, every lab | Static sky gradient backdrop |
 | `clouds_bg.png` | `levels/00_sandbox_01.toml` | Background cloud layer |
 | `glacial_mountains.png` | `levels/00_sandbox_01.toml` | Distant mountains |
 | `clouds_mg_3.png` | `levels/00_sandbox_01.toml` | Midground cloud layer 3 |
@@ -96,21 +96,27 @@ records attribution and unresolved license evidence.
 | `clouds_lonely.png` | `levels/00_sandbox_01.toml` | Single cloud layer |
 | `clouds_mg_1.png` | `levels/00_sandbox_01.toml` | Foreground cloud layer |
 | `sky_fire.png` | `levels/01_lugio_01.toml`, `02_lugio_02.toml` | Volcanic sky backdrop |
-| `sky_fire_lightened.png` | `levels/01_lugio_01.toml`, `02_lugio_02.toml` | Lightened volcanic sky variant |
+| `sky_fire_lightened.png` | Theme variant (no current level) | Lightened volcanic sky variant |
 | `volcanic_mountains.png` | `levels/01_lugio_01.toml`, `02_lugio_02.toml` | Volcanic mountain layer |
-| `volcanic_mountains_lightened.png` | `levels/01_lugio_01.toml`, `02_lugio_02.toml` | Lightened volcanic mountains |
+| `volcanic_mountains_lightened.png` | Theme variant (no current level) | Lightened volcanic mountains |
 | `smoke_bg.png`, `smoke_mg_1.png`, `smoke_mg_2.png`, `smoke_mg_3.png`, `smoke_lonely.png` | Volcanic levels | Smoke parallax layers |
+| `smoke_mg_1_lightened.png` | Theme variant (no current level) | Lightened smoke midground |
+| `forest_leafs.png` | `levels/labs/06_camera.toml` | Forest leaf layer |
 
 ### Foregrounds — `assets/sprites/foregrounds/`
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `fog_1.png` | `fog_layers` / `fog.c` (`fog->textures[0]`) | Fog overlay layer, semi-transparent sliding effect |
-| `fog_2.png` | `fog_layers` / `fog.c` (`fog->textures[1]`) | Fog overlay layer, semi-transparent sliding effect |
+| `fog_1.png` | `fog_layers` in `levels/00_sandbox_01.toml` | Fog overlay layer, semi-transparent sliding effect |
+| `fog_2.png` | `fog_layers` (no current level) | Fog overlay layer, semi-transparent sliding effect |
 | `water.png` | `foreground_layers` / `water->texture` | 384x64 sprite sheet, 8 frames of 48x64 with 16x31 art crop |
 | `lava.png` | `foreground_layers` / `water->texture` | Lava-themed foreground strip |
-| `clouds.png` | foreground clouds | Decorative cloud layer |
-| `fog_fire_1.png`, `fog_fire_2.png`, `smoke.png` | Volcanic levels | Fire fog / smoke overlay layers |
+| `clouds.png` | Editor foreground choice (no current level) | Decorative cloud layer |
+| `fog_fire_1.png`, `fog_fire_2.png` | `fog_layers` in the volcanic levels | Fire fog overlay layers |
+| `smoke.png` | Theme variant (no current level) | Smoke overlay layer |
+
+`fog.c` loads a level's `fog_layers` paths into `fog->textures[]` in array order
+(up to `MAX_FOG_TEXTURES`).
 
 ### Player — `assets/sprites/player/`
 
@@ -171,9 +177,9 @@ records attribution and unresolved license evidence.
 | File | Used By | Description |
 |------|---------|-------------|
 | `grass_tileset.png` | `gs->textures.floor_tile` | 48x48 tile, 9-slice rendered across `FLOOR_Y` to form the floor |
-| `grass_platform.png` | `gs->textures.platform` | 48x48 tile, 9-slice rendered as one-way platform pillars |
-| `stone_tileset.png` | Volcanic levels | 48x48 stone floor tileset |
-| `stone_platform.png` | Volcanic levels | Stone platform pillar tile |
+| `grass_platform.png` | `gs->textures.platform` | Default 48x48 platform tile, 9-slice rendered as one-way platform pillars |
+| `stone_tileset.png` | Volcanic levels (`floor_tile_path`) | 48x48 stone floor tileset |
+| `stone_platform.png` | Volcanic levels (platform `tile_path`) | Stone platform pillar tile |
 | `grass_rock_tileset.png`, `grass_rock_platform.png` | Reserve / level theming | Grass-rock floor/platform variants |
 | `brick_tileset.png`, `brick_platform.png` | Reserve / level theming | Brick floor/platform variants |
 | `leaf_tileset.png`, `leaf_platform.png` | Reserve / level theming | Forest leaf floor/platform variants |
@@ -234,15 +240,15 @@ The following asset is stored in `assets/sprites/unused/` and is not loaded by t
 |------|-------------|
 | `sky_background_0.png` | Sky gradient background |
 
-Additional background variants are stored alongside used backgrounds in `assets/sprites/backgrounds/`:
+Additional background variants are stored alongside used backgrounds in `assets/sprites/backgrounds/`; no current level references them, but they ship as playable theme options:
 
 | File | Description |
 |------|-------------|
 | `castle_pillars.png` | Castle/dungeon pillar background |
 | `clouds_mg_1_lightened.png` | Lightened midground cloud variant |
-| `forest_leafs.png` | Forest leaf layer |
 | `glacial_mountains_lightened.png` | Lightened mountain variant |
 | `sky_blue_lightened.png` | Lightened sky variant |
+| `sky_fire_lightened.png`, `volcanic_mountains_lightened.png`, `smoke_mg_1_lightened.png` | Lightened volcanic variants |
 
 Additional tilesets are stored in `assets/sprites/levels/`; the stone variants
 are already used by the volcanic campaign levels:
@@ -323,7 +329,7 @@ differently on macOS and Linux. `make sounds` applies the same tolerance and
 reports such files as `unchanged` instead of rewriting them, so regenerating on
 another OS only touches sounds whose recipe actually changed. `--check`
 also rejects WAV files the generator does not produce; `make test` runs `tests/gen_sounds_test.py` (format, determinism, fade
-outs, loop seams and a 2 MiB sound budget). To change a sound, edit its recipe
+outs, loop seams, the 1-LSB tolerance, unchanged-file skips and a 2 MiB sound budget). To change a sound, edit its recipe
 and seed/peak entry in the `SOUNDS` table, run `make sounds`, then listen and
 commit the regenerated files with the recipe. To add one, add a recipe and
 table row first; the C side then loads it as described on the
