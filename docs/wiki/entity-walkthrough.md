@@ -213,8 +213,9 @@ the sprite appears on screen.
 
 A Token sits still. An enemy or hazard adds three things:
 
-- **An update function.** Write `tokens_update(Token *items, int count, float dt)`
-  over the whole array and call it from the focused helper in `src/core/`:
+- **An update function.** Write one that walks the whole array, in the shape
+  of `circular_saws_update(CircularSaw *saws, int count, float dt)`, named
+  after your new type, and call it from the focused helper in `src/core/`:
   `game_actors.c` updates enemies (it calls `spiders_update()`), `game_hazards.c`
   updates hazards (it calls `circular_saws_update()`). `dt` is always the fixed
   1/60 s step; see [Developer Guide](../developer-guide/#adding-physics-to-an-entity)
