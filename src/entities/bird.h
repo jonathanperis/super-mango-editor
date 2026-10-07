@@ -49,10 +49,43 @@ typedef struct {
     float  anim_timer_ms;  /* ms accumulated toward the next frame advance */
 } Bird;
 
+/*
+ * BirdSpec — the tuning and sprite facts that differ between bird variants.
+ *
+ * The regular and faster bird share their state (Bird) and behaviour; only
+ * these numbers change. faster_bird.c passes its own BirdSpec to the
+ * bird_variant_* functions instead of copying them — the same pattern
+ * fish.c and faster_fish.c use with FishSpec.
+ */
+typedef struct {
+    int      frames;     /* animation frames in the sheet                  */
+    int      frame_w;    /* width of one frame slot (px)                   */
+    int      art_x;      /* first visible column within each frame         */
+    int      art_y;      /* first visible row within each frame            */
+    int      art_w;      /* width of the visible art (px)                  */
+    int      art_h;      /* height of the visible art (px)                 */
+    uint32_t frame_ms;   /* ms each animation frame is held                */
+    float    speed;      /* horizontal flight speed in px/s (positive)     */
+    float    wave_amp;   /* sine-wave amplitude in px                      */
+    float    wave_freq;  /* sine cycles per px of horizontal travel        */
+} BirdSpec;
+
 /* ---- Function declarations ---------------------------------------------- */
 
+/* Move and animate birds with the given tuning; see birds_update. */
+void bird_variant_update(const BirdSpec *spec, Bird *birds, int count,
+                         float dt, SoundEffect *snd_flap,
+                         float player_x, int cam_x);
+
+/* Draw birds with the given sprite facts and camera offset. */
+void bird_variant_render(const BirdSpec *spec, const Bird *birds, int count,
+                         Texture2D *tex, int cam_x);
+
+/* Collision box of one bird: its visible art, offset by the sine-wave y. */
+IntRect bird_variant_hitbox(const BirdSpec *spec, const Bird *b);
+
 /*
- * birds_update — Move and animate birds.
+ * birds_update — Move and animate regular birds.
  *
  * snd_flap  : wing flap SFX, played once per animation cycle per bird.
  * player_x  : player's world-space x (for distance-based volume).

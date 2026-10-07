@@ -6,7 +6,7 @@
  * unlike coins they award no score. Levels list each colour separately
  * ([[star_yellows]], [[star_greens]], [[star_reds]]) so GameState keeps three
  * arrays and three textures, but every array uses this one struct, renderer
- * and hitbox — the same idea as bird_variant.c for the two bird enemies.
+ * and hitbox — the same idea as bird.c and fish.c for their two variants.
  *
  * Sprites: assets/sprites/collectibles/star_{yellow,green,red}.png, drawn at
  * HEALTH_STAR_DISPLAY_W x HEALTH_STAR_DISPLAY_H logical pixels.

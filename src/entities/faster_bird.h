@@ -13,8 +13,7 @@
  */
 #pragma once
 
-#include "../shared/graphics.h"
-#include "../shared/audio.h"
+#include "bird.h"   /* Bird, BirdSpec */
 
 /* ---- Constants ---------------------------------------------------------- */
 
@@ -36,18 +35,17 @@
 
 /* ---- Types -------------------------------------------------------------- */
 
-typedef struct {
-    float  x;
-    float  base_y;
-    float  vx;
-    float  patrol_x0;
-    float  patrol_x1;
-    int    frame_index;
-    float  anim_timer_ms;  /* ms accumulated toward the next frame advance */
-} FasterBird;
+/*
+ * FasterBird — state for one fast sky enemy.
+ *
+ * The state is exactly a Bird; the separate name keeps GameState and level
+ * loading readable (gs->faster_birds[i] is clearly the fast variant).
+ */
+typedef Bird FasterBird;
 
 /* ---- Function declarations ---------------------------------------------- */
 
+/* Move and animate faster birds (bird.c with FBIRD_* tuning). */
 void faster_birds_update(FasterBird *birds, int count, float dt,
                          SoundEffect *snd_flap, float player_x, int cam_x);
 

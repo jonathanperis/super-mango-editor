@@ -61,7 +61,7 @@ patrol_x1  = 310.0
 
 ### Bird
 
-**File:** `src/entities/bird.c` / `bird.h`; movement, sound, hitbox and render are shared with the faster bird in `src/entities/bird_variant.c`, tuned by a `BirdVariantSpec`  
+**File:** `src/entities/bird.c` / `bird.h`; movement, sound, hitbox and render are shared with the faster bird, tuned by a `BirdSpec`  
 **Sprite:** `assets/sprites/entities/bird.png` — 144×48 px, 3 frames of 48×48 px  
 **Behaviour:** Slow sine-wave sky patrol. Flies horizontally while oscillating vertically around `base_y` using a sine curve. The wing-flap sound effect plays once per animation cycle with distance-based volume.
 
@@ -94,7 +94,7 @@ frame_index = 0
 
 **File:** `src/entities/faster_bird.c` / `faster_bird.h`  
 **Sprite:** `assets/sprites/entities/faster_bird.png`  
-**Behaviour:** Faster sky patrol with a tighter wave, through the same `bird_variant.c` code. Same schema as `Bird` but uses `[[faster_birds]]` in TOML.
+**Behaviour:** Faster sky patrol with a tighter wave, through the same `bird.c` code with its own `BirdSpec`. Same schema as `Bird` but uses `[[faster_birds]]` in TOML.
 
 | Constant | Value | Description |
 |----------|-------|-------------|

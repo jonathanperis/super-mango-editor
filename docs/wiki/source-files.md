@@ -111,11 +111,10 @@ src/
 │   ├── parallax.h / .c           Multi-layer scrolling background: init, tiled render, cleanup
 │   └── water.h / .c              Animated water strip: init, scroll, tile render
 ├── entities/
-│   ├── bird_variant.h / .c       Shared bird/faster-bird sine-wave helpers
 │   ├── spider.h / .c             Spider enemy: ground patrol, animation, render
 │   ├── jumping_spider.h / .c     Jumping spider: patrol, jump arcs, floor-gap awareness
-│   ├── bird.h / .c               Slow bird enemy: sine-wave sky patrol, animation
-│   ├── faster_bird.h / .c        Fast bird enemy: tighter sine-wave, faster animation
+│   ├── bird.h / .c               Bird enemy: sine-wave sky patrol, animation, render (shared by both birds)
+│   ├── faster_bird.h / .c        `FasterBird` (a `typedef` of `Bird`) and its FBIRD_* tuning
 │   ├── fish.h / .c               Fish enemy: patrol, random jump arcs, render (shared by both fish)
 │   └── faster_fish.h / .c        `FasterFish` (a `typedef` of `Fish`) and its FFISH_* tuning
 ├── hazards/
@@ -386,11 +385,11 @@ Spider variant whose jumps are triggered by floor-gap edges, not a periodic time
 
 ### `entities/bird.h` / `entities/bird.c`
 
-Slow sine-wave sky patrol bird. Asset: `bird.png`.
+Slow sine-wave sky patrol bird. The flight, flap sound, hitbox and render code here serve both birds; each variant passes its tuning as a `BirdSpec`. Asset: `bird.png`.
 
 ### `entities/faster_bird.h` / `entities/faster_bird.c`
 
-Fast aggressive sine-wave sky patrol bird with tighter curves and quicker wing animation. Asset: `faster_bird.png`.
+Fast aggressive sine-wave sky patrol bird with tighter curves and quicker wing animation. It is a `Bird` with different `BirdSpec` tuning, run by the code in `bird.c`. Asset: `faster_bird.png`.
 
 ### `entities/fish.h` / `entities/fish.c`
 
@@ -398,7 +397,7 @@ Jumping water enemy that patrols the bottom lane and leaps on random arcs. Asset
 
 ### `entities/faster_fish.h` / `entities/faster_fish.c`
 
-Fast fish variant with higher jumps and faster patrol speed. It is a `Fish` with different `FishSpec` tuning: update, render and hitbox code live once in `fish.c` (the fish counterpart of `bird_variant.c`). Asset: `faster_fish.png`.
+Fast fish variant with higher jumps and faster patrol speed. It is a `Fish` with different `FishSpec` tuning: update, render and hitbox code live once in `fish.c` (the same pattern as `bird.c` and `faster_bird.c`). Asset: `faster_fish.png`.
 
 ---
 

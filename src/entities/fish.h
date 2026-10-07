@@ -56,7 +56,8 @@ typedef struct {
  *
  * The regular and faster fish share their state (Fish), sprite sheet, size,
  * hitbox and behaviour; only these numbers change. faster_fish.c passes its
- * own FishSpec to fish_variant_update instead of copying the update loop.
+ * own FishSpec to fish_variant_update instead of copying the update loop
+ * (BirdSpec in bird.h is the same idea for the two birds).
  */
 typedef struct {
     float    speed;     /* horizontal patrol speed in px/s (positive)      */
