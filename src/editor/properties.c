@@ -125,13 +125,13 @@ static const char *vine_type_opts[] = { "Green", "Brown" };
 #define FIELD_ID(type, field)  ((int)(type) * 100 + (field) + 1)
 
 /*
- * draw_rail_properties — Fields for one rail: layout, position (x, y in
- * pixels), size (w, h in rail tiles) and end_cap.  Kept in its own function
- * so the per-type switch in properties_render stays short; every change is
- * committed through editor_commit_change like the other entity fields.
+ * draw_rail_properties — Fields for the selected rail: layout, position
+ * (x, y in pixels), size (w, h in rail tiles) and end_cap.
  */
-static void draw_rail_properties(EditorState *es, RailPlacement *p, int y)
+static void draw_rail_properties(EditorState *es, int y)
 {
+    RailPlacement *p = &es->level.rails[es->selection.index];
+
     /*
      * layout — dropdown that selects between Rect and Horiz rail types.
      * Cast the enum to int for the dropdown, then cast back on change.
@@ -175,6 +175,824 @@ static void draw_rail_properties(EditorState *es, RailPlacement *p, int y)
                      FIELD_X, y, FIELD_W, &p->end_cap))
         editor_commit_change(es);
 }
+
+/*
+ * One draw_<type>_properties function per entity type.  Each draws the
+ * selected entity's fields starting at row y and commits every edit through
+ * editor_commit_change, so properties_render below is only a dispatch switch.
+ */
+/* draw_floor_gap_properties — Fields for the selected floor gap. */
+static void draw_floor_gap_properties(EditorState *es, int y)
+{
+    /*
+     * floor_gaps is an int array — each element is a single x coordinate.
+     * We take a pointer to the array element so ui_int_field can modify it.
+     */
+    int *p = &es->level.floor_gaps[es->selection.index];
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_FLOOR_GAP, 0),
+                     FIELD_X, y, FIELD_W, p))
+        editor_commit_change(es);
+}
+
+/* draw_checkpoint_properties — Fields for the selected checkpoint. */
+static void draw_checkpoint_properties(EditorState *es, int y)
+{
+    CheckpointPlacement *p = &es->level.checkpoints[es->selection.index];
+    int screen = p->x >= 0.0f && p->x <= MAX_LEVEL_SCREENS * GAME_W
+               ? (int)(p->x / GAME_W) : -1;
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_CHECKPOINT, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_CHECKPOINT, 1),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+    y += ROW_H;
+    ui_label(&es->ui, CONTENT_X, y, "screen:");
+    char screen_text[32];
+    snprintf(screen_text, sizeof(screen_text), "%d (derived)", screen);
+    ui_label_color(&es->ui, FIELD_X, y, screen_text, UI_TEXT_DIM);
+    y += ROW_H;
+    ui_label_color(&es->ui, CONTENT_X, y, "Respawn when crossed.", UI_TEXT_DIM);
+}
+
+/* draw_platform_properties — Fields for the selected platform. */
+static void draw_platform_properties(EditorState *es, int y)
+{
+    PlatformPlacement *p = &es->level.platforms[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_PLATFORM, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "tile_height:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_PLATFORM, 1),
+                     FIELD_X, y, FIELD_W, &p->tile_height))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "tile_width:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_PLATFORM, 2),
+                     FIELD_X, y, FIELD_W, &p->tile_width))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    /* Tile path dropdown — select platform texture override */
+    {
+        static const char *platform_tile_names[] = {
+            "(default)",
+            "stone_platform.png",
+            "leaf_platform.png"
+        };
+        static const char *platform_tile_paths[] = {
+            "",
+            "assets/sprites/levels/stone_platform.png",
+            "assets/sprites/levels/leaf_platform.png"
+        };
+        static const int platform_tile_count = 3;
+
+        int sel = 0;
+        if (p->tile_path[0] != '\0') {
+            for (int i = 1; i < platform_tile_count; i++) {
+                if (strcmp(p->tile_path, platform_tile_paths[i]) == 0) {
+                    sel = i;
+                    break;
+                }
+            }
+        }
+        ui_label(&es->ui, CONTENT_X, y, "tile_path:");
+        if (ui_dropdown(&es->ui, FIELD_ID(ENT_PLATFORM, 3),
+                        FIELD_X, y, FIELD_W,
+                        platform_tile_names, platform_tile_count, &sel)) {
+            if (sel == 0) {
+                p->tile_path[0] = '\0';  /* Clear to use default */
+            } else {
+                strncpy(p->tile_path, platform_tile_paths[sel],
+                        sizeof(p->tile_path) - 1);
+                p->tile_path[sizeof(p->tile_path) - 1] = '\0';
+            }
+            editor_commit_change(es);
+        }
+    }
+}
+
+/* draw_coin_properties — Fields for the selected coin. */
+static void draw_coin_properties(EditorState *es, int y)
+{
+    CoinPlacement *p = &es->level.coins[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_COIN, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_COIN, 1),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+}
+
+/* draw_star_yellow_properties — Fields for the selected star yellow. */
+static void draw_star_yellow_properties(EditorState *es, int y)
+{
+    StarYellowPlacement *p =
+        &es->level.star_yellows[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_YELLOW, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_YELLOW, 1),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+}
+
+/* draw_star_green_properties — Fields for the selected star green. */
+static void draw_star_green_properties(EditorState *es, int y)
+{
+    StarGreenPlacement *p =
+        &es->level.star_greens[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_GREEN, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_GREEN, 1),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+}
+
+/* draw_star_red_properties — Fields for the selected star red. */
+static void draw_star_red_properties(EditorState *es, int y)
+{
+    StarRedPlacement *p =
+        &es->level.star_reds[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_RED, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_RED, 1),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+}
+
+/* draw_last_star_properties — Fields for the selected last star. */
+static void draw_last_star_properties(EditorState *es, int y)
+{
+    /*
+     * last_star is a single struct in LevelDef, not an array.
+     * The selection index is always 0 for this type.
+     */
+    LastStarPlacement *p = &es->level.last_star;
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_LAST_STAR, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_LAST_STAR, 1),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    /* Next phase path for level linking */
+    ui_label(&es->ui, CONTENT_X, y, "next phase:");
+    y += ROW_H;
+    if (ui_text_field(&es->ui, FIELD_ID(ENT_LAST_STAR, 2),
+                      CONTENT_X, y, FIELD_W * 2,
+                      es->level.next_phase,
+                      sizeof(es->level.next_phase)))
+        editor_commit_change(es);
+}
+
+/* draw_player_spawn_properties — Fields for the selected player spawn. */
+static void draw_player_spawn_properties(EditorState *es, int y)
+{
+    /*
+     * player_start_x / player_start_y are scalar fields in LevelDef,
+     * not a struct like LastStarPlacement.  The selection index is
+     * always 0 because there is exactly one player spawn per level.
+     */
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_PLAYER_SPAWN, 0),
+                       FIELD_X, y, FIELD_W,
+                       &es->level.player_start_x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_PLAYER_SPAWN, 1),
+                       FIELD_X, y, FIELD_W,
+                       &es->level.player_start_y))
+        editor_commit_change(es);
+}
+
+/* draw_spider_properties — Fields for the selected spider. */
+static void draw_spider_properties(EditorState *es, int y)
+{
+    SpiderPlacement *p = &es->level.spiders[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "vx:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 1),
+                       FIELD_X, y, FIELD_W, &p->vx))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 2),
+                       FIELD_X, y, FIELD_W, &p->patrol_x0))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 3),
+                       FIELD_X, y, FIELD_W, &p->patrol_x1))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "frame_index:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIDER, 4),
+                     FIELD_X, y, FIELD_W, &p->frame_index))
+        editor_commit_change(es);
+}
+
+/* draw_jumping_spider_properties — Fields for the selected jumping spider. */
+static void draw_jumping_spider_properties(EditorState *es, int y)
+{
+    JumpingSpiderPlacement *p =
+        &es->level.jumping_spiders[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "vx:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 1),
+                       FIELD_X, y, FIELD_W, &p->vx))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 2),
+                       FIELD_X, y, FIELD_W, &p->patrol_x0))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 3),
+                       FIELD_X, y, FIELD_W, &p->patrol_x1))
+        editor_commit_change(es);
+}
+
+/* draw_bird_properties — Fields for the selected bird. */
+static void draw_bird_properties(EditorState *es, int y)
+{
+    BirdPlacement *p = &es->level.birds[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "base_y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 1),
+                       FIELD_X, y, FIELD_W, &p->base_y))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "vx:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 2),
+                       FIELD_X, y, FIELD_W, &p->vx))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 3),
+                       FIELD_X, y, FIELD_W, &p->patrol_x0))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 4),
+                       FIELD_X, y, FIELD_W, &p->patrol_x1))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "frame_index:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_BIRD, 5),
+                     FIELD_X, y, FIELD_W, &p->frame_index))
+        editor_commit_change(es);
+}
+
+/* draw_faster_bird_properties — Fields for the selected faster bird. */
+static void draw_faster_bird_properties(EditorState *es, int y)
+{
+    /*
+     * Faster birds use the same BirdPlacement struct and the same
+     * fields as regular birds — they just live in a separate array.
+     */
+    BirdPlacement *p = &es->level.faster_birds[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "base_y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 1),
+                       FIELD_X, y, FIELD_W, &p->base_y))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "vx:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 2),
+                       FIELD_X, y, FIELD_W, &p->vx))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 3),
+                       FIELD_X, y, FIELD_W, &p->patrol_x0))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 4),
+                       FIELD_X, y, FIELD_W, &p->patrol_x1))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "frame_index:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 5),
+                     FIELD_X, y, FIELD_W, &p->frame_index))
+        editor_commit_change(es);
+}
+
+/* draw_fish_properties — Fields for the selected fish. */
+static void draw_fish_properties(EditorState *es, int y)
+{
+    FishPlacement *p = &es->level.fish[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "vx:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 1),
+                       FIELD_X, y, FIELD_W, &p->vx))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 2),
+                       FIELD_X, y, FIELD_W, &p->patrol_x0))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 3),
+                       FIELD_X, y, FIELD_W, &p->patrol_x1))
+        editor_commit_change(es);
+}
+
+/* draw_faster_fish_properties — Fields for the selected faster fish. */
+static void draw_faster_fish_properties(EditorState *es, int y)
+{
+    /*
+     * Faster fish use the same FishPlacement struct and the same
+     * fields as regular fish — they just live in a separate array.
+     */
+    FishPlacement *p = &es->level.faster_fish[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "vx:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 1),
+                       FIELD_X, y, FIELD_W, &p->vx))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 2),
+                       FIELD_X, y, FIELD_W, &p->patrol_x0))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 3),
+                       FIELD_X, y, FIELD_W, &p->patrol_x1))
+        editor_commit_change(es);
+}
+
+/* draw_axe_trap_properties — Fields for the selected axe trap. */
+static void draw_axe_trap_properties(EditorState *es, int y)
+{
+    AxeTrapPlacement *p = &es->level.axe_traps[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "pillar_x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_AXE_TRAP, 0),
+                       FIELD_X, y, FIELD_W, &p->pillar_x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_AXE_TRAP, 3),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    int mode_sel = (int)p->mode;
+    ui_label(&es->ui, CONTENT_X, y, "mode:");
+    if (ui_dropdown(&es->ui, FIELD_ID(ENT_AXE_TRAP, 1),
+                    FIELD_X, y, FIELD_W,
+                    axe_mode_opts, 2, &mode_sel)) {
+        p->mode = (AxeTrapMode)mode_sel;
+        editor_commit_change(es);
+    }
+}
+
+/* draw_circular_saw_properties — Fields for the selected circular saw. */
+static void draw_circular_saw_properties(EditorState *es, int y)
+{
+    CircularSawPlacement *p =
+        &es->level.circular_saws[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 4),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 1),
+                       FIELD_X, y, FIELD_W, &p->patrol_x0))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 2),
+                       FIELD_X, y, FIELD_W, &p->patrol_x1))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "direction:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 3),
+                     FIELD_X, y, FIELD_W, &p->direction))
+        editor_commit_change(es);
+}
+
+/* draw_spike_row_properties — Fields for the selected spike row. */
+static void draw_spike_row_properties(EditorState *es, int y)
+{
+    SpikeRowPlacement *p =
+        &es->level.spike_rows[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_ROW, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "count:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIKE_ROW, 1),
+                     FIELD_X, y, FIELD_W, &p->count))
+        editor_commit_change(es);
+}
+
+/* draw_spike_platform_properties — Fields for the selected spike platform. */
+static void draw_spike_platform_properties(EditorState *es, int y)
+{
+    SpikePlatformPlacement *p =
+        &es->level.spike_platforms[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_PLATFORM, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_PLATFORM, 1),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "tile_count:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIKE_PLATFORM, 2),
+                     FIELD_X, y, FIELD_W, &p->tile_count))
+        editor_commit_change(es);
+}
+
+/* draw_spike_block_properties — Fields for the selected spike block. */
+static void draw_spike_block_properties(EditorState *es, int y)
+{
+    SpikeBlockPlacement *p =
+        &es->level.spike_blocks[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "rail_index:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 0),
+                     FIELD_X, y, FIELD_W, &p->rail_index))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "t_offset:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 1),
+                       FIELD_X, y, FIELD_W, &p->t_offset))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "speed:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 2),
+                       FIELD_X, y, FIELD_W, &p->speed))
+        editor_commit_change(es);
+}
+
+/* draw_blue_flame_properties — Fields for the selected blue flame. */
+static void draw_blue_flame_properties(EditorState *es, int y)
+{
+    BlueFlamePlacement *p =
+        &es->level.blue_flames[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BLUE_FLAME, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+}
+
+/* draw_fire_flame_properties — Fields for the selected fire flame. */
+static void draw_fire_flame_properties(EditorState *es, int y)
+{
+    FireFlamePlacement *p =
+        &es->level.fire_flames[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FIRE_FLAME, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+}
+
+/* draw_float_platform_properties — Fields for the selected float platform. */
+static void draw_float_platform_properties(EditorState *es, int y)
+{
+    FloatPlatformPlacement *p =
+        &es->level.float_platforms[es->selection.index];
+
+    /*
+     * mode — dropdown selecting Static, Crumble, or Rail.
+     * Cast FloatPlatformMode to int for the dropdown widget.
+     */
+    int mode_sel = (int)p->mode;
+    ui_label(&es->ui, CONTENT_X, y, "mode:");
+    if (ui_dropdown(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 0),
+                    FIELD_X, y, FIELD_W,
+                    fplat_mode_opts, 3, &mode_sel)) {
+        p->mode = (FloatPlatformMode)mode_sel;
+        editor_commit_change(es);
+    }
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 1),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 2),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "tile_count:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 3),
+                     FIELD_X, y, FIELD_W, &p->tile_count))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "rail_index:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 4),
+                     FIELD_X, y, FIELD_W, &p->rail_index))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "t_offset:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 5),
+                       FIELD_X, y, FIELD_W, &p->t_offset))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "speed:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 6),
+                       FIELD_X, y, FIELD_W, &p->speed))
+        editor_commit_change(es);
+}
+
+/* draw_bridge_properties — Fields for the selected bridge. */
+static void draw_bridge_properties(EditorState *es, int y)
+{
+    BridgePlacement *p = &es->level.bridges[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BRIDGE, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BRIDGE, 1),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "brick_count:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_BRIDGE, 2),
+                     FIELD_X, y, FIELD_W, &p->brick_count))
+        editor_commit_change(es);
+}
+
+/* draw_bouncepad_small_properties — Fields for the selected bouncepad small. */
+static void draw_bouncepad_small_properties(EditorState *es, int y)
+{
+    BouncepadPlacement *p =
+        &es->level.bouncepads_small[es->selection.index];
+
+    /*
+     * BouncepadType is fixed per array (BOUNCEPAD_GREEN for small),
+     * so we just show a read-only label instead of a dropdown.
+     */
+    ui_label(&es->ui, CONTENT_X, y, "type: Small (Green)");
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_SMALL, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_SMALL, 1),
+                       FIELD_X, y, FIELD_W, &p->launch_vy))
+        editor_commit_change(es);
+}
+
+/* draw_bouncepad_medium_properties — Fields for the selected bouncepad medium. */
+static void draw_bouncepad_medium_properties(EditorState *es, int y)
+{
+    BouncepadPlacement *p =
+        &es->level.bouncepads_medium[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "type: Medium (Wood)");
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_MEDIUM, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_MEDIUM, 1),
+                       FIELD_X, y, FIELD_W, &p->launch_vy))
+        editor_commit_change(es);
+}
+
+/* draw_bouncepad_high_properties — Fields for the selected bouncepad high. */
+static void draw_bouncepad_high_properties(EditorState *es, int y)
+{
+    BouncepadPlacement *p =
+        &es->level.bouncepads_high[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "type: High (Red)");
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_HIGH, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_HIGH, 1),
+                       FIELD_X, y, FIELD_W, &p->launch_vy))
+        editor_commit_change(es);
+}
+
+/* draw_vine_properties — Fields for the selected vine. */
+static void draw_vine_properties(EditorState *es, int y)
+{
+    VinePlacement *p = &es->level.vines[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_VINE, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_VINE, 1),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "tile_count:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_VINE, 2),
+                     FIELD_X, y, FIELD_W, &p->tile_count))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "vine_type:");
+    if (ui_dropdown(&es->ui, FIELD_ID(ENT_VINE, 3),
+                    FIELD_X, y, FIELD_W,
+                    vine_type_opts, 2, &p->vine_type))
+        editor_commit_change(es);
+}
+
+/* draw_ladder_properties — Fields for the selected ladder. */
+static void draw_ladder_properties(EditorState *es, int y)
+{
+    LadderPlacement *p = &es->level.ladders[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_LADDER, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_LADDER, 1),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "tile_count:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_LADDER, 2),
+                     FIELD_X, y, FIELD_W, &p->tile_count))
+        editor_commit_change(es);
+}
+
+/* draw_rope_properties — Fields for the selected rope. */
+static void draw_rope_properties(EditorState *es, int y)
+{
+    RopePlacement *p = &es->level.ropes[es->selection.index];
+
+    ui_label(&es->ui, CONTENT_X, y, "x:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_ROPE, 0),
+                       FIELD_X, y, FIELD_W, &p->x))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "y:");
+    if (ui_float_field(&es->ui, FIELD_ID(ENT_ROPE, 1),
+                       FIELD_X, y, FIELD_W, &p->y))
+        editor_commit_change(es);
+    y += ROW_H;
+
+    ui_label(&es->ui, CONTENT_X, y, "tile_count:");
+    if (ui_int_field(&es->ui, FIELD_ID(ENT_ROPE, 2),
+                     FIELD_X, y, FIELD_W, &p->tile_count))
+        editor_commit_change(es);
+}
+
 
 /* ------------------------------------------------------------------ */
 /* properties_render                                                   */
@@ -262,815 +1080,153 @@ void properties_render(EditorState *es, int start_y, int available_h)
     /* World geometry                                                    */
     /* ================================================================ */
 
-    case ENT_FLOOR_GAP: {
-        /*
-         * floor_gaps is an int array — each element is a single x coordinate.
-         * We take a pointer to the array element so ui_int_field can modify it.
-         */
-        int *p = &es->level.floor_gaps[es->selection.index];
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_FLOOR_GAP, 0),
-                         FIELD_X, y, FIELD_W, p))
-            editor_commit_change(es);
+    case ENT_FLOOR_GAP:
+        draw_floor_gap_properties(es, y);
         break;
-    }
 
-    case ENT_CHECKPOINT: {
-        CheckpointPlacement *p = &es->level.checkpoints[es->selection.index];
-        int screen = p->x >= 0.0f && p->x <= MAX_LEVEL_SCREENS * GAME_W
-                   ? (int)(p->x / GAME_W) : -1;
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_CHECKPOINT, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_CHECKPOINT, 1),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
-        y += ROW_H;
-        ui_label(&es->ui, CONTENT_X, y, "screen:");
-        char screen_text[32];
-        snprintf(screen_text, sizeof(screen_text), "%d (derived)", screen);
-        ui_label_color(&es->ui, FIELD_X, y, screen_text, UI_TEXT_DIM);
-        y += ROW_H;
-        ui_label_color(&es->ui, CONTENT_X, y, "Respawn when crossed.", UI_TEXT_DIM);
+    case ENT_CHECKPOINT:
+        draw_checkpoint_properties(es, y);
         break;
-    }
 
     case ENT_RAIL:
-        draw_rail_properties(es, &es->level.rails[es->selection.index], y);
+        draw_rail_properties(es, y);
         break;
 
-    case ENT_PLATFORM: {
-        PlatformPlacement *p = &es->level.platforms[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_PLATFORM, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "tile_height:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_PLATFORM, 1),
-                         FIELD_X, y, FIELD_W, &p->tile_height))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "tile_width:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_PLATFORM, 2),
-                         FIELD_X, y, FIELD_W, &p->tile_width))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        /* Tile path dropdown — select platform texture override */
-        {
-            static const char *platform_tile_names[] = {
-                "(default)",
-                "stone_platform.png",
-                "leaf_platform.png"
-            };
-            static const char *platform_tile_paths[] = {
-                "",
-                "assets/sprites/levels/stone_platform.png",
-                "assets/sprites/levels/leaf_platform.png"
-            };
-            static const int platform_tile_count = 3;
-
-            int sel = 0;
-            if (p->tile_path[0] != '\0') {
-                for (int i = 1; i < platform_tile_count; i++) {
-                    if (strcmp(p->tile_path, platform_tile_paths[i]) == 0) {
-                        sel = i;
-                        break;
-                    }
-                }
-            }
-            ui_label(&es->ui, CONTENT_X, y, "tile_path:");
-            if (ui_dropdown(&es->ui, FIELD_ID(ENT_PLATFORM, 3),
-                            FIELD_X, y, FIELD_W,
-                            platform_tile_names, platform_tile_count, &sel)) {
-                if (sel == 0) {
-                    p->tile_path[0] = '\0';  /* Clear to use default */
-                } else {
-                    strncpy(p->tile_path, platform_tile_paths[sel],
-                            sizeof(p->tile_path) - 1);
-                    p->tile_path[sizeof(p->tile_path) - 1] = '\0';
-                }
-                editor_commit_change(es);
-            }
-        }
+    case ENT_PLATFORM:
+        draw_platform_properties(es, y);
         break;
-    }
 
     /* ================================================================ */
     /* Collectibles                                                      */
     /* ================================================================ */
 
-    case ENT_COIN: {
-        CoinPlacement *p = &es->level.coins[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_COIN, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_COIN, 1),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
+    case ENT_COIN:
+        draw_coin_properties(es, y);
         break;
-    }
 
-    case ENT_STAR_YELLOW: {
-        StarYellowPlacement *p =
-            &es->level.star_yellows[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_YELLOW, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_YELLOW, 1),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
+    case ENT_STAR_YELLOW:
+        draw_star_yellow_properties(es, y);
         break;
-    }
 
-    case ENT_STAR_GREEN: {
-        StarGreenPlacement *p =
-            &es->level.star_greens[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_GREEN, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_GREEN, 1),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
+    case ENT_STAR_GREEN:
+        draw_star_green_properties(es, y);
         break;
-    }
 
-    case ENT_STAR_RED: {
-        StarRedPlacement *p =
-            &es->level.star_reds[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_RED, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_RED, 1),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
+    case ENT_STAR_RED:
+        draw_star_red_properties(es, y);
         break;
-    }
 
-    case ENT_LAST_STAR: {
-        /*
-         * last_star is a single struct in LevelDef, not an array.
-         * The selection index is always 0 for this type.
-         */
-        LastStarPlacement *p = &es->level.last_star;
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_LAST_STAR, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_LAST_STAR, 1),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        /* Next phase path for level linking */
-        ui_label(&es->ui, CONTENT_X, y, "next phase:");
-        y += ROW_H;
-        if (ui_text_field(&es->ui, FIELD_ID(ENT_LAST_STAR, 2),
-                          CONTENT_X, y, FIELD_W * 2,
-                          es->level.next_phase,
-                          sizeof(es->level.next_phase)))
-            editor_commit_change(es);
+    case ENT_LAST_STAR:
+        draw_last_star_properties(es, y);
         break;
-    }
 
     /* ================================================================ */
     /* Player                                                            */
     /* ================================================================ */
 
-    case ENT_PLAYER_SPAWN: {
-        /*
-         * player_start_x / player_start_y are scalar fields in LevelDef,
-         * not a struct like LastStarPlacement.  The selection index is
-         * always 0 because there is exactly one player spawn per level.
-         */
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_PLAYER_SPAWN, 0),
-                           FIELD_X, y, FIELD_W,
-                           &es->level.player_start_x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_PLAYER_SPAWN, 1),
-                           FIELD_X, y, FIELD_W,
-                           &es->level.player_start_y))
-            editor_commit_change(es);
+    case ENT_PLAYER_SPAWN:
+        draw_player_spawn_properties(es, y);
         break;
-    }
 
     /* ================================================================ */
     /* Enemies                                                           */
     /* ================================================================ */
 
-    case ENT_SPIDER: {
-        SpiderPlacement *p = &es->level.spiders[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "vx:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 1),
-                           FIELD_X, y, FIELD_W, &p->vx))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 2),
-                           FIELD_X, y, FIELD_W, &p->patrol_x0))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 3),
-                           FIELD_X, y, FIELD_W, &p->patrol_x1))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "frame_index:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIDER, 4),
-                         FIELD_X, y, FIELD_W, &p->frame_index))
-            editor_commit_change(es);
+    case ENT_SPIDER:
+        draw_spider_properties(es, y);
         break;
-    }
 
-    case ENT_JUMPING_SPIDER: {
-        JumpingSpiderPlacement *p =
-            &es->level.jumping_spiders[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "vx:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 1),
-                           FIELD_X, y, FIELD_W, &p->vx))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 2),
-                           FIELD_X, y, FIELD_W, &p->patrol_x0))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 3),
-                           FIELD_X, y, FIELD_W, &p->patrol_x1))
-            editor_commit_change(es);
+    case ENT_JUMPING_SPIDER:
+        draw_jumping_spider_properties(es, y);
         break;
-    }
 
-    case ENT_BIRD: {
-        BirdPlacement *p = &es->level.birds[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "base_y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 1),
-                           FIELD_X, y, FIELD_W, &p->base_y))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "vx:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 2),
-                           FIELD_X, y, FIELD_W, &p->vx))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 3),
-                           FIELD_X, y, FIELD_W, &p->patrol_x0))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 4),
-                           FIELD_X, y, FIELD_W, &p->patrol_x1))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "frame_index:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_BIRD, 5),
-                         FIELD_X, y, FIELD_W, &p->frame_index))
-            editor_commit_change(es);
+    case ENT_BIRD:
+        draw_bird_properties(es, y);
         break;
-    }
 
-    case ENT_FASTER_BIRD: {
-        /*
-         * Faster birds use the same BirdPlacement struct and the same
-         * fields as regular birds — they just live in a separate array.
-         */
-        BirdPlacement *p = &es->level.faster_birds[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "base_y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 1),
-                           FIELD_X, y, FIELD_W, &p->base_y))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "vx:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 2),
-                           FIELD_X, y, FIELD_W, &p->vx))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 3),
-                           FIELD_X, y, FIELD_W, &p->patrol_x0))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 4),
-                           FIELD_X, y, FIELD_W, &p->patrol_x1))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "frame_index:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 5),
-                         FIELD_X, y, FIELD_W, &p->frame_index))
-            editor_commit_change(es);
+    case ENT_FASTER_BIRD:
+        draw_faster_bird_properties(es, y);
         break;
-    }
 
-    case ENT_FISH: {
-        FishPlacement *p = &es->level.fish[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "vx:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 1),
-                           FIELD_X, y, FIELD_W, &p->vx))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 2),
-                           FIELD_X, y, FIELD_W, &p->patrol_x0))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 3),
-                           FIELD_X, y, FIELD_W, &p->patrol_x1))
-            editor_commit_change(es);
+    case ENT_FISH:
+        draw_fish_properties(es, y);
         break;
-    }
 
-    case ENT_FASTER_FISH: {
-        /*
-         * Faster fish use the same FishPlacement struct and the same
-         * fields as regular fish — they just live in a separate array.
-         */
-        FishPlacement *p = &es->level.faster_fish[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "vx:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 1),
-                           FIELD_X, y, FIELD_W, &p->vx))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 2),
-                           FIELD_X, y, FIELD_W, &p->patrol_x0))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 3),
-                           FIELD_X, y, FIELD_W, &p->patrol_x1))
-            editor_commit_change(es);
+    case ENT_FASTER_FISH:
+        draw_faster_fish_properties(es, y);
         break;
-    }
 
     /* ================================================================ */
     /* Hazards                                                           */
     /* ================================================================ */
 
-    case ENT_AXE_TRAP: {
-        AxeTrapPlacement *p = &es->level.axe_traps[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "pillar_x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_AXE_TRAP, 0),
-                           FIELD_X, y, FIELD_W, &p->pillar_x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_AXE_TRAP, 3),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        int mode_sel = (int)p->mode;
-        ui_label(&es->ui, CONTENT_X, y, "mode:");
-        if (ui_dropdown(&es->ui, FIELD_ID(ENT_AXE_TRAP, 1),
-                        FIELD_X, y, FIELD_W,
-                        axe_mode_opts, 2, &mode_sel)) {
-            p->mode = (AxeTrapMode)mode_sel;
-            editor_commit_change(es);
-        }
+    case ENT_AXE_TRAP:
+        draw_axe_trap_properties(es, y);
         break;
-    }
 
-    case ENT_CIRCULAR_SAW: {
-        CircularSawPlacement *p =
-            &es->level.circular_saws[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 4),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 1),
-                           FIELD_X, y, FIELD_W, &p->patrol_x0))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 2),
-                           FIELD_X, y, FIELD_W, &p->patrol_x1))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "direction:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 3),
-                         FIELD_X, y, FIELD_W, &p->direction))
-            editor_commit_change(es);
+    case ENT_CIRCULAR_SAW:
+        draw_circular_saw_properties(es, y);
         break;
-    }
 
-    case ENT_SPIKE_ROW: {
-        SpikeRowPlacement *p =
-            &es->level.spike_rows[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_ROW, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "count:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIKE_ROW, 1),
-                         FIELD_X, y, FIELD_W, &p->count))
-            editor_commit_change(es);
+    case ENT_SPIKE_ROW:
+        draw_spike_row_properties(es, y);
         break;
-    }
 
-    case ENT_SPIKE_PLATFORM: {
-        SpikePlatformPlacement *p =
-            &es->level.spike_platforms[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_PLATFORM, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_PLATFORM, 1),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "tile_count:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIKE_PLATFORM, 2),
-                         FIELD_X, y, FIELD_W, &p->tile_count))
-            editor_commit_change(es);
+    case ENT_SPIKE_PLATFORM:
+        draw_spike_platform_properties(es, y);
         break;
-    }
 
-    case ENT_SPIKE_BLOCK: {
-        SpikeBlockPlacement *p =
-            &es->level.spike_blocks[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "rail_index:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 0),
-                         FIELD_X, y, FIELD_W, &p->rail_index))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "t_offset:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 1),
-                           FIELD_X, y, FIELD_W, &p->t_offset))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "speed:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 2),
-                           FIELD_X, y, FIELD_W, &p->speed))
-            editor_commit_change(es);
+    case ENT_SPIKE_BLOCK:
+        draw_spike_block_properties(es, y);
         break;
-    }
 
-    case ENT_BLUE_FLAME: {
-        BlueFlamePlacement *p =
-            &es->level.blue_flames[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BLUE_FLAME, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
+    case ENT_BLUE_FLAME:
+        draw_blue_flame_properties(es, y);
         break;
-    }
 
-    case ENT_FIRE_FLAME: {
-        FireFlamePlacement *p =
-            &es->level.fire_flames[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FIRE_FLAME, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
+    case ENT_FIRE_FLAME:
+        draw_fire_flame_properties(es, y);
         break;
-    }
 
     /* ================================================================ */
     /* Surfaces                                                          */
     /* ================================================================ */
 
-    case ENT_FLOAT_PLATFORM: {
-        FloatPlatformPlacement *p =
-            &es->level.float_platforms[es->selection.index];
-
-        /*
-         * mode — dropdown selecting Static, Crumble, or Rail.
-         * Cast FloatPlatformMode to int for the dropdown widget.
-         */
-        int mode_sel = (int)p->mode;
-        ui_label(&es->ui, CONTENT_X, y, "mode:");
-        if (ui_dropdown(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 0),
-                        FIELD_X, y, FIELD_W,
-                        fplat_mode_opts, 3, &mode_sel)) {
-            p->mode = (FloatPlatformMode)mode_sel;
-            editor_commit_change(es);
-        }
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 1),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 2),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "tile_count:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 3),
-                         FIELD_X, y, FIELD_W, &p->tile_count))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "rail_index:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 4),
-                         FIELD_X, y, FIELD_W, &p->rail_index))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "t_offset:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 5),
-                           FIELD_X, y, FIELD_W, &p->t_offset))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "speed:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 6),
-                           FIELD_X, y, FIELD_W, &p->speed))
-            editor_commit_change(es);
+    case ENT_FLOAT_PLATFORM:
+        draw_float_platform_properties(es, y);
         break;
-    }
 
-    case ENT_BRIDGE: {
-        BridgePlacement *p = &es->level.bridges[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BRIDGE, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BRIDGE, 1),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "brick_count:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_BRIDGE, 2),
-                         FIELD_X, y, FIELD_W, &p->brick_count))
-            editor_commit_change(es);
+    case ENT_BRIDGE:
+        draw_bridge_properties(es, y);
         break;
-    }
 
-    case ENT_BOUNCEPAD_SMALL: {
-        BouncepadPlacement *p =
-            &es->level.bouncepads_small[es->selection.index];
-
-        /*
-         * BouncepadType is fixed per array (BOUNCEPAD_GREEN for small),
-         * so we just show a read-only label instead of a dropdown.
-         */
-        ui_label(&es->ui, CONTENT_X, y, "type: Small (Green)");
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_SMALL, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_SMALL, 1),
-                           FIELD_X, y, FIELD_W, &p->launch_vy))
-            editor_commit_change(es);
+    case ENT_BOUNCEPAD_SMALL:
+        draw_bouncepad_small_properties(es, y);
         break;
-    }
 
-    case ENT_BOUNCEPAD_MEDIUM: {
-        BouncepadPlacement *p =
-            &es->level.bouncepads_medium[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "type: Medium (Wood)");
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_MEDIUM, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_MEDIUM, 1),
-                           FIELD_X, y, FIELD_W, &p->launch_vy))
-            editor_commit_change(es);
+    case ENT_BOUNCEPAD_MEDIUM:
+        draw_bouncepad_medium_properties(es, y);
         break;
-    }
 
-    case ENT_BOUNCEPAD_HIGH: {
-        BouncepadPlacement *p =
-            &es->level.bouncepads_high[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "type: High (Red)");
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_HIGH, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_HIGH, 1),
-                           FIELD_X, y, FIELD_W, &p->launch_vy))
-            editor_commit_change(es);
+    case ENT_BOUNCEPAD_HIGH:
+        draw_bouncepad_high_properties(es, y);
         break;
-    }
 
     /* ================================================================ */
     /* Decorations & climbables                                          */
     /* ================================================================ */
 
-    case ENT_VINE: {
-        VinePlacement *p = &es->level.vines[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_VINE, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_VINE, 1),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "tile_count:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_VINE, 2),
-                         FIELD_X, y, FIELD_W, &p->tile_count))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "vine_type:");
-        if (ui_dropdown(&es->ui, FIELD_ID(ENT_VINE, 3),
-                        FIELD_X, y, FIELD_W,
-                        vine_type_opts, 2, &p->vine_type))
-            editor_commit_change(es);
+    case ENT_VINE:
+        draw_vine_properties(es, y);
         break;
-    }
 
-    case ENT_LADDER: {
-        LadderPlacement *p = &es->level.ladders[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_LADDER, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_LADDER, 1),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "tile_count:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_LADDER, 2),
-                         FIELD_X, y, FIELD_W, &p->tile_count))
-            editor_commit_change(es);
+    case ENT_LADDER:
+        draw_ladder_properties(es, y);
         break;
-    }
 
-    case ENT_ROPE: {
-        RopePlacement *p = &es->level.ropes[es->selection.index];
-
-        ui_label(&es->ui, CONTENT_X, y, "x:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_ROPE, 0),
-                           FIELD_X, y, FIELD_W, &p->x))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "y:");
-        if (ui_float_field(&es->ui, FIELD_ID(ENT_ROPE, 1),
-                           FIELD_X, y, FIELD_W, &p->y))
-            editor_commit_change(es);
-        y += ROW_H;
-
-        ui_label(&es->ui, CONTENT_X, y, "tile_count:");
-        if (ui_int_field(&es->ui, FIELD_ID(ENT_ROPE, 2),
-                         FIELD_X, y, FIELD_W, &p->tile_count))
-            editor_commit_change(es);
+    case ENT_ROPE:
+        draw_rope_properties(es, y);
         break;
-    }
 
     /* ---- Fallthrough for ENT_COUNT (not a real type) ---------------- */
     case ENT_COUNT:
