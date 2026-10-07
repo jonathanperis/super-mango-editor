@@ -66,8 +66,7 @@ def find_gutter_period(is_transparent, total):
     for p in range(8, total + 1):
         if total % p != 0:
             continue
-        # Check if lines at every p boundary are transparent
-        all_match = True
+        # Does the interval between p boundaries contain any visible lines?
         has_content = False
         for i in range(total):
             if i % p == 0:
