@@ -4,9 +4,11 @@
 #pragma once
 
 #include "editor.h"  /* EditorState */
+#include "../shared/printf_format.h" /* PRINTF_FORMAT */
 
-/* Format the editor status bar message. */
-void editor_set_status(EditorState *es, const char *fmt, ...);
+/* Format the editor status bar message (printf-style; the compiler checks
+ * every call's arguments against fmt). */
+void editor_set_status(EditorState *es, const char *fmt, ...) PRINTF_FORMAT(2, 3);
 
 /* Fill a LevelDef with the editor's blank-level defaults. */
 void editor_level_init_defaults(LevelDef *level);
