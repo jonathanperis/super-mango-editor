@@ -90,7 +90,7 @@ Treat source and workflows as authoritative. When project documents, README, or 
 
 ## Verification and Runtime Controls
 
-Run the 15-test `make test` suite (15 native binaries plus Python and JavaScript host checks) for runtime/editor changes. `make validate-levels` checks level and campaign data; `make docs-drift` checks semantic docs drift, generated catalog freshness, and roadmap quality. For documentation changes, also run `bun run lint`, `bun run build` and `bun run check-site` from `docs/`; compilation alone does not verify links. See [Build System](../build-system/) and [Testing & Smoke Matrix](../testing/) for the full gates.
+Run the 15-test `make test` suite (15 native binaries plus Python and JavaScript host checks) for runtime/editor changes. `make validate-levels` checks level and campaign data; `make docs-drift` checks semantic docs drift, generated catalog freshness, and roadmap quality. For documentation changes, also run `bun run lint`, `bun run build` and `bun run check-site` from `docs/`; compilation alone does not verify links. The game requires an audio device to start; on a machine with a display but no sound hardware, build the test-only `RAYLIB_AUDIO=null` variant (miniaudio's null playback device; release targets refuse it). See [Build System](../build-system/) and [Testing & Smoke Matrix](../testing/) for the full gates.
 
 Terminal overlays use Up/Down or D-pad to select, Enter/Space/Start to confirm (A also confirms), and Esc/Back to exit (B also exits). Completion offers Next Level when configured, Replay, Level Select, and Exit; game over offers Retry, Level Select, and Exit. See [Controls](../controls/) for the full input reference.
 
@@ -98,25 +98,22 @@ Terminal overlays use Up/Down or D-pad to select, Enter/Space/Start to confirm (
 
 ## Adding a New Entity
 
-Most active entities follow this lifecycle pattern:
+Entity modules work on whole arrays and own no resources:
 
 ```text
-entity_init    -> set initial state (textures often live shared in GameState)
-entity_update  -> move, apply physics, detect events
-entity_render  -> draw to the active raylib target
-entity_cleanup -> release only owned resources, then clear their slots
+level_loader.c         -> copy validated LevelDef placements into the GameState array
+<entities>_update      -> move, animate, detect events (one fixed step of dt)
+<entities>_render      -> draw every active instance with a borrowed shared texture
+<entity>_get_hitbox    -> IntRect used by collision and the debug overlay
 ```
 
-Collectibles and simple decorations may use lighter helpers. For example, coins store only placement state in `Coin` and render through `coins_render()` using a shared texture from `GameState`.
-The coin renderer borrows that texture; it must not unload it. Resource cleanup
-in `game_resources.c` owns the shared slot.
-
-Active entities may also expose:
-
-```text
-entity_handle_input   -> if player-controlled
-entity_animate        -> static helper, called from entity_update
-```
+There is no per-entity `_init` or `_cleanup`: placement happens in
+`level_loader.c` (for example `load_coins`), and the shared texture slot in
+`gs->textures` is loaded and released by `game_resources.c`. Static entities
+need even less. Coins store only placement state in `Coin` and expose just
+`coins_render()`; collection is handled in `src/collision/`. A renderer borrows
+its texture and must not unload it. Only the player has `player_init`,
+`player_handle_input` and `player_cleanup`, because it owns its sprite.
 
 ### Step-by-Step
 
@@ -144,17 +141,15 @@ void coins_render(const Coin *coins, int count,
 #### 2. Create the implementation -- `src/collectibles/coin.c`
 
 ```c
-#include "collectibles/coin.h"
+#include "coin.h"
 
 void coins_render(const Coin *coins, int count,
                   Texture2D *tex, int cam_x) {
-    if (!tex) return;
-
     for (int i = 0; i < count; i++) {
         if (!coins[i].active) continue;
 
         IntRect dst = {
-            (int)(coins[i].x - cam_x),
+            (int)coins[i].x - cam_x,
             (int)coins[i].y,
             COIN_DISPLAY_W,
             COIN_DISPLAY_H
@@ -168,7 +163,7 @@ The Makefile picks up `coin.c` automatically from the `src/collectibles/` subdir
 
 #### 3. Add texture to `TextureResources` in `game.h`
 
-Textures are loaded in `game_init()` and stored under `gs->textures`. The entity array and count live directly in `GameState`:
+Textures are loaded by `game_resources_load()` (called from `game_init()`) and stored under `gs->textures`. The entity array and count live directly in `GameState`:
 
 ```c
 #include "collectibles/coin.h"
@@ -184,23 +179,32 @@ typedef struct {
 #### 4. Wire up in the runtime core
 
 ```c
-// src/core/game_resources.c -- load shared texture:
-gs->textures.coin = texture_load("assets/sprites/collectibles/coin.png");
-if (!gs->textures.coin) {
-    fprintf(stderr, "Failed to load assets/sprites/collectibles/coin.png\n");
-    return -1;
+// src/core/game_resources.c -- one table row loads the shared texture and
+// cleanup releases it in reverse order; no hand-written load/free code:
+static const TextureLoadSpec s_required_textures[] = {
+    /* ... */
+    { TEX_FIELD(coin), "assets/sprites/collectibles/coin.png",
+      "Failed to load Coin.png" },
+};
+
+// src/levels/level_loader.c -- populate the array from validated placements:
+static void load_coins(GameState *gs, const LevelDef *def)
+{
+    for (int i = 0; i < def->coin_count; i++) {
+        gs->coins[i].x      = def->coins[i].x;
+        gs->coins[i].y      = def->coins[i].y;
+        gs->coins[i].active = 1;
+    }
+    gs->coin_count = def->coin_count;
 }
 
-// level_loader.c -- populate array from TOML placements:
-gs->coins[i] = (Coin){ .x = def->coins[i].x, .y = def->coins[i].y, .active = 1 };
-gs->coin_count = def->coin_count;
-
-// focused runtime helper render section, in the correct layer order:
-coins_render(gs->coins, gs->coin_count, gs->textures.coin, (int)gs->camera.x);
-
-// src/core/game_resources.c cleanup, before closing the graphics context:
-DESTROY_TEX(gs->textures.coin);
+// src/render/game_render.c -- in the correct layer order:
+coins_render(gs->coins, gs->coin_count, gs->textures.coin, cam_x);
 ```
+
+Textures only some levels use go in `s_optional_textures`; add the slot to
+`game_resources_require_level_textures` so a level that places the entity is
+rejected with the asset path when the texture is missing.
 
 Use the focused runtime module that owns the behavior: resource loading belongs in `src/core/game_resources.c`, lifecycle orchestration in `src/core/game_lifecycle.c`, per-frame update orchestration in `src/core/game_update.c` and its specialized helpers, and collision/pickup behavior in `src/collision/`.
 
@@ -228,14 +232,15 @@ You can also use the visual level editor (`make run-editor`) to place entities i
 Every entity must have hitbox visualization in `core/debug.c`:
 
 ```c
-// In debug_render:
-for (int i = 0; i < gs->coin_count; i++) {
-    if (!gs->coins[i].active) continue;
-    IntRect hb = { (int)gs->coins[i].x - cam_x, (int)gs->coins[i].y,
-                    COIN_DISPLAY_W, COIN_DISPLAY_H };
-    DrawRectangleLines(hb.x, hb.y, hb.w, hb.h, (Color){255,255,0,128});
-}
+// In draw_collision_boxes (outline subtracts the camera X):
+for (int i = 0; i < gs->coin_count; i++) if (gs->coins[i].active)
+    outline((IntRect){(int)gs->coins[i].x, (int)gs->coins[i].y,
+                      COIN_DISPLAY_W, COIN_DISPLAY_H},
+            cam, (Color){255, 255, 0, 255});
 ```
+
+Prefer the entity's `_get_hitbox` helper when it has one, so the box drawn is
+the box collision uses.
 
 Also add `debug_log` calls in the module that owns the event, such as `src/collision/game_collision.c`, `src/core/game_update.c`, or the relevant focused runtime helper.
 
@@ -244,8 +249,8 @@ Also add `debug_log` calls in the module that owns the event, such as `src/colli
 ## Adding Physics to an Entity
 
 Use the same pattern as `player_update`. `dt` is the simulation step passed
-down from `game_update_active`: the fixed 1/60 s step in live play (or a
-replayed capture's recorded step), never the measured frame time:
+down from `game_update_active`: always the fixed 1/60 s `GAME_FIXED_STEP`, in
+live play and in every kind of replay, never the measured frame time:
 
 ```c
 /* Apply gravity while airborne */
@@ -281,7 +286,7 @@ one-way surfaces and the sprite's inset foot position in `player_surfaces.c`.
 
 ## Adding a New Sound Effect
 
-All sound files are `.wav` format, named with the convention `component_descriptor.wav`:
+All sound files are `.wav` format, named with the convention `component_descriptor.wav`. They are synthesized by `tools/gen_sounds.py` (12 mono 16-bit 22050 Hz files); `make docs-drift` runs `gen_sounds.py --check` to catch committed files that drift from the generator:
 
 | Sound | File |
 |-------|------|
@@ -296,24 +301,15 @@ All sound files are `.wav` format, named with the convention `component_descript
 
 Steps to add a new sound:
 
-1. Place `.wav` in `assets/sounds/<category>/`.
+1. Add a generator for the sound to `tools/gen_sounds.py` and run `make sounds`; it writes `assets/sounds/<category>/<name>.wav`.
 2. Add `SoundEffect *<name>;` to `AudioResources` in `game.h`.
-3. Load in `game_init` (non-fatal -- warn but continue):
+3. Add a row to `s_optional_chunks` in `src/core/game_resources.c`. Loading is non-fatal (a missing file warns and leaves the slot NULL), and cleanup frees the table in reverse order:
 
 ```c
-gs->audio.<name> = sound_load("assets/sounds/<category>/<name>.wav");
-if (!gs->audio.<name>) {
-    fprintf(stderr, "Warning: could not load assets/sounds/<category>/<name>.wav\n");
-}
+{ CHUNK_FIELD(<name>), "assets/sounds/<category>/<name>.wav", "<name>.wav" },
 ```
 
-4. Free in `game_cleanup`:
-
-```c
-FREE_CHUNK(gs->audio.<name>);
-```
-
-5. Play wherever needed:
+4. Play wherever needed:
 
 ```c
 sound_play(gs->audio.<name>, 128); // null-safe; per-play volume in authored units
@@ -392,7 +388,7 @@ Always draw in painter's algorithm order (back to front). The game currently use
 13. Ladders                (`assets/sprites/surfaces/ladder.png`)
 14. Ropes                  (`assets/sprites/surfaces/rope.png`)
 15. Coins                  (`assets/sprites/collectibles/coin.png`)
-16. Yellow stars           (`assets/sprites/collectibles/star_yellow.png`)
+16. Health stars           (`star_yellow.png`, then `star_green.png`, `star_red.png`)
 17. Last star              (`assets/sprites/collectibles/last_star.png`)
 18. Blue/fire flames       (`assets/sprites/hazards/blue_flame.png` / `fire_flame.png`)
 19. Fish                   (`assets/sprites/entities/fish.png`)
@@ -450,15 +446,14 @@ Measure each sheet rather than assuming a common frame size or row layout. Advan
 ## Checklist: Adding a New Entity
 
 - [ ] Create `src/<category>/<entity>.h` with struct and function declarations (e.g. `src/entities/`, `src/collectibles/`, `src/hazards/`, `src/surfaces/`)
-- [ ] Create `src/<category>/<entity>.c` with init, update, render, cleanup
+- [ ] Create `src/<category>/<entity>.c` with update, render and hitbox functions over the whole array
 - [ ] Add `#include "<category>/<entity>.h"` to `game.h`
 - [ ] Add texture pointer to `TextureResources`, plus entity array and count to `GameState` (by value, not pointer)
-- [ ] Load texture in the resource-loading path (`src/core/game_resources.c`)
-- [ ] Call `<entity>_init` in `game_init`
-- [ ] Call `<entity>_update` from the relevant `src/core/` update helper
-- [ ] Call `<entity>_render` from `src/render/game_render.c` or its focused render helper (correct layer order)
-- [ ] Call `<entity>_cleanup` in `game_cleanup` before the session closes the graphics context
-- [ ] Set all freed pointers to `NULL`
+- [ ] Add a texture row to `src/core/game_resources.c` (and `game_resources_require_level_textures` if optional)
+- [ ] Copy placements into `GameState` in `src/levels/level_loader.c`
+- [ ] Call `<entities>_update` from the relevant `src/core/` update helper
+- [ ] Call `<entities>_render` from `src/render/game_render.c` or its focused render helper (correct layer order)
+- [ ] Handle damage or pickup in `src/collision/`
 - [ ] Wire shared schema/parser/emitter, C/Python validation, and editor palette/tools/preview/properties/undo/clipboard/document hashing
 - [ ] Add entity placement to a TOML level file in `levels/` (or use the visual level editor)
 - [ ] Add hitbox visualization in `core/debug.c`
