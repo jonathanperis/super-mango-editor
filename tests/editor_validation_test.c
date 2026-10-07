@@ -3372,6 +3372,96 @@ done:
 }
 
 /*
+ * Range limits apply on every commit path.  Typing 0 and pressing Return
+ * always clamped; typing 0 and clicking the canvas (Apply) used to store 0,
+ * which the game reads as "4 screens" / "3 hearts".
+ */
+static int field_limits_apply_on_every_commit_path(void)
+{
+    EditorWidgetTestContext context;
+    EditorState es;
+    InputEvent event;
+    char root[EDITOR_PATH_MAX] = {0};
+    int result = 1;
+
+    if (editor_widget_test_context_init(&context) != 0) {
+        editor_widget_test_context_cleanup(&context);
+        return 1;
+    }
+    if (config_state_init(&es, context.font, root, sizeof(root)) != 0) goto done;
+
+    memset(&event, 0, sizeof(event));
+    event.type = INPUT_MOUSE_DOWN;
+    event.button = MOUSE_BUTTON_LEFT;
+    event.x = 100;
+    event.y = TOOLBAR_H + 100;
+
+    /* Screens: type 0, then click the canvas and choose Apply. */
+    config_frame(&es, NULL, 1, CFG_X + 90, CFG_SCREENS_Y + 4);
+    if (expect_int("screens active", es.ui.active_id, 9011) != 0) goto done;
+    strcpy(es.ui.edit_buf, "0");
+    es.ui.edit_cursor = 1;
+    editor_test_set_finish_field_choice(1);
+    editor_handle_event(&es, &event);
+    if (expect_int("applied screens clamp", es.level.screen_count, 1) != 0 ||
+        expect_int("applied screens undo", es.undo->top, 1) != 0) goto done;
+
+    /* Hearts: the same through the finish dialog... */
+    es.level.initial_hearts = 3;
+    config_frame(&es, NULL, 1, CFG_X + 80, CFG_HEARTS_Y + 4);
+    if (expect_int("hearts active", es.ui.active_id, 9006) != 0) goto done;
+    strcpy(es.ui.edit_buf, "0");
+    es.ui.edit_cursor = 1;
+    editor_test_set_finish_field_choice(1);
+    editor_handle_event(&es, &event);
+    if (expect_int("applied hearts clamp", es.level.initial_hearts, 1) != 0) goto done;
+
+    /* ...and with Return, which already clamped. */
+    config_frame(&es, NULL, 1, CFG_X + 80, CFG_HEARTS_Y + 4);
+    strcpy(es.ui.edit_buf, "9");
+    es.ui.edit_cursor = 1;
+    ui_begin_frame(&es.ui);
+    es.ui.key_return = 1;
+    level_config_render(&es, TOOLBAR_H, EDITOR_H - TOOLBAR_H, EDITOR_H - TOOLBAR_H);
+    if (expect_int("returned hearts clamp", es.level.initial_hearts, 3) != 0) goto done;
+
+    /* A stored value already outside the limits (a hand-edited 0 meaning
+     * "default") survives a no-op confirmation. */
+    es.level.screen_count = 0;
+    config_frame(&es, NULL, 1, CFG_X + 90, CFG_SCREENS_Y + 4);
+    editor_test_set_finish_field_choice(1);
+    if (expect_int("no-op finish", editor_finish_field_edit(&es), 1) != 0 ||
+        expect_int("no-op keeps stored 0", es.level.screen_count, 0) != 0) goto done;
+
+    /* ui_int_field_limited on its own: clamp, and round to the step. */
+    {
+        static const struct { const char *typed; int expected; } cases[] = {
+            {"37", 32}, {"40", 48}, {"-5", 0}, {"99999", 1568}, {"1570", 1568},
+        };
+        for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+            int gap = 16;
+            ui_begin_frame(&es.ui);
+            es.ui.mouse_clicked = 1;
+            es.ui.mouse_x = 4;
+            es.ui.mouse_y = 4;
+            (void)ui_int_field_limited(&es.ui, 77, 0, 0, 120, &gap, 0, 1568, 16);
+            strcpy(es.ui.edit_buf, cases[i].typed);
+            es.ui.edit_cursor = (int)strlen(cases[i].typed);
+            ui_begin_frame(&es.ui);
+            es.ui.key_return = 1;
+            (void)ui_int_field_limited(&es.ui, 77, 0, 0, 120, &gap, 0, 1568, 16);
+            if (expect_int(cases[i].typed, gap, cases[i].expected) != 0) goto done;
+        }
+    }
+    result = 0;
+
+done:
+    config_state_cleanup(&es, root);
+    editor_widget_test_context_cleanup(&context);
+    return result;
+}
+
+/*
  * An open dropdown list owns the next press: it must not also place on the
  * canvas or reach a widget drawn under the list, before or after it.  A
  * list whose dropdown is no longer drawn closes by itself.
@@ -3653,6 +3743,7 @@ int main(void)
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;
     if (display_paths_keep_the_file_name() != 0) return 1;
     if (layer_buttons_record_their_own_undo_step() != 0) return 1;
+    if (field_limits_apply_on_every_commit_path() != 0) return 1;
     if (open_dropdown_owns_the_next_click() != 0) return 1;
     if (dropdowns_accept_any_option_for_unknown_values() != 0) return 1;
     if (extreme_floats_round_trip_through_save() != 0) return 1;

@@ -143,12 +143,16 @@ level-wide TOML fields:
 - `next_phase` path (saved under `[last_star]` in TOML; it must follow the [level-reference rule](../level-design/#level-references))
 - `music_path` (dropdown: none, water, lava, winds) and `music_volume`
 - `floor_tile_path` (dropdown)
-- `initial_hearts`, `initial_lives`
+- `initial_hearts` (1–3), `initial_lives`
 - `score_per_life`, `coin_score`
 - A collapsible Movement Physics group for the optional `[physics]` overrides
 
 The player start and the floor gaps are canvas entities: move the Player Spawn
-marker, and place or delete Floor Gap entities.
+marker, and place or delete Floor Gap entities. A floor gap's `x` field rounds
+to the 16 px floor-piece grid.
+
+Number fields with a range clamp the value however the edit ends: Return, or
+choosing Apply when another click finishes the edit.
 
 A dropdown whose current value is not one of its options (a path typed into
 the TOML by hand) shows `---`, and any option can then be picked. While a

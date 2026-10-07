@@ -92,12 +92,45 @@ static int parse_float_value(const char *text, float *value)
     return 1;
 }
 
+/*
+ * limit_int_edit — Apply the active integer field's limits to a typed value.
+ *
+ * The limits belong to the edit, not to the code that draws the field, so
+ * Return and every other way of committing (the editor applies a staged edit
+ * before Save, a canvas click, a button) store the same clamped value.
+ * long long keeps the rounding below from overflowing near INT_MAX.
+ */
+static int limit_int_edit(const UIState *ui, int value)
+{
+    long long v = value;
+    long long lo = ui->edit_int_min;
+    long long hi = ui->edit_int_max;
+    long long step = ui->edit_int_step;
+
+    if (lo > hi) return value;            /* no usable limits */
+    if (v < lo) v = lo;
+    if (v > hi) v = hi;
+    if (step > 1) {
+        /* Nearest multiple of step, halves rounded up; then step back
+         * inside the limits if rounding crossed one of them. */
+        long long r = v >= 0 ? (v + step / 2) / step * step
+                             : -((-v + step / 2 - 1) / step * step);
+        if (r > hi) r -= step;
+        if (r < lo) r += step;
+        if (r >= lo && r <= hi) v = r;
+    }
+    return (int)v;
+}
+
 static void clear_active_edit(UIState *ui)
 {
     ui->active_id = 0;
     ui->edit_type = UI_EDIT_NONE;
     ui->edit_target = NULL;
     ui->edit_target_size = 0;
+    ui->edit_int_min = INT_MIN;
+    ui->edit_int_max = INT_MAX;
+    ui->edit_int_step = 1;
     ui->edit_cursor = 0;
     ui->edit_buf[0] = '\0';
     ui->pending_text_length = 0;
@@ -170,6 +203,10 @@ int ui_apply_active_edit(UIState *ui)
         int value;
         int *target = (int *)ui->edit_target;
         if (!parse_int_value(ui->edit_buf, &value)) return 0;
+        /* Limits apply to what the user typed. A stored value that is
+         * already outside them (a hand-edited file's screen_count = 0,
+         * meaning "default") survives a no-op Return unchanged. */
+        if (value != *target) value = limit_int_edit(ui, value);
         if (value != *target) {
             notify_before_change(ui, ui->active_id);
             *target = value;
@@ -325,6 +362,7 @@ void ui_init(UIState *ui, TextFont *font)
 {
     memset(ui, 0, sizeof(*ui));
     ui->font     = font;
+    clear_active_edit(ui);
 }
 
 void ui_cleanup(UIState *ui)
@@ -508,6 +546,12 @@ void ui_panel(UIState *ui, int x, int y, int w, int h)
  */
 int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value)
 {
+    return ui_int_field_limited(ui, id, x, y, w, value, INT_MIN, INT_MAX, 1);
+}
+
+int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
+                         int min, int max, int step)
+{
     int h        = 20;             /* fixed field height in logical px   */
     int is_active = (ui->active_id == id);
     int changed   = 0;
@@ -537,6 +581,9 @@ int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value)
         ui->edit_type = UI_EDIT_INT;
         ui->edit_target = value;
         ui->edit_target_size = sizeof(*value);
+        ui->edit_int_min = min;
+        ui->edit_int_max = max;
+        ui->edit_int_step = step;
         snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%d", *value);
         ui->edit_cursor = (int)strlen(ui->edit_buf);
         is_active = 1;

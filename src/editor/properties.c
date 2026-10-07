@@ -125,6 +125,14 @@ static const char *vine_type_opts[] = { "Green", "Brown" };
 #define FIELD_ID(type, field)  ((int)(type) * 100 + (field) + 1)
 
 /*
+ * FLOOR_PIECE_W — the floor is drawn from 16 px pieces (a third of a tile),
+ * so a gap edge must fall on that grid or the floor beside it is cut
+ * mid-piece.  Placing and dragging already keep gaps on the grid; the x
+ * field rounds typed values to it too.
+ */
+#define FLOOR_PIECE_W  (TILE_SIZE / 3)
+
+/*
  * option_index — Position of value in a dropdown's paths, or -1.
  *
  * -1 tells ui_dropdown the stored path is none of its options (a path
@@ -205,9 +213,11 @@ static void draw_floor_gap_properties(EditorState *es, int y)
      * We take a pointer to the array element so ui_int_field can modify it.
      */
     int *p = &es->level.floor_gaps[es->selection.index];
+    int screens = es->level.screen_count > 0 ? es->level.screen_count : 4;
     ui_label(&es->ui, CONTENT_X, y, "x:");
-    if (ui_int_field(&es->ui, FIELD_ID(ENT_FLOOR_GAP, 0),
-                     FIELD_X, y, FIELD_W, p))
+    if (ui_int_field_limited(&es->ui, FIELD_ID(ENT_FLOOR_GAP, 0),
+                             FIELD_X, y, FIELD_W, p,
+                             0, screens * GAME_W - FLOOR_GAP_W, FLOOR_PIECE_W))
         editor_commit_change(es);
 }
 
@@ -1379,12 +1389,11 @@ void level_config_render(EditorState *es, int start_y, int available_h,
 
     /* ---- World Width (screen count) ---- */
     ui_label(&es->ui, x + 8, y, "Screens:");
-    if (ui_int_field(&es->ui, 9011, x + 80, y, 50, &es->level.screen_count)) {
-        /* Clamp to valid range 1-99 */
-        if (es->level.screen_count < 1)  es->level.screen_count = 1;
-        if (es->level.screen_count > 99) es->level.screen_count = 99;
+    /* The limits live in the field, so a value applied by clicking away
+     * (the Apply choice) is clamped exactly like one confirmed with Return. */
+    if (ui_int_field_limited(&es->ui, 9011, x + 80, y, 50,
+                             &es->level.screen_count, 1, 99, 1))
         editor_commit_change(es);
-    }
     {
         char width_text[32];
         snprintf(width_text, sizeof(width_text), "= %lldpx",
@@ -1427,11 +1436,9 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     }
     y += 22;
     ui_label(&es->ui, x + 8, y, "vol:");
-    if (ui_int_field(&es->ui, 9003, x + 50, y, 80, &es->level.music_volume)) {
-        if (es->level.music_volume < 0)  es->level.music_volume = 0;
-        if (es->level.music_volume > 99) es->level.music_volume = 99;
+    if (ui_int_field_limited(&es->ui, 9003, x + 50, y, 80,
+                             &es->level.music_volume, 0, 99, 1))
         editor_commit_change(es);
-    }
     y += 24;
 
     /* ---- Floor tile ---- */
@@ -1475,17 +1482,13 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
     ui_label(&es->ui, x + 8, y, "hearts:");
-    if (ui_int_field(&es->ui, 9006, x + 70, y, 60, &es->level.initial_hearts)) {
-        if (es->level.initial_hearts < 1) es->level.initial_hearts = 1;
-        if (es->level.initial_hearts > 3) es->level.initial_hearts = 3;
+    if (ui_int_field_limited(&es->ui, 9006, x + 70, y, 60,
+                             &es->level.initial_hearts, 1, 3, 1))
         editor_commit_change(es);
-    }
     ui_label(&es->ui, x + 150, y, "lives:");
-    if (ui_int_field(&es->ui, 9007, x + 205, y, 60, &es->level.initial_lives)) {
-        if (es->level.initial_lives < 0)  es->level.initial_lives = 0;
-        if (es->level.initial_lives > 99) es->level.initial_lives = 99;
+    if (ui_int_field_limited(&es->ui, 9007, x + 205, y, 60,
+                             &es->level.initial_lives, 0, 99, 1))
         editor_commit_change(es);
-    }
     y += 22;
     ui_label(&es->ui, x + 8, y, "pts/life:");
     if (ui_int_field(&es->ui, 9008, x + 80, y, 80, &es->level.score_per_life))
