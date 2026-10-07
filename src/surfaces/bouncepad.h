@@ -149,9 +149,9 @@ void bouncepad_place(Bouncepad *pad, float x, float launch_vy, BouncepadType pad
 
 /*
  * Advance the release animation for every ACTIVE pad.
- * dt_ms is the step duration converted to milliseconds (dt * 1000, unrounded).
+ * dt is the step duration in seconds.
  */
-void bouncepads_update(Bouncepad *pads, int count, float dt_ms);
+void bouncepads_update(Bouncepad *pads, int count, float dt);
 
 /* Draw each bouncepad at its current animation frame, offset by cam_x. */
 void bouncepads_render(const Bouncepad *pads, int count,
