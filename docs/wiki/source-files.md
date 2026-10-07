@@ -48,9 +48,9 @@ src/
 ├── editor/
 │   ├── editor_main.c             Standalone editor entry point
 │   ├── editor.h / .c             Editor state, resource startup/cleanup and loop delegation
-│   ├── canvas.h / .c             Scrollable zoomable editing canvas
+│   ├── canvas.h / .c             Zoomable editing canvas with horizontal and vertical camera scrolling
 │   ├── palette.h / .c            Entity palette
-│   ├── properties.h / .c         Per-entity property editing
+│   ├── properties.h / .c         Property panels: one draw_<type>_properties function per entity type, plus level config
 │   ├── tools.h / .c              Selection and placement tools
 │   ├── hit_test.h / .c           Entity rectangles and click hit-testing
 │   ├── entity_meta.h / .c        Entity metadata plus shared read/insert/remove of placements
@@ -61,14 +61,14 @@ src/
 │   ├── editor_panels.h / .c      Palette/properties panel rendering
 │   ├── editor_layout.h / .c      Editor layout metrics
 │   ├── editor_textures.h / .c    Editor texture loading/cleanup
-│   ├── editor_files.h / .c       Open/save/recent file workflows
+│   ├── editor_files.h / .c       Open/save, autosave and recovery, recent files; saving through a symlink keeps the link
 │   ├── editor_session.h / .c     Dirty state, staged-edit/save decisions and document hashing
-│   ├── editor_playtest.h / .c    Launch playtest from editor
-│   ├── editor_clipboard.h / .c   Copy/paste support
+│   ├── editor_playtest.h / .c    Save and launch a playtest, poll it, stop (kill) it
+│   ├── editor_clipboard.h / .c   Copy/paste; a rail rider re-attaches to its rail by shape and position
 │   ├── editor_validation.h / .c  Level validation report helpers
 │   ├── editor_undo_apply.h / .c  Undo operation application
 │   ├── file_dialog.h / .c        Native file dialogs
-│   └── undo.h / .c               Compact history with owned config snapshots
+│   └── undo.h / .c               Compact history with owned config snapshots; `undo_push(stack, const Command *)`
 ├── shared/
 │   ├── graphics.h / .c          raylib texture slots, sprite pivots and logical presentation
 │   ├── geometry.h              Integer hitboxes and half-open intersection
@@ -78,8 +78,8 @@ src/
 │   ├── utf8.h                   Strict UTF-8 checks for loaded strings and typed text
 │   ├── ui.h / .c                 Immediate-mode widgets shared by editor and game settings
 │   ├── serializer.h / .c         TOML save/load public API anchor
-│   ├── serializer_emit.h / .c    TOML emission helpers
-│   ├── serializer_io.h / .c      File I/O helpers for serializer
+│   ├── serializer_emit.h / .c    TOML emission helpers; control bytes and DEL are written as \uXXXX escapes
+│   ├── serializer_io.h / .c      UTF-8 path I/O, temp-file-then-rename saves, symlink checks
 │   ├── serializer_load.c         `level_load_toml` staged parse orchestration
 │   ├── serializer_load_header.h / .c        TOML header/meta and floor-gap parsing
 │   ├── serializer_load_checkpoints.h / .c   Strict authored checkpoint parsing
@@ -92,7 +92,7 @@ src/
 │   ├── serializer_load_layers.h / .c        Background/fog/foreground layer parsing
 │   ├── serializer_load_config.h / .c        Optional rule/config parsing
 │   ├── serializer_parse.h / .c  Shared TOML parse utilities
-│   ├── serializer_save.c        TOML save implementation
+│   ├── serializer_save.c        TOML save: write_level_toml calls one writer per section family
 │   └── serializer_types.h / .c  Enum/string conversion helpers
 ├── effects/
 │   ├── fog.h / .c                Atmospheric fog overlay: init, slide, spawn, render
@@ -105,8 +105,8 @@ src/
 │   ├── jumping_spider.h / .c     Jumping spider: patrol, jump arcs, floor-gap awareness
 │   ├── bird.h / .c               Slow bird enemy: sine-wave sky patrol, animation
 │   ├── faster_bird.h / .c        Fast bird enemy: tighter sine-wave, faster animation
-│   ├── fish.h / .c               Fish enemy: patrol, random jump arcs, render
-│   └── faster_fish.h / .c        Fast fish enemy: higher jumps, faster patrol
+│   ├── fish.h / .c               Fish enemy: patrol, random jump arcs, render (shared by both fish)
+│   └── faster_fish.h / .c        `FasterFish` (a `typedef` of `Fish`) and its FFISH_* tuning
 ├── hazards/
 │   ├── spike.h / .c              Static ground spike hazard rows
 │   ├── spike_block.h / .c        Rail-riding rotating spike hazard
@@ -190,7 +190,7 @@ For a beginner's reading order, continue through `core/app_session.c`,
 |-------|------|---------|
 | 1 | `display_open` / `InitWindow` | One raylib window/context for the session |
 | 2 | `input_open` | Semantic input queue and canvas-scoped browser keyboard handlers |
-| 3 | `audio_open` / `InitAudioDevice` | Audio device; screen assets load afterward |
+| 3 | `audio_open` / `InitAudioDevice` | Required audio device (no device means startup fails); screen assets load afterward |
 
 On failure at any step, all previously-succeeded subsystems are torn down before returning `EXIT_FAILURE`.
 
@@ -291,12 +291,12 @@ void game_complete_level(GameState *gs);
 
 Creates all runtime resources:
 
-1. Screen-owned 400x300 render target in the existing session context
-2. Shared textures for player, entities, hazards, collectibles, surfaces, HUD, and debug overlay
-3. Sound effects for player actions, pickups, entities, hazards, and surface interactions
-4. TOML level load from the selected campaign entry or direct `--level` path
-5. Level-wide resources: parallax, floor/platform tiles, foreground strip, fog, water, and music
-6. Entity init: player, water, fog, HUD, debug, and level contents
+1. Screen-owned 400x300 render target in the existing session context (`game_window_init`)
+2. Shared textures for entities, hazards, collectibles and surfaces, plus sound effects (`game_resources_load`); generated sounds come from `tools/gen_sounds.py`
+3. Player sprite and default physics (`player_init`)
+4. HUD (raylib's built-in font, coin icon, borrowed star/player textures) and, with `--debug`, the debug overlay
+5. TOML level load from the selected campaign entry or direct `--level` path, then level-wide resources: parallax, floor/platform tiles, foreground strip, fog, water, music and level contents
+6. Optional `--replay-script` load
 7. Discover the first available raylib gamepad index
 
 Returns `0` on success. If a required window, texture, level, or subsystem resource fails, it cleans up the partially initialized `GameState` and returns `-1`; the top-level runner reports `EXIT_FAILURE`.
