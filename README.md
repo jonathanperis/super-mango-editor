@@ -91,7 +91,7 @@ make run CC=clang                     # build and play
 make run-editor CC=clang              # build and open the level editor
 make run-level-debug CC=clang LEVEL=levels/labs/01_collision.toml  # a lab, with the inspector
 make debug CC=clang                   # -g -O0 game and editor in out/debug/ for lldb/gdb
-make test CC=clang                    # 15 native regression tests (binaries) plus Python/JavaScript host checks
+make test CC=clang                    # 16 native regression tests (binaries) plus Python/JavaScript host checks
 make sanitize CC=clang                # the tests again under AddressSanitizer/UBSan
 make docs-drift                       # check the manual against the code
 make help                             # list every target with a one-line description

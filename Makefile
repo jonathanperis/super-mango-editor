@@ -129,7 +129,8 @@ TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
                  $(OUTDIR)/gameplay-damage-test $(OUTDIR)/gameplay-config-test \
                  $(OUTDIR)/gameplay-score-test \
                  $(OUTDIR)/game-overlay-test $(OUTDIR)/game-events-test \
-                 $(OUTDIR)/session-test $(OUTDIR)/game-checkpoint-test
+                 $(OUTDIR)/session-test $(OUTDIR)/game-checkpoint-test \
+                 $(OUTDIR)/gameplay-mechanics-test
 LEVEL_FILES   = $(wildcard levels/*.toml) $(wildcard levels/labs/*.toml)
 SMOKE_LEVELS  = $(LEVEL_FILES)
 SMOKE_FRAMES  ?= 5
@@ -294,6 +295,7 @@ test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/game-events-test"
 	MANGO_TEST_WINDOW=1 $(RUN_PREFIX) "$(abspath $(OUTDIR))/session-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/game-checkpoint-test"
+	$(RUN_PREFIX) "$(abspath $(OUTDIR))/gameplay-mechanics-test"
 
 $(TEST_TARGETS): | $(OUTDIR)
 $(filter-out $(OUTDIR)/session-test $(OUTDIR)/game-events-test,$(TEST_TARGETS)): $(PLATFORM_OBJS)
@@ -303,7 +305,7 @@ $(OUTDIR)/editor-validation-test: $(OBJDIR)/src/editor/dialog_choice.o
 # headers retain upstream timestamps, so header mtimes alone are insufficient.
 $(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS)): $(RAYLIB_LIB)
 
-# Extra standalone parser probes; keep the 15-regression-binary inventory above.
+# Extra standalone parser probes; keep the 16-regression-binary inventory above.
 .PHONY: parser-allocation-probe parser-encoding-probe
 parser-allocation-probe: $(OUTDIR)/parser-allocation-probe
 	$(RUN_PREFIX) "$(abspath $<)"
@@ -564,6 +566,16 @@ $(OUTDIR)/session-test: tests/session_test.c tests/game_profile_test.c tests/sim
 
 $(OUTDIR)/game-checkpoint-test: tests/game_checkpoint_test.c $(TEST_GAME_CHECKPOINT_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+
+# Every game object except main.o: the mechanics test drives whole levels
+# through game_init/game_update_active/game_frame, as the game does. Like
+# session-test it links the test build of game_input.o, the copy that
+# compiles the MANGO_TESTING input seams.
+GAMEPLAY_TEST_OBJS = $(filter-out $(OBJDIR)/src/main.o $(OBJDIR)/src/input/game_input.o,$(OBJS)) \
+                     $(TEST_GAME_INPUT_OBJ)
+$(OUTDIR)/gameplay-mechanics-test: tests/gameplay_mechanics_test.c tests/game_replay_test.c \
+		tests/gameplay_mechanics_test.h $(GAMEPLAY_TEST_OBJS)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $(filter %.c %.o,$^) $(LIBS)
 
 # Rebuild objects when their build recipes/flags change in this Makefile.
 $(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS)): Makefile
