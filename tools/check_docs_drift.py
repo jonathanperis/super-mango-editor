@@ -451,7 +451,7 @@ ABSENT_SRC_PATHS = {
     "src/fetch.ts": "build-system.md explains why the docs site has no Astro src/fetch.ts",
 }
 
-FENCE_RE = re.compile(r"^(```|~~~)")
+FENCE_OPEN_RE = re.compile(r"^(`{3,}|~{3,})")
 INLINE_CODE_RE = re.compile(r"`([^`\n]+)`")
 
 
@@ -468,15 +468,22 @@ def split_code(text: str) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]
     with its 1-based line number."""
     spans: list[tuple[int, str]] = []
     fenced: list[tuple[int, str]] = []
-    in_fence = False
+    # A fence closes only on a line made of the opener's character, at least
+    # as many of them as it opened with, as in CommonMark: a ``` line inside
+    # a ```` block, or ~~~ inside ```, is content.
+    fence: str | None = None
     for line_no, line in enumerate(text.splitlines(), start=1):
-        if FENCE_RE.match(line.strip()):
-            in_fence = not in_fence
-            continue
-        if in_fence:
-            fenced.append((line_no, line))
-        else:
+        stripped = line.strip()
+        if fence is None:
+            opener = FENCE_OPEN_RE.match(stripped)
+            if opener:
+                fence = opener.group(1)
+                continue
             spans.extend((line_no, span) for span in INLINE_CODE_RE.findall(line))
+        elif re.fullmatch(re.escape(fence[0]) + "{%d,}" % len(fence), stripped):
+            fence = None
+        else:
+            fenced.append((line_no, line))
     return spans, fenced
 
 

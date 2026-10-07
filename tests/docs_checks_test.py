@@ -56,6 +56,14 @@ class DocsChecksTest(unittest.TestCase):
                 self.assertTrue(any(expected in error for error in drift.FAILURES), drift.FAILURES)
         drift.FAILURES.clear()
 
+    def test_code_fences_close_like_commonmark(self):
+        # A shorter or different fence line inside a fence is content, so the
+        # prose after the real closing fence is still read as prose.
+        text = "````md\n```\n`inside`\n````\n`after`\n~~~\n```\n~~~\n`last`\n"
+        spans, fenced = drift.split_code(text)
+        self.assertEqual([span for _, span in spans], ["after", "last"])
+        self.assertEqual([line for _, line in fenced], ["```", "`inside`", "```"])
+
     def test_published_site_regressions(self):
         self.assertTrue((site.OUT / "index.html").exists(), "build docs before this test")
         cases = [
