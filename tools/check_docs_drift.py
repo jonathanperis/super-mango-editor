@@ -4,12 +4,16 @@
 Astro compiles Markdown; check_docs_site.py checks emitted links. This script
 catches project-specific drift: undocumented test targets, missing
 source-map entries, stale TOML snippets, stale constants, and omitted runtime
-flags/workflows.
+flags/workflows. It also cross-checks every manual page against the code:
+`make` targets, backticked src/ paths, function names on the learning pages,
+documented constant values, the inspector key table and the render order.
 """
 
 from __future__ import annotations
 
+import ast
 import re
+import shlex
 import sys
 from pathlib import Path
 
@@ -421,6 +425,314 @@ def check_pages_metadata() -> None:
             fail("docs/src/layouts/BaseLayout.astro: stale root-only canonical/og URL remains")
 
 
+# ── Cross-checks between the manual and the code ──────────────────────
+#
+# The checks below read every manual page (plus the README) and compare what
+# the prose names with what exists: make targets, src/ paths, function names,
+# constant values, inspector keys and the render order. Each failure names the
+# page and line so the fix is a single edit.
+
+# Pages a learner reads first. Their backticked `name()` calls must exist.
+LEARNING_PAGES = [
+    "learning-path.md",
+    "mechanics-museum.md",
+    "entity-walkthrough.md",
+    "debugging-c.md",
+    "c-concepts.md",
+]
+
+# Names that only exist inside the Token exercise in entity-walkthrough.md.
+EXERCISE_NAMES = {"MAX_TOKENS", "TOKEN_SCORE", "tokens_render", "tokens_update", "load_tokens",
+                  "draw_token_properties"}
+
+# Backticked src/ paths that deliberately name something absent from the
+# repository, with the reason. Ignored local folders are read from .gitignore.
+ABSENT_SRC_PATHS = {
+    "src/fetch.ts": "build-system.md explains why the docs site has no Astro src/fetch.ts",
+}
+
+FENCE_RE = re.compile(r"^(```|~~~)")
+INLINE_CODE_RE = re.compile(r"`([^`\n]+)`")
+
+
+def doc_pages() -> list[Path]:
+    return sorted(DOCS.glob("*.md")) + [ROOT / "README.md"]
+
+
+def page_label(path: Path, line_no: int) -> str:
+    return f"{path.relative_to(ROOT).as_posix()}:{line_no}"
+
+
+def split_code(text: str) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]:
+    """Return (inline code spans outside fences, lines inside fences), each
+    with its 1-based line number."""
+    spans: list[tuple[int, str]] = []
+    fenced: list[tuple[int, str]] = []
+    in_fence = False
+    for line_no, line in enumerate(text.splitlines(), start=1):
+        if FENCE_RE.match(line.strip()):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            fenced.append((line_no, line))
+        else:
+            spans.extend((line_no, span) for span in INLINE_CODE_RE.findall(line))
+    return spans, fenced
+
+
+def makefile_targets() -> set[str]:
+    """Every target a user can name: .PHONY entries and plain rule names.
+    Rules added later (for example `help`) are accepted automatically."""
+    targets: set[str] = set()
+    for line in read(ROOT / "Makefile").splitlines():
+        phony = re.match(r"^\.PHONY\s*:(.*)$", line)
+        if phony:
+            targets.update(phony.group(1).split())
+            continue
+        rule = re.match(r"^([A-Za-z0-9_.\-]+(?:[ \t]+[A-Za-z0-9_.\-]+)*)[ \t]*:(?!=)", line)
+        if rule:
+            targets.update(rule.group(1).split())
+    return targets
+
+
+def make_targets_in(command: str) -> list[str]:
+    """Targets named by one `make ...` command (variables and flags skipped)."""
+    command = re.split(r"\s(?:&&|\|\||[|;#])", command, maxsplit=1)[0]
+    try:
+        words = shlex.split(command)
+    except ValueError:
+        words = command.split()
+    if not words or words[0] != "make":
+        return []
+    return [word for word in words[1:]
+            if "=" not in word and not word.startswith("-") and "/" not in word
+            and word not in {"...", "<target>"}]
+
+
+def check_make_targets_documented() -> None:
+    known = makefile_targets()
+    for page in doc_pages():
+        spans, fenced = split_code(read(page))
+        commands = [(n, s.strip()) for n, s in spans if s.strip().startswith("make")]
+        commands += [(n, re.sub(r"^\$\s+", "", line.strip())) for n, line in fenced
+                     if re.match(r"^(\$\s+)?make(\s|$)", line.strip())]
+        for line_no, command in commands:
+            for target in make_targets_in(command):
+                if target not in known:
+                    fail(f"{page_label(page, line_no)}: `make {target}` is not a Makefile target "
+                         "(check the spelling or the Makefile's .PHONY list)")
+
+
+def ignored_src_prefixes() -> list[str]:
+    prefixes = []
+    for line in read(ROOT / ".gitignore").splitlines():
+        line = line.strip()
+        if line.startswith("src/"):
+            prefixes.append(line.split("*", 1)[0])
+    return prefixes
+
+
+def check_src_paths_exist() -> None:
+    ignored = ignored_src_prefixes()
+    for page in doc_pages():
+        spans, _ = split_code(read(page))
+        for line_no, span in spans:
+            for raw in re.findall(r"(?<![\w./-])src/[\w./*<>{}-]+", span):
+                path = re.sub(r":\d+$", "", raw).rstrip(".")
+                if any(ch in path for ch in "<>*{}") or path in ABSENT_SRC_PATHS:
+                    continue
+                if any(path.startswith(prefix) for prefix in ignored):
+                    continue
+                if not (ROOT / path).exists() and not (ROOT / "docs" / path).exists():
+                    fail(f"{page_label(page, line_no)}: `{path}` does not exist; "
+                         "update the path or remove the reference")
+
+
+def defined_c_names() -> set[str]:
+    """Function and macro names declared or defined at file scope in src/,
+    tests/ and labs/ (calls are indented, so column-0 lines are enough)."""
+    names: set[str] = set()
+    for folder in ("src", "tests", "labs"):
+        for path in (ROOT / folder).rglob("*.[ch]"):
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+                macro = re.match(r"^\s*#\s*define\s+(\w+)", line)
+                if macro:
+                    names.add(macro.group(1))
+                    continue
+                if line[:1].isalpha() and not line.startswith(("return", "if", "else")):
+                    names.update(re.findall(r"\b([A-Za-z_]\w*)\s*\(", line))
+    return names
+
+
+def check_learning_page_functions() -> None:
+    names = defined_c_names() | EXERCISE_NAMES
+    for page_name in LEARNING_PAGES:
+        page = DOCS / page_name
+        spans, _ = split_code(read(page))
+        for line_no, span in spans:
+            for name in re.findall(r"^([a-z]\w*_\w*)\(\)$", span.strip()):
+                if name not in names:
+                    fail(f"{page_label(page, line_no)}: `{name}()` is not defined in src/, tests/ "
+                         "or labs/; rename it to match the code")
+
+
+def source_defines() -> dict[str, list[str]]:
+    defines: dict[str, list[str]] = {}
+    for path in sorted((ROOT / "src").rglob("*.[ch]")):
+        rel = path.relative_to(ROOT).as_posix()
+        if any(rel.startswith(prefix) for prefix in ignored_src_prefixes()):
+            continue
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            match = re.match(r"^\s*#\s*define\s+(\w+)(?!\()\s+(.+?)\s*(?:/\*.*|//.*)?$", line)
+            if match:
+                defines.setdefault(match.group(1), []).append(match.group(2))
+    return defines
+
+
+def normalize_c_value(value: str) -> str:
+    value = re.sub(r"/\*.*?\*/|//.*$", "", value).strip()
+    value = re.sub(r"(?<=\d)[fFuUlL]+\b", "", value)
+    value = re.sub(r"\s+", "", value)
+    while value.startswith("(") and value.endswith(")") and value.count("(") == 1:
+        value = value[1:-1]
+    return value
+
+
+def eval_c_value(value: str, defines: dict[str, list[str]], depth: int = 0) -> float | None:
+    """Evaluate a numeric #define expression, following other #defines."""
+    if depth > 8:
+        return None
+    expr = normalize_c_value(value)
+    expr = re.sub(r"\((?:int|float|double|unsigned)\)", "", expr)
+
+    def substitute(match: re.Match[str]) -> str:
+        name = match.group(0)
+        values = defines.get(name)
+        if not values:
+            raise KeyError(name)
+        result = eval_c_value(values[0], defines, depth + 1)
+        if result is None:
+            raise KeyError(name)
+        return repr(result)
+
+    try:
+        expr = re.sub(r"[A-Za-z_]\w*", substitute, expr)
+    except KeyError:
+        return None
+    try:
+        return arithmetic(ast.parse(expr, mode="eval").body)
+    except (SyntaxError, ValueError, ZeroDivisionError):
+        return None
+
+
+def arithmetic(node: ast.AST) -> float:
+    """Evaluate +, -, *, / and parentheses over numbers; reject anything else."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+        return float(node.value)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+        value = arithmetic(node.operand)
+        return -value if isinstance(node.op, ast.USub) else value
+    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub, ast.Mult, ast.Div)):
+        left, right = arithmetic(node.left), arithmetic(node.right)
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        return left / right
+    raise ValueError("not plain arithmetic")
+
+
+def values_match(doc_value: str, source_value: str, defines: dict[str, list[str]]) -> bool:
+    if normalize_c_value(doc_value) == normalize_c_value(source_value):
+        return True
+    doc_number = eval_c_value(doc_value, defines)
+    source_number = eval_c_value(source_value, defines)
+    return (doc_number is not None and source_number is not None
+            and abs(doc_number - source_number) <= 1e-6 * max(1.0, abs(source_number)))
+
+
+def check_constant_values() -> None:
+    defines = source_defines()
+
+    def compare(page: Path, line_no: int, name: str, doc_value: str) -> None:
+        if name in EXERCISE_NAMES:
+            return
+        values = defines.get(name)
+        if not values:
+            fail(f"{page_label(page, line_no)}: constant `{name}` is not #defined in src/")
+        elif not any(values_match(doc_value, value, defines) for value in values):
+            fail(f"{page_label(page, line_no)}: `{name}` is documented as `{doc_value}` "
+                 f"but src/ defines `{values[0]}`")
+
+    constants = DOCS / "constants-reference.md"
+    for line_no, line in enumerate(read(constants).splitlines(), start=1):
+        row = re.match(r"^\|\s*`([A-Z][A-Z0-9_]+)`\s*\|\s*`([^`]+)`\s*\|", line)
+        if row:
+            compare(constants, line_no, row.group(1), row.group(2))
+    for page in doc_pages():
+        _, fenced = split_code(read(page))
+        for line_no, line in fenced:
+            define = re.match(r"^\s*#define\s+([A-Z][A-Z0-9_]+)\s+(.+?)\s*(?://.*)?$", line)
+            if define and "(" not in define.group(1):
+                compare(page, line_no, define.group(1), define.group(2))
+
+
+def check_inspector_keys_doc() -> None:
+    source = read(ROOT / "src" / "core" / "game_inspector.c")
+    handled = set(re.findall(r"KEY_(F\d+)", source))
+    controls = DOCS / "controls.md"
+    text = read(controls)
+    if "### Debug inspector keys" not in text:
+        fail("docs/wiki/controls.md: missing the `### Debug inspector keys` table "
+             "(other pages link to #debug-inspector-keys)")
+        return
+    section = text.split("### Debug inspector keys", 1)[1].split("\n### ", 1)[0]
+    documented = set(re.findall(r"^\|\s*(F\d+)\s*\|", section, re.M))
+    for key in sorted(handled - documented, key=lambda k: int(k[1:])):
+        fail(f"docs/wiki/controls.md: inspector key {key} is handled in "
+             "src/core/game_inspector.c but missing from the Debug inspector keys table")
+    for key in sorted(documented - handled, key=lambda k: int(k[1:])):
+        fail(f"docs/wiki/controls.md: Debug inspector keys table lists {key}, "
+             "which src/core/game_inspector.c does not handle")
+    help_keys = re.search(r"static const char \*keys\[\]\s*=\s*\{(.*?)\};", source, re.S)
+    if help_keys:
+        in_game = set(re.findall(r'"(F\d+)"', help_keys.group(1)))
+        for key in sorted(handled - in_game, key=lambda k: int(k[1:])):
+            fail(f"src/core/game_inspector.c: key {key} is handled but missing from the F5 help list")
+
+
+def check_render_order_doc() -> None:
+    source = read(ROOT / "src" / "render" / "game_render.c")
+    start = source.find("game_render_frame(")
+    body = source[start:] if start >= 0 else source
+    arch = DOCS / "architecture.md"
+    text = read(arch)
+    section = text.split("### Render Order (back to front)", 1)
+    if len(section) != 2:
+        fail("docs/wiki/architecture.md: missing `### Render Order (back to front)` section")
+        return
+    rows = re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*(.+?)\s*\|\s*$", section[1].split("\n### ", 1)[0], re.M)
+    position = 0
+    listed: set[str] = set()
+    for layer, drawn_by in rows:
+        if drawn_by.startswith("inline"):
+            continue
+        for name in re.findall(r"`(\w+)`", drawn_by):
+            listed.add(name)
+            found = re.search(rf"\b{name}\s*\(", body[position:])
+            if not found:
+                fail(f"docs/wiki/architecture.md: render layer {layer} names `{name}`, which "
+                     "game_render_frame() does not call at that point; fix the order or the name")
+                continue
+            position += found.end()
+    calls = set(re.findall(r"\b(\w+_render)\s*\(", body))
+    for name in sorted(calls - listed - {"game_render_frame", "settings_menu_render"}):
+        fail(f"docs/wiki/architecture.md: game_render_frame() calls `{name}`, "
+             "which is missing from the render order table")
+
+
 def main() -> int:
     check_test_targets_documented()
     check_source_file_map()
@@ -441,6 +753,12 @@ def main() -> int:
     check_public_readme_docs()
     check_wasm_authority_docs()
     check_pages_metadata()
+    check_make_targets_documented()
+    check_src_paths_exist()
+    check_learning_page_functions()
+    check_constant_values()
+    check_inspector_keys_doc()
+    check_render_order_doc()
 
     if FAILURES:
         print("docs drift check failed:")
