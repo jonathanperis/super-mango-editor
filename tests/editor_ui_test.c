@@ -29,7 +29,6 @@
 
 #ifndef _WIN32
 #include <signal.h>
-#include <time.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -662,27 +661,48 @@ done:
 /* ------------------------------------------------------------------ */
 
 #ifndef _WIN32
+/*
+ * wait_until_exited — Block until the child has exited, but leave it
+ * unreaped (WNOWAIT) so the editor's own status check still collects it and
+ * reports the exit code or signal. No time limit: a slow host (sanitizers,
+ * a busy CI runner) only makes the test slower, never wrong.
+ */
+static int wait_until_exited(pid_t child)
+{
+    siginfo_t info;
+    int result;
+    do {
+        result = waitid(P_PID, (id_t)child, &info, WEXITED | WNOWAIT);
+    } while (result != 0 && errno == EINTR);
+    return result;
+}
+
 static int playtest_status_follows_the_game_process(void)
 {
     int failed = 0;
     EditorState es;
     CHECK(open_editor(&es, NULL) == 0);
 
-    /* While a playtest runs, edits are refused with a hint. */
+    /* While a playtest runs, edits are refused with a hint. The child
+     * waits on a pipe so it is certainly still running during that frame. */
+    int gate[2];
+    CHECK(pipe(gate) == 0);
     pid_t child = fork();
     CHECK(child >= 0);
-    if (child == 0) _exit(3);
+    if (child == 0) {
+        char byte;
+        (void)close(gate[1]);
+        (void)read(gate[0], &byte, 1);   /* returns 0 once the parent closes */
+        _exit(3);
+    }
+    (void)close(gate[0]);
     es.playing = 1;
     es.play_pid = (int)child;
     key_frame(&es, KEY_TWO, 0);
     /* The game exits with code 3: the status line says so. */
-    for (int i = 0; i < 400 && es.playing; i++) {
-        ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-        if (es.playing) {
-            struct timespec pause = {0, 5000000L};
-            nanosleep(&pause, NULL);
-        }
-    }
+    (void)close(gate[1]);
+    CHECK(wait_until_exited(child) == 0);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     CHECK(!es.playing && es.play_pid == 0);
     CHECK(strstr(es.status_message, "code 3") != NULL);
     CHECK(es.tool == TOOL_SELECT);
@@ -693,13 +713,8 @@ static int playtest_status_follows_the_game_process(void)
     if (child == 0) { raise(SIGKILL); _exit(0); }
     es.playing = 1;
     es.play_pid = (int)child;
-    for (int i = 0; i < 400 && es.playing; i++) {
-        ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-        if (es.playing) {
-            struct timespec pause = {0, 5000000L};
-            nanosleep(&pause, NULL);
-        }
-    }
+    CHECK(wait_until_exited(child) == 0);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     CHECK(!es.playing && strstr(es.status_message, "signal") != NULL);
 
     /* A child that something else already reaped ends the playtest too. */

@@ -243,16 +243,22 @@ static int blue_flame_erupts_on_a_cycle_and_burns(void)
     CHECK(apex_y < BLUE_FLAME_APEX_Y + 60.0f);
 
     /* Burns at the apex... */
-    while (flame->state != BLUE_FLAME_FLIPPING) mechanics_step(&gs, 0, 1);
+    for (int n = 0; flame->state != BLUE_FLAME_FLIPPING && n < 10 * STEPS_PER_SECOND; n++)
+        mechanics_step(&gs, 0, 1);
+    CHECK(flame->state == BLUE_FLAME_FLIPPING);
     CHECK(touch_costs_heart(&gs, blue_flame_get_hitbox(flame)));
     /* ...but a hidden flame under the floor does not. */
-    while (flame->state != BLUE_FLAME_WAITING) mechanics_step(&gs, 0, 1);
+    for (int n = 0; flame->state != BLUE_FLAME_WAITING && n < 10 * STEPS_PER_SECOND; n++)
+        mechanics_step(&gs, 0, 1);
+    CHECK(flame->state == BLUE_FLAME_WAITING);
     CHECK(!touch_costs_heart(&gs, blue_flame_get_hitbox(flame)));
 
     /* Draw the rising flame with the overlay. */
     gs.debug_mode = 1;
     debug_init(&gs.debug);
-    while (flame->state != BLUE_FLAME_RISING) mechanics_step(&gs, 0, 1);
+    for (int n = 0; flame->state != BLUE_FLAME_RISING && n < 10 * STEPS_PER_SECOND; n++)
+        mechanics_step(&gs, 0, 1);
+    CHECK(flame->state == BLUE_FLAME_RISING);
     stand_at(&gs, 250.0f);
     CHECK(mechanics_frames(&gs, 4) == 4);
 done:
@@ -511,7 +517,9 @@ static int fish_leap_from_the_water_and_patrol(void)
     CHECK(turned);
 
     /* The fish is dangerous mid-leap. */
-    while (!(fish->vy < 0.0f)) mechanics_step(&gs, 0, 1);
+    for (int n = 0; !(fish->vy < 0.0f) && n < 10 * STEPS_PER_SECOND; n++)
+        mechanics_step(&gs, 0, 1);
+    CHECK(fish->vy < 0.0f);
     CHECK(touch_costs_heart(&gs, fish_get_hitbox(fish)));
 done:
     game_cleanup(&gs);
