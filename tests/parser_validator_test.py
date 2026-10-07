@@ -10,7 +10,6 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import validate_levels  # noqa: E402
 import check_docs_drift  # noqa: E402
-import generate_level_catalog  # noqa: E402
 import run_scripted_smoke  # noqa: E402
 
 
@@ -30,10 +29,12 @@ def main() -> int:
         (bom + document.replace(b"\n", b"\r\n"), True),
         (bom + b'format_version=1\nname="' + bom + b'"', True),
     )
+    # The level catalog (tools/generate_level_catalog.py) reads levels through
+    # validate_levels.campaign_manifest_entries, i.e. the validator's reader
+    # covered by the first row, so it needs no row of its own.
     readers = (
         ("validator", validate_levels.load_level),
         ("docs drift", check_docs_drift.load_level),
-        ("catalog", generate_level_catalog.load_level),
         ("scripted smoke", lambda path: run_scripted_smoke.check_builtin_behavior(
             {"elapsed": 5 / 60, "paused": 0, "complete": 0, "x": 81},
             "move-right", path, 5)),

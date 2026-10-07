@@ -22,7 +22,6 @@ Output (13 sprites):
 
 from PIL import Image
 import os
-import sys
 
 # Resolve paths relative to the repo root (the parent of tools/).
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

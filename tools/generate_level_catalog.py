@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from validate_levels import campaign_manifest_entries, load_level
+from validate_levels import campaign_manifest_entries
 
 ROOT = Path(__file__).resolve().parents[1]
 LEVEL_DIR = ROOT / "levels"

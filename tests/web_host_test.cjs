@@ -98,7 +98,7 @@ assert.match(page.nodes.get('.cabinet-standby').textContent, /not saved/);
 vm.runInContext('startGame(false)', page.context);
 assert.equal(page.reloads(), 1, 'ended runtime should restart via reload');
 
-const shell = host('web/shell.html', /<script>([\s\S]*?)<\/script>/);
+const shell = host('web/shell.html', /<script>([\s\S]*?)<\/script\b[^>]*>/i);
 let args;
 shell.window.Module.__superMangoDebug = true;
 shell.window.Module.callMain = value => { args = value; return 0; };
