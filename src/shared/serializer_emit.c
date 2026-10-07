@@ -4,6 +4,9 @@
 
 #include "serializer_emit.h"
 
+#include <float.h>   /* FLT_MAX */
+#include <math.h>    /* fabs, isfinite */
+#include <stdlib.h>  /* strtod */
 #include <string.h>  /* strchr, strlen */
 
 /*
@@ -14,6 +17,7 @@
  *            0.08f  → round-trippable decimal
  *            536.2f → round-trippable decimal
  *           -380.0f → "-380.0"
+ *            FLT_MAX → "3.4028234663852886e+38" (see below)
  *
  * Returns a pointer to a static buffer — valid until the next call.
  * Safe for single-float-per-fprintf usage (which is all we do here).
@@ -22,6 +26,21 @@ const char *fmt_float(double val)
 {
     static char buf[64];
     snprintf(buf, sizeof(buf), "%.9g", val);
+
+    /*
+     * Nine significant digits are enough to bring any float back to itself,
+     * but near the top of the float range the rounded decimal can land just
+     * past FLT_MAX: FLT_MAX itself prints as 3.40282347e+38.  The loader
+     * reads numbers as doubles and refuses anything beyond FLT_MAX, so the
+     * editor would save a file it then could not open.  When the short form
+     * does not read back, within range, as this same float, write the value
+     * with 17 digits instead, which reads back as exactly this double.
+     */
+    if (isfinite(val) && fabs(val) <= FLT_MAX) {
+        double back = strtod(buf, NULL);
+        if (fabs(back) > FLT_MAX || (float)back != (float)val)
+            snprintf(buf, sizeof(buf), "%.17g", val);
+    }
 
     /* TOML parses a bare integer as an integer, not a float. */
     if (!strchr(buf, '.') && !strchr(buf, 'e') && !strchr(buf, 'E')) {
