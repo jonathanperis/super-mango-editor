@@ -1,9 +1,30 @@
 # Entity Walkthrough: From TOML to a Collectible
 
-Start with [Learning Path](../learning-path/) labs 1–5. This walkthrough follows
+Start with [Sandbox School](../learning-path/) labs 1–5. This walkthrough follows
 the existing coin end-to-end, then gives the complete integration map for adding
 a second coin-like collectible named **Token**. It is an exercise, not an entity
-already included in the game.
+already included in the game. It is also the manual's one checklist for adding
+*any* entity: [section 7](#7-entities-that-move-or-hurt) covers the extra steps
+for enemies and hazards, and [the checklist](#checklist) sums everything up.
+
+## The shape of an entity module
+
+Every entity module works on a whole array and owns no resources:
+
+```text
+level_loader.c         -> copy validated LevelDef placements into the GameState array
+<entities>_update      -> move, animate, detect events (one fixed step of dt)
+<entities>_render      -> draw every active instance with a borrowed shared texture
+<entity>_get_hitbox    -> IntRect used by collision and the debug overlay
+```
+
+There is no per-entity `_init` or `_cleanup`. Placement happens in
+`level_loader.c` (for example `load_coins()`), and the shared texture slot in
+`gs->textures` is loaded and released by `src/core/game_resources.c`. Static
+entities need even less: a coin stores only its placement state in `Coin` and
+exposes just `coins_render()`, and collection is handled in `src/collision/`.
+Only the player has `player_init()` and `player_cleanup()`, because it owns its
+sprite.
 
 ## 1. Follow one existing coin
 
@@ -102,9 +123,33 @@ stale hitbox cannot collect an item at the previous location.
 The simulation advances in fixed 1/60 s steps, so `game_collide()` runs once
 per step, not once per rendered frame. Keep pickup logic free of frame timing.
 
-Add Token hitboxes to `src/core/debug.c`. A frozen (F2) frame must draw without
-mutating the Token. If you later supply a distinct sprite, wire its ownership
-into `game_resources.c`, require it when used, and release it exactly once.
+Add Token hitboxes to `draw_collision_boxes()` in `src/core/debug.c`. Prefer
+the entity's `_get_hitbox` helper when it has one, so the box you see is the
+box collision uses:
+
+```c
+for (int i = 0; i < gs->token_count; i++)
+    if (gs->tokens[i].active)
+        outline((IntRect){(int)gs->tokens[i].x, (int)gs->tokens[i].y, 16, 16},
+                cam, (Color){255, 255, 0, 255});
+```
+
+A frozen (F2) frame must draw without mutating the Token. Log significant
+events with `debug_log()` in the module that owns them, as the coin pickup does
+in `game_collision.c`.
+
+If you later give Token its own sprite, add one row to a texture table in
+`src/core/game_resources.c`; loading and the reverse-order release then happen
+in the shared loops, with no hand-written load/free code:
+
+```c
+{ TEX_FIELD(token), "assets/sprites/collectibles/token.png", "token.png" },
+```
+
+`s_required_textures` is for sprites every level needs. A sprite only some
+levels use goes in `s_optional_textures`, plus a `REQUIRE(token, def->token_count)`
+line in `game_resources_require_level_textures()`, so a level that places
+Tokens is rejected with the asset path when the file is missing.
 
 ## 5. Complete editor integration
 
@@ -163,3 +208,39 @@ Add `tokens` to the Collectibles count group in
 manual references. You are finished when Token works through file load,
 runtime, editor, undo, clipboard, validation and save/load, not merely when
 the sprite appears on screen.
+
+## 7. Entities that move or hurt
+
+A Token sits still. An enemy or hazard adds three things:
+
+- **An update function.** Write `tokens_update(Token *items, int count, float dt)`
+  over the whole array and call it from the focused helper in `src/core/`:
+  `game_actors.c` updates enemies (it calls `spiders_update()`), `game_hazards.c`
+  updates hazards (it calls `circular_saws_update()`). `dt` is always the fixed
+  1/60 s step; see [Developer Guide](../developer-guide/#adding-physics-to-an-entity)
+  for the physics pattern.
+- **Damage.** Add one `COLLIDE_DAMAGE` (or `COLLIDE_DAMAGE_ACTIVE`) line in
+  `game_collide()` (`src/collision/game_collision.c`) with your `_get_hitbox`
+  helper, beside the saw's. It calls `apply_damage()` in
+  `src/collision/collision_damage.c`, which handles hearts, knockback and the
+  hurt-immunity timer.
+- **Render order.** Put the render call in `src/render/game_render.c` at the
+  right depth; the [render order](../architecture/#render-order-back-to-front)
+  table lists every layer.
+
+New `.c` files in an existing `src/` subdirectory are picked up by the Makefile
+automatically. A brand-new source directory needs its own wildcard line there.
+
+## Checklist
+
+- [ ] `src/<category>/<entity>.h` and `.c` with render (and update) functions over the whole array, plus a `_get_hitbox` helper if it collides
+- [ ] Placement struct, array and count in `LevelDef` (`src/levels/level.h`); runtime array and count in `GameState` (`src/game.h`), stored by value
+- [ ] Schema entry, loader, saver and C/Python validation (section 3)
+- [ ] `load_<entities>()` in `level_loader.c`, called from `level_load()` and, if it does not award score, from `level_reset()` too
+- [ ] Update call in the matching `src/core/` helper; pickup or damage in `src/collision/`
+- [ ] Render call in `src/render/game_render.c` at the right layer
+- [ ] Texture row in `game_resources.c` (and `game_resources_require_level_textures()` if optional)
+- [ ] Hitbox in `src/core/debug.c` and `debug_log()` calls for significant events
+- [ ] Editor integration (section 5): metadata, hit test, canvas, tools, properties, undo union, clipboard, document hash, status bar
+- [ ] Tests (section 6), then `make builder test CC=clang`, `make validate-levels`, `make docs-drift`
+- [ ] Play it with `make run-level-debug LEVEL=...` and check the hitboxes match the sprite
