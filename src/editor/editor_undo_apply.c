@@ -165,7 +165,7 @@ void editor_commit_change(EditorState *es)
                 memcpy(cmd.property_text_after, es->level.next_phase,
                        sizeof(cmd.property_text_after));
             }
-            undo_push(es->undo, cmd);
+            undo_push(es->undo, &cmd);
             editor_refresh_dirty(es);
         }
     } else if (es->change_tracking_kind == EDITOR_CHANGE_CONFIG) {
@@ -174,7 +174,7 @@ void editor_commit_change(EditorState *es)
             cmd.type = CMD_CONFIG;
             cmd.config_before = es->pending_config_before;
             cmd.config_after = after;
-            if (!undo_push(es->undo, cmd)) {
+            if (!undo_push(es->undo, &cmd)) {
                 editor_apply_config_snapshot(&es->level, &cmd.config_before);
                 editor_set_status(es, "Config edit cancelled: cannot allocate undo history");
             }
