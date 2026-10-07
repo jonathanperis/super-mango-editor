@@ -1,5 +1,7 @@
 # Documentation and Website Audit
 
+> **Historical report, dated 2026-09-17:** it describes the repository at that time, so use the [Builder Manual](https://jonathanperis.github.io/super-mango-editor/docs/) for current behaviour.
+
 Checked **2026-09-17**, against `origin/main` at `16be4a1` and the local
 `feature/documentation-refresh` changes. This is a dated audit, not a live status
 dashboard. The earlier `AUDIT_IMPLEMENTATION.md` remains the Sandbox School
