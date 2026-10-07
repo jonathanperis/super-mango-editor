@@ -537,6 +537,7 @@ reports it, resident memory in MB.
 | `shared/ui.h`, `shared/ui.c` | Immediate-mode calls, stable widget IDs, staged edits and bounded label cache |
 | `shared/platform.h`, `shared/platform.c` | Monotonic elapsed time, UTF-8 copying and caller-owned OS paths |
 | `shared/utf8.h` | What makes a UTF-8 byte sequence valid (overlong forms, surrogates, truncation) |
+| `shared/printf_format.h` | How a compiler attribute lets our own printf-style wrappers get format-string checks |
 | `input/input_backend.h`, `input/input_backend.c` | Ordered events versus held state, logical pointer mapping and saved-binding translation |
 
 ### `core/entity_utils.h` / `core/entity_utils.c`

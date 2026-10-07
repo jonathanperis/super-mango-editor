@@ -3,6 +3,7 @@
 #include "game_profile.h"
 #include "../levels/level_ref.h"
 #include "../shared/platform.h"
+#include "../shared/printf_format.h"
 #include "../shared/serializer_io.h"
 #include "tomlc17.h"
 #include <errno.h>
@@ -252,6 +253,7 @@ done:
     return ok ? 0 : -1;
 }
 
+PRINTF_FORMAT(4, 5)
 static int append(char *text, size_t capacity, size_t *used, const char *format, ...)
 {
     va_list args;
