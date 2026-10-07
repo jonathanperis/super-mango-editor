@@ -12,16 +12,12 @@
 #include "../levels/level_loader.h"
 
 /*
- * write_level_toml — Emit every LevelDef field as TOML text into fp.
- *
- * This is only the *format*: the order of keys and tables the loader
- * expects. level_save_toml_internal below owns the file itself (temporary
- * file, flush, fingerprint check and atomic replace), so a write error is
- * detected there through the stream's error flag after this returns.
- * original_path is non-NULL only for crash-recovery snapshots.
+ * write_header_and_config — Recovery comment, header, level-wide settings,
+ * floor gaps, checkpoints and physics: the plain keys that must come before
+ * any [[array]] table.
  */
-static void write_level_toml(FILE *fp, const LevelDef *def,
-                             const char *original_path)
+static void write_header_and_config(FILE *fp, const LevelDef *def,
+                                    const char *original_path)
 {
     if (original_path) {
         /*
@@ -105,7 +101,11 @@ static void write_level_toml(FILE *fp, const LevelDef *def,
     fprintf(fp, "cam_lookahead_vx_factor = %s\n", fmt_float(def->physics.cam_lookahead_vx_factor));
     fprintf(fp, "cam_lookahead_max    = %s\n", fmt_float(def->physics.cam_lookahead_max));
     fprintf(fp, "\n");
+}
 
+/* write_world_and_collectibles — Rails, pillars, coins, stars, last star. */
+static void write_world_and_collectibles(FILE *fp, const LevelDef *def)
+{
     /* ---- Rails --------------------------------------------------- */
 
     for (int i = 0; i < def->rail_count; i++) {
@@ -186,7 +186,11 @@ static void write_level_toml(FILE *fp, const LevelDef *def,
         }
         fprintf(fp, "\n");
     }
+}
 
+/* write_enemies — Spiders, birds and fish, one [[array]] name per type. */
+static void write_enemies(FILE *fp, const LevelDef *def)
+{
     /* ---- Spiders ------------------------------------------------- */
 
     for (int i = 0; i < def->spider_count; i++) {
@@ -263,7 +267,11 @@ static void write_level_toml(FILE *fp, const LevelDef *def,
         fprintf(fp, "patrol_x1 = %s\n", fmt_float(f->patrol_x1));
         fprintf(fp, "\n");
     }
+}
 
+/* write_hazards — Axe traps, saws, spike rows/platforms/blocks and flames. */
+static void write_hazards(FILE *fp, const LevelDef *def)
+{
     /* ---- Axe traps ----------------------------------------------- */
 
     for (int i = 0; i < def->axe_trap_count; i++) {
@@ -335,7 +343,11 @@ static void write_level_toml(FILE *fp, const LevelDef *def,
         fprintf(fp, "x = %s\n", fmt_float(def->fire_flames[i].x));
         fprintf(fp, "\n");
     }
+}
 
+/* write_surfaces — Float platforms, bridges, bouncepads and climbables. */
+static void write_surfaces(FILE *fp, const LevelDef *def)
+{
     /* ---- Float platforms ----------------------------------------- */
 
     for (int i = 0; i < def->float_platform_count; i++) {
@@ -431,6 +443,11 @@ static void write_level_toml(FILE *fp, const LevelDef *def,
         fprintf(fp, "\n");
     }
 
+}
+
+/* write_layers — Background, foreground and fog layers (drawn, not solid). */
+static void write_layers(FILE *fp, const LevelDef *def)
+{
     /* ---- Background layers --------------------------------------- */
 
     for (int i = 0; i < def->background_layer_count; i++) {
@@ -457,6 +474,28 @@ static void write_level_toml(FILE *fp, const LevelDef *def,
         fprintf(fp, "speed = %s\n", fmt_float(def->fog_layers[i].speed));
         fprintf(fp, "\n");
     }
+}
+
+/*
+ * write_level_toml — Emit every LevelDef field as TOML text into fp.
+ *
+ * This is only the *format*: the order of keys and tables the loader
+ * expects. level_save_toml_internal below owns the file itself (temporary
+ * file, flush, fingerprint check and atomic replace), so a write error is
+ * detected there through the stream's error flag after this returns.
+ * original_path is non-NULL only for crash-recovery snapshots.
+ */
+static void write_level_toml(FILE *fp, const LevelDef *def,
+                             const char *original_path)
+{
+    /* Sections are written in the order the loader and humans expect:
+     * plain keys first, then one group of [[array]] tables per family. */
+    write_header_and_config(fp, def, original_path);
+    write_world_and_collectibles(fp, def);
+    write_enemies(fp, def);
+    write_hazards(fp, def);
+    write_surfaces(fp, def);
+    write_layers(fp, def);
 }
 
 /* ================================================================== */
