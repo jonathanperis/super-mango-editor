@@ -197,14 +197,15 @@ The editor keeps recent files (the last 5) and recovery snapshots for modified l
 | Copy selected entity | `Ctrl+C` |
 | Paste (offset from original) | `Ctrl+V` |
 
-Only one entity can be in the clipboard at a time. The pasted entity appears 24 px right and down from the original so it does not overlap, and it becomes the selection.
+Only one entity can be in the clipboard at a time. The pasted entity is moved a little so it does not hide the original (24 px right, and down for free-floating things; along the rail for rail riders; one gap width for floor gaps), and it becomes the selection.
 
 Place, drag and Paste clamp entities into the world (patrol ranges included, and a
 pasted spike block's `t_offset` wraps onto its rail). Paste is refused while the
-level has validation errors. A copied rail rider remembers the rail it rode
-(its shape and position, not its index), so a paste re-attaches it to that rail
-even after other rails were deleted. When an entity cannot be added — its array
-is full, its rail is not in this level (a clipboard copied from another level),
+level has validation errors. A copied rail rider remembers the rail it rode, so
+a paste re-attaches it to that rail even after the rail was moved or other rails
+were deleted, and never to an identical rail next to it. Pasted into another
+level, it attaches to a rail with the same shape and position. When an entity
+cannot be added — its array is full, its rail is not in this level (or was deleted),
 or the result would fail validation, such as a checkpoint behind the player
 start — the status bar explains why and the level is left unchanged.
 

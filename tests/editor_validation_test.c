@@ -3633,6 +3633,71 @@ done:
 }
 
 /*
+ * A copied rail rider pastes onto the rail it rode: still after that rail
+ * moved, never onto an identical rail beside it, and onto a same-shaped
+ * rail only in another document.
+ */
+static int rail_rider_paste_follows_its_rail(void)
+{
+    EditorState es = {0};
+    char root[EDITOR_PATH_MAX] = {0};
+    int result = 1;
+
+    editor_level_init_defaults(&es.level);
+    es.level.rail_count = 3;
+    es.level.rails[0] = (RailPlacement){RAIL_LAYOUT_RECT, 32, 32, 4, 4, 0};
+    es.level.rails[1] = es.level.rails[0];        /* identical twin */
+    es.level.rails[2] = (RailPlacement){RAIL_LAYOUT_RECT, 400, 32, 4, 4, 0};
+    es.level.spike_block_count = 1;
+    es.level.spike_blocks[0] = (SpikeBlockPlacement){1, 1.0f, 3.0f};
+    es.undo = undo_create();
+    if (!es.undo || make_test_preference_root(root, sizeof(root)) != 0 ||
+        editor_set_preference_root(&es, root) != 0) goto done;
+    editor_set_document_save_point(&es);
+
+    es.selection.type = ENT_SPIKE_BLOCK;
+    es.selection.index = 0;
+    editor_copy_selected(&es);
+    editor_paste_clipboard(&es);
+    if (expect_int("twin rail paste", es.level.spike_block_count, 2) != 0 ||
+        expect_int("paste rides the copied twin", es.level.spike_blocks[1].rail_index, 1) != 0)
+        goto done;
+
+    /* Move the rail (as its x field or a drag would), then paste again. */
+    es.level.rails[1].x += 16;
+    editor_paste_clipboard(&es);
+    if (expect_int("moved rail paste", es.level.spike_block_count, 3) != 0 ||
+        expect_int("paste follows the moved rail", es.level.spike_blocks[2].rail_index, 1) != 0)
+        goto done;
+
+    /* Deleting an earlier, unused rail renumbers the copied one. */
+    es.selection.type = ENT_RAIL;
+    es.selection.index = 0;
+    tools_delete_selected(&es);
+    if (expect_int("unused rail deleted", es.level.rail_count, 2) != 0) goto done;
+    editor_paste_clipboard(&es);
+    if (expect_int("renumbered rail paste", es.level.spike_block_count, 4) != 0 ||
+        expect_int("paste follows renumbered rail", es.level.spike_blocks[3].rail_index, 0) != 0)
+        goto done;
+
+    /* In a new document the rail is matched by its copied shape. */
+    editor_reset_new_level(&es);
+    es.level.rail_count = 2;
+    es.level.rails[0] = (RailPlacement){RAIL_LAYOUT_RECT, 400, 32, 4, 4, 0};
+    es.level.rails[1] = (RailPlacement){RAIL_LAYOUT_RECT, 32, 32, 4, 4, 0};
+    editor_paste_clipboard(&es);
+    if (expect_int("other document paste", es.level.spike_block_count, 1) != 0 ||
+        expect_int("other document matches shape", es.level.spike_blocks[0].rail_index, 1) != 0)
+        goto done;
+    result = 0;
+
+done:
+    cleanup_test_preference_root(root, &es, 1);
+    undo_destroy(es.undo);
+    return result;
+}
+
+/*
  * The editor only saves levels that validate, and must be able to open
  * what it saved.  A rail-mode float platform's x/y are not range-checked
  * (the rail places it), so they can hold FLT_MAX, which "%.9g" used to
@@ -3789,6 +3854,7 @@ int main(void)
     if (open_dropdown_owns_the_next_click() != 0) return 1;
     if (dropdowns_accept_any_option_for_unknown_values() != 0) return 1;
     if (new_level_resets_previews() != 0) return 1;
+    if (rail_rider_paste_follows_its_rail() != 0) return 1;
     if (extreme_floats_round_trip_through_save() != 0) return 1;
     if (create_only_save_without_hard_links() != 0) return 1;
 

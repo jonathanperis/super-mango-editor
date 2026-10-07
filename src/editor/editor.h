@@ -339,9 +339,19 @@ typedef struct {
     PlacementData  clipboard_data;
     /*
      * A rail rider stores only a rail *index*, which goes stale when rails
-     * are deleted or the copy is pasted into another level.  So a copy also
-     * keeps the rail it rode; paste re-attaches it to the matching rail.
+     * are deleted or the copy is pasted into another level.
+     *
+     * clipboard_rail_index follows the copied rider's rail in this document:
+     * removing or re-inserting an earlier rail renumbers it, moving or
+     * resizing the rail leaves it alone, and deleting that rail (or opening
+     * another document) sets it to -1.  Paste uses it while it is valid.
+     *
+     * clipboard_rail keeps the rail's shape for a paste into another level:
+     * there the rider attaches to a rail with the same shape and position.
+     * clipboard_has_rail drops to 0 once the rail is deleted here, so the
+     * snapshot cannot attach the rider to a look-alike rail instead.
      */
+    int            clipboard_rail_index;
     int            clipboard_has_rail;
     RailPlacement  clipboard_rail;
 

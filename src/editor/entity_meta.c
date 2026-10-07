@@ -16,6 +16,8 @@
 
 #include <string.h> /* memcpy, memmove, memset */
 
+#include "editor_clipboard.h" /* keep a copied rail rider on its rail */
+
 typedef struct {
     EntityType type;
     const char *type_name;
@@ -619,9 +621,15 @@ void editor_selection_reconcile(EditorState *es)
     if (!editor_selection_is_valid(es)) es->selection.index = -1;
 }
 
+/*
+ * The two helpers below run after every insert or removal that shifts an
+ * entity array (tools and undo/redo alike).  Besides the selection they
+ * keep the clipboard's copied rail rider pointing at its own rail.
+ */
 void editor_selection_after_remove(EditorState *es, EntityType type, int index)
 {
     if (!es) return;
+    if (type == ENT_RAIL) editor_clipboard_after_rail_remove(es, index);
     if (es->selection.type == type && es->selection.index >= 0) {
         if (es->selection.index == index) {
             es->selection.index = -1;
@@ -636,6 +644,7 @@ void editor_selection_after_insert(EditorState *es, EntityType type, int index,
                                    int select_inserted)
 {
     if (!es) return;
+    if (type == ENT_RAIL) editor_clipboard_after_rail_insert(es, index);
     if (select_inserted) {
         es->selection.type = type;
         es->selection.index = index;
