@@ -55,7 +55,7 @@ int game_inspector_event(GameState *gs, const InputEvent *event)
         return 1;
     case KEY_F4:
         if (gs->experiment && gs->experiment->replaying) {
-            debug_log(&gs->debug, "Replay uses recorded step durations");
+            debug_log(&gs->debug, "Replay runs at normal speed; F2/F3 freeze and step it");
             return 1;
         }
         gs->inspector.slow_mode = (gs->inspector.slow_mode + 1) % 3;

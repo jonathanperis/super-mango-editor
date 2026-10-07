@@ -326,7 +326,6 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_BOUNCEPADS` | `4` | `int` | Unused legacy capacity; runtime placement arrays use the per-variant limits below |
 | `BOUNCEPAD_W` | `48` | `int` | Display width of one bouncepad frame (px) |
 | `BOUNCEPAD_H` | `48` | `int` | Display height of one bouncepad frame (px) |
 | `BOUNCEPAD_VY_SMALL` | `-380.0f` | `float` | Small bouncepad launch impulse (px/s) |
