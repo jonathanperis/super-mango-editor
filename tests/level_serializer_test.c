@@ -202,7 +202,7 @@ static void fill_rich_roundtrip_fixture(LevelDef *def)
     def->bridges[0].brick_count = 5;
     def->bouncepad_small_count = 1;
     def->bouncepads_small[0].x = 260.0f;
-    def->bouncepads_small[0].launch_vy = -320.0f;
+    def->bouncepads_small[0].launch_vy = -340.0f;
     def->bouncepads_small[0].pad_type = BOUNCEPAD_GREEN;
     def->bouncepad_medium_count = 1;
     def->bouncepads_medium[0].x = 300.0f;
@@ -1056,6 +1056,9 @@ static int strict_v1_fixture_suite(void)
         "bad_nested_unknown.toml",
         "bad_floor_gaps.toml",
         "bad_floor_gap_off_grid.toml",
+        "bad_bouncepad_launch_vy.toml",
+        "bad_rail_speed.toml",
+        "bad_patrol_narrow.toml",
         "bad_nested_table_type.toml",
         "bad_root_key_embedded_nul.toml",
         "bad_nested_key_embedded_nul.toml",

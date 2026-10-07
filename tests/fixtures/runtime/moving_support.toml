@@ -17,7 +17,7 @@ x = 128.0
 y = 172.0
 tile_count = 4
 rail_index = 0
-speed = 45.0
+speed = 30.0
 t_offset = 0.0
 [last_star]
 x = 704.0

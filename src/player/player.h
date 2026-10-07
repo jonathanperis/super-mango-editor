@@ -18,6 +18,15 @@
 #include "../surfaces/rope.h"           /* RopeDecor — climbable, same mechanics as vine   */
 
 /*
+ * JUMP_VY — upward velocity a jump starts with, in px/s (negative = up).
+ *
+ * Public because the level validator compares bouncepads against it: a
+ * player standing on a pad cannot jump (the pad keeps relaunching them), so
+ * every pad must launch at least as hard as a normal jump.
+ */
+#define JUMP_VY  -325.0f
+
+/*
  * AnimState — which animation sequence is currently playing.
  * The value maps directly to the sheet row (see ANIM_ROW[] in player.c).
  */
