@@ -8,7 +8,6 @@
 #include <limits.h>
 
 #include "rail.h"
-#include "game.h"   /* WORLD_W, GAME_H — used for placement bounds */
 #include "../levels/level.h"  /* RailPlacement — for rail_init_from_placements */
 
 /* ------------------------------------------------------------------ */

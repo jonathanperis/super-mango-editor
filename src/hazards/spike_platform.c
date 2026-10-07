@@ -10,7 +10,6 @@
 #include <stdio.h>
 
 #include "spike_platform.h"
-#include "../game.h"   /* FLOOR_Y, TILE_SIZE, GAME_W */
 
 /* ------------------------------------------------------------------ */
 
