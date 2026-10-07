@@ -516,14 +516,15 @@ Three workflow files handle automated builds, docs checks and analysis; GitHub P
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job (recommended required check; see the [release checklist](../release-checklist/)); native game/editor tests, smoke and packaging (Windows with GCC); a separate `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` job builds and tests with Clang outside the release `needs`; Linux sanitizers/scripted smoke; level validation on every native OS; WASM build/artifact/package checks; a separate `Desktop backend` job runs Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL (hosted macOS runners have no OpenGL pixel format). Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` |
-| Docs | `docs.yml` | Push to `main`, relevant pull requests, manual | `make docs-drift`, frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows |
-| CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis. The C/C++ job analyzes without uploading, drops code-quality (non-security) results located in third-party code (`out/` raylib headers, `vendor/`) with `tools/filter_codeql_sarif.py`, then uploads the SARIF with `upload-sarif` |
-| Pages | `build.yml` jobs `pages-build` → `pages-deploy` | Main push/manual run on main, after `Docs drift` and the build matrix pass | Builds/checks docs at the run's commit with read-only permissions, adds the same run's WASM artifact, HTTP-smokes the assembly; a separate job with only Pages/OIDC permissions deploys `docs/out/`. Keeping both in one workflow avoids a `workflow_run` trust boundary (no artifact from another run is consumed) |
+| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job (recommended required check; see the [release checklist](../release-checklist/)); native game/editor tests, smoke and packaging (Windows with GCC); a separate `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` job builds and tests with Clang outside the release `needs`; a parallel `Sanitizers (Linux x86_64)` job runs `make sanitize` and `make sanitize-smoke` (ASan/UBSan/LeakSanitizer, undefined behaviour fatal); Linux scripted smoke; level validation on every native OS; WASM build/artifact/package checks; a separate `Desktop backend` job runs Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL (hosted macOS runners have no OpenGL pixel format). Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` |
+| Docs | `docs.yml` | Relevant pull requests, weekly, manual | Frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows. `make docs-drift` is left to the always-on `Docs drift` job, and on `main` the `Pages build` job lints, builds and checks the site, so neither runs twice. The weekly run audits the lockfile against new advisories. Superseded PR runs are cancelled |
+| CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis; superseded PR runs are cancelled. The C/C++ job analyzes without uploading, drops code-quality (non-security) results located in third-party code (`out/` raylib headers, `vendor/`) with `tools/filter_codeql_sarif.py`, then uploads the SARIF with `upload-sarif` |
+| Pages | `build.yml` jobs `pages-build` → `pages-deploy` | Main push/manual run on main, after `Docs drift`, the build matrix and `Sanitizers (Linux x86_64)` pass | Lints, builds and checks docs at the run's commit with read-only permissions, adds the same run's WASM artifact, HTTP-smokes the assembly; a separate job with only Pages/OIDC permissions deploys `docs/out/`. Keeping both in one workflow avoids a `workflow_run` trust boundary (no artifact from another run is consumed) |
 
 Every job sets `timeout-minutes`. Every native leg (Clang and GCC) passes
 `EXTRA_CFLAGS=-Werror` and the WebAssembly leg `EXTRA_WEB_CFLAGS=-Werror`.
-The release job needs only the legs that ship an archive (`build`) plus
+The release job needs the legs that ship an archive (`build`), the
+`Sanitizers (Linux x86_64)` job (which used to be part of the Linux leg) and
 `provenance`; the Windows Clang and `Desktop backend` jobs report separately
 and never block a release.
 
@@ -544,9 +545,14 @@ paths through `editor_path_for_display()` and checks `snprintf` results where
 truncation would change behaviour. Build jobs use Python 3.12 from
 `actions/setup-python` on Linux/macOS (MSYS2 supplies Python on Windows) and
 restore the pinned raylib source archive from `actions/cache` via
-`RAYLIB_ARCHIVE`; the archive is SHA-256 verified on every use. Build
-directories are not cached because CMake caches record absolute paths and
-per-compiler settings.
+`RAYLIB_ARCHIVE`; the archive is SHA-256 verified on every use. The Linux
+build leg and the sanitizers job also cache their compiled debug/sanitizer
+raylib trees (never the release tree that ships). CMake records absolute paths
+and per-compiler settings, so the key must match exactly: it covers the pin,
+patches, `Makefile`, `tools/build_raylib.py`, runner image, workspace path and
+the clang/CMake versions. `make` still runs `build_raylib.py` on a restored
+tree, which re-verifies the archive and re-runs CMake; CMake then rebuilds
+anything its own dependency tracking finds stale.
 
 The repository restricts third-party Actions to an allowlist and requires full
 commit-SHA pins. A renamed or transferred Action can resolve through the GitHub

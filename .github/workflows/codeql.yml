@@ -13,6 +13,13 @@ permissions:
   contents: read
   security-events: write
 
+# A new push to a pull request cancels that PR's superseded analysis; main,
+# scheduled and manual runs are keyed by their unique run id and never
+# cancelled, so main's code scanning results always complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   analyze:
     name: Analyze (c-cpp)
@@ -23,7 +30,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
           persist-credentials: false
 
       - name: Install native build dependencies
