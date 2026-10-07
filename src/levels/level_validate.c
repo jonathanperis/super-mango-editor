@@ -484,12 +484,23 @@ static int validate_checkpoints(const LevelDef *def, char *err, size_t err_size,
     return 0;
 }
 
+/*
+ * level_validate_runtime — Check every rule the runtime relies on.
+ *
+ * Runs on every level before it is used (game load, editor save/playtest),
+ * so code elsewhere may index arrays and trust positions without rechecking.
+ * The order matters: counts are checked first so later loops never run past
+ * an array. The first failure writes "<field> <problem>" into err and
+ * returns -1; a valid level returns 0 with err emptied.
+ */
 int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
 {
     char field[64];
     int screens;
     float world_w;
 
+    /* ---- Level-wide rules: counts first, so every loop below stays inside
+     *      its array; then version, size, audio and scoring limits. ---- */
     if (level_validate_counts(def, err, err_size) != 0) return -1;
 
     if (def->format_version != LEVEL_FORMAT_VERSION) {
@@ -526,6 +537,7 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         return fail_range(err, err_size, "coin_score", def->coin_score,
                           0, MAX_COIN_SCORE);
     }
+    /* ---- Asset paths, physics overrides and per-entity motion values ---- */
     if (validate_level_paths(def, err, err_size) != 0) return -1;
     if (validate_physics_finite(def, err, err_size) != 0) return -1;
 
@@ -549,6 +561,7 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
     CHECK_MOTION_ARRAY(float_platforms, float_platform_count, speed);
 #undef CHECK_MOTION_ARRAY
 
+    /* ---- Player start and checkpoints must lie inside the world ---- */
     if (def->player_start_x != 0.0f || def->player_start_y != 0.0f) {
         if (validate_point(err, err_size, "player_start",
                            def->player_start_x, def->player_start_y, world_w) != 0)
@@ -557,6 +570,7 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
 
     if (validate_checkpoints(def, err, err_size, world_w) != 0) return -1;
 
+    /* ---- World geometry: gaps, rails, ground pillars ---- */
     for (int i = 0; i < def->floor_gap_count; i++) {
         if (def->floor_gaps[i] < 0 ||
             def->floor_gaps[i] > (int)world_w - FLOOR_GAP_W) {
@@ -613,6 +627,7 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         }
     }
 
+    /* ---- Collectibles: positions inside the world ---- */
     for (int i = 0; i < def->coin_count; i++) {
         snprintf(field, sizeof(field), "coins[%d]", i);
         if (validate_point(err, err_size, field, def->coins[i].x,
@@ -638,6 +653,7 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                            def->last_star.y, world_w) != 0) return -1;
     }
 
+    /* ---- Enemies: each patrol range must contain its start x ---- */
     for (int i = 0; i < def->spider_count; i++) {
         if (def->spiders[i].frame_index < 0 || def->spiders[i].frame_index >= SPIDER_FRAMES)
             return fail_value(err, err_size, "spiders[].frame_index", "is outside the sprite sheet");
@@ -685,6 +701,8 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                             def->faster_fish[i].patrol_x1, world_w) != 0) return -1;
     }
 
+    /* ---- Hazards: full width inside the world; rail riders name a real
+     *      rail and keep t_offset on it ---- */
     for (int i = 0; i < def->spike_row_count; i++) {
         int n = def->spike_rows[i].count;
         if (n < 1 || n > MAX_SPIKE_TILES) {
@@ -727,6 +745,7 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         }
     }
 
+    /* ---- Surfaces: float platforms (fixed, crumbling or on a rail) ---- */
     for (int i = 0; i < def->float_platform_count; i++) {
         const FloatPlatformPlacement *fp = &def->float_platforms[i];
         if (fp->mode != FLOAT_PLATFORM_STATIC &&
@@ -814,6 +833,7 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                            def->fire_flames[i].x, world_w) != 0) return -1;
     }
 
+    /* ---- Bouncepads (three separate arrays, same rules) ---- */
     for (int i = 0; i < def->bouncepad_small_count; i++) {
         snprintf(field, sizeof(field), "bouncepads_small[%d].x", i);
         if (validate_world_x(err, err_size, field,
@@ -848,6 +868,7 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         }
     }
 
+    /* ---- Climbables: every stacked tile must end above the bottom ---- */
     for (int i = 0; i < def->vine_count; i++) {
         snprintf(field, sizeof(field), "vines[%d]", i);
         if (def->vines[i].vine_type != VINE_GREEN &&

@@ -166,6 +166,15 @@ static toml_datum_t campaign_manifest_get_exact(toml_datum_t table,
     return missing;
 }
 
+/*
+ * campaign_manifest_load_entries — Parse a campaign manifest into staged.
+ *
+ * The manifest is untrusted input, so every step checks before it trusts:
+ * parse, root keys, version, the level list, then each level path and the
+ * level file it names. Returns 0 with staged filled in, or -1 after printing
+ * why; on failure the caller discards staged, so a bad manifest never
+ * replaces a working campaign.
+ */
 static int campaign_manifest_load_entries(const char *manifest_path,
                                           CampaignCatalog *staged)
 {
@@ -174,7 +183,9 @@ static int campaign_manifest_load_entries(const char *manifest_path,
     toml_datum_t top;
     toml_datum_t version;
     toml_datum_t levels;
+    int result = -1;
 
+    /* 1. Read and parse the manifest file. */
     fp = serializer_fopen_utf8(manifest_path, "rb");
     if (!fp) {
         fprintf(stderr, "campaign: cannot open manifest '%s'\n", manifest_path);
@@ -188,48 +199,45 @@ static int campaign_manifest_load_entries(const char *manifest_path,
         return -1;
     }
 
+    /* 2. The root must be a table holding only the known keys. */
     top = parsed.toptab;
     if (top.type != TOML_TABLE) {
         fprintf(stderr, "campaign: manifest root must be a table\n");
-        toml_free(parsed);
-        return -1;
+        goto done;
     }
     for (int i = 0; i < top.u.tab.size; i++) {
         if (!top.u.tab.key[i] || top.u.tab.len[i] < 0 ||
             memchr(top.u.tab.key[i], '\0', (size_t)top.u.tab.len[i]) != NULL) {
             fprintf(stderr, "campaign: manifest key contains an embedded NUL\n");
-            toml_free(parsed);
-            return -1;
+            goto done;
         }
         if (!campaign_manifest_key_allowed(top.u.tab.key[i], top.u.tab.len[i])) {
             fprintf(stderr, "campaign: manifest contains an unsupported field\n");
-            toml_free(parsed);
-            return -1;
+            goto done;
         }
     }
 
+    /* 3. Exactly the supported format version. */
     version = campaign_manifest_get_exact(top, "format_version",
                                           sizeof("format_version") - 1);
     if (version.type != TOML_INT64 ||
         version.u.int64 != CAMPAIGN_MANIFEST_VERSION) {
         fprintf(stderr, "campaign: manifest format_version must be integer %d\n",
                 CAMPAIGN_MANIFEST_VERSION);
-        toml_free(parsed);
-        return -1;
+        goto done;
     }
 
+    /* 4. A nonempty ordered list of levels; stage one entry per level. */
     levels = campaign_manifest_get_exact(top, "levels", sizeof("levels") - 1);
     if (levels.type != TOML_ARRAY || levels.u.arr.size <= 0) {
         fprintf(stderr, "campaign: manifest levels must be a nonempty array\n");
-        toml_free(parsed);
-        return -1;
+        goto done;
     }
 
     staged->levels = calloc((size_t)levels.u.arr.size, sizeof(*staged->levels));
     if (!staged->levels) {
         fprintf(stderr, "campaign: catalog allocation failed\n");
-        toml_free(parsed);
-        return -1;
+        goto done;
     }
     staged->count = (size_t)levels.u.arr.size;
 
@@ -237,11 +245,11 @@ static int campaign_manifest_load_entries(const char *manifest_path,
         toml_datum_t item = levels.u.arr.elem[i];
         char canonical_path[4096];
 
+        /* 5a. Each entry is a safe levels/NAME.toml path, listed once. */
         if (item.type != TOML_STRING || !item.u.str.ptr || item.u.str.len < 0 ||
             !campaign_level_path_safe(item.u.str.ptr, (size_t)item.u.str.len)) {
             fprintf(stderr, "campaign: levels[%zu] must be a safe levels/*.toml path\n", i);
-            toml_free(parsed);
-            return -1;
+            goto done;
         }
         for (size_t previous = 0; previous < i; previous++) {
             size_t previous_len;
@@ -254,44 +262,47 @@ static int campaign_manifest_load_entries(const char *manifest_path,
                        previous_len) == 0) {
                 fprintf(stderr, "campaign: duplicate manifest level path '%s'\n",
                         item.u.str.ptr);
-                toml_free(parsed);
-                return -1;
+                goto done;
             }
         }
+        /* 5b. Resolve it on disk, keep the manifest spelling, and load the
+         *     level fully now so a broken entry rejects the whole catalog
+         *     (the active catalog is only replaced after every entry loads). */
         if (campaign_canonical_path(item.u.str.ptr, (size_t)item.u.str.len,
                                     canonical_path, sizeof(canonical_path)) != 0) {
             fprintf(stderr, "campaign: cannot resolve manifest level '%s'\n",
                     item.u.str.ptr);
-            toml_free(parsed);
-            return -1;
+            goto done;
         }
 
         if (campaign_copy_exact(staged->levels[i].path,
                                 sizeof(staged->levels[i].path),
                                 item.u.str.ptr, (size_t)item.u.str.len) != 0) {
             fprintf(stderr, "campaign: manifest level path copy failed\n");
-            toml_free(parsed);
-            return -1;
+            goto done;
         }
         level_def_init_defaults(&staged->levels[i].level);
         if (level_load_toml(canonical_path, &staged->levels[i].level) != 0) {
             fprintf(stderr, "campaign: invalid manifest level '%s'\n",
                     item.u.str.ptr);
-            toml_free(parsed);
-            return -1;
+            goto done;
         }
         campaign_derive_display_name(&staged->levels[i]);
         if (!campaign_has_visible_text(staged->levels[i].display_name,
                                        sizeof(staged->levels[i].display_name))) {
             fprintf(stderr, "campaign: level '%s' has no display name\n",
                     item.u.str.ptr);
-            toml_free(parsed);
-            return -1;
+            goto done;
         }
     }
 
+    result = 0;
+
+done:
+    /* Single cleanup point: every failure after parsing jumps here, so the
+     * parsed TOML tree is freed exactly once on every path. */
     toml_free(parsed);
-    return 0;
+    return result;
 }
 
 static int campaign_validate_chain(const CampaignCatalog *catalog)

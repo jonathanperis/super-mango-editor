@@ -11,41 +11,18 @@
 #include "serializer_types.h"
 #include "../levels/level_loader.h"
 
-/* ================================================================== */
-/* level_save_toml — Write a LevelDef to a human-readable TOML file    */
-/* ================================================================== */
-
-static int level_save_toml_internal(const LevelDef *def, const char *path,
-                                    const char *original_path,
-                                    SerializerSavePolicy policy,
-                                    const SerializerFileFingerprint *expected) {
-    char temp_path[SERIALIZER_IO_PATH_MAX];
-
-    if (!def || !path) return -1;
-
-    {
-        char err[128];
-        if (level_validate_runtime(def, err, sizeof(err)) != 0) {
-            fprintf(stderr, "serializer: invalid level for save '%s': %s\n", path, err);
-            return -1;
-        }
-    }
-
-    /* The file written is `path` itself.  A symlink there is replaced, not
-     * followed (see serializer_replace_file); callers that mean to save
-     * through a link resolve it first with serializer_resolve_save_target. */
-    if (serializer_make_temp_path(path, temp_path, sizeof(temp_path)) != 0) {
-        fprintf(stderr, "serializer: path too long for temporary save '%s'\n", path);
-        return -1;
-    }
-
-    FILE *fp = serializer_open_temp(path, temp_path, sizeof(temp_path));
-    if (!fp) {
-        fprintf(stderr, "serializer: cannot open '%s' for writing\n", path);
-        serializer_remove_temp(temp_path);
-        return -1;
-    }
-
+/*
+ * write_level_toml — Emit every LevelDef field as TOML text into fp.
+ *
+ * This is only the *format*: the order of keys and tables the loader
+ * expects. level_save_toml_internal below owns the file itself (temporary
+ * file, flush, fingerprint check and atomic replace), so a write error is
+ * detected there through the stream's error flag after this returns.
+ * original_path is non-NULL only for crash-recovery snapshots.
+ */
+static void write_level_toml(FILE *fp, const LevelDef *def,
+                             const char *original_path)
+{
     if (original_path) {
         /*
          * A TOML comment may not contain raw control characters either, so
@@ -480,6 +457,45 @@ static int level_save_toml_internal(const LevelDef *def, const char *path,
         fprintf(fp, "speed = %s\n", fmt_float(def->fog_layers[i].speed));
         fprintf(fp, "\n");
     }
+}
+
+/* ================================================================== */
+/* level_save_toml — Write a LevelDef to a human-readable TOML file    */
+/* ================================================================== */
+
+static int level_save_toml_internal(const LevelDef *def, const char *path,
+                                    const char *original_path,
+                                    SerializerSavePolicy policy,
+                                    const SerializerFileFingerprint *expected) {
+    char temp_path[SERIALIZER_IO_PATH_MAX];
+
+    if (!def || !path) return -1;
+
+    {
+        char err[128];
+        if (level_validate_runtime(def, err, sizeof(err)) != 0) {
+            fprintf(stderr, "serializer: invalid level for save '%s': %s\n", path, err);
+            return -1;
+        }
+    }
+
+    /* The file written is `path` itself.  A symlink there is replaced, not
+     * followed (see serializer_replace_file); callers that mean to save
+     * through a link resolve it first with serializer_resolve_save_target. */
+    if (serializer_make_temp_path(path, temp_path, sizeof(temp_path)) != 0) {
+        fprintf(stderr, "serializer: path too long for temporary save '%s'\n", path);
+        return -1;
+    }
+
+    FILE *fp = serializer_open_temp(path, temp_path, sizeof(temp_path));
+    if (!fp) {
+        fprintf(stderr, "serializer: cannot open '%s' for writing\n", path);
+        serializer_remove_temp(temp_path);
+        return -1;
+    }
+
+    /* Emit the level; stream errors are checked once, just below. */
+    write_level_toml(fp, def, original_path);
 
     {
         int write_result = serializer_stream_has_error(fp);
