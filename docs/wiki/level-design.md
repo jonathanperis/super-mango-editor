@@ -419,7 +419,7 @@ speed      = 1.5    # traversal speed in tiles per second
 
 ### Blue Flames
 
-Erupts from a manually placed floor-gap position. `x` is the gap's left edge and normally matches a `floor_gaps` entry; the flame is centred in the 32 px opening. `x` must leave room for the whole gap inside the world, and an `x` of 0 is skipped at load. Blue and fire flame placements have separate capacities: `MAX_BLUE_FLAMES` and `MAX_FIRE_FLAMES` (16 each).
+Erupts from a manually placed floor-gap position. `x` is the gap's left edge and normally matches a `floor_gaps` entry; the flame is centred in the 32 px opening. `x` must leave room for the whole gap inside the world; `x = 0` is the gap at the left edge of the world. Blue and fire flame placements have separate capacities: `MAX_BLUE_FLAMES` and `MAX_FIRE_FLAMES` (16 each).
 
 ```toml
 [[blue_flames]]

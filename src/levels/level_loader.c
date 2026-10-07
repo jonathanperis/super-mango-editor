@@ -391,12 +391,12 @@ static void load_blue_flames(GameState *gs, const LevelDef *def)
     /*
      * Blue flames are now manually placed in LevelDef — each entry
      * specifies the gap x position where a flame erupts.  We initialise
-     * each BlueFlame struct from the placement data.
+     * each BlueFlame struct from the placement data.  Every entry is used:
+     * x = 0 is the gap at the world's left edge, not an "unused" marker.
      */
     int n = 0;
     for (int i = 0; i < def->blue_flame_count && n < MAX_BLUE_FLAMES; i++) {
         float gap_x = def->blue_flames[i].x;
-        if (gap_x <= 0.0f) continue;
 
         BlueFlame *f = &gs->blue_flames[n];
         f->gap_x      = gap_x;
@@ -427,7 +427,6 @@ static void load_fire_flames(GameState *gs, const LevelDef *def)
     int n = 0;
     for (int i = 0; i < def->fire_flame_count && n < MAX_FIRE_FLAMES; i++) {
         float gap_x = def->fire_flames[i].x;
-        if (gap_x <= 0.0f) continue;
 
         BlueFlame *f = &gs->fire_flames[n];
         f->gap_x      = gap_x;
