@@ -68,6 +68,9 @@ typedef struct {
     UIEditType edit_type;
     void *edit_target;          /* borrowed destination, interpreted by edit_type */
     int edit_target_size;
+    /* Limits of the active integer field. Every commit path (Return, or the
+     * editor applying a staged edit before another command) clamps to them. */
+    int edit_int_min, edit_int_max, edit_int_step;
     int dropdown_open_id;      /* zero = closed; otherwise the stable widget ID */
     /* A press while a list is open belongs to that list alone (ui_press), so
      * it can never reach a widget or the canvas drawn underneath the list. */
@@ -117,6 +120,10 @@ void ui_panel(UIState *ui, int x, int y, int w, int h);
  * Each returns 1 only when a valid commit changes the caller-owned value.
  * Float display uses nine significant digits for round-trip-safe editing. */
 int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value);
+/* Like ui_int_field, but a committed value is clamped to [min, max] and, when
+ * step > 1, rounded to the nearest multiple of step (from 0) inside them. */
+int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
+                         int min, int max, int step);
 int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value);
 /* buf_size includes the final NUL byte. Paste/backspace preserve UTF-8 units. */
 int ui_text_field(UIState *ui, int id, int x, int y, int w, char *buf, int buf_size);
