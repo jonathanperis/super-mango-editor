@@ -35,9 +35,27 @@ The 400×300 raylib render target is presented with point filtering at 800×600,
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `TARGET_FPS` | `60` | Desired frames per second |
+| `TARGET_FPS` | `60` | Simulation steps per second; also the native window's frame limit |
 
-Used to compute `frame_ms = 1000 / TARGET_FPS` (approximately 16 ms), which is the manual frame-cap duration when VSync is unavailable.
+`TARGET_FPS` sets the fixed simulation step. The step and loop limits live in
+`src/core/game_timing.h`:
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `GAME_FIXED_STEP` | `(1.0f / TARGET_FPS)` | Seconds simulated by one update step (about 16.67 ms) |
+| `GAME_MAX_FRAME_SECONDS` | `0.25` | Longest real frame time accepted; longer stalls are clamped |
+| `GAME_MAX_STEPS_PER_FRAME` | `5` | Most steps run before one render; extra time is dropped, so below 12 rendered FPS the game slows down |
+
+Real frame time comes from raylib's `GetTime()` (a `double` in seconds) and only
+decides how many fixed steps run. Animation timers store milliseconds as
+`float`, so the fractional part of each 16.67 ms step is kept.
+
+Debug experiment captures (`src/core/game_experiment.h`):
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `EXPERIMENT_FORMAT_VERSION` | `2` | One row per fixed step, `[input, physics...]`, no duration column; version 1 captures are rejected |
+| `EXPERIMENT_MAX_FRAMES` | `36000` | Steps one capture can hold (10 minutes at 60 steps/s) |
 
 ### Tiles and Floor
 
@@ -55,10 +73,19 @@ The floor is drawn by repeating the active 48x48 floor tile across the full leve
 | `GRAVITY` | `800.0f` | `float` | Downward acceleration in px/s^2 |
 | `FLOOR_GAP_W` | `32` | `int` | Width of each floor gap in logical pixels |
 | `MAX_FLOOR_GAPS` | `16` | `int` | Maximum number of floor gaps per level |
+| `MAX_LEVEL_MOTION` | `10000` | `int` | Upper magnitude for authored motion values (speeds, accelerations) |
 
-Every simulation step while airborne: `player->vy += GRAVITY * dt`.
+### Level Limits
 
-Live play uses a fixed `dt` of exactly 1/60 s (see [Architecture](../architecture/)), so gravity adds ~13.3 px/s per step regardless of the display refresh rate; only replays of older experiment captures reuse their recorded variable steps. The jump impulse (`-325.0f` px/s) produces a moderate arc.
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_CHECKPOINTS` | `99` | Maximum authored `[[checkpoints]]` records per level |
+| `MAX_LEVEL_SCREENS` | `99` | Maximum `screen_count` |
+| `GAME_LEVEL_PATH_MAX` | `1024` | Byte capacity of a UTF-8 level path (matches the editor) |
+
+Every simulation step: `player->vy += GRAVITY * dt` (a floor or platform snap cancels it while standing).
+
+Every step uses a fixed `dt` of exactly 1/60 s (see [Architecture](../architecture/)), including smoke runs, scripted replays and experiment replays, so gravity adds ~13.3 px/s per step regardless of the display refresh rate. The jump impulse (`-325.0f` px/s) produces a moderate arc.
 
 ### Camera
 
@@ -156,7 +183,9 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 | `0..128` | level/profile audio settings | Authored/saved volume units; normalized to raylib's `0..1` at the audio boundary |
 
 raylib/miniaudio negotiates the device's format, channels and sample rate;
-`main.c` does not hard-code a sample format or mixer buffer size. Music volume
+`audio_open` (`src/shared/audio.c`) just calls `InitAudioDevice` and does not
+hard-code a sample format or mixer buffer size. The game needs a working audio
+device to start. Music volume
 is authored per level and multiplied by the saved music-volume preference;
 mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownership.
 
@@ -168,7 +197,7 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 |------------|--------|---------|
 | `WINDOW_W / GAME_W` | `2x` | Horizontal pixel scale factor |
 | `WINDOW_H / GAME_H` | `2x` | Vertical pixel scale factor |
-| `1000 / TARGET_FPS` | `~16 ms` | Frame budget |
+| `1.0f / TARGET_FPS` | `~16.67 ms` | `GAME_FIXED_STEP`, one simulation step |
 | `GAME_H - TILE_SIZE` | `252` | `FLOOR_Y` |
 | `FLOOR_Y - PLAYER_FRAME_H + PLAYER_FLOOR_SINK` | `220` | Player start / floor snap Y |
 | `GAME_W / TILE_SIZE` | `~8.3` | Tiles needed to fill the floor |
@@ -297,7 +326,7 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_BOUNCEPADS` | `4` | `int` | Legacy helper capacity; runtime placement arrays use the per-variant limits below |
+| `MAX_BOUNCEPADS` | `4` | `int` | Unused legacy capacity; runtime placement arrays use the per-variant limits below |
 | `BOUNCEPAD_W` | `48` | `int` | Display width of one bouncepad frame (px) |
 | `BOUNCEPAD_H` | `48` | `int` | Display height of one bouncepad frame (px) |
 | `BOUNCEPAD_VY_SMALL` | `-380.0f` | `float` | Small bouncepad launch impulse (px/s) |
