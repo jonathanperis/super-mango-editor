@@ -230,6 +230,38 @@ static int expect_rejected_authored_checkpoints(void)
     return 0;
 }
 
+/*
+ * A checkpoint respawns the player in the TILE_SIZE column starting at its
+ * x. Any overlap with a floor gap drops them into the water every life.
+ */
+static int expect_checkpoints_clear_of_floor_gaps(void)
+{
+    LevelDef def;
+    char err[128];
+
+    checkpoint_fixture(&def);              /* checkpoint column 160..208 */
+    def.floor_gap_count = 2;
+    def.floor_gaps[0] = 128;               /* ends exactly where it starts */
+    def.floor_gaps[1] = 208;               /* starts exactly where it ends */
+    if (level_validate_runtime(&def, err, sizeof(err)) != 0) {
+        fprintf(stderr, "level_validate_test: checkpoint beside gaps rejected: %s\n", err);
+        return 1;
+    }
+
+    const int overlapping[] = { 144, 160, 176, 192 };
+    for (size_t i = 0; i < sizeof(overlapping) / sizeof(overlapping[0]); i++) {
+        def.floor_gaps[1] = overlapping[i];
+        if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+            strstr(err, "checkpoints[0].x") == NULL ||
+            strstr(err, "floor_gaps[1]") == NULL) {
+            fprintf(stderr, "level_validate_test: checkpoint over gap %d accepted\n",
+                    overlapping[i]);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static int expect_rejected_platform_outside_world(void)
 {
     LevelDef def;
@@ -851,6 +883,7 @@ int main(void)
     if (expect_floor_gaps_on_piece_grid() != 0) return 1;
     if (expect_valid_authored_checkpoints() != 0) return 1;
     if (expect_rejected_authored_checkpoints() != 0) return 1;
+    if (expect_checkpoints_clear_of_floor_gaps() != 0) return 1;
     if (expect_rejected_platform_outside_world() != 0) return 1;
     if (expect_rejected_reversed_patrol() != 0) return 1;
     if (expect_rejected_bad_rule_values() != 0) return 1;

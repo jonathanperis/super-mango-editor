@@ -1072,6 +1072,7 @@ static int strict_v1_fixture_suite(void)
         "bad_checkpoint_nonfinite.toml",
         "bad_checkpoint_bounds.toml",
         "bad_checkpoint_duplicate.toml",
+        "bad_checkpoint_over_gap.toml",
         "bad_checkpoint_array.toml",
         "bad_screen_count_max_plus_one.toml",
         "bad_utf8_overlong.toml",
