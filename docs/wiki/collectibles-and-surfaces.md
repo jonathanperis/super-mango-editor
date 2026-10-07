@@ -39,7 +39,9 @@ With defaults, every 1000 points (10 coins) earns a bonus life. Both `coin_score
 
 **File:** `src/collectibles/health_star.c` / `health_star.h` (shared by all three star colours)  
 **Sprite:** `assets/sprites/collectibles/star_yellow.png` — 16×16 px display size  
-**Pickup:** AABB overlap. Restores 1 heart (up to `MAX_HEARTS`). No score awarded.
+**Pickup:** AABB overlap. Restores 1 heart (up to `MAX_HEARTS`, 3). No score awarded.
+
+The three colours are one collectible: a single `HealthStar` struct, `health_stars_render()` and `health_star_get_hitbox()`, and one `collect_health_stars()` loop in `src/collision/game_collision.c`. The level file and `GameState` still keep a separate array and texture per colour.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -56,7 +58,7 @@ y = 108.0
 
 ### Star Green
 
-**File:** `src/collectibles/health_star.h` (same `HealthStar` module as yellow)  
+**File:** `src/collectibles/health_star.c` / `health_star.h` (same `HealthStar` module as yellow; `MAX_STAR_GREENS` 16)  
 **Sprite:** `assets/sprites/collectibles/star_green.png` — 16×16 px  
 **Pickup:** Same as star yellow — restores 1 heart.
 
@@ -70,7 +72,7 @@ y = 80.0
 
 ### Star Red
 
-**File:** `src/collectibles/health_star.h` (same `HealthStar` module as yellow)  
+**File:** `src/collectibles/health_star.c` / `health_star.h` (same `HealthStar` module as yellow; `MAX_STAR_REDS` 16)  
 **Sprite:** `assets/sprites/collectibles/star_red.png` — 16×16 px  
 **Pickup:** Same as star yellow — restores 1 heart.
 
@@ -106,23 +108,29 @@ y = 100.0
 ### Platform (Ground Pillar)
 
 **File:** `src/surfaces/platform.c` / `platform.h`  
-**Sprite:** `assets/sprites/levels/grass_platform.png` — 48×48 tile, 9-slice rendered  
-**Behaviour:** Static ground pillar. The player can land on the top surface. Pillars are positioned on the floor and extend upward. Rendered before the floor so the pillar base sinks into the ground naturally.
+**Sprite:** `assets/sprites/levels/grass_platform.png` by default, or the pillar's own `tile_path` — 48×48 tile, 9-slice rendered  
+**Behaviour:** Static ground pillar. The player can land on the top surface. Pillars are positioned on the floor and extend upward, sunk 16 px into the ground. Rendered before the floor so the pillar base sinks into the ground naturally.
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_PLATFORMS` | 32 | Pillar slots per level |
 
 ```toml
 [[platforms]]
 x           = 80.0   # left edge in logical pixels
-tile_height = 2      # height in 48px tiles (1–3)
-tile_width  = 1      # width in 48px tiles (usually 1)
+tile_height = 2      # height in 48px tiles (1–5)
+tile_width  = 1      # width in 48px tiles (0 or omitted = 1)
 ```
 
-Top surface Y for a pillar: `FLOOR_Y − (tile_height × TILE_SIZE)` = `252 − (h × 48)`.
+Top surface Y for a pillar: `FLOOR_Y − (tile_height × TILE_SIZE) + 16` = `268 − (h × 48)`.
 
 | `tile_height` | Top Y | Typical use |
 |---------------|-------|-------------|
-| 1 | 204 | Step / obstacle |
-| 2 | 156 | Standard platform — medium bouncepads clear this |
-| 3 | 108 | Tall — only reachable via high bouncepad or vine |
+| 1 | 220 | Step / obstacle |
+| 2 | 172 | Standard platform |
+| 3 | 124 | Tall — use a bouncepad, climbable or intermediate ledge |
+| 4 | 76 | Very tall |
+| 5 | 28 | Maximum height |
 
 ---
 
@@ -135,8 +143,8 @@ Top surface Y for a pillar: `FLOOR_Y − (tile_height × TILE_SIZE)` = `252 − 
 | Mode | Behaviour |
 |------|-----------|
 | `STATIC` | Fixed position, never moves |
-| `CRUMBLE` | Begins falling after player stands on it for 0.75 s |
-| `RAIL` | Travels along a rail path at constant speed |
+| `CRUMBLE` | Begins falling after the player stands on it for 0.75 s without stepping off (stepping off resets the timer); it reappears when the level resets after a life loss |
+| `RAIL` | Travels along a rail path at constant speed, carrying the player; on an open rail it bounces at both ends and never detaches |
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -151,7 +159,7 @@ Top surface Y for a pillar: `FLOOR_Y − (tile_height × TILE_SIZE)` = `252 − 
 mode       = "STATIC"   # "STATIC" | "CRUMBLE" | "RAIL"
 x          = 172.0
 y          = 200.0
-tile_count = 4          # width in 16px pieces
+tile_count = 4          # width in 16px pieces (1–16)
 rail_index = 0          # RAIL mode only: index into [[rails]]
 t_offset   = 0.0        # RAIL mode only: starting position on rail
 speed      = 0.0        # RAIL mode only: traversal speed in tiles/s
@@ -163,20 +171,21 @@ speed      = 0.0        # RAIL mode only: traversal speed in tiles/s
 
 **File:** `src/surfaces/bridge.c` / `bridge.h`  
 **Sprite:** `assets/sprites/surfaces/bridge.png` — 16×16 px brick tile  
-**Behaviour:** Tiled crumble walkway. Bricks fall individually when the player walks over them, creating a time-limited path. After falling they respawn when the player moves away.
+**Behaviour:** Tiled crumble walkway. Each brick under the player's centre starts its own timer on first contact and falls `BRIDGE_FALL_DELAY` later, so only the bricks the player actually steps on drop, creating a time-limited path. Fallen bricks stay gone until the level resets after a life loss (or a fresh attempt).
 
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `MAX_BRIDGES` | 16 | Bridge slots in `GameState` |
 | `MAX_BRIDGE_BRICKS` | 16 | Maximum bricks in one bridge |
-| `BRIDGE_FALL_DELAY` | 0.2 s | Delay before first touched brick falls |
-| `BRIDGE_CASCADE_DELAY` | 0.06 s | Extra delay per neighbouring brick |
+| `BRIDGE_FALL_DELAY` | 0.2 s | Delay between touching a brick and its fall |
+
+`bridge.h` also defines `BRIDGE_CASCADE_DELAY` (0.06 s) for a neighbour-by-neighbour cascade, but `bridge.c` does not use it: neighbours fall only when stepped on.
 
 ```toml
 [[bridges]]
 x           = 1350.0
 y           = 172.0
-brick_count = 8   # number of 16×16 brick tiles
+brick_count = 8   # number of 16×16 brick tiles (1–16)
 ```
 
 ---
@@ -191,7 +200,7 @@ brick_count = 8   # number of 16×16 brick tiles
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `BOUNCEPAD_W/H` | 48 | Display size in logical px |
-| `BOUNCEPAD_VY_SMALL` | −380.0 | Launch impulse for green pad |
+| `BOUNCEPAD_VY_SMALL` | −380.0 | Usual launch impulse for green pad (the loader uses each pad's authored `launch_vy` as written) |
 | `BOUNCEPAD_VY_MEDIUM` | −536.25 | Launch impulse for wood pad |
 | `BOUNCEPAD_VY_HIGH` | −700.0 | Launch impulse for red pad |
 | `BOUNCEPAD_FRAME_MS` | 80 | ms per animation frame during release |
@@ -226,7 +235,7 @@ pad_type  = "RED"
 
 **File:** `src/surfaces/rail.c` / `rail.h`  
 **Sprite:** `assets/sprites/surfaces/rail.png` — 64×64 px, 4×4 grid of 16×16 bitmask tiles  
-**Behaviour:** A path of interconnected tiles that spike blocks and float platforms ride along. Each tile has a bitmask of connection directions (N/E/S/W) that drives the correct sprite selection. Objects riding a rail store a float `t ∈ [0, tile_count)` and call `rail_get_world_pos()` each frame.
+**Behaviour:** A path of interconnected tiles that spike blocks and float platforms ride along. Each tile has a bitmask of connection directions (N/E/S/W) that drives the correct sprite selection. Objects riding a rail store a float `t ∈ [0, tile_count)` and call `rail_get_world_pos()` each step. `w` and `h` are 2–128 tiles and a `RECT` loop has at most 128 tiles. At an open (`HORIZ`) end without a cap, a spike block detaches and falls; float platforms always bounce.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -242,7 +251,7 @@ x       = 444      # top-left tile x
 y       = 35       # top-left tile y
 w       = 10       # width in tiles
 h       = 6        # height in tiles
-end_cap = 0        # 0 = open end (rider detaches), 1 = bouncing end
+end_cap = 0        # HORIZ only: 0 = open end (spike block detaches), 1 = bouncing end
 ```
 
 ---
@@ -253,12 +262,21 @@ end_cap = 0        # 0 = open end (rider detaches), 1 = bouncing end
 **Sprites:** `assets/sprites/surfaces/vine_green.png`, `assets/sprites/surfaces/vine_brown.png` — 16×48 px per tile  
 **Behaviour:** Press Up while overlapping to grab (without holding Jump), then Up/Down to climb and Left/Right to drift. Jump dismounts; leaving the grab area also detaches.
 
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_VINES` | 24 | Vine slots in `GameState` |
+| `VINE_W/H` | 16×32 | Cropped climbable art size |
+| `VINE_STEP` | 19 | Vertical spacing between tile starts |
+
 ```toml
 [[vines]]
 x          = 88.0
 y          = 172.0   # top tile y in logical pixels
 tile_count = 2       # cropped height = 32 + (tile_count - 1) * 19 = 51 px
+vine_type  = 0       # optional art variant: 0 = green, 1 = brown
 ```
+
+For every climbable, `tile_count` is at least 1 and the whole stack must fit inside the world.
 
 ---
 

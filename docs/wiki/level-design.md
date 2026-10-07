@@ -168,7 +168,7 @@ tile_height = 2      # pillar height in 48px tiles (1–5)
 tile_width  = 1      # pillar width in 48px tiles (0 or omitted = 1)
 ```
 
-An optional `tile_path` (`assets/sprites/levels/*.png`) gives one pillar its own tileset; otherwise it uses `floor_tile_path`.
+An optional `tile_path` (`assets/sprites/levels/*.png`) gives one pillar its own tileset; otherwise it uses `assets/sprites/levels/grass_platform.png`.
 
 Each pillar sinks 16 px into the floor so its grass edge meets the ground, so its top surface is `FLOOR_Y − (tile_height × TILE_SIZE) + 16` = `268 − (tile_height × 48)`.
 
