@@ -458,7 +458,6 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 | `BRIDGE_TILE_W` | `16` | `int` | Width of one bridge.png tile (px) |
 | `BRIDGE_TILE_H` | `16` | `int` | Height of one bridge.png tile (px) |
 | `BRIDGE_FALL_DELAY` | `0.2f` | `float` | Seconds between touch and first brick falling |
-| `BRIDGE_CASCADE_DELAY` | `0.06f` | `float` | Extra seconds between successive bricks cascading outward |
 | `BRIDGE_FALL_GRAVITY` | `250.0f` | `float` | Downward acceleration per brick during fall (px/s^2) |
 | `BRIDGE_FALL_INITIAL_VY` | `20.0f` | `float` | Initial downward velocity on fall-start (px/s) |
 
