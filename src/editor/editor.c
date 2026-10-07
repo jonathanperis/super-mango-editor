@@ -48,6 +48,9 @@ int editor_init(EditorState *es, int hidden)
     }
     editor_textures_load(es);
     editor_level_init_defaults(&es->level);
+    /* Preview exactly what the empty document names: its floor tile, and
+     * no sky or water because it has no background or foreground layers. */
+    editor_sync_config_resources(es);
     editor_set_document_save_point(es);
     es->running = 1;
     es->last_autosave_ms = (uint32_t)clock_millis();

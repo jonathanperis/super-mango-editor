@@ -3590,6 +3590,48 @@ done:
     return result;
 }
 
+/* New must not keep showing the previous level's sky/floor/water. */
+static int new_level_resets_previews(void)
+{
+    EditorWidgetTestContext context;
+    EditorState es;
+    char root[EDITOR_PATH_MAX] = {0};
+    int result = 1;
+
+    if (editor_widget_test_context_init(&context) != 0) {
+        editor_widget_test_context_cleanup(&context);
+        return 1;
+    }
+    if (config_state_init(&es, context.font, root, sizeof(root)) != 0) goto done;
+    if (expect_int("defaults have no sky", es.textures.sky == NULL, 1) != 0 ||
+        expect_int("defaults have no water", es.textures.water == NULL, 1) != 0 ||
+        expect_int("defaults have a floor", es.textures.floor_tile != NULL, 1) != 0)
+        goto done;
+
+    es.level.background_layer_count = 1;
+    strcpy(es.level.background_layers[0].path,
+           "assets/sprites/backgrounds/castle_pillars.png");
+    es.level.foreground_layer_count = 1;
+    strcpy(es.level.foreground_layers[0].path,
+           "assets/sprites/foregrounds/water.png");
+    strcpy(es.level.floor_tile_path, "assets/sprites/levels/stone_tileset.png");
+    editor_sync_config_resources(&es);
+    if (expect_int("level sky", es.textures.sky != NULL, 1) != 0 ||
+        expect_int("level water", es.textures.water != NULL, 1) != 0) goto done;
+
+    editor_reset_new_level(&es);
+    if (expect_int("new level drops sky", es.textures.sky == NULL, 1) != 0 ||
+        expect_int("new level drops water", es.textures.water == NULL, 1) != 0 ||
+        expect_string("new level floor preview", es.preview_floor_path,
+                      "assets/sprites/levels/grass_tileset.png") != 0) goto done;
+    result = 0;
+
+done:
+    config_state_cleanup(&es, root);
+    editor_widget_test_context_cleanup(&context);
+    return result;
+}
+
 /*
  * The editor only saves levels that validate, and must be able to open
  * what it saved.  A rail-mode float platform's x/y are not range-checked
@@ -3746,6 +3788,7 @@ int main(void)
     if (field_limits_apply_on_every_commit_path() != 0) return 1;
     if (open_dropdown_owns_the_next_click() != 0) return 1;
     if (dropdowns_accept_any_option_for_unknown_values() != 0) return 1;
+    if (new_level_resets_previews() != 0) return 1;
     if (extreme_floats_round_trip_through_save() != 0) return 1;
     if (create_only_save_without_hard_links() != 0) return 1;
 
