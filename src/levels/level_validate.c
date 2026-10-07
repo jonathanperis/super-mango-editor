@@ -10,6 +10,11 @@
 #define MAX_SCORE_PER_LIFE 999999
 #define MAX_COIN_SCORE 999999
 
+/* A gap that starts on the floor grid must also end on it, so the renderer
+ * removes exactly the pieces the player can fall through. */
+_Static_assert(FLOOR_GAP_W % FLOOR_PIECE_W == 0,
+               "FLOOR_GAP_W must be a whole number of floor pieces");
+
 static int fail_count(char *err, size_t err_size,
                       const char *field, int count, int max_count)
 {
@@ -577,6 +582,16 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
             snprintf(field, sizeof(field), "floor_gaps[%d]", i);
             return fail_range(err, err_size, field, def->floor_gaps[i],
                               0, (int)world_w - FLOOR_GAP_W);
+        }
+        /* Off-grid gaps render partly covered by grass (see FLOOR_PIECE_W). */
+        if (def->floor_gaps[i] % FLOOR_PIECE_W != 0) {
+            snprintf(field, sizeof(field), "floor_gaps[%d]", i);
+            if (err && err_size > 0) {
+                snprintf(err, err_size,
+                         "%s is %d (must be a multiple of %d, the floor piece width)",
+                         field, def->floor_gaps[i], FLOOR_PIECE_W);
+            }
+            return -1;
         }
     }
 

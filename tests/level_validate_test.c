@@ -148,6 +148,37 @@ static int expect_rejected_floor_gap_outside_world(void)
     return 0;
 }
 
+/*
+ * The floor is drawn in FLOOR_PIECE_W pieces. Level 02 once shipped gaps at
+ * x = 680 (8 px off the grid): the renderer kept grass over half the hole
+ * while the player still fell through all of it.
+ */
+static int expect_floor_gaps_on_piece_grid(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.screen_count = 2;
+    def.floor_gap_count = 2;
+    def.floor_gaps[0] = 0;
+    def.floor_gaps[1] = 672;
+    if (level_validate_runtime(&def, err, sizeof(err)) != 0) {
+        fprintf(stderr, "level_validate_test: on-grid floor gaps rejected: %s\n", err);
+        return 1;
+    }
+
+    def.floor_gaps[1] = 680;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+        strstr(err, "floor_gaps[1]") == NULL ||
+        strstr(err, "multiple of 16") == NULL) {
+        fprintf(stderr, "level_validate_test: off-grid floor gap should fail clearly\n");
+        return 1;
+    }
+
+    return 0;
+}
+
 static void checkpoint_fixture(LevelDef *def)
 {
     level_def_init_defaults(def);
@@ -678,6 +709,7 @@ int main(void)
     if (expect_physics_defaults_are_sentinels() != 0) return 1;
     if (expect_rejected_format_version() != 0) return 1;
     if (expect_rejected_floor_gap_outside_world() != 0) return 1;
+    if (expect_floor_gaps_on_piece_grid() != 0) return 1;
     if (expect_valid_authored_checkpoints() != 0) return 1;
     if (expect_rejected_authored_checkpoints() != 0) return 1;
     if (expect_rejected_platform_outside_world() != 0) return 1;
