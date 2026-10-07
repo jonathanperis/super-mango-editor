@@ -21,7 +21,7 @@ their length. Use F2 to freeze, F3 to freeze and advance exactly one step, and F
 to cycle normal, 1/4 and 1/10 speed (fewer steps per second, each still 1/60 s).
 F6 cycles the nine movement properties; minus/equal changes the selected value by
 25 in its documented units. F7 restores the level's movement settings. Values are
-bounded between zero and `MAX_LEVEL_MOTION`. Player position, velocity,
+bounded between zero and `MAX_LEVEL_MOTION`. Player velocity,
 animation/climbing state, hitboxes, foot contact, moving-support index and
 checkpoint state remain visible in debug mode, kept to a few small panels so the
 level stays readable. F10 cycles a detail row through the player, fish, floating

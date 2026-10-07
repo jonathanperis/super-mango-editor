@@ -6,6 +6,7 @@
 #include "../levels/level_physics.h"
 #include "../screens/settings_menu.h"
 #include "../player/player_internal.h"
+#include <math.h>    /* fabsf */
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -191,7 +192,9 @@ void game_inspector_render(GameState *gs)
     game_inspector_physics(&gs->player, values, 0);
     game_inspector_physics(&level_player, authored, 0);
     int field = gs->inspector.physics_field;
-    int tuned = values[field] != authored[field];
+    /* Tuning moves values in steps of 25 units, so "tuned" means differing
+     * by more than half a unit, not exact float inequality. */
+    int tuned = fabsf(values[field] - authored[field]) > 0.5f;
     char tuning[96];
     if (tuned)
         snprintf(tuning, sizeof(tuning), "%s %.0f (level %.0f)", fields[field].name,

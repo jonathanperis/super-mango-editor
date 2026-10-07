@@ -236,7 +236,7 @@ void debug_update(DebugOverlay *dbg, float dt)
 {
     /* dt arrives in seconds. Refresh readable counters over a short interval
      * instead of changing every label on every frame. This is an inspection
-     * aid, not a CPU profiler: cpu_percent is the dt-based 60 Hz frame budget. */
+     * aid, not a CPU profiler: frame_ms is the interval between frames. */
     dbg->frame_ms = dt * 1000;
     dbg->fps_frame_count++;
     uint64_t now = clock_millis(), elapsed = now - dbg->fps_prev_ticks;
@@ -247,7 +247,6 @@ void debug_update(DebugOverlay *dbg, float dt)
         dbg->fps_frame_count = 0;
         dbg->fps_prev_ticks = now;
         dbg->frame_ms_display = dbg->frame_ms;
-        dbg->cpu_percent = dbg->frame_ms_display / 16.667f * 100;
         dbg->mem_mb = get_resident_mb();
     }
     for (int i = 0; i < dbg->log_count; i++)

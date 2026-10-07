@@ -66,7 +66,6 @@ typedef struct {
     /* Frame interval, not CPU time or OS process utilization. */
     float  frame_ms;          /* last frame duration in milliseconds      */
     float  frame_ms_display;  /* smoothed frame time shown on screen      */
-    float  cpu_percent;       /* historical name: frame interval / 16.67 ms */
 
     /* Memory usage (updated every sample period) */
     float  mem_mb;            /* resident memory in megabytes             */
