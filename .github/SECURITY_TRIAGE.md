@@ -74,3 +74,20 @@ fixed by documenting `editor_clamp_placement` and `editor_entity_array`.
 These eight findings (#122, #125–#131) were dismissed as false positives
 after explicit maintainer authorization on 2026-10-06, as in the earlier
 rounds. No query or check is disabled.
+
+## Editor recovery split (PR #318)
+
+Moving autosave and crash recovery out of `editor_files.c` into
+`editor_recovery.c` reissued the path-injection class at the moved lines. No
+path source or file operation changed; the code is the same as the reviewed
+#86–#93 and #126:
+
+| Alerts | Input and operation | Assessment |
+| --- | --- | --- |
+| #150 | `editor_recovery.c`: temp file for a recovery entry's metadata, beside that metadata | Same as #125/#126: `HOME`/`XDG_DATA_HOME` select the private preference root; fixed suffixes and generated ids select the file, and the temp is created exclusively. |
+| #149 | `editor_recovery.c`: reading a recovery entry's metadata | Same as #86–#93: the metadata path is built from the private root and a generated id, not from level data. |
+| #148 | `editor_recovery.c`: writing the autosave snapshot | Same as #126: the snapshot path is below the private root with a generated name. |
+| #147 | `editor_recovery.c`: loading a recovery snapshot the user chose to restore | Same as #86–#93: the snapshot path comes from validated metadata below the private root. |
+
+These four findings (#147–#150) were dismissed as false positives after
+explicit maintainer authorization on 2026-10-07. No query or check is disabled.
