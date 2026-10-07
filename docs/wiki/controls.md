@@ -102,12 +102,20 @@ Selecting **Replay** on a completion overlay is deliberately a browser reload, n
 ## Debug Experiments
 
 `--debug` opens the simulation inspector and disables personal-profile persistence.
+Besides hitboxes, patrol lines and the velocity arrow, the overlay keeps its text
+in a few small panels: a status line at the top left (`LIVE`, `FROZEN` or `SLOW`,
+plus `REC n` or `REPLAY n/m`), one performance line at the top right (FPS, frame
+time, memory), one player line at the bottom right (state, ground/air, facing,
+velocity, and the checkpoint, riding platform and hurt time when set) and recent
+events at the bottom left. The tuned movement value appears under the status line
+for three seconds after F6/F7/minus/equal, and stays while it differs from the
+level's value; the F10 selection appears there while it is not the player.
 F2 freezes/resumes; F3 advances one 1/60-second step (also during replay);
 F4 cycles 1×, 0.25× and 0.1× speed. F6 cycles nine movement fields (walk/run max
 speed, walk/run ground acceleration, ground friction, ground counter-acceleration,
 walk/run air acceleration, air friction); minus/equal adjusts the selected field
 by 25 within its limits, and F7 restores authored values. F10 cycles
-player/fish/platform/saw inspection. F5 is unused. During experiment replay, F4,
+player/fish/platform/saw inspection. F5 opens and closes a key-help table. During experiment replay, F4,
 F7 and minus/equal are ignored. Focus/settings/player pause and terminal screens
 retain priority.
 

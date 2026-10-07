@@ -23,8 +23,9 @@ F6 cycles the nine movement properties; minus/equal changes the selected value b
 25 in its documented units. F7 restores the level's movement settings. Values are
 bounded between zero and `MAX_LEVEL_MOTION`. Player position, velocity,
 animation/climbing state, hitboxes, foot contact, moving-support index and
-checkpoint state remain visible in debug mode. F10 cycles a detail row through
-the player, fish, floating platforms and saws present in the level. During
+checkpoint state remain visible in debug mode, kept to a few small panels so the
+level stays readable. F10 cycles a detail row through the player, fish, floating
+platforms and saws present in the level. F5 opens a table of every inspector key. During
 capture replay, F4, F7 and minus/equal are ignored, so live speed and tuning
 changes cannot alter the run; F2 and F3 still pause and step it. Inspector
 function keys and minus/equal are reserved during debug remapping; ordinary

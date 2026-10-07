@@ -21,7 +21,7 @@ src/
 ├── core/
 │   ├── app_session.h / .c        Heap-owned session: window/audio lifetime, menu/game routes, browser replay
 │   ├── game_profile.h / .c       Versioned player settings/results and native/web persistence
-│   ├── game_inspector.h / .c     Simulation stepping, slow motion, tuning and cached inspection UI
+│   ├── game_inspector.h / .c     Simulation stepping, slow motion, tuning, status panel and F5 key help
 │   ├── game_experiment.h / .c    Bounded capture/export/replay with level fingerprints
 │   ├── game_random.h / .c        Reproducible unsigned PRNG for native/WASM
 │   ├── debug.h / .c              Debug overlay: FPS/frame budget/memory, hitboxes, event log
@@ -505,7 +505,7 @@ HUD renderer. Draws heart icons (health), player icon + lives counter, coin icon
 
 ### `core/debug.h` / `core/debug.c`
 
-Debug overlay (activated with `--debug` flag). FPS counter, collision hitbox visualization for all entities, and a scrolling event log.
+Debug overlay (activated with `--debug` flag): collision hitbox visualization for all entities, the performance line, the one-line player readout and the event log. `debug_draw_panel` draws the small translucent text panels every debug readout shares, and `debug_draw_box` the box alone.
 The displayed frame percentage is a `dt`-based fraction of a 60 Hz frame budget,
 not measured CPU utilization. The resident-memory sample comes from the OS.
 

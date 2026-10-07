@@ -11,6 +11,7 @@
 #include "screens/settings_menu.h"
 #include "input/game_events.h"
 #include "player/player_internal.h"
+#include "shared/platform.h"   /* clock_millis */
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -33,6 +34,16 @@ static int inspection_and_replay(void)
     strcpy(gs.level_path, "tests/fixtures/runtime/transition.toml");
     CHECK(game_init(&gs) == 0);
     input_clear();
+    /* F5 opens and closes the key help; F6 keeps the tuning line visible for
+     * a few seconds instead of a permanent panel row. */
+    CHECK(!gs.inspector.show_keys);
+    key(&gs, KEY_F5);
+    CHECK(gs.inspector.show_keys);
+    key(&gs, KEY_F5);
+    CHECK(!gs.inspector.show_keys);
+    key(&gs, KEY_F6);
+    CHECK(gs.inspector.tuning_visible_until > clock_millis());
+    gs.inspector.physics_field = 0;
     /* Live play: 40 ms of real time holds two 1/60 s steps (+ the half-step
      * slack a restarted clock starts with), never a 40 ms step. */
     game_timing_restart_clock(&gs);

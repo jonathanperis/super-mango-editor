@@ -36,13 +36,22 @@ void game_inspector_reset_physics(GameState *gs)
     level_apply_player_physics(&gs->player, gs->runtime.current_level);
 }
 
+/* Keep the tuning line on screen for a few seconds after F6, F7, - or +,
+ * so the value being changed is visible without a permanent panel row. */
+#define TUNING_VISIBLE_MS 3000
+static void show_tuning(GameState *gs)
+{
+    gs->inspector.tuning_visible_until = clock_millis() + TUNING_VISIBLE_MS;
+}
+
 int game_inspector_event(GameState *gs, const InputEvent *event)
 {
     if (!gs->debug_mode || event->type != INPUT_KEY_DOWN || event->repeat ||
         (gs->settings_menu && gs->settings_menu->open)) return 0;
     int key = event->key;
-    /* Export remains available on completion/game-over screens. */
+    /* Export and the key help remain available on completion/game-over. */
     if (key == KEY_F9) { game_experiment_export(gs); return 1; }
+    if (key == KEY_F5) { gs->inspector.show_keys = !gs->inspector.show_keys; return 1; }
     if (game_overlay_blocks_update(gs) || gs->route != GAME_ROUTE_NONE) return 0;
     switch (key) {
     case KEY_F2:
@@ -62,6 +71,7 @@ int game_inspector_event(GameState *gs, const InputEvent *event)
         return 1;
     case KEY_F6:
         gs->inspector.physics_field = (gs->inspector.physics_field + 1) % INSPECTOR_PHYSICS_COUNT;
+        show_tuning(gs);
         return 1;
     case KEY_F10:
         gs->inspector.entity_index = (gs->inspector.entity_index + 1) %
@@ -69,6 +79,7 @@ int game_inspector_event(GameState *gs, const InputEvent *event)
         return 1;
     case KEY_F7:
         if (!gs->experiment || !gs->experiment->replaying) game_inspector_reset_physics(gs);
+        show_tuning(gs);
         return 1;
     case KEY_F8:
         if (game_experiment_begin(gs)) debug_log(&gs->debug, "Cannot start experiment");
@@ -79,6 +90,7 @@ int game_inspector_event(GameState *gs, const InputEvent *event)
         float *value = (float *)((char *)&gs->player + fields[gs->inspector.physics_field].offset);
         float next = *value + (key == KEY_EQUAL ? 25.0f : -25.0f);
         if (next >= 0 && next <= MAX_LEVEL_MOTION) *value = next;
+        show_tuning(gs);
         return 1;
     }
     default: return 0;
@@ -108,61 +120,137 @@ int game_inspector_steps(GameState *gs, float frame_seconds)
     return game_timing_take_steps(gs, frame_seconds * speeds[gs->inspector.slow_mode]);
 }
 
+/*
+ * describe_inspected — Text for the entity chosen with F10, or NULL when the
+ * player is selected (the player already has its own bottom-right readout).
+ * entity_index counts the player first, then fish, platforms and saws.
+ */
+static const char *describe_inspected(const GameState *gs, char *out, size_t size)
+{
+    int index = gs->inspector.entity_index - 1;
+    if (index < 0) return NULL;
+    if (index < gs->fish_count) {
+        const Fish *fish = &gs->fish[index];
+        snprintf(out, size, "FISH %d  y %.0f vy %.0f wait %.2f", index, fish->y, fish->vy, fish->jump_timer);
+        return out;
+    }
+    index -= gs->fish_count;
+    if (index < gs->float_platform_count) {
+        const FloatPlatform *fp = &gs->float_platforms[index];
+        snprintf(out, size, "PLATFORM %d  t %.2f fall %d stand %.2f", index, fp->t, fp->falling, fp->stand_timer);
+        return out;
+    }
+    index -= gs->float_platform_count;
+    if (index < gs->circular_saw_count) {
+        const CircularSaw *saw = &gs->circular_saws[index];
+        snprintf(out, size, "SAW %d  x %.0f dir %d angle %.0f", index, saw->x, saw->direction, saw->spin_angle);
+        return out;
+    }
+    return NULL;
+}
+
+/*
+ * game_inspector_render — The inspector's part of the debug overlay.
+ *
+ *   top left : one status line (LIVE / FROZEN / SLOW, recording or replay
+ *              progress) plus, only when relevant, the movement value being
+ *              tuned and the entity chosen with F10;
+ *   centre   : the key list, only while F5 has it open.
+ *
+ * Performance, the player readout and the event log are drawn by
+ * debug_render with the same panel style.
+ */
 void game_inspector_render(GameState *gs)
 {
     if (!gs->debug_mode || !gs->hud.font) return;
-    char text[192];
-    float values[INSPECTOR_PHYSICS_COUNT];
+    TextFont *font = gs->hud.font;
+    const Color green = {120, 230, 120, 255}, cyan = {120, 210, 255, 255};
+    const Color yellow = {255, 225, 90, 255}, red = {255, 110, 110, 255};
+    const Color dim = {150, 155, 170, 255};
+
+    /* ---- Status line --------------------------------------------- */
+    static const char *slow_names[] = {"", "SLOW 0.25x", "SLOW 0.1x"};
+    const GameExperiment *tape = gs->experiment;
+    char status[64];
+    Color status_color = green;
+    const char *mode = "LIVE";
+    if (gs->inspector.frozen) { mode = "FROZEN"; status_color = cyan; }
+    else if (gs->inspector.slow_mode) { mode = slow_names[gs->inspector.slow_mode]; status_color = yellow; }
+    if (tape && tape->replaying)
+        snprintf(status, sizeof(status), "%s  REPLAY %d/%d", mode, tape->cursor, tape->count);
+    else if (tape && tape->recording)
+        snprintf(status, sizeof(status), "%s  REC %d", mode, tape->count);
+    else
+        snprintf(status, sizeof(status), "%s", mode);
+    if (tape && tape->recording && !tape->replaying) status_color = red;
+
+    /* ---- Tuning line: while being changed, or while it differs ----- */
+    float values[INSPECTOR_PHYSICS_COUNT], authored[INSPECTOR_PHYSICS_COUNT];
+    Player level_player = gs->player;
+    level_apply_player_physics(&level_player, gs->runtime.current_level);
     game_inspector_physics(&gs->player, values, 0);
-    static const float speeds[] = {1.0f, 0.25f, 0.1f};
-    snprintf(text, sizeof(text), "%s %.2fx | tape %d steps", gs->inspector.frozen ? "FROZEN" : "LIVE",
-             speeds[gs->inspector.slow_mode], gs->experiment ? gs->experiment->count : 0);
-    const char *lines[6] = {text, "F2 freeze F3 step F4 speed", "F6 field -/+ tune F7 reset", "F8 record F9 export F10 inspect", NULL, NULL};
-    char tuning[128];
-    snprintf(tuning, sizeof(tuning), "%s %.0f | support %d CP %d",
-             fields[gs->inspector.physics_field].name, values[gs->inspector.physics_field],
-             gs->loop.fp_prev_riding, gs->checkpoint_index);
-    lines[4] = tuning;
-    char entity[160];
-    int index = gs->inspector.entity_index - 1;
-    if (index >= 0 && index < gs->fish_count) {
-        const Fish *fish = &gs->fish[index];
-        snprintf(entity, sizeof(entity), "Fish[%d] y %.1f vy %.1f wait %.2f", index, fish->y, fish->vy, fish->jump_timer);
-    } else if ((index -= gs->fish_count) >= 0 && index < gs->float_platform_count) {
-        const FloatPlatform *fp = &gs->float_platforms[index];
-        snprintf(entity, sizeof(entity), "Platform[%d] rail %.2f fall %d stand %.2f", index, fp->t, fp->falling, fp->stand_timer);
-    } else if ((index -= gs->float_platform_count) >= 0 && index < gs->circular_saw_count) {
-        const CircularSaw *saw = &gs->circular_saws[index];
-        snprintf(entity, sizeof(entity), "Saw[%d] x %.1f dir %d angle %.0f", index, saw->x, saw->direction, saw->spin_angle);
-    } else {
-        snprintf(entity, sizeof(entity), "Player ground %d climb %d hurt %.2f", gs->player.on_ground, gs->player.on_vine, gs->player.hurt_timer);
-    }
-    lines[5] = entity;
-    DrawRectangle(0,28,GAME_W,88,(Color){8,12,20,235});
-    for (int i = 0; i < 6; i++) {
-        if (!gs->inspector.labels[i] || strcmp(gs->inspector.text[i], lines[i])) {
-            Texture2D *texture = font_texture(gs->hud.font, lines[i], (Color){240,240,200,255});
-            if (texture) {
-                texture_unload(gs->inspector.labels[i]);
-                gs->inspector.labels[i] = texture;
-                gs->inspector.width[i] = texture->width;
-                gs->inspector.height[i] = texture->height;
-                str_copy(gs->inspector.text[i], lines[i], sizeof(gs->inspector.text[i]));
-            }
+    game_inspector_physics(&level_player, authored, 0);
+    int field = gs->inspector.physics_field;
+    int tuned = values[field] != authored[field];
+    char tuning[96];
+    if (tuned)
+        snprintf(tuning, sizeof(tuning), "%s %.0f (level %.0f)", fields[field].name,
+                 values[field], authored[field]);
+    else
+        snprintf(tuning, sizeof(tuning), "%s %.0f", fields[field].name, values[field]);
+    int show_tuning_line = tuned || clock_millis() < gs->inspector.tuning_visible_until;
+
+    char entity[96];
+    const char *inspected = describe_inspected(gs, entity, sizeof(entity));
+
+    const char *lines[] = {status, show_tuning_line ? tuning : NULL, inspected,
+                           gs->inspector.show_keys ? NULL : "F5 keys"};
+    Color colors[] = {status_color, tuned ? yellow : WHITE, cyan, dim};
+    debug_draw_panel(font, HUD_MARGIN, DEBUG_PANEL_TOP, 0, lines, colors, 4);
+
+    /* ---- Key help, only while F5 has it open ----------------------
+     * A two-column table: the font is proportional, so the action column
+     * starts at a measured x instead of being padded with spaces. */
+    if (gs->inspector.show_keys) {
+        static const char *keys[] = {"F2", "F3", "F4", "F6", "- / +", "F7",
+                                     "F8", "F9", "F10", "F5"};
+        static const char *actions[] = {
+            "freeze / resume", "step one 1/60 s", "speed 1x / 0.25x / 0.1x",
+            "next movement field", "tune that field", "reset tuning",
+            "record from level start", "export the recording",
+            "inspect next entity", "close this help"};
+        const int rows = (int)(sizeof(keys) / sizeof(keys[0]));
+        const int gap = 10, pad = DEBUG_PANEL_PAD;
+        int key_w = 0, action_w = 0, title_w = 0;
+        for (int i = 0; i < rows; i++) {
+            int w = 0;
+            font_measure(font, keys[i], &w, NULL);
+            if (w > key_w) key_w = w;
+            font_measure(font, actions[i], &w, NULL);
+            if (w > action_w) action_w = w;
         }
-        IntRect dst = {4, 30 + 14*i, gs->inspector.width[i], gs->inspector.height[i]};
-        sprite_draw(gs->inspector.labels[i], NULL, &dst, 0, SPRITE_NORMAL, WHITE);
+        font_measure(font, "DEBUG KEYS", &title_w, NULL);
+        int box_w = pad * 2 + key_w + gap + action_w;
+        int box_h = pad * 2 + (rows + 1) * DEBUG_PANEL_LINE_H;
+        int left = (GAME_W - box_w) / 2, top = (GAME_H - box_h) / 2;
+        debug_draw_box(left, top, box_w, box_h);
+        font_draw(font, "DEBUG KEYS", left + (box_w - title_w) / 2, top + pad, yellow);
+        for (int i = 0; i < rows; i++) {
+            int row_y = top + pad + (i + 1) * DEBUG_PANEL_LINE_H;
+            font_draw(font, keys[i], left + pad, row_y, cyan);
+            font_draw(font, actions[i], left + pad + key_w + gap, row_y, WHITE);
+        }
     }
+
     /* Highlight the resolved contact surface and show the physical foot point. */
     int x = (int)(gs->player.x + gs->player.w / 2) - (int)gs->camera.x;
     int y = (int)(gs->player.y + gs->player.h - PLAYER_FLOOR_SINK);
     DrawLine(x-5,y,x+5,y,(Color){gs->player.on_ground ? 0 : 255,255,255,255});
 }
 
+/* The inspector draws with the shared HUD font each frame and owns no
+ * textures or heap memory; the lifecycle call stays for symmetry. */
 void game_inspector_cleanup(GameState *gs)
 {
-    for (int i = 0; i < 6; i++) {
-        texture_unload(gs->inspector.labels[i]);
-        gs->inspector.labels[i] = NULL;
-    }
+    (void)gs;
 }
