@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
-"""Validate TOML level files before runtime.
+"""Cross-file checks for the repository's levels.
 
-Checks stay deliberately boring: parse every repo level, verify referenced assets
-against the repo asset manifest, validate phase links, and enforce the same MAX_*
-array bounds the C loader uses. If this fails in CI, a level is wrong. Fix the
-level, not the validator.
+`make validate-levels` first loads every level through the game's own C loader
+and validator (tools/level_check.c), which owns the per-level rules: schema,
+counts, geometry, rails, checkpoints and path shapes. This script adds only
+what one level file cannot show on its own: referenced assets and next_phase
+targets exist on disk, checked-in levels state format_version and screen_count,
+the campaign manifest lists real levels in a linear chain, and C source asset
+literals exist. If this fails in CI, a level is wrong. Fix the level, not the
+validator.
+
+validate_schema() stays as a type-shape mirror of serializer_parse.c for one
+job: `make docs-drift` checks partial TOML snippets in the manual with it,
+without a C compiler. Levels themselves never rely on it.
 """
 
 from __future__ import annotations
@@ -70,19 +78,13 @@ COUNT_LIMITS = {
 
 PATH_KEYS = {"music_path", "floor_tile_path", "tile_path", "path", "next_phase"}
 
-ASSET_PATH_RULES = {
-    "music_path": (("assets/sounds/",), {".wav"}),
-    "floor_tile_path": (("assets/sprites/levels/",), {".png"}),
-    "tile_path": (("assets/sprites/levels/",), {".png"}),
-    "path": (("assets/sprites/",), {".png"}),
-}
-
 ASSET_LITERAL_RE = re.compile(r'"(assets/[^"\n]+\.(?:png|wav|ttf))"')
 
 
-# These schemas mirror serializer_parse.c.  Fields remain optional because the
-# C loader supplies LevelDef defaults for absent values; present v1 values must
-# still use the exact compatible TOML type.
+# These schemas mirror serializer_parse.c for docs-drift's TOML snippet check
+# (see the module docstring); levels are validated by the C loader.  Fields
+# remain optional because the C loader supplies LevelDef defaults for absent
+# values; present v1 values must still use the exact compatible TOML type.
 XY_FIELDS = {"x": "number", "y": "number"}
 SCHEMA_TABLE_FIELDS = {
     "last_star": {**XY_FIELDS, "next_phase": "string"},
@@ -399,38 +401,18 @@ def validate_schema(
     return errors
 
 
-# Width each enemy's patrol code turns it around with (level_validate.c).
-PATROL_WIDTHS = {
-    "spiders": "SPIDER_FRAME_W",
-    "jumping_spiders": "JSPIDER_FRAME_W",
-    "birds": "BIRD_FRAME_W",
-    "faster_birds": "FBIRD_FRAME_W",
-    "fish": "FISH_RENDER_W",
-    "faster_fish": "FISH_RENDER_W",
-}
-
-
 def load_max_constants() -> dict[str, int]:
+    """The C headers' MAX_* array limits, for validate_schema()'s counts."""
     constants: dict[str, int] = {}
     define_re = re.compile(
-        r"^\s*#define\s+([A-Z][A-Z0-9_]*)\s+([0-9]+)\b"
+        r"^\s*#define\s+(MAX_[A-Z0-9_]*)\s+([0-9]+)\b"
     )
-    shared_names = {"GAME_W", "GAME_H", "TILE_SIZE", "FLOOR_GAP_W"} | {
-        f"{kind}_{dimension}" for kind in ("VINE", "LADDER", "ROPE")
-        for dimension in ("W", "H", "STEP")
-    } | set(PATROL_WIDTHS.values())
-    # The one float the rules need: bouncepads must launch at least this hard.
-    jump_re = re.compile(r"^\s*#define\s+JUMP_VY\s+(-?[0-9.]+)f?\b")
 
     for header in (ROOT / "src").rglob("*.h"):
         for line in header.read_text(encoding="utf-8").splitlines():
             match = define_re.match(line)
-            if match and (match.group(1).startswith("MAX_") or
-                          match.group(1) in shared_names):
+            if match:
                 constants[match.group(1)] = int(match.group(2))
-            jump = jump_re.match(line)
-            if jump:
-                constants["JUMP_VY"] = float(jump.group(1))
 
     return constants
 
@@ -575,10 +557,6 @@ def load_asset_manifest() -> set[str]:
     return manifest
 
 
-def field_leaf(field: str) -> str:
-    return field.rsplit(".", 1)[-1]
-
-
 def validate_safe_repo_path(level_path: Path, field: str, value: str) -> tuple[str | None, list[str]]:
     errors: list[str] = []
     if value == "":
@@ -605,22 +583,6 @@ def validate_asset_reference(
     repo_path, errors = validate_safe_repo_path(level_path, field, value)
     if repo_path is None:
         return errors
-
-    leaf = field_leaf(field)
-    rule = ASSET_PATH_RULES.get(leaf)
-    if rule:
-        prefixes, suffixes = rule
-        if not any(repo_path.startswith(prefix) for prefix in prefixes):
-            allowed = " or ".join(prefixes)
-            errors.append(
-                f"{level_path.relative_to(ROOT)}: {field} must live under {allowed}: {value}"
-            )
-        suffix = Path(repo_path).suffix
-        if suffix not in suffixes:
-            allowed = ", ".join(sorted(suffixes))
-            errors.append(
-                f"{level_path.relative_to(ROOT)}: {field} must use {allowed}: {value}"
-            )
 
     if repo_path not in asset_manifest:
         errors.append(f"{level_path.relative_to(ROOT)}: {field} not in asset manifest: {value}")
@@ -685,388 +647,33 @@ def validate_source_asset_literals(asset_manifest: set[str]) -> list[str]:
     return errors
 
 
-def validate_counts(level_path: Path, data: dict, constants: dict[str, int]) -> list[str]:
-    errors: list[str] = []
+def validate_level(level_path: Path, asset_manifest: set[str]) -> list[str]:
+    """Repository policy and on-disk links for one level.
 
-    for field, constant in COUNT_LIMITS.items():
-        if field not in data:
-            continue
-        if constant not in constants:
-            errors.append(f"{constant} not found while validating {field}")
-            continue
-
-        if not isinstance(data[field], list):
-            errors.append(
-                f"{level_path.relative_to(ROOT)}: {field} must be an array "
-                f"(found {type(data[field]).__name__})"
-            )
-            continue
-
-        count = len(data[field])
-        max_count = constants[constant]
-        if count > max_count:
-            errors.append(
-                f"{level_path.relative_to(ROOT)}: {field} has {count} items (max {max_count})"
-            )
-
-    return errors
-
-
-def validate_rail_links(level_path: Path, data: dict) -> list[str]:
-    errors: list[str] = []
-    rails = data.get("rails", [])
-    rail_count = len(rails) if isinstance(rails, list) else 0
-
-    def check_rail_index(field: str, index: int, value) -> None:
-        if not isinstance(value, dict):
-            return
-        rail_index = value.get("rail_index")
-        if isinstance(rail_index, bool) or not isinstance(rail_index, int):
-            errors.append(
-                f"{level_path.relative_to(ROOT)}: {field}[{index}].rail_index "
-                "must be an integer"
-            )
-            return
-        if rail_index < 0 or rail_index >= rail_count:
-            errors.append(
-                f"{level_path.relative_to(ROOT)}: {field}[{index}].rail_index "
-                f"{rail_index} out of range (rails: {rail_count})"
-            )
-            return
-        rail = rails[rail_index]
-        if not isinstance(rail, dict):
-            return
-        w, h = rail.get("w", 2), rail.get("h", 2)
-        if not isinstance(w, int) or not isinstance(h, int):
-            return
-        count = 2 * w + 2 * (h - 2) if rail.get("layout", "RECT") == "RECT" else w
-        t = value.get("t_offset", 0.0)
-        if not _is_finite_number(t) or not 0 <= t < count or (rail.get("layout") == "HORIZ" and t > count - 1):
-            errors.append(f"{field}[{index}].t_offset must lie on the referenced rail")
-
-    spike_blocks = data.get("spike_blocks", [])
-    if isinstance(spike_blocks, list):
-        for index, spike_block in enumerate(spike_blocks):
-            check_rail_index("spike_blocks", index, spike_block)
-
-    float_platforms = data.get("float_platforms", [])
-    if isinstance(float_platforms, list):
-        for index, platform in enumerate(float_platforms):
-            if isinstance(platform, dict) and platform.get("mode") == "RAIL":
-                check_rail_index("float_platforms", index, platform)
-
-    return errors
-
-
-def validate_rail_geometry(level_path: Path, data: dict, constants: dict[str, int]) -> list[str]:
-    errors: list[str] = []
-    rails = data.get("rails", [])
-    max_tiles = constants.get("MAX_RAIL_TILES", 128)
-
-    if not isinstance(rails, list):
-        return errors
-
-    for index, rail in enumerate(rails):
-        if not isinstance(rail, dict):
-            continue
-        layout = rail.get("layout", "RECT")
-        w = rail.get("w")
-        h = rail.get("h")
-        if not isinstance(w, int) or isinstance(w, bool):
-            errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].w must be an integer")
-            continue
-        if layout == "RECT":
-            if not isinstance(h, int) or isinstance(h, bool):
-                errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].h must be an integer")
-                continue
-            if w < 2 or w > max_tiles:
-                errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].w {w} out of range (2..{max_tiles})")
-            if h < 2 or h > max_tiles:
-                errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].h {h} out of range (2..{max_tiles})")
-            tile_count = w * 2 + (h - 2) * 2
-            if tile_count > max_tiles:
-                errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}] has {tile_count} tiles (max {max_tiles})")
-        elif layout == "HORIZ":
-            if w < 2 or w > max_tiles:
-                errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].w {w} out of range (2..{max_tiles})")
-            end_cap = rail.get("end_cap", 0)
-            if end_cap not in (0, 1):
-                errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].end_cap must be 0 or 1")
-        else:
-            errors.append(f"{level_path.relative_to(ROOT)}: rails[{index}].layout invalid: {layout}")
-
-    return errors
-
-
-def _world_width(data: dict, constants: dict[str, int]) -> int:
-    screens = data.get("screen_count")
-    if isinstance(screens, bool) or not isinstance(screens, int) or screens <= 0:
-        screens = 4
-    return screens * constants.get("GAME_W", 400)
-
-
-def validate_floor_gaps(level_path: Path, data: dict, constants: dict[str, int]) -> list[str]:
-    """Mirror level_validate.c: each gap inside the world and on the floor grid."""
-    errors: list[str] = []
-    gaps = data.get("floor_gaps", [])
-    if not isinstance(gaps, list):
-        return errors
-    gap_w = constants.get("FLOOR_GAP_W", 32)
-    # FLOOR_PIECE_W in src/game.h: the floor is drawn in TILE_SIZE / 3 pieces.
-    piece_w = constants.get("TILE_SIZE", 48) // 3
-    max_x = _world_width(data, constants) - gap_w
-    for index, gap in enumerate(gaps):
-        if isinstance(gap, bool) or not isinstance(gap, int):
-            continue  # Type errors are reported by the schema pass.
-        field = f"{level_path.relative_to(ROOT)}: floor_gaps[{index}]"
-        if gap < 0 or gap > max_x:
-            errors.append(f"{field} {gap} out of range (0..{max_x})")
-        elif gap % piece_w != 0:
-            errors.append(f"{field} is {gap} (must be a multiple of {piece_w}, the floor piece width)")
-    return errors
-
-
-def validate_motion_rules(level_path: Path, data: dict, constants: dict[str, int]) -> list[str]:
-    """Mirror level_validate.c's bouncepad, rail-speed and patrol-width rules."""
-    errors: list[str] = []
-    rel = level_path.relative_to(ROOT)
-
-    def tables(array: str):
-        items = data.get(array, [])
-        if not isinstance(items, list):
-            return []
-        return [(i, item) for i, item in enumerate(items) if isinstance(item, dict)]
-
-    # A pad relaunches the player every step, so it must beat a normal jump.
-    jump_vy = constants.get("JUMP_VY", -325.0)
-    for array in ("bouncepads_small", "bouncepads_medium", "bouncepads_high"):
-        for index, pad in tables(array):
-            vy = pad.get("launch_vy", 0.0)
-            if _is_finite_number(vy) and vy > jump_vy:
-                errors.append(f"{rel}: {array}[{index}].launch_vy is {vy} "
-                              f"(must be {jump_vy:g} or lower, at least a normal jump upward)")
-
-    # Rail riders move forward, no faster than MAX_RAIL_SPEED (rail.h).
-    max_speed = constants.get("MAX_RAIL_SPEED", 30)
-    riders = [("spike_blocks", i, item) for i, item in tables("spike_blocks")]
-    riders += [("float_platforms", i, item) for i, item in tables("float_platforms")
-               if item.get("mode") == "RAIL"]
-    for array, index, rider in riders:
-        speed = rider.get("speed", 0.0)
-        if _is_finite_number(speed) and not 0 < speed <= max_speed:
-            errors.append(f"{rel}: {array}[{index}].speed is {speed} "
-                          f"(expected above 0 and at most {max_speed} tiles/s)")
-
-    # A patrol narrower than the sprite teleports the enemy between its ends.
-    for array, constant in PATROL_WIDTHS.items():
-        width = constants.get(constant)
-        if width is None:
-            errors.append(f"{constant} not found while validating {array}")
-            continue
-        for index, enemy in tables(array):
-            x0, x1 = enemy.get("patrol_x0", 0.0), enemy.get("patrol_x1", 0.0)
-            if _is_finite_number(x0) and _is_finite_number(x1) and x1 >= x0 and x1 - x0 < width:
-                errors.append(f"{rel}: {array}[{index}].patrol is {x1 - x0:g} px wide "
-                              f"(must be at least {width}, the sprite width)")
-    return errors
-
-
-def validate_nested_dimensions(level_path: Path, data: dict, constants: dict[str, int]) -> list[str]:
-    errors: list[str] = []
-    max_spike_tiles = constants.get("MAX_SPIKE_TILES", 16)
-    max_bridge_bricks = constants.get("MAX_BRIDGE_BRICKS", 16)
-
-    def check_range(array_name: str, key: str, lo: int, hi: int) -> None:
-        items = data.get(array_name, [])
-        if not isinstance(items, list):
-            return
-        for index, item in enumerate(items):
-            if not isinstance(item, dict):
-                continue
-            value = item.get(key)
-            if isinstance(value, bool) or not isinstance(value, int):
-                errors.append(f"{level_path.relative_to(ROOT)}: {array_name}[{index}].{key} must be an integer")
-            elif value < lo or value > hi:
-                errors.append(f"{level_path.relative_to(ROOT)}: {array_name}[{index}].{key} {value} out of range ({lo}..{hi})")
-
-    check_range("spike_rows", "count", 1, max_spike_tiles)
-    check_range("spike_platforms", "tile_count", 1, max_spike_tiles)
-    check_range("float_platforms", "tile_count", 1, max_spike_tiles)
-    check_range("bridges", "brick_count", 1, max_bridge_bricks)
-
-    screens = data.get("screen_count", 4)
-    screens = screens if isinstance(screens, int) and 0 < screens <= 99 else 4
-    # Match level_validate.c's rendered climbable rectangles, not just counts.
-    for array, kind in (("vines", "VINE"), ("ladders", "LADDER"), ("ropes", "ROPE")):
-        items = data.get(array, [])
-        if not isinstance(items, list):
-            continue
-        for index, item in enumerate(items):
-            if not isinstance(item, dict):
-                continue
-            count = item.get("tile_count", 1)
-            x, y = item.get("x", 0), item.get("y", 0)
-            if not isinstance(count, int) or isinstance(count, bool) or not _is_finite_number(x) or not _is_finite_number(y):
-                continue  # Type errors are reported by the schema pass.
-            x, y = ctypes.c_float(float(x)).value, ctypes.c_float(float(y)).value
-            height = constants[f"{kind}_H"] + (count - 1) * constants[f"{kind}_STEP"]
-            field = f"{level_path.relative_to(ROOT)}: {array}[{index}]"
-            if count < 1:
-                errors.append(f"{field}.tile_count must be positive")
-            elif x < 0 or x + constants[f"{kind}_W"] > screens * constants["GAME_W"]:
-                errors.append(f"{field}.x plus width is outside world bounds")
-            elif y < 0 or y + height > constants["GAME_H"]:
-                errors.append(f"{field}.y plus rendered height {height} is outside world bounds")
-    check_range("platforms", "tile_height", 1, (300 - 48 + 16) // 48)
-    # Width may be omitted/zero (one tile), unlike height.
-    for item in data.get("platforms", []) if isinstance(data.get("platforms", []), list) else []:
-        if isinstance(item, dict):
-            width = item.get("tile_width", 0)
-            if isinstance(width, (int, float)) and (width < 0 or width > screens * 400 // 48):
-                errors.append("platforms[].tile_width is outside world bounds")
-
-    max_motion = constants.get("MAX_LEVEL_MOTION", 10000)
-    physics = data.get("physics", {})
-    values = list(physics.items()) if isinstance(physics, dict) else []
-    for array, items in data.items():
-        if not isinstance(items, list):
-            continue
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            values.extend((f"{array}.{key}", item[key]) for key in ("vx", "launch_vy", "speed") if key in item)
-            if array in {"spiders", "birds", "faster_birds"}:
-                frame = item.get("frame_index", 0)
-                if isinstance(frame, int) and not 0 <= frame < 3:
-                    errors.append(f"{array}.frame_index is outside the sprite sheet")
-    for key, value in values:
-        if not _is_finite_number(value) or abs(value) > max_motion:
-            errors.append(f"{key} must be finite and within +/-{max_motion}")
-
-    return errors
-
-
-def validate_checkpoints(level_path: Path, data: dict, constants: dict[str, int]) -> list[str]:
-    errors: list[str] = []
-    checkpoints = data.get("checkpoints", [])
-    if not isinstance(checkpoints, list):
-        return errors
-    max_count = constants.get("MAX_CHECKPOINTS", 99)
-    if len(checkpoints) > max_count:
-        errors.append(
-            f"{level_path.relative_to(ROOT)}: checkpoints has {len(checkpoints)} "
-            f"items (max {max_count})"
-        )
-
-    screen_count = data.get("screen_count")
-    screens = screen_count if isinstance(screen_count, int) and not isinstance(screen_count, bool) and screen_count > 0 else 4
-    world_w = screens * constants.get("GAME_W", 400)
-    tile_size = constants.get("TILE_SIZE", 48)
-    start_x_value = data.get("player_start_x", 0.0)
-    start_y_value = data.get("player_start_y", 0.0)
-    start_x = 80.0
-    if (
-        isinstance(start_x_value, (int, float))
-        and not isinstance(start_x_value, bool)
-        and isinstance(start_y_value, (int, float))
-        and not isinstance(start_y_value, bool)
-        and _is_finite_number(start_x_value)
-        and _is_finite_number(start_y_value)
-        and (start_x_value != 0.0 or start_y_value != 0.0)
-    ):
-        start_x = ctypes.c_float(float(start_x_value)).value
-    seen_x: set[float] = set()
-    gap_w = constants.get("FLOOR_GAP_W", 32)
-    raw_gaps = data.get("floor_gaps", [])
-    gaps = [gap for gap in raw_gaps if isinstance(gap, int) and not isinstance(gap, bool)] \
-        if isinstance(raw_gaps, list) else []
-
-    for index, checkpoint in enumerate(checkpoints):
-        path = f"{level_path.relative_to(ROOT)}: checkpoints[{index}]"
-        if not isinstance(checkpoint, dict):
-            errors.append(f"{path} must be a table")
-            continue
-        x = checkpoint.get("x")
-        y = checkpoint.get("y")
-        if "x" not in checkpoint:
-            errors.append(f"{path} missing required key 'x'")
-        if "y" not in checkpoint:
-            errors.append(f"{path} missing required key 'y'")
-        if not _is_finite_number(x):
-            errors.append(f"{path}.x must be a finite number")
-        if not _is_finite_number(y):
-            errors.append(f"{path}.y must be a finite number")
-        if not _is_finite_number(x) or not _is_finite_number(y):
-            continue
-        x_value = ctypes.c_float(float(x)).value if isinstance(x, (int, float)) else 0.0
-        y_value = ctypes.c_float(float(y)).value if isinstance(y, (int, float)) else 0.0
-        if x_value in seen_x:
-            errors.append(f"{path}.x duplicates an earlier checkpoint")
-        seen_x.add(x_value)
-        if x_value <= start_x:
-            errors.append(f"{path}.x must be strictly after effective start x {start_x:g}")
-        if x_value < 0 or x_value > world_w - tile_size:
-            errors.append(f"{path}.x {x_value} out of range (0..{world_w - tile_size})")
-        if y_value < 0 or y_value > 300:
-            errors.append(f"{path}.y {y_value} out of range (0..300)")
-        # The player respawns in the tile-wide column at x; it must not
-        # touch a floor gap (level_validate.c, validate_checkpoints).
-        for gap_index, gap in enumerate(gaps):
-            if x_value < gap + gap_w and gap < x_value + tile_size:
-                errors.append(f"{path}.x respawn column overlaps floor_gaps[{gap_index}] at {gap}")
-
-    return errors
-
-
-def validate_level(
-    level_path: Path,
-    constants: dict[str, int],
-    asset_manifest: set[str],
-    *,
-    require_explicit_version: bool = False,
-) -> list[str]:
+    The C loader (tools/level_check.c) has already accepted the file's shape
+    and runtime rules; these checks need the rest of the repository.
+    """
     data = load_level(level_path)
+    label = level_path.relative_to(ROOT)
     nul_errors = _embedded_nul_errors(data)
     if nul_errors:
-        return [
-            f"{level_path.relative_to(ROOT)}: {error}"
-            for error in nul_errors
-        ]
+        return [f"{label}: {error}" for error in nul_errors]
 
     errors: list[str] = []
-
-    errors.extend(
-        f"{level_path.relative_to(ROOT)}: {error}"
-        for error in validate_schema(
-            data,
-            require_explicit_version=require_explicit_version,
-            constants=constants,
-        )
-    )
-
+    # The loader accepts legacy files without format_version and treats a
+    # missing or zero screen_count as the default; checked-in levels say both.
+    version = data.get("format_version")
+    if isinstance(version, bool) or version != CURRENT_FORMAT_VERSION:
+        errors.append(f"{label}: format_version must be explicit integer {CURRENT_FORMAT_VERSION}")
     screen_count = data.get("screen_count")
     if isinstance(screen_count, bool) or not isinstance(screen_count, int) or screen_count <= 0:
-        errors.append(f"{level_path.relative_to(ROOT)}: screen_count must be a positive integer")
-    elif screen_count > constants.get("MAX_LEVEL_SCREENS", 99):
-        errors.append(
-            f"{level_path.relative_to(ROOT)}: screen_count has {screen_count} "
-            f"screens (max {constants.get('MAX_LEVEL_SCREENS', 99)})"
-        )
+        errors.append(f"{label}: screen_count must be a positive integer")
 
     errors.extend(validate_paths(level_path, data, asset_manifest))
-    errors.extend(validate_counts(level_path, data, constants))
-    errors.extend(validate_rail_geometry(level_path, data, constants))
-    errors.extend(validate_floor_gaps(level_path, data, constants))
-    errors.extend(validate_rail_links(level_path, data))
-    errors.extend(validate_nested_dimensions(level_path, data, constants))
-    errors.extend(validate_motion_rules(level_path, data, constants))
-    errors.extend(validate_checkpoints(level_path, data, constants))
-
     return errors
 
 
 def main() -> int:
-    constants = load_max_constants()
     asset_manifest = load_asset_manifest()
     level_paths = sorted(LEVEL_DIR.glob("*.toml")) + sorted((LEVEL_DIR / "labs").glob("*.toml"))
 
@@ -1082,14 +689,7 @@ def main() -> int:
     errors.extend(campaign_errors)
     for level_path in level_paths:
         try:
-            errors.extend(
-                validate_level(
-                    level_path,
-                    constants,
-                    asset_manifest,
-                    require_explicit_version=True,
-                )
-            )
+            errors.extend(validate_level(level_path, asset_manifest))
         except ValueError as exc:
             errors.append(str(exc))
 
