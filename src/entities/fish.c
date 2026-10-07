@@ -4,7 +4,7 @@
  * This file owns the swim/jump behaviour for BOTH fish variants. The regular
  * fish and the faster fish (faster_fish.c) differ only in tuning — patrol
  * speed, jump impulse, delay between jumps and animation speed — which each
- * variant passes in as a FishSpec. bird_variant.c does the same for birds.
+ * variant passes in as a FishSpec. bird.c does the same for birds.
  */
 
 #include "../core/game_random.h"
