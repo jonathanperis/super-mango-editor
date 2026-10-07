@@ -41,3 +41,14 @@ int game_music_should_play(const GameState *gs);
 
 /* Pause or resume the music stream to match game_music_should_play(). */
 void game_music_sync(const GameState *gs);
+
+/*
+ * game_audio_apply_settings — apply the player's mute and volume settings
+ * (from the profile borrowed in gs->profile) to the sound effects and the
+ * level music. Does nothing without a profile.
+ *
+ * Call it after anything that reloads the level music: loading the music
+ * starts it at the level's own music_volume, which ignores a player who
+ * muted or turned the music down.
+ */
+void game_audio_apply_settings(const GameState *gs);
