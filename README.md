@@ -151,7 +151,7 @@ make clean                            # remove out/, out-sanitize/ and dist/ bui
 
 In debug mode: **F2** freezes, **F3** steps once, **F4** changes speed, **F6** selects
 a movement property, **-/+** tunes it and **F7** resets it. **F8** restarts/records;
-**F9** exports a capture; **F10** cycles inspected entities. Replay with `--level PATH --experiment CAPTURE.toml`.
+**F9** exports a capture; **F10** cycles inspected entities; **F5** shows this key list in game. Replay with `--level PATH --experiment CAPTURE.toml`.
 Debug/playtest sessions do not touch personal profiles. See the museum guide for
 capture limits and pause ownership.
 

@@ -110,3 +110,25 @@ void debug_log(DebugOverlay *dbg, const char *fmt, ...);
  */
 void debug_render(const DebugOverlay *dbg, TextFont *font,
                   const void *gs_ptr, int cam_x);
+
+/*
+ * debug_draw_panel — Draw a small translucent text panel sized to its lines.
+ *
+ * Every debug readout uses this one style so the overlay reads as a few
+ * tidy boxes instead of loose text. x/y is the panel's top-left corner, or
+ * its top-right corner when align_right is non-zero. colors may be NULL
+ * (all lines white). Returns the panel height in pixels (0 when empty) so
+ * callers can stack panels.
+ */
+int debug_draw_panel(TextFont *font, int x, int y, int align_right,
+                     const char *const *lines, const Color *colors, int count);
+
+/* The panel's translucent box alone, for layouts such as two-column tables. */
+void debug_draw_box(int x, int y, int w, int h);
+
+/* Inner padding between a panel's border and its text. */
+#define DEBUG_PANEL_PAD 3
+
+/* Layout shared by the debug panels (logical 400x300 canvas pixels). */
+#define DEBUG_PANEL_TOP    (HUD_MARGIN + HUD_ROW_H + 4) /* just below the HUD row */
+#define DEBUG_PANEL_LINE_H 12                           /* one 10 px text line + gap */

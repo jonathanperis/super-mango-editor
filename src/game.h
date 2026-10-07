@@ -418,9 +418,9 @@ typedef struct {
     uint64_t source_level_hash; /* source bytes corresponding to active LevelDef */
     struct {
         int frozen, step_requested, slow_mode, physics_field, entity_index;
-        Texture2D *labels[6]; /* cached inspector text */
-        char text[6][192];
-        int width[6], height[6];
+        int show_keys;                    /* F5 toggles the key help panel   */
+        uint64_t tuning_visible_until;    /* clock_millis() deadline for the
+                                             tuning line after F6/F7/-/+    */
     } inspector;
     struct GameExperiment *experiment; /* owned opt-in capture/replay */
 } GameState;

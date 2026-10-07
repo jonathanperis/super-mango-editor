@@ -181,11 +181,42 @@ static void draw_collision_boxes(const GameState *gs, int cam)
     outline((IntRect){score_x+width+3,HUD_MARGIN+(HUD_ROW_H-HUD_COIN_ICON_SIZE)/2,HUD_COIN_ICON_SIZE,HUD_COIN_ICON_SIZE},0,WHITE);
 }
 
-static void right_text(TextFont *font, const char *text, int y, Color color)
+void debug_draw_box(int x, int y, int w, int h)
 {
-    int width=0;
-    font_measure(font,text,&width,NULL);
-    font_draw(font,text,GAME_W-HUD_MARGIN-width,y,color);
+    DrawRectangle(x, y, w, h, (Color){8, 12, 20, 200});
+    DrawRectangleLines(x, y, w, h, (Color){70, 80, 100, 220});
+}
+
+int debug_draw_panel(TextFont *font, int x, int y, int align_right,
+                     const char *const *lines, const Color *colors, int count)
+{
+    const int pad = DEBUG_PANEL_PAD;
+    int width = 0, shown = 0;
+
+    if (!font || count <= 0) return 0;
+    /* Size the box to the widest line so short readouts stay small. */
+    for (int i = 0; i < count; i++) {
+        int w = 0;
+        if (!lines[i]) continue;
+        font_measure(font, lines[i], &w, NULL);
+        if (w > width) width = w;
+        shown++;
+    }
+    if (shown == 0) return 0;
+
+    int box_w = width + 2 * pad;
+    int box_h = shown * DEBUG_PANEL_LINE_H + 2 * pad - 2;
+    int left = align_right ? x - box_w : x;
+    debug_draw_box(left, y, box_w, box_h);
+
+    int row = 0;
+    for (int i = 0; i < count; i++) {
+        if (!lines[i]) continue;
+        Color color = colors ? colors[i] : WHITE;
+        font_draw(font, lines[i], left + pad, y + pad + row * DEBUG_PANEL_LINE_H, color);
+        row++;
+    }
+    return box_h;
 }
 
 void debug_init(DebugOverlay *dbg)
@@ -241,42 +272,65 @@ void debug_render(const DebugOverlay *dbg, TextFont *font, const void *state, in
 {
     const GameState *gs=state;
     draw_collision_boxes(gs,cam);
-    char text[64];
     Color green={0,255,0,255},yellow={255,255,0,255},red={255,80,80,255};
-    int y=HUD_MARGIN+HUD_ROW_H+2;
-    snprintf(text,sizeof(text),"FPS: %d",dbg->fps_display);
-    right_text(font,text,y,dbg->fps_display>=55?green:dbg->fps_display>=30?yellow:red);
-    snprintf(text,sizeof(text),"Frame: %.1fms (%.0f%%)",(double)dbg->frame_ms_display,(double)dbg->cpu_percent);
-    right_text(font,text,y+13,dbg->frame_ms_display<12?green:dbg->frame_ms_display<16.7f?yellow:red);
-    if (dbg->mem_mb>0) {
-        snprintf(text,sizeof(text),"MEM: %.1f MB",(double)dbg->mem_mb);
-        right_text(font,text,y+26,(Color){100,220,255,255});
-    }
+
+    /* ---- Top right: performance, one line ------------------------- */
+    char perf[64];
+    if (dbg->mem_mb > 0)
+        snprintf(perf, sizeof(perf), "%d FPS  %.1fms  %.0fMB", dbg->fps_display,
+                 (double)dbg->frame_ms_display, (double)dbg->mem_mb);
+    else
+        snprintf(perf, sizeof(perf), "%d FPS  %.1fms", dbg->fps_display,
+                 (double)dbg->frame_ms_display);
+    const char *perf_lines[] = {perf};
+    Color perf_color = dbg->fps_display >= 55 ? green : dbg->fps_display >= 30 ? yellow : red;
+    debug_draw_panel(font, GAME_W - HUD_MARGIN, DEBUG_PANEL_TOP, 1, perf_lines, &perf_color, 1);
+
+    /* ---- Bottom right: the player, one line ------------------------
+     * State, ground/air, facing and velocity always; checkpoint, riding
+     * platform and hurt time only while they mean something. */
     const Player *p=&gs->player;
-    snprintf(text,sizeof(text),"vx:%.0f vy:%.0f",p->vx,p->vy);
-    right_text(font,text,GAME_H-34,WHITE);
     static const char *states[]={"IDLE","WALK","JUMP","FALL","CLIMB"};
     static const char *climbs[]={" VINE"," LADDER"," ROPE"};
-    snprintf(text,sizeof(text),"%s %s %s%s",states[p->anim_state],p->on_ground?"GND":"AIR",
-             p->facing_left?"<-":"->",p->on_vine?climbs[p->climb_source]:"");
-    right_text(font,text,GAME_H-48,WHITE);
-    if (p->hurt_timer>0) {
-        snprintf(text,sizeof(text),"HURT:%.1fs",p->hurt_timer);
-        right_text(font,text,GAME_H-62,red);
-    }
+    char player_line[96], extras[48] = "";
+    if (gs->checkpoint_index >= 0)
+        snprintf(extras + strlen(extras), sizeof(extras) - strlen(extras), " CP%d", gs->checkpoint_index);
+    if (gs->loop.fp_prev_riding >= 0)
+        snprintf(extras + strlen(extras), sizeof(extras) - strlen(extras), " FP%d", gs->loop.fp_prev_riding);
+    snprintf(player_line, sizeof(player_line), "%s %s %s%s  vx %.0f vy %.0f%s",
+             states[p->anim_state], p->on_ground ? "GND" : "AIR", p->facing_left ? "<" : ">",
+             p->on_vine ? climbs[p->climb_source] : "", p->vx, p->vy, extras);
+    char hurt_line[24];
+    snprintf(hurt_line, sizeof(hurt_line), "HURT %.1fs", p->hurt_timer);
+    const char *player_lines[] = {p->hurt_timer > 0 ? hurt_line : NULL, player_line};
+    Color player_colors[] = {red, WHITE};
+    int player_rows = p->hurt_timer > 0 ? 2 : 1;
+    debug_draw_panel(font, GAME_W - HUD_MARGIN,
+                     GAME_H - HUD_MARGIN - player_rows * DEBUG_PANEL_LINE_H - 4, 1,
+                     player_lines, player_colors, 2);
+
     /* The arrow illustrates a quarter-second of current velocity; it does
      * not advance simulation. Translate its world-space center by camera X. */
     IntRect hit = player_get_hitbox(p);
     int cx = hit.x + hit.w/2 - cam, cy = hit.y + hit.h/2;
     DrawLine(cx, cy, cx + (int)(p->vx/4), cy + (int)(p->vy/4), green);
-    int drawn = 0;
-    /* Walk newest-to-oldest through the ring, skipping expired messages. */
-    for (int k = 0; k < dbg->log_count; k++) {
+
+    /* ---- Bottom left: recent events, newest at the bottom ---------- */
+    const char *log_lines[DEBUG_LOG_MAX_ENTRIES];
+    Color log_colors[DEBUG_LOG_MAX_ENTRIES];
+    int shown = 0;
+    /* Walk oldest-to-newest through the ring, skipping expired messages. */
+    for (int k = dbg->log_count - 1; k >= 0; k--) {
         int index = (dbg->log_head - 1 - k + DEBUG_LOG_MAX_ENTRIES) % DEBUG_LOG_MAX_ENTRIES;
         const DebugLogEntry *entry = &dbg->log[index];
-        if (entry->age>=DEBUG_LOG_DISPLAY_SEC) continue;
-        font_draw(font,entry->text,HUD_MARGIN,GAME_H-20-14*drawn++,entry->age>DEBUG_LOG_DISPLAY_SEC-1?(Color){180,180,180,255}:WHITE);
+        if (entry->age >= DEBUG_LOG_DISPLAY_SEC) continue;
+        log_lines[shown] = entry->text;
+        log_colors[shown] = entry->age > DEBUG_LOG_DISPLAY_SEC - 1 ? (Color){160,160,160,255} : WHITE;
+        shown++;
     }
+    debug_draw_panel(font, HUD_MARGIN, GAME_H - HUD_MARGIN - shown * DEBUG_PANEL_LINE_H - 4, 0,
+                     log_lines, log_colors, shown);
+
     int width=0;
     font_measure(font,"DEBUG MODE",&width,NULL);
     font_draw(font,"DEBUG MODE",(GAME_W-width)/2,HUD_MARGIN,yellow);
