@@ -53,69 +53,53 @@
 /* Player header */
 #include "../player/player.h"
 
-
 /* ------------------------------------------------------------------ */
-/* Main render function                                               */
+/* Layer groups                                                       */
+/*                                                                    */
+/* Each helper draws a run of neighbouring layers, back to front. The */
+/* helpers appear in the order game_render_frame calls them, so       */
+/* reading this file top to bottom follows the draw order. Anything   */
+/* drawn later covers what was drawn before it.                       */
 /* ------------------------------------------------------------------ */
 
-int game_render_frame(GameState *gs, int cam_x, float dt)
+/* The player's reduced-motion setting (no profile means "off"). */
+static int reduced_motion(const GameState *gs)
 {
-    /*
-     * Update the debug overlay even while paused so the FPS counter
-     * keeps measuring render frames and log entries age correctly.
-     */
-    if (gs->debug_mode) debug_update(&gs->debug, dt);
+    return gs->profile && gs->profile->data.settings.reduced_motion;
+}
 
-    /*
-     * Clear the logical render target.
-     * We always clear before drawing to avoid leftover pixels from the
-     * previous frame showing through.
-     */
-    if (!IsRenderTextureValid(gs->frame_target)) {
-        if (gs->route == GAME_ROUTE_NONE) gs->route = GAME_ROUTE_FATAL;
-        return 0;
-    }
+/*
+ * draw_background — The multi-layer parallax background, back-to-front.
+ * Each layer scrolls at a fraction of cam_x to simulate depth; reduced
+ * motion holds it still.
+ */
+static void draw_background(GameState *gs, int cam_x)
+{
+    parallax_render(&gs->parallax, reduced_motion(gs) ? 0 : cam_x);
+}
 
-    BeginDrawing();
-    BeginTextureMode(gs->frame_target);
-    ClearBackground(BLACK);
-
-    /*
-     * Draw the multi-layer parallax background, back-to-front.
-     * Each layer scrolls at a fraction of cam_x to simulate depth.
-     * cam_x is the integer camera offset computed above.
-     */
-    parallax_render(&gs->parallax,
-                     gs->profile && gs->profile->data.settings.reduced_motion ? 0 : cam_x);
-
-    /*
-     * Draw the platforms BEFORE the floor so the floor tiles render
-     * on top, hiding the 16 px of each pillar that sinks below FLOOR_Y.
-     * This makes the pillars look like they grow out of the ground.
-     */
-    platforms_render(gs->platforms, gs->platform_count,
-                     gs->textures.platform, cam_x);
-
-    /*
-     * 9-slice floor rendering — camera-aware, world-wide.
-     *
-     * The 48×48 floor tileset (the level's floor_tile_path, by default
-     * grass_tileset.png) is divided into a 3×3 grid of 16×16 pieces
-     * (TILE_SIZE / 3 = 16). Layout:
-     *
-     *   [TL][TC][TR]   row 0  y= 0..15  ← grass edge
-     *   [ML][MC][MR]   row 1  y=16..31  ← dirt interior
-     *   [BL][BC][BR]   row 2  y=32..47  ← floor base edge
-     *
-     * Piece column selection (based on world-space tx):
-     *   • tx == 0              → col 0 (left  world edge cap)
-     *   • tx + P >= WORLD_W    → col 2 (right world edge cap)
-     *   • all other columns    → col 1 (seamless center fill)
-     *
-     * We iterate tx in world coordinates starting from the tile-aligned
-     * column just behind cam_x, and stop once tx is off the right edge
-     * of the screen. dst.x = tx - cam_x converts world → screen.
-     */
+/*
+ * draw_floor — 9-slice floor rendering, camera-aware, world-wide.
+ *
+ * The 48×48 floor tileset (the level's floor_tile_path, by default
+ * grass_tileset.png) is divided into a 3×3 grid of 16×16 pieces
+ * (TILE_SIZE / 3 = 16). Layout:
+ *
+ *   [TL][TC][TR]   row 0  y= 0..15  ← grass edge
+ *   [ML][MC][MR]   row 1  y=16..31  ← dirt interior
+ *   [BL][BC][BR]   row 2  y=32..47  ← floor base edge
+ *
+ * Piece column selection (based on world-space tx):
+ *   • tx == 0              → col 0 (left  world edge cap)
+ *   • tx + P >= WORLD_W    → col 2 (right world edge cap)
+ *   • all other columns    → col 1 (seamless center fill)
+ *
+ * We iterate tx in world coordinates starting from the tile-aligned
+ * column just behind cam_x, and stop once tx is off the right edge
+ * of the screen. dst.x = tx - cam_x converts world → screen.
+ */
+static void draw_floor(GameState *gs, int cam_x)
+{
     const int P = FLOOR_PIECE_W;   /* 9-slice piece size: 16 px */
 
     /* First piece column at or before the left edge of the viewport */
@@ -182,7 +166,29 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
             sprite_draw(gs->textures.floor_tile, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }
     }
+}
 
+/*
+ * draw_ground — Platform pillars, then the floor.
+ *
+ * The platforms go BEFORE the floor so the floor tiles render on top,
+ * hiding the 16 px of each pillar that sinks below FLOOR_Y. This makes
+ * the pillars look like they grow out of the ground.
+ */
+static void draw_ground(GameState *gs, int cam_x)
+{
+    platforms_render(gs->platforms, gs->platform_count,
+                     gs->textures.platform, cam_x);
+    draw_floor(gs, cam_x);
+}
+
+/*
+ * draw_surfaces — Everything the player stands on or climbs, plus the
+ * static spikes that share their layer: float platforms, spike rows and
+ * platforms, bridges, bouncepads, rails, vines, ladders and ropes.
+ */
+static void draw_surfaces(GameState *gs, int cam_x)
+{
     /*
      * Draw floating platforms above the floor and pillar layer but below
      * bouncepads and entities, so they read as mid-air surfaces.
@@ -218,7 +224,7 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
         bouncepads_render(gs->bouncepads_high, gs->bouncepad_high_count,
                           gs->textures.bouncepad_high, cam_x);
     }
-                      
+
     /*
      * Draw rail tracks before vines and entities so rail tiles appear
      * behind all game objects — the track is part of the background layer.
@@ -243,8 +249,12 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
         rope_render(gs->ropes, gs->rope_count,
                     gs->textures.rope, cam_x);
     }
+}
 
-    /* Draw coins on top of the platforms, before the water and player */
+/* draw_collectibles — Coins and stars, on top of the platforms and
+ * before the water and player. */
+static void draw_collectibles(GameState *gs, int cam_x)
+{
     coins_render(gs->coins, gs->coin_count,
                  gs->textures.coin, cam_x);
 
@@ -260,7 +270,15 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
     /* Draw the end-of-level last star using its dedicated sprite */
     last_star_render(&gs->last_star,
                      gs->textures.last_star, cam_x);
+}
 
+/*
+ * draw_water_layer — What lives in the floor gaps: flames and fish first,
+ * then the water strip over them so the wave art hides their submerged
+ * part.
+ */
+static void draw_water_layer(GameState *gs, int cam_x)
+{
     /* Draw blue flames behind the water and fish, in front of ground */
     blue_flames_render(gs->blue_flames, gs->blue_flame_count,
                   gs->textures.blue_flame, cam_x);
@@ -281,40 +299,49 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
      * The full 384-px sheet scrolls rightward as a seamless loop.
      */
     if (gs->runtime.water_enabled) water_render(&gs->water);
+}
 
-    /* Draw spike blocks above the water strip but below the player */
+/* draw_moving_hazards — Spike blocks, axe traps and circular saws, above
+ * the water strip but below enemies and the player. */
+static void draw_moving_hazards(GameState *gs, int cam_x)
+{
     if (gs->textures.spike_block) {
         spike_blocks_render(gs->spike_blocks, gs->spike_block_count,
                             gs->textures.spike_block, cam_x);
     }
 
-    /* Draw axe traps above spike blocks and water, before spiders */
     axe_traps_render(gs->axe_traps, gs->axe_trap_count,
                      gs->textures.axe_trap, cam_x);
 
     /* Draw circular saws in the same hazard layer as axe traps */
     circular_saws_render(gs->circular_saws, gs->circular_saw_count,
                          gs->textures.circular_saw, cam_x);
+}
 
-    /* Draw spiders on top of the water strip, before the player */
+/* draw_enemies — Spiders, then birds in the sky in front of them; all
+ * behind the player. */
+static void draw_enemies(GameState *gs, int cam_x)
+{
     spiders_render(gs->spiders, gs->spider_count,
                    gs->textures.spider, cam_x);
     /* Draw jumping spiders in the same layer as regular spiders */
     jumping_spiders_render(gs->jumping_spiders, gs->jumping_spider_count,
                            gs->textures.jumping_spider, cam_x);
 
-    /* Draw birds in the sky, in front of spiders but behind the player */
     birds_render(gs->birds, gs->bird_count,
                  gs->textures.bird, cam_x);
     faster_birds_render(gs->faster_birds, gs->faster_bird_count,
                         gs->textures.faster_bird, cam_x);
+}
 
-    /* Draw the player sprite on top of everything */
-    player_render(&gs->player, cam_x);
-
-    /* Draw fog/mist as the topmost layer — rendered after the player.
-     * Only active when the level definition enables fog (fog_enabled == 1). */
-    if (gs->runtime.fog_enabled && !(gs->profile && gs->profile->data.settings.reduced_motion)) fog_render(&gs->fog);
+/*
+ * draw_foreground — Fog/mist over the whole scene, after the player. Only
+ * active when the level enables fog and reduced motion is off. High
+ * contrast then outlines the player's hitbox and darkens the HUD strip.
+ */
+static void draw_foreground(GameState *gs, int cam_x)
+{
+    if (gs->runtime.fog_enabled && !reduced_motion(gs)) fog_render(&gs->fog);
     if (gs->profile && gs->profile->data.settings.high_contrast) {
         IntRect hit = player_get_hitbox(&gs->player);
         hit.x -= cam_x;
@@ -322,8 +349,15 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
         DrawRectangleLines(hit.x,hit.y,hit.w,hit.h,WHITE);
         DrawRectangle(0,0,GAME_W,22,BLACK);
     }
+}
 
-    /* Draw the HUD overlay on top of everything (hearts, lives, score) */
+/*
+ * draw_hud_and_overlays — The HUD (hearts, lives, score), then the debug
+ * overlays when active, then the player-facing overlay (level complete,
+ * game over or pause), which covers everything else.
+ */
+static void draw_hud_and_overlays(GameState *gs, int cam_x)
+{
     hud_render(&gs->hud,
                gs->hearts, gs->lives, gs->score,
                gs->checkpoint_index,
@@ -337,7 +371,6 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
         game_inspector_render(gs);
     }
 
-    /* Player-facing overlays — rendered last on top of everything */
     GameOverlayState overlay = game_overlay_state(gs);
     if (overlay == GAME_OVERLAY_LEVEL_COMPLETE) {
         render_level_complete_overlay(gs);
@@ -346,13 +379,52 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
     } else if (overlay == GAME_OVERLAY_PAUSED) {
         render_pause_overlay(gs);
     }
+}
+
+/* ------------------------------------------------------------------ */
+/* Main render function                                               */
+/* ------------------------------------------------------------------ */
+
+int game_render_frame(GameState *gs, int cam_x, float dt)
+{
+    /*
+     * Update the debug overlay even while paused so the FPS counter
+     * keeps measuring render frames and log entries age correctly.
+     */
+    if (gs->debug_mode) debug_update(&gs->debug, dt);
 
     /*
-     * Present the logical render target to the screen.
-     * Everything drawn so far was on an off-screen buffer.
-     * This call makes it visible instantly, preventing flicker.
-     * With VSync enabled, this call also blocks until the monitor
-     * is ready for the next frame (typically ~16ms at 60 Hz).
+     * Clear the logical render target.
+     * We always clear before drawing to avoid leftover pixels from the
+     * previous frame showing through.
+     */
+    if (!IsRenderTextureValid(gs->frame_target)) {
+        if (gs->route == GAME_ROUTE_NONE) gs->route = GAME_ROUTE_FATAL;
+        return 0;
+    }
+
+    BeginDrawing();
+    BeginTextureMode(gs->frame_target);
+    ClearBackground(BLACK);
+
+    /* Back to front; architecture.md lists every layer in this order. */
+    draw_background(gs, cam_x);
+    draw_ground(gs, cam_x);
+    draw_surfaces(gs, cam_x);
+    draw_collectibles(gs, cam_x);
+    draw_water_layer(gs, cam_x);
+    draw_moving_hazards(gs, cam_x);
+    draw_enemies(gs, cam_x);
+    player_render(&gs->player, cam_x);
+    draw_foreground(gs, cam_x);
+    draw_hud_and_overlays(gs, cam_x);
+
+    /*
+     * The settings panel sits above even the overlays. Then present the
+     * logical render target to the screen: everything so far was drawn
+     * off-screen, and this makes it visible at once, preventing flicker.
+     * With VSync enabled, presenting also blocks until the monitor is
+     * ready for the next frame (typically ~16ms at 60 Hz).
      */
     settings_menu_render(gs->settings_menu, gs->profile, gs->hud.font);
     display_present(gs->frame_target);
