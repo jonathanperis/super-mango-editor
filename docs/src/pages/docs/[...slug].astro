@@ -2,32 +2,37 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import '../../styles/docs.css';
 import { DOCS_META, SECTION_CATEGORIES, SECTION_ORDER } from '@/lib/docsSidebar';
+import { getCollection, render } from 'astro:content';
 
 // docs-drift sentinel: level-catalog
-const globResult = import.meta.glob('../../../wiki/*.md', { eager: true });
+// The manual is the `docs` content collection (src/content.config.ts): one
+// entry per docs/wiki/*.md file, id = file name. index.md is the "home" page.
+const entries = await getCollection('docs');
+const entriesBySlug = new Map(entries.map(entry => [entry.id === 'index' ? 'home' : entry.id, entry]));
 
-const pagesBySlug: Record<string, any> = {};
-for (const [path, module] of Object.entries(globResult)) {
-    const fileName = path.split('/').pop()!.replace('.md', '');
-    const slug = fileName === 'index' ? 'home' : fileName;
-    pagesBySlug[slug] = module;
-}
-
-const availableSlugs = new Set(Object.keys(pagesBySlug));
 for (const id of SECTION_ORDER) {
-    if (!availableSlugs.has(id)) {
+    if (!entriesBySlug.has(id)) {
         throw new Error(
-            `Docs navigation references "${id}" but no matching wiki/${id}.md was found. Available slugs: ${Array.from(availableSlugs).join(', ')}`
+            `Docs navigation references "${id}" but no matching wiki/${id}.md entry was found. Available entries: ${Array.from(entriesBySlug.keys()).join(', ')}`
         );
+    }
+}
+// The reverse check: a wiki page missing from the navigation would build no
+// route and be unreachable, so list every page in src/lib/docsSidebar.ts.
+for (const slug of entriesBySlug.keys()) {
+    if (!(SECTION_ORDER as readonly string[]).includes(slug)) {
+        throw new Error(`docs/wiki page "${slug}" is not listed in SECTION_ORDER (src/lib/docsSidebar.ts)`);
     }
 }
 
 const requestedSlug = Astro.params.slug;
 const isRoot = requestedSlug === undefined;
 const requestedKey = requestedSlug ?? 'home';
-const currentPage = pagesBySlug[requestedKey];
+const currentPage = entriesBySlug.get(requestedKey);
 
-if (!isRoot && !currentPage) {
+// The navigation checks above guarantee every listed route has an entry;
+// anything else is not a manual page.
+if (!currentPage) {
     return Astro.redirect('/404');
 }
 
@@ -48,7 +53,7 @@ function humanizeSlug(s: string): string {
 const pageMeta = DOCS_META[requestedKey as keyof typeof DOCS_META];
 const pageTitle = isRoot
     ? 'Super Mango Builder Manual'
-    : (currentPage?.frontmatter?.title ?? pageMeta?.label ?? humanizeSlug(requestedKey));
+    : (currentPage?.data.title ?? pageMeta?.label ?? humanizeSlug(requestedKey));
 
 const base = import.meta.env.BASE_URL;
 const baseClean = base.replace(/\/$/, '');
@@ -65,10 +70,12 @@ const allPages = SECTION_ORDER.map(id => DOCS_META[id]);
 const currentIndex = SECTION_ORDER.indexOf(requestedKey as any);
 const prevPage = !isRoot && currentIndex > 0 ? DOCS_META[SECTION_ORDER[currentIndex - 1]] : null;
 const nextPage = !isRoot && currentIndex >= 0 && currentIndex < SECTION_ORDER.length - 1 ? DOCS_META[SECTION_ORDER[currentIndex + 1]] : null;
-const CurrentContent = currentPage?.default ?? currentPage;
+// render() compiles the entry's Markdown into a component for this route.
+const { Content: CurrentContent } = await render(currentPage);
+const pageDescription = currentPage?.data.description ?? pageMeta.description;
 ---
 
-<BaseLayout title={isRoot ? pageTitle : `${pageTitle} — Super Mango Manual`} description={pageMeta.description} pageType="docs">
+<BaseLayout title={isRoot ? pageTitle : `${pageTitle} — Super Mango Manual`} description={pageDescription} pageType="docs">
     <div class="mobile-header">
         <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false">
             <span></span><span></span><span></span>
