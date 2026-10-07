@@ -33,5 +33,5 @@ typedef struct {
 } LadderDecor;
 
 /* Blit every ladder with world-to-screen camera offset applied. */
-void ladder_render(const LadderDecor *ladders, int count,
-                   Texture2D *tex, int cam_x);
+void ladders_render(const LadderDecor *ladders, int count,
+                    Texture2D *tex, int cam_x);
