@@ -2,6 +2,14 @@
 
 <a id="home"></a>
 
+On this page: [Quick start](#quick-start) · [Top-level scalars](#top-level-scalars) ·
+[Checkpoints](#authored-checkpoints) · [Rails](#rails) · [Platforms](#platforms) ·
+[Coins](#coins) · [Stars](#stars) · [Last star](#last-star) ·
+[Campaign manifest](#campaign-manifest-v1) · [Enemies](#enemies) ·
+[Hazards](#hazards) · [Surfaces](#surfaces) ·
+[Background and foreground layers](#background--foreground-layers) ·
+[Minimum valid level](#minimum-valid-level-file)
+
 ---
 
 Super Mango levels are defined as [TOML](https://toml.io) files inside the `levels/` directory. The shared serializer parses them; `level_loader.c` creates runtime objects from the validated data. The editor reads and writes the same format. Positions use **logical world pixels**: the viewport is 400×300, while world width is `screen_count × 400`.

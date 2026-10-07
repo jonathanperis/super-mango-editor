@@ -2,6 +2,11 @@
 
 <a id="home"></a>
 
+On this page: [Makefile overview](#makefile-overview) ·
+[Build targets](#build-targets) · [Docs site toolchain](#astro-docs-site-toolchain) ·
+[Prerequisites](#prerequisites) · [CI/CD pipelines](#cicd-pipelines) ·
+[Adding source files](#adding-new-source-files) · [Output structure](#output-structure)
+
 ---
 
 ## Makefile Overview
@@ -575,7 +580,7 @@ touch src/entities/new_enemy.c src/entities/new_enemy.h
 make   # new_enemy.c is compiled automatically
 ```
 
-See [Developer Guide](../developer-guide/) for the full new-entity workflow.
+See the [Entity Walkthrough](../entity-walkthrough/) for the full new-entity workflow.
 
 ---
 
