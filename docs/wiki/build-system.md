@@ -290,7 +290,9 @@ regression suites.
 
 ### `make validate-levels`
 
-Runs the Python TOML validator against `levels/*.toml`, `levels/labs/*.toml` and the required v1 `levels/campaigns/main.toml` manifest. It checks schema, referenced asset paths, `next_phase` links, counts and geometry against C limits, checkpoints, manifest membership/order and the linear campaign chain.
+Builds `out/level-check` (`tools/level_check.c`) and loads every `levels/*.toml` and `levels/labs/*.toml` through the game's own loader and validator, `level_load_toml()`. The rules live in one place, `src/levels/level_validate.c` and `src/shared/serializer_parse.c`: schema, counts, geometry, rails, checkpoints and path shapes. The checker needs no window or GPU; it reuses the game's objects (and so builds raylib once, for its headers).
+
+`tools/validate_levels.py` then makes the checks a single file cannot: referenced assets and `next_phase` targets exist, checked-in levels state `format_version` and a positive `screen_count`, the required v1 `levels/campaigns/main.toml` manifest lists real levels in order as a linear chain, and asset literals in `src/` exist. Its `validate_schema()` only mirrors the type schema so `make docs-drift` can check the manual's partial TOML snippets without a compiler.
 
 ```sh
 make validate-levels

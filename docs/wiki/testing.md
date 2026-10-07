@@ -11,7 +11,7 @@ Use this page to choose the smallest useful verification set for a change. Run c
 | Changed area | Run locally | Why |
 |--------------|-------------|-----|
 | C runtime, gameplay, collision, score, overlays, sessions | `make test CC=clang` | Builds and runs 15 native regression binaries, a parser allocation probe, and Python/Node host checks (levels, generated sounds, parser encoding, web host, release packaging, CodeQL SARIF filter). |
-| Level TOML, campaign manifest, or level schema | `make validate-levels` and `make docs-drift` | Validates root and lab levels, the v1 campaign manifest, generated facts, schema docs and prose counts. |
+| Level TOML, campaign manifest, or level schema | `make validate-levels` and `make docs-drift` | Loads root and lab levels through the C loader and validator, then checks assets, the v1 campaign manifest, generated facts, schema docs and prose counts. |
 | Player/world runtime startup | `make smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEED=1` | Renders every TOML level plus the editor in bounded hidden windows. |
 | Replay or event handling | `make scripted-smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"` | Generates deterministic commands/action masks and checks movement/jump/pause results. |
 | Editor behaviour | `make editor CC=clang` and `./out/super-mango-editor --smoke-test` | Builds the editor and renders five hidden-window frames; a desktop context is still required. |

@@ -269,10 +269,12 @@ jobs:
         shell: msys2 {0}
         run: make test CC="$MANGO_CC" OUTDIR=out/headless RAYLIB_PLATFORM=memory
 
+      # The level checker is C and reuses the objects built above, so it
+      # must use the same compiler.
       - name: Validate levels (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make validate-levels
+        run: make validate-levels CC="$MANGO_CC"
 
       - name: Build editor (Windows)
         if: runner.os == 'Windows'
@@ -404,7 +406,7 @@ jobs:
         run: make test CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
 
       - name: Validate levels (Windows clang)
-        run: make validate-levels
+        run: make validate-levels CC=clang
 
       - name: Build editor with -Werror (Windows clang)
         run: make editor CC=clang
