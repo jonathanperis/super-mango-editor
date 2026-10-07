@@ -109,9 +109,22 @@ def main():
                 raise AssertionError("transitive SDL dependency was accepted")
             imports["game.exe"] = imports["editor.exe"] = ["KERNEL32.dll"]
             assert package_release.collect_windows_dlls(binaries, dll_dir) == []
-    workflow = (ROOT / ".github/workflows/deploy.yml").read_text()
-    assert "ref: ${{ github.event.workflow_run.head_sha }}" in workflow
-    assert "github.event.workflow_run.head_repository.full_name == github.repository" in workflow
+    # Pages publishing lives in build.yml: the WASM artifact must come from
+    # the same run (no run-id), only pages-deploy may hold Pages/OIDC rights,
+    # and no workflow may consume another run's artifact via workflow_run.
+    workflows = ROOT / ".github/workflows"
+    assert not (workflows / "deploy.yml").exists()
+    for path in workflows.glob("*.yml"):
+        text = path.read_text()
+        assert "\n  workflow_run:" not in text, path.name          # trigger
+        assert "github.event.workflow_run" not in text, path.name  # its payload
+    build = (workflows / "build.yml").read_text()
+    pages_build = build.split("  pages-build:", 1)[1].split("  pages-deploy:", 1)[0]
+    pages_deploy = build.split("  pages-deploy:", 1)[1]
+    assert "name: super-mango-wasm" in pages_build and "run-id" not in pages_build
+    assert "pages: write" not in pages_build and "id-token: write" not in pages_build
+    assert "pages: write" in pages_deploy and "id-token: write" in pages_deploy
+    assert "actions/checkout" not in pages_deploy and "bun " not in pages_deploy
     print("package_release_test: ok")
 
 

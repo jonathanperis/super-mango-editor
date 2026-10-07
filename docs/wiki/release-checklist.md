@@ -43,7 +43,7 @@ main builds independently of releases.
 
 ## 3. WebAssembly Gates
 
-The authoritative WebAssembly gate is GitHub CI: the `build.yml` WebAssembly job runs `make web`, verifies artifacts with `tools/check_wasm_artifacts.py`, packages `super-mango-wasm.zip`, and `deploy.yml` smokes the unpacked Pages payload before publishing. Use local Emscripten only as an optional preflight when that host toolchain is healthy.
+The authoritative WebAssembly gate is GitHub CI: the `build.yml` WebAssembly job runs `make web`, verifies artifacts with `tools/check_wasm_artifacts.py`, packages `super-mango-wasm.zip`, and the `pages-build` job in the same workflow smokes the unpacked Pages payload before `pages-deploy` publishes it. Use local Emscripten only as an optional preflight when that host toolchain is healthy.
 
 Optional local preflight:
 
@@ -91,7 +91,7 @@ Before creating a release, confirm checks for the intended source commit are gre
 > pull requests, but it is not yet required by the repository ruleset. Until a
 > repository owner adds it under **Settings › Rules › Rulesets**, confirm it is
 > green manually; GitHub does not block a merge when it fails.
-- Deploy to GitHub Pages
+- Pages build and Pages deploy (main pushes and manual runs on main)
 
 Publishing rules:
 
