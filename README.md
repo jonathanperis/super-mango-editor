@@ -137,6 +137,10 @@ make editor CC=clang                  # build the level editor
 make run-editor CC=clang              # build and run the level editor
 make test CC=clang                    # 15 native regression tests (binaries) plus Python/JavaScript host checks
 make validate-levels                  # validate campaign, root levels and levels/labs/
+make smoke CC=clang                   # render every level and the editor for a few frames
+make sanitize CC=clang                # ASan/UBSan tests plus fuzz-seed replay in out-sanitize/
+make sounds                           # regenerate assets/sounds/ from tools/gen_sounds.py
+make docs-drift                       # generated-content and docs consistency checks
 make web                              # build to WebAssembly (requires Emscripten)
 make clean                            # remove out/, out-sanitize/ and dist/ build artifacts
 ```
@@ -174,8 +178,8 @@ super-mango-editor/
 ├── levels/                           TOML level definitions
 │   ├── labs/                        Six focused learning levels
 │   ├── 00_sandbox_01.toml           Creator's Playground; first campaign level
-│   ├── 01_lugio_01.toml             Level data loaded at runtime
-│   ├── 02_lugio_02.toml             Level data loaded at runtime
+│   ├── 01_lugio_01.toml             Volcanic Depths 1
+│   ├── 02_lugio_02.toml             Volcanic Depths 2
 │   └── campaigns/main.toml           v1 ordered campaign manifest for the native selector
 ├── src/                              C source files and headers
 │   ├── main.c                        CLI entry point; AppSession owns raylib lifetime
@@ -194,14 +198,14 @@ super-mango-editor/
 │   ├── editor/                        Standalone visual level editor
 │   │   ├── editor_main.c             Editor entry point
 │   │   ├── editor.h / .c             Editor state and high-level glue
-│   │   ├── canvas/palette/properties/tools/ui modules
+│   │   ├── canvas/palette/properties/tools/hit_test/entity_meta modules
 │   │   ├── editor_frame/events/chrome/panels/layout/textures modules
 │   │   ├── editor_files/session/playtest/clipboard/validation modules
-│   │   ├── shared serializer/UI consumers
-│   │   ├── file_dialog.h / .c        Native file dialogs
+│   │   ├── file_dialog.h / .c        Native file dialogs; dialog_choice.c: choice dialogs and argument quoting
 │   │   └── undo*.h / .c              Undo/redo history and operation application
 │   ├── shared/                        Graphics/audio/text/OS helpers, TOML serializer, atomic UTF-8 I/O, shared UI
 │   ├── effects/                       Visual effects
+│   │   ├── game_effects.h / .c       Per-frame effect orchestration
 │   │   ├── fog.h / .c                Fog overlay
 │   │   ├── parallax.h / .c           Multi-layer scrolling background
 │   │   └── water.h / .c              Animated water strip
@@ -209,6 +213,7 @@ super-mango-editor/
 │   │   ├── spider.h / .c             Spider (ground patrol)
 │   │   ├── jumping_spider.h / .c     Jumping spider
 │   │   ├── bird.h / .c               Bird (sine-wave sky patrol)
+│   │   ├── bird_variant.h / .c       Shared bird/faster-bird behaviour
 │   │   ├── faster_bird.h / .c        Fast bird
 │   │   ├── fish.h / .c               Fish (jumping water patrol)
 │   │   └── faster_fish.h / .c        Fast fish
@@ -223,19 +228,20 @@ super-mango-editor/
 │   ├── levels/                        Level system
 │   │   ├── level.h                    Shared level definitions (LevelDef struct)
 │   │   ├── level_loader.h / .c       TOML level loading and switching
-│   │   ├── level_path/resources/session/physics helpers
+│   │   ├── level_path/ref/resources/session/physics helpers
 │   │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
-│   │   ├── level_validate.c          LevelDef count validation
+│   │   └── level_validate.c          LevelDef count validation
 │   ├── player/                        Player module split into lifecycle, input, motion, jump, climb, surface, and animation files
 │   ├── render/                        `game_render` frame order and `render_overlay` foreground/overlay helpers
 │   ├── screens/                       Game screens
 │   │   ├── start_menu.h / .c         Start menu
+│   │   ├── settings_menu.h / .c      F1 settings and control remapping
 │   │   └── hud.h / .c                HUD (hearts, lives, score)
 │   └── surfaces/                      Traversable objects
 │       ├── platform.h / .c           One-way platform pillars (9-slice)
 │       ├── float_platform.h / .c     Hovering platforms (static/crumble/rail)
 │       ├── bridge.h / .c             Crumble walkways
-│       ├── bouncepad.h / .c          Bouncepad base + 3 variants (small/medium/high)
+│       ├── bouncepad.h / .c          Bouncepad base; bouncepad_small/medium/high.h variants
 │       ├── rail.h / .c               Rail path system
 │       ├── vine.h / .c               Climbable vine
 │       ├── ladder.h / .c             Climbable ladder
@@ -260,15 +266,20 @@ super-mango-editor/
 │       ├── player/                   Player action sounds
 │       ├── screens/                  Menu sounds
 │       └── surfaces/                 Surface interaction sounds
-├── vendor/                            Vendored third-party libraries
+├── vendor/                            Vendored third-party code and pins
+│   ├── raylib/                       raylib 6.0 source/checksum pin, patches and provenance
 │   └── tomlc17/                      TOML v1.1 parser (tomlc17.c/.h)
-├── tests/                             Native regression test harnesses
-├── docs/                              Astro GitHub Pages documentation site
-├── web/                               Emscripten shell template
-└── .github/workflows/                 CI/CD pipelines
-    ├── build.yml                      Build checks (PRs/main), Pages deploy (main) + tagged/manual releases
-    ├── codeql.yml                     Code security analysis
-    └── docs.yml                       Docs lint/build checks
+├── tests/                             Native harnesses, fuzz harnesses/corpus, fixtures, Python/Node host tests
+├── tools/                             Build, validation, generator, packaging and docs-check scripts
+├── scripts/                           One-off helpers (favicon generation)
+├── docs/                              Astro GitHub Pages site; manual pages in docs/wiki/
+├── web/                               Emscripten shell, touch controls, keyboard scoping, debug boot
+├── .specs/                            Project state, roadmap and feature specs
+└── .github/                           CI workflows and SECURITY_TRIAGE.md
+    └── workflows/
+        ├── build.yml                  Docs drift, builds/tests, release checksums/provenance, Pages build/deploy (main)
+        ├── codeql.yml                 CodeQL: C/C++ (filtered SARIF), Actions, Python, JavaScript/TypeScript
+        └── docs.yml                   Docs drift, lint, audit, build and site checks
 ```
 
 ## Project Documents
@@ -279,20 +290,23 @@ super-mango-editor/
 | `DESIGN.md` | Visual/UX design notes for the arcade-cabinet presentation. |
 | `docs/wiki/developer-guide.md` | Coding conventions, entity integration, resource ownership, and verification. |
 | `docs/README.md` | Website setup, content ownership, generated facts and deployment. |
-| `docs/AUDIT.md` | Dated documentation audit, verification and enhancement follow-ups. |
+| `docs/AUDIT.md`, `docs/AUDIT_IMPLEMENTATION.md` | Historical, dated audit reports (not current status). |
+| `SECURITY.md` | Vulnerability reporting, scope and the web build's shared-origin model. |
+| `THIRD_PARTY_NOTICES.md` | Third-party code and media notices. |
+| `.specs/project/` | Project state, roadmap and decisions. |
 | `CODEOWNERS` | Review ownership hints for GitHub. |
 
 These files complement the public GH Pages manual. If they disagree with code, update the docs and source-backed checks together.
 
 ## CI/CD
 
-Four GitHub Actions workflows:
+Three workflow files (the Pages jobs are part of `build.yml`):
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
 | Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift`; Linux x86_64, macOS arm64, Windows x86_64 and WebAssembly builds; separate Windows Clang and `Desktop backend` jobs; release checksums/attestation; releases only for `v*` tags or manual dispatch on `main` |
 | Docs | `docs.yml` | Push to `main`, relevant pull requests, manual | Source/content drift, frozen Bun install, Astro lint/build, dependency audit and built-site checks |
-| CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis |
+| CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built; non-security results in `out/` and `vendor/` filtered by `tools/filter_codeql_sarif.py` before upload), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis |
 | Deploy Pages | `build.yml` (`pages-build`, `pages-deploy`) | Main push/manual run, after `Docs drift` and the build matrix pass | Builds/checks docs at that commit, adds the same run's WebAssembly artifact, smokes the assembly and deploys Pages |
 
 The build matrix builds desktop game/editor binaries and archives (Windows with GCC); native legs compile with `-Werror`, the WebAssembly leg with `EXTRA_WEB_CFLAGS=-Werror`. Linux runs GLFW tests/rendered smoke with a virtual display and audio sink; macOS/Windows run the same logical/resource suite and rendered smoke using a separate Memory test build. Additional checks include desktop sanitizers (with fuzz-seed replay) and scripted replay smoke on Linux; `make validate-levels` runs on Linux, macOS and Windows. The WebAssembly leg builds and checks normal/debug artifacts and their archive. Two jobs ship nothing and never block a release: Windows Clang (`-Werror` on the rolling MSYS2 toolchain) and `Desktop backend`, which runs the Windows (Mesa llvmpipe) suites on real GLFW/OpenGL (hosted macOS runners have no OpenGL pixel format, so the real macOS backend is checked locally). The always-on `Docs drift` job runs `make docs-drift` on every pull request. For releases, a `Checksums and provenance` job writes `SHA256SUMS` and a GitHub build provenance attestation for the four archives; the release job re-verifies them, uploads assets to a draft, then publishes it. Docs and Pages gates validate the matching source/content and WebAssembly artifacts.
