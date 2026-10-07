@@ -31,8 +31,8 @@ jobs:
   # ────────────────────────────────────────────────────────────────────────────
   # DOCS DRIFT
   # docs.yml only runs for PRs touching docs-related paths, so a check there
-  # would never report on other PRs. This cheap job always runs, making it the
-  # recommended required status check (the owner must add it to the ruleset).
+  # would never report on other PRs. This cheap job always runs, so the main
+  # branch ruleset requires it.
   # ────────────────────────────────────────────────────────────────────────────
   docs-drift:
     name: Docs drift
