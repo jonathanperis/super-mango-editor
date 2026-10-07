@@ -64,12 +64,11 @@ cannot be isolated, so the game treats stored values as untrusted input:
   `last_level`) whose level key fails today's level-reference rule, such as
   `levels/con.toml`, is dropped with a warning while the rest loads. The next
   save then writes the profile without it, through the same compare-and-swap.
-- The replay intent is removed as soon as it is read. The standalone
-  `super-mango.html` shell forwards it as a `--level` argument only when it
-  matches a bundled level path (`levels/NAME.toml` or `levels/labs/NAME.toml`);
-  the docs-site home page (`docs/src/components/home/Dashboard.astro`) forwards
-  any stored value as `--level` without that pattern check. In both cases the
-  path must fit the fixed level-path buffer, can only name
+- The replay intent is removed as soon as it is read. Both pages that host the
+  game (the standalone `super-mango.html` shell and the docs-site home page,
+  `docs/src/components/home/Dashboard.astro`) forward it as a `--level`
+  argument only when it matches a bundled level path (`levels/NAME.toml` or
+  `levels/labs/NAME.toml`). The path must also fit the fixed level-path buffer, can only name
   files inside the Emscripten in-memory filesystem (the preloaded `assets/`
   and `levels/`), and the selected file still goes through full TOML schema
   and level validation before use. It does not reach the host filesystem.
