@@ -54,7 +54,7 @@ RELEASE_PLATFORM=super-mango-wasm make dist-wasm
 python3 tools/check_wasm_artifacts.py --zip dist/super-mango-wasm.zip
 ```
 
-The verifier checks that `out/super-mango.html`, `.js`, `.wasm`, and `.data` exist, that the generated JavaScript references the expected asset basenames, that Node accepts the generated JavaScript syntax, and that `WebAssembly.compile` can compile the generated `.wasm` binary. When a zip exists, it also verifies the WebAssembly release archive includes HTML, JS, WASM, data, `README.txt`, and `LICENSE`.
+The verifier checks that the normal and debug `out/super-mango*.html`, `.js`, `.wasm`, and `.data` files exist, that the generated JavaScript references the expected asset basenames and does not depend on `emscripten_sleep`, that each HTML shell's pinned Content-Security-Policy matches its inline boot script, that Node accepts the generated JavaScript syntax, and that `WebAssembly.compile` can compile the generated `.wasm` binary. With `--zip`, it also verifies the WebAssembly release archive includes those eight files, `README.txt`, `LICENSE`, `THIRD_PARTY_NOTICES.md` and `licenses/tomlc17.txt`.
 
 Report local SDK/cache failures separately from application failures and require green CI WebAssembly/artifact/Pages checks. Native rendered checks need graphics and audio services; Linux CI supplies Xvfb/Mesa and a PulseAudio null sink. A missing desktop device is an explicit verification gap, not a passing test.
 
@@ -83,15 +83,19 @@ Inspect the zip and confirm it contains:
 
 Before creating a release, confirm checks for the intended source commit are green:
 
-- Build & Release
-- CodeQL
+- Build & Release, including the non-gating `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` and `Desktop backend (Windows x86_64 Mesa)` jobs
+- CodeQL (`Analyze (c-cpp)`, `Analyze (actions)`, `Analyze (python)`, `Analyze (javascript-typescript)`)
 - Docs (runs on every `main` push; PRs run it only for docs-related paths, while Build & Release's `Docs drift` job always runs)
-
-> **Owner action:** `Docs drift` is the recommended required status check for
-> pull requests, but it is not yet required by the repository ruleset. Until a
-> repository owner adds it under **Settings › Rules › Rulesets**, confirm it is
-> green manually; GitHub does not block a merge when it fails.
 - Pages build and Pages deploy (main pushes and manual runs on main)
+
+> **Owner action:** as checked on 2026-10-07, the `main` branch ruleset requires
+> `Build (Linux x86_64)`, `Build (macOS arm64)`, `Build (Windows x86_64)`,
+> `Build (WebAssembly)`, `Analyze (c-cpp)`, `Analyze (actions)` and `CodeQL`,
+> and blocks merges on high-or-higher CodeQL security alerts. `Docs drift`,
+> `Analyze (python)` and `Analyze (javascript-typescript)` are recommended
+> additions but are not required yet. Until a repository owner adds them under
+> **Settings › Rules › Rulesets**, confirm they are green manually; GitHub does
+> not block a merge when they fail.
 
 Publishing rules:
 
