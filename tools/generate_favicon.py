@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Generate Super Mango favicon assets for the GitHub Pages site."""
+"""Generate Super Mango favicon assets for the GitHub Pages site.
+
+Writes docs/public/favicon.ico, favicon.png, favicon-32x32.png and
+apple-touch-icon.png. A manual tool (needs Pillow), not part of any build:
+run `python3 tools/generate_favicon.py` from the repository root after
+changing the drawing below, and commit the images it writes.
+"""
 from __future__ import annotations
 
 from pathlib import Path
