@@ -43,12 +43,13 @@ contract; do not generate an npm lockfile.
 
 | Surface | Source |
 |---|---|
-| Landing copy / cabinet host | `src/components/home/`, `src/pages/index.astro` |
+| Landing copy / cabinet host | `src/components/home/`, `src/pages/index.astro` (the boot script in `Dashboard.astro` needs its element ids; see the comment at the top of that file) |
+| Game art used by the site | `src/lib/art.ts` imports sprites straight from `../assets/sprites/` (no copies); `src/components/Sprite.astro` draws a frame or animation at a whole-pixel scale |
 | Manual content | `wiki/*.md`, loaded as the `docs` content collection (`src/content.config.ts`); `wiki/index.md` renders on `/docs/` |
 | Page titles, descriptions, categories and order | `src/lib/docsSidebar.ts` (optional `title`/`description` frontmatter overrides) |
 | Manual layout / routes | `src/pages/docs/[...slug].astro` (`getCollection('docs')` + `render()`) |
 | SEO and shared page shell | `src/layouts/BaseLayout.astro` |
-| Styles | `src/styles/globals.css`, `src/styles/docs.css` |
+| Styles | `src/styles/globals.css` (shared tokens, sprites, pixel buttons), `src/styles/home.css`, `src/styles/docs.css` |
 | Production origin/base | `astro.config.mjs`; keep `public/robots.txt` consistent |
 | Landing-page Content-Security-Policy | `integrations/home-csp.mjs` (hashes inline scripts after build; see `SECURITY.md`) |
 
