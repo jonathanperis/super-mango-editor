@@ -11,6 +11,7 @@
  */
 #pragma once
 
+#include "../shared/printf_format.h"
 #include "../shared/text.h"
 
 /* ------------------------------------------------------------------ */
@@ -94,9 +95,10 @@ void debug_update(DebugOverlay *dbg, float dt);
 
 /*
  * Push a formatted message into the scrolling debug log.
- * Uses printf-style format string + variadic arguments.
+ * Uses printf-style format string + variadic arguments; PRINTF_FORMAT lets
+ * the compiler check each call's arguments against the format.
  */
-void debug_log(DebugOverlay *dbg, const char *fmt, ...);
+void debug_log(DebugOverlay *dbg, const char *fmt, ...) PRINTF_FORMAT(2, 3);
 
 /*
  * debug_render — Draw all debug overlays on top of everything else.

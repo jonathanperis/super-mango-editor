@@ -12,6 +12,7 @@
 #include <string.h>  /* memchr, memcmp, strlen */
 
 #include "serializer_types.h" /* enum validation */
+#include "printf_format.h"    /* PRINTF_FORMAT */
 #include "utf8.h"             /* utf8_valid */
 #include "../game.h"          /* MAX_* array limits */
 
@@ -382,6 +383,7 @@ static const SerializerRootSpec ROOT_FIELDS[] = {
 #undef NUMBER_FIELD
 #undef INTEGER_FIELD
 
+PRINTF_FORMAT(3, 4)
 static int schema_error(char *error, size_t error_size, const char *format, ...)
 {
     va_list args;
