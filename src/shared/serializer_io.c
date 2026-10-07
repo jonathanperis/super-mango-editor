@@ -23,7 +23,7 @@
 #else
 #include <fcntl.h>    /* open, O_CREAT, O_EXCL */
 #include <sys/stat.h> /* stat, lstat, fchmod */
-#include <unistd.h>   /* getpid, fsync, fileno, close */
+#include <unistd.h>   /* getpid, fsync, fileno, close, read, write */
 #endif
 
 static int serializer_test_failure = SERIALIZER_TEST_FAILURE_NONE;
@@ -530,35 +530,53 @@ static int serializer_link_unsupported(int error)
  *
  * O_EXCL claims the target name: it fails if anything, a dangling symlink
  * included, is already there, so an existing file is never replaced.  The
- * finished temporary file is then renamed over the empty placeholder we
- * just made, so a reader sees either that empty file or the whole new one,
- * never a half-written level.  Before renaming we check that the name
- * still points at our placeholder; if something replaced it in between,
- * we leave it alone and fail like an appearing target does with link().
+ * finished temporary file is then copied into the claimed file through the
+ * descriptor we hold, never through the name again, so nothing that appears
+ * at that name afterwards can be written to or replaced.  The copy is
+ * flushed before the temporary file goes away.
+ *
+ * Unlike link(), a reader opening the file during the copy can see it
+ * partly written.  This path only runs on drives without hard links
+ * (FAT/exFAT, many network shares), and a create-only save there has no
+ * atomic option that also refuses to replace an existing file.
  */
 static int serializer_create_without_link(const char *temp_path,
                                           const char *target_path)
 {
-    struct stat claimed;
-    struct stat current;
-    int fd = open(target_path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+    char buffer[8192];
+    int failed = 0;
+    int in = open(temp_path, O_RDONLY);
+    if (in < 0) return -1;
+    int out = open(target_path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+    if (out < 0) {
+        (void)close(in);
+        return -1;
+    }
 
-    if (fd < 0) return -1;
-    if (fstat(fd, &claimed) != 0) {
-        (void)close(fd);
-        (void)unlink(target_path);
+    while (!failed) {
+        ssize_t got = read(in, buffer, sizeof(buffer));
+        if (got == 0) break;
+        if (got < 0) {
+            if (errno != EINTR) failed = 1;
+            continue;
+        }
+        for (ssize_t done = 0; done < got && !failed;) {
+            ssize_t put = write(out, buffer + done, (size_t)(got - done));
+            if (put < 0) {
+                if (errno != EINTR) failed = 1;
+                continue;
+            }
+            done += put;
+        }
+    }
+    if (!failed && fsync(out) != 0) failed = 1;
+    (void)close(in);
+    if (close(out) != 0) failed = 1;
+    if (failed) {
+        (void)unlink(target_path);   /* our own half-written claim */
         return -1;
     }
-    (void)close(fd);
-    if (lstat(target_path, &current) != 0 ||
-        current.st_dev != claimed.st_dev || current.st_ino != claimed.st_ino ||
-        current.st_size != 0) {
-        return -1;
-    }
-    if (rename(temp_path, target_path) != 0) {
-        (void)unlink(target_path);
-        return -1;
-    }
+    (void)unlink(temp_path);
     serializer_sync_parent_dir_or_warn(target_path);
     return 0;
 }
