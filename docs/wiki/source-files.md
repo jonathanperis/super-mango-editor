@@ -2,6 +2,15 @@
 
 <a id="home"></a>
 
+On this page: [File map](#file-map) · [`main.c`](#mainc) · [`game.h`](#gameh) ·
+[Runtime core](#runtime-core-coreapp_sessionc-coregame_lifecyclec-coregame_loopc-coregame_resourcesc) ·
+[Player](#player-module-player) ·
+[Levels](#levelslevelh-levelslevel_loaderc-levelslevel_physicsc-levelslevel_validatec-levelsphase_transitionc) ·
+[Start menu](#screensstart_menuh--screensstart_menuc) · [Enemies](#enemy-modules-entities) ·
+[Hazards](#hazard-modules-hazards) · [Collectibles](#collectible-modules-collectibles) ·
+[Surfaces](#surface-modules-surfaces) · [Effects](#environment-modules-effects) ·
+[System modules](#system-modules)
+
 ---
 
 ## File Map

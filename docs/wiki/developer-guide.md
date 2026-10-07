@@ -145,18 +145,7 @@ one-way surfaces and the sprite's inset foot position in `player_surfaces.c`.
 
 ## Adding a New Sound Effect
 
-All sound files are `.wav` format, named with the convention `component_descriptor.wav`. They are synthesized by `tools/gen_sounds.py` (12 mono 16-bit 22050 Hz files); `make docs-drift` runs `gen_sounds.py --check` to catch committed files that drift from the generator:
-
-| Sound | File |
-|-------|------|
-| Player jump | `player_jump.wav` |
-| Player hit | `player_hit.wav` |
-| Coin collect | `coin.wav` |
-| Bouncepad | `bouncepad.wav` |
-| Bird | `bird.wav` |
-| Fish | `fish.wav` |
-| Spider | `spider.wav` |
-| Axe trap | `axe_trap.wav` |
+All sound files are `.wav` format, named with the convention `component_descriptor.wav`. They are synthesized by `tools/gen_sounds.py` (12 mono 16-bit 22050 Hz files); `make docs-drift` runs `gen_sounds.py --check` to catch committed files that drift from the generator. [Sounds](../sounds/) lists every file and where the game plays it.
 
 Steps to add a new sound:
 
@@ -173,8 +162,6 @@ Steps to add a new sound:
 ```c
 sound_play(gs->audio.<name>, 128); // null-safe; per-play volume in authored units
 ```
-
-See [Sounds](../sounds/) for the full list of available sound files.
 
 ---
 
