@@ -2,6 +2,8 @@
 #define _POSIX_C_SOURCE 200809L /* fork, kill, pipe, sigaction under -std=c11 */
 #endif
 
+#include <float.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +34,7 @@
 #include "editor/entity_meta.h"
 #include "editor/file_dialog.h"
 #include "shared/serializer.h"
+#include "shared/serializer_emit.h"
 #include "shared/serializer_io.h"
 #include "editor/tools.h"
 #include "editor/undo.h"
@@ -3222,6 +3225,54 @@ cleanup:
 #endif
 }
 
+/*
+ * The editor only saves levels that validate, and must be able to open
+ * what it saved.  A rail-mode float platform's x/y are not range-checked
+ * (the rail places it), so they can hold FLT_MAX, which "%.9g" used to
+ * write as 3.40282347e+38: past FLT_MAX, so the loader refused the file.
+ */
+static int extreme_floats_round_trip_through_save(void)
+{
+    const char *path = "out/editor_extreme_float_roundtrip.toml";
+    LevelDef def, loaded;
+    char error[128];
+    static const float samples[] = {
+        FLT_MAX, -FLT_MAX, 3.4028233e38f, FLT_MIN, 1e-45f, 0.08f, 536.2f, -380.0f,
+    };
+
+    for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
+        const char *text = fmt_float(samples[i]);
+        double back = strtod(text, NULL);
+        if (fabs(back) > FLT_MAX || (float)back != samples[i]) {
+            fprintf(stderr, "editor_validation_test: fmt_float(%.9g) wrote %s\n",
+                    (double)samples[i], text);
+            return 1;
+        }
+    }
+
+    ensure_out_dir();
+    editor_level_init_defaults(&def);
+    def.rail_count = 1;
+    def.rails[0] = (RailPlacement){RAIL_LAYOUT_RECT, 32, 32, 4, 4, 0};
+    def.float_platform_count = 1;
+    def.float_platforms[0] = (FloatPlatformPlacement){
+        FLOAT_PLATFORM_RAIL, FLT_MAX, -FLT_MAX, 3, 0, 2.0f, 1.0f};
+    if (level_validate_runtime(&def, error, sizeof(error)) != 0) {
+        fprintf(stderr, "editor_validation_test: extreme fixture invalid: %s\n", error);
+        return 1;
+    }
+    remove(path);
+    if (expect_int("extreme save", level_save_toml(&def, path), 0) != 0 ||
+        expect_int("extreme load", level_load_toml(path, &loaded), 0) != 0 ||
+        expect_int("FLT_MAX x kept", loaded.float_platforms[0].x == FLT_MAX, 1) != 0 ||
+        expect_int("-FLT_MAX y kept", loaded.float_platforms[0].y == -FLT_MAX, 1) != 0) {
+        remove(path);
+        return 1;
+    }
+    remove(path);
+    return 0;
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -3280,6 +3331,7 @@ int main(void)
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;
     if (display_paths_keep_the_file_name() != 0) return 1;
+    if (extreme_floats_round_trip_through_save() != 0) return 1;
 
     puts("editor_validation_test: ok");
     return 0;
