@@ -233,7 +233,7 @@ def check_constants_doc() -> None:
 
 def check_gamestate_doc() -> None:
     doc = read(DOCS / "architecture.md")
-    for token in ["game_over", "paused", "pause_reasons", "checkpoint_x", "completion", "level_def"]:
+    for token in ["game_over", "paused", "pause_reasons", "respawn_x", "checkpoint_index", "completion", "level_def"]:
         if token not in doc:
             fail(f"docs/wiki/architecture.md: GameState docs missing `{token}`")
 

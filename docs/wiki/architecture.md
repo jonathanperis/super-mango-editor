@@ -146,55 +146,60 @@ frame regardless of the wall clock. Experiment captures (`format_version = 2`)
 store one row per fixed step, `[input bits, physics values...]`, with no
 duration column; a `format_version = 1` capture from the variable-timestep
 engine is rejected with a request to record it again. Completion, game over or
-a route stops the remaining steps of that frame. The debug inspector only changes how much real time
-reaches the accumulator: F2 freezes, F3 runs exactly one step, F4 slows time to
-0.25x/0.1x. It never overrides focus/settings/terminal blockers, and touch taps
-are discarded only while such a screen owns input, not on zero-step frames.
+a route stops the remaining steps of that frame. The debug inspector's freeze,
+single-step and slow-motion keys ([Controls](../controls/#debug-inspector-keys))
+only change how much real time reaches the accumulator. They never override the
+focus, settings or end-of-level blockers, and touch taps are discarded only
+while such a screen owns input, not on zero-step frames.
 Render-only timers (debug FPS readout, log ages) use real frame time.
 
 During an active game update, authored checkpoints are sampled after player movement and before lethal collision handling. Legacy screen-boundary checkpoint sampling runs only when the active level has no authored records.
 
 ### Render Order (back to front)
 
-| Layer | What | How |
-|-------|------|-----|
-| 1 | Background | Per-level `background_layers` from `assets/sprites/backgrounds/`, tiled horizontally with each layer's configured scroll speed |
-| 2 | Platforms | active level platform tile, 9-slice tiled pillar stacks (drawn before floor so pillars sink into ground) |
-| 3 | Floor | active level floor tile tiled across world width at `FLOOR_Y`, with floor-gap openings |
-| 4 | Float platforms | `float_platform.png` 3-slice hovering surfaces (static, crumble, rail modes) |
-| 5 | Spike rows | `spike.png` ground-level spike strips on the floor surface |
-| 6 | Spike platforms | `spike_platform.png` elevated spike hazard surfaces |
-| 7 | Bridges | `bridge.png` tiled crumble walkways |
-| 8 | Bouncepads (medium) | `bouncepad_medium.png` standard-launch spring pads |
-| 9 | Bouncepads (small) | `bouncepad_small.png` low-launch spring pads |
-| 10 | Bouncepads (high) | `bouncepad_high.png` high-launch spring pads |
-| 11 | Rails | `rail.png` bitmask tile tracks for spike blocks and float platforms |
-| 12 | Vines | `vine_green.png` / `vine_brown.png` climbable plant decorations hanging from platforms |
-| 13 | Ladders | `ladder.png` climbable ladder structures |
-| 14 | Ropes | `rope.png` climbable rope segments |
-| 15 | Coins | `coin.png` collectible sprites drawn on top of platforms |
-| 16 | Yellow stars | `star_yellow.png` collectible star pickups |
-| 17 | Last star | end-of-level star collectible (uses HUD star sprite) |
-| 18 | Blue/fire flames | `blue_flame.png` / `fire_flame.png` animated flame hazards erupting from floor gaps |
-| 19 | Fish | `fish.png` animated jumping enemies, drawn before water for submerged look |
-| 20 | Faster fish | `faster_fish.png` fast aggressive jumping fish enemies |
-| 21 | Water | `water.png` animated scrolling strip at the bottom |
-| 22 | Spike blocks | `spike_block.png` rotating rail-riding hazards |
-| 23 | Axe traps | `axe_trap.png` swinging axe hazards |
-| 24 | Circular saws | `circular_saw.png` spinning blade hazards |
-| 25 | Spiders | `spider.png` animated ground patrol enemies |
-| 26 | Jumping spiders | `jumping_spider.png` animated jumping patrol enemies |
-| 27 | Birds | `bird.png` slow sine-wave sky patrol enemies |
-| 28 | Faster birds | `faster_bird.png` fast aggressive sky patrol enemies |
-| 29 | Player | Animated sprite sheet, drawn on top of environment |
-| 30 | Fog | Per-level `fog_layers` from `assets/sprites/foregrounds/` (for example `fog_1.png`, `fog_2.png`, `fog_fire_1.png`, `fog_fire_2.png`, `smoke.png`) |
-| 31 | HUD | `hud_render`: hearts, lives, score -- always drawn on top |
-| 32 | Debug | `debug_render`: FPS counter, collision boxes, event log — when `--debug` active |
+Each row names the function in `src/render/game_render.c` (or the code it
+calls) that draws the layer, in the order `game_render_frame()` calls them.
+`make docs-drift` checks that this order matches the source.
+
+| Layer | What | Drawn by |
+|-------|------|----------|
+| 1 | Background: per-level `background_layers` from `assets/sprites/backgrounds/`, tiled with each layer's scroll speed | `parallax_render` |
+| 2 | Platforms: 9-slice pillar stacks, drawn before the floor so they sink into the ground | `platforms_render` |
+| 3 | Floor: the level's floor tile across the world at `FLOOR_Y`, with floor-gap openings | inline loop in `game_render_frame` |
+| 4 | Float platforms: 3-slice hovering surfaces (static, crumble, rail) | `float_platforms_render` |
+| 5 | Spike rows on the floor | `spike_rows_render` |
+| 6 | Spike platforms | `spike_platforms_render` |
+| 7 | Bridges: tiled crumble walkways | `bridges_render` |
+| 8 | Bouncepads (medium) | `bouncepads_render` |
+| 9 | Bouncepads (small) | `bouncepads_render` |
+| 10 | Bouncepads (high) | `bouncepads_render` |
+| 11 | Rails: bitmask tile tracks for spike blocks and float platforms | `rail_render` |
+| 12 | Vines (`vine_green.png` / `vine_brown.png`) | `vine_render` |
+| 13 | Ladders | `ladder_render` |
+| 14 | Ropes | `rope_render` |
+| 15 | Coins | `coins_render` |
+| 16 | Health stars: yellow, then green, then red | `health_stars_render` |
+| 17 | Last star | `last_star_render` |
+| 18 | Blue and fire flames erupting from floor gaps | `blue_flames_render` |
+| 19 | Fish, drawn before the water so they look submerged | `fish_render` |
+| 20 | Faster fish | `faster_fish_render` |
+| 21 | Water: the animated strip at the bottom | `water_render` |
+| 22 | Spike blocks riding their rails | `spike_blocks_render` |
+| 23 | Axe traps | `axe_traps_render` |
+| 24 | Circular saws | `circular_saws_render` |
+| 25 | Spiders | `spiders_render` |
+| 26 | Jumping spiders | `jumping_spiders_render` |
+| 27 | Birds | `birds_render` |
+| 28 | Faster birds | `faster_birds_render` |
+| 29 | Player | `player_render` |
+| 30 | Fog: per-level `fog_layers` from `assets/sprites/foregrounds/` | `fog_render` |
+| 31 | HUD: hearts, lives, score | `hud_render` |
+| 32 | Debug overlay and inspector panels, with `--debug` | `debug_render`, `game_inspector_render` |
 
 > **Note:** Per-level visual layers are split by role: `background_layers` feed the parallax renderer, `foreground_layers` select the water/lava foreground strip texture, and `fog_layers` feed the atmospheric fog system. Fog renders before the HUD so hearts/lives/score remain legible.
 
-The 32 rows group rendering passes: green/red stars share the collectible pass;
-terminal and settings overlays render after the gameplay/debug layers.
+The pause, game-over and completion overlays and the settings panel are drawn
+after these 32 layers.
 
 ### Level Completion and Terminal Actions
 
@@ -290,7 +295,7 @@ typedef struct {
 - `Player` is **embedded by value**, not a pointer. This avoids a heap allocation and keeps the struct self-contained. The same applies to `Platform`, `Water`, `FogSystem`, and all entity arrays.
 - Owning pointers are cleared after release. Borrowed pointers and aliases still require correct lifetime handling.
 - Active-game storage is heap-owned and zero-initialized before initialization; the struct above is an abridged ownership map, not a complete declaration.
-- `checkpoint_x` is no longer a `GameState` field. The resolved respawn state is `respawn_x`, `respawn_y`, and `checkpoint_index`; `legacy_checkpoint_screen` is used only when the active level has no authored records. `checkpoint_index` and `respawn_x`/`respawn_y` are always written together (on load, on retry and when a record is reached), so a valid index always names the current respawn.
+- The resolved respawn state is `respawn_x`, `respawn_y`, and `checkpoint_index`; `legacy_checkpoint_screen` is used only when the active level has no authored records. `checkpoint_index` and `respawn_x`/`respawn_y` are always written together (on load, on retry and when a record is reached), so a valid index always names the current respawn.
 
 ### Authored Checkpoint Flow
 

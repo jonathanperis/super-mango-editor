@@ -7,8 +7,8 @@
 This guide covers the patterns and conventions used in Super Mango and explains how to extend the game safely and consistently.
 
 For a guided sequence, start with [Sandbox School](../learning-path/). The
-[Entity Walkthrough](../entity-walkthrough/) traces all runtime, schema and editor
-integration points; the abbreviated examples here introduce conventions.
+[Entity Walkthrough](../entity-walkthrough/) is the step-by-step route for
+adding an entity; this page covers the conventions around it.
 
 ---
 
@@ -80,7 +80,7 @@ See [Constants Reference](../constants-reference/) for all defined constants.
 | File | Purpose |
 |------|---------|
 | `PRODUCT.md` | Product direction and feature framing. |
-| `DESIGN.md` | Visual/UX design notes for the cabinet-style presentation. |
+| `DESIGN.md` | How the website looks: built from the game's own sprites, palette and fonts. |
 | `docs/wiki/developer-guide.md` | Coding conventions, entity integration, resource ownership, and verification. |
 | `CODEOWNERS` | GitHub ownership hints for review routing. |
 
@@ -98,151 +98,10 @@ Terminal overlays use Up/Down or D-pad to select, Enter/Space/Start to confirm (
 
 ## Adding a New Entity
 
-Entity modules work on whole arrays and own no resources:
-
-```text
-level_loader.c         -> copy validated LevelDef placements into the GameState array
-<entities>_update      -> move, animate, detect events (one fixed step of dt)
-<entities>_render      -> draw every active instance with a borrowed shared texture
-<entity>_get_hitbox    -> IntRect used by collision and the debug overlay
-```
-
-There is no per-entity `_init` or `_cleanup`: placement happens in
-`level_loader.c` (for example `load_coins`), and the shared texture slot in
-`gs->textures` is loaded and released by `game_resources.c`. Static entities
-need even less. Coins store only placement state in `Coin` and expose just
-`coins_render()`; collection is handled in `src/collision/`. A renderer borrows
-its texture and must not unload it. Only the player has `player_init`,
-`player_handle_input` and `player_cleanup`, because it owns its sprite.
-
-### Step-by-Step
-
-#### 1. Create the header -- coin-like collectible example
-
-```c
-#pragma once
-#include "../shared/graphics.h"
-
-#define MAX_COINS       64
-#define COIN_DISPLAY_W  16
-#define COIN_DISPLAY_H  16
-#define COIN_SCORE     100
-
-typedef struct {
-    float x;      /* logical position (top-left) */
-    float y;
-    int   active; /* 1 = visible, 0 = collected */
-} Coin;
-
-void coins_render(const Coin *coins, int count,
-                  Texture2D *tex, int cam_x);
-```
-
-#### 2. Create the implementation -- `src/collectibles/coin.c`
-
-```c
-#include "coin.h"
-
-void coins_render(const Coin *coins, int count,
-                  Texture2D *tex, int cam_x) {
-    for (int i = 0; i < count; i++) {
-        if (!coins[i].active) continue;
-
-        IntRect dst = {
-            (int)coins[i].x - cam_x,
-            (int)coins[i].y,
-            COIN_DISPLAY_W,
-            COIN_DISPLAY_H
-        };
-        sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
-    }
-}
-```
-
-The Makefile picks up `coin.c` automatically from the `src/collectibles/` subdirectory -- **no Makefile changes needed**. New source directories require an explicit wildcard entry in the Makefile.
-
-#### 3. Add texture to `TextureResources` in `game.h`
-
-Textures are loaded by `game_resources_load()` (called from `game_init()`) and stored under `gs->textures`. The entity array and count live directly in `GameState`:
-
-```c
-#include "collectibles/coin.h"
-
-typedef struct {
-    // ... existing fields ...
-    TextureResources textures; /* contains Texture2D *coin */
-    Coin coins[MAX_COINS];    /* fixed-size array -- simple and cache-friendly */
-    int  coin_count;          /* populated slots; each Coin has its own active flag */
-} GameState;
-```
-
-#### 4. Wire up in the runtime core
-
-```c
-// src/core/game_resources.c -- one table row loads the shared texture and
-// cleanup releases it in reverse order; no hand-written load/free code:
-static const TextureLoadSpec s_required_textures[] = {
-    /* ... */
-    { TEX_FIELD(coin), "assets/sprites/collectibles/coin.png",
-      "Failed to load Coin.png" },
-};
-
-// src/levels/level_loader.c -- populate the array from validated placements:
-static void load_coins(GameState *gs, const LevelDef *def)
-{
-    for (int i = 0; i < def->coin_count; i++) {
-        gs->coins[i].x      = def->coins[i].x;
-        gs->coins[i].y      = def->coins[i].y;
-        gs->coins[i].active = 1;
-    }
-    gs->coin_count = def->coin_count;
-}
-
-// src/render/game_render.c -- in the correct layer order:
-coins_render(gs->coins, gs->coin_count, gs->textures.coin, cam_x);
-```
-
-Textures only some levels use go in `s_optional_textures`; add the slot to
-`game_resources_require_level_textures` so a level that places the entity is
-rejected with the asset path when the texture is missing.
-
-Use the focused runtime module that owns the behavior: resource loading belongs in `src/core/game_resources.c`, lifecycle orchestration in `src/core/game_lifecycle.c`, per-frame update orchestration in `src/core/game_update.c` and its specialized helpers, and collision/pickup behavior in `src/collision/`.
-
-#### 5. Add to a TOML level file
-
-Entity spawn positions are defined in TOML level files in the `levels/` directory. Add your entity's array table entry there:
-
-```toml
-# In levels/your_level.toml:
-[[coins]]
-x = 120.0
-y = 180.0
-
-[[coins]]
-x = 200.0
-y = 140.0
-```
-
-Register and parse the array in `src/shared/serializer_parse.c` and the relevant `serializer_load_*.c`; emit it in `serializer_save.c` and validate it in both `level_validate.c` and `tools/validate_levels.py`. Then extend `level_loader.c` to translate the validated placements into `GameState`. Complete palette/tools/preview/property/undo/clipboard/hash integration using the [Entity Walkthrough](../entity-walkthrough/).
-
-You can also use the visual level editor (`make run-editor`) to place entities interactively without writing TOML by hand.
-
-#### 6. Add debug hitbox -- `src/core/debug.c`
-
-Every entity must have hitbox visualization in `core/debug.c`:
-
-```c
-// In draw_collision_boxes (outline subtracts the camera X):
-for (int i = 0; i < gs->coin_count; i++) if (gs->coins[i].active)
-    outline((IntRect){(int)gs->coins[i].x, (int)gs->coins[i].y,
-                      COIN_DISPLAY_W, COIN_DISPLAY_H},
-            cam, (Color){255, 255, 0, 255});
-```
-
-Prefer the entity's `_get_hitbox` helper when it has one, so the box drawn is
-the box collision uses.
-
-Also add `debug_log` calls in the module that owns the event, such as `src/collision/game_collision.c`, `src/core/game_update.c`, or the relevant focused runtime helper.
+Adding an entity touches the file format, the runtime, the editor, undo and the
+tests. The [Entity Walkthrough](../entity-walkthrough/) is the one place that
+lists every step, with the module pattern, the resource table row, the editor
+files and a checklist. Follow it rather than copying an existing entity by eye.
 
 ---
 
@@ -370,44 +229,10 @@ within a frame. Release cached textures before their font and graphics context.
 
 ## Render Layer Order
 
-Always draw in painter's algorithm order (back to front). The game currently uses 32 layers:
-
-```
- 1. Parallax background    (`assets/sprites/backgrounds/*.png` layers)
- 2. Platforms              (`assets/sprites/levels/*_platform.png`, 9-slice pillars)
- 3. Floor tiles            (level floor tile at FLOOR_Y, with floor-gap openings)
- 4. Float platforms        (`assets/sprites/surfaces/float_platform.png`)
- 5. Spike rows             (`assets/sprites/hazards/spike.png`)
- 6. Spike platforms        (`assets/sprites/hazards/spike_platform.png`)
- 7. Bridges                (`assets/sprites/surfaces/bridge.png`)
- 8. Bouncepads medium      (`assets/sprites/surfaces/bouncepad_medium.png`)
- 9. Bouncepads small       (`assets/sprites/surfaces/bouncepad_small.png`)
-10. Bouncepads high        (`assets/sprites/surfaces/bouncepad_high.png`)
-11. Rails                  (`assets/sprites/surfaces/rail.png`)
-12. Vines                  (`assets/sprites/surfaces/vine_green.png` / `vine_brown.png`)
-13. Ladders                (`assets/sprites/surfaces/ladder.png`)
-14. Ropes                  (`assets/sprites/surfaces/rope.png`)
-15. Coins                  (`assets/sprites/collectibles/coin.png`)
-16. Health stars           (`star_yellow.png`, then `star_green.png`, `star_red.png`)
-17. Last star              (`assets/sprites/collectibles/last_star.png`)
-18. Blue/fire flames       (`assets/sprites/hazards/blue_flame.png` / `fire_flame.png`)
-19. Fish                   (`assets/sprites/entities/fish.png`)
-20. Faster fish            (`assets/sprites/entities/faster_fish.png`)
-21. Water                  (`assets/sprites/foregrounds/water.png`)
-22. Spike blocks           (`assets/sprites/hazards/spike_block.png`)
-23. Axe traps              (`assets/sprites/hazards/axe_trap.png`)
-24. Circular saws          (`assets/sprites/hazards/circular_saw.png`)
-25. Spiders                (`assets/sprites/entities/spider.png`)
-26. Jumping spiders        (`assets/sprites/entities/jumping_spider.png`)
-27. Birds                  (`assets/sprites/entities/bird.png`)
-28. Faster birds           (`assets/sprites/entities/faster_bird.png`)
-29. Player                 (`assets/sprites/player/player.png`)
-30. Fog                    (`assets/sprites/foregrounds/fog_1.png` / `fog_2.png`)
-31. HUD                    (hearts, lives, score -- always on top)
-32. Debug overlay          (FPS, hitboxes, event log -- when --debug)
-```
-
-See [Architecture](../architecture/) for details on the render pipeline.
+Draw back to front (the painter's algorithm). The full 32-layer order, with
+the function that draws each layer, is in
+[Architecture](../architecture/#render-order-back-to-front); put a new
+entity's render call in `src/render/game_render.c` at the matching place.
 
 ---
 
@@ -440,30 +265,6 @@ Standard animation row layout (most assets in this pack):
 See [Assets](../assets/) for sprite sheet dimensions and [Player Module](../player-module/) for animation state machine details.
 
 Measure each sheet rather than assuming a common frame size or row layout. Advance animation using accumulated elapsed time (a `float` millisecond timer, so the 0.67 ms fraction of each 16.67 ms step is not truncated away); reset the frame on state entry, loop repeating states, and clamp one-shot animations to their last frame. Reuse right-facing art with `sprite_draw` and `SPRITE_FLIP_X` for left-facing rendering.
-
----
-
-## Checklist: Adding a New Entity
-
-- [ ] Create `src/<category>/<entity>.h` with struct and function declarations (e.g. `src/entities/`, `src/collectibles/`, `src/hazards/`, `src/surfaces/`)
-- [ ] Create `src/<category>/<entity>.c` with update, render and hitbox functions over the whole array
-- [ ] Add `#include "<category>/<entity>.h"` to `game.h`
-- [ ] Add texture pointer to `TextureResources`, plus entity array and count to `GameState` (by value, not pointer)
-- [ ] Add a texture row to `src/core/game_resources.c` (and `game_resources_require_level_textures` if optional)
-- [ ] Copy placements into `GameState` in `src/levels/level_loader.c`
-- [ ] Call `<entities>_update` from the relevant `src/core/` update helper
-- [ ] Call `<entities>_render` from `src/render/game_render.c` or its focused render helper (correct layer order)
-- [ ] Handle damage or pickup in `src/collision/`
-- [ ] Wire shared schema/parser/emitter, C/Python validation, and editor palette/tools/preview/properties/undo/clipboard/document hashing
-- [ ] Add entity placement to a TOML level file in `levels/` (or use the visual level editor)
-- [ ] Add hitbox visualization in `core/debug.c`
-- [ ] Add `debug_log` calls in the module that owns significant entity events
-- [ ] Build game with `make` -- no Makefile changes needed for new `.c` files in existing source directories
-- [ ] Build editor with `make editor` if editor placement/schema behavior changed
-- [ ] Run `make test`
-- [ ] Run `make validate-levels` after any level/schema/editor serializer change
-- [ ] Test with `--debug` flag to verify hitboxes render correctly
-- [ ] Run relevant docs lint/build command when documentation pages changed
 
 ---
 
