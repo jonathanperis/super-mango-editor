@@ -37,7 +37,7 @@ class DocsChecksTest(unittest.TestCase):
              drift.check_constant_values, "`TILE_SIZE` is documented as `32`"),
             ("controls.md", "| F10 |", "| F11 |",
              drift.check_inspector_keys_doc, "inspector key F10 is handled"),
-            ("architecture.md", "| `ladder_render` |", "| `vine_render` |",
+            ("architecture.md", "| `ladders_render` |", "| `vines_render` |",
              drift.check_render_order_doc, "missing from the render order table"),
         ]
         original_read = drift.read
