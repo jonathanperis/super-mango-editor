@@ -15,7 +15,7 @@
  *
  * Usage:
  *   UndoStack *undo = undo_create();
- *   undo_push(undo, cmd);           // after every editor action
+ *   undo_push(undo, &cmd);          // after every editor action
  *   if (undo_pop(undo, &cmd)) ...   // Ctrl+Z
  *   if (redo_pop(undo, &cmd)) ...   // Ctrl+Shift+Z
  *   undo_destroy(undo);             // on editor shutdown
@@ -259,7 +259,7 @@ void undo_destroy(UndoStack *stack);
  */
 /* Returns 0 without changing history on allocation failure. The caller must
  * roll back a config edit if its snapshot cannot be recorded. */
-int undo_push(UndoStack *stack, Command cmd);
+int undo_push(UndoStack *stack, const Command *cmd);
 
 /*
  * undo_pop --- Pop the most recent command from the undo stack.
