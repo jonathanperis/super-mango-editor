@@ -122,7 +122,8 @@ TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
                  $(OUTDIR)/gameplay-score-test \
                  $(OUTDIR)/game-overlay-test $(OUTDIR)/game-events-test \
                  $(OUTDIR)/session-test $(OUTDIR)/game-checkpoint-test
-SMOKE_LEVELS  = $(wildcard levels/*.toml) $(wildcard levels/labs/*.toml)
+LEVEL_FILES   = $(wildcard levels/*.toml) $(wildcard levels/labs/*.toml)
+SMOKE_LEVELS  = $(LEVEL_FILES)
 SMOKE_FRAMES  ?= 5
 SMOKE_SEED    ?= 1
 SMOKE_SEEDS   ?= 1 7 23
@@ -305,8 +306,21 @@ $(OUTDIR)/parser-allocation-probe: tests/parser_allocation_test.c $(VENDOR_DIR)/
 parser-encoding-probe:
 	python3 tests/parser_validator_test.py
 
-validate-levels: ## Check: Every level, the campaign manifest and asset links
+# Levels are checked by the game's own C loader and validator (one source of
+# truth, no window needed); the Python script adds the cross-file checks a
+# single level cannot make: assets and next_phase targets exist, and the
+# campaign manifest chains. The checker reuses the game's objects in $(OBJDIR).
+LEVEL_CHECK = $(OUTDIR)/level-check
+LEVEL_CHECK_OBJS = $(filter $(OBJDIR)/$(SHARED_DIR)/serializer%.o,$(OBJS)) \
+                   $(OBJDIR)/$(SRCDIR)/levels/level_validate.o \
+                   $(OBJDIR)/$(SRCDIR)/levels/level_ref.o $(OBJDIR)/$(VENDOR_DIR)/tomlc17.o
+
+validate-levels: $(LEVEL_CHECK) ## Check: Every level, the campaign manifest and asset links
+	$(RUN_PREFIX) "$(abspath $(LEVEL_CHECK))" $(LEVEL_FILES)
 	python3 tools/validate_levels.py
+
+$(LEVEL_CHECK): tools/level_check.c $(LEVEL_CHECK_OBJS) | $(OUTDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ -lm
 
 web-host-contract: ## Check: Web shell, storage and packaging contract tests
 	python3 tools/check_web_boot_contract.py

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Table-driven coverage for Python v1 schema rejection."""
+"""Coverage for tools/validate_levels.py: cross-file checks and the docs schema.
+
+Per-level runtime rules belong to the C validator; level_serializer_test.c
+loads every fixture below through the real loader.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +18,9 @@ import validate_levels  # noqa: E402
 
 FIXTURE_DIR = ROOT / "tests" / "fixtures" / "serializer_v1"
 CAMPAIGN_FIXTURE_DIR = ROOT / "tests" / "fixtures" / "campaign_manifest"
+# Fixtures whose type shape is wrong, so the docs-snippet schema rejects them
+# too. bad_checkpoint_bounds/duplicate and bad_screen_count_max_plus_one break
+# runtime rules only the C validator applies.
 INVALID_FIXTURES = (
     "bad_version.toml",
     "bad_scalar_type.toml",
@@ -28,10 +35,6 @@ INVALID_FIXTURES = (
     "bad_root_unknown.toml",
     "bad_nested_unknown.toml",
     "bad_floor_gaps.toml",
-    "bad_floor_gap_off_grid.toml",
-    "bad_bouncepad_launch_vy.toml",
-    "bad_rail_speed.toml",
-    "bad_patrol_narrow.toml",
     "bad_nested_table_type.toml",
     "bad_root_key_embedded_nul.toml",
     "bad_nested_key_embedded_nul.toml",
@@ -43,11 +46,7 @@ INVALID_FIXTURES = (
     "bad_checkpoint_type.toml",
     "bad_checkpoint_unknown.toml",
     "bad_checkpoint_nonfinite.toml",
-    "bad_checkpoint_bounds.toml",
-    "bad_checkpoint_duplicate.toml",
-    "bad_checkpoint_over_gap.toml",
     "bad_checkpoint_array.toml",
-    "bad_screen_count_max_plus_one.toml",
     "bad_utf8_overlong.toml",
     "bad_utf8_surrogate.toml",
     "bad_utf8_above_max.toml",
@@ -111,43 +110,24 @@ def main() -> int:
     check_level_references()
     constants = validate_levels.load_max_constants()
     asset_manifest = validate_levels.load_asset_manifest()
-    for array, valid_count, invalid_count in (("ropes", 6, 7), ("ladders", 14, 22), ("vines", 7, 9)):
-        for count, rejected in ((valid_count, False), (invalid_count, True)):
-            kind = {"ropes": "ROPE", "ladders": "LADDER", "vines": "VINE"}[array]
-            height = constants[f"{kind}_H"] + (count - 1) * constants[f"{kind}_STEP"]
-            y = 128 if rejected else 300 - height + 1e-7  # C narrows this to the exact edge.
-            errors = validate_levels.validate_nested_dimensions(
-                FIXTURE_DIR / "valid_v1.toml",
-                {array: [{"x": 128, "y": y, "tile_count": count}]}, constants)
-            if bool(errors) != rejected:
-                raise AssertionError(f"climbable rendered bounds mismatch: {array}, {count}, {errors}")
 
     if validate_levels.validate_schema(load_fixture("valid_legacy.toml")):
         raise AssertionError("valid legacy fixture rejected")
     for value in (float("nan"), float("inf"), 1e30, 2**63 - 1):
         if not validate_levels.validate_schema({"music_volume": value}):
             raise AssertionError("unsafe legacy integer conversion accepted")
-    if not validate_levels.validate_nested_dimensions(FIXTURE_DIR / "valid_v1.toml",
-                                                     {"physics": {"run_max_speed": 1e30}}, constants):
-        raise AssertionError("unsafe motion magnitude accepted")
-    if validate_levels.validate_level(
-        FIXTURE_DIR / "valid_legacy.toml", constants, asset_manifest
-    ):
-        raise AssertionError("validator rejected valid legacy fixture")
     if validate_levels.validate_schema(
         load_fixture("valid_v1.toml"), constants=constants
     ):
         raise AssertionError("valid v1 fixture rejected")
-    if validate_levels.validate_level(
-        FIXTURE_DIR / "valid_utf8.toml", constants, asset_manifest,
-        require_explicit_version=True,
-    ):
-        raise AssertionError("valid multi-byte UTF-8 fixture rejected")
-    if validate_levels.validate_level(
-        FIXTURE_DIR / "valid_screen_count_max.toml", constants, asset_manifest,
-        require_explicit_version=True,
-    ):
-        raise AssertionError("valid maximum screen-count fixture rejected")
+    for name in ("valid_v1.toml", "valid_utf8.toml", "valid_screen_count_max.toml"):
+        errors = validate_levels.validate_level(FIXTURE_DIR / name, asset_manifest)
+        if errors:
+            raise AssertionError(f"valid fixture rejected: {name}: {errors}")
+    # The loader still reads legacy files; checked-in levels must not be one.
+    if not any("format_version" in error for error in validate_levels.validate_level(
+            FIXTURE_DIR / "valid_legacy.toml", asset_manifest)):
+        raise AssertionError("checked-in level policy accepted a missing format_version")
 
     too_many = {
         "format_version": 1,
@@ -162,11 +142,10 @@ def main() -> int:
 
     for name in INVALID_FIXTURES:
         try:
-            errors = validate_levels.validate_level(
-                FIXTURE_DIR / name,
-                constants,
-                asset_manifest,
+            errors = validate_levels.validate_schema(
+                load_fixture(name),
                 require_explicit_version=True,
+                constants=constants,
             )
         except ValueError as exc:  # unreadable file; main() reports it the same way
             errors = [str(exc)]

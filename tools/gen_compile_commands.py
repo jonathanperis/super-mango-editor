@@ -29,6 +29,8 @@ def collect_sources() -> list[Path]:
         sources.append(tomlc)
     if TESTDIR.is_dir():
         sources.extend(sorted(TESTDIR.glob("*.c")))
+    # C helpers built by the Makefile (tools/level_check.c for validate-levels).
+    sources.extend(sorted((ROOT / "tools").glob("*.c")))
     # Stable, unique, relative-friendly order
     seen: set[Path] = set()
     unique: list[Path] = []
