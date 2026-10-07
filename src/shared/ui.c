@@ -181,7 +181,11 @@ int ui_apply_active_edit(UIState *ui)
         float value;
         float *target = (float *)ui->edit_target;
         if (!parse_float_value(ui->edit_buf, &value)) return 0;
-        if (value != *target) {
+        /* "Did the stored value change?" is a question about the stored
+         * bits, not about numbers being close: any edit, however small, is
+         * a change worth an undo step. Comparing the bytes says exactly that
+         * (parse_float_value already rejects NaN and infinity). */
+        if (memcmp(&value, target, sizeof(value)) != 0) {
             notify_before_change(ui, ui->active_id);
             *target = value;
             changed = 1;

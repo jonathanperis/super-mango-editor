@@ -67,17 +67,19 @@ void editor_render_toolbar(EditorState *es)
     static const char *zoom_opts[] = {
         "Zoom: 1x", "Zoom: 2x", "Zoom: 3x", "Zoom: 5x"
     };
-    static const float zoom_vals[] = { 1.0f, 2.0f, 3.0f, 5.0f };
+    /* Zoom is always one of these whole numbers (startup, this dropdown and
+     * Ctrl+wheel assign them; nothing accumulates), so compare integers. */
+    static const int zoom_vals[] = { 1, 2, 3, 5 };
     static const int zoom_count = 4;
 
     int sel = 1;
     for (int zi = 0; zi < zoom_count; zi++) {
-        if (es->camera.zoom == zoom_vals[zi]) { sel = zi; break; }
+        if ((int)es->camera.zoom == zoom_vals[zi]) { sel = zi; break; }
     }
     if (ui_dropdown(&es->ui, 8888, bx, by + 2, 80,
                     zoom_opts, zoom_count, &sel)) {
         /* Zoom around the canvas centre so the view stays on the same area. */
-        canvas_set_zoom(es, zoom_vals[sel], CANVAS_W / 2, TOOLBAR_H + CANVAS_H / 2);
+        canvas_set_zoom(es, (float)zoom_vals[sel], CANVAS_W / 2, TOOLBAR_H + CANVAS_H / 2);
     }
 
     int rx = EDITOR_W - 4 - 52;

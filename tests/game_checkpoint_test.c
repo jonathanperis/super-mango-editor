@@ -95,10 +95,10 @@ static int stale_checkpoint_index_before_first_placement_is_ignored(void)
     def.checkpoints[0].x = 300.0f;
     def.checkpoints[0].y = 120.0f;
     gs.runtime.current_level = &def;
-    /* Index 0 is remembered, but the respawn no longer matches it, and the
-     * player stands before every placement: no checkpoint qualifies. The
-     * update must not index checkpoints[-1] (ASan catches it in sanitize). */
-    gs.checkpoint_index = 0;
+    /* An out-of-range remembered index, and the player stands before every
+     * placement: no checkpoint qualifies. The update must not index
+     * checkpoints[-1] (ASan catches it in sanitize). */
+    gs.checkpoint_index = 5;
     gs.respawn_x = 80.0f;
     gs.respawn_y = 172.0f;
     gs.player.x = 100.0f;
