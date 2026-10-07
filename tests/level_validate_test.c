@@ -421,8 +421,10 @@ static int expect_rejected_bad_enum_values(void)
     level_def_init_defaults(&def);
     def.bouncepad_small_count = 1;
     def.bouncepads_small[0].x = 16.0f;
+    def.bouncepads_small[0].launch_vy = BOUNCEPAD_VY_SMALL;
     def.bouncepads_small[0].pad_type = (BouncepadType)99;
-    if (level_validate_runtime(&def, err, sizeof(err)) == 0) {
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+        strstr(err, "pad_type") == NULL) {
         fprintf(stderr, "level_validate_test: invalid bouncepad type should fail\n");
         return 1;
     }
@@ -464,6 +466,142 @@ static int expect_rejected_flame_gap_outside_world(void)
         return 1;
     }
 
+    return 0;
+}
+
+/*
+ * A pad relaunches the player every step and never lets them jump, so a
+ * launch weaker than JUMP_VY (or pointing down) would trap them on it.
+ */
+static int expect_bouncepads_launch_upward(void)
+{
+    LevelDef def;
+    char err[128];
+    const float rejected[] = { 0.0f, 100.0f, -10.0f, JUMP_VY + 1.0f, NAN };
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.bouncepad_medium_count = 1;
+    def.bouncepads_medium[0].x = 160.0f;
+    def.bouncepads_medium[0].pad_type = BOUNCEPAD_WOOD;
+    def.bouncepads_medium[0].launch_vy = JUMP_VY;
+    if (level_validate_runtime(&def, err, sizeof(err)) != 0) {
+        fprintf(stderr, "level_validate_test: jump-strength pad rejected: %s\n", err);
+        return 1;
+    }
+
+    for (size_t i = 0; i < sizeof(rejected) / sizeof(rejected[0]); i++) {
+        def.bouncepads_medium[0].launch_vy = rejected[i];
+        if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+            strstr(err, "bouncepads_medium[0].launch_vy") == NULL) {
+            fprintf(stderr, "level_validate_test: weak pad launch %.1f accepted\n",
+                    rejected[i]);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/*
+ * Rail riders need a positive speed (a negative one pins them to the start
+ * of an open rail) no faster than MAX_RAIL_SPEED (the rider tolerance).
+ */
+static int expect_rail_speeds_forward_and_bounded(void)
+{
+    LevelDef def;
+    char err[128];
+    const float rejected[] = { 0.0f, -2.0f, (float)MAX_RAIL_SPEED + 0.5f, INFINITY };
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.rail_count = 1;
+    def.rails[0] = (RailPlacement){RAIL_LAYOUT_HORIZ, 80, 40, 6, 0, 0};
+    def.spike_block_count = 1;
+    def.spike_blocks[0].rail_index = 0;
+    def.spike_blocks[0].speed = (float)MAX_RAIL_SPEED;
+    def.float_platform_count = 1;
+    def.float_platforms[0].mode = FLOAT_PLATFORM_RAIL;
+    def.float_platforms[0].rail_index = 0;
+    def.float_platforms[0].tile_count = 2;
+    def.float_platforms[0].speed = SPIKE_SPEED_NORMAL;
+    if (level_validate_runtime(&def, err, sizeof(err)) != 0) {
+        fprintf(stderr, "level_validate_test: valid rail speeds rejected: %s\n", err);
+        return 1;
+    }
+
+    for (size_t i = 0; i < sizeof(rejected) / sizeof(rejected[0]); i++) {
+        def.spike_blocks[0].speed = rejected[i];
+        if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+            strstr(err, "spike_blocks[0].speed") == NULL) {
+            fprintf(stderr, "level_validate_test: spike block speed %.1f accepted\n",
+                    rejected[i]);
+            return 1;
+        }
+        def.spike_blocks[0].speed = SPIKE_SPEED_NORMAL;
+        def.float_platforms[0].speed = rejected[i];
+        if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+            strstr(err, "float_platforms[0].speed") == NULL) {
+            fprintf(stderr, "level_validate_test: rail platform speed %.1f accepted\n",
+                    rejected[i]);
+            return 1;
+        }
+        def.float_platforms[0].speed = SPIKE_SPEED_NORMAL;
+    }
+
+    /* A parked (STATIC) platform never moves, so its speed is not a rail speed. */
+    def.float_platforms[0].mode = FLOAT_PLATFORM_STATIC;
+    def.float_platforms[0].x = 16.0f;
+    def.float_platforms[0].y = 16.0f;
+    def.float_platforms[0].speed = 0.0f;
+    if (level_validate_runtime(&def, err, sizeof(err)) != 0) {
+        fprintf(stderr, "level_validate_test: static platform speed 0 rejected: %s\n", err);
+        return 1;
+    }
+    return 0;
+}
+
+/*
+ * The patrol code turns an enemy when its right edge reaches patrol_x1, so a
+ * range narrower than the sprite would teleport it between the ends.
+ */
+static int expect_patrols_fit_the_sprite(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.spider_count = 1;
+    def.spiders[0].x = 100.0f;
+    def.spiders[0].patrol_x0 = 100.0f;
+    def.spiders[0].patrol_x1 = 100.0f + SPIDER_FRAME_W;
+    def.fish_count = 1;
+    def.fish[0].x = 200.0f;
+    def.fish[0].patrol_x0 = 200.0f;
+    def.fish[0].patrol_x1 = 200.0f + FISH_RENDER_W;
+    def.circular_saw_count = 1;
+    def.circular_saws[0].x = 300.0f;
+    def.circular_saws[0].patrol_x0 = 300.0f;
+    def.circular_saws[0].patrol_x1 = 300.0f;   /* saws have no width rule */
+    def.circular_saws[0].direction = 1;
+    if (level_validate_runtime(&def, err, sizeof(err)) != 0) {
+        fprintf(stderr, "level_validate_test: sprite-wide patrols rejected: %s\n", err);
+        return 1;
+    }
+
+    def.spiders[0].patrol_x1 = 100.0f + SPIDER_FRAME_W - 1.0f;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+        strstr(err, "spiders[0].patrol") == NULL) {
+        fprintf(stderr, "level_validate_test: narrow spider patrol accepted\n");
+        return 1;
+    }
+    def.spiders[0].patrol_x1 = 100.0f + SPIDER_FRAME_W;
+    def.fish[0].patrol_x1 = 200.0f + FISH_RENDER_W / 2.0f;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+        strstr(err, "fish[0].patrol") == NULL) {
+        fprintf(stderr, "level_validate_test: narrow fish patrol accepted\n");
+        return 1;
+    }
     return 0;
 }
 
@@ -685,6 +823,7 @@ static int rejects_numeric_boundaries(void)
             def.rail_count = 1;
             def.rails[0] = (RailPlacement){RAIL_LAYOUT_RECT, 80, 40, 4, 3, 1};
             def.spike_block_count = 1;
+            def.spike_blocks[0].speed = SPIKE_SPEED_NORMAL;
             def.spike_blocks[0].t_offset = test == 3 ? -1.0f : 1e30f;
         }
         if (test == 5) def.physics.walk_max_speed = 1e30f;
@@ -721,6 +860,9 @@ int main(void)
     if (expect_rejected_bad_enum_values() != 0) return 1;
     if (expect_rejected_flame_gap_outside_world() != 0) return 1;
     if (expect_rejected_climbable_extents() != 0) return 1;
+    if (expect_bouncepads_launch_upward() != 0) return 1;
+    if (expect_rail_speeds_forward_and_bounded() != 0) return 1;
+    if (expect_patrols_fit_the_sprite() != 0) return 1;
     if (expect_rejected_unsafe_paths() != 0) return 1;
 
     puts("level_validate_test: ok");

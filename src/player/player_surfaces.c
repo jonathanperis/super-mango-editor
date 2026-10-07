@@ -17,14 +17,20 @@
  * gap smaller than this tolerance between the player's physics bottom and the
  * platform's top surface.
  *
- * Worst-case gap in one step of the longest accepted dt (0.1 s, the limit
- * for replayed experiment captures; live steps are only 1/60 s):
- *   platform moves up : 2 tiles/s × 16 px/tile × 0.1 s = 3.2 px
- *   player falls      : ½ × GRAVITY × dt²            = 4.0 px
- *   total gap                                          = 7.2 px
+ * Worst-case gap in one fixed step (dt = 1/60 s for live play and replays
+ * alike), with the platform at the validator's top rail speed:
+ *   platform moves up : MAX_RAIL_SPEED 30 tiles/s × 16 px/tile ÷ 60 = 8.0 px
+ *   player falls      : GRAVITY × dt² (the rider starts at vy = 0) ≈ 0.2 px
+ *   total gap                                                     ≈ 8.2 px
  * 16 px gives a safe margin over that worst case.
  */
 #define FLOAT_PLATFORM_STICK_TOL  16
+
+/* Keep the per-step rise of the fastest allowed platform within half the
+ * tolerance, so a faster MAX_RAIL_SPEED cannot silently drop riders. */
+_Static_assert(MAX_RAIL_SPEED * RAIL_TILE_H * 2 <=
+               FLOAT_PLATFORM_STICK_TOL * TARGET_FPS,
+               "MAX_RAIL_SPEED outruns the float-platform stay-on tolerance");
 
 void player_resolve_floor_collision(Player *player,
                                     const BouncepadList *bouncepad_lists, int bouncepad_list_count,
@@ -82,9 +88,10 @@ void player_resolve_floor_collision(Player *player,
 
                 /*
                  * The player's physics bottom has reached the floor inside the
-                 * bouncepad's horizontal zone → launch them upward.
-                 * BOUNCEPAD_VY (−875 px/s) is 75 % higher than the original
-                 * −500 px/s jump impulse.
+                 * bouncepad's horizontal zone → launch them upward with the
+                 * pad's own launch_vy. on_ground stays 0, so the player can
+                 * never jump from a pad; that is why the level validator
+                 * requires every pad to launch at least as hard as JUMP_VY.
                  */
                 player->vy        = bp->launch_vy;
                 player->on_ground = 0;

@@ -399,6 +399,17 @@ def validate_schema(
     return errors
 
 
+# Width each enemy's patrol code turns it around with (level_validate.c).
+PATROL_WIDTHS = {
+    "spiders": "SPIDER_FRAME_W",
+    "jumping_spiders": "JSPIDER_FRAME_W",
+    "birds": "BIRD_FRAME_W",
+    "faster_birds": "FBIRD_FRAME_W",
+    "fish": "FISH_RENDER_W",
+    "faster_fish": "FISH_RENDER_W",
+}
+
+
 def load_max_constants() -> dict[str, int]:
     constants: dict[str, int] = {}
     define_re = re.compile(
@@ -407,7 +418,9 @@ def load_max_constants() -> dict[str, int]:
     shared_names = {"GAME_W", "GAME_H", "TILE_SIZE", "FLOOR_GAP_W"} | {
         f"{kind}_{dimension}" for kind in ("VINE", "LADDER", "ROPE")
         for dimension in ("W", "H", "STEP")
-    }
+    } | set(PATROL_WIDTHS.values())
+    # The one float the rules need: bouncepads must launch at least this hard.
+    jump_re = re.compile(r"^\s*#define\s+JUMP_VY\s+(-?[0-9.]+)f?\b")
 
     for header in (ROOT / "src").rglob("*.h"):
         for line in header.read_text(encoding="utf-8").splitlines():
@@ -415,6 +428,9 @@ def load_max_constants() -> dict[str, int]:
             if match and (match.group(1).startswith("MAX_") or
                           match.group(1) in shared_names):
                 constants[match.group(1)] = int(match.group(2))
+            jump = jump_re.match(line)
+            if jump:
+                constants["JUMP_VY"] = float(jump.group(1))
 
     return constants
 
@@ -810,6 +826,51 @@ def validate_floor_gaps(level_path: Path, data: dict, constants: dict[str, int])
     return errors
 
 
+def validate_motion_rules(level_path: Path, data: dict, constants: dict[str, int]) -> list[str]:
+    """Mirror level_validate.c's bouncepad, rail-speed and patrol-width rules."""
+    errors: list[str] = []
+    rel = level_path.relative_to(ROOT)
+
+    def tables(array: str):
+        items = data.get(array, [])
+        if not isinstance(items, list):
+            return []
+        return [(i, item) for i, item in enumerate(items) if isinstance(item, dict)]
+
+    # A pad relaunches the player every step, so it must beat a normal jump.
+    jump_vy = constants.get("JUMP_VY", -325.0)
+    for array in ("bouncepads_small", "bouncepads_medium", "bouncepads_high"):
+        for index, pad in tables(array):
+            vy = pad.get("launch_vy", 0.0)
+            if _is_finite_number(vy) and vy > jump_vy:
+                errors.append(f"{rel}: {array}[{index}].launch_vy is {vy} "
+                              f"(must be {jump_vy:g} or lower, at least a normal jump upward)")
+
+    # Rail riders move forward, no faster than MAX_RAIL_SPEED (rail.h).
+    max_speed = constants.get("MAX_RAIL_SPEED", 30)
+    riders = [("spike_blocks", i, item) for i, item in tables("spike_blocks")]
+    riders += [("float_platforms", i, item) for i, item in tables("float_platforms")
+               if item.get("mode") == "RAIL"]
+    for array, index, rider in riders:
+        speed = rider.get("speed", 0.0)
+        if _is_finite_number(speed) and not 0 < speed <= max_speed:
+            errors.append(f"{rel}: {array}[{index}].speed is {speed} "
+                          f"(expected above 0 and at most {max_speed} tiles/s)")
+
+    # A patrol narrower than the sprite teleports the enemy between its ends.
+    for array, constant in PATROL_WIDTHS.items():
+        width = constants.get(constant)
+        if width is None:
+            errors.append(f"{constant} not found while validating {array}")
+            continue
+        for index, enemy in tables(array):
+            x0, x1 = enemy.get("patrol_x0", 0.0), enemy.get("patrol_x1", 0.0)
+            if _is_finite_number(x0) and _is_finite_number(x1) and x1 >= x0 and x1 - x0 < width:
+                errors.append(f"{rel}: {array}[{index}].patrol is {x1 - x0:g} px wide "
+                              f"(must be at least {width}, the sprite width)")
+    return errors
+
+
 def validate_nested_dimensions(level_path: Path, data: dict, constants: dict[str, int]) -> list[str]:
     errors: list[str] = []
     max_spike_tiles = constants.get("MAX_SPIKE_TILES", 16)
@@ -989,6 +1050,7 @@ def validate_level(
     errors.extend(validate_floor_gaps(level_path, data, constants))
     errors.extend(validate_rail_links(level_path, data))
     errors.extend(validate_nested_dimensions(level_path, data, constants))
+    errors.extend(validate_motion_rules(level_path, data, constants))
     errors.extend(validate_checkpoints(level_path, data, constants))
 
     return errors

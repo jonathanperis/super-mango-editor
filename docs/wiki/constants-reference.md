@@ -169,7 +169,7 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 
 | Constant | Value | Location | Description |
 |----------|-------|----------|-------------|
-| `JUMP_VY` | `-325.0f` | `player_jump.c` | Jump impulse |
+| `JUMP_VY` | `-325.0f` | `player.h` | Jump impulse; also the weakest launch a bouncepad may have |
 | `JUMP_BUFFER_TIME` | `0.10f` | `player_jump.c` | Pre-landing jump input buffer |
 | `JUMP_CUT_FACTOR` | `0.45f` | `player_jump.c` | Jump shortening when input released |
 | `CLIMB_SPEED` | `80.0f` | `player_input.c` | Vertical climb speed |
@@ -353,6 +353,7 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 | `RAIL_TILE_H` | `16` | `int` | Height of one tile in the sprite sheet (px) |
 | `MAX_RAIL_TILES` | `128` | `int` | Maximum tiles in a single Rail path |
 | `MAX_RAILS` | `16` | `int` | Maximum Rail instances per level |
+| `MAX_RAIL_SPEED` | `30` | `int` | Fastest rail rider speed a level may set (tiles/s) |
 
 ---
 

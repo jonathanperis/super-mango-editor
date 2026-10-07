@@ -9,8 +9,8 @@
 #include "player_internal.h"
 
 /* Jump feel helpers. Coyote time gives a tiny grace window after leaving
- * ground; jump cut shortens ascent when the jump button is released early. */
-#define JUMP_VY              -325.0f
+ * ground; jump cut shortens ascent when the jump button is released early.
+ * The jump impulse itself, JUMP_VY, is in player.h. */
 #define JUMP_BUFFER_TIME        0.10f
 #define JUMP_CUT_FACTOR         0.45f
 
