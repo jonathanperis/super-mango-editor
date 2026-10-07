@@ -436,12 +436,43 @@ static int load_rejects_invalid_runtime_level_without_exiting(void)
     return 0;
 }
 
+/*
+ * x = 0 is a real gap (the shipped levels open one at the world's left
+ * edge), so a flame placed there must load like any other. The loader used
+ * to skip it while the validator accepted it, dropping it without a word.
+ */
+static int load_keeps_flames_at_world_edge_gap(void)
+{
+    GameState gs = {0};
+    LevelDef def;
+
+    level_def_init_defaults(&def);
+    init_test_player(&gs);
+    def.floor_gap_count = 1;
+    def.floor_gaps[0] = 0;
+    def.blue_flame_count = 1;
+    def.blue_flames[0].x = 0.0f;
+    def.fire_flame_count = 1;
+    def.fire_flames[0].x = 0.0f;
+
+    if (level_load(&gs, &def) != 0) return 1;
+    if (expect_int("edge blue flame kept", gs.blue_flame_count, 1) != 0) return 1;
+    if (expect_float("edge blue flame gap", gs.blue_flames[0].gap_x, 0.0f) != 0)
+        return 1;
+    if (expect_int("edge fire flame kept", gs.fire_flame_count, 1) != 0) return 1;
+    if (expect_float("edge fire flame gap", gs.fire_flames[0].gap_x, 0.0f) != 0)
+        return 1;
+
+    return 0;
+}
+
 int main(void)
 {
     if (load_applies_runtime_state() != 0) return 1;
     if (reset_restores_mutable_state_only() != 0) return 1;
     if (load_applies_defaults_for_missing_optional_config() != 0) return 1;
     if (load_rejects_invalid_runtime_level_without_exiting() != 0) return 1;
+    if (load_keeps_flames_at_world_edge_gap() != 0) return 1;
 
     puts("runtime_load_test: ok");
     return 0;
