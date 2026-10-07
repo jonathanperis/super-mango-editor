@@ -18,7 +18,15 @@
  */
 #pragma once
 
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__MINGW32__) && !defined(__clang__)
+/*
+ * MinGW GCC checks plain "printf" formats against the old Microsoft rules,
+ * which do not know C99 sizes such as %zu.  The UCRT runtime these builds
+ * use prints them correctly, so check against the standard (GNU) rules.
+ */
+#define PRINTF_FORMAT(format_index, first_arg_index) \
+    __attribute__((format(gnu_printf, format_index, first_arg_index)))
+#elif defined(__GNUC__) || defined(__clang__)
 #define PRINTF_FORMAT(format_index, first_arg_index) \
     __attribute__((format(printf, format_index, first_arg_index)))
 #else

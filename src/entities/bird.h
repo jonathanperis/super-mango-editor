@@ -67,7 +67,7 @@ typedef struct {
     uint32_t frame_ms;   /* ms each animation frame is held                */
     float    speed;      /* horizontal flight speed in px/s (positive)     */
     float    wave_amp;   /* sine-wave amplitude in px                      */
-    float    wave_freq;  /* sine cycles per px of horizontal travel        */
+    float    wave_freq;  /* radians of the sine wave per px travelled      */
 } BirdSpec;
 
 /* ---- Function declarations ---------------------------------------------- */
