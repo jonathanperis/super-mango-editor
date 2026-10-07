@@ -10,9 +10,10 @@ already included in the game.
 Open `levels/labs/01_collision.toml`. Its `[[coins]]` record contains x/y values.
 
 1. `src/shared/serializer_parse.c` declares the schema entry
-   `ROOT_TABLE_ARRAY("coins", XY_FIELDS, MAX_COINS)`: the key must be known,
-   each element must be a table with finite numeric `x`/`y`, and the array may
-   not exceed `MAX_COINS`. Unknown fields are rejected.
+   `ROOT_TABLE_ARRAY("coins", XY_FIELDS, MAX_COINS)`: each element must be a
+   table whose only keys are `x` and `y`, each a finite number (an omitted one
+   reads as 0), and the array may not exceed `MAX_COINS`. Unknown fields are
+   rejected.
 2. `serializer_load_collectibles()` (`src/shared/serializer_load_collectibles.c`)
    copies those values into `LevelDef.coins` with its `LOAD_XY_ARRAY` macro.
 3. `level_validate_runtime()` (`src/levels/level_validate.c`) first checks every

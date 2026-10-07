@@ -18,7 +18,7 @@ make run-level LEVEL=levels/labs/01_collision.toml
 
 # Open a level in the visual editor
 make run-editor
-# Then File → Open inside the editor
+# Then press Ctrl+O (or the Open button) inside the editor
 ```
 
 ---
@@ -50,16 +50,19 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 | Field | Type | Description |
 |-------|------|-------------|
 | `format_version` | int | Required for checked-in levels and new v1 documents: `1`. |
-| `screen_count` | int | Number of 400px-wide screens. `4` → world is 1600px wide. |
-| `player_start_x/y` | float | Spawn x and foot/landing y in logical pixels; y is not the sprite's top edge. |
-| `music_path` | string | Path to a WAV file, relative to repo root. |
-| `music_volume` | int | Authored music volume: 0 (silent) – 128 (full), converted to raylib's normalized volume at playback. |
-| `floor_tile_path` | string | PNG used to tile the ground. Per-level theming. |
-| `initial_hearts` | int | Starting hit points for the level. |
-| `initial_lives` | int | Starting lives for the level. |
-| `score_per_life` | int | Score threshold spacing for bonus lives. |
-| `coin_score` | int | Points awarded for each collected coin. |
-| `floor_gaps` | int array | Sea gap x-positions. Blue/fire flames are placed manually; flame `x` values normally match these openings. |
+| `name`, `description`, `generated_by` | string | Valid UTF-8, at most 63, 4095 and 127 bytes. The editor warns when `name` is empty. |
+| `screen_count` | int | Number of 400px-wide screens, `0`–`99`; `0` means the default of 4. `4` → world is 1600px wide. The editor requires at least 1. |
+| `player_start_x/y` | float | Spawn x and foot/landing y in logical pixels; y is not the sprite's top edge. Both `0` means the engine default (x 80, y 172); otherwise the point must be inside the world. |
+| `music_path` | string | A WAV path matching `assets/sounds/*.wav`, relative to repo root, at most 63 bytes. Empty means no music. |
+| `music_volume` | int | Authored music volume: 0 (silent) – 128 (full), scaled by the player's music setting at playback. |
+| `floor_tile_path` | string | A PNG matching `assets/sprites/levels/*.png` used to tile the ground, at most 63 bytes. Per-level theming. |
+| `initial_hearts` | int | Starting hit points, `0`–`3`; `0` means the default (`MAX_HEARTS`, 3). |
+| `initial_lives` | int | Starting lives, `0`–`999`; `0` means the default (3). |
+| `score_per_life` | int | Score threshold spacing for bonus lives, `0`–`999999`; `0` means the default (1000). |
+| `coin_score` | int | Points awarded for each collected coin, `0`–`999999`; `0` means the default (100). |
+| `floor_gaps` | int array | Up to 16 sea-gap x-positions; each gap is 32 px wide and must fit inside the world. Blue/fire flames are placed manually; flame `x` values normally match these openings. |
+
+Asset paths must be repo-relative with forward slashes, without `..` segments or control characters. Every string must be valid UTF-8; the parser rejects other bytes as `<field> is not valid UTF-8`. When the editor saves, it escapes control characters (including DEL, `\u007f`) so the file loads again.
 
 ## Authored Checkpoints
 
@@ -90,7 +93,7 @@ The standalone `levels/labs/03_checkpoints.toml` example places checkpoints befo
 
 ### Optional `[physics]` Overrides
 
-Levels can override player movement and camera feel with a `[physics]` table. Every field is optional; omitted fields, or values below zero, keep the engine default from `player_lifecycle.c`, `player_motion.c`, and `game_camera.c`.
+Levels can override player movement and camera feel with a `[physics]` table. Every field is optional; omitted fields, or values below zero, keep the engine default (movement constants in `src/player/player_lifecycle.c`, camera constants in `src/game.h`). Values must be finite and at most `MAX_LEVEL_MOTION` (10000). The example below shows overrides; the defaults are in the table.
 
 ```toml
 [physics]
@@ -107,19 +110,21 @@ cam_lookahead_vx_factor = 0.20
 cam_lookahead_max       = 50.0
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `walk_max_speed` | float | Maximum horizontal walk speed in px/s. |
-| `run_max_speed` | float | Maximum horizontal run speed in px/s. |
-| `walk_ground_accel` | float | Ground acceleration when walking. |
-| `run_ground_accel` | float | Ground acceleration when running. |
-| `ground_friction` | float | Deceleration when no horizontal input is held on the ground. |
-| `ground_counter_accel` | float | Extra deceleration/turn force when reversing direction on the ground. |
-| `air_accel_walk` | float | Horizontal air-control acceleration for walk arcs. |
-| `air_accel_run` | float | Horizontal air-control acceleration for run arcs. |
-| `air_friction` | float | Air deceleration when no horizontal input is held. |
-| `cam_lookahead_vx_factor` | float | Camera lookahead multiplier based on player horizontal velocity. |
-| `cam_lookahead_max` | float | Maximum camera lookahead distance in logical pixels. |
+| Field | Default | Description |
+|-------|---------|-------------|
+| `walk_max_speed` | 100 | Maximum horizontal walk speed in px/s. |
+| `run_max_speed` | 250 | Maximum horizontal run speed in px/s. |
+| `walk_ground_accel` | 750 | Ground acceleration when walking (px/s²). |
+| `run_ground_accel` | 600 | Ground acceleration when running (px/s²). |
+| `ground_friction` | 550 | Deceleration when no horizontal input is held on the ground (px/s²). |
+| `ground_counter_accel` | 100 | Extra deceleration/turn force when reversing direction on the ground (px/s²). |
+| `air_accel_walk` | 350 | Horizontal air-control acceleration for walk arcs (px/s²). |
+| `air_accel_run` | 180 | Horizontal air-control acceleration for run arcs (px/s²). |
+| `air_friction` | 80 | Air deceleration when no horizontal input is held (px/s²). |
+| `cam_lookahead_vx_factor` | 0.20 | Camera lookahead in px per px/s of player horizontal velocity. |
+| `cam_lookahead_max` | 50 | Maximum camera lookahead distance in logical pixels. |
+
+All fields are floats. In debug mode the inspector (F6 to choose a field, minus/equal to change it by 25, F7 to restore) edits the first nine live; see the [Mechanics Museum](../mechanics-museum/).
 
 Use physics overrides sparingly: they are level-wide tuning knobs, not per-entity behaviour. After changing them, run the level directly and include `make scripted-smoke` in validation so deterministic replay input still behaves.
 
@@ -136,7 +141,7 @@ x       = 444       # top-left tile x in logical pixels
 y       = 35        # top-left tile y in logical pixels
 w       = 10        # width in tiles (for RECT)
 h       = 6         # height in tiles (for RECT)
-end_cap = 0         # 0 = open end (rider detaches), 1 = capped end (rider bounces)
+end_cap = 0         # HORIZ only: 0 = open end (spike block detaches), 1 = capped end (bounces)
 ```
 
 Rail layouts:
@@ -146,7 +151,9 @@ Rail layouts:
 | `RECT` | Closed rectangular loop | Continuous-circuit spike blocks / float platforms |
 | `HORIZ` | Open horizontal line | Spike block that bounces left–right; `w` = length in tiles |
 
-The `end_cap` flag only applies to open (`HORIZ`) rails. With `end_cap = 1` the rider bounces back; with `end_cap = 0` it falls off the far end as a projectile.
+`w` and `h` are 2–128 tiles (16 px each), a `RECT` loop may have at most 128 tiles in total (`2w + 2(h − 2)`), and the whole rail must lie inside the world. The `end_cap` flag (`0` or `1`) only applies to open (`HORIZ`) rails. With `end_cap = 1` a spike block bounces back; with `end_cap = 0` it waits at the start until the camera reaches it, then falls off the far end as a projectile. Float platforms on an open rail always bounce at both ends.
+
+Riders name a rail by its position in the `[[rails]]` list (`rail_index`, 0-based), and their `t_offset` must lie on that rail. Reordering rails in a text editor therefore changes which rail each rider uses; the editor renumbers references for you.
 
 ---
 
@@ -157,17 +164,21 @@ Ground-level pillar columns. The player can land on the top surface only.
 ```toml
 [[platforms]]
 x           = 80.0   # left edge of the pillar in logical pixels
-tile_height = 2      # pillar height in 48px tiles (1 = 48px, 2 = 96px, 3 = 144px)
-tile_width  = 1      # pillar width in 48px tiles (usually 1)
+tile_height = 2      # pillar height in 48px tiles (1–5)
+tile_width  = 1      # pillar width in 48px tiles (0 or omitted = 1)
 ```
 
-Pillar top Y: `FLOOR_Y − (tile_height × TILE_SIZE)` = `252 − (tile_height × 48)`.
+An optional `tile_path` (`assets/sprites/levels/*.png`) gives one pillar its own tileset; otherwise it uses `floor_tile_path`.
+
+Each pillar sinks 16 px into the floor so its grass edge meets the ground, so its top surface is `FLOOR_Y − (tile_height × TILE_SIZE) + 16` = `268 − (tile_height × 48)`.
 
 | `tile_height` | Top surface Y | Notes |
 |---------------|---------------|-------|
-| 1 | 204 | Short hop |
-| 2 | 156 | Standard — medium bouncepads clear this |
-| 3 | 108 | Tall — use a bouncepad, climbable, or intermediate ledge |
+| 1 | 220 | Short hop |
+| 2 | 172 | Standard step-up |
+| 3 | 124 | Tall — use a bouncepad, climbable, or intermediate ledge |
+| 4 | 76 | Very tall |
+| 5 | 28 | Maximum height |
 
 ---
 
@@ -179,7 +190,7 @@ x = 46.0    # left edge in logical pixels (render width = 16px)
 y = 236.0   # top edge y in logical pixels
 ```
 
-Each coin is worth `coin_score` points (default 100). Every `score_per_life` points grants a bonus life.
+Each coin is worth `coin_score` points (default 100). Every `score_per_life` points grants a bonus life. Up to `MAX_COINS` (64) per level, each inside the world. Collected coins stay collected when the player loses a life; they return only for a fresh attempt (Retry, Replay or loading the level), so dying cannot farm score.
 
 ---
 
@@ -199,7 +210,7 @@ x = 800.0
 y = 100.0
 ```
 
-Each star variant restores 1 heart on pickup. All are 16×16 px display size.
+Each star variant restores 1 heart on pickup (up to the maximum of 3) and awards no score. All are 16×16 px display size, up to 16 of each colour. The three colours share one runtime module, `src/collectibles/health_star.c`. Stars respawn after a life loss.
 
 ---
 
@@ -220,7 +231,8 @@ Single-instance. Triggers the level-complete event when collected. Displayed at 
 
 - The path is a direct child of `levels/` ending in `.toml`: `levels/<name>.toml`. Subdirectories such as `levels/labs/` are rejected, so every chained phase can also be listed in a campaign and record profile results. Labs are standalone examples opened with `--level`.
 - `<name>` must not contain `/`, `\`, control characters (including DEL) or the Windows-reserved characters `< > : " | ? *`.
-- The stem before the first dot must be nonempty and must not be a Windows device name, in any letter case: `CON`, `PRN`, `AUX`, `NUL`, `COM0`–`COM9`, `LPT0`–`LPT9`, or `COM`/`LPT` followed by `¹`, `²` or `³`. `levels/con.toml` and `levels/nul.x.toml` are both rejected; `levels/console.toml` is fine.
+- The stem before the first dot must be nonempty and must not be a Windows device name, in any letter case (trailing spaces ignored): `CON`, `PRN`, `AUX`, `NUL`, `COM0`–`COM9`, `LPT0`–`LPT9`, or `COM`/`LPT` followed by `¹`, `²` or `³`. `levels/con.toml` and `levels/nul.x.toml` are both rejected; `levels/console.toml` is fine.
+- The whole path is valid UTF-8 and at most 255 bytes: `next_phase`, campaign entries and profile keys are each stored in a 256-byte C buffer.
 
 Collecting the last star snapshots elapsed time and coin totals, then shows the level-completion summary. With `next_phase`, its actions are **Next Level**, **Replay**, **Level Select**, and **Exit**; without one, the actions are **Replay**, **Level Select**, and **Exit**. Use Up/Down or D-pad to focus an action, Enter/Space/Start (or A) to confirm it, and Esc/Back (or B) to exit without advancing. See [Controls & Input](../controls/) for native level-select and browser-replay behavior.
 
@@ -253,9 +265,11 @@ The manifest order drives the native selector and generated [Level Catalog](../l
 
 ## Enemies
 
+Every patrolling enemy needs `patrol_x0 ≤ x ≤ patrol_x1`, inside the world, and `|vx|` at most `MAX_LEVEL_MOTION`. `vx` is only the starting velocity: its sign picks the first direction, and after the first turn the enemy moves at its type's fixed speed (spider 50, jumping spider 55, bird 45, faster bird 80, fish 70, faster fish 120 px/s). With `vx = 0` the enemy never starts patrolling. Each type holds up to 16 placements.
+
 ### Spiders
 
-Ground patrol enemy. Walks back and forth between `patrol_x0` and `patrol_x1`.
+Ground patrol enemy. Walks back and forth between `patrol_x0` and `patrol_x1`, turning at floor gaps.
 
 ```toml
 [[spiders]]
@@ -340,10 +354,12 @@ Swinging or spinning axe mounted at the top of a platform pillar.
 
 ```toml
 [[axe_traps]]
-pillar_x = 256.0    # x of the platform column the axe is mounted on
-y        = 0.0      # pivot y (0 = top of pillar; engine computes exact Y from pillar)
+pillar_x = 256.0    # left x of the 48 px column; the pivot is at its centre
+y        = 0.0      # pivot y; 0 = default (y 124, the top of a 3-tile pillar)
 mode     = "PENDULUM"  # "PENDULUM" = sinusoidal ±60° swing | "SPIN" = full 360°
 ```
+
+The default height is fixed; it is not measured from a pillar at `pillar_x`, so set `y` when the axe hangs from a shorter or taller pillar. A non-zero `y` must be within `0..300`.
 
 | `mode` | Behaviour | Period |
 |--------|-----------|--------|
@@ -357,11 +373,13 @@ Fast horizontal patrol with constant spin. Does not use a rail.
 ```toml
 [[circular_saws]]
 x          = 1350.0
-y          = 0.0      # engine snaps to floor level
+y          = 0.0      # 0 = default (y 140: rolling on top of a 2-tile pillar)
 patrol_x0  = 1350.0
 patrol_x1  = 1446.0
 direction  = 1        # 1 = starts moving right, -1 = starts moving left
 ```
+
+`direction` must be `1` or `-1`, and `patrol_x0 ≤ x ≤ patrol_x1`. A non-zero `y` is the saw's top edge and must be within `0..300`.
 
 Patrol speed: 180 px/s. Spin speed: 720°/s. Pushes player on contact (220 px/s + −150 vy).
 
@@ -372,7 +390,7 @@ Static strip of 16×16 spike tiles placed on the ground floor.
 ```toml
 [[spike_rows]]
 x     = 780.0   # left edge of the strip in logical pixels
-count = 4       # number of 16×16 tiles in the row
+count = 4       # number of 16×16 tiles in the row (1–16)
 ```
 
 ### Spike Platforms
@@ -383,7 +401,7 @@ Elevated spike hazard surface.
 [[spike_platforms]]
 x          = 370.0
 y          = 200.0   # top edge in logical pixels
-tile_count = 3       # number of tiles wide
+tile_count = 3       # number of 16 px tiles wide (1–16)
 ```
 
 ### Spike Blocks
@@ -399,11 +417,11 @@ speed      = 1.5    # traversal speed in tiles per second
 
 ### Blue Flames
 
-Erupts from a manually placed floor-gap position. `x` normally matches a `floor_gaps` entry so the flame rises from the opening. Blue and fire flame placements have separate capacities: `MAX_BLUE_FLAMES` and `MAX_FIRE_FLAMES`.
+Erupts from a manually placed floor-gap position. `x` is the gap's left edge and normally matches a `floor_gaps` entry; the flame is centred in the 32 px opening. `x` must leave room for the whole gap inside the world, and an `x` of 0 is skipped at load. Blue and fire flame placements have separate capacities: `MAX_BLUE_FLAMES` and `MAX_FIRE_FLAMES` (16 each).
 
 ```toml
 [[blue_flames]]
-x = 192.0   # world-space x of the sea gap centre
+x = 192.0   # left edge of the sea gap (same value as its floor_gaps entry)
 ```
 
 ```toml
@@ -426,7 +444,7 @@ Hovering surfaces with three behaviour modes.
 mode       = "STATIC"   # "STATIC" | "CRUMBLE" | "RAIL"
 x          = 172.0
 y          = 200.0
-tile_count = 4          # platform width in 16px pieces
+tile_count = 4          # platform width in 16px pieces (1–16)
 rail_index = 0          # only used for RAIL mode
 t_offset   = 0.0        # rail starting position (RAIL mode)
 speed      = 0.0        # rail traversal speed in tiles/s (RAIL mode)
@@ -435,18 +453,20 @@ speed      = 0.0        # rail traversal speed in tiles/s (RAIL mode)
 | `mode` | Behaviour |
 |--------|-----------|
 | `STATIC` | Hovers at fixed position forever |
-| `CRUMBLE` | Falls after player stands on it for 0.75 s |
-| `RAIL` | Travels along the referenced rail path |
+| `CRUMBLE` | Falls after the player stands on it for 0.75 s without stepping off (stepping off resets the timer) |
+| `RAIL` | Travels along the referenced rail path, bouncing at the ends of an open rail; the rail sets its position, so `x`/`y` are not used |
+
+`STATIC` and `CRUMBLE` platforms must fit inside the world.
 
 ### Bridges
 
-Tiled crumble walkway. Bricks fall when the player walks across.
+Tiled crumble walkway. Each brick the player stands on falls 0.2 s later; fallen bricks return only when the level resets after a life loss.
 
 ```toml
 [[bridges]]
 x           = 1350.0
 y           = 172.0
-brick_count = 8       # number of 16×16 brick tiles
+brick_count = 8       # number of 16×16 brick tiles (1–16)
 ```
 
 ### Bouncepads
@@ -470,11 +490,13 @@ launch_vy = -700.0
 pad_type  = "RED"
 ```
 
-| Array | `pad_type` | Default `launch_vy` | Clears |
-|-------|------------|---------------------|--------|
-| `bouncepads_small` | `GREEN` | −380.0 | 1-tile pillars |
-| `bouncepads_medium` | `WOOD` | −536.25 | 2-tile pillars |
-| `bouncepads_high` | `RED` | −700.0 | 3-tile pillars |
+| Array | `pad_type` | Usual `launch_vy` | Rise (approx.) |
+|-------|------------|---------------------|----------------|
+| `bouncepads_small` | `GREEN` | −380.0 | 90 px |
+| `bouncepads_medium` | `WOOD` | −536.25 | 180 px |
+| `bouncepads_high` | `RED` | −700.0 | 306 px (full screen height) |
+
+The usual values are the `BOUNCEPAD_VY_*` constants; the loader uses the authored `launch_vy` as written, so always set it. The rise is `launch_vy² / (2 × 800)`, with gravity 800 px/s². `pad_type` must be `GREEN`, `WOOD` or `RED`, and `|launch_vy|` at most `MAX_LEVEL_MOTION`.
 
 ### Climbable Surfaces
 
@@ -524,9 +546,9 @@ path = "assets/sprites/foregrounds/fog_1.png"
 path = "assets/sprites/foregrounds/fog_2.png"
 ```
 
-Background layers are drawn in array order (first = furthest back). Up to 8 background layers are supported. Speed `0.0` tiles the image but does not scroll; speed `1.0` would scroll at the same rate as the camera (appears fixed in world space). Most parallax layers use `0.1`–`0.5`. `foreground_layers` select the water/lava foreground strip texture, while `fog_layers` configure semi-transparent atmospheric overlays loaded by the fog system.
+Background layers are drawn in array order (first = furthest back). Up to 8 background layers, 8 foreground layers and 4 fog layers are supported; every path must match `assets/sprites/*.png` and fit in 63 bytes. Speed `0.0` tiles the image but does not scroll; speed `1.0` would scroll at the same rate as the camera (appears fixed in world space). Most parallax layers use `0.1`–`0.5`. `foreground_layers` select the water/lava foreground strip texture, while `fog_layers` configure semi-transparent atmospheric overlays loaded by the fog system.
 
-Available background images in `assets/sprites/backgrounds/`:
+Common background images in `assets/sprites/backgrounds/` (the folder also has `smoke_*` layers and `*_lightened` variants):
 
 | File | Suggested speed |
 |------|----------------|
