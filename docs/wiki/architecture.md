@@ -142,9 +142,11 @@ redraws. The accumulator restarts half a step full after pauses and loads, which
 absorbs sub-millisecond vsync jitter. Frame time is clamped to 0.25 s and at most
 5 steps run per frame; excess time is dropped (below 12 FPS the game slows down
 instead of spiralling). Smoke and scripted replays feed exactly one step per
-frame regardless of the wall clock. Experiment captures record each step's
-duration (now always the fixed step; older captures with variable steps in
-(0, 0.1] still replay). The debug inspector only changes how much real time
+frame regardless of the wall clock. Experiment captures (`format_version = 2`)
+store one row per fixed step, `[input bits, physics values...]`, with no
+duration column; a `format_version = 1` capture from the variable-timestep
+engine is rejected with a request to record it again. Completion, game over or
+a route stops the remaining steps of that frame. The debug inspector only changes how much real time
 reaches the accumulator: F2 freezes, F3 runs exactly one step, F4 slows time to
 0.25x/0.1x. It never overrides focus/settings/terminal blockers, and touch taps
 are discarded only while such a screen owns input, not on zero-step frames.
@@ -206,7 +208,7 @@ During active gameplay, Esc or controller Start toggles the player pause reason 
 
 ### Game-Over Flow
 
-When lethal damage consumes the final life, `apply_damage()` sets `gs->game_over` and returns without resetting the level. The shared overlay helper reports `GAME_OVERLAY_GAME_OVER`, so the loop blocks gameplay updates and rendering draws a game-over overlay with the final score. Its terminal action list is **Retry**, **Level Select**, **Exit**. Retry calls `game_restart_after_game_over()` in place: it restores level-defined lives/hearts, resets score and bonus-life threshold, reloads the current level, resumes music, and clears its input latch after held controls are released. Level Select and Exit follow the session routes above.
+When lethal damage consumes the final life, `apply_damage()` sets `gs->game_over` and returns without resetting the level. The shared overlay helper reports `GAME_OVERLAY_GAME_OVER`, so the loop blocks gameplay updates and rendering draws a game-over overlay with the final score. Its terminal action list is **Retry**, **Level Select**, **Exit**. Retry calls `game_restart_after_game_over()` in place: it restores level-defined lives/hearts, resets score and bonus-life threshold, makes every coin collectable again, resets the current level, resumes music, and clears its input latch after held controls are released. Level Select and Exit follow the session routes above.
 
 ---
 
@@ -260,11 +262,13 @@ typedef struct {
     GameCamera camera;
     int     hearts, lives, score, score_life_next;
     int     running;
+    GameRoute route;              /* request consumed by AppSession */
     int     game_over;
     int     paused;
     unsigned int pause_reasons;
     float   respawn_x, respawn_y;
-    int     checkpoint_index;
+    int     checkpoint_index;     /* -1 before the first authored record */
+    CheckpointFeedbackKind checkpoint_feedback_kind;
     uint32_t checkpoint_feedback_until;
     int     legacy_checkpoint_screen;
     int     debug_mode;
@@ -286,13 +290,13 @@ typedef struct {
 - `Player` is **embedded by value**, not a pointer. This avoids a heap allocation and keeps the struct self-contained. The same applies to `Platform`, `Water`, `FogSystem`, and all entity arrays.
 - Owning pointers are cleared after release. Borrowed pointers and aliases still require correct lifetime handling.
 - Active-game storage is heap-owned and zero-initialized before initialization; the struct above is an abridged ownership map, not a complete declaration.
-- `checkpoint_x` is no longer a `GameState` field. The resolved respawn state is `respawn_x`, `respawn_y`, and `checkpoint_index`; `legacy_checkpoint_screen` is used only when the active level has no authored records.
+- `checkpoint_x` is no longer a `GameState` field. The resolved respawn state is `respawn_x`, `respawn_y`, and `checkpoint_index`; `legacy_checkpoint_screen` is used only when the active level has no authored records. `checkpoint_index` and `respawn_x`/`respawn_y` are always written together (on load, on retry and when a record is reached), so a valid index always names the current respawn.
 
 ### Authored Checkpoint Flow
 
 `LevelDef` owns optional immutable `CheckpointPlacement { x, y }` records. Each active frame samples authored records after player movement and before lethal collisions. The furthest record with `x <= player.x` becomes the resolved respawn point, so a death in the same frame preserves a crossed checkpoint. The runtime never regresses to an earlier record.
 
-Authored records disable automatic screen-boundary checkpoints for that level. A level with no records saves automatically when the player enters a new screen; the respawn column is the screen edge, or the nearest column to its left (over ground already crossed) with solid floor and no floor gap, spike row, spike platform or flame. If no such column exists the previous checkpoint is kept. Retry, replay, and successful next-phase loads reset to the effective start of their respective level; a failed next-phase load retains the active level and its resolved checkpoint. The HUD shows brief `CHECKPOINT CP n` and `RESPAWN CP n` notices. The debug inspector exposes the stored checkpoint index; the regular HUD does not keep a permanent checkpoint label after the notice expires.
+Authored records disable automatic screen-boundary checkpoints for that level. A level with no records saves automatically when the player enters a new screen; the respawn column is the screen edge, or the nearest column to its left (over ground already crossed) with solid floor and no floor gap, spike row, spike platform or flame. If no such column exists the previous checkpoint is kept. Losing a life respawns at the resolved checkpoint and keeps collected coins collected; Retry, replay, and successful next-phase loads restore every coin and reset to the effective start of their respective level; a failed next-phase load retains the active level and its resolved checkpoint. The HUD shows brief `CHECKPOINT CP n` and `RESPAWN CP n` notices. The debug inspector exposes the stored checkpoint index; the regular HUD does not keep a permanent checkpoint label after the notice expires.
 
 ---
 
@@ -307,8 +311,10 @@ Authored records disable automatic screen-boundary checkpoints for that level. A
 | Optional presentation texture load failure | Warn and preserve the documented visual fallback |
 
 Application errors identify the failing asset/path or lifecycle operation. raylib's
-warnings provide backend detail. Fonts, textures and sound aliases are released
-before their owning context/sample/device. Menu/game transitions retain the same
+warnings provide backend detail. Text uses raylib's built-in default font; the
+game frees only its small handle, never the borrowed atlas. Textures and sound
+aliases are released before their owning context/sample/device. The game
+requires an audio device: if none can be opened, session creation fails. Menu/game transitions retain the same
 window, including when a candidate level fails to load.
 
 Version-1 profile binding numbers are translated explicitly. Unsupported legacy
