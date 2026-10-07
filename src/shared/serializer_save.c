@@ -188,6 +188,38 @@ static void write_world_and_collectibles(FILE *fp, const LevelDef *def)
     }
 }
 
+/* write_bird_tables — One [[table]] per bird, under the given table name. */
+static void write_bird_tables(FILE *fp, const char *table,
+                              const BirdPlacement *birds, int count)
+{
+    for (int i = 0; i < count; i++) {
+        const BirdPlacement *b = &birds[i];
+        fprintf(fp, "[[%s]]\n", table);
+        fprintf(fp, "x = %s\n", fmt_float(b->x));
+        fprintf(fp, "base_y = %s\n", fmt_float(b->base_y));
+        fprintf(fp, "vx = %s\n", fmt_float(b->vx));
+        fprintf(fp, "patrol_x0 = %s\n", fmt_float(b->patrol_x0));
+        fprintf(fp, "patrol_x1 = %s\n", fmt_float(b->patrol_x1));
+        fprintf(fp, "frame_index = %d\n", b->frame_index);
+        fprintf(fp, "\n");
+    }
+}
+
+/* write_fish_tables — One [[table]] per fish, under the given table name. */
+static void write_fish_tables(FILE *fp, const char *table,
+                              const FishPlacement *fish, int count)
+{
+    for (int i = 0; i < count; i++) {
+        const FishPlacement *f = &fish[i];
+        fprintf(fp, "[[%s]]\n", table);
+        fprintf(fp, "x = %s\n", fmt_float(f->x));
+        fprintf(fp, "vx = %s\n", fmt_float(f->vx));
+        fprintf(fp, "patrol_x0 = %s\n", fmt_float(f->patrol_x0));
+        fprintf(fp, "patrol_x1 = %s\n", fmt_float(f->patrol_x1));
+        fprintf(fp, "\n");
+    }
+}
+
 /* write_enemies — Spiders, birds and fish, one [[array]] name per type. */
 static void write_enemies(FILE *fp, const LevelDef *def)
 {
@@ -216,57 +248,14 @@ static void write_enemies(FILE *fp, const LevelDef *def)
         fprintf(fp, "\n");
     }
 
-    /* ---- Birds --------------------------------------------------- */
-
-    for (int i = 0; i < def->bird_count; i++) {
-        const BirdPlacement *b = &def->birds[i];
-        fprintf(fp, "[[birds]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(b->x));
-        fprintf(fp, "base_y = %s\n", fmt_float(b->base_y));
-        fprintf(fp, "vx = %s\n", fmt_float(b->vx));
-        fprintf(fp, "patrol_x0 = %s\n", fmt_float(b->patrol_x0));
-        fprintf(fp, "patrol_x1 = %s\n", fmt_float(b->patrol_x1));
-        fprintf(fp, "frame_index = %d\n", b->frame_index);
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Faster birds -------------------------------------------- */
-
-    for (int i = 0; i < def->faster_bird_count; i++) {
-        const BirdPlacement *b = &def->faster_birds[i];
-        fprintf(fp, "[[faster_birds]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(b->x));
-        fprintf(fp, "base_y = %s\n", fmt_float(b->base_y));
-        fprintf(fp, "vx = %s\n", fmt_float(b->vx));
-        fprintf(fp, "patrol_x0 = %s\n", fmt_float(b->patrol_x0));
-        fprintf(fp, "patrol_x1 = %s\n", fmt_float(b->patrol_x1));
-        fprintf(fp, "frame_index = %d\n", b->frame_index);
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Fish ---------------------------------------------------- */
-
-    for (int i = 0; i < def->fish_count; i++) {
-        const FishPlacement *f = &def->fish[i];
-        fprintf(fp, "[[fish]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(f->x));
-        fprintf(fp, "vx = %s\n", fmt_float(f->vx));
-        fprintf(fp, "patrol_x0 = %s\n", fmt_float(f->patrol_x0));
-        fprintf(fp, "patrol_x1 = %s\n", fmt_float(f->patrol_x1));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Faster fish --------------------------------------------- */
-
-    for (int i = 0; i < def->faster_fish_count; i++) {
-        const FishPlacement *f = &def->faster_fish[i];
-        fprintf(fp, "[[faster_fish]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(f->x));
-        fprintf(fp, "vx = %s\n", fmt_float(f->vx));
-        fprintf(fp, "patrol_x0 = %s\n", fmt_float(f->patrol_x0));
-        fprintf(fp, "patrol_x1 = %s\n", fmt_float(f->patrol_x1));
-        fprintf(fp, "\n");
-    }
+    /* Both bird types share BirdPlacement and both fish types share
+     * FishPlacement; only the [[table]] name differs, so one writer each. */
+    write_bird_tables(fp, "birds", def->birds, def->bird_count);
+    write_bird_tables(fp, "faster_birds", def->faster_birds,
+                      def->faster_bird_count);
+    write_fish_tables(fp, "fish", def->fish, def->fish_count);
+    write_fish_tables(fp, "faster_fish", def->faster_fish,
+                      def->faster_fish_count);
 }
 
 /* write_hazards — Axe traps, saws, spike rows/platforms/blocks and flames. */
