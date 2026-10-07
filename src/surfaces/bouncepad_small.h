@@ -1,7 +1,7 @@
 /*
  * bouncepad_small.h — Green bouncepad (small jump) placement.
  *
- * Uses Bouncepad_Green.png.  Launch impulse: BOUNCEPAD_VY_SMALL.
+ * Uses bouncepad_small.png.  Usual launch impulse: BOUNCEPAD_VY_SMALL.
  */
 #pragma once
 

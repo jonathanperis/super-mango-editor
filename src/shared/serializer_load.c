@@ -39,11 +39,12 @@ int level_load_toml(const char *path, LevelDef *def) {
     LevelDef *caller_def = def;
 
     /*
-     * toml_parse_file_ex — open and parse a TOML file in one call.
+     * serializer_fopen_utf8 opens the file (UTF-8 paths work on Windows
+     * too), then toml_parse_file parses the open stream.
      *
-     * Returns a toml_result_t.  If parsing fails, r.ok is false and
-     * r.errmsg contains a human-readable error description.  On success,
-     * r.toptab is the root TOML table we can query with toml_get().
+     * toml_parse_file returns a toml_result_t.  If parsing fails, r.ok is
+     * false and r.errmsg contains a human-readable error description.  On
+     * success, r.toptab is the root TOML table we can query with toml_get().
      */
     FILE *fp = serializer_fopen_utf8(path, "rb");
     if (!fp) {
@@ -135,7 +136,7 @@ int level_load_toml(const char *path, LevelDef *def) {
     }
 
     /*
-     * toml_free — release all memory allocated by toml_parse_file_ex.
+     * toml_free — release all memory allocated by toml_parse_file.
      * The LevelDef struct now holds its own copies of all data, so
      * the TOML tree is safe to destroy.
      */

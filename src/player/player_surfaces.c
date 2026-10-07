@@ -269,7 +269,7 @@ void player_resolve_spike_platform_top_collision(Player *player,
     /*
      * Spike platform collision — same one-way crossing test as bridges.
      * The player can land on top (solid surface) but will take damage
-     * from the spike hitbox check in game.c.
+     * from the spike hitbox check in game_collision.c.
      */
     if (player->vy < 0.0f) {
         return;
@@ -304,7 +304,7 @@ void player_resolve_spike_platform_ceiling_collision(Player *player,
      * Here we handle the smooth underside: when the player jumps up and
      * their physical head crosses through the platform bottom, stop them
      * and zero vy, just like hitting a solid ceiling.  No damage is dealt —
-     * damage only comes from the spike tips (handled in game.c).
+     * damage only comes from the spike tips (handled in game_collision.c).
      *
      * We use the PHYSICAL top (player->y + PHYS_PAD_TOP) rather than the
      * raw sprite top so the head snaps flush with the platform underside
