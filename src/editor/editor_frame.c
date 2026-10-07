@@ -8,7 +8,7 @@
 #include "canvas.h"
 #include "editor_chrome.h"
 #include "editor_events.h"
-#include "editor_files.h"
+#include "editor_recovery.h"
 #include "editor_panels.h"
 #include "editor_playtest.h"
 #include "editor_validation.h"
