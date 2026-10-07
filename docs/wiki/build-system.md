@@ -6,7 +6,7 @@
 
 ## Makefile Overview
 
-The project uses a **GNU Makefile** with explicit per-directory wildcards. New `.c` files in recognized source directories are compiled automatically; new source directories need matching `SRCS` and pattern-rule entries.
+The project uses a **GNU Makefile** with explicit per-directory wildcards. New `.c` files in recognized source directories are compiled automatically; a new source directory needs only a matching `SRCS` wildcard (plus `EDITOR_SRCS` if the editor links it), because one pattern rule compiles every `src/` path into `out/obj/`.
 
 ```makefile
 CC      ?= clang
@@ -87,6 +87,15 @@ commit and retained project-patch inventory are recorded in
 | `OBJDIR` | `out/obj` | Object/dependency root that mirrors source paths |
 | `OBJS` | `$(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))` | Object files under `out/obj/...` |
 | `DEPS` | `$(OBJS:.o=.d)` | Auto-generated dependency files beside object files under `out/obj/...` |
+| `BUILD_MODE` | `debug` | `debug` (`-g -O0`) or `release` (`-O2` plus hardening); `make debug`/`make release` set it |
+| `RAYLIB_PLATFORM` | `native` | `memory` selects the headless test backend (rejected by `release`/`dist-native`) |
+| `RAYLIB_AUDIO` | `device` | `null` builds raylib with miniaudio's null playback device in `$(OUTDIR)/raylib-nullaudio` (test-only; rejected by `release`/`dist-native`) |
+| `RAYLIB_ARCHIVE` | empty | Optional shared, SHA-256-verified raylib source archive |
+| `EXTRA_CFLAGS` / `EXTRA_LDFLAGS` / `EXTRA_WEB_CFLAGS` | empty | Appended flags; CI passes `-Werror` |
+
+The Makefile declares `.DELETE_ON_ERROR`, so a recipe that fails part-way (for
+example emcc succeeding and `tools/web_csp.py` then failing) deletes its target
+instead of leaving a half-built file that Make would treat as up to date.
 
 ### Compiler Selection Caveat
 
@@ -259,16 +268,21 @@ Current test binaries (15):
 - `out/session-test`
 - `out/game-checkpoint-test`
 
-`make test` also runs `tests/validate_levels_test.py`. Its `web-host-contract`
-prerequisite runs the static boot check, JavaScript host/profile-storage/touch
-and canvas-keyboard contracts and Python release-archive tests. The native list above is the complete
+`make test` also runs `tests/validate_levels_test.py` and `tests/gen_sounds_test.py`.
+Its `web-host-contract` prerequisite runs `tools/check_web_boot_contract.py`, the
+Node tests `tests/web_host_test.cjs`, `tests/profile_storage_test.cjs`,
+`tests/touch_controls_test.cjs` and `tests/keyboard_scope_test.cjs`, then
+`tests/package_release_test.py` and `tests/filter_codeql_sarif_test.py`
+(`make web-host-contract` runs them alone). `tests/docs_checks_test.py` runs from
+`bun run check-site` instead. The native list above is the complete
 `TEST_TARGETS` inventory; profile, simulation and parser-boundary cases are linked
 into existing harnesses rather than separate binaries.
 
 `make test` also runs the standalone `parser-allocation-probe` and Python
-`parser-encoding-probe`. These focused targets verify allocation-growth limits
-and consistent UTF-8/BOM decoding across tools. `make sanitize` instruments the C
-probe and runs both alongside the existing regression suites.
+`parser-encoding-probe` (`tests/parser_validator_test.py`). These focused targets
+verify allocation-growth limits and consistent UTF-8/BOM decoding across tools.
+`make sanitize` instruments the C probe and runs both alongside the existing
+regression suites.
 
 ### `make validate-levels`
 
@@ -296,7 +310,7 @@ make scripted-smoke SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
 
 ### `make sanitize`
 
-Runs `make test` in a separate `out-sanitize/` tree with AddressSanitizer and UndefinedBehaviorSanitizer enabled, then `make fuzz-corpus` in the same tree.
+Builds the game and editor and runs `make test` in a separate `out-sanitize/` tree with AddressSanitizer and UndefinedBehaviorSanitizer enabled, then runs `make fuzz-corpus` in the same tree.
 
 ### `make coverage`
 
@@ -307,7 +321,7 @@ Rebuilds and runs `make test` in `out/coverage/` with clang source-based coverag
 `fuzz-corpus` replays the level and profile fuzz seeds under ASan/UBSan with a plain driver. `fuzz` runs coverage-guided libFuzzer for `FUZZ_SECONDS` per harness and needs a clang with libFuzzer (`FUZZ_CC`). See [Testing](../testing/#fuzzing).
 
 ```sh
-make sanitize
+make fuzz-corpus FUZZ_MUTATIONS=500
 ```
 
 ### `make sanitize-smoke`
@@ -344,7 +358,7 @@ make roadmap-quality
 
 ### `make dist-native`
 
-Builds optimized native builder archives under `dist/`. Both game and editor are included with playable assets, campaign/lab levels, project and third-party notices, and a run README. `unused/` assets are excluded. CI uses the same packaging path.
+Depends on `release` and `asset-budget`, then packages optimized native builder archives under `dist/`. It refuses `RAYLIB_PLATFORM=memory` and `RAYLIB_AUDIO=null`. Both game and editor are included with playable assets, campaign/lab levels, project and third-party notices, and a run README. `unused/` assets are excluded. CI uses the same packaging path.
 
 ```sh
 make dist-native
@@ -352,7 +366,7 @@ make dist-native
 
 ### `make dist-wasm`
 
-Depends on `make web`, whose HTML outputs are file targets over the sources, headers, `web/` host files, `assets/`, `levels/`, the Web raylib library and the Makefile; emcc only reruns when one of them is newer, so a stale WASM build is never packaged. Archives include HTML/JS/WASM/data files, README and third-party notices.
+Depends on `asset-budget` and `make web`, whose HTML outputs are file targets over the sources, headers, `web/` host files, `assets/`, `levels/`, the Web raylib library and the Makefile; emcc only reruns when one of them is newer, so a stale WASM build is never packaged. Archives include HTML/JS/WASM/data files, README and third-party notices.
 
 ```sh
 make dist-wasm   # runs make web first when its outputs are stale
@@ -360,7 +374,7 @@ make dist-wasm   # runs make web first when its outputs are stale
 
 ### `make docs-drift`
 
-Runs generated content-inventory, level-catalog and overlay-snapshot freshness checks, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. They compare documented test targets, README/guide summaries, source-map entries, campaign coverage, TOML example schemas, player API declarations, runtime flags, selected constants, level prose, workflow references and scripted-smoke wiring. Run the separate built-site check below for emitted links and metadata.
+Runs generated content-inventory/asset-budget, `tools/gen_sounds.py --check`, level-catalog and overlay-snapshot freshness checks, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. They compare documented test targets, README/guide summaries, source-map entries, campaign coverage, TOML example schemas, player API declarations, runtime flags, selected constants, level prose, workflow references and scripted-smoke wiring. Run the separate built-site check below for emitted links and metadata.
 
 ```sh
 make docs-drift
@@ -378,6 +392,15 @@ The public GitHub Pages documentation site lives under `docs/` and builds with *
 - Queued rendering is enabled by Astro 7 by default and does not require config.
 
 Astro 7's route caching, CDN cache providers, and `src/fetch.ts` advanced-routing hooks are intentionally **not** configured here because this repo deploys static HTML/assets to GitHub Pages (`output: "static"`) and has no SSR adapter or request-time runtime.
+
+The manual is an Astro content collection: `docs/src/content.config.ts` uses the
+`glob` loader over `docs/wiki/*.md`, and its strict schema accepts only optional
+`title`/`description` frontmatter. `docs/src/pages/docs/[...slug].astro` loads
+pages with `getCollection('docs')` and `render()`, and fails the build when a
+page and the `SECTION_ORDER` list in `docs/src/lib/docsSidebar.ts` disagree.
+`docs/integrations/home-csp.mjs` adds a hash-pinned Content-Security-Policy to
+the home page that hosts the game after the build. Optional analytics loads only
+on manual pages, never on that home page.
 
 ```sh
 cd docs
@@ -399,7 +422,7 @@ npm run check-site
 Keep Bun and `bun.lock` as the CI dependency contract. The npm fallback runs the declared scripts; it does not replace the locked install step.
 
 Astro requires Node.js 22.12+; CI uses Node **26.9.0** and Bun **1.4.2**. The
-supported frontend set is Astro **7.3.3**, `@astrojs/markdown-satteri` **0.4.1**,
+supported frontend set is Astro **7.3.6**, `@astrojs/markdown-satteri` **0.4.3**,
 `@astrojs/sitemap` **3.7.4**, `@astrojs/check` **0.9.10**, Tailwind CSS and its Vite
 plugin **4.3.3**, and TypeScript **6.0.3**. TypeScript **7.0.2** is newer but outside
 Astro Check 0.9.10's `^5.0.0 || ^6.0.0` peer range; retain 6.0.3 until supported.
@@ -483,14 +506,14 @@ make
 
 ## CI/CD Pipelines
 
-Four GitHub Actions workflows handle automated builds and docs checks:
+Three workflow files handle automated builds, docs checks and analysis; GitHub Pages publishing is part of `build.yml`:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
 | Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job (recommended required check; see the [release checklist](../release-checklist/)); native game/editor tests, smoke and packaging (Windows with GCC); a separate `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` job builds and tests with Clang outside the release `needs`; Linux sanitizers/scripted smoke; level validation on every native OS; WASM build/artifact/package checks; a separate `Desktop backend` job runs Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL (hosted macOS runners have no OpenGL pixel format). Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` |
 | Docs | `docs.yml` | Push to `main`, relevant pull requests, manual | `make docs-drift`, frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows |
-| CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis |
-| Deploy | `build.yml` jobs `pages-build` → `pages-deploy` | Main push/manual run on main, after `Docs drift` and the build matrix pass | Builds/checks docs at the run's commit with read-only permissions, adds the same run's WASM artifact, HTTP-smokes the assembly; a separate job with only Pages/OIDC permissions deploys `docs/out/`. Keeping both in one workflow avoids a `workflow_run` trust boundary (no artifact from another run is consumed) |
+| CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis. The C/C++ job analyzes without uploading, drops code-quality (non-security) results located in third-party code (`out/` raylib headers, `vendor/`) with `tools/filter_codeql_sarif.py`, then uploads the SARIF with `upload-sarif` |
+| Pages | `build.yml` jobs `pages-build` → `pages-deploy` | Main push/manual run on main, after `Docs drift` and the build matrix pass | Builds/checks docs at the run's commit with read-only permissions, adds the same run's WASM artifact, HTTP-smokes the assembly; a separate job with only Pages/OIDC permissions deploys `docs/out/`. Keeping both in one workflow avoids a `workflow_run` trust boundary (no artifact from another run is consumed) |
 
 Every job sets `timeout-minutes`. Every native leg (Clang and GCC) passes
 `EXTRA_CFLAGS=-Werror` and the WebAssembly leg `EXTRA_WEB_CFLAGS=-Werror`.
@@ -532,7 +555,7 @@ Native rendered smoke uses `./out/super-mango --level levels/00_sandbox_01.toml 
 
 ## Adding New Source Files
 
-Because the Makefile uses per-subdirectory wildcards, any new `.c` file placed in `src/` or a recognized source subdirectory is compiled automatically on the next `make` invocation. New source directories require adding a wildcard, compile rule, and clean entry.
+Because the Makefile uses per-subdirectory wildcards, any new `.c` file placed in `src/` or a recognized source subdirectory is compiled automatically on the next `make` invocation. A new source directory needs a `SRCS` wildcard; the shared pattern rule and `make clean` already cover everything under `out/`.
 
 ```sh
 # Example: adding an entity in a subdirectory
@@ -553,6 +576,7 @@ out/
 ├── super-mango                          ← the game binary
 ├── super-mango-editor                   ← the editor binary (make editor)
 ├── raylib/                              ← verified source, applied patches and CMake build
+├── raylib-web/                          ← Emscripten raylib build (make web)
 └── obj/
     ├── src/                             ← game/editor objects mirror source paths
     │   ├── core/*.o / *.d

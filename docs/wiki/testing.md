@@ -10,13 +10,13 @@ Use this page to choose the smallest useful verification set for a change. Run c
 
 | Changed area | Run locally | Why |
 |--------------|-------------|-----|
-| C runtime, gameplay, collision, score, overlays, sessions | `make test CC=clang` | Builds and runs 15 native regression binaries plus Python level-validation and web-host checks. |
+| C runtime, gameplay, collision, score, overlays, sessions | `make test CC=clang` | Builds and runs 15 native regression binaries, a parser allocation probe, and Python/Node host checks (levels, generated sounds, parser encoding, web host, release packaging, CodeQL SARIF filter). |
 | Level TOML, campaign manifest, or level schema | `make validate-levels` and `make docs-drift` | Validates root and lab levels, the v1 campaign manifest, generated facts, schema docs and prose counts. |
 | Player/world runtime startup | `make smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEED=1` | Renders every TOML level plus the editor in bounded hidden windows. |
 | Replay or event handling | `make scripted-smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"` | Generates deterministic commands/action masks and checks movement/jump/pause results. |
 | Editor behaviour | `make editor CC=clang` and `./out/super-mango-editor --smoke-test` | Builds the editor and renders five hidden-window frames; a desktop context is still required. |
 | Memory/UB-sensitive C changes | `make sanitize CC=clang` and, when startup paths changed, `make sanitize-smoke CC=clang` | Runs AddressSanitizer/UBSan over tests and optionally smoke startup. |
-| Docs, README, Pages routes | `make docs-drift`, then from `docs/`: `bun run lint`, `bun run build`, `bun run check-site` | Checks generated facts, TOML examples, API/CLI references, Astro compilation and emitted routes/links/metadata/sitemap. Uses the frozen `bun.lock` dependency set. |
+| Docs, README, Pages routes | `make docs-drift`, then from `docs/`: `bun run lint`, `bun run build`, `bun run check-site` | Checks generated facts and sounds, TOML examples, API/CLI references, Astro compilation and emitted routes/links/metadata/sitemap/CSP (`check-site` also runs `tests/docs_checks_test.py`). Uses the frozen `bun.lock` dependency set. |
 | WebAssembly payload | `make web`, artifact checks, green WebAssembly + Pages assembly checks, and actual browser startup for runtime changes | Build raylib and the application with the same pinned SDK. HTTP/module checks do not execute the browser frame loop. |
 | Release packaging | `make dist-native` and `make dist-wasm` or the `Build & Release` workflow | Produces native and WebAssembly archives using the same archive layout described in the release checklist. |
 
@@ -52,12 +52,14 @@ archive contents, editor inclusion, reserve-asset exclusion and license notices.
 - `session-test`
 - `game-checkpoint-test`
 
-It also runs `tests/validate_levels_test.py`. The `web-host-contract` prerequisite
-adds `tools/check_web_boot_contract.py`, `tests/web_host_test.cjs`,
-`tests/profile_storage_test.cjs`, `tests/touch_controls_test.cjs` and
-`tests/package_release_test.py`. These cover static boot wiring, host lifecycle,
-storage conflicts, touch ownership and native/WASM archive contracts without a
-browser. Native harnesses cover parser/serializer, validation, runtime, editor,
+It also runs `tests/validate_levels_test.py` and `tests/gen_sounds_test.py`. The
+`web-host-contract` prerequisite adds `tools/check_web_boot_contract.py`,
+`tests/web_host_test.cjs`, `tests/profile_storage_test.cjs`,
+`tests/touch_controls_test.cjs`, `tests/keyboard_scope_test.cjs`,
+`tests/package_release_test.py` and `tests/filter_codeql_sarif_test.py`. These
+cover static boot wiring, host lifecycle, storage conflicts, touch ownership,
+canvas keyboard scoping, native/WASM archive contracts and the CodeQL SARIF
+filter without a browser. Native harnesses cover parser/serializer, validation, runtime, editor,
 profile, checkpoint, simulation and session behavior.
 
 The session harness compiles the production display boundary's Web path against
@@ -80,7 +82,7 @@ invalid CR-only documents remain rejected.
 `make coverage CC=clang` rebuilds the native suite in `out/coverage/` with
 clang source-based coverage (`-fprofile-instr-generate -fcoverage-mapping`),
 runs `make test` there, merges the profiles with `llvm-profdata` and prints an
-`llvm-cov report` per source file. `vendor/` and `tests/` are excluded. macOS
+`llvm-cov report` per source file. `vendor/`, `tests/` and `out/` are excluded. macOS
 uses `xcrun llvm-profdata`/`xcrun llvm-cov`; Linux uses `llvm-profdata`/`llvm-cov`
 from `PATH`. Override them with `LLVM_PROFDATA=` / `LLVM_COV=`. For a
 line-by-line view of one file:
@@ -130,7 +132,9 @@ audible output or physical-device behavior.
 
 ## Smoke Tests
 
-`make smoke` builds the game and editor, runs root and lab TOML levels for a bounded frame count, then renders five editor frames. Desktop hidden windows still need graphics and audio devices. Linux CI supplies Xvfb/Mesa and a PulseAudio null sink. macOS/Windows CI uses a separate Memory/software-rendered test build while building and packaging normal GLFW desktop executables.
+`make smoke` builds the game and editor, runs root and lab TOML levels for a bounded frame count, then renders five editor frames. Desktop hidden windows still need graphics and audio devices. Linux CI supplies Xvfb/Mesa and a PulseAudio null sink. The gating macOS/Windows legs use a separate Memory/software-rendered test build while building and packaging normal GLFW desktop executables. The non-gating `Desktop backend` job runs the real GLFW/OpenGL tests and smoke on Windows only, with Mesa llvmpipe and `RAYLIB_AUDIO=null`; hosted macOS runners have no OpenGL pixel format.
+
+On a desktop with a display but no sound device, `make test OUTDIR=out/nullaudio RAYLIB_AUDIO=null` keeps the real graphics backend and swaps in miniaudio's null playback device. Like Memory, it is test-only: `release` and `dist-native` refuse it.
 
 For display-less local verification:
 
@@ -156,7 +160,7 @@ units and owner/borrower contracts still need their existing regression checks.
 
 ## Documentation Drift Gate
 
-`make docs-drift` checks generated content facts/asset budget, level catalog and overlay snapshots, then runs semantic checks for:
+`make docs-drift` checks generated content facts/asset budget, generated sounds (`tools/gen_sounds.py --check`), level catalog and overlay snapshots, then runs semantic checks for:
 
 - documented Makefile test targets;
 - source file map entries;
