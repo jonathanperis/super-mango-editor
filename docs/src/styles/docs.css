@@ -278,6 +278,21 @@
     border-left: 6px solid var(--leaf);
     color: var(--ink-soft);
 }
+/* Lab hints and answers stay folded until the reader asks for them. */
+.doc-page details {
+    margin: 0.8em 0;
+    padding: 10px 16px;
+    background: var(--night-raised);
+    border: 2px solid var(--night-line);
+    border-left: 6px solid var(--gold);
+}
+.doc-page summary {
+    cursor: pointer;
+    color: var(--gold);
+    font: 600 1rem/1.4 var(--font-display);
+}
+.doc-page summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.doc-page details[open] > summary { margin-bottom: 0.6em; }
 .doc-page hr { border: 0; border-top: 3px dashed var(--night-line); margin: 2.5em 0; }
 .doc-page img { max-width: 100%; image-rendering: pixelated; }
 
