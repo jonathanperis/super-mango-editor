@@ -32,6 +32,7 @@ static int file_dialog_test_save_result = -1;
 static char file_dialog_test_open_path[FILE_DIALOG_TEST_PATH_MAX];
 static char file_dialog_test_save_path[FILE_DIALOG_TEST_PATH_MAX];
 
+#ifdef MANGO_TESTING
 void file_dialog_test_set_open_result(int result, const char *path)
 {
     file_dialog_test_open_result = result;
@@ -55,6 +56,7 @@ void file_dialog_test_set_save_result(int result, const char *path)
         file_dialog_test_save_path[0] = '\0';
     }
 }
+#endif /* MANGO_TESTING */
 /* ------------------------------------------------------------------ */
 
 /*

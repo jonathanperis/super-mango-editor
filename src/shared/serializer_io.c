@@ -224,10 +224,12 @@ int serializer_make_temp_path(const char *path, char *buf, size_t buf_size)
     return 0;
 }
 
+#ifdef MANGO_TESTING
 void serializer_test_set_failure(int failure)
 {
     serializer_test_failure = failure;
 }
+#endif
 
 int serializer_stream_has_error(FILE *fp)
 {

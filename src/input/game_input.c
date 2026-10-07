@@ -12,6 +12,7 @@
 static int s_test_physical_override;
 static GameInputPhysicalState s_test_physical_state;
 
+#ifdef MANGO_TESTING
 void game_input_test_set_physical_state(unsigned int keyboard_mask,
                                          unsigned int controller_mask)
 {
@@ -26,6 +27,7 @@ void game_input_test_clear_physical_state(void)
     s_test_physical_state.keyboard_mask = 0;
     s_test_physical_state.controller_mask = 0;
 }
+#endif
 
 unsigned int game_input_keyboard_mask(const uint8_t *keys, const GameSettings *settings)
 {

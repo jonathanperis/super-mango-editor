@@ -62,10 +62,12 @@ static int editor_recovery_seeded;
 static int editor_test_recovery_choice = -1;
 static void (*editor_test_load_hook)(const char *path);
 
+#ifdef MANGO_TESTING
 void editor_test_set_recovery_choice(int button_id)
 {
     editor_test_recovery_choice = button_id;
 }
+#endif
 
 static int editor_save_recent_files(const EditorState *es);
 static int editor_recent_path_storable(const char *path);
@@ -168,10 +170,12 @@ int editor_set_recovery_document(EditorState *es, const char *document_path)
     return editor_set_recovery_path(es, document_path);
 }
 
+#ifdef MANGO_TESTING
 void editor_test_set_load_hook(void (*hook)(const char *path))
 {
     editor_test_load_hook = hook;
 }
+#endif
 
 /*
  * editor_read_stable_level — Parse a level and fingerprint the same bytes.
