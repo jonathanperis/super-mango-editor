@@ -326,6 +326,7 @@ web-host-contract:
 	$(NODE) tests/touch_controls_test.cjs
 	$(NODE) tests/keyboard_scope_test.cjs
 	python3 tests/package_release_test.py
+	python3 tests/filter_codeql_sarif_test.py
 
 # clangd / IDE compile database uses the same pinned dependency headers.
 compile-commands:
