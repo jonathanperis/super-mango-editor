@@ -104,10 +104,11 @@ for the CI-authoritative WebAssembly verification contract.
 source, level, root-doc and workflow changes). It runs drift, frozen install, Astro lint, dependency audit,
 build and built-site validation. It does not deploy.
 
-`deploy.yml` runs after a successful same-repository main push/manual Build &
-Release run. It checks out that run's exact commit, builds/checks the site, adds
-the matching normal/debug WASM artifact, performs HTTP assembly smoke checks and
-deploys `docs/out/` to Pages. Release tags are a separate publication path.
+On a main push or manual run on main, Build & Release ends with two Pages jobs.
+`pages-build` checks out that run's commit, builds/checks the site with
+read-only permissions, adds the same run's normal/debug WASM artifact and
+performs HTTP assembly smoke checks; `pages-deploy`, the only job with Pages
+and OIDC permissions, deploys `docs/out/`. Release tags are a separate publication path.
 
 A passing documentation PR checks the proposed manual, not the deployed site.
 Pages continues to serve the previous successful `main` revision until the PR
@@ -117,7 +118,7 @@ from the same revision when verifying a migration.
 Analytics is optional; see `.env.example`. With no `PUBLIC_GA_ID`, analytics
 scripts are omitted. Production builds map the repository secret
 `NEXT_PUBLIC_GA_ID` (a legacy Next.js-era name; renaming means creating a new
-repository secret and updating `deploy.yml`) to `PUBLIC_GA_ID`. Local
+repository secret and updating the `pages-build` job in `build.yml`) to `PUBLIC_GA_ID`. Local
 environment files stay untracked. Analytics loads only on manual pages
 (`pageType="docs"`), never on the home page that hosts the game, so the
 third-party script does not share a document with the running game. The

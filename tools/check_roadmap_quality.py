@@ -89,7 +89,6 @@ def check_overlay_snapshot_doc() -> None:
 def check_release_and_wasm_guardrails() -> None:
     checklist_path = ROOT / "docs" / "wiki" / "release-checklist.md"
     build_workflow = read(ROOT / ".github" / "workflows" / "build.yml")
-    deploy_workflow = read(ROOT / ".github" / "workflows" / "deploy.yml")
     docs_workflow = read(ROOT / ".github" / "workflows" / "docs.yml")
     build_doc = read(ROOT / "docs" / "wiki" / "build-system.md")
 
@@ -117,8 +116,8 @@ def check_release_and_wasm_guardrails() -> None:
     if "docs/wiki/release-checklist.md" not in docs_workflow:
         fail(".github/workflows/docs.yml: docs path filter must include release checklist")
     for needle in ["docs/out/super-mango.js", "docs/out/super-mango.wasm", "docs/out/super-mango.data"]:
-        if needle not in deploy_workflow:
-            fail(f".github/workflows/deploy.yml: missing Pages WASM smoke for `{needle}`")
+        if needle not in build_workflow:
+            fail(f".github/workflows/build.yml: pages-build job missing Pages WASM smoke for `{needle}`")
     if "on main push: GitHub Release creation" in build_doc:
         fail("docs/wiki/build-system.md: release trigger docs must not claim main pushes create releases")
 

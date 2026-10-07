@@ -2,7 +2,8 @@ name: Build & Release
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Triggers:
-#   push → main    builds the game as a check only; no release is created.
+#   push → main    builds and checks the game, then publishes GitHub Pages
+#                  (pages-build/pages-deploy); no release is created.
 #   pull_request   builds the game as a check only; no release is created.
 #   push tag v*    builds and creates a GitHub Release for that tag.
 #   workflow_dispatch builds and creates a manually versioned GitHub Release.
@@ -21,7 +22,7 @@ permissions:
 
 # A new push to a pull request cancels that PR's superseded run. Branch, tag and
 # manual runs are keyed by their unique run id, so main checks, the Pages
-# deploy that follows them, and releases are never cancelled or queued away.
+# deploy jobs at the end of this workflow, and releases are never cancelled.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -668,3 +669,111 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
         run: gh release edit "$RELEASE_TAG" --repo "$GH_REPO" --draft=false
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # GITHUB PAGES
+  # Main pushes and manual runs on main publish the docs site with the game.
+  # Both jobs live in this workflow on purpose: the WASM artifact comes from
+  # the build job of this same run and the checkout is this run's own commit,
+  # so nothing crosses a workflow_run trust boundary (no foreign artifact or
+  # pull-request head is ever consumed by a job that can deploy).
+  #
+  # pages-build runs third-party npm code with read-only permissions;
+  # pages-deploy holds the Pages/OIDC permissions and runs no repository code.
+  # ────────────────────────────────────────────────────────────────────────────
+  pages-build:
+    name: Pages build
+    needs: [docs-drift, build]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download WebAssembly build from this run
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: super-mango-wasm
+          path: wasm-build/
+
+      # Astro 7 checks process.versions.node during docs builds.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26.9.0'
+
+      # Bun installs the docs dependencies from the frozen lockfile.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Install docs dependencies
+        run: bun install --frozen-lockfile
+        working-directory: docs
+
+      - name: Build docs site
+        run: bun run build
+        working-directory: docs
+        env:
+          # NEXT_PUBLIC_GA_ID is a legacy secret name from the former Next.js
+          # site; Astro reads PUBLIC_GA_ID. Renaming the mapping requires
+          # creating the new repository secret first, then updating this line.
+          PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}
+
+      - name: Check built docs links and metadata
+        run: bun run check-site
+        working-directory: docs
+
+      - name: Copy WASM artifacts into docs output
+        run: |
+          unzip -q wasm-build/super-mango-wasm.zip -d wasm-build/unpacked
+          cp wasm-build/unpacked/super-mango-wasm/super-mango{,-debug}.{html,js,wasm,data} docs/out/
+
+      - name: Smoke Pages WASM assembly
+        run: |
+          test -s docs/out/super-mango.js
+          test -s docs/out/super-mango.wasm
+          test -s docs/out/super-mango.data
+          grep -R "super-mango.js" docs/out/index.html
+          python3 -m http.server 4173 --directory docs/out >/tmp/super-mango-pages.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid' EXIT
+          for path in / /super-mango{,-debug}.{html,js,wasm,data}; do
+            curl --retry 5 --retry-delay 1 --retry-connrefused -fsS "http://127.0.0.1:4173$path" >/dev/null
+          done
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: docs/out/
+          retention-days: 1
+
+  pages-deploy:
+    name: Pages deploy
+    needs: pages-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # One Pages deployment at a time; a newer main run waits, never cancels.
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

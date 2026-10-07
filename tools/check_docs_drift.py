@@ -256,7 +256,7 @@ def check_cli_and_workflows() -> None:
     if "--seed" not in source_doc:
         fail("docs/wiki/source-files.md: CLI flags missing `--seed`")
     build_doc = read(DOCS / "build-system.md")
-    for workflow in ["build.yml", "docs.yml", "deploy.yml", "codeql.yml"]:
+    for workflow in ["build.yml", "docs.yml", "codeql.yml"]:
         if workflow not in build_doc:
             fail(f"docs/wiki/build-system.md: workflow docs missing `{workflow}`")
     for token in ["Astro 7", "Vite 8", "Rolldown", "Sätteri Markdown processor", "output: \"static\""]:
