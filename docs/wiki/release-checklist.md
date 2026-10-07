@@ -88,14 +88,14 @@ Before creating a release, confirm checks for the intended source commit are gre
 - Docs (runs on every `main` push; PRs run it only for docs-related paths, while Build & Release's `Docs drift` job always runs)
 - Pages build and Pages deploy (main pushes and manual runs on main)
 
-> **Owner action:** as checked on 2026-10-07, the `main` branch ruleset requires
+> **Required checks:** as of 2026-10-07 the `main` branch ruleset requires
 > `Build (Linux x86_64)`, `Build (macOS arm64)`, `Build (Windows x86_64)`,
-> `Build (WebAssembly)`, `Analyze (c-cpp)`, `Analyze (actions)` and `CodeQL`,
-> and blocks merges on high-or-higher CodeQL security alerts. `Docs drift`,
-> `Analyze (python)` and `Analyze (javascript-typescript)` are recommended
-> additions but are not required yet. Until a repository owner adds them under
-> **Settings › Rules › Rulesets**, confirm they are green manually; GitHub does
-> not block a merge when they fail.
+> `Build (WebAssembly)`, `Sanitizers (Linux x86_64)`, `Docs drift`,
+> `Analyze (c-cpp)`, `Analyze (actions)`, `Analyze (python)`,
+> `Analyze (javascript-typescript)` and `CodeQL`, and blocks merges on
+> high-or-higher CodeQL security alerts. The Windows clang and `Desktop
+> backend` jobs and `Docs lint and build` (which only runs for docs-related
+> pull requests) are not required; check that they are green before a release.
 
 Publishing rules:
 
