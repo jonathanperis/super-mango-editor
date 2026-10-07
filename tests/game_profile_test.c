@@ -8,6 +8,7 @@
 #include "shared/serializer_io.h"
 #include "input/game_input.h"
 #include "screens/settings_menu.h"
+#include "test_paths.h"  /* TEST_OUT scratch directory */
 #ifdef _WIN32
 #include <direct.h>
 #endif
@@ -47,7 +48,7 @@ static int codec_and_storage(void)
     char *text = malloc(PROFILE_TEXT_MAX);
     char path[160];
     char lock_path[176];
-    snprintf(path,sizeof(path),"out/profile-test-%llu.toml",(unsigned long long)clock_millis());
+    snprintf(path,sizeof(path),TEST_OUT "profile-test-%llu.toml",(unsigned long long)clock_millis());
     snprintf(lock_path,sizeof(lock_path),"%s.lock",path);
     CHECK(a && b && decoded && text);
     game_profile_init(a); game_profile_init(b);
@@ -158,7 +159,7 @@ static int legacy_level_keys_are_dropped(void)
     char *saved = NULL;
     FILE *fp;
 
-    snprintf(path, sizeof(path), "out/profile-legacy-%llu.toml", (unsigned long long)clock_millis());
+    snprintf(path, sizeof(path), TEST_OUT "profile-legacy-%llu.toml", (unsigned long long)clock_millis());
     snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
     CHECK(profile && decoded);
     CHECK(game_profile_decode(decoded, legacy) == 0);
@@ -194,14 +195,14 @@ fail:
 
 static int level_key_boundaries(void)
 {
-    char *prefs = preference_path_at("out", "migration-path-test", "Application");
-    if (!prefs || strcmp(prefs, "out/migration-path-test/Application/")) { free(prefs); return 1; }
+    char *prefs = preference_path_at(MANGO_TEST_OUTDIR, "migration-path-test", "Application");
+    if (!prefs || strcmp(prefs, TEST_OUT "migration-path-test/Application/")) { free(prefs); return 1; }
 #ifdef _WIN32
     _rmdir(prefs);
-    _rmdir("out/migration-path-test");
+    _rmdir(TEST_OUT "migration-path-test");
 #else
     rmdir(prefs);
-    rmdir("out/migration-path-test");
+    rmdir(TEST_OUT "migration-path-test");
 #endif
     free(prefs);
     GameProfile *profile = calloc(1, sizeof(*profile));
@@ -318,7 +319,7 @@ static int persistent_session(void)
 {
     char path[160];
     char lock_path[176];
-    snprintf(path,sizeof(path),"out/profile-session-%llu.toml",(unsigned long long)clock_millis());
+    snprintf(path,sizeof(path),TEST_OUT "profile-session-%llu.toml",(unsigned long long)clock_millis());
     snprintf(lock_path,sizeof(lock_path),"%s.lock",path);
     AppSessionConfig config={.level_path="levels/00_sandbox_01.toml",.profile_enabled=1,.profile_path=path};
     puts("profile session: create");

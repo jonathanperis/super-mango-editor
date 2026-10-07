@@ -37,7 +37,10 @@ endif
 MODE_FLAGS_release = -O2 $(HARDEN_CFLAGS)
 MODE_LDFLAGS_release = $(HARDEN_LDFLAGS)
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(MODE_FLAGS_$(BUILD_MODE)) -I$(RAYLIB_BUILD)/build/raylib/include $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_RAYLIB_MEMORY,) $(EXTRA_CFLAGS)
-TEST_CFLAGS = $(CFLAGS) $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_MEMORY_TESTS,)
+# Tests write scratch files under their own OUTDIR (tests/test_paths.h), so
+# test, sanitize and coverage trees can run side by side in one checkout.
+TEST_CFLAGS = $(CFLAGS) $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_MEMORY_TESTS,) \
+              -DMANGO_TEST_OUTDIR='"$(OUTDIR)"'
 LIBS    = $(RAYLIB_LIB) $(PLATFORM_LIBS) $(MODE_LDFLAGS_$(BUILD_MODE)) $(EXTRA_LDFLAGS)
 OUTDIR  = out
 # RAYLIB_AUDIO=null is a test-only variant: the real desktop GLFW/OpenGL

@@ -36,6 +36,7 @@
 #include "shared/serializer.h"
 #include "shared/serializer_emit.h"
 #include "shared/serializer_io.h"
+#include "test_paths.h"  /* TEST_OUT scratch directory */
 #include "editor/tools.h"
 #include "editor/undo.h"
 #include "shared/ui.h"
@@ -45,11 +46,11 @@
 #include "editor/hit_test.h"
 #include "levels/level_loader.h"
 
-#define EDITOR_WORKFLOW_LEVEL_PATH "out/test_editor_workflow_level.toml"
-#define EDITOR_WORKFLOW_RECENT_PATH "out/editor_recent.txt"
-#define EDITOR_TEST_AUTOSAVE_PATH "out/autosave/test_editor_autosave.toml"
-#define EDITOR_TEST_RECOVERY_DEST "out/test_editor_recovery_destination.toml"
-#define EDITOR_TEST_FAILED_TARGET "out/test_editor_failed_target.toml"
+#define EDITOR_WORKFLOW_LEVEL_PATH TEST_OUT "test_editor_workflow_level.toml"
+#define EDITOR_WORKFLOW_RECENT_PATH TEST_OUT "editor_recent.txt"
+#define EDITOR_TEST_AUTOSAVE_PATH TEST_OUT "autosave/test_editor_autosave.toml"
+#define EDITOR_TEST_RECOVERY_DEST TEST_OUT "test_editor_recovery_destination.toml"
+#define EDITOR_TEST_FAILED_TARGET TEST_OUT "test_editor_failed_target.toml"
 
 static int expect_int(const char *name, int actual, int expected)
 {
@@ -100,18 +101,18 @@ static int expect_float_value(const char *name, float actual, float expected)
 static void ensure_out_dir(void)
 {
 #ifdef _WIN32
-    _mkdir("out");
+    _mkdir(MANGO_TEST_OUTDIR);
 #else
-    mkdir("out", 0755);
+    mkdir(MANGO_TEST_OUTDIR, 0755);
 #endif
 }
 
 static void ensure_autosave_dir(void)
 {
 #ifdef _WIN32
-    _mkdir("out/autosave");
+    _mkdir(TEST_OUT "autosave");
 #else
-    mkdir("out/autosave", 0755);
+    mkdir(TEST_OUT "autosave", 0755);
 #endif
 }
 
@@ -133,7 +134,7 @@ static int make_test_preference_root(char *root, size_t root_size)
 #else
     process_id = (unsigned long)getpid();
 #endif
-    if (snprintf(root, root_size, "out/editor_pref_test_%lu", process_id) < 0)
+    if (snprintf(root, root_size, TEST_OUT "editor_pref_test_%lu", process_id) < 0)
         return -1;
     remove_directory(root);
 #ifdef _WIN32
@@ -524,7 +525,7 @@ cleanup:
 
 static int atomic_save_replaces_and_preserves_on_injected_errors(void)
 {
-    const char *target = "out/editor_atomic_target.toml";
+    const char *target = TEST_OUT "editor_atomic_target.toml";
     const char *sentinel = "exact original bytes\n";
     char temp_path[256];
     LevelDef def;
@@ -579,7 +580,7 @@ cleanup:
 
 static int save_policy_and_fingerprint_seams(void)
 {
-    const char *target = "out/editor_save_policy_target.toml";
+    const char *target = TEST_OUT "editor_save_policy_target.toml";
     const char *external = "external bytes\n";
     const char *sentinel = "existing target\n";
     LevelDef def;
@@ -630,8 +631,8 @@ static int dir_sync_failure_after_install_still_saves(void)
 #ifdef _WIN32
     return 0;   /* Windows uses MOVEFILE_WRITE_THROUGH; no folder sync. */
 #else
-    const char *replaced = "out/editor_dir_sync_replace.toml";
-    const char *created = "out/editor_dir_sync_create.toml";
+    const char *replaced = TEST_OUT "editor_dir_sync_replace.toml";
+    const char *created = TEST_OUT "editor_dir_sync_create.toml";
     EditorState es = {0};
     LevelDef def;
     LevelDef reloaded;
@@ -686,7 +687,7 @@ cleanup:
 
 static int unreadable_existing_probe_is_not_missing(void)
 {
-    const char *target = "out/editor_unreadable_target.toml";
+    const char *target = TEST_OUT "editor_unreadable_target.toml";
     SerializerPathStatus status;
 
     ensure_out_dir();
@@ -709,7 +710,7 @@ static int unreadable_existing_probe_is_not_missing(void)
 
 static int recovery_entries_survive_restart_and_sessions(void)
 {
-    const char *source = "out/editor_manifest_source.toml";
+    const char *source = TEST_OUT "editor_manifest_source.toml";
     EditorState first = {0};
     EditorState second = {0};
     EditorState restarted = {0};
@@ -790,7 +791,7 @@ static int recovery_entries_survive_restart_and_sessions(void)
                    restarted.recovery_entry_count, 2) != 0)
         goto cleanup;
     file_dialog_test_set_open_result(FILE_DIALOG_SELECTED,
-                                     "out/editor_missing_open.toml");
+                                     TEST_OUT "editor_missing_open.toml");
     editor_open_level_file(&restarted);
     if (expect_int("failed open preserves recovery",
                    restarted.recovery_entry_count, 2) != 0)
@@ -798,7 +799,7 @@ static int recovery_entries_survive_restart_and_sessions(void)
 
     {
         InputEvent recovery_event;
-        char modal_save_path[] = "out/editor_recovery_modal_save.toml";
+        char modal_save_path[] = TEST_OUT "editor_recovery_modal_save.toml";
         remove(modal_save_path);
         editor_level_init_defaults(&restarted.level);
         restarted.modified = 1;
@@ -870,7 +871,7 @@ static int over_capacity_load_preserves_document(void)
 
 static int utf8_filename_roundtrip(void)
 {
-    const char *path = "out/editor_é测试_🍊.toml";
+    const char *path = TEST_OUT "editor_é测试_🍊.toml";
     LevelDef before;
     LevelDef after;
 
@@ -898,7 +899,7 @@ cleanup:
 #ifdef _WIN32
 static int utf8_wide_path_conversion_roundtrip(void)
 {
-    const char *original = "out/editor_é测试_🍊";
+    const char *original = TEST_OUT "editor_é测试_🍊";
     wchar_t *wide = serializer_utf8_to_wide(original);
     char *roundtrip = wide ? serializer_wide_to_utf8(wide) : NULL;
     int result = expect_int("UTF-8 wide path conversion",
@@ -912,9 +913,9 @@ static int utf8_wide_path_conversion_roundtrip(void)
 
 static int recovery_metadata_and_failed_save_contract(void)
 {
-    const char *recovery = "out/editor_recovery_contract.toml";
-    const char *valid = "out/editor_recovery_valid.toml";
-    const char *target = "out/editor_recovery_target.toml";
+    const char *recovery = TEST_OUT "editor_recovery_contract.toml";
+    const char *valid = TEST_OUT "editor_recovery_valid.toml";
+    const char *target = TEST_OUT "editor_recovery_target.toml";
     EditorState es;
     EditorState recovered;
     char metadata[EDITOR_PATH_MAX];
@@ -937,7 +938,7 @@ static int recovery_metadata_and_failed_save_contract(void)
     if (level_read_recovery_path(recovery, metadata, sizeof(metadata)) != 1 ||
         expect_string("recovery metadata", metadata, target) != 0)
         goto cleanup;
-    editor_retire_matching_recovery(&es, "out/other-document.toml");
+    editor_retire_matching_recovery(&es, TEST_OUT "other-document.toml");
     if (expect_int("stale recovery retained", editor_file_exists(recovery), 1) != 0)
         goto cleanup;
     if (copy_file_with_bad_recovery_metadata(valid, recovery) != 0)
@@ -993,7 +994,7 @@ static int playtest_destination_isolated(void)
     editor_level_init_defaults(&es.level);
     if (make_test_preference_root(root, sizeof(root)) != 0) return 1;
     if (editor_set_preference_root(&es, root) != 0) goto cleanup;
-    strncpy(es.file_path, "out/active_editor_document.toml",
+    strncpy(es.file_path, TEST_OUT "active_editor_document.toml",
             sizeof(es.file_path) - 1);
     es.modified = 1;
     es.saved_document_hash = editor_document_hash(&es.level);
@@ -1100,7 +1101,7 @@ cleanup:
 static int autosave_recovery_preserves_destination(void)
 {
     const char *destination = EDITOR_TEST_RECOVERY_DEST;
-    const char *save_as_path = "out/editor_recovered_save_as.toml";
+    const char *save_as_path = TEST_OUT "editor_recovered_save_as.toml";
     EditorState es = {0};
     EditorState recovered = {0};
     char root[EDITOR_PATH_MAX] = {0};
@@ -1177,8 +1178,8 @@ cleanup:
 
 static int editor_save_workflows_enforce_baselines(void)
 {
-    const char *existing = "out/editor_save_workflow_existing.toml";
-    const char *appearing = "out/editor_save_workflow_appearing.toml";
+    const char *existing = TEST_OUT "editor_save_workflow_existing.toml";
+    const char *appearing = TEST_OUT "editor_save_workflow_appearing.toml";
     EditorState es = {0};
     EditorState create_only = {0};
     char root[EDITOR_PATH_MAX] = {0};
@@ -1241,7 +1242,7 @@ static int autosave_backs_off_and_snapshots_last_valid_level(void)
     ensure_out_dir();
     memset(&es, 0, sizeof(es));
     editor_level_init_defaults(&es.level);
-    strncpy(es.autosave_path, "out/autosave/test_editor_autosave.toml",
+    strncpy(es.autosave_path, TEST_OUT "autosave/test_editor_autosave.toml",
             sizeof(es.autosave_path) - 1);
     ensure_autosave_dir();
     remove(es.autosave_path);
@@ -1295,7 +1296,7 @@ static int autosave_backs_off_and_snapshots_last_valid_level(void)
                       "Cannot place Coin: limit reached") != 0) return 1;
 
     /* Failures report once, then wait a full interval before retrying. */
-    strncpy(es.autosave_path, "out/no_such_dir/never/autosave.toml",
+    strncpy(es.autosave_path, TEST_OUT "no_such_dir/never/autosave.toml",
             sizeof(es.autosave_path) - 1);
     es.last_autosave_ms = long_ago;
     editor_maybe_autosave(&es);
@@ -1306,7 +1307,7 @@ static int autosave_backs_off_and_snapshots_last_valid_level(void)
     if (expect_string("failure backs off", es.status_message, "Other message") != 0)
         return 1;
 
-    remove("out/autosave/test_editor_autosave.toml");
+    remove(TEST_OUT "autosave/test_editor_autosave.toml");
     return 0;
 }
 
@@ -1344,7 +1345,7 @@ static int loads_recent_files_with_trim_and_limit(void)
 
 static int recent_files_skip_overlong_lines_and_line_breaks(void)
 {
-    const char *level_path = "out/test_editor_recent_level.toml";
+    const char *level_path = TEST_OUT "test_editor_recent_level.toml";
     EditorState es = {0};
     LevelDef fixture;
     char root[EDITOR_PATH_MAX] = {0};
@@ -2388,7 +2389,7 @@ static int playtest_blocks_editing_and_stop_cleans_up(void)
     {
         /* A game that ignores SIGTERM is killed after the bounded wait,
          * reaped (no zombie), and the private level file is removed. */
-        const char *level_path = "out/test_editor_playtest_stop.toml";
+        const char *level_path = TEST_OUT "test_editor_playtest_stop.toml";
         int ready[2];
         char byte = 0;
         pid_t pid;
@@ -2450,7 +2451,7 @@ static void touch_level_during_load(const char *path)
 
 static int load_fingerprints_the_bytes_it_parsed(void)
 {
-    const char *path = "out/test_editor_load_race.toml";
+    const char *path = TEST_OUT "test_editor_load_race.toml";
     EditorState es = {0};
     LevelDef fixture;
     SerializerFileFingerprint on_disk;
@@ -2502,8 +2503,8 @@ static int recovery_metadata_keeps_longest_source_path(void)
     int result = 1;
 
     ensure_out_dir();
-    memcpy(long_path, "out/", 4);
-    memset(long_path + 4, 'p', length - 4 - 5);
+    memcpy(long_path, TEST_OUT, sizeof(TEST_OUT) - 1);
+    memset(long_path + sizeof(TEST_OUT) - 1, 'p', length - (sizeof(TEST_OUT) - 1) - 5);
     memcpy(long_path + length - 5, ".toml", 6);
     if (strlen(long_path) != length || !editor_path_fits(long_path)) return 1;
 
@@ -2778,7 +2779,7 @@ fail:
 
 static int staged_edit_save_and_quit_boundaries(void)
 {
-    const char *target = "out/editor_staged_command.toml";
+    const char *target = TEST_OUT "editor_staged_command.toml";
     EditorState save_state = {0};
     EditorState quit_state = {0};
     EditorState selection_state = {0};
@@ -3120,11 +3121,11 @@ static int symlinks_are_followed_only_for_the_opened_document(void)
 #ifdef _WIN32
     return 0;
 #else
-    const char *victim = "out/editor_symlink_victim.toml";
-    const char *planted = "out/editor_symlink_planted.toml";
-    const char *document = "out/editor_symlink_document.toml";
-    const char *opened = "out/editor_symlink_opened.toml";
-    char alias_root[64];
+    const char *victim = TEST_OUT "editor_symlink_victim.toml";
+    const char *planted = TEST_OUT "editor_symlink_planted.toml";
+    const char *document = TEST_OUT "editor_symlink_document.toml";
+    const char *opened = TEST_OUT "editor_symlink_opened.toml";
+    char alias_root[EDITOR_PATH_MAX];
     char private_alias[EDITOR_PATH_MAX];
     char planted_autosave[EDITOR_PATH_MAX] = {0};
     char root[EDITOR_PATH_MAX] = {0};
@@ -3137,7 +3138,7 @@ static int symlinks_are_followed_only_for_the_opened_document(void)
     ensure_out_dir();
     remove(planted);
     remove(opened);
-    snprintf(alias_root, sizeof(alias_root), "out/editor_symlink_alias_%ld",
+    snprintf(alias_root, sizeof(alias_root), TEST_OUT "editor_symlink_alias_%ld",
              (long)getpid());
     remove(alias_root);
     editor_level_init_defaults(&fixture);
@@ -3174,7 +3175,7 @@ static int symlinks_are_followed_only_for_the_opened_document(void)
     }
     memcpy(planted_autosave, es.autosave_path, strlen(es.autosave_path) + 1);
     if (write_text_file(planted_autosave, "autosave bytes\n") != 0 ||
-        symlink(root + strlen("out/"), alias_root) != 0) goto cleanup;
+        symlink(root + strlen(TEST_OUT), alias_root) != 0) goto cleanup;
     file_dialog_test_set_save_result(FILE_DIALOG_SELECTED, private_alias);
     if (expect_int("Save As to aliased private file refused",
                    editor_save_current_level_as(&es), -1) != 0 ||
@@ -3788,7 +3789,7 @@ done:
  */
 static int extreme_floats_round_trip_through_save(void)
 {
-    const char *path = "out/editor_extreme_float_roundtrip.toml";
+    const char *path = TEST_OUT "editor_extreme_float_roundtrip.toml";
     LevelDef def, loaded;
     char error[128];
     static const float samples[] = {
@@ -3838,7 +3839,7 @@ static int create_only_save_without_hard_links(void)
 #ifdef _WIN32
     return 0;   /* Windows installs with MoveFileExW, which never clobbers. */
 #else
-    const char *target = "out/editor_no_hard_links.toml";
+    const char *target = TEST_OUT "editor_no_hard_links.toml";
     const char *sentinel = "existing target\n";
     char temp[EDITOR_PATH_MAX];
     LevelDef def, loaded;
