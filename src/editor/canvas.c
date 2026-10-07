@@ -21,6 +21,8 @@
  *   8. Grid overlay (optional)
  */
 
+#include "canvas.h"
+
 #include <stdio.h>      /* snprintf for debug labels                      */
 #include <string.h>    /* strcmp for platform texture selection          */
 
@@ -115,8 +117,6 @@ static void render_faster_birds(EditorState *es);
 static void render_selection(EditorState *es);
 static void render_ghost(EditorState *es);
 static void render_grid(EditorState *es);
-void canvas_screen_to_world(const EditorState *es, int sx, int sy,
-                            float *wx, float *wy);
 
 /* ------------------------------------------------------------------ */
 /* Helper — draw an outlined rectangle (selection / ghost highlight)    */

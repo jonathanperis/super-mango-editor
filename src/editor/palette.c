@@ -25,6 +25,8 @@
  * is no persistent widget tree.
  */
 
+#include "palette.h"
+
 #include <stdio.h>     /* snprintf */
 
 #include "editor.h"    /* EditorState, EntityType, EditorTool, CANVAS_W, etc.  */
