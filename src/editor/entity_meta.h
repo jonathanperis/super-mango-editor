@@ -143,6 +143,5 @@ void editor_selection_after_insert(EditorState *es, EntityType type, int index,
 /* Water art strip height, needed for fish lane derivation. */
 #define WATER_ART_H        31
 
-int  editor_rail_placement_tile_count(const RailPlacement *rp);
 void editor_rail_placement_position_at(const RailPlacement *rp, float t,
                                        float *x, float *y);
