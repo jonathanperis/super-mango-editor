@@ -194,8 +194,15 @@ TEST_DEPS           = $(wildcard $(OBJDIR)/tests/*.d)
 # Test objects have explicit recipes; order their directory creation too,
 # including when an individual test is built in parallel from a fresh OUTDIR.
 TEST_OBJECTS := $(foreach name,$(filter %_OBJ,$(filter TEST_%,$(.VARIABLES))),$($(name)))
-SANITIZE_CFLAGS     = -fsanitize=address,undefined -fno-omit-frame-pointer
+# UBSan only prints a report and carries on by default, so a test that hits
+# undefined behaviour would still exit 0 and CI would stay green.
+# -fno-sanitize-recover makes every UB check abort, as the fuzz builds do;
+# UBSAN_OPTIONS also covers code built without it (the sanitized raylib) and
+# prints a stack trace. ASan errors already abort. LeakSanitizer runs where the
+# platform has it (Linux); Apple's ASan has no leak checker, so it is not set.
+SANITIZE_CFLAGS     = -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer
 SANITIZE_LDFLAGS    = -fsanitize=address,undefined
+SANITIZE_ENV        = UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1$${UBSAN_OPTIONS:+:$$UBSAN_OPTIONS}"
 
 .PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels web-host-contract level-catalog overlay-snapshots docs-drift roadmap-quality smoke scripted-smoke sanitize sanitize-smoke dist-native dist-wasm compile-commands
 
@@ -375,13 +382,13 @@ scripted-smoke: all editor
 	python3 tools/run_scripted_smoke.py --binary $(TARGET) --editor $(EDITOR_TARGET) --frames $(SMOKE_FRAMES) --seeds $(SMOKE_SEEDS)
 
 sanitize:
-	$(MAKE) all editor test OUTDIR="$(OUTDIR)-sanitize" \
+	$(SANITIZE_ENV) $(MAKE) all editor test OUTDIR="$(OUTDIR)-sanitize" \
 		EXTRA_CFLAGS="$(EXTRA_CFLAGS) $(SANITIZE_CFLAGS)" \
 		EXTRA_LDFLAGS="$(EXTRA_LDFLAGS) $(SANITIZE_LDFLAGS)"
-	$(MAKE) fuzz-corpus OUTDIR="$(OUTDIR)-sanitize"
+	$(SANITIZE_ENV) $(MAKE) fuzz-corpus OUTDIR="$(OUTDIR)-sanitize"
 
 sanitize-smoke:
-	$(MAKE) smoke OUTDIR="$(OUTDIR)-sanitize" \
+	$(SANITIZE_ENV) $(MAKE) smoke OUTDIR="$(OUTDIR)-sanitize" \
 		EXTRA_CFLAGS="$(EXTRA_CFLAGS) $(SANITIZE_CFLAGS)" \
 		EXTRA_LDFLAGS="$(EXTRA_LDFLAGS) $(SANITIZE_LDFLAGS)"
 

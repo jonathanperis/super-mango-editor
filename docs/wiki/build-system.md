@@ -310,7 +310,7 @@ make scripted-smoke SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
 
 ### `make sanitize`
 
-Builds the game and editor and runs `make test` in a separate `out-sanitize/` tree with AddressSanitizer and UndefinedBehaviorSanitizer enabled, then runs `make fuzz-corpus` in the same tree.
+Builds the game and editor and runs `make test` in a separate `out-sanitize/` tree with AddressSanitizer and UndefinedBehaviorSanitizer enabled, then runs `make fuzz-corpus` in the same tree. Undefined behaviour is fatal (`-fno-sanitize-recover=undefined` plus `UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1`): UBSan would otherwise print a report and let the test pass.
 
 ### `make coverage`
 
