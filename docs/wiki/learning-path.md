@@ -1,8 +1,8 @@
 # Sandbox School: Start Here
 
-Super Mango is a working C11/raylib game you can take apart. Learn one mechanism at
-a time, then combine them in the playground. You need basic C expressions,
-functions, structs and pointers; raylib experience is optional.
+Super Mango is a working C11/raylib game you can take apart. We learn one
+mechanism at a time, then combine them in the playground. You need basic C
+expressions, functions, structs and pointers; raylib experience is optional.
 
 ## First successful build
 
@@ -51,86 +51,454 @@ distinction matters when comparing the project with raylib's own examples.
 After each experiment, prefer one clear change over a compact rewrite. Keep the
 comments that explain an unfamiliar C operation or a resource's lifetime, and
 update them when the behavior changes. The [Developer Guide](../developer-guide/)
-describes the conventions used by the rest of the code.
+describes the conventions used by the rest of the code, and
+[C in This Codebase](../c-concepts/) points at where each C idea is used.
 
 ## How to use each lab
 
 Before changing anything, predict the result. Make one change, observe it, and
-explain any difference from your prediction. Record the command, seed and result.
-Use [the mechanics museum](../mechanics-museum/) for compact examples and
-[Controls](../controls/) for inspection keys.
+explain any difference from your prediction. Write down the command, the seed and
+what happened.
+
+Each lab has the same parts: what to read first, numbered steps, what you will
+see, and why it works that way. It ends with a question to check yourself. Try
+it before opening the hint, and open the answer last.
+
+Most labs use the debug inspector. The keys you will need most are **F2**
+(freeze or resume), **F3** (advance one 1/60 s step) and **F4** (slow motion);
+[Controls](../controls/#debug-inspector-keys) lists all of them. The
+[Mechanics Museum](../mechanics-museum/) describes each lab level. When
+something crashes or behaves strangely, [Debugging C](../debugging-c/) shows
+how to find out why.
 
 ### Lab 1 — Your first frame
 
-- **Goal:** distinguish world, logical-screen and window coordinates.
-- **Read:** `src/main.c`, `src/core/game_loop.c`, `src/render/game_render.c` and `src/collectibles/coin.c`.
-- **Run:** `make run-level-debug LEVEL=levels/labs/01_collision.toml`.
-- **Change:** move its coin 32 logical pixels right in a copied TOML file.
-- **Observe:** the coin moves relative to the platform; changing window scale does not change its world coordinates.
-- **Proof:** explain why rendering subtracts `camera.x`, but the stored coin position does not. Validate your copied level through the editor before playtesting.
+**Goal:** tell apart world, logical-screen and window coordinates.
+
+**Read first:** `src/main.c`, `src/core/game_loop.c`, `src/render/game_render.c`
+and `src/collectibles/coin.c`.
+
+**Steps:**
+
+1. Run `make run-level-debug LEVEL=levels/labs/01_collision.toml` and find the coin.
+2. In the editor, open the lab, **Save As** your own copy, and move its coin
+   32 logical pixels to the right (change its `x` in the properties panel).
+3. Check that the editor shows no validation errors, then playtest with **F5**.
+4. Press F1 and change the window scale.
+
+**What you will see:** the coin sits 32 pixels further along the platform.
+Changing the window scale makes everything bigger or smaller, but the coin
+keeps its place relative to the platform.
+
+**Why:** the coin's `x` is a *world* coordinate, measured from the left edge of
+the level. Each frame, `coins_render()` subtracts the camera's x to get a
+position on the 400×300 logical canvas, and `display_present()` scales that
+canvas to the window. Each step changes only how the coin is shown.
+
+**Check yourself:** why does rendering subtract `camera.x`, while the stored
+coin position never does?
+
+<details>
+<summary>Hint</summary>
+
+Think about what else reads `gs->coins[i].x` besides the renderer, and how
+often the camera moves.
+
+</details>
+
+<details>
+<summary>Answer</summary>
+
+The stored position belongs to the game world: collision in `game_collide()`
+compares it with the player's hitbox, which is also in world coordinates, and
+the editor saves it back to the TOML file. The camera moves almost every frame.
+If the coin stored a screen position, every entity would have to be rewritten
+whenever the camera moved, and collision would compare positions measured from
+different origins. Keeping one world position and converting only at draw time
+(`(int)coins[i].x - cam_x` in `coins_render()`) means the camera is purely a
+view: it can never change what happens in the game.
+
+</details>
 
 ### Lab 2 — Motion and numerical integration
 
-- **Goal:** understand acceleration, friction and timestep error.
-- **Read:** `src/player/player_motion.c`, `src/player/player.c`, `src/core/game_timing.c`.
-- **Run:** `make run-level-debug LEVEL=levels/labs/06_camera.toml` and `make timing-lab`.
-- **Change:** select `ground_friction` with F6; use minus/equal to adjust it. F7 restores authored/default values.
-- **Observe:** releasing movement changes stopping distance. F4 slows time (fewer fixed steps per second, each still 1/60 s); F2 freezes and F3 advances exactly one step.
-- **Proof:** explain why multiplying by dt gives units of distance but does not eliminate numerical error, and why the game therefore advances in fixed 1/60-second steps: the timing lab shows a variable dt landing at different heights for 30/60/144 Hz render rates, while the fixed step (what `game_timing.c` does with its accumulator) gives the same result at every rate.
+**Goal:** understand acceleration, friction and timestep error.
+
+**Read first:** `src/player/player_motion.c`, `src/player/player.c`,
+`src/core/game_timing.c`.
+
+**Steps:**
+
+1. Run `make run-level-debug LEVEL=levels/labs/06_camera.toml`.
+2. Walk, then let go, and note roughly where Mango stops.
+3. Press F6 until `ground_friction` is selected, then press minus or equal to
+   change it. Walk and let go again.
+4. Press F7 to restore the level's values.
+5. Try F4 (slow motion), F2 (freeze) and F3 (one step).
+6. Run `make timing-lab`.
+
+**What you will see:** lower friction makes Mango slide further after you let
+go. Slow motion runs fewer steps per second, but each step is still 1/60 s, so
+the movement looks the same, only slower. The timing lab prints a table like
+this:
+
+```text
+One-second free fall; exact displacement = 400 px
+Render Hz | variable dt (px) | fixed 60 Hz (px, what the game does)
+       30 |       413.333333 |       406.666667
+       60 |       406.666667 |       406.666667
+      144 |       402.777778 |       406.666667
+```
+
+**Why:** speeds are in pixels per second, so each step multiplies them by `dt`
+to get a distance. A simulation that updates in steps is only an approximation
+of smooth motion, and the size of the error depends on the size of the step.
+
+**Check yourself:** multiplying by `dt` gives the right units, so why does the
+game still insist on fixed 1/60 s steps?
+
+<details>
+<summary>Hint</summary>
+
+Compare the "variable dt" column of the timing lab across the three rows, then
+the "fixed" column.
+
+</details>
+
+<details>
+<summary>Answer</summary>
+
+Multiplying by `dt` fixes the units, not the accuracy. Each step treats
+velocity as constant for the whole step, so the result is off by an amount
+that depends on how long the step is: 413 px at 30 Hz, 403 px at 144 Hz, for a
+fall that should be 400 px. If `dt` were the real frame time, a jump would
+reach a different height on a 144 Hz monitor than on a 60 Hz one. With fixed
+1/60 s steps (the accumulator in `game_timing.c` decides only *how many* steps
+to run each frame), the error is still there (406.7 px instead of 400), but it
+is the same everywhere, so jumps, replays and tests give the same result on
+every machine.
+
+</details>
 
 ### Lab 3 — One-way collisions
 
-- **Goal:** understand a crossing test rather than only overlap.
-- **Read:** `src/player/player_surfaces.c` and `tests/session_test.c` (`nearest_surface_is_order_independent`).
-- **Run:** `make run-level-debug LEVEL=levels/labs/01_collision.toml`.
-- **Change:** lower the second ledge in an editor copy; jump through it and land.
-- **Observe:** the stored previous foot position determines whether a descending player crossed a surface. The cyan/green foot marker makes that point visible.
-- **Proof:** the player passes upward through a ledge and lands downward. Run `make test` after changing collision code; explain why a nearer surface must win regardless of array order.
+**Goal:** understand a crossing test, not just an overlap test.
+
+**Read first:** `src/player/player_surfaces.c` and `tests/session_test.c`
+(`nearest_surface_is_order_independent`).
+
+**Steps:**
+
+1. Run `make run-level-debug LEVEL=levels/labs/01_collision.toml`.
+2. Jump up through the first ledge from below, then land on it from above.
+3. In an editor copy, lower the second ledge and try again.
+4. Freeze (F2) just before a landing and step (F3) through it.
+
+**What you will see:** Mango passes up through a ledge and lands on it on the
+way down. A short line at Mango's feet marks the foot point the test uses: cyan
+while standing on something, white in the air.
+
+**Why:** the test compares where the feet were *before* this step's movement
+with where they are now. Mango lands only when falling and the feet went from
+above the ledge's top to on or below it during this step.
+
+**Check yourself:** after changing collision code, run `make test`. Why must
+the nearer surface win, whatever order the surfaces are stored in the array?
+
+<details>
+<summary>Hint</summary>
+
+Imagine a fast fall that crosses two ledges in a single step. Look at the line
+`bottom = plat->y;` in `player_surfaces.c`.
+
+</details>
+
+<details>
+<summary>Answer</summary>
+
+In one step a falling player can cross the tops of two surfaces. The one hit
+first in real life is the higher one, the first the feet reach. If the loop
+simply took whichever matching surface came first in the array, the result
+would depend on how the level file happened to list them, and the player could
+drop through the upper ledge onto the lower one. After each landing the code
+sets `bottom = plat->y`, so a later candidate only counts if it is nearer
+still. `nearest_surface_is_order_independent` runs the same case with the
+array in both orders and expects the same landing height.
+
+</details>
 
 ### Lab 4 — State machines
 
-- **Goal:** follow transitions between waiting, moving and damaging states.
-- **Read:** `src/hazards/blue_flame.c`, `src/entities/fish.c`, `src/core/game_hazards.c` and `src/collision/game_collision.c`.
-- **Run:** `make run-level-debug LEVEL=levels/labs/05_hazards.toml`.
-- **Change:** change one flame duration constant; rebuild and compare against the original.
-- **Observe:** freeze/step the active hitbox, and compare it with the hurt-immunity timer after a hit.
-- **Proof:** explain why collision uses the hazard's updated position, and why a waiting flame must not damage the player. `make test` exercises a saw that enters the player's hitbox during the same simulation step (`tests/simulation_test.c`).
+**Goal:** follow transitions between waiting, moving and damaging states.
+
+**Read first:** `src/hazards/blue_flame.c`, `src/entities/fish.c`,
+`src/core/game_hazards.c` and `src/collision/game_collision.c`.
+
+**Steps:**
+
+1. Run `make run-level-debug LEVEL=levels/labs/05_hazards.toml`.
+2. Change one flame duration constant in `src/hazards/blue_flame.h` (for
+   example `BLUE_FLAME_WAIT_DURATION`), rebuild and compare with the original.
+3. Freeze and step through a flame's rise to watch its hitbox.
+4. Get hit, then watch how long Mango blinks before the next hit counts.
+
+**What you will see:** the flame waits hidden below the floor, rises, flips at
+the top and falls. After a hit there is a short period when nothing can hurt
+Mango.
+
+**Why:** each flame stores its current state and a timer. The update code
+looks only at the current state to decide what to do next, and collision skips
+flames that are waiting. The hurt timer (`hurt_timer`, set to 1.5 s in
+`apply_damage()`) is a second, independent piece of state on the player.
+
+**Check yourself:** `tests/simulation_test.c` checks a saw that moves into the
+player's hitbox during a step. Why does collision use the hazard's *updated*
+position, and why must a waiting flame never cause damage?
+
+<details>
+<summary>Hint</summary>
+
+Look at the order of the calls in `game_update_active()` in
+`src/core/game_update.c`, and at the `BLUE_FLAME_WAITING` check in
+`game_collision.c`.
+
+</details>
+
+<details>
+<summary>Answer</summary>
+
+`game_update_active()` moves the hazards (`game_hazards_update()`) and only
+then calls `game_collide()`. So collision sees where everything is at the end
+of the step, the same positions that will be drawn. If it used the old
+positions, a saw that moved into the player would be drawn overlapping them
+without hurting them until the next step, and the result would depend on the
+order of updates. The test starts a saw one pixel outside the player's hitbox,
+moving toward it, and checks that the player loses a heart in that same step. A waiting flame is
+hidden below the floor and should not exist as far as the player is
+concerned, but its position still produces a hitbox, so `game_collide()`
+skips flames whose state is `BLUE_FLAME_WAITING`. Otherwise the player could be
+hurt by something they cannot see.
+
+</details>
 
 ### Lab 5 — Data-driven design
 
-- **Goal:** trace TOML → validated placement → live entity → editor round-trip.
-- **Read:** the [entity walkthrough](../entity-walkthrough/), `src/shared/serializer_parse.c`, `src/shared/serializer_load_collectibles.c` and `src/levels/level_loader.c`.
-- **Run:** `make run-editor`; open a copied collision lab.
-- **Change:** place a coin, change its coordinates, save, close, reopen, then playtest.
-- **Observe:** the saved values survive and match the runtime position. Collect the coin, then lose a life: it stays collected (score survives a death, so returning coins would let you farm points), while health stars come back. Retry after game over restores it.
-- **Proof:** `make test` checks round-trips and invalid inputs; a fractional integer, NaN or over-capacity array must fail without replacing the active document.
+**Goal:** follow a coin from the TOML file, through validation, into the
+running game and back out of the editor.
+
+**Read first:** the [Entity Walkthrough](../entity-walkthrough/),
+`src/shared/serializer_parse.c`, `src/shared/serializer_load_collectibles.c`
+and `src/levels/level_loader.c`.
+
+**Steps:**
+
+1. Run `make run-editor` and open your copy of the collision lab.
+2. Place a coin, change its coordinates, save, close the editor and reopen the file.
+3. Playtest. Collect the coin, then lose a life.
+4. Lose every life and choose Retry.
+
+**What you will see:** the saved values come back exactly and match where the
+coin appears in the game. After losing a life the coin stays collected, while
+health stars come back. Retry after game over brings the coin back too.
+
+**Why:** coins award score. If they came back after every death, you could
+farm points and bonus lives by dying on purpose. Stars give no score, so
+`level_reset()` restores them.
+
+**Check yourself:** `make test` checks that levels survive a save and reload,
+and that bad files are refused. A level with a fractional value where an
+integer belongs, a NaN, or more coins than `MAX_COINS` must fail to open, and
+the level you already have open in the editor must stay exactly as it was. How
+does the editor make sure of that?
+
+<details>
+<summary>Hint</summary>
+
+Look at `editor_load_level()` in `src/editor/editor_files.c`: where does the
+newly read level go before anything else happens?
+
+</details>
+
+<details>
+<summary>Answer</summary>
+
+`editor_load_level()` reads the file into a separate local `LevelDef
+new_level`, through `level_load_toml()`, which parses, checks every type,
+count and range, and returns an error instead of a partial level. Only when
+that succeeded does it call `editor_apply_loaded_level()` to copy the new level
+over the editor's current one. Any failure returns early with a status message,
+so the open level, its undo history and its unsaved edits are untouched. The
+parser itself refuses a fractional number for an integer field, a non-finite
+float (`isfinite()` in `serializer_parse.c`) and an array longer than its
+`MAX_*` limit.
+
+</details>
 
 ### Lab 6 — Ownership and failure
 
-- **Goal:** distinguish an owning pointer, a borrowed pointer and a failed construction.
-- **Read:** `src/core/game_lifecycle.c`, `src/core/game_resources.c`, `src/shared/serializer_io.c`.
-- **Run:** `make sanitize CC=clang`.
-- **Experiment:** read the simulated missing-saw-texture scenario in `tests/simulation_test.c`; it temporarily clears an in-memory texture slot and restores ownership before cleanup. Do not delete shared assets to perform this exercise.
-- **Observe:** required gameplay assets fail clearly; the error identifies the path. Failed save/load operations preserve existing data.
-- **Proof:** explain why `if (pointer) free(pointer)` alone does not prevent a second free, and why an owner clears its pointer after release.
+**Goal:** tell apart an owning pointer, a borrowed pointer and a failed
+construction.
+
+**Read first:** `src/core/game_lifecycle.c`, `src/core/game_resources.c`,
+`src/shared/serializer_io.c`.
+
+**Steps:**
+
+1. Run `make sanitize CC=clang`. It builds everything with AddressSanitizer
+   and UndefinedBehaviorSanitizer and runs the tests.
+2. Read the missing-saw-texture case in `tests/simulation_test.c`. It
+   temporarily clears an in-memory texture slot and puts it back before
+   cleanup. (Do not delete shared asset files to try this.)
+3. Work through the use-after-free example in [Debugging C](../debugging-c/).
+
+**What you will see:** a level that needs a missing gameplay asset is refused
+with a message naming the file. A failed save or load leaves the existing file
+or level unchanged.
+
+**Why:** each resource has exactly one owner, which frees it once and then
+clears its pointer. Everything else borrows it.
+
+**Check yourself:** why does `if (pointer) free(pointer)` on its own not
+prevent a second free, and why does an owner clear its pointer after releasing
+it?
+
+<details>
+<summary>Hint</summary>
+
+What does `free(NULL)` do? And what value does `pointer` still hold right after
+`free(pointer)`?
+
+</details>
+
+<details>
+<summary>Answer</summary>
+
+`free(NULL)` is already safe, so the `if` adds nothing. The real danger is a
+pointer that is *not* `NULL` but points at memory that was already freed:
+`free()` does not change the caller's variable, so the check passes and the
+memory is freed twice (or read after the free). Setting the pointer to `NULL`
+right after the release, as `DESTROY_TEX` and `FREE_CHUNK` in `src/game.h` do,
+makes a second cleanup call harmless. This is what lets `game_cleanup()` run
+after a half-finished `game_init()`. It only protects that one variable: any
+copy of the pointer elsewhere still dangles, which is why only the owner frees
+and everyone else borrows.
+
+</details>
 
 ### Lab 7 — Editor commands
 
-- **Goal:** understand reversible operations and the distinction between history and document state.
-- **Read:** `src/editor/undo.c`, `src/editor/editor_undo_apply.c`, `src/editor/editor_session.c`.
-- **Run:** `make run-editor`.
-- **Change:** move a coin, edit the level description, undo both, redo one, then make another edit.
-- **Observe:** undo restores values; the new edit invalidates redo; returning to the saved contents removes the dirty marker.
-- **Proof:** run `make test`. Explain why entity commands use inline values while configuration commands own separately allocated snapshot pairs, and how ownership transfers between stacks.
+**Goal:** understand reversible operations, and the difference between the
+history and the level itself.
+
+**Read first:** `src/editor/undo.c`, `src/editor/editor_undo_apply.c`,
+`src/editor/editor_session.c`.
+
+**Steps:**
+
+1. Run `make run-editor`.
+2. Move a coin and edit the level description.
+3. Undo both, redo one, then make a new edit.
+4. Undo back to the state you last saved.
+
+**What you will see:** undo restores the old values. The new edit removes the
+redo you had left. Returning to the saved contents clears the unsaved-changes
+marker.
+
+**Why:** the editor keeps two stacks of commands. Undo moves the newest command
+to the redo stack and applies its "before" values; a new edit empties the redo
+stack. The marker compares a hash of the level with the hash at the last save,
+so it does not matter how you got back.
+
+**Check yourself:** run `make test`. Why do entity commands store their values
+inline, while level-settings commands own a separately allocated pair of
+snapshots, and how does that ownership move between the stacks?
+
+<details>
+<summary>Hint</summary>
+
+Compare the size of `PlacementData` with `LevelConfigSnapshot` in
+`src/editor/undo.h`, and remember each stack holds `UNDO_MAX` (256) entries.
+
+</details>
+
+<details>
+<summary>Answer</summary>
+
+An entity edit needs only the one placement before and after, which fits in
+the small `PlacementData` union stored directly in each `UndoEntry`. A
+level-settings snapshot holds names, a description, layer paths and more, so it
+is much larger. Storing two of those inline in all 512 entries would make every
+stack slot huge even though most commands are entity edits. So `undo_push()`
+mallocs the pair only for `CMD_CONFIG` commands and keeps a pointer in the
+entry.
+
+That pointer always has exactly one owner. `transfer()` moves an entry from one
+stack to the other and sets the old slot's `config` to `NULL`, so the pointer
+moves rather than being copied. A new edit frees everything left on the redo
+stack (`release_entries()`), and when the undo stack is full the oldest entry's
+snapshot is freed before it is dropped. `undo_destroy()` frees whatever is
+left.
+
+</details>
 
 ### Lab 8 — Reproducible experiments and portability
 
-- **Goal:** separate semantic input and simulation time from keyboard layout and rendering.
-- **Read:** `src/input/game_web_input.c`, `web/touch-controls.js`, `src/core/game_experiment.c`, `src/core/game_random.c`.
-- **Run:** `./out/super-mango --debug --no-save --seed 7 --level levels/labs/06_camera.toml`.
-- **Experiment:** press F8 to restart and record; move, jump and change a tuning field; press F9 to export. Native saves a uniquely named TOML file in the working directory; the browser initiates an explicit download.
-- **Replay:** `./out/super-mango --level levels/labs/06_camera.toml --experiment mango-experiment-N.toml` (replace `N` with the exported filename).
-- **Proof:** the replay freezes after the captured simulation steps. `make test` compares position, velocity, elapsed time, score and checkpoint against the recorded run despite opposing live input. Use unchanged level bytes and the same engine revision. Floating-point/platform differences can still prevent bit-identical cross-platform results.
+**Goal:** separate what you meant to do (move, jump) and simulation time from
+keyboard layout and rendering.
+
+**Read first:** `src/input/game_web_input.c`, `web/touch-controls.js`,
+`src/core/game_experiment.c`, `src/core/game_random.c`.
+
+**Steps:**
+
+1. Run `./out/super-mango --debug --no-save --seed 7 --level levels/labs/06_camera.toml`.
+2. Press F8 to restart and start recording. Move, jump and change a tuning
+   value with F6 and minus/equal.
+3. Press F9 to export. The native game writes a uniquely named TOML file in the
+   working directory; the browser starts a download.
+4. Replay it:
+   `./out/super-mango --level levels/labs/06_camera.toml --experiment mango-experiment-N.toml`
+   (use your file's name in place of `mango-experiment-N.toml`).
+
+**What you will see:** the run plays itself back exactly and freezes after the
+last recorded step, even if you press keys during the replay.
+
+**Why:** the recording stores actions (left, jump) for every 1/60 s step plus
+the tuning values and the random seed, not key presses or frame times.
+[Controls](../controls/#recording-and-replaying-an-experiment) has the details.
+
+**Check yourself:** `make test` replays a recorded run while feeding the
+opposite live input, and compares position, velocity, elapsed time, score and
+checkpoint. What makes the replay come out identical, and why might it still
+differ on another platform?
+
+<details>
+<summary>Hint</summary>
+
+List everything that could change the outcome of a step: input, the step
+length, random numbers, the level file. Then think about floating-point maths
+on different compilers and CPUs.
+
+</details>
+
+<details>
+<summary>Answer</summary>
+
+Every input to the simulation is pinned. Input comes from the recorded action
+bits, not the keyboard (the test, `inspection_and_replay()` in
+`tests/simulation_test.c`, holds Left the whole time and the result still
+matches). Every step is exactly 1/60 s. The random generator
+(`game_random()`) starts from the recorded seed. The level file must hash to
+the recorded `level_hash`, or the replay is refused. With the same engine
+build, the same steps run in the same order on the same data.
+
+Across platforms, the same C source can still round floating-point results
+differently: another compiler may fuse a multiply and add into one
+instruction, or a maths library function such as `sinf` may return a value
+that differs in the last bit. Those tiny differences can grow over thousands of
+steps, so a replay is only guaranteed to match on the same build.
+
+</details>
 
 ## Completion portfolio
 
