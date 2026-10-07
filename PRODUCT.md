@@ -60,7 +60,7 @@ Source-backed facts for design and copy:
 - Hazard set: spike rows, spike blocks, spike platforms, circular saws, axe traps, blue flames, fire flames.
 - Visual systems: parallax backgrounds, 32 render layers, scrolling camera, fog overlays, HUD, debug overlay.
 - Level editor: standalone raylib editor with canvas, checkpoint-aware palette and markers, select/place/delete tools, properties inspector, level config, undo/redo, recent files, autosave, validation, TOML save/load, and play-test integration.
-- Controls: keyboard controls are visible on the site: WASD or arrows to move, Space to jump. Docs also describe gamepad hot-plug support.
+- Controls: the site's control strip shows WASD or arrows to move and Space to jump (W/S climb); on-screen touch buttons sit below the browser canvas. Docs also describe gamepad hot-plug support and F1 remapping.
 - Authors: Jonathan Peris and Fernando Santos.
 - Art credit: Super Mango 2D Pixel Art Platformer Asset Pack by Juho.
 
@@ -214,7 +214,9 @@ playtest, ability to locate a behavior's source, completion of the entity lab,
 and a reproducible experiment with an explanation. Page metrics below are
 secondary historical website suggestions.
 
-Track these where analytics allow:
+Track these where analytics allow. Optional analytics loads only on manual
+(`/docs/`) pages, never on the home page that hosts the game, so the home-page
+metrics below are not collected today:
 
 - Hero CTA click-through to `#play`.
 - Actual WebAssembly load starts from the cabinet button.
