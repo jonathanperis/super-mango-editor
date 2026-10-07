@@ -1,20 +1,26 @@
 ---
+/*
+ * The page ends the way a level does: on grass, with the credits written in the dirt.
+ */
+import Sprite from '@/components/Sprite.astro';
+import { art } from '@/lib/art';
+
+const groundStyle = `--grass:url("${art.grassTile.src}")`;
 ---
-<footer class="landing-footer">
-    <p>
-        <a href="https://github.com/jonathanperis/super-mango-editor" target="_blank" rel="noreferrer noopener" aria-label="Super Mango GitHub Repository">GitHub Repository</a>
-        &nbsp;&middot;&nbsp;
-        <a href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Super Mango Releases">Releases</a>
-    </p>
-    <p>
-        Created by
-        <a href="https://github.com/jonathanperis" target="_blank" rel="noreferrer noopener">jonathanperis</a>
-        &amp;
-        <a href="https://github.com/fersantos" target="_blank" rel="noreferrer noopener">fersantos</a>.
-    </p>
-    <p>
-        Art from
-        <a href="https://juhosprite.itch.io/super-mango-2d-pixelart-platformer-asset-pack16x16" target="_blank" rel="noreferrer noopener">Super Mango 2D Pixel Art Platformer Asset Pack</a>
-        by Juho.
-    </p>
+<footer class="site-footer" style={groundStyle}>
+    <div class="footer-ground" aria-hidden="true">
+        <Sprite sheet={art.player} scale={2} row={0} frames={4} fps={6} class="footer-player" />
+    </div>
+    <div class="footer-credits">
+        <p>
+            Made by <a href="https://github.com/jonathanperis" target="_blank" rel="noreferrer noopener">jonathanperis</a> and <a href="https://github.com/fersantos" target="_blank" rel="noreferrer noopener">fersantos</a>, mostly to learn C. The code is MIT licensed.
+        </p>
+        <p>
+            Pixel art from Juho's <a href="https://juhosprite.itch.io/super-mango-2d-pixelart-platformer-asset-pack16x16" target="_blank" rel="noreferrer noopener">Super Mango 2D Pixel Art Platformer Asset Pack</a>. Sounds are generated from code.
+        </p>
+        <p class="footer-links">
+            <a href="https://github.com/jonathanperis/super-mango-editor" target="_blank" rel="noreferrer noopener" aria-label="Super Mango GitHub Repository">Source on GitHub</a>
+            <a href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Super Mango Releases">Releases</a>
+        </p>
+    </div>
 </footer>

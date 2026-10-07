@@ -1,250 +1,208 @@
 ---
+/*
+ * Everything below the title screen: the playable cabinet, what is in the
+ * game, how to learn from it, the manual index and the downloads.
+ *
+ * The inline script at the bottom boots the WebAssembly build. It relies on
+ * these ids and classes, which must keep their names: #play (with
+ * data-asset-base), #game-viewport, #canvas, #game-status,
+ * .cabinet-standby, .cabinet-standby-note, #play-btn, #debug-btn,
+ * #touch-controls and the [data-start-game] buttons.
+ */
+import Sprite from '@/components/Sprite.astro';
+import { art } from '@/lib/art';
+import { DOCS_META, SECTION_CATEGORIES } from '@/lib/docsSidebar';
 import facts from '../../generated/project.json';
+import gameLoopSource from '../../../../src/core/game_loop.c?raw';
+
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
-const scoreboard = [
-    ['LEVELS', facts.levels, 'campaign worlds'],
-    ['SCREENS', facts.screens, 'side-scroll rooms'],
-    ['ENEMIES', facts.enemies, 'spawned threats'],
-    ['HAZARDS', facts.hazards, 'traps & rails'],
-    ['COLLECT', facts.collectibles, 'coins & stars'],
-    ['LABS', facts.labs, 'focused experiments'],
+/* The "learn" excerpt is read from src/core/game_loop.c at build time, so the
+ * site always shows the code that actually ships. A missing marker fails the
+ * build instead of silently showing stale code. */
+function excerpt(source: string, startMarker: string, endMarker: string): string {
+    const marker = source.indexOf(startMarker);
+    const start = source.lastIndexOf('\n', marker) + 1;   /* include the indent */
+    const end = source.indexOf(endMarker, marker);
+    if (marker < 0 || end < 0) {
+        throw new Error(`game_loop.c excerpt markers not found: "${startMarker}" .. "${endMarker}"`);
+    }
+    const lines = source.slice(start, end).replace(/\s+$/, '').split('\n');
+    const indent = Math.min(...lines.filter(l => l.trim()).map(l => l.match(/^ */)![0].length));
+    return lines.map(l => l.slice(indent)).join('\n');
+}
+const loopExcerpt = excerpt(gameLoopSource, 'int steps = game_inspector_steps', '\n\n    /* ---- 4. Render');
+
+const hud = [
+    { sprite: art.lastStar, value: facts.levels, label: 'levels', note: `${facts.screens} screens to cross` },
+    { sprite: art.coin, value: facts.collectibles, label: 'coins & stars', note: 'placed by hand' },
+    { sprite: art.spider, value: facts.enemies, label: 'enemies', note: 'six kinds', scale: 1 },
+    { sprite: art.saw, value: facts.hazards, label: 'hazards', note: 'saws, axes, flames, spikes', scale: 2 },
+    { sprite: art.starYellow, value: facts.labs, label: 'lab levels', note: 'one idea each' },
 ];
 
-const paths = [
-    {
-        label: 'PATH_01',
-        title: 'Play',
-        body: 'Start the WebAssembly build, learn the controls, and test the browser version without installing anything.',
-        action: 'START RUN ->',
-        href: '#play',
-    },
-    {
-        label: 'PATH_02',
-        title: 'Learn the engine',
-        body: 'Follow the C11 + raylib architecture, game loop, rendering, collision, input, and entity systems.',
-        action: 'OPEN GUIDE ->',
-        href: `${base}/docs/learning-path/`,
-    },
-    {
-        label: 'PATH_03',
-        title: 'Build levels',
-        body: 'Inspect TOML worlds, asset rules, and the visual level editor workflow for extending the platformer.',
-        action: 'WORLD BUILDER ->',
-        href: `${base}/docs/level-editor/`,
-    },
+const bestiary = [
+    { name: 'Spider', sprite: art.spider, frames: 3, scale: 2, line: 'Patrols its ledge, turns at the edge. The jumping kind does not turn.' },
+    { name: 'Bird', sprite: art.bird, frames: 3, scale: 2, line: 'Flies a slow sine wave across the sky. Duck or time it.' },
+    { name: 'Fish', sprite: art.fish, frames: 2, scale: 2, line: 'Waits under the water, then leaps at exactly the wrong moment.' },
+    { name: 'Circular saw', sprite: art.saw, frames: 1, scale: 3, line: 'Rolls back and forth along its track. As dangerous as it looks.' },
+    { name: 'Axe trap', sprite: art.axe, frames: 1, scale: 2, line: 'Swings on a schedule. Learn the schedule.' },
+    { name: 'Blue flame', sprite: art.flame, frames: 2, scale: 2, line: 'Erupts from the gaps in the floor. Jump between bursts.' },
 ];
 
-const manualGroups = [
-    {
-        label: 'MANUAL_01',
-        title: 'Start here',
-        body: 'Project overview, codebase map, and the first walkthrough for new contributors.',
-        links: [
-            { title: 'Sandbox School', href: `${base}/docs/learning-path/`, external: false },
-            { title: 'Mechanics Museum', href: `${base}/docs/mechanics-museum/`, external: false },
-            { title: 'README', href: 'https://github.com/jonathanperis/super-mango-editor#readme', external: true },
-            { title: 'Developer Guide', href: `${base}/docs/developer-guide/`, external: false },
-            { title: 'Architecture', href: `${base}/docs/architecture/`, external: false },
-        ],
-        action: 'OPEN STARTER ROUTE ->',
-    },
-    {
-        label: 'MANUAL_02',
-        title: 'Core systems',
-        body: 'Player lifecycle, entities, hazards, constants, collectibles, and platform surfaces.',
-        links: [
-            { title: 'Player Module', href: `${base}/docs/player-module/`, external: false },
-            { title: 'Entities & Hazards', href: `${base}/docs/entities-and-hazards/`, external: false },
-            { title: 'Constants', href: `${base}/docs/constants-reference/`, external: false },
-            { title: 'Collectibles', href: `${base}/docs/collectibles-and-surfaces/`, external: false },
-        ],
-        action: 'STUDY SYSTEMS ->',
-    },
-    {
-        label: 'MANUAL_03',
-        title: 'World builder',
-        body: 'Level format, visual editor, sprites, audio, and content authoring references.',
-        links: [
-            { title: 'Level Design', href: `${base}/docs/level-design/`, external: false },
-            { title: 'Level Editor', href: `${base}/docs/level-editor/`, external: false },
-            { title: 'Assets', href: `${base}/docs/assets/`, external: false },
-            { title: 'Sounds', href: `${base}/docs/sounds/`, external: false },
-        ],
-        action: 'BUILD A LEVEL ->',
-    },
-    {
-        label: 'MANUAL_04',
-        title: 'Build & source',
-        body: 'Make targets, source-file ownership, native builds, WebAssembly, and validation gates.',
-        links: [
-            { title: 'Build System', href: `${base}/docs/build-system/`, external: false },
-            { title: 'Source Files', href: `${base}/docs/source-files/`, external: false },
-            { title: 'Full Docs', href: `${base}/docs`, external: false },
-        ],
-        action: 'OPEN TOOLCHAIN ->',
-    },
+const learnLinks = [
+    { title: 'Sandbox School', note: 'eight small experiments, from your first frame to a reproducible replay', href: `${base}/docs/learning-path/` },
+    { title: 'Mechanics Museum', note: 'six tiny levels, each showing one mechanic in isolation', href: `${base}/docs/mechanics-museum/` },
+    { title: 'Entity walkthrough', note: 'follow one collectible from TOML to screen, editor and tests', href: `${base}/docs/entity-walkthrough/` },
+    { title: 'Level editor', note: 'build your own level with the same editor we use', href: `${base}/docs/level-editor/` },
 ];
+
+const manualColumns = SECTION_CATEGORIES.map(category => ({
+    label: category.label,
+    pages: category.ids.map(id => DOCS_META[id]),
+}));
 ---
 
-<section id="play" class="play-section cabinet-bay" data-asset-base={`${base}/`}>
-    <div class="section-kicker">CABINET BAY</div>
-    <h2 class="section-title">BOOT THE RUN</h2>
-    <p class="section-lede">Start in Creator's Playground. Debug Mode adds hitboxes, freeze/step controls, live movement tuning and experiment capture using the same WebAssembly payload.</p>
-    <div class="cabinet-frame">
-        <div class="cabinet-marquee">
-            <span>WEBASSEMBLY BUILD</span>
-            <strong>READY</strong>
+<section id="play" class="section play-section" data-asset-base={`${base}/`} aria-labelledby="play-title">
+    <div class="section-head">
+        <Sprite sheet={art.coin} scale={3} />
+        <div>
+            <h2 id="play-title">Press start</h2>
+            <p>You begin in Creator's Playground. Debug mode is the same game with the inspector switched on: every hitbox drawn, and time you can freeze, step and slow down.</p>
         </div>
+    </div>
+
+    <div class="cabinet">
         <div id="game-viewport" class="game-viewport">
-        <div class="cabinet-bezel">
-            <canvas
-                id="canvas"
-                role="application"
-                aria-label="Super Mango game canvas - press Play to start"
-            ></canvas>
-            <p id="game-status">
-                <span class="cabinet-standby">WebAssembly cabinet ready</span>
-                <span class="cabinet-standby-note">Click to load the browser build and start the run.</span>
-                <button id="play-btn" type="button" data-start-game="play">Play normal run ({facts.assetMiB} MiB assets + engine)</button>
-                <button id="debug-btn" type="button" data-start-game="debug">Debug mode: simulation inspector</button>
-            </p>
+            <div class="cabinet-screen" style={`--poster-sky:url("${art.sky.src}");--poster-mountains:url("${art.mountains.src}")`}>
+                <canvas
+                    id="canvas"
+                    role="application"
+                    aria-label="Super Mango game canvas - press Play to start"
+                ></canvas>
+                <p id="game-status">
+                    <span class="cabinet-standby">Ready when you are</span>
+                    <span class="cabinet-standby-note">The game downloads only when you press play: about {facts.assetMiB} MB of art and sound plus the engine.</span>
+                    <button id="play-btn" type="button" data-start-game="play">&#9654; Play</button>
+                    <button id="debug-btn" type="button" data-start-game="debug">Play with the debug inspector</button>
+                </p>
+            </div>
+            <div id="touch-controls"></div>
         </div>
-        <div id="touch-controls"></div>
-        </div>
-        <div class="cabinet-controls">
-            <span class="control-group"><kbd>WASD</kbd> / <kbd>Arrows</kbd> Move</span>
-            <span class="control-group"><kbd>Space</kbd> Jump</span>
-            <span class="control-note">Keyboard, gamepad, or touch · Tab leaves the game</span>
-        </div>
-        <div class="cabinet-base"></div>
+        <ul class="controls-legend" aria-label="Keyboard controls">
+            <li><kbd>&larr;</kbd><kbd>&rarr;</kbd> or <kbd>A</kbd><kbd>D</kbd> move</li>
+            <li><kbd>Space</kbd> jump</li>
+            <li><kbd>Shift</kbd> run</li>
+            <li><kbd>Esc</kbd> pause</li>
+            <li><kbd>F1</kbd> settings</li>
+            <li class="controls-note">Gamepads work too, and phones get touch buttons. <kbd>Tab</kbd> leaves the game.</li>
+        </ul>
     </div>
 </section>
 
-<section id="about" class="about-section">
-    <div class="section-kicker">SCOREBOARD</div>
-    <h2 class="section-title">PLAY, STUDY, REBUILD</h2>
-    <p class="section-lede">
-        Super Mango is a classic side-scrolling platformer and a commented learning resource for C and raylib game programming.
-        It keeps the game loop, rendering, input, collision, assets, WebAssembly build, and level tooling visible.
-    </p>
+<section id="about" class="section cartridge-section" aria-labelledby="cartridge-title">
+    <div class="section-head">
+        <Sprite sheet={art.starYellow} scale={3} />
+        <div>
+            <h2 id="cartridge-title">What's in the cartridge</h2>
+            <p>Three hand-built levels, from a grassy playground to two volcanic stages, plus six small lab levels for studying one mechanic at a time.</p>
+        </div>
+    </div>
 
-    <div class="world-map-rail" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-    <div class="scoreboard-grid world-node-grid" aria-label="Project metrics">
-        {scoreboard.map(([label, value, note]) => (
-            <div class="score-tile">
-                <span>{label}</span>
-                <strong>{value}</strong>
-                <em>{note}</em>
+    <ul class="hud-strip" aria-label="Game contents">
+        {hud.map(item => (
+            <li>
+                <Sprite sheet={item.sprite} scale={item.scale ?? 2} />
+                <strong><span aria-hidden="true">x</span>{item.value}</strong>
+                <span class="hud-label">{item.label}</span>
+                <span class="hud-note">{item.note}</span>
+            </li>
+        ))}
+    </ul>
+
+    <h3 class="bestiary-title">Who you'll meet</h3>
+    <ul class="bestiary">
+        {bestiary.map(entry => (
+            <li>
+                <div class="bestiary-portrait">
+                    <Sprite sheet={entry.sprite} scale={entry.scale} frames={entry.frames} fps={6} />
+                </div>
+                <h4>{entry.name}</h4>
+                <p>{entry.line}</p>
+            </li>
+        ))}
+    </ul>
+</section>
+
+<section id="learn" class="section learn-section" aria-labelledby="learn-title">
+    <div class="learn-copy">
+        <h2 id="learn-title">Learn C by taking it apart</h2>
+        <p>
+            Super Mango started as a way to learn C properly, by building something
+            we actually wanted to play. So the code prefers being readable over being
+            clever: simple loops, explicit ownership, and comments that explain <em>why</em>, not just what.
+        </p>
+        <p>
+            Nothing is hidden behind an engine. Open any file and you are one or two
+            function calls away from raylib.
+        </p>
+        <ul class="learn-links">
+            {learnLinks.map(link => (
+                <li>
+                    <a href={link.href}>{link.title}</a>
+                    <span>{link.note}</span>
+                </li>
+            ))}
+        </ul>
+    </div>
+
+    <figure class="code-card">
+        <figcaption>
+            <span class="code-file">src/core/game_loop.c</span>
+            <span class="code-note">pulled from the source when this page was built</span>
+        </figcaption>
+        <pre><code>{loopExcerpt}</code></pre>
+        <p class="code-explainer">
+            Every frame turns real time into a whole number of fixed 1/60 s steps.
+            That is why a jump reaches the same height at 60 Hz and at 144 Hz, and
+            why a recorded run replays exactly.
+        </p>
+    </figure>
+</section>
+
+<section id="docs" class="section manual-section" aria-labelledby="manual-title">
+    <div class="section-head">
+        <Sprite sheet={art.lastStar} scale={3} />
+        <div>
+            <h2 id="manual-title">The manual</h2>
+            <p>Every page was written next to the code it describes, and checked against it.</p>
+        </div>
+    </div>
+    <div class="manual-index">
+        {manualColumns.map(column => (
+            <div class="manual-column">
+                <h3>{column.label}</h3>
+                <ul>
+                    {column.pages.map(page => (
+                        <li><a href={`${base}${page.route}`}>{page.label}</a></li>
+                    ))}
+                </ul>
             </div>
         ))}
     </div>
-
-    <div class="section-kicker sub-kicker">PLAYER / ENGINE / BUILDER</div>
-    <div class="path-grid portal-grid">
-        {paths.map((path) => (
-            <a class="path-card" href={path.href}>
-                <span class="card-label">{path.label}</span>
-                <h3>{path.title}</h3>
-                <p>{path.body}</p>
-                <span class="card-action">{path.action}</span>
-            </a>
-        ))}
-    </div>
-
-    <div class="feature-grid inventory-grid">
-        <div class="feature-card">
-            <span class="card-label">INV_01</span>
-            <h3>Platforming</h3>
-            <p>One-way platforms, float platforms, crumble bridges, floor gaps, bouncepads, vines, ladders, and ropes.</p>
-        </div>
-        <div class="feature-card">
-            <span class="card-label">INV_02</span>
-            <h3>Enemies</h3>
-            <p>Spiders, jumping spiders, birds, faster birds, fish, and faster fish across hand-authored TOML levels.</p>
-        </div>
-        <div class="feature-card">
-            <span class="card-label">INV_03</span>
-            <h3>Hazards</h3>
-            <p>Spike rows, spike platforms, axe traps, circular saws, blue flames, fire flames, and rail blocks.</p>
-        </div>
-        <div class="feature-card">
-            <span class="card-label">INV_04</span>
-            <h3>Visual polish</h3>
-            <p>Parallax scrolling, player animation states, camera tracking, fog overlay, HUD, and pixel-perfect rendering.</p>
-        </div>
-        <div class="feature-card">
-            <span class="card-label">INV_05</span>
-            <h3>Level editor</h3>
-            <p>Standalone raylib editor with canvas tools, palette, properties, TOML save/load, validation, autosave, and play-test integration.</p>
-        </div>
-        <div class="feature-card">
-            <span class="card-label">INV_06</span>
-            <h3>Cross-platform</h3>
-            <p>Native builds for macOS, Linux, and Windows, plus a browser-playable Emscripten/WebAssembly build.</p>
-        </div>
-    </div>
+    <a class="pixel-button pixel-button-ghost manual-all" href={`${base}/docs/`}>Open the manual</a>
 </section>
 
-<section id="docs" class="docs-section">
-    <div class="section-kicker">BUILDER MANUAL</div>
-    <h2 class="section-title">CHOOSE YOUR ROUTE</h2>
-    <p class="section-lede">Start with Sandbox School, trace the engine, or build your first level. The full manual includes controls, testing, asset provenance and release guidance.</p>
-    <div class="docs-cta-row">
-        <a href={`${base}/docs`} class="docs-link-btn">View full documentation &rarr;</a>
-    </div>
-    <div class="docs-grid manual-grid">
-        {manualGroups.map((group) => (
-            <article class="doc-card manual-card">
-                <span class="card-label">{group.label}</span>
-                <h3>{group.title}</h3>
-                <p>{group.body}</p>
-                <ul class="manual-links">
-                    {group.links.map((link) => (
-                        <li>
-                            <a href={link.href} target={link.external ? '_blank' : undefined} rel={link.external ? 'noreferrer noopener' : undefined}>{link.title}</a>
-                        </li>
-                    ))}
-                </ul>
-                <span class="card-action">{group.action}</span>
-            </article>
-        ))}
-    </div>
-</section>
-
-<section id="downloads" class="downloads-section">
-    <div class="section-kicker">ITEM DROP</div>
-    <h2 class="section-title">CHOOSE YOUR CARTRIDGE</h2>
-    <p class="section-lede">
-        Browse published builds on GitHub Releases, or play the current browser build above.
-        Check each release's asset list: older releases predate the game-and-editor builder bundles.
-        For the current editor and learning labs, <a href={`${base}/docs/build-system/`}>build from source with <code>make builder</code></a>.
+<section id="downloads" class="section downloads-section" aria-labelledby="downloads-title">
+    <h2 id="downloads-title">Take it home</h2>
+    <p>
+        Native builds for each platform come with every tagged release. To get the
+        level editor and the learning labs too, build from source with <a href={`${base}/docs/build-system/`}><code>make builder</code></a>.
     </p>
-    <div class="download-grid">
-        <a class="download-card" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for Linux x86_64">
-            <span class="card-label">DROP_01</span>
-            <div class="platform">Linux</div>
-            <div class="arch">x86_64</div>
-            <span class="card-action">OPEN RELEASE -></span>
-        </a>
-        <a class="download-card" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for macOS Apple Silicon">
-            <span class="card-label">DROP_02</span>
-            <div class="platform">macOS</div>
-            <div class="arch">arm64 Apple Silicon</div>
-            <span class="card-action">OPEN RELEASE -></span>
-        </a>
-        <a class="download-card" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for Windows x86_64">
-            <span class="card-label">DROP_03</span>
-            <div class="platform">Windows</div>
-            <div class="arch">x86_64 + runtime DLLs</div>
-            <span class="card-action">OPEN RELEASE -></span>
-        </a>
-        <a class="download-card wasm-drop" href="#play" aria-label="Play Super Mango in browser using WebAssembly">
-            <span class="card-label">DROP_04</span>
-            <div class="platform">WebAssembly</div>
-            <div class="arch">No install · play above</div>
-            <span class="card-action">PLAY ABOVE -></span>
-        </a>
+    <div class="download-row">
+        <a class="pixel-button pixel-button-ghost" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for Linux x86_64">Linux <small>x86_64</small></a>
+        <a class="pixel-button pixel-button-ghost" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for macOS Apple Silicon">macOS <small>Apple Silicon</small></a>
+        <a class="pixel-button pixel-button-ghost" href="https://github.com/jonathanperis/super-mango-editor/releases/latest" target="_blank" rel="noreferrer noopener" aria-label="Download Super Mango for Windows x86_64">Windows <small>x86_64</small></a>
     </div>
 </section>
 

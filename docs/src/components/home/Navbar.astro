@@ -1,28 +1,22 @@
 ---
+/*
+ * A plain top bar: the game's own coin icon as the mark, four destinations.
+ * It stays put at the top of the page instead of appearing on scroll.
+ */
+import Sprite from '@/components/Sprite.astro';
+import { art } from '@/lib/art';
+
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
-<nav class="site-nav" id="site-nav" aria-label="Primary navigation">
-    <a href={`${base}/#hero`} class="nav-logo" aria-label="Super Mango home">
-        <span class="nav-logo-mark" aria-hidden="true">SM</span>
-        <span class="nav-logo-copy">
-            <span>Super Mango</span>
-            <small>Arcade builder</small>
-        </span>
+<nav class="top-bar" aria-label="Primary navigation">
+    <a href={`${base}/`} class="top-bar-home" aria-label="Super Mango home">
+        <Sprite sheet={art.coin} scale={2} />
+        <span>Super Mango</span>
     </a>
-    <div class="nav-rail" aria-label="Page sections">
+    <div class="top-bar-links">
         <a href="#play" data-start-game="play">Play</a>
-        <a href="#about">Scoreboard</a>
-        <a href="#docs">Manual</a>
-        <a href={`${base}/docs`}>Full docs</a>
-        <a href="#downloads">Drops</a>
+        <a href={`${base}/docs/learning-path/`}>Learn</a>
+        <a href={`${base}/docs/`}>Manual</a>
+        <a href="https://github.com/jonathanperis/super-mango-editor" target="_blank" rel="noreferrer noopener">GitHub</a>
     </div>
-    <a class="nav-start" href="#play" data-start-game="play">
-        <span>Insert coin</span>
-        <strong>Play</strong>
-    </a>
-</nav>
-<nav class="mobile-action-bar" aria-label="Mobile quick actions">
-    <a href="#play" data-start-game="play">Play</a>
-    <a href="#docs">Manual</a>
-    <a href="https://github.com/jonathanperis/super-mango-editor" target="_blank" rel="noreferrer noopener">GitHub</a>
 </nav>

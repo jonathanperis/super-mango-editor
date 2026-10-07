@@ -1,89 +1,69 @@
 ---
+/*
+ * Title screen: a small level built from the game's real sprites (sky,
+ * clouds, mountains, grass) with the hero walking in place, a spider on
+ * patrol, a bird crossing and coins bobbing. Below it, a game-style dialog
+ * box says what Super Mango is and offers the two things to do next.
+ */
+import Sprite from '@/components/Sprite.astro';
+import { art } from '@/lib/art';
 import facts from '../../generated/project.json';
+
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const sceneStyle = [
+    `--sky:url("${art.sky.src}")`,
+    `--clouds:url("${art.clouds.src}")`,
+    `--clouds-near:url("${art.cloudsNear.src}")`,
+    `--mountains:url("${art.mountains.src}")`,
+    `--grass:url("${art.grassTile.src}")`,
+].join(';');
 ---
-<!-- Floating particles -->
-<div class="particles" aria-hidden="true">
-    <div class="particle"></div>
-    <div class="particle"></div>
-    <div class="particle"></div>
-    <div class="particle"></div>
-    <div class="particle"></div>
-    <div class="particle"></div>
-</div>
+<header class="title-screen" id="hero">
+    <div class="scene" style={sceneStyle} aria-hidden="true">
+        <div class="scene-layer scene-sky"></div>
+        <div class="scene-layer scene-clouds"></div>
+        <div class="scene-layer scene-mountains"></div>
+        <div class="scene-layer scene-clouds-near"></div>
 
-<section class="hero hero-overhaul" id="hero">
-    <div class="parallax-layer sky-layer"></div>
-    <div class="parallax-layer mountains-layer"></div>
-    <div class="parallax-layer trees-far-layer"></div>
-    <div class="parallax-layer trees-near-layer"></div>
-    <div class="parallax-layer ground-layer"></div>
-
-    <div class="hero-stage">
-        <div class="hero-content">
-            <div class="hero-badge boot-badge"><span class="signal-light"></span> NIGHT ARCADE SERVICE BAY</div>
-            <div class="boot-readout" aria-label="Boot diagnostics">
-                <span>BOOT://C11</span>
-                <span>RAYLIB:6.0</span>
-                <span>ASSETS:{facts.assetMiB}MiB</span>
-            </div>
-            <h1 class="hero-title overdrive-title">
-                <span>SUPER</span>
-                <span>MANGO</span>
-            </h1>
-            <p class="hero-sub">Insert coin, open the cabinet, rebuild the run.</p>
-            <p class="hero-proof">A browser-playable C11 + raylib platformer with TOML worlds, a visual level editor, and a source tree designed to be studied like a working arcade machine.</p>
-            <div class="hero-hud cabinet-ledger" aria-label="Project highlights">
-                <span>C11</span>
-                <span>raylib</span>
-                <span>WASM</span>
-                <span>{facts.levels} campaign levels</span>
-                <span>{facts.labs} learning labs</span>
-                <span>Level editor</span>
-            </div>
-            <div class="hero-ctas" aria-label="Primary actions">
-                <a href="#play" class="btn-play" data-start-game="play">
-                    <span class="btn-kicker">Insert coin</span>
-                    <span class="btn-main">Boot normal run</span>
-                </a>
-                <a href="#docs" class="btn-download">
-                    <span class="btn-kicker">Service panel</span>
-                    <span class="btn-main">Open manual</span>
-                </a>
-            </div>
-            <div class="hero-console" aria-label="Cabinet service log">
-                <span>CHECKSUM: SOURCE-BACKED</span>
-                <span>ROUTES: PLAYER / ENGINE / BUILDER</span>
-                <span>STATUS: AWAITING COIN</span>
-            </div>
+        <div class="scene-coins">
+            <Sprite sheet={art.coin} scale={3} class="bob bob-1" />
+            <Sprite sheet={art.coin} scale={3} class="bob bob-2" />
+            <Sprite sheet={art.coin} scale={3} class="bob bob-3" />
+            <Sprite sheet={art.starYellow} scale={3} class="bob bob-4" />
         </div>
-
-        <aside class="hero-attract-card" aria-label="Attract mode summary">
-            <div class="attract-marquee diagnostic-marquee">
-                <span class="live-dot"></span>
-                <span>WEB BUILD READY</span>
-                <strong>{facts.assetMiB} MiB assets</strong>
-            </div>
-            <div class="service-card-label">CABINET MONITOR</div>
-            <div class="mini-cabinet" aria-hidden="true">
-                <div class="mini-screen">
-                    <span class="mini-sun"></span>
-                    <span class="mini-platform one"></span>
-                    <span class="mini-platform two"></span>
-                    <span class="mini-player"></span>
-                </div>
-                <div class="mini-controls">
-                    <span></span><span></span><span></span>
-                </div>
-            </div>
-            <div class="attract-scoreboard">
-                <div><span>LEVELS</span><strong>{facts.levels}</strong></div>
-                <div><span>SCREENS</span><strong>{facts.screens}</strong></div>
-                <div><span>LABS</span><strong>{facts.labs}</strong></div>
-            </div>
-            <a href={`${base}/docs/learning-path/`} class="attract-link">Start Sandbox School</a>
-        </aside>
+        <Sprite sheet={art.bird} scale={2} frames={3} fps={7} class="scene-bird" />
+        <Sprite sheet={art.player} scale={3} row={1} frames={4} fps={10} class="scene-player" />
+        <Sprite sheet={art.spider} scale={2} frames={3} fps={7} class="scene-spider" />
+        <div class="scene-ground"></div>
     </div>
 
-    <a class="scroll-hint" href="#play">CABINET BELOW &darr;</a>
-</section>
+    <div class="title-block">
+        <h1 class="title-logo">
+            <Sprite sheet={art.logo} scale={6} label="Super Mango" class="logo-sprite" />
+        </h1>
+
+        <div class="dialog-box">
+            <p class="dialog-lead">
+                A little platformer written in C.
+                Play it here, then take it apart.
+            </p>
+            <p class="dialog-body">
+                Every system in Super Mango is plain, commented C11 you can read in an
+                afternoon: the game loop, collisions, the level loader, even the level
+                editor. Built with raylib, it runs right here in your browser, and it is
+                meant to be studied.
+            </p>
+            <div class="dialog-actions">
+                <a href="#play" class="pixel-button pixel-button-gold" data-start-game="play">
+                    <span aria-hidden="true">&#9654;</span> Play in the browser
+                </a>
+                <a href={`${base}/docs/learning-path/`} class="pixel-button pixel-button-ghost">
+                    Learn how it works
+                </a>
+            </div>
+            <p class="dialog-meta">
+                <span>C11</span><span>raylib 6</span><span>{facts.levels} levels</span><span>{facts.assetMiB} MB of art &amp; sound</span><span>MIT</span>
+            </p>
+        </div>
+    </div>
+</header>

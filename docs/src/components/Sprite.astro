@@ -1,0 +1,44 @@
+---
+/*
+ * Sprite — one frame (or a looping animation) from a game sprite sheet,
+ * scaled by whole pixels so the art stays crisp.
+ *
+ *   sheet  : entry from src/lib/art.ts
+ *   scale  : integer zoom (3 = each source pixel becomes 3x3)
+ *   row    : sheet row for multi-row sheets (player: 0 idle, 1 walk)
+ *   frames : how many frames to cycle along the row (1 = still image)
+ *   fps    : animation speed; ignored for still sprites and when the
+ *            visitor prefers reduced motion (see home.css)
+ */
+import type { SpriteSheet } from '@/lib/art';
+
+interface Props {
+    sheet: SpriteSheet;
+    scale?: number;
+    row?: number;
+    frames?: number;
+    fps?: number;
+    class?: string;
+    label?: string;
+}
+
+const { sheet, scale = 3, row = 0, frames = 1, fps = 8, class: className, label } = Astro.props;
+const style = [
+    `--sprite-w:${sheet.frameW * scale}px`,
+    `--sprite-h:${sheet.frameH * scale}px`,
+    `--sprite-sheet-w:${sheet.sheetW * scale}px`,
+    `--sprite-sheet-h:${sheet.sheetH * scale}px`,
+    `--sprite-y:${-row * sheet.frameH * scale}px`,
+    `--sprite-end:${-frames * sheet.frameW * scale}px`,
+    `--sprite-frames:${frames}`,
+    `--sprite-duration:${(frames / fps).toFixed(3)}s`,
+    `background-image:url("${sheet.src}")`,
+].join(';');
+---
+<span
+    class:list={['sprite', { 'sprite-animated': frames > 1 }, className]}
+    style={style}
+    role={label ? 'img' : undefined}
+    aria-label={label}
+    aria-hidden={label ? undefined : 'true'}
+></span>
