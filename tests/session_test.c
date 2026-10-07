@@ -421,18 +421,26 @@ static int repeated_menu_game_ownership(void)
     session->game->loop.accumulator = 0.2; /* time that must not be caught up */
     session->game->terminal_action_index = 0;
     if (push_confirm() != 0) return 1;
-    session_frame(session);
-    if (expect_int("next level success keeps game", session->screen, APP_SCREEN_GAME) != 0) return 1;
-    if (session->game->completion.complete != 0) {
-        fprintf(stderr, "session_test: successful next level kept completion\n");
-        return 1;
+    {
+        /* Bracket the frame with the real clock instead of bounding how long
+         * it took: loading the next level under a sanitizer on a busy CI
+         * runner can take longer than any fixed limit. */
+        double frame_start = GetTime();
+        session_frame(session);
+        if (expect_int("next level success keeps game", session->screen, APP_SCREEN_GAME) != 0) return 1;
+        if (session->game->completion.complete != 0) {
+            fprintf(stderr, "session_test: successful next level kept completion\n");
+            return 1;
+        }
+        /* The clock restarts at "now" (during this frame, not before it), so
+         * the next frame measures normal time (no hitch) and the 0.2 s
+         * pending above is not caught up. */
+        if (expect_int("next level timing reset", session->game->loop.clock_started == 1 &&
+                       session->game->loop.prev_time >= frame_start &&
+                       session->game->loop.prev_time <= GetTime() &&
+                       session->game->loop.accumulator < GAME_FIXED_STEP, 1) != 0)
+            return 1;
     }
-    /* The clock restarts at "now", so the next frame measures normal time
-     * (no hitch) and the 0.2 s pending above is not caught up. */
-    if (expect_int("next level timing reset", session->game->loop.clock_started == 1 &&
-                   GetTime() - session->game->loop.prev_time < 0.1 &&
-                   session->game->loop.accumulator < GAME_FIXED_STEP, 1) != 0)
-        return 1;
 
     {
         LevelDef *def = (LevelDef *)session->game->runtime.current_level;
