@@ -6,8 +6,9 @@
 
 #include <float.h>   /* FLT_MAX */
 #include <math.h>    /* fabs, isfinite */
+#include <stdint.h>  /* uint32_t */
 #include <stdlib.h>  /* strtod */
-#include <string.h>  /* strchr, strlen */
+#include <string.h>  /* memcpy, strchr, strlen */
 
 /*
  * fmt_float — Format a float with enough significant digits for a float
@@ -22,6 +23,16 @@
  * Returns a pointer to a static buffer — valid until the next call.
  * Safe for single-float-per-fprintf usage (which is all we do here).
  */
+/* Bit-for-bit float comparison: the question is whether the text reads
+ * back as exactly this float, not whether two numbers are close. */
+static int same_float(float a, float b)
+{
+    uint32_t bits_a, bits_b;
+    memcpy(&bits_a, &a, sizeof(bits_a));
+    memcpy(&bits_b, &b, sizeof(bits_b));
+    return bits_a == bits_b;
+}
+
 const char *fmt_float(double val)
 {
     static char buf[64];
@@ -38,7 +49,7 @@ const char *fmt_float(double val)
      */
     if (isfinite(val) && fabs(val) <= FLT_MAX) {
         double back = strtod(buf, NULL);
-        if (fabs(back) > FLT_MAX || (float)back != (float)val)
+        if (fabs(back) > FLT_MAX || !same_float((float)back, (float)val))
             snprintf(buf, sizeof(buf), "%.17g", val);
     }
 
