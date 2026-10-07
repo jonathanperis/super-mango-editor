@@ -71,6 +71,6 @@ code moved; it is the same exactly-representable `{1, 2, 3, 5}` comparison as
 #82/#105. The two `cpp/poorly-documented-function` warnings (#123, #124) were
 fixed by documenting `editor_clamp_placement` and `editor_entity_array`.
 
-These findings are proposed for dismissal as false positives and await
-explicit maintainer authorization, as with the earlier rounds. No query or
-check is disabled.
+These eight findings (#122, #125–#131) were dismissed as false positives
+after explicit maintainer authorization on 2026-10-06, as in the earlier
+rounds. No query or check is disabled.
