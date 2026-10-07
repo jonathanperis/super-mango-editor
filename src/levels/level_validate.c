@@ -549,6 +549,26 @@ static int validate_checkpoints(const LevelDef *def, char *err, size_t err_size,
                                     0.0f, world_w - (float)TILE_SIZE);
         }
 
+        /*
+         * The player respawns in the TILE_SIZE-wide column starting at x and
+         * drops straight down. If that column touches a floor gap, the
+         * player can respawn straight into the water and lose a life on
+         * every respawn. Automatic checkpoints skip such columns
+         * (game_checkpoint.c); authored ones must avoid them too.
+         */
+        for (int g = 0; g < def->floor_gap_count; g++) {
+            float gap_x = (float)def->floor_gaps[g];
+            if (checkpoint->x < gap_x + (float)FLOOR_GAP_W &&
+                gap_x < checkpoint->x + (float)TILE_SIZE) {
+                if (err && err_size > 0) {
+                    snprintf(err, err_size,
+                             "%s respawn column overlaps floor_gaps[%d] at %d",
+                             field, g, def->floor_gaps[g]);
+                }
+                return -1;
+            }
+        }
+
         snprintf(field, sizeof(field), "checkpoints[%d].y", i);
         if (validate_world_y(err, err_size, field, checkpoint->y) != 0)
             return -1;

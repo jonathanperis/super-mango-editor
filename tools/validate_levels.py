@@ -976,6 +976,10 @@ def validate_checkpoints(level_path: Path, data: dict, constants: dict[str, int]
     ):
         start_x = ctypes.c_float(float(start_x_value)).value
     seen_x: set[float] = set()
+    gap_w = constants.get("FLOOR_GAP_W", 32)
+    raw_gaps = data.get("floor_gaps", [])
+    gaps = [gap for gap in raw_gaps if isinstance(gap, int) and not isinstance(gap, bool)] \
+        if isinstance(raw_gaps, list) else []
 
     for index, checkpoint in enumerate(checkpoints):
         path = f"{level_path.relative_to(ROOT)}: checkpoints[{index}]"
@@ -1005,6 +1009,11 @@ def validate_checkpoints(level_path: Path, data: dict, constants: dict[str, int]
             errors.append(f"{path}.x {x_value} out of range (0..{world_w - tile_size})")
         if y_value < 0 or y_value > 300:
             errors.append(f"{path}.y {y_value} out of range (0..300)")
+        # The player respawns in the tile-wide column at x; it must not
+        # touch a floor gap (level_validate.c, validate_checkpoints).
+        for gap_index, gap in enumerate(gaps):
+            if x_value < gap + gap_w and gap < x_value + tile_size:
+                errors.append(f"{path}.x respawn column overlaps floor_gaps[{gap_index}] at {gap}")
 
     return errors
 

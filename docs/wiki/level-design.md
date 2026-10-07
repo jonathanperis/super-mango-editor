@@ -81,7 +81,7 @@ y = 205.0
 | Rule | Requirement |
 |------|-------------|
 | Capacity | At most `MAX_CHECKPOINTS` (`99`) records. |
-| `x` | Finite, unique, strictly after the effective player-start x, and within `0..(screen_count × GAME_W − TILE_SIZE)`. |
+| `x` | Finite, unique, strictly after the effective player-start x, and within `0..(screen_count × GAME_W − TILE_SIZE)`. The respawn column `x..x + TILE_SIZE` must not overlap any floor gap. |
 | `y` | Finite and within `0..GAME_H`. |
 | Placement order | Kept as authored. It controls the editor/HUD checkpoint number; records do not need to be sorted by x. |
 
