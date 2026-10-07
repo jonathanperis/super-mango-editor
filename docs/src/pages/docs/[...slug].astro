@@ -4,6 +4,7 @@ import '../../styles/docs.css';
 import { DOCS_META, SECTION_CATEGORIES, SECTION_ORDER } from '@/lib/docsSidebar';
 import { getCollection, render } from 'astro:content';
 import Sprite from '@/components/Sprite.astro';
+import CategoryMark from '@/components/CategoryMark.astro';
 import { art } from '@/lib/art';
 
 // docs-drift sentinel: level-catalog
@@ -157,7 +158,7 @@ const coverStyle = [
                     <section class="manual-toc" aria-label="All manual pages">
                         {categoryCards.map((cat) => (
                             <div class="toc-group" data-doc-card data-search-text={`${cat.label} ${cat.description} ${cat.pages.map(p => `${p.label} ${p.description}`).join(' ')}`}>
-                                <h2>{cat.label}</h2>
+                                <h2><CategoryMark category={cat.label} />{cat.label}</h2>
                                 <p>{cat.description}</p>
                                 <ul>
                                     {cat.pages.map((page) => (

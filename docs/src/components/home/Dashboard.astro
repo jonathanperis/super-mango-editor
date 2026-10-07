@@ -10,28 +10,16 @@
  * #touch-controls and the [data-start-game] buttons.
  */
 import Sprite from '@/components/Sprite.astro';
+import CategoryMark from '@/components/CategoryMark.astro';
 import { art } from '@/lib/art';
 import { DOCS_META, SECTION_CATEGORIES } from '@/lib/docsSidebar';
 import facts from '../../generated/project.json';
 import gameLoopSource from '../../../../src/core/game_loop.c?raw';
+import { sourceExcerpt } from '@/lib/sourceExcerpt';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
-/* The "learn" excerpt is read from src/core/game_loop.c at build time, so the
- * site always shows the code that actually ships. A missing marker fails the
- * build instead of silently showing stale code. */
-function excerpt(source: string, startMarker: string, endMarker: string): string {
-    const marker = source.indexOf(startMarker);
-    const start = source.lastIndexOf('\n', marker) + 1;   /* include the indent */
-    const end = source.indexOf(endMarker, marker);
-    if (marker < 0 || end < 0) {
-        throw new Error(`game_loop.c excerpt markers not found: "${startMarker}" .. "${endMarker}"`);
-    }
-    const lines = source.slice(start, end).replace(/\s+$/, '').split('\n');
-    const indent = Math.min(...lines.filter(l => l.trim()).map(l => l.match(/^ */)![0].length));
-    return lines.map(l => l.slice(indent)).join('\n');
-}
-const loopExcerpt = excerpt(gameLoopSource, 'int steps = game_inspector_steps', '\n\n    /* ---- 4. Render');
+const loopExcerpt = sourceExcerpt('src/core/game_loop.c', gameLoopSource, 'int steps = game_inspector_steps', '\n\n    /* ---- 4. Render');
 
 const hud = [
     { sprite: art.lastStar, value: facts.levels, label: 'levels', note: `${facts.screens} screens to cross` },
@@ -181,7 +169,7 @@ const manualColumns = SECTION_CATEGORIES.map(category => ({
     <div class="manual-index">
         {manualColumns.map(column => (
             <div class="manual-column">
-                <h3>{column.label}</h3>
+                <h3><CategoryMark category={column.label} />{column.label}</h3>
                 <ul>
                     {column.pages.map(page => (
                         <li><a href={`${base}${page.route}`}>{page.label}</a></li>

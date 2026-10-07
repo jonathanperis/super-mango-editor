@@ -12,7 +12,10 @@ actions); Pixelify Sans is for headings and buttons, Atkinson Hyperlegible for
 reading, DM Mono only for code. Copy is first-person and specific: what the
 game is, why it was written, what you can learn, without status-panel jargon.
 The "learn" section shows a real excerpt of `src/core/game_loop.c`, read at
-build time so it cannot go stale. The manual shares the same tokens.
+build time so it cannot go stale. The manual shares the same tokens, and each
+manual category carries a small sprite (Mango, a saw blade, a spider, a star).
+The 404 is a tiny scene of its own: Mango walks off a ledge into the game's
+water strip, with the real floor-gap rule from the C source underneath.
 
 Everything below is the earlier plan, kept as a record.
 

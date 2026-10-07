@@ -147,6 +147,10 @@
     margin-top: 48px;
 }
 .toc-group h2 {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    min-height: 44px;   /* tallest mark (32 px) + padding + border: rules line up */
     padding-bottom: 8px;
     border-bottom: 3px solid var(--night-line);
     color: var(--leaf);

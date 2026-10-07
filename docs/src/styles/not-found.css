@@ -1,0 +1,105 @@
+/*
+ * The 404: the title-screen scene from home.css with the ground cut short.
+ * A grass ledge stops partway across, the water strip fills the bottom, and
+ * Mango walks off the edge into it, over and over.
+ *
+ * Without animation (reduced motion) the scene is a still: Mango mid-fall,
+ * just past the edge. The keyframes below replace that pose while they run.
+ */
+.lost-scene {
+    --ground-h: 96px;
+    --edge: 46%;
+    height: clamp(320px, 36vw, 420px);
+    isolation: isolate;   /* keep the layers' z-index inside the scene, under the dialog */
+}
+
+.lost-ledge {
+    position: absolute;
+    z-index: 3;
+    left: -32px;
+    right: calc(100% - var(--edge));
+    bottom: -32px;
+    height: calc(var(--ground-h) + 32px);
+    border-style: solid;
+    border-image: var(--grass) 16 fill / 32px repeat;
+    image-rendering: pixelated;
+}
+
+/* The water sits in front of Mango, like the fish in the game: he sinks
+ * behind it. It is one pattern period wider than the scene so it can scroll
+ * right by exactly one period and loop without a seam. */
+.lost-water {
+    position: absolute;
+    z-index: 2;
+    left: calc(-1 * var(--water-period));
+    bottom: 0;
+    width: calc(100% + var(--water-period));
+    image-rendering: pixelated;
+}
+
+/* The 48 px frame is 144 px at 3x and the art's feet sit 16 px (48 px here)
+ * above the frame bottom, so bottom: ground - 48px stands Mango on the grass,
+ * as on the home page. The still pose hangs him just past the edge. */
+.lost-mango {
+    position: absolute;
+    z-index: 1;
+    left: calc(var(--edge) - 60px);
+    bottom: calc(var(--ground-h) + 40px);
+    width: 144px;
+    height: 144px;
+}
+.lost-mango .sprite { position: absolute; inset: 0; }
+.lost-walk { opacity: 0; }
+
+@media (prefers-reduced-motion: no-preference) {
+    .lost-water { animation: water-scroll 3.2s linear infinite; }
+    .lost-mango { animation: walk-off 4.8s infinite; }
+    /* Keep the sprite's own frame cycle (globals.css) alongside the fade. */
+    .lost-walk {
+        animation:
+            sprite-frames var(--sprite-duration) steps(var(--sprite-frames)) infinite,
+            show-walk 4.8s steps(1, end) infinite;
+    }
+    .lost-fall { animation: show-fall 4.8s steps(1, end) infinite; }
+}
+
+/* WATER_SCROLL_SPEED is 40 px/s at 1x: one 128 px period every 3.2 s. */
+@keyframes water-scroll { to { translate: var(--water-period) 0; } }
+
+/* Walk to the edge (ground level), then fall: the fall segment eases in,
+ * so the drop speeds up the way gravity does. Hold below the water, reset. */
+@keyframes walk-off {
+    0% { left: calc(var(--edge) - 320px); bottom: calc(var(--ground-h) - 48px); animation-timing-function: linear; }
+    45% { left: calc(var(--edge) - 84px); bottom: calc(var(--ground-h) - 48px); animation-timing-function: ease-out; }
+    52% { left: calc(var(--edge) - 56px); bottom: calc(var(--ground-h) - 30px); animation-timing-function: ease-in; }
+    72% { left: calc(var(--edge) - 28px); bottom: -160px; }
+    100% { left: calc(var(--edge) - 28px); bottom: -160px; }
+}
+@keyframes show-walk { 0% { opacity: 1; } 45% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes show-fall { 0% { opacity: 0; } 45% { opacity: 1; } 100% { opacity: 1; } }
+
+/* Unlike the home page, the dialog does not overlap the scene: the splash
+ * happens right where it would sit. */
+.lost-screen .dialog-box { margin-top: 32px; }
+
+.lost-title {
+    color: var(--ink);
+    font: 600 clamp(1.35rem, 2.6vw, 1.75rem)/1.25 var(--font-display);
+}
+.lost-title span {
+    display: inline-block;
+    margin-right: 0.35em;
+    padding: 0.05em 0.35em 0.12em;
+    border: 3px solid #000;
+    background: var(--mango);
+    color: #1d0608;
+    box-shadow: 3px 3px 0 #000;
+}
+
+.lost-main { max-width: 860px; margin: 72px auto 96px; padding-inline: 24px; }
+
+@media (max-width: 600px) {
+    .lost-scene { --edge: 58%; height: 300px; }
+    .lost-screen .dialog-box { margin-top: 24px; }
+    .lost-main { margin-top: 56px; padding-inline: 12px; }
+}

@@ -1,0 +1,37 @@
+---
+/*
+ * A small sprite beside each manual category heading: Mango for the first
+ * steps, a saw blade (it looks like a gear) for the engine, a spider for the
+ * level builder, a star for the assets.
+ *
+ * Game frames carry transparent padding around the art, so each mark crops
+ * its frame to the art's bounds (x, y, w, h in source pixels, measured over
+ * every frame of the animation) to line up with the heading text.
+ * A category without a mark fails the build, so a new one gets its own.
+ */
+import Sprite from '@/components/Sprite.astro';
+import { art, type SpriteSheet } from '@/lib/art';
+
+interface Props {
+    category: string;
+}
+
+type Mark = { sheet: SpriteSheet; scale: number; frames?: number; fps?: number; crop: [number, number, number, number] };
+
+const MARKS: Record<string, Mark> = {
+    'Start Here': { sheet: art.player, scale: 2, frames: 4, fps: 6, crop: [16, 19, 16, 13] },
+    'Engine & Code': { sheet: art.saw, scale: 1, crop: [0, 0, 32, 32] },
+    'World Builder': { sheet: art.spider, scale: 2, frames: 3, fps: 7, crop: [20, 22, 25, 10] },
+    'Assets & Builds': { sheet: art.starYellow, scale: 2, crop: [2, 2, 12, 11] },
+};
+
+const { category } = Astro.props;
+const mark = MARKS[category];
+if (!mark) {
+    throw new Error(`CategoryMark: no sprite for manual category "${category}"`);
+}
+const [x, y, w, h] = mark.crop.map(n => n * mark.scale);
+---
+<span class="category-mark" style={`width:${w}px;height:${h}px;--crop-x:${-x}px;--crop-y:${-y}px`} aria-hidden="true">
+    <Sprite sheet={mark.sheet} scale={mark.scale} frames={mark.frames} fps={mark.fps} />
+</span>

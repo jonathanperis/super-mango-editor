@@ -6,12 +6,15 @@ interface Props {
     title?: string;
     description?: string;
     pageType?: 'game' | 'docs';
+    /* Pages with no address of their own (the 404) stay out of search results. */
+    noindex?: boolean;
 }
 
 const {
     title = "Super Mango — Platformer, Level Editor & Sandbox School",
     description = "Play a C11 + raylib platformer in your browser, build TOML worlds with the native visual editor, and learn game development through Sandbox School.",
     pageType = 'game',
+    noindex = false,
 } = Astro.props;
 
 const basePath = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
@@ -55,12 +58,13 @@ const jsonLd = pageType === 'docs' ? {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#0f0e17" />
         <meta name="description" content={description} />
+        {noindex && <meta name="robots" content="noindex" />}
         <meta name="keywords" content="Super Mango, platformer, 2D game, pixel art, raylib, C11, WebAssembly, indie game, side-scroller, open source, game development" />
 
         <meta property="og:type" content="website" />
         <meta property="og:title" content={title} />
         <meta property="og:description" content={description} />
-        <meta property="og:url" content={canonicalUrl} />
+        {!noindex && <meta property="og:url" content={canonicalUrl} />}
         <meta property="og:site_name" content="Super Mango" />
         <meta property="og:locale" content="en_US" />
 
@@ -69,7 +73,7 @@ const jsonLd = pageType === 'docs' ? {
         <meta name="twitter:description" content={description} />
         <meta name="twitter:creator" content="@jperis_silva" />
 
-        <link rel="canonical" href={canonicalUrl} />
+        {!noindex && <link rel="canonical" href={canonicalUrl} />}
         <link rel="icon" href={faviconHref} sizes="any" />
         <link rel="icon" type="image/png" href={faviconPngHref} />
         <link rel="icon" type="image/png" sizes="32x32" href={favicon32Href} />
@@ -89,7 +93,7 @@ const jsonLd = pageType === 'docs' ? {
             whose profile lives in this origin's localStorage. Docs pages only. */}
         {pageType !== 'game' && <Analytics />}
 
-        <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+        {!noindex && <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
     </head>
     <body>
         <slot />
