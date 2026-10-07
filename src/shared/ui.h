@@ -71,6 +71,7 @@ typedef struct {
     /* Limits of the active integer field. Every commit path (Return, or the
      * editor applying a staged edit before another command) clamps to them. */
     int edit_int_min, edit_int_max, edit_int_step;
+    float edit_float_min, edit_float_max;   /* same, for a float field */
     int dropdown_open_id;      /* zero = closed; otherwise the stable widget ID */
     /* A press while a list is open belongs to that list alone (ui_press), so
      * it can never reach a widget or the canvas drawn underneath the list. */
@@ -125,6 +126,9 @@ int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value);
 int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
                          int min, int max, int step);
 int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value);
+/* Like ui_float_field, but a committed value is clamped to [min, max]. */
+int ui_float_field_limited(UIState *ui, int id, int x, int y, int w,
+                           float *value, float min, float max);
 /* buf_size includes the final NUL byte. Paste/backspace preserve UTF-8 units. */
 int ui_text_field(UIState *ui, int id, int x, int y, int w, char *buf, int buf_size);
 /* Open/close the option list on click; update *selected and return 1 only

@@ -152,7 +152,11 @@ marker, and place or delete Floor Gap entities. A floor gap's `x` field rounds
 to the 16 px floor-piece grid.
 
 Number fields with a range clamp the value however the edit ends: Return, or
-choosing Apply when another click finishes the edit.
+choosing Apply when another click finishes the edit. A bouncepad's `launch_vy`
+is kept at least as strong as a jump, a rail rider's `speed` above 0 and at
+most the rail speed limit, and an enemy's patrol range at least as wide as its
+sprite. Switching a float platform to Rail gives it a speed of 3 if it had
+none.
 
 A dropdown whose current value is not one of its options (a path typed into
 the TOML by hand) shows `---`, and any option can then be picked. While a
