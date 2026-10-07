@@ -182,12 +182,36 @@ void editor_refresh_dirty(EditorState *es)
     editor_update_window_title(es);
 }
 
+/*
+ * editor_restore_change_tracking — Re-arm the change tracking a panel had
+ * set up before editor_finish_field_edit borrowed it.
+ *
+ * Panels arm tracking while they draw their widgets.  When a button or
+ * dropdown in that panel asks to finish a field edit first, the field's
+ * commit uses (and ends) that tracking.  Re-arming it afterwards, with no
+ * snapshot pending, lets the command that asked (a layer "+ Add", say) take
+ * its own before-snapshot and become its own undo step.
+ */
+static void editor_restore_change_tracking(EditorState *es, int kind,
+                                           UIBeforeChangeFn before_change,
+                                           void *context)
+{
+    editor_end_change_tracking(es);
+    if (kind == 0) return;
+    editor_begin_change_tracking(es, kind);
+    es->ui.before_change = before_change;
+    es->ui.before_change_context = context;
+}
+
 int editor_finish_field_edit(EditorState *es)
 {
     const char *buttons[] = {"Block", "Apply", "Discard"};
     int button_id = 0;
     int result;
     int kind;
+    int outer_kind;
+    UIBeforeChangeFn outer_before_change;
+    void *outer_context;
 
     if (!es || es->ui.active_id == 0) return 1;
 
@@ -203,9 +227,13 @@ int editor_finish_field_edit(EditorState *es)
         editor_set_status(es, "Command blocked: field edit remains active");
         return 0;
     }
+    outer_kind = es->change_tracking_kind;
+    outer_before_change = es->ui.before_change;
+    outer_context = es->ui.before_change_context;
     if (button_id == 2) {
         ui_cancel_active_edit(&es->ui);
-        editor_end_change_tracking(es);
+        editor_restore_change_tracking(es, outer_kind, outer_before_change,
+                                       outer_context);
         return 1;
     }
 
@@ -215,13 +243,13 @@ int editor_finish_field_edit(EditorState *es)
     es->ui.before_change = editor_before_change;
     es->ui.before_change_context = es;
     result = ui_apply_active_edit(&es->ui);
+    if (result == 2) editor_commit_change(es);
+    editor_restore_change_tracking(es, outer_kind, outer_before_change,
+                                   outer_context);
     if (result == 0) {
-        editor_end_change_tracking(es);
         editor_set_status(es, "Command blocked: invalid field value");
         return 0;
     }
-    if (result == 2) editor_commit_change(es);
-    editor_end_change_tracking(es);
     return 1;
 }
 

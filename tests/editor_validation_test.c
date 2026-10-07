@@ -3289,6 +3289,88 @@ static void config_frame(EditorState *es, const char *text, int click,
     level_config_render(es, TOOLBAR_H, EDITOR_H - TOOLBAR_H, EDITOR_H - TOOLBAR_H);
 }
 
+static int redo_last(EditorState *es)
+{
+    Command cmd;
+    if (!redo_pop(es->undo, &cmd)) return 1;
+    editor_apply_undo_command(es, &cmd, 0);
+    return 0;
+}
+
+/*
+ * Clicking a layer button while a field is mid-edit first finishes that
+ * edit.  The button must still be its own undo step, mark the document
+ * modified and refresh the preview, whether the edit is applied or
+ * discarded.
+ */
+static int layer_buttons_record_their_own_undo_step(void)
+{
+    EditorWidgetTestContext context;
+    EditorState es;
+    char root[EDITOR_PATH_MAX] = {0};
+    const int add_x = CFG_X + 20, remove_x = CFG_X + 120;
+    int result = 1;
+
+    if (editor_widget_test_context_init(&context) != 0) {
+        editor_widget_test_context_cleanup(&context);
+        return 1;
+    }
+    g_plx_open = 1;
+    if (config_state_init(&es, context.font, root, sizeof(root)) != 0) goto done;
+
+    /* Baseline: "+ Add" with no field active adds one undoable layer. */
+    config_frame(&es, NULL, 1, add_x, CFG_FIRST_LAYER_Y + 5);
+    if (expect_int("plain add layer", es.level.background_layer_count, 1) != 0 ||
+        expect_int("plain add undo", es.undo->top, 1) != 0 ||
+        expect_int("plain add modified", es.modified, 1) != 0 ||
+        undo_last(&es) != 0 ||
+        expect_int("plain add undone", es.level.background_layer_count, 0) != 0 ||
+        expect_int("plain add clean", es.modified, 0) != 0) goto done;
+
+    /* Name mid-edit, then "+ Add", choosing Apply: two separate steps. */
+    config_frame(&es, NULL, 1, CFG_X + 60, CFG_NAME_Y + 4);
+    config_frame(&es, "2", 0, CFG_X + 60, CFG_NAME_Y + 4);
+    if (expect_int("name field active", es.ui.active_id, 9000) != 0) goto done;
+    editor_test_set_finish_field_choice(1);
+    config_frame(&es, NULL, 1, add_x, CFG_FIRST_LAYER_Y + 5);
+    if (expect_string("applied name", es.level.name, "Untitled2") != 0 ||
+        expect_int("applied add layer", es.level.background_layer_count, 1) != 0 ||
+        expect_int("name and layer are two steps", es.undo->top, 2) != 0 ||
+        expect_int("applied add modified", es.modified, 1) != 0 ||
+        expect_int("sky preview refreshed", es.textures.sky != NULL, 1) != 0)
+        goto done;
+    if (undo_last(&es) != 0 ||
+        expect_int("undo removes only the layer", es.level.background_layer_count, 0) != 0 ||
+        expect_string("undo keeps the name", es.level.name, "Untitled2") != 0 ||
+        undo_last(&es) != 0 ||
+        expect_string("second undo restores the name", es.level.name, "Untitled") != 0 ||
+        redo_last(&es) != 0 || redo_last(&es) != 0 ||
+        expect_int("redo restores the layer", es.level.background_layer_count, 1) != 0 ||
+        expect_string("redo restores the name", es.level.name, "Untitled2") != 0)
+        goto done;
+
+    /* Name mid-edit, then "- Remove Last", choosing Discard. */
+    config_frame(&es, NULL, 1, CFG_X + 60, CFG_NAME_Y + 4);
+    config_frame(&es, "X", 0, CFG_X + 60, CFG_NAME_Y + 4);
+    editor_test_set_finish_field_choice(2);
+    config_frame(&es, NULL, 1, remove_x, CFG_FIRST_LAYER_Y + 20 + 5);
+    if (expect_string("discarded name", es.level.name, "Untitled2") != 0 ||
+        expect_int("discard remove layer", es.level.background_layer_count, 0) != 0 ||
+        expect_int("discard remove undo", es.undo->top, 3) != 0 ||
+        expect_int("discard remove modified", es.modified, 1) != 0 ||
+        expect_int("sky preview cleared", es.textures.sky == NULL, 1) != 0 ||
+        undo_last(&es) != 0 ||
+        expect_int("undo restores removed layer", es.level.background_layer_count, 1) != 0)
+        goto done;
+    result = 0;
+
+done:
+    g_plx_open = 0;
+    config_state_cleanup(&es, root);
+    editor_widget_test_context_cleanup(&context);
+    return result;
+}
+
 /*
  * An open dropdown list owns the next press: it must not also place on the
  * canvas or reach a widget drawn under the list, before or after it.  A
@@ -3570,6 +3652,7 @@ int main(void)
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;
     if (display_paths_keep_the_file_name() != 0) return 1;
+    if (layer_buttons_record_their_own_undo_step() != 0) return 1;
     if (open_dropdown_owns_the_next_click() != 0) return 1;
     if (dropdowns_accept_any_option_for_unknown_values() != 0) return 1;
     if (extreme_floats_round_trip_through_save() != 0) return 1;
