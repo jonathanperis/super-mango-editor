@@ -3461,6 +3461,89 @@ done:
     return result;
 }
 
+/* One editor frame of the entity properties panel placed at PROPS_Y. */
+#define PROPS_Y        (TOOLBAR_H + 100)
+#define PROPS_ROW(n)   (PROPS_Y + 36 + (n) * 24 + 4)  /* n-th field row */
+#define PROPS_FIELD_X  (CFG_X + 8 + 80 + 10)
+static void props_frame(EditorState *es, int click, int row_y)
+{
+    ui_begin_frame(&es->ui);
+    if (click) (void)ui_press(&es->ui);
+    es->ui.mouse_x = PROPS_FIELD_X;
+    es->ui.mouse_y = row_y;
+    properties_render(es, PROPS_Y, 300);
+}
+
+/* Type text into the property field on row_y and press Return. */
+static void props_type(EditorState *es, int row_y, const char *text)
+{
+    props_frame(es, 1, row_y);
+    strcpy(es->ui.edit_buf, text);
+    es->ui.edit_cursor = (int)strlen(text);
+    ui_begin_frame(&es->ui);
+    es->ui.key_return = 1;
+    properties_render(es, PROPS_Y, 300);
+}
+
+/*
+ * Property fields keep motion values inside the validator's limits, and
+ * switching a float platform to Rail gives it a usable speed.
+ */
+static int motion_fields_stay_within_validator_limits(void)
+{
+    EditorWidgetTestContext context;
+    EditorState es;
+    int result = 1;
+
+    if (editor_widget_test_context_init(&context) != 0) {
+        editor_widget_test_context_cleanup(&context);
+        return 1;
+    }
+    if (config_state_init(&es, context.font, NULL, 0) != 0) goto done;
+    es.panel_open = 1;
+    es.level.rail_count = 1;
+    es.level.rails[0] = (RailPlacement){RAIL_LAYOUT_RECT, 32, 32, 4, 4, 0};
+    es.level.float_platform_count = 1;
+    es.level.float_platforms[0] = (FloatPlatformPlacement){
+        FLOAT_PLATFORM_STATIC, 100.0f, 100.0f, 3, 0, 0.0f, 0.0f};
+    es.level.bouncepad_small_count = 1;
+    es.level.bouncepads_small[0] = (BouncepadPlacement){200.0f, -380.0f, BOUNCEPAD_GREEN};
+    es.level.spider_count = 1;
+    es.level.spiders[0] = (SpiderPlacement){300.0f, 50.0f, 250.0f, 350.0f, 0};
+
+    /* Float platform: mode Static -> Rail (third option). */
+    es.selection.type = ENT_FLOAT_PLATFORM;
+    es.selection.index = 0;
+    props_frame(&es, 1, PROPS_ROW(0));
+    props_frame(&es, 1, PROPS_ROW(0) + 20 * 3);
+    if (expect_int("platform now rides a rail", es.level.float_platforms[0].mode,
+                   FLOAT_PLATFORM_RAIL) != 0 ||
+        expect_float_value("rail platform speed", es.level.float_platforms[0].speed,
+                           3.0f) != 0) goto done;
+    props_type(&es, PROPS_ROW(6), "999");
+    if (expect_float_value("rail speed capped", es.level.float_platforms[0].speed,
+                           30.0f) != 0) goto done;
+
+    /* Bouncepad: a launch weaker than a jump is raised to the jump. */
+    es.selection.type = ENT_BOUNCEPAD_SMALL;
+    props_type(&es, PROPS_ROW(2), "-100");
+    if (expect_float_value("launch at least a jump",
+                           es.level.bouncepads_small[0].launch_vy, -325.0f) != 0)
+        goto done;
+
+    /* Spider: the patrol range cannot get narrower than the sprite. */
+    es.selection.type = ENT_SPIDER;
+    props_type(&es, PROPS_ROW(3), "260");
+    if (expect_float_value("patrol_x1 keeps a sprite width",
+                           es.level.spiders[0].patrol_x1, 314.0f) != 0) goto done;
+    result = 0;
+
+done:
+    config_state_cleanup(&es, NULL);
+    editor_widget_test_context_cleanup(&context);
+    return result;
+}
+
 /*
  * An open dropdown list owns the next press: it must not also place on the
  * canvas or reach a widget drawn under the list, before or after it.  A
@@ -3851,6 +3934,7 @@ int main(void)
     if (display_paths_keep_the_file_name() != 0) return 1;
     if (layer_buttons_record_their_own_undo_step() != 0) return 1;
     if (field_limits_apply_on_every_commit_path() != 0) return 1;
+    if (motion_fields_stay_within_validator_limits() != 0) return 1;
     if (open_dropdown_owns_the_next_click() != 0) return 1;
     if (dropdowns_accept_any_option_for_unknown_values() != 0) return 1;
     if (new_level_resets_previews() != 0) return 1;

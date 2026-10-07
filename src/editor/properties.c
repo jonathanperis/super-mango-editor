@@ -15,6 +15,7 @@
  * to track which widget is actively being edited.
  */
 
+#include <float.h>      /* FLT_MAX for one-sided field limits    */
 #include <stdio.h>      /* snprintf for header label formatting */
 #include <string.h>     /* strrchr for filename extraction       */
 
@@ -26,6 +27,8 @@
 #include "../shared/ui.h" /* ui_panel, ui_label, ui_separator, ui_float_field,
                            ui_int_field, ui_dropdown                         */
 #include "../levels/level.h" /* LevelDef, all *Placement structs            */
+#include "../player/player.h"  /* JUMP_VY (bouncepad launch limit)           */
+#include "../surfaces/rail.h"  /* MAX_RAIL_SPEED (rail rider speed limit)    */
 
 /* ------------------------------------------------------------------ */
 /* Layout constants                                                    */
@@ -125,12 +128,22 @@ static const char *vine_type_opts[] = { "Green", "Brown" };
 #define FIELD_ID(type, field)  ((int)(type) * 100 + (field) + 1)
 
 /*
- * FLOOR_PIECE_W — the floor is drawn from 16 px pieces (a third of a tile),
- * so a gap edge must fall on that grid or the floor beside it is cut
- * mid-piece.  Placing and dragging already keep gaps on the grid; the x
- * field rounds typed values to it too.
+ * Limits the level validator puts on a few fields.  The fields clamp typed
+ * values to them, so an edit cannot turn a valid level into one that
+ * refuses to save:
+ *
+ *   floor gap x — rounded to FLOOR_PIECE_W (game.h): the floor is drawn in
+ *                 16 px pieces, so a gap edge must fall on that grid.
+ *   launch_vy   — a bouncepad must launch at least as hard as a jump, so at
+ *                 most JUMP_VY (player.h; negative is up).
+ *   rail speed  — spike blocks and rail-mode float platforms move along
+ *                 their rail at more than 0 and at most MAX_RAIL_SPEED
+ *                 tiles/s (rail.h); RAIL_SPEED_MIN stands in for "more
+ *                 than 0".
  */
-#define FLOOR_PIECE_W  (TILE_SIZE / 3)
+#define BOUNCE_LAUNCH_VY_MAX  JUMP_VY
+#define RAIL_SPEED_MIN        0.1f
+#define RAIL_SPEED_DEFAULT    3.0f   /* same as a newly placed spike block */
 
 /*
  * option_index — Position of value in a dropdown's paths, or -1.
@@ -442,14 +455,16 @@ static void draw_spider_properties(EditorState *es, int y)
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 2),
-                       FIELD_X, y, FIELD_W, &p->patrol_x0))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_SPIDER, 2),
+                               FIELD_X, y, FIELD_W, &p->patrol_x0,
+                               -FLT_MAX, p->patrol_x1 - SPIDER_FRAME_W))
         editor_commit_change(es);
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 3),
-                       FIELD_X, y, FIELD_W, &p->patrol_x1))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_SPIDER, 3),
+                               FIELD_X, y, FIELD_W, &p->patrol_x1,
+                               p->patrol_x0 + SPIDER_FRAME_W, FLT_MAX))
         editor_commit_change(es);
     y += ROW_H;
 
@@ -478,14 +493,16 @@ static void draw_jumping_spider_properties(EditorState *es, int y)
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 2),
-                       FIELD_X, y, FIELD_W, &p->patrol_x0))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 2),
+                               FIELD_X, y, FIELD_W, &p->patrol_x0,
+                               -FLT_MAX, p->patrol_x1 - SPIDER_FRAME_W))
         editor_commit_change(es);
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 3),
-                       FIELD_X, y, FIELD_W, &p->patrol_x1))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 3),
+                               FIELD_X, y, FIELD_W, &p->patrol_x1,
+                               p->patrol_x0 + SPIDER_FRAME_W, FLT_MAX))
         editor_commit_change(es);
 }
 
@@ -513,14 +530,16 @@ static void draw_bird_properties(EditorState *es, int y)
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 3),
-                       FIELD_X, y, FIELD_W, &p->patrol_x0))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_BIRD, 3),
+                               FIELD_X, y, FIELD_W, &p->patrol_x0,
+                               -FLT_MAX, p->patrol_x1 - BIRD_FRAME_W))
         editor_commit_change(es);
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 4),
-                       FIELD_X, y, FIELD_W, &p->patrol_x1))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_BIRD, 4),
+                               FIELD_X, y, FIELD_W, &p->patrol_x1,
+                               p->patrol_x0 + BIRD_FRAME_W, FLT_MAX))
         editor_commit_change(es);
     y += ROW_H;
 
@@ -558,14 +577,16 @@ static void draw_faster_bird_properties(EditorState *es, int y)
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 3),
-                       FIELD_X, y, FIELD_W, &p->patrol_x0))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 3),
+                               FIELD_X, y, FIELD_W, &p->patrol_x0,
+                               -FLT_MAX, p->patrol_x1 - BIRD_FRAME_W))
         editor_commit_change(es);
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 4),
-                       FIELD_X, y, FIELD_W, &p->patrol_x1))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 4),
+                               FIELD_X, y, FIELD_W, &p->patrol_x1,
+                               p->patrol_x0 + BIRD_FRAME_W, FLT_MAX))
         editor_commit_change(es);
     y += ROW_H;
 
@@ -593,14 +614,16 @@ static void draw_fish_properties(EditorState *es, int y)
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 2),
-                       FIELD_X, y, FIELD_W, &p->patrol_x0))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FISH, 2),
+                               FIELD_X, y, FIELD_W, &p->patrol_x0,
+                               -FLT_MAX, p->patrol_x1 - FISH_FRAME_W))
         editor_commit_change(es);
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 3),
-                       FIELD_X, y, FIELD_W, &p->patrol_x1))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FISH, 3),
+                               FIELD_X, y, FIELD_W, &p->patrol_x1,
+                               p->patrol_x0 + FISH_FRAME_W, FLT_MAX))
         editor_commit_change(es);
 }
 
@@ -626,14 +649,16 @@ static void draw_faster_fish_properties(EditorState *es, int y)
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 2),
-                       FIELD_X, y, FIELD_W, &p->patrol_x0))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FASTER_FISH, 2),
+                               FIELD_X, y, FIELD_W, &p->patrol_x0,
+                               -FLT_MAX, p->patrol_x1 - FISH_FRAME_W))
         editor_commit_change(es);
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 3),
-                       FIELD_X, y, FIELD_W, &p->patrol_x1))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FASTER_FISH, 3),
+                               FIELD_X, y, FIELD_W, &p->patrol_x1,
+                               p->patrol_x0 + FISH_FRAME_W, FLT_MAX))
         editor_commit_change(es);
 }
 
@@ -761,8 +786,9 @@ static void draw_spike_block_properties(EditorState *es, int y)
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "speed:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 2),
-                       FIELD_X, y, FIELD_W, &p->speed))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 2),
+                               FIELD_X, y, FIELD_W, &p->speed,
+                               RAIL_SPEED_MIN, MAX_RAIL_SPEED))
         editor_commit_change(es);
 }
 
@@ -806,6 +832,11 @@ static void draw_float_platform_properties(EditorState *es, int y)
                     FIELD_X, y, FIELD_W,
                     fplat_mode_opts, 3, &mode_sel)) {
         p->mode = (FloatPlatformMode)mode_sel;
+        /* Static and crumbling platforms are placed with speed 0, which a
+         * rail rider may not have; give it a speed it can save with. */
+        if (p->mode == FLOAT_PLATFORM_RAIL &&
+            !(p->speed >= RAIL_SPEED_MIN && p->speed <= MAX_RAIL_SPEED))
+            p->speed = RAIL_SPEED_DEFAULT;
         editor_commit_change(es);
     }
     y += ROW_H;
@@ -841,8 +872,11 @@ static void draw_float_platform_properties(EditorState *es, int y)
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "speed:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 6),
-                       FIELD_X, y, FIELD_W, &p->speed))
+    /* Only a rail rider's speed has to lie in the rail range. */
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 6),
+                               FIELD_X, y, FIELD_W, &p->speed,
+                               p->mode == FLOAT_PLATFORM_RAIL ? RAIL_SPEED_MIN : -FLT_MAX,
+                               p->mode == FLOAT_PLATFORM_RAIL ? MAX_RAIL_SPEED : FLT_MAX))
         editor_commit_change(es);
 }
 
@@ -889,8 +923,9 @@ static void draw_bouncepad_small_properties(EditorState *es, int y)
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_SMALL, 1),
-                       FIELD_X, y, FIELD_W, &p->launch_vy))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_BOUNCEPAD_SMALL, 1),
+                               FIELD_X, y, FIELD_W, &p->launch_vy,
+                               -MAX_LEVEL_MOTION, BOUNCE_LAUNCH_VY_MAX))
         editor_commit_change(es);
 }
 
@@ -910,8 +945,9 @@ static void draw_bouncepad_medium_properties(EditorState *es, int y)
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_MEDIUM, 1),
-                       FIELD_X, y, FIELD_W, &p->launch_vy))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_BOUNCEPAD_MEDIUM, 1),
+                               FIELD_X, y, FIELD_W, &p->launch_vy,
+                               -MAX_LEVEL_MOTION, BOUNCE_LAUNCH_VY_MAX))
         editor_commit_change(es);
 }
 
@@ -931,8 +967,9 @@ static void draw_bouncepad_high_properties(EditorState *es, int y)
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_HIGH, 1),
-                       FIELD_X, y, FIELD_W, &p->launch_vy))
+    if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_BOUNCEPAD_HIGH, 1),
+                               FIELD_X, y, FIELD_W, &p->launch_vy,
+                               -MAX_LEVEL_MOTION, BOUNCE_LAUNCH_VY_MAX))
         editor_commit_change(es);
 }
 

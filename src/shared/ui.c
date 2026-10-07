@@ -21,6 +21,7 @@
 #include <string.h>    /* strlen, strncpy, memset                                  */
 #include <stdlib.h>    /* strtol, strtof                                           */
 #include <errno.h>     /* errno, ERANGE                                             */
+#include <float.h>     /* FLT_MAX                                                   */
 #include <limits.h>    /* INT_MIN, INT_MAX                                           */
 #include <math.h>      /* isfinite                                                   */
 
@@ -131,6 +132,8 @@ static void clear_active_edit(UIState *ui)
     ui->edit_int_min = INT_MIN;
     ui->edit_int_max = INT_MAX;
     ui->edit_int_step = 1;
+    ui->edit_float_min = -FLT_MAX;
+    ui->edit_float_max = FLT_MAX;
     ui->edit_cursor = 0;
     ui->edit_buf[0] = '\0';
     ui->pending_text_length = 0;
@@ -218,6 +221,12 @@ int ui_apply_active_edit(UIState *ui)
         float value;
         float *target = (float *)ui->edit_target;
         if (!parse_float_value(ui->edit_buf, &value)) return 0;
+        /* As for integers: limits apply to a value the user changed. */
+        if (memcmp(&value, target, sizeof(value)) != 0 &&
+            ui->edit_float_min <= ui->edit_float_max) {
+            if (value < ui->edit_float_min) value = ui->edit_float_min;
+            if (value > ui->edit_float_max) value = ui->edit_float_max;
+        }
         /* "Did the stored value change?" is a question about the stored
          * bits, not about numbers being close: any edit, however small, is
          * a change worth an undo step. Comparing the bytes says exactly that
@@ -655,6 +664,12 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
  */
 int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value)
 {
+    return ui_float_field_limited(ui, id, x, y, w, value, -FLT_MAX, FLT_MAX);
+}
+
+int ui_float_field_limited(UIState *ui, int id, int x, int y, int w,
+                           float *value, float min, float max)
+{
     int h         = 20;
     int is_active = (ui->active_id == id);
     int changed   = 0;
@@ -673,6 +688,8 @@ int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value)
         ui->edit_type = UI_EDIT_FLOAT;
         ui->edit_target = value;
         ui->edit_target_size = sizeof(*value);
+        ui->edit_float_min = min;
+        ui->edit_float_max = max;
         /*
          * Keep enough significant digits for a float to survive activation
          * and a no-op Return unchanged.
