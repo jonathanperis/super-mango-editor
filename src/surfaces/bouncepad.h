@@ -19,9 +19,6 @@
 /* Constants                                                           */
 /* ------------------------------------------------------------------ */
 
-/* Maximum bouncepad instances the game can hold simultaneously. */
-#define MAX_BOUNCEPADS   4
-
 /* Display size of one bouncepad frame in logical pixels. */
 #define BOUNCEPAD_W      48
 #define BOUNCEPAD_H      48

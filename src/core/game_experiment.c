@@ -1,7 +1,7 @@
 /* Experiments record simulation steps, not wall-clock frames. Pauses therefore
- * do not consume tape; each step carries its own dt, semantic input and tuning.
- * New recordings always store GAME_FIXED_STEP; older captures made with a
- * variable dt in (0, 0.1] still load and replay with their recorded steps.
+ * do not consume tape; each row holds one fixed GAME_FIXED_STEP step's semantic
+ * input and movement tuning (format_version 2). Version 1 captures came from
+ * the variable-timestep engine and are refused with a "record it again" error.
  * Replays require unchanged level bytes and the same engine version. */
 #include "game_experiment.h"
 #include "../shared/platform.h"  /* clock_millis, str_copy */
