@@ -2,6 +2,19 @@
 
 <a id="home"></a>
 
+On this page: [`game.h`](#gameh-constants) · [Player](#player-constants) ·
+[Animation tables](#animation-tables-in-player_animationc) ·
+[Movement defaults](#movement-defaults-in-player_lifecyclec) ·
+[Jump and climb](#jump--climb-constants) · [Audio](#audio-units-and-voice-limit) ·
+[Derived values](#derived-values-quick-reference)
+
+Per header: [`axe_trap.h`](#axe_traph-constants) · [`bird.h`](#birdh-constants) · [`blue_flame.h`](#blue_flameh-constants) · [`bouncepad.h`](#bouncepadh-constants) · [`bridge.h`](#bridgeh-constants) · [`circular_saw.h`](#circular_sawh-constants) · [`coin.h`](#coinh-constants) · [`debug.h`](#debugh-constants) · [`faster_bird.h`](#faster_birdh-constants) · [`faster_fish.h`](#faster_fishh-constants) · [`fish.h`](#fishh-constants) · [`float_platform.h`](#float_platformh-constants) · [`fog.h`](#fogh-constants) · [`health_star.h`](#health_starh-constants) · [`hud.h`](#hudh-constants) · [`jumping_spider.h`](#jumping_spiderh-constants) · [`ladder.h`](#ladderh-constants) · [`last_star.h`](#last_starh-constants) · [`parallax.h`](#parallaxh-constants) · [`platform.h`](#platformh-constants) · [`rail.h`](#railh-constants) · [`rope.h`](#ropeh-constants) · [`spider.h`](#spiderh-constants) · [`spike.h`](#spikeh-constants) · [`spike_block.h`](#spike_blockh-constants) · [`spike_platform.h`](#spike_platformh-constants) · [`vine.h`](#vineh-constants) · [`water.h`](#waterh-constants) ·
+[bouncepad variants](#bouncepad_smallh--bouncepad_mediumh--bouncepad_highh-constants)
+
+`make docs-drift` checks every value in the tables below against the
+`#define` in `src/`, so a changed constant fails the check until this page
+is updated.
+
 ---
 
 A curated reference for gameplay-facing compile-time constants in the codebase. Some local helper constants live beside their implementation and are intentionally summarized rather than exhaustively duplicated here.
