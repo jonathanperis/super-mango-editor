@@ -34,9 +34,9 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 | [Entities & Hazards](entities-and-hazards/) | All 6 enemy types and 7 hazard types: behaviour, constants, TOML placement |
 | [Collectibles & Surfaces](collectibles-and-surfaces/) | Coins, stars, bouncepads, rails, float platforms, climbable surfaces |
 | [Assets](assets/) | All sprite sheets, tilesets, and generated sounds in `assets/`; text uses raylib's built-in font |
-| [Sounds](sounds/) | All audio files in `assets/sounds/` |
+| [Sounds](sounds/) | The 12 generated WAVs in `assets/sounds/` and how the game plays them |
 | [Asset Inventory](asset-inventory/) | Generated raw asset sizes and budget |
-| [Asset Provenance](asset-provenance/) | Third-party notices and unresolved media license records |
+| [Asset Provenance](asset-provenance/) | Code, artwork, audio and font license records |
 | [Level Catalog](level-catalog/) | Generated inventory of every stage selected by the v1 campaign manifest, its progression link, and content count |
 | [Overlay Snapshots](overlay-snapshots/) | Generated text snapshots for pause and terminal overlays |
 
@@ -80,7 +80,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 |------|--------|
 | Language | C11 |
 | Compiler | `clang` recommended for CI/local parity; `gcc` compatible |
-| Window size | 800 × 600 px (OS window) |
+| Window size | 800 × 600 px OS window by default (native settings scale the canvas 1×–4×) |
 | Logical canvas | 400 × 300 px (2× pixel scale) |
 | Target FPS | 60 |
 | Audio | raylib/miniaudio-negotiated device format; decoded effects and streamed WAV music |
