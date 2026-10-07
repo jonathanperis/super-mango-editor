@@ -39,7 +39,9 @@ unsigned int game_input_sample(GameState *gs);
 /* Forget a controller latch when its device disappears. */
 void game_input_clear_controller_latch(GameState *gs);
 
-/* Narrow deterministic seam used by input/session tests; production leaves it off. */
+#ifdef MANGO_TESTING
+/* Narrow deterministic seam used by input/session tests (test builds only). */
 void game_input_test_set_physical_state(unsigned int keyboard_mask,
                                          unsigned int controller_mask);
 void game_input_test_clear_physical_state(void);
+#endif

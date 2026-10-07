@@ -47,8 +47,12 @@ typedef enum {
 /* Ask how to handle a source changed on disk. */
 EditorExternalChoice editor_confirm_external_change(EditorState *es);
 
-/* Native-dialog seams used by focused editor state tests. */
+#ifdef MANGO_TESTING
+/* Native-dialog seams used by focused editor state tests.  Only test builds
+ * define MANGO_TESTING (see TEST_CFLAGS in the Makefile), so the shipped
+ * editor has no way to skip a confirmation dialog. */
 void editor_test_set_finish_field_choice(int button_id);
 void editor_test_set_discard_choice(int button_id);
 void editor_test_set_overwrite_choice(int button_id);
 void editor_test_set_external_choice(EditorExternalChoice choice);
+#endif

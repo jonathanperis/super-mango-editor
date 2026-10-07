@@ -80,6 +80,8 @@ int dialog_zenity_selection(int exit_code, const char *output,
  */
 int file_dialog_read_path(FILE *fp, char *buf, int buf_size);
 
-/* Deterministic picker seam used by editor workflow tests. */
+#ifdef MANGO_TESTING
+/* Deterministic picker seam used by editor workflow tests (test builds only). */
 void file_dialog_test_set_open_result(int result, const char *path);
 void file_dialog_test_set_save_result(int result, const char *path);
+#endif

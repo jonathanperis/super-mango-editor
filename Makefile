@@ -39,8 +39,10 @@ MODE_LDFLAGS_release = $(HARDEN_LDFLAGS)
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(MODE_FLAGS_$(BUILD_MODE)) -I$(RAYLIB_BUILD)/build/raylib/include $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_RAYLIB_MEMORY,) $(EXTRA_CFLAGS)
 # Tests write scratch files under their own OUTDIR (tests/test_paths.h), so
 # test, sanitize and coverage trees can run side by side in one checkout.
+# MANGO_TESTING turns on the *_test_set_* seams (canned dialog answers,
+# injected I/O failures); only test objects get it, never shipped binaries.
 TEST_CFLAGS = $(CFLAGS) $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_MEMORY_TESTS,) \
-              -DMANGO_TEST_OUTDIR='"$(OUTDIR)"'
+              -DMANGO_TEST_OUTDIR='"$(OUTDIR)"' -DMANGO_TESTING
 LIBS    = $(RAYLIB_LIB) $(PLATFORM_LIBS) $(MODE_LDFLAGS_$(BUILD_MODE)) $(EXTRA_LDFLAGS)
 OUTDIR  = out
 # RAYLIB_AUDIO=null is a test-only variant: the real desktop GLFW/OpenGL
@@ -100,7 +102,13 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           vendor/tomlc17/tomlc17.c
 OBJS    = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
 DEPS    = $(OBJS:.o=.d)
-SESSION_RUNTIME_OBJS = $(filter-out $(OBJDIR)/src/main.o $(OBJDIR)/src/shared/audio.o $(OBJDIR)/src/core/app_session.o,$(OBJS)) $(TEST_AUDIO_OBJ) $(TEST_SESSION_OBJ)
+# The session test drives input and save failures through the MANGO_TESTING
+# seams, so those two modules come from the test tree as well.
+SESSION_RUNTIME_OBJS = $(filter-out $(OBJDIR)/src/main.o $(OBJDIR)/src/shared/audio.o \
+                         $(OBJDIR)/src/core/app_session.o $(OBJDIR)/src/input/game_input.o \
+                         $(OBJDIR)/src/shared/serializer_io.o,$(OBJS)) \
+                       $(TEST_AUDIO_OBJ) $(TEST_SESSION_OBJ) $(TEST_GAME_INPUT_OBJ) \
+                       $(TEST_OBJDIR)/$(SHARED_DIR)/serializer_io.o
 
 # ── Editor (standalone level editor) ─────────────────────────────────
 EDITOR_DIR    = src/editor

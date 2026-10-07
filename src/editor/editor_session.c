@@ -19,6 +19,7 @@ static int editor_test_discard_choice = -1;
 static int editor_test_overwrite_choice = -1;
 static EditorExternalChoice editor_test_external_choice = (EditorExternalChoice)-1;
 
+#ifdef MANGO_TESTING
 void editor_test_set_finish_field_choice(int button_id)
 {
     editor_test_finish_choice = button_id;
@@ -38,6 +39,7 @@ void editor_test_set_external_choice(EditorExternalChoice choice)
 {
     editor_test_external_choice = choice;
 }
+#endif /* MANGO_TESTING */
 
 void editor_set_status(EditorState *es, const char *fmt, ...)
 {

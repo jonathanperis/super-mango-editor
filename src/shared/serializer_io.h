@@ -97,7 +97,9 @@ void serializer_remove_temp(const char *path);
 #define SERIALIZER_TEST_FAILURE_TARGET_APPEARED 3
 #define SERIALIZER_TEST_FAILURE_DIR_SYNC 4 /* POSIX parent-folder fsync */
 #define SERIALIZER_TEST_FAILURE_NO_HARD_LINKS 5 /* POSIX link() reports EPERM */
-void serializer_test_set_failure(int failure);
+#ifdef MANGO_TESTING
+void serializer_test_set_failure(int failure);  /* test builds only */
+#endif
 
 /* Check stdio output state, including the internal write-failure seam. */
 int serializer_stream_has_error(FILE *fp);
