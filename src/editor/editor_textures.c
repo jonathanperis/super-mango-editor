@@ -25,10 +25,9 @@ void editor_textures_load(EditorState *es)
             } \
         } while (0)
 
-    /* Environment textures — sky, floor, water (reloaded per-level). */
-    LOAD_TEX(sky,              "assets/sprites/backgrounds/sky_blue.png");
-    LOAD_TEX(floor_tile,       "assets/sprites/levels/grass_tileset.png");
-    LOAD_TEX(water,            "assets/sprites/foregrounds/water.png");
+    /* The sky, floor and water previews are not loaded here: they show the
+     * open document's own layers and floor tile, so editor_sync_config_resources
+     * loads them once there is a document (and again whenever it changes). */
 
     /* Static geometry. */
     LOAD_TEX(platform,         "assets/sprites/levels/grass_platform.png");

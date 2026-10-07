@@ -305,6 +305,9 @@ void editor_reset_new_level(EditorState *es)
     undo_clear(es->undo);
     editor_set_document_save_point(es);
     es->selection.index = -1;
+    /* The canvas previews (sky, floor, water) follow the document; without
+     * this the new level would keep showing the previous level's art. */
+    editor_sync_config_resources(es);
     editor_set_status(es, "New level");
     editor_update_window_title(es);
 }
