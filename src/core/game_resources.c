@@ -91,9 +91,8 @@ static const TextureLoadSpec s_optional_textures[] = {
 static const ChunkLoadSpec s_optional_chunks[] = {
     { CHUNK_FIELD(spring), "assets/sounds/surfaces/bouncepad.wav", "bouncepad.wav" },
     { CHUNK_FIELD(axe), "assets/sounds/hazards/axe_trap.wav", "axe_trap.wav" },
-    { CHUNK_FIELD(flap), "assets/sounds/entities/bird.wav", "flapping.wav" },
-    { CHUNK_FIELD(spider_attack), "assets/sounds/entities/spider.wav",
-      "spider-attack.mp3" },
+    { CHUNK_FIELD(flap), "assets/sounds/entities/bird.wav", "bird.wav" },
+    { CHUNK_FIELD(spider_attack), "assets/sounds/entities/spider.wav", "spider.wav" },
     { CHUNK_FIELD(dive), "assets/sounds/entities/fish.wav", "dive.wav" },
     { CHUNK_FIELD(jump), "assets/sounds/player/player_jump.wav", "jump.wav" },
     { CHUNK_FIELD(coin), "assets/sounds/collectibles/coin.wav", "coin.wav" },
