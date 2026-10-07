@@ -5,7 +5,8 @@
  * and (b) the LevelDef placement format.  Entity modules know HOW things behave;
  * level files know WHERE things go; this file is the bridge between the two.
  *
- * level_load  : called once at game_init.
+ * level_load  : called at game_init, on a phase transition and when an
+ *               experiment recording restarts the level.
  * level_reset : called on player death via reset_current_level; skips static
  *               geometry that never changes (platforms, rails, sea gaps) and
  *               keeps coins collected during the current attempt.
@@ -90,7 +91,8 @@ static void load_rails(GameState *gs, const LevelDef *def)
  * load_platforms — Derive pillar geometry from tile-height placements.
  *
  * Each pillar is shifted 16 px into the floor so the grass top edge meets
- * the ground seamlessly.  Width is always one TILE_SIZE (48 px).
+ * the ground seamlessly.  Width is tile_width tiles of TILE_SIZE (48 px);
+ * a tile_width of 0 means one tile.
  *
  * If a platform specifies a tile_path, that texture is loaded and assigned
  * to the platform.  Otherwise it is drawn with the shared default pillar
@@ -421,7 +423,7 @@ static void load_fire_flames(GameState *gs, const LevelDef *def)
 {
     /*
      * Fire flames use the same BlueFlame struct and eruption mechanics as
-     * blue flames — only the texture differs (set in game.c at render time).
+     * blue flames — only the texture differs (chosen in game_render.c).
      * Initialisation is identical to load_blue_flames.
      */
     int n = 0;
@@ -576,7 +578,8 @@ int level_load(GameState *gs, const LevelDef *def)
         return -1;
     }
 
-    /* Store a pointer to the active level definition for game.c to read */
+    /* Store a pointer to the active level definition for the rest of the
+     * game (checkpoints, camera, completion, audio settings) to read */
     gs->runtime.current_level = def;
 
     /* Set world width from screen_count (default 4 screens if not specified) */

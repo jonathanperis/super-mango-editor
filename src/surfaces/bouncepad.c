@@ -2,8 +2,9 @@
  * bouncepad.c — Implementation of Bouncepad init, update, and render.
  *
  * The bouncepad sits on the floor and acts as a one-way launch surface.
- * Collision detection lives in player_update (player.c), which applies
- * BOUNCEPAD_VY on landing and returns the hit index to game_player_step.
+ * Collision detection lives in player_resolve_floor_collision
+ * (player_surfaces.c), which applies the pad's launch_vy on landing and
+ * returns the hit index to game_player_step.
  * game_bouncepads_handle_hit then sets state = BOUNCE_ACTIVE here to start the animation.
  */
 
@@ -18,9 +19,9 @@
 /*
  * bouncepad_place — Initialise one pad instance with position and type.
  *
- * All three variant inits (small/medium/high) call this instead of setting
- * every field manually.  Only x, launch_vy and pad_type differ between
- * variants; everything else is always the same default state.
+ * The level loader calls this for every small, medium and high pad
+ * instead of setting each field manually.  Only x, launch_vy and pad_type
+ * differ between pads; everything else is always the same default state.
  */
 void bouncepad_place(Bouncepad *pad, float x, float launch_vy, BouncepadType pad_type)
 {

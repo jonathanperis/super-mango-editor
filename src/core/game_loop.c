@@ -52,8 +52,8 @@ int game_frame(GameState *gs)
 
     int steps = game_inspector_steps(gs, frame_seconds);
     for (int i = 0; i < steps; i++) {
-        /* Live steps are GAME_FIXED_STEP; a replayed experiment supplies its
-         * recorded step and 0 once the tape has ended. */
+        /* Every step, live or replayed, is GAME_FIXED_STEP; a replayed
+         * experiment returns 0 once its tape has ended. */
         float step_dt = game_experiment_dt(gs, GAME_FIXED_STEP);
         if (step_dt <= 0.0f) break;
         cam_x = game_update_active(gs, step_dt, cam_x);

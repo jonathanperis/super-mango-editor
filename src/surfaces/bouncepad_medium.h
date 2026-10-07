@@ -1,7 +1,7 @@
 /*
  * bouncepad_medium.h — Wood bouncepad (medium jump) placement.
  *
- * Uses Bouncepad_Wood.png.  Launch impulse: BOUNCEPAD_VY_MEDIUM.
+ * Uses bouncepad_medium.png.  Usual launch impulse: BOUNCEPAD_VY_MEDIUM.
  */
 #pragma once
 

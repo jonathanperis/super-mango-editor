@@ -62,12 +62,13 @@ int level_read_recovery_path(const char *path, char *buf, size_t buf_size);
 /*
  * level_load_toml — Read a TOML file and deserialize it into a LevelDef.
  *
- * Uses toml_parse_file_ex to parse the file, then walks the resulting
- * table tree to populate `def`.  Missing arrays are treated as empty
- * (count = 0).  Array sizes are validated against the MAX_* constants;
- * if any array exceeds its limit, the function returns -1 immediately.
+ * Opens the file with serializer_fopen_utf8, parses it with
+ * toml_parse_file, then walks the resulting table tree to populate `def`.
+ * Missing arrays are treated as empty (count = 0).  The result must pass
+ * level_validate_runtime; `def` is only written when the whole load
+ * succeeds.
  *
- * Returns 0 on success, -1 on error (file not found, parse error, or
- * array size validation failure).
+ * Returns 0 on success, -1 on error (file not found, parse error, schema
+ * error, or a level that fails validation).
  */
 int level_load_toml(const char *path, LevelDef *def);
