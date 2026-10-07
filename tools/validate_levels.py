@@ -402,16 +402,21 @@ def validate_schema(
 
 
 def load_max_constants() -> dict[str, int]:
-    """The C headers' MAX_* array limits, for validate_schema()'s counts."""
+    """MAX_* limits plus the shared world/climbable sizes from the C headers."""
     constants: dict[str, int] = {}
     define_re = re.compile(
-        r"^\s*#define\s+(MAX_[A-Z0-9_]*)\s+([0-9]+)\b"
+        r"^\s*#define\s+([A-Z][A-Z0-9_]*)\s+([0-9]+)\b"
     )
+    shared_names = {"GAME_W", "GAME_H", "TILE_SIZE"} | {
+        f"{kind}_{dimension}" for kind in ("VINE", "LADDER", "ROPE")
+        for dimension in ("W", "H", "STEP")
+    }
 
     for header in (ROOT / "src").rglob("*.h"):
         for line in header.read_text(encoding="utf-8").splitlines():
             match = define_re.match(line)
-            if match:
+            if match and (match.group(1).startswith("MAX_") or
+                          match.group(1) in shared_names):
                 constants[match.group(1)] = int(match.group(2))
 
     return constants
