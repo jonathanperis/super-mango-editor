@@ -93,8 +93,9 @@ static void load_rails(GameState *gs, const LevelDef *def)
  * the ground seamlessly.  Width is always one TILE_SIZE (48 px).
  *
  * If a platform specifies a tile_path, that texture is loaded and assigned
- * to the platform.  Otherwise the platform uses the level's floor_tile_path
- * (loaded separately in game.c and passed as default_tex to platforms_render).
+ * to the platform.  Otherwise it is drawn with the shared default pillar
+ * texture, gs->textures.platform (grass_platform.png, loaded by
+ * game_resources.c and passed as default_tex to platforms_render).
  */
 static void load_platforms(GameState *gs, const LevelDef *def)
 {

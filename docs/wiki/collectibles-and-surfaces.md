@@ -179,7 +179,7 @@ speed      = 0.0        # RAIL mode only: traversal speed in tiles/s
 | `MAX_BRIDGE_BRICKS` | 16 | Maximum bricks in one bridge |
 | `BRIDGE_FALL_DELAY` | 0.2 s | Delay between touching a brick and its fall |
 
-`bridge.h` also defines `BRIDGE_CASCADE_DELAY` (0.06 s) for a neighbour-by-neighbour cascade, but `bridge.c` does not use it: neighbours fall only when stepped on.
+Bricks do not cascade on their own: each brick falls only after the player steps on it.
 
 ```toml
 [[bridges]]

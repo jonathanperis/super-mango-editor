@@ -32,13 +32,6 @@
 #define BRIDGE_FALL_DELAY    0.2f
 
 /*
- * BRIDGE_CASCADE_DELAY — extra seconds between each successive brick's
- * fall start, counted outward from the trigger brick.  Creates a domino
- * ripple effect: 0.06 s × 4 bricks = 0.24 s for the wave to cross 4 bricks.
- */
-#define BRIDGE_CASCADE_DELAY 0.06f
-
-/*
  * Fall physics — gentle descent per brick.
  */
 #define BRIDGE_FALL_GRAVITY      250.0f
