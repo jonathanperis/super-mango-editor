@@ -1,0 +1,111 @@
+---
+/*
+ * Not found. GitHub Pages serves this for any missing address under the site.
+ *
+ * Mango walks off a ledge and drops into the water, on a loop. The water is
+ * drawn the way src/effects/water.c draws it: each of the 8 frames in
+ * water.png keeps its 16 x 31 px of art in the middle of a 48 px slot, so
+ * the strip is a row of those crops, frames 0-7 side by side, repeating every
+ * 128 px and scrolling right. Here an SVG pattern does the cropping (one
+ * nested <svg> viewBox per frame) and CSS does the scrolling.
+ */
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Navbar from '@/components/home/Navbar.astro';
+import Footer from '@/components/home/Footer.astro';
+import Sprite from '@/components/Sprite.astro';
+import { art } from '@/lib/art';
+import { sourceExcerpt } from '@/lib/sourceExcerpt';
+import floorGapSource from '../../../src/collision/floor_gap_collision.c?raw';
+import '../styles/home.css';
+import '../styles/not-found.css';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const gapExcerpt = sourceExcerpt(
+    'src/collision/floor_gap_collision.c', floorGapSource,
+    'for (int g = 0; g < gs->floor_gap_count', '\n}',
+);
+
+/* Water strip at 2x: 16 x 31 px art per frame becomes 32 x 62, period 256. */
+const WATER = { frames: 8, slotW: 48, artX: 16, artY: 17, artW: 16, artH: 31, scale: 2 };
+const waterTileW = WATER.artW * WATER.scale;
+const waterH = WATER.artH * WATER.scale;
+const waterPeriod = WATER.frames * waterTileW;
+const waterFrames = Array.from({ length: WATER.frames }, (_, f) => ({
+    x: f * waterTileW,
+    viewBox: `${f * WATER.slotW + WATER.artX} ${WATER.artY} ${WATER.artW} ${WATER.artH}`,
+}));
+
+const sceneStyle = [
+    `--sky:url("${art.sky.src}")`,
+    `--clouds:url("${art.clouds.src}")`,
+    `--mountains:url("${art.mountains.src}")`,
+    `--grass:url("${art.grassTile.src}")`,
+    `--water-h:${waterH}px`,
+    `--water-period:${waterPeriod}px`,
+].join(';');
+---
+<BaseLayout
+    title="Page not found — Super Mango"
+    description="This page does not exist. Head back to the Super Mango home page or the manual."
+    pageType="docs"
+    noindex
+>
+    <Navbar onHome={false} />
+    <header class="title-screen lost-screen">
+        <div class="scene lost-scene" style={sceneStyle} aria-hidden="true">
+            <div class="scene-layer scene-sky"></div>
+            <div class="scene-layer scene-clouds"></div>
+            <div class="scene-layer scene-mountains"></div>
+
+            <div class="lost-ledge"></div>
+            <div class="lost-mango">
+                <Sprite sheet={art.player} scale={3} row={1} frames={4} fps={10} class="lost-walk" />
+                <Sprite sheet={art.player} scale={3} row={3} class="lost-fall" />
+            </div>
+
+            <svg class="lost-water" height={waterH} xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <image id="water-sheet" href={art.water.src} width={art.water.sheetW} height={art.water.sheetH} />
+                    <pattern id="water-strip" width={waterPeriod} height={waterH} patternUnits="userSpaceOnUse">
+                        {waterFrames.map(frame => (
+                            <svg x={frame.x} width={waterTileW} height={waterH} viewBox={frame.viewBox}>
+                                <use href="#water-sheet" />
+                            </svg>
+                        ))}
+                    </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#water-strip)" />
+            </svg>
+        </div>
+
+        <div class="title-block">
+            <div class="dialog-box">
+                <h1 class="lost-title"><span>404</span> Splash. There's no page here.</h1>
+                <p class="dialog-body">
+                    The link may be old, or the page moved when the manual was reorganised.
+                    In the game a fall like that costs a whole life. Here it only costs a click.
+                </p>
+                <div class="dialog-actions">
+                    <a class="pixel-button pixel-button-gold" href={`${base}/`}>Back to the start</a>
+                    <a class="pixel-button pixel-button-ghost" href={`${base}/docs/`}>Open the manual</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="lost-main">
+        <figure class="code-card">
+            <figcaption>
+                <span class="code-file">src/collision/floor_gap_collision.c</span>
+                <span class="code-note">the rule Mango just broke</span>
+            </figcaption>
+            <pre><code>{gapExcerpt}</code></pre>
+            <p class="code-explainer">
+                Once the middle of the player is over a gap and below the water line,
+                <code>apply_damage</code> is asked for <code>gs-&gt;hearts</code>: every heart
+                left, all at once. Hearts at zero means a life is gone and the level restarts.
+            </p>
+        </figure>
+    </main>
+    <Footer />
+</BaseLayout>
