@@ -10,14 +10,10 @@
 #include "entity_meta.h" /* central selection validity and entity storage */
 #include "tools.h"       /* editor_clamp_placement, editor_add_placement */
 
-/* Paste lands 24 px right and down so the copy does not hide the original. */
+/* How far a pasted copy moves so it does not hide the original (see
+ * offset_pasted_copy for which way each type moves). */
 #define PASTE_OFFSET 24.0f
 
-/*
- * editor_copy_selected — Snapshot the currently selected entity into the clipboard.
- *
- * Stores the entity type and a PlacementData union so paste can recreate it.
- */
 /*
  * rider_rail_index — Point at the rail_index of an entity that rides a rail
  * (every spike block; float platforms in RAIL mode), or return NULL.
@@ -36,6 +32,13 @@ static int same_rail(const RailPlacement *a, const RailPlacement *b)
            a->w == b->w && a->h == b->h && a->end_cap == b->end_cap;
 }
 
+/*
+ * editor_copy_selected — Snapshot the currently selected entity into the clipboard.
+ *
+ * Stores the entity type and a PlacementData union so paste can recreate it.
+ * A rail rider also records which rail it rides (see clipboard_rail_index
+ * in editor.h).
+ */
 void editor_copy_selected(EditorState *es)
 {
     if (!es) return;
@@ -51,8 +54,26 @@ void editor_copy_selected(EditorState *es)
     int *rail_index = rider_rail_index(es->clipboard_type, &es->clipboard_data);
     es->clipboard_has_rail = rail_index && *rail_index >= 0 &&
                              *rail_index < es->level.rail_count;
+    es->clipboard_rail_index = es->clipboard_has_rail ? *rail_index : -1;
     if (es->clipboard_has_rail)
         es->clipboard_rail = es->level.rails[*rail_index];
+}
+
+void editor_clipboard_after_rail_remove(EditorState *es, int index)
+{
+    if (!es || es->clipboard_rail_index < 0) return;
+    if (es->clipboard_rail_index == index) {
+        /* The rail is gone; its old shape must not match a look-alike. */
+        es->clipboard_rail_index = -1;
+        es->clipboard_has_rail = 0;
+    } else if (es->clipboard_rail_index > index) {
+        es->clipboard_rail_index--;
+    }
+}
+
+void editor_clipboard_after_rail_insert(EditorState *es, int index)
+{
+    if (es && es->clipboard_rail_index >= index) es->clipboard_rail_index++;
 }
 
 /*
@@ -60,7 +81,9 @@ void editor_copy_selected(EditorState *es)
  *
  * Every type stores its position in different fields (patrolling enemies
  * also carry a patrol range that must move with them), so this is the one
- * per-type switch in the clipboard.
+ * per-type switch in the clipboard.  Free-floating things move right and
+ * down; things tied to the floor move only right; rail riders move along
+ * their rail; floor gaps move one whole gap width.
  */
 static void offset_pasted_copy(EntityType type, PlacementData *d)
 {
@@ -181,9 +204,9 @@ static void offset_pasted_copy(EntityType type, PlacementData *d)
 /*
  * editor_paste_clipboard — Create a new entity from the clipboard data.
  *
- * Inserts a copy of the last Ctrl+C'd entity into the level, offset by
- * 24px right and 24px down so it doesn't overlap the original. The new
- * entity is auto-selected for immediate repositioning.  The two singletons
+ * Inserts a copy of the last Ctrl+C'd entity into the level, moved a little
+ * (offset_pasted_copy) so it doesn't hide the original. The new entity is
+ * auto-selected for immediate repositioning.  The two singletons
  * (Last Star, Player Spawn) move instead and record a CMD_MOVE.
  *
  * The clipboard survives opening another level, so the copy may come from
@@ -211,14 +234,22 @@ void editor_paste_clipboard(EditorState *es)
     type = es->clipboard_type;
     d = es->clipboard_data;
 
-    /* Re-attach a rail rider to the rail it was copied from, found by its
-     * shape and position.  Without that rail in this level, refuse instead
-     * of silently riding whichever rail now has the old index. */
+    /* Re-attach a rail rider to the rail it was copied from.  In the same
+     * document that rail is tracked by index, so it is found even after it
+     * moved, and never confused with an identical rail.  In another
+     * document, look for a rail with the same shape and position.  With
+     * neither, refuse instead of silently riding whichever rail now has the
+     * old index. */
     int *rail_index = rider_rail_index(type, &d);
     if (rail_index) {
         int found = -1;
-        for (int i = 0; es->clipboard_has_rail && i < es->level.rail_count; i++) {
-            if (same_rail(&es->level.rails[i], &es->clipboard_rail)) { found = i; break; }
+        if (es->clipboard_rail_index >= 0 &&
+            es->clipboard_rail_index < es->level.rail_count) {
+            found = es->clipboard_rail_index;
+        }
+        for (int i = 0; found < 0 && es->clipboard_has_rail &&
+                        i < es->level.rail_count; i++) {
+            if (same_rail(&es->level.rails[i], &es->clipboard_rail)) found = i;
         }
         if (found < 0) {
             editor_set_status(es, "Paste blocked: the copied %s's rail is not in this level",
