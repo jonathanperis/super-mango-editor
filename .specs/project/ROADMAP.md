@@ -1,10 +1,11 @@
 # Roadmap
 
-## Current: Audit Remediation (started 2026-10-06)
+## Recently Shipped: Audit Remediation (2026-10-06 – 2026-10-07)
 
 Work lands on `main` through short-lived `feat/` branches (rebase merges only).
 
-Goal: resolve both codebase audit rounds (security, runtime, editor, build/CI, assets) while keeping specs and contributor docs aligned with TOML-only runtime loading, fixed-step simulation, authored checkpoints, the sandbox-first campaign, the 15-binary native test inventory, validation tooling, and CI smoke/docs gates.
+Resolved both codebase audit rounds (#306), then cleared every open
+code-scanning alert (#308, #309). Goal was to resolve both codebase audit rounds (security, runtime, editor, build/CI, assets) while keeping specs and contributor docs aligned with TOML-only runtime loading, fixed-step simulation, authored checkpoints, the sandbox-first campaign, the 15-binary native test inventory, validation tooling, and CI smoke/docs gates.
 
 ## Shipped Baseline
 

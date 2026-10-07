@@ -4,7 +4,7 @@
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Audit remediation | In progress | Second-round audit fixes across runtime, editor, serializer, CI, docs and the Web build. |
+| Audit remediation | Shipped | Both audit rounds merged in #306; code-scanning cleanup in #308/#309 (0 open alerts); manual moved to an Astro content collection and re-audited against the code. |
 | raylib 6.0 port | Shipped | Game and editor use pinned, checksum-verified raylib 6.0 source (`vendor/raylib/`, `tools/build_raylib.py`) on desktop (bundled GLFW) and Web (Emscripten 6.0.9). SDL2 and its satellite libraries are gone. |
 | Fixed-step simulation | Shipped | `src/core/game_timing.c` feeds frame time into an accumulator and advances fixed 1/60 s steps; `make timing-lab` compares variable and fixed steps. |
 | Runtime level loader | Shipped | Bare game launch loads the v1 campaign manifest and opens its selector; `--level <path>` / `make run-level LEVEL=...` loads TOML directly. |
