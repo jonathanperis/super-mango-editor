@@ -45,9 +45,24 @@ jobs:
           make
           make editor
 
+      # Analyze without uploading, then drop code-quality results that sit in
+      # third-party code (raylib build headers under out/, vendored tomlc17
+      # under vendor/). paths-ignore does not filter results for compiled
+      # languages. Security results are kept everywhere; see the script.
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
+          category: "/language:c-cpp"
+          upload: never
+          output: sarif-results
+
+      - name: Filter third-party code-quality results
+        run: python3 tools/filter_codeql_sarif.py sarif-results/*.sarif
+
+      - name: Upload CodeQL results
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          sarif_file: sarif-results
           category: "/language:c-cpp"
 
   # Interpreted languages need no build: CodeQL extracts the sources directly.
