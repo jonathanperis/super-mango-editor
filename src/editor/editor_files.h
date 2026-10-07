@@ -52,9 +52,6 @@ void editor_path_for_display(const char *path, char *out, size_t out_size);
 /* Discover persistent recovery entries and update startup status. */
 int editor_discover_recoveries(EditorState *es);
 
-/* Recover one manifest entry after its snapshot has loaded successfully. */
-int editor_recover_entry(EditorState *es, int entry_index);
-
 /* Recover by stable session ID after re-discovering current entries. */
 int editor_recover_entry_by_id(EditorState *es, uint64_t recovery_id);
 

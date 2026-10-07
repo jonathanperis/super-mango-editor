@@ -654,12 +654,6 @@ void editor_selection_after_insert(EditorState *es, EntityType type, int index,
     editor_selection_reconcile(es);
 }
 
-int editor_rail_placement_tile_count(const RailPlacement *rp)
-{
-    Rail rail;
-    return rail_build(&rail, rp) == 0 ? rail.count : 0;
-}
-
 void editor_rail_placement_position_at(const RailPlacement *rp, float t,
                                        float *x, float *y)
 {
