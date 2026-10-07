@@ -174,7 +174,15 @@ units and owner/borrower contracts still need their existing regression checks.
 - key constants and `GameState` fields;
 - overlay controls and snapshot text;
 - WebAssembly authority caveats;
-- Pages route metadata and developer-guide context.
+- Pages route metadata and developer-guide context;
+- every `make <target>` the manual or README mentions exists in the Makefile;
+- every backticked `src/...` path exists;
+- backticked `name()` functions on the learning pages are defined in `src/`, `tests/` or `labs/`;
+- constant values in [Constants Reference](../constants-reference/) and in `#define` snippets match the source;
+- the [debug inspector key table](../controls/#debug-inspector-keys) matches `src/core/game_inspector.c`;
+- the [render order table](../architecture/#render-order-back-to-front) matches the call order in `src/render/game_render.c`.
+
+Each failure names the page and line to fix.
 
 If this target fails, update the code-backed docs rather than weakening the check.
 

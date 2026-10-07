@@ -23,6 +23,22 @@ class DocsChecksTest(unittest.TestCase):
              drift.check_input_reference, "missing runtime flag `--profile`"),
             ("player-module.md", "unsigned int physical_input_mask,", "",
              drift.check_input_reference, "player_handle_input"),
+            ("learning-path.md", "`make timing-lab`", "`make timing-labs`",
+             drift.check_make_targets_documented, "`make timing-labs` is not a Makefile target"),
+            ("learning-path.md", "`src/core/game_timing.c`", "`src/core/game_timer.c`",
+             drift.check_src_paths_exist, "`src/core/game_timer.c` does not exist"),
+            ("learning-path.md", "`coins_render()`", "`coin_render()`",
+             drift.check_learning_page_functions, "`coin_render()` is not defined"),
+            ("constants-reference.md", "| `GRAVITY` | `800.0f` |", "| `GRAVITY` | `900.0f` |",
+             drift.check_constant_values, "`GRAVITY` is documented as `900.0f`"),
+            ("constants-reference.md", "| `FLOOR_Y` | `252` |", "| `FLOOR_Y` | `250` |",
+             drift.check_constant_values, "`FLOOR_Y` is documented as `250`"),
+            ("source-files.md", "#define TILE_SIZE     48", "#define TILE_SIZE     32",
+             drift.check_constant_values, "`TILE_SIZE` is documented as `32`"),
+            ("controls.md", "| F10 |", "| F11 |",
+             drift.check_inspector_keys_doc, "inspector key F10 is handled"),
+            ("architecture.md", "| `ladder_render` |", "| `vine_render` |",
+             drift.check_render_order_doc, "missing from the render order table"),
         ]
         original_read = drift.read
         for name, old, new, check, expected in cases:
