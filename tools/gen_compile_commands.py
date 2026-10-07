@@ -54,6 +54,10 @@ def build_arguments(cc: str, raylib_include: Path, source: Path) -> list[str]:
         f"-I{SRCDIR}",
         f"-I{VENDOR_DIR}",
     ]
+    # Test sources call the *_test_set_* seams, which headers only declare
+    # when MANGO_TESTING is defined (the Makefile's TEST_CFLAGS sets it).
+    if TESTDIR in source.parents:
+        args.append("-DMANGO_TESTING")
     args.extend(["-c", str(source)])
     return args
 
