@@ -163,6 +163,11 @@ jobs:
         if: matrix.target == 'native' && runner.os == 'Linux'
         run: |
           Xvfb :99 -screen 0 1280x1024x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          # Xvfb starts in the background; with raylib restored from the
+          # cache the tests can reach the display before it listens, so wait
+          # for its socket (up to 30 s) instead of racing it.
+          for _ in $(seq 60); do [ -S /tmp/.X11-unix/X99 ] && break; sleep 0.5; done
+          [ -S /tmp/.X11-unix/X99 ] || { cat "$RUNNER_TEMP/xvfb.log"; exit 1; }
           echo "DISPLAY=:99" >> "$GITHUB_ENV"
           echo "LIBGL_ALWAYS_SOFTWARE=1" >> "$GITHUB_ENV"
           pulseaudio --start --exit-idle-time=-1
@@ -419,6 +424,11 @@ jobs:
       - name: Start rendered-test display and audio
         run: |
           Xvfb :99 -screen 0 1280x1024x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          # Xvfb starts in the background; with raylib restored from the
+          # cache the tests can reach the display before it listens, so wait
+          # for its socket (up to 30 s) instead of racing it.
+          for _ in $(seq 60); do [ -S /tmp/.X11-unix/X99 ] && break; sleep 0.5; done
+          [ -S /tmp/.X11-unix/X99 ] || { cat "$RUNNER_TEMP/xvfb.log"; exit 1; }
           echo "DISPLAY=:99" >> "$GITHUB_ENV"
           echo "LIBGL_ALWAYS_SOFTWARE=1" >> "$GITHUB_ENV"
           pulseaudio --start --exit-idle-time=-1
