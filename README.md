@@ -10,14 +10,19 @@
 
 ## About
 
-Super Mango is a C11/raylib platformer and sandbox school: play the game, inspect a running simulation, edit TOML worlds, and study the code that connects them. The campaign is Creator's Playground → Volcanic Depths 1 → Volcanic Depths 2. Six separate mechanics levels in `levels/labs/` support an eight-lab learning track. The standalone editor saves the same TOML data that the runtime loads. Rendering uses a 400×300 logical canvas, normally scaled to an 800×600 window. Native builds target macOS, Linux and Windows; Emscripten supplies browser play.
+Super Mango is a C11/raylib platformer and a place to learn C by taking a real
+game apart: play it, freeze and step the running simulation, edit its TOML
+worlds, and read the code that connects them. The campaign is Creator's
+Playground → Volcanic Depths 1 → Volcanic Depths 2. Six small mechanics levels
+in `levels/labs/` go with an eight-lab learning track. The standalone editor
+saves the same TOML files the game loads. Native builds run on macOS, Linux and
+Windows; Emscripten builds the browser version.
 
-**Start learning:** [Sandbox School](docs/wiki/learning-path.md) · [Mechanics Museum](docs/wiki/mechanics-museum.md) · [Entity Walkthrough](docs/wiki/entity-walkthrough.md).
+**Start learning:** [Sandbox School](https://jonathanperis.github.io/super-mango-editor/docs/learning-path/) · [Debugging C](https://jonathanperis.github.io/super-mango-editor/docs/debugging-c/) · [C in This Codebase](https://jonathanperis.github.io/super-mango-editor/docs/c-concepts/) · [Mechanics Museum](https://jonathanperis.github.io/super-mango-editor/docs/mechanics-museum/) · [Entity Walkthrough](https://jonathanperis.github.io/super-mango-editor/docs/entity-walkthrough/)
 
 The source is part of the lesson. Explicit update/draw steps, simple loops and
-comments about units, ownership and library calls are intentional. Favor code
-that a learner can trace over reducing line count or hiding a small operation
-behind another abstraction.
+comments about units, ownership and library calls are intentional. We favour
+code a learner can trace over a shorter version that hides a step.
 
 ## Tech Stack
 
@@ -29,60 +34,26 @@ behind another abstraction.
 | tomlc17 | R260821 + project patches | TOML v1.1 parser; [upstream provenance and patch inventory](vendor/tomlc17/README.md) |
 | Emscripten | 6.0.9 in CI | WebAssembly compilation for browser play |
 
-## Features
+## What is in it
 
-- 2D side-scrolling platformer with dynamic multi-screen TOML worlds, from the 4-screen sandbox to longer volcanic stages
-- 32 render layers drawn back-to-front: parallax background, platforms, floor, enemies, player, fog, HUD, debug overlay
-- Fixed-time-step physics (1/60 s steps fed by an accumulator); `make timing-lab` compares variable and fixed steps
-- Six enemy types: spiders, jumping spiders, birds, faster birds, fish, faster fish
-- Seven hazard types: spike rows, spike blocks, spike platforms, circular saws, axe traps, blue flames, fire flames
-- Collectibles: coins (100 pts each, bonus life by score threshold), star yellow, star green, star red health pickups, end-of-level last star
-- Climbable vines, ladders, and ropes; three bouncepad variants (small, medium, high)
-- TOML-only level workflow: `levels/campaigns/main.toml` orders the three campaign stages; `--level path/to/level.toml` directly opens a campaign, museum or custom level
-- Authored `[[checkpoints]]` records give a level explicit respawn positions; no records preserves legacy automatic screen-boundary respawns
-- Pause, game-over, and end-of-level overlays: terminal action rows use Up/Down or D-pad to select, Enter/Space/Start (A also confirms) to confirm, and Esc/Back (B also exits) to exit
-- Completion actions: Next Level when `next_phase` exists, Replay, Level Select, Exit; game-over actions: Retry, Level Select, Exit
-- Campaign-driven native start menu and level select; HUD (hearts/lives/score), lives system, invincibility blink on damage
-- Browser Replay stores the current TOML path in session storage, tears down the active WebAssembly session, reloads the page, and boots that level again
-- Keyboard, hot-plug gamepad and browser touch controls; F1 settings with remapping, audio, dead-zone, native scale, high-contrast and reduced-motion options
-- Local settings and per-level best results; `--continue` opens the last played stage, while debug/smoke/playtest sessions remain profile-isolated
-- Debug inspector: FPS/frame interval, memory, hitboxes, velocity/state/contact display, freeze/step/slow motion, live movement tuning and explicit experiment capture/replay
-- Builds natively on macOS, Linux, and Windows; WebAssembly build via Emscripten
+- A side-scrolling platformer with multi-screen TOML worlds, 32 render layers and fixed 1/60 s physics steps (`make timing-lab` shows why)
+- Six enemy types, seven hazard types, coins (score and bonus lives), health stars and an end-of-level star
+- Vines, ladders, ropes, three bouncepad sizes, crumbling bridges and float platforms
+- Authored `[[checkpoints]]`, or automatic screen-boundary respawns for levels without them
+- Pause, game-over and completion overlays: Up/Down or D-pad selects, Enter/Space/Start confirms (A also confirms), Esc/Back exits (B also exits)
+- Keyboard, hot-plug gamepad and browser touch controls; F1 settings with remapping, audio, dead zone, window scale, high contrast and reduced motion
+- A debug inspector to freeze, step, slow down and tune the simulation, and to record and replay experiments
+- A standalone level editor with undo/redo, copy/paste, validation that blocks bad saves, autosave and one-key playtesting
 
-## Level Editor
-
-Super Mango includes a standalone visual level editor built with C11 and raylib. The editor lets you create and edit levels with a point-and-click interface, then save and load TOML files used directly by the game.
-
-Editor features:
-
-- Scrollable canvas with zoom, grid snapping, and select/place/delete tools
-- Entity palette with world geometry and game objects, including authored checkpoint markers: platforms, enemies, hazards, collectibles, and surfaces
-- Per-entity property editing (position, size, speed, animation, behavior)
-- TOML serialization (save/load `.toml` level files)
-- Undo/redo history, copy/paste, recent files, autosave, and dirty-state indicators
-- Validation status for the active level; validation errors block save and playtest
-- Native file dialogs
-- Bounded rendered smoke mode for CI (`--smoke-test`)
-
-Build and run the editor:
-
-```sh
-make editor       # build the editor binary into out/
-make run-editor   # build and run the editor
-```
-
-## Development
-
-Start with [Sandbox School](docs/wiki/learning-path.md), then use the [Developer Guide](docs/wiki/developer-guide.md) for conventions and ownership. [Level Design](docs/wiki/level-design.md) documents TOML; [Assets](docs/wiki/assets.md) covers sprite tools. [Asset Inventory](docs/wiki/asset-inventory.md) records the raw bundle budget and [Asset Provenance](docs/wiki/asset-provenance.md) distinguishes code/media licenses.
+The [manual](https://jonathanperis.github.io/super-mango-editor/docs/) covers each of these in detail.
 
 ## Getting Started
 
 ### Prerequisites
 
-A C11-compatible compiler (`clang` or `gcc`), `make`, CMake and a current Python 3
-(3.12+ recommended for the build walkthrough).
-The first build downloads and verifies the pinned raylib 6.0 source archive;
-no system raylib installation is required. See [dependency provenance](vendor/raylib/README.md).
+A C11 compiler (`clang` or `gcc`), `make`, CMake and Python 3 (3.12+
+recommended). The first build downloads and verifies the pinned raylib 6.0
+source; no system raylib is needed. See [dependency provenance](vendor/raylib/README.md).
 
 **macOS:**
 
@@ -106,210 +77,96 @@ pacman -S make mingw-w64-ucrt-x86_64-clang mingw-w64-ucrt-x86_64-gcc mingw-w64-u
           mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-make
 ```
 
-**WebAssembly:** Install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) at **6.0.9** and ensure `emcc` and `emcmake` are on `PATH`. The same toolchain builds raylib's Web backend and both game variants. GitHub CI is the authoritative WASM release verification; local toolchain failures must be reported separately from application failures.
+**WebAssembly:** install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) at **6.0.9** with `emcc` and `emcmake` on `PATH`. GitHub CI is the authoritative WASM release verification; report local toolchain failures separately from application failures.
 
-**Rendered tests:** desktop hidden windows still require a graphics context and
-audio device. Linux CI uses Xvfb/Mesa and a PulseAudio null sink. On display-less
-hosts, use the explicit test backend: `make test OUTDIR=out/headless RAYLIB_PLATFORM=memory`.
-It renders in memory with null audio; OS resize/clipboard/device behavior remains
-a desktop check. Release packaging rejects the Memory backend.
+The docs tools need Python 3.11+; the docs site needs Node.js 22.12+ and Bun
+(see [website maintenance](docs/README.md)). On a machine without a display or
+sound card, `make test OUTDIR=out/headless RAYLIB_PLATFORM=memory` runs the
+tests on raylib's in-memory backend.
 
 ### Quick Start
 
-The documentation tools require Python 3.11+; the raylib bootstrap also needs
-`tarfile` extraction-filter support. Use the current Python recommended above.
-Full verification also needs Node.js. Docs development requires
-Node.js 22.12+ and Bun with the frozen `docs/bun.lock` dependency set (CI pins
-Node **26.9.0** and Bun **1.4.2**); see
-[website maintenance](docs/README.md).
-
 ```sh
-make CC=clang                         # build the game binary into out/
-make run CC=clang                     # build and run
-make run-debug CC=clang               # build and run with debug overlay
-make run-level CC=clang LEVEL=levels/labs/01_collision.toml      # run a focused lab
-make run-level-debug CC=clang LEVEL=levels/labs/01_collision.toml # inspect a lab
-make builder CC=clang                 # build game and editor together
-make debug CC=clang                   # -g -O0 binaries in out/debug/
-make release CC=clang                 # -O2 hardened binaries in out/release/
-make timing-lab                       # quantitative timestep experiment
-make editor CC=clang                  # build the level editor
-make run-editor CC=clang              # build and run the level editor
+make run CC=clang                     # build and play
+make run-editor CC=clang              # build and open the level editor
+make run-level-debug CC=clang LEVEL=levels/labs/01_collision.toml  # a lab, with the inspector
+make debug CC=clang                   # -g -O0 game and editor in out/debug/ for lldb/gdb
 make test CC=clang                    # 15 native regression tests (binaries) plus Python/JavaScript host checks
-make validate-levels                  # validate campaign, root levels and levels/labs/
-make smoke CC=clang                   # render every level and the editor for a few frames
-make sanitize CC=clang                # ASan/UBSan tests plus fuzz-seed replay in out-sanitize/
-make sounds                           # regenerate assets/sounds/ from tools/gen_sounds.py
-make docs-drift                       # generated-content and docs consistency checks
-make web                              # build to WebAssembly (requires Emscripten)
-make clean                            # remove out/, out-sanitize/ and dist/ build artifacts
+make sanitize CC=clang                # the tests again under AddressSanitizer/UBSan
+make docs-drift                       # check the manual against the code
 make help                             # list every target with a one-line description
 ```
 
-> The Makefile replaces GNU Make's built-in `CC=cc` with clang; explicit `CC=gcc`
-> remains supported. After moving source files between directories, use a fresh
-> `OUTDIR` or clean your old build's generated dependencies.
+The [Build System](https://jonathanperis.github.io/super-mango-editor/docs/build-system/) page lists every target and flag, and
+[Testing](https://jonathanperis.github.io/super-mango-editor/docs/testing/) says which checks to run for which change. The debug
+inspector keys are in [Controls](https://jonathanperis.github.io/super-mango-editor/docs/controls/#debug-inspector-keys); debug and
+playtest runs never touch your saved profile.
 
-In debug mode: **F2** freezes, **F3** steps once, **F4** changes speed, **F6** selects
-a movement property, **-/+** tunes it and **F7** resets it. **F8** restarts/records;
-**F9** exports a capture; **F10** cycles inspected entities; **F5** shows this key list in game. Replay with `--level PATH --experiment CAPTURE.toml`.
-Debug/playtest sessions do not touch personal profiles. See the museum guide for
-capture limits and pause ownership.
-
-Or just **[play in your browser](https://jonathanperis.github.io/super-mango-editor/)** -- no build required. Full project documentation is available at the **[docs site](https://jonathanperis.github.io/super-mango-editor/docs/)**.
-
-Useful docs routes:
-
-- **[Controls & Input](https://jonathanperis.github.io/super-mango-editor/docs/controls/)** — keyboard, gamepad, browser/WASM, replay, smoke, and runtime flag reference.
-- **[Testing & Smoke Matrix](https://jonathanperis.github.io/super-mango-editor/docs/testing/)** — which local/CI checks to run for each kind of change.
-- **[Level Design — TOML Reference](https://jonathanperis.github.io/super-mango-editor/docs/level-design/)** — full level schema, including optional `[physics]` tuning.
-- **[Release Checklist](https://jonathanperis.github.io/super-mango-editor/docs/release-checklist/)** — source, docs, WebAssembly, archive, CI, and Pages gates before shipping.
+Or just **[play in your browser](https://jonathanperis.github.io/super-mango-editor/)**, no build required.
 
 ### Release Downloads
 
-Browse [published releases](https://github.com/jonathanperis/super-mango-editor/releases) and check each release's asset list. Older releases predate the current builder packaging; use `make builder` for the current editor and learning labs. The website tracks successful `main` builds independently of tagged releases.
-
-Releases built by the current workflow (a `v*` tag or manual dispatch on `main`) contain native builder archives with both `super-mango` and `super-mango-editor`, playable assets, campaign/lab levels, and third-party notices. Run from the extracted folder. raylib is linked statically; native OS graphics/audio support remains required. Linux dialogs need zenity. Windows bundles both executables' required non-system runtime DLLs and available package notices. `unused/` assets stay in the source checkout. WebAssembly archives contain both normal/debug HTML/JS/WASM/data outputs; serve them with a static HTTP server. Build with `make web`, then package those verified outputs with `make dist-wasm`.
+[Releases](https://github.com/jonathanperis/super-mango-editor/releases) built by
+the current workflow contain a native archive per platform with both
+`super-mango` and `super-mango-editor`, the assets, campaign and lab levels, and
+third-party notices; run them from the extracted folder. A WebAssembly archive
+holds the normal and debug browser builds; serve it with any static HTTP server.
+Older releases predate this packaging. The website follows successful `main`
+builds, not tags. Details are in the [Release Checklist](https://jonathanperis.github.io/super-mango-editor/docs/release-checklist/).
 
 ## Project Structure
 
 ```
 super-mango-editor/
-├── Makefile                          Application build, pinned raylib bootstrap, ad-hoc codesign
-├── levels/                           TOML level definitions
-│   ├── labs/                        Six focused learning levels
-│   ├── 00_sandbox_01.toml           Creator's Playground; first campaign level
-│   ├── 01_lugio_01.toml             Volcanic Depths 1
-│   ├── 02_lugio_02.toml             Volcanic Depths 2
-│   └── campaigns/main.toml           v1 ordered campaign manifest for the native selector
-├── src/                              C source files and headers
-│   ├── main.c                        CLI entry point; AppSession owns raylib lifetime
-│   ├── game.h                        Shared GameState/constants declarations
-│   ├── collectibles/                  Pickup items
-│   │   ├── coin.h / .c               Coin (100 pts; bonus life at score threshold)
-│   │   ├── health_star.h / .c        Yellow/green/red star health pickups
-│   │   └── last_star.h / .c          End-of-level star
-│   ├── collision/                     Gameplay collision and damage passes
-│   ├── core/                          Runtime lifecycle, window/timing/resources, update, camera, checkpoint, completion, overlay, actor/hazard helpers
-│   │   ├── debug.h / .c              Debug overlay (FPS, frame budget, memory, hitboxes, event log)
-│   │   ├── game_lifecycle.c          game_init / game_cleanup orchestration
-│   │   ├── game_loop.c               Main native/WebAssembly frame loop
-│   │   ├── game_update.h / .c        Top-level update orchestration
-│   │   └── game_* helpers            Window, resources, timing, camera, checkpoint, overlay, actors, hazards, surfaces
-│   ├── editor/                        Standalone visual level editor
-│   │   ├── editor_main.c             Editor entry point
-│   │   ├── editor.h / .c             Editor state and high-level glue
-│   │   ├── canvas/palette/properties/tools/hit_test/entity_meta modules
-│   │   ├── editor_frame/events/chrome/panels/layout/textures modules
-│   │   ├── editor_files/session/playtest/clipboard/validation modules
-│   │   ├── file_dialog.h / .c        Native file dialogs; dialog_choice.c: choice dialogs and argument quoting
-│   │   └── undo*.h / .c              Undo/redo history and operation application
-│   ├── shared/                        Graphics/audio/text/OS helpers, TOML serializer, atomic UTF-8 I/O, shared UI
-│   ├── effects/                       Visual effects
-│   │   ├── game_effects.h / .c       Per-frame effect orchestration
-│   │   ├── fog.h / .c                Fog overlay
-│   │   ├── parallax.h / .c           Multi-layer scrolling background
-│   │   └── water.h / .c              Animated water strip
-│   ├── entities/                      Enemies
-│   │   ├── spider.h / .c             Spider (ground patrol)
-│   │   ├── jumping_spider.h / .c     Jumping spider
-│   │   ├── bird.h / .c               Bird (sine-wave sky patrol)
-│   │   ├── bird_variant.h / .c       Shared bird/faster-bird behaviour
-│   │   ├── faster_bird.h / .c        Fast bird
-│   │   ├── fish.h / .c               Fish (jumping water patrol)
-│   │   └── faster_fish.h / .c        Fast fish
-│   ├── hazards/                       Damaging obstacles
-│   │   ├── spike.h / .c              Ground spike rows
-│   │   ├── spike_block.h / .c        Rail-riding spike
-│   │   ├── spike_platform.h / .c     Elevated spike
-│   │   ├── circular_saw.h / .c       Rotating saw
-│   │   ├── axe_trap.h / .c           Swinging axe
-│   │   └── blue_flame.h / .c         Blue flame / fire flame
-│   ├── input/                         raylib device sampling, semantic commands, browser bridge and replay injection
-│   ├── levels/                        Level system
-│   │   ├── level.h                    Shared level definitions (LevelDef struct)
-│   │   ├── level_loader.h / .c       TOML level loading and switching
-│   │   ├── level_path/ref/resources/session/physics helpers
-│   │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
-│   │   └── level_validate.c          LevelDef count validation
-│   ├── player/                        Player module split into lifecycle, input, motion, jump, climb, surface, and animation files
-│   ├── render/                        `game_render` frame order and `render_overlay` foreground/overlay helpers
-│   ├── screens/                       Game screens
-│   │   ├── start_menu.h / .c         Start menu
-│   │   ├── settings_menu.h / .c      F1 settings and control remapping
-│   │   └── hud.h / .c                HUD (hearts, lives, score)
-│   └── surfaces/                      Traversable objects
-│       ├── platform.h / .c           One-way platform pillars (9-slice)
-│       ├── float_platform.h / .c     Hovering platforms (static/crumble/rail)
-│       ├── bridge.h / .c             Crumble walkways
-│       ├── bouncepad.h / .c          Bouncepad base; bouncepad_small/medium/high.h variants
-│       ├── rail.h / .c               Rail path system
-│       ├── vine.h / .c               Climbable vine
-│       ├── ladder.h / .c             Climbable ladder
-│       └── rope.h / .c               Climbable rope
-├── assets/                            All game assets
-│   ├── sprites/                       PNG sprites and tilesets
-│   │   ├── backgrounds/              Parallax background layers
-│   │   ├── foregrounds/              Fog and foreground overlays
-│   │   ├── collectibles/             Coins, stars
-│   │   ├── entities/                 Enemy sprite sheets
-│   │   ├── hazards/                  Hazard sprite sheets
-│   │   ├── levels/                   Floor tiles and level-specific assets
-│   │   ├── player/                   Player sprite sheet
-│   │   ├── screens/                  Menu and HUD sprites
-│   │   ├── surfaces/                 Platforms, bridges, vines, ladders, ropes
-│   │   └── unused/                   Reserve assets from asset pack
-│   └── sounds/                        WAV files generated by tools/gen_sounds.py
-│       ├── collectibles/             Pickup sounds
-│       ├── entities/                 Enemy sounds
-│       ├── hazards/                  Hazard sounds
-│       ├── levels/                   Ambient level loops
-│       ├── player/                   Player action sounds
-│       ├── screens/                  Menu sounds
-│       └── surfaces/                 Surface interaction sounds
-├── vendor/                            Vendored third-party code and pins
-│   ├── raylib/                       raylib 6.0 source/checksum pin, patches and provenance
-│   └── tomlc17/                      TOML v1.1 parser (tomlc17.c/.h)
-├── tests/                             Native harnesses, fuzz harnesses/corpus, fixtures, Python/Node host tests
-├── tools/                             Build, validation, generator, packaging and docs-check scripts (plus manual art tools)
-├── docs/                              Astro GitHub Pages site; manual pages in docs/wiki/
-├── web/                               Emscripten shell, touch controls, keyboard scoping, debug boot
-├── .specs/                            Project state, roadmap and feature specs
-└── .github/                           CI workflows and SECURITY_TRIAGE.md
-    └── workflows/
-        ├── build.yml                  Docs drift, builds/tests, release checksums/provenance, Pages build/deploy (main)
-        ├── codeql.yml                 CodeQL: C/C++ (filtered SARIF), Actions, Python, JavaScript/TypeScript
-        └── docs.yml                   Docs drift, lint, audit, build and site checks
+├── src/          The game and editor in C: core/, player/, entities/, hazards/,
+│                 collectibles/, surfaces/, levels/, render/, input/, screens/,
+│                 effects/, collision/, shared/ (used by both), editor/
+├── levels/       TOML levels, labs/ for the learning levels, campaigns/main.toml
+├── assets/       Sprites and the WAV files generated by tools/gen_sounds.py
+├── labs/         Small standalone C files with planted bugs for Debugging C
+├── tests/        Native, fuzz, Python and Node tests and their fixtures
+├── tools/        Build, validation, generator, packaging and docs-check scripts
+├── vendor/       Pinned raylib source/checksum and the tomlc17 parser
+├── web/          Emscripten shell, touch controls and keyboard scoping
+├── docs/         The Astro website; manual pages in docs/wiki/
+└── .github/      CI workflows and SECURITY_TRIAGE.md
 ```
+
+[Source Files](https://jonathanperis.github.io/super-mango-editor/docs/source-files/) describes every `.c` and `.h` file.
 
 ## Project Documents
 
 | File | Purpose |
 |------|---------|
 | `PRODUCT.md` | Product direction, player promise, and feature framing. |
-| `DESIGN.md` | Visual/UX design notes for the arcade-cabinet presentation. |
-| `docs/wiki/developer-guide.md` | Coding conventions, entity integration, resource ownership, and verification. |
+| `DESIGN.md` | How the website looks: built from the game's own sprites, palette and fonts. |
+| `docs/wiki/` | The manual, published on the [docs site](https://jonathanperis.github.io/super-mango-editor/docs/). |
 | `docs/README.md` | Website setup, content ownership, generated facts and deployment. |
 | `docs/AUDIT.md`, `docs/AUDIT_IMPLEMENTATION.md` | Historical, dated audit reports (not current status). |
 | `SECURITY.md` | Vulnerability reporting, scope and the web build's shared-origin model. |
 | `THIRD_PARTY_NOTICES.md` | Third-party code and media notices. |
-| `.specs/project/` | Project state, roadmap and decisions. |
 | `CODEOWNERS` | Review ownership hints for GitHub. |
 
-These files complement the public GH Pages manual. If they disagree with code, update the docs and source-backed checks together.
+If any of these disagree with the code, the code wins: update the docs and the
+checks that guard them together.
 
 ## CI/CD
 
-Three workflow files (the Pages jobs are part of `build.yml`):
+Three workflows run on pull requests and on `main`:
 
-| Workflow | File | Trigger | Purpose |
-|----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift`; Linux x86_64, macOS arm64, Windows x86_64 and WebAssembly builds; a parallel `Sanitizers (Linux x86_64)` job; separate Windows Clang and `Desktop backend` jobs; release checksums/attestation; releases only for `v*` tags or manual dispatch on `main` |
-| Docs | `docs.yml` | Relevant pull requests, weekly, manual | Frozen Bun install, Astro lint/build, dependency audit and built-site checks (drift is the `Docs drift` job's) |
-| CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built; non-security results in `out/` and `vendor/` filtered by `tools/filter_codeql_sarif.py` before upload), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis |
-| Deploy Pages | `build.yml` (`pages-build`, `pages-deploy`) | Main push/manual run, after `Docs drift`, the build matrix and the sanitizers pass | Builds/checks docs at that commit, adds the same run's WebAssembly artifact, smokes the assembly and deploys Pages |
+- **`build.yml`** builds and tests the game and editor on Linux, macOS and
+  Windows with warnings as errors, renders every level briefly, and builds the
+  WebAssembly version. It also runs the sanitizers (with the fuzz seeds) and
+  scripted replay smoke on Linux. An always-on `Docs drift` job runs
+  `make docs-drift`. On `main` it publishes the website; on a `v*` tag
+  or a manual release run it adds checksums and build provenance and publishes
+  the release archives.
+- **`docs.yml`** checks the manual against the code, then lints, builds and
+  link-checks the website.
+- **`codeql.yml`** runs CodeQL security and quality analysis on the C code, the
+  workflows, the Python tools and the JavaScript/TypeScript.
 
-The build matrix builds desktop game/editor binaries and archives (Windows with GCC); native legs compile with `-Werror`, the WebAssembly leg with `EXTRA_WEB_CFLAGS=-Werror`. Linux runs GLFW tests/rendered smoke with a virtual display and audio sink; macOS/Windows run the same logical/resource suite and rendered smoke using a separate Memory test build. Additional checks include Linux desktop sanitizers in their own job (tests, fuzz-seed replay and rendered smoke under ASan/UBSan) and scripted replay smoke on Linux; `make validate-levels` runs on Linux, macOS and Windows. The WebAssembly leg builds and checks normal/debug artifacts and their archive. Two jobs ship nothing and never block a release: Windows Clang (`-Werror` on the rolling MSYS2 toolchain) and `Desktop backend`, which runs the Windows (Mesa llvmpipe) suites on real GLFW/OpenGL (hosted macOS runners have no OpenGL pixel format, so the real macOS backend is checked locally). The always-on `Docs drift` job runs `make docs-drift` on every pull request. For releases, a `Checksums and provenance` job writes `SHA256SUMS` and a GitHub build provenance attestation for the four archives; the release job re-verifies them, uploads assets to a draft, then publishes it. Docs and Pages gates validate the matching source/content and WebAssembly artifacts.
+The [Build System](https://jonathanperis.github.io/super-mango-editor/docs/build-system/#cicd-pipelines) page has the job-by-job detail.
 
 ## License
 

@@ -130,9 +130,7 @@ src/
 │   ├── level_resources.h / .c    Per-level resource reload wrappers
 │   ├── level_session.h / .c      Active LevelDef storage plus v1 campaign catalog loading/validation
 │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
-│   ├── level_validate.c          LevelDef count, schema-range and geometry validation
-│   └── exported/00_sandbox_01.h / .c
-│                                  Optional ignored legacy artifacts; no runtime or editor exporter generates or consumes them
+│   └── level_validate.c          LevelDef count, schema-range and geometry validation
 ├── player/
 │   ├── player.h / .c             Public API + high-level glue
 │   ├── player_internal.h         Private frame/hitbox/coyote constants
@@ -165,6 +163,13 @@ src/
 ```
 
 New `.c` files in `src/` or recognized source subdirectories are picked up by Makefile wildcards. New source directories need Makefile wildcard, compile-rule, and clean-rule entries.
+
+There is no level-to-C exporter any more. The editor once wrote levels out as
+C source under `src/levels/exported/`; that exporter was removed when levels
+became TOML-only, and nothing builds or reads that folder now. `.gitignore`
+still lists it so a leftover local copy cannot be committed by accident. The
+debugging practice files in `labs/debugging/` are also outside the build; see
+[Debugging C](../debugging-c/).
 
 ---
 
