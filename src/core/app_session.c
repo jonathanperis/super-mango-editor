@@ -151,21 +151,7 @@ static void session_apply_preferences(AppSession *session)
     if (!session->settings.open && (!session->preferences_applied ||
         session->applied_settings_revision != session->profile.revision)) {
         int volume = s->muted ? 0 : s->effects_volume;
-        if (session->game) {
-            GameState *game = session->game;
-#define VOLUME(member) sound_set_volume(game->audio.member, volume)
-            VOLUME(coin);
-            VOLUME(jump);
-            VOLUME(hit);
-            VOLUME(spring);
-            VOLUME(axe);
-            VOLUME(flap);
-            VOLUME(spider_attack);
-            VOLUME(dive);
-#undef VOLUME
-            const LevelDef *level = game->runtime.current_level;
-            music_set_volume(s->muted ? 0 : level->music_volume*s->music_volume/128);
-        }
+        if (session->game) game_audio_apply_settings(session->game);
         if (session->menu) sound_set_volume(session->menu->snd_confirm, volume);
 #ifndef __EMSCRIPTEN__
         if (IsWindowReady() && (GetScreenWidth() != GAME_W*s->window_scale || GetScreenHeight() != GAME_H*s->window_scale))

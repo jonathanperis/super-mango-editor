@@ -7,6 +7,7 @@
 #include "../shared/platform.h"  /* clock_millis, str_copy */
 #include "game_random.h"
 #include "game_completion.h"
+#include "game_overlay.h"   /* game_audio_apply_settings */
 #include "game_timing.h"
 #include "../levels/level_loader.h"
 #include "../levels/level_resources.h"
@@ -43,6 +44,9 @@ static void restart(GameState *gs, unsigned int seed)
      * in the same order so random enemy timers and fog consume the same stream. */
     (void)level_load(gs, gs->runtime.current_level);
     level_resources_apply(gs, gs->runtime.current_level);
+    /* Reloading the music restarts it at the level's own volume; put the
+     * player's mute and volume settings back so F8 cannot unmute the game. */
+    game_audio_apply_settings(gs);
     player_reset(&gs->player);
     game_completion_reset_summary(gs);
     gs->completion.complete = gs->game_over = 0;

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "core/app_session.h"
+#include "core/game_experiment.h"
 #include "core/game_profile.h"
 #include "shared/platform.h"  /* clock_millis, preference_path_at */
 #include "shared/serializer_io.h"
@@ -356,6 +357,12 @@ static int persistent_session(void)
     puts("profile session: completion");
     session_frame(session);
     CHECK(game_profile_result(&session->profile,"levels/00_sandbox_01.toml"));
+    /* F8 restarts the level for a recording, which reloads the music at the
+     * level's own volume; the player's mute must survive that restart. */
+    puts("profile session: experiment restart");
+    test_last_music_volume = -1;
+    CHECK(game_experiment_begin(session->game)==0);
+    CHECK(test_last_music_volume==0);
     puts("profile session: destroy");
     session_destroy(&session);
     config.level_path=NULL; config.continue_last=1;

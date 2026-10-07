@@ -2,6 +2,8 @@
 
 #include "../screens/settings_menu.h" /* SettingsMenu.open */
 #include "../shared/audio.h"          /* music_pause, music_resume */
+#include "../levels/level.h"          /* LevelDef.music_volume */
+#include "game_profile.h"             /* GameProfile, GameSettings */
 
 static void sync_pause_flag(GameState *gs)
 {
@@ -82,4 +84,25 @@ void game_music_sync(const GameState *gs)
      * no-op in raylib, so callers may sync after any state change. */
     if (game_music_should_play(gs)) music_resume();
     else music_pause();
+}
+
+void game_audio_apply_settings(const GameState *gs)
+{
+    if (!gs || !gs->profile) return;
+    const GameSettings *s = &gs->profile->data.settings;
+    int volume = s->muted ? 0 : s->effects_volume;
+
+    sound_set_volume(gs->audio.coin, volume);
+    sound_set_volume(gs->audio.jump, volume);
+    sound_set_volume(gs->audio.hit, volume);
+    sound_set_volume(gs->audio.spring, volume);
+    sound_set_volume(gs->audio.axe, volume);
+    sound_set_volume(gs->audio.flap, volume);
+    sound_set_volume(gs->audio.spider_attack, volume);
+    sound_set_volume(gs->audio.dive, volume);
+
+    /* The settings slider scales the level's authored volume (0-128). */
+    const LevelDef *level = gs->runtime.current_level;
+    if (level)
+        music_set_volume(s->muted ? 0 : level->music_volume * s->music_volume / 128);
 }
