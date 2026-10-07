@@ -455,8 +455,8 @@ typedef struct {
 
     /* ---- Level-wide configuration ----------------------------------- */
     /*
-     * Fields below control systems that were previously hardcoded in game.c.
-     * Moving them into LevelDef lets the editor configure them per-level.
+     * Fields below control systems that used to be hardcoded in the engine.
+     * Keeping them in LevelDef lets the editor configure them per-level.
      */
 
     /* Background layers (back-to-front render order) */

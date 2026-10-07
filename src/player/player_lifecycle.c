@@ -12,7 +12,8 @@
  *
  * All values are in logical pixels and seconds.  These are the engine
  * defaults — each can be overridden per-level via LevelDef.physics in the
- * .toml file (set to 0 there to keep the default).
+ * .toml file. A negative value there (-1.0, the default) keeps the engine
+ * value; 0.0 is a real override (see level_physics.c).
  *
  * Walk (default, no run key):
  *   WALK_MAX_SPEED    — top speed while walking (px/s).
@@ -130,8 +131,9 @@ int player_init(Player *player)
 
     /*
      * Physics fields — initialised from the #define defaults above.
-     * level_load may override these after player_init if the LevelDef
-     * specifies non-zero physics values for finetuning per level.
+     * level_load may override these after player_init: every LevelDef
+     * physics value of 0 or more replaces its default, while -1 keeps it
+     * (level_apply_player_physics in level_physics.c).
      */
     player_apply_default_physics(player);
 

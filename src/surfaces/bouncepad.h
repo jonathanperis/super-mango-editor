@@ -6,7 +6,8 @@
  * pad plays a 3-frame squash/release animation (frame 2 → 1 → 0) driven by
  * an accumulated millisecond timer, then returns to its compressed idle pose.
  *
- * Sprite sheet: assets/Bouncepad_Wood.png  (144×48 px, 3 cols × 1 row)
+ * Sprite sheets: assets/sprites/surfaces/bouncepad_{small,medium,high}.png
+ * (144×48 px each, 3 cols × 1 row)
  *   Frame 0 (x=  0): extended / post-launch
  *   Frame 1 (x= 48): mid-compress
  *   Frame 2 (x= 96): fully compressed — default idle state
@@ -40,12 +41,16 @@
 #define BOUNCEPAD_VY  BOUNCEPAD_VY_MEDIUM
 
 /*
- * BouncepadType — selects which texture variant to use.
+ * BouncepadType — the pad colour named in the level file (pad_type).
+ *
+ * It is validated and saved back to the TOML, but the game never reads it:
+ * the texture comes from which array the pad is in (bouncepads_small,
+ * _medium or _high, drawn in game_render.c) and the launch from launch_vy.
  */
 typedef enum {
-    BOUNCEPAD_GREEN,   /* small jump — Bouncepad_Green.png  */
-    BOUNCEPAD_WOOD,    /* medium jump — Bouncepad_Wood.png  */
-    BOUNCEPAD_RED      /* high jump — Bouncepad_Red.png     */
+    BOUNCEPAD_GREEN,   /* usual for small pads  (bouncepad_small.png)  */
+    BOUNCEPAD_WOOD,    /* usual for medium pads (bouncepad_medium.png) */
+    BOUNCEPAD_RED      /* usual for high pads   (bouncepad_high.png)   */
 } BouncepadType;
 
 /*
@@ -105,7 +110,7 @@ typedef struct {
     int          anim_frame;    /* current displayed frame index (0, 1, or 2)*/
     float        anim_timer_ms; /* ms accumulated in the current anim frame */
     float        launch_vy;     /* upward impulse applied to player on land  */
-    BouncepadType pad_type;     /* GREEN / WOOD / RED — selects texture      */
+    BouncepadType pad_type;     /* GREEN / WOOD / RED — stored, not drawn    */
 } Bouncepad;
 
 /*
@@ -130,9 +135,9 @@ typedef struct {
  * bouncepad_place — Initialise one bouncepad instance at a given position.
  *
  * Sets all fields to their correct defaults (BOUNCE_IDLE, anim_frame=2,
- * standard dimensions) so the individual variant inits (bouncepad_small.c,
- * bouncepad_medium.c, bouncepad_high.c) only need to specify the parts that
- * differ: x position, launch impulse, and pad type.
+ * standard dimensions) so the level loader, which places the small, medium
+ * and high pads, only passes the parts that differ: x position, launch
+ * impulse, and pad type.
  *
  * Parameters:
  *   pad       : pointer to the Bouncepad to initialise.

@@ -99,7 +99,8 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
     /*
      * 9-slice floor rendering — camera-aware, world-wide.
      *
-     * The 48×48 Grass_Tileset.png is divided into a 3×3 grid of 16×16 pieces
+     * The 48×48 floor tileset (the level's floor_tile_path, by default
+     * grass_tileset.png) is divided into a 3×3 grid of 16×16 pieces
      * (TILE_SIZE / 3 = 16). Layout:
      *
      *   [TL][TC][TR]   row 0  y= 0..15  ← grass edge
