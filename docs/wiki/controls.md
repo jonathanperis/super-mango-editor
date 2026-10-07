@@ -101,35 +101,77 @@ Selecting **Replay** on a completion overlay is deliberately a browser reload, n
 
 ## Debug Experiments
 
-`--debug` opens the simulation inspector and disables personal-profile persistence.
-Besides hitboxes, patrol lines and the velocity arrow, the overlay keeps its text
-in a few small panels: a status line at the top left (`LIVE`, `FROZEN` or `SLOW`,
-plus `REC n` or `REPLAY n/m`), one performance line at the top right (FPS, frame
-time, memory), one player line at the bottom right (state, ground/air, facing,
-velocity, and the checkpoint, riding platform and hurt time when set) and recent
-events at the bottom left. The tuned movement value appears under the status line
-for three seconds after F6/F7/minus/equal, and stays while it differs from the
-level's value; the F10 selection appears there while it is not the player.
-F2 freezes/resumes; F3 advances one 1/60-second step (also during replay);
-F4 cycles 1×, 0.25× and 0.1× speed. F6 cycles nine movement fields (walk/run max
-speed, walk/run ground acceleration, ground friction, ground counter-acceleration,
-walk/run air acceleration, air friction); minus/equal adjusts the selected field
-by 25 within its limits, and F7 restores authored values. F10 cycles
-player/fish/platform/saw inspection. F5 opens and closes a key-help table. During experiment replay, F4,
-F7 and minus/equal are ignored. Focus/settings/player pause and terminal screens
-retain priority.
+`--debug` (or `make run-level-debug LEVEL=...`) opens the simulation inspector
+and turns off saving to your personal profile. The game always advances in
+fixed 1/60 s steps (`src/core/game_timing.c` keeps an accumulator of real
+time), so the inspector controls *how many* steps run, never how long one is.
+
+### Debug inspector keys
+
+This is the one reference table for the inspector; F5 shows the same list in
+the game. The keys are handled in `src/core/game_inspector.c`.
+
+| Key | What it does |
+|-----|--------------|
+| F2 | Freeze or resume the simulation |
+| F3 | Freeze and advance exactly one 1/60 s step (also during replay) |
+| F4 | Cycle speed: 1×, 0.25×, 0.1× (fewer steps per second, each still 1/60 s) |
+| F5 | Open or close the key list in the game |
+| F6 | Select the next of the nine movement values |
+| `-` / `=` | Lower or raise the selected value by 25, between zero and `MAX_LEVEL_MOTION` |
+| F7 | Restore the level's own movement values |
+| F8 | Restart the level from its seed and start recording |
+| F9 | Export the recording |
+| F10 | Choose what the detail row inspects: the player, fish, float platforms or saws in the level |
+
+The nine movement values are walk/run max speed, walk/run ground acceleration,
+ground friction, ground counter-acceleration, walk/run air acceleration and air
+friction. While a recording is replaying, F4, F7 and `-`/`=` are ignored so the
+run cannot change; F2 and F3 still pause and step it. In debug gameplay these
+keys are reserved and cannot be used as remapped controls. Focus loss, the
+settings panel, your own pause and the end-of-level and game-over screens
+still stop the simulation; a step requested while it is stopped is dropped,
+not saved for later.
+
+### What the overlay shows
+
+Besides hitboxes, patrol lines and the velocity arrow, the overlay keeps its
+text in a few small panels: a status line at the top left (`LIVE`, `FROZEN` or
+`SLOW`, plus `REC n` or `REPLAY n/m`), one performance line at the top right
+(FPS, frame time, memory), one player line at the bottom right (state,
+ground/air, facing, velocity, and the checkpoint, riding platform and hurt time
+when set) and recent events at the bottom left. The tuned movement value
+appears under the status line for three seconds after F6/F7/`-`/`=`, and stays
+while it differs from the level's value; the F10 selection appears there while
+it is not the player.
+
+### Recording and replaying an experiment
 
 F8 restarts the current level and records, for every fixed 1/60 s step, the
-semantic inputs and movement tuning, plus the seed (capture `format_version = 2`;
-older version-1 captures from the variable-timestep engine are refused). F8 refuses
-to start if the level file changed since it was loaded. F9 explicitly exports the
-capture, including from completion and game-over overlays, as
-`mango-experiment-<milliseconds>.toml` in the working directory (or a browser
-download), preserving existing files. Replay checks the format version, the seed,
-1–36,000 recorded steps and that the `--level` file's bytes hash to the capture's
-`level_hash`; it does not check the engine revision, so replay with the same
-build. It ignores live movement and freezes at the last recorded step. Captures are bounded to 36,000 simulation steps and do not
-span level transitions. See [Mechanics Museum](../mechanics-museum/).
+inputs (as actions like left or jump, not physical keys) and the nine movement
+values, plus the seed. It records at most 36,000 steps (10 minutes) and refuses
+to start if the level file changed since it was loaded; if you edit the level
+in another program, reopen the game first. A recording belongs to one level:
+going to another level, or choosing Replay, Level Select or Exit, throws it
+away, so export it before you leave.
+
+F9 exports the recording, including from the completion and game-over screens,
+as `mango-experiment-<milliseconds>.toml` in the working directory (or as a
+browser download). It never overwrites an existing file. The file
+(`format_version = 2`) has one row per step, `[input bits, nine movement
+values]`, plus the level path, the seed and `level_hash`, a hash of the level
+file's exact bytes.
+
+Replay it with `--level <same level> --experiment <file>`. The game checks the
+format version, the seed, the 1–36,000 step count and that the level file
+still hashes to `level_hash`, then plays the recorded inputs, ignores live
+movement and freezes after the last step. A changed level is rejected rather
+than silently producing a different run. So is a `format_version = 1` file:
+it came from the earlier variable-timestep engine and cannot be replayed
+faithfully, so record it again. The engine version is not checked, so replay
+with the same build. Recordings are not save games: they hold no pause time,
+audio or pixels. See [Mechanics Museum](../mechanics-museum/) for levels to
+try it on.
 
 ## Runtime Flags for Input and CI
 
