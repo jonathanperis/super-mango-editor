@@ -584,25 +584,23 @@ static int validate_checkpoints(const LevelDef *def, char *err, size_t err_size,
     return 0;
 }
 
+/* ------------------------------------------------------------------ */
+/* Rule groups for level_validate_runtime                             */
+/*                                                                    */
+/* Each helper checks one family of fields and returns -1 with err    */
+/* filled at the first failure, 0 otherwise. They appear in the order */
+/* level_validate_runtime calls them, which is the order the checks   */
+/* run in: only the first failure is reported, so moving a call       */
+/* changes which message a broken level gets (tests compare them).    */
+/* ------------------------------------------------------------------ */
+
 /*
- * level_validate_runtime — Check every rule the runtime relies on.
- *
- * Runs on every level before it is used (game load, editor save/playtest),
- * so code elsewhere may index arrays and trust positions without rechecking.
- * The order matters: counts are checked first so later loops never run past
- * an array. The first failure writes "<field> <problem>" into err and
- * returns -1; a valid level returns 0 with err emptied.
+ * validate_level_settings — Format version, world size, audio volume and
+ * the hearts/lives/score limits.
  */
-int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
+static int validate_level_settings(const LevelDef *def,
+                                   char *err, size_t err_size)
 {
-    char field[64];
-    int screens;
-    float world_w;
-
-    /* ---- Level-wide rules: counts first, so every loop below stays inside
-     *      its array; then version, size, audio and scoring limits. ---- */
-    if (level_validate_counts(def, err, err_size) != 0) return -1;
-
     if (def->format_version != LEVEL_FORMAT_VERSION) {
         if (err && err_size > 0) {
             snprintf(err, err_size, "format_version is %d (expected %d)",
@@ -615,9 +613,6 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         return fail_range(err, err_size, "screen_count", def->screen_count,
                           0, MAX_LEVEL_SCREENS);
     }
-
-    screens = (def->screen_count > 0) ? def->screen_count : 4;
-    world_w = (float)screens * (float)GAME_W;
 
     if (def->music_volume < 0 || def->music_volume > 128) {
         return fail_range(err, err_size, "music_volume", def->music_volume, 0, 128);
@@ -637,10 +632,17 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         return fail_range(err, err_size, "coin_score", def->coin_score,
                           0, MAX_COIN_SCORE);
     }
-    /* ---- Asset paths, physics overrides and per-entity motion values ---- */
-    if (validate_level_paths(def, err, err_size) != 0) return -1;
-    if (validate_physics_finite(def, err, err_size) != 0) return -1;
+    return 0;
+}
 
+/*
+ * validate_entity_motion — Every per-entity speed must be finite and
+ * bounded. Bouncepads, spike blocks and float platforms have their own
+ * speed rules in their helpers below.
+ */
+static int validate_entity_motion(const LevelDef *def,
+                                  char *err, size_t err_size)
+{
 #define CHECK_MOTION_ARRAY(array, count, member) \
     for (int i = 0; i < def->count; i++) { \
         if (validate_motion(err, err_size, #array "." #member, def->array[i].member) != 0) return -1; \
@@ -654,20 +656,30 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
     CHECK_MOTION_ARRAY(background_layers, background_layer_count, speed);
     CHECK_MOTION_ARRAY(foreground_layers, foreground_layer_count, speed);
     CHECK_MOTION_ARRAY(fog_layers, fog_layer_count, speed);
-    /* Bouncepads, spike blocks and float platforms have their own speed
-     * rules further down. */
 #undef CHECK_MOTION_ARRAY
+    return 0;
+}
 
-    /* ---- Player start and checkpoints must lie inside the world ---- */
+/* validate_player_start — An authored start point must lie inside the
+ * world. 0,0 means "use the default start" and is not checked. */
+static int validate_player_start(const LevelDef *def, char *err,
+                                 size_t err_size, float world_w)
+{
     if (def->player_start_x != 0.0f || def->player_start_y != 0.0f) {
         if (validate_point(err, err_size, "player_start",
                            def->player_start_x, def->player_start_y, world_w) != 0)
             return -1;
     }
+    return 0;
+}
 
-    if (validate_checkpoints(def, err, err_size, world_w) != 0) return -1;
+/* validate_floor_gaps — Each gap fits in the world and starts on the
+ * floor-piece grid. */
+static int validate_floor_gaps(const LevelDef *def, char *err,
+                               size_t err_size, float world_w)
+{
+    char field[64];
 
-    /* ---- World geometry: gaps, rails, ground pillars ---- */
     for (int i = 0; i < def->floor_gap_count; i++) {
         if (def->floor_gaps[i] < 0 ||
             def->floor_gaps[i] > (int)world_w - FLOOR_GAP_W) {
@@ -686,6 +698,15 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
             return -1;
         }
     }
+    return 0;
+}
+
+/* validate_rails — Each rail has a valid shape (validate_rail) and its
+ * whole track lies inside the world. */
+static int validate_rails(const LevelDef *def, char *err, size_t err_size,
+                          float world_w)
+{
+    char field[64];
 
     for (int i = 0; i < def->rail_count; i++) {
         if (validate_rail(&def->rails[i], i, err, err_size) != 0) return -1;
@@ -711,6 +732,15 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                                     world_w) != 0) return -1;
         }
     }
+    return 0;
+}
+
+/* validate_platforms — Ground pillars: a sane height and width, and a
+ * footprint inside the world. */
+static int validate_platforms(const LevelDef *def, char *err,
+                              size_t err_size, float world_w)
+{
+    char field[64];
 
     for (int i = 0; i < def->platform_count; i++) {
         const PlatformPlacement *p = &def->platforms[i];
@@ -733,8 +763,16 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                               (FLOOR_Y + 16) / TILE_SIZE);
         }
     }
+    return 0;
+}
 
-    /* ---- Collectibles: positions inside the world ---- */
+/* validate_collectibles — Coins, stars and the last star lie inside the
+ * world. A last star at 0,0 means the level has none. */
+static int validate_collectibles(const LevelDef *def, char *err,
+                                 size_t err_size, float world_w)
+{
+    char field[64];
+
     for (int i = 0; i < def->coin_count; i++) {
         snprintf(field, sizeof(field), "coins[%d]", i);
         if (validate_point(err, err_size, field, def->coins[i].x,
@@ -759,9 +797,19 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         if (validate_point(err, err_size, "last_star", def->last_star.x,
                            def->last_star.y, world_w) != 0) return -1;
     }
+    return 0;
+}
 
-    /* ---- Enemies: each patrol range must contain its start x and be at
-     *      least as wide as the sprite that walks it ---- */
+/*
+ * validate_enemies — Each patrol range must contain its start x and be at
+ * least as wide as the sprite that walks it; sprite frames must exist and
+ * birds must fly inside the screen height.
+ */
+static int validate_enemies(const LevelDef *def, char *err, size_t err_size,
+                            float world_w)
+{
+    char field[64];
+
     for (int i = 0; i < def->spider_count; i++) {
         if (def->spiders[i].frame_index < 0 || def->spiders[i].frame_index >= SPIDER_FRAMES)
             return fail_value(err, err_size, "spiders[].frame_index", "is outside the sprite sheet");
@@ -814,9 +862,16 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                             def->faster_fish[i].patrol_x1,
                             (float)FISH_RENDER_W, world_w) != 0) return -1;
     }
+    return 0;
+}
 
-    /* ---- Hazards: full width inside the world; rail riders name a real
-     *      rail and keep t_offset on it ---- */
+/* validate_spike_strips — Ground spike rows and spike platforms: a sane
+ * tile count and their full width inside the world. */
+static int validate_spike_strips(const LevelDef *def, char *err,
+                                 size_t err_size, float world_w)
+{
+    char field[64];
+
     for (int i = 0; i < def->spike_row_count; i++) {
         int n = def->spike_rows[i].count;
         if (n < 1 || n > MAX_SPIKE_TILES) {
@@ -842,18 +897,40 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                                 (float)(n * SPIKE_PLAT_PIECE_W),
                                 (float)SPIKE_PLAT_SRC_H, world_w) != 0) return -1;
     }
+    return 0;
+}
+
+/*
+ * rail_offset_is_on_track — Whether t_offset t names a point on the rail.
+ *
+ * t counts rail tiles from the start. A closed (RECT) loop accepts any t
+ * in [0, tile count); an open (HORIZ) line ends on its last tile, so t
+ * must also be at most count - 1.
+ */
+static int rail_offset_is_on_track(const RailPlacement *rail, float t)
+{
+    int count = rail->layout == RAIL_LAYOUT_RECT
+              ? 2 * rail->w + 2 * (rail->h - 2) : rail->w;
+
+    if (!isfinite(t) || t < 0.0f || t >= (float)count) return 0;
+    if (rail->layout == RAIL_LAYOUT_HORIZ && t > (float)(count - 1)) return 0;
+    return 1;
+}
+
+/* validate_spike_blocks — A spike block names a real rail, starts on it
+ * and moves at a valid rail speed. */
+static int validate_spike_blocks(const LevelDef *def, char *err,
+                                 size_t err_size)
+{
+    char field[64];
 
     for (int i = 0; i < def->spike_block_count; i++) {
         snprintf(field, sizeof(field), "spike_blocks[%d].rail_index", i);
         if (validate_rail_index(err, err_size, field,
                                 def->spike_blocks[i].rail_index,
-                                 def->rail_count) != 0) return -1;
+                                def->rail_count) != 0) return -1;
         const RailPlacement *rail = &def->rails[def->spike_blocks[i].rail_index];
-        int count = rail->layout == RAIL_LAYOUT_RECT
-                  ? 2 * rail->w + 2 * (rail->h - 2) : rail->w;
-        float t = def->spike_blocks[i].t_offset;
-        if (!isfinite(t) || t < 0.0f || t >= (float)count ||
-            (rail->layout == RAIL_LAYOUT_HORIZ && t > (float)(count - 1))) {
+        if (!rail_offset_is_on_track(rail, def->spike_blocks[i].t_offset)) {
             snprintf(field, sizeof(field), "spike_blocks[%d].t_offset", i);
             return fail_value(err, err_size, field, "must lie on the referenced rail");
         }
@@ -861,8 +938,19 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         if (validate_rail_speed(err, err_size, field,
                                 def->spike_blocks[i].speed) != 0) return -1;
     }
+    return 0;
+}
 
-    /* ---- Surfaces: float platforms (fixed, crumbling or on a rail) ---- */
+/*
+ * validate_float_platforms — A known mode and tile count. A rail platform
+ * follows the same rail rules as a spike block; a fixed or crumbling one
+ * must sit inside the world.
+ */
+static int validate_float_platforms(const LevelDef *def, char *err,
+                                    size_t err_size, float world_w)
+{
+    char field[64];
+
     for (int i = 0; i < def->float_platform_count; i++) {
         const FloatPlatformPlacement *fp = &def->float_platforms[i];
         if (fp->mode != FLOAT_PLATFORM_STATIC &&
@@ -881,13 +969,10 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
             if (validate_rail_index(err, err_size, field,
                                     fp->rail_index, def->rail_count) != 0)
                 return -1;
-            const RailPlacement *rail = &def->rails[fp->rail_index];
-            int count = rail->layout == RAIL_LAYOUT_RECT
-                      ? 2 * rail->w + 2 * (rail->h - 2) : rail->w;
-            if (!isfinite(fp->t_offset) || fp->t_offset < 0.0f ||
-                fp->t_offset >= (float)count ||
-                (rail->layout == RAIL_LAYOUT_HORIZ && fp->t_offset > (float)(count - 1))) {
-                return fail_value(err, err_size, "float_platforms[].t_offset", "must lie on the referenced rail");
+            if (!rail_offset_is_on_track(&def->rails[fp->rail_index],
+                                         fp->t_offset)) {
+                return fail_value(err, err_size, "float_platforms[].t_offset",
+                                  "must lie on the referenced rail");
             }
             snprintf(field, sizeof(field), "float_platforms[%d].speed", i);
             if (validate_rail_speed(err, err_size, field, fp->speed) != 0)
@@ -905,6 +990,15 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                                     world_w) != 0) return -1;
         }
     }
+    return 0;
+}
+
+/* validate_bridges — A sane brick count and the whole bridge inside the
+ * world. */
+static int validate_bridges(const LevelDef *def, char *err, size_t err_size,
+                            float world_w)
+{
+    char field[64];
 
     for (int i = 0; i < def->bridge_count; i++) {
         int n = def->bridges[i].brick_count;
@@ -917,6 +1011,18 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                                 def->bridges[i].y, (float)(n * 16), 16.0f,
                                 world_w) != 0) return -1;
     }
+    return 0;
+}
+
+/*
+ * validate_blades — Axe traps and circular saws: positions in the world
+ * (a y of 0 means "use the default height"), a known axe mode, and a saw
+ * direction and patrol range it can bounce inside.
+ */
+static int validate_blades(const LevelDef *def, char *err, size_t err_size,
+                           float world_w)
+{
+    char field[64];
 
     for (int i = 0; i < def->axe_trap_count; i++) {
         snprintf(field, sizeof(field), "axe_traps[%d].pillar_x", i);
@@ -932,7 +1038,6 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         }
     }
     for (int i = 0; i < def->circular_saw_count; i++) {
-        snprintf(field, sizeof(field), "circular_saws[%d]", i);
         if (def->circular_saws[i].y != 0.0f &&
             validate_world_y(err, err_size, "circular_saws[].y",
                              def->circular_saws[i].y) != 0) return -1;
@@ -941,11 +1046,21 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
             snprintf(field, sizeof(field), "circular_saws[%d].direction", i);
             return fail_value(err, err_size, field, "must be -1 or 1");
         }
+        snprintf(field, sizeof(field), "circular_saws[%d]", i);
         if (validate_patrol(err, err_size, field, def->circular_saws[i].x,
                             def->circular_saws[i].patrol_x0,
                             def->circular_saws[i].patrol_x1,
                             0.0f, world_w) != 0) return -1;
     }
+    return 0;
+}
+
+/* validate_flames — Blue and fire flames erupt from a floor gap, so each
+ * needs room for a whole gap inside the world. */
+static int validate_flames(const LevelDef *def, char *err, size_t err_size,
+                           float world_w)
+{
+    char field[64];
 
     for (int i = 0; i < def->blue_flame_count; i++) {
         snprintf(field, sizeof(field), "blue_flames[%d].x", i);
@@ -957,8 +1072,14 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         if (validate_gap_x(err, err_size, field,
                            def->fire_flames[i].x, world_w) != 0) return -1;
     }
+    return 0;
+}
 
-    /* ---- Bouncepads (three separate arrays, same rules) ---- */
+/* validate_all_bouncepads — The three bouncepad arrays share one rule set
+ * (validate_bouncepads above); check small, medium, then high. */
+static int validate_all_bouncepads(const LevelDef *def, char *err,
+                                   size_t err_size, float world_w)
+{
     if (validate_bouncepads(err, err_size, "bouncepads_small",
                             def->bouncepads_small, def->bouncepad_small_count,
                             world_w) != 0) return -1;
@@ -968,15 +1089,23 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
     if (validate_bouncepads(err, err_size, "bouncepads_high",
                             def->bouncepads_high, def->bouncepad_high_count,
                             world_w) != 0) return -1;
+    return 0;
+}
 
-    /* ---- Climbables: every stacked tile must end above the bottom ---- */
+/* validate_climbables — Vines, ladders and ropes: every stacked tile must
+ * end inside the world, and a vine must have a known colour. */
+static int validate_climbables(const LevelDef *def, char *err,
+                               size_t err_size, float world_w)
+{
+    char field[64];
+
     for (int i = 0; i < def->vine_count; i++) {
-        snprintf(field, sizeof(field), "vines[%d]", i);
         if (def->vines[i].vine_type != VINE_GREEN &&
             def->vines[i].vine_type != VINE_BROWN) {
             snprintf(field, sizeof(field), "vines[%d].vine_type", i);
             return fail_value(err, err_size, field, "is invalid");
         }
+        snprintf(field, sizeof(field), "vines[%d]", i);
         if (validate_climbable_rect(err, err_size, field,
                                     def->vines[i].x, def->vines[i].y,
                                     def->vines[i].tile_count,
@@ -1002,6 +1131,58 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                                     world_w) != 0)
             return -1;
     }
+    return 0;
+}
+
+/*
+ * level_validate_runtime — Check every rule the runtime relies on.
+ *
+ * Runs on every level before it is used (game load, editor save/playtest),
+ * so code elsewhere may index arrays and trust positions without rechecking.
+ * The order matters: counts are checked first so later loops never run past
+ * an array. The first failure writes "<field> <problem>" into err and
+ * returns -1; a valid level returns 0 with err emptied.
+ */
+int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
+{
+    int screens;
+    float world_w;
+
+    /* Level-wide rules: counts first, so every loop below stays inside its
+     * array; then version, size, audio and scoring limits. */
+    if (level_validate_counts(def, err, err_size) != 0) return -1;
+    if (validate_level_settings(def, err, err_size) != 0) return -1;
+
+    /* Most rules below need the world width; 0 screens means the default 4. */
+    screens = (def->screen_count > 0) ? def->screen_count : 4;
+    world_w = (float)screens * (float)GAME_W;
+
+    /* Asset paths, physics overrides and per-entity motion values. */
+    if (validate_level_paths(def, err, err_size) != 0) return -1;
+    if (validate_physics_finite(def, err, err_size) != 0) return -1;
+    if (validate_entity_motion(def, err, err_size) != 0) return -1;
+
+    /* Player start and checkpoints must lie inside the world. */
+    if (validate_player_start(def, err, err_size, world_w) != 0) return -1;
+    if (validate_checkpoints(def, err, err_size, world_w) != 0) return -1;
+
+    /* World geometry: gaps, rails, ground pillars. */
+    if (validate_floor_gaps(def, err, err_size, world_w) != 0) return -1;
+    if (validate_rails(def, err, err_size, world_w) != 0) return -1;
+    if (validate_platforms(def, err, err_size, world_w) != 0) return -1;
+
+    /* Everything placed in the world. Rail riders come after
+     * validate_rails, so the rail they name is already known to be valid. */
+    if (validate_collectibles(def, err, err_size, world_w) != 0) return -1;
+    if (validate_enemies(def, err, err_size, world_w) != 0) return -1;
+    if (validate_spike_strips(def, err, err_size, world_w) != 0) return -1;
+    if (validate_spike_blocks(def, err, err_size) != 0) return -1;
+    if (validate_float_platforms(def, err, err_size, world_w) != 0) return -1;
+    if (validate_bridges(def, err, err_size, world_w) != 0) return -1;
+    if (validate_blades(def, err, err_size, world_w) != 0) return -1;
+    if (validate_flames(def, err, err_size, world_w) != 0) return -1;
+    if (validate_all_bouncepads(def, err, err_size, world_w) != 0) return -1;
+    if (validate_climbables(def, err, err_size, world_w) != 0) return -1;
 
     if (err && err_size > 0) err[0] = '\0';
     return 0;
