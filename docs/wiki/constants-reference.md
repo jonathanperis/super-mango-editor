@@ -73,6 +73,7 @@ The floor is drawn by repeating the active 48x48 floor tile across the full leve
 | `GRAVITY` | `800.0f` | `float` | Downward acceleration in px/s^2 |
 | `FLOOR_GAP_W` | `32` | `int` | Width of each floor gap in logical pixels |
 | `MAX_FLOOR_GAPS` | `16` | `int` | Maximum number of floor gaps per level |
+| `FLOOR_PIECE_W` | `TILE_SIZE / 3` (16) | `int` | Width of one floor piece; floor gaps must start on this grid |
 | `MAX_LEVEL_MOTION` | `10000` | `int` | Upper magnitude for authored motion values (speeds, accelerations) |
 
 ### Level Limits
