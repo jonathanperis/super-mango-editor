@@ -13,13 +13,13 @@
 
 
 /*
- * rope_render — Draw each rope as vertically stacked tiles.
+ * ropes_render — Draw each rope as vertically stacked tiles.
  *
  * Rope.png is a 16×48 single frame.  Tiles overlap by 2 px
  * (ROPE_STEP = 46) for seamless stacking.
  */
-void rope_render(const RopeDecor *ropes, int count,
-                 Texture2D *tex, int cam_x) {
+void ropes_render(const RopeDecor *ropes, int count,
+                  Texture2D *tex, int cam_x) {
     if (!tex) return;
 
     for (int i = 0; i < count; i++) {

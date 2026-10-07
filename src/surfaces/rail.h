@@ -106,8 +106,8 @@ typedef struct {
  */
 
 /* Draw every tile of every rail using the given texture and camera offset. */
-void rail_render(const Rail *rails, int count,
-                 Texture2D *tex, int cam_x);
+void rails_render(const Rail *rails, int count,
+                  Texture2D *tex, int cam_x);
 
 /*
  * rail_get_world_pos — Interpolate the world-space centre of position t.

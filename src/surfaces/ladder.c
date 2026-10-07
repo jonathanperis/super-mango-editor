@@ -13,13 +13,13 @@
 
 
 /*
- * ladder_render — Draw each ladder as vertically stacked tiles.
+ * ladders_render — Draw each ladder as vertically stacked tiles.
  *
  * Ladder.png is a 16×48 single frame.  Tiles overlap by 2 px
  * (LADDER_STEP = 46) for seamless stacking.
  */
-void ladder_render(const LadderDecor *ladders, int count,
-                   Texture2D *tex, int cam_x) {
+void ladders_render(const LadderDecor *ladders, int count,
+                    Texture2D *tex, int cam_x) {
     if (!tex) return;
 
     for (int i = 0; i < count; i++) {

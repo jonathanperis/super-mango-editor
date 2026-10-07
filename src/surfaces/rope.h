@@ -29,5 +29,5 @@ typedef struct {
 } RopeDecor;
 
 /* Blit every rope with world-to-screen camera offset applied. */
-void rope_render(const RopeDecor *ropes, int count,
-                 Texture2D *tex, int cam_x);
+void ropes_render(const RopeDecor *ropes, int count,
+                  Texture2D *tex, int cam_x);
