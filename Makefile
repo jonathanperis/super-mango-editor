@@ -123,77 +123,61 @@ SMOKE_LEVELS  = $(wildcard levels/*.toml) $(wildcard levels/labs/*.toml)
 SMOKE_FRAMES  ?= 5
 SMOKE_SEED    ?= 1
 SMOKE_SEEDS   ?= 1 7 23
-TEST_SERIALIZER_OBJ = $(OBJDIR)/tests/test-serializer.o
-TEST_SERIALIZER_EMIT_OBJ = $(OBJDIR)/tests/test-serializer-emit.o
-TEST_SERIALIZER_IO_OBJ = $(OBJDIR)/tests/test-serializer-io.o
-TEST_SERIALIZER_LOAD_OBJ = $(OBJDIR)/tests/test-serializer-load.o
-TEST_SERIALIZER_LOAD_CHECKPOINTS_OBJ = $(OBJDIR)/tests/test-serializer-load-checkpoints.o
-TEST_SERIALIZER_LOAD_CLIMBABLES_OBJ = $(OBJDIR)/tests/test-serializer-load-climbables.o
-TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ = $(OBJDIR)/tests/test-serializer-load-collectibles.o
-TEST_SERIALIZER_LOAD_CONFIG_OBJ = $(OBJDIR)/tests/test-serializer-load-config.o
-TEST_SERIALIZER_LOAD_ENEMIES_OBJ = $(OBJDIR)/tests/test-serializer-load-enemies.o
-TEST_SERIALIZER_LOAD_GEOMETRY_OBJ = $(OBJDIR)/tests/test-serializer-load-geometry.o
-TEST_SERIALIZER_LOAD_HAZARDS_OBJ = $(OBJDIR)/tests/test-serializer-load-hazards.o
-TEST_SERIALIZER_LOAD_HEADER_OBJ = $(OBJDIR)/tests/test-serializer-load-header.o
-TEST_SERIALIZER_LOAD_LAYERS_OBJ = $(OBJDIR)/tests/test-serializer-load-layers.o
-TEST_SERIALIZER_LOAD_SURFACES_OBJ = $(OBJDIR)/tests/test-serializer-load-surfaces.o
-TEST_SERIALIZER_PARSE_OBJ = $(OBJDIR)/tests/test-serializer-parse.o
-TEST_SERIALIZER_SAVE_OBJ = $(OBJDIR)/tests/test-serializer-save.o
-TEST_SERIALIZER_TYPES_OBJ = $(OBJDIR)/tests/test-serializer-types.o
-TEST_VALIDATE_OBJ   = $(OBJDIR)/tests/test-level-validate.o
-TEST_LEVEL_LOADER_OBJ = $(OBJDIR)/tests/test-level-loader.o
-TEST_TOMLC_OBJ      = $(OBJDIR)/tests/test-tomlc17.o
-TEST_RAIL_OBJ       = $(OBJDIR)/tests/test-rail.o
-TEST_ENTITY_UTILS_OBJ = $(OBJDIR)/tests/test-entity-utils.o
-TEST_SPIKE_BLOCK_OBJ = $(OBJDIR)/tests/test-spike-block.o
-TEST_SPIKE_PLATFORM_OBJ = $(OBJDIR)/tests/test-spike-platform.o
-TEST_FISH_OBJ      = $(OBJDIR)/tests/test-fish.o
-TEST_CIRCULAR_SAW_OBJ = $(OBJDIR)/tests/test-circular-saw.o
-TEST_COLLISION_DAMAGE_OBJ = $(OBJDIR)/tests/test-collision-damage.o
-TEST_GAME_CAMERA_OBJ = $(OBJDIR)/tests/test-game-camera.o
-TEST_GAME_SCORE_OBJ = $(OBJDIR)/tests/test-game-score.o
-TEST_LEVEL_PHYSICS_OBJ = $(OBJDIR)/tests/test-level-physics.o
-TEST_PLAYER_LIFECYCLE_OBJ = $(OBJDIR)/tests/test-player-lifecycle.o
-TEST_FLOAT_PLATFORM_OBJ = $(OBJDIR)/tests/test-float-platform.o
-TEST_BOUNCEPAD_OBJ = $(OBJDIR)/tests/test-bouncepad.o
-TEST_PHASE_OBJ      = $(OBJDIR)/tests/test-phase-transition.o
-TEST_GAME_OVERLAY_OBJ = $(OBJDIR)/tests/test-game-overlay.o
-TEST_GAME_EVENTS_OBJ = $(OBJDIR)/tests/test-game-events.o
-TEST_GAME_INPUT_OBJ = $(OBJDIR)/tests/test-game-input.o
-TEST_WEB_INPUT_OBJ = $(OBJDIR)/tests/test-web-input.o
-TEST_BINDINGS_OBJ = $(OBJDIR)/tests/test-game-bindings.o
-TEST_SETTINGS_OBJ = $(OBJDIR)/tests/test-settings-menu.o
+# Tests recompile some game/editor sources with TEST_CFLAGS (a few also swap
+# raylib calls for test doubles), so those objects live in their own tree that
+# mirrors the source path: src/screens/hud.c -> $(TEST_OBJDIR)/src/screens/hud.o.
+# One pattern rule (after the fuzz targets) builds every one of them; adding a
+# test object is just a new variable here plus its use in a link rule below.
+TEST_OBJDIR = $(OBJDIR)/tests
+TEST_SERIALIZER_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(SHARED_DIR)/%.o,serializer serializer_emit \
+                       serializer_io serializer_load serializer_load_checkpoints \
+                       serializer_load_climbables serializer_load_collectibles \
+                       serializer_load_config serializer_load_enemies serializer_load_geometry \
+                       serializer_load_hazards serializer_load_header serializer_load_layers \
+                       serializer_load_surfaces serializer_parse serializer_save serializer_types)
+TEST_VALIDATE_OBJ   = $(TEST_OBJDIR)/$(SRCDIR)/levels/level_validate.o
+TEST_LEVEL_LOADER_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/levels/level_loader.o
+TEST_TOMLC_OBJ      = $(TEST_OBJDIR)/$(VENDOR_DIR)/tomlc17.o
+TEST_RAIL_OBJ       = $(TEST_OBJDIR)/$(SRCDIR)/surfaces/rail.o
+TEST_ENTITY_UTILS_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/core/entity_utils.o
+TEST_SPIKE_BLOCK_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/hazards/spike_block.o
+TEST_SPIKE_PLATFORM_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/hazards/spike_platform.o
+TEST_FISH_OBJ      = $(TEST_OBJDIR)/$(SRCDIR)/entities/fish.o
+TEST_CIRCULAR_SAW_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/hazards/circular_saw.o
+TEST_COLLISION_DAMAGE_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/collision/collision_damage.o
+TEST_GAME_CAMERA_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/core/game_camera.o
+TEST_GAME_SCORE_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/core/game_score.o
+TEST_LEVEL_PHYSICS_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/levels/level_physics.o
+TEST_PLAYER_LIFECYCLE_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/player/player_lifecycle.o
+TEST_FLOAT_PLATFORM_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/surfaces/float_platform.o
+TEST_BOUNCEPAD_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/surfaces/bouncepad.o
+TEST_PHASE_OBJ      = $(TEST_OBJDIR)/$(SRCDIR)/levels/phase_transition.o
+TEST_GAME_OVERLAY_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/core/game_overlay.o
+TEST_GAME_EVENTS_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/game_events.o
+TEST_GAME_INPUT_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/game_input.o
+TEST_WEB_INPUT_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/game_web_input.o
+TEST_BINDINGS_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/game_bindings.o
+TEST_SETTINGS_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/screens/settings_menu.o
+# These two need no test flags, so tests link the game's own objects.
 TEST_GAME_TERMINAL_OBJ = $(OBJDIR)/src/core/game_terminal.o
 TEST_GAME_RANDOM_OBJ = $(OBJDIR)/src/core/game_random.o
-TEST_GAME_CHECKPOINT_OBJ = $(OBJDIR)/tests/test-game-checkpoint.o
-TEST_HUD_OBJ = $(OBJDIR)/tests/test-hud.o
-TEST_EDITOR_VALIDATION_OBJ = $(OBJDIR)/tests/test-editor-validation.o
-TEST_EDITOR_FILES_OBJ = $(OBJDIR)/tests/test-editor-files.o
-TEST_EDITOR_SESSION_OBJ = $(OBJDIR)/tests/test-editor-session.o
-TEST_EDITOR_UNDO_APPLY_OBJ = $(OBJDIR)/tests/test-editor-undo-apply.o
-TEST_EDITOR_ENTITY_META_OBJ = $(OBJDIR)/tests/test-editor-entity-meta.o
-TEST_EDITOR_UI_OBJ = $(OBJDIR)/tests/test-editor-ui.o
-TEST_EDITOR_TOOLS_OBJ = $(OBJDIR)/tests/test-editor-tools.o
-TEST_EDITOR_HIT_TEST_OBJ = $(OBJDIR)/tests/test-editor-hit-test.o
-TEST_EDITOR_CLIPBOARD_OBJ = $(OBJDIR)/tests/test-editor-clipboard.o
-TEST_EDITOR_EVENTS_OBJ = $(OBJDIR)/tests/test-editor-events.o
-TEST_EDITOR_CANVAS_OBJ = $(OBJDIR)/tests/test-editor-canvas.o
-TEST_EDITOR_PANELS_OBJ = $(OBJDIR)/tests/test-editor-panels.o
-TEST_EDITOR_LAYOUT_OBJ = $(OBJDIR)/tests/test-editor-layout.o
-TEST_EDITOR_PALETTE_OBJ = $(OBJDIR)/tests/test-editor-palette.o
-TEST_EDITOR_PROPERTIES_OBJ = $(OBJDIR)/tests/test-editor-properties.o
-TEST_EDITOR_PLAYTEST_OBJ = $(OBJDIR)/tests/test-editor-playtest.o
-TEST_FILE_DIALOG_OBJ = $(OBJDIR)/tests/test-file-dialog.o
-TEST_UNDO_OBJ      = $(OBJDIR)/tests/test-undo.o
-TEST_AUDIO_OBJ     = $(OBJDIR)/tests/test-audio.o
-TEST_SESSION_OBJ   = $(OBJDIR)/tests/test-app-session.o
-TEST_INPUT_BACKEND_OBJ = $(OBJDIR)/tests/test-input-backend.o
+TEST_GAME_CHECKPOINT_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/core/game_checkpoint.o
+TEST_HUD_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/screens/hud.o
+TEST_EDITOR_UI_OBJ = $(TEST_OBJDIR)/$(SHARED_DIR)/ui.o
+TEST_EDITOR_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor_validation editor_files \
+                   editor_session editor_undo_apply entity_meta) \
+                   $(TEST_EDITOR_UI_OBJ) \
+                   $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,tools hit_test editor_clipboard \
+                   editor_events canvas editor_panels editor_layout palette properties \
+                   editor_playtest file_dialog undo)
+TEST_AUDIO_OBJ     = $(TEST_OBJDIR)/$(SHARED_DIR)/audio.o
+TEST_SESSION_OBJ   = $(TEST_OBJDIR)/$(SRCDIR)/core/app_session.o
+TEST_INPUT_BACKEND_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/input_backend.o
 TEST_LIBS           = $(LIBS)
 PLATFORM_OBJS = $(addprefix $(OBJDIR)/src/shared/,audio.o graphics.o platform.o text.o) $(OBJDIR)/src/input/input_backend.o
-TEST_DEPS           = $(wildcard $(OBJDIR)/tests/*.d)
-# Test objects have explicit recipes; order their directory creation too,
-# including when an individual test is built in parallel from a fresh OUTDIR.
-TEST_OBJECTS := $(foreach name,$(filter %_OBJ,$(filter TEST_%,$(.VARIABLES))),$($(name)))
+# Every TEST_*_OBJ / TEST_*_OBJS variable above, so new ones need no extra list.
+TEST_OBJECTS := $(foreach name,$(filter %_OBJ %_OBJS,$(filter TEST_%,$(.VARIABLES))),$($(name)))
+TEST_DEPS           = $(patsubst %.o,%.d,$(filter $(TEST_OBJDIR)/%,$(TEST_OBJECTS)))
 # UBSan only prints a report and carries on by default, so a test that hits
 # undefined behaviour would still exit 0 and CI would stay green.
 # -fno-sanitize-recover makes every UB check abort, as the fuzz builds do;
@@ -206,7 +190,7 @@ SANITIZE_ENV        = UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1$${UBSAN_
 
 .PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels web-host-contract level-catalog overlay-snapshots docs-drift roadmap-quality smoke scripted-smoke sanitize sanitize-smoke dist-native dist-wasm compile-commands
 
-all: $(OUTDIR) $(TARGET)
+all: $(OUTDIR) $(TARGET) ## Build: Compile the game into OUTDIR (default target)
 
 $(RAYLIB_LIB): vendor/raylib/manifest.json vendor/raylib/patches.json tools/build_raylib.py Makefile
 	python3 tools/build_raylib.py --build-dir "$(RAYLIB_BUILD)" --platform $(RAYLIB_PLATFORM) --cc "$(CC)" --mode $(BUILD_MODE) $(if $(findstring -fsanitize,$(CFLAGS)),--sanitize,) $(if $(filter null,$(RAYLIB_AUDIO)),--null-audio,) $(RAYLIB_ARCHIVE_ARG)
@@ -240,20 +224,20 @@ else
 RUN_PREFIX =
 endif
 
-run: all
+run: all ## Run: Build and play the campaign
 	$(RUN_PREFIX) "$(abspath $(TARGET))"
 
-run-debug: all
+run-debug: all ## Run: Play with the debug overlay
 	$(RUN_PREFIX) "$(abspath $(TARGET))" --debug
 
-run-level: all
+run-level: all ## Run: Play one level: make run-level LEVEL=levels/<name>.toml
 	$(RUN_PREFIX) "$(abspath $(TARGET))" --level "$(LEVEL)"
 
-run-level-debug: all
+run-level-debug: all ## Run: run-level with the debug overlay
 	$(RUN_PREFIX) "$(abspath $(TARGET))" --debug --level "$(LEVEL)"
 
 # ── Editor targets ───────────────────────────────────────────────────
-editor: $(OUTDIR) $(EDITOR_TARGET)
+editor: $(OUTDIR) $(EDITOR_TARGET) ## Build: Compile the level editor into OUTDIR
 
 $(EDITOR_TARGET): $(EDITOR_OBJS) | $(OUTDIR)
 	$(CC) $(CFLAGS) -o $@ $^ $(EDITOR_LIBS)
@@ -266,21 +250,21 @@ $(OBJDIR)/$(VENDOR_DIR)/%.o: $(VENDOR_DIR)/%.c | $(OUTDIR)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -MMD -MP -c -o $@ $<
 
-run-editor: all editor
+run-editor: all editor ## Run: Build and open the level editor
 	$(RUN_PREFIX) "$(abspath $(EDITOR_TARGET))"
 
 .PHONY: debug release builder
-builder: all editor
-debug:
+builder: all editor ## Build: Game and editor together
+debug: ## Build: Game and editor with debug flags in OUTDIR/debug
 	$(MAKE) builder BUILD_MODE=debug OUTDIR="$(OUTDIR)/debug"
-release:
+release: ## Build: Game and editor, optimized and hardened, in OUTDIR/release
 	$(MAKE) builder BUILD_MODE=release OUTDIR="$(OUTDIR)/release"
 
 -include $(EDITOR_DEPS)
 -include $(TEST_DEPS)
 
 # ── Tests ────────────────────────────────────────────────────────────
-test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser-encoding-probe
+test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser-encoding-probe ## Test: Native test binaries plus the Python and Node host checks
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/level-serializer-test"
 	python3 tests/validate_levels_test.py
 	python3 tests/gen_sounds_test.py
@@ -300,11 +284,6 @@ test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/game-checkpoint-test"
 
 $(TEST_TARGETS): | $(OUTDIR)
-# $(OUTDIR) is skipped once out/ exists, so test objects also order their own
-# directory; otherwise a deleted out/obj/tests breaks every later `make test`.
-$(TEST_OBJECTS): | $(OUTDIR) $(OBJDIR)/tests
-$(OBJDIR)/tests:
-	mkdir -p $@
 $(filter-out $(OUTDIR)/session-test $(OUTDIR)/game-events-test,$(TEST_TARGETS)): $(PLATFORM_OBJS)
 $(OUTDIR)/game-events-test: $(filter-out $(OBJDIR)/src/input/input_backend.o,$(PLATFORM_OBJS)) $(TEST_INPUT_BACKEND_OBJ) tests/input_backend_test.c
 $(OUTDIR)/editor-validation-test: $(OBJDIR)/src/editor/dialog_choice.o
@@ -323,10 +302,10 @@ $(OUTDIR)/parser-allocation-probe: tests/parser_allocation_test.c $(VENDOR_DIR)/
 parser-encoding-probe:
 	python3 tests/parser_validator_test.py
 
-validate-levels:
+validate-levels: ## Check: Every level, the campaign manifest and asset links
 	python3 tools/validate_levels.py
 
-web-host-contract:
+web-host-contract: ## Check: Web shell, storage and packaging contract tests
 	python3 tools/check_web_boot_contract.py
 	$(NODE) tests/web_host_test.cjs
 	$(NODE) tests/profile_storage_test.cjs
@@ -336,21 +315,21 @@ web-host-contract:
 	python3 tests/filter_codeql_sarif_test.py
 
 # clangd / IDE compile database uses the same pinned dependency headers.
-compile-commands:
+compile-commands: ## Build: Write compile_commands.json for clangd and IDEs
 	CC="$(CC)" RAYLIB_BUILD="$(RAYLIB_BUILD)" python3 tools/gen_compile_commands.py
 
-level-catalog:
+level-catalog: ## Generate: Level catalog page from the campaign manifest
 	python3 tools/generate_level_catalog.py
 
-overlay-snapshots:
+overlay-snapshots: ## Generate: Overlay text snapshots page
 	python3 tools/generate_overlay_snapshots.py
 
 # Regenerate every assets/sounds WAV from tools/gen_sounds.py recipes.
 .PHONY: sounds
-sounds:
+sounds: ## Generate: Every assets/sounds WAV from tools/gen_sounds.py
 	python3 tools/gen_sounds.py
 
-docs-drift:
+docs-drift: ## Check: Generated docs, sounds and manual facts match the code
 	python3 tools/content_inventory.py --check
 	python3 tools/gen_sounds.py --check
 	python3 tools/generate_level_catalog.py --check
@@ -358,36 +337,36 @@ docs-drift:
 	python3 tools/check_docs_drift.py
 	python3 tools/check_roadmap_quality.py
 
-roadmap-quality:
+roadmap-quality: ## Check: Roadmap entries are complete
 	python3 tools/check_roadmap_quality.py
 
 .PHONY: content-inventory asset-budget
-content-inventory:
+content-inventory: ## Generate: Asset inventory page and docs project facts
 	python3 tools/content_inventory.py
-asset-budget:
+asset-budget: ## Check: Shipped assets stay within the size budget
 	python3 tools/content_inventory.py --check
 
 .PHONY: timing-lab
-timing-lab:
+timing-lab: ## Run: Print the fixed-step vs variable-step physics study
 	python3 tools/timing_lab.py
 
-smoke: all editor
+smoke: all editor ## Test: Boot every level and the editor for SMOKE_FRAMES frames
 	@for level in $(SMOKE_LEVELS); do \
 		echo "smoke: $$level"; \
 		$(RUN_PREFIX) "$(abspath $(TARGET))" --level "$$level" --smoke-test-frames $(SMOKE_FRAMES) --seed $(SMOKE_SEED) || exit 1; \
 	done
 	$(RUN_PREFIX) "$(abspath $(EDITOR_TARGET))" --smoke-test
 
-scripted-smoke: all editor
+scripted-smoke: all editor ## Test: Replay scripted input scenarios for each of SMOKE_SEEDS
 	python3 tools/run_scripted_smoke.py --binary $(TARGET) --editor $(EDITOR_TARGET) --frames $(SMOKE_FRAMES) --seeds $(SMOKE_SEEDS)
 
-sanitize:
+sanitize: ## Test: test and fuzz-corpus under ASan/UBSan in OUTDIR-sanitize
 	$(SANITIZE_ENV) $(MAKE) all editor test OUTDIR="$(OUTDIR)-sanitize" \
 		EXTRA_CFLAGS="$(EXTRA_CFLAGS) $(SANITIZE_CFLAGS)" \
 		EXTRA_LDFLAGS="$(EXTRA_LDFLAGS) $(SANITIZE_LDFLAGS)"
 	$(SANITIZE_ENV) $(MAKE) fuzz-corpus OUTDIR="$(OUTDIR)-sanitize"
 
-sanitize-smoke:
+sanitize-smoke: ## Test: smoke under ASan/UBSan in OUTDIR-sanitize
 	$(SANITIZE_ENV) $(MAKE) smoke OUTDIR="$(OUTDIR)-sanitize" \
 		EXTRA_CFLAGS="$(EXTRA_CFLAGS) $(SANITIZE_CFLAGS)" \
 		EXTRA_LDFLAGS="$(EXTRA_LDFLAGS) $(SANITIZE_LDFLAGS)"
@@ -410,7 +389,7 @@ COVERAGE_BINS = $(patsubst $(OUTDIR)/%,$(COVERAGE_OUTDIR)/%,$(TEST_TARGETS)) \
 COVERAGE_IGNORE = '(^|/)(vendor|tests|out)/'
 
 .PHONY: coverage
-coverage: $(RAYLIB_LIB)
+coverage: $(RAYLIB_LIB) ## Test: Per-file line coverage of the native tests (clang)
 	rm -rf "$(COVERAGE_OUTDIR)/profiles"
 	mkdir -p "$(COVERAGE_OUTDIR)/profiles" "$(COVERAGE_OUTDIR)/obj/tests"
 	LLVM_PROFILE_FILE="$(abspath $(COVERAGE_OUTDIR))/profiles/%p-%m.profraw" \
@@ -453,7 +432,7 @@ FUZZ_SECONDS ?= 60
 FUZZ_CC ?= $(firstword $(wildcard /opt/homebrew/opt/llvm/bin/clang /usr/local/opt/llvm/bin/clang) clang)
 
 .PHONY: fuzz-corpus fuzz
-fuzz-corpus: $(OUTDIR)/fuzz-level-replay $(OUTDIR)/fuzz-profile-replay
+fuzz-corpus: $(OUTDIR)/fuzz-level-replay $(OUTDIR)/fuzz-profile-replay ## Test: Replay the fuzz seeds under ASan/UBSan (FUZZ_MUTATIONS=N)
 	"$(abspath $(OUTDIR))/fuzz-level-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_LEVEL_SEEDS)
 	"$(abspath $(OUTDIR))/fuzz-profile-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_PROFILE_SEEDS)
 
@@ -466,7 +445,7 @@ $(OUTDIR)/fuzz-profile-replay: tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(F
 # -close_fd_mask=2 hides the loaders' per-input error lines; libFuzzer keeps
 # its own and the sanitizer reports.  Crashes land in $(OUTDIR)/fuzz/ and
 # replay with: $(OUTDIR)/fuzz-level-replay <crash-file>
-fuzz: $(RAYLIB_LIB) | $(OUTDIR)
+fuzz: $(RAYLIB_LIB) | $(OUTDIR) ## Test: libFuzzer search for FUZZ_SECONDS (needs LLVM clang)
 	@printf 'int LLVMFuzzerTestOneInput(const char *d, unsigned long n) { (void)d; (void)n; return 0; }\n' \
 		| $(FUZZ_CC) -x c -fsanitize=fuzzer -o /dev/null - 2>/dev/null || { \
 		echo "fuzz: '$(FUZZ_CC)' cannot link libFuzzer (Apple clang does not ship it)."; \
@@ -482,204 +461,30 @@ fuzz: $(RAYLIB_LIB) | $(OUTDIR)
 	"$(abspath $(OUTDIR))/fuzz/profile-fuzzer" -max_total_time=$(FUZZ_SECONDS) -close_fd_mask=2 \
 		-artifact_prefix=$(OUTDIR)/fuzz/profile- $(OUTDIR)/fuzz/profile $(FUZZ_PROFILE_SEEDS)
 
-$(TEST_SERIALIZER_OBJ): $(SHARED_DIR)/serializer.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+# Test objects: one rule for every source. $(OUTDIR) is skipped once out/
+# exists, so the recipe also creates its own directory; otherwise a deleted
+# out/obj/tests would break every later `make test`.
+TEST_OBJ_INCLUDES = -I$(SRCDIR) -I$(VENDOR_DIR)
+$(TEST_OBJDIR)/%.o: %.c | $(OUTDIR)
+	@mkdir -p $(@D)
+	$(CC) $(TEST_CFLAGS) $(TEST_OBJ_FLAGS) $(TEST_OBJ_INCLUDES) -MMD -MP -c -o $@ $<
 
-$(TEST_SERIALIZER_EMIT_OBJ): $(SHARED_DIR)/serializer_emit.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+# Per-object extras (target-specific variables). These rename raylib/GLFW
+# calls so the tests can supply recording doubles in their place.
+$(TEST_AUDIO_OBJ): TEST_OBJ_FLAGS = -DSetMusicVolume=test_SetMusicVolume \
+	-DLoadSoundAlias=test_LoadSoundAlias -DSetSoundVolume=test_SetSoundVolume \
+	-DUnloadSoundAlias=test_UnloadSoundAlias -DUnloadSound=test_UnloadSound
+$(TEST_SESSION_OBJ): TEST_OBJ_FLAGS = -DSetWindowSize=test_SetWindowSize
+$(TEST_INPUT_BACKEND_OBJ): TEST_OBJ_FLAGS = -UMANGO_RAYLIB_MEMORY \
+	-DIsWindowReady=test_input_window_ready -DGetScreenWidth=test_input_screen_width -DGetScreenHeight=test_input_screen_height \
+	-DglfwGetCurrentContext=test_input_current_context -DglfwGetCursorPos=test_input_cursor_pos \
+	-DglfwSetKeyCallback=test_input_set_key -DglfwSetCharCallback=test_input_set_char \
+	-DglfwSetMouseButtonCallback=test_input_set_button -DglfwSetCursorPosCallback=test_input_set_cursor \
+	-DglfwSetScrollCallback=test_input_set_scroll
+# Vendored tomlc17 builds without project include paths, as in the game.
+$(TEST_TOMLC_OBJ): TEST_OBJ_INCLUDES =
 
-$(TEST_SERIALIZER_IO_OBJ): $(SHARED_DIR)/serializer_io.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_LOAD_OBJ): $(SHARED_DIR)/serializer_load.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_LOAD_CHECKPOINTS_OBJ): $(SHARED_DIR)/serializer_load_checkpoints.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_LOAD_CLIMBABLES_OBJ): $(SHARED_DIR)/serializer_load_climbables.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ): $(SHARED_DIR)/serializer_load_collectibles.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_LOAD_CONFIG_OBJ): $(SHARED_DIR)/serializer_load_config.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_LOAD_ENEMIES_OBJ): $(SHARED_DIR)/serializer_load_enemies.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_LOAD_GEOMETRY_OBJ): $(SHARED_DIR)/serializer_load_geometry.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_LOAD_HAZARDS_OBJ): $(SHARED_DIR)/serializer_load_hazards.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_LOAD_HEADER_OBJ): $(SHARED_DIR)/serializer_load_header.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_LOAD_LAYERS_OBJ): $(SHARED_DIR)/serializer_load_layers.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_LOAD_SURFACES_OBJ): $(SHARED_DIR)/serializer_load_surfaces.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_PARSE_OBJ): $(SHARED_DIR)/serializer_parse.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_SAVE_OBJ): $(SHARED_DIR)/serializer_save.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SERIALIZER_TYPES_OBJ): $(SHARED_DIR)/serializer_types.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_VALIDATE_OBJ): $(SRCDIR)/levels/level_validate.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_LEVEL_LOADER_OBJ): $(SRCDIR)/levels/level_loader.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_RAIL_OBJ): $(SRCDIR)/surfaces/rail.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_ENTITY_UTILS_OBJ): $(SRCDIR)/core/entity_utils.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SPIKE_BLOCK_OBJ): $(SRCDIR)/hazards/spike_block.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SPIKE_PLATFORM_OBJ): $(SRCDIR)/hazards/spike_platform.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_FISH_OBJ): $(SRCDIR)/entities/fish.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_CIRCULAR_SAW_OBJ): $(SRCDIR)/hazards/circular_saw.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_COLLISION_DAMAGE_OBJ): $(SRCDIR)/collision/collision_damage.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_GAME_CAMERA_OBJ): $(SRCDIR)/core/game_camera.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_GAME_SCORE_OBJ): $(SRCDIR)/core/game_score.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_LEVEL_PHYSICS_OBJ): $(SRCDIR)/levels/level_physics.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_PLAYER_LIFECYCLE_OBJ): $(SRCDIR)/player/player_lifecycle.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_FLOAT_PLATFORM_OBJ): $(SRCDIR)/surfaces/float_platform.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_BOUNCEPAD_OBJ): $(SRCDIR)/surfaces/bouncepad.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_PHASE_OBJ): $(SRCDIR)/levels/phase_transition.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_GAME_OVERLAY_OBJ): $(SRCDIR)/core/game_overlay.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_GAME_EVENTS_OBJ): $(SRCDIR)/input/game_events.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_GAME_CHECKPOINT_OBJ): $(SRCDIR)/core/game_checkpoint.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_HUD_OBJ): $(SRCDIR)/screens/hud.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_GAME_INPUT_OBJ): $(SRCDIR)/input/game_input.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_WEB_INPUT_OBJ): $(SRCDIR)/input/game_web_input.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_BINDINGS_OBJ): $(SRCDIR)/input/game_bindings.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SETTINGS_OBJ): $(SRCDIR)/screens/settings_menu.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_VALIDATION_OBJ): $(EDITOR_DIR)/editor_validation.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_FILES_OBJ): $(EDITOR_DIR)/editor_files.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_SESSION_OBJ): $(EDITOR_DIR)/editor_session.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_UNDO_APPLY_OBJ): $(EDITOR_DIR)/editor_undo_apply.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_ENTITY_META_OBJ): $(EDITOR_DIR)/entity_meta.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_UI_OBJ): $(SHARED_DIR)/ui.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_TOOLS_OBJ): $(EDITOR_DIR)/tools.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_HIT_TEST_OBJ): $(EDITOR_DIR)/hit_test.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_CLIPBOARD_OBJ): $(EDITOR_DIR)/editor_clipboard.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_EVENTS_OBJ): $(EDITOR_DIR)/editor_events.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_CANVAS_OBJ): $(EDITOR_DIR)/canvas.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_PANELS_OBJ): $(EDITOR_DIR)/editor_panels.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_LAYOUT_OBJ): $(EDITOR_DIR)/editor_layout.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_PALETTE_OBJ): $(EDITOR_DIR)/palette.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_PROPERTIES_OBJ): $(EDITOR_DIR)/properties.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_EDITOR_PLAYTEST_OBJ): $(EDITOR_DIR)/editor_playtest.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_FILE_DIALOG_OBJ): $(EDITOR_DIR)/file_dialog.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_UNDO_OBJ): $(EDITOR_DIR)/undo.c
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_AUDIO_OBJ): $(SHARED_DIR)/audio.c
-	$(CC) $(TEST_CFLAGS) -DSetMusicVolume=test_SetMusicVolume \
-		-DLoadSoundAlias=test_LoadSoundAlias -DSetSoundVolume=test_SetSoundVolume \
-		-DUnloadSoundAlias=test_UnloadSoundAlias -DUnloadSound=test_UnloadSound \
-		-I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_SESSION_OBJ): $(SRCDIR)/core/app_session.c
-	$(CC) $(TEST_CFLAGS) -DSetWindowSize=test_SetWindowSize -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_INPUT_BACKEND_OBJ): $(SRCDIR)/input/input_backend.c
-	$(CC) $(TEST_CFLAGS) -UMANGO_RAYLIB_MEMORY \
-		-DIsWindowReady=test_input_window_ready -DGetScreenWidth=test_input_screen_width -DGetScreenHeight=test_input_screen_height \
-		-DglfwGetCurrentContext=test_input_current_context -DglfwGetCursorPos=test_input_cursor_pos \
-		-DglfwSetKeyCallback=test_input_set_key -DglfwSetCharCallback=test_input_set_char \
-		-DglfwSetMouseButtonCallback=test_input_set_button -DglfwSetCursorPosCallback=test_input_set_cursor \
-		-DglfwSetScrollCallback=test_input_set_scroll -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
-
-$(TEST_TOMLC_OBJ): $(VENDOR_DIR)/tomlc17.c
-	$(CC) $(TEST_CFLAGS) -MMD -MP -c -o $@ $<
-
-$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER_OBJ) $(TEST_SERIALIZER_EMIT_OBJ) $(TEST_SERIALIZER_IO_OBJ) $(TEST_SERIALIZER_LOAD_OBJ) $(TEST_SERIALIZER_LOAD_CHECKPOINTS_OBJ) $(TEST_SERIALIZER_LOAD_CLIMBABLES_OBJ) $(TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ) $(TEST_SERIALIZER_LOAD_CONFIG_OBJ) $(TEST_SERIALIZER_LOAD_ENEMIES_OBJ) $(TEST_SERIALIZER_LOAD_GEOMETRY_OBJ) $(TEST_SERIALIZER_LOAD_HAZARDS_OBJ) $(TEST_SERIALIZER_LOAD_HEADER_OBJ) $(TEST_SERIALIZER_LOAD_LAYERS_OBJ) $(TEST_SERIALIZER_LOAD_SURFACES_OBJ) $(TEST_SERIALIZER_PARSE_OBJ) $(TEST_SERIALIZER_SAVE_OBJ) $(TEST_SERIALIZER_TYPES_OBJ) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
+$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
 $(OUTDIR)/level-serializer-test: tests/parser_boundary_test.c
@@ -711,7 +516,7 @@ $(OUTDIR)/collision-test: tests/collision_test.c $(TEST_SPIKE_PLATFORM_OBJ) \
 $(OUTDIR)/phase-transition-test: tests/phase_transition_test.c $(TEST_PHASE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
-$(OUTDIR)/editor-validation-test: tests/editor_validation_test.c $(TEST_EDITOR_VALIDATION_OBJ) $(TEST_EDITOR_FILES_OBJ) $(TEST_EDITOR_SESSION_OBJ) $(TEST_EDITOR_UNDO_APPLY_OBJ) $(TEST_EDITOR_ENTITY_META_OBJ) $(TEST_EDITOR_UI_OBJ) $(TEST_EDITOR_TOOLS_OBJ) $(TEST_EDITOR_HIT_TEST_OBJ) $(TEST_EDITOR_CLIPBOARD_OBJ) $(TEST_EDITOR_EVENTS_OBJ) $(TEST_EDITOR_CANVAS_OBJ) $(TEST_EDITOR_PANELS_OBJ) $(TEST_EDITOR_LAYOUT_OBJ) $(TEST_EDITOR_PALETTE_OBJ) $(TEST_EDITOR_PROPERTIES_OBJ) $(TEST_EDITOR_PLAYTEST_OBJ) $(TEST_FILE_DIALOG_OBJ) $(TEST_UNDO_OBJ) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJ) $(TEST_SERIALIZER_EMIT_OBJ) $(TEST_SERIALIZER_IO_OBJ) $(TEST_SERIALIZER_LOAD_OBJ) $(TEST_SERIALIZER_LOAD_CHECKPOINTS_OBJ) $(TEST_SERIALIZER_LOAD_CLIMBABLES_OBJ) $(TEST_SERIALIZER_LOAD_COLLECTIBLES_OBJ) $(TEST_SERIALIZER_LOAD_CONFIG_OBJ) $(TEST_SERIALIZER_LOAD_ENEMIES_OBJ) $(TEST_SERIALIZER_LOAD_GEOMETRY_OBJ) $(TEST_SERIALIZER_LOAD_HAZARDS_OBJ) $(TEST_SERIALIZER_LOAD_HEADER_OBJ) $(TEST_SERIALIZER_LOAD_LAYERS_OBJ) $(TEST_SERIALIZER_LOAD_SURFACES_OBJ) $(TEST_SERIALIZER_PARSE_OBJ) $(TEST_SERIALIZER_SAVE_OBJ) $(TEST_SERIALIZER_TYPES_OBJ) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
+$(OUTDIR)/editor-validation-test: tests/editor_validation_test.c $(TEST_EDITOR_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(EDITOR_LIBS)
 
 $(OUTDIR)/gameplay-damage-test: tests/gameplay_damage_test.c $(TEST_COLLISION_DAMAGE_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_CHECKPOINT_OBJ) $(TEST_HUD_OBJ)
@@ -765,7 +570,7 @@ WEB_INPUTS = $(SRCS) $(wildcard $(SRCDIR)/*.h $(SRCDIR)/*/*.h) $(VENDOR_DIR)/tom
              $(wildcard web/*) $(wildcard assets/* assets/*/* assets/*/*/*) \
              $(wildcard levels/* levels/*/*) $(WEB_RAYLIB_LIB) tools/web_csp.py Makefile
 
-web: $(WEB_HTML) $(WEB_DEBUG_HTML)
+web: $(WEB_HTML) $(WEB_DEBUG_HTML) ## Build: WebAssembly game with Emscripten (emcc on PATH)
 
 $(WEB_HTML): $(WEB_INPUTS) | $(OUTDIR)
 	emcc $(WEB_CFLAGS) -I$(WEB_RAYLIB_BUILD)/build/raylib/include -I$(SRCDIR) -I$(VENDOR_DIR) $(SRCS) $(WEB_RAYLIB_LIB) -o $@ $(WEB_FLAGS) \
@@ -777,7 +582,7 @@ $(WEB_DEBUG_HTML): $(WEB_INPUTS) | $(OUTDIR)
 		$(WEB_LINK_FLAGS) --post-js web/debug-boot.js
 	python3 tools/web_csp.py $@
 
-dist-native: release asset-budget
+dist-native: release asset-budget ## Package: Native game and editor release zip in DISTDIR
 	@if [ -n "$${RELEASE_DLL_DIR:-}" ]; then \
 		python3 tools/package_release.py --platform "$${RELEASE_PLATFORM:-super-mango-native}" --binary "$(OUTDIR)/release/super-mango" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-native}.zip" --dll-dir "$${RELEASE_DLL_DIR}" --raylib-build "$(RELEASE_RAYLIB_BUILD)"; \
 	else \
@@ -785,10 +590,29 @@ dist-native: release asset-budget
 	fi
 
 # Depends on web so a stale or missing WASM build is rebuilt, never packaged.
-dist-wasm: web asset-budget
+dist-wasm: web asset-budget ## Package: WebAssembly release zip in DISTDIR
 	python3 tools/package_release.py --wasm --out-dir "$(OUTDIR)" --platform "$${RELEASE_PLATFORM:-super-mango-wasm}" --output "$(DISTDIR)/$${RELEASE_PLATFORM:-super-mango-wasm}.zip" --raylib-build "$(WEB_RAYLIB_BUILD)"
 
 # Every build product lives under OUTDIR/DISTDIR (objects in $(OBJDIR)), plus
 # the sibling sanitizer tree that `make sanitize` creates.
-clean:
+clean: ## Other: Remove OUTDIR, OUTDIR-sanitize and DISTDIR
 	rm -rf $(OUTDIR) $(OUTDIR)-sanitize $(DISTDIR)
+
+# ── Help ─────────────────────────────────────────────────────────────
+# `make help` lists every target whose rule line ends in "## Group: text",
+# grouped in the order each group first appears in this file. To document a
+# new target, add that comment to its rule line. Plain POSIX awk, so it runs
+# the same with BSD, GNU and MSYS2 tools.
+.PHONY: help
+help: ## Other: List these targets
+	@awk -F ' ## ' '/^[a-z][a-z0-9-]*:[^=]*## / { \
+		split($$1, rule, ":"); group = $$2; sub(/:.*/, "", group); \
+		text = $$2; sub(/^[^:]*: /, "", text); \
+		if (!(group in rows)) order[++groups] = group; \
+		rows[group] = rows[group] sprintf("  %-18s %s\n", rule[1], text) } \
+		END { for (i = 1; i <= groups; i++) printf "%s\n%s\n", order[i], rows[order[i]] }' \
+		$(firstword $(MAKEFILE_LIST))
+	@echo "Common variables: OUTDIR=out/headless RAYLIB_PLATFORM=memory (no window or GPU),"
+	@echo "  BUILD_MODE=release, CC=gcc, EXTRA_CFLAGS=-Werror, RAYLIB_AUDIO=null (no sound device)."
+	@echo "Manual art tools (python3 tools/<name>.py, not make targets): analyze_sprite"
+	@echo "  (sprite frame grid), gen_fire_sprites (fire palette), generate_favicon (site icons)."
