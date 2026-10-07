@@ -12,7 +12,6 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import package_release
-from package_release import WASM_FILES, package_wasm, package_native
 
 
 def main():
@@ -26,19 +25,19 @@ def main():
         (source / "LICENSE").write_text("raylib license fixture")
         (source / "src/external/glfw/LICENSE.md").write_text("GLFW license fixture")
         (source / "src/external/codec.h").write_text("codec license fixture")
-        for name in WASM_FILES:
+        for name in package_release.WASM_FILES:
             (root / name).write_bytes(b"payload")
         archive = root / "release.zip"
-        package_wasm("super-mango-wasm", archive, root, raylib_build)
+        package_release.package_wasm("super-mango-wasm", archive, root, raylib_build)
         with zipfile.ZipFile(archive) as bundle:
-            assert all(f"super-mango-wasm/{name}" in bundle.namelist() for name in WASM_FILES)
+            assert all(f"super-mango-wasm/{name}" in bundle.namelist() for name in package_release.WASM_FILES)
             assert b"CK Tan" in bundle.read("super-mango-wasm/licenses/tomlc17.txt")
             assert "super-mango-wasm/THIRD_PARTY_NOTICES.md" in bundle.namelist()
             assert b"raylib" in bundle.read("super-mango-wasm/licenses/raylib.txt")
             assert b"codec" in bundle.read("super-mango-wasm/licenses/raylib-dependencies/codec.h")
         (root / "super-mango-debug.data").unlink()
         try:
-            package_wasm("super-mango-wasm", archive, root, raylib_build)
+            package_release.package_wasm("super-mango-wasm", archive, root, raylib_build)
         except SystemExit:
             pass
         else:
@@ -63,7 +62,7 @@ def main():
         original_root = package_release.ROOT
         try:
             package_release.ROOT = fixture
-            package_native(platform, fixture / "super-mango", archive, None, raylib_build)
+            package_release.package_native(platform, fixture / "super-mango", archive, None, raylib_build)
         finally:
             package_release.ROOT = original_root
         with zipfile.ZipFile(archive) as bundle:
