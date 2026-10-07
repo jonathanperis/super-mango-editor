@@ -41,8 +41,14 @@ static int inspection_and_replay(void)
     CHECK(gs.inspector.show_keys);
     key(&gs, KEY_F5);
     CHECK(!gs.inspector.show_keys);
-    key(&gs, KEY_F6);
-    CHECK(gs.inspector.tuning_visible_until > clock_millis());
+    {
+        /* The deadline is set from the clock at the key press, so it is at
+         * least 3 s after a reading taken before the press, however long
+         * the test process pauses afterwards. */
+        uint64_t before_f6 = clock_millis();
+        key(&gs, KEY_F6);
+        CHECK(gs.inspector.tuning_visible_until >= before_f6 + 3000);
+    }
     gs.inspector.physics_field = 0;
     /* Live play: 40 ms of real time holds two 1/60 s steps (+ the half-step
      * slack a restarted clock starts with), never a 40 ms step. */
