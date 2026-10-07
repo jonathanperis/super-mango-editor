@@ -1,5 +1,7 @@
 # Sandbox School — Audit Implementation Report
 
+> **Historical report, dated 2026-09-16:** it describes the repository at that time, so use the [Builder Manual](https://jonathanperis.github.io/super-mango-editor/docs/) for current behaviour.
+
 Date: 2026-09-16. Local branch: `feature/sandbox-school-roadmap`.
 Baseline: `042003d`, with the pre-existing instrumentation cleanup preserved.
 

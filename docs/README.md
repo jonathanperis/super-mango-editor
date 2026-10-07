@@ -8,8 +8,8 @@ The landing page hosts the game; `/docs/` publishes the manual from `wiki/`.
 Use Node.js **22.12+**, Bun and Python **3.11+**. CI pins Node **26.9.0** and Bun
 **1.4.2**. Restore dependencies with `bun install --frozen-lockfile` in this directory.
 
-The supported frontend versions are Astro **7.3.3**, `@astrojs/markdown-satteri`
-**0.4.1**, `@astrojs/sitemap` **3.7.4**, `@astrojs/check` **0.9.10**, Tailwind CSS
+The supported frontend versions are Astro **7.3.6**, `@astrojs/markdown-satteri`
+**0.4.3**, `@astrojs/sitemap` **3.7.4**, `@astrojs/check` **0.9.10**, Tailwind CSS
 and its Vite plugin **4.3.3**, and TypeScript **6.0.3**. TypeScript **7.0.2** is
 newer, but Astro Check 0.9.10 requires `^5.0.0 || ^6.0.0`; retain 6.0.3 until the
 checker supports 7.x. Keep peer constraints enforced. After dependency updates,
@@ -21,7 +21,7 @@ run frozen install, `bun audit`, lint, build and `check-site`.
 | `bun run lint` | Run `astro check` |
 | `bun run drift` | Run `make docs-drift`, including generated freshness and roadmap checks |
 | `bun run build` | Build the production site to `docs/out/` with `/super-mango-editor/` base |
-| `bun run check-site` | Check built routes, Markdown content, links, anchors, metadata, sitemap and the landing-page CSP |
+| `bun run check-site` | Run `tools/check_docs_site.py` (built routes, Markdown content, links, anchors, metadata, sitemap and the landing-page CSP) and `tests/docs_checks_test.py` |
 | `bun run preview` | Serve the production build; open `/super-mango-editor/` |
 
 For a documentation change, from the repository root:
@@ -131,5 +131,5 @@ using the pinned Emscripten SDK's Web/GLFW backend. `web/keyboard-scope.js` scop
 that SDK's keyboard handlers to the canvas; revisit its integration when changing
 the SDK. Host contract tests do not replace real-browser/device verification.
 
-See [AUDIT.md](AUDIT.md) for the dated audit and follow-up plan.
-`AUDIT_IMPLEMENTATION.md` is the historical Sandbox School delivery report.
+[AUDIT.md](AUDIT.md) (2026-09-17) and `AUDIT_IMPLEMENTATION.md` (2026-09-16, the
+Sandbox School delivery report) are historical, dated reports, not current status.
