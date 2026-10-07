@@ -29,11 +29,14 @@ player_init
   ├── default spawn (overridden by LevelDef)
   └── player_apply_default_physics
 
-per frame
+per fixed simulation step (dt = 1/60 s, see game_player_step)
   ├── player_handle_input        -> move_dir, run, jump/climb intent
-  ├── player_update              -> jump buffer, motion, gravity, collisions, animation
-  ├── player_render              -> draw current frame with camera offset
-  └── player_get_hitbox          -> inset AABB for damage/collision checks
+  └── player_update              -> climbing, gravity, motion, collisions, jump timers, animation
+
+per rendered frame
+  └── player_render              -> draw current frame with camera offset
+
+player_get_hitbox                -> inset AABB for damage/collision checks
 
 player_reset                     -> restore spawn/state; keep texture + tunable physics
 player_cleanup                   -> texture_unload
@@ -71,6 +74,17 @@ IntRect player_get_hitbox(const Player *player);
 void player_reset(Player *player);
 void player_cleanup(Player *player);
 ```
+
+`player_update` receives the three bouncepad arrays as `BouncepadList` views
+(`{ const Bouncepad *pads; int count; }`) built by `game_bouncepads_lists`; no
+pads are copied each step. `*out_bounce_idx` is a flat index across those lists
+in order (list 0's pads first). Its `dt` is always `GAME_FIXED_STEP`, so jump
+arcs come out the same at any display rate.
+
+Inside `player_update` the order is: climbing (returns early while on a
+climbable), gravity, horizontal motion, position integration, platform and
+float-platform landing, bridge, spike-platform top and ceiling, floor and
+bouncepad collision, world bounds, jump buffer/coyote timers, then animation.
 
 ---
 
@@ -140,7 +154,7 @@ The same climb state supports vines, ladders, and ropes.
 
 ## Animation
 
-`player_animation.c` selects an `AnimState`, then maps it to a linear frame index on the 4-column sheet.
+`player_animation.c` selects an `AnimState`, then maps it to a linear frame index on the 4-column sheet. `anim_timer_ms` is a `float`, and a finished frame subtracts its duration instead of resetting to zero, so fractional milliseconds from 1/60 s steps carry over and animation speed stays exact.
 
 | State | Frames | ms/frame | First frame | Sheet row |
 |-------|--------|----------|-------------|-----------|
