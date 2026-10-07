@@ -10,7 +10,8 @@
 #include <string.h>       /* memset, strncpy */
 
 #include "editor_validation.h" /* editor_validate_level */
-#include "editor_files.h"      /* recovery retirement */
+#include "editor_files.h"      /* editor_path_for_display */
+#include "editor_recovery.h"   /* recovery retirement */
 #include "editor_undo_apply.h" /* staged property/config command capture */
 #include "undo.h"              /* undo_clear */
 
