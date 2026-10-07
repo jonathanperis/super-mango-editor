@@ -68,6 +68,8 @@ void editor_run_frame(EditorState *es)
         editor_render_toolbar(es);
         editor_render_side_panels(es);
         editor_render_status_bar(es);
+        /* An open dropdown list goes on top of every panel drawn above. */
+        ui_draw_overlays(&es->ui);
     }
     /* Ends texture mode, presents the scaled target, then calls EndDrawing.
      * EndDrawing polls the next frame's input and owns frame pacing; adding

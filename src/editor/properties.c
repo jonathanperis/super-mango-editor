@@ -125,6 +125,22 @@ static const char *vine_type_opts[] = { "Green", "Brown" };
 #define FIELD_ID(type, field)  ((int)(type) * 100 + (field) + 1)
 
 /*
+ * option_index — Position of value in a dropdown's paths, or -1.
+ *
+ * -1 tells ui_dropdown the stored path is none of its options (a path
+ * typed into the TOML by hand).  Mapping it to option 0 instead would make
+ * picking option 0 look like "no change", so it could never be chosen.
+ */
+static int option_index(const char *value, const char *const *paths,
+                        int count)
+{
+    for (int i = 0; i < count; i++) {
+        if (strcmp(value, paths[i]) == 0) return i;
+    }
+    return -1;
+}
+
+/*
  * draw_rail_properties — Fields for the selected rail: layout, position
  * (x, y in pixels), size (w, h in rail tiles) and end_cap.
  */
@@ -256,15 +272,8 @@ static void draw_platform_properties(EditorState *es, int y)
         };
         static const int platform_tile_count = 3;
 
-        int sel = 0;
-        if (p->tile_path[0] != '\0') {
-            for (int i = 1; i < platform_tile_count; i++) {
-                if (strcmp(p->tile_path, platform_tile_paths[i]) == 0) {
-                    sel = i;
-                    break;
-                }
-            }
-        }
+        int sel = option_index(p->tile_path, platform_tile_paths,
+                               platform_tile_count);
         ui_label(&es->ui, CONTENT_X, y, "tile_path:");
         if (ui_dropdown(&es->ui, FIELD_ID(ENT_PLATFORM, 3),
                         FIELD_X, y, FIELD_W,
@@ -1407,13 +1416,7 @@ void level_config_render(EditorState *es, int start_y, int available_h,
         };
         static const int music_count = 4;
 
-        int sel = 0;
-        for (int i = 0; i < music_count; i++) {
-            if (strcmp(es->level.music_path, music_paths[i]) == 0) {
-                sel = i;
-                break;
-            }
-        }
+        int sel = option_index(es->level.music_path, music_paths, music_count);
         if (ui_dropdown(&es->ui, 9009, x + 160, y, 210,
                          music_names, music_count, &sel)) {
             strncpy(es->level.music_path, music_paths[sel],
@@ -1455,14 +1458,8 @@ void level_config_render(EditorState *es, int start_y, int available_h,
         };
         static const int floor_tile_count = 6;
 
-        /* Find which option matches the current path (default to 0) */
-        int sel = 0;
-        for (int i = 0; i < floor_tile_count; i++) {
-            if (strcmp(es->level.floor_tile_path, floor_tile_paths[i]) == 0) {
-                sel = i;
-                break;
-            }
-        }
+        int sel = option_index(es->level.floor_tile_path, floor_tile_paths,
+                               floor_tile_count);
         if (ui_dropdown(&es->ui, 9010, x + 100, y, 270,
                          floor_tile_names, floor_tile_count, &sel)) {
             strncpy(es->level.floor_tile_path, floor_tile_paths[sel],
@@ -1656,12 +1653,7 @@ void level_config_render(EditorState *es, int start_y, int available_h,
             snprintf(label, sizeof(label), "%d:", i);
             ui_label(&es->ui, x + 8, y, label);
 
-            int sel = 0;
-            for (int j = 0; j < bg_count; j++) {
-                if (strcmp(es->level.background_layers[i].path, bg_paths[j]) == 0) {
-                    sel = j; break;
-                }
-            }
+            int sel = option_index(es->level.background_layers[i].path, bg_paths, bg_count);
             if (ui_dropdown(&es->ui, 9200 + i, x + 28, y, 200,
                              bg_names, bg_count, &sel)) {
                 strncpy(es->level.background_layers[i].path, bg_paths[sel],
@@ -1743,12 +1735,7 @@ bg_done:
             snprintf(label, sizeof(label), "%d:", i);
             ui_label(&es->ui, x + 8, y, label);
 
-            int sel = 0;
-            for (int j = 0; j < fg_count; j++) {
-                if (strcmp(es->level.foreground_layers[i].path, fg_paths[j]) == 0) {
-                    sel = j; break;
-                }
-            }
+            int sel = option_index(es->level.foreground_layers[i].path, fg_paths, fg_count);
             if (ui_dropdown(&es->ui, 9300 + i, x + 28, y, 200,
                              fg_names, fg_count, &sel)) {
                 strncpy(es->level.foreground_layers[i].path, fg_paths[sel],
@@ -1832,12 +1819,7 @@ fg_done:
             snprintf(label, sizeof(label), "%d:", i);
             ui_label(&es->ui, x + 8, y, label);
 
-            int sel = 0;
-            for (int j = 0; j < fog_opt_count; j++) {
-                if (strcmp(es->level.fog_layers[i].path, fog_paths[j]) == 0) {
-                    sel = j; break;
-                }
-            }
+            int sel = option_index(es->level.fog_layers[i].path, fog_paths, fog_opt_count);
             if (ui_dropdown(&es->ui, 9600 + i, x + 28, y, 200,
                              fog_names, fog_opt_count, &sel)) {
                 strncpy(es->level.fog_layers[i].path, fog_paths[sel],
