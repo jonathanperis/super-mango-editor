@@ -97,7 +97,7 @@ The right panel lists all **31 placeable entity types** (`ENT_COUNT`) in collaps
 | Surfaces | Platform, Float Platform, Bridge, Bouncepad Small, Bouncepad Medium, Bouncepad High |
 | Decorations | Vine, Ladder, Rope |
 
-Palette rows are text labels; clicking one selects that type and switches to the Place tool. On the canvas, the placement ghost under the cursor uses the in-game sprite. Checkpoints use the editor's primitive marker instead, because they have no sprite asset.
+Palette rows are text labels; clicking one selects that type and switches to the Place tool. On the canvas, the placement ghost under the cursor uses the in-game sprite; which sprite, which part of its sheet and what size come from the same table row. Checkpoints use the editor's primitive marker instead, because they have no sprite asset.
 
 ---
 
@@ -265,16 +265,17 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 | `editor.c` / `editor.h` | Core state struct, init/loop/cleanup, `EntityType` enum (31 types), `EditorTool`, `EditorCamera`, `Selection` |
 | `editor_frame.c`, `editor_events.c` | One frame (validation, autosave, drawing) and keyboard/mouse/wheel event routing, including every shortcut |
 | `editor_chrome.c`, `editor_panels.c`, `editor_layout.c` | Toolbar, status bar and side-panel layout |
-| `editor_files.c`, `editor_session.c` | Open/save/Save As, recent files, autosave and recovery; dirty tracking, document hash and confirmation prompts |
+| `editor_files.c`, `editor_session.c` | Open/save/Save As, playtest copies and recent files; dirty tracking, document hash and confirmation prompts |
+| `editor_recovery.c` | Autosave every 30 s while dirty, and crash recovery: finding leftover snapshots, the Recover picker, loading and retiring them |
 | `editor_playtest.c` | Launching, stopping and reaping the playtest game process |
 | `editor_clipboard.c`, `editor_undo_apply.c` | Copy/paste, and applying undo/redo commands to the level |
 | `editor_validation.c` / `editor_validation.h` | In-memory level validation report used by status, save, autosave, and playtest |
 | `canvas.c` / `canvas.h` | Level preview rendering, `canvas_screen_to_world`, grid overlay |
 | `palette.c` / `palette.h` | Entity palette panel — category rows, type selection |
-| `properties.c` / `properties.h` | Property inspector panel — one `draw_<type>_properties()` function per entity type, plus Level Config |
+| `properties.c` / `properties.h` | Property inspector panel — one `draw_<type>_properties()` function per entity type, chosen from the `s_property_panels` table, plus Level Config drawn by one `config_*` helper per settings group |
 | `tools.c` / `tools.h` | Mouse interaction for Select / Place / Delete tools |
 | `hit_test.c` / `hit_test.h` | Entity rectangles shared by click hit-testing and the selection outline; reverse-draw-order hit test |
-| `entity_meta.c` / `entity_meta.h` | Per-type names/capacities and the shared read/insert/remove helpers used by tools, undo and paste |
+| `entity_meta.c` / `entity_meta.h` | The per-type table (names, category, capacity, where the placements live in `LevelDef`, the placement-ghost sprite) and the shared read/insert/remove helpers used by tools, undo and paste |
 | `src/shared/ui.c` / `ui.h` | Immediate-mode UI widget library shared with game settings |
 | `undo.c` / `undo.h` | Undo stack and `PlacementData` clipboard union |
 | `src/shared/serializer.h`, `serializer_load.c`, `serializer_load_*.c` | Public TOML API and staged parsing into `LevelDef`, including strict checkpoints |

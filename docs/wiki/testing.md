@@ -63,7 +63,10 @@ filter without a browser. Native harnesses cover parser/serializer, validation, 
 profile, checkpoint, simulation and session behavior. They write scratch files
 under the build's own `OUTDIR` (`TEST_OUT` in `tests/test_paths.h`), so
 `make test`, `make sanitize` and `make coverage` can run at the same time in one
-checkout.
+checkout. Test objects are also built with `-DMANGO_TESTING`, which turns on the
+`*_test_set_*` seams (canned answers for native dialogs, injected save failures,
+fake controller input); the game and editor binaries are built without it, so
+they do not contain those functions.
 
 The session harness compiles the production display boundary's Web path against
 test-owned platform calls. It verifies that visible and hidden Web windows leave

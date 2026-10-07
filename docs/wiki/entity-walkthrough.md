@@ -153,25 +153,49 @@ Tokens is rejected with the asset path when the file is missing.
 
 ## 5. Complete editor integration
 
-Follow the existing `ENT_COIN` cases; each row has a distinct responsibility:
+Most of what the editor knows about a type is data in one table, so start
+there. Add `ENT_TOKEN` to `EntityType` in `src/editor/editor.h`, just before
+`ENT_COUNT`, then give it a row in `s_entity_meta` (`src/editor/entity_meta.c`)
+modelled on the `ENT_COIN` row:
+
+```c
+[ENT_TOKEN] = {
+    .type = ENT_TOKEN, .type_name = "Token", .palette_name = "Token",
+    .category = EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
+    .capacity = MAX_TOKENS, STORED_IN(tokens, token_count),
+    .preview = { TEXTURE(coin), .w = COIN_DISPLAY_W, .h = COIN_DISPLAY_H },
+},
+```
+
+That one row gives Token its name, its palette group, its capacity, where
+its placements live in `LevelDef` (`STORED_IN` records the array and count
+with `offsetof`) and the sprite the Place tool shows under the cursor.
+Reading, writing, inserting and removing placements, counts and capacity
+checks, undo and the palette all work from it. Both `s_entity_meta` and the
+property-panel table are sized by their rows, so until the Token row exists a
+`_Static_assert` stops the build with "needs one row per EntityType".
+
+The rest is behaviour: code that does different arithmetic on each
+placement struct. Follow the existing `ENT_COIN` code in each place:
 
 | File | Integration |
 |------|-------------|
-| `editor.h` | Add `ENT_TOKEN` to `EntityType` before `ENT_COUNT` |
-| `entity_meta.c` | Add a row to the `s_entity_meta` table (names, category, singleton flag, `MAX_TOKENS` capacity), a slot in `s_palette_order`, and a case in `editor_entity_array()`; read/write/insert/remove, counts and capacity checks then work through the shared helpers |
-| `hit_test.c` | Add a bounds case to `editor_entity_bounds()` and put `ENT_TOKEN` into `s_hit_order`, which is the exact reverse of the canvas draw order (a `_Static_assert` fails the build if a type is missing) |
-| `canvas.c` | A render call in `canvas_render()` and a placement-ghost case |
-| `tools.c` | Clamp case in `editor_clamp_placement()`, move case in `move_placement()` and defaults in `default_placement()` |
-| `properties.c` | A `draw_token_properties()` function with x/y fields that call `editor_commit_change()`, plus its case in `properties_render()` |
+| `entity_meta.c` | Besides the row above, put `ENT_TOKEN` in `s_palette_order`, the order the palette lists types in |
 | `undo.h` | Add `TokenPlacement token;` to the `PlacementData` union |
+| `properties.c` | Write `draw_token_properties()` with x/y fields that call `editor_commit_change()`, and point `[ENT_TOKEN]` at it in `s_property_panels` |
+| `hit_test.c` | Add a bounds case to `editor_entity_bounds()` and put `ENT_TOKEN` into `s_hit_order`, which is the exact reverse of the canvas draw order |
+| `canvas.c` | A render function for Tokens, called from `canvas_render()` beside `render_coins()` |
+| `tools.c` | Clamp case in `editor_clamp_placement()`, move case in `move_placement()` and defaults in `default_placement()` |
 | `editor_clipboard.c` | Add the `offset_pasted_copy()` case; the shared `editor_add_placement()` already refuses a full array |
 | `editor_session.c` | Add `EDITOR_HASH_ARRAY` for tokens to the document hash so the dirty marker sees Token edits |
 | `editor_chrome.c` | Include `token_count` in the status-bar entity total |
 
-The palette lists types from `entity_meta.c`, so `palette.c` needs no change.
-Undo needs no new code in `editor_undo_apply.c`: commands are built with
-`undo_push(stack, const Command *)` and store `PlacementData` snapshots that
-are applied through the shared `editor_entity_*` helpers.
+You do not have to remember the switches: they have no `default:` case, so
+with `-Wall` the compiler names every `switch` that has no `ENT_TOKEN` case
+yet. The palette lists types from `entity_meta.c`, so `palette.c` needs no
+change. Undo needs no new code in `editor_undo_apply.c`: commands are built
+with `undo_push(stack, const Command *)` and store `PlacementData` snapshots
+that are applied through the shared `editor_entity_*` helpers.
 
 These editor paths all operate on `LevelDef`, not live runtime objects.
 Copy/paste and undo must preserve selection indices after array
@@ -189,7 +213,9 @@ Extend the rich serializer fixture (`fill_rich_roundtrip_fixture()` in
 `tests/level_serializer_test.c`) with Tokens and extend
 `compare_rich_roundtrip()` to prove the round-trip.
 `tests/editor_validation_test.c` already loops over every palette type for
-storage and placement, so it covers `ENT_TOKEN` once it is in the palette.
+storage and placement, and checks that every type has a complete table row
+whose storage changes only its own count, so it covers `ENT_TOKEN` once it is
+in the palette.
 A gameplay case should prove that one pickup awards 250 points exactly once,
 and `tests/runtime_load_test.c` should prove a life-loss `level_reset()` keeps
 collected Tokens gone, as it does for coins. Reuse the count/bounds fixtures
@@ -242,6 +268,6 @@ automatically. A brand-new source directory needs its own wildcard line there.
 - [ ] Render call in `src/render/game_render.c` at the right layer
 - [ ] Texture row in `game_resources.c` (and `game_resources_require_level_textures()` if optional)
 - [ ] Hitbox in `src/core/debug.c` and `debug_log()` calls for significant events
-- [ ] Editor integration (section 5): metadata, hit test, canvas, tools, properties, undo union, clipboard, document hash, status bar
+- [ ] Editor integration (section 5): the `s_entity_meta` row and palette slot, undo union, property panel, hit test, canvas, tools, clipboard, document hash, status bar
 - [ ] Tests (section 6), then `make builder test CC=clang`, `make validate-levels`, `make docs-drift`
 - [ ] Play it with `make run-level-debug LEVEL=...` and check the hitboxes match the sprite
