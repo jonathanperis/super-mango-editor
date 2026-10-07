@@ -141,6 +141,24 @@ jobs:
             libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             xvfb libgl1-mesa-dri pulseaudio zenity
 
+      # Compiled raylib for the debug/test tree only; release archives always
+      # build raylib from source (dist-native uses out/release/raylib). See
+      # the sanitizers job for why a restored tree is safe to reuse.
+      - name: Fingerprint the raylib toolchain (Linux)
+        id: toolchain
+        if: matrix.target == 'native' && runner.os == 'Linux'
+        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; clang --version; cmake --version; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache compiled raylib (Linux)
+        if: matrix.target == 'native' && runner.os == 'Linux'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            out/raylib
+            !out/raylib/raylib-*/examples
+            !out/raylib/raylib-*/projects
+          key: raylib-build-linux-debug-${{ steps.toolchain.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py', 'Makefile') }}
+
       - name: Start rendered-test display and audio (Linux)
         if: matrix.target == 'native' && runner.os == 'Linux'
         run: |
@@ -231,10 +249,6 @@ jobs:
         env:
           MANGO_TEST_WINDOW: '1'
         run: lldb --batch -o run -k "thread backtrace all" -- out/headless/session-test
-
-      - name: Sanitizer tests (Linux)
-        if: matrix.target == 'native' && runner.os == 'Linux'
-        run: make sanitize
 
       - name: Validate levels (Linux / macOS)
         if: matrix.target == 'native' && runner.os != 'Windows'
@@ -336,6 +350,92 @@ jobs:
           path: dist/${{ matrix.artifact }}.zip
           if-no-files-found: error
           retention-days: 1
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # SANITIZERS JOB
+  # AddressSanitizer, UndefinedBehaviorSanitizer and LeakSanitizer over the
+  # native tests, the fuzz seeds and a rendered smoke of every level and the
+  # editor. It used to be one more serial step in the Linux build leg; as its
+  # own job it runs beside the build matrix. Undefined behaviour is fatal
+  # (see SANITIZE_CFLAGS in the Makefile). Releases and Pages wait for it, as
+  # they did when it lived in the Linux leg.
+  # ────────────────────────────────────────────────────────────────────────────
+  sanitizers:
+    name: Sanitizers (Linux x86_64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      EXTRA_CFLAGS: -Werror
+      RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Cache pinned raylib source archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/raylib
+          key: raylib-source-${{ runner.os }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y clang cmake libgl1-mesa-dev libx11-dev \
+            libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            xvfb libgl1-mesa-dri pulseaudio zenity
+
+      # The sanitized raylib takes longest to compile, so it is cached. A
+      # restored tree is safe to reuse: make still runs tools/build_raylib.py,
+      # which re-verifies the archive checksum, re-applies the patches (a no-op
+      # when present) and re-runs CMake, and CMake rebuilds whatever its own
+      # dependency tracking finds stale. The key must match exactly (no
+      # restore-keys): it covers the pin, the patches, the Makefile and build
+      # script that choose the CMake options, the runner image, compiler and
+      # CMake versions, and the workspace path CMake records, so a changed
+      # toolchain, option or path never reuses old objects. Pull requests
+      # cannot write caches that main or tags read.
+      - name: Fingerprint the raylib toolchain
+        id: toolchain
+        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; clang --version; cmake --version; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache compiled sanitizer raylib
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            out-sanitize/raylib
+            !out-sanitize/raylib/raylib-*/examples
+            !out-sanitize/raylib/raylib-*/projects
+          key: raylib-build-linux-sanitize-${{ steps.toolchain.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py', 'Makefile') }}
+
+      - name: Start rendered-test display and audio
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          echo "LIBGL_ALWAYS_SOFTWARE=1" >> "$GITHUB_ENV"
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=mango
+          pactl set-default-sink mango
+
+      - name: Install Node.js for host contracts
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26.9.0'
+
+      - name: Sanitizer tests and fuzz-seed replay
+        run: make sanitize
+
+      # Reuses the instrumented game, editor and raylib built above.
+      - name: Sanitizer smoke (virtual display)
+        run: make sanitize-smoke SMOKE_FRAMES=5 SMOKE_SEED=1
 
   # ────────────────────────────────────────────────────────────────────────────
   # WINDOWS CLANG JOB
@@ -585,13 +685,13 @@ jobs:
   # ────────────────────────────────────────────────────────────────────────────
   # RELEASE JOB
   # Runs only for explicit release events: pushed v* tags or manual dispatch.
-  # Waits for all build matrix legs and the provenance job to succeed, then
+  # Waits for all build matrix legs, the sanitizers and the provenance job, then
   # creates a GitHub Release with the standalone platform archives and
   # SHA256SUMS attached.
   # ────────────────────────────────────────────────────────────────────────────
   release:
     name: Create Release
-    needs: [build, provenance]
+    needs: [build, sanitizers, provenance]
     # Guard: skip normal branch pushes and PR checks. Publish only from v* tags
     # or an explicit manual workflow dispatch from the protected main branch.
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
@@ -685,7 +785,7 @@ jobs:
   # ────────────────────────────────────────────────────────────────────────────
   pages-build:
     name: Pages build
-    needs: [docs-drift, build]
+    needs: [docs-drift, build, sanitizers]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -717,6 +817,12 @@ jobs:
 
       - name: Install docs dependencies
         run: bun install --frozen-lockfile
+        working-directory: docs
+
+      # docs.yml checks pull requests; on main this job is the only docs
+      # build, so it also runs the type/content check.
+      - name: Lint docs
+        run: bun run lint
         working-directory: docs
 
       - name: Build docs site
