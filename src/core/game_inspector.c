@@ -21,8 +21,6 @@ static const PhysicsField fields[] = {
 #undef FIELD
 _Static_assert(sizeof(fields) / sizeof(fields[0]) == INSPECTOR_PHYSICS_COUNT, "physics tape layout");
 
-const char *game_inspector_physics_name(int index) { return fields[index].name; }
-
 void game_inspector_physics(Player *player, float *values, int apply)
 {
     for (int i = 0; i < INSPECTOR_PHYSICS_COUNT; i++) {
@@ -245,7 +243,8 @@ void game_inspector_render(GameState *gs)
         }
     }
 
-    /* Highlight the resolved contact surface and show the physical foot point. */
+    /* Mark the physical foot point (the point the one-way landing test uses)
+     * with a short line: cyan while on the ground, white in the air. */
     int x = (int)(gs->player.x + gs->player.w / 2) - (int)gs->camera.x;
     int y = (int)(gs->player.y + gs->player.h - PLAYER_FLOOR_SINK);
     DrawLine(x-5,y,x+5,y,(Color){gs->player.on_ground ? 0 : 255,255,255,255});

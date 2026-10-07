@@ -377,9 +377,6 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 | `SPIKE_DISPLAY_W` | `24` | `int` | On-screen width in logical pixels (16x16 scaled up) |
 | `SPIKE_DISPLAY_H` | `24` | `int` | On-screen height in logical pixels |
 | `SPIKE_SPIN_DEG_PER_SEC` | `360.0f` | `float` | Rotation speed -- one full turn per second |
-| `SPIKE_SPEED_SLOW` | `1.5f` | `float` | Rail traversal: 1.5 tiles/s |
-| `SPIKE_SPEED_NORMAL` | `3.0f` | `float` | Rail traversal: 3.0 tiles/s |
-| `SPIKE_SPEED_FAST` | `6.0f` | `float` | Rail traversal: 6.0 tiles/s |
 | `SPIKE_PUSH_SPEED` | `220.0f` | `float` | Horizontal push impulse magnitude (px/s) |
 | `SPIKE_PUSH_VY` | `-150.0f` | `float` | Upward push component on collision (px/s) |
 | `MAX_SPIKE_BLOCKS` | `16` | `int` | Maximum spike block instances per level |
@@ -583,7 +580,6 @@ update code in `fish.c`; only this tuning differs (passed as a `FishSpec`).
 |----------|-------|------|-------------|
 | `MAX_SPIKE_PLATFORMS` | `16` | `int` | Maximum spike platform instances per level |
 | `SPIKE_PLAT_PIECE_W` | `16` | `int` | Width of one 3-slice piece (px) |
-| `SPIKE_PLAT_H` | `16` | `int` | Full frame height (px) |
 | `SPIKE_PLAT_SRC_Y` | `5` | `int` | First content row in each piece (px) |
 | `SPIKE_PLAT_SRC_H` | `11` | `int` | Content height (rows 5-15, px) |
 

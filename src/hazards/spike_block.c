@@ -17,7 +17,7 @@
  * rail  : the Rail this block will travel on; stored as a non-owning pointer.
  * t0    : starting position in [0, rail->count).  Different starting offsets
  *         for different blocks prevent all blocks from being synchronised.
- * speed : rail traversal speed in tiles per second (use one of SPIKE_SPEED_SLOW/NORMAL/FAST).
+ * speed : rail traversal speed in tiles per second (spike_block.h lists typical values).
  */
 void spike_block_init(SpikeBlock *sb, const Rail *rail, float t0, float speed) {
     sb->rail      = rail;

@@ -228,7 +228,7 @@ typedef struct {
  *
  * rail_index : index into the level's rails array (0-based).
  * t_offset   : starting position along the rail in tile units.
- * speed      : tiles per second (use SPIKE_SPEED_* constants).
+ * speed      : tiles per second, above 0 and at most MAX_RAIL_SPEED.
  */
 typedef struct {
     int   rail_index;

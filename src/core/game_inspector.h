@@ -13,4 +13,3 @@ void game_inspector_render(GameState *gs);
 void game_inspector_cleanup(GameState *gs);
 void game_inspector_reset_physics(GameState *gs);
 void game_inspector_physics(Player *player, float *values, int apply);
-const char *game_inspector_physics_name(int index);

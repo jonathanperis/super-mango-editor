@@ -35,22 +35,19 @@
 #define SPIKE_SPIN_DEG_PER_SEC  360.0f
 
 /*
- * Speed presets — rail traversal speed in tiles per second.
+ * Rail speed — each level gives its spike blocks a speed in tiles per
+ * second (spike_blocks[].speed, passed to spike_block_init). Anything above
+ * 0 and up to MAX_RAIL_SPEED is valid. Three speeds cover the range of
+ * interesting pacing:
  *
- * Three named tiers cover the range of interesting gameplay pacing:
+ *   slow   : 1.5 tiles/s — 28-tile loop ≈ 18.7 s; 14-tile line ≈ 9.3 s
+ *   normal : 3.0 tiles/s — 28-tile loop ≈  9.3 s; 14-tile line ≈ 4.7 s
+ *   fast   : 6.0 tiles/s — 28-tile loop ≈  4.7 s; 14-tile line ≈ 2.3 s
  *
- *   SLOW   : 1.5 tiles/s — 28-tile loop ≈ 18.7 s; 14-tile line ≈ 9.3 s
- *   NORMAL : 3.0 tiles/s — 28-tile loop ≈  9.3 s; 14-tile line ≈ 4.7 s
- *   FAST   : 6.0 tiles/s — 28-tile loop ≈  4.7 s; 14-tile line ≈ 2.3 s
- *
- * Pass one of these to spike_block_init as the `speed` argument.
  * For closed loops, speed drives clockwise traversal.
  * For open (horizontal) rails, the block bounces and the same speed
  * applies in both directions.
  */
-#define SPIKE_SPEED_SLOW    1.5f
-#define SPIKE_SPEED_NORMAL  3.0f
-#define SPIKE_SPEED_FAST    6.0f
 
 /*
  * Push impulse constants — applied to the player on contact.
@@ -73,7 +70,7 @@
  *
  * t         : current position on the rail, in [0, rail->count).
  *             Integer part = tile index; fractional part = lerp toward next tile.
- * speed     : traversal speed in tiles per second (one of the SPIKE_SPEED_* presets).
+ * speed     : traversal speed in tiles per second (typical values above).
  * direction : +1 = forward (clockwise on loops, rightward on open lines),
  *             -1 = backward (bounce mode on open rails with end_cap = 1).
  *             Always +1 on closed loops since they wrap continuously.

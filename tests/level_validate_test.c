@@ -555,7 +555,7 @@ static int expect_rail_speeds_forward_and_bounded(void)
     def.float_platforms[0].mode = FLOAT_PLATFORM_RAIL;
     def.float_platforms[0].rail_index = 0;
     def.float_platforms[0].tile_count = 2;
-    def.float_platforms[0].speed = SPIKE_SPEED_NORMAL;
+    def.float_platforms[0].speed = 3.0f;
     if (level_validate_runtime(&def, err, sizeof(err)) != 0) {
         fprintf(stderr, "level_validate_test: valid rail speeds rejected: %s\n", err);
         return 1;
@@ -569,7 +569,7 @@ static int expect_rail_speeds_forward_and_bounded(void)
                     rejected[i]);
             return 1;
         }
-        def.spike_blocks[0].speed = SPIKE_SPEED_NORMAL;
+        def.spike_blocks[0].speed = 3.0f;
         def.float_platforms[0].speed = rejected[i];
         if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
             strstr(err, "float_platforms[0].speed") == NULL) {
@@ -577,7 +577,7 @@ static int expect_rail_speeds_forward_and_bounded(void)
                     rejected[i]);
             return 1;
         }
-        def.float_platforms[0].speed = SPIKE_SPEED_NORMAL;
+        def.float_platforms[0].speed = 3.0f;
     }
 
     /* A parked (STATIC) platform never moves, so its speed is not a rail speed. */
@@ -855,7 +855,7 @@ static int rejects_numeric_boundaries(void)
             def.rail_count = 1;
             def.rails[0] = (RailPlacement){RAIL_LAYOUT_RECT, 80, 40, 4, 3, 1};
             def.spike_block_count = 1;
-            def.spike_blocks[0].speed = SPIKE_SPEED_NORMAL;
+            def.spike_blocks[0].speed = 3.0f;
             def.spike_blocks[0].t_offset = test == 3 ? -1.0f : 1e30f;
         }
         if (test == 5) def.physics.walk_max_speed = 1e30f;
