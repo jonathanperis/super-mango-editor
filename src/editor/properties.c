@@ -216,7 +216,7 @@ static void draw_rail_properties(EditorState *es, int y)
 /*
  * One draw_<type>_properties function per entity type.  Each draws the
  * selected entity's fields starting at row y and commits every edit through
- * editor_commit_change, so properties_render below is only a dispatch switch.
+ * editor_commit_change; s_property_panels below picks the one to call.
  */
 /* draw_floor_gap_properties — Fields for the selected floor gap. */
 static void draw_floor_gap_properties(EditorState *es, int y)
@@ -1051,6 +1051,62 @@ static void draw_rope_properties(EditorState *es, int y)
 
 
 /* ------------------------------------------------------------------ */
+/* Which function draws each type's fields                             */
+/* ------------------------------------------------------------------ */
+
+/*
+ * s_property_panels — one draw_<type>_properties function per EntityType,
+ * in the enum order of editor.h.  The table is sized by its rows, so the
+ * _Static_assert fails the build when a type added at the end of the enum
+ * has no panel yet.  Every function takes the panel's first row y.
+ */
+typedef void (*PropertyPanelFn)(EditorState *es, int y);
+
+static const PropertyPanelFn s_property_panels[] = {
+    [ENT_FLOOR_GAP]        = draw_floor_gap_properties,
+    [ENT_CHECKPOINT]       = draw_checkpoint_properties,
+    [ENT_RAIL]             = draw_rail_properties,
+    [ENT_PLATFORM]         = draw_platform_properties,
+    [ENT_COIN]             = draw_coin_properties,
+    [ENT_STAR_YELLOW]      = draw_star_yellow_properties,
+    [ENT_STAR_GREEN]       = draw_star_green_properties,
+    [ENT_STAR_RED]         = draw_star_red_properties,
+    [ENT_LAST_STAR]        = draw_last_star_properties,
+    [ENT_SPIDER]           = draw_spider_properties,
+    [ENT_JUMPING_SPIDER]   = draw_jumping_spider_properties,
+    [ENT_BIRD]             = draw_bird_properties,
+    [ENT_FASTER_BIRD]      = draw_faster_bird_properties,
+    [ENT_FISH]             = draw_fish_properties,
+    [ENT_FASTER_FISH]      = draw_faster_fish_properties,
+    [ENT_AXE_TRAP]         = draw_axe_trap_properties,
+    [ENT_CIRCULAR_SAW]     = draw_circular_saw_properties,
+    [ENT_SPIKE_ROW]        = draw_spike_row_properties,
+    [ENT_SPIKE_PLATFORM]   = draw_spike_platform_properties,
+    [ENT_SPIKE_BLOCK]      = draw_spike_block_properties,
+    [ENT_BLUE_FLAME]       = draw_blue_flame_properties,
+    [ENT_FIRE_FLAME]       = draw_fire_flame_properties,
+    [ENT_FLOAT_PLATFORM]   = draw_float_platform_properties,
+    [ENT_BRIDGE]           = draw_bridge_properties,
+    [ENT_BOUNCEPAD_SMALL]  = draw_bouncepad_small_properties,
+    [ENT_BOUNCEPAD_MEDIUM] = draw_bouncepad_medium_properties,
+    [ENT_BOUNCEPAD_HIGH]   = draw_bouncepad_high_properties,
+    [ENT_VINE]             = draw_vine_properties,
+    [ENT_LADDER]           = draw_ladder_properties,
+    [ENT_ROPE]             = draw_rope_properties,
+    [ENT_PLAYER_SPAWN]     = draw_player_spawn_properties,
+};
+
+_Static_assert(sizeof(s_property_panels) / sizeof(s_property_panels[0]) == ENT_COUNT,
+               "s_property_panels needs one draw function per EntityType");
+
+/* The function that draws `type`'s fields, or NULL for an invalid type. */
+static PropertyPanelFn property_panel(EntityType type)
+{
+    if (type < 0 || type >= ENT_COUNT) return NULL;
+    return s_property_panels[type];
+}
+
+/* ------------------------------------------------------------------ */
 /* properties_render                                                   */
 /* ------------------------------------------------------------------ */
 
@@ -1125,169 +1181,13 @@ void properties_render(EditorState *es, int start_y, int available_h)
     /* ---- Per-type field rendering ----------------------------------- */
 
     /*
-     * Each case accesses the selected placement struct by pointer so that
-     * the ui_*_field widgets can read and write the value in place.
-     * When any widget returns 1 (value changed), commit one property/config
-     * command so the editor can undo the complete committed field edit.
+     * The selected type's draw_<type>_properties function (table above)
+     * draws its fields by pointer into the placement, so the ui_*_field
+     * widgets read and write the value in place, and commits each edit
+     * as one undoable property command.
      */
-    switch (es->selection.type) {
-
-    /* ================================================================ */
-    /* World geometry                                                    */
-    /* ================================================================ */
-
-    case ENT_FLOOR_GAP:
-        draw_floor_gap_properties(es, y);
-        break;
-
-    case ENT_CHECKPOINT:
-        draw_checkpoint_properties(es, y);
-        break;
-
-    case ENT_RAIL:
-        draw_rail_properties(es, y);
-        break;
-
-    case ENT_PLATFORM:
-        draw_platform_properties(es, y);
-        break;
-
-    /* ================================================================ */
-    /* Collectibles                                                      */
-    /* ================================================================ */
-
-    case ENT_COIN:
-        draw_coin_properties(es, y);
-        break;
-
-    case ENT_STAR_YELLOW:
-        draw_star_yellow_properties(es, y);
-        break;
-
-    case ENT_STAR_GREEN:
-        draw_star_green_properties(es, y);
-        break;
-
-    case ENT_STAR_RED:
-        draw_star_red_properties(es, y);
-        break;
-
-    case ENT_LAST_STAR:
-        draw_last_star_properties(es, y);
-        break;
-
-    /* ================================================================ */
-    /* Player                                                            */
-    /* ================================================================ */
-
-    case ENT_PLAYER_SPAWN:
-        draw_player_spawn_properties(es, y);
-        break;
-
-    /* ================================================================ */
-    /* Enemies                                                           */
-    /* ================================================================ */
-
-    case ENT_SPIDER:
-        draw_spider_properties(es, y);
-        break;
-
-    case ENT_JUMPING_SPIDER:
-        draw_jumping_spider_properties(es, y);
-        break;
-
-    case ENT_BIRD:
-        draw_bird_properties(es, y);
-        break;
-
-    case ENT_FASTER_BIRD:
-        draw_faster_bird_properties(es, y);
-        break;
-
-    case ENT_FISH:
-        draw_fish_properties(es, y);
-        break;
-
-    case ENT_FASTER_FISH:
-        draw_faster_fish_properties(es, y);
-        break;
-
-    /* ================================================================ */
-    /* Hazards                                                           */
-    /* ================================================================ */
-
-    case ENT_AXE_TRAP:
-        draw_axe_trap_properties(es, y);
-        break;
-
-    case ENT_CIRCULAR_SAW:
-        draw_circular_saw_properties(es, y);
-        break;
-
-    case ENT_SPIKE_ROW:
-        draw_spike_row_properties(es, y);
-        break;
-
-    case ENT_SPIKE_PLATFORM:
-        draw_spike_platform_properties(es, y);
-        break;
-
-    case ENT_SPIKE_BLOCK:
-        draw_spike_block_properties(es, y);
-        break;
-
-    case ENT_BLUE_FLAME:
-        draw_blue_flame_properties(es, y);
-        break;
-
-    case ENT_FIRE_FLAME:
-        draw_fire_flame_properties(es, y);
-        break;
-
-    /* ================================================================ */
-    /* Surfaces                                                          */
-    /* ================================================================ */
-
-    case ENT_FLOAT_PLATFORM:
-        draw_float_platform_properties(es, y);
-        break;
-
-    case ENT_BRIDGE:
-        draw_bridge_properties(es, y);
-        break;
-
-    case ENT_BOUNCEPAD_SMALL:
-        draw_bouncepad_small_properties(es, y);
-        break;
-
-    case ENT_BOUNCEPAD_MEDIUM:
-        draw_bouncepad_medium_properties(es, y);
-        break;
-
-    case ENT_BOUNCEPAD_HIGH:
-        draw_bouncepad_high_properties(es, y);
-        break;
-
-    /* ================================================================ */
-    /* Decorations & climbables                                          */
-    /* ================================================================ */
-
-    case ENT_VINE:
-        draw_vine_properties(es, y);
-        break;
-
-    case ENT_LADDER:
-        draw_ladder_properties(es, y);
-        break;
-
-    case ENT_ROPE:
-        draw_rope_properties(es, y);
-        break;
-
-    /* ---- Fallthrough for ENT_COUNT (not a real type) ---------------- */
-    case ENT_COUNT:
-        break;
-    }
+    PropertyPanelFn draw_fields = property_panel(es->selection.type);
+    if (draw_fields) draw_fields(es, y);
 
     EndScissorMode();
     editor_end_change_tracking(es);

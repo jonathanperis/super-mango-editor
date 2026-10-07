@@ -1267,176 +1267,29 @@ static void render_ghost(EditorState *es) {
     float wx, wy;
     canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &wx, &wy);
 
-    /* Determine the texture and display size for the palette entity type */
-    Texture2D *tex = NULL;
-    IntRect src_rect;
-    int use_src = 0;  /* 1 = use src_rect crop, 0 = draw full texture */
-    int dw = 0, dh = 0;
+    /*
+     * What to draw comes from the entity table (entity_meta.c): the sprite,
+     * which part of its sheet, and the size.  Checkpoints have no sprite;
+     * they get the same small flag-pole marker the canvas draws for them.
+     */
+    EntityType type = es->palette_type;
+    const EditorEntityPreview *preview = editor_entity_preview(type);
+    if (!preview) return;
 
-    switch (es->palette_type) {
-    case ENT_COIN:
-        tex = es->textures.coin;
-        dw = COIN_DISPLAY_W; dh = COIN_DISPLAY_H;
-        break;
-    case ENT_STAR_YELLOW:
-        tex = es->textures.star_yellow;
-        dw = YSTAR_DISPLAY_W; dh = YSTAR_DISPLAY_H;
-        break;
-    case ENT_STAR_GREEN:
-        tex = es->textures.star_green;
-        dw = YSTAR_DISPLAY_W; dh = YSTAR_DISPLAY_H;
-        break;
-    case ENT_STAR_RED:
-        tex = es->textures.star_red;
-        dw = YSTAR_DISPLAY_W; dh = YSTAR_DISPLAY_H;
-        break;
-    case ENT_LAST_STAR:
-        tex = es->textures.last_star;
-        dw = LSTAR_DISPLAY_W; dh = LSTAR_DISPLAY_H;
-        break;
-    case ENT_PLAYER_SPAWN:
-        tex = es->textures.player;
-        src_rect = (IntRect){ 0, 0, PLAYER_SPAWN_W, PLAYER_SPAWN_H };
-        use_src = 1;
-        dw = PLAYER_SPAWN_W; dh = PLAYER_SPAWN_H;
-        break;
-    case ENT_SPIDER:
-        tex = es->textures.spider;
-        src_rect = (IntRect){ 0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H };
-        use_src = 1;
-        dw = SPIDER_FRAME_W; dh = SPIDER_ART_H;
-        break;
-    case ENT_JUMPING_SPIDER:
-        tex = es->textures.jumping_spider;
-        src_rect = (IntRect){ 0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H };
-        use_src = 1;
-        dw = SPIDER_FRAME_W; dh = SPIDER_ART_H;
-        break;
-    case ENT_BIRD:
-        tex = es->textures.bird;
-        src_rect = (IntRect){ 0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H };
-        use_src = 1;
-        dw = BIRD_FRAME_W; dh = BIRD_ART_H;
-        break;
-    case ENT_FASTER_BIRD:
-        tex = es->textures.faster_bird;
-        src_rect = (IntRect){ 0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H };
-        use_src = 1;
-        dw = BIRD_FRAME_W; dh = BIRD_ART_H;
-        break;
-    case ENT_FISH:
-        tex = es->textures.fish;
-        dw = FISH_FRAME_W; dh = FISH_FRAME_H;
-        break;
-    case ENT_FASTER_FISH:
-        tex = es->textures.faster_fish;
-        dw = FISH_FRAME_W; dh = FISH_FRAME_H;
-        break;
-    case ENT_AXE_TRAP:
-        tex = es->textures.axe_trap;
-        dw = AXE_FRAME_W; dh = AXE_FRAME_H;
-        break;
-    case ENT_CIRCULAR_SAW:
-        tex = es->textures.circular_saw;
-        dw = SAW_DISPLAY_W; dh = SAW_DISPLAY_H;
-        break;
-    case ENT_SPIKE_ROW:
-        tex = es->textures.spike;
-        dw = SPIKE_TILE_W; dh = SPIKE_TILE_H;
-        break;
-    case ENT_SPIKE_PLATFORM:
-        tex = es->textures.spike_platform;
-        src_rect = (IntRect){ 0, SPIKE_PLAT_SRC_Y,
-                               SPIKE_PLAT_PIECE_W, SPIKE_PLAT_SRC_H };
-        use_src = 1;
-        dw = SPIKE_PLAT_PIECE_W; dh = SPIKE_PLAT_SRC_H;
-        break;
-    case ENT_SPIKE_BLOCK:
-        tex = es->textures.spike_block;
-        dw = SPIKE_DISPLAY_W; dh = SPIKE_DISPLAY_H;
-        break;
-    case ENT_BLUE_FLAME:
-        tex = es->textures.blue_flame;
-        dw = BLUE_FLAME_W; dh = BLUE_FLAME_H;
-        break;
-    case ENT_FIRE_FLAME:
-        tex = es->textures.fire_flame;
-        dw = FIRE_FLAME_W; dh = FIRE_FLAME_H;
-        break;
-    case ENT_FLOAT_PLATFORM:
-        tex = es->textures.float_platform;
-        dw = FPLAT_PIECE_W; dh = FPLAT_PIECE_H;
-        break;
-    case ENT_BRIDGE:
-        tex = es->textures.bridge;
-        dw = BRIDGE_TILE_W; dh = BRIDGE_TILE_H;
-        break;
-    case ENT_BOUNCEPAD_SMALL:
-        tex = es->textures.bouncepad_small;
-        src_rect = (IntRect){ 2 * BP_FRAME_W, BP_SRC_Y,
-                               BP_FRAME_W, BP_SRC_H };
-        use_src = 1;
-        dw = BP_FRAME_W; dh = BP_SRC_H;
-        break;
-    case ENT_BOUNCEPAD_MEDIUM:
-        tex = es->textures.bouncepad_medium;
-        src_rect = (IntRect){ 2 * BP_FRAME_W, BP_SRC_Y,
-                               BP_FRAME_W, BP_SRC_H };
-        use_src = 1;
-        dw = BP_FRAME_W; dh = BP_SRC_H;
-        break;
-    case ENT_BOUNCEPAD_HIGH:
-        tex = es->textures.bouncepad_high;
-        src_rect = (IntRect){ 2 * BP_FRAME_W, BP_SRC_Y,
-                               BP_FRAME_W, BP_SRC_H };
-        use_src = 1;
-        dw = BP_FRAME_W; dh = BP_SRC_H;
-        break;
-    case ENT_VINE:
-        tex = es->textures.vine_green;
-        src_rect = (IntRect){ 0, VINE_SRC_Y, VINE_W, VINE_SRC_H };
-        use_src = 1;
-        dw = VINE_W; dh = VINE_H;
-        break;
-    case ENT_LADDER:
-        tex = es->textures.ladder;
-        src_rect = (IntRect){ 0, LADDER_SRC_Y, LADDER_W, LADDER_SRC_H };
-        use_src = 1;
-        dw = LADDER_W; dh = LADDER_H;
-        break;
-    case ENT_ROPE:
-        tex = es->textures.rope;
-        src_rect = (IntRect){ ROPE_SRC_X, ROPE_SRC_Y,
-                               ROPE_SRC_W, ROPE_SRC_H };
-        use_src = 1;
-        dw = ROPE_W; dh = ROPE_H;
-        break;
-    case ENT_PLATFORM:
-        tex = es->textures.platform;
-        dw = TILE_SIZE; dh = 2 * TILE_SIZE;  /* default 2-tile pillar */
-        break;
-    case ENT_FLOOR_GAP:
-        /* Floor gap: draw a blue outline (no texture) */
-        dw = FLOOR_GAP_W; dh = GAME_H - FLOOR_Y;
-        break;
-    case ENT_CHECKPOINT:
-        /* Checkpoints use the same no-asset primitive as the world marker. */
-        {
-            IntRect line = { w2s_x(es, wx), w2s_y(es, wy - 18.0f),
-                              w2s_w(es, 2), w2s_h(es, 18) };
-            IntRect tick = { w2s_x(es, wx - 5.0f), w2s_y(es, wy),
-                              w2s_w(es, 12), w2s_h(es, 2) };
-            DrawRectangle(line.x,line.y,line.w,line.h,(Color){225,169,65,128});
-            DrawRectangle(tick.x,tick.y,tick.w,tick.h,(Color){225,169,65,128});
-        }
-        return;
-    case ENT_RAIL:
-        /* Rail: draw a green outline (no texture) */
-        dw = 3 * RAIL_TILE_W; dh = 3 * RAIL_TILE_H;
-        break;
-    default:
+    if (type == ENT_CHECKPOINT) {
+        IntRect line = { w2s_x(es, wx), w2s_y(es, wy - 18.0f),
+                          w2s_w(es, 2), w2s_h(es, 18) };
+        IntRect tick = { w2s_x(es, wx - 5.0f), w2s_y(es, wy),
+                          w2s_w(es, 12), w2s_h(es, 2) };
+        DrawRectangle(line.x,line.y,line.w,line.h,(Color){225,169,65,128});
+        DrawRectangle(tick.x,tick.y,tick.w,tick.h,(Color){225,169,65,128});
         return;
     }
+
+    Texture2D *tex = editor_entity_texture(&es->textures, type);
+    IntRect src_rect = preview->src;
+    int use_src = preview->crop;  /* 1 = use src_rect crop, 0 = draw full texture */
+    int dw = preview->w, dh = preview->h;
 
     /* Center the ghost on the cursor */
     float ghost_x = wx - (float)dw / 2.0f;

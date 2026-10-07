@@ -1,10 +1,18 @@
 /*
- * entity_meta.h — Shared editor display dimensions and geometry helpers.
+ * entity_meta.h — The editor's per-type table, LevelDef storage access,
+ *                 display dimensions and geometry helpers.
+ *
+ * entity_meta.c holds one row per EntityType (names, palette group,
+ * capacity, where the placements live in LevelDef, the Place-tool preview).
+ * The functions below are the only way the rest of the editor reads it.
  */
 #pragma once
 
+#include <stddef.h>  /* size_t */
+
 #include "editor.h"
 #include "../levels/level.h"
+#include "../shared/geometry.h" /* IntRect */
 
 typedef enum {
     EDITOR_ENTITY_CATEGORY_WORLD = 0,
@@ -26,6 +34,35 @@ int editor_entity_type_is_singleton(EntityType type);
 
 /* MAX_* array length for a type (1 for singletons, 0 for invalid types). */
 int editor_entity_capacity(EntityType type);
+
+/*
+ * EditorEntityPreview — what the Place tool draws under the cursor before
+ * a click (canvas.c, render_ghost).
+ *
+ * w, h    : size in world pixels, centred on the cursor.
+ * crop    : 1 to draw only the src rectangle of the sprite sheet, 0 to
+ *           draw the whole texture.
+ * texture : which EntityTextures member holds the sprite, as a byte offset;
+ *           EDITOR_NO_TEXTURE for types drawn as a plain box (floor gaps,
+ *           rails) or a marker (checkpoints).  Use editor_entity_texture()
+ *           rather than reading it directly.
+ */
+#define EDITOR_NO_TEXTURE ((size_t)-1)
+
+typedef struct {
+    size_t  texture;
+    int     w;
+    int     h;
+    int     crop;
+    IntRect src;
+} EditorEntityPreview;
+
+/* The preview row for a type, or NULL for an invalid type. */
+const EditorEntityPreview *editor_entity_preview(EntityType type);
+
+/* The loaded sprite a type's preview uses, or NULL when it has none (or the
+ * texture failed to load). */
+Texture2D *editor_entity_texture(const EntityTextures *textures, EntityType type);
 
 /* Level width in world pixels: screen_count screens (4 when unset) of
  * GAME_W each, the same rule level validation uses. */

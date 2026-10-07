@@ -1,155 +1,323 @@
 /*
- * entity_meta.c — Per-type editor metadata and LevelDef storage access.
+ * entity_meta.c — The editor's per-type table and LevelDef storage access.
  *
- * Two questions come up for every entity type, all over the editor:
- *   1. "What is it called and how many may exist?"  → s_entity_meta below.
- *   2. "Where does it live inside LevelDef?"         → editor_entity_array().
+ * Every entity type raises the same questions all over the editor:
+ *   - What is it called, which palette group is it in, how many may exist?
+ *   - Where are its placements stored inside LevelDef?
+ *   - What does the Place tool draw under the cursor before a click?
  *
- * Answering both in exactly one place means tools, undo, clipboard and tests
- * cannot disagree about an array's capacity or forget a type when a new one
- * is added.  Reading, writing, inserting and removing one placement all go
- * through the same table, so there is one memmove-based remove path instead
+ * s_entity_meta below answers all three with one row per EntityType, so
+ * tools, undo, the clipboard, the palette, the canvas and the tests cannot
+ * disagree about a type, and adding a type starts with adding one row.
+ * Reading, writing, inserting and removing one placement all go through the
+ * row's storage columns, so there is one memmove-based remove path instead
  * of a copy per caller.
+ *
+ * What stays outside the table is per-type *behaviour*: how a placement is
+ * clamped, dragged, pasted, hit-tested, drawn and edited touches different
+ * fields of each placement struct, so tools.c, hit_test.c, canvas.c,
+ * editor_clipboard.c and properties.c keep one small function or switch
+ * case per type for those.
  */
 
 #include "entity_meta.h"
 
+#include <stddef.h> /* offsetof */
 #include <string.h> /* memcpy, memmove, memset */
 
 #include "editor_clipboard.h" /* keep a copied rail rider on its rail */
+#include "../game.h"          /* GAME_H, FLOOR_Y, TILE_SIZE, FLOOR_GAP_W */
 
+/*
+ * EditorEntityMeta — one row of the table: everything about a type that is
+ * plain data.
+ *
+ * type          : the row's own EntityType.  A row left out of the table
+ *                 reads as all zeros, so comparing this with the index
+ *                 (and checking type_name) tells a real row from a gap.
+ * type_name     : shown in the properties header and status messages.
+ * palette_name  : shown in the palette list.
+ * category      : the palette group the type is listed under.
+ * singleton     : 1 for the two types that are one LevelDef field rather
+ *                 than an array (Last Star, Player Spawn).
+ * capacity      : MAX_* length of the LevelDef array (1 for singletons).
+ * array_offset, count_offset, item_size :
+ *                 where the placements live; see STORED_IN below.
+ * preview       : what the Place tool draws under the cursor.
+ */
 typedef struct {
     EntityType type;
     const char *type_name;
     const char *palette_name;
     EditorEntityCategory category;
     int singleton;
-    int capacity;   /* MAX_* length of the LevelDef array (1 for singletons) */
+    int capacity;
+    size_t array_offset;
+    size_t count_offset;
+    size_t item_size;
+    EditorEntityPreview preview;
 } EditorEntityMeta;
 
-static const EditorEntityMeta s_entity_meta[ENT_COUNT] = {
+/*
+ * STORED_IN(array, count) — fill the three storage columns of a row.
+ *
+ * offsetof(LevelDef, coins) is how many bytes into a LevelDef the coins
+ * array starts; adding it to the address of a real LevelDef gives
+ * &level->coins[0] (see editor_entity_array).  The same goes for the count
+ * field.  sizeof(((LevelDef *)0)->coins[0]) is the size of one element; the
+ * expression inside sizeof is never evaluated, so the null pointer is never
+ * dereferenced.  A table can hold these numbers, while it could not hold a
+ * pointer into a LevelDef that does not exist yet.
+ */
+#define STORED_IN(array, count)                                   \
+    .array_offset = offsetof(LevelDef, array),                    \
+    .count_offset = offsetof(LevelDef, count),                    \
+    .item_size    = sizeof(((LevelDef *)0)->array[0])
+
+/*
+ * TEXTURE(field) — which EntityTextures member holds the preview sprite,
+ * stored as that member's offset for the same reason as STORED_IN.
+ * NO_TEXTURE marks types the canvas draws without a sprite.
+ * CROP(x, y, w, h) — draw only that rectangle of the sprite sheet.
+ */
+#define TEXTURE(field)     .texture = offsetof(EntityTextures, field)
+#define NO_TEXTURE         .texture = EDITOR_NO_TEXTURE
+#define CROP(x, y, w, h)   .crop = 1, .src = { (x), (y), (w), (h) }
+
+/*
+ * The table.  Rows follow the EntityType order in editor.h; the [ENT_...]
+ * designators make each row land at its own index whatever the order.
+ * The array is sized by its rows, not by ENT_COUNT, so the _Static_assert
+ * after it fails the build when a type added at the end of the enum (where
+ * new types go) has no row yet.
+ */
+static const EditorEntityMeta s_entity_meta[] = {
+    /* ---- World ------------------------------------------------------ */
     [ENT_FLOOR_GAP] = {
-        ENT_FLOOR_GAP, "Floor Gap", "Floor Gap",
-        EDITOR_ENTITY_CATEGORY_WORLD, 0, MAX_FLOOR_GAPS
+        .type = ENT_FLOOR_GAP, .type_name = "Floor Gap", .palette_name = "Floor Gap",
+        .category = EDITOR_ENTITY_CATEGORY_WORLD,
+        .capacity = MAX_FLOOR_GAPS, STORED_IN(floor_gaps, floor_gap_count),
+        /* Drawn as a blue box the size of the hole. */
+        .preview = { NO_TEXTURE, .w = FLOOR_GAP_W, .h = GAME_H - FLOOR_Y },
     },
     [ENT_CHECKPOINT] = {
-        ENT_CHECKPOINT, "Checkpoint", "Checkpoint",
-        EDITOR_ENTITY_CATEGORY_WORLD, 0, MAX_CHECKPOINTS
+        .type = ENT_CHECKPOINT, .type_name = "Checkpoint", .palette_name = "Checkpoint",
+        .category = EDITOR_ENTITY_CATEGORY_WORLD,
+        .capacity = MAX_CHECKPOINTS, STORED_IN(checkpoints, checkpoint_count),
+        /* No sprite or box: canvas.c draws a small flag pole instead. */
+        .preview = { NO_TEXTURE },
     },
     [ENT_RAIL] = {
-        ENT_RAIL, "Rail", "Rail", EDITOR_ENTITY_CATEGORY_WORLD, 0, MAX_RAILS
+        .type = ENT_RAIL, .type_name = "Rail", .palette_name = "Rail",
+        .category = EDITOR_ENTITY_CATEGORY_WORLD,
+        .capacity = MAX_RAILS, STORED_IN(rails, rail_count),
+        /* Drawn as a green box three rail tiles square. */
+        .preview = { NO_TEXTURE, .w = 3 * RAIL_TILE_W, .h = 3 * RAIL_TILE_H },
     },
     [ENT_PLATFORM] = {
-        ENT_PLATFORM, "Platform", "Platform", EDITOR_ENTITY_CATEGORY_SURFACES,
-        0, MAX_PLATFORMS
+        .type = ENT_PLATFORM, .type_name = "Platform", .palette_name = "Platform",
+        .category = EDITOR_ENTITY_CATEGORY_SURFACES,
+        .capacity = MAX_PLATFORMS, STORED_IN(platforms, platform_count),
+        /* A new pillar is one tile wide and two tiles tall. */
+        .preview = { TEXTURE(platform), .w = TILE_SIZE, .h = 2 * TILE_SIZE },
     },
+    /* ---- Collectibles ----------------------------------------------- */
     [ENT_COIN] = {
-        ENT_COIN, "Coin", "Coin", EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
-        0, MAX_COINS
+        .type = ENT_COIN, .type_name = "Coin", .palette_name = "Coin",
+        .category = EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
+        .capacity = MAX_COINS, STORED_IN(coins, coin_count),
+        .preview = { TEXTURE(coin), .w = COIN_DISPLAY_W, .h = COIN_DISPLAY_H },
     },
     [ENT_STAR_YELLOW] = {
-        ENT_STAR_YELLOW, "Star Yellow", "Star Yellow",
-        EDITOR_ENTITY_CATEGORY_COLLECTIBLES, 0, MAX_STAR_YELLOWS
+        .type = ENT_STAR_YELLOW, .type_name = "Star Yellow", .palette_name = "Star Yellow",
+        .category = EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
+        .capacity = MAX_STAR_YELLOWS, STORED_IN(star_yellows, star_yellow_count),
+        .preview = { TEXTURE(star_yellow), .w = YSTAR_DISPLAY_W, .h = YSTAR_DISPLAY_H },
     },
     [ENT_STAR_GREEN] = {
-        ENT_STAR_GREEN, "Star Green", "Star Green",
-        EDITOR_ENTITY_CATEGORY_COLLECTIBLES, 0, MAX_STAR_GREENS
+        .type = ENT_STAR_GREEN, .type_name = "Star Green", .palette_name = "Star Green",
+        .category = EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
+        .capacity = MAX_STAR_GREENS, STORED_IN(star_greens, star_green_count),
+        .preview = { TEXTURE(star_green), .w = YSTAR_DISPLAY_W, .h = YSTAR_DISPLAY_H },
     },
     [ENT_STAR_RED] = {
-        ENT_STAR_RED, "Star Red", "Star Red",
-        EDITOR_ENTITY_CATEGORY_COLLECTIBLES, 0, MAX_STAR_REDS
+        .type = ENT_STAR_RED, .type_name = "Star Red", .palette_name = "Star Red",
+        .category = EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
+        .capacity = MAX_STAR_REDS, STORED_IN(star_reds, star_red_count),
+        .preview = { TEXTURE(star_red), .w = YSTAR_DISPLAY_W, .h = YSTAR_DISPLAY_H },
     },
     [ENT_LAST_STAR] = {
-        ENT_LAST_STAR, "Last Star", "Last Star",
-        EDITOR_ENTITY_CATEGORY_COLLECTIBLES, 1, 1
+        .type = ENT_LAST_STAR, .type_name = "Last Star", .palette_name = "Last Star",
+        .category = EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
+        .singleton = 1, .capacity = 1,   /* the LevelDef field last_star */
+        .preview = { TEXTURE(last_star), .w = LSTAR_DISPLAY_W, .h = LSTAR_DISPLAY_H },
     },
+    /* ---- Enemies ---------------------------------------------------- */
     [ENT_SPIDER] = {
-        ENT_SPIDER, "Spider", "Spider", EDITOR_ENTITY_CATEGORY_ENEMIES,
-        0, MAX_SPIDERS
+        .type = ENT_SPIDER, .type_name = "Spider", .palette_name = "Spider",
+        .category = EDITOR_ENTITY_CATEGORY_ENEMIES,
+        .capacity = MAX_SPIDERS, STORED_IN(spiders, spider_count),
+        .preview = { TEXTURE(spider), .w = SPIDER_FRAME_W, .h = SPIDER_ART_H,
+                     CROP(0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H) },
     },
     [ENT_JUMPING_SPIDER] = {
-        ENT_JUMPING_SPIDER, "Jumping Spider", "Jumping Spider",
-        EDITOR_ENTITY_CATEGORY_ENEMIES, 0, MAX_JUMPING_SPIDERS
+        .type = ENT_JUMPING_SPIDER, .type_name = "Jumping Spider",
+        .palette_name = "Jumping Spider",
+        .category = EDITOR_ENTITY_CATEGORY_ENEMIES,
+        .capacity = MAX_JUMPING_SPIDERS, STORED_IN(jumping_spiders, jumping_spider_count),
+        .preview = { TEXTURE(jumping_spider), .w = SPIDER_FRAME_W, .h = SPIDER_ART_H,
+                     CROP(0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H) },
     },
     [ENT_BIRD] = {
-        ENT_BIRD, "Bird", "Bird", EDITOR_ENTITY_CATEGORY_ENEMIES, 0, MAX_BIRDS
+        .type = ENT_BIRD, .type_name = "Bird", .palette_name = "Bird",
+        .category = EDITOR_ENTITY_CATEGORY_ENEMIES,
+        .capacity = MAX_BIRDS, STORED_IN(birds, bird_count),
+        .preview = { TEXTURE(bird), .w = BIRD_FRAME_W, .h = BIRD_ART_H,
+                     CROP(0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H) },
     },
     [ENT_FASTER_BIRD] = {
-        ENT_FASTER_BIRD, "Faster Bird", "Faster Bird",
-        EDITOR_ENTITY_CATEGORY_ENEMIES, 0, MAX_FASTER_BIRDS
+        .type = ENT_FASTER_BIRD, .type_name = "Faster Bird", .palette_name = "Faster Bird",
+        .category = EDITOR_ENTITY_CATEGORY_ENEMIES,
+        .capacity = MAX_FASTER_BIRDS, STORED_IN(faster_birds, faster_bird_count),
+        .preview = { TEXTURE(faster_bird), .w = BIRD_FRAME_W, .h = BIRD_ART_H,
+                     CROP(0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H) },
     },
     [ENT_FISH] = {
-        ENT_FISH, "Fish", "Fish", EDITOR_ENTITY_CATEGORY_ENEMIES, 0, MAX_FISH
+        .type = ENT_FISH, .type_name = "Fish", .palette_name = "Fish",
+        .category = EDITOR_ENTITY_CATEGORY_ENEMIES,
+        .capacity = MAX_FISH, STORED_IN(fish, fish_count),
+        .preview = { TEXTURE(fish), .w = FISH_FRAME_W, .h = FISH_FRAME_H },
     },
     [ENT_FASTER_FISH] = {
-        ENT_FASTER_FISH, "Faster Fish", "Faster Fish",
-        EDITOR_ENTITY_CATEGORY_ENEMIES, 0, MAX_FASTER_FISH
+        .type = ENT_FASTER_FISH, .type_name = "Faster Fish", .palette_name = "Faster Fish",
+        .category = EDITOR_ENTITY_CATEGORY_ENEMIES,
+        .capacity = MAX_FASTER_FISH, STORED_IN(faster_fish, faster_fish_count),
+        .preview = { TEXTURE(faster_fish), .w = FISH_FRAME_W, .h = FISH_FRAME_H },
     },
+    /* ---- Hazards ---------------------------------------------------- */
     [ENT_AXE_TRAP] = {
-        ENT_AXE_TRAP, "Axe Trap", "Axe Trap",
-        EDITOR_ENTITY_CATEGORY_HAZARDS, 0, MAX_AXE_TRAPS
+        .type = ENT_AXE_TRAP, .type_name = "Axe Trap", .palette_name = "Axe Trap",
+        .category = EDITOR_ENTITY_CATEGORY_HAZARDS,
+        .capacity = MAX_AXE_TRAPS, STORED_IN(axe_traps, axe_trap_count),
+        .preview = { TEXTURE(axe_trap), .w = AXE_FRAME_W, .h = AXE_FRAME_H },
     },
     [ENT_CIRCULAR_SAW] = {
-        ENT_CIRCULAR_SAW, "Circular Saw", "Circular Saw",
-        EDITOR_ENTITY_CATEGORY_HAZARDS, 0, MAX_CIRCULAR_SAWS
+        .type = ENT_CIRCULAR_SAW, .type_name = "Circular Saw", .palette_name = "Circular Saw",
+        .category = EDITOR_ENTITY_CATEGORY_HAZARDS,
+        .capacity = MAX_CIRCULAR_SAWS, STORED_IN(circular_saws, circular_saw_count),
+        .preview = { TEXTURE(circular_saw), .w = SAW_DISPLAY_W, .h = SAW_DISPLAY_H },
     },
     [ENT_SPIKE_ROW] = {
-        ENT_SPIKE_ROW, "Spike Row", "Spike Row",
-        EDITOR_ENTITY_CATEGORY_HAZARDS, 0, MAX_SPIKE_ROWS
+        .type = ENT_SPIKE_ROW, .type_name = "Spike Row", .palette_name = "Spike Row",
+        .category = EDITOR_ENTITY_CATEGORY_HAZARDS,
+        .capacity = MAX_SPIKE_ROWS, STORED_IN(spike_rows, spike_row_count),
+        .preview = { TEXTURE(spike), .w = SPIKE_TILE_W, .h = SPIKE_TILE_H },
     },
     [ENT_SPIKE_PLATFORM] = {
-        ENT_SPIKE_PLATFORM, "Spike Platform", "Spike Platform",
-        EDITOR_ENTITY_CATEGORY_HAZARDS, 0, MAX_SPIKE_PLATFORMS
+        .type = ENT_SPIKE_PLATFORM, .type_name = "Spike Platform",
+        .palette_name = "Spike Platform",
+        .category = EDITOR_ENTITY_CATEGORY_HAZARDS,
+        .capacity = MAX_SPIKE_PLATFORMS, STORED_IN(spike_platforms, spike_platform_count),
+        .preview = { TEXTURE(spike_platform), .w = SPIKE_PLAT_PIECE_W, .h = SPIKE_PLAT_SRC_H,
+                     CROP(0, SPIKE_PLAT_SRC_Y, SPIKE_PLAT_PIECE_W, SPIKE_PLAT_SRC_H) },
     },
     [ENT_SPIKE_BLOCK] = {
-        ENT_SPIKE_BLOCK, "Spike Block", "Spike Block",
-        EDITOR_ENTITY_CATEGORY_HAZARDS, 0, MAX_SPIKE_BLOCKS
+        .type = ENT_SPIKE_BLOCK, .type_name = "Spike Block", .palette_name = "Spike Block",
+        .category = EDITOR_ENTITY_CATEGORY_HAZARDS,
+        .capacity = MAX_SPIKE_BLOCKS, STORED_IN(spike_blocks, spike_block_count),
+        .preview = { TEXTURE(spike_block), .w = SPIKE_DISPLAY_W, .h = SPIKE_DISPLAY_H },
     },
     [ENT_BLUE_FLAME] = {
-        ENT_BLUE_FLAME, "Blue Flame", "Blue Flame",
-        EDITOR_ENTITY_CATEGORY_HAZARDS, 0, MAX_BLUE_FLAMES
+        .type = ENT_BLUE_FLAME, .type_name = "Blue Flame", .palette_name = "Blue Flame",
+        .category = EDITOR_ENTITY_CATEGORY_HAZARDS,
+        .capacity = MAX_BLUE_FLAMES, STORED_IN(blue_flames, blue_flame_count),
+        .preview = { TEXTURE(blue_flame), .w = BLUE_FLAME_W, .h = BLUE_FLAME_H },
     },
     [ENT_FIRE_FLAME] = {
-        ENT_FIRE_FLAME, "Fire Flame", "Fire Flame",
-        EDITOR_ENTITY_CATEGORY_HAZARDS, 0, MAX_FIRE_FLAMES
+        .type = ENT_FIRE_FLAME, .type_name = "Fire Flame", .palette_name = "Fire Flame",
+        .category = EDITOR_ENTITY_CATEGORY_HAZARDS,
+        .capacity = MAX_FIRE_FLAMES, STORED_IN(fire_flames, fire_flame_count),
+        .preview = { TEXTURE(fire_flame), .w = FIRE_FLAME_W, .h = FIRE_FLAME_H },
     },
+    /* ---- Surfaces --------------------------------------------------- */
     [ENT_FLOAT_PLATFORM] = {
-        ENT_FLOAT_PLATFORM, "Float Platform", "Float Platform",
-        EDITOR_ENTITY_CATEGORY_SURFACES, 0, MAX_FLOAT_PLATFORMS
+        .type = ENT_FLOAT_PLATFORM, .type_name = "Float Platform",
+        .palette_name = "Float Platform",
+        .category = EDITOR_ENTITY_CATEGORY_SURFACES,
+        .capacity = MAX_FLOAT_PLATFORMS, STORED_IN(float_platforms, float_platform_count),
+        .preview = { TEXTURE(float_platform), .w = FPLAT_PIECE_W, .h = FPLAT_PIECE_H },
     },
     [ENT_BRIDGE] = {
-        ENT_BRIDGE, "Bridge", "Bridge", EDITOR_ENTITY_CATEGORY_SURFACES,
-        0, MAX_BRIDGES
+        .type = ENT_BRIDGE, .type_name = "Bridge", .palette_name = "Bridge",
+        .category = EDITOR_ENTITY_CATEGORY_SURFACES,
+        .capacity = MAX_BRIDGES, STORED_IN(bridges, bridge_count),
+        .preview = { TEXTURE(bridge), .w = BRIDGE_TILE_W, .h = BRIDGE_TILE_H },
     },
+    /* The three bouncepads show frame 2 (idle) of their own sheet. */
     [ENT_BOUNCEPAD_SMALL] = {
-        ENT_BOUNCEPAD_SMALL, "Bouncepad (S)", "Bouncepad Small",
-        EDITOR_ENTITY_CATEGORY_SURFACES, 0, MAX_BOUNCEPADS_SMALL
+        .type = ENT_BOUNCEPAD_SMALL, .type_name = "Bouncepad (S)",
+        .palette_name = "Bouncepad Small",
+        .category = EDITOR_ENTITY_CATEGORY_SURFACES,
+        .capacity = MAX_BOUNCEPADS_SMALL, STORED_IN(bouncepads_small, bouncepad_small_count),
+        .preview = { TEXTURE(bouncepad_small), .w = BP_FRAME_W, .h = BP_SRC_H,
+                     CROP(2 * BP_FRAME_W, BP_SRC_Y, BP_FRAME_W, BP_SRC_H) },
     },
     [ENT_BOUNCEPAD_MEDIUM] = {
-        ENT_BOUNCEPAD_MEDIUM, "Bouncepad (M)", "Bouncepad Medium",
-        EDITOR_ENTITY_CATEGORY_SURFACES, 0, MAX_BOUNCEPADS_MEDIUM
+        .type = ENT_BOUNCEPAD_MEDIUM, .type_name = "Bouncepad (M)",
+        .palette_name = "Bouncepad Medium",
+        .category = EDITOR_ENTITY_CATEGORY_SURFACES,
+        .capacity = MAX_BOUNCEPADS_MEDIUM, STORED_IN(bouncepads_medium, bouncepad_medium_count),
+        .preview = { TEXTURE(bouncepad_medium), .w = BP_FRAME_W, .h = BP_SRC_H,
+                     CROP(2 * BP_FRAME_W, BP_SRC_Y, BP_FRAME_W, BP_SRC_H) },
     },
     [ENT_BOUNCEPAD_HIGH] = {
-        ENT_BOUNCEPAD_HIGH, "Bouncepad (H)", "Bouncepad High",
-        EDITOR_ENTITY_CATEGORY_SURFACES, 0, MAX_BOUNCEPADS_HIGH
+        .type = ENT_BOUNCEPAD_HIGH, .type_name = "Bouncepad (H)",
+        .palette_name = "Bouncepad High",
+        .category = EDITOR_ENTITY_CATEGORY_SURFACES,
+        .capacity = MAX_BOUNCEPADS_HIGH, STORED_IN(bouncepads_high, bouncepad_high_count),
+        .preview = { TEXTURE(bouncepad_high), .w = BP_FRAME_W, .h = BP_SRC_H,
+                     CROP(2 * BP_FRAME_W, BP_SRC_Y, BP_FRAME_W, BP_SRC_H) },
     },
+    /* ---- Decorations (climbables): one tile of the stack ------------ */
     [ENT_VINE] = {
-        ENT_VINE, "Vine", "Vine", EDITOR_ENTITY_CATEGORY_DECORATIONS,
-        0, MAX_VINES
+        .type = ENT_VINE, .type_name = "Vine", .palette_name = "Vine",
+        .category = EDITOR_ENTITY_CATEGORY_DECORATIONS,
+        .capacity = MAX_VINES, STORED_IN(vines, vine_count),
+        .preview = { TEXTURE(vine_green), .w = VINE_W, .h = VINE_H,
+                     CROP(0, VINE_SRC_Y, VINE_W, VINE_SRC_H) },
     },
     [ENT_LADDER] = {
-        ENT_LADDER, "Ladder", "Ladder", EDITOR_ENTITY_CATEGORY_DECORATIONS,
-        0, MAX_LADDERS
+        .type = ENT_LADDER, .type_name = "Ladder", .palette_name = "Ladder",
+        .category = EDITOR_ENTITY_CATEGORY_DECORATIONS,
+        .capacity = MAX_LADDERS, STORED_IN(ladders, ladder_count),
+        .preview = { TEXTURE(ladder), .w = LADDER_W, .h = LADDER_H,
+                     CROP(0, LADDER_SRC_Y, LADDER_W, LADDER_SRC_H) },
     },
     [ENT_ROPE] = {
-        ENT_ROPE, "Rope", "Rope", EDITOR_ENTITY_CATEGORY_DECORATIONS,
-        0, MAX_ROPES
+        .type = ENT_ROPE, .type_name = "Rope", .palette_name = "Rope",
+        .category = EDITOR_ENTITY_CATEGORY_DECORATIONS,
+        .capacity = MAX_ROPES, STORED_IN(ropes, rope_count),
+        .preview = { TEXTURE(rope), .w = ROPE_W, .h = ROPE_H,
+                     CROP(ROPE_SRC_X, ROPE_SRC_Y, ROPE_SRC_W, ROPE_SRC_H) },
     },
+    /* ---- Player ----------------------------------------------------- */
     [ENT_PLAYER_SPAWN] = {
-        ENT_PLAYER_SPAWN, "Player Spawn", "Player Spawn",
-        EDITOR_ENTITY_CATEGORY_WORLD, 1, 1
-    }
+        .type = ENT_PLAYER_SPAWN, .type_name = "Player Spawn", .palette_name = "Player Spawn",
+        .category = EDITOR_ENTITY_CATEGORY_WORLD,
+        /* player_start_x/y in LevelDef; first frame of the idle sheet. */
+        .singleton = 1, .capacity = 1,
+        .preview = { TEXTURE(player), .w = PLAYER_SPAWN_W, .h = PLAYER_SPAWN_H,
+                     CROP(0, 0, PLAYER_SPAWN_W, PLAYER_SPAWN_H) },
+    },
 };
+
+_Static_assert(sizeof(s_entity_meta) / sizeof(s_entity_meta[0]) == ENT_COUNT,
+               "s_entity_meta needs one row per EntityType");
+
+#undef STORED_IN
+#undef TEXTURE
+#undef NO_TEXTURE
+#undef CROP
 
 static const EntityType s_palette_order[] = {
     ENT_PLAYER_SPAWN,
@@ -199,10 +367,12 @@ static const char *s_category_names[EDITOR_ENTITY_CATEGORY_COUNT] = {
 _Static_assert(PALETTE_ENTRY_COUNT == ENT_COUNT,
                "palette order must include every editor entity type");
 
+/* The row for `type`, or NULL for ENT_COUNT, a bad value or a missing row. */
 static const EditorEntityMeta *editor_entity_meta(EntityType type)
 {
     if (type < 0 || type >= ENT_COUNT) return 0;
-    if (s_entity_meta[type].type != type) return 0;
+    if (s_entity_meta[type].type != type || !s_entity_meta[type].type_name)
+        return 0;
     return &s_entity_meta[type];
 }
 
@@ -253,6 +423,22 @@ int editor_entity_capacity(EntityType type)
     return meta ? meta->capacity : 0;
 }
 
+const EditorEntityPreview *editor_entity_preview(EntityType type)
+{
+    const EditorEntityMeta *meta = editor_entity_meta(type);
+    return meta ? &meta->preview : 0;
+}
+
+Texture2D *editor_entity_texture(const EntityTextures *textures, EntityType type)
+{
+    const EditorEntityPreview *preview = editor_entity_preview(type);
+
+    if (!textures || !preview || preview->texture == EDITOR_NO_TEXTURE) return 0;
+    /* preview->texture is the byte offset of one Texture2D * member inside
+     * EntityTextures (see TEXTURE above); read that member. */
+    return *(Texture2D *const *)((const char *)textures + preview->texture);
+}
+
 float editor_world_width(const LevelDef *level)
 {
     int screens = (level && level->screen_count > 0) ? level->screen_count : 4;
@@ -282,167 +468,25 @@ typedef struct {
     int    *count;
 } EditorEntityArray;
 
-static EditorEntityArray entity_array(void *items, size_t item_size, int *count)
-{
-    EditorEntityArray array;
-    array.items = items;
-    array.item_size = item_size;
-    array.count = count;
-    return array;
-}
-
 /*
  * editor_entity_array — Fill *out with the array that stores `type`.
  *
  * Returns 1 for array-backed types and 0 for the two singletons (Last Star,
- * Player Spawn), which are plain fields instead of arrays.  This is the only
- * switch that names every LevelDef array; read/write/insert/remove and the
- * entity count all start here.
+ * Player Spawn), which are plain fields instead of arrays.  The row's
+ * offsets turn into real addresses by adding them to the address of this
+ * LevelDef; read/write/insert/remove and the entity count all start here.
  */
 static int editor_entity_array(LevelDef *level, EntityType type,
                                EditorEntityArray *out)
 {
-    /*
-     * Each case pairs an array with its element size and its count field.
-     * sizeof(array[0]) keeps the size correct if a placement struct grows.
-     */
-    switch (type) {
-    /* ---- World geometry ------------------------------------------- */
-    case ENT_FLOOR_GAP:
-        *out = entity_array(level->floor_gaps, sizeof(level->floor_gaps[0]),
-                            &level->floor_gap_count);
-        return 1;
-    case ENT_CHECKPOINT:
-        *out = entity_array(level->checkpoints, sizeof(level->checkpoints[0]),
-                            &level->checkpoint_count);
-        return 1;
-    case ENT_RAIL:
-        *out = entity_array(level->rails, sizeof(level->rails[0]),
-                            &level->rail_count);
-        return 1;
-    case ENT_PLATFORM:
-        *out = entity_array(level->platforms, sizeof(level->platforms[0]),
-                            &level->platform_count);
-        return 1;
-    /* ---- Collectibles --------------------------------------------- */
-    case ENT_COIN:
-        *out = entity_array(level->coins, sizeof(level->coins[0]),
-                            &level->coin_count);
-        return 1;
-    case ENT_STAR_YELLOW:
-        *out = entity_array(level->star_yellows, sizeof(level->star_yellows[0]),
-                            &level->star_yellow_count);
-        return 1;
-    case ENT_STAR_GREEN:
-        *out = entity_array(level->star_greens, sizeof(level->star_greens[0]),
-                            &level->star_green_count);
-        return 1;
-    case ENT_STAR_RED:
-        *out = entity_array(level->star_reds, sizeof(level->star_reds[0]),
-                            &level->star_red_count);
-        return 1;
-    /* ---- Enemies -------------------------------------------------- */
-    case ENT_SPIDER:
-        *out = entity_array(level->spiders, sizeof(level->spiders[0]),
-                            &level->spider_count);
-        return 1;
-    case ENT_JUMPING_SPIDER:
-        *out = entity_array(level->jumping_spiders,
-                            sizeof(level->jumping_spiders[0]),
-                            &level->jumping_spider_count);
-        return 1;
-    case ENT_BIRD:
-        *out = entity_array(level->birds, sizeof(level->birds[0]),
-                            &level->bird_count);
-        return 1;
-    case ENT_FASTER_BIRD:
-        *out = entity_array(level->faster_birds, sizeof(level->faster_birds[0]),
-                            &level->faster_bird_count);
-        return 1;
-    case ENT_FISH:
-        *out = entity_array(level->fish, sizeof(level->fish[0]),
-                            &level->fish_count);
-        return 1;
-    case ENT_FASTER_FISH:
-        *out = entity_array(level->faster_fish, sizeof(level->faster_fish[0]),
-                            &level->faster_fish_count);
-        return 1;
-    /* ---- Hazards -------------------------------------------------- */
-    case ENT_AXE_TRAP:
-        *out = entity_array(level->axe_traps, sizeof(level->axe_traps[0]),
-                            &level->axe_trap_count);
-        return 1;
-    case ENT_CIRCULAR_SAW:
-        *out = entity_array(level->circular_saws,
-                            sizeof(level->circular_saws[0]),
-                            &level->circular_saw_count);
-        return 1;
-    case ENT_SPIKE_ROW:
-        *out = entity_array(level->spike_rows, sizeof(level->spike_rows[0]),
-                            &level->spike_row_count);
-        return 1;
-    case ENT_SPIKE_PLATFORM:
-        *out = entity_array(level->spike_platforms,
-                            sizeof(level->spike_platforms[0]),
-                            &level->spike_platform_count);
-        return 1;
-    case ENT_SPIKE_BLOCK:
-        *out = entity_array(level->spike_blocks, sizeof(level->spike_blocks[0]),
-                            &level->spike_block_count);
-        return 1;
-    case ENT_BLUE_FLAME:
-        *out = entity_array(level->blue_flames, sizeof(level->blue_flames[0]),
-                            &level->blue_flame_count);
-        return 1;
-    case ENT_FIRE_FLAME:
-        *out = entity_array(level->fire_flames, sizeof(level->fire_flames[0]),
-                            &level->fire_flame_count);
-        return 1;
-    /* ---- Surfaces and bouncepads (three separate arrays) ---------- */
-    case ENT_FLOAT_PLATFORM:
-        *out = entity_array(level->float_platforms,
-                            sizeof(level->float_platforms[0]),
-                            &level->float_platform_count);
-        return 1;
-    case ENT_BRIDGE:
-        *out = entity_array(level->bridges, sizeof(level->bridges[0]),
-                            &level->bridge_count);
-        return 1;
-    case ENT_BOUNCEPAD_SMALL:
-        *out = entity_array(level->bouncepads_small,
-                            sizeof(level->bouncepads_small[0]),
-                            &level->bouncepad_small_count);
-        return 1;
-    case ENT_BOUNCEPAD_MEDIUM:
-        *out = entity_array(level->bouncepads_medium,
-                            sizeof(level->bouncepads_medium[0]),
-                            &level->bouncepad_medium_count);
-        return 1;
-    case ENT_BOUNCEPAD_HIGH:
-        *out = entity_array(level->bouncepads_high,
-                            sizeof(level->bouncepads_high[0]),
-                            &level->bouncepad_high_count);
-        return 1;
-    /* ---- Climbables ----------------------------------------------- */
-    case ENT_VINE:
-        *out = entity_array(level->vines, sizeof(level->vines[0]),
-                            &level->vine_count);
-        return 1;
-    case ENT_LADDER:
-        *out = entity_array(level->ladders, sizeof(level->ladders[0]),
-                            &level->ladder_count);
-        return 1;
-    case ENT_ROPE:
-        *out = entity_array(level->ropes, sizeof(level->ropes[0]),
-                            &level->rope_count);
-        return 1;
-    /* Singletons are plain LevelDef fields, not arrays. */
-    case ENT_LAST_STAR:
-    case ENT_PLAYER_SPAWN:
-    case ENT_COUNT:
-        break;
-    }
-    return 0;
+    const EditorEntityMeta *meta = editor_entity_meta(type);
+    char *base = (char *)level;
+
+    if (!level || !meta || meta->singleton) return 0;
+    out->items     = base + meta->array_offset;
+    out->item_size = meta->item_size;
+    out->count     = (int *)(base + meta->count_offset);
+    return 1;
 }
 
 int editor_entity_count(const LevelDef *level, EntityType type)
