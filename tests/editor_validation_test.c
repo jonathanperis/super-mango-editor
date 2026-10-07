@@ -28,6 +28,7 @@
 #include "editor/editor_clipboard.h"
 #include "editor/editor_events.h"
 #include "editor/editor_files.h"
+#include "editor/editor_recovery.h"
 #include "editor/editor_session.h"
 #include "editor/editor_undo_apply.h"
 #include "editor/editor_validation.h"
