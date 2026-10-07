@@ -69,6 +69,14 @@ typedef struct {
     void *edit_target;          /* borrowed destination, interpreted by edit_type */
     int edit_target_size;
     int dropdown_open_id;      /* zero = closed; otherwise the stable widget ID */
+    /* A press while a list is open belongs to that list alone (ui_press), so
+     * it can never reach a widget or the canvas drawn underneath the list. */
+    int dropdown_click;
+    int dropdown_seen;         /* the open dropdown was drawn this frame */
+    /* The open list is drawn last (ui_draw_overlays) so later widgets cannot
+     * paint over it. Options are borrowed from the caller's static array. */
+    const char **dropdown_options;
+    int dropdown_count, dropdown_x, dropdown_y, dropdown_w, dropdown_selected;
     /* Capture undo before a change; finish/block a field edit before commands. */
     UIBeforeChangeFn before_change;
     void *before_change_context;
@@ -82,6 +90,12 @@ void ui_init(UIState *ui, TextFont *font);
 void ui_cleanup(UIState *ui);
 /* Reset one-shot input, not retained edits. Call before processing commands. */
 void ui_begin_frame(UIState *ui);
+/* Record a left-button press. While a dropdown list is open the press only
+ * goes to that list (to pick an option or close it); mouse_clicked stays 0,
+ * so no other widget reacts. Returns 1 when the press was taken this way. */
+int ui_press(UIState *ui);
+/* Draw the open dropdown list on top of everything else drawn this frame. */
+void ui_draw_overlays(UIState *ui);
 /* Append UTF-8 input without splitting a codepoint if the queue fills. */
 void ui_queue_text_input(UIState *ui, const char *text);
 /* Apply at command boundaries: 0 invalid/retained, 1 valid no-op, 2 changed. */
@@ -107,7 +121,9 @@ int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value);
 /* buf_size includes the final NUL byte. Paste/backspace preserve UTF-8 units. */
 int ui_text_field(UIState *ui, int id, int x, int y, int w, char *buf, int buf_size);
 /* Open/close the option list on click; update *selected and return 1 only
- * when the choice changes. Labels are borrowed from the caller's array. */
+ * when the choice changes. Labels are borrowed from the caller's array.
+ * A *selected outside [0, count) means "not one of these options" (a
+ * hand-edited path, say): the header shows "---" and any choice applies. */
 int ui_dropdown(UIState *ui, int id, int x, int y, int w,
                 const char **options, int count, int *selected);
 /* A horizontal divider, drawn in logical pixels. */

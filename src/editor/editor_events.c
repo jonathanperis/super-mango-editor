@@ -225,15 +225,21 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         break;
     case INPUT_MOUSE_DOWN:
         if (event->button == MOUSE_BUTTON_LEFT) {
-            es->mouse_down = es->ui.mouse_clicked = 1;
+            /* An open dropdown list hangs over the canvas and the panels.
+             * The press belongs to the list (pick an option or close it);
+             * placing or deleting under it as well would be a surprise. */
+            if (ui_press(&es->ui)) break;
+            es->mouse_down = 1;
             if (canvas_contains(event->x, event->y) && editor_finish_field_edit(es))
                 tools_mouse_down(es, wx, wy);
         } else if (event->button == MOUSE_BUTTON_RIGHT) {
             es->mouse_right_down = 1;
             /* Right-click deletes. During a left-button drag that would shift
              * the array under drag_index, so the drag would then overwrite a
-             * different entity. Finish (release) the drag first. */
-            if (!es->dragging && canvas_contains(event->x, event->y) &&
+             * different entity. Finish (release) the drag first. The same
+             * goes for a click under an open dropdown list. */
+            if (!es->dragging && es->ui.dropdown_open_id == 0 &&
+                canvas_contains(event->x, event->y) &&
                 editor_finish_field_edit(es))
                 tools_right_click(es, wx, wy);
         }
