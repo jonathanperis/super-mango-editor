@@ -116,3 +116,7 @@ kbd {
 .pixel-button-gold:hover { background: #ffcd57; }
 .pixel-button-ghost { background: var(--night-panel); color: var(--ink); border-color: #000; }
 .pixel-button-ghost:hover { background: #24305a; color: var(--ink); }
+
+/* Category marks (CategoryMark.astro): a sprite cropped to its art. */
+.category-mark { position: relative; display: inline-block; flex: none; overflow: hidden; }
+.category-mark .sprite { position: absolute; left: var(--crop-x); top: var(--crop-y); }
