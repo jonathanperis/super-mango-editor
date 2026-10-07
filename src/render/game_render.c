@@ -90,9 +90,12 @@ static void draw_background(GameState *gs, int cam_x)
  *   [BL][BC][BR]   row 2  y=32..47  ← floor base edge
  *
  * Piece column selection (based on world-space tx):
- *   • tx == 0              → col 0 (left  world edge cap)
- *   • tx + P >= WORLD_W    → col 2 (right world edge cap)
- *   • all other columns    → col 1 (seamless center fill)
+ *   • tx <= 0, or the piece just right of a floor gap
+ *                                → col 0 (left edge cap)
+ *   • tx + P >= gs->runtime.world_w, or the piece just left of a gap
+ *                                → col 2 (right edge cap)
+ *   • every other column, or one that is both edges
+ *                                → col 1 (seamless center fill)
  *
  * We iterate tx in world coordinates starting from the tile-aligned
  * column just behind cam_x, and stop once tx is off the right edge
