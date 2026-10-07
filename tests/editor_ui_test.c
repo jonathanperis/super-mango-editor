@@ -1,0 +1,850 @@
+/*
+ * editor_ui_test.c — The editor driven the way a designer drives it.
+ *
+ * Every interaction is an InputEvent (mouse, wheel, key) handled by
+ * editor_handle_event, followed by one immediate-mode frame. Assertions read
+ * the resulting document, selection, undo history and status line, never
+ * pixel colours, so they hold while the panels' code is reorganised.
+ *
+ * The frames draw into an 8x8 render target: every widget and canvas path
+ * still runs (hit tests, hover, clicks, text), but software rendering of a
+ * full 1280x720 frame would cost a hundred times more. Two real
+ * editor_run_frame calls cover the full-size frame path as well.
+ *
+ * Panel positions are found by probing, not hard-coded: a probe is one click
+ * at a point, and its effect (tool, selection, active field) says what was
+ * there. Native dialogs can never open: their test seams are armed before
+ * every probe, and on POSIX fake pickers that answer "Cancel" come first on
+ * PATH.
+ */
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L /* fork, setenv, mkdir, chmod under -std=c11 */
+#endif
+
+#include <errno.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#ifndef _WIN32
+#include <signal.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
+
+#include "editor/canvas.h"
+#include "editor/editor.h"
+#include "editor/editor_chrome.h"
+#include "editor/editor_events.h"
+#include "editor/editor_files.h"
+#include "editor/editor_frame.h"
+#include "editor/editor_layout.h"
+#include "editor/editor_panels.h"
+#include "editor/editor_playtest.h"
+#include "editor/editor_session.h"
+#include "editor/entity_meta.h"
+#include "editor/file_dialog.h"
+#include "levels/level_loader.h"
+#include "shared/serializer.h"
+#include "test_paths.h"
+
+#define CHECK(test) do { if (!(test)) { \
+    fprintf(stderr, "editor_ui_test:%d: %s\n", __LINE__, #test); \
+    failed = 1; goto done; } } while (0)
+
+/* A spot in the status bar: drawn every frame, but nothing there to click. */
+#define NEUTRAL_X (CANVAS_W / 2)
+#define NEUTRAL_Y (EDITOR_H - STATUS_H / 2)
+/* Probe columns in the right panel: labels on the left, fields on the right. */
+#define PANEL_LABEL_X (CANVAS_W + 40)
+#define PANEL_FIELD_X (CANVAS_W + 140)
+#define PANEL_FAR_X   (CANVAS_W + 300)
+
+static RenderTexture2D tiny_target;
+
+/* ------------------------------------------------------------------ */
+/* Input and frames                                                    */
+/* ------------------------------------------------------------------ */
+
+static void push_event(InputKind type, int key_or_button, int mods, int x, int y)
+{
+    InputEvent event = {0};
+    event.type = type;
+    if (type == INPUT_KEY_DOWN || type == INPUT_KEY_UP) event.key = key_or_button;
+    else event.button = key_or_button;
+    event.mods = mods;
+    event.x = x;
+    event.y = y;
+    input_push(&event);
+}
+
+static void push_key(int key, int mods)
+{
+    push_event(INPUT_KEY_DOWN, key, mods, 0, 0);
+    push_event(INPUT_KEY_UP, key, mods, 0, 0);
+}
+
+static void push_click(int x, int y)
+{
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, x, y);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, x, y);
+}
+
+static void push_wheel(int x, int y, float wheel, int mods)
+{
+    InputEvent event = {0};
+    event.type = INPUT_WHEEL;
+    event.x = x;
+    event.y = y;
+    event.wheel = wheel;
+    event.mods = mods;
+    input_push(&event);
+}
+
+static void push_text(const char *text)
+{
+    for (; *text; text++) {
+        InputEvent event = {0};
+        event.type = INPUT_TEXT;
+        event.text[0] = *text;
+        input_push(&event);
+    }
+}
+
+/* A dialog that would block the run instead returns its safe answer. */
+static void arm_dialog_seams(void)
+{
+    editor_test_set_finish_field_choice(2);   /* Discard the field edit */
+    file_dialog_test_set_open_result(FILE_DIALOG_CANCELLED, NULL);
+    file_dialog_test_set_save_result(FILE_DIALOG_CANCELLED, NULL);
+}
+
+static void clear_dialog_seams(void)
+{
+    editor_test_set_finish_field_choice(-1);
+    file_dialog_test_set_open_result(-1, NULL);
+    file_dialog_test_set_save_result(-1, NULL);
+}
+
+/*
+ * One editor frame with the pointer at (mx, my): queued events, hover and
+ * drawing in editor_run_frame's order, into the tiny target.
+ */
+static void ui_frame(EditorState *es, int mx, int my)
+{
+    InputEvent event;
+    arm_dialog_seams();
+    ui_begin_frame(&es->ui);
+    while (input_poll(&event)) editor_handle_event(es, &event);
+    es->mouse_x = es->ui.mouse_x = mx;
+    es->mouse_y = es->ui.mouse_y = my;
+    if (es->playing) editor_check_play_status(es);
+    /* Like editor_run_frame, revalidate (which also checks asset files on
+     * disk) only when the document changed. */
+    uint64_t hash = editor_document_hash(&es->level);
+    if (!es->validation_cache_valid || hash != es->validated_document_hash) {
+        editor_validate_level(&es->level, &es->validation_report);
+        es->validated_document_hash = hash;
+        es->validation_cache_valid = 1;
+    }
+    canvas_clamp_camera(es);
+    BeginDrawing();
+    BeginTextureMode(tiny_target);
+    if (es->playing) {
+        editor_render_play_overlay(es);
+    } else {
+        canvas_render(es);
+        editor_render_toolbar(es);
+        editor_render_side_panels(es);
+        editor_render_status_bar(es);
+        ui_draw_overlays(&es->ui);
+    }
+    EndTextureMode();
+    EndDrawing();
+}
+
+/* Click at (x, y) and run the frame that sees it. */
+static void click_frame(EditorState *es, int x, int y)
+{
+    push_click(x, y);
+    ui_frame(es, x, y);
+}
+
+static void key_frame(EditorState *es, int key, int mods)
+{
+    push_key(key, mods);
+    ui_frame(es, NEUTRAL_X, NEUTRAL_Y);
+}
+
+static int level_is_valid(const EditorState *es)
+{
+    return level_validate_runtime(&es->level, NULL, 0) == 0;
+}
+
+static uint64_t doc_hash(const EditorState *es)
+{
+    return editor_document_hash(&es->level);
+}
+
+static int open_editor(EditorState *es, const char *level_path)
+{
+    memset(es, 0, sizeof(*es));
+    if (editor_init(es, 1) != 0) return -1;
+    /* Each editor owns its window, so the tiny target lives with it. */
+    tiny_target = LoadRenderTexture(8, 8);
+    if (!IsRenderTextureValid(tiny_target)) return -1;
+    if (level_path) {
+        if (level_load_toml(level_path, &es->level) != 0) return -1;
+        editor_sync_config_resources(es);
+        editor_set_document_save_point(es);
+    }
+    input_clear();
+    return 0;
+}
+
+static void close_editor(EditorState *es)
+{
+    if (IsRenderTextureValid(tiny_target)) UnloadRenderTexture(tiny_target);
+    tiny_target = (RenderTexture2D){0};
+    editor_cleanup(es);
+}
+
+/*
+ * Finish whatever a probe click at (x, y) started: a text edit gets a digit
+ * appended and Enter; an open dropdown gets the entry below the field
+ * picked. If the document changed, that must be exactly one undo step:
+ * undo restores the exact document, redo brings the edit back, and a
+ * final undo leaves the document as it was before the probe.
+ * Returns 0 on success.
+ */
+static int settle_probe(EditorState *es, int x, int y, uint64_t before,
+                        int undo_before, int *changes)
+{
+    if (es->ui.active_id) {
+        push_text("7");
+        key_frame(es, KEY_ENTER, 0);
+        if (es->ui.active_id) key_frame(es, KEY_ESCAPE, 0);
+    }
+    if (es->ui.dropdown_open_id) {
+        click_frame(es, x, y + 26);
+        if (es->ui.dropdown_open_id) click_frame(es, NEUTRAL_X, NEUTRAL_Y);
+    }
+    if (es->ui.active_id || es->ui.dropdown_open_id) return -1;
+    if (doc_hash(es) == before) return es->undo->top == undo_before ? 0 : -1;
+    if (es->undo->top != undo_before + 1) return -1;
+    (*changes)++;
+    uint64_t after = doc_hash(es);
+    key_frame(es, KEY_Z, INPUT_CTRL);
+    if (doc_hash(es) != before || es->undo->top != undo_before) return -1;
+    key_frame(es, KEY_Y, INPUT_CTRL);
+    if (doc_hash(es) != after) return -1;
+    key_frame(es, KEY_Z, INPUT_CTRL);
+    return doc_hash(es) == before ? 0 : -1;
+}
+
+/* ------------------------------------------------------------------ */
+/* Palette                                                             */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Click down the palette column. A click that switches to the Place tool
+ * hit an entry; any other click hit a header (which opens or closes its
+ * category), so the next probe skips past it. Every probe starts from the
+ * Select tool so each pick is visible.
+ */
+static int scan_palette(EditorState *es, int top, int bottom, int picked[ENT_COUNT])
+{
+    int found = 0;
+    for (int y = top; y < bottom; ) {
+        push_key(KEY_ONE, 0);
+        click_frame(es, PANEL_LABEL_X, y);
+        if (es->tool == TOOL_PLACE) {
+            if (es->palette_type < 0 || es->palette_type >= ENT_COUNT) return -1;
+            if (!picked[es->palette_type]) found++;
+            picked[es->palette_type] = 1;
+            y += 9;
+        } else {
+            y += 30;
+        }
+    }
+    return found;
+}
+
+static int palette_clicks_choose_what_the_place_tool_adds(void)
+{
+    int failed = 0;
+    EditorState es;
+    int picked[ENT_COUNT] = {0};
+    CHECK(open_editor(&es, NULL) == 0);
+
+    /* Collapse Level Config by its header so the palette gets the column. */
+    CHECK(es.config_open == 1);
+    click_frame(&es, PANEL_LABEL_X, TOOLBAR_H + 8);
+    CHECK(es.config_open == 0);
+    const int column_bottom = EDITOR_H - STATUS_H;
+
+    /* Find the palette title just below the folded config header: the
+     * click that folds the palette away. Clicking it again unfolds it. */
+    int title_y = -1;
+    for (int y = TOOLBAR_H + 20; y < TOOLBAR_H + 120 && title_y < 0; y += 4) {
+        click_frame(&es, PANEL_LABEL_X, y);
+        if (!es.palette_open) title_y = y;
+    }
+    CHECK(title_y > 0 && es.config_open == 0);
+    /* Nothing is under a folded palette. */
+    push_key(KEY_ONE, 0);
+    click_frame(&es, PANEL_LABEL_X, title_y + 60);
+    CHECK(es.tool == TOOL_SELECT);
+    click_frame(&es, PANEL_LABEL_X, title_y);
+    CHECK(es.palette_open == 1);
+    /* Rows start below the title, which is no taller than a header. */
+    const int palette_top = title_y + 30;
+
+    /* Pass 1 opens categories top-down; the list then outgrows the column,
+     * so scroll to the end and pass again for the rest. */
+    int found = scan_palette(&es, palette_top, column_bottom - 4, picked);
+    CHECK(found >= 4);
+    for (int pass = 0; pass < 3; pass++) {
+        push_wheel(PANEL_LABEL_X, palette_top + 100, -40.0f, 0);
+        ui_frame(&es, PANEL_LABEL_X, palette_top + 100);
+        int more = scan_palette(&es, palette_top, column_bottom - 4, picked);
+        CHECK(more >= 0);
+        found += more;
+    }
+    push_wheel(PANEL_LABEL_X, palette_top + 100, 80.0f, 0);   /* back to the top */
+    ui_frame(&es, PANEL_LABEL_X, palette_top + 100);
+    CHECK(found >= 15);
+    CHECK(!picked[ENT_PLAYER_SPAWN] || editor_entity_type_is_singleton(ENT_PLAYER_SPAWN));
+    CHECK(doc_hash(&es) == es.saved_document_hash && es.undo->top == 0);
+
+    /* Each picked type is what a canvas click then places, with its ghost
+     * drawn under the cursor first. Some need something to attach to (a
+     * rail, a gap); those refuse with a status message. Either way the
+     * level stays valid and every placement is one undo step. */
+    int placed = 0, refused = 0;
+    for (int type = 0; type < ENT_COUNT; type++) {
+        if (!picked[type]) continue;
+        es.palette_type = (EntityType)type;
+        es.tool = TOOL_PLACE;
+        int x = 40 + (placed * 53) % (CANVAS_W - 120);
+        int y = TOOLBAR_H + 120 + (placed % 3) * 60;
+        ui_frame(&es, x, y);                       /* ghost preview */
+        int count = editor_entity_count(&es.level, (EntityType)type);
+        int undo_top = es.undo->top;
+        click_frame(&es, x, y);
+        CHECK(level_is_valid(&es));
+        if (editor_entity_count(&es.level, (EntityType)type) == count + 1 ||
+            (editor_entity_type_is_singleton((EntityType)type) && es.undo->top == undo_top + 1)) {
+            CHECK(es.undo->top == undo_top + 1);
+            placed++;
+        } else {
+            CHECK(es.undo->top == undo_top && es.status_message[0] != '\0');
+            refused++;
+        }
+    }
+    CHECK(placed >= 12 && placed + refused == found);
+    CHECK(es.modified == 1);
+
+    /* Esc leaves the Place tool; the grid key toggles the overlay. */
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(es.tool == TOOL_SELECT);
+    int grid = es.show_grid;
+    key_frame(&es, KEY_G, 0);
+    CHECK(es.show_grid == !grid);
+    key_frame(&es, KEY_G, 0);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/* ------------------------------------------------------------------ */
+/* Canvas                                                              */
+/* ------------------------------------------------------------------ */
+
+static int canvas_place_select_drag_delete_and_undo(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(es.level.coin_count == 0 && es.camera.zoom == 2.0f);
+
+    /* Place a coin with the Place tool (key 2). */
+    es.palette_type = ENT_COIN;
+    key_frame(&es, KEY_TWO, 0);
+    CHECK(es.tool == TOOL_PLACE);
+    const int sx = 300, sy = 300;
+    ui_frame(&es, sx, sy);
+    click_frame(&es, sx, sy);
+    CHECK(es.level.coin_count == 1 && es.undo->top == 1 && es.modified);
+    /* A click outside the canvas never places. */
+    click_frame(&es, CANVAS_W + 10, EDITOR_H - STATUS_H - 10);
+    CHECK(es.level.coin_count == 1);
+
+    /* Select it where it was placed (key 1 = Select tool). */
+    key_frame(&es, KEY_ONE, 0);
+    click_frame(&es, sx, sy);
+    CHECK(es.selection.type == ENT_COIN && es.selection.index == 0);
+    const float x0 = es.level.coins[0].x, y0 = es.level.coins[0].y;
+
+    /* Drag it: 60 x 20 screen pixels at zoom 2 is 30 x 10 world pixels, and
+     * the point that was grabbed stays under the cursor. */
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, sx, sy);
+    push_event(INPUT_MOUSE_MOVE, 0, 0, sx + 30, sy + 10);
+    push_event(INPUT_MOUSE_MOVE, 0, 0, sx + 60, sy + 20);
+    ui_frame(&es, sx + 60, sy + 20);
+    /* Mid-drag, history keys are refused with an explanation. */
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strstr(es.status_message, "Release the mouse") != NULL);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, sx + 60, sy + 20);
+    ui_frame(&es, sx + 60, sy + 20);
+    CHECK(es.level.coins[0].x == x0 + 30.0f && es.level.coins[0].y == y0 + 10.0f);
+    CHECK(es.undo->top == 2);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coins[0].x == x0 && es.level.coins[0].y == y0);
+    key_frame(&es, KEY_Z, INPUT_CTRL | INPUT_SHIFT);   /* Ctrl+Shift+Z redoes */
+    CHECK(es.level.coins[0].x == x0 + 30.0f);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+
+    /* Esc during a drag puts the coin back and records nothing. */
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, sx, sy);
+    push_event(INPUT_MOUSE_MOVE, 0, 0, sx + 80, sy);
+    ui_frame(&es, sx + 80, sy);
+    key_frame(&es, KEY_ESCAPE, 0);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, sx + 80, sy);
+    ui_frame(&es, sx + 80, sy);
+    CHECK(es.level.coins[0].x == x0 && es.undo->top == 1);
+
+    /* Copy and paste makes a second coin; undo takes it away again. */
+    click_frame(&es, sx, sy);
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    key_frame(&es, KEY_V, INPUT_CTRL);
+    CHECK(es.level.coin_count == 2 && level_is_valid(&es));
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 1);
+
+    /* Three ways to delete, each undoable: Delete key, right-click, and
+     * the Delete tool (key 3). */
+    click_frame(&es, sx, sy);
+    CHECK(es.selection.index == 0);
+    key_frame(&es, KEY_DELETE, 0);
+    CHECK(es.level.coin_count == 0 && es.selection.index < 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 1);
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_RIGHT, 0, sx, sy);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_RIGHT, 0, sx, sy);
+    ui_frame(&es, sx, sy);
+    CHECK(es.level.coin_count == 0);
+    key_frame(&es, KEY_Y, INPUT_CTRL);   /* redo of nothing: still deleted */
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 1);
+    key_frame(&es, KEY_THREE, 0);
+    CHECK(es.tool == TOOL_DELETE);
+    click_frame(&es, sx, sy);
+    CHECK(es.level.coin_count == 0);
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(es.tool == TOOL_SELECT);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 1);
+
+    /* Esc with a selection clears it. */
+    click_frame(&es, sx, sy);
+    CHECK(es.selection.index == 0);
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(es.selection.index < 0);
+
+    /* The wheel pans; Ctrl+wheel steps through the 1/2/3/5 zoom presets
+     * around the cursor; Shift+wheel pans vertically when the world is
+     * taller than the view. The camera never leaves the world. */
+    push_wheel(400, 300, -2.0f, 0);
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.x == 2 * 48.0f / 2.0f);
+    push_wheel(400, 300, 100.0f, 0);
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.x == 0.0f);
+    static const float presets[] = {3.0f, 5.0f, 1.0f, 2.0f};
+    for (int i = 0; i < 4; i++) {
+        push_wheel(400, 300, 1.0f, INPUT_CTRL);
+        ui_frame(&es, 400, 300);
+        CHECK(es.camera.zoom == presets[i]);
+    }
+    push_wheel(400, 300, -1.0f, INPUT_CTRL);
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.zoom == 1.0f);
+    push_wheel(400, 300, 1.0f, INPUT_CTRL);
+    push_wheel(400, 300, 1.0f, INPUT_CTRL);
+    push_wheel(400, 300, 1.0f, INPUT_CTRL);
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.zoom == 5.0f);
+    push_wheel(400, 300, -10.0f, INPUT_SHIFT);
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.y > 0.0f && es.camera.y <= GAME_H - CANVAS_H / 5.0f + 0.01f);
+    ui_frame(&es, 400, 300);   /* draw the grid at 5x */
+    push_wheel(400, 300, 1.0f, INPUT_CTRL);
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.zoom == 1.0f && es.camera.y == 0.0f);
+
+    /* Typing into the selected coin's first field (x) and pressing Enter
+     * moves it; undo restores it. The field is found by probing. */
+    push_wheel(400, 300, 1.0f, INPUT_CTRL);
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.zoom == 2.0f);
+    push_wheel(400, 300, 100.0f, 0);   /* pan back to the left edge */
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.x == 0.0f && es.camera.y == 0.0f);
+    click_frame(&es, sx, sy);
+    CHECK(es.selection.type == ENT_COIN && es.selection.index == 0);
+    int field_y = -1;
+    for (int y = EDITOR_H - STATUS_H - 200 + 30; y < EDITOR_H - STATUS_H && field_y < 0; y += 6) {
+        click_frame(&es, PANEL_FIELD_X, y);
+        if (es.ui.active_id) field_y = y;
+    }
+    CHECK(field_y > 0);
+    for (int i = 0; i < 16; i++) key_frame(&es, KEY_BACKSPACE, 0);
+    push_text("123");
+    ui_frame(&es, PANEL_FIELD_X, field_y);
+    int undo_top = es.undo->top;
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(es.ui.active_id == 0);
+    CHECK(es.level.coins[0].x == 123.0f || es.level.coins[0].y == 123.0f);
+    CHECK(es.undo->top == undo_top + 1);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coins[0].x == x0 && es.level.coins[0].y == y0);
+
+    /* The properties header folds the panel; the canvas keeps the selection. */
+    for (int y = EDITOR_H - STATUS_H - 200; y < EDITOR_H - STATUS_H - 200 + 24; y += 6) {
+        click_frame(&es, PANEL_LABEL_X, y);
+        if (!es.panel_open) break;
+    }
+    CHECK(es.panel_open == 0 && es.selection.index == 0);
+    for (int y = EDITOR_H - STATUS_H - 30; y < EDITOR_H - STATUS_H; y += 4) {
+        click_frame(&es, PANEL_LABEL_X, y);
+        if (es.panel_open) break;
+    }
+    CHECK(es.panel_open == 1);
+
+    /* Two full-size frames through editor_run_frame itself. */
+    editor_run_frame(&es);
+    editor_run_frame(&es);
+    CHECK(es.running && es.validation_cache_valid);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/* ------------------------------------------------------------------ */
+/* Properties and level config                                         */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Select the first entity of every type in a real level, draw its
+ * properties, and click every row of the panel. Whatever a click does —
+ * start a text edit, open a dropdown, flip a toggle — must leave the level
+ * valid, and any change must be exactly one undo step.
+ */
+static int probe_properties_of_every_type(const char *level_path, int seen[ENT_COUNT],
+                                          int *changes)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, level_path) == 0);
+    const int panel_top = EDITOR_H - STATUS_H - 200;
+    for (int type = 0; type < ENT_COUNT; type++) {
+        if (editor_entity_count(&es.level, (EntityType)type) == 0) continue;
+        es.selection.type = (EntityType)type;
+        es.selection.index = 0;
+        es.tool = TOOL_SELECT;
+        ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+        CHECK(es.selection.index == 0);
+        if (seen[type]) continue;   /* already probed in an earlier level */
+        for (int y = panel_top + 36; y < EDITOR_H - STATUS_H; y += 24) {
+            uint64_t before = doc_hash(&es);
+            int undo_before = es.undo->top;
+            click_frame(&es, PANEL_FIELD_X, y);
+            CHECK(level_is_valid(&es));
+            if (settle_probe(&es, PANEL_FIELD_X, y, before, undo_before, changes) != 0 ||
+                !level_is_valid(&es)) {
+                fprintf(stderr, "editor_ui_test: %s probe at y=%d broke undo\n",
+                        level_path, y);
+                CHECK(0);
+            }
+            es.selection.type = (EntityType)type;
+            es.selection.index = 0;
+        }
+        seen[type] = 1;
+    }
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+static int properties_panel_handles_every_entity_type(void)
+{
+    int failed = 0, changes = 0;
+    int seen[ENT_COUNT] = {0};
+    CHECK(probe_properties_of_every_type("levels/02_lugio_02.toml", seen, &changes) == 0);
+    CHECK(probe_properties_of_every_type("levels/00_sandbox_01.toml", seen, &changes) == 0);
+    int types = 0;
+    for (int i = 0; i < ENT_COUNT; i++) types += seen[i];
+    CHECK(types >= 25);
+    /* Toggles and dropdown picks really edit the document. */
+    CHECK(changes >= 3);
+done:
+    return failed;
+}
+
+static int level_config_sections_resize_the_panel(void)
+{
+    int failed = 0, changes = 0;
+    EditorState es;
+    CHECK(open_editor(&es, "levels/00_sandbox_01.toml") == 0);
+    CHECK(es.config_open == 1);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+
+    /* Validation messages and recent files take rows of their own. */
+    int base = editor_config_total_height(&es);
+    es.recent_file_count = 2;
+    CHECK(editor_config_total_height(&es) > base);
+    es.recent_file_count = 0;
+    int messages = es.validation_report.message_count;
+    es.validation_report.message_count = messages + 3;
+    CHECK(editor_config_total_height(&es) > base);
+    es.validation_report.message_count = messages;
+    CHECK(editor_config_total_height(&es) == base);
+
+    /* Click down the visible config panel, scrolling it as we go. Section
+     * headers open (the panel grows); fields edit or open lists. Every
+     * change is one undo step and the level stays valid. */
+    int grew = 0, max_height = base;
+    for (int pass = 0; pass < 3; pass++) {
+        for (int y = TOOLBAR_H + 30; y < TOOLBAR_H + (EDITOR_H - STATUS_H - TOOLBAR_H) / 2; y += 11) {
+            for (int column = 0; column < 2; column++) {
+                int x = column ? PANEL_FIELD_X : PANEL_LABEL_X;
+                uint64_t before = doc_hash(&es);
+                int undo_before = es.undo->top;
+                int height = editor_config_total_height(&es);
+                click_frame(&es, x, y);
+                if (editor_config_total_height(&es) > height) grew = 1;
+                if (editor_config_total_height(&es) > max_height)
+                    max_height = editor_config_total_height(&es);
+                CHECK(es.config_open == 1 || y < TOOLBAR_H + 28);
+                CHECK(settle_probe(&es, x, y, before, undo_before, &changes) == 0);
+                if (!es.config_open) click_frame(&es, PANEL_LABEL_X, TOOLBAR_H + 8);
+            }
+        }
+        /* Scroll the config panel down for the next pass. */
+        push_wheel(PANEL_LABEL_X, TOOLBAR_H + 100, -6.0f, 0);
+        ui_frame(&es, PANEL_LABEL_X, TOOLBAR_H + 100);
+    }
+    CHECK(grew && max_height > base);
+    CHECK(level_is_valid(&es));
+    /* Scrolling and section toggles are view state, not document edits. */
+    push_wheel(PANEL_LABEL_X, TOOLBAR_H + 100, 50.0f, 0);
+    ui_frame(&es, PANEL_LABEL_X, TOOLBAR_H + 100);
+    /* The header folds the whole panel to one row. */
+    click_frame(&es, PANEL_LABEL_X, TOOLBAR_H + 8);
+    CHECK(es.config_open == 0);
+    click_frame(&es, PANEL_LABEL_X, TOOLBAR_H + 8);
+    CHECK(es.config_open == 1);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/* ------------------------------------------------------------------ */
+/* Playtest process and native pickers (POSIX)                         */
+/* ------------------------------------------------------------------ */
+
+#ifndef _WIN32
+static int playtest_status_follows_the_game_process(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+
+    /* While a playtest runs, edits are refused with a hint. */
+    pid_t child = fork();
+    CHECK(child >= 0);
+    if (child == 0) _exit(3);
+    es.playing = 1;
+    es.play_pid = (int)child;
+    key_frame(&es, KEY_TWO, 0);
+    /* The game exits with code 3: the status line says so. */
+    for (int i = 0; i < 400 && es.playing; i++) {
+        ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+        if (es.playing) {
+            struct timespec pause = {0, 5000000L};
+            nanosleep(&pause, NULL);
+        }
+    }
+    CHECK(!es.playing && es.play_pid == 0);
+    CHECK(strstr(es.status_message, "code 3") != NULL);
+    CHECK(es.tool == TOOL_SELECT);
+
+    /* A game killed by a signal reports the signal. */
+    child = fork();
+    CHECK(child >= 0);
+    if (child == 0) { raise(SIGKILL); _exit(0); }
+    es.playing = 1;
+    es.play_pid = (int)child;
+    for (int i = 0; i < 400 && es.playing; i++) {
+        ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+        if (es.playing) {
+            struct timespec pause = {0, 5000000L};
+            nanosleep(&pause, NULL);
+        }
+    }
+    CHECK(!es.playing && strstr(es.status_message, "signal") != NULL);
+
+    /* A child that something else already reaped ends the playtest too. */
+    child = fork();
+    CHECK(child >= 0);
+    if (child == 0) _exit(0);
+    CHECK(waitpid(child, NULL, 0) == child);
+    es.playing = 1;
+    es.play_pid = (int)child;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(!es.playing && strstr(es.status_message, "already reaped") != NULL);
+
+    /* The overlay's Stop button ends a running game. */
+    child = fork();
+    CHECK(child >= 0);
+    if (child == 0) { for (;;) pause(); }
+    es.playing = 1;
+    es.play_pid = (int)child;
+    for (int y = EDITOR_H / 2; y < EDITOR_H / 2 + 80 && es.playing; y += 4)
+        click_frame(&es, EDITOR_W / 2, y);
+    CHECK(!es.playing && es.play_pid == 0);
+    CHECK(strstr(es.status_message, "stopped") != NULL);
+    /* The child is gone: there is nothing left to reap. */
+    CHECK(waitpid(child, NULL, WNOHANG) == -1 && errno == ECHILD);
+
+    /* Starting a playtest of an invalid level is refused up front. */
+    es.level.screen_count = -1;
+    key_frame(&es, KEY_F5, 0);
+    CHECK(!es.playing && strstr(es.status_message, "Playtest blocked") != NULL);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+#define FAKE_BIN TEST_OUT "fake-picker-bin"
+
+/* Write a stand-in for osascript/zenity: it prints MANGO_FAKE_PICK (when
+ * set) and exits with MANGO_FAKE_STATUS, like a real picker would. */
+static int install_fake_pickers(void)
+{
+    static const char script[] =
+        "#!/bin/sh\n"
+        "if [ -n \"$MANGO_FAKE_PICK\" ]; then printf '%s\\n' \"$MANGO_FAKE_PICK\"; fi\n"
+        "exit \"${MANGO_FAKE_STATUS:-1}\"\n";
+    static const char *const names[] = {"osascript", "zenity"};
+    char path[512], cwd[2048], new_path[8192];
+    if (mkdir(FAKE_BIN, 0755) != 0 && errno != EEXIST) return -1;
+    for (size_t i = 0; i < 2; i++) {
+        snprintf(path, sizeof(path), FAKE_BIN "/%s", names[i]);
+        FILE *file = fopen(path, "w");
+        if (!file) return -1;
+        fputs(script, file);
+        if (fclose(file) != 0 || chmod(path, 0755) != 0) return -1;
+    }
+    if (!getcwd(cwd, sizeof(cwd))) return -1;
+    const char *old_path = getenv("PATH");
+    snprintf(new_path, sizeof(new_path), "%s/" FAKE_BIN ":%s", cwd, old_path ? old_path : "");
+    return setenv("PATH", new_path, 1);
+}
+
+static int pick(int save, const char *output, const char *status, char *buf, int size)
+{
+    if (output) setenv("MANGO_FAKE_PICK", output, 1);
+    else unsetenv("MANGO_FAKE_PICK");
+    setenv("MANGO_FAKE_STATUS", status, 1);
+    int result = save ? file_dialog_save(buf, size) : file_dialog_open(buf, size);
+    unsetenv("MANGO_FAKE_PICK");
+    setenv("MANGO_FAKE_STATUS", "1", 1);
+    return result;
+}
+
+static int native_pickers_report_choice_cancel_and_failure(void)
+{
+    int failed = 0;
+    char buf[256];
+    clear_dialog_seams();
+
+    /* A picked file comes back without its line ending. */
+    CHECK(pick(0, "/levels/one.toml", "0", buf, sizeof(buf)) == FILE_DIALOG_SELECTED);
+    CHECK(strcmp(buf, "/levels/one.toml") == 0);
+    /* Cancel: no output and exit status 1 (osascript/zenity convention). */
+    CHECK(pick(0, NULL, "1", buf, sizeof(buf)) == FILE_DIALOG_CANCELLED);
+    /* No output and a successful exit is also a cancel (PowerShell's). */
+    CHECK(pick(0, NULL, "0", buf, sizeof(buf)) == FILE_DIALOG_CANCELLED);
+    /* Any other exit status is a failure, even with a path printed. */
+    CHECK(pick(0, NULL, "2", buf, sizeof(buf)) == FILE_DIALOG_ERROR);
+    CHECK(pick(0, "/levels/one.toml", "4", buf, sizeof(buf)) == FILE_DIALOG_ERROR);
+
+    /* Save adds ".toml" when the name has no extension, keeps any case of
+     * an existing one, and refuses a name with no room for it. */
+    CHECK(pick(1, "/levels/new", "0", buf, sizeof(buf)) == FILE_DIALOG_SELECTED);
+    CHECK(strcmp(buf, "/levels/new.toml") == 0);
+    CHECK(pick(1, "/levels/Loud.TOML", "0", buf, sizeof(buf)) == FILE_DIALOG_SELECTED);
+    CHECK(strcmp(buf, "/levels/Loud.TOML") == 0);
+    CHECK(pick(1, "/levels.d/plain", "0", buf, sizeof(buf)) == FILE_DIALOG_SELECTED);
+    CHECK(strcmp(buf, "/levels.d/plain.toml") == 0);
+    CHECK(pick(1, "/levels/abcdefgh", "0", buf, 20) == FILE_DIALOG_ERROR);
+    CHECK(pick(1, NULL, "1", buf, sizeof(buf)) == FILE_DIALOG_CANCELLED);
+    CHECK(pick(1, "/levels/x", "3", buf, sizeof(buf)) == FILE_DIALOG_ERROR);
+
+    /* The editor's Open command with a cancelled picker keeps the document. */
+    {
+        EditorState es;
+        CHECK(open_editor(&es, "levels/labs/04_climbing.toml") == 0);
+        uint64_t hash = doc_hash(&es);
+        editor_open_level_file(&es);
+        CHECK(doc_hash(&es) == hash && es.modified == 0);
+        close_editor(&es);
+    }
+done:
+    return failed;
+}
+#endif
+
+/* ------------------------------------------------------------------ */
+
+int main(void)
+{
+    setvbuf(stdout, NULL, _IONBF, 0);
+#ifndef _WIN32
+    /* Any native dialog the seams miss answers "Cancel" at once. */
+    if (install_fake_pickers() != 0) {
+        fprintf(stderr, "editor_ui_test: could not install fake pickers\n");
+        return 1;
+    }
+#endif
+    const struct { const char *name; int (*run)(void); } cases[] = {
+#define CASE(fn) {#fn, fn}
+        CASE(palette_clicks_choose_what_the_place_tool_adds),
+        CASE(canvas_place_select_drag_delete_and_undo),
+        CASE(properties_panel_handles_every_entity_type),
+        CASE(level_config_sections_resize_the_panel),
+#ifndef _WIN32
+        CASE(playtest_status_follows_the_game_process),
+        CASE(native_pickers_report_choice_cancel_and_failure),
+#endif
+#undef CASE
+    };
+    int failures = 0;
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        int result = cases[i].run();
+        printf("editor_ui: %s %s\n", cases[i].name, result ? "FAIL" : "PASS");
+        failures += result != 0;
+    }
+    printf("editor_ui_test: %d failing cases\n", failures);
+    return failures ? 1 : 0;
+}

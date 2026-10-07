@@ -259,7 +259,7 @@ Builds and runs native regression harnesses, including hidden-window session/edi
 make test
 ```
 
-Current test binaries (16):
+Current test binaries (17):
 
 - `out/level-serializer-test`
 - `out/level-validate-test`
@@ -277,6 +277,7 @@ Current test binaries (16):
 - `out/session-test`
 - `out/game-checkpoint-test`
 - `out/gameplay-mechanics-test`
+- `out/editor-ui-test`
 
 `make test` also runs `tests/validate_levels_test.py` and `tests/gen_sounds_test.py`.
 Its `web-host-contract` prerequisite runs `tools/check_web_boot_contract.py`, the
