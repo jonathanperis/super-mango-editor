@@ -143,6 +143,7 @@ make sounds                           # regenerate assets/sounds/ from tools/gen
 make docs-drift                       # generated-content and docs consistency checks
 make web                              # build to WebAssembly (requires Emscripten)
 make clean                            # remove out/, out-sanitize/ and dist/ build artifacts
+make help                             # list every target with a one-line description
 ```
 
 > The Makefile replaces GNU Make's built-in `CC=cc` with clang; explicit `CC=gcc`
