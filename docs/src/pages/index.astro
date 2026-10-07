@@ -1,32 +1,17 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
-import Hero from "@/components/home/Hero.astro";
 import Navbar from "@/components/home/Navbar.astro";
+import Hero from "@/components/home/Hero.astro";
 import Dashboard from "@/components/home/Dashboard.astro";
 import Footer from "@/components/home/Footer.astro";
+import "../styles/home.css";
 ---
 
 <BaseLayout>
-    <Hero />
     <Navbar />
-    <Dashboard />
+    <Hero />
+    <main>
+        <Dashboard />
+    </main>
     <Footer />
 </BaseLayout>
-
-<script>
-    /* Parallax scroll: set --scroll CSS variable used by parallax layers */
-    window.addEventListener("scroll", () => {
-        document.documentElement.style.setProperty("--scroll", String(window.scrollY));
-    });
-
-    /* Nav visibility: show sticky nav when hero scrolls out of view */
-    const hero = document.getElementById("hero");
-    const nav = document.getElementById("site-nav");
-
-    if (hero && nav) {
-        const observer = new IntersectionObserver(([entry]) => {
-            nav.classList.toggle("visible", !entry.isIntersecting);
-        });
-        observer.observe(hero);
-    }
-</script>
