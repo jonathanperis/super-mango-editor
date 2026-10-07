@@ -710,10 +710,48 @@ def check_inspector_keys_doc() -> None:
             fail(f"src/core/game_inspector.c: key {key} is handled but missing from the F5 help list")
 
 
+C_COMMENT_RE = re.compile(r"/\*.*?\*/|//[^\n]*", re.S)
+C_FUNCTION_RE = re.compile(r"^[A-Za-z_][\w \t*]*?\b(\w+)\s*\([^;{)]*\)\s*\{", re.M)
+
+
+def c_function_bodies(source: str) -> dict[str, str]:
+    """Map each function defined in a C file to its body text (comments
+    removed), found by matching braces from the definition's opening {."""
+    source = C_COMMENT_RE.sub(" ", source)
+    bodies: dict[str, str] = {}
+    for match in C_FUNCTION_RE.finditer(source):
+        depth, end = 0, match.end() - 1
+        for end in range(match.end() - 1, len(source)):
+            if source[end] == "{":
+                depth += 1
+            elif source[end] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+        bodies[match.group(1)] = source[match.end():end]
+    return bodies
+
+
+def render_call_sequence() -> str:
+    """game_render_frame()'s body with each call to a helper defined in
+    game_render.c replaced by that helper's own (expanded) body, so the text
+    lists every draw call in the order the frame makes it. The helper's name
+    stays in front of its body, so the table may name a helper as well."""
+    bodies = c_function_bodies(read(ROOT / "src" / "render" / "game_render.c"))
+
+    def expand(name: str, seen: tuple[str, ...]) -> str:
+        def inline(match: re.Match[str]) -> str:
+            callee = match.group(1)
+            if callee not in bodies or callee in seen:
+                return match.group(0)
+            return f"{callee}( {expand(callee, seen + (callee,))} ) ("
+        return re.sub(r"\b(\w+)\s*\(", inline, bodies.get(name, ""))
+
+    return "game_render_frame( " + expand("game_render_frame", ("game_render_frame",))
+
+
 def check_render_order_doc() -> None:
-    source = read(ROOT / "src" / "render" / "game_render.c")
-    start = source.find("game_render_frame(")
-    body = source[start:] if start >= 0 else source
+    body = render_call_sequence()
     arch = DOCS / "architecture.md"
     text = read(arch)
     section = text.split("### Render Order (back to front)", 1)

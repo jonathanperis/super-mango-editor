@@ -157,15 +157,20 @@ During an active game update, authored checkpoints are sampled after player move
 
 ### Render Order (back to front)
 
-Each row names the function in `src/render/game_render.c` (or the code it
-calls) that draws the layer, in the order `game_render_frame()` calls them.
-`make docs-drift` checks that this order matches the source.
+Each row names the function that draws the layer, in the order
+`game_render_frame()` reaches it. The frame calls a short list of `draw_*`
+helpers in `src/render/game_render.c`, each drawing a run of neighbouring
+layers (`draw_ground`, `draw_surfaces`, `draw_collectibles`,
+`draw_water_layer`, `draw_moving_hazards`, `draw_enemies`, `draw_foreground`,
+`draw_hud_and_overlays`), and those call the functions below.
+`make docs-drift` follows the helpers and checks that this order matches the
+source.
 
 | Layer | What | Drawn by |
 |-------|------|----------|
 | 1 | Background: per-level `background_layers` from `assets/sprites/backgrounds/`, tiled with each layer's scroll speed | `parallax_render` |
 | 2 | Platforms: 9-slice pillar stacks, drawn before the floor so they sink into the ground | `platforms_render` |
-| 3 | Floor: the level's floor tile across the world at `FLOOR_Y`, with floor-gap openings | inline loop in `game_render_frame` |
+| 3 | Floor: the level's floor tile across the world at `FLOOR_Y`, with floor-gap openings | `draw_floor`, a loop in `game_render.c` |
 | 4 | Float platforms: 3-slice hovering surfaces (static, crumble, rail) | `float_platforms_render` |
 | 5 | Spike rows on the floor | `spike_rows_render` |
 | 6 | Spike platforms | `spike_platforms_render` |
@@ -173,10 +178,10 @@ calls) that draws the layer, in the order `game_render_frame()` calls them.
 | 8 | Bouncepads (medium) | `bouncepads_render` |
 | 9 | Bouncepads (small) | `bouncepads_render` |
 | 10 | Bouncepads (high) | `bouncepads_render` |
-| 11 | Rails: bitmask tile tracks for spike blocks and float platforms | `rail_render` |
-| 12 | Vines (`vine_green.png` / `vine_brown.png`) | `vine_render` |
-| 13 | Ladders | `ladder_render` |
-| 14 | Ropes | `rope_render` |
+| 11 | Rails: bitmask tile tracks for spike blocks and float platforms | `rails_render` |
+| 12 | Vines (`vine_green.png` / `vine_brown.png`) | `vines_render` |
+| 13 | Ladders | `ladders_render` |
+| 14 | Ropes | `ropes_render` |
 | 15 | Coins | `coins_render` |
 | 16 | Health stars: yellow, then green, then red | `health_stars_render` |
 | 17 | Last star | `last_star_render` |
