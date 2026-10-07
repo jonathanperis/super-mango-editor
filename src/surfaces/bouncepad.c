@@ -44,16 +44,17 @@ void bouncepad_place(Bouncepad *pad, float x, float launch_vy, BouncepadType pad
  * Only ACTIVE pads move through the sequence.  The sequence is:
  *   frame 1 (80 ms) → frame 0 (80 ms) → IDLE (frame 2)
  *
- * dt_ms is the step duration in milliseconds (a float, so the 0.67 ms
- * fraction of a 16.67 ms step is not lost), consistent with how
- * the rest of the animation timers in this codebase work.
+ * dt is the step duration in seconds, like every other *_update. The
+ * frame timer counts milliseconds, as a float: dt * 1000 keeps the 0.67 ms
+ * fraction of a 16.67 ms step instead of truncating it to 16 ms, the same
+ * way animate_frame_ms (entity_utils.c) handles the other animations.
  */
-void bouncepads_update(Bouncepad *pads, int count, float dt_ms) {
+void bouncepads_update(Bouncepad *pads, int count, float dt) {
     for (int i = 0; i < count; i++) {
         Bouncepad *p = &pads[i];
         if (p->state != BOUNCE_ACTIVE) continue;
 
-        p->anim_timer_ms += dt_ms;
+        p->anim_timer_ms += dt * 1000.0f;
 
         if (p->anim_timer_ms >= (float)BOUNCEPAD_FRAME_MS) {
             p->anim_timer_ms -= (float)BOUNCEPAD_FRAME_MS;  /* carry over remainder */
