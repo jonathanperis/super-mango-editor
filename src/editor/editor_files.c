@@ -1175,19 +1175,6 @@ static int editor_remove_recovery_entry(EditorState *es, int entry_index)
     return editor_discover_recoveries(es);
 }
 
-int editor_recover_entry(EditorState *es, int entry_index)
-{
-    uint64_t recovery_id;
-
-    if (!es) return -1;
-    recovery_id = es->pending_recovery_id;
-    if (recovery_id == 0) {
-        if (entry_index < 0 || entry_index >= es->recovery_entry_count) return -1;
-        recovery_id = es->recovery_entries[entry_index].id;
-    }
-    return editor_recover_entry_by_id(es, recovery_id);
-}
-
 int editor_recover_entry_by_id(EditorState *es, uint64_t recovery_id)
 {
     EditorRecoveryEntry entry;
