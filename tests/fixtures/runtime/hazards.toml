@@ -1,0 +1,71 @@
+# Hazard fixture for gameplay_mechanics_test.c. Each hazard sits on its own
+# stretch of floor so a test can stand the player next to just one of them.
+format_version = 1
+name = "Runtime hazard fixture"
+screen_count = 6
+player_start_x = 48.0
+player_start_y = 252.0
+initial_hearts = 3
+initial_lives = 3
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+floor_gaps = [320]
+
+[[blue_flames]]
+x = 320.0
+
+[[axe_traps]]
+pillar_x = 560.0
+y = 0.0
+mode = "PENDULUM"
+
+[[axe_traps]]
+pillar_x = 800.0
+y = 0.0
+mode = "SPIN"
+
+[[spike_rows]]
+x = 1008.0
+count = 3
+
+[[rails]]
+layout = "RECT"
+x = 1200
+y = 40
+w = 6
+h = 4
+end_cap = 0
+
+[[rails]]
+layout = "HORIZ"
+x = 1700
+y = 120
+w = 8
+h = 0
+end_cap = 0
+
+[[rails]]
+layout = "HORIZ"
+x = 1900
+y = 120
+w = 8
+h = 0
+end_cap = 1
+
+[[spike_blocks]]
+rail_index = 0
+t_offset = 0.0
+speed = 3.0
+
+[[spike_blocks]]
+rail_index = 1
+t_offset = 0.0
+speed = 4.0
+
+[[spike_blocks]]
+rail_index = 2
+t_offset = 0.0
+speed = 4.0
+
+[last_star]
+x = 2300.0
+y = 228.0

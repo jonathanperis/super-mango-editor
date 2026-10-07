@@ -1,0 +1,49 @@
+# Enemy and bridge fixture for gameplay_mechanics_test.c. The jumping
+# spider's patrol crosses the floor gap at x = 160; the fish swim over the
+# gap at x = 704; the bridge stands alone near the end of the level.
+format_version = 1
+name = "Runtime creature fixture"
+screen_count = 4
+player_start_x = 48.0
+player_start_y = 252.0
+initial_hearts = 3
+initial_lives = 3
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+floor_gaps = [160, 704]
+
+[[jumping_spiders]]
+x = 64.0
+vx = 55.0
+patrol_x0 = 48.0
+patrol_x1 = 320.0
+
+[[birds]]
+x = 100.0
+base_y = 60.0
+vx = 45.0
+patrol_x0 = 0.0
+patrol_x1 = 400.0
+frame_index = 0
+
+[[faster_birds]]
+x = 600.0
+base_y = 50.0
+vx = -80.0
+patrol_x0 = 400.0
+patrol_x1 = 1000.0
+frame_index = 0
+
+[[fish]]
+x = 600.0
+vx = 70.0
+patrol_x0 = 560.0
+patrol_x1 = 860.0
+
+[[bridges]]
+x = 1200.0
+y = 172.0
+brick_count = 8
+
+[last_star]
+x = 1500.0
+y = 228.0
