@@ -37,10 +37,11 @@ void game_checkpoint_update_authored(GameState *gs)
     if (!def || def->checkpoint_count <= 0) return;
 
     {
+        /* checkpoint_index and respawn_x/y are always written together
+         * (below, at level load and on retry), so a valid index already
+         * names the current respawn. Only its range needs checking. */
         int best_index = gs->checkpoint_index;
-        if (best_index < 0 || best_index >= def->checkpoint_count ||
-            gs->respawn_x != def->checkpoints[best_index].x ||
-            gs->respawn_y != def->checkpoints[best_index].y) {
+        if (best_index < 0 || best_index >= def->checkpoint_count) {
             best_index = -1;
         }
         float best_x = (best_index >= 0)
@@ -58,7 +59,7 @@ void game_checkpoint_update_authored(GameState *gs)
 
         /*
          * best_index is -1 when the player has not reached any placement yet
-         * (or the remembered index no longer matches the resolved respawn).
+         * (or the remembered index is out of range).
          * Keep the current respawn; checkpoints[-1] would read before the
          * start of the array.
          */

@@ -15,6 +15,7 @@
 #include "../surfaces/ladder.h"         /* LadderDecor — climbable, same mechanics as vine          */
 #include "../surfaces/rope.h"           /* RopeDecor — climbable, same mechanics as vine            */
 #include "../game.h"                    /* GRAVITY — vertical acceleration */
+#include <math.h>                       /* fabsf */
 
 /* ------------------------------------------------------------------ */
 
@@ -127,10 +128,19 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
     player_resolve_floor_collision(player, bouncepad_lists, bouncepad_list_count,
                                    floor_gaps, floor_gap_count, out_bounce_idx);
     /* A nearer bridge/spike surface or the floor may have replaced the float
-     * platform candidate. Do not carry the player with the discarded support. */
+     * platform candidate. Do not carry the player with the discarded support.
+     *
+     * Landing set y = platform_y - h + FLOOR_SINK; adding h back and
+     * subtracting FLOOR_SINK can differ from platform_y in the last bits of a
+     * float, so "still on this platform" allows a tiny tolerance instead of
+     * exact equality. Other surfaces sit whole pixels away. vy is exactly 0
+     * after a landing (it is assigned, not computed), so that test stays. */
+    const float support_tolerance = 0.01f;   /* logical px */
     if (*out_fp_landed_idx >= 0 &&
-        (player->vy != 0.0f || player->y + player->h - FLOOR_SINK !=
-         float_platforms[*out_fp_landed_idx].y)) *out_fp_landed_idx = -1;
+        (player->vy != 0.0f ||
+         fabsf(player->y + player->h - FLOOR_SINK -
+               float_platforms[*out_fp_landed_idx].y) > support_tolerance))
+        *out_fp_landed_idx = -1;
 
     player_resolve_world_bounds(player, world_w);
 

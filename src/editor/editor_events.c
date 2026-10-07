@@ -159,18 +159,19 @@ static void editor_canvas_wheel(EditorState *es, const InputEvent *event)
     float step = event->wheel * 48.0f / zoom;
 
     if (event->mods & INPUT_CTRL) {
-        /* These exact integer presets are assigned by startup, the
-         * toolbar and this wheel handler; zoom is not accumulated. */
-        static const float zooms[] = {1, 2, 3, 5};
+        /* These whole-number presets are assigned by startup, the
+         * toolbar and this wheel handler; zoom is not accumulated, so the
+         * current preset is found by comparing integers. */
+        static const int zooms[] = {1, 2, 3, 5};
         int index = 1;
         for (int i = 0; i < 4; i++)
-            if (es->camera.zoom == zooms[i]) {
+            if ((int)es->camera.zoom == zooms[i]) {
                 index = i;
                 break;
             }
         if (event->wheel > 0) index = (index+1)%4;
         else if (event->wheel < 0) index = (index+3)%4;
-        canvas_set_zoom(es, zooms[index], event->x, event->y);
+        canvas_set_zoom(es, (float)zooms[index], event->x, event->y);
     } else if (event->mods & INPUT_SHIFT) {
         float amount = event->wheel != 0.0f ? event->wheel : event->wheel_x;
         es->camera.y -= amount * 48.0f / zoom;
