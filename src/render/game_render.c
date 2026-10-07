@@ -115,7 +115,7 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
      * column just behind cam_x, and stop once tx is off the right edge
      * of the screen. dst.x = tx - cam_x converts world → screen.
      */
-    const int P = TILE_SIZE / 3;   /* 9-slice piece size: 16 px */
+    const int P = FLOOR_PIECE_W;   /* 9-slice piece size: 16 px */
 
     /* First piece column at or before the left edge of the viewport */
     int floor_start_tx = (cam_x / P) * P;

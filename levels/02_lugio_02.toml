@@ -20,7 +20,7 @@ initial_hearts = 3
 initial_lives = 3
 score_per_life = 1000
 coin_score = 100
-floor_gaps = [0, 320, 680, 1040, 1400, 1800, 2200, 2600, 3000, 3400, 3800, 4200]
+floor_gaps = [0, 320, 672, 1040, 1392, 1792, 2192, 2592, 2992, 3392, 3792, 4192]
 
 [physics]
 walk_max_speed       = -1.0
@@ -572,34 +572,34 @@ speed = 4.0
 x = 320.0
 
 [[fire_flames]]
-x = 680.0
+x = 672.0
 
 [[fire_flames]]
 x = 1040.0
 
 [[fire_flames]]
-x = 1400.0
+x = 1392.0
 
 [[fire_flames]]
-x = 1800.0
+x = 1792.0
 
 [[fire_flames]]
-x = 2200.0
+x = 2192.0
 
 [[fire_flames]]
-x = 2600.0
+x = 2592.0
 
 [[fire_flames]]
-x = 3000.0
+x = 2992.0
 
 [[fire_flames]]
-x = 3400.0
+x = 3392.0
 
 [[fire_flames]]
-x = 3800.0
+x = 3792.0
 
 [[fire_flames]]
-x = 4200.0
+x = 4192.0
 
 [[float_platforms]]
 mode = "STATIC"

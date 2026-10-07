@@ -404,7 +404,7 @@ def load_max_constants() -> dict[str, int]:
     define_re = re.compile(
         r"^\s*#define\s+([A-Z][A-Z0-9_]*)\s+([0-9]+)\b"
     )
-    shared_names = {"GAME_W", "GAME_H", "TILE_SIZE"} | {
+    shared_names = {"GAME_W", "GAME_H", "TILE_SIZE", "FLOOR_GAP_W"} | {
         f"{kind}_{dimension}" for kind in ("VINE", "LADDER", "ROPE")
         for dimension in ("W", "H", "STEP")
     }
@@ -782,6 +782,34 @@ def validate_rail_geometry(level_path: Path, data: dict, constants: dict[str, in
     return errors
 
 
+def _world_width(data: dict, constants: dict[str, int]) -> int:
+    screens = data.get("screen_count")
+    if isinstance(screens, bool) or not isinstance(screens, int) or screens <= 0:
+        screens = 4
+    return screens * constants.get("GAME_W", 400)
+
+
+def validate_floor_gaps(level_path: Path, data: dict, constants: dict[str, int]) -> list[str]:
+    """Mirror level_validate.c: each gap inside the world and on the floor grid."""
+    errors: list[str] = []
+    gaps = data.get("floor_gaps", [])
+    if not isinstance(gaps, list):
+        return errors
+    gap_w = constants.get("FLOOR_GAP_W", 32)
+    # FLOOR_PIECE_W in src/game.h: the floor is drawn in TILE_SIZE / 3 pieces.
+    piece_w = constants.get("TILE_SIZE", 48) // 3
+    max_x = _world_width(data, constants) - gap_w
+    for index, gap in enumerate(gaps):
+        if isinstance(gap, bool) or not isinstance(gap, int):
+            continue  # Type errors are reported by the schema pass.
+        field = f"{level_path.relative_to(ROOT)}: floor_gaps[{index}]"
+        if gap < 0 or gap > max_x:
+            errors.append(f"{field} {gap} out of range (0..{max_x})")
+        elif gap % piece_w != 0:
+            errors.append(f"{field} is {gap} (must be a multiple of {piece_w}, the floor piece width)")
+    return errors
+
+
 def validate_nested_dimensions(level_path: Path, data: dict, constants: dict[str, int]) -> list[str]:
     errors: list[str] = []
     max_spike_tiles = constants.get("MAX_SPIKE_TILES", 16)
@@ -958,6 +986,7 @@ def validate_level(
     errors.extend(validate_paths(level_path, data, asset_manifest))
     errors.extend(validate_counts(level_path, data, constants))
     errors.extend(validate_rail_geometry(level_path, data, constants))
+    errors.extend(validate_floor_gaps(level_path, data, constants))
     errors.extend(validate_rail_links(level_path, data))
     errors.extend(validate_nested_dimensions(level_path, data, constants))
     errors.extend(validate_checkpoints(level_path, data, constants))

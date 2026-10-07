@@ -1055,6 +1055,7 @@ static int strict_v1_fixture_suite(void)
         "bad_root_unknown.toml",
         "bad_nested_unknown.toml",
         "bad_floor_gaps.toml",
+        "bad_floor_gap_off_grid.toml",
         "bad_nested_table_type.toml",
         "bad_root_key_embedded_nul.toml",
         "bad_nested_key_embedded_nul.toml",

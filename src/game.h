@@ -124,6 +124,17 @@
  */
 #define FLOOR_GAP_W         32
 #define MAX_FLOOR_GAPS      16
+
+/*
+ * FLOOR_PIECE_W — width of one 9-slice floor piece (TILE_SIZE / 3 = 16 px).
+ *
+ * The floor is drawn in whole pieces starting at x = 0, and a piece is left
+ * out only when it lies completely inside a gap. A gap whose left edge is
+ * off this grid would therefore be drawn half covered by grass while the
+ * player still falls through the full FLOOR_GAP_W, so the level validator
+ * requires every gap to start on a multiple of FLOOR_PIECE_W.
+ */
+#define FLOOR_PIECE_W       (TILE_SIZE / 3)
 #define MAX_CHECKPOINTS     99
 #define MAX_LEVEL_SCREENS   99
 /* Upper magnitude for authored motion values; keeps integration and render
