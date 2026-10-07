@@ -1,0 +1,9 @@
+format_version = 1
+screen_count = 1
+
+[[spiders]]
+x = 100.0
+vx = 50.0
+patrol_x0 = 100.0
+patrol_x1 = 140.0
+frame_index = 0

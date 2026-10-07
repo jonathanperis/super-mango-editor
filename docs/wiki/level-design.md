@@ -265,7 +265,7 @@ The manifest order drives the native selector and generated [Level Catalog](../l
 
 ## Enemies
 
-Every patrolling enemy needs `patrol_x0 ≤ x ≤ patrol_x1`, inside the world, and `|vx|` at most `MAX_LEVEL_MOTION`. `vx` is only the starting velocity: its sign picks the first direction, and after the first turn the enemy moves at its type's fixed speed (spider 50, jumping spider 55, bird 45, faster bird 80, fish 70, faster fish 120 px/s). With `vx = 0` the enemy never starts patrolling. Each type holds up to 16 placements.
+Every patrolling enemy needs `patrol_x0 ≤ x ≤ patrol_x1`, inside the world, a range at least as wide as its sprite (`patrol_x1 - patrol_x0` ≥ 64 px for spiders and jumping spiders, 48 px for birds and fish), and `|vx|` at most `MAX_LEVEL_MOTION`. `vx` is only the starting velocity: its sign picks the first direction, and after the first turn the enemy moves at its type's fixed speed (spider 50, jumping spider 55, bird 45, faster bird 80, fish 70, faster fish 120 px/s). With `vx = 0` the enemy never starts patrolling. Each type holds up to 16 placements.
 
 ### Spiders
 
@@ -415,6 +415,8 @@ t_offset   = 0.0    # starting position on the rail (0.0 = first tile)
 speed      = 1.5    # traversal speed in tiles per second
 ```
 
+`speed` must be above 0 and at most `MAX_RAIL_SPEED` (30 tiles/s).
+
 ### Blue Flames
 
 Erupts from a manually placed floor-gap position. `x` is the gap's left edge and normally matches a `floor_gaps` entry; the flame is centred in the 32 px opening. `x` must leave room for the whole gap inside the world, and an `x` of 0 is skipped at load. Blue and fire flame placements have separate capacities: `MAX_BLUE_FLAMES` and `MAX_FIRE_FLAMES` (16 each).
@@ -456,7 +458,7 @@ speed      = 0.0        # rail traversal speed in tiles/s (RAIL mode)
 | `CRUMBLE` | Falls after the player stands on it for 0.75 s without stepping off (stepping off resets the timer) |
 | `RAIL` | Travels along the referenced rail path, bouncing at the ends of an open rail; the rail sets its position, so `x`/`y` are not used |
 
-`STATIC` and `CRUMBLE` platforms must fit inside the world.
+`STATIC` and `CRUMBLE` platforms must fit inside the world. A `RAIL` platform's `speed` must be above 0 and at most `MAX_RAIL_SPEED` (30 tiles/s), so a rising platform never outruns the player standing on it.
 
 ### Bridges
 
@@ -496,7 +498,7 @@ pad_type  = "RED"
 | `bouncepads_medium` | `WOOD` | −536.25 | 180 px |
 | `bouncepads_high` | `RED` | −700.0 | 306 px (full screen height) |
 
-The usual values are the `BOUNCEPAD_VY_*` constants; the loader uses the authored `launch_vy` as written, so always set it. The rise is `launch_vy² / (2 × 800)`, with gravity 800 px/s². `pad_type` must be `GREEN`, `WOOD` or `RED`, and `|launch_vy|` at most `MAX_LEVEL_MOTION`.
+The usual values are the `BOUNCEPAD_VY_*` constants; the loader uses the authored `launch_vy` as written, so always set it. The rise is `launch_vy² / (2 × 800)`, with gravity 800 px/s². `pad_type` must be `GREEN`, `WOOD` or `RED`, and `launch_vy` must be between `-MAX_LEVEL_MOTION` and `JUMP_VY` (−325): the player cannot jump while standing on a pad, so every pad has to launch at least as hard as a normal jump.
 
 ### Climbable Surfaces
 

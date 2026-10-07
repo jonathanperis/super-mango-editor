@@ -200,7 +200,7 @@ brick_count = 8   # number of 16×16 brick tiles (1–16)
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `BOUNCEPAD_W/H` | 48 | Display size in logical px |
-| `BOUNCEPAD_VY_SMALL` | −380.0 | Usual launch impulse for green pad (the loader uses each pad's authored `launch_vy` as written) |
+| `BOUNCEPAD_VY_SMALL` | −380.0 | Usual launch impulse for green pad (the loader uses each pad's authored `launch_vy` as written; it must be `JUMP_VY` (−325) or stronger) |
 | `BOUNCEPAD_VY_MEDIUM` | −536.25 | Launch impulse for wood pad |
 | `BOUNCEPAD_VY_HIGH` | −700.0 | Launch impulse for red pad |
 | `BOUNCEPAD_FRAME_MS` | 80 | ms per animation frame during release |
@@ -235,7 +235,7 @@ pad_type  = "RED"
 
 **File:** `src/surfaces/rail.c` / `rail.h`  
 **Sprite:** `assets/sprites/surfaces/rail.png` — 64×64 px, 4×4 grid of 16×16 bitmask tiles  
-**Behaviour:** A path of interconnected tiles that spike blocks and float platforms ride along. Each tile has a bitmask of connection directions (N/E/S/W) that drives the correct sprite selection. Objects riding a rail store a float `t ∈ [0, tile_count)` and call `rail_get_world_pos()` each step. `w` and `h` are 2–128 tiles and a `RECT` loop has at most 128 tiles. At an open (`HORIZ`) end without a cap, a spike block detaches and falls; float platforms always bounce.
+**Behaviour:** A path of interconnected tiles that spike blocks and float platforms ride along. Each tile has a bitmask of connection directions (N/E/S/W) that drives the correct sprite selection. Objects riding a rail store a float `t ∈ [0, tile_count)` and call `rail_get_world_pos()` each step. `w` and `h` are 2–128 tiles and a `RECT` loop has at most 128 tiles. At an open (`HORIZ`) end without a cap, a spike block detaches and falls; float platforms always bounce. A rider's `speed` must be above 0 and at most `MAX_RAIL_SPEED` (30 tiles/s).
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -243,6 +243,7 @@ pad_type  = "RED"
 | `RAIL_TILE_W/H` | 16 | Tile size in the sprite sheet |
 | `MAX_RAIL_TILES` | 128 | Max tiles per Rail instance |
 | `MAX_RAILS` | 16 | Rail instances in `GameState` |
+| `MAX_RAIL_SPEED` | 30 | Fastest rider speed a level may set, in tiles/s |
 
 ```toml
 [[rails]]

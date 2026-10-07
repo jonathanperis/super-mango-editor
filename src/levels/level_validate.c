@@ -410,9 +410,75 @@ static int validate_rail_index(char *err, size_t err_size,
     return 0;
 }
 
+/*
+ * validate_rail_speed — a rail rider must move forward, and no faster than
+ * MAX_RAIL_SPEED (rail.h explains both limits).
+ */
+static int validate_rail_speed(char *err, size_t err_size, const char *field,
+                               float speed)
+{
+    if (!isfinite(speed) || speed <= 0.0f || speed > (float)MAX_RAIL_SPEED) {
+        if (err && err_size > 0) {
+            snprintf(err, err_size,
+                     "%s is %.2f (expected above 0 and at most %d tiles/s)",
+                     field, speed, MAX_RAIL_SPEED);
+        }
+        return -1;
+    }
+    return 0;
+}
+
+/*
+ * validate_bouncepads — shared rules for the three bouncepad arrays.
+ *
+ * Standing on a pad relaunches the player every step and never lets them
+ * jump, so a pad weaker than a normal jump (or one pushing down) would trap
+ * them in a buzzing hop with the spring sound replaying. launch_vy must be
+ * at least as strong as JUMP_VY, and finite and bounded like any motion.
+ */
+static int validate_bouncepads(char *err, size_t err_size, const char *name,
+                               const BouncepadPlacement *pads, int count,
+                               float world_w)
+{
+    char field[64];
+
+    for (int i = 0; i < count; i++) {
+        snprintf(field, sizeof(field), "%s[%d].x", name, i);
+        if (validate_world_x(err, err_size, field, pads[i].x, world_w) != 0)
+            return -1;
+        snprintf(field, sizeof(field), "%s[%d].launch_vy", name, i);
+        if (validate_motion(err, err_size, field, pads[i].launch_vy) != 0)
+            return -1;
+        if (pads[i].launch_vy > JUMP_VY) {
+            if (err && err_size > 0) {
+                snprintf(err, err_size,
+                         "%s is %.2f (must be %.0f or lower, at least a normal jump upward)",
+                         field, pads[i].launch_vy, JUMP_VY);
+            }
+            return -1;
+        }
+        if (pads[i].pad_type != BOUNCEPAD_GREEN &&
+            pads[i].pad_type != BOUNCEPAD_WOOD &&
+            pads[i].pad_type != BOUNCEPAD_RED) {
+            snprintf(field, sizeof(field), "%s[%d].pad_type", name, i);
+            return fail_value(err, err_size, field, "is invalid");
+        }
+    }
+    return 0;
+}
+
+/*
+ * validate_patrol — x and its patrol range lie in the world, in order.
+ *
+ * entity_w is the width the patrol code turns the entity around with: it
+ * turns when its right edge (x + entity_w) reaches patrol_x1 and its left
+ * edge reaches patrol_x0. A range narrower than that snaps the entity from
+ * one end to the other every step, so it is rejected. Saws bounce their x
+ * itself between the bounds and pass 0.
+ */
 static int validate_patrol(char *err, size_t err_size, const char *field,
                            float x, float patrol_x0, float patrol_x1,
-                           float world_w)
+                           float entity_w, float world_w)
 {
     char child[96];
 
@@ -428,6 +494,15 @@ static int validate_patrol(char *err, size_t err_size, const char *field,
     snprintf(child, sizeof(child), "%s.patrol_x1", field);
     if (validate_world_x(err, err_size, child, patrol_x1, world_w) != 0)
         return -1;
+    if (patrol_x1 - patrol_x0 < entity_w) {
+        snprintf(child, sizeof(child), "%s.patrol", field);
+        if (err && err_size > 0) {
+            snprintf(err, err_size,
+                     "%s is %.2f px wide (must be at least %.0f, the sprite width)",
+                     child, patrol_x1 - patrol_x0, entity_w);
+        }
+        return -1;
+    }
     if (x < patrol_x0 || x > patrol_x1) {
         snprintf(child, sizeof(child), "%s.x", field);
         return fail_float_range(err, err_size, child, x, patrol_x0, patrol_x1);
@@ -556,14 +631,11 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
     CHECK_MOTION_ARRAY(faster_birds, faster_bird_count, vx);
     CHECK_MOTION_ARRAY(fish, fish_count, vx);
     CHECK_MOTION_ARRAY(faster_fish, faster_fish_count, vx);
-    CHECK_MOTION_ARRAY(bouncepads_small, bouncepad_small_count, launch_vy);
-    CHECK_MOTION_ARRAY(bouncepads_medium, bouncepad_medium_count, launch_vy);
-    CHECK_MOTION_ARRAY(bouncepads_high, bouncepad_high_count, launch_vy);
     CHECK_MOTION_ARRAY(background_layers, background_layer_count, speed);
     CHECK_MOTION_ARRAY(foreground_layers, foreground_layer_count, speed);
     CHECK_MOTION_ARRAY(fog_layers, fog_layer_count, speed);
-    CHECK_MOTION_ARRAY(spike_blocks, spike_block_count, speed);
-    CHECK_MOTION_ARRAY(float_platforms, float_platform_count, speed);
+    /* Bouncepads, spike blocks and float platforms have their own speed
+     * rules further down. */
 #undef CHECK_MOTION_ARRAY
 
     /* ---- Player start and checkpoints must lie inside the world ---- */
@@ -668,20 +740,23 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                            def->last_star.y, world_w) != 0) return -1;
     }
 
-    /* ---- Enemies: each patrol range must contain its start x ---- */
+    /* ---- Enemies: each patrol range must contain its start x and be at
+     *      least as wide as the sprite that walks it ---- */
     for (int i = 0; i < def->spider_count; i++) {
         if (def->spiders[i].frame_index < 0 || def->spiders[i].frame_index >= SPIDER_FRAMES)
             return fail_value(err, err_size, "spiders[].frame_index", "is outside the sprite sheet");
         snprintf(field, sizeof(field), "spiders[%d]", i);
         if (validate_patrol(err, err_size, field, def->spiders[i].x,
                             def->spiders[i].patrol_x0,
-                            def->spiders[i].patrol_x1, world_w) != 0) return -1;
+                            def->spiders[i].patrol_x1,
+                            (float)SPIDER_FRAME_W, world_w) != 0) return -1;
     }
     for (int i = 0; i < def->jumping_spider_count; i++) {
         snprintf(field, sizeof(field), "jumping_spiders[%d]", i);
         if (validate_patrol(err, err_size, field, def->jumping_spiders[i].x,
                             def->jumping_spiders[i].patrol_x0,
-                            def->jumping_spiders[i].patrol_x1, world_w) != 0) return -1;
+                            def->jumping_spiders[i].patrol_x1,
+                            (float)JSPIDER_FRAME_W, world_w) != 0) return -1;
     }
     for (int i = 0; i < def->bird_count; i++) {
         if (def->birds[i].frame_index < 0 || def->birds[i].frame_index >= BIRD_FRAMES)
@@ -689,7 +764,8 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         snprintf(field, sizeof(field), "birds[%d]", i);
         if (validate_patrol(err, err_size, field, def->birds[i].x,
                             def->birds[i].patrol_x0,
-                            def->birds[i].patrol_x1, world_w) != 0) return -1;
+                            def->birds[i].patrol_x1,
+                            (float)BIRD_FRAME_W, world_w) != 0) return -1;
         if (validate_world_y(err, err_size, "birds[].base_y",
                              def->birds[i].base_y) != 0) return -1;
     }
@@ -699,7 +775,8 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         snprintf(field, sizeof(field), "faster_birds[%d]", i);
         if (validate_patrol(err, err_size, field, def->faster_birds[i].x,
                             def->faster_birds[i].patrol_x0,
-                            def->faster_birds[i].patrol_x1, world_w) != 0) return -1;
+                            def->faster_birds[i].patrol_x1,
+                            (float)FBIRD_FRAME_W, world_w) != 0) return -1;
         if (validate_world_y(err, err_size, "faster_birds[].base_y",
                              def->faster_birds[i].base_y) != 0) return -1;
     }
@@ -707,13 +784,15 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         snprintf(field, sizeof(field), "fish[%d]", i);
         if (validate_patrol(err, err_size, field, def->fish[i].x,
                             def->fish[i].patrol_x0,
-                            def->fish[i].patrol_x1, world_w) != 0) return -1;
+                            def->fish[i].patrol_x1,
+                            (float)FISH_RENDER_W, world_w) != 0) return -1;
     }
     for (int i = 0; i < def->faster_fish_count; i++) {
         snprintf(field, sizeof(field), "faster_fish[%d]", i);
         if (validate_patrol(err, err_size, field, def->faster_fish[i].x,
                             def->faster_fish[i].patrol_x0,
-                            def->faster_fish[i].patrol_x1, world_w) != 0) return -1;
+                            def->faster_fish[i].patrol_x1,
+                            (float)FISH_RENDER_W, world_w) != 0) return -1;
     }
 
     /* ---- Hazards: full width inside the world; rail riders name a real
@@ -758,6 +837,9 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
             snprintf(field, sizeof(field), "spike_blocks[%d].t_offset", i);
             return fail_value(err, err_size, field, "must lie on the referenced rail");
         }
+        snprintf(field, sizeof(field), "spike_blocks[%d].speed", i);
+        if (validate_rail_speed(err, err_size, field,
+                                def->spike_blocks[i].speed) != 0) return -1;
     }
 
     /* ---- Surfaces: float platforms (fixed, crumbling or on a rail) ---- */
@@ -787,7 +869,15 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
                 (rail->layout == RAIL_LAYOUT_HORIZ && fp->t_offset > (float)(count - 1))) {
                 return fail_value(err, err_size, "float_platforms[].t_offset", "must lie on the referenced rail");
             }
+            snprintf(field, sizeof(field), "float_platforms[%d].speed", i);
+            if (validate_rail_speed(err, err_size, field, fp->speed) != 0)
+                return -1;
         } else {
+            /* STATIC and CRUMBLE platforms never move, so speed is unused
+             * and only has to be a sane number. */
+            snprintf(field, sizeof(field), "float_platforms[%d].speed", i);
+            if (validate_motion(err, err_size, field, fp->speed) != 0)
+                return -1;
             snprintf(field, sizeof(field), "float_platforms[%d]", i);
             if (validate_world_rect(err, err_size, field, fp->x, fp->y,
                                     (float)(fp->tile_count * FLOAT_PLATFORM_PIECE_W),
@@ -834,7 +924,7 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
         if (validate_patrol(err, err_size, field, def->circular_saws[i].x,
                             def->circular_saws[i].patrol_x0,
                             def->circular_saws[i].patrol_x1,
-                            world_w) != 0) return -1;
+                            0.0f, world_w) != 0) return -1;
     }
 
     for (int i = 0; i < def->blue_flame_count; i++) {
@@ -849,39 +939,15 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
     }
 
     /* ---- Bouncepads (three separate arrays, same rules) ---- */
-    for (int i = 0; i < def->bouncepad_small_count; i++) {
-        snprintf(field, sizeof(field), "bouncepads_small[%d].x", i);
-        if (validate_world_x(err, err_size, field,
-                             def->bouncepads_small[i].x, world_w) != 0) return -1;
-        if (def->bouncepads_small[i].pad_type != BOUNCEPAD_GREEN &&
-            def->bouncepads_small[i].pad_type != BOUNCEPAD_WOOD &&
-            def->bouncepads_small[i].pad_type != BOUNCEPAD_RED) {
-            snprintf(field, sizeof(field), "bouncepads_small[%d].pad_type", i);
-            return fail_value(err, err_size, field, "is invalid");
-        }
-    }
-    for (int i = 0; i < def->bouncepad_medium_count; i++) {
-        snprintf(field, sizeof(field), "bouncepads_medium[%d].x", i);
-        if (validate_world_x(err, err_size, field,
-                             def->bouncepads_medium[i].x, world_w) != 0) return -1;
-        if (def->bouncepads_medium[i].pad_type != BOUNCEPAD_GREEN &&
-            def->bouncepads_medium[i].pad_type != BOUNCEPAD_WOOD &&
-            def->bouncepads_medium[i].pad_type != BOUNCEPAD_RED) {
-            snprintf(field, sizeof(field), "bouncepads_medium[%d].pad_type", i);
-            return fail_value(err, err_size, field, "is invalid");
-        }
-    }
-    for (int i = 0; i < def->bouncepad_high_count; i++) {
-        snprintf(field, sizeof(field), "bouncepads_high[%d].x", i);
-        if (validate_world_x(err, err_size, field,
-                             def->bouncepads_high[i].x, world_w) != 0) return -1;
-        if (def->bouncepads_high[i].pad_type != BOUNCEPAD_GREEN &&
-            def->bouncepads_high[i].pad_type != BOUNCEPAD_WOOD &&
-            def->bouncepads_high[i].pad_type != BOUNCEPAD_RED) {
-            snprintf(field, sizeof(field), "bouncepads_high[%d].pad_type", i);
-            return fail_value(err, err_size, field, "is invalid");
-        }
-    }
+    if (validate_bouncepads(err, err_size, "bouncepads_small",
+                            def->bouncepads_small, def->bouncepad_small_count,
+                            world_w) != 0) return -1;
+    if (validate_bouncepads(err, err_size, "bouncepads_medium",
+                            def->bouncepads_medium, def->bouncepad_medium_count,
+                            world_w) != 0) return -1;
+    if (validate_bouncepads(err, err_size, "bouncepads_high",
+                            def->bouncepads_high, def->bouncepad_high_count,
+                            world_w) != 0) return -1;
 
     /* ---- Climbables: every stacked tile must end above the bottom ---- */
     for (int i = 0; i < def->vine_count; i++) {

@@ -1,0 +1,15 @@
+format_version = 1
+screen_count = 1
+
+[[rails]]
+layout = "HORIZ"
+x = 80
+y = 40
+w = 6
+h = 0
+end_cap = 0
+
+[[spike_blocks]]
+rail_index = 0
+t_offset = 0.0
+speed = -2.0
