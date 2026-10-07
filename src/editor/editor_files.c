@@ -292,6 +292,9 @@ static void editor_apply_loaded_level(EditorState *es, const LevelDef *level,
     es->source_state = EDITOR_SOURCE_UNKNOWN;
     undo_clear(es->undo);
     es->selection.index = -1;
+    /* A copied rail rider's rail index named a rail in the old document;
+     * a paste here matches the rail by shape instead. */
+    es->clipboard_rail_index = -1;
     if (modified) {
         editor_set_recovered_dirty(es);
     } else {
