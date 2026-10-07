@@ -46,6 +46,6 @@ typedef struct {
 } VineDecor;
 
 /* Blit every vine with world-to-screen camera offset applied. */
-void vine_render(const VineDecor *vines, int count,
-                 Texture2D *green_tex, Texture2D *brown_tex,
-                 int cam_x);
+void vines_render(const VineDecor *vines, int count,
+                  Texture2D *green_tex, Texture2D *brown_tex,
+                  int cam_x);

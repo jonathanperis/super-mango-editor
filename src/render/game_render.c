@@ -230,24 +230,24 @@ static void draw_surfaces(GameState *gs, int cam_x)
      * behind all game objects — the track is part of the background layer.
      */
     if (gs->textures.rail) {
-        rail_render(gs->rails, gs->rail_count,
-                    gs->textures.rail, cam_x);
+        rails_render(gs->rails, gs->rail_count,
+                     gs->textures.rail, cam_x);
     }
 
     /* Draw vine decorations on ground and platform tops, behind entities */
     if (gs->textures.vine_green || gs->textures.vine_brown) {
-        vine_render(gs->vines, gs->vine_count,
-                    gs->textures.vine_green, gs->textures.vine_brown, cam_x);
+        vines_render(gs->vines, gs->vine_count,
+                     gs->textures.vine_green, gs->textures.vine_brown, cam_x);
     }
 
     /* Draw ladders and ropes in the same layer as vines */
     if (gs->textures.ladder) {
-        ladder_render(gs->ladders, gs->ladder_count,
-                      gs->textures.ladder, cam_x);
+        ladders_render(gs->ladders, gs->ladder_count,
+                       gs->textures.ladder, cam_x);
     }
     if (gs->textures.rope) {
-        rope_render(gs->ropes, gs->rope_count,
-                    gs->textures.rope, cam_x);
+        ropes_render(gs->ropes, gs->rope_count,
+                     gs->textures.rope, cam_x);
     }
 }
 

@@ -18,9 +18,9 @@
 
 /* ------------------------------------------------------------------ */
 
-void vine_render(const VineDecor *vines, int count,
-                 Texture2D *green_tex, Texture2D *brown_tex,
-                 int cam_x)
+void vines_render(const VineDecor *vines, int count,
+                  Texture2D *green_tex, Texture2D *brown_tex,
+                  int cam_x)
 {
     for (int i = 0; i < count; i++) {
         const VineDecor *v = &vines[i];

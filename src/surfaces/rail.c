@@ -215,14 +215,14 @@ int rail_build(Rail *rail, const RailPlacement *p)
 /* ------------------------------------------------------------------ */
 
 /*
- * rail_render — Draw every tile of every rail loop.
+ * rails_render — Draw every tile of every rail loop.
  *
  * For each tile we call connection_to_src() to pick the correct 16×16 cell
  * from Rails.png, then draws it at its world position
  * adjusted by the camera offset (world → screen: dst.x = tile.x − cam_x).
  */
-void rail_render(const Rail *rails, int count,
-                 Texture2D *tex, int cam_x) {
+void rails_render(const Rail *rails, int count,
+                  Texture2D *tex, int cam_x) {
     for (int r = 0; r < count; r++) {
         const Rail *rail = &rails[r];
         for (int i = 0; i < rail->count; i++) {
