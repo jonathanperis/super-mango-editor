@@ -1415,6 +1415,60 @@ static int expect_hash_changes(const char *name, uint64_t before,
     return 0;
 }
 
+/*
+ * entity_meta.c's table is filled with designated initializers, so a type
+ * left out of it compiles (its row is all zeros) unless it is the last one.
+ * Check every row here: names, a capacity, a preview, and storage that
+ * points at that type's own array (adding one entity changes only its own
+ * count).
+ */
+static int entity_table_has_a_row_for_every_type(void)
+{
+    static LevelDef level;
+    PlacementData data;
+    EntityTextures textures;
+    Texture2D fake_texture;
+
+    memset(&data, 0, sizeof(data));
+    for (size_t i = 0; i < sizeof(textures) / sizeof(Texture2D *); i++)
+        ((Texture2D **)&textures)[i] = &fake_texture;
+
+    for (int t = 0; t < ENT_COUNT; t++) {
+        EntityType type = (EntityType)t;
+        const EditorEntityPreview *preview = editor_entity_preview(type);
+
+        if (strcmp(editor_entity_type_name(type), "Unknown") == 0 ||
+            strcmp(editor_entity_palette_name(type), "Unknown") == 0 ||
+            editor_entity_capacity(type) <= 0 || !preview) {
+            fprintf(stderr, "editor_validation_test: entity type %d has no table row\n", t);
+            return 1;
+        }
+        if (preview->texture != EDITOR_NO_TEXTURE &&
+            editor_entity_texture(&textures, type) != &fake_texture) {
+            fprintf(stderr, "editor_validation_test: %s preview texture is not an EntityTextures member\n",
+                    editor_entity_type_name(type));
+            return 1;
+        }
+        if (editor_entity_type_is_singleton(type)) continue;
+
+        memset(&level, 0, sizeof(level));
+        if (editor_entity_insert(&level, type, 0, &data) != 0) return 1;
+        for (int other = 0; other < ENT_COUNT; other++) {
+            int expected = (other == t) ? 1 : 0;
+            if (editor_entity_type_is_singleton((EntityType)other)) continue;
+            if (editor_entity_count(&level, (EntityType)other) != expected) {
+                fprintf(stderr, "editor_validation_test: inserting a %s changed the %s count\n",
+                        editor_entity_type_name(type),
+                        editor_entity_type_name((EntityType)other));
+                return 1;
+            }
+        }
+    }
+    if (editor_entity_preview(ENT_COUNT) != NULL ||
+        editor_entity_texture(&textures, ENT_COUNT) != NULL) return 1;
+    return 0;
+}
+
 static int document_hash_covers_every_entity_and_config_field(void)
 {
     LevelDef level;
@@ -3929,6 +3983,7 @@ int main(void)
     if (recovery_metadata_keeps_longest_source_path() != 0) return 1;
     if (recent_files_skip_overlong_lines_and_line_breaks() != 0) return 1;
     if (dialog_quoting_and_picked_paths_stay_literal() != 0) return 1;
+    if (entity_table_has_a_row_for_every_type() != 0) return 1;
     if (document_hash_covers_every_entity_and_config_field() != 0) return 1;
     if (widget_commit_paths_preserve_values() != 0) return 1;
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
