@@ -3273,6 +3273,52 @@ static int extreme_floats_round_trip_through_save(void)
     return 0;
 }
 
+/*
+ * Save As to a new file uses link() for its no-clobber install.  On a
+ * filesystem without hard links it must still create the file, and still
+ * never replace one that is already there.
+ */
+static int create_only_save_without_hard_links(void)
+{
+#ifdef _WIN32
+    return 0;   /* Windows installs with MoveFileExW, which never clobbers. */
+#else
+    const char *target = "out/editor_no_hard_links.toml";
+    const char *sentinel = "existing target\n";
+    char temp[EDITOR_PATH_MAX];
+    LevelDef def, loaded;
+    int result = 1;
+
+    ensure_out_dir();
+    fill_valid_minimal(&def);
+    remove(target);
+    serializer_temp_path(target, temp, sizeof(temp));
+
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NO_HARD_LINKS);
+    if (expect_int("create without links",
+                   level_save_toml_with_policy(&def, target,
+                                               SERIALIZER_SAVE_CREATE_ONLY), 0) != 0 ||
+        expect_int("created file loads", level_load_toml(target, &loaded), 0) != 0 ||
+        expect_string("created file content", loaded.name, def.name) != 0) goto done;
+    if (expect_int("temp removed", serializer_probe_path_utf8(temp),
+                   SERIALIZER_PATH_MISSING) != 0) goto done;
+
+    if (write_text_file(target, sentinel) != 0 ||
+        write_text_file(temp, "new bytes\n") != 0) goto done;
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NO_HARD_LINKS);
+    if (expect_int("existing target refused", serializer_create_file(temp, target), -1) != 0 ||
+        expect_int("existing target kept", file_equals_text(target, sentinel), 1) != 0)
+        goto done;
+    result = 0;
+
+done:
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+    remove(temp);
+    remove(target);
+    return result;
+#endif
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -3332,6 +3378,7 @@ int main(void)
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;
     if (display_paths_keep_the_file_name() != 0) return 1;
     if (extreme_floats_round_trip_through_save() != 0) return 1;
+    if (create_only_save_without_hard_links() != 0) return 1;
 
     puts("editor_validation_test: ok");
     return 0;

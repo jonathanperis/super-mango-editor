@@ -504,6 +504,66 @@ int serializer_replace_file(const char *temp_path, const char *target_path)
 #endif
 }
 
+#ifndef _WIN32
+/*
+ * serializer_link_unsupported — Did link() fail because this filesystem
+ * has no hard links (FAT/exFAT drives, many network shares), rather than
+ * because the target exists or the folder is not writable?
+ */
+static int serializer_link_unsupported(int error)
+{
+    if (error == EPERM || error == EXDEV) return 1;
+#ifdef ENOTSUP
+    if (error == ENOTSUP) return 1;
+#endif
+#ifdef EOPNOTSUPP
+    if (error == EOPNOTSUPP) return 1;
+#endif
+#ifdef ENOSYS
+    if (error == ENOSYS) return 1;
+#endif
+    return 0;
+}
+
+/*
+ * serializer_create_without_link — Create-only install without link().
+ *
+ * O_EXCL claims the target name: it fails if anything, a dangling symlink
+ * included, is already there, so an existing file is never replaced.  The
+ * finished temporary file is then renamed over the empty placeholder we
+ * just made, so a reader sees either that empty file or the whole new one,
+ * never a half-written level.  Before renaming we check that the name
+ * still points at our placeholder; if something replaced it in between,
+ * we leave it alone and fail like an appearing target does with link().
+ */
+static int serializer_create_without_link(const char *temp_path,
+                                          const char *target_path)
+{
+    struct stat claimed;
+    struct stat current;
+    int fd = open(target_path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+
+    if (fd < 0) return -1;
+    if (fstat(fd, &claimed) != 0) {
+        (void)close(fd);
+        (void)unlink(target_path);
+        return -1;
+    }
+    (void)close(fd);
+    if (lstat(target_path, &current) != 0 ||
+        current.st_dev != claimed.st_dev || current.st_ino != claimed.st_ino ||
+        current.st_size != 0) {
+        return -1;
+    }
+    if (rename(temp_path, target_path) != 0) {
+        (void)unlink(target_path);
+        return -1;
+    }
+    serializer_sync_parent_dir_or_warn(target_path);
+    return 0;
+}
+#endif
+
 int serializer_create_file(const char *temp_path, const char *target_path)
 {
     if (!temp_path || !target_path) return -1;
@@ -527,8 +587,21 @@ int serializer_create_file(const char *temp_path, const char *target_path)
         return result;
     }
 #else
-    /* link() gives create-only installation: an appearing target wins. */
-    if (link(temp_path, target_path) != 0) return -1;
+    {
+        int link_result;
+        /* link() gives create-only installation: an appearing target wins. */
+        if (serializer_test_failure == SERIALIZER_TEST_FAILURE_NO_HARD_LINKS) {
+            serializer_test_failure = SERIALIZER_TEST_FAILURE_NONE;
+            errno = EPERM;
+            link_result = -1;
+        } else {
+            link_result = link(temp_path, target_path);
+        }
+        if (link_result != 0) {
+            if (!serializer_link_unsupported(errno)) return -1;
+            return serializer_create_without_link(temp_path, target_path);
+        }
+    }
     if (unlink(temp_path) != 0) {
         (void)unlink(target_path);
         return -1;
