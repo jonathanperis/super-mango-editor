@@ -271,8 +271,7 @@ super-mango-editor/
 │   ├── raylib/                       raylib 6.0 source/checksum pin, patches and provenance
 │   └── tomlc17/                      TOML v1.1 parser (tomlc17.c/.h)
 ├── tests/                             Native harnesses, fuzz harnesses/corpus, fixtures, Python/Node host tests
-├── tools/                             Build, validation, generator, packaging and docs-check scripts
-├── scripts/                           One-off helpers (favicon generation)
+├── tools/                             Build, validation, generator, packaging and docs-check scripts (plus manual art tools)
 ├── docs/                              Astro GitHub Pages site; manual pages in docs/wiki/
 ├── web/                               Emscripten shell, touch controls, keyboard scoping, debug boot
 ├── .specs/                            Project state, roadmap and feature specs
