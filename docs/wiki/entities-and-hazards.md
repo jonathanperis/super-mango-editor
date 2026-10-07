@@ -4,7 +4,11 @@
 
 ---
 
-Super Mango has six enemy types and seven hazard types. All are stored as fixed-size arrays inside `GameState` and managed via the standard `init / update / render` lifecycle. Positions are in **logical pixels** (400×300 space).
+Super Mango has six enemy types and seven hazard types. All are stored as fixed-size arrays inside `GameState`, filled from the level by `src/levels/level_loader.c`, then updated and rendered every frame. Updates run in fixed 1/60 s simulation steps, so every speed below (px/s, °/s) means the same on any display. Positions are in **logical pixels** (400×300 space).
+
+Losing a life resets every enemy and hazard to its authored placement.
+
+All enemies patrol between `patrol_x0` and `patrol_x1`. The TOML `vx` is only the starting velocity: its sign picks the first direction, and after the first turn the enemy moves at its type's speed constant below.
 
 ---
 
@@ -14,7 +18,7 @@ Super Mango has six enemy types and seven hazard types. All are stored as fixed-
 
 **File:** `src/entities/spider.c` / `spider.h`  
 **Sprite:** `assets/sprites/entities/spider.png` — 192×48 px, 3 frames of 64×48 px  
-**Behaviour:** Horizontal ground patrol. Walks back and forth between `patrol_x0` and `patrol_x1`. No gravity — stays on the ground floor. Reverses direction and flips sprite when it hits a patrol boundary.
+**Behaviour:** Horizontal ground patrol. Walks back and forth between `patrol_x0` and `patrol_x1`. No gravity — stays on the ground floor. Reverses direction and flips sprite when it hits a patrol boundary, or when its art centre would move over a floor gap.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -42,7 +46,7 @@ frame_index = 0          # starting animation frame (0–2)
 
 **File:** `src/entities/jumping_spider.c` / `jumping_spider.h`  
 **Sprite:** `assets/sprites/entities/jumping_spider.png`  
-**Behaviour:** Like the spider but leaps when its art centre reaches a floor gap. Normal spiders reverse at gaps; jumping spiders continue across them. Neither variant follows the player.
+**Behaviour:** Like the spider (55 px/s, `JSPIDER_SPEED`) but leaps when its art centre reaches a floor gap: an upward impulse of −200 px/s under its own 600 px/s² gravity, with the attack sound when on screen. Normal spiders reverse at gaps; jumping spiders continue across them. Neither variant follows the player.
 
 **TOML placement:**
 ```toml
@@ -57,7 +61,7 @@ patrol_x1  = 310.0
 
 ### Bird
 
-**File:** `src/entities/bird.c` / `bird.h`  
+**File:** `src/entities/bird.c` / `bird.h`; movement, sound, hitbox and render are shared with the faster bird in `src/entities/bird_variant.c`, tuned by a `BirdVariantSpec`  
 **Sprite:** `assets/sprites/entities/bird.png` — 144×48 px, 3 frames of 48×48 px  
 **Behaviour:** Slow sine-wave sky patrol. Flies horizontally while oscillating vertically around `base_y` using a sine curve. The wing-flap sound effect plays once per animation cycle with distance-based volume.
 
@@ -90,7 +94,15 @@ frame_index = 0
 
 **File:** `src/entities/faster_bird.c` / `faster_bird.h`  
 **Sprite:** `assets/sprites/entities/faster_bird.png`  
-**Behaviour:** Faster sky patrol with a tighter wave. Same schema as `Bird` but uses `[[faster_birds]]` in TOML. Typical `vx` is 70–100 px/s vs. the bird's 45 px/s.
+**Behaviour:** Faster sky patrol with a tighter wave, through the same `bird_variant.c` code. Same schema as `Bird` but uses `[[faster_birds]]` in TOML.
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_FASTER_BIRDS` | 16 | Slots in `GameState` |
+| `FBIRD_SPEED` | 80.0 | Horizontal speed in px/s (bird: 45) |
+| `FBIRD_WAVE_AMP` | 15.0 | Sine-wave vertical amplitude in px |
+| `FBIRD_WAVE_FREQ` | 0.025 | Sine phase in radians per horizontal px |
+| `FBIRD_FRAME_MS` | 90 | ms per animation frame |
 
 ```toml
 [[faster_birds]]
@@ -136,7 +148,8 @@ patrol_x1  = 950.0
 ### Faster Fish
 
 **File:** `src/entities/faster_fish.c` / `faster_fish.h`  
-**Behaviour:** Same as fish (one shared implementation in `fish.c`, tuned by a `FishSpec`) but defaults to 120 px/s and jumps more frequently. Uses `[[faster_fish]]` in TOML.
+**Sprite:** `assets/sprites/entities/faster_fish.png`  
+**Behaviour:** Same as fish (one shared implementation in `fish.c`, tuned by a `FishSpec`) but faster and jumpier: 120 px/s (`FFISH_SPEED`), a −420 px/s jump (`FFISH_JUMP_VY`) every 1.0–2.2 s, and 100 ms animation frames. Uses `[[faster_fish]]` in TOML.
 
 ```toml
 [[faster_fish]]
@@ -150,7 +163,9 @@ patrol_x1  = 1400.0
 
 ## Hazards
 
-Active hazard hitboxes deal **1 heart of damage** on contact with knockback, subject to hurt immunity. `game_collision.c` routes hits through `apply_damage()` in `src/collision/collision_damage.c`; waiting flames have no active damage hitbox.
+Enemy and active hazard hitboxes deal **1 heart of damage** on contact with knockback, subject to hurt immunity. `game_collide()` in `src/collision/game_collision.c` routes hits through `apply_damage()` in `src/collision/collision_damage.c`; waiting flames have no active damage hitbox. Collision uses each hazard's position after this step's update.
+
+When a level has no authored `[[checkpoints]]`, automatic screen-edge checkpoints avoid floor gaps and the static hazards on this page (spike rows, spike platforms, blue and fire flames). Moving hazards and enemies are not considered; see [Authored Checkpoints](../level-design/#authored-checkpoints).
 
 ---
 
@@ -179,7 +194,7 @@ count = 4       # number of tiles
 
 **File:** `src/hazards/spike_block.c` / `spike_block.h`  
 **Sprite:** `assets/sprites/hazards/spike_block.png`  
-**Behaviour:** A rotating hazard that travels along a `Rail` path. References a rail by index and can be given an initial offset and speed. Visually rotates as it travels. The player is pushed on contact.
+**Behaviour:** A rotating hazard (24×24 px, 360°/s spin) that travels along a `Rail` path. References a rail by index and can be given an initial offset and speed; the presets are `SPIKE_SPEED_SLOW` 1.5, `SPIKE_SPEED_NORMAL` 3.0 and `SPIKE_SPEED_FAST` 6.0 tiles/s. On a closed loop it circulates; on an open rail it bounces at a capped end. On an open rail without an end cap it waits at the start until the camera reaches it, then flies off the far end and falls. The player is pushed on contact.
 
 ```toml
 [[spike_blocks]]
@@ -194,7 +209,7 @@ speed      = 1.5    # traversal speed in tiles/s
 
 **File:** `src/hazards/spike_platform.c` / `spike_platform.h`  
 **Sprite:** `assets/sprites/hazards/spike_platform.png`  
-**Behaviour:** Elevated static surface tiled across `tile_count` units. The player is damaged when landing on the top surface or touching the sides.
+**Behaviour:** Elevated static surface tiled across `tile_count` 16 px pieces (1–16). The player can land on the spiked top, which damages them (the hitbox reaches 2 px above the surface so a standing player always overlaps it), and touching the sides also hurts. The smooth underside is a solid ceiling that deals no damage.
 
 ```toml
 [[spike_platforms]]
@@ -209,7 +224,7 @@ tile_count = 3
 
 **File:** `src/hazards/circular_saw.c` / `circular_saw.h`  
 **Sprite:** `assets/sprites/hazards/circular_saw.png` — 32×32 px  
-**Behaviour:** Spins continuously and patrols a horizontal line at ground level. Does not ride a rail — it bounces between `patrol_x0` and `patrol_x1`. Faster than the player's walk speed. Pushes the player on contact.
+**Behaviour:** Spins continuously and patrols a horizontal line. With `y = 0` it uses the default height, rolling on top of a 2-tile pillar (y 140); a non-zero `y` is its top edge. Does not ride a rail — it bounces between `patrol_x0` and `patrol_x1`. Faster than the player's walk speed. Pushes the player on contact.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -222,7 +237,7 @@ tile_count = 3
 ```toml
 [[circular_saws]]
 x          = 1350.0
-y          = 0.0        # engine snaps to floor level
+y          = 0.0        # 0 = default height (y 140)
 patrol_x0  = 1350.0
 patrol_x1  = 1446.0
 direction  = 1          # 1 = starts right, -1 = starts left
@@ -234,12 +249,12 @@ direction  = 1          # 1 = starts right, -1 = starts left
 
 **File:** `src/hazards/axe_trap.c` / `axe_trap.h`  
 **Sprite:** `assets/sprites/hazards/axe_trap.png` — 48×64 px  
-**Behaviour:** Swinging or spinning axe mounted at the top centre of a platform pillar. Two modes:
+**Behaviour:** Swinging or spinning axe. The pivot sits at the horizontal centre of the 48 px column starting at `pillar_x`. With `y = 0` the pivot uses a fixed default height (y 124, the top of a 3-tile pillar); it is not measured from a pillar, so set `y` for other pillar heights. Two modes:
 
 - **PENDULUM** — sinusoidal swing from −60° to +60° over a 2 s cycle. SFX plays at each extreme.
 - **SPIN** — continuous 360° clockwise rotation at 180°/s. SFX plays each full rotation.
 
-Collision uses the full rotated bounding box of the blade region.
+Collision uses a 28×28 px box centred on the blade, whose centre is rotated around the pivot with the current angle (`axe_trap_get_hitbox()`).
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -251,7 +266,7 @@ Collision uses the full rotated bounding box of the blade region.
 ```toml
 [[axe_traps]]
 pillar_x = 256.0    # left x of the pillar column
-y        = 0.0      # pivot y (engine computes from pillar height)
+y        = 0.0      # pivot y; 0 = default (y 124)
 mode     = "PENDULUM"   # or "SPIN"
 ```
 
@@ -270,11 +285,11 @@ mode     = "PENDULUM"   # or "SPIN"
 | `FLIPPING` | 0.12 s | Rotates 180° at the apex |
 | `FALLING` | Until below floor | Descends upside-down, accelerating with gravity |
 
-Blue flames are placed explicitly with `[[blue_flames]]`. `x` normally matches a `floor_gaps` entry so the flame erupts from the opening.
+Blue flames are placed explicitly with `[[blue_flames]]`. `x` is the gap's left edge and normally matches a `floor_gaps` entry; the flame is centred in the 32 px opening. An `x` of 0 is skipped at load.
 
 ```toml
 [[blue_flames]]
-x = 192.0   # world-space x of the sea gap
+x = 192.0   # left edge of the sea gap
 ```
 
 | Constant | Value | Description |
@@ -298,18 +313,21 @@ x = 192.0   # world-space x of the sea gap
 
 ## Collision Architecture
 
-All entity–player collision uses **AABB (axis-aligned bounding box)** overlap tests. Entity hitboxes are inset from the sprite frame to match visible art bounds only — transparent padding is excluded.
+All entity–player collision uses **AABB (axis-aligned bounding box)** overlap tests on integer `IntRect`s. Entity hitboxes are inset from the sprite frame to match visible art bounds only — transparent padding is excluded.
 
 ```c
-/* Example: is the player overlapping a coin? */
-static int aabb_overlap(float ax, float ay, int aw, int ah,
-                         float bx, float by, int bw, int bh) {
-    return ax < bx + bw && ax + aw > bx &&
-           ay < by + bh && ay + ah > by;
+/* src/shared/geometry.h — half-open boxes: [x, x+w) */
+static inline int rect_intersects(const IntRect *a, const IntRect *b)
+{
+    return a && b && a->w > 0 && a->h > 0 && b->w > 0 && b->h > 0 &&
+        (int64_t)a->x < (int64_t)b->x + b->w &&
+        (int64_t)b->x < (int64_t)a->x + a->w &&
+        (int64_t)a->y < (int64_t)b->y + b->h &&
+        (int64_t)b->y < (int64_t)a->y + a->h;
 }
 ```
 
-For entities with non-rectangular visible art (birds, fish, spiders), `get_hitbox()` functions return an inset integer `IntRect` matching the art bounds. See each entity's header for `ART_X`, `ART_W`, `ART_Y`, `ART_H`, and `HITBOX_PAD_*` constants.
+Boxes that merely touch an edge do not overlap, and the 64-bit widening keeps the additions from overflowing. Each module exposes a hitbox function, such as `bird_get_hitbox()`, `fish_get_hitbox()` or `circular_saw_get_hitbox()`; `game_collision.c` builds spider hitboxes with `spider_build_hitbox()`. See each entity's header for `ART_X`, `ART_W`, `ART_Y`, `ART_H`, and `HITBOX_PAD_*` constants.
 
 ---
 
