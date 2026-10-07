@@ -44,7 +44,7 @@ export const DOCS_META: Record<DocsSectionId, DocsPageMeta> = {
   'debugging-c': { id: 'debugging-c', label: 'Debugging C', description: 'Find crashes and memory bugs with sanitizers, lldb or gdb, and a quick profiling pass.', route: '/docs/debugging-c/' },
   'c-concepts': { id: 'c-concepts', label: 'C in This Codebase', shortLabel: 'C Concepts', description: 'Each C idea the game relies on, mapped to the file and function where you can read it.', route: '/docs/c-concepts/' },
   'mechanics-museum': { id: 'mechanics-museum', label: 'Mechanics Museum', description: 'Six focused levels and the simulation inspector.', route: '/docs/mechanics-museum/' },
-  'entity-walkthrough': { id: 'entity-walkthrough', label: 'Entity Walkthrough', description: 'Trace a collectible through parser, runtime, editor, undo and tests.', route: '/docs/entity-walkthrough/' },
+  'entity-walkthrough': { id: 'entity-walkthrough', label: 'Entity Walkthrough', description: 'Trace a collectible through parser, runtime, editor, undo and tests, then add your own entity.', route: '/docs/entity-walkthrough/' },
   'asset-inventory': { id: 'asset-inventory', label: 'Asset Inventory', description: 'Generated playable asset sizes and bundle budget.', route: '/docs/asset-inventory/' },
   'asset-provenance': { id: 'asset-provenance', label: 'Asset Provenance', description: 'Sources, third-party notices and media license records.', route: '/docs/asset-provenance/' },
   home: {
@@ -56,7 +56,7 @@ export const DOCS_META: Record<DocsSectionId, DocsPageMeta> = {
   'developer-guide': {
     id: 'developer-guide',
     label: 'Developer Guide',
-    description: 'Coding conventions, safe extension patterns, entity workflow, and contribution rules.',
+    description: 'Coding conventions, ownership rules, and adding physics, sounds, music and text.',
     route: '/docs/developer-guide/',
   },
   controls: {
