@@ -10,7 +10,7 @@ Use this page to choose the smallest useful verification set for a change. Run c
 
 | Changed area | Run locally | Why |
 |--------------|-------------|-----|
-| C runtime, gameplay, collision, score, overlays, sessions | `make test CC=clang` | Builds and runs 16 native regression binaries, a parser allocation probe, and Python/Node host checks (levels, generated sounds, parser encoding, web host, release packaging, CodeQL SARIF filter). |
+| C runtime, gameplay, collision, score, overlays, sessions | `make test CC=clang` | Builds and runs 17 native regression binaries, a parser allocation probe, and Python/Node host checks (levels, generated sounds, parser encoding, web host, release packaging, CodeQL SARIF filter). |
 | Level TOML, campaign manifest, or level schema | `make validate-levels` and `make docs-drift` | Loads root and lab levels through the C loader and validator, then checks assets, the v1 campaign manifest, generated facts, schema docs and prose counts. |
 | Player/world runtime startup | `make smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEED=1` | Renders every TOML level plus the editor in bounded hidden windows. |
 | Replay or event handling | `make scripted-smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"` | Generates deterministic commands/action masks and checks movement/jump/pause results. |
@@ -34,7 +34,7 @@ ownership through overflow, undo/redo, branching and clearing.
 generated JSON instead of maintaining its own counts. Packaging tests inspect
 archive contents, editor inclusion, reserve-asset exclusion and license notices.
 
-`make test` builds these 16 native binaries under `out/` and runs each one:
+`make test` builds these 17 native binaries under `out/` and runs each one:
 
 - `level-serializer-test`
 - `level-validate-test`
@@ -52,6 +52,7 @@ archive contents, editor inclusion, reserve-asset exclusion and license notices.
 - `session-test`
 - `game-checkpoint-test`
 - `gameplay-mechanics-test`
+- `editor-ui-test`
 
 It also runs `tests/validate_levels_test.py` and `tests/gen_sounds_test.py`. The
 `web-host-contract` prerequisite adds `tools/check_web_boot_contract.py`,
@@ -67,7 +68,11 @@ profile, checkpoint, simulation and session behavior.
 climbing on and off ladders, ropes and vines; the blue flame's eruption timing
 and damage; axe swings; spike-block rails (loop, detach, end cap); jumping
 spiders, fish leaps, bird patrols and bridge crumbling. It also replays
-`--replay` scripts and rejects malformed ones. They write scratch files
+`--replay` scripts and rejects malformed ones. `editor-ui-test` drives the
+editor with input events (palette picks, place, select, drag, delete, undo,
+wheel zoom/pan, property and config panel clicks) and checks the resulting
+document and undo history; on POSIX it also covers the playtest process status
+and the native file pickers through stand-in `osascript`/`zenity` scripts. They write scratch files
 under the build's own `OUTDIR` (`TEST_OUT` in `tests/test_paths.h`), so
 `make test`, `make sanitize` and `make coverage` can run at the same time in one
 checkout. Test objects are also built with `-DMANGO_TESTING`, which turns on the
@@ -83,7 +88,7 @@ The artifact check also rejects an `emscripten_sleep` dependency in the emitted
 glue: this catches native-only calls such as raylib's Web `WindowShouldClose`
 before a non-Asyncify build is deployed.
 
-Two extra standalone probes accompany the 16 regression binaries:
+Two extra standalone probes accompany the 17 regression binaries:
 `make parser-allocation-probe` checks parser buffer-growth limits without huge
 allocations, and `make parser-encoding-probe` checks all Python level readers.
 Both run under `make test`; `make sanitize` instruments the C probe as well.

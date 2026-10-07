@@ -80,7 +80,7 @@ growth and source-name copying. It runs as part of `level-serializer-test`.
 documentation, catalog and scripted-smoke readers. `make parser-allocation-probe`
 compiles and runs `tests/parser_allocation_test.c`, a standalone white-box
 allocation-limit probe that includes the vendored implementation directly.
-Both are prerequisites of `make test`, in addition to its existing 16 native
+Both are prerequisites of `make test`, in addition to its existing 17 native
 regression binaries; `make sanitize` also runs them and instruments the C probe.
 Existing serializer, profile and level-validator tests cover application
 contracts.

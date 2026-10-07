@@ -130,7 +130,7 @@ TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
                  $(OUTDIR)/gameplay-score-test \
                  $(OUTDIR)/game-overlay-test $(OUTDIR)/game-events-test \
                  $(OUTDIR)/session-test $(OUTDIR)/game-checkpoint-test \
-                 $(OUTDIR)/gameplay-mechanics-test
+                 $(OUTDIR)/gameplay-mechanics-test $(OUTDIR)/editor-ui-test
 LEVEL_FILES   = $(wildcard levels/*.toml) $(wildcard levels/labs/*.toml)
 SMOKE_LEVELS  = $(LEVEL_FILES)
 SMOKE_FRAMES  ?= 5
@@ -183,6 +183,9 @@ TEST_EDITOR_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor_validati
                    $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,tools hit_test editor_clipboard \
                    editor_events canvas editor_panels editor_layout palette properties \
                    editor_playtest file_dialog undo)
+# The editor's own window, chrome and frame, for editor-ui-test.
+TEST_EDITOR_FRAME_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor editor_chrome \
+                   editor_frame editor_textures)
 TEST_AUDIO_OBJ     = $(TEST_OBJDIR)/$(SHARED_DIR)/audio.o
 TEST_SESSION_OBJ   = $(TEST_OBJDIR)/$(SRCDIR)/core/app_session.o
 TEST_INPUT_BACKEND_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/input_backend.o
@@ -296,16 +299,17 @@ test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser
 	MANGO_TEST_WINDOW=1 $(RUN_PREFIX) "$(abspath $(OUTDIR))/session-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/game-checkpoint-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/gameplay-mechanics-test"
+	$(RUN_PREFIX) "$(abspath $(OUTDIR))/editor-ui-test"
 
 $(TEST_TARGETS): | $(OUTDIR)
 $(filter-out $(OUTDIR)/session-test $(OUTDIR)/game-events-test,$(TEST_TARGETS)): $(PLATFORM_OBJS)
 $(OUTDIR)/game-events-test: $(filter-out $(OBJDIR)/src/input/input_backend.o,$(PLATFORM_OBJS)) $(TEST_INPUT_BACKEND_OBJ) tests/input_backend_test.c
-$(OUTDIR)/editor-validation-test: $(OBJDIR)/src/editor/dialog_choice.o
+$(OUTDIR)/editor-validation-test $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/editor/dialog_choice.o
 # A rebuilt dependency must refresh consumers and relink executables. Exported
 # headers retain upstream timestamps, so header mtimes alone are insufficient.
 $(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS)): $(RAYLIB_LIB)
 
-# Extra standalone parser probes; keep the 16-regression-binary inventory above.
+# Extra standalone parser probes; keep the 17-regression-binary inventory above.
 .PHONY: parser-allocation-probe parser-encoding-probe
 parser-allocation-probe: $(OUTDIR)/parser-allocation-probe
 	$(RUN_PREFIX) "$(abspath $<)"
@@ -518,7 +522,8 @@ $(OUTDIR)/level-serializer-test: tests/parser_boundary_test.c
 
 # level_validate.c shares the levels/<name>.toml rule from level_ref.c.
 $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
-$(OUTDIR)/runtime-load-test $(OUTDIR)/editor-validation-test: $(OBJDIR)/src/levels/level_ref.o
+$(OUTDIR)/runtime-load-test $(OUTDIR)/editor-validation-test \
+$(OUTDIR)/editor-ui-test: $(OBJDIR)/src/levels/level_ref.o
 
 $(OUTDIR)/level-validate-test: tests/level_validate_test.c $(TEST_VALIDATE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
@@ -544,6 +549,10 @@ $(OUTDIR)/phase-transition-test: tests/phase_transition_test.c $(TEST_PHASE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
 $(OUTDIR)/editor-validation-test: tests/editor_validation_test.c $(TEST_EDITOR_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(EDITOR_LIBS)
+
+# The editor as a designer drives it: events in, document/undo state out.
+$(OUTDIR)/editor-ui-test: tests/editor_ui_test.c $(TEST_EDITOR_OBJS) $(TEST_EDITOR_FRAME_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(EDITOR_LIBS)
 
 $(OUTDIR)/gameplay-damage-test: tests/gameplay_damage_test.c $(TEST_COLLISION_DAMAGE_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_CHECKPOINT_OBJ) $(TEST_HUD_OBJ)
