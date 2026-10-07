@@ -82,7 +82,9 @@ int serializer_resolve_save_target(const char *path, char *buf, size_t buf_size)
  * after the file is in place is a stderr warning, not a failed save. */
 int serializer_replace_file(const char *temp_path, const char *target_path);
 
-/* Install a completed sibling only when target is still absent (also synced). */
+/* Install a completed sibling only when target is still absent (also synced).
+ * POSIX uses link(); on filesystems without hard links (FAT/exFAT, some
+ * network shares) it claims the name with O_EXCL and renames over that. */
 int serializer_create_file(const char *temp_path, const char *target_path);
 
 /* Remove a temporary file after an incomplete save. */
@@ -94,6 +96,7 @@ void serializer_remove_temp(const char *path);
 #define SERIALIZER_TEST_FAILURE_FLUSH 2
 #define SERIALIZER_TEST_FAILURE_TARGET_APPEARED 3
 #define SERIALIZER_TEST_FAILURE_DIR_SYNC 4 /* POSIX parent-folder fsync */
+#define SERIALIZER_TEST_FAILURE_NO_HARD_LINKS 5 /* POSIX link() reports EPERM */
 void serializer_test_set_failure(int failure);
 
 /* Check stdio output state, including the internal write-failure seam. */
