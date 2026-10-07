@@ -119,58 +119,16 @@ static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
 }
 
 /* ------------------------------------------------------------------ */
-/* palette_render                                                      */
+/* Pieces of the palette, top to bottom                                */
 /* ------------------------------------------------------------------ */
 
 /*
- * palette_render — Draw the categorised entity palette and handle input.
- *
- * This function does three things every frame:
- *
- *   1. Compute the panel geometry (position, height) based on whether
- *      an entity is selected on the canvas.
- *
- *   2. Handle mouse-wheel scrolling when the cursor is over the panel
- *      and the content is taller than the visible area.
- *
- *   3. Draw the panel background, title, category headers, and entity
- *      rows.  Detect clicks on rows and update es->palette_type and
- *      es->tool accordingly.
- *
- * The drawing uses a "cursor_y" approach: we start at the top of the
- * panel and move downward row by row.  The scroll offset shifts the
- * cursor upward so earlier content scrolls off the top edge.  We skip
- * drawing any row whose Y falls outside the visible clip region.
+ * palette_content_height — Height of everything below and including the
+ * title: the title, every category header, and a row per entry of each
+ * expanded category.  Collapsed categories contribute only their header.
  */
-void palette_render(EditorState *es, int start_y, int available_h)
+static int palette_content_height(void)
 {
-    UIState *ui = &es->ui;
-
-    /* ---- Step 1: Compute panel geometry ---- */
-
-    /*
-     * panel_x — the palette panel starts immediately after the canvas area.
-     * panel_y / panel_h — passed in by the caller so the layout orchestrator
-     * in editor.c can position the palette dynamically between the level
-     * config section above and the properties section below.
-     */
-    int panel_x = CANVAS_W;
-    int panel_y = start_y;
-    int panel_h = available_h;
-
-    /*
-     * Draw the panel background — a dark rectangle that visually separates
-     * the palette from the canvas on the left and provides contrast for
-     * the text labels drawn on top.
-     */
-    ui_panel(ui, panel_x, panel_y, PANEL_W, panel_h);
-
-    /* ---- Step 2: Calculate total content height ---- */
-
-    /*
-     * Total height accounts for headers always, but only adds row heights
-     * for expanded categories.
-     */
     int total_content_h = TITLE_H;
     for (int cat = 0; cat < EDITOR_ENTITY_CATEGORY_COUNT; cat++) {
         EditorEntityCategory category = (EditorEntityCategory)cat;
@@ -184,63 +142,156 @@ void palette_render(EditorState *es, int start_y, int available_h)
             }
         }
     }
+    return total_content_h;
+}
+
+/*
+ * palette_title_bar — The fixed "PALETTE" title at the top of the panel.
+ *
+ * It does not scroll and is drawn with a slightly lighter background
+ * (UI_TITLE_BG) than the content below.  Clicking it collapses or expands
+ * the whole palette.
+ */
+static void palette_title_bar(EditorState *es, int panel_x, int panel_y)
+{
+    UIState *ui = &es->ui;
+
+    DrawRectangle(panel_x, panel_y, PANEL_W, TITLE_H, UI_TITLE_BG);
+
+    /* Click header to toggle expand/collapse */
+    int hdr_hovered = (ui->mouse_x >= panel_x &&
+                       ui->mouse_x < panel_x + PANEL_W &&
+                       ui->mouse_y >= panel_y &&
+                       ui->mouse_y < panel_y + TITLE_H);
+    if (hdr_hovered && ui->mouse_clicked)
+        es->palette_open = !es->palette_open;
+
+    const char *pal_sym = es->palette_open ? "v" : ">";
+    int pal_sym_w = ui_text_width(ui, pal_sym);
+    ui_label_color(ui, panel_x + PAD_X, panel_y + 6, pal_sym, UI_ACCENT);
+    ui_label_color(ui, panel_x + PAD_X + pal_sym_w, panel_y + 6,
+                   " PALETTE",
+                   hdr_hovered ? UI_TEXT : UI_TEXT_DIM);
+}
+
+/*
+ * palette_category_header — One category header at row_y ("> Enemies").
+ * Clicking it opens or closes that category.
+ */
+static void palette_category_header(UIState *ui, int cat, int panel_x, int row_y)
+{
+    int hdr_hovered = point_in_rect(ui->mouse_x, ui->mouse_y,
+                                    panel_x, row_y,
+                                    PANEL_W, CATEGORY_H);
+    if (hdr_hovered && ui->mouse_clicked) {
+        category_open[cat] = !category_open[cat];
+    }
+
+    /* Draw expand/collapse indicator and category name */
+    const char *cat_sym = category_open[cat] ? "v" : ">";
+    int cat_sym_w = ui_text_width(ui, cat_sym);
+    ui_label_color(ui, panel_x + PAD_X, row_y + 7,
+                   cat_sym, UI_ACCENT);
+    ui_label_color(ui, panel_x + PAD_X + cat_sym_w, row_y + 7,
+                   editor_entity_category_name((EditorEntityCategory)cat),
+                   hdr_hovered ? UI_TEXT : UI_TEXT_DIM);
+
+    ui_separator(ui,
+                 panel_x + PAD_X,
+                 row_y + CATEGORY_H - 2,
+                 PANEL_W - PAD_X * 2);
+}
+
+/*
+ * palette_entry_row — One entity row at row_y, and its click.
+ *
+ * The entry the next canvas click will place (palette_type while the Place
+ * tool is active) has an accent background; a hovered row gets the button
+ * hover colour.  Clicking a row picks that type and switches to Place.
+ */
+static void palette_entry_row(EditorState *es, EntityType type,
+                              int panel_x, int row_y)
+{
+    UIState *ui = &es->ui;
+    int is_selected = (type == es->palette_type && es->tool == TOOL_PLACE);
+    int hovered = point_in_rect(ui->mouse_x, ui->mouse_y,
+                                panel_x, row_y, PANEL_W, ROW_H);
+
+    /* ---- Draw row background ---- */
+    if (is_selected) {
+        /* UI_ACCENT (#4A90D9) contrasts well against the dark panel. */
+        DrawRectangle(panel_x, row_y, PANEL_W, ROW_H, UI_ACCENT);
+    } else if (hovered) {
+        /* Feedback before the click. */
+        DrawRectangle(panel_x, row_y, PANEL_W, ROW_H, UI_BTN_HOT);
+    }
+    /* Else: no background drawn — the panel's UI_BG shows through. */
 
     /*
-     * visible_h — the drawable area inside the panel, excluding the title.
-     * Content below the title scrolls; the title itself stays fixed.
+     * The name is bright white (UI_TEXT) whether or not the row is
+     * selected: the accent background gives enough contrast, and dim text
+     * would be hard to read.  The +4 vertical offset centres the 13-px
+     * font within the 22-px row height: (22 - 13) / 2 ~ 4.
+     */
+    ui_label_color(ui,
+                   panel_x + PAD_X + 8,  /* extra indent under category */
+                   row_y + 4,
+                   editor_entity_palette_name(type),
+                   UI_TEXT);
+
+    /*
+     * mouse_clicked is 1 only on the frame the button went down (not while
+     * held), so one press changes the selection once.
+     */
+    if (hovered && ui->mouse_clicked) {
+        es->palette_type = type;
+        es->tool         = TOOL_PLACE;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* palette_render                                                      */
+/* ------------------------------------------------------------------ */
+
+/*
+ * palette_render — Draw the categorised entity palette and handle input.
+ *
+ * Every frame this:
+ *
+ *   1. Draws the panel background at the position the layout code in
+ *      editor_panels.c passes in (between Level Config and properties).
+ *
+ *   2. Clamps the scroll offset to the content height, which depends on
+ *      which categories are open.
+ *
+ *   3. Draws the title, then each category header and, for open
+ *      categories, their entity rows, detecting clicks as it goes.
+ *
+ * The drawing uses a "cursor_y" approach: we start at the top of the
+ * panel and move downward row by row.  The scroll offset shifts the
+ * cursor upward so earlier content scrolls off the top edge.  We skip
+ * drawing any row whose Y falls outside the visible clip region.
+ */
+void palette_render(EditorState *es, int start_y, int available_h)
+{
+    int panel_x = CANVAS_W;
+    int panel_y = start_y;
+    int panel_h = available_h;
+
+    ui_panel(&es->ui, panel_x, panel_y, PANEL_W, panel_h);
+
+    /*
+     * Only the content below the title scrolls.  scrollable_h is how far
+     * that content extends past the visible area (0 when it all fits);
+     * palette_scroll() moves scroll_y and this keeps it in [0, scrollable_h].
      */
     int visible_h = panel_h - TITLE_H;
-
-    /*
-     * scrollable_h — how much content extends beyond the visible area.
-     * If this is zero or negative, all content fits and no scrolling is needed.
-     * We subtract TITLE_H from total because the title doesn't scroll.
-     */
-    int scrollable_h = (total_content_h - TITLE_H) - visible_h;
+    int scrollable_h = (palette_content_height() - TITLE_H) - visible_h;
     if (scrollable_h < 0) scrollable_h = 0;
-
-    /* ---- Step 3: Handle mouse-wheel scrolling ---- */
-
-    /*
-     * Only process scroll input when the mouse cursor is hovering over
-     * the palette panel.  This prevents accidental scrolling when the
-     * designer is interacting with the canvas or other panels.
-     *
-     * For now, scroll_y is only modified externally (the editor main loop
-     * should call palette_scroll or set scroll_y via a public API if
-     * mouse wheel events are needed).  The clamp below keeps it in range.
-     */
-
-    /* Clamp scroll_y to valid range [0, scrollable_h]. */
     if (scroll_y < 0)             scroll_y = 0;
     if (scroll_y > scrollable_h)  scroll_y = scrollable_h;
 
-    /* ---- Step 4: Draw the title bar ---- */
-
-    /*
-     * The title sits at the very top of the panel and does NOT scroll.
-     * We draw it with a slightly lighter background (UI_TITLE_BG) to
-     * distinguish it from the scrolling content below.
-     */
-    /* ---- Collapsible title bar ---- */
-    {
-        DrawRectangle(panel_x, panel_y, PANEL_W, TITLE_H, UI_TITLE_BG);
-
-        /* Click header to toggle expand/collapse */
-        int hdr_hovered = (ui->mouse_x >= panel_x &&
-                           ui->mouse_x < panel_x + PANEL_W &&
-                           ui->mouse_y >= panel_y &&
-                           ui->mouse_y < panel_y + TITLE_H);
-        if (hdr_hovered && ui->mouse_clicked)
-            es->palette_open = !es->palette_open;
-
-        const char *pal_sym = es->palette_open ? "v" : ">";
-        int pal_sym_w = ui_text_width(ui, pal_sym);
-        ui_label_color(ui, panel_x + PAD_X, panel_y + 6, pal_sym, UI_ACCENT);
-        ui_label_color(ui, panel_x + PAD_X + pal_sym_w, panel_y + 6,
-                       " PALETTE",
-                       hdr_hovered ? UI_TEXT : UI_TEXT_DIM);
-    }
+    palette_title_bar(es, panel_x, panel_y);
 
     /* If collapsed, just show the header bar */
     if (!es->palette_open) {
@@ -262,57 +313,19 @@ void palette_render(EditorState *es, int start_y, int available_h)
 
     /*
      * cursor_y — a running Y position that advances downward as we lay
-     * out each category header and entity row.  The scroll offset shifts
-     * it upward so earlier content scrolls off the top.
-     *
-     * Starting value: content_top minus the scroll offset.  As scroll_y
-     * increases, cursor_y starts further above the visible area, causing
-     * the top entries to disappear and later entries to slide into view.
+     * out each category header and entity row.  Starting scroll_y above
+     * the content top makes earlier entries disappear off the top.
      */
     int cursor_y = content_top - scroll_y;
 
-    /*
-     * Iterate through categories in order (0..5).  For each category,
-     * draw its header, then draw every entry that belongs to it.
-     */
     for (int cat = 0; cat < EDITOR_ENTITY_CATEGORY_COUNT; cat++) {
         EditorEntityCategory category = (EditorEntityCategory)cat;
 
-        /* ---- Category header ---- */
-
-        /*
-         * Only draw the header if it falls within the visible clip region.
-         * The header must overlap the vertical band [content_top, clip_bottom)
-         * to be at least partially visible.
-         */
-        if (cursor_y + CATEGORY_H > content_top && cursor_y < clip_bottom) {
-            /* Click on category header toggles open/closed */
-            int hdr_hovered = point_in_rect(ui->mouse_x, ui->mouse_y,
-                                            panel_x, cursor_y,
-                                            PANEL_W, CATEGORY_H);
-            if (hdr_hovered && ui->mouse_clicked) {
-                category_open[cat] = !category_open[cat];
-            }
-
-            /* Draw expand/collapse indicator and category name */
-            const char *cat_sym = category_open[cat] ? "v" : ">";
-            int cat_sym_w = ui_text_width(ui, cat_sym);
-            ui_label_color(ui, panel_x + PAD_X, cursor_y + 7,
-                           cat_sym, UI_ACCENT);
-            ui_label_color(ui, panel_x + PAD_X + cat_sym_w, cursor_y + 7,
-                           editor_entity_category_name(category),
-                           hdr_hovered ? UI_TEXT : UI_TEXT_DIM);
-
-            ui_separator(ui,
-                         panel_x + PAD_X,
-                         cursor_y + CATEGORY_H - 2,
-                         PANEL_W - PAD_X * 2);
-        }
-
-        /* Advance cursor past the category header. */
+        /* A header or row is drawn (and clickable) only if some of it
+         * overlaps the visible band [content_top, clip_bottom). */
+        if (cursor_y + CATEGORY_H > content_top && cursor_y < clip_bottom)
+            palette_category_header(&es->ui, cat, panel_x, cursor_y);
         cursor_y += CATEGORY_H;
-
-        /* ---- Entity rows for this category (only if expanded) ---- */
 
         if (!category_open[cat]) continue;
 
@@ -321,90 +334,8 @@ void palette_render(EditorState *es, int start_y, int available_h)
             EntityType type = editor_entity_palette_entry_type(i);
             if (editor_entity_category(type) != category) continue;
 
-            /*
-             * Determine if this row is within the visible vertical clip
-             * region.  Rows entirely above content_top (scrolled past)
-             * or entirely below clip_bottom (below the panel) are skipped.
-             */
-            int row_visible = (cursor_y + ROW_H > content_top &&
-                               cursor_y < clip_bottom);
-
-            if (row_visible) {
-
-                /*
-                 * Check if this entry is the currently selected palette type.
-                 * An entry is "selected" when its EntityType matches the one
-                 * stored in es->palette_type AND the active tool is TOOL_PLACE.
-                 *
-                 * We highlight the selected row with the accent colour
-                 * (#4A90D9) so the designer immediately sees which entity
-                 * type will be placed on the next canvas click.
-                 */
-                int is_selected = (type == es->palette_type &&
-                                   es->tool == TOOL_PLACE);
-
-                /*
-                 * Check if the mouse is hovering over this row.
-                 * We test against the full row rectangle (panel-wide, ROW_H tall).
-                 */
-                int hovered = point_in_rect(ui->mouse_x, ui->mouse_y,
-                                            panel_x, cursor_y,
-                                            PANEL_W, ROW_H);
-
-                /* ---- Draw row background ---- */
-
-                if (is_selected) {
-                    /*
-                     * Selected row — draw with the accent colour to make it
-                     * stand out.  UI_ACCENT is a blue (#4A90D9) that contrasts
-                     * well against the dark panel background.
-                     */
-                    DrawRectangle(panel_x, cursor_y, PANEL_W, ROW_H, UI_ACCENT);
-
-                } else if (hovered) {
-                    /*
-                     * Hovered row — draw with the button-hover colour to
-                     * provide visual feedback before the click.
-                     */
-                    DrawRectangle(panel_x, cursor_y, PANEL_W, ROW_H, UI_BTN_HOT);
-                }
-                /* Else: no background drawn — the panel's UI_BG shows through. */
-
-                /*
-                 * Draw the entity name label.
-                 *
-                 * Text colour is bright white (UI_TEXT) regardless of selection
-                 * state — the accent background provides enough contrast for
-                 * selected rows, and dim text would be hard to read.
-                 *
-                 * The +4 vertical offset centres the 13-px font within the
-                 * 22-px row height: (22 - 13) / 2 ~ 4.
-                 */
-                ui_label_color(ui,
-                               panel_x + PAD_X + 8,  /* extra indent under category */
-                               cursor_y + 4,
-                                editor_entity_palette_name(type),
-                                UI_TEXT);
-
-                /* ---- Handle click on this row ---- */
-
-                /*
-                 * If the user clicked on this row, select this entity type
-                 * for placement.  We set palette_type to the entry's type
-                 * and switch the tool to TOOL_PLACE so the next canvas click
-                 * stamps this entity.
-                 *
-                 * mouse_clicked is 1 only on the frame the button went down
-                 * (not while held), preventing repeated selection changes
-                 * from a single press.
-                 */
-                if (hovered && ui->mouse_clicked) {
-                    es->palette_type = type;
-                    es->tool         = TOOL_PLACE;
-                }
-            }
-
-            /* Advance cursor past this entity row. */
+            if (cursor_y + ROW_H > content_top && cursor_y < clip_bottom)
+                palette_entry_row(es, type, panel_x, cursor_y);
             cursor_y += ROW_H;
         }
     }
