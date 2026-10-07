@@ -3225,6 +3225,199 @@ cleanup:
 #endif
 }
 
+/* ---- Level Config panel driven like a real frame ------------------- */
+
+/*
+ * Rows of the Level Config panel when it starts at TOOLBAR_H, is not
+ * scrolled, the validation report is empty and there are no recent files
+ * (the layout written out in level_config_render).  The layer-button test
+ * first checks "+ Add" really is at CFG_FIRST_LAYER_Y, so a layout change
+ * fails loudly there instead of making these tests click empty space.
+ */
+#define CFG_X              CANVAS_W
+#define CFG_NAME_Y         (TOOLBAR_H + 64)
+#define CFG_SCREENS_Y      (TOOLBAR_H + 136)
+#define CFG_MUSIC_Y        (TOOLBAR_H + 190)
+#define CFG_HEARTS_Y       (TOOLBAR_H + 272)
+#define CFG_FIRST_LAYER_Y  (TOOLBAR_H + 368)
+
+static int config_state_init(EditorState *es, TextFont *font, char *root,
+                             size_t root_size)
+{
+    memset(es, 0, sizeof(*es));
+    editor_level_init_defaults(&es->level);
+    ui_init(&es->ui, font);
+    es->ui.before_command = editor_before_command;
+    es->ui.before_command_context = es;
+    es->config_open = 1;
+    es->selection.index = -1;
+    es->tool = TOOL_SELECT;
+    es->camera.zoom = 2.0f;
+    es->undo = undo_create();
+    if (!es->undo) return -1;
+    if (root && (make_test_preference_root(root, root_size) != 0 ||
+                 editor_set_preference_root(es, root) != 0)) return -1;
+    editor_sync_config_resources(es);
+    editor_set_document_save_point(es);
+    return 0;
+}
+
+static void config_state_cleanup(EditorState *es, const char *root)
+{
+    texture_unload(es->textures.sky);
+    texture_unload(es->textures.floor_tile);
+    texture_unload(es->textures.water);
+    es->textures.sky = es->textures.floor_tile = es->textures.water = NULL;
+    undo_destroy(es->undo);
+    es->undo = NULL;
+    ui_cleanup(&es->ui);
+    if (root && root[0]) cleanup_test_preference_root(root, es, 1);
+    editor_test_set_finish_field_choice(-1);
+}
+
+/* One editor frame of the Level Config panel: optional typed text, then an
+ * optional press at (mx, my) routed the way editor_handle_event routes it. */
+static void config_frame(EditorState *es, const char *text, int click,
+                         int mx, int my)
+{
+    ui_begin_frame(&es->ui);
+    if (text) ui_queue_text_input(&es->ui, text);
+    if (click) (void)ui_press(&es->ui);
+    es->ui.mouse_x = mx;
+    es->ui.mouse_y = my;
+    /* total == visible, so any earlier scroll clamps back to 0. */
+    level_config_render(es, TOOLBAR_H, EDITOR_H - TOOLBAR_H, EDITOR_H - TOOLBAR_H);
+}
+
+/*
+ * An open dropdown list owns the next press: it must not also place on the
+ * canvas or reach a widget drawn under the list, before or after it.  A
+ * list whose dropdown is no longer drawn closes by itself.
+ */
+static int open_dropdown_owns_the_next_click(void)
+{
+    static const char *zoom[] = {"Zoom: 1x", "Zoom: 2x", "Zoom: 3x", "Zoom: 5x"};
+    EditorWidgetTestContext context;
+    EditorState es;
+    InputEvent down, up;
+    int sel = 1;
+    int result = 1;
+
+    if (editor_widget_test_context_init(&context) != 0) {
+        editor_widget_test_context_cleanup(&context);
+        return 1;
+    }
+    if (config_state_init(&es, context.font, NULL, 0) != 0) goto done;
+    es.tool = TOOL_PLACE;
+    es.palette_type = ENT_COIN;
+
+    memset(&down, 0, sizeof(down));
+    down.type = INPUT_MOUSE_DOWN;
+    down.button = MOUSE_BUTTON_LEFT;
+    down.x = 380;            /* inside the toolbar zoom list's third row */
+    down.y = 70;
+    up = down;
+    up.type = INPUT_MOUSE_UP;
+
+    /* Baseline: with no list open, this press places a coin. */
+    ui_begin_frame(&es.ui);
+    editor_handle_event(&es, &down);
+    editor_handle_event(&es, &up);
+    if (expect_int("baseline place", es.level.coin_count, 1) != 0) goto done;
+
+    /* Open the zoom dropdown where the toolbar draws it. */
+    ui_begin_frame(&es.ui);
+    es.ui.mouse_clicked = 1;
+    es.ui.mouse_x = 360;
+    es.ui.mouse_y = 10;
+    (void)ui_dropdown(&es.ui, 8888, 344, 6, 80, zoom, 4, &sel);
+    if (expect_int("zoom list open", es.ui.dropdown_open_id, 8888) != 0) goto done;
+
+    /* Choose "Zoom: 3x" over the canvas. */
+    ui_begin_frame(&es.ui);
+    editor_handle_event(&es, &down);
+    editor_handle_event(&es, &up);
+    es.ui.mouse_x = down.x;
+    es.ui.mouse_y = down.y;
+    if (expect_int("button before list", ui_button(&es.ui, 344, 60, 80, 20, "a"), 0) != 0 ||
+        expect_int("zoom picked",
+                   ui_dropdown(&es.ui, 8888, 344, 6, 80, zoom, 4, &sel), 1) != 0 ||
+        expect_int("zoom option", sel, 2) != 0 ||
+        expect_int("button after list", ui_button(&es.ui, 344, 60, 80, 20, "b"), 0) != 0 ||
+        expect_int("no coin under the list", es.level.coin_count, 1) != 0 ||
+        expect_int("zoom list closed", es.ui.dropdown_open_id, 0) != 0) goto done;
+
+    /* A press outside an open list only closes it. */
+    ui_begin_frame(&es.ui);
+    es.ui.mouse_clicked = 1;
+    es.ui.mouse_x = 360;
+    es.ui.mouse_y = 10;
+    (void)ui_dropdown(&es.ui, 8888, 344, 6, 80, zoom, 4, &sel);
+    ui_begin_frame(&es.ui);
+    down.x = 600;
+    up.x = 600;
+    editor_handle_event(&es, &down);
+    editor_handle_event(&es, &up);
+    es.ui.mouse_x = down.x;
+    es.ui.mouse_y = down.y;
+    if (expect_int("outside press is not a pick",
+                   ui_dropdown(&es.ui, 8888, 344, 6, 80, zoom, 4, &sel), 0) != 0 ||
+        expect_int("outside press closes", es.ui.dropdown_open_id, 0) != 0 ||
+        expect_int("outside press places nothing", es.level.coin_count, 1) != 0)
+        goto done;
+
+    /* A list whose dropdown stops being drawn closes on the next frame. */
+    ui_begin_frame(&es.ui);
+    es.ui.mouse_clicked = 1;
+    es.ui.mouse_x = 360;
+    es.ui.mouse_y = 10;
+    (void)ui_dropdown(&es.ui, 8888, 344, 6, 80, zoom, 4, &sel);
+    ui_begin_frame(&es.ui);          /* frame without the dropdown */
+    ui_begin_frame(&es.ui);
+    editor_handle_event(&es, &down);
+    editor_handle_event(&es, &up);
+    if (expect_int("stale list closed", es.ui.dropdown_open_id, 0) != 0 ||
+        expect_int("canvas works again", es.level.coin_count, 2) != 0) goto done;
+    result = 0;
+
+done:
+    config_state_cleanup(&es, NULL);
+    editor_widget_test_context_cleanup(&context);
+    return result;
+}
+
+/*
+ * A dropdown whose stored value is none of its options (a hand-edited
+ * path) must still let the designer pick option 0, "(none)" here.
+ */
+static int dropdowns_accept_any_option_for_unknown_values(void)
+{
+    EditorWidgetTestContext context;
+    EditorState es;
+    int result = 1;
+
+    if (editor_widget_test_context_init(&context) != 0) {
+        editor_widget_test_context_cleanup(&context);
+        return 1;
+    }
+    if (config_state_init(&es, context.font, NULL, 0) != 0) goto done;
+    strcpy(es.level.music_path, "assets/sounds/levels/custom.wav");
+    editor_set_document_save_point(&es);
+
+    config_frame(&es, NULL, 1, CFG_X + 200, CFG_MUSIC_Y + 4);
+    if (expect_int("music list open", es.ui.dropdown_open_id, 9009) != 0) goto done;
+    config_frame(&es, NULL, 1, CFG_X + 200, CFG_MUSIC_Y + 20 + 4);
+    if (expect_string("custom music set to none", es.level.music_path, "") != 0 ||
+        expect_int("none choice undoable", es.undo->top, 1) != 0 ||
+        expect_int("none choice modified", es.modified, 1) != 0) goto done;
+    result = 0;
+
+done:
+    config_state_cleanup(&es, NULL);
+    editor_widget_test_context_cleanup(&context);
+    return result;
+}
+
 /*
  * The editor only saves levels that validate, and must be able to open
  * what it saved.  A rail-mode float platform's x/y are not range-checked
@@ -3377,6 +3570,8 @@ int main(void)
     if (config_preview_sync_preserves_old_texture() != 0) return 1;
     if (staged_edit_save_and_quit_boundaries() != 0) return 1;
     if (display_paths_keep_the_file_name() != 0) return 1;
+    if (open_dropdown_owns_the_next_click() != 0) return 1;
+    if (dropdowns_accept_any_option_for_unknown_values() != 0) return 1;
     if (extreme_floats_round_trip_through_save() != 0) return 1;
     if (create_only_save_without_hard_links() != 0) return 1;
 

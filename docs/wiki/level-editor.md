@@ -150,6 +150,11 @@ level-wide TOML fields:
 The player start and the floor gaps are canvas entities: move the Player Spawn
 marker, and place or delete Floor Gap entities.
 
+A dropdown whose current value is not one of its options (a path typed into
+the TOML by hand) shows `---`, and any option can then be picked. While a
+dropdown list is open, the next click only picks an option or closes the list;
+it never reaches the canvas or the fields under the list.
+
 ---
 
 ## Camera Controls

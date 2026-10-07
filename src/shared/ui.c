@@ -347,6 +347,16 @@ void ui_cleanup(UIState *ui)
  */
 void ui_begin_frame(UIState *ui)
 {
+    /*
+     * A list stays open only while its dropdown is still drawn. If the
+     * widget went away (its entity was deleted, its panel collapsed), close
+     * the list; otherwise ui_press would keep handing every click to a list
+     * nobody can see.
+     */
+    if (!ui->dropdown_seen) ui->dropdown_open_id = 0;
+    ui->dropdown_seen    = 0;
+    ui->dropdown_click   = 0;
+    ui->dropdown_options = NULL;
     ui->mouse_clicked  = 0;
     ui->mouse_down     = 0;
     ui->key_backspace  = 0;
@@ -356,6 +366,17 @@ void ui_begin_frame(UIState *ui)
     memset(ui->text_input, 0, sizeof(ui->text_input));
     ui->pending_text_length = 0;
     memset(ui->pending_text_input, 0, sizeof(ui->pending_text_input));
+}
+
+int ui_press(UIState *ui)
+{
+    if (!ui) return 0;
+    if (ui->dropdown_open_id != 0) {
+        ui->dropdown_click = 1;
+        return 1;
+    }
+    ui->mouse_clicked = 1;
+    return 0;
 }
 
 void ui_queue_text_input(UIState *ui, const char *text)
@@ -767,12 +788,21 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
  *   └──────────────────────┘
  *
  * Interaction:
- *   - Click the header to toggle open/closed.
- *   - Click an option to select it (closes the dropdown).
- *   - Click anywhere outside to close without changing selection.
+ *   - Click the header to open the list.
+ *   - While the list is open, the next press belongs to it: on an option it
+ *     picks that option, anywhere else (the header included) it just closes
+ *     the list.  Either way nothing underneath reacts to that press.
  *
- * Only one dropdown can be open at a time; opening one closes any other.
- * The dropdown_open_id in UIState tracks which one is expanded.
+ * The list hangs over whatever is below the header: the canvas, palette
+ * rows, other fields.  Two things keep it on top.  ui_press routes a press
+ * to the open list instead of setting mouse_clicked, so widgets drawn
+ * earlier in the frame never see it, and the list clears both flags once it
+ * has used the press, so widgets drawn later do not either.  The list itself
+ * is drawn by ui_draw_overlays after everything else, so a field drawn later
+ * cannot paint over it.
+ *
+ * Only one dropdown can be open at a time.  dropdown_open_id in UIState
+ * tracks which one is expanded.
  */
 int ui_dropdown(UIState *ui, int id, int x, int y, int w,
                 const char **options, int count, int *selected)
@@ -800,81 +830,75 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
      */
     draw_text(ui, x + w - 14, y + 3, "v", UI_TEXT_DIM);
 
-    /* --- Toggle open/closed on header click --- */
-    if (ui->mouse_clicked && hovered_header) {
-        if (ui->active_id != 0 && ui->before_command &&
-            !ui->before_command(ui->before_command_context)) {
-            return 0;
-        }
-        if (ui->active_id != 0) return 0;
-        if (is_open) {
-            /* Already open — close it. */
-            ui->dropdown_open_id = 0;
-            is_open = 0;
-        } else {
-            /* Open this dropdown (and implicitly close any other). */
-            ui->dropdown_open_id = id;
+    if (!is_open) {
+        /* --- Open on header click --- */
+        if (ui->mouse_clicked && hovered_header) {
+            if (ui->active_id != 0 && ui->before_command &&
+                !ui->before_command(ui->before_command_context)) {
+                return 0;
+            }
+            if (ui->active_id != 0) return 0;
+            ui->dropdown_open_id = id;   /* implicitly closes any other */
+            ui->mouse_clicked = 0;       /* the press opened the list    */
             is_open = 1;
         }
+    } else if (ui->mouse_clicked || ui->dropdown_click) {
+        /* --- The press while open: pick an option or just close --- */
+        int list_y = y + h;
+        if (count > 0 &&
+            point_in_rect(ui->mouse_x, ui->mouse_y, x, list_y, w, count * h)) {
+            int i = (ui->mouse_y - list_y) / h;
+            if (ui->active_id != 0 && ui->before_command &&
+                !ui->before_command(ui->before_command_context)) {
+                return 0;
+            }
+            if (ui->active_id != 0) return 0;
+            /* An unrecognised current value (*selected out of range) never
+             * equals i, so every option, the first included, applies. */
+            if (i != *selected) {
+                notify_before_change(ui, id);
+                *selected = i;
+                changed   = 1;
+            }
+        }
+        ui->dropdown_open_id = 0;
+        ui->dropdown_click = 0;
+        ui->mouse_clicked = 0;
+        is_open = 0;
     }
 
-    /* --- Draw the option list when open --- */
+    /* --- Remember the open list; ui_draw_overlays draws it last --- */
     if (is_open) {
-        /*
-         * Draw each option as a row directly below the header.
-         * Hovered rows get a lighter background for visual feedback.
-         */
-        for (int i = 0; i < count; i++) {
-            int oy = y + h + i * h;   /* Y of this option row */
-
-            int hovered_opt = point_in_rect(ui->mouse_x, ui->mouse_y,
-                                            x, oy, w, h);
-
-            /* Highlight: accent colour for the selected item, hot for hover. */
-            Color opt_bg;
-            if (i == *selected) {
-                opt_bg = UI_BTN_ACTIVE;
-            } else if (hovered_opt) {
-                opt_bg = UI_BTN_HOT;
-            } else {
-                opt_bg = UI_BTN;
-            }
-            draw_rect(x, oy, w, h, opt_bg);
-            draw_text(ui, x + 4, oy + 3,
-                      options[i], UI_TEXT);
-
-            /* Select this option on click. */
-            if (ui->mouse_clicked && hovered_opt) {
-                if (ui->active_id != 0 && ui->before_command &&
-                    !ui->before_command(ui->before_command_context)) {
-                    return 0;
-                }
-                if (ui->active_id != 0) return 0;
-                if (i != *selected) {
-                    notify_before_change(ui, id);
-                    *selected = i;
-                    changed   = 1;
-                }
-                ui->dropdown_open_id = 0;   /* close after selection */
-                break;   /* stop processing further options this frame */
-            }
-        }
-
-        /*
-         * Close on click outside: if the user clicked but not on the header
-         * and not on any option row, close the dropdown.  We check whether
-         * the click landed inside the combined header + list rectangle.
-         */
-        if (ui->mouse_clicked && !changed) {
-            int total_h = h + count * h;  /* header + all option rows */
-            if (!point_in_rect(ui->mouse_x, ui->mouse_y,
-                               x, y, w, total_h)) {
-                ui->dropdown_open_id = 0;
-            }
-        }
+        ui->dropdown_seen = 1;
+        ui->dropdown_options = options;
+        ui->dropdown_count = count;
+        ui->dropdown_x = x;
+        ui->dropdown_y = y + h;
+        ui->dropdown_w = w;
+        ui->dropdown_selected = *selected;
     }
 
     return changed;
+}
+
+void ui_draw_overlays(UIState *ui)
+{
+    int h = 20;
+
+    if (!ui || ui->dropdown_open_id == 0 || !ui->dropdown_options) return;
+    for (int i = 0; i < ui->dropdown_count; i++) {
+        int oy = ui->dropdown_y + i * h;   /* Y of this option row */
+        int hovered = point_in_rect(ui->mouse_x, ui->mouse_y,
+                                    ui->dropdown_x, oy, ui->dropdown_w, h);
+
+        /* Highlight: accent colour for the selected item, hot for hover. */
+        Color bg = i == ui->dropdown_selected ? UI_BTN_ACTIVE
+                 : hovered                    ? UI_BTN_HOT
+                                              : UI_BTN;
+        draw_rect(ui->dropdown_x, oy, ui->dropdown_w, h, bg);
+        draw_text(ui, ui->dropdown_x + 4, oy + 3,
+                  ui->dropdown_options[i], UI_TEXT);
+    }
 }
 
 /* ------------------------------------------------------------------ */
