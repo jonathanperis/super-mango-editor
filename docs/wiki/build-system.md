@@ -153,6 +153,10 @@ filters. Linux dialogs use zenity.
 
 ## Build Targets
 
+`make help` prints every target below with a one-line description, grouped by
+purpose. A target shows up there when its rule line ends in a `## Group: text`
+comment, so document a new target by adding one.
+
 ### `make` / `make all`
 
 Compiles game source files from the Makefile's source directory list to `.o` objects, then links them into `out/super-mango`.
@@ -583,5 +587,6 @@ out/
     │   ├── editor/*.o / *.d
     │   ├── player/*.o / *.d
     │   └── ...
+    ├── tests/                           ← test-flag copies, same mirrored paths (make test)
     └── vendor/tomlc17/tomlc17.o / .d
 ```
