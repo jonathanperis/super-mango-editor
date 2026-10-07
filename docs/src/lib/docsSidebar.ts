@@ -1,6 +1,8 @@
 export type DocsSectionId =
   | 'home'
   | 'learning-path'
+  | 'debugging-c'
+  | 'c-concepts'
   | 'mechanics-museum'
   | 'entity-walkthrough'
   | 'asset-inventory'
@@ -39,6 +41,8 @@ export type DocsCategory = {
 
 export const DOCS_META: Record<DocsSectionId, DocsPageMeta> = {
   'learning-path': { id: 'learning-path', label: 'Sandbox School', description: 'Eight guided experiments from first frame to reproducible replay.', route: '/docs/learning-path/' },
+  'debugging-c': { id: 'debugging-c', label: 'Debugging C', description: 'Find crashes and memory bugs with sanitizers, lldb or gdb, and a quick profiling pass.', route: '/docs/debugging-c/' },
+  'c-concepts': { id: 'c-concepts', label: 'C in This Codebase', shortLabel: 'C Concepts', description: 'Each C idea the game relies on, mapped to the file and function where you can read it.', route: '/docs/c-concepts/' },
   'mechanics-museum': { id: 'mechanics-museum', label: 'Mechanics Museum', description: 'Six focused levels and the simulation inspector.', route: '/docs/mechanics-museum/' },
   'entity-walkthrough': { id: 'entity-walkthrough', label: 'Entity Walkthrough', description: 'Trace a collectible through parser, runtime, editor, undo and tests.', route: '/docs/entity-walkthrough/' },
   'asset-inventory': { id: 'asset-inventory', label: 'Asset Inventory', description: 'Generated playable asset sizes and bundle budget.', route: '/docs/asset-inventory/' },
@@ -163,12 +167,12 @@ export const SECTION_CATEGORIES: DocsCategory[] = [
   {
     label: 'Start Here',
     description: 'Where to begin: the lessons, the controls, how the code is organised and how to test a change.',
-    ids: ['home', 'learning-path', 'mechanics-museum', 'developer-guide', 'controls', 'testing', 'architecture'],
+    ids: ['home', 'learning-path', 'debugging-c', 'mechanics-museum', 'developer-guide', 'controls', 'testing', 'architecture'],
   },
   {
     label: 'Engine & Code',
     description: 'How the game works inside: every source file, the player, the numbers that tune it.',
-    ids: ['source-files', 'entity-walkthrough', 'player-module', 'constants-reference'],
+    ids: ['c-concepts', 'source-files', 'entity-walkthrough', 'player-module', 'constants-reference'],
   },
   {
     label: 'World Builder',
