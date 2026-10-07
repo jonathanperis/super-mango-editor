@@ -91,3 +91,17 @@ path source or file operation changed; the code is the same as the reviewed
 
 These four findings (#147–#150) were dismissed as false positives after
 explicit maintainer authorization on 2026-10-07. No query or check is disabled.
+
+## Create-only fallback without hard links (PR #315)
+
+The editor fix that lets a create-only save work on drives without hard
+links (FAT/exFAT, some network shares) added `open()` calls inside
+`serializer_create_without_link`. The game profile's first save goes through
+that create-only path, so the analysis followed the profile path into it:
+
+| Alerts | Input and operation | Assessment |
+| --- | --- | --- |
+| #145, #146 | `game_profile.c`: first save of the player profile, temp file and target, through the create-only fallback | Same as #56–#58: the profile path comes from the explicit native `--profile` flag or the invoking user's per-user preference root (`HOME`/`XDG_DATA_HOME`), never from profile file contents. The fallback claims the target with `O_EXCL` and writes through that descriptor, so it never replaces an existing file. |
+
+These two findings (#145, #146) were dismissed as false positives after
+explicit maintainer authorization on 2026-10-07. No query or check is disabled.
