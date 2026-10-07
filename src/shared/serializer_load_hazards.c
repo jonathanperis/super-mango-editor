@@ -9,24 +9,6 @@
 #include "serializer_types.h"
 #include "../game.h" /* MAX_* constants */
 
-#define LOAD_ARRAY(toml_key, count_field, max_count, parse_body)           \
-    do {                                                                   \
-        toml_datum_t arr_d = toml_get(top, toml_key);                      \
-        if (arr_d.type == TOML_ARRAY) {                                    \
-            int n = arr_d.u.arr.size;                                      \
-            if (n > (max_count)) {                                         \
-                fprintf(stderr, "serializer: %s array has %d items "       \
-                        "(max %d)\n", toml_key, n, (max_count));           \
-                return -1;                                                 \
-            }                                                              \
-            def->count_field = n;                                          \
-            for (int idx = 0; idx < n; idx++) {                            \
-                toml_datum_t elem = arr_d.u.arr.elem[idx];                 \
-                parse_body                                                 \
-            }                                                              \
-        }                                                                  \
-    } while (0)
-
 int serializer_load_hazards(toml_datum_t top, LevelDef *def) {
     if (!def) return -1;
 
@@ -80,5 +62,3 @@ int serializer_load_hazards(toml_datum_t top, LevelDef *def) {
 
     return 0;
 }
-
-#undef LOAD_ARRAY
