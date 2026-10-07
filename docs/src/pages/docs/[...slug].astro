@@ -3,6 +3,8 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import '../../styles/docs.css';
 import { DOCS_META, SECTION_CATEGORIES, SECTION_ORDER } from '@/lib/docsSidebar';
 import { getCollection, render } from 'astro:content';
+import Sprite from '@/components/Sprite.astro';
+import { art } from '@/lib/art';
 
 // docs-drift sentinel: level-catalog
 // The manual is the `docs` content collection (src/content.config.ts): one
@@ -52,7 +54,7 @@ function humanizeSlug(s: string): string {
 
 const pageMeta = DOCS_META[requestedKey as keyof typeof DOCS_META];
 const pageTitle = isRoot
-    ? 'Super Mango Builder Manual'
+    ? 'The Super Mango manual'
     : (currentPage?.data.title ?? pageMeta?.label ?? humanizeSlug(requestedKey));
 
 const base = import.meta.env.BASE_URL;
@@ -73,14 +75,21 @@ const nextPage = !isRoot && currentIndex >= 0 && currentIndex < SECTION_ORDER.le
 // render() compiles the entry's Markdown into a component for this route.
 const { Content: CurrentContent } = await render(currentPage);
 const pageDescription = currentPage?.data.description ?? pageMeta.description;
+const currentCategory = SECTION_CATEGORIES.find(cat => cat.ids.includes(requestedKey as any));
+const pageHref = (id: string) => (id === 'home' ? `${docsBase}/` : `${docsBase}/${id}/`);
+const coverStyle = [
+    `--sky:url("${art.sky.src}")`,
+    `--mountains:url("${art.mountains.src}")`,
+    `--grass:url("${art.grassTile.src}")`,
+].join(';');
 ---
 
-<BaseLayout title={isRoot ? pageTitle : `${pageTitle} — Super Mango Manual`} description={pageDescription} pageType="docs">
+<BaseLayout title={isRoot ? pageTitle : `${pageTitle} — Super Mango manual`} description={pageDescription} pageType="docs">
     <div class="mobile-header">
-        <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false">
+        <button class="menu-toggle" id="menuToggle" aria-label="Open the page list" aria-controls="sidebar" aria-expanded="false">
             <span></span><span></span><span></span>
         </button>
-        <a class="mobile-title" href={docsBase}>Builder Manual</a>
+        <a class="mobile-title" href={`${docsBase}/`}>Super Mango manual</a>
         <a class="mobile-play" href={playUrl}>Play</a>
     </div>
 
@@ -88,28 +97,27 @@ const pageDescription = currentPage?.data.description ?? pageMeta.description;
 
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <a class="repo-badge" href={docsBase}>
-                <span>SM</span>
-                <strong>Builder Manual</strong>
+            <a class="sidebar-brand" href={backHomeUrl}>
+                <Sprite sheet={art.coin} scale={2} />
+                <span>Super Mango</span>
             </a>
-            <p class="repo-description">Read the engine route, world-builder guide, and platform docs without one giant scroll.</p>
-            <label class="search-label" for="searchInput">Filter pages</label>
-            <input type="search" id="searchInput" class="search-box" placeholder={`Filter all ${allPages.length} manual pages...`} aria-label="Filter manual pages">
-            <p class="search-status" id="searchStatus" aria-live="polite">{allPages.length} routes ready</p>
+            <a class="sidebar-title" href={`${docsBase}/`}>The manual</a>
+            <label class="search-label" for="searchInput">Find a page</label>
+            <input type="search" id="searchInput" class="search-box" placeholder="Type to filter..." aria-label="Filter manual pages">
+            <p class="search-status" id="searchStatus" aria-live="polite">{allPages.length} pages</p>
         </div>
-        <nav class="sidebar-nav-container" aria-label="Documentation sections">
+        <nav class="sidebar-nav-container" aria-label="Manual pages">
             {SECTION_CATEGORIES.map((cat) => (
                 <div class="sidebar-category-group" data-category>
                     <div class="sidebar-category">{cat.label}</div>
                     <ul>
                         {cat.ids.map((id) => {
                             const meta = DOCS_META[id];
-                            const href = id === 'home' ? docsBase : `${docsBase}/${id}/`;
                             const active = isRoot ? id === 'home' : id === requestedKey;
                             return (
                                 <li>
-                                    <a class:list={['nav-item', { active }]} href={href} aria-current={active ? 'page' : undefined} data-nav-id={id} data-search-text={`${meta.label} ${meta.description} ${cat.label}`}>
-                                        <span>{meta.shortLabel ?? meta.label}</span>
+                                    <a class:list={['nav-item', { active }]} href={pageHref(id)} aria-current={active ? 'page' : undefined} data-nav-id={id} data-search-text={`${meta.label} ${meta.description} ${cat.label}`}>
+                                        {meta.shortLabel ?? meta.label}
                                     </a>
                                 </li>
                             );
@@ -119,9 +127,8 @@ const pageDescription = currentPage?.data.description ?? pageMeta.description;
             ))}
         </nav>
         <div class="sidebar-footer">
-            <a href={backHomeUrl}>← Home screen</a>
-            <a href={playUrl}>Insert coin</a>
-            <a href={repoUrl} target="_blank" rel="noopener noreferrer">GitHub source</a>
+            <a href={playUrl}>Play the game</a>
+            <a href={repoUrl} target="_blank" rel="noopener noreferrer">Source on GitHub</a>
         </div>
     </aside>
 
@@ -129,117 +136,74 @@ const pageDescription = currentPage?.data.description ?? pageMeta.description;
         <main class:list={['content', { 'content-hub': isRoot }]} id="mainContent">
             {isRoot ? (
                 <>
-                    <section class="docs-hero manual-cover" aria-labelledby="manual-title">
-                        <div>
-                            <p class="docs-kicker">SERVICE MANUAL / CABINET BACKPLANE</p>
-                            <h1 id="manual-title">Trace every wire inside Super Mango</h1>
-                            <p>Use the manual like a service bay: start with orientation, inspect the engine, open world-builder references, then verify builds and source ownership without one giant scroll.</p>
-                            <div class="manual-diagnostics" aria-label="Manual diagnostics">
-                                <span>{allPages.length} routes indexed</span>
-                                <span>C11 + raylib</span>
-                                <span>TOML levels</span>
-                                <span>WASM cabinet</span>
-                            </div>
-                            <div class="docs-actions" aria-label="Primary manual actions">
-                                <a href={`${docsBase}/learning-path/`}>Start learning</a>
-                                <a href={playUrl}>Boot the cabinet</a>
-                            </div>
+                    <section class="manual-cover" style={coverStyle} aria-labelledby="manual-title">
+                        <div class="manual-cover-scene" aria-hidden="true">
+                            <Sprite sheet={art.player} scale={3} row={0} frames={4} fps={6} class="cover-player" />
                         </div>
-                        <div class="manual-status manual-gauge" aria-label="Documentation stats">
-                            <span>ROUTES</span>
-                            <strong>{allPages.length}</strong>
-                            <small>focused manual pages</small>
-                            <dl class="manual-gauge-list">
-                                {SECTION_CATEGORIES.map(cat => (
-                                    <div>
-                                        <dt>{cat.label}</dt>
-                                        <dd>{cat.ids.length}</dd>
-                                    </div>
-                                ))}
-                            </dl>
+                        <div class="manual-cover-text">
+                            <h1 id="manual-title">The Super Mango manual</h1>
+                            <p>
+                                {allPages.length} pages, written next to the code and checked against it.
+                                Here to learn? Start with Sandbox School. Looking for something
+                                specific? Everything is listed below, or filter the page list.
+                            </p>
+                            <div class="docs-actions">
+                                <a class="pixel-button pixel-button-gold" href={`${docsBase}/learning-path/`}>Start with Sandbox School</a>
+                                <a class="pixel-button pixel-button-ghost" href={playUrl}>Play the game</a>
+                            </div>
                         </div>
                     </section>
 
-                    <section class="manual-route-grid service-routing-matrix" aria-label="Manual routes">
+                    <section class="manual-toc" aria-label="All manual pages">
                         {categoryCards.map((cat) => (
-                            <article class="route-card" data-doc-card data-search-text={`${cat.label} ${cat.description} ${cat.pages.map(p => `${p.label} ${p.description}`).join(' ')}`}>
-                                <p class="card-kicker">{cat.kicker}</p>
+                            <div class="toc-group" data-doc-card data-search-text={`${cat.label} ${cat.description} ${cat.pages.map(p => `${p.label} ${p.description}`).join(' ')}`}>
                                 <h2>{cat.label}</h2>
                                 <p>{cat.description}</p>
                                 <ul>
                                     {cat.pages.map((page) => (
                                         <li>
-                                            <a href={page.id === 'home' ? docsBase : `${docsBase}/${page.id}/`}>
-                                                <span>{page.marker}</span>
-                                                {page.label}
+                                            <a href={pageHref(page.id)}>
+                                                <strong>{page.label}</strong>
+                                                <span>{page.description}</span>
                                             </a>
                                         </li>
                                     ))}
                                 </ul>
-                            </article>
+                            </div>
                         ))}
                     </section>
 
-                    <section class="manual-index" aria-labelledby="index-title">
-                        <div class="section-heading-row">
-                            <div>
-                                <p class="docs-kicker">FULL INDEX</p>
-                                <h2 id="index-title">Every manual page</h2>
-                            </div>
-                            <a href={repoUrl} target="_blank" rel="noopener noreferrer">Open source →</a>
-                        </div>
-                        <div class="index-list">
-                            {allPages.map((page, index) => (
-                                <a class="index-row" data-doc-card data-search-text={`${page.label} ${page.description} ${page.marker}`} href={page.id === 'home' ? docsBase : `${docsBase}/${page.id}/`}>
-                                    <span>{String(index + 1).padStart(2, '0')}</span>
-                                    <strong>{page.label}</strong>
-                                    <em>{page.description}</em>
-                                </a>
-                            ))}
-                        </div>
-                    </section>
-                    <section id="overview" class="doc-section doc-page service-page" aria-label="Project overview and quick start">
+                    <section id="overview" class="doc-page" aria-label="Project overview and quick start">
                         <CurrentContent />
                     </section>
                 </>
             ) : (
                 <>
-                    <div class="docs-breadcrumbs route-terminal" aria-label="Breadcrumb">
-                        <a href={docsBase}>Builder Manual</a>
-                        <span>/</span>
-                        <span>{pageMeta?.label ?? pageTitle}</span>
-                    </div>
-                    <section class="doc-route-header" aria-label="Current manual route">
-                        <p class="docs-kicker">{pageMeta?.marker ?? 'ROUTE'} / {pageMeta?.label ?? pageTitle}</p>
-                        <h1>{pageMeta?.label ?? pageTitle}</h1>
-                        <p>{pageMeta?.description ?? 'Source-backed service notes for the Super Mango cabinet.'}</p>
-                        <div class="manual-diagnostics">
-                            <a href={playUrl}>Boot cabinet</a>
-                            <a href={docsBase}>Manual index</a>
-                            <a href={editorUrl} target="_blank" rel="noopener noreferrer">Source markdown</a>
-                        </div>
-                    </section>
-                    <section id={requestedKey} class="doc-section doc-page service-page">
+                    <nav class="breadcrumbs" aria-label="Breadcrumb">
+                        <a href={`${docsBase}/`}>Manual</a>
+                        <span aria-hidden="true">/</span>
+                        <span>{currentCategory?.label ?? 'Page'}</span>
+                    </nav>
+                    <article id={requestedKey} class="doc-page">
                         <CurrentContent />
-                    </section>
-                    <nav class="doc-pager" aria-label="Documentation pagination">
+                    </article>
+                    <nav class="doc-pager" aria-label="Previous and next page">
                         {prevPage ? (
-                            <a class="pager-card previous" href={`${docsBase}/${prevPage.id === 'home' ? '' : `${prevPage.id}/`}`}>
-                                <span>Previous route</span>
+                            <a class="pager-card previous" href={pageHref(prevPage.id)}>
+                                <span>&larr; Previous</span>
                                 <strong>{prevPage.label}</strong>
                             </a>
                         ) : <span></span>}
                         {nextPage ? (
-                            <a class="pager-card next" href={`${docsBase}/${nextPage.id}/`}>
-                                <span>Next route</span>
+                            <a class="pager-card next" href={pageHref(nextPage.id)}>
+                                <span>Next &rarr;</span>
                                 <strong>{nextPage.label}</strong>
                             </a>
                         ) : <span></span>}
                     </nav>
-                    <div class="doc-feedback">
-                        <a href={editorUrl} target="_blank" rel="noopener noreferrer">Edit this page on GitHub</a>
-                        <a href={docsBase}>Back to manual index</a>
-                    </div>
+                    <p class="doc-feedback">
+                        Spotted something wrong or out of date? <a href={editorUrl} target="_blank" rel="noopener noreferrer">Suggest an edit on GitHub</a>.
+                    </p>
                 </>
             )}
         </main>
@@ -265,7 +229,7 @@ const pageDescription = currentPage?.data.description ?? pageMeta.description;
             menuToggle?.addEventListener('click', () => setMenu(!sidebar?.classList.contains('open')));
             overlay?.addEventListener('click', () => setMenu(false));
             navItems.forEach(item => item.addEventListener('click', () => {
-                if (window.innerWidth <= 768) setMenu(false);
+                if (window.innerWidth <= 900) setMenu(false);
             }));
 
             searchInput?.addEventListener('input', (event) => {
@@ -285,8 +249,8 @@ const pageDescription = currentPage?.data.description ?? pageMeta.description;
                 const visibleRoutes = navItems.filter(item => item.parentElement.style.display !== 'none').length;
                 if (searchStatus) {
                     searchStatus.textContent = query
-                        ? (visibleRoutes ? `${visibleRoutes} matching routes` : 'No routes found')
-                        : `${navItems.length} routes ready`;
+                        ? (visibleRoutes ? `${visibleRoutes} matching pages` : 'Nothing matches')
+                        : `${navItems.length} pages`;
                 }
             });
         });

@@ -1,5 +1,23 @@
 # DESIGN.md
 
+## Current direction (2026-10)
+
+The site is built from the game itself. The home page opens on a small level
+made of the real sprites (sky, mountains, clouds, grass drawn with the same
+9-slice the game uses, the walking hero, coins, a spider, a bird) with the
+start-menu logo as the title. Text sits in game-style boxes: thick black edges,
+an inner frame and a solid offset shadow instead of glows. The palette comes
+from the art (night blues, leaf green and mango red from the logo, coin gold for
+actions); Pixelify Sans is for headings and buttons, Atkinson Hyperlegible for
+reading, DM Mono only for code. Copy is first-person and specific: what the
+game is, why it was written, what you can learn, without status-panel jargon.
+The "learn" section shows a real excerpt of `src/core/game_loop.c`, read at
+build time so it cannot go stale. The manual shares the same tokens.
+
+Everything below is the earlier plan, kept as a record.
+
+---
+
 > Historical website design plan. Counts, payload examples and “current” findings
 > below describe the earlier design assessment. Several changes have since shipped.
 > Use `docs/src/generated/project.json`, the public manual and current source for
