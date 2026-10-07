@@ -12,6 +12,7 @@
 #include "input/game_events.h"
 #include "player/player_internal.h"
 #include "shared/platform.h"   /* clock_millis */
+#include "test_paths.h"         /* TEST_OUT scratch directory */
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -95,10 +96,10 @@ static int inspection_and_replay(void)
     Player recorded = gs.player;
     float elapsed = gs.completion.level_elapsed;
     int score = gs.score, checkpoint = gs.checkpoint_index;
-    remove("out/school-experiment.toml");
-    CHECK(game_experiment_save(&gs, "out/school-experiment.toml") == 0);
-    CHECK(game_experiment_save(&gs, "out/school-experiment.toml") == -1);
-    CHECK(game_experiment_load(&gs, "out/school-experiment.toml") == 0);
+    remove(TEST_OUT "school-experiment.toml");
+    CHECK(game_experiment_save(&gs, TEST_OUT "school-experiment.toml") == 0);
+    CHECK(game_experiment_save(&gs, TEST_OUT "school-experiment.toml") == -1);
+    CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment.toml") == 0);
     /* Replay through the same frame loop shape as game_frame: real frames of
      * 70 ms run several fixed steps each, one recorded row per step. */
     int replayed = 0;
@@ -118,11 +119,11 @@ static int inspection_and_replay(void)
     CHECK(NEAR(gs.player.vx, recorded.vx) && NEAR(gs.player.vy, recorded.vy));
     CHECK(NEAR(gs.completion.level_elapsed, elapsed) && gs.score == score && gs.checkpoint_index == checkpoint);
     CHECK(game_inspector_steps(&gs, 0.04f) == 0);
-    FILE *bad = fopen("out/school-experiment-invalid.toml", "w");
+    FILE *bad = fopen(TEST_OUT "school-experiment-invalid.toml", "w");
     CHECK(bad != NULL);
     fputs("format_version = 9\n", bad); fclose(bad);
     GameExperiment *before = gs.experiment;
-    CHECK(game_experiment_load(&gs, "out/school-experiment-invalid.toml") == -1 && gs.experiment == before);
+    CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment-invalid.toml") == -1 && gs.experiment == before);
     /* Rows are [input, 9 physics values]. Format 1 rows (with a leading
      * frame duration) came from the variable-timestep engine: refused. */
     const char *bad_rows[] = {
@@ -133,18 +134,18 @@ static int inspection_and_replay(void)
     };
     const int bad_versions[] = {2, 2, 2, 1};
     for (size_t i = 0; i < sizeof(bad_rows) / sizeof(bad_rows[0]); i++) {
-        bad = fopen("out/school-experiment-invalid.toml", "w");
+        bad = fopen(TEST_OUT "school-experiment-invalid.toml", "w");
         CHECK(bad != NULL);
         fprintf(bad, "format_version = %d\nlevel_path = \"fixture\"\nseed = 7\nlevel_hash = \"%016llx\"\nframes = [%s]\n",
                 bad_versions[i], (unsigned long long)gs.source_level_hash, bad_rows[i]);
         fclose(bad);
-        CHECK(game_experiment_load(&gs, "out/school-experiment-invalid.toml") == -1 && gs.experiment == before);
+        CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment-invalid.toml") == -1 && gs.experiment == before);
     }
     gs.source_level_hash ^= 1; /* Loaded bytes no longer match the file. */
     CHECK(game_experiment_begin(&gs) == -1 && gs.experiment == before);
     gs.source_level_hash ^= 1;
 done:
-    remove("out/school-experiment.toml"); remove("out/school-experiment-invalid.toml");
+    remove(TEST_OUT "school-experiment.toml"); remove(TEST_OUT "school-experiment-invalid.toml");
     game_cleanup(&gs);
     return failed;
 }
