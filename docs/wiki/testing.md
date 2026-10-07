@@ -60,7 +60,10 @@ It also runs `tests/validate_levels_test.py` and `tests/gen_sounds_test.py`. The
 cover static boot wiring, host lifecycle, storage conflicts, touch ownership,
 canvas keyboard scoping, native/WASM archive contracts and the CodeQL SARIF
 filter without a browser. Native harnesses cover parser/serializer, validation, runtime, editor,
-profile, checkpoint, simulation and session behavior.
+profile, checkpoint, simulation and session behavior. They write scratch files
+under the build's own `OUTDIR` (`TEST_OUT` in `tests/test_paths.h`), so
+`make test`, `make sanitize` and `make coverage` can run at the same time in one
+checkout.
 
 The session harness compiles the production display boundary's Web path against
 test-owned platform calls. It verifies that visible and hidden Web windows leave

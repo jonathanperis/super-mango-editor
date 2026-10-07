@@ -15,6 +15,7 @@
 
 #include "shared/serializer.h"
 #include "levels/level.h"
+#include "test_paths.h"         /* TEST_OUT scratch directory */
 
 static int fail(const char *msg)
 {
@@ -25,10 +26,10 @@ static int fail(const char *msg)
 static int ensure_out_dir(void)
 {
 #ifdef _WIN32
-    if (_mkdir("out") != 0 && errno != EEXIST)
+    if (_mkdir(MANGO_TEST_OUTDIR) != 0 && errno != EEXIST)
         return fail("could not create out directory");
 #else
-    if (mkdir("out", 0755) != 0 && errno != EEXIST)
+    if (mkdir(MANGO_TEST_OUTDIR, 0755) != 0 && errno != EEXIST)
         return fail("could not create out directory");
 #endif
     return 0;
@@ -448,9 +449,9 @@ enum { EXPECTED_SHIPPED_LEVEL_COUNT = 3 };
 
 /* Keep this explicit inventory aligned with levels/campaigns/main.toml. */
 static const ShippedLevel shipped_levels[] = {
-    {"levels/00_sandbox_01.toml", "out/test_roundtrip_01.toml"},
-    {"levels/01_lugio_01.toml", "out/test_roundtrip_02.toml"},
-    {"levels/02_lugio_02.toml", "out/test_roundtrip_03.toml"},
+    {"levels/00_sandbox_01.toml", TEST_OUT "test_roundtrip_01.toml"},
+    {"levels/01_lugio_01.toml", TEST_OUT "test_roundtrip_02.toml"},
+    {"levels/02_lugio_02.toml", TEST_OUT "test_roundtrip_03.toml"},
 };
 
 _Static_assert(sizeof(shipped_levels) / sizeof(shipped_levels[0]) ==
@@ -690,7 +691,7 @@ static int roundtrip_repo_levels(void)
 
 static int escaped_strings_roundtrip(void)
 {
-    const char *path = "out/test_escaped_strings.toml";
+    const char *path = TEST_OUT "test_escaped_strings.toml";
     LevelDef before;
     LevelDef after;
 
@@ -750,8 +751,8 @@ static int file_has_raw_control_bytes(const char *path)
 
 static int control_chars_roundtrip(void)
 {
-    const char *path = "out/test_control_chars.toml";
-    const char *recovery = "out/test_control_recovery.toml";
+    const char *path = TEST_OUT "test_control_chars.toml";
+    const char *recovery = TEST_OUT "test_control_recovery.toml";
     LevelDef before;
     LevelDef after;
     char destination[128];
@@ -804,8 +805,8 @@ static int symlinked_save_updates_target(void)
 #ifdef _WIN32
     return 0;
 #else
-    const char *target = "out/test_symlink_target.toml";
-    const char *link_path = "out/test_symlink_link.toml";
+    const char *target = TEST_OUT "test_symlink_target.toml";
+    const char *link_path = TEST_OUT "test_symlink_link.toml";
     char resolved[SERIALIZER_IO_PATH_MAX];
     LevelDef before;
     LevelDef after;
@@ -849,7 +850,7 @@ static int symlinked_save_updates_target(void)
 
 static int rich_level_roundtrip(void)
 {
-    const char *path = "out/test_rich_level_roundtrip.toml";
+    const char *path = TEST_OUT "test_rich_level_roundtrip.toml";
     LevelDef before;
     LevelDef after;
 
@@ -869,7 +870,7 @@ static int rich_level_roundtrip(void)
 
 static int independent_star_color_counts_roundtrip(void)
 {
-    const char *path = "out/test_star_color_counts.toml";
+    const char *path = TEST_OUT "test_star_color_counts.toml";
     LevelDef before;
     LevelDef after;
 
@@ -916,7 +917,7 @@ static int independent_star_color_counts_roundtrip(void)
 
 static int missing_physics_uses_engine_defaults(void)
 {
-    const char *path = "out/test_no_physics.toml";
+    const char *path = TEST_OUT "test_no_physics.toml";
     FILE *fp = fopen(path, "w");
     LevelDef def;
 
@@ -953,7 +954,7 @@ static int write_format_version_fixture(const char *path, const char *version)
 
 static int legacy_version_loads_as_current(void)
 {
-    const char *path = "out/test_legacy_format_version.toml";
+    const char *path = TEST_OUT "test_legacy_format_version.toml";
     LevelDef def;
 
     if (write_format_version_fixture(path, NULL) != 0)
@@ -972,7 +973,7 @@ static int legacy_version_loads_as_current(void)
 
 static int explicit_version_saves_first_and_roundtrips(void)
 {
-    const char *path = "out/test_explicit_format_version.toml";
+    const char *path = TEST_OUT "test_explicit_format_version.toml";
     LevelDef before;
     LevelDef after;
     FILE *fp;
@@ -1021,10 +1022,10 @@ static int rejects_invalid_format_versions_transactionally(void)
     expected.screen_count = 7;
 
     for (size_t i = 0; i < sizeof(versions) / sizeof(versions[0]); i++) {
-        char path[96];
+        char path[256];
         LevelDef actual = expected;
 
-        snprintf(path, sizeof(path), "out/test_bad_format_version_%zu.toml", i);
+        snprintf(path, sizeof(path), TEST_OUT "test_bad_format_version_%zu.toml", i);
         if (write_format_version_fixture(path, versions[i]) != 0)
             return fail("could not write invalid format version fixture");
         if (level_load_toml(path, &actual) == 0) {
@@ -1144,7 +1145,7 @@ static int strict_v1_fixture_suite(void)
 
 static int rejects_oversized_arrays(void)
 {
-    const char *path = "out/test_too_many_coins.toml";
+    const char *path = TEST_OUT "test_too_many_coins.toml";
     LevelDef def;
 
     if (write_too_many_coins_fixture(path) != 0)
@@ -1159,7 +1160,7 @@ static int rejects_oversized_arrays(void)
 
 static int rejects_oversized_checkpoints_transactionally(void)
 {
-    const char *path = "out/test_too_many_checkpoints.toml";
+    const char *path = TEST_OUT "test_too_many_checkpoints.toml";
     LevelDef expected;
     LevelDef actual;
 
@@ -1181,7 +1182,7 @@ static int rejects_oversized_checkpoints_transactionally(void)
 
 static int rejects_bad_runtime_links(void)
 {
-    const char *path = "out/test_bad_rail_link.toml";
+    const char *path = TEST_OUT "test_bad_rail_link.toml";
     LevelDef def;
 
     if (write_bad_rail_link_fixture(path) != 0)
@@ -1219,19 +1220,19 @@ static int expect_unsafe_toml_rejected(const char *path, const char *body)
 
 static int rejects_unsafe_toml_paths(void)
 {
-    if (expect_unsafe_toml_rejected("out/test_unsafe_music.toml",
+    if (expect_unsafe_toml_rejected(TEST_OUT "test_unsafe_music.toml",
                                     "music_path = \"../assets/sounds/levels/water.wav\"\n") != 0)
         return 1;
-    if (expect_unsafe_toml_rejected("out/test_unsafe_floor.toml",
+    if (expect_unsafe_toml_rejected(TEST_OUT "test_unsafe_floor.toml",
                                     "floor_tile_path = \"/tmp/grass.png\"\n") != 0)
         return 1;
-    if (expect_unsafe_toml_rejected("out/test_unsafe_layer.toml",
+    if (expect_unsafe_toml_rejected(TEST_OUT "test_unsafe_layer.toml",
                                     "[[background_layers]]\npath = \"assets/../secret.png\"\nspeed = 0.25\n") != 0)
         return 1;
-    if (expect_unsafe_toml_rejected("out/test_unsafe_platform.toml",
+    if (expect_unsafe_toml_rejected(TEST_OUT "test_unsafe_platform.toml",
                                     "[[platforms]]\nx = 64\ntile_height = 1\ntile_width = 1\ntile_path = \"../secret.png\"\n") != 0)
         return 1;
-    if (expect_unsafe_toml_rejected("out/test_unsafe_phase.toml",
+    if (expect_unsafe_toml_rejected(TEST_OUT "test_unsafe_phase.toml",
                                     "[last_star]\nx = 100\ny = 100\nnext_phase = \"../levels/evil.toml\"\n") != 0)
         return 1;
     return 0;
@@ -1241,7 +1242,7 @@ int parser_boundary_test(void);
 
 static int metadata_roundtrip_and_limits(void)
 {
-    const char *path="out/test_long_metadata.toml";
+    const char *path=TEST_OUT "test_long_metadata.toml";
     LevelDef before, after;
     level_def_init_defaults(&before);
     before.screen_count=1;
@@ -1270,7 +1271,7 @@ int main(void)
         "description = \"\\u", "player_start_x = 1e100\n"
     };
     for (size_t i = 0; i < sizeof(numeric_cases) / sizeof(numeric_cases[0]); i++) {
-        if (expect_unsafe_toml_rejected("out/test_unsafe_numeric.toml", numeric_cases[i])) return 1;
+        if (expect_unsafe_toml_rejected(TEST_OUT "test_unsafe_numeric.toml", numeric_cases[i])) return 1;
     }
     if (load_all_repo_levels() != 0) return 1;
     if (roundtrip_repo_levels() != 0) return 1;
