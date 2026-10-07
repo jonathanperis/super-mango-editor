@@ -380,7 +380,7 @@ make dist-wasm   # runs make web first when its outputs are stale
 
 ### `make docs-drift`
 
-Runs generated content-inventory/asset-budget, `tools/gen_sounds.py --check`, level-catalog and overlay-snapshot freshness checks, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. They compare documented test targets, README/guide summaries, source-map entries, campaign coverage, TOML example schemas, player API declarations, runtime flags, selected constants, level prose, workflow references and scripted-smoke wiring. Run the separate built-site check below for emitted links and metadata.
+Runs generated content-inventory/asset-budget, `tools/gen_sounds.py --check`, level-catalog and overlay-snapshot freshness checks, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. They compare documented test targets, README/guide summaries, source-map entries, campaign coverage, TOML example schemas, player API declarations, runtime flags, constant values, inspector keys, the render order, `make` targets and `src/` paths named in the manual, level prose, workflow references and scripted-smoke wiring. Run the separate built-site check below for emitted links and metadata.
 
 ```sh
 make docs-drift
