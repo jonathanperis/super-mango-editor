@@ -16,7 +16,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 | [Debugging C](debugging-c/) | Sanitizer reports, lldb/gdb on a real crash, and a quick profiling pass |
 | [C in This Codebase](c-concepts/) | Each C idea (ownership, `offsetof` tables, `goto` cleanup, overflow checks) mapped to where the game uses it |
 | [Mechanics Museum](mechanics-museum/) | Six standalone levels for focused inspection |
-| [Entity Walkthrough](entity-walkthrough/) | Trace a collectible through file format, runtime and editor |
+| [Entity Walkthrough](entity-walkthrough/) | Trace a collectible through file format, runtime and editor; the checklist for adding any entity |
 
 ### Engine & Code
 
@@ -49,7 +49,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 | [Build System](build-system/) | Makefile, compiler flags, build targets, prerequisites for all platforms |
 | [Level Design — TOML Reference](level-design/) | Full TOML schema for every entity type; minimum level template |
 | [Level Editor](level-editor/) | Visual editor: canvas, palette, properties, undo, play-test, file I/O |
-| [Developer Guide](developer-guide/) | Coding conventions, adding new entities, sound effects workflow |
+| [Developer Guide](developer-guide/) | Coding conventions, ownership rules, physics, sound, music and text workflows |
 | [Release Checklist](release-checklist/) | Source, docs, WebAssembly, archive, CI, and Pages gates before shipping |
 
 ---
