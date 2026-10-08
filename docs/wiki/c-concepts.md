@@ -43,7 +43,7 @@ dereference you get once the owner clears its pointer.
 | Idea | Where to read it | What to notice |
 |------|------------------|----------------|
 | One big struct that holds everything | `GameState` in `src/game.h` | `Player player;` and `Coin coins[MAX_COINS];` are stored by value inside it, not as separate allocations. One `calloc` in `session_make_game()` (`src/core/app_session.c`) creates all of it, already zeroed. |
-| Fixed limits instead of resizing | `MAX_COINS` in `src/collectibles/coin.h`; `MAX_FLOOR_GAPS` and friends in `src/game.h` | A level can never need more memory than the limits allow, so there is no `realloc` during play and nothing to free per entity. |
+| Fixed limits instead of resizing | `MAX_COINS` in `src/collectibles/coin.h`; `MAX_FLOOR_GAPS` and friends in `src/game_constants.h` | A level can never need more memory than the limits allow, so there is no `realloc` during play and nothing to free per entity. |
 | Checking the count before copying | `level_validate_counts()` in `src/levels/level_validate.c`; `LOAD_XY_ARRAY` in `src/shared/serializer_load_collectibles.c` | A count larger than the array is rejected before the copy loop runs. A fixed array is only safe if every writer checks this. |
 | Immutable data versus live state | `CoinPlacement` in `LevelDef` versus `Coin` in `GameState`; `load_coins()` in `src/levels/level_loader.c` | The level file's data stays untouched; `load_coins()` copies it into the runtime array and sets `active = 1`. A restart copies again instead of "undoing" changes. |
 | Designated initializers | `main()` in `src/main.c` (`AppSessionConfig config = {.profile_enabled = 1};`) | Named fields are set and every other member starts at zero. |

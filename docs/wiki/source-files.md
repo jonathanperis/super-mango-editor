@@ -18,7 +18,8 @@ On this page: [File map](#file-map) · [`main.c`](#mainc) · [`game.h`](#gameh) 
 ```
 src/
 ├── main.c                        CLI entry point; AppSession owns platform lifetime
-├── game.h                        Shared constants + GameState struct (included everywhere)
+├── game.h                        GameState struct; includes game_constants.h
+├── game_constants.h              Window, world, floor and camera #defines (no other includes)
 ├── collectibles/
 │   ├── coin.h / .c               Coin collectible: placement, AABB collection, render
 │   ├── health_star.h / .c        Yellow/green/red star health pickups (one module)
@@ -213,13 +214,18 @@ On failure at any step, all previously-succeeded subsystems are torn down before
 
 ## `game.h`
 
-**Role:** Gameplay's umbrella header: constants, shared resource groups and
-`GameState`. Gameplay modules use it; smaller shared helpers and editor modules
-also have their own focused headers.
+**Role:** Gameplay's umbrella header: shared resource groups and `GameState`,
+plus the shared constants through `game_constants.h`. Gameplay modules use it;
+smaller shared helpers and editor modules also have their own focused headers.
 
 ### Constants
 
-See [Constants Reference](../constants-reference/) for full details.
+The shared numbers live in `src/game_constants.h`, which includes nothing
+else. `game.h` includes it, so any file with `game.h` sees them; a file that
+needs only the numbers (most entity, hazard, surface and effect `.c` files)
+includes `game_constants.h` instead. Changing `GameState`, or one of the
+headers `game.h` pulls in for it, then does not recompile those files. See
+[Constants Reference](../constants-reference/) for full details.
 
 ```c
 #define WINDOW_TITLE  "Super Mango"
@@ -244,7 +250,7 @@ See [Constants Reference](../constants-reference/) for full details.
 
 `GameState` is deliberately one struct that stores every entity array by
 value, so `game.h` includes exactly the headers whose structs or `MAX_*`
-constants that definition needs — nothing else. Call-only helpers such as
+constants that definition needs, plus `game_constants.h` — nothing else. Call-only helpers such as
 `shared/platform.h` (`clock_millis`, `str_copy`) are included by the `.c` files
 that use them. Splitting `GameState` would hide less but also be harder to
 trace; the comment at the top of `game.h` explains the trade-off.

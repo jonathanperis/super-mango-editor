@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 #include "spike.h"
-#include "../game.h"   /* FLOOR_Y, TILE_SIZE, GAME_W */
+#include "../game_constants.h" /* FLOOR_Y, TILE_SIZE, GAME_W */
 
 /* ------------------------------------------------------------------ */
 

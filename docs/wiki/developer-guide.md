@@ -135,7 +135,7 @@ if (entity->x < 0.0f)                entity->x = 0.0f;
 if (entity->x > world_w - entity->w) entity->x = (float)(world_w - entity->w);
 ```
 
-`GRAVITY`, `FLOOR_Y`, `GAME_W`, and `GAME_H` are all defined in `game.h` and available to any file that includes it. See [Constants Reference](../constants-reference/) for values.
+`GRAVITY`, `FLOOR_Y`, `GAME_W`, and `GAME_H` are all defined in `game_constants.h`. An entity `.c` file that needs only these numbers includes that header; `game.h` includes it too, so files that use `GameState` already have them. See [Constants Reference](../constants-reference/) for values.
 
 This example is a simplified solid-floor integrator. Pass the active
 `gs->runtime.world_w` as `world_w`; real player movement also resolves gaps,

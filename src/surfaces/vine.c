@@ -14,7 +14,7 @@
  * hangs toward the ground, matching the classic hanging-vine look.
  */
 #include "vine.h"
-#include "game.h"   /* FLOOR_Y, GAME_W */
+#include "game_constants.h" /* FLOOR_Y, GAME_W */
 
 /* ------------------------------------------------------------------ */
 
