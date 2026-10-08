@@ -75,20 +75,35 @@ static void apply_replay_action(GameState *gs, int key, const char *action)
     }
 }
 
-static const char *replay_script_path(const char *name)
+/* Where `make scripted-smoke` writes its scripts when no --replay-dir is
+ * given, relative to the working directory (the repository root). */
+#define DEFAULT_REPLAY_DIR "out/replays-smoke"
+
+/* Only these script names are accepted, so --replay-script cannot name an
+ * arbitrary file; --replay-dir only chooses the folder they are read from. */
+static const char *replay_script_file(const char *name)
 {
-    if (strcmp(name, "move-right") == 0) return "out/replays-smoke/move-right.replay";
-    if (strcmp(name, "jump-right") == 0) return "out/replays-smoke/jump-right.replay";
-    if (strcmp(name, "pause-resume") == 0) return "out/replays-smoke/pause-resume.replay";
+    if (strcmp(name, "move-right") == 0) return "move-right.replay";
+    if (strcmp(name, "jump-right") == 0) return "jump-right.replay";
+    if (strcmp(name, "pause-resume") == 0) return "pause-resume.replay";
     return NULL;
 }
 
 int game_replay_load(GameState *gs)
 {
     if (!gs->replay_script_path[0]) return 0;
-    const char *replay_path = replay_script_path(gs->replay_script_path);
-    if (!replay_path) {
+    const char *file = replay_script_file(gs->replay_script_path);
+    if (!file) {
         fprintf(stderr, "Error: unknown replay script '%s'\n", gs->replay_script_path);
+        return -1;
+    }
+    const char *dir = gs->replay_dir[0] ? gs->replay_dir : DEFAULT_REPLAY_DIR;
+    /* replay_dir holds at most 255 bytes, so this buffer fits any folder
+     * plus "/" and the longest script name; the check keeps that true. */
+    char replay_path[sizeof(gs->replay_dir) + 32];
+    int written = snprintf(replay_path, sizeof(replay_path), "%s/%s", dir, file);
+    if (written < 0 || (size_t)written >= sizeof(replay_path)) {
+        fprintf(stderr, "Error: replay script path is too long\n");
         return -1;
     }
     FILE *fp = fopen(replay_path, "r");

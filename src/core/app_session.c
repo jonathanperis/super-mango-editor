@@ -200,6 +200,7 @@ static GameState *session_make_game(AppSession *session, const char *path, const
     game->smoke_test_frames = session->smoke_test_frames;
     copy_path(game->level_path, sizeof(game->level_path), path);
     copy_path(game->replay_script_path, sizeof(game->replay_script_path), session->replay_script_path);
+    copy_path(game->replay_dir, sizeof(game->replay_dir), session->replay_dir);
     if (game_init(game)) {
         free(game);
         return NULL;
@@ -413,7 +414,8 @@ AppSession *session_create(const AppSessionConfig *config)
     if (!session) return NULL;
     game_profile_init(&session->profile);
     if ((level && strlen(level) >= sizeof(session->boot_level_path)) ||
-        (config && config->replay_script_path && strlen(config->replay_script_path) >= sizeof(session->replay_script_path))) {
+        (config && config->replay_script_path && strlen(config->replay_script_path) >= sizeof(session->replay_script_path)) ||
+        (config && config->replay_dir && strlen(config->replay_dir) >= sizeof(session->replay_dir))) {
         free(session);
         return NULL;
     }
@@ -422,6 +424,7 @@ AppSession *session_create(const AppSessionConfig *config)
     session->smoke_test_frames = config ? config->smoke_test_frames : 0;
     if (config && config->hooks) session->hooks = *config->hooks;
     copy_path(session->replay_script_path, sizeof(session->replay_script_path), config ? config->replay_script_path : NULL);
+    copy_path(session->replay_dir, sizeof(session->replay_dir), config ? config->replay_dir : NULL);
     /* Acquire process resources before a screen loads GPU/audio assets. Tests
      * can supply a context; production creates one here and retains it across
      * menu/game transitions. The game requires an audio device to start. */
