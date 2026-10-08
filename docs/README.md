@@ -54,7 +54,8 @@ contract; do not generate an npm lockfile.
 | SEO and shared page shell | `src/layouts/BaseLayout.astro` |
 | Styles | `src/styles/globals.css` (shared tokens, sprites, pixel buttons), `src/styles/home.css`, `src/styles/docs.css`, `src/styles/not-found.css` |
 | Production origin/base | `astro.config.mjs`; keep `public/robots.txt` consistent |
-| Favicons | `public/favicon.ico`, `favicon.png`, `favicon-32x32.png`, `apple-touch-icon.png`, all written by `python3 tools/generate_favicon.py` (needs Pillow); edit the script and rerun it rather than the images |
+| Favicons | `public/favicon.ico`, `favicon.png`, `favicon-32x32.png`, `apple-touch-icon.png`, all cut from the game's sprites by `python3 tools/generate_favicon.py` (needs Pillow); edit the script and rerun it rather than the images |
+| Link preview image | `public/og-image.png` (1200x630), a screenshot of `tools/og-image.html` taken by `python3 tools/render_og_image.py` (needs Google Chrome); edit the template and rerun it rather than the image |
 | Landing-page Content-Security-Policy | `integrations/home-csp.mjs` (hashes inline scripts after build; see `SECURITY.md`) |
 
 Add a manual page in `wiki/`, register its ID/metadata/category in `docsSidebar.ts`,

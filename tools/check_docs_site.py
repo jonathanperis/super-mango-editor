@@ -88,6 +88,11 @@ def check_site(out: Path) -> list[str]:
         for key in ("og:description", "twitter:description"):
             if page.meta.get(key) != description:
                 failures.append(f"{relative}: {key} differs from page description")
+        # Link previews fetch the image by absolute URL, so it must be one of ours.
+        for key in ("og:image", "twitter:image"):
+            image = local_file(page.meta.get(key, ""))
+            if image is None or not image.is_file():
+                failures.append(f"{relative}: {key} must point at an image in the build")
         for link in page.links:
             target_url = urljoin(url, link)
             target = local_file(target_url)

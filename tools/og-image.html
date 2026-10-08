@@ -1,0 +1,132 @@
+<!doctype html>
+<!--
+  Template for docs/public/og-image.png, the 1200x630 picture link previews
+  show. tools/render_og_image.py screenshots it with headless Chrome. Like the
+  home page's title screen, it is built from the game's real sprites at whole
+  pixel scales, with the site's colours, fonts and game-style text box.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;600;700&display=block" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    position: relative;
+    width: 1200px;
+    height: 630px;
+    overflow: hidden;
+    background: #8fd0f4;
+    color: #f4ead6;
+    font-family: 'Pixelify Sans', monospace;
+    --ground-h: 112px;
+  }
+  /* Background tiles at 2x, as on the home page. */
+  .layer {
+    position: absolute;
+    inset: 0;
+    background-repeat: repeat-x;
+    background-size: 768px 432px;
+    background-position: 0 100%;
+    image-rendering: pixelated;
+  }
+  .sky { background-image: url('../assets/sprites/backgrounds/sky_blue.png'); background-size: 768px 100%; }
+  .clouds { background-image: url('../assets/sprites/backgrounds/clouds_bg.png'); bottom: 96px; }
+  .mountains { background-image: url('../assets/sprites/backgrounds/glacial_mountains.png'); bottom: 56px; }
+  .clouds-near { background-image: url('../assets/sprites/backgrounds/clouds_mg_1.png'); bottom: 46px; }
+  /* The grass tileset as a 9-slice, its rounded ends pushed off the edges. */
+  .ground {
+    position: absolute;
+    left: -32px;
+    right: -32px;
+    bottom: -32px;
+    height: calc(var(--ground-h) + 32px);
+    border-style: solid;
+    border-image: url('../assets/sprites/levels/grass_tileset.png') 16 fill / 32px repeat;
+    image-rendering: pixelated;
+  }
+  /* One sprite frame: --w/--h is the frame size, --sw/--sh the sheet size,
+   * all already multiplied by the scale; --x/--y pick the frame. */
+  .sprite {
+    position: absolute;
+    width: var(--w);
+    height: var(--h);
+    background-repeat: no-repeat;
+    background-size: var(--sw) var(--sh);
+    background-position: var(--x, 0) var(--y, 0);
+    image-rendering: pixelated;
+  }
+  /* Mango's idle frame at 8x. The game sinks the 48 px frame 16 px into the
+   * floor (FLOOR_SINK), 128 px at 8x. */
+  .mango {
+    left: 690px;
+    bottom: calc(var(--ground-h) - 128px);
+    --w: 384px; --h: 384px; --sw: 1536px; --sh: 2304px;
+    background-image: url('../assets/sprites/player/player.png');
+  }
+  .coin { --w: 64px; --h: 64px; --sw: 64px; --sh: 64px; background-image: url('../assets/sprites/collectibles/coin.png'); }
+  .coin-1 { left: 770px; top: 268px; }
+  .coin-2 { left: 850px; top: 222px; }
+  .coin-3 { left: 930px; top: 268px; }
+  .star { left: 1090px; top: 300px; --w: 64px; --h: 64px; --sw: 64px; --sh: 64px; background-image: url('../assets/sprites/collectibles/star_yellow.png'); }
+  .bird { left: 1020px; top: 64px; --w: 144px; --h: 144px; --sw: 432px; --sh: 144px; --x: -144px; background-image: url('../assets/sprites/entities/bird.png'); }
+  /* The spider's feet are 16 px above its frame bottom: 48 px at 3x. */
+  .spider { left: 1040px; bottom: calc(var(--ground-h) - 48px); --w: 192px; --h: 144px; --sw: 576px; --sh: 144px; background-image: url('../assets/sprites/entities/spider.png'); }
+
+  /* The start-menu logo at 5x, with the title screen's hard shadow. */
+  .logo {
+    left: 60px;
+    top: 34px;
+    --w: 320px; --h: 240px; --sw: 320px; --sh: 240px;
+    background-image: url('../assets/sprites/screens/start_menu_logo.png');
+    filter: drop-shadow(6px 6px 0 rgba(0, 0, 0, 0.35));
+  }
+  /* The home page's dialog box: thick black edge, inner frame, solid shadow. */
+  .dialog {
+    position: absolute;
+    left: 64px;
+    top: 290px;
+    width: 660px;
+    padding: 24px 30px 22px;
+    background: #1a2442;
+    border: 4px solid #000;
+    box-shadow: inset 0 0 0 3px #2c3a66, 8px 8px 0 #000;
+  }
+  .lead { font-size: 35px; font-weight: 600; line-height: 1.2; }
+  .meta { margin-top: 16px; font-size: 22px; font-weight: 500; color: #8a93ad; }
+  .meta span + span::before { content: '\00b7'; padding: 0 0.5em; color: #2c3a66; }
+  .url {
+    position: absolute;
+    left: 64px;
+    bottom: 30px;
+    font-size: 26px;
+    font-weight: 600;
+    text-shadow: 3px 3px 0 #000;
+  }
+</style>
+</head>
+<body>
+  <div class="layer sky"></div>
+  <div class="layer clouds"></div>
+  <div class="layer mountains"></div>
+  <div class="layer clouds-near"></div>
+
+  <div class="sprite bird"></div>
+  <div class="sprite coin coin-1"></div>
+  <div class="sprite coin coin-2"></div>
+  <div class="sprite coin coin-3"></div>
+  <div class="sprite star"></div>
+  <div class="sprite mango"></div>
+  <div class="sprite spider"></div>
+  <div class="ground"></div>
+
+  <div class="sprite logo"></div>
+  <div class="dialog">
+    <p class="lead">A little platformer written in C.<br>Play it here, then take it apart.</p>
+    <p class="meta"><span>Plays in your browser</span><span>Level editor</span><span>MIT</span></p>
+  </div>
+  <p class="url">jonathanperis.github.io/super-mango-editor</p>
+</body>
+</html>
