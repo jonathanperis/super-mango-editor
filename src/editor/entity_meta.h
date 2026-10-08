@@ -68,6 +68,11 @@ Texture2D *editor_entity_texture(const EntityTextures *textures, EntityType type
  * GAME_W each, the same rule level validation uses. */
 float editor_world_width(const LevelDef *level);
 
+/* The floor gap x closest to x, for flames: a flame's x is the gap it
+ * erupts from, so validation only accepts an x that names a gap.  Returns
+ * x unchanged when the level has no gaps. */
+float editor_nearest_floor_gap(const LevelDef *level, float x);
+
 /* Central LevelDef count and selection safety helpers. */
 int editor_entity_count(const LevelDef *level, EntityType type);
 

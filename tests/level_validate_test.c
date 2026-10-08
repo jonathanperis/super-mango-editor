@@ -501,6 +501,58 @@ static int expect_rejected_flame_gap_outside_world(void)
     return 0;
 }
 
+/* A flame's x is the gap it erupts from, so it must name a real floor gap;
+ * x = 0 is the gap at the world's left edge, not a "not placed" marker. */
+static int expect_flames_on_floor_gaps(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    def.screen_count = 2;
+    def.floor_gap_count = 2;
+    def.floor_gaps[0] = 0;
+    def.floor_gaps[1] = 640;
+    def.blue_flame_count = 2;
+    def.blue_flames[0].x = 0.0f;
+    def.blue_flames[1].x = 640.0f;
+    def.fire_flame_count = 1;
+    def.fire_flames[0].x = 640.0f;
+    if (level_validate_runtime(&def, err, sizeof(err)) != 0) {
+        fprintf(stderr, "level_validate_test: flames on gaps rejected: %s\n", err);
+        return 1;
+    }
+
+    def.blue_flames[1].x = 320.0f;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+        strstr(err, "blue_flames[1].x is 320.00 (must match a floor gap x)") == NULL) {
+        fprintf(stderr, "level_validate_test: blue flame on solid floor should fail clearly\n");
+        return 1;
+    }
+
+    /* Off by a fraction of a pixel is still not the gap the loader uses. */
+    def.blue_flames[1].x = 640.0f;
+    def.fire_flames[0].x = 640.5f;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+        strstr(err, "fire_flames[0].x") == NULL) {
+        fprintf(stderr, "level_validate_test: fire flame off its gap should fail\n");
+        return 1;
+    }
+
+    /* No gaps at all: there is nowhere for a flame to erupt from. */
+    def.floor_gap_count = 0;
+    def.fire_flame_count = 0;
+    def.blue_flame_count = 1;
+    def.blue_flames[0].x = 0.0f;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+        strstr(err, "must match a floor gap x") == NULL) {
+        fprintf(stderr, "level_validate_test: flame without any gap should fail\n");
+        return 1;
+    }
+
+    return 0;
+}
+
 /*
  * A pad relaunches the player every step and never lets them jump, so a
  * launch weaker than JUMP_VY (or pointing down) would trap them on it.
@@ -892,6 +944,7 @@ int main(void)
     if (expect_rejected_nonfinite_values() != 0) return 1;
     if (expect_rejected_bad_enum_values() != 0) return 1;
     if (expect_rejected_flame_gap_outside_world() != 0) return 1;
+    if (expect_flames_on_floor_gaps() != 0) return 1;
     if (expect_rejected_climbable_extents() != 0) return 1;
     if (expect_bouncepads_launch_upward() != 0) return 1;
     if (expect_rail_speeds_forward_and_bounded() != 0) return 1;
