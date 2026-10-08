@@ -13,7 +13,7 @@
 #include "../core/game_random.h"
 
 #include "fog.h"
-#include "game.h"       /* GAME_W, GAME_H (logical canvas)  */
+#include "game_constants.h" /* GAME_W, GAME_H (logical canvas)  */
 
 /* ------------------------------------------------------------------ */
 /* Tuning constants                                                    */

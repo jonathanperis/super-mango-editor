@@ -11,7 +11,7 @@
 #include <math.h>   /* fabsf */
 
 #include "bridge.h"
-#include "game.h"   /* FLOOR_Y, TILE_SIZE, GAME_H */
+#include "game_constants.h" /* FLOOR_Y, TILE_SIZE, GAME_H */
 
 /* ------------------------------------------------------------------ */
 

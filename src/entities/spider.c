@@ -7,7 +7,7 @@
  * No player collision is handled here; that comes in a later pass.
  */
 #include "spider.h"
-#include "../game.h"                /* FLOOR_Y, GAME_W, FLOOR_GAP_W */
+#include "../game_constants.h"      /* FLOOR_Y, GAME_W, FLOOR_GAP_W */
 #include "../core/entity_utils.h"  /* patrol_update, patrol_gap_reverse, animate_frame_ms */
 
 /* ------------------------------------------------------------------ */

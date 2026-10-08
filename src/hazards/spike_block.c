@@ -7,7 +7,7 @@
 
 #include "spike_block.h"
 #include "../surfaces/rail.h"
-#include "../game.h"   /* GAME_W, GAME_H, GRAVITY — waiting and falling off a rail */
+#include "../game_constants.h" /* GAME_W, GAME_H, GRAVITY — waiting and falling off a rail */
 
 /* ------------------------------------------------------------------ */
 

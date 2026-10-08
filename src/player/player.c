@@ -14,7 +14,7 @@
 #include "../surfaces/bridge.h"         /* Bridge — for one-way landing collision on bridges         */
 #include "../surfaces/ladder.h"         /* LadderDecor — climbable, same mechanics as vine          */
 #include "../surfaces/rope.h"           /* RopeDecor — climbable, same mechanics as vine            */
-#include "../game.h"                    /* GRAVITY — vertical acceleration */
+#include "../game_constants.h"          /* GRAVITY — vertical acceleration */
 #include <math.h>                       /* fabsf */
 
 /* ------------------------------------------------------------------ */

@@ -5,7 +5,7 @@
 #include "player_surfaces.h"
 
 #include "player_internal.h"
-#include "../game.h"  /* FLOOR_Y, FLOOR_GAP_W */
+#include "../game_constants.h" /* FLOOR_Y, FLOOR_GAP_W */
 
 /*
  * FLOAT_PLATFORM_STICK_TOL — tolerance in logical pixels for the stay-on check.

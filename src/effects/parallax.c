@@ -15,7 +15,7 @@
 #include <stdio.h>      /* fprintf, stderr                        */
 
 #include "parallax.h"
-#include "game.h"       /* GAME_W, GAME_H                         */
+#include "game_constants.h" /* GAME_W, GAME_H                         */
 
 /* ------------------------------------------------------------------ */
 /* Layer configuration table                                          */

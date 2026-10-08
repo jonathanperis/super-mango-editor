@@ -2,7 +2,7 @@
 
 <a id="home"></a>
 
-On this page: [`game.h`](#gameh-constants) · [Player](#player-constants) ·
+On this page: [`game_constants.h`](#game_constantsh-constants) · [Player](#player-constants) ·
 [Animation tables](#animation-tables-in-player_animationc) ·
 [Movement defaults](#movement-defaults-in-player_lifecyclec) ·
 [Jump and climb](#jump--climb-constants) · [Audio](#audio-units-and-voice-limit) ·
@@ -21,9 +21,12 @@ A curated reference for gameplay-facing compile-time constants in the codebase. 
 
 ---
 
-## `game.h` Constants
+## `game_constants.h` Constants
 
-These are available to every file that `#include "game.h"`.
+These live in `src/game_constants.h`. `game.h` includes it, so they are
+available to every file that `#include "game.h"`; a file that needs only
+these numbers includes `game_constants.h` on its own and does not depend on
+`GameState`.
 
 ### Window
 

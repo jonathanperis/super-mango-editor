@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 #include "platform.h"
-#include "game.h"   /* FLOOR_Y, TILE_SIZE */
+#include "game_constants.h" /* FLOOR_Y, TILE_SIZE */
 
 /* ------------------------------------------------------------------ */
 

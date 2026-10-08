@@ -14,7 +14,7 @@
 #include <math.h>   /* fabsf */
 
 #include "jumping_spider.h"
-#include "../game.h"                /* FLOOR_Y, GAME_W, FLOOR_GAP_W */
+#include "../game_constants.h"      /* FLOOR_Y, GAME_W, FLOOR_GAP_W */
 #include "../core/entity_utils.h"  /* patrol_update, animate_frame_ms */
 
 #define JSPIDER_AUDIBLE_RANGE  ((float)GAME_W)

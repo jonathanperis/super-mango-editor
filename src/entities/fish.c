@@ -10,7 +10,7 @@
 #include "../core/game_random.h"
 
 #include "fish.h"
-#include "../game.h"               /* GRAVITY */
+#include "../game_constants.h"     /* GRAVITY */
 #include "../core/entity_utils.h"  /* animate_frame_ms */
 
 /* Tuning for the regular fish; faster_fish.c defines its own FishSpec. */

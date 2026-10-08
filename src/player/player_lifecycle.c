@@ -6,7 +6,7 @@
 
 #include "player.h"
 #include "player_internal.h"
-#include "../game.h"  /* FLOOR_Y, TILE_SIZE — spawn/reset placement */
+#include "../game_constants.h" /* FLOOR_Y, TILE_SIZE — spawn/reset placement */
 
 /* ---- Horizontal movement physics (default values) ------------------------
  *
