@@ -9,7 +9,7 @@
 #include "../shared/graphics.h"
 
 #include "last_star.h"
-#include "game.h"   /* FLOOR_Y, TILE_SIZE, GAME_W */
+#include "game_constants.h" /* FLOOR_Y, TILE_SIZE, GAME_W */
 
 /* ------------------------------------------------------------------ */
 

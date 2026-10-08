@@ -252,7 +252,7 @@ is a drawing boundary type. Two hitboxes that merely touch edges do not overlap.
 
 ## GameState Struct
 
-Defined in `game.h`. The **single container** for active-game resources; `AppSession` owns app-wide runtime state and the active screen.
+Defined in `game.h`. The **single container** for active-game resources; `AppSession` owns app-wide runtime state and the active screen. The plain numbers it and the entity code share (`GAME_W`, `FLOOR_Y`, `GRAVITY`, `MAX_FLOOR_GAPS`, camera tuning) live in `game_constants.h`, which `game.h` includes; entity, hazard, surface and effect `.c` files that need only those numbers include `game_constants.h` alone, so a `GameState` change does not recompile them.
 
 ```c
 typedef struct {

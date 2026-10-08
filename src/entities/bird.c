@@ -14,7 +14,7 @@
 #include <math.h>   /* fabsf, sinf */
 
 #include "../core/entity_utils.h"
-#include "../game.h"               /* GAME_W */
+#include "../game_constants.h"     /* GAME_W */
 
 /* Loudest wing flap, heard right next to the player. */
 #define BIRD_FLAP_VOL_MAX 67

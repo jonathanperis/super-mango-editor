@@ -7,7 +7,7 @@
 
 #include "float_platform.h"
 #include "rail.h"
-#include "game.h"   /* GAME_H, GRAVITY */
+#include "game_constants.h" /* GAME_H, GRAVITY */
 
 /* ------------------------------------------------------------------ */
 

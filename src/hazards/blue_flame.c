@@ -15,7 +15,7 @@
 #include <stdio.h>
 
 #include "blue_flame.h"
-#include "../game.h"   /* FLOOR_Y, TILE_SIZE, GAME_W, FLOOR_GAP_W */
+#include "../game_constants.h" /* FLOOR_Y, TILE_SIZE, GAME_W, FLOOR_GAP_W */
 
 /* ------------------------------------------------------------------ */
 

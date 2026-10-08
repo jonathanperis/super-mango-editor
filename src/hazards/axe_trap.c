@@ -12,7 +12,7 @@
 #include <stdio.h>
 
 #include "axe_trap.h"
-#include "../game.h"               /* FLOOR_Y, TILE_SIZE, platforms — for placement */
+#include "../game_constants.h"     /* FLOOR_Y, TILE_SIZE — for placement */
 #include "../core/entity_utils.h"  /* sound_volume_for_distance */
 
 #ifndef M_PI

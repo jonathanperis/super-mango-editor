@@ -4,7 +4,7 @@
  * See water.h for sprite layout details and rendering strategy.
  */
 #include "water.h"
-#include "game.h"   /* GAME_W, GAME_H */
+#include "game_constants.h" /* GAME_W, GAME_H */
 #include <stdio.h>
 
 /* ─── public API ──────────────────────────────────────────────────── */
