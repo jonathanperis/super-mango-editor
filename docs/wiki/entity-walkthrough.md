@@ -171,9 +171,10 @@ That one row gives Token its name, its palette group, its capacity, where
 its placements live in `LevelDef` (`STORED_IN` records the array and count
 with `offsetof`) and the sprite the Place tool shows under the cursor.
 Reading, writing, inserting and removing placements, counts and capacity
-checks, undo and the palette all work from it. Both `s_entity_meta` and the
-property-panel table are sized by their rows, so until the Token row exists a
-`_Static_assert` stops the build with "needs one row per EntityType".
+checks, undo, the palette and the status-bar entity total all work from it.
+Both `s_entity_meta` and the property-panel table are sized by their rows,
+so until the Token row exists a `_Static_assert` stops the build with "needs
+one row per EntityType".
 
 The rest is behaviour: code that does different arithmetic on each
 placement struct. Follow the existing `ENT_COIN` code in each place:
@@ -188,7 +189,6 @@ placement struct. Follow the existing `ENT_COIN` code in each place:
 | `tools.c` | Clamp case in `editor_clamp_placement()`, move case in `move_placement()` and defaults in `default_placement()` |
 | `editor_clipboard.c` | Add the `offset_pasted_copy()` case; the shared `editor_add_placement()` already refuses a full array |
 | `editor_session.c` | Add `EDITOR_HASH_ARRAY` for tokens to the document hash so the dirty marker sees Token edits |
-| `editor_chrome.c` | Include `token_count` in the status-bar entity total |
 
 You do not have to remember the switches: they have no `default:` case, so
 with `-Wall` the compiler names every `switch` that has no `ENT_TOKEN` case
@@ -268,6 +268,6 @@ automatically. A brand-new source directory needs its own wildcard line there.
 - [ ] Render call in `src/render/game_render.c` at the right layer
 - [ ] Texture row in `game_resources.c` (and `game_resources_require_level_textures()` if optional)
 - [ ] Hitbox in `src/core/debug.c` and `debug_log()` calls for significant events
-- [ ] Editor integration (section 5): the `s_entity_meta` row and palette slot, undo union, property panel, hit test, canvas, tools, clipboard, document hash, status bar
+- [ ] Editor integration (section 5): the `s_entity_meta` row and palette slot, undo union, property panel, hit test, canvas, tools, clipboard, document hash
 - [ ] Tests (section 6), then `make builder test CC=clang`, `make validate-levels`, `make docs-drift`
 - [ ] Play it with `make run-level-debug LEVEL=...` and check the hitboxes match the sprite
