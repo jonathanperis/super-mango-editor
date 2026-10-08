@@ -506,6 +506,31 @@ int editor_entity_count(const LevelDef *level, EntityType type)
     return count > capacity ? capacity : count;
 }
 
+/*
+ * editor_placed_entity_total — What the status bar shows as "Entities: N".
+ *
+ * Walking the table instead of listing count fields by hand means a type
+ * added later (as checkpoints were) is counted without anyone having to
+ * remember the status bar.  The player spawn is left out: every level has
+ * exactly one, so it is not something the designer placed.  The Last Star
+ * counts once it has a position, the same "unset" rule the loader uses.
+ */
+int editor_placed_entity_total(const LevelDef *level)
+{
+    int total = 0;
+
+    if (!level) return 0;
+    for (int type = 0; type < ENT_COUNT; type++) {
+        if (type == ENT_PLAYER_SPAWN) continue;
+        if (type == ENT_LAST_STAR) {
+            if (level->last_star.x != 0.0f || level->last_star.y != 0.0f) total++;
+            continue;
+        }
+        total += editor_entity_count(level, (EntityType)type);
+    }
+    return total;
+}
+
 /* ------------------------------------------------------------------ */
 /* Read / write / insert / remove one placement                        */
 /* ------------------------------------------------------------------ */

@@ -322,7 +322,8 @@ static int palette_clicks_choose_what_the_place_tool_adds(void)
     /* Each picked type is what a canvas click then places, with its ghost
      * drawn under the cursor first. Some need something to attach to (a
      * rail, a gap); those refuse with a status message. Either way the
-     * level stays valid and every placement is one undo step. */
+     * level stays valid and every placement is one undo step. Each new
+     * array placement also adds one to the status bar's "Entities: N". */
     int placed = 0, refused = 0;
     for (int type = 0; type < ENT_COUNT; type++) {
         if (!picked[type]) continue;
@@ -332,12 +333,15 @@ static int palette_clicks_choose_what_the_place_tool_adds(void)
         int y = TOOLBAR_H + 120 + (placed % 3) * 60;
         ui_frame(&es, x, y);                       /* ghost preview */
         int count = editor_entity_count(&es.level, (EntityType)type);
+        int total = editor_placed_entity_total(&es.level);
         int undo_top = es.undo->top;
         click_frame(&es, x, y);
         CHECK(level_is_valid(&es));
         if (editor_entity_count(&es.level, (EntityType)type) == count + 1 ||
             (editor_entity_type_is_singleton((EntityType)type) && es.undo->top == undo_top + 1)) {
             CHECK(es.undo->top == undo_top + 1);
+            if (!editor_entity_type_is_singleton((EntityType)type))
+                CHECK(editor_placed_entity_total(&es.level) == total + 1);
             placed++;
         } else {
             CHECK(es.undo->top == undo_top && es.status_message[0] != '\0');
@@ -345,6 +349,24 @@ static int palette_clicks_choose_what_the_place_tool_adds(void)
         }
     }
     CHECK(placed >= 12 && placed + refused == found);
+
+    /* Checkpoints count toward "Entities: N" too (the status bar used to
+     * leave them out). One must sit right of the player start, which the
+     * sweep above may not reach, so place one near the canvas's right edge. */
+    {
+        const int cx = CANVAS_W - 60, cy = TOOLBAR_H + 200;
+        float wx, wy;
+        canvas_screen_to_world(&es, cx, cy, &wx, &wy);
+        CHECK(wx > es.level.player_start_x);
+        int total = editor_placed_entity_total(&es.level);
+        int count = es.level.checkpoint_count;
+        es.palette_type = ENT_CHECKPOINT;
+        es.tool = TOOL_PLACE;
+        ui_frame(&es, cx, cy);
+        click_frame(&es, cx, cy);
+        CHECK(es.level.checkpoint_count == count + 1 && level_is_valid(&es));
+        CHECK(editor_placed_entity_total(&es.level) == total + 1);
+    }
     CHECK(es.modified == 1);
 
     /* Esc leaves the Place tool; the grid key toggles the overlay. */
