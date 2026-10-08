@@ -389,7 +389,7 @@ smoke: all editor ## Test: Boot every level and the editor for SMOKE_FRAMES fram
 	$(RUN_PREFIX) "$(abspath $(EDITOR_TARGET))" --smoke-test
 
 scripted-smoke: all editor ## Test: Replay scripted input scenarios for each of SMOKE_SEEDS
-	python3 tools/run_scripted_smoke.py --binary $(TARGET) --editor $(EDITOR_TARGET) --frames $(SMOKE_FRAMES) --seeds $(SMOKE_SEEDS)
+	python3 tools/run_scripted_smoke.py --binary $(TARGET) --editor $(EDITOR_TARGET) --frames $(SMOKE_FRAMES) --seeds $(SMOKE_SEEDS) --replay-dir $(OUTDIR)/replays-smoke
 
 sanitize: ## Test: test and fuzz-corpus under ASan/UBSan in OUTDIR-sanitize
 	$(SANITIZE_ENV) $(MAKE) all editor test OUTDIR="$(OUTDIR)-sanitize" \
