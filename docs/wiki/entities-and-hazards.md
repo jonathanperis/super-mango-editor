@@ -285,7 +285,7 @@ mode     = "PENDULUM"   # or "SPIN"
 | `FLIPPING` | 0.12 s | Rotates 180° at the apex |
 | `FALLING` | Until below floor | Descends upside-down, accelerating with gravity |
 
-Blue flames are placed explicitly with `[[blue_flames]]`. `x` is the gap's left edge and normally matches a `floor_gaps` entry; the flame is centred in the 32 px opening. `x = 0` (the gap at the left edge of the world) works like any other gap.
+Blue flames are placed explicitly with `[[blue_flames]]`. `x` is the gap's left edge and must match one of the level's `floor_gaps` entries (validation rejects a flame on solid floor); the flame is centred in the 32 px opening. `x = 0` (the gap at the left edge of the world) works like any other gap. In the editor, placing, pasting, dragging or typing a flame's x lands it on the nearest gap, and a level with no gaps refuses new flames.
 
 ```toml
 [[blue_flames]]

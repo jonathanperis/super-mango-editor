@@ -22,6 +22,7 @@
 
 #include "entity_meta.h"
 
+#include <math.h>   /* fabsf */
 #include <stddef.h> /* offsetof */
 #include <string.h> /* memcpy, memmove, memset */
 
@@ -445,6 +446,32 @@ float editor_world_width(const LevelDef *level)
     /* A hand-edited file may hold any int; never let it overflow below. */
     if (screens > MAX_LEVEL_SCREENS) screens = MAX_LEVEL_SCREENS;
     return (float)screens * (float)GAME_W;
+}
+
+/*
+ * editor_nearest_floor_gap — Place, paste, drag and the x field all move a
+ * flame through here, so the editor never stores a flame on solid floor.
+ * On a tie the earlier gap in the array wins, which keeps the result the
+ * same however often it is called.
+ */
+float editor_nearest_floor_gap(const LevelDef *level, float x)
+{
+    float best = x;
+    float best_distance = 0.0f;
+    int count;
+
+    if (!level) return x;
+    count = level->floor_gap_count;
+    if (count > MAX_FLOOR_GAPS) count = MAX_FLOOR_GAPS;
+    for (int i = 0; i < count; i++) {
+        float gap = (float)level->floor_gaps[i];
+        float distance = fabsf(gap - x);
+        if (i == 0 || distance < best_distance) {
+            best = gap;
+            best_distance = distance;
+        }
+    }
+    return best;
 }
 
 /* ------------------------------------------------------------------ */

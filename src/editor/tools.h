@@ -62,8 +62,9 @@ void tools_cancel_drag(EditorState *es);
  *
  * Applies the world-bounds rules level validation enforces: positions
  * within [0, world width] x [0, GAME_H], wide entities fully inside,
- * patrol ranges inside the world (the entity slides with its range), and
- * rail riders' t_offset on their rail (loops wrap, open rails stop).
+ * patrol ranges inside the world (the entity slides with its range),
+ * rail riders' t_offset on their rail (loops wrap, open rails stop), and
+ * flames onto the nearest floor gap (the gap they erupt from).
  * Used by place, paste and drag so none of them creates a rejected level.
  */
 void editor_clamp_placement(const LevelDef *level, EntityType type,

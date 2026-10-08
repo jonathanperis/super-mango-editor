@@ -129,6 +129,7 @@ static float clamp_rail_t(const LevelDef *level, int rail_index, float t)
  *   spans         : clamp_span keeps a whole width (spikes, platforms...) inside
  *   custom y      : clamp_custom_y keeps "0 = default height" meaningful
  *   rail riders   : clamp_rail_t keeps t_offset on the rail they ride
+ *   flames        : editor_nearest_floor_gap puts x on a floor gap
  *   stacked tiles : vines/ladders/ropes keep every tile above the bottom edge
  */
 void editor_clamp_placement(const LevelDef *level, EntityType type,
@@ -214,11 +215,14 @@ void editor_clamp_placement(const LevelDef *level, EntityType type,
         pd->spike_block.t_offset = clamp_rail_t(level, pd->spike_block.rail_index,
                                                 pd->spike_block.t_offset);
         break;
+    /* A flame's x is the gap it erupts from: land on the nearest one. */
     case ENT_BLUE_FLAME:
         clamp_span(&pd->blue_flame.x, FLOOR_GAP_W, world_w);
+        pd->blue_flame.x = editor_nearest_floor_gap(level, pd->blue_flame.x);
         break;
     case ENT_FIRE_FLAME:
         clamp_span(&pd->fire_flame.x, FLOOR_GAP_W, world_w);
+        pd->fire_flame.x = editor_nearest_floor_gap(level, pd->fire_flame.x);
         break;
     /* ---- Surfaces: keep the full width (and height) inside -------- */
     case ENT_FLOAT_PLATFORM:
@@ -575,11 +579,13 @@ static int default_placement(EntityType type, float world_x, float world_y,
         out->spike_block.t_offset   = 0.0f;
         out->spike_block.speed      = 3.0f;
         return 1;
+    /* x is the gap's left edge; centring it on the click (like the ghost)
+     * lets editor_clamp_placement pick the gap under the cursor. */
     case ENT_BLUE_FLAME:
-        out->blue_flame.x = world_x;
+        out->blue_flame.x = world_x - FLOOR_GAP_W / 2.0f;
         return 1;
     case ENT_FIRE_FLAME:
-        out->fire_flame.x = world_x;
+        out->fire_flame.x = world_x - FLOOR_GAP_W / 2.0f;
         return 1;
     case ENT_FLOAT_PLATFORM:
         out->float_platform.mode       = FLOAT_PLATFORM_STATIC;
@@ -730,6 +736,15 @@ int editor_add_placement(EditorState *es, EntityType type,
                               action, editor_entity_type_name(type), rail_index);
             return -1;
         }
+    }
+
+    /* A flame needs a floor gap to erupt from; say so before validation
+     * reports it as a field value. */
+    if ((type == ENT_BLUE_FLAME || type == ENT_FIRE_FLAME) &&
+        level->floor_gap_count == 0) {
+        editor_set_status(es, "Cannot %s %s: place a floor gap first", action,
+                          editor_entity_type_name(type));
+        return -1;
     }
 
     memset(&before, 0, sizeof(before));

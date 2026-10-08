@@ -68,7 +68,7 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 | `initial_lives` | int | Starting lives, `0`–`999`; `0` means the default (3). |
 | `score_per_life` | int | Score threshold spacing for bonus lives, `0`–`999999`; `0` means the default (1000). |
 | `coin_score` | int | Points awarded for each collected coin, `0`–`999999`; `0` means the default (100). |
-| `floor_gaps` | int array | Up to 16 sea-gap x-positions; each gap is 32 px wide, must fit inside the world, and must start on a multiple of 16 px (the floor is drawn in 16 px pieces, so an off-grid gap would show grass over part of the hole). Blue/fire flames are placed manually; flame `x` values normally match these openings. |
+| `floor_gaps` | int array | Up to 16 sea-gap x-positions; each gap is 32 px wide, must fit inside the world, and must start on a multiple of 16 px (the floor is drawn in 16 px pieces, so an off-grid gap would show grass over part of the hole). Blue/fire flames are placed manually; each flame `x` must match one of these openings. |
 
 Asset paths must be repo-relative with forward slashes, without `..` segments or control characters. Every string must be valid UTF-8; the parser rejects other bytes as `<field> is not valid UTF-8`. When the editor saves, it escapes control characters (including DEL, `\u007f`) so the file loads again.
 
@@ -427,7 +427,7 @@ speed      = 1.5    # traversal speed in tiles per second
 
 ### Blue Flames
 
-Erupts from a manually placed floor-gap position. `x` is the gap's left edge and normally matches a `floor_gaps` entry; the flame is centred in the 32 px opening. `x` must leave room for the whole gap inside the world; `x = 0` is the gap at the left edge of the world. Blue and fire flame placements have separate capacities: `MAX_BLUE_FLAMES` and `MAX_FIRE_FLAMES` (16 each).
+Erupts from a manually placed floor-gap position. `x` is the gap's left edge and must match a `floor_gaps` entry; the flame is centred in the 32 px opening. `x` must leave room for the whole gap inside the world; `x = 0` is the gap at the left edge of the world. Blue and fire flame placements have separate capacities: `MAX_BLUE_FLAMES` and `MAX_FIRE_FLAMES` (16 each).
 
 ```toml
 [[blue_flames]]
@@ -436,7 +436,7 @@ x = 192.0   # left edge of the sea gap (same value as its floor_gaps entry)
 
 ```toml
 [[fire_flames]]
-x = 560.0   # same mechanics, fire-colored sprite
+x = 560.0   # same mechanics, fire-colored sprite (also a floor_gaps entry)
 ```
 
 Eruption cycle: **waiting** (1.5 s) → **rising** (−550 px/s launch) → **flipping** (180° over 0.12 s at apex) → **falling** → repeat.

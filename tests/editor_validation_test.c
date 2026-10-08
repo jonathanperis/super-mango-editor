@@ -2069,6 +2069,10 @@ static int drag_round_trips_and_follows_grab_point(void)
     if (!es.undo) return 1;
     es.camera.zoom = 2.0f;
     es.tool = TOOL_SELECT;
+    es.level.floor_gap_count = 3;
+    es.level.floor_gaps[0] = 64;
+    es.level.floor_gaps[1] = 96;
+    es.level.floor_gaps[2] = 320;
     es.level.blue_flame_count = 1;
     es.level.blue_flames[0].x = 64.0f;
     es.level.axe_trap_count = 1;
@@ -2087,6 +2091,19 @@ static int drag_round_trips_and_follows_grab_point(void)
         undo_last(&es) != 0 ||
         expect_float_value("flame undo", es.level.blue_flames[0].x, 64.0f) != 0 ||
         expect_int("flame undo clean", es.modified, 0) != 0) goto fail;
+
+    /* A flame erupts from a gap, so a drag between gaps lands on the
+     * nearest one: 64 + 150 = 214 is 106 px from 320 and 118 px from 96;
+     * 64 + 100 = 164 is closer to 96. */
+    drag_by(&es, r.x + 10.0f, r.y + 10.0f, 150.0f, 0.0f);
+    if (expect_float_value("flame drag snaps to nearest gap",
+                           es.level.blue_flames[0].x, 320.0f) != 0 ||
+        undo_last(&es) != 0) goto fail;
+    drag_by(&es, r.x + 10.0f, r.y + 10.0f, 100.0f, 0.0f);
+    if (expect_float_value("flame drag snaps back to closer gap",
+                           es.level.blue_flames[0].x, 96.0f) != 0 ||
+        undo_last(&es) != 0 ||
+        expect_int("flame snap undo clean", es.modified, 0) != 0) goto fail;
 
     /* Axe y = 0 means "default height"; a horizontal move keeps the 0. */
     if (!editor_entity_bounds(&es.level, ENT_AXE_TRAP, 0, &r)) goto fail;
@@ -2188,6 +2205,10 @@ static int editor_mutations_keep_level_valid(void)
         editor_level_init_defaults(&es.level);
         es.level.rail_count = 1;  /* lets spike blocks attach */
         es.level.rails[0] = (RailPlacement){RAIL_LAYOUT_RECT, 32, 32, 4, 4, 0};
+        /* Lets flames erupt; a gap at each end so every corner has one near. */
+        es.level.floor_gap_count = 2;
+        es.level.floor_gaps[0] = 0;
+        es.level.floor_gaps[1] = (int)editor_world_width(&es.level) - FLOOR_GAP_W;
         es.undo = undo_create();
         if (!es.undo) return 1;
         es.camera.zoom = 1.0f;
@@ -2252,6 +2273,34 @@ static int refused_mutations_explain_why(void)
     if (expect_int("no rail no spike block", es.level.spike_block_count, 0) != 0 ||
         expect_string("no rail status", es.status_message,
                       "Cannot place Spike Block: place a rail first") != 0) goto fail;
+
+    /* Flames erupt from a floor gap; with none there is nowhere to go. */
+    es.palette_type = ENT_FIRE_FLAME;
+    tools_mouse_down(&es, 100.0f, 100.0f);
+    if (expect_int("no gap no flame", es.level.fire_flame_count, 0) != 0 ||
+        expect_string("no gap status", es.status_message,
+                      "Cannot place Fire Flame: place a floor gap first") != 0) goto fail;
+    /* With gaps, a click lands the flame on the gap under the cursor
+     * (the click is the flame's centre, like the ghost preview). */
+    es.level.floor_gap_count = 2;
+    es.level.floor_gaps[0] = 64;
+    es.level.floor_gaps[1] = 96;
+    tools_mouse_down(&es, 96.0f + FLOOR_GAP_W / 2.0f + 5.0f, 100.0f);
+    if (expect_int("flame on gap placed", es.level.fire_flame_count, 1) != 0 ||
+        expect_float_value("flame on clicked gap", es.level.fire_flames[0].x, 96.0f) != 0)
+        goto fail;
+    /* Deleting the gap a flame stands on is refused with the rule. */
+    es.tool = TOOL_SELECT;
+    es.selection.type = ENT_FLOOR_GAP;
+    es.selection.index = 1;
+    tools_delete_selected(&es);
+    if (expect_int("gap under flame kept", es.level.floor_gap_count, 2) != 0 ||
+        expect_prefix("gap under flame status", es.status_message,
+                      "Cannot delete Floor Gap: fire_flames[0].x") != 0) goto fail;
+    es.level.fire_flame_count = 0;
+    es.level.floor_gap_count = 0;
+    undo_clear(es.undo);
+    es.tool = TOOL_PLACE;
 
     /* A full array is reported instead of silently ignored. */
     es.palette_type = ENT_COIN;
