@@ -105,3 +105,15 @@ that create-only path, so the analysis followed the profile path into it:
 
 These two findings (#145, #146) were dismissed as false positives after
 explicit maintainer authorization on 2026-10-07. No query or check is disabled.
+
+## Replay folder flag (PR #323)
+
+`--replay-dir` lets scripted smoke keep its replay scripts under the build's
+`OUTDIR` instead of the fixed `out/replays-smoke/`:
+
+| Alerts | Input and operation | Assessment |
+| --- | --- | --- |
+| #152 | `game_replay.c`: `fopen(..., "r")` of `<--replay-dir>/<name>.replay` | Same class as #75 (`--experiment`) and #56–#58 (`--profile`): a local command-line path under the invoking user's permissions. It is length-checked, accepted only together with `--replay-script`, opened read-only, and the file name is still chosen from the fixed allow-list of script names, never from the flag. |
+
+This finding (#152) was dismissed as a false positive after explicit
+maintainer authorization on 2026-10-08. No query or check is disabled.
