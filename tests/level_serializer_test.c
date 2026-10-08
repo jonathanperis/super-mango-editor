@@ -1057,6 +1057,7 @@ static int strict_v1_fixture_suite(void)
         "bad_nested_unknown.toml",
         "bad_floor_gaps.toml",
         "bad_floor_gap_off_grid.toml",
+        "bad_flame_off_gap.toml",
         "bad_bouncepad_launch_vy.toml",
         "bad_rail_speed.toml",
         "bad_patrol_narrow.toml",

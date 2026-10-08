@@ -827,8 +827,11 @@ static void draw_blue_flame_properties(EditorState *es, int y)
 
     ui_label(&es->ui, CONTENT_X, y, "x:");
     if (ui_float_field(&es->ui, FIELD_ID(ENT_BLUE_FLAME, 0),
-                       FIELD_X, y, FIELD_W, &p->x))
+                       FIELD_X, y, FIELD_W, &p->x)) {
+        /* A typed x lands on the nearest gap, as a click would. */
+        p->x = editor_nearest_floor_gap(&es->level, p->x);
         editor_commit_change(es);
+    }
 }
 
 /* draw_fire_flame_properties — Fields for the selected fire flame. */
@@ -839,8 +842,11 @@ static void draw_fire_flame_properties(EditorState *es, int y)
 
     ui_label(&es->ui, CONTENT_X, y, "x:");
     if (ui_float_field(&es->ui, FIELD_ID(ENT_FIRE_FLAME, 0),
-                       FIELD_X, y, FIELD_W, &p->x))
+                       FIELD_X, y, FIELD_W, &p->x)) {
+        /* A typed x lands on the nearest gap, as a click would. */
+        p->x = editor_nearest_floor_gap(&es->level, p->x);
         editor_commit_change(es);
+    }
 }
 
 /* draw_float_platform_properties — Fields for the selected float platform. */

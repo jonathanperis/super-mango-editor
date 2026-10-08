@@ -151,7 +151,7 @@ static void fill_runtime_fixture(LevelDef *def)
     def->blue_flame_count = 1;
     def->blue_flames[0].x = 128.0f;
     def->fire_flame_count = 1;
-    def->fire_flames[0].x = 224.0f;
+    def->fire_flames[0].x = 128.0f;   /* flames erupt from a floor gap */
 
     def->float_platform_count = 2;
     def->float_platforms[0].mode = FLOAT_PLATFORM_STATIC;

@@ -1,0 +1,7 @@
+format_version = 1
+screen_count = 2
+floor_gaps = [640]
+
+# A flame erupts from the gap at its x; 320 is solid floor.
+[[blue_flames]]
+x = 320.0

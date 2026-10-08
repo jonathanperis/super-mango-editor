@@ -1055,8 +1055,25 @@ static int validate_blades(const LevelDef *def, char *err, size_t err_size,
     return 0;
 }
 
+/* validate_flame_gap — A flame's x is the gap_x it erupts from (see
+ * load_blue_flames), so it must be one of the level's floor gaps.  Without
+ * this, a flame placed on solid floor rises out of the grass. */
+static int validate_flame_gap(const LevelDef *def, char *err, size_t err_size,
+                              const char *field, float x, float world_w)
+{
+    if (validate_gap_x(err, err_size, field, x, world_w) != 0) return -1;
+    for (int g = 0; g < def->floor_gap_count; g++) {
+        if (x == (float)def->floor_gaps[g]) return 0;
+    }
+    if (err && err_size > 0) {
+        snprintf(err, err_size, "%s is %.2f (must match a floor gap x)",
+                 field, x);
+    }
+    return -1;
+}
+
 /* validate_flames — Blue and fire flames erupt from a floor gap, so each
- * needs room for a whole gap inside the world. */
+ * must sit on one (validate_flame_gap). */
 static int validate_flames(const LevelDef *def, char *err, size_t err_size,
                            float world_w)
 {
@@ -1064,13 +1081,13 @@ static int validate_flames(const LevelDef *def, char *err, size_t err_size,
 
     for (int i = 0; i < def->blue_flame_count; i++) {
         snprintf(field, sizeof(field), "blue_flames[%d].x", i);
-        if (validate_gap_x(err, err_size, field,
-                           def->blue_flames[i].x, world_w) != 0) return -1;
+        if (validate_flame_gap(def, err, err_size, field,
+                               def->blue_flames[i].x, world_w) != 0) return -1;
     }
     for (int i = 0; i < def->fire_flame_count; i++) {
         snprintf(field, sizeof(field), "fire_flames[%d].x", i);
-        if (validate_gap_x(err, err_size, field,
-                           def->fire_flames[i].x, world_w) != 0) return -1;
+        if (validate_flame_gap(def, err, err_size, field,
+                               def->fire_flames[i].x, world_w) != 0) return -1;
     }
     return 0;
 }
