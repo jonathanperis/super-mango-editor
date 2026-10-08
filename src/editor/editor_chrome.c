@@ -11,6 +11,7 @@
 #include "editor_playtest.h"   /* editor_play_test/editor_stop_play */
 #include "editor_session.h"    /* editor reset/confirm helpers */
 #include "editor_validation.h" /* editor_validation_summary */
+#include "entity_meta.h"       /* editor_placed_entity_total */
 #include "../shared/ui.h"      /* ui_panel, ui_button, ui_label */
 
 /*
@@ -147,36 +148,7 @@ void editor_render_status_bar(EditorState *es)
                    es->validation_report.error_count > 0 ?
                    (Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
 
-    int total = es->level.floor_gap_count
-              + es->level.rail_count
-              + es->level.platform_count
-              + es->level.coin_count
-              + es->level.star_yellow_count
-              + es->level.star_green_count
-              + es->level.star_red_count
-              + (es->level.last_star.x != 0.0f || es->level.last_star.y != 0.0f
-                 ? 1 : 0)
-              + es->level.spider_count
-              + es->level.jumping_spider_count
-              + es->level.bird_count
-              + es->level.faster_bird_count
-              + es->level.fish_count
-              + es->level.faster_fish_count
-              + es->level.blue_flame_count
-              + es->level.fire_flame_count
-              + es->level.axe_trap_count
-              + es->level.circular_saw_count
-              + es->level.spike_row_count
-              + es->level.spike_platform_count
-              + es->level.spike_block_count
-              + es->level.float_platform_count
-              + es->level.bridge_count
-              + es->level.bouncepad_small_count
-              + es->level.bouncepad_medium_count
-              + es->level.bouncepad_high_count
-              + es->level.vine_count
-              + es->level.ladder_count
-              + es->level.rope_count;
+    int total = editor_placed_entity_total(&es->level);
 
     char info_text[512];
     if (es->file_path[0] != '\0') {

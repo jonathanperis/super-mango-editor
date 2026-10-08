@@ -41,7 +41,7 @@ make run-editor    # build game + editor, then launch editor
 | Toolbar | 1280 × 32 px | Tool selector (Select / Place / Delete), Grid and Debug toggles, zoom dropdown, file buttons (New, Open, Save As, Save), Play (Stop while a playtest runs) |
 | Canvas | 896 × 656 px | Scrollable level view with zoom. All entity types drawn at game-accurate sizes |
 | Panel | 384 × 656 px | Entity palette, properties inspector, level config (collapsible sections) |
-| Status bar | 1280 × 32 px | Cursor world coordinates, active tool, validation summary, entity count, current filename with ` *` when modified, latest status message |
+| Status bar | 1280 × 32 px | Cursor world coordinates, active tool, validation summary, entity count (every placement except the player spawn), current filename with ` *` when modified, latest status message |
 
 ---
 

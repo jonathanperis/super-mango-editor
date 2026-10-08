@@ -71,6 +71,10 @@ float editor_world_width(const LevelDef *level);
 /* Central LevelDef count and selection safety helpers. */
 int editor_entity_count(const LevelDef *level, EntityType type);
 
+/* Every placement in the level except the always-present player spawn;
+ * the status bar's "Entities: N". */
+int editor_placed_entity_total(const LevelDef *level);
+
 /*
  * One placement, addressed by (type, index).  These are the only functions
  * that copy entity bytes in or out of LevelDef; tools, undo, clipboard and
