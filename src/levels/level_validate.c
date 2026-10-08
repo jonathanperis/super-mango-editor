@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -1055,6 +1056,20 @@ static int validate_blades(const LevelDef *def, char *err, size_t err_size,
     return 0;
 }
 
+/* same_position — Whether two coordinates are exactly the same value,
+ * compared bit for bit as ui.c and serializer_emit.c do: the flame rule is
+ * "on this gap", not "close to it".  Adding 0.0f first turns -0.0 into +0.0,
+ * so a flame written as -0.0 still matches the gap at 0. */
+static int same_position(float a, float b)
+{
+    uint32_t bits_a, bits_b;
+    a += 0.0f;
+    b += 0.0f;
+    memcpy(&bits_a, &a, sizeof(bits_a));
+    memcpy(&bits_b, &b, sizeof(bits_b));
+    return bits_a == bits_b;
+}
+
 /* validate_flame_gap — A flame's x is the gap_x it erupts from (see
  * load_blue_flames), so it must be one of the level's floor gaps.  Without
  * this, a flame placed on solid floor rises out of the grass. */
@@ -1063,7 +1078,7 @@ static int validate_flame_gap(const LevelDef *def, char *err, size_t err_size,
 {
     if (validate_gap_x(err, err_size, field, x, world_w) != 0) return -1;
     for (int g = 0; g < def->floor_gap_count; g++) {
-        if (x == (float)def->floor_gaps[g]) return 0;
+        if (same_position(x, (float)def->floor_gaps[g])) return 0;
     }
     if (err && err_size > 0) {
         snprintf(err, err_size, "%s is %.2f (must match a floor gap x)",
