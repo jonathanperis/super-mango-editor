@@ -661,4 +661,5 @@ help: ## Other: List these targets
 	@echo "Common variables: OUTDIR=out/headless RAYLIB_PLATFORM=memory (no window or GPU),"
 	@echo "  BUILD_MODE=release, CC=gcc, EXTRA_CFLAGS=-Werror, RAYLIB_AUDIO=null (no sound device)."
 	@echo "Manual art tools (python3 tools/<name>.py, not make targets): analyze_sprite"
-	@echo "  (sprite frame grid), gen_fire_sprites (fire palette), generate_favicon (site icons)."
+	@echo "  (sprite frame grid), gen_fire_sprites (fire palette), generate_favicon (site icons),"
+	@echo "  render_og_image (site link preview, needs Chrome)."
