@@ -187,7 +187,8 @@ try it on.
 | `--experiment <path>` | Replays an exported capture; requires `--level` (whose bytes must match the capture's `level_hash`), enables debug/no-save, and cannot combine with `--replay-script`. |
 | `--smoke-test-frames N` | Runs exactly `N` (positive) frames and exits for bounded CI smoke checks; defaults to `levels/00_sandbox_01.toml` without `--level` and disables the profile. |
 | `--seed N` | Seeds the explicit unsigned PRNG for reproducible enemy timers and experiments; without it the seed comes from a monotonic clock. |
-| `--replay-script <name>` | Injects `out/replays-smoke/<name>.replay` as deterministic commands and action masks. Only `move-right`, `jump-right` and `pause-resume` are accepted; disables the profile. |
+| `--replay-script <name>` | Injects `<name>.replay` from the replay folder (`out/replays-smoke/` unless `--replay-dir` says otherwise) as deterministic commands and action masks. Only `move-right`, `jump-right` and `pause-resume` are accepted; disables the profile. |
+| `--replay-dir <dir>` | Reads `--replay-script` files from `<dir>` instead of `out/replays-smoke/`; requires `--replay-script`. `make scripted-smoke` passes `$(OUTDIR)/replays-smoke`. |
 
 An unknown option, or a value flag whose value is missing or starts with `-`, exits with an error.
 

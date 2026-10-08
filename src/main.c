@@ -54,7 +54,8 @@ int main(int argc, char **argv)
         else if (!strcmp(option, "--continue"))
             config.continue_last = 1;
         else if (!strcmp(option, "--level") || !strcmp(option, "--profile") ||
-                 !strcmp(option, "--replay-script") || !strcmp(option, "--experiment")) {
+                 !strcmp(option, "--replay-script") || !strcmp(option, "--replay-dir") ||
+                 !strcmp(option, "--experiment")) {
             const char *value = argument(argc, argv, &i);
             if (!value) {
                 fprintf(stderr, "Error: %s requires a path\n", option);
@@ -66,6 +67,8 @@ int main(int argc, char **argv)
                 config.profile_path = value;
             else if (!strcmp(option, "--replay-script"))
                 config.replay_script_path = value;
+            else if (!strcmp(option, "--replay-dir"))
+                config.replay_dir = value;
             else {
                 config.experiment_path = value;
                 config.debug_mode = 1;
@@ -96,6 +99,7 @@ int main(int argc, char **argv)
                  "  --experiment PATH --level PATH   replay a captured experiment\n"
                  "Debug: F2 freeze, F3 step, F4 slow, F6 field, -/+ tune, F7 reset, F8 record, F9 export.\n"
                  "  --debug --seed N --smoke-test-frames N --replay-script NAME\n"
+                 "  --replay-dir DIR  read replay scripts from DIR (default out/replays-smoke)\n"
                  "F1: settings (menu: gamepad Y; gameplay: Back).\n"
                  "Continue opens the last stage, not a mid-level save.\n"
                  "Profiles: OS preference directory on native; localStorage on web.\n"
@@ -108,6 +112,13 @@ int main(int argc, char **argv)
     }
     if (config.experiment_path && (!config.level_path || config.replay_script_path)) {
         fprintf(stderr, "Error: --experiment requires --level and cannot combine with --replay-script\n");
+        return EXIT_FAILURE;
+    }
+    /* The folder only says where --replay-script looks; alone it would be
+     * silently ignored, so refuse it the way --experiment refuses a
+     * missing --level. */
+    if (config.replay_dir && !config.replay_script_path) {
+        fprintf(stderr, "Error: --replay-dir requires --replay-script\n");
         return EXIT_FAILURE;
     }
     if (config.smoke_test_frames > 0 && !config.level_path)

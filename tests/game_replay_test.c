@@ -1,14 +1,13 @@
 /*
  * game_replay_test.c — Scripted input replay (input/game_replay.c).
  *
- * `--replay <name>` reads out/replays-smoke/<name>.replay relative to the
- * working directory. To keep scratch files inside TEST_OUT, these tests
- * write their scripts under TEST_OUT "replay-root/out/replays-smoke/" and
- * change into TEST_OUT "replay-root" only for the game_replay_load call.
- * Levels and assets are loaded before that, from the repository root.
+ * `--replay-script <name>` reads <name>.replay from the `--replay-dir`
+ * folder (out/replays-smoke by default). These tests point
+ * gs->replay_dir, which that flag fills, at TEST_OUT "replays" so their
+ * scratch scripts stay inside this build's output tree.
  */
 #ifndef _WIN32
-#define _POSIX_C_SOURCE 200809L /* chdir, getcwd, mkdir under -std=c11 */
+#define _POSIX_C_SOURCE 200809L /* mkdir under -std=c11 */
 #endif
 
 #include <errno.h>
@@ -19,14 +18,9 @@
 
 #ifdef _WIN32
 #include <direct.h>
-#define test_chdir _chdir
-#define test_getcwd _getcwd
 #define test_mkdir(path) _mkdir(path)
 #else
 #include <sys/stat.h>
-#include <unistd.h>
-#define test_chdir chdir
-#define test_getcwd getcwd
 #define test_mkdir(path) mkdir(path, 0755)
 #endif
 
@@ -42,8 +36,7 @@
 #include "test_paths.h"
 
 #define REPLAY_LEVEL "tests/fixtures/runtime/climbing.toml"
-#define REPLAY_ROOT TEST_OUT "replay-root"
-#define REPLAY_DIR  REPLAY_ROOT "/out/replays-smoke/"
+#define REPLAY_DIR TEST_OUT "replays"
 
 #define CHECK(test) do { if (!(test)) { \
     fprintf(stderr, "game_replay_test:%d: %s\n", __LINE__, #test); \
@@ -57,9 +50,8 @@ static int make_dir(const char *path)
 static int write_script(const char *name, const char *text)
 {
     char path[512];
-    if (make_dir(REPLAY_ROOT) || make_dir(REPLAY_ROOT "/out") ||
-        make_dir(REPLAY_ROOT "/out/replays-smoke")) return -1;
-    snprintf(path, sizeof(path), REPLAY_DIR "%s.replay", name);
+    if (make_dir(REPLAY_DIR)) return -1;
+    snprintf(path, sizeof(path), REPLAY_DIR "/%s.replay", name);
     FILE *file = fopen(path, "wb");
     if (!file) return -1;
     int ok = fputs(text, file) >= 0;
@@ -69,20 +61,17 @@ static int write_script(const char *name, const char *text)
 static void remove_script(const char *name)
 {
     char path[512];
-    snprintf(path, sizeof(path), REPLAY_DIR "%s.replay", name);
+    snprintf(path, sizeof(path), REPLAY_DIR "/%s.replay", name);
     remove(path);
 }
 
-/* Load gs->replay_script_path = name with REPLAY_ROOT as the working
- * directory, the way the game resolves it from the repository root. */
+/* Load script `name` from REPLAY_DIR, as `--replay-dir REPLAY_DIR
+ * --replay-script name` would. */
 static int load_script(GameState *gs, const char *name)
 {
-    char cwd[4096];
     snprintf(gs->replay_script_path, sizeof(gs->replay_script_path), "%s", name);
-    if (!test_getcwd(cwd, sizeof(cwd)) || test_chdir(REPLAY_ROOT) != 0) return -2;
-    int result = game_replay_load(gs);
-    if (test_chdir(cwd) != 0) return -2;
-    return result;
+    snprintf(gs->replay_dir, sizeof(gs->replay_dir), "%s", REPLAY_DIR);
+    return game_replay_load(gs);
 }
 
 typedef struct {
@@ -290,6 +279,13 @@ int replay_scripts_reject_malformed_files(void)
     CHECK(load_script(&gs, "not-a-script") == -1);
     remove_script("jump-right");
     CHECK(load_script(&gs, "jump-right") == -1);
+    /* The folder is read as given: a script that exists in REPLAY_DIR is
+     * not found through a folder that does not. */
+    CHECK(write_script("move-right", "0 tap left\n") == 0);
+    CHECK(load_script(&gs, "move-right") == 0);
+    game_replay_cleanup(&gs);
+    snprintf(gs.replay_dir, sizeof(gs.replay_dir), "%s", TEST_OUT "no-such-replays");
+    CHECK(game_replay_load(&gs) == -1 && gs.replay_events == NULL);
     /* No name means no replay, which is not an error. */
     gs.replay_script_path[0] = '\0';
     CHECK(game_replay_load(&gs) == 0 && gs.replay_events == NULL);

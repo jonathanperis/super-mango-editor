@@ -53,6 +53,7 @@ typedef struct {
     int debug_mode;
     int smoke_test_frames;
     const char *replay_script_path;
+    const char *replay_dir; /* optional folder for replay scripts */
     const AppSessionHooks *hooks;
     int profile_enabled; /* opt-in; tests/smoke default to memory-only */
     int continue_last;
@@ -96,6 +97,7 @@ typedef struct AppSession {
     AppSessionHooks hooks;
     char status_message[160];
     char replay_script_path[256];
+    char replay_dir[256];
     char boot_level_path[GAME_LEVEL_PATH_MAX];
     unsigned int random_seed;
 } AppSession;

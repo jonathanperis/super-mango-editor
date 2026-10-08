@@ -16,7 +16,7 @@ from pathlib import Path
 from validate_levels import load_level
 
 ROOT = Path(__file__).resolve().parents[1]
-REPLAY_DIR = ROOT / "out" / "replays-smoke"
+DEFAULT_REPLAY_DIR = "out/replays-smoke"  # the game reads here without --replay-dir
 ALLOWED_REPLAY_IDS = {"move-right", "jump-right", "pause-resume"}
 
 
@@ -36,6 +36,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--levels", nargs="*", default=None, help="levels to run; defaults to levels/*.toml")
     parser.add_argument("--replays", nargs="*", default=None, help="replay scripts to run; defaults to built-in movement scripts")
     parser.add_argument("--skip-editor", action="store_true", help="skip editor smoke scenario")
+    parser.add_argument("--replay-dir", default=DEFAULT_REPLAY_DIR,
+                        help="folder for generated replay scripts, passed to the game as --replay-dir")
     return parser.parse_args()
 
 
@@ -79,9 +81,11 @@ def check_builtin_behavior(state: dict, replay: str, level: Path, frames: int) -
         raise AssertionError("jump input did not launch the player")
 
 
-def check_replay_failures(binary: Path, level: str, replay: Path, env: dict[str, str]) -> None:
+def check_replay_failures(binary: Path, level: str, replay: Path, replay_dir: str,
+                          env: dict[str, str]) -> None:
     original = replay.read_text(encoding="utf-8")
-    cmd = [str(binary), "--level", level, "--smoke-test-frames", "5", "--seed", "1", "--replay-script"]
+    cmd = [str(binary), "--level", level, "--smoke-test-frames", "5", "--seed", "1",
+           "--replay-dir", replay_dir, "--replay-script"]
     try:
         for contents in (None, "", "-1 down right\n", "999999999999999999999999 down right\n",
                          "0 down mystery\n", "2 down right\n1 up right\n"):
@@ -155,7 +159,10 @@ def main() -> int:
     env = os.environ.copy()
     env.setdefault("MANGO_TEST_WINDOW", "1")
 
-    replays = selected_replays(args, REPLAY_DIR)
+    # The game runs from ROOT, so a relative --replay-dir is passed through
+    # as given (short, like the default) and only Python resolves it.
+    replay_dir = ROOT / args.replay_dir
+    replays = selected_replays(args, replay_dir)
     for level in levels:
         level_path = level if level.is_absolute() else ROOT / level
         if not level_path.exists():
@@ -171,6 +178,8 @@ def main() -> int:
                     str(args.frames),
                     "--seed",
                     str(seed),
+                    "--replay-dir",
+                    args.replay_dir,
                     "--replay-script",
                     replay_id(replay),
                 ]
@@ -184,10 +193,11 @@ def main() -> int:
     scenario_count = len(levels) * len(args.seeds) * len(replays)
     if not args.replays:
         first_level = levels[0] if levels[0].is_absolute() else ROOT / levels[0]
-        check_replay_failures(binary, first_level.relative_to(ROOT).as_posix(), replays[0], env)
+        check_replay_failures(binary, first_level.relative_to(ROOT).as_posix(), replays[0],
+                              args.replay_dir, env)
         # An explicit profile must still be ignored by smoke/replay. Use an
         # intentionally invalid task-owned file to prove it is neither loaded nor overwritten.
-        profile = REPLAY_DIR / 'smoke-profile.toml'
+        profile = replay_dir / 'smoke-profile.toml'
         contents = 'not a player profile\n'
         profile.write_text(contents, encoding='utf-8')
         try:

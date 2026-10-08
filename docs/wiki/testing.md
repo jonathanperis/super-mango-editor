@@ -68,9 +68,10 @@ profile, checkpoint, simulation and session behavior.
 climbing on and off ladders, ropes and vines; the blue flame's eruption timing
 and damage; axe swings; spike-block rails (loop, detach, end cap); jumping
 spiders, fish leaps, bird patrols and bridge crumbling. It also replays
-`--replay` scripts and rejects malformed ones. `editor-ui-test` drives the
-editor with input events (palette picks, place, select, drag, delete, undo,
-wheel zoom/pan, property and config panel clicks) and checks the resulting
+`--replay-script` scripts (from a `--replay-dir` under the test output) and
+rejects malformed ones. `editor-ui-test` drives the editor with input events
+(palette picks, place, select, drag, delete, undo, wheel zoom/pan, property
+and config panel clicks) and checks the resulting
 document and undo history; on POSIX it also covers the playtest process status
 and the native file pickers through stand-in `osascript`/`zenity` scripts. They write scratch files
 under the build's own `OUTDIR` (`TEST_OUT` in `tests/test_paths.h`), so
@@ -174,7 +175,7 @@ the explanations against their callers before rebuilding. Do not change gameplay
 expectations to make a readability pass look green. Saved-binding translations,
 units and owner/borrower contracts still need their existing regression checks.
 
-`make scripted-smoke` drives the runtime with generated replay scripts. The runner writes files under `out/replays-smoke/`, then invokes the game with `--replay-script`, `--seed`, and `--smoke-test-frames` to exercise deterministic movement, jumping, and pause/resume paths. Each subprocess has a 30-second limit; use the default five-frame scenarios for slow sanitizer/software-renderer runs.
+`make scripted-smoke` drives the runtime with generated replay scripts. The runner writes files under `$(OUTDIR)/replays-smoke/` (`out/replays-smoke/` by default), then invokes the game with `--replay-dir` pointing there, `--replay-script`, `--seed`, and `--smoke-test-frames` to exercise deterministic movement, jumping, and pause/resume paths. Each subprocess has a 30-second limit; use the default five-frame scenarios for slow sanitizer/software-renderer runs.
 
 ## Documentation Drift Gate
 

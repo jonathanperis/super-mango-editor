@@ -315,7 +315,7 @@ make smoke SMOKE_FRAMES=5 SMOKE_SEED=1
 
 ### `make scripted-smoke`
 
-Builds the game and editor, then runs `tools/run_scripted_smoke.py` against every `levels/*.toml` for each seed in `SMOKE_SEEDS`. The runner writes deterministic replay scripts under `out/replays-smoke/` and passes validated replay names with `--replay-script`, injecting semantic commands and sampled action masks for movement, jumping and pause/resume. It checks observable results and repeats each scenario to verify deterministic state.
+Builds the game and editor, then runs `tools/run_scripted_smoke.py` against every `levels/*.toml` for each seed in `SMOKE_SEEDS`. The runner writes deterministic replay scripts under `$(OUTDIR)/replays-smoke/`, so `OUTDIR=out/headless` keeps them beside that build, and passes that folder with `--replay-dir` and validated replay names with `--replay-script`, injecting semantic commands and sampled action masks for movement, jumping and pause/resume. It checks observable results and repeats each scenario to verify deterministic state.
 
 ```sh
 make scripted-smoke SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
