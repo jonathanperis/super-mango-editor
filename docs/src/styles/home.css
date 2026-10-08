@@ -85,13 +85,19 @@
     bottom: calc(var(--ground-h) - 48px);
     z-index: 2;
 }
+/* Enemies that move across the scene: the wrapper moves, and the sprite
+ * inside keeps its own frame animation. One element cannot do both, since
+ * a second `animation` would replace the sprite's frame cycle. */
+.scene-spider,
+.scene-bird { position: absolute; line-height: 0; }
 .scene-spider {
-    position: absolute;
     left: 66%;
-    bottom: calc(var(--ground-h) - 22px);
+    /* The spider's feet are at y = 32 of its 48 px frame, 16 px above the
+     * frame bottom: 32 px at 2x puts them on the grass. */
+    bottom: calc(var(--ground-h) - 32px);
     z-index: 2;
 }
-.scene-bird { position: absolute; top: 46%; left: 74%; }
+.scene-bird { top: 46%; left: 74%; }
 .scene-coins .sprite { position: absolute; }
 /* A coin arc to the left of the logo, and a star waiting on the right. */
 .bob-1 { left: 22%; bottom: 190px; }
@@ -103,6 +109,14 @@
     .scene-clouds { animation: drift 160s linear infinite; }
     .scene-clouds-near { animation: drift 90s linear infinite; }
     .scene-spider { animation: patrol 14s steps(140) infinite alternate; }
+    /* Both sprites face left. The spider walks left for one 14 s patrol and
+     * back for the next, so it turns round halfway through each 28 s cycle,
+     * as the game flips it when it walks right. */
+    .spider-facing {
+        animation:
+            sprite-frames var(--sprite-duration) steps(var(--sprite-frames)) infinite,
+            face-back 28s steps(1, end) infinite;
+    }
     .scene-bird { animation: glide 22s linear infinite, swoop 3.6s ease-in-out infinite alternate; }
     .scene-coins .sprite { animation: bob 1.4s ease-in-out infinite alternate; }
     .bob-2 { animation-delay: -0.35s !important; }
@@ -114,6 +128,7 @@
 @keyframes glide { from { left: 105%; } to { left: -12%; } }
 @keyframes swoop { from { margin-top: -18px; } to { margin-top: 18px; } }
 @keyframes bob { from { translate: 0 0; } to { translate: 0 -10px; } }
+@keyframes face-back { 0% { scale: 1 1; } 50% { scale: -1 1; } 100% { scale: -1 1; } }
 
 /* The real start-menu logo sprite, centred in the sky like a title screen. */
 .title-logo {

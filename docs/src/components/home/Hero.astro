@@ -31,9 +31,9 @@ const sceneStyle = [
             <Sprite sheet={art.coin} scale={3} class="bob bob-3" />
             <Sprite sheet={art.starYellow} scale={3} class="bob bob-4" />
         </div>
-        <Sprite sheet={art.bird} scale={2} frames={3} fps={7} class="scene-bird" />
+        <span class="scene-bird"><Sprite sheet={art.bird} scale={2} frames={3} fps={7} /></span>
         <Sprite sheet={art.player} scale={3} row={1} frames={4} fps={10} class="scene-player" />
-        <Sprite sheet={art.spider} scale={2} frames={3} fps={7} class="scene-spider" />
+        <span class="scene-spider"><Sprite sheet={art.spider} scale={2} frames={3} fps={7} class="spider-facing" /></span>
         <div class="scene-ground"></div>
     </div>
 
