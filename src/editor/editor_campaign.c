@@ -40,6 +40,7 @@ struct EditorCampaign {
     int selected;              /* highlighted row, -1 for none           */
     int scroll;                /* first row shown                        */
     int close_armed;           /* Close was refused once for unsaved work */
+    int revert_armed;          /* Revert was refused once, likewise       */
     char problem[160];         /* campaign-wide problem, "" when none    */
 };
 
@@ -88,10 +89,20 @@ static int level_changed(const EditorCampaign *c, size_t i)
             strcmp(entry->level.next_phase, c->disk[i].disk_next) != 0);
 }
 
-/* Any edit means a refused Close must be asked again. */
+/* Any edit means a refused Close or Revert must be asked again. */
 static void edited(EditorCampaign *c)
 {
     c->close_armed = 0;
+    c->revert_armed = 0;
+}
+
+/* The entry whose name field is being typed in, or -1. */
+static int name_being_typed(const EditorState *es)
+{
+    int row = es->ui.active_id - CAMPAIGN_NAME_FIELD_ID;
+    if (!es->campaign || es->ui.active_id < CAMPAIGN_NAME_FIELD_ID ||
+        (size_t)row >= es->campaign->catalog.count) return -1;
+    return row;
 }
 
 /* Settle a half-typed name before the list changes under its field. */
@@ -120,8 +131,13 @@ const char *editor_campaign_problem(const EditorState *es)
 int editor_campaign_unsaved(const EditorState *es)
 {
     const EditorCampaign *c = es ? es->campaign : NULL;
+    int typing;
     if (!c) return 0;
     if (c->manifest_changed) return 1;
+    /* A name typed but not yet applied is work too: quitting must ask. */
+    typing = name_being_typed(es);
+    if (typing >= 0 && strcmp(es->ui.edit_buf, c->catalog.levels[typing].level.name) != 0)
+        return 1;
     for (size_t i = 0; i < c->catalog.count; i++)
         if (level_changed(c, i)) return 1;
     return 0;
@@ -200,11 +216,41 @@ int editor_campaign_close(EditorState *es, int force)
         return 0;
     }
     /* A name being typed belongs to the view going away. */
-    if (es->ui.active_id >= CAMPAIGN_NAME_FIELD_ID &&
-        es->ui.active_id < CAMPAIGN_NAME_FIELD_ID + 1000)
-        ui_cancel_active_edit(&es->ui);
+    if (name_being_typed(es) >= 0) ui_cancel_active_edit(&es->ui);
     editor_campaign_free(es);
     editor_set_status(es, "Campaign closed");
+    return 1;
+}
+
+int editor_campaign_revert(EditorState *es)
+{
+    EditorCampaign *c = es ? es->campaign : NULL;
+    char path[EDITOR_PATH_MAX];
+    int selected;
+    int scroll;
+
+    if (!c) return -1;
+    if (!editor_campaign_unsaved(es)) {
+        editor_set_status(es, "Campaign: nothing to revert; it matches the files on disk");
+        return 0;
+    }
+    if (!c->revert_armed) {
+        c->revert_armed = 1;
+        editor_set_status(es, "Revert discards your campaign changes: Revert again to confirm");
+        return 0;
+    }
+    /* The view has no undo history of its own; reading the manifest and
+     * its levels again is the way back.  A name being typed goes too. */
+    if (name_being_typed(es) >= 0) ui_cancel_active_edit(&es->ui);
+    memcpy(path, c->manifest_path, sizeof(path));
+    selected = c->selected;
+    scroll = c->scroll;
+    editor_campaign_free(es);
+    if (editor_campaign_open(es, path) != 0) return -1;   /* status says why */
+    c = es->campaign;
+    if (selected < (int)c->catalog.count) c->selected = selected;
+    c->scroll = scroll;   /* editor_campaign_render clamps it */
+    editor_set_status(es, "Campaign reverted to the files on disk");
     return 1;
 }
 
@@ -664,11 +710,11 @@ static void draw_row(EditorState *es, EditorCampaign *c, int i, int y)
 static void draw_buttons(EditorState *es, EditorCampaign *c)
 {
     static const char *labels[] = {
-        "Up", "Down", "Remove", "Add level...", "Link in order", "Save", "Close"
+        "Up", "Down", "Remove", "Add level...", "Link in order", "Save", "Revert", "Close"
     };
     int y = CAMPAIGN_BUTTONS_Y;
 
-    for (int b = 0; b < 7; b++) {
+    for (int b = 0; b < (int)(sizeof(labels) / sizeof(labels[0])); b++) {
         int x = CAMPAIGN_VIEW_X + b * CAMPAIGN_BUTTON_STEP;
         if (!ui_button(&es->ui, x, y, CAMPAIGN_BUTTON_W, 24, labels[b])) continue;
         switch (b) {
@@ -684,9 +730,10 @@ static void draw_buttons(EditorState *es, EditorCampaign *c)
         }
         case 4: (void)editor_campaign_link_in_order(es); break;
         case 5: (void)editor_campaign_save(es); break;
-        case 6: (void)editor_campaign_close(es, 0); break;
+        case 6: (void)editor_campaign_revert(es); break;
+        case 7: (void)editor_campaign_close(es, 0); break;
         }
-        /* Close frees the view; nothing below may touch it. */
+        /* Close and Revert free the view; nothing below may touch it. */
         return;
     }
 }
