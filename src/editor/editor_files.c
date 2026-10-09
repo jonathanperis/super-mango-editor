@@ -66,22 +66,31 @@ static int editor_finalize_save(EditorState *es, const char *path,
  * And on Windows the old file can be moved away before the new one
  * fails to move in.  The level is then kept in a temporary file next to the
  * destination, and the designer needs its name to get the work back.
+ *
+ * lead (may be NULL) goes in front, for a caller that saved several files
+ * and says how far it got.  kept_path names the temporary file a
+ * SERIALIZER_REPLACE_TEMP_KEPT result left; NULL means the one the last
+ * level save reported (level_save_kept_temp_path).
  */
-static void editor_report_save_failure(EditorState *es, int result,
-                                       const char *path)
+void editor_report_save_failure(EditorState *es, int result, const char *path,
+                                const char *lead, const char *kept_path)
 {
+    if (!lead) lead = "";
     if (result == -2) {
         /* level_save_toml_checked found the file different from the copy
          * this editor last read or wrote, just before replacing it: another
          * program changed it.  Nothing was written; the next Save asks
          * whether to replace it or save under another name. */
-        editor_set_status(es, "Save stopped: %s changed on disk; nothing was "
-                          "written. Save again to replace it or Save As", path);
+        editor_set_status(es, "%sSave stopped: %s changed on disk; nothing was "
+                          "written. Save again to replace it or Save As", lead, path);
+    } else if (result == SERIALIZER_REPLACE_TEMP_KEPT && kept_path) {
+        editor_set_status(es, "%sSave incomplete: the new %s is safe in %s",
+                          lead, path, kept_path);
     } else if (result == SERIALIZER_REPLACE_TEMP_KEPT) {
-        editor_set_status(es, "Save incomplete: your level is safe in %s",
-                          level_save_kept_temp_path());
+        editor_set_status(es, "%sSave incomplete: your level is safe in %s",
+                          lead, level_save_kept_temp_path());
     } else {
-        editor_set_status(es, "Save failed: %s", path);
+        editor_set_status(es, "%sSave failed: %s", lead, path);
     }
 }
 
@@ -451,7 +460,7 @@ int editor_save_current_level(EditorState *es)
                                                  SERIALIZER_SAVE_REPLACE,
                                                  &replace_expected);
             if (result != 0) {
-                editor_report_save_failure(es, result, es->file_path);
+                editor_report_save_failure(es, result, es->file_path, NULL, NULL);
                 return -1;
             }
         }
@@ -462,7 +471,7 @@ int editor_save_current_level(EditorState *es)
         int result = level_save_toml_with_policy(&es->level, target,
                                                  SERIALIZER_SAVE_CREATE_ONLY);
         if (result != 0) {
-            editor_report_save_failure(es, result, es->file_path);
+            editor_report_save_failure(es, result, es->file_path, NULL, NULL);
             return -1;
         }
         return editor_finalize_save(es, es->file_path, "Saved");
@@ -477,7 +486,7 @@ int editor_save_current_level(EditorState *es)
                                              SERIALIZER_SAVE_REPLACE,
                                              &es->source_fingerprint);
         if (result != 0) {
-            editor_report_save_failure(es, result, es->file_path);
+            editor_report_save_failure(es, result, es->file_path, NULL, NULL);
             return -1;
         }
     }
@@ -544,7 +553,7 @@ static int editor_save_current_level_as_validated(EditorState *es)
             result = level_save_toml_checked(&es->level, path,
                                              SERIALIZER_SAVE_REPLACE, &baseline);
         if (result != 0) {
-            editor_report_save_failure(es, result, path);
+            editor_report_save_failure(es, result, path, NULL, NULL);
             return -1;
         }
     } else {
@@ -552,7 +561,7 @@ static int editor_save_current_level_as_validated(EditorState *es)
                                                  SERIALIZER_SAVE_CREATE_ONLY);
         if (result != 0) {
             fprintf(stderr, "Error: failed to save %s\n", path);
-            editor_report_save_failure(es, result, path);
+            editor_report_save_failure(es, result, path, NULL, NULL);
             return -1;
         }
     }

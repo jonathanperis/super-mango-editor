@@ -457,6 +457,28 @@ static int install_temps(EditorState *es, EditorCampaign *c, CampaignSavePlan *p
         int result = serializer_install_temp(file->temp, file->target, 0);
         const char *name = file->entry >= 0 ? c->catalog.levels[file->entry].path
                                             : c->manifest_path;
+        if (result == SERIALIZER_REPLACE_TEMP_KEPT) {
+            /* Windows moved the old file aside but could not move the new
+             * one in: the temporary file is the only complete copy, so it
+             * stays, and the designer needs its name. */
+            char lead[96];   /* the words below with two counts of up to 11 characters */
+            char shown[sizeof(es->status_message)];
+            int room;
+            snprintf(lead, sizeof(lead), "Campaign partly saved (%d of %d files written). ",
+                     installed, plan->count);
+            /* The status bar holds what is left after the words around the
+             * path; a longer path keeps its end, the file's own name. */
+            room = (int)sizeof(es->status_message) - (int)strlen(lead) - (int)strlen(name) -
+                   (int)sizeof("Save incomplete: the new  is safe in ");
+            if (room < 24) room = 24;
+            editor_path_for_display(file->temp, shown, (size_t)room);
+            fprintf(stderr, "campaign: could not finish replacing '%s'; it is kept in '%s'\n",
+                    file->target, file->temp);
+            editor_report_save_failure(es, result, name, lead, shown);
+            file->temp[0] = '\0';           /* never delete the kept copy */
+            discard_temps(plan, k + 1);
+            return -1;
+        }
         if (result != 0) {
             if (installed == 0)
                 editor_set_status(es, "Campaign not saved: writing %s failed; no file "
