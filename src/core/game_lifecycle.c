@@ -9,12 +9,16 @@
 #include "game_experiment.h"
 #include "game_ghost.h"
 #include "game_window.h"
-#include "../effects/fog.h"
+#include "../effects/water.h"
 #include "../input/game_input.h"
 #include "../input/game_replay.h"
+#include "../levels/level_resources.h"
 #include "../levels/level_session.h"
 #include "../player/player.h"
 #include "../screens/hud.h"
+#include "../shared/audio.h"  /* sound_stop_all */
+
+#include <string.h>           /* memset */
 
 /*
  * game_init — Set up every subsystem needed before the game loop starts.
@@ -27,7 +31,19 @@ int game_init(GameState *gs)
 {
     if (game_window_init(gs) != 0) goto fail;
 
-    if (game_resources_load(gs) != 0) goto fail;
+    /*
+     * The shared sprites and sounds. AppSession copies its loaded set into
+     * gs->assets before calling game_init. A GameState started without a
+     * session, as the tests do, still has empty slots: it loads a private
+     * set and owns it, so game_cleanup will unload that set.
+     */
+    if (!game_resources_loaded(&gs->assets)) {
+        gs->owns_assets = 1;
+        if (game_resources_load(&gs->assets) != 0) goto fail;
+    }
+
+    /* The default water strip; a level may swap it (level_resources_apply). */
+    if (water_init(&gs->world.water) != 0) goto fail;
 
     /* Set up the player (loads texture, sets initial position on the floor). */
     if (player_init(&gs->world.player) != 0) goto fail;
@@ -112,13 +128,22 @@ void game_cleanup(GameState *gs)
     /* Free HUD resources (font + generated textures, renderer-dependent). */
     hud_cleanup(&gs->screen.hud);
 
-    /* Free fog textures before the renderer disappears. */
-    fog_cleanup(&gs->world.fog);
+    /* Silence this game's sound effects; their samples may outlive it. */
+    sound_stop_all();
+
+    /* The level's own files: music, fog, water strip, floor tileset,
+     * platform tiles and background layers. */
+    level_resources_cleanup(gs);
 
     /* Free player texture before shared texture resources. */
     player_cleanup(&gs->world.player);
 
-    game_resources_cleanup(gs);
+    /* Unload the shared sprites and sounds only if this GameState loaded
+     * them; borrowed ones belong to AppSession and stay loaded for the
+     * next game. */
+    if (gs->owns_assets) game_resources_unload(&gs->assets);
+    gs->owns_assets = 0;
+    memset(&gs->assets, 0, sizeof(gs->assets));
 
     game_window_cleanup(gs);
 }

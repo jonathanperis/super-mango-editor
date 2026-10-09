@@ -106,6 +106,10 @@ static void draw_floor(GameState *gs, int cam_x)
 {
     const int P = FLOOR_PIECE_W;   /* 9-slice piece size: 16 px */
 
+    /* The level's own tileset, or the shared default when it names none. */
+    Texture2D *tileset = gs->world.floor_tile ? gs->world.floor_tile
+                                              : gs->assets.textures.floor_tile;
+
     /* First piece column at or before the left edge of the viewport */
     int floor_start_tx = (cam_x / P) * P;
 
@@ -167,7 +171,7 @@ static void draw_floor(GameState *gs, int cam_x)
              */
             IntRect src = { piece_col * P, piece_row * P, P, P };
             IntRect dst = { tx - cam_x,    ty,            P, P };
-            sprite_draw(gs->assets.textures.floor_tile, &src, &dst, 0, SPRITE_NORMAL, WHITE);
+            sprite_draw(tileset, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }
     }
 }

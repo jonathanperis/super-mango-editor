@@ -62,9 +62,9 @@ be available for level authors without being selected by a current campaign or l
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `water.wav` | `MusicTrack` | `gs->assets.audio.music` | 6 s seamless loop: filtered-noise wash and surf with slow swells and bubbles; water-themed levels |
-| `lava.wav` | `MusicTrack` | `gs->assets.audio.music` | 6 s seamless loop: low brown-noise rumble, sizzle, slow bubbles and crackles; lava-themed levels |
-| `winds.wav` | `MusicTrack` | `gs->assets.audio.music` | 8 s seamless loop: band-limited noise with drifting band and gusts; available, no current level selects it |
+| `water.wav` | `MusicTrack` | `gs->world.music` | 6 s seamless loop: filtered-noise wash and surf with slow swells and bubbles; water-themed levels |
+| `lava.wav` | `MusicTrack` | `gs->world.music` | 6 s seamless loop: low brown-noise rumble, sizzle, slow bubbles and crackles; lava-themed levels |
+| `winds.wav` | `MusicTrack` | `gs->world.music` | 8 s seamless loop: band-limited noise with drifting band and gusts; available, no current level selects it |
 
 ---
 
@@ -121,10 +121,12 @@ backing-storage cost. See [Asset Inventory](../asset-inventory/).
 { CHUNK_FIELD(<name>), "assets/sounds/<category>/<name>.wav", "<name>.wav" },
 ```
 
-   `game_resources_load` (called by `game_init`) loads every row through
-   `sound_load`, printing a warning and leaving the slot `NULL` when a file is
-   missing (non-fatal). `game_resources_cleanup` walks the same table in reverse
-   with `FREE_CHUNK`, so no separate free call is needed.
+   `game_resources_load` loads every row through `sound_load`, printing a
+   warning and leaving the slot `NULL` when a file is missing (non-fatal).
+   `AppSession` calls it once, when the first game opens, and lends the
+   loaded sounds to every game after that, so Replay does not load them
+   again. `game_resources_unload` walks the same table in reverse with
+   `FREE_CHUNK` when the session ends, so no separate free call is needed.
 
 4. Play it wherever the event occurs:
 
@@ -153,11 +155,11 @@ into its head so `MusicTrack` can repeat it without a click.
 
 ```c
 // Load (streaming — not fully decoded into RAM)
-gs->assets.audio.music = music_load("assets/sounds/levels/new_track.wav");
-if (!gs->assets.audio.music) { /* handle error */ }
+gs->world.music = music_load("assets/sounds/levels/new_track.wav");
+if (!gs->world.music) { /* handle error */ }
 
 // Start (loop forever)
-music_play(gs->assets.audio.music);
+music_play(gs->world.music);
 
 // Volume (0-128)
 music_set_volume(64); // 50%
@@ -166,8 +168,8 @@ music_set_volume(64); // 50%
 music_update();
 
 // Stop and free
-music_unload(gs->assets.audio.music);
-gs->assets.audio.music = NULL;
+music_unload(gs->world.music);
+gs->world.music = NULL;
 ```
 
 The normal session applies authored `music_volume` scaled by the player's saved

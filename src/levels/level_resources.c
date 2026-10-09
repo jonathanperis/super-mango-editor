@@ -1,11 +1,20 @@
 /*
- * level_resources.c — Apply LevelDef-driven runtime resources.
+ * level_resources.c — Load and release the files a level names.
+ *
+ * Background layers, the floor tileset, the water strip, fog layers and
+ * music all come from the LevelDef, so they belong to gs->world and change
+ * with the level: level_resources_apply swaps them in when a level is
+ * committed, level_resources_cleanup releases them when the game closes.
+ * The sprites every level shares are in gs->assets instead (game_resources.c).
  */
 
 #include "level_resources.h"
+#include "level_loader.h"        /* level_release_platform_tiles */
+#include "../core/game_resources.h"  /* DEFAULT_FLOOR_TILE_PATH */
 #include "../shared/platform.h"  /* str_copy */
 
 #include <stdio.h>
+#include <string.h>   /* strcmp */
 
 #include "../effects/fog.h"
 #include "../effects/parallax.h"
@@ -32,19 +41,19 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
         parallax_init(&gs->world.parallax);
     }
 
-    {
-        const char *floor_path = def->floor_tile_path[0] != '\0'
-                               ? def->floor_tile_path
-                               : "assets/sprites/levels/grass_tileset.png";
-        Texture2D *new_floor = texture_load(floor_path);
-        if (!new_floor) {
-            fprintf(stderr, "Warning: failed to load floor tile %s\n", floor_path);
-            new_floor = texture_load("assets/sprites/levels/grass_tileset.png");
-        }
-        if (new_floor) {
-            texture_unload(gs->assets.textures.floor_tile);
-            gs->assets.textures.floor_tile = new_floor;
-        }
+    /*
+     * Floor tileset. A level that names its own file gets its own copy in
+     * gs->world.floor_tile; NULL means "draw the shared default", the grass
+     * tileset in gs->assets (also the fallback when the named file fails
+     * to load), so most levels decode no floor image at all.
+     */
+    texture_unload(gs->world.floor_tile);
+    gs->world.floor_tile = NULL;
+    if (def->floor_tile_path[0] != '\0' &&
+        strcmp(def->floor_tile_path, DEFAULT_FLOOR_TILE_PATH) != 0) {
+        gs->world.floor_tile = texture_load(def->floor_tile_path);
+        if (!gs->world.floor_tile)
+            fprintf(stderr, "Warning: failed to load floor tile %s\n", def->floor_tile_path);
     }
 
     {
@@ -71,17 +80,37 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
         fog_init(&gs->world.fog, (const char (*)[64])fog_paths, n);
     }
 
-    if (gs->assets.audio.music) {
-        music_unload(gs->assets.audio.music);
-        gs->assets.audio.music = NULL;
+    if (gs->world.music) {
+        music_unload(gs->world.music);
+        gs->world.music = NULL;
     }
     if (def->music_path[0] != '\0') {
-        gs->assets.audio.music = music_load(def->music_path);
-        if (!gs->assets.audio.music) {
+        gs->world.music = music_load(def->music_path);
+        if (!gs->world.music) {
             fprintf(stderr, "Warning: failed to load %s\n", def->music_path);
         } else {
-            music_play(gs->assets.audio.music);
+            music_play(gs->world.music);
             music_set_volume(def->music_volume); /* zero is an authored mute */
         }
     }
+}
+
+/*
+ * level_resources_cleanup — Release every file the level loaded, plus the
+ * water strip game_init loaded, in reverse order of level_resources_apply.
+ * Each helper clears what it frees, so a half-started game is safe too.
+ */
+void level_resources_cleanup(GameState *gs)
+{
+    if (gs->world.music) {
+        music_unload(gs->world.music);
+        gs->world.music = NULL;
+    }
+    fog_cleanup(&gs->world.fog);
+    water_cleanup(&gs->world.water);
+    texture_unload(gs->world.floor_tile);
+    gs->world.floor_tile = NULL;
+    /* Platform tiles are shared per path; the cache unloads each once. */
+    level_release_platform_tiles(gs);
+    parallax_cleanup(&gs->world.parallax);
 }

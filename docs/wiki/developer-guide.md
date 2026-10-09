@@ -152,7 +152,7 @@ Steps to add a new sound:
 
 1. Add a generator for the sound to `tools/gen_sounds.py` and run `make sounds`; it writes `assets/sounds/<category>/<name>.wav`.
 2. Add `SoundEffect *<name>;` to `AudioResources` in `game.h`.
-3. Add a row to `s_optional_chunks` in `src/core/game_resources.c`. Loading is non-fatal (a missing file warns and leaves the slot NULL), and cleanup frees the table in reverse order:
+3. Add a row to `s_optional_chunks` in `src/core/game_resources.c`. Loading is non-fatal (a missing file warns and leaves the slot NULL). The session loads the table once and lends the sounds to every game, and frees it in reverse order when it ends:
 
 ```c
 { CHUNK_FIELD(<name>), "assets/sounds/<category>/<name>.wav", "<name>.wav" },
@@ -172,15 +172,15 @@ Background music uses raylib streams through the project `MusicTrack` owner. Run
 
 ```c
 // Load from current LevelDef
-gs->assets.audio.music = music_load(def->music_path);
+gs->world.music = music_load(def->music_path);
 
 // Play (looping)
-music_play(gs->assets.audio.music);
+music_play(gs->world.music);
 music_set_volume(64); // 50%; normal sessions combine level/user/mute settings
 
 // Cleanup
-music_unload(gs->assets.audio.music);
-gs->assets.audio.music = NULL;
+music_unload(gs->world.music);
+gs->world.music = NULL;
 ```
 
 ---

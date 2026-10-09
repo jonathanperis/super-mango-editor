@@ -1,5 +1,11 @@
 /*
- * game_resources.c — Load and release renderer/audio resources owned by GameState.
+ * game_resources.c — Load and release the shared sprites and sounds (GameAssets).
+ *
+ * Three tables below list every shared texture and sound effect: where it
+ * goes in GameAssets (a byte offset, see TEX_FIELD), its file and a label
+ * for messages. game_resources_load walks them forwards; game_resources_unload
+ * walks them backwards. AppSession calls both once per session; game_init
+ * calls them only for a GameState started without a session.
  */
 
 #include "game_resources.h"
@@ -7,10 +13,6 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
-
-#include "../effects/water.h"
-#include "../effects/parallax.h"
-#include "../levels/level_loader.h"  /* level_release_platform_tiles */
 
 #define ARRAY_LEN(arr) ((int)(sizeof(arr) / sizeof((arr)[0])))
 #define TEX_FIELD(field) offsetof(TextureResources, field)
@@ -29,7 +31,7 @@ typedef struct {
 } ChunkLoadSpec;
 
 static const TextureLoadSpec s_boot_textures[] = {
-    { TEX_FIELD(floor_tile), "assets/sprites/levels/grass_tileset.png",
+    { TEX_FIELD(floor_tile), DEFAULT_FLOOR_TILE_PATH,
       "Failed to load Grass_Tileset.png" },
     { TEX_FIELD(platform), "assets/sprites/levels/grass_platform.png",
       "Failed to load Grass_Oneway.png" }
@@ -100,14 +102,14 @@ static const ChunkLoadSpec s_optional_chunks[] = {
     { CHUNK_FIELD(hit), "assets/sounds/player/player_hit.wav", "hit.wav" }
 };
 
-static Texture2D **texture_slot(GameState *gs, size_t offset)
+static Texture2D **texture_slot(GameAssets *assets, size_t offset)
 {
-    return (Texture2D **)((char *)&gs->assets.textures + offset);
+    return (Texture2D **)((char *)&assets->textures + offset);
 }
 
-static SoundEffect **chunk_slot(GameState *gs, size_t offset)
+static SoundEffect **chunk_slot(GameAssets *assets, size_t offset)
 {
-    return (SoundEffect **)((char *)&gs->assets.audio + offset);
+    return (SoundEffect **)((char *)&assets->audio + offset);
 }
 
 static int game_resources_fail(const char *label, const char *detail)
@@ -143,113 +145,93 @@ static SoundEffect *load_optional_chunk(const char *path, const char *label)
     return chunk;
 }
 
-static int load_required_texture_specs(GameState *gs,
+static int load_required_texture_specs(GameAssets *assets,
                                        const TextureLoadSpec *specs, int count)
 {
     for (int i = 0; i < count; i++) {
         Texture2D *tex = load_required_texture(specs[i].path,
                                                  specs[i].label);
         if (!tex) return -1;
-        *texture_slot(gs, specs[i].offset) = tex;
+        *texture_slot(assets, specs[i].offset) = tex;
     }
     return 0;
 }
 
-static void load_optional_texture_specs(GameState *gs,
+static void load_optional_texture_specs(GameAssets *assets,
                                         const TextureLoadSpec *specs, int count)
 {
     for (int i = 0; i < count; i++) {
-        *texture_slot(gs, specs[i].offset) =
+        *texture_slot(assets, specs[i].offset) =
             load_optional_texture(specs[i].path, specs[i].label);
     }
 }
 
-static void load_optional_chunk_specs(GameState *gs, const ChunkLoadSpec *specs,
+static void load_optional_chunk_specs(GameAssets *assets, const ChunkLoadSpec *specs,
                                       int count)
 {
     for (int i = 0; i < count; i++) {
-        *chunk_slot(gs, specs[i].offset) = load_optional_chunk(specs[i].path,
+        *chunk_slot(assets, specs[i].offset) = load_optional_chunk(specs[i].path,
                                                                specs[i].label);
     }
 }
 
-static void destroy_texture_specs_reverse(GameState *gs,
+static void destroy_texture_specs_reverse(GameAssets *assets,
                                           const TextureLoadSpec *specs,
                                           int count)
 {
     for (int i = count - 1; i >= 0; i--) {
-        Texture2D **slot = texture_slot(gs, specs[i].offset);
+        Texture2D **slot = texture_slot(assets, specs[i].offset);
         DESTROY_TEX(*slot);
     }
 }
 
-static void free_chunk_specs_reverse(GameState *gs, const ChunkLoadSpec *specs,
+static void free_chunk_specs_reverse(GameAssets *assets, const ChunkLoadSpec *specs,
                                      int count)
 {
     for (int i = count - 1; i >= 0; i--) {
-        SoundEffect **slot = chunk_slot(gs, specs[i].offset);
+        SoundEffect **slot = chunk_slot(assets, specs[i].offset);
         FREE_CHUNK(*slot);
     }
 }
 
-static void game_resources_reset_owned_slots(GameState *gs)
+int game_resources_load(GameAssets *assets)
 {
-    memset(&gs->assets.textures, 0, sizeof(gs->assets.textures));
-    memset(&gs->assets.audio, 0, sizeof(gs->assets.audio));
-    gs->world.water.texture = NULL;
-    gs->world.water.scroll_x = 0.0f;
-}
+    /* Start from empty slots, so game_resources_unload after a failure
+     * below frees exactly what was loaded. */
+    memset(assets, 0, sizeof(*assets));
 
-int game_resources_load(GameState *gs)
-{
-    game_resources_reset_owned_slots(gs);
-
-    if (load_required_texture_specs(gs, s_boot_textures,
+    if (load_required_texture_specs(assets, s_boot_textures,
                                     ARRAY_LEN(s_boot_textures)) != 0) {
         return -1;
     }
-
-    if (water_init(&gs->world.water) != 0) return -1;
-
-    if (load_required_texture_specs(gs, s_required_textures,
+    if (load_required_texture_specs(assets, s_required_textures,
                                     ARRAY_LEN(s_required_textures)) != 0) {
         return -1;
     }
-    load_optional_texture_specs(gs, s_optional_textures,
+    load_optional_texture_specs(assets, s_optional_textures,
                                 ARRAY_LEN(s_optional_textures));
-    load_optional_chunk_specs(gs, s_optional_chunks, ARRAY_LEN(s_optional_chunks));
+    load_optional_chunk_specs(assets, s_optional_chunks, ARRAY_LEN(s_optional_chunks));
 
     return 0;
 }
 
-void game_resources_cleanup(GameState *gs)
+void game_resources_unload(GameAssets *assets)
 {
     /* Stop every effect channel before freeing any chunk it may reference. */
     sound_stop_all();
 
-    /* Level-specific resources are applied after core resources; release first. */
-    if (gs->assets.audio.music) {
-        music_unload(gs->assets.audio.music);
-        gs->assets.audio.music = NULL;
-    }
-
-    parallax_cleanup(&gs->world.parallax);
-
-    /* Platform tiles are shared per path; the cache unloads each once. */
-    level_release_platform_tiles(gs);
-
-    /* Core audio chunks: reverse order of game_resources_load(). */
-    free_chunk_specs_reverse(gs, s_optional_chunks, ARRAY_LEN(s_optional_chunks));
-
-    /* Core textures: reverse order of game_resources_load(). */
-    destroy_texture_specs_reverse(gs, s_optional_textures,
+    /* Sound effects, then textures: reverse order of game_resources_load(). */
+    free_chunk_specs_reverse(assets, s_optional_chunks, ARRAY_LEN(s_optional_chunks));
+    destroy_texture_specs_reverse(assets, s_optional_textures,
                                   ARRAY_LEN(s_optional_textures));
-    destroy_texture_specs_reverse(gs, s_required_textures,
+    destroy_texture_specs_reverse(assets, s_required_textures,
                                   ARRAY_LEN(s_required_textures));
+    destroy_texture_specs_reverse(assets, s_boot_textures, ARRAY_LEN(s_boot_textures));
+}
 
-    water_cleanup(&gs->world.water);
-
-    destroy_texture_specs_reverse(gs, s_boot_textures, ARRAY_LEN(s_boot_textures));
+int game_resources_loaded(const GameAssets *assets)
+{
+    return assets->textures.floor_tile != NULL;
 }
 
 static int missing_level_texture(size_t offset)

@@ -21,7 +21,8 @@ level_loader.c         -> copy validated LevelDef placements into the gs->world 
 There is no per-entity `_init` or `_cleanup`. Placement happens in
 `level_loader.c` (for example `load_coins()`, one row of its `s_level_loaders`
 table), and the shared texture slot in
-`gs->assets.textures` is loaded and released by `src/core/game_resources.c`. Static
+`gs->assets.textures` is loaded and released by `src/core/game_resources.c`,
+once per session. Static
 entities need even less: a coin stores only its placement state in `Coin` and
 exposes just `coins_render()`, and collection is handled in `src/collision/`.
 Only the player has `player_init()` and `player_cleanup()`, because it owns its
