@@ -1128,9 +1128,10 @@ int editor_recover_entry_by_id(EditorState *es, uint64_t recovery_id)
  * editor_ask_recovery_action — One native dialog about entry `index`.
  *
  * Native dialogs have at most three buttons (macOS allows no more), and the
- * picker needs four actions.  With one snapshot the buttons are
+ * picker needs five actions.  With one snapshot the buttons are
  * Cancel / Recover / Discard.  With several, the third button is "More...",
- * which asks a second question: Back / Discard / Next.
+ * which asks a second question: Back / Discard... / Next; and Discard...
+ * a third: Back / This copy / All N copies.
  * Returns an EditorRecoveryAction, or -1 when the dialog failed.
  */
 static int editor_ask_recovery_action(const EditorState *es, int index)
@@ -1165,7 +1166,7 @@ static int editor_ask_recovery_action(const EditorState *es, int index)
     if (button_id == 1) return EDITOR_RECOVERY_RECOVER;
     if (!several) return EDITOR_RECOVERY_DISCARD;
     {
-        const char *buttons[] = {"Back", "Discard", "Next"};
+        const char *buttons[] = {"Back", "Discard...", "Next"};
         snprintf(message, sizeof(message),
                  "Discard copy %d of %d (deleting it), or look at the next one?\n"
                  "Source: %s\nTimestamp: %s",
@@ -1173,8 +1174,22 @@ static int editor_ask_recovery_action(const EditorState *es, int index)
         if (dialog_choice("Recover Editor Snapshot", message, buttons, 3, 2, 0,
                           &button_id) != 0) return -1;
     }
-    if (button_id == 1) return EDITOR_RECOVERY_DISCARD;
     if (button_id == 2) return EDITOR_RECOVERY_NEXT;
+    if (button_id != 1) return EDITOR_RECOVERY_BACK;
+    {
+        char all[32];
+        const char *buttons[] = {"Back", "This copy", all};
+        snprintf(all, sizeof(all), "All %d copies", es->recovery_entry_count);
+        snprintf(message, sizeof(message),
+                 "Delete copy %d only, or all %d recovery copies?\n"
+                 "Deleted copies cannot be recovered.",
+                 index + 1, es->recovery_entry_count);
+        /* Back is the default: deleting everything takes a deliberate click. */
+        if (dialog_choice("Discard Editor Snapshots", message, buttons, 3, 0, 0,
+                          &button_id) != 0) return -1;
+    }
+    if (button_id == 1) return EDITOR_RECOVERY_DISCARD;
+    if (button_id == 2) return EDITOR_RECOVERY_DISCARD_ALL;
     return EDITOR_RECOVERY_BACK;
 }
 
@@ -1217,6 +1232,26 @@ int editor_choose_recovery(EditorState *es)
             }
             if (index >= es->recovery_entry_count) index = 0;
             continue;
+        }
+        if (action == EDITOR_RECOVERY_DISCARD_ALL) {
+            /* Every copy offered here: another running editor's live work
+             * was never offered, so it is not touched.  The list is re-read
+             * after each removal, so always take the first entry. */
+            int discarded = 0;
+            while (es->recovery_entry_count > 0) {
+                if (editor_remove_recovery_entry(es, 0) != 0) {
+                    editor_set_status(es, "Discarded %d recovery cop%s; could not "
+                                      "discard the rest", discarded,
+                                      discarded == 1 ? "y" : "ies");
+                    es->pending_recovery_id = 0;
+                    return -1;
+                }
+                discarded++;
+            }
+            es->pending_recovery_id = 0;
+            editor_set_status(es, "Discarded %d recovery cop%s", discarded,
+                              discarded == 1 ? "y" : "ies");
+            return -1;
         }
         if (action == EDITOR_RECOVERY_NEXT)
             index = (index + 1) % es->recovery_entry_count;

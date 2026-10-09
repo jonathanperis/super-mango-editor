@@ -34,13 +34,15 @@ typedef enum {
     EDITOR_RECOVERY_RECOVER = 1, /* load this copy                       */
     EDITOR_RECOVERY_NEXT = 2,    /* look at the next copy                */
     EDITOR_RECOVERY_DISCARD = 3, /* delete this copy's files             */
-    EDITOR_RECOVERY_BACK = 4     /* from "More...": ask about it again   */
+    EDITOR_RECOVERY_BACK = 4,    /* from "More...": ask about it again   */
+    EDITOR_RECOVERY_DISCARD_ALL = 5 /* delete every copy offered         */
 } EditorRecoveryAction;
 
 /* Show the native recovery picker (Cancel / Recover / Discard, with
- * "More..." for Discard / Next when there are several copies).  Returns the
- * chosen entry's index (its id is left in es->pending_recovery_id), or -1
- * when cancelled or when every copy was discarded. */
+ * "More..." for Discard... / Next when there are several copies, and
+ * Discard... asking "this copy or all of them").  Returns the chosen
+ * entry's index (its id is left in es->pending_recovery_id), or -1 when
+ * cancelled or when every copy was discarded. */
 int editor_choose_recovery(EditorState *es);
 
 /* Delete snapshot files that have lost their .meta (they can never be
