@@ -82,6 +82,9 @@ rewrites it only when the text differs. Every object lists its stamp as a
 prerequisite, so a changed setting rebuilds exactly what it affects (for
 example `make BUILD_MODE=release` after a debug build in the same `OUTDIR`
 recompiles everything with `-O2`), and an unchanged one rebuilds nothing.
+Test sources (`tests/*.c`) and `tools/level_check.c` compile through the same
+object rules with `-MMD -MP`, so editing a shared test header such as
+`tests/test_paths.h` rebuilds exactly the tests that include it.
 
 `RAYLIB_PLATFORM=memory` selects raylib's software framebuffer and miniaudio's
 null backend for explicit headless tests. Use a dedicated `OUTDIR`, such as
@@ -628,6 +631,8 @@ out/
     │   ├── player/*.o / *.d
     │   └── ...
     ├── tests/                           ← test-flag copies, same mirrored paths (make test)
+    │   └── tests/*.o / *.d              ← the test sources themselves
+    ├── tools/level_check.o / .d         ← level checker (make validate-levels)
     ├── web-build-flags.txt              ← flag stamp for the Web pages (make web)
     └── vendor/tomlc17/tomlc17.o / .d
 ```

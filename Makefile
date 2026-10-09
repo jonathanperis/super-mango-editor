@@ -199,6 +199,14 @@ TEST_AUDIO_OBJ     = $(TEST_OBJDIR)/$(SHARED_DIR)/audio.o
 TEST_SESSION_OBJ   = $(TEST_OBJDIR)/$(SRCDIR)/core/app_session.o
 TEST_INPUT_BACKEND_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/input_backend.o
 TEST_LIBS           = $(LIBS)
+# Each test's own .c files (tests/rail_test.c and friends) compile through the
+# same test-object rule, into $(TEST_OBJDIR)/tests/, so their -MMD dependency
+# files notice edits to shared test headers such as tests/test_paths.h. The
+# fuzz harnesses and the parser probe build separately (see their rules).
+TEST_SOURCE_DIR  = $(TEST_OBJDIR)/tests
+TEST_SOURCE_OBJS = $(patsubst %.c,$(TEST_OBJDIR)/%.o,$(filter-out tests/fuzz_%.c tests/parser_allocation_test.c,$(wildcard tests/*.c)))
+# tools/level_check.c (validate-levels) is compiled the same way, with CFLAGS.
+TOOL_OBJS = $(OBJDIR)/tools/level_check.o
 PLATFORM_OBJS = $(addprefix $(OBJDIR)/src/shared/,audio.o graphics.o platform.o text.o) $(OBJDIR)/src/input/input_backend.o
 # Every TEST_*_OBJ / TEST_*_OBJS variable above, so new ones need no extra list.
 TEST_OBJECTS := $(foreach name,$(filter %_OBJ %_OBJS,$(filter TEST_%,$(.VARIABLES))),$($(name)))
@@ -342,12 +350,12 @@ test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser
 
 $(TEST_TARGETS): | $(OUTDIR)
 $(filter-out $(OUTDIR)/session-test $(OUTDIR)/game-events-test,$(TEST_TARGETS)): $(PLATFORM_OBJS)
-$(OUTDIR)/game-events-test: $(filter-out $(OBJDIR)/src/input/input_backend.o,$(PLATFORM_OBJS)) $(TEST_INPUT_BACKEND_OBJ) tests/input_backend_test.c
+$(OUTDIR)/game-events-test: $(filter-out $(OBJDIR)/src/input/input_backend.o,$(PLATFORM_OBJS)) $(TEST_INPUT_BACKEND_OBJ) $(TEST_SOURCE_DIR)/input_backend_test.o
 $(OUTDIR)/editor-validation-test $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/editor/dialog_choice.o
 # A rebuilt dependency must refresh consumers and relink executables. Exported
 # headers retain upstream timestamps, so header mtimes alone are insufficient.
 # The flags stamp rebuilds every object when a compiler or flag changes.
-$(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS)): $(RAYLIB_LIB) $(BUILD_FLAGS_STAMP)
+$(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS) $(TOOL_OBJS)): $(RAYLIB_LIB) $(BUILD_FLAGS_STAMP)
 
 # Extra standalone parser probes; keep the 17-regression-binary inventory above.
 .PHONY: parser-allocation-probe parser-encoding-probe
@@ -373,8 +381,14 @@ validate-levels: $(LEVEL_CHECK) ## Check: Every level, the campaign manifest and
 	$(RUN_PREFIX) "$(abspath $(LEVEL_CHECK))" $(LEVEL_FILES)
 	python3 tools/validate_levels.py
 
-$(LEVEL_CHECK): tools/level_check.c $(LEVEL_CHECK_OBJS) | $(OUTDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ -lm
+$(LEVEL_CHECK): $(TOOL_OBJS) $(LEVEL_CHECK_OBJS) | $(OUTDIR)
+	$(CC) $(CFLAGS) -o $@ $^ -lm
+
+$(OBJDIR)/tools/%.o: tools/%.c | $(OUTDIR)
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+
+-include $(TOOL_OBJS:.o=.d)
 
 web-host-contract: ## Check: Web shell, storage and packaging contract tests
 	python3 tools/check_web_boot_contract.py
@@ -559,65 +573,65 @@ $(TEST_INPUT_BACKEND_OBJ): TEST_OBJ_FLAGS = $(TEST_INPUT_BACKEND_FLAGS)
 # Vendored tomlc17 builds without project include paths, as in the game.
 $(TEST_TOMLC_OBJ): TEST_OBJ_INCLUDES =
 
-$(OUTDIR)/level-serializer-test: tests/level_serializer_test.c $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
+$(OUTDIR)/level-serializer-test: $(TEST_SOURCE_DIR)/level_serializer_test.o $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
-$(OUTDIR)/level-serializer-test: tests/parser_boundary_test.c
+$(OUTDIR)/level-serializer-test: $(TEST_SOURCE_DIR)/parser_boundary_test.o
 
 # level_validate.c shares the levels/<name>.toml rule from level_ref.c.
 $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
 $(OUTDIR)/runtime-load-test $(OUTDIR)/editor-validation-test \
 $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/levels/level_ref.o
 
-$(OUTDIR)/level-validate-test: tests/level_validate_test.c $(TEST_VALIDATE_OBJ)
+$(OUTDIR)/level-validate-test: $(TEST_SOURCE_DIR)/level_validate_test.o $(TEST_VALIDATE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
-$(OUTDIR)/runtime-load-test: tests/runtime_load_test.c $(TEST_LEVEL_LOADER_OBJ) \
+$(OUTDIR)/runtime-load-test: $(TEST_SOURCE_DIR)/runtime_load_test.o $(TEST_LEVEL_LOADER_OBJ) \
 		$(TEST_GAME_RANDOM_OBJ) \
 		$(TEST_VALIDATE_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_RAIL_OBJ) \
 		$(TEST_SPIKE_BLOCK_OBJ) $(TEST_FLOAT_PLATFORM_OBJ) \
 		$(TEST_BOUNCEPAD_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
 
-$(OUTDIR)/rail-test: tests/rail_test.c $(TEST_RAIL_OBJ)
+$(OUTDIR)/rail-test: $(TEST_SOURCE_DIR)/rail_test.o $(TEST_RAIL_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
-$(OUTDIR)/entity-utils-test: tests/entity_utils_test.c $(TEST_ENTITY_UTILS_OBJ)
+$(OUTDIR)/entity-utils-test: $(TEST_SOURCE_DIR)/entity_utils_test.o $(TEST_ENTITY_UTILS_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
-$(OUTDIR)/collision-test: tests/collision_test.c $(TEST_SPIKE_PLATFORM_OBJ) \
+$(OUTDIR)/collision-test: $(TEST_SOURCE_DIR)/collision_test.o $(TEST_SPIKE_PLATFORM_OBJ) \
 		$(TEST_FISH_OBJ) $(TEST_CIRCULAR_SAW_OBJ) $(TEST_ENTITY_UTILS_OBJ) $(TEST_GAME_RANDOM_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
-$(OUTDIR)/phase-transition-test: tests/phase_transition_test.c $(TEST_PHASE_OBJ)
+$(OUTDIR)/phase-transition-test: $(TEST_SOURCE_DIR)/phase_transition_test.o $(TEST_PHASE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
-$(OUTDIR)/editor-validation-test: tests/editor_validation_test.c $(TEST_EDITOR_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
+$(OUTDIR)/editor-validation-test: $(TEST_SOURCE_DIR)/editor_validation_test.o $(TEST_EDITOR_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(EDITOR_LIBS)
 
 # The editor as a designer drives it: events in, document/undo state out.
-$(OUTDIR)/editor-ui-test: tests/editor_ui_test.c $(TEST_EDITOR_OBJS) $(TEST_EDITOR_FRAME_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
+$(OUTDIR)/editor-ui-test: $(TEST_SOURCE_DIR)/editor_ui_test.o $(TEST_EDITOR_OBJS) $(TEST_EDITOR_FRAME_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(EDITOR_LIBS)
 
-$(OUTDIR)/gameplay-damage-test: tests/gameplay_damage_test.c $(TEST_COLLISION_DAMAGE_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_CHECKPOINT_OBJ) $(TEST_HUD_OBJ)
+$(OUTDIR)/gameplay-damage-test: $(TEST_SOURCE_DIR)/gameplay_damage_test.o $(TEST_COLLISION_DAMAGE_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_CHECKPOINT_OBJ) $(TEST_HUD_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
 
-$(OUTDIR)/gameplay-config-test: tests/gameplay_config_test.c $(TEST_GAME_CAMERA_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
+$(OUTDIR)/gameplay-config-test: $(TEST_SOURCE_DIR)/gameplay_config_test.o $(TEST_GAME_CAMERA_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
 
-$(OUTDIR)/gameplay-score-test: tests/gameplay_score_test.c $(TEST_GAME_SCORE_OBJ)
+$(OUTDIR)/gameplay-score-test: $(TEST_SOURCE_DIR)/gameplay_score_test.o $(TEST_GAME_SCORE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
-$(OUTDIR)/game-overlay-test: tests/game_overlay_test.c $(TEST_GAME_OVERLAY_OBJ)
+$(OUTDIR)/game-overlay-test: $(TEST_SOURCE_DIR)/game_overlay_test.o $(TEST_GAME_OVERLAY_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
-$(OUTDIR)/game-events-test: tests/game_events_test.c $(TEST_GAME_EVENTS_OBJ) $(TEST_GAME_INPUT_OBJ) $(TEST_WEB_INPUT_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_TERMINAL_OBJ) $(TEST_SETTINGS_OBJ) $(TEST_BINDINGS_OBJ) $(TEST_EDITOR_UI_OBJ)
+$(OUTDIR)/game-events-test: $(TEST_SOURCE_DIR)/game_events_test.o $(TEST_GAME_EVENTS_OBJ) $(TEST_GAME_INPUT_OBJ) $(TEST_WEB_INPUT_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_TERMINAL_OBJ) $(TEST_SETTINGS_OBJ) $(TEST_BINDINGS_OBJ) $(TEST_EDITOR_UI_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
 
-$(OUTDIR)/session-test: tests/session_test.c tests/game_profile_test.c tests/simulation_test.c tests/audio_contract_test.c tests/web_frame_pacing_test.c $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $(filter %.c %.o,$^) $(LIBS)
+$(OUTDIR)/session-test: $(TEST_SOURCE_DIR)/session_test.o $(TEST_SOURCE_DIR)/game_profile_test.o $(TEST_SOURCE_DIR)/simulation_test.o $(TEST_SOURCE_DIR)/audio_contract_test.o $(TEST_SOURCE_DIR)/web_frame_pacing_test.o $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $(filter %.o,$^) $(LIBS)
 
-$(OUTDIR)/game-checkpoint-test: tests/game_checkpoint_test.c $(TEST_GAME_CHECKPOINT_OBJ)
+$(OUTDIR)/game-checkpoint-test: $(TEST_SOURCE_DIR)/game_checkpoint_test.o $(TEST_GAME_CHECKPOINT_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
 
 # Every game object except main.o: the mechanics test drives whole levels
@@ -626,9 +640,9 @@ $(OUTDIR)/game-checkpoint-test: tests/game_checkpoint_test.c $(TEST_GAME_CHECKPO
 # compiles the MANGO_TESTING input seams.
 GAMEPLAY_TEST_OBJS = $(filter-out $(OBJDIR)/src/main.o $(OBJDIR)/src/input/game_input.o,$(OBJS)) \
                      $(TEST_GAME_INPUT_OBJ)
-$(OUTDIR)/gameplay-mechanics-test: tests/gameplay_mechanics_test.c tests/game_replay_test.c \
-		tests/gameplay_mechanics_test.h $(GAMEPLAY_TEST_OBJS)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $(filter %.c %.o,$^) $(LIBS)
+$(OUTDIR)/gameplay-mechanics-test: $(TEST_SOURCE_DIR)/gameplay_mechanics_test.o $(TEST_SOURCE_DIR)/game_replay_test.o \
+		$(GAMEPLAY_TEST_OBJS)
+	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $(filter %.o,$^) $(LIBS)
 
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
 # Requires the Emscripten SDK (emcc on PATH).
