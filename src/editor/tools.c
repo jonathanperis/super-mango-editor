@@ -367,7 +367,7 @@ static PlacementData move_placement(EntityType type, const PlacementData *from,
          * lands exactly on y = 0 (e.g. Shift-snap to the top row) is stored
          * as 1 px so it is not read back as "default height". */
         if (dy != 0.0f) {
-            pd.axe_trap.y = editor_axe_trap_y(&from->axe_trap) + dy;
+            pd.axe_trap.y = level_axe_trap_y(&from->axe_trap) + dy;
             if (pd.axe_trap.y <= 0.0f) pd.axe_trap.y = 1.0f;
         }
         break;
@@ -376,7 +376,7 @@ static PlacementData move_placement(EntityType type, const PlacementData *from,
         pd.circular_saw.patrol_x0 += dx;
         pd.circular_saw.patrol_x1 += dx;
         if (dy != 0.0f) {    /* same "0 = default height" rule as axes */
-            pd.circular_saw.y = editor_circular_saw_y(&from->circular_saw) + dy;
+            pd.circular_saw.y = level_circular_saw_y(&from->circular_saw) + dy;
             if (pd.circular_saw.y <= 0.0f) pd.circular_saw.y = 1.0f;
         }
         break;

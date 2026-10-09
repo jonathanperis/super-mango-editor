@@ -534,6 +534,38 @@ typedef struct {
 _Static_assert(sizeof(LevelDef) <= LEVEL_DEF_SIZE_BUDGET,
                "LevelDef outgrew its size budget; keep load staging off the stack");
 
+/* ------------------------------------------------------------------ */
+/* Positions the game derives instead of storing                       */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Some placements leave a coordinate to the game.  The loader (runtime
+ * objects), the validator and the editor (canvas, hit test, dragging) must
+ * all agree on it, so each formula lives here exactly once.
+ *
+ * level_platform_top_y — top edge of a ground pillar `tile_height` tiles
+ * tall.  Pillars stand on the floor and overlap it by 16 px (one floor
+ * piece), so the top is FLOOR_Y - tile_height * TILE_SIZE + 16.
+ */
+static inline float level_platform_top_y(int tile_height)
+{
+    return (float)(FLOOR_Y - tile_height * TILE_SIZE + 16);
+}
+
+/* Axe traps store y = 0 for "default height": the pivot then sits on top of
+ * a 3-tile pillar.  Any other y is used as written. */
+static inline float level_axe_trap_y(const AxeTrapPlacement *p)
+{
+    return (p->y != 0.0f) ? p->y : level_platform_top_y(3);
+}
+
+/* Circular saws store y = 0 for "default height": the saw then rides along
+ * the top of a 2-tile pillar (its top edge SAW_DISPLAY_H above it). */
+static inline float level_circular_saw_y(const CircularSawPlacement *p)
+{
+    return (p->y != 0.0f) ? p->y : level_platform_top_y(2) - (float)SAW_DISPLAY_H;
+}
+
 /* Resolve the original spawn, including the legacy engine default. */
 static inline void level_effective_spawn(const LevelDef *def,
                                          float *x, float *y)
