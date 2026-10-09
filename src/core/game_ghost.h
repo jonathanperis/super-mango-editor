@@ -132,5 +132,15 @@ int game_ghost_file_path(const char *profile_path, const char *level_key,
  * owned), 0 none stored, -1 unreadable or invalid. */
 int game_ghost_load(const GameProfile *profile, const char *level_key, GameGhostTrack *out);
 
-/* Store track as its level's ghost, replacing an older one. 0 or -1. */
+/* What game_ghost_save did. */
+enum {
+    GHOST_SAVE_FAILED = -1,  /* not stored: storage full, busy or failed  */
+    GHOST_SAVE_WRITTEN = 0,  /* track is now its level's ghost            */
+    GHOST_SAVE_KEPT = 1      /* the stored ghost (same level version) was
+                                read again and is at least as fast: kept */
+};
+
+/* Store track as its level's ghost unless the ghost stored right now is
+ * at least as fast (another window or tab may have saved one since this
+ * game loaded it). Returns a GHOST_SAVE_* value. */
 int game_ghost_save(const GameProfile *profile, const GameGhostTrack *track);

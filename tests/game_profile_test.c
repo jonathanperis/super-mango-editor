@@ -985,6 +985,53 @@ fail:
     return 1;
 }
 
+/*
+ * Two game windows on one profile: this one loaded no ghost, then another
+ * stored a faster run before this one finished. The save used to trust
+ * the ghost loaded at level open and wrote the slower run over the faster
+ * one. It now reads the stored ghost again first and keeps it.
+ */
+static int ghost_save_keeps_a_faster_stored_run(void)
+{
+    char path[160], lock_path[176], ghost_path[200];
+    const char *level = "levels/00_sandbox_01.toml";
+    snprintf(path, sizeof(path), TEST_OUT "profile-ghost-race-%llu.toml", (unsigned long long)clock_millis());
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+    CHECK(game_ghost_file_path(path, level, ghost_path, sizeof(ghost_path)) == 0);
+    AppSessionConfig config = {.level_path = level, .profile_enabled = 1, .profile_path = path};
+    GameGhostTrack other = {.level = "levels/00_sandbox_01.toml", .count = 15, .time = 0.25f};
+    AppSession *session = session_create(&config);
+    CHECK(session && session->game && session->game->screen.ghost->best.count == 0);
+
+    /* The other window's faster run: 15 steps, 0.25 s. */
+    other.level_hash = session->game->world.source_level_hash;
+    other.samples = calloc(15, sizeof(*other.samples));
+    CHECK(other.samples);
+    CHECK(game_ghost_save(&session->profile, &other) == GHOST_SAVE_WRITTEN);
+    game_ghost_track_free(&other);
+
+    /* This window finishes in 0.5 s: the faster stored ghost stays. */
+    finish_run(session, 30, 0.5f);
+    CHECK(game_ghost_load(&session->profile, level, &other) == 1);
+    CHECK(other.count == 15 && other.time == 0.25f);
+    game_ghost_track_free(&other);
+
+    /* A faster run than the stored one still replaces it. */
+    session->game->screen.route = GAME_ROUTE_REPLAY;
+    session_frame(session);
+    finish_run(session, 6, 0.1f);
+    CHECK(game_ghost_load(&session->profile, level, &other) == 1 && other.count == 6);
+    game_ghost_track_free(&other);
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 0;
+fail:
+    game_ghost_track_free(&other);
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 1;
+}
+
 /* Collect raylib warnings so a test can see what the session logged. */
 static char last_warning[256];
 static void capture_warning(int level, const char *text, va_list args)
@@ -1053,6 +1100,7 @@ int game_profile_contract_test(void)
     puts("profile: start-point runs");
     if (start_point_runs_leave_the_profile_alone()) return 1;
     if (ghost_hidden_on_partial_runs()) return 1;
+    if (ghost_save_keeps_a_faster_stored_run()) return 1;
     puts("game_profile_contract_test: ok");
     return 0;
 }
