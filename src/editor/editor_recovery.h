@@ -44,7 +44,9 @@ typedef enum {
 int editor_choose_recovery(EditorState *es);
 
 /* Delete snapshot files that have lost their .meta (they can never be
- * offered), except this editor's own.  Returns how many were removed. */
+ * offered), except this editor's own and any written in the last five
+ * minutes (another editor may be about to write its .meta).  Returns how
+ * many were removed. */
 int editor_clean_orphan_recoveries(EditorState *es);
 
 /* Load one recovery snapshot, found by its id, as an unsaved document. */

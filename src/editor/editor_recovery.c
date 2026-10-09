@@ -45,6 +45,7 @@
 #include <bcrypt.h>     /* BCryptGenRandom */
 #else
 #include <dirent.h>     /* directory discovery */
+#include <sys/stat.h>   /* stat: how old an orphan snapshot is */
 #include <signal.h>     /* kill(pid, 0): is the owning editor still running? */
 #include <unistd.h>     /* getpid */
 #endif
@@ -59,6 +60,9 @@
 #define EDITOR_AUTOSAVE_MS   30000u
 #define EDITOR_STATUS_HOLD_MS 5000u  /* keep a fresh status message this long */
 #define EDITOR_RECOVERY_PREFIX "editor_recovery_"
+/* An orphan snapshot younger than this may belong to an editor that is
+ * between writing its .toml and its .meta; it is left alone. */
+#define EDITOR_ORPHAN_MIN_AGE_S (5 * 60)
 
 /*
  * A recovery metadata file holds one line:
@@ -707,7 +711,44 @@ int editor_discover_recoveries(EditorState *es)
  * offered (the .meta is what discovery reads), so it would only take up
  * space forever.  Older editors could leave one behind when autosave hit
  * the entry limit after writing the level.
+ *
+ * But every editor writes a new snapshot's .toml first and its .meta right
+ * after, so another editor starting in that moment sees an "orphan" that
+ * is about to get its .meta.  Only a snapshot last written more than
+ * EDITOR_ORPHAN_MIN_AGE_S ago is a real leftover; autosave rewrites a live
+ * one every 30 seconds, so a live snapshot is never that old.
  */
+
+/* Seconds since path was last written, or -1 when that is unknown. */
+static long long editor_file_age_seconds(const char *path)
+{
+#ifdef _WIN32
+    WIN32_FILE_ATTRIBUTE_DATA data;
+    FILETIME now_time;
+    ULARGE_INTEGER written, now;
+    wchar_t *wide = serializer_utf8_to_wide(path);
+    BOOL ok;
+
+    if (!wide) return -1;
+    ok = GetFileAttributesExW(wide, GetFileExInfoStandard, &data);
+    free(wide);
+    if (!ok) return -1;
+    GetSystemTimeAsFileTime(&now_time);
+    written.LowPart = data.ftLastWriteTime.dwLowDateTime;
+    written.HighPart = data.ftLastWriteTime.dwHighDateTime;
+    now.LowPart = now_time.dwLowDateTime;
+    now.HighPart = now_time.dwHighDateTime;
+    /* FILETIME counts 100-nanosecond steps. */
+    return now.QuadPart > written.QuadPart
+         ? (long long)((now.QuadPart - written.QuadPart) / 10000000ull) : 0;
+#else
+    struct stat info;
+    time_t now = time(NULL);
+    if (stat(path, &info) != 0) return -1;
+    return now > info.st_mtime ? (long long)(now - info.st_mtime) : 0;
+#endif
+}
+
 typedef struct {
     const EditorState *es;
     int removed;
@@ -728,6 +769,7 @@ static int editor_sweep_orphan_name(const char *name, void *context)
         editor_recovery_snapshot_path(sweep->es, id, snapshot_path,
                                       sizeof(snapshot_path)) != 0) return 0;
     if (serializer_probe_path_utf8(metadata_path) == SERIALIZER_PATH_MISSING &&
+        editor_file_age_seconds(snapshot_path) >= EDITOR_ORPHAN_MIN_AGE_S &&
         serializer_remove_utf8(snapshot_path) == 0)
         sweep->removed++;
     return 0;
