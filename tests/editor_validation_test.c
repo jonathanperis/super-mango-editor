@@ -355,6 +355,48 @@ static int warns_without_blocking(void)
     return 0;
 }
 
+/*
+ * The editor lists every error the game's rules find and adds only what
+ * the game cannot check: that files exist.  It never says the same thing
+ * twice, and accepts what the game accepts, such as screen_count 0 (the
+ * game's default of four screens).
+ */
+static int editor_checks_do_not_repeat_runtime_errors(void)
+{
+    LevelDef def;
+    EditorValidationReport report;
+
+    fill_valid_minimal(&def);
+    def.screen_count = 0;
+    if (expect_int("screen_count 0 accepted", editor_validate_level(&def, &report), 0) != 0 ||
+        expect_int("screen_count 0 errors", report.error_count, 0) != 0)
+        return 1;
+
+    def.screen_count = -1;
+    if (expect_int("negative screens refused", editor_validate_level(&def, &report), -1) != 0 ||
+        expect_int("negative screens once", report.error_count, 1) != 0 ||
+        expect_prefix("negative screens message", report.messages[0], "screen_count") != 0)
+        return 1;
+
+    /* A path in the wrong folder is the game's error; "missing" would
+     * be a second message about the same field. */
+    fill_valid_minimal(&def);
+    snprintf(def.music_path, sizeof(def.music_path), "%s", "music/missing.wav");
+    if (expect_int("wrong folder refused", editor_validate_level(&def, &report), -1) != 0 ||
+        expect_int("wrong folder once", report.error_count, 1) != 0 ||
+        expect_int("game's wording", strstr(report.messages[0], "must match") != NULL, 1) != 0)
+        return 1;
+
+    /* A path the game accepts but whose file is missing: the editor's own. */
+    snprintf(def.music_path, sizeof(def.music_path), "%s", "assets/sounds/missing.wav");
+    if (expect_int("missing refused", editor_validate_level(&def, &report), -1) != 0 ||
+        expect_int("missing once", report.error_count, 1) != 0 ||
+        expect_prefix("missing message", report.messages[0],
+                      "music_path missing: assets/sounds/missing.wav") != 0)
+        return 1;
+    return 0;
+}
+
 static int rejects_unsafe_asset_paths(void)
 {
     LevelDef def;
@@ -366,8 +408,8 @@ static int rejects_unsafe_asset_paths(void)
     if (expect_int("unsafe floor path result",
                    editor_validate_level(&def, &report), -1) != 0)
         return 1;
-    if (report.error_count < 1) {
-        fprintf(stderr, "editor_validation_test: unsafe floor path should report error\n");
+    if (report.error_count != 1) {
+        fprintf(stderr, "editor_validation_test: unsafe floor path should report exactly one error\n");
         return 1;
     }
 
@@ -381,8 +423,8 @@ static int rejects_unsafe_asset_paths(void)
     if (expect_int("unsafe platform path result",
                    editor_validate_level(&def, &report), -1) != 0)
         return 1;
-    if (report.error_count < 1) {
-        fprintf(stderr, "editor_validation_test: unsafe platform path should report error\n");
+    if (report.error_count != 1) {
+        fprintf(stderr, "editor_validation_test: unsafe platform path should report exactly one error\n");
         return 1;
     }
 
@@ -391,8 +433,8 @@ static int rejects_unsafe_asset_paths(void)
     if (expect_int("unsafe next phase result",
                    editor_validate_level(&def, &report), -1) != 0)
         return 1;
-    if (report.error_count < 1) {
-        fprintf(stderr, "editor_validation_test: unsafe next phase should report error\n");
+    if (report.error_count != 1) {
+        fprintf(stderr, "editor_validation_test: unsafe next phase should report exactly one error\n");
         return 1;
     }
 
@@ -5496,6 +5538,7 @@ int main(void)
     if (rejects_bad_runtime_link() != 0) return 1;
     if (warns_without_blocking() != 0) return 1;
     if (rejects_unsafe_asset_paths() != 0) return 1;
+    if (editor_checks_do_not_repeat_runtime_errors() != 0) return 1;
     if (save_and_load_resets_editor_session() != 0) return 1;
     if (invalid_save_preserves_existing_file() != 0) return 1;
     if (atomic_save_replaces_and_preserves_on_injected_errors() != 0) return 1;
