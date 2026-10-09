@@ -23,8 +23,11 @@ Use this page to choose the smallest useful verification set for a change. Run c
 ## Native Regression Tests
 
 The session suite also runs `tests/simulation_test.c`: 180-step capture/replay
-equivalence, the inspector never overriding a real pause, moving-platform carry (sideways, and down and up a RECT rail), same-frame hazard
-damage, required sprite failure and checkpoint respawn. Stable geometry belongs
+equivalence, the inspector never overriding a real pause, moving-platform
+carry (sideways, and down and up a RECT rail), same-frame hazard damage,
+required sprite failure, checkpoint respawn, floor-gap walls, health-star
+healing up to the heart cap, and jump buffering, coyote time and short hops.
+Stable geometry belongs
 in `tests/fixtures/runtime/`; showcase data is still checked separately for
 campaign ordering and round-trip validity. Editor regressions cover history
 ownership through overflow, undo/redo, branching and clearing.
@@ -66,9 +69,11 @@ profile, checkpoint, simulation and session behavior.
 `gameplay-mechanics-test` loads small levels from `tests/fixtures/runtime/`
 (climbing, hazards, creatures) and steps them through `game_update_active`:
 climbing on and off ladders, ropes and vines; the blue flame's eruption timing
-and damage; axe swings; spike-block rails (loop, detach, end cap); jumping
-spiders, a spider keeping its authored speed through every turn, fish leaps,
-bird patrols and bridge crumbling. It also replays
+and damage; axe swings; spike-block rails (loop, detach, end cap); knockback
+throwing a climber off; jumping spiders, a spider keeping its authored speed
+through every turn, fish and faster-fish leaps, bird patrols, bridge crumbling
+(and not crumbling under a player on another surface) and the camera jumping
+to the respawn point. It also replays
 `--replay-script` scripts (from a `--replay-dir` under the test output) and
 rejects malformed ones. `editor-ui-test` drives the editor with input events
 (palette picks, place, select, drag, delete, undo, wheel zoom/pan, property
