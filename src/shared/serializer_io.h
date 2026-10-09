@@ -135,8 +135,14 @@ int serializer_install_temp(const char *temp_path, const char *target_path,
 /* A checked save's last fingerprint check sees a changed file (as if another
  * program wrote it during the save), so the save returns -2. */
 #define SERIALIZER_TEST_FAILURE_SOURCE_CHANGED 7
+/* serializer_replace_file fails and leaves the target as it was (-1), as a
+ * rename refused by the OS would. */
+#define SERIALIZER_TEST_FAILURE_REPLACE 8
 #ifdef MANGO_TESTING
 void serializer_test_set_failure(int failure);  /* test builds only */
+/* Like serializer_test_set_failure, but REPLACE_STRANDED and REPLACE only
+ * fire on the (skip + 1)th replace: "the third file of a save fails". */
+void serializer_test_set_failure_after(int failure, int skip);
 #endif
 
 /* 1 when the injected test failure is `failure` (it is then used up);

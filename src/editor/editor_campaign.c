@@ -335,11 +335,149 @@ int editor_campaign_link_in_order(EditorState *es)
 /* Saving                                                              */
 /* ------------------------------------------------------------------ */
 
+/*
+ * One file a Campaign Save rewrites: where it goes, the temporary file that
+ * holds its new text, and which entry it belongs to (-1 for the manifest).
+ */
+typedef struct {
+    int entry;
+    char target[EDITOR_PATH_MAX];
+    char temp[EDITOR_PATH_MAX];
+} CampaignSaveFile;
+
+/* Every file of one Save: a level file per changed entry, plus the
+ * manifest.  Allocated per Save, since a campaign can list many levels. */
+typedef struct {
+    CampaignSaveFile *files;
+    int count;
+} CampaignSavePlan;
+
+/* Delete the temporary files from index `from` on and free the plan. */
+static void discard_temps(CampaignSavePlan *plan, int from)
+{
+    for (int k = from; k < plan->count; k++)
+        if (plan->files[k].temp[0]) serializer_remove_temp(plan->files[k].temp);
+    free(plan->files);
+    plan->files = NULL;
+    plan->count = 0;
+}
+
+/*
+ * write_temps — Phase one of a Save: list the files to rewrite and write
+ * each one's new text to a temporary sibling.  Returns 0, or -1 (status
+ * set) with every temporary already written deleted again.
+ */
+static int write_temps(EditorState *es, EditorCampaign *c, CampaignSavePlan *plan)
+{
+    plan->count = 0;
+    plan->files = calloc(c->catalog.count + 1, sizeof(*plan->files));
+    if (!plan->files) {
+        editor_set_status(es, "Campaign not saved: out of memory");
+        return -1;
+    }
+    for (size_t i = 0; i < c->catalog.count; i++) {
+        CampaignSaveFile *file = &plan->files[plan->count];
+        if (!level_changed(c, i)) continue;
+        file->entry = (int)i;
+        if (level_resolve_path(c->catalog.levels[i].path, file->target,
+                               sizeof(file->target)) != 0) {
+            editor_set_status(es, "Campaign not saved: cannot find %s",
+                              c->catalog.levels[i].path);
+            discard_temps(plan, 0);
+            return -1;
+        }
+        plan->count++;
+        if (level_write_temp(&c->catalog.levels[i].level, file->target,
+                             file->temp, sizeof(file->temp)) != 0) {
+            file->temp[0] = '\0';
+            editor_set_status(es, "Campaign not saved: writing %s failed; no file "
+                              "was changed", c->catalog.levels[i].path);
+            discard_temps(plan, 0);
+            return -1;
+        }
+    }
+    if (c->manifest_changed) {
+        CampaignSaveFile *file = &plan->files[plan->count++];
+        file->entry = -1;
+        memcpy(file->target, c->manifest_path, sizeof(file->target));
+        if (campaign_manifest_write_temp(c->manifest_path, &c->catalog,
+                                         file->temp, sizeof(file->temp)) != 0) {
+            file->temp[0] = '\0';
+            editor_set_status(es, "Campaign not saved: writing %s failed; no file "
+                              "was changed", c->manifest_path);
+            discard_temps(plan, 0);
+            return -1;
+        }
+    }
+    return 0;
+}
+
+/* Does every level file in the plan still hold what the view read?  When
+ * one does not, nothing may be installed (status set, returns 0). */
+static int plan_still_matches_disk(EditorState *es, const EditorCampaign *c,
+                                   const CampaignSavePlan *plan)
+{
+    for (int k = 0; k < plan->count; k++) {
+        const CampaignSaveFile *file = &plan->files[k];
+        SerializerFileFingerprint now;
+        if (file->entry < 0) continue;
+        if (serializer_fingerprint_utf8(file->target, &now) != 1 ||
+            !serializer_fingerprint_equal(&now, &c->disk[file->entry].fingerprint)) {
+            editor_set_status(es, "Campaign not saved: %s changed on disk; close and "
+                              "reopen the Campaign view",
+                              c->catalog.levels[file->entry].path);
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/*
+ * install_temps — Phase two: put each temporary file in its target's place.
+ * Returns how many level files were installed, or -1 when one file failed:
+ * the files before it are written (and remembered as saved), the ones
+ * after it are not, and the status names the count and the failed file.
+ */
+static int install_temps(EditorState *es, EditorCampaign *c, CampaignSavePlan *plan)
+{
+    int installed = 0;
+    int levels = 0;
+
+    for (int k = 0; k < plan->count; k++) {
+        CampaignSaveFile *file = &plan->files[k];
+        int result = serializer_install_temp(file->temp, file->target, 0);
+        const char *name = file->entry >= 0 ? c->catalog.levels[file->entry].path
+                                            : c->manifest_path;
+        if (result != 0) {
+            if (installed == 0)
+                editor_set_status(es, "Campaign not saved: writing %s failed; no file "
+                                  "was changed", name);
+            else
+                editor_set_status(es, "Campaign partly saved: %d of %d files written; "
+                                  "writing %s failed", installed, plan->count, name);
+            discard_temps(plan, k + 1);
+            return -1;
+        }
+        /* Written: this file now matches the view, whatever happens next. */
+        if (file->entry >= 0) {
+            remember_disk(&c->catalog.levels[file->entry], &c->disk[file->entry]);
+            levels++;
+        } else {
+            c->manifest_changed = 0;
+        }
+        installed++;
+    }
+    discard_temps(plan, plan->count);
+    return levels;
+}
+
 int editor_campaign_save(EditorState *es)
 {
     EditorCampaign *c = es ? es->campaign : NULL;
     char reload[EDITOR_PATH_MAX] = "";
-    int written = 0;
+    int reload_entry = -1;
+    CampaignSavePlan plan;
+    int written;
     int unloaded = 0;
 
     if (!c || !finish_edit(es)) return -1;
@@ -387,41 +525,35 @@ int editor_campaign_save(EditorState *es)
             return -1;
         }
         memcpy(reload, es->file_path, sizeof(reload));
+        reload_entry = (int)i;
     }
 
-    /* 3. Each changed level file, through the checked save: if someone
-     *    else changed the file since the view read it, it is left alone. */
-    for (size_t i = 0; i < c->catalog.count; i++) {
-        CampaignLevel *entry = &c->catalog.levels[i];
-        char resolved[EDITOR_PATH_MAX];
-        int result;
-        if (!level_changed(c, i)) continue;
-        if (level_resolve_path(entry->path, resolved, sizeof(resolved)) != 0) {
-            editor_set_status(es, "Campaign not saved: cannot find %s", entry->path);
-            return -1;
-        }
-        result = level_save_toml_checked(&entry->level, resolved, SERIALIZER_SAVE_REPLACE,
-                                         &c->disk[i].fingerprint);
-        if (result == -2) {
-            editor_set_status(es, "Campaign not saved: %s changed on disk; close and reopen "
-                              "the Campaign view", entry->path);
-            return -1;
-        }
-        if (result != 0) {
-            editor_set_status(es, "Campaign not saved: writing %s failed", entry->path);
-            return -1;
-        }
-        remember_disk(entry, &c->disk[i]);
-        written++;
-    }
+    /* 3. Write every file this save changes to a temporary file next to
+     *    it: the changed levels, then the manifest when its list changed.
+     *    Nothing is replaced yet, so any failure here leaves the campaign
+     *    on disk exactly as it was. */
+    if (write_temps(es, c, &plan) != 0) return -1;
 
-    /* 4. The manifest, when its list changed. */
-    if (c->manifest_changed) {
-        if (campaign_manifest_save(c->manifest_path, &c->catalog) != 0) {
-            editor_set_status(es, "Campaign not saved: writing %s failed", c->manifest_path);
-            return -1;
+    /* 4. Install them, one quick rename each.  Right before, every target
+     *    must still hold what the view read: the window in which another
+     *    program could slip a change in is now as short as it can be.
+     *    A rename can still fail half-way (a full disk, a file locked on
+     *    Windows); the status then says exactly which files were written. */
+    if (!plan_still_matches_disk(es, c, &plan)) {
+        discard_temps(&plan, 0);
+        return -1;
+    }
+    written = install_temps(es, c, &plan);
+    if (written < 0) {
+        /* The open level may be among the files that did get written: show
+         * it as it now is, and keep the failure in the status bar. */
+        if (reload_entry >= 0 && !level_changed(c, (size_t)reload_entry)) {
+            char failure[sizeof(es->status_message)];
+            memcpy(failure, es->status_message, sizeof(failure));
+            (void)editor_load_level(es, reload);
+            editor_set_status(es, "%s", failure);
         }
-        c->manifest_changed = 0;
+        return -1;
     }
     c->close_armed = 0;
 
