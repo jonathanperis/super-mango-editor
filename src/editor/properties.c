@@ -1357,8 +1357,10 @@ static int config_music(EditorState *es, int x, int y)
     }
     y += 22;
     ui_label(&es->ui, x + 8, y, "vol:");
+    /* The same 0..128 range the validator and the TOML format accept. */
     if (ui_int_field_limited(&es->ui, 9003, x + 50, y, 80,
-                             &es->level.music_volume, 0, 99, 1))
+                             &es->level.music_volume, 0,
+                             LEVEL_MUSIC_VOLUME_MAX, 1))
         editor_commit_change(es);
     return y + 24;
 }
