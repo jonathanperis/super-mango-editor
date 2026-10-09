@@ -108,24 +108,6 @@
                 moduleConfig.clearTouchInput = function() { touchControls.clear(); };
                 gameCanvas.tabIndex = 0;
                 gameCanvas.focus({preventScroll: true});
-                var replayLevel = null;
-                try {
-                    replayLevel = sessionStorage.getItem('super-mango-replay-level');
-                    if (replayLevel) {
-                        sessionStorage.removeItem('super-mango-replay-level');
-                        /* Session storage is shared with every page on this
-                         * origin. Only forward a bundled level path; the C
-                         * loader still validates the file it opens. This
-                         * pattern is intentionally stricter than the C
-                         * level_ref rule: it admits bundled names only. */
-                        if (/^levels\/(labs\/)?[A-Za-z0-9_-]+\.toml$/.test(replayLevel))
-                            moduleConfig.arguments = ['--level', replayLevel];
-                        else
-                            console.warn('Super Mango: ignored unexpected replay level path');
-                    }
-                } catch (e) {
-                    console.error('Super Mango: replay boot intent unavailable', e);
-                }
                 if (moduleConfig.__superMangoDebug) moduleConfig.arguments.push('--debug');
                 document.getElementById('status').style.display = 'none';
                 setTimeout(function() {

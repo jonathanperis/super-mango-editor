@@ -29,8 +29,7 @@ session_run(session)
        ├── start menu frame → Play or Exit route
        └── game_frame(gs) → Next Level, Replay, Level Select, or Exit route
             ├── Next Level: load resolved phase in current GameState
-            ├── native Replay: replace active game with same TOML path
-            ├── browser Replay: persist path, cancel callback, clean up, reload
+            ├── Replay (native and browser): close game, open same path in place
             └── Level Select: close game only, open start menu
 
 session_destroy(session) / browser terminal cleanup
@@ -210,7 +209,7 @@ after these 32 layers.
 
 Collecting `last_star` calls `game_complete_level()`. The game snapshots elapsed time, coins collected, total coins, and the resolved `next_phase` path (if any), then shows a completion overlay. While it is active, gameplay update pauses. Its action list is **Next Level**, **Replay**, **Level Select**, **Exit** when a phase is pending; otherwise it is **Replay**, **Level Select**, **Exit**. Up/Down or D-pad moves the focused row with wraparound. Enter/Space/Start confirms it (controller A also confirms). Esc/Back exits immediately (controller B is equivalent).
 
-Next Level uses `game_load_next_phase()` without replacing the game screen. If loading fails, the completion overlay stays visible with a "Next level failed to load" line (`completion.next_phase_failed`), the dead Next Level row is removed and focus moves to Replay; the current level is untouched, so the remaining actions keep working. That holds by construction: the next file is parsed and validated once into a heap copy and its sprites are checked before anything changes; only then is the active `LevelDef` swapped and applied, a step with no failure path. Level Select closes the game screen and opens the start menu in the same `AppSession`. Native Replay closes the game screen and opens the same TOML path in a new `GameState`; Browser Replay persists that path in session storage, cancels the Emscripten callback, tears down once, reloads, and then boots the stored level.
+Next Level uses `game_load_next_phase()` without replacing the game screen. If loading fails, the completion overlay stays visible with a "Next level failed to load" line (`completion.next_phase_failed`), the dead Next Level row is removed and focus moves to Replay; the current level is untouched, so the remaining actions keep working. That holds by construction: the next file is parsed and validated once into a heap copy and its sprites are checked before anything changes; only then is the active `LevelDef` swapped and applied, a step with no failure path. Level Select closes the game screen and opens the start menu in the same `AppSession`. Replay closes the game screen and opens the same TOML path in a new `GameState`, on native and in the browser alike; the window, audio device, frame callback and profile stay alive.
 
 ### Pause Overlay Flow
 

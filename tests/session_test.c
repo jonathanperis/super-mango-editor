@@ -828,31 +828,9 @@ fail:
 }
 
 typedef struct {
-    int store_result;
-    int store_calls;
-    int reload_calls;
-    AppSessionLifecycleEvent events[16];
+    AppSessionLifecycleEvent events[32];
     int event_count;
-    char reload_path[256];
 } LifecycleProbe;
-
-static int probe_store_replay(const char *path, void *userdata)
-{
-    LifecycleProbe *probe = userdata;
-    (void)path;
-    probe->store_calls++;
-    return probe->store_result;
-}
-
-static void probe_reload(const char *path, void *userdata)
-{
-    LifecycleProbe *probe = userdata;
-    probe->reload_calls++;
-    strncpy(probe->reload_path, path, sizeof(probe->reload_path) - 1);
-    probe->reload_path[sizeof(probe->reload_path) - 1] = '\0';
-    if (probe->event_count < (int)(sizeof(probe->events) / sizeof(probe->events[0])))
-        probe->events[probe->event_count++] = APP_SESSION_EVENT_RELOAD_REQUESTED;
-}
 
 static void probe_lifecycle(AppSessionLifecycleEvent event, const char *path,
                             void *userdata)
@@ -863,75 +841,67 @@ static void probe_lifecycle(AppSessionLifecycleEvent event, const char *path,
         probe->events[probe->event_count++] = event;
 }
 
-static int replay_storage_failure_retains_session_and_success_orders_cleanup(void)
+/*
+ * Browser Replay used to persist the level path, free the whole session and
+ * reload the page. The browser frame callback now replaces the game in
+ * place, exactly as the native loop does: the callback stays registered,
+ * the window, audio and profile stay alive, and only the GameState is
+ * swapped. force_callback_mode runs the browser's callback-owned path.
+ */
+static int browser_replay_replaces_the_game_in_place(void)
 {
     LifecycleProbe probe = {0};
-    AppSessionHooks hooks = {
-        probe_store_replay,
-        probe_reload,
-        probe_lifecycle,
-        &probe,
-        1
-    };
-    AppSessionConfig config = {0};
-    AppSession *session;
-    static const AppSessionLifecycleEvent expected[] = {
-        APP_SESSION_EVENT_WEB_INPUT_REPAIRED,
-        APP_SESSION_EVENT_CALLBACK_REGISTERED,
-        APP_SESSION_EVENT_CALLBACK_CANCELLED,
-        APP_SESSION_EVENT_GAME_CLOSED,
-        APP_SESSION_EVENT_RUNTIME_CLEANED,
-        APP_SESSION_EVENT_SESSION_FREED,
-        APP_SESSION_EVENT_RELOAD_REQUESTED
-    };
-
-    config.level_path = "levels/00_sandbox_01.toml";
-    config.smoke_test_frames = 0;
-    config.hooks = &hooks;
-    session = session_create(&config);
+    AppSessionHooks hooks = {.lifecycle = probe_lifecycle, .userdata = &probe,
+                             .force_callback_mode = 1};
+    AppSessionConfig config = {.level_path = "levels/00_sandbox_01.toml", .hooks = &hooks};
+    AppSession *session = session_create(&config);
     if (!session) return 1;
+    Texture2D probe_texture = context_probe_open();
+    int failed = 1;
 
-    if (expect_int("callback registers once", session_run(session), EXIT_SUCCESS) != 0 ||
-        expect_int("callback second registration is ignored",
-                   session_run(session), EXIT_SUCCESS) != 0 ||
-        expect_int("callback registration count", session->callback_registration_count, 1) != 0)
-        goto fail;
+    if (expect_int("callback registers once", session_run(session), EXIT_SUCCESS) ||
+        expect_int("callback second registration is ignored", session_run(session), EXIT_SUCCESS) ||
+        expect_int("callback registration count", session->callback_registration_count, 1))
+        goto done;
 
-    probe.store_result = 0;
-    session->game->completion.complete = 1;
-    session->game->route = GAME_ROUTE_REPLAY;
-    session_frame(session);
-    if (expect_int("storage failure keeps game screen", session->screen, APP_SCREEN_GAME) != 0 ||
-        expect_int("storage failure keeps completion", session->game->completion.complete, 1) != 0 ||
-        expect_int("storage failure leaves callback", session->callback_cancelled, 0) != 0 ||
-        expect_int("storage failure leaves cleanup", session->runtime_cleanup_count, 0) != 0 ||
-        expect_int("storage failure counted", session->replay_storage_attempts, 1) != 0 ||
-        expect_int("storage failure not successful", session->replay_storage_successes, 0) != 0 ||
-        expect_int("storage failure status", strcmp(session->status_message,
-                                                    "Replay unavailable: storage failed") == 0, 1) != 0 ||
-        expect_int("storage failure emits no teardown", probe.event_count, 2) != 0)
-        goto fail;
-
-    probe.store_result = 1;
-    session->game->route = GAME_ROUTE_REPLAY;
-    session_frame(session);
-    if (expect_int("replay storage called twice", probe.store_calls, 2) != 0 ||
-        expect_int("reload called once after free", probe.reload_calls, 1) != 0 ||
-        expect_int("lifecycle ordering length", probe.event_count,
-                   (int)(sizeof(expected) / sizeof(expected[0]))) != 0)
-        return 1;
-    for (int i = 0; i < (int)(sizeof(expected) / sizeof(expected[0])); i++) {
-        if (expect_int("lifecycle ordering", probe.events[i], expected[i]) != 0)
-            return 1;
+    /* Unsaved profile changes no longer block Replay: the profile stays in
+     * memory, so nothing is lost by replaying. (This run has saving off, so
+     * the changes simply stay pending.) */
+    session->profile.error = session->profile.dirty = 1;
+    for (int round = 1; round <= 3; round++) {
+        session->game->completion.complete = 1;
+        session->game->score = 500;
+        session->game->route = GAME_ROUTE_REPLAY;
+        session_frame(session);
+        if (expect_int("replay keeps the session", session->ended, 0) ||
+            expect_int("replay keeps the game screen", session->screen, APP_SCREEN_GAME) ||
+            expect_int("replay has a game", session->game != NULL, 1) ||
+            expect_int("replay restarts the level", session->game->completion.complete, 0) ||
+            expect_int("replay resets the score", session->game->score, 0) ||
+            expect_int("replay opens count", session->game_open_count, round + 1) ||
+            expect_int("replay closes count", session->game_close_count, round) ||
+            expect_int("replay keeps the callback", session->callback_cancelled, 0) ||
+            expect_int("replay keeps the runtime", session->runtime_cleanup_count, 0) ||
+            expect_int("replay level path",
+                       strcmp(session->game->level_path, "levels/00_sandbox_01.toml"), 0))
+            goto done;
     }
-    if (expect_int("reload path", strcmp(probe.reload_path,
-                                         "levels/00_sandbox_01.toml") == 0, 1) != 0)
-        return 1;
-    return 0;
-
-fail:
+    if (expect_int("profile kept in memory", session->profile.dirty, 1) ||
+        expect_int("shared context survives replays", context_probe_alive(probe_texture), 1))
+        goto done;
+    for (int i = 0; i < probe.event_count; i++) {
+        if (probe.events[i] == APP_SESSION_EVENT_SESSION_FREED ||
+            probe.events[i] == APP_SESSION_EVENT_CALLBACK_CANCELLED ||
+            probe.events[i] == APP_SESSION_EVENT_RUNTIME_CLEANED) {
+            fprintf(stderr, "session_test: replay emitted teardown event %d\n", probe.events[i]);
+            goto done;
+        }
+    }
+    failed = 0;
+done:
+    UnloadTexture(probe_texture);
     session_destroy(&session);
-    return 1;
+    return failed;
 }
 
 static int pending_profile_keeps_exit_alive(void)
@@ -968,16 +938,12 @@ static int pending_profile_keeps_exit_alive(void)
 
 static int native_replay_keeps_session_ownership(void)
 {
-    LifecycleProbe probe = {.store_result = 1};
-    AppSessionHooks hooks = {.store_replay = probe_store_replay,
-                            .reload = probe_reload, .userdata = &probe};
     AppSessionConfig config = {.level_path = "tests/fixtures/runtime/transition.toml",
-                               .smoke_test_frames = 1, .hooks = &hooks};
+                               .smoke_test_frames = 1};
     AppSession *session = session_create(&config);
     if (!session) return 1;
     session->game->route = GAME_ROUTE_REPLAY;
     int result = session_run(session) != EXIT_SUCCESS ||
-                 expect_int("native replay does not call browser hook", probe.store_calls, 0) ||
                  expect_int("native replay reopens game", session->game_open_count, 2);
     session_destroy(&session);
     return result;
@@ -1358,7 +1324,7 @@ int main(void)
         CASE(direct_game_boot_repairs_input_and_keeps_controller_runtime),
         CASE(immediate_play_preserves_window_and_input_latch),
         CASE(repeated_menu_game_ownership), CASE(checkpoint_transitions_use_production_paths),
-        CASE(replay_storage_failure_retains_session_and_success_orders_cleanup)
+        CASE(browser_replay_replaces_the_game_in_place)
 #undef CASE
     };
     int failures = 0;

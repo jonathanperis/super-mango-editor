@@ -60,8 +60,10 @@ that origin can read or write the game's storage. Without a custom domain this
 cannot be isolated, so the game treats stored values as untrusted input:
 
 - Keys are prefixed: `super-mango-profile-v2` (with read-only fallback to
-  `super-mango-profile-v1`) in `localStorage`, and the one-shot
-  `super-mango-replay-level` boot intent in `sessionStorage`.
+  `super-mango-profile-v1`) in `localStorage`. The game no longer uses
+  `sessionStorage`: Replay restarts the level inside the running page, so the
+  host pages read no boot intent (`tools/check_web_boot_contract.py` fails if
+  one reappears).
 - Profiles hold only settings, key bindings and level progress; no credentials
   or personal data. The browser bridge rejects text containing NUL or larger
   than the fixed profile buffer, then `game_profile_decode()` parses it with
@@ -73,14 +75,6 @@ cannot be isolated, so the game treats stored values as untrusted input:
   `last_level`) whose level key fails today's level-reference rule, such as
   `levels/con.toml`, is dropped with a warning while the rest loads. The next
   save then writes the profile without it, through the same compare-and-swap.
-- The replay intent is removed as soon as it is read. Both pages that host the
-  game (the standalone `super-mango.html` shell and the docs-site home page,
-  `docs/src/components/home/Dashboard.astro`) forward it as a `--level`
-  argument only when it matches a bundled level path (`levels/NAME.toml` or
-  `levels/labs/NAME.toml`). The path must also fit the fixed level-path buffer, can only name
-  files inside the Emscripten in-memory filesystem (the preloaded `assets/`
-  and `levels/`), and the selected file still goes through full TOML schema
-  and level validation before use. It does not reach the host filesystem.
 - Profile writes use a compare-and-swap against the profile read at startup
   under a Web Lock, so a conflicting write from another tab is refused rather
   than silently overwritten.

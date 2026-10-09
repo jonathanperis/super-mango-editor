@@ -210,28 +210,7 @@ const manualColumns = SECTION_CATEGORIES.map(category => ({
     let reloadRequired = false;
     let touchControls = null;
 
-    function consumeReplayLevel() {
-        try {
-            const level = window.sessionStorage.getItem('super-mango-replay-level');
-            if (!level) return null;
-            window.sessionStorage.removeItem('super-mango-replay-level');
-            // Session storage is shared by every page on this origin. Forward
-            // only a bundled level path (same rule as web/shell.html); the C
-            // loader still validates whatever file it opens.
-            if (!/^levels\/(labs\/)?[A-Za-z0-9_-]+\.toml$/.test(level)) {
-                console.warn('[Super Mango] ignored unexpected replay level path');
-                return null;
-            }
-            return level;
-        } catch (error) {
-            console.error('[Super Mango] replay boot intent unavailable', error);
-            return null;
-        }
-    }
-
-    const replayBootLevel = consumeReplayLevel();
-
-    function startGame(debug = false, bootLevel = null) {
+    function startGame(debug = false) {
         if (reloadRequired) { window.location.reload(); return; }
         if (!canvas || !statusEl || !playBtn || gameBooted) return;
         gameBooted = true;
@@ -246,8 +225,9 @@ const manualColumns = SECTION_CATEGORIES.map(category => ({
         if (statusNote) statusNote.style.display = 'none';
         if (statusMessage) statusMessage.textContent = debug ? 'Booting developer diagnostics...' : 'Downloading normal game data...';
 
-        const replayLevel = bootLevel || consumeReplayLevel();
-        const args = ['--level', replayLevel || 'levels/00_sandbox_01.toml'];
+        // Replay restarts the level inside the running game, so the page
+        // always boots the sandbox level.
+        const args = ['--level', 'levels/00_sandbox_01.toml'];
         if (debug) args.push('--debug');
 
         const handleContextLoss = (event) => {
@@ -364,8 +344,4 @@ const manualColumns = SECTION_CATEGORIES.map(category => ({
             requestGameStart(control.getAttribute('data-start-game') === 'debug');
         });
     });
-
-    if (replayBootLevel) {
-        window.setTimeout(() => startGame(false, replayBootLevel), 0);
-    }
 </script>

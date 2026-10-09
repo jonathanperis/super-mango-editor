@@ -29,7 +29,7 @@ src/
 │   ├── floor_gap_collision.h / .c Sea-gap fall/death detection
 │   └── game_collision.h / .c     Gameplay collision passes and pickups
 ├── core/
-│   ├── app_session.h / .c        Heap-owned session: window/audio lifetime, menu/game routes, browser replay
+│   ├── app_session.h / .c        Heap-owned session: window/audio lifetime, menu/game routes, in-place replay
 │   ├── game_profile.h / .c       Versioned player settings/results and native/web persistence
 │   ├── game_inspector.h / .c     Simulation stepping, slow motion, tuning, status panel and F5 key help
 │   ├── game_experiment.h / .c    Bounded capture/export/replay with level fingerprints
@@ -200,7 +200,7 @@ For a beginner's reading order, continue through `core/app_session.c`,
 - When the working folder holds no `assets/`, make typed paths absolute and move to the executable's folder (`asset_root_enter`, `shared/asset_root.c`); the editor's `editor_main.c` does the same
 - Delegate window, input and audio initialization to `session_create`
 - Route to the start menu, sandbox, or direct TOML level mode through `session_create()`
-- Run `session_run()`; native callers then destroy the session, while browser replay frees it before requesting a reload
+- Run `session_run()`; native callers then destroy the session, while the browser callback frees it after terminal cleanup
 
 ### Subsystem Init Order
 
@@ -308,7 +308,7 @@ void game_complete_level(GameState *gs);
 
 ## Runtime Core (`core/app_session.c`, `core/game_lifecycle.c`, `core/game_loop.c`, `core/game_resources.c`)
 
-**Role:** `app_session.c` owns the app-level frame loop, window/audio lifetime, menu/game swaps, native/browser replay and shutdown. `game_lifecycle.c` owns active-game `game_init` / `game_cleanup`; `game_loop.c` owns `game_frame`; resource loading/reloading lives in `game_resources.c`.
+**Role:** `app_session.c` owns the app-level frame loop, window/audio lifetime, menu/game swaps, in-place replay and shutdown. `game_lifecycle.c` owns active-game `game_init` / `game_cleanup`; `game_loop.c` owns `game_frame`; resource loading/reloading lives in `game_resources.c`.
 
 ### `game_init(GameState *gs)`
 
@@ -379,7 +379,7 @@ Builds the single valid terminal-action list used by both rendering and input. C
 
 ### `core/app_session.h` / `core/app_session.c`
 
-Owns one heap-allocated application session and its active menu or game screen. Without `--level`, it loads and retains the validated v1 campaign catalog; the menu uses the catalog's names and ordered paths. A direct `--level` session bypasses the catalog. The session consumes explicit game routes after each rendered frame: next level stays in the current game; native replay replaces the game with the same TOML path; level select returns to the menu; browser replay stores the path in `sessionStorage`, cleans up once, cancels the Emscripten callback, and reloads.
+Owns one heap-allocated application session and its active menu or game screen. Without `--level`, it loads and retains the validated v1 campaign catalog; the menu uses the catalog's names and ordered paths. A direct `--level` session bypasses the catalog. The session consumes explicit game routes after each rendered frame: next level stays in the current game; replay replaces the game with the same TOML path in place (native and browser alike); level select returns to the menu.
 
 ---
 
