@@ -113,9 +113,20 @@ int editor_entity_remove(LevelDef *level, EntityType type, int index);
 int editor_rail_reference_count(const LevelDef *level, int rail_index,
                                 int *spike_blocks, int *float_platforms);
 int editor_selection_is_valid(const EditorState *es);
-/* Copy every selected entity into out (at most max) and return how many.
- * Group actions (nudge, duplicate...) walk this list. */
+/* Copy every selected entity into out (at most max), the primary one first,
+ * and return how many.  Group actions (move, delete, copy...) walk this. */
 int editor_selection_items(const EditorState *es, Selection *out, int max);
+/* How many entities are selected (0 when nothing is). */
+int editor_selection_count(const EditorState *es);
+/* 1 when (type, index) is part of the selection. */
+int editor_is_selected(const EditorState *es, EntityType type, int index);
+/* Clear the selection. */
+void editor_select_none(EditorState *es);
+/* Select exactly these entities (items[0] becomes the primary one); more
+ * than EDITOR_MAX_SELECTION are cut off.  Returns how many were taken. */
+int editor_select_items(EditorState *es, const Selection *items, int count);
+/* Shift+click: add (type, index) to the selection, or take it out. */
+void editor_selection_toggle(EditorState *es, EntityType type, int index);
 void editor_selection_reconcile(EditorState *es);
 /* Make (type, index) the whole selection. */
 void editor_select_only(EditorState *es, EntityType type, int index);

@@ -29,10 +29,12 @@
 
 #include "editor_recovery.h"   /* recovery paths and retirement on load/save */
 #include "editor_session.h"    /* editor status/title/persist helpers */
+#include "editor_clipboard.h"  /* editor_clipboard_forget_rails */
 #include "file_dialog.h"       /* file_dialog_open */
 #include "../shared/serializer.h"    /* shared level format */
 #include "../shared/serializer_io.h" /* UTF-8 file I/O */
 #include "undo.h"              /* undo_clear */
+#include "entity_meta.h"       /* editor_select_none */
 
 #define EDITOR_RECENT_MAX    5
 #define EDITOR_PREF_ORG      "Super Mango"
@@ -270,10 +272,10 @@ void editor_apply_loaded_level(EditorState *es, const LevelDef *level,
     memset(&es->source_fingerprint, 0, sizeof(es->source_fingerprint));
     es->source_state = EDITOR_SOURCE_UNKNOWN;
     undo_clear(es->undo);
-    es->selection.index = -1;
+    editor_select_none(es);
     /* A copied rail rider's rail index named a rail in the old document;
      * a paste here matches the rail by shape instead. */
-    es->clipboard_rail_index = -1;
+    editor_clipboard_forget_rails(es);
     if (modified) {
         editor_set_recovered_dirty(es);
     } else {

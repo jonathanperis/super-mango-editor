@@ -10,6 +10,7 @@
 #include "editor_files.h"
 #include "editor_session.h"
 #include "editor_textures.h"
+#include "entity_meta.h"     /* editor_select_none */
 #include <stdio.h>
 
 int editor_init(EditorState *es, int hidden)
@@ -30,7 +31,7 @@ int editor_init(EditorState *es, int hidden)
     es->camera.y = 0;
     es->camera.zoom = 2;
     es->tool = TOOL_SELECT;
-    es->selection.index = -1;
+    editor_select_none(es);
     es->palette_type = ENT_COIN;
     es->show_grid = es->panel_open = es->config_open = es->palette_open = 1;
     es->undo = undo_create();

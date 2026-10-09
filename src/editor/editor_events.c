@@ -10,6 +10,7 @@
 #include "editor_session.h"
 #include "editor_undo_apply.h"
 #include "tools.h"
+#include "entity_meta.h"   /* editor_select_none */
 
 static void editor_history(EditorState *es, int redo)
 {
@@ -133,9 +134,10 @@ static void editor_key(EditorState *es, const InputEvent *event)
     switch (key) {
     case KEY_ESCAPE:
         if (es->ui.active_id) ui_cancel_active_edit(&es->ui);
+        else if (es->box_selecting) tools_cancel_drag(es);
         else if (es->tool == TOOL_PLACE || es->tool == TOOL_DELETE) es->tool = TOOL_SELECT;
         else if (es->selection.index >= 0) {
-            es->selection.index = -1;
+            editor_select_none(es);
             es->panel_scroll = 0;
         }
         break;

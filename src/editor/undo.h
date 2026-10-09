@@ -316,6 +316,13 @@ int undo_amend_after(UndoStack *stack, int group, int entity_type,
                      int entity_index, const PlacementData *after);
 
 /*
+ * undo_take --- Remove the newest entry from the undo stack WITHOUT moving
+ * it to the redo stack (it is forgotten).  Used to roll back a group action
+ * that failed half way, which must leave nothing behind to redo.
+ */
+int undo_take(UndoStack *stack, Command *out);
+
+/*
  * undo_clear --- Reset both stacks to empty.
  *
  * Called when loading a new level or starting a fresh editing session.

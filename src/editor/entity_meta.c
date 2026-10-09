@@ -730,11 +730,53 @@ int editor_selection_is_valid(const EditorState *es)
            es->selection.index;
 }
 
+/*
+ * The selection is es->selection (the primary entity) plus the list
+ * es->selection_more.  The helpers below are the only code that edits
+ * them, so they stay consistent: no entity listed twice, nothing listed
+ * when the primary is empty, and no index past the end of its array.
+ */
+static int same_entity(Selection a, EntityType type, int index)
+{
+    return a.type == type && a.index == index;
+}
+
+static int entity_exists(const EditorState *es, Selection s)
+{
+    return s.index >= 0 && s.index < editor_entity_count(&es->level, s.type);
+}
+
+int editor_selection_count(const EditorState *es)
+{
+    if (!es || !editor_selection_is_valid(es)) return 0;
+    return 1 + es->selection_more_count;
+}
+
 int editor_selection_items(const EditorState *es, Selection *out, int max)
 {
+    int count = 0;
+
     if (!es || !out || max <= 0 || !editor_selection_is_valid(es)) return 0;
-    out[0] = es->selection;
-    return 1;
+    out[count++] = es->selection;
+    for (int i = 0; i < es->selection_more_count && count < max; i++)
+        out[count++] = es->selection_more[i];
+    return count;
+}
+
+int editor_is_selected(const EditorState *es, EntityType type, int index)
+{
+    if (!es || !editor_selection_is_valid(es)) return 0;
+    if (same_entity(es->selection, type, index)) return 1;
+    for (int i = 0; i < es->selection_more_count; i++)
+        if (same_entity(es->selection_more[i], type, index)) return 1;
+    return 0;
+}
+
+void editor_select_none(EditorState *es)
+{
+    if (!es) return;
+    es->selection.index = -1;
+    es->selection_more_count = 0;
 }
 
 void editor_select_only(EditorState *es, EntityType type, int index)
@@ -742,31 +784,111 @@ void editor_select_only(EditorState *es, EntityType type, int index)
     if (!es) return;
     es->selection.type = type;
     es->selection.index = index;
+    es->selection_more_count = 0;
     editor_selection_reconcile(es);
+}
+
+int editor_select_items(EditorState *es, const Selection *items, int count)
+{
+    editor_select_none(es);
+    if (!es || !items) return 0;
+    for (int i = 0; i < count; i++) {
+        if (editor_is_selected(es, items[i].type, items[i].index)) continue;
+        if (es->selection.index < 0) {
+            es->selection = items[i];
+        } else if (es->selection_more_count < EDITOR_MAX_SELECTION - 1) {
+            es->selection_more[es->selection_more_count++] = items[i];
+        }
+    }
+    editor_selection_reconcile(es);
+    return editor_selection_count(es);
+}
+
+void editor_selection_toggle(EditorState *es, EntityType type, int index)
+{
+    Selection item;
+
+    if (!es) return;
+    item.type = type;
+    item.index = index;
+    if (!entity_exists(es, item)) return;
+    if (!editor_is_selected(es, type, index)) {
+        if (!editor_selection_is_valid(es)) es->selection = item;
+        else if (es->selection_more_count < EDITOR_MAX_SELECTION - 1)
+            es->selection_more[es->selection_more_count++] = item;
+        return;
+    }
+    if (same_entity(es->selection, type, index)) {
+        /* The primary goes: the first of the others takes its place. */
+        if (es->selection_more_count == 0) {
+            es->selection.index = -1;
+            return;
+        }
+        es->selection = es->selection_more[0];
+        index = 0;
+    } else {
+        for (index = 0; index < es->selection_more_count; index++)
+            if (same_entity(es->selection_more[index], type, item.index)) break;
+    }
+    /* Close the gap in the list. */
+    for (int i = index; i + 1 < es->selection_more_count; i++)
+        es->selection_more[i] = es->selection_more[i + 1];
+    es->selection_more_count--;
 }
 
 void editor_selection_reconcile(EditorState *es)
 {
+    int kept = 0;
+
     if (!es) return;
-    if (!editor_selection_is_valid(es)) es->selection.index = -1;
+    if (es->selection_more_count < 0) es->selection_more_count = 0;
+    if (es->selection_more_count > EDITOR_MAX_SELECTION - 1)
+        es->selection_more_count = EDITOR_MAX_SELECTION - 1;
+    /* Drop listed entities that no longer exist. */
+    for (int i = 0; i < es->selection_more_count; i++)
+        if (entity_exists(es, es->selection_more[i]))
+            es->selection_more[kept++] = es->selection_more[i];
+    es->selection_more_count = kept;
+    if (!editor_selection_is_valid(es)) {
+        /* No primary: the first other entity takes its place, if any. */
+        if (es->selection_more_count > 0) {
+            es->selection = es->selection_more[0];
+            for (int i = 0; i + 1 < es->selection_more_count; i++)
+                es->selection_more[i] = es->selection_more[i + 1];
+            es->selection_more_count--;
+        } else {
+            es->selection.index = -1;
+        }
+    }
+}
+
+/* What a removal of (type, index) does to one remembered entity: it is
+ * gone (-1), or a later one moves down a slot. */
+static void shift_after_remove(Selection *s, EntityType type, int index)
+{
+    if (s->type != type || s->index < 0) return;
+    if (s->index == index) s->index = -1;
+    else if (s->index > index) s->index--;
 }
 
 /*
  * The two helpers below run after every insert or removal that shifts an
  * entity array (tools and undo/redo alike).  Besides the selection they
- * keep the clipboard's copied rail rider pointing at its own rail.
+ * keep the clipboard's copied rail riders pointing at their own rails.
  */
 void editor_selection_after_remove(EditorState *es, EntityType type, int index)
 {
+    int kept = 0;
+
     if (!es) return;
     if (type == ENT_RAIL) editor_clipboard_after_rail_remove(es, index);
-    if (es->selection.type == type && es->selection.index >= 0) {
-        if (es->selection.index == index) {
-            es->selection.index = -1;
-        } else if (es->selection.index > index) {
-            es->selection.index--;
-        }
+    shift_after_remove(&es->selection, type, index);
+    for (int i = 0; i < es->selection_more_count; i++) {
+        shift_after_remove(&es->selection_more[i], type, index);
+        if (es->selection_more[i].index >= 0)
+            es->selection_more[kept++] = es->selection_more[i];
     }
+    es->selection_more_count = kept;
     editor_selection_reconcile(es);
 }
 
@@ -776,11 +898,14 @@ void editor_selection_after_insert(EditorState *es, EntityType type, int index,
     if (!es) return;
     if (type == ENT_RAIL) editor_clipboard_after_rail_insert(es, index);
     if (select_inserted) {
-        es->selection.type = type;
-        es->selection.index = index;
-    } else if (es->selection.type == type && es->selection.index >= index) {
-        es->selection.index++;
+        editor_select_only(es, type, index);
+        return;
     }
+    if (es->selection.type == type && es->selection.index >= index)
+        es->selection.index++;
+    for (int i = 0; i < es->selection_more_count; i++)
+        if (es->selection_more[i].type == type && es->selection_more[i].index >= index)
+            es->selection_more[i].index++;
     editor_selection_reconcile(es);
 }
 

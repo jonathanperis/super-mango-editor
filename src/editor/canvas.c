@@ -1237,16 +1237,29 @@ static void render_faster_birds(EditorState *es) {
 static void render_selection(EditorState *es) {
     EditorRect r;
 
-    if (es->selection.index < 0) return;
-    if (!editor_entity_bounds(&es->level, es->selection.type,
-                              es->selection.index, &r)) return;
+    static Selection items[EDITOR_MAX_SELECTION];
+    int count = editor_selection_items(es, items, EDITOR_MAX_SELECTION);
 
-    /* Draw 2-pixel accent outline around the selected entity */
-    int sx = w2s_x(es, r.x) - 2;
-    int sy = w2s_y(es, r.y) - 2;
-    int sw = w2s_w(es, (int)r.w) + 4;
-    int sh = w2s_h(es, (int)r.h) + 4;
-    draw_outline(sx, sy, sw, sh, 2, UI_ACCENT);
+    /* A 2-pixel accent outline around every selected entity. */
+    for (int i = 0; i < count; i++) {
+        if (!editor_entity_bounds(&es->level, items[i].type, items[i].index, &r))
+            continue;
+        int sx = w2s_x(es, r.x) - 2;
+        int sy = w2s_y(es, r.y) - 2;
+        int sw = w2s_w(es, (int)r.w) + 4;
+        int sh = w2s_h(es, (int)r.h) + 4;
+        draw_outline(sx, sy, sw, sh, 2, UI_ACCENT);
+    }
+
+    /* The rubber band of a box selection in progress. */
+    if (es->box_selecting) {
+        float x0 = es->box_x0 < es->box_x1 ? es->box_x0 : es->box_x1;
+        float y0 = es->box_y0 < es->box_y1 ? es->box_y0 : es->box_y1;
+        float w = es->box_x0 < es->box_x1 ? es->box_x1 - es->box_x0 : es->box_x0 - es->box_x1;
+        float h = es->box_y0 < es->box_y1 ? es->box_y1 - es->box_y0 : es->box_y0 - es->box_y1;
+        draw_outline(w2s_x(es, x0), w2s_y(es, y0), w2s_w(es, (int)w),
+                     w2s_h(es, (int)h), 1, UI_ACCENT);
+    }
 }
 
 /* ---- Ghost preview (placement mode) ------------------------------ */
