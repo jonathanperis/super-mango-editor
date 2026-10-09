@@ -94,6 +94,16 @@ int editor_add_placement(EditorState *es, EntityType type,
                          const PlacementData *pd, const char *action);
 
 /*
+ * Snap to grid.  editor_snap_active says whether the current click or drag
+ * snaps: es->snap_to_grid (toggled with S), inverted while Shift is held.
+ * editor_snap_point then rounds a world point down to the TILE_SIZE grid
+ * (and leaves it alone when snapping is off).  Placing, dragging and the
+ * placement ghost all go through these two.
+ */
+int editor_snap_active(const EditorState *es);
+void editor_snap_point(const EditorState *es, float *x, float *y);
+
+/*
  * editor_nearest_rail --- Index of the rail closest to world point (x, y),
  * or -1 when the level has no rails.  Spike-block placement and the float
  * platform's switch to Rail mode both attach to this rail.

@@ -29,6 +29,7 @@
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, TOOLBAR_H, etc. */
 #include "entity_meta.h" /* Editor display dimensions and rail helpers          */
 #include "hit_test.h"    /* editor_entity_bounds for the selection outline      */
+#include "tools.h"       /* editor_snap_point for the placement ghost           */
 #include "../levels/level_loader.h"
 #include "../game.h"    /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE,
                            FLOOR_GAP_W, MAX_* constants, GRAVITY            */
@@ -1261,9 +1262,11 @@ static void render_ghost(EditorState *es) {
     if (es->tool != TOOL_PLACE) return;
     if (!canvas_contains(es->mouse_x, es->mouse_y)) return;
 
-    /* Convert cursor position to world coordinates */
+    /* Convert cursor position to world coordinates, then onto the grid
+     * when a click here would snap (WYSIWYG: the ghost shows the spot). */
     float wx, wy;
     canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &wx, &wy);
+    editor_snap_point(es, &wx, &wy);
 
     /*
      * What to draw comes from the entity table (entity_meta.c): the sprite,

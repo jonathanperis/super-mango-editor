@@ -430,6 +430,11 @@ typedef struct {
 
     /* ---- UI toggles --------------------------------------------------- */
     int            show_grid;     /* 1 = draw grid lines on the canvas         */
+    /* 1 = placing and dragging snap to the TILE_SIZE grid (key S).  Holding
+     * Shift inverts it for one click or drag.  input_mods are the modifier
+     * keys of the latest mouse event, which tools and the ghost read. */
+    int            snap_to_grid;
+    int            input_mods;
     int            running;       /* 1 = main loop active, 0 = exit requested  */
     int            panel_scroll;  /* scroll offset (px) for the right panel    */
     /*
