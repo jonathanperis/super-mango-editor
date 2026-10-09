@@ -29,6 +29,14 @@ int editor_set_preference_root(EditorState *es, const char *root);
 /* Load recent file paths from persistent editor state. */
 void editor_load_recent_files(EditorState *es);
 
+/* Explain in the status bar why saving `path` failed; result is what the
+ * save returned (-2 changed on disk, SERIALIZER_REPLACE_TEMP_KEPT, or -1).
+ * lead (may be NULL) is put in front.  kept_path is the temporary file that
+ * holds the new contents after SERIALIZER_REPLACE_TEMP_KEPT; NULL means the
+ * one the last level save left (level_save_kept_temp_path). */
+void editor_report_save_failure(EditorState *es, int result, const char *path,
+                                const char *lead, const char *kept_path);
+
 /* Return non-zero when a path exists and can be opened for reading. */
 int editor_file_exists(const char *path);
 
