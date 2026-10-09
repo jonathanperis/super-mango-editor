@@ -267,7 +267,7 @@ levels = [
 | Listed files | Every entry must resolve and load as a TOML level. The start menu uses that level's `name`, falling back to its filename stem. |
 | Progression | Each non-final listed level must set `[last_star].next_phase` to the next manifest entry. The final listed level must omit `next_phase`. |
 
-The manifest order drives the native selector and generated [Level Catalog](../level-catalog/): Creator's Playground, then Volcanic Depths 1 and 2. `make validate-levels` checks the manifest, campaign levels and `levels/labs/*.toml`.
+The manifest order drives the native selector and generated [Level Catalog](../level-catalog/): Creator's Playground, then Volcanic Depths 1 and 2. `make validate-levels` checks the manifest, campaign levels and `levels/labs/*.toml`. The editor's [Campaign view](../level-editor/#campaign-view) (`Ctrl+M`) edits the manifest with the same rules: reorder, add, remove and rename levels, and relink every `next_phase` to the order in one step.
 
 At runtime, breaking the Version, Membership or Paths rules rejects the whole manifest. A listed file that is missing or invalid, or that breaks Progression, only disables its own entry: the menu lists it greyed out as "Unavailable: <reason>" (`level file not found`, `level file is invalid`, `next_phase is out of campaign order`, `final level has a next_phase`) and keeps every other level playable. A manifest with no playable entry is rejected. `--level <path>` bypasses the selector and can open a valid TOML file outside the campaign. The mechanics museum remains a separate collection of standalone examples.
 

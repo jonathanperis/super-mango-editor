@@ -27,6 +27,7 @@
 #include <string.h>    /* strcmp for platform texture selection          */
 
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, TOOLBAR_H, etc. */
+#include "editor_campaign.h" /* the Campaign view drawn in the canvas's place  */
 #include "entity_meta.h" /* Editor display dimensions and rail helpers          */
 #include "hit_test.h"    /* editor_entity_bounds for the selection outline      */
 #include "tools.h"       /* editor_snap_point for the placement ghost           */
@@ -167,6 +168,11 @@ static void draw_tex(EditorState *es, Texture2D *tex, const IntRect *src,
 
 void canvas_render(EditorState *es) {
     char error[128];
+    /* The Campaign view takes the canvas's place while it is open. */
+    if (es->campaign) {
+        editor_campaign_render(es);
+        return;
+    }
     /* Properties and Undo stay available while an invalid draft is corrected.
      * Never feed rejected counts/dimensions into the preview's tile loops. */
     if (level_validate_runtime(&es->level, error, sizeof(error)) != 0) {

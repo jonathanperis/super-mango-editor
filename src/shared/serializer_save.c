@@ -504,31 +504,28 @@ const char *level_save_kept_temp_path(void)
 }
 
 /*
- * level_save_toml_internal — The one save path behind every public saver.
+ * save_emitted — The one save path behind every public saver: write what
+ * emit(fp, context) prints to a sibling temporary file, flush it, then
+ * install it as `path` in one step (serializer_replace_file), so a failure
+ * at any point leaves the old file whole.
  *
  * private_file picks the permissions of a *new* file on POSIX: 1 for the
  * editor's own recovery and playtest copies (owner only, 0600), 0 for a
- * level the user saves (0666 minus the umask, usually 0644, like any text
+ * file the user saves (0666 minus the umask, usually 0644, like any text
  * editor).  Replacing an existing file keeps its permissions either way.
+ * expected, when given, must still describe `path` right before the
+ * replace (-2 otherwise, nothing written).
  */
-static int level_save_toml_internal(const LevelDef *def, const char *path,
-                                    const char *original_path,
-                                    SerializerSavePolicy policy,
-                                    const SerializerFileFingerprint *expected,
-                                    int private_file) {
+static int save_emitted(const char *path, SerializerEmitFn emit,
+                        const void *context, SerializerSavePolicy policy,
+                        const SerializerFileFingerprint *expected,
+                        int private_file)
+{
     char temp_path[SERIALIZER_IO_PATH_MAX];
     int install_result;
 
     s_kept_temp_path[0] = '\0';
-    if (!def || !path) return -1;
-
-    {
-        char err[128];
-        if (level_validate_runtime(def, err, sizeof(err)) != 0) {
-            fprintf(stderr, "serializer: invalid level for save '%s': %s\n", path, err);
-            return -1;
-        }
-    }
+    if (!path || !emit) return -1;
 
     /* The file written is `path` itself.  A symlink there is replaced, not
      * followed (see serializer_replace_file); callers that mean to save
@@ -547,8 +544,8 @@ static int level_save_toml_internal(const LevelDef *def, const char *path,
         return -1;
     }
 
-    /* Emit the level; stream errors are checked once, just below. */
-    write_level_toml(fp, def, original_path);
+    /* Emit the contents; stream errors are checked once, just below. */
+    emit(fp, context);
 
     {
         int write_result = serializer_stream_has_error(fp);
@@ -593,6 +590,48 @@ static int level_save_toml_internal(const LevelDef *def, const char *path,
     }
 
     return 0;
+}
+
+int serializer_save_file(const char *path, SerializerEmitFn emit,
+                         const void *context)
+{
+    return save_emitted(path, emit, context, SERIALIZER_SAVE_REPLACE, NULL, 0);
+}
+
+/* What write_level_toml needs, passed through save_emitted's context. */
+typedef struct {
+    const LevelDef *def;
+    const char *original_path;
+} LevelEmit;
+
+static void emit_level(FILE *fp, const void *context)
+{
+    const LevelEmit *level = context;
+    write_level_toml(fp, level->def, level->original_path);
+}
+
+/*
+ * level_save_toml_internal — Every level saver: refuse a level the game
+ * would refuse, then save it through save_emitted.
+ */
+static int level_save_toml_internal(const LevelDef *def, const char *path,
+                                    const char *original_path,
+                                    SerializerSavePolicy policy,
+                                    const SerializerFileFingerprint *expected,
+                                    int private_file)
+{
+    LevelEmit level = { def, original_path };
+
+    s_kept_temp_path[0] = '\0';
+    if (!def || !path) return -1;
+    {
+        char err[128];
+        if (level_validate_runtime(def, err, sizeof(err)) != 0) {
+            fprintf(stderr, "serializer: invalid level for save '%s': %s\n", path, err);
+            return -1;
+        }
+    }
+    return save_emitted(path, emit_level, &level, policy, expected, private_file);
 }
 
 int level_save_toml(const LevelDef *def, const char *path)

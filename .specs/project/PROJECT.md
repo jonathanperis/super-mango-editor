@@ -23,4 +23,4 @@ A 2D pixel art platformer written in C11 + raylib 6.0, designed as a learning re
 
 ## Next Milestone
 
-- **Editor Quality + Campaign Flow**: richer validation diagnostics, metadata editing, autosave recovery, and manifest-editing support on top of the shipped selector
+- **Editor Quality + Campaign Flow**: richer validation diagnostics, metadata editing and autosave recovery on top of the shipped selector and the editor's Campaign view

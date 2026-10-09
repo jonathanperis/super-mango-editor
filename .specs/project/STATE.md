@@ -23,7 +23,7 @@
   - `levels/01_lugio_01.toml` (Volcanic Depths 1)
   - `levels/02_lugio_02.toml` (Volcanic Depths 2)
   - six learning labs in `levels/labs/` (`01_collision` … `06_camera`)
-- Campaign manifest: `levels/campaigns/main.toml` is required for the native selector. Its ordered, unique `levels/*.toml` entries form Creator's Playground → Volcanic Depths 1 → Volcanic Depths 2 and must form a linear `[last_star].next_phase` chain; the final entry has no `next_phase`.
+- Campaign manifest: `levels/campaigns/main.toml` is required for the native selector. Its ordered, unique `levels/*.toml` entries form Creator's Playground → Volcanic Depths 1 → Volcanic Depths 2 and must form a linear `[last_star].next_phase` chain; the final entry has no `next_phase`. The editor's Campaign view (`Ctrl+M`) edits it with the same C rules the start menu applies (`src/levels/campaign_catalog.c`), including relinking every `next_phase` to the order.
 - Parser: vendored `vendor/tomlc17/tomlc17.c`.
 - Serializer: shared by game and editor in `src/shared/serializer*.c`.
 - Editor target is separate: `out/super-mango-editor`, built from `src/editor/` against the same raylib library; native file pickers and confirmations go through `src/editor/file_dialog.c` (Linux uses zenity).
@@ -105,4 +105,3 @@ Gameplay advances in fixed 1/60 s steps from a frame-time accumulator instead of
 - Serializer round-trip fixture expansion beyond current regression tests.
 - Recovery snapshot presentation (a richer picker than native three-button dialogs). Cleanup shipped: Discard in the picker, orphan sweep at start-up, owner-PID guard for live snapshots, and a specific "folder full" status.
 - Tilemap painting for custom floor layouts.
-- Campaign-manifest editing and ordering support in the visual editor.

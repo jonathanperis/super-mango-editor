@@ -57,6 +57,8 @@ Editor validation runs before save, autosave, and playtest. Errors block unsafe 
 
 `levels/campaigns/main.toml` orders the campaign: `levels/00_sandbox_01.toml` (Creator's Playground) → `levels/01_lugio_01.toml` → `levels/02_lugio_02.toml`. The former onboarding level was removed; focused mechanics lessons live in `levels/labs/`.
 
+Shipped: the editor's Campaign view (`Ctrl+M` / the Campaign button) lists the entries with the game's verdict on each, reorders, adds (files directly in `levels/` only), removes and renames them (a level's `name` is its menu label), relinks every `[last_star].next_phase` to the order, and saves the changed level files and then the manifest atomically. Its checks are the start menu's own (`campaign_catalog_check` in `src/levels/campaign_catalog.c`, split out of `level_session.c`).
+
 ### R-007: Validation Commands
 Contributor validation commands are:
 
