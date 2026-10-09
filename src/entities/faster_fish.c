@@ -9,7 +9,6 @@
 #include "faster_fish.h"
 
 static const FishSpec s_faster_fish = {
-    FFISH_SPEED,
     FFISH_JUMP_VY,
     FFISH_JUMP_MIN,
     FFISH_JUMP_MAX,

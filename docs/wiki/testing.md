@@ -67,7 +67,8 @@ profile, checkpoint, simulation and session behavior.
 (climbing, hazards, creatures) and steps them through `game_update_active`:
 climbing on and off ladders, ropes and vines; the blue flame's eruption timing
 and damage; axe swings; spike-block rails (loop, detach, end cap); jumping
-spiders, fish leaps, bird patrols and bridge crumbling. It also replays
+spiders, a spider keeping its authored speed through every turn, fish leaps,
+bird patrols and bridge crumbling. It also replays
 `--replay-script` scripts (from a `--replay-dir` under the test output) and
 rejects malformed ones. `editor-ui-test` drives the editor with input events
 (palette picks, place, select, drag, delete, undo, wheel zoom/pan, property

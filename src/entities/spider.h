@@ -28,7 +28,9 @@
 #define SPIDER_ART_W     25    /* width of visible art  (cols 20..44)       */
 #define SPIDER_ART_Y     22    /* first visible row within each frame slot  */
 #define SPIDER_ART_H     10    /* height of visible art (rows 22..31)       */
-#define SPIDER_SPEED     50.0f /* walk speed in logical pixels per second   */
+/* SPIDER_SPEED — the usual walk speed, px/s. Shipped levels and new editor
+ * placements author it as vx; the level's vx is the speed actually used. */
+#define SPIDER_SPEED     50.0f
 #define SPIDER_FRAME_MS  150   /* ms each animation frame is held           */
 
 /*

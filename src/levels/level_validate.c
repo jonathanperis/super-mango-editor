@@ -261,6 +261,26 @@ static int validate_motion(char *err, size_t err_size, const char *field, float 
     return 0;
 }
 
+/*
+ * validate_patrol_speed — An enemy's vx is its patrol speed for the whole
+ * level (the sign only picks the first direction). 0 would leave it frozen,
+ * and above MAX_PATROL_SPEED a spider could step over a floor gap between
+ * two of its once-per-step gap checks.
+ */
+static int validate_patrol_speed(char *err, size_t err_size,
+                                 const char *field, float vx)
+{
+    if (!isfinite(vx) || vx == 0.0f || fabsf(vx) > (float)MAX_PATROL_SPEED) {
+        if (err && err_size > 0) {
+            snprintf(err, err_size,
+                     "%s is %.2f (must be nonzero and at most %d px/s either way)",
+                     field, vx, MAX_PATROL_SPEED);
+        }
+        return -1;
+    }
+    return 0;
+}
+
 static int validate_world_x(char *err, size_t err_size,
                             const char *field, float x, float world_w)
 {
@@ -638,22 +658,29 @@ static int validate_level_settings(const LevelDef *def,
 
 /*
  * validate_entity_motion — Every per-entity speed must be finite and
- * bounded. Bouncepads, spike blocks and float platforms have their own
- * speed rules in their helpers below.
+ * bounded. Enemy patrol speeds follow the tighter MAX_PATROL_SPEED rule;
+ * bouncepads, spike blocks and float platforms have their own speed rules
+ * in their helpers below.
  */
 static int validate_entity_motion(const LevelDef *def,
                                   char *err, size_t err_size)
 {
+#define CHECK_PATROL_SPEED_ARRAY(array, count) \
+    for (int i = 0; i < def->count; i++) { \
+        if (validate_patrol_speed(err, err_size, #array ".vx", def->array[i].vx) != 0) return -1; \
+    }
+    CHECK_PATROL_SPEED_ARRAY(spiders, spider_count);
+    CHECK_PATROL_SPEED_ARRAY(jumping_spiders, jumping_spider_count);
+    CHECK_PATROL_SPEED_ARRAY(birds, bird_count);
+    CHECK_PATROL_SPEED_ARRAY(faster_birds, faster_bird_count);
+    CHECK_PATROL_SPEED_ARRAY(fish, fish_count);
+    CHECK_PATROL_SPEED_ARRAY(faster_fish, faster_fish_count);
+#undef CHECK_PATROL_SPEED_ARRAY
+
 #define CHECK_MOTION_ARRAY(array, count, member) \
     for (int i = 0; i < def->count; i++) { \
         if (validate_motion(err, err_size, #array "." #member, def->array[i].member) != 0) return -1; \
     }
-    CHECK_MOTION_ARRAY(spiders, spider_count, vx);
-    CHECK_MOTION_ARRAY(jumping_spiders, jumping_spider_count, vx);
-    CHECK_MOTION_ARRAY(birds, bird_count, vx);
-    CHECK_MOTION_ARRAY(faster_birds, faster_bird_count, vx);
-    CHECK_MOTION_ARRAY(fish, fish_count, vx);
-    CHECK_MOTION_ARRAY(faster_fish, faster_fish_count, vx);
     CHECK_MOTION_ARRAY(background_layers, background_layer_count, speed);
     CHECK_MOTION_ARRAY(foreground_layers, foreground_layer_count, speed);
     CHECK_MOTION_ARRAY(fog_layers, fog_layer_count, speed);

@@ -86,6 +86,20 @@
 /* Upper magnitude for authored motion values; keeps integration and render
  * conversions bounded, well above the shipped speeds/accelerations. */
 #define MAX_LEVEL_MOTION    10000
+
+/*
+ * MAX_PATROL_SPEED — fastest |vx| a level may give a patrolling enemy, px/s.
+ *
+ * Spiders look for floor gaps once per fixed step (1/TARGET_FPS s): is the
+ * centre of their art over a gap right now? A spider that moved a whole gap
+ * width in one step could be on one side of the gap in one step and past it
+ * in the next, and would walk over the hole. Half a gap per step
+ * (32 / 2 × 60 = 960 px/s) leaves a safe margin for float rounding. It is
+ * still eight times the fastest shipped enemy, so one limit serves every
+ * patrolling enemy, birds and fish too. A vx of 0 is rejected as well: the
+ * enemy would never move.
+ */
+#define MAX_PATROL_SPEED    (FLOOR_GAP_W * TARGET_FPS / 2)
 #define GAME_LEVEL_PATH_MAX 1024 /* UTF-8 native document path; matches editor capacity */
 
 /* ------------------------------------------------------------------ */

@@ -56,9 +56,9 @@ int animate_frame_ms(int *frame_index, float *timer_ms,
  * patrol_update — move entity horizontally and reverse at patrol boundaries.
  *
  * Advances x by vx * dt, then checks if the entity has reached or passed
- * either end of its patrol range.  On reaching the right boundary (patrol_x1)
- * the entity is snapped to the boundary and its velocity is set to -speed.
- * On reaching the left boundary (patrol_x0) it is snapped and set to +speed.
+ * either end of its patrol range.  On reaching either boundary the entity is
+ * snapped to it and vx changes sign: the authored speed is kept, only the
+ * direction flips.
  *
  * Parameters:
  *   x          : pointer to entity world-space x — updated in place.
@@ -66,16 +66,14 @@ int animate_frame_ms(int *frame_index, float *timer_ms,
  *   entity_w   : display width of the entity (px); used for right-edge snap.
  *   patrol_x0  : left  boundary of the patrol range in world-space px.
  *   patrol_x1  : right boundary of the patrol range in world-space px.
- *   speed      : absolute patrol speed in px/s; always a positive value.
  *   dt         : seconds simulated by this step.
  *
  * Usage:
  *   patrol_update(&s->x, &s->vx, SPIDER_FRAME_W,
- *                 s->patrol_x0, s->patrol_x1, SPIDER_SPEED, dt);
+ *                 s->patrol_x0, s->patrol_x1, dt);
  */
 void patrol_update(float *x, float *vx, float entity_w,
-                   float patrol_x0, float patrol_x1,
-                   float speed, float dt);
+                   float patrol_x0, float patrol_x1, float dt);
 
 /* ------------------------------------------------------------------ */
 /* Sea-gap avoidance                                                   */
@@ -116,23 +114,22 @@ int sound_volume_for_distance(float dist, float audible_range, int max_volume);
  * FLOOR_GAP_W pixels wide).  Ground-patrol enemies must not walk across them.
  * This function checks whether the centre of the entity's visible art region
  * is currently over any gap and, if so, snaps the entity back to the gap
- * edge and reverses its velocity.
+ * edge and reverses its velocity (same speed, opposite direction).
  *
  * Parameters:
  *   x              : pointer to entity world-space x — updated in place.
  *   vx             : pointer to horizontal velocity — updated in place.
  *   art_x_offset   : distance (px) from entity.x to the left edge of the art.
  *   art_w          : width (px) of the visible art region.
- *   speed          : absolute patrol speed in px/s (always positive).
  *   floor_gaps     : array of gap left-edge x positions in world-space px.
  *   floor_gap_count: number of entries in floor_gaps.
  *   floor_gap_w    : width of each gap in px (pass FLOOR_GAP_W from game.h).
  *
  * Usage:
  *   patrol_gap_reverse(&s->x, &s->vx,
- *                      SPIDER_ART_X, SPIDER_ART_W, SPIDER_SPEED,
+ *                      SPIDER_ART_X, SPIDER_ART_W,
  *                      floor_gaps, floor_gap_count, FLOOR_GAP_W);
  */
 void patrol_gap_reverse(float *x, float *vx,
-                        float art_x_offset, float art_w, float speed,
+                        float art_x_offset, float art_w,
                         const int *floor_gaps, int floor_gap_count, int floor_gap_w);

@@ -25,7 +25,9 @@
 #define BIRD_ART_W       15      /* width  of visible art (cols 17..31)      */
 #define BIRD_ART_Y       17      /* first visible row within each frame      */
 #define BIRD_ART_H       14      /* height of visible art (rows 17..30)      */
-#define BIRD_SPEED       45.0f   /* horizontal flight speed in px/s          */
+/* BIRD_SPEED — the usual flight speed, px/s; the level's vx is the speed
+ * actually used (shipped levels author this value). */
+#define BIRD_SPEED       45.0f
 #define BIRD_FRAME_MS    140     /* ms each animation frame is held          */
 
 /*
@@ -65,7 +67,6 @@ typedef struct {
     int      art_w;      /* width of the visible art (px)                  */
     int      art_h;      /* height of the visible art (px)                 */
     uint32_t frame_ms;   /* ms each animation frame is held                */
-    float    speed;      /* horizontal flight speed in px/s (positive)     */
     float    wave_amp;   /* sine-wave amplitude in px                      */
     float    wave_freq;  /* radians of the sine wave per px travelled      */
 } BirdSpec;
