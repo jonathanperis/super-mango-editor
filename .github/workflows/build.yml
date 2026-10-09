@@ -530,6 +530,42 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ────────────────────────────────────────────────────────────────────────────
+  # RELEASE FRESHNESS
+  # Main pushes only. Warns (never fails) when main has moved more than
+  # RELEASE_STALE_AFTER commits past the latest v* tag it contains, so a
+  # long-unreleased main is noticed. See docs/wiki/release-checklist.md for
+  # the release cadence this nudges towards.
+  # ────────────────────────────────────────────────────────────────────────────
+  release-freshness:
+    name: Release freshness
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      # Full history and tags, so the latest tag and the distance are real.
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Warn when main is far past the latest release
+        env:
+          RELEASE_STALE_AFTER: '50'
+        run: |
+          latest=$(git describe --tags --abbrev=0 --match 'v*' HEAD 2>/dev/null || true)
+          if [ -z "$latest" ]; then
+            echo "::warning title=No release yet::main contains no v* tag."
+            exit 0
+          fi
+          ahead=$(git rev-list --count "$latest..HEAD")
+          echo "main is $ahead commits past $latest" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$ahead" -gt "$RELEASE_STALE_AFTER" ]; then
+            echo "::warning title=Release is stale::main is $ahead commits past $latest (more than $RELEASE_STALE_AFTER). Consider cutting a release; see docs/wiki/release-checklist.md."
+          fi
+
+  # ────────────────────────────────────────────────────────────────────────────
   # WINDOWS CLANG JOB
   # Builds and tests with UCRT64 Clang, the Makefile's local Windows default,
   # under -Werror. It ships nothing, so it stays out of the release `needs`: a
@@ -795,6 +831,34 @@ jobs:
       contents: write
 
     steps:
+      # Manual releases are tagged v1.0.<commits on main>. The commit count
+      # only grows as main does, unlike the workflow run number, which every pull
+      # request run also advances; it continues the existing v1.0.N series
+      # (v1.0.845 was the last run-number tag, at a lower commit count). A
+      # full-history checkout is needed: a shallow clone would count one.
+      - name: Checkout history for the release number
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Choose the release tag
+        id: version
+        env:
+          PUSHED_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+        run: |
+          if [ -n "$PUSHED_TAG" ]; then
+            echo "tag=$PUSHED_TAG" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          tag="v1.0.$(git rev-list --count HEAD)"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::$tag already exists; merge a new commit to main or push an explicit v* tag."
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
       # The four platform archives have distinct names, so they can share dist/.
       - name: Download release archives
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -819,10 +883,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          tag_name: ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
           draft: true
-          name: Super Mango ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          name: Super Mango ${{ steps.version.outputs.tag }}
           body: |
             Automated release built from commit [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
 
@@ -860,7 +924,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: gh release edit "$RELEASE_TAG" --repo "$GH_REPO" --draft=false
 
   # ────────────────────────────────────────────────────────────────────────────

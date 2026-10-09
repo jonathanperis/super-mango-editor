@@ -100,7 +100,12 @@ Before creating a release, confirm checks for the intended source commit are gre
 Publishing rules:
 
 - push a `v*` tag to create a tagged GitHub Release, or
-- use `workflow_dispatch` **on `main`** for a manually versioned release.
+- use `workflow_dispatch` **on `main`** for a manually versioned release. It is
+  tagged `v1.0.<N>`, where N is the number of commits on `main`
+  (`git rev-list --count HEAD`), so numbers only grow as `main` does. This
+  continues the earlier `v1.0.N` series, which used the workflow run number
+  (`v1.0.845` was the last); the release job stops with an error rather than
+  reuse a tag that already exists.
 
 A separate `Checksums and provenance` job (the only one holding
 `attestations: write` and `id-token: write`) waits for the same gates as the
@@ -114,6 +119,25 @@ but does not publish. Verify the release event's own build matrix, not an older
 green run.
 
 Normal `main` pushes are build/deploy checks only; they do not publish a GitHub Release.
+
+<a id="release-cadence"></a>
+
+### Release cadence
+
+Pages always shows the latest `main`, but the downloadable archives only
+change when someone publishes a release, so they quietly fall behind. Aim to
+cut a release:
+
+- after any player-visible change (new level, mechanic, editor feature or
+  control change) once it is green on `main`;
+- after any security fix, as soon as its checks pass (`SECURITY.md` promises
+  fixes in the latest release);
+- otherwise at least every 50 commits on `main`.
+
+On every `main` push the `Release freshness` job counts the commits since the
+latest `v*` tag that `main` contains and raises a warning annotation (it never
+fails the run) once that is more than 50. Treat the warning as a prompt to
+work through this checklist, not as something to silence.
 
 After publish, verify:
 
