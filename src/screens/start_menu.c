@@ -136,7 +136,7 @@ int start_menu_frame(StartMenu *menu)
                 select_level(menu, menu->selected_level-1);
             else if (key == KEY_RIGHT || key == KEY_D || key == KEY_DOWN || button == PAD_RIGHT || button == PAD_DOWN)
                 select_level(menu, menu->selected_level+1);
-            else if (key == KEY_ENTER || key == KEY_KP_ENTER || key == KEY_SPACE || button == PAD_A || button == PAD_START)
+            else if (game_input_event_confirms(&event))
                 play(menu);
         }
     }

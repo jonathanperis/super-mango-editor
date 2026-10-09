@@ -145,10 +145,27 @@ void game_input_clear_controller_latch(GameState *gs)
     gs->input_release_latched = gs->input_release_keyboard_mask != 0;
 }
 
+void gamepad_adopt_controller(GameState *gs, int device)
+{
+    /* Keep the controller already in use; removal commands clear the old
+     * device and its latch before another can be adopted. */
+    if (gs && !gs->controller && device) gs->controller = device;
+}
+
 void gamepad_refresh_controller(GameState *gs)
 {
-    /* Removal commands clear the old device/latch before adopting another. */
-    if (gs && !gs->controller) gs->controller = input_first_gamepad();
+    gamepad_adopt_controller(gs, input_first_gamepad());
+}
+
+int game_input_event_confirms(const InputEvent *event)
+{
+    if (!event) return 0;
+    if (event->type == INPUT_KEY_DOWN)
+        return event->key == KEY_ENTER || event->key == KEY_KP_ENTER || event->key == KEY_SPACE;
+    /* Checking the type matters: a mouse event's button 0 is not PAD_A. */
+    if (event->type == INPUT_PAD_DOWN)
+        return event->button == PAD_A || event->button == PAD_START;
+    return 0;
 }
 
 void gamepad_close_controller(GameState *gs)

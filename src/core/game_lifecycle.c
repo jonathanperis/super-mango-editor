@@ -64,7 +64,9 @@ int game_init(GameState *gs)
     gs->paused = 0;
     gs->pause_reasons = 0;
     gs->completion.complete = 0;
-    game_input_arm_release_latch(gs, NULL);
+    /* No release latch here: the session arms it once the profile (and its
+     * bindings) is attached, together with controls held on the old screen
+     * (session_make_game in app_session.c). */
     return 0;
 
 fail:
