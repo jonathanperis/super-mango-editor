@@ -3,8 +3,13 @@
 int game_settings_key_allowed(int key)
 {
     if (!input_binding_known(key)) return 0;
-    return key != 41 && key != 58 && key != 43 && key != 40 && key != 88 &&
-           key != 80 && key != 79 && key != 82 && key != 81 && key != 229;
+    /* Menu, pause and settings keys, the fixed arrow alternatives and the
+     * fixed Run key stay what they are, so a remap can never strand them. */
+    return key != BINDING_KEY_ESCAPE && key != BINDING_KEY_F1 && key != BINDING_KEY_TAB &&
+           key != BINDING_KEY_ENTER && key != BINDING_KEY_KP_ENTER &&
+           key != BINDING_KEY_LEFT && key != BINDING_KEY_RIGHT &&
+           key != BINDING_KEY_UP && key != BINDING_KEY_DOWN &&
+           key != BINDING_KEY_RIGHT_SHIFT;
 }
 
 int game_settings_button_allowed(int button)

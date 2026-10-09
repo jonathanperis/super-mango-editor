@@ -37,12 +37,13 @@ unsigned int game_input_keyboard_mask(const uint8_t *keys, const GameSettings *s
     /* Action order matches PLAYER_INPUT_* bit positions. Arrows remain fixed
      * alternatives so remapping can never strand menu/navigation controls. */
     for (int i = 0; i < PROFILE_ACTION_COUNT; i++) if (keys[s->keys[i]]) mask |= 1u << i;
-    if (keys[80]) mask |= PLAYER_INPUT_LEFT;
-    if (keys[79]) mask |= PLAYER_INPUT_RIGHT;
-    if (keys[82]) mask |= PLAYER_INPUT_UP;
-    if (keys[81]) mask |= PLAYER_INPUT_DOWN;
-    if (keys[229]) mask |= PLAYER_INPUT_RUN;
-    if (keys[44] || keys[40] || keys[88]) mask |= GAME_INPUT_CONFIRM;
+    if (keys[BINDING_KEY_LEFT]) mask |= PLAYER_INPUT_LEFT;
+    if (keys[BINDING_KEY_RIGHT]) mask |= PLAYER_INPUT_RIGHT;
+    if (keys[BINDING_KEY_UP]) mask |= PLAYER_INPUT_UP;
+    if (keys[BINDING_KEY_DOWN]) mask |= PLAYER_INPUT_DOWN;
+    if (keys[BINDING_KEY_RIGHT_SHIFT]) mask |= PLAYER_INPUT_RUN;
+    if (keys[BINDING_KEY_SPACE] || keys[BINDING_KEY_ENTER] || keys[BINDING_KEY_KP_ENTER])
+        mask |= GAME_INPUT_CONFIRM;
     return mask;
 }
 
