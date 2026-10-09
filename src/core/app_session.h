@@ -62,6 +62,12 @@ typedef struct {
 typedef struct AppSession {
     StartMenu *menu;
     GameState *game;
+    /* The sprites and sounds every level uses. Loaded when the first game
+     * opens, copied into each GameState (game->assets, borrowed) and
+     * unloaded once, with the window and audio device, so Replay and Play
+     * reuse them. */
+    GameAssets assets;
+    int assets_loaded;
     CampaignCatalog catalog; /* owned when a campaign menu is active */
     int catalog_loaded;
     GameProfile profile;

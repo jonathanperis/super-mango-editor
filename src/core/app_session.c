@@ -6,8 +6,10 @@
  * Both paths use the same screen routes below.
  *
  * Ownership hierarchy:
- *   session: one window/context, audio device, profile and campaign catalog
- *     screen: menu OR GameState, its render target, textures/fonts/sounds
+ *   session: one window/context, audio device, profile, campaign catalog
+ *            and the shared game sprites and sounds (GameAssets)
+ *     screen: menu OR GameState, its render target and the files its level
+ *             names; a GameState borrows the session's GameAssets
  *
  * A transition can prepare a candidate game before releasing the old menu.
  * Resources outlive neither their owning screen nor the shared GPU/audio
@@ -26,6 +28,7 @@
 #include "game_overlay.h"
 #include "game_experiment.h"
 #include "game_ghost.h"
+#include "game_resources.h"
 #include "game_resume.h"
 #include "game_timing.h"
 #include "../shared/serializer_io.h"  /* serializer_fingerprint_utf8 */
@@ -83,6 +86,12 @@ static void session_runtime_cleanup(AppSession *session)
 #endif
     session->runtime_cleaned = 1;
     session->runtime_cleanup_count++;
+    /* Every screen is closed by now, so nothing borrows the shared sprites
+     * and sounds; release them while the GPU and audio device still exist. */
+    if (session->assets_loaded) {
+        game_resources_unload(&session->assets);
+        session->assets_loaded = 0;
+    }
     game_web_input_clear_touch();
     input_close();
     audio_close();
@@ -311,10 +320,31 @@ static void session_save_ghost(AppSession *session, GameState *game)
     game_ghost_track_free(&run);
 }
 
+/*
+ * session_load_assets — Load the shared sprites and sounds the first time a
+ * game opens; later games reuse them. A failed load is undone, so the next
+ * attempt (another Play) starts clean. Returns 0 when they are loaded.
+ */
+static int session_load_assets(AppSession *session)
+{
+    if (session->assets_loaded) return 0;
+    if (game_resources_load(&session->assets) != 0) {
+        game_resources_unload(&session->assets);
+        return -1;
+    }
+    session->assets_loaded = 1;
+    return 0;
+}
+
 static GameState *session_make_game(AppSession *session, const char *path, const GameInputPhysicalState *inherited)
 {
+    if (session_load_assets(session) != 0) return NULL;
     GameState *game = calloc(1, sizeof(*game));
     if (!game) return NULL;
+    /* Lend the shared sprites and sounds: the game gets a copy of the
+     * pointers (owns_assets stays 0), so game_cleanup leaves them loaded
+     * for the next game and session_runtime_cleanup unloads them once. */
+    game->assets = session->assets;
     game->screen.debug_mode = session->debug_mode;
     game->screen.random_seed = session->random_seed;
     game->screen.smoke_test_frames = session->smoke_test_frames;
@@ -482,7 +512,8 @@ static void session_apply_game_route(AppSession *session)
          * WebGL context could not be torn down and rebuilt inside the
          * browser's frame callback. Since the raylib port this session owns
          * the one window, GL context and audio device for the whole run; a
-         * GameState owns only its render target, textures and sounds, which
+         * GameState owns only its render target and its level's own files
+         * (the shared sprites and sounds stay with the session), which
          * is exactly what Level Select and Play already swap in place on the
          * web. Staying on the page also keeps the browser's unlocked audio
          * (a reloaded page needs a new click or key press before it may play
