@@ -12,10 +12,31 @@
 #include "tools.h"
 #include "entity_meta.h"   /* editor_select_none */
 
+/*
+ * note_redone_place — Remember an entity a redone CMD_PLACE put back, so a
+ * redone group paste can select all of them, as the paste itself did.
+ * Each redo selects only the entity it inserted, and a later insert into
+ * the same array moves the ones after it up a slot, so earlier entries in
+ * the list follow that shift first.
+ */
+static void note_redone_place(Selection *placed, int *count, const Command *command)
+{
+    if (command->type != CMD_PLACE || *count >= EDITOR_MAX_SELECTION) return;
+    for (int i = 0; i < *count; i++)
+        if (placed[i].type == (EntityType)command->entity_type &&
+            placed[i].index >= command->entity_index)
+            placed[i].index++;
+    placed[*count].type = (EntityType)command->entity_type;
+    placed[*count].index = command->entity_index;
+    (*count)++;
+}
+
 static void editor_history(EditorState *es, int redo)
 {
     /* Finish the staged field edit before moving history. Otherwise Undo could
      * change the document while a widget still points at its previous value. */
+    static Selection placed[EDITOR_MAX_SELECTION];
+    int placed_count = 0;
     Command command;
     int group;
     if (es->dragging) return;  /* editor_key already explained why */
@@ -30,10 +51,15 @@ static void editor_history(EditorState *es, int redo)
      */
     group = command.group;
     editor_apply_undo_command(es, &command, redo ? 0 : 1);
+    if (redo) note_redone_place(placed, &placed_count, &command);
     while (group != 0 &&
            (redo ? redo_top_group(es->undo) : undo_top_group(es->undo)) == group &&
-           (redo ? redo_pop(es->undo, &command) : undo_pop(es->undo, &command)))
+           (redo ? redo_pop(es->undo, &command) : undo_pop(es->undo, &command))) {
         editor_apply_undo_command(es, &command, redo ? 0 : 1);
+        if (redo) note_redone_place(placed, &placed_count, &command);
+    }
+    /* A redone group paste or duplicate selects every copy again. */
+    if (placed_count > 1) (void)editor_select_items(es, placed, placed_count);
     editor_refresh_dirty(es);
 }
 
