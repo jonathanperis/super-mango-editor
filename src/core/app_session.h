@@ -59,6 +59,9 @@ typedef struct {
     unsigned int random_seed;
     const char *experiment_path; /* explicit native capture import */
     LevelStart start; /* where the --level game first starts; kind 0 = its own start */
+    /* The campaign manifest; NULL = CAMPAIGN_MANIFEST_PATH. Tests point it
+     * at a fixture to get a campaign with an unavailable entry. */
+    const char *campaign_path;
 } AppSessionConfig;
 
 typedef struct AppSession {
@@ -70,8 +73,9 @@ typedef struct AppSession {
      * reuse them. */
     GameAssets assets;
     int assets_loaded;
-    CampaignCatalog catalog; /* owned when a campaign menu is active */
+    CampaignCatalog catalog; /* owned once loaded (menu, Next Level, --continue) */
     int catalog_loaded;
+    char campaign_path[GAME_LEVEL_PATH_MAX]; /* the manifest catalog is read from */
     GameProfile profile;
     SettingsMenu settings;
     unsigned int applied_settings_revision;

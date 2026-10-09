@@ -163,6 +163,12 @@ typedef enum {
     GAME_ROUTE_SMOKE_EXIT
 } GameRoute;
 
+/* GameCompletionState.next_phase_failed: why Next Level did not open. */
+enum {
+    NEXT_PHASE_LOAD_FAILED = 1, /* the next file did not load              */
+    NEXT_PHASE_UNAVAILABLE = 2  /* the campaign lists it as unavailable    */
+};
+
 typedef struct {
     int   complete;           /* 1 = last star collected; show overlay     */
     float level_elapsed;      /* active level timer in seconds             */
@@ -171,7 +177,7 @@ typedef struct {
     int   coin_total;         /* total coins shown at completion summary   */
     float elapsed;            /* elapsed seconds shown at summary          */
     int   pending_next_phase; /* Enter/Start loads next phase              */
-    int   next_phase_failed;  /* 1 = Next Level load failed: hide it, say so */
+    int   next_phase_failed;  /* NEXT_PHASE_*: Next Level refused, hide it, say so */
     char  next_phase[256];    /* next TOML path shown/loaded               */
 } GameCompletionState;
 

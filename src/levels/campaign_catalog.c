@@ -350,7 +350,10 @@ done:
  * that must name entry i+1 (and the last entry must have none). A level
  * that breaks the order is marked unavailable rather than rejecting the
  * whole campaign. The comparison uses paths only, so a level before an
- * unavailable entry stays playable; its Next Level reports the failure.
+ * unavailable entry stays playable, but the game's Next Level refuses to
+ * open that entry and says so, as the menu refuses to start it; so does
+ * --continue (session_campaign_refusal in app_session.c). Only --level,
+ * which loads one file directly, bypasses the manifest.
  */
 static void campaign_check_chain(CampaignCatalog *catalog, int report)
 {
