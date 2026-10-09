@@ -6,7 +6,7 @@
 
 #include <stdio.h>     /* fprintf, stderr */
 
-#include "../game.h"   /* DESTROY_TEX */
+#include "../shared/graphics.h" /* DESTROY_TEX */
 
 /*
  * editor_textures_load — Load all entity sprite sheets from assets/.

@@ -3,6 +3,7 @@
  */
 
 #include "game_float_platforms.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 #include "../surfaces/float_platform.h"
 

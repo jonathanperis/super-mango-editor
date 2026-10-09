@@ -9,6 +9,7 @@
  * long after the start.
  */
 #include "game_ghost.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 #include <stdlib.h>
 #include <string.h>

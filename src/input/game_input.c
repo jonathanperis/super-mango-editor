@@ -5,6 +5,7 @@
  */
 
 #include "game_input.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 #include "game_web_input.h"
 
 #include "input_backend.h"

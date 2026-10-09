@@ -7,6 +7,8 @@
 #include "level_loader.h"
 #include "level_ref.h"
 #include "level_validate.h"
+#include "../player/player.h"  /* JUMP_VY: the jump-height check */
+#include "../screens/hud.h"    /* MAX_HEARTS: the initial_hearts limit */
 
 #define MAX_INITIAL_LIVES 999
 #define MAX_SCORE_PER_LIFE 999999

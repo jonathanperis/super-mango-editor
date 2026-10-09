@@ -4,6 +4,6 @@
 
 #pragma once
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 
 void floor_gap_handle_collision(GameState *gs);

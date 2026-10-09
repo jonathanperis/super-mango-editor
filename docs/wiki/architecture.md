@@ -311,7 +311,7 @@ typedef struct {
     DebugOverlay debug;
 } GameScreen;
 
-typedef struct GameAssets {
+typedef struct GameAssets {      /* in game_assets.h */
     TextureResources textures;    /* Texture2D slots, owned by AppSession */
     AudioResources   audio;       /* SoundEffect slots, owned by AppSession */
 } GameAssets;

@@ -6,6 +6,7 @@
  */
 
 #include "game_hazards.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 #include "../hazards/axe_trap.h"
 #include "../hazards/blue_flame.h"

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 
 /* Create the logical canvas in the AppSession-owned graphics context. */
 int game_window_init(GameState *gs);

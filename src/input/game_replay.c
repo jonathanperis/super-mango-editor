@@ -3,6 +3,7 @@
  */
 
 #include "game_replay.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 #include "../player/player.h"
 

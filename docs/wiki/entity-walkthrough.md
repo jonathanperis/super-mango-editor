@@ -97,7 +97,7 @@ new `.c` in `src/collectibles/` automatically.
 
 | File | Required change |
 |------|-----------------|
-| `src/levels/level.h` | Add `TokenPlacement { float x, y; }`, a bounded placement array and a count to `LevelDef` |
+| `src/levels/level.h` | Include the Token header (for `MAX_TOKENS`); add `TokenPlacement { float x, y; }`, a bounded placement array and a count to `LevelDef` |
 | `src/game.h` | Include the Token header; add the runtime array and count to `GameWorld`, the `gs->world` part of `GameState` |
 | `src/shared/serializer_parse.c` | Register `ROOT_TABLE_ARRAY("tokens", XY_FIELDS, MAX_TOKENS)` |
 | `src/shared/serializer_load_collectibles.c` | Add `LOAD_XY_ARRAY("tokens", token_count, MAX_TOKENS, tokens)` |

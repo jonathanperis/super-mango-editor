@@ -7,7 +7,7 @@
  */
 #pragma once
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 #include "../entities/spider.h"
 #include "../entities/jumping_spider.h"
 

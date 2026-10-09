@@ -1,4 +1,5 @@
 #include "game_overlay.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 #include "../screens/settings_menu.h" /* SettingsMenu.open */
 #include "../shared/audio.h"          /* music_pause, music_resume */

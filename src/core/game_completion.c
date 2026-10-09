@@ -3,6 +3,7 @@
  */
 
 #include "game_completion.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 #include "../levels/level.h"
 #include "../levels/phase_transition.h"

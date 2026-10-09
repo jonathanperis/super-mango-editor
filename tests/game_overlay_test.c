@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "core/game_overlay.h"
+#include "game.h"  /* GameState: this file reads its fields */
 
 static int expect_int(const char *name, int actual, int expected)
 {

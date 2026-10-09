@@ -14,7 +14,7 @@
 #include "hit_test.h"
 
 #include "entity_meta.h" /* display sizes, editor_entity_count, rail helpers */
-#include "../game.h"     /* GAME_H, FLOOR_Y, TILE_SIZE, FLOOR_GAP_W         */
+#include "../game_constants.h" /* GAME_H, FLOOR_Y, TILE_SIZE, FLOOR_GAP_W   */
 
 static EditorRect rect(float x, float y, float w, float h)
 {
