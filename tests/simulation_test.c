@@ -11,6 +11,7 @@
 #include "screens/settings_menu.h"
 #include "input/game_events.h"
 #include "player/player_internal.h"
+#include "player/player_jump.h"
 #include "shared/platform.h"   /* clock_millis */
 #include "test_paths.h"         /* TEST_OUT scratch directory */
 #include <math.h>
@@ -400,6 +401,129 @@ done:
     return failed;
 }
 
+/*
+ * health_star.c: every colour heals one heart on touch, never above
+ * MAX_HEARTS, and is used up even when the player is already full.
+ */
+static int health_stars_heal_one_heart_up_to_the_cap(void)
+{
+    int failed = 0;
+    GameState gs = {0};
+    stand_player_on_floor(&gs, 100.0f);
+    gs.lives = 3;
+    IntRect phit = player_get_hitbox(&gs.player);
+    HealthStar on_player = {.x = (float)phit.x, .y = (float)phit.y, .active = 1};
+
+    /* The hitbox is the whole 16x16 sprite at the star's position. */
+    IntRect star_hit = health_star_get_hitbox(&on_player);
+    CHECK(star_hit.x == phit.x && star_hit.y == phit.y);
+    CHECK(star_hit.w == HEALTH_STAR_DISPLAY_W && star_hit.h == HEALTH_STAR_DISPLAY_H);
+
+    /* One heart left: a yellow star heals one, and is gone. */
+    gs.hearts = 1;
+    gs.star_yellow_count = 1;
+    gs.star_yellows[0] = on_player;
+    game_collide(&gs, GAME_FIXED_STEP);
+    CHECK(gs.hearts == 2 && !gs.star_yellows[0].active && gs.score == 0);
+    game_collide(&gs, GAME_FIXED_STEP);
+    CHECK(gs.hearts == 2);
+
+    /* Green and red together, one heart short: one fills the gap, the
+     * other is still used up but cannot heal past MAX_HEARTS. */
+    gs.hearts = MAX_HEARTS - 1;
+    gs.star_green_count = 1;
+    gs.star_greens[0] = on_player;
+    gs.star_red_count = 1;
+    gs.star_reds[0] = on_player;
+    game_collide(&gs, GAME_FIXED_STEP);
+    CHECK(gs.hearts == MAX_HEARTS);
+    CHECK(!gs.star_greens[0].active && !gs.star_reds[0].active);
+
+    /* A star the player does not touch stays. */
+    gs.star_yellows[0] = (HealthStar){.x = phit.x + 200.0f, .y = (float)phit.y, .active = 1};
+    gs.hearts = 1;
+    game_collide(&gs, GAME_FIXED_STEP);
+    CHECK(gs.hearts == 1 && gs.star_yellows[0].active);
+done:
+    return failed;
+}
+
+/*
+ * player_jump.c: coyote time, the jump buffer and the short-hop cut, each
+ * through the functions player_handle_input and player_update call.
+ */
+static int jump_buffer_coyote_time_and_short_hops(void)
+{
+    int failed = 0;
+    Player p = {.w = 48, .h = 48};
+    player_apply_default_physics(&p);
+
+    /* Coyote time: just off a ledge (airborne, not rising), a press still
+     * jumps, because the timers armed the grace window. */
+    p.on_ground = 0;
+    p.vy = 0.0f;
+    CHECK(player_update_jump_timers(&p, GAME_FIXED_STEP, 1) == 0);
+    CHECK(NEAR(p.coyote_timer, PLAYER_COYOTE_TIME));
+    player_press_jump(&p, NULL);
+    CHECK(p.vy == JUMP_VY && p.coyote_timer == 0.0f && p.jump_held);
+
+    /* After the grace window runs out in the air, a press only buffers. */
+    p = (Player){.w = 48, .h = 48};
+    player_apply_default_physics(&p);
+    p.coyote_timer = PLAYER_COYOTE_TIME;
+    p.vy = 50.0f;
+    for (int step = 0; step < 7; step++)       /* 7/60 s > 0.10 s */
+        player_update_jump_timers(&p, GAME_FIXED_STEP, 0);
+    CHECK(p.coyote_timer == 0.0f);
+    player_press_jump(&p, NULL);
+    CHECK(p.vy == 50.0f && p.jump_buffer_timer > 0.0f);
+
+    /* Jump buffer: landing within 0.10 s of that press jumps on contact... */
+    for (int step = 0; step < 4; step++)
+        CHECK(player_update_jump_timers(&p, GAME_FIXED_STEP, 0) == 0);
+    p.on_ground = 1;
+    CHECK(player_update_jump_timers(&p, GAME_FIXED_STEP, 0) == 1);
+
+    /* ...but a press more than 0.10 s before landing has expired. */
+    p.on_ground = 0;
+    p.jump_buffer_timer = 0.0f;
+    player_press_jump(&p, NULL);
+    p.coyote_timer = 0.0f;
+    for (int step = 0; step < 7; step++)
+        player_update_jump_timers(&p, GAME_FIXED_STEP, 0);
+    CHECK(p.jump_buffer_timer == 0.0f);
+    p.on_ground = 1;
+    CHECK(player_update_jump_timers(&p, GAME_FIXED_STEP, 0) == 0);
+
+    /* Short hop: letting go while rising cuts the upward speed to 45%;
+     * letting go while falling changes nothing. */
+    p.vy = -200.0f;
+    p.jump_held = 1;
+    player_release_jump(&p);
+    CHECK(NEAR(p.vy, -90.0f) && !p.jump_held);
+    p.vy = 120.0f;
+    p.jump_held = 1;
+    player_release_jump(&p);
+    CHECK(p.vy == 120.0f);
+
+    /* End to end: a tap rises much less than a held jump. */
+    {
+        GameState gs = {0};
+        float floor_y, apex_y;
+        stand_player_on_floor(&gs, 100.0f);
+        floor_y = apex_y = gs.player.y;
+        for (int step = 0; step < 60; step++) {
+            gs.replay_input_mask = step < 2 ? PLAYER_INPUT_JUMP : 0;
+            game_player_step(&gs, GAME_FIXED_STEP);
+            if (gs.player.y < apex_y) apex_y = gs.player.y;
+        }
+        float tap = floor_y - apex_y;
+        CHECK(tap > 5.0f && tap < 30.0f);   /* a full jump rises 60+ px */
+    }
+done:
+    return failed;
+}
+
 int game_simulation_contract_test(void)
 {
     int failures = inspection_and_replay();
@@ -416,6 +540,12 @@ int game_simulation_contract_test(void)
     int gap_walls = sinking_into_a_gap_cannot_steer_back_onto_the_floor();
     printf("simulation: floor gap sides hold a sinking player %s\n", gap_walls ? "FAIL" : "PASS");
     failures += gap_walls;
+    int stars = health_stars_heal_one_heart_up_to_the_cap();
+    printf("simulation: health stars heal up to the cap %s\n", stars ? "FAIL" : "PASS");
+    failures += stars;
+    int jumps = jump_buffer_coyote_time_and_short_hops();
+    printf("simulation: jump buffer, coyote time and short hops %s\n", jumps ? "FAIL" : "PASS");
+    failures += jumps;
     int collide = collision_hurts_once_and_collects_coins();
     printf("simulation: hazard and coin collision %s\n", collide ? "FAIL" : "PASS");
     return failures + scenario + jump + tunnel + collide;

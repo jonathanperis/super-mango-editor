@@ -1,7 +1,8 @@
 # Enemy and bridge fixture for gameplay_mechanics_test.c. The jumping
 # spider's patrol crosses the floor gap at x = 160; the spider walks at three
 # times its usual speed and turns at that gap; the fish swim over the gap at
-# x = 704; the bridge stands alone near the end of the level.
+# x = 704 and the faster fish patrols 400..560; the bridge stands alone
+# near the end of the level.
 format_version = 1
 name = "Runtime creature fixture"
 screen_count = 4
@@ -46,6 +47,12 @@ x = 600.0
 vx = 70.0
 patrol_x0 = 560.0
 patrol_x1 = 860.0
+
+[[faster_fish]]
+x = 420.0
+vx = -120.0
+patrol_x0 = 400.0
+patrol_x1 = 560.0
 
 [[bridges]]
 x = 1200.0

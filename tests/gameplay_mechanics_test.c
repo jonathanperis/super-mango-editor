@@ -600,6 +600,54 @@ done:
     return failed;
 }
 
+/*
+ * The faster fish runs the shared fish code with its own tuning: it patrols
+ * at its authored 120 px/s, leaps -420 px/s every 1.0-2.2 s (about 110 px
+ * above the water) and hurts on contact.
+ */
+static int faster_fish_leap_higher_and_patrol_faster(void)
+{
+    int failed = 0;
+    GameState gs;
+    CHECK(mechanics_open_level(&gs, CREATURES_LEVEL, 0) == 0);
+    CHECK(gs.faster_fish_count == 1);
+    FasterFish *fish = &gs.faster_fish[0];
+    const float water_y = fish->water_y;
+    CHECK(fish->y == water_y && fish->vx == -120.0f);
+    stand_at(&gs, 1000.0f);
+
+    /* Ten steps at 120 px/s: 20 px to the left, before any turn. */
+    const float start_x = fish->x;
+    mechanics_step(&gs, 0, 10);
+    CHECK(NEAR(start_x - fish->x, 20.0f, 0.01f));
+
+    float top = water_y;
+    int leaps = 0, turned_right = 0, turned_left = 0;
+    for (int step = 0; step < 6 * STEPS_PER_SECOND; step++) {
+        float before_vx = fish->vx, before_vy = fish->vy;
+        mechanics_step(&gs, 0, 1);
+        if (before_vy == 0.0f && fish->vy < 0.0f) leaps++;
+        if (before_vx < 0.0f && fish->vx > 0.0f) turned_right = 1;
+        if (before_vx > 0.0f && fish->vx < 0.0f) turned_left = 1;
+        if (fish->y < top) top = fish->y;
+        CHECK(fabsf(fish->vx) == 120.0f);
+        CHECK(fish->y <= water_y);
+        CHECK(fish->x >= 400.0f - 0.01f && fish->x + FISH_RENDER_W <= 560.0f + 0.01f);
+    }
+    CHECK(leaps >= 2 && turned_right && turned_left);
+    /* 420 px/s up under 800 px/s²: about 110 px above the water. */
+    CHECK(NEAR(water_y - top, 420.0f * 420.0f / (2.0f * 800.0f), 4.0f));
+
+    /* Mid-leap it costs a heart, like the regular fish. */
+    for (int n = 0; !(fish->vy < 0.0f) && n < 5 * STEPS_PER_SECOND; n++)
+        mechanics_step(&gs, 0, 1);
+    CHECK(fish->vy < 0.0f);
+    CHECK(touch_costs_heart(&gs, faster_fish_get_hitbox(fish)));
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
 static int birds_patrol_at_their_own_speeds(void)
 {
     int failed = 0;
@@ -855,6 +903,7 @@ int main(void)
         CASE(jumping_spider_leaps_the_gap),
         CASE(spider_keeps_its_authored_speed),
         CASE(fish_leap_from_the_water_and_patrol),
+        CASE(faster_fish_leap_higher_and_patrol_faster),
         CASE(birds_patrol_at_their_own_speeds),
         CASE(bridge_crumbles_under_the_player),
         CASE(bridge_ignores_a_player_on_another_surface),
