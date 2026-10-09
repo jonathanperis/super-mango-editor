@@ -56,9 +56,10 @@ void game_ghost_step(GameState *gs)
 {
     GameGhost *ghost = gs->screen.ghost;
     if (!ghost) return;
-    /* A run continued from a saved point began part-way through the level,
-     * so its recording could never be a whole run: stop recording it. */
-    if (gs->screen.resumed) ghost->recording = 0;
+    /* A run continued from a saved point, or started at a playtest start
+     * point, began part-way through the level, so its recording could
+     * never be a whole run: stop recording it. */
+    if (gs->screen.resumed || gs->screen.start_point_run) ghost->recording = 0;
     if (ghost->recording) {
         if (ghost->run_count == GHOST_MAX_STEPS) {
             ghost->recording = 0;  /* too long to keep; see GHOST_MAX_STEPS */
@@ -91,7 +92,8 @@ int game_ghost_take_run(const GameState *gs, GameGhostTrack *out)
 {
     const GameGhost *ghost = gs->screen.ghost;
     memset(out, 0, sizeof(*out));
-    if (!ghost || !ghost->recording || gs->screen.resumed || ghost->run_count == 0 ||
+    if (!ghost || !ghost->recording || gs->screen.resumed || gs->screen.start_point_run ||
+        ghost->run_count == 0 ||
         !gs->screen.profile_level_key[0]) return -1;
     out->samples = malloc((size_t)ghost->run_count * sizeof(*out->samples));
     if (!out->samples) return -1;

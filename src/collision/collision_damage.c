@@ -42,9 +42,11 @@ void game_restart_after_game_over(GameState *gs)
     /* Retry is a fresh attempt with score 0, so every coin returns. A life
      * loss (reset_current_level alone) keeps collected coins gone. */
     for (int i = 0; i < gs->world.coin_count; i++) gs->world.coins[i].active = 1;
-    /* A fresh attempt from the level start: no longer a continued run, and
-     * the time-trial recording (and the ghost race) start over with it. */
+    /* A fresh attempt from the level start: no longer a continued run or a
+     * playtest from a start point, and the time-trial recording (and the
+     * ghost race) start over with it. */
     gs->screen.resumed = 0;
+    gs->screen.start_point_run = 0;
     game_ghost_restart(gs);
     reset_current_level(gs, &gs->screen.loop.fp_prev_riding);
 }

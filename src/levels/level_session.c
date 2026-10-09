@@ -76,6 +76,9 @@ static void game_level_commit(GameState *gs, LevelDef *staged, uint64_t hash)
  * The point becomes the respawn point, so a lost life comes back here
  * rather than at the level's start, until a later checkpoint is crossed.
  * Checkpoints already behind it count as reached, without the banner.
+ * The attempt is marked start_point_run: it skipped part of the level, so
+ * its time is no best time, its recording no ghost, and its respawn point
+ * no Continue point (app_session.c checks the flag).
  * Returns -1 (after saying why) when the level has no such start.
  */
 static int apply_start_request(GameState *gs, const LevelDef *def)
@@ -98,6 +101,7 @@ static int apply_start_request(GameState *gs, const LevelDef *def)
     gs->world.player.spawn_x = point.spawn_x;
     gs->world.player.spawn_y = point.spawn_y;
     player_reset(&gs->world.player);
+    gs->screen.start_point_run = 1;
     /* Show the start point at once instead of panning from the left edge. */
     game_camera_snap(gs);
     return 0;

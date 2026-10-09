@@ -96,7 +96,9 @@ when its tab is hidden, the only warning before a tab closes), and when the play
 leaves the level part-way with Exit or Level Select. It holds the respawn point,
 score, lives, the coins already collected and the level timer, plus the level
 file's content hash. Finishing the level or losing its last life clears it; the
-profile keeps only one, for the most recent level.
+profile keeps only one, for the most recent level. A run started with
+`--start-x` or `--start-checkpoint` never records, replaces or clears it (see the
+[runtime flags](#runtime-flags-for-input-and-ci)).
 
 **Continue** in the start menu, or `--continue` on the command line, reopens that
 level and puts the player on the saved respawn point exactly as a lost life would:
@@ -127,8 +129,9 @@ the same way twice.
   reduced motion holds one pose per animation instead of cycling frames.
 - A ghost is bound to its level file's content hash: after the level is edited
   the old ghost is ignored, and the next finished run replaces it.
-- Runs continued from a Continue point, and runs longer than five minutes
-  (`GHOST_MAX_STEPS`), are not whole runs and never become ghosts. Debug, smoke,
+- Runs continued from a Continue point or started with `--start-x` /
+  `--start-checkpoint`, and runs longer than five minutes (`GHOST_MAX_STEPS`),
+  are not whole runs and never become ghosts. Debug, smoke,
   replay, experiment and `--no-save` runs have no ghost at all.
 - Native ghosts are TOML files next to the profile, named after it and the
   level: `profile-ghost-01_lugio_01.toml` beside `profile.toml` (or
@@ -255,7 +258,7 @@ try it on.
 | `--sandbox` | Loads `levels/00_sandbox_01.toml` directly (whichever of `--sandbox`/`--level` comes last wins). |
 | `--level <path>` | Starts gameplay from a specific TOML file and skips the start menu. |
 | `--start-x <px>` | With `--level`: starts the first attempt with the player centred on world x `<px>` (a whole number, 0 to the level width), standing on the highest surface under it (ground floor, pillar, bridge, or a fixed or crumbling float platform). A lost life respawns there until a later checkpoint is crossed; checkpoints already behind it count as reached. Over a floor gap with nothing above it, or outside the level, the game exits with an error. The editor's **Playtest from here** passes it. |
-| `--start-checkpoint <n>` | With `--level`: starts the first attempt on authored checkpoint `<n>` (0-based `[[checkpoints]]` order), exactly where its respawn puts the player. A checkpoint the level does not have is an error. Only one of `--start-x` / `--start-checkpoint` may be given, neither combines with `--replay-script` or `--experiment`, and both apply to the first game only: Retry after Game Over, Replay and the next phase start at the level's own start. |
+| `--start-checkpoint <n>` | With `--level`: starts the first attempt on authored checkpoint `<n>` (0-based `[[checkpoints]]` order), exactly where its respawn puts the player. A checkpoint the level does not have is an error. Only one of `--start-x` / `--start-checkpoint` may be given, neither combines with `--replay-script` or `--experiment`, and both apply to the first game only: Retry after Game Over, Replay and the next phase start at the level's own start. That first attempt skipped part of the level, so it is a playtest even when the profile is saved: it records no best result and no ghost, and it neither saves nor clears a Continue point; the profile's settings still apply. |
 | `--continue` | Opens the last saved stage if available and no explicit level was supplied, at its saved [Continue](#continue) point when it has one; otherwise, or when that stage no longer loads, opens the selector. Runs that do not read the profile (`--no-save`, `--debug`, smoke, replay scripts) always open the selector. |
 | `--profile <path>` | Uses an explicit native profile file. |
 | `--no-save` | Keeps settings/results in memory only; does not read or write the personal profile. |

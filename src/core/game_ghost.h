@@ -99,7 +99,8 @@ const GhostSample *game_ghost_current(const GameState *gs);
 
 /* Copy this finished attempt into out (owned; free with
  * game_ghost_track_free). Returns -1 when the attempt cannot be a ghost:
- * it continued from a saved point, ran too long, or recorded nothing. */
+ * it continued from a saved point or a start point, ran too long, or
+ * recorded nothing. */
 int game_ghost_take_run(const GameState *gs, GameGhostTrack *out);
 
 /* Make track the run to race (takes ownership of its samples). */

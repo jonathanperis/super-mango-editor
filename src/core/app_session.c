@@ -220,8 +220,12 @@ static void session_track_resume(AppSession *session, const GameState *game, int
 {
     GameProfile *profile = &session->profile;
     /* Labs and editor playtests have no profile key; F8 experiments are
-     * debug runs, which never touch the personal profile anyway. */
-    if (!game->screen.profile_level_key[0] || game->screen.experiment) return;
+     * debug runs, which never touch the personal profile anyway. A run from
+     * a --start-x / --start-checkpoint point neither records a point (its
+     * respawn may be one no normal run could save, which game_resume_apply
+     * would refuse) nor clears the real one when it ends. */
+    if (!game->screen.profile_level_key[0] || game->screen.experiment ||
+        game->screen.start_point_run) return;
     if (game->screen.completion.complete || game->screen.game_over) {
         /* A finished or lost attempt leaves nothing to continue. */
         if (game_profile_resume(profile, game->screen.profile_level_key)) game_profile_clear_resume(profile);
@@ -304,8 +308,9 @@ static void session_load_ghost(AppSession *session, GameState *game)
 /*
  * A finished run becomes the level's ghost when there is none yet (or only
  * one for another version of the level, which was never loaded) or when it
- * beat the stored ghost's time. A run continued from a saved point, or one
- * longer than GHOST_MAX_STEPS, recorded no whole run and is skipped.
+ * beat the stored ghost's time. A run continued from a saved point or
+ * started at a --start-x / --start-checkpoint point, or one longer than
+ * GHOST_MAX_STEPS, recorded no whole run and is skipped.
  */
 static void session_save_ghost(AppSession *session, GameState *game)
 {
@@ -481,7 +486,9 @@ static void session_apply_game_route(AppSession *session)
         if (!game_load_next_phase(game)) {
             session_profile_key(game, path);
             game_profile_select(&session->profile, game->screen.profile_level_key);
-            game->screen.resumed = 0;  /* the new level is played from its start */
+            /* The new level is played from its start: a whole attempt. */
+            game->screen.resumed = 0;
+            game->screen.start_point_run = 0;
             session_watch_resume(session, game);
             /* A new level, a new race: restart the recording, load its ghost. */
             game_ghost_restart(game);
@@ -629,9 +636,11 @@ static void session_step(AppSession *session, int callback_owned)
         if (game->screen.completion.complete && !game->screen.profile_completion_recorded) {
             game->screen.profile_completion_recorded = 1;
             /* A level outside levels/ (a lab, an editor playtest) has no
-             * profile key and is simply not recorded. A refusal for a keyed
-             * level means a lost result, so say so. */
-            if (game->screen.profile_level_key[0] &&
+             * profile key and is simply not recorded, and neither is a run
+             * from a start point: it skipped part of the level, so its
+             * time would be a false best. A refusal for a keyed level means
+             * a lost result, so say so. */
+            if (game->screen.profile_level_key[0] && !game->screen.start_point_run &&
                 game_profile_record(&session->profile, game->screen.profile_level_key, game->world.score-game->world.level_score_start,
                                     game->screen.completion.coins_collected, game->screen.completion.elapsed) != 0)
                 TraceLog(LOG_WARNING, "Profile: result for %s was not recorded (profile full or values out of range)",

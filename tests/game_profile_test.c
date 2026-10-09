@@ -839,6 +839,70 @@ fail:
     return 1;
 }
 
+/*
+ * A run started with --start-x / --start-checkpoint (the editor's
+ * "Playtest from here") skipped part of the level. It used to record its
+ * short time as the best time and its recording as the ghost, and to save
+ * its respawn point as the Continue point, replacing the real one with a
+ * point --continue then refused. Now it writes none of the three, and it
+ * leaves the real Continue point alone even when it finishes the level.
+ */
+static int start_point_runs_leave_the_profile_alone(void)
+{
+    char path[160], lock_path[176], ghost_path[200];
+    const char *level = "levels/00_sandbox_01.toml";
+    snprintf(path, sizeof(path), TEST_OUT "profile-start-point-%llu.toml", (unsigned long long)clock_millis());
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+    CHECK(game_ghost_file_path(path, level, ghost_path, sizeof(ghost_path)) == 0);
+    AppSessionConfig config = {.level_path = level, .profile_enabled = 1, .profile_path = path};
+
+    /* A normal run leaves a Continue point in the third screen, score 30. */
+    AppSession *session = session_create(&config);
+    CHECK(session && session->game);
+    session->game->world.player.x = 2.0f * GAME_W + 50.0f;
+    game_checkpoint_update(session->game);
+    session->game->world.score = 30;
+    session->game->screen.route = GAME_ROUTE_EXIT;
+    session_frame(session);
+    session_destroy(&session);
+
+    /* A playtest from x 300 moves its respawn point, pauses and finishes. */
+    config.start.kind = LEVEL_START_AT_X;
+    config.start.x = 300.0f;
+    session = session_create(&config);
+    CHECK(session && session->game);
+    GameState *game = session->game;
+    game->world.player.x = 3.0f * GAME_W + 50.0f;
+    game_checkpoint_update(game);
+    game->world.score = 99;
+    game_overlay_set_pause_reason(game, GAME_PAUSE_REASON_PLAYER, 1);
+    session_frame(session);
+    const GameResume *saved = game_profile_resume(&session->profile, level);
+    CHECK(saved && saved->score == 30 && saved->legacy_screen == 2);
+    game_overlay_set_pause_reason(game, GAME_PAUSE_REASON_PLAYER, 0);
+    finish_run(session, 30, 0.5f);
+    CHECK(game->screen.profile_completion_recorded);
+    CHECK(!game_profile_result(&session->profile, level));
+    CHECK(serializer_probe_path_utf8(ghost_path) == SERIALIZER_PATH_MISSING);
+    saved = game_profile_resume(&session->profile, level);
+    CHECK(saved && saved->score == 30);
+    session_destroy(&session);
+
+    /* The real Continue point still works. */
+    config.start.kind = LEVEL_START_DEFAULT;
+    config.level_path = NULL;
+    config.continue_last = 1;
+    session = session_create(&config);
+    CHECK(session && session->game && session->game->screen.resumed && session->game->world.score == 30);
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 0;
+fail:
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 1;
+}
+
 /* Collect raylib warnings so a test can see what the session logged. */
 static char last_warning[256];
 static void capture_warning(int level, const char *text, va_list args)
@@ -904,6 +968,8 @@ int game_profile_contract_test(void)
     puts("profile: ghost codec and session");
     if (ghost_codec_and_paths()) return 1;
     if (ghost_session_keeps_the_fastest_run()) return 1;
+    puts("profile: start-point runs");
+    if (start_point_runs_leave_the_profile_alone()) return 1;
     puts("game_profile_contract_test: ok");
     return 0;
 }
