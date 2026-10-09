@@ -3,6 +3,7 @@
 
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -63,6 +64,23 @@ class DocsChecksTest(unittest.TestCase):
         spans, fenced = drift.split_code(text)
         self.assertEqual([span for _, span in spans], ["after", "last"])
         self.assertEqual([line for _, line in fenced], ["```", "`inside`", "```"])
+
+    def test_google_fonts_urls_fail_in_sources(self):
+        # The real sources are clean, without building the site.
+        self.assertEqual(site.check_font_sources(ROOT), [])
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            (root / "tools").mkdir()
+            (root / "docs" / "node_modules" / "pkg").mkdir(parents=True)
+            (root / "docs" / "node_modules" / "pkg" / "a.css").write_text(
+                "@import url(https://fonts.googleapis.com/css2);", encoding="utf-8")
+            (root / "tools" / "card.html").write_text(
+                '<link href="https://fonts.googleapis.com/css2?family=X">\n'
+                "<style>@font-face { src: url(//fonts.gstatic.com/x.woff2); }</style>\n",
+                encoding="utf-8")
+            failures = site.check_font_sources(root)
+        self.assertEqual([item.split(": ")[0] for item in failures],
+                         ["tools/card.html:1", "tools/card.html:2"], failures)
 
     def test_published_site_regressions(self):
         self.assertTrue((site.OUT / "index.html").exists(), "build docs before this test")

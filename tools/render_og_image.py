@@ -4,8 +4,9 @@
 Screenshots tools/og-image.html at 1200x630 with headless Google Chrome. A
 manual tool, not part of any build: run `python3 tools/render_og_image.py`
 from the repository root after changing the template, and commit the image
-it writes. Needs Chrome (set CHROME to its path if it is not found) and a
-network connection for the Pixelify Sans web font.
+it writes. Needs Chrome (set CHROME to its path if it is not found) and the
+website's font packages: the template loads Pixelify Sans from
+docs/node_modules, so run `bun install` in docs/ first. No network is used.
 """
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "tools" / "og-image.html"
 OUTPUT = ROOT / "docs" / "public" / "og-image.png"
+FONT_CSS = ROOT / "docs" / "node_modules" / "@fontsource" / "pixelify-sans" / "500.css"
 WIDTH, HEIGHT = 1200, 630
 
 CANDIDATES = [
@@ -37,12 +39,18 @@ def find_chrome() -> str:
 
 
 def main() -> None:
+    # Without the font Chrome quietly falls back to monospace, and the
+    # picture would look right enough to be committed by mistake.
+    if not FONT_CSS.is_file():
+        sys.exit(f"{FONT_CSS.relative_to(ROOT)} not found; run `bun install` in docs/ first")
     subprocess.run(
         [
             find_chrome(),
             "--headless=new",
             "--disable-gpu",
             "--hide-scrollbars",
+            # The template is a local file that loads local fonts and sprites.
+            "--allow-file-access-from-files",
             "--force-device-scale-factor=1",
             f"--window-size={WIDTH},{HEIGHT}",
             # Lets the web font finish loading before the shot is taken.
