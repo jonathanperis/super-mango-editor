@@ -80,6 +80,11 @@ const GhostSample *game_ghost_current(const GameState *gs)
 {
     const GameGhost *ghost = gs->screen.ghost;
     if (!ghost || !gs->screen.profile || !gs->screen.profile->data.settings.ghost || ghost->best.count == 0) return NULL;
+    /* The best run is raced from the level start. A run that picked the
+     * level up part-way (Continue, or a --start-x playtest) is somewhere
+     * else at step 0, so a ghost there would race nothing: hide it until
+     * a whole attempt (Retry, Replay) starts. */
+    if (gs->screen.resumed || gs->screen.start_point_run) return NULL;
     /* step counts the steps already simulated; after step n the real Mango
      * shows the result of step n, which the best run recorded as sample
      * n - 1. Before the first step the ghost waits on its first sample. */

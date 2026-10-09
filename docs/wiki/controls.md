@@ -131,7 +131,9 @@ the same way twice.
   the old ghost is ignored, and the next finished run replaces it.
 - Runs continued from a Continue point or started with `--start-x` /
   `--start-checkpoint`, and runs longer than five minutes (`GHOST_MAX_STEPS`),
-  are not whole runs and never become ghosts. Debug, smoke,
+  are not whole runs and never become ghosts. Those that pick the level up
+  part-way do not show the ghost either: it races from the level start, so it
+  returns with the next whole attempt (Retry or Replay). Debug, smoke,
   replay, experiment and `--no-save` runs have no ghost at all.
 - Native ghosts are TOML files next to the profile, named after it and the
   level: `profile-ghost-01_lugio_01.toml` beside `profile.toml` (or
