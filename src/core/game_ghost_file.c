@@ -24,7 +24,8 @@
  *
  * Storage: natively a file next to the profile (game_ghost_file_path),
  * written through a temporary file like the profile itself; in a browser a
- * localStorage entry per level. Ghosts are not shared between profiles.
+ * localStorage entry per level, all of them within GHOST_WEB_BUDGET. Ghosts
+ * are not shared between profiles.
  */
 #include "game_ghost.h"
 #include "../game.h"  /* GameState: this file reads its fields */
@@ -68,6 +69,19 @@ static int ghost_time_matches_steps(double time, int steps)
     return fabs(time - (double)expected) <= (double)GAME_FIXED_STEP;
 }
 
+/*
+ * GHOST_WEB_BUDGET — the most localStorage all browser ghosts may use
+ * together, in characters (keys included; ghost text is ASCII).
+ *
+ * localStorage holds about 5 million characters per site, and on
+ * <user>.github.io every project page of that user is the same site. The
+ * profile, which holds the player's results and settings, lives there too,
+ * and a ghost must never take the space a profile save needs. One million
+ * characters keeps five of the longest (five-minute) ghosts or dozens of
+ * ordinary ones; past it, the ghosts written longest ago are deleted first.
+ */
+#define GHOST_WEB_BUDGET (1024 * 1024)
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 /* Browser storage: one localStorage entry per level, keyed by its profile
@@ -84,9 +98,48 @@ EM_JS(int, ghost_browser_read, (const char *key, char *out, int capacity), {
         return size + 1;
     } catch (_) { return -1; }
 });
-EM_JS(int, ghost_browser_write, (const char *key, const char *text), {
+/*
+ * Write one ghost within `budget` characters for all ghosts together.
+ * 'super-mango-ghost-order-v1' lists the ghost entries from least to most
+ * recently written; an entry it does not list (lost order, older build)
+ * counts as the oldest. Older ghosts are deleted until the new one fits
+ * the budget, and again one by one if the browser still reports its quota
+ * full. A ghost larger than the whole budget is not written at all.
+ */
+EM_JS(int, ghost_browser_write, (const char *key, const char *text, int budget), {
+    const prefix = 'super-mango-ghost-v1:', orderKey = 'super-mango-ghost-order-v1';
     try {
-        localStorage.setItem('super-mango-ghost-v1:' + UTF8ToString(key), UTF8ToString(text));
+        const name = prefix + UTF8ToString(key), value = UTF8ToString(text);
+        const size = k => k.length + (localStorage.getItem(k) || "").length;
+        if (name.length + value.length > budget) return 0;
+        let order = [];
+        try {
+            const saved = JSON.parse(localStorage.getItem(orderKey) || '[]');
+            if (Array.isArray(saved)) order = saved.filter(k => typeof k === 'string');
+        } catch (_) { order = []; }
+        const present = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith(prefix) && k !== name) present.push(k);
+        }
+        // Oldest first: unlisted entries, then the listed ones in order.
+        const listed = order.filter(k => present.includes(k));
+        const others = present.filter(k => !listed.includes(k)).concat(listed);
+        let used = name.length + value.length;
+        for (const k of others) used += size(k);
+        while (used > budget && others.length) {
+            const oldest = others.shift();
+            used -= size(oldest);
+            localStorage.removeItem(oldest);
+        }
+        for (;;) {
+            try { localStorage.setItem(name, value); break; } catch (error) {
+                if (!others.length) return 0;
+                localStorage.removeItem(others.shift());
+            }
+        }
+        // Losing the order list only makes eviction order less exact.
+        try { localStorage.setItem(orderKey, JSON.stringify(others.concat([name]))); } catch (_) {}
         return 1;
     } catch (_) { return 0; }
 });
@@ -337,7 +390,7 @@ int game_ghost_save(const GameProfile *profile, const GameGhostTrack *track)
         free(text);
         return GHOST_SAVE_KEPT;
     }
-    if (!result && !ghost_browser_write(track->level, text)) result = -1;
+    if (!result && !ghost_browser_write(track->level, text, GHOST_WEB_BUDGET)) result = -1;
 #else
     char path[SERIALIZER_IO_PATH_MAX], temporary[SERIALIZER_IO_PATH_MAX] = "";
     if (!result && game_ghost_file_path(profile->path, track->level, path, sizeof(path))) result = -1;
