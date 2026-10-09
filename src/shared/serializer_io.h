@@ -55,9 +55,19 @@ int serializer_make_temp_path(const char *path, char *buf, size_t buf_size);
 /*
  * Create an exclusive temporary sibling.  Collision candidates are retried;
  * returned path is the file actually opened.
+ *
+ * serializer_open_temp makes a private file (POSIX mode 0600): recovery
+ * snapshots, playtest copies, profiles and editor preferences are nobody
+ * else's business.  serializer_open_temp_shared is for files the user
+ * saves on purpose, such as a level: it asks for 0666 and lets the
+ * process umask (usually 022) decide, exactly like a text editor would.
+ * Either way, replacing an existing regular file keeps that file's
+ * permission bits, and its owner and group where the OS allows it.
  */
 FILE *serializer_open_temp(const char *target_path, char *temp_path,
                            size_t temp_path_size);
+FILE *serializer_open_temp_shared(const char *target_path, char *temp_path,
+                                  size_t temp_path_size);
 
 /* Flush stdio buffers and request an OS-level file flush where supported. */
 int serializer_flush(FILE *fp);
