@@ -385,7 +385,7 @@ Frees all resources in reverse init order.
 - `level_release_platform_tiles(GameState *gs)` -- unload the platform tile textures; `GameState.world.platform_tiles` loads each distinct `tile_path` once and every platform naming it borrows that texture, so a level with 23 stone pillars decodes `stone_platform.png` once, and reloading the same level (Replay, F8) decodes nothing
 - `level_load_toml(const char *path, LevelDef *def)` -- parse TOML into heap staging storage, run runtime validation, free TOML data, then assign the validated `LevelDef` to the caller. A `LevelDef` is about 16 KB; game load paths never keep one in a local variable (the browser stack is 64 KB), and `level.h` stops the build if it outgrows `LEVEL_DEF_SIZE_BUDGET`
 - `level_apply_player_physics(Player *player, const LevelDef *def)` -- reset player movement tunables to engine defaults, then apply non-negative level overrides
-- `level_validate_counts(const LevelDef *level, char *err, size_t err_sz)` -- reject out-of-range array counts
+- `level_validate_counts(const LevelDef *def, char *err, size_t err_size)` -- reject out-of-range array counts
 - `phase_has_next`, `phase_next_path`, `phase_progress_save`, `phase_progress_restore` -- resolve level-completion next-phase paths and protect progress when staging phase transitions
 
 `LevelDef.checkpoints` stores optional immutable `CheckpointPlacement { x, y }` records. The serializer requires finite numeric `x` and `y`; runtime validation enforces a maximum of `MAX_CHECKPOINTS` (`99`), unique in-world x coordinates strictly after the effective player start, and y coordinates in the logical canvas.

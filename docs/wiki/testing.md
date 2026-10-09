@@ -65,7 +65,13 @@ It also runs `tests/validate_levels_test.py` and `tests/gen_sounds_test.py`. The
 cover static boot wiring, host lifecycle, storage conflicts, touch ownership,
 canvas keyboard scoping, native/WASM archive contracts and the CodeQL SARIF
 filter without a browser. Native harnesses cover parser/serializer, validation, runtime, editor,
-profile, checkpoint, simulation and session behavior.
+profile, checkpoint, simulation and session behavior. The session, profile and
+mechanics cases include the Continue point (its codec, migration and round trip, and
+refusing a point the level no longer fits), the time-trial ghost (codec, paths,
+keeping the fastest run, racing it), Level Select's best results, `--start-x` /
+`--start-checkpoint` start points, the asset root found from the executable's
+folder, Replay reusing the session's shared sprites and sounds, and Replay
+replacing the game in place under the browser-style callback loop.
 `gameplay-mechanics-test` loads small levels from `tests/fixtures/runtime/`
 (climbing, hazards, creatures) and steps them through `game_update_active`:
 climbing on and off ladders, ropes and vines; the blue flame's eruption timing
@@ -80,8 +86,10 @@ level, settings open). It also replays
 `--replay-script` scripts (from a `--replay-dir` under the test output) and
 rejects malformed ones. `editor-ui-test` drives the editor with input events
 (palette picks, place, select, drag, delete, undo, wheel zoom/pan, property
-and config panel clicks) and checks the resulting
-document and undo history. It and `editor-validation-test` edit a campaign in a
+and config panel clicks, box and Shift selection acting on the group, arrow-key
+nudges, Ctrl+D, the snap toggle, Alt+click cycling, text-field caret and Tab,
+validation messages that select the problem, the Campaign view and Playtest
+from here) and checks the resulting document and undo history. It and `editor-validation-test` edit a campaign in a
 scratch game folder, made and entered through `tests/test_folders.h`, so those
 cases run on Windows too. On POSIX it also covers the playtest process status
 and the native file pickers through stand-in `osascript`/`zenity` scripts. They write scratch files
