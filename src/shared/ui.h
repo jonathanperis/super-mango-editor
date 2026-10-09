@@ -23,7 +23,8 @@ typedef enum { UI_EDIT_NONE = 0, UI_EDIT_INT, UI_EDIT_FLOAT, UI_EDIT_TEXT } UIEd
 /* Caret keys an active field understands (see ui_edit_key). */
 typedef enum {
     UI_KEY_LEFT, UI_KEY_RIGHT, UI_KEY_HOME, UI_KEY_END,
-    UI_KEY_BACKSPACE, UI_KEY_DELETE
+    UI_KEY_BACKSPACE, UI_KEY_DELETE,
+    UI_KEY_UP, UI_KEY_DOWN, UI_KEY_PICK   /* open dropdown lists only */
 } UIEditKey;
 
 #define UI_EDIT_BUFFER_SIZE LEVEL_DESCRIPTION_CAPACITY
@@ -95,6 +96,13 @@ typedef struct {
      * paint over it. Options are borrowed from the caller's static array. */
     const char **dropdown_options;
     int dropdown_count, dropdown_x, dropdown_y, dropdown_w, dropdown_selected;
+    /* The keyboard on an open list: the highlighted option, and what this
+     * frame's keys asked for (ui_dropdown_key, ui_focus_next), done when
+     * the dropdown is next drawn. */
+    int dropdown_highlight;
+    int dropdown_key_move;     /* rows to move the highlight            */
+    int dropdown_key_pick;     /* Enter: choose the highlighted option  */
+    int dropdown_key_tab;      /* Tab +1 / Shift+Tab -1: close and move */
     /*
      * Tab / Shift+Tab focus.  Every field records its id in field_order as it
      * is drawn, so the order is simply the order on screen; ui_begin_frame
@@ -142,8 +150,14 @@ void ui_cancel_active_edit(UIState *ui);
 void ui_edit_key(UIState *ui, UIEditKey key);
 /* Tab (+1) / Shift+Tab (-1): when the active field is next drawn it commits
  * like Return and the next / previous field on screen becomes active.  An
- * invalid value keeps the focus where it is. */
+ * invalid value keeps the focus where it is.  Dropdowns take part in the
+ * order: Tab onto one opens its list, Tab from an open list closes it. */
 void ui_focus_next(UIState *ui, int direction);
+/* Keys for the open dropdown list: UI_KEY_UP / UI_KEY_DOWN move the
+ * highlight, UI_KEY_HOME / UI_KEY_END jump to the first / last option and
+ * UI_KEY_PICK chooses the highlighted one (like clicking it).  Does
+ * nothing when no list is open. */
+void ui_dropdown_key(UIState *ui, UIEditKey key);
 /* Activate field `id` the next time it is drawn, as if it had been clicked
  * (dropped if it is not drawn within two frames).  For a dropdown id this
  * opens its list. */

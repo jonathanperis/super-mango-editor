@@ -1560,6 +1560,42 @@ static int text_fields_move_the_caret_and_tab_between_fields(void)
     CHECK(es.ui.active_id == 9011 && es.level.screen_count == 5);
     key_frame(&es, KEY_ESCAPE, 0);
     CHECK(es.ui.active_id == 0);
+
+    /* Dropdowns are in the Tab order: Tab from the axe's y field opens its
+     * mode list, Down + Enter picks Spin as one undo step, and Tab from an
+     * open list closes it and moves on. */
+    es.level.axe_trap_count = 1;
+    es.level.axe_traps[0] = (AxeTrapPlacement){.pillar_x = 500.0f, .mode = AXE_MODE_PENDULUM};
+    editor_select_only(&es, ENT_AXE_TRAP, 0);
+    es.panel_open = 1;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    ui_focus_field(&es.ui, (int)ENT_AXE_TRAP * 100 + 4);          /* y */
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.active_id == (int)ENT_AXE_TRAP * 100 + 4);
+    undo_top = es.undo->top;
+    key_frame(&es, KEY_TAB, 0);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.active_id == 0 && es.ui.dropdown_open_id == (int)ENT_AXE_TRAP * 100 + 2);
+    key_frame(&es, KEY_DOWN, 0);
+    key_frame(&es, KEY_DOWN, 0);                                  /* stops at Spin */
+    CHECK(es.ui.dropdown_highlight == 1 && es.level.axe_traps[0].mode == AXE_MODE_PENDULUM);
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(es.ui.dropdown_open_id == 0 && es.level.axe_traps[0].mode == AXE_MODE_SPIN);
+    CHECK(es.undo->top == undo_top + 1);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.axe_traps[0].mode == AXE_MODE_PENDULUM);
+    /* Shift+Tab from the reopened list goes back to y; Esc just closes. */
+    ui_focus_field(&es.ui, (int)ENT_AXE_TRAP * 100 + 2);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.dropdown_open_id == (int)ENT_AXE_TRAP * 100 + 2);
+    key_frame(&es, KEY_TAB, INPUT_SHIFT);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.dropdown_open_id == 0 && es.ui.active_id == (int)ENT_AXE_TRAP * 100 + 4);
+    key_frame(&es, KEY_ESCAPE, 0);
+    ui_focus_field(&es.ui, (int)ENT_AXE_TRAP * 100 + 2);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(es.ui.dropdown_open_id == 0 && es.level.axe_traps[0].mode == AXE_MODE_PENDULUM);
 done:
     clear_dialog_seams();
     close_editor(&es);
