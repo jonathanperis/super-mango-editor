@@ -177,7 +177,7 @@ static void load_platforms(GameState *gs, const LevelDef *def)
         const PlatformPlacement *p = &def->platforms[i];
         int tw = (p->tile_width > 0) ? p->tile_width : 1;
         gs->platforms[i].x = p->x;
-        gs->platforms[i].y = (float)(FLOOR_Y - p->tile_height * TILE_SIZE + 16);
+        gs->platforms[i].y = level_platform_top_y(p->tile_height);
         gs->platforms[i].w = tw * TILE_SIZE;
         gs->platforms[i].h = p->tile_height * TILE_SIZE;
         gs->platforms[i].tex = NULL;
@@ -374,8 +374,7 @@ static void load_axe_traps(GameState *gs, const LevelDef *def)
          * Pivot y: top surface of a 3-tile pillar.
          */
         gs->axe_traps[i].x            = p->pillar_x + TILE_SIZE / 2.0f;
-        gs->axe_traps[i].y            = (p->y != 0.0f) ? p->y
-                                       : (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
+        gs->axe_traps[i].y            = level_axe_trap_y(p);
         gs->axe_traps[i].angle        = 0.0f;
         gs->axe_traps[i].time         = 0.0f;
         gs->axe_traps[i].mode         = p->mode;
@@ -395,8 +394,7 @@ static void load_circular_saws(GameState *gs, const LevelDef *def)
          * 2-tile pillar's top edge.
          */
         gs->circular_saws[i].x          = p->x;
-        gs->circular_saws[i].y          = (p->y != 0.0f) ? p->y
-                                         : (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H);
+        gs->circular_saws[i].y          = level_circular_saw_y(p);
         gs->circular_saws[i].w          = SAW_DISPLAY_W;
         gs->circular_saws[i].h          = SAW_DISPLAY_H;
         gs->circular_saws[i].patrol_x0  = p->patrol_x0;

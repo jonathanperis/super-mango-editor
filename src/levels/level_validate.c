@@ -6,6 +6,7 @@
 
 #include "level_loader.h"
 #include "level_ref.h"
+#include "level_validate.h"
 
 #define MAX_INITIAL_LIVES 999
 #define MAX_SCORE_PER_LIFE 999999
@@ -128,7 +129,7 @@ static int ends_with(const char *value, const char *suffix)
     return strcmp(value + value_len - suffix_len, suffix) == 0;
 }
 
-static int has_parent_segment(const char *value)
+int level_path_has_parent_segment(const char *value)
 {
     const char *p = value;
     while (*p) {
@@ -144,7 +145,7 @@ static int has_parent_segment(const char *value)
     return 0;
 }
 
-static int has_control_char(const char *value)
+int level_path_has_control_char(const char *value)
 {
     const unsigned char *p = (const unsigned char *)value;
     while (*p) {
@@ -165,11 +166,11 @@ static int validate_safe_repo_path(const char *field, const char *value,
         return fail_value(err, err_size, field,
                           "must be a repo-relative forward-slash path");
     }
-    if (has_parent_segment(value)) {
+    if (level_path_has_parent_segment(value)) {
         return fail_value(err, err_size, field,
                           "must not contain '..' path segments");
     }
-    if (has_control_char(value)) {
+    if (level_path_has_control_char(value)) {
         return fail_value(err, err_size, field,
                           "must not contain control characters");
     }
@@ -786,7 +787,7 @@ static int validate_platforms(const LevelDef *def, char *err,
         if (validate_world_rect(err, err_size, field, p->x, 0.0f,
                                 (float)(tw * TILE_SIZE), 1.0f, world_w) != 0)
             return -1;
-        if (FLOOR_Y - p->tile_height * TILE_SIZE + 16 < 0) {
+        if (level_platform_top_y(p->tile_height) < 0.0f) {
             snprintf(field, sizeof(field), "platforms[%d].tile_height", i);
             return fail_range(err, err_size, field, p->tile_height, 1,
                               (FLOOR_Y + 16) / TILE_SIZE);

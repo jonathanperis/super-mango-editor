@@ -46,6 +46,7 @@
 #include "editor/properties.h"
 #include "editor/hit_test.h"
 #include "levels/level_loader.h"
+#include "levels/level_validate.h"
 
 #define EDITOR_WORKFLOW_LEVEL_PATH TEST_OUT "test_editor_workflow_level.toml"
 #define EDITOR_WORKFLOW_RECENT_PATH TEST_OUT "editor_recent.txt"
@@ -2218,6 +2219,40 @@ fail:
     return 1;
 }
 
+/*
+ * The derived positions and path rules live once (level.h, level_validate.h)
+ * and the game, the validator and the editor all call them.  Pin their
+ * values, and check the editor's hit test uses the same platform top.
+ */
+static int shared_level_rules_have_one_answer(void)
+{
+    LevelDef level;
+    EditorRect r;
+
+    editor_level_init_defaults(&level);
+    level.platform_count = 1;
+    level.platforms[0] = (PlatformPlacement){100.0f, 2, 1, ""};
+    if (expect_float_value("2-tile platform top", level_platform_top_y(2),
+                           (float)(FLOOR_Y - 2 * TILE_SIZE + 16)) != 0 ||
+        expect_float_value("default axe y", level_axe_trap_y(&(AxeTrapPlacement){0}),
+                           level_platform_top_y(3)) != 0 ||
+        expect_float_value("custom axe y",
+                           level_axe_trap_y(&(AxeTrapPlacement){.y = 50.0f}), 50.0f) != 0 ||
+        expect_float_value("default saw y",
+                           level_circular_saw_y(&(CircularSawPlacement){0}),
+                           level_platform_top_y(2) - SAW_DISPLAY_H) != 0 ||
+        !editor_entity_bounds(&level, ENT_PLATFORM, 0, &r) ||
+        expect_float_value("hit test platform top", r.y, level_platform_top_y(2)) != 0)
+        return 1;
+    if (expect_int("parent segment", level_path_has_parent_segment("assets/../x.png"), 1) != 0 ||
+        expect_int("leading parent", level_path_has_parent_segment("../x.png"), 1) != 0 ||
+        expect_int("dots in a name", level_path_has_parent_segment("a/..b/c..png"), 0) != 0 ||
+        expect_int("control byte", level_path_has_control_char("a\nb"), 1) != 0 ||
+        expect_int("plain path", level_path_has_control_char("assets/a.png"), 0) != 0)
+        return 1;
+    return 0;
+}
+
 static int rail_deletion_keeps_references_valid(void)
 {
     EditorState es = {0};
@@ -2356,12 +2391,12 @@ static int drag_round_trips_and_follows_grab_point(void)
         expect_int("axe undo clean", es.modified, 0) != 0) goto fail;
     drag_by(&es, r.x + 5.0f, r.y + 5.0f, 0.0f, 10.0f);
     if (expect_float_value("axe vertical drag", es.level.axe_traps[0].y,
-                           editor_axe_trap_y(&(AxeTrapPlacement){0}) + 10.0f) != 0 ||
+                           level_axe_trap_y(&(AxeTrapPlacement){0}) + 10.0f) != 0 ||
         undo_last(&es) != 0 || expect_int("axe y undo clean", es.modified, 0) != 0)
         goto fail;
     /* Moving it up to exactly y = 0 must not read back as "default". */
     drag_by(&es, r.x + 5.0f, r.y + 5.0f, 0.0f,
-            -editor_axe_trap_y(&(AxeTrapPlacement){0}));
+            -level_axe_trap_y(&(AxeTrapPlacement){0}));
     if (expect_int("axe at top keeps a custom y", es.level.axe_traps[0].y > 0.0f, 1) != 0 ||
         undo_last(&es) != 0) goto fail;
 
@@ -4550,6 +4585,7 @@ int main(void)
     if (selection_structural_mutations_are_safe() != 0) return 1;
     if (checkpoint_editor_mutations_are_reversible() != 0) return 1;
     if (rail_deletion_keeps_references_valid() != 0) return 1;
+    if (shared_level_rules_have_one_answer() != 0) return 1;
     if (float_platform_rail_switch_rechecks_its_rail() != 0) return 1;
     if (drag_round_trips_and_follows_grab_point() != 0) return 1;
     if (editor_mutations_keep_level_valid() != 0) return 1;
