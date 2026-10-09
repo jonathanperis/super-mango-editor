@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 
 /*
  * Advance every bridge's crumble state. bridge_landed_idx is the bridge the

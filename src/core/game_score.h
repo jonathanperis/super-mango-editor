@@ -3,7 +3,7 @@
  */
 #pragma once
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 
 /* Add score and grant one bonus life for every crossed score_per_life threshold. */
 void game_award_score(GameState *gs, int amount);

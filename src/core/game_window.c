@@ -1,5 +1,6 @@
 /* Screen-local logical target. AppSession owns the process-wide raylib window. */
 #include "game_window.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 #include <stdio.h>
 
 int game_window_init(GameState *gs)

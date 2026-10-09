@@ -24,8 +24,8 @@
 #include "hit_test.h"    /* editor_hit_test                                */
 #include "undo.h"    /* Command, PlacementData, undo_push                 */
 #include "../levels/level_loader.h" /* level_validate_runtime            */
-#include "../game.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE, WORLD_W,
-                        FLOOR_GAP_W, MAX_* constants                      */
+#include "../game_constants.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE, WORLD_W,
+                                   FLOOR_GAP_W; MAX_* via level.h           */
 #include "../surfaces/rail.h" /* MAX_RAIL_SPEED                            */
 
 /*

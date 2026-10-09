@@ -5,6 +5,7 @@
  */
 
 #include "game_state.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 #include "game_camera.h"
 
 #include "../levels/level.h"

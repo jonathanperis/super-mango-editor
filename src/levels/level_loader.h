@@ -18,7 +18,7 @@
 #include <stddef.h>     /* size_t */
 
 #include "level.h"      /* LevelDef */
-#include "../game.h"    /* GameState */
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 
 /* Validate LevelDef count fields before fixed-size GameState array copies. */
 int level_validate_counts(const LevelDef *def, char *err, size_t err_size);

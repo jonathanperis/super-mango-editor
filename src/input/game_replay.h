@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 
 typedef struct GameReplayEvent {
     int frame;

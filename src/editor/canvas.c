@@ -32,8 +32,8 @@
 #include "hit_test.h"    /* editor_entity_bounds for the selection outline      */
 #include "tools.h"       /* editor_snap_point for the placement ghost           */
 #include "../levels/level_loader.h"
-#include "../game.h"    /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE,
-                           FLOOR_GAP_W, MAX_* constants, GRAVITY            */
+#include "../game_constants.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE,
+                                   FLOOR_GAP_W, GRAVITY; MAX_* via level.h */
 
 /* ------------------------------------------------------------------ */
 /* Helper: dynamic world width from editor's screen_count setting */

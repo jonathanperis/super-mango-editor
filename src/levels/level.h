@@ -17,12 +17,41 @@
 
 #include <stdint.h>
 #include <string.h>                    /* memset */
-#include "../surfaces/bouncepad.h"     /* BouncepadType, MAX_BOUNCEPADS_* */
+#include "../surfaces/bouncepad.h"     /* BouncepadType */
+#include "../surfaces/bouncepad_small.h"  /* MAX_BOUNCEPADS_SMALL */
+#include "../surfaces/bouncepad_medium.h" /* MAX_BOUNCEPADS_MEDIUM */
+#include "../surfaces/bouncepad_high.h"   /* MAX_BOUNCEPADS_HIGH */
 #include "../hazards/axe_trap.h"       /* AxeTrapMode, MAX_AXE_TRAPS */
 #include "../hazards/blue_flame.h"     /* MAX_BLUE_FLAMES, MAX_FIRE_FLAMES */
 #include "../surfaces/float_platform.h"/* FloatPlatformMode, MAX_FLOAT_PLATFORMS */
 #include "../surfaces/rail.h"          /* MAX_RAILS */
-#include "../game.h"                   /* MAX_* constants, FLOOR_Y, TILE_SIZE, etc. */
+/*
+ * The rest of the array limits and sizes LevelDef uses. These are the
+ * headers that define them, not game.h: a LevelDef does not contain a
+ * GameState, so the serializer, the editor and the level checker (which
+ * include this file but never touch GameState) are not recompiled when
+ * GameState changes.
+ */
+#include "../game_constants.h"         /* FLOOR_Y, TILE_SIZE, MAX_FLOOR_GAPS, MAX_CHECKPOINTS */
+#include "../surfaces/platform.h"      /* MAX_PLATFORMS */
+#include "../surfaces/bridge.h"        /* MAX_BRIDGES */
+#include "../surfaces/vine.h"          /* MAX_VINES */
+#include "../surfaces/ladder.h"        /* MAX_LADDERS */
+#include "../surfaces/rope.h"          /* MAX_ROPES */
+#include "../collectibles/coin.h"      /* MAX_COINS */
+#include "../collectibles/health_star.h" /* MAX_STAR_YELLOWS / GREENS / REDS */
+#include "../entities/spider.h"        /* MAX_SPIDERS */
+#include "../entities/jumping_spider.h"/* MAX_JUMPING_SPIDERS */
+#include "../entities/bird.h"          /* MAX_BIRDS */
+#include "../entities/faster_bird.h"   /* MAX_FASTER_BIRDS */
+#include "../entities/fish.h"          /* MAX_FISH */
+#include "../entities/faster_fish.h"   /* MAX_FASTER_FISH */
+#include "../hazards/circular_saw.h"   /* MAX_CIRCULAR_SAWS, SAW_DISPLAY_H */
+#include "../hazards/spike.h"          /* MAX_SPIKE_ROWS */
+#include "../hazards/spike_platform.h" /* MAX_SPIKE_PLATFORMS */
+#include "../hazards/spike_block.h"    /* MAX_SPIKE_BLOCKS */
+#include "../effects/parallax.h"       /* MAX_BACKGROUND_LAYERS */
+#include "../effects/fog.h"            /* MAX_FOG_TEXTURES */
 
 /* Current TOML level document schema version. Missing TOML version means v1. */
 #define LEVEL_FORMAT_VERSION 1

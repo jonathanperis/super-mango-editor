@@ -9,6 +9,7 @@
  */
 
 #include "game_bridges.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 void game_bridges_update(GameState *gs, float dt, int bridge_landed_idx)
 {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 
 typedef enum GameOverlayState {
     GAME_OVERLAY_NONE = 0,

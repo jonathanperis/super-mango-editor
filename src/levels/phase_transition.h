@@ -6,7 +6,7 @@
 #include <stddef.h>
 
 #include "level.h"
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 
 typedef struct {
     int score;

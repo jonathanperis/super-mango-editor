@@ -8,7 +8,7 @@
 
 #include "serializer_load_header.h"
 #include "serializer_parse.h"
-#include "../game.h" /* MAX_FLOOR_GAPS */
+#include "../levels/level.h" /* LevelDef and its MAX_* array limits */
 
 static void copy_header_string(char *dst, size_t dst_size, const char *src) {
     if (!dst || dst_size == 0) return;

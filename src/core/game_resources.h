@@ -10,7 +10,8 @@
 
 #pragma once
 
-#include "../game.h"
+#include "../game_assets.h"  /* GameAssets */
+#include "../game_fwd.h"     /* GameState, used by pointer only */
 #include "../levels/level.h"
 
 /* The shared default floor tileset (assets->textures.floor_tile). A level

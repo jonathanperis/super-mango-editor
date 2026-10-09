@@ -10,6 +10,7 @@
  */
 
 #include "game_actors.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 #include "../entities/bird.h"
 #include "../entities/faster_bird.h"

@@ -4,6 +4,8 @@
 #include <string.h>
 
 #include "levels/level_loader.h"
+#include "player/player.h"  /* JUMP_VY */
+#include "screens/hud.h"    /* MAX_HEARTS */
 #include "levels/level_ref.h"
 
 static int expect_valid_level(void)

@@ -3,6 +3,7 @@
  */
 
 #include "floor_gap_collision.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 #include "../shared/audio.h"
 

@@ -8,7 +8,7 @@
 
 #include "serializer_load_layers.h"
 #include "serializer_parse.h"
-#include "../game.h" /* MAX_BACKGROUND_LAYERS, MAX_FOG_TEXTURES */
+#include "../levels/level.h" /* LevelDef and its MAX_* array limits */
 
 static void copy_layer_path(char *dst, size_t dst_size, const char *src) {
     if (!dst || dst_size == 0) return;

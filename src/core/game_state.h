@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 
 /* ------------------------------------------------------------------ */
 /* Level reset / respawn                                              */

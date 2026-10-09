@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 
 /* Ease the camera toward the player (plus lookahead) for one step and
  * return its left edge as a whole pixel. */

@@ -19,7 +19,9 @@ On this page: [File map](#file-map) · [`main.c`](#mainc) · [`game.h`](#gameh) 
 src/
 ├── main.c                        CLI entry point; AppSession owns platform lifetime
 ├── game.h                        GameState struct; includes game_constants.h
+├── game_assets.h                 GameAssets: the shared sprite and sound slots
 ├── game_constants.h              Window, world, floor and camera #defines (no other includes)
+├── game_fwd.h                    `typedef struct GameState GameState;` for pointer-only headers
 ├── collectibles/
 │   ├── coin.h / .c               Coin collectible: placement, AABB collection, render
 │   ├── health_star.h / .c        Yellow/green/red star health pickups (one module)
@@ -235,6 +237,21 @@ includes `game_constants.h` instead. Changing `GameState`, or one of the
 headers `game.h` pulls in for it, then does not recompile those files. See
 [Constants Reference](../constants-reference/) for full details.
 
+### Who includes `game.h`
+
+Only files that read or write `GameState` fields: the gameplay `.c` files
+and the tests that build a `GameState`. A module header that merely passes
+`GameState *` around (`game_camera.h`, `level_loader.h`, `game_render.h`, ...)
+includes `game_fwd.h`, a forward declaration of the name, instead; its
+`.c` file includes `game.h` itself. `levels/level.h` includes the entity
+headers that define its `MAX_*` limits rather than `game.h`, so the
+serializer, the editor and `tools/level_check.c` never see `GameState`.
+`game_assets.h` holds the shared sprite and sound slots, which `AppSession`
+and `game_resources.c` need without the rest. Touching `game.h` now
+recompiles 65 of the 231 objects of the headless game, editor and tests.
+An entity header such as `spider.h` still reaches about 160, because
+`LevelDef` needs its `MAX_SPIDERS` and almost everything reads levels.
+
 ```c
 #define WINDOW_TITLE  "Super Mango"
 #define WINDOW_W      800
@@ -268,7 +285,9 @@ explains the trade-off.
 
 ```c
 #include "shared/graphics.h"            // Texture2D, RenderTexture2D, IntRect
-#include "shared/audio.h"               // SoundEffect, MusicTrack
+#include "shared/audio.h"               // MusicTrack pointer
+#include "game_assets.h"                // GameAssets: shared sprites and sounds
+#include "game_fwd.h"                   // the GameState typedef name
 #include <stdint.h>                     // uint32_t, uint64_t fields
 #include "player/player.h"              // Player struct
 #include "surfaces/platform.h"          // Platform struct + MAX_PLATFORMS

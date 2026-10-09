@@ -27,7 +27,7 @@
 #include <string.h> /* memcpy, memmove, memset */
 
 #include "editor_clipboard.h" /* keep a copied rail rider on its rail */
-#include "../game.h"          /* GAME_H, FLOOR_Y, TILE_SIZE, FLOOR_GAP_W */
+#include "../game_constants.h" /* GAME_H, FLOOR_Y, TILE_SIZE, FLOOR_GAP_W */
 
 /*
  * EditorEntityMeta — one row of the table: everything about a type that is

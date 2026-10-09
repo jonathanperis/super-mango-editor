@@ -27,6 +27,7 @@
  * localStorage entry per level. Ghosts are not shared between profiles.
  */
 #include "game_ghost.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 #include <errno.h>
 #include <math.h>

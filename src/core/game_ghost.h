@@ -22,7 +22,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 #include "game_profile.h"
 
 /* One ghost covers at most five minutes of fixed steps. A longer run is

@@ -6,7 +6,7 @@
 
 #include <stddef.h>
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 #include "level.h"
 
 /* The campaign manifest and its catalog (CampaignCatalog, campaign_*) live

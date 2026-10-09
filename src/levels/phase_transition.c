@@ -3,6 +3,7 @@
  */
 
 #include "phase_transition.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 #include <string.h>
 

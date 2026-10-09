@@ -6,7 +6,7 @@
 
 #include "serializer_load_enemies.h"
 #include "serializer_parse.h"
-#include "../game.h" /* MAX_* constants */
+#include "../levels/level.h" /* LevelDef and its MAX_* array limits */
 
 int serializer_load_enemies(toml_datum_t top, LevelDef *def) {
     if (!def) return -1;

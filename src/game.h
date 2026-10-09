@@ -34,13 +34,22 @@
  * The cost is visible below: to embed `Spider spiders[MAX_SPIDERS]` the
  * compiler must know sizeof(Spider), so game.h has to include every header
  * that defines a struct or MAX_* constant used by GameState. Those, and
- * game_constants.h, are the ONLY includes allowed here. Helpers a .c file merely calls (clock_millis,
- * str_copy from shared/platform.h, collision helpers, ...) are included by
- * that .c file itself, so its dependencies stay visible where they are used.
+ * game_constants.h, game_assets.h and game_fwd.h, are the ONLY includes
+ * allowed here. Helpers a .c file merely calls (clock_millis, str_copy from
+ * shared/platform.h, collision helpers, ...) are included by that .c file
+ * itself, so its dependencies stay visible where they are used.
+ *
+ * To keep that cost contained, only files that read GameState fields
+ * include game.h. A header that just passes GameState * along includes
+ * game_fwd.h (the name without the contents), and levels/level.h includes
+ * the entity headers it needs directly, so editing GameState recompiles
+ * the gameplay code and its tests, not the editor or the serializer.
  */
 
 #include "shared/graphics.h"        /* Texture2D, RenderTexture2D, IntRect */
-#include "shared/audio.h"           /* SoundEffect, MusicTrack pointers */
+#include "shared/audio.h"           /* MusicTrack pointer */
+#include "game_assets.h"            /* GameAssets: shared sprites and sounds */
+#include "game_fwd.h"               /* the GameState typedef name */
 #include <stdint.h>                 /* uint32_t, uint64_t fields */
 
 #include "player/player.h"          /* Player struct — embedded by value in GameState */
@@ -93,26 +102,6 @@ typedef enum {
     CHECKPOINT_FEEDBACK_SAVED,
     CHECKPOINT_FEEDBACK_RESPAWN
 } CheckpointFeedbackKind;
-
-/* ------------------------------------------------------------------ */
-/* Cleanup helpers                                                     */
-/* ------------------------------------------------------------------ */
-
-/*
- * DESTROY_TEX / FREE_CHUNK — null-safe one-liner resource release.
- *
- * Both macros check for NULL before destroying, then set the pointer to
- * NULL so accidental double-frees become safe no-ops.  They are intended
- * for use inside game_cleanup() where ~35 identical if-guard-destroy-null
- * blocks would otherwise appear.
- *
- * Slot owners clear pointers after unloading; borrowers never call these.
- */
-#define DESTROY_TEX(tex) \
-    do { texture_unload(tex); (tex) = NULL; } while (0)
-
-#define FREE_CHUNK(snd) \
-    do { sound_unload(snd); (snd) = NULL; } while (0)
 
 /* ------------------------------------------------------------------ */
 /* GameState — the single source of truth for everything the game owns */
@@ -187,43 +176,6 @@ typedef struct {
 } GameCompletionState;
 
 /*
- * TextureResources — one slot per shared sprite sheet. game_resources.c
- * loads them all from its tables; renderers borrow them.
- */
-typedef struct {
-    Texture2D *floor_tile;      /* default floor tileset, for levels naming none */
-    Texture2D *platform;
-    Texture2D *spider;
-    Texture2D *jumping_spider;
-    Texture2D *bird;
-    Texture2D *faster_bird;
-    Texture2D *fish;
-    Texture2D *faster_fish;
-    Texture2D *coin;
-    Texture2D *vine_green;
-    Texture2D *vine_brown;
-    Texture2D *ladder;
-    Texture2D *rope;
-    Texture2D *bouncepad_medium;
-    Texture2D *bouncepad_small;
-    Texture2D *bouncepad_high;
-    Texture2D *rail;
-    Texture2D *spike_block;
-    Texture2D *float_platform;
-    Texture2D *bridge;
-    Texture2D *star_yellow;
-    Texture2D *star_green;
-    Texture2D *star_red;
-    Texture2D *last_star;
-    Texture2D *axe_trap;
-    Texture2D *circular_saw;
-    Texture2D *blue_flame;
-    Texture2D *fire_flame;
-    Texture2D *spike;
-    Texture2D *spike_platform;
-} TextureResources;
-
-/*
  * PlatformTileCache — one texture per distinct platform tile image.
  *
  * Many pillars in a level share one tileset (02_lugio_02 draws 23 of them
@@ -245,35 +197,7 @@ typedef struct {
     int          count;
 } PlatformTileCache;
 
-/* AudioResources — one slot per shared sound effect (music is per level). */
-typedef struct {
-    SoundEffect *jump;
-    SoundEffect *coin;
-    SoundEffect *hit;
-    SoundEffect *spring;
-    SoundEffect *axe;
-    SoundEffect *flap;
-    SoundEffect *spider_attack;
-    SoundEffect *dive;
-} AudioResources;
-
-/*
- * GameAssets — the sprites and sound effects every level draws and plays.
- *
- * None of them depends on which level is loaded, so they do not belong to
- * one GameState. AppSession loads one GameAssets the first time it opens a
- * game, keeps it until the session ends, and copies it into every GameState
- * it creates (Play, Replay, Level Select -> Play): the copies hold the same
- * pointers, so a Replay decodes none of these files again.
- *
- * Level-specific files (parallax layers, fog, the water strip, the floor
- * tileset a level names, platform tiles, music) live with the level in
- * GameWorld instead, and are loaded and released with it.
- */
-typedef struct GameAssets {
-    TextureResources textures;    /* owned GPU textures */
-    AudioResources   audio;       /* owned sound samples */
-} GameAssets;
+/* TextureResources, AudioResources and GameAssets are in game_assets.h. */
 
 /*
  * GameWorld — the level being played.
