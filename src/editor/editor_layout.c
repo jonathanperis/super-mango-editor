@@ -35,8 +35,9 @@ enum {
 
 int editor_config_total_height(const EditorState *es)
 {
-    int validation_h = CFG_H_VALIDATION_BASE
-                     + es->validation_report.message_count * CFG_H_VALIDATION_ROW;
+    int validation_rows = es->validation_report.message_count
+                        + (editor_validation_hidden_count(&es->validation_report) > 0);
+    int validation_h = CFG_H_VALIDATION_BASE + validation_rows * CFG_H_VALIDATION_ROW;
     int recent_h = es->recent_file_count > 0
                  ? CFG_H_RECENT_HEADER + es->recent_file_count * CFG_H_RECENT_ROW
                  : 0;
