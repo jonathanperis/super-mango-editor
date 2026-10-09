@@ -928,6 +928,60 @@ done:
     return failed;
 }
 
+/*
+ * Clickable validation messages (spec N-001): clicking a message selects
+ * the entity it is about and pans the canvas to it, or focuses the Level
+ * Config field.  The status-bar summary goes to the first message.
+ */
+static int validation_messages_take_you_to_the_problem(void)
+{
+    int failed = 0;
+    EditorState es;
+    /* First message row: below the Level Config title and its summary. */
+    const int row_x = CANVAS_W + 60, row_y = TOOLBAR_H + 28 + 8 + 20 + 9;
+    CHECK(open_editor(&es, NULL) == 0);
+    es.level.screen_count = 20;
+    es.level.coin_count = 3;
+    for (int i = 0; i < 3; i++)
+        es.level.coins[i] = (CoinPlacement){200.0f + 40.0f * (float)i, 100.0f};
+    es.level.checkpoint_count = 1;
+    es.level.checkpoints[0] = (CheckpointPlacement){6000.0f, 100.0f};
+    CHECK(level_is_valid(&es));
+
+    /* A checkpoint far off to the right goes out of the world. */
+    es.level.screen_count = 4;
+    es.camera.x = 0.0f;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.validation_report.error_count > 0);
+    CHECK(strcmp(es.validation_report.locations[0].path, "checkpoints") == 0);
+    click_frame(&es, row_x, row_y);
+    CHECK(es.selection.type == ENT_CHECKPOINT && es.selection.index == 0);
+    CHECK(es.tool == TOOL_SELECT && es.camera.x > 0.0f);
+    CHECK(strstr(es.status_message, "Checkpoint 0") != NULL);
+    es.level.checkpoints[0].x = 900.0f;
+
+    /* A bad config value focuses its field. */
+    es.level.coin_score = -5;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(strcmp(es.validation_report.locations[0].path, "coin_score") == 0);
+    click_frame(&es, row_x, row_y);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.active_id == 9012);
+    key_frame(&es, KEY_ESCAPE, 0);
+    es.level.coin_score = 10;
+
+    /* The status-bar summary jumps to the first message's entity. */
+    es.level.coins[2].y = 9999.0f;
+    es.selection.index = -1;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    click_frame(&es, 335, EDITOR_H - STATUS_H / 2);
+    CHECK(es.selection.type == ENT_COIN && es.selection.index == 2);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
 /* ------------------------------------------------------------------ */
 /* Text editing: caret keys and Tab                                    */
 /* ------------------------------------------------------------------ */
@@ -1223,6 +1277,7 @@ int main(void)
         CASE(ctrl_d_duplicates_with_a_stepping_offset),
         CASE(snap_toggle_applies_to_placing_and_dragging),
         CASE(alt_click_cycles_through_overlapping_entities),
+        CASE(validation_messages_take_you_to_the_problem),
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),
         CASE(native_pickers_report_choice_cancel_and_failure),

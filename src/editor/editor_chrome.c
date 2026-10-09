@@ -3,6 +3,7 @@
  */
 
 #include "editor_chrome.h"
+#include "editor_panels.h" /* editor_focus_validation_issue */
 
 #include <stdio.h> /* snprintf */
 
@@ -148,10 +149,24 @@ void editor_render_status_bar(EditorState *es)
     snprintf(tool_text, sizeof(tool_text), "Tool: %s", tool_name);
     ui_label(&es->ui, 228, bar_y + 8, tool_text);
 
-    ui_label_color(&es->ui, 330, bar_y + 8,
-                   editor_validation_summary(&es->validation_report),
-                   es->validation_report.error_count > 0 ?
-                   (Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
+    /* The validation summary is a link: clicking it goes to the first
+     * message's entity or field, like clicking that message in the panel. */
+    {
+        const char *summary = editor_validation_summary(&es->validation_report);
+        int width = ui_text_width(&es->ui, summary);
+        int clickable = es->validation_report.message_count > 0;
+        int hovered = clickable &&
+                      es->ui.mouse_x >= 330 && es->ui.mouse_x < 330 + width &&
+                      es->ui.mouse_y >= bar_y && es->ui.mouse_y < bar_y + STATUS_H;
+        ui_label_color(&es->ui, 330, bar_y + 8, summary,
+                       es->validation_report.error_count > 0 ?
+                       (Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
+        if (hovered) DrawRectangle(330, bar_y + 22, width, 1, UI_TEXT_DIM);
+        if (hovered && es->ui.mouse_clicked) {
+            es->ui.mouse_clicked = 0;
+            (void)editor_focus_validation_issue(es, 0);
+        }
+    }
 
     int total = editor_placed_entity_total(&es->level);
 

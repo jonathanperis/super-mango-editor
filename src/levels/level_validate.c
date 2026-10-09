@@ -667,9 +667,13 @@ static int validate_level_settings(const LevelDef *def,
 static int validate_entity_motion(const LevelDef *def,
                                   char *err, size_t err_size)
 {
+    char field[64];
+    /* Every message names the element (spiders[2].vx), so the editor can
+     * take the designer straight to it. */
 #define CHECK_PATROL_SPEED_ARRAY(array, count) \
     for (int i = 0; i < def->count; i++) { \
-        if (validate_patrol_speed(err, err_size, #array ".vx", def->array[i].vx) != 0) return -1; \
+        snprintf(field, sizeof(field), #array "[%d].vx", i); \
+        if (validate_patrol_speed(err, err_size, field, def->array[i].vx) != 0) return -1; \
     }
     CHECK_PATROL_SPEED_ARRAY(spiders, spider_count);
     CHECK_PATROL_SPEED_ARRAY(jumping_spiders, jumping_spider_count);
@@ -681,7 +685,8 @@ static int validate_entity_motion(const LevelDef *def,
 
 #define CHECK_MOTION_ARRAY(array, count, member) \
     for (int i = 0; i < def->count; i++) { \
-        if (validate_motion(err, err_size, #array "." #member, def->array[i].member) != 0) return -1; \
+        snprintf(field, sizeof(field), #array "[%d]." #member, i); \
+        if (validate_motion(err, err_size, field, def->array[i].member) != 0) return -1; \
     }
     CHECK_MOTION_ARRAY(background_layers, background_layer_count, speed);
     CHECK_MOTION_ARRAY(foreground_layers, foreground_layer_count, speed);
@@ -842,7 +847,10 @@ static int validate_enemies(const LevelDef *def, char *err, size_t err_size,
 
     for (int i = 0; i < def->spider_count; i++) {
         if (def->spiders[i].frame_index < 0 || def->spiders[i].frame_index >= SPIDER_FRAMES)
-            return fail_value(err, err_size, "spiders[].frame_index", "is outside the sprite sheet");
+        {
+            snprintf(field, sizeof(field), "spiders[%d].frame_index", i);
+            return fail_value(err, err_size, field, "is outside the sprite sheet");
+        }
         snprintf(field, sizeof(field), "spiders[%d]", i);
         if (validate_patrol(err, err_size, field, def->spiders[i].x,
                             def->spiders[i].patrol_x0,
@@ -858,24 +866,32 @@ static int validate_enemies(const LevelDef *def, char *err, size_t err_size,
     }
     for (int i = 0; i < def->bird_count; i++) {
         if (def->birds[i].frame_index < 0 || def->birds[i].frame_index >= BIRD_FRAMES)
-            return fail_value(err, err_size, "birds[].frame_index", "is outside the sprite sheet");
+        {
+            snprintf(field, sizeof(field), "birds[%d].frame_index", i);
+            return fail_value(err, err_size, field, "is outside the sprite sheet");
+        }
         snprintf(field, sizeof(field), "birds[%d]", i);
         if (validate_patrol(err, err_size, field, def->birds[i].x,
                             def->birds[i].patrol_x0,
                             def->birds[i].patrol_x1,
                             (float)BIRD_FRAME_W, world_w) != 0) return -1;
-        if (validate_world_y(err, err_size, "birds[].base_y",
+        snprintf(field, sizeof(field), "birds[%d].base_y", i);
+        if (validate_world_y(err, err_size, field,
                              def->birds[i].base_y) != 0) return -1;
     }
     for (int i = 0; i < def->faster_bird_count; i++) {
         if (def->faster_birds[i].frame_index < 0 || def->faster_birds[i].frame_index >= FBIRD_FRAMES)
-            return fail_value(err, err_size, "faster_birds[].frame_index", "is outside the sprite sheet");
+        {
+            snprintf(field, sizeof(field), "faster_birds[%d].frame_index", i);
+            return fail_value(err, err_size, field, "is outside the sprite sheet");
+        }
         snprintf(field, sizeof(field), "faster_birds[%d]", i);
         if (validate_patrol(err, err_size, field, def->faster_birds[i].x,
                             def->faster_birds[i].patrol_x0,
                             def->faster_birds[i].patrol_x1,
                             (float)FBIRD_FRAME_W, world_w) != 0) return -1;
-        if (validate_world_y(err, err_size, "faster_birds[].base_y",
+        snprintf(field, sizeof(field), "faster_birds[%d].base_y", i);
+        if (validate_world_y(err, err_size, field,
                              def->faster_birds[i].base_y) != 0) return -1;
     }
     for (int i = 0; i < def->fish_count; i++) {
@@ -1001,7 +1017,8 @@ static int validate_float_platforms(const LevelDef *def, char *err,
                 return -1;
             if (!rail_offset_is_on_track(&def->rails[fp->rail_index],
                                          fp->t_offset)) {
-                return fail_value(err, err_size, "float_platforms[].t_offset",
+                snprintf(field, sizeof(field), "float_platforms[%d].t_offset", i);
+                return fail_value(err, err_size, field,
                                   "must lie on the referenced rail");
             }
             snprintf(field, sizeof(field), "float_platforms[%d].speed", i);
@@ -1058,8 +1075,9 @@ static int validate_blades(const LevelDef *def, char *err, size_t err_size,
         snprintf(field, sizeof(field), "axe_traps[%d].pillar_x", i);
         if (validate_world_x(err, err_size, field,
                              def->axe_traps[i].pillar_x, world_w) != 0) return -1;
+        snprintf(field, sizeof(field), "axe_traps[%d].y", i);
         if (def->axe_traps[i].y != 0.0f &&
-            validate_world_y(err, err_size, "axe_traps[].y",
+            validate_world_y(err, err_size, field,
                              def->axe_traps[i].y) != 0) return -1;
         if (def->axe_traps[i].mode != AXE_MODE_PENDULUM &&
             def->axe_traps[i].mode != AXE_MODE_SPIN) {
@@ -1068,8 +1086,9 @@ static int validate_blades(const LevelDef *def, char *err, size_t err_size,
         }
     }
     for (int i = 0; i < def->circular_saw_count; i++) {
+        snprintf(field, sizeof(field), "circular_saws[%d].y", i);
         if (def->circular_saws[i].y != 0.0f &&
-            validate_world_y(err, err_size, "circular_saws[].y",
+            validate_world_y(err, err_size, field,
                              def->circular_saws[i].y) != 0) return -1;
         if (def->circular_saws[i].direction != -1 &&
             def->circular_saws[i].direction != 1) {
@@ -1247,4 +1266,84 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
 
     if (err && err_size > 0) err[0] = '\0';
     return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Where an error is                                                   */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Every message the validator writes starts with the TOML path of what is
+ * wrong ("coins[3].x is ...", "rails[1] has ...", "screen_count is ...").
+ * That is a promise to callers, kept by always passing that path as the
+ * `field` of the fail_* helpers above, and checked by the tests.  Reading
+ * the path back gives a structured location without threading one more
+ * parameter through every check.
+ */
+static int is_path_char(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
+}
+
+int level_issue_location_parse(const char *message, LevelIssueLocation *where)
+{
+    const char *p = message;
+    size_t n = 0;
+
+    if (!where) return 0;
+    memset(where, 0, sizeof(*where));
+    where->index = -1;
+    if (!message) return 0;
+
+    /* The array or key name: "coins", "screen_count", "physics". */
+    while (is_path_char(*p) && n + 1 < sizeof(where->path)) where->path[n++] = *p++;
+    where->path[n] = '\0';
+    if (n == 0) return 0;
+
+    /* An optional element index: "[3]". */
+    if (*p == '[') {
+        long index = 0;
+        int digits = 0;
+        p++;
+        while (*p >= '0' && *p <= '9' && digits < 9) {
+            index = index * 10 + (*p - '0');
+            digits++;
+            p++;
+        }
+        if (*p != ']' || digits == 0) goto not_a_path;
+        where->index = (int)index;
+        p++;
+    }
+
+    /* An optional field inside it: ".x", ".tile_height". */
+    if (*p == '.') {
+        n = 0;
+        p++;
+        while (is_path_char(*p) && n + 1 < sizeof(where->field)) where->field[n++] = *p++;
+        where->field[n] = '\0';
+        if (n == 0) goto not_a_path;
+    }
+
+    /* The path ends where the message's words begin. */
+    if (*p != ' ' && *p != '\0') goto not_a_path;
+    return 1;
+
+not_a_path:
+    memset(where, 0, sizeof(*where));
+    where->index = -1;
+    return 0;
+}
+
+int level_validate_runtime_at(const LevelDef *def, char *err, size_t err_size,
+                              LevelIssueLocation *where)
+{
+    int result = level_validate_runtime(def, err, err_size);
+
+    if (where) {
+        memset(where, 0, sizeof(*where));
+        where->index = -1;
+        if (result != 0 && err && err_size > 0)
+            (void)level_issue_location_parse(err, where);
+    }
+    return result;
 }

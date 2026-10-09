@@ -26,6 +26,7 @@
 #include "editor_files.h"  /* editor_path_for_display for recent entries   */
 #include "entity_meta.h" /* editor_entity_type_name/is_singleton             */
 #include "tools.h"       /* editor_set_float_platform_mode                    */
+#include "editor_panels.h" /* editor_focus_validation_issue                     */
 #include "../shared/ui.h" /* ui_panel, ui_label, ui_separator, ui_float_field,
                            ui_int_field, ui_dropdown                         */
 #include "../levels/level.h" /* LevelDef, all *Placement structs            */
@@ -74,6 +75,11 @@ int g_phys_open = 0;
  * level_config_render each frame.
  */
 static int cfg_scroll_y = 0;
+
+/* The part of the screen the scrolled config content shows this frame
+ * (set by level_config_render); rows outside it cannot be clicked. */
+static int cfg_clip_top = 0;
+static int cfg_clip_bottom = 0;
 
 /*
  * cfg_scroll — Adjust the Level Config scroll offset by a pixel delta.
@@ -1243,7 +1249,11 @@ static void config_subsection_header(EditorState *es, int x, int y,
                    hovered ? UI_TEXT : UI_TEXT_DIM);
 }
 
-/* Validation result and every error/warning message. */
+/*
+ * Validation result and every error/warning message.  Each message is a
+ * row the designer can click: it selects the entity the message is about
+ * (and pans the canvas to it) or focuses the Level Config field.
+ */
 static int config_validation(EditorState *es, int x, int y)
 {
     ui_label_color(&es->ui, x + 8, y,
@@ -1255,8 +1265,20 @@ static int config_validation(EditorState *es, int x, int y)
         Color msg_color = i < es->validation_report.error_count
                             ? (Color){0xFF,0x70,0x70,0xFF}
                             : (Color){0xFF,0xC0,0x60,0xFF};
+        int has_place = es->validation_report.locations[i].path[0] != '\0';
+        int hovered = has_place &&
+                      es->ui.mouse_x >= x && es->ui.mouse_x < x + PROP_W &&
+                      es->ui.mouse_y >= y && es->ui.mouse_y < y + 18 &&
+                      es->ui.mouse_y >= cfg_clip_top &&
+                      es->ui.mouse_y < cfg_clip_bottom;
+        if (hovered) DrawRectangle(x + 4, y - 1, PROP_W - 8, 18, UI_BTN_HOT);
         ui_label_color(&es->ui, x + 16, y,
                        es->validation_report.messages[i], msg_color);
+        if (hovered && es->ui.mouse_clicked) {
+            /* The click is used up here; no widget below sees it. */
+            es->ui.mouse_clicked = 0;
+            (void)editor_focus_validation_issue(es, i);
+        }
         y += 18;
     }
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
@@ -1786,6 +1808,8 @@ void level_config_render(EditorState *es, int start_y, int available_h,
      * Subtracting cfg_scroll_y shifts content upward as the user scrolls.
      */
     int y = content_top + 8 - cfg_scroll_y;
+    cfg_clip_top = content_top;
+    cfg_clip_bottom = content_top + content_visible_h;
     y = config_validation(es, x, y);
     y = config_recent_files(es, x, y);
     y = config_level_fields(es, x, y);
@@ -1799,4 +1823,75 @@ void level_config_render(EditorState *es, int start_y, int available_h,
 
     EndScissorMode();
     editor_end_change_tracking(es);
+
+    /* A field activated by Tab or by a clicked validation message may be
+     * scrolled out of sight: scroll just enough to show it (the clamp at
+     * the top of this function keeps the result in range next frame). */
+    if (es->ui.focus_landed_id >= 9000) {
+        int field_top = es->ui.focus_landed_y;
+        int field_bottom = field_top + 20;
+        if (field_top < cfg_clip_top)
+            cfg_scroll_y -= cfg_clip_top - field_top + 8;
+        else if (field_bottom > cfg_clip_bottom)
+            cfg_scroll_y += field_bottom - cfg_clip_bottom + 8;
+        if (cfg_scroll_y < 0) cfg_scroll_y = 0;
+        es->ui.focus_landed_id = 0;
+    }
+}
+
+/*
+ * Where each Level Config key lives in the panel, for jumping to it from a
+ * validation message.  widget is the field's ID (0 for a list or dropdown,
+ * which cannot hold a text caret); open is the foldout that must be open
+ * for it to be drawn (NULL when it is always shown).
+ */
+typedef struct {
+    const char *key;
+    int widget;
+    int *open;
+} ConfigTarget;
+
+static const ConfigTarget s_config_targets[] = {
+    {"name", 9000, NULL},              {"description", 9001, NULL},
+    {"generated_by", 9002, NULL},      {"screen_count", 9011, NULL},
+    {"next_phase", 9031, NULL},        {"music_path", 0, NULL},
+    {"music_volume", 9003, NULL},      {"floor_tile_path", 0, NULL},
+    {"initial_hearts", 9006, NULL},    {"initial_lives", 9007, NULL},
+    {"score_per_life", 9008, NULL},    {"coin_score", 9012, NULL},
+    {"physics.walk_max_speed", 9020, &g_phys_open},
+    {"physics.run_max_speed", 9021, &g_phys_open},
+    {"physics.walk_ground_accel", 9022, &g_phys_open},
+    {"physics.run_ground_accel", 9023, &g_phys_open},
+    {"physics.ground_friction", 9024, &g_phys_open},
+    {"physics.ground_counter_accel", 9025, &g_phys_open},
+    {"physics.air_accel_walk", 9026, &g_phys_open},
+    {"physics.air_accel_run", 9027, &g_phys_open},
+    {"physics.air_friction", 9028, &g_phys_open},
+    {"physics.cam_lookahead_vx_factor", 9029, &g_phys_open},
+    {"physics.cam_lookahead_max", 9030, &g_phys_open},
+    {"background_layers", 0, &g_plx_open},
+    {"foreground_layers", 0, &g_fg_open},
+    {"fog_layers", 0, &g_fog_open},
+};
+
+int properties_focus_config(EditorState *es, const LevelIssueLocation *where)
+{
+    char key[80];
+
+    if (!es || !where || where->path[0] == '\0') return 0;
+    /* Physics keys are "physics.<name>"; everything else is the path. */
+    if (strcmp(where->path, "physics") == 0)
+        snprintf(key, sizeof(key), "physics.%s", where->field);
+    else
+        snprintf(key, sizeof(key), "%s", where->path);
+
+    for (size_t i = 0; i < sizeof(s_config_targets) / sizeof(s_config_targets[0]); i++) {
+        const ConfigTarget *target = &s_config_targets[i];
+        if (strcmp(target->key, key) != 0) continue;
+        es->config_open = 1;
+        if (target->open) *target->open = 1;
+        if (target->widget) ui_focus_field(&es->ui, target->widget);
+        return 1;
+    }
+    return 0;
 }

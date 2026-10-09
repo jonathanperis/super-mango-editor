@@ -146,7 +146,13 @@ The canvas draws a labelled `CP n` marker. Valid markers are amber, hovered mark
 
 The Level Config section in the right panel starts with the validation summary
 and its messages, then the recent-files list (`Ctrl+1` to `Ctrl+5`), then the
-level-wide TOML fields:
+level-wide TOML fields. Each validation message is clickable (it highlights
+under the cursor): a message about an entity, such as `checkpoints[0].x is ...`,
+selects that entity (checkpoints, the Player Spawn and the Last Star included),
+switches to Select and pans the canvas to centre it; a message about a Level
+Config value focuses that field, unfolding its group and scrolling the panel
+to it. Clicking the `Validation: ...` summary in the status bar does the same
+for the first message. The level-wide fields are:
 
 - `name`, `description`, `generated_by`
 - `screen_count` (1–99; world width = screen_count × 400 px)

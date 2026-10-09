@@ -9,6 +9,10 @@
  */
 #pragma once
 
+#include <stddef.h>   /* size_t */
+
+#include "level.h"    /* LevelDef */
+
 /*
  * level_path_has_parent_segment — 1 when a '/'-separated path contains a
  * ".." segment ("../x.png", "a/../b"), which could climb out of the
@@ -22,3 +26,39 @@ int level_path_has_parent_segment(const char *value);
  * and would break the one-path-per-line files the editor writes.
  */
 int level_path_has_control_char(const char *value);
+
+/*
+ * LevelIssueLocation — where in a level a validation error is, in TOML
+ * terms, so a tool can take the designer to it.  It knows nothing about
+ * the editor; the editor maps TOML names to its own entity types.
+ *
+ *   path  : the [[array]] or top-level key: "coins", "screen_count",
+ *           "physics", "last_star", "player_start".  "" when unknown.
+ *   index : the element of that array, or -1 for a plain key / no element.
+ *   field : the key inside it, such as "x" or "tile_height"; "" for none.
+ *
+ * "coins[3].x is 9000.00 (expected 0.00..1600.00)" reads as
+ * { "coins", 3, "x" }; "screen_count is 0 (...)" as { "screen_count", -1, "" }.
+ */
+typedef struct {
+    char path[32];
+    int  index;
+    char field[32];
+} LevelIssueLocation;
+
+/*
+ * level_issue_location_parse — Read the location at the start of a
+ * validator message (every message begins with its TOML path).  Returns 1
+ * and fills *where when the message starts with one, else 0 with an empty
+ * location.  Also used for the editor's own "<field> missing: ..." checks.
+ */
+int level_issue_location_parse(const char *message, LevelIssueLocation *where);
+
+/*
+ * level_validate_runtime_at — level_validate_runtime (level_loader.h) plus
+ * the location of the first error.  The game keeps calling the plain
+ * function; the editor uses this one to make its messages clickable.
+ * where may be NULL; on success it is left empty.
+ */
+int level_validate_runtime_at(const LevelDef *def, char *err, size_t err_size,
+                              LevelIssueLocation *where);
