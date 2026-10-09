@@ -79,7 +79,11 @@ starts a new step. Right-click quick-deletes an entity in
 any tool (ignored while a drag is in progress). Clicks pick the entity drawn on
 top: the hit test (`src/editor/hit_test.c`) walks the exact reverse of the
 canvas draw order, so enemies and hazards win over collectibles, and those over
-surfaces and ground pillars. Esc cancels a field edit, returns to Select, or
+surfaces and ground pillars. To reach an entity hidden underneath, `Alt+click`
+the spot, or click the very same spot again without moving: each such click
+selects the next entity down and wraps back to the top. The status bar says
+which one is selected (`Selected Coin (2 of 2 here)`). (Some Linux window
+managers take `Alt+click` for themselves; the second click works everywhere.) Esc cancels a field edit, returns to Select, or
 clears the selection. Printable shortcuts do not switch tools while a text field
 is active; Ctrl+C/Ctrl+V inside a text field copy and paste text. File/history
 shortcuts accept Command on macOS as well as Ctrl.

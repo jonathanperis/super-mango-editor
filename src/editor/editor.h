@@ -478,6 +478,14 @@ typedef struct {
     float          drag_grab_y;
     float          drag_mouse_x;  /* cursor world position at mouse-down       */
     float          drag_mouse_y;
+    /*
+     * Where the last Select click landed (world px) when it selected
+     * something without moving it.  A second click on that same spot steps
+     * to the next entity underneath, like Alt+click does.
+     */
+    int            last_click_valid;
+    float          last_click_x;
+    float          last_click_y;
 
     /*
      * Arrow-key nudges.  A quick run of nudges of the same selection is one
