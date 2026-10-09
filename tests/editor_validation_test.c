@@ -3776,9 +3776,11 @@ fail:
 }
 
 /*
- * Undo groups: entries pushed between undo_group_begin/end share a number
- * and are undone as one step by the editor; amending folds nudges into a
- * step; and a full history drops a whole group, never half of one.
+ * Undo groups: entries pushed between undo_group_begin/end share a number,
+ * live in one step (one history slot) and are undone as one step by the
+ * editor; amending folds nudges into a step; a full history drops a whole
+ * group, never half of one; and a new edit after a partly undone group
+ * keeps only the part still applied.
  */
 static int undo_groups_stay_whole(void)
 {
@@ -3793,38 +3795,191 @@ static int undo_groups_stay_whole(void)
     cmd.type = CMD_MOVE;
     cmd.entity_type = ENT_COIN;
     undo_push(stack, &cmd);                       /* a step of its own */
-    group = undo_group_begin(stack);
+    group = undo_group_begin(stack, 3);
     for (int i = 0; i < 3; i++) {
         cmd.entity_index = i;
         undo_push(stack, &cmd);
     }
     undo_group_end(stack);
     if (expect_int("group number", group > 0, 1) != 0 ||
-        expect_int("top is the group", undo_top_group(stack), group) != 0) goto done;
+        expect_int("top is the group", undo_top_group(stack), group) != 0 ||
+        expect_int("group is one slot", stack->top, 2) != 0 ||
+        expect_int("group holds three", stack->steps[1].count, 3) != 0) goto done;
 
     memset(&later, 0, sizeof(later));
     later.coin.x = 42.0f;
     if (expect_int("amend found", undo_amend_after(stack, group, ENT_COIN, 1, &later), 1) != 0 ||
-        expect_int("amend other entity", undo_amend_after(stack, group, ENT_STAR_RED, 1, &later), 0) != 0 ||
-        expect_float_value("amended after", stack->commands[stack->top - 2].after.coin.x, 42.0f) != 0)
+        expect_int("amend other entity", undo_amend_after(stack, group, ENT_STAR_RED, 1, &later), 0) != 0)
         goto done;
+    /* Undo meets the group newest entry first, redo oldest first. */
     if (!undo_pop(stack, &cmd) || expect_int("popped group", cmd.group, group) != 0 ||
-        expect_int("redo top group", redo_top_group(stack), group) != 0) goto done;
+        expect_int("newest first", cmd.entity_index, 2) != 0 ||
+        expect_int("rest of group still on top", undo_top_group(stack), group) != 0 ||
+        expect_int("redo top group", redo_top_group(stack), group) != 0 ||
+        !undo_pop(stack, &cmd) ||
+        expect_float_value("amended after", cmd.after.coin.x, 42.0f) != 0 ||
+        !redo_pop(stack, &cmd) || expect_int("redo oldest undone first", cmd.entity_index, 1) != 0)
+        goto done;
+    /* A new edit now forgets the undone entry 2 and keeps entries 0 and 1. */
+    cmd.group = 0;
+    cmd.entity_index = 7;
+    undo_push(stack, &cmd);
+    if (expect_int("redo cleared", stack->redo_top, 0) != 0 ||
+        expect_int("partly undone group kept", stack->steps[1].count, 2) != 0 ||
+        expect_int("three steps", stack->top, 3) != 0) goto done;
     undo_clear(stack);
 
+    /* A group asking for more room than a step may hold is refused. */
+    if (expect_int("oversized group refused", undo_group_begin(stack, UNDO_GROUP_MAX + 1), 0) != 0)
+        goto done;
+
     /* Fill the history so the oldest step is a group of three. */
-    group = undo_group_begin(stack);
+    group = undo_group_begin(stack, 3);
     for (int i = 0; i < 3; i++) undo_push(stack, &cmd);
     undo_group_end(stack);
     cmd.group = 0;
-    for (int i = 0; i < UNDO_MAX - 3; i++) undo_push(stack, &cmd);
-    if (expect_int("history full", stack->top, UNDO_MAX) != 0) goto done;
+    for (int i = 0; i < UNDO_MAX - 1; i++) undo_push(stack, &cmd);
+    if (expect_int("history full", stack->top, UNDO_MAX) != 0 ||
+        expect_int("oldest is the group", stack->steps[0].group, group) != 0) goto done;
     undo_push(stack, &cmd);                       /* evicts the whole group */
-    if (expect_int("group evicted whole", stack->top, UNDO_MAX - 2) != 0 ||
-        expect_int("no group remnant", stack->commands[0].group, 0) != 0) goto done;
+    if (expect_int("group evicted whole", stack->top, UNDO_MAX) != 0 ||
+        expect_int("no group remnant", stack->steps[0].group, 0) != 0 ||
+        expect_int("oldest step is lone", stack->steps[0].count, 1) != 0) goto done;
     failed = 0;
 done:
     undo_destroy(stack);
+    return failed;
+}
+
+/* Undo (redo = 0) or redo one whole step the way the editor does. */
+static int history_step(EditorState *es, int redo)
+{
+    Command cmd;
+    int group;
+
+    if (!(redo ? redo_pop(es->undo, &cmd) : undo_pop(es->undo, &cmd))) return 1;
+    group = cmd.group;
+    editor_apply_undo_command(es, &cmd, !redo);
+    while (group != 0 &&
+           (redo ? redo_top_group(es->undo) : undo_top_group(es->undo)) == group &&
+           (redo ? redo_pop(es->undo, &cmd) : undo_pop(es->undo, &cmd)))
+        editor_apply_undo_command(es, &cmd, !redo);
+    return 0;
+}
+
+/*
+ * A group costs one history slot, made through the editor itself: a drag
+ * of 64 selected coins is one step, 256 such steps all fit, and undoing
+ * every one then redoing every one lands on exactly the same coins.  When
+ * the memory for a group cannot be had, the move, nudge, delete or paste
+ * changes nothing.
+ */
+static int group_steps_cost_one_slot_each(void)
+{
+    static Selection all[EDITOR_MAX_SELECTION];
+    static LevelDef original, final_level, before;
+    static EditorState es;
+    EditorRect r;
+    Command cmd;
+    int failed = 1;
+
+    memset(&es, 0, sizeof(es));
+    editor_level_init_defaults(&es.level);
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+    es.camera.zoom = 1.0f;
+    es.tool = TOOL_SELECT;
+    es.level.coin_count = EDITOR_MAX_SELECTION;
+    for (int i = 0; i < EDITOR_MAX_SELECTION; i++) {
+        es.level.coins[i] = (CoinPlacement){64.0f + (float)(i % 16) * 32.0f,
+                                            64.0f + (float)(i / 16) * 32.0f};
+        all[i] = (Selection){ENT_COIN, i};
+    }
+    if (level_is_valid("64 coins", &es.level) != 0) goto done;
+    original = es.level;
+    editor_set_document_save_point(&es);
+    (void)editor_select_items(&es, all, EDITOR_MAX_SELECTION);
+    if (expect_int("all selected", editor_selection_count(&es), EDITOR_MAX_SELECTION) != 0)
+        goto done;
+
+    /* UNDO_MAX drags of the whole selection: 16 px right, then 8 px back. */
+    for (int step = 0; step < UNDO_MAX; step++) {
+        if (!editor_entity_bounds(&es.level, ENT_COIN, 0, &r)) goto done;
+        drag_by(&es, r.x + 2.0f, r.y + 2.0f, step % 2 ? -8.0f : 16.0f, 0.0f);
+        if (step == 0 &&
+            (expect_int("64-entity move is one slot", es.undo->top, 1) != 0 ||
+             expect_int("one step holds all 64", es.undo->steps[0].count,
+                        EDITOR_MAX_SELECTION) != 0)) goto done;
+    }
+    if (expect_int("256 group steps fit", es.undo->top, UNDO_MAX) != 0 ||
+        expect_float_value("drags landed", es.level.coins[0].x,
+                           64.0f + 8.0f * (float)(UNDO_MAX / 2)) != 0)
+        goto done;
+    final_level = es.level;
+
+    for (int step = 0; step < UNDO_MAX; step++)
+        if (history_step(&es, 0) != 0) goto done;
+    if (expect_int("everything undone", es.undo->top, 0) != 0 ||
+        expect_int("everything redoable", es.undo->redo_top, UNDO_MAX) != 0 ||
+        expect_int("undo round-trips exactly",
+                   memcmp(es.level.coins, original.coins, sizeof(original.coins)), 0) != 0)
+        goto done;
+    for (int step = 0; step < UNDO_MAX; step++)
+        if (history_step(&es, 1) != 0) goto done;
+    if (expect_int("everything redone", es.undo->top, UNDO_MAX) != 0 ||
+        expect_int("redo round-trips exactly",
+                   memcmp(es.level.coins, final_level.coins, sizeof(final_level.coins)), 0) != 0)
+        goto done;
+
+    /* One more group drops the oldest step whole. */
+    if (!editor_entity_bounds(&es.level, ENT_COIN, 0, &r)) goto done;
+    drag_by(&es, r.x + 2.0f, r.y + 2.0f, 16.0f, 0.0f);
+    if (expect_int("still full", es.undo->top, UNDO_MAX) != 0 ||
+        expect_int("oldest kept whole", es.undo->steps[0].count, EDITOR_MAX_SELECTION) != 0)
+        goto done;
+
+    /* No memory for the history: each group action is refused untouched. */
+    before = es.level;
+    undo_test_limit_allocations(0);
+    if (!editor_entity_bounds(&es.level, ENT_COIN, 0, &r)) goto done;
+    drag_by(&es, r.x + 2.0f, r.y + 2.0f, 16.0f, 0.0f);
+    if (expect_int("refused drag put back",
+                   memcmp(es.level.coins, before.coins, sizeof(before.coins)), 0) != 0 ||
+        expect_string("refused drag says why", es.status_message,
+                      "Move cancelled: cannot allocate undo history") != 0) goto done;
+    tools_nudge_selection(&es, 1.0f, 0.0f);
+    if (expect_int("refused nudge put back",
+                   memcmp(es.level.coins, before.coins, sizeof(before.coins)), 0) != 0 ||
+        expect_string("refused nudge says why", es.status_message,
+                      "Nothing moved: cannot allocate undo history") != 0) goto done;
+    tools_delete_selected(&es);
+    if (expect_int("refused delete keeps coins", es.level.coin_count, EDITOR_MAX_SELECTION) != 0 ||
+        expect_string("refused delete says why", es.status_message,
+                      "Delete cancelled: cannot allocate undo history") != 0) goto done;
+    /* A lone entity edit lives inside its step, so it still records. */
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.type = CMD_MOVE;
+    cmd.entity_type = ENT_COIN;
+    if (expect_int("lone push needs no memory", undo_push(es.undo, &cmd), 1) != 0) goto done;
+    cmd.type = CMD_CONFIG;
+    if (expect_int("config push refused", undo_push(es.undo, &cmd), 0) != 0 ||
+        expect_int("history kept", es.undo->top, UNDO_MAX) != 0) goto done;
+    undo_test_limit_allocations(-1);
+
+    /* Same for a paste: without room for the copies, nothing is added. */
+    es.level.coin_count = 2;
+    (void)editor_select_items(&es, all, 2);
+    editor_copy_selected(&es);
+    undo_test_limit_allocations(0);
+    editor_paste_clipboard(&es);
+    undo_test_limit_allocations(-1);
+    if (expect_int("refused paste adds nothing", es.level.coin_count, 2) != 0 ||
+        expect_string("refused paste says why", es.status_message,
+                      "Paste cancelled: cannot allocate undo history") != 0) goto done;
+    failed = 0;
+done:
+    undo_test_limit_allocations(-1);
+    undo_destroy(es.undo);
     return failed;
 }
 
@@ -5097,6 +5252,7 @@ int main(void)
     if (compact_history_owns_config_snapshots()) return 1;
     if (orphan_recovery_does_not_poison_discovery()) return 1;
     if (undo_groups_stay_whole()) return 1;
+    if (group_steps_cost_one_slot_each()) return 1;
     if (recovery_folder_stays_manageable()) return 1;
     char binary_path[EDITOR_PATH_MAX];
     if (editor_playtest_binary_path(binary_path, sizeof(binary_path))) return 1;

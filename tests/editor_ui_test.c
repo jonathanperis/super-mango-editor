@@ -1267,7 +1267,7 @@ static int box_and_shift_select_act_on_the_group(void)
     push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, 302, 302);
     ui_frame(&es, 302, 302);
     for (int i = 0; i < 3; i++) CHECK(es.level.coins[i].x == x[i] + 20.0f);
-    CHECK(es.undo->top == undo_top + 3 && editor_selection_count(&es) == 3);
+    CHECK(es.undo->top == undo_top + 1 && editor_selection_count(&es) == 3);
     key_frame(&es, KEY_Z, INPUT_CTRL);
     for (int i = 0; i < 3; i++) CHECK(es.level.coins[i].x == x[i]);
     CHECK(es.undo->top == undo_top);

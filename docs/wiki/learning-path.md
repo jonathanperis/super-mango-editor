@@ -404,9 +404,11 @@ history and the level itself.
 redo you had left. Returning to the saved contents clears the unsaved-changes
 marker.
 
-**Why:** the editor keeps two stacks of commands. Undo moves the newest command
-to the redo stack and applies its "before" values; a new edit empties the redo
-stack. The marker compares a hash of the level with the hash at the last save,
+**Why:** the editor keeps two stacks of commands, stored as one list of steps
+with a boundary between them. Undo moves the newest command across the boundary
+to the redo side and applies its "before" values; a new edit empties the redo
+side. A step is one user action, so moving 64 selected entities is one step
+holding 64 entries. The marker compares a hash of the level with the hash at the last save,
 so it does not matter how you got back.
 
 **Check yourself:** run `make test`. Why do entity commands store their values
@@ -417,7 +419,7 @@ snapshots, and how does that ownership move between the stacks?
 <summary>Hint</summary>
 
 Compare the size of `PlacementData` with `LevelConfigSnapshot` in
-`src/editor/undo.h`, and remember each stack holds `UNDO_MAX` (256) entries.
+`src/editor/undo.h`, and remember the history holds `UNDO_MAX` (256) steps.
 
 </details>
 
@@ -427,17 +429,16 @@ Compare the size of `PlacementData` with `LevelConfigSnapshot` in
 An entity edit needs only the one placement before and after, which fits in
 the small `PlacementData` union stored directly in each `UndoEntry`. A
 level-settings snapshot holds names, a description, layer paths and more, so it
-is much larger. Storing two of those inline in all 512 entries would make every
-stack slot huge even though most commands are entity edits. So `undo_push()`
-mallocs the pair only for `CMD_CONFIG` commands and keeps a pointer in the
-entry.
+is much larger. Storing two of those inline in all 256 steps would make every
+slot huge even though most commands are entity edits. So `undo_push()` mallocs
+the pair only for `CMD_CONFIG` commands and keeps a pointer in the entry.
 
-That pointer always has exactly one owner. `transfer()` moves an entry from one
-stack to the other and sets the old slot's `config` to `NULL`, so the pointer
-moves rather than being copied. A new edit frees everything left on the redo
-stack (`release_entries()`), and when the undo stack is full the oldest entry's
-snapshot is freed before it is dropped. `undo_destroy()` frees whatever is
-left.
+That pointer always has exactly one owner: the entry that recorded it. Undo and
+redo never move an entry; they only move the boundary between the two stacks
+(each step's `applied` count), so ownership never has to change hands. A new
+edit frees everything on the redo side (`discard_redo()`), and when the history
+is full the oldest step's snapshots are freed before it is dropped
+(`remove_step()`). `undo_destroy()` frees whatever is left.
 
 </details>
 
