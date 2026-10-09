@@ -100,11 +100,22 @@ static void editor_key(EditorState *es, const InputEvent *event)
         }
         return;
     }
+    if (es->ui.active_id && ctrl && (key == KEY_C || key == KEY_V)) {
+        if (key == KEY_C) SetClipboardText(es->ui.edit_buf);
+        else {
+            const char *text = GetClipboardText(); /* borrowed by raylib; do not free */
+            if (text) ui_queue_text_input(&es->ui, text);
+        }
+        return;
+    }
     /* The Campaign view covers the canvas: a level shortcut there would
-     * change a document the designer cannot see.  It takes Esc (close),
-     * Ctrl+S (save the campaign) and Ctrl+M (close) only. */
-    if (es->campaign && !es->ui.active_id) {
-        if (key == KEY_ESCAPE || (ctrl && key == KEY_M))
+     * change a document the designer cannot see.  It takes Esc (cancel a
+     * name being typed, else close), Ctrl+S (save the campaign) and Ctrl+M
+     * (close) only. */
+    if (es->campaign) {
+        if (key == KEY_ESCAPE && es->ui.active_id)
+            ui_cancel_active_edit(&es->ui);
+        else if (key == KEY_ESCAPE || (ctrl && key == KEY_M))
             (void)editor_campaign_close(es, 0);
         else if (ctrl && key == KEY_S)
             (void)editor_campaign_save(es);
@@ -113,14 +124,6 @@ static void editor_key(EditorState *es, const InputEvent *event)
                  key != KEY_LEFT_ALT && key != KEY_RIGHT_ALT &&
                  key != KEY_LEFT_SUPER && key != KEY_RIGHT_SUPER)
             editor_set_status(es, "Campaign view: Esc or Close returns to the level");
-        return;
-    }
-    if (es->ui.active_id && ctrl && (key == KEY_C || key == KEY_V)) {
-        if (key == KEY_C) SetClipboardText(es->ui.edit_buf);
-        else {
-            const char *text = GetClipboardText(); /* borrowed by raylib; do not free */
-            if (text) ui_queue_text_input(&es->ui, text);
-        }
         return;
     }
     if (ctrl) {
