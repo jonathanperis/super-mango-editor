@@ -76,11 +76,19 @@ static int inspection_and_replay(void)
     gs.settings_menu = &settings;
     key(&gs, KEY_F3);
     CHECK(game_inspector_steps(&gs, 0.04f) == 0);
+    /* While a binding is being captured, the inspector's keys go to the
+     * settings panel, which refuses them as bindings (in every run). */
+    static GameProfile profile;
+    game_profile_init(&profile);
+    gs.profile = &profile;
+    settings.page = 1;
     settings.capture = 1;
-    InputEvent reserved = {.type=INPUT_KEY_DOWN,.key=KEY_F3};
+    InputEvent reserved = {.type=INPUT_KEY_DOWN,.key=KEY_F3,.binding=input_binding_from_key(KEY_F3)};
     input_push(&reserved); game_handle_events(&gs);
-    CHECK(settings.capture == 1 && strstr(settings.message, "Reserved for debug") != NULL);
+    CHECK(settings.capture == 1 && strstr(settings.message, "debug inspector") != NULL);
+    CHECK(game_inspector_steps(&gs, 0.04f) == 0);
     gs.settings_menu = NULL;
+    gs.profile = NULL;
     float speed = gs.player.walk_max_speed;
     key(&gs, KEY_EQUAL);
     CHECK(gs.player.walk_max_speed == speed + 25);

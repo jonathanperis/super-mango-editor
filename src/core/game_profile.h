@@ -54,6 +54,8 @@ void game_profile_init(GameProfile *profile);
 void game_profile_close(GameProfile *profile);
 int game_profile_key_valid(const char *path);
 int game_settings_key_allowed(int key);
+/* F2-F10, '-' and '=': the debug inspector's keys, never a control. */
+int game_settings_key_debug_reserved(int key);
 int game_settings_button_allowed(int button);
 int game_settings_has_unavailable_binding(const GameSettings *settings);
 int game_settings_valid(const GameSettings *settings);

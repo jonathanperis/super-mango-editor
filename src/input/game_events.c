@@ -6,7 +6,6 @@
  * not also jump or select an item on the screen underneath it.
  */
 #include "game_events.h"
-#include "../shared/platform.h"  /* str_copy */
 #include "game_input.h"
 #include "../collision/collision_damage.h"
 #include "../core/game_overlay.h"
@@ -51,11 +50,8 @@ void game_handle_events(GameState *gs)
         /* Preserve priority: settings/capture first, then the debug inspector,
          * then normal screen commands. Key-repeat must not toggle pause twice. */
         int was_open = gs->settings_menu && gs->settings_menu->open;
-        if (gs->debug_mode && was_open && gs->settings_menu->capture == 1 && event.type == INPUT_KEY_DOWN &&
-            ((event.key >= KEY_F2 && event.key <= KEY_F10) || event.key == KEY_MINUS || event.key == KEY_EQUAL)) {
-            str_copy(gs->settings_menu->message, "Reserved for debug inspection; choose another key.", sizeof(gs->settings_menu->message));
-            continue;
-        }
+        /* Settings consume every key while open, including the inspector's
+         * F2-F10/-/= (which game_settings_key_allowed refuses as bindings). */
         if (gs->route == GAME_ROUTE_NONE && settings_menu_event(gs->settings_menu, gs->profile, &event,
                                                                terminal_overlay(gs) ? -1 : PAD_BACK)) {
             if (was_open && !gs->settings_menu->open) {
