@@ -103,7 +103,9 @@ typedef struct AppSession {
     AppSessionHooks hooks;
     char status_message[160];
     char replay_script_path[256];
-    char replay_dir[256];
+    /* main.c makes a relative --replay-dir absolute, so this holds a whole
+     * path, the same size as a level path. */
+    char replay_dir[GAME_LEVEL_PATH_MAX];
     char boot_level_path[GAME_LEVEL_PATH_MAX];
     unsigned int random_seed;
     /* Continue-point bookkeeping: the respawn point and pause state seen at
