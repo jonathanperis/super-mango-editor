@@ -93,6 +93,17 @@
 _Static_assert(EDITOR_MAX_SELECTION <= UNDO_GROUP_MAX,
                "an undo step must fit a whole selection");
 
+/*
+ * EditorFocusArea — where the last left click landed.  A few keys mean
+ * different things in different places: Backspace deletes the selected
+ * entities only when the canvas has the focus, so a Backspace meant for a
+ * field just committed with Enter cannot delete them by surprise.
+ */
+typedef enum {
+    EDITOR_FOCUS_CANVAS = 0,   /* the level (also at start-up)            */
+    EDITOR_FOCUS_PANEL         /* a panel, the toolbar, the status bar... */
+} EditorFocusArea;
+
 typedef struct {
     uint64_t id;
     uint64_t timestamp;
@@ -467,6 +478,7 @@ typedef struct {
      * keys of the latest mouse event, which tools and the ghost read. */
     int            snap_to_grid;
     int            input_mods;
+    EditorFocusArea focus_area;   /* where the last left click landed */
     int            running;       /* 1 = main loop active, 0 = exit requested  */
     int            panel_scroll;  /* scroll offset (px) for the right panel    */
     /*
