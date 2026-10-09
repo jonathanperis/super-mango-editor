@@ -1,7 +1,7 @@
 /* Bounded command history: one timeline of steps (see UndoStack in undo.h).
  *
  * Memory: a lone entry lives inside its step, a group's entries in one heap
- * array per step, and only configuration edits own heap snapshots.  Undo and
+ * array per step, and only configuration and text edits own heap snapshots.  Undo and
  * redo never move an entry, so they never allocate and never hand a pointer
  * from one owner to another; copying an entry to the caller returns a value
  * snapshot, never a borrowed pointer into history.  The only hand-over is the
@@ -64,7 +64,9 @@ static void release_entries_from(UndoStep *step, int from)
     UndoEntry *entries = step_entries(step);
     for (int i = from; i < step->count; i++) {
         free(entries[i].config);
+        free(entries[i].text);
         entries[i].config = NULL;
+        entries[i].text = NULL;
     }
     step->count = from;
     if (step->applied > from) step->applied = from;
@@ -248,11 +250,21 @@ int undo_push(UndoStack *stack, const Command *cmd)
     entry.before = cmd->before;
     entry.after = cmd->after;
     entry.property_field = cmd->property_field;
-    memcpy(entry.property_text_before, cmd->property_text_before, sizeof(entry.property_text_before));
-    memcpy(entry.property_text_after, cmd->property_text_after, sizeof(entry.property_text_after));
+    if (cmd->property_text_before[0] || cmd->property_text_after[0]) {
+        _Static_assert(sizeof(entry.text->before) == sizeof(cmd->property_text_before) &&
+                       sizeof(entry.text->after) == sizeof(cmd->property_text_after),
+                       "stored text matches the command's");
+        entry.text = history_malloc(sizeof(*entry.text));
+        if (!entry.text) return 0; /* History remains intact. */
+        memcpy(entry.text->before, cmd->property_text_before, sizeof(entry.text->before));
+        memcpy(entry.text->after, cmd->property_text_after, sizeof(entry.text->after));
+    }
     if (cmd->type == CMD_CONFIG) {
         entry.config = history_malloc(2 * sizeof(*entry.config));
-        if (!entry.config) return 0; /* History remains intact. */
+        if (!entry.config) {
+            free(entry.text);
+            return 0; /* History remains intact. */
+        }
         entry.config[0] = cmd->config_before;
         entry.config[1] = cmd->config_after;
     }
@@ -289,8 +301,10 @@ static void entry_to_command(const UndoEntry *entry, int group, Command *out)
     out->before = entry->before;
     out->after = entry->after;
     out->property_field = entry->property_field;
-    memcpy(out->property_text_before, entry->property_text_before, sizeof(out->property_text_before));
-    memcpy(out->property_text_after, entry->property_text_after, sizeof(out->property_text_after));
+    if (entry->text) {
+        memcpy(out->property_text_before, entry->text->before, sizeof(out->property_text_before));
+        memcpy(out->property_text_after, entry->text->after, sizeof(out->property_text_after));
+    }
     if (entry->config) {
         out->config_before = entry->config[0];
         out->config_after = entry->config[1];
@@ -334,6 +348,7 @@ int undo_take(UndoStack *stack, Command *out)
     step = &stack->steps[index];
     entries = step_entries(step);
     free(entries[step->applied].config);
+    free(entries[step->applied].text);
     memmove(entries + step->applied, entries + step->applied + 1,
             (size_t)(step->count - step->applied - 1) * sizeof(*entries));
     step->count--;
