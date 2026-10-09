@@ -208,7 +208,7 @@ font_draw_centered(font, "Paused", GAME_W / 2, 92, WHITE);
 font_unload(font);
 ```
 
-The HUD renders hearts (health), life counter and score. It is drawn after game entities; terminal/settings overlays can cover it.
+The HUD renders hearts (health), life counter and score. It is drawn after game entities; terminal/settings overlays can cover it. `hud_layout()` computes every HUD rectangle once; `hud_render` draws into them and the `--debug` hitbox view outlines the same ones, so a layout change needs one edit.
 
 For repeated labels, reuse `UIState`'s bounded cache or `font_texture`. Rebuild
 only when content/appearance changes. `texture_unload` flushes pending raylib
