@@ -38,7 +38,6 @@ void float_platform_init(FloatPlatform *fp, FloatPlatformMode mode,
     fp->t         = t;
     fp->speed     = speed;
     fp->direction = 1;   /* always start moving forward */
-    fp->prev_x    = 0.0f;
 
     if (mode == FLOAT_PLATFORM_RAIL && rail != NULL) {
         /*
@@ -49,13 +48,16 @@ void float_platform_init(FloatPlatform *fp, FloatPlatformMode mode,
          */
         float cx, cy;
         rail_get_world_pos(rail, t, &cx, &cy);
-        fp->x      = cx - fp->w * 0.5f;
-        fp->y      = cy - fp->h * 0.5f;
-        fp->prev_x = fp->x;
+        fp->x = cx - fp->w * 0.5f;
+        fp->y = cy - fp->h * 0.5f;
     } else {
         fp->x = x;
         fp->y = y;
     }
+
+    /* Not moved yet: the "previous" position is the starting one. */
+    fp->prev_x = fp->x;
+    fp->prev_y = fp->y;
 }
 
 /* ------------------------------------------------------------------ */
@@ -74,27 +76,23 @@ void float_platform_init(FloatPlatform *fp, FloatPlatformMode mode,
  *              If the player steps off before the limit, the timer resets —
  *              the platform only falls after continuous standing.
  *
- *   RAIL     — save prev_x for the nudge calculation in game_float_platforms_update, then
- *              advance t along the rail.  Closed loops use rail_advance()
+ *   RAIL     — advance t along the rail.  Closed loops use rail_advance()
  *              (which wraps t).  Open rails advance manually with bounce
  *              at both endpoints (no fall-off — platforms never detach).
+ *
+ * Before any of them, every mode saves prev_x/prev_y: the position the
+ * player's landing test compares against, and the start of the move that
+ * game_float_platforms_update carries a rail rider through.
  */
 /*
  * float_platform_update_rail — Advance a RAIL-mode platform for one frame.
  *
  * Extracted from float_platform_update to keep the switch statement concise.
- * Saves prev_x for the game-loop nudge calculation, advances t along the rail,
- * and recomputes the world-space position from rail_get_world_pos.
+ * Advances t along the rail and recomputes the world-space position from
+ * rail_get_world_pos.
  */
 static void float_platform_update_rail(FloatPlatform *fp, float dt)
 {
-    /*
-     * Save the current x before advancing so game_loop can compute
-     * the horizontal delta (fp->x − fp->prev_x) and push the player
-     * sideways when they are riding this platform.
-     */
-    fp->prev_x = fp->x;
-
     if (fp->rail->closed) {
         /* Closed loop: rail_advance wraps t continuously in [0, count) */
         fp->t = rail_advance(fp->rail, fp->t, fp->speed, dt);
@@ -133,6 +131,15 @@ static void float_platform_update_rail(FloatPlatform *fp, float dt)
 
 void float_platform_update(FloatPlatform *fp, float dt, int player_on_top) {
     if (!fp->active) return;
+
+    /*
+     * Remember where this step starts. After the move below,
+     * (x − prev_x, y − prev_y) is how far the platform travelled: the
+     * distance a rider is carried, and the "before" half of the player's
+     * landing test in the next step.
+     */
+    fp->prev_x = fp->x;
+    fp->prev_y = fp->y;
 
     switch (fp->mode) {
 

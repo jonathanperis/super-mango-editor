@@ -90,8 +90,14 @@ typedef enum {
  *   t         : position on the rail in [0, rail->count).
  *   speed     : traversal speed in tiles/s.
  *   direction : +1 forward / −1 backward (only used for open rails).
- *   prev_x    : x at the start of the current frame; used to compute the
- *               horizontal delta so the player is nudged along with the platform.
+ *
+ * Every mode:
+ *   prev_x, prev_y : x and y before the platform's latest update. The
+ *               difference (x − prev_x, y − prev_y) is how far it moved in
+ *               that step: game_float_platforms_update moves a rail rider by
+ *               it, and the player's landing test compares the feet against
+ *               where the top was (prev_y) and where it is now (y), so a
+ *               platform rising past falling feet still catches them.
  */
 typedef struct {
     float x;
@@ -112,7 +118,10 @@ typedef struct {
     float        t;
     float        speed;
     int          direction;
+
+    /* Every mode: position before the latest update */
     float        prev_x;
+    float        prev_y;
 } FloatPlatform;
 
 /* ---- Function declarations ----------------------------------------------- */

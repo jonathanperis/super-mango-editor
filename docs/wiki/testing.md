@@ -23,7 +23,7 @@ Use this page to choose the smallest useful verification set for a change. Run c
 ## Native Regression Tests
 
 The session suite also runs `tests/simulation_test.c`: 180-step capture/replay
-equivalence, the inspector never overriding a real pause, moving-platform carry, same-frame hazard
+equivalence, the inspector never overriding a real pause, moving-platform carry (sideways, and down and up a RECT rail), same-frame hazard
 damage, required sprite failure and checkpoint respawn. Stable geometry belongs
 in `tests/fixtures/runtime/`; showcase data is still checked separately for
 campaign ordering and round-trip validity. Editor regressions cover history
