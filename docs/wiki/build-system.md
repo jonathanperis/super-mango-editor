@@ -62,6 +62,26 @@ Application objects depend on the built raylib library as well as their own
 sources/headers. A dependency or patch change therefore recompiles consumers and
 relinks executables; preserved upstream header timestamps cannot leave old code
 silently linked. `vendor/raylib/README.md` records the source and patch provenance.
+raylib itself is rebuilt only when the pin, the patches, `tools/build_raylib.py`
+or its options (platform, compiler, build mode, sanitizer, null audio) change.
+`build_raylib.py` always re-runs CMake, but CMake leaves `libraylib.a` untouched
+when nothing needed recompiling, and the Makefile records the successful run in
+`$(RAYLIB_BUILD)/build-done.stamp`; so editing the Makefile or the build script
+does not recompile the game.
+
+### Flag stamps
+
+Make only compares timestamps, so it cannot notice on its own that a compiler
+or flag changed. Three one-line stamp files record the settings each tree was
+built with: `$(OBJDIR)/build-flags.txt` (`CC`, `BUILD_MODE`, `RAYLIB_PLATFORM`,
+`CFLAGS`, `TEST_CFLAGS`, the per-object test flags and `LIBS`, which carry
+`EXTRA_CFLAGS`/`EXTRA_LDFLAGS`), `$(RAYLIB_BUILD)/make-options.txt` (the
+`build_raylib.py` options) and `$(OBJDIR)/web-build-flags.txt` (the Web
+flags). While parsing the Makefile, Make reads each stamp back and
+rewrites it only when the text differs. Every object lists its stamp as a
+prerequisite, so a changed setting rebuilds exactly what it affects (for
+example `make BUILD_MODE=release` after a debug build in the same `OUTDIR`
+recompiles everything with `-O2`), and an unchanged one rebuilds nothing.
 
 `RAYLIB_PLATFORM=memory` selects raylib's software framebuffer and miniaudio's
 null backend for explicit headless tests. Use a dedicated `OUTDIR`, such as
@@ -121,8 +141,10 @@ isolates it under `out/debug/`, and `make release` builds `-O2` game/editor bina
 under `out/release/`. Release builds on Linux/macOS add `-fstack-protector-strong` and
 `-D_FORTIFY_SOURCE=2`; Linux also links PIE with full RELRO (`-pie -Wl,-z,relro,-z,now`)
 against a position-independent release raylib. MSYS2/MinGW keeps plain `-O2`.
-Their object directories never overlap. For additional
-custom flag combinations, choose a separate `OUTDIR` to avoid reusing old objects.
+Their object directories never overlap. Changing flags inside one `OUTDIR` is
+safe (the [flag stamps](#flag-stamps) rebuild what changed), but switching back
+and forth recompiles each time, so give long-lived flag combinations their own
+`OUTDIR`.
 
 `make content-inventory` regenerates public counts and the raw asset inventory;
 `make asset-budget` checks freshness and the 4 MiB raw playable-asset budget
@@ -379,7 +401,7 @@ make dist-native
 
 ### `make dist-wasm`
 
-Depends on `asset-budget` and `make web`, whose HTML outputs are file targets over the sources, headers, `web/` host files, `assets/`, `levels/`, the Web raylib library and the Makefile; emcc only reruns when one of them is newer, so a stale WASM build is never packaged. Archives include HTML/JS/WASM/data files, README and third-party notices.
+Depends on `asset-budget` and `make web`, whose HTML outputs are file targets over the sources, headers, `web/` host files, `assets/`, `levels/`, the Web raylib library and the Web flag stamp; emcc only reruns when one of them is newer, so a stale WASM build is never packaged. Archives include HTML/JS/WASM/data files, README and third-party notices.
 
 ```sh
 make dist-wasm   # runs make web first when its outputs are stale
@@ -595,13 +617,17 @@ out/
 ├── super-mango                          ← the game binary
 ├── super-mango-editor                   ← the editor binary (make editor)
 ├── raylib/                              ← verified source, applied patches and CMake build
+│   ├── make-options.txt                 ← raylib flag stamp
+│   └── build-done.stamp                 ← last successful build_raylib.py run
 ├── raylib-web/                          ← Emscripten raylib build (make web)
 └── obj/
+    ├── build-flags.txt                  ← flag stamp for every native object
     ├── src/                             ← game/editor objects mirror source paths
     │   ├── core/*.o / *.d
     │   ├── editor/*.o / *.d
     │   ├── player/*.o / *.d
     │   └── ...
     ├── tests/                           ← test-flag copies, same mirrored paths (make test)
+    ├── web-build-flags.txt              ← flag stamp for the Web pages (make web)
     └── vendor/tomlc17/tomlc17.o / .d
 ```
