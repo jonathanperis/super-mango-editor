@@ -362,6 +362,9 @@ typedef struct {
 #define LEVEL_NAME_CAPACITY 64
 #define LEVEL_DESCRIPTION_CAPACITY 4096
 #define LEVEL_AUTHOR_CAPACITY 128
+/* Loudest authored music_volume (the audio module's full volume, 128 units);
+ * the validator and the editor's volume field share this limit. */
+#define LEVEL_MUSIC_VOLUME_MAX 128
 
 typedef struct {
     int   format_version;    /* serialized document schema; always current v1 */
@@ -487,7 +490,7 @@ typedef struct {
 
     /* Background sound */
     char  music_path[64];   /* path to .wav sound file, empty = no sound */
-    int   music_volume;     /* authored 0-128 volume units */
+    int   music_volume;     /* authored 0..LEVEL_MUSIC_VOLUME_MAX volume units */
 
     /* Floor tile texture */
     char  floor_tile_path[64]; /* 9-slice tileset PNG, e.g. "assets/sprites/levels/grass_tileset.png" */

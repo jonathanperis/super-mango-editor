@@ -635,8 +635,9 @@ static int validate_level_settings(const LevelDef *def,
                           0, MAX_LEVEL_SCREENS);
     }
 
-    if (def->music_volume < 0 || def->music_volume > 128) {
-        return fail_range(err, err_size, "music_volume", def->music_volume, 0, 128);
+    if (def->music_volume < 0 || def->music_volume > LEVEL_MUSIC_VOLUME_MAX) {
+        return fail_range(err, err_size, "music_volume", def->music_volume, 0,
+                          LEVEL_MUSIC_VOLUME_MAX);
     }
     if (def->initial_hearts < 0 || def->initial_hearts > MAX_HEARTS) {
         return fail_range(err, err_size, "initial_hearts", def->initial_hearts, 0, MAX_HEARTS);
