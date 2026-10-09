@@ -5,7 +5,7 @@
 Work lands on `main` through short-lived `feat/` branches (rebase merges only).
 
 Resolved both codebase audit rounds (#306), then cleared every open
-code-scanning alert (#308, #309). Goal was to resolve both codebase audit rounds (security, runtime, editor, build/CI, assets) while keeping specs and contributor docs aligned with TOML-only runtime loading, fixed-step simulation, authored checkpoints, the sandbox-first campaign, the 15-binary native test inventory, validation tooling, and CI smoke/docs gates.
+code-scanning alert (#308, #309). Goal was to resolve both codebase audit rounds (security, runtime, editor, build/CI, assets) while keeping specs and contributor docs aligned with TOML-only runtime loading, fixed-step simulation, authored checkpoints, the sandbox-first campaign, the native test inventory, validation tooling, and CI smoke/docs gates.
 
 ## Shipped Baseline
 
@@ -15,10 +15,10 @@ code-scanning alert (#308, #309). Goal was to resolve both codebase audit rounds
 | Campaign selector + direct TOML load | Shipped | bare launch reads `levels/campaigns/main.toml` in Creator's Playground (sandbox) → Volcanic Depths 1 → 2 order; `make run-level LEVEL=levels/labs/01_collision.toml` bypasses it |
 | Authored checkpoints | Shipped | Optional `[[checkpoints]]` use exact x/y respawns; records disable legacy screen-boundary fallback |
 | Standalone editor | Shipped | `make editor`, `make run-editor`; palette/canvas/properties/undo/playtest support checkpoints |
-| Tests | Shipped | `make test` runs 15 native binaries, a parser allocation probe, and Python/Node host checks (levels, sounds, parser encoding, web host, packaging, SARIF filter) |
+| Tests | Shipped | `make test` runs 17 native binaries, a parser allocation probe, and Python/Node host checks (levels, sounds, parser encoding, web host, packaging, SARIF filter) |
 | Level validation | Shipped | `make validate-levels` |
 | CI smoke gates | Shipped | Native game/editor smoke, scripted replay smoke and WebAssembly artifact smoke in `build.yml` |
-| Docs checks | Shipped | Always-on `Docs drift` job in `build.yml`; `docs.yml` runs drift, lint, audit, build and site checks |
+| Docs checks | Shipped | Always-on `Docs drift` job in `build.yml` runs `make docs-drift`; `docs.yml` lints, audits, builds and site-checks the website on pull requests that touch it, weekly and on demand |
 | Pages publishing | Shipped | `pages-build` → `pages-deploy` in `build.yml` |
 | Browser touch controls | Shipped | `web/touch-controls.js`; `tests/touch_controls_test.cjs` |
 | Web build | Shipped target | `make web` |

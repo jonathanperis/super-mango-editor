@@ -51,14 +51,15 @@ The [manual](https://jonathanperis.github.io/super-mango-editor/docs/) covers ea
 
 ### Prerequisites
 
-A C11 compiler (`clang` or `gcc`), `make`, CMake and Python 3 (3.12+
-recommended). The first build downloads and verifies the pinned raylib 6.0
-source; no system raylib is needed. See [dependency provenance](vendor/raylib/README.md).
+A C11 compiler (`clang` or `gcc`), `make`, CMake, Python 3 (3.12+
+recommended) and Node.js 22.12+ (CI uses 26.9.0), which `make test` needs for
+its four JavaScript host-contract tests. The first build downloads and verifies
+the pinned raylib 6.0 source; no system raylib is needed. See [dependency provenance](vendor/raylib/README.md).
 
 **macOS:**
 
 ```sh
-brew install cmake python
+brew install cmake python node
 xcode-select --install   # provides clang and make
 ```
 
@@ -68,6 +69,7 @@ xcode-select --install   # provides clang and make
 sudo apt update
 sudo apt install build-essential clang cmake python3 libgl1-mesa-dev libx11-dev \
     libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev zenity
+# Node.js 22.12+: distribution packages are often older; see https://nodejs.org/
 ```
 
 **Windows (MSYS2 UCRT64):**
@@ -75,11 +77,12 @@ sudo apt install build-essential clang cmake python3 libgl1-mesa-dev libx11-dev 
 ```sh
 pacman -S make mingw-w64-ucrt-x86_64-clang mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-python \
           mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-make
+# plus Node.js 22.12+ from https://nodejs.org/ on PATH
 ```
 
 **WebAssembly:** install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) at **6.0.9** with `emcc` and `emcmake` on `PATH`. GitHub CI is the authoritative WASM release verification; report local toolchain failures separately from application failures.
 
-The docs tools need Python 3.11+; the docs site needs Node.js 22.12+ and Bun
+The docs tools need Python 3.11+; the docs site also needs Bun
 (see [website maintenance](docs/README.md)). On a machine without a display or
 sound card, `make test OUTDIR=out/headless RAYLIB_PLATFORM=memory` runs the
 tests on raylib's in-memory backend.
@@ -152,7 +155,9 @@ checks that guard them together.
 
 ## CI/CD
 
-Three workflows run on pull requests and on `main`:
+`build.yml` and `codeql.yml` run on every pull request and every push to
+`main`; `docs.yml` runs only on pull requests that touch the website's inputs,
+plus a weekly and a manual run:
 
 - **`build.yml`** builds and tests the game and editor on Linux, macOS and
   Windows with warnings as errors, renders every level briefly, and builds the
@@ -161,8 +166,10 @@ Three workflows run on pull requests and on `main`:
   `make docs-drift`. On `main` it publishes the website; on a `v*` tag
   or a manual release run it adds checksums and build provenance and publishes
   the release archives.
-- **`docs.yml`** checks the manual against the code, then lints, builds and
-  link-checks the website.
+- **`docs.yml`** lints, audits, builds and link-checks the website. It does
+  not repeat `make docs-drift` (the always-on `Docs drift` job in `build.yml`
+  checks the manual against the code), and on `main` the website is built by
+  `build.yml` before it is published.
 - **`codeql.yml`** runs CodeQL security and quality analysis on the C code, the
   workflows, the Python tools and the JavaScript/TypeScript.
 

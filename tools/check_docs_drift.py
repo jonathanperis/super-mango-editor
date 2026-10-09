@@ -12,6 +12,7 @@ documented constant values, the inspector key table and the render order.
 from __future__ import annotations
 
 import ast
+import json
 import re
 import shlex
 import sys
@@ -411,6 +412,122 @@ def check_wasm_authority_docs() -> None:
     for rel, token in expectations.items():
         if token not in read(ROOT / rel):
             fail(f"{rel}: missing current CI-authoritative WebAssembly verification note")
+
+
+# Tracked project notes outside the manual (.specs/ is otherwise gitignored).
+SPEC_PAGES = sorted((ROOT / ".specs" / "project").glob("*.md"))
+NATIVE_COUNT_RE = re.compile(r"\b(\d+) native (?:regression |test )?(?:binaries|harnesses|tests)\b")
+
+
+def check_native_test_counts() -> None:
+    """Every "N native binaries" claim, and the spec's list of them, match TEST_TARGETS."""
+    targets = makefile_test_targets()
+    for page in doc_pages() + SPEC_PAGES:
+        for line_no, line in enumerate(read(page).splitlines(), start=1):
+            for count in NATIVE_COUNT_RE.findall(line):
+                if int(count) != len(targets):
+                    fail(f"{page_label(page, line_no)}: says {count} native test binaries; "
+                         f"the Makefile's TEST_TARGETS has {len(targets)}")
+    state = read(ROOT / ".specs" / "project" / "STATE.md")
+    tests_line = next((line for line in state.splitlines() if line.startswith("- Tests:")), "")
+    for target in targets:
+        if target.removesuffix("-test") not in tests_line:
+            fail(f".specs/project/STATE.md: the `- Tests:` line does not list `{target}`")
+
+
+# "`NAME` in `src/file.h`" names the file that defines NAME. When a constant
+# moves (as the world constants did to game_constants.h), these go stale.
+CONSTANT_LOCATION_RE = re.compile(r"`([A-Z][A-Z0-9_]{2,})` in `(src/[\w/]+\.[ch])`")
+
+
+def check_constant_locations() -> None:
+    for page in doc_pages() + [ROOT / "PRODUCT.md"] + SPEC_PAGES:
+        for line_no, line in enumerate(read(page).splitlines(), start=1):
+            for name, rel in CONSTANT_LOCATION_RE.findall(line):
+                path = ROOT / rel
+                if not path.is_file():
+                    fail(f"{page_label(page, line_no)}: `{rel}` does not exist")
+                    continue
+                source = read(path)
+                # A #define, or an enum member (followed by `,`, `=`, a comment or the line end).
+                if not re.search(rf"#\s*define\s+{name}\b|^\s*{name}\b\s*(?:[,=]|/\*|$)", source, re.M):
+                    fail(f"{page_label(page, line_no)}: `{name}` is not defined in `{rel}`")
+            for rel in re.findall(r"camera constants in `(src/[\w/]+\.[ch])`", line):
+                if not (ROOT / rel).is_file() or "#define CAM_" not in read(ROOT / rel):
+                    fail(f"{page_label(page, line_no)}: the CAM_* camera constants are not in `{rel}`")
+
+
+def workflow_triggers(name: str) -> tuple[bool, bool, bool]:
+    """(runs on every pull request, runs on main pushes, has a paths filter)."""
+    text = read(ROOT / ".github" / "workflows" / name)
+    block = text.split("\non:", 1)[1].split("\n\n", 1)[0] if "\non:" in text else ""
+    triggers = re.split(r"\n  (?=[a-z_]+:)", "\n" + block)
+    pull = next((part for part in triggers if part.startswith("pull_request:")), None)
+    push = next((part for part in triggers if part.startswith("push:")), None)
+    filtered = pull is not None and "paths:" in pull
+    return pull is not None and not filtered, push is not None and "main" in push, filtered
+
+
+def check_workflow_claims() -> None:
+    """The README's trigger summary and every "docs.yml runs drift" claim match the workflows."""
+    readme = read(ROOT / "README.md")
+    claim = re.search(r"((?:`\w+\.yml`(?:,|\s+and)?\s*)+)run on every pull request and every push to\s+`main`",
+                      readme)
+    if not claim:
+        fail("README.md: CI/CD section must say which workflows run on every pull request and main push")
+    else:
+        for name in re.findall(r"`(\w+\.yml)`", claim.group(1)):
+            every_pr, main_push, _ = workflow_triggers(name)
+            if not (every_pr and main_push):
+                fail(f"README.md: says `{name}` runs on every pull request and main push; its triggers disagree")
+    _, docs_on_main, docs_filtered = workflow_triggers("docs.yml")
+    docs_runs_drift = "make docs-drift" in "\n".join(
+        line for line in read(ROOT / ".github" / "workflows" / "docs.yml").splitlines()
+        if line.strip().startswith("run:"))
+    for page in doc_pages() + SPEC_PAGES:
+        for line_no, line in enumerate(read(page).splitlines(), start=1):
+            if not docs_runs_drift and re.search(
+                    r"docs\.yml`?\*{0,2}\s+(?:runs|checks)\b[^.|\n]*(?:\bdrift\b|manual against the code)", line):
+                fail(f"{page_label(page, line_no)}: says docs.yml runs the docs drift check; "
+                     "only build.yml's `Docs drift` job does")
+            if not docs_on_main and docs_filtered and re.search(r"Docs \(runs on every `main` push", line):
+                fail(f"{page_label(page, line_no)}: docs.yml does not run on main pushes")
+
+
+def check_readme_prerequisites() -> None:
+    """`make test` runs Node tests, so the README prerequisites must name Node.js and CI's version."""
+    makefile = read(ROOT / "Makefile")
+    test_rule = re.search(r"^test:([^\n#]*)", makefile, re.M)
+    host_rule = makefile.split("\nweb-host-contract:", 1)[-1].split("\n\n", 1)[0]
+    if not test_rule or "web-host-contract" not in test_rule.group(1) or "$(NODE)" not in host_rule:
+        return  # make test no longer runs Node; nothing to require
+    readme = read(ROOT / "README.md")
+    section = readme.split("### Prerequisites", 1)[-1].split("\n### ", 1)[0]
+    # The opening paragraph is the build/test list; a later docs-site note does not count.
+    if "Node.js" not in section.strip().split("\n\n", 1)[0]:
+        fail("README.md: the Prerequisites list must name Node.js; `make test` runs the Node host-contract tests")
+    ci_node = re.search(r"node-version: '([\d.]+)'", read(ROOT / ".github" / "workflows" / "build.yml"))
+    for version in re.findall(r"CI uses ([\d.]+)", section):
+        if ci_node and version != ci_node.group(1):
+            fail(f"README.md: Prerequisites say CI uses Node.js {version}; build.yml uses {ci_node.group(1)}")
+
+
+def check_content_counts() -> None:
+    """Level, screen and lab numbers outside the generated pages match the levels on disk."""
+    facts = json.loads(read(ROOT / "docs" / "src" / "generated" / "project.json"))
+    expected = {"levels": facts["levels"], "campaign levels": facts["levels"],
+                "screens": facts["screens"], "labs": facts["labs"]}
+    for page in [ROOT / "PRODUCT.md", ROOT / "README.md"] + SPEC_PAGES:
+        for line_no, line in enumerate(read(page).splitlines(), start=1):
+            for count, noun in re.findall(r"\b(\d+) (campaign levels|levels|screens|labs)\b", line):
+                if int(count) != expected[noun]:
+                    fail(f"{page_label(page, line_no)}: says {count} {noun}; the levels have "
+                         f"{expected[noun]} (docs/src/generated/project.json, make content-inventory)")
+    state = read(ROOT / ".specs" / "project" / "STATE.md")
+    row = re.search(r"^\| Playable TOML level files \| (\d+) \|", state, re.M)
+    on_disk = len(list((ROOT / "levels").glob("*.toml")))
+    if row and int(row.group(1)) != on_disk:
+        fail(f".specs/project/STATE.md: Playable TOML level files is {row.group(1)}; levels/ has {on_disk}")
 
 
 # Files that quote the Emscripten version. Renovate's "emscripten" group
@@ -826,6 +943,11 @@ def main() -> int:
     check_public_readme_docs()
     check_wasm_authority_docs()
     check_emscripten_pins()
+    check_native_test_counts()
+    check_constant_locations()
+    check_workflow_claims()
+    check_readme_prerequisites()
+    check_content_counts()
     check_pages_metadata()
     check_make_targets_documented()
     check_src_paths_exist()
