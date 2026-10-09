@@ -31,7 +31,7 @@ void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
 
         /* ── horizontal movement + patrol boundary reversal ──────── */
         patrol_update(&s->x, &s->vx, JSPIDER_FRAME_W,
-                      s->patrol_x0, s->patrol_x1, JSPIDER_SPEED, dt);
+                      s->patrol_x0, s->patrol_x1, dt);
 
         /* ── floor gap interaction ────────────────────────────────── */
         /*

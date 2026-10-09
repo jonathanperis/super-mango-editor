@@ -14,7 +14,9 @@
 #define FISH_FRAME_H       48       /* height of one frame slot in the sheet   */
 #define FISH_RENDER_W      48       /* on-screen render width  (matches player) */
 #define FISH_RENDER_H      48       /* on-screen render height (matches player) */
-#define FISH_SPEED         70.0f    /* horizontal patrol speed in px/s         */
+/* FISH_SPEED — the usual patrol speed, px/s; the level's vx is the speed
+ * actually used (shipped levels author this value). */
+#define FISH_SPEED         70.0f
 #define FISH_JUMP_VY     -280.0f    /* upward jump impulse in px/s             */
 #define FISH_JUMP_MIN      1.4f     /* minimum seconds before next jump        */
 #define FISH_JUMP_MAX      3.0f     /* maximum seconds before next jump        */
@@ -60,7 +62,6 @@ typedef struct {
  * (BirdSpec in bird.h is the same idea for the two birds).
  */
 typedef struct {
-    float    speed;     /* horizontal patrol speed in px/s (positive)      */
     float    jump_vy;   /* upward jump impulse in px/s (negative = up)     */
     float    jump_min;  /* shortest wait before the next jump, in seconds  */
     float    jump_max;  /* longest wait before the next jump, in seconds   */

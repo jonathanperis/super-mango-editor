@@ -24,7 +24,9 @@
 #define FBIRD_ART_W          15      /* width  of visible art (cols 17..31)   */
 #define FBIRD_ART_Y          17      /* first visible row within each frame   */
 #define FBIRD_ART_H          14      /* height of visible art (rows 17..30)   */
-#define FBIRD_SPEED          80.0f   /* horizontal speed — nearly 2× the bird */
+/* FBIRD_SPEED — the usual speed, nearly 2x the bird, px/s; the level's vx
+ * is the speed actually used (shipped levels author this value). */
+#define FBIRD_SPEED          80.0f
 #define FBIRD_FRAME_MS       90      /* faster wing animation                 */
 
 /*

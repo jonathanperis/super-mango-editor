@@ -84,7 +84,8 @@ typedef struct {
  * SpiderPlacement — one ground-patrol spider.
  *
  * x            : starting world-space x.
- * vx           : starting velocity (sign encodes direction; use ±SPIDER_SPEED).
+ * vx           : patrol velocity in px/s; the sign is the starting direction
+ *                and the size is kept at every turn (usually ±SPIDER_SPEED).
  * patrol_x0/x1 : left and right patrol boundaries.
  * frame_index  : starting animation frame (0–2; vary for visual diversity).
  */

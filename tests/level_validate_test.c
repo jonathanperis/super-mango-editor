@@ -657,10 +657,12 @@ static int expect_patrols_fit_the_sprite(void)
     def.screen_count = 1;
     def.spider_count = 1;
     def.spiders[0].x = 100.0f;
+    def.spiders[0].vx = SPIDER_SPEED;
     def.spiders[0].patrol_x0 = 100.0f;
     def.spiders[0].patrol_x1 = 100.0f + SPIDER_FRAME_W;
     def.fish_count = 1;
     def.fish[0].x = 200.0f;
+    def.fish[0].vx = FISH_SPEED;
     def.fish[0].patrol_x0 = 200.0f;
     def.fish[0].patrol_x1 = 200.0f + FISH_RENDER_W;
     def.circular_saw_count = 1;
@@ -684,6 +686,60 @@ static int expect_patrols_fit_the_sprite(void)
     if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
         strstr(err, "fish[0].patrol") == NULL) {
         fprintf(stderr, "level_validate_test: narrow fish patrol accepted\n");
+        return 1;
+    }
+    return 0;
+}
+
+/*
+ * vx is an enemy's patrol speed for the whole level. 0 never moves, and a
+ * spider faster than MAX_PATROL_SPEED could step over a floor gap between
+ * two gap checks; both ends of the range are accepted, either direction.
+ */
+static int expect_patrol_speeds_are_bounded(void)
+{
+    LevelDef def;
+    char err[160];
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.spider_count = 1;
+    def.spiders[0].x = 100.0f;
+    def.spiders[0].patrol_x0 = 100.0f;
+    def.spiders[0].patrol_x1 = 300.0f;
+    def.bird_count = 1;
+    def.birds[0].x = 100.0f;
+    def.birds[0].base_y = 60.0f;
+    def.birds[0].vx = BIRD_SPEED;
+    def.birds[0].patrol_x0 = 100.0f;
+    def.birds[0].patrol_x1 = 300.0f;
+
+    const float accepted[] = {(float)MAX_PATROL_SPEED, -(float)MAX_PATROL_SPEED,
+                              SPIDER_SPEED, -0.5f};
+    for (size_t i = 0; i < sizeof(accepted) / sizeof(accepted[0]); i++) {
+        def.spiders[0].vx = accepted[i];
+        if (level_validate_runtime(&def, err, sizeof(err)) != 0) {
+            fprintf(stderr, "level_validate_test: spider vx %.1f rejected: %s\n",
+                    accepted[i], err);
+            return 1;
+        }
+    }
+    const float rejected[] = {0.0f, (float)MAX_PATROL_SPEED + 1.0f,
+                              -(float)MAX_PATROL_SPEED - 1.0f, NAN};
+    for (size_t i = 0; i < sizeof(rejected) / sizeof(rejected[0]); i++) {
+        def.spiders[0].vx = rejected[i];
+        if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+            strstr(err, "spiders.vx") == NULL) {
+            fprintf(stderr, "level_validate_test: spider vx %.1f accepted\n", rejected[i]);
+            return 1;
+        }
+    }
+    /* Birds and fish follow the same rule. */
+    def.spiders[0].vx = SPIDER_SPEED;
+    def.birds[0].vx = 0.0f;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+        strstr(err, "birds.vx") == NULL) {
+        fprintf(stderr, "level_validate_test: frozen bird accepted\n");
         return 1;
     }
     return 0;
@@ -949,6 +1005,7 @@ int main(void)
     if (expect_bouncepads_launch_upward() != 0) return 1;
     if (expect_rail_speeds_forward_and_bounded() != 0) return 1;
     if (expect_patrols_fit_the_sprite() != 0) return 1;
+    if (expect_patrol_speeds_are_bounded() != 0) return 1;
     if (expect_rejected_unsafe_paths() != 0) return 1;
 
     puts("level_validate_test: ok");

@@ -66,10 +66,13 @@ int sound_volume_for_distance(float dist, float audible_range, int max_volume)
  * right edge reaching patrol_x1, not the left edge overshooting it.
  * This prevents the entity from visually "sliding" past its turn point
  * before reversing.
+ *
+ * A turn only flips the sign of vx (-*vx). The speed itself is whatever the
+ * level authored, so a fast spider stays fast after its first turn instead
+ * of dropping to a built-in speed.
  */
 void patrol_update(float *x, float *vx, float entity_w,
-                   float patrol_x0, float patrol_x1,
-                   float speed, float dt)
+                   float patrol_x0, float patrol_x1, float dt)
 {
     /* Apply velocity × delta-time for frame-rate-independent movement. */
     *x += *vx * dt;
@@ -77,11 +80,11 @@ void patrol_update(float *x, float *vx, float entity_w,
     if (*vx > 0.0f && *x + entity_w >= patrol_x1) {
         /* Right edge reached patrol_x1 — snap and turn left. */
         *x  = patrol_x1 - entity_w;
-        *vx = -speed;
+        *vx = -*vx;
     } else if (*vx < 0.0f && *x <= patrol_x0) {
         /* Left edge reached patrol_x0 — snap and turn right. */
         *x  = patrol_x0;
-        *vx =  speed;
+        *vx = -*vx;
     }
 }
 
@@ -95,11 +98,17 @@ void patrol_update(float *x, float *vx, float entity_w,
  * it is about to step onto air, not one frame earlier or later.
  *
  * On a match we snap the entity back to the gap edge (based on travel
- * direction) and reverse velocity.  The 'break' exits after the first gap
- * match; an entity cannot straddle two gaps simultaneously at FLOOR_GAP_W=32.
+ * direction) and reverse velocity, keeping its speed.  The 'break' exits
+ * after the first gap match; an entity cannot straddle two gaps
+ * simultaneously at FLOOR_GAP_W=32.
+ *
+ * The art centre is only tested once per step, so this works only while one
+ * step moves the entity less than a gap width; otherwise it could be on one
+ * side of the gap in one step and past it in the next. The level validator
+ * enforces that with MAX_PATROL_SPEED (see game_constants.h).
  */
 void patrol_gap_reverse(float *x, float *vx,
-                        float art_x_offset, float art_w, float speed,
+                        float art_x_offset, float art_w,
                         const int *floor_gaps, int floor_gap_count, int floor_gap_w)
 {
     float art_center = *x + art_x_offset + art_w * 0.5f;
@@ -111,11 +120,11 @@ void patrol_gap_reverse(float *x, float *vx,
             if (*vx > 0.0f) {
                 /* Travelling right — snap left edge of art to gap left edge. */
                 *x  = gx - art_x_offset - art_w;
-                *vx = -speed;
+                *vx = -*vx;
             } else {
                 /* Travelling left — snap left edge of art to gap right edge. */
                 *x  = gx + gw - art_x_offset;
-                *vx =  speed;
+                *vx = -*vx;
             }
             break;
         }

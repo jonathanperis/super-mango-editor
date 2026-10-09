@@ -27,7 +27,9 @@
 #define JSPIDER_ART_W        25      /* width  of visible art (cols 20..44)   */
 #define JSPIDER_ART_Y        22      /* first visible row within each frame   */
 #define JSPIDER_ART_H        10      /* height of visible art (rows 22..31)   */
-#define JSPIDER_SPEED        55.0f   /* walk speed in logical px/s            */
+/* JSPIDER_SPEED — the usual walk speed, px/s; the level's vx is the speed
+ * actually used (shipped levels author this value). */
+#define JSPIDER_SPEED        55.0f
 #define JSPIDER_FRAME_MS     150     /* ms each animation frame is held       */
 
 /*

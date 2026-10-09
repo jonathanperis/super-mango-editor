@@ -91,6 +91,7 @@ The floor is drawn by repeating the active 48x48 floor tile across the full leve
 | `MAX_FLOOR_GAPS` | `16` | `int` | Maximum number of floor gaps per level |
 | `FLOOR_PIECE_W` | `TILE_SIZE / 3` (16) | `int` | Width of one floor piece; floor gaps must start on this grid |
 | `MAX_LEVEL_MOTION` | `10000` | `int` | Upper magnitude for authored motion values (speeds, accelerations) |
+| `MAX_PATROL_SPEED` | `FLOOR_GAP_W * TARGET_FPS / 2` (960) | `int` | Fastest enemy `vx` a level may set (px/s): half a floor gap per step, so spider gap checks cannot be skipped |
 
 ### Level Limits
 
@@ -256,7 +257,7 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 | `SPIDER_ART_W` | `25` | `int` | Width of visible art (cols 20-44) |
 | `SPIDER_ART_Y` | `22` | `int` | First visible row within each frame slot |
 | `SPIDER_ART_H` | `10` | `int` | Height of visible art (rows 22-31) |
-| `SPIDER_SPEED` | `50.0f` | `float` | Walk speed (px/s) |
+| `SPIDER_SPEED` | `50.0f` | `float` | Usual walk speed (px/s); the level's `vx` is used |
 | `SPIDER_FRAME_MS` | `150` | `int` | Milliseconds each animation frame is held |
 
 ---
@@ -313,7 +314,7 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 | `FISH_FRAME_H` | `48` | `int` | Height of one frame slot in the sheet (px) |
 | `FISH_RENDER_W` | `48` | `int` | On-screen render width in logical pixels |
 | `FISH_RENDER_H` | `48` | `int` | On-screen render height in logical pixels |
-| `FISH_SPEED` | `70.0f` | `float` | Horizontal patrol speed (px/s) |
+| `FISH_SPEED` | `70.0f` | `float` | Usual patrol speed (px/s); the level's `vx` is used |
 | `FISH_JUMP_VY` | `-280.0f` | `float` | Upward jump impulse (px/s) |
 | `FISH_JUMP_MIN` | `1.4f` | `float` | Minimum seconds before next jump |
 | `FISH_JUMP_MAX` | `3.0f` | `float` | Maximum seconds before next jump |
@@ -408,7 +409,7 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 | `JSPIDER_ART_W` | `25` | `int` | Width of visible art (cols 20-44) |
 | `JSPIDER_ART_Y` | `22` | `int` | First visible row within each frame |
 | `JSPIDER_ART_H` | `10` | `int` | Height of visible art (rows 22-31) |
-| `JSPIDER_SPEED` | `55.0f` | `float` | Walk speed (px/s) |
+| `JSPIDER_SPEED` | `55.0f` | `float` | Usual walk speed (px/s); the level's `vx` is used |
 | `JSPIDER_FRAME_MS` | `150` | `int` | Milliseconds per animation frame |
 | `JSPIDER_JUMP_VY` | `-200.0f` | `float` | Upward jump impulse (px/s) |
 | `JSPIDER_GRAVITY` | `600.0f` | `float` | Downward acceleration while airborne (px/s^2) |
@@ -426,7 +427,7 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 | `BIRD_ART_W` | `15` | `int` | Width of visible art (cols 17-31) |
 | `BIRD_ART_Y` | `17` | `int` | First visible row within each frame |
 | `BIRD_ART_H` | `14` | `int` | Height of visible art (rows 17-30) |
-| `BIRD_SPEED` | `45.0f` | `float` | Horizontal flight speed (px/s) |
+| `BIRD_SPEED` | `45.0f` | `float` | Usual flight speed (px/s); the level's `vx` is used |
 | `BIRD_FRAME_MS` | `140` | `int` | Milliseconds per wing animation frame |
 | `BIRD_WAVE_AMP` | `20.0f` | `float` | Sine-wave amplitude in logical pixels |
 | `BIRD_WAVE_FREQ` | `0.015f` | `float` | Sine phase in radians per pixel of horizontal travel |
@@ -436,7 +437,8 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 ## `faster_bird.h` Constants
 
 The faster bird is a `Bird` run by the same code in `bird.c`; only this
-tuning differs (passed as a `BirdSpec`).
+tuning differs (passed as a `BirdSpec`). `FBIRD_SPEED` is not part of it:
+the speed comes from each placement's `vx`.
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
@@ -447,7 +449,7 @@ tuning differs (passed as a `BirdSpec`).
 | `FBIRD_ART_W` | `15` | `int` | Width of visible art (cols 17-31) |
 | `FBIRD_ART_Y` | `17` | `int` | First visible row within each frame |
 | `FBIRD_ART_H` | `14` | `int` | Height of visible art (rows 17-30) |
-| `FBIRD_SPEED` | `80.0f` | `float` | Horizontal speed -- nearly 2x the slow bird |
+| `FBIRD_SPEED` | `80.0f` | `float` | Usual speed, nearly 2x the slow bird; the level's `vx` is used |
 | `FBIRD_FRAME_MS` | `90` | `int` | Faster wing animation (ms per frame) |
 | `FBIRD_WAVE_AMP` | `15.0f` | `float` | Tighter sine-wave amplitude (px) |
 | `FBIRD_WAVE_FREQ` | `0.025f` | `float` | Higher frequency -- more erratic curves |
@@ -557,11 +559,12 @@ tuning differs (passed as a `BirdSpec`).
 
 The faster fish shares the `FISH_*` sprite, render and hitbox sizes and the
 update code in `fish.c`; only this tuning differs (passed as a `FishSpec`).
+`FFISH_SPEED` is not part of it: the speed comes from each placement's `vx`.
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
 | `MAX_FASTER_FISH` | `16` | `int` | Maximum faster fish instances per level |
-| `FFISH_SPEED` | `120.0f` | `float` | Patrol speed (px/s) |
+| `FFISH_SPEED` | `120.0f` | `float` | Usual patrol speed (px/s); the level's `vx` is used |
 | `FFISH_JUMP_VY` | `-420.0f` | `float` | Jump impulse (px/s) |
 | `FFISH_JUMP_MIN` | `1.0f` | `float` | Minimum delay between jumps (s) |
 | `FFISH_JUMP_MAX` | `2.2f` | `float` | Maximum delay between jumps (s) |

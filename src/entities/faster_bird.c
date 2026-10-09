@@ -15,7 +15,6 @@ static const BirdSpec s_faster_bird = {
     FBIRD_ART_W,
     FBIRD_ART_H,
     FBIRD_FRAME_MS,
-    FBIRD_SPEED,
     FBIRD_WAVE_AMP,
     FBIRD_WAVE_FREQ
 };

@@ -488,6 +488,43 @@ done:
     return failed;
 }
 
+/*
+ * The fixture spider is authored at -150 px/s, three times SPIDER_SPEED. It
+ * must keep that speed after turning at the floor gap and at its patrol end;
+ * the old code dropped it to SPIDER_SPEED at the first turn.
+ */
+static int spider_keeps_its_authored_speed(void)
+{
+    int failed = 0;
+    GameState gs;
+    CHECK(mechanics_open_level(&gs, CREATURES_LEVEL, 0) == 0);
+    CHECK(gs.spider_count == 1);
+    Spider *spider = &gs.spiders[0];
+    const float gap = (float)gs.floor_gaps[0];
+    CHECK(spider->vx == -150.0f);
+    stand_at(&gs, 1000.0f);
+
+    int gap_turn = 0, end_turn = 0;
+    for (int step = 0; step < 4 * STEPS_PER_SECOND && !end_turn; step++) {
+        float before = spider->vx;
+        mechanics_step(&gs, 0, 1);
+        if (before < 0.0f && spider->vx > 0.0f) gap_turn = 1;
+        if (gap_turn && before > 0.0f && spider->vx < 0.0f) end_turn = 1;
+        CHECK(fabsf(spider->vx) == 150.0f);
+        /* Never over the hole: the gap check still catches it every step. */
+        float centre = spider->x + SPIDER_ART_X + SPIDER_ART_W / 2.0f;
+        CHECK(centre < gap || centre >= gap + FLOOR_GAP_W);
+    }
+    CHECK(gap_turn && end_turn);
+    CHECK(NEAR(spider->x + SPIDER_FRAME_W, 400.0f, 0.01f));
+    /* A full step later it has walked 150 / 60 = 2.5 px back. */
+    mechanics_step(&gs, 0, 1);
+    CHECK(NEAR(spider->x + SPIDER_FRAME_W, 397.5f, 0.01f));
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
 static int fish_leap_from_the_water_and_patrol(void)
 {
     int failed = 0;
@@ -711,6 +748,7 @@ int main(void)
         CASE(spikes_hurt_once_per_invincibility),
         CASE(spike_blocks_follow_their_rails),
         CASE(jumping_spider_leaps_the_gap),
+        CASE(spider_keeps_its_authored_speed),
         CASE(fish_leap_from_the_water_and_patrol),
         CASE(birds_patrol_at_their_own_speeds),
         CASE(bridge_crumbles_under_the_player),
