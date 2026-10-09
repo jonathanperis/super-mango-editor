@@ -147,24 +147,6 @@ jobs:
             libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             xvfb libgl1-mesa-dri pulseaudio zenity
 
-      # Compiled raylib for the debug/test tree only; release archives always
-      # build raylib from source (dist-native uses out/release/raylib). See
-      # the sanitizers job for why a restored tree is safe to reuse.
-      - name: Fingerprint the raylib toolchain (Linux)
-        id: toolchain
-        if: matrix.target == 'native' && runner.os == 'Linux'
-        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; clang --version; cmake --version; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache compiled raylib (Linux)
-        if: matrix.target == 'native' && runner.os == 'Linux'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            out/raylib
-            !out/raylib/raylib-*/examples
-            !out/raylib/raylib-*/projects
-          key: raylib-build-linux-debug-${{ steps.toolchain.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py', 'Makefile') }}
-
       - name: Start rendered-test display and audio (Linux)
         if: matrix.target == 'native' && runner.os == 'Linux'
         run: |
@@ -219,6 +201,37 @@ jobs:
         run: |
           "$MANGO_CC" --version
           pacman -Q mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake
+
+      # Compiled raylib for the debug/test trees only: out/raylib (desktop)
+      # and, on macOS and Windows, out/headless/raylib (Memory backend tests).
+      # Without this, Windows compiled raylib from scratch two or three times
+      # per job. Release archives always build raylib from source (dist-native
+      # uses out/release/raylib). See the sanitizers job for why a restored
+      # tree is safe to reuse. The fingerprint covers the compiler this leg
+      # actually uses (MANGO_CC), so the MSYS2 toolchain runs in its shell.
+      - name: Fingerprint the raylib toolchain (Linux / macOS)
+        id: toolchain
+        if: matrix.target == 'native' && runner.os != 'Windows'
+        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; "$MANGO_CC" --version; cmake --version; } | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Fingerprint the raylib toolchain (Windows)
+        id: toolchain-windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; "$MANGO_CC" --version; cmake --version; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache compiled raylib
+        if: matrix.target == 'native'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            out/raylib
+            !out/raylib/raylib-*/examples
+            !out/raylib/raylib-*/projects
+            out/headless/raylib
+            !out/headless/raylib/raylib-*/examples
+            !out/headless/raylib/raylib-*/projects
+          key: raylib-build-${{ runner.os }}-debug-${{ steps.toolchain.outputs.id || steps.toolchain-windows.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py', 'Makefile') }}
 
       # ── Emscripten SDK install (WebAssembly) ────────────────────────────────
       # The same emcc toolchain builds raylib's Web backend and the application.
@@ -634,12 +647,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Python
-        if: runner.os != 'Windows'
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
-
+      # No Setup Python step: this matrix is Windows-only and MSYS2's UCRT64
+      # Python (installed below) runs the tools, as in the other Windows jobs.
       - name: Cache pinned raylib source archive
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -719,11 +728,14 @@ jobs:
   # ────────────────────────────────────────────────────────────────────────────
   # CHECKSUMS AND PROVENANCE JOB
   # Only this job can mint OIDC tokens and write attestations. It runs no
-  # third-party actions and does not get repository write access.
+  # third-party actions and does not get repository write access. It waits
+  # for every job the release waits for, so a failing gate mints nothing.
   # ────────────────────────────────────────────────────────────────────────────
   provenance:
     name: Checksums and provenance
-    needs: build
+    # The same gates as the release job (minus provenance itself), so no
+    # attestation is minted for archives that a failing gate keeps unpublished.
+    needs: [build, sanitizers]
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -557,8 +557,9 @@ Every job sets `timeout-minutes`. Every native leg (Clang and GCC) passes
 `EXTRA_CFLAGS=-Werror` and the WebAssembly leg `EXTRA_WEB_CFLAGS=-Werror`.
 The release job needs the legs that ship an archive (`build`), the
 `Sanitizers (Linux x86_64)` job (which used to be part of the Linux leg) and
-`provenance`; the Windows Clang and `Desktop backend` jobs report separately
-and never block a release.
+`provenance`, which itself waits for `build` and the sanitizers so it never
+attests archives a failing gate blocks; the Windows Clang, `Desktop backend`
+and `Coverage (Linux x86_64)` jobs report separately and never block a release.
 
 **Toolchain drift under `-Werror`.** Linux/macOS use the runner image's
 compilers and the WebAssembly leg pins Emscripten 6.0.9, but Windows uses
@@ -577,12 +578,14 @@ paths through `editor_path_for_display()` and checks `snprintf` results where
 truncation would change behaviour. Build jobs use Python 3.12 from
 `actions/setup-python` on Linux/macOS (MSYS2 supplies Python on Windows) and
 restore the pinned raylib source archive from `actions/cache` via
-`RAYLIB_ARCHIVE`; the archive is SHA-256 verified on every use. The Linux
-build leg and the sanitizers job also cache their compiled debug/sanitizer
-raylib trees (never the release tree that ships). CMake records absolute paths
-and per-compiler settings, so the key must match exactly: it covers the pin,
-patches, `Makefile`, `tools/build_raylib.py`, runner image, workspace path and
-the clang/CMake versions. `make` still runs `build_raylib.py` on a restored
+`RAYLIB_ARCHIVE`; the archive is SHA-256 verified on every use. Every native
+build leg (Linux, macOS and Windows) caches its compiled debug raylib trees
+(`out/raylib`, plus `out/headless/raylib` for the Memory-backend tests), and the
+sanitizers job caches its sanitizer tree; the release tree that ships is never
+cached. CMake records absolute paths and per-compiler settings, so the key must
+match exactly: it covers the pin, patches, `Makefile`, `tools/build_raylib.py`,
+runner image, workspace path and the leg's compiler (`MANGO_CC`) and CMake
+versions. `make` still runs `build_raylib.py` on a restored
 tree, which re-verifies the archive and re-runs CMake; CMake then rebuilds
 anything its own dependency tracking finds stale.
 
