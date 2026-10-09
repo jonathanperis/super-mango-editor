@@ -1224,6 +1224,74 @@ static int nearest_surface_is_order_independent(void)
  * its path, its hash and a running experiment recording exactly as they
  * were; a successful one swaps in the new definition in one step.
  */
+/*
+ * Level Select lists every campaign level with the player's best time and
+ * coins from the profile, and marks the ones already cleared. A broken
+ * entry stays listed, greyed out, and shows no result.
+ */
+static int level_select_lists_best_results(void)
+{
+    CampaignCatalog catalog = {0};
+    static GameProfile profile;
+    StartMenu *menu = NULL;
+    StartMenuLevelRow row;
+    char time[16];
+    int failed = 1;
+
+    if (campaign_catalog_load(CAMPAIGN_MANIFEST_PATH, &catalog) || catalog.count < 3) goto done;
+    menu = start_menu_create(&catalog);
+    if (!menu) goto done;
+    game_profile_init(&profile);
+    menu->profile = &profile;
+    if (game_profile_record(&profile, catalog.levels[1].path, 150, 3, 65.25f) ||
+        game_profile_record(&profile, catalog.levels[2].path, 90, 1, 30.0f))
+        goto done;
+    catalog.levels[2].available = 0;  /* as if its file had broken since */
+
+    start_menu_level_row(menu, 0, &row);
+    if (expect_int("uncleared level", row.cleared, 0) ||
+        expect_int("uncleared time", strcmp(row.time, "--"), 0) ||
+        expect_int("uncleared coins", strcmp(row.coins, "--"), 0) ||
+        expect_int("uncleared name", strcmp(row.name, catalog.levels[0].display_name), 0))
+        goto done;
+    start_menu_level_row(menu, 1, &row);
+    char coins[16];
+    snprintf(coins, sizeof(coins), "3/%d", catalog.levels[1].level.coin_count);
+    if (expect_int("cleared level", row.cleared, 1) ||
+        expect_int("cleared available", row.available, 1) ||
+        expect_int("cleared time", strcmp(row.time, "1:05.25"), 0) ||
+        expect_int("cleared coins", strcmp(row.coins, coins), 0))
+        goto done;
+    start_menu_level_row(menu, 2, &row);
+    if (expect_int("broken entry greyed", row.available, 0) ||
+        expect_int("broken entry shows no result", row.cleared, 0))
+        goto done;
+
+    start_menu_format_time(59.996f, time, sizeof(time));
+    if (expect_int("rounding carries into minutes", strcmp(time, "1:00.00"), 0)) goto done;
+    start_menu_format_time(0.0f, time, sizeof(time));
+    if (expect_int("zero time", strcmp(time, "0:00.00"), 0)) goto done;
+    start_menu_format_time(-1.0f, time, sizeof(time));
+    if (expect_int("no time", strcmp(time, "--"), 0)) goto done;
+
+    /* A click on the second list row selects that level (Play starts it),
+     * and the frame with results and a broken row draws without trouble. */
+    input_clear();
+    InputEvent click = {.type=INPUT_MOUSE_DOWN,.button=MOUSE_BUTTON_LEFT,.x=200,.y=84+15+7};
+    input_push(&click);
+    if (expect_int("menu frame presents", start_menu_frame(menu), 1) ||
+        expect_int("row click selects", menu->selected_level, 1) ||
+        expect_int("row click does not play", menu->route, MENU_ROUTE_NONE) ||
+        expect_int("row click path", strcmp(menu->selected_level_path, catalog.levels[1].path), 0))
+        goto done;
+    failed = 0;
+done:
+    start_menu_close(&menu);
+    campaign_catalog_cleanup(&catalog);
+    game_profile_close(&profile);
+    return failed;
+}
+
 static int failed_next_phase_keeps_the_current_level(void)
 {
     GameState gs = {0};
@@ -1310,7 +1378,8 @@ int main(void)
         CASE(web_frame_pacing_contract_test),
         CASE(game_simulation_contract_test), CASE(game_profile_contract_test),
         CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),
-        CASE(menu_mouse_and_path_boundaries), CASE(collision_lifetime_and_pickups),
+        CASE(menu_mouse_and_path_boundaries), CASE(level_select_lists_best_results),
+        CASE(collision_lifetime_and_pickups),
         CASE(coins_stay_collected_across_life_loss), CASE(settings_keep_music_paused_after_refocus),
         CASE(fixed_step_accumulator_contract), CASE(bouncepad_lists_select_the_landed_pad),
         CASE(nearest_surface_is_order_independent), CASE(phase_resets_transient_state),

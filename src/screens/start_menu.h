@@ -48,6 +48,28 @@ typedef struct {
     struct SettingsMenu *settings_menu;
 } StartMenu;
 
+/*
+ * StartMenuLevelRow — what the Level Select list shows for one campaign
+ * entry: its name and the player's best results from the profile. Building
+ * the text apart from drawing it lets the tests read exactly what a row says.
+ */
+typedef struct {
+    char name[CAMPAIGN_DISPLAY_NAME_SIZE];
+    char time[16];   /* best time as m:ss.cc ("1:05.25"), "--" before a clear */
+    char coins[16];  /* best coins of the level's total ("5/12"), "--" before */
+    int  cleared;    /* 1 = the profile records a finished run of this level */
+    int  available;  /* 0 = broken entry: drawn greyed out, cannot be played */
+} StartMenuLevelRow;
+
+/* How many list rows fit between the logo and the Play button. */
+#define START_MENU_LIST_ROWS 5
+
+/* Fill row for catalog entry index (index must be < catalog->count). */
+void start_menu_level_row(const StartMenu *menu, size_t index, StartMenuLevelRow *row);
+
+/* Write seconds as m:ss.cc, rounded to hundredths ("--" when negative). */
+void start_menu_format_time(float seconds, char *out, size_t size);
+
 /* Initialise the start menu: load font and logo. */
 int start_menu_init(StartMenu *menu);
 

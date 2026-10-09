@@ -369,9 +369,9 @@ Resolves respawn state without mutating `LevelDef`. With authored records, the g
 
 ## `screens/start_menu.h` / `screens/start_menu.c`
 
-**Role:** Start menu screen with centred title text, `start_menu_logo.png`, and a wrapped selector backed by the validated ordered catalog from `levels/campaigns/main.toml`. Entries whose level file failed to load stay listed but disabled, with their reason; Play refuses them. The AppSession can reopen it after a terminal **Level Select** action without restarting the process.
+**Role:** Start menu screen with `start_menu_logo.png` and a wrapped level list backed by the validated ordered catalog from `levels/campaigns/main.toml`. Each row shows the profile's cleared mark, best time (`m:ss.cc`) and best coins (`start_menu_level_row`). Entries whose level file failed to load stay listed but greyed out, with their reason; Play refuses them. The AppSession can reopen it after a terminal **Level Select** action without restarting the process.
 
-**Key functions:** `start_menu_create`, `start_menu_frame`, `start_menu_get_input_state`, `start_menu_close`
+**Key functions:** `start_menu_create`, `start_menu_frame`, `start_menu_level_row`, `start_menu_format_time`, `start_menu_get_input_state`, `start_menu_close`
 
 ### `core/game_terminal.h` / `core/game_terminal.c`
 
