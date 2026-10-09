@@ -126,7 +126,8 @@ SHARED_DIR    = src/shared
 VENDOR_DIR    = vendor/tomlc17
 EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(wildcard $(SHARED_DIR)/*.c) $(VENDOR_DIR)/tomlc17.c \
                 src/surfaces/rail.c src/levels/level_validate.c src/levels/level_ref.c \
-                src/levels/level_start.c src/input/input_backend.c
+                src/levels/level_start.c src/levels/campaign_catalog.c src/levels/level_path.c \
+                src/input/input_backend.c
 EDITOR_OBJS   = $(patsubst %.c,$(OBJDIR)/%.o,$(EDITOR_SRCS))
 EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor
@@ -189,7 +190,7 @@ TEST_GAME_CHECKPOINT_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/core/game_checkpoint.o
 TEST_HUD_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/screens/hud.o
 TEST_EDITOR_UI_OBJ = $(TEST_OBJDIR)/$(SHARED_DIR)/ui.o
 TEST_EDITOR_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor_validation editor_files \
-                   editor_recovery editor_session editor_undo_apply entity_meta) \
+                   editor_recovery editor_session editor_undo_apply entity_meta editor_campaign) \
                    $(TEST_EDITOR_UI_OBJ) \
                    $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,tools hit_test editor_clipboard \
                    editor_events canvas editor_panels editor_layout palette properties \
@@ -601,8 +602,10 @@ $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
 $(OUTDIR)/runtime-load-test $(OUTDIR)/editor-validation-test \
 $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/levels/level_ref.o
 
-# "Playtest from here" checks a start point with the game's own rules.
-$(OUTDIR)/editor-validation-test $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/levels/level_start.o
+# "Playtest from here" checks a start point with the game's own rules, and
+# the Campaign view checks the manifest with them.
+$(OUTDIR)/editor-validation-test $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/levels/level_start.o \
+		$(OBJDIR)/src/levels/campaign_catalog.o $(OBJDIR)/src/levels/level_path.o
 
 $(OUTDIR)/level-validate-test: $(TEST_SOURCE_DIR)/level_validate_test.o $(TEST_VALIDATE_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)

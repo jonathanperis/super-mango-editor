@@ -2,6 +2,7 @@
  * commands and toolbar actions share the same transactional editor helpers. */
 #include "editor_events.h"
 #include "canvas.h"
+#include "editor_campaign.h"
 #include "editor_clipboard.h"
 #include "editor_files.h"
 #include "editor_recovery.h"
@@ -99,6 +100,21 @@ static void editor_key(EditorState *es, const InputEvent *event)
         }
         return;
     }
+    /* The Campaign view covers the canvas: a level shortcut there would
+     * change a document the designer cannot see.  It takes Esc (close),
+     * Ctrl+S (save the campaign) and Ctrl+M (close) only. */
+    if (es->campaign && !es->ui.active_id) {
+        if (key == KEY_ESCAPE || (ctrl && key == KEY_M))
+            (void)editor_campaign_close(es, 0);
+        else if (ctrl && key == KEY_S)
+            (void)editor_campaign_save(es);
+        else if (key != KEY_LEFT_SHIFT && key != KEY_RIGHT_SHIFT &&
+                 key != KEY_LEFT_CONTROL && key != KEY_RIGHT_CONTROL &&
+                 key != KEY_LEFT_ALT && key != KEY_RIGHT_ALT &&
+                 key != KEY_LEFT_SUPER && key != KEY_RIGHT_SUPER)
+            editor_set_status(es, "Campaign view: Esc or Close returns to the level");
+        return;
+    }
     if (es->ui.active_id && ctrl && (key == KEY_C || key == KEY_V)) {
         if (key == KEY_C) SetClipboardText(es->ui.edit_buf);
         else {
@@ -151,6 +167,9 @@ static void editor_key(EditorState *es, const InputEvent *event)
             break;
         case KEY_D:
             if (editor_finish_field_edit(es)) editor_duplicate_selection(es);
+            break;
+        case KEY_M:
+            (void)editor_campaign_open(es, NULL);
             break;
         default:
             break;
@@ -310,6 +329,8 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
 
     switch (event->type) {
     case INPUT_QUIT:
+        /* Unsaved campaign edits are asked about first, like Close does. */
+        if (!editor_campaign_close(es, 0)) break;
         if (editor_confirm_discard_changes(es, "quit")) {
             editor_retire_current_recovery(es);
             if (es->playing) editor_stop_play(es);
@@ -329,7 +350,10 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
              * placing or deleting under it as well would be a surprise. */
             if (ui_press(&es->ui)) break;
             es->mouse_down = 1;
-            if (canvas_contains(event->x, event->y) && editor_finish_field_edit(es))
+            /* Over the Campaign view the canvas tools are asleep; its
+             * widgets read the click from ui.mouse_clicked. */
+            if (canvas_contains(event->x, event->y) && !es->campaign &&
+                editor_finish_field_edit(es))
                 tools_mouse_down(es, wx, wy);
         } else if (event->button == MOUSE_BUTTON_RIGHT) {
             es->mouse_right_down = 1;
@@ -337,7 +361,7 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
              * the array under drag_index, so the drag would then overwrite a
              * different entity. Finish (release) the drag first. The same
              * goes for a click under an open dropdown list. */
-            if (!es->dragging && es->ui.dropdown_open_id == 0 &&
+            if (!es->dragging && es->ui.dropdown_open_id == 0 && !es->campaign &&
                 canvas_contains(event->x, event->y) &&
                 editor_finish_field_edit(es))
                 tools_right_click(es, wx, wy);
@@ -357,7 +381,9 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         /* The panels take the wheel as a float: a trackpad's small
          * fractions add up there instead of being cut to 0 here. */
         if (editor_handle_side_panel_scroll(es, event->x, event->y, event->wheel)) break;
-        if (canvas_contains(event->x, event->y)) editor_canvas_wheel(es, event);
+        if (es->campaign && canvas_contains(event->x, event->y))
+            editor_campaign_wheel(es, event->wheel);
+        else if (canvas_contains(event->x, event->y)) editor_canvas_wheel(es, event);
         break;
     default: break;
     }

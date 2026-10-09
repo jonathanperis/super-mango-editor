@@ -15,6 +15,7 @@
 #pragma once
 
 #include <stddef.h> /* size_t */
+#include <stdio.h>  /* FILE, for SerializerEmitFn */
 
 #include "../levels/level.h" /* LevelDef and all placement structs */
 #include "serializer_io.h"   /* SerializerFileFingerprint */
@@ -23,6 +24,18 @@ typedef enum {
     SERIALIZER_SAVE_REPLACE = 0,
     SERIALIZER_SAVE_CREATE_ONLY = 1
 } SerializerSavePolicy;
+
+/* Prints a file's whole contents into fp (see serializer_save_file). */
+typedef void (*SerializerEmitFn)(FILE *fp, const void *context);
+
+/*
+ * serializer_save_file — Save any text file the way a level is saved:
+ * emit(fp, context) writes a sibling temporary file, which then replaces
+ * `path` in one step, so a failure leaves the old file whole.  Used for
+ * the campaign manifest.  Returns 0, -1, or SERIALIZER_REPLACE_TEMP_KEPT.
+ */
+int serializer_save_file(const char *path, SerializerEmitFn emit,
+                         const void *context);
 
 /* ------------------------------------------------------------------ */
 /* File I/O                                                            */

@@ -6,6 +6,7 @@
  * editor_events.c translates commands into document/history operations.
  */
 #include "editor.h"
+#include "editor_campaign.h"  /* editor_campaign_free */
 #include "editor_frame.h"
 #include "editor_files.h"
 #include "editor_session.h"
@@ -73,6 +74,7 @@ void editor_loop(EditorState *es)
 
 void editor_cleanup(EditorState *es)
 {
+    editor_campaign_free(es);
     /* Release cached labels and textures while their GPU context is alive.
      * UIState borrows the font; it must not be used after font_unload. */
     ui_cleanup(&es->ui);

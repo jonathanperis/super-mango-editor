@@ -15,6 +15,7 @@ code-scanning alert (#308, #309). Goal was to resolve both codebase audit rounds
 | Campaign selector + direct TOML load | Shipped | bare launch reads `levels/campaigns/main.toml` in Creator's Playground (sandbox) → Volcanic Depths 1 → 2 order; `make run-level LEVEL=levels/labs/01_collision.toml` bypasses it |
 | Authored checkpoints | Shipped | Optional `[[checkpoints]]` use exact x/y respawns; records disable legacy screen-boundary fallback |
 | Standalone editor | Shipped | `make editor`, `make run-editor`; palette/canvas/properties/undo/playtest support checkpoints |
+| Campaign editing | Shipped | Editor Campaign view (`Ctrl+M`) reorders, adds, removes, renames and relinks manifest entries with the game's campaign rules (`src/levels/campaign_catalog.c`); `editor_validation_test` / `editor_ui_test` cover it |
 | Tests | Shipped | `make test` runs 17 native binaries, a parser allocation probe, and Python/Node host checks (levels, sounds, parser encoding, web host, packaging, SARIF filter) |
 | Level validation | Shipped | `make validate-levels` |
 | CI smoke gates | Shipped | Native game/editor smoke, scripted replay smoke and WebAssembly artifact smoke in `build.yml` |
@@ -43,6 +44,5 @@ code-scanning alert (#308, #309). Goal was to resolve both codebase audit rounds
 
 ## Backlog
 
-- Campaign-manifest editing in the visual editor.
 - Boss encounters.
 - Power-up system.

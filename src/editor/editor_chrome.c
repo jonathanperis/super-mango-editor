@@ -8,6 +8,7 @@
 #include <stdio.h> /* snprintf */
 
 #include "canvas.h"            /* canvas_set_zoom, canvas_screen_to_world */
+#include "editor_campaign.h"   /* the Campaign view's button */
 #include "editor_files.h"      /* editor file/save helpers */
 #include "editor_playtest.h"   /* editor_play_test/editor_stop_play */
 #include "editor_session.h"    /* editor reset/confirm helpers */
@@ -19,7 +20,7 @@
  * editor_render_toolbar — Draw the top toolbar (32 px tall, full width).
  *
  * Layout from left to right:
- *   [Select] [Place] [Delete] | [Grid] | [Debug] | Zoom | file buttons
+ *   [Select] [Place] [Delete] | [Grid] | [Debug] | Zoom | [Campaign] | file buttons
  */
 void editor_render_toolbar(EditorState *es)
 {
@@ -82,6 +83,14 @@ void editor_render_toolbar(EditorState *es)
                     zoom_opts, zoom_count, &sel)) {
         /* Zoom around the canvas centre so the view stays on the same area. */
         canvas_set_zoom(es, (float)zoom_vals[sel], CANVAS_W / 2, TOOLBAR_H + CANVAS_H / 2);
+    }
+
+    /* The Campaign view (Ctrl+M) covers the canvas; the button closes it
+     * again (asking first about unsaved campaign edits). */
+    bx += 88;
+    if (ui_button(&es->ui, bx, by, 84, bh, es->campaign ? "[Campaign]" : "Campaign")) {
+        if (es->campaign) (void)editor_campaign_close(es, 0);
+        else (void)editor_campaign_open(es, NULL);
     }
 
     int rx = EDITOR_W - 4 - 52;

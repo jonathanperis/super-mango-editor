@@ -78,6 +78,7 @@ src/
 │   ├── editor_recovery.h / .c    Autosave snapshots and crash recovery (find, offer, load and retire them)
 │   ├── editor_session.h / .c     Dirty state, staged-edit/save decisions and document hashing
 │   ├── editor_playtest.h / .c    Save and launch a playtest, poll it, stop (kill) it
+│   ├── editor_campaign.h / .c    Campaign view: reorder, add, remove, rename and relink the levels/campaigns/main.toml entries
 │   ├── editor_clipboard.h / .c   Copy/paste; a rail rider re-attaches to its rail by shape and position
 │   ├── editor_validation.h / .c  Level validation report helpers
 │   ├── editor_undo_apply.h / .c  Undo operation application
@@ -143,7 +144,8 @@ src/
 │   ├── level_physics.h / .c      Level physics override/default helpers
 │   ├── level_ref.h / .c          Shared levels/<name>.toml rule for next_phase, campaigns and profile keys
 │   ├── level_resources.h / .c    Per-level resource reload wrappers
-│   ├── level_session.h / .c      Active LevelDef storage plus v1 campaign catalog loading/validation
+│   ├── level_session.h / .c      Active LevelDef storage, initial load and phase transitions
+│   ├── campaign_catalog.h / .c   v1 campaign manifest: loading, the campaign rules, and saving (shared with the editor)
 │   ├── level_start.h / .c        Playtest start points (--start-x / --start-checkpoint), shared with the editor
 │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
 │   └── level_validate.h / .c     LevelDef count, schema-range and geometry validation
@@ -585,6 +587,10 @@ Shared physics override/default helpers for player movement and camera lookahead
 ### `levels/level_ref.h` / `levels/level_ref.c`
 
 `level_ref_valid()` defines the one level-reference rule shared by `[last_star].next_phase`, campaign manifest entries and profile result keys: a direct `levels/<name>.toml` child without subdirectories, Windows-reserved characters or device names. `tools/validate_levels.py` mirrors it.
+
+### `levels/campaign_catalog.h` / `levels/campaign_catalog.c`
+
+The campaign manifest (`levels/campaigns/main.toml`) and its catalog. `campaign_catalog_load()` is what the start menu calls: `campaign_catalog_read()` parses the manifest (version, a nonempty list of valid, unrepeated `levels/<name>.toml` paths) and loads each listed level with `campaign_entry_load()`, then the order rule (each `next_phase` names the next entry, the last none) marks entries unavailable, and a catalog with nothing playable is refused. The editor's Campaign view applies the same rules to its edited, in-memory catalog with `campaign_catalog_check()` and writes the list with `campaign_manifest_save()`, which goes through the serializer's atomic `serializer_save_file()` like a level save.
 
 ### `levels/level_start.h` / `levels/level_start.c`
 
