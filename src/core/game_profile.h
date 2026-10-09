@@ -17,11 +17,12 @@ typedef enum {
 typedef struct {
     int music_volume, effects_volume, muted, dead_zone, window_scale;
     int high_contrast, reduced_motion;
+    int ghost;      /* 1 = draw the time-trial ghost of the best run (format 2) */
     int keys[PROFILE_ACTION_COUNT]; /* version-1 wire IDs, translated at input */
     int buttons[PROFILE_ACTION_COUNT];
 } GameSettings;
 
-#define GAME_SETTINGS_DEFAULTS {128,128,0,8000,2,0,0, \
+#define GAME_SETTINGS_DEFAULTS {128,128,0,8000,2,0,0,1, \
     {BINDING_KEY_A,BINDING_KEY_D,BINDING_KEY_W,BINDING_KEY_S,BINDING_KEY_SPACE,BINDING_KEY_LEFT_SHIFT}, \
     {PAD_LEFT,PAD_RIGHT,PAD_UP,PAD_DOWN,PAD_A,PAD_RIGHT_SHOULDER}}
 
@@ -33,8 +34,9 @@ typedef struct {
 
 /*
  * The profile file's format_version. Version 2 added the optional [resume]
- * table (the Continue point). A version-1 profile still loads: it simply
- * has no Continue point, and the next save writes it as version 2.
+ * table (the Continue point) and the `ghost` setting. A version-1 profile
+ * still loads: it has no Continue point, the ghost setting takes its
+ * default (on), and the next save writes it as version 2.
  */
 #define PROFILE_FORMAT_VERSION 2
 

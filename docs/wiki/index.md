@@ -22,7 +22,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 
 | Page | Description |
 |------|-------------|
-| [Architecture](architecture/) | Game loop, init/loop/cleanup pattern, GameState container, 32-layer render order |
+| [Architecture](architecture/) | Game loop, init/loop/cleanup pattern, GameState container, 33-layer render order |
 | [Controls & Input](controls/) | Keyboard, gamepad, browser/WASM, replay, smoke, and runtime flag reference |
 | [Testing & Smoke Matrix](testing/) | Which local/CI checks to run for runtime, editor, docs, WASM, and release changes |
 | [Source Files](source-files/) | Module-by-module reference for every `.c` / `.h` file |
@@ -57,7 +57,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 ## Key Features
 
 - 2D side-scrolling platformer with dynamic multi-screen worlds (configurable via `screen_count`)
-- 32 render layers drawn back-to-front with per-level configurable parallax backgrounds
+- 33 render layers drawn back-to-front with per-level configurable parallax backgrounds
 - Fixed-time-step physics (1/60 s steps fed by an accumulator); `make timing-lab` shows why variable steps made results depend on the frame rate
 - Six enemy types (spider, jumping spider, bird, faster bird, fish, faster fish)
 - Seven hazard types (spike, spike block, spike platform, circular saw, axe trap, blue flame, fire flame)

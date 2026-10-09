@@ -328,7 +328,7 @@ int game_profile_decode(GameProfileData *out, const char *text)
     toml_result_t parsed = toml_parse(text, (int)strlen(text));
     if (!parsed.ok) { toml_free(parsed); return -1; }
     GameProfileData *data = calloc(1, sizeof(*data));
-    int ok = 0, version = 0, has_resume = 0;
+    int ok = 0, version = 0, has_version2_field = 0;
     if (!data) goto done;
     data->settings = (GameSettings)GAME_SETTINGS_DEFAULTS;
     for (int i = 0; i < parsed.toptab.u.tab.size; i++) {
@@ -343,13 +343,18 @@ int game_profile_decode(GameProfileData *out, const char *text)
         else FIELD("window_scale", window_scale)
         else FIELD("high_contrast", high_contrast)
         else FIELD("reduced_motion", reduced_motion)
+        else if (!strcmp(key, "ghost")) {
+            if (integer(value, &data->settings.ghost)) goto done;
+            has_version2_field = 1;
+        }
         else if (!strcmp(key, "format_version")) {
-            /* Version 1 (no Continue point) still loads; see game_profile.h. */
+            /* Version 1 (no Continue point, no ghost setting) still loads;
+             * see game_profile.h. */
             if (integer(value, &version) || version < 1 || version > PROFILE_FORMAT_VERSION) goto done;
         }
         else if (!strcmp(key, "resume")) {
             if (decode_resume(value, &data->resume)) goto done;
-            has_resume = 1;
+            has_version2_field = 1;
         }
         else if (!strcmp(key, "keys")) { if (bindings(value, &data->settings, 1)) goto done; }
         else if (!strcmp(key, "buttons")) { if (bindings(value, &data->settings, 0)) goto done; }
@@ -383,8 +388,10 @@ int game_profile_decode(GameProfileData *out, const char *text)
 #undef FIELD
     }
     reset_debug_reserved_keys(&data->settings);
-    /* [resume] arrived with version 2; a version-1 file never had one. */
-    if (version < 1 || (version == 1 && has_resume) || !game_settings_valid(&data->settings)) goto done;
+    /* `ghost` and [resume] arrived with version 2; a version-1 file never
+     * had them, so finding one there means the file is damaged. A version-1
+     * file keeps the version-2 defaults: ghost on, no Continue point. */
+    if (version < 1 || (version == 1 && has_version2_field) || !game_settings_valid(&data->settings)) goto done;
     *out = *data;
     ok = 1;
 done:
@@ -425,9 +432,10 @@ int game_profile_encode(const GameProfileData *data, char *text, size_t capacity
     const GameSettings *s = &data->settings;
     if (append(text, capacity, &used,
                "format_version = %d\nmusic_volume = %d\neffects_volume = %d\nmuted = %d\n"
-               "dead_zone = %d\nwindow_scale = %d\nhigh_contrast = %d\nreduced_motion = %d\nlast_level = ",
+               "dead_zone = %d\nwindow_scale = %d\nhigh_contrast = %d\nreduced_motion = %d\nghost = %d\nlast_level = ",
                PROFILE_FORMAT_VERSION,
-               s->music_volume,s->effects_volume,s->muted,s->dead_zone,s->window_scale,s->high_contrast,s->reduced_motion) ||
+               s->music_volume,s->effects_volume,s->muted,s->dead_zone,s->window_scale,s->high_contrast,s->reduced_motion,
+               s->ghost) ||
         quoted(text, capacity, &used, data->last_level)) return -1;
     for (int kind = 0; kind < 2; kind++) {
         if (append(text, capacity, &used, "\n%s = [", kind ? "buttons" : "keys")) return -1;

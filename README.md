@@ -36,7 +36,7 @@ code a learner can trace over a shorter version that hides a step.
 
 ## What is in it
 
-- A side-scrolling platformer with multi-screen TOML worlds, 32 render layers and fixed 1/60 s physics steps (`make timing-lab` shows why)
+- A side-scrolling platformer with multi-screen TOML worlds, 33 render layers and fixed 1/60 s physics steps (`make timing-lab` shows why)
 - Six enemy types, seven hazard types, coins (score and bonus lives), health stars and an end-of-level star
 - Vines, ladders, ropes, three bouncepad sizes, crumbling bridges and float platforms
 - Authored `[[checkpoints]]`, or automatic screen-boundary respawns for levels without them

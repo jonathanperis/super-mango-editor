@@ -76,11 +76,11 @@ The overlay text is snapshotted in [Overlay Snapshots](../overlay-snapshots/) so
 
 - **Open:** F1 on either screen; gamepad Y in the start menu or Back during gameplay/pause. On terminal overlays, Back exits; use F1 for settings.
 - **Navigate:** Up/Down or D-pad selects a row, wrapping at the ends; Left/Right changes values on the main page; Enter, keypad Enter, Space or A/Start activates, and a mouse click activates a row. Esc or B/Back closes, or cancels binding capture first; either one also clears the message about a refused binding. The start menu's **Settings** button opens the panel exactly as F1 does.
-- **Options:** music/effects volume (0–128 in steps of 8), mute, stick dead zone (0–28000 in steps of 1000), native window scale (1×–4×; not applied in the browser), high-contrast outlines, reduced motion, control remapping (a separate page of 12 binding rows) and **Restore default settings**, which resets every setting, not only controls.
+- **Options:** music/effects volume (0–128 in steps of 8), mute, stick dead zone (0–28000 in steps of 1000), native window scale (1×–4×; not applied in the browser), high-contrast outlines, reduced motion, **Ghost (best run)** on/off (default on; see [Time Trial Ghost](#time-trial-ghost)), control remapping (a separate page of 12 binding rows) and **Restore default settings**, which resets every setting, not only controls.
 - **Remapping:** Left, Right, Up, Down, Jump and Run each have keyboard and gamepad bindings. Duplicates are rejected, as are reserved keys (Esc, F1, Tab, Enter, keypad Enter, the arrows and Right Shift) and buttons (Back, Start, Guide, B); misc, paddle and touchpad buttons cannot be captured. Arrows remain available. F2–F10, `-` and `=` belong to the [debug inspector](#debug-inspector-keys) and are refused in every run, because normal and debug runs share one profile. A profile saved with one of them bound has that control put back on its default key (every key, if that default is taken), with a warning; the rest of the profile still loads.
 
 Settings apply when the panel closes. Normal runs save settings, the last played
-stage and per-level best score/time/coin results. A profile holds results for up
+stage, per-level best score/time/coin results and time-trial ghosts. A profile holds results for up
 to 128 levels; a coin result is at most `MAX_COINS` (64), the most coins one level
 can place, so raising that constant keeps old profiles readable. A result that
 cannot be recorded (a full profile) is logged as a warning rather than dropped
@@ -106,8 +106,38 @@ saved timer. A Continue point whose level file has changed since (a different
 content hash) is dropped with a warning, before the menu offers it and again when
 it is applied, and that level starts from its beginning. **Play**, **Retry**,
 **Replay** and **Next Level** always start a level from its beginning. The profile
-stores it as a `[resume]` table, added in profile `format_version` 2; version-1
-profiles load unchanged and are written as version 2 on the next save.
+stores it as a `[resume]` table, added in profile `format_version` 2 together with
+the `ghost` setting; version-1
+profiles load unchanged (Ghost on, no Continue point) and are written as version 2
+on the next save.
+
+### Time Trial Ghost
+
+Every normal run records where Mango is after each fixed 1/60 s step (his pixel
+position and sprite frame). When a run finishes a level faster than that level's
+stored ghost, or the level has no ghost yet, the run becomes the new ghost. Every
+later attempt at that level (Play, Replay, Retry, Next Level into it) races it: a
+translucent Mango drawn just behind the player shows where the best run was at the
+same moment, and disappears once that run reached its star. Positions are stored
+rather than inputs, so a ghost never depends on enemies or random numbers behaving
+the same way twice.
+
+- **Ghost (best run)** in Settings hides or shows it (stored as `ghost` in the
+  profile). High-contrast outlines make the ghost more opaque with a cyan outline;
+  reduced motion holds one pose per animation instead of cycling frames.
+- A ghost is bound to its level file's content hash: after the level is edited
+  the old ghost is ignored, and the next finished run replaces it.
+- Runs continued from a Continue point, and runs longer than five minutes
+  (`GHOST_MAX_STEPS`), are not whole runs and never become ghosts. Debug, smoke,
+  replay, experiment and `--no-save` runs have no ghost at all.
+- Native ghosts are TOML files next to the profile, named after it and the
+  level: `profile-ghost-01_lugio_01.toml` beside `profile.toml` (or
+  `<name>-ghost-<level>.toml` beside an explicit `--profile <name>.toml`). They
+  are written through a temporary file like the profile. Browser ghosts use one
+  `localStorage` entry per level, `super-mango-ghost-v1:<level path>`; when storage
+  is full the ghost is simply not saved and a warning is logged. A ghost text of
+  five minutes is about 180 KB; anything over 256 KB, or damaged in any way, is
+  ignored.
 
 Native profiles use `profile.toml` under the OS preference root plus `SuperMango/SuperMango/`,
 or an explicit `--profile PATH`. A native save writes a sibling temporary file and

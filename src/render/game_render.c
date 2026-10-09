@@ -1,7 +1,7 @@
 /*
  * game_render.c — Rendering system implementation.
  *
- * Handles all game rendering including the 32 render layers,
+ * Handles all game rendering including the 33 render layers,
  * parallax backgrounds, entities, player, effects, HUD, and overlays.
  */
 
@@ -11,6 +11,7 @@
 
 #include "../core/debug.h"
 #include "../core/game_inspector.h"
+#include "../core/game_ghost.h"
 #include "../core/game_overlay.h"
 #include "../screens/hud.h"
 
@@ -338,6 +339,40 @@ static void draw_enemies(GameState *gs, int cam_x)
 }
 
 /*
+ * draw_ghost — The time-trial ghost: Mango as he was at this moment of the
+ * best run (game_ghost.c picks the sample), drawn just behind the real one.
+ *
+ * It is translucent, so it never hides the player. High contrast makes it
+ * more solid and outlines its body in cyan, a colour nothing else uses, so
+ * it cannot be mistaken for the player (outlined in white). Reduced motion
+ * holds one pose per animation (its first frame) instead of flickering
+ * through the frames; the ghost still moves.
+ */
+static void draw_ghost(GameState *gs, int cam_x)
+{
+    const GhostSample *sample = game_ghost_current(gs);
+    if (!sample) return;
+    int high_contrast = gs->profile->data.settings.high_contrast;
+    int cell = sample->cell & (GHOST_CELL_FACING_LEFT - 1);
+    if (reduced_motion(gs)) cell -= cell % GHOST_SHEET_COLS;
+    IntRect source = {(cell % GHOST_SHEET_COLS) * GHOST_SHEET_FRAME,
+                      (cell / GHOST_SHEET_COLS) * GHOST_SHEET_FRAME,
+                      GHOST_SHEET_FRAME, GHOST_SHEET_FRAME};
+    /* Stored positions carry GHOST_COORD_OFFSET; take it off again. */
+    IntRect dest = {(int)sample->x - GHOST_COORD_OFFSET - cam_x, (int)sample->y - GHOST_COORD_OFFSET,
+                    gs->player.w, gs->player.h};
+    int flip = (sample->cell & GHOST_CELL_FACING_LEFT) ? SPRITE_FLIP_X : SPRITE_NORMAL;
+    Color tint = {255, 255, 255, (unsigned char)(high_contrast ? 170 : 120)};
+    sprite_draw(gs->player.texture, &source, &dest, 0, flip, tint);
+    if (high_contrast) {
+        /* The player's hitbox sits at the same offset inside every frame. */
+        IntRect body = player_get_hitbox(&gs->player);
+        DrawRectangleLines(dest.x + body.x - (int)gs->player.x, dest.y + body.y - (int)gs->player.y,
+                           body.w, body.h, (Color){0, 230, 255, 255});
+    }
+}
+
+/*
  * draw_foreground — Fog/mist over the whole scene, after the player. Only
  * active when the level enables fog and reduced motion is off. High
  * contrast then outlines the player's hitbox and darkens the HUD strip.
@@ -418,6 +453,7 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
     draw_water_layer(gs, cam_x);
     draw_moving_hazards(gs, cam_x);
     draw_enemies(gs, cam_x);
+    draw_ghost(gs, cam_x);
     player_render(&gs->player, cam_x);
     draw_foreground(gs, cam_x);
     draw_hud_and_overlays(gs, cam_x);

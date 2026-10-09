@@ -25,6 +25,7 @@
 #include "../levels/level_path.h"
 #include "game_overlay.h"
 #include "game_experiment.h"
+#include "game_ghost.h"
 #include "game_resume.h"
 #include "game_timing.h"
 #include "../shared/serializer_io.h"  /* serializer_fingerprint_utf8 */
@@ -267,6 +268,49 @@ static void session_drop_stale_resume(AppSession *session)
     }
 }
 
+/*
+ * Time trial. A game that saves to the personal profile gets a ghost
+ * recorder and its level's best run to race. A stored ghost recorded on
+ * another version of the level file (a different content hash) is ignored:
+ * it would run through walls that have moved. The next finished run then
+ * replaces it.
+ */
+static void session_load_ghost(AppSession *session, GameState *game)
+{
+    if (!session->profile.enabled || !game->profile_level_key[0]) return;
+    if (!game->ghost && game_ghost_begin(game)) return;  /* out of memory: no ghost */
+    GameGhostTrack best;
+    int found = game_ghost_load(&session->profile, game->profile_level_key, &best);
+    if (found < 0)
+        TraceLog(LOG_WARNING, "Ghost for %s is unreadable or invalid; ignored", game->profile_level_key);
+    else if (found == 1 && best.level_hash != game->source_level_hash) {
+        TraceLog(LOG_INFO, "Ghost for %s was recorded on another version of the level; ignored",
+                 game->profile_level_key);
+        game_ghost_track_free(&best);
+    } else if (found == 1) {
+        game_ghost_set_best(game, &best);
+    }
+}
+
+/*
+ * A finished run becomes the level's ghost when there is none yet (or only
+ * one for another version of the level, which was never loaded) or when it
+ * beat the stored ghost's time. A run continued from a saved point, or one
+ * longer than GHOST_MAX_STEPS, recorded no whole run and is skipped.
+ */
+static void session_save_ghost(AppSession *session, GameState *game)
+{
+    GameGhostTrack run;
+    if (!game->ghost || !session->profile.enabled || !session->profile.writable) return;
+    if (game_ghost_take_run(game, &run)) return;
+    const GameGhostTrack *best = &game->ghost->best;
+    if ((best->count == 0 || run.time < best->time) && game_ghost_save(&session->profile, &run))
+        TraceLog(LOG_WARNING, "Ghost for %s was not saved (storage full or unavailable)", run.level);
+    /* Whatever comes next (Replay, Next Level, Level Select) loads the
+     * stored ghost again, so this game does not need the new one. */
+    game_ghost_track_free(&run);
+}
+
 static GameState *session_make_game(AppSession *session, const char *path, const GameInputPhysicalState *inherited)
 {
     GameState *game = calloc(1, sizeof(*game));
@@ -295,6 +339,7 @@ static GameState *session_make_game(AppSession *session, const char *path, const
      * the new one. The latch waits for those physical controls to release. */
     game_input_arm_release_latch(game, inherited);
     session_watch_resume(session, game);
+    session_load_ghost(session, game);
     session->game_open_count++;
     return game;
 }
@@ -403,6 +448,10 @@ static void session_apply_game_route(AppSession *session)
             game_profile_select(&session->profile, game->profile_level_key);
             game->resumed = 0;  /* the new level is played from its start */
             session_watch_resume(session, game);
+            /* A new level, a new race: restart the recording, load its ghost. */
+            game_ghost_restart(game);
+            game_ghost_track_free(game->ghost ? &game->ghost->best : NULL);
+            session_load_ghost(session, game);
             session->preferences_applied = 0;
             game_timing_restart_clock(game);
             game_input_arm_release_latch(game, NULL);
@@ -550,6 +599,7 @@ static void session_step(AppSession *session, int callback_owned)
                                     game->completion.coins_collected, game->completion.elapsed) != 0)
                 TraceLog(LOG_WARNING, "Profile: result for %s was not recorded (profile full or values out of range)",
                          game->profile_level_key);
+            session_save_ghost(session, game);
         }
         session_track_resume(session, game, 0);
         session_apply_game_route(session);

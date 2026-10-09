@@ -7,6 +7,7 @@
 #include "core/app_session.h"
 #include "core/game_checkpoint.h"
 #include "core/game_experiment.h"
+#include "core/game_ghost.h"
 #include "core/game_overlay.h"
 #include "core/game_resume.h"
 #include "core/game_profile.h"
@@ -266,6 +267,12 @@ static int resume_codec_and_migration(void)
     /* Version 1 loads with no Continue point and is written as version 2. */
     CHECK(game_profile_decode(decoded, version1) == 0);
     CHECK(!decoded->resume.path[0] && decoded->count == 1 && decoded->settings.muted == 1);
+    CHECK(decoded->settings.ghost == 1);  /* the version-2 default: ghost on */
+    /* The ghost setting is a version-2 key, and only 0 or 1. */
+    CHECK(game_profile_decode(decoded, "format_version = 2\nghost = 0\n") == 0 && decoded->settings.ghost == 0);
+    CHECK(game_profile_decode(decoded, "format_version = 1\nghost = 0\n") == -1);
+    CHECK(game_profile_decode(decoded, "format_version = 2\nghost = 2\n") == -1);
+    CHECK(game_profile_decode(decoded, version1) == 0);
     CHECK(game_profile_encode(decoded, text, PROFILE_TEXT_MAX) == 0);
     CHECK(!strncmp(text, "format_version = 2\n", 19) && !strstr(text, "[resume]"));
 
@@ -295,6 +302,7 @@ static int resume_codec_and_migration(void)
         fclose(seed);
         text[size] = '\0';
         CHECK(game_profile_decode(decoded, text) == 0 && decoded->resume.legacy_screen == 3);
+        CHECK(decoded->settings.ghost == 0);
     }
 
     /* [resume] in a version-1 file is damage: version 1 never had one. */
@@ -657,6 +665,180 @@ fail:
     return 1;
 }
 
+/*
+ * Ghost text is untrusted like the profile: a strict decoder, a stable
+ * encoding, and file names derived from the profile's own path.
+ */
+static int ghost_codec_and_paths(void)
+{
+    static const char good[] =
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0.05\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n";
+    /* Each bad case is the good text with one fault. */
+    static const char *const bad[] = {
+        "format_version = 2\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0.05\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n",
+        "format_version = 1\nlevel = \"levels/labs/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0.05\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n",
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000FF\"\n"
+        "time = 0.05\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n",
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0.05\nsteps = 4\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n",   /* too few */
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0.05\nsteps = 2\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n",   /* too many */
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0.05\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011c40\"]\n",   /* cell 64 */
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0.05\nsteps = 3\nframes = [\"0450011c000451011c0\", \"0452011c220\"]\n",   /* split sample */
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0.05\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011g22\"]\n",   /* bad digit */
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 9999\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n",   /* time > cap */
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0.05\nsteps = 0\nframes = []\n",
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0.05\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\nextra = 1\n",
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0.05\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n",              /* no steps */
+    };
+    GameGhostTrack track = {0};
+    char *text = malloc(GHOST_TEXT_MAX), *again = malloc(GHOST_TEXT_MAX);
+    char path[64];
+    CHECK(text && again);
+    CHECK(game_ghost_decode(&track, good) == 0);
+    CHECK(track.count == 3 && track.level_hash == 0xff && track.time == 0.05f);
+    CHECK(track.samples[0].x == 0x0450 && track.samples[0].y == 0x011c && track.samples[0].cell == 0);
+    CHECK(track.samples[2].x == 0x0452 && track.samples[2].cell == 0x22);  /* facing left, cell 2 */
+    CHECK(game_ghost_encode(&track, text, GHOST_TEXT_MAX) == 0);
+    game_ghost_track_free(&track);
+    CHECK(game_ghost_decode(&track, text) == 0 && game_ghost_encode(&track, again, GHOST_TEXT_MAX) == 0);
+    CHECK(!strcmp(text, again));
+    CHECK(game_ghost_encode(&track, text, 40) == -1);  /* does not fit */
+    game_ghost_track_free(&track);
+    for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+        if (game_ghost_decode(&track, bad[i]) != -1 || track.samples) {
+            fprintf(stderr, "profile test: accepted bad ghost case %zu\n", i);
+            goto fail;
+        }
+    }
+    /* The ghost fuzz seed must decode, or fuzzing would only explore the
+     * rejection path from it. */
+    {
+        FILE *seed = fopen("tests/fuzz/corpus/profile/ghost.toml", "rb");
+        CHECK(seed);
+        size_t size = fread(text, 1, GHOST_TEXT_MAX - 1, seed);
+        fclose(seed);
+        text[size] = '\0';
+        CHECK(game_ghost_decode(&track, text) == 0 && track.count == 5);
+        CHECK(track.samples[3].cell == 0x24 && track.samples[4].cell == 0x2d);
+        game_ghost_track_free(&track);
+    }
+    /* Oversized text is refused before parsing. */
+    memset(text, ' ', GHOST_TEXT_MAX - 1);
+    text[GHOST_TEXT_MAX - 1] = '\0';
+    CHECK(game_ghost_decode(&track, text) == -1);
+
+    CHECK(game_ghost_file_path("/p/profile.toml", "levels/01_x.toml", path, sizeof(path)) == 0);
+    CHECK(!strcmp(path, "/p/profile-ghost-01_x.toml"));
+    CHECK(game_ghost_file_path("/p/mine", "levels/a.toml", path, sizeof(path)) == 0);
+    CHECK(!strcmp(path, "/p/mine-ghost-a.toml"));
+    CHECK(game_ghost_file_path("/p/profile.toml", "levels/a.toml", path, 8) == -1);
+    CHECK(game_ghost_file_path("", "levels/a.toml", path, sizeof(path)) == -1);
+    CHECK(game_ghost_file_path("/p/profile.toml", "levels/labs/a.toml", path, sizeof(path)) == -1);
+    free(text); free(again);
+    return 0;
+fail:
+    game_ghost_track_free(&track);
+    free(text); free(again);
+    return 1;
+}
+
+/* Pretend the player ran `steps` fixed steps standing at the start, then
+ * finished in `seconds`; the session records the result and the ghost. */
+static void finish_run(AppSession *session, int steps, float seconds)
+{
+    GameState *game = session->game;
+    for (int i = 0; i < steps; i++) game_ghost_step(game);
+    game->completion.level_elapsed = seconds;
+    game_complete_level(game);
+    session_frame(session);
+}
+
+/*
+ * The session keeps the fastest finished run as the level's ghost: the
+ * first run is saved, a slower one leaves it alone, a faster one replaces
+ * it, and the next game loads it to race. A ghost recorded on another
+ * version of the level, or a damaged file, is ignored and then replaced.
+ */
+static int ghost_session_keeps_the_fastest_run(void)
+{
+    char path[160], lock_path[176], ghost_path[200];
+    const char *level = "levels/00_sandbox_01.toml";
+    snprintf(path, sizeof(path), TEST_OUT "profile-ghost-%llu.toml", (unsigned long long)clock_millis());
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+    CHECK(game_ghost_file_path(path, level, ghost_path, sizeof(ghost_path)) == 0);
+    AppSessionConfig config = {.level_path = level, .profile_enabled = 1, .profile_path = path};
+    AppSession *session = session_create(&config);
+    SerializerFileFingerprint before, after;
+    CHECK(session && session->game && session->game->ghost && !session->game->ghost->best.count);
+
+    finish_run(session, 30, 0.5f);
+    CHECK(serializer_probe_path_utf8(ghost_path) == SERIALIZER_PATH_EXISTING);
+    session->game->route = GAME_ROUTE_REPLAY;
+    session_frame(session);
+    CHECK(session->game->ghost->best.count == 30 && session->game->ghost->best.time == 0.5f);
+
+    /* Slower: the stored ghost stays as it was. */
+    CHECK(serializer_fingerprint_utf8(ghost_path, &before) == 1);
+    finish_run(session, 60, 1.0f);
+    CHECK(serializer_fingerprint_utf8(ghost_path, &after) == 1 && serializer_fingerprint_equal(&before, &after));
+
+    /* Faster: it replaces the ghost. */
+    session->game->route = GAME_ROUTE_REPLAY;
+    session_frame(session);
+    finish_run(session, 15, 0.25f);
+    session->game->route = GAME_ROUTE_REPLAY;
+    session_frame(session);
+    CHECK(session->game->ghost->best.count == 15 && session->game->ghost->best.time == 0.25f);
+
+    /* Recorded on another version of the level: not loaded, and the next
+     * finished run (however slow) takes its place. */
+    {
+        GameGhostTrack stale = session->game->ghost->best;
+        stale.level_hash ^= 1;
+        CHECK(game_ghost_save(&session->profile, &stale) == 0);
+    }
+    session->game->route = GAME_ROUTE_REPLAY;
+    session_frame(session);
+    CHECK(session->game->ghost->best.count == 0);
+    finish_run(session, 90, 1.5f);
+    session->game->route = GAME_ROUTE_REPLAY;
+    session_frame(session);
+    CHECK(session->game->ghost->best.count == 90);
+
+    /* A damaged file is ignored the same way. */
+    FILE *fp = fopen(ghost_path, "wb");
+    CHECK(fp);
+    fputs("not a ghost", fp);
+    fclose(fp);
+    session->game->route = GAME_ROUTE_REPLAY;
+    session_frame(session);
+    CHECK(session->game->ghost->best.count == 0);
+
+    /* Runs without a personal profile have no ghost at all. */
+    session_destroy(&session);
+    config.profile_enabled = 0;
+    session = session_create(&config);
+    CHECK(session && session->game && !session->game->ghost);
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 0;
+fail:
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 1;
+}
+
 /* Collect raylib warnings so a test can see what the session logged. */
 static char last_warning[256];
 static void capture_warning(int level, const char *text, va_list args)
@@ -719,6 +901,9 @@ int game_profile_contract_test(void)
     if (persistent_session()) return 1;
     puts("profile: continue round trip");
     if (continue_round_trip()) return 1;
+    puts("profile: ghost codec and session");
+    if (ghost_codec_and_paths()) return 1;
+    if (ghost_session_keeps_the_fastest_run()) return 1;
     puts("game_profile_contract_test: ok");
     return 0;
 }

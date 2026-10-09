@@ -53,6 +53,7 @@ static void adjust(SettingsMenu *menu, GameProfile *profile, int direction)
         case 4: value = &s->window_scale; low = 1; high = 4; break;
         case 5: value = &s->high_contrast; break;
         case 6: value = &s->reduced_motion; break;
+        case 7: value = &s->ghost; break;
         default: return;
     }
     int updated = *value + step * direction;
@@ -88,13 +89,13 @@ static void activate(SettingsMenu *menu, GameProfile *profile)
 {
     menu->message[0] = '\0';
     if (menu->page) {
-        if (menu->selected == 12) { menu->page = 0; menu->selected = 7; }
+        if (menu->selected == 12) { menu->page = 0; menu->selected = 8; }
         else menu->capture = menu->selected < 6 ? 1 : 2;
-    } else if (menu->selected == 7) { menu->page = 1; menu->selected = 0; }
-    else if (menu->selected == 8) {
+    } else if (menu->selected == 8) { menu->page = 1; menu->selected = 0; }
+    else if (menu->selected == 9) {
         profile->data.settings = (GameSettings)GAME_SETTINGS_DEFAULTS;
         changed(profile);
-    } else if (menu->selected == 9) close_panel(menu);
+    } else if (menu->selected == 10) close_panel(menu);
     else adjust(menu, profile, 1);
 }
 
@@ -133,7 +134,7 @@ int settings_menu_event(SettingsMenu *menu, GameProfile *profile,
         else snprintf(menu->message, sizeof(menu->message), "Reserved/duplicate binding. Choose another; Esc cancels.");
         return 1;
     }
-    int rows = menu->page ? 13 : 10;
+    int rows = menu->page ? 13 : 11;
     if (key == KEY_UP || button == PAD_UP) menu->selected = (menu->selected + rows - 1) % rows;
     if (key == KEY_DOWN || button == PAD_DOWN) menu->selected = (menu->selected + 1) % rows;
     if (!menu->page && (key == KEY_LEFT || button == PAD_LEFT)) adjust(menu, profile, -1);
@@ -165,7 +166,7 @@ void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
     DrawRectangle(8, 4, 384, 292, (Color){10,12,18,255});
     ui_label(&menu->ui, 18, 12, menu->page ? "CONTROLS" : "SETTINGS");
     const GameSettings *s = &profile->data.settings;
-    int rows = menu->page ? 13 : 10;
+    int rows = menu->page ? 13 : 11;
     for (int row = 0; row < rows; row++) {
         char label[160];
         if (menu->page && row < 12) {
@@ -181,8 +182,9 @@ void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
             case 4: snprintf(label,sizeof(label),"Window scale (native): %dx",s->window_scale); break;
             case 5: snprintf(label,sizeof(label),"High-contrast outlines: %s",s->high_contrast?"On":"Off"); break;
             case 6: snprintf(label,sizeof(label),"Reduced motion: %s",s->reduced_motion?"On":"Off"); break;
-            case 7: snprintf(label,sizeof(label),"Configure controls..."); break;
-            case 8: snprintf(label,sizeof(label),"Restore default settings"); break;
+            case 7: snprintf(label,sizeof(label),"Ghost (best run): %s",s->ghost?"On":"Off"); break;
+            case 8: snprintf(label,sizeof(label),"Configure controls..."); break;
+            case 9: snprintf(label,sizeof(label),"Restore default settings"); break;
             default: snprintf(label,sizeof(label),"Save and close"); break;
         }
         int y = 36 + row*16;

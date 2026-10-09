@@ -10,6 +10,7 @@
 #include "../levels/level.h"
 #include "../core/debug.h"
 #include "../core/game_checkpoint.h"
+#include "../core/game_ghost.h"
 #include "../hazards/spike_block.h"  /* SPIKE_PUSH_SPEED, SPIKE_PUSH_VY */
 
 #include "../shared/audio.h"
@@ -41,6 +42,10 @@ void game_restart_after_game_over(GameState *gs)
     /* Retry is a fresh attempt with score 0, so every coin returns. A life
      * loss (reset_current_level alone) keeps collected coins gone. */
     for (int i = 0; i < gs->coin_count; i++) gs->coins[i].active = 1;
+    /* A fresh attempt from the level start: no longer a continued run, and
+     * the time-trial recording (and the ghost race) start over with it. */
+    gs->resumed = 0;
+    game_ghost_restart(gs);
     reset_current_level(gs, &gs->loop.fp_prev_riding);
 }
 

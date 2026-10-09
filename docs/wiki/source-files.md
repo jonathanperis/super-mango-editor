@@ -32,6 +32,8 @@ src/
 │   ├── app_session.h / .c        Heap-owned session: window/audio lifetime, menu/game routes, in-place replay
 │   ├── game_profile.h / .c       Versioned player settings/results/Continue point and native/web persistence
 │   ├── game_resume.h / .c        Capture a running level as a Continue point and resume it
+│   ├── game_ghost.h / .c         Time trial: record each step, race the best run's ghost
+│   ├── game_ghost_file.c         Ghost text format and its native file / browser storage
 │   ├── game_inspector.h / .c     Simulation stepping, slow motion, tuning, status panel and F5 key help
 │   ├── game_experiment.h / .c    Bounded capture/export/replay with level fingerprints
 │   ├── game_random.h / .c        Reproducible unsigned PRNG for native/WASM
@@ -365,6 +367,10 @@ Frees all resources in reverse init order.
 ### `core/game_checkpoint.h` / `core/game_checkpoint.c`
 
 Resolves respawn state without mutating `LevelDef`. With authored records, the greatest crossed x coordinate becomes `GameState.respawn_x` / `respawn_y` before lethal collisions run. With no records, the legacy automatic screen-boundary checkpoint remains active; it walks left from the screen edge to the first column with solid floor and no static hazard, keeping the previous checkpoint when none is safe.
+
+### `core/game_ghost.h` / `core/game_ghost.c` / `core/game_ghost_file.c`
+
+The time-trial ghost. `game_ghost.c` records one `GhostSample` (pixel position plus sprite cell and facing) after every fixed step (`game_ghost_step`, called from `game_frame`) and picks the best run's sample for the same step (`game_ghost_current`; `draw_ghost` in `game_render.c` draws it). `game_ghost_take_run` turns a finished attempt into a `GameGhostTrack`, refusing a continued run or one longer than `GHOST_MAX_STEPS`; Retry calls `game_ghost_restart`. `game_ghost_file.c` holds the strict TOML codec (`game_ghost_decode` / `game_ghost_encode`, fuzzed alongside the profile) and storage: a file next to the profile (`game_ghost_file_path`) or a browser `localStorage` entry. `AppSession` loads the best ghost when a level opens and saves a finished run that beats it.
 
 ### `core/game_resume.h` / `core/game_resume.c`
 

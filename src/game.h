@@ -369,6 +369,7 @@ typedef struct {
                                              tuning line after F6/F7/-/+    */
     } inspector;
     struct GameExperiment *experiment; /* owned opt-in capture/replay */
+    struct GameGhost *ghost; /* owned time-trial recorder and best run; NULL without a profile */
 } GameState;
 
 /* ------------------------------------------------------------------ */

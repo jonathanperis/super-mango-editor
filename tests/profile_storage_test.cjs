@@ -58,6 +58,38 @@ function environment(initial = {}) {
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
+
+/* Time-trial ghosts: one localStorage entry per level, synchronous, and a
+ * full or denied storage is a failed write, never an exception into C. */
+function ghostStorage() {
+    const ghostSource = fs.readFileSync(path.join(__dirname, '../src/core/game_ghost_file.c'), 'utf8');
+    const values = new Map();
+    const storage = { getItem: key => values.has(key) ? values.get(key) : null,
+        setItem: (key, value) => values.set(key, value) };
+    const context = vm.createContext({ localStorage: storage,
+        UTF8ToString: value => typeof value === 'string' ? value : value.text,
+        lengthBytesUTF8: text => Buffer.byteLength(text),
+        stringToUTF8: (text, out) => { out.text = text; } });
+    const method = (name, args) => {
+        const body = ghostSource.match(new RegExp(`EM_JS\\((?:int|void), ${name},[\\s\\S]*?\\{([\\s\\S]*?)\\n\\}\\);`))[1];
+        return vm.runInContext(`(function(${args}) {${body}})`, context);
+    };
+    const read = method('ghost_browser_read', 'key, out, capacity');
+    const write = method('ghost_browser_write', 'key, text');
+    const level = 'levels/01_lugio_01.toml', key = 'super-mango-ghost-v1:' + level, out = {};
+    assert.equal(read(level, out, 100), 0, 'missing ghost was not reported as absent');
+    assert.equal(write(level, 'format_version = 1'), 1);
+    assert.equal(values.get(key), 'format_version = 1', 'ghost stored under the wrong key');
+    assert.equal(read(level, out, 100), Buffer.byteLength('format_version = 1') + 1);
+    assert.equal(out.text, 'format_version = 1');
+    assert.equal(read(level, out, 5), -1, 'oversized ghost was accepted');
+    values.set(key, 'a\0b');
+    assert.equal(read(level, out, 100), -1, 'embedded NUL was accepted');
+    storage.setItem = () => { throw Error('QuotaExceededError'); };
+    assert.equal(write(level, 'too big'), 0, 'quota failure was not reported');
+    storage.getItem = () => { throw Error('storage denied'); };
+    assert.equal(read(level, out, 100), -1, 'read denial was treated as absence');
+}
 async function main() {
     const shared = environment({ [legacyKey]: 'café' });
     const a = shared.context(), b = shared.context(), destination = {};
@@ -111,6 +143,7 @@ async function main() {
     assert.equal(invalid.context().read({}, 100), -1, 'embedded NUL was accepted');
     invalid.storage.getItem = () => { throw Error('storage denied'); };
     assert.equal(invalid.context().read({}, 100), -1, 'read denial was treated as absence');
+    ghostStorage();
     console.log('profile_storage_test: ok');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
