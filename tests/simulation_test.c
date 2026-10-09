@@ -196,6 +196,63 @@ done:
     return failed;
 }
 
+/*
+ * Float platform 1 of moving_support.toml rides a tall RECT rail. Going down
+ * its right side, the rider must stay on it every step (it used to fall a
+ * little, land, fall again: FALL/IDLE flicker). Going up its left side at the
+ * top rail speed, a player falling onto it must land, not drop through: the
+ * platform rises past their feet during its own update, after the player
+ * already moved that step.
+ */
+static int rect_rail_platform_carries_rider_down_and_catches_from_above(void)
+{
+    int failed = 0;
+    GameState gs = {0};
+    strcpy(gs.level_path, "tests/fixtures/runtime/moving_support.toml");
+    CHECK(game_init(&gs) == 0);
+    CHECK(gs.float_platform_count == 2 && gs.rail_count == 2);
+    FloatPlatform *fp = &gs.float_platforms[1];
+    Player *p = &gs.player;
+
+    /* Down: t = 3 is the top-right corner; the next 9 tiles go straight down. */
+    p->x = fp->x + fp->w / 2.0f - p->w / 2.0f;
+    p->y = fp->y - p->h + PLAYER_FLOOR_SINK;
+    p->vx = p->vy = 0.0f;
+    p->on_ground = 1;
+    gs.loop.fp_prev_riding = 1;
+    float start_y = fp->y;
+    for (int step = 0; step < 150; step++) {
+        game_update_active(&gs, GAME_FIXED_STEP, (int)gs.camera.x);
+        CHECK(gs.loop.fp_prev_riding == 1 && p->on_ground);
+        CHECK(fabsf(p->y + p->h - PLAYER_FLOOR_SINK - fp->y) < 0.01f);
+    }
+    CHECK(fp->y > start_y + 100.0f);   /* it really went down: 3 tiles/s × 2.5 s */
+
+    /* Up: t = 16 is the bottom of the left side; at 30 tiles/s it rises
+     * 8 px per step. The player hovers 1 px above it, falling from rest. */
+    float_platform_init(fp, FLOAT_PLATFORM_RAIL, 0.0f, 0.0f, 4, 0.0f,
+                        &gs.rails[1], 16.0f, (float)MAX_RAIL_SPEED);
+    p->x = fp->x + fp->w / 2.0f - p->w / 2.0f;
+    p->y = fp->y - 1.0f - p->h + PLAYER_FLOOR_SINK;
+    p->vx = p->vy = 0.0f;
+    p->on_ground = 0;
+    gs.loop.fp_prev_riding = -1;
+    start_y = fp->y;
+    game_update_active(&gs, GAME_FIXED_STEP, (int)gs.camera.x);
+    CHECK(!p->on_ground);              /* still 0.8 px above the old top */
+    game_update_active(&gs, GAME_FIXED_STEP, (int)gs.camera.x);
+    CHECK(p->on_ground && gs.loop.fp_prev_riding == 1);
+    for (int step = 0; step < 10; step++) {
+        game_update_active(&gs, GAME_FIXED_STEP, (int)gs.camera.x);
+        CHECK(gs.loop.fp_prev_riding == 1 && p->on_ground);
+        CHECK(fabsf(p->y + p->h - PLAYER_FLOOR_SINK - fp->y) < 0.01f);
+    }
+    CHECK(fp->y < start_y - 80.0f);    /* it really went up: 8 px per step */
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
 /* A bare GameState with one player standing on the ground floor. */
 static void stand_player_on_floor(GameState *gs, float x)
 {
@@ -307,6 +364,9 @@ int game_simulation_contract_test(void)
     printf("simulation: inspection/export/replay %s\n", failures ? "FAIL" : "PASS");
     int scenario = moving_support_and_damage();
     printf("simulation: moving support/hazard/checkpoint %s\n", scenario ? "FAIL" : "PASS");
+    int rect_rail = rect_rail_platform_carries_rider_down_and_catches_from_above();
+    printf("simulation: RECT rail platform carries and catches the player %s\n", rect_rail ? "FAIL" : "PASS");
+    failures += rect_rail;
     int jump = jump_height_ignores_frame_rate();
     printf("simulation: jump apex independent of frame rate %s\n", jump ? "FAIL" : "PASS");
     int tunnel = fast_fall_does_not_tunnel_through_platform();

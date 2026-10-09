@@ -1038,7 +1038,7 @@ static int nearest_surface_is_order_independent(void)
     for (int order = 0; order < 2; order++) {
         Platform platforms[2] = {{.x=0,.y=order ? 100 : 120,.w=100},
                                  {.x=0,.y=order ? 120 : 100,.w=100}};
-        FloatPlatform floating = {.x=0,.y=95,.w=100,.active=1};
+        FloatPlatform floating = {.x=0,.y=95,.w=100,.active=1,.prev_y=95};
         Player player = {.x=10,.y=98,.w=48,.h=48,.vy=100};
         int landed;
         player_resolve_platform_collisions(&player, platforms, 2, NULL, 0, 90, &landed, -1);
@@ -1055,7 +1055,7 @@ static int nearest_surface_is_order_independent(void)
         if (expect_float("nearest ceiling", player.y + PLAYER_PHYS_PAD_TOP, 120 + SPIKE_PLAT_SRC_H)) return 1;
     }
     Platform pillar = {.x=0,.y=172,.w=100};
-    FloatPlatform floating = {.x=0,.y=200,.w=100,.active=1};
+    FloatPlatform floating = {.x=0,.y=200,.w=100,.active=1,.prev_y=200};
     Bridge bridge = {.x=0,.base_y=160,.brick_count=8};
     for (int i = 0; i < 8; i++) bridge.bricks[i].active = 1;
     SpikePlatform spike = {.x=0,.y=150,.w=100,.active=1};

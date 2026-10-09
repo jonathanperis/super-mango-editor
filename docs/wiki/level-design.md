@@ -466,7 +466,7 @@ speed      = 0.0        # rail traversal speed in tiles/s (RAIL mode)
 | `CRUMBLE` | Falls after the player stands on it for 0.75 s without stepping off (stepping off resets the timer) |
 | `RAIL` | Travels along the referenced rail path, bouncing at the ends of an open rail; the rail sets its position, so `x`/`y` are not used |
 
-`STATIC` and `CRUMBLE` platforms must fit inside the world. A `RAIL` platform's `speed` must be above 0 and at most `MAX_RAIL_SPEED` (30 tiles/s), so a rising platform never outruns the player standing on it.
+`STATIC` and `CRUMBLE` platforms must fit inside the world. A `RAIL` platform's `speed` must be above 0 and at most `MAX_RAIL_SPEED` (30 tiles/s). The platform carries the player standing on it, up and down as well as sideways.
 
 ### Bridges
 

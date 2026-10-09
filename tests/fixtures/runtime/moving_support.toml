@@ -11,6 +11,15 @@ y = 172
 w = 12
 h = 0
 end_cap = 0
+# A tall clockwise loop: its right side carries a platform down, its left
+# side carries it up (simulation_test.c rides both).
+[[rails]]
+layout = "RECT"
+x = 480
+y = 40
+w = 4
+h = 10
+end_cap = 0
 [[float_platforms]]
 mode = "RAIL"
 x = 128.0
@@ -19,6 +28,14 @@ tile_count = 4
 rail_index = 0
 speed = 30.0
 t_offset = 0.0
+[[float_platforms]]
+mode = "RAIL"
+x = 480.0
+y = 40.0
+tile_count = 4
+rail_index = 1
+speed = 3.0
+t_offset = 3.0
 [last_star]
 x = 704.0
 y = 228.0
