@@ -169,9 +169,12 @@ and its messages, then the recent-files list (`Ctrl+1` to `Ctrl+5`), then the
 level-wide TOML fields. Each validation message is clickable (it highlights
 under the cursor): a message about an entity, such as `checkpoints[0].x is ...`,
 selects that entity (checkpoints, the Player Spawn and the Last Star included),
-switches to Select and pans the canvas to centre it; a message about a Level
+switches to Select, pans the canvas to centre it and focuses the property the
+message names (`spiders[2].vx` puts the caret in that spider's `vx` field; a
+dropdown such as an axe's `mode` opens its list); a message about a Level
 Config value focuses that field, unfolding its group and scrolling the panel
-to it. Clicking the `Validation: ...` summary in the status bar does the same
+to it (a layer's asset dropdown opens, `fog_layers[1].speed` takes the
+caret). Clicking the `Validation: ...` summary in the status bar does the same
 for the first message. The level-wide fields are:
 
 - `name`, `description`, `generated_by`
