@@ -318,8 +318,13 @@ static void session_save_ghost(AppSession *session, GameState *game)
     if (!game->screen.ghost || !session->profile.enabled || !session->profile.writable) return;
     if (game_ghost_take_run(game, &run)) return;
     const GameGhostTrack *best = &game->screen.ghost->best;
-    if ((best->count == 0 || run.time < best->time) && game_ghost_save(&session->profile, &run))
-        TraceLog(LOG_WARNING, "Ghost for %s was not saved (storage full or unavailable)", run.level);
+    if (best->count == 0 || run.time < best->time) {
+        int saved = game_ghost_save(&session->profile, &run);
+        if (saved == GHOST_SAVE_FAILED)
+            TraceLog(LOG_WARNING, "Ghost for %s was not saved (storage full or unavailable)", run.level);
+        else if (saved == GHOST_SAVE_KEPT)
+            TraceLog(LOG_INFO, "Ghost for %s kept: another game saved a faster run meanwhile", run.level);
+    }
     /* Whatever comes next (Replay, Next Level, Level Select) loads the
      * stored ghost again, so this game does not need the new one. */
     game_ghost_track_free(&run);

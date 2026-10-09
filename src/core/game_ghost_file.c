@@ -304,17 +304,53 @@ int game_ghost_load(const GameProfile *profile, const char *level_key, GameGhost
     return found;
 }
 
+/*
+ * stored_ghost_is_as_fast — Should the stored ghost stay?
+ *
+ * The session decides to save a run by comparing it with the ghost it
+ * loaded when the level opened. Another game window or browser tab on the
+ * same profile may have stored a faster one since, so the save reads the
+ * stored ghost again right before writing. It stays when it is a valid
+ * ghost of the same level version and at least as fast; a damaged ghost or
+ * one for another version of the level is replaced, as on load.
+ */
+static int stored_ghost_is_as_fast(const GameProfile *profile, const GameGhostTrack *track)
+{
+    GameGhostTrack stored;
+    int keep = game_ghost_load(profile, track->level, &stored) == 1 &&
+               stored.level_hash == track->level_hash && stored.time <= track->time;
+    game_ghost_track_free(&stored);
+    return keep;
+}
+
 int game_ghost_save(const GameProfile *profile, const GameGhostTrack *track)
 {
-    if (!profile || !profile->enabled || !track) return -1;
+    if (!profile || !profile->enabled || !track) return GHOST_SAVE_FAILED;
     char *text = malloc(GHOST_TEXT_MAX);
-    if (!text) return -1;
+    if (!text) return GHOST_SAVE_FAILED;
     int result = game_ghost_encode(track, text, GHOST_TEXT_MAX);
 #ifdef __EMSCRIPTEN__
+    /* localStorage is synchronous, and this read, compare and write run in
+     * one go without returning to the browser, so no other tab's script
+     * runs in between. */
+    if (!result && stored_ghost_is_as_fast(profile, track)) {
+        free(text);
+        return GHOST_SAVE_KEPT;
+    }
     if (!result && !ghost_browser_write(track->level, text)) result = -1;
 #else
     char path[SERIALIZER_IO_PATH_MAX], temporary[SERIALIZER_IO_PATH_MAX] = "";
     if (!result && game_ghost_file_path(profile->path, track->level, path, sizeof(path))) result = -1;
+    /* Hold the profile's lock from the comparison to the replacement, the
+     * way game_profile_save does, so another instance cannot write a
+     * faster ghost in between. */
+    GameProfileLock *lock = result ? NULL : game_profile_lock(profile);
+    if (!lock) result = -1;
+    if (lock && stored_ghost_is_as_fast(profile, track)) {
+        game_profile_unlock(lock);
+        free(text);
+        return GHOST_SAVE_KEPT;
+    }
     FILE *fp = result ? NULL : serializer_open_temp(path, temporary, sizeof(temporary));
     if (!result && !fp) result = -1;
     if (fp) {
@@ -331,7 +367,8 @@ int game_ghost_save(const GameProfile *profile, const GameGhostTrack *track)
                 fprintf(stderr, "Ghost save incomplete; the ghost is kept in '%s'\n", temporary);
         }
     }
+    game_profile_unlock(lock);
 #endif
     free(text);
-    return result ? -1 : 0;
+    return result ? GHOST_SAVE_FAILED : GHOST_SAVE_WRITTEN;
 }

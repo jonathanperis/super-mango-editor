@@ -498,6 +498,32 @@ static void unlock_profile(ProfileLock lock)
 #endif
 }
 
+/* The lock file outlives every holder, so the opaque handle game_ghost.c
+ * gets is only a heap copy of the OS handle. */
+struct GameProfileLock {
+    ProfileLock handle;
+};
+
+GameProfileLock *game_profile_lock(const GameProfile *profile)
+{
+    if (!profile || !profile->path[0]) return NULL;
+    GameProfileLock *lock = malloc(sizeof(*lock));
+    if (!lock) return NULL;
+    lock->handle = lock_profile(profile->path);
+    if (lock->handle == PROFILE_LOCK_INVALID) {
+        free(lock);
+        return NULL;
+    }
+    return lock;
+}
+
+void game_profile_unlock(GameProfileLock *lock)
+{
+    if (!lock) return;
+    unlock_profile(lock->handle);
+    free(lock);
+}
+
 /* 1 existing, 0 absent, -1 failed. Never mistake unreadable data for absence. */
 static int read_native(const char *path, char **out)
 {
