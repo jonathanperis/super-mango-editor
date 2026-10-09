@@ -372,6 +372,10 @@ typedef struct {
     char profile_level_key[256];
     int profile_completion_recorded;
     int resumed;        /* 1 = this run started from a saved Continue point */
+    /* 1 = this attempt began at a --start-x / --start-checkpoint point: a
+     * playtest of part of the level, so it records no best result, ghost or
+     * Continue point. Retry, Replay and Next Level start whole attempts. */
+    int start_point_run;
     struct GameGhost *ghost; /* owned time-trial recorder and best run; NULL without a profile */
 
     /* ---- Debug tools ------------------------------------------------------ */
