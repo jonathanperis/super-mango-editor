@@ -57,6 +57,7 @@ Baseline editor is shipped. TOML is the only level workflow; no C exporter remai
 **Work:**
 - Preserve shipped validation + private snapshot + game launch with current TOML level (`--level <path>` semantics).
 - Show launch result and validation output in status/panel.
+- Playtest from a point. **Done:** Shift+F5 (mouse x, or the selected checkpoint) and the checkpoint panel's **Playtest from here** pass the game's new `--start-x` / `--start-checkpoint` flags; the editor checks the point with the game's `level_start_resolve` first.
 
 **Verify:** valid level launches; invalid level blocks with actionable error list.
 

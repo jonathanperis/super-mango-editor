@@ -28,6 +28,7 @@
 #include "tools.h"       /* editor_set_float_platform_mode                    */
 #include "editor_panels.h" /* editor_focus_validation_issue                     */
 #include "editor_session.h" /* editor_set_status (show_field_note)              */
+#include "editor_playtest.h" /* editor_play_test_from (checkpoint "Playtest here") */
 #include "../shared/ui.h" /* ui_panel, ui_label, ui_separator, ui_float_field,
                            ui_int_field, ui_dropdown                         */
 #include "../levels/level.h" /* LevelDef, all *Placement structs            */
@@ -340,6 +341,13 @@ static void draw_checkpoint_properties(EditorState *es, int y)
     ui_label_color(&es->ui, FIELD_X, y, screen_text, UI_TEXT_DIM);
     y += ROW_H;
     ui_label_color(&es->ui, CONTENT_X, y, "Respawn when crossed.", UI_TEXT_DIM);
+    y += ROW_H;
+    /* Start a playtest standing on this checkpoint (the game's
+     * --start-checkpoint), like Shift+F5 with it selected. */
+    if (ui_button(&es->ui, CONTENT_X, y, 160, 20, "Playtest from here")) {
+        LevelStart start = { LEVEL_START_AT_CHECKPOINT, 0.0f, es->selection.index };
+        editor_play_test_from(es, &start);
+    }
 }
 
 /* draw_platform_properties — Fields for the selected platform. */
