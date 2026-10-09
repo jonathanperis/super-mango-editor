@@ -47,10 +47,20 @@ int level_save_toml(const LevelDef *def, const char *path);
 int level_save_toml_with_policy(const LevelDef *def, const char *path,
                                 SerializerSavePolicy policy);
 
-/* Save with a final source fingerprint recheck before replacement. */
+/* Save with a final source fingerprint recheck before replacement.
+ * Returns -2 (nothing written) when the file no longer matches expected. */
 int level_save_toml_checked(const LevelDef *def, const char *path,
                             SerializerSavePolicy policy,
                             const SerializerFileFingerprint *expected);
+
+/*
+ * Every save above returns SERIALIZER_REPLACE_TEMP_KEPT (-3) when the
+ * operating system moved the old file away but could not put the new one in
+ * its place (this can happen on Windows).  The level is then safe in a
+ * temporary file next to the destination; this returns that file's path
+ * until the next save starts ("" when the last save did not end this way).
+ */
+const char *level_save_kept_temp_path(void);
 
 /* Save a recovery copy with its known normal destination embedded as metadata. */
 int level_save_toml_recovery(const LevelDef *def, const char *path,

@@ -54,6 +54,26 @@ static int editor_source_changed(EditorState *es);
 static int editor_finalize_save(EditorState *es, const char *path,
                                 const char *status_prefix);
 
+/*
+ * editor_report_save_failure — Explain a failed level save in the status bar.
+ *
+ * result is what the level_save_toml_* call returned.  Most failures leave
+ * the file on disk as it was, and "Save failed: <path>" says enough.  One
+ * does not: on Windows the old file can be moved away before the new one
+ * fails to move in.  The level is then kept in a temporary file next to the
+ * destination, and the designer needs its name to get the work back.
+ */
+static void editor_report_save_failure(EditorState *es, int result,
+                                       const char *path)
+{
+    if (result == SERIALIZER_REPLACE_TEMP_KEPT) {
+        editor_set_status(es, "Save incomplete: your level is safe in %s",
+                          level_save_kept_temp_path());
+    } else {
+        editor_set_status(es, "Save failed: %s", path);
+    }
+}
+
 int editor_path_fits(const char *path)
 {
     return path && strlen(path) < EDITOR_PATH_MAX;
@@ -396,10 +416,11 @@ int editor_save_current_level(EditorState *es)
                 return -1;
             }
             /* Recheck occurs immediately before replacement. */
-            if (level_save_toml_checked(&es->level, target,
-                                        SERIALIZER_SAVE_REPLACE,
-                                        &replace_expected) != 0) {
-                editor_set_status(es, "Save failed: %s", es->file_path);
+            int result = level_save_toml_checked(&es->level, target,
+                                                 SERIALIZER_SAVE_REPLACE,
+                                                 &replace_expected);
+            if (result != 0) {
+                editor_report_save_failure(es, result, es->file_path);
                 return -1;
             }
         }
@@ -407,9 +428,10 @@ int editor_save_current_level(EditorState *es)
     }
 
     if (es->source_state == EDITOR_SOURCE_EXPECTED_MISSING) {
-        if (level_save_toml_with_policy(&es->level, target,
-                                        SERIALIZER_SAVE_CREATE_ONLY) != 0) {
-            editor_set_status(es, "Save failed: %s", es->file_path);
+        int result = level_save_toml_with_policy(&es->level, target,
+                                                 SERIALIZER_SAVE_CREATE_ONLY);
+        if (result != 0) {
+            editor_report_save_failure(es, result, es->file_path);
             return -1;
         }
         return editor_finalize_save(es, es->file_path, "Saved");
@@ -419,11 +441,14 @@ int editor_save_current_level(EditorState *es)
         editor_set_status(es, "Save failed: source baseline unavailable");
         return -1;
     }
-    if (level_save_toml_checked(&es->level, target,
-                                SERIALIZER_SAVE_REPLACE,
-                                &es->source_fingerprint) != 0) {
-        editor_set_status(es, "Save failed: %s", es->file_path);
-        return -1;
+    {
+        int result = level_save_toml_checked(&es->level, target,
+                                             SERIALIZER_SAVE_REPLACE,
+                                             &es->source_fingerprint);
+        if (result != 0) {
+            editor_report_save_failure(es, result, es->file_path);
+            return -1;
+        }
     }
     return editor_finalize_save(es, es->file_path, "Saved");
 }
@@ -483,17 +508,22 @@ static int editor_save_current_level_as_validated(EditorState *es)
 
     if (target_status == SERIALIZER_PATH_EXISTING) {
         SerializerFileFingerprint baseline;
-        if (serializer_fingerprint_utf8(path, &baseline) != 1 ||
-            level_save_toml_checked(&es->level, path,
-                                    SERIALIZER_SAVE_REPLACE, &baseline) != 0) {
-            editor_set_status(es, "Save failed: %s", path);
+        int result = -1;
+        if (serializer_fingerprint_utf8(path, &baseline) == 1)
+            result = level_save_toml_checked(&es->level, path,
+                                             SERIALIZER_SAVE_REPLACE, &baseline);
+        if (result != 0) {
+            editor_report_save_failure(es, result, path);
             return -1;
         }
-    } else if (level_save_toml_with_policy(&es->level, path,
-                                           SERIALIZER_SAVE_CREATE_ONLY) != 0) {
-        fprintf(stderr, "Error: failed to save %s\n", path);
-        editor_set_status(es, "Save failed: %s", path);
-        return -1;
+    } else {
+        int result = level_save_toml_with_policy(&es->level, path,
+                                                 SERIALIZER_SAVE_CREATE_ONLY);
+        if (result != 0) {
+            fprintf(stderr, "Error: failed to save %s\n", path);
+            editor_report_save_failure(es, result, path);
+            return -1;
+        }
     }
 
     memcpy(es->file_path, path, strlen(path) + 1);
@@ -589,6 +619,13 @@ int editor_commit_temp_file(FILE *fp, const char *temp_path,
                       ? -1
                       : serializer_replace_file(temp_path, target_path);
 
+    /* A half-finished Windows replace leaves the temporary file as the only
+     * copy (see serializer_replace_file): keep it rather than lose both. */
+    if (replace_error == SERIALIZER_REPLACE_TEMP_KEPT) {
+        fprintf(stderr, "editor: could not finish replacing '%s'; kept '%s'\n",
+                target_path, temp_path);
+        return -1;
+    }
     if (stream_error || flush_error || close_error || replace_error) {
         serializer_remove_temp(temp_path);
         return -1;

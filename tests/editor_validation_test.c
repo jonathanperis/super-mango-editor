@@ -1234,6 +1234,71 @@ cleanup:
     return result;
 }
 
+/*
+ * When Windows' ReplaceFileW moves the old file away but cannot move the new
+ * one in, the temporary file is the only copy of the level.  The save must
+ * keep it (never "clean it up"), and the editor must say where it is.  The
+ * test seam reports that failure without touching either file.
+ */
+static int stranded_replace_keeps_the_temporary_file(void)
+{
+    const char *target = TEST_OUT "editor_stranded_target.toml";
+    EditorState es = {0};
+    LevelDef def;
+    LevelDef kept;
+    char kept_path[EDITOR_PATH_MAX] = {0};
+    char root[EDITOR_PATH_MAX] = {0};
+    int result = 1;
+
+    ensure_out_dir();
+    remove(target);
+    fill_valid_minimal(&def);
+    if (level_save_toml(&def, target) != 0) return 1;
+
+    def.coin_score = 77;
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_REPLACE_STRANDED);
+    if (expect_int("stranded replace result", level_save_toml(&def, target),
+                   SERIALIZER_REPLACE_TEMP_KEPT) != 0) goto cleanup;
+    snprintf(kept_path, sizeof(kept_path), "%s", level_save_kept_temp_path());
+    if (expect_int("stranded temp named", kept_path[0] != '\0', 1) != 0 ||
+        expect_int("stranded temp kept", editor_file_exists(kept_path), 1) != 0 ||
+        expect_int("stranded temp loads", level_load_toml(kept_path, &kept), 0) != 0 ||
+        expect_int("stranded temp holds the new level", kept.coin_score, 77) != 0)
+        goto cleanup;
+    remove(kept_path);
+    /* The next save starts with a clean report. */
+    if (expect_int("normal save after stranding", level_save_toml(&def, target), 0) != 0 ||
+        expect_string("kept path cleared", level_save_kept_temp_path(), "") != 0)
+        goto cleanup;
+
+    /* The editor names the kept file instead of a plain "Save failed". */
+    es.undo = undo_create();
+    if (!es.undo || make_test_preference_root(root, sizeof(root)) != 0) goto cleanup;
+    if (editor_set_preference_root(&es, root) != 0 ||
+        editor_init_persistence_paths(&es) != 0 ||
+        editor_load_level(&es, target) != 0) goto cleanup;
+    es.level.coin_score = 78;
+    editor_refresh_dirty(&es);
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_REPLACE_STRANDED);
+    if (expect_int("editor stranded save", editor_save_current_level(&es), -1) != 0 ||
+        expect_prefix("editor stranded status", es.status_message,
+                      "Save incomplete: your level is safe in ") != 0 ||
+        expect_int("editor still modified", es.modified, 1) != 0)
+        goto cleanup;
+    snprintf(kept_path, sizeof(kept_path), "%s", level_save_kept_temp_path());
+    if (expect_int("editor stranded temp kept", editor_file_exists(kept_path), 1) != 0)
+        goto cleanup;
+    result = 0;
+
+cleanup:
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+    if (kept_path[0]) remove(kept_path);
+    if (root[0]) cleanup_test_preference_root(root, &es, 1);
+    undo_destroy(es.undo);
+    remove(target);
+    return result;
+}
+
 static int autosave_backs_off_and_snapshots_last_valid_level(void)
 {
     EditorState es;
@@ -4010,6 +4075,7 @@ int main(void)
     if (failed_save_preserves_target_and_cleans_temp() != 0) return 1;
     if (autosave_recovery_preserves_destination() != 0) return 1;
     if (editor_save_workflows_enforce_baselines() != 0) return 1;
+    if (stranded_replace_keeps_the_temporary_file() != 0) return 1;
     if (symlinks_are_followed_only_for_the_opened_document() != 0) return 1;
     if (text_fields_drop_invalid_utf8() != 0) return 1;
     if (recovery_metadata_and_failed_save_contract() != 0) return 1;

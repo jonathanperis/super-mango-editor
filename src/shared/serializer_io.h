@@ -79,7 +79,14 @@ int serializer_resolve_save_target(const char *path, char *buf, size_t buf_size)
 
 /* Replace target with a completed sibling temporary file, then sync its
  * directory entry where the platform supports it.  A failed directory sync
- * after the file is in place is a stderr warning, not a failed save. */
+ * after the file is in place is a stderr warning, not a failed save.
+ *
+ * Returns 0 on success and -1 when the target was left as it was (the
+ * caller may delete the temporary file).  It returns
+ * SERIALIZER_REPLACE_TEMP_KEPT when the target may already be gone and the
+ * temporary file is the only complete copy: the caller must NOT delete it,
+ * and should tell the user where it is. */
+#define SERIALIZER_REPLACE_TEMP_KEPT (-3)
 int serializer_replace_file(const char *temp_path, const char *target_path);
 
 /* Install a completed sibling only when target is still absent (also synced).
@@ -97,6 +104,10 @@ void serializer_remove_temp(const char *path);
 #define SERIALIZER_TEST_FAILURE_TARGET_APPEARED 3
 #define SERIALIZER_TEST_FAILURE_DIR_SYNC 4 /* POSIX parent-folder fsync */
 #define SERIALIZER_TEST_FAILURE_NO_HARD_LINKS 5 /* POSIX link() reports EPERM */
+/* serializer_replace_file acts as if Windows had moved the original away and
+ * then failed to move the new file in: it returns SERIALIZER_REPLACE_TEMP_KEPT
+ * and leaves both files untouched. */
+#define SERIALIZER_TEST_FAILURE_REPLACE_STRANDED 6
 #ifdef MANGO_TESTING
 void serializer_test_set_failure(int failure);  /* test builds only */
 #endif
