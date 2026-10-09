@@ -15,10 +15,11 @@
  * Saving, or explicitly discarding, the document deletes both files again
  * (editor_retire_*_recovery).
  *
- * The owner is the process id of the editor that wrote the snapshot.  A
- * snapshot whose owner is another editor that is still running is that
- * editor's live work, not a crash leftover, so it is never offered here.
-  *
+ * The owner is the process id of the editor that wrote the snapshot, and
+ * when the system tells, the time that process started.  A snapshot whose
+ * owner is another editor that is still running is that editor's live
+ * work, not a crash leftover, so it is never offered here.
+ *
  * Opening, saving and the recent-file list live in editor_files.c; this file
  * borrows its preference-folder and atomic-write helpers.
  */
@@ -61,21 +62,23 @@
 
 /*
  * A recovery metadata file holds one line:
- *     2 \t <id: 16 hex> \t <timestamp> \t <owner pid> \t <source path: hex> \n
- * Version 1 files (written before the owner was recorded) have no pid
- * field; they are still read, as snapshots with an unknown owner.
+ *     3 \t <id: 16 hex> \t <timestamp> \t <owner pid> \t <owner start>
+ *       \t <source path: hex> \n
+ * Older files are still read: version 2 has no owner start (the pid alone
+ * decides), and version 1 has no owner at all.
  * The path is hex-encoded (2 characters per byte) so tabs and newlines in
  * a file name cannot break the format.  Buffers are sized from that layout
  * so the longest path the editor accepts (EDITOR_PATH_MAX - 1 bytes)
  * survives a write/read round trip:
  *     source hex : 2 * (EDITOR_PATH_MAX - 1) digits + NUL
- *     whole line : "2\t" (2) + id (16) + "\t" (1) + largest uint64 (20)
+ *     whole line : "3\t" (2) + id (16) + "\t" (1) + largest uint64 (20)
  *                  + "\t" (1) + largest uint64 pid (20) + "\t" (1)
+ *                  + largest uint64 start (20) + "\t" (1)
  *                  + hex digits + "\n" (1) + NUL (1)
  */
 #define EDITOR_RECOVERY_SOURCE_HEX_MAX (2 * (EDITOR_PATH_MAX - 1) + 1)
 #define EDITOR_RECOVERY_LINE_MAX \
-    (2 + 16 + 1 + 20 + 1 + 20 + 1 + (EDITOR_RECOVERY_SOURCE_HEX_MAX - 1) + 1 + 1)
+    (2 + 16 + 1 + 20 + 1 + 20 + 1 + 20 + 1 + (EDITOR_RECOVERY_SOURCE_HEX_MAX - 1) + 1 + 1)
 
 static uint64_t editor_recovery_sequence;
 static int editor_recovery_seeded;
@@ -127,18 +130,84 @@ static unsigned long editor_current_process_id(void)
 #endif
 }
 
+#ifdef _WIN32
+/* The creation time of an open process handle, or 0. */
+static uint64_t editor_windows_start_time(HANDLE process)
+{
+    FILETIME created, exited, kernel, user;
+    if (!GetProcessTimes(process, &created, &exited, &kernel, &user)) return 0;
+    return ((uint64_t)created.dwHighDateTime << 32) | created.dwLowDateTime;
+}
+#endif
+
+uint64_t editor_process_start_time(unsigned long pid)
+{
+    if (pid == 0) return 0;
+#if defined(_WIN32)
+    {
+        HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE,
+                                     (DWORD)pid);
+        uint64_t start;
+        if (!process) return 0;
+        start = editor_windows_start_time(process);
+        CloseHandle(process);
+        return start;
+    }
+#elif defined(__linux__)
+    {
+        /* /proc/<pid>/stat is one line of space-separated fields; field 22
+         * is the start time in clock ticks after boot.  Field 2 is the
+         * program name in parentheses, which may itself hold spaces and
+         * ')', so counting starts after the LAST ')'. */
+        char path[48];
+        char line[1024];
+        const char *field;
+        char *end;
+        unsigned long long start;
+        FILE *fp;
+
+        snprintf(path, sizeof(path), "/proc/%lu/stat", pid);
+        fp = fopen(path, "r");
+        if (!fp) return 0;
+        field = fgets(line, sizeof(line), fp);
+        fclose(fp);
+        if (!field || !(field = strrchr(line, ')'))) return 0;
+        for (int number = 2; number < 22; number++) {   /* field 2 ends here */
+            field = strchr(field, ' ');
+            if (!field) return 0;
+            field++;
+        }
+        errno = 0;
+        start = strtoull(field, &end, 10);
+        if (errno == ERANGE || end == field) return 0;
+        return (uint64_t)start;
+    }
+#else
+    /* No portable way to ask (macOS would need proc_pidinfo); the pid
+     * alone decides, as it did before start times were recorded. */
+    return 0;
+#endif
+}
+
 /*
- * editor_process_is_running — Is process `pid` still alive?
+ * editor_process_is_running — Is the process that was `pid`, started at
+ * `start` (0 = unknown), still alive?
  *
  * POSIX: kill() with signal 0 sends nothing; it only checks that the process
  * exists.  EPERM means it exists but belongs to another user, which still
  * counts as running.  Windows: open the process and ask for its exit code;
- * STILL_ACTIVE means it has not exited.  A process id can be reused after
- * its process ends, so a crash snapshot may stay hidden while an unrelated
- * program happens to hold the old number; it reappears once that ends.
+ * STILL_ACTIVE means it has not exited.
+ *
+ * A process id is reused after its process ends.  When the start time was
+ * recorded and the system still knows the pid's start time, the two must
+ * match: an unrelated program that got the old number started later, so a
+ * crash snapshot is not hidden behind it.  When either is unknown, the pid
+ * alone decides, and the snapshot reappears once that program ends.
  */
-static int editor_process_is_running(unsigned long pid)
+static int editor_process_is_running(unsigned long pid, uint64_t start)
 {
+    uint64_t now_start;
+
     if (pid == 0) return 0;
 #ifdef _WIN32
     {
@@ -148,13 +217,16 @@ static int editor_process_is_running(unsigned long pid)
         int running;
         if (!process) return GetLastError() == ERROR_ACCESS_DENIED;
         running = GetExitCodeProcess(process, &code) && code == STILL_ACTIVE;
+        now_start = running && start != 0 ? editor_windows_start_time(process) : 0;
         CloseHandle(process);
-        return running;
+        if (!running) return 0;
     }
 #else
     if ((unsigned long)(pid_t)pid != pid) return 0;   /* not a valid pid_t */
-    return kill((pid_t)pid, 0) == 0 || errno == EPERM;
+    if (kill((pid_t)pid, 0) != 0 && errno != EPERM) return 0;
+    now_start = start != 0 ? editor_process_start_time(pid) : 0;
 #endif
+    return start == 0 || now_start == 0 || now_start == start;
 }
 
 /* A snapshot that another, still running, editor is keeping up to date. */
@@ -162,7 +234,7 @@ static int editor_recovery_entry_is_live_elsewhere(const EditorRecoveryEntry *en
 {
     return entry->owner_pid != 0 &&
            entry->owner_pid != editor_current_process_id() &&
-           editor_process_is_running(entry->owner_pid);
+           editor_process_is_running(entry->owner_pid, entry->owner_start);
 }
 
 /* ------------------------------------------------------------------ */
@@ -380,10 +452,11 @@ static int editor_write_recovery_metadata(const EditorRecoveryEntry *entry)
     fp = serializer_open_temp(entry->metadata_path, temp_path,
                               sizeof(temp_path));
     if (!fp) return -1;
-    if (fprintf(fp, "2\t%016llx\t%llu\t%lu\t%s\n",
+    if (fprintf(fp, "3\t%016llx\t%llu\t%lu\t%llu\t%s\n",
                 (unsigned long long)entry->id,
                 (unsigned long long)entry->timestamp,
-                entry->owner_pid, source_hex) < 0) {
+                entry->owner_pid, (unsigned long long)entry->owner_start,
+                source_hex) < 0) {
         fclose(fp);
         serializer_remove_temp(temp_path);
         return -1;
@@ -430,11 +503,13 @@ static int editor_read_recovery_metadata(const EditorState *es,
     char *id_text;
     char *timestamp_text;
     char *pid_text = NULL;
+    char *start_text = NULL;
     char *source_text;
     char *end;
     uint64_t id;
     unsigned long long timestamp;
     unsigned long owner_pid = 0;
+    unsigned long long owner_start = 0;
     FILE *fp;
 
     if (!es || !name || !entry ||
@@ -459,17 +534,26 @@ static int editor_read_recovery_metadata(const EditorState *es,
     version = strtok(line, "\t");
     id_text = strtok(NULL, "\t");
     timestamp_text = strtok(NULL, "\t");
-    /* Version 2 adds the owner's process id before the source path. */
-    if (version && strcmp(version, "2") == 0) pid_text = strtok(NULL, "\t");
+    /* Version 2 adds the owner's process id before the source path, and
+     * version 3 the owner's start time after it. */
+    if (version && (strcmp(version, "2") == 0 || strcmp(version, "3") == 0))
+        pid_text = strtok(NULL, "\t");
+    if (version && strcmp(version, "3") == 0) start_text = strtok(NULL, "\t");
     source_text = strtok(NULL, "\t");
     if (!version || !id_text || !timestamp_text || !source_text ||
         strtok(NULL, "\t") ||
-        !(strcmp(version, "1") == 0 || (strcmp(version, "2") == 0 && pid_text)))
+        !(strcmp(version, "1") == 0 || (strcmp(version, "2") == 0 && pid_text) ||
+          (strcmp(version, "3") == 0 && pid_text && start_text)))
         return 0;
     if (pid_text) {
         errno = 0;
         owner_pid = strtoul(pid_text, &end, 10);
         if (errno == ERANGE || end == pid_text || *end != '\0') return 0;
+    }
+    if (start_text) {
+        errno = 0;
+        owner_start = strtoull(start_text, &end, 10);
+        if (errno == ERANGE || end == start_text || *end != '\0') return 0;
     }
     errno = 0;
     id = strtoull(id_text, &end, 16);
@@ -483,6 +567,7 @@ static int editor_read_recovery_metadata(const EditorState *es,
     entry->id = (uint64_t)id;
     entry->timestamp = (uint64_t)timestamp;
     entry->owner_pid = owner_pid;
+    entry->owner_start = (uint64_t)owner_start;
     if (recovery_hex_decode(source_text, entry->source_path,
                             sizeof(entry->source_path)) != 0) return 0;
     memcpy(entry->snapshot_path, snapshot_path, strlen(snapshot_path) + 1);
@@ -689,6 +774,7 @@ static int editor_add_recovery_entry(EditorState *es, const char *source_path)
     entry.id = es->recovery_document_id;
     entry.timestamp = (uint64_t)time(NULL);
     entry.owner_pid = editor_current_process_id();
+    entry.owner_start = editor_process_start_time(entry.owner_pid);
     memcpy(entry.source_path, source_path, strlen(source_path) + 1);
     memcpy(entry.snapshot_path, es->autosave_path,
            strlen(es->autosave_path) + 1);

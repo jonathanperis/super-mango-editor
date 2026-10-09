@@ -4307,6 +4307,36 @@ static int recovery_folder_stays_manageable(void)
             goto cleanup;
     }
 #endif
+#ifdef __linux__
+    /* Version 3 also records when the owner started.  The same pid with a
+     * different start time is another program that got the number after
+     * the editor crashed: that copy is offered.  (Linux reads start times;
+     * elsewhere the pid alone decides, as checked above.) */
+    {
+        unsigned long parent = (unsigned long)getppid();
+        unsigned long long start = (unsigned long long)editor_process_start_time(parent);
+        char path[EDITOR_PATH_MAX];
+        char line[160];
+        int ok = 1;
+        if (expect_int("start time known", start != 0, 1) != 0) goto cleanup;
+        for (int k = 0; k < 2; k++) {
+            unsigned long long id = 0x3002ull + (unsigned long long)k;
+            snprintf(path, sizeof(path), "%s/editor_recovery_%016llx.toml", root, id);
+            ok = ok && write_text_file(path, "name = \"left over\"\n") == 0;
+            snprintf(path, sizeof(path), "%s/editor_recovery_%016llx.meta", root, id);
+            snprintf(line, sizeof(line), "3\t%016llx\t1700000000\t%lu\t%llu\t-\n",
+                     id, parent, start + (unsigned long long)k);
+            ok = ok && write_text_file(path, line) == 0;
+        }
+        if (!ok || editor_discover_recoveries(&es) != 0 ||
+            expect_int("crashed and reused-pid copies offered", es.recovery_entry_count, 2) != 0 ||
+            expect_int("live v3 copy hidden",
+                       es.recovery_entries[0].id != 0x3002 && es.recovery_entries[1].id != 0x3002, 1) != 0 ||
+            expect_int("reused pid offered",
+                       es.recovery_entries[0].id == 0x3003 || es.recovery_entries[1].id == 0x3003, 1) != 0)
+            goto cleanup;
+    }
+#endif
     result = 0;
 
 cleanup:
@@ -4317,6 +4347,8 @@ cleanup:
     remove_recovery_pair(root, 0x2000);
     remove_recovery_pair(root, 0x3000);
     remove_recovery_pair(root, 0x3001);
+    remove_recovery_pair(root, 0x3002);
+    remove_recovery_pair(root, 0x3003);
     cleanup_test_preference_root(root, &es, 1);
     return result;
 }
