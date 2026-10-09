@@ -328,7 +328,7 @@ aliases are released before their owning context/sample/device. The game
 requires an audio device: if none can be opened, session creation fails. Menu/game transitions retain the same
 window, including when a candidate level fails to load.
 
-Version-1 profile binding numbers are translated explicitly. Unsupported legacy
+Version-1 profile binding numbers (USB HID keyboard usage IDs; the ones code names directly are `BINDING_KEY_*` in `src/input/input_backend.h`) are translated explicitly. Unsupported legacy
 media/paddle/touchpad bindings retain their stored values and show a remap warning;
 fixed keyboard navigation remains available. Native preference paths retain both
 organization and application components. Browser input handlers are scoped to
