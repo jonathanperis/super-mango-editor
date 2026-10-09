@@ -201,6 +201,8 @@ if (!font) return -1;
 
 // Draw while the frame's render target is active
 font_draw(font, "Score: 0", 10, 10, WHITE);
+// Centre a label on x = 200 (measures the text for you)
+font_draw_centered(font, "Paused", GAME_W / 2, 92, WHITE);
 
 // Cleanup before closing the graphics context (frees only the handle)
 font_unload(font);
