@@ -201,13 +201,14 @@ void editor_play_test_from(EditorState *es, const LevelStart *start)
         memset(&startup, 0, sizeof(startup));
         memset(&process, 0, sizeof(process));
         startup.cb = sizeof(startup);
-        /* The start flag (args after the fixed ones) is ASCII digits. */
+        /* The same start flag editor_playtest_arguments put in args. */
         wchar_t start_flag[48] = L"";
-        if (start && start->kind != LEVEL_START_DEFAULT)
+        if (start && start->kind == LEVEL_START_AT_X)
             _snwprintf(start_flag, sizeof(start_flag) / sizeof(start_flag[0]),
-                       L" %hs %hs",
-                       start->kind == LEVEL_START_AT_X ? "--start-x" : "--start-checkpoint",
-                       start_number);
+                       L" --start-x %d", (int)(start->x + 0.5f));
+        else if (start && start->kind == LEVEL_START_AT_CHECKPOINT)
+            _snwprintf(start_flag, sizeof(start_flag) / sizeof(start_flag[0]),
+                       L" --start-checkpoint %d", start->checkpoint);
         written = wide_level && wide_binary
                   ? _snwprintf(command, sizeof(command) / sizeof(command[0]),
                               L"\"%ls\" --no-save --level \"%ls\"%ls%ls",
@@ -231,7 +232,12 @@ void editor_play_test_from(EditorState *es, const LevelStart *start)
         es->play_process = (intptr_t)process.hProcess;
     }
     es->playing = 1;
-    editor_set_status(es, "Play launched %s", save_path);
+    if (start && start->kind == LEVEL_START_AT_X)
+        editor_set_status(es, "Play launched from x %s", start_number);
+    else if (start && start->kind == LEVEL_START_AT_CHECKPOINT)
+        editor_set_status(es, "Play launched from checkpoint %s", start_number);
+    else
+        editor_set_status(es, "Play launched %s", save_path);
     SetWindowTitle("Super Mango Editor - Playing...");
 #endif
 }
