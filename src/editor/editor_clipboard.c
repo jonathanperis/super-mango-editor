@@ -11,8 +11,8 @@
 #include "tools.h"       /* editor_clamp_placement, editor_add_placement */
 #include "editor_undo_apply.h" /* editor_apply_undo_command (group rollback) */
 
-/* How far a pasted copy moves so it does not hide the original (see
- * offset_pasted_copy for which way each type moves). */
+/* How far a pasted copy moves, right and down, so it does not hide the
+ * original (see offset_pasted_copy). */
 #define PASTE_OFFSET 24.0f
 
 /*
@@ -133,127 +133,21 @@ void editor_clipboard_after_rail_insert(EditorState *es, int index)
 }
 
 /*
- * offset_pasted_copy — Move a copied placement by PASTE_OFFSET.
- *
- * Every type stores its position in different fields (patrolling enemies
- * also carry a patrol range that must move with them), so this is the one
- * per-type switch in the clipboard.  Free-floating things move right and
- * down; things tied to the floor move only right; rail riders move along
- * their rail; floor gaps move one whole gap width.
+ * offset_pasted_copy — Move a copied placement by PASTE_OFFSET right and
+ * down, exactly as dragging it that far would (editor_move_placement):
+ * things tied to the floor move only right, floor gaps one whole gap
+ * width.  The one paste-only rule is for rail riders, which a drag leaves
+ * where their rail puts them: a copy steps along its rail instead, so it
+ * does not hide the original.
  */
 static void offset_pasted_copy(EntityType type, PlacementData *d)
 {
-    switch (type) {
-    case ENT_COIN:
-        d->coin.x += PASTE_OFFSET;
-        d->coin.y += PASTE_OFFSET;
-        break;
-    case ENT_STAR_YELLOW:
-        d->star_yellow.x += PASTE_OFFSET;
-        d->star_yellow.y += PASTE_OFFSET;
-        break;
-    case ENT_STAR_GREEN:
-        d->star_green.x += PASTE_OFFSET;
-        d->star_green.y += PASTE_OFFSET;
-        break;
-    case ENT_STAR_RED:
-        d->star_red.x += PASTE_OFFSET;
-        d->star_red.y += PASTE_OFFSET;
-        break;
-    case ENT_LAST_STAR:
-    case ENT_PLAYER_SPAWN:
-        d->last_star.x += PASTE_OFFSET;
-        d->last_star.y += PASTE_OFFSET;
-        break;
-    case ENT_SPIDER:
-        d->spider.x += PASTE_OFFSET;
-        d->spider.patrol_x0 += PASTE_OFFSET;
-        d->spider.patrol_x1 += PASTE_OFFSET;
-        break;
-    case ENT_JUMPING_SPIDER:
-        d->jumping_spider.x += PASTE_OFFSET;
-        d->jumping_spider.patrol_x0 += PASTE_OFFSET;
-        d->jumping_spider.patrol_x1 += PASTE_OFFSET;
-        break;
-    case ENT_BIRD:
-    case ENT_FASTER_BIRD:
-        d->bird.x += PASTE_OFFSET;
-        d->bird.patrol_x0 += PASTE_OFFSET;
-        d->bird.patrol_x1 += PASTE_OFFSET;
-        break;
-    case ENT_FISH:
-    case ENT_FASTER_FISH:
-        d->fish.x += PASTE_OFFSET;
-        d->fish.patrol_x0 += PASTE_OFFSET;
-        d->fish.patrol_x1 += PASTE_OFFSET;
-        break;
-    case ENT_AXE_TRAP:
-        d->axe_trap.pillar_x += PASTE_OFFSET;
-        break;
-    case ENT_CIRCULAR_SAW:
-        d->circular_saw.x += PASTE_OFFSET;
-        d->circular_saw.patrol_x0 += PASTE_OFFSET;
-        d->circular_saw.patrol_x1 += PASTE_OFFSET;
-        break;
-    case ENT_SPIKE_ROW:
-        d->spike_row.x += PASTE_OFFSET;
-        break;
-    case ENT_SPIKE_PLATFORM:
-        d->spike_platform.x += PASTE_OFFSET;
-        d->spike_platform.y += PASTE_OFFSET;
-        break;
-    case ENT_SPIKE_BLOCK:
-        /* Spike blocks ride a rail: move along it instead of in x/y. */
+    if (type == ENT_SPIKE_BLOCK) {
         d->spike_block.t_offset += PASTE_OFFSET / (float)RAIL_TILE_W;
-        break;
-    case ENT_BLUE_FLAME:
-        d->blue_flame.x += PASTE_OFFSET;
-        break;
-    case ENT_FIRE_FLAME:
-        d->fire_flame.x += PASTE_OFFSET;
-        break;
-    case ENT_FLOAT_PLATFORM:
-        /* RAIL mode ignores x/y (the rail positions it): move along it. */
-        if (d->float_platform.mode == FLOAT_PLATFORM_RAIL) {
-            d->float_platform.t_offset += PASTE_OFFSET / (float)RAIL_TILE_W;
-        } else {
-            d->float_platform.x += PASTE_OFFSET;
-            d->float_platform.y += PASTE_OFFSET;
-        }
-        break;
-    case ENT_BRIDGE:
-        d->bridge.x += PASTE_OFFSET;
-        break;
-    case ENT_BOUNCEPAD_SMALL:
-    case ENT_BOUNCEPAD_MEDIUM:
-    case ENT_BOUNCEPAD_HIGH:
-        d->bouncepad.x += PASTE_OFFSET;
-        break;
-    case ENT_PLATFORM:
-        d->platform.x += PASTE_OFFSET;
-        break;
-    case ENT_VINE:
-        d->vine.x += PASTE_OFFSET;
-        break;
-    case ENT_LADDER:
-        d->ladder.x += PASTE_OFFSET;
-        break;
-    case ENT_ROPE:
-        d->rope.x += PASTE_OFFSET;
-        break;
-    case ENT_FLOOR_GAP:
-        /* Gaps live on the 32-px floor grid; step one whole gap instead. */
-        d->floor_gap += FLOOR_GAP_W;
-        break;
-    case ENT_CHECKPOINT:
-        d->checkpoint.x += PASTE_OFFSET;
-        d->checkpoint.y += PASTE_OFFSET;
-        break;
-    case ENT_RAIL:
-        d->rail.x += (int)PASTE_OFFSET;
-        break;
-    case ENT_COUNT:
-        break;
+    } else if (type == ENT_FLOAT_PLATFORM && d->float_platform.mode == FLOAT_PLATFORM_RAIL) {
+        d->float_platform.t_offset += PASTE_OFFSET / (float)RAIL_TILE_W;
+    } else {
+        *d = editor_move_placement(type, d, PASTE_OFFSET, PASTE_OFFSET);
     }
 }
 
