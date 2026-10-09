@@ -4,7 +4,7 @@
  * the variable-timestep engine and are refused with a "record it again" error.
  * Replays require unchanged level bytes and the same engine version. */
 #include "game_experiment.h"
-#include "../shared/platform.h"  /* clock_millis, str_copy */
+#include "../shared/platform.h"  /* str_copy */
 #include "game_random.h"
 #include "game_completion.h"
 #include "game_overlay.h"   /* game_audio_apply_settings */
@@ -17,6 +17,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>    /* time: calendar seconds for export names */
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 EM_JS(void, experiment_download, (const char *path), {
@@ -138,16 +139,57 @@ int game_experiment_save(GameState *gs, const char *path)
     return failed ? -1 : 0;
 }
 
+/*
+ * The file name used to come from clock_millis(), the time since the
+ * computer started. After a reboot that count starts again, so a new export
+ * could ask for the name of an old one; the create-only save then refused
+ * it and the log blamed a missing recording. The name now uses the calendar
+ * time, and a taken name moves on to -2, -3, ... instead of failing.
+ */
+ExperimentExportResult game_experiment_export_at(GameState *gs, const char *folder,
+                                                 long long stamp, char *path, size_t size)
+{
+    const GameExperiment *tape = gs->experiment;
+    if (!tape || !tape->count) return EXPERIMENT_EXPORT_NOTHING;
+    for (int attempt = 1; attempt <= EXPERIMENT_EXPORT_ATTEMPTS; attempt++) {
+        int length = attempt == 1
+            ? snprintf(path, size, "%smango-experiment-%lld.toml", folder, stamp)
+            : snprintf(path, size, "%smango-experiment-%lld-%d.toml", folder, stamp, attempt);
+        if (length < 0 || (size_t)length >= size) return EXPERIMENT_EXPORT_WRITE_FAILED;
+        SerializerPathStatus status = serializer_probe_path_utf8(path);
+        if (status == SERIALIZER_PATH_EXISTING) continue;
+        if (status == SERIALIZER_PATH_ERROR) return EXPERIMENT_EXPORT_WRITE_FAILED;
+        if (game_experiment_save(gs, path) == 0) return EXPERIMENT_EXPORT_OK;
+        /* Another program took the name between the check and the save. */
+        if (serializer_probe_path_utf8(path) == SERIALIZER_PATH_EXISTING) continue;
+        return EXPERIMENT_EXPORT_WRITE_FAILED;
+    }
+    return EXPERIMENT_EXPORT_NAME_TAKEN;
+}
+
 void game_experiment_export(GameState *gs)
 {
-    char path[128];
-    snprintf(path, sizeof(path), "mango-experiment-%llu.toml", (unsigned long long)clock_millis());
-    if (game_experiment_save(gs, path)) { debug_log(&gs->debug, "Export failed; F8 starts a recording"); return; }
+    char path[160];
+    switch (game_experiment_export_at(gs, "", (long long)time(NULL), path, sizeof(path))) {
+    case EXPERIMENT_EXPORT_OK:
 #ifdef __EMSCRIPTEN__
-    experiment_download(path);
+        experiment_download(path);
 #endif
-    debug_log(&gs->debug, "Exported %s", path);
-    TraceLog(LOG_INFO, "Experiment exported: %s", path);
+        debug_log(&gs->debug, "Exported %s", path);
+        TraceLog(LOG_INFO, "Experiment exported: %s", path);
+        break;
+    case EXPERIMENT_EXPORT_NOTHING:
+        debug_log(&gs->debug, "Nothing recorded; F8 starts a recording");
+        break;
+    case EXPERIMENT_EXPORT_NAME_TAKEN:
+        debug_log(&gs->debug, "Export failed: file names already taken");
+        TraceLog(LOG_WARNING, "Experiment export: %s and earlier names already exist", path);
+        break;
+    default:
+        debug_log(&gs->debug, "Export failed: could not write the file");
+        TraceLog(LOG_WARNING, "Experiment export: could not write %s", path);
+        break;
+    }
 }
 
 static int number(toml_datum_t datum, float *out)

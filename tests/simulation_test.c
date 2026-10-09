@@ -27,6 +27,22 @@ static void key(GameState *gs, int keycode)
     (void)game_inspector_event(gs, &event);
 }
 
+/* The file F9 writes for stamp 1000 on its attempt-th try. */
+static void export_name(char *out, size_t size, int attempt)
+{
+    if (attempt == 1) snprintf(out, size, TEST_OUT "mango-experiment-1000.toml");
+    else snprintf(out, size, TEST_OUT "mango-experiment-1000-%d.toml", attempt);
+}
+
+static void remove_exports(void)
+{
+    char name[160];
+    for (int i = 1; i <= EXPERIMENT_EXPORT_ATTEMPTS; i++) {
+        export_name(name, sizeof(name), i);
+        remove(name);
+    }
+}
+
 static int inspection_and_replay(void)
 {
     int failed = 0;
@@ -108,6 +124,32 @@ static int inspection_and_replay(void)
     remove(TEST_OUT "school-experiment.toml");
     CHECK(game_experiment_save(&gs, TEST_OUT "school-experiment.toml") == 0);
     CHECK(game_experiment_save(&gs, TEST_OUT "school-experiment.toml") == -1);
+    /* F9 export names: an export used to reuse a time-since-boot name after
+     * a reboot, collide with an old file, and report "F8 starts a recording"
+     * although a recording existed. A taken name now moves on to -2, -3...,
+     * and running out of names has its own result. */
+    {
+        char exported[160], expected[160];
+        remove_exports();
+        CHECK(game_experiment_export_at(&gs, TEST_OUT, 1000, exported, sizeof(exported)) == EXPERIMENT_EXPORT_OK);
+        export_name(expected, sizeof(expected), 1);
+        CHECK(strcmp(exported, expected) == 0);
+        CHECK(game_experiment_export_at(&gs, TEST_OUT, 1000, exported, sizeof(exported)) == EXPERIMENT_EXPORT_OK);
+        export_name(expected, sizeof(expected), 2);
+        CHECK(strcmp(exported, expected) == 0);
+        for (int i = 3; i <= EXPERIMENT_EXPORT_ATTEMPTS; i++) {
+            export_name(expected, sizeof(expected), i);
+            FILE *taken = fopen(expected, "w");
+            CHECK(taken != NULL);
+            fclose(taken);
+        }
+        CHECK(game_experiment_export_at(&gs, TEST_OUT, 1000, exported, sizeof(exported)) == EXPERIMENT_EXPORT_NAME_TAKEN);
+        GameExperiment *tape = gs.experiment;
+        gs.experiment = NULL;
+        CHECK(game_experiment_export_at(&gs, TEST_OUT, 1001, exported, sizeof(exported)) == EXPERIMENT_EXPORT_NOTHING);
+        gs.experiment = tape;
+        remove_exports();
+    }
     CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment.toml") == 0);
     /* Replay through the same frame loop shape as game_frame: real frames of
      * 70 ms run several fixed steps each, one recorded row per step. */
@@ -155,6 +197,7 @@ static int inspection_and_replay(void)
     gs.source_level_hash ^= 1;
 done:
     remove(TEST_OUT "school-experiment.toml"); remove(TEST_OUT "school-experiment-invalid.toml");
+    remove_exports();
     game_cleanup(&gs);
     return failed;
 }

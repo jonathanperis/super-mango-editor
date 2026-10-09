@@ -160,8 +160,13 @@ going to another level, or choosing Replay, Level Select or Exit, throws it
 away, so export it before you leave.
 
 F9 exports the recording, including from the completion and game-over screens,
-as `mango-experiment-<milliseconds>.toml` in the working directory (or as a
-browser download). It never overwrites an existing file. The file
+as `mango-experiment-<seconds>.toml` in the working directory (or as a
+browser download), where `<seconds>` is the calendar time (seconds since
+1970). It never overwrites an existing file: a taken name becomes
+`mango-experiment-<seconds>-2.toml`, `-3` and so on up to `-10`. The debug log
+says which of "Nothing recorded; F8 starts a recording", "Export failed: file
+names already taken" or "Export failed: could not write the file" stopped an
+export. The file
 (`format_version = 2`) has one row per step, `[input bits, nine movement
 values]`, plus the level path, the seed and `level_hash`, a hash of the level
 file's exact bytes.
