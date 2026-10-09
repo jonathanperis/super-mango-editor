@@ -15,6 +15,7 @@
 #include "level_ref.h"
 #include "level_resources.h"
 #include "phase_transition.h"
+#include "../core/game_camera.h"
 #include "../core/game_completion.h"
 #include "../core/game_resources.h"
 #include "../core/game_experiment.h"
@@ -516,8 +517,10 @@ int game_load_next_phase(GameState *gs)
     /* Only campaign progress crosses a phase boundary. Old movement, climbing,
      * and support indices refer to the previous level and must not survive. */
     player_reset(&gs->player);
-    gs->camera.x = 0.0f;
     gs->loop.fp_prev_riding = -1;
+    /* Show the new level's start at once. Setting the camera to 0 instead
+     * would pan from the left edge whenever the start lies further right. */
+    game_camera_snap(gs);
 
     phase_progress_restore(gs, &saved_progress);
     gs->level_score_start = gs->score;

@@ -117,9 +117,12 @@ Every step uses a fixed `dt` of exactly 1/60 s (see [Architecture](../architectu
 
 Loaded levels set `gs->runtime.world_w = screen_count × GAME_W`; `WORLD_W` is not
 the active width of every level. The visible canvas is `GAME_W` (400 px), and the
-camera tracks its left edge in world coordinates. After a lost life or a Retry,
-`game_camera_snap` puts the camera straight on the respawn point instead of
-easing it back across the level from where the player died.
+camera tracks its left edge in world coordinates. Whenever the player is placed
+rather than moved (level start, a phase transition, an F8 experiment restart, a
+lost life or a Retry), `game_camera_snap` puts the camera straight on that spot
+instead of easing it across the level from wherever it was. A level whose start
+lies further right than half a screen therefore opens on its start, not on a pan
+from x = 0.
 
 ---
 

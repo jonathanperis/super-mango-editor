@@ -6,6 +6,7 @@
 #include "game_experiment.h"
 #include "../shared/platform.h"  /* str_copy */
 #include "game_random.h"
+#include "game_camera.h"
 #include "game_completion.h"
 #include "game_overlay.h"   /* game_audio_apply_settings */
 #include "game_timing.h"
@@ -53,7 +54,7 @@ static void restart(GameState *gs, unsigned int seed)
     game_completion_reset_summary(gs);
     gs->completion.complete = gs->game_over = 0;
     gs->loop.fp_prev_riding = -1;
-    gs->camera.x = 0;
+    game_camera_snap(gs);  /* the restarted level's start, not x = 0 */
     gs->level_score_start = 0;
     gs->profile_completion_recorded = 1; /* Experiments never become best results. */
     gs->inspector.frozen = gs->inspector.step_requested = 0;

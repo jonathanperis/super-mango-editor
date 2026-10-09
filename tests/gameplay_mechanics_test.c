@@ -19,6 +19,7 @@
 
 #include "collision/collision_damage.h"
 #include "core/debug.h"
+#include "core/game_experiment.h"
 #include "core/game_overlay.h"
 #include "core/game_profile.h"
 #include "effects/parallax.h"
@@ -39,6 +40,8 @@
 #define CLIMBING_LEVEL  "tests/fixtures/runtime/climbing.toml"
 #define HAZARDS_LEVEL   "tests/fixtures/runtime/hazards.toml"
 #define CREATURES_LEVEL "tests/fixtures/runtime/creatures.toml"
+#define FAR_START_LEVEL "tests/fixtures/runtime/far_start.toml"
+#define TRANSITION_LEVEL "tests/fixtures/runtime/transition.toml"
 
 #define STEPS_PER_SECOND 60
 #define CHECK(test) do { if (!(test)) { \
@@ -829,6 +832,52 @@ done:
     return failed;
 }
 
+/* Where the camera rests for the player's current position: centred on
+ * the player, clamped to the world (no lookahead: these players stand still). */
+static float resting_camera_x(const GameState *gs)
+{
+    float x = gs->player.x + gs->player.w * 0.5f - GAME_W * 0.5f;
+    if (x < 0.0f) x = 0.0f;
+    if (x > (float)(gs->runtime.world_w - GAME_W)) x = (float)(gs->runtime.world_w - GAME_W);
+    return x;
+}
+
+/*
+ * A level that starts far from x = 0 shows its start on the very first
+ * frame: game_init snaps the camera instead of leaving it at 0 for the
+ * easing to pan across. A phase transition and an F8 experiment restart
+ * place the player the same way, so they snap too.
+ */
+static int level_start_shows_the_start_at_once(void)
+{
+    int failed = 0;
+    GameState gs;
+    CHECK(mechanics_open_level(&gs, FAR_START_LEVEL, 1) == 0);
+    float rest = resting_camera_x(&gs);
+    CHECK(rest > 600.0f);
+    CHECK(gs.camera.x == rest);
+    /* One idle step leaves it there: nothing was left to ease toward. */
+    mechanics_step(&gs, 0, 1);
+    CHECK(NEAR(gs.camera.x, rest, 0.5f));
+
+    /* F8 restarts at the start: the camera follows at once. */
+    gs.camera.x = 0.0f;
+    CHECK(game_experiment_begin(&gs) == 0);
+    CHECK(gs.camera.x == resting_camera_x(&gs) && gs.camera.x > 600.0f);
+    game_cleanup(&gs);
+
+    /* A phase transition puts the camera on the new level's start, not
+     * where the old level's camera happened to be. */
+    CHECK(mechanics_open_level(&gs, TRANSITION_LEVEL, 0) == 0);
+    gs.camera.x = 300.0f;
+    game_complete_level(&gs);
+    CHECK(game_load_next_phase(&gs) == 0);
+    CHECK(gs.camera.x == resting_camera_x(&gs));
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
 /* ------------------------------------------------------------------ */
 /* Debug overlay                                                       */
 /* ------------------------------------------------------------------ */
@@ -1009,6 +1058,7 @@ int main(void)
         CASE(bridge_crumbles_under_the_player),
         CASE(bridge_ignores_a_player_on_another_surface),
         CASE(camera_jumps_to_the_respawn_point),
+        CASE(level_start_shows_the_start_at_once),
         CASE(debug_log_is_a_bounded_ring),
         CASE(parallax_scrolls_and_wraps),
         CASE(every_overlay_state_renders),
