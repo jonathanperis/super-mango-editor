@@ -122,6 +122,9 @@ static void editor_key(EditorState *es, const InputEvent *event)
         case KEY_V:
             if (editor_finish_field_edit(es)) editor_paste_clipboard(es);
             break;
+        case KEY_D:
+            if (editor_finish_field_edit(es)) editor_duplicate_selection(es);
+            break;
         default:
             break;
         }

@@ -1108,9 +1108,6 @@ void tools_cancel_drag(EditorState *es)
 /* tools_nudge_selection                                               */
 /* ------------------------------------------------------------------ */
 
-/* The most entities one group action handles at once. */
-#define TOOLS_MAX_GROUP 256
-
 /* A fingerprint of which entities a list names, so a run of nudges is
  * only merged while it keeps moving the same ones (FNV-1a over the list). */
 static uint64_t selection_key(const Selection *items, int count)
@@ -1129,9 +1126,9 @@ static uint64_t selection_key(const Selection *items, int count)
 
 void tools_nudge_selection(EditorState *es, float dx, float dy)
 {
-    static Selection items[TOOLS_MAX_GROUP];
-    static PlacementData before[TOOLS_MAX_GROUP];
-    static PlacementData after[TOOLS_MAX_GROUP];
+    static Selection items[EDITOR_MAX_SELECTION];
+    static PlacementData before[EDITOR_MAX_SELECTION];
+    static PlacementData after[EDITOR_MAX_SELECTION];
     char error[128];
     int count;
     int changed = 0;
@@ -1141,7 +1138,7 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
 
     if (!es || !tools_can_hit_test(es)) return;
     editor_selection_reconcile(es);
-    count = editor_selection_items(es, items, TOOLS_MAX_GROUP);
+    count = editor_selection_items(es, items, EDITOR_MAX_SELECTION);
     if (count == 0) return;
 
     /* Move every selected entity, exactly as a drag by (dx, dy) would. */

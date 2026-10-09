@@ -223,11 +223,17 @@ The folder holds at most 32 recovery copies. When leftover copies fill it, autos
 |--------|----------|
 | Copy selected entity | `Ctrl+C` |
 | Paste (offset from original) | `Ctrl+V` |
+| Duplicate the selection (offset, clipboard untouched) | `Ctrl+D` |
 
 Only one entity can be in the clipboard at a time. The pasted entity is moved a little so it does not hide the original (24 px right, and down for free-floating things; along the rail for rail riders; one gap width for floor gaps), and it becomes the selection. Each further
 `Ctrl+V` steps one more offset from the previous copy, so repeated pastes lay
 out a row instead of stacking on one spot; a new `Ctrl+C` starts again from the
 copied entity.
+
+`Ctrl+D` duplicates the selection without touching the clipboard: the copy moves
+by the same offset a paste uses and becomes the selection, so pressing `Ctrl+D`
+again keeps stepping. A rail rider stays on its own rail. The Player Spawn and
+the Last Star exist once per level and are not duplicated.
 
 Place, drag and Paste clamp entities into the world (patrol ranges included, and a
 pasted spike block's `t_offset` wraps onto its rail). Paste is refused while the
