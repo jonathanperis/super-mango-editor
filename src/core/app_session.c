@@ -450,6 +450,18 @@ static int session_open_menu(AppSession *session)
     return 0;
 }
 
+/*
+ * session_show_load_failure — Tell the player a level did not open, on the
+ * menu that is showing instead. Play and --continue both land here, so a
+ * failed start never just leaves the player at the menu without a word.
+ */
+static void session_show_load_failure(AppSession *session, const char *path)
+{
+    copy_path(session->status_message, sizeof(session->status_message), "Selected level could not be loaded");
+    TraceLog(LOG_WARNING, "%s: %s", session->status_message, path);
+    if (session->menu) start_menu_set_error(session->menu, session->status_message);
+}
+
 static void session_end(AppSession *session, int fatal)
 {
     if (session->ended) return;
@@ -479,8 +491,7 @@ static void session_apply_menu_route(AppSession *session)
         start_menu_get_input_state(session->menu, &inherited);
         GameState *candidate = session_make_game(session, session->menu->selected_level_path, &inherited);
         if (!candidate) {
-            copy_path(session->status_message, sizeof(session->status_message), "Selected level could not be loaded");
-            start_menu_set_error(session->menu, session->status_message);
+            session_show_load_failure(session, session->menu->selected_level_path);
             session->menu->route = MENU_ROUTE_NONE;
         } else {
             /* Continue starts from the saved point; Play from the start. */
@@ -655,9 +666,12 @@ AppSession *session_create(const AppSessionConfig *config)
     if (level && level[0]) {
         copy_path(session->boot_level_path, sizeof(session->boot_level_path), level);
         /* An explicit --level that fails is an error. A remembered stage
-         * that no longer loads falls back to the selector instead. */
-        if (session_open_game(session, session->boot_level_path, NULL) &&
-            (!continued || session_open_menu(session))) goto fail;
+         * that no longer loads falls back to the selector instead, which
+         * says so the way a failed Play does. */
+        if (session_open_game(session, session->boot_level_path, NULL)) {
+            if (!continued || session_open_menu(session)) goto fail;
+            session_show_load_failure(session, session->boot_level_path);
+        }
         /* --continue also picks the stage up at its saved Continue point. */
         if (continued && session->game) session_apply_resume(session, session->game);
     } else if (session_open_menu(session)) goto fail;
