@@ -60,6 +60,14 @@ void editor_retire_matching_recovery(EditorState *es, const char *destination);
 /* Retire the current document recovery after a save or explicit discard. */
 void editor_retire_current_recovery(EditorState *es);
 
+/* When process `pid` started, as a number only comparable with another
+ * answer for the same pid on this machine (Linux: clock ticks after boot;
+ * Windows: a FILETIME); 0 when not known.  Together with the pid it names
+ * one process even after the system hands the pid to another program.
+ * Other systems (macOS, the browser) always answer 0, and the pid alone
+ * decides. */
+uint64_t editor_process_start_time(unsigned long pid);
+
 /* Non-zero when the file name in path is a recovery snapshot
  * (editor_recovery_<16 hex digits>.toml); such files are never saved over. */
 int editor_path_is_recovery(const char *path);
