@@ -141,7 +141,8 @@ void ui_edit_key(UIState *ui, UIEditKey key);
  * invalid value keeps the focus where it is. */
 void ui_focus_next(UIState *ui, int direction);
 /* Activate field `id` the next time it is drawn, as if it had been clicked
- * (dropped if it is not drawn within two frames). */
+ * (dropped if it is not drawn within two frames).  For a dropdown id this
+ * opens its list. */
 void ui_focus_field(UIState *ui, int id);
 
 /* Draw a button and return 1 on its click frame, not every held-mouse frame.

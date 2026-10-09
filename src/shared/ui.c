@@ -1081,6 +1081,17 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
      */
     draw_text(ui, x + w - 14, y + 3, "v", UI_TEXT_DIM);
 
+    /* A focus request (ui_focus_field, e.g. a jump from a validation
+     * message) opens the list: for a dropdown, that is taking the focus.
+     * Like a click, it waits until no text field is being edited. */
+    if (!is_open && ui->focus_request_id == id && ui->active_id == 0) {
+        ui->focus_request_id = 0;
+        ui->focus_landed_id = id;
+        ui->focus_landed_y = y;
+        ui->dropdown_open_id = id;
+        is_open = 1;
+    }
+
     if (!is_open) {
         /* --- Open on header click --- */
         if (ui->mouse_clicked && hovered_header) {
