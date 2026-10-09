@@ -47,6 +47,11 @@ CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(MODE_FLAGS_$(BUILD_MODE)) -I$(RAYL
 TEST_CFLAGS = $(CFLAGS) $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_MEMORY_TESTS,) \
               -DMANGO_TEST_OUTDIR='"$(OUTDIR)"' -DMANGO_TESTING
 LIBS    = $(RAYLIB_LIB) $(PLATFORM_LIBS) $(MODE_LDFLAGS_$(BUILD_MODE)) $(EXTRA_LDFLAGS)
+# Every flag a compile or link recipe passes lives in a named variable that a
+# flag stamp records (see "Flag stamps" near the end), never as literal recipe
+# text: Make cannot see a flag edited inside a recipe, so nothing would rebuild.
+PROJECT_INCLUDES = -I$(SRCDIR) -I$(VENDOR_DIR)
+MATH_LIBS = -lm
 OUTDIR  = out
 # RAYLIB_AUDIO=null is a test-only variant: the real desktop GLFW/OpenGL
 # backend with miniaudio's null playback device, for CI machines that have a
@@ -74,6 +79,9 @@ OBJDIR  = $(OUTDIR)/obj
 # built with. Named here because rule prerequisites are expanded as soon as
 # Make reads them, so these names must exist before the first rule uses them.
 BUILD_FLAGS_STAMP    = $(OBJDIR)/build-flags.txt
+TEST_FLAGS_STAMP     = $(OBJDIR)/test-flags.txt
+LINK_FLAGS_STAMP     = $(OBJDIR)/link-flags.txt
+FUZZ_FLAGS_STAMP     = $(OBJDIR)/fuzz-flags.txt
 RAYLIB_OPTIONS_STAMP = $(RAYLIB_BUILD)/make-options.txt
 WEB_OBJDIR           = $(OBJDIR)/web
 WEB_FLAGS_STAMP      = $(WEB_OBJDIR)/build-flags.txt
@@ -268,7 +276,7 @@ $(OUTDIR):
 	mkdir -p $(OUTDIR) $(OBJDIR) $(OBJDIR)/tests
 
 $(TARGET): $(OBJS) | $(OUTDIR)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
 ifeq ($(OS),Windows_NT)
 else ifeq ($(shell uname -s),Darwin)
 	codesign --force --sign - $@
@@ -276,7 +284,7 @@ endif
 
 $(OBJDIR)/$(SRCDIR)/%.o: $(SRCDIR)/%.c | $(OUTDIR)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+	$(CC) $(CFLAGS) $(PROJECT_INCLUDES) -MMD -MP -c -o $@ $<
 
 -include $(DEPS)
 
@@ -306,7 +314,7 @@ run-level-debug: all ## Run: run-level with the debug overlay
 editor: $(OUTDIR) $(EDITOR_TARGET) ## Build: Compile the level editor into OUTDIR
 
 $(EDITOR_TARGET): $(EDITOR_OBJS) | $(OUTDIR)
-	$(CC) $(CFLAGS) -o $@ $^ $(EDITOR_LIBS)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(EDITOR_LIBS)
 ifeq ($(OS),Windows_NT)
 else ifeq ($(shell uname -s),Darwin)
 	codesign --force --sign - $@
@@ -357,16 +365,22 @@ $(OUTDIR)/game-events-test: $(filter-out $(OBJDIR)/src/input/input_backend.o,$(P
 $(OUTDIR)/editor-validation-test $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/editor/dialog_choice.o
 # A rebuilt dependency must refresh consumers and relink executables. Exported
 # headers retain upstream timestamps, so header mtimes alone are insufficient.
-# The flags stamp rebuilds every object when a compiler or flag changes.
-$(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS) $(TOOL_OBJS)): $(RAYLIB_LIB) $(BUILD_FLAGS_STAMP)
+# The flag stamps recompile the objects whose compile flags changed (game and
+# test copies separately) and relink every program when a link flag changed;
+# link recipes pass only $(filter %.o,$^), so the stamp never reaches the linker.
+$(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS) $(TOOL_OBJS)): $(RAYLIB_LIB)
+$(filter-out $(TEST_OBJDIR)/%,$(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS) $(TOOL_OBJS))): $(BUILD_FLAGS_STAMP)
+$(filter $(TEST_OBJDIR)/%,$(TEST_OBJECTS)): $(TEST_FLAGS_STAMP)
+$(TARGET) $(EDITOR_TARGET) $(TEST_TARGETS): $(LINK_FLAGS_STAMP)
 
 # Extra standalone parser probes; keep the 17-regression-binary inventory above.
 .PHONY: parser-allocation-probe parser-encoding-probe
 parser-allocation-probe: $(OUTDIR)/parser-allocation-probe
 	$(RUN_PREFIX) "$(abspath $<)"
 
-$(OUTDIR)/parser-allocation-probe: tests/parser_allocation_test.c $(VENDOR_DIR)/tomlc17.c $(VENDOR_DIR)/tomlc17.h $(BUILD_FLAGS_STAMP) | $(OUTDIR)
-	$(CC) $(TEST_CFLAGS) -o $@ $< -lm
+$(OUTDIR)/parser-allocation-probe: tests/parser_allocation_test.c $(VENDOR_DIR)/tomlc17.c $(VENDOR_DIR)/tomlc17.h \
+		$(TEST_FLAGS_STAMP) $(LINK_FLAGS_STAMP) | $(OUTDIR)
+	$(CC) $(TEST_CFLAGS) -o $@ $< $(MATH_LIBS)
 
 parser-encoding-probe:
 	python3 tests/parser_validator_test.py
@@ -384,12 +398,12 @@ validate-levels: $(LEVEL_CHECK) ## Check: Every level, the campaign manifest and
 	$(RUN_PREFIX) "$(abspath $(LEVEL_CHECK))" $(LEVEL_FILES)
 	python3 tools/validate_levels.py
 
-$(LEVEL_CHECK): $(TOOL_OBJS) $(LEVEL_CHECK_OBJS) | $(OUTDIR)
-	$(CC) $(CFLAGS) -o $@ $^ -lm
+$(LEVEL_CHECK): $(TOOL_OBJS) $(LEVEL_CHECK_OBJS) $(LINK_FLAGS_STAMP) | $(OUTDIR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(MATH_LIBS)
 
 $(OBJDIR)/tools/%.o: tools/%.c | $(OUTDIR)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -MMD -MP -c -o $@ $<
+	$(CC) $(CFLAGS) $(PROJECT_INCLUDES) -MMD -MP -c -o $@ $<
 
 -include $(TOOL_OBJS:.o=.d)
 
@@ -514,7 +528,7 @@ coverage: $(RAYLIB_LIB) ## Test: Per-file line coverage of the native tests (cla
 # libFuzzer for coverage-guided search; Apple clang lacks libFuzzer, so
 # point FUZZ_CC at Homebrew LLVM or a Linux clang.  Both honour
 # EXTRA_CFLAGS, so CI's -Werror covers the harnesses under `make sanitize`.
-FUZZ_FLAGS = -std=c11 -g -O1 -Wall -Wextra -Wpedantic -I$(SRCDIR) -I$(VENDOR_DIR) \
+FUZZ_FLAGS = -std=c11 -g -O1 -Wall -Wextra -Wpedantic $(PROJECT_INCLUDES) \
              -I$(RAYLIB_BUILD)/build/raylib/include \
              $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_RAYLIB_MEMORY,) \
              -fno-omit-frame-pointer -fsanitize=address,undefined \
@@ -540,10 +554,10 @@ fuzz-corpus: $(OUTDIR)/fuzz-level-replay $(OUTDIR)/fuzz-profile-replay ## Test: 
 	"$(abspath $(OUTDIR))/fuzz-level-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_LEVEL_SEEDS)
 	"$(abspath $(OUTDIR))/fuzz-profile-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_PROFILE_SEEDS)
 
-$(OUTDIR)/fuzz-level-replay: tests/fuzz_replay_main.c $(FUZZ_LEVEL_SRCS) $(FUZZ_HEADERS) $(BUILD_FLAGS_STAMP) | $(OUTDIR)
-	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_LEVEL_SRCS) -lm
+$(OUTDIR)/fuzz-level-replay: tests/fuzz_replay_main.c $(FUZZ_LEVEL_SRCS) $(FUZZ_HEADERS) $(FUZZ_FLAGS_STAMP) | $(OUTDIR)
+	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_LEVEL_SRCS) $(MATH_LIBS)
 
-$(OUTDIR)/fuzz-profile-replay: tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(FUZZ_HEADERS) $(RAYLIB_LIB) $(BUILD_FLAGS_STAMP) | $(OUTDIR)
+$(OUTDIR)/fuzz-profile-replay: tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(FUZZ_HEADERS) $(RAYLIB_LIB) $(FUZZ_FLAGS_STAMP) | $(OUTDIR)
 	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(LIBS)
 
 # -close_fd_mask=2 hides the loaders' per-input error lines; libFuzzer keeps
@@ -558,7 +572,7 @@ fuzz: $(RAYLIB_LIB) | $(OUTDIR) ## Test: libFuzzer search for FUZZ_SECONDS (need
 		echo "fuzz: without libFuzzer, 'make fuzz-corpus FUZZ_MUTATIONS=500' runs blind mutations."; \
 		exit 1; }
 	mkdir -p $(OUTDIR)/fuzz/level $(OUTDIR)/fuzz/profile
-	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/level-fuzzer $(FUZZ_LEVEL_SRCS) -lm
+	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/level-fuzzer $(FUZZ_LEVEL_SRCS) $(MATH_LIBS)
 	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/profile-fuzzer $(FUZZ_PROFILE_SRCS) $(LIBS)
 	"$(abspath $(OUTDIR))/fuzz/level-fuzzer" -max_total_time=$(FUZZ_SECONDS) -close_fd_mask=2 \
 		-artifact_prefix=$(OUTDIR)/fuzz/level- $(OUTDIR)/fuzz/level $(FUZZ_LEVEL_SEEDS)
@@ -568,32 +582,31 @@ fuzz: $(RAYLIB_LIB) | $(OUTDIR) ## Test: libFuzzer search for FUZZ_SECONDS (need
 # Test objects: one rule for every source. $(OUTDIR) is skipped once out/
 # exists, so the recipe also creates its own directory; otherwise a deleted
 # out/obj/tests would break every later `make test`.
-TEST_OBJ_INCLUDES = -I$(SRCDIR) -I$(VENDOR_DIR)
+# Vendored tomlc17 builds without project include paths, as in the game.
+TEST_OBJ_INCLUDES = $(if $(filter $(VENDOR_DIR)/%,$<),,$(PROJECT_INCLUDES))
+# Per-object extras: the rule picks TEST_OBJ_FLAGS_<source path without .c>.
+# The test stamp records every TEST_OBJ_FLAGS_* variable and the text of these
+# two lookups, so adding, changing or retargeting an extra rebuilds the tests.
+TEST_OBJ_FLAGS = $(TEST_OBJ_FLAGS_$(<:.c=))
 $(TEST_OBJDIR)/%.o: %.c | $(OUTDIR)
 	@mkdir -p $(@D)
 	$(CC) $(TEST_CFLAGS) $(TEST_OBJ_FLAGS) $(TEST_OBJ_INCLUDES) -MMD -MP -c -o $@ $<
 
-# Per-object extras (target-specific variables). These rename raylib/GLFW
-# calls so the tests can supply recording doubles in their place. Each set
-# has a TEST_*_FLAGS name so the flags stamp can record it too.
-TEST_AUDIO_FLAGS = -DSetMusicVolume=test_SetMusicVolume \
+# These rename raylib/GLFW calls so the tests can supply recording doubles in
+# their place.
+TEST_OBJ_FLAGS_src/shared/audio = -DSetMusicVolume=test_SetMusicVolume \
 	-DLoadSoundAlias=test_LoadSoundAlias -DSetSoundVolume=test_SetSoundVolume \
 	-DUnloadSoundAlias=test_UnloadSoundAlias -DUnloadSound=test_UnloadSound
-TEST_SESSION_FLAGS = -DSetWindowSize=test_SetWindowSize
-TEST_INPUT_BACKEND_FLAGS = -UMANGO_RAYLIB_MEMORY \
+TEST_OBJ_FLAGS_src/core/app_session = -DSetWindowSize=test_SetWindowSize
+TEST_OBJ_FLAGS_src/input/input_backend = -UMANGO_RAYLIB_MEMORY \
 	-DIsWindowReady=test_input_window_ready -DGetScreenWidth=test_input_screen_width -DGetScreenHeight=test_input_screen_height \
 	-DglfwGetCurrentContext=test_input_current_context -DglfwGetCursorPos=test_input_cursor_pos \
 	-DglfwSetKeyCallback=test_input_set_key -DglfwSetCharCallback=test_input_set_char \
 	-DglfwSetMouseButtonCallback=test_input_set_button -DglfwSetCursorPosCallback=test_input_set_cursor \
 	-DglfwSetScrollCallback=test_input_set_scroll
-$(TEST_AUDIO_OBJ): TEST_OBJ_FLAGS = $(TEST_AUDIO_FLAGS)
-$(TEST_SESSION_OBJ): TEST_OBJ_FLAGS = $(TEST_SESSION_FLAGS)
-$(TEST_INPUT_BACKEND_OBJ): TEST_OBJ_FLAGS = $(TEST_INPUT_BACKEND_FLAGS)
-# Vendored tomlc17 builds without project include paths, as in the game.
-$(TEST_TOMLC_OBJ): TEST_OBJ_INCLUDES =
 
 $(OUTDIR)/level-serializer-test: $(TEST_SOURCE_DIR)/level_serializer_test.o $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
 $(OUTDIR)/level-serializer-test: $(TEST_SOURCE_DIR)/parser_boundary_test.o
 
@@ -608,56 +621,56 @@ $(OUTDIR)/editor-validation-test $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/levels/
 		$(OBJDIR)/src/levels/campaign_catalog.o $(OBJDIR)/src/levels/level_path.o
 
 $(OUTDIR)/level-validate-test: $(TEST_SOURCE_DIR)/level_validate_test.o $(TEST_VALIDATE_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
 $(OUTDIR)/runtime-load-test: $(TEST_SOURCE_DIR)/runtime_load_test.o $(TEST_LEVEL_LOADER_OBJ) \
 		$(TEST_GAME_RANDOM_OBJ) \
 		$(TEST_VALIDATE_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_RAIL_OBJ) \
 		$(TEST_SPIKE_BLOCK_OBJ) $(TEST_FLOAT_PLATFORM_OBJ) \
 		$(TEST_BOUNCEPAD_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
 
 $(OUTDIR)/rail-test: $(TEST_SOURCE_DIR)/rail_test.o $(TEST_RAIL_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
 $(OUTDIR)/entity-utils-test: $(TEST_SOURCE_DIR)/entity_utils_test.o $(TEST_ENTITY_UTILS_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
 $(OUTDIR)/collision-test: $(TEST_SOURCE_DIR)/collision_test.o $(TEST_SPIKE_PLATFORM_OBJ) \
 		$(TEST_FISH_OBJ) $(TEST_CIRCULAR_SAW_OBJ) $(TEST_ENTITY_UTILS_OBJ) $(TEST_GAME_RANDOM_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
 $(OUTDIR)/phase-transition-test: $(TEST_SOURCE_DIR)/phase_transition_test.o $(TEST_PHASE_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
 $(OUTDIR)/editor-validation-test: $(TEST_SOURCE_DIR)/editor_validation_test.o $(TEST_EDITOR_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(EDITOR_LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(EDITOR_LIBS)
 
 # The editor as a designer drives it: events in, document/undo state out.
 $(OUTDIR)/editor-ui-test: $(TEST_SOURCE_DIR)/editor_ui_test.o $(TEST_EDITOR_OBJS) $(TEST_EDITOR_FRAME_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(EDITOR_LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(EDITOR_LIBS)
 
 $(OUTDIR)/gameplay-damage-test: $(TEST_SOURCE_DIR)/gameplay_damage_test.o $(TEST_COLLISION_DAMAGE_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_CHECKPOINT_OBJ) $(TEST_HUD_OBJ) \
 		$(TEST_GAME_GHOST_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
 
 $(OUTDIR)/gameplay-config-test: $(TEST_SOURCE_DIR)/gameplay_config_test.o $(TEST_GAME_CAMERA_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
 
 $(OUTDIR)/gameplay-score-test: $(TEST_SOURCE_DIR)/gameplay_score_test.o $(TEST_GAME_SCORE_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
 $(OUTDIR)/game-overlay-test: $(TEST_SOURCE_DIR)/game_overlay_test.o $(TEST_GAME_OVERLAY_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
 $(OUTDIR)/game-events-test: $(TEST_SOURCE_DIR)/game_events_test.o $(TEST_GAME_EVENTS_OBJ) $(TEST_GAME_INPUT_OBJ) $(TEST_WEB_INPUT_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_TERMINAL_OBJ) $(TEST_SETTINGS_OBJ) $(TEST_BINDINGS_OBJ) $(TEST_EDITOR_UI_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
 
 $(OUTDIR)/session-test: $(TEST_SOURCE_DIR)/session_test.o $(TEST_SOURCE_DIR)/game_profile_test.o $(TEST_SOURCE_DIR)/simulation_test.o $(TEST_SOURCE_DIR)/audio_contract_test.o $(TEST_SOURCE_DIR)/web_frame_pacing_test.o $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $(filter %.o,$^) $(LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
 
 $(OUTDIR)/game-checkpoint-test: $(TEST_SOURCE_DIR)/game_checkpoint_test.o $(TEST_GAME_CHECKPOINT_OBJ)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(TEST_LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
 # Every game object except main.o: the mechanics test drives whole levels
 # through game_init/game_update_active/game_frame, as the game does. Like
@@ -667,7 +680,7 @@ GAMEPLAY_TEST_OBJS = $(filter-out $(OBJDIR)/src/main.o $(OBJDIR)/src/input/game_
                      $(TEST_GAME_INPUT_OBJ)
 $(OUTDIR)/gameplay-mechanics-test: $(TEST_SOURCE_DIR)/gameplay_mechanics_test.o $(TEST_SOURCE_DIR)/game_replay_test.o \
 		$(GAMEPLAY_TEST_OBJS)
-	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $(filter %.o,$^) $(LIBS)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
 
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
 # Requires the Emscripten SDK (emcc on PATH).
@@ -696,13 +709,14 @@ WEB_FLAGS = -s USE_GLFW=3 \
 WEB_OPT = -O2
 WEB_CFLAGS = -std=c11 -Wall -Wextra -Wpedantic -Wno-extra-semi $(WEB_OPT) -D_GNU_SOURCE $(EXTRA_WEB_CFLAGS)
 WEB_LINK_FLAGS = -s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]'
+WEB_DEBUG_LINK_FLAGS = --post-js web/debug-boot.js
 WEB_HTML = $(OUTDIR)/super-mango.html
 WEB_DEBUG_HTML = $(OUTDIR)/super-mango-debug.html
 # The normal and debug pages compile the same sources with the same flags and
 # differ only when linking (--post-js), so every source compiles once into
 # $(WEB_OBJDIR) and both pages link those objects. The .d files track headers.
 WEB_OBJS = $(patsubst %.c,$(WEB_OBJDIR)/%.o,$(SRCS))
-WEB_INCLUDES = -I$(WEB_RAYLIB_BUILD)/build/raylib/include -I$(SRCDIR) -I$(VENDOR_DIR)
+WEB_INCLUDES = -I$(WEB_RAYLIB_BUILD)/build/raylib/include $(PROJECT_INCLUDES)
 # The .js/.wasm/.data siblings are emitted with each HTML file. Listing every
 # link input lets `web` (and dist-wasm through it) skip emcc only when fresh.
 WEB_LINK_INPUTS = $(WEB_OBJS) $(WEB_RAYLIB_LIB) $(WEB_FLAGS_STAMP) \
@@ -741,7 +755,7 @@ $(WEB_HTML): $(WEB_LINK_INPUTS) | $(OUTDIR) web-toolchain
 
 $(WEB_DEBUG_HTML): $(WEB_LINK_INPUTS) | $(OUTDIR) web-toolchain
 	emcc $(WEB_OPT) $(EXTRA_WEB_CFLAGS) $(WEB_OBJS) $(WEB_RAYLIB_LIB) -o $@ $(WEB_FLAGS) \
-		$(WEB_LINK_FLAGS) --post-js web/debug-boot.js
+		$(WEB_LINK_FLAGS) $(WEB_DEBUG_LINK_FLAGS)
 	python3 tools/web_csp.py $@
 
 dist-native: release asset-budget ## Package: Native game and editor release zip in DISTDIR
@@ -765,49 +779,58 @@ clean: ## Other: Remove OUTDIR, OUTDIR-sanitize and DISTDIR
 # cannot see that a flag changed: after a debug build, `make BUILD_MODE=release`
 # would link the old -O0 objects. A stamp file closes that gap. It holds the
 # exact settings its outputs were built with, and those outputs list it as a
-# prerequisite (objects above; raylib's "done" file; the web objects).
+# prerequisite. Compile and link settings have separate stamps, so a link-only
+# change (a library) relinks without recompiling:
 #
-# Each block below reads its stamp back while Make parses this file. Only when
-# the text differs, or the file is missing, does the stamp's rule depend on
-# FORCE and rewrite the file; that newer file makes its outputs out of date.
-# When the text matches, the file is left alone and nothing rebuilds. Editing
-# this Makefile therefore rebuilds only what a changed setting affects.
+#   build-flags.txt       game, editor and tool objects   CC CFLAGS PROJECT_INCLUDES
+#   test-flags.txt        test copies of objects          TEST_CFLAGS and per-object extras
+#   link-flags.txt        every native program            LIBS and the other link inputs
+#   fuzz-flags.txt        the fuzz replay programs        FUZZ_FLAGS (they compile and link at once)
+#   web/build-flags.txt   Web objects, pages and raylib   every WEB_* compile and link flag
+#   raylib/make-options.txt   raylib's "done" file        build_raylib.py options
+#
+# Each stamp is read back while Make parses this file. Only when the text
+# differs, or the file is missing, does the stamp's rule depend on FORCE and
+# rewrite the file; that newer file makes its outputs out of date. When the
+# text matches, the file is left alone and nothing rebuilds. Editing this
+# Makefile therefore rebuilds only what a changed setting affects, provided
+# every recipe flag sits in a variable listed below (see PROJECT_INCLUDES).
 # Every stamp is a single line, so reading it back with $(shell cat) is exact.
 #
 # shell_quote wraps a value in '...' for the shell, turning each ' inside it
 # into '"'"' (close quote, a quoted ', reopen), so TEST_CFLAGS's
 # -DMANGO_TEST_OUTDIR='"out"' is written out unchanged.
 shell_quote = '$(subst ','"'"',$(1))'
+# NAME=value for each listed variable. stamp_text records a variable's own
+# text instead, for lookups that only resolve inside a recipe ($<).
+stamp_vars = $(foreach v,$(1),$(v)=$($(v)))
+stamp_text = $(foreach v,$(1),$(v)=$(value $(v)))
 
-BUILD_FLAGS = CC=$(CC) BUILD_MODE=$(BUILD_MODE) RAYLIB_PLATFORM=$(RAYLIB_PLATFORM) \
-              CFLAGS=$(CFLAGS) TEST_CFLAGS=$(TEST_CFLAGS) LIBS=$(LIBS) \
-              TEST_AUDIO_FLAGS=$(TEST_AUDIO_FLAGS) TEST_SESSION_FLAGS=$(TEST_SESSION_FLAGS) \
-              TEST_INPUT_BACKEND_FLAGS=$(TEST_INPUT_BACKEND_FLAGS)
-ifneq ($(strip $(BUILD_FLAGS)),$(strip $(shell cat "$(BUILD_FLAGS_STAMP)" 2>/dev/null)))
-$(BUILD_FLAGS_STAMP): FORCE
+BUILD_FLAGS      = $(call stamp_vars,CC CFLAGS PROJECT_INCLUDES)
+TEST_BUILD_FLAGS = $(call stamp_vars,CC TEST_CFLAGS PROJECT_INCLUDES \
+                     $(sort $(filter TEST_OBJ_FLAGS_%,$(.VARIABLES)))) \
+                   $(call stamp_text,TEST_OBJ_FLAGS TEST_OBJ_INCLUDES)
+LINK_BUILD_FLAGS = $(call stamp_vars,CC CFLAGS TEST_CFLAGS LIBS EDITOR_LIBS TEST_LIBS MATH_LIBS)
+FUZZ_BUILD_FLAGS = $(call stamp_vars,CC FUZZ_FLAGS LIBS MATH_LIBS)
+WEB_BUILD_FLAGS  = $(call stamp_vars,EMSCRIPTEN_VERSION WEB_CFLAGS WEB_INCLUDES WEB_OPT \
+                     EXTRA_WEB_CFLAGS WEB_FLAGS WEB_LINK_FLAGS WEB_DEBUG_LINK_FLAGS)
+
+# $(call flag_stamp,FILE,VARIABLE): FILE holds VARIABLE's text, rewritten only
+# when that text changed.
+define flag_stamp
+ifneq ($$(strip $$($(2))),$$(strip $$(shell cat "$(1)" 2>/dev/null)))
+$(1): FORCE
 endif
-
-ifneq ($(strip $(RAYLIB_OPTIONS)),$(strip $(shell cat "$(RAYLIB_OPTIONS_STAMP)" 2>/dev/null)))
-$(RAYLIB_OPTIONS_STAMP): FORCE
-endif
-
-WEB_BUILD_FLAGS = EMSCRIPTEN_VERSION=$(EMSCRIPTEN_VERSION) WEB_CFLAGS=$(WEB_CFLAGS) \
-                  WEB_FLAGS=$(WEB_FLAGS) WEB_LINK_FLAGS=$(WEB_LINK_FLAGS)
-ifneq ($(strip $(WEB_BUILD_FLAGS)),$(strip $(shell cat "$(WEB_FLAGS_STAMP)" 2>/dev/null)))
-$(WEB_FLAGS_STAMP): FORCE
-endif
-
-$(BUILD_FLAGS_STAMP):
-	@mkdir -p $(@D)
-	@printf '%s\n' $(call shell_quote,$(strip $(BUILD_FLAGS))) > $@
-
-$(RAYLIB_OPTIONS_STAMP):
-	@mkdir -p $(@D)
-	@printf '%s\n' $(call shell_quote,$(strip $(RAYLIB_OPTIONS))) > $@
-
-$(WEB_FLAGS_STAMP):
-	@mkdir -p $(@D)
-	@printf '%s\n' $(call shell_quote,$(strip $(WEB_BUILD_FLAGS))) > $@
+$(1):
+	@mkdir -p $$(@D)
+	@printf '%s\n' $$(call shell_quote,$$(strip $$($(2)))) > $$@
+endef
+$(eval $(call flag_stamp,$(BUILD_FLAGS_STAMP),BUILD_FLAGS))
+$(eval $(call flag_stamp,$(TEST_FLAGS_STAMP),TEST_BUILD_FLAGS))
+$(eval $(call flag_stamp,$(LINK_FLAGS_STAMP),LINK_BUILD_FLAGS))
+$(eval $(call flag_stamp,$(FUZZ_FLAGS_STAMP),FUZZ_BUILD_FLAGS))
+$(eval $(call flag_stamp,$(RAYLIB_OPTIONS_STAMP),RAYLIB_OPTIONS))
+$(eval $(call flag_stamp,$(WEB_FLAGS_STAMP),WEB_BUILD_FLAGS))
 
 # FORCE has no rule and no file, so anything that depends on it always runs.
 .PHONY: FORCE
