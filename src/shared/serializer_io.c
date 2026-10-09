@@ -468,6 +468,10 @@ int serializer_resolve_save_target(const char *path, char *buf, size_t buf_size)
 int serializer_replace_file(const char *temp_path, const char *target_path)
 {
     if (!temp_path || !target_path) return -1;
+    if (serializer_test_failure == SERIALIZER_TEST_FAILURE_REPLACE_STRANDED) {
+        serializer_test_failure = SERIALIZER_TEST_FAILURE_NONE;
+        return SERIALIZER_REPLACE_TEMP_KEPT;
+    }
 
 #ifdef _WIN32
     {
@@ -482,6 +486,29 @@ int serializer_replace_file(const char *temp_path, const char *target_path)
                 if (ReplaceFileW(wide_target, wide_temp, NULL,
                                  0, NULL, NULL)) {
                     result = 0;
+                } else {
+                    /*
+                     * ReplaceFileW works in steps: it renames the original
+                     * out of the way, then moves the new file in.  These two
+                     * errors mean the first step happened but the second did
+                     * not (an antivirus scanner holding the file open is a
+                     * common cause).  The original may already be gone, and
+                     * the temporary file is then the only copy of the level,
+                     * so it must never be deleted.  Try once more with a
+                     * plain move; if that fails too, tell the caller to keep
+                     * the temporary file.
+                     */
+                    DWORD error = GetLastError();
+                    if (error == ERROR_UNABLE_TO_MOVE_REPLACEMENT ||
+                        error == ERROR_UNABLE_TO_MOVE_REPLACEMENT_2) {
+                        if (MoveFileExW(wide_temp, wide_target,
+                                        MOVEFILE_REPLACE_EXISTING |
+                                        MOVEFILE_WRITE_THROUGH)) {
+                            result = 0;
+                        } else {
+                            result = SERIALIZER_REPLACE_TEMP_KEPT;
+                        }
+                    }
                 }
             } else if (GetLastError() == ERROR_FILE_NOT_FOUND) {
                 if (MoveFileExW(wide_temp, wide_target,

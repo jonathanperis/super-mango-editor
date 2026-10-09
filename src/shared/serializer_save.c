@@ -491,12 +491,26 @@ static void write_level_toml(FILE *fp, const LevelDef *def,
 /* level_save_toml — Write a LevelDef to a human-readable TOML file    */
 /* ================================================================== */
 
+/*
+ * s_kept_temp_path — Where the last save that returned
+ * SERIALIZER_REPLACE_TEMP_KEPT left the level (see level_save_kept_temp_path).
+ * Like errno, it describes only the most recent save and is "" otherwise.
+ */
+static char s_kept_temp_path[SERIALIZER_IO_PATH_MAX];
+
+const char *level_save_kept_temp_path(void)
+{
+    return s_kept_temp_path;
+}
+
 static int level_save_toml_internal(const LevelDef *def, const char *path,
                                     const char *original_path,
                                     SerializerSavePolicy policy,
                                     const SerializerFileFingerprint *expected) {
     char temp_path[SERIALIZER_IO_PATH_MAX];
+    int install_result;
 
+    s_kept_temp_path[0] = '\0';
     if (!def || !path) return -1;
 
     {
@@ -549,9 +563,18 @@ static int level_save_toml_internal(const LevelDef *def, const char *path,
         }
     }
 
-    if ((policy == SERIALIZER_SAVE_CREATE_ONLY
-             ? serializer_create_file(temp_path, path)
-             : serializer_replace_file(temp_path, path)) != 0) {
+    install_result = policy == SERIALIZER_SAVE_CREATE_ONLY
+                   ? serializer_create_file(temp_path, path)
+                   : serializer_replace_file(temp_path, path);
+    if (install_result == SERIALIZER_REPLACE_TEMP_KEPT) {
+        /* The old file may be gone already: the temporary file is the only
+         * complete copy of the level now, so it stays where it is. */
+        fprintf(stderr, "serializer: could not finish replacing '%s'; the level "
+                "is kept in '%s'\n", path, temp_path);
+        memcpy(s_kept_temp_path, temp_path, strlen(temp_path) + 1);
+        return SERIALIZER_REPLACE_TEMP_KEPT;
+    }
+    if (install_result != 0) {
         fprintf(stderr, "serializer: failed to replace '%s'\n", path);
         serializer_remove_temp(temp_path);
         return -1;
