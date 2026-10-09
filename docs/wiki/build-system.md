@@ -448,7 +448,11 @@ the home page that hosts the game after the build. The site's three fonts
 (Pixelify Sans, Atkinson Hyperlegible, DM Mono) are self-hosted from the
 `@fontsource/*` packages **5.3.0**, which `BaseLayout.astro` imports so Astro
 bundles the font files; that policy allows styles and fonts only from the site
-itself, and `bun run check-site` fails if any page references Google Fonts. The
+itself, and `bun run check-site` fails if any page references Google Fonts or
+any source under `docs/` or `tools/` contains a Google Fonts URL. The link
+preview template `tools/og-image.html` loads Pixelify Sans from
+`docs/node_modules` too, so run `bun install` in `docs/` before
+`python3 tools/render_og_image.py`. The
 SIL Open Font License texts are published from `docs/public/licenses/fonts/`. Optional analytics loads only
 on manual pages, never on that home page.
 

@@ -157,12 +157,42 @@ def check_site(out: Path) -> list[str]:
     return failures
 
 
+# A Google Fonts URL (with or without the scheme) in a source file.
+GOOGLE_FONTS_URL = re.compile(r"//fonts\.(?:googleapis|gstatic)\.com")
+SOURCE_SUFFIXES = {".astro", ".css", ".html", ".js", ".json", ".md", ".mdx",
+                   ".mjs", ".py", ".svg", ".ts", ".txt", ".xml"}
+GENERATED_DIRS = {"node_modules", "out", "dist", ".astro"}
+
+
+def check_font_sources(root: Path) -> list[str]:
+    """Fail on any Google Fonts URL in the website and tool sources.
+
+    The built-site check above only sees what Astro published; a template
+    such as tools/og-image.html is never built, so it is checked here, as is
+    every source a later build would publish. Installed packages and build
+    output are skipped. Works without building the site.
+    """
+    failures: list[str] = []
+    for folder in ("docs", "tools"):
+        for path in sorted((root / folder).rglob("*")):
+            relative = path.relative_to(root)
+            if (path.suffix not in SOURCE_SUFFIXES or not path.is_file()
+                    or GENERATED_DIRS.intersection(relative.parts)):
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+            for number, line in enumerate(text.splitlines(), 1):
+                if GOOGLE_FONTS_URL.search(line):
+                    failures.append(f"{relative.as_posix()}:{number}: Google Fonts URL; "
+                                    "use the self-hosted @fontsource files")
+    return failures
+
+
 def main() -> int:
-    failures = check_site(OUT)
+    failures = check_font_sources(ROOT) + check_site(OUT)
     if failures:
         print("built docs check failed:\n" + "\n".join(f"- {item}" for item in failures))
         return 1
-    print("built docs check: ok (routes, content, links, anchors, metadata, sitemap, home CSP, self-hosted fonts)")
+    print("built docs check: ok (routes, content, links, anchors, metadata, sitemap, home CSP, self-hosted fonts in pages and sources)")
     return 0
 
 
