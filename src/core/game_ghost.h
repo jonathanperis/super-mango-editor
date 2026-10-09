@@ -70,7 +70,7 @@ typedef struct {
 
 /*
  * GameGhost — owned by a GameState that saves to a personal profile.
- * Debug, smoke and replay runs have none (GameState.ghost stays NULL).
+ * Debug, smoke and replay runs have none (GameState.screen.ghost stays NULL).
  */
 typedef struct GameGhost {
     GameGhostTrack best;   /* the run to race; best.count == 0 means none  */
@@ -86,7 +86,7 @@ typedef struct GameGhost {
 int game_ghost_begin(GameState *gs);
 
 /* Start a fresh attempt: Retry, or the next level of a campaign. The best
- * run stays loaded. Safe when gs->ghost is NULL. */
+ * run stays loaded. Safe when gs->screen.ghost is NULL. */
 void game_ghost_restart(GameState *gs);
 
 /* After every fixed simulation step: record Mango, advance the ghost. */

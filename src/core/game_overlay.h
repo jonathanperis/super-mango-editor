@@ -44,7 +44,7 @@ void game_music_sync(const GameState *gs);
 
 /*
  * game_audio_apply_settings — apply the player's mute and volume settings
- * (from the profile borrowed in gs->profile) to the sound effects and the
+ * (from the profile borrowed in gs->screen.profile) to the sound effects and the
  * level music. Does nothing without a profile.
  *
  * Call it after anything that reloads the level music: loading the music

@@ -41,7 +41,7 @@
  * FasterBird — state for one fast sky enemy.
  *
  * The state is exactly a Bird; the separate name keeps GameState and level
- * loading readable (gs->faster_birds[i] is clearly the fast variant).
+ * loading readable (gs->world.faster_birds[i] is clearly the fast variant).
  */
 typedef Bird FasterBird;
 

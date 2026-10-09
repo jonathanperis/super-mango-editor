@@ -42,8 +42,8 @@ static int expect_ptr(const char *name, const void *actual, const void *expected
 
 static void init_test_player(GameState *gs)
 {
-    gs->player.w = TEST_PLAYER_W;
-    gs->player.h = TEST_PLAYER_H;
+    gs->world.player.w = TEST_PLAYER_W;
+    gs->world.player.h = TEST_PLAYER_H;
 }
 
 static void fill_runtime_fixture(LevelDef *def)
@@ -229,87 +229,87 @@ static int load_applies_runtime_state(void)
 
     fill_runtime_fixture(&def);
     init_test_player(&gs);
-    gs.score = 999;
+    gs.world.score = 999;
 
     if (level_load(&gs, &def) != 0) return 1;
 
-    if (expect_ptr("current level", gs.runtime.current_level, &def) != 0)
+    if (expect_ptr("current level", gs.world.runtime.current_level, &def) != 0)
         return 1;
-    if (expect_int("world width", gs.runtime.world_w, 3 * GAME_W) != 0)
+    if (expect_int("world width", gs.world.runtime.world_w, 3 * GAME_W) != 0)
         return 1;
-    if (expect_float("initial respawn x", gs.respawn_x, def.player_start_x) != 0)
+    if (expect_float("initial respawn x", gs.world.respawn_x, def.player_start_x) != 0)
         return 1;
-    if (expect_float("initial respawn y", gs.respawn_y, def.player_start_y) != 0)
+    if (expect_float("initial respawn y", gs.world.respawn_y, def.player_start_y) != 0)
         return 1;
-    if (expect_int("initial checkpoint index", gs.checkpoint_index, -1) != 0)
+    if (expect_int("initial checkpoint index", gs.world.checkpoint_index, -1) != 0)
         return 1;
-    if (expect_int("fog enabled", gs.runtime.fog_enabled, 1) != 0) return 1;
-    if (expect_int("water enabled", gs.runtime.water_enabled, 1) != 0)
+    if (expect_int("fog enabled", gs.world.runtime.fog_enabled, 1) != 0) return 1;
+    if (expect_int("water enabled", gs.world.runtime.water_enabled, 1) != 0)
         return 1;
 
-    if (expect_int("floor gap count", gs.floor_gap_count, 1) != 0) return 1;
-    if (expect_int("rail count", gs.rail_count, 1) != 0) return 1;
-    if (expect_int("rail tile count", gs.rails[0].count, 5) != 0) return 1;
-    if (expect_int("platform count", gs.platform_count, 1) != 0) return 1;
-    if (expect_float("platform x", gs.platforms[0].x, 96.0f) != 0)
+    if (expect_int("floor gap count", gs.world.floor_gap_count, 1) != 0) return 1;
+    if (expect_int("rail count", gs.world.rail_count, 1) != 0) return 1;
+    if (expect_int("rail tile count", gs.world.rails[0].count, 5) != 0) return 1;
+    if (expect_int("platform count", gs.world.platform_count, 1) != 0) return 1;
+    if (expect_float("platform x", gs.world.platforms[0].x, 96.0f) != 0)
         return 1;
-    if (expect_float("platform y", gs.platforms[0].y,
+    if (expect_float("platform y", gs.world.platforms[0].y,
                      (float)(FLOOR_Y - 2 * TILE_SIZE + 16)) != 0)
         return 1;
-    if (expect_int("platform width", gs.platforms[0].w, 2 * TILE_SIZE) != 0)
+    if (expect_int("platform width", gs.world.platforms[0].w, 2 * TILE_SIZE) != 0)
         return 1;
 
-    if (expect_int("coin count", gs.coin_count, 2) != 0) return 1;
-    if (expect_int("coin active", gs.coins[0].active, 1) != 0) return 1;
-    if (expect_int("last star active", gs.last_star.active, 1) != 0) return 1;
-    if (expect_int("bird count", gs.bird_count, 1) != 0) return 1;
-    if (expect_float("faster bird vx", gs.faster_birds[0].vx, -62.0f) != 0)
+    if (expect_int("coin count", gs.world.coin_count, 2) != 0) return 1;
+    if (expect_int("coin active", gs.world.coins[0].active, 1) != 0) return 1;
+    if (expect_int("last star active", gs.world.last_star.active, 1) != 0) return 1;
+    if (expect_int("bird count", gs.world.bird_count, 1) != 0) return 1;
+    if (expect_float("faster bird vx", gs.world.faster_birds[0].vx, -62.0f) != 0)
         return 1;
-    if (expect_float("fish water y", gs.fish[0].water_y, gs.fish[0].y) != 0)
+    if (expect_float("fish water y", gs.world.fish[0].water_y, gs.world.fish[0].y) != 0)
         return 1;
 
-    if (expect_int("spike block count", gs.spike_block_count, 1) != 0)
+    if (expect_int("spike block count", gs.world.spike_block_count, 1) != 0)
         return 1;
-    if (expect_ptr("spike block rail", gs.spike_blocks[0].rail,
-                   &gs.rails[0]) != 0) return 1;
-    if (expect_int("blue flame state", gs.blue_flames[0].state,
+    if (expect_ptr("spike block rail", gs.world.spike_blocks[0].rail,
+                   &gs.world.rails[0]) != 0) return 1;
+    if (expect_int("blue flame state", gs.world.blue_flames[0].state,
                    BLUE_FLAME_WAITING) != 0) return 1;
-    if (expect_float("blue flame x", gs.blue_flames[0].x,
+    if (expect_float("blue flame x", gs.world.blue_flames[0].x,
                      128.0f + (FLOOR_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f) != 0)
         return 1;
 
-    if (expect_int("float platform count", gs.float_platform_count, 2) != 0)
+    if (expect_int("float platform count", gs.world.float_platform_count, 2) != 0)
         return 1;
-    if (expect_int("rail platform mode", gs.float_platforms[1].mode,
+    if (expect_int("rail platform mode", gs.world.float_platforms[1].mode,
                    FLOAT_PLATFORM_RAIL) != 0) return 1;
-    if (expect_ptr("rail platform rail", gs.float_platforms[1].rail,
-                   &gs.rails[0]) != 0) return 1;
-    if (expect_int("bridge count", gs.bridge_count, 1) != 0) return 1;
-    if (expect_int("bridge brick active", gs.bridges[0].bricks[0].active, 1) != 0)
+    if (expect_ptr("rail platform rail", gs.world.float_platforms[1].rail,
+                   &gs.world.rails[0]) != 0) return 1;
+    if (expect_int("bridge count", gs.world.bridge_count, 1) != 0) return 1;
+    if (expect_int("bridge brick active", gs.world.bridges[0].bricks[0].active, 1) != 0)
         return 1;
-    if (expect_int("small pad idle", gs.bouncepads_small[0].state,
+    if (expect_int("small pad idle", gs.world.bouncepads_small[0].state,
                    BOUNCE_IDLE) != 0) return 1;
-    if (expect_float("small pad y", gs.bouncepads_small[0].y,
+    if (expect_float("small pad y", gs.world.bouncepads_small[0].y,
                      (float)(FLOOR_Y - BOUNCEPAD_SRC_H)) != 0) return 1;
-    if (expect_int("vine count", gs.vine_count, 1) != 0) return 1;
-    if (expect_int("ladder count", gs.ladder_count, 1) != 0) return 1;
-    if (expect_int("rope count", gs.rope_count, 1) != 0) return 1;
+    if (expect_int("vine count", gs.world.vine_count, 1) != 0) return 1;
+    if (expect_int("ladder count", gs.world.ladder_count, 1) != 0) return 1;
+    if (expect_int("rope count", gs.world.rope_count, 1) != 0) return 1;
 
-    if (expect_float("player spawn x", gs.player.x, def.player_start_x) != 0)
+    if (expect_float("player spawn x", gs.world.player.x, def.player_start_x) != 0)
         return 1;
-    if (expect_float("player spawn y", gs.player.y,
+    if (expect_float("player spawn y", gs.world.player.y,
                      def.player_start_y - TEST_PLAYER_H + TEST_FLOOR_SINK) != 0)
         return 1;
-    if (expect_int("hearts", gs.hearts, 2) != 0) return 1;
-    if (expect_int("lives", gs.lives, 4) != 0) return 1;
-    if (expect_int("score reset", gs.score, 0) != 0) return 1;
-    if (expect_int("score per life", gs.rules.score_per_life, 1500) != 0)
+    if (expect_int("hearts", gs.world.hearts, 2) != 0) return 1;
+    if (expect_int("lives", gs.world.lives, 4) != 0) return 1;
+    if (expect_int("score reset", gs.world.score, 0) != 0) return 1;
+    if (expect_int("score per life", gs.world.rules.score_per_life, 1500) != 0)
         return 1;
-    if (expect_int("score next", gs.score_life_next, 1500) != 0) return 1;
-    if (expect_int("coin score", gs.rules.coin_score, 125) != 0) return 1;
-    if (expect_float("walk max speed", gs.player.walk_max_speed, 82.0f) != 0)
+    if (expect_int("score next", gs.world.score_life_next, 1500) != 0) return 1;
+    if (expect_int("coin score", gs.world.rules.coin_score, 125) != 0) return 1;
+    if (expect_float("walk max speed", gs.world.player.walk_max_speed, 82.0f) != 0)
         return 1;
-    if (expect_float("zero air friction", gs.player.air_friction, 0.0f) != 0)
+    if (expect_float("zero air friction", gs.world.player.air_friction, 0.0f) != 0)
         return 1;
 
     return 0;
@@ -324,65 +324,65 @@ static int reset_restores_mutable_state_only(void)
     init_test_player(&gs);
     if (level_load(&gs, &def) != 0) return 1;
 
-    gs.coins[0].active = 0;
-    gs.star_yellows[0].active = 0;
-    gs.last_star.active = 0;
-    gs.last_star.collected = 1;
-    gs.spiders[0].x = -20.0f;
-    gs.blue_flames[0].state = BLUE_FLAME_RISING;
-    gs.blue_flames[0].y = 0.0f;
-    gs.float_platforms[0].falling = 1;
-    gs.float_platforms[0].y = 999.0f;
-    gs.bridges[0].bricks[0].active = 0;
-    gs.bridges[0].bricks[0].falling = 1;
-    gs.bouncepads_small[0].state = BOUNCE_ACTIVE;
-    gs.bouncepads_small[0].anim_frame = 0;
-    gs.player.x = 999.0f;
-    gs.player.y = 999.0f;
-    gs.player.vx = 12.0f;
-    gs.player.on_ground = 0;
-    gs.platforms[0].x = 777.0f;
+    gs.world.coins[0].active = 0;
+    gs.world.star_yellows[0].active = 0;
+    gs.world.last_star.active = 0;
+    gs.world.last_star.collected = 1;
+    gs.world.spiders[0].x = -20.0f;
+    gs.world.blue_flames[0].state = BLUE_FLAME_RISING;
+    gs.world.blue_flames[0].y = 0.0f;
+    gs.world.float_platforms[0].falling = 1;
+    gs.world.float_platforms[0].y = 999.0f;
+    gs.world.bridges[0].bricks[0].active = 0;
+    gs.world.bridges[0].bricks[0].falling = 1;
+    gs.world.bouncepads_small[0].state = BOUNCE_ACTIVE;
+    gs.world.bouncepads_small[0].anim_frame = 0;
+    gs.world.player.x = 999.0f;
+    gs.world.player.y = 999.0f;
+    gs.world.player.vx = 12.0f;
+    gs.world.player.on_ground = 0;
+    gs.world.platforms[0].x = 777.0f;
 
     level_reset(&gs, &def);
 
     /* A life-loss reset keeps coins collected (no score farming) but brings
      * health stars back for the next life. */
-    if (expect_float("coin x untouched", gs.coins[0].x, def.coins[0].x) != 0)
+    if (expect_float("coin x untouched", gs.world.coins[0].x, def.coins[0].x) != 0)
         return 1;
-    if (expect_int("collected coin stays collected", gs.coins[0].active, 0) != 0)
+    if (expect_int("collected coin stays collected", gs.world.coins[0].active, 0) != 0)
         return 1;
-    if (expect_int("reset star active", gs.star_yellows[0].active, 1) != 0)
+    if (expect_int("reset star active", gs.world.star_yellows[0].active, 1) != 0)
         return 1;
-    if (expect_int("reset last star active", gs.last_star.active, 1) != 0)
+    if (expect_int("reset last star active", gs.world.last_star.active, 1) != 0)
         return 1;
-    if (expect_int("reset last star collected", gs.last_star.collected, 0) != 0)
+    if (expect_int("reset last star collected", gs.world.last_star.collected, 0) != 0)
         return 1;
-    if (expect_float("reset spider x", gs.spiders[0].x, def.spiders[0].x) != 0)
+    if (expect_float("reset spider x", gs.world.spiders[0].x, def.spiders[0].x) != 0)
         return 1;
-    if (expect_int("reset flame state", gs.blue_flames[0].state,
+    if (expect_int("reset flame state", gs.world.blue_flames[0].state,
                    BLUE_FLAME_WAITING) != 0) return 1;
-    if (expect_float("reset flame y", gs.blue_flames[0].y,
+    if (expect_float("reset flame y", gs.world.blue_flames[0].y,
                      (float)(FLOOR_Y + TILE_SIZE)) != 0) return 1;
-    if (expect_int("reset platform falling", gs.float_platforms[0].falling, 0) != 0)
+    if (expect_int("reset platform falling", gs.world.float_platforms[0].falling, 0) != 0)
         return 1;
-    if (expect_float("reset platform y", gs.float_platforms[0].y,
+    if (expect_float("reset platform y", gs.world.float_platforms[0].y,
                      def.float_platforms[0].y) != 0) return 1;
-    if (expect_int("reset brick active", gs.bridges[0].bricks[0].active, 1) != 0)
+    if (expect_int("reset brick active", gs.world.bridges[0].bricks[0].active, 1) != 0)
         return 1;
-    if (expect_int("reset brick falling", gs.bridges[0].bricks[0].falling, 0) != 0)
+    if (expect_int("reset brick falling", gs.world.bridges[0].bricks[0].falling, 0) != 0)
         return 1;
-    if (expect_float("reset brick delay", gs.bridges[0].bricks[0].fall_delay,
+    if (expect_float("reset brick delay", gs.world.bridges[0].bricks[0].fall_delay,
                      -1.0f) != 0) return 1;
-    if (expect_int("reset pad state", gs.bouncepads_small[0].state,
+    if (expect_int("reset pad state", gs.world.bouncepads_small[0].state,
                    BOUNCE_IDLE) != 0) return 1;
-    if (expect_int("reset pad frame", gs.bouncepads_small[0].anim_frame, 2) != 0)
+    if (expect_int("reset pad frame", gs.world.bouncepads_small[0].anim_frame, 2) != 0)
         return 1;
-    if (expect_float("reset player x", gs.player.x, def.player_start_x) != 0)
+    if (expect_float("reset player x", gs.world.player.x, def.player_start_x) != 0)
         return 1;
-    if (expect_int("reset player ground", gs.player.on_ground, 1) != 0)
+    if (expect_int("reset player ground", gs.world.player.on_ground, 1) != 0)
         return 1;
 
-    if (expect_float("static platform preserved", gs.platforms[0].x, 777.0f) != 0)
+    if (expect_float("static platform preserved", gs.world.platforms[0].x, 777.0f) != 0)
         return 1;
 
     return 0;
@@ -398,21 +398,21 @@ static int load_applies_defaults_for_missing_optional_config(void)
 
     if (level_load(&gs, &def) != 0) return 1;
 
-    if (expect_int("default world width", gs.runtime.world_w, WORLD_W) != 0)
+    if (expect_int("default world width", gs.world.runtime.world_w, WORLD_W) != 0)
         return 1;
-    if (expect_int("default fog disabled", gs.runtime.fog_enabled, 0) != 0)
+    if (expect_int("default fog disabled", gs.world.runtime.fog_enabled, 0) != 0)
         return 1;
-    if (expect_int("default water disabled", gs.runtime.water_enabled, 0) != 0)
+    if (expect_int("default water disabled", gs.world.runtime.water_enabled, 0) != 0)
         return 1;
-    if (expect_float("default last star x", gs.last_star.x, 145.0f) != 0)
+    if (expect_float("default last star x", gs.world.last_star.x, 145.0f) != 0)
         return 1;
-    if (expect_float("default last star y", gs.last_star.y, 167.0f) != 0)
+    if (expect_float("default last star y", gs.world.last_star.y, 167.0f) != 0)
         return 1;
-    if (expect_int("default hearts", gs.hearts, MAX_HEARTS) != 0) return 1;
-    if (expect_int("default lives", gs.lives, DEFAULT_LIVES) != 0) return 1;
-    if (expect_int("default score per life", gs.rules.score_per_life,
+    if (expect_int("default hearts", gs.world.hearts, MAX_HEARTS) != 0) return 1;
+    if (expect_int("default lives", gs.world.lives, DEFAULT_LIVES) != 0) return 1;
+    if (expect_int("default score per life", gs.world.rules.score_per_life,
                    SCORE_PER_LIFE) != 0) return 1;
-    if (expect_int("default coin score", gs.rules.coin_score, COIN_SCORE) != 0)
+    if (expect_int("default coin score", gs.world.rules.coin_score, COIN_SCORE) != 0)
         return 1;
 
     return 0;
@@ -429,9 +429,9 @@ static int load_rejects_invalid_runtime_level_without_exiting(void)
 
     if (expect_int("invalid level rejected", level_load(&gs, &def), -1) != 0)
         return 1;
-    if (expect_ptr("current level unchanged", gs.runtime.current_level, NULL) != 0)
+    if (expect_ptr("current level unchanged", gs.world.runtime.current_level, NULL) != 0)
         return 1;
-    if (expect_int("world width unchanged", gs.runtime.world_w, 0) != 0)
+    if (expect_int("world width unchanged", gs.world.runtime.world_w, 0) != 0)
         return 1;
 
     return 0;
@@ -457,11 +457,11 @@ static int load_keeps_flames_at_world_edge_gap(void)
     def.fire_flames[0].x = 0.0f;
 
     if (level_load(&gs, &def) != 0) return 1;
-    if (expect_int("edge blue flame kept", gs.blue_flame_count, 1) != 0) return 1;
-    if (expect_float("edge blue flame gap", gs.blue_flames[0].gap_x, 0.0f) != 0)
+    if (expect_int("edge blue flame kept", gs.world.blue_flame_count, 1) != 0) return 1;
+    if (expect_float("edge blue flame gap", gs.world.blue_flames[0].gap_x, 0.0f) != 0)
         return 1;
-    if (expect_int("edge fire flame kept", gs.fire_flame_count, 1) != 0) return 1;
-    if (expect_float("edge fire flame gap", gs.fire_flames[0].gap_x, 0.0f) != 0)
+    if (expect_int("edge fire flame kept", gs.world.fire_flame_count, 1) != 0) return 1;
+    if (expect_float("edge fire flame gap", gs.world.fire_flames[0].gap_x, 0.0f) != 0)
         return 1;
 
     return 0;
@@ -504,19 +504,19 @@ static int load_shares_one_texture_per_tile_path(void)
     int before = level_loader_test_tile_loads();
     if (level_load(&gs, &def) != 0) goto done;
     if (expect_int("two paths load two images", level_loader_test_tile_loads() - before, 2) ||
-        expect_int("cache holds two tiles", gs.platform_tiles.count, 2) ||
-        expect_int("stone texture loaded", gs.platforms[0].tex != NULL, 1) ||
-        expect_ptr("stone shared by 1", gs.platforms[1].tex, gs.platforms[0].tex) ||
-        expect_ptr("stone shared by 3", gs.platforms[3].tex, gs.platforms[0].tex) ||
-        expect_int("brick is its own texture", gs.platforms[2].tex != gs.platforms[0].tex, 1) ||
-        expect_ptr("untiled platform uses default", gs.platforms[4].tex, NULL))
+        expect_int("cache holds two tiles", gs.world.platform_tiles.count, 2) ||
+        expect_int("stone texture loaded", gs.world.platforms[0].tex != NULL, 1) ||
+        expect_ptr("stone shared by 1", gs.world.platforms[1].tex, gs.world.platforms[0].tex) ||
+        expect_ptr("stone shared by 3", gs.world.platforms[3].tex, gs.world.platforms[0].tex) ||
+        expect_int("brick is its own texture", gs.world.platforms[2].tex != gs.world.platforms[0].tex, 1) ||
+        expect_ptr("untiled platform uses default", gs.world.platforms[4].tex, NULL))
         goto done;
 
     /* Replay/F8 reload the same level: nothing is decoded again. */
-    Texture2D *stone = gs.platforms[0].tex;
+    Texture2D *stone = gs.world.platforms[0].tex;
     if (level_load(&gs, &def) != 0) goto done;
     if (expect_int("reload loads nothing", level_loader_test_tile_loads() - before, 2) ||
-        expect_ptr("reload keeps the stone texture", gs.platforms[0].tex, stone))
+        expect_ptr("reload keeps the stone texture", gs.world.platforms[0].tex, stone))
         goto done;
 
     /* A level without brick drops it; one new path loads once. */
@@ -524,13 +524,13 @@ static int load_shares_one_texture_per_tile_path(void)
     strcpy(def.platforms[4].tile_path, "assets/sprites/levels/leaf_platform.png");
     if (level_load(&gs, &def) != 0) goto done;
     if (expect_int("new path loads once", level_loader_test_tile_loads() - before, 3) ||
-        expect_int("unused brick unloaded", gs.platform_tiles.count, 2) ||
-        expect_ptr("stone still shared", gs.platforms[2].tex, stone))
+        expect_int("unused brick unloaded", gs.world.platform_tiles.count, 2) ||
+        expect_ptr("stone still shared", gs.world.platforms[2].tex, stone))
         goto done;
 
     level_release_platform_tiles(&gs);
-    if (expect_int("cleanup empties cache", gs.platform_tiles.count, 0) ||
-        expect_ptr("cleanup clears borrowers", gs.platforms[0].tex, NULL))
+    if (expect_int("cleanup empties cache", gs.world.platform_tiles.count, 0) ||
+        expect_ptr("cleanup clears borrowers", gs.world.platforms[0].tex, NULL))
         goto done;
     failed = 0;
 done:

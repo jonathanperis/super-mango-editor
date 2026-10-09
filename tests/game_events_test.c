@@ -29,7 +29,7 @@ int game_load_next_phase(GameState *gs)
 void game_restart_after_game_over(GameState *gs)
 {
     restart_calls++;
-    gs->game_over = 0;
+    gs->screen.game_over = 0;
 }
 
 static int expect_int(const char *name, int actual, int expected)
@@ -63,14 +63,14 @@ static int push_key(int key)
 static int controller_back_exits_game_over_overlay(void)
 {
     GameState gs = {0};
-    gs.running = 1;
-    gs.game_over = 1;
+    gs.screen.running = 1;
+    gs.screen.game_over = 1;
 
     reset_counters();
     if (push_controller_button(PAD_BACK) != 0) return 1;
     game_handle_events(&gs);
 
-    if (expect_int("Back routes game-over exit", gs.route, GAME_ROUTE_EXIT) != 0) return 1;
+    if (expect_int("Back routes game-over exit", gs.screen.route, GAME_ROUTE_EXIT) != 0) return 1;
     if (expect_int("Back does not restart game-over", restart_calls, 0) != 0) return 1;
     return 0;
 }
@@ -78,14 +78,14 @@ static int controller_back_exits_game_over_overlay(void)
 static int controller_back_exits_completion_overlay(void)
 {
     GameState gs = {0};
-    gs.running = 1;
-    gs.completion.complete = 1;
+    gs.screen.running = 1;
+    gs.screen.completion.complete = 1;
 
     reset_counters();
     if (push_controller_button(PAD_BACK) != 0) return 1;
     game_handle_events(&gs);
 
-    if (expect_int("Back routes completion exit", gs.route, GAME_ROUTE_EXIT) != 0) return 1;
+    if (expect_int("Back routes completion exit", gs.screen.route, GAME_ROUTE_EXIT) != 0) return 1;
     if (expect_int("Back does not load next phase", load_next_phase_calls, 0) != 0) return 1;
     return 0;
 }
@@ -93,15 +93,15 @@ static int controller_back_exits_completion_overlay(void)
 static int controller_start_respects_completion_priority_over_game_over(void)
 {
     GameState gs = {0};
-    gs.running = 1;
-    gs.game_over = 1;
-    gs.completion.complete = 1;
+    gs.screen.running = 1;
+    gs.screen.game_over = 1;
+    gs.screen.completion.complete = 1;
 
     reset_counters();
     if (push_controller_button(PAD_START) != 0) return 1;
     game_handle_events(&gs);
 
-    if (expect_int("Start confirms replay", gs.route, GAME_ROUTE_REPLAY) != 0) return 1;
+    if (expect_int("Start confirms replay", gs.screen.route, GAME_ROUTE_REPLAY) != 0) return 1;
     if (expect_int("Start did not restart lower-priority game-over", restart_calls, 0) != 0) return 1;
     return 0;
 }
@@ -109,30 +109,30 @@ static int controller_start_respects_completion_priority_over_game_over(void)
 static int completion_navigation_and_first_route_wins(void)
 {
     GameState gs = {0};
-    gs.completion.complete = 1;
-    gs.completion.pending_next_phase = 1;
+    gs.screen.completion.complete = 1;
+    gs.screen.completion.pending_next_phase = 1;
 
     if (push_key(KEY_DOWN) != 0) return 1;
     game_handle_events(&gs);
-    if (expect_int("down focuses replay", gs.terminal_action_index, 1) != 0) return 1;
+    if (expect_int("down focuses replay", gs.screen.terminal_action_index, 1) != 0) return 1;
 
     if (push_key(KEY_ENTER) != 0) return 1;
     if (push_key(KEY_ESCAPE) != 0) return 1;
     game_handle_events(&gs);
-    if (expect_int("first confirm route wins", gs.route, GAME_ROUTE_REPLAY) != 0) return 1;
+    if (expect_int("first confirm route wins", gs.screen.route, GAME_ROUTE_REPLAY) != 0) return 1;
     return 0;
 }
 
 static int failed_next_level_keeps_completion_overlay(void)
 {
     GameState gs = {0};
-    gs.completion.complete = 1;
-    gs.completion.pending_next_phase = 1;
-    gs.terminal_action_index = 0;
+    gs.screen.completion.complete = 1;
+    gs.screen.completion.pending_next_phase = 1;
+    gs.screen.terminal_action_index = 0;
 
     if (push_key(KEY_ENTER) != 0) return 1;
     game_handle_events(&gs);
-    if (expect_int("next routes explicitly", gs.route, GAME_ROUTE_NEXT_LEVEL) != 0) return 1;
+    if (expect_int("next routes explicitly", gs.screen.route, GAME_ROUTE_NEXT_LEVEL) != 0) return 1;
     if (expect_int("completion remains after request",
                    game_overlay_state(&gs), GAME_OVERLAY_LEVEL_COMPLETE) != 0) return 1;
     return 0;
@@ -141,26 +141,26 @@ static int failed_next_level_keeps_completion_overlay(void)
 static int game_over_retry_stays_in_place(void)
 {
     GameState gs = {0};
-    gs.game_over = 1;
+    gs.screen.game_over = 1;
 
     reset_counters();
     if (push_key(KEY_ENTER) != 0) return 1;
     game_handle_events(&gs);
     if (expect_int("retry calls existing restart", restart_calls, 1) != 0) return 1;
-    if (expect_int("retry clears game over", gs.game_over, 0) != 0) return 1;
-    if (expect_int("retry has no cross-screen route", gs.route, GAME_ROUTE_NONE) != 0) return 1;
+    if (expect_int("retry clears game over", gs.screen.game_over, 0) != 0) return 1;
+    if (expect_int("retry has no cross-screen route", gs.screen.route, GAME_ROUTE_NONE) != 0) return 1;
     return 0;
 }
 
 static int keyboard_escape_toggles_pause_in_active_gameplay(void)
 {
     GameState gs = {0};
-    gs.running = 1;
+    gs.screen.running = 1;
 
     if (push_key(KEY_ESCAPE) != 0) return 1;
     game_handle_events(&gs);
 
-    if (expect_int("Escape pauses active gameplay", gs.paused, 1) != 0) return 1;
+    if (expect_int("Escape pauses active gameplay", gs.screen.paused, 1) != 0) return 1;
     if (expect_int("Escape sets player pause reason",
                    game_overlay_pause_reasons(&gs), GAME_PAUSE_REASON_PLAYER) != 0) return 1;
     return 0;
@@ -170,21 +170,21 @@ static int focus_regain_keeps_music_paused_under_settings(void)
 {
     GameState gs = {0};
     SettingsMenu settings = {.open = 1};
-    gs.running = 1;
-    gs.settings_menu = &settings;
+    gs.screen.running = 1;
+    gs.screen.settings_menu = &settings;
 
     InputEvent lost = {.type=INPUT_FOCUS,.focused=0};
     InputEvent gained = {.type=INPUT_FOCUS,.focused=1};
     if (input_push(&lost) != 1 || input_push(&gained) != 1) return 1;
     game_handle_events(&gs);
-    if (expect_int("focus returns to unpaused game", gs.paused, 0) != 0) return 1;
+    if (expect_int("focus returns to unpaused game", gs.screen.paused, 0) != 0) return 1;
     if (expect_int("settings still silence music", game_music_should_play(&gs), 0) != 0) return 1;
     settings.open = 0;
     if (expect_int("closing settings allows music", game_music_should_play(&gs), 1) != 0) return 1;
     game_overlay_toggle_pause(&gs);
     if (expect_int("pause overlay silences music", game_music_should_play(&gs), 0) != 0) return 1;
-    gs.paused = gs.pause_reasons = 0;
-    gs.game_over = 1;
+    gs.screen.paused = gs.screen.pause_reasons = 0;
+    gs.screen.game_over = 1;
     if (expect_int("game over keeps music", game_music_should_play(&gs), 1) != 0) return 1;
     return 0;
 }
@@ -209,9 +209,9 @@ static int semantic_touch_input(void)
     game_web_input_touch(GAME_TOUCH_PAUSE, 1);
     game_web_input_touch(GAME_TOUCH_PAUSE, 0);
     if (expect_int("pause is not a movement bit", game_web_input_take_touch_mask(), 0)) return 1;
-    gs.running = 1;
+    gs.screen.running = 1;
     game_handle_events(&gs);
-    if (expect_int("touch pause dispatches semantic action", gs.paused, 1)) return 1;
+    if (expect_int("touch pause dispatches semantic action", gs.screen.paused, 1)) return 1;
     game_web_input_clear_touch();
     input_clear();
     return 0;
@@ -222,17 +222,17 @@ static int semantic_touch_input(void)
 static int confirm_resume_latches_the_jump_button(void)
 {
     GameState gs = {0};
-    gs.running = 1;
+    gs.screen.running = 1;
 
     if (push_key(KEY_ESCAPE) != 0) return 1;
     game_handle_events(&gs);
-    if (expect_int("paused before resume", gs.paused, 1) != 0) return 1;
+    if (expect_int("paused before resume", gs.screen.paused, 1) != 0) return 1;
     if (push_controller_button(PAD_A) != 0) return 1;
     game_handle_events(&gs);
-    if (expect_int("A resumes", gs.paused, 0) != 0) return 1;
-    if (expect_int("resume press is latched", gs.input_release_latched, 1) != 0) return 1;
+    if (expect_int("A resumes", gs.screen.paused, 0) != 0) return 1;
+    if (expect_int("resume press is latched", gs.screen.input_release_latched, 1) != 0) return 1;
     if (expect_int("A stays blocked until released",
-                   (int)(gs.input_release_controller_mask & GAME_INPUT_CONFIRM),
+                   (int)(gs.screen.input_release_controller_mask & GAME_INPUT_CONFIRM),
                    (int)GAME_INPUT_CONFIRM) != 0) return 1;
     return 0;
 }
@@ -302,12 +302,12 @@ static int confirm_and_controller_helpers(void)
     GameState gs = {0};
     gamepad_adopt_controller(&gs, 2);
     gamepad_adopt_controller(&gs, 3);
-    if (expect_int("first controller kept", gs.controller, 2) != 0) return 1;
-    gs.controller = 0;
+    if (expect_int("first controller kept", gs.screen.controller, 2) != 0) return 1;
+    gs.screen.controller = 0;
     InputEvent added = {.type=INPUT_PAD_ADDED,.device=4};
     input_push(&added);
     game_handle_events(&gs);
-    if (expect_int("hot-plugged controller adopted", gs.controller, 4) != 0) return 1;
+    if (expect_int("hot-plugged controller adopted", gs.screen.controller, 4) != 0) return 1;
     return 0;
 }
 

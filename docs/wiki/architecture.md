@@ -218,7 +218,7 @@ During active gameplay, Esc or controller Start toggles the player pause reason 
 
 ### Game-Over Flow
 
-When lethal damage consumes the final life, `apply_damage()` sets `gs->game_over` and returns without resetting the level. The shared overlay helper reports `GAME_OVERLAY_GAME_OVER`, so the loop blocks gameplay updates and rendering draws a game-over overlay with the final score. Its terminal action list is **Retry**, **Level Select**, **Exit**. Retry calls `game_restart_after_game_over()` in place: it restores level-defined lives/hearts, resets score and bonus-life threshold, makes every coin collectable again, resets the current level, resumes music, and clears its input latch after held controls are released. Level Select and Exit follow the session routes above.
+When lethal damage consumes the final life, `apply_damage()` sets `gs->screen.game_over` and returns without resetting the level. The shared overlay helper reports `GAME_OVERLAY_GAME_OVER`, so the loop blocks gameplay updates and rendering draws a game-over overlay with the final score. Its terminal action list is **Retry**, **Level Select**, **Exit**. Retry calls `game_restart_after_game_over()` in place: it restores level-defined lives/hearts, resets score and bonus-life threshold, makes every coin collectable again, resets the current level, resumes music, and clears its input latch after held controls are released. Level Select and Exit follow the session routes above.
 
 ---
 
@@ -254,53 +254,75 @@ is a drawing boundary type. Two hitboxes that merely touch edges do not overlap.
 
 Defined in `game.h`. The **single container** for active-game resources; `AppSession` owns app-wide runtime state and the active screen. The plain numbers it and the entity code share (`GAME_W`, `FLOOR_Y`, `GRAVITY`, `MAX_FLOOR_GAPS`, camera tuning) live in `game_constants.h`, which `game.h` includes; entity, hazard, surface and effect `.c` files that need only those numbers include `game_constants.h` alone, so a `GameState` change does not recompile them.
 
+`GameState` is split into three named parts, so the path to a value also
+says what kind of state it is:
+
+| Part | Type | Holds | Example |
+|------|------|-------|---------|
+| `gs->world` | `GameWorld` | The level being played: player, camera, every entity array and count, score, lives, checkpoints, simulated time, the active `LevelDef` and the level's scenery (parallax, water, fog, platform tiles) | `gs->world.spiders[i]` |
+| `gs->screen` | `GameScreen` | The game screen around the level: render target, HUD, pause / game-over / completion overlays, the route for `AppSession`, frame-loop clock, input latches, replay script, debug tools, profile and ghost | `gs->screen.paused` |
+| `gs->assets` | `GameAssets` | The sprites and sound effects every level uses | `gs->assets.textures.spider` |
+
 ```c
 typedef struct {
-    RenderTexture2D frame_target;  /* screen owns target; session owns window */
-    int controller;               /* raylib index + 1; zero means none */
-    TextureResources textures;    /* owned Texture2D slots */
-    AudioResources audio;         /* owned SoundEffect / MusicTrack slots */
-
-    ParallaxSystem parallax;
-    Player         player;
-    Platform       platforms[MAX_PLATFORMS];
-    Water          water;
-    FogSystem      fog;
-    /* fixed-size arrays + counts for every enemy, hazard, collectible, surface */
-
-    Hud     hud;
+    char      level_path[GAME_LEVEL_PATH_MAX];
+    void     *level_def;          /* owned active LevelDef backing storage */
+    LevelRuntime runtime;         /* active LevelDef, world width, effect flags */
+    GameRules    rules;
+    Player     player;            /* embedded by value */
     GameCamera camera;
+    ParallaxSystem parallax;  Water water;  FogSystem fog;
+    Platform   platforms[MAX_PLATFORMS];
+    int        platform_count;
+    Spider     spiders[MAX_SPIDERS];
+    int        spider_count;
+    /* ... fixed-size arrays + counts for every enemy, hazard, surface,
+       collectible, in that order ... */
     int     hearts, lives, score, score_life_next;
+    float   respawn_x, respawn_y;
+    int     checkpoint_index;     /* -1 before the first authored record */
+    CheckpointFeedbackKind checkpoint_feedback_kind;
+    uint32_t checkpoint_feedback_until; /* deadline on game_checkpoint_clock_ms */
+    int     legacy_checkpoint_screen;
+    double  sim_time;             /* seconds simulated; stops while paused */
+} GameWorld;
+
+typedef struct {
+    RenderTexture2D frame_target; /* screen owns target; session owns window */
+    Hud     hud;
+    int     controller;           /* raylib index + 1; zero means none */
     int     running;
     GameRoute route;              /* request consumed by AppSession */
     int     game_over;
     int     paused;
     unsigned int pause_reasons;
-    float   respawn_x, respawn_y;
-    int     checkpoint_index;     /* -1 before the first authored record */
-    CheckpointFeedbackKind checkpoint_feedback_kind;
-    uint32_t checkpoint_feedback_until; /* deadline on game_checkpoint_clock_ms */
-    double  sim_time;             /* seconds simulated; stops while paused */
-    int     legacy_checkpoint_screen;
-    int     debug_mode;
-    int     smoke_test_frames;
-    char    level_path[GAME_LEVEL_PATH_MAX];
-    void   *level_def;      /* owned active LevelDef backing storage */
-
-    LevelRuntime        runtime;
-    GameRules           rules;
-    GameLoopState       loop;
     GameCompletionState completion;
-    DebugOverlay        debug;
+    GameLoopState       loop;
+    int     smoke_test_frames;
+    /* ... replay script, input latches, profile, ghost, inspector ... */
+    int     debug_mode;
+    DebugOverlay debug;
+} GameScreen;
+
+typedef struct {
+    TextureResources textures;    /* owned Texture2D slots */
+    AudioResources   audio;       /* owned SoundEffect / MusicTrack slots */
+} GameAssets;
+
+typedef struct GameState {
+    GameWorld  world;
+    GameScreen screen;
+    GameAssets assets;
 } GameState;
 ```
 
 **Key design decisions:**
 
-- Textures are grouped in `TextureResources` (`gs->textures.*`) and audio in `AudioResources` (`gs->audio.*`) so cleanup can be centralized.
-- `Player` is **embedded by value**, not a pointer. This avoids a heap allocation and keeps the struct self-contained. The same applies to `Platform`, `Water`, `FogSystem`, and all entity arrays.
+- `world` is the level itself: what is in it, where it is and how the player is doing (hearts, lives, score, checkpoints). "What happens to a spider each frame" is a walk over `gs->world.spiders`. `screen` is how this screen presents and steers that level: the HUD, the pause, game-over and completion overlays, routes, the frame clock, input, replay scripts and debug tools.
+- Textures are grouped in `TextureResources` (`gs->assets.textures.*`) and audio in `AudioResources` (`gs->assets.audio.*`) so cleanup can be centralized.
+- `Player` is **embedded by value**, not a pointer. This avoids a heap allocation and keeps the struct self-contained. The same applies to `Platform`, `Water`, `FogSystem`, all entity arrays and the three parts themselves.
 - Owning pointers are cleared after release. Borrowed pointers and aliases still require correct lifetime handling.
-- Active-game storage is heap-owned and zero-initialized before initialization; the struct above is an abridged ownership map, not a complete declaration.
+- Active-game storage is heap-owned and zero-initialized before initialization; the structs above are an abridged ownership map, not complete declarations.
 - The resolved respawn state is `respawn_x`, `respawn_y`, and `checkpoint_index`; `legacy_checkpoint_screen` is used only when the active level has no authored records. `checkpoint_index` and `respawn_x`/`respawn_y` are always written together (on load, on retry and when a record is reached), so a valid index always names the current respawn.
 
 ### Authored Checkpoint Flow

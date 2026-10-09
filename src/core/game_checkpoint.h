@@ -23,7 +23,7 @@ void game_checkpoint_update(GameState *gs);
  * shows it for exactly the same steps every time.
  */
 
-/* Simulated milliseconds (gs->sim_time), wrapping like a 32-bit ms clock. */
+/* Simulated milliseconds (gs->world.sim_time), wrapping like a 32-bit ms clock. */
 uint32_t game_checkpoint_clock_ms(const GameState *gs);
 
 void game_checkpoint_feedback_set(GameState *gs, CheckpointFeedbackKind kind,

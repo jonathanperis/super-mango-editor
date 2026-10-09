@@ -44,20 +44,20 @@ static int camera_uses_default_for_negative_sentinel(void)
     const float dt = 1.0f / 60.0f;
 
     level_def_init_defaults(&def);
-    gs.runtime.current_level = &def;
-    gs.runtime.world_w = WORLD_W;
-    gs.player.x = 300.0f;
-    gs.player.w = 48;
-    gs.player.vx = 250.0f;
+    gs.world.runtime.current_level = &def;
+    gs.world.runtime.world_w = WORLD_W;
+    gs.world.player.x = 300.0f;
+    gs.world.player.w = 48;
+    gs.world.player.vx = 250.0f;
 
     game_camera_update(&gs, dt);
 
     return expect_float("default sentinel camera",
-                        gs.camera.x,
-                        expected_camera_step(gs.player.x, gs.player.w, gs.player.vx,
+                        gs.world.camera.x,
+                        expected_camera_step(gs.world.player.x, gs.world.player.w, gs.world.player.vx,
                                              CAM_LOOKAHEAD_VX_FACTOR,
                                              CAM_LOOKAHEAD_MAX,
-                                             gs.runtime.world_w, dt));
+                                             gs.world.runtime.world_w, dt));
 }
 
 static int camera_allows_zero_override(void)
@@ -70,19 +70,19 @@ static int camera_allows_zero_override(void)
     def.physics.cam_lookahead_vx_factor = 0.0f;
     def.physics.cam_lookahead_max = 0.0f;
 
-    gs.runtime.current_level = &def;
-    gs.runtime.world_w = WORLD_W;
-    gs.player.x = 300.0f;
-    gs.player.w = 48;
-    gs.player.vx = 250.0f;
+    gs.world.runtime.current_level = &def;
+    gs.world.runtime.world_w = WORLD_W;
+    gs.world.player.x = 300.0f;
+    gs.world.player.w = 48;
+    gs.world.player.vx = 250.0f;
 
     game_camera_update(&gs, dt);
 
     return expect_float("zero override camera",
-                        gs.camera.x,
-                        expected_camera_step(gs.player.x, gs.player.w, gs.player.vx,
+                        gs.world.camera.x,
+                        expected_camera_step(gs.world.player.x, gs.world.player.w, gs.world.player.vx,
                                              0.0f, 0.0f,
-                                             gs.runtime.world_w, dt));
+                                             gs.world.runtime.world_w, dt));
 }
 
 static int level_physics_resets_stale_overrides(void)

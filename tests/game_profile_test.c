@@ -491,7 +491,7 @@ static int persistent_session(void)
     InputEvent event = {.type=INPUT_KEY_DOWN,.key=KEY_F1};
     puts("profile session: open settings");
     input_push(&event); session_frame(session);
-    CHECK(session->settings.open && session->game->completion.level_elapsed==0);
+    CHECK(session->settings.open && session->game->screen.completion.level_elapsed==0);
     session->profile.data.settings.muted=1;
     session->profile.data.settings.high_contrast=1;
     session->profile.data.settings.reduced_motion=1;
@@ -516,7 +516,7 @@ static int persistent_session(void)
                   GetScreenHeight()>0 && GetScreenHeight()<=900);
     }
 #endif
-    session->game->score=200;
+    session->game->world.score=200;
     game_complete_level(session->game);
     puts("profile session: completion");
     session_frame(session);
@@ -533,7 +533,7 @@ static int persistent_session(void)
     puts("profile session: continue");
     session=session_create(&config);
     CHECK(session && session->game && session->profile.data.settings.muted==1);
-    CHECK(!strcmp(session->game->profile_level_key,"levels/00_sandbox_01.toml"));
+    CHECK(!strcmp(session->game->screen.profile_level_key,"levels/00_sandbox_01.toml"));
     CHECK(session->profile.data.count==1);
     /* A remembered stage that no longer loads used to end the program;
      * --continue now falls back to the level selector. */
@@ -571,30 +571,30 @@ static int continue_round_trip(void)
     const char *level = "levels/00_sandbox_01.toml";
     AppSessionConfig config = {.level_path = level, .profile_enabled = 1, .profile_path = path};
     AppSession *session = session_create(&config);
-    CHECK(session && session->game && !session->game->resumed);
+    CHECK(session && session->game && !session->game->screen.resumed);
     GameState *game = session->game;
     CHECK(!game_profile_resume(&session->profile, level));  /* nothing yet */
 
     /* Walk into the third screen: the automatic screen checkpoint moves the
      * respawn point. Collect coin 3 on the way and pause there. */
-    game->player.x = 2.0f * GAME_W + 50.0f;
+    game->world.player.x = 2.0f * GAME_W + 50.0f;
     game_checkpoint_update(game);
-    float respawn_x = game->respawn_x;
-    CHECK(respawn_x > 80.0f && game->legacy_checkpoint_screen == 2);
-    game->coins[3].active = 0;
-    game->score = 30;
-    game->lives = 2;
-    game->completion.level_elapsed = 12.5f;
+    float respawn_x = game->world.respawn_x;
+    CHECK(respawn_x > 80.0f && game->world.legacy_checkpoint_screen == 2);
+    game->world.coins[3].active = 0;
+    game->world.score = 30;
+    game->world.lives = 2;
+    game->screen.completion.level_elapsed = 12.5f;
     game_overlay_set_pause_reason(game, GAME_PAUSE_REASON_PLAYER, 1);
     session_frame(session);
     const GameResume *saved = game_profile_resume(&session->profile, level);
     CHECK(saved && saved->respawn_x == respawn_x && saved->legacy_screen == 2);
     CHECK(saved->coins == (1u << 3) && saved->score == 30 && saved->lives == 2);
-    CHECK(saved->level_hash == game->source_level_hash && saved->elapsed >= 12.5f);
+    CHECK(saved->level_hash == game->world.source_level_hash && saved->elapsed >= 12.5f);
 
     /* Leave part-way: the point is written to disk with the profile. */
-    game->score = 40;  /* changed since the pause: Exit records it again */
-    game->route = GAME_ROUTE_EXIT;
+    game->world.score = 40;  /* changed since the pause: Exit records it again */
+    game->screen.route = GAME_ROUTE_EXIT;
     session_frame(session);
     CHECK(session->ended);
     session_destroy(&session);
@@ -603,12 +603,12 @@ static int continue_round_trip(void)
     config.level_path = NULL;
     config.continue_last = 1;
     session = session_create(&config);
-    CHECK(session && session->game && session->game->resumed);
+    CHECK(session && session->game && session->game->screen.resumed);
     game = session->game;
-    CHECK(game->respawn_x == respawn_x && game->score == 40 && game->lives == 2);
-    CHECK(!game->coins[3].active && game->coins[2].active && game->completion.level_elapsed >= 12.5f);
-    CHECK(fabsf(game->player.x - (respawn_x + (TILE_SIZE - game->player.w) / 2.0f)) < 0.01f);
-    CHECK(game->camera.x > 0.0f);  /* snapped to the respawn, not panning from 0 */
+    CHECK(game->world.respawn_x == respawn_x && game->world.score == 40 && game->world.lives == 2);
+    CHECK(!game->world.coins[3].active && game->world.coins[2].active && game->screen.completion.level_elapsed >= 12.5f);
+    CHECK(fabsf(game->world.player.x - (respawn_x + (TILE_SIZE - game->world.player.w) / 2.0f)) < 0.01f);
+    CHECK(game->world.camera.x > 0.0f);  /* snapped to the respawn, not panning from 0 */
 
     /* Finishing the level forgets the point. */
     game_complete_level(game);
@@ -622,7 +622,7 @@ static int continue_round_trip(void)
     config.level_path = level;
     session = session_create(&config);
     CHECK(session && session->game);
-    session->game->route = GAME_ROUTE_LEVEL_SELECT;
+    session->game->screen.route = GAME_ROUTE_LEVEL_SELECT;
     session_frame(session);
     CHECK(session->menu && session->screen == APP_SCREEN_MENU);
     saved = game_profile_resume(&session->profile, level);
@@ -636,8 +636,8 @@ static int continue_round_trip(void)
     InputEvent continue_key = {.type = INPUT_KEY_DOWN, .key = KEY_C};
     input_push(&continue_key);
     session_frame(session);
-    CHECK(session->game && session->game->resumed && session->game->score == 55);
-    session->game->route = GAME_ROUTE_LEVEL_SELECT;
+    CHECK(session->game && session->game->screen.resumed && session->game->world.score == 55);
+    session->game->screen.route = GAME_ROUTE_LEVEL_SELECT;
     session_frame(session);
     CHECK(session->menu);
     session_destroy(&session);
@@ -759,7 +759,7 @@ static void finish_run(AppSession *session, int steps, float seconds)
 {
     GameState *game = session->game;
     for (int i = 0; i < steps; i++) game_ghost_step(game);
-    game->completion.level_elapsed = seconds;
+    game->screen.completion.level_elapsed = seconds;
     game_complete_level(game);
     session_frame(session);
 }
@@ -780,13 +780,13 @@ static int ghost_session_keeps_the_fastest_run(void)
     AppSessionConfig config = {.level_path = level, .profile_enabled = 1, .profile_path = path};
     AppSession *session = session_create(&config);
     SerializerFileFingerprint before, after;
-    CHECK(session && session->game && session->game->ghost && !session->game->ghost->best.count);
+    CHECK(session && session->game && session->game->screen.ghost && !session->game->screen.ghost->best.count);
 
     finish_run(session, 30, 0.5f);
     CHECK(serializer_probe_path_utf8(ghost_path) == SERIALIZER_PATH_EXISTING);
-    session->game->route = GAME_ROUTE_REPLAY;
+    session->game->screen.route = GAME_ROUTE_REPLAY;
     session_frame(session);
-    CHECK(session->game->ghost->best.count == 30 && session->game->ghost->best.time == 0.5f);
+    CHECK(session->game->screen.ghost->best.count == 30 && session->game->screen.ghost->best.time == 0.5f);
 
     /* Slower: the stored ghost stays as it was. */
     CHECK(serializer_fingerprint_utf8(ghost_path, &before) == 1);
@@ -794,42 +794,42 @@ static int ghost_session_keeps_the_fastest_run(void)
     CHECK(serializer_fingerprint_utf8(ghost_path, &after) == 1 && serializer_fingerprint_equal(&before, &after));
 
     /* Faster: it replaces the ghost. */
-    session->game->route = GAME_ROUTE_REPLAY;
+    session->game->screen.route = GAME_ROUTE_REPLAY;
     session_frame(session);
     finish_run(session, 15, 0.25f);
-    session->game->route = GAME_ROUTE_REPLAY;
+    session->game->screen.route = GAME_ROUTE_REPLAY;
     session_frame(session);
-    CHECK(session->game->ghost->best.count == 15 && session->game->ghost->best.time == 0.25f);
+    CHECK(session->game->screen.ghost->best.count == 15 && session->game->screen.ghost->best.time == 0.25f);
 
     /* Recorded on another version of the level: not loaded, and the next
      * finished run (however slow) takes its place. */
     {
-        GameGhostTrack stale = session->game->ghost->best;
+        GameGhostTrack stale = session->game->screen.ghost->best;
         stale.level_hash ^= 1;
         CHECK(game_ghost_save(&session->profile, &stale) == 0);
     }
-    session->game->route = GAME_ROUTE_REPLAY;
+    session->game->screen.route = GAME_ROUTE_REPLAY;
     session_frame(session);
-    CHECK(session->game->ghost->best.count == 0);
+    CHECK(session->game->screen.ghost->best.count == 0);
     finish_run(session, 90, 1.5f);
-    session->game->route = GAME_ROUTE_REPLAY;
+    session->game->screen.route = GAME_ROUTE_REPLAY;
     session_frame(session);
-    CHECK(session->game->ghost->best.count == 90);
+    CHECK(session->game->screen.ghost->best.count == 90);
 
     /* A damaged file is ignored the same way. */
     FILE *fp = fopen(ghost_path, "wb");
     CHECK(fp);
     fputs("not a ghost", fp);
     fclose(fp);
-    session->game->route = GAME_ROUTE_REPLAY;
+    session->game->screen.route = GAME_ROUTE_REPLAY;
     session_frame(session);
-    CHECK(session->game->ghost->best.count == 0);
+    CHECK(session->game->screen.ghost->best.count == 0);
 
     /* Runs without a personal profile have no ghost at all. */
     session_destroy(&session);
     config.profile_enabled = 0;
     session = session_create(&config);
-    CHECK(session && session->game && !session->game->ghost);
+    CHECK(session && session->game && !session->game->screen.ghost);
     session_destroy(&session);
     remove(ghost_path); remove(path); remove(lock_path);
     return 0;

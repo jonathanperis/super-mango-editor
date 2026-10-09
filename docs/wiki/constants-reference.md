@@ -115,7 +115,7 @@ Every step uses a fixed `dt` of exactly 1/60 s (see [Architecture](../architectu
 | `CAM_SMOOTHING` | `8.0f` | `float` | Lerp speed factor (per second); higher = snappier follow |
 | `CAM_SNAP_THRESHOLD` | `0.5f` | `float` | Sub-pixel distance at which the camera snaps exactly to target |
 
-Loaded levels set `gs->runtime.world_w = screen_count × GAME_W`; `WORLD_W` is not
+Loaded levels set `gs->world.runtime.world_w = screen_count × GAME_W`; `WORLD_W` is not
 the active width of every level. The visible canvas is `GAME_W` (400 px), and the
 camera tracks its left edge in world coordinates. Whenever the player is placed
 rather than moved (level start, a phase transition, an F8 experiment restart, a

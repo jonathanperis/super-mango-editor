@@ -24,14 +24,14 @@ static void request_terminal_action(GameState *gs, GameTerminalAction action)
 {
     /* Retry resets the current level in place. Other terminal choices become
      * routes for AppSession to apply after this frame has finished. */
-    if (!gs || gs->route != GAME_ROUTE_NONE) return;
+    if (!gs || gs->screen.route != GAME_ROUTE_NONE) return;
     if (action == GAME_TERMINAL_ACTION_RETRY) {
         game_restart_after_game_over(gs);
         game_music_sync(gs);
         game_timing_restart_clock(gs);
         game_input_arm_release_latch(gs, NULL);
     } else
-        gs->route = game_terminal_action_route(action);
+        gs->screen.route = game_terminal_action_route(action);
 }
 
 static void sync_pause_music(GameState *gs)
@@ -49,12 +49,12 @@ void game_handle_events(GameState *gs)
     while (input_poll(&event)) {
         /* Preserve priority: settings/capture first, then the debug inspector,
          * then normal screen commands. Key-repeat must not toggle pause twice. */
-        int was_open = gs->settings_menu && gs->settings_menu->open;
+        int was_open = gs->screen.settings_menu && gs->screen.settings_menu->open;
         /* Settings consume every key while open, including the inspector's
          * F2-F10/-/= (which game_settings_key_allowed refuses as bindings). */
-        if (gs->route == GAME_ROUTE_NONE && settings_menu_event(gs->settings_menu, gs->profile, &event,
+        if (gs->screen.route == GAME_ROUTE_NONE && settings_menu_event(gs->screen.settings_menu, gs->screen.profile, &event,
                                                                terminal_overlay(gs) ? -1 : PAD_BACK)) {
-            if (was_open && !gs->settings_menu->open) {
+            if (was_open && !gs->screen.settings_menu->open) {
                 GameInputPhysicalState inherited = {0};
                 if (event.type == INPUT_PAD_DOWN && (event.button == PAD_A || event.button == PAD_START))
                     inherited.controller_mask = GAME_INPUT_CONFIRM;
@@ -64,15 +64,15 @@ void game_handle_events(GameState *gs)
         }
         if (game_inspector_event(gs, &event)) continue;
         if (event.type == INPUT_QUIT) {
-            if (gs->route == GAME_ROUTE_NONE) gs->route = GAME_ROUTE_EXIT;
+            if (gs->screen.route == GAME_ROUTE_NONE) gs->screen.route = GAME_ROUTE_EXIT;
         } else if (event.type == INPUT_FOCUS) {
             game_overlay_set_pause_reason(gs, GAME_PAUSE_REASON_FOCUS, !event.focused);
             sync_pause_music(gs);
         } else if (event.type == INPUT_PAD_ADDED) {
             gamepad_adopt_controller(gs, event.device);
         } else if (event.type == INPUT_PAD_REMOVED) {
-            if (gs->controller == event.device) {
-                gs->controller = 0;
+            if (gs->screen.controller == event.device) {
+                gs->screen.controller = 0;
                 game_input_clear_controller_latch(gs);
             }
         } else if (event.type == INPUT_KEY_DOWN || event.type == INPUT_PAD_DOWN) {
@@ -81,7 +81,7 @@ void game_handle_events(GameState *gs)
             int button = event.type == INPUT_PAD_DOWN ? event.button : -1;
             int confirm = game_input_event_confirms(&event);
             if (terminal_overlay(gs)) {
-                if (gs->route != GAME_ROUTE_NONE) continue;
+                if (gs->screen.route != GAME_ROUTE_NONE) continue;
                 if (key == KEY_UP || key == KEY_W || button == PAD_UP) game_terminal_move(gs, -1);
                 else if (key == KEY_DOWN || key == KEY_S || button == PAD_DOWN) game_terminal_move(gs, 1);
                 else if (key == KEY_ESCAPE || button == PAD_BACK || button == PAD_B)

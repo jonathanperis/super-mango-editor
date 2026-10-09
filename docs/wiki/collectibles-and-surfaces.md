@@ -14,7 +14,7 @@ Collectibles are items the player can pick up. Surfaces are interactive terrain 
 
 **File:** `src/collectibles/coin.c` / `coin.h`  
 **Sprite:** `assets/sprites/collectibles/coin.png` — 16×16 px display size  
-**Pickup:** AABB overlap with player. Plays `gs->audio.coin` on collection.
+**Pickup:** AABB overlap with player. Plays `gs->assets.audio.coin` on collection.
 
 | Constant | Value | Description |
 |----------|-------|-------------|

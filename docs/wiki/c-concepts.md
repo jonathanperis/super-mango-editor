@@ -42,7 +42,7 @@ dereference you get once the owner clears its pointer.
 
 | Idea | Where to read it | What to notice |
 |------|------------------|----------------|
-| One big struct that holds everything | `GameState` in `src/game.h` | `Player player;` and `Coin coins[MAX_COINS];` are stored by value inside it, not as separate allocations. One `calloc` in `session_make_game()` (`src/core/app_session.c`) creates all of it, already zeroed. |
+| One big struct that holds everything | `GameState` in `src/game.h` | `Player player;` and `Coin coins[MAX_COINS];` are stored by value inside its `world` part (`GameWorld`), and that part by value inside `GameState`, not as separate allocations. The parts only group fields: `gs->world.coins[i]` is still one struct member reached through another. One `calloc` in `session_make_game()` (`src/core/app_session.c`) creates all of it, already zeroed. |
 | Fixed limits instead of resizing | `MAX_COINS` in `src/collectibles/coin.h`; `MAX_FLOOR_GAPS` and friends in `src/game_constants.h` | A level can never need more memory than the limits allow, so there is no `realloc` during play and nothing to free per entity. |
 | Checking the count before copying | `level_validate_counts()` in `src/levels/level_validate.c`; `LOAD_XY_ARRAY` in `src/shared/serializer_load_collectibles.c` | A count larger than the array is rejected before the copy loop runs. A fixed array is only safe if every writer checks this. |
 | Immutable data versus live state | `CoinPlacement` in `LevelDef` versus `Coin` in `GameState`; `load_coins()` in `src/levels/level_loader.c` | The level file's data stays untouched; `load_coins()` copies it into the runtime array and sets `active = 1`. A restart copies again instead of "undoing" changes. |
@@ -56,7 +56,7 @@ pairs in a table and writes the logic once.
 
 | Idea | Where to read it | What to notice |
 |------|------------------|----------------|
-| `offsetof` to name a struct field | `TEX_FIELD` and `CHUNK_FIELD` in `src/core/game_resources.c` | Each row of `s_required_textures` stores *where* in `TextureResources` the texture goes, as a byte offset. `texture_slot()` turns the offset back into a `Texture2D **` with `(char *)&gs->textures + offset`. One loop loads every texture, one loop frees them. |
+| `offsetof` to name a struct field | `TEX_FIELD` and `CHUNK_FIELD` in `src/core/game_resources.c` | Each row of `s_required_textures` stores *where* in `TextureResources` the texture goes, as a byte offset. `texture_slot()` turns the offset back into a `Texture2D **` with `(char *)&gs->assets.textures + offset`. One loop loads every texture, one loop frees them. |
 | The same trick for tuning values | the `fields` table and its `FIELD` macro in `src/core/game_inspector.c` | `#name` turns the field name into a string for the inspector's label, and `offsetof(Player, name)` finds the value. |
 | Macros that build a schema | `ROOT_TABLE_ARRAY` in `src/shared/serializer_parse.c` | `ROOT_FIELDS` lists every key a level file may contain, with its type and maximum count. The parser walks that table, so adding a key is one line. |
 | A macro wrapped in `do { ... } while (0)` | `LOAD_XY_ARRAY` in `src/shared/serializer_load_collectibles.c` | The wrapper makes a multi-line macro behave like one statement, so it is safe after an `if` without braces. |
@@ -88,7 +88,7 @@ the arithmetic.
 
 | Idea | Where to read it | What to notice |
 |------|------------------|----------------|
-| Saturating addition | `game_award_score()` in `src/core/game_score.c` | `amount > INT_MAX - gs->score ? INT_MAX : gs->score + amount` never computes a sum that does not fit. |
+| Saturating addition | `game_award_score()` in `src/core/game_score.c` | `amount > INT_MAX - gs->world.score ? INT_MAX : gs->world.score + amount` never computes a sum that does not fit. |
 | Wider arithmetic for the hard part | the bonus-life lines in `game_award_score()` | The threshold maths uses `int64_t`, which has room for any product here, then clamps back to `int`. |
 | Parsing numbers safely | `unsigned_argument()` in `src/main.c` | `strtoul` instead of `atoi`: `errno` catches overflow, `end` catches trailing junk like `7x`, and `value > UINT_MAX` is checked before narrowing to `unsigned int`. |
 | Unsigned wraparound on purpose | `editor_hash_bytes()` in `src/editor/editor_session.c`; `game_random()` in `src/core/game_random.c` | Unsigned overflow is defined (it wraps), which the FNV-1a hash and the xorshift generator rely on. |

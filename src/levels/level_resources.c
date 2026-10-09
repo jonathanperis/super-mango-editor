@@ -15,7 +15,7 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
 {
     if (!gs || !def) return;
 
-    parallax_cleanup(&gs->parallax);
+    parallax_cleanup(&gs->world.parallax);
     if (def->background_layer_count > 0) {
         char  paths[MAX_BACKGROUND_LAYERS][64] = {{0}};
         float speeds[MAX_BACKGROUND_LAYERS] = {0.0f};
@@ -26,10 +26,10 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
             str_copy(paths[i], def->background_layers[i].path, 64);
             speeds[i] = def->background_layers[i].speed;
         }
-        parallax_init_from_def(&gs->parallax,
+        parallax_init_from_def(&gs->world.parallax,
                                (const char (*)[64])paths, speeds, n);
     } else {
-        parallax_init(&gs->parallax);
+        parallax_init(&gs->world.parallax);
     }
 
     {
@@ -42,8 +42,8 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
             new_floor = texture_load("assets/sprites/levels/grass_tileset.png");
         }
         if (new_floor) {
-            texture_unload(gs->textures.floor_tile);
-            gs->textures.floor_tile = new_floor;
+            texture_unload(gs->assets.textures.floor_tile);
+            gs->assets.textures.floor_tile = new_floor;
         }
     }
 
@@ -56,10 +56,10 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
                 def->foreground_layers[n - 1].path;
             if (level_strip[0] != '\0') strip = level_strip;
         }
-        water_reload_texture(&gs->water, strip);
+        water_reload_texture(&gs->world.water, strip);
     }
 
-    fog_cleanup(&gs->fog);
+    fog_cleanup(&gs->world.fog);
     if (def->fog_layer_count > 0) {
         char fog_paths[MAX_FOG_TEXTURES][64] = {{0}};
         int  n = def->fog_layer_count;
@@ -68,19 +68,19 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
         for (int i = 0; i < n; i++) {
             str_copy(fog_paths[i], def->fog_layers[i].path, 64);
         }
-        fog_init(&gs->fog, (const char (*)[64])fog_paths, n);
+        fog_init(&gs->world.fog, (const char (*)[64])fog_paths, n);
     }
 
-    if (gs->audio.music) {
-        music_unload(gs->audio.music);
-        gs->audio.music = NULL;
+    if (gs->assets.audio.music) {
+        music_unload(gs->assets.audio.music);
+        gs->assets.audio.music = NULL;
     }
     if (def->music_path[0] != '\0') {
-        gs->audio.music = music_load(def->music_path);
-        if (!gs->audio.music) {
+        gs->assets.audio.music = music_load(def->music_path);
+        if (!gs->assets.audio.music) {
             fprintf(stderr, "Warning: failed to load %s\n", def->music_path);
         } else {
-            music_play(gs->audio.music);
+            music_play(gs->assets.audio.music);
             music_set_volume(def->music_volume); /* zero is an authored mute */
         }
     }

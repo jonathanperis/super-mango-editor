@@ -16,30 +16,30 @@ PlayerStepSupport game_player_step(GameState *gs, float dt)
     int bounce_idx = -1;
     PlayerStepSupport support = { -1, -1 };
 
-    unsigned int input = gs->replay_input_mask | game_web_input_take_touch_mask() | game_input_sample(gs);
+    unsigned int input = gs->screen.replay_input_mask | game_web_input_take_touch_mask() | game_input_sample(gs);
     input = game_experiment_input(gs, input);
-    player_handle_input(&gs->player, gs->audio.jump,
+    player_handle_input(&gs->world.player, gs->assets.audio.jump,
                         input, 0,
-                        gs->vines, gs->vine_count,
-                        gs->ladders, gs->ladder_count,
-                        gs->ropes, gs->rope_count);
+                        gs->world.vines, gs->world.vine_count,
+                        gs->world.ladders, gs->world.ladder_count,
+                        gs->world.ropes, gs->world.rope_count);
 
     /* Pass the three pad arrays as views (no per-frame copy). */
     game_bouncepads_lists(gs, pad_lists);
 
-    player_update(&gs->player, dt, gs->audio.jump,
-                  gs->platforms, gs->platform_count,
-                  gs->float_platforms, gs->float_platform_count,
+    player_update(&gs->world.player, dt, gs->assets.audio.jump,
+                  gs->world.platforms, gs->world.platform_count,
+                  gs->world.float_platforms, gs->world.float_platform_count,
                   pad_lists, GAME_BOUNCEPAD_LIST_COUNT,
-                  gs->vines, gs->vine_count,
-                  gs->ladders, gs->ladder_count,
-                  gs->ropes, gs->rope_count,
-                  gs->bridges, gs->bridge_count,
-                  gs->spike_platforms, gs->spike_platform_count,
-                  gs->floor_gaps, gs->floor_gap_count,
+                  gs->world.vines, gs->world.vine_count,
+                  gs->world.ladders, gs->world.ladder_count,
+                  gs->world.ropes, gs->world.rope_count,
+                  gs->world.bridges, gs->world.bridge_count,
+                  gs->world.spike_platforms, gs->world.spike_platform_count,
+                  gs->world.floor_gaps, gs->world.floor_gap_count,
                   &bounce_idx, &support.float_platform, &support.bridge,
-                  gs->loop.fp_prev_riding,
-                  gs->runtime.world_w);
+                  gs->screen.loop.fp_prev_riding,
+                  gs->world.runtime.world_w);
 
     game_bouncepads_handle_hit(gs, bounce_idx);
 

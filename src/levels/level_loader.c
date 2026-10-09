@@ -72,8 +72,8 @@ static float rand_range(float lo, float hi) {
 static void load_floor_gaps(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->floor_gap_count; i++)
-        gs->floor_gaps[i] = def->floor_gaps[i];
-    gs->floor_gap_count = def->floor_gap_count;
+        gs->world.floor_gaps[i] = def->floor_gaps[i];
+    gs->world.floor_gap_count = def->floor_gap_count;
 }
 
 /*
@@ -84,7 +84,7 @@ static void load_floor_gaps(GameState *gs, const LevelDef *def)
  */
 static void load_rails(GameState *gs, const LevelDef *def)
 {
-    rail_init_from_placements(gs->rails, &gs->rail_count,
+    rail_init_from_placements(gs->world.rails, &gs->world.rail_count,
                               def->rails, def->rail_count);
 }
 
@@ -147,8 +147,8 @@ static Texture2D *platform_tile_acquire(PlatformTileCache *cache, const char *pa
 void level_release_platform_tiles(GameState *gs)
 {
     /* Platforms only borrow these; forget their pointers first. */
-    for (int i = 0; i < gs->platform_count; i++) gs->platforms[i].tex = NULL;
-    PlatformTileCache *cache = &gs->platform_tiles;
+    for (int i = 0; i < gs->world.platform_count; i++) gs->world.platforms[i].tex = NULL;
+    PlatformTileCache *cache = &gs->world.platform_tiles;
     for (int i = 0; i < cache->count; i++) {
         texture_unload(cache->tiles[i].texture);
         cache->tiles[i].texture = NULL;
@@ -164,29 +164,29 @@ void level_release_platform_tiles(GameState *gs)
  * a tile_width of 0 means one tile.
  *
  * If a platform specifies a tile_path, it borrows that image from
- * gs->platform_tiles, which loads each distinct path once.  Otherwise it is
- * drawn with the shared default pillar texture, gs->textures.platform
+ * gs->world.platform_tiles, which loads each distinct path once.  Otherwise it is
+ * drawn with the shared default pillar texture, gs->assets.textures.platform
  * (grass_platform.png, loaded by game_resources.c and passed as default_tex
  * to platforms_render).
  */
 static void load_platforms(GameState *gs, const LevelDef *def)
 {
-    platform_tiles_keep_used(&gs->platform_tiles, def);
+    platform_tiles_keep_used(&gs->world.platform_tiles, def);
 
     for (int i = 0; i < def->platform_count; i++) {
         const PlatformPlacement *p = &def->platforms[i];
         int tw = (p->tile_width > 0) ? p->tile_width : 1;
-        gs->platforms[i].x = p->x;
-        gs->platforms[i].y = level_platform_top_y(p->tile_height);
-        gs->platforms[i].w = tw * TILE_SIZE;
-        gs->platforms[i].h = p->tile_height * TILE_SIZE;
-        gs->platforms[i].tex = NULL;
+        gs->world.platforms[i].x = p->x;
+        gs->world.platforms[i].y = level_platform_top_y(p->tile_height);
+        gs->world.platforms[i].w = tw * TILE_SIZE;
+        gs->world.platforms[i].h = p->tile_height * TILE_SIZE;
+        gs->world.platforms[i].tex = NULL;
 
         /* Borrow the level's shared copy of this platform's tileset. */
         if (p->tile_path[0] != '\0')
-            gs->platforms[i].tex = platform_tile_acquire(&gs->platform_tiles, p->tile_path);
+            gs->world.platforms[i].tex = platform_tile_acquire(&gs->world.platform_tiles, p->tile_path);
     }
-    gs->platform_count = def->platform_count;
+    gs->world.platform_count = def->platform_count;
 }
 
 /* ------------------------------------------------------------------ */
@@ -196,57 +196,57 @@ static void load_platforms(GameState *gs, const LevelDef *def)
 static void load_coins(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->coin_count; i++) {
-        gs->coins[i].x      = def->coins[i].x;
-        gs->coins[i].y      = def->coins[i].y;
-        gs->coins[i].active = 1;
+        gs->world.coins[i].x      = def->coins[i].x;
+        gs->world.coins[i].y      = def->coins[i].y;
+        gs->world.coins[i].active = 1;
     }
-    gs->coin_count = def->coin_count;
+    gs->world.coin_count = def->coin_count;
 }
 
 static void load_star_yellows(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->star_yellow_count; i++) {
-        gs->star_yellows[i].x      = def->star_yellows[i].x;
-        gs->star_yellows[i].y      = def->star_yellows[i].y;
-        gs->star_yellows[i].active = 1;
+        gs->world.star_yellows[i].x      = def->star_yellows[i].x;
+        gs->world.star_yellows[i].y      = def->star_yellows[i].y;
+        gs->world.star_yellows[i].active = 1;
     }
-    gs->star_yellow_count = def->star_yellow_count;
+    gs->world.star_yellow_count = def->star_yellow_count;
 }
 
 static void load_star_greens(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->star_green_count; i++) {
-        gs->star_greens[i].x      = def->star_greens[i].x;
-        gs->star_greens[i].y      = def->star_greens[i].y;
-        gs->star_greens[i].active = 1;
+        gs->world.star_greens[i].x      = def->star_greens[i].x;
+        gs->world.star_greens[i].y      = def->star_greens[i].y;
+        gs->world.star_greens[i].active = 1;
     }
-    gs->star_green_count = def->star_green_count;
+    gs->world.star_green_count = def->star_green_count;
 }
 
 static void load_star_reds(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->star_red_count; i++) {
-        gs->star_reds[i].x      = def->star_reds[i].x;
-        gs->star_reds[i].y      = def->star_reds[i].y;
-        gs->star_reds[i].active = 1;
+        gs->world.star_reds[i].x      = def->star_reds[i].x;
+        gs->world.star_reds[i].y      = def->star_reds[i].y;
+        gs->world.star_reds[i].active = 1;
     }
-    gs->star_red_count = def->star_red_count;
+    gs->world.star_red_count = def->star_red_count;
 }
 
 static void load_last_star(GameState *gs, const LevelDef *def)
 {
-    gs->last_star.x         = def->last_star.x;
-    gs->last_star.y         = def->last_star.y;
-    gs->last_star.w         = LAST_STAR_DISPLAY_W;
-    gs->last_star.h         = LAST_STAR_DISPLAY_H;
-    gs->last_star.collected = 0;
+    gs->world.last_star.x         = def->last_star.x;
+    gs->world.last_star.y         = def->last_star.y;
+    gs->world.last_star.w         = LAST_STAR_DISPLAY_W;
+    gs->world.last_star.h         = LAST_STAR_DISPLAY_H;
+    gs->world.last_star.collected = 0;
 
     /* If the level didn't place one, use a visible default position */
     if (def->last_star.x == 0.0f && def->last_star.y == 0.0f) {
-        gs->last_star.x = 145.0f;
-        gs->last_star.y = 167.0f;
+        gs->world.last_star.x = 145.0f;
+        gs->world.last_star.y = 167.0f;
     }
-    gs->last_star.active = 1;
+    gs->world.last_star.active = 1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -257,62 +257,62 @@ static void load_spiders(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->spider_count; i++) {
         const SpiderPlacement *p = &def->spiders[i];
-        gs->spiders[i].x             = p->x;
-        gs->spiders[i].vx            = p->vx;
-        gs->spiders[i].patrol_x0     = p->patrol_x0;
-        gs->spiders[i].patrol_x1     = p->patrol_x1;
-        gs->spiders[i].frame_index   = p->frame_index;
-        gs->spiders[i].anim_timer_ms = 0;
+        gs->world.spiders[i].x             = p->x;
+        gs->world.spiders[i].vx            = p->vx;
+        gs->world.spiders[i].patrol_x0     = p->patrol_x0;
+        gs->world.spiders[i].patrol_x1     = p->patrol_x1;
+        gs->world.spiders[i].frame_index   = p->frame_index;
+        gs->world.spiders[i].anim_timer_ms = 0;
     }
-    gs->spider_count = def->spider_count;
+    gs->world.spider_count = def->spider_count;
 }
 
 static void load_jumping_spiders(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->jumping_spider_count; i++) {
         const JumpingSpiderPlacement *p = &def->jumping_spiders[i];
-        gs->jumping_spiders[i].x             = p->x;
-        gs->jumping_spiders[i].y             = 0.0f;  /* always on ground */
-        gs->jumping_spiders[i].vx            = p->vx;
-        gs->jumping_spiders[i].vy            = 0.0f;
-        gs->jumping_spiders[i].patrol_x0     = p->patrol_x0;
-        gs->jumping_spiders[i].patrol_x1     = p->patrol_x1;
-        gs->jumping_spiders[i].jump_timer    = 0.0f;
-        gs->jumping_spiders[i].on_ground     = 1;
-        gs->jumping_spiders[i].frame_index   = 0;
-        gs->jumping_spiders[i].anim_timer_ms = 0;
+        gs->world.jumping_spiders[i].x             = p->x;
+        gs->world.jumping_spiders[i].y             = 0.0f;  /* always on ground */
+        gs->world.jumping_spiders[i].vx            = p->vx;
+        gs->world.jumping_spiders[i].vy            = 0.0f;
+        gs->world.jumping_spiders[i].patrol_x0     = p->patrol_x0;
+        gs->world.jumping_spiders[i].patrol_x1     = p->patrol_x1;
+        gs->world.jumping_spiders[i].jump_timer    = 0.0f;
+        gs->world.jumping_spiders[i].on_ground     = 1;
+        gs->world.jumping_spiders[i].frame_index   = 0;
+        gs->world.jumping_spiders[i].anim_timer_ms = 0;
     }
-    gs->jumping_spider_count = def->jumping_spider_count;
+    gs->world.jumping_spider_count = def->jumping_spider_count;
 }
 
 static void load_birds(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->bird_count; i++) {
         const BirdPlacement *p = &def->birds[i];
-        gs->birds[i].x             = p->x;
-        gs->birds[i].base_y        = p->base_y;
-        gs->birds[i].vx            = p->vx;
-        gs->birds[i].patrol_x0     = p->patrol_x0;
-        gs->birds[i].patrol_x1     = p->patrol_x1;
-        gs->birds[i].frame_index   = p->frame_index;
-        gs->birds[i].anim_timer_ms = 0;
+        gs->world.birds[i].x             = p->x;
+        gs->world.birds[i].base_y        = p->base_y;
+        gs->world.birds[i].vx            = p->vx;
+        gs->world.birds[i].patrol_x0     = p->patrol_x0;
+        gs->world.birds[i].patrol_x1     = p->patrol_x1;
+        gs->world.birds[i].frame_index   = p->frame_index;
+        gs->world.birds[i].anim_timer_ms = 0;
     }
-    gs->bird_count = def->bird_count;
+    gs->world.bird_count = def->bird_count;
 }
 
 static void load_faster_birds(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->faster_bird_count; i++) {
         const BirdPlacement *p = &def->faster_birds[i];
-        gs->faster_birds[i].x             = p->x;
-        gs->faster_birds[i].base_y        = p->base_y;
-        gs->faster_birds[i].vx            = p->vx;
-        gs->faster_birds[i].patrol_x0     = p->patrol_x0;
-        gs->faster_birds[i].patrol_x1     = p->patrol_x1;
-        gs->faster_birds[i].frame_index   = p->frame_index;
-        gs->faster_birds[i].anim_timer_ms = 0;
+        gs->world.faster_birds[i].x             = p->x;
+        gs->world.faster_birds[i].base_y        = p->base_y;
+        gs->world.faster_birds[i].vx            = p->vx;
+        gs->world.faster_birds[i].patrol_x0     = p->patrol_x0;
+        gs->world.faster_birds[i].patrol_x1     = p->patrol_x1;
+        gs->world.faster_birds[i].frame_index   = p->frame_index;
+        gs->world.faster_birds[i].anim_timer_ms = 0;
     }
-    gs->faster_bird_count = def->faster_bird_count;
+    gs->world.faster_bird_count = def->faster_bird_count;
 }
 
 static void load_fish(GameState *gs, const LevelDef *def)
@@ -327,18 +327,18 @@ static void load_fish(GameState *gs, const LevelDef *def)
 
     for (int i = 0; i < def->fish_count; i++) {
         const FishPlacement *p = &def->fish[i];
-        gs->fish[i].x             = p->x;
-        gs->fish[i].y             = water_y;
-        gs->fish[i].vx            = p->vx;
-        gs->fish[i].vy            = 0.0f;
-        gs->fish[i].patrol_x0     = p->patrol_x0;
-        gs->fish[i].patrol_x1     = p->patrol_x1;
-        gs->fish[i].jump_timer    = rand_range(FISH_JUMP_MIN, FISH_JUMP_MAX);
-        gs->fish[i].water_y       = water_y;
-        gs->fish[i].frame_index   = 0;
-        gs->fish[i].anim_timer_ms = 0;
+        gs->world.fish[i].x             = p->x;
+        gs->world.fish[i].y             = water_y;
+        gs->world.fish[i].vx            = p->vx;
+        gs->world.fish[i].vy            = 0.0f;
+        gs->world.fish[i].patrol_x0     = p->patrol_x0;
+        gs->world.fish[i].patrol_x1     = p->patrol_x1;
+        gs->world.fish[i].jump_timer    = rand_range(FISH_JUMP_MIN, FISH_JUMP_MAX);
+        gs->world.fish[i].water_y       = water_y;
+        gs->world.fish[i].frame_index   = 0;
+        gs->world.fish[i].anim_timer_ms = 0;
     }
-    gs->fish_count = def->fish_count;
+    gs->world.fish_count = def->fish_count;
 }
 
 static void load_faster_fish(GameState *gs, const LevelDef *def)
@@ -347,18 +347,18 @@ static void load_faster_fish(GameState *gs, const LevelDef *def)
 
     for (int i = 0; i < def->faster_fish_count; i++) {
         const FishPlacement *p = &def->faster_fish[i];
-        gs->faster_fish[i].x             = p->x;
-        gs->faster_fish[i].y             = water_y;
-        gs->faster_fish[i].vx            = p->vx;
-        gs->faster_fish[i].vy            = 0.0f;
-        gs->faster_fish[i].patrol_x0     = p->patrol_x0;
-        gs->faster_fish[i].patrol_x1     = p->patrol_x1;
-        gs->faster_fish[i].jump_timer    = rand_range(FFISH_JUMP_MIN, FFISH_JUMP_MAX);
-        gs->faster_fish[i].water_y       = water_y;
-        gs->faster_fish[i].frame_index   = 0;
-        gs->faster_fish[i].anim_timer_ms = 0;
+        gs->world.faster_fish[i].x             = p->x;
+        gs->world.faster_fish[i].y             = water_y;
+        gs->world.faster_fish[i].vx            = p->vx;
+        gs->world.faster_fish[i].vy            = 0.0f;
+        gs->world.faster_fish[i].patrol_x0     = p->patrol_x0;
+        gs->world.faster_fish[i].patrol_x1     = p->patrol_x1;
+        gs->world.faster_fish[i].jump_timer    = rand_range(FFISH_JUMP_MIN, FFISH_JUMP_MAX);
+        gs->world.faster_fish[i].water_y       = water_y;
+        gs->world.faster_fish[i].frame_index   = 0;
+        gs->world.faster_fish[i].anim_timer_ms = 0;
     }
-    gs->faster_fish_count = def->faster_fish_count;
+    gs->world.faster_fish_count = def->faster_fish_count;
 }
 
 /* ------------------------------------------------------------------ */
@@ -373,15 +373,15 @@ static void load_axe_traps(GameState *gs, const LevelDef *def)
          * Pivot x: horizontal centre of the host pillar (left_edge + half_width).
          * Pivot y: top surface of a 3-tile pillar.
          */
-        gs->axe_traps[i].x            = p->pillar_x + TILE_SIZE / 2.0f;
-        gs->axe_traps[i].y            = level_axe_trap_y(p);
-        gs->axe_traps[i].angle        = 0.0f;
-        gs->axe_traps[i].time         = 0.0f;
-        gs->axe_traps[i].mode         = p->mode;
-        gs->axe_traps[i].sound_played = 0;
-        gs->axe_traps[i].active       = 1;
+        gs->world.axe_traps[i].x            = p->pillar_x + TILE_SIZE / 2.0f;
+        gs->world.axe_traps[i].y            = level_axe_trap_y(p);
+        gs->world.axe_traps[i].angle        = 0.0f;
+        gs->world.axe_traps[i].time         = 0.0f;
+        gs->world.axe_traps[i].mode         = p->mode;
+        gs->world.axe_traps[i].sound_played = 0;
+        gs->world.axe_traps[i].active       = 1;
     }
-    gs->axe_trap_count = def->axe_trap_count;
+    gs->world.axe_trap_count = def->axe_trap_count;
 }
 
 static void load_circular_saws(GameState *gs, const LevelDef *def)
@@ -393,17 +393,17 @@ static void load_circular_saws(GameState *gs, const LevelDef *def)
          * This puts the saw riding along a flat surface at the height of a
          * 2-tile pillar's top edge.
          */
-        gs->circular_saws[i].x          = p->x;
-        gs->circular_saws[i].y          = level_circular_saw_y(p);
-        gs->circular_saws[i].w          = SAW_DISPLAY_W;
-        gs->circular_saws[i].h          = SAW_DISPLAY_H;
-        gs->circular_saws[i].patrol_x0  = p->patrol_x0;
-        gs->circular_saws[i].patrol_x1  = p->patrol_x1;
-        gs->circular_saws[i].direction  = p->direction;
-        gs->circular_saws[i].spin_angle = 0.0f;
-        gs->circular_saws[i].active     = 1;
+        gs->world.circular_saws[i].x          = p->x;
+        gs->world.circular_saws[i].y          = level_circular_saw_y(p);
+        gs->world.circular_saws[i].w          = SAW_DISPLAY_W;
+        gs->world.circular_saws[i].h          = SAW_DISPLAY_H;
+        gs->world.circular_saws[i].patrol_x0  = p->patrol_x0;
+        gs->world.circular_saws[i].patrol_x1  = p->patrol_x1;
+        gs->world.circular_saws[i].direction  = p->direction;
+        gs->world.circular_saws[i].spin_angle = 0.0f;
+        gs->world.circular_saws[i].active     = 1;
     }
-    gs->circular_saw_count = def->circular_saw_count;
+    gs->world.circular_saw_count = def->circular_saw_count;
 }
 
 static void load_spike_rows(GameState *gs, const LevelDef *def)
@@ -411,24 +411,24 @@ static void load_spike_rows(GameState *gs, const LevelDef *def)
     for (int i = 0; i < def->spike_row_count; i++) {
         const SpikeRowPlacement *p = &def->spike_rows[i];
         /* y: top edge of spikes sits flush with the ground floor surface. */
-        gs->spike_rows[i].x      = p->x;
-        gs->spike_rows[i].y      = (float)(FLOOR_Y - SPIKE_TILE_H);
-        gs->spike_rows[i].count  = p->count;
-        gs->spike_rows[i].active = 1;
+        gs->world.spike_rows[i].x      = p->x;
+        gs->world.spike_rows[i].y      = (float)(FLOOR_Y - SPIKE_TILE_H);
+        gs->world.spike_rows[i].count  = p->count;
+        gs->world.spike_rows[i].active = 1;
     }
-    gs->spike_row_count = def->spike_row_count;
+    gs->world.spike_row_count = def->spike_row_count;
 }
 
 static void load_spike_platforms(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->spike_platform_count; i++) {
         const SpikePlatformPlacement *p = &def->spike_platforms[i];
-        gs->spike_platforms[i].x      = p->x;
-        gs->spike_platforms[i].y      = p->y;
-        gs->spike_platforms[i].w      = p->tile_count * SPIKE_PLAT_PIECE_W;
-        gs->spike_platforms[i].active = 1;
+        gs->world.spike_platforms[i].x      = p->x;
+        gs->world.spike_platforms[i].y      = p->y;
+        gs->world.spike_platforms[i].w      = p->tile_count * SPIKE_PLAT_PIECE_W;
+        gs->world.spike_platforms[i].active = 1;
     }
-    gs->spike_platform_count = def->spike_platform_count;
+    gs->world.spike_platform_count = def->spike_platform_count;
 }
 
 static void load_spike_blocks(GameState *gs, const LevelDef *def)
@@ -437,13 +437,13 @@ static void load_spike_blocks(GameState *gs, const LevelDef *def)
         const SpikeBlockPlacement *p = &def->spike_blocks[i];
         /*
          * spike_block_init expects a Rail pointer and t_offset.
-         * rail_index references the gs->rails array built by load_rails().
+         * rail_index references the gs->world.rails array built by load_rails().
          */
-        spike_block_init(&gs->spike_blocks[i],
-                         &gs->rails[p->rail_index],
+        spike_block_init(&gs->world.spike_blocks[i],
+                         &gs->world.rails[p->rail_index],
                          p->t_offset, p->speed);
     }
-    gs->spike_block_count = def->spike_block_count;
+    gs->world.spike_block_count = def->spike_block_count;
 }
 
 static void load_blue_flames(GameState *gs, const LevelDef *def)
@@ -458,7 +458,7 @@ static void load_blue_flames(GameState *gs, const LevelDef *def)
     for (int i = 0; i < def->blue_flame_count && n < MAX_BLUE_FLAMES; i++) {
         float gap_x = def->blue_flames[i].x;
 
-        BlueFlame *f = &gs->blue_flames[n];
+        BlueFlame *f = &gs->world.blue_flames[n];
         f->gap_x      = gap_x;
         f->x          = gap_x + (FLOOR_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f;
         f->start_y    = (float)(FLOOR_Y + TILE_SIZE);
@@ -474,7 +474,7 @@ static void load_blue_flames(GameState *gs, const LevelDef *def)
         f->active     = 1;
         n++;
     }
-    gs->blue_flame_count = n;
+    gs->world.blue_flame_count = n;
 }
 
 static void load_fire_flames(GameState *gs, const LevelDef *def)
@@ -488,7 +488,7 @@ static void load_fire_flames(GameState *gs, const LevelDef *def)
     for (int i = 0; i < def->fire_flame_count && n < MAX_FIRE_FLAMES; i++) {
         float gap_x = def->fire_flames[i].x;
 
-        BlueFlame *f = &gs->fire_flames[n];
+        BlueFlame *f = &gs->world.fire_flames[n];
         f->gap_x      = gap_x;
         f->x          = gap_x + (FLOOR_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f;
         f->start_y    = (float)(FLOOR_Y + TILE_SIZE);
@@ -504,7 +504,7 @@ static void load_fire_flames(GameState *gs, const LevelDef *def)
         f->active     = 1;
         n++;
     }
-    gs->fire_flame_count = n;
+    gs->world.fire_flame_count = n;
 }
 
 /* ------------------------------------------------------------------ */
@@ -516,24 +516,24 @@ static void load_float_platforms(GameState *gs, const LevelDef *def)
     for (int i = 0; i < def->float_platform_count; i++) {
         const FloatPlatformPlacement *p = &def->float_platforms[i];
         const Rail *rail = (p->mode == FLOAT_PLATFORM_RAIL)
-                           ? &gs->rails[p->rail_index]
+                           ? &gs->world.rails[p->rail_index]
                            : NULL;
         float stand_lim  = (p->mode == FLOAT_PLATFORM_CRUMBLE)
                            ? CRUMBLE_STAND_LIMIT : 0.0f;
 
-        float_platform_init(&gs->float_platforms[i],
+        float_platform_init(&gs->world.float_platforms[i],
                             p->mode, p->x, p->y, p->tile_count,
                             stand_lim,
                             rail, p->t_offset, p->speed);
     }
-    gs->float_platform_count = def->float_platform_count;
+    gs->world.float_platform_count = def->float_platform_count;
 }
 
 static void load_bridges(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->bridge_count; i++) {
         const BridgePlacement *p = &def->bridges[i];
-        Bridge *b = &gs->bridges[i];
+        Bridge *b = &gs->world.bridges[i];
 
         b->x           = p->x;
         b->base_y      = p->y;
@@ -548,7 +548,7 @@ static void load_bridges(GameState *gs, const LevelDef *def)
             b->bricks[k].fall_delay = -1.0f;
         }
     }
-    gs->bridge_count = def->bridge_count;
+    gs->world.bridge_count = def->bridge_count;
 }
 
 /*
@@ -560,25 +560,25 @@ static void load_bridges(GameState *gs, const LevelDef *def)
 static void load_bouncepads(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->bouncepad_small_count; i++)
-        bouncepad_place(&gs->bouncepads_small[i],
+        bouncepad_place(&gs->world.bouncepads_small[i],
                         def->bouncepads_small[i].x,
                         def->bouncepads_small[i].launch_vy,
                         def->bouncepads_small[i].pad_type);
-    gs->bouncepad_small_count = def->bouncepad_small_count;
+    gs->world.bouncepad_small_count = def->bouncepad_small_count;
 
     for (int i = 0; i < def->bouncepad_medium_count; i++)
-        bouncepad_place(&gs->bouncepads_medium[i],
+        bouncepad_place(&gs->world.bouncepads_medium[i],
                         def->bouncepads_medium[i].x,
                         def->bouncepads_medium[i].launch_vy,
                         def->bouncepads_medium[i].pad_type);
-    gs->bouncepad_medium_count = def->bouncepad_medium_count;
+    gs->world.bouncepad_medium_count = def->bouncepad_medium_count;
 
     for (int i = 0; i < def->bouncepad_high_count; i++)
-        bouncepad_place(&gs->bouncepads_high[i],
+        bouncepad_place(&gs->world.bouncepads_high[i],
                         def->bouncepads_high[i].x,
                         def->bouncepads_high[i].launch_vy,
                         def->bouncepads_high[i].pad_type);
-    gs->bouncepad_high_count = def->bouncepad_high_count;
+    gs->world.bouncepad_high_count = def->bouncepad_high_count;
 }
 
 /* ------------------------------------------------------------------ */
@@ -588,32 +588,32 @@ static void load_bouncepads(GameState *gs, const LevelDef *def)
 static void load_vines(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->vine_count; i++) {
-        gs->vines[i].x          = def->vines[i].x;
-        gs->vines[i].y          = def->vines[i].y;
-        gs->vines[i].tile_count = def->vines[i].tile_count;
-        gs->vines[i].type       = (VineType)def->vines[i].vine_type;
+        gs->world.vines[i].x          = def->vines[i].x;
+        gs->world.vines[i].y          = def->vines[i].y;
+        gs->world.vines[i].tile_count = def->vines[i].tile_count;
+        gs->world.vines[i].type       = (VineType)def->vines[i].vine_type;
     }
-    gs->vine_count = def->vine_count;
+    gs->world.vine_count = def->vine_count;
 }
 
 static void load_ladders(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->ladder_count; i++) {
-        gs->ladders[i].x          = def->ladders[i].x;
-        gs->ladders[i].y          = def->ladders[i].y;
-        gs->ladders[i].tile_count = def->ladders[i].tile_count;
+        gs->world.ladders[i].x          = def->ladders[i].x;
+        gs->world.ladders[i].y          = def->ladders[i].y;
+        gs->world.ladders[i].tile_count = def->ladders[i].tile_count;
     }
-    gs->ladder_count = def->ladder_count;
+    gs->world.ladder_count = def->ladder_count;
 }
 
 static void load_ropes(GameState *gs, const LevelDef *def)
 {
     for (int i = 0; i < def->rope_count; i++) {
-        gs->ropes[i].x          = def->ropes[i].x;
-        gs->ropes[i].y          = def->ropes[i].y;
-        gs->ropes[i].tile_count = def->ropes[i].tile_count;
+        gs->world.ropes[i].x          = def->ropes[i].x;
+        gs->world.ropes[i].y          = def->ropes[i].y;
+        gs->world.ropes[i].tile_count = def->ropes[i].tile_count;
     }
-    gs->rope_count = def->rope_count;
+    gs->world.rope_count = def->rope_count;
 }
 
 /* ------------------------------------------------------------------ */
@@ -655,11 +655,11 @@ void level_apply(GameState *gs, const LevelDef *def)
 {
     /* Store a pointer to the active level definition for the rest of the
      * game (checkpoints, camera, completion, audio settings) to read */
-    gs->runtime.current_level = def;
+    gs->world.runtime.current_level = def;
 
     /* Set world width from screen_count (default 4 screens if not specified) */
     int screens = (def->screen_count > 0) ? def->screen_count : 4;
-    gs->runtime.world_w = screens * GAME_W;
+    gs->world.runtime.world_w = screens * GAME_W;
 
     /* ---- Static geometry ------------------------------------------ */
     load_floor_gaps(gs, def);
@@ -708,15 +708,15 @@ void level_apply(GameState *gs, const LevelDef *def)
      * FLOOR_SINK is 16 px (defined in player.c); we use the same literal
      * here to keep the spawn formula consistent with player_reset.
      */
-    level_effective_spawn(def, &gs->respawn_x, &gs->respawn_y);
-    gs->checkpoint_index = -1;
-    gs->checkpoint_feedback_kind = CHECKPOINT_FEEDBACK_NONE;
-    gs->checkpoint_feedback_until = 0;
-    gs->legacy_checkpoint_screen = 0;
-    gs->player.spawn_x = gs->respawn_x;
-    gs->player.spawn_y = gs->respawn_y;
-    gs->player.x = gs->respawn_x + (TILE_SIZE - gs->player.w) / 2.0f;
-    gs->player.y = gs->respawn_y - gs->player.h + 16;  /* 16 = FLOOR_SINK */
+    level_effective_spawn(def, &gs->world.respawn_x, &gs->world.respawn_y);
+    gs->world.checkpoint_index = -1;
+    gs->world.checkpoint_feedback_kind = CHECKPOINT_FEEDBACK_NONE;
+    gs->world.checkpoint_feedback_until = 0;
+    gs->world.legacy_checkpoint_screen = 0;
+    gs->world.player.spawn_x = gs->world.respawn_x;
+    gs->world.player.spawn_y = gs->world.respawn_y;
+    gs->world.player.x = gs->world.respawn_x + (TILE_SIZE - gs->world.player.w) / 2.0f;
+    gs->world.player.y = gs->world.respawn_y - gs->world.player.h + 16;  /* 16 = FLOOR_SINK */
 
     /* ---- Level-wide configuration ---------------------------------- */
     /*
@@ -725,22 +725,22 @@ void level_apply(GameState *gs, const LevelDef *def)
      * Water/lava strip is driven by foreground_layers (the animated bottom strip).
      * Each system is independent — a level can have fog without water, or vice versa.
      */
-    gs->runtime.fog_enabled   = (def->fog_layer_count > 0) ? 1 : 0;
-    gs->runtime.water_enabled = (def->foreground_layer_count > 0) ? 1 : 0;
+    gs->world.runtime.fog_enabled   = (def->fog_layer_count > 0) ? 1 : 0;
+    gs->world.runtime.water_enabled = (def->foreground_layer_count > 0) ? 1 : 0;
 
     /*
      * Game rules — use level-defined values if set (>0), otherwise fall
      * back to engine defaults defined in hud.h and coin.h.
      */
-    gs->hearts          = def->initial_hearts  > 0 ? def->initial_hearts  : MAX_HEARTS;
-    gs->lives           = def->initial_lives   > 0 ? def->initial_lives   : DEFAULT_LIVES;
-    gs->score           = 0;
-    gs->rules.score_per_life  = def->score_per_life  > 0 ? def->score_per_life  : SCORE_PER_LIFE;
-    gs->score_life_next = gs->rules.score_per_life;
-    gs->rules.coin_score      = def->coin_score     > 0 ? def->coin_score      : COIN_SCORE;
+    gs->world.hearts          = def->initial_hearts  > 0 ? def->initial_hearts  : MAX_HEARTS;
+    gs->world.lives           = def->initial_lives   > 0 ? def->initial_lives   : DEFAULT_LIVES;
+    gs->world.score           = 0;
+    gs->world.rules.score_per_life  = def->score_per_life  > 0 ? def->score_per_life  : SCORE_PER_LIFE;
+    gs->world.score_life_next = gs->world.rules.score_per_life;
+    gs->world.rules.coin_score      = def->coin_score     > 0 ? def->coin_score      : COIN_SCORE;
 
     /* Negative physics values mean engine default; never inherit stale phases. */
-    level_apply_player_physics(&gs->player, def);
+    level_apply_player_physics(&gs->world.player, def);
 }
 
 /*
@@ -762,7 +762,7 @@ void level_apply(GameState *gs, const LevelDef *def)
  */
 void level_reset(GameState *gs, const LevelDef *def)
 {
-    player_reset(&gs->player);
+    player_reset(&gs->world.player);
 
     /* Collectibles (coins intentionally kept — see the rule above) */
     load_star_yellows(gs, def);

@@ -9,16 +9,16 @@ void game_terminal_actions(const GameState *gs, GameTerminalActionList *list)
     list->count = 0;
     if (!gs) return;
 
-    if (gs->completion.complete) {
+    if (gs->screen.completion.complete) {
         /* After a failed load the next level is not reachable; offering it
          * again would leave a dead button. The overlay explains why. */
-        if (gs->completion.pending_next_phase && !gs->completion.next_phase_failed) {
+        if (gs->screen.completion.pending_next_phase && !gs->screen.completion.next_phase_failed) {
             list->items[list->count++] = GAME_TERMINAL_ACTION_NEXT_LEVEL;
         }
         list->items[list->count++] = GAME_TERMINAL_ACTION_REPLAY;
         list->items[list->count++] = GAME_TERMINAL_ACTION_LEVEL_SELECT;
         list->items[list->count++] = GAME_TERMINAL_ACTION_EXIT;
-    } else if (gs->game_over) {
+    } else if (gs->screen.game_over) {
         list->items[list->count++] = GAME_TERMINAL_ACTION_RETRY;
         list->items[list->count++] = GAME_TERMINAL_ACTION_LEVEL_SELECT;
         list->items[list->count++] = GAME_TERMINAL_ACTION_EXIT;
@@ -30,7 +30,7 @@ static int normalized_index(const GameState *gs, int count)
     int index;
 
     if (!gs || count <= 0) return 0;
-    index = gs->terminal_action_index;
+    index = gs->screen.terminal_action_index;
     if (index < 0 || index >= count) return 0;
     return index;
 }
@@ -48,7 +48,7 @@ void game_terminal_move(GameState *gs, int direction)
     index += direction > 0 ? 1 : -1;
     if (index < 0) index = list.count - 1;
     if (index >= list.count) index = 0;
-    gs->terminal_action_index = index;
+    gs->screen.terminal_action_index = index;
 }
 
 GameTerminalAction game_terminal_focused_action(const GameState *gs)

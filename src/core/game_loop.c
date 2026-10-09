@@ -40,7 +40,7 @@ int game_frame(GameState *gs)
      * with the previous camera position; active frames replace it with the
      * smoothed camera result from game_update_active().
      */
-    int cam_x = (int)gs->camera.x;
+    int cam_x = (int)gs->world.camera.x;
 
     /* ---- 3. Fixed-step simulation -------------------------------- */
     /*

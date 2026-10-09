@@ -128,56 +128,56 @@ records attribution and unresolved license evidence.
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `spider.png` | `gs->textures.spider` | Spider enemy sprite sheet (ground patrol) |
-| `jumping_spider.png` | `gs->textures.jumping_spider` | Jumping spider enemy sprite sheet |
-| `bird.png` | `gs->textures.bird` | Slow sine-wave bird enemy sprite sheet |
-| `faster_bird.png` | `gs->textures.faster_bird` | Fast aggressive bird enemy sprite sheet |
-| `fish.png` | `gs->textures.fish` | Jumping fish enemy sprite sheet |
-| `faster_fish.png` | `gs->textures.faster_fish` | Faster fish enemy sprite sheet |
+| `spider.png` | `gs->assets.textures.spider` | Spider enemy sprite sheet (ground patrol) |
+| `jumping_spider.png` | `gs->assets.textures.jumping_spider` | Jumping spider enemy sprite sheet |
+| `bird.png` | `gs->assets.textures.bird` | Slow sine-wave bird enemy sprite sheet |
+| `faster_bird.png` | `gs->assets.textures.faster_bird` | Fast aggressive bird enemy sprite sheet |
+| `fish.png` | `gs->assets.textures.fish` | Jumping fish enemy sprite sheet |
+| `faster_fish.png` | `gs->assets.textures.faster_fish` | Faster fish enemy sprite sheet |
 
 ### Collectibles — `assets/sprites/collectibles/`
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `coin.png` | `gs->textures.coin` | 16x16 coin collectible sprite |
-| `star_yellow.png` | `gs->textures.star_yellow` | Yellow star collectible sprite |
-| `star_green.png` | `gs->textures.star_green` | Green star collectible sprite |
-| `star_red.png` | `gs->textures.star_red` | Red star collectible sprite |
-| `last_star.png` | `gs->textures.last_star` | Last star goal collectible sprite |
+| `coin.png` | `gs->assets.textures.coin` | 16x16 coin collectible sprite |
+| `star_yellow.png` | `gs->assets.textures.star_yellow` | Yellow star collectible sprite |
+| `star_green.png` | `gs->assets.textures.star_green` | Green star collectible sprite |
+| `star_red.png` | `gs->assets.textures.star_red` | Red star collectible sprite |
+| `last_star.png` | `gs->assets.textures.last_star` | Last star goal collectible sprite |
 
 ### Hazards — `assets/sprites/hazards/`
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `spike.png` | `gs->textures.spike` | Floor/ceiling spike hazard |
-| `spike_block.png` | `gs->textures.spike_block` | Rail-riding rotating hazard sprite |
-| `spike_platform.png` | `gs->textures.spike_platform` | Spiked platform hazard sprite |
-| `circular_saw.png` | `gs->textures.circular_saw` | Rotating saw blade hazard |
-| `axe_trap.png` | `gs->textures.axe_trap` | Swinging axe trap hazard |
-| `blue_flame.png` | `gs->textures.blue_flame` | Blue flame hazard sprite |
-| `fire_flame.png` | `gs->textures.fire_flame` | Fire flame hazard sprite |
+| `spike.png` | `gs->assets.textures.spike` | Floor/ceiling spike hazard |
+| `spike_block.png` | `gs->assets.textures.spike_block` | Rail-riding rotating hazard sprite |
+| `spike_platform.png` | `gs->assets.textures.spike_platform` | Spiked platform hazard sprite |
+| `circular_saw.png` | `gs->assets.textures.circular_saw` | Rotating saw blade hazard |
+| `axe_trap.png` | `gs->assets.textures.axe_trap` | Swinging axe trap hazard |
+| `blue_flame.png` | `gs->assets.textures.blue_flame` | Blue flame hazard sprite |
+| `fire_flame.png` | `gs->assets.textures.fire_flame` | Fire flame hazard sprite |
 
 ### Surfaces — `assets/sprites/surfaces/`
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `float_platform.png` | `gs->textures.float_platform` | 48x16 sprite, 3-slice horizontal strip (left cap, centre fill, right cap) |
-| `bridge.png` | `gs->textures.bridge` | 16x16 single-frame brick tile for crumble walkways |
-| `bouncepad_small.png` | `gs->textures.bouncepad_small` | Small bouncepad sprite (low launch) |
-| `bouncepad_medium.png` | `gs->textures.bouncepad_medium` | Medium bouncepad sprite (standard launch) |
-| `bouncepad_high.png` | `gs->textures.bouncepad_high` | High bouncepad sprite (max launch) |
-| `rail.png` | `gs->textures.rail` | 64x64 sprite sheet, 4x4 grid of 16x16 bitmask rail tiles |
-| `vine_green.png` | `gs->textures.vine_green` | 16x48 green climbable vine sprite |
-| `vine_brown.png` | `gs->textures.vine_brown` | 16x48 brown climbable vine sprite |
-| `ladder.png` | `gs->textures.ladder` | Climbable ladder sprite |
-| `rope.png` | `gs->textures.rope` | Climbable rope sprite |
+| `float_platform.png` | `gs->assets.textures.float_platform` | 48x16 sprite, 3-slice horizontal strip (left cap, centre fill, right cap) |
+| `bridge.png` | `gs->assets.textures.bridge` | 16x16 single-frame brick tile for crumble walkways |
+| `bouncepad_small.png` | `gs->assets.textures.bouncepad_small` | Small bouncepad sprite (low launch) |
+| `bouncepad_medium.png` | `gs->assets.textures.bouncepad_medium` | Medium bouncepad sprite (standard launch) |
+| `bouncepad_high.png` | `gs->assets.textures.bouncepad_high` | High bouncepad sprite (max launch) |
+| `rail.png` | `gs->assets.textures.rail` | 64x64 sprite sheet, 4x4 grid of 16x16 bitmask rail tiles |
+| `vine_green.png` | `gs->assets.textures.vine_green` | 16x48 green climbable vine sprite |
+| `vine_brown.png` | `gs->assets.textures.vine_brown` | 16x48 brown climbable vine sprite |
+| `ladder.png` | `gs->assets.textures.ladder` | Climbable ladder sprite |
+| `rope.png` | `gs->assets.textures.rope` | Climbable rope sprite |
 
 ### Levels — `assets/sprites/levels/`
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `grass_tileset.png` | `gs->textures.floor_tile` | 48x48 tile, 9-slice rendered across `FLOOR_Y` to form the floor |
-| `grass_platform.png` | `gs->textures.platform` | Default 48x48 platform tile, 9-slice rendered as one-way platform pillars |
+| `grass_tileset.png` | `gs->assets.textures.floor_tile` | 48x48 tile, 9-slice rendered across `FLOOR_Y` to form the floor |
+| `grass_platform.png` | `gs->assets.textures.platform` | Default 48x48 platform tile, 9-slice rendered as one-way platform pillars |
 | `stone_tileset.png` | Volcanic levels (`floor_tile_path`) | 48x48 stone floor tileset |
 | `stone_platform.png` | Volcanic levels (platform `tile_path`) | Stone platform pillar tile |
 | `grass_rock_tileset.png`, `grass_rock_platform.png` | Reserve / level theming | Grass-rock floor/platform variants |
