@@ -165,7 +165,16 @@ void editor_commit_change(EditorState *es)
                 memcpy(cmd.property_text_after, es->level.next_phase,
                        sizeof(cmd.property_text_after));
             }
-            undo_push(es->undo, &cmd);
+            if (!undo_push(es->undo, &cmd)) {
+                /* Only a text edit allocates; without room to record it,
+                 * put the entity and its text back as they were. */
+                (void)editor_entity_write(&es->level, type, es->pending_entity_index,
+                                          &cmd.before);
+                if (text_changed)
+                    memcpy(es->level.next_phase, es->pending_text_before,
+                           sizeof(es->level.next_phase));
+                editor_set_status(es, "Edit cancelled: cannot allocate undo history");
+            }
             editor_refresh_dirty(es);
         }
     } else if (es->change_tracking_kind == EDITOR_CHANGE_CONFIG) {
