@@ -144,6 +144,7 @@ src/
 │   ├── level_ref.h / .c          Shared levels/<name>.toml rule for next_phase, campaigns and profile keys
 │   ├── level_resources.h / .c    Per-level resource reload wrappers
 │   ├── level_session.h / .c      Active LevelDef storage plus v1 campaign catalog loading/validation
+│   ├── level_start.h / .c        Playtest start points (--start-x / --start-checkpoint), shared with the editor
 │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
 │   └── level_validate.h / .c     LevelDef count, schema-range and geometry validation
 ├── player/
@@ -584,6 +585,10 @@ Shared physics override/default helpers for player movement and camera lookahead
 ### `levels/level_ref.h` / `levels/level_ref.c`
 
 `level_ref_valid()` defines the one level-reference rule shared by `[last_star].next_phase`, campaign manifest entries and profile result keys: a direct `levels/<name>.toml` child without subdirectories, Windows-reserved characters or device names. `tools/validate_levels.py` mirrors it.
+
+### `levels/level_start.h` / `levels/level_start.c`
+
+Resolves the game's `--start-x` / `--start-checkpoint` request (the editor's **Playtest from here**) against a `LevelDef`: `level_ground_top_at()` finds the highest surface a player dropped into a column lands on (floor unless over a gap, pillars, bridges, non-rail float platforms), and `level_start_resolve()` turns the request into a spawn point plus the authored checkpoint already behind it, or an error for an x outside the level, an x over a gap with nothing above it, or a missing checkpoint. `level_session.c` applies it after the first level loads; the editor links the same file to refuse a start before launching.
 
 ### `levels/level_validate.h` / `levels/level_validate.c`
 
