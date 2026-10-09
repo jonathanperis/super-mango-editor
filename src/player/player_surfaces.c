@@ -263,12 +263,18 @@ void player_resolve_platform_collisions(Player *player,
 
 void player_resolve_bridge_collision(Player *player,
                                      const Bridge *bridges, int bridge_count,
-                                     float prev_bottom) {
+                                     float prev_bottom,
+                                     int *out_bridge_landed_idx) {
     /*
      * Bridge collision — same one-way crossing test as static platforms.
      * Only land if the brick under the player's centre is still solid
      * (not already falling or deactivated).
+     *
+     * The index of the bridge landed on is reported back, the way float
+     * platforms and bouncepads report theirs, so the bridge update starts
+     * crumbling exactly the bridge this test landed on, and nothing else.
      */
+    *out_bridge_landed_idx = -1;
     if (player->vy < 0.0f) {
         return;
     }
@@ -289,6 +295,7 @@ void player_resolve_bridge_collision(Player *player,
             player->y         = br->base_y - player->h + FLOOR_SINK;
             player->vy        = 0.0f;
             player->on_ground = 1;
+            *out_bridge_landed_idx = i;
             bottom = br->base_y;
         }
     }

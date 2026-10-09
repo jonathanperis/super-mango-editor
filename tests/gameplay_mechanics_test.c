@@ -672,6 +672,34 @@ done:
     return failed;
 }
 
+/*
+ * A player standing on a platform 2 px below the bridge's top, over a solid
+ * brick, stands on the platform, not the bridge: that is what the landing
+ * test decided. The bridge update used to guess again from "feet within 4 px
+ * of the bridge top" and crumbled the brick anyway.
+ */
+static int bridge_ignores_a_player_on_another_surface(void)
+{
+    int failed = 0;
+    GameState gs;
+    Player *p = &gs.player;
+    CHECK(mechanics_open_level(&gs, CREATURES_LEVEL, 0) == 0);
+    Bridge *bridge = &gs.bridges[0];
+    gs.platform_count = 1;
+    gs.platforms[0] = (Platform){.x = bridge->x, .y = bridge->base_y + 2.0f,
+                                 .w = bridge->brick_count * BRIDGE_TILE_W, .h = 64};
+    stand_at(&gs, bridge->x + 2 * BRIDGE_TILE_W + BRIDGE_TILE_W / 2.0f - p->w / 2.0f);
+    p->y = gs.platforms[0].y - p->h + PLAYER_FLOOR_SINK;
+    mechanics_step(&gs, 0, STEPS_PER_SECOND / 2);
+    CHECK(p->on_ground);
+    CHECK(NEAR(p->y + p->h - PLAYER_FLOOR_SINK, gs.platforms[0].y, 0.01f));
+    for (int i = 0; i < bridge->brick_count; i++)
+        CHECK(bridge->bricks[i].fall_delay < 0.0f && !bridge->bricks[i].falling);
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
 /* ------------------------------------------------------------------ */
 /* Debug overlay                                                       */
 /* ------------------------------------------------------------------ */
@@ -752,6 +780,7 @@ int main(void)
         CASE(fish_leap_from_the_water_and_patrol),
         CASE(birds_patrol_at_their_own_speeds),
         CASE(bridge_crumbles_under_the_player),
+        CASE(bridge_ignores_a_player_on_another_surface),
         CASE(debug_log_is_a_bounded_ring),
         CASE(replay_scripts_drive_the_game),
         CASE(replay_scripts_reject_malformed_files),

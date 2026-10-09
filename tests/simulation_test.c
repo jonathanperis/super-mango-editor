@@ -314,11 +314,11 @@ static int fast_fall_does_not_tunnel_through_platform(void)
     Platform pillar = {.x = 0, .y = 150, .w = 200, .h = 102};
     Player player = {.x = 50, .y = 0, .w = 48, .h = 48, .vy = 3000};
     player_apply_default_physics(&player);
-    int bounce = -1, support = -1;
+    int bounce = -1, support = -1, on_bridge = -1;
     for (int step = 0; step < 60 && !player.on_ground; step++)
         player_update(&player, GAME_FIXED_STEP, NULL, &pillar, 1, NULL, 0,
                       NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0,
-                      NULL, 0, NULL, 0, &bounce, &support, -1, 400);
+                      NULL, 0, NULL, 0, &bounce, &support, &on_bridge, -1, 400);
     CHECK(player.on_ground);
     CHECK(NEAR(player.y + player.h - PLAYER_FLOOR_SINK, pillar.y));
     CHECK(player.vy == 0.0f);
@@ -341,11 +341,11 @@ static int sinking_into_a_gap_cannot_steer_back_onto_the_floor(void)
     player.y = (float)FLOOR_Y + 10.0f - player.h + PLAYER_FLOOR_SINK;
     player.vx = 100.0f;
     player.move_dir = 1;
-    int bounce = -1, support = -1;
+    int bounce = -1, support = -1, on_bridge = -1;
     for (int step = 0; step < 30; step++) {
         player_update(&player, GAME_FIXED_STEP, NULL, NULL, 0, NULL, 0,
                       NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0,
-                      NULL, 0, gaps, 1, &bounce, &support, -1, 1600);
+                      NULL, 0, gaps, 1, &bounce, &support, &on_bridge, -1, 1600);
         float centre = player.x + player.w / 2.0f;
         CHECK(!player.on_ground);
         CHECK(player.y + player.h - PLAYER_FLOOR_SINK > (float)FLOOR_Y + 10.0f);
@@ -361,7 +361,7 @@ static int sinking_into_a_gap_cannot_steer_back_onto_the_floor(void)
     player.move_dir = 1;
     player_update(&player, GAME_FIXED_STEP, NULL, NULL, 0, NULL, 0,
                   NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0,
-                  NULL, 0, gaps, 1, &bounce, &support, -1, 1600);
+                  NULL, 0, gaps, 1, &bounce, &support, &on_bridge, -1, 1600);
     CHECK(player.on_ground);
     CHECK(NEAR(player.y + player.h - PLAYER_FLOOR_SINK, (float)FLOOR_Y));
 done:

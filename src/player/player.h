@@ -124,6 +124,11 @@ void player_handle_input(Player *player, SoundEffect *snd_jump,
  * platform's index; otherwise it is left at -1.  Used by game_float_platforms_update to drive
  * the crumble timer and to carry the player along with a moving rail platform.
  *
+ * *out_bridge_landed_idx is set to the bridge the player is standing on after
+ * this step, or -1.  game_bridges_update uses it to start crumbling the brick
+ * under the player, so a bridge only crumbles when this landing test says
+ * the player stands on it.
+ *
  * prev_fp_landed_idx : the index that *out_fp_landed_idx was set to last frame
  *   (pass -1 on the first frame).  Used internally to "stay" on a platform that
  *   moved downward last step — the rider was carried down with it, so their
@@ -141,6 +146,7 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
                    const int *floor_gaps, int floor_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
+                   int *out_bridge_landed_idx,
                    int prev_fp_landed_idx,
                    int world_w);
 
