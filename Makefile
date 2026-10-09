@@ -75,7 +75,8 @@ OBJDIR  = $(OUTDIR)/obj
 # Make reads them, so these names must exist before the first rule uses them.
 BUILD_FLAGS_STAMP    = $(OBJDIR)/build-flags.txt
 RAYLIB_OPTIONS_STAMP = $(RAYLIB_BUILD)/make-options.txt
-WEB_FLAGS_STAMP      = $(OBJDIR)/web-build-flags.txt
+WEB_OBJDIR           = $(OBJDIR)/web
+WEB_FLAGS_STAMP      = $(WEB_OBJDIR)/build-flags.txt
 ifeq ($(RAYLIB_PLATFORM),memory)
 ifeq ($(OS),Windows_NT)
 PLATFORM_LIBS = -lshell32 -lole32 -lpsapi -lwinmm -lbcrypt -lm
@@ -251,7 +252,7 @@ $(RAYLIB_DONE): $(RAYLIB_INPUTS) $(RAYLIB_OPTIONS_STAMP) $(if $(wildcard $(RAYLI
 	python3 tools/build_raylib.py --build-dir "$(RAYLIB_BUILD)" $(RAYLIB_OPTIONS) $(RAYLIB_ARCHIVE_ARG)
 	$(call mark_raylib_done,$(RAYLIB_LIB))
 
-$(WEB_RAYLIB_DONE): $(RAYLIB_INPUTS) $(WEB_FLAGS_STAMP) $(if $(wildcard $(WEB_RAYLIB_LIB)),,FORCE)
+$(WEB_RAYLIB_DONE): $(RAYLIB_INPUTS) $(WEB_FLAGS_STAMP) $(if $(wildcard $(WEB_RAYLIB_LIB)),,FORCE) | web-toolchain
 	python3 tools/build_raylib.py --build-dir "$(WEB_RAYLIB_BUILD)" --platform web --mode release $(RAYLIB_ARCHIVE_ARG)
 	$(call mark_raylib_done,$(WEB_RAYLIB_LIB))
 
@@ -649,6 +650,12 @@ $(OUTDIR)/gameplay-mechanics-test: $(TEST_SOURCE_DIR)/gameplay_mechanics_test.o 
 # Produces out/super-mango.html, .js, .wasm, and .data (bundled assets).
 #
 # raylib is built with the same Emscripten toolchain as the application.
+# CI pins this Emscripten release (.github/workflows/build.yml). `make web`
+# stops early with a clear message when emcc reports another version, since
+# a different SDK can change warnings and generated code. Pass
+# EMSCRIPTEN_VERSION=<x.y.z> to expect another release, or leave it empty
+# (EMSCRIPTEN_VERSION=) to skip the check.
+EMSCRIPTEN_VERSION ?= 6.0.9
 WEB_FLAGS = -s USE_GLFW=3 \
             --pre-js web/touch-controls.js \
             --pre-js web/keyboard-scope.js \
@@ -661,25 +668,54 @@ WEB_FLAGS = -s USE_GLFW=3 \
 # Same warning set as native builds so Web-only code paths stay warning-free.
 # Emscripten documents EM_JS(...); with a trailing semicolon, which pedantic C
 # reports as an empty file-scope declaration; that one diagnostic is disabled.
-WEB_CFLAGS = -std=c11 -Wall -Wextra -Wpedantic -Wno-extra-semi -O2 -D_GNU_SOURCE $(EXTRA_WEB_CFLAGS)
+WEB_OPT = -O2
+WEB_CFLAGS = -std=c11 -Wall -Wextra -Wpedantic -Wno-extra-semi $(WEB_OPT) -D_GNU_SOURCE $(EXTRA_WEB_CFLAGS)
 WEB_LINK_FLAGS = -s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]'
 WEB_HTML = $(OUTDIR)/super-mango.html
 WEB_DEBUG_HTML = $(OUTDIR)/super-mango-debug.html
+# The normal and debug pages compile the same sources with the same flags and
+# differ only when linking (--post-js), so every source compiles once into
+# $(WEB_OBJDIR) and both pages link those objects. The .d files track headers.
+WEB_OBJS = $(patsubst %.c,$(WEB_OBJDIR)/%.o,$(SRCS))
+WEB_INCLUDES = -I$(WEB_RAYLIB_BUILD)/build/raylib/include -I$(SRCDIR) -I$(VENDOR_DIR)
 # The .js/.wasm/.data siblings are emitted with each HTML file. Listing every
-# input lets `web` (and dist-wasm through it) skip emcc only when fresh.
-WEB_INPUTS = $(SRCS) $(wildcard $(SRCDIR)/*.h $(SRCDIR)/*/*.h) $(VENDOR_DIR)/tomlc17.h \
-             $(wildcard web/*) $(wildcard assets/* assets/*/* assets/*/*/*) \
-             $(wildcard levels/* levels/*/*) $(WEB_RAYLIB_LIB) tools/web_csp.py $(WEB_FLAGS_STAMP)
+# link input lets `web` (and dist-wasm through it) skip emcc only when fresh.
+WEB_LINK_INPUTS = $(WEB_OBJS) $(WEB_RAYLIB_LIB) $(WEB_FLAGS_STAMP) \
+                  $(wildcard web/*) $(wildcard assets/* assets/*/* assets/*/*/*) \
+                  $(wildcard levels/* levels/*/*) tools/web_csp.py
 
 web: $(WEB_HTML) $(WEB_DEBUG_HTML) ## Build: WebAssembly game with Emscripten (emcc on PATH)
 
-$(WEB_HTML): $(WEB_INPUTS) | $(OUTDIR)
-	emcc $(WEB_CFLAGS) -I$(WEB_RAYLIB_BUILD)/build/raylib/include -I$(SRCDIR) -I$(VENDOR_DIR) $(SRCS) $(WEB_RAYLIB_LIB) -o $@ $(WEB_FLAGS) \
+# Order-only (after the |): it runs first but never makes anything stale.
+.PHONY: web-toolchain
+web-toolchain:
+	@if [ -n "$(EMSCRIPTEN_VERSION)" ]; then \
+		found="$$(emcc --version 2>/dev/null | head -n 1)"; \
+		case " $$found " in \
+		*" $(EMSCRIPTEN_VERSION) "*) ;; \
+		*) echo "web: expected Emscripten $(EMSCRIPTEN_VERSION) (the CI pin), found: $${found:-no emcc on PATH}"; \
+		   echo "web: activate that SDK (emsdk install/activate $(EMSCRIPTEN_VERSION)), or pass"; \
+		   echo "     EMSCRIPTEN_VERSION=<version> to expect another one (empty skips this check)"; \
+		   exit 1 ;; \
+		esac; \
+	fi
+
+$(WEB_OBJDIR)/%.o: %.c | $(OUTDIR) web-toolchain
+	@mkdir -p $(@D)
+	emcc $(WEB_CFLAGS) $(WEB_INCLUDES) -MMD -MP -c -o $@ $<
+
+$(WEB_OBJS): $(WEB_RAYLIB_LIB) $(WEB_FLAGS_STAMP)
+-include $(WEB_OBJS:.o=.d)
+
+# Linking needs the optimisation level again (it drives wasm-opt) and the
+# extra flags, so CI's -Werror also covers link-time warnings.
+$(WEB_HTML): $(WEB_LINK_INPUTS) | $(OUTDIR) web-toolchain
+	emcc $(WEB_OPT) $(EXTRA_WEB_CFLAGS) $(WEB_OBJS) $(WEB_RAYLIB_LIB) -o $@ $(WEB_FLAGS) \
 		$(WEB_LINK_FLAGS)
 	python3 tools/web_csp.py $@
 
-$(WEB_DEBUG_HTML): $(WEB_INPUTS) | $(OUTDIR)
-	emcc $(WEB_CFLAGS) -I$(WEB_RAYLIB_BUILD)/build/raylib/include -I$(SRCDIR) -I$(VENDOR_DIR) $(SRCS) $(WEB_RAYLIB_LIB) -o $@ $(WEB_FLAGS) \
+$(WEB_DEBUG_HTML): $(WEB_LINK_INPUTS) | $(OUTDIR) web-toolchain
+	emcc $(WEB_OPT) $(EXTRA_WEB_CFLAGS) $(WEB_OBJS) $(WEB_RAYLIB_LIB) -o $@ $(WEB_FLAGS) \
 		$(WEB_LINK_FLAGS) --post-js web/debug-boot.js
 	python3 tools/web_csp.py $@
 
@@ -704,7 +740,7 @@ clean: ## Other: Remove OUTDIR, OUTDIR-sanitize and DISTDIR
 # cannot see that a flag changed: after a debug build, `make BUILD_MODE=release`
 # would link the old -O0 objects. A stamp file closes that gap. It holds the
 # exact settings its outputs were built with, and those outputs list it as a
-# prerequisite (objects above; raylib's "done" files; the web pages).
+# prerequisite (objects above; raylib's "done" file; the web objects).
 #
 # Each block below reads its stamp back while Make parses this file. Only when
 # the text differs, or the file is missing, does the stamp's rule depend on
@@ -730,7 +766,7 @@ ifneq ($(strip $(RAYLIB_OPTIONS)),$(strip $(shell cat "$(RAYLIB_OPTIONS_STAMP)" 
 $(RAYLIB_OPTIONS_STAMP): FORCE
 endif
 
-WEB_BUILD_FLAGS = WEB_CFLAGS=$(WEB_CFLAGS) \
+WEB_BUILD_FLAGS = EMSCRIPTEN_VERSION=$(EMSCRIPTEN_VERSION) WEB_CFLAGS=$(WEB_CFLAGS) \
                   WEB_FLAGS=$(WEB_FLAGS) WEB_LINK_FLAGS=$(WEB_LINK_FLAGS)
 ifneq ($(strip $(WEB_BUILD_FLAGS)),$(strip $(shell cat "$(WEB_FLAGS_STAMP)" 2>/dev/null)))
 $(WEB_FLAGS_STAMP): FORCE

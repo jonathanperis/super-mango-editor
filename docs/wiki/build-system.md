@@ -76,8 +76,8 @@ or flag changed. Three one-line stamp files record the settings each tree was
 built with: `$(OBJDIR)/build-flags.txt` (`CC`, `BUILD_MODE`, `RAYLIB_PLATFORM`,
 `CFLAGS`, `TEST_CFLAGS`, the per-object test flags and `LIBS`, which carry
 `EXTRA_CFLAGS`/`EXTRA_LDFLAGS`), `$(RAYLIB_BUILD)/make-options.txt` (the
-`build_raylib.py` options) and `$(OBJDIR)/web-build-flags.txt` (the Web
-flags). While parsing the Makefile, Make reads each stamp back and
+`build_raylib.py` options) and `$(OBJDIR)/web/build-flags.txt` (the Emscripten
+pin and Web flags). While parsing the Makefile, Make reads each stamp back and
 rewrites it only when the text differs. Every object lists its stamp as a
 prerequisite, so a changed setting rebuilds exactly what it affects (for
 example `make BUILD_MODE=release` after a debug build in the same `OUTDIR`
@@ -259,13 +259,13 @@ make run-editor
 
 ### `make web`
 
-Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). CI pins **6.0.9**; use that SDK with `emcc` on `PATH` for matching local builds.
+Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). CI pins **6.0.9**; use that SDK with `emcc` on `PATH` for matching local builds. `make web` first checks `emcc --version` against `EMSCRIPTEN_VERSION` (default `6.0.9`, the same pin) and stops with a clear message on a mismatch; pass `EMSCRIPTEN_VERSION=<x.y.z>` to expect another release, or `EMSCRIPTEN_VERSION=` to skip the check.
 
 ```sh
 make web
 ```
 
-Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). The pinned raylib Web library is built separately with `emcmake`; the application links it with `USE_GLFW=3`. Uses a custom shell template from `web/shell.html`. Application sources compile with the native warning set (`-Wall -Wextra -Wpedantic`), minus the pedantic empty-declaration diagnostic that Emscripten's documented `EM_JS(...);` form triggers. `EXTRA_WEB_CFLAGS` appends flags (CI passes `-Werror`). After linking, `tools/web_csp.py` pins the minified shell's inline boot script hash into its same-origin Content-Security-Policy (`script-src 'self' 'wasm-unsafe-eval'`, no JavaScript eval); `tools/check_wasm_artifacts.py` re-verifies it.
+Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). Each source compiles once into `out/obj/web/` (with `-MMD -MP` header tracking), and the normal and debug pages both link those objects, since they differ only at link time. The pinned raylib Web library is built separately with `emcmake`; the application links it with `USE_GLFW=3`. Uses a custom shell template from `web/shell.html`. Application sources compile with the native warning set (`-Wall -Wextra -Wpedantic`), minus the pedantic empty-declaration diagnostic that Emscripten's documented `EM_JS(...);` form triggers. `EXTRA_WEB_CFLAGS` appends flags (CI passes `-Werror`). After linking, `tools/web_csp.py` pins the minified shell's inline boot script hash into its same-origin Content-Security-Policy (`script-src 'self' 'wasm-unsafe-eval'`, no JavaScript eval); `tools/check_wasm_artifacts.py` re-verifies it.
 
 The Web frame callback returns to Emscripten's animation-frame scheduler rather
 than using raylib's blocking FPS limiter. Asyncify is not required by this loop.
@@ -404,7 +404,7 @@ make dist-native
 
 ### `make dist-wasm`
 
-Depends on `asset-budget` and `make web`, whose HTML outputs are file targets over the sources, headers, `web/` host files, `assets/`, `levels/`, the Web raylib library and the Web flag stamp; emcc only reruns when one of them is newer, so a stale WASM build is never packaged. Archives include HTML/JS/WASM/data files, README and third-party notices.
+Depends on `asset-budget` and `make web`, whose HTML outputs are file targets over the Web objects (and through them the sources and headers), `web/` host files, `assets/`, `levels/`, the Web raylib library and the Web flag stamp; emcc only reruns when one of them is newer, so a stale WASM build is never packaged. Archives include HTML/JS/WASM/data files, README and third-party notices.
 
 ```sh
 make dist-wasm   # runs make web first when its outputs are stale
@@ -633,6 +633,6 @@ out/
     ├── tests/                           ← test-flag copies, same mirrored paths (make test)
     │   └── tests/*.o / *.d              ← the test sources themselves
     ├── tools/level_check.o / .d         ← level checker (make validate-levels)
-    ├── web-build-flags.txt              ← flag stamp for the Web pages (make web)
+    ├── web/                             ← emcc objects and Web flag stamp (make web)
     └── vendor/tomlc17/tomlc17.o / .d
 ```
