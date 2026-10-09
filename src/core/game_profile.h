@@ -97,6 +97,16 @@ int game_settings_has_unavailable_binding(const GameSettings *settings);
 int game_settings_valid(const GameSettings *settings);
 int game_profile_decode(GameProfileData *out, const char *text);
 int game_profile_encode(const GameProfileData *data, char *text, size_t capacity);
+/*
+ * Native only: take the lock that cooperating game instances hold while
+ * they compare a file next to this profile with what they expect and then
+ * replace it (the empty "<profile path>.lock" file). game_profile_save
+ * takes it internally; the ghost save takes it the same way. It does not
+ * wait: NULL means another instance holds it right now, or it failed.
+ */
+typedef struct GameProfileLock GameProfileLock;
+GameProfileLock *game_profile_lock(const GameProfile *profile);
+void game_profile_unlock(GameProfileLock *lock);
 /* Explicit path overrides native prefs. NULL uses OS prefs / web localStorage. */
 int game_profile_open(GameProfile *profile, const char *path);
 int game_profile_save(GameProfile *profile);

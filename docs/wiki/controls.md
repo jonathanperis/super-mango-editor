@@ -138,7 +138,10 @@ the same way twice.
 - Native ghosts are TOML files next to the profile, named after it and the
   level: `profile-ghost-01_lugio_01.toml` beside `profile.toml` (or
   `<name>-ghost-<level>.toml` beside an explicit `--profile <name>.toml`). They
-  are written through a temporary file like the profile. Browser ghosts use one
+  are written through a temporary file like the profile. Just before writing,
+  the stored ghost is read again (natively while holding the profile's lock
+  file), so a faster ghost that another game window or browser tab saved in the
+  meantime is kept rather than overwritten by a slower run. Browser ghosts use one
   `localStorage` entry per level, `super-mango-ghost-v1:<level path>`; when storage
   is full the ghost is simply not saved and a warning is logged. A ghost text of
   five minutes is about 180 KB; anything over 256 KB, or damaged in any way, is
