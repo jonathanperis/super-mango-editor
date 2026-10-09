@@ -1,5 +1,8 @@
 /*
  * game_hazards.c — Per-frame hazard animation updates.
+ *
+ * One call per kind, in update order; see game_actors.c for why these
+ * stay written out rather than in a table.
  */
 
 #include "game_hazards.h"

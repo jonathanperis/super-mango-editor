@@ -1,5 +1,12 @@
 /*
  * game_actors.c — Per-frame enemy and moving hazard updates.
+ *
+ * One call per kind, in update order. Loading and damage use tables
+ * (s_level_loaders in level_loader.c, s_damage_sources in game_collision.c)
+ * because every row there has the same shape. Updates do not: each kind
+ * reads different things (floor gaps, a sound, the player's x, the world
+ * width), so the calls stay written out and each line shows exactly what
+ * its kind depends on.
  */
 
 #include "game_actors.h"

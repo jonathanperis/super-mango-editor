@@ -63,6 +63,7 @@ pairs in a table and writes the logic once.
 | Per-type metadata | `s_entity_meta` in `src/editor/entity_meta.c` | The editor's names, categories, capacities, `LevelDef` storage and placement preview for every entity type live in one array indexed by `EntityType`, one row per type written with designated initializers (`[ENT_COIN] = { .type_name = "Coin", ... }`). |
 | `offsetof` in a table | `STORED_IN` in `src/editor/entity_meta.c` | A static table cannot point into a `LevelDef` that does not exist yet, so each row stores `offsetof(LevelDef, coins)`; `editor_entity_array()` adds that to a real level's address. `sizeof(((LevelDef *)0)->coins[0])` gets an element's size without evaluating the null pointer. |
 | A table of function pointers | `s_property_panels` in `src/editor/properties.c` | Indexed by `EntityType`, it replaces a 30-case `switch`: `properties_render()` looks up the selected type's `draw_<type>_properties` function and calls it. |
+| A table walked in order | `s_level_loaders` in `src/levels/level_loader.c`; `s_damage_sources` in `src/collision/game_collision.c` | Every row's function has the same signature, so one `for` loop calls them all, top to bottom. The row order is the run order, and a flag (`LOAD_EVERY_LIFE`) or an `offsetof(GameWorld, spider_count)` column says what differs between rows. |
 
 ## Checks the compiler does for us
 
