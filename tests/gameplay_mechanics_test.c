@@ -19,6 +19,7 @@
 
 #include "collision/collision_damage.h"
 #include "core/debug.h"
+#include "core/game_checkpoint.h"  /* game_checkpoint_clock_ms */
 #include "core/game_experiment.h"
 #include "core/game_overlay.h"
 #include "core/game_profile.h"
@@ -966,6 +967,29 @@ done:
  * frames with the ghost drawn (also in high contrast and reduced motion)
  * render through the production path.
  */
+/*
+ * F8 restarts the level for a recording, and a replayed experiment starts
+ * the same way. The simulated clock (which times the checkpoint banners)
+ * used to keep counting from the first attempt, so a restarted run did
+ * not see the clock the original saw. Applying a level now restarts it.
+ */
+static int experiment_restart_resets_the_step_clock(void)
+{
+    int failed = 0;
+    GameState gs;
+    CHECK(mechanics_open_level(&gs, CREATURES_LEVEL, 1) == 0);
+    CHECK(game_checkpoint_clock_ms(&gs) == 0);
+    mechanics_step(&gs, 0, 90);
+    CHECK(game_checkpoint_clock_ms(&gs) == 1500);  /* 90 steps of 1000/60 ms */
+    CHECK(game_experiment_begin(&gs) == 0);
+    CHECK(game_checkpoint_clock_ms(&gs) == 0);
+    mechanics_step(&gs, 0, 3);
+    CHECK(game_checkpoint_clock_ms(&gs) == 50);
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
 static int ghost_records_and_races_the_best_run(void)
 {
     int failed = 0;
@@ -1230,6 +1254,7 @@ int main(void)
         CASE(level_start_shows_the_start_at_once),
         CASE(continue_point_must_fit_the_level),
         CASE(ghost_records_and_races_the_best_run),
+        CASE(experiment_restart_resets_the_step_clock),
         CASE(debug_log_is_a_bounded_ring),
         CASE(parallax_scrolls_and_wraps),
         CASE(every_overlay_state_renders),

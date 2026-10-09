@@ -291,7 +291,7 @@ typedef struct {
     CheckpointFeedbackKind checkpoint_feedback_kind;
     uint32_t checkpoint_feedback_until; /* deadline on game_checkpoint_clock_ms */
     int     legacy_checkpoint_screen;
-    double  sim_time;             /* seconds simulated; stops while paused */
+    uint32_t sim_steps;           /* fixed steps since the level was applied; stops while paused */
 } GameWorld;
 
 typedef struct {
@@ -338,7 +338,7 @@ typedef struct GameState {
 
 `LevelDef` owns optional immutable `CheckpointPlacement { x, y }` records. Each active frame samples authored records after player movement and before lethal collisions. The furthest record with `x <= player.x` becomes the resolved respawn point, so a death in the same frame preserves a crossed checkpoint. The runtime never regresses to an earlier record.
 
-Authored records disable automatic screen-boundary checkpoints for that level. A level with no records saves automatically when the player enters a new screen; the respawn column is the screen edge, or the nearest column to its left (over ground already crossed) with solid floor and no floor gap, spike row, spike platform or flame. If no such column exists the previous checkpoint is kept. Losing a life respawns at the resolved checkpoint and keeps collected coins collected; Retry, replay, and successful next-phase loads restore every coin and reset to the effective start of their respective level; a failed next-phase load retains the active level and its resolved checkpoint. The HUD shows brief `CHECKPOINT CP n` (1.2 s) and `RESPAWN CP n` (0.9 s) notices. They are timed in simulated time (`sim_time`, advanced only by fixed steps), so a pause does not use them up and a replay shows them for the same steps every time. The debug inspector exposes the stored checkpoint index; the regular HUD does not keep a permanent checkpoint label after the notice expires.
+Authored records disable automatic screen-boundary checkpoints for that level. A level with no records saves automatically when the player enters a new screen; the respawn column is the screen edge, or the nearest column to its left (over ground already crossed) with solid floor and no floor gap, spike row, spike platform or flame. If no such column exists the previous checkpoint is kept. Losing a life respawns at the resolved checkpoint and keeps collected coins collected; Retry, replay, and successful next-phase loads restore every coin and reset to the effective start of their respective level; a failed next-phase load retains the active level and its resolved checkpoint. The HUD shows brief `CHECKPOINT CP n` (1.2 s) and `RESPAWN CP n` (0.9 s) notices. They are timed in simulated time (`sim_steps`, a count of fixed steps turned into milliseconds with integers, restarted whenever a level is applied, F8 restarts included), so a pause does not use them up and they last exactly 72 and 54 steps, the same steps in every replay. The debug inspector exposes the stored checkpoint index; the regular HUD does not keep a permanent checkpoint label after the notice expires.
 
 ---
 
