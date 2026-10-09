@@ -6,10 +6,16 @@
 
 #include "player.h"  /* Player, Bouncepad */
 
-/* Resolve floor landing and floor-level bouncepad launches. */
+/*
+ * Resolve floor landing and floor-level bouncepad launches.
+ * prev_center_x / prev_bottom are the physics centre x and bottom before this
+ * step's movement: a player who was already below the floor surface inside a
+ * floor gap is kept inside it (the gap's sides act as walls).
+ */
 void player_resolve_floor_collision(Player *player,
                                     const BouncepadList *bouncepad_lists, int bouncepad_list_count,
                                     const int *floor_gaps, int floor_gap_count,
+                                    float prev_center_x, float prev_bottom,
                                     int *out_bounce_idx);
 
 /* Resolve one-way static and float platform landings. */

@@ -68,7 +68,7 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 | `initial_lives` | int | Starting lives, `0`–`999`; `0` means the default (3). |
 | `score_per_life` | int | Score threshold spacing for bonus lives, `0`–`999999`; `0` means the default (1000). |
 | `coin_score` | int | Points awarded for each collected coin, `0`–`999999`; `0` means the default (100). |
-| `floor_gaps` | int array | Up to 16 sea-gap x-positions; each gap is 32 px wide, must fit inside the world, and must start on a multiple of 16 px (the floor is drawn in 16 px pieces, so an off-grid gap would show grass over part of the hole). Blue/fire flames are placed manually; each flame `x` must match one of these openings. |
+| `floor_gaps` | int array | Up to 16 sea-gap x-positions; each gap is 32 px wide, must fit inside the world, and must start on a multiple of 16 px (the floor is drawn in 16 px pieces, so an off-grid gap would show grass over part of the hole). The player falls in when their centre is over the opening; once their feet are below the floor top, the gap's sides hold them in, so steering sideways cannot climb back onto the grass. Blue/fire flames are placed manually; each flame `x` must match one of these openings. |
 
 Asset paths must be repo-relative with forward slashes, without `..` segments or control characters. Every string must be valid UTF-8; the parser rejects other bytes as `<field> is not valid UTF-8`. When the editor saves, it escapes control characters (including DEL, `\u007f`) so the file loads again.
 
