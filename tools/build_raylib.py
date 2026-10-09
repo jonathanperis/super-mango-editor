@@ -28,7 +28,7 @@ def main() -> None:
     parser.add_argument("--null-audio", action="store_true")
     parser.add_argument("--archive", type=Path)
     args = parser.parse_args()
-    pin = json.loads((ROOT / "vendor/raylib/manifest.json").read_text())
+    pin = json.loads((ROOT / "vendor/raylib/manifest.json").read_text(encoding="utf-8"))
     build = args.build_dir.resolve()
     build.mkdir(parents=True, exist_ok=True)
     # --archive lets several build directories (and CI caches) share one
@@ -52,7 +52,7 @@ def main() -> None:
     if not source.is_dir():
         with tarfile.open(archive, "r:gz") as package:
             package.extractall(build, filter="data")
-    patches = json.loads((ROOT / "vendor/raylib/patches.json").read_text())
+    patches = json.loads((ROOT / "vendor/raylib/patches.json").read_text(encoding="utf-8"))
     for name, replacements in patches.items():
         path = source / name
         original = text = path.read_text(encoding="utf-8")
