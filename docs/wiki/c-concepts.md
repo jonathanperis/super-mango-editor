@@ -101,7 +101,7 @@ version of the score addition.
 | Idea | Where to read it | What to notice |
 |------|------------------|----------------|
 | Write a temporary file, then rename | `level_save_toml_internal()` in `src/shared/serializer_save.c` | The level is written to `<path>.tmp.<pid>` (`serializer_make_temp_path()`), flushed and closed, and only then moved over the real file. A crash mid-save leaves the old file intact. |
-| The rename itself | `serializer_replace_file()` in `src/shared/serializer_io.c` | On POSIX `rename()` swaps the file in one step; Windows uses `ReplaceFileW`/`MoveFileExW`. The profile (`src/core/game_profile.c`) and experiment captures (`src/core/game_experiment.c`) save the same way. |
+| The rename itself | `serializer_replace_file()` in `src/shared/serializer_io.c` | On POSIX `rename()` swaps the file in one step; Windows uses `ReplaceFileW`/`MoveFileExW`. The profile (`src/core/game_profile.c`) and experiment captures (`src/core/game_experiment.c`) save the same way; the profile installs its file through `serializer_install_temp()`, which keeps the temporary file when a Windows replace stops halfway. |
 | Checking every step | the `serializer_flush()` and `fclose` results in `level_save_toml_internal()` | A full disk often shows up only at flush or close, so both results are checked before the rename. |
 
 When you find another idea worth a row, add it here with the file and function,

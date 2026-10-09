@@ -119,6 +119,23 @@ static int codec_and_storage(void)
     CHECK(game_profile_save(a)==-1);
     serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
     CHECK(serializer_fingerprint_utf8(path,&after)==1 && serializer_fingerprint_equal(&before,&after));
+    /* A Windows replace that moved the old profile away but not the new one
+     * in: the temp file is the only copy, so it must survive, the status
+     * must name it, and this run must stop writing. */
+    {
+        a->error = 0;
+        serializer_test_set_failure(SERIALIZER_TEST_FAILURE_REPLACE_STRANDED);
+        CHECK(game_profile_save(a)==-1);
+        serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+        const char *kept = strstr(a->status, "safe in ");
+        CHECK(kept && a->error && !a->writable && !a->pending_text);
+        kept += strlen("safe in ");
+        CHECK(serializer_probe_path_utf8(kept)==SERIALIZER_PATH_EXISTING);
+        CHECK(serializer_fingerprint_utf8(path,&after)==1 && serializer_fingerprint_equal(&before,&after));
+        CHECK(game_profile_save(a)==-1); /* no second write over the kept copy */
+        remove(kept);
+        a->writable = 1;
+    }
     game_profile_close(b); game_profile_init(b);
     FILE *fp = fopen(path,"wb"); CHECK(fp);
     fputs("not a profile",fp); fclose(fp);

@@ -452,16 +452,41 @@ int game_profile_save(GameProfile *profile)
         if (fputs(text, fp) == EOF || serializer_stream_has_error(fp) || serializer_flush(fp)) result = -1;
         if (fclose(fp)) result = -1;
     }
+    int installing = 0;  /* 1 once serializer_install_temp owns the temp file */
     if (!result) {
         char *current = NULL;
         int found = read_native(profile->path, &current);
         if (found < 0 || (profile->baseline ? found != 1 || strcmp(profile->baseline, current) : found != 0)) result = -1;
         free(current);
-        if (!result) result = profile->baseline ? serializer_replace_file(temporary, profile->path)
-                                               : serializer_create_file(temporary, profile->path);
+        if (!result) {
+            /* Replace an existing profile; create a first one only while no
+             * other instance has created it meanwhile. */
+            installing = 1;
+            result = serializer_install_temp(temporary, profile->path, profile->baseline == NULL);
+        }
     }
-    serializer_remove_temp(temporary);
+    /* Before installing, a failure leaves an unused temp file to delete;
+     * serializer_install_temp has already cleaned up after itself. */
+    if (!installing) serializer_remove_temp(temporary);
     unlock_profile(lock);
+    if (result == SERIALIZER_REPLACE_TEMP_KEPT) {
+        /*
+         * Windows moved the old profile away but could not move the new one
+         * in, so the temp file may now be the only copy of the player's
+         * progress. It stays on disk; stop saving for this run so nothing
+         * writes over it, and say where it is. Renaming that file to
+         * profile.toml restores the profile.
+         */
+        game_profile_finish_save(profile, PROFILE_SAVE_ERROR);
+        profile->writable = 0;
+        fprintf(stderr, "Profile save incomplete; the profile is kept in '%s'\n", temporary);
+        /* Two copies rather than one snprintf: a long path is cut to fit
+         * the status line on purpose (stderr above has all of it). */
+        str_copy(profile->status, "Profile save incomplete; your profile is safe in ", sizeof(profile->status));
+        size_t used = strlen(profile->status);
+        str_copy(profile->status + used, temporary, sizeof(profile->status) - used);
+        return PROFILE_SAVE_ERROR;
+    }
     return game_profile_finish_save(profile, result);
 #endif
 }

@@ -107,6 +107,18 @@ int serializer_create_file(const char *temp_path, const char *target_path);
 /* Remove a temporary file after an incomplete save. */
 void serializer_remove_temp(const char *path);
 
+/*
+ * Install a completed, closed temporary file at target: replace it
+ * (serializer_replace_file) or, with create_only, create it only while it
+ * is still absent (serializer_create_file). Returns what that call
+ * returned. On failure the temporary file is deleted, except after
+ * SERIALIZER_REPLACE_TEMP_KEPT: then it is the only complete copy and stays
+ * where it is, so the caller can tell the user its name. The player
+ * profile and its ghost runs save through this.
+ */
+int serializer_install_temp(const char *temp_path, const char *target_path,
+                            int create_only);
+
 /* Internal deterministic failure seam.  Zero is normal production behavior. */
 #define SERIALIZER_TEST_FAILURE_NONE  0
 #define SERIALIZER_TEST_FAILURE_WRITE 1

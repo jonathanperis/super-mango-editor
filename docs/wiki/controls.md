@@ -82,7 +82,11 @@ cannot be recorded (a full profile) is logged as a warning rather than dropped
 silently. `--continue` opens that stage
 from its start, not a mid-level checkpoint; all campaign levels remain selectable.
 Native profiles use `profile.toml` under the OS preference root plus `SuperMango/SuperMango/`,
-or an explicit `--profile PATH`. Browser profiles use localStorage and Web Locks;
+or an explicit `--profile PATH`. A native save writes a sibling temporary file and
+renames it over `profile.toml`. If Windows moves the old file aside but cannot put
+the new one in place, the temporary file is kept (never deleted), saving stops for
+that run, and F1 shows `Profile save incomplete; your profile is safe in <path>`;
+renaming that file to `profile.toml` restores it. Browser profiles use localStorage and Web Locks;
 unsupported/denied storage or conflicting saves produce a visible profile warning
 (F1 shows details). Exit/replay waits for a pending save to settle. Debug, smoke,
 scripted replay, experiment replay and `--no-save` runs do not read or write the

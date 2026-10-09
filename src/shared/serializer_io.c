@@ -716,3 +716,17 @@ void serializer_remove_temp(const char *path)
 {
     if (path) (void)serializer_remove_utf8(path);
 }
+
+int serializer_install_temp(const char *temp_path, const char *target_path,
+                            int create_only)
+{
+    int result = create_only ? serializer_create_file(temp_path, target_path)
+                             : serializer_replace_file(temp_path, target_path);
+
+    /* After a half-finished Windows replace the old target may be gone and
+     * the temporary file is the only complete copy: leave it on disk. Any
+     * other failure left the target as it was, so the temporary is litter. */
+    if (result != 0 && result != SERIALIZER_REPLACE_TEMP_KEPT)
+        serializer_remove_temp(temp_path);
+    return result;
+}
