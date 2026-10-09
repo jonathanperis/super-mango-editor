@@ -480,6 +480,32 @@ int serializer_same_file_utf8(const char *a, const char *b)
         return stat(a, &a_stat) == 0 && stat(b, &b_stat) == 0 &&
                a_stat.st_dev == b_stat.st_dev && a_stat.st_ino == b_stat.st_ino;
     }
+#elif defined(_WIN32)
+    {
+        /* Windows has no inode, but every open file reports the serial number
+         * of its volume and a file index that is unique on that volume. Two
+         * spellings ("C:\x\levels\a.toml" against "levels/a.toml") match
+         * when both numbers do. */
+        BY_HANDLE_FILE_INFORMATION info[2];
+        const char *paths[2] = {a, b};
+        for (int i = 0; i < 2; i++) {
+            wchar_t *wide = serializer_utf8_to_wide(paths[i]);
+            if (!wide) return 0;
+            /* Access 0 asks only for attributes, so a file another program
+             * holds open still answers; BACKUP_SEMANTICS allows folders too. */
+            HANDLE handle = CreateFileW(wide, 0,
+                                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                        NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+            free(wide);
+            if (handle == INVALID_HANDLE_VALUE) return 0;
+            BOOL ok = GetFileInformationByHandle(handle, &info[i]);
+            CloseHandle(handle);
+            if (!ok) return 0;
+        }
+        return info[0].dwVolumeSerialNumber == info[1].dwVolumeSerialNumber &&
+               info[0].nFileIndexHigh == info[1].nFileIndexHigh &&
+               info[0].nFileIndexLow == info[1].nFileIndexLow;
+    }
 #else
     return 0;
 #endif
