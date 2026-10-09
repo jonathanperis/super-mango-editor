@@ -940,6 +940,65 @@ static int missing_physics_uses_engine_defaults(void)
     return 0;
 }
 
+/* The problems level_load_toml_explained reported, first one kept. */
+typedef struct {
+    int count;
+    int first_line;
+    char first[256];
+} LoadProblemLog;
+
+static void log_load_problem(void *context, const char *message, int line)
+{
+    LoadProblemLog *log = context;
+    if (log->count++ == 0) {
+        log->first_line = line;
+        snprintf(log->first, sizeof(log->first), "%s", message);
+    }
+}
+
+/*
+ * A schema error names the value and the line it is on (looked up by
+ * following the message's TOML path through the parsed tree), and a load
+ * that succeeds reports nothing.
+ */
+static int explained_load_gives_schema_lines(void)
+{
+    const char *path = TEST_OUT "test_explained_schema.toml";
+    LevelDef def;
+    LoadProblemLog log = {0};
+    FILE *file = fopen(path, "wb");
+
+    if (!file) return fail("cannot write explained-load fixture");
+    fputs("format_version = 1\n"
+          "name = \"Schema\"\n"
+          "\n"
+          "[[coins]]\n"
+          "x = 10.0\n"
+          "y = 10.0\n"
+          "\n"
+          "[[coins]]\n"
+          "x = \"left\"\n"
+          "y = 10.0\n", file);
+    if (fclose(file) != 0) return fail("cannot close explained-load fixture");
+
+    level_def_init_defaults(&def);
+    if (level_load_toml_explained(path, &def, log_load_problem, &log) == 0)
+        return fail("schema fixture loaded");
+    if (expect_int_value("schema problems", log.count, 1) != 0 ||
+        expect_int_value("schema line", log.first_line, 9) != 0 ||
+        expect_int_value("schema names the value",
+                         strncmp(log.first, "root.coins[1].x has type string", 31), 0) != 0)
+        return 1;
+
+    memset(&log, 0, sizeof(log));
+    if (level_load_toml_explained("levels/00_sandbox_01.toml", &def,
+                                  log_load_problem, &log) != 0 ||
+        expect_int_value("valid load problems", log.count, 0) != 0)
+        return fail("valid level reported problems");
+    (void)remove(path);
+    return 0;
+}
+
 static int write_format_version_fixture(const char *path, const char *version)
 {
     FILE *fp = fopen(path, "w");
@@ -1275,6 +1334,7 @@ int main(void)
         if (expect_unsafe_toml_rejected(TEST_OUT "test_unsafe_numeric.toml", numeric_cases[i])) return 1;
     }
     if (load_all_repo_levels() != 0) return 1;
+    if (explained_load_gives_schema_lines() != 0) return 1;
     if (roundtrip_repo_levels() != 0) return 1;
     if (escaped_strings_roundtrip() != 0) return 1;
     if (control_chars_roundtrip() != 0) return 1;

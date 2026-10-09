@@ -321,6 +321,8 @@ void editor_reset_new_level(EditorState *es)
     if (!es || !editor_finish_field_edit(es)) return;
     editor_retire_current_recovery(es);
     editor_level_init_defaults(&es->level);
+    es->load_report.count = 0;   /* a fresh document; an old Open no longer matters */
+    es->load_report.total = 0;
     es->file_path[0] = '\0';
     memset(&es->source_fingerprint, 0, sizeof(es->source_fingerprint));
     es->source_state = EDITOR_SOURCE_UNKNOWN;

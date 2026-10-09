@@ -1291,8 +1291,11 @@ static void config_subsection_header(EditorState *es, int x, int y,
  * row the designer can click: it selects the entity the message is about
  * (and pans the canvas to it) or focuses the Level Config field.
  */
+static int config_load_problems(EditorState *es, int x, int y);
+
 static int config_validation(EditorState *es, int x, int y)
 {
+    y = config_load_problems(es, x, y);
     ui_label_color(&es->ui, x + 8, y,
                    editor_validation_summary(&es->validation_report),
                    es->validation_report.error_count > 0 ?
@@ -1328,6 +1331,47 @@ static int config_validation(EditorState *es, int x, int y)
             ui_label_color(&es->ui, x + 16, y, more, UI_TEXT_DIM);
             y += 18;
         }
+    }
+    ui_separator(&es->ui, x + 4, y, PROP_W - 8);
+    return y + 8;
+}
+
+/*
+ * config_load_problems — Why the last Open failed (nothing when it did
+ * not).  The file never became the document, so its rows cannot take the
+ * designer anywhere; clicking the heading hides the list.
+ */
+static int config_load_problems(EditorState *es, int x, int y)
+{
+    const EditorLoadReport *report = &es->load_report;
+    char heading[96];
+    int hovered;
+
+    if (report->count <= 0) return y;
+    snprintf(heading, sizeof(heading), "Could not open %s (click to hide):",
+             report->file);
+    hovered = es->ui.mouse_x >= x && es->ui.mouse_x < x + PROP_W &&
+              es->ui.mouse_y >= y && es->ui.mouse_y < y + 18 &&
+              es->ui.mouse_y >= cfg_clip_top && es->ui.mouse_y < cfg_clip_bottom;
+    if (hovered) DrawRectangle(x + 4, y - 1, PROP_W - 8, 18, UI_BTN_HOT);
+    ui_label_color(&es->ui, x + 8, y, heading, (Color){0xFF,0x70,0x70,0xFF});
+    if (hovered && es->ui.mouse_clicked) {
+        es->ui.mouse_clicked = 0;
+        es->load_report.count = 0;
+        es->load_report.total = 0;
+        return y + 18;
+    }
+    y += 18;
+    for (int i = 0; i < report->count; i++) {
+        ui_label_color(&es->ui, x + 16, y, report->messages[i],
+                       (Color){0xFF,0x70,0x70,0xFF});
+        y += 18;
+    }
+    if (report->total > report->count) {
+        char more[48];
+        snprintf(more, sizeof(more), "... and %d more", report->total - report->count);
+        ui_label_color(&es->ui, x + 16, y, more, UI_TEXT_DIM);
+        y += 18;
     }
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     return y + 8;

@@ -4,11 +4,13 @@
 
 #include "serializer_parse.h"
 
+#include <ctype.h>   /* isalnum */
 #include <limits.h>  /* INT_MIN, INT_MAX */
 #include <float.h>   /* FLT_MAX — check before narrowing a TOML double */
 #include <math.h>    /* isfinite */
 #include <stdarg.h>  /* va_list */
 #include <stdio.h>   /* vsnprintf */
+#include <stdlib.h>  /* strtol */
 #include <string.h>  /* memchr, memcmp, strlen */
 
 #include "serializer_types.h" /* enum validation */
@@ -770,6 +772,46 @@ static int validate_legacy(toml_datum_t top, char *error, size_t error_size)
         }
     }
     return 0;
+}
+
+int serializer_toml_line(toml_datum_t top, const char *message)
+{
+    const char *p = message;
+    toml_datum_t node = top;
+    int line = 0;
+
+    if (!message) return 0;
+    /* Schema messages name the document root "root."; validator ones don't. */
+    if (strncmp(p, "root.", 5) == 0) p += 5;
+
+    /* Walk "name", then any "[index]" and ".name" parts, up to the first
+     * character that cannot be part of a path (the space before the words). */
+    while (*p && *p != ' ') {
+        char key[64];
+        size_t n = 0;
+
+        while ((isalnum((unsigned char)*p) || *p == '_') && n + 1 < sizeof(key))
+            key[n++] = *p++;
+        key[n] = '\0';
+        if (n == 0 || node.type != TOML_TABLE) break;
+        node = toml_get(node, key);
+        if (node.type == TOML_UNKNOWN) break;
+        if (node.lineno > 0) line = node.lineno;
+
+        while (*p == '[') {
+            char *end;
+            long index = strtol(p + 1, &end, 10);
+            if (*end != ']' || node.type != TOML_ARRAY ||
+                index < 0 || index >= node.u.arr.size)
+                return line;
+            node = node.u.arr.elem[index];
+            if (node.lineno > 0) line = node.lineno;
+            p = end + 1;
+        }
+        if (*p != '.') break;
+        p++;
+    }
+    return line;
 }
 
 int serializer_validate_schema(toml_datum_t top, int *strict,
