@@ -35,6 +35,7 @@
 #endif
 
 #include "editor/canvas.h"
+#include "editor/editor_campaign.h"
 #include "editor/editor.h"
 #include "editor/editor_chrome.h"
 #include "editor/editor_events.h"
@@ -1114,6 +1115,104 @@ done:
     return failed;
 }
 
+#ifndef _WIN32
+/* A scratch game folder: levels/a, b, c chained and listed in order. */
+#define UI_CAMPAIGN_ROOT TEST_OUT "ui-campaign-root"
+static int write_ui_campaign_level(const char *path, const char *name, const char *next)
+{
+    char text[512];
+    snprintf(text, sizeof(text),
+             "format_version = 1\nname = \"%s\"\nscreen_count = 4\n\n"
+             "[last_star]\nx = 300.0\ny = 200.0\n%s%s%s", name,
+             next[0] ? "next_phase = \"" : "", next, next[0] ? "\"\n" : "");
+    return write_text_file(path, text);
+}
+
+/* Click button `index` of the Campaign view's bottom row. */
+static void click_campaign_button(EditorState *es, int index)
+{
+    click_frame(es, CAMPAIGN_VIEW_X + index * CAMPAIGN_BUTTON_STEP + 10,
+                CAMPAIGN_BUTTONS_Y + 10);
+}
+
+/*
+ * The Campaign view as a designer uses it: Ctrl+M covers the canvas (a
+ * click there places nothing), a row click and Up reorder, typing in a
+ * name field renames the level, Link in order and Save write the files
+ * the game's own loader then reads, and Esc returns to the level.
+ */
+static int campaign_view_reorders_renames_and_saves(void)
+{
+    int failed = 0;
+    EditorState es;
+    char cwd[4096];
+    int moved = 0;
+    CampaignCatalog reloaded = {0};
+    const CampaignCatalog *view;
+    CHECK(open_editor(&es, NULL) == 0);
+    (void)mkdir(UI_CAMPAIGN_ROOT, 0755);
+    (void)mkdir(UI_CAMPAIGN_ROOT "/levels", 0755);
+    (void)mkdir(UI_CAMPAIGN_ROOT "/levels/campaigns", 0755);
+    CHECK(write_ui_campaign_level(UI_CAMPAIGN_ROOT "/levels/a.toml", "Alpha", "levels/b.toml") == 0);
+    CHECK(write_ui_campaign_level(UI_CAMPAIGN_ROOT "/levels/b.toml", "Bravo", "levels/c.toml") == 0);
+    CHECK(write_ui_campaign_level(UI_CAMPAIGN_ROOT "/levels/c.toml", "Charlie", "") == 0);
+    CHECK(write_text_file(UI_CAMPAIGN_ROOT "/levels/campaigns/main.toml",
+                          "format_version = 1\nlevels = [\"levels/a.toml\", "
+                          "\"levels/b.toml\", \"levels/c.toml\"]\n") == 0);
+    CHECK(getcwd(cwd, sizeof(cwd)) != NULL);
+    CHECK(chdir(UI_CAMPAIGN_ROOT) == 0);
+    moved = 1;
+
+    es.tool = TOOL_PLACE;
+    es.palette_type = ENT_COIN;
+    key_frame(&es, KEY_M, INPUT_CTRL);
+    CHECK(es.campaign != NULL);
+    view = editor_campaign_entries(&es);
+    CHECK(view && view->count == 3);
+    click_frame(&es, 400, 500);                      /* the canvas sleeps */
+    CHECK(es.level.coin_count == 0);
+    key_frame(&es, KEY_DELETE, 0);                   /* level keys too */
+    CHECK(strstr(es.status_message, "Campaign view") != NULL);
+
+    /* Select row 3 (c) and move it up. */
+    click_frame(&es, CAMPAIGN_VIEW_X + 20, CAMPAIGN_ROWS_Y + 2 * CAMPAIGN_ROW_H + 8);
+    click_campaign_button(&es, 0);
+    CHECK(strcmp(view->levels[1].path, "levels/c.toml") == 0);
+    CHECK(editor_campaign_problem(&es)[0] != '\0' || !view->levels[0].available);
+
+    /* Rename the first level: the field holds its name, typing appends. */
+    click_frame(&es, CAMPAIGN_NAME_X + 10, CAMPAIGN_ROWS_Y + 8);
+    CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID);
+    push_text("!");
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(strcmp(view->levels[0].level.name, "Alpha!") == 0);
+    CHECK(strcmp(view->levels[0].display_name, "Alpha!") == 0);
+
+    /* Link in order, then Save. */
+    click_campaign_button(&es, 4);
+    CHECK(editor_campaign_problem(&es)[0] == '\0');
+    click_campaign_button(&es, 5);
+    CHECK(strstr(es.status_message, "Campaign saved") != NULL);
+    CHECK(campaign_catalog_load(CAMPAIGN_MANIFEST_PATH, &reloaded) == 0);
+    CHECK(reloaded.count == 3 && strcmp(reloaded.levels[1].path, "levels/c.toml") == 0);
+    CHECK(strcmp(reloaded.levels[0].display_name, "Alpha!") == 0);
+    CHECK(reloaded.levels[0].available && reloaded.levels[1].available &&
+          reloaded.levels[2].available);
+
+    /* Esc goes back to the level. */
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(es.campaign == NULL);
+    click_frame(&es, 400, 500);
+    CHECK(es.level.coin_count == 1);
+done:
+    campaign_catalog_cleanup(&reloaded);
+    if (moved && chdir(cwd) != 0) failed = 1;
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+#endif
+
 /*
  * Multi-select: a box on empty canvas selects what it touches, Shift+click
  * adds or removes one entity, and move (drag or arrows), delete, copy /
@@ -1661,6 +1760,7 @@ int main(void)
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),
         CASE(playtest_from_here_passes_the_start_point),
+        CASE(campaign_view_reorders_renames_and_saves),
         CASE(native_pickers_report_choice_cancel_and_failure),
 #endif
 #undef CASE

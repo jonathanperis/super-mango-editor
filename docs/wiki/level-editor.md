@@ -305,6 +305,23 @@ Enabling **Debug Mode** in the toolbar adds `--debug` to the game launch, showin
 
 ---
 
+## Campaign View
+
+**Ctrl+M** or the toolbar's **Campaign** button opens `levels/campaigns/main.toml`, the list of levels the game's start menu offers, in place of the canvas. Each row shows the level file, its `name` (the menu's label, editable in place) and the game's verdict on it: `ok`, or why the start menu would grey it out (`next_phase is out of campaign order`, `final level has a next_phase`, `level file is invalid`...). A problem with the campaign as a whole (a repeated level, nothing playable) shows in red above the list. The verdicts come from the same C rules the game applies when it loads the manifest (`campaign_catalog_check` in `src/levels/campaign_catalog.c`), rerun after every edit.
+
+| Button | Action |
+|--------|--------|
+| Up / Down | Move the selected row (click a row to select it) |
+| Remove | Take the selected level out of the campaign; its file is not touched |
+| Add level... | Pick a level file with the native picker; it must sit directly in `levels/` (the [level-reference rule](../level-design/#level-references)) and not be listed already |
+| Link in order | Set every listed level's `[last_star].next_phase` to the row below it, and clear the last one's, so the chain matches the order shown |
+| Save (`Ctrl+S`) | Write each level whose name or `next_phase` changed, then the manifest, each through the atomic temporary-file save |
+| Close (`Esc`) | Back to the level; with unsaved campaign changes the first Close (or quit) only warns, the second discards them |
+
+Save is refused while the rules find something this view can fix: a campaign-wide problem, or a level that is out of order or has no name (Link in order fixes the order). A listed file that does not load is the file's own problem and may stay listed; the menu shows it disabled. Before writing anything, Save checks that every level file it would rewrite still holds what the view read, so a file changed by another program is never overwritten and no half-written chain is left; it also refuses to rewrite the level open in the editor while that level has unsaved changes, and reloads it afterwards when it was clean. While the view is open, clicks on it never reach the canvas and level shortcuts are ignored.
+
+---
+
 ## File Operations
 
 | Operation | Shortcut / Button | Notes |
@@ -315,6 +332,7 @@ Enabling **Debug Mode** in the toolbar adds `--debug` to the game launch, showin
 | Save As | `Ctrl+Shift+S` / Save As button | Native file picker for new path |
 | Recover autosave | `Ctrl+R` | Recover or discard a leftover recovery snapshot |
 | Recent file | `Ctrl+1` through `Ctrl+5` | Open a recent file |
+| Campaign view | `Ctrl+M` / Campaign button | Edit the campaign manifest (see [Campaign View](#campaign-view)) |
 
 The title bar and status bar show an asterisk (`*`) after the filename when there are unsaved changes. New, Open, a recent file, recovery and quit first ask **Save / Discard / Cancel** when the level has been modified; Save continues only if the save succeeds. On Linux these three-button prompts use zenity's extra button.
 
@@ -347,6 +365,7 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 | `editor_files.c`, `editor_session.c` | Open/save/Save As, playtest copies and recent files; dirty tracking, document hash and confirmation prompts |
 | `editor_recovery.c` | Autosave every 30 s while dirty, and crash recovery: finding leftover snapshots, the Recover picker, loading and retiring them |
 | `editor_playtest.c` | Launching, stopping and reaping the playtest game process |
+| `editor_campaign.c` | The Campaign view: editing `levels/campaigns/main.toml` with the game's campaign rules (`src/levels/campaign_catalog.c`) |
 | `editor_clipboard.c`, `editor_undo_apply.c` | Copy/paste, and applying undo/redo commands to the level |
 | `editor_validation.c` / `editor_validation.h` | In-memory level validation report used by status, save, autosave, and playtest |
 | `canvas.c` / `canvas.h` | Level preview rendering, `canvas_screen_to_world`, grid overlay |

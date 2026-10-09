@@ -314,6 +314,9 @@ typedef struct {
  * function modify the original struct in place.  If we passed by value,
  * the function would receive a copy and changes would be lost.
  */
+/* The Campaign view's state (editor_campaign.c); NULL while it is closed. */
+typedef struct EditorCampaign EditorCampaign;
+
 typedef struct {
     /* Editor owns its process-wide context and logical render target. */
     RenderTexture2D frame_target;
@@ -444,6 +447,10 @@ typedef struct {
 
     EditorValidationReport validation_report;
     EditorLoadReport load_report;   /* why the last Open failed */
+
+    /* The Campaign view (Ctrl+M / the Campaign button), drawn over the
+     * canvas while it is open; NULL when it is closed. */
+    EditorCampaign *campaign;
     uint64_t validated_document_hash;
     uint32_t last_validation_ms;
     int validation_cache_valid;
