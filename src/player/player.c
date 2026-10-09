@@ -48,12 +48,17 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
                    const int *floor_gaps, int floor_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
+                   int *out_bridge_landed_idx,
                    int prev_fp_landed_idx,
                    int world_w) {
 
     (void)vine_count;    /* vine_index selects the climbable; count unused here */
     (void)ladder_count;
     (void)rope_count;
+
+    /* No bridge support until the bridge test below finds one; a climbing
+     * player returns early and stands on nothing. */
+    *out_bridge_landed_idx = -1;
 
     if (player_update_climbing(player, dt, vines, ladders, ropes, world_w)) {
         return;
@@ -123,7 +128,8 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
                                        prev_bottom, out_fp_landed_idx,
                                        prev_fp_landed_idx);
 
-    player_resolve_bridge_collision(player, bridges, bridge_count, prev_bottom);
+    player_resolve_bridge_collision(player, bridges, bridge_count, prev_bottom,
+                                    out_bridge_landed_idx);
     player_resolve_spike_platform_top_collision(player, spike_platforms,
                                                 spike_platform_count,
                                                 prev_bottom);
@@ -135,19 +141,24 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
                                    floor_gaps, floor_gap_count,
                                    prev_center_x, prev_bottom, out_bounce_idx);
     /* A nearer bridge/spike surface or the floor may have replaced the float
-     * platform candidate. Do not carry the player with the discarded support.
+     * platform or bridge candidate. Do not carry the player with, or crumble,
+     * a discarded support.
      *
-     * Landing set y = platform_y - h + FLOOR_SINK; adding h back and
-     * subtracting FLOOR_SINK can differ from platform_y in the last bits of a
-     * float, so "still on this platform" allows a tiny tolerance instead of
+     * Landing set y = surface_y - h + FLOOR_SINK; adding h back and
+     * subtracting FLOOR_SINK can differ from surface_y in the last bits of a
+     * float, so "still on this surface" allows a tiny tolerance instead of
      * exact equality. Other surfaces sit whole pixels away. vy is exactly 0
      * after a landing (it is assigned, not computed), so that test stays. */
     const float support_tolerance = 0.01f;   /* logical px */
+    const float feet = player->y + player->h - FLOOR_SINK;
     if (*out_fp_landed_idx >= 0 &&
         (player->vy != 0.0f ||
-         fabsf(player->y + player->h - FLOOR_SINK -
-               float_platforms[*out_fp_landed_idx].y) > support_tolerance))
+         fabsf(feet - float_platforms[*out_fp_landed_idx].y) > support_tolerance))
         *out_fp_landed_idx = -1;
+    if (*out_bridge_landed_idx >= 0 &&
+        (player->vy != 0.0f ||
+         fabsf(feet - bridges[*out_bridge_landed_idx].base_y) > support_tolerance))
+        *out_bridge_landed_idx = -1;
 
     player_resolve_world_bounds(player, world_w);
 

@@ -1061,12 +1061,13 @@ static int nearest_surface_is_order_independent(void)
     SpikePlatform spike = {.x=0,.y=150,.w=100,.active=1};
     Player falling = {.x=10,.y=100,.w=48,.h=48,.vy=1500};
     player_apply_default_physics(&falling);
-    int bounce, support;
+    int bounce, support, on_bridge;
     player_update(&falling, 0.1f, NULL, &pillar, 1, &floating, 1,
                   NULL, 0, NULL, 0, NULL, 0, NULL, 0, &bridge, 1,
-                  &spike, 1, NULL, 0, &bounce, &support, -1, 400);
+                  &spike, 1, NULL, 0, &bounce, &support, &on_bridge, -1, 400);
     if (expect_float("mixed surfaces beat lower floor", falling.y + falling.h - PLAYER_FLOOR_SINK, 150) ||
-        expect_int("discarded float is not ridden", support, -1)) return 1;
+        expect_int("discarded float is not ridden", support, -1) ||
+        expect_int("discarded bridge is not crumbled", on_bridge, -1)) return 1;
     return 0;
 }
 

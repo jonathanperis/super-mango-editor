@@ -10,11 +10,11 @@
 #include "../input/game_web_input.h"
 #include "../player/player.h"
 
-int game_player_step(GameState *gs, float dt)
+PlayerStepSupport game_player_step(GameState *gs, float dt)
 {
     BouncepadList pad_lists[GAME_BOUNCEPAD_LIST_COUNT];
     int bounce_idx = -1;
-    int fp_landed_idx = -1;
+    PlayerStepSupport support = { -1, -1 };
 
     unsigned int input = gs->replay_input_mask | game_web_input_take_touch_mask() | game_input_sample(gs);
     input = game_experiment_input(gs, input);
@@ -37,11 +37,11 @@ int game_player_step(GameState *gs, float dt)
                   gs->bridges, gs->bridge_count,
                   gs->spike_platforms, gs->spike_platform_count,
                   gs->floor_gaps, gs->floor_gap_count,
-                  &bounce_idx, &fp_landed_idx,
+                  &bounce_idx, &support.float_platform, &support.bridge,
                   gs->loop.fp_prev_riding,
                   gs->runtime.world_w);
 
     game_bouncepads_handle_hit(gs, bounce_idx);
 
-    return fp_landed_idx;
+    return support;
 }

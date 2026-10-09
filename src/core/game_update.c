@@ -19,21 +19,21 @@
 
 int game_update_active(GameState *gs, float dt, int cam_x)
 {
-    int fp_landed_idx;
+    PlayerStepSupport support;
     const int lives_before = gs->lives;
 
     game_checkpoint_feedback_clear_expired(gs, (uint32_t)clock_millis());
     gs->completion.level_elapsed += dt;
 
-    fp_landed_idx = game_player_step(gs, dt);
+    support = game_player_step(gs, dt);
     /* Player movement and surface collision resolve before checkpoint sampling. */
     game_checkpoint_update_authored(gs);
     /* Lethal gap damage must run after checkpoint sampling. */
     floor_gap_handle_collision(gs);
     if (gs->game_over || gs->lives != lives_before) return game_camera_update(gs, dt);
     game_actors_update(gs, dt, cam_x);
-    game_float_platforms_update(gs, dt, fp_landed_idx);
-    game_bridges_update(gs, dt);
+    game_float_platforms_update(gs, dt, support.float_platform);
+    game_bridges_update(gs, dt, support.bridge);
     /* All moving hazards reach this frame's position before hitbox sampling. */
     game_hazards_update(gs, dt, cam_x);
     game_collide(gs, dt);
