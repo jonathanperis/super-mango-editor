@@ -495,6 +495,48 @@ static int start_points_place_the_first_game(void)
     session_destroy(&session);
     if (failed) return 1;
 
+    /* x 595: the column's centre is on the floor beside the pillar at 600,
+     * but the player's physics box (centre +-9 px) overlaps the pillar, and
+     * that is what collision tests, so the player stands on the pillar. The
+     * old centre-only test put the start on the floor, inside the pillar. */
+    memset(&config, 0, sizeof(config));
+    config.level_path = fixture;
+    config.start.kind = LEVEL_START_AT_X;
+    config.start.x = 595.0f;
+    session = session_create(&config);
+    if (!session || !session->game) {
+        fprintf(stderr, "session_test: start-x 595 session_create failed\n");
+        session_destroy(&session);
+        return 1;
+    }
+    failed |= expect_float("box over the pillar edge", session->game->world.respawn_y,
+                           (float)(FLOOR_Y - 2 * TILE_SIZE + 16));
+    session_destroy(&session);
+    if (failed) return 1;
+
+    /* The same rule for a surface over a gap: a float platform ending at
+     * 404 covers the box of a column centred on 410, over the gap at 400,
+     * which the centre test refused as "nothing to stand on". */
+    {
+        LevelDef def;
+        LevelStart request = {.kind = LEVEL_START_AT_X, .x = 410.0f};
+        LevelStartPoint point;
+        char err[128];
+        level_def_init_defaults(&def);
+        def.floor_gap_count = 1;
+        def.floor_gaps[0] = 400;
+        def.float_platform_count = 1;
+        def.float_platforms[0].x = 404.0f - 2.0f * FLOAT_PLATFORM_PIECE_W;
+        def.float_platforms[0].y = 200.0f;
+        def.float_platforms[0].tile_count = 2;
+        failed |= expect_int("float platform over the gap", level_start_resolve(&def, &request, &point, err, sizeof(err)), 0);
+        failed |= expect_float("stands on it", point.spawn_y, 200.0f);
+        /* x 416: the box [407, 425) misses it: still nothing to stand on. */
+        request.x = 416.0f;
+        failed |= expect_int("box clear of it", level_start_resolve(&def, &request, &point, err, sizeof(err)), -1);
+        if (failed) return 1;
+    }
+
     /* Over the floor gap at 400 there is nothing to stand on; checkpoint 5
      * does not exist.  Neither creates a session. */
     memset(&config, 0, sizeof(config));
