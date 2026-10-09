@@ -160,8 +160,8 @@ Each row names the function that draws the layer, in the order
 `game_render_frame()` reaches it. The frame calls a short list of `draw_*`
 helpers in `src/render/game_render.c`, each drawing a run of neighbouring
 layers (`draw_ground`, `draw_surfaces`, `draw_collectibles`,
-`draw_water_layer`, `draw_moving_hazards`, `draw_enemies`, `draw_foreground`,
-`draw_hud_and_overlays`), and those call the functions below.
+`draw_water_layer`, `draw_moving_hazards`, `draw_enemies`, `draw_ghost`,
+`draw_foreground`, `draw_hud_and_overlays`), and those call the functions below.
 `make docs-drift` follows the helpers and checks that this order matches the
 source.
 
@@ -195,15 +195,16 @@ source.
 | 26 | Jumping spiders | `jumping_spiders_render` |
 | 27 | Birds | `birds_render` |
 | 28 | Faster birds | `faster_birds_render` |
-| 29 | Player | `player_render` |
-| 30 | Fog: per-level `fog_layers` from `assets/sprites/foregrounds/` | `fog_render` |
-| 31 | HUD: hearts, lives, score | `hud_render` |
-| 32 | Debug overlay and inspector panels, with `--debug` | `debug_render`, `game_inspector_render` |
+| 29 | Time-trial ghost: the best run's Mango, translucent (see [Controls](../controls/#time-trial-ghost)) | `draw_ghost`, a helper in `game_render.c` |
+| 30 | Player | `player_render` |
+| 31 | Fog: per-level `fog_layers` from `assets/sprites/foregrounds/` | `fog_render` |
+| 32 | HUD: hearts, lives, score | `hud_render` |
+| 33 | Debug overlay and inspector panels, with `--debug` | `debug_render`, `game_inspector_render` |
 
 > **Note:** Per-level visual layers are split by role: `background_layers` feed the parallax renderer, `foreground_layers` select the water/lava foreground strip texture, and `fog_layers` feed the atmospheric fog system. Fog renders before the HUD so hearts/lives/score remain legible.
 
 The pause, game-over and completion overlays and the settings panel are drawn
-after these 32 layers.
+after these 33 layers.
 
 ### Level Completion and Terminal Actions
 

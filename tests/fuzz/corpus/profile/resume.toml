@@ -6,6 +6,7 @@ dead_zone = 8000
 window_scale = 2
 high_contrast = 0
 reduced_motion = 1
+ghost = 0
 last_level = "levels/01_lugio_01.toml"
 keys = [4, 7, 26, 22, 44, 225]
 

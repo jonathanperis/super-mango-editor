@@ -219,7 +219,7 @@ within a frame. Release cached textures before their font and graphics context.
 
 ## Render Layer Order
 
-Draw back to front (the painter's algorithm). The full 32-layer order, with
+Draw back to front (the painter's algorithm). The full 33-layer order, with
 the function that draws each layer, is in
 [Architecture](../architecture/#render-order-back-to-front); put a new
 entity's render call in `src/render/game_render.c` at the matching place.

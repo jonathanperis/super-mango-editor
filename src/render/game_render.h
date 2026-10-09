@@ -1,7 +1,7 @@
 /*
  * game_render.h — Rendering system public interface.
  *
- * Handles all game rendering including the 32 render layers,
+ * Handles all game rendering including the 33 render layers,
  * parallax backgrounds, entities, player, effects, HUD, and overlays.
  */
 #pragma once
