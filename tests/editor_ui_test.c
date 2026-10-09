@@ -792,9 +792,16 @@ static int install_fake_pickers(void)
         fputs(script, file);
         if (fclose(file) != 0 || chmod(path, 0755) != 0) return -1;
     }
-    if (!getcwd(cwd, sizeof(cwd))) return -1;
     const char *old_path = getenv("PATH");
-    snprintf(new_path, sizeof(new_path), "%s/" FAKE_BIN ":%s", cwd, old_path ? old_path : "");
+    if (!old_path) old_path = "";
+    /* PATH needs a full path. An absolute OUTDIR (make test OUTDIR=/tmp/x)
+     * already is one; a relative OUTDIR gets the working directory in front. */
+    if (FAKE_BIN[0] == '/') {
+        snprintf(new_path, sizeof(new_path), FAKE_BIN ":%s", old_path);
+    } else {
+        if (!getcwd(cwd, sizeof(cwd))) return -1;
+        snprintf(new_path, sizeof(new_path), "%s/" FAKE_BIN ":%s", cwd, old_path);
+    }
     return setenv("PATH", new_path, 1);
 }
 
