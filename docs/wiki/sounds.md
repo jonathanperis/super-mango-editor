@@ -125,7 +125,11 @@ backing-storage cost. See [Asset Inventory](../asset-inventory/).
    warning and leaving the slot `NULL` when a file is missing (non-fatal).
    `AppSession` calls it once, when the first game opens, and lends the
    loaded sounds to every game after that, so Replay does not load them
-   again. `game_resources_unload` walks the same table in reverse with
+   again. Only a sound (or optional sprite) whose slot is still `NULL` is
+   tried again when the next game opens (`game_resources_reload_missing`),
+   so a file put back during the session is picked up by the next Play. A
+   level that needs a missing sprite does not open, and the menu names the
+   file (`Missing file: spike.png`). `game_resources_unload` walks the same table in reverse with
    `FREE_CHUNK` when the session ends, so no separate free call is needed.
 
 4. Play it wherever the event occurs:

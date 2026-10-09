@@ -102,6 +102,7 @@ typedef struct AppSession {
     int smoke_test_frames;
     AppSessionHooks hooks;
     char status_message[160];
+    char load_error[96]; /* why the last game failed to open; "" = not said */
     char replay_script_path[256];
     /* main.c makes a relative --replay-dir absolute, so this holds a whole
      * path, the same size as a level path. */

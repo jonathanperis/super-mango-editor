@@ -23,6 +23,7 @@
 #include "core/game_completion.h"
 #include "core/game_experiment.h"
 #include "core/game_overlay.h"
+#include "core/game_resources.h"  /* game_resources_load, _reload_missing */
 #include "core/game_player_step.h"
 #include "core/game_terminal.h"
 #include "core/game_timing.h"
@@ -677,6 +678,56 @@ static int start_point_respawns_follow_the_ground(void)
     game_update_active(game, GAME_FIXED_STEP, (int)game->world.camera.x);
     failed |= expect_int("normal run checkpoint saved", game->world.legacy_checkpoint_screen, 2);
     failed |= expect_float("normal run keeps the start height", game->world.respawn_y, start_y);
+    session_destroy(&session);
+    return failed;
+}
+
+/*
+ * The shared sprites are loaded once per session now, so a sprite whose
+ * file was missing at that moment stayed missing for every later game,
+ * and a level that needs it failed with only "Selected level could not
+ * be loaded". The failure now names the file, and each new game tries the
+ * missing files again, so putting the file back fixes the next Play.
+ */
+static int missing_shared_sprite_is_named_and_retried(void)
+{
+    const char *level = "tests/fixtures/runtime/hazards.toml";  /* has spike rows */
+    GameAssets assets;
+    int failed = 0;
+
+    /* A set loaded while spike.png was missing. */
+    if (game_resources_load(&assets) != 0) return 1;
+    texture_unload(assets.textures.spike);
+    assets.textures.spike = NULL;
+    GameState *game = calloc(1, sizeof(*game));
+    if (!game) { game_resources_unload(&assets); return 1; }
+    game->assets = assets;  /* borrowed, as the session lends it */
+    strcpy(game->world.level_path, level);
+    failed |= expect_int("level needing it fails", game_init(game) != 0, 1);
+    failed |= expect_int("failure names the file",
+                         strcmp(game->screen.load_error, "Missing file: spike.png"), 0);
+    free(game);
+    game_resources_reload_missing(&assets);
+    failed |= expect_int("reload fills the slot", assets.textures.spike != NULL, 1);
+    game_resources_unload(&assets);
+    if (failed) return 1;
+
+    /* Through the session: the slot empties after the set was loaded, and
+     * the next Play from the menu loads the file again and opens. */
+    AppSessionConfig config = {.level_path = level};
+    AppSession *session = session_create(&config);
+    if (!session || !session->game) { session_destroy(&session); return 1; }
+    session->game->screen.route = GAME_ROUTE_LEVEL_SELECT;
+    session_frame(session);
+    failed |= expect_int("back at the menu", session->menu != NULL, 1);
+    if (!session->menu) { session_destroy(&session); return 1; }
+    texture_unload(session->assets.textures.spike);
+    session->assets.textures.spike = NULL;
+    str_copy(session->menu->selected_level_path, level, sizeof(session->menu->selected_level_path));
+    session->menu->route = MENU_ROUTE_PLAY;
+    session_frame(session);
+    failed |= expect_int("next Play opens the level", session->game != NULL, 1);
+    failed |= expect_int("the sprite is back", session->assets.textures.spike != NULL, 1);
     session_destroy(&session);
     return failed;
 }
@@ -1660,6 +1711,7 @@ int main(void)
         CASE(campaign_broken_level_disables_only_its_entry),
         CASE(physical_release_latch_blocks_transition_input),
         CASE(failed_initial_level_does_not_create_session),
+        CASE(missing_shared_sprite_is_named_and_retried),
         CASE(start_points_place_the_first_game),
         CASE(start_point_respawns_follow_the_ground),
         CASE(asset_root_moves_a_foreign_working_folder),

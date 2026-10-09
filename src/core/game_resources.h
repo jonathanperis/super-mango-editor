@@ -30,5 +30,19 @@ void game_resources_unload(GameAssets *assets);
  * required texture, so every successful game_resources_load sets it. */
 int game_resources_loaded(const GameAssets *assets);
 
-/* Verify shared sprites before committing a level/phase. */
+/* After game_resources_load failed: the required sprite that was missing
+ * (its file path), or NULL when none is. */
+const char *game_resources_missing_required(const GameAssets *assets);
+
+/* Try again to load every optional sprite and sound that is still empty,
+ * say because its file was missing when the set was loaded and has been
+ * put back since. AppSession calls it each time it opens a game. */
+void game_resources_reload_missing(GameAssets *assets);
+
+/* The file of the first shared sprite def needs that *assets lacks, or
+ * NULL when every one it needs is loaded. */
+const char *game_resources_missing_level_texture(const GameAssets *assets, const LevelDef *def);
+
+/* Verify shared sprites before committing a level/phase: -1 (after naming
+ * the missing file on stderr) when one is missing. */
 int game_resources_require_level_textures(const GameState *gs, const LevelDef *def);
