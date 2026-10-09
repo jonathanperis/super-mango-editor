@@ -65,7 +65,7 @@ static void collect_health_stars(GameState *gs, const IntRect *phit,
 /* ------------------------------------------------------------------ */
 
 /* Test all entities in an array against player; apply damage on hit.
- * Usage: COLLIDE_DAMAGE(gs->spiders, gs->spider_count, spider_get_hitbox, "spider")
+ * Usage: COLLIDE_DAMAGE(gs->spiders, gs->spider_count, spider_build_hitbox, "spider")
  */
 #define COLLIDE_DAMAGE(arr, count, get_hitbox_fn, name) \
     for (int i = 0; i < (count) && gs->player.hurt_timer == 0.0f; i++) { \
@@ -136,26 +136,9 @@ void game_collide(GameState *gs, float dt)
     IntRect phit = player_get_hitbox(&gs->player);
 
     /* ---- Enemy collisions ---------------------------------------- */
-    for (int i = 0; i < gs->spider_count && gs->player.hurt_timer == 0.0f; i++) {
-        IntRect shit = spider_build_hitbox(&gs->spiders[i]);
-        if (rect_intersects(&phit, &shit)) {
-            if (gs->debug_mode) debug_log(&gs->debug, "HIT spider[%d]", i);
-            float sx = shit.x + shit.w * 0.5f;
-            float sy = shit.y + shit.h * 0.5f;
-            if (damage_ends_pass(gs, sx, sy)) return;
-        }
-    }
-
-    for (int i = 0; i < gs->jumping_spider_count && gs->player.hurt_timer == 0.0f; i++) {
-        IntRect jhit = jumping_spider_build_hitbox(&gs->jumping_spiders[i]);
-        if (rect_intersects(&phit, &jhit)) {
-            if (gs->debug_mode) debug_log(&gs->debug, "HIT jspider[%d]", i);
-            float sx = jhit.x + jhit.w * 0.5f;
-            float sy = jhit.y + jhit.h * 0.5f;
-            if (damage_ends_pass(gs, sx, sy)) return;
-        }
-    }
-
+    COLLIDE_DAMAGE(gs->spiders, gs->spider_count, spider_build_hitbox, "spider");
+    COLLIDE_DAMAGE(gs->jumping_spiders, gs->jumping_spider_count,
+                   jumping_spider_build_hitbox, "jspider");
     COLLIDE_DAMAGE(gs->birds, gs->bird_count, bird_get_hitbox, "bird");
     COLLIDE_DAMAGE(gs->faster_birds, gs->faster_bird_count, faster_bird_get_hitbox, "fbird");
     COLLIDE_DAMAGE(gs->fish, gs->fish_count, fish_get_hitbox, "fish");
