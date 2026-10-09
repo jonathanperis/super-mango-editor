@@ -173,7 +173,7 @@ speed      = 0.0        # RAIL mode only: traversal speed in tiles/s
 
 **File:** `src/surfaces/bridge.c` / `bridge.h`  
 **Sprite:** `assets/sprites/surfaces/bridge.png` — 16×16 px brick tile  
-**Behaviour:** Tiled crumble walkway. Each brick under the player's centre starts its own timer on first contact and falls `BRIDGE_FALL_DELAY` later, so only the bricks the player actually steps on drop, creating a time-limited path. Fallen bricks stay gone until the level resets after a life loss (or a fresh attempt).
+**Behaviour:** Tiled crumble walkway. Each brick under the player's centre starts its own timer on first contact and falls `BRIDGE_FALL_DELAY` later, so only the bricks the player actually steps on drop, creating a time-limited path. A brick counts as stepped on only when the player's landing test lands them on that bridge, so standing on another surface beside or just below it never starts the timer. Fallen bricks stay gone until the level resets after a life loss (or a fresh attempt).
 
 | Constant | Value | Description |
 |----------|-------|-------------|

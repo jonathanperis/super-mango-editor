@@ -15,9 +15,11 @@
 
 /* ------------------------------------------------------------------ */
 
-void bridges_update(Bridge *bridges, int count, float dt,
-                    int landed_idx, float player_cx)
+int bridges_update(Bridge *bridges, int count, float dt,
+                   int landed_idx, float player_cx)
 {
+    int touched_brick = -1;
+
     for (int bi = 0; bi < count; bi++) {
         Bridge *b = &bridges[bi];
 
@@ -36,9 +38,10 @@ void bridges_update(Bridge *bridges, int count, float dt,
                     /*
                      * First contact — mark the brick as triggered
                      * immediately.  Set fall_delay to 0 to start the
-                     * countdown toward BRIDGE_FALL_DELAY.
+                     * timer counting up toward BRIDGE_FALL_DELAY.
                      */
                     touched->fall_delay = 0.0f;
+                    touched_brick = idx;
                 }
             }
         }
@@ -68,6 +71,8 @@ void bridges_update(Bridge *bridges, int count, float dt,
             }
         }
     }
+
+    return touched_brick;
 }
 
 /* ------------------------------------------------------------------ */

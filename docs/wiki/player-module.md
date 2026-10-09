@@ -67,6 +67,7 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
                    const int *floor_gaps, int floor_gap_count,
                    int *out_bounce_idx,
                    int *out_fp_landed_idx,
+                   int *out_bridge_landed_idx,
                    int prev_fp_landed_idx,
                    int world_w);
 void player_render(Player *player, int cam_x);

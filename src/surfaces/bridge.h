@@ -59,8 +59,16 @@ typedef struct {
 
 /* ---- Function declarations ---------------------------------------------- */
 
-void bridges_update(Bridge *bridges, int count, float dt,
-                    int landed_idx, float player_cx);
+/*
+ * bridges_update — Advance every brick's fall state.
+ *
+ * landed_idx : the bridge the player landed on this step, or -1; the brick
+ *              under player_cx on that bridge starts its fall timer.
+ * Returns the index of the brick that was touched for the first time this
+ * step (for the debug log), or -1 when no brick was newly touched.
+ */
+int bridges_update(Bridge *bridges, int count, float dt,
+                   int landed_idx, float player_cx);
 
 void bridges_render(const Bridge *bridges, int count,
                     Texture2D *tex, int cam_x);
