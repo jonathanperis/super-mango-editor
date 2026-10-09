@@ -27,7 +27,8 @@
 #define CAMPAIGN_BUTTON_W      96
 #define CAMPAIGN_BUTTON_STEP   (CAMPAIGN_BUTTON_W + 8)
 /* Buttons, left to right: Up, Down, Remove, Add level..., Link in order,
- * Save, Close.  Button i starts at CAMPAIGN_VIEW_X + i * CAMPAIGN_BUTTON_STEP. */
+ * Save, Revert, Close.  Button i starts at
+ * CAMPAIGN_VIEW_X + i * CAMPAIGN_BUTTON_STEP. */
 #define CAMPAIGN_NAME_FIELD_ID 7000                /* + row index          */
 
 /*
@@ -44,6 +45,15 @@ int editor_campaign_open(EditorState *es, const char *manifest_path);
  */
 int editor_campaign_close(EditorState *es, int force);
 
+/*
+ * editor_campaign_revert — Throw away the view's unsaved changes (a name
+ * being typed included) by reading the manifest and its levels again.
+ * Like Close, the first call with unsaved changes only warns.  Returns 1
+ * when reverted, 0 when it only warned or there was nothing to revert,
+ * -1 when the manifest can no longer be read (the view is then closed).
+ */
+int editor_campaign_revert(EditorState *es);
+
 /* Free the view's memory (editor shutdown). */
 void editor_campaign_free(EditorState *es);
 
@@ -51,7 +61,8 @@ void editor_campaign_free(EditorState *es);
 void editor_campaign_check(EditorState *es);
 
 /* 1 when the entries, their order or a level's name or next_phase differ
- * from the files on disk. */
+ * from the files on disk, or a name is being typed that differs from the
+ * level's name. */
 int editor_campaign_unsaved(const EditorState *es);
 
 /* Move entry `index` up (-1) or down (+1) one place.  Returns 0 or -1. */
