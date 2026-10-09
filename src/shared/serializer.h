@@ -36,12 +36,18 @@ typedef enum {
  * at `path`.  Enum fields are stored as human-readable strings ("RECT",
  * "SPIN", etc.) so the TOML is easy to read and edit by hand.
  *
- * On POSIX, new files use 0600 permissions; replacement preserves regular-file
- * permissions when available. A sibling temporary file is installed atomically.
+ * On POSIX, a new file gets 0666 minus the process umask (usually 0644),
+ * as any saved document would; replacing a regular file keeps its
+ * permission bits, and its owner and group where the OS allows it. A
+ * sibling temporary file is installed atomically.
  *
  * Returns 0 on success, -1 on error (serialization or file I/O failure).
  */
 int level_save_toml(const LevelDef *def, const char *path);
+
+/* Like level_save_toml, but a new file is private to its owner (0600):
+ * for the editor's playtest copies, which nobody else should read. */
+int level_save_toml_private(const LevelDef *def, const char *path);
 
 /* Save with explicit create-only or replacement semantics. */
 int level_save_toml_with_policy(const LevelDef *def, const char *path,
@@ -62,7 +68,8 @@ int level_save_toml_checked(const LevelDef *def, const char *path,
  */
 const char *level_save_kept_temp_path(void);
 
-/* Save a recovery copy with its known normal destination embedded as metadata. */
+/* Save a recovery copy with its known normal destination embedded as metadata.
+ * Recovery copies are private to their owner (0600) on POSIX. */
 int level_save_toml_recovery(const LevelDef *def, const char *path,
                              const char *original_path);
 
