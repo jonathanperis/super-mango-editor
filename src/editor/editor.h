@@ -85,6 +85,7 @@
 typedef struct {
     uint64_t id;
     uint64_t timestamp;
+    unsigned long owner_pid;  /* process that wrote it; 0 = unknown (old file) */
     char source_path[EDITOR_PATH_MAX];
     char snapshot_path[EDITOR_PATH_MAX];
     char metadata_path[EDITOR_PATH_MAX];
