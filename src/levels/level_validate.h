@@ -62,3 +62,24 @@ int level_issue_location_parse(const char *message, LevelIssueLocation *where);
  */
 int level_validate_runtime_at(const LevelDef *def, char *err, size_t err_size,
                               LevelIssueLocation *where);
+
+/*
+ * LevelIssueFn — receives one validation error: its message (the same text
+ * level_validate_runtime would write) and where it is.  Both are only valid
+ * during the call; copy what you keep.
+ */
+typedef void (*LevelIssueFn)(void *context, const char *message,
+                             const LevelIssueLocation *where);
+
+/*
+ * level_validate_runtime_each — Run the same rules as
+ * level_validate_runtime, but report every error instead of stopping at
+ * the first.  report is called once per error, in the order the checks
+ * run, so its first call carries exactly the message the game would show.
+ * A rule that depends on an earlier one (a rail rider's t_offset needs a
+ * valid rail_index) is skipped once that earlier rule failed, and a bad
+ * array count stops everything, since no later check could read the array.
+ * Returns how many errors were found (0 = the level is valid).
+ */
+int level_validate_runtime_each(const LevelDef *def, LevelIssueFn report,
+                                void *context);

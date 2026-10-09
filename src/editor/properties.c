@@ -1318,6 +1318,17 @@ static int config_validation(EditorState *es, int x, int y)
         }
         y += 18;
     }
+    /* The list holds EDITOR_VALIDATION_MAX_MESSAGES; say how many more the
+     * counts include, so a long report is not mistaken for a short one. */
+    {
+        int hidden = editor_validation_hidden_count(&es->validation_report);
+        if (hidden > 0) {
+            char more[48];
+            snprintf(more, sizeof(more), "... and %d more", hidden);
+            ui_label_color(&es->ui, x + 16, y, more, UI_TEXT_DIM);
+            y += 18;
+        }
+    }
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     return y + 8;
 }

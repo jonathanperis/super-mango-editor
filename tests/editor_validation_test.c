@@ -251,6 +251,9 @@ static int copy_file_with_bad_recovery_metadata(const char *source,
     return 0;
 }
 
+static int expect_location(const char *name, const LevelIssueLocation *where,
+                           const char *path, int index, const char *field);
+
 static int rejects_bad_runtime_link(void)
 {
     LevelDef def;
@@ -262,7 +265,11 @@ static int rejects_bad_runtime_link(void)
 
     if (expect_int("bad link result", editor_validate_level(&def, &report), -1) != 0)
         return 1;
-    if (expect_int("bad link errors", report.error_count, 1) != 0) return 1;
+    /* The block names a rail that does not exist, and its speed was left
+     * at 0: both are reported, the rail first. */
+    if (expect_int("bad link errors", report.error_count, 2) != 0) return 1;
+    if (expect_location("bad link first", &report.locations[0],
+                        "spike_blocks", 0, "rail_index") != 0) return 1;
 
     return 0;
 }
@@ -2357,6 +2364,96 @@ static int validation_errors_report_where_they_are(void)
             expect_int("config key", editor_entity_type_for_toml("screen_count"), ENT_COUNT) != 0)
             return 1;
     }
+    return 0;
+}
+
+/* Every error level_validate_runtime_each reported, in order. */
+typedef struct {
+    int count;
+    char first[256];
+    LevelIssueLocation where[16];
+} CollectedIssues;
+
+static void collect_issue(void *context, const char *message,
+                          const LevelIssueLocation *where)
+{
+    CollectedIssues *issues = context;
+    if (issues->count == 0) snprintf(issues->first, sizeof(issues->first), "%s", message);
+    if (issues->count < 16) issues->where[issues->count] = *where;
+    issues->count++;
+}
+
+/*
+ * The editor lists every runtime error at once, while the game keeps its
+ * single-error API: the first error collected is word for word the one
+ * level_validate_runtime reports.  Checks that need an earlier value to be
+ * good (t_offset needs a valid rail_index) are skipped instead of reading
+ * past an array, and a bad array count stops everything.
+ */
+static int validation_reports_every_runtime_error(void)
+{
+    LevelDef level;
+    CollectedIssues issues;
+    EditorValidationReport report;
+    char err[256];
+
+    editor_level_init_defaults(&level);
+    level.coin_count = 2;
+    level.coins[0] = (CoinPlacement){100.0f, 100.0f};
+    level.coins[1] = (CoinPlacement){99999.0f, 100.0f};      /* 1: coins[1].x  */
+    level.spider_count = 1;
+    level.spiders[0] = (SpiderPlacement){300.0f, 0.0f, 250.0f, 350.0f, 0};  /* vx 0 */
+    level.axe_trap_count = 1;
+    level.axe_traps[0] = (AxeTrapPlacement){.pillar_x = 500.0f, .mode = (AxeTrapMode)7};
+    level.spike_block_count = 1;                               /* no rails at all */
+    level.spike_blocks[0] = (SpikeBlockPlacement){5, 1.0f, 3.0f};
+    level.physics.air_friction = NAN;
+
+    memset(&issues, 0, sizeof(issues));
+    if (expect_int("errors found",
+                   level_validate_runtime_each(&level, collect_issue, &issues), 5) != 0 ||
+        expect_int("errors reported", issues.count, 5) != 0 ||
+        level_validate_runtime(&level, err, sizeof(err)) == 0 ||
+        expect_int("first matches the game", strcmp(issues.first, err), 0) != 0 ||
+        expect_location("physics first", &issues.where[0], "physics", -1, "air_friction") != 0 ||
+        expect_location("spider vx", &issues.where[1], "spiders", 0, "vx") != 0 ||
+        expect_location("coin x", &issues.where[2], "coins", 1, "x") != 0 ||
+        expect_location("rider rail", &issues.where[3], "spike_blocks", 0, "rail_index") != 0 ||
+        expect_location("axe mode", &issues.where[4], "axe_traps", 0, "mode") != 0)
+        return 1;
+
+    /* The editor's report lists them all, each with its location. */
+    (void)editor_validate_level(&level, &report);
+    if (expect_int("report errors", report.error_count, 5) != 0 ||
+        expect_location("report first", &report.locations[0], "physics", -1, "air_friction") != 0 ||
+        expect_location("report last", &report.locations[4], "axe_traps", 0, "mode") != 0 ||
+        expect_int("nothing hidden", editor_validation_hidden_count(&report), 0) != 0)
+        return 1;
+
+    /* More errors than the list holds: the counts keep them all. */
+    editor_level_init_defaults(&level);
+    level.coin_count = EDITOR_VALIDATION_MAX_MESSAGES + 4;
+    for (int i = 0; i < level.coin_count; i++)
+        level.coins[i] = (CoinPlacement){-5.0f, 100.0f};
+    (void)editor_validate_level(&level, &report);
+    if (expect_int("listed", report.message_count, EDITOR_VALIDATION_MAX_MESSAGES) != 0 ||
+        expect_int("counted", report.error_count, EDITOR_VALIDATION_MAX_MESSAGES + 4) != 0 ||
+        expect_int("hidden", editor_validation_hidden_count(&report) >= 4, 1) != 0)
+        return 1;
+
+    /* A bad count is reported alone: the arrays cannot be walked. */
+    level.coin_count = MAX_COINS + 1;
+    memset(&issues, 0, sizeof(issues));
+    if (expect_int("count stops", level_validate_runtime_each(&level, collect_issue, &issues), 1) != 0 ||
+        expect_location("count location", &issues.where[0], "coin_count", -1, "") != 0)
+        return 1;
+
+    /* A valid level reports nothing. */
+    editor_level_init_defaults(&level);
+    memset(&issues, 0, sizeof(issues));
+    if (expect_int("valid", level_validate_runtime_each(&level, collect_issue, &issues), 0) != 0 ||
+        expect_int("valid calls", issues.count, 0) != 0)
+        return 1;
     return 0;
 }
 
@@ -4824,6 +4921,7 @@ int main(void)
     if (group_copy_and_delete_keep_riders_with_their_rail() != 0) return 1;
     if (shared_level_rules_have_one_answer() != 0) return 1;
     if (validation_errors_report_where_they_are() != 0) return 1;
+    if (validation_reports_every_runtime_error() != 0) return 1;
     if (float_platform_rail_switch_rechecks_its_rail() != 0) return 1;
     if (drag_round_trips_and_follows_grab_point() != 0) return 1;
     if (editor_mutations_keep_level_valid() != 0) return 1;
