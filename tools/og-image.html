@@ -8,9 +8,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;600;700&display=block" rel="stylesheet">
+<!-- Pixelify Sans from the website's own @fontsource package, the same
+     files the site bundles (`bun install` in docs/ puts them there), so
+     rendering needs no network and asks no font CDN for anything. -->
+<link rel="stylesheet" href="../docs/node_modules/@fontsource/pixelify-sans/500.css">
+<link rel="stylesheet" href="../docs/node_modules/@fontsource/pixelify-sans/600.css">
+<link rel="stylesheet" href="../docs/node_modules/@fontsource/pixelify-sans/700.css">
 <style>
   * { box-sizing: border-box; margin: 0; }
   body {
