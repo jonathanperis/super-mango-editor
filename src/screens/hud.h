@@ -41,6 +41,27 @@ typedef struct {
     Texture2D *player_icon;   /* borrowed player sprite sheet */
 } Hud;
 
+/*
+ * HudLayout — where each HUD element sits this frame.
+ *
+ * hud_render draws into these rectangles and the --debug overlay outlines
+ * the very same ones, so the two can never disagree. Text rectangles use
+ * the measured width of the formatted string, which changes with the score.
+ */
+typedef struct {
+    int     heart_count;          /* hearts to draw, 0..MAX_HEARTS        */
+    IntRect hearts[MAX_HEARTS];   /* one star icon per remaining heart    */
+    IntRect player_icon;          /* cropped player sprite beside lives   */
+    IntRect lives_text;           /* "x3"                                 */
+    IntRect score_text;           /* "SCORE: 1200", right-aligned         */
+    IntRect coin_icon;            /* coin to the right of the score       */
+    char    lives[32];            /* the formatted lives text             */
+    char    score[32];            /* the formatted score text             */
+} HudLayout;
+
+/* Fill layout for these values; needs hud->font to measure the text. */
+void hud_layout(const Hud *hud, int hearts, int lives, int score, HudLayout *layout);
+
 /* Load the font; accept shared textures from GameState to avoid duplicates. */
 int hud_init(Hud *hud, Texture2D *star_tex, Texture2D *player_tex);
 
