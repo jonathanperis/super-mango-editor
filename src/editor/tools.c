@@ -26,6 +26,7 @@
 #include "../levels/level_loader.h" /* level_validate_runtime            */
 #include "../game.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE, WORLD_W,
                         FLOOR_GAP_W, MAX_* constants                      */
+#include "../surfaces/rail.h" /* MAX_RAIL_SPEED                            */
 
 /*
  * tools_can_hit_test --- Canvas clicks need a level that passes validation.
@@ -792,11 +793,11 @@ int editor_add_placement(EditorState *es, EntityType type,
 }
 
 /*
- * nearest_rail --- Index of the rail closest to (x, y), or -1 when the
+ * editor_nearest_rail --- Index of the rail closest to (x, y), or -1 when the
  * level has none.  Distance is measured to the rail's rectangle, so a click
  * anywhere on or inside a rail loop picks that rail.
  */
-static int nearest_rail(const LevelDef *level, float x, float y)
+int editor_nearest_rail(const LevelDef *level, float x, float y)
 {
     int best = -1;
     float best_distance = 0.0f;
@@ -816,6 +817,54 @@ static int nearest_rail(const LevelDef *level, float x, float y)
 }
 
 /*
+ * editor_set_float_platform_mode --- Switch a float platform between
+ * Static, Crumble and Rail without leaving it on a rail it never meant.
+ *
+ * Rails are referred to by their position in the rails array, and the
+ * editor only renumbers the references that are in use: RAIL-mode float
+ * platforms and spike blocks.  A Static or Crumble platform keeps whatever
+ * rail_index it last had, and after rails were added or deleted that number
+ * may name another rail or no rail at all.  So switching to Rail checks it:
+ * a number that names no rail is replaced by the rail nearest the platform,
+ * and either way the status bar says which rail it now rides, so a stale
+ * (but existing) rail is visible at once and easy to change.
+ */
+int editor_set_float_platform_mode(EditorState *es, int index,
+                                   FloatPlatformMode mode)
+{
+    FloatPlatformPlacement *p;
+
+    if (!es || index < 0 || index >= editor_entity_count(&es->level, ENT_FLOAT_PLATFORM))
+        return -1;
+    p = &es->level.float_platforms[index];
+    if (mode != FLOAT_PLATFORM_RAIL) {
+        p->mode = mode;
+        return 0;
+    }
+    if (es->level.rail_count <= 0) {
+        editor_set_status(es, "Cannot switch Float Platform to Rail: place a rail first");
+        return -1;
+    }
+    p->mode = FLOAT_PLATFORM_RAIL;
+    /* Static and crumbling platforms are placed with speed 0, which a rail
+     * rider may not have; give it a speed it can save with. */
+    if (!(p->speed >= RAIL_SPEED_MIN && p->speed <= MAX_RAIL_SPEED))
+        p->speed = RAIL_SPEED_DEFAULT;
+    if (p->rail_index < 0 || p->rail_index >= es->level.rail_count) {
+        int old = p->rail_index;
+        p->rail_index = editor_nearest_rail(&es->level, p->x, p->y);
+        p->t_offset = clamp_rail_t(&es->level, p->rail_index, p->t_offset);
+        editor_set_status(es, "Float Platform rides rail %d (its rail %d no longer exists)",
+                          p->rail_index, old);
+    } else {
+        p->t_offset = clamp_rail_t(&es->level, p->rail_index, p->t_offset);
+        editor_set_status(es, "Float Platform rides rail %d; edit rail_index to pick another",
+                          p->rail_index);
+    }
+    return 0;
+}
+
+/*
  * place_entity --- Add one entity of the palette type at (world_x, world_y).
  *
  * Builds the default placement, attaches spike blocks to the nearest rail,
@@ -829,7 +878,7 @@ static void place_entity(EditorState *es, float world_x, float world_y)
 
     if (!default_placement(type, world_x, world_y, &pd)) return;
     if (type == ENT_SPIKE_BLOCK) {
-        int rail = nearest_rail(&es->level, world_x, world_y);
+        int rail = editor_nearest_rail(&es->level, world_x, world_y);
         /* With no rail at all, editor_add_placement explains the refusal. */
         pd.spike_block.rail_index = rail >= 0 ? rail : 0;
     }

@@ -156,7 +156,11 @@ choosing Apply when another click finishes the edit. A bouncepad's `launch_vy`
 is kept at least as strong as a jump, a rail rider's `speed` above 0 and at
 most the rail speed limit, and an enemy's patrol range at least as wide as its
 sprite. Switching a float platform to Rail gives it a speed of 3 if it had
-none.
+none, and needs a rail in the level. A Static or Crumble platform keeps its old
+`rail_index`, which deleting rails does not renumber; if that number names no
+rail any more, the switch attaches the platform to the rail nearest it. Either
+way the status bar names the rail it now rides. In Rail mode the `rail_index`
+field only accepts existing rails.
 
 A dropdown whose current value is not one of its options (a path typed into
 the TOML by hand) shows `---`, and any option can then be picked. While a
