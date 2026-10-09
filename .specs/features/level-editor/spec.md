@@ -72,6 +72,8 @@ make validate-levels
 ### N-001: Validation Panel Polish
 Editor should expand the shipped validation summary/blocking into clickable inline results: TOML parse errors, schema/count bounds, missing assets, bad paths, invalid next-phase links, and gameplay-dangerous placement warnings.
 
+Shipped: validation messages in the Level Config panel and the status-bar summary are clickable. The shared validator reports a structured `LevelIssueLocation` (TOML path, element index, field; `src/levels/level_validate.h`) for its first error, the editor's own path checks and warnings carry one too, and a click selects the entity (checkpoints, spawn and Last Star included) and pans the canvas to it, or focuses the Level Config field. Still open: TOML parse errors of a file that fails to load are not listed in the panel (the load is refused before there is a document), and the validator stops at its first runtime error.
+
 ### N-002: Metadata Editor UX
 The editor already edits full top-level TOML metadata: `name`, `description`, `generated_by`, `screen_count`, `next_phase`, music path/volume, floor tile, lives/hearts/scoring, player spawn, background/foreground/fog layers, and physics overrides. Improve discoverability and dense-panel ergonomics without adding a second format or a C exporter.
 

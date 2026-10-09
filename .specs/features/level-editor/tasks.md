@@ -36,7 +36,7 @@ Baseline editor is shipped. TOML is the only level workflow; no C exporter remai
 - Surface same classes of checks as `make validate-levels` for active level where practical.
 - Display parse/schema/count/path diagnostics in editor panel.
 - Classify severity: error/warning/info.
-- Select entity/property from issue row where mapping exists.
+- Select entity/property from issue row where mapping exists. **Done:** rows and the status-bar summary are clickable; entities are selected and centred, Level Config fields focused (`LevelIssueLocation` in `level_validate.h`).
 - Keep save/playtest blocked on errors.
 
 **Verify:** malformed TOML, missing asset path, over-MAX entity count, bad `next_phase`, and valid shipped levels produce expected panel states.

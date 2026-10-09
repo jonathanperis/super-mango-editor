@@ -275,15 +275,24 @@ void ui_focus_next(UIState *ui, int direction)
  * note its place in the on-screen order, and say whether a Tab asked this
  * field to become active.
  */
-static int field_drawn(UIState *ui, int id)
+static int field_drawn(UIState *ui, int id, int y)
 {
     if (ui->field_order_count < UI_MAX_FIELDS)
         ui->field_order[ui->field_order_count++] = id;
     if (ui->focus_request_id == id && ui->active_id == 0) {
         ui->focus_request_id = 0;
+        ui->focus_landed_id = id;
+        ui->focus_landed_y = y;
         return 1;
     }
     return 0;
+}
+
+void ui_focus_field(UIState *ui, int id)
+{
+    if (!ui || id == 0) return;
+    ui->focus_request_id = id;
+    ui->focus_request_frames = 0;
 }
 
 /*
@@ -742,7 +751,7 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
     if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
 
     /* --- Activation on click, or by Tab from the previous field --- */
-    if (field_drawn(ui, id) ||
+    if (field_drawn(ui, id, y) ||
         (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
                                             x, y, w, h) &&
          command_allows_activation(ui, id))) {
@@ -850,7 +859,7 @@ int ui_float_field_limited(UIState *ui, int id, int x, int y, int w,
     if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
 
     /* --- Activation on click, or by Tab from the previous field --- */
-    if (field_drawn(ui, id) ||
+    if (field_drawn(ui, id, y) ||
         (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
                                             x, y, w, h) &&
          command_allows_activation(ui, id))) {
@@ -939,7 +948,7 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
     if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
 
     /* --- Activation on click, or by Tab from the previous field --- */
-    if (field_drawn(ui, id) ||
+    if (field_drawn(ui, id, y) ||
         (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
                                             x, y, w, h) &&
          command_allows_activation(ui, id))) {
