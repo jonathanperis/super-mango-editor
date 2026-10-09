@@ -116,6 +116,12 @@ jobs:
         with:
           persist-credentials: false
 
+      # Release zips date every entry with SOURCE_DATE_EPOCH (see
+      # tools/package_release.py), so the same commit packs the same bytes.
+      - name: Date release archives by the commit
+        shell: bash
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+
       # MSYS2 provides its own Python on Windows; pin the runner Python elsewhere.
       - name: Setup Python
         if: runner.os != 'Windows'
