@@ -205,7 +205,11 @@ and the command waits. Esc always discards the typed text. Number fields with a
 range clamp the value however the edit ends. A bouncepad's `launch_vy`
 is kept at least as strong as a jump, a rail rider's `speed` above 0 and at
 most the rail speed limit, and an enemy's patrol range at least as wide as its
-sprite. Switching a float platform to Rail gives it a speed of 3 if it had
+sprite. An enemy's `vx` is limited to `MAX_PATROL_SPEED` (960 px/s) either
+way, and a typed `0`, which would freeze the enemy, is not stored: the field
+stays open like any value that cannot be stored. When a field limits or refuses
+what you typed, the status bar says so (`-99999 is outside -960..960, so it was
+limited`). Newly placed enemies start at their usual speeds, which are valid. Switching a float platform to Rail gives it a speed of 3 if it had
 none, and needs a rail in the level. A Static or Crumble platform keeps its old
 `rail_index`, which deleting rails does not renumber; if that number names no
 rail any more, the switch attaches the platform to the rail nearest it. Either

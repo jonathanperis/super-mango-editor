@@ -82,6 +82,10 @@ typedef struct {
      * editor applying a staged edit before another command) clamps to them. */
     int edit_int_min, edit_int_max, edit_int_step;
     float edit_float_min, edit_float_max;   /* same, for a float field */
+    int edit_float_nonzero;    /* 1: 0 is not a value this field accepts  */
+    /* Set when a commit changed or refused what was typed ("900 is outside
+     * -960..960, so it became 960"); the caller shows it and clears it. */
+    char edit_note[96];
     int dropdown_open_id;      /* zero = closed; otherwise the stable widget ID */
     /* A press while a list is open belongs to that list alone (ui_press), so
      * it can never reach a widget or the canvas drawn underneath the list. */
@@ -167,6 +171,11 @@ int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value);
 /* Like ui_float_field, but a committed value is clamped to [min, max]. */
 int ui_float_field_limited(UIState *ui, int id, int x, int y, int w,
                            float *value, float min, float max);
+/* A speed that must keep moving: clamped to [-limit, limit] like the field
+ * above, and a typed 0 is refused like text that is not a number (the
+ * field stays active and edit_note says why). */
+int ui_float_field_nonzero(UIState *ui, int id, int x, int y, int w,
+                           float *value, float limit);
 /* buf_size includes the final NUL byte. Paste/backspace preserve UTF-8 units. */
 int ui_text_field(UIState *ui, int id, int x, int y, int w, char *buf, int buf_size);
 /* Open/close the option list on click; update *selected and return 1 only

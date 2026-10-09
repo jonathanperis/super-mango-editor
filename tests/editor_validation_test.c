@@ -4479,6 +4479,43 @@ static int motion_fields_stay_within_validator_limits(void)
     props_type(&es, PROPS_ROW(3), "260");
     if (expect_float_value("patrol_x1 keeps a sprite width",
                            es.level.spiders[0].patrol_x1, 314.0f) != 0) goto done;
+
+    /* Spider vx: a speed past MAX_PATROL_SPEED is limited to it, and the
+     * status bar says so... */
+    props_type(&es, PROPS_ROW(1), "-99999");
+    if (expect_float_value("vx limited", es.level.spiders[0].vx,
+                           -(float)MAX_PATROL_SPEED) != 0 ||
+        expect_int("limit reported", strstr(es.status_message, "limited") != NULL, 1) != 0)
+        goto done;
+    /* ...and 0, which would freeze the spider, is refused: nothing is
+     * stored and the field stays open with the reason in the status bar. */
+    props_type(&es, PROPS_ROW(1), "0");
+    if (expect_float_value("vx kept", es.level.spiders[0].vx,
+                           -(float)MAX_PATROL_SPEED) != 0 ||
+        expect_int("field still open", es.ui.active_id != 0, 1) != 0 ||
+        expect_int("zero reported", strstr(es.status_message, "0 is not allowed") != NULL, 1) != 0)
+        goto done;
+    ui_cancel_active_edit(&es.ui);
+    if (level_is_valid("vx edits keep the level valid", &es.level) != 0) goto done;
+
+    /* Every newly placed enemy starts with a valid patrol speed. */
+    {
+        static const EntityType enemies[] = {
+            ENT_SPIDER, ENT_JUMPING_SPIDER, ENT_BIRD, ENT_FASTER_BIRD,
+            ENT_FISH, ENT_FASTER_FISH,
+        };
+        es.tool = TOOL_PLACE;
+        for (size_t i = 0; i < sizeof(enemies) / sizeof(enemies[0]); i++) {
+            es.palette_type = enemies[i];
+            tools_mouse_down(&es, 700.0f + 60.0f * (float)i, 150.0f);
+            tools_mouse_up(&es, 700.0f + 60.0f * (float)i, 150.0f);
+        }
+        if (expect_int("enemies placed", es.level.spider_count + es.level.jumping_spider_count +
+                       es.level.bird_count + es.level.faster_bird_count +
+                       es.level.fish_count + es.level.faster_fish_count, 7) != 0 ||
+            level_is_valid("placed enemies", &es.level) != 0)
+            goto done;
+    }
     result = 0;
 
 done:
