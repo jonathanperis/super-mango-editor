@@ -30,6 +30,23 @@ typedef struct GameExperiment {
 int game_experiment_begin(GameState *gs);
 int game_experiment_load(GameState *gs, const char *path);
 int game_experiment_save(GameState *gs, const char *path);
+
+/* What an F9 export did, so the debug log can say what actually went wrong. */
+typedef enum {
+    EXPERIMENT_EXPORT_OK = 0,
+    EXPERIMENT_EXPORT_NOTHING,      /* no recorded steps to export          */
+    EXPERIMENT_EXPORT_NAME_TAKEN,   /* every candidate file name exists     */
+    EXPERIMENT_EXPORT_WRITE_FAILED  /* the file could not be written        */
+} ExperimentExportResult;
+
+/* mango-experiment-<stamp>.toml, then -2 ... -EXPERIMENT_EXPORT_ATTEMPTS. */
+#define EXPERIMENT_EXPORT_ATTEMPTS 10
+
+/* Export into folder ("" = working folder; else ending in a separator),
+ * named after stamp, seconds since 1970. path receives the name used. */
+ExperimentExportResult game_experiment_export_at(GameState *gs, const char *folder,
+                                                 long long stamp, char *path, size_t size);
+/* F9: export into the working folder, stamped with the current date/time. */
 void game_experiment_export(GameState *gs);
 /* Step length for the next update: dt normally; 0 once a replay has ended. */
 float game_experiment_dt(const GameState *gs, float dt);
