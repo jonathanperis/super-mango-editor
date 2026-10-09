@@ -99,7 +99,7 @@ static int lethal_damage_consumes_life_and_resets_level(void)
     gs.world.player.spawn_x = 88.0f;
     gs.world.player.spawn_y = 120.0f;
     gs.screen.loop.fp_prev_riding = 7;
-    gs.world.sim_time = 50.0;   /* 50 s of play so far */
+    gs.world.sim_steps = 50 * 60;   /* 50 s of play so far */
 
     apply_damage(&gs, 1, 0, 0.0f, 0.0f);
 

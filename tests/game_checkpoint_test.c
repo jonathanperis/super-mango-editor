@@ -215,7 +215,7 @@ static int feedback_runs_on_simulated_time(void)
     def.checkpoints[0].y = 90.0f;
     gs.world.runtime.current_level = &def;
     gs.world.checkpoint_index = -1;
-    gs.world.sim_time = 100.0;
+    gs.world.sim_steps = 100 * 60;  /* 100 s of play */
     gs.world.player.x = 250.0f;
     game_checkpoint_update_authored(&gs);
     if (expect_int("saved banner", gs.world.checkpoint_feedback_kind,
@@ -234,6 +234,36 @@ static int feedback_runs_on_simulated_time(void)
     return 0;
 }
 
+/*
+ * A banner set on any step lasts exactly 72 steps (1.2 s): the clock
+ * counts whole steps and turns them into milliseconds with integers. (The
+ * old clock summed float step lengths into a double and cut the
+ * milliseconds, exact only because 1.0f / 60 rounds up.)
+ */
+static int feedback_lasts_whole_steps(void)
+{
+    for (uint32_t start = 0; start < 2000; start++) {
+        GameState gs = {0};
+        gs.world.sim_steps = start;
+        game_checkpoint_feedback_set(&gs, CHECKPOINT_FEEDBACK_SAVED,
+                                     game_checkpoint_clock_ms(&gs), 1200);
+        int steps = 0;
+        while (gs.world.checkpoint_feedback_kind != CHECKPOINT_FEEDBACK_NONE && steps < 100) {
+            game_checkpoint_feedback_tick(&gs, 1.0f / 60.0f);
+            steps++;
+        }
+        if (steps != 72) {
+            fprintf(stderr, "game_checkpoint_test: banner set at step %u lasted %d steps\n",
+                    (unsigned)start, steps);
+            return 1;
+        }
+    }
+    /* A zero-length update simulates nothing and counts no step. */
+    GameState gs = {0};
+    game_checkpoint_feedback_tick(&gs, 0.0f);
+    return expect_int("zero dt counts no step", (int)gs.world.sim_steps, 0);
+}
+
 int main(void)
 {
     if (authored_checkpoints_advance_by_highest_x() != 0) return 1;
@@ -243,6 +273,7 @@ int main(void)
     if (legacy_checkpoints_skip_gaps_and_hazards_at_screen_edge() != 0) return 1;
     if (feedback_save_and_expiry_are_explicit() != 0) return 1;
     if (feedback_runs_on_simulated_time() != 0) return 1;
+    if (feedback_lasts_whole_steps() != 0) return 1;
     puts("game_checkpoint_test: ok");
     return 0;
 }
