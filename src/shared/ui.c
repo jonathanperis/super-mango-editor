@@ -272,13 +272,45 @@ void ui_edit_key(UIState *ui, UIEditKey key)
         erase_edit_range(ui, ui->edit_cursor,
                          next_char_start(ui->edit_buf, ui->edit_cursor));
         break;
+    case UI_KEY_UP: case UI_KEY_DOWN: case UI_KEY_PICK:
+        break;   /* list keys: see ui_dropdown_key */
     }
 }
 
 void ui_focus_next(UIState *ui, int direction)
 {
-    if (!ui || ui->active_id == 0 || direction == 0) return;
+    if (!ui || direction == 0) return;
+    if (ui->active_id == 0 && ui->dropdown_open_id != 0) {
+        ui->dropdown_key_tab = direction > 0 ? 1 : -1;
+        return;
+    }
+    if (ui->active_id == 0) return;
     ui->tab_request = direction > 0 ? 1 : -1;
+}
+
+void ui_dropdown_key(UIState *ui, UIEditKey key)
+{
+    if (!ui || ui->dropdown_open_id == 0) return;
+    switch (key) {
+    case UI_KEY_UP:   ui->dropdown_key_move--; break;
+    case UI_KEY_DOWN: ui->dropdown_key_move++; break;
+    /* Far past either end; ui_dropdown stops at the first / last row. */
+    case UI_KEY_HOME: ui->dropdown_key_move = -100000; break;
+    case UI_KEY_END:  ui->dropdown_key_move = 100000; break;
+    case UI_KEY_PICK: ui->dropdown_key_pick = 1; break;
+    default: break;
+    }
+}
+
+/* The field `direction` places after / before `id` in last frame's
+ * on-screen order (wrapping around), or 0 when id was not drawn. */
+static int neighbour_field(const UIState *ui, int id, int direction)
+{
+    int count = ui->prev_field_order_count;
+    for (int i = 0; i < count; i++)
+        if (ui->prev_field_order[i] == id)
+            return ui->prev_field_order[(i + direction + count) % count];
+    return 0;
 }
 
 /*
@@ -315,17 +347,16 @@ void ui_focus_field(UIState *ui, int id)
 static int handle_tab(UIState *ui, int id)
 {
     int direction = ui->tab_request;
-    int count = ui->prev_field_order_count;
+    int next;
     int result;
 
     ui->tab_request = 0;
     result = ui_apply_active_edit(ui);
     if (result == 0) return 0;
-    for (int i = 0; i < count; i++) {
-        if (ui->prev_field_order[i] != id) continue;
-        ui->focus_request_id = ui->prev_field_order[(i + direction + count) % count];
+    next = neighbour_field(ui, id, direction);
+    if (next) {
+        ui->focus_request_id = next;
         ui->focus_request_frames = 0;
-        break;
     }
     return result;
 }
@@ -597,6 +628,9 @@ void ui_begin_frame(UIState *ui)
     ui->dropdown_seen    = 0;
     ui->dropdown_click   = 0;
     ui->dropdown_options = NULL;
+    ui->dropdown_key_move = 0;
+    ui->dropdown_key_pick = 0;
+    ui->dropdown_key_tab  = 0;
     ui->mouse_clicked  = 0;
     ui->mouse_down     = 0;
     ui->key_backspace  = 0;
@@ -1100,6 +1134,11 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
  *
  * Only one dropdown can be open at a time.  dropdown_open_id in UIState
  * tracks which one is expanded.
+ *
+ * The keyboard reaches it too: a dropdown has its place in the Tab order
+ * like a field, and Tab onto it opens its list.  While open, Up / Down
+ * move a highlight (ui_dropdown_key), Enter picks the highlighted option
+ * like a click, Esc closes the list, and Tab closes it and moves on.
  */
 int ui_dropdown(UIState *ui, int id, int x, int y, int w,
                 const char **options, int count, int *selected)
@@ -1107,6 +1146,10 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
     int h       = 20;              /* height of the header row             */
     int is_open = (ui->dropdown_open_id == id);
     int changed = 0;
+
+    /* A place in the Tab order, the order on screen. */
+    if (ui->field_order_count < UI_MAX_FIELDS)
+        ui->field_order[ui->field_order_count++] = id;
 
     /* --- Draw the header (always visible) --- */
     int hovered_header = point_in_rect(ui->mouse_x, ui->mouse_y,
@@ -1135,6 +1178,7 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
         ui->focus_landed_id = id;
         ui->focus_landed_y = y;
         ui->dropdown_open_id = id;
+        ui->dropdown_highlight = *selected >= 0 && *selected < count ? *selected : 0;
         is_open = 1;
     }
 
@@ -1148,8 +1192,29 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
             if (ui->active_id != 0) return 0;
             ui->dropdown_open_id = id;   /* implicitly closes any other */
             ui->mouse_clicked = 0;       /* the press opened the list    */
+            ui->dropdown_highlight = *selected >= 0 && *selected < count ? *selected : 0;
             is_open = 1;
         }
+    } else if (ui->dropdown_key_pick || ui->dropdown_key_tab) {
+        /* --- Enter picks the highlighted option; Tab moves on --- */
+        int pick = ui->dropdown_key_pick ? ui->dropdown_highlight + ui->dropdown_key_move : -1;
+        if (pick >= count) pick = count - 1;
+        if (ui->dropdown_key_pick && pick < 0) pick = 0;
+        if (pick >= 0 && pick != *selected) {
+            notify_before_change(ui, id);
+            *selected = pick;
+            changed = 1;
+        }
+        if (ui->dropdown_key_tab) {
+            int next = neighbour_field(ui, id, ui->dropdown_key_tab);
+            if (next && next != id) {
+                ui->focus_request_id = next;
+                ui->focus_request_frames = 0;
+            }
+        }
+        ui->dropdown_open_id = 0;
+        ui->dropdown_key_move = ui->dropdown_key_pick = ui->dropdown_key_tab = 0;
+        is_open = 0;
     } else if (ui->mouse_clicked || ui->dropdown_click) {
         /* --- The press while open: pick an option or just close --- */
         int list_y = y + h;
@@ -1173,6 +1238,14 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
         ui->dropdown_click = 0;
         ui->mouse_clicked = 0;
         is_open = 0;
+    }
+
+    /* --- Up / Down move the highlight, stopping at either end --- */
+    if (is_open && ui->dropdown_key_move) {
+        ui->dropdown_highlight += ui->dropdown_key_move;
+        if (ui->dropdown_highlight >= count) ui->dropdown_highlight = count - 1;
+        if (ui->dropdown_highlight < 0) ui->dropdown_highlight = 0;
+        ui->dropdown_key_move = 0;
     }
 
     /* --- Remember the open list; ui_draw_overlays draws it last --- */
@@ -1199,10 +1272,11 @@ void ui_draw_overlays(UIState *ui)
         int hovered = point_in_rect(ui->mouse_x, ui->mouse_y,
                                     ui->dropdown_x, oy, ui->dropdown_w, h);
 
-        /* Highlight: accent colour for the selected item, hot for hover. */
-        Color bg = i == ui->dropdown_selected ? UI_BTN_ACTIVE
-                 : hovered                    ? UI_BTN_HOT
-                                              : UI_BTN;
+        /* Highlight: accent colour for the selected item, hot for hover
+         * and for the row the keyboard highlights. */
+        Color bg = i == ui->dropdown_selected                 ? UI_BTN_ACTIVE
+                 : hovered || i == ui->dropdown_highlight ? UI_BTN_HOT
+                                                          : UI_BTN;
         draw_rect(ui->dropdown_x, oy, ui->dropdown_w, h, bg);
         draw_text(ui, ui->dropdown_x + 4, oy + 3,
                   ui->dropdown_options[i], UI_TEXT);

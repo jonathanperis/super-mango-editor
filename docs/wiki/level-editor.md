@@ -207,7 +207,11 @@ Inside an active field, `Left` / `Right` move the caret one character,
 / `Delete` remove the character before / after it (whole UTF-8 characters, so
 `é` never splits in half). `Tab` applies the field and moves to the next field
 of the side panel, `Shift+Tab` to the previous one (wrapping at either end); a
-value that cannot be stored keeps the focus where it is.
+value that cannot be stored keeps the focus where it is. Dropdowns (a rail's
+layout, an axe's mode, the music track...) have their place in that order too:
+`Tab` onto one opens its list, `Up` / `Down` (or `Home` / `End`) move the
+highlight, `Enter` picks the highlighted option as one undo step, `Esc` closes
+the list without a change, and `Tab` / `Shift+Tab` close it and move on.
 
 Leaving a field applies what you typed: Return, a click on the canvas or
 another field, or any command (Save, Undo, a shortcut) stores a valid value as

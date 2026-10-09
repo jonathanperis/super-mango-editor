@@ -109,6 +109,22 @@ static void editor_key(EditorState *es, const InputEvent *event)
     }
     /* An active text field owns ordinary typing. The digit '2' in a field
      * must not also select the Place tool. Modifiers come from this event. */
+    /* An open dropdown list owns the keys that work it: Up / Down,
+     * Home / End, Enter, Tab and Esc.  Other keys are ignored rather than
+     * reaching the canvas under the list. */
+    if (es->ui.dropdown_open_id && !es->ui.active_id && !ctrl) {
+        switch (key) {
+        case KEY_UP:    ui_dropdown_key(&es->ui, UI_KEY_UP);   break;
+        case KEY_DOWN:  ui_dropdown_key(&es->ui, UI_KEY_DOWN); break;
+        case KEY_HOME:  ui_dropdown_key(&es->ui, UI_KEY_HOME); break;
+        case KEY_END:   ui_dropdown_key(&es->ui, UI_KEY_END);  break;
+        case KEY_ENTER: case KEY_KP_ENTER: ui_dropdown_key(&es->ui, UI_KEY_PICK); break;
+        case KEY_TAB:   ui_focus_next(&es->ui, shift ? -1 : 1); break;
+        case KEY_ESCAPE: es->ui.dropdown_open_id = 0;           break;
+        default: break;
+        }
+        return;
+    }
     if (es->ui.active_id && !ctrl && key != KEY_ESCAPE && key != KEY_F5) {
         /* Caret keys act at once, in the order they were pressed, so
          * "type, Left, type" in one frame lands where it should. */
