@@ -2,6 +2,7 @@
 
 #include "../input/input_backend.h"
 #include <stddef.h>
+#include <stdint.h>  /* uint64_t: the level hash and coin mask in GameResume */
 
 #define PROFILE_ACTION_COUNT 6
 #define PROFILE_LEVEL_COUNT 128
@@ -30,11 +31,44 @@ typedef struct {
     float best_time;
 } GameProgress;
 
+/*
+ * The profile file's format_version. Version 2 added the optional [resume]
+ * table (the Continue point). A version-1 profile still loads: it simply
+ * has no Continue point, and the next save writes it as version 2.
+ */
+#define PROFILE_FORMAT_VERSION 2
+
+/*
+ * GameResume — where Continue picks a level up again (one slot per profile).
+ *
+ * The session records it when the player reaches a checkpoint, pauses, or
+ * leaves a level part-way, and clears it when that level is finished or
+ * lost. Resuming puts the player back on the saved respawn point exactly as
+ * a lost life would, with the saved score, lives and collected coins.
+ * level_hash ties it to the level file's exact bytes (the hash in
+ * GameState.source_level_hash): an edited level no longer matches, so its
+ * old Continue point is dropped instead of placing the player somewhere
+ * the new layout never meant.
+ */
+typedef struct {
+    char path[PROFILE_LEVEL_PATH]; /* profile key; "" = no Continue point   */
+    uint64_t level_hash;           /* content hash of the level when saved  */
+    uint64_t coins;                /* bit i set = coin i already collected  */
+    int checkpoint;                /* authored checkpoint index, -1 = none  */
+    int legacy_screen;             /* furthest automatic screen checkpoint  */
+    int score, level_score_start;  /* run score, and its value at level start */
+    int score_life_next;           /* next bonus-life threshold, 0 = none left */
+    int lives;
+    float respawn_x, respawn_y;    /* where the player reappears            */
+    float elapsed;                 /* level timer when saved, seconds       */
+} GameResume;
+
 typedef struct {
     GameSettings settings;
     char last_level[PROFILE_LEVEL_PATH];
     GameProgress levels[PROFILE_LEVEL_COUNT];
     int count;
+    GameResume resume;
 } GameProfileData;
 
 typedef struct GameProfile {
@@ -71,3 +105,10 @@ int game_profile_finish_save(GameProfile *profile, int result);
 void game_profile_select(GameProfile *profile, const char *key);
 int game_profile_record(GameProfile *profile, const char *key, int score, int coins, float elapsed);
 const GameProgress *game_profile_result(const GameProfile *profile, const char *key);
+/* Replace the Continue point. Returns -1 (and keeps the old one) when the
+ * record is out of range; marks the profile changed only when it differs. */
+int game_profile_set_resume(GameProfile *profile, const GameResume *resume);
+/* Forget the Continue point, if there is one. */
+void game_profile_clear_resume(GameProfile *profile);
+/* The Continue point saved for key, or NULL when there is none. */
+const GameResume *game_profile_resume(const GameProfile *profile, const char *key);

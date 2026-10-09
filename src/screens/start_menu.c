@@ -23,6 +23,8 @@
 #define BTN_H 28
 #define BTN_X ((MENU_GAME_W-BTN_W)/2)
 #define BTN_Y 170
+/* With a Continue point, Continue and Play sit side by side, 8 px apart. */
+#define BTN_PAIR_X ((MENU_GAME_W-2*BTN_W-8)/2)
 /* Level list: START_MENU_LIST_ROWS rows of LIST_ROW_H pixels from LIST_Y. */
 #define LIST_X 20
 #define LIST_W 360
@@ -150,7 +152,28 @@ static void draw_level_list(StartMenu *menu)
     }
 }
 
-static void play(StartMenu *menu)
+int start_menu_can_continue(const StartMenu *menu)
+{
+    /* AppSession drops a Continue point whose level file has changed before
+     * it opens this menu, so a stored point for this path is usable. */
+    return menu && selected_entry(menu)->available &&
+           game_profile_resume(menu->profile, menu->selected_level_path) != NULL;
+}
+
+/* Play is centred alone, or on the right of Continue when there is one. */
+static IntRect play_button(const StartMenu *menu)
+{
+    if (start_menu_can_continue(menu)) return (IntRect){BTN_PAIR_X + BTN_W + 8, BTN_Y, BTN_W, BTN_H};
+    return (IntRect){BTN_X, BTN_Y, BTN_W, BTN_H};
+}
+
+static IntRect continue_button(void)
+{
+    return (IntRect){BTN_PAIR_X, BTN_Y, BTN_W, BTN_H};
+}
+
+/* route is MENU_ROUTE_PLAY (from the start) or MENU_ROUTE_CONTINUE. */
+static void start_level(StartMenu *menu, MenuRoute route)
 {
     /* A confirm carried from a prior screen must be released before this
      * menu can act on another press. Sound playback accepts a missing slot.
@@ -158,10 +181,24 @@ static void play(StartMenu *menu)
      * but it cannot start; the menu already shows why. */
     if (menu->route != MENU_ROUTE_NONE) return;
     if (!selected_entry(menu)->available) return;
+    if (route == MENU_ROUTE_CONTINUE && !start_menu_can_continue(menu)) return;
     if (menu->confirm_release_required && confirm_held(menu)) return;
     menu->confirm_release_required = 0;
     sound_play(menu->snd_confirm, 128);
-    menu->route = MENU_ROUTE_PLAY;
+    menu->route = route;
+}
+
+static void draw_button(StartMenu *menu, IntRect r, const char *label, int enabled)
+{
+    Vector2 mouse = input_mouse();
+    int hovering = point_in_rect((int)mouse.x, (int)mouse.y, r.x, r.y, r.w, r.h);
+    /* A disabled button is darker and never highlights on hover. */
+    Color color = !enabled ? (Color){45,45,45,255} :
+                  hovering ? (Color){74,144,217,255} : (Color){77,77,77,255};
+    DrawRectangle(r.x, r.y, r.w, r.h, color);
+    DrawRectangleLines(r.x, r.y, r.w, r.h, (Color){224, 224, 224, 255});
+    font_draw_centered(menu->font, label, r.x + r.w/2, r.y + (r.h-TEXT_FONT_SIZE)/2,
+                       enabled ? WHITE : (Color){110,110,110,255});
 }
 
 int start_menu_init(StartMenu *menu)
@@ -221,10 +258,14 @@ int start_menu_frame(StartMenu *menu)
         if (settings_menu_event(menu->settings_menu, menu->profile, &event, PAD_Y)) continue;
         if (event.type == INPUT_MOUSE_DOWN && event.button == MOUSE_BUTTON_LEFT) {
             int list_h = START_MENU_LIST_ROWS * LIST_ROW_H;
+            IntRect play = play_button(menu), resume = continue_button();
             if (menu->settings_menu && point_in_rect(event.x,event.y,125,270,150,24))
                 settings_menu_open(menu->settings_menu);
-            else if (point_in_rect(event.x, event.y, BTN_X, BTN_Y, BTN_W, BTN_H))
-                play(menu);
+            else if (point_in_rect(event.x, event.y, play.x, play.y, play.w, play.h))
+                start_level(menu, MENU_ROUTE_PLAY);
+            else if (start_menu_can_continue(menu) &&
+                     point_in_rect(event.x, event.y, resume.x, resume.y, resume.w, resume.h))
+                start_level(menu, MENU_ROUTE_CONTINUE);
             else if (point_in_rect(event.x, event.y, LIST_X, LIST_Y, LIST_W, list_h)) {
                 /* A click on a row selects that level; Play still starts it. */
                 size_t row = list_first_row(menu) + (size_t)((event.y - LIST_Y) / LIST_ROW_H);
@@ -238,8 +279,10 @@ int start_menu_frame(StartMenu *menu)
                 select_level(menu, menu->selected_level-1);
             else if (key == KEY_RIGHT || key == KEY_D || key == KEY_DOWN || button == PAD_RIGHT || button == PAD_DOWN)
                 select_level(menu, menu->selected_level+1);
+            else if (key == KEY_C || button == PAD_X)
+                start_level(menu, MENU_ROUTE_CONTINUE);
             else if (game_input_event_confirms(&event))
-                play(menu);
+                start_level(menu, MENU_ROUTE_PLAY);
         }
     }
     if (menu->route != MENU_ROUTE_NONE && !menu->route_waiting_render) return 0;
@@ -252,17 +295,11 @@ int start_menu_frame(StartMenu *menu)
     IntRect logo = {(MENU_GAME_W - LOGO_DISPLAY_W) / 2, LOGO_Y, LOGO_DISPLAY_W, LOGO_DISPLAY_H};
     sprite_draw(menu->logo_tex, NULL, &logo, 0, SPRITE_NORMAL, WHITE);
     draw_level_list(menu);
-    Vector2 mouse = input_mouse();
     const CampaignLevel *entry = selected_entry(menu);
-    int hovering = point_in_rect((int)mouse.x,(int)mouse.y,BTN_X,BTN_Y,BTN_W,BTN_H);
-    /* A disabled Play button is darker and never highlights on hover. */
-    Color color = !entry->available ? (Color){45,45,45,255} :
-                  hovering ? (Color){74,144,217,255} : (Color){77,77,77,255};
+    int can_continue = start_menu_can_continue(menu);
     Color red = {220,120,120,255};
-    DrawRectangle(BTN_X, BTN_Y, BTN_W, BTN_H, color);
-    DrawRectangleLines(BTN_X, BTN_Y, BTN_W, BTN_H, (Color){224, 224, 224, 255});
-    font_draw_centered(menu->font, "Play", BTN_X + BTN_W/2, BTN_Y + (BTN_H-TEXT_FONT_SIZE)/2,
-                       entry->available ? WHITE : (Color){110,110,110,255});
+    if (can_continue) draw_button(menu, continue_button(), "Continue", 1);
+    draw_button(menu, play_button(menu), "Play", entry->available);
     char text[160];
     Color grey = {120,120,120,255};
     /* Under the Play button: the selected level's full result, or why it
@@ -278,8 +315,18 @@ int start_menu_frame(StartMenu *menu)
     else if (!entry->available) {
         snprintf(text, sizeof(text), "Unavailable: %s", entry->problem);
         font_draw_centered(menu->font, text, MENU_GAME_W/2, 232, red);
+    } else if (can_continue) {
+        /* Say where Continue picks up, so it is not a surprise. */
+        const GameResume *resume = game_profile_resume(menu->profile, menu->selected_level_path);
+        char at[24];
+        if (resume->checkpoint >= 0) snprintf(at, sizeof(at), "checkpoint %d", resume->checkpoint + 1);
+        else snprintf(at, sizeof(at), "%s", resume->legacy_screen > 0 ? "last screen reached" : "the start");
+        snprintf(text, sizeof(text), "Continue from %s: %d pts, %d lives", at, resume->score, resume->lives);
+        font_draw_centered(menu->font, text, MENU_GAME_W/2, 232, (Color){150,200,150,255});
     }
-    font_draw_centered(menu->font,"Arrows/D-pad: level  Enter/A: play  Esc: exit",MENU_GAME_W/2,250,grey);
+    font_draw_centered(menu->font, can_continue ? "Arrows: level  Enter/A: play  C/X: continue  Esc: exit"
+                                                : "Arrows/D-pad: level  Enter/A: play  Esc: exit",
+                       MENU_GAME_W/2, 250, grey);
     if (menu->settings_menu) {
         DrawRectangle(125,270,150,24,(Color){50,65,85,255});
         font_draw_centered(menu->font,"Settings (F1 / Y)",MENU_GAME_W/2,270+(24-TEXT_FONT_SIZE)/2,WHITE);

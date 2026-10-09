@@ -21,6 +21,7 @@ code-scanning alert (#308, #309). Goal was to resolve both codebase audit rounds
 | Docs checks | Shipped | Always-on `Docs drift` job in `build.yml` runs `make docs-drift`; `docs.yml` lints, audits, builds and site-checks the website on pull requests that touch it, weekly and on demand |
 | Pages publishing | Shipped | `pages-build` → `pages-deploy` in `build.yml` |
 | Browser touch controls | Shipped | `web/touch-controls.js`; `tests/touch_controls_test.cjs` |
+| Mid-level Continue | Shipped | `[resume]` Continue point in the profile; menu **Continue** / `--continue`; `continue_round_trip` and `continue_point_must_fit_the_level` tests |
 | Web build | Shipped target | `make web` |
 
 ## Near-Term Work Groups

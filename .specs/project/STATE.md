@@ -13,6 +13,7 @@
 | Level validation | Shipped | `tools/validate_levels.py`, `make validate-levels` (CI on Linux, macOS and Windows), and C validation tests. |
 | CI gates | Shipped | `-Werror` on every native leg and the Web leg, sanitizers with fuzz-seed replay, scripted replay smoke, Windows-only real-backend desktop job (Mesa llvmpipe, `RAYLIB_AUDIO=null`), Windows Clang job, WebAssembly artifact checks, always-on docs drift job plus docs lint/build, CodeQL (C/C++ SARIF filtered for third-party code-quality noise; Actions, Python, JS/TS), release `SHA256SUMS` and build provenance attestations. |
 | Pages publishing | Shipped | `pages-build` → `pages-deploy` jobs at the end of `build.yml` use the same run's WASM artifact; only the deploy job holds Pages/OIDC permissions. |
+| Mid-level Continue | Shipped | The profile (format_version 2) keeps one `[resume]` Continue point: respawn point, score, lives, collected coins and timer, bound to the level's content hash. Recorded on a new respawn point, a pause or leaving part-way; cleared on finishing or losing the level; offered by the menu's **Continue** and `--continue` (`src/core/game_resume.c`). |
 
 ## Current Repository Reality
 
