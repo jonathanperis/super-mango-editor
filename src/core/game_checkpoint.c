@@ -3,7 +3,6 @@
  */
 
 #include "game_checkpoint.h"
-#include "../shared/platform.h"  /* clock_millis */
 
 #include "../levels/level.h"
 #include "../hazards/spike.h"          /* SpikeRow, SPIKE_TILE_W */
@@ -25,6 +24,24 @@ void game_checkpoint_feedback_clear_expired(GameState *gs, uint32_t now)
     if ((int32_t)(now - gs->checkpoint_feedback_until) >= 0) {
         game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_NONE, now, 0);
     }
+}
+
+uint32_t game_checkpoint_clock_ms(const GameState *gs)
+{
+    /*
+     * Convert through uint64_t: converting a double larger than UINT32_MAX
+     * straight to uint32_t is undefined in C, while the 64-bit value can be
+     * cut to 32 bits safely. The result wraps after ~49 days of play, and the
+     * deadline checks compare with signed differences so they survive that.
+     */
+    return (uint32_t)(uint64_t)(gs->sim_time * 1000.0);
+}
+
+void game_checkpoint_feedback_tick(GameState *gs, float dt)
+{
+    if (!gs) return;
+    gs->sim_time += dt;
+    game_checkpoint_feedback_clear_expired(gs, game_checkpoint_clock_ms(gs));
 }
 
 void game_checkpoint_update_authored(GameState *gs)
@@ -70,7 +87,7 @@ void game_checkpoint_update_authored(GameState *gs)
             gs->respawn_x = def->checkpoints[best_index].x;
             gs->respawn_y = def->checkpoints[best_index].y;
             game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_SAVED,
-                                          (uint32_t)clock_millis(), 1200);
+                                          game_checkpoint_clock_ms(gs), 1200);
             if (gs->debug_mode) {
                 debug_log(&gs->debug, "CHECKPOINT saved at x=%.0f y=%.0f",
                           gs->respawn_x, gs->respawn_y);
@@ -181,7 +198,7 @@ void game_checkpoint_update(GameState *gs)
             if (new_checkpoint < 0.0f) return;
             gs->respawn_x = new_checkpoint;
             game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_SAVED,
-                                          (uint32_t)clock_millis(), 1200);
+                                          game_checkpoint_clock_ms(gs), 1200);
             if (gs->debug_mode) {
                 debug_log(&gs->debug, "CHECKPOINT saved at x=%.0f", gs->respawn_x);
             }
