@@ -135,7 +135,7 @@ static void fill_rich_roundtrip_fixture(LevelDef *def)
     def->spiders[0].frame_index = 2;
     def->jumping_spider_count = 1;
     def->jumping_spiders[0].x = 300.0f;
-    def->jumping_spiders[0].vx = 32.0f;
+    def->jumping_spiders[0].vx = 52.0f;  /* fast enough to jump the gap at 320 */
     def->jumping_spiders[0].patrol_x0 = 280.0f;
     def->jumping_spiders[0].patrol_x1 = 360.0f;
     def->bird_count = 1;

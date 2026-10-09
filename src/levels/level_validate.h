@@ -28,6 +28,15 @@ int level_path_has_parent_segment(const char *value);
 int level_path_has_control_char(const char *value);
 
 /*
+ * level_jumping_spider_min_gap_speed — The slowest |vx| (px/s) at which a
+ * jumping spider clears a FLOOR_GAP_W floor gap, derived from its jump
+ * constants and the fixed step (about 49.24 with the shipped ones). A
+ * slower spider whose patrol reaches a gap lands back over it and hops in
+ * place forever, so the validator refuses that.
+ */
+float level_jumping_spider_min_gap_speed(void);
+
+/*
  * LevelIssueLocation — where in a level a validation error is, in TOML
  * terms, so a tool can take the designer to it.  It knows nothing about
  * the editor; the editor maps TOML names to its own entity types.
