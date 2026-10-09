@@ -138,6 +138,7 @@ static void clear_active_edit(UIState *ui)
     ui->edit_buf[0] = '\0';
     ui->pending_text_length = 0;
     ui->pending_text_input[0] = '\0';
+    ui->tab_request = 0;
 }
 
 static void apply_pending_text_input(UIState *ui)
@@ -175,15 +176,138 @@ static void apply_pending_text_input(UIState *ui)
         } else if (ui->edit_type == UI_EDIT_FLOAT) {
             accepted = (ch >= '0' && ch <= '9') || ch == '.' || ch == '-';
         }
-        if (accepted && bytes <= (size_t)(max_len - ui->edit_cursor)) {
+        /* Insert at the caret: the text after it moves right to make room.
+         * The whole field, not just the part before the caret, must still
+         * fit the target buffer. */
+        size_t length = strlen(ui->edit_buf);
+        if (accepted && length + bytes <= (size_t)max_len) {
+            memmove(ui->edit_buf + ui->edit_cursor + bytes,
+                    ui->edit_buf + ui->edit_cursor,
+                    length - (size_t)ui->edit_cursor + 1);   /* + 1: the NUL */
             memcpy(ui->edit_buf + ui->edit_cursor, ui->pending_text_input + i, bytes);
             ui->edit_cursor += (int)bytes;
-            ui->edit_buf[ui->edit_cursor] = '\0';
         }
         i += bytes;
     }
     ui->pending_text_length = 0;
     ui->pending_text_input[0] = '\0';
+}
+
+/* ------------------------------------------------------------------ */
+/* Caret movement                                                      */
+/* ------------------------------------------------------------------ */
+
+/* UTF-8 continuation bytes look like 10xxxxxx; a character starts anywhere
+ * else.  Stepping over them moves by whole characters. */
+static int is_continuation_byte(char c)
+{
+    return ((unsigned char)c & 0xC0) == 0x80;
+}
+
+/* Byte offset of the character before / after offset `at` in text. */
+static int previous_char_start(const char *text, int at)
+{
+    if (at <= 0) return 0;
+    at--;
+    while (at > 0 && is_continuation_byte(text[at])) at--;
+    return at;
+}
+
+static int next_char_start(const char *text, int at)
+{
+    int length = (int)strlen(text);
+    if (at >= length) return length;
+    at++;
+    while (at < length && is_continuation_byte(text[at])) at++;
+    return at;
+}
+
+/* Remove the bytes [from, to) of the edit buffer and put the caret at from. */
+static void erase_edit_range(UIState *ui, int from, int to)
+{
+    size_t length = strlen(ui->edit_buf);
+    if (from < 0 || to <= from || (size_t)to > length) return;
+    memmove(ui->edit_buf + from, ui->edit_buf + to, length - (size_t)to + 1);
+    ui->edit_cursor = from;
+}
+
+void ui_edit_key(UIState *ui, UIEditKey key)
+{
+    int length;
+
+    if (!ui || ui->active_id == 0) return;
+    /* Text typed before this key belongs in front of the caret's move. */
+    apply_pending_text_input(ui);
+    length = (int)strlen(ui->edit_buf);
+    if (ui->edit_cursor > length) ui->edit_cursor = length;
+    switch (key) {
+    case UI_KEY_LEFT:
+        ui->edit_cursor = previous_char_start(ui->edit_buf, ui->edit_cursor);
+        break;
+    case UI_KEY_RIGHT:
+        ui->edit_cursor = next_char_start(ui->edit_buf, ui->edit_cursor);
+        break;
+    case UI_KEY_HOME:
+        ui->edit_cursor = 0;
+        break;
+    case UI_KEY_END:
+        ui->edit_cursor = length;
+        break;
+    case UI_KEY_BACKSPACE:
+        erase_edit_range(ui, previous_char_start(ui->edit_buf, ui->edit_cursor),
+                         ui->edit_cursor);
+        break;
+    case UI_KEY_DELETE:
+        erase_edit_range(ui, ui->edit_cursor,
+                         next_char_start(ui->edit_buf, ui->edit_cursor));
+        break;
+    }
+}
+
+void ui_focus_next(UIState *ui, int direction)
+{
+    if (!ui || ui->active_id == 0 || direction == 0) return;
+    ui->tab_request = direction > 0 ? 1 : -1;
+}
+
+/*
+ * field_drawn — Bookkeeping every editable field does when it is drawn:
+ * note its place in the on-screen order, and say whether a Tab asked this
+ * field to become active.
+ */
+static int field_drawn(UIState *ui, int id)
+{
+    if (ui->field_order_count < UI_MAX_FIELDS)
+        ui->field_order[ui->field_order_count++] = id;
+    if (ui->focus_request_id == id && ui->active_id == 0) {
+        ui->focus_request_id = 0;
+        return 1;
+    }
+    return 0;
+}
+
+/*
+ * handle_tab — The active field `id` saw a Tab: commit it like Return, then
+ * ask its neighbour in last frame's on-screen order to take the focus
+ * (wrapping around at either end).  Returns ui_apply_active_edit's result:
+ * 0 (invalid value: the field stays active and nothing moves), 1 or 2.
+ */
+static int handle_tab(UIState *ui, int id)
+{
+    int direction = ui->tab_request;
+    int count = ui->prev_field_order_count;
+    int result;
+
+    ui->tab_request = 0;
+    result = ui_apply_active_edit(ui);
+    if (result == 0) return 0;
+    for (int i = 0; i < count; i++) {
+        if (ui->prev_field_order[i] != id) continue;
+        ui->focus_request_id = ui->prev_field_order[(i + direction + count) % count];
+        ui->focus_request_frames = 0;
+        break;
+    }
+    return result;
 }
 
 static int command_allows_activation(UIState *ui, int id)
@@ -306,49 +430,80 @@ static void draw_text(UIState *ui, int x, int y,
 }
 
 /*
+ * text_width_of — Width in pixels of the bytes [from, to) of text.
+ */
+static int text_width_of(UIState *ui, const char *text, size_t from, size_t to)
+{
+    char part[UI_EDIT_BUFFER_SIZE];
+    size_t length = to > from ? to - from : 0;
+
+    if (length >= sizeof(part)) length = sizeof(part) - 1;
+    memcpy(part, text + from, length);
+    part[length] = '\0';
+    return ui_text_width(ui, part);
+}
+
+/*
  * draw_active_edit — Draw the edit buffer of the active field with a
- * blinking cursor, scrolled so the end (where typing happens) stays visible.
+ * blinking caret, scrolled so the caret stays visible.
  *
  * The edit buffer can hold a 4 KiB description, but a field is only a few
- * hundred pixels wide. Drawing from the first byte would hide the cursor
- * once the text is longer than the field, so we draw the longest tail that
- * fits instead.
+ * hundred pixels wide, so only a window of the text is drawn: it starts at
+ * the first character that still lets the text up to the caret fit, and
+ * ends where the field runs out of room.  Text width only grows as a piece
+ * of text gets longer, so a binary search finds each end of the window with
+ * about 12 measurements instead of one per character.
  *
- * Text width only grows as the tail gets longer, so a binary search over the
- * starting byte finds that tail with about 12 measurements instead of one
- * measurement per character.
+ * The caret is a 1-pixel line drawn between two characters, so blinking
+ * never shifts the text around it.
  */
 static void draw_active_edit(UIState *ui, int x, int y, int w)
 {
-    char display[UI_EDIT_BUFFER_SIZE + 2];   /* edit text + "|" + NUL */
-    const size_t length = strlen(ui->edit_buf);
+    char display[UI_EDIT_BUFFER_SIZE];
+    const char *text = ui->edit_buf;
+    const size_t length = strlen(text);
     const int max_width = w - 8;             /* 4 px padding on each side */
-    size_t low = 0, high = length;           /* answer lies in [low, high] */
+    size_t cursor = (size_t)ui->edit_cursor;
+    size_t low, high;
+    size_t start, end;
 
-    /* Measure the tail together with the cursor so it never overflows. */
+    if (cursor > length) cursor = length;
+
+    /* start: the smallest offset whose text up to the caret still fits. */
+    low = 0;
+    high = cursor;
     while (low < high) {
         size_t mid = low + (high - low) / 2;
-        size_t tail = length - mid;
-        memcpy(display, ui->edit_buf + mid, tail);
-        display[tail] = '|';
-        display[tail + 1] = '\0';
-        if (ui_text_width(ui, display) <= max_width) high = mid;
+        if (text_width_of(ui, text, mid, cursor) <= max_width) high = mid;
         else low = mid + 1;
     }
+    start = low;
     /* Never start drawing in the middle of a multi-byte UTF-8 character. */
-    while (low < length && ((unsigned char)ui->edit_buf[low] & 0xc0) == 0x80) low++;
+    while (start < cursor && is_continuation_byte(text[start])) start++;
 
-    size_t tail = length - low;
-    memcpy(display, ui->edit_buf + low, tail);
+    /* end: the largest offset whose text from start still fits. */
+    low = cursor;
+    high = length;
+    while (low < high) {
+        size_t mid = low + (high - low + 1) / 2;
+        if (text_width_of(ui, text, start, mid) <= max_width) low = mid;
+        else high = mid - 1;
+    }
+    end = low;
+    while (end > cursor && end < length && is_continuation_byte(text[end])) end--;
+
+    memcpy(display, text + start, end - start);
+    display[end - start] = '\0';
+    draw_text(ui, x + 4, y + 3, display, UI_TEXT);
+
     /*
      * The monotonic clock returns milliseconds. Dividing by 500 and checking
-     * odd/even gives a half-second blink. The cursor is a "|" appended to
-     * the visible text; on "off" phases we end the string before it instead.
+     * odd/even gives a half-second blink.
      */
-    int blink = (int)((clock_millis() / 500) % 2);
-    display[tail] = blink ? '|' : '\0';
-    display[tail + 1] = '\0';
-    draw_text(ui, x + 4, y + 3, display, UI_TEXT);
+    if ((clock_millis() / 500) % 2) {
+        int caret_x = x + 4 + text_width_of(ui, text, start, cursor);
+        draw_rect(caret_x, y + 3, 1, 14, UI_TEXT);
+    }
 }
 
 static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
@@ -413,6 +568,15 @@ void ui_begin_frame(UIState *ui)
     memset(ui->text_input, 0, sizeof(ui->text_input));
     ui->pending_text_length = 0;
     memset(ui->pending_text_input, 0, sizeof(ui->pending_text_input));
+    /* The last frame's fields, in the order they were drawn, are the order
+     * Tab walks through.  A focus request that no field took within a
+     * frame (its panel closed, say) is dropped. */
+    memcpy(ui->prev_field_order, ui->field_order,
+           (size_t)ui->field_order_count * sizeof(ui->field_order[0]));
+    ui->prev_field_order_count = ui->field_order_count;
+    ui->field_order_count = 0;
+    if (ui->focus_request_id && ++ui->focus_request_frames > 2)
+        ui->focus_request_id = 0;
 }
 
 int ui_press(UIState *ui)
@@ -577,10 +741,11 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
     Color border = is_active ? UI_ACCENT : UI_TEXT_DIM;
     if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
 
-    /* --- Activation on click --- */
-    if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
-                                           x, y, w, h) &&
-        command_allows_activation(ui, id)) {
+    /* --- Activation on click, or by Tab from the previous field --- */
+    if (field_drawn(ui, id) ||
+        (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
+                                            x, y, w, h) &&
+         command_allows_activation(ui, id))) {
         /*
          * Start editing: copy the current value into edit_buf so the user
          * sees the existing number and can modify it.  snprintf converts
@@ -613,11 +778,8 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
          */
         apply_pending_text_input(ui);
 
-        /* Backspace — delete the character before the cursor. */
-        if (ui->key_backspace && ui->edit_cursor > 0) {
-            ui->edit_cursor--;
-            ui->edit_buf[ui->edit_cursor] = '\0';
-        }
+        /* Backspace — delete the character before the caret. */
+        if (ui->key_backspace) ui_edit_key(ui, UI_KEY_BACKSPACE);
 
         /*
          * Return — confirm only a complete, in-range integer.  Invalid input
@@ -625,6 +787,13 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
          */
         if (ui->key_return) {
             int result = ui_apply_active_edit(ui);
+            if (result != 0) {
+                changed = result == 2;
+                is_active = 0;
+            }
+        } else if (ui->tab_request) {
+            /* Tab commits like Return, then focuses the neighbour. */
+            int result = handle_tab(ui, id);
             if (result != 0) {
                 changed = result == 2;
                 is_active = 0;
@@ -680,10 +849,11 @@ int ui_float_field_limited(UIState *ui, int id, int x, int y, int w,
     Color border = is_active ? UI_ACCENT : UI_TEXT_DIM;
     if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
 
-    /* --- Activation on click --- */
-    if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
-                                           x, y, w, h) &&
-        command_allows_activation(ui, id)) {
+    /* --- Activation on click, or by Tab from the previous field --- */
+    if (field_drawn(ui, id) ||
+        (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
+                                            x, y, w, h) &&
+         command_allows_activation(ui, id))) {
         ui->active_id = id;
         ui->edit_type = UI_EDIT_FLOAT;
         ui->edit_target = value;
@@ -704,10 +874,7 @@ int ui_float_field_limited(UIState *ui, int id, int x, int y, int w,
     if (is_active) {
         apply_pending_text_input(ui);
 
-        if (ui->key_backspace && ui->edit_cursor > 0) {
-            ui->edit_cursor--;
-            ui->edit_buf[ui->edit_cursor] = '\0';
-        }
+        if (ui->key_backspace) ui_edit_key(ui, UI_KEY_BACKSPACE);
 
         /*
          * Return — parse only a complete, finite float.  Invalid input leaves
@@ -715,6 +882,13 @@ int ui_float_field_limited(UIState *ui, int id, int x, int y, int w,
          */
         if (ui->key_return) {
             int result = ui_apply_active_edit(ui);
+            if (result != 0) {
+                changed = result == 2;
+                is_active = 0;
+            }
+        } else if (ui->tab_request) {
+            /* Tab commits like Return, then focuses the neighbour. */
+            int result = handle_tab(ui, id);
             if (result != 0) {
                 changed = result == 2;
                 is_active = 0;
@@ -764,10 +938,11 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
     Color border = is_active ? UI_ACCENT : UI_TEXT_DIM;
     if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
 
-    /* --- Activation on click --- */
-    if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
-                                           x, y, w, h) &&
-        command_allows_activation(ui, id)) {
+    /* --- Activation on click, or by Tab from the previous field --- */
+    if (field_drawn(ui, id) ||
+        (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
+                                            x, y, w, h) &&
+         command_allows_activation(ui, id))) {
         ui->active_id = id;
         ui->edit_type = UI_EDIT_TEXT;
         ui->edit_target = buf;
@@ -800,12 +975,8 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
          */
         apply_pending_text_input(ui);
 
-        if (ui->key_backspace && ui->edit_cursor > 0) {
-            ui->edit_cursor--;
-            while (ui->edit_cursor > 0 &&
-                   ((unsigned char)ui->edit_buf[ui->edit_cursor] & 0xc0) == 0x80) ui->edit_cursor--;
-            ui->edit_buf[ui->edit_cursor] = '\0';
-        }
+        /* Backspace removes the whole UTF-8 character before the caret. */
+        if (ui->key_backspace) ui_edit_key(ui, UI_KEY_BACKSPACE);
 
         /*
          * Return — confirm the edit.  Copy edit_buf back into the caller's
@@ -813,6 +984,13 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
          */
         if (ui->key_return) {
             int result = ui_apply_active_edit(ui);
+            if (result != 0) {
+                changed = result == 2;
+                is_active = 0;
+            }
+        } else if (ui->tab_request) {
+            /* Tab commits like Return, then focuses the neighbour. */
+            int result = handle_tab(ui, id);
             if (result != 0) {
                 changed = result == 2;
                 is_active = 0;

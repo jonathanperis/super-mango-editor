@@ -45,8 +45,19 @@ static void editor_key(EditorState *es, const InputEvent *event)
     /* An active text field owns ordinary typing. The digit '2' in a field
      * must not also select the Place tool. Modifiers come from this event. */
     if (es->ui.active_id && !ctrl && key != KEY_ESCAPE && key != KEY_F5) {
-        if (key == KEY_BACKSPACE) es->ui.key_backspace = 1;
-        if (key == KEY_ENTER || key == KEY_KP_ENTER) es->ui.key_return = 1;
+        /* Caret keys act at once, in the order they were pressed, so
+         * "type, Left, type" in one frame lands where it should. */
+        switch (key) {
+        case KEY_BACKSPACE: ui_edit_key(&es->ui, UI_KEY_BACKSPACE); break;
+        case KEY_DELETE:    ui_edit_key(&es->ui, UI_KEY_DELETE);    break;
+        case KEY_LEFT:      ui_edit_key(&es->ui, UI_KEY_LEFT);      break;
+        case KEY_RIGHT:     ui_edit_key(&es->ui, UI_KEY_RIGHT);     break;
+        case KEY_HOME:      ui_edit_key(&es->ui, UI_KEY_HOME);      break;
+        case KEY_END:       ui_edit_key(&es->ui, UI_KEY_END);       break;
+        case KEY_TAB:       ui_focus_next(&es->ui, shift ? -1 : 1); break;
+        case KEY_ENTER: case KEY_KP_ENTER: es->ui.key_return = 1;  break;
+        default: break;
+        }
         return;
     }
     if (es->ui.active_id && ctrl && (key == KEY_C || key == KEY_V)) {

@@ -20,11 +20,18 @@
 typedef void (*UIBeforeChangeFn)(void *context, int widget_id);
 typedef int (*UIBeforeCommandFn)(void *context);
 typedef enum { UI_EDIT_NONE = 0, UI_EDIT_INT, UI_EDIT_FLOAT, UI_EDIT_TEXT } UIEditType;
+/* Caret keys an active field understands (see ui_edit_key). */
+typedef enum {
+    UI_KEY_LEFT, UI_KEY_RIGHT, UI_KEY_HOME, UI_KEY_END,
+    UI_KEY_BACKSPACE, UI_KEY_DELETE
+} UIEditKey;
 
 #define UI_EDIT_BUFFER_SIZE LEVEL_DESCRIPTION_CAPACITY
 #define UI_PENDING_TEXT_SIZE 4096
 #define UI_TEXT_CACHE_COUNT 64
 #define UI_TEXT_CACHE_BYTES 128
+/* Most editable fields one frame can draw; Tab moves through them in order. */
+#define UI_MAX_FIELDS 128
 
 #define UI_BG         (Color){0x2D,0x2D,0x2D,0xFF}
 #define UI_TITLE_BG   (Color){0x3D,0x3D,0x3D,0xFF}
@@ -64,7 +71,10 @@ typedef struct {
     /* ---- Retained edit state; zero active_id means no active field ---- */
     int active_id;
     char edit_buf[UI_EDIT_BUFFER_SIZE];
-    int edit_cursor;           /* byte offset; UTF-8 deletion respects codepoints */
+    /* The caret, as a byte offset into edit_buf.  It always sits on a
+     * character boundary: moving and deleting step over whole UTF-8
+     * characters, and typing inserts at the caret. */
+    int edit_cursor;
     UIEditType edit_type;
     void *edit_target;          /* borrowed destination, interpreted by edit_type */
     int edit_target_size;
@@ -81,6 +91,18 @@ typedef struct {
      * paint over it. Options are borrowed from the caller's static array. */
     const char **dropdown_options;
     int dropdown_count, dropdown_x, dropdown_y, dropdown_w, dropdown_selected;
+    /*
+     * Tab / Shift+Tab focus.  Every field records its id in field_order as it
+     * is drawn, so the order is simply the order on screen; ui_begin_frame
+     * keeps the last complete frame's list in prev_field_order.  A Tab
+     * (tab_request = +1 or -1) commits the active field like Return and asks
+     * the neighbouring field, focus_request_id, to activate itself when it
+     * is next drawn.
+     */
+    int field_order[UI_MAX_FIELDS], field_order_count;
+    int prev_field_order[UI_MAX_FIELDS], prev_field_order_count;
+    int tab_request;
+    int focus_request_id, focus_request_frames;
     /* Capture undo before a change; finish/block a field edit before commands. */
     UIBeforeChangeFn before_change;
     void *before_change_context;
@@ -106,6 +128,14 @@ void ui_queue_text_input(UIState *ui, const char *text);
 int ui_apply_active_edit(UIState *ui);
 /* Discard the staging buffer; the uncommitted model value was never replaced. */
 void ui_cancel_active_edit(UIState *ui);
+/* Move the caret or delete a character in the active field, right away.
+ * Typing queued earlier is inserted first, so keys and text keep the order
+ * they were pressed in.  Does nothing when no field is active. */
+void ui_edit_key(UIState *ui, UIEditKey key);
+/* Tab (+1) / Shift+Tab (-1): when the active field is next drawn it commits
+ * like Return and the next / previous field on screen becomes active.  An
+ * invalid value keeps the focus where it is. */
+void ui_focus_next(UIState *ui, int direction);
 
 /* Draw a button and return 1 on its click frame, not every held-mouse frame.
  * An active edit must finish before the caller executes the button command. */
