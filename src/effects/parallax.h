@@ -79,6 +79,16 @@ void parallax_init_from_def(ParallaxSystem *ps,
                             const char (*paths)[64], const float *speeds, int count);
 
 /*
+ * parallax_layer_offset — How far a layer's tiles are shifted left.
+ *
+ * Returns (int)(cam_x × speed) wrapped into [0, tex_w): the first tile is
+ * drawn at x = -offset and the rest follow every tex_w pixels. A layer that
+ * failed to load (tex_w <= 0) returns 0. Pure arithmetic, so tests can
+ * check the scroll factors and wrapping without drawing anything.
+ */
+int parallax_layer_offset(const ParallaxLayer *layer, int cam_x);
+
+/*
  * parallax_render — Draw all layers back-to-front with horizontal tiling.
  *
  * cam_x is the integer camera offset for this frame (from game_frame).

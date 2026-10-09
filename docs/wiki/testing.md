@@ -73,7 +73,10 @@ and damage; axe swings; spike-block rails (loop, detach, end cap); knockback
 throwing a climber off; jumping spiders, a spider keeping its authored speed
 through every turn, fish and faster-fish leaps, bird patrols, bridge crumbling
 (and not crumbling under a player on another surface) and the camera jumping
-to the respawn point. It also replays
+to the respawn point. It checks parallax scroll factors and wrapping
+(`parallax_layer_offset`) and renders one frame in every overlay state (play,
+pause, game over, completion with and without a next level, a failed next
+level, settings open). It also replays
 `--replay-script` scripts (from a `--replay-dir` under the test output) and
 rejects malformed ones. `editor-ui-test` drives the editor with input events
 (palette picks, place, select, drag, delete, undo, wheel zoom/pan, property

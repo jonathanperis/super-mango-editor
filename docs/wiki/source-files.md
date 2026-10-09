@@ -518,7 +518,7 @@ Atmospheric fog overlay. Semi-transparent foreground layers slide across the scr
 
 ### `effects/parallax.h` / `effects/parallax.c`
 
-Multi-layer scrolling background configured per TOML level. Current assets include blue-sky/cloud/glacial layers plus volcanic sky, mountains, and smoke layers under `assets/sprites/backgrounds/`.
+Multi-layer scrolling background configured per TOML level. Current assets include blue-sky/cloud/glacial layers plus volcanic sky, mountains, and smoke layers under `assets/sprites/backgrounds/`. `parallax_layer_offset` is the scroll arithmetic on its own: `cam_x × speed`, wrapped into `[0, tex_w)` (never negative), so `parallax_render` only tiles from `-offset`.
 
 ---
 
