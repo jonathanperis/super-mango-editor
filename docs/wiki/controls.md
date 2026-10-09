@@ -38,7 +38,9 @@ Without `--level`, the native executable loads `levels/campaigns/main.toml`: Cre
 | Play selected level | Enter, keypad Enter or Space | A / Cross or Start |
 | Exit menu | Esc | B / Circle or Back |
 
-The mouse can also click **Play** and the **Settings (F1 / Y)** button. The selected level wraps at either end of the manifest-defined catalog. A held confirm carried from a prior screen must be released before it can start the selected level. A missing or malformed manifest, or one with no playable level, prevents the native menu from opening. A single listed level that fails to load stays in the selector, greyed out with an "Unavailable" reason, and cannot be started; the rest remain playable (see [Campaign Manifest](../level-design/#campaign-manifest-v1)).
+The selector lists every campaign level (up to five rows at a time, scrolling with the selection). Each row shows a gold `*` when the profile records a finished run of that level (`-` otherwise), the level name, the best time as `m:ss.cc` and the best coins out of the level's total, such as `3/12`; an uncleared level shows `--`. The line under **Play** repeats the selected level's best time, coins and score, or says it is not cleared yet.
+
+The mouse can also click a list row to select that level, **Play** and the **Settings (F1 / Y)** button. The selected level wraps at either end of the manifest-defined catalog. A held confirm carried from a prior screen must be released before it can start the selected level. A missing or malformed manifest, or one with no playable level, prevents the native menu from opening. A single listed level that fails to load stays in the selector, greyed out with an "Unavailable" reason, and cannot be started; the rest remain playable (see [Campaign Manifest](../level-design/#campaign-manifest-v1)).
 
 ## Pause and Terminal Overlays
 
