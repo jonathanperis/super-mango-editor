@@ -99,9 +99,10 @@ def main() -> None:
     include = output / "raylib/include/GLFW"
     include.mkdir(exist_ok=True)
     shutil.copy2(source / "src/external/glfw/include/GLFW/glfw3.h", include / "glfw3.h")
-    # CMake can correctly reuse unchanged objects after the application Makefile
-    # changes. Mark the successfully revalidated dependency recipe up to date.
-    (output / "raylib/libraylib.a").touch()
+    # libraylib.a is deliberately not touched here. When CMake found nothing
+    # to rebuild, the library keeps its old timestamp, so the game objects that
+    # depend on it are not recompiled. The Makefile records a successful run in
+    # its own build-done.stamp file instead.
 
 
 if __name__ == "__main__":

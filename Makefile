@@ -70,6 +70,12 @@ else
 PLATFORM_LIBS = -lGL -lX11 -lpthread -ldl -lrt -lm
 endif
 OBJDIR  = $(OUTDIR)/obj
+# Flag stamps (see "Flag stamps" near the end): the settings each tree was
+# built with. Named here because rule prerequisites are expanded as soon as
+# Make reads them, so these names must exist before the first rule uses them.
+BUILD_FLAGS_STAMP    = $(OBJDIR)/build-flags.txt
+RAYLIB_OPTIONS_STAMP = $(RAYLIB_BUILD)/make-options.txt
+WEB_FLAGS_STAMP      = $(OBJDIR)/web-build-flags.txt
 ifeq ($(RAYLIB_PLATFORM),memory)
 ifeq ($(OS),Windows_NT)
 PLATFORM_LIBS = -lshell32 -lole32 -lpsapi -lwinmm -lbcrypt -lm
@@ -211,11 +217,41 @@ SANITIZE_ENV        = UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1$${UBSAN_
 
 all: $(OUTDIR) $(TARGET) ## Build: Compile the game into OUTDIR (default target)
 
-$(RAYLIB_LIB): vendor/raylib/manifest.json vendor/raylib/patches.json tools/build_raylib.py Makefile
-	python3 tools/build_raylib.py --build-dir "$(RAYLIB_BUILD)" --platform $(RAYLIB_PLATFORM) --cc "$(CC)" --mode $(BUILD_MODE) $(if $(findstring -fsanitize,$(CFLAGS)),--sanitize,) $(if $(filter null,$(RAYLIB_AUDIO)),--null-audio,) $(RAYLIB_ARCHIVE_ARG)
+# raylib is rebuilt only when something that shapes it changes: the pin, the
+# patches, the build script, or the options below (kept in a flags stamp; see
+# "Flag stamps" further down). build_raylib.py always re-runs CMake, and CMake
+# leaves libraylib.a untouched when nothing needed recompiling, so objects
+# that depend on the library rebuild only when the library really changed.
+# The rule therefore builds a separate "done" file, touched after every
+# successful run; a deleted library forces a run even when that file is fresh.
+RAYLIB_INPUTS = vendor/raylib/manifest.json vendor/raylib/patches.json tools/build_raylib.py
+RAYLIB_OPTIONS = --platform $(RAYLIB_PLATFORM) --cc "$(CC)" --mode $(BUILD_MODE) \
+                 $(if $(findstring -fsanitize,$(CFLAGS)),--sanitize,) $(if $(filter null,$(RAYLIB_AUDIO)),--null-audio,)
+RAYLIB_DONE = $(RAYLIB_BUILD)/build-done.stamp
+WEB_RAYLIB_DONE = $(WEB_RAYLIB_BUILD)/build-done.stamp
 
-$(WEB_RAYLIB_LIB): vendor/raylib/manifest.json vendor/raylib/patches.json tools/build_raylib.py Makefile
+# mark_raylib_done touches the "done" file, then, when the library ($(1)) is
+# newer than every input, gives the done file the library's own timestamp.
+# That keeps `make -n` honest: it only lists objects as stale when the library
+# really is older than the done file (CMake found nothing to rebuild).
+define mark_raylib_done
+@touch $@; for input in $(filter-out FORCE,$^); do \
+	[ "$(1)" -nt "$$input" ] || exit 0; done; touch -r "$(1)" $@
+endef
+
+$(RAYLIB_DONE): $(RAYLIB_INPUTS) $(RAYLIB_OPTIONS_STAMP) $(if $(wildcard $(RAYLIB_LIB)),,FORCE)
+	python3 tools/build_raylib.py --build-dir "$(RAYLIB_BUILD)" $(RAYLIB_OPTIONS) $(RAYLIB_ARCHIVE_ARG)
+	$(call mark_raylib_done,$(RAYLIB_LIB))
+
+$(WEB_RAYLIB_DONE): $(RAYLIB_INPUTS) $(WEB_FLAGS_STAMP) $(if $(wildcard $(WEB_RAYLIB_LIB)),,FORCE)
 	python3 tools/build_raylib.py --build-dir "$(WEB_RAYLIB_BUILD)" --platform web --mode release $(RAYLIB_ARCHIVE_ARG)
+	$(call mark_raylib_done,$(WEB_RAYLIB_LIB))
+
+# The libraries are made by the rules above; these empty recipes (the ";")
+# only tell Make so. Make re-reads a library's timestamp afterwards, so its
+# users rebuild only if CMake actually rewrote it.
+$(RAYLIB_LIB): $(RAYLIB_DONE) ;
+$(WEB_RAYLIB_LIB): $(WEB_RAYLIB_DONE) ;
 
 $(OUTDIR):
 	mkdir -p $(OUTDIR) $(OBJDIR) $(OBJDIR)/tests
@@ -310,14 +346,15 @@ $(OUTDIR)/game-events-test: $(filter-out $(OBJDIR)/src/input/input_backend.o,$(P
 $(OUTDIR)/editor-validation-test $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/editor/dialog_choice.o
 # A rebuilt dependency must refresh consumers and relink executables. Exported
 # headers retain upstream timestamps, so header mtimes alone are insufficient.
-$(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS)): $(RAYLIB_LIB)
+# The flags stamp rebuilds every object when a compiler or flag changes.
+$(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS)): $(RAYLIB_LIB) $(BUILD_FLAGS_STAMP)
 
 # Extra standalone parser probes; keep the 17-regression-binary inventory above.
 .PHONY: parser-allocation-probe parser-encoding-probe
 parser-allocation-probe: $(OUTDIR)/parser-allocation-probe
 	$(RUN_PREFIX) "$(abspath $<)"
 
-$(OUTDIR)/parser-allocation-probe: tests/parser_allocation_test.c $(VENDOR_DIR)/tomlc17.c $(VENDOR_DIR)/tomlc17.h Makefile | $(OUTDIR)
+$(OUTDIR)/parser-allocation-probe: tests/parser_allocation_test.c $(VENDOR_DIR)/tomlc17.c $(VENDOR_DIR)/tomlc17.h $(BUILD_FLAGS_STAMP) | $(OUTDIR)
 	$(CC) $(TEST_CFLAGS) -o $@ $< -lm
 
 parser-encoding-probe:
@@ -470,10 +507,10 @@ fuzz-corpus: $(OUTDIR)/fuzz-level-replay $(OUTDIR)/fuzz-profile-replay ## Test: 
 	"$(abspath $(OUTDIR))/fuzz-level-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_LEVEL_SEEDS)
 	"$(abspath $(OUTDIR))/fuzz-profile-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_PROFILE_SEEDS)
 
-$(OUTDIR)/fuzz-level-replay: tests/fuzz_replay_main.c $(FUZZ_LEVEL_SRCS) $(FUZZ_HEADERS) | $(OUTDIR)
+$(OUTDIR)/fuzz-level-replay: tests/fuzz_replay_main.c $(FUZZ_LEVEL_SRCS) $(FUZZ_HEADERS) $(BUILD_FLAGS_STAMP) | $(OUTDIR)
 	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_LEVEL_SRCS) -lm
 
-$(OUTDIR)/fuzz-profile-replay: tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(FUZZ_HEADERS) $(RAYLIB_LIB) | $(OUTDIR)
+$(OUTDIR)/fuzz-profile-replay: tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(FUZZ_HEADERS) $(RAYLIB_LIB) $(BUILD_FLAGS_STAMP) | $(OUTDIR)
 	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(LIBS)
 
 # -close_fd_mask=2 hides the loaders' per-input error lines; libFuzzer keeps
@@ -504,17 +541,21 @@ $(TEST_OBJDIR)/%.o: %.c | $(OUTDIR)
 	$(CC) $(TEST_CFLAGS) $(TEST_OBJ_FLAGS) $(TEST_OBJ_INCLUDES) -MMD -MP -c -o $@ $<
 
 # Per-object extras (target-specific variables). These rename raylib/GLFW
-# calls so the tests can supply recording doubles in their place.
-$(TEST_AUDIO_OBJ): TEST_OBJ_FLAGS = -DSetMusicVolume=test_SetMusicVolume \
+# calls so the tests can supply recording doubles in their place. Each set
+# has a TEST_*_FLAGS name so the flags stamp can record it too.
+TEST_AUDIO_FLAGS = -DSetMusicVolume=test_SetMusicVolume \
 	-DLoadSoundAlias=test_LoadSoundAlias -DSetSoundVolume=test_SetSoundVolume \
 	-DUnloadSoundAlias=test_UnloadSoundAlias -DUnloadSound=test_UnloadSound
-$(TEST_SESSION_OBJ): TEST_OBJ_FLAGS = -DSetWindowSize=test_SetWindowSize
-$(TEST_INPUT_BACKEND_OBJ): TEST_OBJ_FLAGS = -UMANGO_RAYLIB_MEMORY \
+TEST_SESSION_FLAGS = -DSetWindowSize=test_SetWindowSize
+TEST_INPUT_BACKEND_FLAGS = -UMANGO_RAYLIB_MEMORY \
 	-DIsWindowReady=test_input_window_ready -DGetScreenWidth=test_input_screen_width -DGetScreenHeight=test_input_screen_height \
 	-DglfwGetCurrentContext=test_input_current_context -DglfwGetCursorPos=test_input_cursor_pos \
 	-DglfwSetKeyCallback=test_input_set_key -DglfwSetCharCallback=test_input_set_char \
 	-DglfwSetMouseButtonCallback=test_input_set_button -DglfwSetCursorPosCallback=test_input_set_cursor \
 	-DglfwSetScrollCallback=test_input_set_scroll
+$(TEST_AUDIO_OBJ): TEST_OBJ_FLAGS = $(TEST_AUDIO_FLAGS)
+$(TEST_SESSION_OBJ): TEST_OBJ_FLAGS = $(TEST_SESSION_FLAGS)
+$(TEST_INPUT_BACKEND_OBJ): TEST_OBJ_FLAGS = $(TEST_INPUT_BACKEND_FLAGS)
 # Vendored tomlc17 builds without project include paths, as in the game.
 $(TEST_TOMLC_OBJ): TEST_OBJ_INCLUDES =
 
@@ -589,9 +630,6 @@ $(OUTDIR)/gameplay-mechanics-test: tests/gameplay_mechanics_test.c tests/game_re
 		tests/gameplay_mechanics_test.h $(GAMEPLAY_TEST_OBJS)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $(filter %.c %.o,$^) $(LIBS)
 
-# Rebuild objects when their build recipes/flags change in this Makefile.
-$(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS)): Makefile
-
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
 # Requires the Emscripten SDK (emcc on PATH).
 # Produces out/super-mango.html, .js, .wasm, and .data (bundled assets).
@@ -617,7 +655,7 @@ WEB_DEBUG_HTML = $(OUTDIR)/super-mango-debug.html
 # input lets `web` (and dist-wasm through it) skip emcc only when fresh.
 WEB_INPUTS = $(SRCS) $(wildcard $(SRCDIR)/*.h $(SRCDIR)/*/*.h) $(VENDOR_DIR)/tomlc17.h \
              $(wildcard web/*) $(wildcard assets/* assets/*/* assets/*/*/*) \
-             $(wildcard levels/* levels/*/*) $(WEB_RAYLIB_LIB) tools/web_csp.py Makefile
+             $(wildcard levels/* levels/*/*) $(WEB_RAYLIB_LIB) tools/web_csp.py $(WEB_FLAGS_STAMP)
 
 web: $(WEB_HTML) $(WEB_DEBUG_HTML) ## Build: WebAssembly game with Emscripten (emcc on PATH)
 
@@ -646,6 +684,59 @@ dist-wasm: web asset-budget ## Package: WebAssembly release zip in DISTDIR
 # the sibling sanitizer tree that `make sanitize` creates.
 clean: ## Other: Remove OUTDIR, OUTDIR-sanitize and DISTDIR
 	rm -rf $(OUTDIR) $(OUTDIR)-sanitize $(DISTDIR)
+
+# ── Flag stamps ──────────────────────────────────────────────────────
+# Make decides what to rebuild from file timestamps alone, so by itself it
+# cannot see that a flag changed: after a debug build, `make BUILD_MODE=release`
+# would link the old -O0 objects. A stamp file closes that gap. It holds the
+# exact settings its outputs were built with, and those outputs list it as a
+# prerequisite (objects above; raylib's "done" files; the web pages).
+#
+# Each block below reads its stamp back while Make parses this file. Only when
+# the text differs, or the file is missing, does the stamp's rule depend on
+# FORCE and rewrite the file; that newer file makes its outputs out of date.
+# When the text matches, the file is left alone and nothing rebuilds. Editing
+# this Makefile therefore rebuilds only what a changed setting affects.
+# Every stamp is a single line, so reading it back with $(shell cat) is exact.
+#
+# shell_quote wraps a value in '...' for the shell, turning each ' inside it
+# into '"'"' (close quote, a quoted ', reopen), so TEST_CFLAGS's
+# -DMANGO_TEST_OUTDIR='"out"' is written out unchanged.
+shell_quote = '$(subst ','"'"',$(1))'
+
+BUILD_FLAGS = CC=$(CC) BUILD_MODE=$(BUILD_MODE) RAYLIB_PLATFORM=$(RAYLIB_PLATFORM) \
+              CFLAGS=$(CFLAGS) TEST_CFLAGS=$(TEST_CFLAGS) LIBS=$(LIBS) \
+              TEST_AUDIO_FLAGS=$(TEST_AUDIO_FLAGS) TEST_SESSION_FLAGS=$(TEST_SESSION_FLAGS) \
+              TEST_INPUT_BACKEND_FLAGS=$(TEST_INPUT_BACKEND_FLAGS)
+ifneq ($(strip $(BUILD_FLAGS)),$(strip $(shell cat "$(BUILD_FLAGS_STAMP)" 2>/dev/null)))
+$(BUILD_FLAGS_STAMP): FORCE
+endif
+
+ifneq ($(strip $(RAYLIB_OPTIONS)),$(strip $(shell cat "$(RAYLIB_OPTIONS_STAMP)" 2>/dev/null)))
+$(RAYLIB_OPTIONS_STAMP): FORCE
+endif
+
+WEB_BUILD_FLAGS = WEB_CFLAGS=$(WEB_CFLAGS) \
+                  WEB_FLAGS=$(WEB_FLAGS) WEB_LINK_FLAGS=$(WEB_LINK_FLAGS)
+ifneq ($(strip $(WEB_BUILD_FLAGS)),$(strip $(shell cat "$(WEB_FLAGS_STAMP)" 2>/dev/null)))
+$(WEB_FLAGS_STAMP): FORCE
+endif
+
+$(BUILD_FLAGS_STAMP):
+	@mkdir -p $(@D)
+	@printf '%s\n' $(call shell_quote,$(strip $(BUILD_FLAGS))) > $@
+
+$(RAYLIB_OPTIONS_STAMP):
+	@mkdir -p $(@D)
+	@printf '%s\n' $(call shell_quote,$(strip $(RAYLIB_OPTIONS))) > $@
+
+$(WEB_FLAGS_STAMP):
+	@mkdir -p $(@D)
+	@printf '%s\n' $(call shell_quote,$(strip $(WEB_BUILD_FLAGS))) > $@
+
+# FORCE has no rule and no file, so anything that depends on it always runs.
+.PHONY: FORCE
+FORCE:
 
 # ── Help ─────────────────────────────────────────────────────────────
 # `make help` lists every target whose rule line ends in "## Group: text",
