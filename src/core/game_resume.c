@@ -19,20 +19,20 @@
 void game_resume_capture(const GameState *gs, GameResume *resume)
 {
     memset(resume, 0, sizeof(*resume));
-    str_copy(resume->path, gs->profile_level_key, sizeof(resume->path));
-    resume->level_hash = gs->source_level_hash;
-    resume->checkpoint = gs->checkpoint_index;
-    resume->legacy_screen = gs->legacy_checkpoint_screen;
-    resume->respawn_x = gs->respawn_x;
-    resume->respawn_y = gs->respawn_y;
-    resume->score = gs->score;
-    resume->level_score_start = gs->level_score_start;
-    resume->score_life_next = gs->score_life_next;
-    resume->lives = gs->lives < 0 ? 0 : gs->lives;
-    resume->elapsed = gs->completion.level_elapsed;
+    str_copy(resume->path, gs->screen.profile_level_key, sizeof(resume->path));
+    resume->level_hash = gs->world.source_level_hash;
+    resume->checkpoint = gs->world.checkpoint_index;
+    resume->legacy_screen = gs->world.legacy_checkpoint_screen;
+    resume->respawn_x = gs->world.respawn_x;
+    resume->respawn_y = gs->world.respawn_y;
+    resume->score = gs->world.score;
+    resume->level_score_start = gs->world.level_score_start;
+    resume->score_life_next = gs->world.score_life_next;
+    resume->lives = gs->world.lives < 0 ? 0 : gs->world.lives;
+    resume->elapsed = gs->screen.completion.level_elapsed;
     /* One bit per coin: bit i set means coins[i] was already collected. */
-    for (int i = 0; i < gs->coin_count && i < 64; i++)
-        if (!gs->coins[i].active) resume->coins |= (uint64_t)1 << i;
+    for (int i = 0; i < gs->world.coin_count && i < 64; i++)
+        if (!gs->world.coins[i].active) resume->coins |= (uint64_t)1 << i;
 }
 
 /*
@@ -48,7 +48,7 @@ static int resume_fits_level(const GameState *gs, const LevelDef *def, const Gam
     level_effective_spawn(def, &start_x, &start_y);
 
     /* No coin index the level does not place. */
-    for (int i = gs->coin_count; i < 64; i++)
+    for (int i = gs->world.coin_count; i < 64; i++)
         if (resume->coins & ((uint64_t)1 << i)) return 0;
     if (resume->level_score_start > resume->score) return 0;
 
@@ -65,36 +65,36 @@ static int resume_fits_level(const GameState *gs, const LevelDef *def, const Gam
     /* Automatic screen checkpoints move only x, along the floor of the
      * screens already entered; y stays the start's. */
     return resume->respawn_y == start_y && resume->respawn_x >= 0.0f &&
-           resume->respawn_x < (float)gs->runtime.world_w &&
-           resume->legacy_screen <= gs->runtime.world_w / GAME_W;
+           resume->respawn_x < (float)gs->world.runtime.world_w &&
+           resume->legacy_screen <= gs->world.runtime.world_w / GAME_W;
 }
 
 int game_resume_apply(GameState *gs, const GameResume *resume)
 {
-    const LevelDef *def = (const LevelDef *)gs->runtime.current_level;
-    if (!def || !resume || !gs->profile_level_key[0] ||
-        strcmp(resume->path, gs->profile_level_key) != 0 ||
-        resume->level_hash != gs->source_level_hash ||
+    const LevelDef *def = (const LevelDef *)gs->world.runtime.current_level;
+    if (!def || !resume || !gs->screen.profile_level_key[0] ||
+        strcmp(resume->path, gs->screen.profile_level_key) != 0 ||
+        resume->level_hash != gs->world.source_level_hash ||
         !resume_fits_level(gs, def, resume)) return -1;
 
-    gs->respawn_x = resume->respawn_x;
-    gs->respawn_y = resume->respawn_y;
-    gs->checkpoint_index = resume->checkpoint;
-    gs->legacy_checkpoint_screen = resume->legacy_screen;
-    gs->score = resume->score;
-    gs->level_score_start = resume->level_score_start;
-    gs->score_life_next = resume->score_life_next;
-    gs->lives = resume->lives;
-    gs->completion.level_elapsed = resume->elapsed;
-    for (int i = 0; i < gs->coin_count; i++)
-        gs->coins[i].active = (resume->coins & ((uint64_t)1 << i)) == 0;
+    gs->world.respawn_x = resume->respawn_x;
+    gs->world.respawn_y = resume->respawn_y;
+    gs->world.checkpoint_index = resume->checkpoint;
+    gs->world.legacy_checkpoint_screen = resume->legacy_screen;
+    gs->world.score = resume->score;
+    gs->world.level_score_start = resume->level_score_start;
+    gs->world.score_life_next = resume->score_life_next;
+    gs->world.lives = resume->lives;
+    gs->screen.completion.level_elapsed = resume->elapsed;
+    for (int i = 0; i < gs->world.coin_count; i++)
+        gs->world.coins[i].active = (resume->coins & ((uint64_t)1 << i)) == 0;
 
     /* The same reset a lost life uses: player on the respawn point,
      * enemies and hazards back at their start, camera snapped there. */
-    reset_current_level(gs, &gs->loop.fp_prev_riding);
+    reset_current_level(gs, &gs->screen.loop.fp_prev_riding);
     /* "RESPAWN" on the HUD says where the run picked up again. */
     game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_RESPAWN,
                                  game_checkpoint_clock_ms(gs), 1200);
-    gs->resumed = 1;
+    gs->screen.resumed = 1;
     return 0;
 }

@@ -32,7 +32,7 @@ void game_inspector_physics(Player *player, float *values, int apply)
 
 void game_inspector_reset_physics(GameState *gs)
 {
-    level_apply_player_physics(&gs->player, gs->runtime.current_level);
+    level_apply_player_physics(&gs->world.player, gs->world.runtime.current_level);
 }
 
 /* Keep the tuning line on screen for a few seconds after F6, F7, - or +,
@@ -40,53 +40,53 @@ void game_inspector_reset_physics(GameState *gs)
 #define TUNING_VISIBLE_MS 3000
 static void show_tuning(GameState *gs)
 {
-    gs->inspector.tuning_visible_until = clock_millis() + TUNING_VISIBLE_MS;
+    gs->screen.inspector.tuning_visible_until = clock_millis() + TUNING_VISIBLE_MS;
 }
 
 int game_inspector_event(GameState *gs, const InputEvent *event)
 {
-    if (!gs->debug_mode || event->type != INPUT_KEY_DOWN || event->repeat ||
-        (gs->settings_menu && gs->settings_menu->open)) return 0;
+    if (!gs->screen.debug_mode || event->type != INPUT_KEY_DOWN || event->repeat ||
+        (gs->screen.settings_menu && gs->screen.settings_menu->open)) return 0;
     int key = event->key;
     /* Export and the key help remain available on completion/game-over. */
     if (key == KEY_F9) { game_experiment_export(gs); return 1; }
-    if (key == KEY_F5) { gs->inspector.show_keys = !gs->inspector.show_keys; return 1; }
-    if (game_overlay_blocks_update(gs) || gs->route != GAME_ROUTE_NONE) return 0;
+    if (key == KEY_F5) { gs->screen.inspector.show_keys = !gs->screen.inspector.show_keys; return 1; }
+    if (game_overlay_blocks_update(gs) || gs->screen.route != GAME_ROUTE_NONE) return 0;
     switch (key) {
     case KEY_F2:
-        gs->inspector.frozen = !gs->inspector.frozen;
-        gs->inspector.step_requested = 0;
+        gs->screen.inspector.frozen = !gs->screen.inspector.frozen;
+        gs->screen.inspector.step_requested = 0;
         return 1;
     case KEY_F3:
-        gs->inspector.frozen = 1;
-        gs->inspector.step_requested = 1;
+        gs->screen.inspector.frozen = 1;
+        gs->screen.inspector.step_requested = 1;
         return 1;
     case KEY_F4:
-        if (gs->experiment && gs->experiment->replaying) {
-            debug_log(&gs->debug, "Replay runs at normal speed; F2/F3 freeze and step it");
+        if (gs->screen.experiment && gs->screen.experiment->replaying) {
+            debug_log(&gs->screen.debug, "Replay runs at normal speed; F2/F3 freeze and step it");
             return 1;
         }
-        gs->inspector.slow_mode = (gs->inspector.slow_mode + 1) % 3;
+        gs->screen.inspector.slow_mode = (gs->screen.inspector.slow_mode + 1) % 3;
         return 1;
     case KEY_F6:
-        gs->inspector.physics_field = (gs->inspector.physics_field + 1) % INSPECTOR_PHYSICS_COUNT;
+        gs->screen.inspector.physics_field = (gs->screen.inspector.physics_field + 1) % INSPECTOR_PHYSICS_COUNT;
         show_tuning(gs);
         return 1;
     case KEY_F10:
-        gs->inspector.entity_index = (gs->inspector.entity_index + 1) %
-            (1 + gs->fish_count + gs->float_platform_count + gs->circular_saw_count);
+        gs->screen.inspector.entity_index = (gs->screen.inspector.entity_index + 1) %
+            (1 + gs->world.fish_count + gs->world.float_platform_count + gs->world.circular_saw_count);
         return 1;
     case KEY_F7:
-        if (!gs->experiment || !gs->experiment->replaying) game_inspector_reset_physics(gs);
+        if (!gs->screen.experiment || !gs->screen.experiment->replaying) game_inspector_reset_physics(gs);
         show_tuning(gs);
         return 1;
     case KEY_F8:
-        if (game_experiment_begin(gs)) debug_log(&gs->debug, "Cannot start experiment");
+        if (game_experiment_begin(gs)) debug_log(&gs->screen.debug, "Cannot start experiment");
         return 1;
     case KEY_MINUS:
     case KEY_EQUAL: {
-        if (gs->experiment && gs->experiment->replaying) return 1;
-        float *value = (float *)((char *)&gs->player + fields[gs->inspector.physics_field].offset);
+        if (gs->screen.experiment && gs->screen.experiment->replaying) return 1;
+        float *value = (float *)((char *)&gs->world.player + fields[gs->screen.inspector.physics_field].offset);
         float next = *value + (key == KEY_EQUAL ? 25.0f : -25.0f);
         if (next >= 0 && next <= MAX_LEVEL_MOTION) *value = next;
         show_tuning(gs);
@@ -101,22 +101,22 @@ int game_inspector_steps(GameState *gs, float frame_seconds)
     /* Overlays, settings and routes own the frame. Forget the time that
      * passes meanwhile so resuming does not replay it as a burst of steps. */
     if (game_simulation_blocked(gs)) {
-        gs->inspector.step_requested = 0;
+        gs->screen.inspector.step_requested = 0;
         game_timing_restart_clock(gs);
         return 0;
     }
-    if (!gs->debug_mode) return game_timing_take_steps(gs, frame_seconds);
+    if (!gs->screen.debug_mode) return game_timing_take_steps(gs, frame_seconds);
 
     /* Debug inspection changes only how much real time reaches the
      * accumulator; every step it runs is still exactly GAME_FIXED_STEP. */
-    int step = gs->inspector.step_requested;
-    gs->inspector.step_requested = 0;
-    if (step || gs->inspector.frozen) {
+    int step = gs->screen.inspector.step_requested;
+    gs->screen.inspector.step_requested = 0;
+    if (step || gs->screen.inspector.frozen) {
         game_timing_restart_clock(gs);
         return step ? 1 : 0;   /* F3 advances exactly one step */
     }
     static const float speeds[] = {1.0f, 0.25f, 0.1f};
-    return game_timing_take_steps(gs, frame_seconds * speeds[gs->inspector.slow_mode]);
+    return game_timing_take_steps(gs, frame_seconds * speeds[gs->screen.inspector.slow_mode]);
 }
 
 /*
@@ -126,22 +126,22 @@ int game_inspector_steps(GameState *gs, float frame_seconds)
  */
 static const char *describe_inspected(const GameState *gs, char *out, size_t size)
 {
-    int index = gs->inspector.entity_index - 1;
+    int index = gs->screen.inspector.entity_index - 1;
     if (index < 0) return NULL;
-    if (index < gs->fish_count) {
-        const Fish *fish = &gs->fish[index];
+    if (index < gs->world.fish_count) {
+        const Fish *fish = &gs->world.fish[index];
         snprintf(out, size, "FISH %d  y %.0f vy %.0f wait %.2f", index, fish->y, fish->vy, fish->jump_timer);
         return out;
     }
-    index -= gs->fish_count;
-    if (index < gs->float_platform_count) {
-        const FloatPlatform *fp = &gs->float_platforms[index];
+    index -= gs->world.fish_count;
+    if (index < gs->world.float_platform_count) {
+        const FloatPlatform *fp = &gs->world.float_platforms[index];
         snprintf(out, size, "PLATFORM %d  t %.2f fall %d stand %.2f", index, fp->t, fp->falling, fp->stand_timer);
         return out;
     }
-    index -= gs->float_platform_count;
-    if (index < gs->circular_saw_count) {
-        const CircularSaw *saw = &gs->circular_saws[index];
+    index -= gs->world.float_platform_count;
+    if (index < gs->world.circular_saw_count) {
+        const CircularSaw *saw = &gs->world.circular_saws[index];
         snprintf(out, size, "SAW %d  x %.0f dir %d angle %.0f", index, saw->x, saw->direction, saw->spin_angle);
         return out;
     }
@@ -161,20 +161,20 @@ static const char *describe_inspected(const GameState *gs, char *out, size_t siz
  */
 void game_inspector_render(GameState *gs)
 {
-    if (!gs->debug_mode || !gs->hud.font) return;
-    TextFont *font = gs->hud.font;
+    if (!gs->screen.debug_mode || !gs->screen.hud.font) return;
+    TextFont *font = gs->screen.hud.font;
     const Color green = {120, 230, 120, 255}, cyan = {120, 210, 255, 255};
     const Color yellow = {255, 225, 90, 255}, red = {255, 110, 110, 255};
     const Color dim = {150, 155, 170, 255};
 
     /* ---- Status line --------------------------------------------- */
     static const char *slow_names[] = {"", "SLOW 0.25x", "SLOW 0.1x"};
-    const GameExperiment *tape = gs->experiment;
+    const GameExperiment *tape = gs->screen.experiment;
     char status[64];
     Color status_color = green;
     const char *mode = "LIVE";
-    if (gs->inspector.frozen) { mode = "FROZEN"; status_color = cyan; }
-    else if (gs->inspector.slow_mode) { mode = slow_names[gs->inspector.slow_mode]; status_color = yellow; }
+    if (gs->screen.inspector.frozen) { mode = "FROZEN"; status_color = cyan; }
+    else if (gs->screen.inspector.slow_mode) { mode = slow_names[gs->screen.inspector.slow_mode]; status_color = yellow; }
     if (tape && tape->replaying)
         snprintf(status, sizeof(status), "%s  REPLAY %d/%d", mode, tape->cursor, tape->count);
     else if (tape && tape->recording)
@@ -185,11 +185,11 @@ void game_inspector_render(GameState *gs)
 
     /* ---- Tuning line: while being changed, or while it differs ----- */
     float values[INSPECTOR_PHYSICS_COUNT], authored[INSPECTOR_PHYSICS_COUNT];
-    Player level_player = gs->player;
-    level_apply_player_physics(&level_player, gs->runtime.current_level);
-    game_inspector_physics(&gs->player, values, 0);
+    Player level_player = gs->world.player;
+    level_apply_player_physics(&level_player, gs->world.runtime.current_level);
+    game_inspector_physics(&gs->world.player, values, 0);
     game_inspector_physics(&level_player, authored, 0);
-    int field = gs->inspector.physics_field;
+    int field = gs->screen.inspector.physics_field;
     /* Tuning moves values in steps of 25 units, so "tuned" means differing
      * by more than half a unit, not exact float inequality. */
     int tuned = fabsf(values[field] - authored[field]) > 0.5f;
@@ -199,20 +199,20 @@ void game_inspector_render(GameState *gs)
                  values[field], authored[field]);
     else
         snprintf(tuning, sizeof(tuning), "%s %.0f", fields[field].name, values[field]);
-    int show_tuning_line = tuned || clock_millis() < gs->inspector.tuning_visible_until;
+    int show_tuning_line = tuned || clock_millis() < gs->screen.inspector.tuning_visible_until;
 
     char entity[96];
     const char *inspected = describe_inspected(gs, entity, sizeof(entity));
 
     const char *lines[] = {status, show_tuning_line ? tuning : NULL, inspected,
-                           gs->inspector.show_keys ? NULL : "F5 keys"};
+                           gs->screen.inspector.show_keys ? NULL : "F5 keys"};
     Color colors[] = {status_color, tuned ? yellow : WHITE, cyan, dim};
     debug_draw_panel(font, HUD_MARGIN, DEBUG_PANEL_TOP, 0, lines, colors, 4);
 
     /* ---- Key help, only while F5 has it open ----------------------
      * A two-column table: the font is proportional, so the action column
      * starts at a measured x instead of being padded with spaces. */
-    if (gs->inspector.show_keys) {
+    if (gs->screen.inspector.show_keys) {
         static const char *keys[] = {"F2", "F3", "F4", "F6", "- / +", "F7",
                                      "F8", "F9", "F10", "F5"};
         static const char *actions[] = {
@@ -245,9 +245,9 @@ void game_inspector_render(GameState *gs)
 
     /* Mark the physical foot point (the point the one-way landing test uses)
      * with a short line: cyan while on the ground, white in the air. */
-    int x = (int)(gs->player.x + gs->player.w / 2) - (int)gs->camera.x;
-    int y = (int)(gs->player.y + gs->player.h - PLAYER_FLOOR_SINK);
-    DrawLine(x-5,y,x+5,y,(Color){gs->player.on_ground ? 0 : 255,255,255,255});
+    int x = (int)(gs->world.player.x + gs->world.player.w / 2) - (int)gs->world.camera.x;
+    int y = (int)(gs->world.player.y + gs->world.player.h - PLAYER_FLOOR_SINK);
+    DrawLine(x-5,y,x+5,y,(Color){gs->world.player.on_ground ? 0 : 255,255,255,255});
 }
 
 /* The inspector draws with the shared HUD font each frame and owns no

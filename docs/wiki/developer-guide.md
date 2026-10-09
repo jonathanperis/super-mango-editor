@@ -139,7 +139,7 @@ if (entity->x > world_w - entity->w) entity->x = (float)(world_w - entity->w);
 `GRAVITY`, `FLOOR_Y`, `GAME_W`, and `GAME_H` are all defined in `game_constants.h`. An entity `.c` file that needs only these numbers includes that header; `game.h` includes it too, so files that use `GameState` already have them. See [Constants Reference](../constants-reference/) for values.
 
 This example is a simplified solid-floor integrator. Pass the active
-`gs->runtime.world_w` as `world_w`; real player movement also resolves gaps,
+`gs->world.runtime.world_w` as `world_w`; real player movement also resolves gaps,
 one-way surfaces and the sprite's inset foot position in `player_surfaces.c`.
 
 ---
@@ -161,7 +161,7 @@ Steps to add a new sound:
 4. Play wherever needed:
 
 ```c
-sound_play(gs->audio.<name>, 128); // null-safe; per-play volume in authored units
+sound_play(gs->assets.audio.<name>, 128); // null-safe; per-play volume in authored units
 ```
 
 ---
@@ -172,15 +172,15 @@ Background music uses raylib streams through the project `MusicTrack` owner. Run
 
 ```c
 // Load from current LevelDef
-gs->audio.music = music_load(def->music_path);
+gs->assets.audio.music = music_load(def->music_path);
 
 // Play (looping)
-music_play(gs->audio.music);
+music_play(gs->assets.audio.music);
 music_set_volume(64); // 50%; normal sessions combine level/user/mute settings
 
 // Cleanup
-music_unload(gs->audio.music);
-gs->audio.music = NULL;
+music_unload(gs->assets.audio.music);
+gs->assets.audio.music = NULL;
 ```
 
 ---

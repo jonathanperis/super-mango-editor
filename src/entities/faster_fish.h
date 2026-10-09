@@ -23,7 +23,7 @@
  * FasterFish — state for one fast aquatic enemy.
  *
  * The state is exactly a Fish; the separate name keeps GameState and level
- * loading readable (gs->faster_fish[i] is clearly the fast variant).
+ * loading readable (gs->world.faster_fish[i] is clearly the fast variant).
  */
 typedef Fish FasterFish;
 

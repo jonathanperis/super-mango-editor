@@ -8,15 +8,15 @@
 
 void game_float_platforms_update(GameState *gs, float dt, int fp_landed_idx)
 {
-    float_platforms_update(gs->float_platforms, gs->float_platform_count,
+    float_platforms_update(gs->world.float_platforms, gs->world.float_platform_count,
                            dt, fp_landed_idx);
 
-    if (fp_landed_idx < 0 || fp_landed_idx >= gs->float_platform_count) {
+    if (fp_landed_idx < 0 || fp_landed_idx >= gs->world.float_platform_count) {
         fp_landed_idx = -1;
     }
 
     if (fp_landed_idx >= 0) {
-        const FloatPlatform *fp = &gs->float_platforms[fp_landed_idx];
+        const FloatPlatform *fp = &gs->world.float_platforms[fp_landed_idx];
         if (fp->mode == FLOAT_PLATFORM_RAIL) {
             /*
              * Carry the rider by exactly the distance the platform just
@@ -25,10 +25,10 @@ void game_float_platforms_update(GameState *gs, float dt, int fp_landed_idx)
              * (falling, landing, falling again), and one moving up would sink
              * the feet into it until the next step pulled them back on top.
              */
-            gs->player.x += fp->x - fp->prev_x;
-            gs->player.y += fp->y - fp->prev_y;
+            gs->world.player.x += fp->x - fp->prev_x;
+            gs->world.player.y += fp->y - fp->prev_y;
         }
     }
 
-    gs->loop.fp_prev_riding = fp_landed_idx;
+    gs->screen.loop.fp_prev_riding = fp_landed_idx;
 }

@@ -23,34 +23,34 @@ be available for level authors without being selected by a current campaign or l
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `player_jump.wav` | `SoundEffect` | `gs->audio.jump` | Rising square-wave blip; played when a jump starts, including buffered/coyote jumps and climb dismounts |
-| `player_hit.wav` | `SoundEffect` | `gs->audio.hit` | Noisy descending thud; played when the player takes damage |
+| `player_jump.wav` | `SoundEffect` | `gs->assets.audio.jump` | Rising square-wave blip; played when a jump starts, including buffered/coyote jumps and climb dismounts |
+| `player_hit.wav` | `SoundEffect` | `gs->assets.audio.hit` | Noisy descending thud; played when the player takes damage |
 
 ### Collectibles — `assets/sounds/collectibles/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `coin.wav` | `SoundEffect` | `gs->audio.coin` | Two-tone chime (B5 then E6); played when the player collects a coin |
+| `coin.wav` | `SoundEffect` | `gs->assets.audio.coin` | Two-tone chime (B5 then E6); played when the player collects a coin |
 
 ### Entities — `assets/sounds/entities/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `bird.wav` | `SoundEffect` | `gs->audio.flap` | Two soft band-passed noise puffs; played for each bird wing flap |
-| `spider.wav` | `SoundEffect` | `gs->audio.spider_attack` | Hiss, rising zip and leg clicks; played when a jumping spider leaps at a gap |
-| `fish.wav` | `SoundEffect` | `gs->audio.dive` | Filtered noise splash plus rising bubbles; played when the player falls into a water gap |
+| `bird.wav` | `SoundEffect` | `gs->assets.audio.flap` | Two soft band-passed noise puffs; played for each bird wing flap |
+| `spider.wav` | `SoundEffect` | `gs->assets.audio.spider_attack` | Hiss, rising zip and leg clicks; played when a jumping spider leaps at a gap |
+| `fish.wav` | `SoundEffect` | `gs->assets.audio.dive` | Filtered noise splash plus rising bubbles; played when the player falls into a water gap |
 
 ### Hazards — `assets/sounds/hazards/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `axe_trap.wav` | `SoundEffect` | `gs->audio.axe` | Filter-swept noise whoosh; played for axe trap swing |
+| `axe_trap.wav` | `SoundEffect` | `gs->assets.audio.axe` | Filter-swept noise whoosh; played for axe trap swing |
 
 ### Surfaces — `assets/sounds/surfaces/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `bouncepad.wav` | `SoundEffect` | `gs->audio.spring` | Sine "boing" with fading vibrato; played when the player lands on a bouncepad |
+| `bouncepad.wav` | `SoundEffect` | `gs->assets.audio.spring` | Sine "boing" with fading vibrato; played when the player lands on a bouncepad |
 
 ### Screens — `assets/sounds/screens/`
 
@@ -62,9 +62,9 @@ be available for level authors without being selected by a current campaign or l
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `water.wav` | `MusicTrack` | `gs->audio.music` | 6 s seamless loop: filtered-noise wash and surf with slow swells and bubbles; water-themed levels |
-| `lava.wav` | `MusicTrack` | `gs->audio.music` | 6 s seamless loop: low brown-noise rumble, sizzle, slow bubbles and crackles; lava-themed levels |
-| `winds.wav` | `MusicTrack` | `gs->audio.music` | 8 s seamless loop: band-limited noise with drifting band and gusts; available, no current level selects it |
+| `water.wav` | `MusicTrack` | `gs->assets.audio.music` | 6 s seamless loop: filtered-noise wash and surf with slow swells and bubbles; water-themed levels |
+| `lava.wav` | `MusicTrack` | `gs->assets.audio.music` | 6 s seamless loop: low brown-noise rumble, sizzle, slow bubbles and crackles; lava-themed levels |
+| `winds.wav` | `MusicTrack` | `gs->assets.audio.music` | 8 s seamless loop: band-limited noise with drifting band and gusts; available, no current level selects it |
 
 ---
 
@@ -129,7 +129,7 @@ backing-storage cost. See [Asset Inventory](../asset-inventory/).
 4. Play it wherever the event occurs:
 
 ```c
-sound_play(gs->audio.<name>, 128);
+sound_play(gs->assets.audio.<name>, 128);
 ```
 
 `sound_play` accepts an empty optional slot. Volume remains in the existing
@@ -153,11 +153,11 @@ into its head so `MusicTrack` can repeat it without a click.
 
 ```c
 // Load (streaming — not fully decoded into RAM)
-gs->audio.music = music_load("assets/sounds/levels/new_track.wav");
-if (!gs->audio.music) { /* handle error */ }
+gs->assets.audio.music = music_load("assets/sounds/levels/new_track.wav");
+if (!gs->assets.audio.music) { /* handle error */ }
 
 // Start (loop forever)
-music_play(gs->audio.music);
+music_play(gs->assets.audio.music);
 
 // Volume (0-128)
 music_set_volume(64); // 50%
@@ -166,8 +166,8 @@ music_set_volume(64); // 50%
 music_update();
 
 // Stop and free
-music_unload(gs->audio.music);
-gs->audio.music = NULL;
+music_unload(gs->assets.audio.music);
+gs->assets.audio.music = NULL;
 ```
 
 The normal session applies authored `music_volume` scaled by the player's saved

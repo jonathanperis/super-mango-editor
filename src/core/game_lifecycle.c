@@ -30,11 +30,11 @@ int game_init(GameState *gs)
     if (game_resources_load(gs) != 0) goto fail;
 
     /* Set up the player (loads texture, sets initial position on the floor). */
-    if (player_init(&gs->player) != 0) goto fail;
+    if (player_init(&gs->world.player) != 0) goto fail;
 
     /* A safe value until the level says where the player starts; the
      * camera is snapped to the real start once the level is loaded. */
-    gs->camera.x = 0.0f;
+    gs->world.camera.x = 0.0f;
 
     /*
      * Fog textures are loaded later, after level_load, because fog texture
@@ -42,13 +42,13 @@ int game_init(GameState *gs)
      */
 
     /* Load HUD font and icon textures while the renderer is available. */
-    if (hud_init(&gs->hud, gs->textures.star_yellow,
-                 gs->player.texture) != 0) {
+    if (hud_init(&gs->screen.hud, gs->assets.textures.star_yellow,
+                 gs->world.player.texture) != 0) {
         goto fail;
     }
 
     /* Initialise debug overlay if --debug was passed on the CLI. */
-    if (gs->debug_mode) debug_init(&gs->debug);
+    if (gs->screen.debug_mode) debug_init(&gs->screen.debug);
 
     if (game_level_load_initial(gs) != 0) goto fail;
     if (game_replay_load(gs) != 0) goto fail;
@@ -69,12 +69,12 @@ int game_init(GameState *gs)
     gamepad_refresh_controller(gs);
 
     /* Signal the loop to start running; game starts in the foreground. */
-    gs->running = 1;
-    gs->route = GAME_ROUTE_NONE;
-    gs->game_over = 0;
-    gs->paused = 0;
-    gs->pause_reasons = 0;
-    gs->completion.complete = 0;
+    gs->screen.running = 1;
+    gs->screen.route = GAME_ROUTE_NONE;
+    gs->screen.game_over = 0;
+    gs->screen.paused = 0;
+    gs->screen.pause_reasons = 0;
+    gs->screen.completion.complete = 0;
     /* No release latch here: the session arms it once the profile (and its
      * bindings) is attached, together with controls held on the old screen
      * (session_make_game in app_session.c). */
@@ -102,21 +102,21 @@ void game_cleanup(GameState *gs)
     gamepad_close_controller(gs);
 
     /* Tear down debug overlay state after the loop has stopped using it. */
-    if (gs->debug_mode) {
-        debug_cleanup(&gs->debug);
+    if (gs->screen.debug_mode) {
+        debug_cleanup(&gs->screen.debug);
     }
 
     /* Free level storage owned by GameState before renderer-backed assets. */
     game_level_session_cleanup(gs);
 
     /* Free HUD resources (font + generated textures, renderer-dependent). */
-    hud_cleanup(&gs->hud);
+    hud_cleanup(&gs->screen.hud);
 
     /* Free fog textures before the renderer disappears. */
-    fog_cleanup(&gs->fog);
+    fog_cleanup(&gs->world.fog);
 
     /* Free player texture before shared texture resources. */
-    player_cleanup(&gs->player);
+    player_cleanup(&gs->world.player);
 
     game_resources_cleanup(gs);
 

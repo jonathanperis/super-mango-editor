@@ -9,6 +9,6 @@
 
 void game_effects_update(GameState *gs, float dt)
 {
-    if (gs->runtime.water_enabled) water_update(&gs->water, dt);
-    if (gs->runtime.fog_enabled) fog_update(&gs->fog, dt);
+    if (gs->world.runtime.water_enabled) water_update(&gs->world.water, dt);
+    if (gs->world.runtime.fog_enabled) fog_update(&gs->world.fog, dt);
 }

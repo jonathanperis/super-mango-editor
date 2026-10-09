@@ -16,7 +16,7 @@ static void render_overlay_backdrop(uint8_t alpha)
 static void render_centered_text(GameState *gs, const char *text,
                                  Color color, int y)
 {
-    font_draw_centered(gs->hud.font, text, GAME_W / 2, y, color);
+    font_draw_centered(gs->screen.hud.font, text, GAME_W / 2, y, color);
 }
 
 static void render_terminal_actions(GameState *gs, int first_y)
@@ -25,7 +25,7 @@ static void render_terminal_actions(GameState *gs, int first_y)
     int focused;
 
     game_terminal_actions(gs, &list);
-    focused = gs->terminal_action_index;
+    focused = gs->screen.terminal_action_index;
     if (focused < 0 || focused >= list.count) focused = 0;
 
     for (int i = 0; i < list.count; i++) {
@@ -44,13 +44,13 @@ static void render_terminal_actions(GameState *gs, int first_y)
 void render_pause_overlay(GameState *gs)
 {
     render_overlay_backdrop(150);
-    if (gs->hud.font) {
+    if (gs->screen.hud.font) {
         render_centered_text(gs, "Paused", (Color){255, 215, 0, 255}, 92);
         render_centered_text(gs, "Enter/Space/Esc/Start: resume",
                              (Color){255, 255, 255, 255}, 134);
         render_centered_text(gs, "Close window to quit",
                              (Color){190, 190, 190, 255}, 160);
-        if (gs->settings_menu) render_centered_text(gs, "F1 / Back: settings",
+        if (gs->screen.settings_menu) render_centered_text(gs, "F1 / Back: settings",
                               (Color){190, 190, 190, 255}, 186);
     }
 }
@@ -58,10 +58,10 @@ void render_pause_overlay(GameState *gs)
 void render_game_over_overlay(GameState *gs)
 {
     render_overlay_backdrop(190);
-    if (gs->hud.font) {
+    if (gs->screen.hud.font) {
         char line[96];
         render_centered_text(gs, "Game Over", (Color){255, 90, 90, 255}, 66);
-        snprintf(line, sizeof(line), "Final Score: %d", gs->score);
+        snprintf(line, sizeof(line), "Final Score: %d", gs->world.score);
         render_centered_text(gs, line, (Color){255, 255, 255, 255}, 104);
         render_terminal_actions(gs, 136);
         render_centered_text(gs, "Up/Down or D-pad: Select",
@@ -75,29 +75,29 @@ void render_game_over_overlay(GameState *gs)
 
 void render_level_complete_overlay(GameState *gs)
 {
-    const int has_next_level = gs->completion.pending_next_phase;
+    const int has_next_level = gs->screen.completion.pending_next_phase;
 
     render_overlay_backdrop(180);
-    if (gs->hud.font) {
+    if (gs->screen.hud.font) {
         char line[96];
-        int elapsed = (int)(gs->completion.elapsed + 0.5f);
+        int elapsed = (int)(gs->screen.completion.elapsed + 0.5f);
         int minutes = elapsed / 60;
         int seconds = elapsed % 60;
 
         render_centered_text(gs,
                              has_next_level ? "Level Complete!" : "Game Complete!",
                              (Color){255, 215, 0, 255}, 54);
-        snprintf(line, sizeof(line), "Score: %d", gs->score);
+        snprintf(line, sizeof(line), "Score: %d", gs->world.score);
         render_centered_text(gs, line, (Color){255, 255, 255, 255}, 88);
         snprintf(line, sizeof(line), "Coins: %d/%d",
-                 gs->completion.coins_collected,
-                 gs->completion.coin_total);
+                 gs->screen.completion.coins_collected,
+                 gs->screen.completion.coin_total);
         render_centered_text(gs, line, (Color){255, 255, 255, 255}, 104);
-        snprintf(line, sizeof(line), "Lives: %d", gs->lives);
+        snprintf(line, sizeof(line), "Lives: %d", gs->world.lives);
         render_centered_text(gs, line, (Color){255, 255, 255, 255}, 120);
         snprintf(line, sizeof(line), "Time: %02d:%02d", minutes, seconds);
         render_centered_text(gs, line, (Color){255, 255, 255, 255}, 136);
-        if (gs->completion.next_phase_failed) {
+        if (gs->screen.completion.next_phase_failed) {
             render_centered_text(gs, "Next level failed to load",
                                  (Color){255, 90, 90, 255}, 154);
         } else if (!has_next_level) {
