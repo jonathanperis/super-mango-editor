@@ -107,6 +107,28 @@ static int apply_start_request(GameState *gs, const LevelDef *def)
     return 0;
 }
 
+/*
+ * game_level_start_point_respawn_y — Keep a start-point run's respawn on
+ * the ground.
+ *
+ * A level without authored checkpoints saves one at each newly entered
+ * screen, and that moves only respawn_x (game_checkpoint_update): on a
+ * normal run respawn_y stays the level start's height, and recorded runs
+ * depend on that, so it is left alone. A --start-x run starts at the height
+ * of one particular column, such as the top of a pillar. Carried to a later
+ * column, that height would put the player in mid-air, or level with
+ * nothing, inside a taller pillar. So on such a run the height follows the
+ * new column, chosen by the same rule as the start point itself.
+ */
+void game_level_start_point_respawn_y(GameState *gs)
+{
+    const LevelDef *def = (const LevelDef *)gs->world.runtime.current_level;
+    float top;
+    if (!gs->screen.start_point_run || !def) return;
+    /* The column search skips floor gaps, so the floor is always found. */
+    if (level_ground_top_at(def, gs->world.respawn_x, &top)) gs->world.respawn_y = top;
+}
+
 int game_level_load_initial(GameState *gs)
 {
     char safe_path[GAME_LEVEL_PATH_MAX] = {0};

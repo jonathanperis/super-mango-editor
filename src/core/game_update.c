@@ -15,6 +15,7 @@
 #include "../collision/floor_gap_collision.h"
 #include "../collision/game_collision.h"
 #include "../effects/game_effects.h"
+#include "../levels/level_session.h"  /* game_level_start_point_respawn_y */
 
 int game_update_active(GameState *gs, float dt, int cam_x)
 {
@@ -37,8 +38,12 @@ int game_update_active(GameState *gs, float dt, int cam_x)
     game_hazards_update(gs, dt, cam_x);
     game_collide(gs, dt);
     if (gs->screen.game_over || gs->world.lives != lives_before) return game_camera_update(gs, dt);
-    /* Legacy screen checkpoints remain sampled after collision damage. */
+    /* Legacy screen checkpoints remain sampled after collision damage. They
+     * move respawn_x only; a start-point run also moves respawn_y to the
+     * ground there (level_session.c says why). */
+    float respawn_x = gs->world.respawn_x;
     game_checkpoint_update(gs);
+    if (gs->world.respawn_x != respawn_x) game_level_start_point_respawn_y(gs);
     game_effects_update(gs, dt);
     game_bouncepads_update_animations(gs, dt);
 
