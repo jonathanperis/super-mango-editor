@@ -75,7 +75,9 @@ int serializer_flush(FILE *fp);
 /* Non-zero when path itself is a symbolic link (POSIX; always 0 elsewhere). */
 int serializer_path_is_symlink(const char *path);
 
-/* Non-zero when both paths exist and name the same file (POSIX only). */
+/* Non-zero when both paths exist and name the same file: the same device
+ * and inode on POSIX, the same volume and file index on Windows. Always 0 in
+ * the browser build, whose files are never shared between two names. */
 int serializer_same_file_utf8(const char *a, const char *b);
 
 /*
