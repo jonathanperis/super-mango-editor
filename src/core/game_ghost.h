@@ -113,11 +113,13 @@ void game_ghost_cleanup(GameState *gs);
 /* ---- Text format and storage (game_ghost_file.c) -------------------- */
 
 /* Strict parse of ghost text into out (owned on success). -1 on any
- * damage: wrong version, sizes, digits, or a sample count that does not
- * match `steps`. */
+ * damage: wrong version, sizes, digits, a sample count that does not
+ * match `steps`, or a `time` more than one step away from the time
+ * `steps` fixed steps take. */
 int game_ghost_decode(GameGhostTrack *out, const char *text);
 
-/* Write track as text. -1 when it does not fit or is out of range. */
+/* Write track as text. -1 when it does not fit or is out of range (the
+ * same rules decoding applies, so whatever is written reads back). */
 int game_ghost_encode(const GameGhostTrack *track, char *text, size_t capacity);
 
 /* Native ghost file for a level: next to the profile file, named after it,
