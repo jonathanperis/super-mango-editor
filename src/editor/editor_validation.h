@@ -25,6 +25,25 @@ typedef struct {
     LevelIssueLocation locations[EDITOR_VALIDATION_MAX_MESSAGES];
 } EditorValidationReport;
 
+/*
+ * EditorLoadReport — why the last Open failed (count == 0: it did not, or
+ * the designer dismissed the list).  A file that will not load never
+ * becomes the document, so its problems cannot be validation messages;
+ * the Level Config panel lists them above those instead.  Each message
+ * starts with "line N: " when the problem is on one line of the file.
+ */
+#define EDITOR_LOAD_PROBLEM_MAX 8
+typedef struct {
+    char file[64];   /* the file name, for the list's heading */
+    int  count;      /* problems listed                       */
+    int  total;      /* problems found (may exceed the list)  */
+    char messages[EDITOR_LOAD_PROBLEM_MAX][EDITOR_VALIDATION_MESSAGE_LEN];
+} EditorLoadReport;
+
+/* Add one problem; the signature is level_load_toml_explained's
+ * LevelLoadProblemFn, with the report as context. */
+void editor_load_report_add(void *report, const char *message, int line);
+
 int editor_validate_level(const LevelDef *def, EditorValidationReport *report);
 const char *editor_validation_summary(const EditorValidationReport *report);
 /* How many errors and warnings the report counted but had no room to list. */

@@ -38,6 +38,12 @@ int editor_config_total_height(const EditorState *es)
     int validation_rows = es->validation_report.message_count
                         + (editor_validation_hidden_count(&es->validation_report) > 0);
     int validation_h = CFG_H_VALIDATION_BASE + validation_rows * CFG_H_VALIDATION_ROW;
+    /* Why the last Open failed: a heading, its rows, maybe "... and N more",
+     * and a separator (config_load_problems in properties.c). */
+    if (es->load_report.count > 0)
+        validation_h += (1 + es->load_report.count +
+                         (es->load_report.total > es->load_report.count)) * CFG_H_VALIDATION_ROW
+                      + CFG_H_MARGIN_TOP;
     int recent_h = es->recent_file_count > 0
                  ? CFG_H_RECENT_HEADER + es->recent_file_count * CFG_H_RECENT_ROW
                  : 0;

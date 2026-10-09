@@ -443,6 +443,7 @@ typedef struct {
     LevelConfigSnapshot pending_config_before;
 
     EditorValidationReport validation_report;
+    EditorLoadReport load_report;   /* why the last Open failed */
     uint64_t validated_document_hash;
     uint32_t last_validation_ms;
     int validation_cache_valid;

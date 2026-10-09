@@ -177,7 +177,8 @@ enum {
 };
 
 static int editor_read_stable_level(const char *path, LevelDef *level,
-                                    SerializerFileFingerprint *fingerprint)
+                                    SerializerFileFingerprint *fingerprint,
+                                    EditorLoadReport *problems)
 {
     for (int attempt = 0; attempt < 2; attempt++) {
         SerializerFileFingerprint before;
@@ -186,7 +187,10 @@ static int editor_read_stable_level(const char *path, LevelDef *level,
 
         if (serializer_fingerprint_utf8(path, &before) != 1)
             return EDITOR_LOAD_IO_ERROR;
-        parsed = level_load_toml(path, level) == 0;
+        /* Only the last attempt's problems describe the bytes on disk. */
+        memset(problems, 0, sizeof(*problems));
+        parsed = level_load_toml_explained(path, level, editor_load_report_add,
+                                           problems) == 0;
         if (editor_test_load_hook) editor_test_load_hook(path);
         if (serializer_fingerprint_utf8(path, &after) != 1)
             return EDITOR_LOAD_IO_ERROR;
@@ -206,6 +210,9 @@ int editor_load_level(EditorState *es, const char *path)
     LevelDef new_level;
     SerializerFileFingerprint fingerprint;
     char target[EDITOR_PATH_MAX];
+    /* Static: an EditorLoadReport is about 3 KB, and the editor is single
+     * threaded.  It is copied into es->load_report only when the load fails. */
+    static EditorLoadReport problems;
     int result;
     memset(&new_level, 0, sizeof(new_level));
 
@@ -221,10 +228,19 @@ int editor_load_level(EditorState *es, const char *path)
         return -1;
     }
 
-    result = editor_read_stable_level(target, &new_level, &fingerprint);
+    result = editor_read_stable_level(target, &new_level, &fingerprint, &problems);
     if (result == EDITOR_LOAD_PARSE_ERROR) {
+        /* Keep the reasons for the Level Config panel (editor_load_report),
+         * and put the first in the status bar. */
         fprintf(stderr, "Error: failed to load %s\n", path);
-        editor_set_status(es, "Load failed: %s", path);
+        es->load_report = problems;
+        editor_path_for_display(path, es->load_report.file, sizeof(es->load_report.file));
+        es->config_open = 1;
+        if (problems.count > 0)
+            editor_set_status(es, "Load failed: %s: %s", es->load_report.file,
+                              problems.messages[0]);
+        else
+            editor_set_status(es, "Load failed: %s", path);
         return -1;
     }
     if (result == EDITOR_LOAD_IO_ERROR) {
@@ -237,7 +253,10 @@ int editor_load_level(EditorState *es, const char *path)
         return -1;
     }
 
-    /* The load succeeded; only now retire the old session's recovery. */
+    /* The load succeeded; only now retire the old session's recovery, and
+     * forget why an earlier Open failed. */
+    es->load_report.count = 0;
+    es->load_report.total = 0;
     editor_retire_current_recovery(es);
     editor_apply_loaded_level(es, &new_level, path, 0, 1);
     memcpy(es->file_target, target, strlen(target) + 1);

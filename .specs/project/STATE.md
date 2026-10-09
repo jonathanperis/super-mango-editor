@@ -100,7 +100,7 @@ Gameplay advances in fixed 1/60 s steps from a frame-time accumulator instead of
 
 ## Deferred Ideas
 
-- Rich editor validation panel: clickable diagnostics and a list of every runtime error shipped (N-001); still deferred is showing TOML parse errors of a file that fails to load.
+- Rich editor validation panel: shipped (N-001) — clickable diagnostics, every runtime error listed, and the syntax/schema/runtime problems of a file that fails to load, with lines. Severity beyond error/warning (an "info" class) remains open.
 - Metadata-editor ergonomics for shipped background/foreground/fog arrays and physics overrides.
 - Serializer round-trip fixture expansion beyond current regression tests.
 - Recovery snapshot presentation (a richer picker than native three-button dialogs). Cleanup shipped: Discard in the picker, orphan sweep at start-up, owner-PID guard for live snapshots, and a specific "folder full" status.

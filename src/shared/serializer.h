@@ -89,3 +89,22 @@ int level_read_recovery_path(const char *path, char *buf, size_t buf_size);
  * error, or a level that fails validation).
  */
 int level_load_toml(const char *path, LevelDef *def);
+
+/*
+ * LevelLoadProblemFn — hears one reason a level could not be loaded.
+ * line is the 1-based line in the file the problem is on, or 0 when it is
+ * not tied to one line (the file cannot be opened, say).  message is only
+ * valid during the call.
+ */
+typedef void (*LevelLoadProblemFn)(void *context, const char *message, int line);
+
+/*
+ * level_load_toml_explained — level_load_toml, and when it fails, say why.
+ * report (may be NULL) is called for: a file that cannot be opened, a TOML
+ * syntax error (one, with its line), a schema error (the first, with the
+ * line of the value), or — for a file that is valid TOML but breaks the
+ * runtime rules — every runtime error, each with its line.  The editor
+ * lists them when a level will not open.
+ */
+int level_load_toml_explained(const char *path, LevelDef *def,
+                              LevelLoadProblemFn report, void *context);
