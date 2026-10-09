@@ -181,6 +181,9 @@ int main(int argc, char **argv)
             fprintf(stderr, "Warning: assets/ and levels/ were not found here or "
                             "next to the executable\n");
     }
+#else
+    /* The browser preloads assets/ and levels/ at "/", its working folder. */
+    (void)level_typed;
 #endif
 
     /* A fixed seed makes enemy/decorative randomness reproducible. A normal
