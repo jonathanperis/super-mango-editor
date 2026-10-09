@@ -68,7 +68,30 @@ EM_JS(int, profile_browser_begin_write, (const char *text, const char *baseline)
             const saved = localStorage.getItem('super-mango-profile-v2');
             const current = saved === null ? localStorage.getItem('super-mango-profile-v1') : saved;
             if (current !== expected) { operation.status = -1; return; }
-            localStorage.setItem('super-mango-profile-v2', value);
+            try { localStorage.setItem('super-mango-profile-v2', value); } catch (full) {
+                // Storage is full. Results and settings matter more than any
+                // time-trial ghost (game_ghost_file.c), so delete ghosts,
+                // least recently written first, until the profile fits.
+                const prefix = 'super-mango-ghost-v1:', orderKey = 'super-mango-ghost-order-v1';
+                let order = [];
+                try { order = JSON.parse(localStorage.getItem(orderKey) || '[]'); } catch (_) { order = []; }
+                if (!Array.isArray(order)) order = [];
+                const ghosts = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (k && k.startsWith(prefix)) ghosts.push(k);
+                }
+                const listed = order.filter(k => ghosts.includes(k));
+                const doomed = ghosts.filter(k => !listed.includes(k)).concat(listed);
+                if (!doomed.length) throw full;
+                localStorage.removeItem(orderKey);
+                for (;;) {
+                    localStorage.removeItem(doomed.shift());
+                    try { localStorage.setItem('super-mango-profile-v2', value); break; } catch (again) {
+                        if (!doomed.length) throw again;
+                    }
+                }
+            }
             operation.status = 2; // confirmed commit, not merely a queued request
         }).catch(function() {
             if (operation.status === 1) operation.status = -1;
