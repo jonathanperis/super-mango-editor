@@ -732,6 +732,45 @@ done:
     return failed;
 }
 
+/*
+ * After losing a life far from the respawn point, and after Retry, the
+ * camera is already on the respawn point; it used to pan back across the
+ * level from where the player died.
+ */
+static int camera_jumps_to_the_respawn_point(void)
+{
+    int failed = 0;
+    GameState gs;
+    CHECK(mechanics_open_level(&gs, CREATURES_LEVEL, 0) == 0);
+    stand_at(&gs, 1200.0f);
+    gs.player.y = 0.0f;   /* above every enemy and hazard */
+    gs.camera.x = 1000.0f;
+    mechanics_step(&gs, 0, 1);
+    CHECK(gs.camera.x > 900.0f);
+
+    /* Lose a life with the respawn back at the level start (x = 48, where
+     * the camera rests at 0), not at the screen checkpoint just saved. */
+    gs.respawn_x = 48.0f;
+    gs.respawn_y = 252.0f;
+    gs.hearts = 1;
+    gs.player.hurt_timer = 0.0f;
+    apply_damage(&gs, 1, 0, 0.0f, 0.0f);
+    CHECK(NEAR(gs.player.x, 48.0f + (TILE_SIZE - gs.player.w) / 2.0f, 0.01f));
+    CHECK(gs.camera.x == 0.0f);
+
+    /* Retry after game over does the same. */
+    gs.camera.x = 1000.0f;
+    gs.lives = 0;
+    gs.hearts = 1;
+    apply_damage(&gs, 1, 0, 0.0f, 0.0f);
+    CHECK(gs.game_over);
+    game_restart_after_game_over(&gs);
+    CHECK(!gs.game_over && gs.camera.x == 0.0f);
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
 /* ------------------------------------------------------------------ */
 /* Debug overlay                                                       */
 /* ------------------------------------------------------------------ */
@@ -814,6 +853,7 @@ int main(void)
         CASE(birds_patrol_at_their_own_speeds),
         CASE(bridge_crumbles_under_the_player),
         CASE(bridge_ignores_a_player_on_another_surface),
+        CASE(camera_jumps_to_the_respawn_point),
         CASE(debug_log_is_a_bounded_ring),
         CASE(replay_scripts_drive_the_game),
         CASE(replay_scripts_reject_malformed_files),

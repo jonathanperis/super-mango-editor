@@ -20,7 +20,8 @@
  * an identical reset — no entity is accidentally left in a stale state.
  *
  * Applies runtime-resolved respawn x/y. Authored levels use their furthest
- * reached placement; legacy levels use their furthest reached screen.
+ * reached placement; legacy levels use their furthest reached screen. The
+ * camera then jumps straight to the respawn point (game_camera_snap).
  *
  * fp_prev_riding is passed by pointer because it lives in the frame-loop
  * scratch state (GameState.loop); resetting it here keeps the float-platform

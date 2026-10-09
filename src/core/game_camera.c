@@ -8,7 +8,12 @@
 #include "../levels/level_physics.h"
 #include "game_profile.h"
 
-int game_camera_update(GameState *gs, float dt)
+/*
+ * game_camera_target — Where the camera wants its left edge to be: the
+ * player's centre in the middle of the screen, pushed ahead in the direction
+ * of travel (the lookahead), and clamped so the view never leaves the world.
+ */
+static float game_camera_target(const GameState *gs)
 {
     const LevelDef *cam_def = (const LevelDef *)gs->runtime.current_level;
     float cam_vx_factor = level_camera_lookahead_vx_factor(cam_def);
@@ -27,6 +32,12 @@ int game_camera_update(GameState *gs, float dt)
     if (cam_target > gs->runtime.world_w - GAME_W) {
         cam_target = (float)(gs->runtime.world_w - GAME_W);
     }
+    return cam_target;
+}
+
+int game_camera_update(GameState *gs, float dt)
+{
+    float cam_target = game_camera_target(gs);
 
     float cam_diff = cam_target - gs->camera.x;
     if (cam_diff > CAM_SNAP_THRESHOLD || cam_diff < -CAM_SNAP_THRESHOLD) {
@@ -36,4 +47,9 @@ int game_camera_update(GameState *gs, float dt)
     }
 
     return (int)gs->camera.x;
+}
+
+void game_camera_snap(GameState *gs)
+{
+    gs->camera.x = game_camera_target(gs);
 }
