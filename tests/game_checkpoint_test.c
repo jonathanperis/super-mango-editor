@@ -51,13 +51,13 @@ static int authored_checkpoints_advance_by_highest_x(void)
 
     /* One large movement crosses all placements; highest x wins. */
     gs.player.x = 550.0f;
-    game_checkpoint_update(&gs);
+    game_checkpoint_update_authored(&gs);
     if (expect_int("crossed index", gs.checkpoint_index, 0) != 0) return 1;
     if (expect_float("crossed x", gs.respawn_x, 500.0f) != 0) return 1;
     if (expect_float("crossed y", gs.respawn_y, 210.0f) != 0) return 1;
 
     gs.player.x = 250.0f;
-    game_checkpoint_update(&gs);
+    game_checkpoint_update_authored(&gs);
     if (expect_int("no regression index", gs.checkpoint_index, 0) != 0) return 1;
     if (expect_float("no regression x", gs.respawn_x, 500.0f) != 0) return 1;
     return 0;
@@ -77,8 +77,17 @@ static int authored_checkpoints_disable_legacy_fallback(void)
     gs.respawn_y = 172.0f;
     gs.checkpoint_index = -1;
     gs.player.x = 450.0f;
-    game_checkpoint_update(&gs);
 
+    /* The end-of-step legacy update leaves authored levels alone: no screen
+     * checkpoint, and no second sampling of the authored placements (that
+     * happens once per step, in game_checkpoint_update_authored). */
+    game_checkpoint_update(&gs);
+    if (expect_int("legacy update leaves authored index", gs.checkpoint_index, -1) != 0)
+        return 1;
+    if (expect_float("legacy update leaves respawn", gs.respawn_x, 80.0f) != 0) return 1;
+    if (expect_int("no screen checkpoint", gs.legacy_checkpoint_screen, 0) != 0) return 1;
+
+    game_checkpoint_update_authored(&gs);
     if (expect_float("authored x beats screen fallback", gs.respawn_x, 200.0f) != 0)
         return 1;
     if (expect_float("authored y", gs.respawn_y, 90.0f) != 0) return 1;
@@ -102,7 +111,7 @@ static int stale_checkpoint_index_before_first_placement_is_ignored(void)
     gs.respawn_x = 80.0f;
     gs.respawn_y = 172.0f;
     gs.player.x = 100.0f;
-    game_checkpoint_update(&gs);
+    game_checkpoint_update_authored(&gs);
     if (expect_float("unreached respawn x", gs.respawn_x, 80.0f) != 0) return 1;
     if (expect_float("unreached respawn y", gs.respawn_y, 172.0f) != 0) return 1;
     return 0;
