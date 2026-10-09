@@ -145,6 +145,14 @@ static void editor_key(EditorState *es, const InputEvent *event)
     case KEY_G:
         if (editor_finish_field_edit(es)) es->show_grid ^= 1;
         break;
+    case KEY_S:
+        if (editor_finish_field_edit(es)) {
+            es->snap_to_grid ^= 1;
+            editor_set_status(es, es->snap_to_grid
+                ? "Snap to grid on: placing and dragging use the 48 px grid (Shift: free)"
+                : "Snap to grid off (hold Shift to snap)");
+        }
+        break;
     case KEY_DELETE:
     case KEY_BACKSPACE:
         /* Backspace too: many laptop keyboards (Macs) have no Delete key.
@@ -245,8 +253,12 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
     /* Input already maps window pixels to the logical editor canvas. Tools
      * need world coordinates; canvas_screen_to_world undoes zoom and adds
      * the camera scroll in both axes. */
-    if (event->type >= INPUT_MOUSE_DOWN && event->type <= INPUT_WHEEL)
+    if (event->type >= INPUT_MOUSE_DOWN && event->type <= INPUT_WHEEL) {
         canvas_screen_to_world(es, event->x, event->y, &wx, &wy);
+        /* Remember Shift/Ctrl/Alt as this mouse event saw them: snapping,
+         * selection and cycling clicks read them from here. */
+        es->input_mods = event->mods;
+    }
 
     /*
      * While a playtest runs the editor shows only the "Playing" overlay and
