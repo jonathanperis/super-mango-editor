@@ -27,11 +27,13 @@
 #include "entity_meta.h" /* editor_entity_type_name/is_singleton             */
 #include "tools.h"       /* editor_set_float_platform_mode                    */
 #include "editor_panels.h" /* editor_focus_validation_issue                     */
+#include "editor_session.h" /* editor_set_status (show_field_note)              */
 #include "../shared/ui.h" /* ui_panel, ui_label, ui_separator, ui_float_field,
                            ui_int_field, ui_dropdown                         */
 #include "../levels/level.h" /* LevelDef, all *Placement structs            */
 #include "../player/player.h"  /* JUMP_VY (bouncepad launch limit)           */
 #include "../surfaces/rail.h"  /* MAX_RAIL_SPEED (rail rider speed limit)    */
+#include "../game_constants.h" /* MAX_PATROL_SPEED (enemy vx limit)          */
 
 /* ------------------------------------------------------------------ */
 /* Layout constants                                                    */
@@ -150,6 +152,26 @@ static const char *vine_type_opts[] = { "Green", "Brown" };
  *                 for "more than 0".
  */
 #define BOUNCE_LAUNCH_VY_MAX  JUMP_VY
+
+/*
+ *   enemy vx    — a patrol speed: not 0 (the enemy would never move) and at
+ *                 most MAX_PATROL_SPEED px/s either way (game_constants.h
+ *                 explains why), the sign being its first direction.  The
+ *                 field clamps a bigger value and refuses a typed 0, and the
+ *                 status bar says which happened (show_field_note).
+ */
+#define PATROL_SPEED_LIMIT    ((float)MAX_PATROL_SPEED)
+
+/*
+ * show_field_note — When the last commit limited or refused what was
+ * typed, the UI left a note saying so; put it in the status bar.
+ */
+static void show_field_note(EditorState *es)
+{
+    if (es->ui.edit_note[0] == '\0') return;
+    editor_set_status(es, "%s", es->ui.edit_note);
+    es->ui.edit_note[0] = '\0';
+}
 
 /*
  * option_index — Position of value in a dropdown's paths, or -1.
@@ -511,8 +533,9 @@ static void draw_spider_properties(EditorState *es, int y)
     y += ROW_H;
 
     field_label(es, y, "vx", FIELD_ID(ENT_SPIDER, 1));
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 1),
-                       FIELD_X, y, FIELD_W, &p->vx))
+    if (ui_float_field_nonzero(&es->ui, FIELD_ID(ENT_SPIDER, 1),
+                               FIELD_X, y, FIELD_W, &p->vx,
+                               PATROL_SPEED_LIMIT))
         editor_commit_change(es);
     y += ROW_H;
 
@@ -549,8 +572,9 @@ static void draw_jumping_spider_properties(EditorState *es, int y)
     y += ROW_H;
 
     field_label(es, y, "vx", FIELD_ID(ENT_JUMPING_SPIDER, 1));
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 1),
-                       FIELD_X, y, FIELD_W, &p->vx))
+    if (ui_float_field_nonzero(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 1),
+                               FIELD_X, y, FIELD_W, &p->vx,
+                               PATROL_SPEED_LIMIT))
         editor_commit_change(es);
     y += ROW_H;
 
@@ -586,8 +610,9 @@ static void draw_bird_properties(EditorState *es, int y)
     y += ROW_H;
 
     field_label(es, y, "vx", FIELD_ID(ENT_BIRD, 2));
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 2),
-                       FIELD_X, y, FIELD_W, &p->vx))
+    if (ui_float_field_nonzero(&es->ui, FIELD_ID(ENT_BIRD, 2),
+                               FIELD_X, y, FIELD_W, &p->vx,
+                               PATROL_SPEED_LIMIT))
         editor_commit_change(es);
     y += ROW_H;
 
@@ -633,8 +658,9 @@ static void draw_faster_bird_properties(EditorState *es, int y)
     y += ROW_H;
 
     field_label(es, y, "vx", FIELD_ID(ENT_FASTER_BIRD, 2));
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 2),
-                       FIELD_X, y, FIELD_W, &p->vx))
+    if (ui_float_field_nonzero(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 2),
+                               FIELD_X, y, FIELD_W, &p->vx,
+                               PATROL_SPEED_LIMIT))
         editor_commit_change(es);
     y += ROW_H;
 
@@ -670,8 +696,9 @@ static void draw_fish_properties(EditorState *es, int y)
     y += ROW_H;
 
     field_label(es, y, "vx", FIELD_ID(ENT_FISH, 1));
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 1),
-                       FIELD_X, y, FIELD_W, &p->vx))
+    if (ui_float_field_nonzero(&es->ui, FIELD_ID(ENT_FISH, 1),
+                               FIELD_X, y, FIELD_W, &p->vx,
+                               PATROL_SPEED_LIMIT))
         editor_commit_change(es);
     y += ROW_H;
 
@@ -705,8 +732,9 @@ static void draw_faster_fish_properties(EditorState *es, int y)
     y += ROW_H;
 
     field_label(es, y, "vx", FIELD_ID(ENT_FASTER_FISH, 1));
-    if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 1),
-                       FIELD_X, y, FIELD_W, &p->vx))
+    if (ui_float_field_nonzero(&es->ui, FIELD_ID(ENT_FASTER_FISH, 1),
+                               FIELD_X, y, FIELD_W, &p->vx,
+                               PATROL_SPEED_LIMIT))
         editor_commit_change(es);
     y += ROW_H;
 
@@ -1269,6 +1297,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
      */
     PropertyPanelFn draw_fields = property_panel(es->selection.type);
     if (draw_fields) draw_fields(es, y);
+    show_field_note(es);
 
     /* A request is for the first drawing of fields after it: a key this
      * entity has no field for (or another entity) must not linger. */
@@ -1948,6 +1977,7 @@ void level_config_render(EditorState *es, int start_y, int available_h,
 
     EndScissorMode();
     editor_end_change_tracking(es);
+    show_field_note(es);
 
     /* A field activated by Tab or by a clicked validation message may be
      * scrolled out of sight: scroll just enough to show it (the clamp at
