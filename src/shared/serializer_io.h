@@ -118,9 +118,16 @@ void serializer_remove_temp(const char *path);
  * then failed to move the new file in: it returns SERIALIZER_REPLACE_TEMP_KEPT
  * and leaves both files untouched. */
 #define SERIALIZER_TEST_FAILURE_REPLACE_STRANDED 6
+/* A checked save's last fingerprint check sees a changed file (as if another
+ * program wrote it during the save), so the save returns -2. */
+#define SERIALIZER_TEST_FAILURE_SOURCE_CHANGED 7
 #ifdef MANGO_TESTING
 void serializer_test_set_failure(int failure);  /* test builds only */
 #endif
+
+/* 1 when the injected test failure is `failure` (it is then used up);
+ * always 0 in normal runs, where no failure is ever injected. */
+int serializer_test_take_failure(int failure);
 
 /* Check stdio output state, including the internal write-failure seam. */
 int serializer_stream_has_error(FILE *fp);
