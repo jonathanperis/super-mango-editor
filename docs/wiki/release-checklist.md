@@ -103,7 +103,9 @@ Publishing rules:
 - use `workflow_dispatch` **on `main`** for a manually versioned release.
 
 A separate `Checksums and provenance` job (the only one holding
-`attestations: write` and `id-token: write`) writes `SHA256SUMS` for the four
+`attestations: write` and `id-token: write`) waits for the same gates as the
+release (`build` and `Sanitizers (Linux x86_64)`), so no attestation is minted
+for archives a failing gate keeps unpublished. It writes `SHA256SUMS` for the four
 archives and creates a GitHub build provenance attestation for each. The
 release job re-checks the archives against `SHA256SUMS`, creates a draft,
 uploads the four archives plus `SHA256SUMS` without overwriting existing
