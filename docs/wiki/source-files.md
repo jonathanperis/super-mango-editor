@@ -351,9 +351,10 @@ Frees all resources in reverse init order.
 
 **Key functions:**
 - `int level_load(GameState *gs, const LevelDef *def);` -- validate and copy a parsed level definition into runtime `GameState`; returns `-1` without mutating current runtime state when runtime counts are invalid
+- `level_apply(GameState *gs, const LevelDef *def)` -- the copy step alone, for a definition `level_load_toml` already validated; it cannot fail. The level session parses and validates a level once, checks its sprites, then swaps the heap-staged `LevelDef` in and applies it, so a failed Next Level never replaces the current level
 - `level_reset(GameState *gs, const LevelDef *def)` -- restore mutable level state after death/retry; collected coins stay collected (Retry re-activates them)
 - `level_release_platform_tiles(GameState *gs)` -- unload the platform tile textures; `GameState.platform_tiles` loads each distinct `tile_path` once and every platform naming it borrows that texture, so a level with 23 stone pillars decodes `stone_platform.png` once, and reloading the same level (Replay, F8) decodes nothing
-- `level_load_toml(const char *path, LevelDef *def)` -- parse TOML into staging storage, run runtime validation, free TOML data, then assign the validated `LevelDef` to the caller
+- `level_load_toml(const char *path, LevelDef *def)` -- parse TOML into heap staging storage, run runtime validation, free TOML data, then assign the validated `LevelDef` to the caller. A `LevelDef` is about 16 KB; game load paths never keep one in a local variable (the browser stack is 64 KB), and `level.h` stops the build if it outgrows `LEVEL_DEF_SIZE_BUDGET`
 - `level_apply_player_physics(Player *player, const LevelDef *def)` -- reset player movement tunables to engine defaults, then apply non-negative level overrides
 - `level_validate_counts(const LevelDef *level, char *err, size_t err_sz)` -- reject out-of-range array counts
 - `phase_has_next`, `phase_next_path`, `phase_progress_save`, `phase_progress_restore` -- resolve level-completion next-phase paths and protect progress when staging phase transitions

@@ -40,9 +40,10 @@ void game_experiment_cleanup(GameState *gs)
 static void restart(GameState *gs, unsigned int seed)
 {
     game_random_seed(seed);
-    /* The active definition has already passed validation. Repeat initialization
-     * in the same order so random enemy timers and fog consume the same stream. */
-    (void)level_load(gs, gs->runtime.current_level);
+    /* The active definition has already passed validation, so apply it
+     * again without re-checking. Repeat initialization in the same order so
+     * random enemy timers and fog consume the same stream. */
+    level_apply(gs, gs->runtime.current_level);
     level_resources_apply(gs, gs->runtime.current_level);
     /* Reloading the music restarts it at the level's own volume; put the
      * player's mute and volume settings back so F8 cannot unmute the game. */

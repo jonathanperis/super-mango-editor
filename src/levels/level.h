@@ -519,6 +519,18 @@ typedef struct {
     } physics;
 } LevelDef;
 
+/*
+ * A LevelDef is big (about 16 KB) because every placement array is stored
+ * inline. The browser build runs on Emscripten's default 64 KB stack, where
+ * two local LevelDef copies once used half of it. So the game's load paths
+ * keep staging copies on the heap (serializer_load.c, level_session.c) and
+ * never declare a LevelDef local. This check stops the build if the struct
+ * grows past the budget, so that decision is revisited before it matters.
+ */
+#define LEVEL_DEF_SIZE_BUDGET (20 * 1024)
+_Static_assert(sizeof(LevelDef) <= LEVEL_DEF_SIZE_BUDGET,
+               "LevelDef outgrew its size budget; keep load staging off the stack");
+
 /* Resolve the original spawn, including the legacy engine default. */
 static inline void level_effective_spawn(const LevelDef *def,
                                          float *x, float *y)
