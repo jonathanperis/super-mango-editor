@@ -93,8 +93,9 @@ void game_ghost_restart(GameState *gs);
 void game_ghost_step(GameState *gs);
 
 /* The best run's sample to draw for the current step, or NULL when there
- * is nothing to draw: no best run, the Ghost setting is off, or the best
- * run has already reached its star. game_render.c draws it. */
+ * is nothing to draw: no best run, the Ghost setting is off, this run
+ * started part-way (Continue or a start point), or the best run has
+ * already reached its star. game_render.c draws it. */
 const GhostSample *game_ghost_current(const GameState *gs);
 
 /* Copy this finished attempt into out (owned; free with

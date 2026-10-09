@@ -5,6 +5,7 @@
 #include <string.h>
 #include "collectibles/coin.h"  /* MAX_COINS */
 #include "core/app_session.h"
+#include "collision/collision_damage.h"  /* game_restart_after_game_over */
 #include "core/game_checkpoint.h"
 #include "core/game_experiment.h"
 #include "core/game_ghost.h"
@@ -903,6 +904,66 @@ fail:
     return 1;
 }
 
+/*
+ * The ghost races from step 0 of the level. A run that picks the level up
+ * part-way (Continue, or a --start-x playtest) used to show it too, from
+ * the level start, where it had nothing to do with the player. It is now
+ * hidden for those runs and shown again for the next whole one.
+ */
+static int ghost_hidden_on_partial_runs(void)
+{
+    char path[160], lock_path[176], ghost_path[200];
+    const char *level = "levels/00_sandbox_01.toml";
+    snprintf(path, sizeof(path), TEST_OUT "profile-ghost-hidden-%llu.toml", (unsigned long long)clock_millis());
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+    CHECK(game_ghost_file_path(path, level, ghost_path, sizeof(ghost_path)) == 0);
+    AppSessionConfig config = {.level_path = level, .profile_enabled = 1, .profile_path = path};
+    AppSession *session = session_create(&config);
+    CHECK(session && session->game);
+    finish_run(session, 30, 0.5f);
+    session->game->screen.route = GAME_ROUTE_REPLAY;
+    session_frame(session);
+    CHECK(session->game->screen.ghost->best.count == 30);
+    CHECK(game_ghost_current(session->game) != NULL);  /* a whole run races it */
+
+    /* Leave a Continue point in the third screen. */
+    session->game->world.player.x = 2.0f * GAME_W + 50.0f;
+    game_checkpoint_update(session->game);
+    session->game->screen.route = GAME_ROUTE_EXIT;
+    session_frame(session);
+    session_destroy(&session);
+
+    config.level_path = NULL;
+    config.continue_last = 1;
+    session = session_create(&config);
+    CHECK(session && session->game && session->game->screen.resumed);
+    CHECK(session->game->screen.ghost && session->game->screen.ghost->best.count == 30);
+    game_ghost_step(session->game);
+    CHECK(game_ghost_current(session->game) == NULL);
+    session_destroy(&session);
+
+    config.level_path = level;
+    config.continue_last = 0;
+    config.start.kind = LEVEL_START_AT_X;
+    config.start.x = 300.0f;
+    session = session_create(&config);
+    CHECK(session && session->game && session->game->screen.ghost);
+    game_ghost_step(session->game);
+    CHECK(game_ghost_current(session->game) == NULL);
+    /* Retry after Game Over is a whole attempt again: the ghost returns. */
+    session->game->screen.game_over = 1;
+    game_restart_after_game_over(session->game);
+    game_ghost_step(session->game);
+    CHECK(game_ghost_current(session->game) != NULL);
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 0;
+fail:
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 1;
+}
+
 /* Collect raylib warnings so a test can see what the session logged. */
 static char last_warning[256];
 static void capture_warning(int level, const char *text, va_list args)
@@ -970,6 +1031,7 @@ int game_profile_contract_test(void)
     if (ghost_session_keeps_the_fastest_run()) return 1;
     puts("profile: start-point runs");
     if (start_point_runs_leave_the_profile_alone()) return 1;
+    if (ghost_hidden_on_partial_runs()) return 1;
     puts("game_profile_contract_test: ok");
     return 0;
 }
