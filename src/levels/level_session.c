@@ -60,10 +60,10 @@ static LevelDef *read_stable_level(const char *path, uint64_t *hash)
  */
 static void game_level_commit(GameState *gs, LevelDef *staged, uint64_t hash)
 {
-    free(gs->level_def);
-    gs->level_def = staged;
-    gs->runtime.current_level = staged;
-    gs->source_level_hash = hash;
+    free(gs->world.level_def);
+    gs->world.level_def = staged;
+    gs->world.runtime.current_level = staged;
+    gs->world.source_level_hash = hash;
     level_apply(gs, staged);
     game_completion_reset_summary(gs);
     level_resources_apply(gs, staged);
@@ -71,7 +71,7 @@ static void game_level_commit(GameState *gs, LevelDef *staged, uint64_t hash)
 
 /*
  * apply_start_request — Put the player where --start-x or
- * --start-checkpoint asked (gs->start_kind; level_start.h has the rules).
+ * --start-checkpoint asked (gs->screen.start_kind; level_start.h has the rules).
  *
  * The point becomes the respawn point, so a lost life comes back here
  * rather than at the level's start, until a later checkpoint is crossed.
@@ -84,20 +84,20 @@ static int apply_start_request(GameState *gs, const LevelDef *def)
     LevelStartPoint point;
     char err[128];
 
-    if (gs->start_kind == LEVEL_START_DEFAULT) return 0;
-    request.kind = (LevelStartKind)gs->start_kind;
-    request.x = gs->start_x;
-    request.checkpoint = gs->start_checkpoint;
+    if (gs->screen.start_kind == LEVEL_START_DEFAULT) return 0;
+    request.kind = (LevelStartKind)gs->screen.start_kind;
+    request.x = gs->screen.start_x;
+    request.checkpoint = gs->screen.start_checkpoint;
     if (level_start_resolve(def, &request, &point, err, sizeof(err)) != 0) {
-        fprintf(stderr, "Error: cannot start %s there: %s\n", gs->level_path, err);
+        fprintf(stderr, "Error: cannot start %s there: %s\n", gs->world.level_path, err);
         return -1;
     }
-    gs->respawn_x = point.spawn_x;
-    gs->respawn_y = point.spawn_y;
-    gs->checkpoint_index = point.checkpoint_index;
-    gs->player.spawn_x = point.spawn_x;
-    gs->player.spawn_y = point.spawn_y;
-    player_reset(&gs->player);
+    gs->world.respawn_x = point.spawn_x;
+    gs->world.respawn_y = point.spawn_y;
+    gs->world.checkpoint_index = point.checkpoint_index;
+    gs->world.player.spawn_x = point.spawn_x;
+    gs->world.player.spawn_y = point.spawn_y;
+    player_reset(&gs->world.player);
     /* Show the start point at once instead of panning from the left edge. */
     game_camera_snap(gs);
     return 0;
@@ -107,14 +107,14 @@ int game_level_load_initial(GameState *gs)
 {
     char safe_path[GAME_LEVEL_PATH_MAX] = {0};
 
-    if (!gs || gs->level_path[0] == '\0') {
+    if (!gs || gs->world.level_path[0] == '\0') {
         fprintf(stderr, "Error: initial level path is missing\n");
         return -1;
     }
 
-    if (level_resolve_path(gs->level_path, safe_path, sizeof(safe_path)) != 0) {
+    if (level_resolve_path(gs->world.level_path, safe_path, sizeof(safe_path)) != 0) {
         fprintf(stderr, "Error: could not resolve initial level: %s\n",
-                gs->level_path);
+                gs->world.level_path);
         return -1;
     }
 
@@ -136,7 +136,7 @@ int game_level_load_initial(GameState *gs)
 
 int game_load_next_phase(GameState *gs)
 {
-    const LevelDef *current = (const LevelDef *)gs->runtime.current_level;
+    const LevelDef *current = (const LevelDef *)gs->world.runtime.current_level;
     char next_path[256] = {0};
     if (phase_next_path(current, next_path, sizeof(next_path)) != 0) return -1;
 
@@ -163,25 +163,25 @@ int game_load_next_phase(GameState *gs)
     /* Every failure point is behind us: from here the switch cannot fail,
      * so the current level is only given up once the next one is certain. */
     game_experiment_cleanup(gs);
-    str_copy(gs->level_path, next_path, sizeof(gs->level_path));
+    str_copy(gs->world.level_path, next_path, sizeof(gs->world.level_path));
     game_level_commit(gs, next_level, source_hash);
 
     /* Only campaign progress crosses a phase boundary. Old movement, climbing,
      * and support indices refer to the previous level and must not survive. */
-    player_reset(&gs->player);
-    gs->loop.fp_prev_riding = -1;
+    player_reset(&gs->world.player);
+    gs->screen.loop.fp_prev_riding = -1;
     /* Show the new level's start at once. Setting the camera to 0 instead
      * would pan from the left edge whenever the start lies further right. */
     game_camera_snap(gs);
 
     phase_progress_restore(gs, &saved_progress);
-    gs->level_score_start = gs->score;
-    gs->profile_completion_recorded = 0;
+    gs->world.level_score_start = gs->world.score;
+    gs->screen.profile_completion_recorded = 0;
 
-    gs->completion.complete = 0;
+    gs->screen.completion.complete = 0;
 
-    if (gs->debug_mode) {
-        debug_log(&gs->debug, "PHASE TRANSITION to: %s", safe_path);
+    if (gs->screen.debug_mode) {
+        debug_log(&gs->screen.debug, "PHASE TRANSITION to: %s", safe_path);
     }
 
     return 0;
@@ -189,9 +189,9 @@ int game_load_next_phase(GameState *gs)
 
 void game_level_session_cleanup(GameState *gs)
 {
-    if (gs->level_def) {
-        free(gs->level_def);
-        gs->level_def = NULL;
+    if (gs->world.level_def) {
+        free(gs->world.level_def);
+        gs->world.level_def = NULL;
     }
-    gs->runtime.current_level = NULL;
+    gs->world.runtime.current_level = NULL;
 }

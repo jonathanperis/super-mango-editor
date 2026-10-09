@@ -8,15 +8,15 @@
 static void sync_pause_flag(GameState *gs)
 {
     if (!gs) return;
-    gs->paused = gs->pause_reasons != 0;
+    gs->screen.paused = gs->screen.pause_reasons != 0;
 }
 
 GameOverlayState game_overlay_state(const GameState *gs)
 {
     if (!gs) return GAME_OVERLAY_NONE;
-    if (gs->completion.complete) return GAME_OVERLAY_LEVEL_COMPLETE;
-    if (gs->game_over) return GAME_OVERLAY_GAME_OVER;
-    if (gs->paused || gs->pause_reasons != 0) return GAME_OVERLAY_PAUSED;
+    if (gs->screen.completion.complete) return GAME_OVERLAY_LEVEL_COMPLETE;
+    if (gs->screen.game_over) return GAME_OVERLAY_GAME_OVER;
+    if (gs->screen.paused || gs->screen.pause_reasons != 0) return GAME_OVERLAY_PAUSED;
     return GAME_OVERLAY_NONE;
 }
 
@@ -28,17 +28,17 @@ int game_overlay_blocks_update(const GameState *gs)
 unsigned int game_overlay_pause_reasons(const GameState *gs)
 {
     if (!gs) return 0;
-    if (gs->pause_reasons == 0 && gs->paused) return GAME_PAUSE_REASON_PLAYER;
-    return gs->pause_reasons;
+    if (gs->screen.pause_reasons == 0 && gs->screen.paused) return GAME_PAUSE_REASON_PLAYER;
+    return gs->screen.pause_reasons;
 }
 
 void game_overlay_set_pause_reason(GameState *gs, unsigned int reason, int enabled)
 {
     if (!gs) return;
     if (enabled) {
-        gs->pause_reasons |= reason;
+        gs->screen.pause_reasons |= reason;
     } else {
-        gs->pause_reasons &= ~reason;
+        gs->screen.pause_reasons &= ~reason;
     }
     sync_pause_flag(gs);
 }
@@ -49,15 +49,15 @@ void game_overlay_toggle_pause(GameState *gs)
     if (game_overlay_state(gs) == GAME_OVERLAY_LEVEL_COMPLETE) return;
     if (game_overlay_state(gs) == GAME_OVERLAY_GAME_OVER) return;
     game_overlay_set_pause_reason(gs, GAME_PAUSE_REASON_PLAYER,
-                                  (gs->pause_reasons & GAME_PAUSE_REASON_PLAYER) == 0);
+                                  (gs->screen.pause_reasons & GAME_PAUSE_REASON_PLAYER) == 0);
 }
 
 void game_overlay_resume(GameState *gs)
 {
     if (!gs) return;
     if (game_overlay_state(gs) != GAME_OVERLAY_PAUSED) return;
-    if (gs->pause_reasons == 0 && gs->paused) {
-        gs->paused = 0;
+    if (gs->screen.pause_reasons == 0 && gs->screen.paused) {
+        gs->screen.paused = 0;
         return;
     }
     game_overlay_set_pause_reason(gs, GAME_PAUSE_REASON_PLAYER, 0);
@@ -67,14 +67,14 @@ int game_simulation_blocked(const GameState *gs)
 {
     if (!gs) return 1;
     return game_overlay_blocks_update(gs) ||
-           (gs->settings_menu && gs->settings_menu->open) ||
-           !gs->running || gs->route != GAME_ROUTE_NONE;
+           (gs->screen.settings_menu && gs->screen.settings_menu->open) ||
+           !gs->screen.running || gs->screen.route != GAME_ROUTE_NONE;
 }
 
 int game_music_should_play(const GameState *gs)
 {
     if (!gs) return 0;
-    if (gs->settings_menu && gs->settings_menu->open) return 0;
+    if (gs->screen.settings_menu && gs->screen.settings_menu->open) return 0;
     return game_overlay_state(gs) != GAME_OVERLAY_PAUSED;
 }
 
@@ -88,21 +88,21 @@ void game_music_sync(const GameState *gs)
 
 void game_audio_apply_settings(const GameState *gs)
 {
-    if (!gs || !gs->profile) return;
-    const GameSettings *s = &gs->profile->data.settings;
+    if (!gs || !gs->screen.profile) return;
+    const GameSettings *s = &gs->screen.profile->data.settings;
     int volume = s->muted ? 0 : s->effects_volume;
 
-    sound_set_volume(gs->audio.coin, volume);
-    sound_set_volume(gs->audio.jump, volume);
-    sound_set_volume(gs->audio.hit, volume);
-    sound_set_volume(gs->audio.spring, volume);
-    sound_set_volume(gs->audio.axe, volume);
-    sound_set_volume(gs->audio.flap, volume);
-    sound_set_volume(gs->audio.spider_attack, volume);
-    sound_set_volume(gs->audio.dive, volume);
+    sound_set_volume(gs->assets.audio.coin, volume);
+    sound_set_volume(gs->assets.audio.jump, volume);
+    sound_set_volume(gs->assets.audio.hit, volume);
+    sound_set_volume(gs->assets.audio.spring, volume);
+    sound_set_volume(gs->assets.audio.axe, volume);
+    sound_set_volume(gs->assets.audio.flap, volume);
+    sound_set_volume(gs->assets.audio.spider_attack, volume);
+    sound_set_volume(gs->assets.audio.dive, volume);
 
     /* The settings slider scales the level's authored volume (0-128). */
-    const LevelDef *level = gs->runtime.current_level;
+    const LevelDef *level = gs->world.runtime.current_level;
     if (level)
         music_set_volume(s->muted ? 0 : level->music_volume * s->music_volume / 128);
 }

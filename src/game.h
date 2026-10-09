@@ -24,6 +24,12 @@
  * game can be reset or replaced by working on one object, and there is no
  * hidden global state or heap graph to trace.
  *
+ * Inside, GameState is split into three named parts so the path to a value
+ * also says what kind of state it is (see GameState at the end):
+ *   gs->world.spiders[i]     the level being simulated
+ *   gs->screen.paused        the game screen around it
+ *   gs->assets.textures.coin the sprites and sounds every level uses
+ *
  * The cost is visible below: to embed `Spider spiders[MAX_SPIDERS]` the
  * compiler must know sizeof(Spider), so game.h has to include every header
  * that defines a struct or MAX_* constant used by GameState. Those, and
@@ -246,18 +252,56 @@ typedef struct {
     MusicTrack *music;
 } AudioResources;
 
+/*
+ * GameAssets — the sprites and sound effects every level draws and plays.
+ *
+ * None of them depends on which level is loaded. Level-specific images
+ * (parallax layers, fog, the water strip, platform tiles) live with the
+ * level in GameWorld instead.
+ */
 typedef struct {
-    RenderTexture2D frame_target; /* owned logical canvas; session owns window */
-    int controller;               /* raylib device index + 1; zero means none */
     TextureResources textures;    /* owned GPU textures */
-    AudioResources audio;         /* owned samples and music stream */
-    ParallaxSystem      parallax;  /* multi-layer scrolling background            */
+    AudioResources   audio;       /* owned samples and music stream */
+} GameAssets;
+
+/*
+ * GameWorld — the level being played.
+ *
+ * Everything here describes the level as it is played: what is in it,
+ * where it is, and how the player is doing. The fixed-step update reads
+ * and writes it, and a lost life or Retry resets parts of it. "What
+ * happens to a spider each frame" happens to gs->world.spiders[i]. The
+ * level's own scenery images (parallax layers,
+ * fog, water strip, platform tiles) are owned here too, because they are
+ * loaded and replaced together with the level.
+ */
+typedef struct {
+    /* ---- Which level, and its level-wide settings ------------------- */
+    char          level_path[GAME_LEVEL_PATH_MAX]; /* TOML level to load (--level flag) */
+    void         *level_def;   /* owned active LevelDef backing storage   */
+    uint64_t      source_level_hash; /* source bytes corresponding to active LevelDef */
+    LevelRuntime  runtime;     /* active LevelDef pointer, level width, effect flags */
+    GameRules     rules;       /* score/life and collectible rule values             */
+
+    /* ---- The player and the camera that follows them -------------------- */
     Player        player;      /* the player, stored by value (not a pointer) */
+    GameCamera    camera;      /* viewport scroll position; updated every frame*/
+
+    /* ---- Scenery: background, water strip and fog ------------------------ */
+    ParallaxSystem parallax;   /* multi-layer scrolling background            */
+    Water         water;        /* animated water strip at the bottom of screen*/
+    FogSystem     fog;         /* atmospheric fog overlay — topmost layer      */
+
+    /* ---- Static geometry ------------------------------------------------- */
     Platform      platforms[MAX_PLATFORMS]; /* one-way pillar definitions     */
     int           platform_count;           /* how many platforms are active  */
     PlatformTileCache platform_tiles;       /* owns the textures platforms borrow */
-    Water         water;        /* animated water strip at the bottom of screen*/
-    FogSystem     fog;         /* atmospheric fog overlay — topmost layer      */
+    int           floor_gaps[MAX_FLOOR_GAPS]; /* left-edge x of each floor gap     */
+    int           floor_gap_count;           /* number of active floor gaps       */
+    Rail          rails[MAX_RAILS];/* level rail loop definitions                 */
+    int           rail_count;      /* number of active rail loops                 */
+
+    /* ---- Enemies --------------------------------------------------------- */
     Spider        spiders[MAX_SPIDERS]; /* ground-patrol enemy instances      */
     int           spider_count;         /* number of active spiders           */
     JumpingSpider jumping_spiders[MAX_JUMPING_SPIDERS]; /* jump-patrol enemies*/
@@ -268,36 +312,12 @@ typedef struct {
     int           faster_bird_count; /* number of active faster birds         */
     Fish          fish[MAX_FISH]; /* jumping water enemy instances             */
     int           fish_count;      /* number of active fish                     */
-    Coin          coins[MAX_COINS]; /* collectible coin instances             */
-    int           coin_count;       /* number of coins placed                */
-    VineDecor     vines[MAX_VINES]; /* static scenery vine instances               */
-    int           vine_count;       /* number of vine decorations placed           */
-    LadderDecor   ladders[MAX_LADDERS]; /* climbable ladder instances             */
-    int           ladder_count;    /* number of ladders placed                    */
-    RopeDecor     ropes[MAX_ROPES];/* climbable rope instances                    */
-    int           rope_count;      /* number of ropes placed                      */
-    Bouncepad     bouncepads_medium[MAX_BOUNCEPADS_MEDIUM]; /* wood pads             */
-    int           bouncepad_medium_count;     /* number of medium bouncepads         */
-    Bouncepad     bouncepads_small[MAX_BOUNCEPADS_SMALL];   /* green pads            */
-    int           bouncepad_small_count;      /* number of small bouncepads          */
-    Bouncepad     bouncepads_high[MAX_BOUNCEPADS_HIGH];     /* red pads              */
-    int           bouncepad_high_count;       /* number of high bouncepads           */
-    Rail          rails[MAX_RAILS];/* level rail loop definitions                 */
-    int           rail_count;      /* number of active rail loops                 */
+    FasterFish    faster_fish[MAX_FASTER_FISH]; /* fast jumping fish enemies   */
+    int           faster_fish_count;     /* number of faster fish placed       */
+
+    /* ---- Hazards --------------------------------------------------------- */
     SpikeBlock    spike_blocks[MAX_SPIKE_BLOCKS]; /* rail-riding hazard instances */
     int           spike_block_count;              /* number of active blocks      */
-    FloatPlatform  float_platforms[MAX_FLOAT_PLATFORMS];    /* hovering surface instances        */
-    int            float_platform_count;                    /* number of float platforms placed  */
-    Bridge        bridges[MAX_BRIDGES];/* tiled crumble walkway instances      */
-    int           bridge_count;        /* number of active bridges             */
-    int           floor_gaps[MAX_FLOOR_GAPS]; /* left-edge x of each floor gap     */
-    int           floor_gap_count;           /* number of active floor gaps       */
-    HealthStar    star_yellows[MAX_STAR_YELLOWS]; /* yellow health stars           */
-    int           star_yellow_count;     /* number of star yellows placed       */
-    HealthStar    star_greens[MAX_STAR_GREENS];   /* green health stars            */
-    int           star_green_count;      /* number of star greens placed        */
-    HealthStar    star_reds[MAX_STAR_REDS];       /* red health stars              */
-    int           star_red_count;        /* number of star reds placed          */
     AxeTrap       axe_traps[MAX_AXE_TRAPS]; /* swinging/spinning axe hazards  */
     int           axe_trap_count;        /* number of axe traps placed         */
     CircularSaw   circular_saws[MAX_CIRCULAR_SAWS]; /* fast patrol saw hazards */
@@ -306,34 +326,99 @@ typedef struct {
     int           blue_flame_count;     /* number of blue flames placed        */
     BlueFlame     fire_flames[MAX_FIRE_FLAMES]; /* erupting fire hazards (fire variant) */
     int           fire_flame_count;     /* number of fire flames placed        */
-    FasterFish    faster_fish[MAX_FASTER_FISH]; /* fast jumping fish enemies   */
-    int           faster_fish_count;     /* number of faster fish placed       */
-    LastStar      last_star;             /* end-of-level collectible           */
     SpikeRow      spike_rows[MAX_SPIKE_ROWS]; /* static ground spike hazards  */
     int           spike_row_count;       /* number of spike rows placed        */
     SpikePlatform spike_platforms[MAX_SPIKE_PLATFORMS]; /* elevated spike surfs*/
     int           spike_platform_count;  /* number of spike platforms placed   */
-    Hud           hud;         /* HUD display: hearts, lives, score           */
+
+    /* ---- Surfaces and climbables ------------------------------------------ */
+    FloatPlatform  float_platforms[MAX_FLOAT_PLATFORMS];    /* hovering surface instances        */
+    int            float_platform_count;                    /* number of float platforms placed  */
+    Bridge        bridges[MAX_BRIDGES];/* tiled crumble walkway instances      */
+    int           bridge_count;        /* number of active bridges             */
+    Bouncepad     bouncepads_medium[MAX_BOUNCEPADS_MEDIUM]; /* wood pads             */
+    int           bouncepad_medium_count;     /* number of medium bouncepads         */
+    Bouncepad     bouncepads_small[MAX_BOUNCEPADS_SMALL];   /* green pads            */
+    int           bouncepad_small_count;      /* number of small bouncepads          */
+    Bouncepad     bouncepads_high[MAX_BOUNCEPADS_HIGH];     /* red pads              */
+    int           bouncepad_high_count;       /* number of high bouncepads           */
+    VineDecor     vines[MAX_VINES]; /* static scenery vine instances               */
+    int           vine_count;       /* number of vine decorations placed           */
+    LadderDecor   ladders[MAX_LADDERS]; /* climbable ladder instances             */
+    int           ladder_count;    /* number of ladders placed                    */
+    RopeDecor     ropes[MAX_ROPES];/* climbable rope instances                    */
+    int           rope_count;      /* number of ropes placed                      */
+
+    /* ---- Collectibles ---------------------------------------------------- */
+    Coin          coins[MAX_COINS]; /* collectible coin instances             */
+    int           coin_count;       /* number of coins placed                */
+    HealthStar    star_yellows[MAX_STAR_YELLOWS]; /* yellow health stars           */
+    int           star_yellow_count;     /* number of star yellows placed       */
+    HealthStar    star_greens[MAX_STAR_GREENS];   /* green health stars            */
+    int           star_green_count;      /* number of star greens placed        */
+    HealthStar    star_reds[MAX_STAR_REDS];       /* red health stars              */
+    int           star_red_count;        /* number of star reds placed          */
+    LastStar      last_star;             /* end-of-level collectible           */
+
+    /* ---- Health, lives and score ------------------------------------------ */
     int           hearts;      /* current hit points (0–MAX_HEARTS)           */
     int           lives;       /* remaining lives; <0 triggers game over      */
     int           score;       /* cumulative score from collecting coins      */
     int           score_life_next; /* next bonus threshold; 0 = score ceiling reached */
-    GameCamera    camera;      /* viewport scroll position; updated every frame*/
-    int           running;     /* active game frame flag; session owns routes  */
-    GameRoute     route;       /* explicit request consumed by AppSession      */
-    int           game_over;   /* 1 = game-over overlay awaiting restart      */
-    int           paused;      /* 1 = pause overlay active; physics/music frozen */
-    unsigned int  pause_reasons; /* bitmask of active pause reasons             */
+    int           level_score_start; /* score when this level began (profile results) */
+
+    /* ---- Checkpoints and simulated time ----------------------------------- */
     float         respawn_x;      /* resolved respawn placement x               */
     float         respawn_y;      /* resolved respawn placement y               */
     int           checkpoint_index; /* authored checkpoint index, -1 before one */
     CheckpointFeedbackKind checkpoint_feedback_kind; /* explicit HUD cue reason */
     uint32_t      checkpoint_feedback_until; /* cue expiry, game_checkpoint_clock_ms time */
+    int           legacy_checkpoint_screen; /* last automatic screen boundary   */
     double        sim_time;    /* seconds simulated so far; only fixed steps
                                   advance it, so a pause stops it            */
-    int           legacy_checkpoint_screen; /* last automatic screen boundary   */
-    int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
+} GameWorld;
+
+/*
+ * GameScreen — everything about this game screen that is not the level.
+ *
+ * AppSession shows one screen at a time: the start menu or a GameState.
+ * This part holds the screen's canvas and HUD, its pause, game-over and
+ * completion overlays, the route it asks the session to take, the frame
+ * loop's clock, input latches, the replay script feeding it, the debug
+ * tools, and the options the session opened it with.
+ */
+typedef struct {
+    /* ---- Canvas, HUD and controller ------------------------------------- */
+    RenderTexture2D frame_target; /* owned logical canvas; session owns window */
+    Hud           hud;         /* HUD display: hearts, lives, score           */
+    int           controller;  /* raylib device index + 1; zero means none    */
+
+    /* ---- Flow: running, routes, overlays ------------------------------- */
+    int           running;     /* active game frame flag; session owns routes  */
+    GameRoute     route;       /* explicit request consumed by AppSession      */
+    int           game_over;   /* 1 = game-over overlay awaiting restart      */
+    int           paused;      /* 1 = pause overlay active; physics/music frozen */
+    unsigned int  pause_reasons; /* bitmask of active pause reasons             */
+    GameCompletionState completion; /* timer, summary, and next-phase state   */
+    int           terminal_action_index; /* focused terminal action row        */
+    GameLoopState loop;        /* frame loop scratch state for native/WASM loops */
+
+    /* ---- Input ----------------------------------------------------------- */
+    unsigned int  input_release_keyboard_mask;   /* keys held across a route    */
+    unsigned int  input_release_controller_mask; /* buttons held across a route */
+    int           input_release_latched;         /* physical input gate active   */
+
+    /* ---- How the session opened this screen ---------------------------- */
     int           smoke_test_frames; /* >0 = exit after this many frames     */
+    unsigned int  random_seed;
+    /* --start-x / --start-checkpoint (levels/level_start.h): where the
+     * first attempt at world.level_path starts.  start_kind is a
+     * LevelStartKind; 0 is the level's own start. */
+    int           start_kind;
+    float         start_x;
+    int           start_checkpoint;
+
+    /* ---- Scripted replay input ------------------------------------------ */
     char          replay_script_path[256]; /* optional replay script name     */
     char          replay_dir[256]; /* folder holding replay scripts; "" = default */
     unsigned int  replay_input_mask; /* replay keys active for this frame    */
@@ -342,32 +427,18 @@ typedef struct {
     struct GameReplayEvent *replay_events; /* owned parsed replay, NULL in normal play */
     int           replay_event_count;
     int           replay_cursor;
-    char          level_path[GAME_LEVEL_PATH_MAX]; /* TOML level to load (--level flag) */
-    /* --start-x / --start-checkpoint (levels/level_start.h): where the
-     * first attempt at level_path starts.  start_kind is a LevelStartKind;
-     * 0 is the level's own start. */
-    int           start_kind;
-    float         start_x;
-    int           start_checkpoint;
-    void         *level_def;   /* owned active LevelDef backing storage   */
-    DebugOverlay  debug;       /* FPS counter, collision vis, event log      */
 
-    LevelRuntime runtime; /* active LevelDef pointer, level width, effect flags */
-    GameRules    rules;   /* score/life and collectible rule values             */
-    GameLoopState loop;   /* frame loop scratch state for native/WASM loops     */
-    GameCompletionState completion; /* timer, summary, and next-phase state   */
-    int           terminal_action_index; /* focused terminal action row        */
-    unsigned int  input_release_keyboard_mask;   /* keys held across a route    */
-    unsigned int  input_release_controller_mask; /* buttons held across a route */
-    int           input_release_latched;         /* physical input gate active   */
+    /* ---- Player profile, settings, time trial ---------------------------- */
     struct GameProfile *profile; /* borrowed from the owning AppSession */
     struct SettingsMenu *settings_menu; /* borrowed; screen cleanup releases its textures */
     char profile_level_key[256];
     int profile_completion_recorded;
     int resumed;        /* 1 = this run started from a saved Continue point */
-    int level_score_start;
-    unsigned int random_seed;
-    uint64_t source_level_hash; /* source bytes corresponding to active LevelDef */
+    struct GameGhost *ghost; /* owned time-trial recorder and best run; NULL without a profile */
+
+    /* ---- Debug tools ------------------------------------------------------ */
+    int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
+    DebugOverlay  debug;       /* FPS counter, collision vis, event log      */
     struct {
         int frozen, step_requested, slow_mode, physics_field, entity_index;
         int show_keys;                    /* F5 toggles the key help panel   */
@@ -375,7 +446,20 @@ typedef struct {
                                              tuning line after F6/F7/-/+    */
     } inspector;
     struct GameExperiment *experiment; /* owned opt-in capture/replay */
-    struct GameGhost *ghost; /* owned time-trial recorder and best run; NULL without a profile */
+} GameScreen;
+
+/*
+ * GameState — one game screen: its world, its screen state and its assets.
+ *
+ * The three parts answer "what kind of state is this?":
+ *   gs->world   the level being played (player, entities, camera, score)
+ *   gs->screen  the screen around it (HUD, overlays, routes, replay, debug)
+ *   gs->assets  the sprites and sounds every level uses
+ */
+typedef struct GameState {
+    GameWorld  world;
+    GameScreen screen;
+    GameAssets assets;
 } GameState;
 
 /* ------------------------------------------------------------------ */

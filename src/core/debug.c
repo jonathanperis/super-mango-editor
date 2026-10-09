@@ -58,98 +58,98 @@ static void draw_collision_boxes(const GameState *gs, int cam)
 {
     /* Draw world-space collision extents, not entire transparent sprite slots.
      * The same helpers feed collision detection; outline applies camera X. */
-    outline(player_get_hitbox(&gs->player),cam,(Color){0,255,0,255});
-    for (int i = 0; i < gs->floor_gap_count; i++)
-        outline((IntRect){gs->floor_gaps[i], GAME_H - WATER_ART_H, FLOOR_GAP_W, WATER_ART_H},
+    outline(player_get_hitbox(&gs->world.player),cam,(Color){0,255,0,255});
+    for (int i = 0; i < gs->world.floor_gap_count; i++)
+        outline((IntRect){gs->world.floor_gaps[i], GAME_H - WATER_ART_H, FLOOR_GAP_W, WATER_ART_H},
                 cam, (Color){0, 50, 200, 255});
-    for (int i = 0; i < gs->platform_count; i++) {
-        const Platform *p = &gs->platforms[i];
+    for (int i = 0; i < gs->world.platform_count; i++) {
+        const Platform *p = &gs->world.platforms[i];
         outline((IntRect){(int)p->x, (int)p->y, p->w, p->h}, cam, (Color){0, 100, 255, 255});
     }
-    for (int i=0;i<gs->float_platform_count;i++)
-        if (gs->float_platforms[i].active) outline(float_platform_get_rect(&gs->float_platforms[i]),cam,(Color){0,200,180,255});
+    for (int i=0;i<gs->world.float_platform_count;i++)
+        if (gs->world.float_platforms[i].active) outline(float_platform_get_rect(&gs->world.float_platforms[i]),cam,(Color){0,200,180,255});
     /* Crumbling bridges contain independently active bricks; use each brick's
      * current offset, just as collision does, rather than one large bridge box. */
-    for (int i = 0; i < gs->bridge_count; i++) {
-        const Bridge *b = &gs->bridges[i];
+    for (int i = 0; i < gs->world.bridge_count; i++) {
+        const Bridge *b = &gs->world.bridges[i];
         for (int j = 0; j < b->brick_count; j++)
             if (b->bricks[j].active)
                 outline((IntRect){(int)b->x + j*BRIDGE_TILE_W,
                                   (int)(b->base_y + b->bricks[j].y_offset),
                                   BRIDGE_TILE_W, BRIDGE_TILE_H}, cam, (Color){180,120,60,255});
     }
-    for (int i=0;i<gs->coin_count;i++) if (gs->coins[i].active)
-        outline((IntRect){(int)gs->coins[i].x,(int)gs->coins[i].y,COIN_DISPLAY_W,COIN_DISPLAY_H},cam,(Color){255,255,0,255});
-    for (int i=0;i<gs->star_yellow_count;i++) if (gs->star_yellows[i].active)
-        outline(health_star_get_hitbox(&gs->star_yellows[i]),cam,(Color){255,0,255,255});
-    for (int i=0;i<gs->star_green_count;i++) if (gs->star_greens[i].active)
-        outline(health_star_get_hitbox(&gs->star_greens[i]),cam,(Color){0,200,0,255});
-    for (int i=0;i<gs->star_red_count;i++) if (gs->star_reds[i].active)
-        outline(health_star_get_hitbox(&gs->star_reds[i]),cam,(Color){200,0,0,255});
+    for (int i=0;i<gs->world.coin_count;i++) if (gs->world.coins[i].active)
+        outline((IntRect){(int)gs->world.coins[i].x,(int)gs->world.coins[i].y,COIN_DISPLAY_W,COIN_DISPLAY_H},cam,(Color){255,255,0,255});
+    for (int i=0;i<gs->world.star_yellow_count;i++) if (gs->world.star_yellows[i].active)
+        outline(health_star_get_hitbox(&gs->world.star_yellows[i]),cam,(Color){255,0,255,255});
+    for (int i=0;i<gs->world.star_green_count;i++) if (gs->world.star_greens[i].active)
+        outline(health_star_get_hitbox(&gs->world.star_greens[i]),cam,(Color){0,200,0,255});
+    for (int i=0;i<gs->world.star_red_count;i++) if (gs->world.star_reds[i].active)
+        outline(health_star_get_hitbox(&gs->world.star_reds[i]),cam,(Color){200,0,0,255});
 
     /* Patrol extents follow visible art, rather than transparent sprite slots. */
-    for (int i=0;i<gs->spider_count;i++) {
-        const Spider *s=&gs->spiders[i];
+    for (int i=0;i<gs->world.spider_count;i++) {
+        const Spider *s=&gs->world.spiders[i];
         outline(spider_build_hitbox(s),cam,(Color){255,0,0,255});
         int y=FLOOR_Y-SPIDER_ART_H/2;
         DrawLine((int)s->patrol_x0+SPIDER_ART_X-cam,y,(int)s->patrol_x1-SPIDER_FRAME_W+SPIDER_ART_X+SPIDER_ART_W-cam,y,(Color){180,0,0,255});
     }
-    for (int i=0;i<gs->jumping_spider_count;i++) {
-        const JumpingSpider *s=&gs->jumping_spiders[i];
+    for (int i=0;i<gs->world.jumping_spider_count;i++) {
+        const JumpingSpider *s=&gs->world.jumping_spiders[i];
         outline(jumping_spider_build_hitbox(s),cam,(Color){255,0,180,255});
         int y=FLOOR_Y-JSPIDER_ART_H/2;
         DrawLine((int)s->patrol_x0+JSPIDER_ART_X-cam,y,(int)s->patrol_x1-JSPIDER_FRAME_W+JSPIDER_ART_X+JSPIDER_ART_W-cam,y,(Color){180,0,120,255});
     }
-    for (int i=0;i<gs->bird_count;i++) {
-        const Bird *b=&gs->birds[i];
+    for (int i=0;i<gs->world.bird_count;i++) {
+        const Bird *b=&gs->world.birds[i];
         outline(bird_get_hitbox(b),cam,(Color){255,160,0,255});
         int y=(int)b->base_y+BIRD_ART_H/2;
         DrawLine((int)b->patrol_x0+BIRD_ART_X-cam,y,(int)b->patrol_x1-BIRD_FRAME_W+BIRD_ART_X+BIRD_ART_W-cam,y,(Color){180,120,0,255});
     }
-    for (int i=0;i<gs->faster_bird_count;i++) {
-        const FasterBird *b=&gs->faster_birds[i];
+    for (int i=0;i<gs->world.faster_bird_count;i++) {
+        const FasterBird *b=&gs->world.faster_birds[i];
         outline(faster_bird_get_hitbox(b),cam,(Color){255,100,200,255});
         int y=(int)b->base_y+FBIRD_ART_H/2;
         DrawLine((int)b->patrol_x0+FBIRD_ART_X-cam,y,(int)b->patrol_x1-FBIRD_FRAME_W+FBIRD_ART_X+FBIRD_ART_W-cam,y,(Color){180,70,140,255});
     }
-    for (int i=0;i<gs->fish_count;i++) {
-        const Fish *f=&gs->fish[i];
+    for (int i=0;i<gs->world.fish_count;i++) {
+        const Fish *f=&gs->world.fish[i];
         outline(fish_get_hitbox(f),cam,(Color){255,50,50,255});
         int y=(int)f->water_y+24;
         DrawLine((int)f->patrol_x0+FISH_HITBOX_PAD_X-cam,y,(int)f->patrol_x1-FISH_HITBOX_PAD_X-cam,y,(Color){180,50,50,255});
     }
-    for (int i=0;i<gs->spike_block_count;i++) if (gs->spike_blocks[i].active)
-        outline(spike_block_get_hitbox(&gs->spike_blocks[i]),cam,(Color){255,140,0,255});
-    for (int i = 0; i < gs->axe_trap_count; i++)
-        if (gs->axe_traps[i].active) {
-            outline(axe_trap_get_hitbox(&gs->axe_traps[i]), cam, (Color){200,0,50,255});
-            int x = (int)gs->axe_traps[i].x - cam, y = (int)gs->axe_traps[i].y + 4;
+    for (int i=0;i<gs->world.spike_block_count;i++) if (gs->world.spike_blocks[i].active)
+        outline(spike_block_get_hitbox(&gs->world.spike_blocks[i]),cam,(Color){255,140,0,255});
+    for (int i = 0; i < gs->world.axe_trap_count; i++)
+        if (gs->world.axe_traps[i].active) {
+            outline(axe_trap_get_hitbox(&gs->world.axe_traps[i]), cam, (Color){200,0,50,255});
+            int x = (int)gs->world.axe_traps[i].x - cam, y = (int)gs->world.axe_traps[i].y + 4;
             DrawLine(x - 3, y, x + 3, y, (Color){200,0,50,255});
             DrawLine(x, y - 3, x, y + 3, (Color){200,0,50,255});
         }
-    for (int i=0;i<gs->spike_row_count;i++) if (gs->spike_rows[i].active)
-        outline(spike_row_get_rect(&gs->spike_rows[i]),cam,(Color){220,180,0,255});
-    for (int i=0;i<gs->spike_platform_count;i++) if (gs->spike_platforms[i].active)
-        outline(spike_platform_get_rect(&gs->spike_platforms[i]),cam,(Color){180,0,120,255});
-    for (int i=0;i<gs->blue_flame_count;i++) if (gs->blue_flames[i].active && gs->blue_flames[i].state!=BLUE_FLAME_WAITING)
-        outline(blue_flame_get_hitbox(&gs->blue_flames[i]),cam,(Color){255,80,0,255});
-    for (int i=0;i<gs->fire_flame_count;i++) if (gs->fire_flames[i].active && gs->fire_flames[i].state!=BLUE_FLAME_WAITING)
-        outline(blue_flame_get_hitbox(&gs->fire_flames[i]),cam,(Color){255,120,0,255});
-    for (int i=0;i<gs->circular_saw_count;i++) if (gs->circular_saws[i].active)
-        outline(circular_saw_get_hitbox(&gs->circular_saws[i]),cam,(Color){255,140,0,255});
-    for (int i=0;i<gs->faster_fish_count;i++) outline(faster_fish_get_hitbox(&gs->faster_fish[i]),cam,(Color){220,100,180,255});
-    if (gs->last_star.active) outline(last_star_get_hitbox(&gs->last_star),cam,(Color){255,215,0,255});
+    for (int i=0;i<gs->world.spike_row_count;i++) if (gs->world.spike_rows[i].active)
+        outline(spike_row_get_rect(&gs->world.spike_rows[i]),cam,(Color){220,180,0,255});
+    for (int i=0;i<gs->world.spike_platform_count;i++) if (gs->world.spike_platforms[i].active)
+        outline(spike_platform_get_rect(&gs->world.spike_platforms[i]),cam,(Color){180,0,120,255});
+    for (int i=0;i<gs->world.blue_flame_count;i++) if (gs->world.blue_flames[i].active && gs->world.blue_flames[i].state!=BLUE_FLAME_WAITING)
+        outline(blue_flame_get_hitbox(&gs->world.blue_flames[i]),cam,(Color){255,80,0,255});
+    for (int i=0;i<gs->world.fire_flame_count;i++) if (gs->world.fire_flames[i].active && gs->world.fire_flames[i].state!=BLUE_FLAME_WAITING)
+        outline(blue_flame_get_hitbox(&gs->world.fire_flames[i]),cam,(Color){255,120,0,255});
+    for (int i=0;i<gs->world.circular_saw_count;i++) if (gs->world.circular_saws[i].active)
+        outline(circular_saw_get_hitbox(&gs->world.circular_saws[i]),cam,(Color){255,140,0,255});
+    for (int i=0;i<gs->world.faster_fish_count;i++) outline(faster_fish_get_hitbox(&gs->world.faster_fish[i]),cam,(Color){220,100,180,255});
+    if (gs->world.last_star.active) outline(last_star_get_hitbox(&gs->world.last_star),cam,(Color){255,215,0,255});
     /* Climbables show their full interaction spans, including tile overlap. */
-    for (int i=0;i<gs->ladder_count;i++) {
-        const LadderDecor *d=&gs->ladders[i];
+    for (int i=0;i<gs->world.ladder_count;i++) {
+        const LadderDecor *d=&gs->world.ladders[i];
         outline((IntRect){(int)d->x,(int)d->y,LADDER_W,(d->tile_count-1)*LADDER_STEP+LADDER_H},cam,(Color){180,120,60,255});
     }
-    for (int i=0;i<gs->rope_count;i++) {
-        const RopeDecor *r=&gs->ropes[i];
+    for (int i=0;i<gs->world.rope_count;i++) {
+        const RopeDecor *r=&gs->world.ropes[i];
         outline((IntRect){(int)r->x,(int)r->y,ROPE_W,(r->tile_count-1)*ROPE_STEP+ROPE_H},cam,(Color){200,160,100,255});
     }
-    const Bouncepad *pads[] = {gs->bouncepads_medium, gs->bouncepads_small, gs->bouncepads_high};
-    int counts[] = {gs->bouncepad_medium_count, gs->bouncepad_small_count, gs->bouncepad_high_count};
+    const Bouncepad *pads[] = {gs->world.bouncepads_medium, gs->world.bouncepads_small, gs->world.bouncepads_high};
+    int counts[] = {gs->world.bouncepad_medium_count, gs->world.bouncepad_small_count, gs->world.bouncepad_high_count};
     Color colors[] = {{0,255,255,255}, {0,200,0,255}, {255,50,50,255}};
     for (int kind = 0; kind < 3; kind++)
         for (int i = 0; i < counts[kind]; i++) {
@@ -157,16 +157,16 @@ static void draw_collision_boxes(const GameState *gs, int cam)
             outline((IntRect){(int)p->x + BOUNCEPAD_ART_X, (int)p->y, BOUNCEPAD_ART_W, p->h},
                     cam, colors[kind]);
         }
-    for (int i=0;i<gs->vine_count;i++) {
-        const VineDecor *v=&gs->vines[i];
+    for (int i=0;i<gs->world.vine_count;i++) {
+        const VineDecor *v=&gs->world.vines[i];
         outline((IntRect){(int)v->x-4,(int)v->y,VINE_W+8,(v->tile_count-1)*VINE_STEP+VINE_H},cam,(Color){0,180,0,255});
     }
-    for (int i=0;i<gs->rail_count;i++) for (int j=0;j<gs->rails[i].count;j++)
-        outline((IntRect){gs->rails[i].tiles[j].x,gs->rails[i].tiles[j].y,RAIL_TILE_W,RAIL_TILE_H},cam,(Color){160,80,255,255});
+    for (int i=0;i<gs->world.rail_count;i++) for (int j=0;j<gs->world.rails[i].count;j++)
+        outline((IntRect){gs->world.rails[i].tiles[j].x,gs->world.rails[i].tiles[j].y,RAIL_TILE_W,RAIL_TILE_H},cam,(Color){160,80,255,255});
 
     /* HUD outlines use camera=0 and the very rectangles hud_render draws. */
     HudLayout hud;
-    hud_layout(&gs->hud, gs->hearts, gs->lives, gs->score, &hud);
+    hud_layout(&gs->screen.hud, gs->world.hearts, gs->world.lives, gs->world.score, &hud);
     for (int i = 0; i < hud.heart_count; i++) outline(hud.hearts[i], 0, WHITE);
     outline(hud.player_icon, 0, WHITE);
     outline(hud.lives_text, 0, WHITE);
@@ -281,14 +281,14 @@ void debug_render(const DebugOverlay *dbg, TextFont *font, const void *state, in
     /* ---- Bottom right: the player, one line ------------------------
      * State, ground/air, facing and velocity always; checkpoint, riding
      * platform and hurt time only while they mean something. */
-    const Player *p=&gs->player;
+    const Player *p=&gs->world.player;
     static const char *states[]={"IDLE","WALK","JUMP","FALL","CLIMB"};
     static const char *climbs[]={" VINE"," LADDER"," ROPE"};
     char player_line[96], extras[48] = "";
-    if (gs->checkpoint_index >= 0)
-        snprintf(extras + strlen(extras), sizeof(extras) - strlen(extras), " CP%d", gs->checkpoint_index);
-    if (gs->loop.fp_prev_riding >= 0)
-        snprintf(extras + strlen(extras), sizeof(extras) - strlen(extras), " FP%d", gs->loop.fp_prev_riding);
+    if (gs->world.checkpoint_index >= 0)
+        snprintf(extras + strlen(extras), sizeof(extras) - strlen(extras), " CP%d", gs->world.checkpoint_index);
+    if (gs->screen.loop.fp_prev_riding >= 0)
+        snprintf(extras + strlen(extras), sizeof(extras) - strlen(extras), " FP%d", gs->screen.loop.fp_prev_riding);
     snprintf(player_line, sizeof(player_line), "%s %s %s%s  vx %.0f vy %.0f%s",
              states[p->anim_state], p->on_ground ? "GND" : "AIR", p->facing_left ? "<" : ">",
              p->on_vine ? climbs[p->climb_source] : "", p->vx, p->vy, extras);

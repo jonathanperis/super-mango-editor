@@ -28,7 +28,7 @@ static int pause_overlay_blocks_update(void)
 {
     GameState gs = {0};
 
-    gs.paused = 1;
+    gs.screen.paused = 1;
 
     if (expect_int("paused overlay", game_overlay_state(&gs), GAME_OVERLAY_PAUSED) != 0)
         return 1;
@@ -42,7 +42,7 @@ static int completion_overlay_blocks_update(void)
 {
     GameState gs = {0};
 
-    gs.completion.complete = 1;
+    gs.screen.completion.complete = 1;
 
     if (expect_int("completion overlay", game_overlay_state(&gs), GAME_OVERLAY_LEVEL_COMPLETE) != 0)
         return 1;
@@ -56,8 +56,8 @@ static int completion_overlay_wins_over_pause(void)
 {
     GameState gs = {0};
 
-    gs.paused = 1;
-    gs.completion.complete = 1;
+    gs.screen.paused = 1;
+    gs.screen.completion.complete = 1;
 
     if (expect_int("completion priority", game_overlay_state(&gs), GAME_OVERLAY_LEVEL_COMPLETE) != 0)
         return 1;
@@ -71,7 +71,7 @@ static int game_over_overlay_blocks_update(void)
 {
     GameState gs = {0};
 
-    gs.game_over = 1;
+    gs.screen.game_over = 1;
 
     if (expect_int("game over overlay", game_overlay_state(&gs), GAME_OVERLAY_GAME_OVER) != 0)
         return 1;
@@ -85,8 +85,8 @@ static int completion_overlay_wins_over_game_over(void)
 {
     GameState gs = {0};
 
-    gs.game_over = 1;
-    gs.completion.complete = 1;
+    gs.screen.game_over = 1;
+    gs.screen.completion.complete = 1;
 
     if (expect_int("completion priority over game over",
                    game_overlay_state(&gs), GAME_OVERLAY_LEVEL_COMPLETE) != 0)
@@ -100,13 +100,13 @@ static int player_pause_toggle_pauses_and_resumes_active_gameplay(void)
     GameState gs = {0};
 
     game_overlay_toggle_pause(&gs);
-    if (expect_int("toggle pauses active gameplay", gs.paused, 1) != 0)
+    if (expect_int("toggle pauses active gameplay", gs.screen.paused, 1) != 0)
         return 1;
     if (expect_int("toggle pause overlay", game_overlay_state(&gs), GAME_OVERLAY_PAUSED) != 0)
         return 1;
 
     game_overlay_toggle_pause(&gs);
-    if (expect_int("toggle resumes paused gameplay", gs.paused, 0) != 0)
+    if (expect_int("toggle resumes paused gameplay", gs.screen.paused, 0) != 0)
         return 1;
     if (expect_int("resumed overlay", game_overlay_state(&gs), GAME_OVERLAY_NONE) != 0)
         return 1;
@@ -118,10 +118,10 @@ static int pause_toggle_ignores_completion_overlay(void)
 {
     GameState gs = {0};
 
-    gs.completion.complete = 1;
+    gs.screen.completion.complete = 1;
 
     game_overlay_toggle_pause(&gs);
-    if (expect_int("completion toggle leaves pause off", gs.paused, 0) != 0)
+    if (expect_int("completion toggle leaves pause off", gs.screen.paused, 0) != 0)
         return 1;
     if (expect_int("completion toggle overlay", game_overlay_state(&gs), GAME_OVERLAY_LEVEL_COMPLETE) != 0)
         return 1;
@@ -133,17 +133,17 @@ static int resume_from_pause_only_clears_pause_overlay(void)
 {
     GameState gs = {0};
 
-    gs.paused = 1;
+    gs.screen.paused = 1;
     game_overlay_resume(&gs);
-    if (expect_int("resume clears pause", gs.paused, 0) != 0)
+    if (expect_int("resume clears pause", gs.screen.paused, 0) != 0)
         return 1;
     if (expect_int("resume clears overlay", game_overlay_state(&gs), GAME_OVERLAY_NONE) != 0)
         return 1;
 
-    gs.paused = 1;
-    gs.completion.complete = 1;
+    gs.screen.paused = 1;
+    gs.screen.completion.complete = 1;
     game_overlay_resume(&gs);
-    if (expect_int("completion resume leaves pause untouched", gs.paused, 1) != 0)
+    if (expect_int("completion resume leaves pause untouched", gs.screen.paused, 1) != 0)
         return 1;
     if (expect_int("completion resume overlay", game_overlay_state(&gs), GAME_OVERLAY_LEVEL_COMPLETE) != 0)
         return 1;
@@ -157,7 +157,7 @@ static int pause_reasons_preserve_player_pause_after_focus_resume(void)
 
     game_overlay_toggle_pause(&gs);
     game_overlay_set_pause_reason(&gs, GAME_PAUSE_REASON_FOCUS, 1);
-    if (expect_int("player plus focus pause", gs.paused, 1) != 0)
+    if (expect_int("player plus focus pause", gs.screen.paused, 1) != 0)
         return 1;
     if (expect_int("player plus focus reasons",
                    game_overlay_pause_reasons(&gs),
@@ -165,20 +165,20 @@ static int pause_reasons_preserve_player_pause_after_focus_resume(void)
         return 1;
 
     game_overlay_set_pause_reason(&gs, GAME_PAUSE_REASON_FOCUS, 0);
-    if (expect_int("focus resume preserves player pause", gs.paused, 1) != 0)
+    if (expect_int("focus resume preserves player pause", gs.screen.paused, 1) != 0)
         return 1;
     if (expect_int("focus resume preserves player reason",
                    game_overlay_pause_reasons(&gs), GAME_PAUSE_REASON_PLAYER) != 0)
         return 1;
 
     game_overlay_resume(&gs);
-    if (expect_int("player resume clears final pause", gs.paused, 0) != 0)
+    if (expect_int("player resume clears final pause", gs.screen.paused, 0) != 0)
         return 1;
 
     game_overlay_toggle_pause(&gs);
     game_overlay_set_pause_reason(&gs, GAME_PAUSE_REASON_FOCUS, 1);
     game_overlay_resume(&gs);
-    if (expect_int("player resume preserves focus pause", gs.paused, 1) != 0)
+    if (expect_int("player resume preserves focus pause", gs.screen.paused, 1) != 0)
         return 1;
     if (expect_int("player resume preserves focus reason",
                    game_overlay_pause_reasons(&gs), GAME_PAUSE_REASON_FOCUS) != 0)

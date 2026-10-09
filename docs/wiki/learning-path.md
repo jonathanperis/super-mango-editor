@@ -101,7 +101,7 @@ coin position never does?
 <details>
 <summary>Hint</summary>
 
-Think about what else reads `gs->coins[i].x` besides the renderer, and how
+Think about what else reads `gs->world.coins[i].x` besides the renderer, and how
 often the camera moves.
 
 </details>

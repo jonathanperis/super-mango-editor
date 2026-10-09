@@ -127,7 +127,7 @@ static int physical_release_latch_blocks_transition_input(void)
     game_input_arm_release_latch(&gs, NULL);
     sampled = game_input_sample(&gs);
     if (expect_int("held Space is gated", sampled, 0) != 0 ||
-        expect_int("Space latch armed", gs.input_release_latched, 1) != 0)
+        expect_int("Space latch armed", gs.screen.input_release_latched, 1) != 0)
         goto fail;
     player_handle_input(&player, NULL, 0, sampled,
                         NULL, 0, NULL, 0, NULL, 0);
@@ -136,7 +136,7 @@ static int physical_release_latch_blocks_transition_input(void)
 
     game_input_test_set_physical_state(0, 0);
     if (expect_int("Space release clears gate", game_input_sample(&gs), 0) != 0 ||
-        expect_int("Space latch cleared", gs.input_release_latched, 0) != 0)
+        expect_int("Space latch cleared", gs.screen.input_release_latched, 0) != 0)
         goto fail;
 
     game_input_test_set_physical_state(PLAYER_INPUT_LEFT, 0);
@@ -329,7 +329,7 @@ static int direct_game_boot_repairs_input_and_keeps_controller_runtime(void)
         expect_int("direct boot repairs web input", session->web_input_repair_count, 1) != 0 ||
         expect_int("direct boot owns window", IsWindowReady(), 1) != 0 ||
         expect_int("direct boot input ready", input_ready(), 1) != 0 ||
-        expect_int("direct boot latch armed", session->game->input_release_latched, 1) != 0 ||
+        expect_int("direct boot latch armed", session->game->screen.input_release_latched, 1) != 0 ||
         expect_int("direct boot held input gated", game_input_sample(session->game), 0) != 0)
         goto fail;
 
@@ -343,7 +343,7 @@ static int direct_game_boot_repairs_input_and_keeps_controller_runtime(void)
     if (expect_int("direct boot release opens gate",
                    game_input_sample(session->game), 0) != 0 ||
         expect_int("direct boot latch cleared",
-                   session->game->input_release_latched, 0) != 0)
+                   session->game->screen.input_release_latched, 0) != 0)
         goto fail;
 
     session_destroy(&session);
@@ -466,12 +466,12 @@ static int start_points_place_the_first_game(void)
         return 1;
     }
     game = session->game;
-    failed |= expect_float("start-x respawn x", game->respawn_x, 592.0f);
-    failed |= expect_float("start-x stands on the pillar", game->respawn_y,
+    failed |= expect_float("start-x respawn x", game->world.respawn_x, 592.0f);
+    failed |= expect_float("start-x stands on the pillar", game->world.respawn_y,
                            (float)(FLOOR_Y - 2 * TILE_SIZE + 16));
     failed |= expect_float("start-x player centred",
-                           game->player.x + game->player.w / 2.0f, 616.0f);
-    failed |= expect_int("start-x checkpoint behind", game->checkpoint_index, 0);
+                           game->world.player.x + game->world.player.w / 2.0f, 616.0f);
+    failed |= expect_int("start-x checkpoint behind", game->world.checkpoint_index, 0);
     failed |= expect_int("start used up", session->start.kind, LEVEL_START_DEFAULT);
     session_destroy(&session);
     if (failed) return 1;
@@ -488,9 +488,9 @@ static int start_points_place_the_first_game(void)
         return 1;
     }
     game = session->game;
-    failed |= expect_float("checkpoint respawn x", game->respawn_x, 1000.0f);
-    failed |= expect_float("checkpoint respawn y", game->respawn_y, 252.0f);
-    failed |= expect_int("checkpoint index", game->checkpoint_index, 1);
+    failed |= expect_float("checkpoint respawn x", game->world.respawn_x, 1000.0f);
+    failed |= expect_float("checkpoint respawn y", game->world.respawn_y, 252.0f);
+    failed |= expect_int("checkpoint index", game->world.checkpoint_index, 1);
     session_destroy(&session);
     if (failed) return 1;
 
@@ -547,7 +547,7 @@ static int immediate_play_preserves_window_and_input_latch(void)
         expect_int("immediate Play keeps context", context_probe_alive(window), 1) ||
         expect_int("immediate Play has no menu present", session->menu_presented_count, 0) ||
         expect_int("immediate Play constructs one game", session->game_open_count, 1) ||
-        expect_int("held confirmation stays gated", session->game->input_release_latched, 1)) goto fail;
+        expect_int("held confirmation stays gated", session->game->screen.input_release_latched, 1)) goto fail;
     session_frame(session);
     if (expect_int("game first frame presents", session->game_presented_count, 1)) goto fail;
     UnloadTexture(window);
@@ -595,9 +595,9 @@ static int repeated_menu_game_ownership(void)
         expect_int("menu-to-game repairs web input", session->web_input_repair_count, 1) != 0)
         return 1;
 
-    session->game->completion.complete = 1;
-    session->game->completion.pending_next_phase = 0;
-    session->game->terminal_action_index = 0;
+    session->game->screen.completion.complete = 1;
+    session->game->screen.completion.pending_next_phase = 0;
+    session->game->screen.terminal_action_index = 0;
     if (!game_web_input_touch(GAME_TOUCH_RIGHT, 1)) return 1;
     if (push_key(KEY_DOWN) != 0 || push_confirm() != 0) return 1;
     session_frame(session);
@@ -643,9 +643,9 @@ static int repeated_menu_game_ownership(void)
     game_input_test_set_physical_state(0, 0);
     (void)game_input_sample(session->game);
 
-    session->game->completion.complete = 1;
-    session->game->completion.pending_next_phase = 0;
-    session->game->terminal_action_index = 0;
+    session->game->screen.completion.complete = 1;
+    session->game->screen.completion.pending_next_phase = 0;
+    session->game->screen.terminal_action_index = 0;
     if (push_confirm() != 0) return 1;
     session_frame(session);
     if (expect_int("replay stays in game", session->screen, APP_SCREEN_GAME) != 0) return 1;
@@ -654,11 +654,11 @@ static int repeated_menu_game_ownership(void)
         expect_int("replay retains context", context_probe_alive(window), 1) != 0)
         return 1;
 
-    session->game->completion.complete = 1;
-    session->game->completion.pending_next_phase = 1;
-    session->game->loop.clock_started = 1;
-    session->game->loop.accumulator = 0.2; /* time that must not be caught up */
-    session->game->terminal_action_index = 0;
+    session->game->screen.completion.complete = 1;
+    session->game->screen.completion.pending_next_phase = 1;
+    session->game->screen.loop.clock_started = 1;
+    session->game->screen.loop.accumulator = 0.2; /* time that must not be caught up */
+    session->game->screen.terminal_action_index = 0;
     if (push_confirm() != 0) return 1;
     {
         /* Bracket the frame with the real clock instead of bounding how long
@@ -667,39 +667,39 @@ static int repeated_menu_game_ownership(void)
         double frame_start = GetTime();
         session_frame(session);
         if (expect_int("next level success keeps game", session->screen, APP_SCREEN_GAME) != 0) return 1;
-        if (session->game->completion.complete != 0) {
+        if (session->game->screen.completion.complete != 0) {
             fprintf(stderr, "session_test: successful next level kept completion\n");
             return 1;
         }
         /* The clock restarts at "now" (during this frame, not before it), so
          * the next frame measures normal time (no hitch) and the 0.2 s
          * pending above is not caught up. */
-        if (expect_int("next level timing reset", session->game->loop.clock_started == 1 &&
-                       session->game->loop.prev_time >= frame_start &&
-                       session->game->loop.prev_time <= GetTime() &&
-                       session->game->loop.accumulator < GAME_FIXED_STEP, 1) != 0)
+        if (expect_int("next level timing reset", session->game->screen.loop.clock_started == 1 &&
+                       session->game->screen.loop.prev_time >= frame_start &&
+                       session->game->screen.loop.prev_time <= GetTime() &&
+                       session->game->screen.loop.accumulator < GAME_FIXED_STEP, 1) != 0)
             return 1;
     }
 
     {
-        LevelDef *def = (LevelDef *)session->game->runtime.current_level;
+        LevelDef *def = (LevelDef *)session->game->world.runtime.current_level;
         strncpy(def->next_phase, "levels/does-not-exist.toml",
                 sizeof(def->next_phase) - 1);
         def->next_phase[sizeof(def->next_phase) - 1] = '\0';
     }
-    session->game->completion.complete = 1;
-    session->game->completion.pending_next_phase = 1;
-    session->game->terminal_action_index = 0;
+    session->game->screen.completion.complete = 1;
+    session->game->screen.completion.pending_next_phase = 1;
+    session->game->screen.terminal_action_index = 0;
     if (push_confirm() != 0) return 1;
     session_frame(session);
     if (expect_int("next failure keeps game", session->screen, APP_SCREEN_GAME) != 0) return 1;
-    if (expect_int("next failure keeps overlay", session->game->completion.complete, 1) != 0) return 1;
-    if (expect_int("next failure clears request", session->game->route, GAME_ROUTE_NONE) != 0) return 1;
+    if (expect_int("next failure keeps overlay", session->game->screen.completion.complete, 1) != 0) return 1;
+    if (expect_int("next failure clears request", session->game->screen.route, GAME_ROUTE_NONE) != 0) return 1;
     {
         /* The failure is visible and the dead Next Level row is gone. */
         GameTerminalActionList actions;
         game_terminal_actions(session->game, &actions);
-        if (expect_int("next failure flagged", session->game->completion.next_phase_failed, 1) != 0 ||
+        if (expect_int("next failure flagged", session->game->screen.completion.next_phase_failed, 1) != 0 ||
             expect_int("next failure leaves three actions", actions.count, 3) != 0 ||
             expect_int("next failure focuses replay", game_terminal_focused_action(session->game),
                        GAME_TERMINAL_ACTION_REPLAY) != 0 ||
@@ -726,31 +726,31 @@ static int repeated_menu_game_ownership(void)
 
 static void disable_integration_dynamic_collisions(GameState *game)
 {
-    game->platform_count = 0;
-    game->spider_count = 0;
-    game->jumping_spider_count = 0;
-    game->bird_count = 0;
-    game->faster_bird_count = 0;
-    game->fish_count = 0;
-    game->faster_fish_count = 0;
-    game->coin_count = 0;
-    game->star_yellow_count = 0;
-    game->star_green_count = 0;
-    game->star_red_count = 0;
-    game->axe_trap_count = 0;
-    game->circular_saw_count = 0;
-    game->spike_row_count = 0;
-    game->spike_platform_count = 0;
-    game->spike_block_count = 0;
-    game->blue_flame_count = 0;
-    game->fire_flame_count = 0;
-    game->float_platform_count = 0;
-    game->bridge_count = 0;
-    game->bouncepad_small_count = 0;
-    game->bouncepad_medium_count = 0;
-    game->bouncepad_high_count = 0;
-    game->floor_gap_count = 0;
-    game->last_star.active = 0;
+    game->world.platform_count = 0;
+    game->world.spider_count = 0;
+    game->world.jumping_spider_count = 0;
+    game->world.bird_count = 0;
+    game->world.faster_bird_count = 0;
+    game->world.fish_count = 0;
+    game->world.faster_fish_count = 0;
+    game->world.coin_count = 0;
+    game->world.star_yellow_count = 0;
+    game->world.star_green_count = 0;
+    game->world.star_red_count = 0;
+    game->world.axe_trap_count = 0;
+    game->world.circular_saw_count = 0;
+    game->world.spike_row_count = 0;
+    game->world.spike_platform_count = 0;
+    game->world.spike_block_count = 0;
+    game->world.blue_flame_count = 0;
+    game->world.fire_flame_count = 0;
+    game->world.float_platform_count = 0;
+    game->world.bridge_count = 0;
+    game->world.bouncepad_small_count = 0;
+    game->world.bouncepad_medium_count = 0;
+    game->world.bouncepad_high_count = 0;
+    game->world.floor_gap_count = 0;
+    game->world.last_star.active = 0;
 }
 
 static int checkpoint_transitions_use_production_paths(void)
@@ -774,9 +774,9 @@ static int checkpoint_transitions_use_production_paths(void)
     }
 
     game = session->game;
-    def = (LevelDef *)game->runtime.current_level;
-    initial_x = game->respawn_x;
-    initial_y = game->respawn_y;
+    def = (LevelDef *)game->world.runtime.current_level;
+    initial_x = game->world.respawn_x;
+    initial_y = game->world.respawn_y;
 
     /* Real active update: movement crosses CP, then real gap damage kills. */
     disable_integration_dynamic_collisions(game);
@@ -785,115 +785,115 @@ static int checkpoint_transitions_use_production_paths(void)
     def->checkpoints[0].y = 96.0f;
     def->checkpoints[1].x = 125.0f;
     def->checkpoints[1].y = 88.0f;
-    game->floor_gap_count = 1;
-    game->floor_gaps[0] = 130;
-    game->player.x = 130.0f;
-    game->player.y = 270.0f;
-    game->player.vx = 0.0f;
-    game->player.vy = 0.0f;
-    game->player.on_ground = 0;
+    game->world.floor_gap_count = 1;
+    game->world.floor_gaps[0] = 130;
+    game->world.player.x = 130.0f;
+    game->world.player.y = 270.0f;
+    game->world.player.vx = 0.0f;
+    game->world.player.vy = 0.0f;
+    game->world.player.on_ground = 0;
     game_update_active(game, 0.0f, 0);
     if (expect_int("same-frame life loss preserves checkpoint",
-                   game->checkpoint_index, 1) != 0 ||
-        expect_float("same-frame checkpoint x", game->respawn_x, 125.0f) != 0 ||
-        expect_float("same-frame checkpoint y", game->respawn_y, 88.0f) != 0 ||
-        expect_int("same-frame life loss decrements lives", game->lives, 2) != 0 ||
-        expect_float("same-frame player respawn x", game->player.spawn_x, 125.0f) != 0 ||
-        expect_float("same-frame player respawn y", game->player.spawn_y, 88.0f) != 0)
+                   game->world.checkpoint_index, 1) != 0 ||
+        expect_float("same-frame checkpoint x", game->world.respawn_x, 125.0f) != 0 ||
+        expect_float("same-frame checkpoint y", game->world.respawn_y, 88.0f) != 0 ||
+        expect_int("same-frame life loss decrements lives", game->world.lives, 2) != 0 ||
+        expect_float("same-frame player respawn x", game->world.player.spawn_x, 125.0f) != 0 ||
+        expect_float("same-frame player respawn y", game->world.player.spawn_y, 88.0f) != 0)
         goto fail;
 
     /* Real damage path reaches game-over; real session event path retries. */
-    game->floor_gap_count = 0;
-    game->hearts = 1;
-    game->lives = 0;
+    game->world.floor_gap_count = 0;
+    game->world.hearts = 1;
+    game->world.lives = 0;
     apply_damage(game, 1, 0, 0.0f, 0.0f);
-    if (expect_int("game-over damage sets overlay", game->game_over, 1) != 0 ||
-        expect_int("game-over retains checkpoint", game->checkpoint_index, 1) != 0)
+    if (expect_int("game-over damage sets overlay", game->screen.game_over, 1) != 0 ||
+        expect_int("game-over retains checkpoint", game->world.checkpoint_index, 1) != 0)
         goto fail;
     if (push_confirm() != 0) goto fail;
     session_frame(session);
     game = session->game;
-    if (!game || expect_int("retry clears game-over", game->game_over, 0) != 0 ||
-        expect_int("retry resets checkpoint", game->checkpoint_index, -1) != 0 ||
-        expect_float("retry resets initial x", game->respawn_x, initial_x) != 0 ||
-        expect_float("retry resets initial y", game->respawn_y, initial_y) != 0)
+    if (!game || expect_int("retry clears game-over", game->screen.game_over, 0) != 0 ||
+        expect_int("retry resets checkpoint", game->world.checkpoint_index, -1) != 0 ||
+        expect_float("retry resets initial x", game->world.respawn_x, initial_x) != 0 ||
+        expect_float("retry resets initial y", game->world.respawn_y, initial_y) != 0)
         goto fail;
 
     /* Native Replay closes/reopens through AppSession, so TOML start wins. */
-    def = (LevelDef *)game->runtime.current_level;
+    def = (LevelDef *)game->world.runtime.current_level;
     def->checkpoint_count = 1;
     def->checkpoints[0].x = 220.0f;
     def->checkpoints[0].y = 100.0f;
-    game->checkpoint_index = 0;
-    game->respawn_x = 220.0f;
-    game->respawn_y = 100.0f;
-    game->completion.complete = 1;
-    game->completion.pending_next_phase = 0;
-    game->terminal_action_index = 0;
+    game->world.checkpoint_index = 0;
+    game->world.respawn_x = 220.0f;
+    game->world.respawn_y = 100.0f;
+    game->screen.completion.complete = 1;
+    game->screen.completion.pending_next_phase = 0;
+    game->screen.terminal_action_index = 0;
     if (push_confirm() != 0) goto fail;
     session_frame(session);
     game = session->game;
     if (!game || expect_int("replay keeps game screen", session->screen,
                             APP_SCREEN_GAME) != 0 ||
-        expect_int("replay resets checkpoint", game->checkpoint_index, -1) != 0 ||
-        expect_float("replay resets initial x", game->respawn_x, initial_x) != 0 ||
-        expect_float("replay resets initial y", game->respawn_y, initial_y) != 0)
+        expect_int("replay resets checkpoint", game->world.checkpoint_index, -1) != 0 ||
+        expect_float("replay resets initial x", game->world.respawn_x, initial_x) != 0 ||
+        expect_float("replay resets initial y", game->world.respawn_y, initial_y) != 0)
         goto fail;
 
     /* Next Level loads real phase data and must not carry old CP progress. */
-    def = (LevelDef *)game->runtime.current_level;
+    def = (LevelDef *)game->world.runtime.current_level;
     _Static_assert(sizeof(expected_next_path) == sizeof(def->next_phase),
                    "next phase copy uses the same buffer size");
     memcpy(expected_next_path, def->next_phase, sizeof(expected_next_path));
     def->checkpoint_count = 1;
     def->checkpoints[0].x = 220.0f;
     def->checkpoints[0].y = 100.0f;
-    game->checkpoint_index = 0;
-    game->respawn_x = 220.0f;
-    game->respawn_y = 100.0f;
-    game->completion.complete = 1;
-    game->completion.pending_next_phase = 1;
-    game->terminal_action_index = 0;
+    game->world.checkpoint_index = 0;
+    game->world.respawn_x = 220.0f;
+    game->world.respawn_y = 100.0f;
+    game->screen.completion.complete = 1;
+    game->screen.completion.pending_next_phase = 1;
+    game->screen.terminal_action_index = 0;
     if (push_confirm() != 0) goto fail;
     session_frame(session);
     game = session->game;
     if (!game || expect_int("next phase keeps game screen", session->screen,
                             APP_SCREEN_GAME) != 0 ||
-         expect_int("next phase resets checkpoint", game->checkpoint_index, -1) != 0 ||
-         expect_int("next phase completion clears", game->completion.complete, 0) != 0 ||
+         expect_int("next phase resets checkpoint", game->world.checkpoint_index, -1) != 0 ||
+         expect_int("next phase completion clears", game->screen.completion.complete, 0) != 0 ||
          expect_int("next phase path advances",
-                    strcmp(game->level_path, expected_next_path) == 0, 1) != 0)
+                    strcmp(game->world.level_path, expected_next_path) == 0, 1) != 0)
         goto fail;
 
-    def = (LevelDef *)game->runtime.current_level;
+    def = (LevelDef *)game->world.runtime.current_level;
     level_effective_spawn(def, &expected_next_x, &expected_next_y);
-    if (expect_float("next phase start x", game->respawn_x, expected_next_x) != 0 ||
-        expect_float("next phase start y", game->respawn_y, expected_next_y) != 0)
+    if (expect_float("next phase start x", game->world.respawn_x, expected_next_x) != 0 ||
+        expect_float("next phase start y", game->world.respawn_y, expected_next_y) != 0)
         goto fail;
 
     /* A failed load must leave active phase and resolved checkpoint untouched. */
-    def = (LevelDef *)game->runtime.current_level;
+    def = (LevelDef *)game->world.runtime.current_level;
     def->checkpoint_count = 1;
     def->checkpoints[0].x = 400.0f;
     def->checkpoints[0].y = 112.0f;
     strncpy(def->next_phase, "levels/does-not-exist.toml",
             sizeof(def->next_phase) - 1);
     def->next_phase[sizeof(def->next_phase) - 1] = '\0';
-    game->checkpoint_index = 0;
-    game->respawn_x = 400.0f;
-    game->respawn_y = 112.0f;
-    game->completion.complete = 1;
-    game->completion.pending_next_phase = 1;
-    game->terminal_action_index = 0;
+    game->world.checkpoint_index = 0;
+    game->world.respawn_x = 400.0f;
+    game->world.respawn_y = 112.0f;
+    game->screen.completion.complete = 1;
+    game->screen.completion.pending_next_phase = 1;
+    game->screen.terminal_action_index = 0;
     if (push_confirm() != 0) goto fail;
     session_frame(session);
     game = session->game;
     if (!game || expect_int("failed phase keeps game screen", session->screen,
                             APP_SCREEN_GAME) != 0 ||
-        expect_int("failed phase keeps completion", game->completion.complete, 1) != 0 ||
-        expect_int("failed phase keeps checkpoint", game->checkpoint_index, 0) != 0 ||
-        expect_float("failed phase keeps checkpoint x", game->respawn_x, 400.0f) != 0 ||
-        expect_float("failed phase keeps checkpoint y", game->respawn_y, 112.0f) != 0)
+        expect_int("failed phase keeps completion", game->screen.completion.complete, 1) != 0 ||
+        expect_int("failed phase keeps checkpoint", game->world.checkpoint_index, 0) != 0 ||
+        expect_float("failed phase keeps checkpoint x", game->world.respawn_x, 400.0f) != 0 ||
+        expect_float("failed phase keeps checkpoint y", game->world.respawn_y, 112.0f) != 0)
         goto fail;
 
     session_destroy(&session);
@@ -946,21 +946,21 @@ static int browser_replay_replaces_the_game_in_place(void)
      * the changes simply stay pending.) */
     session->profile.error = session->profile.dirty = 1;
     for (int round = 1; round <= 3; round++) {
-        session->game->completion.complete = 1;
-        session->game->score = 500;
-        session->game->route = GAME_ROUTE_REPLAY;
+        session->game->screen.completion.complete = 1;
+        session->game->world.score = 500;
+        session->game->screen.route = GAME_ROUTE_REPLAY;
         session_frame(session);
         if (expect_int("replay keeps the session", session->ended, 0) ||
             expect_int("replay keeps the game screen", session->screen, APP_SCREEN_GAME) ||
             expect_int("replay has a game", session->game != NULL, 1) ||
-            expect_int("replay restarts the level", session->game->completion.complete, 0) ||
-            expect_int("replay resets the score", session->game->score, 0) ||
+            expect_int("replay restarts the level", session->game->screen.completion.complete, 0) ||
+            expect_int("replay resets the score", session->game->world.score, 0) ||
             expect_int("replay opens count", session->game_open_count, round + 1) ||
             expect_int("replay closes count", session->game_close_count, round) ||
             expect_int("replay keeps the callback", session->callback_cancelled, 0) ||
             expect_int("replay keeps the runtime", session->runtime_cleanup_count, 0) ||
             expect_int("replay level path",
-                       strcmp(session->game->level_path, "levels/00_sandbox_01.toml"), 0))
+                       strcmp(session->game->world.level_path, "levels/00_sandbox_01.toml"), 0))
             goto done;
     }
     if (expect_int("profile kept in memory", session->profile.dirty, 1) ||
@@ -994,14 +994,14 @@ static int pending_profile_keeps_exit_alive(void)
     }
     session->profile.pending_revision = session->profile.revision;
     session->attempted_save_revision = session->profile.revision;
-    session->game->route = GAME_ROUTE_EXIT;
-    session->game->loop.clock_started = 1;
-    session->game->loop.prev_time = GetTime() - 0.1; /* 100 ms pending */
-    float elapsed = session->game->completion.level_elapsed;
+    session->game->screen.route = GAME_ROUTE_EXIT;
+    session->game->screen.loop.clock_started = 1;
+    session->game->screen.loop.prev_time = GetTime() - 0.1; /* 100 ms pending */
+    float elapsed = session->game->screen.completion.level_elapsed;
     session_frame(session);
     if (expect_int("pending save retains session", session->ended, 0) ||
         expect_int("pending save retains game", session->game_close_count, 0) ||
-        expect_float("pending exit freezes gameplay", session->game->completion.level_elapsed, elapsed)) {
+        expect_float("pending exit freezes gameplay", session->game->screen.completion.level_elapsed, elapsed)) {
         session_destroy(&session);
         return 1;
     }
@@ -1019,7 +1019,7 @@ static int native_replay_keeps_session_ownership(void)
                                .smoke_test_frames = 1};
     AppSession *session = session_create(&config);
     if (!session) return 1;
-    session->game->route = GAME_ROUTE_REPLAY;
+    session->game->screen.route = GAME_ROUTE_REPLAY;
     int result = session_run(session) != EXIT_SUCCESS ||
                  expect_int("native replay reopens game", session->game_open_count, 2);
     session_destroy(&session);
@@ -1081,18 +1081,18 @@ static int collision_lifetime_and_pickups(void)
         def.coin_count = 1;
         def.coins[0] = (CoinPlacement){115, 239};
         def.last_star = (LastStarPlacement){110, 236};
-        gs.player.w = gs.player.h = 48;
+        gs.world.player.w = gs.world.player.h = 48;
         if (level_load(&gs, &def)) return 1;
-        gs.player.x = 100;
-        gs.player.y = 220;
-        gs.player.hurt_timer = mode == 0 ? 1.0f : 0.0f;
-        gs.hearts = mode == 0 ? 3 : 1;
-        gs.lives = mode == 2 ? 0 : 1;
+        gs.world.player.x = 100;
+        gs.world.player.y = 220;
+        gs.world.player.hurt_timer = mode == 0 ? 1.0f : 0.0f;
+        gs.world.hearts = mode == 0 ? 3 : 1;
+        gs.world.lives = mode == 2 ? 0 : 1;
         game_collide(&gs, 1.0f / TARGET_FPS);
-        if (expect_int("immunity pickups/death no stale goal", gs.completion.complete, mode == 0) ||
-            expect_int("coin remains after death", gs.coins[0].active, mode != 0) ||
-            expect_int("game over only on final life", gs.game_over, mode == 2)) return 1;
-        if (mode == 1 && expect_float("respawn before next pass", gs.player.x, 20)) return 1;
+        if (expect_int("immunity pickups/death no stale goal", gs.screen.completion.complete, mode == 0) ||
+            expect_int("coin remains after death", gs.world.coins[0].active, mode != 0) ||
+            expect_int("game over only on final life", gs.screen.game_over, mode == 2)) return 1;
+        if (mode == 1 && expect_float("respawn before next pass", gs.world.player.x, 20)) return 1;
     }
     return 0;
 }
@@ -1103,8 +1103,8 @@ static int settings_keep_music_paused_after_refocus(void)
     AppSessionConfig config = {.level_path = "levels/00_sandbox_01.toml"};
     AppSession *session = session_create(&config);
     int failed = 1;
-    if (!session || !session->game || !session->game->audio.music) goto done;
-    Music stream = session->game->audio.music->stream;
+    if (!session || !session->game || !session->game->assets.audio.music) goto done;
+    Music stream = session->game->assets.audio.music->stream;
     session_frame(session);
     if (expect_int("music plays in game", IsMusicStreamPlaying(stream), 1)) goto done;
     if (push_key(KEY_F1)) goto done;
@@ -1140,42 +1140,42 @@ static int coins_stay_collected_across_life_loss(void)
     def.star_yellow_count = 1;
     def.star_yellows[0] = (StarYellowPlacement){30, 230};
     def.last_star = (LastStarPlacement){380, 100};
-    gs.player.w = gs.player.h = 48;
+    gs.world.player.w = gs.world.player.h = 48;
     if (level_load(&gs, &def)) return 1;
     game_completion_reset_summary(&gs); /* as level_session does after a load */
 
     /* The player spawns over coin 0 and the star: one pass collects both. */
-    gs.hearts = 2;
+    gs.world.hearts = 2;
     game_collide(&gs, 1.0f / TARGET_FPS);
-    int score = gs.score;
-    if (expect_int("coin collected", gs.coins[0].active, 0) ||
-        expect_int("star collected", gs.star_yellows[0].active, 0) ||
-        expect_int("coin scored", score, gs.rules.coin_score)) return 1;
+    int score = gs.world.score;
+    if (expect_int("coin collected", gs.world.coins[0].active, 0) ||
+        expect_int("star collected", gs.world.star_yellows[0].active, 0) ||
+        expect_int("coin scored", score, gs.world.rules.coin_score)) return 1;
 
     /* Lethal damage spends a life and respawns at the same spot. */
-    gs.player.hurt_timer = 0;
-    apply_damage(&gs, gs.hearts, 0, 0, 0);
-    if (expect_int("life spent", gs.lives, DEFAULT_LIVES - 1) ||
-        expect_int("coin stays gone after death", gs.coins[0].active, 0) ||
-        expect_int("uncollected coin remains", gs.coins[1].active, 1) ||
-        expect_int("star respawns for next life", gs.star_yellows[0].active, 1)) return 1;
+    gs.world.player.hurt_timer = 0;
+    apply_damage(&gs, gs.world.hearts, 0, 0, 0);
+    if (expect_int("life spent", gs.world.lives, DEFAULT_LIVES - 1) ||
+        expect_int("coin stays gone after death", gs.world.coins[0].active, 0) ||
+        expect_int("uncollected coin remains", gs.world.coins[1].active, 1) ||
+        expect_int("star respawns for next life", gs.world.star_yellows[0].active, 1)) return 1;
     game_collide(&gs, 1.0f / TARGET_FPS);
-    if (expect_int("no second award at respawn", gs.score, score)) return 1;
+    if (expect_int("no second award at respawn", gs.world.score, score)) return 1;
 
     /* Completion counts every coin collected during the attempt. */
     game_complete_level(&gs);
-    if (expect_int("summary counts coins across lives", gs.completion.coins_collected, 1) ||
-        expect_int("summary coin total", gs.completion.coin_total, 2)) return 1;
+    if (expect_int("summary counts coins across lives", gs.screen.completion.coins_collected, 1) ||
+        expect_int("summary coin total", gs.screen.completion.coin_total, 2)) return 1;
 
     /* Game over, then Retry: a fresh attempt brings every coin back. */
-    gs.completion.complete = 0;
-    gs.lives = 0;
-    gs.player.hurt_timer = 0;
-    apply_damage(&gs, gs.hearts, 0, 0, 0);
-    if (expect_int("game over", gs.game_over, 1)) return 1;
+    gs.screen.completion.complete = 0;
+    gs.world.lives = 0;
+    gs.world.player.hurt_timer = 0;
+    apply_damage(&gs, gs.world.hearts, 0, 0, 0);
+    if (expect_int("game over", gs.screen.game_over, 1)) return 1;
     game_restart_after_game_over(&gs);
-    if (expect_int("retry restores coins", gs.coins[0].active, 1) ||
-        expect_int("retry clears score", gs.score, 0)) return 1;
+    if (expect_int("retry restores coins", gs.world.coins[0].active, 1) ||
+        expect_int("retry clears score", gs.world.score, 0)) return 1;
     return 0;
 }
 
@@ -1184,27 +1184,27 @@ static int coins_stay_collected_across_life_loss(void)
 static int bouncepad_lists_select_the_landed_pad(void)
 {
     GameState gs = {0};
-    gs.runtime.world_w = 1600;
-    gs.player.w = gs.player.h = 48;
-    player_apply_default_physics(&gs.player);
-    bouncepad_place(&gs.bouncepads_medium[0], 0.0f, BOUNCEPAD_VY_MEDIUM, BOUNCEPAD_WOOD);
-    bouncepad_place(&gs.bouncepads_small[0], 100.0f, BOUNCEPAD_VY_SMALL, BOUNCEPAD_GREEN);
-    bouncepad_place(&gs.bouncepads_small[1], 150.0f, BOUNCEPAD_VY_SMALL, BOUNCEPAD_GREEN);
-    bouncepad_place(&gs.bouncepads_high[0], 300.0f, BOUNCEPAD_VY_HIGH, BOUNCEPAD_RED);
-    gs.bouncepad_medium_count = 1;
-    gs.bouncepad_small_count = 2;
-    gs.bouncepad_high_count = 1;
+    gs.world.runtime.world_w = 1600;
+    gs.world.player.w = gs.world.player.h = 48;
+    player_apply_default_physics(&gs.world.player);
+    bouncepad_place(&gs.world.bouncepads_medium[0], 0.0f, BOUNCEPAD_VY_MEDIUM, BOUNCEPAD_WOOD);
+    bouncepad_place(&gs.world.bouncepads_small[0], 100.0f, BOUNCEPAD_VY_SMALL, BOUNCEPAD_GREEN);
+    bouncepad_place(&gs.world.bouncepads_small[1], 150.0f, BOUNCEPAD_VY_SMALL, BOUNCEPAD_GREEN);
+    bouncepad_place(&gs.world.bouncepads_high[0], 300.0f, BOUNCEPAD_VY_HIGH, BOUNCEPAD_RED);
+    gs.world.bouncepad_medium_count = 1;
+    gs.world.bouncepad_small_count = 2;
+    gs.world.bouncepad_high_count = 1;
 
     /* Drop the player onto the red (high) pad: flat index 3 of 4. */
-    gs.player.x = 300.0f;
-    gs.player.y = (float)(FLOOR_Y - gs.player.h + PLAYER_FLOOR_SINK) - 1.0f;
-    gs.player.vy = 200.0f;
-    gs.loop.fp_prev_riding = -1;
+    gs.world.player.x = 300.0f;
+    gs.world.player.y = (float)(FLOOR_Y - gs.world.player.h + PLAYER_FLOOR_SINK) - 1.0f;
+    gs.world.player.vy = 200.0f;
+    gs.screen.loop.fp_prev_riding = -1;
     game_player_step(&gs, GAME_FIXED_STEP);
-    if (expect_int("high pad animates", gs.bouncepads_high[0].state, BOUNCE_ACTIVE) ||
-        expect_int("small pads untouched", gs.bouncepads_small[1].state, BOUNCE_IDLE) ||
-        expect_int("medium pad untouched", gs.bouncepads_medium[0].state, BOUNCE_IDLE) ||
-        expect_float("high pad launch", gs.player.vy, BOUNCEPAD_VY_HIGH)) return 1;
+    if (expect_int("high pad animates", gs.world.bouncepads_high[0].state, BOUNCE_ACTIVE) ||
+        expect_int("small pads untouched", gs.world.bouncepads_small[1].state, BOUNCE_IDLE) ||
+        expect_int("medium pad untouched", gs.world.bouncepads_medium[0].state, BOUNCE_IDLE) ||
+        expect_float("high pad launch", gs.world.player.vy, BOUNCEPAD_VY_HIGH)) return 1;
     return 0;
 }
 
@@ -1213,7 +1213,7 @@ static int fixed_step_accumulator_contract(void)
     /* Smoke and scripted replays: one fixed step per frame, whatever the
      * wall clock says, so their results match on every machine. */
     GameState smoke = {0};
-    smoke.smoke_test_frames = 5;
+    smoke.screen.smoke_test_frames = 5;
     game_timing_restart_clock(&smoke);
     float first = game_timing_frame_seconds(&smoke);
     clock_wait(20);
@@ -1248,8 +1248,8 @@ static int fixed_step_accumulator_contract(void)
     /* A stall is clamped, capped and then forgotten (no spiral of death). */
     GameState stall = {0};
     game_timing_restart_clock(&stall);
-    stall.loop.clock_started = 1;
-    stall.loop.prev_time = GetTime() - 5.0;
+    stall.screen.loop.clock_started = 1;
+    stall.screen.loop.prev_time = GetTime() - 5.0;
     float stalled = game_timing_frame_seconds(&stall);
     if (expect_float("stall clamped", stalled, (float)GAME_MAX_FRAME_SECONDS) ||
         expect_int("stall capped", game_timing_take_steps(&stall, stalled), GAME_MAX_STEPS_PER_FRAME) ||
@@ -1373,30 +1373,30 @@ static int failed_next_phase_keeps_the_current_level(void)
 {
     GameState gs = {0};
     int failed = 1;
-    strcpy(gs.level_path, "tests/fixtures/runtime/transition.toml");
-    gs.debug_mode = 1;
+    strcpy(gs.world.level_path, "tests/fixtures/runtime/transition.toml");
+    gs.screen.debug_mode = 1;
     if (game_init(&gs)) return 1;
     if (game_experiment_begin(&gs) != 0) goto done;
 
-    LevelDef *active = gs.level_def;
-    uint64_t hash = gs.source_level_hash;
-    struct GameExperiment *tape = gs.experiment;
+    LevelDef *active = gs.world.level_def;
+    uint64_t hash = gs.world.source_level_hash;
+    struct GameExperiment *tape = gs.screen.experiment;
     strcpy(active->next_phase, "levels/zz_removed_phase.toml");
     if (expect_int("missing next phase fails", game_load_next_phase(&gs), -1) ||
-        expect_int("active level kept", gs.level_def == active, 1) ||
-        expect_int("runtime level kept", gs.runtime.current_level == active, 1) ||
+        expect_int("active level kept", gs.world.level_def == active, 1) ||
+        expect_int("runtime level kept", gs.world.runtime.current_level == active, 1) ||
         expect_int("level path kept",
-                   strcmp(gs.level_path, "tests/fixtures/runtime/transition.toml"), 0) ||
-        expect_int("level hash kept", gs.source_level_hash == hash, 1) ||
-        expect_int("recording kept", gs.experiment == tape, 1))
+                   strcmp(gs.world.level_path, "tests/fixtures/runtime/transition.toml"), 0) ||
+        expect_int("level hash kept", gs.world.source_level_hash == hash, 1) ||
+        expect_int("recording kept", gs.screen.experiment == tape, 1))
         goto done;
 
     strcpy(active->next_phase, "levels/00_sandbox_01.toml");
     if (expect_int("next phase loads", game_load_next_phase(&gs), 0) ||
-        expect_int("runtime follows the new level", gs.runtime.current_level == gs.level_def, 1) ||
+        expect_int("runtime follows the new level", gs.world.runtime.current_level == gs.world.level_def, 1) ||
         expect_int("path follows the new level",
-                   strcmp(gs.level_path, "levels/00_sandbox_01.toml"), 0) ||
-        expect_int("recording ends with its level", gs.experiment == NULL, 1))
+                   strcmp(gs.world.level_path, "levels/00_sandbox_01.toml"), 0) ||
+        expect_int("recording ends with its level", gs.screen.experiment == NULL, 1))
         goto done;
     failed = 0;
 done:
@@ -1407,28 +1407,28 @@ done:
 static int phase_resets_transient_state(void)
 {
     GameState gs = {0};
-    strcpy(gs.level_path, "tests/fixtures/runtime/transition.toml");
+    strcpy(gs.world.level_path, "tests/fixtures/runtime/transition.toml");
     if (game_init(&gs)) return 1;
-    gs.player.vx = 123;
-    gs.player.vy = -222;
-    gs.player.on_vine = 1;
-    gs.player.vine_index = 7;
-    gs.loop.fp_prev_riding = 3;
-    gs.score = 1200;
-    gs.score_life_next = 2000;
-    gs.lives = 4;
+    gs.world.player.vx = 123;
+    gs.world.player.vy = -222;
+    gs.world.player.on_vine = 1;
+    gs.world.player.vine_index = 7;
+    gs.screen.loop.fp_prev_riding = 3;
+    gs.world.score = 1200;
+    gs.world.score_life_next = 2000;
+    gs.world.lives = 4;
     game_complete_level(&gs);
     int result = game_load_next_phase(&gs) != 0 ||
-        expect_float("phase vx cleared", gs.player.vx, 0) ||
-        expect_float("phase vy cleared", gs.player.vy, 0) ||
-        expect_int("phase climb cleared", gs.player.on_vine, 0) ||
-        expect_int("phase support cleared", gs.loop.fp_prev_riding, -1) ||
-        expect_int("campaign score retained", gs.score, 1200) ||
-        expect_int("campaign lives retained", gs.lives, 4);
-    LevelDef *active = gs.level_def;
+        expect_float("phase vx cleared", gs.world.player.vx, 0) ||
+        expect_float("phase vy cleared", gs.world.player.vy, 0) ||
+        expect_int("phase climb cleared", gs.world.player.on_vine, 0) ||
+        expect_int("phase support cleared", gs.screen.loop.fp_prev_riding, -1) ||
+        expect_int("campaign score retained", gs.world.score, 1200) ||
+        expect_int("campaign lives retained", gs.world.lives, 4);
+    LevelDef *active = gs.world.level_def;
     active->music_volume = 0;
     level_resources_apply(&gs, active);
-    if (gs.audio.music && expect_float("zero volume stays muted", test_last_music_volume, 0)) result = 1;
+    if (gs.assets.audio.music && expect_float("zero volume stays muted", test_last_music_volume, 0)) result = 1;
     game_cleanup(&gs);
     return result;
 }

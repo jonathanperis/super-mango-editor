@@ -33,10 +33,10 @@ EM_JS(void, experiment_download, (const char *path), {
 
 void game_experiment_cleanup(GameState *gs)
 {
-    if (!gs->experiment) return;
-    free(gs->experiment->frames);
-    free(gs->experiment);
-    gs->experiment = NULL;
+    if (!gs->screen.experiment) return;
+    free(gs->screen.experiment->frames);
+    free(gs->screen.experiment);
+    gs->screen.experiment = NULL;
 }
 
 static void restart(GameState *gs, unsigned int seed)
@@ -45,19 +45,19 @@ static void restart(GameState *gs, unsigned int seed)
     /* The active definition has already passed validation, so apply it
      * again without re-checking. Repeat initialization in the same order so
      * random enemy timers and fog consume the same stream. */
-    level_apply(gs, gs->runtime.current_level);
-    level_resources_apply(gs, gs->runtime.current_level);
+    level_apply(gs, gs->world.runtime.current_level);
+    level_resources_apply(gs, gs->world.runtime.current_level);
     /* Reloading the music restarts it at the level's own volume; put the
      * player's mute and volume settings back so F8 cannot unmute the game. */
     game_audio_apply_settings(gs);
-    player_reset(&gs->player);
+    player_reset(&gs->world.player);
     game_completion_reset_summary(gs);
-    gs->completion.complete = gs->game_over = 0;
-    gs->loop.fp_prev_riding = -1;
+    gs->screen.completion.complete = gs->screen.game_over = 0;
+    gs->screen.loop.fp_prev_riding = -1;
     game_camera_snap(gs);  /* the restarted level's start, not x = 0 */
-    gs->level_score_start = 0;
-    gs->profile_completion_recorded = 1; /* Experiments never become best results. */
-    gs->inspector.frozen = gs->inspector.step_requested = 0;
+    gs->world.level_score_start = 0;
+    gs->screen.profile_completion_recorded = 1; /* Experiments never become best results. */
+    gs->screen.inspector.frozen = gs->screen.inspector.step_requested = 0;
     game_timing_restart_clock(gs);
 }
 
@@ -66,23 +66,23 @@ int game_experiment_begin(GameState *gs)
     GameExperiment *tape = calloc(1, sizeof(*tape));
     if (!tape) return -1;
     tape->frames = calloc(EXPERIMENT_MAX_FRAMES, sizeof(*tape->frames));
-    if (!tape->frames || serializer_fingerprint_utf8(gs->level_path, &tape->fingerprint) != 1 ||
-        tape->fingerprint.content_hash != gs->source_level_hash) {
+    if (!tape->frames || serializer_fingerprint_utf8(gs->world.level_path, &tape->fingerprint) != 1 ||
+        tape->fingerprint.content_hash != gs->world.source_level_hash) {
         free(tape->frames); free(tape); return -1;
     }
-    str_copy(tape->level_path, gs->level_path, sizeof(tape->level_path));
-    tape->seed = gs->random_seed;
+    str_copy(tape->level_path, gs->world.level_path, sizeof(tape->level_path));
+    tape->seed = gs->screen.random_seed;
     tape->recording = 1;
     game_experiment_cleanup(gs);
-    gs->experiment = tape;
+    gs->screen.experiment = tape;
     restart(gs, tape->seed);
-    debug_log(&gs->debug, "Recording restarted (seed %u)", tape->seed);
+    debug_log(&gs->screen.debug, "Recording restarted (seed %u)", tape->seed);
     return 0;
 }
 
 float game_experiment_dt(const GameState *gs, float dt)
 {
-    const GameExperiment *tape = gs->experiment;
+    const GameExperiment *tape = gs->screen.experiment;
     /* Every step, live or replayed, is the fixed step; slow mode and F3 only
      * change how many steps run per rendered frame. A finished replay stops. */
     if (tape && tape->replaying && tape->cursor >= tape->count) return 0;
@@ -91,22 +91,22 @@ float game_experiment_dt(const GameState *gs, float dt)
 
 unsigned int game_experiment_input(GameState *gs, unsigned int input)
 {
-    GameExperiment *tape = gs->experiment;
+    GameExperiment *tape = gs->screen.experiment;
     if (!tape) return input;
     if (tape->replaying) {
         if (tape->cursor >= tape->count) return 0;
         ExperimentFrame *frame = &tape->frames[tape->cursor++];
-        game_inspector_physics(&gs->player, frame->physics, 1);
-        if (tape->cursor == tape->count) gs->inspector.frozen = 1;
+        game_inspector_physics(&gs->world.player, frame->physics, 1);
+        if (tape->cursor == tape->count) gs->screen.inspector.frozen = 1;
         return frame->input;
     }
     if (tape->recording) {
         ExperimentFrame *frame = &tape->frames[tape->count++];
         frame->input = input & 63u;
-        game_inspector_physics(&gs->player, frame->physics, 0);
+        game_inspector_physics(&gs->world.player, frame->physics, 0);
         if (tape->count == EXPERIMENT_MAX_FRAMES) {
             tape->recording = 0;
-            debug_log(&gs->debug, "Recording full; F9 exports %d steps", tape->count);
+            debug_log(&gs->screen.debug, "Recording full; F9 exports %d steps", tape->count);
         }
     }
     return input;
@@ -114,7 +114,7 @@ unsigned int game_experiment_input(GameState *gs, unsigned int input)
 
 int game_experiment_save(GameState *gs, const char *path)
 {
-    GameExperiment *tape = gs->experiment;
+    GameExperiment *tape = gs->screen.experiment;
     if (!tape || !tape->count) return -1;
     char temporary[SERIALIZER_IO_PATH_MAX];
     FILE *fp = serializer_open_temp(path, temporary, sizeof(temporary));
@@ -150,7 +150,7 @@ int game_experiment_save(GameState *gs, const char *path)
 ExperimentExportResult game_experiment_export_at(GameState *gs, const char *folder,
                                                  long long stamp, char *path, size_t size)
 {
-    const GameExperiment *tape = gs->experiment;
+    const GameExperiment *tape = gs->screen.experiment;
     if (!tape || !tape->count) return EXPERIMENT_EXPORT_NOTHING;
     for (int attempt = 1; attempt <= EXPERIMENT_EXPORT_ATTEMPTS; attempt++) {
         int length = attempt == 1
@@ -176,18 +176,18 @@ void game_experiment_export(GameState *gs)
 #ifdef __EMSCRIPTEN__
         experiment_download(path);
 #endif
-        debug_log(&gs->debug, "Exported %s", path);
+        debug_log(&gs->screen.debug, "Exported %s", path);
         TraceLog(LOG_INFO, "Experiment exported: %s", path);
         break;
     case EXPERIMENT_EXPORT_NOTHING:
-        debug_log(&gs->debug, "Nothing recorded; F8 starts a recording");
+        debug_log(&gs->screen.debug, "Nothing recorded; F8 starts a recording");
         break;
     case EXPERIMENT_EXPORT_NAME_TAKEN:
-        debug_log(&gs->debug, "Export failed: file names already taken");
+        debug_log(&gs->screen.debug, "Export failed: file names already taken");
         TraceLog(LOG_WARNING, "Experiment export: %s and earlier names already exist", path);
         break;
     default:
-        debug_log(&gs->debug, "Export failed: could not write the file");
+        debug_log(&gs->screen.debug, "Export failed: could not write the file");
         TraceLog(LOG_WARNING, "Experiment export: could not write %s", path);
         break;
     }
@@ -236,14 +236,14 @@ int game_experiment_load(GameState *gs, const char *path)
         strlen(level.u.str.ptr) != (size_t)level.u.str.len ||
         hash.type != TOML_STRING || hash.u.str.len != 16 || strlen(hash.u.str.ptr) != 16 ||
         frames.type != TOML_ARRAY || frames.u.arr.size <= 0 || frames.u.arr.size > EXPERIMENT_MAX_FRAMES) goto done;
-    if (serializer_fingerprint_utf8(gs->level_path, &tape->fingerprint) != 1 ||
-        tape->fingerprint.content_hash != gs->source_level_hash) goto done;
+    if (serializer_fingerprint_utf8(gs->world.level_path, &tape->fingerprint) != 1 ||
+        tape->fingerprint.content_hash != gs->world.source_level_hash) goto done;
     char expected[17];
     snprintf(expected, sizeof(expected), "%016llx", (unsigned long long)tape->fingerprint.content_hash);
     if (strcmp(expected, hash.u.str.ptr)) goto done;
     tape->count = frames.u.arr.size;
     tape->seed = (unsigned int)seed.u.int64;
-    str_copy(tape->level_path, gs->level_path, sizeof(tape->level_path));
+    str_copy(tape->level_path, gs->world.level_path, sizeof(tape->level_path));
     tape->frames = calloc((size_t)tape->count, sizeof(*tape->frames));
     if (!tape->frames) goto done;
     for (int i = 0; i < tape->count; i++) {
@@ -259,9 +259,9 @@ int game_experiment_load(GameState *gs, const char *path)
     }
     tape->replaying = 1;
     game_experiment_cleanup(gs);
-    gs->experiment = tape;
+    gs->screen.experiment = tape;
     restart(gs, tape->seed);
-    gs->random_seed = tape->seed;
+    gs->screen.random_seed = tape->seed;
     result = 0;
 done:
     if (result && tape) { free(tape->frames); free(tape); }

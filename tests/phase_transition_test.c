@@ -99,22 +99,22 @@ static int preserves_progress_across_reload(void)
     GameState gs = {0};
     PhaseProgress progress;
 
-    gs.score = 1500;
-    gs.lives = 4;
-    gs.hearts = 2;
-    gs.score_life_next = 2000;
+    gs.world.score = 1500;
+    gs.world.lives = 4;
+    gs.world.hearts = 2;
+    gs.world.score_life_next = 2000;
     phase_progress_save(&gs, &progress);
 
-    gs.score = 0;
-    gs.lives = 1;
-    gs.hearts = 1;
-    gs.score_life_next = 1000;
+    gs.world.score = 0;
+    gs.world.lives = 1;
+    gs.world.hearts = 1;
+    gs.world.score_life_next = 1000;
     phase_progress_restore(&gs, &progress);
 
-    if (expect_int("score", gs.score, 1500) != 0) return 1;
-    if (expect_int("lives", gs.lives, 4) != 0) return 1;
-    if (expect_int("hearts", gs.hearts, 2) != 0) return 1;
-    if (expect_int("score_life_next", gs.score_life_next, 2000) != 0) return 1;
+    if (expect_int("score", gs.world.score, 1500) != 0) return 1;
+    if (expect_int("lives", gs.world.lives, 4) != 0) return 1;
+    if (expect_int("hearts", gs.world.hearts, 2) != 0) return 1;
+    if (expect_int("score_life_next", gs.world.score_life_next, 2000) != 0) return 1;
 
     return 0;
 }
@@ -124,10 +124,10 @@ static int ignores_null_progress_args(void)
     GameState gs = {0};
     PhaseProgress progress = {0};
 
-    gs.score = 300;
-    gs.lives = 2;
-    gs.hearts = 1;
-    gs.score_life_next = 1000;
+    gs.world.score = 300;
+    gs.world.lives = 2;
+    gs.world.hearts = 1;
+    gs.world.score_life_next = 1000;
     progress.score = 900;
     progress.lives = 5;
     progress.hearts = 4;
@@ -150,10 +150,10 @@ static int ignores_null_progress_args(void)
     if (expect_int("null progress next", progress.score_life_next, 2000) != 0)
         return 1;
 
-    if (expect_int("null restore score", gs.score, 300) != 0) return 1;
-    if (expect_int("null restore lives", gs.lives, 2) != 0) return 1;
-    if (expect_int("null restore hearts", gs.hearts, 1) != 0) return 1;
-    if (expect_int("null restore next", gs.score_life_next, 1000) != 0) return 1;
+    if (expect_int("null restore score", gs.world.score, 300) != 0) return 1;
+    if (expect_int("null restore lives", gs.world.lives, 2) != 0) return 1;
+    if (expect_int("null restore hearts", gs.world.hearts, 1) != 0) return 1;
+    if (expect_int("null restore next", gs.world.score_life_next, 1000) != 0) return 1;
 
     return 0;
 }

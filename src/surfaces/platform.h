@@ -28,7 +28,7 @@
  *
  * `tex` is the 9-slice tileset texture for this platform.  If NULL, the
  * renderer falls back to the level's default floor tile texture.  It is
- * borrowed: GameState::platform_tiles owns one texture per tile path, shared
+ * borrowed: GameState.world.platform_tiles owns one texture per tile path, shared
  * by every platform that names it, so a Platform never unloads `tex`.
  */
 typedef struct {

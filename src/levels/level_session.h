@@ -14,7 +14,7 @@
  * of the active-level API keep one include. */
 #include "campaign_catalog.h"
 
-/* Load the required startup level from GameState::level_path. */
+/* Load the required startup level from GameState.world.level_path. */
 int game_level_load_initial(GameState *gs);
 
 /* Free active level storage owned by GameState. */

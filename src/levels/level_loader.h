@@ -45,7 +45,7 @@ void level_reset(GameState *gs, const LevelDef *def);
 
 /*
  * Unload the platform tile textures the level loader shares between
- * platforms (GameState::platform_tiles) and clear every borrowed pointer.
+ * platforms (GameState.world.platform_tiles) and clear every borrowed pointer.
  * Called once from game cleanup; a new level_load keeps the ones it reuses.
  */
 void level_release_platform_tiles(GameState *gs);

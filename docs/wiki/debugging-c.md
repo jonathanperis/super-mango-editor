@@ -203,7 +203,7 @@ lines printed. If you want it to stop at the first problem, as ASan does, add
 `-fno-sanitize-recover=undefined` to the compile command.
 
 The fix in the game is to compare before adding,
-`amount > INT_MAX - gs->score ? INT_MAX : gs->score + amount`, and to do the
+`amount > INT_MAX - gs->world.score ? INT_MAX : gs->world.score + amount`, and to do the
 bonus-life arithmetic in `int64_t`, which has room for any sum of two `int`
 values. [C in this codebase](../c-concepts/) lists that and the other
 overflow-safe spots.
@@ -282,7 +282,7 @@ gdb --args out/labs/texture_after_free_plain --clear
 | Stop at a line | `b game_score.c:11` | `break game_score.c:11` |
 | Show the call stack | `bt` | `bt` |
 | Move to a caller | `up`, or `frame select N` | `up`, or `frame N` |
-| Print a value | `p gs->score` | `print gs->score` |
+| Print a value | `p gs->world.score` | `print gs->world.score` |
 | Locals of this frame | `frame variable` | `info locals` |
 | Next line / into a call | `n` / `s` | `next` / `step` |
 | Carry on / quit | `c` / `q` | `continue` / `quit` |
@@ -339,7 +339,7 @@ collision lab has one coin.
     frame #5: ... super-mango`session_run(session=0x00000074bc400000) at app_session.c:535:9
     frame #6: ... super-mango`main(argc=6, argv=0x000000016fdfef98) at main.c:123:18
 (lldb) frame select 1
-(lldb) p gs->player
+(lldb) p gs->world.player
 (Player) {
   x = 48
   y = 220
@@ -360,9 +360,9 @@ Things to notice:
   It is the same on every call, whatever your monitor's refresh rate.
 - `player_update()` only receives a `Player *`, not the whole `GameState`.
   To see `gs`, step up one frame to `game_player_step()`, which has it.
-- `p gs->player` prints the struct by value because `Player` is stored by
+- `p gs->world.player` prints the struct by value because `Player` is stored by
   value inside `GameState`. lldb shortens long structs with `...`; print one
-  field with `p gs->player.vx`, or every field with `frame variable -A gs->player`.
+  field with `p gs->world.player.vx`, or every field with `frame variable -A gs->world.player`.
 - `player=0x...0230` is `gs` plus a small offset: the player lives inside the
   game state allocation, not in a separate one.
 

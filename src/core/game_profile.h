@@ -48,7 +48,7 @@ typedef struct {
  * lost. Resuming puts the player back on the saved respawn point exactly as
  * a lost life would, with the saved score, lives and collected coins.
  * level_hash ties it to the level file's exact bytes (the hash in
- * GameState.source_level_hash): an edited level no longer matches, so its
+ * GameState.world.source_level_hash): an edited level no longer matches, so its
  * old Continue point is dropped instead of placing the player somewhere
  * the new layout never meant.
  */

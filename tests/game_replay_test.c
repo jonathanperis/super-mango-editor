@@ -3,7 +3,7 @@
  *
  * `--replay-script <name>` reads <name>.replay from the `--replay-dir`
  * folder (out/replays-smoke by default). These tests point
- * gs->replay_dir, which that flag fills, at TEST_OUT "replays" so their
+ * gs->screen.replay_dir, which that flag fills, at TEST_OUT "replays" so their
  * scratch scripts stay inside this build's output tree.
  */
 #ifndef _WIN32
@@ -69,8 +69,8 @@ static void remove_script(const char *name)
  * --replay-script name` would. */
 static int load_script(GameState *gs, const char *name)
 {
-    snprintf(gs->replay_script_path, sizeof(gs->replay_script_path), "%s", name);
-    snprintf(gs->replay_dir, sizeof(gs->replay_dir), "%s", REPLAY_DIR);
+    snprintf(gs->screen.replay_script_path, sizeof(gs->screen.replay_script_path), "%s", name);
+    snprintf(gs->screen.replay_dir, sizeof(gs->screen.replay_dir), "%s", REPLAY_DIR);
     return game_replay_load(gs);
 }
 
@@ -91,7 +91,7 @@ static void replay_frame_unrendered(GameState *gs)
     game_handle_events(gs);
     int steps = game_inspector_steps(gs, GAME_FIXED_STEP);
     for (int i = 0; i < steps; i++) {
-        game_update_active(gs, GAME_FIXED_STEP, (int)gs->camera.x);
+        game_update_active(gs, GAME_FIXED_STEP, (int)gs->world.camera.x);
         if (game_simulation_blocked(gs)) break;
     }
     game_timing_tick_smoke(gs);
@@ -107,20 +107,20 @@ static int play_move_right(ReplayRun *run, int frames, int rendered)
     CHECK(frames <= (int)(sizeof(run->x) / sizeof(run->x[0])));
     CHECK(mechanics_open_level(&gs, REPLAY_LEVEL, 0) == 0);
     CHECK(load_script(&gs, "move-right") == 0);
-    CHECK(gs.replay_event_count == 3);
+    CHECK(gs.screen.replay_event_count == 3);
     for (int frame = 0; frame < frames; frame++) {
         if (frame < rendered) CHECK(mechanics_frames(&gs, 1) == 1);
         else replay_frame_unrendered(&gs);
-        run->x[frame] = gs.player.x;
-        run->vy[frame] = gs.player.vy;
+        run->x[frame] = gs.world.player.x;
+        run->vy[frame] = gs.world.player.vy;
     }
-    run->final_x = gs.player.x;
-    run->final_y = gs.player.y;
-    run->final_vx = gs.player.vx;
-    run->on_ground = gs.player.on_ground;
-    run->frames = gs.replay_frame;
-    run->cursor = gs.replay_cursor;
-    run->held = (int)gs.replay_held_mask;
+    run->final_x = gs.world.player.x;
+    run->final_y = gs.world.player.y;
+    run->final_vx = gs.world.player.vx;
+    run->on_ground = gs.world.player.on_ground;
+    run->frames = gs.screen.replay_frame;
+    run->cursor = gs.screen.replay_cursor;
+    run->held = (int)gs.screen.replay_held_mask;
 done:
     game_cleanup(&gs);
     return failed;
@@ -166,13 +166,13 @@ int replay_scripts_drive_the_game(void)
         int paused_ok = 0, frozen_ok = 0, resumed_ok = 0;
         if (loaded) {
             for (int i = 0; i < 6; i++) replay_frame_unrendered(&gs);
-            paused_ok = gs.paused == 1;
-            float x = gs.player.x;
+            paused_ok = gs.screen.paused == 1;
+            float x = gs.world.player.x;
             for (int i = 0; i < 20; i++) replay_frame_unrendered(&gs);
             /* Draw the pause overlay once. */
-            frozen_ok = mechanics_frames(&gs, 1) == 1 && gs.player.x == x;
+            frozen_ok = mechanics_frames(&gs, 1) == 1 && gs.world.player.x == x;
             for (int i = 0; i < 10; i++) replay_frame_unrendered(&gs);
-            resumed_ok = gs.paused == 0 && gs.player.x > x;
+            resumed_ok = gs.screen.paused == 0 && gs.world.player.x > x;
         }
         game_cleanup(&gs);
         CHECK(loaded && paused_ok && frozen_ok && resumed_ok);
@@ -185,41 +185,41 @@ int replay_scripts_drive_the_game(void)
                            "0 press a\n0 release d\n1 down w\n1 up s\n"
                            "2 tap jump\n2 tap run\n3 tap return\n3 tap esc\n") == 0);
         int loaded = load_script(&gs, "jump-right");
-        int count = gs.replay_event_count;
+        int count = gs.screen.replay_event_count;
         int keys_ok = loaded == 0 && count == 8 &&
-                      gs.replay_events[0].key == KEY_LEFT &&
-                      gs.replay_events[1].key == KEY_RIGHT &&
-                      gs.replay_events[2].key == KEY_UP &&
-                      gs.replay_events[3].key == KEY_DOWN &&
-                      gs.replay_events[4].key == KEY_SPACE &&
-                      gs.replay_events[5].key == KEY_LEFT_SHIFT &&
-                      gs.replay_events[6].key == KEY_ENTER &&
-                      gs.replay_events[7].key == KEY_ESCAPE &&
-                      strcmp(gs.replay_events[1].action, "release") == 0;
+                      gs.screen.replay_events[0].key == KEY_LEFT &&
+                      gs.screen.replay_events[1].key == KEY_RIGHT &&
+                      gs.screen.replay_events[2].key == KEY_UP &&
+                      gs.screen.replay_events[3].key == KEY_DOWN &&
+                      gs.screen.replay_events[4].key == KEY_SPACE &&
+                      gs.screen.replay_events[5].key == KEY_LEFT_SHIFT &&
+                      gs.screen.replay_events[6].key == KEY_ENTER &&
+                      gs.screen.replay_events[7].key == KEY_ESCAPE &&
+                      strcmp(gs.screen.replay_events[1].action, "release") == 0;
         /* Inject without a level: press/release only change held keys;
          * a tap holds its bit for exactly one frame. */
         int held_ok = 0;
         if (keys_ok) {
             input_clear();
             game_replay_inject_events(&gs);   /* frame 0: press a */
-            held_ok = gs.replay_input_mask == PLAYER_INPUT_LEFT;
+            held_ok = gs.screen.replay_input_mask == PLAYER_INPUT_LEFT;
             game_replay_inject_events(&gs);   /* frame 1: hold w */
-            held_ok &= gs.replay_input_mask == (PLAYER_INPUT_LEFT | PLAYER_INPUT_UP);
+            held_ok &= gs.screen.replay_input_mask == (PLAYER_INPUT_LEFT | PLAYER_INPUT_UP);
             game_replay_inject_events(&gs);   /* frame 2: taps */
-            held_ok &= gs.replay_input_mask ==
+            held_ok &= gs.screen.replay_input_mask ==
                        (PLAYER_INPUT_LEFT | PLAYER_INPUT_UP | PLAYER_INPUT_JUMP | PLAYER_INPUT_RUN);
             game_replay_inject_events(&gs);   /* frame 3: taps end */
-            held_ok &= gs.replay_input_mask == (PLAYER_INPUT_LEFT | PLAYER_INPUT_UP);
-            held_ok &= gs.replay_cursor == 8 && gs.replay_frame == 4;
+            held_ok &= gs.screen.replay_input_mask == (PLAYER_INPUT_LEFT | PLAYER_INPUT_UP);
+            held_ok &= gs.screen.replay_cursor == 8 && gs.screen.replay_frame == 4;
             input_clear();
         }
         game_replay_cleanup(&gs);
         CHECK(keys_ok && held_ok);
-        CHECK(gs.replay_events == NULL && gs.replay_event_count == 0 && gs.replay_cursor == 0);
+        CHECK(gs.screen.replay_events == NULL && gs.screen.replay_event_count == 0 && gs.screen.replay_cursor == 0);
         /* With no script, injection only repeats the held keys. */
-        gs.replay_held_mask = PLAYER_INPUT_RIGHT;
+        gs.screen.replay_held_mask = PLAYER_INPUT_RIGHT;
         game_replay_inject_events(&gs);
-        CHECK(gs.replay_input_mask == PLAYER_INPUT_RIGHT);
+        CHECK(gs.screen.replay_input_mask == PLAYER_INPUT_RIGHT);
     }
 done:
     remove_script("move-right");
@@ -248,9 +248,9 @@ int replay_scripts_reject_malformed_files(void)
     for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
         CHECK(write_script("move-right", bad[i]) == 0);
         int result = load_script(&gs, "move-right");
-        if (result != -1 || gs.replay_events != NULL || gs.replay_event_count != 0)
+        if (result != -1 || gs.screen.replay_events != NULL || gs.screen.replay_event_count != 0)
             fprintf(stderr, "game_replay_test: accepted bad script %zu\n", i);
-        CHECK(result == -1 && gs.replay_events == NULL && gs.replay_event_count == 0);
+        CHECK(result == -1 && gs.screen.replay_events == NULL && gs.screen.replay_event_count == 0);
     }
 
     /* A line longer than the 160-byte reader is refused, not split. */
@@ -259,7 +259,7 @@ int replay_scripts_reject_malformed_files(void)
         memset(text, ' ', 300);
         memcpy(text + 290, "1 tap left\n", 12);
         CHECK(write_script("move-right", text) == 0);
-        CHECK(load_script(&gs, "move-right") == -1 && gs.replay_events == NULL);
+        CHECK(load_script(&gs, "move-right") == -1 && gs.screen.replay_events == NULL);
     }
 
     /* At most 4096 events: one more is refused as oversized. */
@@ -272,7 +272,7 @@ int replay_scripts_reject_malformed_files(void)
         int written = write_script("move-right", text);
         free(text);
         CHECK(written == 0);
-        CHECK(load_script(&gs, "move-right") == -1 && gs.replay_events == NULL);
+        CHECK(load_script(&gs, "move-right") == -1 && gs.screen.replay_events == NULL);
     }
 
     /* Only the known script names map to files, and they must exist. */
@@ -284,11 +284,11 @@ int replay_scripts_reject_malformed_files(void)
     CHECK(write_script("move-right", "0 tap left\n") == 0);
     CHECK(load_script(&gs, "move-right") == 0);
     game_replay_cleanup(&gs);
-    snprintf(gs.replay_dir, sizeof(gs.replay_dir), "%s", TEST_OUT "no-such-replays");
-    CHECK(game_replay_load(&gs) == -1 && gs.replay_events == NULL);
+    snprintf(gs.screen.replay_dir, sizeof(gs.screen.replay_dir), "%s", TEST_OUT "no-such-replays");
+    CHECK(game_replay_load(&gs) == -1 && gs.screen.replay_events == NULL);
     /* No name means no replay, which is not an error. */
-    gs.replay_script_path[0] = '\0';
-    CHECK(game_replay_load(&gs) == 0 && gs.replay_events == NULL);
+    gs.screen.replay_script_path[0] = '\0';
+    CHECK(game_replay_load(&gs) == 0 && gs.screen.replay_events == NULL);
 done:
     game_replay_cleanup(&gs);
     remove_script("move-right");

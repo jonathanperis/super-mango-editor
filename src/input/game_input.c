@@ -104,16 +104,16 @@ void game_input_arm_release_latch(GameState *gs,
 
     if (!gs) return;
     game_web_input_clear_touch();
-    game_input_read_bound(gs->controller, gs->profile ? &gs->profile->data.settings : NULL, &current);
-    gs->input_release_keyboard_mask = current.keyboard_mask;
-    gs->input_release_controller_mask = current.controller_mask;
+    game_input_read_bound(gs->screen.controller, gs->screen.profile ? &gs->screen.profile->data.settings : NULL, &current);
+    gs->screen.input_release_keyboard_mask = current.keyboard_mask;
+    gs->screen.input_release_controller_mask = current.controller_mask;
     if (inherited) {
-        gs->input_release_keyboard_mask |= inherited->keyboard_mask;
-        gs->input_release_controller_mask |= inherited->controller_mask;
+        gs->screen.input_release_keyboard_mask |= inherited->keyboard_mask;
+        gs->screen.input_release_controller_mask |= inherited->controller_mask;
     }
-    gs->input_release_latched =
-        gs->input_release_keyboard_mask != 0 ||
-        gs->input_release_controller_mask != 0;
+    gs->screen.input_release_latched =
+        gs->screen.input_release_keyboard_mask != 0 ||
+        gs->screen.input_release_controller_mask != 0;
 }
 
 unsigned int game_input_sample(GameState *gs)
@@ -123,33 +123,33 @@ unsigned int game_input_sample(GameState *gs)
     int controller_held;
 
     if (!gs) return 0;
-    game_input_read_bound(gs->controller, gs->profile ? &gs->profile->data.settings : NULL, &current);
-    if (!gs->input_release_latched)
+    game_input_read_bound(gs->screen.controller, gs->screen.profile ? &gs->screen.profile->data.settings : NULL, &current);
+    if (!gs->screen.input_release_latched)
         return current.keyboard_mask | current.controller_mask;
 
-    keyboard_held = (current.keyboard_mask & gs->input_release_keyboard_mask) != 0;
-    controller_held = (current.controller_mask & gs->input_release_controller_mask) != 0;
+    keyboard_held = (current.keyboard_mask & gs->screen.input_release_keyboard_mask) != 0;
+    controller_held = (current.controller_mask & gs->screen.input_release_controller_mask) != 0;
 
     if (keyboard_held || controller_held) return 0;
 
-    gs->input_release_keyboard_mask = 0;
-    gs->input_release_controller_mask = 0;
-    gs->input_release_latched = 0;
+    gs->screen.input_release_keyboard_mask = 0;
+    gs->screen.input_release_controller_mask = 0;
+    gs->screen.input_release_latched = 0;
     return current.keyboard_mask | current.controller_mask;
 }
 
 void game_input_clear_controller_latch(GameState *gs)
 {
     if (!gs) return;
-    gs->input_release_controller_mask = 0;
-    gs->input_release_latched = gs->input_release_keyboard_mask != 0;
+    gs->screen.input_release_controller_mask = 0;
+    gs->screen.input_release_latched = gs->screen.input_release_keyboard_mask != 0;
 }
 
 void gamepad_adopt_controller(GameState *gs, int device)
 {
     /* Keep the controller already in use; removal commands clear the old
      * device and its latch before another can be adopted. */
-    if (gs && !gs->controller && device) gs->controller = device;
+    if (gs && !gs->screen.controller && device) gs->screen.controller = device;
 }
 
 void gamepad_refresh_controller(GameState *gs)
@@ -171,5 +171,5 @@ int game_input_event_confirms(const InputEvent *event)
 void gamepad_close_controller(GameState *gs)
 {
     if (!gs) return;
-    gs->controller = 0;
+    gs->screen.controller = 0;
 }

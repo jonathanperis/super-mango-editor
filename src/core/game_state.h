@@ -24,7 +24,7 @@
  * camera then jumps straight to the respawn point (game_camera_snap).
  *
  * fp_prev_riding is passed by pointer because it lives in the frame-loop
- * scratch state (GameState.loop); resetting it here keeps the float-platform
+ * scratch state (GameState.screen.loop); resetting it here keeps the float-platform
  * stay-on logic from snapping the player to a platform that no longer
  * exists after the reset.
  */

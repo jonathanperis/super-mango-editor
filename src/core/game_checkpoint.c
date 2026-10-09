@@ -13,15 +13,15 @@ void game_checkpoint_feedback_set(GameState *gs, CheckpointFeedbackKind kind,
                                   uint32_t now, uint32_t duration)
 {
     if (!gs) return;
-    gs->checkpoint_feedback_kind = kind;
-    gs->checkpoint_feedback_until = kind == CHECKPOINT_FEEDBACK_NONE
+    gs->world.checkpoint_feedback_kind = kind;
+    gs->world.checkpoint_feedback_until = kind == CHECKPOINT_FEEDBACK_NONE
         ? 0 : now + duration;
 }
 
 void game_checkpoint_feedback_clear_expired(GameState *gs, uint32_t now)
 {
-    if (!gs || gs->checkpoint_feedback_kind == CHECKPOINT_FEEDBACK_NONE) return;
-    if ((int32_t)(now - gs->checkpoint_feedback_until) >= 0) {
+    if (!gs || gs->world.checkpoint_feedback_kind == CHECKPOINT_FEEDBACK_NONE) return;
+    if ((int32_t)(now - gs->world.checkpoint_feedback_until) >= 0) {
         game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_NONE, now, 0);
     }
 }
@@ -34,13 +34,13 @@ uint32_t game_checkpoint_clock_ms(const GameState *gs)
      * cut to 32 bits safely. The result wraps after ~49 days of play, and the
      * deadline checks compare with signed differences so they survive that.
      */
-    return (uint32_t)(uint64_t)(gs->sim_time * 1000.0);
+    return (uint32_t)(uint64_t)(gs->world.sim_time * 1000.0);
 }
 
 void game_checkpoint_feedback_tick(GameState *gs, float dt)
 {
     if (!gs) return;
-    gs->sim_time += dt;
+    gs->world.sim_time += dt;
     game_checkpoint_feedback_clear_expired(gs, game_checkpoint_clock_ms(gs));
 }
 
@@ -49,7 +49,7 @@ void game_checkpoint_update_authored(GameState *gs)
     const LevelDef *def;
 
     if (!gs) return;
-    def = (const LevelDef *)gs->runtime.current_level;
+    def = (const LevelDef *)gs->world.runtime.current_level;
 
     if (!def || def->checkpoint_count <= 0) return;
 
@@ -57,7 +57,7 @@ void game_checkpoint_update_authored(GameState *gs)
         /* checkpoint_index and respawn_x/y are always written together
          * (below, at level load and on retry), so a valid index already
          * names the current respawn. Only its range needs checking. */
-        int best_index = gs->checkpoint_index;
+        int best_index = gs->world.checkpoint_index;
         if (best_index < 0 || best_index >= def->checkpoint_count) {
             best_index = -1;
         }
@@ -68,7 +68,7 @@ void game_checkpoint_update_authored(GameState *gs)
         /* Scan instead of sorting: authored record order remains canonical. */
         for (int i = 0; i < def->checkpoint_count; i++) {
             const CheckpointPlacement *placement = &def->checkpoints[i];
-            if (placement->x <= gs->player.x && placement->x > best_x) {
+            if (placement->x <= gs->world.player.x && placement->x > best_x) {
                 best_index = i;
                 best_x = placement->x;
             }
@@ -82,15 +82,15 @@ void game_checkpoint_update_authored(GameState *gs)
          */
         if (best_index < 0) return;
 
-        if (best_index != gs->checkpoint_index) {
-            gs->checkpoint_index = best_index;
-            gs->respawn_x = def->checkpoints[best_index].x;
-            gs->respawn_y = def->checkpoints[best_index].y;
+        if (best_index != gs->world.checkpoint_index) {
+            gs->world.checkpoint_index = best_index;
+            gs->world.respawn_x = def->checkpoints[best_index].x;
+            gs->world.respawn_y = def->checkpoints[best_index].y;
             game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_SAVED,
                                           game_checkpoint_clock_ms(gs), 1200);
-            if (gs->debug_mode) {
-                debug_log(&gs->debug, "CHECKPOINT saved at x=%.0f y=%.0f",
-                          gs->respawn_x, gs->respawn_y);
+            if (gs->screen.debug_mode) {
+                debug_log(&gs->screen.debug, "CHECKPOINT saved at x=%.0f y=%.0f",
+                          gs->world.respawn_x, gs->world.respawn_y);
             }
         }
         return;
@@ -130,25 +130,25 @@ static int legacy_respawn_column_is_safe(const GameState *gs, float x)
 {
     float x1 = x + (float)TILE_SIZE;
 
-    for (int i = 0; i < gs->floor_gap_count; i++) {
-        float gap_x = (float)gs->floor_gaps[i];
+    for (int i = 0; i < gs->world.floor_gap_count; i++) {
+        float gap_x = (float)gs->world.floor_gaps[i];
         if (spans_overlap(x, x1, gap_x, gap_x + (float)FLOOR_GAP_W)) return 0;
     }
-    for (int i = 0; i < gs->spike_row_count; i++) {
-        const SpikeRow *row = &gs->spike_rows[i];
+    for (int i = 0; i < gs->world.spike_row_count; i++) {
+        const SpikeRow *row = &gs->world.spike_rows[i];
         if (row->active && spans_overlap(x, x1, row->x,
                 row->x + (float)(row->count * SPIKE_TILE_W))) return 0;
     }
-    for (int i = 0; i < gs->spike_platform_count; i++) {
-        const SpikePlatform *sp = &gs->spike_platforms[i];
+    for (int i = 0; i < gs->world.spike_platform_count; i++) {
+        const SpikePlatform *sp = &gs->world.spike_platforms[i];
         if (sp->active && spans_overlap(x, x1, sp->x, sp->x + (float)sp->w)) return 0;
     }
-    for (int i = 0; i < gs->blue_flame_count; i++) {
-        const BlueFlame *flame = &gs->blue_flames[i];
+    for (int i = 0; i < gs->world.blue_flame_count; i++) {
+        const BlueFlame *flame = &gs->world.blue_flames[i];
         if (flame->active && spans_overlap(x, x1, flame->x, flame->x + (float)flame->w)) return 0;
     }
-    for (int i = 0; i < gs->fire_flame_count; i++) {
-        const BlueFlame *flame = &gs->fire_flames[i];
+    for (int i = 0; i < gs->world.fire_flame_count; i++) {
+        const BlueFlame *flame = &gs->world.fire_flames[i];
         if (flame->active && spans_overlap(x, x1, flame->x, flame->x + (float)flame->w)) return 0;
     }
     return 1;
@@ -165,7 +165,7 @@ static int legacy_respawn_column_is_safe(const GameState *gs, float x)
  */
 static float legacy_safe_respawn_x(const GameState *gs, float boundary_x)
 {
-    for (float x = boundary_x; x > gs->respawn_x && x >= 0.0f;
+    for (float x = boundary_x; x > gs->world.respawn_x && x >= 0.0f;
          x -= LEGACY_CHECKPOINT_STEP) {
         if (legacy_respawn_column_is_safe(gs, x)) return x;
     }
@@ -177,7 +177,7 @@ void game_checkpoint_update(GameState *gs)
     const LevelDef *def;
 
     if (!gs) return;
-    def = (const LevelDef *)gs->runtime.current_level;
+    def = (const LevelDef *)gs->world.runtime.current_level;
 
     /* Levels with authored placements use only those, and game_update_active
      * already sampled them this step (game_checkpoint_update_authored, before
@@ -188,19 +188,19 @@ void game_checkpoint_update(GameState *gs)
 
     /* Legacy levels save automatically at each newly entered screen. */
     {
-        int current_screen = (int)(gs->player.x / GAME_W);
+        int current_screen = (int)(gs->world.player.x / GAME_W);
 
-        if (current_screen > gs->legacy_checkpoint_screen) {
+        if (current_screen > gs->world.legacy_checkpoint_screen) {
             /* Record the screen even when no safe column exists, so the
              * search runs once per screen rather than every frame. */
-            gs->legacy_checkpoint_screen = current_screen;
+            gs->world.legacy_checkpoint_screen = current_screen;
             float new_checkpoint = legacy_safe_respawn_x(gs, (float)(current_screen * GAME_W));
             if (new_checkpoint < 0.0f) return;
-            gs->respawn_x = new_checkpoint;
+            gs->world.respawn_x = new_checkpoint;
             game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_SAVED,
                                           game_checkpoint_clock_ms(gs), 1200);
-            if (gs->debug_mode) {
-                debug_log(&gs->debug, "CHECKPOINT saved at x=%.0f", gs->respawn_x);
+            if (gs->screen.debug_mode) {
+                debug_log(&gs->screen.debug, "CHECKPOINT saved at x=%.0f", gs->world.respawn_x);
             }
         }
     }

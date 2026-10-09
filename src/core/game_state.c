@@ -12,15 +12,15 @@
 
 void reset_current_level(GameState *gs, int *fp_prev_riding)
 {
-    const LevelDef *def = (const LevelDef *)gs->runtime.current_level;
+    const LevelDef *def = (const LevelDef *)gs->world.runtime.current_level;
 
     *fp_prev_riding = -1;
 
     if (!def) return;
 
     /* Runtime owns resolved respawn coordinates; LevelDef stays immutable. */
-    gs->player.spawn_x = gs->respawn_x;
-    gs->player.spawn_y = gs->respawn_y;
+    gs->world.player.spawn_x = gs->world.respawn_x;
+    gs->world.player.spawn_y = gs->world.respawn_y;
     level_reset(gs, def);
 
     /* The player is back at the respawn point, possibly a whole level away

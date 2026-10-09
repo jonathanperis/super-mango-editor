@@ -260,8 +260,11 @@ headers `game.h` pulls in for it, then does not recompile those files. See
 value, so `game.h` includes exactly the headers whose structs or `MAX_*`
 constants that definition needs, plus `game_constants.h` — nothing else. Call-only helpers such as
 `shared/platform.h` (`clock_millis`, `str_copy`) are included by the `.c` files
-that use them. Splitting `GameState` would hide less but also be harder to
-trace; the comment at the top of `game.h` explains the trade-off.
+that use them. Inside, `GameState` is three named parts stored by value,
+`world` (the level being played), `screen` (overlays, routes, timing, input,
+tools) and `assets` (shared sprites and sounds), so `gs->world.spiders[i]`
+still leads straight to the data; the comment at the top of `game.h`
+explains the trade-off.
 
 ```c
 #include "shared/graphics.h"            // Texture2D, RenderTexture2D, IntRect
@@ -359,7 +362,7 @@ Frees all resources in reverse init order.
 - `int level_load(GameState *gs, const LevelDef *def);` -- validate and copy a parsed level definition into runtime `GameState`; returns `-1` without mutating current runtime state when runtime counts are invalid
 - `level_apply(GameState *gs, const LevelDef *def)` -- the copy step alone, for a definition `level_load_toml` already validated; it cannot fail. The level session parses and validates a level once, checks its sprites, then swaps the heap-staged `LevelDef` in and applies it, so a failed Next Level never replaces the current level
 - `level_reset(GameState *gs, const LevelDef *def)` -- restore mutable level state after death/retry; collected coins stay collected (Retry re-activates them)
-- `level_release_platform_tiles(GameState *gs)` -- unload the platform tile textures; `GameState.platform_tiles` loads each distinct `tile_path` once and every platform naming it borrows that texture, so a level with 23 stone pillars decodes `stone_platform.png` once, and reloading the same level (Replay, F8) decodes nothing
+- `level_release_platform_tiles(GameState *gs)` -- unload the platform tile textures; `GameState.world.platform_tiles` loads each distinct `tile_path` once and every platform naming it borrows that texture, so a level with 23 stone pillars decodes `stone_platform.png` once, and reloading the same level (Replay, F8) decodes nothing
 - `level_load_toml(const char *path, LevelDef *def)` -- parse TOML into heap staging storage, run runtime validation, free TOML data, then assign the validated `LevelDef` to the caller. A `LevelDef` is about 16 KB; game load paths never keep one in a local variable (the browser stack is 64 KB), and `level.h` stops the build if it outgrows `LEVEL_DEF_SIZE_BUDGET`
 - `level_apply_player_physics(Player *player, const LevelDef *def)` -- reset player movement tunables to engine defaults, then apply non-negative level overrides
 - `level_validate_counts(const LevelDef *level, char *err, size_t err_sz)` -- reject out-of-range array counts
@@ -369,7 +372,7 @@ Frees all resources in reverse init order.
 
 ### `core/game_checkpoint.h` / `core/game_checkpoint.c`
 
-Resolves respawn state without mutating `LevelDef`. With authored records, the greatest crossed x coordinate becomes `GameState.respawn_x` / `respawn_y` before lethal collisions run. With no records, the legacy automatic screen-boundary checkpoint remains active; it walks left from the screen edge to the first column with solid floor and no static hazard, keeping the previous checkpoint when none is safe.
+Resolves respawn state without mutating `LevelDef`. With authored records, the greatest crossed x coordinate becomes `GameState.world.respawn_x` / `respawn_y` before lethal collisions run. With no records, the legacy automatic screen-boundary checkpoint remains active; it walks left from the screen edge to the first column with solid floor and no static hazard, keeping the previous checkpoint when none is safe.
 
 ### `core/game_ghost.h` / `core/game_ghost.c` / `core/game_ghost_file.c`
 
@@ -377,7 +380,7 @@ The time-trial ghost. `game_ghost.c` records one `GhostSample` (pixel position p
 
 ### `core/game_resume.h` / `core/game_resume.c`
 
-Bridges gameplay and the profile's one Continue point (`GameResume`, defined in `game_profile.h`). `game_resume_capture` copies the profile key, the level's content hash (`GameState.source_level_hash`), respawn point, checkpoint index, score, lives, collected coins (one bit per coin) and level timer out of a running `GameState`. `game_resume_apply` refuses a point for another level, another version of the file, or a checkpoint, coin or position the level does not have; otherwise it restores those values and calls `reset_current_level`, the same reset a lost life uses, so the camera snaps there and enemies restart. `AppSession` decides when to record (new respawn point, pause, leaving part-way) and clear (level finished or lost) it.
+Bridges gameplay and the profile's one Continue point (`GameResume`, defined in `game_profile.h`). `game_resume_capture` copies the profile key, the level's content hash (`GameState.world.source_level_hash`), respawn point, checkpoint index, score, lives, collected coins (one bit per coin) and level timer out of a running `GameState`. `game_resume_apply` refuses a point for another level, another version of the file, or a checkpoint, coin or position the level does not have; otherwise it restores those values and calls `reset_current_level`, the same reset a lost life uses, so the camera snaps there and enemies restart. `AppSession` decides when to record (new respawn point, pause, leaving part-way) and clear (level finished or lost) it.
 
 ---
 

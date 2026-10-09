@@ -125,19 +125,19 @@ static void session_close_game(AppSession *session)
 
 static void session_profile_key(GameState *game, const char *source)
 {
-    game->profile_level_key[0] = 0;
+    game->screen.profile_level_key[0] = 0;
     if (game_profile_key_valid(source)) {
-        copy_path(game->profile_level_key, sizeof(game->profile_level_key), source);
+        copy_path(game->screen.profile_level_key, sizeof(game->screen.profile_level_key), source);
         return;
     }
-    const char *base = strrchr(game->level_path, '/');
-    const char *back = strrchr(game->level_path, '\\');
+    const char *base = strrchr(game->world.level_path, '/');
+    const char *back = strrchr(game->world.level_path, '\\');
     if (!base || (back && back > base)) base = back;
     char key[PROFILE_LEVEL_PATH], resolved[GAME_LEVEL_PATH_MAX];
-    int size = snprintf(key, sizeof(key), "levels/%s", base ? base+1 : game->level_path);
+    int size = snprintf(key, sizeof(key), "levels/%s", base ? base+1 : game->world.level_path);
     if (size > 0 && (size_t)size < sizeof(key) && game_profile_key_valid(key) &&
-        !level_resolve_path(key, resolved, sizeof(resolved)) && !strcmp(resolved, game->level_path))
-        copy_path(game->profile_level_key, sizeof(game->profile_level_key), key);
+        !level_resolve_path(key, resolved, sizeof(resolved)) && !strcmp(resolved, game->world.level_path))
+        copy_path(game->screen.profile_level_key, sizeof(game->screen.profile_level_key), key);
 }
 
 static void session_apply_preferences(AppSession *session)
@@ -202,8 +202,8 @@ static int session_profile_ready_to_leave(AppSession *session)
  */
 static void session_watch_resume(AppSession *session, const GameState *game)
 {
-    session->resume_respawn_x = game->respawn_x;
-    session->resume_respawn_y = game->respawn_y;
+    session->resume_respawn_x = game->world.respawn_x;
+    session->resume_respawn_y = game->world.respawn_y;
     session->resume_was_paused = 0;
 }
 
@@ -212,24 +212,24 @@ static void session_track_resume(AppSession *session, const GameState *game, int
     GameProfile *profile = &session->profile;
     /* Labs and editor playtests have no profile key; F8 experiments are
      * debug runs, which never touch the personal profile anyway. */
-    if (!game->profile_level_key[0] || game->experiment) return;
-    if (game->completion.complete || game->game_over) {
+    if (!game->screen.profile_level_key[0] || game->screen.experiment) return;
+    if (game->screen.completion.complete || game->screen.game_over) {
         /* A finished or lost attempt leaves nothing to continue. */
-        if (game_profile_resume(profile, game->profile_level_key)) game_profile_clear_resume(profile);
+        if (game_profile_resume(profile, game->screen.profile_level_key)) game_profile_clear_resume(profile);
         return;
     }
-    int paused = game->paused || game->pause_reasons;
-    int moved = game->respawn_x != session->resume_respawn_x || game->respawn_y != session->resume_respawn_y;
+    int paused = game->screen.paused || game->screen.pause_reasons;
+    int moved = game->world.respawn_x != session->resume_respawn_x || game->world.respawn_y != session->resume_respawn_y;
     int pause_began = paused && !session->resume_was_paused;
     session->resume_was_paused = paused;
     if (!leaving && !moved && !pause_began) return;
-    session->resume_respawn_x = game->respawn_x;
-    session->resume_respawn_y = game->respawn_y;
+    session->resume_respawn_x = game->world.respawn_x;
+    session->resume_respawn_y = game->world.respawn_y;
     GameResume resume;
     game_resume_capture(game, &resume);
     if (game_profile_set_resume(profile, &resume))
         TraceLog(LOG_WARNING, "Profile: Continue point for %s was out of range and not saved",
-                 game->profile_level_key);
+                 game->screen.profile_level_key);
 }
 
 /*
@@ -239,10 +239,10 @@ static void session_track_resume(AppSession *session, const GameState *game, int
  */
 static void session_apply_resume(AppSession *session, GameState *game)
 {
-    const GameResume *resume = game_profile_resume(&session->profile, game->profile_level_key);
+    const GameResume *resume = game_profile_resume(&session->profile, game->screen.profile_level_key);
     if (resume && game_resume_apply(game, resume)) {
         TraceLog(LOG_WARNING, "Continue point for %s no longer matches the level; starting from its start",
-                 game->profile_level_key);
+                 game->screen.profile_level_key);
         game_profile_clear_resume(&session->profile);
     }
     session_watch_resume(session, game);
@@ -277,15 +277,15 @@ static void session_drop_stale_resume(AppSession *session)
  */
 static void session_load_ghost(AppSession *session, GameState *game)
 {
-    if (!session->profile.enabled || !game->profile_level_key[0]) return;
-    if (!game->ghost && game_ghost_begin(game)) return;  /* out of memory: no ghost */
+    if (!session->profile.enabled || !game->screen.profile_level_key[0]) return;
+    if (!game->screen.ghost && game_ghost_begin(game)) return;  /* out of memory: no ghost */
     GameGhostTrack best;
-    int found = game_ghost_load(&session->profile, game->profile_level_key, &best);
+    int found = game_ghost_load(&session->profile, game->screen.profile_level_key, &best);
     if (found < 0)
-        TraceLog(LOG_WARNING, "Ghost for %s is unreadable or invalid; ignored", game->profile_level_key);
-    else if (found == 1 && best.level_hash != game->source_level_hash) {
+        TraceLog(LOG_WARNING, "Ghost for %s is unreadable or invalid; ignored", game->screen.profile_level_key);
+    else if (found == 1 && best.level_hash != game->world.source_level_hash) {
         TraceLog(LOG_INFO, "Ghost for %s was recorded on another version of the level; ignored",
-                 game->profile_level_key);
+                 game->screen.profile_level_key);
         game_ghost_track_free(&best);
     } else if (found == 1) {
         game_ghost_set_best(game, &best);
@@ -301,9 +301,9 @@ static void session_load_ghost(AppSession *session, GameState *game)
 static void session_save_ghost(AppSession *session, GameState *game)
 {
     GameGhostTrack run;
-    if (!game->ghost || !session->profile.enabled || !session->profile.writable) return;
+    if (!game->screen.ghost || !session->profile.enabled || !session->profile.writable) return;
     if (game_ghost_take_run(game, &run)) return;
-    const GameGhostTrack *best = &game->ghost->best;
+    const GameGhostTrack *best = &game->screen.ghost->best;
     if ((best->count == 0 || run.time < best->time) && game_ghost_save(&session->profile, &run))
         TraceLog(LOG_WARNING, "Ghost for %s was not saved (storage full or unavailable)", run.level);
     /* Whatever comes next (Replay, Next Level, Level Select) loads the
@@ -315,30 +315,30 @@ static GameState *session_make_game(AppSession *session, const char *path, const
 {
     GameState *game = calloc(1, sizeof(*game));
     if (!game) return NULL;
-    game->debug_mode = session->debug_mode;
-    game->random_seed = session->random_seed;
-    game->smoke_test_frames = session->smoke_test_frames;
-    copy_path(game->level_path, sizeof(game->level_path), path);
-    copy_path(game->replay_script_path, sizeof(game->replay_script_path), session->replay_script_path);
-    copy_path(game->replay_dir, sizeof(game->replay_dir), session->replay_dir);
+    game->screen.debug_mode = session->debug_mode;
+    game->screen.random_seed = session->random_seed;
+    game->screen.smoke_test_frames = session->smoke_test_frames;
+    copy_path(game->world.level_path, sizeof(game->world.level_path), path);
+    copy_path(game->screen.replay_script_path, sizeof(game->screen.replay_script_path), session->replay_script_path);
+    copy_path(game->screen.replay_dir, sizeof(game->screen.replay_dir), session->replay_dir);
     /* A requested start point applies to the first game only. */
-    game->start_kind = (int)session->start.kind;
-    game->start_x = session->start.x;
-    game->start_checkpoint = session->start.checkpoint;
+    game->screen.start_kind = (int)session->start.kind;
+    game->screen.start_x = session->start.x;
+    game->screen.start_checkpoint = session->start.checkpoint;
     session->start.kind = LEVEL_START_DEFAULT;
     if (game_init(game)) {
         free(game);
         return NULL;
     }
     game_timing_restart_clock(game);
-    game->profile = &session->profile;
-    game->settings_menu = &session->settings;
+    game->screen.profile = &session->profile;
+    game->screen.settings_menu = &session->settings;
     /* These two pointers are borrowed from the longer-lived session. The
      * screen must not free them when a replay replaces its GameState. */
     session_profile_key(game, path);
-    game_profile_select(&session->profile, game->profile_level_key);
+    game_profile_select(&session->profile, game->screen.profile_level_key);
     session->preferences_applied = 0;
-    game->loop.fp_prev_riding = -1;
+    game->screen.loop.fp_prev_riding = -1;
     session_repair_web_input(session);
     /* A confirm held on the old screen cannot immediately jump/confirm on
      * the new one. The latch waits for those physical controls to release. */
@@ -433,9 +433,9 @@ static void session_apply_game_route(AppSession *session)
      * screen frame, when its event/update/render code is no longer running. */
     GameState *game = session->game;
     if (!game) return;
-    GameRoute route = game->route;
+    GameRoute route = game->screen.route;
     char path[GAME_LEVEL_PATH_MAX];
-    if (route == GAME_ROUTE_NONE && !game->running) route = GAME_ROUTE_EXIT;
+    if (route == GAME_ROUTE_NONE && !game->screen.running) route = GAME_ROUTE_EXIT;
     if (route == GAME_ROUTE_NONE) return;
     /* Leaving a level part-way keeps a Continue point; record it before the
      * save below, so Exit writes it to disk with everything else. */
@@ -443,19 +443,19 @@ static void session_apply_game_route(AppSession *session)
     /* Leaving the program waits for a pending browser save to settle. Every
      * other route keeps the session, and with it the profile in memory. */
     if (route == GAME_ROUTE_EXIT && !session_profile_ready_to_leave(session)) return;
-    game->route = GAME_ROUTE_NONE;
+    game->screen.route = GAME_ROUTE_NONE;
     switch (route) {
     case GAME_ROUTE_NEXT_LEVEL:
         session->route = APP_ROUTE_GAME_NEXT_LEVEL;
-        copy_path(path, sizeof(path), game->completion.next_phase);
+        copy_path(path, sizeof(path), game->screen.completion.next_phase);
         if (!game_load_next_phase(game)) {
             session_profile_key(game, path);
-            game_profile_select(&session->profile, game->profile_level_key);
-            game->resumed = 0;  /* the new level is played from its start */
+            game_profile_select(&session->profile, game->screen.profile_level_key);
+            game->screen.resumed = 0;  /* the new level is played from its start */
             session_watch_resume(session, game);
             /* A new level, a new race: restart the recording, load its ghost. */
             game_ghost_restart(game);
-            game_ghost_track_free(game->ghost ? &game->ghost->best : NULL);
+            game_ghost_track_free(game->screen.ghost ? &game->screen.ghost->best : NULL);
             session_load_ghost(session, game);
             session->preferences_applied = 0;
             game_timing_restart_clock(game);
@@ -464,12 +464,12 @@ static void session_apply_game_route(AppSession *session)
             /* The current level is untouched, so Replay, Level Select and
              * Exit still work. Say what happened, drop the dead Next Level
              * row and focus the first remaining action. */
-            game->completion.next_phase_failed = 1;
-            game->terminal_action_index = 0;
+            game->screen.completion.next_phase_failed = 1;
+            game->screen.terminal_action_index = 0;
             copy_path(session->status_message, sizeof(session->status_message), "Next level failed to load");
             TraceLog(LOG_WARNING, "%s: %s", session->status_message, path);
         }
-        game->route = GAME_ROUTE_NONE;
+        game->screen.route = GAME_ROUTE_NONE;
         session->route = APP_ROUTE_NONE;
         break;
     case GAME_ROUTE_REPLAY:
@@ -492,10 +492,10 @@ static void session_apply_game_route(AppSession *session)
          */
         session->route = APP_ROUTE_GAME_REPLAY;
         /* Keep an independent path before the old GameState is freed. */
-        copy_path(path, sizeof(path), game->level_path);
+        copy_path(path, sizeof(path), game->world.level_path);
         {
             GameInputPhysicalState inherited;
-            game_input_read_physical(game->controller, &inherited);
+            game_input_read_physical(game->screen.controller, &inherited);
             session_close_game(session);
             if (session_open_game(session, path, &inherited)) session_end(session, 1);
             else session->route = APP_ROUTE_NONE;
@@ -595,16 +595,16 @@ static void session_step(AppSession *session, int callback_owned)
     } else if (session->screen == APP_SCREEN_GAME) {
         GameState *game = session->game;
         if (game_frame(game)) session->game_presented_count++;
-        if (game->completion.complete && !game->profile_completion_recorded) {
-            game->profile_completion_recorded = 1;
+        if (game->screen.completion.complete && !game->screen.profile_completion_recorded) {
+            game->screen.profile_completion_recorded = 1;
             /* A level outside levels/ (a lab, an editor playtest) has no
              * profile key and is simply not recorded. A refusal for a keyed
              * level means a lost result, so say so. */
-            if (game->profile_level_key[0] &&
-                game_profile_record(&session->profile, game->profile_level_key, game->score-game->level_score_start,
-                                    game->completion.coins_collected, game->completion.elapsed) != 0)
+            if (game->screen.profile_level_key[0] &&
+                game_profile_record(&session->profile, game->screen.profile_level_key, game->world.score-game->world.level_score_start,
+                                    game->screen.completion.coins_collected, game->screen.completion.elapsed) != 0)
                 TraceLog(LOG_WARNING, "Profile: result for %s was not recorded (profile full or values out of range)",
-                         game->profile_level_key);
+                         game->screen.profile_level_key);
             session_save_ghost(session, game);
         }
         session_track_resume(session, game, 0);

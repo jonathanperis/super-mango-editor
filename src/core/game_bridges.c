@@ -12,15 +12,15 @@
 
 void game_bridges_update(GameState *gs, float dt, int bridge_landed_idx)
 {
-    float player_cx = gs->player.x + gs->player.w / 2.0f;
+    float player_cx = gs->world.player.x + gs->world.player.w / 2.0f;
 
-    if (bridge_landed_idx < 0 || bridge_landed_idx >= gs->bridge_count) {
+    if (bridge_landed_idx < 0 || bridge_landed_idx >= gs->world.bridge_count) {
         bridge_landed_idx = -1;
     }
 
-    int touched = bridges_update(gs->bridges, gs->bridge_count, dt,
+    int touched = bridges_update(gs->world.bridges, gs->world.bridge_count, dt,
                                  bridge_landed_idx, player_cx);
-    if (touched >= 0 && gs->debug_mode) {
-        debug_log(&gs->debug, "BRIDGE brick[%d] touched", touched);
+    if (touched >= 0 && gs->screen.debug_mode) {
+        debug_log(&gs->screen.debug, "BRIDGE brick[%d] touched", touched);
     }
 }

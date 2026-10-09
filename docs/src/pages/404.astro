@@ -22,7 +22,7 @@ import '../styles/not-found.css';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const gapExcerpt = sourceExcerpt(
     'src/collision/floor_gap_collision.c', floorGapSource,
-    'for (int g = 0; g < gs->floor_gap_count', '\n}',
+    'for (int g = 0; g < gs->world.floor_gap_count', '\n}',
 );
 
 /* Water strip at 2x: 16 x 31 px art per frame becomes 32 x 62, period 256. */

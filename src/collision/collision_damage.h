@@ -18,7 +18,7 @@ void reset_current_level(GameState *gs, int *fp_prev_riding);
 /*
  * apply_damage — Centralized damage and knockback handler.
  *
- * amount   : hearts to remove. Pass gs->hearts for an instant-kill
+ * amount   : hearts to remove. Pass gs->world.hearts for an instant-kill
  *            (e.g., sea gap) that bypasses the normal 1-heart decrement.
  *
  * push     : 1 = apply a knockback impulse opposite to the contact

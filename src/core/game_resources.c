@@ -102,12 +102,12 @@ static const ChunkLoadSpec s_optional_chunks[] = {
 
 static Texture2D **texture_slot(GameState *gs, size_t offset)
 {
-    return (Texture2D **)((char *)&gs->textures + offset);
+    return (Texture2D **)((char *)&gs->assets.textures + offset);
 }
 
 static SoundEffect **chunk_slot(GameState *gs, size_t offset)
 {
-    return (SoundEffect **)((char *)&gs->audio + offset);
+    return (SoundEffect **)((char *)&gs->assets.audio + offset);
 }
 
 static int game_resources_fail(const char *label, const char *detail)
@@ -194,10 +194,10 @@ static void free_chunk_specs_reverse(GameState *gs, const ChunkLoadSpec *specs,
 
 static void game_resources_reset_owned_slots(GameState *gs)
 {
-    memset(&gs->textures, 0, sizeof(gs->textures));
-    memset(&gs->audio, 0, sizeof(gs->audio));
-    gs->water.texture = NULL;
-    gs->water.scroll_x = 0.0f;
+    memset(&gs->assets.textures, 0, sizeof(gs->assets.textures));
+    memset(&gs->assets.audio, 0, sizeof(gs->assets.audio));
+    gs->world.water.texture = NULL;
+    gs->world.water.scroll_x = 0.0f;
 }
 
 int game_resources_load(GameState *gs)
@@ -209,7 +209,7 @@ int game_resources_load(GameState *gs)
         return -1;
     }
 
-    if (water_init(&gs->water) != 0) return -1;
+    if (water_init(&gs->world.water) != 0) return -1;
 
     if (load_required_texture_specs(gs, s_required_textures,
                                     ARRAY_LEN(s_required_textures)) != 0) {
@@ -228,12 +228,12 @@ void game_resources_cleanup(GameState *gs)
     sound_stop_all();
 
     /* Level-specific resources are applied after core resources; release first. */
-    if (gs->audio.music) {
-        music_unload(gs->audio.music);
-        gs->audio.music = NULL;
+    if (gs->assets.audio.music) {
+        music_unload(gs->assets.audio.music);
+        gs->assets.audio.music = NULL;
     }
 
-    parallax_cleanup(&gs->parallax);
+    parallax_cleanup(&gs->world.parallax);
 
     /* Platform tiles are shared per path; the cache unloads each once. */
     level_release_platform_tiles(gs);
@@ -247,7 +247,7 @@ void game_resources_cleanup(GameState *gs)
     destroy_texture_specs_reverse(gs, s_required_textures,
                                   ARRAY_LEN(s_required_textures));
 
-    water_cleanup(&gs->water);
+    water_cleanup(&gs->world.water);
 
     destroy_texture_specs_reverse(gs, s_boot_textures, ARRAY_LEN(s_boot_textures));
 }
@@ -267,7 +267,7 @@ static int missing_level_texture(size_t offset)
 int game_resources_require_level_textures(const GameState *gs, const LevelDef *def)
 {
 #define REQUIRE(member, used) \
-    do { if ((used) && !gs->textures.member) return missing_level_texture(TEX_FIELD(member)); } while (0)
+    do { if ((used) && !gs->assets.textures.member) return missing_level_texture(TEX_FIELD(member)); } while (0)
     REQUIRE(last_star, 1);
     REQUIRE(star_yellow, 1); /* Also used by the HUD. */
     REQUIRE(star_green, def->star_green_count);

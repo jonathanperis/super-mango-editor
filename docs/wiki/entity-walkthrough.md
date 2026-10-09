@@ -20,7 +20,7 @@ level_loader.c         -> copy validated LevelDef placements into the GameState 
 
 There is no per-entity `_init` or `_cleanup`. Placement happens in
 `level_loader.c` (for example `load_coins()`), and the shared texture slot in
-`gs->textures` is loaded and released by `src/core/game_resources.c`. Static
+`gs->assets.textures` is loaded and released by `src/core/game_resources.c`. Static
 entities need even less: a coin stores only its placement state in `Coin` and
 exposes just `coins_render()`, and collection is handled in `src/collision/`.
 Only the player has `player_init()` and `player_cleanup()`, because it owns its
@@ -47,7 +47,7 @@ Open `levels/labs/01_collision.toml`. Its `[[coins]]` record contains x/y values
    reactivates them for Retry.
 5. `game_collide()` in `src/collision/game_collision.c` tests the player's
    hitbox with `rect_intersects()`, deactivates the coin, calls
-   `game_award_score(gs, gs->rules.coin_score)` and plays the pickup sound.
+   `game_award_score(gs, gs->world.rules.coin_score)` and plays the pickup sound.
 6. `coins_render()` in `src/collectibles/coin.c` draws only active entries,
    subtracting camera x at draw time; `src/render/game_render.c` calls it.
 7. The editor saves the same `LevelDef` through `src/shared/serializer_save.c`,
@@ -95,7 +95,7 @@ new `.c` in `src/collectibles/` automatically.
 | File | Required change |
 |------|-----------------|
 | `src/levels/level.h` | Add `TokenPlacement { float x, y; }`, a bounded placement array and a count to `LevelDef` |
-| `src/game.h` | Include the Token header; add the runtime array and count to `GameState` |
+| `src/game.h` | Include the Token header; add the runtime array and count to `GameWorld`, the `gs->world` part of `GameState` |
 | `src/shared/serializer_parse.c` | Register `ROOT_TABLE_ARRAY("tokens", XY_FIELDS, MAX_TOKENS)` |
 | `src/shared/serializer_load_collectibles.c` | Add `LOAD_XY_ARRAY("tokens", token_count, MAX_TOKENS, tokens)` |
 | `src/shared/serializer_save.c` | In `write_world_and_collectibles()`, emit every token as `[[tokens]]` with x/y through the existing float formatter |
@@ -128,9 +128,9 @@ the entity's `_get_hitbox` helper when it has one, so the box you see is the
 box collision uses:
 
 ```c
-for (int i = 0; i < gs->token_count; i++)
-    if (gs->tokens[i].active)
-        outline((IntRect){(int)gs->tokens[i].x, (int)gs->tokens[i].y, 16, 16},
+for (int i = 0; i < gs->world.token_count; i++)
+    if (gs->world.tokens[i].active)
+        outline((IntRect){(int)gs->world.tokens[i].x, (int)gs->world.tokens[i].y, 16, 16},
                 cam, (Color){255, 255, 0, 255});
 ```
 
@@ -261,7 +261,7 @@ automatically. A brand-new source directory needs its own wildcard line there.
 ## Checklist
 
 - [ ] `src/<category>/<entity>.h` and `.c` with render (and update) functions over the whole array, plus a `_get_hitbox` helper if it collides
-- [ ] Placement struct, array and count in `LevelDef` (`src/levels/level.h`); runtime array and count in `GameState` (`src/game.h`), stored by value
+- [ ] Placement struct, array and count in `LevelDef` (`src/levels/level.h`); runtime array and count in `GameWorld` (`src/game.h`), stored by value
 - [ ] Schema entry, loader, saver and C/Python validation (section 3)
 - [ ] `load_<entities>()` in `level_loader.c`, called from `level_load()` and, if it does not award score, from `level_reset()` too
 - [ ] Update call in the matching `src/core/` helper; pickup or damage in `src/collision/`

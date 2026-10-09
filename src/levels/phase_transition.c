@@ -26,18 +26,18 @@ void phase_progress_save(const GameState *gs, PhaseProgress *progress)
 {
     if (!gs || !progress) return;
 
-    progress->score           = gs->score;
-    progress->lives           = gs->lives;
-    progress->hearts          = gs->hearts;
-    progress->score_life_next = gs->score_life_next;
+    progress->score           = gs->world.score;
+    progress->lives           = gs->world.lives;
+    progress->hearts          = gs->world.hearts;
+    progress->score_life_next = gs->world.score_life_next;
 }
 
 void phase_progress_restore(GameState *gs, const PhaseProgress *progress)
 {
     if (!gs || !progress) return;
 
-    gs->score           = progress->score;
-    gs->lives           = progress->lives;
-    gs->hearts          = progress->hearts;
-    gs->score_life_next = progress->score_life_next;
+    gs->world.score           = progress->score;
+    gs->world.lives           = progress->lives;
+    gs->world.hearts          = progress->hearts;
+    gs->world.score_life_next = progress->score_life_next;
 }

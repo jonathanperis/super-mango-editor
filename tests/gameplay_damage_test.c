@@ -19,10 +19,10 @@ void reset_current_level(GameState *gs, int *fp_prev_riding)
 {
     s_reset_calls++;
     if (fp_prev_riding) *fp_prev_riding = -1;
-    gs->player.spawn_x = gs->respawn_x;
-    gs->player.spawn_y = gs->respawn_y;
-    gs->player.x = gs->player.spawn_x;
-    gs->player.y = gs->player.spawn_y;
+    gs->world.player.spawn_x = gs->world.respawn_x;
+    gs->world.player.spawn_y = gs->world.respawn_y;
+    gs->world.player.x = gs->world.player.spawn_x;
+    gs->world.player.y = gs->world.player.spawn_y;
 }
 
 static int expect_int(const char *name, int actual, int expected)
@@ -63,22 +63,22 @@ static int nonlethal_damage_sets_invincibility_and_push(void)
     GameState gs = {0};
 
     s_reset_calls = 0;
-    gs.hearts = 3;
-    gs.lives = 2;
-    gs.player.x = 64.0f;
-    gs.player.w = 48;
-    gs.player.vx = 0.0f;
-    gs.player.vy = 0.0f;
-    gs.player.on_ground = 1;
+    gs.world.hearts = 3;
+    gs.world.lives = 2;
+    gs.world.player.x = 64.0f;
+    gs.world.player.w = 48;
+    gs.world.player.vx = 0.0f;
+    gs.world.player.vy = 0.0f;
+    gs.world.player.on_ground = 1;
 
     apply_damage(&gs, 1, 1, 0.0f, 0.0f);
 
-    if (expect_int("hearts", gs.hearts, 2) != 0) return 1;
-    if (expect_int("lives", gs.lives, 2) != 0) return 1;
-    if (expect_int("on_ground", gs.player.on_ground, 0) != 0) return 1;
+    if (expect_int("hearts", gs.world.hearts, 2) != 0) return 1;
+    if (expect_int("lives", gs.world.lives, 2) != 0) return 1;
+    if (expect_int("on_ground", gs.world.player.on_ground, 0) != 0) return 1;
     if (expect_int("reset calls", s_reset_calls, 0) != 0) return 1;
-    if (expect_float_positive("hurt_timer", gs.player.hurt_timer) != 0) return 1;
-    if (expect_float_positive("knockback vx", gs.player.vx) != 0) return 1;
+    if (expect_float_positive("hurt_timer", gs.world.player.hurt_timer) != 0) return 1;
+    if (expect_float_positive("knockback vx", gs.world.player.vx) != 0) return 1;
 
     return 0;
 }
@@ -93,34 +93,34 @@ static int lethal_damage_consumes_life_and_resets_level(void)
     def.initial_hearts = 2;
     def.initial_lives = 4;
 
-    gs.runtime.current_level = &def;
-    gs.hearts = 1;
-    gs.lives = 2;
-    gs.player.spawn_x = 88.0f;
-    gs.player.spawn_y = 120.0f;
-    gs.loop.fp_prev_riding = 7;
-    gs.sim_time = 50.0;   /* 50 s of play so far */
+    gs.world.runtime.current_level = &def;
+    gs.world.hearts = 1;
+    gs.world.lives = 2;
+    gs.world.player.spawn_x = 88.0f;
+    gs.world.player.spawn_y = 120.0f;
+    gs.screen.loop.fp_prev_riding = 7;
+    gs.world.sim_time = 50.0;   /* 50 s of play so far */
 
     apply_damage(&gs, 1, 0, 0.0f, 0.0f);
 
-    if (expect_int("hearts reset", gs.hearts, 2) != 0) return 1;
-    if (expect_int("lives decremented", gs.lives, 1) != 0) return 1;
-    if (expect_int("respawn feedback reason", gs.checkpoint_feedback_kind,
+    if (expect_int("hearts reset", gs.world.hearts, 2) != 0) return 1;
+    if (expect_int("lives decremented", gs.world.lives, 1) != 0) return 1;
+    if (expect_int("respawn feedback reason", gs.world.checkpoint_feedback_kind,
                    CHECKPOINT_FEEDBACK_RESPAWN) != 0) return 1;
     /* 0.9 s of game time after the reset, on the simulated clock. */
-    if (expect_int("respawn feedback deadline", (int)gs.checkpoint_feedback_until, 50900) != 0)
+    if (expect_int("respawn feedback deadline", (int)gs.world.checkpoint_feedback_until, 50900) != 0)
         return 1;
     if (expect_int("HUD respawn visible",
-                   hud_checkpoint_feedback_visible(gs.checkpoint_feedback_kind,
-                                                   gs.checkpoint_feedback_until,
+                   hud_checkpoint_feedback_visible(gs.world.checkpoint_feedback_kind,
+                                                   gs.world.checkpoint_feedback_until,
                                                    game_checkpoint_clock_ms(&gs)), 1) != 0)
         return 1;
     if (expect_int("HUD respawn label",
-                   strcmp(hud_checkpoint_feedback_label(gs.checkpoint_feedback_kind, -1),
+                   strcmp(hud_checkpoint_feedback_label(gs.world.checkpoint_feedback_kind, -1),
                           "RESPAWN") == 0, 1) != 0)
         return 1;
     if (expect_int("reset calls", s_reset_calls, 1) != 0) return 1;
-    if (expect_int("float platform reset", gs.loop.fp_prev_riding, -1) != 0)
+    if (expect_int("float platform reset", gs.screen.loop.fp_prev_riding, -1) != 0)
         return 1;
 
     return 0;
@@ -136,22 +136,22 @@ static int game_over_sets_overlay_without_resetting_level(void)
     def.initial_hearts = 3;
     def.initial_lives = 5;
 
-    gs.runtime.current_level = &def;
-    gs.hearts = 1;
-    gs.lives = 0;
-    gs.score = 1200;
-    gs.rules.score_per_life = 1000;
-    gs.score_life_next = 2000;
+    gs.world.runtime.current_level = &def;
+    gs.world.hearts = 1;
+    gs.world.lives = 0;
+    gs.world.score = 1200;
+    gs.world.rules.score_per_life = 1000;
+    gs.world.score_life_next = 2000;
 
     apply_damage(&gs, 1, 0, 0.0f, 0.0f);
 
-    if (expect_int("game over flag", gs.game_over, 1) != 0) return 1;
+    if (expect_int("game over flag", gs.screen.game_over, 1) != 0) return 1;
     if (expect_int("game over overlay", game_overlay_state(&gs), GAME_OVERLAY_GAME_OVER) != 0)
         return 1;
-    if (expect_int("lives stay depleted", gs.lives, -1) != 0) return 1;
-    if (expect_int("hearts stay depleted", gs.hearts, 0) != 0) return 1;
-    if (expect_int("score preserved for overlay", gs.score, 1200) != 0) return 1;
-    if (expect_int("next life preserved", gs.score_life_next, 2000) != 0) return 1;
+    if (expect_int("lives stay depleted", gs.world.lives, -1) != 0) return 1;
+    if (expect_int("hearts stay depleted", gs.world.hearts, 0) != 0) return 1;
+    if (expect_int("score preserved for overlay", gs.world.score, 1200) != 0) return 1;
+    if (expect_int("next life preserved", gs.world.score_life_next, 2000) != 0) return 1;
     if (expect_int("reset waits for confirmation", s_reset_calls, 0) != 0) return 1;
 
     return 0;
@@ -165,19 +165,19 @@ static int life_loss_uses_saved_respawn_coordinates(void)
     s_reset_calls = 0;
     level_def_init_defaults(&def);
     def.initial_hearts = 3;
-    gs.runtime.current_level = &def;
-    gs.hearts = 1;
-    gs.lives = 2;
-    gs.respawn_x = 240.0f;
-    gs.respawn_y = 96.0f;
-    gs.player.spawn_x = 80.0f;
-    gs.player.spawn_y = 172.0f;
+    gs.world.runtime.current_level = &def;
+    gs.world.hearts = 1;
+    gs.world.lives = 2;
+    gs.world.respawn_x = 240.0f;
+    gs.world.respawn_y = 96.0f;
+    gs.world.player.spawn_x = 80.0f;
+    gs.world.player.spawn_y = 172.0f;
 
     apply_damage(&gs, 1, 0, 0.0f, 0.0f);
 
-    if (expect_float_near("life-loss respawn x", gs.player.spawn_x, 240.0f, 0.001f) != 0)
+    if (expect_float_near("life-loss respawn x", gs.world.player.spawn_x, 240.0f, 0.001f) != 0)
         return 1;
-    if (expect_float_near("life-loss respawn y", gs.player.spawn_y, 96.0f, 0.001f) != 0)
+    if (expect_float_near("life-loss respawn y", gs.world.player.spawn_y, 96.0f, 0.001f) != 0)
         return 1;
     if (expect_int("life-loss reset calls", s_reset_calls, 1) != 0) return 1;
     return 0;
@@ -198,38 +198,38 @@ static int confirming_game_over_restores_level_lives_and_score(void)
     def.checkpoints[0].x = 320.0f;
     def.checkpoints[0].y = 96.0f;
 
-    gs.runtime.current_level = &def;
-    gs.hearts = 0;
-    gs.lives = -1;
-    gs.game_over = 1;
-    gs.score = 1200;
-    gs.respawn_x = 320.0f;
-    gs.respawn_y = 172.0f;
-    gs.checkpoint_index = -1;
-    gs.player.spawn_x = 320.0f;
-    gs.player.spawn_y = 172.0f;
-    gs.rules.score_per_life = 1000;
-    gs.score_life_next = 2000;
+    gs.world.runtime.current_level = &def;
+    gs.world.hearts = 0;
+    gs.world.lives = -1;
+    gs.screen.game_over = 1;
+    gs.world.score = 1200;
+    gs.world.respawn_x = 320.0f;
+    gs.world.respawn_y = 172.0f;
+    gs.world.checkpoint_index = -1;
+    gs.world.player.spawn_x = 320.0f;
+    gs.world.player.spawn_y = 172.0f;
+    gs.world.rules.score_per_life = 1000;
+    gs.world.score_life_next = 2000;
 
     game_restart_after_game_over(&gs);
 
-    if (expect_int("game over cleared", gs.game_over, 0) != 0) return 1;
+    if (expect_int("game over cleared", gs.screen.game_over, 0) != 0) return 1;
     if (expect_int("overlay cleared", game_overlay_state(&gs), GAME_OVERLAY_NONE) != 0)
         return 1;
-    if (expect_int("lives restored", gs.lives, 5) != 0) return 1;
-    if (expect_int("hearts restored", gs.hearts, 3) != 0) return 1;
-    if (expect_int("score reset", gs.score, 0) != 0) return 1;
-    if (expect_float_near("respawn x reset", gs.respawn_x, 80.0f, 0.001f) != 0)
+    if (expect_int("lives restored", gs.world.lives, 5) != 0) return 1;
+    if (expect_int("hearts restored", gs.world.hearts, 3) != 0) return 1;
+    if (expect_int("score reset", gs.world.score, 0) != 0) return 1;
+    if (expect_float_near("respawn x reset", gs.world.respawn_x, 80.0f, 0.001f) != 0)
         return 1;
-    if (expect_float_near("respawn y reset", gs.respawn_y, 172.0f, 0.001f) != 0)
+    if (expect_float_near("respawn y reset", gs.world.respawn_y, 172.0f, 0.001f) != 0)
         return 1;
-    if (expect_int("checkpoint index reset", gs.checkpoint_index, -1) != 0)
+    if (expect_int("checkpoint index reset", gs.world.checkpoint_index, -1) != 0)
         return 1;
-    if (expect_float_near("spawn x restored", gs.player.spawn_x, 80.0f, 0.001f) != 0)
+    if (expect_float_near("spawn x restored", gs.world.player.spawn_x, 80.0f, 0.001f) != 0)
         return 1;
-    if (expect_float_near("spawn y restored", gs.player.spawn_y, 172.0f, 0.001f) != 0)
+    if (expect_float_near("spawn y restored", gs.world.player.spawn_y, 172.0f, 0.001f) != 0)
         return 1;
-    if (expect_int("next life reset", gs.score_life_next, 1000) != 0) return 1;
+    if (expect_int("next life reset", gs.world.score_life_next, 1000) != 0) return 1;
     if (expect_int("reset calls", s_reset_calls, 1) != 0) return 1;
 
     return 0;
@@ -246,21 +246,21 @@ static int confirming_game_over_restores_default_spawn_when_level_start_unset(vo
     def.initial_hearts = 3;
     def.initial_lives = 5;
 
-    gs.runtime.current_level = &def;
-    gs.hearts = 0;
-    gs.lives = -1;
-    gs.game_over = 1;
-    gs.respawn_x = 320.0f;
-    gs.respawn_y = 172.0f;
-    gs.player.spawn_x = 320.0f;
-    gs.player.spawn_y = 172.0f;
-    gs.rules.score_per_life = 1000;
+    gs.world.runtime.current_level = &def;
+    gs.world.hearts = 0;
+    gs.world.lives = -1;
+    gs.screen.game_over = 1;
+    gs.world.respawn_x = 320.0f;
+    gs.world.respawn_y = 172.0f;
+    gs.world.player.spawn_x = 320.0f;
+    gs.world.player.spawn_y = 172.0f;
+    gs.world.rules.score_per_life = 1000;
 
     game_restart_after_game_over(&gs);
 
-    if (expect_float_near("default spawn x restored", gs.player.spawn_x, 80.0f, 0.001f) != 0)
+    if (expect_float_near("default spawn x restored", gs.world.player.spawn_x, 80.0f, 0.001f) != 0)
         return 1;
-    if (expect_float_near("default spawn y restored", gs.player.spawn_y,
+    if (expect_float_near("default spawn y restored", gs.world.player.spawn_y,
                           (float)default_spawn_y, 0.001f) != 0)
         return 1;
     if (expect_int("default spawn reset calls", s_reset_calls, 1) != 0) return 1;

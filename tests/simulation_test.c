@@ -47,27 +47,27 @@ static int inspection_and_replay(void)
 {
     int failed = 0;
     GameState gs = {0};
-    gs.debug_mode = 1;
-    gs.random_seed = 7;
-    strcpy(gs.level_path, "tests/fixtures/runtime/transition.toml");
+    gs.screen.debug_mode = 1;
+    gs.screen.random_seed = 7;
+    strcpy(gs.world.level_path, "tests/fixtures/runtime/transition.toml");
     CHECK(game_init(&gs) == 0);
     input_clear();
     /* F5 opens and closes the key help; F6 keeps the tuning line visible for
      * a few seconds instead of a permanent panel row. */
-    CHECK(!gs.inspector.show_keys);
+    CHECK(!gs.screen.inspector.show_keys);
     key(&gs, KEY_F5);
-    CHECK(gs.inspector.show_keys);
+    CHECK(gs.screen.inspector.show_keys);
     key(&gs, KEY_F5);
-    CHECK(!gs.inspector.show_keys);
+    CHECK(!gs.screen.inspector.show_keys);
     {
         /* The deadline is set from the clock at the key press, so it is at
          * least 3 s after a reading taken before the press, however long
          * the test process pauses afterwards. */
         uint64_t before_f6 = clock_millis();
         key(&gs, KEY_F6);
-        CHECK(gs.inspector.tuning_visible_until >= before_f6 + 3000);
+        CHECK(gs.screen.inspector.tuning_visible_until >= before_f6 + 3000);
     }
-    gs.inspector.physics_field = 0;
+    gs.screen.inspector.physics_field = 0;
     /* Live play: 40 ms of real time holds two 1/60 s steps (+ the half-step
      * slack a restarted clock starts with), never a 40 ms step. */
     game_timing_restart_clock(&gs);
@@ -79,7 +79,7 @@ static int inspection_and_replay(void)
     CHECK(game_inspector_steps(&gs, 0.04f) == 0);
     key(&gs, KEY_F3);
     game_overlay_set_pause_reason(&gs, GAME_PAUSE_REASON_FOCUS, 1);
-    CHECK(game_inspector_steps(&gs, 0.04f) == 0 && !gs.inspector.step_requested);
+    CHECK(game_inspector_steps(&gs, 0.04f) == 0 && !gs.screen.inspector.step_requested);
     game_overlay_set_pause_reason(&gs, GAME_PAUSE_REASON_FOCUS, 0);
     CHECK(game_inspector_steps(&gs, 0.04f) == 0);
     /* Slow mode 0.25x: 40 ms of real time is 10 ms of game time, so steps
@@ -89,38 +89,38 @@ static int inspection_and_replay(void)
     CHECK(game_inspector_steps(&gs, 0.04f) == 0);
     CHECK(game_inspector_steps(&gs, 0.04f) == 1);
     SettingsMenu settings = {.open = 1};
-    gs.settings_menu = &settings;
+    gs.screen.settings_menu = &settings;
     key(&gs, KEY_F3);
     CHECK(game_inspector_steps(&gs, 0.04f) == 0);
     /* While a binding is being captured, the inspector's keys go to the
      * settings panel, which refuses them as bindings (in every run). */
     static GameProfile profile;
     game_profile_init(&profile);
-    gs.profile = &profile;
+    gs.screen.profile = &profile;
     settings.page = 1;
     settings.capture = 1;
     InputEvent reserved = {.type=INPUT_KEY_DOWN,.key=KEY_F3,.binding=input_binding_from_key(KEY_F3)};
     input_push(&reserved); game_handle_events(&gs);
     CHECK(settings.capture == 1 && strstr(settings.message, "debug inspector") != NULL);
     CHECK(game_inspector_steps(&gs, 0.04f) == 0);
-    gs.settings_menu = NULL;
-    gs.profile = NULL;
-    float speed = gs.player.walk_max_speed;
+    gs.screen.settings_menu = NULL;
+    gs.screen.profile = NULL;
+    float speed = gs.world.player.walk_max_speed;
     key(&gs, KEY_EQUAL);
-    CHECK(gs.player.walk_max_speed == speed + 25);
+    CHECK(gs.world.player.walk_max_speed == speed + 25);
     key(&gs, KEY_F7);
-    CHECK(gs.player.walk_max_speed == speed);
+    CHECK(gs.world.player.walk_max_speed == speed);
     CHECK(game_experiment_begin(&gs) == 0);
     for (int i = 0; i < 180; i++) {
-        gs.replay_input_mask = i < 120 ? PLAYER_INPUT_RIGHT : 0;
-        if (i == 30) gs.replay_input_mask |= PLAYER_INPUT_JUMP;
-        if (i == 60) gs.player.walk_max_speed = 150;
-        game_update_active(&gs, GAME_FIXED_STEP, (int)gs.camera.x);
+        gs.screen.replay_input_mask = i < 120 ? PLAYER_INPUT_RIGHT : 0;
+        if (i == 30) gs.screen.replay_input_mask |= PLAYER_INPUT_JUMP;
+        if (i == 60) gs.world.player.walk_max_speed = 150;
+        game_update_active(&gs, GAME_FIXED_STEP, (int)gs.world.camera.x);
     }
-    CHECK(gs.experiment->count == 180 && gs.player.x > 150);
-    Player recorded = gs.player;
-    float elapsed = gs.completion.level_elapsed;
-    int score = gs.score, checkpoint = gs.checkpoint_index;
+    CHECK(gs.screen.experiment->count == 180 && gs.world.player.x > 150);
+    Player recorded = gs.world.player;
+    float elapsed = gs.screen.completion.level_elapsed;
+    int score = gs.world.score, checkpoint = gs.world.checkpoint_index;
     remove(TEST_OUT "school-experiment.toml");
     CHECK(game_experiment_save(&gs, TEST_OUT "school-experiment.toml") == 0);
     CHECK(game_experiment_save(&gs, TEST_OUT "school-experiment.toml") == -1);
@@ -144,10 +144,10 @@ static int inspection_and_replay(void)
             fclose(taken);
         }
         CHECK(game_experiment_export_at(&gs, TEST_OUT, 1000, exported, sizeof(exported)) == EXPERIMENT_EXPORT_NAME_TAKEN);
-        GameExperiment *tape = gs.experiment;
-        gs.experiment = NULL;
+        GameExperiment *tape = gs.screen.experiment;
+        gs.screen.experiment = NULL;
         CHECK(game_experiment_export_at(&gs, TEST_OUT, 1001, exported, sizeof(exported)) == EXPERIMENT_EXPORT_NOTHING);
-        gs.experiment = tape;
+        gs.screen.experiment = tape;
         remove_exports();
     }
     CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment.toml") == 0);
@@ -156,25 +156,25 @@ static int inspection_and_replay(void)
     int replayed = 0;
     for (int frame = 0; frame < 400 && replayed < 180; frame++) {
         /* Opposite live input must not perturb replay. */
-        gs.replay_input_mask = PLAYER_INPUT_LEFT;
+        gs.screen.replay_input_mask = PLAYER_INPUT_LEFT;
         int steps = game_inspector_steps(&gs, 0.07f);
         for (int s = 0; s < steps; s++) {
             float dt = game_experiment_dt(&gs, GAME_FIXED_STEP);
             if (dt <= 0) break;
-            game_update_active(&gs, dt, (int)gs.camera.x);
+            game_update_active(&gs, dt, (int)gs.world.camera.x);
             replayed++;
         }
     }
     CHECK(replayed == 180);
-    CHECK(NEAR(gs.player.x, recorded.x) && NEAR(gs.player.y, recorded.y));
-    CHECK(NEAR(gs.player.vx, recorded.vx) && NEAR(gs.player.vy, recorded.vy));
-    CHECK(NEAR(gs.completion.level_elapsed, elapsed) && gs.score == score && gs.checkpoint_index == checkpoint);
+    CHECK(NEAR(gs.world.player.x, recorded.x) && NEAR(gs.world.player.y, recorded.y));
+    CHECK(NEAR(gs.world.player.vx, recorded.vx) && NEAR(gs.world.player.vy, recorded.vy));
+    CHECK(NEAR(gs.screen.completion.level_elapsed, elapsed) && gs.world.score == score && gs.world.checkpoint_index == checkpoint);
     CHECK(game_inspector_steps(&gs, 0.04f) == 0);
     FILE *bad = fopen(TEST_OUT "school-experiment-invalid.toml", "w");
     CHECK(bad != NULL);
     fputs("format_version = 9\n", bad); fclose(bad);
-    GameExperiment *before = gs.experiment;
-    CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment-invalid.toml") == -1 && gs.experiment == before);
+    GameExperiment *before = gs.screen.experiment;
+    CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment-invalid.toml") == -1 && gs.screen.experiment == before);
     /* Rows are [input, 9 physics values]. Format 1 rows (with a leading
      * frame duration) came from the variable-timestep engine: refused. */
     const char *bad_rows[] = {
@@ -188,13 +188,13 @@ static int inspection_and_replay(void)
         bad = fopen(TEST_OUT "school-experiment-invalid.toml", "w");
         CHECK(bad != NULL);
         fprintf(bad, "format_version = %d\nlevel_path = \"fixture\"\nseed = 7\nlevel_hash = \"%016llx\"\nframes = [%s]\n",
-                bad_versions[i], (unsigned long long)gs.source_level_hash, bad_rows[i]);
+                bad_versions[i], (unsigned long long)gs.world.source_level_hash, bad_rows[i]);
         fclose(bad);
-        CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment-invalid.toml") == -1 && gs.experiment == before);
+        CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment-invalid.toml") == -1 && gs.screen.experiment == before);
     }
-    gs.source_level_hash ^= 1; /* Loaded bytes no longer match the file. */
-    CHECK(game_experiment_begin(&gs) == -1 && gs.experiment == before);
-    gs.source_level_hash ^= 1;
+    gs.world.source_level_hash ^= 1; /* Loaded bytes no longer match the file. */
+    CHECK(game_experiment_begin(&gs) == -1 && gs.screen.experiment == before);
+    gs.world.source_level_hash ^= 1;
 done:
     remove(TEST_OUT "school-experiment.toml"); remove(TEST_OUT "school-experiment-invalid.toml");
     remove_exports();
@@ -206,43 +206,43 @@ static int moving_support_and_damage(void)
 {
     int failed = 0;
     GameState gs = {0};
-    strcpy(gs.level_path, "tests/fixtures/runtime/moving_support.toml");
+    strcpy(gs.world.level_path, "tests/fixtures/runtime/moving_support.toml");
     CHECK(game_init(&gs) == 0);
-    gs.player.x = gs.float_platforms[0].x;
-    gs.player.y = gs.float_platforms[0].y - gs.player.h + PLAYER_FLOOR_SINK;
-    gs.player.on_ground = 1;
-    gs.loop.fp_prev_riding = 0;
-    float offset = gs.player.x - gs.float_platforms[0].x;
-    for (int i = 0; i < 180; i++) game_update_active(&gs, 1.0f / 60, (int)gs.camera.x);
-    CHECK(gs.loop.fp_prev_riding == 0 && NEAR(gs.player.x - gs.float_platforms[0].x, offset));
+    gs.world.player.x = gs.world.float_platforms[0].x;
+    gs.world.player.y = gs.world.float_platforms[0].y - gs.world.player.h + PLAYER_FLOOR_SINK;
+    gs.world.player.on_ground = 1;
+    gs.screen.loop.fp_prev_riding = 0;
+    float offset = gs.world.player.x - gs.world.float_platforms[0].x;
+    for (int i = 0; i < 180; i++) game_update_active(&gs, 1.0f / 60, (int)gs.world.camera.x);
+    CHECK(gs.screen.loop.fp_prev_riding == 0 && NEAR(gs.world.player.x - gs.world.float_platforms[0].x, offset));
 
     /* A saw starts one pixel outside the player and enters during this step. */
-    gs.player.x = 48; gs.player.y = FLOOR_Y - gs.player.h + PLAYER_FLOOR_SINK;
-    gs.player.vx = gs.player.vy = gs.player.hurt_timer = 0;
-    IntRect hit = player_get_hitbox(&gs.player);
-    gs.circular_saw_count = 1;
-    gs.circular_saws[0] = (CircularSaw){.x = hit.x + hit.w - 3, .y = 220,
+    gs.world.player.x = 48; gs.world.player.y = FLOOR_Y - gs.world.player.h + PLAYER_FLOOR_SINK;
+    gs.world.player.vx = gs.world.player.vy = gs.world.player.hurt_timer = 0;
+    IntRect hit = player_get_hitbox(&gs.world.player);
+    gs.world.circular_saw_count = 1;
+    gs.world.circular_saws[0] = (CircularSaw){.x = hit.x + hit.w - 3, .y = 220,
         .w = 32, .h = 32, .active = 1, .direction = -1, .patrol_x0 = 0, .patrol_x1 = 300};
-    int hearts = gs.hearts;
+    int hearts = gs.world.hearts;
     game_update_active(&gs, 1.0f / 60, 0);
-    CHECK(gs.hearts == hearts - 1);
-    LevelDef *def = gs.level_def;
+    CHECK(gs.world.hearts == hearts - 1);
+    LevelDef *def = gs.world.level_def;
     def->circular_saw_count = 1;
-    Texture2D *texture = gs.textures.circular_saw;
-    gs.textures.circular_saw = NULL;
+    Texture2D *texture = gs.assets.textures.circular_saw;
+    gs.assets.textures.circular_saw = NULL;
     int missing = game_resources_require_level_textures(&gs, def);
-    gs.textures.circular_saw = texture;
+    gs.assets.textures.circular_saw = texture;
     CHECK(missing == -1);
 
     /* Authored checkpoints persist through an actual lethal-damage reset. */
     def->checkpoint_count = 1; def->checkpoints[0] = (CheckpointPlacement){304, 252};
-    gs.player.x = 320;
-    gs.player.hurt_timer = 0;
+    gs.world.player.x = 320;
+    gs.world.player.hurt_timer = 0;
     game_update_active(&gs, 1.0f / 60, 0);
-    CHECK(gs.checkpoint_index == 0);
-    gs.hearts = 1; gs.player.hurt_timer = 0;
-    apply_damage(&gs, 1, 0, gs.player.x, gs.player.y);
-    CHECK(gs.checkpoint_index == 0 && NEAR(gs.player.x, 304));
+    CHECK(gs.world.checkpoint_index == 0);
+    gs.world.hearts = 1; gs.world.player.hurt_timer = 0;
+    apply_damage(&gs, 1, 0, gs.world.player.x, gs.world.player.y);
+    CHECK(gs.world.checkpoint_index == 0 && NEAR(gs.world.player.x, 304));
 done:
     game_cleanup(&gs);
     return failed;
@@ -260,22 +260,22 @@ static int rect_rail_platform_carries_rider_down_and_catches_from_above(void)
 {
     int failed = 0;
     GameState gs = {0};
-    strcpy(gs.level_path, "tests/fixtures/runtime/moving_support.toml");
+    strcpy(gs.world.level_path, "tests/fixtures/runtime/moving_support.toml");
     CHECK(game_init(&gs) == 0);
-    CHECK(gs.float_platform_count == 2 && gs.rail_count == 2);
-    FloatPlatform *fp = &gs.float_platforms[1];
-    Player *p = &gs.player;
+    CHECK(gs.world.float_platform_count == 2 && gs.world.rail_count == 2);
+    FloatPlatform *fp = &gs.world.float_platforms[1];
+    Player *p = &gs.world.player;
 
     /* Down: t = 3 is the top-right corner; the next 9 tiles go straight down. */
     p->x = fp->x + fp->w / 2.0f - p->w / 2.0f;
     p->y = fp->y - p->h + PLAYER_FLOOR_SINK;
     p->vx = p->vy = 0.0f;
     p->on_ground = 1;
-    gs.loop.fp_prev_riding = 1;
+    gs.screen.loop.fp_prev_riding = 1;
     float start_y = fp->y;
     for (int step = 0; step < 150; step++) {
-        game_update_active(&gs, GAME_FIXED_STEP, (int)gs.camera.x);
-        CHECK(gs.loop.fp_prev_riding == 1 && p->on_ground);
+        game_update_active(&gs, GAME_FIXED_STEP, (int)gs.world.camera.x);
+        CHECK(gs.screen.loop.fp_prev_riding == 1 && p->on_ground);
         CHECK(fabsf(p->y + p->h - PLAYER_FLOOR_SINK - fp->y) < 0.01f);
     }
     CHECK(fp->y > start_y + 100.0f);   /* it really went down: 3 tiles/s × 2.5 s */
@@ -283,20 +283,20 @@ static int rect_rail_platform_carries_rider_down_and_catches_from_above(void)
     /* Up: t = 16 is the bottom of the left side; at 30 tiles/s it rises
      * 8 px per step. The player hovers 1 px above it, falling from rest. */
     float_platform_init(fp, FLOAT_PLATFORM_RAIL, 0.0f, 0.0f, 4, 0.0f,
-                        &gs.rails[1], 16.0f, (float)MAX_RAIL_SPEED);
+                        &gs.world.rails[1], 16.0f, (float)MAX_RAIL_SPEED);
     p->x = fp->x + fp->w / 2.0f - p->w / 2.0f;
     p->y = fp->y - 1.0f - p->h + PLAYER_FLOOR_SINK;
     p->vx = p->vy = 0.0f;
     p->on_ground = 0;
-    gs.loop.fp_prev_riding = -1;
+    gs.screen.loop.fp_prev_riding = -1;
     start_y = fp->y;
-    game_update_active(&gs, GAME_FIXED_STEP, (int)gs.camera.x);
+    game_update_active(&gs, GAME_FIXED_STEP, (int)gs.world.camera.x);
     CHECK(!p->on_ground);              /* still 0.8 px above the old top */
-    game_update_active(&gs, GAME_FIXED_STEP, (int)gs.camera.x);
-    CHECK(p->on_ground && gs.loop.fp_prev_riding == 1);
+    game_update_active(&gs, GAME_FIXED_STEP, (int)gs.world.camera.x);
+    CHECK(p->on_ground && gs.screen.loop.fp_prev_riding == 1);
     for (int step = 0; step < 10; step++) {
-        game_update_active(&gs, GAME_FIXED_STEP, (int)gs.camera.x);
-        CHECK(gs.loop.fp_prev_riding == 1 && p->on_ground);
+        game_update_active(&gs, GAME_FIXED_STEP, (int)gs.world.camera.x);
+        CHECK(gs.screen.loop.fp_prev_riding == 1 && p->on_ground);
         CHECK(fabsf(p->y + p->h - PLAYER_FLOOR_SINK - fp->y) < 0.01f);
     }
     CHECK(fp->y < start_y - 80.0f);    /* it really went up: 8 px per step */
@@ -308,13 +308,13 @@ done:
 /* A bare GameState with one player standing on the ground floor. */
 static void stand_player_on_floor(GameState *gs, float x)
 {
-    gs->runtime.world_w = 1600;
-    gs->player.w = gs->player.h = 48;
-    player_apply_default_physics(&gs->player);
-    gs->player.spawn_x = x;
-    gs->player.spawn_y = FLOOR_Y;
-    player_reset(&gs->player);
-    gs->loop.fp_prev_riding = -1;
+    gs->world.runtime.world_w = 1600;
+    gs->world.player.w = gs->world.player.h = 48;
+    player_apply_default_physics(&gs->world.player);
+    gs->world.player.spawn_x = x;
+    gs->world.player.spawn_y = FLOOR_Y;
+    player_reset(&gs->world.player);
+    gs->screen.loop.fp_prev_riding = -1;
 }
 
 /*
@@ -327,16 +327,16 @@ static float jump_apex_height(float render_hz, float jitter)
 {
     GameState gs = {0};
     stand_player_on_floor(&gs, 100.0f);
-    float floor_y = gs.player.y, apex_y = gs.player.y;
+    float floor_y = gs.world.player.y, apex_y = gs.world.player.y;
     int step_index = 0;
     game_timing_restart_clock(&gs);
     for (int frame = 0; frame < (int)(render_hz * 2.0f); frame++) {
         float seconds = 1.0f / render_hz + (frame % 2 ? jitter : -jitter);
         int steps = game_timing_take_steps(&gs, seconds);
         for (int s = 0; s < steps; s++, step_index++) {
-            gs.replay_input_mask = step_index < 30 ? PLAYER_INPUT_JUMP : 0;
+            gs.screen.replay_input_mask = step_index < 30 ? PLAYER_INPUT_JUMP : 0;
             game_player_step(&gs, GAME_FIXED_STEP);
-            if (gs.player.y < apex_y) apex_y = gs.player.y;
+            if (gs.world.player.y < apex_y) apex_y = gs.world.player.y;
         }
     }
     return floor_y - apex_y;
@@ -425,29 +425,29 @@ static int collision_hurts_once_and_collects_coins(void)
     int failed = 0;
     GameState gs = {0};
     stand_player_on_floor(&gs, 100.0f);
-    gs.hearts = 3;
-    gs.lives = 3;
-    gs.rules.coin_score = 100;
-    gs.rules.score_per_life = 1000;
-    gs.score_life_next = 1000;
-    gs.coin_count = 1;
-    gs.coins[0] = (Coin){.x = 300, .y = 230, .active = 1};
-    gs.spike_row_count = 1;
-    gs.spike_rows[0] = (SpikeRow){.x = 110, .y = FLOOR_Y - SPIKE_TILE_H, .count = 2, .active = 1};
+    gs.world.hearts = 3;
+    gs.world.lives = 3;
+    gs.world.rules.coin_score = 100;
+    gs.world.rules.score_per_life = 1000;
+    gs.world.score_life_next = 1000;
+    gs.world.coin_count = 1;
+    gs.world.coins[0] = (Coin){.x = 300, .y = 230, .active = 1};
+    gs.world.spike_row_count = 1;
+    gs.world.spike_rows[0] = (SpikeRow){.x = 110, .y = FLOOR_Y - SPIKE_TILE_H, .count = 2, .active = 1};
 
     /* Standing in the spikes: one heart lost, knockback, invincibility. */
     game_collide(&gs, GAME_FIXED_STEP);
-    CHECK(gs.hearts == 2 && gs.player.hurt_timer > 0.0f && gs.player.vx != 0.0f);
-    CHECK(gs.coins[0].active == 1 && gs.score == 0);
+    CHECK(gs.world.hearts == 2 && gs.world.player.hurt_timer > 0.0f && gs.world.player.vx != 0.0f);
+    CHECK(gs.world.coins[0].active == 1 && gs.world.score == 0);
     /* Still overlapping during invincibility: no second hit. */
     game_collide(&gs, GAME_FIXED_STEP);
-    CHECK(gs.hearts == 2);
+    CHECK(gs.world.hearts == 2);
 
     /* Overlapping the coin collects it exactly once. */
-    gs.player.x = 290.0f;
+    gs.world.player.x = 290.0f;
     game_collide(&gs, GAME_FIXED_STEP);
     game_collide(&gs, GAME_FIXED_STEP);
-    CHECK(gs.coins[0].active == 0 && gs.score == 100 && gs.hearts == 2);
+    CHECK(gs.world.coins[0].active == 0 && gs.world.score == 100 && gs.world.hearts == 2);
 done:
     return failed;
 }
@@ -461,8 +461,8 @@ static int health_stars_heal_one_heart_up_to_the_cap(void)
     int failed = 0;
     GameState gs = {0};
     stand_player_on_floor(&gs, 100.0f);
-    gs.lives = 3;
-    IntRect phit = player_get_hitbox(&gs.player);
+    gs.world.lives = 3;
+    IntRect phit = player_get_hitbox(&gs.world.player);
     HealthStar on_player = {.x = (float)phit.x, .y = (float)phit.y, .active = 1};
 
     /* The hitbox is the whole 16x16 sprite at the star's position. */
@@ -471,30 +471,30 @@ static int health_stars_heal_one_heart_up_to_the_cap(void)
     CHECK(star_hit.w == HEALTH_STAR_DISPLAY_W && star_hit.h == HEALTH_STAR_DISPLAY_H);
 
     /* One heart left: a yellow star heals one, and is gone. */
-    gs.hearts = 1;
-    gs.star_yellow_count = 1;
-    gs.star_yellows[0] = on_player;
+    gs.world.hearts = 1;
+    gs.world.star_yellow_count = 1;
+    gs.world.star_yellows[0] = on_player;
     game_collide(&gs, GAME_FIXED_STEP);
-    CHECK(gs.hearts == 2 && !gs.star_yellows[0].active && gs.score == 0);
+    CHECK(gs.world.hearts == 2 && !gs.world.star_yellows[0].active && gs.world.score == 0);
     game_collide(&gs, GAME_FIXED_STEP);
-    CHECK(gs.hearts == 2);
+    CHECK(gs.world.hearts == 2);
 
     /* Green and red together, one heart short: one fills the gap, the
      * other is still used up but cannot heal past MAX_HEARTS. */
-    gs.hearts = MAX_HEARTS - 1;
-    gs.star_green_count = 1;
-    gs.star_greens[0] = on_player;
-    gs.star_red_count = 1;
-    gs.star_reds[0] = on_player;
+    gs.world.hearts = MAX_HEARTS - 1;
+    gs.world.star_green_count = 1;
+    gs.world.star_greens[0] = on_player;
+    gs.world.star_red_count = 1;
+    gs.world.star_reds[0] = on_player;
     game_collide(&gs, GAME_FIXED_STEP);
-    CHECK(gs.hearts == MAX_HEARTS);
-    CHECK(!gs.star_greens[0].active && !gs.star_reds[0].active);
+    CHECK(gs.world.hearts == MAX_HEARTS);
+    CHECK(!gs.world.star_greens[0].active && !gs.world.star_reds[0].active);
 
     /* A star the player does not touch stays. */
-    gs.star_yellows[0] = (HealthStar){.x = phit.x + 200.0f, .y = (float)phit.y, .active = 1};
-    gs.hearts = 1;
+    gs.world.star_yellows[0] = (HealthStar){.x = phit.x + 200.0f, .y = (float)phit.y, .active = 1};
+    gs.world.hearts = 1;
     game_collide(&gs, GAME_FIXED_STEP);
-    CHECK(gs.hearts == 1 && gs.star_yellows[0].active);
+    CHECK(gs.world.hearts == 1 && gs.world.star_yellows[0].active);
 done:
     return failed;
 }
@@ -562,11 +562,11 @@ static int jump_buffer_coyote_time_and_short_hops(void)
         GameState gs = {0};
         float floor_y, apex_y;
         stand_player_on_floor(&gs, 100.0f);
-        floor_y = apex_y = gs.player.y;
+        floor_y = apex_y = gs.world.player.y;
         for (int step = 0; step < 60; step++) {
-            gs.replay_input_mask = step < 2 ? PLAYER_INPUT_JUMP : 0;
+            gs.screen.replay_input_mask = step < 2 ? PLAYER_INPUT_JUMP : 0;
             game_player_step(&gs, GAME_FIXED_STEP);
-            if (gs.player.y < apex_y) apex_y = gs.player.y;
+            if (gs.world.player.y < apex_y) apex_y = gs.world.player.y;
         }
         float tap = floor_y - apex_y;
         CHECK(tap > 5.0f && tap < 30.0f);   /* a full jump rises 60+ px */
