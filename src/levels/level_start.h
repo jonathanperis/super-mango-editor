@@ -42,10 +42,12 @@ typedef struct {
 /*
  * level_ground_top_at — The highest surface a player dropped into the
  * column at column_x (its left edge) lands on: the ground floor (unless a
- * floor gap is under the column's centre), a ground pillar, a bridge, or a
- * fixed or crumbling float platform.  Spike platforms and rail riders do
- * not count: one hurts, the other moves away.  Returns 1 and sets *top,
- * or 0 when there is nothing to stand on (a gap with nothing above it).
+ * floor gap is under the column's centre), a bridge under that centre, or
+ * a ground pillar or fixed or crumbling float platform that the player's
+ * physics box overlaps, the same tests the collision code makes.  Spike
+ * platforms and rail riders do not count: one hurts, the other moves
+ * away.  Returns 1 and sets *top, or 0 when there is nothing to stand on
+ * (a gap with nothing above it).
  */
 int level_ground_top_at(const LevelDef *def, float column_x, float *top);
 

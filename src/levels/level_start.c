@@ -8,6 +8,7 @@
 #include <stdio.h>   /* snprintf */
 
 #include "../game_constants.h"        /* FLOOR_Y, FLOOR_GAP_W, TILE_SIZE, GAME_W */
+#include "../player/player_internal.h"  /* PLAYER_FRAME_W, PLAYER_PHYS_PAD_X */
 #include "../surfaces/float_platform.h" /* FLOAT_PLATFORM_PIECE_W */
 
 /* Bridges are drawn and collided as 16-px bricks (level_validate.c checks
@@ -20,6 +21,20 @@ static int spans(float x, float left, float width)
     return x >= left && x < left + width;
 }
 
+/*
+ * Does the player's physics box overlap [left, left + width)? This is the
+ * test player_resolve_platform_collisions uses for pillars and float
+ * platforms: the box is the sprite (PLAYER_FRAME_W wide, centred in the
+ * column by player_reset) inset by PLAYER_PHYS_PAD_X on each side, and
+ * touching edges do not count.
+ */
+static int box_overlaps(float column_x, float left, float width)
+{
+    float sprite_x = column_x + (float)(TILE_SIZE - PLAYER_FRAME_W) / 2.0f;
+    return sprite_x + (float)(PLAYER_FRAME_W - PLAYER_PHYS_PAD_X) > left &&
+           sprite_x + (float)PLAYER_PHYS_PAD_X < left + width;
+}
+
 /* Keep the higher of two surfaces: a smaller y is higher on screen. */
 static void keep_highest(int *found, float *top, float candidate)
 {
@@ -29,7 +44,9 @@ static void keep_highest(int *found, float *top, float candidate)
 
 int level_ground_top_at(const LevelDef *def, float column_x, float *top)
 {
-    /* The player lands on what is under the middle of its column. */
+    /* Each surface uses the rule its collision code uses: the floor (and
+     * its gaps) and bridge bricks are tested under the middle of the
+     * column, pillars and float platforms against the physics box. */
     float centre = column_x + (float)TILE_SIZE / 2.0f;
     int found = 0;
     int over_gap = 0;
@@ -44,7 +61,7 @@ int level_ground_top_at(const LevelDef *def, float column_x, float *top)
     for (int i = 0; i < def->platform_count; i++) {
         const PlatformPlacement *p = &def->platforms[i];
         int tiles = p->tile_width > 0 ? p->tile_width : 1;
-        if (spans(centre, p->x, (float)(tiles * TILE_SIZE)))
+        if (box_overlaps(column_x, p->x, (float)(tiles * TILE_SIZE)))
             keep_highest(&found, &best, level_platform_top_y(p->tile_height));
     }
     for (int i = 0; i < def->bridge_count; i++) {
@@ -55,7 +72,7 @@ int level_ground_top_at(const LevelDef *def, float column_x, float *top)
     for (int i = 0; i < def->float_platform_count; i++) {
         const FloatPlatformPlacement *fp = &def->float_platforms[i];
         if (fp->mode == FLOAT_PLATFORM_RAIL) continue;   /* it moves */
-        if (spans(centre, fp->x, (float)(fp->tile_count * FLOAT_PLATFORM_PIECE_W)))
+        if (box_overlaps(column_x, fp->x, (float)(fp->tile_count * FLOAT_PLATFORM_PIECE_W)))
             keep_highest(&found, &best, fp->y);
     }
 
