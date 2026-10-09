@@ -82,13 +82,16 @@ was built with, compile and link settings apart:
 | `$(OBJDIR)/link-flags.txt` | `CC`, `CFLAGS`, `TEST_CFLAGS`, `LIBS` (with `EXTRA_LDFLAGS`), `EDITOR_LIBS`, `TEST_LIBS`, `MATH_LIBS` | every native program is relinked; no object recompiles |
 | `$(OBJDIR)/fuzz-flags.txt` | `CC`, `FUZZ_FLAGS`, `LIBS`, `MATH_LIBS` | the two fuzz replay programs |
 | `$(RAYLIB_BUILD)/make-options.txt` | the `build_raylib.py` options | raylib |
-| `$(OBJDIR)/web/build-flags.txt` | the Emscripten pin and every Web compile and link flag | Web raylib, objects and pages |
+| `$(WEB_RAYLIB_BUILD)/make-options.txt` | the Emscripten pin and `WEB_RAYLIB_OPTIONS` | Web raylib |
+| `$(OBJDIR)/web/build-flags.txt` | the Emscripten pin, `WEB_CFLAGS` (with `WEB_OPT` and `EXTRA_WEB_CFLAGS`), `WEB_INCLUDES` | Web objects |
+| `$(OBJDIR)/web/link-flags.txt` | the Emscripten pin, `WEB_OPT`, `EXTRA_WEB_CFLAGS`, `WEB_FLAGS`, `WEB_LINK_FLAGS`, `WEB_DEBUG_LINK_FLAGS` | both Web pages are relinked; no object recompiles |
 
 While parsing the Makefile, Make reads each stamp back and rewrites it only
 when the text differs. Every output lists its stamp as a prerequisite, so a
 changed setting rebuilds the outputs that use it (for example
 `make BUILD_MODE=release` after a debug build in the same `OUTDIR` recompiles
-everything with `-O2`, while `make EXTRA_LDFLAGS=...` only relinks), and an
+everything with `-O2`, while `make EXTRA_LDFLAGS=...` only relinks and a new
+`--pre-js` in `WEB_FLAGS` only relinks the Web pages), and an
 unchanged one rebuilds nothing. That holds for edits to the Makefile itself
 because recipes carry no literal flags: every flag a compile or link recipe
 passes (include paths in `PROJECT_INCLUDES`, `-lm` in `MATH_LIBS`, the per-object
@@ -423,7 +426,7 @@ make dist-native
 
 ### `make dist-wasm`
 
-Depends on `asset-budget` and `make web`, whose HTML outputs are file targets over the Web objects (and through them the sources and headers), `web/` host files, `assets/`, `levels/`, the Web raylib library and the Web flag stamp; emcc only reruns when one of them is newer, so a stale WASM build is never packaged. Archives include HTML/JS/WASM/data files, README and third-party notices.
+Depends on `asset-budget` and `make web`, whose HTML outputs are file targets over the Web objects (and through them the sources and headers), `web/` host files, `assets/`, `levels/`, the Web raylib library and the Web link flag stamp; emcc only reruns when one of them is newer, so a stale WASM build is never packaged. Archives include HTML/JS/WASM/data files, README and third-party notices.
 
 ```sh
 make dist-wasm   # runs make web first when its outputs are stale
@@ -666,7 +669,7 @@ out/
 ├── raylib/                              ← verified source, applied patches and CMake build
 │   ├── make-options.txt                 ← raylib flag stamp
 │   └── build-done.stamp                 ← last successful build_raylib.py run
-├── raylib-web/                          ← Emscripten raylib build (make web)
+├── raylib-web/                          ← Emscripten raylib build and its flag stamp (make web)
 └── obj/
     ├── build-flags.txt                  ← flag stamp for game, editor and tool objects
     ├── test-flags.txt                   ← flag stamp for test objects
@@ -680,6 +683,6 @@ out/
     ├── tests/                           ← test-flag copies, same mirrored paths (make test)
     │   └── tests/*.o / *.d              ← the test sources themselves
     ├── tools/level_check.o / .d         ← level checker (make validate-levels)
-    ├── web/                             ← emcc objects and Web flag stamp (make web)
+    ├── web/                             ← emcc objects, Web compile and link flag stamps (make web)
     └── vendor/tomlc17/tomlc17.o / .d
 ```
