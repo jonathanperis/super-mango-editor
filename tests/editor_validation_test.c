@@ -3784,6 +3784,20 @@ static int field_limits_apply_on_every_commit_path(void)
     editor_handle_event(&es, &event);
     if (expect_int("applied hearts clamp", es.level.initial_hearts, 1) != 0) goto done;
 
+    /* Music volume accepts the whole 0..128 range the format allows (it
+     * used to stop at 99). */
+    config_frame(&es, NULL, 1, CFG_X + 60, CFG_MUSIC_Y + 22 + 4);
+    if (expect_int("volume active", es.ui.active_id, 9003) != 0) goto done;
+    strcpy(es.ui.edit_buf, "128");
+    es.ui.edit_cursor = 3;
+    if (expect_int("volume applied", editor_finish_field_edit(&es), 1) != 0 ||
+        expect_int("volume reaches 128", es.level.music_volume, 128) != 0) goto done;
+    config_frame(&es, NULL, 1, CFG_X + 60, CFG_MUSIC_Y + 22 + 4);
+    strcpy(es.ui.edit_buf, "500");
+    es.ui.edit_cursor = 3;
+    if (expect_int("loud volume applied", editor_finish_field_edit(&es), 1) != 0 ||
+        expect_int("volume clamps to 128", es.level.music_volume, 128) != 0) goto done;
+
     /* ...and with Return, which already clamped. */
     config_frame(&es, NULL, 1, CFG_X + 80, CFG_HEARTS_Y + 4);
     strcpy(es.ui.edit_buf, "9");

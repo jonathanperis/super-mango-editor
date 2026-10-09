@@ -141,7 +141,7 @@ level-wide TOML fields:
 - `name`, `description`, `generated_by`
 - `screen_count` (1–99; world width = screen_count × 400 px)
 - `next_phase` path (saved under `[last_star]` in TOML; it must follow the [level-reference rule](../level-design/#level-references))
-- `music_path` (dropdown: none, water, lava, winds) and `music_volume`
+- `music_path` (dropdown: none, water, lava, winds) and `music_volume` (0–128)
 - `floor_tile_path` (dropdown)
 - `initial_hearts` (1–3), `initial_lives`
 - `score_per_life`, `coin_score`
