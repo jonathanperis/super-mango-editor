@@ -1,8 +1,17 @@
 #include "../core/game_profile.h"
 
+int game_settings_key_debug_reserved(int key)
+{
+    /* F2-F10, '-' and '=' drive the --debug inspector. One profile serves
+     * normal and debug runs, so a key bound in normal play (Jump on F2)
+     * would both jump and freeze the game in --debug: refuse them always. */
+    return (key >= BINDING_KEY_F2 && key <= BINDING_KEY_F10) ||
+           key == BINDING_KEY_MINUS || key == BINDING_KEY_EQUAL;
+}
+
 int game_settings_key_allowed(int key)
 {
-    if (!input_binding_known(key)) return 0;
+    if (!input_binding_known(key) || game_settings_key_debug_reserved(key)) return 0;
     /* Menu, pause and settings keys, the fixed arrow alternatives and the
      * fixed Run key stay what they are, so a remap can never strand them. */
     return key != BINDING_KEY_ESCAPE && key != BINDING_KEY_F1 && key != BINDING_KEY_TAB &&

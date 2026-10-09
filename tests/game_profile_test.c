@@ -83,6 +83,14 @@ static int codec_and_storage(void)
         CHECK(game_profile_decode(decoded,bad[i])==-1);
         CHECK(decoded->count==1 && decoded->settings.keys[BIND_JUMP]==13);
     }
+    /* A profile saved before the inspector keys were reserved: Jump on F2
+     * goes back to its default (Space) and the rest of the profile loads. */
+    CHECK(game_profile_decode(decoded,"format_version=1\nkeys=[4,7,26,22,59,225]\n")==0);
+    CHECK(decoded->settings.keys[BIND_JUMP]==BINDING_KEY_SPACE && decoded->settings.keys[BIND_LEFT]==BINDING_KEY_A);
+    /* Down already holds Space, so every key returns to its default. */
+    CHECK(game_profile_decode(decoded,"format_version=1\nkeys=[4,7,26,44,46,225]\n")==0);
+    CHECK(decoded->settings.keys[BIND_DOWN]==BINDING_KEY_S && decoded->settings.keys[BIND_JUMP]==BINDING_KEY_SPACE);
+    CHECK(game_settings_valid(&decoded->settings));
     CHECK(game_profile_open(a,path)==0 && game_profile_save(a)==0);
     CHECK(game_profile_open(b,path)==0);
     a->data.settings.muted=1;
@@ -310,6 +318,21 @@ static int settings_and_bindings(void)
     event.button=PAD_BACK;
     settings_menu_event(menu,profile,&event,PAD_BACK);
     CHECK(!menu->open);
+    /* The debug inspector's keys are refused in every run, not only while
+     * capturing in --debug: a profile is shared by both kinds of run. */
+    CHECK(game_settings_key_debug_reserved(BINDING_KEY_F2) && game_settings_key_debug_reserved(BINDING_KEY_F10));
+    CHECK(game_settings_key_debug_reserved(BINDING_KEY_MINUS) && game_settings_key_debug_reserved(BINDING_KEY_EQUAL));
+    CHECK(!game_settings_key_allowed(BINDING_KEY_F2) && !game_settings_key_allowed(BINDING_KEY_EQUAL));
+    CHECK(game_settings_key_allowed(BINDING_KEY_F10 + 1) && game_settings_key_allowed(BINDING_KEY_F10 + 2)); /* F11, F12 */
+    settings_menu_open(menu);
+    menu->page=1; menu->selected=BIND_JUMP;
+    event.type=INPUT_KEY_DOWN; event.key=KEY_ENTER; event.binding=BINDING_KEY_ENTER;
+    settings_menu_event(menu,profile,&event,PAD_BACK);
+    CHECK(menu->capture==1);
+    event.key=KEY_F2; event.binding=BINDING_KEY_F2;
+    settings_menu_event(menu,profile,&event,PAD_BACK);
+    CHECK(menu->capture==1 && profile->data.settings.keys[BIND_JUMP]==13);
+    CHECK(strstr(menu->message,"debug inspector")!=NULL);
     settings_menu_cleanup(menu); free(menu); free(profile);
     return 0;
 fail:

@@ -70,7 +70,7 @@ The overlay text is snapshotted in [Overlay Snapshots](../overlay-snapshots/) so
 - **Open:** F1 on either screen; gamepad Y in the start menu or Back during gameplay/pause. On terminal overlays, Back exits; use F1 for settings.
 - **Navigate:** Up/Down or D-pad selects a row, wrapping at the ends; Left/Right changes values on the main page; Enter, keypad Enter, Space or A/Start activates, and a mouse click activates a row. Esc or B/Back closes, or cancels binding capture first; either one also clears the message about a refused binding. The start menu's **Settings** button opens the panel exactly as F1 does.
 - **Options:** music/effects volume (0–128 in steps of 8), mute, stick dead zone (0–28000 in steps of 1000), native window scale (1×–4×; not applied in the browser), high-contrast outlines, reduced motion, control remapping (a separate page of 12 binding rows) and **Restore default settings**, which resets every setting, not only controls.
-- **Remapping:** Left, Right, Up, Down, Jump and Run each have keyboard and gamepad bindings. Duplicates are rejected, as are reserved keys (Esc, F1, Tab, Enter, keypad Enter, the arrows and Right Shift) and buttons (Back, Start, Guide, B); misc, paddle and touchpad buttons cannot be captured. Arrows remain available. In debug gameplay, F2–F10 and `-`/`=` are reserved for the inspector.
+- **Remapping:** Left, Right, Up, Down, Jump and Run each have keyboard and gamepad bindings. Duplicates are rejected, as are reserved keys (Esc, F1, Tab, Enter, keypad Enter, the arrows and Right Shift) and buttons (Back, Start, Guide, B); misc, paddle and touchpad buttons cannot be captured. Arrows remain available. F2–F10, `-` and `=` belong to the [debug inspector](#debug-inspector-keys) and are refused in every run, because normal and debug runs share one profile. A profile saved with one of them bound has that control put back on its default key (every key, if that default is taken), with a warning; the rest of the profile still loads.
 
 Settings apply when the panel closes. Normal runs save settings, the last played
 stage and per-level best score/time/coin results. A profile holds results for up
@@ -131,8 +131,8 @@ the game. The keys are handled in `src/core/game_inspector.c`.
 The nine movement values are walk/run max speed, walk/run ground acceleration,
 ground friction, ground counter-acceleration, walk/run air acceleration and air
 friction. While a recording is replaying, F4, F7 and `-`/`=` are ignored so the
-run cannot change; F2 and F3 still pause and step it. In debug gameplay these
-keys are reserved and cannot be used as remapped controls. Focus loss, the
+run cannot change; F2 and F3 still pause and step it. These keys can never be
+remapped controls, in debug or normal runs. Focus loss, the
 settings panel, your own pause and the end-of-level and game-over screens
 still stop the simulation; a step requested while it is stopped is dropped,
 not saved for later.

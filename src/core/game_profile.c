@@ -197,6 +197,34 @@ static int decode_result(toml_datum_t table, GameProgress *result)
     return drop ? RESULT_DROP : RESULT_KEEP;
 }
 
+/*
+ * Profiles saved before the debug inspector's keys (F2-F10, '-', '=') were
+ * reserved may bind one of them. Rejecting the whole file for that would
+ * also throw away the player's progress, so put each such action back on
+ * its default key, or every key on its default if that default is already
+ * taken, and warn. Any other invalid binding still rejects the profile.
+ */
+static void reset_debug_reserved_keys(GameSettings *settings)
+{
+    static const GameSettings defaults = GAME_SETTINGS_DEFAULTS;
+    int reset = 0;
+    for (int i = 0; i < PROFILE_ACTION_COUNT; i++) {
+        if (!game_settings_key_debug_reserved(settings->keys[i])) continue;
+        settings->keys[i] = defaults.keys[i];
+        reset = 1;
+    }
+    if (!reset) return;
+    fprintf(stderr, "Warning: profile bound a debug inspector key (F2-F10, -, =); "
+                    "that control is back on its default key\n");
+    for (int i = 0; i < PROFILE_ACTION_COUNT; i++)
+        for (int j = 0; j < i; j++)
+            if (settings->keys[i] == settings->keys[j]) {
+                memcpy(settings->keys, defaults.keys, sizeof(settings->keys));
+                fprintf(stderr, "Warning: that default key was taken; all keys restored to defaults\n");
+                return;
+            }
+}
+
 int game_profile_decode(GameProfileData *out, const char *text)
 {
     if (!out || !text || strlen(text) >= PROFILE_TEXT_MAX) return -1;
@@ -250,6 +278,7 @@ int game_profile_decode(GameProfileData *out, const char *text)
         } else goto done;
 #undef FIELD
     }
+    reset_debug_reserved_keys(&data->settings);
     if (version != 1 || !game_settings_valid(&data->settings)) goto done;
     *out = *data;
     ok = 1;

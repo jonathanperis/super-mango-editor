@@ -127,7 +127,9 @@ int settings_menu_event(SettingsMenu *menu, GameProfile *profile,
         if (game_settings_valid(&candidate)) {
             profile->data.settings = candidate; changed(profile); menu->capture = 0;
             menu->message[0] = '\0';
-        } else snprintf(menu->message, sizeof(menu->message), "Reserved/duplicate binding. Choose another; Esc cancels.");
+        } else if (keyboard && game_settings_key_debug_reserved(event->binding))
+            snprintf(menu->message, sizeof(menu->message), "F2-F10, - and = belong to the debug inspector. Choose another; Esc cancels.");
+        else snprintf(menu->message, sizeof(menu->message), "Reserved/duplicate binding. Choose another; Esc cancels.");
         return 1;
     }
     int rows = menu->page ? 13 : 10;
