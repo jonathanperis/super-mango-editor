@@ -7,7 +7,7 @@ const vm = require('node:vm');
 function host(file, pattern) {
     const nodes = new Map();
     const listeners = new Map();
-    let reloads = 0;
+    let reloads = 0, storageReads = 0;
     function element(id = '') {
         const handlers = new Map();
         const node = { id, style: {}, dataset: {}, children: [], disabled: false,
@@ -43,7 +43,8 @@ function host(file, pattern) {
     };
     const window = {
         SuperMangoTouch: { mount() { return touch; } },
-        sessionStorage: { getItem() { return null; }, removeItem() {} },
+        // Replay restarts in place; the hosts no longer read a boot intent.
+        sessionStorage: { getItem() { storageReads++; return null; }, removeItem() { storageReads++; } },
         setTimeout(fn) { fn(); }, location: { reload() { reloads++; } },
     };
     const touch = { enabled: false, clears: 0,
@@ -52,7 +53,8 @@ function host(file, pattern) {
         setTimeout: window.setTimeout, console: { log() {}, error() {} } });
     const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8').match(pattern)[1];
     vm.runInContext(source, context);
-    return { nodes, document, window, listeners, context, touch, reloads: () => reloads };
+    return { nodes, document, window, listeners, context, touch, reloads: () => reloads,
+        storageReads: () => storageReads };
 }
 
 const page = host('docs/src/components/home/Dashboard.astro', /<script is:inline>([\s\S]*?)<\/script>/);
@@ -97,6 +99,7 @@ assert.match(page.nodes.get('canvas')['aria-label'], /not running/);
 assert.match(page.nodes.get('.cabinet-standby').textContent, /not saved/);
 vm.runInContext('startGame(false)', page.context);
 assert.equal(page.reloads(), 1, 'ended runtime should restart via reload');
+assert.equal(page.storageReads(), 0, 'Dashboard read a replay boot intent');
 
 const shell = host('web/shell.html', /<script>([\s\S]*?)<\/script\b[^>]*>/i);
 let args;
@@ -104,6 +107,8 @@ shell.window.Module.__superMangoDebug = true;
 shell.window.Module.callMain = value => { args = value; return 0; };
 shell.window.Module.onRuntimeInitialized();
 assert(args.includes('--debug'), 'standalone debug payload omitted debug argument');
+assert.equal(JSON.stringify(args.slice(0, 2)), JSON.stringify(['--level', 'levels/00_sandbox_01.toml']));
+assert.equal(shell.storageReads(), 0, 'standalone shell read a replay boot intent');
 assert.match(shell.nodes.get('canvas')['aria-label'], /running; F1/);
 shell.window.Module.onAbort();
 assert.equal(shell.touch.enabled, false);
