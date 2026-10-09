@@ -159,6 +159,21 @@ void parallax_init_from_def(ParallaxSystem *ps,
  * The destination rect stretches each tile to tex_w × GAME_H so the layer
  * fills the full canvas height.  (Natural height is 216 px; GAME_H is 300 px.)
  */
+int parallax_layer_offset(const ParallaxLayer *layer, int cam_x)
+{
+    if (!layer || layer->tex_w <= 0) return 0;
+    /*
+     * cam_x × speed gives the virtual pan distance.  The modulo wraps it
+     * into one tile width so tiles repeat seamlessly.
+     *
+     * Adding tex_w before the final modulo ensures the result is always
+     * non-negative even when cam_x × speed is negative (C's % keeps the
+     * sign of the left operand, so -5 % 384 is -5, not 379).
+     */
+    int parallax_x = (int)(cam_x * layer->speed);
+    return ((parallax_x % layer->tex_w) + layer->tex_w) % layer->tex_w;
+}
+
 void parallax_render(const ParallaxSystem *ps, int cam_x)
 {
     for (int i = 0; i < ps->count; i++) {
@@ -167,18 +182,8 @@ void parallax_render(const ParallaxSystem *ps, int cam_x)
         /* Skip layers that failed to load */
         if (!layer->texture || layer->tex_w <= 0) continue;
 
-        /*
-         * Compute the horizontal scroll offset for this layer.
-         *
-         * cam_x × speed gives the virtual pan distance.  The modulo wraps it
-         * into one tile width so tiles repeat seamlessly.
-         *
-         * Adding tex_w before the final modulo ensures the result is
-         * always non-negative even when cam_x × speed rounds to a small
-         * negative float (e.g. floating-point noise near cam_x == 0).
-         */
-        int parallax_x = (int)(cam_x * layer->speed);
-        int offset      = ((parallax_x % layer->tex_w) + layer->tex_w) % layer->tex_w;
+        /* Horizontal scroll offset for this layer, in [0, tex_w). */
+        int offset = parallax_layer_offset(layer, cam_x);
 
         /*
          * Tile the texture horizontally to cover the full canvas width.

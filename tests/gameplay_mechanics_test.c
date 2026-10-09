@@ -19,6 +19,11 @@
 
 #include "collision/collision_damage.h"
 #include "core/debug.h"
+#include "core/game_overlay.h"
+#include "core/game_profile.h"
+#include "effects/parallax.h"
+#include "render/game_render.h"
+#include "screens/settings_menu.h"
 #include "core/game_timing.h"
 #include "core/game_update.h"
 #include "hazards/axe_trap.h"
@@ -889,6 +894,102 @@ static int setup_window(void)
     return audio_open() != 0;
 }
 
+/* ------------------------------------------------------------------ */
+/* Parallax and render smoke                                           */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Each background layer scrolls at speed × camera and wraps every tex_w
+ * pixels, so its tiles always cover the canvas. A missing image leaves its
+ * layer empty instead of failing the level.
+ */
+static int parallax_scrolls_and_wraps(void)
+{
+    int failed = 0;
+    ParallaxSystem ps = {0};
+    ParallaxLayer layer = {.tex_w = 384, .speed = 0.5f};
+    CHECK(parallax_layer_offset(&layer, 100) == 50);
+    CHECK(parallax_layer_offset(&layer, 1000) == 500 % 384);   /* wrapped */
+    CHECK(parallax_layer_offset(&layer, 768) == 0);            /* one tile exactly */
+    CHECK(parallax_layer_offset(&layer, -10) == 384 - 5);      /* never negative */
+    layer.speed = 0.0f;
+    CHECK(parallax_layer_offset(&layer, 5000) == 0);           /* static sky */
+    layer.tex_w = 0;
+    CHECK(parallax_layer_offset(&layer, 100) == 0);            /* failed image */
+    /* For every camera, the first tile starts at or left of x = 0 and
+     * reaches past it, so no gap opens at the left edge. */
+    layer = (ParallaxLayer){.tex_w = 384, .speed = 0.38f};
+    for (int cam = 0; cam < 4000; cam += 37) {
+        int offset = parallax_layer_offset(&layer, cam);
+        CHECK(offset >= 0 && offset < layer.tex_w && -offset + layer.tex_w > 0);
+    }
+
+    const char paths[2][64] = {"assets/sprites/backgrounds/sky_blue.png",
+                               "assets/sprites/backgrounds/missing_layer.png"};
+    const float speeds[2] = {0.0f, 0.25f};
+    parallax_init_from_def(&ps, paths, speeds, 2);
+    CHECK(ps.count == 2);
+    CHECK(ps.layers[0].texture && ps.layers[0].tex_w > 0 && ps.layers[0].speed == 0.0f);
+    CHECK(!ps.layers[1].texture && ps.layers[1].tex_w == 0 && ps.layers[1].speed == 0.25f);
+done:
+    parallax_cleanup(&ps);
+    if (!failed && ps.count != 0) failed = 1;
+    return failed;
+}
+
+/*
+ * game_render_frame and the overlays in render_overlay.c must present a
+ * frame in every overlay state: plain play, pause, game over, completion
+ * with and without a next level, a failed next level, and the settings
+ * panel on top. A draw path that failed would leave the frame unpresented
+ * or ask for a fatal route.
+ */
+static int every_overlay_state_renders(void)
+{
+    int failed = 0;
+    GameState gs;
+    static GameProfile profile;
+    SettingsMenu settings = {0};
+    CHECK(mechanics_open_level(&gs, HAZARDS_LEVEL, 1) == 0);
+    game_profile_init(&profile);
+    gs.profile = &profile;
+    gs.settings_menu = &settings;
+
+    CHECK(game_overlay_state(&gs) == GAME_OVERLAY_NONE);
+    CHECK(game_render_frame(&gs, 0, GAME_FIXED_STEP) == 1);
+    game_overlay_toggle_pause(&gs);
+    CHECK(game_overlay_state(&gs) == GAME_OVERLAY_PAUSED);
+    CHECK(game_render_frame(&gs, 0, GAME_FIXED_STEP) == 1);
+    game_overlay_resume(&gs);
+
+    gs.game_over = 1;
+    CHECK(game_overlay_state(&gs) == GAME_OVERLAY_GAME_OVER);
+    CHECK(game_render_frame(&gs, 0, GAME_FIXED_STEP) == 1);
+    gs.game_over = 0;
+
+    gs.completion.complete = 1;
+    gs.completion.pending_next_phase = 1;
+    CHECK(game_overlay_state(&gs) == GAME_OVERLAY_LEVEL_COMPLETE);
+    CHECK(game_render_frame(&gs, 0, GAME_FIXED_STEP) == 1);
+    gs.completion.next_phase_failed = 1;
+    CHECK(game_render_frame(&gs, 0, GAME_FIXED_STEP) == 1);
+    gs.completion.pending_next_phase = gs.completion.next_phase_failed = 0;
+    CHECK(game_render_frame(&gs, 0, GAME_FIXED_STEP) == 1);  /* final level */
+    gs.completion.complete = 0;
+
+    settings_menu_open(&settings);
+    CHECK(game_render_frame(&gs, 0, GAME_FIXED_STEP) == 1);
+    settings.page = 1;
+    CHECK(game_render_frame(&gs, 0, GAME_FIXED_STEP) == 1);
+    CHECK(gs.route == GAME_ROUTE_NONE);
+done:
+    settings_menu_cleanup(&settings);
+    gs.settings_menu = NULL;
+    gs.profile = NULL;
+    game_cleanup(&gs);
+    return failed;
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -909,6 +1010,8 @@ int main(void)
         CASE(bridge_ignores_a_player_on_another_surface),
         CASE(camera_jumps_to_the_respawn_point),
         CASE(debug_log_is_a_bounded_ring),
+        CASE(parallax_scrolls_and_wraps),
+        CASE(every_overlay_state_renders),
         CASE(replay_scripts_drive_the_game),
         CASE(replay_scripts_reject_malformed_files),
 #undef CASE
