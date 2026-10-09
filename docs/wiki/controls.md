@@ -36,11 +36,14 @@ Without `--level`, the native executable loads `levels/campaigns/main.toml`: Cre
 | Previous level | Left, A, or Up | D-pad Left or Up |
 | Next level | Right, D, or Down | D-pad Right or Down |
 | Play selected level | Enter, keypad Enter or Space | A / Cross or Start |
+| Continue the selected level from its saved point (when shown) | C | X / Square |
 | Exit menu | Esc | B / Circle or Back |
 
 The selector lists every campaign level (up to five rows at a time, scrolling with the selection). Each row shows a gold `*` when the profile records a finished run of that level (`-` otherwise), the level name, the best time as `m:ss.cc` and the best coins out of the level's total, such as `3/12`; an uncleared level shows `--`. The line under **Play** repeats the selected level's best time, coins and score, or says it is not cleared yet.
 
-The mouse can also click a list row to select that level, **Play** and the **Settings (F1 / Y)** button. The selected level wraps at either end of the manifest-defined catalog. A held confirm carried from a prior screen must be released before it can start the selected level. A missing or malformed manifest, or one with no playable level, prevents the native menu from opening. A single listed level that fails to load stays in the selector, greyed out with an "Unavailable" reason, and cannot be started; the rest remain playable (see [Campaign Manifest](../level-design/#campaign-manifest-v1)).
+When the profile holds a Continue point for the selected level (see [Continue](#continue)), a **Continue** button appears to the left of **Play**, the line under them says where it picks up (`Continue from checkpoint 2: 120 pts, 2 lives`), and the hint line adds `C/X: continue`. **Play** still starts the level from its beginning.
+
+The mouse can also click a list row to select that level, **Continue**, **Play** and the **Settings (F1 / Y)** button. The selected level wraps at either end of the manifest-defined catalog. A held confirm carried from a prior screen must be released before it can start the selected level. A missing or malformed manifest, or one with no playable level, prevents the native menu from opening. A single listed level that fails to load stays in the selector, greyed out with an "Unavailable" reason, and cannot be started; the rest remain playable (see [Campaign Manifest](../level-design/#campaign-manifest-v1)).
 
 ## Pause and Terminal Overlays
 
@@ -81,8 +84,31 @@ stage and per-level best score/time/coin results. A profile holds results for up
 to 128 levels; a coin result is at most `MAX_COINS` (64), the most coins one level
 can place, so raising that constant keeps old profiles readable. A result that
 cannot be recorded (a full profile) is logged as a warning rather than dropped
-silently. `--continue` opens that stage
-from its start, not a mid-level checkpoint; all campaign levels remain selectable.
+silently. The profile also keeps one Continue point (below); all campaign levels
+remain selectable.
+
+### Continue
+
+A normal run records a **Continue point** for the level being played whenever the
+player reaches a new respawn point (an authored checkpoint, or the next screen in
+a level without authored checkpoints), whenever a pause begins (the browser pauses
+when its tab is hidden, the only warning before a tab closes), and when the player
+leaves the level part-way with Exit or Level Select. It holds the respawn point,
+score, lives, the coins already collected and the level timer, plus the level
+file's content hash. Finishing the level or losing its last life clears it; the
+profile keeps only one, for the most recent level.
+
+**Continue** in the start menu, or `--continue` on the command line, reopens that
+level and puts the player on the saved respawn point exactly as a lost life would:
+enemies and hazards restart from their authored places, hearts are full, collected
+coins stay collected, and the HUD shows `RESPAWN`. Its time counts on from the
+saved timer. A Continue point whose level file has changed since (a different
+content hash) is dropped with a warning, before the menu offers it and again when
+it is applied, and that level starts from its beginning. **Play**, **Retry**,
+**Replay** and **Next Level** always start a level from its beginning. The profile
+stores it as a `[resume]` table, added in profile `format_version` 2; version-1
+profiles load unchanged and are written as version 2 on the next save.
+
 Native profiles use `profile.toml` under the OS preference root plus `SuperMango/SuperMango/`,
 or an explicit `--profile PATH`. A native save writes a sibling temporary file and
 renames it over `profile.toml`. If Windows moves the old file aside but cannot put
@@ -198,7 +224,7 @@ try it on.
 | `--debug` | Enables the inspector, FPS/frame interval, memory, hitboxes and event log; disables personal-profile persistence. |
 | `--sandbox` | Loads `levels/00_sandbox_01.toml` directly (whichever of `--sandbox`/`--level` comes last wins). |
 | `--level <path>` | Starts gameplay from a specific TOML file and skips the start menu. |
-| `--continue` | Opens the last saved stage if available and no explicit level was supplied; otherwise, or when that stage no longer loads, opens the selector. Runs that do not read the profile (`--no-save`, `--debug`, smoke, replay scripts) always open the selector. |
+| `--continue` | Opens the last saved stage if available and no explicit level was supplied, at its saved [Continue](#continue) point when it has one; otherwise, or when that stage no longer loads, opens the selector. Runs that do not read the profile (`--no-save`, `--debug`, smoke, replay scripts) always open the selector. |
 | `--profile <path>` | Uses an explicit native profile file. |
 | `--no-save` | Keeps settings/results in memory only; does not read or write the personal profile. |
 | `--experiment <path>` | Replays an exported capture; requires `--level` (whose bytes must match the capture's `level_hash`), enables debug/no-save, and cannot combine with `--replay-script`. |

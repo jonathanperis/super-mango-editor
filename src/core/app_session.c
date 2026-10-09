@@ -25,7 +25,9 @@
 #include "../levels/level_path.h"
 #include "game_overlay.h"
 #include "game_experiment.h"
+#include "game_resume.h"
 #include "game_timing.h"
+#include "../shared/serializer_io.h"  /* serializer_fingerprint_utf8 */
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -186,6 +188,85 @@ static int session_profile_ready_to_leave(AppSession *session)
     return result != PROFILE_SAVE_PENDING;
 }
 
+/*
+ * Continue points (GameResume in game_profile.h).
+ *
+ * The session records one when the player reaches a new respawn point,
+ * when a pause begins (the browser pauses when its tab is hidden, the only
+ * warning before a tab is closed), and when the player leaves a level
+ * part-way through Exit or Level Select. Finishing the level or losing its
+ * last life clears it. Recording only on those events, not every frame,
+ * keeps profile writes rare. resume_respawn_x/y and resume_was_paused
+ * remember what the last check saw.
+ */
+static void session_watch_resume(AppSession *session, const GameState *game)
+{
+    session->resume_respawn_x = game->respawn_x;
+    session->resume_respawn_y = game->respawn_y;
+    session->resume_was_paused = 0;
+}
+
+static void session_track_resume(AppSession *session, const GameState *game, int leaving)
+{
+    GameProfile *profile = &session->profile;
+    /* Labs and editor playtests have no profile key; F8 experiments are
+     * debug runs, which never touch the personal profile anyway. */
+    if (!game->profile_level_key[0] || game->experiment) return;
+    if (game->completion.complete || game->game_over) {
+        /* A finished or lost attempt leaves nothing to continue. */
+        if (game_profile_resume(profile, game->profile_level_key)) game_profile_clear_resume(profile);
+        return;
+    }
+    int paused = game->paused || game->pause_reasons;
+    int moved = game->respawn_x != session->resume_respawn_x || game->respawn_y != session->resume_respawn_y;
+    int pause_began = paused && !session->resume_was_paused;
+    session->resume_was_paused = paused;
+    if (!leaving && !moved && !pause_began) return;
+    session->resume_respawn_x = game->respawn_x;
+    session->resume_respawn_y = game->respawn_y;
+    GameResume resume;
+    game_resume_capture(game, &resume);
+    if (game_profile_set_resume(profile, &resume))
+        TraceLog(LOG_WARNING, "Profile: Continue point for %s was out of range and not saved",
+                 game->profile_level_key);
+}
+
+/*
+ * Put a freshly opened game on its saved Continue point. A point that no
+ * longer fits (the level file changed since it was saved) is dropped and
+ * the run starts at the level start.
+ */
+static void session_apply_resume(AppSession *session, GameState *game)
+{
+    const GameResume *resume = game_profile_resume(&session->profile, game->profile_level_key);
+    if (resume && game_resume_apply(game, resume)) {
+        TraceLog(LOG_WARNING, "Continue point for %s no longer matches the level; starting from its start",
+                 game->profile_level_key);
+        game_profile_clear_resume(&session->profile);
+    }
+    session_watch_resume(session, game);
+}
+
+/*
+ * Before the menu offers Continue, check the saved point against the level
+ * file's current bytes, the same hash game_resume_apply compares. An edited
+ * or missing level loses its Continue point here, so the menu never shows a
+ * button that would start somewhere else.
+ */
+static void session_drop_stale_resume(AppSession *session)
+{
+    const GameResume *resume = &session->profile.data.resume;
+    char resolved[GAME_LEVEL_PATH_MAX];
+    SerializerFileFingerprint fingerprint;
+    if (!resume->path[0]) return;
+    if (level_resolve_path(resume->path, resolved, sizeof(resolved)) != 0 ||
+        serializer_fingerprint_utf8(resolved, &fingerprint) != 1 ||
+        fingerprint.content_hash != resume->level_hash) {
+        TraceLog(LOG_WARNING, "Continue point for %s dropped: the level changed", resume->path);
+        game_profile_clear_resume(&session->profile);
+    }
+}
+
 static GameState *session_make_game(AppSession *session, const char *path, const GameInputPhysicalState *inherited)
 {
     GameState *game = calloc(1, sizeof(*game));
@@ -213,6 +294,7 @@ static GameState *session_make_game(AppSession *session, const char *path, const
     /* A confirm held on the old screen cannot immediately jump/confirm on
      * the new one. The latch waits for those physical controls to release. */
     game_input_arm_release_latch(game, inherited);
+    session_watch_resume(session, game);
     session->game_open_count++;
     return game;
 }
@@ -230,6 +312,7 @@ static int session_open_menu(AppSession *session)
     if (session_load_catalog(session)) return -1;
     game_web_input_clear_touch();
     input_clear();
+    session_drop_stale_resume(session);
     session->menu = start_menu_create(&session->catalog);
     if (!session->menu) return -1;
     session->menu->profile = &session->profile;
@@ -269,7 +352,7 @@ static void session_apply_menu_route(AppSession *session)
     if (!session->menu || session->menu->route == MENU_ROUTE_NONE) return;
     MenuRoute route = session->menu->route;
     if (route == MENU_ROUTE_EXIT && !session_profile_ready_to_leave(session)) return;
-    if (route == MENU_ROUTE_PLAY) {
+    if (route == MENU_ROUTE_PLAY || route == MENU_ROUTE_CONTINUE) {
         /* Prepare before commit: a bad level leaves the menu usable, with an
          * error message, rather than destroying the only reachable screen. */
         GameInputPhysicalState inherited;
@@ -281,6 +364,8 @@ static void session_apply_menu_route(AppSession *session)
             start_menu_set_error(session->menu, session->status_message);
             session->menu->route = MENU_ROUTE_NONE;
         } else {
+            /* Continue starts from the saved point; Play from the start. */
+            if (route == MENU_ROUTE_CONTINUE) session_apply_resume(session, candidate);
             session_close_menu(session);
             session->game = candidate;
             session->screen = APP_SCREEN_GAME;
@@ -302,6 +387,9 @@ static void session_apply_game_route(AppSession *session)
     char path[GAME_LEVEL_PATH_MAX];
     if (route == GAME_ROUTE_NONE && !game->running) route = GAME_ROUTE_EXIT;
     if (route == GAME_ROUTE_NONE) return;
+    /* Leaving a level part-way keeps a Continue point; record it before the
+     * save below, so Exit writes it to disk with everything else. */
+    if (route == GAME_ROUTE_EXIT || route == GAME_ROUTE_LEVEL_SELECT) session_track_resume(session, game, 1);
     /* Leaving the program waits for a pending browser save to settle. Every
      * other route keeps the session, and with it the profile in memory. */
     if (route == GAME_ROUTE_EXIT && !session_profile_ready_to_leave(session)) return;
@@ -313,6 +401,8 @@ static void session_apply_game_route(AppSession *session)
         if (!game_load_next_phase(game)) {
             session_profile_key(game, path);
             game_profile_select(&session->profile, game->profile_level_key);
+            game->resumed = 0;  /* the new level is played from its start */
+            session_watch_resume(session, game);
             session->preferences_applied = 0;
             game_timing_restart_clock(game);
             game_input_arm_release_latch(game, NULL);
@@ -420,6 +510,8 @@ AppSession *session_create(const AppSessionConfig *config)
          * that no longer loads falls back to the selector instead. */
         if (session_open_game(session, session->boot_level_path, NULL) &&
             (!continued || session_open_menu(session))) goto fail;
+        /* --continue also picks the stage up at its saved Continue point. */
+        if (continued && session->game) session_apply_resume(session, session->game);
     } else if (session_open_menu(session)) goto fail;
     if (config && config->experiment_path && (!session->game || game_experiment_load(session->game, config->experiment_path))) goto fail;
     return session;
@@ -459,6 +551,7 @@ static void session_step(AppSession *session, int callback_owned)
                 TraceLog(LOG_WARNING, "Profile: result for %s was not recorded (profile full or values out of range)",
                          game->profile_level_key);
         }
+        session_track_resume(session, game, 0);
         session_apply_game_route(session);
     } else session_end(session, 1);
     if (!session->ended) session_apply_preferences(session);

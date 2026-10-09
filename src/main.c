@@ -132,7 +132,7 @@ int main(int argc, char **argv)
                  "  --debug --seed N --smoke-test-frames N --replay-script NAME\n"
                  "  --replay-dir DIR  read replay scripts from DIR (default out/replays-smoke)\n"
                  "F1: settings (menu: gamepad Y; gameplay: Back).\n"
-                 "Continue opens the last stage, not a mid-level save.\n"
+                 "--continue resumes the last stage at its saved Continue point.\n"
                  "Profiles: OS preference directory on native; localStorage on web.\n"
                  "Smoke/replay never reads or writes personal profiles.");
             return EXIT_SUCCESS;

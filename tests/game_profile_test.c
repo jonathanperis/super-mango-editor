@@ -1,10 +1,14 @@
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "collectibles/coin.h"  /* MAX_COINS */
 #include "core/app_session.h"
+#include "core/game_checkpoint.h"
 #include "core/game_experiment.h"
+#include "core/game_overlay.h"
+#include "core/game_resume.h"
 #include "core/game_profile.h"
 #include "shared/platform.h"  /* clock_millis, preference_path_at */
 #include "shared/serializer_io.h"
@@ -76,7 +80,7 @@ static int codec_and_storage(void)
     CHECK(game_settings_has_unavailable_binding(&decoded->settings));
     CHECK(input_key_from_binding(261)==KEY_NULL && input_pad_button(16)==0);
     CHECK(decoded->levels[0].best_score==150 && decoded->levels[0].best_coins==3 && decoded->levels[0].best_time==10);
-    const char *bad[] = {"format_version=2\n", "format_version=1\nmuted=2\n", "format_version=1\ndead_zone=30000\n",
+    const char *bad[] = {"format_version=3\n", "format_version=0\n", "format_version=1\nmuted=2\n", "format_version=1\ndead_zone=30000\n",
         "format_version=1\nkeys=[4,4,26,22,44,225]\n", "format_version=1\nwindow_scale=nan\n",
         "format_version=1\nunknown=1\n", "format_version=1\nlast_level=\"levels/a\\u0000.toml\"\n"};
     for (size_t i=0;i<sizeof(bad)/sizeof(bad[0]);i++) {
@@ -217,6 +221,115 @@ static int legacy_level_keys_are_dropped(void)
 fail:
     if (profile) game_profile_close(profile);
     free(profile); free(decoded); remove(path); remove(lock_path);
+    return 1;
+}
+
+/*
+ * Format version 2 adds the optional [resume] table (the Continue point).
+ * It must survive encode/decode bit for bit, a version-1 profile must still
+ * load (with no Continue point) and be written back as version 2, and every
+ * malformed [resume] must reject the whole file like any other damage.
+ */
+static int resume_codec_and_migration(void)
+{
+    static const char version1[] =
+        "format_version = 1\nmuted = 1\n"
+        "[[levels]]\npath = \"levels/kept.toml\"\nscore = 7\ncoins = 2\ntime = 4\n";
+    static const char resume_head[] = "format_version = 2\n[resume]\npath = \"levels/a.toml\"\n";
+    /* One valid [resume] body; each bad case below changes one line. */
+    static const char *const fields[] = {
+        "level_hash = \"00000000deadbeef\"\n", "coins = \"0000000000000005\"\n", "checkpoint = -1\n",
+        "legacy_screen = 2\n", "score = 120\n", "level_score_start = 20\n", "score_life_next = 300\n",
+        "lives = 2\n", "respawn_x = 812.5\n", "respawn_y = 252\n", "elapsed = 41.25\n"};
+    enum { FIELD_COUNT = sizeof(fields) / sizeof(fields[0]) };
+    static const struct { int field; const char *line; } bad[] = {
+        {0, "level_hash = \"00000000DEADBEEF\"\n"},  /* uppercase */
+        {0, "level_hash = \"deadbeef\"\n"},          /* too short */
+        {0, "level_hash = 7\n"},                     /* not a string */
+        {1, "coins = \"zz00000000000005\"\n"},
+        {2, "checkpoint = -2\n"},
+        {2, "checkpoint = 99\n"},                    /* MAX_CHECKPOINTS is 99 */
+        {4, "score = -1\n"},
+        {5, "level_score_start = 121\n"},            /* more than the score */
+        {7, "lives = -1\n"},
+        {8, "respawn_x = nan\n"},
+        {10, "elapsed = -1.0\n"},
+        {10, "elapsed = 41.25\nextra = 1\n"},        /* unknown key */
+        {10, ""},                                    /* missing field */
+    };
+    GameProfileData *decoded = calloc(1, sizeof(*decoded));
+    GameProfile *profile = calloc(1, sizeof(*profile));
+    char *text = malloc(PROFILE_TEXT_MAX), *again = malloc(PROFILE_TEXT_MAX);
+    char build[2048];
+    CHECK(decoded && profile && text && again);
+
+    /* Version 1 loads with no Continue point and is written as version 2. */
+    CHECK(game_profile_decode(decoded, version1) == 0);
+    CHECK(!decoded->resume.path[0] && decoded->count == 1 && decoded->settings.muted == 1);
+    CHECK(game_profile_encode(decoded, text, PROFILE_TEXT_MAX) == 0);
+    CHECK(!strncmp(text, "format_version = 2\n", 19) && !strstr(text, "[resume]"));
+
+    /* A full [resume] round-trips exactly. */
+    size_t used = (size_t)snprintf(build, sizeof(build), "%s", resume_head);
+    for (int i = 0; i < FIELD_COUNT; i++) used += (size_t)snprintf(build + used, sizeof(build) - used, "%s", fields[i]);
+    CHECK(game_profile_decode(decoded, build) == 0);
+    const GameResume *r = &decoded->resume;
+    CHECK(!strcmp(r->path, "levels/a.toml") && r->level_hash == 0xdeadbeefu && r->coins == 5);
+    CHECK(r->checkpoint == -1 && r->legacy_screen == 2 && r->score == 120 && r->level_score_start == 20);
+    CHECK(r->score_life_next == 300 && r->lives == 2 && r->respawn_x == 812.5f && r->respawn_y == 252.0f);
+    CHECK(r->elapsed == 41.25f);
+    decoded->resume.level_hash = 0xfedcba9876543210ull;  /* top bit set: why it is a string */
+    decoded->resume.coins = 0x8000000000000001ull;      /* coins 0 and 63 */
+    CHECK(game_profile_encode(decoded, text, PROFILE_TEXT_MAX) == 0);
+    CHECK(strstr(text, "level_hash = \"fedcba9876543210\"") && strstr(text, "coins = \"8000000000000001\""));
+    CHECK(game_profile_decode(decoded, text) == 0);
+    CHECK(game_profile_encode(decoded, again, PROFILE_TEXT_MAX) == 0 && !strcmp(text, again));
+    CHECK(decoded->resume.level_hash == 0xfedcba9876543210ull && decoded->resume.coins == 0x8000000000000001ull);
+
+    /* The fuzz seed for this table must itself be a valid profile, or the
+     * fuzzer would only ever explore the rejection path from it. */
+    {
+        FILE *seed = fopen("tests/fuzz/corpus/profile/resume.toml", "rb");
+        CHECK(seed);
+        size_t size = fread(text, 1, PROFILE_TEXT_MAX - 1, seed);
+        fclose(seed);
+        text[size] = '\0';
+        CHECK(game_profile_decode(decoded, text) == 0 && decoded->resume.legacy_screen == 3);
+    }
+
+    /* [resume] in a version-1 file is damage: version 1 never had one. */
+    build[strlen("format_version = ")] = '1';
+    CHECK(game_profile_decode(decoded, build) == -1);
+
+    for (size_t b = 0; b < sizeof(bad) / sizeof(bad[0]); b++) {
+        used = (size_t)snprintf(build, sizeof(build), "%s", resume_head);
+        for (int i = 0; i < FIELD_COUNT; i++)
+            used += (size_t)snprintf(build + used, sizeof(build) - used, "%s",
+                                     i == bad[b].field ? bad[b].line : fields[i]);
+        if (game_profile_decode(decoded, build) != -1) {
+            fprintf(stderr, "profile test: accepted bad [resume] case %zu\n", b);
+            goto fail;
+        }
+    }
+
+    /* Recording: a changed point marks the profile; the same one does not. */
+    game_profile_init(profile);
+    GameResume point = {.path = "levels/a.toml", .level_hash = 9, .checkpoint = 0, .lives = 3,
+                        .respawn_x = 304, .respawn_y = 252};
+    CHECK(game_profile_set_resume(profile, &point) == 0 && profile->dirty && profile->revision == 1);
+    CHECK(game_profile_set_resume(profile, &point) == 0 && profile->revision == 1);
+    CHECK(game_profile_resume(profile, "levels/a.toml") && !game_profile_resume(profile, "levels/b.toml"));
+    point.lives = -1;
+    CHECK(game_profile_set_resume(profile, &point) == -1 && profile->data.resume.lives == 3);
+    game_profile_clear_resume(profile);
+    CHECK(!profile->data.resume.path[0] && profile->revision == 2);
+    game_profile_clear_resume(profile);
+    CHECK(profile->revision == 2);
+
+    free(decoded); free(profile); free(text); free(again);
+    return 0;
+fail:
+    free(decoded); free(profile); free(text); free(again);
     return 1;
 }
 
@@ -435,6 +548,115 @@ fail:
     session_destroy(&session); remove(path); remove(lock_path); return 1;
 }
 
+/*
+ * Continue, end to end through the session and a real profile file:
+ * reaching a new respawn point and pausing records a Continue point,
+ * leaving mid-level keeps it on disk, --continue and the menu's Continue
+ * pick the level up there, finishing the level forgets it, and a level
+ * whose bytes changed loses it before the menu can offer it.
+ */
+static int continue_round_trip(void)
+{
+    char path[160], lock_path[176];
+    snprintf(path, sizeof(path), TEST_OUT "profile-continue-%llu.toml", (unsigned long long)clock_millis());
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+    const char *level = "levels/00_sandbox_01.toml";
+    AppSessionConfig config = {.level_path = level, .profile_enabled = 1, .profile_path = path};
+    AppSession *session = session_create(&config);
+    CHECK(session && session->game && !session->game->resumed);
+    GameState *game = session->game;
+    CHECK(!game_profile_resume(&session->profile, level));  /* nothing yet */
+
+    /* Walk into the third screen: the automatic screen checkpoint moves the
+     * respawn point. Collect coin 3 on the way and pause there. */
+    game->player.x = 2.0f * GAME_W + 50.0f;
+    game_checkpoint_update(game);
+    float respawn_x = game->respawn_x;
+    CHECK(respawn_x > 80.0f && game->legacy_checkpoint_screen == 2);
+    game->coins[3].active = 0;
+    game->score = 30;
+    game->lives = 2;
+    game->completion.level_elapsed = 12.5f;
+    game_overlay_set_pause_reason(game, GAME_PAUSE_REASON_PLAYER, 1);
+    session_frame(session);
+    const GameResume *saved = game_profile_resume(&session->profile, level);
+    CHECK(saved && saved->respawn_x == respawn_x && saved->legacy_screen == 2);
+    CHECK(saved->coins == (1u << 3) && saved->score == 30 && saved->lives == 2);
+    CHECK(saved->level_hash == game->source_level_hash && saved->elapsed >= 12.5f);
+
+    /* Leave part-way: the point is written to disk with the profile. */
+    game->score = 40;  /* changed since the pause: Exit records it again */
+    game->route = GAME_ROUTE_EXIT;
+    session_frame(session);
+    CHECK(session->ended);
+    session_destroy(&session);
+
+    /* --continue resumes there: respawn, score, lives, coins, camera. */
+    config.level_path = NULL;
+    config.continue_last = 1;
+    session = session_create(&config);
+    CHECK(session && session->game && session->game->resumed);
+    game = session->game;
+    CHECK(game->respawn_x == respawn_x && game->score == 40 && game->lives == 2);
+    CHECK(!game->coins[3].active && game->coins[2].active && game->completion.level_elapsed >= 12.5f);
+    CHECK(fabsf(game->player.x - (respawn_x + (TILE_SIZE - game->player.w) / 2.0f)) < 0.01f);
+    CHECK(game->camera.x > 0.0f);  /* snapped to the respawn, not panning from 0 */
+
+    /* Finishing the level forgets the point. */
+    game_complete_level(game);
+    session_frame(session);
+    CHECK(!game_profile_resume(&session->profile, level));
+    session_destroy(&session);
+
+    /* Level Select part-way also keeps a point, and the menu then offers
+     * Continue (C key) beside Play for that level. */
+    config.continue_last = 0;
+    config.level_path = level;
+    session = session_create(&config);
+    CHECK(session && session->game);
+    session->game->route = GAME_ROUTE_LEVEL_SELECT;
+    session_frame(session);
+    CHECK(session->menu && session->screen == APP_SCREEN_MENU);
+    saved = game_profile_resume(&session->profile, level);
+    CHECK(saved && saved->score == 0 && saved->checkpoint == -1);
+    GameResume point = *saved;
+    point.score = 55;  /* tell this point apart from a fresh start */
+    CHECK(game_profile_set_resume(&session->profile, &point) == 0);
+    CHECK(!strcmp(session->menu->selected_level_path, level) && start_menu_can_continue(session->menu));
+    input_clear();
+    session->menu->confirm_release_required = 0;
+    InputEvent continue_key = {.type = INPUT_KEY_DOWN, .key = KEY_C};
+    input_push(&continue_key);
+    session_frame(session);
+    CHECK(session->game && session->game->resumed && session->game->score == 55);
+    session->game->route = GAME_ROUTE_LEVEL_SELECT;
+    session_frame(session);
+    CHECK(session->menu);
+    session_destroy(&session);
+
+    /* A stale hash (the level was edited since) is dropped on menu open. */
+    config.level_path = level;
+    session = session_create(&config);
+    CHECK(session && session->game);
+    game_resume_capture(session->game, &point);
+    point.level_hash ^= 1;
+    CHECK(game_profile_set_resume(&session->profile, &point) == 0);
+    session_destroy(&session);  /* native teardown saves the dirty profile */
+    config.level_path = NULL;
+    session = session_create(&config);
+    CHECK(session && session->menu && !game_profile_resume(&session->profile, level));
+    CHECK(!start_menu_can_continue(session->menu));
+    session_destroy(&session);
+    remove(path);
+    remove(lock_path);
+    return 0;
+fail:
+    session_destroy(&session);
+    remove(path);
+    remove(lock_path);
+    return 1;
+}
+
 /* Collect raylib warnings so a test can see what the session logged. */
 static char last_warning[256];
 static void capture_warning(int level, const char *text, va_list args)
@@ -486,6 +708,8 @@ int game_profile_contract_test(void)
     puts("profile: codec/storage");
     if (codec_and_storage()) return 1;
     if (legacy_level_keys_are_dropped()) return 1;
+    puts("profile: resume codec/migration");
+    if (resume_codec_and_migration()) return 1;
     if (level_key_boundaries()) return 1;
     if (pending_snapshot_bookkeeping()) return 1;
     if (result_cap_and_record_failure()) return 1;
@@ -493,6 +717,8 @@ int game_profile_contract_test(void)
     if (settings_and_bindings()) return 1;
     puts("profile: session integration");
     if (persistent_session()) return 1;
+    puts("profile: continue round trip");
+    if (continue_round_trip()) return 1;
     puts("game_profile_contract_test: ok");
     return 0;
 }

@@ -30,7 +30,8 @@ src/
 │   └── game_collision.h / .c     Gameplay collision passes and pickups
 ├── core/
 │   ├── app_session.h / .c        Heap-owned session: window/audio lifetime, menu/game routes, in-place replay
-│   ├── game_profile.h / .c       Versioned player settings/results and native/web persistence
+│   ├── game_profile.h / .c       Versioned player settings/results/Continue point and native/web persistence
+│   ├── game_resume.h / .c        Capture a running level as a Continue point and resume it
 │   ├── game_inspector.h / .c     Simulation stepping, slow motion, tuning, status panel and F5 key help
 │   ├── game_experiment.h / .c    Bounded capture/export/replay with level fingerprints
 │   ├── game_random.h / .c        Reproducible unsigned PRNG for native/WASM
@@ -365,6 +366,10 @@ Frees all resources in reverse init order.
 
 Resolves respawn state without mutating `LevelDef`. With authored records, the greatest crossed x coordinate becomes `GameState.respawn_x` / `respawn_y` before lethal collisions run. With no records, the legacy automatic screen-boundary checkpoint remains active; it walks left from the screen edge to the first column with solid floor and no static hazard, keeping the previous checkpoint when none is safe.
 
+### `core/game_resume.h` / `core/game_resume.c`
+
+Bridges gameplay and the profile's one Continue point (`GameResume`, defined in `game_profile.h`). `game_resume_capture` copies the profile key, the level's content hash (`GameState.source_level_hash`), respawn point, checkpoint index, score, lives, collected coins (one bit per coin) and level timer out of a running `GameState`. `game_resume_apply` refuses a point for another level, another version of the file, or a checkpoint, coin or position the level does not have; otherwise it restores those values and calls `reset_current_level`, the same reset a lost life uses, so the camera snaps there and enemies restart. `AppSession` decides when to record (new respawn point, pause, leaving part-way) and clear (level finished or lost) it.
+
 ---
 
 ## `screens/start_menu.h` / `screens/start_menu.c`
@@ -379,7 +384,7 @@ Builds the single valid terminal-action list used by both rendering and input. C
 
 ### `core/app_session.h` / `core/app_session.c`
 
-Owns one heap-allocated application session and its active menu or game screen. Without `--level`, it loads and retains the validated v1 campaign catalog; the menu uses the catalog's names and ordered paths. A direct `--level` session bypasses the catalog. The session consumes explicit game routes after each rendered frame: next level stays in the current game; replay replaces the game with the same TOML path in place (native and browser alike); level select returns to the menu.
+Owns one heap-allocated application session and its active menu or game screen. Without `--level`, it loads and retains the validated v1 campaign catalog; the menu uses the catalog's names and ordered paths. A direct `--level` session bypasses the catalog. The session consumes explicit game routes after each rendered frame: next level stays in the current game; replay replaces the game with the same TOML path in place (native and browser alike); level select returns to the menu. It also keeps the profile's Continue point current (`session_track_resume`), drops one whose level file changed before the menu opens, and applies it for the menu's **Continue** and for `--continue`.
 
 ---
 

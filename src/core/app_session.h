@@ -92,6 +92,10 @@ typedef struct AppSession {
     char replay_dir[256];
     char boot_level_path[GAME_LEVEL_PATH_MAX];
     unsigned int random_seed;
+    /* Continue-point bookkeeping: the respawn point and pause state seen at
+     * the last check, so a new point is recorded only when one changes. */
+    float resume_respawn_x, resume_respawn_y;
+    int resume_was_paused;
 } AppSession;
 
 /* Heap-allocate a session and its initial menu or game screen. */
