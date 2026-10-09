@@ -294,7 +294,12 @@ static int add_items(EditorState *es, const EditorClipboardItem *items, int coun
     int added_count = 0;
     int group;
 
-    group = undo_group_begin(es->undo);
+    /* One entry per copy; without room for them, add nothing. */
+    group = undo_group_begin(es->undo, count);
+    if (group == 0) {
+        editor_set_status(es, "%s cancelled: cannot allocate undo history", title);
+        return 0;
+    }
     for (int pass = 0; pass < 2; pass++) {
         for (int i = 0; i < count; i++) {
             const EditorClipboardItem *item = &items[i];

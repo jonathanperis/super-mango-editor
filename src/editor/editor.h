@@ -88,6 +88,10 @@
  * struct small enough to sit on a stack.
  */
 #define EDITOR_MAX_SELECTION 64
+/* A group action records at most one undo entry per selected entity, and
+ * one undo step holds at most UNDO_GROUP_MAX entries (undo.h). */
+_Static_assert(EDITOR_MAX_SELECTION <= UNDO_GROUP_MAX,
+               "an undo step must fit a whole selection");
 
 typedef struct {
     uint64_t id;
