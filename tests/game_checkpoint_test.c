@@ -198,6 +198,42 @@ static int feedback_save_and_expiry_are_explicit(void)
     return 0;
 }
 
+/*
+ * The banner lives on simulated time. Saving a checkpoint 100 s into play
+ * sets a deadline 1.2 s later on that clock; only simulation steps (ticks)
+ * count it down, so a pause, which runs no steps, cannot use it up however
+ * long it lasts.
+ */
+static int feedback_runs_on_simulated_time(void)
+{
+    GameState gs = {0};
+    LevelDef def;
+
+    level_def_init_defaults(&def);
+    def.checkpoint_count = 1;
+    def.checkpoints[0].x = 200.0f;
+    def.checkpoints[0].y = 90.0f;
+    gs.runtime.current_level = &def;
+    gs.checkpoint_index = -1;
+    gs.sim_time = 100.0;
+    gs.player.x = 250.0f;
+    game_checkpoint_update_authored(&gs);
+    if (expect_int("saved banner", gs.checkpoint_feedback_kind,
+                   CHECKPOINT_FEEDBACK_SAVED) != 0) return 1;
+    if (expect_int("deadline on the simulated clock",
+                   (int)gs.checkpoint_feedback_until, 101200) != 0) return 1;
+
+    /* 71 steps of 1/60 s are 1.183 s: still showing. The 72nd reaches 1.2 s. */
+    for (int step = 0; step < 71; step++)
+        game_checkpoint_feedback_tick(&gs, 1.0f / 60.0f);
+    if (expect_int("banner before 1.2 s of play", gs.checkpoint_feedback_kind,
+                   CHECKPOINT_FEEDBACK_SAVED) != 0) return 1;
+    game_checkpoint_feedback_tick(&gs, 1.0f / 60.0f);
+    if (expect_int("banner after 1.2 s of play", gs.checkpoint_feedback_kind,
+                   CHECKPOINT_FEEDBACK_NONE) != 0) return 1;
+    return 0;
+}
+
 int main(void)
 {
     if (authored_checkpoints_advance_by_highest_x() != 0) return 1;
@@ -206,6 +242,7 @@ int main(void)
     if (legacy_checkpoints_keep_screen_boundary_behavior() != 0) return 1;
     if (legacy_checkpoints_skip_gaps_and_hazards_at_screen_edge() != 0) return 1;
     if (feedback_save_and_expiry_are_explicit() != 0) return 1;
+    if (feedback_runs_on_simulated_time() != 0) return 1;
     puts("game_checkpoint_test: ok");
     return 0;
 }
