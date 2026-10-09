@@ -711,6 +711,13 @@ int editor_selection_is_valid(const EditorState *es)
            es->selection.index;
 }
 
+int editor_selection_items(const EditorState *es, Selection *out, int max)
+{
+    if (!es || !out || max <= 0 || !editor_selection_is_valid(es)) return 0;
+    out[0] = es->selection;
+    return 1;
+}
+
 void editor_selection_reconcile(EditorState *es)
 {
     if (!es) return;

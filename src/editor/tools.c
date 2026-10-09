@@ -1105,6 +1105,100 @@ void tools_cancel_drag(EditorState *es)
 }
 
 /* ------------------------------------------------------------------ */
+/* tools_nudge_selection                                               */
+/* ------------------------------------------------------------------ */
+
+/* The most entities one group action handles at once. */
+#define TOOLS_MAX_GROUP 256
+
+/* A fingerprint of which entities a list names, so a run of nudges is
+ * only merged while it keeps moving the same ones (FNV-1a over the list). */
+static uint64_t selection_key(const Selection *items, int count)
+{
+    uint64_t hash = UINT64_C(1469598103934665603);
+    for (int i = 0; i < count; i++) {
+        int pair[2] = {(int)items[i].type, items[i].index};
+        const unsigned char *bytes = (const unsigned char *)pair;
+        for (size_t b = 0; b < sizeof(pair); b++) {
+            hash ^= bytes[b];
+            hash *= UINT64_C(1099511628211);
+        }
+    }
+    return hash;
+}
+
+void tools_nudge_selection(EditorState *es, float dx, float dy)
+{
+    static Selection items[TOOLS_MAX_GROUP];
+    static PlacementData before[TOOLS_MAX_GROUP];
+    static PlacementData after[TOOLS_MAX_GROUP];
+    char error[128];
+    int count;
+    int changed = 0;
+    uint32_t now;
+    uint64_t key;
+    int merge;
+
+    if (!es || !tools_can_hit_test(es)) return;
+    editor_selection_reconcile(es);
+    count = editor_selection_items(es, items, TOOLS_MAX_GROUP);
+    if (count == 0) return;
+
+    /* Move every selected entity, exactly as a drag by (dx, dy) would. */
+    for (int i = 0; i < count; i++) {
+        before[i] = editor_snapshot_entity(&es->level, items[i].type, items[i].index);
+        after[i] = move_placement(items[i].type, &before[i], dx, dy);
+        editor_clamp_placement(&es->level, items[i].type, &after[i]);
+        (void)editor_entity_write(&es->level, items[i].type, items[i].index, &after[i]);
+        if (memcmp(&before[i], &after[i], sizeof(after[i])) != 0) changed++;
+    }
+    if (level_validate_runtime(&es->level, error, sizeof(error)) != 0) {
+        for (int i = 0; i < count; i++)
+            (void)editor_entity_write(&es->level, items[i].type, items[i].index, &before[i]);
+        editor_set_status(es, "Cannot move here: %s", error);
+        return;
+    }
+    if (changed == 0) {
+        editor_set_status(es, "Nothing moved: the selection cannot go further that way");
+        return;
+    }
+
+    /*
+     * Record the move.  Holding an arrow key sends a stream of nudges; one
+     * undo step per pixel would bury everything else in the history.  So
+     * a nudge of the same entities soon after the last one, with nothing
+     * else recorded in between, extends that step's "after" instead.
+     */
+    now = (uint32_t)clock_millis();
+    key = selection_key(items, count);
+    merge = es->nudge_group != 0 &&
+            undo_top_group(es->undo) == es->nudge_group &&
+            now - es->nudge_ms < NUDGE_COALESCE_MS &&
+            key == es->nudge_selection_key;
+    if (!merge) {
+        es->nudge_group = undo_group_begin(es->undo);
+        undo_group_end(es->undo);
+    }
+    for (int i = 0; i < count; i++) {
+        Command cmd;
+        if (memcmp(&before[i], &after[i], sizeof(after[i])) == 0) continue;
+        if (merge && undo_amend_after(es->undo, es->nudge_group, (int)items[i].type,
+                                      items[i].index, &after[i])) continue;
+        memset(&cmd, 0, sizeof(cmd));
+        cmd.type = CMD_MOVE;
+        cmd.entity_type = (int)items[i].type;
+        cmd.entity_index = items[i].index;
+        cmd.group = es->nudge_group;
+        cmd.before = before[i];
+        cmd.after = after[i];
+        undo_push(es->undo, &cmd);
+    }
+    es->nudge_ms = now;
+    es->nudge_selection_key = key;
+    editor_refresh_dirty(es);
+}
+
+/* ------------------------------------------------------------------ */
 /* tools_right_click                                                   */
 /* ------------------------------------------------------------------ */
 

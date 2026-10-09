@@ -13,6 +13,12 @@
  * is full the oldest command is silently dropped -- the user loses the ability
  * to undo that ancient action but nothing else breaks.
  *
+ * Groups: one user action can change several entities (moving or deleting a
+ * multi-selection, pasting a group).  Each entity still gets its own entry,
+ * but entries pushed between undo_group_begin and undo_group_end share a
+ * group number, and the editor undoes or redoes a whole group in one step.
+ * Group 0 means "a step of its own".
+ *
  * Usage:
  *   UndoStack *undo = undo_create();
  *   undo_push(undo, &cmd);          // after every editor action
@@ -183,6 +189,7 @@ typedef struct {
     CommandType   type;
     int           entity_type;    /* EntityType enum value from the editor */
     int           entity_index;
+    int           group;          /* 0, or the step this entry belongs to */
     PlacementData before;
     PlacementData after;
     int           property_field;
@@ -214,6 +221,7 @@ typedef struct {
 typedef struct {
     CommandType type;
     int entity_type, entity_index;
+    int group;                   /* see "Groups" at the top of this file */
     PlacementData before, after;
     int property_field;
     char property_text_before[256], property_text_after[256];
@@ -225,6 +233,8 @@ typedef struct UndoStack {
     int     top;
     UndoEntry redo_stack[UNDO_MAX];
     int     redo_top;
+    int     open_group;   /* group stamped on pushes, 0 when none is open */
+    int     last_group;   /* the last group number handed out             */
 } UndoStack;
 
 /* ------------------------------------------------------------------ */
@@ -282,6 +292,28 @@ int undo_pop(UndoStack *stack, Command *out);
  * On failure (empty stack): returns 0 and leaves *out untouched.
  */
 int redo_pop(UndoStack *stack, Command *out);
+
+/*
+ * undo_group_begin / undo_group_end --- Bracket the pushes of one action
+ * that touches several entities.  Every command pushed in between (whose
+ * own group is 0) gets the same new group number, which begin returns.
+ */
+int undo_group_begin(UndoStack *stack);
+void undo_group_end(UndoStack *stack);
+
+/* Group of the entry undo_pop / redo_pop would return next (0 when that
+ * entry stands alone or the stack is empty). */
+int undo_top_group(const UndoStack *stack);
+int redo_top_group(const UndoStack *stack);
+
+/*
+ * undo_amend_after --- Replace the "after" snapshot of the entry for
+ * (entity_type, entity_index) inside `group`, which must be the newest
+ * step on the undo stack.  Used to fold a quick run of arrow-key nudges
+ * into one step.  Returns 1 when such an entry was found.
+ */
+int undo_amend_after(UndoStack *stack, int group, int entity_type,
+                     int entity_index, const PlacementData *after);
 
 /*
  * undo_clear --- Reset both stacks to empty.

@@ -46,6 +46,7 @@
 #include "editor/editor_session.h"
 #include "editor/entity_meta.h"
 #include "editor/file_dialog.h"
+#include "editor/tools.h"
 #include "levels/level_loader.h"
 #include "shared/serializer.h"
 #include "test_paths.h"
@@ -718,6 +719,78 @@ done:
 }
 
 /* ------------------------------------------------------------------ */
+/* Keyboard editing of the selection                                   */
+/* ------------------------------------------------------------------ */
+
+/* Place a coin at screen (sx, sy) with the Place tool, then select it. */
+static int place_and_select_coin(EditorState *es, int sx, int sy)
+{
+    int before = es->level.coin_count;
+    es->palette_type = ENT_COIN;
+    es->tool = TOOL_PLACE;
+    ui_frame(es, sx, sy);
+    click_frame(es, sx, sy);
+    es->tool = TOOL_SELECT;
+    click_frame(es, sx, sy);
+    return es->level.coin_count == before + 1 && es->selection.type == ENT_COIN ? 0 : -1;
+}
+
+/*
+ * Arrow keys nudge the selection (1 px, Shift = 16 px).  A quick run of
+ * nudges is one undo step; a pause starts a new one.  Backspace deletes
+ * the selection like Delete (Mac laptops have no Delete key).
+ */
+static int arrow_keys_nudge_and_backspace_deletes(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(place_and_select_coin(&es, 300, 300) == 0);
+    const int coin = es.selection.index;
+    const float x0 = es.level.coins[coin].x, y0 = es.level.coins[coin].y;
+    const int undo_top = es.undo->top;
+
+    key_frame(&es, KEY_RIGHT, 0);
+    key_frame(&es, KEY_RIGHT, 0);
+    key_frame(&es, KEY_RIGHT, 0);
+    key_frame(&es, KEY_DOWN, INPUT_SHIFT);
+    CHECK(es.level.coins[coin].x == x0 + 3.0f && es.level.coins[coin].y == y0 + 16.0f);
+    CHECK(es.undo->top == undo_top + 1);          /* one step for the run */
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coins[coin].x == x0 && es.level.coins[coin].y == y0);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(es.level.coins[coin].x == x0 + 3.0f && es.level.coins[coin].y == y0 + 16.0f);
+
+    /* After a pause, the next nudge is a step of its own. */
+    es.nudge_ms -= 2 * NUDGE_COALESCE_MS;
+    key_frame(&es, KEY_LEFT, INPUT_SHIFT);
+    key_frame(&es, KEY_UP, 0);
+    CHECK(es.level.coins[coin].x == x0 + 3.0f - 16.0f && es.level.coins[coin].y == y0 + 15.0f);
+    CHECK(es.undo->top == undo_top + 2);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coins[coin].x == x0 + 3.0f && es.level.coins[coin].y == y0 + 16.0f);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coins[coin].x == x0 && es.level.coins[coin].y == y0);
+
+    /* A nudge never leaves the world: at the left edge nothing moves. */
+    es.level.coins[coin].x = 0.0f;
+    key_frame(&es, KEY_LEFT, 0);
+    CHECK(es.level.coins[coin].x == 0.0f && strstr(es.status_message, "Nothing moved"));
+    es.level.coins[coin].x = x0;
+
+    /* Backspace deletes the selection; undo brings it back. */
+    const int coins = es.level.coin_count;
+    key_frame(&es, KEY_BACKSPACE, 0);
+    CHECK(es.level.coin_count == coins - 1 && es.selection.index < 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == coins);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/* ------------------------------------------------------------------ */
 /* Text editing: caret keys and Tab                                    */
 /* ------------------------------------------------------------------ */
 
@@ -1008,6 +1081,7 @@ int main(void)
         CASE(properties_panel_handles_every_entity_type),
         CASE(level_config_sections_resize_the_panel),
         CASE(text_fields_move_the_caret_and_tab_between_fields),
+        CASE(arrow_keys_nudge_and_backspace_deletes),
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),
         CASE(native_pickers_report_choice_cancel_and_failure),
