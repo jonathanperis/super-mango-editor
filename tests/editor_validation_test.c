@@ -2360,6 +2360,79 @@ static int validation_errors_report_where_they_are(void)
     return 0;
 }
 
+/*
+ * A rail copied together with the spike block riding it pastes as a new
+ * rail with the copy riding the NEW rail; deleting the pair is one undo
+ * step even though the rail must go after its rider.
+ */
+static int group_copy_and_delete_keep_riders_with_their_rail(void)
+{
+    EditorState es = {0};
+    LevelDef original;
+    Command cmd;
+    int group;
+
+    editor_level_init_defaults(&es.level);
+    es.level.rail_count = 2;
+    es.level.rails[0] = (RailPlacement){RAIL_LAYOUT_RECT, 32, 32, 4, 4, 0};
+    es.level.rails[1] = (RailPlacement){RAIL_LAYOUT_RECT, 400, 32, 4, 4, 0};
+    es.level.spike_block_count = 1;
+    es.level.spike_blocks[0] = (SpikeBlockPlacement){1, 1.0f, 3.0f};
+    es.undo = undo_create();
+    if (!es.undo || level_is_valid("group rail base", &es.level) != 0) goto fail;
+    original = es.level;
+    editor_set_document_save_point(&es);
+
+    (void)editor_select_items(&es, (Selection[]){{ENT_SPIKE_BLOCK, 0}, {ENT_RAIL, 1}}, 2);
+    editor_copy_selected(&es);
+    editor_paste_clipboard(&es);
+    if (expect_int("pasted rail", es.level.rail_count, 3) != 0 ||
+        expect_int("pasted rider", es.level.spike_block_count, 2) != 0 ||
+        expect_int("copy rides the copied rail", es.level.spike_blocks[1].rail_index, 2) != 0 ||
+        expect_int("original keeps its rail", es.level.spike_blocks[0].rail_index, 1) != 0 ||
+        expect_int("both copies selected", editor_selection_count(&es), 2) != 0 ||
+        level_is_valid("after group paste", &es.level) != 0) goto fail;
+
+    /* Undo the paste as one step (the editor pops a whole group). */
+    group = undo_top_group(es.undo);
+    while (undo_top_group(es.undo) == group && group != 0 && undo_pop(es.undo, &cmd))
+        editor_apply_undo_command(&es, &cmd, 1);
+    /* (The hash covers what is in use; removed slots may keep old bytes.) */
+    if (expect_int("paste undone",
+                   editor_document_hash(&es.level) == editor_document_hash(&original), 1) != 0)
+        goto fail;
+
+    /* Delete the rail together with its rider: allowed, and one step. */
+    (void)editor_select_items(&es, (Selection[]){{ENT_RAIL, 1}, {ENT_SPIKE_BLOCK, 0}}, 2);
+    tools_delete_selected(&es);
+    if (expect_int("pair deleted rails", es.level.rail_count, 1) != 0 ||
+        expect_int("pair deleted riders", es.level.spike_block_count, 0) != 0) goto fail;
+    group = undo_top_group(es.undo);
+    while (undo_top_group(es.undo) == group && group != 0 && undo_pop(es.undo, &cmd))
+        editor_apply_undo_command(&es, &cmd, 1);
+    if (expect_int("delete undone exactly",
+                   editor_document_hash(&es.level) == editor_document_hash(&original), 1) != 0)
+        goto fail;
+
+    /* A group paste that cannot complete adds nothing at all. */
+    es.level.coin_count = MAX_COINS - 1;
+    for (int i = 0; i < MAX_COINS - 1; i++) es.level.coins[i] = (CoinPlacement){10.0f, 10.0f};
+    (void)editor_select_items(&es, (Selection[]){{ENT_COIN, 0}, {ENT_COIN, 1}}, 2);
+    editor_copy_selected(&es);
+    {
+        int top = es.undo->top;
+        editor_paste_clipboard(&es);
+        if (expect_int("all or nothing", es.level.coin_count, MAX_COINS - 1) != 0 ||
+            expect_int("no history left", es.undo->top, top) != 0 ||
+            expect_int("nothing to redo", es.undo->redo_top, 0) != 0) goto fail;
+    }
+    undo_destroy(es.undo);
+    return 0;
+fail:
+    undo_destroy(es.undo);
+    return 1;
+}
+
 static int rail_deletion_keeps_references_valid(void)
 {
     EditorState es = {0};
@@ -2712,12 +2785,14 @@ static int refused_mutations_explain_why(void)
 
     /* A clipboard from another level cannot ride a rail this level lacks:
      * the copy remembers its rail's shape, and no rail here matches it. */
-    es.has_clipboard = 1;
-    es.clipboard_type = ENT_SPIKE_BLOCK;
-    memset(&es.clipboard_data, 0, sizeof(es.clipboard_data));
-    es.clipboard_data.spike_block = (SpikeBlockPlacement){2, 0.0f, 3.0f};
-    es.clipboard_has_rail = 1;
-    es.clipboard_rail = (RailPlacement){RAIL_LAYOUT_HORIZ, 200, 80, 6, 1, 1};
+    es.clipboard_count = 1;
+    memset(&es.clipboard[0], 0, sizeof(es.clipboard[0]));
+    es.clipboard[0].type = ENT_SPIKE_BLOCK;
+    es.clipboard[0].data.spike_block = (SpikeBlockPlacement){2, 0.0f, 3.0f};
+    es.clipboard[0].rail_index = -1;     /* copied in another document */
+    es.clipboard[0].rail_item = -1;
+    es.clipboard[0].has_rail = 1;
+    es.clipboard[0].rail = (RailPlacement){RAIL_LAYOUT_HORIZ, 200, 80, 6, 1, 1};
     es.level.rail_count = 1;
     es.level.rails[0] = (RailPlacement){RAIL_LAYOUT_RECT, 32, 32, 4, 4, 0};
     editor_paste_clipboard(&es);
@@ -2728,8 +2803,8 @@ static int refused_mutations_explain_why(void)
 
     /* The same copy re-attaches by rail shape, whatever index it had: the
      * stored index 2 becomes 0, where the matching rail lives here. */
-    es.clipboard_rail = es.level.rails[0];
-    es.clipboard_data.spike_block = (SpikeBlockPlacement){2, 11.5f, 3.0f};
+    es.clipboard[0].rail = es.level.rails[0];
+    es.clipboard[0].data.spike_block = (SpikeBlockPlacement){2, 11.5f, 3.0f};
     /* A t_offset past the end of a loop also wraps onto the rail. */
     editor_paste_clipboard(&es);
     if (expect_int("wrapped paste count", es.level.spike_block_count, 1) != 0 ||
@@ -2865,9 +2940,9 @@ static int playtest_blocks_editing_and_stop_cleans_up(void)
     event.type = INPUT_KEY_DOWN;
     event.key = KEY_V;
     event.mods = INPUT_CTRL;
-    es.has_clipboard = 1;
-    es.clipboard_type = ENT_COIN;
-    es.clipboard_data.coin = (CoinPlacement){50.0f, 50.0f};
+    es.clipboard_count = 1;
+    es.clipboard[0].type = ENT_COIN;
+    es.clipboard[0].data.coin = (CoinPlacement){50.0f, 50.0f};
     editor_handle_event(&es, &event);
     if (expect_int("no paste while playing", es.level.coin_count, 0) != 0 ||
         expect_prefix("playing status", es.status_message, "Playtest running") != 0)
@@ -4746,6 +4821,7 @@ int main(void)
     if (selection_structural_mutations_are_safe() != 0) return 1;
     if (checkpoint_editor_mutations_are_reversible() != 0) return 1;
     if (rail_deletion_keeps_references_valid() != 0) return 1;
+    if (group_copy_and_delete_keep_riders_with_their_rail() != 0) return 1;
     if (shared_level_rules_have_one_answer() != 0) return 1;
     if (validation_errors_report_where_they_are() != 0) return 1;
     if (float_platform_rail_switch_rechecks_its_rail() != 0) return 1;

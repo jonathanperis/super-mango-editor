@@ -9,6 +9,7 @@
 #include "editor_session.h" /* editor_set_status */
 #include "entity_meta.h" /* central selection validity and entity storage */
 #include "tools.h"       /* editor_clamp_placement, editor_add_placement */
+#include "editor_undo_apply.h" /* editor_apply_undo_command (group rollback) */
 
 /* How far a pasted copy moves so it does not hide the original (see
  * offset_pasted_copy for which way each type moves). */
@@ -33,47 +34,102 @@ static int same_rail(const RailPlacement *a, const RailPlacement *b)
 }
 
 /*
- * editor_copy_selected — Snapshot the currently selected entity into the clipboard.
+ * fill_item — Snapshot one entity of this level into a clipboard item,
+ * remembering the rail it rides (or, for a rail, which rail it is) both by
+ * position and by shape (see EditorClipboardItem in editor.h).
+ */
+static void fill_item(const LevelDef *level, Selection which,
+                      EditorClipboardItem *item)
+{
+    int *rail_index;
+
+    item->type = which.type;
+    item->data = editor_snapshot_entity(level, which.type, which.index);
+    item->rail_index = -1;
+    item->has_rail = 0;
+    item->rail_item = -1;
+    if (which.type == ENT_RAIL) {
+        item->rail_index = which.index;
+        return;
+    }
+    rail_index = rider_rail_index(which.type, &item->data);
+    if (rail_index && *rail_index >= 0 && *rail_index < level->rail_count) {
+        item->rail_index = *rail_index;
+        item->has_rail = 1;
+        item->rail = level->rails[*rail_index];
+    }
+}
+
+/*
+ * fill_items — Snapshot the selection into items[] and link each rider to
+ * the slot of its rail when that rail is part of the selection too, so a
+ * pasted rider rides the pasted rail rather than the original.
+ */
+static int fill_items(EditorState *es, EditorClipboardItem *items)
+{
+    static Selection selected[EDITOR_MAX_SELECTION];
+    int count;
+
+    editor_selection_reconcile(es);
+    count = editor_selection_items(es, selected, EDITOR_MAX_SELECTION);
+    for (int i = 0; i < count; i++) fill_item(&es->level, selected[i], &items[i]);
+    for (int i = 0; i < count; i++) {
+        if (items[i].type == ENT_RAIL || !items[i].has_rail) continue;
+        for (int j = 0; j < count; j++)
+            if (items[j].type == ENT_RAIL && items[j].rail_index == items[i].rail_index)
+                items[i].rail_item = j;
+    }
+    return count;
+}
+
+/*
+ * editor_copy_selected — Snapshot every selected entity into the clipboard.
  *
- * Stores the entity type and a PlacementData union so paste can recreate it.
- * A rail rider also records which rail it rides (see clipboard_rail_index
- * in editor.h).
+ * Stores each entity's type and a PlacementData union so paste can
+ * recreate it.  A rail rider also records which rail it rides (see
+ * EditorClipboardItem in editor.h).
  */
 void editor_copy_selected(EditorState *es)
 {
+    int count;
+
     if (!es) return;
     editor_selection_reconcile(es);
     if (!editor_selection_is_valid(es)) return;
+    count = fill_items(es, es->clipboard);
+    es->clipboard_count = count;
+    if (count > 1) editor_set_status(es, "Copied %d entities", count);
+}
 
-    es->clipboard_type = es->selection.type;
-    es->clipboard_data = editor_snapshot_entity(&es->level, es->selection.type,
-                                                es->selection.index);
-    es->has_clipboard = 1;
-
-    /* Remember the rail itself, not just its position in the rails array. */
-    int *rail_index = rider_rail_index(es->clipboard_type, &es->clipboard_data);
-    es->clipboard_has_rail = rail_index && *rail_index >= 0 &&
-                             *rail_index < es->level.rail_count;
-    es->clipboard_rail_index = es->clipboard_has_rail ? *rail_index : -1;
-    if (es->clipboard_has_rail)
-        es->clipboard_rail = es->level.rails[*rail_index];
+/* Forget which rails the clipboard's riders rode in this document (another
+ * document is open now); their rail shapes still match a paste there. */
+void editor_clipboard_forget_rails(EditorState *es)
+{
+    if (!es) return;
+    for (int i = 0; i < es->clipboard_count; i++) es->clipboard[i].rail_index = -1;
 }
 
 void editor_clipboard_after_rail_remove(EditorState *es, int index)
 {
-    if (!es || es->clipboard_rail_index < 0) return;
-    if (es->clipboard_rail_index == index) {
-        /* The rail is gone; its old shape must not match a look-alike. */
-        es->clipboard_rail_index = -1;
-        es->clipboard_has_rail = 0;
-    } else if (es->clipboard_rail_index > index) {
-        es->clipboard_rail_index--;
+    if (!es) return;
+    for (int i = 0; i < es->clipboard_count; i++) {
+        EditorClipboardItem *item = &es->clipboard[i];
+        if (item->rail_index < 0) continue;
+        if (item->rail_index == index) {
+            /* The rail is gone; its old shape must not match a look-alike. */
+            item->rail_index = -1;
+            item->has_rail = 0;
+        } else if (item->rail_index > index) {
+            item->rail_index--;
+        }
     }
 }
 
 void editor_clipboard_after_rail_insert(EditorState *es, int index)
 {
-    if (es && es->clipboard_rail_index >= index) es->clipboard_rail_index++;
+    if (!es) return;
+    for (int i = 0; i < es->clipboard_count; i++)
+        if (es->clipboard[i].rail_index >= index) es->clipboard[i].rail_index++;
 }
 
 /*
@@ -202,29 +258,111 @@ static void offset_pasted_copy(EntityType type, PlacementData *d)
 }
 
 /*
+ * rollback_group — Take back the entries of `group` already recorded, newest
+ * first, and forget them (they must not come back with Redo).  A group
+ * paste or duplicate is all or nothing.
+ */
+static void rollback_group(EditorState *es, int group)
+{
+    Command cmd;
+    while (group != 0 && undo_top_group(es->undo) == group &&
+           undo_take(es->undo, &cmd))
+        editor_apply_undo_command(es, &cmd, 1);
+    editor_refresh_dirty(es);
+}
+
+/*
+ * add_items — Add one offset copy of each item as a single undo step and
+ * select the copies.  Shared by Paste and Duplicate; verb ("paste") goes
+ * into editor_add_placement's messages, title ("Paste") starts our own.
+ *
+ * Rails go first, so a rider whose rail was copied with it (rail_item)
+ * can ride the new copy of that rail.  Any other rider re-attaches to the
+ * rail it was copied from: in this document that rail is tracked by index,
+ * so it is found even after it moved and never confused with an identical
+ * rail; in another document a rail with the same shape and position is
+ * used.  With neither, or when a copy cannot be added (a full array, a
+ * failed validation...), everything added so far is taken back and the
+ * status bar explains.  On success out_data[i] holds the copy of item i.
+ * Returns how many copies were added (0 on failure).
+ */
+static int add_items(EditorState *es, const EditorClipboardItem *items, int count,
+                     const char *verb, const char *title, PlacementData *out_data)
+{
+    static int new_index[EDITOR_MAX_SELECTION];
+    static Selection added[EDITOR_MAX_SELECTION];
+    int added_count = 0;
+    int group;
+
+    group = undo_group_begin(es->undo);
+    for (int pass = 0; pass < 2; pass++) {
+        for (int i = 0; i < count; i++) {
+            const EditorClipboardItem *item = &items[i];
+            PlacementData d = item->data;
+            int *rail_index;
+
+            if ((item->type == ENT_RAIL) != (pass == 0)) continue;
+            rail_index = rider_rail_index(item->type, &d);
+            if (rail_index) {
+                int found = -1;
+                if (item->rail_item >= 0) {
+                    found = new_index[item->rail_item];
+                } else if (item->rail_index >= 0 && item->rail_index < es->level.rail_count) {
+                    found = item->rail_index;
+                }
+                for (int r = 0; found < 0 && item->has_rail && r < es->level.rail_count; r++)
+                    if (same_rail(&es->level.rails[r], &item->rail)) found = r;
+                if (found < 0) {
+                    undo_group_end(es->undo);
+                    rollback_group(es, group);
+                    editor_set_status(es, "%s blocked: the copied %s's rail is not in this level",
+                                      title, editor_entity_type_name(item->type));
+                    return 0;
+                }
+                *rail_index = found;
+            }
+            offset_pasted_copy(item->type, &d);
+            editor_clamp_placement(&es->level, item->type, &d);
+            if (editor_add_placement(es, item->type, &d, verb) != 0) {
+                /* editor_add_placement already said why. */
+                undo_group_end(es->undo);
+                rollback_group(es, group);
+                return 0;
+            }
+            new_index[i] = es->selection.index;
+            added[added_count++] = es->selection;
+            if (out_data) out_data[i] = d;
+        }
+    }
+    undo_group_end(es->undo);
+    (void)editor_select_items(es, added, added_count);
+    return added_count;
+}
+
+/*
  * editor_duplicate_selection — Ctrl+D: copy the selection in place, one
  * paste offset along, without touching the clipboard.
  *
  * Each copy is moved by offset_pasted_copy (the same step Paste uses) and
- * becomes the new selection, so pressing Ctrl+D again duplicates the copy
- * and the row keeps stepping.  A rail rider stays on its own rail.  The
- * player spawn and the Last Star exist once per level and are refused.
- * Several selected entities are copied as one undo step.
+ * the copies become the selection, so pressing Ctrl+D again duplicates the
+ * copies and the row keeps stepping.  A rail rider stays on its own rail
+ * (or rides the copy of its rail when that was selected too).  The player
+ * spawn and the Last Star exist once per level and are refused.  Several
+ * selected entities are copied as one undo step.
  */
 void editor_duplicate_selection(EditorState *es)
 {
-    static Selection items[EDITOR_MAX_SELECTION];
+    static EditorClipboardItem items[EDITOR_MAX_SELECTION];
     char error[128];
     int count;
-    int added = 0;
+    int added;
 
     if (!es) return;
     if (level_validate_runtime(&es->level, error, sizeof(error)) != 0) {
         editor_set_status(es, "Duplicate blocked: fix level errors first (%s)", error);
         return;
     }
-    editor_selection_reconcile(es);
-    count = editor_selection_items(es, items, EDITOR_MAX_SELECTION);
+    count = fill_items(es, items);
     if (count == 0) {
         editor_set_status(es, "Nothing to duplicate: select an entity first");
         return;
@@ -236,43 +374,35 @@ void editor_duplicate_selection(EditorState *es)
             return;
         }
     }
-
-    (void)undo_group_begin(es->undo);
-    for (int i = 0; i < count; i++) {
-        PlacementData d = editor_snapshot_entity(&es->level, items[i].type,
-                                                 items[i].index);
-        offset_pasted_copy(items[i].type, &d);
-        editor_clamp_placement(&es->level, items[i].type, &d);
-        if (editor_add_placement(es, items[i].type, &d, "duplicate") == 0) added++;
-    }
-    undo_group_end(es->undo);
-    if (added == count)
+    added = add_items(es, items, count, "duplicate", "Duplicate", NULL);
+    if (added > 0)
         editor_set_status(es, added == 1 ? "Duplicated %d entity" : "Duplicated %d entities",
                           added);
 }
 
 /*
- * editor_paste_clipboard — Create a new entity from the clipboard data.
+ * editor_paste_clipboard — Create new entities from the clipboard.
  *
- * Inserts a copy of the last Ctrl+C'd entity into the level, moved a little
+ * Inserts a copy of each entity the last Ctrl+C copied, moved a little
  * (offset_pasted_copy) so it doesn't hide the original; each further paste
- * moves one more step, so repeated Ctrl+V lays out a row. The new entity is
- * auto-selected for immediate repositioning.  The two singletons
- * (Last Star, Player Spawn) move instead and record a CMD_MOVE.
+ * moves one more step, so repeated Ctrl+V lays out a row.  The copies are
+ * selected for immediate repositioning.  The two singletons (Last Star,
+ * Player Spawn) move instead and record a CMD_MOVE.
  *
  * The clipboard survives opening another level, so the copy may come from
  * a document with a different width or different rails.  It is clamped
- * into this level, and editor_add_placement refuses (with a status-bar
- * message) a full array, a missing rail, or a result that fails validation.
+ * into this level, and the paste is refused as a whole (with a status-bar
+ * message) on a full array, a missing rail, or a result that fails
+ * validation.
  */
 void editor_paste_clipboard(EditorState *es)
 {
+    static PlacementData pasted[EDITOR_MAX_SELECTION];
     char error[128];
-    EntityType type;
-    PlacementData d;
+    int added;
 
     if (!es) return;
-    if (!es->has_clipboard) {
+    if (es->clipboard_count <= 0) {
         editor_set_status(es, "Nothing to paste: copy an entity with Ctrl+C first");
         return;
     }
@@ -281,43 +411,14 @@ void editor_paste_clipboard(EditorState *es)
         return;
     }
     editor_selection_reconcile(es);
-
-    type = es->clipboard_type;
-    d = es->clipboard_data;
-
-    /* Re-attach a rail rider to the rail it was copied from.  In the same
-     * document that rail is tracked by index, so it is found even after it
-     * moved, and never confused with an identical rail.  In another
-     * document, look for a rail with the same shape and position.  With
-     * neither, refuse instead of silently riding whichever rail now has the
-     * old index. */
-    int *rail_index = rider_rail_index(type, &d);
-    if (rail_index) {
-        int found = -1;
-        if (es->clipboard_rail_index >= 0 &&
-            es->clipboard_rail_index < es->level.rail_count) {
-            found = es->clipboard_rail_index;
-        }
-        for (int i = 0; found < 0 && es->clipboard_has_rail &&
-                        i < es->level.rail_count; i++) {
-            if (same_rail(&es->level.rails[i], &es->clipboard_rail)) found = i;
-        }
-        if (found < 0) {
-            editor_set_status(es, "Paste blocked: the copied %s's rail is not in this level",
-                              editor_entity_type_name(type));
-            return;
-        }
-        *rail_index = found;
-    }
-    offset_pasted_copy(type, &d);
-    editor_clamp_placement(&es->level, type, &d);
-    if (editor_add_placement(es, type, &d, "paste") == 0) {
-        /*
-         * The next paste starts from this copy, so pressing Ctrl+V again
-         * steps one more offset along instead of stacking a second copy on
-         * exactly the same spot (which, for a floor gap, validation would
-         * even refuse as a duplicate).
-         */
-        es->clipboard_data = d;
-    }
+    added = add_items(es, es->clipboard, es->clipboard_count, "paste", "Paste", pasted);
+    if (added == 0) return;
+    /*
+     * The next paste starts from these copies, so pressing Ctrl+V again
+     * steps one more offset along instead of stacking a second copy on
+     * exactly the same spot (which, for a floor gap, validation would even
+     * refuse as a duplicate).
+     */
+    for (int i = 0; i < es->clipboard_count; i++) es->clipboard[i].data = pasted[i];
+    if (added > 1) editor_set_status(es, "Pasted %d entities", added);
 }

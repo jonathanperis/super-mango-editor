@@ -147,6 +147,19 @@ static int transfer(UndoEntry *from, int *from_count,
     return 1;
 }
 
+int undo_take(UndoStack *stack, Command *out)
+{
+    UndoEntry scratch[1];
+    int scratch_count = 0;
+
+    if (!stack || stack->top == 0) return 0;
+    /* Move it into a throwaway one-entry stack, then free what it owns. */
+    if (!transfer(stack->commands, &stack->top, scratch, &scratch_count, out))
+        return 0;
+    release_entries(scratch, scratch_count);
+    return 1;
+}
+
 int undo_pop(UndoStack *stack, Command *out)
 {
     return stack ? transfer(stack->commands, &stack->top, stack->redo_stack, &stack->redo_top, out) : 0;

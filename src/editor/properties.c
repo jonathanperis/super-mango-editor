@@ -1168,6 +1168,43 @@ void properties_render(EditorState *es, int start_y, int available_h)
     int prop_y = start_y;
     int prop_h = available_h;
 
+    /*
+     * Several entities selected: there is no single set of fields to edit,
+     * so show how many of each type are selected and what acts on them.
+     */
+    int selected = editor_selection_count(es);
+    if (selected > 1) {
+        static Selection items[EDITOR_MAX_SELECTION];
+        int counts[ENT_COUNT] = {0};
+        char header[64];
+        int y;
+        int n = editor_selection_items(es, items, EDITOR_MAX_SELECTION);
+
+        snprintf(header, sizeof(header), " %d selected", selected);
+        ui_panel(&es->ui, prop_x, prop_y, PROP_W, prop_h);
+        draw_section_title(es, prop_x, prop_y, header, &es->panel_open);
+        if (!es->panel_open) return;
+        BeginScissorMode(prop_x, prop_y + ROW_H + 4, PROP_W, prop_h - ROW_H - 4);
+        y = prop_y + ROW_H + 8;
+        for (int i = 0; i < n; i++) counts[items[i].type]++;
+        for (int type = 0; type < ENT_COUNT; type++) {
+            char line[64];
+            if (counts[type] == 0) continue;
+            snprintf(line, sizeof(line), "%d x %s", counts[type],
+                     editor_entity_type_name((EntityType)type));
+            ui_label(&es->ui, CONTENT_X, y, line);
+            y += 18;
+        }
+        y += 6;
+        ui_label_color(&es->ui, CONTENT_X, y,
+                       "Drag, arrows, Delete, Ctrl+C / Ctrl+D act on all.",
+                       UI_TEXT_DIM);
+        ui_label_color(&es->ui, CONTENT_X, y + 18,
+                       "Shift+click adds or removes one.", UI_TEXT_DIM);
+        EndScissorMode();
+        return;
+    }
+
     /* Panel background, then the "Coin #3" title bar that collapses it.
      * Singletons (Last Star, Player Spawn) have no index to show. */
     char header[64];

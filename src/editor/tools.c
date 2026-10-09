@@ -423,21 +423,23 @@ static PlacementData move_placement(EntityType type, const PlacementData *from,
 
 /*
  * delete_entity --- Remove one entity from the level and push undo.
+ * Returns 0 when it was removed, -1 when it was refused (with a status
+ * message) or does not exist.
  *
  * Snapshots the entity data before removal, removes it through the shared
  * editor_entity_remove helper (the same path undo/redo uses), pushes a
  * CMD_DELETE command to the undo stack, and refreshes the dirty flag.
  */
-static void delete_entity(EditorState *es, EntityType type, int index)
+static int delete_entity(EditorState *es, EntityType type, int index)
 {
     LevelDef *level;
     PlacementData before;
     Command cmd;
 
-    if (!es) return;
+    if (!es) return -1;
     level = &es->level;
     if (index < 0 || index >= editor_entity_count(level, type))
-        return;
+        return -1;
 
     /*
      * Spike blocks and rail-mode float platforms store the *position* of
@@ -455,7 +457,7 @@ static void delete_entity(EditorState *es, EntityType type, int index)
                               "platform%s; move or delete them first",
                               index, blocks, blocks == 1 ? "" : "s",
                               platforms, platforms == 1 ? "" : "s");
-            return;
+            return -1;
         }
     }
 
@@ -473,7 +475,7 @@ static void delete_entity(EditorState *es, EntityType type, int index)
         memset(&cleared, 0, sizeof(cleared));
         (void)editor_entity_write(level, type, 0, &cleared);
     } else if (editor_entity_remove(level, type, index) != 0) {
-        return;
+        return -1;
     }
 
     /*
@@ -490,7 +492,7 @@ static void delete_entity(EditorState *es, EntityType type, int index)
                 (void)editor_entity_insert(level, type, index, &before);
             editor_set_status(es, "Cannot delete %s: %s",
                               editor_entity_type_name(type), error);
-            return;
+            return -1;
         }
     }
 
@@ -505,6 +507,7 @@ static void delete_entity(EditorState *es, EntityType type, int index)
     editor_selection_after_remove(es, type, index);
     editor_refresh_dirty(es);
     if (type == ENT_CHECKPOINT) editor_set_status(es, "Checkpoint deleted");
+    return 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -785,8 +788,7 @@ int editor_add_placement(EditorState *es, EntityType type,
     undo_push(es->undo, &cmd);
 
     /* Select the new entity for immediate inspection */
-    es->selection.type  = type;
-    es->selection.index = index;
+    editor_select_only(es, type, index);
     editor_refresh_dirty(es);
     if (type == ENT_CHECKPOINT) editor_set_status(es, "Checkpoint placed");
     return 0;
@@ -971,42 +973,105 @@ static Selection pick_under_cursor(EditorState *es, float world_x, float world_y
     return hits[0];
 }
 
-static void select_and_arm_drag(EditorState *es, float world_x, float world_y)
+/*
+ * arm_drag — Remember everything a drag of `items` needs, grabbed at
+ * `grabbed` (whose corner is the one that snaps to the grid).
+ *
+ * Each entity's placement at mouse-down is kept, so every motion event
+ * recomputes positions from the originals (no drift) and mouse-up can
+ * record exact undo "befores".  The drag only counts as a move once the
+ * cursor travels a few pixels (see tools_mouse_drag).
+ */
+static void arm_drag(EditorState *es, Selection grabbed, const Selection *items,
+                     int count, float world_x, float world_y)
 {
-    Selection hit = pick_under_cursor(es, world_x, world_y);
     float anchor_x, anchor_y;
 
+    if (!get_entity_anchor(&es->level, grabbed.type, grabbed.index,
+                           &anchor_x, &anchor_y)) return;
+    if (count > EDITOR_MAX_SELECTION) count = EDITOR_MAX_SELECTION;
+    es->dragging     = 1;
+    es->drag_moved   = 0;
+    es->drag_type    = grabbed.type;
+    es->drag_index   = grabbed.index;
+    es->drag_count   = count;
+    for (int i = 0; i < count; i++) {
+        es->drag_items[i] = items[i];
+        es->drag_befores[i] = editor_snapshot_entity(&es->level, items[i].type,
+                                                     items[i].index);
+    }
+    es->drag_start_x = anchor_x;
+    es->drag_start_y = anchor_y;
+    es->drag_grab_x  = world_x - anchor_x;
+    es->drag_grab_y  = world_y - anchor_y;
+    es->drag_mouse_x = world_x;
+    es->drag_mouse_y = world_y;
+}
+
+/* Start a rubber-band box at the press point. */
+static void start_box(EditorState *es, float world_x, float world_y, int additive)
+{
+    es->box_selecting = 1;
+    es->box_additive = additive;
+    es->box_x0 = es->box_x1 = world_x;
+    es->box_y0 = es->box_y1 = world_y;
+}
+
+/*
+ * select_and_arm_drag — TOOL_SELECT press.
+ *
+ *   Shift+click on an entity   add it to the selection, or take it out
+ *   Shift+press on empty space start a box that adds to the selection
+ *   press on a member of a     drag the whole selection (a click without
+ *   multi-selection            moving selects just that member)
+ *   press on another entity    select it alone and arm a drag of it;
+ *                              Alt or a repeat click picks the one below
+ *   press on empty space       clear the selection and start a box
+ */
+static void select_and_arm_drag(EditorState *es, float world_x, float world_y)
+{
+    static Selection items[EDITOR_MAX_SELECTION];
+    int shift = (es->input_mods & INPUT_SHIFT) != 0;
+    int alt = (es->input_mods & INPUT_ALT) != 0;
+    Selection top = editor_hit_test(&es->level, world_x, world_y);
+    Selection hit;
+
     es->dragging = 0;
+    es->box_selecting = 0;
+
+    if (shift && !alt) {
+        es->last_click_valid = 0;
+        if (top.index >= 0) editor_selection_toggle(es, top.type, top.index);
+        else start_box(es, world_x, world_y, 1);
+        return;
+    }
+
+    if (!alt && top.index >= 0 && editor_selection_count(es) > 1 &&
+        editor_is_selected(es, top.type, top.index)) {
+        int count = editor_selection_items(es, items, EDITOR_MAX_SELECTION);
+        es->last_click_valid = 0;
+        arm_drag(es, top, items, count, world_x, world_y);
+        return;
+    }
+
+    hit = pick_under_cursor(es, world_x, world_y);
     es->last_click_valid = 0;
     if (hit.index < 0) {
-        es->selection.index = -1;   /* clicked empty space */
+        editor_select_none(es);   /* clicked empty space */
+        start_box(es, world_x, world_y, 0);
         return;
     }
     es->last_click_valid = 1;
     es->last_click_x = world_x;
     es->last_click_y = world_y;
-
-    es->selection = hit;
-    if (!get_entity_anchor(&es->level, hit.type, hit.index,
-                           &anchor_x, &anchor_y)) return;
-    es->dragging         = 1;
-    es->drag_moved       = 0;
-    es->drag_type        = hit.type;
-    es->drag_index       = hit.index;
-    es->drag_before      = editor_snapshot_entity(&es->level, hit.type,
-                                                  hit.index);
-    es->drag_start_x     = anchor_x;
-    es->drag_start_y     = anchor_y;
-    es->drag_grab_x      = world_x - anchor_x;
-    es->drag_grab_y      = world_y - anchor_y;
-    es->drag_mouse_x     = world_x;
-    es->drag_mouse_y     = world_y;
+    editor_select_only(es, hit.type, hit.index);
+    arm_drag(es, hit, &hit, 1, world_x, world_y);
 }
 
 /*
  * tools_mouse_down --- Dispatch a left-click to the active tool handler.
  *
- * TOOL_SELECT : hit-test and select/deselect, optionally start a drag.
+ * TOOL_SELECT : hit-test and select/deselect, optionally start a drag or a box.
  * TOOL_PLACE  : stamp a new entity at the click position.
  * TOOL_DELETE : hit-test and delete the clicked entity.
  */
@@ -1029,18 +1094,78 @@ void tools_mouse_down(EditorState *es, float world_x, float world_y)
     case TOOL_DELETE: {
         Selection hit = editor_hit_test(&es->level, world_x, world_y);
         if (hit.index >= 0) {
-            delete_entity(es, hit.type, hit.index);
+            (void)delete_entity(es, hit.type, hit.index);
         }
         break;
     }
     }
 }
 
-/* The dragged entity still exists where mouse-down found it. */
-static int drag_target_exists(const EditorState *es)
+/* Every dragged entity still exists where mouse-down found it.  (Commands
+ * that add or remove entities wait while the button is held, so this only
+ * fails if something unexpected changed the arrays.) */
+static int drag_targets_exist(const EditorState *es)
 {
-    return es->drag_index >= 0 &&
-           es->drag_index < editor_entity_count(&es->level, es->drag_type);
+    for (int i = 0; i < es->drag_count; i++) {
+        const Selection *item = &es->drag_items[i];
+        if (item->index < 0 ||
+            item->index >= editor_entity_count(&es->level, item->type)) return 0;
+    }
+    return es->drag_count > 0;
+}
+
+/* Put every dragged entity back where it was at mouse-down. */
+static void restore_drag(EditorState *es)
+{
+    for (int i = 0; i < es->drag_count; i++)
+        (void)editor_entity_write(&es->level, es->drag_items[i].type,
+                                  es->drag_items[i].index, &es->drag_befores[i]);
+}
+
+/*
+ * finish_box — Select what the rubber band touches.  A box smaller than
+ * the drag threshold was just a click on empty space, which already
+ * cleared the selection (unless Shift was held).
+ */
+static void finish_box(EditorState *es)
+{
+    static Selection found[EDITOR_MAX_SELECTION];
+    float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+    float x0 = fminf(es->box_x0, es->box_x1), x1 = fmaxf(es->box_x0, es->box_x1);
+    float y0 = fminf(es->box_y0, es->box_y1), y1 = fmaxf(es->box_y0, es->box_y1);
+    int count = 0;
+    int skipped = 0;
+
+    es->box_selecting = 0;
+    if ((x1 - x0) * zoom < DRAG_THRESHOLD_PX && (y1 - y0) * zoom < DRAG_THRESHOLD_PX)
+        return;
+
+    if (es->box_additive) count = editor_selection_items(es, found, EDITOR_MAX_SELECTION);
+    for (int type = 0; type < ENT_COUNT; type++) {
+        for (int i = 0; i < editor_entity_count(&es->level, (EntityType)type); i++) {
+            EditorRect r;
+            int already = 0;
+            if (!editor_entity_bounds(&es->level, (EntityType)type, i, &r)) continue;
+            /* Touching the box is enough; it need not be inside it. */
+            if (r.x >= x1 || r.x + r.w <= x0 || r.y >= y1 || r.y + r.h <= y0) continue;
+            for (int k = 0; k < count && !already; k++)
+                already = found[k].type == (EntityType)type && found[k].index == i;
+            if (already) continue;
+            if (count == EDITOR_MAX_SELECTION) {
+                skipped++;
+                continue;
+            }
+            found[count].type = (EntityType)type;
+            found[count].index = i;
+            count++;
+        }
+    }
+    (void)editor_select_items(es, found, count);
+    if (skipped > 0)
+        editor_set_status(es, "Selected %d entities (a selection holds at most %d)",
+                          count, EDITOR_MAX_SELECTION);
+    else if (count > 1)
+        editor_set_status(es, "Selected %d entities", count);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1048,49 +1173,66 @@ static int drag_target_exists(const EditorState *es)
 /* ------------------------------------------------------------------ */
 
 /*
- * tools_mouse_up --- End a drag operation and record the move for undo.
+ * tools_mouse_up --- End a box or a drag; record a move for undo.
  *
- * Compares the entity's final placement with the copy taken at mouse-down.
- * If they differ (the user actually moved it), a CMD_MOVE command is pushed
- * with "before" = mouse-down placement and "after" = final placement.
+ * Compares each dragged entity's final placement with the copy taken at
+ * mouse-down.  Those that changed are recorded as CMD_MOVE commands in one
+ * undo group, so moving a multi-selection is a single undo step.
  */
 void tools_mouse_up(EditorState *es, float world_x, float world_y)
 {
-    PlacementData after;
-    Command cmd;
+    int moved = 0;
 
     (void)world_x;
     (void)world_y;
 
-    if (!es || !es->dragging) return;
+    if (!es) return;
+    if (es->box_selecting) {
+        finish_box(es);
+        return;
+    }
+    if (!es->dragging) return;
     es->dragging = 0;
-    if (!es->drag_moved || !drag_target_exists(es)) return;
+    if (!drag_targets_exist(es)) return;
+    if (!es->drag_moved) {
+        /* A click on a member of a multi-selection selects just it. */
+        if (es->drag_count > 1) editor_select_only(es, es->drag_type, es->drag_index);
+        return;
+    }
 
     /*
      * Every motion event kept the level valid, but a field edit could have
      * broken it while the button was held.  Never leave an unrecorded
-     * change behind: put the entity back where the drag started.
+     * change behind: put the entities back where the drag started.
      */
     if (level_validate_runtime(&es->level, NULL, 0) != 0) {
-        (void)editor_entity_write(&es->level, es->drag_type, es->drag_index,
-                                  &es->drag_before);
+        restore_drag(es);
         editor_set_status(es, "Move cancelled: level has errors");
         return;
     }
 
-    after = editor_snapshot_entity(&es->level, es->drag_type, es->drag_index);
-    if (memcmp(&after, &es->drag_before, sizeof(after)) == 0) return;
-
-    memset(&cmd, 0, sizeof(cmd));
-    cmd.type         = CMD_MOVE;
-    cmd.entity_type  = (int)es->drag_type;
-    cmd.entity_index = es->drag_index;
-    cmd.before       = es->drag_before;
-    cmd.after        = after;
-    undo_push(es->undo, &cmd);
+    (void)undo_group_begin(es->undo);
+    for (int i = 0; i < es->drag_count; i++) {
+        Command cmd;
+        PlacementData after = editor_snapshot_entity(&es->level, es->drag_items[i].type,
+                                                     es->drag_items[i].index);
+        if (memcmp(&after, &es->drag_befores[i], sizeof(after)) == 0) continue;
+        memset(&cmd, 0, sizeof(cmd));
+        cmd.type         = CMD_MOVE;
+        cmd.entity_type  = (int)es->drag_items[i].type;
+        cmd.entity_index = es->drag_items[i].index;
+        cmd.before       = es->drag_befores[i];
+        cmd.after        = after;
+        undo_push(es->undo, &cmd);
+        moved++;
+    }
+    undo_group_end(es->undo);
+    if (moved == 0) return;
 
     editor_refresh_dirty(es);
-    if (es->drag_type == ENT_CHECKPOINT)
+    if (es->drag_count > 1)
+        editor_set_status(es, "Moved %d entities", moved);
+    else if (es->drag_type == ENT_CHECKPOINT)
         editor_set_status(es, "Checkpoint moved");
 }
 
@@ -1099,32 +1241,40 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
 /* ------------------------------------------------------------------ */
 
 /*
- * tools_mouse_drag --- Update entity position while dragging.
+ * tools_mouse_drag --- Grow the box, or move what is being dragged.
  *
- * Called on every mouse-motion event while the left button is held.
- * The new position is always computed from the mouse-down placement:
- *   new top-left = cursor - grab offset   (optionally Shift-snapped)
- * then clamped into the world.  If the result would still fail level
- * validation (for example a checkpoint dragged behind the player start),
- * the entity stays at its last valid position.
+ * Called on every mouse-motion event while the left button is held.  The
+ * grabbed entity's new corner is always computed from its mouse-down
+ * placement:
+ *   new top-left = cursor - grab offset   (optionally snapped)
+ * and every dragged entity moves by that same amount from its own
+ * mouse-down placement, then is clamped into the world.  If the result
+ * would fail level validation (for example a checkpoint dragged behind the
+ * player start), everything stays at its last valid position.
  */
 void tools_mouse_drag(EditorState *es, float world_x, float world_y)
 {
-    PlacementData previous;
-    PlacementData moved;
+    static PlacementData previous[EDITOR_MAX_SELECTION];
     float zoom;
     float target_x, target_y;
+    float dx, dy;
 
-    if (!es || !es->dragging || !drag_target_exists(es)) return;
+    if (!es) return;
+    if (es->box_selecting) {
+        es->box_x1 = world_x;
+        es->box_y1 = world_y;
+        return;
+    }
+    if (!es->dragging || !drag_targets_exist(es)) return;
 
     /* Ignore small wobbles until the cursor leaves the click threshold.
      * The threshold is in canvas pixels, so divide by zoom for world px. */
     if (!es->drag_moved) {
-        float dx = world_x - es->drag_mouse_x;
-        float dy = world_y - es->drag_mouse_y;
+        float mx = world_x - es->drag_mouse_x;
+        float my = world_y - es->drag_mouse_y;
         zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
         float limit = DRAG_THRESHOLD_PX / zoom;
-        if (dx * dx + dy * dy < limit * limit) return;
+        if (mx * mx + my * my < limit * limit) return;
         es->drag_moved = 1;
         es->last_click_valid = 0;   /* a move, not a click on one spot */
     }
@@ -1134,33 +1284,40 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
 
     /*
      * Snapping: with snap-to-grid on (key S), or while Shift is held with it
-     * off, round the entity's top-left corner down to the TILE_SIZE (48 px)
-     * grid.  Shift always means "the other way" for the move in progress.
+     * off, round the grabbed entity's top-left corner down to the TILE_SIZE
+     * (48 px) grid.  Shift always means "the other way" for the move in
+     * progress.  The rest of a group keeps its distance to it.
      */
     editor_snap_point(es, &target_x, &target_y);
+    dx = target_x - es->drag_start_x;
+    dy = target_y - es->drag_start_y;
 
-    moved = move_placement(es->drag_type, &es->drag_before,
-                           target_x - es->drag_start_x,
-                           target_y - es->drag_start_y);
-    editor_clamp_placement(&es->level, es->drag_type, &moved);
-
-    previous = editor_snapshot_entity(&es->level, es->drag_type, es->drag_index);
-    (void)editor_entity_write(&es->level, es->drag_type, es->drag_index, &moved);
+    for (int i = 0; i < es->drag_count; i++) {
+        const Selection *item = &es->drag_items[i];
+        PlacementData moved = move_placement(item->type, &es->drag_befores[i], dx, dy);
+        editor_clamp_placement(&es->level, item->type, &moved);
+        previous[i] = editor_snapshot_entity(&es->level, item->type, item->index);
+        (void)editor_entity_write(&es->level, item->type, item->index, &moved);
+    }
     /* Drags only start on a valid level (tools_can_hit_test), so a step
      * that would make it invalid is reverted to the last valid position. */
     if (level_validate_runtime(&es->level, NULL, 0) != 0) {
-        (void)editor_entity_write(&es->level, es->drag_type, es->drag_index,
-                                  &previous);
+        for (int i = 0; i < es->drag_count; i++)
+            (void)editor_entity_write(&es->level, es->drag_items[i].type,
+                                      es->drag_items[i].index, &previous[i]);
     }
 }
 
 void tools_cancel_drag(EditorState *es)
 {
-    if (!es || !es->dragging) return;
+    if (!es) return;
+    if (es->box_selecting) {
+        es->box_selecting = 0;
+        return;
+    }
+    if (!es->dragging) return;
     es->dragging = 0;
-    if (es->drag_moved && drag_target_exists(es))
-        (void)editor_entity_write(&es->level, es->drag_type, es->drag_index,
-                                  &es->drag_before);
+    if (es->drag_moved && drag_targets_exist(es)) restore_drag(es);
     editor_set_status(es, "Move cancelled");
 }
 
@@ -1274,7 +1431,7 @@ void tools_right_click(EditorState *es, float world_x, float world_y)
     Selection hit = editor_hit_test(&es->level, world_x, world_y);
     if (hit.index < 0) return;
 
-    delete_entity(es, hit.type, hit.index);
+    (void)delete_entity(es, hit.type, hit.index);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1282,16 +1439,61 @@ void tools_right_click(EditorState *es, float world_x, float world_y)
 /* ------------------------------------------------------------------ */
 
 /*
- * tools_delete_selected --- Delete the currently selected entity.
+ * delete_order — Sort key for deleting several entities: rails last (a
+ * rail can only go once the riders deleted with it are gone), and within
+ * one type the highest index first, so removing one never shifts the
+ * index of another still waiting in the list.
+ */
+static int delete_before(Selection a, Selection b)
+{
+    int a_rail = a.type == ENT_RAIL, b_rail = b.type == ENT_RAIL;
+    if (a_rail != b_rail) return b_rail;
+    if (a.type != b.type) return a.type < b.type;
+    return a.index > b.index;
+}
+
+/*
+ * tools_delete_selected --- Delete every selected entity.
  *
  * Called from the keyboard handler when Delete or Backspace is pressed.
- * Does nothing if no entity is selected (index == -1).
+ * Several entities are deleted as one undo group (one Ctrl+Z restores
+ * them all).  An entity that cannot go (a rail still ridden by something
+ * outside the selection, say) stays, and the status bar says why.
  */
 void tools_delete_selected(EditorState *es)
 {
+    static Selection items[EDITOR_MAX_SELECTION];
+    int count;
+    int deleted = 0;
+
     if (!es) return;
     editor_selection_reconcile(es);
-    if (!editor_selection_is_valid(es)) return;
+    count = editor_selection_items(es, items, EDITOR_MAX_SELECTION);
+    if (count == 0) return;
+    if (count == 1) {
+        (void)delete_entity(es, items[0].type, items[0].index);
+        return;
+    }
 
-    delete_entity(es, es->selection.type, es->selection.index);
+    /* Insertion sort into delete order: the list is short. */
+    for (int i = 1; i < count; i++) {
+        Selection item = items[i];
+        int j = i;
+        while (j > 0 && delete_before(item, items[j - 1])) {
+            items[j] = items[j - 1];
+            j--;
+        }
+        items[j] = item;
+    }
+
+    (void)undo_group_begin(es->undo);
+    for (int i = 0; i < count; i++)
+        if (delete_entity(es, items[i].type, items[i].index) == 0) deleted++;
+    undo_group_end(es->undo);
+    editor_select_none(es);
+    if (deleted == count)
+        editor_set_status(es, "Deleted %d entities", deleted);
+    else if (deleted > 0)
+        editor_set_status(es, "Deleted %d of %d entities; the rest could not go",
+                          deleted, count);
 }

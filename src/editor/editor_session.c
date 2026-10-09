@@ -4,6 +4,7 @@
 
 #include "editor_session.h"
 
+#include "editor_clipboard.h"  /* editor_clipboard_forget_rails */
 #include "file_dialog.h"
 #include <stdarg.h>       /* va_list */
 #include <stdio.h>        /* fprintf, snprintf, stderr, vsnprintf */
@@ -14,6 +15,7 @@
 #include "editor_recovery.h"   /* recovery retirement */
 #include "editor_undo_apply.h" /* staged property/config command capture */
 #include "undo.h"              /* undo_clear */
+#include "entity_meta.h"       /* editor_select_none */
 
 static int editor_test_finish_choice = -1;
 static int editor_test_discard_choice = -1;
@@ -326,9 +328,9 @@ void editor_reset_new_level(EditorState *es)
     (void)editor_set_recovery_document(es, NULL);
     undo_clear(es->undo);
     editor_set_document_save_point(es);
-    es->selection.index = -1;
+    editor_select_none(es);
     /* A copied rail rider can no longer name a rail in this document. */
-    es->clipboard_rail_index = -1;
+    editor_clipboard_forget_rails(es);
     /* The canvas previews (sky, floor, water) follow the document; without
      * this the new level would keep showing the previous level's art. */
     editor_sync_config_resources(es);
