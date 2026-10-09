@@ -6,7 +6,6 @@
  */
 
 #include "collision_damage.h"
-#include "../shared/platform.h"  /* clock_millis */
 
 #include "../levels/level.h"
 #include "../core/debug.h"
@@ -100,6 +99,6 @@ void apply_damage(GameState *gs, int amount, int push,
         }
         reset_current_level(gs, &gs->loop.fp_prev_riding);
         game_checkpoint_feedback_set(gs, CHECKPOINT_FEEDBACK_RESPAWN,
-                                      (uint32_t)clock_millis(), 900);
+                                      game_checkpoint_clock_ms(gs), 900);
     }
 }

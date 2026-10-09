@@ -305,7 +305,9 @@ typedef struct {
     float         respawn_y;      /* resolved respawn placement y               */
     int           checkpoint_index; /* authored checkpoint index, -1 before one */
     CheckpointFeedbackKind checkpoint_feedback_kind; /* explicit HUD cue reason */
-    uint32_t      checkpoint_feedback_until; /* cue expiry deadline */
+    uint32_t      checkpoint_feedback_until; /* cue expiry, game_checkpoint_clock_ms time */
+    double        sim_time;    /* seconds simulated so far; only fixed steps
+                                  advance it, so a pause stops it            */
     int           legacy_checkpoint_screen; /* last automatic screen boundary   */
     int           debug_mode;  /* 1 = debug overlays active (--debug flag)   */
     int           smoke_test_frames; /* >0 = exit after this many frames     */

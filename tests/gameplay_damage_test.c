@@ -5,7 +5,7 @@
 #include "core/game_overlay.h"
 #include "levels/level.h"
 #include "screens/hud.h"
-#include "shared/platform.h"  /* clock_millis */
+#include "core/game_checkpoint.h"  /* game_checkpoint_clock_ms */
 
 void debug_log(DebugOverlay *dbg, const char *fmt, ...)
 {
@@ -99,6 +99,7 @@ static int lethal_damage_consumes_life_and_resets_level(void)
     gs.player.spawn_x = 88.0f;
     gs.player.spawn_y = 120.0f;
     gs.loop.fp_prev_riding = 7;
+    gs.sim_time = 50.0;   /* 50 s of play so far */
 
     apply_damage(&gs, 1, 0, 0.0f, 0.0f);
 
@@ -106,12 +107,13 @@ static int lethal_damage_consumes_life_and_resets_level(void)
     if (expect_int("lives decremented", gs.lives, 1) != 0) return 1;
     if (expect_int("respawn feedback reason", gs.checkpoint_feedback_kind,
                    CHECKPOINT_FEEDBACK_RESPAWN) != 0) return 1;
-    if (expect_int("respawn feedback deadline", gs.checkpoint_feedback_until > 0, 1) != 0)
+    /* 0.9 s of game time after the reset, on the simulated clock. */
+    if (expect_int("respawn feedback deadline", (int)gs.checkpoint_feedback_until, 50900) != 0)
         return 1;
     if (expect_int("HUD respawn visible",
                    hud_checkpoint_feedback_visible(gs.checkpoint_feedback_kind,
                                                    gs.checkpoint_feedback_until,
-                                                   (uint32_t)clock_millis()), 1) != 0)
+                                                   game_checkpoint_clock_ms(&gs)), 1) != 0)
         return 1;
     if (expect_int("HUD respawn label",
                    strcmp(hud_checkpoint_feedback_label(gs.checkpoint_feedback_kind, -1),

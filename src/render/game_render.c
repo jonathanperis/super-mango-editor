@@ -6,7 +6,7 @@
  */
 
 #include "game_render.h"
-#include "../shared/platform.h"  /* clock_millis */
+#include "../core/game_checkpoint.h"  /* game_checkpoint_clock_ms */
 #include "../screens/settings_menu.h"
 
 #include "../core/debug.h"
@@ -366,7 +366,7 @@ static void draw_hud_and_overlays(GameState *gs, int cam_x)
                gs->checkpoint_index,
                gs->checkpoint_feedback_kind,
                gs->checkpoint_feedback_until,
-               (uint32_t)clock_millis());
+               game_checkpoint_clock_ms(gs));
 
     /* Draw debug overlays (collision boxes, FPS, event log) if active */
     if (gs->debug_mode) {

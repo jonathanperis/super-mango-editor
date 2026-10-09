@@ -3,7 +3,6 @@
  */
 
 #include "game_update.h"
-#include "../shared/platform.h"  /* clock_millis */
 
 #include "game_actors.h"
 #include "game_bouncepads.h"
@@ -22,7 +21,7 @@ int game_update_active(GameState *gs, float dt, int cam_x)
     PlayerStepSupport support;
     const int lives_before = gs->lives;
 
-    game_checkpoint_feedback_clear_expired(gs, (uint32_t)clock_millis());
+    game_checkpoint_feedback_tick(gs, dt);
     gs->completion.level_elapsed += dt;
 
     support = game_player_step(gs, dt);
