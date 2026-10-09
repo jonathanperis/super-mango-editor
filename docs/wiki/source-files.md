@@ -352,6 +352,7 @@ Frees all resources in reverse init order.
 **Key functions:**
 - `int level_load(GameState *gs, const LevelDef *def);` -- validate and copy a parsed level definition into runtime `GameState`; returns `-1` without mutating current runtime state when runtime counts are invalid
 - `level_reset(GameState *gs, const LevelDef *def)` -- restore mutable level state after death/retry; collected coins stay collected (Retry re-activates them)
+- `level_release_platform_tiles(GameState *gs)` -- unload the platform tile textures; `GameState.platform_tiles` loads each distinct `tile_path` once and every platform naming it borrows that texture, so a level with 23 stone pillars decodes `stone_platform.png` once, and reloading the same level (Replay, F8) decodes nothing
 - `level_load_toml(const char *path, LevelDef *def)` -- parse TOML into staging storage, run runtime validation, free TOML data, then assign the validated `LevelDef` to the caller
 - `level_apply_player_physics(Player *player, const LevelDef *def)` -- reset player movement tunables to engine defaults, then apply non-negative level overrides
 - `level_validate_counts(const LevelDef *level, char *err, size_t err_sz)` -- reject out-of-range array counts

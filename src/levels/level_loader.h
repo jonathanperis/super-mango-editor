@@ -33,3 +33,15 @@ int level_load(GameState *gs, const LevelDef *def);
  * Also resets the player to the spawn position.
  */
 void level_reset(GameState *gs, const LevelDef *def);
+
+/*
+ * Unload the platform tile textures the level loader shares between
+ * platforms (GameState::platform_tiles) and clear every borrowed pointer.
+ * Called once from game cleanup; a new level_load keeps the ones it reuses.
+ */
+void level_release_platform_tiles(GameState *gs);
+
+#ifdef MANGO_TESTING
+/* Test builds only: how many platform tile images have been loaded so far. */
+int level_loader_test_tile_loads(void);
+#endif

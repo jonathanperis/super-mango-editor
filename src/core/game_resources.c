@@ -10,6 +10,7 @@
 
 #include "../effects/water.h"
 #include "../effects/parallax.h"
+#include "../levels/level_loader.h"  /* level_release_platform_tiles */
 
 #define ARRAY_LEN(arr) ((int)(sizeof(arr) / sizeof((arr)[0])))
 #define TEX_FIELD(field) offsetof(TextureResources, field)
@@ -234,12 +235,8 @@ void game_resources_cleanup(GameState *gs)
 
     parallax_cleanup(&gs->parallax);
 
-    for (int i = 0; i < gs->platform_count; i++) {
-        if (gs->platforms[i].tex) {
-            texture_unload(gs->platforms[i].tex);
-            gs->platforms[i].tex = NULL;
-        }
-    }
+    /* Platform tiles are shared per path; the cache unloads each once. */
+    level_release_platform_tiles(gs);
 
     /* Core audio chunks: reverse order of game_resources_load(). */
     free_chunk_specs_reverse(gs, s_optional_chunks, ARRAY_LEN(s_optional_chunks));

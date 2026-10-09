@@ -212,6 +212,28 @@ typedef struct {
     Texture2D *spike_platform;
 } TextureResources;
 
+/*
+ * PlatformTileCache — one texture per distinct platform tile image.
+ *
+ * Many pillars in a level share one tileset (02_lugio_02 draws 23 of them
+ * from stone_platform.png). Decoding that PNG once per pillar wasted load
+ * time and GPU memory, so level_loader.c keeps one entry per path: the cache
+ * owns each texture and every Platform::tex naming that path borrows it.
+ * An entry whose image failed to load keeps texture == NULL, so the warning
+ * prints once and the file is not read again.
+ */
+#define PLATFORM_TILE_PATH_SIZE 64  /* same capacity as PlatformPlacement::tile_path */
+typedef struct {
+    char       path[PLATFORM_TILE_PATH_SIZE];
+    Texture2D *texture;   /* owned GPU texture; NULL when loading failed */
+    int        in_use;    /* scratch mark while a new level is applied   */
+} PlatformTile;
+
+typedef struct {
+    PlatformTile tiles[MAX_PLATFORMS]; /* at most one per platform */
+    int          count;
+} PlatformTileCache;
+
 typedef struct {
     SoundEffect *jump;
     SoundEffect *coin;
@@ -233,6 +255,7 @@ typedef struct {
     Player        player;      /* the player, stored by value (not a pointer) */
     Platform      platforms[MAX_PLATFORMS]; /* one-way pillar definitions     */
     int           platform_count;           /* how many platforms are active  */
+    PlatformTileCache platform_tiles;       /* owns the textures platforms borrow */
     Water         water;        /* animated water strip at the bottom of screen*/
     FogSystem     fog;         /* atmospheric fog overlay — topmost layer      */
     Spider        spiders[MAX_SPIDERS]; /* ground-patrol enemy instances      */
