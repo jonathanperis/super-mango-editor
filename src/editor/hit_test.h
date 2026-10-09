@@ -51,3 +51,12 @@ int editor_entity_bounds(const LevelDef *level, EntityType type, int index,
  * Returns {type, index}; index is -1 when nothing is under the point.
  */
 Selection editor_hit_test(const LevelDef *level, float wx, float wy);
+
+/*
+ * editor_hit_test_all — Every entity under world point (wx, wy), topmost
+ * first (the same order editor_hit_test uses), at most max of them.
+ * Returns how many were written to out.  Alt+click and a second click on
+ * the same spot walk down this list to reach entities hidden underneath.
+ */
+int editor_hit_test_all(const LevelDef *level, float wx, float wy,
+                        Selection *out, int max);

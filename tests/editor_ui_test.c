@@ -884,6 +884,50 @@ done:
     return failed;
 }
 
+/*
+ * Overlapping entities: a click picks the topmost; Alt+click, or a second
+ * click on the very same spot, steps to the next one underneath and wraps.
+ */
+static int alt_click_cycles_through_overlapping_entities(void)
+{
+    int failed = 0;
+    EditorState es;
+    const int sx = 300, sy = 300;
+    CHECK(open_editor(&es, NULL) == 0);
+    es.tool = TOOL_PLACE;
+    es.palette_type = ENT_COIN;
+    click_frame(&es, sx, sy);
+    es.palette_type = ENT_STAR_YELLOW;            /* drawn above coins */
+    click_frame(&es, sx, sy);
+    CHECK(es.level.coin_count == 1 && es.level.star_yellow_count == 1);
+    es.tool = TOOL_SELECT;
+
+    click_frame(&es, sx + 2, sy + 2);
+    CHECK(es.selection.type == ENT_STAR_YELLOW);
+    CHECK(strstr(es.status_message, "1 of 2") != NULL);
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, INPUT_ALT, sx + 5, sy + 5);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, INPUT_ALT, sx + 5, sy + 5);
+    ui_frame(&es, sx + 5, sy + 5);
+    CHECK(es.selection.type == ENT_COIN && strstr(es.status_message, "2 of 2"));
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, INPUT_ALT, sx + 5, sy + 5);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, INPUT_ALT, sx + 5, sy + 5);
+    ui_frame(&es, sx + 5, sy + 5);
+    CHECK(es.selection.type == ENT_STAR_YELLOW);   /* wrapped to the top */
+
+    /* A second plain click on the same spot steps down too... */
+    click_frame(&es, sx + 5, sy + 5);
+    CHECK(es.selection.type == ENT_COIN);
+    /* ...but a click somewhere else starts again from the top. */
+    click_frame(&es, sx + 3, sy + 1);
+    CHECK(es.selection.type == ENT_STAR_YELLOW);
+    /* Nothing changed in the document: picking is not an edit. */
+    CHECK(es.undo->top == 2);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
 /* ------------------------------------------------------------------ */
 /* Text editing: caret keys and Tab                                    */
 /* ------------------------------------------------------------------ */
@@ -1178,6 +1222,7 @@ int main(void)
         CASE(arrow_keys_nudge_and_backspace_deletes),
         CASE(ctrl_d_duplicates_with_a_stepping_offset),
         CASE(snap_toggle_applies_to_placing_and_dragging),
+        CASE(alt_click_cycles_through_overlapping_entities),
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),
         CASE(native_pickers_report_choice_cancel_and_failure),

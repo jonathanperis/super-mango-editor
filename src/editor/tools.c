@@ -929,16 +929,62 @@ static void place_entity(EditorState *es, float world_x, float world_y)
  * jump.  The drag only counts as a move once the cursor travels a few pixels
  * (see tools_mouse_drag).
  */
+/*
+ * pick_under_cursor — Which entity a Select click at (world_x, world_y)
+ * picks.  Normally the topmost one.  Alt+click, or a second click on the
+ * very spot of the previous click, picks the one below the current
+ * selection instead (wrapping back to the top), so entities hidden under
+ * others can be reached without moving anything out of the way.
+ */
+static Selection pick_under_cursor(EditorState *es, float world_x, float world_y)
+{
+    static Selection hits[EDITOR_MAX_SELECTION];
+    int count = editor_hit_test_all(&es->level, world_x, world_y, hits,
+                                    EDITOR_MAX_SELECTION);
+    float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+    /* "The same spot": within one canvas pixel, whatever the zoom. */
+    float same = 1.0f / zoom;
+    int alt = (es->input_mods & INPUT_ALT) != 0;
+    int again = es->last_click_valid &&
+                fabsf(world_x - es->last_click_x) <= same &&
+                fabsf(world_y - es->last_click_y) <= same;
+    Selection none = { 0, -1 };
+
+    if (count == 0) return none;
+    if ((alt || again) && count > 1) {
+        for (int i = 0; i < count; i++) {
+            if (hits[i].type == es->selection.type &&
+                hits[i].index == es->selection.index &&
+                es->selection.index >= 0) {
+                Selection next = hits[(i + 1) % count];
+                editor_set_status(es, "Selected %s (%d of %d here)",
+                                  editor_entity_type_name(next.type),
+                                  (i + 1) % count + 1, count);
+                return next;
+            }
+        }
+    }
+    if (count > 1)
+        editor_set_status(es, "Selected %s (1 of %d here; Alt+click or click "
+                          "again for the next)",
+                          editor_entity_type_name(hits[0].type), count);
+    return hits[0];
+}
+
 static void select_and_arm_drag(EditorState *es, float world_x, float world_y)
 {
-    Selection hit = editor_hit_test(&es->level, world_x, world_y);
+    Selection hit = pick_under_cursor(es, world_x, world_y);
     float anchor_x, anchor_y;
 
     es->dragging = 0;
+    es->last_click_valid = 0;
     if (hit.index < 0) {
         es->selection.index = -1;   /* clicked empty space */
         return;
     }
+    es->last_click_valid = 1;
+    es->last_click_x = world_x;
+    es->last_click_y = world_y;
 
     es->selection = hit;
     if (!get_entity_anchor(&es->level, hit.type, hit.index,
@@ -1080,6 +1126,7 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
         float limit = DRAG_THRESHOLD_PX / zoom;
         if (dx * dx + dy * dy < limit * limit) return;
         es->drag_moved = 1;
+        es->last_click_valid = 0;   /* a move, not a click on one spot */
     }
 
     target_x = world_x - es->drag_grab_x;

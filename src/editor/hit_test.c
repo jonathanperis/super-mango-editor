@@ -243,26 +243,35 @@ static const EntityType s_hit_order[] = {
 _Static_assert(sizeof(s_hit_order) / sizeof(s_hit_order[0]) == ENT_COUNT,
                "hit-test order must list every editor entity type");
 
-Selection editor_hit_test(const LevelDef *level, float wx, float wy)
+int editor_hit_test_all(const LevelDef *level, float wx, float wy,
+                        Selection *out, int max)
 {
-    Selection sel = { 0, -1 };
     size_t type_count = sizeof(s_hit_order) / sizeof(s_hit_order[0]);
+    int found = 0;
 
-    if (!level) return sel;
+    if (!level || !out || max <= 0) return 0;
 
     for (size_t t = 0; t < type_count; t++) {
         EntityType type = s_hit_order[t];
+        /* Within one type, later array entries are drawn later (on top). */
         for (int i = editor_entity_count(level, type) - 1; i >= 0; i--) {
             EditorRect r;
             if (!editor_entity_bounds(level, type, i, &r)) continue;
             /* Half-open box: the right and bottom edges belong to the
              * neighbour, so two touching entities never both claim a pixel. */
             if (wx >= r.x && wx < r.x + r.w && wy >= r.y && wy < r.y + r.h) {
-                sel.type = type;
-                sel.index = i;
-                return sel;
+                out[found].type = type;
+                out[found].index = i;
+                if (++found == max) return found;
             }
         }
     }
-    return sel;  /* no hit — index stays -1 */
+    return found;
+}
+
+Selection editor_hit_test(const LevelDef *level, float wx, float wy)
+{
+    Selection sel = { 0, -1 };   /* no hit: index stays -1 */
+    (void)editor_hit_test_all(level, wx, wy, &sel, 1);
+    return sel;
 }
