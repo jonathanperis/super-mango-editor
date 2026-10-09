@@ -152,6 +152,22 @@ int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
     return report->error_count == 0 ? 0 : -1;
 }
 
+void editor_load_report_add(void *context, const char *message, int line)
+{
+    EditorLoadReport *report = context;
+
+    if (!report || !message) return;
+    report->total++;
+    if (report->count >= EDITOR_LOAD_PROBLEM_MAX) return;
+    if (line > 0)
+        snprintf(report->messages[report->count], EDITOR_VALIDATION_MESSAGE_LEN,
+                 "line %d: %s", line, message);
+    else
+        snprintf(report->messages[report->count], EDITOR_VALIDATION_MESSAGE_LEN,
+                 "%s", message);
+    report->count++;
+}
+
 int editor_validation_hidden_count(const EditorValidationReport *report)
 {
     int hidden;

@@ -46,6 +46,7 @@
 #include "editor/editor_session.h"
 #include "editor/entity_meta.h"
 #include "editor/file_dialog.h"
+#include "editor/properties.h"
 #include "editor/tools.h"
 #include "levels/level_loader.h"
 #include "shared/serializer.h"
@@ -982,6 +983,83 @@ done:
     return failed;
 }
 
+/* Write `text` to `path`; 0 on success. */
+static int write_text_file(const char *path, const char *text)
+{
+    FILE *file = fopen(path, "wb");
+    if (!file) return -1;
+    if (fputs(text, file) == EOF) { fclose(file); return -1; }
+    return fclose(file) == 0 ? 0 : -1;
+}
+
+/*
+ * A file that will not open says why, in the Level Config panel: the TOML
+ * syntax error with its line, or every runtime rule the file breaks with
+ * the line of each value.  The document stays as it was, and clicking the
+ * heading hides the list.
+ */
+static int files_that_will_not_open_list_why(void)
+{
+    int failed = 0;
+    EditorState es;
+    const char *broken = TEST_OUT "ui_broken_syntax.toml";
+    const char *invalid = TEST_OUT "ui_invalid_rules.toml";
+    /* The list starts the Level Config content, above the summary. */
+    const int heading_x = CANVAS_W + 60, heading_y = TOOLBAR_H + 28 + 8 + 9;
+    CHECK(open_editor(&es, NULL) == 0);
+    cfg_scroll(-100000);   /* an earlier case may have scrolled the panel */
+    uint64_t before = doc_hash(&es);
+
+    /* Line 3 is not "key = value". */
+    CHECK(write_text_file(broken,
+                          "format_version = 1\n"
+                          "name = \"Broken\"\n"
+                          "screen_count 4\n") == 0);
+    CHECK(editor_load_level(&es, broken) != 0);
+    CHECK(doc_hash(&es) == before);
+    CHECK(es.load_report.count == 1);
+    CHECK(strncmp(es.load_report.messages[0], "line 3: TOML syntax", 19) == 0);
+    CHECK(strstr(es.status_message, "line 3") != NULL);
+
+    /* Well-formed TOML that breaks two runtime rules: both are listed,
+     * each with the line of its value. */
+    CHECK(write_text_file(invalid,
+                          "format_version = 1\n"
+                          "name = \"Invalid\"\n"
+                          "screen_count = 4\n"
+                          "\n"
+                          "[[coins]]\n"
+                          "x = 99999.0\n"
+                          "y = 100.0\n"
+                          "\n"
+                          "[[spiders]]\n"
+                          "x = 300.0\n"
+                          "vx = 0.0\n"
+                          "patrol_x0 = 250.0\n"
+                          "patrol_x1 = 350.0\n"
+                          "frame_index = 0\n") == 0);
+    CHECK(editor_load_level(&es, invalid) != 0);
+    CHECK(es.load_report.count == 2);
+    CHECK(strncmp(es.load_report.messages[0], "line 11: spiders[0].vx", 22) == 0);
+    CHECK(strncmp(es.load_report.messages[1], "line 6: coins[0].x", 18) == 0);
+    CHECK(strstr(es.load_report.file, "ui_invalid_rules.toml") != NULL);
+
+    /* The panel shows them; clicking the heading hides them. */
+    CHECK(es.config_open == 1);
+    int with_list = editor_config_total_height(&es);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    click_frame(&es, heading_x, heading_y);
+    CHECK(es.load_report.count == 0);
+    CHECK(editor_config_total_height(&es) < with_list);
+    CHECK(doc_hash(&es) == before);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    (void)remove(broken);
+    (void)remove(invalid);
+    return failed;
+}
+
 /*
  * Multi-select: a box on empty canvas selects what it touches, Shift+click
  * adds or removes one entity, and move (drag or arrows), delete, copy /
@@ -1387,6 +1465,7 @@ int main(void)
         CASE(snap_toggle_applies_to_placing_and_dragging),
         CASE(alt_click_cycles_through_overlapping_entities),
         CASE(validation_messages_take_you_to_the_problem),
+        CASE(files_that_will_not_open_list_why),
         CASE(box_and_shift_select_act_on_the_group),
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),

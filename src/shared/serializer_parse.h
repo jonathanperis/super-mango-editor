@@ -25,6 +25,18 @@ int serializer_validate_schema(toml_datum_t top, int *strict,
                                char *error, size_t error_size);
 
 /*
+ * serializer_toml_line — The source line of the value a message is about.
+ *
+ * Schema and validator messages start with a TOML path ("root.coins[2].x
+ * has type string", "spiders[0].vx is 0.00 ..."); this follows that path
+ * through the parsed tree and returns the line tomlc17 recorded for the
+ * deepest part it finds (the element's [[coins]] header when the key
+ * itself is missing).  Returns 0 when the message has no path or the
+ * path is not in the tree.
+ */
+int serializer_toml_line(toml_datum_t top, const char *message);
+
+/*
  * LOAD_ARRAY — Copy one TOML array of tables into a LevelDef array.
  *
  * Used inside the serializer_load_*() section loaders, which all have

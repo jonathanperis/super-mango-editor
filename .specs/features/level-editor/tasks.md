@@ -34,7 +34,7 @@ Baseline editor is shipped. TOML is the only level workflow; no C exporter remai
 **Work:**
 - Build on shipped `editor_validate_level` status/blocking.
 - Surface same classes of checks as `make validate-levels` for active level where practical.
-- Display parse/schema/count/path diagnostics in editor panel. **Done for a loaded level:** every runtime error is listed (`level_validate_runtime_each`), up to 16 rows plus a "... and N more" line.
+- Display parse/schema/count/path diagnostics in editor panel. **Done:** every runtime error of the open level is listed (`level_validate_runtime_each`), up to 16 rows plus a "... and N more" line; a file that fails to load lists its syntax, schema or runtime problems with line numbers (`level_load_toml_explained`).
 - Classify severity: error/warning/info.
 - Select entity/property from issue row where mapping exists. **Done:** rows and the status-bar summary are clickable; entities are selected and centred, Level Config fields focused (`LevelIssueLocation` in `level_validate.h`).
 - Keep save/playtest blocked on errors.

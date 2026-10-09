@@ -310,6 +310,8 @@ Saves write a sibling temporary file, flush it, then atomically rename it over t
 
 Save, autosave, and Play run `editor_validate_level()` first. Errors include everything `level_validate_runtime()` rejects (bad counts, out-of-world placements, invalid checkpoints, unsafe paths, a `next_phase` that breaks the level-reference rule), a `screen_count` below 1, and asset or `next_phase` files that do not exist. They block persistence and playtest, and the status bar reports `Save blocked: <first error>`. An empty level name or a Last Star left at the origin are warnings only. The status bar shows `Validation: OK` or `Validation: N error(s), M warning(s)`; the Level Config panel lists the messages. Every broken rule gets its own message (the game itself stops at the first), so a level with a bad coin and a frozen spider shows both at once; the panel lists up to 16 and ends with `... and N more` when there are others.
 
+A file that will not open is not loaded (the current document stays), and the status bar says `Load failed: <file>: <first problem>`. The Level Config panel then starts with `Could not open <file>`, listing why: a TOML syntax error with its line (`line 3: TOML syntax: ...`), a schema error with the line of the bad value (`line 9: root.coins[1].x has type string, expected finite number`), or every runtime rule the file breaks, each with its line. Clicking that heading hides the list; opening a level or starting a new one clears it.
+
 CI can initialize the editor, render five bounded frames, and exit with:
 
 ```sh
