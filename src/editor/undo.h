@@ -212,20 +212,29 @@ typedef struct {
 /* UndoStack --- the paired undo + redo stacks                         */
 /* ------------------------------------------------------------------ */
 
+/* The text a property edit changed (only next_phase has one so far). */
+typedef struct {
+    char before[256];
+    char after[256];
+} UndoText;
+
 /*
  * UndoEntry --- how the history stores one Command.
  *
- * Transfer Commands contain inline config snapshots for simple caller
- * ownership.  Stored entries allocate those snapshots only for CMD_CONFIG;
- * ordinary entity actions use compact inline storage.  A config pair is owned
- * by the entry that recorded it and freed when that entry is forgotten.
+ * Transfer Commands contain inline config snapshots and texts for simple
+ * caller ownership.  Stored entries allocate those only when the command
+ * has them: config snapshots for CMD_CONFIG, texts for a property edit that
+ * changed text.  Ordinary entity actions use compact inline storage, so the
+ * full history (UNDO_MAX steps of UNDO_GROUP_MAX entries) stays a few MB
+ * instead of over ten.  Each allocation is owned by the entry that recorded
+ * it and freed when that entry is forgotten.
  */
 typedef struct {
     CommandType type;
     int entity_type, entity_index;
     PlacementData before, after;
     int property_field;
-    char property_text_before[256], property_text_after[256];
+    UndoText *text;              /* owned; NULL when no text changed      */
     LevelConfigSnapshot *config; /* owned pair: before, after; NULL for entities */
 } UndoEntry;
 
@@ -304,9 +313,9 @@ void undo_destroy(UndoStack *stack);
  * while preserving the most recent history.
  */
 /* Returns 0 without changing history on allocation failure. The caller must
- * roll back a config edit if its snapshot cannot be recorded.  A lone entity
- * edit never allocates, and neither does a group push within the room
- * undo_group_begin reserved. */
+ * roll back a config or text edit if its snapshot cannot be recorded.  Any
+ * other lone entity edit never allocates, and neither does a group push
+ * within the room undo_group_begin reserved. */
 int undo_push(UndoStack *stack, const Command *cmd);
 
 /*

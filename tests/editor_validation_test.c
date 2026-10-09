@@ -2082,6 +2082,24 @@ static int last_star_text_property_undo_redo(void)
         goto fail;
     if (expect_int("last star text redo dirty", es.modified, 1) != 0) goto fail;
 
+    /* The text lives on the heap; when it cannot be recorded, the edit is
+     * taken back rather than left without an undo step. */
+    editor_begin_change_tracking(&es, EDITOR_CHANGE_ENTITY);
+    editor_capture_change_before(&es, EDITOR_LAST_STAR_NEXT_PHASE_WIDGET);
+    strncpy(es.level.next_phase, "levels/other.toml", sizeof(es.level.next_phase) - 1);
+    undo_test_limit_allocations(0);
+    editor_commit_change(&es);
+    undo_test_limit_allocations(-1);
+    if (expect_string("unrecorded text taken back", es.level.next_phase,
+                      "levels/new.toml") != 0 ||
+        expect_int("still one step", es.undo->top, 1) != 0 ||
+        expect_prefix("cancel reported", es.status_message,
+                      "Edit cancelled: cannot allocate undo history") != 0)
+        goto fail;
+
+    /* An entry without text costs no allocation and stores none. */
+    if (expect_int("text off the entry", (int)(sizeof(UndoEntry) < 256), 1) != 0) goto fail;
+
     undo_destroy(es.undo);
     return 0;
 
