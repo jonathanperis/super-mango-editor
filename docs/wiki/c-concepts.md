@@ -31,7 +31,7 @@ piece of code that will free it. Everything else only *borrows* the pointer.
 | Clearing a pointer after the free | `DESTROY_TEX` and `FREE_CHUNK` in `src/game.h` | `do { texture_unload(tex); (tex) = NULL; } while (0)`: the owner frees, then forgets the address, so a second cleanup is harmless. |
 | Release in reverse order | `destroy_texture_specs_reverse()` in `src/core/game_resources.c`; `game_cleanup()` in `src/core/game_lifecycle.c` | Things are freed in the opposite order they were created, so nothing is released while something else still points into it. |
 | Borrowed pointers | `coins_render()` in `src/collectibles/coin.c` | The renderer receives `Texture2D *` but never frees it; `TextureResources` in `GameState` owns it. |
-| Handing ownership over | `undo_push()` and `transfer()` in `src/editor/undo.c` | Config edits malloc a pair of snapshots. Moving an entry from the undo stack to the redo stack moves the pointer and sets the old slot to `NULL`, so exactly one stack frees it. `release_entries()` frees what a stack still owns. |
+| Handing ownership over | `undo_group_begin()` and `undo_push()` in `src/editor/undo.c` | Begin mallocs room for a group's entries and keeps the pointer in `reserve`. The group's first push hands that pointer to its step and sets `reserve` to `NULL`, so exactly one owner frees it: the step when it is dropped, or `undo_group_end()` when the group recorded nothing. |
 | A pointer to a struct, read-only | `undo_push(UndoStack *stack, const Command *cmd)` | A `Command` is about 13 KB. Passing `const Command *` avoids copying it and promises the function only reads it. |
 
 The [Debugging C](../debugging-c/) page shows what goes wrong when these

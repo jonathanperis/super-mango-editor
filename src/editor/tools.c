@@ -1226,7 +1226,13 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
         return;
     }
 
-    (void)undo_group_begin(es->undo);
+    /* Set aside the history room first: a move that cannot be recorded is
+     * put back rather than left in the level with nothing to undo it. */
+    if (undo_group_begin(es->undo, es->drag_count) == 0) {
+        restore_drag(es);
+        editor_set_status(es, "Move cancelled: cannot allocate undo history");
+        return;
+    }
     for (int i = 0; i < es->drag_count; i++) {
         Command cmd;
         PlacementData after = editor_snapshot_entity(&es->level, es->drag_items[i].type,
@@ -1238,7 +1244,7 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
         cmd.entity_index = es->drag_items[i].index;
         cmd.before       = es->drag_befores[i];
         cmd.after        = after;
-        undo_push(es->undo, &cmd);
+        (void)undo_push(es->undo, &cmd);  /* fits the room begin reserved */
         moved++;
     }
     undo_group_end(es->undo);
@@ -1405,8 +1411,17 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
             now - es->nudge_ms < NUDGE_COALESCE_MS &&
             key == es->nudge_selection_key;
     if (!merge) {
-        es->nudge_group = undo_group_begin(es->undo);
-        undo_group_end(es->undo);
+        /* Room for every selected entity, so a later nudge of the same
+         * selection merged into this step fits too.  Without it, put the
+         * selection back. */
+        int group = undo_group_begin(es->undo, count);
+        if (group == 0) {
+            for (int i = 0; i < count; i++)
+                (void)editor_entity_write(&es->level, items[i].type, items[i].index, &before[i]);
+            editor_set_status(es, "Nothing moved: cannot allocate undo history");
+            return;
+        }
+        es->nudge_group = group;
     }
     for (int i = 0; i < count; i++) {
         Command cmd;
@@ -1420,8 +1435,9 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
         cmd.group = es->nudge_group;
         cmd.before = before[i];
         cmd.after = after[i];
-        undo_push(es->undo, &cmd);
+        (void)undo_push(es->undo, &cmd);  /* fits the room begin reserved */
     }
+    if (!merge) undo_group_end(es->undo);
     es->nudge_ms = now;
     es->nudge_selection_key = key;
     editor_refresh_dirty(es);
@@ -1499,7 +1515,10 @@ void tools_delete_selected(EditorState *es)
         items[j] = item;
     }
 
-    (void)undo_group_begin(es->undo);
+    if (undo_group_begin(es->undo, count) == 0) {
+        editor_set_status(es, "Delete cancelled: cannot allocate undo history");
+        return;
+    }
     for (int i = 0; i < count; i++)
         if (delete_entity(es, items[i].type, items[i].index) == 0) deleted++;
     undo_group_end(es->undo);
