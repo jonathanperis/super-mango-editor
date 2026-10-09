@@ -1199,6 +1199,22 @@ static int campaign_view_reorders_renames_and_saves(void)
     CHECK(reloaded.levels[0].available && reloaded.levels[1].available &&
           reloaded.levels[2].available);
 
+    /* Ctrl+S saves the campaign even while a name is being typed (the
+     * name is applied first), and never saves the level instead. */
+    click_frame(&es, CAMPAIGN_NAME_X + 10, CAMPAIGN_ROWS_Y + CAMPAIGN_ROW_H + 8);
+    CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID + 1);
+    push_text("?");
+    key_frame(&es, KEY_S, INPUT_CTRL);
+    CHECK(es.ui.active_id == 0);
+    CHECK(strstr(es.status_message, "Campaign saved") != NULL);
+    CHECK(campaign_catalog_load(CAMPAIGN_MANIFEST_PATH, &reloaded) == 0);
+    CHECK(strcmp(reloaded.levels[1].display_name, "Charlie?") == 0);
+    /* Esc first cancels a name being typed, then closes. */
+    click_frame(&es, CAMPAIGN_NAME_X + 10, CAMPAIGN_ROWS_Y + 8);
+    CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID);
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(es.ui.active_id == 0 && es.campaign != NULL);
+
     /* Esc goes back to the level. */
     key_frame(&es, KEY_ESCAPE, 0);
     CHECK(es.campaign == NULL);
