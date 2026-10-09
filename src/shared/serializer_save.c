@@ -503,10 +503,19 @@ const char *level_save_kept_temp_path(void)
     return s_kept_temp_path;
 }
 
+/*
+ * level_save_toml_internal — The one save path behind every public saver.
+ *
+ * private_file picks the permissions of a *new* file on POSIX: 1 for the
+ * editor's own recovery and playtest copies (owner only, 0600), 0 for a
+ * level the user saves (0666 minus the umask, usually 0644, like any text
+ * editor).  Replacing an existing file keeps its permissions either way.
+ */
 static int level_save_toml_internal(const LevelDef *def, const char *path,
                                     const char *original_path,
                                     SerializerSavePolicy policy,
-                                    const SerializerFileFingerprint *expected) {
+                                    const SerializerFileFingerprint *expected,
+                                    int private_file) {
     char temp_path[SERIALIZER_IO_PATH_MAX];
     int install_result;
 
@@ -529,7 +538,9 @@ static int level_save_toml_internal(const LevelDef *def, const char *path,
         return -1;
     }
 
-    FILE *fp = serializer_open_temp(path, temp_path, sizeof(temp_path));
+    FILE *fp = private_file
+             ? serializer_open_temp(path, temp_path, sizeof(temp_path))
+             : serializer_open_temp_shared(path, temp_path, sizeof(temp_path));
     if (!fp) {
         fprintf(stderr, "serializer: cannot open '%s' for writing\n", path);
         serializer_remove_temp(temp_path);
@@ -586,13 +597,19 @@ static int level_save_toml_internal(const LevelDef *def, const char *path,
 int level_save_toml(const LevelDef *def, const char *path)
 {
     return level_save_toml_internal(def, path, NULL,
-                                   SERIALIZER_SAVE_REPLACE, NULL);
+                                   SERIALIZER_SAVE_REPLACE, NULL, 0);
+}
+
+int level_save_toml_private(const LevelDef *def, const char *path)
+{
+    return level_save_toml_internal(def, path, NULL,
+                                   SERIALIZER_SAVE_REPLACE, NULL, 1);
 }
 
 int level_save_toml_with_policy(const LevelDef *def, const char *path,
                                 SerializerSavePolicy policy)
 {
-    return level_save_toml_internal(def, path, NULL, policy, NULL);
+    return level_save_toml_internal(def, path, NULL, policy, NULL, 0);
 }
 
 int level_save_toml_checked(const LevelDef *def, const char *path,
@@ -601,14 +618,14 @@ int level_save_toml_checked(const LevelDef *def, const char *path,
 {
     if (policy == SERIALIZER_SAVE_REPLACE &&
         (!expected || !expected->valid)) return -1;
-    return level_save_toml_internal(def, path, NULL, policy, expected);
+    return level_save_toml_internal(def, path, NULL, policy, expected, 0);
 }
 
 int level_save_toml_recovery(const LevelDef *def, const char *path,
                              const char *original_path)
 {
     return level_save_toml_internal(def, path, original_path ? original_path : "",
-                                   SERIALIZER_SAVE_REPLACE, NULL);
+                                   SERIALIZER_SAVE_REPLACE, NULL, 1);
 }
 
 int level_read_recovery_path(const char *path, char *buf, size_t buf_size)

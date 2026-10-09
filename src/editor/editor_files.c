@@ -655,7 +655,7 @@ int editor_prepare_playtest_level(EditorState *es, char *path, size_t path_size)
         editor_set_status(es, "Play failed: path too long");
         return -1;
     }
-    if (level_save_toml(&es->level, es->playtest_path) != 0) {
+    if (level_save_toml_private(&es->level, es->playtest_path) != 0) {
         editor_set_status(es, "Play failed: save temporary level");
         return -1;
     }

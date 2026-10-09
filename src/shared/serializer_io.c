@@ -241,8 +241,38 @@ int serializer_stream_has_error(FILE *fp)
     return 0;
 }
 
-FILE *serializer_open_temp(const char *target_path, char *temp_path,
-                           size_t temp_path_size)
+#ifndef _WIN32
+/*
+ * copy_target_permissions — Give a temporary file the identity of the file
+ * it is about to replace.
+ *
+ * rename() installs the temporary file itself, so whatever mode, owner and
+ * group the temporary file has is what the saved file ends up with.  Copying
+ * them from the old file means a save never quietly changes who may read
+ * the level.  fchown can only give a file away when we are allowed to (the
+ * owner may usually pick another of their own groups, root may do anything),
+ * so a refusal is ignored: the file then simply belongs to the saver.
+ */
+static void copy_target_permissions(int fd, const char *target_path)
+{
+    struct stat target_stat;
+
+    if (lstat(target_path, &target_stat) != 0 || !S_ISREG(target_stat.st_mode))
+        return;
+    if (fchown(fd, target_stat.st_uid, target_stat.st_gid) != 0) {
+        /* Not allowed: the file simply stays the saver's. */
+    }
+    /* chown can clear set-id bits, so the mode is applied afterwards. */
+    (void)fchmod(fd, target_stat.st_mode & 07777);
+}
+#endif
+
+/*
+ * open_temp_with_mode — Shared body of serializer_open_temp and
+ * serializer_open_temp_shared; only the POSIX creation mode differs.
+ */
+static FILE *open_temp_with_mode(const char *target_path, char *temp_path,
+                                 size_t temp_path_size, int create_mode)
 {
     unsigned long attempt;
     unsigned long process_id;
@@ -281,7 +311,8 @@ FILE *serializer_open_temp(const char *target_path, char *temp_path,
             free(wide_path);
         }
 #else
-        fd = open(temp_path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+        /* open() removes the umask bits from create_mode for us. */
+        fd = open(temp_path, O_WRONLY | O_CREAT | O_EXCL, (mode_t)create_mode);
 #endif
 
         if (fd < 0) {
@@ -291,13 +322,9 @@ FILE *serializer_open_temp(const char *target_path, char *temp_path,
         }
 
 #ifndef _WIN32
-        {
-            struct stat target_stat;
-            if (lstat(target_path, &target_stat) == 0 &&
-                S_ISREG(target_stat.st_mode)) {
-                (void)fchmod(fd, target_stat.st_mode & 07777);
-            }
-        }
+        copy_target_permissions(fd, target_path);
+#else
+        (void)create_mode;  /* Windows files have no POSIX mode bits. */
 #endif
 
 #ifdef _WIN32
@@ -325,6 +352,18 @@ FILE *serializer_open_temp(const char *target_path, char *temp_path,
 
     temp_path[0] = '\0';
     return NULL;
+}
+
+FILE *serializer_open_temp(const char *target_path, char *temp_path,
+                           size_t temp_path_size)
+{
+    return open_temp_with_mode(target_path, temp_path, temp_path_size, 0600);
+}
+
+FILE *serializer_open_temp_shared(const char *target_path, char *temp_path,
+                                  size_t temp_path_size)
+{
+    return open_temp_with_mode(target_path, temp_path, temp_path_size, 0666);
 }
 
 int serializer_flush(FILE *fp)
@@ -574,9 +613,17 @@ static int serializer_create_without_link(const char *temp_path,
 {
     char buffer[8192];
     int failed = 0;
+    struct stat temp_stat;
     int in = open(temp_path, O_RDONLY);
     if (in < 0) return -1;
-    int out = open(target_path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+    /* The copy gets the temporary file's mode (private or shared, as the
+     * caller chose when it opened the temporary file). */
+    if (fstat(in, &temp_stat) != 0) {
+        (void)close(in);
+        return -1;
+    }
+    int out = open(target_path, O_WRONLY | O_CREAT | O_EXCL,
+                   temp_stat.st_mode & 0777);
     if (out < 0) {
         (void)close(in);
         return -1;

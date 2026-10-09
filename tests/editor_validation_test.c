@@ -1299,6 +1299,76 @@ cleanup:
     return result;
 }
 
+#ifndef _WIN32
+/* The permission bits of path, or -1 when it cannot be read. */
+static int file_mode(const char *path)
+{
+    struct stat st;
+    return stat(path, &st) == 0 ? (int)(st.st_mode & 07777) : -1;
+}
+#endif
+
+/*
+ * A level the user saves is an ordinary document: a new file gets
+ * 0666 minus the umask (0644 here), not the owner-only 0600 that only the
+ * editor's private recovery and playtest copies need.  Replacing a file
+ * keeps its permissions and group.
+ */
+static int saved_levels_get_ordinary_permissions(void)
+{
+#ifdef _WIN32
+    return 0;   /* Windows files have no POSIX mode bits. */
+#else
+    const char *fresh = TEST_OUT "perm_fresh.toml";
+    const char *created = TEST_OUT "perm_created.toml";
+    const char *copied = TEST_OUT "perm_copied.toml";
+    const char *private_copy = TEST_OUT "perm_private.toml";
+    const char *recovery = TEST_OUT "perm_recovery.toml";
+    const char *existing = TEST_OUT "perm_existing.toml";
+    const char *all[] = {fresh, created, copied, private_copy, recovery, existing};
+    struct stat before, after;
+    LevelDef def;
+    int result = 1;
+    mode_t old_mask = umask(022);
+
+    ensure_out_dir();
+    for (size_t i = 0; i < sizeof(all) / sizeof(all[0]); i++) remove(all[i]);
+    fill_valid_minimal(&def);
+
+    if (level_save_toml(&def, fresh) != 0 ||
+        expect_int("new level mode", file_mode(fresh), 0644) != 0) goto cleanup;
+    if (level_save_toml_with_policy(&def, created, SERIALIZER_SAVE_CREATE_ONLY) != 0 ||
+        expect_int("create-only level mode", file_mode(created), 0644) != 0) goto cleanup;
+    /* Drives without hard links copy into the claimed name instead. */
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NO_HARD_LINKS);
+    if (level_save_toml_with_policy(&def, copied, SERIALIZER_SAVE_CREATE_ONLY) != 0 ||
+        expect_int("copied level mode", file_mode(copied), 0644) != 0) goto cleanup;
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+    if (level_save_toml_private(&def, private_copy) != 0 ||
+        expect_int("playtest copy mode", file_mode(private_copy), 0600) != 0) goto cleanup;
+    if (level_save_toml_recovery(&def, recovery, fresh) != 0 ||
+        expect_int("recovery copy mode", file_mode(recovery), 0600) != 0) goto cleanup;
+
+    /* Replacing keeps the old file's mode and group, private or not. */
+    if (write_text_file(existing, "old\n") != 0 || chmod(existing, 0640) != 0 ||
+        stat(existing, &before) != 0) goto cleanup;
+    if (level_save_toml(&def, existing) != 0 || stat(existing, &after) != 0 ||
+        expect_int("replaced mode kept", (int)(after.st_mode & 07777), 0640) != 0 ||
+        expect_int("replaced group kept", after.st_gid == before.st_gid, 1) != 0)
+        goto cleanup;
+    if (level_save_toml_private(&def, existing) != 0 ||
+        expect_int("private replace keeps mode", file_mode(existing), 0640) != 0)
+        goto cleanup;
+    result = 0;
+
+cleanup:
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+    umask(old_mask);
+    for (size_t i = 0; i < sizeof(all) / sizeof(all[0]); i++) remove(all[i]);
+    return result;
+#endif
+}
+
 static int autosave_backs_off_and_snapshots_last_valid_level(void)
 {
     EditorState es;
@@ -4076,6 +4146,7 @@ int main(void)
     if (autosave_recovery_preserves_destination() != 0) return 1;
     if (editor_save_workflows_enforce_baselines() != 0) return 1;
     if (stranded_replace_keeps_the_temporary_file() != 0) return 1;
+    if (saved_levels_get_ordinary_permissions() != 0) return 1;
     if (symlinks_are_followed_only_for_the_opened_document() != 0) return 1;
     if (text_fields_drop_invalid_utf8() != 0) return 1;
     if (recovery_metadata_and_failed_save_contract() != 0) return 1;
