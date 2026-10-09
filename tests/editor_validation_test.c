@@ -11,12 +11,16 @@
 #include "shared/graphics.h"
 #include "shared/text.h"
 
+#include <time.h>
+
 #ifdef _WIN32
 #include <direct.h>
 #include <process.h>
 #include <io.h>
 #include <sys/stat.h>
+#include <sys/utime.h>  /* _utime: backdate a file */
 #else
+#include <utime.h>      /* utime: backdate a file */
 #include <errno.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -4196,6 +4200,20 @@ static int write_recovery_pair(const char *root, unsigned long long id,
     return write_text_file(path, line);
 }
 
+/* Make a file look `seconds` old, as if written that long ago. */
+static int backdate_file(const char *path, long seconds)
+{
+#ifdef _WIN32
+    struct _utimbuf times;
+    times.actime = times.modtime = time(NULL) - seconds;
+    return _utime(path, &times);
+#else
+    struct utimbuf times;
+    times.actime = times.modtime = time(NULL) - seconds;
+    return utime(path, &times);
+#endif
+}
+
 static int recovery_pair_exists(const char *root, unsigned long long id,
                                 const char *suffix)
 {
@@ -4228,12 +4246,22 @@ static int recovery_folder_stays_manageable(void)
 
     if (make_test_preference_root(root, sizeof(root)) != 0) return 1;
 
-    /* A .toml whose .meta is gone is swept at start-up. */
-    if (write_recovery_pair(root, 0xabc, 0, 0) != 0) goto cleanup;
+    /* A .toml whose .meta is gone is swept at start-up, once it is old
+     * enough; one written moments ago may be another editor's first
+     * snapshot, whose .meta comes right after, and stays. */
+    if (write_recovery_pair(root, 0xabc, 0, 0) != 0 ||
+        write_recovery_pair(root, 0xabd, 0, 0) != 0) goto cleanup;
+    {
+        char path[EDITOR_PATH_MAX + 64];   /* root, then the file name */
+        snprintf(path, sizeof(path), "%s/editor_recovery_%016llx.toml", root, 0xabcull);
+        if (backdate_file(path, 10 * 60) != 0) goto cleanup;
+    }
     if (editor_set_preference_root(&es, root) != 0 ||
         editor_init_persistence_paths(&es) != 0 ||
-        expect_int("orphan swept", recovery_pair_exists(root, 0xabc, ".toml"), 0) != 0)
+        expect_int("orphan swept", recovery_pair_exists(root, 0xabc, ".toml"), 0) != 0 ||
+        expect_int("fresh orphan kept", recovery_pair_exists(root, 0xabd, ".toml"), 1) != 0)
         goto cleanup;
+    remove_recovery_pair(root, 0xabd);
 
     /* Old copies fill every slot: autosave says so, and leaves no orphan. */
     for (int i = 0; i < EDITOR_MAX_RECOVERY_ENTRIES; i++)
@@ -4315,7 +4343,7 @@ static int recovery_folder_stays_manageable(void)
     {
         unsigned long parent = (unsigned long)getppid();
         unsigned long long start = (unsigned long long)editor_process_start_time(parent);
-        char path[EDITOR_PATH_MAX];
+        char path[EDITOR_PATH_MAX + 64];   /* root, then the file name */
         char line[160];
         int ok = 1;
         if (expect_int("start time known", start != 0, 1) != 0) goto cleanup;
@@ -4344,6 +4372,7 @@ cleanup:
     for (int i = 0; i < EDITOR_MAX_RECOVERY_ENTRIES; i++)
         remove_recovery_pair(root, first_id + (unsigned long long)i);
     remove_recovery_pair(root, 0xabc);
+    remove_recovery_pair(root, 0xabd);
     remove_recovery_pair(root, 0x2000);
     remove_recovery_pair(root, 0x3000);
     remove_recovery_pair(root, 0x3001);
