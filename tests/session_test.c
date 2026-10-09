@@ -33,6 +33,7 @@
 #include "levels/level_loader.h"
 #include "levels/level_path.h"
 #include "levels/level_resources.h"
+#include "levels/level_start.h"  /* level_ground_top_at */
 #include "player/player_surfaces.h"
 #include "player/player_internal.h"
 
@@ -515,6 +516,61 @@ static int start_points_place_the_first_game(void)
         return 1;
     }
     return 0;
+}
+
+/*
+ * A level without authored checkpoints saves one at each new screen,
+ * moving respawn_x only. After --start-x on the 3-tile pillar at x 256,
+ * the next screen's respawn kept the pillar's height, in mid-air over the
+ * floor. On a start-point run the height now follows the ground under the
+ * new respawn column; a normal run keeps the level start's height, so
+ * recorded runs do not change.
+ */
+static int start_point_respawns_follow_the_ground(void)
+{
+    const char *level = "levels/00_sandbox_01.toml";
+    AppSessionConfig config = {.level_path = level};
+    AppSession *session;
+    GameState *game;
+    float top = 0.0f;
+    int failed = 0;
+
+    config.start.kind = LEVEL_START_AT_X;
+    config.start.x = 280.0f;
+    session = session_create(&config);
+    if (!session || !session->game) {
+        fprintf(stderr, "session_test: sandbox start-x session_create failed\n");
+        session_destroy(&session);
+        return 1;
+    }
+    game = session->game;
+    failed |= expect_float("start on the 3-tile pillar", game->world.respawn_y,
+                           level_platform_top_y(3));
+    game->world.player.x = 2.0f * GAME_W + 50.0f;
+    game_update_active(game, GAME_FIXED_STEP, (int)game->world.camera.x);
+    failed |= expect_int("screen checkpoint saved", game->world.legacy_checkpoint_screen, 2);
+    failed |= expect_int("ground under the new respawn",
+                         level_ground_top_at(game->world.level_def, game->world.respawn_x, &top), 1);
+    failed |= expect_float("respawn on that ground", game->world.respawn_y, top);
+    failed |= expect_int("not the pillar's height", game->world.respawn_y != level_platform_top_y(3), 1);
+    session_destroy(&session);
+
+    /* A normal run: the same checkpoint keeps the level start's height. */
+    config.start.kind = LEVEL_START_DEFAULT;
+    session = session_create(&config);
+    if (!session || !session->game) {
+        fprintf(stderr, "session_test: sandbox session_create failed\n");
+        session_destroy(&session);
+        return 1;
+    }
+    game = session->game;
+    float start_y = game->world.respawn_y;
+    game->world.player.x = 2.0f * GAME_W + 50.0f;
+    game_update_active(game, GAME_FIXED_STEP, (int)game->world.camera.x);
+    failed |= expect_int("normal run checkpoint saved", game->world.legacy_checkpoint_screen, 2);
+    failed |= expect_float("normal run keeps the start height", game->world.respawn_y, start_y);
+    session_destroy(&session);
+    return failed;
 }
 
 static int failed_initial_level_does_not_create_session(void)
@@ -1497,6 +1553,7 @@ int main(void)
         CASE(physical_release_latch_blocks_transition_input),
         CASE(failed_initial_level_does_not_create_session),
         CASE(start_points_place_the_first_game),
+        CASE(start_point_respawns_follow_the_ground),
         CASE(asset_root_moves_a_foreign_working_folder),
         CASE(direct_game_boot_repairs_input_and_keeps_controller_runtime),
         CASE(immediate_play_preserves_window_and_input_latch),
