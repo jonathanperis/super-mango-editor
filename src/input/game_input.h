@@ -17,8 +17,15 @@ typedef struct {
 } GameInputPhysicalState;
 
 /* The window owns device polling. GameState retains the selected device index. */
+/* Use device (raylib index + 1) when this screen has no controller yet. */
+void gamepad_adopt_controller(GameState *gs, int device);
+/* Adopt the first connected gamepad, if any (called every frame). */
 void gamepad_refresh_controller(GameState *gs);
 void gamepad_close_controller(GameState *gs);
+
+/* Non-zero for a "confirm" press: Enter, keypad Enter or Space on a
+ * keyboard; A or Start on a gamepad. Menus, settings and overlays agree. */
+int game_input_event_confirms(const InputEvent *event);
 
 /* Read physical controls without consuming queued commands. */
 void game_input_read_physical(int controller,

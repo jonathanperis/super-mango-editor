@@ -284,6 +284,33 @@ static int settings_message_clears_on_cancel_and_close(void)
     return 0;
 }
 
+/* The confirm test and controller adoption are shared by the menu, the
+ * settings panel and gameplay; both must agree wherever they are used. */
+static int confirm_and_controller_helpers(void)
+{
+    InputEvent event = {.type=INPUT_KEY_DOWN,.key=KEY_KP_ENTER};
+    if (expect_int("keypad Enter confirms", game_input_event_confirms(&event), 1) != 0) return 1;
+    event.key = KEY_A;
+    if (expect_int("A key does not confirm", game_input_event_confirms(&event), 0) != 0) return 1;
+    event = (InputEvent){.type=INPUT_PAD_DOWN,.button=PAD_START};
+    if (expect_int("Start confirms", game_input_event_confirms(&event), 1) != 0) return 1;
+    event.button = PAD_B;
+    if (expect_int("B does not confirm", game_input_event_confirms(&event), 0) != 0) return 1;
+    event = (InputEvent){.type=INPUT_MOUSE_DOWN,.button=MOUSE_BUTTON_LEFT};
+    if (expect_int("left click is not pad A", game_input_event_confirms(&event), 0) != 0) return 1;
+
+    GameState gs = {0};
+    gamepad_adopt_controller(&gs, 2);
+    gamepad_adopt_controller(&gs, 3);
+    if (expect_int("first controller kept", gs.controller, 2) != 0) return 1;
+    gs.controller = 0;
+    InputEvent added = {.type=INPUT_PAD_ADDED,.device=4};
+    input_push(&added);
+    game_handle_events(&gs);
+    if (expect_int("hot-plugged controller adopted", gs.controller, 4) != 0) return 1;
+    return 0;
+}
+
 int main(void)
 {
     if (input_backend_contract_test()) return 1;
@@ -301,6 +328,7 @@ int main(void)
     if (confirm_resume_latches_the_jump_button() != 0) return 1;
     if (focus_regain_keeps_music_paused_under_settings() != 0) return 1;
     if (settings_message_clears_on_cancel_and_close() != 0) return 1;
+    if (confirm_and_controller_helpers() != 0) return 1;
 
     input_close();
     if (game_web_input_touch(GAME_TOUCH_JUMP, 1) != 0) return 1;

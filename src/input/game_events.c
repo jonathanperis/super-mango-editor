@@ -69,7 +69,7 @@ void game_handle_events(GameState *gs)
             game_overlay_set_pause_reason(gs, GAME_PAUSE_REASON_FOCUS, !event.focused);
             sync_pause_music(gs);
         } else if (event.type == INPUT_PAD_ADDED) {
-            if (!gs->controller) gs->controller = event.device;
+            gamepad_adopt_controller(gs, event.device);
         } else if (event.type == INPUT_PAD_REMOVED) {
             if (gs->controller == event.device) {
                 gs->controller = 0;
@@ -79,7 +79,7 @@ void game_handle_events(GameState *gs)
             if (event.repeat) continue;
             int key = event.type == INPUT_KEY_DOWN ? event.key : KEY_NULL;
             int button = event.type == INPUT_PAD_DOWN ? event.button : -1;
-            int confirm = key == KEY_ENTER || key == KEY_KP_ENTER || key == KEY_SPACE || button == PAD_A || button == PAD_START;
+            int confirm = game_input_event_confirms(&event);
             if (terminal_overlay(gs)) {
                 if (gs->route != GAME_ROUTE_NONE) continue;
                 if (key == KEY_UP || key == KEY_W || button == PAD_UP) game_terminal_move(gs, -1);

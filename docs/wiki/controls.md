@@ -61,7 +61,9 @@ The mouse can also click **Play** and the **Settings (F1 / Y)** button. The sele
 **Release latch.** After a pause resumes, settings close, Retry or Next Level,
 the game records every bound key and button still held (a gamepad A/Start that
 confirmed counts too). Gameplay input reads as zero until all of them are
-released, so the Space or A that resumed a pause does not also jump.
+released, so the Space or A that resumed a pause does not also jump. A new game
+screen (Play, Replay, a direct `--level` start) arms it once, after the profile's
+bindings are attached, including controls still held from the previous screen.
 
 The overlay text is snapshotted in [Overlay Snapshots](../overlay-snapshots/) so docs drift checks catch stale copy and control hints.
 

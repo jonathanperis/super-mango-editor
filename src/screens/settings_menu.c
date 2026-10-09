@@ -1,4 +1,5 @@
 #include "settings_menu.h"
+#include "../input/game_input.h"  /* game_input_event_confirms */
 #include "../shared/platform.h"
 #include <stdio.h>
 #include <string.h>
@@ -137,8 +138,7 @@ int settings_menu_event(SettingsMenu *menu, GameProfile *profile,
     if (key == KEY_DOWN || button == PAD_DOWN) menu->selected = (menu->selected + 1) % rows;
     if (!menu->page && (key == KEY_LEFT || button == PAD_LEFT)) adjust(menu, profile, -1);
     if (!menu->page && (key == KEY_RIGHT || button == PAD_RIGHT)) adjust(menu, profile, 1);
-    if (key == KEY_ENTER || key == KEY_KP_ENTER || key == KEY_SPACE ||
-        button == PAD_A || button == PAD_START) activate(menu, profile);
+    if (game_input_event_confirms(event)) activate(menu, profile);
     if (event->type == INPUT_MOUSE_DOWN && event->button == MOUSE_BUTTON_LEFT) {
         int row = (event->y - 36) / 16;
         if (event->x >= 18 && event->x < 382 && event->y >= 36 && row < rows) {
