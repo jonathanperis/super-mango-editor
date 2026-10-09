@@ -413,6 +413,34 @@ def check_wasm_authority_docs() -> None:
             fail(f"{rel}: missing current CI-authoritative WebAssembly verification note")
 
 
+# Files that quote the Emscripten version. Renovate's "emscripten" group
+# (renovate.json) rewrites all of them together; this check catches a pin
+# changed by hand in only one place.
+EMSCRIPTEN_MENTIONS = [
+    "README.md",
+    "docs/README.md",
+    "docs/wiki/build-system.md",
+    "vendor/raylib/README.md",
+    "web/keyboard-scope.js",
+]
+
+
+def check_emscripten_pins() -> None:
+    makefile = re.search(r"^EMSCRIPTEN_VERSION \?= (\S+)$", read(ROOT / "Makefile"), re.M)
+    workflow = re.search(r"depName=emscripten-core/emsdk\s*\n\s*version: (\S+)",
+                         read(ROOT / ".github" / "workflows" / "build.yml"))
+    if not makefile or not workflow:
+        fail("Makefile/build.yml: Emscripten pin (EMSCRIPTEN_VERSION / setup-emsdk version) not found")
+        return
+    pin = makefile.group(1)
+    if workflow.group(1) != pin:
+        fail(f".github/workflows/build.yml: Emscripten {workflow.group(1)} differs from the Makefile's {pin}")
+    for rel in EMSCRIPTEN_MENTIONS:
+        for found in re.findall(r"Emscripten[^\n]{0,100}?(\d+\.\d+\.\d+)", read(ROOT / rel)):
+            if found != pin:
+                fail(f"{rel}: mentions Emscripten {found}; the pin is {pin}")
+
+
 def check_pages_metadata() -> None:
     layout = read(ROOT / "docs" / "src" / "layouts" / "BaseLayout.astro")
     if "const canonicalUrl = new URL(Astro.url.pathname, Astro.site).toString();" not in layout:
@@ -797,6 +825,7 @@ def main() -> int:
     check_developer_context_docs()
     check_public_readme_docs()
     check_wasm_authority_docs()
+    check_emscripten_pins()
     check_pages_metadata()
     check_make_targets_documented()
     check_src_paths_exist()

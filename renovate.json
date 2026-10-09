@@ -1,4 +1,73 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>jonathanperis/.github"]
+  "extends": ["github>jonathanperis/.github"],
+  "customManagers": [
+    {
+      "description": "Version pins marked with a `# renovate: datasource=... depName=...` comment on the line above: Emscripten in build.yml and the Makefile, Mesa in build.yml",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/build\\.yml$/", "/^Makefile$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n[^\\n]*?(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ]
+    },
+    {
+      "description": "Emscripten versions quoted in the manuals and comments, kept equal to the CI pin (make docs-drift checks this)",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^README\\.md$/",
+        "/^docs/README\\.md$/",
+        "/^docs/wiki/build-system\\.md$/",
+        "/^vendor/raylib/README\\.md$/",
+        "/^web/keyboard-scope\\.js$/"
+      ],
+      "matchStrings": ["Emscripten[^\\n]{0,100}?(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "emscripten-core/emsdk"
+    },
+    {
+      "description": "raylib source pin: the tag and its commit (also in the archive URL). The sha256 and patches.json need a manual update, so CI fails until a maintainer finishes the bump.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^vendor/raylib/manifest\\.json$/"],
+      "matchStrings": [
+        "\"version\":\\s*\"(?<currentValue>[^\"]+)\",\\s*\"commit\":\\s*\"(?<currentDigest>[0-9a-f]{40})\",\\s*\"url\":\\s*\"[^\"]*\""
+      ],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "raysan5/raylib",
+      "versioningTemplate": "loose"
+    },
+    {
+      "description": "Vendored tomlc17 release. Renovate cannot re-import the sources and re-apply the project patches, so this only reports new releases on the Dependency Dashboard (see vendor/tomlc17/README.md).",
+      "customType": "regex",
+      "managerFilePatterns": ["/^vendor/tomlc17/README\\.md$/"],
+      "matchStrings": ["- Release: \\[(?<currentValue>R\\d{6})\\]"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "cktan/tomlc17",
+      "versioningTemplate": "regex:^R(?<major>\\d{2})(?<minor>\\d{2})(?<patch>\\d{2})$"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Toolchain and vendored-source pins change generated code or need manual follow-up (checksums, patches), so they are never automerged",
+      "matchManagers": ["custom.regex"],
+      "automerge": false
+    },
+    {
+      "description": "One pull request for every Emscripten pin and mention",
+      "matchManagers": ["custom.regex"],
+      "matchPackageNames": ["emscripten-core/emsdk"],
+      "groupName": "emscripten"
+    },
+    {
+      "description": "Mesa and raylib bumps also need a new SHA-256 (MESA_SHA256 in build.yml, sha256 in vendor/raylib/manifest.json); CI fails closed until it is updated",
+      "matchManagers": ["custom.regex"],
+      "matchPackageNames": ["pal1000/mesa-dist-win", "raysan5/raylib"],
+      "prBodyNotes": ["Update the pinned SHA-256 for the new archive before merging; the checksum check in CI fails until then."]
+    },
+    {
+      "description": "tomlc17 is vendored with project patches: report new releases on the Dependency Dashboard only",
+      "matchManagers": ["custom.regex"],
+      "matchPackageNames": ["cktan/tomlc17"],
+      "dependencyDashboardApproval": true
+    }
+  ]
 }
