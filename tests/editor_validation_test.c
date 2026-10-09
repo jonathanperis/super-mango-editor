@@ -5443,6 +5443,54 @@ done:
  * third... copies all landed on the first copy's spot, and a second floor
  * gap was even refused as a duplicate.  Now every paste steps once more.
  */
+/*
+ * A pasted copy lands where dragging the original 24 px right and down
+ * would put it: one shared helper (editor_move_placement) moves both, so a
+ * bird's height or a saw's y can no longer follow a drag but not a paste.
+ */
+static int paste_moves_like_a_drag(void)
+{
+    static const EntityType types[] = { ENT_BIRD, ENT_CIRCULAR_SAW, ENT_BRIDGE, ENT_COIN };
+    EditorState es = {0};
+    int failed = 1;
+
+    editor_level_init_defaults(&es.level);
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+    es.level.bird_count = 1;
+    es.level.birds[0] = (BirdPlacement){200.0f, 100.0f, 30.0f, 150.0f, 250.0f, 0};
+    es.level.circular_saw_count = 1;
+    es.level.circular_saws[0] = (CircularSawPlacement){300.0f, 120.0f, 280.0f, 340.0f, 1};
+    es.level.bridge_count = 1;
+    es.level.bridges[0] = (BridgePlacement){500.0f, 150.0f, 3};
+    es.level.coin_count = 1;
+    es.level.coins[0] = (CoinPlacement){100.0f, 100.0f};
+    if (level_is_valid("paste-like-drag base", &es.level) != 0) goto done;
+
+    for (size_t t = 0; t < sizeof(types) / sizeof(types[0]); t++) {
+        EntityType type = types[t];
+        PlacementData original = editor_snapshot_entity(&es.level, type, 0);
+        PlacementData dragged = editor_move_placement(type, &original, 24.0f, 24.0f);
+        PlacementData pasted;
+        editor_clamp_placement(&es.level, type, &dragged);
+        es.selection.type = type;
+        es.selection.index = 0;
+        editor_copy_selected(&es);
+        editor_paste_clipboard(&es);
+        if (expect_int("one copy", editor_entity_count(&es.level, type), 2) != 0) goto done;
+        pasted = editor_snapshot_entity(&es.level, type, 1);
+        if (expect_int(editor_entity_type_name(type),
+                       memcmp(&pasted, &dragged, sizeof(pasted)) == 0, 1) != 0)
+            goto done;
+    }
+    if (expect_float_value("bird height moved", es.level.birds[1].base_y, 124.0f) != 0)
+        goto done;
+    failed = 0;
+done:
+    undo_destroy(es.undo);
+    return failed;
+}
+
 static int repeated_paste_steps_each_copy(void)
 {
     EditorState es = {0};
@@ -5727,6 +5775,7 @@ int main(void)
     if (new_level_resets_previews() != 0) return 1;
     if (rail_rider_paste_follows_its_rail() != 0) return 1;
     if (repeated_paste_steps_each_copy() != 0) return 1;
+    if (paste_moves_like_a_drag() != 0) return 1;
     if (extreme_floats_round_trip_through_save() != 0) return 1;
     if (create_only_save_without_hard_links() != 0) return 1;
 

@@ -266,7 +266,7 @@ The folder holds at most 32 recovery copies. When leftover copies fill it, autos
 | Paste (offset from original) | `Ctrl+V` |
 | Duplicate the selection (offset, clipboard untouched) | `Ctrl+D` |
 
-`Ctrl+C` copies the whole selection. Each pasted entity is moved a little so it does not hide the original (24 px right, and down for free-floating things; along the rail for rail riders; one gap width for floor gaps), and the pasted copies become the selection. A rail copied together with its riders pastes as a new rail carrying the copied riders. A paste is all or nothing: if one copy cannot be added, none is. Each further
+`Ctrl+C` copies the whole selection. Each pasted entity is moved a little so it does not hide the original: exactly where dragging it 24 px right and 24 px down would put it (things whose height comes from the floor or water move only right, floor gaps one whole gap width), except rail riders, which step along their rail, and the pasted copies become the selection. A rail copied together with its riders pastes as a new rail carrying the copied riders. A paste is all or nothing: if one copy cannot be added, none is. Each further
 `Ctrl+V` steps one more offset from the previous copy, so repeated pastes lay
 out a row instead of stacking on one spot; a new `Ctrl+C` starts again from the
 copied entity.
