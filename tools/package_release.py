@@ -35,7 +35,7 @@ def copy_tree(src: Path, dst: Path, *, playable_assets: bool = False) -> None:
 
 
 def raylib_source(build: Path) -> Path:
-    pin = json.loads((ROOT / "vendor/raylib/manifest.json").read_text())
+    pin = json.loads((ROOT / "vendor/raylib/manifest.json").read_text(encoding="utf-8"))
     return build / ("raylib-" + pin["commit"])
 
 
