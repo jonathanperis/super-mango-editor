@@ -113,6 +113,20 @@ int editor_set_float_platform_mode(EditorState *es, int index,
                                    FloatPlatformMode mode);
 
 /*
+ * tools_nudge_selection --- Move the selection by (dx, dy) world pixels
+ * (the arrow keys: 1 px, or NUDGE_LARGE_PX with Shift).
+ *
+ * Uses the same per-type rules as dragging (floor-bound things ignore dy,
+ * rail riders stay on their rail) and the same world clamping.  A nudge
+ * that would make the level invalid is refused with a status message.
+ * Nudges of the same selection less than NUDGE_COALESCE_MS apart extend
+ * one undo step instead of filling the history with 1-px moves.
+ */
+#define NUDGE_LARGE_PX    16.0f
+#define NUDGE_COALESCE_MS 1000u
+void tools_nudge_selection(EditorState *es, float dx, float dy);
+
+/*
  * tools_right_click --- Handle a right-click at world position.
  *
  * Convenience shortcut: right-clicking any entity deletes it regardless

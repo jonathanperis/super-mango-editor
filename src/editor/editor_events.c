@@ -16,12 +16,24 @@ static void editor_history(EditorState *es, int redo)
     /* Finish the staged field edit before moving history. Otherwise Undo could
      * change the document while a widget still points at its previous value. */
     Command command;
+    int group;
     if (es->dragging) return;  /* editor_key already explained why */
     if (!editor_finish_field_edit(es)) return;
-    if (redo ? redo_pop(es->undo, &command) : undo_pop(es->undo, &command)) {
+    if (!(redo ? redo_pop(es->undo, &command) : undo_pop(es->undo, &command)))
+        return;
+    /*
+     * One step may be a group of entries (a multi-entity move, delete or
+     * paste; see undo.h).  Keep popping while the next entry belongs to the
+     * same group.  Undo meets the entries newest first and redo oldest
+     * first, so array positions shift back exactly as they shifted forward.
+     */
+    group = command.group;
+    editor_apply_undo_command(es, &command, redo ? 0 : 1);
+    while (group != 0 &&
+           (redo ? redo_top_group(es->undo) : undo_top_group(es->undo)) == group &&
+           (redo ? redo_pop(es->undo, &command) : undo_pop(es->undo, &command)))
         editor_apply_undo_command(es, &command, redo ? 0 : 1);
-        editor_refresh_dirty(es);
-    }
+    editor_refresh_dirty(es);
 }
 
 static void editor_key(EditorState *es, const InputEvent *event)
@@ -131,8 +143,20 @@ static void editor_key(EditorState *es, const InputEvent *event)
         if (editor_finish_field_edit(es)) es->show_grid ^= 1;
         break;
     case KEY_DELETE:
+    case KEY_BACKSPACE:
+        /* Backspace too: many laptop keyboards (Macs) have no Delete key.
+         * Inside a text field it edits text instead (handled above). */
         if (es->selection.index >= 0 && editor_finish_field_edit(es)) tools_delete_selected(es);
         break;
+    case KEY_LEFT: case KEY_RIGHT: case KEY_UP: case KEY_DOWN: {
+        /* Nudge the selection 1 px, or 16 px with Shift. */
+        float step = shift ? NUDGE_LARGE_PX : 1.0f;
+        float dx = key == KEY_LEFT ? -step : key == KEY_RIGHT ? step : 0.0f;
+        float dy = key == KEY_UP ? -step : key == KEY_DOWN ? step : 0.0f;
+        if (es->selection.index >= 0 && editor_finish_field_edit(es))
+            tools_nudge_selection(es, dx, dy);
+        break;
+    }
     case KEY_ONE:
         if (editor_finish_field_edit(es)) es->tool = TOOL_SELECT;
         break;
@@ -141,9 +165,6 @@ static void editor_key(EditorState *es, const InputEvent *event)
         break;
     case KEY_THREE:
         if (editor_finish_field_edit(es)) es->tool = TOOL_DELETE;
-        break;
-    case KEY_BACKSPACE:
-        es->ui.key_backspace = 1;
         break;
     case KEY_ENTER:
         es->ui.key_return = 1;
