@@ -728,6 +728,42 @@ def check_learning_page_functions() -> None:
                          "or labs/; rename it to match the code")
 
 
+# "`foo()` in `src/x/y.c`", "`foo()` and `bar()` in `src/x/y.h`", "`foo()` (`src/x/y.c`".
+FUNCTION_LOCATION_RE = re.compile(
+    r"((?:`[A-Za-z_]\w*\(\)`(?:,\s+|\s+and\s+|\s+or\s+|\s*/\s*))*`[A-Za-z_]\w*\(\)`)"
+    r"\s+(?:in\s+|\()`(src/[\w/]+\.[ch])`")
+
+
+def file_defines_function(source: str, name: str) -> bool:
+    """A file-scope definition or declaration of `name(` (a line that starts
+    with a type or the name itself), or a function-like macro."""
+    for line in source.splitlines():
+        if re.match(rf"^\s*#\s*define\s+{name}\(", line):
+            return True
+        if line[:1].isalpha() and not line.startswith(("return", "if", "else")) \
+                and re.search(rf"\b{name}\s*\(", line):
+            return True
+    return False
+
+
+def check_function_locations() -> None:
+    """Every "`foo()` in `src/...`" claim names a file that defines or declares foo."""
+    for page in doc_pages() + [ROOT / "PRODUCT.md"] + SPEC_PAGES:
+        text = read(page)
+        for match in FUNCTION_LOCATION_RE.finditer(text):
+            line_no = text.count("\n", 0, match.start()) + 1
+            rel = match.group(2)
+            path = ROOT / rel
+            if not path.is_file():
+                fail(f"{page_label(page, line_no)}: `{rel}` does not exist")
+                continue
+            source = read(path)
+            for name in re.findall(r"`(\w+)\(\)`", match.group(1)):
+                if name not in EXERCISE_NAMES and not file_defines_function(source, name):
+                    fail(f"{page_label(page, line_no)}: `{name}()` is not defined in `{rel}`; "
+                         "name the file that defines it")
+
+
 def source_defines() -> dict[str, list[str]]:
     defines: dict[str, list[str]] = {}
     for path in sorted((ROOT / "src").rglob("*.[ch]")):
@@ -952,6 +988,7 @@ def main() -> int:
     check_make_targets_documented()
     check_src_paths_exist()
     check_learning_page_functions()
+    check_function_locations()
     check_constant_values()
     check_inspector_keys_doc()
     check_render_order_doc()

@@ -37,7 +37,7 @@ CAMPAIGN_MANIFEST = LEVEL_DIR / "campaigns" / "main.toml"
 CURRENT_FORMAT_VERSION = 1
 CAMPAIGN_MANIFEST_VERSION = 1
 CAMPAIGN_MANIFEST_FIELDS = {"format_version", "levels"}
-# Mirrors CAMPAIGN_LEVEL_PATH_SIZE in src/levels/level_session.h: the game
+# Mirrors CAMPAIGN_LEVEL_PATH_SIZE in src/levels/campaign_catalog.h: the game
 # keeps each entry in a 256-byte C buffer, so 255 UTF-8 bytes plus the NUL.
 CAMPAIGN_LEVEL_PATH_SIZE = 256
 
@@ -473,7 +473,7 @@ C_SPACE_CHARS = " \t\n\v\f\r"
 
 
 def campaign_display_name(campaign_path: str, data: dict) -> str:
-    """Mirror campaign_derive_display_name in src/levels/level_session.c.
+    """Mirror campaign_derive_display_name in src/levels/campaign_catalog.c.
 
     The level selector shows the level's `name` when it has any non-blank
     character, otherwise the file name without `.toml`.  The game refuses a

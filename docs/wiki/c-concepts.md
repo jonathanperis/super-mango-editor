@@ -79,9 +79,9 @@ pairs in a table and writes the logic once.
 
 | Idea | Where to read it | What to notice |
 |------|------------------|----------------|
-| `goto` to a single cleanup label | `campaign_manifest_load_entries()` in `src/levels/level_session.c` | Every check after the TOML file is parsed jumps to `done:`, which calls `toml_free(parsed)` once. Without the `goto`, each of the dozen error paths would need its own free, and one would eventually be forgotten. |
+| `goto` to a single cleanup label | `campaign_manifest_load_entries()` in `src/levels/campaign_catalog.c` | Every check after the TOML file is parsed jumps to `done:`, which calls `toml_free(parsed)` once. Without the `goto`, each of the dozen error paths would need its own free, and one would eventually be forgotten. |
 | The same pattern at startup | `game_init()` in `src/core/game_lifecycle.c` | Any failed step jumps to `fail:`, which runs `game_cleanup()`. That works because cleanup tolerates a half-built `GameState`: every slot is either `NULL` or owned. |
-| Staging before committing | `campaign_catalog_load()` in `src/levels/level_session.c` | The manifest is loaded into a staged catalog first; the caller's data only changes when everything succeeded. |
+| Staging before committing | `campaign_catalog_load()` in `src/levels/campaign_catalog.c` | The manifest is loaded into a staged catalog first; the caller's data only changes when everything succeeded. |
 
 ## Integers that must not overflow
 
