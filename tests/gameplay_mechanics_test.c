@@ -35,6 +35,7 @@
 #include "hazards/spike_block.h"
 #include "input/game_input.h"
 #include "input/input_backend.h"
+#include "levels/level_validate.h"  /* level_jumping_spider_min_gap_speed */
 #include "player/player_internal.h"
 #include "shared/audio.h"
 #include "gameplay_mechanics_test.h"
@@ -532,6 +533,43 @@ static int jumping_spider_leaps_the_gap(void)
     CHECK(turned && jumped_back);
 done:
     game_cleanup(&gs);
+    return failed;
+}
+
+/*
+ * The validator's slowest jumping-spider speed is the one that really
+ * clears a gap: at it the spider lands past the gap, while a spider 1 px/s
+ * slower lands back over it, snaps to the edge and hops in place forever.
+ * Both directions, so the edge snap is tested each way.
+ */
+static int spider_crosses_gap(float vx)
+{
+    const int gap = 400;
+    const float centre = JSPIDER_ART_X + JSPIDER_ART_W / 2.0f;
+    JumpingSpider s = {0};
+    /* Start 20 px before the near edge, walking towards the gap. */
+    s.x = (vx > 0.0f ? (float)gap - 20.0f : (float)(gap + FLOOR_GAP_W) + 20.0f) - centre;
+    s.vx = vx;
+    s.patrol_x0 = 0.0f;
+    s.patrol_x1 = 1000.0f;
+    s.on_ground = 1;
+    for (int step = 0; step < 10 * STEPS_PER_SECOND; step++) {
+        jumping_spiders_update(&s, 1, GAME_FIXED_STEP, &gap, 1, NULL, 0.0f, 0);
+        float c = s.x + centre;
+        if (s.on_ground && (vx > 0.0f ? c >= gap + FLOOR_GAP_W : c < gap)) return 1;
+    }
+    return 0;
+}
+
+static int jumping_spider_minimum_speed_clears_a_gap(void)
+{
+    int failed = 0;
+    float min_speed = level_jumping_spider_min_gap_speed();
+    CHECK(min_speed > 45.0f && min_speed < JSPIDER_SPEED);
+    CHECK(spider_crosses_gap(min_speed) && spider_crosses_gap(-min_speed));
+    CHECK(!spider_crosses_gap(min_speed - 1.0f) && !spider_crosses_gap(-(min_speed - 1.0f)));
+    CHECK(spider_crosses_gap(JSPIDER_SPEED));
+done:
     return failed;
 }
 
@@ -1181,6 +1219,7 @@ int main(void)
         CASE(spikes_hurt_once_per_invincibility),
         CASE(spike_blocks_follow_their_rails),
         CASE(jumping_spider_leaps_the_gap),
+        CASE(jumping_spider_minimum_speed_clears_a_gap),
         CASE(spider_keeps_its_authored_speed),
         CASE(fish_leap_from_the_water_and_patrol),
         CASE(faster_fish_leap_higher_and_patrol_faster),

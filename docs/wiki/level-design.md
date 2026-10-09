@@ -294,6 +294,8 @@ frame_index = 0      # starting animation frame (0–2)
 
 Variant that leaps across sea gaps. Uses the spider's position, velocity and patrol fields, but has no authored `frame_index`.
 
+Its jump lasts 39 fixed steps (−200 px/s up against 600 px/s² of its own gravity), and it must carry the spider across a whole 32 px floor gap in that time. So when a floor gap lies between the patrol ends, `vx` must be at least about 49.24 px/s either way (`level_jumping_spider_min_gap_speed()` in `level_validate.c`, derived from those constants); a slower spider would land back over the gap and hop in place forever, and the level is refused. A jumping spider with no gap in its patrol may walk at any valid speed.
+
 ```toml
 [[jumping_spiders]]
 x          = 130.0
