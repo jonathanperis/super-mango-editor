@@ -53,7 +53,7 @@ Three interaction modes are available via the toolbar or keyboard shortcuts:
 |------|-----|-----------|
 | **Select** | `1` | Click an entity on the canvas to select it. Drag to reposition. Selected entity appears in the Properties panel. Clicking empty space clears the selection; dragging from empty space draws a selection box. |
 | **Place** | `2` | Click the canvas to stamp a new entity of the type chosen in the palette. For the two singletons (Player Spawn, Last Star) the click moves the existing one. A new spike block attaches to the rail nearest the click. |
-| **Delete** | `3` | Click an entity to remove it from the level immediately. |
+| **Delete** | `3` | Click an entity to remove it from the level immediately. Clicking a member of a multi-selection removes the whole selection. |
 
 ### Selecting Several Entities
 
@@ -70,7 +70,10 @@ Several entities can be selected at once (up to 64, `EDITOR_MAX_SELECTION`):
 Dragging any selected entity moves the whole group (the grabbed one snaps to
 the grid; the others keep their distance), and the arrow keys nudge it. Delete
 or Backspace, `Ctrl+C` / `Ctrl+V` and `Ctrl+D` act on every selected entity.
-Each of these is a single undo step, however many entities it touched. A rail
+Each of these is a single undo step, however many entities it touched, and
+redoing a paste or duplicate selects all the copies again. The Delete tool and
+right-click also act on the whole selection when the entity they hit is part
+of it (on anything else they delete just that entity). A rail
 deleted together with the spike blocks and platforms riding it goes after them,
 so the pair can be deleted (alone, a ridden rail is refused). The Properties
 panel shows `N selected` with a count per type instead of fields.

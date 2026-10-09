@@ -1075,6 +1075,25 @@ static void select_and_arm_drag(EditorState *es, float world_x, float world_y)
  * TOOL_PLACE  : stamp a new entity at the click position.
  * TOOL_DELETE : hit-test and delete the clicked entity.
  */
+/*
+ * delete_at — The Delete tool's click and the right-click shortcut.
+ *
+ * Clicking a member of a multi-selection deletes the whole selection, as
+ * the Delete key would: the designer pointed at the group.  Anything else
+ * under the cursor is deleted on its own and the selection is left alone.
+ */
+static void delete_at(EditorState *es, float world_x, float world_y)
+{
+    Selection hit = editor_hit_test(&es->level, world_x, world_y);
+
+    if (hit.index < 0) return;
+    if (editor_selection_count(es) > 1 && editor_is_selected(es, hit.type, hit.index)) {
+        tools_delete_selected(es);
+        return;
+    }
+    (void)delete_entity(es, hit.type, hit.index);
+}
+
 void tools_mouse_down(EditorState *es, float world_x, float world_y)
 {
     if (!es) return;
@@ -1091,13 +1110,9 @@ void tools_mouse_down(EditorState *es, float world_x, float world_y)
         place_entity(es, world_x, world_y);
         break;
 
-    case TOOL_DELETE: {
-        Selection hit = editor_hit_test(&es->level, world_x, world_y);
-        if (hit.index >= 0) {
-            (void)delete_entity(es, hit.type, hit.index);
-        }
+    case TOOL_DELETE:
+        delete_at(es, world_x, world_y);
         break;
-    }
     }
 }
 
@@ -1420,18 +1435,16 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
  * tools_right_click --- Right-click deletes whatever entity is under the cursor.
  *
  * This is a convenience shortcut: regardless of the current tool mode,
- * right-clicking an entity removes it immediately.  Useful for quick
- * corrections without switching to the delete tool.
+ * right-clicking an entity removes it immediately (with the rest of the
+ * selection, when it is part of a multi-selection; see delete_at).
+ * Useful for quick corrections without switching to the delete tool.
  */
 void tools_right_click(EditorState *es, float world_x, float world_y)
 {
     if (!es) return;
     if (!tools_can_hit_test(es)) return;
     editor_selection_reconcile(es);
-    Selection hit = editor_hit_test(&es->level, world_x, world_y);
-    if (hit.index < 0) return;
-
-    (void)delete_entity(es, hit.type, hit.index);
+    delete_at(es, world_x, world_y);
 }
 
 /* ------------------------------------------------------------------ */

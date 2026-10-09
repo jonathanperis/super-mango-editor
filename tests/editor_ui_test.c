@@ -1185,6 +1185,12 @@ static int box_and_shift_select_act_on_the_group(void)
     for (int i = 3; i < 6; i++) CHECK(editor_is_selected(&es, ENT_COIN, i));
     key_frame(&es, KEY_Z, INPUT_CTRL);
     CHECK(es.level.coin_count == 3 && es.undo->top == undo_top);
+    /* Redo brings the copies back selected together, as the paste left them. */
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(es.level.coin_count == 6 && editor_selection_count(&es) == 3);
+    for (int i = 3; i < 6; i++) CHECK(editor_is_selected(&es, ENT_COIN, i));
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 3 && es.undo->top == undo_top);
 
     /* Duplicate the group, then undo it in one step. */
     CHECK(editor_select_items(&es, (Selection[]){{ENT_COIN, 0}, {ENT_COIN, 1}, {ENT_COIN, 2}}, 3) == 3);
@@ -1200,6 +1206,29 @@ static int box_and_shift_select_act_on_the_group(void)
     key_frame(&es, KEY_Z, INPUT_CTRL);
     CHECK(es.level.coin_count == 3);
     for (int i = 0; i < 3; i++) CHECK(es.level.coins[i].x == x[i] && es.level.coins[i].y == y[i]);
+
+    /* The Delete tool, or a right-click, on a member deletes the whole
+     * selection as one step; on anything else just that entity. */
+    CHECK(editor_select_items(&es, (Selection[]){{ENT_COIN, 0}, {ENT_COIN, 1}}, 2) == 2);
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_RIGHT, 0, 322, 302);   /* coin 2: not selected */
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_RIGHT, 0, 322, 302);
+    ui_frame(&es, 322, 302);
+    CHECK(es.level.coin_count == 2 && editor_selection_count(&es) == 2);
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_RIGHT, 0, 262, 302);   /* coin 1: a member */
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_RIGHT, 0, 262, 302);
+    ui_frame(&es, 262, 302);
+    CHECK(es.level.coin_count == 0 && editor_selection_count(&es) == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 2);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 3);
+    CHECK(editor_select_items(&es, (Selection[]){{ENT_COIN, 1}, {ENT_COIN, 2}}, 2) == 2);
+    es.tool = TOOL_DELETE;
+    click_frame(&es, 322, 302);
+    CHECK(es.level.coin_count == 1 && es.level.coins[0].x == x[0]);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 3);
+    es.tool = TOOL_SELECT;
 
     /* A plain click on one member (no drag) selects just it. */
     CHECK(editor_select_items(&es, (Selection[]){{ENT_COIN, 0}, {ENT_COIN, 1}, {ENT_COIN, 2}}, 3) == 3);
