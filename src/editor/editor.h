@@ -101,7 +101,9 @@ _Static_assert(EDITOR_MAX_SELECTION <= UNDO_GROUP_MAX,
  */
 typedef enum {
     EDITOR_FOCUS_CANVAS = 0,   /* the level (also at start-up)            */
-    EDITOR_FOCUS_PANEL         /* a panel, the toolbar, the status bar... */
+    EDITOR_FOCUS_PANEL,        /* a panel, the toolbar, the status bar... */
+    EDITOR_FOCUS_MESSAGES      /* a validation or load-problem row: Ctrl+C
+                                * copies its text                         */
 } EditorFocusArea;
 
 typedef struct {
@@ -479,6 +481,12 @@ typedef struct {
     int            snap_to_grid;
     int            input_mods;
     EditorFocusArea focus_area;   /* where the last left click landed */
+    /* The validation list in the Level Config panel: the first row shown,
+     * the wheel's leftover fraction of a row, and the text of the row (or
+     * load-problem row) clicked last, which Ctrl+C copies. */
+    int            message_scroll;
+    float          message_wheel_accum;
+    char           selected_message[EDITOR_VALIDATION_MESSAGE_LEN];
     int            running;       /* 1 = main loop active, 0 = exit requested  */
     int            panel_scroll;  /* scroll offset (px) for the right panel    */
     /*

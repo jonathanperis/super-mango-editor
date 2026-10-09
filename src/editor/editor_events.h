@@ -19,3 +19,10 @@
  * wheel scrolling, and drag motion.  Mutates EditorState directly.
  */
 void editor_handle_event(EditorState *es, const InputEvent *event);
+
+#ifdef MANGO_TESTING
+/* Test builds keep the system clipboard out of it (the headless raylib
+ * has none): Ctrl+C / Ctrl+X store text here, and Ctrl+V pastes it. */
+const char *editor_test_clipboard(void);
+void editor_test_set_clipboard(const char *text);
+#endif

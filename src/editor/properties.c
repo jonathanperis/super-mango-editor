@@ -1356,45 +1356,90 @@ static void config_subsection_header(EditorState *es, int x, int y,
                    hovered ? UI_TEXT : UI_TEXT_DIM);
 }
 
+/* Where the validation rows were drawn this frame, for the wheel; empty
+ * when they all fit and there is nothing to scroll. */
+static int msg_list_top = 0;
+static int msg_list_bottom = 0;
+
+int properties_message_list_contains(int x, int y)
+{
+    return x >= PROP_X && y >= msg_list_top && y < msg_list_bottom &&
+           y >= cfg_clip_top && y < cfg_clip_bottom;
+}
+
+/*
+ * message_row — One message row, error or warning or load problem.  The
+ * row clicked last is highlighted while the list has the focus, and Ctrl+C
+ * copies it (editor_events.c).  A click on the row is used up here, so no
+ * widget below sees it; returns 1 on that click.
+ */
+static int message_row(EditorState *es, int x, int y, const char *text, Color color)
+{
+    int hovered = es->ui.mouse_x >= x && es->ui.mouse_x < x + PROP_W &&
+                  es->ui.mouse_y >= y && es->ui.mouse_y < y + 18 &&
+                  es->ui.mouse_y >= cfg_clip_top && es->ui.mouse_y < cfg_clip_bottom;
+    int selected = es->focus_area == EDITOR_FOCUS_MESSAGES &&
+                   strcmp(es->selected_message, text) == 0;
+
+    if (selected) DrawRectangle(x + 4, y - 1, PROP_W - 8, 18, UI_BTN_ACTIVE);
+    else if (hovered) DrawRectangle(x + 4, y - 1, PROP_W - 8, 18, UI_BTN_HOT);
+    ui_label_color(&es->ui, x + 16, y, text, color);
+    if (!hovered || !es->ui.mouse_clicked) return 0;
+    es->ui.mouse_clicked = 0;
+    snprintf(es->selected_message, sizeof(es->selected_message), "%s", text);
+    es->focus_area = EDITOR_FOCUS_MESSAGES;
+    return 1;
+}
+
 /*
  * Validation result and every error/warning message.  Each message is a
- * row the designer can click: it selects the entity the message is about
- * (and pans the canvas to it) or focuses the Level Config field.
+ * row the designer can click: it selects the row (Ctrl+C then copies it)
+ * and goes to what the message is about: the entity (panning the canvas
+ * to it) or the Level Config field.  When there are more messages than
+ * EDITOR_VALIDATION_VISIBLE_ROWS, the wheel over the rows scrolls them.
  */
 static int config_load_problems(EditorState *es, int x, int y);
 
 static int config_validation(EditorState *es, int x, int y)
 {
+    const EditorValidationReport *report = &es->validation_report;
+    int count = report->message_count;
+    int shown = count < EDITOR_VALIDATION_VISIBLE_ROWS ? count : EDITOR_VALIDATION_VISIBLE_ROWS;
+    int first;
+
     y = config_load_problems(es, x, y);
-    ui_label_color(&es->ui, x + 8, y,
-                   editor_validation_summary(&es->validation_report),
-                   es->validation_report.error_count > 0 ?
-                   (Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
+    ui_label_color(&es->ui, x + 8, y, editor_validation_summary(report),
+                   report->error_count > 0 ? (Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
     y += 20;
-    for (int i = 0; i < es->validation_report.message_count; i++) {
-        Color msg_color = i < es->validation_report.error_count
-                            ? (Color){0xFF,0x70,0x70,0xFF}
-                            : (Color){0xFF,0xC0,0x60,0xFF};
-        int has_place = es->validation_report.locations[i].path[0] != '\0';
-        int hovered = has_place &&
-                      es->ui.mouse_x >= x && es->ui.mouse_x < x + PROP_W &&
-                      es->ui.mouse_y >= y && es->ui.mouse_y < y + 18 &&
-                      es->ui.mouse_y >= cfg_clip_top &&
-                      es->ui.mouse_y < cfg_clip_bottom;
-        if (hovered) DrawRectangle(x + 4, y - 1, PROP_W - 8, 18, UI_BTN_HOT);
-        ui_label_color(&es->ui, x + 16, y,
-                       es->validation_report.messages[i], msg_color);
-        if (hovered && es->ui.mouse_clicked) {
-            /* The click is used up here; no widget below sees it. */
-            es->ui.mouse_clicked = 0;
+
+    /* Keep the window on the list as it shrinks or grows. */
+    if (es->message_scroll > count - shown) es->message_scroll = count - shown;
+    if (es->message_scroll < 0) es->message_scroll = 0;
+    first = es->message_scroll;
+    msg_list_top = msg_list_bottom = 0;
+    if (count > shown) {
+        msg_list_top = y;
+        msg_list_bottom = y + shown * 18;
+    }
+    for (int i = first; i < first + shown; i++) {
+        Color msg_color = i < report->error_count ? (Color){0xFF,0x70,0x70,0xFF}
+                                                  : (Color){0xFF,0xC0,0x60,0xFF};
+        if (message_row(es, x, y, report->messages[i], msg_color) &&
+            report->locations[i].path[0] != '\0')
             (void)editor_focus_validation_issue(es, i);
-        }
         y += 18;
     }
-    /* The list holds EDITOR_VALIDATION_MAX_MESSAGES; say how many more the
-     * counts include, so a long report is not mistaken for a short one. */
+    if (count > shown) {
+        char where[96];   /* the words below with three row numbers */
+        snprintf(where, sizeof(where), "Rows %d-%d of %d (the wheel scrolls them)",
+                 first + 1, first + shown, count);
+        ui_label_color(&es->ui, x + 16, y, where, UI_TEXT_DIM);
+        y += 18;
+    }
+    /* The report keeps EDITOR_VALIDATION_MAX_MESSAGES; say how many more
+     * the counts include, so a long report is not mistaken for a short one. */
     {
-        int hidden = editor_validation_hidden_count(&es->validation_report);
+        int hidden = editor_validation_hidden_count(report);
         if (hidden > 0) {
             char more[48];
             snprintf(more, sizeof(more), "... and %d more", hidden);
@@ -1409,7 +1454,8 @@ static int config_validation(EditorState *es, int x, int y)
 /*
  * config_load_problems — Why the last Open failed (nothing when it did
  * not).  The file never became the document, so its rows cannot take the
- * designer anywhere; clicking the heading hides the list.
+ * designer anywhere, but a click selects one for Ctrl+C (to search for the
+ * line it names, say).  Clicking the heading hides the list.
  */
 static int config_load_problems(EditorState *es, int x, int y)
 {
@@ -1433,8 +1479,7 @@ static int config_load_problems(EditorState *es, int x, int y)
     }
     y += 18;
     for (int i = 0; i < report->count; i++) {
-        ui_label_color(&es->ui, x + 16, y, report->messages[i],
-                       (Color){0xFF,0x70,0x70,0xFF});
+        (void)message_row(es, x, y, report->messages[i], (Color){0xFF,0x70,0x70,0xFF});
         y += 18;
     }
     if (report->total > report->count) {

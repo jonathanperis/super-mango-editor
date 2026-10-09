@@ -68,6 +68,13 @@ void level_config_render(EditorState *es, int start_y, int available_h,
 void cfg_scroll(int delta);
 
 /*
+ * properties_message_list_contains — 1 when (x, y) is over the validation
+ * rows as last drawn and there are more rows than fit, so the wheel there
+ * scrolls the list instead of the panel.
+ */
+int properties_message_list_contains(int x, int y);
+
+/*
  * properties_focus_config — Open the Level Config panel at the field a
  * validation location names ("screen_count", "physics" + "air_friction",
  * "fog_layers"...): unfold its group and give a text field the caret.
