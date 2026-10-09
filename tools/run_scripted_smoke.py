@@ -20,6 +20,25 @@ DEFAULT_REPLAY_DIR = "out/replays-smoke"  # the game reads here without --replay
 ALLOWED_REPLAY_IDS = {"move-right", "jump-right", "pause-resume"}
 
 
+def repo_relative(path: Path) -> str:
+    """The path as the game expects it: relative to the repository root.
+
+    The game runs from ROOT, so a path inside the repository is passed
+    relative to it (levels/x.toml). A path elsewhere cannot be made
+    relative; Path.relative_to() would raise ValueError, so it is passed
+    (and reported) as an absolute path instead.
+    """
+    try:
+        return path.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def default_levels() -> list[Path]:
+    """Every campaign level and lab, the same set `make smoke` boots."""
+    return sorted((ROOT / "levels").glob("*.toml")) + sorted((ROOT / "levels" / "labs").glob("*.toml"))
+
+
 def replay_id(path: Path) -> str:
     name = path.stem
     if name not in ALLOWED_REPLAY_IDS:
@@ -33,7 +52,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--editor", default="out/super-mango-editor", help="editor binary to smoke")
     parser.add_argument("--frames", type=int, default=5, help="frames per game scenario")
     parser.add_argument("--seeds", nargs="+", type=int, default=[1, 7, 23], help="deterministic RNG seeds")
-    parser.add_argument("--levels", nargs="*", default=None, help="levels to run; defaults to levels/*.toml")
+    parser.add_argument("--levels", nargs="*", default=None, help="levels to run; defaults to levels/*.toml and levels/labs/*.toml")
     parser.add_argument("--replays", nargs="*", default=None, help="replay scripts to run; defaults to built-in movement scripts")
     parser.add_argument("--skip-editor", action="store_true", help="skip editor smoke scenario")
     parser.add_argument("--replay-dir", default=DEFAULT_REPLAY_DIR,
@@ -148,11 +167,11 @@ def main() -> int:
     binary = executable(ROOT / args.binary)
     editor = executable(ROOT / args.editor)
     if not binary.exists():
-        raise SystemExit(f"game binary missing: {binary.relative_to(ROOT)}")
+        raise SystemExit(f"game binary missing: {repo_relative(binary)}")
     if not args.skip_editor and not editor.exists():
-        raise SystemExit(f"editor binary missing: {editor.relative_to(ROOT)}")
+        raise SystemExit(f"editor binary missing: {repo_relative(editor)}")
 
-    levels = [Path(item) for item in args.levels] if args.levels else sorted((ROOT / "levels").glob("*.toml"))
+    levels = [Path(item) for item in args.levels] if args.levels else default_levels()
     if not levels:
         raise SystemExit("no levels selected for scripted smoke")
 
@@ -167,7 +186,7 @@ def main() -> int:
         level_path = level if level.is_absolute() else ROOT / level
         if not level_path.exists():
             raise SystemExit(f"level missing: {level}")
-        rel_level = level_path.relative_to(ROOT).as_posix()
+        rel_level = repo_relative(level_path)
         for seed in args.seeds:
             for replay in replays:
                 cmd = [
@@ -193,7 +212,7 @@ def main() -> int:
     scenario_count = len(levels) * len(args.seeds) * len(replays)
     if not args.replays:
         first_level = levels[0] if levels[0].is_absolute() else ROOT / levels[0]
-        check_replay_failures(binary, first_level.relative_to(ROOT).as_posix(), replays[0],
+        check_replay_failures(binary, repo_relative(first_level), replays[0],
                               args.replay_dir, env)
         # An explicit profile must still be ignored by smoke/replay. Use an
         # intentionally invalid task-owned file to prove it is neither loaded nor overwritten.
@@ -201,7 +220,7 @@ def main() -> int:
         contents = 'not a player profile\n'
         profile.write_text(contents, encoding='utf-8')
         try:
-            smoke_state(run([str(binary), '--level', first_level.relative_to(ROOT).as_posix(),
+            smoke_state(run([str(binary), '--level', repo_relative(first_level),
                                       '--smoke-test-frames', '5', '--profile', str(profile)], env), 5)
             if profile.read_text(encoding='utf-8') != contents:
                 raise AssertionError('smoke modified a profile')
