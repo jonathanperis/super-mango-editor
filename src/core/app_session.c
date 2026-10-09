@@ -620,9 +620,18 @@ AppSession *session_create(const AppSessionConfig *config)
     const char *level = config ? config->level_path : NULL;
     if (!session) return NULL;
     game_profile_init(&session->profile);
-    if ((level && strlen(level) >= sizeof(session->boot_level_path)) ||
-        (config && config->replay_script_path && strlen(config->replay_script_path) >= sizeof(session->replay_script_path)) ||
-        (config && config->replay_dir && strlen(config->replay_dir) >= sizeof(session->replay_dir))) {
+    /* Say which path does not fit: main.c just exits when this fails. */
+    const char *too_long = NULL;
+    if (level && strlen(level) >= sizeof(session->boot_level_path)) too_long = "--level";
+    else if (config && config->replay_script_path &&
+             strlen(config->replay_script_path) >= sizeof(session->replay_script_path))
+        too_long = "--replay-script";
+    else if (config && config->replay_dir && strlen(config->replay_dir) >= sizeof(session->replay_dir))
+        too_long = "--replay-dir";
+    else if (config && config->campaign_path && strlen(config->campaign_path) >= sizeof(session->campaign_path))
+        too_long = "the campaign manifest path";
+    if (too_long) {
+        fprintf(stderr, "Error: %s is too long\n", too_long);
         free(session);
         return NULL;
     }

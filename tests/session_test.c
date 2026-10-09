@@ -7,7 +7,8 @@
 #ifdef _WIN32
 #include <direct.h>   /* _chdir */
 #else
-#include <unistd.h>   /* chdir */
+#include <sys/stat.h> /* mkdir */
+#include <unistd.h>   /* chdir, symlink, rmdir */
 #endif
 
 #include "input/input_backend.h"
@@ -396,6 +397,71 @@ static int same_path_spelling_prefix(const char *path, const char *prefix,
  * must move it to the folder that holds assets/ and levels/, and turn typed
  * paths into absolute ones first so they keep their meaning.
  */
+/*
+ * The asset root is the folder of the executable. Started through a
+ * symbolic link, that must be the real file's folder: macOS reports the
+ * link's path, which pointed the game at the link's folder, where no
+ * assets/ is. executable_folder resolves links (the same code on every
+ * POSIX system, so Linux tests it too).
+ */
+static int executable_folder_follows_links(void)
+{
+    int failed = 0;
+    char *folder = executable_folder("/no-such-folder/game");
+    failed |= expect_int("unresolvable path keeps its folder",
+                         folder != NULL && strcmp(folder, "/no-such-folder/") == 0, 1);
+    free(folder);
+#ifndef _WIN32
+    const char *real_dir = TEST_OUT "exe-real", *real = TEST_OUT "exe-real/game";
+    const char *link = TEST_OUT "exe-link";
+    (void)mkdir(real_dir, 0700);
+    FILE *fp = fopen(real, "w");
+    if (!fp) return 1;
+    fclose(fp);
+    remove(link);
+    if (symlink("exe-real/game", link) != 0) {
+        remove(real);
+        return 1;
+    }
+    folder = executable_folder(link);
+    size_t size = folder ? strlen(folder) : 0;
+    failed |= expect_int("link resolved to the real folder",
+                         size > 10 && strcmp(folder + size - 10, "/exe-real/") == 0, 1);
+    free(folder);
+    remove(link);
+    remove(real);
+    rmdir(real_dir);
+#endif
+    return failed;
+}
+
+/*
+ * main.c makes a relative --replay-dir absolute before the session copies
+ * it. That copy was 256 bytes, so a deep working folder made
+ * session_create return NULL and the game exit without a word. It now
+ * holds GAME_LEVEL_PATH_MAX bytes, and a path longer than that is named
+ * in an error.
+ */
+static int long_replay_dir_fits_the_session(void)
+{
+    static char dir[GAME_LEVEL_PATH_MAX + 8];
+    AppSessionConfig config = {.level_path = "levels/00_sandbox_01.toml", .replay_dir = dir};
+    AppSession *session;
+    memset(dir, 'd', 600);
+    dir[0] = '/';
+    dir[600] = '\0';
+    session = session_create(&config);
+    int failed = expect_int("600-byte replay folder accepted", session != NULL, 1);
+    if (session) failed |= expect_int("kept whole", (int)strlen(session->game->screen.replay_dir), 600);
+    session_destroy(&session);
+    memset(dir, 'd', GAME_LEVEL_PATH_MAX);
+    dir[GAME_LEVEL_PATH_MAX] = '\0';
+    session = session_create(&config);
+    failed |= expect_int("over-long replay folder refused", session == NULL, 1);
+    session_destroy(&session);
+    return failed;
+}
+
 static int asset_root_moves_a_foreign_working_folder(void)
 {
     int failed = 1;
@@ -1597,6 +1663,7 @@ int main(void)
         CASE(start_points_place_the_first_game),
         CASE(start_point_respawns_follow_the_ground),
         CASE(asset_root_moves_a_foreign_working_folder),
+        CASE(executable_folder_follows_links), CASE(long_replay_dir_fits_the_session),
         CASE(direct_game_boot_repairs_input_and_keeps_controller_runtime),
         CASE(immediate_play_preserves_window_and_input_latch),
         CASE(repeated_menu_game_ownership), CASE(checkpoint_transitions_use_production_paths),

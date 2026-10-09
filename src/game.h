@@ -364,7 +364,7 @@ typedef struct {
 
     /* ---- Scripted replay input ------------------------------------------ */
     char          replay_script_path[256]; /* optional replay script name     */
-    char          replay_dir[256]; /* folder holding replay scripts; "" = default */
+    char          replay_dir[GAME_LEVEL_PATH_MAX]; /* replay script folder; "" = default */
     unsigned int  replay_input_mask; /* replay keys active for this frame    */
     unsigned int  replay_held_mask;  /* replay keys held across frames       */
     int           replay_frame; /* current deterministic replay frame     */

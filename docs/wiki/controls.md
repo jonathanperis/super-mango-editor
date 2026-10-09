@@ -287,8 +287,11 @@ An unknown option, or a value flag whose value is missing or starts with `-`, ex
 `levels/` relative to the working folder. When that folder does not hold them
 (a desktop shortcut, a file manager, `../out/super-mango`), both programs move
 to the executable's folder, or one or two folders above it, before loading
-anything. `--profile`, `--experiment`, `--replay-dir` and the editor's document
-path are read relative to the folder you started in. `--level` is too when the
+anything. A program started through a symbolic link uses the folder of the real
+file the link points to (on macOS and Linux alike). `--profile`, `--experiment`,
+`--replay-dir` and the editor's document path are read relative to the folder
+you started in, and are made absolute before the move; a resulting path longer
+than 1023 bytes is refused with an error naming the flag. `--level` is too when the
 file exists there; otherwise it names a bundled level such as
 `levels/labs/01_collision.toml`. F9 experiment exports then land in the
 asset folder.

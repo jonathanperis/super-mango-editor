@@ -18,3 +18,8 @@ size_t utf8_copy(char *dest, const char *source, size_t capacity);
 char *preference_path(const char *organization, const char *application);
 char *preference_path_at(const char *base, const char *organization, const char *application);
 char *application_path(void);
+/* The folder holding the file `executable`, with its trailing separator.
+ * Outside Windows, symbolic links in the path are resolved first, so a
+ * program started through a link finds the files next to the real one.
+ * NULL when the path names no folder or memory runs out. */
+char *executable_folder(const char *executable);
