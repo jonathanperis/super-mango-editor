@@ -1215,7 +1215,10 @@ static int playtest_status_follows_the_game_process(void)
     if (child == 0) {
         char byte;
         (void)close(gate[1]);
-        (void)read(gate[0], &byte, 1);   /* returns 0 once the parent closes */
+        /* read() returns 0 once the parent closes its end. glibc marks
+         * read() warn_unused_result, and a (void) cast does not silence
+         * that under release flags, so the result is consumed by the if. */
+        if (read(gate[0], &byte, 1) < 0) _exit(4);
         _exit(3);
     }
     (void)close(gate[0]);
