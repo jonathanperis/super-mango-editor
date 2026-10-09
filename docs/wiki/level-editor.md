@@ -151,6 +151,13 @@ The player start and the floor gaps are canvas entities: move the Player Spawn
 marker, and place or delete Floor Gap entities. A floor gap's `x` field rounds
 to the 16 px floor-piece grid.
 
+Inside an active field, `Left` / `Right` move the caret one character,
+`Home` / `End` jump to either end, typing inserts at the caret, and `Backspace`
+/ `Delete` remove the character before / after it (whole UTF-8 characters, so
+`é` never splits in half). `Tab` applies the field and moves to the next field
+of the side panel, `Shift+Tab` to the previous one (wrapping at either end); a
+value that cannot be stored keeps the focus where it is.
+
 Leaving a field applies what you typed: Return, a click on the canvas or
 another field, or any command (Save, Undo, a shortcut) stores a valid value as
 its own undo step, with no prompt. Only a value that cannot be stored (`12a`,

@@ -718,6 +718,97 @@ done:
 }
 
 /* ------------------------------------------------------------------ */
+/* Text editing: caret keys and Tab                                    */
+/* ------------------------------------------------------------------ */
+
+/* Level Config rows (the panel is open and unscrolled at start). */
+#define CFG_NAME_Y    (TOOLBAR_H + 64 + 4)
+#define CFG_SCREENS_Y (TOOLBAR_H + 136 + 4)
+
+static void text_frame(EditorState *es, const char *text)
+{
+    push_text(text);
+    ui_frame(es, NEUTRAL_X, NEUTRAL_Y);
+}
+
+/*
+ * Fields used to append and backspace at the end only.  The caret now
+ * moves with Left/Right/Home/End, typing inserts at it, Backspace and
+ * Delete remove the whole UTF-8 character on either side, and Tab /
+ * Shift+Tab commit the field and move to the next / previous one.
+ */
+static int text_fields_move_the_caret_and_tab_between_fields(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(strcmp(es.level.name, "Untitled") == 0);
+
+    click_frame(&es, CANVAS_W + 60, CFG_NAME_Y);
+    CHECK(es.ui.active_id == 9000);
+    key_frame(&es, KEY_HOME, 0);
+    text_frame(&es, "\xc3\xa9");                 /* é, two bytes */
+    CHECK(strcmp(es.ui.edit_buf, "\xc3\xa9Untitled") == 0 && es.ui.edit_cursor == 2);
+    key_frame(&es, KEY_RIGHT, 0);                 /* past the U */
+    key_frame(&es, KEY_DELETE, 0);                /* the n goes */
+    key_frame(&es, KEY_END, 0);
+    text_frame(&es, "!");
+    key_frame(&es, KEY_LEFT, 0);
+    key_frame(&es, KEY_LEFT, 0);
+    key_frame(&es, KEY_BACKSPACE, 0);             /* the e before d */
+    CHECK(strcmp(es.ui.edit_buf, "\xc3\xa9Utitld!") == 0);
+    /* Left and Backspace step over the whole two-byte character. */
+    key_frame(&es, KEY_HOME, 0);
+    key_frame(&es, KEY_RIGHT, 0);
+    CHECK(es.ui.edit_cursor == 2);
+    key_frame(&es, KEY_BACKSPACE, 0);
+    CHECK(strcmp(es.ui.edit_buf, "Utitld!") == 0 && es.ui.edit_cursor == 0);
+    /* Keys and text in one frame keep their order: x, Right, y. */
+    {
+        InputEvent event = {0};
+        event.type = INPUT_TEXT;
+        event.text[0] = 'x';
+        input_push(&event);
+        push_key(KEY_RIGHT, 0);
+        event.text[0] = 'y';
+        input_push(&event);
+        ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    }
+    CHECK(strcmp(es.ui.edit_buf, "xUytitld!") == 0);
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(es.ui.active_id == 0 && strcmp(es.level.name, "xUytitld!") == 0);
+
+    /* Tab commits the typed value as one undo step and moves on. */
+    int undo_top = es.undo->top;
+    click_frame(&es, CANVAS_W + 90, CFG_SCREENS_Y);
+    CHECK(es.ui.active_id == 9011);
+    key_frame(&es, KEY_END, 0);
+    key_frame(&es, KEY_BACKSPACE, 0);
+    text_frame(&es, "5");
+    key_frame(&es, KEY_TAB, 0);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.level.screen_count == 5 && es.undo->top == undo_top + 1);
+    CHECK(es.ui.active_id != 0 && es.ui.active_id != 9011);
+    /* Shift+Tab comes back, with nothing to commit. */
+    key_frame(&es, KEY_TAB, INPUT_SHIFT);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.active_id == 9011 && es.undo->top == undo_top + 1);
+    /* An invalid value keeps the focus where it is. */
+    key_frame(&es, KEY_END, 0);
+    key_frame(&es, KEY_BACKSPACE, 0);
+    text_frame(&es, "-");
+    key_frame(&es, KEY_TAB, 0);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.active_id == 9011 && es.level.screen_count == 5);
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(es.ui.active_id == 0);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/* ------------------------------------------------------------------ */
 /* Playtest process and native pickers (POSIX)                         */
 /* ------------------------------------------------------------------ */
 
@@ -916,6 +1007,7 @@ int main(void)
         CASE(canvas_place_select_drag_delete_and_undo),
         CASE(properties_panel_handles_every_entity_type),
         CASE(level_config_sections_resize_the_panel),
+        CASE(text_fields_move_the_caret_and_tab_between_fields),
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),
         CASE(native_pickers_report_choice_cancel_and_failure),
