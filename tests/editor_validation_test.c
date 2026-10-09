@@ -1240,6 +1240,53 @@ cleanup:
  * keep it (never "clean it up"), and the editor must say where it is.  The
  * test seam reports that failure without touching either file.
  */
+/*
+ * A checked save that finds the file changed on disk at the last moment
+ * writes nothing and returns -2.  The status bar used to call that a plain
+ * "Save failed"; it now says the file changed and how to go on.
+ */
+static int changed_on_disk_save_has_its_own_message(void)
+{
+    const char *target = TEST_OUT "editor_changed_on_disk.toml";
+    EditorState es = {0};
+    LevelDef def;
+    char root[EDITOR_PATH_MAX] = {0};
+    int result = 1;
+
+    ensure_out_dir();
+    remove(target);
+    fill_valid_minimal(&def);
+    es.undo = undo_create();
+    if (!es.undo || level_save_toml(&def, target) != 0 ||
+        make_test_preference_root(root, sizeof(root)) != 0 ||
+        editor_set_preference_root(&es, root) != 0 ||
+        editor_init_persistence_paths(&es) != 0 ||
+        editor_load_level(&es, target) != 0) goto cleanup;
+    es.level.coin_score = 31;
+    editor_refresh_dirty(&es);
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_SOURCE_CHANGED);
+    if (expect_int("changed save refused", editor_save_current_level(&es), -1) != 0 ||
+        expect_prefix("changed save explained", es.status_message,
+                      "Save stopped: " TEST_OUT "editor_changed_on_disk.toml changed on disk") != 0 ||
+        expect_int("changed save keeps edits", es.modified, 1) != 0)
+        goto cleanup;
+    /* Nothing was written: the file still holds the old level. */
+    {
+        LevelDef on_disk;
+        if (level_load_toml(target, &on_disk) != 0 ||
+            expect_int("file untouched", on_disk.coin_score == def.coin_score, 1) != 0)
+            goto cleanup;
+    }
+    result = 0;
+
+cleanup:
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+    if (root[0]) cleanup_test_preference_root(root, &es, 1);
+    undo_destroy(es.undo);
+    remove(target);
+    return result;
+}
+
 static int stranded_replace_keeps_the_temporary_file(void)
 {
     const char *target = TEST_OUT "editor_stranded_target.toml";
@@ -4488,6 +4535,7 @@ int main(void)
     if (autosave_recovery_preserves_destination() != 0) return 1;
     if (editor_save_workflows_enforce_baselines() != 0) return 1;
     if (stranded_replace_keeps_the_temporary_file() != 0) return 1;
+    if (changed_on_disk_save_has_its_own_message() != 0) return 1;
     if (saved_levels_get_ordinary_permissions() != 0) return 1;
     if (symlinks_are_followed_only_for_the_opened_document() != 0) return 1;
     if (text_fields_drop_invalid_utf8() != 0) return 1;

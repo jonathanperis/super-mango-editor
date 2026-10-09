@@ -566,7 +566,8 @@ static int level_save_toml_internal(const LevelDef *def, const char *path,
         SerializerFileFingerprint actual;
         int fingerprint_result = serializer_fingerprint_utf8(path, &actual);
         if (fingerprint_result != 1 ||
-            !serializer_fingerprint_equal(expected, &actual)) {
+            !serializer_fingerprint_equal(expected, &actual) ||
+            serializer_test_take_failure(SERIALIZER_TEST_FAILURE_SOURCE_CHANGED)) {
             fprintf(stderr, "serializer: source changed before replacement '%s'\n",
                     path);
             serializer_remove_temp(temp_path);

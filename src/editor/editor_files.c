@@ -58,15 +58,24 @@ static int editor_finalize_save(EditorState *es, const char *path,
  * editor_report_save_failure — Explain a failed level save in the status bar.
  *
  * result is what the level_save_toml_* call returned.  Most failures leave
- * the file on disk as it was, and "Save failed: <path>" says enough.  One
- * does not: on Windows the old file can be moved away before the new one
+ * the file on disk as it was, and "Save failed: <path>" says enough.  Two
+ * deserve their own words.  -2 means the file changed on disk under us
+ * (nothing was written), which is not a failure of the disk or the editor.
+ * And on Windows the old file can be moved away before the new one
  * fails to move in.  The level is then kept in a temporary file next to the
  * destination, and the designer needs its name to get the work back.
  */
 static void editor_report_save_failure(EditorState *es, int result,
                                        const char *path)
 {
-    if (result == SERIALIZER_REPLACE_TEMP_KEPT) {
+    if (result == -2) {
+        /* level_save_toml_checked found the file different from the copy
+         * this editor last read or wrote, just before replacing it: another
+         * program changed it.  Nothing was written; the next Save asks
+         * whether to replace it or save under another name. */
+        editor_set_status(es, "Save stopped: %s changed on disk; nothing was "
+                          "written. Save again to replace it or Save As", path);
+    } else if (result == SERIALIZER_REPLACE_TEMP_KEPT) {
         editor_set_status(es, "Save incomplete: your level is safe in %s",
                           level_save_kept_temp_path());
     } else {
