@@ -299,6 +299,10 @@ The **Play** button or **F5** validates the active `LevelDef`, serializes it to 
 
 Enabling **Debug Mode** in the toolbar adds `--debug` to the game launch, showing collision boxes, FPS counter, and the event log.
 
+### Playtest From Here
+
+**Shift+F5** playtests from a point instead of the level's start. With exactly one checkpoint selected, the game starts on that checkpoint (`--start-checkpoint <n>`); otherwise it starts with the player centred on the world x under the mouse (`--start-x <px>`), standing on the highest surface there: the ground floor, a pillar, a bridge, or a fixed or crumbling float platform. The selected checkpoint's properties also have a **Playtest from here** button. The point is checked with the game's own rules first, so pointing over a floor gap with nothing above it, or away from the canvas with no checkpoint selected, is refused in the status bar (`Playtest from here: nothing to stand on at x 416 (a floor gap)`) and nothing is launched. In the game the start point is also where a lost life comes back to, until a later checkpoint is crossed; Retry after Game Over starts the level from its own start (see the [runtime flags](../controls/#runtime-flags-for-input-and-ci)).
+
 ---
 
 ## File Operations

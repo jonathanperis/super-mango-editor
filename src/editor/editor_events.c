@@ -168,7 +168,9 @@ static void editor_key(EditorState *es, const InputEvent *event)
         }
         break;
     case KEY_F5:
-        editor_play_test(es);
+        /* Shift+F5: playtest from the selected checkpoint or the mouse. */
+        if (shift) editor_play_test_here(es);
+        else editor_play_test(es);
         break;
     case KEY_G:
         if (editor_finish_field_edit(es)) es->show_grid ^= 1;

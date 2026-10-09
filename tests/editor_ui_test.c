@@ -1437,6 +1437,114 @@ done:
     return failed;
 }
 
+/* The command line the last test launch would have run, one string per
+ * argument, and how many launches there were. */
+static char launched_args[8][EDITOR_PATH_MAX];
+static int launched_argc;
+static int launch_count;
+
+/* Stand-in for running the game: record the arguments and start a child
+ * that exits at once, so the editor follows and reaps a real process. */
+static int record_launch(const char *const *argv)
+{
+    pid_t child;
+    launched_argc = 0;
+    for (int i = 0; argv[i] && i < 8; i++) {
+        snprintf(launched_args[i], sizeof(launched_args[i]), "%s", argv[i]);
+        launched_argc++;
+    }
+    launch_count++;
+    child = fork();
+    if (child == 0) _exit(0);
+    return child > 0 ? (int)child : -1;
+}
+
+/* Is `flag` followed by `value` in the recorded command line? */
+static int launched_with(const char *flag, const char *value)
+{
+    for (int i = 0; i + 1 < launched_argc; i++)
+        if (strcmp(launched_args[i], flag) == 0 && strcmp(launched_args[i + 1], value) == 0)
+            return 1;
+    return 0;
+}
+
+/* Let the recorded child exit and the editor notice. */
+static void finish_launched_game(EditorState *es)
+{
+    if (es->play_pid > 0) (void)wait_until_exited((pid_t)es->play_pid);
+    ui_frame(es, NEUTRAL_X, NEUTRAL_Y);
+}
+
+/*
+ * Shift+F5 is "Playtest from here": the game gets --start-x for the spot
+ * under the mouse, or --start-checkpoint for a selected checkpoint.  A
+ * spot the game would refuse (over a floor gap) is refused before
+ * anything is launched.  F5 alone still starts at the level's start.
+ */
+static int playtest_from_here_passes_the_start_point(void)
+{
+    int failed = 0;
+    EditorState es;
+    const char *prefs = TEST_OUT "ui-playtest-prefs";
+    const int canvas_y = TOOLBAR_H + 100;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(mkdir(prefs, 0700) == 0 || errno == EEXIST);
+    CHECK(editor_set_preference_root(&es, prefs) == 0);
+    CHECK(editor_init_persistence_paths(&es) == 0);
+    editor_test_set_play_launcher(record_launch);
+    es.level.floor_gap_count = 1;
+    es.level.floor_gaps[0] = 400;
+    es.level.checkpoint_count = 1;
+    es.level.checkpoints[0] = (CheckpointPlacement){800.0f, 252.0f};
+    CHECK(level_is_valid(&es));
+    es.camera.x = 0.0f;
+    es.camera.y = 0.0f;
+    es.camera.zoom = 1.0f;
+
+    /* The mouse over world x 200, on the grass. */
+    ui_frame(&es, 200, canvas_y);
+    push_key(KEY_F5, INPUT_SHIFT);
+    ui_frame(&es, 200, canvas_y);
+    CHECK(launch_count == 1 && es.playing);
+    CHECK(launched_with("--start-x", "200"));
+    CHECK(launched_with("--level", es.playtest_path));
+    CHECK(strstr(es.status_message, "from x 200") != NULL);
+    finish_launched_game(&es);
+    CHECK(!es.playing);
+
+    /* Over the gap there is nothing to stand on: nothing is launched. */
+    ui_frame(&es, 416, canvas_y);
+    push_key(KEY_F5, INPUT_SHIFT);
+    ui_frame(&es, 416, canvas_y);
+    CHECK(launch_count == 1 && !es.playing);
+    CHECK(strstr(es.status_message, "nothing to stand on") != NULL);
+
+    /* A selected checkpoint wins over the mouse. */
+    editor_select_only(&es, ENT_CHECKPOINT, 0);
+    ui_frame(&es, 200, canvas_y);
+    push_key(KEY_F5, INPUT_SHIFT);
+    ui_frame(&es, 200, canvas_y);
+    CHECK(launch_count == 2 && launched_with("--start-checkpoint", "0"));
+    finish_launched_game(&es);
+
+    /* Nothing selected and the mouse off the canvas: say what to do. */
+    editor_select_none(&es);
+    key_frame(&es, KEY_F5, INPUT_SHIFT);
+    CHECK(launch_count == 2 && strstr(es.status_message, "point at the canvas") != NULL);
+
+    /* Plain F5 starts where the level starts. */
+    key_frame(&es, KEY_F5, 0);
+    CHECK(launch_count == 3 && es.playing);
+    for (int i = 0; i < launched_argc; i++)
+        CHECK(strncmp(launched_args[i], "--start", 7) != 0);
+    finish_launched_game(&es);
+done:
+    editor_test_set_play_launcher(NULL);
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
 #define FAKE_BIN TEST_OUT "fake-picker-bin"
 
 /* Write a stand-in for osascript/zenity: it prints MANGO_FAKE_PICK (when
@@ -1552,6 +1660,7 @@ int main(void)
         CASE(box_and_shift_select_act_on_the_group),
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),
+        CASE(playtest_from_here_passes_the_start_point),
         CASE(native_pickers_report_choice_cancel_and_failure),
 #endif
 #undef CASE

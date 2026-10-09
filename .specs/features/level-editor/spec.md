@@ -78,7 +78,7 @@ Shipped: validation messages in the Level Config panel and the status-bar summar
 The editor already edits full top-level TOML metadata: `name`, `description`, `generated_by`, `screen_count`, `next_phase`, music path/volume, floor tile, lives/hearts/scoring, player spawn, background/foreground/fog layers, and physics overrides. Improve discoverability and dense-panel ergonomics without adding a second format or a C exporter.
 
 ### N-003: Playtest UX Polish
-The shipped Play button validates, serializes a private temporary TOML snapshot, and launches the game with `--level <path>` semantics without overwriting the source file. Next work should improve stderr/stdout reporting and recovery when build/launch fails.
+The shipped Play button validates, serializes a private temporary TOML snapshot, and launches the game with `--level <path>` semantics without overwriting the source file. Shipped: "Playtest from here" (Shift+F5, or the checkpoint panel's button) adds `--start-x <px>` for the spot under the mouse or `--start-checkpoint <n>` for the selected checkpoint; the game drops the player onto the highest surface there, and the editor refuses a spot the game would refuse (`src/levels/level_start.c`). Next work should improve stderr/stdout reporting and recovery when build/launch fails.
 
 ### N-004: TOML Serializer Regression
 Add regression coverage for TOML serializer paths and representative levels so schema changes do not silently corrupt saved data.
