@@ -26,15 +26,6 @@ static int point_in_rect(int x, int y, int rx, int ry, int w, int h)
     return x >= rx && x < rx+w && y >= ry && y < ry+h;
 }
 
-static void centered(TextFont *font, const char *text, int cx, int y, Color color)
-{
-    /* cx is the desired center, not the left edge. Measure this exact label
-     * because different glyphs and score strings need different offsets. */
-    int width = 0;
-    if (font_measure(font, text, &width, NULL)) return;
-    font_draw(font, text, cx-width/2, y, color);
-}
-
 static void select_level(StartMenu *menu, int index)
 {
     /* Wrap at the catalog ends; the manifest, not a directory scan, owns the
@@ -167,28 +158,28 @@ int start_menu_frame(StartMenu *menu)
     Color red = {220,120,120,255};
     DrawRectangle(BTN_X, BTN_Y, BTN_W, BTN_H, color);
     DrawRectangleLines(BTN_X, BTN_Y, BTN_W, BTN_H, (Color){224, 224, 224, 255});
-    centered(menu->font, "Play", BTN_X + BTN_W/2, BTN_Y + (BTN_H-TEXT_FONT_SIZE)/2,
+    font_draw_centered(menu->font, "Play", BTN_X + BTN_W/2, BTN_Y + (BTN_H-TEXT_FONT_SIZE)/2,
                        entry->available ? WHITE : (Color){110,110,110,255});
     char text[160];
     Color grey = {120,120,120,255};
     snprintf(text,sizeof(text),"Level: < %s >",entry->display_name);
-    centered(menu->font,text,MENU_GAME_W/2,214,entry->available ? grey : (Color){80,80,80,255});
+    font_draw_centered(menu->font,text,MENU_GAME_W/2,214,entry->available ? grey : (Color){80,80,80,255});
     if (menu->error_message[0])
-        centered(menu->font, menu->error_message, MENU_GAME_W/2, 232, red);
+        font_draw_centered(menu->font, menu->error_message, MENU_GAME_W/2, 232, red);
     else if (!entry->available) {
         snprintf(text, sizeof(text), "Unavailable: %s", entry->problem);
-        centered(menu->font, text, MENU_GAME_W/2, 232, red);
+        font_draw_centered(menu->font, text, MENU_GAME_W/2, 232, red);
     }
     const GameProgress *best = game_profile_result(menu->profile,menu->selected_level_path);
     if (best && entry->available && !menu->error_message[0]) {
         snprintf(text, sizeof(text), "Best: %d pts / %.2fs / %d coins",
                  best->best_score, best->best_time, best->best_coins);
-        centered(menu->font,text,MENU_GAME_W/2,232,grey);
+        font_draw_centered(menu->font,text,MENU_GAME_W/2,232,grey);
     }
-    centered(menu->font,"Arrows/D-pad: level  Enter/A: play  Esc: exit",MENU_GAME_W/2,250,grey);
+    font_draw_centered(menu->font,"Arrows/D-pad: level  Enter/A: play  Esc: exit",MENU_GAME_W/2,250,grey);
     if (menu->settings_menu) {
         DrawRectangle(125,270,150,24,(Color){50,65,85,255});
-        centered(menu->font,"Settings (F1 / Y)",MENU_GAME_W/2,270+(24-TEXT_FONT_SIZE)/2,WHITE);
+        font_draw_centered(menu->font,"Settings (F1 / Y)",MENU_GAME_W/2,270+(24-TEXT_FONT_SIZE)/2,WHITE);
     }
     settings_menu_render(menu->settings_menu,menu->profile,menu->font);
     display_present(menu->frame_target);
