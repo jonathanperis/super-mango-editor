@@ -134,7 +134,7 @@ Recommended page story:
 
 1. **Attract mode hero:** `SUPER MANGO`, browser-play CTA, short source-backed value prop.
 2. **Cabinet play panel:** game canvas, payload size, controls, debug mode tucked into a developer drawer.
-3. **Scoreboard proof strip:** C11, raylib, WebAssembly, 4 levels, 25 screens, TOML levels, level editor.
+3. **Scoreboard proof strip:** C11, raylib, WebAssembly, the campaign's level and screen counts (read from `docs/src/generated/project.json`, never typed in), TOML levels, level editor.
 4. **What you can do:** Play, learn the engine, build levels.
 5. **Builder manual:** grouped docs by intent, not a flat list.
 6. **Item drop:** native builds and WebAssembly route with clear platform actions.

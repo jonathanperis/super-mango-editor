@@ -101,7 +101,7 @@ The standalone `levels/labs/03_checkpoints.toml` example places checkpoints befo
 
 ### Optional `[physics]` Overrides
 
-Levels can override player movement and camera feel with a `[physics]` table. Every field is optional; omitted fields, or values below zero, keep the engine default (movement constants in `src/player/player_lifecycle.c`, camera constants in `src/game.h`). Values must be finite and at most `MAX_LEVEL_MOTION` (10000). The example below shows overrides; the defaults are in the table.
+Levels can override player movement and camera feel with a `[physics]` table. Every field is optional; omitted fields, or values below zero, keep the engine default (movement constants in `src/player/player_lifecycle.c`, camera constants in `src/game_constants.h`). Values must be finite and at most `MAX_LEVEL_MOTION` (10000). The example below shows overrides; the defaults are in the table.
 
 ```toml
 [physics]

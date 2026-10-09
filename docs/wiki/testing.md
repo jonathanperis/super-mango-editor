@@ -203,7 +203,13 @@ units and owner/borrower contracts still need their existing regression checks.
 - backticked `name()` functions on the learning pages are defined in `src/`, `tests/` or `labs/`;
 - constant values in [Constants Reference](../constants-reference/) and in `#define` snippets match the source;
 - the [debug inspector key table](../controls/#debug-inspector-keys) matches `src/core/game_inspector.c`;
-- the [render order table](../architecture/#render-order-back-to-front) matches the call order in `src/render/game_render.c`.
+- the [render order table](../architecture/#render-order-back-to-front) matches the call order in `src/render/game_render.c`;
+- every "N native binaries" claim in the manual, README and `.specs/project/` matches `TEST_TARGETS`, and `STATE.md` lists each test binary;
+- every constant the docs place in a particular `src/` header (written as the constant name, "in", then the header path) is really defined there, and so are the camera constants;
+- the README's workflow trigger summary matches each workflow's `on:` block, and no page credits the drift check to the Docs workflow (only `build.yml` runs it);
+- the README prerequisites name Node.js (`make test` runs Node tests) with the Node version CI uses;
+- level, screen and lab counts in `PRODUCT.md`, the README and `.specs/project/` match `docs/src/generated/project.json` and `levels/`;
+- the Emscripten version is the same in the Makefile, `build.yml` and every page that quotes it.
 
 Each failure names the page and line to fix.
 
