@@ -105,6 +105,27 @@ int main(int argc, char **argv)
                 config.debug_mode = 1;
                 config.profile_enabled = 0;
             }
+        } else if (!strcmp(option, "--start-x") || !strcmp(option, "--start-checkpoint")) {
+            /* Playtest from a point (the editor's "Playtest from here"):
+             * a world x in whole pixels, or an authored checkpoint index.
+             * Whether the level has that point is checked once it loads. */
+            unsigned int value;
+            const char *text = argument(argc, argv, &i);
+            if (unsigned_argument(text, &value) || value > INT_MAX) {
+                fprintf(stderr, "Error: %s requires a whole number\n", option);
+                return EXIT_FAILURE;
+            }
+            if (config.start.kind != LEVEL_START_DEFAULT) {
+                fprintf(stderr, "Error: use only one of --start-x and --start-checkpoint\n");
+                return EXIT_FAILURE;
+            }
+            if (!strcmp(option, "--start-x")) {
+                config.start.kind = LEVEL_START_AT_X;
+                config.start.x = (float)value;
+            } else {
+                config.start.kind = LEVEL_START_AT_CHECKPOINT;
+                config.start.checkpoint = (int)value;
+            }
         } else if (!strcmp(option, "--seed") || !strcmp(option, "--smoke-test-frames")) {
             unsigned int value;
             const char *text = argument(argc, argv, &i);
@@ -128,6 +149,7 @@ int main(int argc, char **argv)
                  "  --profile PATH   explicit native player profile\n"
                  "  --no-save        memory-only settings/results\n"
                  "  --experiment PATH --level PATH   replay a captured experiment\n"
+                 "  --level PATH --start-x PX | --start-checkpoint N   start there\n"
                  "Debug: F2 freeze, F3 step, F4 slow, F6 field, -/+ tune, F7 reset, F8 record, F9 export.\n"
                  "  --debug --seed N --smoke-test-frames N --replay-script NAME\n"
                  "  --replay-dir DIR  read replay scripts from DIR (default out/replays-smoke)\n"
@@ -150,6 +172,14 @@ int main(int argc, char **argv)
      * missing --level. */
     if (config.replay_dir && !config.replay_script_path) {
         fprintf(stderr, "Error: --replay-dir requires --replay-script\n");
+        return EXIT_FAILURE;
+    }
+    /* A start point is for playtesting one level the user named; a replay
+     * or an experiment must start where it was recorded. */
+    if (config.start.kind != LEVEL_START_DEFAULT &&
+        (!level_typed || config.replay_script_path || config.experiment_path)) {
+        fprintf(stderr, "Error: --start-x and --start-checkpoint require --level and "
+                        "cannot combine with --replay-script or --experiment\n");
         return EXIT_FAILURE;
     }
     if (config.smoke_test_frames > 0 && !config.level_path)

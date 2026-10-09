@@ -343,6 +343,12 @@ typedef struct {
     int           replay_event_count;
     int           replay_cursor;
     char          level_path[GAME_LEVEL_PATH_MAX]; /* TOML level to load (--level flag) */
+    /* --start-x / --start-checkpoint (levels/level_start.h): where the
+     * first attempt at level_path starts.  start_kind is a LevelStartKind;
+     * 0 is the level's own start. */
+    int           start_kind;
+    float         start_x;
+    int           start_checkpoint;
     void         *level_def;   /* owned active LevelDef backing storage   */
     DebugOverlay  debug;       /* FPS counter, collision vis, event log      */
 

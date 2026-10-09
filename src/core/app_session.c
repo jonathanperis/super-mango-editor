@@ -321,6 +321,11 @@ static GameState *session_make_game(AppSession *session, const char *path, const
     copy_path(game->level_path, sizeof(game->level_path), path);
     copy_path(game->replay_script_path, sizeof(game->replay_script_path), session->replay_script_path);
     copy_path(game->replay_dir, sizeof(game->replay_dir), session->replay_dir);
+    /* A requested start point applies to the first game only. */
+    game->start_kind = (int)session->start.kind;
+    game->start_x = session->start.x;
+    game->start_checkpoint = session->start.checkpoint;
+    session->start.kind = LEVEL_START_DEFAULT;
     if (game_init(game)) {
         free(game);
         return NULL;
@@ -533,6 +538,7 @@ AppSession *session_create(const AppSessionConfig *config)
     session->random_seed = config ? config->random_seed : 1;
     session->smoke_test_frames = config ? config->smoke_test_frames : 0;
     if (config && config->hooks) session->hooks = *config->hooks;
+    if (config) session->start = config->start;
     copy_path(session->replay_script_path, sizeof(session->replay_script_path), config ? config->replay_script_path : NULL);
     copy_path(session->replay_dir, sizeof(session->replay_dir), config ? config->replay_dir : NULL);
     /* Acquire process resources before a screen loads GPU/audio assets. Tests

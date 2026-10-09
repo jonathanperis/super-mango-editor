@@ -440,6 +440,83 @@ done:
     return failed;
 }
 
+/*
+ * --start-x / --start-checkpoint (the editor's "Playtest from here"): the
+ * first game starts at that point, which is also where a lost life comes
+ * back to; a start the level does not have refuses the session, like a
+ * level that does not load.
+ */
+static int start_points_place_the_first_game(void)
+{
+    const char *fixture = "tests/fixtures/runtime/start_points.toml";
+    AppSessionConfig config = {0};
+    AppSession *session;
+    GameState *game;
+    int failed = 0;
+
+    /* x 616 is over the 2-tile pillar at 600: the player stands on top of
+     * it, in the column centred on 616, with checkpoint 0 (x 304) behind. */
+    config.level_path = fixture;
+    config.start.kind = LEVEL_START_AT_X;
+    config.start.x = 616.0f;
+    session = session_create(&config);
+    if (!session || !session->game) {
+        fprintf(stderr, "session_test: start-x session_create failed\n");
+        session_destroy(&session);
+        return 1;
+    }
+    game = session->game;
+    failed |= expect_float("start-x respawn x", game->respawn_x, 592.0f);
+    failed |= expect_float("start-x stands on the pillar", game->respawn_y,
+                           (float)(FLOOR_Y - 2 * TILE_SIZE + 16));
+    failed |= expect_float("start-x player centred",
+                           game->player.x + game->player.w / 2.0f, 616.0f);
+    failed |= expect_int("start-x checkpoint behind", game->checkpoint_index, 0);
+    failed |= expect_int("start used up", session->start.kind, LEVEL_START_DEFAULT);
+    session_destroy(&session);
+    if (failed) return 1;
+
+    /* A checkpoint start is exactly that checkpoint's respawn. */
+    memset(&config, 0, sizeof(config));
+    config.level_path = fixture;
+    config.start.kind = LEVEL_START_AT_CHECKPOINT;
+    config.start.checkpoint = 1;
+    session = session_create(&config);
+    if (!session || !session->game) {
+        fprintf(stderr, "session_test: start-checkpoint session_create failed\n");
+        session_destroy(&session);
+        return 1;
+    }
+    game = session->game;
+    failed |= expect_float("checkpoint respawn x", game->respawn_x, 1000.0f);
+    failed |= expect_float("checkpoint respawn y", game->respawn_y, 252.0f);
+    failed |= expect_int("checkpoint index", game->checkpoint_index, 1);
+    session_destroy(&session);
+    if (failed) return 1;
+
+    /* Over the floor gap at 400 there is nothing to stand on; checkpoint 5
+     * does not exist.  Neither creates a session. */
+    memset(&config, 0, sizeof(config));
+    config.level_path = fixture;
+    config.start.kind = LEVEL_START_AT_X;
+    config.start.x = 416.0f;
+    session = session_create(&config);
+    if (session) {
+        fprintf(stderr, "session_test: start over a gap created a session\n");
+        session_destroy(&session);
+        return 1;
+    }
+    config.start.kind = LEVEL_START_AT_CHECKPOINT;
+    config.start.checkpoint = 5;
+    session = session_create(&config);
+    if (session) {
+        fprintf(stderr, "session_test: missing checkpoint created a session\n");
+        session_destroy(&session);
+        return 1;
+    }
+    return 0;
+}
+
 static int failed_initial_level_does_not_create_session(void)
 {
     AppSessionConfig config = {0};
@@ -1389,6 +1466,7 @@ int main(void)
         CASE(campaign_broken_level_disables_only_its_entry),
         CASE(physical_release_latch_blocks_transition_input),
         CASE(failed_initial_level_does_not_create_session),
+        CASE(start_points_place_the_first_game),
         CASE(asset_root_moves_a_foreign_working_folder),
         CASE(direct_game_boot_repairs_input_and_keeps_controller_runtime),
         CASE(immediate_play_preserves_window_and_input_latch),

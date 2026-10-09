@@ -4,6 +4,7 @@
 #include "../screens/start_menu.h"
 #include "game_profile.h"
 #include "../screens/settings_menu.h"
+#include "../levels/level_start.h"  /* LevelStart: --start-x / --start-checkpoint */
 
 typedef enum {
     APP_SCREEN_NONE = 0,
@@ -55,6 +56,7 @@ typedef struct {
     const char *profile_path; /* optional native profile override */
     unsigned int random_seed;
     const char *experiment_path; /* explicit native capture import */
+    LevelStart start; /* where the --level game first starts; kind 0 = its own start */
 } AppSessionConfig;
 
 typedef struct AppSession {
@@ -96,6 +98,9 @@ typedef struct AppSession {
      * the last check, so a new point is recorded only when one changes. */
     float resume_respawn_x, resume_respawn_y;
     int resume_was_paused;
+    /* The config's start point, used up by the first game opened (Replay,
+     * Level Select and Next Level start levels at their own start). */
+    LevelStart start;
 } AppSession;
 
 /* Heap-allocate a session and its initial menu or game screen. */
