@@ -80,6 +80,19 @@ void editor_clamp_placement(const LevelDef *level, EntityType type,
                             PlacementData *pd);
 
 /*
+ * editor_move_placement --- Return a copy of `from` moved by (dx, dy) world
+ * pixels, the way a drag, an arrow-key nudge and a paste all move it.
+ * Patrolling enemies carry their patrol range along; types whose y comes
+ * from the floor or water (ground enemies, fish, pads, spike rows, flames,
+ * pillars) ignore dy; floor gaps move in whole FLOOR_GAP_W steps and rails
+ * in whole pixels; rail riders are positioned by their rail and do not
+ * move.  An axe trap or saw keeps "y = 0, default height" for a purely
+ * horizontal move.  The result is not clamped (editor_clamp_placement).
+ */
+PlacementData editor_move_placement(EntityType type, const PlacementData *from,
+                                    float dx, float dy);
+
+/*
  * editor_insert_checked --- The part of editor_add_placement that touches
  * only `level`: check there is room (and a rail or floor gap when the type
  * needs one), append pd (or move a singleton, whose old data goes in

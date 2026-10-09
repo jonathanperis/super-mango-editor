@@ -311,15 +311,14 @@ static int get_entity_anchor(const LevelDef *level, EntityType type, int index,
 }
 
 /*
- * move_placement --- Return a copy of `from` shifted by (dx, dy) world px.
+ * editor_move_placement --- see tools.h.  This is the one place that knows
+ * which fields hold each type's position.
  *
  * Working with a delta from the original placement makes this the exact
  * inverse of get_entity_anchor: a zero delta returns identical bytes, so a
- * click without movement can never change the document.  Types whose y is
- * derived from the floor or water ignore dy; rail riders are positioned by
- * their rail and do not move at all.
+ * click without movement can never change the document.
  */
-static PlacementData move_placement(EntityType type, const PlacementData *from,
+PlacementData editor_move_placement(EntityType type, const PlacementData *from,
                                     float dx, float dy)
 {
     PlacementData pd = *from;
@@ -1333,7 +1332,7 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
 
     for (int i = 0; i < es->drag_count; i++) {
         const Selection *item = &es->drag_items[i];
-        PlacementData moved = move_placement(item->type, &es->drag_befores[i], dx, dy);
+        PlacementData moved = editor_move_placement(item->type, &es->drag_befores[i], dx, dy);
         editor_clamp_placement(&es->level, item->type, &moved);
         previous[i] = editor_snapshot_entity(&es->level, item->type, item->index);
         (void)editor_entity_write(&es->level, item->type, item->index, &moved);
@@ -1400,7 +1399,7 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
     /* Move every selected entity, exactly as a drag by (dx, dy) would. */
     for (int i = 0; i < count; i++) {
         before[i] = editor_snapshot_entity(&es->level, items[i].type, items[i].index);
-        after[i] = move_placement(items[i].type, &before[i], dx, dy);
+        after[i] = editor_move_placement(items[i].type, &before[i], dx, dy);
         editor_clamp_placement(&es->level, items[i].type, &after[i]);
         (void)editor_entity_write(&es->level, items[i].type, items[i].index, &after[i]);
         if (memcmp(&before[i], &after[i], sizeof(after[i])) != 0) changed++;
