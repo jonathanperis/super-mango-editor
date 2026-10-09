@@ -237,6 +237,53 @@ static int confirm_resume_latches_the_jump_button(void)
     return 0;
 }
 
+/*
+ * A refused binding leaves a message ("Reserved/duplicate binding...").
+ * Cancelling that capture with Esc, or closing the panel, used to keep it,
+ * so a stale complaint stayed under the next unrelated row.
+ */
+static int settings_message_clears_on_cancel_and_close(void)
+{
+    SettingsMenu menu = {0};
+    GameProfile profile = {0};
+    InputEvent f1 = {.type=INPUT_KEY_DOWN,.key=KEY_F1};
+    InputEvent enter = {.type=INPUT_KEY_DOWN,.key=KEY_ENTER};
+    InputEvent tab = {.type=INPUT_KEY_DOWN,.key=KEY_TAB,.binding=input_binding_from_key(KEY_TAB)};
+    InputEvent escape = {.type=INPUT_KEY_DOWN,.key=KEY_ESCAPE};
+    profile.data.settings = (GameSettings)GAME_SETTINGS_DEFAULTS;
+
+    settings_menu_event(&menu, &profile, &f1, PAD_BACK);
+    menu.page = 1;
+    menu.selected = BIND_JUMP;
+    settings_menu_event(&menu, &profile, &enter, PAD_BACK);
+    settings_menu_event(&menu, &profile, &tab, PAD_BACK);  /* Tab is reserved */
+    if (expect_int("reserved key keeps capturing", menu.capture, 1) != 0 ||
+        expect_int("reserved key explains", menu.message[0] != '\0', 1) != 0)
+        return 1;
+    settings_menu_event(&menu, &profile, &escape, PAD_BACK);
+    if (expect_int("Esc cancels capture", menu.capture, 0) != 0 ||
+        expect_int("Esc keeps the panel", menu.open, 1) != 0 ||
+        expect_int("cancel clears message", menu.message[0], '\0') != 0)
+        return 1;
+
+    settings_menu_event(&menu, &profile, &enter, PAD_BACK);
+    settings_menu_event(&menu, &profile, &tab, PAD_BACK);
+    menu.capture = 0;  /* as if a pad capture had ended; close from the page */
+    settings_menu_event(&menu, &profile, &escape, PAD_BACK);
+    if (expect_int("Esc closes", menu.open, 0) != 0 ||
+        expect_int("close clears message", menu.message[0], '\0') != 0)
+        return 1;
+
+    snprintf(menu.message, sizeof(menu.message), "stale");
+    menu.page = 1;
+    settings_menu_open(&menu);
+    if (expect_int("open starts on main page", menu.page, 0) != 0 ||
+        expect_int("open clears message", menu.message[0], '\0') != 0)
+        return 1;
+    settings_menu_cleanup(&menu);
+    return 0;
+}
+
 int main(void)
 {
     if (input_backend_contract_test()) return 1;
@@ -253,6 +300,7 @@ int main(void)
     if (keyboard_escape_toggles_pause_in_active_gameplay() != 0) return 1;
     if (confirm_resume_latches_the_jump_button() != 0) return 1;
     if (focus_regain_keeps_music_paused_under_settings() != 0) return 1;
+    if (settings_message_clears_on_cancel_and_close() != 0) return 1;
 
     input_close();
     if (game_web_input_touch(GAME_TOUCH_JUMP, 1) != 0) return 1;

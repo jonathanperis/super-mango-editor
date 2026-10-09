@@ -133,10 +133,9 @@ int start_menu_frame(StartMenu *menu)
         if (menu->route != MENU_ROUTE_NONE) continue;
         if (settings_menu_event(menu->settings_menu, menu->profile, &event, PAD_Y)) continue;
         if (event.type == INPUT_MOUSE_DOWN && event.button == MOUSE_BUTTON_LEFT) {
-            if (menu->settings_menu && point_in_rect(event.x,event.y,125,270,150,24)) {
-                menu->settings_menu->open = 1;
-                menu->settings_menu->page = menu->settings_menu->selected = menu->settings_menu->capture = 0;
-            } else if (point_in_rect(event.x, event.y, BTN_X, BTN_Y, BTN_W, BTN_H))
+            if (menu->settings_menu && point_in_rect(event.x,event.y,125,270,150,24))
+                settings_menu_open(menu->settings_menu);
+            else if (point_in_rect(event.x, event.y, BTN_X, BTN_Y, BTN_W, BTN_H))
                 play(menu);
         } else if ((event.type == INPUT_KEY_DOWN || event.type == INPUT_PAD_DOWN) && !event.repeat) {
             int key = event.type == INPUT_KEY_DOWN ? event.key : KEY_NULL;

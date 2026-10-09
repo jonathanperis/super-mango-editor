@@ -68,7 +68,7 @@ The overlay text is snapshotted in [Overlay Snapshots](../overlay-snapshots/) so
 ## Settings and Saved Progress
 
 - **Open:** F1 on either screen; gamepad Y in the start menu or Back during gameplay/pause. On terminal overlays, Back exits; use F1 for settings.
-- **Navigate:** Up/Down or D-pad selects a row, wrapping at the ends; Left/Right changes values on the main page; Enter, keypad Enter, Space or A/Start activates, and a mouse click activates a row. Esc or B/Back closes, or cancels binding capture first.
+- **Navigate:** Up/Down or D-pad selects a row, wrapping at the ends; Left/Right changes values on the main page; Enter, keypad Enter, Space or A/Start activates, and a mouse click activates a row. Esc or B/Back closes, or cancels binding capture first; either one also clears the message about a refused binding. The start menu's **Settings** button opens the panel exactly as F1 does.
 - **Options:** music/effects volume (0–128 in steps of 8), mute, stick dead zone (0–28000 in steps of 1000), native window scale (1×–4×; not applied in the browser), high-contrast outlines, reduced motion, control remapping (a separate page of 12 binding rows) and **Restore default settings**, which resets every setting, not only controls.
 - **Remapping:** Left, Right, Up, Down, Jump and Run each have keyboard and gamepad bindings. Duplicates are rejected, as are reserved keys (Esc, F1, Tab, Enter, keypad Enter, the arrows and Right Shift) and buttons (Back, Start, Guide, B); misc, paddle and touchpad buttons cannot be captured. Arrows remain available. In debug gameplay, F2–F10 and `-`/`=` are reserved for the inspector.
 
