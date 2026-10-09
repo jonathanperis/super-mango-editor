@@ -202,6 +202,56 @@ static void offset_pasted_copy(EntityType type, PlacementData *d)
 }
 
 /*
+ * editor_duplicate_selection — Ctrl+D: copy the selection in place, one
+ * paste offset along, without touching the clipboard.
+ *
+ * Each copy is moved by offset_pasted_copy (the same step Paste uses) and
+ * becomes the new selection, so pressing Ctrl+D again duplicates the copy
+ * and the row keeps stepping.  A rail rider stays on its own rail.  The
+ * player spawn and the Last Star exist once per level and are refused.
+ * Several selected entities are copied as one undo step.
+ */
+void editor_duplicate_selection(EditorState *es)
+{
+    static Selection items[EDITOR_MAX_SELECTION];
+    char error[128];
+    int count;
+    int added = 0;
+
+    if (!es) return;
+    if (level_validate_runtime(&es->level, error, sizeof(error)) != 0) {
+        editor_set_status(es, "Duplicate blocked: fix level errors first (%s)", error);
+        return;
+    }
+    editor_selection_reconcile(es);
+    count = editor_selection_items(es, items, EDITOR_MAX_SELECTION);
+    if (count == 0) {
+        editor_set_status(es, "Nothing to duplicate: select an entity first");
+        return;
+    }
+    for (int i = 0; i < count; i++) {
+        if (editor_entity_type_is_singleton(items[i].type)) {
+            editor_set_status(es, "%s is unique; it cannot be duplicated",
+                              editor_entity_type_name(items[i].type));
+            return;
+        }
+    }
+
+    (void)undo_group_begin(es->undo);
+    for (int i = 0; i < count; i++) {
+        PlacementData d = editor_snapshot_entity(&es->level, items[i].type,
+                                                 items[i].index);
+        offset_pasted_copy(items[i].type, &d);
+        editor_clamp_placement(&es->level, items[i].type, &d);
+        if (editor_add_placement(es, items[i].type, &d, "duplicate") == 0) added++;
+    }
+    undo_group_end(es->undo);
+    if (added == count)
+        editor_set_status(es, added == 1 ? "Duplicated %d entity" : "Duplicated %d entities",
+                          added);
+}
+
+/*
  * editor_paste_clipboard — Create a new entity from the clipboard data.
  *
  * Inserts a copy of the last Ctrl+C'd entity into the level, moved a little

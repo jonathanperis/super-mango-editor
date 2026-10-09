@@ -81,6 +81,8 @@
 #define CANVAS_H      (EDITOR_H - TOOLBAR_H - STATUS_H)
 #define EDITOR_PATH_MAX 1024
 #define EDITOR_MAX_RECOVERY_ENTRIES 32
+/* Most entities one selection (and one group action on it) can hold. */
+#define EDITOR_MAX_SELECTION 256
 
 typedef struct {
     uint64_t id;

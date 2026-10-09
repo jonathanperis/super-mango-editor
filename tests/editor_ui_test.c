@@ -790,6 +790,42 @@ done:
     return failed;
 }
 
+/*
+ * Ctrl+D copies the selection one paste offset along and selects the copy,
+ * so repeating it lays out a row.  The clipboard is not touched, and the
+ * one-per-level entities refuse.
+ */
+static int ctrl_d_duplicates_with_a_stepping_offset(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(place_and_select_coin(&es, 300, 300) == 0);
+    const float x0 = es.level.coins[0].x, y0 = es.level.coins[0].y;
+    const int undo_top = es.undo->top;
+
+    key_frame(&es, KEY_D, INPUT_CTRL);
+    CHECK(es.level.coin_count == 2 && es.selection.index == 1);
+    CHECK(es.level.coins[1].x == x0 + 24.0f && es.level.coins[1].y == y0 + 24.0f);
+    key_frame(&es, KEY_D, INPUT_CTRL);
+    CHECK(es.level.coin_count == 3 && es.selection.index == 2);
+    CHECK(es.level.coins[2].x == x0 + 48.0f && es.level.coins[2].y == y0 + 48.0f);
+    CHECK(es.undo->top == undo_top + 2 && !es.has_clipboard && level_is_valid(&es));
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 2);
+
+    /* The player spawn is unique: nothing is added. */
+    es.selection.type = ENT_PLAYER_SPAWN;
+    es.selection.index = 0;
+    key_frame(&es, KEY_D, INPUT_CTRL);
+    CHECK(strstr(es.status_message, "cannot be duplicated") != NULL);
+    CHECK(es.undo->top == undo_top + 1);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
 /* ------------------------------------------------------------------ */
 /* Text editing: caret keys and Tab                                    */
 /* ------------------------------------------------------------------ */
@@ -1082,6 +1118,7 @@ int main(void)
         CASE(level_config_sections_resize_the_panel),
         CASE(text_fields_move_the_caret_and_tab_between_fields),
         CASE(arrow_keys_nudge_and_backspace_deletes),
+        CASE(ctrl_d_duplicates_with_a_stepping_offset),
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),
         CASE(native_pickers_report_choice_cancel_and_failure),
