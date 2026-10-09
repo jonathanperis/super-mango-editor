@@ -37,6 +37,7 @@
 #include "shared/serializer.h"
 #include "shared/serializer_emit.h"
 #include "shared/serializer_io.h"
+#include "test_folders.h"
 #include "test_paths.h"  /* TEST_OUT scratch directory */
 #include "editor/tools.h"
 #include "editor/undo.h"
@@ -2458,7 +2459,6 @@ static int validation_reports_every_runtime_error(void)
     return 0;
 }
 
-#ifndef _WIN32   /* the scratch folder uses POSIX mkdir/chdir */
 /* A minimal valid level named `name` whose next_phase is `next` ("" none). */
 static int write_campaign_level(const char *path, const char *name, const char *next)
 {
@@ -2483,10 +2483,10 @@ static int write_campaign_level(const char *path, const char *name, const char *
 #define CAMPAIGN_ROOT TEST_OUT "campaign-root"
 static int make_campaign_root(void)
 {
-    (void)mkdir(CAMPAIGN_ROOT, 0755);
-    (void)mkdir(CAMPAIGN_ROOT "/levels", 0755);
-    (void)mkdir(CAMPAIGN_ROOT "/levels/campaigns", 0755);
-    (void)mkdir(CAMPAIGN_ROOT "/other", 0755);
+    test_make_folder(CAMPAIGN_ROOT);
+    test_make_folder(CAMPAIGN_ROOT "/levels");
+    test_make_folder(CAMPAIGN_ROOT "/levels/campaigns");
+    test_make_folder(CAMPAIGN_ROOT "/other");
     return write_campaign_level(CAMPAIGN_ROOT "/levels/a.toml", "Alpha", "levels/b.toml") ||
            write_campaign_level(CAMPAIGN_ROOT "/levels/b.toml", "Bravo", "levels/c.toml") ||
            write_campaign_level(CAMPAIGN_ROOT "/levels/c.toml", "Charlie", "") ||
@@ -2535,8 +2535,8 @@ static int campaign_view_edits_and_saves_the_manifest(void)
 
     memset(&es, 0, sizeof(es));
     editor_level_init_defaults(&es.level);
-    if (make_campaign_root() != 0 || !getcwd(cwd, sizeof(cwd)) ||
-        chdir(CAMPAIGN_ROOT) != 0) return 1;
+    if (make_campaign_root() != 0 || test_working_folder(cwd, sizeof(cwd)) != 0 ||
+        test_change_folder(CAMPAIGN_ROOT) != 0) return 1;
 
     if (expect_int("opens", editor_campaign_open(&es, NULL), 0) != 0) goto done;
     view = editor_campaign_entries(&es);
@@ -2636,10 +2636,9 @@ static int campaign_view_edits_and_saves_the_manifest(void)
 done:
     campaign_catalog_cleanup(&reloaded);
     editor_campaign_free(&es);
-    if (chdir(cwd) != 0) result = 1;
+    if (test_change_folder(cwd) != 0) result = 1;
     return result;
 }
-#endif
 
 /*
  * A rail copied together with the spike block riding it pastes as a new
@@ -5299,9 +5298,7 @@ int main(void)
     if (shared_level_rules_have_one_answer() != 0) return 1;
     if (validation_errors_report_where_they_are() != 0) return 1;
     if (validation_reports_every_runtime_error() != 0) return 1;
-#ifndef _WIN32
     if (campaign_view_edits_and_saves_the_manifest() != 0) return 1;
-#endif
     if (float_platform_rail_switch_rechecks_its_rail() != 0) return 1;
     if (drag_round_trips_and_follows_grab_point() != 0) return 1;
     if (editor_mutations_keep_level_valid() != 0) return 1;
