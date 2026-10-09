@@ -77,6 +77,14 @@ static LevelIssueLocation location(const char *path)
     return where;
 }
 
+/* level_validate_runtime_each hands every runtime error to this, with its
+ * location already read from the message. */
+static void add_runtime_issue(void *context, const char *message,
+                              const LevelIssueLocation *where)
+{
+    report_add_at((EditorValidationReport *)context, 1, where, "%s", message, NULL);
+}
+
 static void check_path(EditorValidationReport *report, const char *field,
                        const char *path)
 {
@@ -92,7 +100,6 @@ static void check_path(EditorValidationReport *report, const char *field,
 
 int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
 {
-    char err[256];
     char field[64];
 
     if (!report) return -1;
@@ -103,11 +110,9 @@ int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
         return -1;
     }
 
-    {
-        LevelIssueLocation where;
-        if (level_validate_runtime_at(def, err, sizeof(err), &where) != 0)
-            report_add_at(report, 1, &where, "%s", err, NULL);
-    }
+    /* Every runtime rule the game applies, each failure its own message
+     * (the game itself stops at the first one). */
+    (void)level_validate_runtime_each(def, add_runtime_issue, report);
 
     if (def->screen_count <= 0) {
         report_add(report, 1, "%s", "screen_count must be > 0", NULL);
@@ -145,6 +150,15 @@ int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
     }
 
     return report->error_count == 0 ? 0 : -1;
+}
+
+int editor_validation_hidden_count(const EditorValidationReport *report)
+{
+    int hidden;
+
+    if (!report) return 0;
+    hidden = report->error_count + report->warning_count - report->message_count;
+    return hidden > 0 ? hidden : 0;
 }
 
 const char *editor_validation_summary(const EditorValidationReport *report)
