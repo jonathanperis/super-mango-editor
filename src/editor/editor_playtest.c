@@ -27,9 +27,20 @@
 #include <windows.h>   /* CreateProcessW, HANDLE */
 #endif
 
+#include "canvas.h"          /* canvas_contains, canvas_screen_to_world */
 #include "editor_files.h"    /* private playtest snapshot lifecycle */
 #include "editor_session.h" /* editor status/title/persist helpers */
+#include "entity_meta.h"     /* editor_selection_count */
 #include "../shared/serializer_io.h"
+
+#if defined(MANGO_TESTING) && !defined(_WIN32)
+static int (*editor_test_launch)(const char *const *argv);
+
+void editor_test_set_play_launcher(int (*launch)(const char *const *argv))
+{
+    editor_test_launch = launch;
+}
+#endif
 
 int editor_playtest_binary_path(char *path, size_t size)
 {
@@ -46,8 +57,80 @@ int editor_playtest_binary_path(char *path, size_t size)
     return 0;
 }
 
+int editor_playtest_arguments(const char *binary, const char *level, int debug,
+                              const LevelStart *start, char *number,
+                              const char **argv, int max)
+{
+    int n = 0;
+
+    /* At most: binary, --level, path, --no-save, --debug, flag, value, NULL. */
+    if (!binary || !level || !number || !argv || max < 8) return -1;
+    argv[n++] = binary;
+    argv[n++] = "--level";
+    argv[n++] = level;
+    argv[n++] = "--no-save";
+    if (debug) argv[n++] = "--debug";
+    if (start && start->kind == LEVEL_START_AT_X) {
+        /* The flag takes whole pixels; x is already inside the level. */
+        snprintf(number, 16, "%d", (int)(start->x + 0.5f));
+        argv[n++] = "--start-x";
+        argv[n++] = number;
+    } else if (start && start->kind == LEVEL_START_AT_CHECKPOINT) {
+        snprintf(number, 16, "%d", start->checkpoint);
+        argv[n++] = "--start-checkpoint";
+        argv[n++] = number;
+    }
+    argv[n] = NULL;
+    return n;
+}
+
+int editor_playtest_start_here(EditorState *es, LevelStart *start)
+{
+    LevelStartPoint point;
+    char why[128];
+
+    if (!es || !start) return -1;
+    memset(start, 0, sizeof(*start));
+    if (editor_selection_count(es) == 1 && es->selection.type == ENT_CHECKPOINT) {
+        start->kind = LEVEL_START_AT_CHECKPOINT;
+        start->checkpoint = es->selection.index;
+    } else if (canvas_contains(es->mouse_x, es->mouse_y)) {
+        float world_x, world_y;
+        canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &world_x, &world_y);
+        start->kind = LEVEL_START_AT_X;
+        /* Whole pixels, as the game's flag takes them. */
+        start->x = (float)(int)(world_x + 0.5f);
+    } else {
+        editor_set_status(es, "Playtest from here: point at the canvas or select a checkpoint");
+        return -1;
+    }
+    if (level_start_resolve(&es->level, start, &point, why, sizeof(why)) != 0) {
+        editor_set_status(es, "Playtest from here: %s", why);
+        return -1;
+    }
+    return 0;
+}
+
+void editor_play_test_here(EditorState *es)
+{
+    LevelStart start;
+
+    if (!es || !editor_finish_field_edit(es)) return;
+    if (es->playing) return;
+    if (editor_playtest_start_here(es, &start) != 0) return;
+    editor_play_test_from(es, &start);
+}
+
 void editor_play_test(EditorState *es)
 {
+    editor_play_test_from(es, NULL);
+}
+
+void editor_play_test_from(EditorState *es, const LevelStart *start)
+{
+    char start_number[16];
+    const char *args[8];
+
     if (!es || !editor_finish_field_edit(es)) return;
     if (es->playing) return;   /* already running */
     if (!editor_can_persist(es, "Playtest")) return;
@@ -58,7 +141,11 @@ void editor_play_test(EditorState *es)
         editor_set_status(es, "Play failed: cannot locate sibling game executable");
         return;
     }
-    if (!serializer_file_exists_utf8(binary_path)) {
+    if (!serializer_file_exists_utf8(binary_path)
+#if defined(MANGO_TESTING) && !defined(_WIN32)
+        && !editor_test_launch   /* a test launcher needs no real game */
+#endif
+       ) {
         editor_set_status(es, "Play failed: build both executables with make builder");
         return;
     }
@@ -68,23 +155,34 @@ void editor_play_test(EditorState *es)
         return;
     }
     editor_set_status(es, "Play saved %s", save_path);
+    if (editor_playtest_arguments(binary_path, save_path, es->debug_play, start,
+                                  start_number, args, 8) < 0) {
+        editor_retire_playtest_level(es);
+        editor_set_status(es, "Play failed: command line");
+        return;
+    }
 
     fprintf(stderr, "Play: launching game...\n");
 
 #ifndef _WIN32
+#ifdef MANGO_TESTING
+    pid_t pid = editor_test_launch ? (pid_t)editor_test_launch(args) : fork();
+#else
     pid_t pid = fork();
+#endif
     if (pid == 0) {
-        if (es->debug_play)
-            execl(binary_path, "super-mango",
-                  "--level", save_path, "--debug", "--no-save", (char *)NULL);
-        else
-            execl(binary_path, "super-mango",
-                  "--level", save_path, "--no-save", (char *)NULL);
+        /* execv wants a char *const[]; the strings are not changed. */
+        execv(binary_path, (char *const *)args);
         _exit(1);
     } else if (pid > 0) {
         es->play_pid = (int)pid;
         es->playing = 1;
-        editor_set_status(es, "Play launched %s", save_path);
+        if (start && start->kind == LEVEL_START_AT_X)
+            editor_set_status(es, "Play launched from x %s", start_number);
+        else if (start && start->kind == LEVEL_START_AT_CHECKPOINT)
+            editor_set_status(es, "Play launched from checkpoint %s", start_number);
+        else
+            editor_set_status(es, "Play launched %s", save_path);
         SetWindowTitle("Super Mango Editor - Playing...");
     } else {
         fprintf(stderr, "Play: fork() failed\n");
@@ -103,11 +201,18 @@ void editor_play_test(EditorState *es)
         memset(&startup, 0, sizeof(startup));
         memset(&process, 0, sizeof(process));
         startup.cb = sizeof(startup);
+        /* The start flag (args after the fixed ones) is ASCII digits. */
+        wchar_t start_flag[48] = L"";
+        if (start && start->kind != LEVEL_START_DEFAULT)
+            _snwprintf(start_flag, sizeof(start_flag) / sizeof(start_flag[0]),
+                       L" %hs %hs",
+                       start->kind == LEVEL_START_AT_X ? "--start-x" : "--start-checkpoint",
+                       start_number);
         written = wide_level && wide_binary
                   ? _snwprintf(command, sizeof(command) / sizeof(command[0]),
-                              L"\"%ls\" --no-save --level \"%ls\"%ls",
+                              L"\"%ls\" --no-save --level \"%ls\"%ls%ls",
                               wide_binary, wide_level,
-                              es->debug_play ? L" --debug" : L"")
+                              es->debug_play ? L" --debug" : L"", start_flag)
                  : -1;
         if (written < 0 || (size_t)written >= sizeof(command) / sizeof(command[0]) ||
             !CreateProcessW(wide_binary, command, NULL, NULL, FALSE, 0, NULL, NULL,
