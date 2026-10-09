@@ -7,15 +7,16 @@
  * variant passes in as a FishSpec. bird.c does the same for birds.
  */
 
+#include <math.h>  /* fabsf */
+
 #include "../core/game_random.h"
 
 #include "fish.h"
 #include "../game_constants.h"     /* GRAVITY */
-#include "../core/entity_utils.h"  /* animate_frame_ms */
+#include "../core/entity_utils.h"  /* patrol_update, animate_frame_ms */
 
 /* Tuning for the regular fish; faster_fish.c defines its own FishSpec. */
 static const FishSpec s_regular_fish = {
-    FISH_SPEED,
     FISH_JUMP_VY,
     FISH_JUMP_MIN,
     FISH_JUMP_MAX,
@@ -48,25 +49,23 @@ void fish_variant_update(const FishSpec *spec, Fish *fish, int count,
             }
         }
 
-        /* Horizontal patrol runs continuously, both in water and airborne. */
-        f->x += f->vx * dt;
+        /*
+         * Horizontal patrol runs continuously, both in water and airborne.
+         * patrol_update turns the fish at its patrol ends and keeps the
+         * level's authored speed; only the direction flips.
+         */
+        patrol_update(&f->x, &f->vx, FISH_RENDER_W,
+                      f->patrol_x0, f->patrol_x1, dt);
 
-        if (f->vx > 0.0f && f->x + FISH_RENDER_W >= f->patrol_x1) {
-            f->x  = f->patrol_x1 - FISH_RENDER_W;
-            f->vx = -spec->speed;
-        } else if (f->vx < 0.0f && f->x <= f->patrol_x0) {
-            f->x  = f->patrol_x0;
-            f->vx = spec->speed;
-        }
-
-        /* Clamp to world edges as a final safety net. */
+        /* Clamp to world edges as a final safety net. fabsf keeps the
+         * authored speed and only picks the direction away from the edge. */
         if (f->x < 0.0f) {
             f->x = 0.0f;
-            f->vx = spec->speed;
+            f->vx = fabsf(f->vx);
         }
         if (f->x > world_w - FISH_RENDER_W) {
             f->x = (float)(world_w - FISH_RENDER_W);
-            f->vx = -spec->speed;
+            f->vx = -fabsf(f->vx);
         }
 
         /* Gravity only affects the fish while it is in its jump arc. */

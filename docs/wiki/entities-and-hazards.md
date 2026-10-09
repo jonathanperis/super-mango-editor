@@ -8,7 +8,7 @@ Super Mango has six enemy types and seven hazard types. All are stored as fixed-
 
 Losing a life resets every enemy and hazard to its authored placement.
 
-All enemies patrol between `patrol_x0` and `patrol_x1`; the range must be at least as wide as the enemy's sprite. The TOML `vx` is only the starting velocity: its sign picks the first direction, and after the first turn the enemy moves at its type's speed constant below.
+All enemies patrol between `patrol_x0` and `patrol_x1`; the range must be at least as wide as the enemy's sprite. The TOML `vx` is the patrol speed for the whole level: its sign picks the first direction, and every turn (at a patrol end, at a floor gap for spiders, at the world edge for fish) flips the direction and keeps the speed. The `*_SPEED` constants below are the usual speeds, the values shipped levels and new editor placements use. `vx` must not be 0 (the enemy would never move) and its size must be at most `MAX_PATROL_SPEED` (960 px/s): spiders check for floor gaps once per step, and a faster spider could step over a whole gap between two checks.
 
 ---
 
@@ -27,7 +27,7 @@ All enemies patrol between `patrol_x0` and `patrol_x1`; the range must be at lea
 | `SPIDER_FRAME_W` | 64 | Width of one frame slot in px |
 | `SPIDER_ART_W` | 25 | Width of visible art (cols 20–44) |
 | `SPIDER_ART_H` | 10 | Height of visible art (rows 22–31) |
-| `SPIDER_SPEED` | 50.0 | Walk speed in logical px/s |
+| `SPIDER_SPEED` | 50.0 | Usual walk speed in logical px/s (the level's `vx` is used) |
 | `SPIDER_FRAME_MS` | 150 | ms per animation frame |
 
 **TOML placement:**
@@ -46,7 +46,7 @@ frame_index = 0          # starting animation frame (0–2)
 
 **File:** `src/entities/jumping_spider.c` / `jumping_spider.h`  
 **Sprite:** `assets/sprites/entities/jumping_spider.png`  
-**Behaviour:** Like the spider (55 px/s, `JSPIDER_SPEED`) but leaps when its art centre reaches a floor gap: an upward impulse of −200 px/s under its own 600 px/s² gravity, with the attack sound when on screen. Normal spiders reverse at gaps; jumping spiders continue across them. Neither variant follows the player.
+**Behaviour:** Like the spider (usually 55 px/s, `JSPIDER_SPEED`) but leaps when its art centre reaches a floor gap: an upward impulse of −200 px/s under its own 600 px/s² gravity, with the attack sound when on screen. Normal spiders reverse at gaps; jumping spiders continue across them. Neither variant follows the player.
 
 **TOML placement:**
 ```toml
@@ -72,7 +72,7 @@ patrol_x1  = 310.0
 | `BIRD_FRAME_W` | 48 | Frame slot width in px |
 | `BIRD_ART_W` | 15 | Visible art width (cols 17–31) |
 | `BIRD_ART_H` | 14 | Visible art height (rows 17–30) |
-| `BIRD_SPEED` | 45.0 | Horizontal speed in px/s |
+| `BIRD_SPEED` | 45.0 | Usual horizontal speed in px/s (the level's `vx` is used) |
 | `BIRD_WAVE_AMP` | 20.0 | Sine-wave vertical amplitude in px |
 | `BIRD_WAVE_FREQ` | 0.015 | Sine phase in radians per horizontal px |
 | `BIRD_FRAME_MS` | 140 | ms per animation frame |
@@ -99,7 +99,7 @@ frame_index = 0
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `MAX_FASTER_BIRDS` | 16 | Slots in `GameState` |
-| `FBIRD_SPEED` | 80.0 | Horizontal speed in px/s (bird: 45) |
+| `FBIRD_SPEED` | 80.0 | Usual horizontal speed in px/s (bird: 45; the level's `vx` is used) |
 | `FBIRD_WAVE_AMP` | 15.0 | Sine-wave vertical amplitude in px |
 | `FBIRD_WAVE_FREQ` | 0.025 | Sine phase in radians per horizontal px |
 | `FBIRD_FRAME_MS` | 90 | ms per animation frame |
@@ -127,7 +127,7 @@ frame_index = 0
 | `MAX_FISH` | 16 | Slots in `GameState` |
 | `FISH_FRAMES` | 2 | Animation frames |
 | `FISH_FRAME_W` | 48 | Frame slot width in px |
-| `FISH_SPEED` | 70.0 | Horizontal patrol speed in px/s |
+| `FISH_SPEED` | 70.0 | Usual patrol speed in px/s (the level's `vx` is used) |
 | `FISH_JUMP_VY` | −280.0 | Upward jump impulse in px/s |
 | `FISH_JUMP_MIN` | 1.4 | Minimum seconds between jumps |
 | `FISH_JUMP_MAX` | 3.0 | Maximum seconds between jumps |
@@ -149,7 +149,7 @@ patrol_x1  = 950.0
 
 **File:** `src/entities/faster_fish.c` / `faster_fish.h`  
 **Sprite:** `assets/sprites/entities/faster_fish.png`  
-**Behaviour:** Same as fish (one shared implementation in `fish.c`, tuned by a `FishSpec`) but faster and jumpier: 120 px/s (`FFISH_SPEED`), a −420 px/s jump (`FFISH_JUMP_VY`) every 1.0–2.2 s, and 100 ms animation frames. Uses `[[faster_fish]]` in TOML.
+**Behaviour:** Same as fish (one shared implementation in `fish.c`, tuned by a `FishSpec`) but faster and jumpier: usually 120 px/s (`FFISH_SPEED`), a −420 px/s jump (`FFISH_JUMP_VY`) every 1.0–2.2 s, and 100 ms animation frames. Uses `[[faster_fish]]` in TOML.
 
 ```toml
 [[faster_fish]]

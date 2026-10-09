@@ -61,13 +61,13 @@ static int reverses_patrol_at_boundaries(void)
     float x = 88.0f;
     float vx = 50.0f;
 
-    patrol_update(&x, &vx, 16.0f, 20.0f, 100.0f, 50.0f, 0.25f);
+    patrol_update(&x, &vx, 16.0f, 20.0f, 100.0f, 0.25f);
     if (expect_float("right snap x", x, 84.0f) != 0) return 1;
     if (expect_float("right reverse vx", vx, -50.0f) != 0) return 1;
 
     x = 22.0f;
     vx = -50.0f;
-    patrol_update(&x, &vx, 16.0f, 20.0f, 100.0f, 50.0f, 0.25f);
+    patrol_update(&x, &vx, 16.0f, 20.0f, 100.0f, 0.25f);
     if (expect_float("left snap x", x, 20.0f) != 0) return 1;
     if (expect_float("left reverse vx", vx, 50.0f) != 0) return 1;
 
@@ -80,15 +80,36 @@ static int reverses_at_floor_gaps(void)
     float x = 80.0f;
     float vx = 40.0f;
 
-    patrol_gap_reverse(&x, &vx, 0.0f, 48.0f, 40.0f, gaps, 1, 32);
+    patrol_gap_reverse(&x, &vx, 0.0f, 48.0f, gaps, 1, 32);
     if (expect_float("right gap snap x", x, 52.0f) != 0) return 1;
     if (expect_float("right gap reverse vx", vx, -40.0f) != 0) return 1;
 
     x = 120.0f;
     vx = -40.0f;
-    patrol_gap_reverse(&x, &vx, 0.0f, 16.0f, 40.0f, gaps, 1, 32);
+    patrol_gap_reverse(&x, &vx, 0.0f, 16.0f, gaps, 1, 32);
     if (expect_float("left gap snap x", x, 132.0f) != 0) return 1;
     if (expect_float("left gap reverse vx", vx, 40.0f) != 0) return 1;
+
+    return 0;
+}
+
+/* A turn flips the direction only: the level's speed (here 130 px/s, not a
+ * type's built-in speed) survives both kinds of turn. */
+static int turns_keep_the_authored_speed(void)
+{
+    int gaps[] = {100};
+    float x = 88.0f;
+    float vx = 130.0f;
+
+    patrol_update(&x, &vx, 16.0f, 20.0f, 100.0f, 0.25f);
+    if (expect_float("patrol turn keeps speed", vx, -130.0f) != 0) return 1;
+    patrol_update(&x, &vx, 16.0f, 20.0f, 100.0f, 1.0f);
+    if (expect_float("second patrol turn keeps speed", vx, 130.0f) != 0) return 1;
+
+    x = 80.0f;
+    vx = 130.0f;
+    patrol_gap_reverse(&x, &vx, 0.0f, 48.0f, gaps, 1, 32);
+    if (expect_float("gap turn keeps speed", vx, -130.0f) != 0) return 1;
 
     return 0;
 }
@@ -111,6 +132,7 @@ int main(void)
     if (fixed_steps_keep_fractional_milliseconds() != 0) return 1;
     if (reverses_patrol_at_boundaries() != 0) return 1;
     if (reverses_at_floor_gaps() != 0) return 1;
+    if (turns_keep_the_authored_speed() != 0) return 1;
     if (computes_sound_falloff() != 0) return 1;
 
     puts("entity_utils_test: ok");

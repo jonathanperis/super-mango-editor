@@ -853,7 +853,7 @@ static int collision_lifetime_and_pickups(void)
         def.player_start_x = 20;
         def.player_start_y = FLOOR_Y;
         def.spider_count = 1;
-        def.spiders[0] = (SpiderPlacement){100, 0, 100, 200, 0};
+        def.spiders[0] = (SpiderPlacement){100, SPIDER_SPEED, 100, 200, 0};
         def.coin_count = 1;
         def.coins[0] = (CoinPlacement){115, 239};
         def.last_star = (LastStarPlacement){110, 236};

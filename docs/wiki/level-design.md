@@ -273,7 +273,7 @@ The manifest order drives the native selector and generated [Level Catalog](../l
 
 ## Enemies
 
-Every patrolling enemy needs `patrol_x0 ≤ x ≤ patrol_x1`, inside the world, a range at least as wide as its sprite (`patrol_x1 - patrol_x0` ≥ 64 px for spiders and jumping spiders, 48 px for birds and fish), and `|vx|` at most `MAX_LEVEL_MOTION`. `vx` is only the starting velocity: its sign picks the first direction, and after the first turn the enemy moves at its type's fixed speed (spider 50, jumping spider 55, bird 45, faster bird 80, fish 70, faster fish 120 px/s). With `vx = 0` the enemy never starts patrolling. Each type holds up to 16 placements.
+Every patrolling enemy needs `patrol_x0 ≤ x ≤ patrol_x1`, inside the world, a range at least as wide as its sprite (`patrol_x1 - patrol_x0` ≥ 64 px for spiders and jumping spiders, 48 px for birds and fish), and a `vx` that is not 0 and whose size is at most `MAX_PATROL_SPEED` (960 px/s, half a floor gap per 1/60 s step, so a spider can never step over a gap between two gap checks). `vx` is the patrol speed for the whole level: its sign picks the first direction, and every turn flips the direction and keeps the speed. The usual speeds are spider 50, jumping spider 55, bird 45, faster bird 80, fish 70 and faster fish 120 px/s. Each type holds up to 16 placements.
 
 ### Spiders
 
@@ -282,7 +282,7 @@ Ground patrol enemy. Walks back and forth between `patrol_x0` and `patrol_x1`, t
 ```toml
 [[spiders]]
 x          = 600.0   # starting x in logical pixels
-vx         = 50.0    # initial horizontal speed (px/s); sign sets direction
+vx         = 50.0    # patrol speed (px/s); sign sets the first direction
 patrol_x0  = 592.0   # left patrol boundary
 patrol_x1  = 750.0   # right patrol boundary
 frame_index = 0      # starting animation frame (0–2)

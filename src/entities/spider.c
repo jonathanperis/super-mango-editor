@@ -20,14 +20,14 @@ void spiders_update(Spider *spiders, int count, float dt,
 
         /* ── move horizontally + patrol boundary reversal ─────────── */
         patrol_update(&s->x, &s->vx, SPIDER_FRAME_W,
-                      s->patrol_x0, s->patrol_x1, SPIDER_SPEED, dt);
+                      s->patrol_x0, s->patrol_x1, dt);
 
         /*
          * Floor gap check — reverse if the spider's art centre would be
          * over a hole in the ground, preventing them from floating in mid-air.
          */
         patrol_gap_reverse(&s->x, &s->vx,
-                           SPIDER_ART_X, SPIDER_ART_W, SPIDER_SPEED,
+                           SPIDER_ART_X, SPIDER_ART_W,
                            floor_gaps, floor_gap_count, FLOOR_GAP_W);
 
         /* ── advance animation frame ───────────────────────────────── */

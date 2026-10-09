@@ -28,7 +28,6 @@ static const BirdSpec s_regular_bird = {
     BIRD_ART_W,
     BIRD_ART_H,
     BIRD_FRAME_MS,
-    BIRD_SPEED,
     BIRD_WAVE_AMP,
     BIRD_WAVE_FREQ
 };
@@ -71,7 +70,7 @@ void bird_variant_update(const BirdSpec *spec, Bird *birds, int count,
         Bird *b = &birds[i];
 
         patrol_update(&b->x, &b->vx, (float)spec->frame_w,
-                      b->patrol_x0, b->patrol_x1, spec->speed, dt);
+                      b->patrol_x0, b->patrol_x1, dt);
 
         /* animate_frame_ms returns 1 when the animation wraps to frame 0,
          * which is one full wing beat. */
