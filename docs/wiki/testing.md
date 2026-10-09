@@ -111,8 +111,15 @@ xcrun llvm-cov show out/coverage/level-serializer-test \
     -instr-profile=out/coverage/tests.profdata src/levels/level_ref.c
 ```
 
+The report is also saved as `out/coverage/summary.txt`. `COVERAGE_MIN=<percent>`
+fails the run when the TOTAL line coverage drops below that floor; it is empty
+(report only) by default. The `Coverage (Linux x86_64)` CI job runs
+`make coverage` on the headless Memory backend with a floor set a little below
+the measured total (91.2% of lines when the floor was set), and publishes the
+per-file table in the job summary.
+
 Coverage only measures what the tests execute. Use it to find untested
-branches, not as a target number.
+branches; the CI floor only catches a large, accidental drop.
 
 ## Fuzzing
 

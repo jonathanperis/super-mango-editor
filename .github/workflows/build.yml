@@ -454,6 +454,69 @@ jobs:
         run: make sanitize-smoke SMOKE_FRAMES=5 SMOKE_SEED=1
 
   # ────────────────────────────────────────────────────────────────────────────
+  # COVERAGE JOB
+  # clang source-based coverage of the native tests on the headless Memory
+  # backend (no display or audio needed). The per-file llvm-cov table goes to
+  # the job summary, and COVERAGE_MIN fails the job when the TOTAL line
+  # coverage drops below a floor set a little under the measured total
+  # (91.2% when the floor was set). Raise the floor as tests are added; it
+  # exists to catch a large accidental drop, not to chase a number. It
+  # reports separately and stays out of the release `needs`.
+  # ────────────────────────────────────────────────────────────────────────────
+  coverage:
+    name: Coverage (Linux x86_64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      EXTRA_CFLAGS: -Werror
+      RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Cache pinned raylib source archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/raylib
+          key: raylib-source-${{ runner.os }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+
+      # llvm provides llvm-profdata and llvm-cov for the default clang.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y clang llvm cmake
+
+      - name: Install Node.js for host contracts
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26.9.0'
+
+      - name: Coverage of the native tests
+        run: make coverage CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory COVERAGE_MIN=90
+
+      - name: Publish the coverage summary
+        if: always()
+        run: |
+          summary=out/headless/coverage/summary.txt
+          [ -f "$summary" ] || exit 0
+          {
+            echo "### Native test coverage (llvm-cov, Memory backend)"
+            echo
+            echo '```text'
+            cat "$summary"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ────────────────────────────────────────────────────────────────────────────
   # WINDOWS CLANG JOB
   # Builds and tests with UCRT64 Clang, the Makefile's local Windows default,
   # under -Werror. It ships nothing, so it stays out of the release `needs`: a

@@ -473,6 +473,9 @@ endif
 COVERAGE_BINS = $(patsubst $(OUTDIR)/%,$(COVERAGE_OUTDIR)/%,$(TEST_TARGETS)) \
                 $(COVERAGE_OUTDIR)/parser-allocation-probe
 COVERAGE_IGNORE = '(^|/)(vendor|tests|out)/'
+# Optional floor for the TOTAL line coverage, in percent (CI sets one). Empty
+# means "report only". The summary is also kept in summary.txt for CI.
+COVERAGE_MIN ?=
 
 .PHONY: coverage
 coverage: $(RAYLIB_LIB) ## Test: Per-file line coverage of the native tests (clang)
@@ -487,8 +490,20 @@ coverage: $(RAYLIB_LIB) ## Test: Per-file line coverage of the native tests (cla
 	$(LLVM_COV) report $(firstword $(COVERAGE_BINS)) \
 		$(addprefix -object ,$(wordlist 2,$(words $(COVERAGE_BINS)),$(COVERAGE_BINS))) \
 		-instr-profile="$(COVERAGE_OUTDIR)/tests.profdata" \
-		-ignore-filename-regex=$(COVERAGE_IGNORE)
+		-ignore-filename-regex=$(COVERAGE_IGNORE) > "$(COVERAGE_OUTDIR)/summary.txt"
+	@cat "$(COVERAGE_OUTDIR)/summary.txt"
 	@echo "coverage: per-line view: $(LLVM_COV) show $(firstword $(COVERAGE_BINS)) -instr-profile=$(COVERAGE_OUTDIR)/tests.profdata <file.c>"
+# The TOTAL row lists region, function and line coverage (then branches, on
+# newer llvm-cov) as percentages, so the third NN.NN% field is the line total.
+	@if [ -n "$(COVERAGE_MIN)" ]; then \
+		awk -v min="$(COVERAGE_MIN)" ' \
+			$$1 == "TOTAL" { for (i = 2; i <= NF; i++) if ($$i ~ /%$$/ && ++n == 3) lines = $$i } \
+			END { if (lines == "") { print "coverage: no TOTAL line coverage in summary.txt"; exit 1 } \
+			      sub(/%$$/, "", lines); \
+			      if (lines + 0 < min + 0) { printf "coverage: line coverage %s%% is below the %s%% floor\n", lines, min; exit 1 } \
+			      printf "coverage: line coverage %s%% meets the %s%% floor\n", lines, min }' \
+			"$(COVERAGE_OUTDIR)/summary.txt"; \
+	fi
 
 # ── Fuzzing (POSIX) ──────────────────────────────────────────────────
 # Each harness defines LLVMFuzzerTestOneInput.  fuzz-corpus links it with
