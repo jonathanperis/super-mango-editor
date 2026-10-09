@@ -84,7 +84,7 @@ commit and retained project-patch inventory are recorded in
 
 | Variable | Value | Description |
 |----------|-------|-------------|
-| `CC` | `clang` | Replaces Make's built-in default; explicit compiler overrides remain supported. |
+| `CC` | `clang` | Replaces Make's built-in default (on Windows, MSYS2's `/c/msys64/ucrt64/bin/clang.exe`); explicit compiler overrides remain supported. |
 | `CFLAGS` | see below | Compiler flags |
 | `LIBS` | see below | Linker flags |
 | `TARGET` | `out/super-mango` | Output binary path |
@@ -111,7 +111,7 @@ make test CC=clang
 make smoke CC=clang
 ```
 
-The Makefile detects GNU Make's built-in compiler default and replaces it with clang. An explicit command-line compiler takes precedence.
+The Makefile detects GNU Make's built-in compiler default (`$(origin CC)` is `default`) and replaces it with clang; on Windows that is the MSYS2 UCRT64 Clang at `/c/msys64/ucrt64/bin/clang.exe`. A plain `CC ?= clang` would never apply, because Make always predefines `CC=cc`. A compiler from the command line or the environment takes precedence.
 
 ### Builder and build modes
 

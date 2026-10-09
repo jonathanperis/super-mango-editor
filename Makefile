@@ -9,14 +9,17 @@ NODE ?= node
 # target of any failed recipe so the next run rebuilds it.
 .DELETE_ON_ERROR:
 
-ifeq ($(OS),Windows_NT)
-CC      ?= /c/msys64/ucrt64/bin/clang.exe
-else
-CC      ?= clang
-endif
-
+# GNU make predefines CC as `cc`, so `CC ?= clang` would never take effect:
+# CC is never empty. $(origin CC) is "default" exactly when neither the
+# command line nor the environment chose a compiler, so only then do we pick
+# ours. On Windows that is the MSYS2 UCRT64 Clang (the same toolchain as
+# RUNTIME_DLL_PATH below); `make CC=gcc` and friends still win.
 ifeq ($(origin CC),default)
+ifeq ($(OS),Windows_NT)
+CC = /c/msys64/ucrt64/bin/clang.exe
+else
 CC = clang
+endif
 endif
 BUILD_MODE ?= debug
 MODE_FLAGS_debug = -g -O0
