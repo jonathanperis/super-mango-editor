@@ -15,6 +15,9 @@
     "dependencies": {
         "@astrojs/markdown-satteri": "^0.4.3",
         "@astrojs/sitemap": "^3.7.4",
+        "@fontsource/atkinson-hyperlegible": "^5.3.0",
+        "@fontsource/dm-mono": "^5.3.0",
+        "@fontsource/pixelify-sans": "^5.3.0",
         "astro": "^7.3.6"
     },
     "devDependencies": {

@@ -74,6 +74,20 @@ def check_site(out: Path) -> list[str]:
         failures.append("index.html: CSP script-src must be 'self' plus inline script hashes only")
     elif home.find(policy[0]) > home.find("<script"):
         failures.append("index.html: CSP meta must precede every script")
+    # Fonts are self-hosted; no style or font may come from another origin.
+    for directive in ("style-src", "font-src"):
+        sources = re.search(rf"{directive}([^;\"]*)", policy[0]) if policy else None
+        if not sources or "http" in sources.group(1):
+            failures.append(f"index.html: CSP {directive} must not allow a remote host (fonts are self-hosted)")
+
+    # No page or stylesheet may ask a font CDN for anything: every visitor's
+    # browser would otherwise contact Google on each page view.
+    for path in sorted(out.rglob("*")):
+        if path.suffix in {".html", ".css"}:
+            text = path.read_text(encoding="utf-8", errors="replace")
+            for host in ("fonts.googleapis.com", "fonts.gstatic.com"):
+                if host in text:
+                    failures.append(f"{path.relative_to(out).as_posix()}: loads fonts from {host}; self-host them")
 
     descriptions: set[str] = set()
     for path, page in pages.items():
@@ -148,7 +162,7 @@ def main() -> int:
     if failures:
         print("built docs check failed:\n" + "\n".join(f"- {item}" for item in failures))
         return 1
-    print("built docs check: ok (routes, content, links, anchors, metadata, sitemap, home CSP)")
+    print("built docs check: ok (routes, content, links, anchors, metadata, sitemap, home CSP, self-hosted fonts)")
     return 0
 
 

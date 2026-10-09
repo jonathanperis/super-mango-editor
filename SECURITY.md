@@ -85,7 +85,9 @@ WebAssembly compilation only):
   the SHA-256 hash of each inline script (Astro's inlined module script and the
   game bootstrap). The game's `super-mango.js`, `.wasm` and `.data` load from
   `'self'`. Styles allow `'self'`, inline styles (the game injects its
-  touch-control CSS) and Google Fonts; fonts allow `fonts.gstatic.com`.
+  touch-control CSS); fonts come only from `'self'`. The site's fonts are
+  self-hosted, so no page contacts a font CDN, and `tools/check_docs_site.py`
+  fails the build if a page or stylesheet references Google Fonts.
   `object-src`, `base-uri` and `form-action` are `'none'`.
   `tools/check_docs_site.py` fails the docs build if a hash is missing, if
   `script-src` gains `'unsafe-inline'` or a remote host, or if the tag no longer
