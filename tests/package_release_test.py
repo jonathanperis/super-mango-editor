@@ -55,13 +55,13 @@ def main():
     (ROOT / "out").mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="package-test-", dir=ROOT / "out") as temp:
         root = Path(temp)
-        pin = json.loads((ROOT / "vendor/raylib/manifest.json").read_text())
+        pin = json.loads((ROOT / "vendor/raylib/manifest.json").read_text(encoding="utf-8"))
         raylib_build = root / "raylib-build"
         source = raylib_build / ("raylib-" + pin["commit"])
         (source / "src/external/glfw").mkdir(parents=True)
-        (source / "LICENSE").write_text("raylib license fixture")
-        (source / "src/external/glfw/LICENSE.md").write_text("GLFW license fixture")
-        (source / "src/external/codec.h").write_text("codec license fixture")
+        (source / "LICENSE").write_text("raylib license fixture", encoding="utf-8")
+        (source / "src/external/glfw/LICENSE.md").write_text("GLFW license fixture", encoding="utf-8")
+        (source / "src/external/codec.h").write_text("codec license fixture", encoding="utf-8")
         for name in package_release.WASM_FILES:
             (root / name).write_bytes(b"payload")
         archive = root / "release.zip"
@@ -87,7 +87,7 @@ def main():
         (fixture / "assets/sounds/used.wav").write_bytes(b"used")
         (fixture / "assets/sounds/unused/reserve.wav").write_bytes(b"reserve")
         (fixture / "levels/labs").mkdir(parents=True)
-        (fixture / "levels/labs/example.toml").write_text("format_version = 1\n")
+        (fixture / "levels/labs/example.toml").write_text("format_version = 1\n", encoding="utf-8")
         (fixture / "vendor/tomlc17").mkdir(parents=True)
         (fixture / "vendor/raylib").mkdir(parents=True)
         for name in ("LICENSE", "THIRD_PARTY_NOTICES.md", "vendor/tomlc17/LICENSE", "vendor/raylib/manifest.json"):
@@ -152,10 +152,10 @@ def main():
     workflows = ROOT / ".github/workflows"
     assert not (workflows / "deploy.yml").exists()
     for path in workflows.glob("*.yml"):
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         assert "\n  workflow_run:" not in text, path.name          # trigger
         assert "github.event.workflow_run" not in text, path.name  # its payload
-    build = (workflows / "build.yml").read_text()
+    build = (workflows / "build.yml").read_text(encoding="utf-8")
     pages_build = build.split("  pages-build:", 1)[1].split("  pages-deploy:", 1)[0]
     pages_deploy = build.split("  pages-deploy:", 1)[1]
     assert "name: super-mango-wasm" in pages_build and "run-id" not in pages_build

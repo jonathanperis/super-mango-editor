@@ -6,8 +6,8 @@ import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DASHBOARD = (ROOT / "docs/src/components/home/Dashboard.astro").read_text()
-SHELL = (ROOT / "web/shell.html").read_text()
+DASHBOARD = (ROOT / "docs/src/components/home/Dashboard.astro").read_text(encoding="utf-8")
+SHELL = (ROOT / "web/shell.html").read_text(encoding="utf-8")
 
 
 def require(text: str, fragment: str, label: str) -> None:
