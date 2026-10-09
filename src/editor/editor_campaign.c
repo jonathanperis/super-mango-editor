@@ -32,6 +32,7 @@ typedef struct {
 
 struct EditorCampaign {
     char manifest_path[EDITOR_PATH_MAX];
+    SerializerFileFingerprint manifest_fingerprint;  /* as read or saved  */
     CampaignCatalog catalog;   /* the entries, in the order shown        */
     CampaignDisk *disk;        /* disk[i] belongs to catalog.levels[i]   */
     size_t capacity;           /* room in both arrays                    */
@@ -149,6 +150,10 @@ int editor_campaign_open(EditorState *es, const char *manifest_path)
         return -1;
     }
     memcpy(c->manifest_path, manifest_path, strlen(manifest_path) + 1);
+    /* Fingerprint first, read second: if another program changes the
+     * manifest in between, Save sees a difference and refuses, rather than
+     * overwriting a change the view never showed. */
+    (void)serializer_fingerprint_utf8(manifest_path, &c->manifest_fingerprint);
     /* The parse half of the game's load: a campaign the start menu would
      * refuse (no playable level) still opens here, to be repaired. */
     if (campaign_catalog_read(manifest_path, &c->catalog) != 0) {
@@ -412,20 +417,24 @@ static int write_temps(EditorState *es, EditorCampaign *c, CampaignSavePlan *pla
     return 0;
 }
 
-/* Does every level file in the plan still hold what the view read?  When
- * one does not, nothing may be installed (status set, returns 0). */
+/* Does every file in the plan, the manifest included, still hold what the
+ * view read?  When one does not, nothing may be installed (status set,
+ * returns 0): another program changed it, and its change wins. */
 static int plan_still_matches_disk(EditorState *es, const EditorCampaign *c,
                                    const CampaignSavePlan *plan)
 {
     for (int k = 0; k < plan->count; k++) {
         const CampaignSaveFile *file = &plan->files[k];
+        const SerializerFileFingerprint *expected =
+            file->entry >= 0 ? &c->disk[file->entry].fingerprint : &c->manifest_fingerprint;
         SerializerFileFingerprint now;
-        if (file->entry < 0) continue;
-        if (serializer_fingerprint_utf8(file->target, &now) != 1 ||
-            !serializer_fingerprint_equal(&now, &c->disk[file->entry].fingerprint)) {
+        if (!expected->valid || serializer_fingerprint_utf8(file->target, &now) != 1 ||
+            !serializer_fingerprint_equal(&now, expected) ||
+            serializer_test_take_failure(SERIALIZER_TEST_FAILURE_SOURCE_CHANGED)) {
             editor_set_status(es, "Campaign not saved: %s changed on disk; close and "
                               "reopen the Campaign view",
-                              c->catalog.levels[file->entry].path);
+                              file->entry >= 0 ? c->catalog.levels[file->entry].path
+                                               : c->manifest_path);
             return 0;
         }
     }
@@ -464,6 +473,7 @@ static int install_temps(EditorState *es, EditorCampaign *c, CampaignSavePlan *p
             levels++;
         } else {
             c->manifest_changed = 0;
+            (void)serializer_fingerprint_utf8(c->manifest_path, &c->manifest_fingerprint);
         }
         installed++;
     }

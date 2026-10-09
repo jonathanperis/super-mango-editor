@@ -2735,6 +2735,62 @@ done:
 }
 
 /*
+ * The manifest is fingerprinted when the view opens, like each level file:
+ * a manifest another program rewrote since is never overwritten, whether
+ * the change came before Save or during it (the seam), and Save then
+ * writes nothing at all.
+ */
+static int campaign_save_keeps_a_manifest_changed_by_hand(void)
+{
+    static const char hand_edit[] =
+        "format_version = 1\nlevels = [\n    \"levels/a.toml\",\n"
+        "    \"levels/b.toml\",\n    \"levels/c.toml\",\n    \"levels/d.toml\",\n]\n";
+    EditorState es;
+    char cwd[4096];
+    CampaignCatalog reloaded = {0};
+    int result = 1;
+
+    memset(&es, 0, sizeof(es));
+    editor_level_init_defaults(&es.level);
+    if (make_campaign_root() != 0 || test_working_folder(cwd, sizeof(cwd)) != 0 ||
+        test_change_folder(CAMPAIGN_ROOT) != 0) return 1;
+
+    /* Remove c and relink: b changes, and so does the manifest. */
+    if (expect_int("opens", editor_campaign_open(&es, NULL), 0) != 0 ||
+        editor_campaign_remove(&es, 2) != 0 ||
+        expect_int("linked", editor_campaign_link_in_order(&es), 1) != 0)
+        goto done;
+
+    /* Changed during the save, after the temporary files were written. */
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_SOURCE_CHANGED);
+    if (expect_int("late change refused", editor_campaign_save(&es), -1) != 0 ||
+        expect_int("late change status", strstr(es.status_message, "changed on disk") != NULL, 1) != 0 ||
+        expect_int("b untouched", strcmp(next_on_disk("levels/b.toml"), "levels/c.toml"), 0) != 0 ||
+        expect_int("no b temporary", temp_left_for("levels/b.toml"), 0) != 0 ||
+        expect_int("no manifest temporary", temp_left_for(CAMPAIGN_MANIFEST_PATH), 0) != 0)
+        goto done;
+
+    /* Changed by hand before Save: the manifest names the hand edit. */
+    if (write_text_file(CAMPAIGN_MANIFEST_PATH, hand_edit) != 0 ||
+        expect_int("hand edit refused", editor_campaign_save(&es), -1) != 0 ||
+        expect_prefix("hand edit status", es.status_message,
+                      "Campaign not saved: " CAMPAIGN_MANIFEST_PATH " changed on disk") != 0 ||
+        expect_int("b still untouched", strcmp(next_on_disk("levels/b.toml"), "levels/c.toml"), 0) != 0 ||
+        campaign_catalog_read(CAMPAIGN_MANIFEST_PATH, &reloaded) != 0 ||
+        expect_int("hand edit kept", strcmp(campaign_order(&reloaded),
+                                            "a.toml b.toml c.toml d.toml"), 0) != 0)
+        goto done;
+    result = 0;
+
+done:
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+    campaign_catalog_cleanup(&reloaded);
+    editor_campaign_free(&es);
+    if (test_change_folder(cwd) != 0) result = 1;
+    return result;
+}
+
+/*
  * A rail copied together with the spike block riding it pastes as a new
  * rail with the copy riding the NEW rail; deleting the pair is one undo
  * step even though the rail must go after its rider.
@@ -5394,6 +5450,7 @@ int main(void)
     if (validation_reports_every_runtime_error() != 0) return 1;
     if (campaign_view_edits_and_saves_the_manifest() != 0) return 1;
     if (campaign_save_writes_everything_before_replacing() != 0) return 1;
+    if (campaign_save_keeps_a_manifest_changed_by_hand() != 0) return 1;
     if (float_platform_rail_switch_rechecks_its_rail() != 0) return 1;
     if (drag_round_trips_and_follows_grab_point() != 0) return 1;
     if (editor_mutations_keep_level_valid() != 0) return 1;
