@@ -18,10 +18,13 @@ main()
        ├── initialise one raylib window/context, semantic input and audio device
        │   └── device polling and platform teardown stay on the application thread
        ├── no `--level` → start_menu_create()
-       └── `--level` / `--sandbox` → session_open_game() → game_init(gs)
-            ├── create a screen-owned logical render target
-            ├── load textures, audio, TOML level data, player, HUD, effects, and entities
-            └── arm release latch and repair browser keyboard state
+       └── `--level` / `--sandbox` → session_open_game()
+            ├── first game only: load the shared sprites and sounds (GameAssets)
+            └── game_init(gs), with a copy of those GameAssets
+                 ├── create a screen-owned logical render target
+                 ├── load TOML level data, player, HUD, the level's own files
+                 │   (background, floor, water, fog, music) and entities
+                 └── arm release latch and repair browser keyboard state
 
 session_run(session)
   ├── native: while active, call session_frame(session)
@@ -29,11 +32,13 @@ session_run(session)
        ├── start menu frame → Play or Exit route
        └── game_frame(gs) → Next Level, Replay, Level Select, or Exit route
             ├── Next Level: load resolved phase in current GameState
-            ├── Replay (native and browser): close game, open same path in place
+            ├── Replay (native and browser): close game, open same path in place,
+            │   reusing the session's GameAssets
             └── Level Select: close game only, open start menu
 
 session_destroy(session) / browser terminal cleanup
   ├── close active menu or game screen
+  ├── unload the shared GameAssets, once
   ├── clear input handlers and sound voices after screen assets are released
   ├── CloseAudioDevice → CloseWindow
   └── free AppSession
@@ -261,7 +266,7 @@ says what kind of state it is:
 |------|------|-------|---------|
 | `gs->world` | `GameWorld` | The level being played: player, camera, every entity array and count, score, lives, checkpoints, simulated time, the active `LevelDef` and the level's scenery (parallax, water, fog, platform tiles) | `gs->world.spiders[i]` |
 | `gs->screen` | `GameScreen` | The game screen around the level: render target, HUD, pause / game-over / completion overlays, the route for `AppSession`, frame-loop clock, input latches, replay script, debug tools, profile and ghost | `gs->screen.paused` |
-| `gs->assets` | `GameAssets` | The sprites and sound effects every level uses | `gs->assets.textures.spider` |
+| `gs->assets` | `GameAssets` | The sprites and sound effects every level uses, borrowed from `AppSession` | `gs->assets.textures.spider` |
 
 ```c
 typedef struct {
@@ -272,6 +277,8 @@ typedef struct {
     Player     player;            /* embedded by value */
     GameCamera camera;
     ParallaxSystem parallax;  Water water;  FogSystem fog;
+    Texture2D  *floor_tile;       /* the level's own floor; NULL = shared default */
+    MusicTrack *music;            /* the level's music stream */
     Platform   platforms[MAX_PLATFORMS];
     int        platform_count;
     Spider     spiders[MAX_SPIDERS];
@@ -304,22 +311,24 @@ typedef struct {
     DebugOverlay debug;
 } GameScreen;
 
-typedef struct {
-    TextureResources textures;    /* owned Texture2D slots */
-    AudioResources   audio;       /* owned SoundEffect / MusicTrack slots */
+typedef struct GameAssets {
+    TextureResources textures;    /* Texture2D slots, owned by AppSession */
+    AudioResources   audio;       /* SoundEffect slots, owned by AppSession */
 } GameAssets;
 
 typedef struct GameState {
     GameWorld  world;
     GameScreen screen;
-    GameAssets assets;
+    GameAssets assets;            /* a copy of the session's pointers */
+    int        owns_assets;       /* 1 only when game_init loaded them */
 } GameState;
 ```
 
 **Key design decisions:**
 
 - `world` is the level itself: what is in it, where it is and how the player is doing (hearts, lives, score, checkpoints). "What happens to a spider each frame" is a walk over `gs->world.spiders`. `screen` is how this screen presents and steers that level: the HUD, the pause, game-over and completion overlays, routes, the frame clock, input, replay scripts and debug tools.
-- Textures are grouped in `TextureResources` (`gs->assets.textures.*`) and audio in `AudioResources` (`gs->assets.audio.*`) so cleanup can be centralized.
+- Textures are grouped in `TextureResources` (`gs->assets.textures.*`) and sound effects in `AudioResources` (`gs->assets.audio.*`) so loading and cleanup walk one table each (`src/core/game_resources.c`).
+- Those shared sprites and sounds belong to the session, not the game: `AppSession` loads one `GameAssets` when the first game opens, copies it into every `GameState` it creates and unloads it once when the session ends, so Replay, Level Select → Play and Next Level reuse the same textures. A copy holds the same pointers, so a game only borrows them (`owns_assets` stays 0) and `game_cleanup` leaves them loaded. A `GameState` started without a session (the tests do this) loads a private set in `game_init` and unloads it in `game_cleanup`. Everything a level file names (background layers, floor tileset, water strip, fog, platform tiles, music) is in `world` and is loaded and released with the level (`src/levels/level_resources.c`).
 - `Player` is **embedded by value**, not a pointer. This avoids a heap allocation and keeps the struct self-contained. The same applies to `Platform`, `Water`, `FogSystem`, all entity arrays and the three parts themselves.
 - Owning pointers are cleared after release. Borrowed pointers and aliases still require correct lifetime handling.
 - Active-game storage is heap-owned and zero-initialized before initialization; the structs above are an abridged ownership map, not complete declarations.
@@ -338,7 +347,7 @@ Authored records disable automatic screen-boundary checkpoints for that level. A
 | Situation | Action |
 |-----------|--------|
 | Window/audio initialization failure | Session creation fails and releases initialized resources; the top-level runner returns `EXIT_FAILURE` |
-| Resource load failure (in `game_init`) | `fprintf(stderr, ...)` → clean up partially-created `GameState` resources → return `-1`; the top-level runner returns `EXIT_FAILURE` |
+| Resource load failure (shared sprites when the first game opens; player, HUD, water or level files in `game_init`) | `fprintf(stderr, ...)` → release what was partly loaded → return `-1`, so the game does not open; for `--level` the top-level runner returns `EXIT_FAILURE` |
 | Optional sound load failure | Warn and retain an empty slot; `sound_play` accepts NULL |
 | Missing gameplay-critical shared sprite | Reject the level before replacing active level state; identify the required asset path |
 | Optional presentation texture load failure | Warn and preserve the documented visual fallback |

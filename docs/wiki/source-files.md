@@ -53,7 +53,7 @@ src/
 │   ├── game_bridges.h / .c       Bridge update helpers
 │   ├── game_checkpoint.h / .c    Checkpoint/respawn helpers
 │   ├── game_camera.h / .c        Camera follow/lookahead helpers
-│   ├── game_resources.h / .c     Texture/audio/level resource loading
+│   ├── game_resources.h / .c     Shared sprite/sound tables (GameAssets) load/unload
 │   ├── game_score.h / .c         Shared score and bonus-life helpers
 │   ├── game_overlay.h / .c       Canonical pause/game-over/completion overlay state
 │   ├── game_completion.h / .c    Last-star completion and next-phase flow
@@ -143,7 +143,7 @@ src/
 │   ├── level_path.h / .c         Level path normalization and directory helpers
 │   ├── level_physics.h / .c      Level physics override/default helpers
 │   ├── level_ref.h / .c          Shared levels/<name>.toml rule for next_phase, campaigns and profile keys
-│   ├── level_resources.h / .c    Per-level resource reload wrappers
+│   ├── level_resources.h / .c    A level's own files: background, floor, water, fog, music
 │   ├── level_session.h / .c      Active LevelDef storage, initial load and phase transitions
 │   ├── campaign_catalog.h / .c   v1 campaign manifest: loading, the campaign rules, and saving (shared with the editor)
 │   ├── level_start.h / .c        Playtest start points (--start-x / --start-checkpoint), shared with the editor
@@ -317,17 +317,17 @@ void game_complete_level(GameState *gs);
 
 ## Runtime Core (`core/app_session.c`, `core/game_lifecycle.c`, `core/game_loop.c`, `core/game_resources.c`)
 
-**Role:** `app_session.c` owns the app-level frame loop, window/audio lifetime, menu/game swaps, in-place replay and shutdown. `game_lifecycle.c` owns active-game `game_init` / `game_cleanup`; `game_loop.c` owns `game_frame`; resource loading/reloading lives in `game_resources.c`.
+**Role:** `app_session.c` owns the app-level frame loop, window/audio lifetime, the shared sprites and sounds (`GameAssets`), menu/game swaps, in-place replay and shutdown. `game_lifecycle.c` owns active-game `game_init` / `game_cleanup`; `game_loop.c` owns `game_frame`; the shared sprite and sound tables and their load/unload live in `game_resources.c`, a level's own files in `levels/level_resources.c`.
 
 ### `game_init(GameState *gs)`
 
 Creates all runtime resources:
 
 1. Screen-owned 400x300 render target in the existing session context (`game_window_init`)
-2. Shared textures for entities, hazards, collectibles and surfaces, plus sound effects (`game_resources_load`); generated sounds come from `tools/gen_sounds.py`
+2. Shared textures for entities, hazards, collectibles and surfaces, plus sound effects: borrowed from the session, which loaded them with `game_resources_load` when its first game opened; only a `GameState` with no session loads its own here (`owns_assets`). Generated sounds come from `tools/gen_sounds.py`; the default water strip follows (`water_init`)
 3. Player sprite and default physics (`player_init`)
 4. HUD (raylib's built-in font, coin icon, borrowed star/player textures) and, with `--debug`, the debug overlay
-5. TOML level load from the selected campaign entry or direct `--level` path, then level-wide resources: parallax, floor/platform tiles, foreground strip, fog, water, music and level contents
+5. TOML level load from the selected campaign entry or direct `--level` path, then level-wide resources (`level_resources_apply`, owned by `gs->world`): parallax, floor/platform tiles, foreground strip, fog, water, music and level contents
 6. Optional `--replay-script` load
 7. Discover the first available raylib gamepad index
 
@@ -397,7 +397,7 @@ Builds the single valid terminal-action list used by both rendering and input. C
 
 ### `core/app_session.h` / `core/app_session.c`
 
-Owns one heap-allocated application session and its active menu or game screen. Without `--level`, it loads and retains the validated v1 campaign catalog; the menu uses the catalog's names and ordered paths. A direct `--level` session bypasses the catalog. The session consumes explicit game routes after each rendered frame: next level stays in the current game; replay replaces the game with the same TOML path in place (native and browser alike); level select returns to the menu. It also keeps the profile's Continue point current (`session_track_resume`), drops one whose level file changed before the menu opens, and applies it for the menu's **Continue** and for `--continue`.
+Owns one heap-allocated application session and its active menu or game screen. Without `--level`, it loads and retains the validated v1 campaign catalog; the menu uses the catalog's names and ordered paths. A direct `--level` session bypasses the catalog. The first game it opens loads the shared sprites and sounds into `session->assets`; every game gets a copy of those pointers and the session unloads them once, in `session_runtime_cleanup`, so Replay and Play load only the files their level names. The session consumes explicit game routes after each rendered frame: next level stays in the current game; replay replaces the game with the same TOML path in place (native and browser alike); level select returns to the menu. It also keeps the profile's Continue point current (`session_track_resume`), drops one whose level file changed before the menu opens, and applies it for the menu's **Continue** and for `--continue`.
 
 ---
 

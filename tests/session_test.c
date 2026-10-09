@@ -1013,6 +1013,35 @@ static int pending_profile_keeps_exit_alive(void)
     return result;
 }
 
+/* The shared sprites and sounds are the session's: a Replay hands the new
+ * game the very same textures and samples instead of loading them again,
+ * and neither game owns them. */
+static int replay_reuses_the_session_assets(void)
+{
+    AppSessionConfig config = {.level_path = "tests/fixtures/runtime/transition.toml"};
+    AppSession *session = session_create(&config);
+    if (!session) return 1;
+    Texture2D *spider = session->assets.textures.spider;
+    SoundEffect *jump = session->assets.audio.jump;
+    int failed = expect_int("session loaded its assets", session->assets_loaded, 1) ||
+                 expect_int("first game borrows the spider sprite",
+                            session->game->assets.textures.spider == spider && spider != NULL, 1) ||
+                 expect_int("first game does not own its assets", session->game->owns_assets, 0);
+    if (!failed) {
+        session->game->screen.route = GAME_ROUTE_REPLAY;
+        session_frame(session);
+        failed = expect_int("replay opened a new game", session->game_open_count, 2) ||
+                 expect_int("replay keeps the spider sprite", session->assets.textures.spider == spider, 1) ||
+                 expect_int("new game borrows the same sprite",
+                            session->game->assets.textures.spider == spider, 1) ||
+                 expect_int("new game borrows the same sound",
+                            session->game->assets.audio.jump == jump, 1) ||
+                 expect_int("new game does not own its assets", session->game->owns_assets, 0);
+    }
+    session_destroy(&session);
+    return failed;
+}
+
 static int native_replay_keeps_session_ownership(void)
 {
     AppSessionConfig config = {.level_path = "tests/fixtures/runtime/transition.toml",
@@ -1103,8 +1132,8 @@ static int settings_keep_music_paused_after_refocus(void)
     AppSessionConfig config = {.level_path = "levels/00_sandbox_01.toml"};
     AppSession *session = session_create(&config);
     int failed = 1;
-    if (!session || !session->game || !session->game->assets.audio.music) goto done;
-    Music stream = session->game->assets.audio.music->stream;
+    if (!session || !session->game || !session->game->world.music) goto done;
+    Music stream = session->game->world.music->stream;
     session_frame(session);
     if (expect_int("music plays in game", IsMusicStreamPlaying(stream), 1)) goto done;
     if (push_key(KEY_F1)) goto done;
@@ -1428,7 +1457,7 @@ static int phase_resets_transient_state(void)
     LevelDef *active = gs.world.level_def;
     active->music_volume = 0;
     level_resources_apply(&gs, active);
-    if (gs.assets.audio.music && expect_float("zero volume stays muted", test_last_music_volume, 0)) result = 1;
+    if (gs.world.music && expect_float("zero volume stays muted", test_last_music_volume, 0)) result = 1;
     game_cleanup(&gs);
     return result;
 }
@@ -1455,6 +1484,7 @@ int main(void)
         CASE(web_frame_pacing_contract_test),
         CASE(game_simulation_contract_test), CASE(game_profile_contract_test),
         CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),
+        CASE(replay_reuses_the_session_assets),
         CASE(menu_mouse_and_path_boundaries), CASE(level_select_lists_best_results),
         CASE(collision_lifetime_and_pickups),
         CASE(coins_stay_collected_across_life_loss), CASE(settings_keep_music_paused_after_refocus),

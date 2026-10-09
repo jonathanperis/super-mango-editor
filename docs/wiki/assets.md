@@ -176,9 +176,9 @@ records attribution and unresolved license evidence.
 
 | File | Used By | Description |
 |------|---------|-------------|
-| `grass_tileset.png` | `gs->assets.textures.floor_tile` | 48x48 tile, 9-slice rendered across `FLOOR_Y` to form the floor |
+| `grass_tileset.png` | `gs->assets.textures.floor_tile` | 48x48 tile, 9-slice rendered across `FLOOR_Y` to form the floor; the shared default for levels that name no other `floor_tile_path` |
 | `grass_platform.png` | `gs->assets.textures.platform` | Default 48x48 platform tile, 9-slice rendered as one-way platform pillars |
-| `stone_tileset.png` | Volcanic levels (`floor_tile_path`) | 48x48 stone floor tileset |
+| `stone_tileset.png` | Volcanic levels (`floor_tile_path`, loaded into `gs->world.floor_tile`) | 48x48 stone floor tileset |
 | `stone_platform.png` | Volcanic levels (platform `tile_path`) | Stone platform pillar tile |
 | `grass_rock_tileset.png`, `grass_rock_platform.png` | Reserve / level theming | Grass-rock floor/platform variants |
 | `brick_tileset.png`, `brick_platform.png` | Reserve / level theming | Brick floor/platform variants |

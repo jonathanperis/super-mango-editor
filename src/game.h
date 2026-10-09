@@ -26,9 +26,10 @@
  *
  * Inside, GameState is split into three named parts so the path to a value
  * also says what kind of state it is (see GameState at the end):
- *   gs->world.spiders[i]     the level being simulated
- *   gs->screen.paused        the game screen around it
- *   gs->assets.textures.coin the sprites and sounds every level uses
+ *   gs->world.spiders[i]      the level being simulated
+ *   gs->screen.paused         the game screen around it
+ *   gs->assets.textures.coin  the sprites and sounds every level uses
+ *                             (borrowed from AppSession, which owns them)
  *
  * The cost is visible below: to embed `Spider spiders[MAX_SPIDERS]` the
  * compiler must know sizeof(Spider), so game.h has to include every header
@@ -185,8 +186,12 @@ typedef struct {
     char  next_phase[256];    /* next TOML path shown/loaded               */
 } GameCompletionState;
 
+/*
+ * TextureResources — one slot per shared sprite sheet. game_resources.c
+ * loads them all from its tables; renderers borrow them.
+ */
 typedef struct {
-    Texture2D *floor_tile;
+    Texture2D *floor_tile;      /* default floor tileset, for levels naming none */
     Texture2D *platform;
     Texture2D *spider;
     Texture2D *jumping_spider;
@@ -240,6 +245,7 @@ typedef struct {
     int          count;
 } PlatformTileCache;
 
+/* AudioResources — one slot per shared sound effect (music is per level). */
 typedef struct {
     SoundEffect *jump;
     SoundEffect *coin;
@@ -249,19 +255,24 @@ typedef struct {
     SoundEffect *flap;
     SoundEffect *spider_attack;
     SoundEffect *dive;
-    MusicTrack *music;
 } AudioResources;
 
 /*
  * GameAssets — the sprites and sound effects every level draws and plays.
  *
- * None of them depends on which level is loaded. Level-specific images
- * (parallax layers, fog, the water strip, platform tiles) live with the
- * level in GameWorld instead.
+ * None of them depends on which level is loaded, so they do not belong to
+ * one GameState. AppSession loads one GameAssets the first time it opens a
+ * game, keeps it until the session ends, and copies it into every GameState
+ * it creates (Play, Replay, Level Select -> Play): the copies hold the same
+ * pointers, so a Replay decodes none of these files again.
+ *
+ * Level-specific files (parallax layers, fog, the water strip, the floor
+ * tileset a level names, platform tiles, music) live with the level in
+ * GameWorld instead, and are loaded and released with it.
  */
-typedef struct {
+typedef struct GameAssets {
     TextureResources textures;    /* owned GPU textures */
-    AudioResources   audio;       /* owned samples and music stream */
+    AudioResources   audio;       /* owned sound samples */
 } GameAssets;
 
 /*
@@ -287,10 +298,13 @@ typedef struct {
     Player        player;      /* the player, stored by value (not a pointer) */
     GameCamera    camera;      /* viewport scroll position; updated every frame*/
 
-    /* ---- Scenery: background, water strip and fog ------------------------ */
+    /* ---- Scenery and music: loaded with the level, owned here ------------ */
     ParallaxSystem parallax;   /* multi-layer scrolling background            */
+    Texture2D    *floor_tile;  /* the level's floor tileset; NULL = the shared
+                                  default, gs->assets.textures.floor_tile    */
     Water         water;        /* animated water strip at the bottom of screen*/
     FogSystem     fog;         /* atmospheric fog overlay — topmost layer      */
+    MusicTrack   *music;       /* the level's music stream; NULL = silence    */
 
     /* ---- Static geometry ------------------------------------------------- */
     Platform      platforms[MAX_PLATFORMS]; /* one-way pillar definitions     */
@@ -452,14 +466,23 @@ typedef struct {
  * GameState — one game screen: its world, its screen state and its assets.
  *
  * The three parts answer "what kind of state is this?":
- *   gs->world   the level being played (player, entities, camera, score)
- *   gs->screen  the screen around it (HUD, overlays, routes, replay, debug)
- *   gs->assets  the sprites and sounds every level uses
+ *   gs->world    the level being played (player, entities, camera, score)
+ *   gs->screen   the screen around it (HUD, overlays, routes, replay, debug)
+ *   gs->assets   the sprites and sounds every level uses
+ *
+ * This GameState owns world and screen. The sprites in assets outlive it:
+ * AppSession loads one GameAssets for the whole run and copies it into
+ * every game it opens (session_make_game), so gs->assets holds the same
+ * pointers as the session's copy, borrowed, and game_cleanup leaves them
+ * alone. A GameState started without a session (the tests do this) finds
+ * its assets empty, so game_init loads a private set and sets owns_assets;
+ * only then does game_cleanup unload them.
  */
 typedef struct GameState {
     GameWorld  world;
     GameScreen screen;
-    GameAssets assets;
+    GameAssets assets;       /* the shared sprites and sounds (see above)   */
+    int        owns_assets;  /* 1 = game_init loaded assets; 0 = borrowed   */
 } GameState;
 
 /* ------------------------------------------------------------------ */
