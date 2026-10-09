@@ -69,7 +69,13 @@ editor refuses to delete a rail that one of them rides (the status bar names
 what still uses it). Deleting an unused rail renumbers the references to later
 rails, and undo restores the original numbering.
 
-The `Delete` key removes the selection; right-click quick-deletes an entity in
+The `Delete` key, or `Backspace` (laptops without a Delete key), removes the
+selection; inside a text field both edit text instead. The arrow keys nudge the
+selection 1 px, or 16 px with `Shift`, following the same rules as a drag
+(floor-bound entities move only sideways, rail riders stay on their rail, and
+nothing leaves the world or makes the level invalid). A quick run of nudges of
+the same selection is one undo step; after a one-second pause the next nudge
+starts a new step. Right-click quick-deletes an entity in
 any tool (ignored while a drag is in progress). Clicks pick the entity drawn on
 top: the hit test (`src/editor/hit_test.c`) walks the exact reverse of the
 canvas draw order, so enemies and hazards win over collectibles, and those over
@@ -196,7 +202,7 @@ The canvas renders the level in WYSIWYG — entity positions and sizes match the
 
 ## Undo / Redo
 
-The editor keeps an undo stack for placement, movement, deletion, property and Level Config changes. It holds the latest 256 actions (`UNDO_MAX`); older ones are dropped. A new edit clears the redo stack.
+The editor keeps an undo stack for placement, movement, deletion, property and Level Config changes. It holds the latest 256 entries (`UNDO_MAX`); older ones are dropped. An action on several entities at once (a nudge, move, delete, paste or duplicate of a multi-selection) records one entry per entity but undoes and redoes as a single step, and the oldest step is always dropped whole. A new edit clears the redo stack.
 
 | Action | Shortcut |
 |--------|----------|

@@ -110,6 +110,9 @@ int editor_entity_remove(LevelDef *level, EntityType type, int index);
 int editor_rail_reference_count(const LevelDef *level, int rail_index,
                                 int *spike_blocks, int *float_platforms);
 int editor_selection_is_valid(const EditorState *es);
+/* Copy every selected entity into out (at most max) and return how many.
+ * Group actions (nudge, duplicate...) walk this list. */
+int editor_selection_items(const EditorState *es, Selection *out, int max);
 void editor_selection_reconcile(EditorState *es);
 void editor_selection_after_remove(EditorState *es, EntityType type, int index);
 void editor_selection_after_insert(EditorState *es, EntityType type, int index,

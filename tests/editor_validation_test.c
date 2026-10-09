@@ -3312,6 +3312,59 @@ fail:
     return 1;
 }
 
+/*
+ * Undo groups: entries pushed between undo_group_begin/end share a number
+ * and are undone as one step by the editor; amending folds nudges into a
+ * step; and a full history drops a whole group, never half of one.
+ */
+static int undo_groups_stay_whole(void)
+{
+    UndoStack *stack = undo_create();
+    Command cmd;
+    PlacementData later;
+    int failed = 1;
+    int group;
+
+    if (!stack) return 1;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.type = CMD_MOVE;
+    cmd.entity_type = ENT_COIN;
+    undo_push(stack, &cmd);                       /* a step of its own */
+    group = undo_group_begin(stack);
+    for (int i = 0; i < 3; i++) {
+        cmd.entity_index = i;
+        undo_push(stack, &cmd);
+    }
+    undo_group_end(stack);
+    if (expect_int("group number", group > 0, 1) != 0 ||
+        expect_int("top is the group", undo_top_group(stack), group) != 0) goto done;
+
+    memset(&later, 0, sizeof(later));
+    later.coin.x = 42.0f;
+    if (expect_int("amend found", undo_amend_after(stack, group, ENT_COIN, 1, &later), 1) != 0 ||
+        expect_int("amend other entity", undo_amend_after(stack, group, ENT_STAR_RED, 1, &later), 0) != 0 ||
+        expect_float_value("amended after", stack->commands[stack->top - 2].after.coin.x, 42.0f) != 0)
+        goto done;
+    if (!undo_pop(stack, &cmd) || expect_int("popped group", cmd.group, group) != 0 ||
+        expect_int("redo top group", redo_top_group(stack), group) != 0) goto done;
+    undo_clear(stack);
+
+    /* Fill the history so the oldest step is a group of three. */
+    group = undo_group_begin(stack);
+    for (int i = 0; i < 3; i++) undo_push(stack, &cmd);
+    undo_group_end(stack);
+    cmd.group = 0;
+    for (int i = 0; i < UNDO_MAX - 3; i++) undo_push(stack, &cmd);
+    if (expect_int("history full", stack->top, UNDO_MAX) != 0) goto done;
+    undo_push(stack, &cmd);                       /* evicts the whole group */
+    if (expect_int("group evicted whole", stack->top, UNDO_MAX - 2) != 0 ||
+        expect_int("no group remnant", stack->commands[0].group, 0) != 0) goto done;
+    failed = 0;
+done:
+    undo_destroy(stack);
+    return failed;
+}
+
 static int orphan_recovery_does_not_poison_discovery(void)
 {
     EditorState es = {0};
@@ -4543,6 +4596,7 @@ int main(void)
     ensure_out_dir();
     if (compact_history_owns_config_snapshots()) return 1;
     if (orphan_recovery_does_not_poison_discovery()) return 1;
+    if (undo_groups_stay_whole()) return 1;
     if (recovery_folder_stays_manageable()) return 1;
     char binary_path[EDITOR_PATH_MAX];
     if (editor_playtest_binary_path(binary_path, sizeof(binary_path))) return 1;

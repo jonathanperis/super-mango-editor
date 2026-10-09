@@ -472,6 +472,15 @@ typedef struct {
     float          drag_mouse_x;  /* cursor world position at mouse-down       */
     float          drag_mouse_y;
 
+    /*
+     * Arrow-key nudges.  A quick run of nudges of the same selection is one
+     * undo step: nudge_group is the undo group of the last nudge, nudge_ms
+     * when it happened, and nudge_selection_key which entities it moved.
+     */
+    int            nudge_group;
+    uint32_t       nudge_ms;
+    uint64_t       nudge_selection_key;
+
     /* ---- Play-test state ---------------------------------------------- */
     /*
      * playing — 1 while the game is running as a child process.
