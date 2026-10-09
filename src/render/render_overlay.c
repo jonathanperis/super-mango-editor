@@ -6,18 +6,17 @@
 
 #include "../core/game_terminal.h"
 
-static void render_overlay_backdrop(GameState *gs, uint8_t alpha)
+/* Dim the frozen game picture behind an overlay's text. */
+static void render_overlay_backdrop(uint8_t alpha)
 {
-    (void)gs;
     DrawRectangle(0, 0, GAME_W, GAME_H, (Color){0,0,0,alpha});
 }
 
+/* One overlay line, centred on the canvas in the HUD font. */
 static void render_centered_text(GameState *gs, const char *text,
                                  Color color, int y)
 {
-    int width = 0;
-    if (font_measure(gs->hud.font, text, &width, NULL)) return;
-    font_draw(gs->hud.font, text, (GAME_W-width)/2, y, color);
+    font_draw_centered(gs->hud.font, text, GAME_W / 2, y, color);
 }
 
 static void render_terminal_actions(GameState *gs, int first_y)
@@ -44,7 +43,7 @@ static void render_terminal_actions(GameState *gs, int first_y)
 
 void render_pause_overlay(GameState *gs)
 {
-    render_overlay_backdrop(gs, 150);
+    render_overlay_backdrop(150);
     if (gs->hud.font) {
         render_centered_text(gs, "Paused", (Color){255, 215, 0, 255}, 92);
         render_centered_text(gs, "Enter/Space/Esc/Start: resume",
@@ -58,7 +57,7 @@ void render_pause_overlay(GameState *gs)
 
 void render_game_over_overlay(GameState *gs)
 {
-    render_overlay_backdrop(gs, 190);
+    render_overlay_backdrop(190);
     if (gs->hud.font) {
         char line[96];
         render_centered_text(gs, "Game Over", (Color){255, 90, 90, 255}, 66);
@@ -78,7 +77,7 @@ void render_level_complete_overlay(GameState *gs)
 {
     const int has_next_level = gs->completion.pending_next_phase;
 
-    render_overlay_backdrop(gs, 180);
+    render_overlay_backdrop(180);
     if (gs->hud.font) {
         char line[96];
         int elapsed = (int)(gs->completion.elapsed + 0.5f);

@@ -26,3 +26,6 @@ int font_measure(TextFont *font, const char *text, int *width, int *height);
 Texture2D *font_texture(TextFont *font, const char *text, Color color);
 /* Draw directly into the current render target; no separate label texture. */
 void font_draw(TextFont *font, const char *text, int x, int y, Color color);
+/* Draw text whose middle lands on center_x (y is still the top edge). Every
+ * centred label in the game (menu, overlays, debug title) uses this one. */
+void font_draw_centered(TextFont *font, const char *text, int center_x, int y, Color color);

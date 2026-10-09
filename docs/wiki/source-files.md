@@ -84,7 +84,7 @@ src/
 │   ├── graphics.h / .c          raylib texture slots, sprite pivots and logical presentation
 │   ├── geometry.h              Integer hitboxes and half-open intersection
 │   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
-│   ├── text.h / .c              Borrowed built-in font, text measurement and label texture creation
+│   ├── text.h / .c              Borrowed built-in font, text measurement, centred drawing and label texture creation
 │   ├── platform.h / .c          Monotonic time, UTF-8 copying and OS preference/executable paths
 │   ├── asset_root.h / .c        Move a foreign working folder to the one holding assets/ and levels/
 │   ├── utf8.h                   Strict UTF-8 checks for loaded strings and typed text

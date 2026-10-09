@@ -330,7 +330,5 @@ void debug_render(const DebugOverlay *dbg, TextFont *font, const void *state, in
     debug_draw_panel(font, HUD_MARGIN, GAME_H - HUD_MARGIN - shown * DEBUG_PANEL_LINE_H - 4, 0,
                      log_lines, log_colors, shown);
 
-    int width=0;
-    font_measure(font,"DEBUG MODE",&width,NULL);
-    font_draw(font,"DEBUG MODE",(GAME_W-width)/2,HUD_MARGIN,yellow);
+    font_draw_centered(font, "DEBUG MODE", GAME_W / 2, HUD_MARGIN, yellow);
 }

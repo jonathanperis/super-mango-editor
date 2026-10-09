@@ -63,3 +63,13 @@ void font_draw(TextFont *font, const char *text, int x, int y, Color color)
     DrawTextEx(font->font, text, (Vector2){(float)x, (float)y}, (float)font->size,
                (float)font->spacing, color);
 }
+
+void font_draw_centered(TextFont *font, const char *text, int center_x, int y, Color color)
+{
+    /* Measure this exact label: glyphs and numbers differ in width, so a
+     * fixed offset would drift. Half the width left of the centre is the
+     * left edge; (2*centre - width)/2 rounds the same way on every label. */
+    int width = 0;
+    if (font_measure(font, text, &width, NULL)) return;
+    font_draw(font, text, (2 * center_x - width) / 2, y, color);
+}
