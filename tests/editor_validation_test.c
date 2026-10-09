@@ -2912,17 +2912,28 @@ static int group_copy_and_delete_keep_riders_with_their_rail(void)
                    editor_document_hash(&es.level) == editor_document_hash(&original), 1) != 0)
         goto fail;
 
-    /* A group paste that cannot complete adds nothing at all. */
+    /* A group paste or duplicate that cannot complete adds nothing at all,
+     * and is refused before anything is recorded: the undone delete above
+     * can still be redone. */
     es.level.coin_count = MAX_COINS - 1;
     for (int i = 0; i < MAX_COINS - 1; i++) es.level.coins[i] = (CoinPlacement){10.0f, 10.0f};
     (void)editor_select_items(&es, (Selection[]){{ENT_COIN, 0}, {ENT_COIN, 1}}, 2);
     editor_copy_selected(&es);
     {
         int top = es.undo->top;
+        int redo = es.undo->redo_top;
+        if (expect_int("a delete to redo", redo > 0, 1) != 0) goto fail;
         editor_paste_clipboard(&es);
         if (expect_int("all or nothing", es.level.coin_count, MAX_COINS - 1) != 0 ||
             expect_int("no history left", es.undo->top, top) != 0 ||
-            expect_int("nothing to redo", es.undo->redo_top, 0) != 0) goto fail;
+            expect_int("redo kept after paste", es.undo->redo_top, redo) != 0 ||
+            expect_prefix("paste refusal", es.status_message, "Cannot paste Coin: limit of") != 0)
+            goto fail;
+        editor_duplicate_selection(&es);
+        if (expect_int("duplicate all or nothing", es.level.coin_count, MAX_COINS - 1) != 0 ||
+            expect_int("no duplicate history", es.undo->top, top) != 0 ||
+            expect_int("redo kept after duplicate", es.undo->redo_top, redo) != 0)
+            goto fail;
     }
     undo_destroy(es.undo);
     return 0;

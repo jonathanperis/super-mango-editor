@@ -699,30 +699,25 @@ static int rail_rider_index(EntityType type, const PlacementData *pd)
     return -1;
 }
 
-int editor_add_placement(EditorState *es, EntityType type,
-                         const PlacementData *pd, const char *action)
+int editor_insert_checked(LevelDef *level, EntityType type,
+                          const PlacementData *pd, const char *action,
+                          PlacementData *before, char *why, size_t why_size)
 {
-    LevelDef *level;
     int singleton;
     int count;
     int index;
     int rail_index;
-    PlacementData before;
-    Command cmd;
     char error[128];
 
-    if (!es || !pd || type < 0 || type >= ENT_COUNT) return -1;
+    if (!level || !pd || !before || !why || type < 0 || type >= ENT_COUNT) return -1;
     if (!action) action = "add";
-    level = &es->level;
     singleton = editor_entity_type_is_singleton(type);
-    editor_selection_reconcile(es);
 
     /* Check capacity — every entity type has a fixed-size array */
     count = editor_entity_count(level, type);
     if (!singleton && count >= editor_entity_capacity(type)) {
-        editor_set_status(es, "Cannot %s %s: limit of %d reached", action,
-                          editor_entity_type_name(type),
-                          editor_entity_capacity(type));
+        snprintf(why, why_size, "Cannot %s %s: limit of %d reached", action,
+                 editor_entity_type_name(type), editor_entity_capacity(type));
         return -1;
     }
 
@@ -731,13 +726,13 @@ int editor_add_placement(EditorState *es, EntityType type,
     rail_index = rail_rider_index(type, pd);
     if (rail_index >= 0 || type == ENT_SPIKE_BLOCK) {
         if (level->rail_count == 0) {
-            editor_set_status(es, "Cannot %s %s: place a rail first", action,
-                              editor_entity_type_name(type));
+            snprintf(why, why_size, "Cannot %s %s: place a rail first", action,
+                     editor_entity_type_name(type));
             return -1;
         }
         if (rail_index < 0 || rail_index >= level->rail_count) {
-            editor_set_status(es, "Cannot %s %s: rail %d does not exist in this level",
-                              action, editor_entity_type_name(type), rail_index);
+            snprintf(why, why_size, "Cannot %s %s: rail %d does not exist in this level",
+                     action, editor_entity_type_name(type), rail_index);
             return -1;
         }
     }
@@ -746,19 +741,22 @@ int editor_add_placement(EditorState *es, EntityType type,
      * reports it as a field value. */
     if ((type == ENT_BLUE_FLAME || type == ENT_FIRE_FLAME) &&
         level->floor_gap_count == 0) {
-        editor_set_status(es, "Cannot %s %s: place a floor gap first", action,
-                          editor_entity_type_name(type));
+        snprintf(why, why_size, "Cannot %s %s: place a floor gap first", action,
+                 editor_entity_type_name(type));
         return -1;
     }
 
-    memset(&before, 0, sizeof(before));
+    memset(before, 0, sizeof(*before));
     if (singleton) {
         index = 0;
-        before = editor_snapshot_entity(level, type, 0);
+        *before = editor_snapshot_entity(level, type, 0);
         (void)editor_entity_write(level, type, 0, pd);
     } else {
         index = count;  /* append: new entities draw on top of older ones */
-        if (editor_entity_insert(level, type, index, pd) != 0) return -1;
+        if (editor_entity_insert(level, type, index, pd) != 0) {
+            snprintf(why, why_size, "Cannot %s %s", action, editor_entity_type_name(type));
+            return -1;
+        }
     }
 
     /*
@@ -768,10 +766,30 @@ int editor_add_placement(EditorState *es, EntityType type,
      * leave a level the canvas refuses to draw.
      */
     if (level_validate_runtime(level, error, sizeof(error)) != 0) {
-        if (singleton) (void)editor_entity_write(level, type, 0, &before);
+        if (singleton) (void)editor_entity_write(level, type, 0, before);
         else (void)editor_entity_remove(level, type, index);
-        editor_set_status(es, "Cannot %s %s here: %s", action,
-                          editor_entity_type_name(type), error);
+        snprintf(why, why_size, "Cannot %s %s here: %s", action,
+                 editor_entity_type_name(type), error);
+        return -1;
+    }
+    return index;
+}
+
+int editor_add_placement(EditorState *es, EntityType type,
+                         const PlacementData *pd, const char *action)
+{
+    PlacementData before;
+    Command cmd;
+    char why[192];
+    int singleton;
+    int index;
+
+    if (!es || !pd || type < 0 || type >= ENT_COUNT) return -1;
+    singleton = editor_entity_type_is_singleton(type);
+    editor_selection_reconcile(es);
+    index = editor_insert_checked(&es->level, type, pd, action, &before, why, sizeof(why));
+    if (index < 0) {
+        editor_set_status(es, "%s", why);
         return -1;
     }
 

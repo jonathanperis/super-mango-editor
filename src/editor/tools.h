@@ -80,6 +80,19 @@ void editor_clamp_placement(const LevelDef *level, EntityType type,
                             PlacementData *pd);
 
 /*
+ * editor_insert_checked --- The part of editor_add_placement that touches
+ * only `level`: check there is room (and a rail or floor gap when the type
+ * needs one), append pd (or move a singleton, whose old data goes in
+ * before), and validate the result.  Returns the new entity's index, or -1
+ * with the level unchanged and why, a whole status-bar sentence, in why.
+ * Paste and Duplicate run it on a scratch copy of the level first, so a
+ * group that cannot be added whole touches neither level nor history.
+ */
+int editor_insert_checked(LevelDef *level, EntityType type,
+                          const PlacementData *pd, const char *action,
+                          PlacementData *before, char *why, size_t why_size);
+
+/*
  * editor_add_placement --- Add one placement as a single undoable step.
  *
  * Shared by Place and Paste.  Appends pd (or moves a singleton), refuses
