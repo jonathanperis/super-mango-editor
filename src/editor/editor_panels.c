@@ -4,8 +4,11 @@
 
 #include "editor_panels.h"
 
+#include "canvas.h"        /* canvas_clamp_camera */
 #include "editor_layout.h" /* editor_config_total_height */
+#include "editor_session.h" /* editor_finish_field_edit, editor_set_status */
 #include "entity_meta.h"   /* editor_selection_reconcile */
+#include "hit_test.h"      /* editor_entity_bounds */
 #include "palette.h"       /* palette_render */
 #include "properties.h"    /* level_config_render, properties_render */
 
@@ -109,4 +112,54 @@ int editor_handle_side_panel_scroll(EditorState *es, int mx, int my, float wheel
     }
 
     return 1;
+}
+
+/*
+ * editor_focus_validation_issue — Take the designer to what validation
+ * message `message` is about (spec N-001: clickable diagnostics).
+ *
+ * The validator reports a location in TOML terms (see LevelIssueLocation).
+ * An entity array such as "coins" or "checkpoints" selects that entity,
+ * switches to the Select tool and pans the canvas so the entity sits in
+ * the middle; a Level Config key opens the panel at that field.  The
+ * message itself is repeated in the status bar.
+ */
+int editor_focus_validation_issue(EditorState *es, int message)
+{
+    const LevelIssueLocation *where;
+    const char *text;
+    EntityType type;
+
+    if (!es || message < 0 || message >= es->validation_report.message_count)
+        return 0;
+    where = &es->validation_report.locations[message];
+    text = es->validation_report.messages[message];
+    if (!editor_finish_field_edit(es)) return 0;
+
+    type = editor_entity_type_for_toml(where->path);
+    if (type != ENT_COUNT) {
+        int index = editor_entity_type_is_singleton(type) ? 0 : where->index;
+        EditorRect r;
+        if (index < 0 || index >= editor_entity_count(&es->level, type)) {
+            editor_set_status(es, "Cannot show it: %s", text);
+            return 0;
+        }
+        es->tool = TOOL_SELECT;
+        editor_select_only(es, type, index);
+        es->panel_open = 1;
+        if (editor_entity_bounds(&es->level, type, index, &r)) {
+            float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+            es->camera.x = r.x + r.w / 2.0f - (float)CANVAS_W / (2.0f * zoom);
+            es->camera.y = r.y + r.h / 2.0f - (float)CANVAS_H / (2.0f * zoom);
+            canvas_clamp_camera(es);
+        }
+        editor_set_status(es, "%s %d: %s", editor_entity_type_name(type), index, text);
+        return 1;
+    }
+    if (properties_focus_config(es, where)) {
+        editor_set_status(es, "Level Config: %s", text);
+        return 1;
+    }
+    editor_set_status(es, "%s", text);
+    return 0;
 }

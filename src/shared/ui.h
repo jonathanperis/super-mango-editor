@@ -103,6 +103,10 @@ typedef struct {
     int prev_field_order[UI_MAX_FIELDS], prev_field_order_count;
     int tab_request;
     int focus_request_id, focus_request_frames;
+    /* The field a focus request (Tab, or a jump from elsewhere) activated
+     * and the y it was drawn at, so a scrolling panel can bring it into
+     * view.  The panel clears focus_landed_id once it has scrolled. */
+    int focus_landed_id, focus_landed_y;
     /* Capture undo before a change; finish/block a field edit before commands. */
     UIBeforeChangeFn before_change;
     void *before_change_context;
@@ -136,6 +140,9 @@ void ui_edit_key(UIState *ui, UIEditKey key);
  * like Return and the next / previous field on screen becomes active.  An
  * invalid value keeps the focus where it is. */
 void ui_focus_next(UIState *ui, int direction);
+/* Activate field `id` the next time it is drawn, as if it had been clicked
+ * (dropped if it is not drawn within two frames). */
+void ui_focus_field(UIState *ui, int id);
 
 /* Draw a button and return 1 on its click frame, not every held-mouse frame.
  * An active edit must finish before the caller executes the button command. */

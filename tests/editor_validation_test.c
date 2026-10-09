@@ -2253,6 +2253,113 @@ static int shared_level_rules_have_one_answer(void)
     return 0;
 }
 
+static int expect_location(const char *name, const LevelIssueLocation *where,
+                           const char *path, int index, const char *field)
+{
+    if (strcmp(where->path, path) != 0 || where->index != index ||
+        strcmp(where->field, field) != 0) {
+        fprintf(stderr, "editor_validation_test: %s got {%s, %d, %s} expected {%s, %d, %s}\n",
+                name, where->path, where->index, where->field, path, index, field);
+        return 1;
+    }
+    return 0;
+}
+
+/*
+ * Validation messages carry a structured location (spec N-001) so the
+ * editor can take the designer to the problem.  The validator promises
+ * that every message starts with the TOML path of the bad value; these
+ * cases pin that promise for each family of checks, including the ones
+ * that used to print "spiders[].frame_index" without the element.
+ */
+static int validation_errors_report_where_they_are(void)
+{
+    LevelDef base, level;
+    LevelIssueLocation where;
+    char err[256];
+
+    if (level_issue_location_parse("coins[3].x is 9.00 (expected 0..1)", &where) != 1 ||
+        expect_location("parse element field", &where, "coins", 3, "x") != 0 ||
+        level_issue_location_parse("screen_count is 0 (expected 1..99)", &where) != 1 ||
+        expect_location("parse key", &where, "screen_count", -1, "") != 0 ||
+        level_issue_location_parse("rails[2] has negative origin", &where) != 1 ||
+        expect_location("parse element", &where, "rails", 2, "") != 0 ||
+        expect_int("not a path", level_issue_location_parse("LevelDef is NULL", &where), 0) != 0 ||
+        expect_int("half a path", level_issue_location_parse("coins[x].y bad", &where), 0) != 0 ||
+        expect_location("cleared on failure", &where, "", -1, "") != 0)
+        return 1;
+
+    editor_level_init_defaults(&base);
+    base.coin_count = 2;
+    base.coins[0] = (CoinPlacement){100.0f, 100.0f};
+    base.coins[1] = (CoinPlacement){140.0f, 100.0f};
+    base.spider_count = 1;
+    base.spiders[0] = (SpiderPlacement){300.0f, 50.0f, 250.0f, 350.0f, 0};
+    base.axe_trap_count = 1;
+    base.axe_traps[0] = (AxeTrapPlacement){.pillar_x = 500.0f, .y = 0.0f, .mode = AXE_MODE_PENDULUM};
+    base.checkpoint_count = 1;
+    base.checkpoints[0] = (CheckpointPlacement){600.0f, 100.0f};
+    if (level_is_valid("location base", &base) != 0 ||
+        expect_int("valid has no location",
+                   level_validate_runtime_at(&base, err, sizeof(err), &where), 0) != 0 ||
+        expect_location("valid location", &where, "", -1, "") != 0) return 1;
+
+    level = base;
+    level.coins[1].x = 99999.0f;
+    if (level_validate_runtime_at(&level, err, sizeof(err), &where) == 0 ||
+        expect_location("coin x", &where, "coins", 1, "x") != 0) return 1;
+    level = base;
+    level.spiders[0].frame_index = 99;
+    if (level_validate_runtime_at(&level, err, sizeof(err), &where) == 0 ||
+        expect_location("spider frame", &where, "spiders", 0, "frame_index") != 0) return 1;
+    level = base;
+    level.spiders[0].vx = 1.0e9f;
+    if (level_validate_runtime_at(&level, err, sizeof(err), &where) == 0 ||
+        expect_location("spider vx", &where, "spiders", 0, "vx") != 0) return 1;
+    level = base;
+    level.axe_traps[0].y = 5000.0f;
+    if (level_validate_runtime_at(&level, err, sizeof(err), &where) == 0 ||
+        expect_location("axe y", &where, "axe_traps", 0, "y") != 0) return 1;
+    level = base;
+    level.checkpoints[0].x = 1.0f;          /* behind the player start */
+    if (level_validate_runtime_at(&level, err, sizeof(err), &where) == 0 ||
+        expect_location("checkpoint x", &where, "checkpoints", 0, "x") != 0) return 1;
+    level = base;
+    level.screen_count = 500;
+    if (level_validate_runtime_at(&level, err, sizeof(err), &where) == 0 ||
+        expect_location("screens", &where, "screen_count", -1, "") != 0) return 1;
+    level = base;
+    level.physics.air_friction = NAN;
+    if (level_validate_runtime_at(&level, err, sizeof(err), &where) == 0 ||
+        expect_location("physics", &where, "physics", -1, "air_friction") != 0) return 1;
+    level = base;
+    level.player_start_x = 99999.0f;
+    if (level_validate_runtime_at(&level, err, sizeof(err), &where) == 0 ||
+        expect_location("player start", &where, "player_start", -1, "x") != 0) return 1;
+
+    /* The editor's report keeps the location next to each message, and
+     * maps TOML names back to its entity types. */
+    {
+        EditorValidationReport report;
+        level = base;
+        level.coins[1].x = 99999.0f;
+        level.name[0] = '\0';
+        (void)editor_validate_level(&level, &report);
+        if (expect_int("report messages", report.message_count >= 2, 1) != 0 ||
+            expect_location("report error", &report.locations[0], "coins", 1, "x") != 0 ||
+            expect_location("report warning", &report.locations[report.message_count - 1],
+                            "name", -1, "") != 0 ||
+            expect_int("coins type", editor_entity_type_for_toml("coins"), ENT_COIN) != 0 ||
+            expect_int("checkpoint type", editor_entity_type_for_toml("checkpoints"),
+                       ENT_CHECKPOINT) != 0 ||
+            expect_int("spawn type", editor_entity_type_for_toml("player_start"),
+                       ENT_PLAYER_SPAWN) != 0 ||
+            expect_int("config key", editor_entity_type_for_toml("screen_count"), ENT_COUNT) != 0)
+            return 1;
+    }
+    return 0;
+}
+
 static int rail_deletion_keeps_references_valid(void)
 {
     EditorState es = {0};
@@ -4640,6 +4747,7 @@ int main(void)
     if (checkpoint_editor_mutations_are_reversible() != 0) return 1;
     if (rail_deletion_keeps_references_valid() != 0) return 1;
     if (shared_level_rules_have_one_answer() != 0) return 1;
+    if (validation_errors_report_where_they_are() != 0) return 1;
     if (float_platform_rail_switch_rechecks_its_rail() != 0) return 1;
     if (drag_round_trips_and_follows_grab_point() != 0) return 1;
     if (editor_mutations_keep_level_valid() != 0) return 1;

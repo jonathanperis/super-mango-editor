@@ -44,6 +44,10 @@
  * capacity      : MAX_* length of the LevelDef array (1 for singletons).
  * array_offset, count_offset, item_size :
  *                 where the placements live; see STORED_IN below.
+ * toml_name     : the type's [[array]] (or table) name in a level file, which
+ *                 is also how the validator names it in messages ("coins[3]
+ *                 ..."); STORED_IN fills it from the LevelDef field name,
+ *                 which is the same word.
  * preview       : what the Place tool draws under the cursor.
  */
 typedef struct {
@@ -56,6 +60,7 @@ typedef struct {
     size_t array_offset;
     size_t count_offset;
     size_t item_size;
+    const char *toml_name;
     EditorEntityPreview preview;
 } EditorEntityMeta;
 
@@ -73,7 +78,8 @@ typedef struct {
 #define STORED_IN(array, count)                                   \
     .array_offset = offsetof(LevelDef, array),                    \
     .count_offset = offsetof(LevelDef, count),                    \
-    .item_size    = sizeof(((LevelDef *)0)->array[0])
+    .item_size    = sizeof(((LevelDef *)0)->array[0]),            \
+    .toml_name    = #array
 
 /*
  * TEXTURE(field) — which EntityTextures member holds the preview sprite,
@@ -151,6 +157,7 @@ static const EditorEntityMeta s_entity_meta[] = {
         .type = ENT_LAST_STAR, .type_name = "Last Star", .palette_name = "Last Star",
         .category = EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
         .singleton = 1, .capacity = 1,   /* the LevelDef field last_star */
+        .toml_name = "last_star",
         .preview = { TEXTURE(last_star), .w = LSTAR_DISPLAY_W, .h = LSTAR_DISPLAY_H },
     },
     /* ---- Enemies ---------------------------------------------------- */
@@ -307,6 +314,7 @@ static const EditorEntityMeta s_entity_meta[] = {
         .category = EDITOR_ENTITY_CATEGORY_WORLD,
         /* player_start_x/y in LevelDef; first frame of the idle sheet. */
         .singleton = 1, .capacity = 1,
+        .toml_name = "player_start",   /* validator: player_start.x / .y */
         .preview = { TEXTURE(player), .w = PLAYER_SPAWN_W, .h = PLAYER_SPAWN_H,
                      CROP(0, 0, PLAYER_SPAWN_W, PLAYER_SPAWN_H) },
     },
@@ -375,6 +383,17 @@ static const EditorEntityMeta *editor_entity_meta(EntityType type)
     if (s_entity_meta[type].type != type || !s_entity_meta[type].type_name)
         return 0;
     return &s_entity_meta[type];
+}
+
+EntityType editor_entity_type_for_toml(const char *name)
+{
+    if (!name || !name[0]) return ENT_COUNT;
+    for (int type = 0; type < ENT_COUNT; type++) {
+        const EditorEntityMeta *meta = editor_entity_meta((EntityType)type);
+        if (meta && meta->toml_name && strcmp(meta->toml_name, name) == 0)
+            return (EntityType)type;
+    }
+    return ENT_COUNT;
 }
 
 const char *editor_entity_type_name(EntityType type)
@@ -716,6 +735,14 @@ int editor_selection_items(const EditorState *es, Selection *out, int max)
     if (!es || !out || max <= 0 || !editor_selection_is_valid(es)) return 0;
     out[0] = es->selection;
     return 1;
+}
+
+void editor_select_only(EditorState *es, EntityType type, int index)
+{
+    if (!es) return;
+    es->selection.type = type;
+    es->selection.index = index;
+    editor_selection_reconcile(es);
 }
 
 void editor_selection_reconcile(EditorState *es)

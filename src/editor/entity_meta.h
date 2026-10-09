@@ -31,6 +31,9 @@ const char *editor_entity_category_name(EditorEntityCategory category);
 int editor_entity_palette_entry_count(void);
 EntityType editor_entity_palette_entry_type(int index);
 int editor_entity_type_is_singleton(EntityType type);
+/* The type stored under a TOML array name ("coins", "player_start"...), as
+ * validation messages name it, or ENT_COUNT for any other name. */
+EntityType editor_entity_type_for_toml(const char *name);
 
 /* MAX_* array length for a type (1 for singletons, 0 for invalid types). */
 int editor_entity_capacity(EntityType type);
@@ -114,6 +117,8 @@ int editor_selection_is_valid(const EditorState *es);
  * Group actions (nudge, duplicate...) walk this list. */
 int editor_selection_items(const EditorState *es, Selection *out, int max);
 void editor_selection_reconcile(EditorState *es);
+/* Make (type, index) the whole selection. */
+void editor_select_only(EditorState *es, EntityType type, int index);
 void editor_selection_after_remove(EditorState *es, EntityType type, int index);
 void editor_selection_after_insert(EditorState *es, EntityType type, int index,
                                    int select_inserted);

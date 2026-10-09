@@ -729,7 +729,7 @@ static int expect_patrol_speeds_are_bounded(void)
     for (size_t i = 0; i < sizeof(rejected) / sizeof(rejected[0]); i++) {
         def.spiders[0].vx = rejected[i];
         if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
-            strstr(err, "spiders.vx") == NULL) {
+            strstr(err, "spiders[0].vx") == NULL) {
             fprintf(stderr, "level_validate_test: spider vx %.1f accepted\n", rejected[i]);
             return 1;
         }
@@ -738,7 +738,7 @@ static int expect_patrol_speeds_are_bounded(void)
     def.spiders[0].vx = SPIDER_SPEED;
     def.birds[0].vx = 0.0f;
     if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
-        strstr(err, "birds.vx") == NULL) {
+        strstr(err, "birds[0].vx") == NULL) {
         fprintf(stderr, "level_validate_test: frozen bird accepted\n");
         return 1;
     }

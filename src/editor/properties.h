@@ -67,6 +67,14 @@ void level_config_render(EditorState *es, int start_y, int available_h,
  */
 void cfg_scroll(int delta);
 
+/*
+ * properties_focus_config — Open the Level Config panel at the field a
+ * validation location names ("screen_count", "physics" + "air_friction",
+ * "fog_layers"...): unfold its group and give a text field the caret.
+ * Returns 1 when the key is a Level Config key, 0 otherwise.
+ */
+int properties_focus_config(EditorState *es, const LevelIssueLocation *where);
+
 /* Level Config foldout state shared with layout measurement. */
 extern int g_plx_open;
 extern int g_fg_open;

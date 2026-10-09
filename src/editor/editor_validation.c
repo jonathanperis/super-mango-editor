@@ -30,8 +30,9 @@ static int is_safe_repo_path_shape(const char *path)
     return 1;
 }
 
-static void report_add(EditorValidationReport *report, int is_error,
-                       const char *fmt, const char *field, const char *path)
+static void report_add_at(EditorValidationReport *report, int is_error,
+                          const LevelIssueLocation *where,
+                          const char *fmt, const char *field, const char *path)
 {
     int idx;
 
@@ -49,7 +50,31 @@ static void report_add(EditorValidationReport *report, int is_error,
         snprintf(report->messages[idx], EDITOR_VALIDATION_MESSAGE_LEN,
                  "%s", field);
     }
+    if (where) {
+        report->locations[idx] = *where;
+    } else {
+        /* Messages begin with the field they are about; read it back. */
+        (void)level_issue_location_parse(report->messages[idx],
+                                         &report->locations[idx]);
+    }
     report->message_count++;
+}
+
+/* A message whose location is read from its leading field name. */
+static void report_add(EditorValidationReport *report, int is_error,
+                       const char *fmt, const char *field, const char *path)
+{
+    report_add_at(report, is_error, NULL, fmt, field, path);
+}
+
+/* A message pointing at one place that its wording does not start with. */
+static LevelIssueLocation location(const char *path)
+{
+    LevelIssueLocation where;
+    memset(&where, 0, sizeof(where));
+    where.index = -1;
+    snprintf(where.path, sizeof(where.path), "%s", path);
+    return where;
 }
 
 static void check_path(EditorValidationReport *report, const char *field,
@@ -78,8 +103,10 @@ int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
         return -1;
     }
 
-    if (level_validate_runtime(def, err, sizeof(err)) != 0) {
-        report_add(report, 1, "%s", err, NULL);
+    {
+        LevelIssueLocation where;
+        if (level_validate_runtime_at(def, err, sizeof(err), &where) != 0)
+            report_add_at(report, 1, &where, "%s", err, NULL);
     }
 
     if (def->screen_count <= 0) {
@@ -109,7 +136,8 @@ int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
     }
 
     if (def->name[0] == '\0') {
-        report_add(report, 0, "%s", "level name is empty", NULL);
+        LevelIssueLocation where = location("name");
+        report_add_at(report, 0, &where, "%s", "level name is empty", NULL);
     }
 
     if (def->last_star.x == 0.0f && def->last_star.y == 0.0f) {
