@@ -205,10 +205,21 @@ static void editor_key(EditorState *es, const InputEvent *event)
                 : "Snap to grid off (hold Shift to snap)");
         }
         break;
-    case KEY_DELETE:
     case KEY_BACKSPACE:
-        /* Backspace too: many laptop keyboards (Macs) have no Delete key.
-         * Inside a text field it edits text instead (handled above). */
+        /* Backspace too deletes: many laptop keyboards (Macs) have no Delete
+         * key.  Inside a text field it edits text instead (handled above).
+         * But right after Enter commits a field, a Backspace still meant
+         * for that field would delete the selection, so Backspace deletes
+         * only while the canvas has the focus (the last click was on it). */
+        if (es->selection.index < 0) break;
+        if (es->focus_area != EDITOR_FOCUS_CANVAS) {
+            editor_set_status(es, "Backspace deletes on the canvas: click it first, "
+                              "or press Delete");
+            break;
+        }
+        if (editor_finish_field_edit(es)) tools_delete_selected(es);
+        break;
+    case KEY_DELETE:
         if (es->selection.index >= 0 && editor_finish_field_edit(es)) tools_delete_selected(es);
         break;
     case KEY_LEFT: case KEY_RIGHT: case KEY_UP: case KEY_DOWN: {
@@ -353,6 +364,8 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
              * placing or deleting under it as well would be a surprise. */
             if (ui_press(&es->ui)) break;
             es->mouse_down = 1;
+            es->focus_area = canvas_contains(event->x, event->y) && !es->campaign
+                           ? EDITOR_FOCUS_CANVAS : EDITOR_FOCUS_PANEL;
             /* Over the Campaign view the canvas tools are asleep; its
              * widgets read the click from ui.mouse_clicked. */
             if (canvas_contains(event->x, event->y) && !es->campaign &&
