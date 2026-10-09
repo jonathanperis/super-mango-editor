@@ -27,6 +27,7 @@
 void player_resolve_floor_collision(Player *player,
                                     const BouncepadList *bouncepad_lists, int bouncepad_list_count,
                                     const int *floor_gaps, int floor_gap_count,
+                                    float prev_center_x, float prev_bottom,
                                     int *out_bounce_idx) {
     *out_bounce_idx = -1;
 
@@ -44,6 +45,36 @@ void player_resolve_floor_collision(Player *player,
      * physically it is just a region of the floor that bounces.
      */
     const float ground_snap = (float)(FLOOR_Y - player->h + FLOOR_SINK);
+
+    /*
+     * Gap walls — once the player's feet are below the floor surface inside
+     * a gap, the gap's sides are solid. Without this, a player who had
+     * already sunk into the hole could steer sideways until their centre
+     * was over grass again, and the snap below would lift them back up onto
+     * the floor from inside it.
+     *
+     * "Inside" is decided from where the player was BEFORE this step: feet
+     * below the floor top (prev_bottom > FLOOR_Y) with the centre over a
+     * gap. Then the centre is held between that gap's edges; the right edge
+     * is kept one pixel in, because a centre exactly on gx + FLOOR_GAP_W
+     * counts as ground.
+     */
+    if (prev_bottom > (float)FLOOR_Y) {
+        for (int g = 0; g < floor_gap_count; g++) {
+            float gx = (float)floor_gaps[g];
+            if (prev_center_x < gx || prev_center_x >= gx + (float)FLOOR_GAP_W)
+                continue;
+            float center_x = player->x + player->w / 2.0f;
+            float wall_left = gx;
+            float wall_right = gx + (float)FLOOR_GAP_W - 1.0f;
+            if (center_x < wall_left || center_x > wall_right) {
+                float held = center_x < wall_left ? wall_left : wall_right;
+                player->x  = held - player->w / 2.0f;
+                player->vx = 0.0f;
+            }
+            break;
+        }
+    }
 
     /*
      * The physics centre of the player determines whether solid ground

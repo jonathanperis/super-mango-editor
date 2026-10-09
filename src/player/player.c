@@ -98,6 +98,12 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
      * for the spike-platform ceiling crossing test.
      */
     const float prev_top    = prev_bottom - player->h + FLOOR_SINK;
+    /*
+     * prev_center_x — physics centre before this frame's movement. With
+     * prev_bottom it tells the floor check whether the player was already
+     * inside a floor gap, whose sides then hold them in.
+     */
+    const float prev_center_x = player->x + player->w / 2.0f;
 
     /*
      * Gravity: accelerate downward each frame.
@@ -126,7 +132,8 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
                                                     prev_top);
 
     player_resolve_floor_collision(player, bouncepad_lists, bouncepad_list_count,
-                                   floor_gaps, floor_gap_count, out_bounce_idx);
+                                   floor_gaps, floor_gap_count,
+                                   prev_center_x, prev_bottom, out_bounce_idx);
     /* A nearer bridge/spike surface or the floor may have replaced the float
      * platform candidate. Do not carry the player with the discarded support.
      *
