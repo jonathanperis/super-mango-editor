@@ -210,12 +210,19 @@ Builds (if out of date) then immediately executes the binary with no CLI flags. 
 make run
 ```
 
-The binary must be run from the **repo root** because asset paths are relative:
+Asset and level paths are relative to the process's working folder:
 
 ```c
 texture_load("assets/sprites/backgrounds/sky_blue.png");
 sound_load("assets/sounds/player/player_jump.wav");
 ```
+
+`make run` starts the game from the repo root, where those paths resolve. Started
+from any other folder, the game and editor first change to the folder that holds
+`assets/` and `levels/`: the executable's own folder (a release zip) or one or two
+folders above it (`out/super-mango`, `out/release/super-mango` in a checkout).
+Command-line paths are made absolute before that move, so they keep meaning the
+folder they were typed in (`src/shared/asset_root.c`).
 
 ### `make run-debug`
 

@@ -14,6 +14,8 @@
 #include "game.h"
 #include "core/app_session.h"
 #include "core/game_random.h"
+#include "shared/asset_root.h"
+#include "shared/serializer_io.h"  /* serializer_file_exists_utf8 */
 
 static const char *argument(int argc, char **argv, int *index)
 {
@@ -37,18 +39,45 @@ static int unsigned_argument(const char *text, unsigned int *result)
     return 0;
 }
 
+#ifndef __EMSCRIPTEN__
+/* Replace *path with an owned absolute copy when wanted (and *path is set).
+ * Returns -1 only when that copy cannot be allocated. */
+static int keep_typed_path(const char **path, int wanted, char **owned)
+{
+    if (!wanted || !*path) return 0;
+    *owned = asset_root_absolute(*path);
+    if (!*owned) return -1;
+    *path = *owned;
+    return 0;
+}
+#endif
+
+/* --level, --profile, --experiment and --replay-dir. */
+#define TYPED_PATH_COUNT 4
+
+static void free_owned_paths(char **owned)
+{
+    for (int i = 0; i < TYPED_PATH_COUNT; i++) {
+        free(owned[i]);
+        owned[i] = NULL;
+    }
+}
+
 int main(int argc, char **argv)
 {
     /* The designated initializer enables saving and zero-initializes the
      * remaining members. A NULL level path selects the campaign menu. */
     AppSessionConfig config = {.profile_enabled = 1};
     int seed_set = 0;
+    int level_typed = 0;  /* --level came from the user, not a built-in default */
     for (int i = 1; i < argc; i++) {
         const char *option = argv[i];
         if (!strcmp(option, "--debug"))
             config.debug_mode = 1;
-        else if (!strcmp(option, "--sandbox"))
+        else if (!strcmp(option, "--sandbox")) {
             config.level_path = "levels/00_sandbox_01.toml";
+            level_typed = 0;
+        }
         else if (!strcmp(option, "--no-save"))
             config.profile_enabled = 0;
         else if (!strcmp(option, "--continue"))
@@ -61,8 +90,10 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Error: %s requires a path\n", option);
                 return EXIT_FAILURE;
             }
-            if (!strcmp(option, "--level"))
+            if (!strcmp(option, "--level")) {
                 config.level_path = value;
+                level_typed = 1;
+            }
             else if (!strcmp(option, "--profile"))
                 config.profile_path = value;
             else if (!strcmp(option, "--replay-script"))
@@ -124,12 +155,42 @@ int main(int argc, char **argv)
     if (config.smoke_test_frames > 0 && !config.level_path)
         config.level_path = "levels/00_sandbox_01.toml";
 
+    /* Absolute copies of typed paths when the working folder moves below. */
+    char *owned_paths[TYPED_PATH_COUNT] = {NULL, NULL, NULL, NULL};
+#ifndef __EMSCRIPTEN__
+    /*
+     * Every asset and level path is relative, so the game needs a working
+     * folder that holds assets/ and levels/. Started from somewhere else (a
+     * shortcut, a file manager, `../out/super-mango`), move to the folder of
+     * the executable instead. Paths the user typed were meant relative to
+     * the original folder, so make them absolute before moving. --level is
+     * the exception when it does not exist there: then it most likely names
+     * a bundled level such as levels/labs/01_collision.toml.
+     */
+    if (!asset_root_contains("")) {
+        if (level_typed && !serializer_file_exists_utf8(config.level_path)) level_typed = 0;
+        if (keep_typed_path(&config.level_path, level_typed, &owned_paths[0]) ||
+            keep_typed_path(&config.profile_path, 1, &owned_paths[1]) ||
+            keep_typed_path(&config.experiment_path, 1, &owned_paths[2]) ||
+            keep_typed_path(&config.replay_dir, 1, &owned_paths[3])) {
+            fprintf(stderr, "Error: out of memory while reading the command line\n");
+            free_owned_paths(owned_paths);
+            return EXIT_FAILURE;
+        }
+        if (asset_root_enter() != 0)
+            fprintf(stderr, "Warning: assets/ and levels/ were not found here or "
+                            "next to the executable\n");
+    }
+#endif
+
     /* A fixed seed makes enemy/decorative randomness reproducible. A normal
      * run without --seed varies its starting state using a monotonic clock. */
     if (!seed_set) config.random_seed = (unsigned int)clock_millis();
     game_random_seed(config.random_seed);
     /* session_create unwinds partially initialized resources on failure. */
     AppSession *session = session_create(&config);
+    /* session_create copied every path it keeps (or opened the file). */
+    free_owned_paths(owned_paths);
     if (!session) return EXIT_FAILURE;
     int result = session_run(session);
 #ifndef __EMSCRIPTEN__

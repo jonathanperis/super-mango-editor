@@ -9,6 +9,7 @@
 #include "editor_frame.h"
 #include "editor_files.h"
 #include "editor_session.h"
+#include "../shared/asset_root.h"
 #include "../shared/serializer.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,10 +23,31 @@ int main(int argc, char **argv)
         if (!strcmp(argv[i], "--smoke-test")) smoke = 1;
         else path = argv[i];
     }
+    /* Palette art, level checks and Playtest all use paths such as
+     * "assets/..." relative to the working folder. Started elsewhere, move
+     * to the executable's folder, after making the document path absolute
+     * so it still names the file the user meant (see shared/asset_root.h). */
+    char *typed_path = NULL;
+    if (!asset_root_contains("")) {
+        if (path) {
+            typed_path = asset_root_absolute(path);
+            if (!typed_path) {
+                fprintf(stderr, "Error: out of memory while reading the command line\n");
+                return EXIT_FAILURE;
+            }
+            path = typed_path;
+        }
+        if (asset_root_enter() != 0)
+            fprintf(stderr, "Warning: assets/ and levels/ were not found here or "
+                            "next to the executable\n");
+    }
     /* Aggregate initialization gives pointers NULL and numeric members zero.
      * That lets startup failure use the same cleanup path as normal exit. */
     EditorState editor = {0};
-    if (editor_init(&editor, smoke)) return EXIT_FAILURE;
+    if (editor_init(&editor, smoke)) {
+        free(typed_path);
+        return EXIT_FAILURE;
+    }
     if (path) {
         int result;
         if (smoke) {
@@ -49,5 +71,6 @@ int main(int argc, char **argv)
             editor_run_frame(&editor);
     int result = smoke && !editor.running ? EXIT_FAILURE : EXIT_SUCCESS;
     editor_cleanup(&editor);
+    free(typed_path);
     return result;
 }

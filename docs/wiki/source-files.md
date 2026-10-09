@@ -86,6 +86,7 @@ src/
 │   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
 │   ├── text.h / .c              Borrowed built-in font, text measurement and label texture creation
 │   ├── platform.h / .c          Monotonic time, UTF-8 copying and OS preference/executable paths
+│   ├── asset_root.h / .c        Move a foreign working folder to the one holding assets/ and levels/
 │   ├── utf8.h                   Strict UTF-8 checks for loaded strings and typed text
 │   ├── printf_format.h          PRINTF_FORMAT: lets GCC/Clang check printf-style format arguments
 │   ├── ui.h / .c                 Immediate-mode widgets shared by editor and game settings
@@ -196,6 +197,7 @@ For a beginner's reading order, continue through `core/app_session.c`,
 ### Responsibilities
 
 - Parse startup, profile, experiment and smoke flags; see the complete [Controls reference](../controls/#runtime-flags-for-input-and-ci), including `--seed`, `--profile`, `--continue`, `--no-save` and `--experiment`
+- When the working folder holds no `assets/`, make typed paths absolute and move to the executable's folder (`asset_root_enter`, `shared/asset_root.c`); the editor's `editor_main.c` does the same
 - Delegate window, input and audio initialization to `session_create`
 - Route to the start menu, sandbox, or direct TOML level mode through `session_create()`
 - Run `session_run()`; native callers then destroy the session, while browser replay frees it before requesting a reload
@@ -541,6 +543,7 @@ reports it, resident memory in MB.
 | `shared/text.h`, `shared/text.c` | CPU image versus GPU texture; borrowing raylib's built-in font |
 | `shared/ui.h`, `shared/ui.c` | Immediate-mode calls, stable widget IDs, staged edits and bounded label cache |
 | `shared/platform.h`, `shared/platform.c` | Monotonic elapsed time, UTF-8 copying and caller-owned OS paths |
+| `shared/asset_root.h`, `shared/asset_root.c` | Why relative paths depend on the working folder, and how startup finds the asset root |
 | `shared/utf8.h` | What makes a UTF-8 byte sequence valid (overlong forms, surrogates, truncation) |
 | `shared/printf_format.h` | How a compiler attribute lets our own printf-style wrappers get format-string checks |
 | `input/input_backend.h`, `input/input_backend.c` | Ordered events versus held state, logical pointer mapping and saved-binding translation |
