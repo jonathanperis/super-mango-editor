@@ -18,6 +18,15 @@
 
 #include "editor.h"   /* EditorState, EditorTool, EntityType, Selection */
 
+/*
+ * Rail riders (spike blocks, rail-mode float platforms) move at more than 0
+ * and at most MAX_RAIL_SPEED tiles/s (rail.h).  RAIL_SPEED_MIN stands in
+ * for "more than 0" in the speed fields; RAIL_SPEED_DEFAULT is the speed a
+ * new rider gets, the same as a newly placed spike block.
+ */
+#define RAIL_SPEED_MIN     0.1f
+#define RAIL_SPEED_DEFAULT 3.0f
+
 /* ------------------------------------------------------------------ */
 /* Tool interaction entry points                                       */
 /* ------------------------------------------------------------------ */
@@ -83,6 +92,25 @@ void editor_clamp_placement(const LevelDef *level, EntityType type,
  */
 int editor_add_placement(EditorState *es, EntityType type,
                          const PlacementData *pd, const char *action);
+
+/*
+ * editor_nearest_rail --- Index of the rail closest to world point (x, y),
+ * or -1 when the level has no rails.  Spike-block placement and the float
+ * platform's switch to Rail mode both attach to this rail.
+ */
+int editor_nearest_rail(const LevelDef *level, float x, float y);
+
+/*
+ * editor_set_float_platform_mode --- Change float platform `index` to mode.
+ *
+ * Switching to Rail needs a rail in the level (otherwise the status bar
+ * explains and -1 is returned with nothing changed).  A stored rail_index
+ * that names no rail any more is replaced by the nearest rail, the speed
+ * is given a valid rail value, and the status bar names the rail.
+ * Returns 0 when the mode was applied.  The caller records the undo step.
+ */
+int editor_set_float_platform_mode(EditorState *es, int index,
+                                   FloatPlatformMode mode);
 
 /*
  * tools_right_click --- Handle a right-click at world position.

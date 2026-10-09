@@ -2111,6 +2111,66 @@ static int level_is_valid(const char *name, const LevelDef *level)
     return 0;
 }
 
+/*
+ * A Static or Crumble float platform keeps its old rail_index, and deleting
+ * rails renumbers only the references that are in use.  Switching such a
+ * platform back to Rail must not leave it on a rail that no longer exists
+ * (the level would stop validating), and must say which rail it rides.
+ */
+static int float_platform_rail_switch_rechecks_its_rail(void)
+{
+    EditorState es = {0};
+
+    fill_rail_level(&es.level);
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+
+    /* Rail 1 -> Static, then delete rails 0 and 1 (the spike block rides
+     * rail 2, which becomes rail 0).  The platform still says rail 1. */
+    if (editor_set_float_platform_mode(&es, 0, FLOAT_PLATFORM_STATIC) != 0) goto fail;
+    es.level.float_platforms[0].x = 400.0f;
+    es.level.float_platforms[0].y = 100.0f;
+    es.selection.type = ENT_RAIL;
+    es.selection.index = 0;
+    tools_delete_selected(&es);
+    es.selection.index = 0;
+    tools_delete_selected(&es);
+    if (expect_int("two rails deleted", es.level.rail_count, 1) != 0 ||
+        expect_int("static platform kept its number",
+                   es.level.float_platforms[0].rail_index, 1) != 0) goto fail;
+
+    /* Back to Rail: the missing rail is replaced by the nearest one. */
+    if (expect_int("switch to rail", editor_set_float_platform_mode(&es, 0,
+                   FLOAT_PLATFORM_RAIL), 0) != 0 ||
+        expect_int("re-picked rail", es.level.float_platforms[0].rail_index, 0) != 0 ||
+        expect_prefix("re-pick explained", es.status_message,
+                      "Float Platform rides rail 0 (its rail 1 no longer exists)") != 0 ||
+        level_is_valid("after switch to rail", &es.level) != 0) goto fail;
+
+    /* A number that still names a rail is kept, and announced. */
+    if (editor_set_float_platform_mode(&es, 0, FLOAT_PLATFORM_CRUMBLE) != 0 ||
+        editor_set_float_platform_mode(&es, 0, FLOAT_PLATFORM_RAIL) != 0 ||
+        expect_prefix("kept rail announced", es.status_message,
+                      "Float Platform rides rail 0; edit rail_index") != 0) goto fail;
+
+    /* Without any rail the switch is refused and nothing changes. */
+    if (editor_set_float_platform_mode(&es, 0, FLOAT_PLATFORM_STATIC) != 0) goto fail;
+    es.level.spike_block_count = 0;
+    es.level.rail_count = 0;
+    if (expect_int("no rail refused", editor_set_float_platform_mode(&es, 0,
+                   FLOAT_PLATFORM_RAIL), -1) != 0 ||
+        expect_int("mode unchanged", (int)es.level.float_platforms[0].mode,
+                   (int)FLOAT_PLATFORM_STATIC) != 0 ||
+        expect_prefix("no rail explained", es.status_message,
+                      "Cannot switch Float Platform to Rail: place a rail first") != 0)
+        goto fail;
+    undo_destroy(es.undo);
+    return 0;
+fail:
+    undo_destroy(es.undo);
+    return 1;
+}
+
 static int rail_deletion_keeps_references_valid(void)
 {
     EditorState es = {0};
@@ -4160,6 +4220,7 @@ int main(void)
     if (selection_structural_mutations_are_safe() != 0) return 1;
     if (checkpoint_editor_mutations_are_reversible() != 0) return 1;
     if (rail_deletion_keeps_references_valid() != 0) return 1;
+    if (float_platform_rail_switch_rechecks_its_rail() != 0) return 1;
     if (drag_round_trips_and_follows_grab_point() != 0) return 1;
     if (editor_mutations_keep_level_valid() != 0) return 1;
     if (refused_mutations_explain_why() != 0) return 1;
