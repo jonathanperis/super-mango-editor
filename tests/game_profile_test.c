@@ -11,6 +11,7 @@
 #include "core/game_ghost.h"
 #include "core/game_overlay.h"
 #include "core/game_resume.h"
+#include "core/game_timing.h"   /* GAME_FIXED_STEP */
 #include "core/game_profile.h"
 #include "shared/platform.h"  /* clock_millis, preference_path_at */
 #include "shared/serializer_io.h"
@@ -701,6 +702,11 @@ static int ghost_codec_and_paths(void)
         "time = 0.05\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\nextra = 1\n",
         "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
         "time = 0.05\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n",              /* no steps */
+        /* A time that 3 steps (0.05 s) cannot take: 0 would be unbeatable. */
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n",
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0.1\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n",
     };
     GameGhostTrack track = {0};
     char *text = malloc(GHOST_TEXT_MAX), *again = malloc(GHOST_TEXT_MAX);
@@ -715,6 +721,21 @@ static int ghost_codec_and_paths(void)
     CHECK(game_ghost_decode(&track, text) == 0 && game_ghost_encode(&track, again, GHOST_TEXT_MAX) == 0);
     CHECK(!strcmp(text, again));
     CHECK(game_ghost_encode(&track, text, 40) == -1);  /* does not fit */
+    track.time = 0.0f;  /* not the time of 3 steps */
+    CHECK(game_ghost_encode(&track, text, GHOST_TEXT_MAX) == -1);
+    track.time = 0.05f;
+    /* Five minutes of steps: the level timer's float sum ends ~0.03 s
+     * (two steps) short of 300 s, and a real run's time must still pass. */
+    {
+        GameGhostTrack longest = {.level = "levels/a.toml", .count = GHOST_MAX_STEPS};
+        longest.samples = calloc(GHOST_MAX_STEPS, sizeof(*longest.samples));
+        CHECK(longest.samples);
+        for (int i = 0; i < GHOST_MAX_STEPS; i++) longest.time += GAME_FIXED_STEP;
+        int encoded = game_ghost_encode(&longest, text, GHOST_TEXT_MAX);
+        game_ghost_track_free(&longest);
+        CHECK(encoded == 0 && game_ghost_decode(&longest, text) == 0);
+        game_ghost_track_free(&longest);
+    }
     game_ghost_track_free(&track);
     for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
         if (game_ghost_decode(&track, bad[i]) != -1 || track.samples) {

@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "game_timing.h"  /* GAME_FIXED_STEP */
 #include "tomlc17.h"
 #include "../shared/platform.h"       /* str_copy */
 #include "../shared/printf_format.h"
@@ -47,6 +48,25 @@
 #define GHOST_SAMPLE_DIGITS 10
 /* A ghost's time can be at most its steps plus a little rounding. */
 #define GHOST_TIME_MAX ((float)GHOST_MAX_STEPS / TARGET_FPS + 1.0f)
+
+/*
+ * ghost_time_matches_steps — Is `time` the time a run of `steps` steps
+ * shows?
+ *
+ * The session keeps the run with the smaller time, so a time that does not
+ * belong to its samples (a hand edit to `time = 0`) would make a ghost no
+ * real run could ever beat. The level timer starts at 0 and adds
+ * GAME_FIXED_STEP once per step, in float (game_update.c); after 18000
+ * steps that sum is about 0.03 s short of steps / 60, more than one step.
+ * So repeat the same float sum here, and accept a time within one step of
+ * it.
+ */
+static int ghost_time_matches_steps(double time, int steps)
+{
+    float expected = 0.0f;
+    for (int i = 0; i < steps; i++) expected += GAME_FIXED_STEP;
+    return fabs(time - (double)expected) <= (double)GAME_FIXED_STEP;
+}
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -167,7 +187,7 @@ int game_ghost_decode(GameGhostTrack *out, const char *text)
         } else failed = 1;  /* unknown key */
     }
     /* Samples are decoded last, once `steps` says how many to expect. */
-    if (!failed && version && seen == 63) {
+    if (!failed && version && seen == 63 && ghost_time_matches_steps(out->time, steps)) {
         out->samples = malloc((size_t)steps * sizeof(*out->samples));
         failed = !out->samples || decode_frames(frames, out, steps);
         out->count = steps;
@@ -199,7 +219,8 @@ int game_ghost_encode(const GameGhostTrack *track, char *text, size_t capacity)
     size_t used = 0;
     if (!track || !text || !capacity || !game_profile_key_valid(track->level) ||
         track->count < 1 || track->count > GHOST_MAX_STEPS || !track->samples ||
-        !isfinite(track->time) || track->time < 0.0f || track->time > GHOST_TIME_MAX) return -1;
+        !isfinite(track->time) || track->time < 0.0f || track->time > GHOST_TIME_MAX ||
+        !ghost_time_matches_steps(track->time, track->count)) return -1;
     /* The key passed game_profile_key_valid, which refuses quotes,
      * backslashes and control characters, so it needs no TOML escaping. */
     if (append(text, capacity, &used,
