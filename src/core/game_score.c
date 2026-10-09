@@ -2,6 +2,7 @@
  * game_score.c — Shared score and bonus-life helpers.
  */
 #include "game_score.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 #include <limits.h>
 #include <stdint.h>
 

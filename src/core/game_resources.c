@@ -9,6 +9,7 @@
  */
 
 #include "game_resources.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 #include <stddef.h>
 #include <stdio.h>

@@ -9,6 +9,7 @@
  */
 
 #include "level_resources.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 #include "level_loader.h"        /* level_release_platform_tiles */
 #include "../core/game_resources.h"  /* DEFAULT_FLOOR_TILE_PATH */
 #include "../shared/platform.h"  /* str_copy */

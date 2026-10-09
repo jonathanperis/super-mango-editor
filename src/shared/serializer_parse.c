@@ -16,7 +16,7 @@
 #include "serializer_types.h" /* enum validation */
 #include "printf_format.h"    /* PRINTF_FORMAT */
 #include "utf8.h"             /* utf8_valid */
-#include "../game.h"          /* MAX_* array limits */
+#include "../levels/level.h" /* LevelDef and its MAX_* array limits */
 
 /* ------------------------------------------------------------------ */
 /* Permissive legacy field readers                                      */

@@ -3,6 +3,7 @@
  */
 
 #include "game_camera.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 #include "../levels/level.h"
 #include "../levels/level_physics.h"

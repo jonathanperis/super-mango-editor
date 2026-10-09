@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 #include "../core/game_profile.h"
 
 /* Physical input bits use PLAYER_INPUT_* values plus this confirmation bit. */

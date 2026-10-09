@@ -4,6 +4,6 @@
 
 #pragma once
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 
 void game_actors_update(GameState *gs, float dt, int cam_x);

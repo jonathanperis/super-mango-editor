@@ -5,7 +5,7 @@
 #pragma once
 
 #include "level.h"
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 
 /* Apply level-specific background, floor, foreground, fog, and music assets. */
 void level_resources_apply(GameState *gs, const LevelDef *def);

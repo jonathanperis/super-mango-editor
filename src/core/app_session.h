@@ -1,6 +1,8 @@
 #pragma once
 
-#include "../game.h"
+#include "../game_assets.h"     /* GameAssets, owned here */
+#include "../game_constants.h"  /* GAME_LEVEL_PATH_MAX */
+#include "../game_fwd.h"        /* GameState, used by pointer only */
 #include "../screens/start_menu.h"
 #include "game_profile.h"
 #include "../screens/settings_menu.h"

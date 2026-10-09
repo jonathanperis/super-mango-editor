@@ -22,6 +22,7 @@
  */
 
 #include "../core/game_random.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 #include "../shared/platform.h"  /* str_copy */
 #include <stdio.h>     /* fprintf, stderr */
 #include <string.h>    /* strcmp: platform tile paths */

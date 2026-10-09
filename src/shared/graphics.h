@@ -38,6 +38,17 @@ static inline void texture_unload(Texture2D *texture)
     free(texture);
 }
 
+/*
+ * DESTROY_TEX — unload a texture slot and clear it, in one statement.
+ *
+ * texture_unload already ignores NULL; setting the slot to NULL afterwards
+ * makes a second cleanup of the same slot a harmless no-op. The resource
+ * tables in game_resources.c and the editor's texture cleanup use it.
+ * Slot owners clear pointers after unloading; borrowers never call this.
+ */
+#define DESTROY_TEX(tex) \
+    do { texture_unload(tex); (tex) = NULL; } while (0)
+
 enum { SPRITE_NORMAL = 0, SPRITE_FLIP_X = 1, SPRITE_FLIP_Y = 2 };
 
 static inline Rectangle rect_to_raylib(IntRect r)

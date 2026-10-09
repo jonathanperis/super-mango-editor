@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "levels/phase_transition.h"
+#include "game.h"  /* GameState: this file reads its fields */
 
 static int expect_int(const char *name, int actual, int expected)
 {

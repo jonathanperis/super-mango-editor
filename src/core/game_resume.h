@@ -9,7 +9,7 @@
  */
 #pragma once
 
-#include "../game.h"
+#include "../game_fwd.h"  /* GameState, used by pointer only */
 #include "game_profile.h"
 
 /* Fill resume from the running level: its profile key and content hash,

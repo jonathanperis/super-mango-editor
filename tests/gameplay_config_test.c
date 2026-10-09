@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "core/game_camera.h"
+#include "game.h"  /* GameState: this file reads its fields */
 #include "levels/level_physics.h"
 
 static int expect_float(const char *name, float actual, float expected)

@@ -3,6 +3,7 @@
  */
 
 #include "game_effects.h"
+#include "../game.h"  /* GameState: this file reads its fields */
 
 #include "fog.h"
 #include "water.h"

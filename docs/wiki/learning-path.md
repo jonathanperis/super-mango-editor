@@ -377,7 +377,8 @@ What does `free(NULL)` do? And what value does `pointer` still hold right after
 pointer that is *not* `NULL` but points at memory that was already freed:
 `free()` does not change the caller's variable, so the check passes and the
 memory is freed twice (or read after the free). Setting the pointer to `NULL`
-right after the release, as `DESTROY_TEX` and `FREE_CHUNK` in `src/game.h` do,
+right after the release, as `DESTROY_TEX` in `src/shared/graphics.h` and
+`FREE_CHUNK` in `src/shared/audio.h` do,
 makes a second cleanup call harmless. This is what lets `game_cleanup()` run
 after a half-finished `game_init()`. It only protects that one variable: any
 copy of the pointer elsewhere still dangles, which is why only the owner frees

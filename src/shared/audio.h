@@ -20,6 +20,10 @@ void audio_close(void);
  * can stay NULL; playback and unloading accept that empty slot. */
 SoundEffect *sound_load(const char *path);
 void sound_unload(SoundEffect *sound);
+/* FREE_CHUNK — unload a sound slot and clear it, so a second cleanup of the
+ * same slot does nothing (the sound twin of DESTROY_TEX in graphics.h). */
+#define FREE_CHUNK(snd) \
+    do { sound_unload(snd); (snd) = NULL; } while (0)
 /* Volumes use authored/profile units 0..128. Each play gets independent
  * alias state; it shares the sample bytes without taking ownership of them. */
 void sound_play(SoundEffect *sound, int volume);
