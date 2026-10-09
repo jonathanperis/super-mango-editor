@@ -1,6 +1,8 @@
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "collectibles/coin.h"  /* MAX_COINS */
 #include "core/app_session.h"
 #include "core/game_experiment.h"
 #include "core/game_profile.h"
@@ -393,6 +395,52 @@ fail:
     session_destroy(&session); remove(path); remove(lock_path); return 1;
 }
 
+/* Collect raylib warnings so a test can see what the session logged. */
+static char last_warning[256];
+static void capture_warning(int level, const char *text, va_list args)
+{
+    if (level == LOG_WARNING) vsnprintf(last_warning, sizeof(last_warning), text, args);
+}
+
+/*
+ * The coin cap is MAX_COINS, the most coins a level can hold, not a second
+ * literal 64. And when a finished level's result cannot be recorded (here:
+ * the profile already holds PROFILE_LEVEL_COUNT other levels) the session
+ * used to drop it silently; it now logs a warning naming the level.
+ */
+static int result_cap_and_record_failure(void)
+{
+    GameProfile profile;
+    AppSession *session = NULL;
+    game_profile_init(&profile);
+    CHECK(game_profile_record(&profile, "levels/coins.toml", 1, MAX_COINS, 1.0f) == 0);
+    CHECK(game_profile_record(&profile, "levels/coins.toml", 1, MAX_COINS + 1, 1.0f) == -1);
+    CHECK(game_profile_result(&profile, "levels/coins.toml")->best_coins == MAX_COINS);
+    game_profile_close(&profile);
+
+    AppSessionConfig config = {.level_path = "levels/00_sandbox_01.toml"};
+    session = session_create(&config);
+    CHECK(session && session->game);
+    for (int i = 0; i < PROFILE_LEVEL_COUNT; i++) {
+        char key[64];
+        snprintf(key, sizeof(key), "levels/filler_%03d.toml", i);
+        CHECK(game_profile_record(&session->profile, key, 1, 1, 1.0f) == 0);
+    }
+    last_warning[0] = '\0';
+    SetTraceLogCallback(capture_warning);
+    game_complete_level(session->game);
+    session_frame(session);
+    SetTraceLogCallback(NULL);
+    CHECK(strstr(last_warning, "levels/00_sandbox_01.toml") != NULL);
+    CHECK(strstr(last_warning, "not recorded") != NULL);
+    session_destroy(&session);
+    return 0;
+fail:
+    SetTraceLogCallback(NULL);
+    session_destroy(&session);
+    return 1;
+}
+
 int game_profile_contract_test(void)
 {
     puts("profile: codec/storage");
@@ -400,6 +448,7 @@ int game_profile_contract_test(void)
     if (legacy_level_keys_are_dropped()) return 1;
     if (level_key_boundaries()) return 1;
     if (pending_snapshot_bookkeeping()) return 1;
+    if (result_cap_and_record_failure()) return 1;
     puts("profile: settings/bindings");
     if (settings_and_bindings()) return 1;
     puts("profile: session integration");

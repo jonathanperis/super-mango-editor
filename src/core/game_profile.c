@@ -1,6 +1,7 @@
 /* Versioned player preferences/results. Persistence belongs to AppSession,
  * never to a render frame, entity, or smoke/replay run. */
 #include "game_profile.h"
+#include "../collectibles/coin.h"  /* MAX_COINS: the most coins a level holds */
 #include "../levels/level_ref.h"
 #include "../shared/platform.h"
 #include "../shared/printf_format.h"
@@ -149,7 +150,12 @@ static int bindings(toml_datum_t value, GameSettings *settings, int keyboard)
 }
 
 /* decode_result outcomes: a usable entry, a well-formed entry to drop, or a
- * malformed one that rejects the whole profile. */
+ * malformed one that rejects the whole profile.
+ *
+ * A saved coin count can never exceed MAX_COINS, the most coins one level
+ * can place. The file stores the plain number, so raising MAX_COINS keeps
+ * every existing profile readable; lowering it would reject old profiles
+ * that recorded more coins than the new limit. */
 enum { RESULT_KEEP = 0, RESULT_DROP = 1, RESULT_INVALID = -1 };
 
 /*
@@ -177,7 +183,7 @@ static int decode_result(toml_datum_t table, GameProgress *result)
             if (integer(value, &result->best_score)) return -1;
             mask |= 2;
         } else if (!strcmp(key, "coins")) {
-            if (integer(value, &result->best_coins) || result->best_coins > 64) return -1;
+            if (integer(value, &result->best_coins) || result->best_coins > MAX_COINS) return -1;
             mask |= 4;
         } else if (!strcmp(key, "time")) {
             double time = value.type == TOML_FP64 ? value.u.fp64 :
@@ -296,7 +302,7 @@ int game_profile_encode(const GameProfileData *data, char *text, size_t capacity
     for (int i = 0; i < data->count; i++) {
         const GameProgress *p = &data->levels[i];
         if (!game_profile_key_valid(p->path) || p->best_score < 0 || p->best_coins < 0 ||
-            p->best_coins > 64 || !isfinite(p->best_time) || p->best_time < 0 || p->best_time > 1e9f) return -1;
+            p->best_coins > MAX_COINS || !isfinite(p->best_time) || p->best_time < 0 || p->best_time > 1e9f) return -1;
         if (append(text, capacity, &used, "\n[[levels]]\npath = ") || quoted(text, capacity, &used, p->path) ||
             append(text, capacity, &used, "\nscore = %d\ncoins = %d\ntime = %.9g\n",
                    p->best_score, p->best_coins, (double)p->best_time)) return -1;
@@ -478,7 +484,7 @@ const GameProgress *game_profile_result(const GameProfile *profile, const char *
 
 int game_profile_record(GameProfile *profile, const char *key, int score, int coins, float elapsed)
 {
-    if (!game_profile_key_valid(key) || score < 0 || coins < 0 || coins > 64 ||
+    if (!game_profile_key_valid(key) || score < 0 || coins < 0 || coins > MAX_COINS ||
         !isfinite(elapsed) || elapsed < 0 || elapsed > 1e9f) return -1;
     int index = 0;
     while (index < profile->data.count && strcmp(profile->data.levels[index].path, key)) index++;
