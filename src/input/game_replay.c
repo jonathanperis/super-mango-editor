@@ -99,8 +99,9 @@ int game_replay_load(GameState *gs)
         return -1;
     }
     const char *dir = gs->screen.replay_dir[0] ? gs->screen.replay_dir : DEFAULT_REPLAY_DIR;
-    /* replay_dir holds at most 255 bytes, so this buffer fits any folder
-     * plus "/" and the longest script name; the check keeps that true. */
+    /* replay_dir holds at most GAME_LEVEL_PATH_MAX - 1 bytes, so this
+     * buffer fits any folder plus "/" and the longest script name; the
+     * check keeps that true. */
     char replay_path[sizeof(gs->screen.replay_dir) + 32];
     int written = snprintf(replay_path, sizeof(replay_path), "%s/%s", dir, file);
     if (written < 0 || (size_t)written >= sizeof(replay_path)) {
