@@ -85,6 +85,9 @@ Inside `player_update` the order is: climbing (returns early while on a
 climbable), gravity, horizontal motion, position integration, platform and
 float-platform landing, bridge, spike-platform top and ceiling, floor and
 bouncepad collision, world bounds, jump buffer/coyote timers, then animation.
+The floor check holds a player whose feet were already below the floor top
+inside a floor gap between that gap's edges, so they keep falling instead of
+being lifted back onto the grass.
 
 ---
 

@@ -326,6 +326,48 @@ done:
     return failed;
 }
 
+/*
+ * A player already 10 px down inside a floor gap, running right, must keep
+ * falling: the gap's sides hold them in. The floor snap used to lift anyone
+ * whose centre reached grass again, even from inside the hole.
+ */
+static int sinking_into_a_gap_cannot_steer_back_onto_the_floor(void)
+{
+    int failed = 0;
+    int gaps[] = {160};
+    Player player = {.w = 48, .h = 48};
+    player_apply_default_physics(&player);
+    player.x = 160.0f + FLOOR_GAP_W / 2.0f - player.w / 2.0f;
+    player.y = (float)FLOOR_Y + 10.0f - player.h + PLAYER_FLOOR_SINK;
+    player.vx = 100.0f;
+    player.move_dir = 1;
+    int bounce = -1, support = -1;
+    for (int step = 0; step < 30; step++) {
+        player_update(&player, GAME_FIXED_STEP, NULL, NULL, 0, NULL, 0,
+                      NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0,
+                      NULL, 0, gaps, 1, &bounce, &support, -1, 1600);
+        float centre = player.x + player.w / 2.0f;
+        CHECK(!player.on_ground);
+        CHECK(player.y + player.h - PLAYER_FLOOR_SINK > (float)FLOOR_Y + 10.0f);
+        CHECK(centre >= 160.0f && centre < 160.0f + FLOOR_GAP_W);
+    }
+
+    /* Running across the gap at floor height still reaches the far side. */
+    player = (Player){.w = 48, .h = 48};
+    player_apply_default_physics(&player);
+    player.x = 160.0f + FLOOR_GAP_W - 1.0f - player.w / 2.0f;
+    player.y = (float)FLOOR_Y - player.h + PLAYER_FLOOR_SINK;
+    player.vx = 100.0f;
+    player.move_dir = 1;
+    player_update(&player, GAME_FIXED_STEP, NULL, NULL, 0, NULL, 0,
+                  NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0,
+                  NULL, 0, gaps, 1, &bounce, &support, -1, 1600);
+    CHECK(player.on_ground);
+    CHECK(NEAR(player.y + player.h - PLAYER_FLOOR_SINK, (float)FLOOR_Y));
+done:
+    return failed;
+}
+
 static int collision_hurts_once_and_collects_coins(void)
 {
     int failed = 0;
@@ -371,6 +413,9 @@ int game_simulation_contract_test(void)
     printf("simulation: jump apex independent of frame rate %s\n", jump ? "FAIL" : "PASS");
     int tunnel = fast_fall_does_not_tunnel_through_platform();
     printf("simulation: fast fall lands on platform %s\n", tunnel ? "FAIL" : "PASS");
+    int gap_walls = sinking_into_a_gap_cannot_steer_back_onto_the_floor();
+    printf("simulation: floor gap sides hold a sinking player %s\n", gap_walls ? "FAIL" : "PASS");
+    failures += gap_walls;
     int collide = collision_hurts_once_and_collects_coins();
     printf("simulation: hazard and coin collision %s\n", collide ? "FAIL" : "PASS");
     return failures + scenario + jump + tunnel + collide;
