@@ -83,8 +83,10 @@ TEST_FLAGS_STAMP     = $(OBJDIR)/test-flags.txt
 LINK_FLAGS_STAMP     = $(OBJDIR)/link-flags.txt
 FUZZ_FLAGS_STAMP     = $(OBJDIR)/fuzz-flags.txt
 RAYLIB_OPTIONS_STAMP = $(RAYLIB_BUILD)/make-options.txt
+WEB_RAYLIB_OPTIONS_STAMP = $(WEB_RAYLIB_BUILD)/make-options.txt
 WEB_OBJDIR           = $(OBJDIR)/web
 WEB_FLAGS_STAMP      = $(WEB_OBJDIR)/build-flags.txt
+WEB_LINK_FLAGS_STAMP = $(WEB_OBJDIR)/link-flags.txt
 ifeq ($(RAYLIB_PLATFORM),memory)
 ifeq ($(OS),Windows_NT)
 PLATFORM_LIBS = -lshell32 -lole32 -lpsapi -lwinmm -lbcrypt -lm
@@ -246,6 +248,7 @@ all: $(OUTDIR) $(TARGET) ## Build: Compile the game into OUTDIR (default target)
 RAYLIB_INPUTS = vendor/raylib/manifest.json vendor/raylib/patches.json tools/build_raylib.py
 RAYLIB_OPTIONS = --platform $(RAYLIB_PLATFORM) --cc "$(CC)" --mode $(BUILD_MODE) \
                  $(if $(findstring -fsanitize,$(CFLAGS)),--sanitize,) $(if $(filter null,$(RAYLIB_AUDIO)),--null-audio,)
+WEB_RAYLIB_OPTIONS = --platform web --mode release
 RAYLIB_DONE = $(RAYLIB_BUILD)/build-done.stamp
 WEB_RAYLIB_DONE = $(WEB_RAYLIB_BUILD)/build-done.stamp
 
@@ -262,8 +265,8 @@ $(RAYLIB_DONE): $(RAYLIB_INPUTS) $(RAYLIB_OPTIONS_STAMP) $(if $(wildcard $(RAYLI
 	python3 tools/build_raylib.py --build-dir "$(RAYLIB_BUILD)" $(RAYLIB_OPTIONS) $(RAYLIB_ARCHIVE_ARG)
 	$(call mark_raylib_done,$(RAYLIB_LIB))
 
-$(WEB_RAYLIB_DONE): $(RAYLIB_INPUTS) $(WEB_FLAGS_STAMP) $(if $(wildcard $(WEB_RAYLIB_LIB)),,FORCE) | web-toolchain
-	python3 tools/build_raylib.py --build-dir "$(WEB_RAYLIB_BUILD)" --platform web --mode release $(RAYLIB_ARCHIVE_ARG)
+$(WEB_RAYLIB_DONE): $(RAYLIB_INPUTS) $(WEB_RAYLIB_OPTIONS_STAMP) $(if $(wildcard $(WEB_RAYLIB_LIB)),,FORCE) | web-toolchain
+	python3 tools/build_raylib.py --build-dir "$(WEB_RAYLIB_BUILD)" $(WEB_RAYLIB_OPTIONS) $(RAYLIB_ARCHIVE_ARG)
 	$(call mark_raylib_done,$(WEB_RAYLIB_LIB))
 
 # The libraries are made by the rules above; these empty recipes (the ";")
@@ -719,7 +722,7 @@ WEB_OBJS = $(patsubst %.c,$(WEB_OBJDIR)/%.o,$(SRCS))
 WEB_INCLUDES = -I$(WEB_RAYLIB_BUILD)/build/raylib/include $(PROJECT_INCLUDES)
 # The .js/.wasm/.data siblings are emitted with each HTML file. Listing every
 # link input lets `web` (and dist-wasm through it) skip emcc only when fresh.
-WEB_LINK_INPUTS = $(WEB_OBJS) $(WEB_RAYLIB_LIB) $(WEB_FLAGS_STAMP) \
+WEB_LINK_INPUTS = $(WEB_OBJS) $(WEB_RAYLIB_LIB) $(WEB_LINK_FLAGS_STAMP) \
                   $(wildcard web/*) $(wildcard assets/* assets/*/* assets/*/*/*) \
                   $(wildcard levels/* levels/*/*) tools/web_csp.py
 
@@ -780,14 +783,15 @@ clean: ## Other: Remove OUTDIR, OUTDIR-sanitize and DISTDIR
 # would link the old -O0 objects. A stamp file closes that gap. It holds the
 # exact settings its outputs were built with, and those outputs list it as a
 # prerequisite. Compile and link settings have separate stamps, so a link-only
-# change (a library) relinks without recompiling:
+# change (a library, an Emscripten --pre-js) relinks without recompiling:
 #
 #   build-flags.txt       game, editor and tool objects   CC CFLAGS PROJECT_INCLUDES
 #   test-flags.txt        test copies of objects          TEST_CFLAGS and per-object extras
 #   link-flags.txt        every native program            LIBS and the other link inputs
 #   fuzz-flags.txt        the fuzz replay programs        FUZZ_FLAGS (they compile and link at once)
-#   web/build-flags.txt   Web objects, pages and raylib   every WEB_* compile and link flag
-#   raylib/make-options.txt   raylib's "done" file        build_raylib.py options
+#   web/build-flags.txt   Emscripten objects              WEB_CFLAGS WEB_INCLUDES
+#   web/link-flags.txt    the two Web pages               WEB_OPT WEB_FLAGS WEB_LINK_FLAGS ...
+#   raylib*/make-options.txt  raylib's "done" file        build_raylib.py options
 #
 # Each stamp is read back while Make parses this file. Only when the text
 # differs, or the file is missing, does the stamp's rule depend on FORCE and
@@ -812,8 +816,10 @@ TEST_BUILD_FLAGS = $(call stamp_vars,CC TEST_CFLAGS PROJECT_INCLUDES \
                    $(call stamp_text,TEST_OBJ_FLAGS TEST_OBJ_INCLUDES)
 LINK_BUILD_FLAGS = $(call stamp_vars,CC CFLAGS TEST_CFLAGS LIBS EDITOR_LIBS TEST_LIBS MATH_LIBS)
 FUZZ_BUILD_FLAGS = $(call stamp_vars,CC FUZZ_FLAGS LIBS MATH_LIBS)
-WEB_BUILD_FLAGS  = $(call stamp_vars,EMSCRIPTEN_VERSION WEB_CFLAGS WEB_INCLUDES WEB_OPT \
-                     EXTRA_WEB_CFLAGS WEB_FLAGS WEB_LINK_FLAGS WEB_DEBUG_LINK_FLAGS)
+WEB_BUILD_FLAGS  = $(call stamp_vars,EMSCRIPTEN_VERSION WEB_CFLAGS WEB_INCLUDES)
+WEB_LINK_BUILD_FLAGS = $(call stamp_vars,EMSCRIPTEN_VERSION WEB_OPT EXTRA_WEB_CFLAGS WEB_FLAGS \
+                         WEB_LINK_FLAGS WEB_DEBUG_LINK_FLAGS)
+WEB_RAYLIB_BUILD_OPTIONS = $(call stamp_vars,EMSCRIPTEN_VERSION WEB_RAYLIB_OPTIONS)
 
 # $(call flag_stamp,FILE,VARIABLE): FILE holds VARIABLE's text, rewritten only
 # when that text changed.
@@ -831,6 +837,8 @@ $(eval $(call flag_stamp,$(LINK_FLAGS_STAMP),LINK_BUILD_FLAGS))
 $(eval $(call flag_stamp,$(FUZZ_FLAGS_STAMP),FUZZ_BUILD_FLAGS))
 $(eval $(call flag_stamp,$(RAYLIB_OPTIONS_STAMP),RAYLIB_OPTIONS))
 $(eval $(call flag_stamp,$(WEB_FLAGS_STAMP),WEB_BUILD_FLAGS))
+$(eval $(call flag_stamp,$(WEB_LINK_FLAGS_STAMP),WEB_LINK_BUILD_FLAGS))
+$(eval $(call flag_stamp,$(WEB_RAYLIB_OPTIONS_STAMP),WEB_RAYLIB_BUILD_OPTIONS))
 
 # FORCE has no rule and no file, so anything that depends on it always runs.
 .PHONY: FORCE
