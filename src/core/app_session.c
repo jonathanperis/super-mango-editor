@@ -362,12 +362,25 @@ static void session_save_ghost(AppSession *session, GameState *game)
 /*
  * session_load_assets — Load the shared sprites and sounds the first time a
  * game opens; later games reuse them. A failed load is undone, so the next
- * attempt (another Play) starts clean. Returns 0 when they are loaded.
+ * attempt (another Play) starts clean, and the missing file is named in
+ * session->load_error. A sprite or sound that was missing from an earlier
+ * load is tried again each time, so putting the file back fixes the next
+ * Play without restarting. No game holds a copy of the set at this point
+ * (Replay closes its game first), so filling empty slots is safe. Returns
+ * 0 when the set is loaded.
  */
 static int session_load_assets(AppSession *session)
 {
-    if (session->assets_loaded) return 0;
+    if (session->assets_loaded) {
+        game_resources_reload_missing(&session->assets);
+        return 0;
+    }
     if (game_resources_load(&session->assets) != 0) {
+        const char *missing = game_resources_missing_required(&session->assets);
+        const char *name = missing ? strrchr(missing, '/') : NULL;
+        if (missing)
+            snprintf(session->load_error, sizeof(session->load_error), "Missing file: %s",
+                     name ? name + 1 : missing);
         game_resources_unload(&session->assets);
         return -1;
     }
@@ -377,6 +390,7 @@ static int session_load_assets(AppSession *session)
 
 static GameState *session_make_game(AppSession *session, const char *path, const GameInputPhysicalState *inherited)
 {
+    session->load_error[0] = '\0';
     if (session_load_assets(session) != 0) return NULL;
     GameState *game = calloc(1, sizeof(*game));
     if (!game) return NULL;
@@ -396,6 +410,8 @@ static GameState *session_make_game(AppSession *session, const char *path, const
     game->screen.start_checkpoint = session->start.checkpoint;
     session->start.kind = LEVEL_START_DEFAULT;
     if (game_init(game)) {
+        /* Keep its reason (a missing sprite, say) for the menu. */
+        copy_path(session->load_error, sizeof(session->load_error), game->screen.load_error);
         free(game);
         return NULL;
     }
@@ -457,8 +473,10 @@ static int session_open_menu(AppSession *session)
  */
 static void session_show_load_failure(AppSession *session, const char *path)
 {
-    copy_path(session->status_message, sizeof(session->status_message), "Selected level could not be loaded");
-    TraceLog(LOG_WARNING, "%s: %s", session->status_message, path);
+    /* Name the cause when the game gave one (a missing sprite or sound). */
+    copy_path(session->status_message, sizeof(session->status_message),
+              session->load_error[0] ? session->load_error : "Selected level could not be loaded");
+    TraceLog(LOG_WARNING, "Level could not be loaded: %s (%s)", path, session->status_message);
     if (session->menu) start_menu_set_error(session->menu, session->status_message);
 }
 

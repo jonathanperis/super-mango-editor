@@ -108,6 +108,12 @@ static Texture2D **texture_slot(GameAssets *assets, size_t offset)
     return (Texture2D **)((char *)&assets->textures + offset);
 }
 
+/* texture_slot for reading only. */
+static Texture2D *const *texture_slot_read(const GameAssets *assets, size_t offset)
+{
+    return (Texture2D *const *)((const char *)&assets->textures + offset);
+}
+
 static SoundEffect **chunk_slot(GameAssets *assets, size_t offset)
 {
     return (SoundEffect **)((char *)&assets->audio + offset);
@@ -235,22 +241,44 @@ int game_resources_loaded(const GameAssets *assets)
     return assets->textures.floor_tile != NULL;
 }
 
-static int missing_level_texture(size_t offset)
+const char *game_resources_missing_required(const GameAssets *assets)
 {
-    for (int i = 0; i < ARRAY_LEN(s_optional_textures); i++) {
-        if (s_optional_textures[i].offset == offset) {
-            fprintf(stderr, "Required gameplay texture unavailable: %s\n",
-                    s_optional_textures[i].path);
-            break;
-        }
-    }
-    return -1;
+    /* game_resources_load stops at the first required sprite that fails
+     * and leaves the slots after it empty, so the first empty slot, in
+     * load order, is the file that was missing. */
+    for (int i = 0; i < ARRAY_LEN(s_boot_textures); i++)
+        if (!*texture_slot_read(assets, s_boot_textures[i].offset)) return s_boot_textures[i].path;
+    for (int i = 0; i < ARRAY_LEN(s_required_textures); i++)
+        if (!*texture_slot_read(assets, s_required_textures[i].offset)) return s_required_textures[i].path;
+    return NULL;
 }
 
-int game_resources_require_level_textures(const GameState *gs, const LevelDef *def)
+void game_resources_reload_missing(GameAssets *assets)
+{
+    /* Only the optional slots can be empty in a loaded set: a missing
+     * required sprite fails the whole load instead. */
+    for (int i = 0; i < ARRAY_LEN(s_optional_textures); i++) {
+        Texture2D **slot = texture_slot(assets, s_optional_textures[i].offset);
+        if (!*slot) *slot = load_optional_texture(s_optional_textures[i].path, s_optional_textures[i].label);
+    }
+    for (int i = 0; i < ARRAY_LEN(s_optional_chunks); i++) {
+        SoundEffect **slot = chunk_slot(assets, s_optional_chunks[i].offset);
+        if (!*slot) *slot = load_optional_chunk(s_optional_chunks[i].path, s_optional_chunks[i].label);
+    }
+}
+
+/* The file of the optional texture stored at offset. */
+static const char *optional_texture_path(size_t offset)
+{
+    for (int i = 0; i < ARRAY_LEN(s_optional_textures); i++)
+        if (s_optional_textures[i].offset == offset) return s_optional_textures[i].path;
+    return "an unknown sprite";
+}
+
+const char *game_resources_missing_level_texture(const GameAssets *assets, const LevelDef *def)
 {
 #define REQUIRE(member, used) \
-    do { if ((used) && !gs->assets.textures.member) return missing_level_texture(TEX_FIELD(member)); } while (0)
+    do { if ((used) && !assets->textures.member) return optional_texture_path(TEX_FIELD(member)); } while (0)
     REQUIRE(last_star, 1);
     REQUIRE(star_yellow, 1); /* Also used by the HUD. */
     REQUIRE(star_green, def->star_green_count);
@@ -275,5 +303,13 @@ int game_resources_require_level_textures(const GameState *gs, const LevelDef *d
         REQUIRE(vine_brown, def->vines[i].vine_type != 0);
     }
 #undef REQUIRE
-    return 0;
+    return NULL;
+}
+
+int game_resources_require_level_textures(const GameState *gs, const LevelDef *def)
+{
+    const char *missing = game_resources_missing_level_texture(&gs->assets, def);
+    if (!missing) return 0;
+    fprintf(stderr, "Required gameplay texture unavailable: %s\n", missing);
+    return -1;
 }
