@@ -162,8 +162,10 @@ void game_checkpoint_update(GameState *gs)
     if (!gs) return;
     def = (const LevelDef *)gs->runtime.current_level;
 
+    /* Levels with authored placements use only those, and game_update_active
+     * already sampled them this step (game_checkpoint_update_authored, before
+     * floor-gap damage), so there is nothing left to do here. */
     if (def && def->checkpoint_count > 0) {
-        game_checkpoint_update_authored(gs);
         return;
     }
 
