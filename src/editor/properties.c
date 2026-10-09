@@ -16,6 +16,7 @@
  */
 
 #include <float.h>      /* FLT_MAX for one-sided field limits    */
+#include <limits.h>     /* INT_MIN, INT_MAX for unlimited int fields */
 #include <stdio.h>      /* snprintf for header label formatting */
 #include <string.h>     /* strrchr for filename extraction       */
 
@@ -24,6 +25,7 @@
 #include "editor_undo_apply.h" /* committed property/config command tracking */
 #include "editor_files.h"  /* editor_path_for_display for recent entries   */
 #include "entity_meta.h" /* editor_entity_type_name/is_singleton             */
+#include "tools.h"       /* editor_set_float_platform_mode                    */
 #include "../shared/ui.h" /* ui_panel, ui_label, ui_separator, ui_float_field,
                            ui_int_field, ui_dropdown                         */
 #include "../levels/level.h" /* LevelDef, all *Placement structs            */
@@ -138,12 +140,10 @@ static const char *vine_type_opts[] = { "Green", "Brown" };
  *                 most JUMP_VY (player.h; negative is up).
  *   rail speed  — spike blocks and rail-mode float platforms move along
  *                 their rail at more than 0 and at most MAX_RAIL_SPEED
- *                 tiles/s (rail.h); RAIL_SPEED_MIN stands in for "more
- *                 than 0".
+ *                 tiles/s (rail.h); RAIL_SPEED_MIN (tools.h) stands in
+ *                 for "more than 0".
  */
 #define BOUNCE_LAUNCH_VY_MAX  JUMP_VY
-#define RAIL_SPEED_MIN        0.1f
-#define RAIL_SPEED_DEFAULT    3.0f   /* same as a newly placed spike block */
 
 /*
  * option_index — Position of value in a dropdown's paths, or -1.
@@ -864,12 +864,10 @@ static void draw_float_platform_properties(EditorState *es, int y)
     if (ui_dropdown(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 0),
                     FIELD_X, y, FIELD_W,
                     fplat_mode_opts, 3, &mode_sel)) {
-        p->mode = (FloatPlatformMode)mode_sel;
-        /* Static and crumbling platforms are placed with speed 0, which a
-         * rail rider may not have; give it a speed it can save with. */
-        if (p->mode == FLOAT_PLATFORM_RAIL &&
-            !(p->speed >= RAIL_SPEED_MIN && p->speed <= MAX_RAIL_SPEED))
-            p->speed = RAIL_SPEED_DEFAULT;
+        /* The switch to Rail re-checks the stored rail (see tools.c).  A
+         * refused switch changes nothing, so the commit records nothing. */
+        (void)editor_set_float_platform_mode(es, es->selection.index,
+                                             (FloatPlatformMode)mode_sel);
         editor_commit_change(es);
     }
     y += ROW_H;
@@ -893,8 +891,13 @@ static void draw_float_platform_properties(EditorState *es, int y)
     y += ROW_H;
 
     ui_label(&es->ui, CONTENT_X, y, "rail_index:");
-    if (ui_int_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 4),
-                     FIELD_X, y, FIELD_W, &p->rail_index))
+    /* A rail rider's index must name an existing rail; other modes ignore
+     * it, and the switch to Rail checks it then. */
+    if (ui_int_field_limited(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 4),
+                             FIELD_X, y, FIELD_W, &p->rail_index,
+                             p->mode == FLOAT_PLATFORM_RAIL ? 0 : INT_MIN,
+                             p->mode == FLOAT_PLATFORM_RAIL && es->level.rail_count > 0
+                                 ? es->level.rail_count - 1 : INT_MAX, 1))
         editor_commit_change(es);
     y += ROW_H;
 
