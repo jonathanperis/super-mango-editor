@@ -181,9 +181,10 @@ TEST_GAME_INPUT_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/game_input.o
 TEST_WEB_INPUT_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/game_web_input.o
 TEST_BINDINGS_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/game_bindings.o
 TEST_SETTINGS_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/screens/settings_menu.o
-# These two need no test flags, so tests link the game's own objects.
+# These need no test flags, so tests link the game's own objects.
 TEST_GAME_TERMINAL_OBJ = $(OBJDIR)/src/core/game_terminal.o
 TEST_GAME_RANDOM_OBJ = $(OBJDIR)/src/core/game_random.o
+TEST_GAME_GHOST_OBJ = $(OBJDIR)/src/core/game_ghost.o
 TEST_GAME_CHECKPOINT_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/core/game_checkpoint.o
 TEST_HUD_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/screens/hud.o
 TEST_EDITOR_UI_OBJ = $(TEST_OBJDIR)/$(SHARED_DIR)/ui.o
@@ -520,6 +521,7 @@ FUZZ_FLAGS = -std=c11 -g -O1 -Wall -Wextra -Wpedantic -I$(SRCDIR) -I$(VENDOR_DIR
 FUZZ_LEVEL_SRCS = tests/fuzz_level_parse.c $(wildcard $(SHARED_DIR)/serializer*.c) \
                   src/levels/level_validate.c src/levels/level_ref.c $(VENDOR_DIR)/tomlc17.c
 FUZZ_PROFILE_SRCS = tests/fuzz_profile_decode.c src/core/game_profile.c \
+                    src/core/game_ghost.c src/core/game_ghost_file.c \
                     src/input/game_bindings.c src/input/input_backend.c \
                     src/levels/level_ref.c src/shared/serializer_io.c \
                     src/shared/platform.c $(VENDOR_DIR)/tomlc17.c
@@ -629,7 +631,8 @@ $(OUTDIR)/editor-validation-test: $(TEST_SOURCE_DIR)/editor_validation_test.o $(
 $(OUTDIR)/editor-ui-test: $(TEST_SOURCE_DIR)/editor_ui_test.o $(TEST_EDITOR_OBJS) $(TEST_EDITOR_FRAME_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(EDITOR_LIBS)
 
-$(OUTDIR)/gameplay-damage-test: $(TEST_SOURCE_DIR)/gameplay_damage_test.o $(TEST_COLLISION_DAMAGE_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_CHECKPOINT_OBJ) $(TEST_HUD_OBJ)
+$(OUTDIR)/gameplay-damage-test: $(TEST_SOURCE_DIR)/gameplay_damage_test.o $(TEST_COLLISION_DAMAGE_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_CHECKPOINT_OBJ) $(TEST_HUD_OBJ) \
+		$(TEST_GAME_GHOST_OBJ)
 	$(CC) $(TEST_CFLAGS) -I$(SRCDIR) -I$(VENDOR_DIR) -o $@ $^ $(LIBS)
 
 $(OUTDIR)/gameplay-config-test: $(TEST_SOURCE_DIR)/gameplay_config_test.o $(TEST_GAME_CAMERA_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)

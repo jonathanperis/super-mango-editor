@@ -22,6 +22,7 @@ code-scanning alert (#308, #309). Goal was to resolve both codebase audit rounds
 | Pages publishing | Shipped | `pages-build` → `pages-deploy` in `build.yml` |
 | Browser touch controls | Shipped | `web/touch-controls.js`; `tests/touch_controls_test.cjs` |
 | Mid-level Continue | Shipped | `[resume]` Continue point in the profile; menu **Continue** / `--continue`; `continue_round_trip` and `continue_point_must_fit_the_level` tests |
+| Time-trial ghost | Shipped | best-run ghost per level, Settings toggle; `ghost_records_and_races_the_best_run`, `ghost_session_keeps_the_fastest_run`, ghost codec fuzz seeds and the browser storage contract |
 | Web build | Shipped target | `make web` |
 
 ## Near-Term Work Groups

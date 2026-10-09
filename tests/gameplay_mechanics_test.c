@@ -22,6 +22,7 @@
 #include "core/game_experiment.h"
 #include "core/game_overlay.h"
 #include "core/game_profile.h"
+#include "core/game_ghost.h"
 #include "core/game_resume.h"
 #include "effects/parallax.h"
 #include "render/game_render.h"
@@ -920,6 +921,93 @@ done:
     return failed;
 }
 
+/*
+ * Time trial: game_frame records one sample per fixed step, the finished
+ * run becomes a track, and racing it shows sample n - 1 after n steps.
+ * A continued run, Retry and the length cap all behave as documented, and
+ * frames with the ghost drawn (also in high contrast and reduced motion)
+ * render through the production path.
+ */
+static int ghost_records_and_races_the_best_run(void)
+{
+    int failed = 0;
+    GameState gs;
+    static GameProfile profile;
+    GameGhostTrack run = {0}, copy = {0};
+    char *text = malloc(GHOST_TEXT_MAX);
+    game_profile_init(&profile);
+    CHECK(text && mechanics_open_level(&gs, CLIMBING_LEVEL, 0) == 0);
+    gs.profile = &profile;
+    snprintf(gs.profile_level_key, sizeof(gs.profile_level_key), "levels/ghost_test.toml");
+    CHECK(game_ghost_begin(&gs) == 0 && gs.ghost->recording && gs.ghost->step == 0);
+    CHECK(game_ghost_current(&gs) == NULL);  /* no best run yet */
+
+    /* Run right for 40 whole frames: one step and one sample each. */
+    gs.replay_held_mask = PLAYER_INPUT_RIGHT;
+    CHECK(mechanics_frames(&gs, 40) == 40);
+    gs.replay_held_mask = 0;
+    CHECK(gs.ghost->step == 40 && gs.ghost->run_count == 40);
+    const GhostSample *last = &gs.ghost->run[39];
+    CHECK((int)last->x - GHOST_COORD_OFFSET == (int)gs.player.x);
+    CHECK((int)last->y - GHOST_COORD_OFFSET == (int)gs.player.y);
+    CHECK(!(last->cell & GHOST_CELL_FACING_LEFT) && gs.ghost->run[0].x < last->x);
+    CHECK((last->cell & (GHOST_CELL_FACING_LEFT - 1)) ==
+          (gs.player.frame.y / GHOST_SHEET_FRAME) * GHOST_SHEET_COLS + gs.player.frame.x / GHOST_SHEET_FRAME);
+
+    /* Finish: the recording becomes a track bound to this level file. */
+    game_complete_level(&gs);
+    CHECK(game_ghost_take_run(&gs, &run) == 0 && run.count == 40);
+    CHECK(run.time == gs.completion.elapsed && run.time > 0.6f && run.level_hash == gs.source_level_hash);
+    CHECK(!strcmp(run.level, "levels/ghost_test.toml"));
+
+    /* The text format round-trips every sample. */
+    CHECK(game_ghost_encode(&run, text, GHOST_TEXT_MAX) == 0 && game_ghost_decode(&copy, text) == 0);
+    CHECK(copy.count == 40 && copy.time == run.time && copy.level_hash == run.level_hash);
+    for (int i = 0; i < 40; i++)
+        CHECK(copy.samples[i].x == run.samples[i].x && copy.samples[i].y == run.samples[i].y &&
+              copy.samples[i].cell == run.samples[i].cell);
+
+    /* Retry: a fresh attempt races the run just made. */
+    gs.completion.complete = 0;
+    gs.game_over = 1;
+    game_restart_after_game_over(&gs);
+    CHECK(gs.ghost->step == 0 && gs.ghost->run_count == 0 && gs.ghost->recording);
+    game_ghost_set_best(&gs, &run);
+    CHECK(run.samples == NULL && gs.ghost->best.count == 40);
+    CHECK(game_ghost_current(&gs) == &gs.ghost->best.samples[0]);
+    CHECK(mechanics_frames(&gs, 10) == 10);
+    CHECK(game_ghost_current(&gs) == &gs.ghost->best.samples[9]);
+    profile.data.settings.ghost = 0;
+    CHECK(game_ghost_current(&gs) == NULL);  /* Ghost: Off */
+    profile.data.settings.ghost = 1;
+    /* High contrast and reduced motion draw it their own way. */
+    profile.data.settings.high_contrast = profile.data.settings.reduced_motion = 1;
+    CHECK(mechanics_frames(&gs, 2) == 2);
+    profile.data.settings.high_contrast = profile.data.settings.reduced_motion = 0;
+    gs.ghost->step = 41;
+    CHECK(game_ghost_current(&gs) == NULL);  /* the best run already finished */
+
+    /* A continued run is not a whole run: it stops recording. */
+    gs.resumed = 1;
+    CHECK(mechanics_frames(&gs, 1) == 1 && !gs.ghost->recording);
+    game_complete_level(&gs);
+    CHECK(game_ghost_take_run(&gs, &run) == -1);
+    gs.completion.complete = 0;
+
+    /* Past GHOST_MAX_STEPS the recording stops rather than grow. */
+    gs.resumed = 0;
+    game_ghost_restart(&gs);
+    gs.ghost->run_count = GHOST_MAX_STEPS;
+    game_ghost_step(&gs);
+    CHECK(!gs.ghost->recording && gs.ghost->run_count == GHOST_MAX_STEPS);
+done:
+    game_ghost_track_free(&run);
+    game_ghost_track_free(&copy);
+    free(text);
+    game_cleanup(&gs);
+    return failed;
+}
+
 /* ------------------------------------------------------------------ */
 /* Debug overlay                                                       */
 /* ------------------------------------------------------------------ */
@@ -1102,6 +1190,7 @@ int main(void)
         CASE(camera_jumps_to_the_respawn_point),
         CASE(level_start_shows_the_start_at_once),
         CASE(continue_point_must_fit_the_level),
+        CASE(ghost_records_and_races_the_best_run),
         CASE(debug_log_is_a_bounded_ring),
         CASE(parallax_scrolls_and_wraps),
         CASE(every_overlay_state_renders),

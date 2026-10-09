@@ -10,6 +10,7 @@
 #include "../game.h"
 
 #include "game_experiment.h"
+#include "game_ghost.h"
 #include "game_overlay.h"
 #include "game_timing.h"
 #include "game_update.h"
@@ -57,6 +58,9 @@ int game_frame(GameState *gs)
         float step_dt = game_experiment_dt(gs, GAME_FIXED_STEP);
         if (step_dt <= 0.0f) break;
         cam_x = game_update_active(gs, step_dt, cam_x);
+        /* Time trial: record where Mango is after this step and move the
+         * ghost of the best run on by one step (game_ghost.c). */
+        game_ghost_step(gs);
         /* Completion, game over or a route stops the remaining steps. */
         if (game_simulation_blocked(gs)) break;
     }

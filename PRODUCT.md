@@ -58,7 +58,7 @@ Source-backed facts for design and copy:
 - Gameplay systems: one-way platforms, floating platforms, crumble bridges, floor gaps, animated water/lava, authored checkpoints, bouncepads, vines, ladders, ropes, coins, stars, hearts, lives, score, pause, game over, completion flow.
 - Enemy set: spiders, jumping spiders, birds, faster birds, fish, faster fish.
 - Hazard set: spike rows, spike blocks, spike platforms, circular saws, axe traps, blue flames, fire flames.
-- Visual systems: parallax backgrounds, 32 render layers, scrolling camera, fog overlays, HUD, debug overlay.
+- Visual systems: parallax backgrounds, 33 render layers, scrolling camera, fog overlays, HUD, debug overlay.
 - Level editor: standalone raylib editor with canvas, checkpoint-aware palette and markers, select/place/delete tools, properties inspector, level config, undo/redo, recent files, autosave, validation, TOML save/load, and play-test integration.
 - Controls: the site's control strip shows WASD or arrows to move and Space to jump (W/S climb); on-screen touch buttons sit below the browser canvas. Docs also describe gamepad hot-plug support and F1 remapping.
 - Authors: Jonathan Peris and Fernando Santos.

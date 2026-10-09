@@ -60,7 +60,12 @@ that origin can read or write the game's storage. Without a custom domain this
 cannot be isolated, so the game treats stored values as untrusted input:
 
 - Keys are prefixed: `super-mango-profile-v2` (with read-only fallback to
-  `super-mango-profile-v1`) in `localStorage`. The game no longer uses
+  `super-mango-profile-v1`) and one `super-mango-ghost-v1:<level path>` entry
+  per level with a time-trial ghost, all in `localStorage`. A ghost holds only
+  positions and sprite frames; the browser bridge rejects text with NUL or over
+  256 KB, `game_ghost_decode()` rejects any malformed field or sample count, and a
+  ghost whose level hash does not match the loaded level is ignored. A full or
+  denied storage only means the ghost is not saved. The game no longer uses
   `sessionStorage`: Replay restarts the level inside the running page, so the
   host pages read no boot intent (`tools/check_web_boot_contract.py` fails if
   one reappears).
