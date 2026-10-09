@@ -85,7 +85,7 @@ Before creating a release, confirm checks for the intended source commit are gre
 
 - Build & Release, including the non-gating `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)`, `Desktop backend (Windows x86_64 Mesa)` and `Coverage (Linux x86_64)` jobs
 - CodeQL (`Analyze (c-cpp)`, `Analyze (actions)`, `Analyze (python)`, `Analyze (javascript-typescript)`)
-- Docs (runs on every `main` push; PRs run it only for docs-related paths, while Build & Release's `Docs drift` job always runs)
+- Docs (runs on pull requests that touch docs-related paths, weekly and on demand, never on `main` pushes; Build & Release's `Docs drift` job always runs, and on `main` its `Pages build` job lints, builds and checks the site)
 - Pages build and Pages deploy (main pushes and manual runs on main)
 
 > **Required checks:** as of 2026-10-07 the `main` branch ruleset requires
