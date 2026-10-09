@@ -146,10 +146,13 @@ redraws. The accumulator restarts half a step full after pauses and loads, which
 absorbs sub-millisecond vsync jitter. Frame time is clamped to 0.25 s and at most
 5 steps run per frame; excess time is dropped (below 12 FPS the game slows down
 instead of spiralling). Smoke and scripted replays feed exactly one step per
-frame regardless of the wall clock. Experiment captures (`format_version = 2`)
+frame regardless of the wall clock. Experiment captures (`format_version = 3`)
 store one row per fixed step, `[input bits, physics values...]`, with no
 duration column; a `format_version = 1` capture from the variable-timestep
-engine is rejected with a request to record it again. Completion, game over or
+engine, or a `format_version = 2` one from before the camera snapped to the
+level start and the respawn point (waiting spike blocks start when the camera
+reveals them, so they could start on other steps), is rejected with a request
+to record it again. Completion, game over or
 a route stops the remaining steps of that frame. The debug inspector's freeze,
 single-step and slow-motion keys ([Controls](../controls/#debug-inspector-keys))
 only change how much real time reaches the accumulator. They never override the
