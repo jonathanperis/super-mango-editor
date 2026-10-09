@@ -58,11 +58,19 @@ static int confirm_held(const StartMenu *menu)
     return ((state.keyboard_mask | state.controller_mask) & GAME_INPUT_CONFIRM) != 0;
 }
 
+static const CampaignLevel *selected_entry(const StartMenu *menu)
+{
+    return &menu->catalog->levels[menu->selected_level];
+}
+
 static void play(StartMenu *menu)
 {
     /* A confirm carried from a prior screen must be released before this
-     * menu can act on another press. Sound playback accepts a missing slot. */
+     * menu can act on another press. Sound playback accepts a missing slot.
+     * An unavailable level is listed so the player can see it is broken,
+     * but it cannot start; the menu already shows why. */
     if (menu->route != MENU_ROUTE_NONE) return;
+    if (!selected_entry(menu)->available) return;
     if (menu->confirm_release_required && confirm_held(menu)) return;
     menu->confirm_release_required = 0;
     sound_play(menu->snd_confirm, 128);
@@ -78,7 +86,9 @@ int start_menu_init(StartMenu *menu)
     if (!menu->font) return -1;
     menu->logo_tex = texture_load("assets/sprites/screens/start_menu_logo.png");
     menu->snd_confirm = sound_load("assets/sounds/screens/confirm_ui.wav");
-    select_level(menu, 0);
+    /* Start on the first playable entry; a loaded catalog always has one. */
+    int first = campaign_first_available(menu->catalog);
+    select_level(menu, first >= 0 ? first : 0);
     return 0;
 }
 
@@ -150,19 +160,28 @@ int start_menu_frame(StartMenu *menu)
     IntRect logo = {(MENU_GAME_W - LOGO_DISPLAY_W) / 2, 20, LOGO_DISPLAY_W, LOGO_DISPLAY_H};
     sprite_draw(menu->logo_tex, NULL, &logo, 0, SPRITE_NORMAL, WHITE);
     Vector2 mouse = input_mouse();
+    const CampaignLevel *entry = selected_entry(menu);
     int hovering = point_in_rect((int)mouse.x,(int)mouse.y,BTN_X,BTN_Y,BTN_W,BTN_H);
-    Color color = hovering ? (Color){74,144,217,255} : (Color){77,77,77,255};
+    /* A disabled Play button is darker and never highlights on hover. */
+    Color color = !entry->available ? (Color){45,45,45,255} :
+                  hovering ? (Color){74,144,217,255} : (Color){77,77,77,255};
+    Color red = {220,120,120,255};
     DrawRectangle(BTN_X, BTN_Y, BTN_W, BTN_H, color);
     DrawRectangleLines(BTN_X, BTN_Y, BTN_W, BTN_H, (Color){224, 224, 224, 255});
-    centered(menu->font, "Play", BTN_X + BTN_W/2, BTN_Y + (BTN_H-TEXT_FONT_SIZE)/2, WHITE);
+    centered(menu->font, "Play", BTN_X + BTN_W/2, BTN_Y + (BTN_H-TEXT_FONT_SIZE)/2,
+                       entry->available ? WHITE : (Color){110,110,110,255});
     char text[160];
     Color grey = {120,120,120,255};
-    snprintf(text,sizeof(text),"Level: < %s >",menu->catalog->levels[menu->selected_level].display_name);
-    centered(menu->font,text,MENU_GAME_W/2,214,grey);
+    snprintf(text,sizeof(text),"Level: < %s >",entry->display_name);
+    centered(menu->font,text,MENU_GAME_W/2,214,entry->available ? grey : (Color){80,80,80,255});
     if (menu->error_message[0])
-        centered(menu->font, menu->error_message, MENU_GAME_W/2, 232, (Color){220,120,120,255});
+        centered(menu->font, menu->error_message, MENU_GAME_W/2, 232, red);
+    else if (!entry->available) {
+        snprintf(text, sizeof(text), "Unavailable: %s", entry->problem);
+        centered(menu->font, text, MENU_GAME_W/2, 232, red);
+    }
     const GameProgress *best = game_profile_result(menu->profile,menu->selected_level_path);
-    if (best && !menu->error_message[0]) {
+    if (best && entry->available && !menu->error_message[0]) {
         snprintf(text, sizeof(text), "Best: %d pts / %.2fs / %d coins",
                  best->best_score, best->best_time, best->best_coins);
         centered(menu->font,text,MENU_GAME_W/2,232,grey);

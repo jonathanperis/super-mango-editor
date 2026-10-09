@@ -1,0 +1,8 @@
+# One listed file is missing: only that entry becomes unavailable.
+format_version = 1
+levels = [
+    "levels/zz_missing_campaign_level.toml",
+    "levels/00_sandbox_01.toml",
+    "levels/01_lugio_01.toml",
+    "levels/02_lugio_02.toml",
+]

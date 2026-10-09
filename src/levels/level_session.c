@@ -18,7 +18,9 @@
 #include "../core/game_completion.h"
 #include "../core/game_resources.h"
 #include "../core/game_experiment.h"
+#include "../shared/platform.h"  /* str_copy */
 #include "../shared/serializer.h"
+#include "../shared/serializer_io.h" /* serializer_file_exists_utf8 */
 #include "../../vendor/tomlc17/tomlc17.h"
 
 static int campaign_key_matches(const char *supplied, int supplied_len,
@@ -166,6 +168,46 @@ static toml_datum_t campaign_manifest_get_exact(toml_datum_t table,
     return missing;
 }
 
+/* Record why an entry cannot be played; the menu shows this text. */
+static void campaign_mark_unavailable(CampaignLevel *entry, const char *problem)
+{
+    entry->available = 0;
+    str_copy(entry->problem, problem, sizeof(entry->problem));
+    fprintf(stderr, "campaign: '%s' unavailable: %s\n", entry->path, problem);
+}
+
+/*
+ * campaign_load_entry — Load one listed level file into its catalog entry.
+ *
+ * entry->path is already a safe levels/NAME.toml string. Failing here makes
+ * only this entry unavailable; its display name then comes from the file
+ * name, because the level's own name could not be read.
+ */
+static void campaign_load_entry(CampaignLevel *entry)
+{
+    char canonical_path[4096];
+
+    entry->available = 1;
+    entry->problem[0] = '\0';
+    level_def_init_defaults(&entry->level);
+    /* realpath() fails for a missing file, but Windows (GetFullPathNameW)
+     * and the browser build only tidy the path without looking at the disk,
+     * so the file is checked separately to give the same reason everywhere. */
+    if (campaign_canonical_path(entry->path, strlen(entry->path),
+                                canonical_path, sizeof(canonical_path)) != 0 ||
+        !serializer_file_exists_utf8(canonical_path))
+        campaign_mark_unavailable(entry, "level file not found");
+    else if (level_load_toml(canonical_path, &entry->level) != 0) {
+        level_def_init_defaults(&entry->level);
+        campaign_mark_unavailable(entry, "level file is invalid");
+    }
+    campaign_derive_display_name(entry);
+    if (!campaign_has_visible_text(entry->display_name, sizeof(entry->display_name))) {
+        str_copy(entry->display_name, entry->path, sizeof(entry->display_name));
+        if (entry->available) campaign_mark_unavailable(entry, "level has no display name");
+    }
+}
+
 /*
  * campaign_manifest_load_entries — Parse a campaign manifest into staged.
  *
@@ -173,7 +215,8 @@ static toml_datum_t campaign_manifest_get_exact(toml_datum_t table,
  * parse, root keys, version, the level list, then each level path and the
  * level file it names. Returns 0 with staged filled in, or -1 after printing
  * why; on failure the caller discards staged, so a bad manifest never
- * replaces a working campaign.
+ * replaces a working campaign. A broken *level file* is not a broken
+ * manifest: campaign_load_entry marks only that entry unavailable.
  */
 static int campaign_manifest_load_entries(const char *manifest_path,
                                           CampaignCatalog *staged)
@@ -243,7 +286,6 @@ static int campaign_manifest_load_entries(const char *manifest_path,
 
     for (size_t i = 0; i < staged->count; i++) {
         toml_datum_t item = levels.u.arr.elem[i];
-        char canonical_path[4096];
 
         /* 5a. Each entry is a safe levels/NAME.toml path, listed once. */
         if (item.type != TOML_STRING || !item.u.str.ptr || item.u.str.len < 0 ||
@@ -265,35 +307,17 @@ static int campaign_manifest_load_entries(const char *manifest_path,
                 goto done;
             }
         }
-        /* 5b. Resolve it on disk, keep the manifest spelling, and load the
-         *     level fully now so a broken entry rejects the whole catalog
-         *     (the active catalog is only replaced after every entry loads). */
-        if (campaign_canonical_path(item.u.str.ptr, (size_t)item.u.str.len,
-                                    canonical_path, sizeof(canonical_path)) != 0) {
-            fprintf(stderr, "campaign: cannot resolve manifest level '%s'\n",
-                    item.u.str.ptr);
-            goto done;
-        }
-
+        /* 5b. Keep the manifest spelling, then resolve and load the level
+         *     file. A file that is missing or invalid is the entry's own
+         *     problem: it stays listed, unavailable, and the rest of the
+         *     campaign remains playable. */
         if (campaign_copy_exact(staged->levels[i].path,
                                 sizeof(staged->levels[i].path),
                                 item.u.str.ptr, (size_t)item.u.str.len) != 0) {
             fprintf(stderr, "campaign: manifest level path copy failed\n");
             goto done;
         }
-        level_def_init_defaults(&staged->levels[i].level);
-        if (level_load_toml(canonical_path, &staged->levels[i].level) != 0) {
-            fprintf(stderr, "campaign: invalid manifest level '%s'\n",
-                    item.u.str.ptr);
-            goto done;
-        }
-        campaign_derive_display_name(&staged->levels[i]);
-        if (!campaign_has_visible_text(staged->levels[i].display_name,
-                                       sizeof(staged->levels[i].display_name))) {
-            fprintf(stderr, "campaign: level '%s' has no display name\n",
-                    item.u.str.ptr);
-            goto done;
-        }
+        campaign_load_entry(&staged->levels[i]);
     }
 
     result = 0;
@@ -305,27 +329,47 @@ done:
     return result;
 }
 
-static int campaign_validate_chain(const CampaignCatalog *catalog)
+/*
+ * campaign_check_chain — Each playable level must lead to the next entry.
+ *
+ * Completing level i offers "Next Level", which loads its next_phase, so
+ * that must name entry i+1 (and the last entry must have none). A level
+ * that breaks the order is marked unavailable rather than rejecting the
+ * whole campaign. The comparison uses paths only, so a level before an
+ * unavailable entry stays playable; its Next Level reports the failure.
+ */
+static void campaign_check_chain(CampaignCatalog *catalog)
 {
     for (size_t i = 0; i < catalog->count; i++) {
-        const LevelDef *level = &catalog->levels[i].level;
+        CampaignLevel *entry = &catalog->levels[i];
+        const LevelDef *level = &entry->level;
 
+        if (!entry->available) continue;
         if (i + 1 < catalog->count) {
+            /* Same spelling also counts: the next file may be missing, and
+             * then it cannot be resolved for the on-disk comparison. */
+            const char *next = catalog->levels[i + 1].path;
             if (level->next_phase[0] == '\0' ||
-                !campaign_paths_equal(level->next_phase,
-                                      catalog->levels[i + 1].path)) {
+                (strcmp(level->next_phase, next) != 0 &&
+                 !campaign_paths_equal(level->next_phase, next))) {
                 fprintf(stderr, "campaign: '%s' next_phase must be '%s'\n",
-                        catalog->levels[i].path,
-                        catalog->levels[i + 1].path);
-                return -1;
+                        entry->path, catalog->levels[i + 1].path);
+                campaign_mark_unavailable(entry, "next_phase is out of campaign order");
             }
         } else if (level->next_phase[0] != '\0') {
             fprintf(stderr, "campaign: final level '%s' must not have next_phase\n",
-                    catalog->levels[i].path);
-            return -1;
+                    entry->path);
+            campaign_mark_unavailable(entry, "final level has a next_phase");
         }
     }
-    return 0;
+}
+
+int campaign_first_available(const CampaignCatalog *catalog)
+{
+    if (!catalog) return -1;
+    for (size_t i = 0; i < catalog->count; i++)
+        if (catalog->levels[i].available) return (int)i;
+    return -1;
 }
 
 int campaign_catalog_load(const char *manifest_path, CampaignCatalog *catalog)
@@ -333,8 +377,14 @@ int campaign_catalog_load(const char *manifest_path, CampaignCatalog *catalog)
     CampaignCatalog staged = {0};
 
     if (!manifest_path || !catalog) return -1;
-    if (campaign_manifest_load_entries(manifest_path, &staged) != 0 ||
-        campaign_validate_chain(&staged) != 0) {
+    if (campaign_manifest_load_entries(manifest_path, &staged) != 0) {
+        campaign_catalog_cleanup(&staged);
+        return -1;
+    }
+    campaign_check_chain(&staged);
+    /* A menu with nothing to play is not a usable campaign. */
+    if (campaign_first_available(&staged) < 0) {
+        fprintf(stderr, "campaign: no playable level in '%s'\n", manifest_path);
         campaign_catalog_cleanup(&staged);
         return -1;
     }

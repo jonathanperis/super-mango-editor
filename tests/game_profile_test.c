@@ -372,6 +372,13 @@ static int persistent_session(void)
     CHECK(session && session->game && session->profile.data.settings.muted==1);
     CHECK(!strcmp(session->game->profile_level_key,"levels/00_sandbox_01.toml"));
     CHECK(session->profile.data.count==1);
+    /* A remembered stage that no longer loads used to end the program;
+     * --continue now falls back to the level selector. */
+    game_profile_select(&session->profile, "levels/zz_removed_stage.toml");
+    session_destroy(&session);
+    puts("profile session: continue to a removed stage");
+    session=session_create(&config);
+    CHECK(session && !session->game && session->menu && session->screen==APP_SCREEN_MENU);
     session_destroy(&session);
     config.level_path="levels/00_sandbox_01.toml"; config.smoke_test_frames=1;
     session=session_create(&config);

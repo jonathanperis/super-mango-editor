@@ -240,7 +240,8 @@ static int session_open_menu(AppSession *session)
     session->menu->profile = &session->profile;
     session->menu->settings_menu = &session->settings;
     for (size_t i = 0; i < session->catalog.count; i++) {
-        if (!strcmp(session->catalog.levels[i].path, session->profile.data.last_level)) {
+        if (session->catalog.levels[i].available &&
+            !strcmp(session->catalog.levels[i].path, session->profile.data.last_level)) {
             session->menu->selected_level = (int)i;
             copy_path(session->menu->selected_level_path, sizeof(session->menu->selected_level_path), session->profile.data.last_level);
             break;
@@ -438,10 +439,17 @@ AppSession *session_create(const AppSessionConfig *config)
         !session->smoke_test_frames && !session->replay_script_path[0]) {
         if (game_profile_open(&session->profile, config->profile_path)) TraceLog(LOG_WARNING, "%s", session->profile.status);
     } else copy_path(session->profile.status, sizeof(session->profile.status), "Saving disabled; settings apply to this run.");
-    if (!level && config && config->continue_last && session->profile.data.last_level[0]) level = session->profile.data.last_level;
+    int continued = 0;  /* the level came from the profile, not the command line */
+    if (!level && config && config->continue_last && session->profile.data.last_level[0]) {
+        level = session->profile.data.last_level;
+        continued = 1;
+    }
     if (level && level[0]) {
         copy_path(session->boot_level_path, sizeof(session->boot_level_path), level);
-        if (session_open_game(session, session->boot_level_path, NULL)) goto fail;
+        /* An explicit --level that fails is an error. A remembered stage
+         * that no longer loads falls back to the selector instead. */
+        if (session_open_game(session, session->boot_level_path, NULL) &&
+            (!continued || session_open_menu(session))) goto fail;
     } else if (session_open_menu(session)) goto fail;
     if (config && config->experiment_path && (!session->game || game_experiment_load(session->game, config->experiment_path))) goto fail;
     return session;
