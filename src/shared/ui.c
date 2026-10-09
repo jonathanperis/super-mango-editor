@@ -109,9 +109,16 @@ static int limit_int_edit(UIState *ui, int value)
     long long step = ui->edit_int_step;
 
     if (lo > hi) return value;            /* no usable limits */
-    if (v < lo || v > hi)
+    /* Say which end was hit: one-sided limits use INT_MIN / INT_MAX for
+     * the other end, which would read badly as a range. */
+    if (v < lo)
         snprintf(ui->edit_note, sizeof(ui->edit_note),
-                 "%d is outside %lld..%lld, so it was limited", value, lo, hi);
+                 "%d is below %lld, the smallest this field takes; it was limited",
+                 value, lo);
+    else if (v > hi)
+        snprintf(ui->edit_note, sizeof(ui->edit_note),
+                 "%d is above %lld, the largest this field takes; it was limited",
+                 value, hi);
     if (v < lo) v = lo;
     if (v > hi) v = hi;
     if (step > 1) {
@@ -361,10 +368,16 @@ int ui_apply_active_edit(UIState *ui)
         /* As for integers: limits apply to a value the user changed. */
         if (memcmp(&value, target, sizeof(value)) != 0 &&
             ui->edit_float_min <= ui->edit_float_max) {
-            if (value < ui->edit_float_min || value > ui->edit_float_max)
+            /* As for integers, name the end that was hit (the other may
+             * be -FLT_MAX or FLT_MAX). */
+            if (value < ui->edit_float_min)
                 snprintf(ui->edit_note, sizeof(ui->edit_note),
-                         "%.9g is outside %.9g..%.9g, so it was limited",
-                         value, ui->edit_float_min, ui->edit_float_max);
+                         "%.9g is below %.9g, the smallest this field takes; it was limited",
+                         value, ui->edit_float_min);
+            else if (value > ui->edit_float_max)
+                snprintf(ui->edit_note, sizeof(ui->edit_note),
+                         "%.9g is above %.9g, the largest this field takes; it was limited",
+                         value, ui->edit_float_max);
             if (value < ui->edit_float_min) value = ui->edit_float_min;
             if (value > ui->edit_float_max) value = ui->edit_float_max;
         }
