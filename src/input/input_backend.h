@@ -12,6 +12,19 @@ enum {
     PAD_UP, PAD_DOWN, PAD_LEFT, PAD_RIGHT, PAD_MISC,
     PAD_PADDLE1, PAD_PADDLE2, PAD_PADDLE3, PAD_PADDLE4, PAD_TOUCHPAD, PAD_COUNT
 };
+/* Saved keyboard bindings are version-1 profile wire IDs too: the USB HID
+ * keyboard usage numbers (SDL's scancodes), not raylib KEY_* values.
+ * input_key_from_binding translates every one; these are the few the game
+ * names directly, for defaults, fixed alternatives and reserved keys. */
+enum {
+    BINDING_KEY_A = 4, BINDING_KEY_D = 7, BINDING_KEY_S = 22, BINDING_KEY_W = 26,
+    BINDING_KEY_ENTER = 40, BINDING_KEY_ESCAPE = 41, BINDING_KEY_TAB = 43,
+    BINDING_KEY_SPACE = 44, BINDING_KEY_MINUS = 45, BINDING_KEY_EQUAL = 46,
+    BINDING_KEY_F1 = 58, BINDING_KEY_F2 = 59, BINDING_KEY_F10 = 67,
+    BINDING_KEY_RIGHT = 79, BINDING_KEY_LEFT = 80, BINDING_KEY_DOWN = 81, BINDING_KEY_UP = 82,
+    BINDING_KEY_KP_ENTER = 88,
+    BINDING_KEY_LEFT_SHIFT = 225, BINDING_KEY_RIGHT_SHIFT = 229
+};
 enum { INPUT_SHIFT = 1, INPUT_CTRL = 2, INPUT_ALT = 4, INPUT_SUPER = 8 };
 typedef enum {
     INPUT_QUIT, INPUT_KEY_DOWN, INPUT_KEY_UP, INPUT_TEXT,
