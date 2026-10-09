@@ -4472,6 +4472,21 @@ static int recovery_folder_stays_manageable(void)
         remove_recovery_pair(root, first_id + (unsigned long long)i);
     editor_retire_current_recovery(&es);
 
+    /* Discard all deletes every copy offered and ends the picker. */
+    if (write_recovery_pair(root, 0x2001, 0, 1) != 0 ||
+        write_recovery_pair(root, 0x2002, 0, 1) != 0 ||
+        write_recovery_pair(root, 0x2003, 0, 1) != 0 ||
+        editor_discover_recoveries(&es) != 0 ||
+        expect_int("three copies offered", es.recovery_entry_count, 3) != 0) goto cleanup;
+    editor_test_set_recovery_choice(EDITOR_RECOVERY_DISCARD_ALL);
+    if (expect_int("discard all", editor_choose_recovery(&es), -1) != 0 ||
+        expect_int("none left", es.recovery_entry_count, 0) != 0 ||
+        expect_string("discard all reported", es.status_message,
+                      "Discarded 3 recovery copies") != 0 ||
+        expect_int("snapshot gone", recovery_pair_exists(root, 0x2002, ".toml"), 0) != 0 ||
+        expect_int("metadata gone", recovery_pair_exists(root, 0x2003, ".meta"), 0) != 0)
+        goto cleanup;
+
     /* Discarding the only copy ends the picker. */
     if (write_recovery_pair(root, 0x2000, 0, 1) != 0 ||
         editor_discover_recoveries(&es) != 0 ||
@@ -4541,6 +4556,7 @@ cleanup:
     remove_recovery_pair(root, 0xabc);
     remove_recovery_pair(root, 0xabd);
     remove_recovery_pair(root, 0x2000);
+    for (unsigned long long id = 0x2001; id <= 0x2003; id++) remove_recovery_pair(root, id);
     remove_recovery_pair(root, 0x3000);
     remove_recovery_pair(root, 0x3001);
     remove_recovery_pair(root, 0x3002);
