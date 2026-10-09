@@ -13,9 +13,10 @@
 #include "level_loader.h"
 #include "level_path.h"
 #include "level_ref.h"
+#include "level_start.h"
 #include "level_resources.h"
 #include "phase_transition.h"
-#include "../core/game_camera.h"
+#include "../core/game_camera.h"      /* game_camera_snap */
 #include "../core/game_completion.h"
 #include "../core/game_resources.h"
 #include "../core/game_experiment.h"
@@ -451,6 +452,40 @@ static void game_level_commit(GameState *gs, LevelDef *staged, uint64_t hash)
     level_resources_apply(gs, staged);
 }
 
+/*
+ * apply_start_request — Put the player where --start-x or
+ * --start-checkpoint asked (gs->start_kind; level_start.h has the rules).
+ *
+ * The point becomes the respawn point, so a lost life comes back here
+ * rather than at the level's start, until a later checkpoint is crossed.
+ * Checkpoints already behind it count as reached, without the banner.
+ * Returns -1 (after saying why) when the level has no such start.
+ */
+static int apply_start_request(GameState *gs, const LevelDef *def)
+{
+    LevelStart request;
+    LevelStartPoint point;
+    char err[128];
+
+    if (gs->start_kind == LEVEL_START_DEFAULT) return 0;
+    request.kind = (LevelStartKind)gs->start_kind;
+    request.x = gs->start_x;
+    request.checkpoint = gs->start_checkpoint;
+    if (level_start_resolve(def, &request, &point, err, sizeof(err)) != 0) {
+        fprintf(stderr, "Error: cannot start %s there: %s\n", gs->level_path, err);
+        return -1;
+    }
+    gs->respawn_x = point.spawn_x;
+    gs->respawn_y = point.spawn_y;
+    gs->checkpoint_index = point.checkpoint_index;
+    gs->player.spawn_x = point.spawn_x;
+    gs->player.spawn_y = point.spawn_y;
+    player_reset(&gs->player);
+    /* Show the start point at once instead of panning from the left edge. */
+    game_camera_snap(gs);
+    return 0;
+}
+
 int game_level_load_initial(GameState *gs)
 {
     char safe_path[GAME_LEVEL_PATH_MAX] = {0};
@@ -479,7 +514,7 @@ int game_level_load_initial(GameState *gs)
         return -1;
     }
     game_level_commit(gs, loaded, source_hash);
-    return 0;
+    return apply_start_request(gs, loaded);
 }
 
 int game_load_next_phase(GameState *gs)
