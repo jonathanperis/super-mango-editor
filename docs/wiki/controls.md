@@ -142,8 +142,14 @@ the same way twice.
   the stored ghost is read again (natively while holding the profile's lock
   file), so a faster ghost that another game window or browser tab saved in the
   meantime is kept rather than overwritten by a slower run. Browser ghosts use one
-  `localStorage` entry per level, `super-mango-ghost-v1:<level path>`; when storage
-  is full the ghost is simply not saved and a warning is logged. A ghost text of
+  `localStorage` entry per level, `super-mango-ghost-v1:<level path>`. The
+  profile and every other page of the same site share that storage (about 5
+  million characters), so all ghosts together stay within one million
+  characters (`GHOST_WEB_BUDGET`): past it, the ghosts written longest ago are
+  deleted first (`super-mango-ghost-order-v1` lists them oldest first). When
+  storage is full anyway, a ghost save deletes older ghosts until it fits, and a
+  profile save deletes ghosts until the profile fits; a ghost that still cannot
+  be saved is skipped with a warning. A ghost text of
   five minutes is about 180 KB; anything over 256 KB, or damaged in any way, is
   ignored. Damage includes a `time` more than one 1/60 s step away from the time
   its `steps` take, so a hand-edited `time = 0` cannot make a ghost no run could
