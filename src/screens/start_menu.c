@@ -14,12 +14,20 @@
 
 #define MENU_GAME_W 400
 #define MENU_GAME_H 300
-#define LOGO_DISPLAY_W 128
-#define LOGO_DISPLAY_H 96
+/* The logo keeps its 4:3 shape at three quarters of its old size, which
+ * leaves room for the level list between it and the Play button. */
+#define LOGO_DISPLAY_W 96
+#define LOGO_DISPLAY_H 72
+#define LOGO_Y 6
 #define BTN_W 120
 #define BTN_H 28
 #define BTN_X ((MENU_GAME_W-BTN_W)/2)
 #define BTN_Y 170
+/* Level list: START_MENU_LIST_ROWS rows of LIST_ROW_H pixels from LIST_Y. */
+#define LIST_X 20
+#define LIST_W 360
+#define LIST_Y 84
+#define LIST_ROW_H 15
 
 static int point_in_rect(int x, int y, int rx, int ry, int w, int h)
 {
@@ -52,6 +60,94 @@ static int confirm_held(const StartMenu *menu)
 static const CampaignLevel *selected_entry(const StartMenu *menu)
 {
     return &menu->catalog->levels[menu->selected_level];
+}
+
+void start_menu_format_time(float seconds, char *out, size_t size)
+{
+    if (!out || !size) return;
+    if (!(seconds >= 0.0f)) { snprintf(out, size, "--"); return; }  /* also NaN */
+    /* Round once, to whole hundredths, and split that integer. Rounding the
+     * seconds part on its own could print 59.996 as "0:60.00". The clamp
+     * keeps the multiplication inside long (a best time is at most 1e9 s). */
+    if (seconds > 1e7f) seconds = 1e7f;
+    long hundredths = (long)(seconds * 100.0f + 0.5f);
+    long minutes = hundredths / 6000;
+    long whole_seconds = (hundredths / 100) % 60;
+    snprintf(out, size, "%ld:%02ld.%02ld", minutes, whole_seconds, hundredths % 100);
+}
+
+void start_menu_level_row(const StartMenu *menu, size_t index, StartMenuLevelRow *row)
+{
+    const CampaignLevel *entry = &menu->catalog->levels[index];
+    /* The profile records a result only when a level is finished, so a
+     * stored result is the "cleared" flag. A broken entry shows no result:
+     * it cannot be played, so an old best would only confuse. */
+    const GameProgress *best = entry->available ? game_profile_result(menu->profile, entry->path) : NULL;
+
+    str_copy(row->name, entry->display_name, sizeof(row->name));
+    row->available = entry->available;
+    row->cleared = best != NULL;
+    if (best) {
+        start_menu_format_time(best->best_time, row->time, sizeof(row->time));
+        snprintf(row->coins, sizeof(row->coins), "%d/%d", best->best_coins, entry->level.coin_count);
+    } else {
+        snprintf(row->time, sizeof(row->time), "--");
+        snprintf(row->coins, sizeof(row->coins), "--");
+    }
+}
+
+/* First catalog index shown, keeping the selection inside the visible rows. */
+static size_t list_first_row(const StartMenu *menu)
+{
+    size_t count = menu->catalog->count;
+    size_t selected = (size_t)menu->selected_level;
+    if (count <= START_MENU_LIST_ROWS || selected < START_MENU_LIST_ROWS / 2) return 0;
+    size_t first = selected - START_MENU_LIST_ROWS / 2;
+    if (first + START_MENU_LIST_ROWS > count) first = count - START_MENU_LIST_ROWS;
+    return first;
+}
+
+/* Shorten text (whole UTF-8 characters at a time, ending in "..") until it
+ * is at most max_width pixels wide, so a long name cannot run into the
+ * time column. */
+static void fit_text(TextFont *font, char *text, size_t capacity, int max_width)
+{
+    char original[CAMPAIGN_DISPLAY_NAME_SIZE];
+    int width = 0;
+    str_copy(original, text, sizeof(original));
+    size_t keep = strlen(original);
+    while (keep > 0 && font_measure(font, text, &width, NULL) == 0 && width > max_width) {
+        /* Keep one whole character fewer: step back over its UTF-8
+         * continuation bytes (binary 10xxxxxx) to its first byte. */
+        do { keep--; } while (keep > 0 && ((unsigned char)original[keep] & 0xc0) == 0x80);
+        snprintf(text, capacity, "%.*s..", (int)keep, original);
+    }
+}
+
+/*
+ * draw_level_list — One row per campaign entry: cleared mark, name, best
+ * time and best coins. The selected row is highlighted; a broken entry is
+ * drawn in dark grey, like the disabled Play button.
+ */
+static void draw_level_list(StartMenu *menu)
+{
+    Color text = {200,200,200,255}, dim = {80,80,80,255}, gold = {240,200,90,255};
+    size_t first = list_first_row(menu);
+    for (size_t i = first; i < menu->catalog->count && i < first + START_MENU_LIST_ROWS; i++) {
+        StartMenuLevelRow row;
+        start_menu_level_row(menu, i, &row);
+        int y = LIST_Y + (int)(i - first) * LIST_ROW_H;
+        if ((int)i == menu->selected_level)
+            DrawRectangle(LIST_X, y, LIST_W, LIST_ROW_H, (Color){40,70,105,255});
+        int text_y = y + (LIST_ROW_H - TEXT_FONT_SIZE) / 2;
+        Color color = row.available ? text : dim;
+        /* A star for a cleared level; the default font has no check mark. */
+        font_draw(menu->font, row.cleared ? "*" : "-", LIST_X + 6, text_y, row.cleared ? gold : color);
+        fit_text(menu->font, row.name, sizeof(row.name), 200);
+        font_draw(menu->font, row.name, LIST_X + 18, text_y, color);
+        font_draw(menu->font, row.time, LIST_X + 230, text_y, color);
+        font_draw(menu->font, row.coins, LIST_X + 300, text_y, color);
+    }
 }
 
 static void play(StartMenu *menu)
@@ -124,10 +220,16 @@ int start_menu_frame(StartMenu *menu)
         if (menu->route != MENU_ROUTE_NONE) continue;
         if (settings_menu_event(menu->settings_menu, menu->profile, &event, PAD_Y)) continue;
         if (event.type == INPUT_MOUSE_DOWN && event.button == MOUSE_BUTTON_LEFT) {
+            int list_h = START_MENU_LIST_ROWS * LIST_ROW_H;
             if (menu->settings_menu && point_in_rect(event.x,event.y,125,270,150,24))
                 settings_menu_open(menu->settings_menu);
             else if (point_in_rect(event.x, event.y, BTN_X, BTN_Y, BTN_W, BTN_H))
                 play(menu);
+            else if (point_in_rect(event.x, event.y, LIST_X, LIST_Y, LIST_W, list_h)) {
+                /* A click on a row selects that level; Play still starts it. */
+                size_t row = list_first_row(menu) + (size_t)((event.y - LIST_Y) / LIST_ROW_H);
+                if (row < menu->catalog->count) select_level(menu, (int)row);
+            }
         } else if ((event.type == INPUT_KEY_DOWN || event.type == INPUT_PAD_DOWN) && !event.repeat) {
             int key = event.type == INPUT_KEY_DOWN ? event.key : KEY_NULL;
             int button = event.type == INPUT_PAD_DOWN ? event.button : -1;
@@ -147,8 +249,9 @@ int start_menu_frame(StartMenu *menu)
     BeginDrawing();
     BeginTextureMode(menu->frame_target);
     ClearBackground(BLACK);
-    IntRect logo = {(MENU_GAME_W - LOGO_DISPLAY_W) / 2, 20, LOGO_DISPLAY_W, LOGO_DISPLAY_H};
+    IntRect logo = {(MENU_GAME_W - LOGO_DISPLAY_W) / 2, LOGO_Y, LOGO_DISPLAY_W, LOGO_DISPLAY_H};
     sprite_draw(menu->logo_tex, NULL, &logo, 0, SPRITE_NORMAL, WHITE);
+    draw_level_list(menu);
     Vector2 mouse = input_mouse();
     const CampaignLevel *entry = selected_entry(menu);
     int hovering = point_in_rect((int)mouse.x,(int)mouse.y,BTN_X,BTN_Y,BTN_W,BTN_H);
@@ -162,19 +265,19 @@ int start_menu_frame(StartMenu *menu)
                        entry->available ? WHITE : (Color){110,110,110,255});
     char text[160];
     Color grey = {120,120,120,255};
-    snprintf(text,sizeof(text),"Level: < %s >",entry->display_name);
-    font_draw_centered(menu->font,text,MENU_GAME_W/2,214,entry->available ? grey : (Color){80,80,80,255});
+    /* Under the Play button: the selected level's full result, or why it
+     * cannot be played. The list above already shows every level's best. */
+    StartMenuLevelRow row;
+    start_menu_level_row(menu, (size_t)menu->selected_level, &row);
+    const GameProgress *best = row.cleared ? game_profile_result(menu->profile, entry->path) : NULL;
+    if (best) snprintf(text, sizeof(text), "Best: %s  %s coins  %d pts", row.time, row.coins, best->best_score);
+    else snprintf(text, sizeof(text), "%s: not cleared yet", entry->display_name);
+    font_draw_centered(menu->font, text, MENU_GAME_W/2, 214, entry->available ? grey : (Color){80,80,80,255});
     if (menu->error_message[0])
         font_draw_centered(menu->font, menu->error_message, MENU_GAME_W/2, 232, red);
     else if (!entry->available) {
         snprintf(text, sizeof(text), "Unavailable: %s", entry->problem);
         font_draw_centered(menu->font, text, MENU_GAME_W/2, 232, red);
-    }
-    const GameProgress *best = game_profile_result(menu->profile,menu->selected_level_path);
-    if (best && entry->available && !menu->error_message[0]) {
-        snprintf(text, sizeof(text), "Best: %d pts / %.2fs / %d coins",
-                 best->best_score, best->best_time, best->best_coins);
-        font_draw_centered(menu->font,text,MENU_GAME_W/2,232,grey);
     }
     font_draw_centered(menu->font,"Arrows/D-pad: level  Enter/A: play  Esc: exit",MENU_GAME_W/2,250,grey);
     if (menu->settings_menu) {
