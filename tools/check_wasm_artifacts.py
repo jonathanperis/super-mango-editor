@@ -23,6 +23,19 @@ REQUIRED_ZIP = [f"super-mango-wasm/{name}" for name in WASM_FILES] + [
 ]
 
 
+def display(path: Path) -> str:
+    """Show a path relative to the repository when it is inside it.
+
+    Path.relative_to() raises ValueError for a path elsewhere, such as an
+    absolute --out-dir or --zip under /tmp, which would hide the real
+    message behind a traceback; those paths are shown as given.
+    """
+    try:
+        return path.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
 def fail(message: str) -> int:
     print(f"wasm artifact check failed: {message}", file=sys.stderr)
     return 1
@@ -30,9 +43,9 @@ def fail(message: str) -> int:
 
 def require_nonempty(path: Path) -> int:
     if not path.is_file():
-        return fail(f"missing {path.relative_to(ROOT)}")
+        return fail(f"missing {display(path)}")
     if path.stat().st_size <= 0:
-        return fail(f"empty {path.relative_to(ROOT)}")
+        return fail(f"empty {display(path)}")
     return 0
 
 
@@ -61,27 +74,27 @@ def check_js_asset_references(js_path: Path) -> int:
     # WindowShouldClose pulls in this unsupported sleep even though the files
     # compile and download correctly; reject that dependency before shipping.
     if "_emscripten_sleep" in text:
-        return fail(f"{js_path.relative_to(ROOT)} depends on unsupported emscripten_sleep")
+        return fail(f"{display(js_path)} depends on unsupported emscripten_sleep")
     for basename in [f"{js_path.stem}.wasm", f"{js_path.stem}.data"]:
         if basename not in text:
-            return fail(f"{js_path.relative_to(ROOT)} does not reference {basename}")
+            return fail(f"{display(js_path)} does not reference {basename}")
     for interface in ["SuperMangoTouch", "SuperMangoKeyboard", "_game_web_input_touch", "super-mango-profile-v2", "navigator.locks"]:
         if interface not in text:
-            return fail(f"{js_path.relative_to(ROOT)} is missing host interface {interface}")
+            return fail(f"{display(js_path)} is missing host interface {interface}")
     return 0
 
 
 def check_zip(zip_path: Path, required: bool) -> int:
     if not zip_path.exists():
         if required:
-            return fail(f"missing {zip_path.relative_to(ROOT)}")
-        print(f"wasm artifact check: {zip_path.relative_to(ROOT)} not present; skipping zip inspection")
+            return fail(f"missing {display(zip_path)}")
+        print(f"wasm artifact check: {display(zip_path)} not present; skipping zip inspection")
         return 0
     with zipfile.ZipFile(zip_path) as archive:
         names = set(archive.namelist())
         missing = [name for name in REQUIRED_ZIP if name not in names]
     if missing:
-        return fail(f"{zip_path.relative_to(ROOT)} missing entries: {', '.join(missing)}")
+        return fail(f"{display(zip_path)} missing entries: {', '.join(missing)}")
     return 0
 
 
@@ -102,7 +115,7 @@ def main() -> int:
     for stem in ("super-mango", "super-mango-debug"):
         html = out_dir / f"{stem}.html"
         for problem in csp_problems(html.read_text(encoding="utf-8")):
-            return fail(f"{html.relative_to(ROOT)}: {problem}")
+            return fail(f"{display(html)}: {problem}")
         rc = check_js_asset_references(out_dir / f"{stem}.js")
         if rc != 0:
             return rc
