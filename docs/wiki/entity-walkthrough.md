@@ -12,14 +12,15 @@ for enemies and hazards, and [the checklist](#checklist) sums everything up.
 Every entity module works on a whole array and owns no resources:
 
 ```text
-level_loader.c         -> copy validated LevelDef placements into the GameState array
+level_loader.c         -> copy validated LevelDef placements into the gs->world array
 <entities>_update      -> move, animate, detect events (one fixed step of dt)
 <entities>_render      -> draw every active instance with a borrowed shared texture
 <entity>_get_hitbox    -> IntRect used by collision and the debug overlay
 ```
 
 There is no per-entity `_init` or `_cleanup`. Placement happens in
-`level_loader.c` (for example `load_coins()`), and the shared texture slot in
+`level_loader.c` (for example `load_coins()`, one row of its `s_level_loaders`
+table), and the shared texture slot in
 `gs->assets.textures` is loaded and released by `src/core/game_resources.c`. Static
 entities need even less: a coin stores only its placement state in `Coin` and
 exposes just `coins_render()`, and collection is handled in `src/collision/`.
@@ -41,10 +42,11 @@ Open `levels/labs/01_collision.toml`. Its `[[coins]]` record contains x/y values
    count in `level_validate_counts()`, then checks that each coin lies inside
    the world.
 4. `load_coins()` in `src/levels/level_loader.c` converts each immutable
-   `CoinPlacement` into an active runtime `Coin`. Only `level_load()` calls it:
-   `level_reset()` (a life loss) deliberately leaves collected coins gone, and
-   `game_restart_after_game_over()` in `src/collision/collision_damage.c`
-   reactivates them for Retry.
+   `CoinPlacement` into an active runtime `Coin`. Its row in the
+   `s_level_loaders` table is marked `LOAD_ONCE`: loading a level runs it, but
+   `level_reset()` (a life loss) runs only the `LOAD_EVERY_LIFE` rows, so
+   collected coins stay gone, and `game_restart_after_game_over()` in
+   `src/collision/collision_damage.c` reactivates them for Retry.
 5. `game_collide()` in `src/collision/game_collision.c` tests the player's
    hitbox with `rect_intersects()`, deactivates the coin, calls
    `game_award_score(gs, gs->world.rules.coin_score)` and plays the pickup sound.
@@ -108,9 +110,11 @@ rejected; do not loosen schema validation to make the exercise pass.
 ## 4. Add runtime behavior
 
 In `level_loader.c`, add a small `load_tokens()` that copies placement
-positions and sets `active = 1`, and call it from `level_load()`. Token awards
-score, so follow the coin rule: do **not** call it from `level_reset()`, or a
-player could farm points and bonus lives by dying on purpose. Reactivate tokens
+positions into `world->tokens` and sets `active = 1`, then add its row to the
+`s_level_loaders` table just below the coins: `{ load_tokens, LOAD_ONCE }`.
+Token awards score, so follow the coin rule: `LOAD_ONCE`, **not**
+`LOAD_EVERY_LIFE`, or `level_reset()` would bring tokens back after every
+lost life and a player could farm points and bonus lives by dying on purpose. Reactivate tokens
 beside the coins in `game_restart_after_game_over()` so Retry starts a fresh
 attempt. Wire `tokens_render()` into `src/render/game_render.c` beside coins.
 
@@ -241,14 +245,20 @@ A Token sits still. An enemy or hazard adds three things:
 
 - **An update function.** Write one that walks the whole array, in the shape
   of `circular_saws_update(CircularSaw *saws, int count, float dt)`, named
-  after your new type, and call it from the focused helper in `src/core/`:
+  after your new type, and call it from the focused helper in `src/core/`
+  (these calls are written out, not a table, because each kind's update
+  takes different inputs):
   `game_actors.c` updates enemies (it calls `spiders_update()`), `game_hazards.c`
   updates hazards (it calls `circular_saws_update()`). `dt` is always the fixed
   1/60 s step; see [Developer Guide](../developer-guide/#adding-physics-to-an-entity)
   for the physics pattern.
-- **Damage.** Add one `COLLIDE_DAMAGE` (or `COLLIDE_DAMAGE_ACTIVE`) line in
-  `game_collide()` (`src/collision/game_collision.c`) with your `_get_hitbox`
-  helper, beside the saw's. It calls `apply_damage()` in
+- **Damage.** In `src/collision/game_collision.c`, write a
+  `<thing>_touches()` function beside `circular_saw_touches()`: skip an
+  inactive item, build its box with your `_get_hitbox` helper and test it
+  against the player. Then add one row to the `s_damage_sources` table: the
+  name the debug log prints, `WORLD_COUNT(<things>_count)` and your function.
+  The row's place in the table is when it is tested; the first hit in a
+  step wins. `game_collide()` passes that hit to `apply_damage()` in
   `src/collision/collision_damage.c`, which handles hearts, knockback and the
   hurt-immunity timer.
 - **Render order.** Put the render call in `src/render/game_render.c` at the
@@ -263,8 +273,8 @@ automatically. A brand-new source directory needs its own wildcard line there.
 - [ ] `src/<category>/<entity>.h` and `.c` with render (and update) functions over the whole array, plus a `_get_hitbox` helper if it collides
 - [ ] Placement struct, array and count in `LevelDef` (`src/levels/level.h`); runtime array and count in `GameWorld` (`src/game.h`), stored by value
 - [ ] Schema entry, loader, saver and C/Python validation (section 3)
-- [ ] `load_<entities>()` in `level_loader.c`, called from `level_load()` and, if it does not award score, from `level_reset()` too
-- [ ] Update call in the matching `src/core/` helper; pickup or damage in `src/collision/`
+- [ ] `load_<entities>()` in `level_loader.c` and its `s_level_loaders` row: `LOAD_EVERY_LIFE` unless it awards score (then `LOAD_ONCE`)
+- [ ] Update call in the matching `src/core/` helper; pickup code, or a `_touches()` function and `s_damage_sources` row, in `src/collision/game_collision.c`
 - [ ] Render call in `src/render/game_render.c` at the right layer
 - [ ] Texture row in `game_resources.c` (and `game_resources_require_level_textures()` if optional)
 - [ ] Hitbox in `src/core/debug.c` and `debug_log()` calls for significant events

@@ -2,9 +2,17 @@
  * game_collision.c — Collision detection system implementation.
  *
  * Handles all player-entity collision detection including enemies,
- * hazards, and collectibles. Uses macro-based patterns to reduce
- * repetitive boilerplate code.
+ * hazards, and collectibles.
+ *
+ * How to read it:
+ *   1. One small <thing>_touches() function per kind of enemy or hazard:
+ *      "does item i hurt the player box now, and which box touched it?"
+ *   2. s_damage_sources: a table listing those kinds in the order they are
+ *      tested, and collide_damage_sources(), the one loop that walks it.
+ *   3. game_collide(): the hurt timer, that loop, then the collectibles.
  */
+
+#include <stddef.h>  /* offsetof */
 
 #include "game_collision.h"
 #include "collision_damage.h"
@@ -30,6 +38,8 @@
 #include "../collectibles/health_star.h"
 
 #include "../shared/audio.h"
+
+#define ARRAY_LEN(arr) ((int)(sizeof(arr) / sizeof((arr)[0])))
 
 /* A life loss replaces entities and the player position. End this pass so no
  * remaining collision uses the hitbox sampled before that replacement. */
@@ -61,41 +71,6 @@ static void collect_health_stars(GameState *gs, const IntRect *phit,
 }
 
 /* ------------------------------------------------------------------ */
-/* Collision helper macros                                            */
-/* ------------------------------------------------------------------ */
-
-/* Test all entities in an array against player; apply damage on hit.
- * Usage: COLLIDE_DAMAGE(gs->world.spiders, gs->world.spider_count, spider_build_hitbox, "spider")
- */
-#define COLLIDE_DAMAGE(arr, count, get_hitbox_fn, name) \
-    for (int i = 0; i < (count) && gs->world.player.hurt_timer == 0.0f; i++) { \
-        IntRect ehit = get_hitbox_fn(&(arr)[i]); \
-        if (rect_intersects(&phit, &ehit)) { \
-            if (gs->screen.debug_mode) debug_log(&gs->screen.debug, "HIT %s[%d]", name, i); \
-            float sx = ehit.x + ehit.w * 0.5f; \
-            float sy = ehit.y + ehit.h * 0.5f; \
-            if (damage_ends_pass(gs, sx, sy)) return; \
-            break; \
-        } \
-    }
-
-/* Test all entities in an array with 'active' field; apply damage on hit.
- * Usage: COLLIDE_DAMAGE_ACTIVE(gs->world.axe_traps, gs->world.axe_trap_count, axe_trap_get_hitbox, "axe")
- */
-#define COLLIDE_DAMAGE_ACTIVE(arr, count, get_hitbox_fn, name) \
-    for (int i = 0; i < (count) && gs->world.player.hurt_timer == 0.0f; i++) { \
-        if (!(arr)[i].active) continue; \
-        IntRect ehit = get_hitbox_fn(&(arr)[i]); \
-        if (rect_intersects(&phit, &ehit)) { \
-            if (gs->screen.debug_mode) debug_log(&gs->screen.debug, "HIT %s[%d]", name, i); \
-            float sx = ehit.x + ehit.w * 0.5f; \
-            float sy = ehit.y + ehit.h * 0.5f; \
-            if (damage_ends_pass(gs, sx, sy)) return; \
-            break; \
-        } \
-    }
-
-/* ------------------------------------------------------------------ */
 /* Hitbox builders                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -120,6 +95,191 @@ IntRect jumping_spider_build_hitbox(const JumpingSpider *js)
 }
 
 /* ------------------------------------------------------------------ */
+/* Damage sources: what hurts on touch                                */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Each <thing>_touches(world, i, player, &hit) answers one question for
+ * item i of one array: does it hurt the player box right now? When it
+ * does, it returns 1 and stores in *hit the box that touched, whose
+ * centre is where the knockback pushes away from. Inactive items, and
+ * flames still waiting below their gap, never hurt.
+ */
+
+static int spider_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+{
+    *hit = spider_build_hitbox(&world->spiders[i]);
+    return rect_intersects(player, hit);
+}
+
+static int jumping_spider_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+{
+    *hit = jumping_spider_build_hitbox(&world->jumping_spiders[i]);
+    return rect_intersects(player, hit);
+}
+
+static int bird_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+{
+    *hit = bird_get_hitbox(&world->birds[i]);
+    return rect_intersects(player, hit);
+}
+
+static int faster_bird_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+{
+    *hit = faster_bird_get_hitbox(&world->faster_birds[i]);
+    return rect_intersects(player, hit);
+}
+
+static int fish_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+{
+    *hit = fish_get_hitbox(&world->fish[i]);
+    return rect_intersects(player, hit);
+}
+
+static int faster_fish_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+{
+    *hit = faster_fish_get_hitbox(&world->faster_fish[i]);
+    return rect_intersects(player, hit);
+}
+
+static int axe_trap_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+{
+    if (!world->axe_traps[i].active) return 0;
+    *hit = axe_trap_get_hitbox(&world->axe_traps[i]);
+    return rect_intersects(player, hit);
+}
+
+static int circular_saw_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+{
+    if (!world->circular_saws[i].active) return 0;
+    *hit = circular_saw_get_hitbox(&world->circular_saws[i]);
+    return rect_intersects(player, hit);
+}
+
+static int spike_block_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+{
+    if (!world->spike_blocks[i].active) return 0;
+    *hit = spike_block_get_hitbox(&world->spike_blocks[i]);
+    return rect_intersects(player, hit);
+}
+
+/* A spike row is tested one tile at a time, so the knockback pushes away
+ * from the tile the player touched, not from the middle of a long row. */
+static int spike_row_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+{
+    const SpikeRow *row = &world->spike_rows[i];
+    if (!row->active) return 0;
+    for (int t = 0; t < row->count; t++) {
+        *hit = (IntRect){ (int)row->x + t * SPIKE_TILE_W, (int)row->y,
+                          SPIKE_TILE_W, SPIKE_TILE_H };
+        if (rect_intersects(player, hit)) return 1;
+    }
+    return 0;
+}
+
+/*
+ * Spike platforms use spike_platform_get_rect(), which reaches 2 px above
+ * the platform. A player standing on top has their bottom snapped to
+ * exactly sp->y, and the strict overlap test would miss a box whose top is
+ * also sp->y; the extra 2 px make top-landing damage work.
+ */
+static int spike_platform_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+{
+    if (!world->spike_platforms[i].active) return 0;
+    *hit = spike_platform_get_rect(&world->spike_platforms[i]);
+    return rect_intersects(player, hit);
+}
+
+/* Blue and fire flames share BlueFlame; one waiting below its gap is harmless. */
+static int flame_touches(const BlueFlame *flame, const IntRect *player, IntRect *hit)
+{
+    if (!flame->active || flame->state == BLUE_FLAME_WAITING) return 0;
+    *hit = blue_flame_get_hitbox(flame);
+    return rect_intersects(player, hit);
+}
+
+static int blue_flame_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+{
+    return flame_touches(&world->blue_flames[i], player, hit);
+}
+
+static int fire_flame_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+{
+    return flame_touches(&world->fire_flames[i], player, hit);
+}
+
+/*
+ * s_damage_sources — every kind of enemy and hazard that hurts on touch, in
+ * the order game_collide tests them.
+ *
+ * Each row names the kind for the debug log ("HIT spider[3]"), says where
+ * its count lives in GameWorld (offsetof gives the byte offset of that
+ * int field), and points at its touches function. The order only matters
+ * when two things touch the player in the same step: the first row wins
+ * and decides the knockback direction.
+ *
+ * Adding an enemy or hazard that hurts on touch means one <thing>_touches()
+ * above and one row here.
+ */
+typedef struct {
+    const char *name;
+    size_t      count_offset;  /* offsetof(GameWorld, <things>_count) */
+    int       (*touches)(const GameWorld *world, int i, const IntRect *player, IntRect *hit);
+} DamageSource;
+
+#define WORLD_COUNT(field) offsetof(GameWorld, field)
+
+static const DamageSource s_damage_sources[] = {
+    /* debug name      count in GameWorld                       touches function       */
+    /* ---- Enemies ------------------------------------------------------------------ */
+    { "spider",         WORLD_COUNT(spider_count),               spider_touches          },
+    { "jspider",        WORLD_COUNT(jumping_spider_count),       jumping_spider_touches  },
+    { "bird",           WORLD_COUNT(bird_count),                 bird_touches            },
+    { "fbird",          WORLD_COUNT(faster_bird_count),          faster_bird_touches     },
+    { "fish",           WORLD_COUNT(fish_count),                 fish_touches            },
+    { "ffish",          WORLD_COUNT(faster_fish_count),          faster_fish_touches     },
+    /* ---- Hazards ------------------------------------------------------------------ */
+    { "axe",            WORLD_COUNT(axe_trap_count),             axe_trap_touches        },
+    { "saw",            WORLD_COUNT(circular_saw_count),         circular_saw_touches    },
+    { "spike_block",    WORLD_COUNT(spike_block_count),          spike_block_touches     },
+    { "spike",          WORLD_COUNT(spike_row_count),            spike_row_touches       },
+    { "spike_platform", WORLD_COUNT(spike_platform_count),       spike_platform_touches  },
+    { "blue_flame",     WORLD_COUNT(blue_flame_count),           blue_flame_touches      },
+    { "fire_flame",     WORLD_COUNT(fire_flame_count),           fire_flame_touches      },
+};
+
+/* Read the int count field that sits count_offset bytes into the world. */
+static int world_count(const GameWorld *world, size_t count_offset)
+{
+    return *(const int *)((const char *)world + count_offset);
+}
+
+/*
+ * collide_damage_sources — Walk s_damage_sources and apply the first hit.
+ *
+ * At most one hit per step: apply_damage starts the hurt timer, and the
+ * player is invincible until it runs out, so the search stops at the first
+ * touch. Returns 1 when that hit cost a life (or the game); the level has
+ * then been reset, and the caller must not test anything else this step.
+ */
+static int collide_damage_sources(GameState *gs, const IntRect *player)
+{
+    for (int s = 0; s < ARRAY_LEN(s_damage_sources); s++) {
+        const DamageSource *source = &s_damage_sources[s];
+        int count = world_count(&gs->world, source->count_offset);
+        for (int i = 0; i < count; i++) {
+            IntRect hit;
+            if (!source->touches(&gs->world, i, player, &hit)) continue;
+            if (gs->screen.debug_mode) debug_log(&gs->screen.debug, "HIT %s[%d]", source->name, i);
+            float sx = hit.x + hit.w * 0.5f;
+            float sy = hit.y + hit.h * 0.5f;
+            return damage_ends_pass(gs, sx, sy);
+        }
+    }
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* Collision detection                                                */
 /* ------------------------------------------------------------------ */
 
@@ -135,95 +295,9 @@ void game_collide(GameState *gs, float dt)
 
     IntRect phit = player_get_hitbox(&gs->world.player);
 
-    /* ---- Enemy collisions ---------------------------------------- */
-    COLLIDE_DAMAGE(gs->world.spiders, gs->world.spider_count, spider_build_hitbox, "spider");
-    COLLIDE_DAMAGE(gs->world.jumping_spiders, gs->world.jumping_spider_count,
-                   jumping_spider_build_hitbox, "jspider");
-    COLLIDE_DAMAGE(gs->world.birds, gs->world.bird_count, bird_get_hitbox, "bird");
-    COLLIDE_DAMAGE(gs->world.faster_birds, gs->world.faster_bird_count, faster_bird_get_hitbox, "fbird");
-    COLLIDE_DAMAGE(gs->world.fish, gs->world.fish_count, fish_get_hitbox, "fish");
-    COLLIDE_DAMAGE(gs->world.faster_fish, gs->world.faster_fish_count, faster_fish_get_hitbox, "ffish");
-
-    /* ---- Hazard collisions --------------------------------------- */
-    COLLIDE_DAMAGE_ACTIVE(gs->world.axe_traps, gs->world.axe_trap_count, axe_trap_get_hitbox, "axe");
-    COLLIDE_DAMAGE_ACTIVE(gs->world.circular_saws, gs->world.circular_saw_count, circular_saw_get_hitbox, "saw");
-    COLLIDE_DAMAGE_ACTIVE(gs->world.spike_blocks, gs->world.spike_block_count, spike_block_get_hitbox, "spike_block");
-
-    /* Ground spikes — nested loop for tiles */
-    if (gs->world.player.hurt_timer == 0.0f) {
-        for (int i = 0; i < gs->world.spike_row_count && gs->world.player.hurt_timer == 0.0f; i++) {
-            if (!gs->world.spike_rows[i].active) continue;
-            for (int t = 0; t < gs->world.spike_rows[i].count; t++) {
-                int tx = (int)gs->world.spike_rows[i].x + t * SPIKE_TILE_W;
-                IntRect stile = { tx, (int)gs->world.spike_rows[i].y,
-                                   SPIKE_TILE_W, SPIKE_TILE_H };
-                if (rect_intersects(&phit, &stile)) {
-                    if (gs->screen.debug_mode) debug_log(&gs->screen.debug, "HIT spike[%d]", i);
-                    float sx = stile.x + stile.w * 0.5f;
-                    float sy = stile.y + stile.h * 0.5f;
-                    if (damage_ends_pass(gs, sx, sy)) return;
-                    goto next_spike_row;
-                }
-            }
-        next_spike_row:;
-        }
-    }
-
-    /* Spike platforms — use spike_platform_get_rect() for the extended hitbox.
-     *
-     * The inline hitbox (y = sp->y, h = SPIKE_PLAT_SRC_H) placed the top edge
-     * exactly at sp->y.  When the player stands on top, the physics engine snaps
-     * their bottom to sp->y as well, so the intersection's strict less-than
-     * test evaluates phit.bottom > sphit.top as sp->y > sp->y — false — and no
-     * damage fires.  spike_platform_get_rect() extends the hitbox 2 px upward
-     * (y = sp->y - 2) so the standing player's hitbox always overlaps, making
-     * top-landing damage work correctly.
-     */
-    if (gs->world.player.hurt_timer == 0.0f) {
-        for (int i = 0; i < gs->world.spike_platform_count; i++) {
-            if (!gs->world.spike_platforms[i].active) continue;
-            IntRect sphit = spike_platform_get_rect(&gs->world.spike_platforms[i]);
-            if (rect_intersects(&phit, &sphit)) {
-                if (gs->screen.debug_mode) debug_log(&gs->screen.debug, "HIT spike_platform[%d]", i);
-                float sx = sphit.x + sphit.w * 0.5f;
-                float sy = sphit.y + sphit.h * 0.5f;
-                if (damage_ends_pass(gs, sx, sy)) return;
-                break;
-            }
-        }
-    }
-
-    /* Blue flames — skip if in WAITING state */
-    if (gs->world.player.hurt_timer == 0.0f) {
-        for (int i = 0; i < gs->world.blue_flame_count; i++) {
-            if (!gs->world.blue_flames[i].active) continue;
-            if (gs->world.blue_flames[i].state == BLUE_FLAME_WAITING) continue;
-            IntRect bfhit = blue_flame_get_hitbox(&gs->world.blue_flames[i]);
-            if (rect_intersects(&phit, &bfhit)) {
-                if (gs->screen.debug_mode) debug_log(&gs->screen.debug, "HIT blue_flame[%d]", i);
-                float sx = bfhit.x + bfhit.w * 0.5f;
-                float sy = bfhit.y + bfhit.h * 0.5f;
-                if (damage_ends_pass(gs, sx, sy)) return;
-                break;
-            }
-        }
-    }
-
-    /* Fire flames — same logic as blue flames */
-    if (gs->world.player.hurt_timer == 0.0f) {
-        for (int i = 0; i < gs->world.fire_flame_count; i++) {
-            if (!gs->world.fire_flames[i].active) continue;
-            if (gs->world.fire_flames[i].state == BLUE_FLAME_WAITING) continue;
-            IntRect ffhit = blue_flame_get_hitbox(&gs->world.fire_flames[i]);
-            if (rect_intersects(&phit, &ffhit)) {
-                if (gs->screen.debug_mode) debug_log(&gs->screen.debug, "HIT fire_flame[%d]", i);
-                float sx = ffhit.x + ffhit.w * 0.5f;
-                float sy = ffhit.y + ffhit.h * 0.5f;
-                if (damage_ends_pass(gs, sx, sy)) return;
-                break;
-            }
-        }
-    }
+    /* ---- Enemy and hazard collisions (skipped while invincible) -- */
+    if (gs->world.player.hurt_timer == 0.0f && collide_damage_sources(gs, &phit))
+        return;
 
     /* ---- Collectible collisions ---------------------------------- */
     /* Coins — add score, possible bonus life */
@@ -254,11 +328,8 @@ void game_collide(GameState *gs, float dt)
             gs->world.last_star.collected = 1;
             sound_play(gs->assets.audio.coin, 128);
             if (gs->screen.debug_mode) debug_log(&gs->screen.debug, "LAST STAR collected");
-            
+
             game_complete_level(gs);
         }
     }
-
-#undef COLLIDE_DAMAGE
-#undef COLLIDE_DAMAGE_ACTIVE
 }
