@@ -17,6 +17,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 from pathlib import Path
 
@@ -119,14 +120,53 @@ def copy_windows_notices(dlls: list[Path], destination: Path) -> None:
             shutil.copy2(native, target)
 
 
+# Zip stores a local date and time per entry; 1980-01-01 is the earliest it
+# can represent, and it is the fallback when SOURCE_DATE_EPOCH is unset.
+ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
+
+
+def archive_timestamp() -> tuple[int, int, int, int, int, int]:
+    """The date every archive entry gets, so equal inputs give equal bytes.
+
+    SOURCE_DATE_EPOCH is the reproducible-builds convention for "the time
+    this source was made" (CI sets it to the commit time). Without it, a
+    fixed date keeps archives identical across rebuilds.
+    """
+    value = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
+    if not value:
+        return ZIP_EPOCH
+    try:
+        seconds = int(value)
+    except ValueError:
+        raise SystemExit(f"SOURCE_DATE_EPOCH must be whole seconds, got {value!r}") from None
+    when = time.gmtime(max(seconds, 0))
+    return max(ZIP_EPOCH, tuple(when[:6]))
+
+
 def zip_dir(src_dir: Path, output_zip: Path) -> None:
+    """Zip src_dir reproducibly: the same files always give the same bytes.
+
+    A plain ZipFile.write() records each file's modification time and the
+    host's file mode, and rglob() order can follow the file system, so two
+    builds of one commit produced different archives (and checksums).
+    Entries are therefore sorted by their archive name, stamped with
+    archive_timestamp(), and given fixed Unix modes: 755 for executables,
+    644 for everything else.
+    """
     output_zip.parent.mkdir(parents=True, exist_ok=True)
     if output_zip.exists():
         output_zip.unlink()
+    stamp = archive_timestamp()
+    files = [path for path in src_dir.rglob("*") if path.is_file()]
+    entries = sorted((path.relative_to(src_dir.parent).as_posix(), path) for path in files)
     with zipfile.ZipFile(output_zip, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for path in sorted(src_dir.rglob("*")):
-            if path.is_file():
-                zf.write(path, path.relative_to(src_dir.parent))
+        for name, path in entries:
+            info = zipfile.ZipInfo(name, date_time=stamp)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3  # Unix, so the mode below means the same on every host
+            executable = path.stat().st_mode & stat.S_IXUSR
+            info.external_attr = (stat.S_IFREG | (0o755 if executable else 0o644)) << 16
+            zf.writestr(info, path.read_bytes())
 
 
 def package_native(platform: str, binary: Path, output_zip: Path, dll_dir: Path | None,

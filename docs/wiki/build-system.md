@@ -396,7 +396,7 @@ make roadmap-quality
 
 ### `make dist-native`
 
-Depends on `release` and `asset-budget`, then packages optimized native builder archives under `dist/`. It refuses `RAYLIB_PLATFORM=memory` and `RAYLIB_AUDIO=null`. Both game and editor are included with playable assets, campaign/lab levels, project and third-party notices, and a run README. `unused/` assets are excluded. CI uses the same packaging path.
+Depends on `release` and `asset-budget`, then packages optimized native builder archives under `dist/`. It refuses `RAYLIB_PLATFORM=memory` and `RAYLIB_AUDIO=null`. Both game and editor are included with playable assets, campaign/lab levels, project and third-party notices, and a run README. `unused/` assets are excluded. CI uses the same packaging path. Archives are reproducible: `tools/package_release.py` sorts the entries, gives files fixed modes (755 for executables, 644 otherwise) and dates every entry from `SOURCE_DATE_EPOCH` (CI sets the commit time), or 1980-01-01 when it is unset, so one commit always packs the same bytes.
 
 ```sh
 make dist-native

@@ -14,6 +14,43 @@ sys.path.insert(0, str(ROOT / "tools"))
 import package_release
 
 
+def check_reproducible_zips(root):
+    """The same files must zip to the same bytes, whatever their mtimes."""
+    tree = root / "zip-fixture" / "bundle"
+    (tree / "b").mkdir(parents=True)
+    (tree / "b" / "z.txt").write_bytes(b"z")
+    (tree / "a.txt").write_bytes(b"a")
+    (tree / "run").write_bytes(b"#!/bin/sh\n")
+    (tree / "run").chmod(0o755)
+    first, second = root / "first.zip", root / "second.zip"
+    with patch.dict(os.environ, {"SOURCE_DATE_EPOCH": ""}):
+        package_release.zip_dir(tree, first)
+        # New modification times (and a later run) must not change the archive.
+        for path in tree.rglob("*"):
+            os.utime(path, (1_900_000_000, 1_900_000_000))
+        package_release.zip_dir(tree, second)
+    assert first.read_bytes() == second.read_bytes()
+    with zipfile.ZipFile(first) as bundle:
+        names = bundle.namelist()
+        assert names == sorted(names) == ["bundle/a.txt", "bundle/b/z.txt", "bundle/run"]
+        assert all(info.date_time == (1980, 1, 1, 0, 0, 0) for info in bundle.infolist())
+        assert bundle.getinfo("bundle/a.txt").external_attr >> 16 & 0o777 == 0o644
+        if sys.platform != "win32":
+            assert bundle.getinfo("bundle/run").external_attr >> 16 & 0o777 == 0o755
+    # SOURCE_DATE_EPOCH (CI passes the commit time) dates every entry.
+    with patch.dict(os.environ, {"SOURCE_DATE_EPOCH": "1700000000"}):
+        package_release.zip_dir(tree, second)
+    with zipfile.ZipFile(second) as bundle:
+        assert {info.date_time for info in bundle.infolist()} == {(2023, 11, 14, 22, 13, 20)}
+    with patch.dict(os.environ, {"SOURCE_DATE_EPOCH": "yesterday"}):
+        try:
+            package_release.zip_dir(tree, second)
+        except SystemExit as error:
+            assert "SOURCE_DATE_EPOCH" in str(error)
+        else:
+            raise AssertionError("a malformed SOURCE_DATE_EPOCH was accepted")
+
+
 def main():
     (ROOT / "out").mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="package-test-", dir=ROOT / "out") as temp:
@@ -35,6 +72,7 @@ def main():
             assert "super-mango-wasm/THIRD_PARTY_NOTICES.md" in bundle.namelist()
             assert b"raylib" in bundle.read("super-mango-wasm/licenses/raylib.txt")
             assert b"codec" in bundle.read("super-mango-wasm/licenses/raylib-dependencies/codec.h")
+        check_reproducible_zips(root)
         (root / "super-mango-debug.data").unlink()
         try:
             package_release.package_wasm("super-mango-wasm", archive, root, raylib_build)
