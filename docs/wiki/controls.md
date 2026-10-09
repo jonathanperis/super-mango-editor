@@ -73,7 +73,11 @@ The overlay text is snapshotted in [Overlay Snapshots](../overlay-snapshots/) so
 - **Remapping:** Left, Right, Up, Down, Jump and Run each have keyboard and gamepad bindings. Duplicates are rejected, as are reserved keys (Esc, F1, Tab, Enter, keypad Enter, the arrows and Right Shift) and buttons (Back, Start, Guide, B); misc, paddle and touchpad buttons cannot be captured. Arrows remain available. In debug gameplay, F2–F10 and `-`/`=` are reserved for the inspector.
 
 Settings apply when the panel closes. Normal runs save settings, the last played
-stage and per-level best score/time/coin results. `--continue` opens that stage
+stage and per-level best score/time/coin results. A profile holds results for up
+to 128 levels; a coin result is at most `MAX_COINS` (64), the most coins one level
+can place, so raising that constant keeps old profiles readable. A result that
+cannot be recorded (a full profile) is logged as a warning rather than dropped
+silently. `--continue` opens that stage
 from its start, not a mid-level checkpoint; all campaign levels remain selectable.
 Native profiles use `profile.toml` under the OS preference root plus `SuperMango/SuperMango/`,
 or an explicit `--profile PATH`. Browser profiles use localStorage and Web Locks;
