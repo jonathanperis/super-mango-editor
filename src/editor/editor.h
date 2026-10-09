@@ -81,8 +81,13 @@
 #define CANVAS_H      (EDITOR_H - TOOLBAR_H - STATUS_H)
 #define EDITOR_PATH_MAX 1024
 #define EDITOR_MAX_RECOVERY_ENTRIES 32
-/* Most entities one selection (and one group action on it) can hold. */
-#define EDITOR_MAX_SELECTION 256
+/*
+ * Most entities one selection (and so one group move, delete, copy or
+ * duplicate) can hold.  Every one costs a placement snapshot in the drag
+ * and the clipboard, which live inside EditorState, so the limit keeps the
+ * struct small enough to sit on a stack.
+ */
+#define EDITOR_MAX_SELECTION 64
 
 typedef struct {
     uint64_t id;
@@ -187,6 +192,30 @@ typedef struct {
     EntityType type;
     int        index;  /* -1 = nothing selected */
 } Selection;
+
+/*
+ * EditorClipboardItem — one copied entity (Ctrl+C copies the whole
+ * selection, so the clipboard holds a list of these).
+ *
+ * A rail rider stores only a rail *index*, which goes stale when rails
+ * are deleted or the copy is pasted into another level.  rail_index
+ * follows the copied rider's rail in this document: removing or
+ * re-inserting an earlier rail renumbers it, moving or resizing the rail
+ * leaves it alone, and deleting that rail (or opening another document)
+ * sets it to -1.  Paste uses it while it is valid.  rail keeps the rail's
+ * shape for a paste into another level, where the rider attaches to a rail
+ * with the same shape and position; has_rail drops to 0 once the rail is
+ * deleted here, so the copy cannot attach to a look-alike rail instead.
+ */
+typedef struct {
+    EntityType    type;
+    PlacementData data;
+    int           rail_index;  /* a rider's rail; a copied rail's own index */
+    int           has_rail;
+    RailPlacement rail;
+    int           rail_item;   /* clipboard slot of the rail it rides when
+                                  that rail was copied too, else -1 */
+} EditorClipboardItem;
 
 /* ------------------------------------------------------------------ */
 /* EntityTextures — preloaded GPU textures for all entity thumbnails   */
@@ -317,7 +346,17 @@ typedef struct {
 
     /* ---- Tool and selection state ------------------------------------- */
     EditorTool     tool;          /* active interaction mode (select/place/delete)  */
-    Selection      selection;     /* which entity is currently selected (-1 = none) */
+    /*
+     * The selection.  `selection` is the primary entity: the one the
+     * properties panel shows and a drag grabbed (-1 = nothing selected).
+     * selection_more lists the other selected entities of a multi-selection
+     * (Shift+click, box select).  Code that changes the selection goes
+     * through the editor_select_* helpers in entity_meta.c, which keep the
+     * two consistent; index shifts after inserts and removals update both.
+     */
+    Selection      selection;
+    Selection      selection_more[EDITOR_MAX_SELECTION - 1];
+    int            selection_more_count;
     EntityType     palette_type;  /* entity type chosen in the palette for placing  */
 
     /* ---- Undo / redo ------------------------------------------------- */
@@ -331,32 +370,12 @@ typedef struct {
 
     /* ---- Clipboard (copy/paste) ---------------------------------------- */
     /*
-     * clipboard — holds a snapshot of one entity's placement data for Ctrl+C/V.
-     *
-     * has_clipboard is 1 after a Ctrl+C; the entity_type and data fields
-     * identify what was copied.  Ctrl+V creates a new entity from this
-     * snapshot at a position offset from the original.
+     * clipboard — snapshots of the entities the last Ctrl+C copied (0 = the
+     * clipboard is empty).  Ctrl+V adds a copy of each, offset from the
+     * originals; see EditorClipboardItem for how rail riders keep their rail.
      */
-    int            has_clipboard;
-    EntityType     clipboard_type;
-    PlacementData  clipboard_data;
-    /*
-     * A rail rider stores only a rail *index*, which goes stale when rails
-     * are deleted or the copy is pasted into another level.
-     *
-     * clipboard_rail_index follows the copied rider's rail in this document:
-     * removing or re-inserting an earlier rail renumbers it, moving or
-     * resizing the rail leaves it alone, and deleting that rail (or opening
-     * another document) sets it to -1.  Paste uses it while it is valid.
-     *
-     * clipboard_rail keeps the rail's shape for a paste into another level:
-     * there the rider attaches to a rail with the same shape and position.
-     * clipboard_has_rail drops to 0 once the rail is deleted here, so the
-     * snapshot cannot attach the rider to a look-alike rail instead.
-     */
-    int            clipboard_rail_index;
-    int            clipboard_has_rail;
-    RailPlacement  clipboard_rail;
+    EditorClipboardItem clipboard[EDITOR_MAX_SELECTION];
+    int            clipboard_count;
 
     /* ---- File I/O ----------------------------------------------------- */
     /*
@@ -469,9 +488,13 @@ typedef struct {
      */
     int            dragging;      /* 1 while a drag operation is in progress   */
     int            drag_moved;    /* 1 once the cursor passed the threshold    */
-    EntityType     drag_type;     /* entity being dragged                      */
+    EntityType     drag_type;     /* entity grabbed (its corner snaps)          */
     int            drag_index;
-    PlacementData  drag_before;   /* placement at mouse-down (undo "before")   */
+    /* Everything the drag moves (the grabbed entity alone, or the whole
+     * multi-selection) and each one's placement at mouse-down. */
+    int            drag_count;
+    Selection      drag_items[EDITOR_MAX_SELECTION];
+    PlacementData  drag_befores[EDITOR_MAX_SELECTION];
     float          drag_start_x;  /* entity top-left (world) at mouse-down     */
     float          drag_start_y;
     float          drag_grab_x;   /* cursor minus entity top-left at mouse-down */
@@ -486,6 +509,17 @@ typedef struct {
     int            last_click_valid;
     float          last_click_x;
     float          last_click_y;
+
+    /* ---- Box (rubber-band) selection ---------------------------------- */
+    /*
+     * A Select-tool press on empty canvas starts a box from (box_x0, box_y0)
+     * to the cursor (box_x1, box_y1), in world px.  On release every entity
+     * the box touches is selected; with Shift held they are added to the
+     * current selection (box_additive).
+     */
+    int            box_selecting;
+    int            box_additive;
+    float          box_x0, box_y0, box_x1, box_y1;
 
     /*
      * Arrow-key nudges.  A quick run of nudges of the same selection is one

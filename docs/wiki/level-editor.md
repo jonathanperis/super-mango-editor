@@ -51,9 +51,29 @@ Three interaction modes are available via the toolbar or keyboard shortcuts:
 
 | Tool | Key | Behaviour |
 |------|-----|-----------|
-| **Select** | `1` | Click an entity on the canvas to select it. Drag to reposition. Selected entity appears in the Properties panel. Clicking empty space clears the selection. |
+| **Select** | `1` | Click an entity on the canvas to select it. Drag to reposition. Selected entity appears in the Properties panel. Clicking empty space clears the selection; dragging from empty space draws a selection box. |
 | **Place** | `2` | Click the canvas to stamp a new entity of the type chosen in the palette. For the two singletons (Player Spawn, Last Star) the click moves the existing one. A new spike block attaches to the rail nearest the click. |
 | **Delete** | `3` | Click an entity to remove it from the level immediately. |
+
+### Selecting Several Entities
+
+Several entities can be selected at once (up to 64, `EDITOR_MAX_SELECTION`):
+
+| Action | Input |
+|--------|-------|
+| Box select | Press on empty canvas and drag: every entity the box touches is selected |
+| Add to the selection with a box | `Shift` + drag from empty canvas |
+| Add / remove one entity | `Shift + click` it |
+| Select just one member again | Click it without dragging |
+| Clear the selection | `Esc`, or a click on empty canvas |
+
+Dragging any selected entity moves the whole group (the grabbed one snaps to
+the grid; the others keep their distance), and the arrow keys nudge it. Delete
+or Backspace, `Ctrl+C` / `Ctrl+V` and `Ctrl+D` act on every selected entity.
+Each of these is a single undo step, however many entities it touched. A rail
+deleted together with the spike blocks and platforms riding it goes after them,
+so the pair can be deleted (alone, a ridden rail is refused). The Properties
+panel shows `N selected` with a count per type instead of fields.
 
 Dragging keeps the point you grabbed under the cursor and starts only after the
 cursor moves 3 canvas pixels, so a plain click selects without moving anything.
@@ -113,7 +133,7 @@ Palette rows are text labels; clicking one selects that type and switches to the
 
 ## Properties Inspector
 
-When an entity is selected with the Select tool, the Properties panel displays its editable fields. All fields match the TOML schema exactly — what you see in the inspector is what gets written to the file.
+When one entity is selected with the Select tool, the Properties panel displays its editable fields (with several selected it shows how many of each type instead). All fields match the TOML schema exactly — what you see in the inspector is what gets written to the file.
 
 **Example — Spider:**
 - `x`, `vx`, `patrol_x0`, `patrol_x1`, `frame_index`
@@ -232,11 +252,11 @@ The folder holds at most 32 recovery copies. When leftover copies fill it, autos
 
 | Action | Shortcut |
 |--------|----------|
-| Copy selected entity | `Ctrl+C` |
+| Copy the selection | `Ctrl+C` |
 | Paste (offset from original) | `Ctrl+V` |
 | Duplicate the selection (offset, clipboard untouched) | `Ctrl+D` |
 
-Only one entity can be in the clipboard at a time. The pasted entity is moved a little so it does not hide the original (24 px right, and down for free-floating things; along the rail for rail riders; one gap width for floor gaps), and it becomes the selection. Each further
+`Ctrl+C` copies the whole selection. Each pasted entity is moved a little so it does not hide the original (24 px right, and down for free-floating things; along the rail for rail riders; one gap width for floor gaps), and the pasted copies become the selection. A rail copied together with its riders pastes as a new rail carrying the copied riders. A paste is all or nothing: if one copy cannot be added, none is. Each further
 `Ctrl+V` steps one more offset from the previous copy, so repeated pastes lay
 out a row instead of stacking on one spot; a new `Ctrl+C` starts again from the
 copied entity.
