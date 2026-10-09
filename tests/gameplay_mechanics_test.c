@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "collision/collision_damage.h"
 #include "core/debug.h"
 #include "core/game_timing.h"
 #include "core/game_update.h"
@@ -195,6 +196,37 @@ static int climbing_ladder_rope_and_vine(void)
     /* Draw the climbing state with the debug overlay on. */
     CHECK(mechanics_frames(&gs, 3) == 3);
     CHECK(p->on_vine);
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
+/*
+ * A hit while climbing throws the player off with the usual knockback, even
+ * while Up stays held. The climbing controls used to overwrite the push on
+ * the next step, and holding Up would re-grab the ladder at once.
+ */
+static int knockback_throws_a_climber_off(void)
+{
+    int failed = 0;
+    GameState gs;
+    Player *p = &gs.player;
+    CHECK(mechanics_open_level(&gs, CLIMBING_LEVEL, 0) == 0);
+    stand_at(&gs, gs.ladders[0].x - 8.0f);
+    mechanics_step(&gs, PLAYER_INPUT_UP, 20);
+    mechanics_step(&gs, 0, 1);              /* hang still on the ladder */
+    CHECK(p->on_vine && p->vx == 0.0f && p->vy == 0.0f);
+
+    /* A hit from the right of a still player pushes it left and up. */
+    const float x_before = p->x;
+    apply_damage(&gs, 1, 1, p->x + p->w, p->y);
+    CHECK(!p->on_vine && p->vx < 0.0f && p->vy < 0.0f);
+    mechanics_step(&gs, PLAYER_INPUT_UP, 1);
+    CHECK(!p->on_vine && p->x < x_before - 3.0f && p->vy < 0.0f);
+
+    /* Still holding Up, the player flies clear instead of re-grabbing. */
+    mechanics_step(&gs, PLAYER_INPUT_UP, STEPS_PER_SECOND / 2);
+    CHECK(!p->on_vine && p->x < x_before - 40.0f);
 done:
     game_cleanup(&gs);
     return failed;
@@ -771,6 +803,7 @@ int main(void)
     const struct { const char *name; int (*run)(void); } cases[] = {
 #define CASE(fn) {#fn, fn}
         CASE(climbing_ladder_rope_and_vine),
+        CASE(knockback_throws_a_climber_off),
         CASE(blue_flame_erupts_on_a_cycle_and_burns),
         CASE(axe_traps_swing_spin_and_hit),
         CASE(spikes_hurt_once_per_invincibility),

@@ -248,7 +248,7 @@ Mango.
 
 **Why:** each flame stores its current state and a timer. The update code
 looks only at the current state to decide what to do next, and collision skips
-flames that are waiting. The hurt timer (`hurt_timer`, set to 1.5 s in
+flames that are waiting. The hurt timer (`hurt_timer`, set to `PLAYER_HURT_TIME`, 1.5 s, in
 `apply_damage()`) is a second, independent piece of state on the player.
 
 **Check yourself:** `tests/simulation_test.c` checks a saw that moves into the

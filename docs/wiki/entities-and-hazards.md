@@ -163,7 +163,7 @@ patrol_x1  = 1400.0
 
 ## Hazards
 
-Enemy and active hazard hitboxes deal **1 heart of damage** on contact with knockback, subject to hurt immunity. `game_collide()` in `src/collision/game_collision.c` routes hits through `apply_damage()` in `src/collision/collision_damage.c`; waiting flames have no active damage hitbox. Collision uses each hazard's position after this step's update.
+Enemy and active hazard hitboxes deal **1 heart of damage** on contact with knockback, subject to hurt immunity. A hit knocks a climbing player off the vine, ladder or rope, and for `PLAYER_KNOCKBACK_GRAB_LOCK` (0.25 s) they cannot grab one again, so holding Up does not cancel the push. `game_collide()` in `src/collision/game_collision.c` routes hits through `apply_damage()` in `src/collision/collision_damage.c`; waiting flames have no active damage hitbox. Collision uses each hazard's position after this step's update.
 
 When a level has no authored `[[checkpoints]]`, automatic screen-edge checkpoints avoid floor gaps and the static hazards on this page (spike rows, spike platforms, blue and fire flames). Moving hazards and enemies are not considered; see [Authored Checkpoints](../level-design/#authored-checkpoints).
 

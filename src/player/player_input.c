@@ -64,8 +64,14 @@ void player_handle_input(Player *player, SoundEffect *snd_jump,
      * Ignore the grab when jump is held — otherwise holding jump + UP
      * causes the player to grab and immediately jump-dismount every frame,
      * spamming the jump action and accumulating height.
+     *
+     * Also ignore it for PLAYER_KNOCKBACK_GRAB_LOCK seconds after a hit
+     * (hurt_timer starts at PLAYER_HURT_TIME and counts down): the hit
+     * knocked the player off, and re-grabbing at once would cancel the push.
      */
-    if (!player->on_vine && !jump_down &&
+    const int knocked_back =
+        player->hurt_timer > PLAYER_HURT_TIME - PLAYER_KNOCKBACK_GRAB_LOCK;
+    if (!player->on_vine && !jump_down && !knocked_back &&
         (physical_up || replay_up)) {
         player_try_grab_climbable(player, vines, vine_count,
                                   ladders, ladder_count,
