@@ -206,10 +206,24 @@ static void editor_restore_change_tracking(EditorState *es, int kind,
     es->ui.before_change_context = context;
 }
 
+/*
+ * editor_finish_field_edit — Settle the active text field before a command.
+ *
+ * Every command that changes the document or the view (a click elsewhere,
+ * a shortcut, Save, Undo...) calls this first, so a half-typed value never
+ * sits next to a document that moved on.  A value that parses is simply
+ * applied, as leaving a field does in most programs: it becomes its own
+ * undo step, clamped to the field's limits.  Only a value that cannot be
+ * stored ("12a", "-") asks what to do: keep editing (the command waits)
+ * or discard the typed text.
+ *
+ * Returns 1 when the command may go ahead, 0 when it must wait.
+ */
 int editor_finish_field_edit(EditorState *es)
 {
-    const char *buttons[] = {"Block", "Apply", "Discard"};
+    const char *buttons[] = {"Keep Editing", "Discard"};
     int button_id = 0;
+    int test_choice;
     int result;
     int kind;
     int outer_kind;
@@ -218,28 +232,17 @@ int editor_finish_field_edit(EditorState *es)
 
     if (!es || es->ui.active_id == 0) return 1;
 
-    if (editor_test_finish_choice >= 0) {
-        button_id = editor_test_finish_choice;
-        editor_test_finish_choice = -1;
-    } else if (dialog_choice("Finish Field Edit", "Field edit is still active. Choose Apply, Discard, or Block.",
-                             buttons, 3, 1, 0, &button_id) != 0) {
-        editor_set_status(es, "Command blocked: field edit confirmation failed");
-        return 0;
-    }
-    if (button_id == 0) {
-        editor_set_status(es, "Command blocked: field edit remains active");
-        return 0;
-    }
+    /* A test answer is used up by this call whether or not it is needed,
+     * so it can never linger and answer a later, unrelated prompt. */
+    test_choice = editor_test_finish_choice;
+    editor_test_finish_choice = -1;
+
+    /* Apply the typed value under its own change tracking, then put back
+     * whatever tracking the panel that asked had armed (see
+     * editor_restore_change_tracking). */
     outer_kind = es->change_tracking_kind;
     outer_before_change = es->ui.before_change;
     outer_context = es->ui.before_change_context;
-    if (button_id == 2) {
-        ui_cancel_active_edit(&es->ui);
-        editor_restore_change_tracking(es, outer_kind, outer_before_change,
-                                       outer_context);
-        return 1;
-    }
-
     kind = es->ui.active_id >= 9000 ? EDITOR_CHANGE_CONFIG
                                     : EDITOR_CHANGE_ENTITY;
     editor_begin_change_tracking(es, kind);
@@ -249,11 +252,27 @@ int editor_finish_field_edit(EditorState *es)
     if (result == 2) editor_commit_change(es);
     editor_restore_change_tracking(es, outer_kind, outer_before_change,
                                    outer_context);
-    if (result == 0) {
-        editor_set_status(es, "Command blocked: invalid field value");
+    if (result != 0) return 1;
+
+    /* The value cannot be stored: ask.  The field is still active. */
+    if (test_choice >= 0) {
+        /* Test seam: 2 means Discard (the old dialog's button number);
+         * anything else keeps editing. */
+        button_id = test_choice == 2 ? 1 : 0;
+    } else if (dialog_choice("Invalid Field Value",
+                             "The field holds a value that cannot be stored. "
+                             "Keep editing it, or discard what you typed?",
+                             buttons, 2, 0, 0, &button_id) != 0) {
+        editor_set_status(es, "Command blocked: field edit confirmation failed");
         return 0;
     }
-    return 1;
+    if (button_id == 1) {
+        ui_cancel_active_edit(&es->ui);
+        editor_set_status(es, "Discarded the invalid field value");
+        return 1;
+    }
+    editor_set_status(es, "Command blocked: invalid field value");
+    return 0;
 }
 
 int editor_before_command(void *context)
