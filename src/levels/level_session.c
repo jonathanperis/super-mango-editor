@@ -58,6 +58,22 @@ static LevelDef *read_stable_level(const char *path, uint64_t *hash)
  * cannot fail, and a failed load before it leaves the current level, path
  * and hash untouched. gs takes ownership of staged.
  */
+/*
+ * require_shared_sprites — Check that every shared sprite the level draws
+ * is loaded. A missing one is named on stderr and, by file name only so it
+ * fits one line of the menu, in gs->screen.load_error. 0 or -1.
+ */
+static int require_shared_sprites(GameState *gs, const LevelDef *def)
+{
+    const char *missing = game_resources_missing_level_texture(&gs->assets, def);
+    if (!missing) return 0;
+    fprintf(stderr, "Required gameplay texture unavailable: %s\n", missing);
+    const char *name = strrchr(missing, '/');
+    snprintf(gs->screen.load_error, sizeof(gs->screen.load_error), "Missing file: %s",
+             name ? name + 1 : missing);
+    return -1;
+}
+
 static void game_level_commit(GameState *gs, LevelDef *staged, uint64_t hash)
 {
     free(gs->world.level_def);
@@ -152,7 +168,7 @@ int game_level_load_initial(GameState *gs)
     }
 
     /* Parse and required sprites are checked before replacing active storage. */
-    if (game_resources_require_level_textures(gs, loaded) != 0) {
+    if (require_shared_sprites(gs, loaded) != 0) {
         free(loaded);
         return -1;
     }
@@ -181,7 +197,7 @@ int game_load_next_phase(GameState *gs)
         fprintf(stderr, "Error: Failed to load next phase: %s\n", safe_path);
         return -1;
     }
-    if (game_resources_require_level_textures(gs, next_level) != 0) {
+    if (require_shared_sprites(gs, next_level) != 0) {
         free(next_level);
         return -1;
     }

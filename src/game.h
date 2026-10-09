@@ -354,6 +354,9 @@ typedef struct {
 
     /* ---- How the session opened this screen ---------------------------- */
     int           smoke_test_frames; /* >0 = exit after this many frames     */
+    /* Why game_init could not open the level, for the menu to show (for
+     * example "Missing file: spike.png"); "" when it did not say. */
+    char          load_error[96];
     unsigned int  random_seed;
     /* --start-x / --start-checkpoint (levels/level_start.h): where the
      * first attempt at world.level_path starts.  start_kind is a
