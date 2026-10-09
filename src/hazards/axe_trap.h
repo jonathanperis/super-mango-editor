@@ -83,8 +83,8 @@ typedef enum {
  *
  * angle         : current rotation in degrees.  0° = handle up, blade down.
  *                 Positive = clockwise.
- * time          : accumulated time in seconds, drives the sine oscillation
- *                 for pendulum mode.
+ * time          : seconds into the current swing cycle (0 .. AXE_SWING_PERIOD,
+ *                 wrapping each cycle); drives the pendulum sine wave.
  * mode          : AXE_MODE_PENDULUM or AXE_MODE_SPIN.
  * sound_played  : prevents the swing SFX from retriggering on the same
  *                 half-cycle.  Resets when the axe crosses centre.
@@ -94,7 +94,7 @@ typedef struct {
     float        x;            /* pivot x in world space (top-centre of handle)  */
     float        y;            /* pivot y in world space                          */
     float        angle;        /* current rotation degrees (0 = straight down)   */
-    float        time;         /* accumulated seconds for pendulum sine wave      */
+    float        time;         /* seconds into the swing cycle (wraps)            */
     AxeTrapMode  mode;         /* pendulum or full-spin                           */
     int          sound_played; /* 1 = SFX already fired this half-swing           */
     int          active;       /* 1 = hazard is live                              */
