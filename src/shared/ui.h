@@ -85,7 +85,7 @@ typedef struct {
     int edit_float_nonzero;    /* 1: 0 is not a value this field accepts  */
     /* Set when a commit changed or refused what was typed ("900 is outside
      * -960..960, so it became 960"); the caller shows it and clears it. */
-    char edit_note[96];
+    char edit_note[128];
     int dropdown_open_id;      /* zero = closed; otherwise the stable widget ID */
     /* A press while a list is open belongs to that list alone (ui_press), so
      * it can never reach a widget or the canvas drawn underneath the list. */
