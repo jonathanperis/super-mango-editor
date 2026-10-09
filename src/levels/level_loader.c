@@ -623,12 +623,11 @@ static void load_ropes(GameState *gs, const LevelDef *def)
 /* ------------------------------------------------------------------ */
 
 /*
- * level_load — Populate all GameState arrays from a LevelDef.
+ * level_load — Validate a LevelDef, then populate GameState from it.
  *
- * Call order matters:
- *   1. Sea gaps (used by blue_flames and spider gap checks).
- *   2. Rails (must exist before spike_blocks / float_platforms reference them).
- *   3. Everything else can follow in any order.
+ * Use this for a definition nobody has checked yet (a test fixture built in
+ * code). A file read by level_load_toml has already passed the same check,
+ * so the level session calls level_apply directly and validates once.
  */
 int level_load(GameState *gs, const LevelDef *def)
 {
@@ -637,7 +636,25 @@ int level_load(GameState *gs, const LevelDef *def)
         fprintf(stderr, "level_load: invalid level definition: %s\n", err);
         return -1;
     }
+    level_apply(gs, def);
+    return 0;
+}
 
+/*
+ * level_apply — Populate all GameState arrays from a validated LevelDef.
+ *
+ * It returns nothing because nothing in it can fail: counts and links were
+ * checked by level_validate_runtime, and a missing tile image only warns.
+ * That lets a level change commit without a failure point after the old
+ * level has been replaced.
+ *
+ * Call order matters:
+ *   1. Sea gaps (used by blue_flames and spider gap checks).
+ *   2. Rails (must exist before spike_blocks / float_platforms reference them).
+ *   3. Everything else can follow in any order.
+ */
+void level_apply(GameState *gs, const LevelDef *def)
+{
     /* Store a pointer to the active level definition for the rest of the
      * game (checkpoints, camera, completion, audio settings) to read */
     gs->runtime.current_level = def;
@@ -726,7 +743,6 @@ int level_load(GameState *gs, const LevelDef *def)
 
     /* Negative physics values mean engine default; never inherit stale phases. */
     level_apply_player_physics(&gs->player, def);
-    return 0;
 }
 
 /*

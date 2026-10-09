@@ -20,6 +20,7 @@
 #include "collision/game_collision.h"
 #include "core/app_session.h"
 #include "core/game_completion.h"
+#include "core/game_experiment.h"
 #include "core/game_overlay.h"
 #include "core/game_player_step.h"
 #include "core/game_terminal.h"
@@ -1232,6 +1233,47 @@ static int nearest_surface_is_order_independent(void)
     return 0;
 }
 
+/*
+ * A Next Level load must not give up the current level until nothing can
+ * fail any more. A next_phase that cannot load leaves the active LevelDef,
+ * its path, its hash and a running experiment recording exactly as they
+ * were; a successful one swaps in the new definition in one step.
+ */
+static int failed_next_phase_keeps_the_current_level(void)
+{
+    GameState gs = {0};
+    int failed = 1;
+    strcpy(gs.level_path, "tests/fixtures/runtime/transition.toml");
+    gs.debug_mode = 1;
+    if (game_init(&gs)) return 1;
+    if (game_experiment_begin(&gs) != 0) goto done;
+
+    LevelDef *active = gs.level_def;
+    uint64_t hash = gs.source_level_hash;
+    struct GameExperiment *tape = gs.experiment;
+    strcpy(active->next_phase, "levels/zz_removed_phase.toml");
+    if (expect_int("missing next phase fails", game_load_next_phase(&gs), -1) ||
+        expect_int("active level kept", gs.level_def == active, 1) ||
+        expect_int("runtime level kept", gs.runtime.current_level == active, 1) ||
+        expect_int("level path kept",
+                   strcmp(gs.level_path, "tests/fixtures/runtime/transition.toml"), 0) ||
+        expect_int("level hash kept", gs.source_level_hash == hash, 1) ||
+        expect_int("recording kept", gs.experiment == tape, 1))
+        goto done;
+
+    strcpy(active->next_phase, "levels/00_sandbox_01.toml");
+    if (expect_int("next phase loads", game_load_next_phase(&gs), 0) ||
+        expect_int("runtime follows the new level", gs.runtime.current_level == gs.level_def, 1) ||
+        expect_int("path follows the new level",
+                   strcmp(gs.level_path, "levels/00_sandbox_01.toml"), 0) ||
+        expect_int("recording ends with its level", gs.experiment == NULL, 1))
+        goto done;
+    failed = 0;
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
 static int phase_resets_transient_state(void)
 {
     GameState gs = {0};
@@ -1287,6 +1329,7 @@ int main(void)
         CASE(coins_stay_collected_across_life_loss), CASE(settings_keep_music_paused_after_refocus),
         CASE(fixed_step_accumulator_contract), CASE(bouncepad_lists_select_the_landed_pad),
         CASE(nearest_surface_is_order_independent), CASE(phase_resets_transient_state),
+        CASE(failed_next_phase_keeps_the_current_level),
         CASE(campaign_manifest_is_ordered_and_transactional),
         CASE(campaign_manifest_nul_fixtures_reject_transactionally),
         CASE(campaign_broken_level_disables_only_its_entry),

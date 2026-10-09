@@ -10,6 +10,7 @@
  */
 
 #include <stdio.h>   /* fprintf */
+#include <stdlib.h>  /* malloc, free: the staging LevelDef */
 
 #include "serializer.h"
 #include "serializer_load_climbables.h"
@@ -35,7 +36,6 @@
 int level_load_toml(const char *path, LevelDef *def) {
     if (!path || !def) return -1;
 
-    LevelDef loaded;
     LevelDef *caller_def = def;
 
     /*
@@ -72,54 +72,70 @@ int level_load_toml(const char *path, LevelDef *def) {
 
     /*
      * Parse into staging storage so failed validation never leaves the caller
-     * with a partially-loaded LevelDef.
+     * with a partially-loaded LevelDef. The staging copy lives on the heap:
+     * a LevelDef is about 16 KB (LEVEL_DEF_SIZE_BUDGET in level.h), and the
+     * browser build has only a 64 KB stack to share with its callers.
      */
-    def = &loaded;
+    def = malloc(sizeof(*def));
+    if (!def) {
+        fprintf(stderr, "serializer: out of memory loading '%s'\n", path);
+        toml_free(r);
+        return -1;
+    }
     level_def_init_defaults(def);
 
     toml_datum_t top = r.toptab;
 
     if (serializer_load_header(top, def) != 0) {
+        free(def);
         toml_free(r);
         return -1;
     }
 
     if (serializer_load_geometry(top, def) != 0) {
+        free(def);
         toml_free(r);
         return -1;
     }
 
     if (serializer_load_checkpoints(top, def) != 0) {
+        free(def);
         toml_free(r);
         return -1;
     }
 
     if (serializer_load_collectibles(top, def) != 0) {
+        free(def);
         toml_free(r);
         return -1;
     }
 
     if (serializer_load_enemies(top, def) != 0) {
+        free(def);
         toml_free(r);
         return -1;
     }
 
     if (serializer_load_hazards(top, def) != 0) {
+        free(def);
         toml_free(r);
         return -1;
     }
 
     if (serializer_load_surfaces(top, def) != 0) {
+        free(def);
         toml_free(r);
         return -1;
     }
 
     if (serializer_load_climbables(top, def) != 0) {
+        free(def);
         toml_free(r);
         return -1;
     }
 
     if (serializer_load_layers(top, def) != 0) {
+        free(def);
         toml_free(r);
         return -1;
     }
@@ -130,6 +146,7 @@ int level_load_toml(const char *path, LevelDef *def) {
         char err[128];
         if (level_validate_runtime(def, err, sizeof(err)) != 0) {
             fprintf(stderr, "serializer: invalid level '%s': %s\n", path, err);
+            free(def);
             toml_free(r);
             return -1;
         }
@@ -142,7 +159,8 @@ int level_load_toml(const char *path, LevelDef *def) {
      */
     toml_free(r);
 
-    *caller_def = loaded;
+    *caller_def = *def;
+    free(def);
 
     return 0;
 }
