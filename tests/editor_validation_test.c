@@ -3250,6 +3250,153 @@ static int orphan_recovery_does_not_poison_discovery(void)
     return result;
 }
 
+/*
+ * Write one recovery pair by hand: editor_recovery_<id>.toml (any bytes;
+ * discovery only checks it exists) and its .meta naming `owner_pid`
+ * (0 writes the old version-1 line, which has no owner).
+ */
+static int write_recovery_pair(const char *root, unsigned long long id,
+                               unsigned long owner_pid, int with_meta)
+{
+    char path[EDITOR_PATH_MAX];
+    char line[160];
+
+    snprintf(path, sizeof(path), "%s/editor_recovery_%016llx.toml", root, id);
+    if (write_text_file(path, "name = \"left over\"\n") != 0) return -1;
+    if (!with_meta) return 0;
+    snprintf(path, sizeof(path), "%s/editor_recovery_%016llx.meta", root, id);
+    if (owner_pid)
+        snprintf(line, sizeof(line), "2\t%016llx\t1700000000\t%lu\t-\n", id, owner_pid);
+    else
+        snprintf(line, sizeof(line), "1\t%016llx\t1700000000\t-\n", id);
+    return write_text_file(path, line);
+}
+
+static int recovery_pair_exists(const char *root, unsigned long long id,
+                                const char *suffix)
+{
+    char path[EDITOR_PATH_MAX];
+    snprintf(path, sizeof(path), "%s/editor_recovery_%016llx%s", root, id, suffix);
+    return editor_file_exists(path);
+}
+
+static void remove_recovery_pair(const char *root, unsigned long long id)
+{
+    char path[EDITOR_PATH_MAX];
+    snprintf(path, sizeof(path), "%s/editor_recovery_%016llx.toml", root, id);
+    remove(path);
+    snprintf(path, sizeof(path), "%s/editor_recovery_%016llx.meta", root, id);
+    remove(path);
+}
+
+/*
+ * The recovery folder used to fill up for good: with 32 leftover copies
+ * autosave failed forever with a generic message, left a .toml without a
+ * .meta that nothing cleaned, and a second editor offered the first one's
+ * live snapshot as if it had crashed.
+ */
+static int recovery_folder_stays_manageable(void)
+{
+    EditorState es = {0};
+    char root[EDITOR_PATH_MAX] = {0};
+    const unsigned long long first_id = 0x1000;
+    int result = 1;
+
+    if (make_test_preference_root(root, sizeof(root)) != 0) return 1;
+
+    /* A .toml whose .meta is gone is swept at start-up. */
+    if (write_recovery_pair(root, 0xabc, 0, 0) != 0) goto cleanup;
+    if (editor_set_preference_root(&es, root) != 0 ||
+        editor_init_persistence_paths(&es) != 0 ||
+        expect_int("orphan swept", recovery_pair_exists(root, 0xabc, ".toml"), 0) != 0)
+        goto cleanup;
+
+    /* Old copies fill every slot: autosave says so, and leaves no orphan. */
+    for (int i = 0; i < EDITOR_MAX_RECOVERY_ENTRIES; i++)
+        if (write_recovery_pair(root, first_id + (unsigned long long)i, 0, 1) != 0)
+            goto cleanup;
+    fill_valid_minimal(&es.level);
+    es.modified = 1;
+    es.last_autosave_ms = (uint32_t)clock_millis() - 30001u;
+    editor_maybe_autosave(&es);
+    if (expect_prefix("full folder explained", es.status_message,
+                      "Autosave paused: 32 old recovery copies fill the folder") != 0 ||
+        expect_int("no orphan from the full folder",
+                   editor_file_exists(es.autosave_path), 0) != 0) goto cleanup;
+
+    /* Discard from the picker deletes that copy's files, then Cancel. */
+    if (editor_discover_recoveries(&es) != 0 ||
+        expect_int("all copies offered", es.recovery_entry_count,
+                   EDITOR_MAX_RECOVERY_ENTRIES) != 0) goto cleanup;
+    {
+        unsigned long long discarded = (unsigned long long)es.recovery_entries[0].id;
+        editor_test_set_recovery_choice(EDITOR_RECOVERY_DISCARD);
+        editor_test_queue_recovery_choice(EDITOR_RECOVERY_CANCEL);
+        if (expect_int("picker after discard", editor_choose_recovery(&es), -1) != 0 ||
+            expect_int("one copy fewer", es.recovery_entry_count,
+                       EDITOR_MAX_RECOVERY_ENTRIES - 1) != 0 ||
+            expect_int("discarded snapshot gone",
+                       recovery_pair_exists(root, discarded, ".toml"), 0) != 0 ||
+            expect_int("discarded metadata gone",
+                       recovery_pair_exists(root, discarded, ".meta"), 0) != 0)
+            goto cleanup;
+    }
+    /* With a free slot the next autosave works again.  (A fresh status
+     * line is not overwritten by routine autosave news, so clear it.) */
+    es.status_message[0] = '\0';
+    es.last_autosave_ms = (uint32_t)clock_millis() - 30001u;
+    editor_maybe_autosave(&es);
+    if (expect_string("autosave resumes", es.status_message, "Autosaved recovery copy") != 0 ||
+        expect_int("own snapshot written", editor_file_exists(es.autosave_path), 1) != 0)
+        goto cleanup;
+    for (int i = 0; i < EDITOR_MAX_RECOVERY_ENTRIES; i++)
+        remove_recovery_pair(root, first_id + (unsigned long long)i);
+    editor_retire_current_recovery(&es);
+
+    /* Discarding the only copy ends the picker. */
+    if (write_recovery_pair(root, 0x2000, 0, 1) != 0 ||
+        editor_discover_recoveries(&es) != 0 ||
+        expect_int("single copy offered", es.recovery_entry_count, 1) != 0) goto cleanup;
+    editor_test_set_recovery_choice(EDITOR_RECOVERY_DISCARD);
+    if (expect_int("discard only copy", editor_choose_recovery(&es), -1) != 0 ||
+        expect_int("nothing left", es.recovery_entry_count, 0) != 0 ||
+        expect_string("discard reported", es.status_message, "Recovery copy discarded") != 0)
+        goto cleanup;
+
+#ifndef _WIN32
+    /* A copy owned by another running editor (our parent process stands in
+     * for one) is live work and is not offered; one whose owner has exited
+     * is a crash leftover and is. */
+    {
+        pid_t child = fork();
+        if (child < 0) goto cleanup;
+        if (child == 0) _exit(0);
+        if (waitpid(child, NULL, 0) != child) goto cleanup;
+        if (write_recovery_pair(root, 0x3000, (unsigned long)getppid(), 1) != 0 ||
+            write_recovery_pair(root, 0x3001, (unsigned long)child, 1) != 0 ||
+            editor_discover_recoveries(&es) != 0 ||
+            expect_int("only the crashed copy offered", es.recovery_entry_count, 1) != 0 ||
+            expect_int("crashed copy id", (int)(es.recovery_entries[0].id == 0x3001), 1) != 0)
+            goto cleanup;
+        /* The live copy is not an orphan either: its files stay. */
+        if (expect_int("live copy kept", recovery_pair_exists(root, 0x3000, ".toml"), 1) != 0)
+            goto cleanup;
+    }
+#endif
+    result = 0;
+
+cleanup:
+    editor_test_set_recovery_choice(-1);
+    for (int i = 0; i < EDITOR_MAX_RECOVERY_ENTRIES; i++)
+        remove_recovery_pair(root, first_id + (unsigned long long)i);
+    remove_recovery_pair(root, 0xabc);
+    remove_recovery_pair(root, 0x2000);
+    remove_recovery_pair(root, 0x3000);
+    remove_recovery_pair(root, 0x3001);
+    cleanup_test_preference_root(root, &es, 1);
+    return result;
+}
+
 static int invalid_drafts_do_not_build_unsafe_previews(void)
 {
     EditorWidgetTestContext context;
@@ -4314,6 +4461,7 @@ int main(void)
     ensure_out_dir();
     if (compact_history_owns_config_snapshots()) return 1;
     if (orphan_recovery_does_not_poison_discovery()) return 1;
+    if (recovery_folder_stays_manageable()) return 1;
     char binary_path[EDITOR_PATH_MAX];
     if (editor_playtest_binary_path(binary_path, sizeof(binary_path))) return 1;
     if (editor_playtest_binary_path(binary_path, 2) != -1) return 1;

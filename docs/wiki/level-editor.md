@@ -200,6 +200,8 @@ The undo stack is in-memory only — it is cleared when a new file is opened or 
 
 The editor keeps recent files (the last 5) and recovery snapshots for modified levels in its OS preference directory, retaining the `Super Mango/Editor/` organization/application suffix. Autosave runs every 30 seconds while the level is modified. Recovery snapshots must load through the same validation as any level, so while the current level has validation errors autosave writes the most recent valid version of the document instead ("Autosaved last valid version"); if nothing newer than the saved file is valid, it skips that round. Every attempt, successful or not, restarts the 30-second timer, so a failing autosave reports `Autosave failed; retrying in 30 s` at most once per interval.
 
+The folder holds at most 32 recovery copies. When leftover copies fill it, autosave pauses with `Autosave paused: 32 old recovery copies fill the folder; Ctrl+R to recover or discard them` instead of failing silently. `Ctrl+R` shows one copy at a time (source file and time) with **Cancel / Recover / Discard**; with several copies the third button is **More...**, which offers **Back / Discard / Next**. Discard deletes that copy's files. Each copy records the process id of the editor that wrote it: a copy whose editor is still running (a second editor window, say) is that editor's live work and is never offered or deleted by another one. A snapshot file that lost its `.meta` description can never be offered, so the editor deletes such orphans when it starts.
+
 ---
 
 ## Copy / Paste
@@ -247,7 +249,7 @@ Enabling **Debug Mode** in the toolbar adds `--debug` to the game launch, showin
 | Open | `Ctrl+O` / Open button | Opens a native file picker |
 | Save | `Ctrl+S` / Save button | Overwrites the current file |
 | Save As | `Ctrl+Shift+S` / Save As button | Native file picker for new path |
-| Recover autosave | `Ctrl+R` | Select an available recovery snapshot |
+| Recover autosave | `Ctrl+R` | Recover or discard a leftover recovery snapshot |
 | Recent file | `Ctrl+1` through `Ctrl+5` | Open a recent file |
 
 The title bar and status bar show an asterisk (`*`) after the filename when there are unsaved changes. New, Open, a recent file, recovery and quit first ask **Save / Discard / Cancel** when the level has been modified; Save continues only if the save succeeds. On Linux these three-button prompts use zenity's extra button.

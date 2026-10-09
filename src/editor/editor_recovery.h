@@ -28,9 +28,24 @@ int editor_set_recovery_document(EditorState *es, const char *document_path);
 /* Re-read the recovery entries on disk into es->recovery_entries. */
 int editor_discover_recoveries(EditorState *es);
 
-/* Show the native Recover / Next / Cancel picker.  Returns the chosen
- * entry's index (its id is left in es->pending_recovery_id) or -1. */
+/* What the designer chose in the recovery picker for one copy. */
+typedef enum {
+    EDITOR_RECOVERY_CANCEL = 0,  /* close the picker                     */
+    EDITOR_RECOVERY_RECOVER = 1, /* load this copy                       */
+    EDITOR_RECOVERY_NEXT = 2,    /* look at the next copy                */
+    EDITOR_RECOVERY_DISCARD = 3, /* delete this copy's files             */
+    EDITOR_RECOVERY_BACK = 4     /* from "More...": ask about it again   */
+} EditorRecoveryAction;
+
+/* Show the native recovery picker (Cancel / Recover / Discard, with
+ * "More..." for Discard / Next when there are several copies).  Returns the
+ * chosen entry's index (its id is left in es->pending_recovery_id), or -1
+ * when cancelled or when every copy was discarded. */
 int editor_choose_recovery(EditorState *es);
+
+/* Delete snapshot files that have lost their .meta (they can never be
+ * offered), except this editor's own.  Returns how many were removed. */
+int editor_clean_orphan_recoveries(EditorState *es);
 
 /* Load one recovery snapshot, found by its id, as an unsaved document. */
 int editor_recover_entry_by_id(EditorState *es, uint64_t recovery_id);
@@ -50,6 +65,9 @@ void editor_retire_current_recovery(EditorState *es);
 int editor_path_is_recovery(const char *path);
 
 #ifdef MANGO_TESTING
-/* Native picker seam used by focused recovery tests (test builds only). */
-void editor_test_set_recovery_choice(int button_id);
+/* Native picker seams used by focused recovery tests (test builds only):
+ * set replaces the canned answers with one EditorRecoveryAction; queue
+ * appends another for the next question (up to four in all). */
+void editor_test_set_recovery_choice(int action);
+void editor_test_queue_recovery_choice(int action);
 #endif

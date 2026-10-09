@@ -120,6 +120,7 @@ int editor_init_persistence_paths(EditorState *es)
 
     if (editor_preference_root_path(es, es->recovery_root_path,
                                     sizeof(es->recovery_root_path)) != 0 ||
+        editor_clean_orphan_recoveries(es) < 0 ||
         editor_discover_recoveries(es) < 0 ||
         editor_set_recovery_document(es, es->file_path) != 0 ||
         editor_make_playtest_path(es) != 0 ||
