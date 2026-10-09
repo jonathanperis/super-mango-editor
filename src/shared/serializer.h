@@ -25,17 +25,21 @@ typedef enum {
     SERIALIZER_SAVE_CREATE_ONLY = 1
 } SerializerSavePolicy;
 
-/* Prints a file's whole contents into fp (see serializer_save_file). */
+/* Prints a file's whole contents into fp (see serializer_write_temp). */
 typedef void (*SerializerEmitFn)(FILE *fp, const void *context);
 
 /*
- * serializer_save_file — Save any text file the way a level is saved:
- * emit(fp, context) writes a sibling temporary file, which then replaces
- * `path` in one step, so a failure leaves the old file whole.  Used for
- * the campaign manifest.  Returns 0, -1, or SERIALIZER_REPLACE_TEMP_KEPT.
+ * serializer_write_temp — The first half of a save, for a caller that
+ * saves several files together and wants every one written before any is
+ * replaced (the editor's Campaign view).  Writes emit's text
+ * to a new sibling temporary file of `path` (permissions as a level save),
+ * flushed and closed, and puts its name in temp_path.  Returns 0, or -1
+ * with nothing left on disk.  Then either serializer_install_temp(temp_path,
+ * path, 0) or serializer_remove_temp(temp_path).
  */
-int serializer_save_file(const char *path, SerializerEmitFn emit,
-                         const void *context);
+int serializer_write_temp(const char *path, SerializerEmitFn emit,
+                          const void *context, char *temp_path,
+                          size_t temp_path_size);
 
 /* ------------------------------------------------------------------ */
 /* File I/O                                                            */
@@ -80,6 +84,12 @@ int level_save_toml_checked(const LevelDef *def, const char *path,
  * until the next save starts ("" when the last save did not end this way).
  */
 const char *level_save_kept_temp_path(void);
+
+/* serializer_write_temp for a level: refuses (-1) a level the game would
+ * refuse, like every save above, and otherwise writes the text
+ * level_save_toml would write into a temporary sibling of path. */
+int level_write_temp(const LevelDef *def, const char *path,
+                     char *temp_path, size_t temp_path_size);
 
 /* Save a recovery copy with its known normal destination embedded as metadata.
  * Recovery copies are private to their owner (0600) on POSIX. */

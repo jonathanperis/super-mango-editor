@@ -2640,6 +2640,100 @@ done:
     return result;
 }
 
+/* 1 when a save of `path` left its first-choice temporary file behind. */
+static int temp_left_for(const char *path)
+{
+    char temp[4096];
+    return serializer_make_temp_path(path, temp, sizeof(temp)) == 0 &&
+           serializer_file_exists_utf8(temp);
+}
+
+/* The next_phase levels/<file> holds on disk now ("?" when it won't load). */
+static const char *next_on_disk(const char *path)
+{
+    static LevelDef level;
+    level_def_init_defaults(&level);
+    return level_load_toml(path, &level) == 0 ? level.next_phase : "?";
+}
+
+/*
+ * Campaign Save writes every changed file to a temporary file first and
+ * only then replaces them, one quick rename each.  A failure while writing
+ * changes nothing on disk and leaves no temporary file; a rename failing
+ * half-way says how many files were written and which one failed, and the
+ * next Save finishes the job.
+ */
+static int campaign_save_writes_everything_before_replacing(void)
+{
+    static const char *const files[] = {
+        "levels/a.toml", "levels/b.toml", "levels/c.toml", CAMPAIGN_MANIFEST_PATH
+    };
+    EditorState es;
+    char cwd[4096];
+    CampaignCatalog reloaded = {0};
+    int result = 1;
+
+    memset(&es, 0, sizeof(es));
+    editor_level_init_defaults(&es.level);
+    if (make_campaign_root() != 0 || test_working_folder(cwd, sizeof(cwd)) != 0 ||
+        test_change_folder(CAMPAIGN_ROOT) != 0) return 1;
+
+    /* a c b: three levels to relink, and the manifest: four files. */
+    if (expect_int("opens", editor_campaign_open(&es, NULL), 0) != 0 ||
+        editor_campaign_move(&es, 2, -1) != 0 ||
+        expect_int("linked", editor_campaign_link_in_order(&es), 3) != 0)
+        goto done;
+
+    /* Writing the first temporary file fails: nothing changes at all. */
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_WRITE);
+    if (expect_int("write failure refused", editor_campaign_save(&es), -1) != 0 ||
+        expect_prefix("write failure status", es.status_message,
+                      "Campaign not saved: writing levels/a.toml failed; no file was changed") != 0 ||
+        expect_int("a untouched", strcmp(next_on_disk("levels/a.toml"), "levels/b.toml"), 0) != 0 ||
+        campaign_catalog_load(CAMPAIGN_MANIFEST_PATH, &reloaded) != 0 ||
+        expect_int("manifest untouched", strcmp(campaign_order(&reloaded),
+                                                "a.toml b.toml c.toml"), 0) != 0)
+        goto done;
+    campaign_catalog_cleanup(&reloaded);
+    for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); i++)
+        if (expect_int("no temporary file after a write failure", temp_left_for(files[i]), 0) != 0)
+            goto done;
+
+    /* Every file is written, then the third rename (levels/b.toml) fails:
+     * a and c are in place, b and the manifest are not, and the status
+     * says so; their temporary files are gone. */
+    serializer_test_set_failure_after(SERIALIZER_TEST_FAILURE_REPLACE, 2);
+    if (expect_int("rename failure", editor_campaign_save(&es), -1) != 0 ||
+        expect_prefix("partial status", es.status_message,
+                      "Campaign partly saved: 2 of 4 files written; writing levels/b.toml failed") != 0 ||
+        expect_int("a written", strcmp(next_on_disk("levels/a.toml"), "levels/c.toml"), 0) != 0 ||
+        expect_int("c written", strcmp(next_on_disk("levels/c.toml"), "levels/b.toml"), 0) != 0 ||
+        expect_int("b not written", strcmp(next_on_disk("levels/b.toml"), "levels/c.toml"), 0) != 0 ||
+        expect_int("still unsaved", editor_campaign_unsaved(&es), 1) != 0)
+        goto done;
+    for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); i++)
+        if (expect_int("no temporary file after a rename failure", temp_left_for(files[i]), 0) != 0)
+            goto done;
+
+    /* Saving again writes only what is left: b and the manifest. */
+    if (expect_int("second save", editor_campaign_save(&es), 0) != 0 ||
+        expect_prefix("second save status", es.status_message,
+                      "Campaign saved: 3 levels, 1 level file updated") != 0 ||
+        campaign_catalog_load(CAMPAIGN_MANIFEST_PATH, &reloaded) != 0 ||
+        expect_int("game reads a c b", strcmp(campaign_order(&reloaded), "a.toml c.toml b.toml"), 0) != 0 ||
+        expect_int("every entry playable", reloaded.levels[0].available &&
+                   reloaded.levels[1].available && reloaded.levels[2].available, 1) != 0)
+        goto done;
+    result = 0;
+
+done:
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+    campaign_catalog_cleanup(&reloaded);
+    editor_campaign_free(&es);
+    if (test_change_folder(cwd) != 0) result = 1;
+    return result;
+}
+
 /*
  * A rail copied together with the spike block riding it pastes as a new
  * rail with the copy riding the NEW rail; deleting the pair is one undo
@@ -5299,6 +5393,7 @@ int main(void)
     if (validation_errors_report_where_they_are() != 0) return 1;
     if (validation_reports_every_runtime_error() != 0) return 1;
     if (campaign_view_edits_and_saves_the_manifest() != 0) return 1;
+    if (campaign_save_writes_everything_before_replacing() != 0) return 1;
     if (float_platform_rail_switch_rechecks_its_rail() != 0) return 1;
     if (drag_round_trips_and_follows_grab_point() != 0) return 1;
     if (editor_mutations_keep_level_valid() != 0) return 1;

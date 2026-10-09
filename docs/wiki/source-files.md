@@ -613,7 +613,7 @@ Shared physics override/default helpers for player movement and camera lookahead
 
 ### `levels/campaign_catalog.h` / `levels/campaign_catalog.c`
 
-The campaign manifest (`levels/campaigns/main.toml`) and its catalog. `campaign_catalog_load()` is what the start menu calls: `campaign_catalog_read()` parses the manifest (version, a nonempty list of valid, unrepeated `levels/<name>.toml` paths) and loads each listed level with `campaign_entry_load()`, then the order rule (each `next_phase` names the next entry, the last none) marks entries unavailable, and a catalog with nothing playable is refused. The editor's Campaign view applies the same rules to its edited, in-memory catalog with `campaign_catalog_check()` and writes the list with `campaign_manifest_save()`, which goes through the serializer's atomic `serializer_save_file()` like a level save.
+The campaign manifest (`levels/campaigns/main.toml`) and its catalog. `campaign_catalog_load()` is what the start menu calls: `campaign_catalog_read()` parses the manifest (version, a nonempty list of valid, unrepeated `levels/<name>.toml` paths) and loads each listed level with `campaign_entry_load()`, then the order rule (each `next_phase` names the next entry, the last none) marks entries unavailable, and a catalog with nothing playable is refused. The editor's Campaign view applies the same rules to its edited, in-memory catalog with `campaign_catalog_check()` and writes the list with `campaign_manifest_write_temp()`: the serializer's `serializer_write_temp()` writes a temporary file next to the manifest, which the view installs only after every changed level file has been written the same way.
 
 ### `levels/level_start.h` / `levels/level_start.c`
 

@@ -504,6 +504,54 @@ const char *level_save_kept_temp_path(void)
 }
 
 /*
+ * write_temp — The first half of every save: write what emit(fp, context)
+ * prints to a new sibling temporary file of `path`, flush it and close it.
+ * temp_path receives the name of the file actually created.  Returns 0, or
+ * -1 with nothing left on disk.
+ *
+ * The file written later is `path` itself.  A symlink there is replaced, not
+ * followed (see serializer_replace_file); callers that mean to save through
+ * a link resolve it first with serializer_resolve_save_target.
+ */
+static int write_temp(const char *path, SerializerEmitFn emit,
+                      const void *context, int private_file,
+                      char *temp_path, size_t temp_path_size)
+{
+    FILE *fp;
+
+    if (!path || !emit || !temp_path || temp_path_size == 0) return -1;
+    if (serializer_make_temp_path(path, temp_path, temp_path_size) != 0) {
+        fprintf(stderr, "serializer: path too long for temporary save '%s'\n", path);
+        return -1;
+    }
+
+    fp = private_file
+       ? serializer_open_temp(path, temp_path, temp_path_size)
+       : serializer_open_temp_shared(path, temp_path, temp_path_size);
+    if (!fp) {
+        fprintf(stderr, "serializer: cannot open '%s' for writing\n", path);
+        serializer_remove_temp(temp_path);
+        return -1;
+    }
+
+    /* Emit the contents; stream errors are checked once, just below. */
+    emit(fp, context);
+
+    {
+        int write_result = serializer_stream_has_error(fp);
+        int flush_result = write_result != 0 ? -1 : serializer_flush(fp);
+        int close_result = fclose(fp);
+
+        if (write_result != 0 || flush_result != 0 || close_result != 0) {
+            fprintf(stderr, "serializer: failed to flush/close '%s'\n", path);
+            serializer_remove_temp(temp_path);
+            return -1;
+        }
+    }
+    return 0;
+}
+
+/*
  * save_emitted — The one save path behind every public saver: write what
  * emit(fp, context) prints to a sibling temporary file, flush it, then
  * install it as `path` in one step (serializer_replace_file), so a failure
@@ -525,39 +573,9 @@ static int save_emitted(const char *path, SerializerEmitFn emit,
     int install_result;
 
     s_kept_temp_path[0] = '\0';
-    if (!path || !emit) return -1;
-
-    /* The file written is `path` itself.  A symlink there is replaced, not
-     * followed (see serializer_replace_file); callers that mean to save
-     * through a link resolve it first with serializer_resolve_save_target. */
-    if (serializer_make_temp_path(path, temp_path, sizeof(temp_path)) != 0) {
-        fprintf(stderr, "serializer: path too long for temporary save '%s'\n", path);
+    if (write_temp(path, emit, context, private_file,
+                   temp_path, sizeof(temp_path)) != 0)
         return -1;
-    }
-
-    FILE *fp = private_file
-             ? serializer_open_temp(path, temp_path, sizeof(temp_path))
-             : serializer_open_temp_shared(path, temp_path, sizeof(temp_path));
-    if (!fp) {
-        fprintf(stderr, "serializer: cannot open '%s' for writing\n", path);
-        serializer_remove_temp(temp_path);
-        return -1;
-    }
-
-    /* Emit the contents; stream errors are checked once, just below. */
-    emit(fp, context);
-
-    {
-        int write_result = serializer_stream_has_error(fp);
-        int flush_result = write_result != 0 ? -1 : serializer_flush(fp);
-        int close_result = fclose(fp);
-
-        if (write_result != 0 || flush_result != 0 || close_result != 0) {
-            fprintf(stderr, "serializer: failed to flush/close '%s'\n", path);
-            serializer_remove_temp(temp_path);
-            return -1;
-        }
-    }
 
     if (expected) {
         SerializerFileFingerprint actual;
@@ -592,10 +610,11 @@ static int save_emitted(const char *path, SerializerEmitFn emit,
     return 0;
 }
 
-int serializer_save_file(const char *path, SerializerEmitFn emit,
-                         const void *context)
+int serializer_write_temp(const char *path, SerializerEmitFn emit,
+                          const void *context, char *temp_path,
+                          size_t temp_path_size)
 {
-    return save_emitted(path, emit, context, SERIALIZER_SAVE_REPLACE, NULL, 0);
+    return write_temp(path, emit, context, 0, temp_path, temp_path_size);
 }
 
 /* What write_level_toml needs, passed through save_emitted's context. */
@@ -659,6 +678,20 @@ int level_save_toml_checked(const LevelDef *def, const char *path,
     if (policy == SERIALIZER_SAVE_REPLACE &&
         (!expected || !expected->valid)) return -1;
     return level_save_toml_internal(def, path, NULL, policy, expected, 0);
+}
+
+int level_write_temp(const LevelDef *def, const char *path,
+                     char *temp_path, size_t temp_path_size)
+{
+    LevelEmit level = { def, NULL };
+    char err[128];
+
+    if (!def || !path) return -1;
+    if (level_validate_runtime(def, err, sizeof(err)) != 0) {
+        fprintf(stderr, "serializer: invalid level for save '%s': %s\n", path, err);
+        return -1;
+    }
+    return write_temp(path, emit_level, &level, 0, temp_path, temp_path_size);
 }
 
 int level_save_toml_recovery(const LevelDef *def, const char *path,
