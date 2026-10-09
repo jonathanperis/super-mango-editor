@@ -544,6 +544,8 @@ static int persistent_session(void)
     puts("profile session: continue to a removed stage");
     session=session_create(&config);
     CHECK(session && !session->game && session->menu && session->screen==APP_SCREEN_MENU);
+    /* ...and says why, as a failed Play does, instead of a silent menu. */
+    CHECK(strstr(session->menu->error_message,"could not be loaded")!=NULL);
     session_destroy(&session);
     config.level_path="levels/00_sandbox_01.toml"; config.smoke_test_frames=1;
     session=session_create(&config);
