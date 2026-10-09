@@ -2568,15 +2568,43 @@ static int validation_reports_every_runtime_error(void)
         expect_int("nothing hidden", editor_validation_hidden_count(&report), 0) != 0)
         return 1;
 
-    /* More errors than the list holds: the counts keep them all. */
+    /* Every coin, star, climbable, platform, bridge and pad left of the
+     * world (or worse): more errors than the report keeps.  It keeps the
+     * first EDITOR_VALIDATION_MAX_MESSAGES, and the counts keep them all. */
     editor_level_init_defaults(&level);
-    level.coin_count = EDITOR_VALIDATION_MAX_MESSAGES + 4;
-    for (int i = 0; i < level.coin_count; i++)
-        level.coins[i] = (CoinPlacement){-5.0f, 100.0f};
+    level.coin_count = MAX_COINS;
+    for (int i = 0; i < MAX_COINS; i++) level.coins[i] = (CoinPlacement){-5.0f, 100.0f};
+    level.star_yellow_count = level.star_green_count = level.star_red_count = 16;
+    for (int i = 0; i < 16; i++) {
+        level.star_yellows[i] = (StarYellowPlacement){-5.0f, 100.0f};
+        level.star_greens[i] = (StarGreenPlacement){-5.0f, 100.0f};
+        level.star_reds[i] = (StarRedPlacement){-5.0f, 100.0f};
+    }
+    level.vine_count = MAX_VINES;
+    for (int i = 0; i < MAX_VINES; i++) level.vines[i] = (VinePlacement){-5.0f, 100.0f, 3, 0};
+    level.ladder_count = level.rope_count = 16;
+    for (int i = 0; i < 16; i++) {
+        level.ladders[i] = (LadderPlacement){-5.0f, 100.0f, 3};
+        level.ropes[i] = (RopePlacement){-5.0f, 100.0f, 3};
+    }
+    level.platform_count = MAX_PLATFORMS;
+    for (int i = 0; i < MAX_PLATFORMS; i++)
+        level.platforms[i] = (PlatformPlacement){.x = -5.0f, .tile_height = 1, .tile_width = 1};
+    level.bridge_count = MAX_BRIDGES;
+    for (int i = 0; i < MAX_BRIDGES; i++) level.bridges[i] = (BridgePlacement){-5.0f, 100.0f, 3};
+    level.bouncepad_small_count = MAX_BOUNCEPADS_SMALL;
+    level.bouncepad_medium_count = MAX_BOUNCEPADS_MEDIUM;
+    level.bouncepad_high_count = MAX_BOUNCEPADS_HIGH;
+    for (int i = 0; i < 16; i++) {
+        level.bouncepads_small[i] = (BouncepadPlacement){.x = -5.0f};
+        level.bouncepads_medium[i] = (BouncepadPlacement){.x = -5.0f};
+        level.bouncepads_high[i] = (BouncepadPlacement){.x = -5.0f};
+    }
     (void)editor_validate_level(&level, &report);
-    if (expect_int("listed", report.message_count, EDITOR_VALIDATION_MAX_MESSAGES) != 0 ||
-        expect_int("counted", report.error_count, EDITOR_VALIDATION_MAX_MESSAGES + 4) != 0 ||
-        expect_int("hidden", editor_validation_hidden_count(&report) >= 4, 1) != 0)
+    if (expect_int("more than kept", report.error_count > EDITOR_VALIDATION_MAX_MESSAGES, 1) != 0 ||
+        expect_int("listed", report.message_count, EDITOR_VALIDATION_MAX_MESSAGES) != 0 ||
+        expect_int("hidden", editor_validation_hidden_count(&report),
+                   report.error_count - EDITOR_VALIDATION_MAX_MESSAGES) != 0)
         return 1;
 
     /* A bad count is reported alone: the arrays cannot be walked. */

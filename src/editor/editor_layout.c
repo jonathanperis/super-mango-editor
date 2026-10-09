@@ -35,7 +35,13 @@ enum {
 
 int editor_config_total_height(const EditorState *es)
 {
-    int validation_rows = es->validation_report.message_count
+    /* The rows shown (at most EDITOR_VALIDATION_VISIBLE_ROWS), the line
+     * saying which ones when there are more, and "... and N more" for any
+     * the report had no room for (config_validation in properties.c). */
+    int listed = es->validation_report.message_count;
+    int validation_rows = (listed < EDITOR_VALIDATION_VISIBLE_ROWS
+                           ? listed : EDITOR_VALIDATION_VISIBLE_ROWS)
+                        + (listed > EDITOR_VALIDATION_VISIBLE_ROWS)
                         + (editor_validation_hidden_count(&es->validation_report) > 0);
     int validation_h = CFG_H_VALIDATION_BASE + validation_rows * CFG_H_VALIDATION_ROW;
     /* Why the last Open failed: a heading, its rows, maybe "... and N more",

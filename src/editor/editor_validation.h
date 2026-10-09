@@ -6,8 +6,12 @@
 #include "../levels/level.h"
 #include "../levels/level_validate.h" /* LevelIssueLocation */
 
-/* The panel lists this many messages; the counts include any beyond it. */
-#define EDITOR_VALIDATION_MAX_MESSAGES 16
+/* The report keeps this many messages, more than any level a person writes
+ * by hand produces; the counts include any beyond it.  The Level Config
+ * panel shows EDITOR_VALIDATION_VISIBLE_ROWS of them at a time and the wheel
+ * scrolls through the rest. */
+#define EDITOR_VALIDATION_MAX_MESSAGES 256
+#define EDITOR_VALIDATION_VISIBLE_ROWS 8
 /* Room for "<field> unsafe: " plus a full 255-byte level path, so a long
  * asset path is reported whole instead of being cut off mid-name. */
 #define EDITOR_VALIDATION_MESSAGE_LEN  384

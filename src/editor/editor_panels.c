@@ -98,6 +98,18 @@ int editor_handle_side_panel_scroll(EditorState *es, int mx, int my, float wheel
      * that is not yet a whole pixel for the next event.  Truncating each
      * event to an int on its own would turn every small swipe into 0.
      */
+    /* Over a validation list longer than its window, the wheel scrolls
+     * the list one row per notch (fractions add up, as below). */
+    if (properties_message_list_contains(mx, my)) {
+        int rows;
+        es->message_wheel_accum += -wheel_y;
+        rows = (int)es->message_wheel_accum;
+        es->message_wheel_accum -= (float)rows;
+        es->message_scroll += rows;     /* config_validation clamps it */
+        if (es->message_scroll < 0) es->message_scroll = 0;
+        return 1;
+    }
+
     es->panel_wheel_accum += -wheel_y * 20.0f;
     pixels = (int)es->panel_wheel_accum;     /* toward 0, sign kept */
     es->panel_wheel_accum -= (float)pixels;
