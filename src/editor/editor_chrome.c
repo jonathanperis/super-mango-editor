@@ -134,6 +134,11 @@ void editor_render_status_bar(EditorState *es)
     snprintf(mouse_text, sizeof(mouse_text), "Mouse: (%.0f, %.0f)", wx, wy);
     ui_label(&es->ui, 8, bar_y + 8, mouse_text);
 
+    /* Snap indicator: bright while on, dim while off (key S toggles). */
+    ui_label_color(&es->ui, 150, bar_y + 8,
+                   es->snap_to_grid ? "Snap: on" : "Snap: off",
+                   es->snap_to_grid ? UI_ACCENT : UI_TEXT_DIM);
+
     const char *tool_names[] = { "Select", "Place", "Delete" };
     const char *tool_name = (es->tool >= 0 && es->tool < 3)
                             ? tool_names[es->tool]
@@ -141,7 +146,7 @@ void editor_render_status_bar(EditorState *es)
 
     char tool_text[64];
     snprintf(tool_text, sizeof(tool_text), "Tool: %s", tool_name);
-    ui_label(&es->ui, 210, bar_y + 8, tool_text);
+    ui_label(&es->ui, 228, bar_y + 8, tool_text);
 
     ui_label_color(&es->ui, 330, bar_y + 8,
                    editor_validation_summary(&es->validation_report),

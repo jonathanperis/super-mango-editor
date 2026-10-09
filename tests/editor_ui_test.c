@@ -826,6 +826,64 @@ done:
     return failed;
 }
 
+/*
+ * Snap to grid (key S) applies to placing as well as dragging; Shift
+ * inverts it for one click or drag.  The status bar shows whether it is on.
+ */
+static int snap_toggle_applies_to_placing_and_dragging(void)
+{
+    int failed = 0;
+    EditorState es;
+    float wx, wy;
+    CHECK(open_editor(&es, NULL) == 0);
+    /* The status-bar labels around the indicator do not overlap. */
+    CHECK(8 + ui_text_width(&es.ui, "Mouse: (1600, 300)") < 150);
+    CHECK(150 + ui_text_width(&es.ui, "Snap: off") < 228);
+    CHECK(228 + ui_text_width(&es.ui, "Tool: Delete") < 330);
+
+    CHECK(es.snap_to_grid == 0);
+    key_frame(&es, KEY_S, 0);
+    CHECK(es.snap_to_grid == 1 && strstr(es.status_message, "Snap to grid on"));
+
+    /* A placement lands on the grid cell's corner... */
+    es.palette_type = ENT_COIN;
+    es.tool = TOOL_PLACE;
+    const int sx = 317, sy = 251;
+    canvas_screen_to_world(&es, sx, sy, &wx, &wy);
+    CHECK(fmodf(wx, (float)TILE_SIZE) != 0.0f);
+    ui_frame(&es, sx, sy);
+    click_frame(&es, sx, sy);
+    CHECK(es.level.coin_count == 1);
+    CHECK(es.level.coins[0].x == floorf(wx / TILE_SIZE) * TILE_SIZE);
+    CHECK(es.level.coins[0].y == floorf(wy / TILE_SIZE) * TILE_SIZE);
+    /* ...unless Shift is held, which places freely. */
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, INPUT_SHIFT, sx, sy);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, INPUT_SHIFT, sx, sy);
+    ui_frame(&es, sx, sy);
+    CHECK(es.level.coin_count == 2 && es.level.coins[1].x == wx);
+
+    /* A drag of the free coin snaps its corner onto the grid. */
+    es.tool = TOOL_SELECT;
+    int cx = sx + 2, cy = sy + 2;
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, cx, cy);
+    push_event(INPUT_MOUSE_MOVE, 0, 0, cx + 70, cy + 9);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, cx + 70, cy + 9);
+    ui_frame(&es, cx + 70, cy + 9);
+    CHECK(es.selection.type == ENT_COIN);
+    {
+        const CoinPlacement *moved = &es.level.coins[es.selection.index];
+        CHECK(fmodf(moved->x, (float)TILE_SIZE) == 0.0f);
+        CHECK(fmodf(moved->y, (float)TILE_SIZE) == 0.0f);
+    }
+
+    key_frame(&es, KEY_S, 0);
+    CHECK(es.snap_to_grid == 0);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
 /* ------------------------------------------------------------------ */
 /* Text editing: caret keys and Tab                                    */
 /* ------------------------------------------------------------------ */
@@ -1119,6 +1177,7 @@ int main(void)
         CASE(text_fields_move_the_caret_and_tab_between_fields),
         CASE(arrow_keys_nudge_and_backspace_deletes),
         CASE(ctrl_d_duplicates_with_a_stepping_offset),
+        CASE(snap_toggle_applies_to_placing_and_dragging),
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),
         CASE(native_pickers_report_choice_cancel_and_failure),

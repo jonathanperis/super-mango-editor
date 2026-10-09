@@ -864,6 +864,20 @@ int editor_set_float_platform_mode(EditorState *es, int index,
     return 0;
 }
 
+int editor_snap_active(const EditorState *es)
+{
+    int shift = es && (es->input_mods & INPUT_SHIFT) != 0;
+    return es && (es->snap_to_grid != 0) != shift;
+}
+
+void editor_snap_point(const EditorState *es, float *x, float *y)
+{
+    if (!editor_snap_active(es)) return;
+    /* floorf, not a cast: a cast rounds -10 up to 0, floorf down to -48. */
+    if (x) *x = floorf(*x / TILE_SIZE) * TILE_SIZE;
+    if (y) *y = floorf(*y / TILE_SIZE) * TILE_SIZE;
+}
+
 /*
  * place_entity --- Add one entity of the palette type at (world_x, world_y).
  *
@@ -876,6 +890,9 @@ static void place_entity(EditorState *es, float world_x, float world_y)
     EntityType type = es->palette_type;
     PlacementData pd;
 
+    /* With snapping on, the click lands on the grid cell's corner, the same
+     * point the placement ghost was drawn at. */
+    editor_snap_point(es, &world_x, &world_y);
     if (!default_placement(type, world_x, world_y, &pd)) return;
     if (type == ENT_SPIKE_BLOCK) {
         int rail = editor_nearest_rail(&es->level, world_x, world_y);
@@ -1069,15 +1086,11 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
     target_y = world_y - es->drag_grab_y;
 
     /*
-     * Shift-snap: when the Shift key is held, round the entity's top-left
-     * corner down to the TILE_SIZE (48 px) grid.  This makes alignment easy
-     * without needing to toggle a separate grid-snap mode.
+     * Snapping: with snap-to-grid on (key S), or while Shift is held with it
+     * off, round the entity's top-left corner down to the TILE_SIZE (48 px)
+     * grid.  Shift always means "the other way" for the move in progress.
      */
-    int mods = IsWindowReady() ? input_modifiers() : 0;
-    if (mods & INPUT_SHIFT) {
-        target_x = floorf(target_x / TILE_SIZE) * TILE_SIZE;
-        target_y = floorf(target_y / TILE_SIZE) * TILE_SIZE;
-    }
+    editor_snap_point(es, &target_x, &target_y);
 
     moved = move_placement(es->drag_type, &es->drag_before,
                            target_x - es->drag_start_x,
