@@ -371,7 +371,7 @@ static void render_platforms(EditorState *es) {
         int   tw     = (pp->tile_width > 0) ? pp->tile_width : 1;
         int   plat_w = tw * TILE_SIZE;
         int   plat_h = pp->tile_height * TILE_SIZE;
-        float plat_y = (float)(FLOOR_Y - pp->tile_height * TILE_SIZE + 16);
+        float plat_y = level_platform_top_y(pp->tile_height);
 
         /* Select texture based on tile_path */
         Texture2D *tex;
@@ -1120,7 +1120,7 @@ static void render_axe_traps(EditorState *es) {
         const AxeTrapPlacement *at = &es->level.axe_traps[i];
 
         float ax = at->pillar_x;
-        float ay = (at->y != 0.0f) ? at->y : (float)(FLOOR_Y - 3 * TILE_SIZE + 16);
+        float ay = level_axe_trap_y(at);   /* y = 0 means default height */
 
         draw_tex(es, es->textures.axe_trap, NULL,
                  ax, ay, AXE_FRAME_W, AXE_FRAME_H);
@@ -1137,11 +1137,9 @@ static void render_axe_traps(EditorState *es) {
  *     = 252 - 96 + 16 - 32 = 140
  */
 static void render_circular_saws(EditorState *es) {
-    float default_y = (float)(FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H);
-
     for (int i = 0; i < es->level.circular_saw_count; i++) {
         const CircularSawPlacement *cs = &es->level.circular_saws[i];
-        float sy = (cs->y != 0.0f) ? cs->y : default_y;
+        float sy = level_circular_saw_y(cs);   /* y = 0 means default height */
         draw_tex(es, es->textures.circular_saw, NULL,
                  cs->x, sy, SAW_DISPLAY_W, SAW_DISPLAY_H);
     }
