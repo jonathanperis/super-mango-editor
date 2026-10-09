@@ -231,6 +231,13 @@ void serializer_test_set_failure(int failure)
 }
 #endif
 
+int serializer_test_take_failure(int failure)
+{
+    if (serializer_test_failure != failure) return 0;
+    serializer_test_failure = SERIALIZER_TEST_FAILURE_NONE;
+    return 1;
+}
+
 int serializer_stream_has_error(FILE *fp)
 {
     if (fp && ferror(fp)) return 1;
