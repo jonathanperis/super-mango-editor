@@ -98,7 +98,10 @@ void render_level_complete_overlay(GameState *gs)
         snprintf(line, sizeof(line), "Time: %02d:%02d", minutes, seconds);
         render_centered_text(gs, line, (Color){255, 255, 255, 255}, 136);
         if (gs->screen.completion.next_phase_failed) {
-            render_centered_text(gs, "Next level failed to load",
+            render_centered_text(gs,
+                                 gs->screen.completion.next_phase_failed == NEXT_PHASE_UNAVAILABLE
+                                     ? "Next level is unavailable in the campaign"
+                                     : "Next level failed to load",
                                  (Color){255, 90, 90, 255}, 154);
         } else if (!has_next_level) {
             render_centered_text(gs, "Congratulations!",

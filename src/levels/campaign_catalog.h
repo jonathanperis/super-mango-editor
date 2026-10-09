@@ -23,6 +23,9 @@
  * One manifest entry. A level file that is missing, invalid or out of the
  * campaign order does not take the whole menu down: its entry stays listed
  * with available == 0 and a short reason, and the menu shows it disabled.
+ * The game's campaign flow (Play, Continue, Next Level, --continue) never
+ * starts an unavailable entry; only --level, which bypasses the manifest,
+ * can still load its file.
  * level is only meaningful when loaded is 1; available is loaded plus the
  * order and name rules (campaign_catalog_check).
  */

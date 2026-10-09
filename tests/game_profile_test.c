@@ -1032,6 +1032,58 @@ fail:
     return 1;
 }
 
+/*
+ * The manifest marks an entry unavailable when it breaks the campaign
+ * order, and the menu refuses to start it. Next Level and --continue used
+ * to open it anyway. Both now refuse it and say so; --level still loads
+ * the file directly (decision D-003).
+ */
+static int campaign_flow_refuses_unavailable_entries(void)
+{
+    char path[160], lock_path[176];
+    const char *campaign = "tests/fixtures/runtime/campaign_out_of_order.toml";
+    const char *sandbox = "levels/00_sandbox_01.toml";
+    snprintf(path, sizeof(path), TEST_OUT "profile-campaign-%llu.toml", (unsigned long long)clock_millis());
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+
+    /* Next Level into the unavailable sandbox entry is refused. */
+    AppSessionConfig config = {.level_path = "levels/01_lugio_01.toml", .campaign_path = campaign};
+    AppSession *session = session_create(&config);
+    CHECK(session && session->game);
+    LevelDef *def = session->game->world.level_def;
+    snprintf(def->next_phase, sizeof(def->next_phase), "%s", sandbox);
+    game_complete_level(session->game);
+    session->game->screen.route = GAME_ROUTE_NEXT_LEVEL;
+    session_frame(session);
+    CHECK(session->game && session->game->screen.completion.next_phase_failed == NEXT_PHASE_UNAVAILABLE);
+    CHECK(!strcmp(session->game->world.level_path, "levels/01_lugio_01.toml"));
+    CHECK(strstr(session->status_message, "unavailable") != NULL);
+    session_destroy(&session);
+
+    /* --level bypasses the manifest: the same file still loads. */
+    config.level_path = sandbox;
+    config.profile_enabled = 1;
+    config.profile_path = path;
+    session = session_create(&config);
+    CHECK(session && session->game);
+    CHECK(!strcmp(session->profile.data.last_level, sandbox));
+    session_destroy(&session);  /* saves last_level = the sandbox */
+
+    /* --continue to it falls back to the menu, with the reason shown. */
+    config.level_path = NULL;
+    config.continue_last = 1;
+    session = session_create(&config);
+    CHECK(session && !session->game && session->menu);
+    CHECK(strstr(session->menu->error_message, "unavailable") != NULL);
+    session_destroy(&session);
+    remove(path); remove(lock_path);
+    return 0;
+fail:
+    session_destroy(&session);
+    remove(path); remove(lock_path);
+    return 1;
+}
+
 /* Collect raylib warnings so a test can see what the session logged. */
 static char last_warning[256];
 static void capture_warning(int level, const char *text, va_list args)
@@ -1101,6 +1153,8 @@ int game_profile_contract_test(void)
     if (start_point_runs_leave_the_profile_alone()) return 1;
     if (ghost_hidden_on_partial_runs()) return 1;
     if (ghost_save_keeps_a_faster_stored_run()) return 1;
+    puts("profile: campaign flow");
+    if (campaign_flow_refuses_unavailable_entries()) return 1;
     puts("game_profile_contract_test: ok");
     return 0;
 }
