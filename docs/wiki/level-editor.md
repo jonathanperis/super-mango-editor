@@ -93,7 +93,11 @@ what still uses it). Deleting an unused rail renumbers the references to later
 rails, and undo restores the original numbering.
 
 The `Delete` key, or `Backspace` (laptops without a Delete key), removes the
-selection; inside a text field both edit text instead. The arrow keys nudge the
+selection; inside a text field both edit text instead. `Backspace` deletes the
+selection only while the canvas has the focus, that is, when your last click
+was on the canvas: right after `Enter` commits a field, a `Backspace` still
+meant for that field deletes nothing and the status bar says to click the
+canvas or press `Delete`, which works wherever the focus is. The arrow keys nudge the
 selection 1 px, or 16 px with `Shift`, following the same rules as a drag
 (floor-bound entities move only sideways, rail riders stay on their rail, and
 nothing leaves the world or makes the level invalid). A quick run of nudges of

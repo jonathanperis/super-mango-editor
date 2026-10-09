@@ -65,6 +65,9 @@
 #define PANEL_LABEL_X (CANVAS_W + 40)
 #define PANEL_FIELD_X (CANVAS_W + 140)
 #define PANEL_FAR_X   (CANVAS_W + 300)
+/* Level Config rows (the panel is open and unscrolled at start). */
+#define CFG_NAME_Y    (TOOLBAR_H + 64 + 4)
+#define CFG_SCREENS_Y (TOOLBAR_H + 136 + 4)
 
 static RenderTexture2D tiny_target;
 
@@ -787,6 +790,25 @@ static int arrow_keys_nudge_and_backspace_deletes(void)
     CHECK(es.level.coin_count == coins - 1 && es.selection.index < 0);
     key_frame(&es, KEY_Z, INPUT_CTRL);
     CHECK(es.level.coin_count == coins);
+
+    /* After a field commit with Enter the panel has the focus: a Backspace
+     * still meant for the field deletes nothing.  Delete still does, and a
+     * click on the canvas gives Backspace back. */
+    CHECK(place_and_select_coin(&es, 360, 300) == 0);
+    click_frame(&es, CANVAS_W + 60, CFG_NAME_Y);
+    CHECK(es.ui.active_id != 0);
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(es.ui.active_id == 0 && es.selection.index >= 0);
+    const int before_backspace = es.level.coin_count;
+    key_frame(&es, KEY_BACKSPACE, 0);
+    CHECK(es.level.coin_count == before_backspace && es.selection.index >= 0);
+    CHECK(strstr(es.status_message, "Backspace deletes on the canvas") != NULL);
+    key_frame(&es, KEY_DELETE, 0);
+    CHECK(es.level.coin_count == before_backspace - 1);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(place_and_select_coin(&es, 420, 300) == 0);
+    key_frame(&es, KEY_BACKSPACE, 0);
+    CHECK(es.level.coin_count == before_backspace);
 done:
     clear_dialog_seams();
     close_editor(&es);
@@ -1367,9 +1389,6 @@ done:
 /* Text editing: caret keys and Tab                                    */
 /* ------------------------------------------------------------------ */
 
-/* Level Config rows (the panel is open and unscrolled at start). */
-#define CFG_NAME_Y    (TOOLBAR_H + 64 + 4)
-#define CFG_SCREENS_Y (TOOLBAR_H + 136 + 4)
 
 static void text_frame(EditorState *es, const char *text)
 {
