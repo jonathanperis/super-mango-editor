@@ -12,8 +12,9 @@ int game_camera_update(GameState *gs, float dt);
 
 /*
  * Jump the camera straight to where it wants to be for the player's current
- * position, with no easing. Used after a respawn or Retry: the player
- * reappears far from where they died, and easing would visibly pan the
- * whole way back across the level.
+ * position, with no easing. Used whenever the player is placed rather
+ * than moved: at level start (game_init), after a phase transition or an
+ * experiment restart, and after a respawn or Retry. Easing from wherever
+ * the camera was would visibly pan the whole way across the level.
  */
 void game_camera_snap(GameState *gs);

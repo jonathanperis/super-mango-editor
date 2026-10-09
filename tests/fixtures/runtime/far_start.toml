@@ -1,0 +1,18 @@
+# Runtime fixture whose start lies several screens into the world, so the
+# camera must begin there instead of at x = 0 (camera snap tests).
+format_version = 1
+name = "Runtime far start fixture"
+screen_count = 4
+player_start_x = 900.0
+player_start_y = 252.0
+initial_hearts = 3
+initial_lives = 3
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+
+[[checkpoints]]
+x = 1100.0
+y = 252.0
+
+[last_star]
+x = 1500.0
+y = 228.0

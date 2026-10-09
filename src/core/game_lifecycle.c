@@ -4,6 +4,7 @@
 
 #include "../game.h"
 
+#include "game_camera.h"
 #include "game_resources.h"
 #include "game_experiment.h"
 #include "game_window.h"
@@ -30,7 +31,8 @@ int game_init(GameState *gs)
     /* Set up the player (loads texture, sets initial position on the floor). */
     if (player_init(&gs->player) != 0) goto fail;
 
-    /* Camera starts at the far-left edge of the world. */
+    /* A safe value until the level says where the player starts; the
+     * camera is snapped to the real start once the level is loaded. */
     gs->camera.x = 0.0f;
 
     /*
@@ -49,6 +51,14 @@ int game_init(GameState *gs)
 
     if (game_level_load_initial(gs) != 0) goto fail;
     if (game_replay_load(gs) != 0) goto fail;
+
+    /*
+     * The level has placed the player at its start. Put the camera there
+     * now, instead of leaving it at x = 0 and letting the per-step easing
+     * pan across the level on the first frames (visible whenever a level
+     * starts further right than half a screen).
+     */
+    game_camera_snap(gs);
 
     /*
      * Health, lives, and scoring rules are set by level_load() from LevelDef
