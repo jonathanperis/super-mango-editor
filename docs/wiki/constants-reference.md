@@ -192,6 +192,8 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 | `CLIMB_SPEED` | `80.0f` | `player_input.c` | Vertical climb speed |
 | `CLIMB_H_SPEED` | `80.0f` | `player_input.c` | Horizontal climb drift |
 | `PLAYER_CLIMB_GRAB_PAD` | `4` | `player_climb.c` | Extra grab width around climbables |
+| `PLAYER_HURT_TIME` | `1.5f` | `player.h` | Invincibility after a hit (s); `apply_damage` sets `hurt_timer` to it |
+| `PLAYER_KNOCKBACK_GRAB_LOCK` | `0.25f` | `player.h` | Time after a hit when no climbable can be grabbed, so the knockback is not cancelled (s) |
 
 ## Audio Units and Voice Limit
 
