@@ -142,7 +142,9 @@ the same way twice.
   `localStorage` entry per level, `super-mango-ghost-v1:<level path>`; when storage
   is full the ghost is simply not saved and a warning is logged. A ghost text of
   five minutes is about 180 KB; anything over 256 KB, or damaged in any way, is
-  ignored.
+  ignored. Damage includes a `time` more than one 1/60 s step away from the time
+  its `steps` take, so a hand-edited `time = 0` cannot make a ghost no run could
+  beat.
 
 Native profiles use `profile.toml` under the OS preference root plus `SuperMango/SuperMango/`,
 or an explicit `--profile PATH`. A native save writes a sibling temporary file and

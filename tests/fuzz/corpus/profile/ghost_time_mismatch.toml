@@ -1,0 +1,11 @@
+# A hand-edited ghost: five steps take 0.083 s, not 0. The decoder must
+# reject it, or no real run could ever beat its time.
+format_version = 1
+level = "levels/00_sandbox_01.toml"
+level_hash = "fedcba9876543210"
+time = 0
+steps = 5
+frames = [
+  "0450011c000451011c040452011a050453011824",
+  "045401172d",
+]
