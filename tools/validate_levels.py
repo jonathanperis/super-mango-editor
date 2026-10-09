@@ -468,6 +468,27 @@ def normalize_campaign_path(value) -> str | None:
     return value
 
 
+# The C runtime's isspace() in the "C" locale: what counts as blank there.
+C_SPACE_CHARS = " \t\n\v\f\r"
+
+
+def campaign_display_name(campaign_path: str, data: dict) -> str:
+    """Mirror campaign_derive_display_name in src/levels/level_session.c.
+
+    The level selector shows the level's `name` when it has any non-blank
+    character, otherwise the file name without `.toml`.  The game refuses a
+    campaign whose entry would show nothing at all, so the validator must
+    too: `levels/   .toml` with an empty `name` passes every path rule.
+    """
+    name = data.get("name")
+    if isinstance(name, str) and name.strip(C_SPACE_CHARS):
+        return name
+    filename = campaign_path.rsplit("/", 1)[-1]
+    if filename.endswith(".toml"):
+        filename = filename[: -len(".toml")]
+    return filename
+
+
 def campaign_manifest_entries(
     manifest_path: Path | None = None,
 ) -> tuple[list[tuple[str, Path, dict]], list[str]]:
@@ -531,6 +552,11 @@ def campaign_manifest_entries(
         except ValueError as exc:
             errors.append(str(exc))
             continue
+        if not campaign_display_name(normalized, data).strip(C_SPACE_CHARS):
+            errors.append(
+                f"{normalized}: campaign level has no display name; set `name` "
+                f"or rename the file so it is not only spaces"
+            )
         entries.append((normalized, level_path, data))
 
     for index, (path, _, data) in enumerate(entries):

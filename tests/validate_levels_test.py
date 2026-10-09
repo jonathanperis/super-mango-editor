@@ -8,6 +8,7 @@ loads every fixture below through the real loader.
 from __future__ import annotations
 
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -178,8 +179,56 @@ def main() -> int:
         if not errors:
             raise AssertionError(f"invalid campaign fixture accepted: {name}")
 
+    check_campaign_display_names()
+
     print("validate_levels_test: ok")
     return 0
+
+
+def check_campaign_display_names() -> None:
+    """A campaign entry must have something to show in the level selector.
+
+    The game (campaign_derive_display_name in level_session.c) shows `name`,
+    or the file name when `name` is blank, and refuses a campaign whose
+    entry would show nothing.  `levels/   .toml` passes every path rule, so
+    with an empty `name` it used to pass validation and then fail in game.
+    """
+    show = validate_levels.campaign_display_name
+    if show("levels/   .toml", {"name": "Lava Run"}) != "Lava Run":
+        raise AssertionError("visible name not used")
+    if show("levels/lava.toml", {"name": " \t "}) != "lava":
+        raise AssertionError("blank name did not fall back to the file name")
+    if show("levels/   .toml", {"name": ""}).strip(validate_levels.C_SPACE_CHARS):
+        raise AssertionError("spaces-only file name counted as visible")
+
+    original_root = validate_levels.ROOT
+    with tempfile.TemporaryDirectory() as scratch:
+        root = Path(scratch)
+        (root / "levels").mkdir()
+        level_text = (FIXTURE_DIR / "valid_legacy.toml").read_text(encoding="utf-8")
+        (root / "levels" / "   .toml").write_text(level_text, encoding="utf-8")
+        manifest = root / "main.toml"
+        manifest.write_text(
+            'format_version = 1\nlevels = ["levels/   .toml"]\n', encoding="utf-8"
+        )
+        validate_levels.ROOT = root
+        try:
+            for name, expect_error in (("", True), ("Spaces", False)):
+                body = "\n".join(
+                    line for line in level_text.splitlines()
+                    if not line.startswith("name ")
+                )
+                (root / "levels" / "   .toml").write_text(
+                    f'name = "{name}"\n{body}\n', encoding="utf-8"
+                )
+                _, errors = validate_levels.campaign_manifest_entries(manifest)
+                found = any("no display name" in error for error in errors)
+                if found != expect_error:
+                    raise AssertionError(
+                        f"display-name check for name={name!r}: {errors}"
+                    )
+        finally:
+            validate_levels.ROOT = original_root
 
 
 if __name__ == "__main__":
