@@ -101,7 +101,7 @@ static int parse_float_value(const char *text, float *value)
  * before Save, a canvas click, a button) store the same clamped value.
  * long long keeps the rounding below from overflowing near INT_MAX.
  */
-static int limit_int_edit(const UIState *ui, int value)
+static int limit_int_edit(UIState *ui, int value)
 {
     long long v = value;
     long long lo = ui->edit_int_min;
@@ -109,6 +109,9 @@ static int limit_int_edit(const UIState *ui, int value)
     long long step = ui->edit_int_step;
 
     if (lo > hi) return value;            /* no usable limits */
+    if (v < lo || v > hi)
+        snprintf(ui->edit_note, sizeof(ui->edit_note),
+                 "%d is outside %lld..%lld, so it was limited", value, lo, hi);
     if (v < lo) v = lo;
     if (v > hi) v = hi;
     if (step > 1) {
@@ -134,6 +137,7 @@ static void clear_active_edit(UIState *ui)
     ui->edit_int_step = 1;
     ui->edit_float_min = -FLT_MAX;
     ui->edit_float_max = FLT_MAX;
+    ui->edit_float_nonzero = 0;
     ui->edit_cursor = 0;
     ui->edit_buf[0] = '\0';
     ui->pending_text_length = 0;
@@ -357,8 +361,20 @@ int ui_apply_active_edit(UIState *ui)
         /* As for integers: limits apply to a value the user changed. */
         if (memcmp(&value, target, sizeof(value)) != 0 &&
             ui->edit_float_min <= ui->edit_float_max) {
+            if (value < ui->edit_float_min || value > ui->edit_float_max)
+                snprintf(ui->edit_note, sizeof(ui->edit_note),
+                         "%.9g is outside %.9g..%.9g, so it was limited",
+                         value, ui->edit_float_min, ui->edit_float_max);
             if (value < ui->edit_float_min) value = ui->edit_float_min;
             if (value > ui->edit_float_max) value = ui->edit_float_max;
+        }
+        /* A field that must not hold 0 treats a typed 0 like text that is
+         * not a number: nothing is stored and the field stays active. */
+        if (ui->edit_float_nonzero && value == 0.0f &&
+            memcmp(&value, target, sizeof(value)) != 0) {
+            snprintf(ui->edit_note, sizeof(ui->edit_note),
+                     "0 is not allowed here; type a value other than 0");
+            return 0;
         }
         /* "Did the stored value change?" is a question about the stored
          * bits, not about numbers being close: any edit, however small, is
@@ -840,13 +856,29 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
  *   - Displays the value with nine significant digits ("%.9g").
  *   - Parses the edit buffer with complete-input validation.
  */
+static int float_field(UIState *ui, int id, int x, int y, int w,
+                       float *value, float min, float max, int nonzero);
+
 int ui_float_field(UIState *ui, int id, int x, int y, int w, float *value)
 {
-    return ui_float_field_limited(ui, id, x, y, w, value, -FLT_MAX, FLT_MAX);
+    return float_field(ui, id, x, y, w, value, -FLT_MAX, FLT_MAX, 0);
 }
 
 int ui_float_field_limited(UIState *ui, int id, int x, int y, int w,
                            float *value, float min, float max)
+{
+    return float_field(ui, id, x, y, w, value, min, max, 0);
+}
+
+int ui_float_field_nonzero(UIState *ui, int id, int x, int y, int w,
+                           float *value, float limit)
+{
+    return float_field(ui, id, x, y, w, value, -limit, limit, 1);
+}
+
+/* The float field itself; nonzero is ui_float_field_nonzero's extra rule. */
+static int float_field(UIState *ui, int id, int x, int y, int w,
+                       float *value, float min, float max, int nonzero)
 {
     int h         = 20;
     int is_active = (ui->active_id == id);
@@ -869,6 +901,7 @@ int ui_float_field_limited(UIState *ui, int id, int x, int y, int w,
         ui->edit_target_size = sizeof(*value);
         ui->edit_float_min = min;
         ui->edit_float_max = max;
+        ui->edit_float_nonzero = nonzero;
         /*
          * Keep enough significant digits for a float to survive activation
          * and a no-op Return unchanged.

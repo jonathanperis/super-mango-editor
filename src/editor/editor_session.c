@@ -254,16 +254,28 @@ int editor_finish_field_edit(EditorState *es)
     if (result == 2) editor_commit_change(es);
     editor_restore_change_tracking(es, outer_kind, outer_before_change,
                                    outer_context);
+    /* The field may have limited what was typed: say so (the command's
+     * own status, set after this returns, may then replace it). */
+    if (result != 0 && es->ui.edit_note[0] != '\0') {
+        editor_set_status(es, "%s", es->ui.edit_note);
+        es->ui.edit_note[0] = '\0';
+    }
     if (result != 0) return 1;
 
-    /* The value cannot be stored: ask.  The field is still active. */
+    /* The value cannot be stored: ask.  The field is still active.  A
+     * field with its own rule (a speed that must not be 0) left a note
+     * saying which; the question repeats it. */
+    char question[256];
+    snprintf(question, sizeof(question),
+             "The field holds a value that cannot be stored%s%s. "
+             "Keep editing it, or discard what you typed?",
+             es->ui.edit_note[0] ? ": " : "", es->ui.edit_note);
+    es->ui.edit_note[0] = '\0';
     if (test_choice >= 0) {
         /* Test seam: 2 means Discard (the old dialog's button number);
          * anything else keeps editing. */
         button_id = test_choice == 2 ? 1 : 0;
-    } else if (dialog_choice("Invalid Field Value",
-                             "The field holds a value that cannot be stored. "
-                             "Keep editing it, or discard what you typed?",
+    } else if (dialog_choice("Invalid Field Value", question,
                              buttons, 2, 0, 0, &button_id) != 0) {
         editor_set_status(es, "Command blocked: field edit confirmation failed");
         return 0;
