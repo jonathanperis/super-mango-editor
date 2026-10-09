@@ -22,7 +22,9 @@ void editor_set_document_save_point(EditorState *es);
 void editor_set_recovered_dirty(EditorState *es);
 void editor_refresh_dirty(EditorState *es);
 
-/* Resolve retained field text before any command can change editor state. */
+/* Resolve retained field text before any command can change editor state:
+ * a valid value is applied as its own undo step; only an invalid one asks
+ * (Keep Editing / Discard).  Returns 1 when the command may proceed. */
 int editor_finish_field_edit(EditorState *es);
 int editor_before_command(void *context);
 
@@ -51,6 +53,8 @@ EditorExternalChoice editor_confirm_external_change(EditorState *es);
 /* Native-dialog seams used by focused editor state tests.  Only test builds
  * define MANGO_TESTING (see TEST_CFLAGS in the Makefile), so the shipped
  * editor has no way to skip a confirmation dialog. */
+/* Answer for the invalid-field prompt: 2 = Discard, other values keep
+ * editing, -1 = no canned answer.  Used up by the next finish call. */
 void editor_test_set_finish_field_choice(int button_id);
 void editor_test_set_discard_choice(int button_id);
 void editor_test_set_overwrite_choice(int button_id);
