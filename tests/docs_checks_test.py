@@ -49,6 +49,12 @@ class DocsChecksTest(unittest.TestCase):
             ("entity-walkthrough.md", "`level_validate_runtime()` (`src/levels/level_validate.c`",
              "`level_validate_runtime()` (`src/levels/level_check.c`", drift.check_function_locations,
              "`src/levels/level_check.c` does not exist"),
+            ("index.md", "33 render layers drawn", "32 render layers drawn",
+             drift.check_content_counts, "says 32 render layers; the render order table"),
+            ("developer-guide.md", "The full 33-layer order", "The full 34-layer order",
+             drift.check_content_counts, "says 34 render layers"),
+            ("architecture.md", "| 33 | Debug overlay", "| 34 | Debug overlay",
+             drift.check_content_counts, "must number its layers 1..N"),
         ]
         original_read = drift.read
         for name, old, new, check, expected in cases:
