@@ -1,0 +1,9 @@
+# A campaign whose first entry breaks the order: 00_sandbox_01's
+# next_phase is 01_lugio_01, not the 02_lugio_02 listed after it, so the
+# manifest marks it unavailable. game_profile_test.c checks that Next Level
+# and --continue refuse it the way the menu does.
+format_version = 1
+levels = [
+    "levels/00_sandbox_01.toml",
+    "levels/02_lugio_02.toml",
+]

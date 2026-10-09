@@ -50,15 +50,44 @@ static void session_emit(AppSession *session, AppSessionLifecycleEvent event, co
     if (session->hooks.lifecycle) session->hooks.lifecycle(event, path, session->hooks.userdata);
 }
 
-static int session_load_catalog(AppSession *session)
+static int session_read_catalog(AppSession *session)
 {
     if (session->catalog_loaded) return 0;
-    if (campaign_catalog_load(CAMPAIGN_MANIFEST_PATH, &session->catalog)) {
+    if (campaign_catalog_load(session->campaign_path, &session->catalog)) return -1;
+    session->catalog_loaded = 1;
+    return 0;
+}
+
+static int session_load_catalog(AppSession *session)
+{
+    if (session_read_catalog(session)) {
         copy_path(session->status_message, sizeof(session->status_message), "Campaign manifest unavailable");
         return -1;
     }
-    session->catalog_loaded = 1;
     return 0;
+}
+
+/*
+ * session_campaign_refusal — Why the campaign will not play `path`, or
+ * NULL when it may.
+ *
+ * The manifest marks an entry unavailable when its file is missing or
+ * invalid, or when it breaks the campaign order (campaign_check_chain).
+ * The menu already refuses such an entry; Next Level and --continue ask
+ * here too, so the campaign flow never reaches a level its own menu greys
+ * out. A level the manifest does not list (a lab, a --level file) has no
+ * campaign rule to break, and without a readable manifest there is none
+ * to apply. --level itself never asks: it loads a file directly and
+ * bypasses the manifest on purpose.
+ */
+static const char *session_campaign_refusal(AppSession *session, const char *path)
+{
+    if (!path || !path[0] || session_read_catalog(session)) return NULL;
+    for (size_t i = 0; i < session->catalog.count; i++) {
+        const CampaignLevel *entry = &session->catalog.levels[i];
+        if (!strcmp(entry->path, path)) return entry->available ? NULL : entry->problem;
+    }
+    return NULL;
 }
 
 static void session_free_owned(AppSession *session)
@@ -485,10 +514,18 @@ static void session_apply_game_route(AppSession *session)
     if (route == GAME_ROUTE_EXIT && !session_profile_ready_to_leave(session)) return;
     game->screen.route = GAME_ROUTE_NONE;
     switch (route) {
-    case GAME_ROUTE_NEXT_LEVEL:
+    case GAME_ROUTE_NEXT_LEVEL: {
         session->route = APP_ROUTE_GAME_NEXT_LEVEL;
         copy_path(path, sizeof(path), game->screen.completion.next_phase);
-        if (!game_load_next_phase(game)) {
+        const char *refused = session_campaign_refusal(session, path);
+        if (refused) {
+            /* Like a failed load below, but the reason is the campaign's. */
+            game->screen.completion.next_phase_failed = NEXT_PHASE_UNAVAILABLE;
+            game->screen.terminal_action_index = 0;
+            copy_path(session->status_message, sizeof(session->status_message),
+                      "Next level is unavailable in the campaign");
+            TraceLog(LOG_WARNING, "%s: %s (%s)", session->status_message, path, refused);
+        } else if (!game_load_next_phase(game)) {
             session_profile_key(game, path);
             game_profile_select(&session->profile, game->screen.profile_level_key);
             /* The new level is played from its start: a whole attempt. */
@@ -506,7 +543,7 @@ static void session_apply_game_route(AppSession *session)
             /* The current level is untouched, so Replay, Level Select and
              * Exit still work. Say what happened, drop the dead Next Level
              * row and focus the first remaining action. */
-            game->screen.completion.next_phase_failed = 1;
+            game->screen.completion.next_phase_failed = NEXT_PHASE_LOAD_FAILED;
             game->screen.terminal_action_index = 0;
             copy_path(session->status_message, sizeof(session->status_message), "Next level failed to load");
             TraceLog(LOG_WARNING, "%s: %s", session->status_message, path);
@@ -514,6 +551,7 @@ static void session_apply_game_route(AppSession *session)
         game->screen.route = GAME_ROUTE_NONE;
         session->route = APP_ROUTE_NONE;
         break;
+    }
     case GAME_ROUTE_REPLAY:
         /*
          * Native and browser builds both replace the game in place.
@@ -582,6 +620,8 @@ AppSession *session_create(const AppSessionConfig *config)
     session->smoke_test_frames = config ? config->smoke_test_frames : 0;
     if (config && config->hooks) session->hooks = *config->hooks;
     if (config) session->start = config->start;
+    copy_path(session->campaign_path, sizeof(session->campaign_path),
+              config && config->campaign_path ? config->campaign_path : CAMPAIGN_MANIFEST_PATH);
     copy_path(session->replay_script_path, sizeof(session->replay_script_path), config ? config->replay_script_path : NULL);
     copy_path(session->replay_dir, sizeof(session->replay_dir), config ? config->replay_dir : NULL);
     /* Acquire process resources before a screen loads GPU/audio assets. Tests
@@ -598,9 +638,19 @@ AppSession *session_create(const AppSessionConfig *config)
         if (game_profile_open(&session->profile, config->profile_path)) TraceLog(LOG_WARNING, "%s", session->profile.status);
     } else copy_path(session->profile.status, sizeof(session->profile.status), "Saving disabled; settings apply to this run.");
     int continued = 0;  /* the level came from the profile, not the command line */
+    int refused = 0;    /* ...but the campaign no longer offers it */
     if (!level && config && config->continue_last && session->profile.data.last_level[0]) {
-        level = session->profile.data.last_level;
-        continued = 1;
+        const char *problem = session_campaign_refusal(session, session->profile.data.last_level);
+        if (problem) {
+            refused = 1;
+            copy_path(session->status_message, sizeof(session->status_message),
+                      "Last stage is unavailable in the campaign");
+            TraceLog(LOG_WARNING, "%s: %s (%s)", session->status_message,
+                     session->profile.data.last_level, problem);
+        } else {
+            level = session->profile.data.last_level;
+            continued = 1;
+        }
     }
     if (level && level[0]) {
         copy_path(session->boot_level_path, sizeof(session->boot_level_path), level);
@@ -611,6 +661,7 @@ AppSession *session_create(const AppSessionConfig *config)
         /* --continue also picks the stage up at its saved Continue point. */
         if (continued && session->game) session_apply_resume(session, session->game);
     } else if (session_open_menu(session)) goto fail;
+    if (refused && session->menu) start_menu_set_error(session->menu, session->status_message);
     if (config && config->experiment_path && (!session->game || game_experiment_load(session->game, config->experiment_path))) goto fail;
     return session;
 fail:
