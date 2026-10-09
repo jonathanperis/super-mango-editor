@@ -1304,6 +1304,32 @@ static int campaign_view_reorders_renames_and_saves(void)
     key_frame(&es, KEY_ESCAPE, 0);
     CHECK(es.ui.active_id == 0 && es.campaign != NULL);
 
+    /* A name typed but not applied is unsaved work: quitting only warns. */
+    click_frame(&es, CAMPAIGN_NAME_X + 10, CAMPAIGN_ROWS_Y + 8);
+    push_text("#");
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(editor_campaign_unsaved(&es) == 1);
+    push_event(INPUT_QUIT, 0, 0, 0, 0);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.running && es.campaign != NULL);
+    CHECK(strstr(es.status_message, "Unsaved campaign changes") != NULL);
+    key_frame(&es, KEY_ESCAPE, 0);                   /* drop the typing */
+    CHECK(editor_campaign_unsaved(&es) == 0);
+
+    /* Revert (asked twice, like Close) puts back what is on disk. */
+    click_frame(&es, CAMPAIGN_VIEW_X + 20, CAMPAIGN_ROWS_Y + 2 * CAMPAIGN_ROW_H + 8);
+    click_campaign_button(&es, 0);                   /* b above c... */
+    CHECK(strcmp(view->levels[1].path, "levels/b.toml") == 0);
+    click_campaign_button(&es, 6);
+    CHECK(strstr(es.status_message, "Revert again") != NULL);
+    view = editor_campaign_entries(&es);
+    CHECK(strcmp(view->levels[1].path, "levels/b.toml") == 0);
+    click_campaign_button(&es, 6);
+    view = editor_campaign_entries(&es);
+    CHECK(view && strcmp(view->levels[1].path, "levels/c.toml") == 0);
+    CHECK(editor_campaign_unsaved(&es) == 0);
+    CHECK(strstr(es.status_message, "reverted") != NULL);
+
     /* Esc goes back to the level. */
     key_frame(&es, KEY_ESCAPE, 0);
     CHECK(es.campaign == NULL);
