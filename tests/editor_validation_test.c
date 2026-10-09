@@ -2724,6 +2724,28 @@ static int campaign_save_writes_everything_before_replacing(void)
         expect_int("every entry playable", reloaded.levels[0].available &&
                    reloaded.levels[1].available && reloaded.levels[2].available, 1) != 0)
         goto done;
+
+    /* Windows can move a file aside and then fail to move the new one in
+     * (the seam acts it out): that temporary file is the only complete
+     * copy, so it stays, and the status bar names it. */
+    if (editor_campaign_move(&es, 2, -1) != 0 ||          /* a b c */
+        expect_int("relinked", editor_campaign_link_in_order(&es), 3) != 0)
+        goto done;
+    serializer_test_set_failure_after(SERIALIZER_TEST_FAILURE_REPLACE_STRANDED, 1);
+    if (expect_int("stranded", editor_campaign_save(&es), -1) != 0 ||
+        expect_prefix("stranded status", es.status_message,
+                      "Campaign partly saved (1 of 4 files written). Save incomplete: "
+                      "the new levels/b.toml is safe in ") != 0 ||
+        expect_int("names the copy", strstr(es.status_message, "b.toml.tmp.") != NULL, 1) != 0 ||
+        expect_int("kept copy stays", temp_left_for("levels/b.toml"), 1) != 0 ||
+        expect_int("c temporary gone", temp_left_for("levels/c.toml"), 0) != 0 ||
+        expect_int("manifest temporary gone", temp_left_for(CAMPAIGN_MANIFEST_PATH), 0) != 0)
+        goto done;
+    {
+        char kept[4096];
+        if (serializer_make_temp_path("levels/b.toml", kept, sizeof(kept)) == 0)
+            serializer_remove_temp(kept);
+    }
     result = 0;
 
 done:
