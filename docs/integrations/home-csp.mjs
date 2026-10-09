@@ -14,11 +14,13 @@ const INLINE_PLACEHOLDER = "'sha256-MANGO_HOME_INLINE_SCRIPTS'";
 // 'self' serves the Astro bundle and the game's super-mango.js/.wasm/.data;
 // 'wasm-unsafe-eval' compiles WebAssembly without allowing JavaScript eval.
 // Styles keep 'unsafe-inline' because the game injects its touch-control CSS.
+// Fonts are self-hosted (see BaseLayout.astro), so no font or style host is
+// allowed beyond 'self'.
 export const HOME_CSP = [
     "default-src 'self'",
     `script-src 'self' 'wasm-unsafe-eval' ${INLINE_PLACEHOLDER}`,
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
     "img-src 'self' data: blob:",
     "media-src 'self' blob:",
     "connect-src 'self'",

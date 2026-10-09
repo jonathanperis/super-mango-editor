@@ -50,6 +50,23 @@ by more than 1 LSB per sample (platform math libraries may round differently).
 
 All game and editor text uses raylib's built-in default font, compiled into
 raylib and covered by raylib's zlib/libpng license above. No font file is
-bundled.
+bundled with the game, the editor or their release archives.
+
+## Website fonts
+
+The documentation website (`docs/`, published on GitHub Pages) serves its own
+copies of three typefaces, installed from the [Fontsource](https://fontsource.org/)
+npm packages and bundled into the site by Astro, so visitors' browsers never
+contact Google Fonts:
+
+| Typeface | Package | Copyright | License |
+|----------|---------|-----------|---------|
+| Pixelify Sans | `@fontsource/pixelify-sans` | Copyright 2021 The Pixelify Sans Project Authors | SIL Open Font License 1.1 |
+| Atkinson Hyperlegible | `@fontsource/atkinson-hyperlegible` | Copyright 2020 Braille Institute of America, Inc. | SIL Open Font License 1.1 |
+| DM Mono | `@fontsource/dm-mono` | Copyright 2020 The DM Mono Project Authors | SIL Open Font License 1.1 |
+
+The fonts are used unmodified. The full license texts are in
+`docs/public/licenses/fonts/`, which the site publishes beside the font files
+(`/licenses/fonts/`), and in each package's `LICENSE`.
 
 The documentation's Asset Provenance page records each component's evidence.

@@ -437,7 +437,12 @@ The manual is an Astro content collection: `docs/src/content.config.ts` uses the
 pages with `getCollection('docs')` and `render()`, and fails the build when a
 page and the `SECTION_ORDER` list in `docs/src/lib/docsSidebar.ts` disagree.
 `docs/integrations/home-csp.mjs` adds a hash-pinned Content-Security-Policy to
-the home page that hosts the game after the build. Optional analytics loads only
+the home page that hosts the game after the build. The site's three fonts
+(Pixelify Sans, Atkinson Hyperlegible, DM Mono) are self-hosted from the
+`@fontsource/*` packages **5.3.0**, which `BaseLayout.astro` imports so Astro
+bundles the font files; that policy allows styles and fonts only from the site
+itself, and `bun run check-site` fails if any page references Google Fonts. The
+SIL Open Font License texts are published from `docs/public/licenses/fonts/`. Optional analytics loads only
 on manual pages, never on that home page.
 
 ```sh

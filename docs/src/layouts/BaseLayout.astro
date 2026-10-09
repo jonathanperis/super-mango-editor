@@ -1,4 +1,18 @@
 ---
+/* Self-hosted fonts (the @fontsource packages, SIL Open Font License 1.1):
+   Astro bundles each @font-face and its WOFF2 files into this site, so no page
+   asks Google Fonts, or any other origin, for them. Pixelify Sans is the
+   display face, Atkinson Hyperlegible the reading face, DM Mono the code face;
+   only the weights and styles the CSS uses are imported. */
+import "@fontsource/pixelify-sans/400.css";
+import "@fontsource/pixelify-sans/500.css";
+import "@fontsource/pixelify-sans/600.css";
+import "@fontsource/pixelify-sans/700.css";
+import "@fontsource/atkinson-hyperlegible/400.css";
+import "@fontsource/atkinson-hyperlegible/400-italic.css";
+import "@fontsource/atkinson-hyperlegible/700.css";
+import "@fontsource/dm-mono/400.css";
+import "@fontsource/dm-mono/500.css";
 import "../styles/globals.css";
 import Analytics from '../components/Analytics.astro';
 
@@ -90,14 +104,6 @@ const jsonLd = pageType === 'docs' ? {
         <link rel="icon" type="image/png" sizes="32x32" href={favicon32Href} />
         <link rel="apple-touch-icon" href={appleTouchIconHref} />
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
-
-        <!-- Google Fonts: Pixelify Sans (display), Atkinson Hyperlegible (text), DM Mono (code) -->
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@400;500&display=swap"
-            rel="stylesheet"
-        />
 
         <title>{title}</title>
         {/* Third-party analytics never runs in the document hosting the game,
