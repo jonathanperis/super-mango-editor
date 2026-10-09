@@ -247,7 +247,7 @@ browser download), where `<seconds>` is the calendar time (seconds since
 says which of "Nothing recorded; F8 starts a recording", "Export failed: file
 names already taken" or "Export failed: could not write the file" stopped an
 export. The file
-(`format_version = 2`) has one row per step, `[input bits, nine movement
+(`format_version = 3`) has one row per step, `[input bits, nine movement
 values]`, plus the level path, the seed and `level_hash`, a hash of the level
 file's exact bytes.
 
@@ -255,9 +255,13 @@ Replay it with `--level <same level> --experiment <file>`. The game checks the
 format version, the seed, the 1–36,000 step count and that the level file
 still hashes to `level_hash`, then plays the recorded inputs, ignores live
 movement and freezes after the last step. A changed level is rejected rather
-than silently producing a different run. So is a `format_version = 1` file:
-it came from the earlier variable-timestep engine and cannot be replayed
-faithfully, so record it again. The engine version is not checked, so replay
+than silently producing a different run. So is an older format, with a
+"record it again" error: a `format_version = 1` file came from the earlier
+variable-timestep engine, and a `format_version = 2` file was recorded while
+the camera still panned in from the left edge at a level start and eased back
+after a lost life. The camera now snaps there at once, and a waiting spike
+block starts moving when the camera first shows it, so in a version-2 capture
+it could start on a different step and the run would quietly go another way. The engine version is not checked, so replay
 with the same build. Recordings are not save games: they hold no pause time,
 audio or pixels. See [Mechanics Museum](../mechanics-museum/) for levels to
 try it on.
