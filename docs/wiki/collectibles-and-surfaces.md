@@ -144,7 +144,9 @@ Top surface Y for a pillar: `FLOOR_Y − (tile_height × TILE_SIZE) + 16` = `268
 |------|-----------|
 | `STATIC` | Fixed position, never moves |
 | `CRUMBLE` | Begins falling after the player stands on it for 0.75 s without stepping off (stepping off resets the timer); it reappears when the level resets after a life loss |
-| `RAIL` | Travels along a rail path at constant speed, carrying the player; on an open rail it bounces at both ends and never detaches |
+| `RAIL` | Travels along a rail path at constant speed, carrying the player sideways and up or down with it; on an open rail it bounces at both ends and never detaches |
+
+Landing on a float platform is tested against the platform's own movement: the player lands when their feet were at or above where its top was before its last move, and are now at or below where it is. The player moves before the platforms in each step, so this is what lets a platform that rises into falling feet catch them instead of slipping under them. A rider whose platform moved down was carried down with it; a small stay-on tolerance keeps them standing.
 
 | Constant | Value | Description |
 |----------|-------|-------------|

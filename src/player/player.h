@@ -122,12 +122,12 @@ void player_handle_input(Player *player, SoundEffect *snd_jump,
  *
  * If the player lands on a float platform, *out_fp_landed_idx is set to that
  * platform's index; otherwise it is left at -1.  Used by game_float_platforms_update to drive
- * the crumble timer and to nudge the player along with a moving rail platform.
+ * the crumble timer and to carry the player along with a moving rail platform.
  *
  * prev_fp_landed_idx : the index that *out_fp_landed_idx was set to last frame
  *   (pass -1 on the first frame).  Used internally to "stay" on a platform that
- *   moved upward this frame — without it, the crossing test misses because the
- *   surface escaped upward past the player's feet before they could cross it.
+ *   moved downward last step — the rider was carried down with it, so their
+ *   feet start below the platform's previous top and the crossing test misses.
  */
 void player_update(Player *player, float dt, SoundEffect *snd_jump,
                    const Platform *platforms, int platform_count,

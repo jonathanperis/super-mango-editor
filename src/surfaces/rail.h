@@ -45,13 +45,13 @@
  * MAX_RAIL_SPEED — fastest speed, in tiles per second, a level may give
  * anything that rides a rail (spike blocks and float platforms).
  *
- * The limit comes from the player riding a float platform. When the
- * platform moves up, the player's feet end up below its top for a moment,
- * and the stay-on check in player_surfaces.c pulls them back only while
- * that gap is under FLOAT_PLATFORM_STICK_TOL (16 px). At the fixed 60 Hz
- * step, 30 tiles/s rises 30 × 16 / 60 = 8 px per step: half the tolerance,
- * leaving the rest for gravity (under 1 px per step). The shipped levels
- * use at most 6 tiles/s. Speeds must also be positive: an open rail turns
+ * At the fixed 60 Hz step, 30 tiles/s moves a rider 30 × 16 / 60 = 8 px
+ * per step: half a rail tile, and less than the player's 18 px wide hitbox,
+ * so a spike block cannot pass through the player between two hitbox
+ * checks. (A float platform carries its rider by however far it moved, and
+ * landings are tested against the platform's movement, so riders do not
+ * set this limit.) The shipped levels use at most 6 tiles/s. Speeds must
+ * also be positive: an open rail turns
  * its rider around at each end, and a negative speed would push it back
  * past the start every step, so it would never move.
  */

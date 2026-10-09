@@ -10,27 +10,19 @@
 /*
  * FLOAT_PLATFORM_STICK_TOL — tolerance in logical pixels for the stay-on check.
  *
- * When a rail platform moves upward, it escapes from under the player before
- * the crossing test can fire (the player's feet are slightly BELOW the new
- * surface position, but `prev_bottom` was also below the new position so the
- * "from above" test fails).  The stay-on check catches this by accepting any
- * gap smaller than this tolerance between the player's physics bottom and the
- * platform's top surface.
+ * After every step a rail platform carries its rider by exactly the distance
+ * it moved (game_float_platforms.c), so the rider starts the next step with
+ * their feet on the surface. If the platform was moving DOWN, those feet are
+ * now below where the top was before that move (fp->prev_y), so the crossing
+ * test below, which wants the feet to start at or above prev_y, fails. The
+ * stay-on check catches this by accepting any gap smaller than this tolerance
+ * between the rider's physics bottom and the platform's top surface.
  *
- * Worst-case gap in one fixed step (dt = 1/60 s for live play and replays
- * alike), with the platform at the validator's top rail speed:
- *   platform moves up : MAX_RAIL_SPEED 30 tiles/s × 16 px/tile ÷ 60 = 8.0 px
- *   player falls      : GRAVITY × dt² (the rider starts at vy = 0) ≈ 0.2 px
- *   total gap                                                     ≈ 8.2 px
- * 16 px gives a safe margin over that worst case.
+ * In one fixed step (dt = 1/60 s for live play and replays alike) the rider
+ * only falls by gravity, GRAVITY × dt² ≈ 0.2 px from vy = 0, whatever the
+ * platform's speed. 16 px is a generous margin over that.
  */
 #define FLOAT_PLATFORM_STICK_TOL  16
-
-/* Keep the per-step rise of the fastest allowed platform within half the
- * tolerance, so a faster MAX_RAIL_SPEED cannot silently drop riders. */
-_Static_assert(MAX_RAIL_SPEED * RAIL_TILE_H * 2 <=
-               FLOAT_PLATFORM_STICK_TOL * TARGET_FPS,
-               "MAX_RAIL_SPEED outruns the float-platform stay-on tolerance");
 
 void player_resolve_floor_collision(Player *player,
                                     const BouncepadList *bouncepad_lists, int bouncepad_list_count,
@@ -158,13 +150,21 @@ void player_resolve_platform_collisions(Player *player,
     }
 
     /*
-     * Float-platform collision — same crossing test as above.
+     * Float-platform collision — a crossing test measured against the
+     * platform, because the platform moves too.
      *
      * A float platform can replace a lower static surface candidate.
      * The FLOAT_PLATFORM_H sprite (16 px) is a thin surface
      * so the crossing test is the correct approach: we check whether the
      * player's physics bottom crossed the platform's top surface y this
      * frame, rather than using a distance threshold.
+     *
+     * prev_bottom was where the feet were when the platform's top was still
+     * at fp->prev_y: the player moved during the last step BEFORE the
+     * platforms did (game_update.c). So "the feet were above the top and are
+     * now at or below it" is  prev_bottom <= fp->prev_y && bottom >= fp->y.
+     * Comparing prev_bottom with the new fp->y instead would let a platform
+     * that rose past falling feet during its own update slip under them.
      *
      * When a landing is detected:
      *   • The player is snapped so their physics bottom sits at fp->y.
@@ -185,8 +185,8 @@ void player_resolve_platform_collisions(Player *player,
                             (player->x + PHYS_PAD_X < fp->x + fp->w);
             if (!h_overlap) continue;
 
-            /* Vertical crossing: bottom crossed the top surface from above. */
-            if (prev_bottom <= fp->y && bottom >= fp->y) {
+            /* Vertical crossing, relative to the moving top surface. */
+            if (prev_bottom <= fp->prev_y && bottom >= fp->y) {
                 player->y          = fp->y - player->h + FLOOR_SINK;
                 player->vy         = 0.0f;
                 player->on_ground  = 1;
@@ -196,14 +196,15 @@ void player_resolve_platform_collisions(Player *player,
         }
 
         /*
-         * Stay-on check — handles platforms that moved UPWARD this frame.
+         * Stay-on check — keeps a rider on a platform that moved DOWNWARD.
          *
-         * When the surface escapes upward, the crossing test fails because
-         * both prev_bottom and bottom end up BELOW the new fp->y.  We detect
-         * this by remembering which platform the player was on last frame
-         * (prev_fp_landed_idx) and checking whether the player's physics
-         * bottom is still within FLOAT_PLATFORM_STICK_TOL pixels of that
-         * surface.  If so, snap back and re-establish contact.
+         * The rider was carried down with the platform, so prev_bottom is
+         * below fp->prev_y and the crossing test fails, though the feet are
+         * still on the surface.  We detect this by remembering which platform
+         * the player was on last frame (prev_fp_landed_idx) and checking
+         * whether the player's physics bottom is still within
+         * FLOAT_PLATFORM_STICK_TOL pixels of that surface.  If so, snap back
+         * and re-establish contact.
          *
          * The outer `player->vy >= 0` guard already excludes upward jumps,
          * so this check cannot mistakenly re-snap a player who just jumped.
