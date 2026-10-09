@@ -108,7 +108,7 @@ y = 100.0
 ### Platform (Ground Pillar)
 
 **File:** `src/surfaces/platform.c` / `platform.h`  
-**Sprite:** `assets/sprites/levels/grass_platform.png` by default, or the pillar's own `tile_path` — 48×48 tile, 9-slice rendered  
+**Sprite:** `assets/sprites/levels/grass_platform.png` by default, or the pillar's own `tile_path` — 48×48 tile, 9-slice rendered. Pillars naming the same `tile_path` share one loaded texture.  
 **Behaviour:** Static ground pillar. The player can land on the top surface. Pillars are positioned on the floor and extend upward, sunk 16 px into the ground. Rendered before the floor so the pillar base sinks into the ground naturally.
 
 | Constant | Value | Description |

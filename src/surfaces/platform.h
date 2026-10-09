@@ -27,14 +27,16 @@
  * `w` and `h` are set at init time and never change during a play session.
  *
  * `tex` is the 9-slice tileset texture for this platform.  If NULL, the
- * renderer falls back to the level's default floor tile texture.
+ * renderer falls back to the level's default floor tile texture.  It is
+ * borrowed: GameState::platform_tiles owns one texture per tile path, shared
+ * by every platform that names it, so a Platform never unloads `tex`.
  */
 typedef struct {
     float       x;   /* left edge of the platform in logical pixels   */
     float       y;   /* top  edge (landing surface) in logical pixels */
     int         w;   /* total width  in logical pixels                */
     int         h;   /* total height in logical pixels                */
-    Texture2D *tex; /* 9-slice tileset texture (NULL = use default) */
+    Texture2D *tex; /* borrowed 9-slice tileset (NULL = use default) */
 } Platform;
 
 /*
