@@ -13,6 +13,31 @@
 #include "tools.h"
 #include "entity_meta.h"   /* editor_select_none */
 
+#include <stdio.h>    /* snprintf */
+#include <string.h>   /* strlen */
+
+/*
+ * The system clipboard, through raylib.  Test builds use a buffer of their
+ * own instead: the headless raylib the tests run on has no clipboard.
+ */
+#ifdef MANGO_TESTING
+static char s_test_clipboard[UI_EDIT_BUFFER_SIZE];
+
+const char *editor_test_clipboard(void) { return s_test_clipboard; }
+
+void editor_test_set_clipboard(const char *text)
+{
+    snprintf(s_test_clipboard, sizeof(s_test_clipboard), "%s", text ? text : "");
+}
+
+static void clipboard_set(const char *text) { editor_test_set_clipboard(text); }
+static const char *clipboard_get(void) { return s_test_clipboard; }
+#else
+static void clipboard_set(const char *text) { SetClipboardText(text); }
+/* Borrowed from raylib; do not free. */
+static const char *clipboard_get(void) { return GetClipboardText(); }
+#endif
+
 /*
  * note_redone_place — Remember an entity a redone CMD_PLACE put back, so a
  * redone group paste can select all of them, as the paste itself did.
@@ -100,10 +125,18 @@ static void editor_key(EditorState *es, const InputEvent *event)
         }
         return;
     }
+    /* A validation or load-problem row clicked last: Ctrl+C copies its
+     * text (even when the click put the caret in the field it is about). */
+    if (ctrl && key == KEY_C && es->focus_area == EDITOR_FOCUS_MESSAGES &&
+        es->selected_message[0]) {
+        clipboard_set(es->selected_message);
+        editor_set_status(es, "Copied: %s", es->selected_message);
+        return;
+    }
     if (es->ui.active_id && ctrl && (key == KEY_C || key == KEY_V)) {
-        if (key == KEY_C) SetClipboardText(es->ui.edit_buf);
+        if (key == KEY_C) clipboard_set(es->ui.edit_buf);
         else {
-            const char *text = GetClipboardText(); /* borrowed by raylib; do not free */
+            const char *text = clipboard_get();
             if (text) ui_queue_text_input(&es->ui, text);
         }
         return;

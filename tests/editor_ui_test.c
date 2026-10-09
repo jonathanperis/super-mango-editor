@@ -1061,6 +1061,68 @@ done:
     return failed;
 }
 
+/*
+ * Every validation row can be reached: more rows than fit scroll with the
+ * wheel over them, each one is clickable, and the row clicked last is
+ * what Ctrl+C copies (until a click elsewhere).
+ */
+static int validation_rows_scroll_and_copy(void)
+{
+    int failed = 0;
+    EditorState es;
+    const int row_x = CANVAS_W + 60, row_y = TOOLBAR_H + 28 + 8 + 20 + 9;
+    char first[EDITOR_VALIDATION_MESSAGE_LEN];
+    CHECK(open_editor(&es, NULL) == 0);
+    cfg_scroll(-100000);   /* an earlier case may have scrolled the panel */
+
+    /* Twelve coins below the world: twelve errors, eight rows shown. */
+    es.level.coin_count = 12;
+    for (int i = 0; i < 12; i++)
+        es.level.coins[i] = (CoinPlacement){100.0f + 30.0f * (float)i, 9999.0f};
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.validation_report.message_count == 12);
+    CHECK(es.message_scroll == 0);
+    snprintf(first, sizeof(first), "%s", es.validation_report.messages[0]);
+
+    /* The first row takes you to coin 0, and Ctrl+C copies the row. */
+    click_frame(&es, row_x, row_y);
+    CHECK(es.selection.type == ENT_COIN && es.selection.index == 0);
+    CHECK(es.focus_area == EDITOR_FOCUS_MESSAGES);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    CHECK(strcmp(editor_test_clipboard(), first) == 0);
+    CHECK(strncmp(es.status_message, "Copied: coins[0]", 16) == 0);
+    key_frame(&es, KEY_ESCAPE, 0);
+
+    /* The wheel over the rows scrolls them, not the panel; the first row
+     * shown is now message 4, and clicking it goes to coin 4. */
+    push_wheel(row_x, row_y, -4.0f, 0);
+    ui_frame(&es, row_x, row_y);
+    CHECK(es.message_scroll == 4);
+    click_frame(&es, row_x, row_y);
+    CHECK(es.selection.type == ENT_COIN && es.selection.index == 4);
+    key_frame(&es, KEY_ESCAPE, 0);
+    /* It stops at the last full window: rows 5-12. */
+    push_wheel(row_x, row_y, -20.0f, 0);
+    ui_frame(&es, row_x, row_y);
+    CHECK(es.message_scroll == 12 - EDITOR_VALIDATION_VISIBLE_ROWS);
+    click_frame(&es, row_x, row_y + 18 * (EDITOR_VALIDATION_VISIBLE_ROWS - 1));
+    CHECK(es.selection.type == ENT_COIN && es.selection.index == 11);
+    key_frame(&es, KEY_ESCAPE, 0);
+
+    /* A click on the canvas takes the focus away: Ctrl+C copies entities
+     * again, not the row. */
+    editor_test_set_clipboard("");
+    click_frame(&es, NEUTRAL_X, TOOLBAR_H + 200);
+    CHECK(es.focus_area == EDITOR_FOCUS_CANVAS);
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    CHECK(editor_test_clipboard()[0] == '\0');
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
 /* Write `text` to `path`; 0 on success. */
 static int write_text_file(const char *path, const char *text)
 {
@@ -1122,10 +1184,15 @@ static int files_that_will_not_open_list_why(void)
     CHECK(strncmp(es.load_report.messages[1], "line 6: coins[0].x", 18) == 0);
     CHECK(strstr(es.load_report.file, "ui_invalid_rules.toml") != NULL);
 
-    /* The panel shows them; clicking the heading hides them. */
+    /* The panel shows them; a row can be selected and copied... */
     CHECK(es.config_open == 1);
     int with_list = editor_config_total_height(&es);
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    click_frame(&es, heading_x, heading_y + 18);
+    CHECK(es.focus_area == EDITOR_FOCUS_MESSAGES && es.load_report.count == 2);
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    CHECK(strncmp(editor_test_clipboard(), "line 11: spiders[0].vx", 22) == 0);
+    /* ...and clicking the heading hides them. */
     click_frame(&es, heading_x, heading_y);
     CHECK(es.load_report.count == 0);
     CHECK(editor_config_total_height(&es) < with_list);
@@ -1791,6 +1858,7 @@ int main(void)
         CASE(validation_messages_take_you_to_the_problem),
         CASE(files_that_will_not_open_list_why),
         CASE(box_and_shift_select_act_on_the_group),
+        CASE(validation_rows_scroll_and_copy),
         CASE(campaign_view_reorders_renames_and_saves),
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),
