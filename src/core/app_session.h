@@ -30,19 +30,14 @@ typedef enum {
     APP_SESSION_EVENT_GAME_CLOSED,
     APP_SESSION_EVENT_RUNTIME_CLEANED,
     APP_SESSION_EVENT_SESSION_FREED,
-    APP_SESSION_EVENT_RELOAD_REQUESTED,
     APP_SESSION_EVENT_WEB_INPUT_REPAIRED
 } AppSessionLifecycleEvent;
 
-typedef int (*AppSessionReplayStoreFn)(const char *level_path, void *userdata);
-typedef void (*AppSessionReloadFn)(const char *level_path, void *userdata);
 typedef void (*AppSessionLifecycleFn)(AppSessionLifecycleEvent event,
                                       const char *level_path,
                                       void *userdata);
 
 typedef struct {
-    AppSessionReplayStoreFn store_replay;
-    AppSessionReloadFn reload;
     AppSessionLifecycleFn lifecycle;
     void *userdata;
     int force_callback_mode; /* narrow native lifecycle-test seam */
@@ -89,9 +84,6 @@ typedef struct AppSession {
     int menu_presented_count;
     int game_presented_count;
     int game_open_count;
-    int browser_reload_requested;
-    int replay_storage_attempts;
-    int replay_storage_successes;
     int debug_mode;
     int smoke_test_frames;
     AppSessionHooks hooks;

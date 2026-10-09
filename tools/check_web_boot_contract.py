@@ -25,19 +25,16 @@ assert_no_generated_module_declaration(SHELL, "standalone shell")
 
 for text, label in ((DASHBOARD, "Dashboard"), (SHELL, "standalone shell")):
     require(text, "window.Module = moduleConfig", f"{label} scoped Module assignment")
-    require(text, "super-mango-replay-level", f"{label} replay storage key")
-    require(text, "sessionStorage.removeItem('super-mango-replay-level')",
-            f"{label} replay intent consumption")
-    require(text, "['--level', replayLevel",
-            f"{label} replay startup arguments")
     require(text, "__superMangoMainStarted", f"{label} single-start guard")
     if text.count("moduleConfig.callMain") != 1:
         raise SystemExit(f"web boot contract: {label} must call main once")
+    # Replay restarts the level inside the running game (app_session.c), so
+    # no host may read a boot intent from origin-shared session storage.
+    if "sessionStorage" in text or "super-mango-replay-level" in text:
+        raise SystemExit(f"web boot contract: {label} still reads a replay boot intent")
 
-require(DASHBOARD, "const replayBootLevel = consumeReplayLevel()",
-        "Dashboard automatic replay boot")
-require(DASHBOARD, "startGame(false, replayBootLevel)",
-        "Dashboard replay auto-start")
+require(DASHBOARD, "const args = ['--level', 'levels/00_sandbox_01.toml']",
+        "Dashboard startup arguments")
 require(SHELL, "moduleConfig.arguments = ['--level', 'levels/00_sandbox_01.toml']",
         "standalone default startup arguments")
 

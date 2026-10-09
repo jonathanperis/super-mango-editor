@@ -29,11 +29,6 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
-EM_JS(int, session_browser_store_replay_js, (const char *path), {
-    try { sessionStorage.setItem('super-mango-replay-level', UTF8ToString(path)); return 1; }
-    catch (e) { console.error('Super Mango: unable to persist replay level', e); return 0; }
-});
-EM_JS(void, session_browser_reload, (const char *path), { void path; window.location.reload(); });
 EM_JS(void, session_browser_ended, (int fatal, int profile_error), {
     if (typeof Module.onGameEnded === 'function') Module.onGameEnded(fatal, profile_error);
 });
@@ -297,59 +292,19 @@ static void session_apply_menu_route(AppSession *session)
     }
 }
 
-static int session_browser_replay(AppSession *session, const char *path)
-{
-    /* Save the one-shot replay path before freeing anything. If storage is
-     * unavailable, retain the current completion screen so the user can act. */
-    int stored = 0;
-    if (session->hooks.store_replay) stored = session->hooks.store_replay(path, session->hooks.userdata);
-#ifdef __EMSCRIPTEN__
-    else stored = session_browser_store_replay_js(path);
-#endif
-    session->replay_storage_attempts++;
-    if (!stored) {
-        copy_path(session->status_message, sizeof(session->status_message), "Replay unavailable: storage failed");
-        session->game->route = GAME_ROUTE_NONE;
-        session->route = APP_ROUTE_NONE;
-        TraceLog(LOG_WARNING, "%s", session->status_message);
-        return 0;
-    }
-    session->replay_storage_successes++;
-    /* Copy callbacks before releasing their containing session. Nothing may
-     * dereference session after session_free_owned below. */
-    AppSessionHooks hooks = session->hooks;
-    session_cancel_callback(session);
-    session_close_game(session);
-    session->screen = APP_SCREEN_ENDED;
-    session->ended = session->browser_reload_requested = 1;
-    session_runtime_cleanup(session);
-    session_emit(session, APP_SESSION_EVENT_SESSION_FREED, path);
-    session_free_owned(session);
-    if (hooks.reload) hooks.reload(path, hooks.userdata);
-#ifdef __EMSCRIPTEN__
-    else session_browser_reload(path);
-#endif
-    return 1;
-}
-
-static int session_apply_game_route(AppSession *session, int callback_owned)
+static void session_apply_game_route(AppSession *session)
 {
     /* Routes are requests, not nested main loops. Consume them after the
      * screen frame, when its event/update/render code is no longer running. */
     GameState *game = session->game;
-    if (!game) return 0;
+    if (!game) return;
     GameRoute route = game->route;
     char path[GAME_LEVEL_PATH_MAX];
     if (route == GAME_ROUTE_NONE && !game->running) route = GAME_ROUTE_EXIT;
-    if (route == GAME_ROUTE_NONE) return 0;
-    if ((route == GAME_ROUTE_EXIT || route == GAME_ROUTE_REPLAY) && !session_profile_ready_to_leave(session)) return 0;
-    if (route == GAME_ROUTE_REPLAY && callback_owned && session->profile.enabled &&
-        session->profile.writable && session->profile.error && session->profile.dirty) {
-        copy_path(session->profile.status, sizeof(session->profile.status), "Replay blocked: profile not saved. Use Level Select or Exit.");
-        game->route = GAME_ROUTE_NONE;
-        session->route = APP_ROUTE_NONE;
-        return 0;
-    }
+    if (route == GAME_ROUTE_NONE) return;
+    /* Leaving the program waits for a pending browser save to settle. Every
+     * other route keeps the session, and with it the profile in memory. */
+    if (route == GAME_ROUTE_EXIT && !session_profile_ready_to_leave(session)) return;
     game->route = GAME_ROUTE_NONE;
     switch (route) {
     case GAME_ROUTE_NEXT_LEVEL:
@@ -374,10 +329,26 @@ static int session_apply_game_route(AppSession *session, int callback_owned)
         session->route = APP_ROUTE_NONE;
         break;
     case GAME_ROUTE_REPLAY:
+        /*
+         * Native and browser builds both replace the game in place.
+         *
+         * Browser Replay used to save the level path in sessionStorage and
+         * reload the whole page. That dates from the SDL2 build, where every
+         * GameState created its own window and renderer, and the canvas's
+         * WebGL context could not be torn down and rebuilt inside the
+         * browser's frame callback. Since the raylib port this session owns
+         * the one window, GL context and audio device for the whole run; a
+         * GameState owns only its render target, textures and sounds, which
+         * is exactly what Level Select and Play already swap in place on the
+         * web. Staying on the page also keeps the browser's unlocked audio
+         * (a reloaded page needs a new click or key press before it may play
+         * sound) and the profile held in memory, even an unsaved one. The
+         * old game is freed before the new one loads, so the WebAssembly
+         * heap reuses its blocks instead of growing on every Replay.
+         */
         session->route = APP_ROUTE_GAME_REPLAY;
         /* Keep an independent path before the old GameState is freed. */
         copy_path(path, sizeof(path), game->level_path);
-        if (callback_owned) return session_browser_replay(session, path);
         {
             GameInputPhysicalState inherited;
             game_input_read_physical(game->controller, &inherited);
@@ -391,7 +362,7 @@ static int session_apply_game_route(AppSession *session, int callback_owned)
         if (session_load_catalog(session)) {
             copy_path(session->status_message, sizeof(session->status_message), "Level Select unavailable: campaign manifest failed");
             session->route = APP_ROUTE_NONE;
-            return 0;
+            return;
         }
         session_close_game(session);
         if (session_open_menu(session)) session_end(session, 1);
@@ -403,7 +374,6 @@ static int session_apply_game_route(AppSession *session, int callback_owned)
         session_end(session, route == GAME_ROUTE_FATAL);
         break;
     }
-    return 0;
 }
 
 AppSession *session_create(const AppSessionConfig *config)
@@ -489,9 +459,7 @@ static void session_step(AppSession *session, int callback_owned)
                 TraceLog(LOG_WARNING, "Profile: result for %s was not recorded (profile full or values out of range)",
                          game->profile_level_key);
         }
-        /* Browser replay can free the session. Its return value tells us to
-         * stop immediately, before the common end-of-frame work below. */
-        if (session_apply_game_route(session, callback_owned)) return;
+        session_apply_game_route(session);
     } else session_end(session, 1);
     if (!session->ended) session_apply_preferences(session);
     if (session->ended && callback_owned) {
