@@ -3649,18 +3649,19 @@ static int layer_buttons_record_their_own_undo_step(void)
         expect_string("redo restores the name", es.level.name, "Untitled2") != 0)
         goto done;
 
-    /* Name mid-edit, then "- Remove Last", choosing Discard. */
+    /* Name mid-edit, then "- Remove Last" with no prompt answer at all:
+     * a valid value is applied silently (no dialog), as its own step. */
     config_frame(&es, NULL, 1, CFG_X + 60, CFG_NAME_Y + 4);
     config_frame(&es, "X", 0, CFG_X + 60, CFG_NAME_Y + 4);
-    editor_test_set_finish_field_choice(2);
     config_frame(&es, NULL, 1, remove_x, CFG_FIRST_LAYER_Y + 20 + 5);
-    if (expect_string("discarded name", es.level.name, "Untitled2") != 0 ||
-        expect_int("discard remove layer", es.level.background_layer_count, 0) != 0 ||
-        expect_int("discard remove undo", es.undo->top, 3) != 0 ||
-        expect_int("discard remove modified", es.modified, 1) != 0 ||
+    if (expect_string("silently applied name", es.level.name, "Untitled2X") != 0 ||
+        expect_int("silent remove layer", es.level.background_layer_count, 0) != 0 ||
+        expect_int("silent name and remove are two steps", es.undo->top, 4) != 0 ||
+        expect_int("silent remove modified", es.modified, 1) != 0 ||
         expect_int("sky preview cleared", es.textures.sky == NULL, 1) != 0 ||
         undo_last(&es) != 0 ||
-        expect_int("undo restores removed layer", es.level.background_layer_count, 1) != 0)
+        expect_int("undo restores removed layer", es.level.background_layer_count, 1) != 0 ||
+        expect_string("undo keeps the applied name", es.level.name, "Untitled2X") != 0)
         goto done;
     result = 0;
 
@@ -3676,6 +3677,73 @@ done:
  * always clamped; typing 0 and clicking the canvas (Apply) used to store 0,
  * which the game reads as "4 screens" / "3 hearts".
  */
+/*
+ * Leaving a field used to ask Apply / Discard / Block every time, even for
+ * a perfectly good value.  A valid value is now applied without a prompt;
+ * only a value that cannot be stored asks, and its answer decides between
+ * keeping the edit open (the command waits) and dropping the typed text.
+ */
+static int leaving_a_field_applies_valid_values_silently(void)
+{
+    EditorWidgetTestContext context;
+    EditorState es;
+    InputEvent canvas_click;
+    char root[EDITOR_PATH_MAX] = {0};
+    int result = 1;
+
+    if (editor_widget_test_context_init(&context) != 0) {
+        editor_widget_test_context_cleanup(&context);
+        return 1;
+    }
+    if (config_state_init(&es, context.font, root, sizeof(root)) != 0) goto done;
+    memset(&canvas_click, 0, sizeof(canvas_click));
+    canvas_click.type = INPUT_MOUSE_DOWN;
+    canvas_click.button = MOUSE_BUTTON_LEFT;
+    canvas_click.x = 100;
+    canvas_click.y = TOOLBAR_H + 100;
+
+    /* Valid: no canned answer is armed, so a prompt would fail the test
+     * (dialog_choice has no display here and reports an error). */
+    config_frame(&es, NULL, 1, CFG_X + 90, CFG_SCREENS_Y + 4);
+    if (expect_int("screens active", es.ui.active_id, 9011) != 0) goto done;
+    strcpy(es.ui.edit_buf, "6");
+    es.ui.edit_cursor = 1;
+    editor_handle_event(&es, &canvas_click);
+    if (expect_int("valid value applied", es.level.screen_count, 6) != 0 ||
+        expect_int("valid value field closed", es.ui.active_id, 0) != 0 ||
+        expect_int("valid value one undo step", es.undo->top, 1) != 0) goto done;
+
+    /* Clicking straight into another field applies the first one too. */
+    config_frame(&es, NULL, 1, CFG_X + 90, CFG_SCREENS_Y + 4);
+    strcpy(es.ui.edit_buf, "7");
+    es.ui.edit_cursor = 1;
+    config_frame(&es, NULL, 1, CFG_X + 80, CFG_HEARTS_Y + 4);
+    if (expect_int("field to field applies", es.level.screen_count, 7) != 0 ||
+        expect_int("second field active", es.ui.active_id, 9006) != 0) goto done;
+    ui_cancel_active_edit(&es.ui);
+
+    /* Invalid: "Keep Editing" keeps the field open and the command waits. */
+    config_frame(&es, NULL, 1, CFG_X + 90, CFG_SCREENS_Y + 4);
+    strcpy(es.ui.edit_buf, "-");
+    es.ui.edit_cursor = 1;
+    editor_test_set_finish_field_choice(0);
+    if (expect_int("invalid blocks", editor_finish_field_edit(&es), 0) != 0 ||
+        expect_int("invalid stays active", es.ui.active_id, 9011) != 0 ||
+        expect_prefix("invalid explained", es.status_message,
+                      "Command blocked: invalid field value") != 0) goto done;
+    /* ...and "Discard" drops the typed text and lets the command run. */
+    editor_test_set_finish_field_choice(2);
+    if (expect_int("discard proceeds", editor_finish_field_edit(&es), 1) != 0 ||
+        expect_int("discard closes", es.ui.active_id, 0) != 0 ||
+        expect_int("discard keeps value", es.level.screen_count, 7) != 0) goto done;
+    result = 0;
+
+done:
+    config_state_cleanup(&es, root);
+    editor_widget_test_context_cleanup(&context);
+    return result;
+}
+
 static int field_limits_apply_on_every_commit_path(void)
 {
     EditorWidgetTestContext context;
@@ -4238,6 +4306,7 @@ int main(void)
     if (display_paths_keep_the_file_name() != 0) return 1;
     if (layer_buttons_record_their_own_undo_step() != 0) return 1;
     if (field_limits_apply_on_every_commit_path() != 0) return 1;
+    if (leaving_a_field_applies_valid_values_silently() != 0) return 1;
     if (motion_fields_stay_within_validator_limits() != 0) return 1;
     if (open_dropdown_owns_the_next_click() != 0) return 1;
     if (dropdowns_accept_any_option_for_unknown_values() != 0) return 1;

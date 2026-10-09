@@ -151,8 +151,12 @@ The player start and the floor gaps are canvas entities: move the Player Spawn
 marker, and place or delete Floor Gap entities. A floor gap's `x` field rounds
 to the 16 px floor-piece grid.
 
-Number fields with a range clamp the value however the edit ends: Return, or
-choosing Apply when another click finishes the edit. A bouncepad's `launch_vy`
+Leaving a field applies what you typed: Return, a click on the canvas or
+another field, or any command (Save, Undo, a shortcut) stores a valid value as
+its own undo step, with no prompt. Only a value that cannot be stored (`12a`,
+a lone `-`) asks **Keep Editing / Discard**; Keep Editing leaves the field open
+and the command waits. Esc always discards the typed text. Number fields with a
+range clamp the value however the edit ends. A bouncepad's `launch_vy`
 is kept at least as strong as a jump, a rail rider's `speed` above 0 and at
 most the rail speed limit, and an enemy's patrol range at least as wide as its
 sprite. Switching a float platform to Rail gives it a speed of 3 if it had
