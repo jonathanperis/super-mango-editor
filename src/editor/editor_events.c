@@ -150,8 +150,9 @@ static void editor_key(EditorState *es, const InputEvent *event)
  *   Shift+wheel  : pan up/down (needed at 3x/5x, where the floor is
  *                  below the visible area).  macOS delivers Shift+wheel
  *                  as horizontal scrolling, so either axis counts here.
- *   Ctrl+wheel   : step through the zoom presets, keeping the point under
- *                  the cursor in place
+ *   Ctrl+wheel   : step through the zoom presets (1x, 2x, 3x, 5x, stopping
+ *                  at either end), keeping the point under the cursor in
+ *                  place
  */
 static void editor_canvas_wheel(EditorState *es, const InputEvent *event)
 {
@@ -161,18 +162,38 @@ static void editor_canvas_wheel(EditorState *es, const InputEvent *event)
 
     if (event->mods & INPUT_CTRL) {
         /* These whole-number presets are assigned by startup, the
-         * toolbar and this wheel handler; zoom is not accumulated, so the
-         * current preset is found by comparing integers. */
+         * toolbar and this wheel handler; zoom itself is never a fraction,
+         * so the current preset is found by comparing integers. */
         static const int zooms[] = {1, 2, 3, 5};
+        const int last = (int)(sizeof(zooms) / sizeof(zooms[0])) - 1;
         int index = 1;
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i <= last; i++)
             if ((int)es->camera.zoom == zooms[i]) {
                 index = i;
                 break;
             }
-        if (event->wheel > 0) index = (index+1)%4;
-        else if (event->wheel < 0) index = (index+3)%4;
-        canvas_set_zoom(es, (float)zooms[index], event->x, event->y);
+        /*
+         * A mouse wheel reports whole notches (1.0), but a trackpad or a
+         * pinch reports many small fractions.  Add them up and step one
+         * preset each time a whole notch has gathered; turning the other
+         * way starts a fresh count.
+         */
+        if ((event->wheel > 0.0f) != (es->zoom_wheel_accum > 0.0f))
+            es->zoom_wheel_accum = 0.0f;
+        es->zoom_wheel_accum += event->wheel;
+        if (es->zoom_wheel_accum >= 1.0f) {
+            index++;
+            es->zoom_wheel_accum = 0.0f;
+        } else if (es->zoom_wheel_accum <= -1.0f) {
+            index--;
+            es->zoom_wheel_accum = 0.0f;
+        }
+        /* Stop at the ends instead of wrapping: scrolling past 5x must
+         * not suddenly jump back to 1x. */
+        if (index < 0) index = 0;
+        if (index > last) index = last;
+        if ((float)zooms[index] != es->camera.zoom)
+            canvas_set_zoom(es, (float)zooms[index], event->x, event->y);
     } else if (event->mods & INPUT_SHIFT) {
         float amount = event->wheel != 0.0f ? event->wheel : event->wheel_x;
         es->camera.y -= amount * 48.0f / zoom;
@@ -256,7 +277,9 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         if (es->mouse_down) tools_mouse_drag(es,wx,wy);
         break;
     case INPUT_WHEEL:
-        if (editor_handle_side_panel_scroll(es,event->x,event->y,(int)event->wheel)) break;
+        /* The panels take the wheel as a float: a trackpad's small
+         * fractions add up there instead of being cut to 0 here. */
+        if (editor_handle_side_panel_scroll(es, event->x, event->y, event->wheel)) break;
         if (canvas_contains(event->x, event->y)) editor_canvas_wheel(es, event);
         break;
     default: break;

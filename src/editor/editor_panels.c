@@ -81,18 +81,31 @@ void editor_render_side_panels(EditorState *es)
  * The config height calculation mirrors editor_render_side_panels so hit tests
  * match what the user sees.
  */
-int editor_handle_side_panel_scroll(EditorState *es, int mx, int my, int wheel_y)
+int editor_handle_side_panel_scroll(EditorState *es, int mx, int my, float wheel_y)
 {
+    int pixels;
+
     if (mx < CANVAS_W || my <= TOOLBAR_H || my >= EDITOR_H - STATUS_H) {
         return 0;
     }
 
+    /*
+     * One wheel notch scrolls 20 px.  A trackpad sends fractions of a notch
+     * (0.1, say), and the panels scroll in whole pixels, so keep the part
+     * that is not yet a whole pixel for the next event.  Truncating each
+     * event to an int on its own would turn every small swipe into 0.
+     */
+    es->panel_wheel_accum += -wheel_y * 20.0f;
+    pixels = (int)es->panel_wheel_accum;     /* toward 0, sign kept */
+    es->panel_wheel_accum -= (float)pixels;
+    if (pixels == 0) return 1;
+
     ConfigPanelGeometry config = config_panel_geometry(es);
 
     if (my < config.bottom_y) {
-        cfg_scroll(-wheel_y * 20);
+        cfg_scroll(pixels);
     } else {
-        palette_scroll(-wheel_y * 20);
+        palette_scroll(pixels);
     }
 
     return 1;

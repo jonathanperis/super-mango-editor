@@ -429,6 +429,13 @@ typedef struct {
     int            show_grid;     /* 1 = draw grid lines on the canvas         */
     int            running;       /* 1 = main loop active, 0 = exit requested  */
     int            panel_scroll;  /* scroll offset (px) for the right panel    */
+    /*
+     * Trackpads report the wheel in fractions of a notch.  These keep the
+     * part that has not yet added up to a whole step: panel pixels for the
+     * side panels, notches for Ctrl+wheel zoom.
+     */
+    float          panel_wheel_accum;
+    float          zoom_wheel_accum;
     int            panel_open;    /* 1 = properties panel expanded, 0 = collapsed  */
     int            config_open;   /* 1 = level config panel expanded, 0 = collapsed */
     int            palette_open;  /* 1 = palette panel expanded, 0 = collapsed      */

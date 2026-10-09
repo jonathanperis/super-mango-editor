@@ -486,12 +486,26 @@ static int canvas_place_select_drag_delete_and_undo(void)
     push_wheel(400, 300, 100.0f, 0);
     ui_frame(&es, 400, 300);
     CHECK(es.camera.x == 0.0f);
-    static const float presets[] = {3.0f, 5.0f, 1.0f, 2.0f};
-    for (int i = 0; i < 4; i++) {
+    /* Zoom stops at 5x and at 1x: it used to wrap from 5x to 1x. */
+    static const float up[] = {3.0f, 5.0f, 5.0f};
+    for (int i = 0; i < 3; i++) {
         push_wheel(400, 300, 1.0f, INPUT_CTRL);
         ui_frame(&es, 400, 300);
-        CHECK(es.camera.zoom == presets[i]);
+        CHECK(es.camera.zoom == up[i]);
     }
+    static const float down[] = {3.0f, 2.0f, 1.0f, 1.0f};
+    for (int i = 0; i < 4; i++) {
+        push_wheel(400, 300, -1.0f, INPUT_CTRL);
+        ui_frame(&es, 400, 300);
+        CHECK(es.camera.zoom == down[i]);
+    }
+    /* A trackpad pinch sends fractions: four quarter notches make one step. */
+    for (int i = 0; i < 3; i++) push_wheel(400, 300, 0.25f, INPUT_CTRL);
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.zoom == 1.0f);
+    push_wheel(400, 300, 0.25f, INPUT_CTRL);
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.zoom == 2.0f);
     push_wheel(400, 300, -1.0f, INPUT_CTRL);
     ui_frame(&es, 400, 300);
     CHECK(es.camera.zoom == 1.0f);
@@ -504,7 +518,7 @@ static int canvas_place_select_drag_delete_and_undo(void)
     ui_frame(&es, 400, 300);
     CHECK(es.camera.y > 0.0f && es.camera.y <= GAME_H - CANVAS_H / 5.0f + 0.01f);
     ui_frame(&es, 400, 300);   /* draw the grid at 5x */
-    push_wheel(400, 300, 1.0f, INPUT_CTRL);
+    for (int i = 0; i < 3; i++) push_wheel(400, 300, -1.0f, INPUT_CTRL);
     ui_frame(&es, 400, 300);
     CHECK(es.camera.zoom == 1.0f && es.camera.y == 0.0f);
 
@@ -667,6 +681,31 @@ static int level_config_sections_resize_the_panel(void)
     /* Scrolling and section toggles are view state, not document edits. */
     push_wheel(PANEL_LABEL_X, TOOLBAR_H + 100, 50.0f, 0);
     ui_frame(&es, PANEL_LABEL_X, TOOLBAR_H + 100);
+    /* A trackpad's small fractions add up to a scroll instead of each
+     * being cut to nothing: ten 0.1-notch swipes scroll one notch. */
+    {
+        /* The top edge of one field (found by its id), before and after. */
+        int top_y = -1, scrolled_y = -1, field_id = 0;
+        for (int y = TOOLBAR_H + 150; y < TOOLBAR_H + 300 && top_y < 0; y += 2) {
+            click_frame(&es, PANEL_FIELD_X, y);
+            if (es.ui.active_id) {
+                top_y = y;
+                field_id = es.ui.active_id;
+            }
+            key_frame(&es, KEY_ESCAPE, 0);
+        }
+        CHECK(top_y > 0);
+        for (int i = 0; i < 10; i++) push_wheel(PANEL_LABEL_X, TOOLBAR_H + 100, -0.1f, 0);
+        ui_frame(&es, PANEL_LABEL_X, TOOLBAR_H + 100);
+        for (int y = top_y - 40; y <= top_y && scrolled_y < 0; y += 2) {
+            click_frame(&es, PANEL_FIELD_X, y);
+            if (es.ui.active_id == field_id) scrolled_y = y;
+            key_frame(&es, KEY_ESCAPE, 0);
+        }
+        CHECK(scrolled_y > 0 && scrolled_y < top_y);
+        push_wheel(PANEL_LABEL_X, TOOLBAR_H + 100, 50.0f, 0);
+        ui_frame(&es, PANEL_LABEL_X, TOOLBAR_H + 100);
+    }
     /* The header folds the whole panel to one row. */
     click_frame(&es, PANEL_LABEL_X, TOOLBAR_H + 8);
     CHECK(es.config_open == 0);
