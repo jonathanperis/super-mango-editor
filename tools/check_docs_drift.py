@@ -512,8 +512,30 @@ def check_readme_prerequisites() -> None:
             fail(f"README.md: Prerequisites say CI uses Node.js {version}; build.yml uses {ci_node.group(1)}")
 
 
+# "33 render layers", "33-layer render order", "the full 33-layer order", "these 33 layers".
+RENDER_LAYER_COUNT_RE = re.compile(r"\b(\d+)(?:[ -]render layers\b|-layer (?:render )?order\b)|\bthese (\d+) layers\b")
+
+
+def render_order_rows() -> list[tuple[str, str]]:
+    """(layer number, "Drawn by" cell) for each row of architecture.md's render order table."""
+    section = read(DOCS / "architecture.md").split("### Render Order (back to front)", 1)
+    if len(section) != 2:
+        return []
+    return re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*(.+?)\s*\|\s*$", section[1].split("\n### ", 1)[0], re.M)
+
+
+def render_layer_count() -> int | None:
+    """How many layers the render order table lists, numbered 1..N (None if it is missing)."""
+    numbers = [int(layer) for layer, _ in render_order_rows()]
+    if not numbers:
+        return None
+    if numbers != list(range(1, len(numbers) + 1)):
+        fail("docs/wiki/architecture.md: the render order table must number its layers 1..N in order")
+    return len(numbers)
+
+
 def check_content_counts() -> None:
-    """Level, screen and lab numbers outside the generated pages match the levels on disk."""
+    """Level, screen, lab and render layer numbers outside the generated pages match their sources."""
     facts = json.loads(read(ROOT / "docs" / "src" / "generated" / "project.json"))
     expected = {"levels": facts["levels"], "campaign levels": facts["levels"],
                 "screens": facts["screens"], "labs": facts["labs"]}
@@ -523,6 +545,14 @@ def check_content_counts() -> None:
                 if int(count) != expected[noun]:
                     fail(f"{page_label(page, line_no)}: says {count} {noun}; the levels have "
                          f"{expected[noun]} (docs/src/generated/project.json, make content-inventory)")
+    layers = render_layer_count()
+    for page in doc_pages() + [ROOT / "PRODUCT.md"] + SPEC_PAGES:
+        for line_no, line in enumerate(read(page).splitlines(), start=1):
+            for match in RENDER_LAYER_COUNT_RE.finditer(line):
+                count = int(match.group(1) or match.group(2))
+                if layers is not None and count != layers:
+                    fail(f"{page_label(page, line_no)}: says {count} render layers; the render order "
+                         f"table in docs/wiki/architecture.md has {layers}")
     state = read(ROOT / ".specs" / "project" / "STATE.md")
     row = re.search(r"^\| Playable TOML level files \| (\d+) \|", state, re.M)
     on_disk = len(list((ROOT / "levels").glob("*.toml")))
@@ -939,7 +969,7 @@ def check_render_order_doc() -> None:
     if len(section) != 2:
         fail("docs/wiki/architecture.md: missing `### Render Order (back to front)` section")
         return
-    rows = re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*(.+?)\s*\|\s*$", section[1].split("\n### ", 1)[0], re.M)
+    rows = render_order_rows()
     position = 0
     listed: set[str] = set()
     for layer, drawn_by in rows:
