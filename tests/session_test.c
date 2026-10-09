@@ -1,7 +1,20 @@
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L  /* chdir under -std=c11 */
+#endif
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#ifdef _WIN32
+#include <direct.h>   /* _chdir */
+#else
+#include <unistd.h>   /* chdir */
+#endif
 
 #include "input/input_backend.h"
+#include "shared/asset_root.h"
 #include "shared/platform.h"  /* clock_wait */
+#include "shared/serializer_io.h"
+#include "test_paths.h"
 
 #include "collision/collision_damage.h"
 #include "collision/game_collision.h"
@@ -276,6 +289,87 @@ fail:
     game_input_test_clear_physical_state();
     session_destroy(&session);
     return 1;
+}
+
+/* Change the working folder for a test without going through the helper
+ * under test. Windows spells chdir with a leading underscore. */
+static int test_change_directory(const char *folder)
+{
+#ifdef _WIN32
+    return _chdir(folder);
+#else
+    return chdir(folder);
+#endif
+}
+
+/* 1 when path is prefix followed by rest, treating '/' and '\\' as the same
+ * separator (Windows mixes them; POSIX paths only ever use '/'). */
+static int same_path_spelling_prefix(const char *path, const char *prefix,
+                                     const char *rest)
+{
+    size_t prefix_len = strlen(prefix);
+    size_t rest_len = strlen(rest);
+
+    if (strlen(path) != prefix_len + rest_len) return 0;
+    for (size_t i = 0; i < prefix_len + rest_len; i++) {
+        char want = i < prefix_len ? prefix[i] : rest[i - prefix_len];
+        char got = path[i];
+        if (want == '\\') want = '/';
+        if (got == '\\') got = '/';
+        if (want != got) return 0;
+    }
+    return 1;
+}
+
+/*
+ * Started from another folder, the game and editor used to find no assets:
+ * every path is relative and nothing moved the working folder. The helper
+ * must move it to the folder that holds assets/ and levels/, and turn typed
+ * paths into absolute ones first so they keep their meaning.
+ */
+static int asset_root_moves_a_foreign_working_folder(void)
+{
+    int failed = 1;
+    char *home = asset_root_absolute(".");
+    char *scratch = asset_root_absolute(TEST_OUT);
+    char *typed = NULL;
+    char start[4096], missing[4096];
+    if (!home || !scratch) goto done;
+    snprintf(start, sizeof(start), "%s/levels/campaigns/", home);
+    snprintf(missing, sizeof(missing), "%sno/such/folder/", scratch);
+
+    if (expect_int("repository root is an asset root", asset_root_contains(""), 1) ||
+        expect_int("absolute path", asset_root_path_is_absolute("/tmp/x.toml"), 1) ||
+        expect_int("drive path", asset_root_path_is_absolute("C:\\levels\\x.toml"), 1) ||
+        expect_int("relative path", asset_root_path_is_absolute("levels/x.toml"), 0))
+        goto done;
+
+    /* Start the "game" from the scratch folder, as a shortcut would. */
+    if (test_change_directory(scratch) != 0) goto done;
+    typed = asset_root_absolute("mine.toml");
+    /* Windows reports the working folder with backslashes while scratch was
+     * joined with '/', so compare with one separator spelling. */
+    if (expect_int("scratch folder holds no assets", asset_root_contains(""), 0) ||
+        expect_int("typed path keeps the launch folder",
+                   typed && same_path_spelling_prefix(typed, scratch, "mine.toml"), 1))
+        goto done;
+    /* Nothing within reach: report failure and stay put. */
+    if (expect_int("no asset root found", asset_root_enter_from(missing), -1) ||
+        expect_int("failed search keeps folder", asset_root_contains(""), 0))
+        goto done;
+    /* Two parents up from levels/campaigns/ is the checkout. */
+    if (expect_int("asset root found", asset_root_enter_from(start), 0) ||
+        expect_int("moved to the asset root", asset_root_contains(""), 1) ||
+        expect_int("campaign readable after move",
+                   serializer_file_exists_utf8(CAMPAIGN_MANIFEST_PATH), 1))
+        goto done;
+    failed = 0;
+done:
+    if (home && test_change_directory(home) != 0) failed = 1;
+    free(typed);
+    free(scratch);
+    free(home);
+    return failed;
 }
 
 static int failed_initial_level_does_not_create_session(void)
@@ -1130,6 +1224,7 @@ int main(void)
         CASE(campaign_manifest_nul_fixtures_reject_transactionally),
         CASE(physical_release_latch_blocks_transition_input),
         CASE(failed_initial_level_does_not_create_session),
+        CASE(asset_root_moves_a_foreign_working_folder),
         CASE(direct_game_boot_repairs_input_and_keeps_controller_runtime),
         CASE(immediate_play_preserves_window_and_input_latch),
         CASE(repeated_menu_game_ownership), CASE(checkpoint_transitions_use_production_paths),

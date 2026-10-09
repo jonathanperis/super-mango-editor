@@ -64,6 +64,7 @@ they preserve explicit ownership, logical coordinates and saved-binding IDs.
   initialization order is a useful way to achieve this, not a reason to free a
   borrowed resource twice.
 - Use `float` for positions and velocities. Preserve integer `IntRect` hitbox construction and edge rules; convert to raylib `Rectangle` at drawing boundaries.
+- Asset and level paths stay relative (`"assets/..."`, `"levels/..."`). Startup moves a foreign working folder to the asset root once (`src/shared/asset_root.c`), so no module needs to build absolute asset paths. A new command-line *path* option must be made absolute in `main.c` before that move, as `--profile` is.
 
 ### Coordinate System
 

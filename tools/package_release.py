@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Create standalone Super Mango release archives.
 
-The native game binary loads assets and levels from paths relative to the
-process working directory, so shipping only the executable is not enough.
-This helper builds a small runnable folder and compresses it into a zip file.
+The native game and editor load assets and levels from paths relative to the
+asset folder; started from elsewhere they change to the executable's folder
+first (src/shared/asset_root.c). So assets/ and levels/ must sit beside the
+executables: shipping only the executable is not enough. This helper builds
+that runnable folder and compresses it into a zip file.
 """
 
 from __future__ import annotations
@@ -65,7 +67,7 @@ def make_executable(path: Path) -> None:
 
 def write_native_readme(bundle: Path, executable: str) -> None:
     (bundle / "README.txt").write_text(
-        f"""Super Mango builder release\n\nRun from this directory so both programs can find assets/ and levels/.\n\nGame: ./{executable}\nEditor: ./super-mango-editor{'.exe' if executable.endswith('.exe') else ''}\n\nraylib is linked statically. Native OS graphics/audio support is required. Linux dialogs require zenity.\nRequired non-system Windows runtime DLLs are included. Playtest starts the sibling game without saving a personal profile.\n\nLearning manual:\n  https://jonathanperis.github.io/super-mango-editor/docs/learning-path/\n\nSource:\n  https://github.com/jonathanperis/super-mango-editor\nSee LICENSE, THIRD_PARTY_NOTICES.md and licenses/.\n""",
+        f"""Super Mango builder release\n\nKeep assets/ and levels/ beside both programs; they find them from any starting folder.\n\nGame: ./{executable}\nEditor: ./super-mango-editor{'.exe' if executable.endswith('.exe') else ''}\n\nraylib is linked statically. Native OS graphics/audio support is required. Linux dialogs require zenity.\nRequired non-system Windows runtime DLLs are included. Playtest starts the sibling game without saving a personal profile.\n\nLearning manual:\n  https://jonathanperis.github.io/super-mango-editor/docs/learning-path/\n\nSource:\n  https://github.com/jonathanperis/super-mango-editor\nSee LICENSE, THIRD_PARTY_NOTICES.md and licenses/.\n""",
         encoding="utf-8",
     )
 
