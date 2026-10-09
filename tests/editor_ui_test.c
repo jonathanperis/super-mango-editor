@@ -959,6 +959,11 @@ static int validation_messages_take_you_to_the_problem(void)
     CHECK(es.selection.type == ENT_CHECKPOINT && es.selection.index == 0);
     CHECK(es.tool == TOOL_SELECT && es.camera.x > 0.0f);
     CHECK(strstr(es.status_message, "Checkpoint 0") != NULL);
+    /* ...and its x field takes the caret (properties.c numbers entity
+     * fields type * 100 + field + 1; x is the checkpoint's field 0). */
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.active_id == (int)ENT_CHECKPOINT * 100 + 1);
+    key_frame(&es, KEY_ESCAPE, 0);
     es.level.checkpoints[0].x = 900.0f;
 
     /* A bad config value focuses its field. */
@@ -977,6 +982,55 @@ static int validation_messages_take_you_to_the_problem(void)
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     click_frame(&es, 335, EDITOR_H - STATUS_H / 2);
     CHECK(es.selection.type == ENT_COIN && es.selection.index == 2);
+    /* The next frame draws the coin's fields with y holding the caret. */
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.active_id == (int)ENT_COIN * 100 + 2);
+    key_frame(&es, KEY_ESCAPE, 0);
+    es.level.coins[2].y = 100.0f;
+
+    /* An enemy's bad vx focuses its vx field (spider field 1). */
+    es.level.spider_count = 1;
+    es.level.spiders[0] = (SpiderPlacement){300.0f, 0.0f, 250.0f, 350.0f, 0};
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(strcmp(es.validation_report.locations[0].field, "vx") == 0);
+    CHECK(editor_focus_validation_issue(&es, 0) == 1);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.selection.type == ENT_SPIDER && es.ui.active_id == (int)ENT_SPIDER * 100 + 2);
+    key_frame(&es, KEY_ESCAPE, 0);
+    es.level.spiders[0].vx = 50.0f;
+
+    /* A dropdown takes the focus by opening: the axe's mode (field 1)... */
+    es.level.axe_trap_count = 1;
+    es.level.axe_traps[0] = (AxeTrapPlacement){.pillar_x = 500.0f, .mode = (AxeTrapMode)9};
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(editor_focus_validation_issue(&es, 0) == 1);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.dropdown_open_id == (int)ENT_AXE_TRAP * 100 + 2);
+    click_frame(&es, NEUTRAL_X, NEUTRAL_Y);          /* closes the list */
+    es.level.axe_trap_count = 0;
+
+    /* ...and a Level Config list row: layer 1's asset dropdown unfolds
+     * its group and opens, its speed field takes the caret. */
+    g_plx_open = 0;
+    es.level.background_layer_count = 2;
+    snprintf(es.level.background_layers[0].path, sizeof(es.level.background_layers[0].path),
+             "assets/sprites/backgrounds/sky_blue.png");
+    snprintf(es.level.background_layers[1].path, sizeof(es.level.background_layers[1].path),
+             "assets/sprites/backgrounds/sky.txt");
+    es.level.background_layers[1].speed = 0.5f;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(strcmp(es.validation_report.locations[0].path, "background_layers") == 0);
+    CHECK(editor_focus_validation_issue(&es, 0) == 1);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(g_plx_open == 1 && es.ui.dropdown_open_id == 9201);
+    click_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    {
+        LevelIssueLocation speed = {"background_layers", 1, "speed"};
+        CHECK(properties_focus_config(&es, &speed) == 1);
+        ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+        CHECK(es.ui.active_id == 9101);
+        key_frame(&es, KEY_ESCAPE, 0);
+    }
 done:
     clear_dialog_seams();
     close_editor(&es);

@@ -147,6 +147,8 @@ int editor_focus_validation_issue(EditorState *es, int message)
         es->tool = TOOL_SELECT;
         editor_select_only(es, type, index);
         es->panel_open = 1;
+        /* "spiders[2].vx" also puts the caret in spider 2's vx field. */
+        properties_focus_entity_field(es, type, index, where->field);
         if (editor_entity_bounds(&es->level, type, index, &r)) {
             float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
             es->camera.x = r.x + r.w / 2.0f - (float)CANVAS_W / (2.0f * zoom);

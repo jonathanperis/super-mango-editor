@@ -75,6 +75,15 @@ void cfg_scroll(int delta);
  */
 int properties_focus_config(EditorState *es, const LevelIssueLocation *where);
 
+/*
+ * properties_focus_entity_field — When the properties panel next draws
+ * entity (type, index), focus its `field` (a TOML key such as "vx" or
+ * "tile_count"): a text field takes the caret, a dropdown opens.  An
+ * empty field, or a key the entity has no field for, focuses nothing.
+ */
+void properties_focus_entity_field(EditorState *es, EntityType type, int index,
+                                   const char *field);
+
 /* Level Config foldout state shared with layout measurement. */
 extern int g_plx_open;
 extern int g_fg_open;

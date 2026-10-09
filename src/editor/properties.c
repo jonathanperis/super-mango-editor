@@ -168,6 +168,35 @@ static int option_index(const char *value, const char *const *paths,
 }
 
 /*
+ * A field a validation message asked to focus ("spiders[2].vx" -> the vx
+ * field of spider 2), until the properties panel draws that entity.
+ * focus_key is the TOML key, which is also the field's label; "" = none.
+ */
+static char       s_focus_key[32];
+static EntityType s_focus_type;
+static int        s_focus_index = -1;
+
+/*
+ * field_label — Draw a property's "key:" label at row y, and when a
+ * validation message asked for this key, give the field the focus: the
+ * widget `id` drawn right after the label then activates (a text field
+ * takes the caret, a dropdown opens).  Using the TOML key as the label is
+ * what lets a message name the field.
+ */
+static void field_label(EditorState *es, int y, const char *key, int id)
+{
+    char text[40];
+
+    snprintf(text, sizeof(text), "%s:", key);
+    ui_label(&es->ui, CONTENT_X, y, text);
+    if (s_focus_key[0] != '\0' && strcmp(s_focus_key, key) == 0 &&
+        es->selection.type == s_focus_type && es->selection.index == s_focus_index) {
+        ui_focus_field(&es->ui, id);
+        s_focus_key[0] = '\0';
+    }
+}
+
+/*
  * draw_section_title — The title bar of a collapsible right-panel section
  * (the entity properties and Level Config).
  *
@@ -207,7 +236,7 @@ static void draw_rail_properties(EditorState *es, int y)
      * Cast the enum to int for the dropdown, then cast back on change.
      */
     int layout_sel = (int)p->layout;
-    ui_label(&es->ui, CONTENT_X, y, "layout:");
+    field_label(es, y, "layout", FIELD_ID(ENT_RAIL, 0));
     if (ui_dropdown(&es->ui, FIELD_ID(ENT_RAIL, 0),
                     FIELD_X, y, FIELD_W,
                     rail_layout_opts, 2, &layout_sel)) {
@@ -216,31 +245,31 @@ static void draw_rail_properties(EditorState *es, int y)
     }
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_RAIL, 1));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 1),
                      FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_RAIL, 2));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 2),
                      FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "w:");
+    field_label(es, y, "w", FIELD_ID(ENT_RAIL, 3));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 3),
                      FIELD_X, y, FIELD_W, &p->w))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "h:");
+    field_label(es, y, "h", FIELD_ID(ENT_RAIL, 4));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 4),
                      FIELD_X, y, FIELD_W, &p->h))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "end_cap:");
+    field_label(es, y, "end_cap", FIELD_ID(ENT_RAIL, 5));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_RAIL, 5),
                      FIELD_X, y, FIELD_W, &p->end_cap))
         editor_commit_change(es);
@@ -260,7 +289,7 @@ static void draw_floor_gap_properties(EditorState *es, int y)
      */
     int *p = &es->level.floor_gaps[es->selection.index];
     int screens = es->level.screen_count > 0 ? es->level.screen_count : 4;
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_FLOOR_GAP, 0));
     if (ui_int_field_limited(&es->ui, FIELD_ID(ENT_FLOOR_GAP, 0),
                              FIELD_X, y, FIELD_W, p,
                              0, screens * GAME_W - FLOOR_GAP_W, FLOOR_PIECE_W))
@@ -273,12 +302,12 @@ static void draw_checkpoint_properties(EditorState *es, int y)
     CheckpointPlacement *p = &es->level.checkpoints[es->selection.index];
     int screen = p->x >= 0.0f && p->x <= MAX_LEVEL_SCREENS * GAME_W
                ? (int)(p->x / GAME_W) : -1;
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_CHECKPOINT, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_CHECKPOINT, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_CHECKPOINT, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_CHECKPOINT, 1),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
@@ -296,19 +325,19 @@ static void draw_platform_properties(EditorState *es, int y)
 {
     PlatformPlacement *p = &es->level.platforms[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_PLATFORM, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_PLATFORM, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "tile_height:");
+    field_label(es, y, "tile_height", FIELD_ID(ENT_PLATFORM, 1));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_PLATFORM, 1),
                      FIELD_X, y, FIELD_W, &p->tile_height))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "tile_width:");
+    field_label(es, y, "tile_width", FIELD_ID(ENT_PLATFORM, 2));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_PLATFORM, 2),
                      FIELD_X, y, FIELD_W, &p->tile_width))
         editor_commit_change(es);
@@ -330,7 +359,7 @@ static void draw_platform_properties(EditorState *es, int y)
 
         int sel = option_index(p->tile_path, platform_tile_paths,
                                platform_tile_count);
-        ui_label(&es->ui, CONTENT_X, y, "tile_path:");
+        field_label(es, y, "tile_path", FIELD_ID(ENT_PLATFORM, 3));
         if (ui_dropdown(&es->ui, FIELD_ID(ENT_PLATFORM, 3),
                         FIELD_X, y, FIELD_W,
                         platform_tile_names, platform_tile_count, &sel)) {
@@ -351,13 +380,13 @@ static void draw_coin_properties(EditorState *es, int y)
 {
     CoinPlacement *p = &es->level.coins[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_COIN, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_COIN, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_COIN, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_COIN, 1),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
@@ -369,13 +398,13 @@ static void draw_star_yellow_properties(EditorState *es, int y)
     StarYellowPlacement *p =
         &es->level.star_yellows[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_STAR_YELLOW, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_YELLOW, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_STAR_YELLOW, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_YELLOW, 1),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
@@ -387,13 +416,13 @@ static void draw_star_green_properties(EditorState *es, int y)
     StarGreenPlacement *p =
         &es->level.star_greens[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_STAR_GREEN, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_GREEN, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_STAR_GREEN, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_GREEN, 1),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
@@ -405,13 +434,13 @@ static void draw_star_red_properties(EditorState *es, int y)
     StarRedPlacement *p =
         &es->level.star_reds[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_STAR_RED, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_RED, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_STAR_RED, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_STAR_RED, 1),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
@@ -426,13 +455,13 @@ static void draw_last_star_properties(EditorState *es, int y)
      */
     LastStarPlacement *p = &es->level.last_star;
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_LAST_STAR, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_LAST_STAR, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_LAST_STAR, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_LAST_STAR, 1),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
@@ -456,14 +485,14 @@ static void draw_player_spawn_properties(EditorState *es, int y)
      * not a struct like LastStarPlacement.  The selection index is
      * always 0 because there is exactly one player spawn per level.
      */
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_PLAYER_SPAWN, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_PLAYER_SPAWN, 0),
                        FIELD_X, y, FIELD_W,
                        &es->level.player_start_x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_PLAYER_SPAWN, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_PLAYER_SPAWN, 1),
                        FIELD_X, y, FIELD_W,
                        &es->level.player_start_y))
@@ -475,33 +504,33 @@ static void draw_spider_properties(EditorState *es, int y)
 {
     SpiderPlacement *p = &es->level.spiders[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_SPIDER, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "vx:");
+    field_label(es, y, "vx", FIELD_ID(ENT_SPIDER, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIDER, 1),
                        FIELD_X, y, FIELD_W, &p->vx))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    field_label(es, y, "patrol_x0", FIELD_ID(ENT_SPIDER, 2));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_SPIDER, 2),
                                FIELD_X, y, FIELD_W, &p->patrol_x0,
                                -FLT_MAX, p->patrol_x1 - SPIDER_FRAME_W))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    field_label(es, y, "patrol_x1", FIELD_ID(ENT_SPIDER, 3));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_SPIDER, 3),
                                FIELD_X, y, FIELD_W, &p->patrol_x1,
                                p->patrol_x0 + SPIDER_FRAME_W, FLT_MAX))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "frame_index:");
+    field_label(es, y, "frame_index", FIELD_ID(ENT_SPIDER, 4));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIDER, 4),
                      FIELD_X, y, FIELD_W, &p->frame_index))
         editor_commit_change(es);
@@ -513,26 +542,26 @@ static void draw_jumping_spider_properties(EditorState *es, int y)
     JumpingSpiderPlacement *p =
         &es->level.jumping_spiders[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_JUMPING_SPIDER, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "vx:");
+    field_label(es, y, "vx", FIELD_ID(ENT_JUMPING_SPIDER, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 1),
                        FIELD_X, y, FIELD_W, &p->vx))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    field_label(es, y, "patrol_x0", FIELD_ID(ENT_JUMPING_SPIDER, 2));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 2),
                                FIELD_X, y, FIELD_W, &p->patrol_x0,
                                -FLT_MAX, p->patrol_x1 - SPIDER_FRAME_W))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    field_label(es, y, "patrol_x1", FIELD_ID(ENT_JUMPING_SPIDER, 3));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_JUMPING_SPIDER, 3),
                                FIELD_X, y, FIELD_W, &p->patrol_x1,
                                p->patrol_x0 + SPIDER_FRAME_W, FLT_MAX))
@@ -544,39 +573,39 @@ static void draw_bird_properties(EditorState *es, int y)
 {
     BirdPlacement *p = &es->level.birds[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_BIRD, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "base_y:");
+    field_label(es, y, "base_y", FIELD_ID(ENT_BIRD, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 1),
                        FIELD_X, y, FIELD_W, &p->base_y))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "vx:");
+    field_label(es, y, "vx", FIELD_ID(ENT_BIRD, 2));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_BIRD, 2),
                        FIELD_X, y, FIELD_W, &p->vx))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    field_label(es, y, "patrol_x0", FIELD_ID(ENT_BIRD, 3));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_BIRD, 3),
                                FIELD_X, y, FIELD_W, &p->patrol_x0,
                                -FLT_MAX, p->patrol_x1 - BIRD_FRAME_W))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    field_label(es, y, "patrol_x1", FIELD_ID(ENT_BIRD, 4));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_BIRD, 4),
                                FIELD_X, y, FIELD_W, &p->patrol_x1,
                                p->patrol_x0 + BIRD_FRAME_W, FLT_MAX))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "frame_index:");
+    field_label(es, y, "frame_index", FIELD_ID(ENT_BIRD, 5));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_BIRD, 5),
                      FIELD_X, y, FIELD_W, &p->frame_index))
         editor_commit_change(es);
@@ -591,39 +620,39 @@ static void draw_faster_bird_properties(EditorState *es, int y)
      */
     BirdPlacement *p = &es->level.faster_birds[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_FASTER_BIRD, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "base_y:");
+    field_label(es, y, "base_y", FIELD_ID(ENT_FASTER_BIRD, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 1),
                        FIELD_X, y, FIELD_W, &p->base_y))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "vx:");
+    field_label(es, y, "vx", FIELD_ID(ENT_FASTER_BIRD, 2));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 2),
                        FIELD_X, y, FIELD_W, &p->vx))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    field_label(es, y, "patrol_x0", FIELD_ID(ENT_FASTER_BIRD, 3));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 3),
                                FIELD_X, y, FIELD_W, &p->patrol_x0,
                                -FLT_MAX, p->patrol_x1 - BIRD_FRAME_W))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    field_label(es, y, "patrol_x1", FIELD_ID(ENT_FASTER_BIRD, 4));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 4),
                                FIELD_X, y, FIELD_W, &p->patrol_x1,
                                p->patrol_x0 + BIRD_FRAME_W, FLT_MAX))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "frame_index:");
+    field_label(es, y, "frame_index", FIELD_ID(ENT_FASTER_BIRD, 5));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_FASTER_BIRD, 5),
                      FIELD_X, y, FIELD_W, &p->frame_index))
         editor_commit_change(es);
@@ -634,26 +663,26 @@ static void draw_fish_properties(EditorState *es, int y)
 {
     FishPlacement *p = &es->level.fish[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_FISH, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "vx:");
+    field_label(es, y, "vx", FIELD_ID(ENT_FISH, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_FISH, 1),
                        FIELD_X, y, FIELD_W, &p->vx))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    field_label(es, y, "patrol_x0", FIELD_ID(ENT_FISH, 2));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FISH, 2),
                                FIELD_X, y, FIELD_W, &p->patrol_x0,
                                -FLT_MAX, p->patrol_x1 - FISH_FRAME_W))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    field_label(es, y, "patrol_x1", FIELD_ID(ENT_FISH, 3));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FISH, 3),
                                FIELD_X, y, FIELD_W, &p->patrol_x1,
                                p->patrol_x0 + FISH_FRAME_W, FLT_MAX))
@@ -669,26 +698,26 @@ static void draw_faster_fish_properties(EditorState *es, int y)
      */
     FishPlacement *p = &es->level.faster_fish[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_FASTER_FISH, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "vx:");
+    field_label(es, y, "vx", FIELD_ID(ENT_FASTER_FISH, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_FASTER_FISH, 1),
                        FIELD_X, y, FIELD_W, &p->vx))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    field_label(es, y, "patrol_x0", FIELD_ID(ENT_FASTER_FISH, 2));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FASTER_FISH, 2),
                                FIELD_X, y, FIELD_W, &p->patrol_x0,
                                -FLT_MAX, p->patrol_x1 - FISH_FRAME_W))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    field_label(es, y, "patrol_x1", FIELD_ID(ENT_FASTER_FISH, 3));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FASTER_FISH, 3),
                                FIELD_X, y, FIELD_W, &p->patrol_x1,
                                p->patrol_x0 + FISH_FRAME_W, FLT_MAX))
@@ -700,20 +729,20 @@ static void draw_axe_trap_properties(EditorState *es, int y)
 {
     AxeTrapPlacement *p = &es->level.axe_traps[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "pillar_x:");
+    field_label(es, y, "pillar_x", FIELD_ID(ENT_AXE_TRAP, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_AXE_TRAP, 0),
                        FIELD_X, y, FIELD_W, &p->pillar_x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_AXE_TRAP, 3));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_AXE_TRAP, 3),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
     y += ROW_H;
 
     int mode_sel = (int)p->mode;
-    ui_label(&es->ui, CONTENT_X, y, "mode:");
+    field_label(es, y, "mode", FIELD_ID(ENT_AXE_TRAP, 1));
     if (ui_dropdown(&es->ui, FIELD_ID(ENT_AXE_TRAP, 1),
                     FIELD_X, y, FIELD_W,
                     axe_mode_opts, 2, &mode_sel)) {
@@ -728,31 +757,31 @@ static void draw_circular_saw_properties(EditorState *es, int y)
     CircularSawPlacement *p =
         &es->level.circular_saws[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_CIRCULAR_SAW, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_CIRCULAR_SAW, 4));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 4),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x0:");
+    field_label(es, y, "patrol_x0", FIELD_ID(ENT_CIRCULAR_SAW, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 1),
                        FIELD_X, y, FIELD_W, &p->patrol_x0))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "patrol_x1:");
+    field_label(es, y, "patrol_x1", FIELD_ID(ENT_CIRCULAR_SAW, 2));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 2),
                        FIELD_X, y, FIELD_W, &p->patrol_x1))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "direction:");
+    field_label(es, y, "direction", FIELD_ID(ENT_CIRCULAR_SAW, 3));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_CIRCULAR_SAW, 3),
                      FIELD_X, y, FIELD_W, &p->direction))
         editor_commit_change(es);
@@ -764,13 +793,13 @@ static void draw_spike_row_properties(EditorState *es, int y)
     SpikeRowPlacement *p =
         &es->level.spike_rows[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_SPIKE_ROW, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_ROW, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "count:");
+    field_label(es, y, "count", FIELD_ID(ENT_SPIKE_ROW, 1));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIKE_ROW, 1),
                      FIELD_X, y, FIELD_W, &p->count))
         editor_commit_change(es);
@@ -782,19 +811,19 @@ static void draw_spike_platform_properties(EditorState *es, int y)
     SpikePlatformPlacement *p =
         &es->level.spike_platforms[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_SPIKE_PLATFORM, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_PLATFORM, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_SPIKE_PLATFORM, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_PLATFORM, 1),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "tile_count:");
+    field_label(es, y, "tile_count", FIELD_ID(ENT_SPIKE_PLATFORM, 2));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIKE_PLATFORM, 2),
                      FIELD_X, y, FIELD_W, &p->tile_count))
         editor_commit_change(es);
@@ -806,19 +835,19 @@ static void draw_spike_block_properties(EditorState *es, int y)
     SpikeBlockPlacement *p =
         &es->level.spike_blocks[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "rail_index:");
+    field_label(es, y, "rail_index", FIELD_ID(ENT_SPIKE_BLOCK, 0));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 0),
                      FIELD_X, y, FIELD_W, &p->rail_index))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "t_offset:");
+    field_label(es, y, "t_offset", FIELD_ID(ENT_SPIKE_BLOCK, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 1),
                        FIELD_X, y, FIELD_W, &p->t_offset))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "speed:");
+    field_label(es, y, "speed", FIELD_ID(ENT_SPIKE_BLOCK, 2));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_SPIKE_BLOCK, 2),
                                FIELD_X, y, FIELD_W, &p->speed,
                                RAIL_SPEED_MIN, MAX_RAIL_SPEED))
@@ -831,7 +860,7 @@ static void draw_blue_flame_properties(EditorState *es, int y)
     BlueFlamePlacement *p =
         &es->level.blue_flames[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_BLUE_FLAME, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_BLUE_FLAME, 0),
                        FIELD_X, y, FIELD_W, &p->x)) {
         /* A typed x lands on the nearest gap, as a click would. */
@@ -846,7 +875,7 @@ static void draw_fire_flame_properties(EditorState *es, int y)
     FireFlamePlacement *p =
         &es->level.fire_flames[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_FIRE_FLAME, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_FIRE_FLAME, 0),
                        FIELD_X, y, FIELD_W, &p->x)) {
         /* A typed x lands on the nearest gap, as a click would. */
@@ -866,7 +895,7 @@ static void draw_float_platform_properties(EditorState *es, int y)
      * Cast FloatPlatformMode to int for the dropdown widget.
      */
     int mode_sel = (int)p->mode;
-    ui_label(&es->ui, CONTENT_X, y, "mode:");
+    field_label(es, y, "mode", FIELD_ID(ENT_FLOAT_PLATFORM, 0));
     if (ui_dropdown(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 0),
                     FIELD_X, y, FIELD_W,
                     fplat_mode_opts, 3, &mode_sel)) {
@@ -878,25 +907,25 @@ static void draw_float_platform_properties(EditorState *es, int y)
     }
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_FLOAT_PLATFORM, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 1),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_FLOAT_PLATFORM, 2));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 2),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "tile_count:");
+    field_label(es, y, "tile_count", FIELD_ID(ENT_FLOAT_PLATFORM, 3));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 3),
                      FIELD_X, y, FIELD_W, &p->tile_count))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "rail_index:");
+    field_label(es, y, "rail_index", FIELD_ID(ENT_FLOAT_PLATFORM, 4));
     /* A rail rider's index must name an existing rail; other modes ignore
      * it, and the switch to Rail checks it then. */
     if (ui_int_field_limited(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 4),
@@ -907,13 +936,13 @@ static void draw_float_platform_properties(EditorState *es, int y)
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "t_offset:");
+    field_label(es, y, "t_offset", FIELD_ID(ENT_FLOAT_PLATFORM, 5));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 5),
                        FIELD_X, y, FIELD_W, &p->t_offset))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "speed:");
+    field_label(es, y, "speed", FIELD_ID(ENT_FLOAT_PLATFORM, 6));
     /* Only a rail rider's speed has to lie in the rail range. */
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_FLOAT_PLATFORM, 6),
                                FIELD_X, y, FIELD_W, &p->speed,
@@ -927,19 +956,19 @@ static void draw_bridge_properties(EditorState *es, int y)
 {
     BridgePlacement *p = &es->level.bridges[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_BRIDGE, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_BRIDGE, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_BRIDGE, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_BRIDGE, 1),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "brick_count:");
+    field_label(es, y, "brick_count", FIELD_ID(ENT_BRIDGE, 2));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_BRIDGE, 2),
                      FIELD_X, y, FIELD_W, &p->brick_count))
         editor_commit_change(es);
@@ -958,13 +987,13 @@ static void draw_bouncepad_small_properties(EditorState *es, int y)
     ui_label(&es->ui, CONTENT_X, y, "type: Small (Green)");
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_BOUNCEPAD_SMALL, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_SMALL, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
+    field_label(es, y, "launch_vy", FIELD_ID(ENT_BOUNCEPAD_SMALL, 1));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_BOUNCEPAD_SMALL, 1),
                                FIELD_X, y, FIELD_W, &p->launch_vy,
                                -MAX_LEVEL_MOTION, BOUNCE_LAUNCH_VY_MAX))
@@ -980,13 +1009,13 @@ static void draw_bouncepad_medium_properties(EditorState *es, int y)
     ui_label(&es->ui, CONTENT_X, y, "type: Medium (Wood)");
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_BOUNCEPAD_MEDIUM, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_MEDIUM, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
+    field_label(es, y, "launch_vy", FIELD_ID(ENT_BOUNCEPAD_MEDIUM, 1));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_BOUNCEPAD_MEDIUM, 1),
                                FIELD_X, y, FIELD_W, &p->launch_vy,
                                -MAX_LEVEL_MOTION, BOUNCE_LAUNCH_VY_MAX))
@@ -1002,13 +1031,13 @@ static void draw_bouncepad_high_properties(EditorState *es, int y)
     ui_label(&es->ui, CONTENT_X, y, "type: High (Red)");
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_BOUNCEPAD_HIGH, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_BOUNCEPAD_HIGH, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "launch_vy:");
+    field_label(es, y, "launch_vy", FIELD_ID(ENT_BOUNCEPAD_HIGH, 1));
     if (ui_float_field_limited(&es->ui, FIELD_ID(ENT_BOUNCEPAD_HIGH, 1),
                                FIELD_X, y, FIELD_W, &p->launch_vy,
                                -MAX_LEVEL_MOTION, BOUNCE_LAUNCH_VY_MAX))
@@ -1020,25 +1049,25 @@ static void draw_vine_properties(EditorState *es, int y)
 {
     VinePlacement *p = &es->level.vines[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_VINE, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_VINE, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_VINE, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_VINE, 1),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "tile_count:");
+    field_label(es, y, "tile_count", FIELD_ID(ENT_VINE, 2));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_VINE, 2),
                      FIELD_X, y, FIELD_W, &p->tile_count))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "vine_type:");
+    field_label(es, y, "vine_type", FIELD_ID(ENT_VINE, 3));
     if (ui_dropdown(&es->ui, FIELD_ID(ENT_VINE, 3),
                     FIELD_X, y, FIELD_W,
                     vine_type_opts, 2, &p->vine_type))
@@ -1050,19 +1079,19 @@ static void draw_ladder_properties(EditorState *es, int y)
 {
     LadderPlacement *p = &es->level.ladders[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_LADDER, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_LADDER, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_LADDER, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_LADDER, 1),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "tile_count:");
+    field_label(es, y, "tile_count", FIELD_ID(ENT_LADDER, 2));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_LADDER, 2),
                      FIELD_X, y, FIELD_W, &p->tile_count))
         editor_commit_change(es);
@@ -1073,19 +1102,19 @@ static void draw_rope_properties(EditorState *es, int y)
 {
     RopePlacement *p = &es->level.ropes[es->selection.index];
 
-    ui_label(&es->ui, CONTENT_X, y, "x:");
+    field_label(es, y, "x", FIELD_ID(ENT_ROPE, 0));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_ROPE, 0),
                        FIELD_X, y, FIELD_W, &p->x))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "y:");
+    field_label(es, y, "y", FIELD_ID(ENT_ROPE, 1));
     if (ui_float_field(&es->ui, FIELD_ID(ENT_ROPE, 1),
                        FIELD_X, y, FIELD_W, &p->y))
         editor_commit_change(es);
     y += ROW_H;
 
-    ui_label(&es->ui, CONTENT_X, y, "tile_count:");
+    field_label(es, y, "tile_count", FIELD_ID(ENT_ROPE, 2));
     if (ui_int_field(&es->ui, FIELD_ID(ENT_ROPE, 2),
                      FIELD_X, y, FIELD_W, &p->tile_count))
         editor_commit_change(es);
@@ -1240,6 +1269,10 @@ void properties_render(EditorState *es, int start_y, int available_h)
      */
     PropertyPanelFn draw_fields = property_panel(es->selection.type);
     if (draw_fields) draw_fields(es, y);
+
+    /* A request is for the first drawing of fields after it: a key this
+     * entity has no field for (or another entity) must not linger. */
+    s_focus_key[0] = '\0';
 
     EndScissorMode();
     editor_end_change_tracking(es);
@@ -1933,38 +1966,70 @@ void level_config_render(EditorState *es, int start_y, int available_h,
 
 /*
  * Where each Level Config key lives in the panel, for jumping to it from a
- * validation message.  widget is the field's ID (0 for a list or dropdown,
- * which cannot hold a text caret); open is the foldout that must be open
- * for it to be drawn (NULL when it is always shown).
+ * validation message.  widget is the field's ID: a text field takes the
+ * caret and a dropdown opens (ui_focus_field).  A layer list has one row
+ * per layer, so its targets also name the key inside the row (field) and
+ * give row 0's ID: row i's widget is widget + i, as config_layer_row
+ * numbers them.  A target without a field matches any message about that
+ * key and only unfolds its group (widget 0).  open is the foldout that
+ * must be open for the widget to be drawn (NULL when it always is).
  */
 typedef struct {
     const char *key;
+    const char *field;
     int widget;
     int *open;
 } ConfigTarget;
 
 static const ConfigTarget s_config_targets[] = {
-    {"name", 9000, NULL},              {"description", 9001, NULL},
-    {"generated_by", 9002, NULL},      {"screen_count", 9011, NULL},
-    {"next_phase", 9031, NULL},        {"music_path", 0, NULL},
-    {"music_volume", 9003, NULL},      {"floor_tile_path", 0, NULL},
-    {"initial_hearts", 9006, NULL},    {"initial_lives", 9007, NULL},
-    {"score_per_life", 9008, NULL},    {"coin_score", 9012, NULL},
-    {"physics.walk_max_speed", 9020, &g_phys_open},
-    {"physics.run_max_speed", 9021, &g_phys_open},
-    {"physics.walk_ground_accel", 9022, &g_phys_open},
-    {"physics.run_ground_accel", 9023, &g_phys_open},
-    {"physics.ground_friction", 9024, &g_phys_open},
-    {"physics.ground_counter_accel", 9025, &g_phys_open},
-    {"physics.air_accel_walk", 9026, &g_phys_open},
-    {"physics.air_accel_run", 9027, &g_phys_open},
-    {"physics.air_friction", 9028, &g_phys_open},
-    {"physics.cam_lookahead_vx_factor", 9029, &g_phys_open},
-    {"physics.cam_lookahead_max", 9030, &g_phys_open},
-    {"background_layers", 0, &g_plx_open},
-    {"foreground_layers", 0, &g_fg_open},
-    {"fog_layers", 0, &g_fog_open},
+    {"name", NULL, 9000, NULL},             {"description", NULL, 9001, NULL},
+    {"generated_by", NULL, 9002, NULL},     {"screen_count", NULL, 9011, NULL},
+    {"next_phase", NULL, 9031, NULL},       {"music_path", NULL, 9009, NULL},
+    {"music_volume", NULL, 9003, NULL},     {"floor_tile_path", NULL, 9010, NULL},
+    {"initial_hearts", NULL, 9006, NULL},   {"initial_lives", NULL, 9007, NULL},
+    {"score_per_life", NULL, 9008, NULL},   {"coin_score", NULL, 9012, NULL},
+    {"physics.walk_max_speed", NULL, 9020, &g_phys_open},
+    {"physics.run_max_speed", NULL, 9021, &g_phys_open},
+    {"physics.walk_ground_accel", NULL, 9022, &g_phys_open},
+    {"physics.run_ground_accel", NULL, 9023, &g_phys_open},
+    {"physics.ground_friction", NULL, 9024, &g_phys_open},
+    {"physics.ground_counter_accel", NULL, 9025, &g_phys_open},
+    {"physics.air_accel_walk", NULL, 9026, &g_phys_open},
+    {"physics.air_accel_run", NULL, 9027, &g_phys_open},
+    {"physics.air_friction", NULL, 9028, &g_phys_open},
+    {"physics.cam_lookahead_vx_factor", NULL, 9029, &g_phys_open},
+    {"physics.cam_lookahead_max", NULL, 9030, &g_phys_open},
+    /* Layer rows: the asset dropdown and the speed field (the IDs in the
+     * LayerChoices of config_background_layers and friends). */
+    {"background_layers", "path", 9200, &g_plx_open},
+    {"background_layers", "speed", 9100, &g_plx_open},
+    {"background_layers", NULL, 0, &g_plx_open},
+    {"foreground_layers", "path", 9300, &g_fg_open},
+    {"foreground_layers", "speed", 9400, &g_fg_open},
+    {"foreground_layers", NULL, 0, &g_fg_open},
+    {"fog_layers", "path", 9600, &g_fog_open},
+    {"fog_layers", "speed", 9700, &g_fog_open},
+    {"fog_layers", NULL, 0, &g_fog_open},
 };
+
+void properties_focus_entity_field(EditorState *es, EntityType type, int index,
+                                   const char *field)
+{
+    /* A few messages name a pair of fields together; edit the one that
+     * usually fixes it ("patrol is 20 px wide" -> move its right end). */
+    static const struct { const char *alias, *key; } aliases[] = {
+        { "patrol", "patrol_x1" },
+    };
+
+    if (!es || !field || field[0] == '\0') return;
+    snprintf(s_focus_key, sizeof(s_focus_key), "%s", field);
+    for (size_t i = 0; i < sizeof(aliases) / sizeof(aliases[0]); i++)
+        if (strcmp(field, aliases[i].alias) == 0)
+            snprintf(s_focus_key, sizeof(s_focus_key), "%s", aliases[i].key);
+    s_focus_type = type;
+    s_focus_index = index;
+    es->panel_open = 1;
+}
 
 int properties_focus_config(EditorState *es, const LevelIssueLocation *where)
 {
@@ -1979,10 +2044,16 @@ int properties_focus_config(EditorState *es, const LevelIssueLocation *where)
 
     for (size_t i = 0; i < sizeof(s_config_targets) / sizeof(s_config_targets[0]); i++) {
         const ConfigTarget *target = &s_config_targets[i];
+        int widget = target->widget;
         if (strcmp(target->key, key) != 0) continue;
+        if (target->field) {
+            /* A row target: the message must name this key of a row. */
+            if (strcmp(target->field, where->field) != 0 || where->index < 0) continue;
+            widget += where->index;
+        }
         es->config_open = 1;
         if (target->open) *target->open = 1;
-        if (target->widget) ui_focus_field(&es->ui, target->widget);
+        if (widget) ui_focus_field(&es->ui, widget);
         return 1;
     }
     return 0;
