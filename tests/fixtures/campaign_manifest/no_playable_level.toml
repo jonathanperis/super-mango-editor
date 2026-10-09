@@ -1,0 +1,6 @@
+# Nothing listed can be played, so the catalog itself fails.
+format_version = 1
+levels = [
+    "levels/zz_missing_campaign_a.toml",
+    "levels/zz_missing_campaign_b.toml",
+]
