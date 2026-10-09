@@ -21,7 +21,8 @@
  * Counts down the invincibility timer then checks the player's physics
  * hitbox (AABB) against every active enemy, hazard, and collectible.
  * Damage is applied through apply_damage(); coins/stars are collected
- * directly. Refactored to use helper macros for readability.
+ * directly. Enemies and hazards come from the s_damage_sources table in
+ * game_collision.c, one row per kind, tested in that order.
  */
 void game_collide(GameState *gs, float dt);
 

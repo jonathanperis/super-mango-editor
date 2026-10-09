@@ -27,7 +27,7 @@ src/
 ├── collision/
 │   ├── collision_damage.h / .c   Damage checks against hazards and enemies
 │   ├── floor_gap_collision.h / .c Sea-gap fall/death detection
-│   └── game_collision.h / .c     Gameplay collision passes and pickups
+│   └── game_collision.h / .c     s_damage_sources table, collision pass, pickups
 ├── core/
 │   ├── app_session.h / .c        Heap-owned session: window/audio lifetime, menu/game routes, in-place replay
 │   ├── game_profile.h / .c       Versioned player settings/results/Continue point and native/web persistence
@@ -46,8 +46,8 @@ src/
 │   ├── game_loop.c               Active-game frame runner (game_frame)
 │   ├── game_update.h / .c        Top-level update orchestration
 │   ├── game_player_step.h / .c   Player update/collision step wrapper
-│   ├── game_actors.h / .c        Enemy update/render helpers
-│   ├── game_hazards.h / .c       Hazard update/render helpers
+│   ├── game_actors.h / .c        Enemy and spike-block update calls
+│   ├── game_hazards.h / .c       Hazard update calls
 │   ├── game_bouncepads.h / .c    Bouncepad update/render helpers
 │   ├── game_float_platforms.h / .c Float-platform update helpers
 │   ├── game_bridges.h / .c       Bridge update helpers
@@ -139,7 +139,7 @@ src/
 │   └── game_web_input.h / .c     Browser/WebAssembly stale-key repair
 ├── levels/
 │   ├── level.h                   Shared level definitions
-│   ├── level_loader.h / .c       TOML level loading and switching
+│   ├── level_loader.h / .c       s_level_loaders table: LevelDef into GameWorld
 │   ├── level_path.h / .c         Level path normalization and directory helpers
 │   ├── level_physics.h / .c      Level physics override/default helpers
 │   ├── level_ref.h / .c          Shared levels/<name>.toml rule for next_phase, campaigns and profile keys
@@ -362,6 +362,7 @@ Frees all resources in reverse init order.
 - `int level_load(GameState *gs, const LevelDef *def);` -- validate and copy a parsed level definition into runtime `GameState`; returns `-1` without mutating current runtime state when runtime counts are invalid
 - `level_apply(GameState *gs, const LevelDef *def)` -- the copy step alone, for a definition `level_load_toml` already validated; it cannot fail. The level session parses and validates a level once, checks its sprites, then swaps the heap-staged `LevelDef` in and applies it, so a failed Next Level never replaces the current level
 - `level_reset(GameState *gs, const LevelDef *def)` -- restore mutable level state after death/retry; collected coins stay collected (Retry re-activates them)
+- `s_level_loaders` (static, in `level_loader.c`) -- one row per placement array: its `load_<things>()` function and whether it runs once per level (`LOAD_ONCE`) or after every lost life too (`LOAD_EVERY_LIFE`). `level_apply` runs every row in order, `level_reset` only the `LOAD_EVERY_LIFE` ones
 - `level_release_platform_tiles(GameState *gs)` -- unload the platform tile textures; `GameState.world.platform_tiles` loads each distinct `tile_path` once and every platform naming it borrows that texture, so a level with 23 stone pillars decodes `stone_platform.png` once, and reloading the same level (Replay, F8) decodes nothing
 - `level_load_toml(const char *path, LevelDef *def)` -- parse TOML into heap staging storage, run runtime validation, free TOML data, then assign the validated `LevelDef` to the caller. A `LevelDef` is about 16 KB; game load paths never keep one in a local variable (the browser stack is 64 KB), and `level.h` stops the build if it outgrows `LEVEL_DEF_SIZE_BUDGET`
 - `level_apply_player_physics(Player *player, const LevelDef *def)` -- reset player movement tunables to engine defaults, then apply non-negative level overrides
@@ -581,7 +582,7 @@ Shared level definitions and constants.
 
 ### `levels/level_loader.h` / `levels/level_loader.c`
 
-TOML level loading and switching system.
+Copies a validated `LevelDef` into `gs->world`: one small `load_<things>()` per placement array, listed in the `s_level_loaders` table in the order they run.
 
 ### `levels/level_physics.h` / `levels/level_physics.c`
 
