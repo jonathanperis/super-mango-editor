@@ -22,6 +22,7 @@
 #include "core/game_experiment.h"
 #include "core/game_overlay.h"
 #include "core/game_profile.h"
+#include "core/game_resume.h"
 #include "effects/parallax.h"
 #include "render/game_render.h"
 #include "screens/settings_menu.h"
@@ -878,6 +879,47 @@ done:
     return failed;
 }
 
+/*
+ * game_resume_apply accepts only a Continue point this exact level file
+ * could have produced, and otherwise changes nothing. The transition
+ * fixture has one authored checkpoint at (304, 252) and no coins.
+ */
+static int continue_point_must_fit_the_level(void)
+{
+    int failed = 0;
+    GameState gs;
+    GameResume good, bad;
+    CHECK(mechanics_open_level(&gs, TRANSITION_LEVEL, 0) == 0);
+    snprintf(gs.profile_level_key, sizeof(gs.profile_level_key), "levels/transition.toml");
+    game_resume_capture(&gs, &good);
+    good.checkpoint = 0;
+    good.respawn_x = 304.0f;
+    good.respawn_y = 252.0f;
+    good.score = 70;
+    good.lives = 1;
+
+#define REJECTS(change) do { bad = good; change; \
+        CHECK(game_resume_apply(&gs, &bad) == -1); \
+        CHECK(gs.score == 0 && !gs.resumed && gs.checkpoint_index == -1); } while (0)
+    REJECTS(snprintf(bad.path, sizeof(bad.path), "levels/other.toml"));
+    REJECTS(bad.level_hash ^= 1);          /* the file changed since */
+    REJECTS(bad.checkpoint = 1);           /* only checkpoint 0 exists */
+    REJECTS(bad.respawn_x = 305.0f);       /* not where checkpoint 0 is */
+    REJECTS(bad.checkpoint = -1);          /* no checkpoint: must be the start */
+    REJECTS(bad.coins = 1);                /* the fixture places no coins */
+    REJECTS(bad.level_score_start = 71);   /* more than the run's score */
+#undef REJECTS
+
+    CHECK(game_resume_apply(&gs, &good) == 0);
+    CHECK(gs.resumed && gs.score == 70 && gs.lives == 1 && gs.checkpoint_index == 0);
+    CHECK(NEAR(gs.player.x, 304.0f + (TILE_SIZE - gs.player.w) / 2.0f, 0.01f));
+    CHECK(gs.checkpoint_feedback_kind == CHECKPOINT_FEEDBACK_RESPAWN);
+    CHECK(gs.camera.x == resting_camera_x(&gs));
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
 /* ------------------------------------------------------------------ */
 /* Debug overlay                                                       */
 /* ------------------------------------------------------------------ */
@@ -1059,6 +1101,7 @@ int main(void)
         CASE(bridge_ignores_a_player_on_another_surface),
         CASE(camera_jumps_to_the_respawn_point),
         CASE(level_start_shows_the_start_at_once),
+        CASE(continue_point_must_fit_the_level),
         CASE(debug_log_is_a_bounded_ring),
         CASE(parallax_scrolls_and_wraps),
         CASE(every_overlay_state_renders),

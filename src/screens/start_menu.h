@@ -22,6 +22,7 @@
 typedef enum {
     MENU_ROUTE_NONE = 0,
     MENU_ROUTE_PLAY,
+    MENU_ROUTE_CONTINUE,  /* play the selected level from its Continue point */
     MENU_ROUTE_EXIT,
     MENU_ROUTE_FATAL
 } MenuRoute;
@@ -66,6 +67,10 @@ typedef struct {
 
 /* Fill row for catalog entry index (index must be < catalog->count). */
 void start_menu_level_row(const StartMenu *menu, size_t index, StartMenuLevelRow *row);
+
+/* 1 when the profile holds a Continue point for the selected level: the
+ * menu then shows Continue beside Play (C key / gamepad X). */
+int start_menu_can_continue(const StartMenu *menu);
 
 /* Write seconds as m:ss.cc, rounded to hundredths ("--" when negative). */
 void start_menu_format_time(float seconds, char *out, size_t size);

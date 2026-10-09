@@ -2,6 +2,7 @@
  * never to a render frame, entity, or smoke/replay run. */
 #include "game_profile.h"
 #include "../collectibles/coin.h"  /* MAX_COINS: the most coins a level holds */
+#include "../game_constants.h"      /* MAX_CHECKPOINTS */
 #include "../levels/level_ref.h"
 #include "../shared/platform.h"
 #include "../shared/printf_format.h"
@@ -137,6 +138,102 @@ static int string(toml_datum_t value, char *out, size_t capacity)
     return 0;
 }
 
+/* A whole number between low and high; unlike integer(), it may be negative. */
+static int integer_in(toml_datum_t value, int low, int high, int *out)
+{
+    if (value.type != TOML_INT64 || value.u.int64 < low || value.u.int64 > high) return -1;
+    *out = (int)value.u.int64;
+    return 0;
+}
+
+/* Any finite number; TOML writes 900.0 as a float but a hand edit may say 900. */
+static int number(toml_datum_t value, float *out)
+{
+    double parsed = value.type == TOML_FP64 ? value.u.fp64 :
+                    value.type == TOML_INT64 ? (double)value.u.int64 : NAN;
+    if (!isfinite(parsed) || parsed < -1e9 || parsed > 1e9) return -1;
+    *out = (float)parsed;
+    return 0;
+}
+
+/* Exactly 16 lowercase hex digits, the way encode writes a 64-bit value.
+ * TOML integers are signed 64-bit, so a hash or bit mask that uses the top
+ * bit could not be stored as one; a string can hold all 64 bits. */
+static int hex64(toml_datum_t value, uint64_t *out)
+{
+    if (value.type != TOML_STRING || value.u.str.len != 16) return -1;
+    uint64_t result = 0;
+    for (int i = 0; i < 16; i++) {
+        char c = value.u.str.ptr[i];
+        int digit = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : -1;
+        if (digit < 0) return -1;
+        result = (result << 4) | (uint64_t)digit;
+    }
+    *out = result;
+    return 0;
+}
+
+/*
+ * resume_valid — The checks every Continue point passes, whether it is
+ * decoded, encoded or recorded. They only say the numbers are sane; whether
+ * they fit the level (a checkpoint it has, a coin it places) is checked when
+ * the point is applied to that level (game_resume_apply).
+ */
+_Static_assert(MAX_COINS <= 64, "GameResume.coins holds one bit per coin in 64 bits");
+static int resume_valid(const GameResume *r)
+{
+    if (!game_profile_key_valid(r->path) ||
+        r->checkpoint < -1 || r->checkpoint >= MAX_CHECKPOINTS ||
+        r->legacy_screen < 0 || r->legacy_screen > 1000 ||
+        r->score < 0 || r->level_score_start < 0 || r->level_score_start > r->score ||
+        r->score_life_next < 0 || r->lives < 0 ||
+        !isfinite(r->respawn_x) || !isfinite(r->respawn_y) ||
+        r->respawn_x < -1e6f || r->respawn_x > 1e6f || r->respawn_y < -1e6f || r->respawn_y > 1e6f ||
+        !isfinite(r->elapsed) || r->elapsed < 0 || r->elapsed > 1e9f) return 0;
+    /* No coin beyond the most a level can place. */
+    for (int i = MAX_COINS; i < 64; i++)
+        if (r->coins & ((uint64_t)1 << i)) return 0;
+    return 1;
+}
+
+/* The [resume] table: every field present exactly once, each in range. */
+static int decode_resume(toml_datum_t table, GameResume *resume)
+{
+    static const char *const names[] = {"path", "level_hash", "coins", "checkpoint", "legacy_screen",
+        "score", "level_score_start", "score_life_next", "lives", "respawn_x", "respawn_y", "elapsed"};
+    enum { RESUME_FIELDS = sizeof(names) / sizeof(names[0]) };
+    int seen = 0;
+    if (table.type != TOML_TABLE || table.u.tab.size != RESUME_FIELDS) return -1;
+    memset(resume, 0, sizeof(*resume));
+    for (int i = 0; i < table.u.tab.size; i++) {
+        const char *key = table.u.tab.key[i];
+        toml_datum_t value = table.u.tab.value[i];
+        int field = 0;
+        if (strlen(key) != (size_t)table.u.tab.len[i]) return -1;
+        while (field < RESUME_FIELDS && strcmp(key, names[field])) field++;
+        int failed;
+        switch (field) {
+        case 0: failed = string(value, resume->path, sizeof(resume->path)); break;
+        case 1: failed = hex64(value, &resume->level_hash); break;
+        case 2: failed = hex64(value, &resume->coins); break;
+        case 3: failed = integer_in(value, -1, MAX_CHECKPOINTS - 1, &resume->checkpoint); break;
+        case 4: failed = integer(value, &resume->legacy_screen); break;
+        case 5: failed = integer(value, &resume->score); break;
+        case 6: failed = integer(value, &resume->level_score_start); break;
+        case 7: failed = integer(value, &resume->score_life_next); break;
+        case 8: failed = integer(value, &resume->lives); break;
+        case 9: failed = number(value, &resume->respawn_x); break;
+        case 10: failed = number(value, &resume->respawn_y); break;
+        case 11: failed = number(value, &resume->elapsed); break;
+        default: return -1;  /* unknown key */
+        }
+        if (failed) return -1;
+        seen |= 1 << field;
+    }
+    /* size matched and every key was known, so a repeat would leave a gap. */
+    return seen == (1 << RESUME_FIELDS) - 1 && resume_valid(resume) ? 0 : -1;
+}
+
 static int bindings(toml_datum_t value, GameSettings *settings, int keyboard)
 {
     if (value.type != TOML_ARRAY || value.u.arr.size != PROFILE_ACTION_COUNT) return -1;
@@ -231,7 +328,7 @@ int game_profile_decode(GameProfileData *out, const char *text)
     toml_result_t parsed = toml_parse(text, (int)strlen(text));
     if (!parsed.ok) { toml_free(parsed); return -1; }
     GameProfileData *data = calloc(1, sizeof(*data));
-    int ok = 0, version = 0;
+    int ok = 0, version = 0, has_resume = 0;
     if (!data) goto done;
     data->settings = (GameSettings)GAME_SETTINGS_DEFAULTS;
     for (int i = 0; i < parsed.toptab.u.tab.size; i++) {
@@ -246,7 +343,14 @@ int game_profile_decode(GameProfileData *out, const char *text)
         else FIELD("window_scale", window_scale)
         else FIELD("high_contrast", high_contrast)
         else FIELD("reduced_motion", reduced_motion)
-        else if (!strcmp(key, "format_version")) { if (integer(value, &version) || version != 1) goto done; }
+        else if (!strcmp(key, "format_version")) {
+            /* Version 1 (no Continue point) still loads; see game_profile.h. */
+            if (integer(value, &version) || version < 1 || version > PROFILE_FORMAT_VERSION) goto done;
+        }
+        else if (!strcmp(key, "resume")) {
+            if (decode_resume(value, &data->resume)) goto done;
+            has_resume = 1;
+        }
         else if (!strcmp(key, "keys")) { if (bindings(value, &data->settings, 1)) goto done; }
         else if (!strcmp(key, "buttons")) { if (bindings(value, &data->settings, 0)) goto done; }
         else if (!strcmp(key, "last_level")) {
@@ -279,7 +383,8 @@ int game_profile_decode(GameProfileData *out, const char *text)
 #undef FIELD
     }
     reset_debug_reserved_keys(&data->settings);
-    if (version != 1 || !game_settings_valid(&data->settings)) goto done;
+    /* [resume] arrived with version 2; a version-1 file never had one. */
+    if (version < 1 || (version == 1 && has_resume) || !game_settings_valid(&data->settings)) goto done;
     *out = *data;
     ok = 1;
 done:
@@ -314,12 +419,14 @@ int game_profile_encode(const GameProfileData *data, char *text, size_t capacity
 {
     if (!data || !text || !capacity || !game_settings_valid(&data->settings) ||
         data->count < 0 || data->count > PROFILE_LEVEL_COUNT ||
-        (data->last_level[0] && !game_profile_key_valid(data->last_level))) return -1;
+        (data->last_level[0] && !game_profile_key_valid(data->last_level)) ||
+        (data->resume.path[0] && !resume_valid(&data->resume))) return -1;
     size_t used = 0;
     const GameSettings *s = &data->settings;
     if (append(text, capacity, &used,
-               "format_version = 1\nmusic_volume = %d\neffects_volume = %d\nmuted = %d\n"
+               "format_version = %d\nmusic_volume = %d\neffects_volume = %d\nmuted = %d\n"
                "dead_zone = %d\nwindow_scale = %d\nhigh_contrast = %d\nreduced_motion = %d\nlast_level = ",
+               PROFILE_FORMAT_VERSION,
                s->music_volume,s->effects_volume,s->muted,s->dead_zone,s->window_scale,s->high_contrast,s->reduced_motion) ||
         quoted(text, capacity, &used, data->last_level)) return -1;
     for (int kind = 0; kind < 2; kind++) {
@@ -327,6 +434,19 @@ int game_profile_encode(const GameProfileData *data, char *text, size_t capacity
         for (int i = 0; i < PROFILE_ACTION_COUNT; i++)
             if (append(text, capacity, &used, "%s%d", i ? ", " : "", kind ? (int)s->buttons[i] : (int)s->keys[i])) return -1;
         if (append(text, capacity, &used, "]\n")) return -1;
+    }
+    const GameResume *r = &data->resume;
+    if (r->path[0]) {
+        /* A table must follow the plain keys above, and comes before the
+         * [[levels]] array so each part of the file stays together. */
+        if (append(text, capacity, &used, "\n[resume]\npath = ") || quoted(text, capacity, &used, r->path) ||
+            append(text, capacity, &used,
+                   "\nlevel_hash = \"%016llx\"\ncoins = \"%016llx\"\ncheckpoint = %d\nlegacy_screen = %d\n"
+                   "score = %d\nlevel_score_start = %d\nscore_life_next = %d\nlives = %d\n"
+                   "respawn_x = %.9g\nrespawn_y = %.9g\nelapsed = %.9g\n",
+                   (unsigned long long)r->level_hash, (unsigned long long)r->coins, r->checkpoint,
+                   r->legacy_screen, r->score, r->level_score_start, r->score_life_next, r->lives,
+                   (double)r->respawn_x, (double)r->respawn_y, (double)r->elapsed)) return -1;
     }
     for (int i = 0; i < data->count; i++) {
         const GameProgress *p = &data->levels[i];
@@ -555,4 +675,38 @@ int game_profile_record(GameProfile *profile, const char *key, int score, int co
     profile->dirty = 1;
     profile->revision++;
     return 0;
+}
+
+/* Field by field: struct padding makes memcmp unreliable for this. */
+static int resume_equal(const GameResume *a, const GameResume *b)
+{
+    return !strcmp(a->path, b->path) && a->level_hash == b->level_hash && a->coins == b->coins &&
+           a->checkpoint == b->checkpoint && a->legacy_screen == b->legacy_screen &&
+           a->score == b->score && a->level_score_start == b->level_score_start &&
+           a->score_life_next == b->score_life_next && a->lives == b->lives &&
+           a->respawn_x == b->respawn_x && a->respawn_y == b->respawn_y && a->elapsed == b->elapsed;
+}
+
+int game_profile_set_resume(GameProfile *profile, const GameResume *resume)
+{
+    if (!profile || !resume || !resume_valid(resume)) return -1;
+    if (resume_equal(&profile->data.resume, resume)) return 0;
+    profile->data.resume = *resume;
+    profile->dirty = 1;
+    profile->revision++;
+    return 0;
+}
+
+void game_profile_clear_resume(GameProfile *profile)
+{
+    if (!profile || !profile->data.resume.path[0]) return;
+    memset(&profile->data.resume, 0, sizeof(profile->data.resume));
+    profile->dirty = 1;
+    profile->revision++;
+}
+
+const GameResume *game_profile_resume(const GameProfile *profile, const char *key)
+{
+    if (!profile || !key || !profile->data.resume.path[0] || strcmp(profile->data.resume.path, key)) return NULL;
+    return &profile->data.resume;
 }

@@ -358,6 +358,7 @@ typedef struct {
     struct SettingsMenu *settings_menu; /* borrowed; screen cleanup releases its textures */
     char profile_level_key[256];
     int profile_completion_recorded;
+    int resumed;        /* 1 = this run started from a saved Continue point */
     int level_score_start;
     unsigned int random_seed;
     uint64_t source_level_hash; /* source bytes corresponding to active LevelDef */
