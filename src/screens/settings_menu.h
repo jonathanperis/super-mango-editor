@@ -8,6 +8,10 @@ typedef struct SettingsMenu {
     UIState ui;
 } SettingsMenu;
 
+/* Open on the first row of the main page with no leftover message. The
+ * start menu's Settings button and the F1/Y/Back keys both use this. */
+void settings_menu_open(SettingsMenu *menu);
+
 /* Returns 1 only for events consumed by settings; quit/hot-plug still propagate. */
 int settings_menu_event(SettingsMenu *menu, GameProfile *profile,
                          const InputEvent *event, int open_button);

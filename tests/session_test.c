@@ -998,6 +998,25 @@ static int menu_mouse_and_path_boundaries(void)
     input_push(&event);
     start_menu_frame(menu);
     int result = expect_int("physical Play click", menu->route, MENU_ROUTE_PLAY);
+    /* The Settings button opens the panel exactly like F1: first page and
+     * no message left over from an earlier visit. */
+    static SettingsMenu settings;
+    static GameProfile profile;
+    game_profile_init(&profile);
+    memset(&settings, 0, sizeof(settings));
+    snprintf(settings.message, sizeof(settings.message), "stale");
+    settings.page = 1;
+    menu->settings_menu = &settings;
+    menu->profile = &profile;
+    menu->route = MENU_ROUTE_NONE;
+    InputEvent click = {.type=INPUT_MOUSE_DOWN,.button=MOUSE_BUTTON_LEFT,.x=200,.y=282};
+    input_push(&click);
+    start_menu_frame(menu);
+    if (expect_int("Settings click opens", settings.open, 1) ||
+        expect_int("Settings click starts on main page", settings.page, 0) ||
+        expect_int("Settings click clears message", settings.message[0], '\0'))
+        result = 1;
+    settings_menu_cleanup(&settings);
     start_menu_close(&menu);
     campaign_catalog_cleanup(&catalog);
     char short_path[8];

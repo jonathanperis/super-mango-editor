@@ -61,6 +61,28 @@ static void adjust(SettingsMenu *menu, GameProfile *profile, int direction)
     if (*value != updated) { *value = updated; changed(profile); }
 }
 
+void settings_menu_open(SettingsMenu *menu)
+{
+    if (!menu) return;
+    menu->open = 1;
+    menu->page = menu->selected = menu->capture = 0;
+    menu->message[0] = '\0';
+}
+
+/* A message explains the last refused binding. Once the player cancels the
+ * capture or closes the panel, it no longer describes anything on screen. */
+static void cancel_capture(SettingsMenu *menu)
+{
+    menu->capture = 0;
+    menu->message[0] = '\0';
+}
+
+static void close_panel(SettingsMenu *menu)
+{
+    cancel_capture(menu);
+    menu->open = 0;
+}
+
 static void activate(SettingsMenu *menu, GameProfile *profile)
 {
     menu->message[0] = '\0';
@@ -71,7 +93,7 @@ static void activate(SettingsMenu *menu, GameProfile *profile)
     else if (menu->selected == 8) {
         profile->data.settings = (GameSettings)GAME_SETTINGS_DEFAULTS;
         changed(profile);
-    } else if (menu->selected == 9) menu->open = 0;
+    } else if (menu->selected == 9) close_panel(menu);
     else adjust(menu, profile, 1);
 }
 
@@ -88,13 +110,12 @@ int settings_menu_event(SettingsMenu *menu, GameProfile *profile,
     int button = controller ? event->button : -1;
     if (!menu->open) {
         if (key != KEY_F1 && !(controller && button == open_button)) return 0;
-        menu->open = 1; menu->page = menu->selected = menu->capture = 0;
-        menu->message[0] = '\0';
+        settings_menu_open(menu);
         return 1;
     }
     if (key == KEY_ESCAPE || (controller && (button == PAD_B || button == PAD_BACK))) {
-        if (menu->capture) menu->capture = 0;
-        else menu->open = 0;
+        if (menu->capture) cancel_capture(menu);
+        else close_panel(menu);
         return 1;
     }
     if (menu->capture) {
@@ -183,5 +204,5 @@ void settings_menu_cleanup(SettingsMenu *menu)
 {
     ui_cleanup(&menu->ui);
     menu->ui.font = NULL;
-    menu->open = menu->capture = 0;
+    close_panel(menu);
 }
