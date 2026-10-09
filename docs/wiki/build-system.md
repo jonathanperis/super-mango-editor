@@ -259,7 +259,7 @@ make run-editor
 
 ### `make web`
 
-Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). CI pins **6.0.9**; use that SDK with `emcc` on `PATH` for matching local builds. `make web` first checks `emcc --version` against `EMSCRIPTEN_VERSION` (default `6.0.9`, the same pin) and stops with a clear message on a mismatch; pass `EMSCRIPTEN_VERSION=<x.y.z>` to expect another release, or `EMSCRIPTEN_VERSION=` to skip the check.
+Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). CI pins **6.0.9**; use that SDK with `emcc` on `PATH` for matching local builds. `make web` first checks `emcc --version` against `EMSCRIPTEN_VERSION` (by default that same pin) and stops with a clear message on a mismatch; pass `EMSCRIPTEN_VERSION=<x.y.z>` to expect another release, or `EMSCRIPTEN_VERSION=` to skip the check.
 
 ```sh
 make web
@@ -588,6 +588,19 @@ runner image, workspace path and the leg's compiler (`MANGO_CC`) and CMake
 versions. `make` still runs `build_raylib.py` on a restored
 tree, which re-verifies the archive and re-runs CMake; CMake then rebuilds
 anything its own dependency tracking finds stale.
+
+Renovate (`renovate.json`, on top of the shared `jonathanperis/.github` preset)
+watches the pins that no package manager owns, through regex `customManagers`:
+the Emscripten SDK (the setup-emsdk `version` in `build.yml`, `EMSCRIPTEN_VERSION`
+in the Makefile and every version quoted in the docs, grouped into one pull
+request; `make docs-drift` fails if they disagree), Mesa for the `Desktop
+backend` job, the raylib tag and commit in `vendor/raylib/manifest.json`, and
+the vendored tomlc17 release. None of them automerge. Mesa and raylib bumps
+also need their new SHA-256 entered by hand (CI fails closed until then), and
+tomlc17 only appears on the Dependency Dashboard, because re-importing it means
+re-applying the project patches listed in `vendor/tomlc17/README.md`. Pins
+inside a workflow or the Makefile carry a `# renovate: datasource=... depName=...`
+comment on the line above.
 
 The repository restricts third-party Actions to an allowlist and requires full
 commit-SHA pins. A renamed or transferred Action can resolve through the GitHub

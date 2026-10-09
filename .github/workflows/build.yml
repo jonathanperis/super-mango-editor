@@ -239,6 +239,7 @@ jobs:
         if: matrix.target == 'wasm'
         uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
         with:
+          # renovate: datasource=github-tags depName=emscripten-core/emsdk
           version: 6.0.9
 
       - name: Verify Emscripten
@@ -723,6 +724,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         env:
+          # renovate: datasource=github-releases depName=pal1000/mesa-dist-win
           MESA_VERSION: 26.0.3
           MESA_SHA256: de1ec45c906164de2c046288a8969e83cf2d51d031dc8dfd1f9371bb31cd6755
         run: |
