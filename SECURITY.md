@@ -17,6 +17,15 @@ release; there are no backported security releases.
 
 Only the latest release and the current `main` branch receive fixes.
 
+The latest published release can lag well behind `main`. At the time of
+writing it is `v1.0.845` (2026-09-17), which predates the move from SDL2 to
+raylib and the editor/lab builder archives, so much of the code in `main`
+(and in this policy's scope) has not shipped in any release yet. A fix to that
+code reaches players through the website, which follows `main`, and through
+the next release. Check the
+[releases page](https://github.com/jonathanperis/super-mango-editor/releases)
+for the current latest release.
+
 ## Scope
 
 In scope:
@@ -106,7 +115,10 @@ boundary.
 
 ## Verifying releases
 
-Each release attaches `SHA256SUMS` and a GitHub build provenance attestation
-for every archive. See the
+Releases built by the current workflow attach `SHA256SUMS` and a GitHub
+build provenance attestation for every archive. The workflow started
+publishing them on 2026-10-06, so earlier releases, including `v1.0.845`
+(2026-09-17), have neither: their archives can only be traced to the workflow
+run that built them. See the
 [release checklist](docs/wiki/release-checklist.md#verifying-a-download) for
 the verification commands and the macOS Gatekeeper note.
