@@ -6,14 +6,19 @@
  * document gets a random 64-bit id and two files named after it:
  *
  *     editor_recovery_<id>.toml   the level itself (a normal level file)
- *     editor_recovery_<id>.meta   one line: version, id, time, source path
+ *     editor_recovery_<id>.meta   one line: version, id, time, owner, source
  *
  * After a crash the next editor start finds the .meta files
  * (editor_discover_recoveries), offers them (editor_choose_recovery) and
  * loads the chosen snapshot as an unsaved document
- * (editor_recover_entry_by_id).  Saving, or explicitly discarding, the
- * document deletes both files again (editor_retire_*_recovery).
+ * (editor_recover_entry_by_id), or deletes one the designer discards.
+ * Saving, or explicitly discarding, the document deletes both files again
+ * (editor_retire_*_recovery).
  *
+ * The owner is the process id of the editor that wrote the snapshot.  A
+ * snapshot whose owner is another editor that is still running is that
+ * editor's live work, not a crash leftover, so it is never offered here.
+  *
  * Opening, saving and the recent-file list live in editor_files.c; this file
  * borrows its preference-folder and atomic-write helpers.
  */
@@ -39,6 +44,8 @@
 #include <bcrypt.h>     /* BCryptGenRandom */
 #else
 #include <dirent.h>     /* directory discovery */
+#include <signal.h>     /* kill(pid, 0): is the owning editor still running? */
+#include <unistd.h>     /* getpid */
 #endif
 
 #include "file_dialog.h"       /* dialog_choice (native button dialog) */
@@ -54,29 +61,109 @@
 
 /*
  * A recovery metadata file holds one line:
- *     1 \t <id: 16 hex> \t <timestamp: decimal> \t <source path: hex> \n
+ *     2 \t <id: 16 hex> \t <timestamp> \t <owner pid> \t <source path: hex> \n
+ * Version 1 files (written before the owner was recorded) have no pid
+ * field; they are still read, as snapshots with an unknown owner.
  * The path is hex-encoded (2 characters per byte) so tabs and newlines in
  * a file name cannot break the format.  Buffers are sized from that layout
  * so the longest path the editor accepts (EDITOR_PATH_MAX - 1 bytes)
  * survives a write/read round trip:
  *     source hex : 2 * (EDITOR_PATH_MAX - 1) digits + NUL
- *     whole line : "1\t" (2) + id (16) + "\t" (1) + largest uint64 (20)
- *                  + "\t" (1) + hex digits + "\n" (1) + NUL (1)
+ *     whole line : "2\t" (2) + id (16) + "\t" (1) + largest uint64 (20)
+ *                  + "\t" (1) + largest uint64 pid (20) + "\t" (1)
+ *                  + hex digits + "\n" (1) + NUL (1)
  */
 #define EDITOR_RECOVERY_SOURCE_HEX_MAX (2 * (EDITOR_PATH_MAX - 1) + 1)
 #define EDITOR_RECOVERY_LINE_MAX \
-    (2 + 16 + 1 + 20 + 1 + (EDITOR_RECOVERY_SOURCE_HEX_MAX - 1) + 1 + 1)
+    (2 + 16 + 1 + 20 + 1 + 20 + 1 + (EDITOR_RECOVERY_SOURCE_HEX_MAX - 1) + 1 + 1)
 
 static uint64_t editor_recovery_sequence;
 static int editor_recovery_seeded;
-static int editor_test_recovery_choice = -1;
+
+/* Canned picker answers for tests, used first to last (see
+ * editor_test_set_recovery_choice); -1 entries mean "no answer". */
+#define EDITOR_TEST_RECOVERY_ANSWERS 4
+static int editor_test_recovery_answers[EDITOR_TEST_RECOVERY_ANSWERS] = {-1, -1, -1, -1};
 
 #ifdef MANGO_TESTING
-void editor_test_set_recovery_choice(int button_id)
+void editor_test_set_recovery_choice(int action)
 {
-    editor_test_recovery_choice = button_id;
+    for (int i = 0; i < EDITOR_TEST_RECOVERY_ANSWERS; i++)
+        editor_test_recovery_answers[i] = -1;
+    editor_test_recovery_answers[0] = action;
+}
+
+void editor_test_queue_recovery_choice(int action)
+{
+    for (int i = 0; i < EDITOR_TEST_RECOVERY_ANSWERS; i++) {
+        if (editor_test_recovery_answers[i] < 0) {
+            editor_test_recovery_answers[i] = action;
+            return;
+        }
+    }
 }
 #endif
+
+/* Take the next canned answer, or -1 when none is waiting. */
+static int editor_take_test_recovery_answer(void)
+{
+    int answer = editor_test_recovery_answers[0];
+    for (int i = 0; i + 1 < EDITOR_TEST_RECOVERY_ANSWERS; i++)
+        editor_test_recovery_answers[i] = editor_test_recovery_answers[i + 1];
+    editor_test_recovery_answers[EDITOR_TEST_RECOVERY_ANSWERS - 1] = -1;
+    return answer;
+}
+
+/* ------------------------------------------------------------------ */
+/* Which editor owns a snapshot                                        */
+/* ------------------------------------------------------------------ */
+
+static unsigned long editor_current_process_id(void)
+{
+#ifdef _WIN32
+    return (unsigned long)GetCurrentProcessId();
+#else
+    return (unsigned long)getpid();
+#endif
+}
+
+/*
+ * editor_process_is_running — Is process `pid` still alive?
+ *
+ * POSIX: kill() with signal 0 sends nothing; it only checks that the process
+ * exists.  EPERM means it exists but belongs to another user, which still
+ * counts as running.  Windows: open the process and ask for its exit code;
+ * STILL_ACTIVE means it has not exited.  A process id can be reused after
+ * its process ends, so a crash snapshot may stay hidden while an unrelated
+ * program happens to hold the old number; it reappears once that ends.
+ */
+static int editor_process_is_running(unsigned long pid)
+{
+    if (pid == 0) return 0;
+#ifdef _WIN32
+    {
+        DWORD code = 0;
+        HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE,
+                                     (DWORD)pid);
+        int running;
+        if (!process) return GetLastError() == ERROR_ACCESS_DENIED;
+        running = GetExitCodeProcess(process, &code) && code == STILL_ACTIVE;
+        CloseHandle(process);
+        return running;
+    }
+#else
+    if ((unsigned long)(pid_t)pid != pid) return 0;   /* not a valid pid_t */
+    return kill((pid_t)pid, 0) == 0 || errno == EPERM;
+#endif
+}
+
+/* A snapshot that another, still running, editor is keeping up to date. */
+static int editor_recovery_entry_is_live_elsewhere(const EditorRecoveryEntry *entry)
+{
+    return entry->owner_pid != 0 &&
+           entry->owner_pid != editor_current_process_id() &&
+           editor_process_is_running(entry->owner_pid);
+}
 
 /* ------------------------------------------------------------------ */
 /* Recovery file names                                                 */
@@ -293,9 +380,10 @@ static int editor_write_recovery_metadata(const EditorRecoveryEntry *entry)
     fp = serializer_open_temp(entry->metadata_path, temp_path,
                               sizeof(temp_path));
     if (!fp) return -1;
-    if (fprintf(fp, "1\t%016llx\t%llu\t%s\n",
+    if (fprintf(fp, "2\t%016llx\t%llu\t%lu\t%s\n",
                 (unsigned long long)entry->id,
-                (unsigned long long)entry->timestamp, source_hex) < 0) {
+                (unsigned long long)entry->timestamp,
+                entry->owner_pid, source_hex) < 0) {
         fclose(fp);
         serializer_remove_temp(temp_path);
         return -1;
@@ -341,10 +429,12 @@ static int editor_read_recovery_metadata(const EditorState *es,
     char *version;
     char *id_text;
     char *timestamp_text;
+    char *pid_text = NULL;
     char *source_text;
     char *end;
     uint64_t id;
     unsigned long long timestamp;
+    unsigned long owner_pid = 0;
     FILE *fp;
 
     if (!es || !name || !entry ||
@@ -369,9 +459,18 @@ static int editor_read_recovery_metadata(const EditorState *es,
     version = strtok(line, "\t");
     id_text = strtok(NULL, "\t");
     timestamp_text = strtok(NULL, "\t");
+    /* Version 2 adds the owner's process id before the source path. */
+    if (version && strcmp(version, "2") == 0) pid_text = strtok(NULL, "\t");
     source_text = strtok(NULL, "\t");
     if (!version || !id_text || !timestamp_text || !source_text ||
-        strtok(NULL, "\t") || strcmp(version, "1") != 0) return 0;
+        strtok(NULL, "\t") ||
+        !(strcmp(version, "1") == 0 || (strcmp(version, "2") == 0 && pid_text)))
+        return 0;
+    if (pid_text) {
+        errno = 0;
+        owner_pid = strtoul(pid_text, &end, 10);
+        if (errno == ERANGE || end == pid_text || *end != '\0') return 0;
+    }
     errno = 0;
     id = strtoull(id_text, &end, 16);
     if (errno == ERANGE || id == 0 || end == id_text || *end != '\0') return 0;
@@ -383,6 +482,7 @@ static int editor_read_recovery_metadata(const EditorState *es,
     memset(entry, 0, sizeof(*entry));
     entry->id = (uint64_t)id;
     entry->timestamp = (uint64_t)timestamp;
+    entry->owner_pid = owner_pid;
     if (recovery_hex_decode(source_text, entry->source_path,
                             sizeof(entry->source_path)) != 0) return 0;
     memcpy(entry->snapshot_path, snapshot_path, strlen(snapshot_path) + 1);
@@ -420,6 +520,8 @@ static int editor_discover_recovery_name(const char *name, void *context)
         return -1;
     }
     if (result == 0 || discovery->count >= EDITOR_MAX_RECOVERY_ENTRIES) return 0;
+    /* Another running editor's live work is not ours to offer or delete. */
+    if (editor_recovery_entry_is_live_elsewhere(&entry)) return 0;
     for (int i = 0; i < discovery->count; i++) {
         if (discovery->entries[i].id == entry.id) return 0;
     }
@@ -439,7 +541,8 @@ static int editor_for_each_recovery_name(const EditorState *es,
         char *name;
         WIN32_FIND_DATAW data;
         HANDLE handle;
-        int written = snprintf(pattern, sizeof(pattern), "%s\\%s*.meta",
+        /* Every recovery file (.meta and .toml); callbacks pick by suffix. */
+        int written = snprintf(pattern, sizeof(pattern), "%s\\%s*",
                                es->recovery_root_path, EDITOR_RECOVERY_PREFIX);
         if (written < 0 || (size_t)written >= sizeof(pattern)) return -1;
         wide_pattern = serializer_utf8_to_wide(pattern);
@@ -514,9 +617,55 @@ int editor_discover_recoveries(EditorState *es)
     return 0;
 }
 
+/*
+ * Orphan snapshots: an editor_recovery_<id>.toml without its .meta is never
+ * offered (the .meta is what discovery reads), so it would only take up
+ * space forever.  Older editors could leave one behind when autosave hit
+ * the entry limit after writing the level.
+ */
+typedef struct {
+    const EditorState *es;
+    int removed;
+} EditorOrphanSweep;
+
+static int editor_sweep_orphan_name(const char *name, void *context)
+{
+    EditorOrphanSweep *sweep = (EditorOrphanSweep *)context;
+    char metadata_path[EDITOR_PATH_MAX];
+    char snapshot_path[EDITOR_PATH_MAX];
+    uint64_t id;
+
+    if (editor_recovery_name_id(name, &id, ".toml") != 0) return 0;
+    /* This editor's own snapshot may be between its two writes. */
+    if (id == sweep->es->recovery_document_id) return 0;
+    if (editor_recovery_metadata_path(sweep->es, id, metadata_path,
+                                      sizeof(metadata_path)) != 0 ||
+        editor_recovery_snapshot_path(sweep->es, id, snapshot_path,
+                                      sizeof(snapshot_path)) != 0) return 0;
+    if (serializer_probe_path_utf8(metadata_path) == SERIALIZER_PATH_MISSING &&
+        serializer_remove_utf8(snapshot_path) == 0)
+        sweep->removed++;
+    return 0;
+}
+
+int editor_clean_orphan_recoveries(EditorState *es)
+{
+    EditorOrphanSweep sweep;
+
+    if (!es || es->recovery_root_path[0] == '\0') return 0;
+    sweep.es = es;
+    sweep.removed = 0;
+    (void)editor_for_each_recovery_name(es, editor_sweep_orphan_name, &sweep);
+    return sweep.removed;
+}
+
 /* ------------------------------------------------------------------ */
 /* Adding and retiring entries                                         */
 /* ------------------------------------------------------------------ */
+
+/* editor_add_recovery_entry's answer when the folder already holds
+ * EDITOR_MAX_RECOVERY_ENTRIES other snapshots (other failures are -1). */
+#define EDITOR_RECOVERY_FOLDER_FULL (-2)
 
 static int editor_add_recovery_entry(EditorState *es, const char *source_path)
 {
@@ -534,11 +683,12 @@ static int editor_add_recovery_entry(EditorState *es, const char *source_path)
                 break;
             }
         }
-        if (!current_entry) return -1;
+        if (!current_entry) return EDITOR_RECOVERY_FOLDER_FULL;
     }
     memset(&entry, 0, sizeof(entry));
     entry.id = es->recovery_document_id;
     entry.timestamp = (uint64_t)time(NULL);
+    entry.owner_pid = editor_current_process_id();
     memcpy(entry.source_path, source_path, strlen(source_path) + 1);
     memcpy(entry.snapshot_path, es->autosave_path,
            strlen(es->autosave_path) + 1);
@@ -697,15 +847,36 @@ void editor_maybe_autosave(EditorState *es)
         return;
     }
 
+    int added = -1;
     if (es->autosave_path[0] != '\0' &&
         level_save_toml_recovery(snapshot, es->autosave_path,
-                                 es->file_path) == 0 &&
-        editor_add_recovery_entry(es, es->file_path) == 0) {
+                                 es->file_path) == 0) {
+        added = editor_add_recovery_entry(es, es->file_path);
+        if (added != 0) {
+            /* Without its .meta the snapshot is never offered; do not leave
+             * it behind as an orphan.  A snapshot registered by an earlier
+             * autosave keeps its (still valid) files. */
+            char metadata_path[EDITOR_PATH_MAX];
+            if (editor_recovery_metadata_path(es, es->recovery_document_id,
+                                              metadata_path,
+                                              sizeof(metadata_path)) == 0 &&
+                serializer_probe_path_utf8(metadata_path) == SERIALIZER_PATH_MISSING)
+                (void)serializer_remove_utf8(es->autosave_path);
+        }
+    }
+    if (added == 0) {
         memcpy(es->recovery_original_path, es->file_path,
                strlen(es->file_path) + 1);
         editor_set_background_status(es, now, snapshot == &es->level
             ? "Autosaved recovery copy"
             : "Autosaved last valid version (current level has errors)");
+    } else if (added == EDITOR_RECOVERY_FOLDER_FULL) {
+        /* Say what is wrong and how to fix it: old crash copies fill every
+         * slot, and only the designer can decide to recover or drop them. */
+        (void)editor_clean_orphan_recoveries(es);
+        editor_set_status(es, "Autosave paused: %d old recovery copies fill the "
+                          "folder; Ctrl+R to recover or discard them",
+                          EDITOR_MAX_RECOVERY_ENTRIES);
     } else {
         /* A failure matters more than whatever was shown; it repeats at
          * most once per interval, so it cannot flood the bar. */
@@ -825,6 +996,60 @@ int editor_recover_entry_by_id(EditorState *es, uint64_t recovery_id)
     return 0;
 }
 
+/*
+ * editor_ask_recovery_action — One native dialog about entry `index`.
+ *
+ * Native dialogs have at most three buttons (macOS allows no more), and the
+ * picker needs four actions.  With one snapshot the buttons are
+ * Cancel / Recover / Discard.  With several, the third button is "More...",
+ * which asks a second question: Back / Discard / Next.
+ * Returns an EditorRecoveryAction, or -1 when the dialog failed.
+ */
+static int editor_ask_recovery_action(const EditorState *es, int index)
+{
+    char message[EDITOR_PATH_MAX + 160];
+    char timestamp[64] = "unknown time";
+    time_t raw_time = (time_t)es->recovery_entries[index].timestamp;
+    struct tm time_value;
+    int several = es->recovery_entry_count > 1;
+    int button_id = 0;
+    int answer = editor_take_test_recovery_answer();
+#ifdef _WIN32
+    int time_valid = localtime_s(&time_value, &raw_time) == 0;
+#else
+    int time_valid = localtime_r(&raw_time, &time_value) != NULL;
+#endif
+    const char *source = es->recovery_entries[index].source_path[0]
+                       ? es->recovery_entries[index].source_path
+                       : "(untitled)";
+
+    if (answer >= 0) return answer;
+    if (time_valid) strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S",
+                             &time_value);
+    snprintf(message, sizeof(message), "Copy %d of %d\nSource: %s\nTimestamp: %s",
+             index + 1, es->recovery_entry_count, source, timestamp);
+    {
+        const char *buttons[] = {"Cancel", "Recover", several ? "More..." : "Discard"};
+        if (dialog_choice("Recover Editor Snapshot", message, buttons, 3, 1, 0,
+                          &button_id) != 0) return -1;
+    }
+    if (button_id == 0) return EDITOR_RECOVERY_CANCEL;
+    if (button_id == 1) return EDITOR_RECOVERY_RECOVER;
+    if (!several) return EDITOR_RECOVERY_DISCARD;
+    {
+        const char *buttons[] = {"Back", "Discard", "Next"};
+        snprintf(message, sizeof(message),
+                 "Discard copy %d of %d (deleting it), or look at the next one?\n"
+                 "Source: %s\nTimestamp: %s",
+                 index + 1, es->recovery_entry_count, source, timestamp);
+        if (dialog_choice("Recover Editor Snapshot", message, buttons, 3, 2, 0,
+                          &button_id) != 0) return -1;
+    }
+    if (button_id == 1) return EDITOR_RECOVERY_DISCARD;
+    if (button_id == 2) return EDITOR_RECOVERY_NEXT;
+    return EDITOR_RECOVERY_BACK;
+}
+
 int editor_choose_recovery(EditorState *es)
 {
     int index = 0;
@@ -836,42 +1061,37 @@ int editor_choose_recovery(EditorState *es)
     }
     if (es->recovery_entry_count == 0) return -1;
     for (;;) {
-        const char *buttons[] = {"Cancel", "Recover", "Next"};
-        char message[EDITOR_PATH_MAX + 128];
-        char timestamp[64] = "unknown time";
-        time_t raw_time = (time_t)es->recovery_entries[index].timestamp;
-        struct tm time_value;
-#ifdef _WIN32
-        int time_valid = localtime_s(&time_value, &raw_time) == 0;
-#else
-        int time_valid = localtime_r(&raw_time, &time_value) != NULL;
-#endif
-        const char *source = es->recovery_entries[index].source_path[0]
-                           ? es->recovery_entries[index].source_path
-                           : "(untitled)";
-        if (time_valid) strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S",
-                                 &time_value);
-        snprintf(message, sizeof(message), "Source: %s\nTimestamp: %s",
-                 source, timestamp);
-        {
-            int button_id = 0;
-            if (editor_test_recovery_choice >= 0) {
-                button_id = editor_test_recovery_choice;
-                editor_test_recovery_choice = -1;
-            } else if (dialog_choice("Recover Editor Snapshot", message, buttons, 3, 1, 0, &button_id) != 0) {
-                editor_set_status(es, "Recovery cancelled");
-                return -1;
-            }
-            if (button_id == 0) {
-                es->pending_recovery_id = 0;
-                editor_set_status(es, "Recovery cancelled");
-                return -1;
-            }
-            if (button_id == 1) {
-                es->pending_recovery_id = es->recovery_entries[index].id;
-                return index;
-            }
-            index = (index + 1) % es->recovery_entry_count;
+        int action = editor_ask_recovery_action(es, index);
+        if (action < 0) {
+            editor_set_status(es, "Recovery cancelled");
+            return -1;
         }
+        if (action == EDITOR_RECOVERY_CANCEL) {
+            es->pending_recovery_id = 0;
+            editor_set_status(es, "Recovery cancelled");
+            return -1;
+        }
+        if (action == EDITOR_RECOVERY_RECOVER) {
+            es->pending_recovery_id = es->recovery_entries[index].id;
+            return index;
+        }
+        if (action == EDITOR_RECOVERY_DISCARD) {
+            /* Delete both files of this copy; the list is re-read from
+             * disk, so the next copy (if any) moves into this position. */
+            if (editor_remove_recovery_entry(es, index) != 0) {
+                editor_set_status(es, "Could not discard the recovery copy");
+                return -1;
+            }
+            if (es->recovery_entry_count == 0) {
+                es->pending_recovery_id = 0;
+                editor_set_status(es, "Recovery copy discarded");
+                return -1;
+            }
+            if (index >= es->recovery_entry_count) index = 0;
+            continue;
+        }
+        if (action == EDITOR_RECOVERY_NEXT)
+            index = (index + 1) % es->recovery_entry_count;
+        /* EDITOR_RECOVERY_BACK asks about the same copy again. */
     }
 }

@@ -101,6 +101,6 @@ Gameplay advances in fixed 1/60 s steps from a frame-time accumulator instead of
 - Rich editor validation panel with clickable inline TOML diagnostics.
 - Metadata-editor ergonomics for shipped background/foreground/fog arrays and physics overrides.
 - Serializer round-trip fixture expansion beyond current regression tests.
-- Recovery snapshot presentation and cleanup policy.
+- Recovery snapshot presentation (a richer picker than native three-button dialogs). Cleanup shipped: Discard in the picker, orphan sweep at start-up, owner-PID guard for live snapshots, and a specific "folder full" status.
 - Tilemap painting for custom floor layouts.
 - Campaign-manifest editing and ordering support in the visual editor.
