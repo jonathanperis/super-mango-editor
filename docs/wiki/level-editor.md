@@ -243,7 +243,7 @@ The canvas renders the level in WYSIWYG — entity positions and sizes match the
 
 ## Undo / Redo
 
-The editor keeps an undo stack for placement, movement, deletion, property and Level Config changes. It holds the latest 256 steps (`UNDO_MAX`); older ones are dropped. An action on several entities at once (a nudge, move, delete, paste or duplicate of a multi-selection) records one entry per entity, up to 64 (`UNDO_GROUP_MAX`), in a single step: it costs one of the 256 slots, undoes and redoes in one go, and the oldest step is always dropped whole. If the editor cannot get the memory to record such an action, it refuses the action and the level is left unchanged. A new edit clears the redo stack.
+The editor keeps an undo stack for placement, movement, deletion, property and Level Config changes. It holds the latest 256 steps (`UNDO_MAX`); older ones are dropped. An action on several entities at once (a nudge, move, delete, paste or duplicate of a multi-selection) records one entry per entity, up to 64 (`UNDO_GROUP_MAX`), in a single step: it costs one of the 256 slots, undoes and redoes in one go, and the oldest step is always dropped whole. If the editor cannot get the memory to record such an action, it refuses the action and the level is left unchanged. A new edit clears the redo stack; an edit that is refused (a paste into a full array, say) is not an edit and leaves it alone.
 
 | Action | Shortcut |
 |--------|----------|
