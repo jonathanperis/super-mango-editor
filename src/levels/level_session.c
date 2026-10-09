@@ -402,35 +402,56 @@ void campaign_catalog_cleanup(CampaignCatalog *catalog)
     catalog->count = 0;
 }
 
-static LevelDef *game_level_storage(GameState *gs)
-{
-    if (!gs->level_def) {
-        gs->level_def = (LevelDef *)calloc(1, sizeof(LevelDef));
-        if (!gs->level_def) {
-            fprintf(stderr, "Error: Failed to allocate active level storage\n");
-            return NULL;
-        }
-    }
-    gs->runtime.current_level = gs->level_def;
-    return (LevelDef *)gs->level_def;
-}
-
-static int read_stable_level(const char *path, LevelDef *level, uint64_t *hash)
+/*
+ * read_stable_level — Parse, validate and fingerprint a level into the heap.
+ *
+ * level_load_toml validates the definition, which is the only validation a
+ * level load needs; the callers below never repeat it. The copy lives on the
+ * heap because a LevelDef is about 16 KB (see LEVEL_DEF_SIZE_BUDGET in
+ * level.h). The file is fingerprinted before and after the parse, so the
+ * hash an experiment records is the hash of exactly these bytes. Returns an
+ * owned LevelDef, or NULL after printing why.
+ */
+static LevelDef *read_stable_level(const char *path, uint64_t *hash)
 {
     SerializerFileFingerprint before, after;
+    LevelDef *level = malloc(sizeof(*level));
+    if (!level) {
+        fprintf(stderr, "Error: Failed to allocate level storage\n");
+        return NULL;
+    }
+    level_def_init_defaults(level);
     if (serializer_fingerprint_utf8(path, &before) != 1 || level_load_toml(path, level) != 0 ||
         serializer_fingerprint_utf8(path, &after) != 1 || !serializer_fingerprint_equal(&before, &after)) {
         fprintf(stderr, "Error: cannot read stable level bytes: %s\n", path);
-        return -1;
+        free(level);
+        return NULL;
     }
     *hash = after.content_hash;
-    return 0;
+    return level;
+}
+
+/*
+ * game_level_commit — Make a checked, heap-staged level the active one.
+ *
+ * Every step that can fail (resolve, parse, validate, required sprites) has
+ * already run, so this function only moves pointers and applies data: it
+ * cannot fail, and a failed load before it leaves the current level, path
+ * and hash untouched. gs takes ownership of staged.
+ */
+static void game_level_commit(GameState *gs, LevelDef *staged, uint64_t hash)
+{
+    free(gs->level_def);
+    gs->level_def = staged;
+    gs->runtime.current_level = staged;
+    gs->source_level_hash = hash;
+    level_apply(gs, staged);
+    game_completion_reset_summary(gs);
+    level_resources_apply(gs, staged);
 }
 
 int game_level_load_initial(GameState *gs)
 {
-    LevelDef loaded;
-    LevelDef *level;
     char safe_path[GAME_LEVEL_PATH_MAX] = {0};
 
     if (!gs || gs->level_path[0] == '\0') {
@@ -444,23 +465,19 @@ int game_level_load_initial(GameState *gs)
         return -1;
     }
 
-    level_def_init_defaults(&loaded);
     uint64_t source_hash;
-    if (read_stable_level(safe_path, &loaded, &source_hash) != 0) {
+    LevelDef *loaded = read_stable_level(safe_path, &source_hash);
+    if (!loaded) {
         fprintf(stderr, "Error: could not load initial level: %s\n", safe_path);
         return -1;
     }
 
-    if (game_resources_require_level_textures(gs, &loaded) != 0) return -1;
     /* Parse and required sprites are checked before replacing active storage. */
-    level = game_level_storage(gs);
-    if (!level) return -1;
-    *level = loaded;
-    gs->source_level_hash = source_hash;
-
-    if (level_load(gs, level) != 0) return -1;
-    game_completion_reset_summary(gs);
-    level_resources_apply(gs, (const LevelDef *)gs->runtime.current_level);
+    if (game_resources_require_level_textures(gs, loaded) != 0) {
+        free(loaded);
+        return -1;
+    }
+    game_level_commit(gs, loaded, source_hash);
     return 0;
 }
 
@@ -479,34 +496,22 @@ int game_load_next_phase(GameState *gs)
         return -1;
     }
 
-    LevelDef next_level;
-    level_def_init_defaults(&next_level);
-
     uint64_t source_hash;
-    if (read_stable_level(safe_path, &next_level, &source_hash) != 0) {
+    LevelDef *next_level = read_stable_level(safe_path, &source_hash);
+    if (!next_level) {
         fprintf(stderr, "Error: Failed to load next phase: %s\n", safe_path);
         return -1;
     }
-
-    char err[128];
-    if (level_validate_runtime(&next_level, err, sizeof(err)) != 0) {
-        fprintf(stderr, "Error: Invalid next phase %s: %s\n", safe_path, err);
+    if (game_resources_require_level_textures(gs, next_level) != 0) {
+        free(next_level);
         return -1;
     }
 
-    if (game_resources_require_level_textures(gs, &next_level) != 0) return -1;
+    /* Every failure point is behind us: from here the switch cannot fail,
+     * so the current level is only given up once the next one is certain. */
     game_experiment_cleanup(gs);
-    LevelDef *level = game_level_storage(gs);
-    if (!level) return -1;
-    *level = next_level;
-    gs->source_level_hash = source_hash;
-
-    strncpy(gs->level_path, next_path, sizeof(gs->level_path) - 1);
-    gs->level_path[sizeof(gs->level_path) - 1] = '\0';
-
-    if (level_load(gs, level) != 0) return -1;
-    game_completion_reset_summary(gs);
-    level_resources_apply(gs, level);
+    str_copy(gs->level_path, next_path, sizeof(gs->level_path));
+    game_level_commit(gs, next_level, source_hash);
 
     /* Only campaign progress crosses a phase boundary. Old movement, climbing,
      * and support indices refer to the previous level and must not survive. */
