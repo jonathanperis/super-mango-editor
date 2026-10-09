@@ -480,8 +480,14 @@ static void session_step(AppSession *session, int callback_owned)
         if (game_frame(game)) session->game_presented_count++;
         if (game->completion.complete && !game->profile_completion_recorded) {
             game->profile_completion_recorded = 1;
-            game_profile_record(&session->profile, game->profile_level_key, game->score-game->level_score_start,
-                                game->completion.coins_collected, game->completion.elapsed);
+            /* A level outside levels/ (a lab, an editor playtest) has no
+             * profile key and is simply not recorded. A refusal for a keyed
+             * level means a lost result, so say so. */
+            if (game->profile_level_key[0] &&
+                game_profile_record(&session->profile, game->profile_level_key, game->score-game->level_score_start,
+                                    game->completion.coins_collected, game->completion.elapsed) != 0)
+                TraceLog(LOG_WARNING, "Profile: result for %s was not recorded (profile full or values out of range)",
+                         game->profile_level_key);
         }
         /* Browser replay can free the session. Its return value tells us to
          * stop immediately, before the common end-of-frame work below. */
