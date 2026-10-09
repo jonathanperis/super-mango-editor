@@ -151,8 +151,15 @@ The same climb state supports vines, ladders, and ropes.
 | `CLIMB_SPEED` | 80.0 px/s | vertical climb speed |
 | `CLIMB_H_SPEED` | 80.0 px/s | horizontal drift while climbing |
 | `PLAYER_CLIMB_GRAB_PAD` | 4 px | extra grab width around climbable art |
+| `PLAYER_KNOCKBACK_GRAB_LOCK` | 0.25 s | no grabbing this long after a hit |
 
 `Player.climb_source` identifies the active climbable type: 0 = vine, 1 = ladder, 2 = rope.
+
+A hit with knockback (`apply_damage`) clears `on_vine`, so the push is not
+overwritten by the climbing controls on the next step. For
+`PLAYER_KNOCKBACK_GRAB_LOCK` after the hit (while `hurt_timer`, which starts
+at `PLAYER_HURT_TIME`, is above `PLAYER_HURT_TIME - PLAYER_KNOCKBACK_GRAB_LOCK`)
+Up does not grab a climbable, so holding it cannot cancel the knockback.
 
 ---
 

@@ -57,6 +57,9 @@ void apply_damage(GameState *gs, int amount, int push,
      *      damage source's centre instead.
      *   3. Both cases add SPIKE_PUSH_VY upward and clear on_ground; otherwise
      *      the next floor snap would cancel the bounce on the same frame.
+     *   4. A climbing player lets go (on_vine = 0). The climbing controls
+     *      set vx and vy from the keys every step, so they would wipe the
+     *      push out; PLAYER_KNOCKBACK_GRAB_LOCK stops an immediate re-grab.
      */
     if (push) {
         float vx  = gs->player.vx;
@@ -71,10 +74,11 @@ void apply_damage(GameState *gs, int amount, int push,
             gs->player.vy = SPIKE_PUSH_VY;
         }
         gs->player.on_ground = 0;
+        gs->player.on_vine   = 0;
     }
     (void)src_cy;   /* reserved for future vertical-push logic */
 
-    gs->player.hurt_timer = 1.5f;
+    gs->player.hurt_timer = PLAYER_HURT_TIME;
     sound_play(gs->audio.hit, 128);
 
     gs->hearts -= amount;

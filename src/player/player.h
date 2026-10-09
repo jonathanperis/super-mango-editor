@@ -27,6 +27,21 @@
 #define JUMP_VY  -325.0f
 
 /*
+ * PLAYER_HURT_TIME — seconds of invincibility after a hit. apply_damage sets
+ * hurt_timer to this; while it counts down the sprite blinks and no hazard
+ * or enemy can hurt the player again.
+ */
+#define PLAYER_HURT_TIME  1.5f
+
+/*
+ * PLAYER_KNOCKBACK_GRAB_LOCK — seconds after a hit during which the player
+ * cannot grab a vine, ladder or rope. A hit knocks a climbing player off;
+ * without this short pause, holding Up would grab the same climbable again
+ * on the very next step and cancel the knockback.
+ */
+#define PLAYER_KNOCKBACK_GRAB_LOCK  0.25f
+
+/*
  * AnimState — which animation sequence is currently playing.
  * The value maps directly to the sheet row (see ANIM_ROW[] in player.c).
  */
