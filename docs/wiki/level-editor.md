@@ -209,7 +209,10 @@ The editor keeps recent files (the last 5) and recovery snapshots for modified l
 | Copy selected entity | `Ctrl+C` |
 | Paste (offset from original) | `Ctrl+V` |
 
-Only one entity can be in the clipboard at a time. The pasted entity is moved a little so it does not hide the original (24 px right, and down for free-floating things; along the rail for rail riders; one gap width for floor gaps), and it becomes the selection.
+Only one entity can be in the clipboard at a time. The pasted entity is moved a little so it does not hide the original (24 px right, and down for free-floating things; along the rail for rail riders; one gap width for floor gaps), and it becomes the selection. Each further
+`Ctrl+V` steps one more offset from the previous copy, so repeated pastes lay
+out a row instead of stacking on one spot; a new `Ctrl+C` starts again from the
+copied entity.
 
 Place, drag and Paste clamp entities into the world (patrol ranges included, and a
 pasted spike block's `t_offset` wraps onto its rail). Paste is refused while the

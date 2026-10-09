@@ -205,7 +205,8 @@ static void offset_pasted_copy(EntityType type, PlacementData *d)
  * editor_paste_clipboard — Create a new entity from the clipboard data.
  *
  * Inserts a copy of the last Ctrl+C'd entity into the level, moved a little
- * (offset_pasted_copy) so it doesn't hide the original. The new entity is
+ * (offset_pasted_copy) so it doesn't hide the original; each further paste
+ * moves one more step, so repeated Ctrl+V lays out a row. The new entity is
  * auto-selected for immediate repositioning.  The two singletons
  * (Last Star, Player Spawn) move instead and record a CMD_MOVE.
  *
@@ -260,5 +261,13 @@ void editor_paste_clipboard(EditorState *es)
     }
     offset_pasted_copy(type, &d);
     editor_clamp_placement(&es->level, type, &d);
-    (void)editor_add_placement(es, type, &d, "paste");
+    if (editor_add_placement(es, type, &d, "paste") == 0) {
+        /*
+         * The next paste starts from this copy, so pressing Ctrl+V again
+         * steps one more offset along instead of stacking a second copy on
+         * exactly the same spot (which, for a floor gap, validation would
+         * even refuse as a duplicate).
+         */
+        es->clipboard_data = d;
+    }
 }

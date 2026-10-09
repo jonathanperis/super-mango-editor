@@ -4102,6 +4102,58 @@ done:
  * moved, never onto an identical rail beside it, and onto a same-shaped
  * rail only in another document.
  */
+/*
+ * Each Ctrl+V used to offset the same clipboard snapshot, so the second,
+ * third... copies all landed on the first copy's spot, and a second floor
+ * gap was even refused as a duplicate.  Now every paste steps once more.
+ */
+static int repeated_paste_steps_each_copy(void)
+{
+    EditorState es = {0};
+
+    editor_level_init_defaults(&es.level);
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+    es.level.coin_count = 1;
+    es.level.coins[0] = (CoinPlacement){100.0f, 100.0f};
+    es.level.floor_gap_count = 1;
+    es.level.floor_gaps[0] = 320;
+
+    es.selection.type = ENT_COIN;
+    es.selection.index = 0;
+    editor_copy_selected(&es);
+    for (int i = 0; i < 3; i++) editor_paste_clipboard(&es);
+    if (expect_int("three coin copies", es.level.coin_count, 4) != 0 ||
+        expect_float_value("first copy x", es.level.coins[1].x, 124.0f) != 0 ||
+        expect_float_value("second copy x", es.level.coins[2].x, 148.0f) != 0 ||
+        expect_float_value("third copy x", es.level.coins[3].x, 172.0f) != 0 ||
+        expect_float_value("third copy y", es.level.coins[3].y, 172.0f) != 0)
+        goto fail;
+
+    es.selection.type = ENT_FLOOR_GAP;
+    es.selection.index = 0;
+    editor_copy_selected(&es);
+    editor_paste_clipboard(&es);
+    editor_paste_clipboard(&es);
+    if (expect_int("two gap copies", es.level.floor_gap_count, 3) != 0 ||
+        expect_int("first gap copy", es.level.floor_gaps[1], 320 + FLOOR_GAP_W) != 0 ||
+        expect_int("second gap copy", es.level.floor_gaps[2], 320 + 2 * FLOOR_GAP_W) != 0 ||
+        level_is_valid("after repeated paste", &es.level) != 0) goto fail;
+
+    /* A fresh copy starts stepping from the copied entity again. */
+    es.selection.type = ENT_COIN;
+    es.selection.index = 0;
+    editor_copy_selected(&es);
+    editor_paste_clipboard(&es);
+    if (expect_float_value("fresh copy restarts", es.level.coins[4].x, 124.0f) != 0)
+        goto fail;
+    undo_destroy(es.undo);
+    return 0;
+fail:
+    undo_destroy(es.undo);
+    return 1;
+}
+
 static int rail_rider_paste_follows_its_rail(void)
 {
     EditorState es = {0};
@@ -4326,6 +4378,7 @@ int main(void)
     if (dropdowns_accept_any_option_for_unknown_values() != 0) return 1;
     if (new_level_resets_previews() != 0) return 1;
     if (rail_rider_paste_follows_its_rail() != 0) return 1;
+    if (repeated_paste_steps_each_copy() != 0) return 1;
     if (extreme_floats_round_trip_through_save() != 0) return 1;
     if (create_only_save_without_hard_links() != 0) return 1;
 
