@@ -51,6 +51,7 @@
 #include "editor/tools.h"
 #include "levels/level_loader.h"
 #include "shared/serializer.h"
+#include "test_folders.h"
 #include "test_paths.h"
 
 #define CHECK(test) do { if (!(test)) { \
@@ -1115,7 +1116,6 @@ done:
     return failed;
 }
 
-#ifndef _WIN32
 /* A scratch game folder: levels/a, b, c chained and listed in order. */
 #define UI_CAMPAIGN_ROOT TEST_OUT "ui-campaign-root"
 static int write_ui_campaign_level(const char *path, const char *name, const char *next)
@@ -1150,17 +1150,17 @@ static int campaign_view_reorders_renames_and_saves(void)
     CampaignCatalog reloaded = {0};
     const CampaignCatalog *view;
     CHECK(open_editor(&es, NULL) == 0);
-    (void)mkdir(UI_CAMPAIGN_ROOT, 0755);
-    (void)mkdir(UI_CAMPAIGN_ROOT "/levels", 0755);
-    (void)mkdir(UI_CAMPAIGN_ROOT "/levels/campaigns", 0755);
+    test_make_folder(UI_CAMPAIGN_ROOT);
+    test_make_folder(UI_CAMPAIGN_ROOT "/levels");
+    test_make_folder(UI_CAMPAIGN_ROOT "/levels/campaigns");
     CHECK(write_ui_campaign_level(UI_CAMPAIGN_ROOT "/levels/a.toml", "Alpha", "levels/b.toml") == 0);
     CHECK(write_ui_campaign_level(UI_CAMPAIGN_ROOT "/levels/b.toml", "Bravo", "levels/c.toml") == 0);
     CHECK(write_ui_campaign_level(UI_CAMPAIGN_ROOT "/levels/c.toml", "Charlie", "") == 0);
     CHECK(write_text_file(UI_CAMPAIGN_ROOT "/levels/campaigns/main.toml",
                           "format_version = 1\nlevels = [\"levels/a.toml\", "
                           "\"levels/b.toml\", \"levels/c.toml\"]\n") == 0);
-    CHECK(getcwd(cwd, sizeof(cwd)) != NULL);
-    CHECK(chdir(UI_CAMPAIGN_ROOT) == 0);
+    CHECK(test_working_folder(cwd, sizeof(cwd)) == 0);
+    CHECK(test_change_folder(UI_CAMPAIGN_ROOT) == 0);
     moved = 1;
 
     es.tool = TOOL_PLACE;
@@ -1222,12 +1222,11 @@ static int campaign_view_reorders_renames_and_saves(void)
     CHECK(es.level.coin_count == 1);
 done:
     campaign_catalog_cleanup(&reloaded);
-    if (moved && chdir(cwd) != 0) failed = 1;
+    if (moved && test_change_folder(cwd) != 0) failed = 1;
     clear_dialog_seams();
     close_editor(&es);
     return failed;
 }
-#endif
 
 /*
  * Multi-select: a box on empty canvas selects what it touches, Shift+click
@@ -1773,10 +1772,10 @@ int main(void)
         CASE(validation_messages_take_you_to_the_problem),
         CASE(files_that_will_not_open_list_why),
         CASE(box_and_shift_select_act_on_the_group),
+        CASE(campaign_view_reorders_renames_and_saves),
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),
         CASE(playtest_from_here_passes_the_start_point),
-        CASE(campaign_view_reorders_renames_and_saves),
         CASE(native_pickers_report_choice_cancel_and_failure),
 #endif
 #undef CASE
