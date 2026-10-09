@@ -162,7 +162,7 @@ src/
 └── surfaces/
     ├── platform.h / .c           One-way platform pillar init and 9-slice rendering
     ├── float_platform.h / .c     Hovering platform: static, crumble, and rail behaviours
-    ├── bridge.h / .c             Tiled crumble walkway: init, cascade-fall, render
+    ├── bridge.h / .c             Tiled crumble walkway: per-brick fall timers, render
     ├── bouncepad.h / .c          Shared bouncepad mechanics (squash/release animation)
     ├── bouncepad_small.h         Green bouncepad placement helper
     ├── bouncepad_medium.h        Wood bouncepad placement helper
@@ -466,7 +466,7 @@ Hovering surfaces with three modes: static, crumble (falls after 0.75s), and rai
 
 ### `surfaces/bridge.h` / `surfaces/bridge.c`
 
-Tiled crumble walkway. Bricks cascade-fall outward from the player's feet after a short delay. Asset: `bridge.png`.
+Tiled crumble walkway. Each brick the player stands on falls `BRIDGE_FALL_DELAY` (0.2 s) after it is first touched; bricks the player never stands on stay. Asset: `bridge.png`.
 
 ### `surfaces/bouncepad.h` / `surfaces/bouncepad.c`
 

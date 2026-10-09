@@ -2,9 +2,10 @@
  * bridge.h — Public interface for the Bridge module.
  *
  * A Bridge is a horizontal walkway built from individual Bridge.png bricks
- * (16×16 px each).  When the player touches the bridge, each brick begins
- * falling independently after a short staggered delay — the brick under the
- * player's feet drops first, then the adjacent bricks cascade outward.
+ * (16×16 px each).  Each brick the player stands on starts its own timer
+ * and drops BRIDGE_FALL_DELAY seconds later. Only bricks the player actually
+ * steps on fall; walking along the bridge drops them one after another
+ * behind the player.
  *
  * Collision (top-surface one-way landing) is handled inside player_update.
  */
@@ -20,14 +21,11 @@
 #define BRIDGE_TILE_H       16     /* height of one Bridge.png tile (px)     */
 
 /*
- * BRIDGE_STAND_LIMIT — seconds after the player first touches the bridge
- * before the first brick starts falling.  The timer never resets.
- */
-/*
- * BRIDGE_FALL_DELAY — milliseconds between the player touching a brick
+ * BRIDGE_FALL_DELAY — seconds between the player first touching a brick
  * and the brick starting to fall.  The touch is registered immediately
- * (fall_delay is set on the first contact frame); the brick holds for
- * this duration then drops.
+ * (fall_delay goes from -1 to 0 on the first contact step), then fall_delay
+ * counts UP by dt each step; when it reaches this value the brick drops.
+ * The timer never resets, even if the player steps off.
  */
 #define BRIDGE_FALL_DELAY    0.2f
 
@@ -47,7 +45,8 @@ typedef struct {
     float fall_vy;        /* downward velocity when falling (px/s)           */
     int   falling;        /* 1 = this brick is actively falling              */
     int   active;         /* 1 = visible, 0 = fallen off-screen              */
-    float fall_delay;     /* seconds remaining before this brick starts falling */
+    float fall_delay;     /* -1 = untouched; else seconds since first touched,
+                             counting up to BRIDGE_FALL_DELAY                */
 } BridgeBrick;
 
 typedef struct {

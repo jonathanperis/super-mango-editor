@@ -2,10 +2,10 @@
  * bridge.c — Tiled bridge with brick-by-brick crumble-fall.
  *
  * Each brick is an independent 16×16 tile that falls on its own schedule.
- * When the player first touches the bridge, the brick nearest to the player
- * begins falling after BRIDGE_STAND_LIMIT seconds.  Adjacent bricks follow
- * with a staggered CASCADE_DELAY, creating a domino ripple outward from
- * the contact point.
+ * When the player stands on a brick for the first time, that brick starts a
+ * timer and begins falling BRIDGE_FALL_DELAY seconds later. Bricks the
+ * player never stands on stay put, so running across a bridge drops the
+ * bricks one by one behind the player.
  */
 #include "../shared/graphics.h"
 #include <math.h>   /* fabsf */

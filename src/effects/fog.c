@@ -25,7 +25,7 @@
 
 /*
  * Maximum alpha applied to the fog overlay (0 = invisible, 255 = opaque).
- * 180 / 255 ≈ 71% opacity — enough to be visible without hiding the game.
+ * 120 / 255 ≈ 47% opacity — enough to be visible without hiding the game.
  */
 #define FOG_ALPHA_MAX  120
 
@@ -121,11 +121,11 @@ void fog_init(FogSystem *fog,
               const char (*paths)[64], int count)
 {
     /*
-     * Seed the random number generator with the current uptime so that
-     * each game session produces a different sequence of fog waves.
+     * No seeding here: main.c seeds the random generator at start-up (from
+     * --seed, or the clock when none is given). Reseeding here would
+     * discard --seed and also change enemy randomness whenever a level
+     * reloads its fog textures.
      */
-    /* The runner seeds once. Reseeding here would discard --seed and also
-     * change enemy randomness whenever a level reloads its fog textures. */
 
     /* Zero-init the instance pool so every slot starts as inactive */
     for (int i = 0; i < FOG_MAX; i++) {
