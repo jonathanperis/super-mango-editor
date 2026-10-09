@@ -81,8 +81,15 @@ void axe_traps_update(AxeTrap *traps, int count, float dt,
              * The angular frequency ω = 2π / PERIOD converts seconds to
              * radians.  sin(ω × time) produces a smooth −1..+1 wave.
              * Multiplying by AMPLITUDE scales that to the desired swing arc.
+             *
+             * time wraps back by one PERIOD each cycle (fmodf keeps the
+             * remainder). sin repeats every 2π, and ω × PERIOD is exactly
+             * 2π, so the swing carries on without a jump. Without the wrap,
+             * time would grow for as long as the level runs, and a large
+             * float holds too few digits: after hours of play each 1/60 s
+             * step would round away and the swing would stutter.
              */
-            t->time += dt;
+            t->time = fmodf(t->time + dt, AXE_SWING_PERIOD);
             float omega = 2.0f * (float)M_PI / AXE_SWING_PERIOD;
             t->angle = AXE_SWING_AMPLITUDE * sinf(omega * t->time);
 

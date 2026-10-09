@@ -251,7 +251,7 @@ direction  = 1          # 1 = starts right, -1 = starts left
 **Sprite:** `assets/sprites/hazards/axe_trap.png` — 48×64 px  
 **Behaviour:** Swinging or spinning axe. The pivot sits at the horizontal centre of the 48 px column starting at `pillar_x`. With `y = 0` the pivot uses a fixed default height (y 124, the top of a 3-tile pillar); it is not measured from a pillar, so set `y` for other pillar heights. Two modes:
 
-- **PENDULUM** — sinusoidal swing from −60° to +60° over a 2 s cycle. SFX plays at each extreme.
+- **PENDULUM** — sinusoidal swing from −60° to +60° over a 2 s cycle. SFX plays at each extreme. The swing clock wraps back by one cycle (`fmodf`) instead of growing for as long as the level runs.
 - **SPIN** — continuous 360° clockwise rotation at 180°/s. SFX plays each full rotation.
 
 Collision uses a 28×28 px box centred on the blade, whose centre is rotated around the pivot with the current angle (`axe_trap_get_hitbox()`).

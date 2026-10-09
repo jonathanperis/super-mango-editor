@@ -322,6 +322,11 @@ static int axe_traps_swing_spin_and_hit(void)
     /* The spin wraps at a full turn instead of growing without bound. */
     mechanics_step(&gs, 0, STEPS_PER_SECOND);
     CHECK(spin->angle >= 0.0f && spin->angle < 360.0f && NEAR(spin->angle, 90.0f, 0.2f));
+    /* So does the pendulum's clock, 2.5 s in: it is 0.5 s into its second
+     * cycle, and the swing went on through the wrap to +60 degrees again. */
+    CHECK(pendulum->time >= 0.0f && pendulum->time < AXE_SWING_PERIOD);
+    CHECK(NEAR(pendulum->time, 0.5f, 0.01f));
+    CHECK(NEAR(pendulum->angle, AXE_SWING_AMPLITUDE, 0.1f));
 
     /* The blade's hitbox follows the swing: it moves sideways between the
      * two extremes, and touching it costs a heart. */
