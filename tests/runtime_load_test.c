@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "levels/level_loader.h"
+#include "shared/graphics.h"  /* display_open */
 
 #define TEST_PLAYER_W 48
 #define TEST_PLAYER_H 48
@@ -466,6 +467,78 @@ static int load_keeps_flames_at_world_edge_gap(void)
     return 0;
 }
 
+/*
+ * 02_lugio_02.toml names stone_platform.png on 23 platforms, and the loader
+ * used to decode that image once per platform, again on every reload. Each
+ * distinct tile path must now load once, be shared, survive a reload of the
+ * same level, and be unloaded exactly when no platform names it any more.
+ */
+#define STONE_TILE "assets/sprites/levels/stone_platform.png"
+#define BRICK_TILE "assets/sprites/levels/brick_platform.png"
+
+static int load_shares_one_texture_per_tile_path(void)
+{
+    static GameState gs;  /* static: GameState is too large for comfort here */
+    static LevelDef def;
+    int failed = 1;
+
+    /* A hidden window gives raylib a context to upload textures into. */
+    if (display_open(GAME_W, GAME_H, "runtime load test", 1) != 0) {
+        fprintf(stderr, "runtime_load_test: hidden window failed\n");
+        return 1;
+    }
+    memset(&gs, 0, sizeof(gs));
+    level_def_init_defaults(&def);
+    init_test_player(&gs);
+    def.platform_count = 5;
+    for (int i = 0; i < def.platform_count; i++) {
+        def.platforms[i].x = 100.0f * (float)i;
+        def.platforms[i].tile_height = 1;
+    }
+    strcpy(def.platforms[0].tile_path, STONE_TILE);
+    strcpy(def.platforms[1].tile_path, STONE_TILE);
+    strcpy(def.platforms[2].tile_path, BRICK_TILE);
+    strcpy(def.platforms[3].tile_path, STONE_TILE);
+    /* platforms[4] has no tile_path and uses the default texture. */
+
+    int before = level_loader_test_tile_loads();
+    if (level_load(&gs, &def) != 0) goto done;
+    if (expect_int("two paths load two images", level_loader_test_tile_loads() - before, 2) ||
+        expect_int("cache holds two tiles", gs.platform_tiles.count, 2) ||
+        expect_int("stone texture loaded", gs.platforms[0].tex != NULL, 1) ||
+        expect_ptr("stone shared by 1", gs.platforms[1].tex, gs.platforms[0].tex) ||
+        expect_ptr("stone shared by 3", gs.platforms[3].tex, gs.platforms[0].tex) ||
+        expect_int("brick is its own texture", gs.platforms[2].tex != gs.platforms[0].tex, 1) ||
+        expect_ptr("untiled platform uses default", gs.platforms[4].tex, NULL))
+        goto done;
+
+    /* Replay/F8 reload the same level: nothing is decoded again. */
+    Texture2D *stone = gs.platforms[0].tex;
+    if (level_load(&gs, &def) != 0) goto done;
+    if (expect_int("reload loads nothing", level_loader_test_tile_loads() - before, 2) ||
+        expect_ptr("reload keeps the stone texture", gs.platforms[0].tex, stone))
+        goto done;
+
+    /* A level without brick drops it; one new path loads once. */
+    strcpy(def.platforms[2].tile_path, STONE_TILE);
+    strcpy(def.platforms[4].tile_path, "assets/sprites/levels/leaf_platform.png");
+    if (level_load(&gs, &def) != 0) goto done;
+    if (expect_int("new path loads once", level_loader_test_tile_loads() - before, 3) ||
+        expect_int("unused brick unloaded", gs.platform_tiles.count, 2) ||
+        expect_ptr("stone still shared", gs.platforms[2].tex, stone))
+        goto done;
+
+    level_release_platform_tiles(&gs);
+    if (expect_int("cleanup empties cache", gs.platform_tiles.count, 0) ||
+        expect_ptr("cleanup clears borrowers", gs.platforms[0].tex, NULL))
+        goto done;
+    failed = 0;
+done:
+    level_release_platform_tiles(&gs);
+    if (IsWindowReady()) CloseWindow();
+    return failed;
+}
+
 int main(void)
 {
     if (load_applies_runtime_state() != 0) return 1;
@@ -473,6 +546,7 @@ int main(void)
     if (load_applies_defaults_for_missing_optional_config() != 0) return 1;
     if (load_rejects_invalid_runtime_level_without_exiting() != 0) return 1;
     if (load_keeps_flames_at_world_edge_gap() != 0) return 1;
+    if (load_shares_one_texture_per_tile_path() != 0) return 1;
 
     puts("runtime_load_test: ok");
     return 0;
