@@ -38,7 +38,7 @@ Without `--level`, the native executable loads `levels/campaigns/main.toml`: Cre
 | Play selected level | Enter, keypad Enter or Space | A / Cross or Start |
 | Exit menu | Esc | B / Circle or Back |
 
-The mouse can also click **Play** and the **Settings (F1 / Y)** button. The selected level wraps at either end of the manifest-defined catalog. A held confirm carried from a prior screen must be released before it can start the selected level. A missing or invalid manifest prevents the native menu from opening; fix the manifest or its listed TOML files rather than expecting a fallback selector.
+The mouse can also click **Play** and the **Settings (F1 / Y)** button. The selected level wraps at either end of the manifest-defined catalog. A held confirm carried from a prior screen must be released before it can start the selected level. A missing or malformed manifest, or one with no playable level, prevents the native menu from opening. A single listed level that fails to load stays in the selector, greyed out with an "Unavailable" reason, and cannot be started; the rest remain playable (see [Campaign Manifest](../level-design/#campaign-manifest-v1)).
 
 ## Pause and Terminal Overlays
 
@@ -181,7 +181,7 @@ try it on.
 | `--debug` | Enables the inspector, FPS/frame interval, memory, hitboxes and event log; disables personal-profile persistence. |
 | `--sandbox` | Loads `levels/00_sandbox_01.toml` directly (whichever of `--sandbox`/`--level` comes last wins). |
 | `--level <path>` | Starts gameplay from a specific TOML file and skips the start menu. |
-| `--continue` | Opens the last saved stage if available and no explicit level was supplied; otherwise opens the selector. Runs that do not read the profile (`--no-save`, `--debug`, smoke, replay scripts) always open the selector. |
+| `--continue` | Opens the last saved stage if available and no explicit level was supplied; otherwise, or when that stage no longer loads, opens the selector. Runs that do not read the profile (`--no-save`, `--debug`, smoke, replay scripts) always open the selector. |
 | `--profile <path>` | Uses an explicit native profile file. |
 | `--no-save` | Keeps settings/results in memory only; does not read or write the personal profile. |
 | `--experiment <path>` | Replays an exported capture; requires `--level` (whose bytes must match the capture's `level_hash`), enables debug/no-save, and cannot combine with `--replay-script`. |

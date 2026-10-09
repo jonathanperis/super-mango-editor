@@ -242,6 +242,73 @@ static int campaign_manifest_nul_fixtures_reject_transactionally(void)
     return 0;
 }
 
+/*
+ * One missing or out-of-order level file used to fail the whole catalog, so
+ * the game could not even open its menu. Now only that entry is unavailable:
+ * it stays listed with a reason, the menu starts on a playable entry, shows
+ * the broken one disabled and refuses to start it.
+ */
+static int campaign_broken_level_disables_only_its_entry(void)
+{
+    CampaignCatalog catalog = {0};
+    StartMenu *menu = NULL;
+    int failed = 1;
+
+    if (campaign_catalog_load("tests/fixtures/campaign_manifest/partial_missing_level.toml",
+                              &catalog) != 0) {
+        fprintf(stderr, "session_test: partial campaign rejected as a whole\n");
+        goto done;
+    }
+    if (expect_int("partial count", (int)catalog.count, 4) ||
+        expect_int("missing entry unavailable", catalog.levels[0].available, 0) ||
+        expect_int("missing entry reason",
+                   strcmp(catalog.levels[0].problem, "level file not found"), 0) ||
+        expect_int("missing entry named by file",
+                   strcmp(catalog.levels[0].display_name, "zz_missing_campaign_level"), 0) ||
+        expect_int("sandbox playable", catalog.levels[1].available, 1) ||
+        expect_int("lugio 1 playable", catalog.levels[2].available, 1) ||
+        expect_int("lugio 2 playable", catalog.levels[3].available, 1) ||
+        expect_int("first playable", campaign_first_available(&catalog), 1))
+        goto done;
+
+    menu = start_menu_create(&catalog);
+    if (!menu) goto done;
+    menu->confirm_release_required = 0;
+    if (expect_int("menu starts on a playable level", menu->selected_level, 1)) goto done;
+    input_clear();
+    if (push_key(KEY_LEFT) || push_confirm()) goto done;
+    if (expect_int("disabled entry still renders", start_menu_frame(menu), 1) ||
+        expect_int("broken entry selectable", menu->selected_level, 0) ||
+        expect_int("broken entry cannot start", menu->route, MENU_ROUTE_NONE))
+        goto done;
+    if (push_key(KEY_RIGHT) || push_confirm()) goto done;
+    start_menu_frame(menu);
+    if (expect_int("playable entry starts", menu->route, MENU_ROUTE_PLAY)) goto done;
+    start_menu_close(&menu);
+
+    /* A level that does not lead to the next entry is unavailable too. */
+    if (campaign_catalog_load("tests/fixtures/campaign_manifest/partial_broken_chain.toml",
+                              &catalog) != 0 ||
+        expect_int("chain breaker unavailable", catalog.levels[0].available, 0) ||
+        expect_int("chain reason",
+                   strcmp(catalog.levels[0].problem, "next_phase is out of campaign order"), 0) ||
+        expect_int("final level playable", catalog.levels[1].available, 1))
+        goto done;
+
+    /* Nothing playable is still a failed catalog, and keeps the old one. */
+    CampaignLevel *kept = catalog.levels;
+    if (expect_int("no playable level fails",
+                   campaign_catalog_load("tests/fixtures/campaign_manifest/no_playable_level.toml",
+                                         &catalog), -1) ||
+        expect_int("failed load keeps catalog", catalog.levels == kept, 1))
+        goto done;
+    failed = 0;
+done:
+    start_menu_close(&menu);
+    campaign_catalog_cleanup(&catalog);
+    return failed;
+}
+
 static int direct_game_boot_repairs_input_and_keeps_controller_runtime(void)
 {
     AppSessionConfig config = {0};
@@ -1222,6 +1289,7 @@ int main(void)
         CASE(nearest_surface_is_order_independent), CASE(phase_resets_transient_state),
         CASE(campaign_manifest_is_ordered_and_transactional),
         CASE(campaign_manifest_nul_fixtures_reject_transactionally),
+        CASE(campaign_broken_level_disables_only_its_entry),
         CASE(physical_release_latch_blocks_transition_input),
         CASE(failed_initial_level_does_not_create_session),
         CASE(asset_root_moves_a_foreign_working_folder),
