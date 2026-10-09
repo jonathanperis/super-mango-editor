@@ -72,16 +72,28 @@ does not recompile the game.
 ### Flag stamps
 
 Make only compares timestamps, so it cannot notice on its own that a compiler
-or flag changed. Three one-line stamp files record the settings each tree was
-built with: `$(OBJDIR)/build-flags.txt` (`CC`, `BUILD_MODE`, `RAYLIB_PLATFORM`,
-`CFLAGS`, `TEST_CFLAGS`, the per-object test flags and `LIBS`, which carry
-`EXTRA_CFLAGS`/`EXTRA_LDFLAGS`), `$(RAYLIB_BUILD)/make-options.txt` (the
-`build_raylib.py` options) and `$(OBJDIR)/web/build-flags.txt` (the Emscripten
-pin and Web flags). While parsing the Makefile, Make reads each stamp back and
-rewrites it only when the text differs. Every object lists its stamp as a
-prerequisite, so a changed setting rebuilds exactly what it affects (for
-example `make BUILD_MODE=release` after a debug build in the same `OUTDIR`
-recompiles everything with `-O2`), and an unchanged one rebuilds nothing.
+or flag changed. One-line stamp files record the settings each part of a tree
+was built with, compile and link settings apart:
+
+| Stamp | Records | Rebuilds when it changes |
+|-------|---------|--------------------------|
+| `$(OBJDIR)/build-flags.txt` | `CC`, `CFLAGS` (with `EXTRA_CFLAGS`), `PROJECT_INCLUDES` | game, editor and tool objects |
+| `$(OBJDIR)/test-flags.txt` | `CC`, `TEST_CFLAGS`, `PROJECT_INCLUDES`, every per-object `TEST_OBJ_FLAGS_<source>` extra and the text of the two per-object lookups | test copies of objects |
+| `$(OBJDIR)/link-flags.txt` | `CC`, `CFLAGS`, `TEST_CFLAGS`, `LIBS` (with `EXTRA_LDFLAGS`), `EDITOR_LIBS`, `TEST_LIBS`, `MATH_LIBS` | every native program is relinked; no object recompiles |
+| `$(OBJDIR)/fuzz-flags.txt` | `CC`, `FUZZ_FLAGS`, `LIBS`, `MATH_LIBS` | the two fuzz replay programs |
+| `$(RAYLIB_BUILD)/make-options.txt` | the `build_raylib.py` options | raylib |
+| `$(OBJDIR)/web/build-flags.txt` | the Emscripten pin and every Web compile and link flag | Web raylib, objects and pages |
+
+While parsing the Makefile, Make reads each stamp back and rewrites it only
+when the text differs. Every output lists its stamp as a prerequisite, so a
+changed setting rebuilds the outputs that use it (for example
+`make BUILD_MODE=release` after a debug build in the same `OUTDIR` recompiles
+everything with `-O2`, while `make EXTRA_LDFLAGS=...` only relinks), and an
+unchanged one rebuilds nothing. That holds for edits to the Makefile itself
+because recipes carry no literal flags: every flag a compile or link recipe
+passes (include paths in `PROJECT_INCLUDES`, `-lm` in `MATH_LIBS`, the per-object
+test renames in `TEST_OBJ_FLAGS_<source>`) lives in a variable a stamp records.
+A new flag belongs in one of those variables, never in recipe text.
 Test sources (`tests/*.c`) and `tools/level_check.c` compile through the same
 object rules with `-MMD -MP`, so editing a shared test header such as
 `tests/test_paths.h` rebuilds exactly the tests that include it.
@@ -656,7 +668,10 @@ out/
 │   └── build-done.stamp                 ← last successful build_raylib.py run
 ├── raylib-web/                          ← Emscripten raylib build (make web)
 └── obj/
-    ├── build-flags.txt                  ← flag stamp for every native object
+    ├── build-flags.txt                  ← flag stamp for game, editor and tool objects
+    ├── test-flags.txt                   ← flag stamp for test objects
+    ├── link-flags.txt                   ← flag stamp for linking native programs
+    ├── fuzz-flags.txt                   ← flag stamp for the fuzz replay programs
     ├── src/                             ← game/editor objects mirror source paths
     │   ├── core/*.o / *.d
     │   ├── editor/*.o / *.d
