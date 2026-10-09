@@ -312,8 +312,8 @@ typedef struct {
     CheckpointFeedbackKind checkpoint_feedback_kind; /* explicit HUD cue reason */
     uint32_t      checkpoint_feedback_until; /* cue expiry, game_checkpoint_clock_ms time */
     int           legacy_checkpoint_screen; /* last automatic screen boundary   */
-    double        sim_time;    /* seconds simulated so far; only fixed steps
-                                  advance it, so a pause stops it            */
+    uint32_t      sim_steps;   /* fixed steps simulated since the level was
+                                  applied; a pause runs none, so it stops  */
 } GameWorld;
 
 /*

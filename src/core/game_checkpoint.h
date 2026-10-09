@@ -23,13 +23,15 @@ void game_checkpoint_update(GameState *gs);
  * shows it for exactly the same steps every time.
  */
 
-/* Simulated milliseconds (gs->world.sim_time), wrapping like a 32-bit ms clock. */
+/* Simulated milliseconds: gs->world.sim_steps fixed steps of 1000/60 ms,
+ * rounded down, wrapping like a 32-bit ms clock. It restarts at 0 whenever
+ * a level is applied (load, next phase, F8 restart). */
 uint32_t game_checkpoint_clock_ms(const GameState *gs);
 
 void game_checkpoint_feedback_set(GameState *gs, CheckpointFeedbackKind kind,
                                   uint32_t now, uint32_t duration);
 void game_checkpoint_feedback_clear_expired(GameState *gs, uint32_t now);
 
-/* Advance simulated time by one step of dt seconds, then hide the banner if
- * its time is up. game_update_active calls this once per step. */
+/* Count one fixed step (when dt > 0), then hide the banner if its time is
+ * up. game_update_active calls this once per step. */
 void game_checkpoint_feedback_tick(GameState *gs, float dt);
