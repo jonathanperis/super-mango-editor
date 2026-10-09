@@ -580,19 +580,24 @@ int serializer_replace_file(const char *temp_path, const char *target_path)
                      * not (an antivirus scanner holding the file open is a
                      * common cause).  The original may already be gone, and
                      * the temporary file is then the only copy of the level,
-                     * so it must never be deleted.  Try once more with a
-                     * plain move; if that fails too, tell the caller to keep
+                     * so it must never be deleted.  Finish the job with a
+                     * plain move.  A scanner usually lets go within a
+                     * fraction of a second, so try a few times, 100 ms
+                     * apart; if every try fails, tell the caller to keep
                      * the temporary file.
                      */
                     DWORD error = GetLastError();
                     if (error == ERROR_UNABLE_TO_MOVE_REPLACEMENT ||
                         error == ERROR_UNABLE_TO_MOVE_REPLACEMENT_2) {
-                        if (MoveFileExW(wide_temp, wide_target,
-                                        MOVEFILE_REPLACE_EXISTING |
-                                        MOVEFILE_WRITE_THROUGH)) {
-                            result = 0;
-                        } else {
-                            result = SERIALIZER_REPLACE_TEMP_KEPT;
+                        result = SERIALIZER_REPLACE_TEMP_KEPT;
+                        for (int attempt = 0; attempt < 5; attempt++) {
+                            if (attempt > 0) Sleep(100);
+                            if (MoveFileExW(wide_temp, wide_target,
+                                            MOVEFILE_REPLACE_EXISTING |
+                                            MOVEFILE_WRITE_THROUGH)) {
+                                result = 0;
+                                break;
+                            }
                         }
                     }
                 }
