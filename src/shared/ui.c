@@ -146,10 +146,40 @@ static void clear_active_edit(UIState *ui)
     ui->edit_float_max = FLT_MAX;
     ui->edit_float_nonzero = 0;
     ui->edit_cursor = 0;
+    ui->edit_anchor = -1;
+    ui->edit_drag = 0;
     ui->edit_buf[0] = '\0';
     ui->pending_text_length = 0;
     ui->pending_text_input[0] = '\0';
     ui->tab_request = 0;
+}
+
+/* Is some text selected in the active field?  [*from, *to) is it. */
+static int selection_range(const UIState *ui, int *from, int *to)
+{
+    int length = (int)strlen(ui->edit_buf);
+    int anchor = ui->edit_anchor;
+    int cursor = ui->edit_cursor;
+
+    if (anchor < 0 || anchor == cursor || anchor > length || cursor > length) return 0;
+    *from = anchor < cursor ? anchor : cursor;
+    *to = anchor < cursor ? cursor : anchor;
+    return 1;
+}
+
+/* Remove the selected text, leaving the caret where it was; 1 when there
+ * was a selection to remove. */
+static int erase_selection(UIState *ui)
+{
+    int from, to;
+    if (!selection_range(ui, &from, &to)) {
+        ui->edit_anchor = -1;
+        return 0;
+    }
+    memmove(ui->edit_buf + from, ui->edit_buf + to, strlen(ui->edit_buf) - (size_t)to + 1);
+    ui->edit_cursor = from;
+    ui->edit_anchor = -1;
+    return 1;
 }
 
 static void apply_pending_text_input(UIState *ui)
@@ -158,6 +188,8 @@ static void apply_pending_text_input(UIState *ui)
     int max_len;
 
     if (!ui || ui->active_id == 0 || ui->edit_target == NULL) return;
+    /* Typed or pasted text replaces the selection. */
+    if (ui->pending_text_length > 0) (void)erase_selection(ui);
     max_len = UI_EDIT_BUFFER_SIZE - 1;
     if (ui->edit_type == UI_EDIT_TEXT) {
         max_len = ui->edit_target_size - 1;
@@ -242,39 +274,110 @@ static void erase_edit_range(UIState *ui, int from, int to)
     ui->edit_cursor = from;
 }
 
-void ui_edit_key(UIState *ui, UIEditKey key)
+/*
+ * Word jumps.  A word is a run of letters, digits, '_' or non-ASCII
+ * characters (every byte of a multi-byte UTF-8 character is >= 0x80, so a
+ * jump never stops inside one).  Ctrl+Right goes to the end of the next
+ * word, Ctrl+Left to the start of the previous one.
+ */
+static int is_word_byte(char c)
+{
+    unsigned char b = (unsigned char)c;
+    return b >= 0x80 || b == '_' || (b >= '0' && b <= '9') ||
+           (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z');
+}
+
+static int next_word_end(const char *text, int at)
+{
+    int length = (int)strlen(text);
+    while (at < length && !is_word_byte(text[at])) at++;
+    while (at < length && is_word_byte(text[at])) at++;
+    return at;
+}
+
+static int previous_word_start(const char *text, int at)
+{
+    while (at > 0 && !is_word_byte(text[at - 1])) at--;
+    while (at > 0 && is_word_byte(text[at - 1])) at--;
+    return at;
+}
+
+void ui_edit_key(UIState *ui, UIEditKey key, int extend)
 {
     int length;
+    int from, to;
+    int selected;
+    int cursor;
 
     if (!ui || ui->active_id == 0) return;
     /* Text typed before this key belongs in front of the caret's move. */
     apply_pending_text_input(ui);
     length = (int)strlen(ui->edit_buf);
     if (ui->edit_cursor > length) ui->edit_cursor = length;
+    selected = selection_range(ui, &from, &to);
+    cursor = ui->edit_cursor;
     switch (key) {
     case UI_KEY_LEFT:
-        ui->edit_cursor = previous_char_start(ui->edit_buf, ui->edit_cursor);
+        /* Without Shift, Left first collapses a selection to its start. */
+        cursor = selected && !extend ? from : previous_char_start(ui->edit_buf, cursor);
         break;
     case UI_KEY_RIGHT:
-        ui->edit_cursor = next_char_start(ui->edit_buf, ui->edit_cursor);
+        cursor = selected && !extend ? to : next_char_start(ui->edit_buf, cursor);
         break;
-    case UI_KEY_HOME:
-        ui->edit_cursor = 0;
-        break;
-    case UI_KEY_END:
+    case UI_KEY_WORD_LEFT:  cursor = previous_word_start(ui->edit_buf, cursor); break;
+    case UI_KEY_WORD_RIGHT: cursor = next_word_end(ui->edit_buf, cursor);       break;
+    case UI_KEY_HOME:       cursor = 0;      break;
+    case UI_KEY_END:        cursor = length; break;
+    case UI_KEY_SELECT_ALL:
+        ui->edit_anchor = length > 0 ? 0 : -1;
         ui->edit_cursor = length;
-        break;
+        return;
     case UI_KEY_BACKSPACE:
-        erase_edit_range(ui, previous_char_start(ui->edit_buf, ui->edit_cursor),
-                         ui->edit_cursor);
-        break;
+        if (!erase_selection(ui))
+            erase_edit_range(ui, previous_char_start(ui->edit_buf, ui->edit_cursor),
+                             ui->edit_cursor);
+        return;
     case UI_KEY_DELETE:
-        erase_edit_range(ui, ui->edit_cursor,
-                         next_char_start(ui->edit_buf, ui->edit_cursor));
-        break;
+        if (!erase_selection(ui))
+            erase_edit_range(ui, ui->edit_cursor,
+                             next_char_start(ui->edit_buf, ui->edit_cursor));
+        return;
     case UI_KEY_UP: case UI_KEY_DOWN: case UI_KEY_PICK:
-        break;   /* list keys: see ui_dropdown_key */
+        return;   /* list keys: see ui_dropdown_key */
     }
+    /* A caret move: with Shift it stretches the selection from where it
+     * started (the anchor stays put); without, any selection ends. */
+    if (extend && ui->edit_anchor < 0) ui->edit_anchor = ui->edit_cursor;
+    if (!extend) ui->edit_anchor = -1;
+    ui->edit_cursor = cursor;
+    if (ui->edit_anchor == ui->edit_cursor) ui->edit_anchor = -1;
+}
+
+int ui_edit_selected_text(UIState *ui, char *out, size_t out_size)
+{
+    int from, to;
+    size_t length;
+
+    if (!ui || !out || out_size == 0) return 0;
+    out[0] = '\0';
+    if (ui->active_id == 0) return 0;
+    apply_pending_text_input(ui);
+    if (!selection_range(ui, &from, &to)) return 0;
+    length = (size_t)(to - from);
+    if (length >= out_size) {
+        length = out_size - 1;
+        while (length > 0 && is_continuation_byte(ui->edit_buf[from + (int)length])) length--;
+    }
+    memcpy(out, ui->edit_buf + from, length);
+    out[length] = '\0';
+    return (int)length;
+}
+
+void ui_edit_delete_selection(UIState *ui)
+{
+    if (!ui || ui->active_id == 0) return;
+    apply_pending_text_input(ui);
+    (void)erase_selection(ui);
 }
 
 void ui_focus_next(UIState *ui, int direction)
@@ -526,6 +629,77 @@ static int text_width_of(UIState *ui, const char *text, size_t from, size_t to)
  * The caret is a 1-pixel line drawn between two characters, so blinking
  * never shifts the text around it.
  */
+/* The first byte of the active field's text a field of width w shows:
+ * the smallest offset whose text up to the caret still fits. */
+static size_t edit_window_start(UIState *ui, int w)
+{
+    const char *text = ui->edit_buf;
+    const size_t length = strlen(text);
+    const int max_width = w - 8;             /* 4 px padding on each side */
+    size_t cursor = (size_t)ui->edit_cursor;
+    size_t low = 0, high;
+
+    if (cursor > length) cursor = length;
+    high = cursor;
+    while (low < high) {
+        size_t mid = low + (high - low) / 2;
+        if (text_width_of(ui, text, mid, cursor) <= max_width) high = mid;
+        else low = mid + 1;
+    }
+    /* Never start drawing in the middle of a multi-byte UTF-8 character. */
+    while (low < cursor && is_continuation_byte(text[low])) low++;
+    return low;
+}
+
+/*
+ * edit_offset_at — The character boundary of the active field's text
+ * nearest to window x `px`, for a field at x whose text is drawn from byte
+ * `start` on.  Walks the visible characters one by one, which is cheap for
+ * the few dozen a field shows.
+ */
+static int edit_offset_at(UIState *ui, int x, size_t start, int px)
+{
+    const char *text = ui->edit_buf;
+    int length = (int)strlen(text);
+    int target = px - (x + 4);
+    int at = (int)start;
+    int at_width = 0;
+
+    if (target <= 0) return at;
+    while (at < length) {
+        int next = next_char_start(text, at);
+        int width = text_width_of(ui, text, start, (size_t)next);
+        if (width >= target) return width - target < target - at_width ? next : at;
+        at = next;
+        at_width = width;
+    }
+    return length;
+}
+
+/*
+ * edit_mouse — A press inside the field that is already active puts the
+ * caret where it landed; while the button stays down the caret follows
+ * the pointer and the text between them is selected.  The press that
+ * activates a field (`activated`) leaves the caret at the end, ready to
+ * append, as it always did.
+ */
+static void edit_mouse(UIState *ui, int x, int y, int w, int h, int activated)
+{
+    if (activated) return;
+    if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h)) {
+        apply_pending_text_input(ui);
+        ui->edit_cursor = edit_offset_at(ui, x, edit_window_start(ui, w), ui->mouse_x);
+        ui->edit_anchor = -1;
+        ui->edit_drag = 1;
+        ui->edit_drag_from = ui->edit_cursor;
+    } else if (ui->edit_drag && ui->mouse_down) {
+        ui->edit_cursor = edit_offset_at(ui, x, edit_window_start(ui, w), ui->mouse_x);
+        ui->edit_anchor = ui->edit_cursor != ui->edit_drag_from ? ui->edit_drag_from : -1;
+    } else {
+        ui->edit_drag = 0;
+    }
+}
+
 static void draw_active_edit(UIState *ui, int x, int y, int w)
 {
     char display[UI_EDIT_BUFFER_SIZE];
@@ -535,20 +709,10 @@ static void draw_active_edit(UIState *ui, int x, int y, int w)
     size_t cursor = (size_t)ui->edit_cursor;
     size_t low, high;
     size_t start, end;
+    int from, to;
 
     if (cursor > length) cursor = length;
-
-    /* start: the smallest offset whose text up to the caret still fits. */
-    low = 0;
-    high = cursor;
-    while (low < high) {
-        size_t mid = low + (high - low) / 2;
-        if (text_width_of(ui, text, mid, cursor) <= max_width) high = mid;
-        else low = mid + 1;
-    }
-    start = low;
-    /* Never start drawing in the middle of a multi-byte UTF-8 character. */
-    while (start < cursor && is_continuation_byte(text[start])) start++;
+    start = edit_window_start(ui, w);
 
     /* end: the largest offset whose text from start still fits. */
     low = cursor;
@@ -561,6 +725,13 @@ static void draw_active_edit(UIState *ui, int x, int y, int w)
     end = low;
     while (end > cursor && end < length && is_continuation_byte(text[end])) end--;
 
+    /* The selection, as far as it is in view, behind the text. */
+    if (selection_range(ui, &from, &to) && (size_t)to > start && (size_t)from < end) {
+        size_t lo = (size_t)from > start ? (size_t)from : start;
+        size_t hi = (size_t)to < end ? (size_t)to : end;
+        int left = x + 4 + text_width_of(ui, text, start, lo);
+        draw_rect(left, y + 2, text_width_of(ui, text, lo, hi), 16, UI_BTN_ACTIVE);
+    }
     memcpy(display, text + start, end - start);
     display[end - start] = '\0';
     draw_text(ui, x + 4, y + 3, display, UI_TEXT);
@@ -814,10 +985,10 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
     if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
 
     /* --- Activation on click, or by Tab from the previous field --- */
+    int clicked_on = !is_active && ui->mouse_clicked &&
+                     point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
     if (field_drawn(ui, id, y) ||
-        (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
-                                            x, y, w, h) &&
-         command_allows_activation(ui, id))) {
+        (clicked_on && command_allows_activation(ui, id))) {
         /*
          * Start editing: copy the current value into edit_buf so the user
          * sees the existing number and can modify it.  snprintf converts
@@ -832,8 +1003,11 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
         ui->edit_int_step = step;
         snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%d", *value);
         ui->edit_cursor = (int)strlen(ui->edit_buf);
+        ui->edit_anchor = -1;
         is_active = 1;
     }
+    /* The mouse places the caret and drags out a selection. */
+    if (is_active) edit_mouse(ui, x, y, w, h, clicked_on);
 
     /*
      * Deactivate if the user clicks somewhere else (clicked but NOT inside
@@ -851,7 +1025,7 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
         apply_pending_text_input(ui);
 
         /* Backspace — delete the character before the caret. */
-        if (ui->key_backspace) ui_edit_key(ui, UI_KEY_BACKSPACE);
+        if (ui->key_backspace) ui_edit_key(ui, UI_KEY_BACKSPACE, 0);
 
         /*
          * Return — confirm only a complete, in-range integer.  Invalid input
@@ -938,10 +1112,10 @@ static int float_field(UIState *ui, int id, int x, int y, int w,
     if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
 
     /* --- Activation on click, or by Tab from the previous field --- */
+    int clicked_on = !is_active && ui->mouse_clicked &&
+                     point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
     if (field_drawn(ui, id, y) ||
-        (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
-                                            x, y, w, h) &&
-         command_allows_activation(ui, id))) {
+        (clicked_on && command_allows_activation(ui, id))) {
         ui->active_id = id;
         ui->edit_type = UI_EDIT_FLOAT;
         ui->edit_target = value;
@@ -955,15 +1129,18 @@ static int float_field(UIState *ui, int id, int x, int y, int w,
          */
         snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%.9g", *value);
         ui->edit_cursor = (int)strlen(ui->edit_buf);
+        ui->edit_anchor = -1;
         is_active = 1;
     }
+    /* The mouse places the caret and drags out a selection. */
+    if (is_active) edit_mouse(ui, x, y, w, h, clicked_on);
 
     /* Deactivate on click outside. */
     /* --- Keyboard handling while active --- */
     if (is_active) {
         apply_pending_text_input(ui);
 
-        if (ui->key_backspace) ui_edit_key(ui, UI_KEY_BACKSPACE);
+        if (ui->key_backspace) ui_edit_key(ui, UI_KEY_BACKSPACE, 0);
 
         /*
          * Return — parse only a complete, finite float.  Invalid input leaves
@@ -1028,10 +1205,10 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
     if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
 
     /* --- Activation on click, or by Tab from the previous field --- */
+    int clicked_on = !is_active && ui->mouse_clicked &&
+                     point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
     if (field_drawn(ui, id, y) ||
-        (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y,
-                                            x, y, w, h) &&
-         command_allows_activation(ui, id))) {
+        (clicked_on && command_allows_activation(ui, id))) {
         ui->active_id = id;
         ui->edit_type = UI_EDIT_TEXT;
         ui->edit_target = buf;
@@ -1052,8 +1229,11 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
             ui->edit_buf[copy_len] = '\0';
         }
         ui->edit_cursor = (int)strlen(ui->edit_buf);
+        ui->edit_anchor = -1;
         is_active = 1;
     }
+    /* The mouse places the caret and drags out a selection. */
+    if (is_active) edit_mouse(ui, x, y, w, h, clicked_on);
 
     /* Deactivate on click outside. */
     /* --- Keyboard handling while active --- */
@@ -1065,7 +1245,7 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
         apply_pending_text_input(ui);
 
         /* Backspace removes the whole UTF-8 character before the caret. */
-        if (ui->key_backspace) ui_edit_key(ui, UI_KEY_BACKSPACE);
+        if (ui->key_backspace) ui_edit_key(ui, UI_KEY_BACKSPACE, 0);
 
         /*
          * Return — confirm the edit.  Copy edit_buf back into the caller's

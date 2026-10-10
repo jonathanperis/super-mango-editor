@@ -128,13 +128,14 @@ static void editor_key(EditorState *es, const InputEvent *event)
     if (es->ui.active_id && !ctrl && key != KEY_ESCAPE && key != KEY_F5) {
         /* Caret keys act at once, in the order they were pressed, so
          * "type, Left, type" in one frame lands where it should. */
+        /* Shift with a caret key selects what the caret passes over. */
         switch (key) {
-        case KEY_BACKSPACE: ui_edit_key(&es->ui, UI_KEY_BACKSPACE); break;
-        case KEY_DELETE:    ui_edit_key(&es->ui, UI_KEY_DELETE);    break;
-        case KEY_LEFT:      ui_edit_key(&es->ui, UI_KEY_LEFT);      break;
-        case KEY_RIGHT:     ui_edit_key(&es->ui, UI_KEY_RIGHT);     break;
-        case KEY_HOME:      ui_edit_key(&es->ui, UI_KEY_HOME);      break;
-        case KEY_END:       ui_edit_key(&es->ui, UI_KEY_END);       break;
+        case KEY_BACKSPACE: ui_edit_key(&es->ui, UI_KEY_BACKSPACE, 0); break;
+        case KEY_DELETE:    ui_edit_key(&es->ui, UI_KEY_DELETE, 0);    break;
+        case KEY_LEFT:      ui_edit_key(&es->ui, UI_KEY_LEFT, shift);  break;
+        case KEY_RIGHT:     ui_edit_key(&es->ui, UI_KEY_RIGHT, shift); break;
+        case KEY_HOME:      ui_edit_key(&es->ui, UI_KEY_HOME, shift);  break;
+        case KEY_END:       ui_edit_key(&es->ui, UI_KEY_END, shift);   break;
         case KEY_TAB:       ui_focus_next(&es->ui, shift ? -1 : 1); break;
         case KEY_ENTER: case KEY_KP_ENTER: es->ui.key_return = 1;  break;
         default: break;
@@ -149,11 +150,32 @@ static void editor_key(EditorState *es, const InputEvent *event)
         editor_set_status(es, "Copied: %s", es->selected_message);
         return;
     }
-    if (es->ui.active_id && ctrl && (key == KEY_C || key == KEY_V)) {
-        if (key == KEY_C) clipboard_set(es->ui.edit_buf);
-        else {
+    /* Ctrl with a field active edits text: copy, cut and paste act on the
+     * selection, Ctrl+A selects everything, Ctrl+Left / Right jump a word
+     * (with Shift, selecting it). */
+    if (es->ui.active_id && ctrl &&
+        (key == KEY_C || key == KEY_X || key == KEY_V || key == KEY_A ||
+         key == KEY_LEFT || key == KEY_RIGHT)) {
+        char selected[UI_EDIT_BUFFER_SIZE];
+        switch (key) {
+        case KEY_C: case KEY_X:
+            if (ui_edit_selected_text(&es->ui, selected, sizeof(selected)) == 0) {
+                editor_set_status(es, "Nothing selected to %s: Shift+arrows, a drag or "
+                                  "Ctrl+A select text", key == KEY_C ? "copy" : "cut");
+                break;
+            }
+            clipboard_set(selected);
+            if (key == KEY_X) ui_edit_delete_selection(&es->ui);
+            break;
+        case KEY_V: {
             const char *text = clipboard_get();
-            if (text) ui_queue_text_input(&es->ui, text);
+            if (text) ui_queue_text_input(&es->ui, text);   /* replaces the selection */
+            break;
+        }
+        case KEY_A:     ui_edit_key(&es->ui, UI_KEY_SELECT_ALL, 0);     break;
+        case KEY_LEFT:  ui_edit_key(&es->ui, UI_KEY_WORD_LEFT, shift);  break;
+        case KEY_RIGHT: ui_edit_key(&es->ui, UI_KEY_WORD_RIGHT, shift); break;
+        default: break;
         }
         return;
     }

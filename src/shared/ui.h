@@ -24,6 +24,8 @@ typedef enum { UI_EDIT_NONE = 0, UI_EDIT_INT, UI_EDIT_FLOAT, UI_EDIT_TEXT } UIEd
 typedef enum {
     UI_KEY_LEFT, UI_KEY_RIGHT, UI_KEY_HOME, UI_KEY_END,
     UI_KEY_BACKSPACE, UI_KEY_DELETE,
+    UI_KEY_WORD_LEFT, UI_KEY_WORD_RIGHT,  /* Ctrl+Left / Ctrl+Right      */
+    UI_KEY_SELECT_ALL,                    /* Ctrl+A                      */
     UI_KEY_UP, UI_KEY_DOWN, UI_KEY_PICK   /* open dropdown lists only */
 } UIEditKey;
 
@@ -76,6 +78,14 @@ typedef struct {
      * character boundary: moving and deleting step over whole UTF-8
      * characters, and typing inserts at the caret. */
     int edit_cursor;
+    /* The other end of the selection, a byte offset like the caret; -1
+     * when nothing is selected.  The selected text is what lies between
+     * the two, and typing, Backspace, Delete or a paste replaces it. */
+    int edit_anchor;
+    /* A press inside the active field: while the button stays down, the
+     * caret follows the pointer and selects from where the press landed.
+     * mouse_down must be filled in each frame for this (after events). */
+    int edit_drag, edit_drag_from;
     UIEditType edit_type;
     void *edit_target;          /* borrowed destination, interpreted by edit_type */
     int edit_target_size;
@@ -146,8 +156,15 @@ int ui_apply_active_edit(UIState *ui);
 void ui_cancel_active_edit(UIState *ui);
 /* Move the caret or delete a character in the active field, right away.
  * Typing queued earlier is inserted first, so keys and text keep the order
- * they were pressed in.  Does nothing when no field is active. */
-void ui_edit_key(UIState *ui, UIEditKey key);
+ * they were pressed in.  With extend (Shift held) a caret move selects the
+ * text it passes over instead.  Does nothing when no field is active. */
+void ui_edit_key(UIState *ui, UIEditKey key, int extend);
+/* Copy the active field's selected text into out (cut short to fit, never
+ * inside a UTF-8 character) and return its length in bytes; 0 when
+ * nothing is selected. */
+int ui_edit_selected_text(UIState *ui, char *out, size_t out_size);
+/* Delete the active field's selected text (Ctrl+X, after copying it). */
+void ui_edit_delete_selection(UIState *ui);
 /* Tab (+1) / Shift+Tab (-1): when the active field is next drawn it commits
  * like Return and the next / previous field on screen becomes active.  An
  * invalid value keeps the focus where it is.  Dropdowns take part in the
