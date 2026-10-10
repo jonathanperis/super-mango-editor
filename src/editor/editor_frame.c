@@ -30,6 +30,8 @@ void editor_run_frame(EditorState *es)
     Vector2 mouse = input_mouse();
     es->mouse_x = es->ui.mouse_x = (int)mouse.x;
     es->mouse_y = es->ui.mouse_y = (int)mouse.y;
+    /* Held after this frame's events: a text field drags out a selection. */
+    es->ui.mouse_down = es->mouse_down;
     if (es->playing
 #ifndef _WIN32
         || es->play_pid > 0
