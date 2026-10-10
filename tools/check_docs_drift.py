@@ -770,9 +770,13 @@ def file_defines_function(source: str, name: str) -> bool:
     for line in source.splitlines():
         if re.match(rf"^\s*#\s*define\s+{name}\(", line):
             return True
-        if line[:1].isalpha() and not line.startswith(("return", "if", "else")) \
-                and re.search(rf"\b{name}\s*\(", line):
-            return True
+        # The declared name is the identifier right before the first "(" of
+        # a file-scope line. Looking for `name(` anywhere would also accept
+        # `int other(void) { return name(); }`, which only calls it.
+        if line[:1].isalpha() and not line.startswith(("return", "if", "else")):
+            declared = re.match(r"[^(]*?\b(\w+)\s*\(", line)
+            if declared and declared.group(1) == name:
+                return True
     return False
 
 
