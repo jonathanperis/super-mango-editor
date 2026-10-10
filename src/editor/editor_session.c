@@ -11,6 +11,7 @@
 #include <string.h>       /* memset, strncpy */
 
 #include "editor_validation.h" /* editor_validate_level */
+#include "editor_campaign.h"   /* editor_campaign_finish_name */
 #include "editor_files.h"      /* editor_path_for_display */
 #include "editor_recovery.h"   /* recovery retirement */
 #include "editor_undo_apply.h" /* staged property/config command capture */
@@ -238,6 +239,11 @@ int editor_finish_field_edit(EditorState *es)
      * so it can never linger and answer a later, unrelated prompt. */
     test_choice = editor_test_finish_choice;
     editor_test_finish_choice = -1;
+
+    /* A name typed in the Campaign view is that view's edit: it becomes a
+     * step in the view's own history, and the level's undo stack below
+     * never hears of it. */
+    if (editor_campaign_finish_name(es)) return 1;
 
     /* Apply the typed value under its own change tracking, then put back
      * whatever tracking the panel that asked had armed (see

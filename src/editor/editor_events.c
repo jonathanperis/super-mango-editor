@@ -187,8 +187,10 @@ static void editor_key(EditorState *es, const InputEvent *event)
     }
     /* The Campaign view covers the canvas: a level shortcut there would
      * change a document the designer cannot see.  It takes Esc (cancel a
-     * name being typed, else close), Ctrl+S (save the campaign) and Ctrl+M
-     * (close) only. */
+     * name being typed, else close), Ctrl+S (save the campaign), Ctrl+M
+     * (close) and the undo keys only.  Those replay the view's own history
+     * (editor_campaign.c); the level's undo stack, reached further down,
+     * is out of their way until the view closes. */
     if (es->campaign) {
         if (key == KEY_ESCAPE && es->ui.active_id)
             ui_cancel_active_edit(&es->ui);
@@ -196,6 +198,10 @@ static void editor_key(EditorState *es, const InputEvent *event)
             (void)editor_campaign_close(es, 0);
         else if (ctrl && key == KEY_S)
             (void)editor_campaign_save(es);
+        else if (ctrl && key == KEY_Z && !shift)
+            (void)editor_campaign_undo(es);
+        else if (ctrl && (key == KEY_Z || key == KEY_Y))
+            (void)editor_campaign_redo(es);
         else if (key != KEY_LEFT_SHIFT && key != KEY_RIGHT_SHIFT &&
                  key != KEY_LEFT_CONTROL && key != KEY_RIGHT_CONTROL &&
                  key != KEY_LEFT_ALT && key != KEY_RIGHT_ALT &&
