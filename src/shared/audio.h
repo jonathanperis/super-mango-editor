@@ -40,3 +40,13 @@ void music_resume(void);
 /* Pump the active stream every session frame, including overlay frames. */
 void music_update(void);
 void music_set_volume(int volume);
+
+#ifdef MANGO_TESTING
+/* Test builds only. *_test_loads: files loaded so far. *_test_live: loaded
+ * ones not unloaded yet, so a test can check that a session frees each
+ * sound and track exactly once. */
+int sound_test_loads(void);
+int sound_test_live(void);
+int music_test_loads(void);
+int music_test_live(void);
+#endif

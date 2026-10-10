@@ -27,7 +27,7 @@ piece of code that will free it. Everything else only *borrows* the pointer.
 
 | Idea | Where to read it | What to notice |
 |------|------------------|----------------|
-| An owning pointer | `texture_load()` and `texture_unload()` in `src/shared/graphics.h` | Load mallocs a small `Texture2D` handle and returns `NULL` on failure; unload frees it. Neither function can clear the caller's variable, which is why the next row exists. |
+| An owning pointer | `texture_load()` and `texture_unload()` in `src/shared/texture.c` | Load mallocs a small `Texture2D` handle and returns `NULL` on failure; unload frees it. Neither function can clear the caller's variable, which is why the next row exists. |
 | Clearing a pointer after the free | `DESTROY_TEX` in `src/shared/graphics.h` and `FREE_CHUNK` in `src/shared/audio.h` | `do { texture_unload(tex); (tex) = NULL; } while (0)`: the owner frees, then forgets the address, so a second cleanup is harmless. |
 | Release in reverse order | `destroy_texture_specs_reverse()` in `src/core/game_resources.c`; `game_cleanup()` in `src/core/game_lifecycle.c` | Things are freed in the opposite order they were created, so nothing is released while something else still points into it. |
 | Borrowed pointers | `coins_render()` in `src/collectibles/coin.c` | The renderer receives `Texture2D *` but never frees it; the session's `GameAssets` owns it, and each `GameState` holds a borrowed copy of the pointer. |
