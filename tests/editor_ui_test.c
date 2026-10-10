@@ -1127,6 +1127,13 @@ static int validation_rows_scroll_and_copy(void)
     key_frame(&es, KEY_C, INPUT_CTRL);
     CHECK(strcmp(editor_test_clipboard(), first) == 0);
     CHECK(strncmp(es.status_message, "Copied: coins[0]", 16) == 0);
+    /* Text selected in the field the row opened is the newer choice:
+     * Ctrl+C now copies that, as Ctrl+X would cut it. */
+    CHECK(es.ui.active_id != 0);
+    key_frame(&es, KEY_A, INPUT_CTRL);
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    CHECK(es.ui.edit_buf[0] != '\0');
+    CHECK(strcmp(editor_test_clipboard(), es.ui.edit_buf) == 0);
     key_frame(&es, KEY_ESCAPE, 0);
 
     /* The wheel over the rows scrolls them, not the panel; the first row
@@ -1152,6 +1159,13 @@ static int validation_rows_scroll_and_copy(void)
     CHECK(es.focus_area == EDITOR_FOCUS_CANVAS);
     key_frame(&es, KEY_C, INPUT_CTRL);
     CHECK(editor_test_clipboard()[0] == '\0');
+
+    /* Folded, Level Config draws no rows, so the wheel over that spot must
+     * not be taken for the hidden list: the palette is there now. */
+    CHECK(properties_message_list_contains(row_x, row_y));
+    es.config_open = 0;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(!properties_message_list_contains(row_x, row_y));
 done:
     clear_dialog_seams();
     close_editor(&es);
@@ -1942,6 +1956,8 @@ static int playtest_from_here_passes_the_start_point(void)
         CHECK(strncmp(launched_args[i], "--start", 7) != 0);
     finish_launched_game(&es);
 done:
+    /* A check that failed part-way may have left a child waiting. */
+    release_launched_game();
     editor_test_set_play_launcher(NULL);
     clear_dialog_seams();
     close_editor(&es);

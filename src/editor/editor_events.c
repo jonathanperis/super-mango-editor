@@ -144,9 +144,14 @@ static void editor_key(EditorState *es, const InputEvent *event)
         return;
     }
     /* A validation or load-problem row clicked last: Ctrl+C copies its
-     * text (even when the click put the caret in the field it is about). */
+     * text (even when the click put the caret in the field it is about).
+     * Text selected in that field since then is the newer choice, so it is
+     * left to the field branch below, as Ctrl+X already is. */
+    char field_selection[UI_EDIT_BUFFER_SIZE];
+    int field_has_selection = es->ui.active_id &&
+        ui_edit_selected_text(&es->ui, field_selection, sizeof(field_selection)) > 0;
     if (ctrl && key == KEY_C && es->focus_area == EDITOR_FOCUS_MESSAGES &&
-        es->selected_message[0]) {
+        es->selected_message[0] && !field_has_selection) {
         clipboard_set(es->selected_message);
         editor_set_status(es, "Copied: %s", es->selected_message);
         return;
