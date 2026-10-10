@@ -1,6 +1,14 @@
 #include "text.h"
 #include <stdlib.h>
 
+#ifdef MANGO_TESTING
+/* Test builds count font handles made and still alive (see text.h). */
+static int s_test_loads;
+static int s_test_live;
+int font_test_loads(void) { return s_test_loads; }
+int font_test_live(void) { return s_test_live; }
+#endif
+
 TextFont *font_load(void)
 {
     /* GetFontDefault returns a copy of raylib's internal Font value. Copying
@@ -17,13 +25,21 @@ TextFont *font_load(void)
     /* raylib's DrawText spaces default-font glyphs by size / baseSize
      * pixels; the glyph images have no padding of their own. */
     *text_font = (TextFont){font, TEXT_FONT_SIZE, TEXT_FONT_SIZE / font.baseSize};
+#ifdef MANGO_TESTING
+    s_test_loads++;
+    s_test_live++;
+#endif
     return text_font;
 }
 
 void font_unload(TextFont *font)
 {
+    if (!font) return;
     /* Only the handle is ours; the borrowed default font stays alive. */
     free(font);
+#ifdef MANGO_TESTING
+    s_test_live--;
+#endif
 }
 
 int font_measure(TextFont *font, const char *text, int *width, int *height)
@@ -47,14 +63,7 @@ Texture2D *font_texture(TextFont *font, const char *text, Color color)
     Texture2D value = LoadTextureFromImage(image);
     UnloadImage(image);
     if (!IsTextureValid(value)) return NULL;
-    Texture2D *texture = malloc(sizeof(*texture));
-    if (!texture) {
-        UnloadTexture(value);
-        return NULL;
-    }
-    *texture = value;
-    SetTextureFilter(value, TEXTURE_FILTER_POINT);
-    return texture;
+    return texture_own(value);
 }
 
 void font_draw(TextFont *font, const char *text, int x, int y, Color color)

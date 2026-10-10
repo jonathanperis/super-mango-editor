@@ -87,7 +87,8 @@ src/
 │   ├── file_dialog.h / .c        Native file dialogs
 │   └── undo.h / .c               Compact history with owned config snapshots; `undo_push(stack, const Command *)`
 ├── shared/
-│   ├── graphics.h / .c          raylib texture slots, sprite pivots and logical presentation
+│   ├── graphics.h / .c          Window, sprite pivots and logical presentation; declares the texture handles
+│   ├── texture.c                `texture_load`, `texture_own`, `texture_unload`: owned texture handles
 │   ├── geometry.h              Integer hitboxes and half-open intersection
 │   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
 │   ├── text.h / .c              Borrowed built-in font, text measurement, centred drawing and label texture creation
@@ -576,7 +577,8 @@ reports it, resident memory in MB.
 
 | Read | Learning purpose |
 |---|---|
-| `shared/graphics.h`, `shared/graphics.c` | Texture ownership, sprite pivots/flips and logical-canvas presentation |
+| `shared/graphics.h`, `shared/graphics.c` | Sprite pivots/flips and logical-canvas presentation |
+| `shared/texture.c` | Texture ownership: a malloc'd handle, `NULL` on failure, one owner unloads it |
 | `shared/geometry.h` | Integer, half-open hitboxes; overflow-safe edge arithmetic |
 | `shared/audio.h`, `shared/audio.c` | Owned samples, borrowed alias data, per-play volume and music pumping |
 | `shared/text.h`, `shared/text.c` | CPU image versus GPU texture; borrowing raylib's built-in font |

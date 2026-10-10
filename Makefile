@@ -123,11 +123,14 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
 OBJS    = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
 DEPS    = $(OBJS:.o=.d)
 # The session test drives input and save failures through the MANGO_TESTING
-# seams, so those two modules come from the test tree as well.
+# seams, so those two modules come from the test tree as well. So do the
+# texture, sound, music and font loaders, whose test builds count loads.
 SESSION_RUNTIME_OBJS = $(filter-out $(OBJDIR)/src/main.o $(OBJDIR)/src/shared/audio.o \
                          $(OBJDIR)/src/core/app_session.o $(OBJDIR)/src/input/game_input.o \
-                         $(OBJDIR)/src/shared/serializer_io.o,$(OBJS)) \
+                         $(OBJDIR)/src/shared/serializer_io.o $(OBJDIR)/src/shared/texture.o \
+                         $(OBJDIR)/src/shared/text.o,$(OBJS)) \
                        $(TEST_AUDIO_OBJ) $(TEST_SESSION_OBJ) $(TEST_GAME_INPUT_OBJ) \
+                       $(TEST_TEXTURE_OBJ) $(TEST_TEXT_OBJ) \
                        $(TEST_OBJDIR)/$(SHARED_DIR)/serializer_io.o
 
 # ── Editor (standalone level editor) ─────────────────────────────────
@@ -209,6 +212,8 @@ TEST_EDITOR_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor_validati
 TEST_EDITOR_FRAME_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor editor_chrome \
                    editor_frame editor_textures)
 TEST_AUDIO_OBJ     = $(TEST_OBJDIR)/$(SHARED_DIR)/audio.o
+TEST_TEXTURE_OBJ   = $(TEST_OBJDIR)/$(SHARED_DIR)/texture.o
+TEST_TEXT_OBJ      = $(TEST_OBJDIR)/$(SHARED_DIR)/text.o
 TEST_SESSION_OBJ   = $(TEST_OBJDIR)/$(SRCDIR)/core/app_session.o
 TEST_INPUT_BACKEND_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/input_backend.o
 TEST_LIBS           = $(LIBS)
@@ -220,7 +225,7 @@ TEST_SOURCE_DIR  = $(TEST_OBJDIR)/tests
 TEST_SOURCE_OBJS = $(patsubst %.c,$(TEST_OBJDIR)/%.o,$(filter-out tests/fuzz_%.c tests/parser_allocation_test.c,$(wildcard tests/*.c)))
 # tools/level_check.c (validate-levels) is compiled the same way, with CFLAGS.
 TOOL_OBJS = $(OBJDIR)/tools/level_check.o
-PLATFORM_OBJS = $(addprefix $(OBJDIR)/src/shared/,audio.o graphics.o platform.o text.o) $(OBJDIR)/src/input/input_backend.o
+PLATFORM_OBJS = $(addprefix $(OBJDIR)/src/shared/,audio.o graphics.o platform.o text.o texture.o) $(OBJDIR)/src/input/input_backend.o
 # Every TEST_*_OBJ / TEST_*_OBJS variable above, so new ones need no extra list.
 TEST_OBJECTS := $(foreach name,$(filter %_OBJ %_OBJS,$(filter TEST_%,$(.VARIABLES))),$($(name)))
 TEST_DEPS           = $(patsubst %.o,%.d,$(filter $(TEST_OBJDIR)/%,$(TEST_OBJECTS)))
