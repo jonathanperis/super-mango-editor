@@ -14,7 +14,9 @@ On this page: [Makefile overview](#makefile-overview) ·
 The project uses a **GNU Makefile** with explicit per-directory wildcards. New `.c` files in recognized source directories are compiled automatically; a new source directory needs only a matching `SRCS` wildcard (plus `EDITOR_SRCS` if the editor links it), because one pattern rule compiles every `src/` path into `out/obj/`.
 
 ```makefile
-CC      ?= clang
+ifeq ($(origin CC),default)
+CC      = clang   # /c/msys64/ucrt64/bin/clang.exe on Windows
+endif
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic -I$(RAYLIB_BUILD)/build/raylib/include
 LIBS    = $(RAYLIB_LIB) $(PLATFORM_LIBS)
 OUTDIR  = out
