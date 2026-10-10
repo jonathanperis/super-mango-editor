@@ -1816,10 +1816,18 @@ static char launched_args[8][EDITOR_PATH_MAX];
 static int launched_argc;
 static int launch_count;
 
+/* The write end of the pipe the current stand-in game is waiting on, or -1
+ * when none is running. Closing it is what lets that child exit. */
+static int launch_gate = -1;
+
 /* Stand-in for running the game: record the arguments and start a child
- * that exits at once, so the editor follows and reaps a real process. */
+ * that waits on a pipe until the test lets it go, so the editor follows and
+ * reaps a real process. A child that exited at once could be gone before
+ * the frame that launched it had finished, and "is the playtest running"
+ * would then depend on how busy the machine was. */
 static int record_launch(const char *const *argv)
 {
+    int gate[2];
     pid_t child;
     launched_argc = 0;
     for (int i = 0; argv[i] && i < 8; i++) {
@@ -1827,9 +1835,30 @@ static int record_launch(const char *const *argv)
         launched_argc++;
     }
     launch_count++;
+    if (pipe(gate) != 0) return -1;
     child = fork();
-    if (child == 0) _exit(0);
-    return child > 0 ? (int)child : -1;
+    if (child == 0) {
+        char byte;
+        /* The child holds a copy of the write end too; read() only sees
+         * end-of-file once every copy is closed. */
+        (void)close(gate[1]);
+        if (read(gate[0], &byte, 1) < 0) _exit(4);
+        _exit(0);
+    }
+    (void)close(gate[0]);
+    if (child < 0) {
+        (void)close(gate[1]);
+        return -1;
+    }
+    launch_gate = gate[1];
+    return (int)child;
+}
+
+/* Let the stand-in game exit, if one is still waiting. */
+static void release_launched_game(void)
+{
+    if (launch_gate >= 0) (void)close(launch_gate);
+    launch_gate = -1;
 }
 
 /* Is `flag` followed by `value` in the recorded command line? */
@@ -1844,6 +1873,7 @@ static int launched_with(const char *flag, const char *value)
 /* Let the recorded child exit and the editor notice. */
 static void finish_launched_game(EditorState *es)
 {
+    release_launched_game();
     if (es->play_pid > 0) (void)wait_until_exited((pid_t)es->play_pid);
     ui_frame(es, NEUTRAL_X, NEUTRAL_Y);
 }
