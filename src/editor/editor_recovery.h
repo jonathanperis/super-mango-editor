@@ -66,13 +66,14 @@ void editor_retire_current_recovery(EditorState *es);
 
 /* When process `pid` started, as a number only comparable with another
  * answer for the same pid on this machine (Linux: clock ticks after boot;
- * Windows: a FILETIME); 0 when not known.  Together with the pid it names
+ * Windows: a FILETIME; macOS: microseconds of wall-clock time, from
+ * proc_pidinfo); 0 when not known.  Together with the pid it names
  * one process even after the system hands the pid to another program.
  * The Linux clock counts in ticks (usually 1/100 s), so a pid reused within
  * the very tick its last owner started in would look the same; pids are
  * handed out in rising order, which makes that a full wrap of the pid
- * range inside one tick. Other systems (macOS, the browser) always answer
- * 0, and the pid alone decides. */
+ * range inside one tick. macOS answers 0 for a process of another user,
+ * and the browser always answers 0; the pid alone decides then. */
 uint64_t editor_process_start_time(unsigned long pid);
 
 /* Non-zero when the file name in path is a recovery snapshot
