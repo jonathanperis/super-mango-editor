@@ -274,9 +274,11 @@ static void copy_target_permissions(int fd, const char *target_path)
 
     if (lstat(target_path, &target_stat) != 0 || !S_ISREG(target_stat.st_mode))
         return;
-    if (fchown(fd, target_stat.st_uid, target_stat.st_gid) != 0) {
-        /* Not allowed: the file simply stays the saver's. */
-    }
+    /* Not allowed? Then the file simply stays the saver's. The result is
+     * kept in a variable because glibc marks fchown "must use the result"
+     * and a plain (void) cast does not satisfy that under release flags. */
+    int owner_kept = fchown(fd, target_stat.st_uid, target_stat.st_gid) == 0;
+    (void)owner_kept;
     /* chown can clear set-id bits, so the mode is applied afterwards. */
     (void)fchmod(fd, target_stat.st_mode & 07777);
 }

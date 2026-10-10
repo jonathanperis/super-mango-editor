@@ -94,6 +94,31 @@ static int parse_float_value(const char *text, float *value)
 }
 
 /*
+ * limit_float_edit — Apply the active float field's limits to a typed value.
+ *
+ * The float twin of limit_int_edit below, without the step: a value outside
+ * the limits is moved to the nearer end, and the note says which end was hit
+ * (the other may be -FLT_MAX or FLT_MAX, which would read badly as a range).
+ */
+static float limit_float_edit(UIState *ui, float value)
+{
+    if (ui->edit_float_min > ui->edit_float_max) return value;   /* no usable limits */
+    if (value < ui->edit_float_min) {
+        snprintf(ui->edit_note, sizeof(ui->edit_note),
+                 "%.9g is below %.9g, the smallest this field takes; it was limited",
+                 value, ui->edit_float_min);
+        return ui->edit_float_min;
+    }
+    if (value > ui->edit_float_max) {
+        snprintf(ui->edit_note, sizeof(ui->edit_note),
+                 "%.9g is above %.9g, the largest this field takes; it was limited",
+                 value, ui->edit_float_max);
+        return ui->edit_float_max;
+    }
+    return value;
+}
+
+/*
  * limit_int_edit — Apply the active integer field's limits to a typed value.
  *
  * The limits belong to the edit, not to the code that draws the field, so
@@ -500,21 +525,7 @@ int ui_apply_active_edit(UIState *ui)
         float *target = (float *)ui->edit_target;
         if (!parse_float_value(ui->edit_buf, &value)) return 0;
         /* As for integers: limits apply to a value the user changed. */
-        if (memcmp(&value, target, sizeof(value)) != 0 &&
-            ui->edit_float_min <= ui->edit_float_max) {
-            /* As for integers, name the end that was hit (the other may
-             * be -FLT_MAX or FLT_MAX). */
-            if (value < ui->edit_float_min)
-                snprintf(ui->edit_note, sizeof(ui->edit_note),
-                         "%.9g is below %.9g, the smallest this field takes; it was limited",
-                         value, ui->edit_float_min);
-            else if (value > ui->edit_float_max)
-                snprintf(ui->edit_note, sizeof(ui->edit_note),
-                         "%.9g is above %.9g, the largest this field takes; it was limited",
-                         value, ui->edit_float_max);
-            if (value < ui->edit_float_min) value = ui->edit_float_min;
-            if (value > ui->edit_float_max) value = ui->edit_float_max;
-        }
+        if (memcmp(&value, target, sizeof(value)) != 0) value = limit_float_edit(ui, value);
         /* A field that must not hold 0 treats a typed 0 like text that is
          * not a number: nothing is stored and the field stays active. */
         if (ui->edit_float_nonzero && value == 0.0f &&
