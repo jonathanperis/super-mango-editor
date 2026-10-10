@@ -27,6 +27,12 @@
 #ifndef _WIN32
 #define _POSIX_C_SOURCE 200809L
 #endif
+#ifdef __APPLE__
+/* _POSIX_C_SOURCE hides everything that is not POSIX, and <libproc.h> (how
+ * macOS reports a process's start time) is built on Apple's own types. This
+ * asks the macOS headers to show those as well. */
+#define _DARWIN_C_SOURCE
+#endif
 
 #include "editor_recovery.h"
 
@@ -48,6 +54,9 @@
 #include <sys/stat.h>   /* stat: how old an orphan snapshot is */
 #include <signal.h>     /* kill(pid, 0): is the owning editor still running? */
 #include <unistd.h>     /* getpid */
+#endif
+#ifdef __APPLE__
+#include <libproc.h>    /* proc_pidinfo: when a process started */
 #endif
 
 #include "file_dialog.h"       /* dialog_choice (native button dialog) */
@@ -186,8 +195,23 @@ uint64_t editor_process_start_time(unsigned long pid)
         if (errno == ERANGE || end == field) return 0;
         return (uint64_t)start;
     }
+#elif defined(__APPLE__)
+    {
+        /* macOS has no /proc.  proc_pidinfo fills a struct describing one
+         * process and returns how many bytes it wrote; anything but the
+         * whole struct means the process is gone or belongs to someone
+         * else, and then the pid alone decides.  The start time is a
+         * wall-clock second and a microsecond within it, joined here into
+         * one count of microseconds. */
+        struct proc_bsdinfo info;
+        if ((unsigned long)(int)pid != pid) return 0;   /* not a valid pid */
+        if (proc_pidinfo((int)pid, PROC_PIDTBSDINFO, 0, &info, (int)sizeof(info)) !=
+            (int)sizeof(info)) return 0;
+        return (uint64_t)info.pbi_start_tvsec * UINT64_C(1000000) +
+               (uint64_t)info.pbi_start_tvusec;
+    }
 #else
-    /* No portable way to ask (macOS would need proc_pidinfo); the pid
+    /* No way to ask here (the browser has no other processes); the pid
      * alone decides, as it did before start times were recorded. */
     return 0;
 #endif

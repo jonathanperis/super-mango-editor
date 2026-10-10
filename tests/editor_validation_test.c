@@ -4545,11 +4545,12 @@ static int recovery_folder_stays_manageable(void)
             goto cleanup;
     }
 #endif
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
     /* Version 3 also records when the owner started.  The same pid with a
      * different start time is another program that got the number after
-     * the editor crashed: that copy is offered.  (Linux reads start times;
-     * elsewhere the pid alone decides, as checked above.) */
+     * the editor crashed: that copy is offered.  (Linux and macOS read
+     * start times in their own ways, so both run this; it is not built for
+     * Windows because it needs the parent's pid from getppid().) */
     {
         unsigned long parent = (unsigned long)getppid();
         unsigned long long start = (unsigned long long)editor_process_start_time(parent);
