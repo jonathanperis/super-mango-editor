@@ -213,9 +213,13 @@ static int resume_valid(const GameResume *r)
         !isfinite(r->respawn_x) || !isfinite(r->respawn_y) ||
         r->respawn_x < -1e6f || r->respawn_x > 1e6f || r->respawn_y < -1e6f || r->respawn_y > 1e6f ||
         !isfinite(r->elapsed) || r->elapsed < 0 || r->elapsed > 1e9f) return 0;
-    /* No coin beyond the most a level can place. */
+    /* No coin beyond the most a level can place. The mask has 64 bits and
+     * MAX_COINS is 64 today, so there is no bit to refuse; the check is
+     * compiled only if the limit is ever lowered. */
+#if MAX_COINS < 64
     for (int i = MAX_COINS; i < 64; i++)
         if (r->coins & ((uint64_t)1 << i)) return 0;
+#endif
     return 1;
 }
 

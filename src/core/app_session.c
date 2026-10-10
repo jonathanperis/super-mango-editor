@@ -527,6 +527,56 @@ static void session_apply_menu_route(AppSession *session)
     }
 }
 
+/*
+ * session_open_next_level — Follow the finished level's next_phase.
+ *
+ * Three outcomes: the campaign refuses the level (it is listed as
+ * unavailable), the level loads and becomes a fresh attempt, or the load
+ * fails. In the two failing cases the finished level stays on screen, so
+ * Replay, Level Select and Exit still work; the session's status message
+ * says which one happened.
+ */
+static void session_open_next_level(AppSession *session, GameState *game)
+{
+    char path[GAME_LEVEL_PATH_MAX];
+
+    session->route = APP_ROUTE_GAME_NEXT_LEVEL;
+    copy_path(path, sizeof(path), game->screen.completion.next_phase);
+    const char *refused = session_campaign_refusal(session, path);
+    if (refused) {
+        /* Like a failed load below, but the reason is the campaign's. */
+        game->screen.completion.next_phase_failed = NEXT_PHASE_UNAVAILABLE;
+        game->screen.terminal_action_index = 0;
+        copy_path(session->status_message, sizeof(session->status_message),
+                  "Next level is unavailable in the campaign");
+        TraceLog(LOG_WARNING, "%s: %s (%s)", session->status_message, path, refused);
+    } else if (!game_load_next_phase(game)) {
+        session_profile_key(game, path);
+        game_profile_select(&session->profile, game->screen.profile_level_key);
+        /* The new level is played from its start: a whole attempt. */
+        game->screen.resumed = 0;
+        game->screen.start_point_run = 0;
+        session_watch_resume(session, game);
+        /* A new level, a new race: restart the recording, load its ghost. */
+        game_ghost_restart(game);
+        game_ghost_track_free(game->screen.ghost ? &game->screen.ghost->best : NULL);
+        session_load_ghost(session, game);
+        session->preferences_applied = 0;
+        game_timing_restart_clock(game);
+        game_input_arm_release_latch(game, NULL);
+    } else {
+        /* The current level is untouched, so Replay, Level Select and
+         * Exit still work. Say what happened, drop the dead Next Level
+         * row and focus the first remaining action. */
+        game->screen.completion.next_phase_failed = NEXT_PHASE_LOAD_FAILED;
+        game->screen.terminal_action_index = 0;
+        copy_path(session->status_message, sizeof(session->status_message), "Next level failed to load");
+        TraceLog(LOG_WARNING, "%s: %s", session->status_message, path);
+    }
+    game->screen.route = GAME_ROUTE_NONE;
+    session->route = APP_ROUTE_NONE;
+}
+
 static void session_apply_game_route(AppSession *session)
 {
     /* Routes are requests, not nested main loops. Consume them after the
@@ -545,44 +595,9 @@ static void session_apply_game_route(AppSession *session)
     if (route == GAME_ROUTE_EXIT && !session_profile_ready_to_leave(session)) return;
     game->screen.route = GAME_ROUTE_NONE;
     switch (route) {
-    case GAME_ROUTE_NEXT_LEVEL: {
-        session->route = APP_ROUTE_GAME_NEXT_LEVEL;
-        copy_path(path, sizeof(path), game->screen.completion.next_phase);
-        const char *refused = session_campaign_refusal(session, path);
-        if (refused) {
-            /* Like a failed load below, but the reason is the campaign's. */
-            game->screen.completion.next_phase_failed = NEXT_PHASE_UNAVAILABLE;
-            game->screen.terminal_action_index = 0;
-            copy_path(session->status_message, sizeof(session->status_message),
-                      "Next level is unavailable in the campaign");
-            TraceLog(LOG_WARNING, "%s: %s (%s)", session->status_message, path, refused);
-        } else if (!game_load_next_phase(game)) {
-            session_profile_key(game, path);
-            game_profile_select(&session->profile, game->screen.profile_level_key);
-            /* The new level is played from its start: a whole attempt. */
-            game->screen.resumed = 0;
-            game->screen.start_point_run = 0;
-            session_watch_resume(session, game);
-            /* A new level, a new race: restart the recording, load its ghost. */
-            game_ghost_restart(game);
-            game_ghost_track_free(game->screen.ghost ? &game->screen.ghost->best : NULL);
-            session_load_ghost(session, game);
-            session->preferences_applied = 0;
-            game_timing_restart_clock(game);
-            game_input_arm_release_latch(game, NULL);
-        } else {
-            /* The current level is untouched, so Replay, Level Select and
-             * Exit still work. Say what happened, drop the dead Next Level
-             * row and focus the first remaining action. */
-            game->screen.completion.next_phase_failed = NEXT_PHASE_LOAD_FAILED;
-            game->screen.terminal_action_index = 0;
-            copy_path(session->status_message, sizeof(session->status_message), "Next level failed to load");
-            TraceLog(LOG_WARNING, "%s: %s", session->status_message, path);
-        }
-        game->screen.route = GAME_ROUTE_NONE;
-        session->route = APP_ROUTE_NONE;
+    case GAME_ROUTE_NEXT_LEVEL:
+        session_open_next_level(session, game);
         break;
-    }
     case GAME_ROUTE_REPLAY:
         /*
          * Native and browser builds both replace the game in place.
