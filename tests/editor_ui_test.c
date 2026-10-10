@@ -147,6 +147,7 @@ static void ui_frame(EditorState *es, int mx, int my)
     while (input_poll(&event)) editor_handle_event(es, &event);
     es->mouse_x = es->ui.mouse_x = mx;
     es->mouse_y = es->ui.mouse_y = my;
+    es->ui.mouse_down = es->mouse_down;
     if (es->playing) editor_check_play_status(es);
     /* Like editor_run_frame, revalidate (which also checks asset files on
      * disk) only when the document changed. */
@@ -1602,6 +1603,82 @@ done:
     return failed;
 }
 
+/*
+ * Text selection: Shift+arrows, Ctrl+A and a mouse drag select; Ctrl+Left /
+ * Right jump a word (Shift: selecting it); Ctrl+C / X / V and typing act on
+ * the selection; all in whole UTF-8 characters.
+ */
+static int text_fields_select_copy_cut_and_paste(void)
+{
+    int failed = 0;
+    EditorState es;
+    const int field_left = CANVAS_W + 55, field_right = CANVAS_W + 55 + 310;
+    CHECK(open_editor(&es, NULL) == 0);
+    cfg_scroll(-100000);
+    editor_test_set_clipboard("");
+
+    click_frame(&es, CANVAS_W + 60, CFG_NAME_Y);
+    CHECK(es.ui.active_id == 9000 && strcmp(es.ui.edit_buf, "Untitled") == 0);
+    /* Nothing selected: Ctrl+C copies nothing and says how to select. */
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    CHECK(editor_test_clipboard()[0] == '\0' && strstr(es.status_message, "Nothing selected"));
+    /* Ctrl+A, Ctrl+C: the whole field. */
+    key_frame(&es, KEY_A, INPUT_CTRL);
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    CHECK(strcmp(editor_test_clipboard(), "Untitled") == 0);
+    /* Shift+Left twice selects "ed"; Ctrl+X cuts it. */
+    key_frame(&es, KEY_END, 0);
+    key_frame(&es, KEY_LEFT, INPUT_SHIFT);
+    key_frame(&es, KEY_LEFT, INPUT_SHIFT);
+    key_frame(&es, KEY_X, INPUT_CTRL);
+    CHECK(strcmp(editor_test_clipboard(), "ed") == 0 && strcmp(es.ui.edit_buf, "Untitl") == 0);
+    /* Ctrl+Left jumps to the start of the word; Ctrl+V pastes there. */
+    key_frame(&es, KEY_LEFT, INPUT_CTRL);
+    CHECK(es.ui.edit_cursor == 0);
+    key_frame(&es, KEY_V, INPUT_CTRL);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(strcmp(es.ui.edit_buf, "edUntitl") == 0);
+    /* Typing replaces a selection; word jumps step over whole UTF-8
+     * characters, so Ctrl+Shift+Right selects "w\xc3\xb6rld" whole. */
+    key_frame(&es, KEY_A, INPUT_CTRL);
+    text_frame(&es, "H\xc3\xa9 llo w\xc3\xb6rld");
+    CHECK(strcmp(es.ui.edit_buf, "H\xc3\xa9 llo w\xc3\xb6rld") == 0);
+    key_frame(&es, KEY_LEFT, INPUT_CTRL);
+    CHECK(es.ui.edit_cursor == (int)strlen("H\xc3\xa9 llo "));
+    key_frame(&es, KEY_RIGHT, INPUT_CTRL | INPUT_SHIFT);
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    CHECK(strcmp(editor_test_clipboard(), "w\xc3\xb6rld") == 0);
+    /* Shift+Left from inside a two-byte character's neighbour takes it
+     * whole: select "\xc3\xa9" and delete it. */
+    key_frame(&es, KEY_HOME, 0);
+    key_frame(&es, KEY_RIGHT, 0);
+    key_frame(&es, KEY_RIGHT, INPUT_SHIFT);
+    key_frame(&es, KEY_DELETE, 0);
+    CHECK(strcmp(es.ui.edit_buf, "H llo w\xc3\xb6rld") == 0);
+    /* Left without Shift ends a selection at its start. */
+    key_frame(&es, KEY_END, INPUT_SHIFT);
+    key_frame(&es, KEY_LEFT, 0);
+    CHECK(es.ui.edit_cursor == 1 && es.ui.edit_anchor < 0);
+
+    /* A press past the end of the text and a drag to the field's left
+     * edge select everything; Backspace deletes the selection. */
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, field_right - 10, CFG_NAME_Y);
+    ui_frame(&es, field_right - 10, CFG_NAME_Y);
+    CHECK(es.ui.active_id == 9000 && es.ui.edit_cursor == (int)strlen(es.ui.edit_buf));
+    ui_frame(&es, field_left + 1, CFG_NAME_Y);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, field_left + 1, CFG_NAME_Y);
+    ui_frame(&es, field_left + 1, CFG_NAME_Y);
+    CHECK(es.ui.edit_cursor == 0 && es.ui.edit_anchor == (int)strlen(es.ui.edit_buf));
+    key_frame(&es, KEY_BACKSPACE, 0);
+    CHECK(es.ui.edit_buf[0] == '\0');
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(strcmp(es.level.name, "Untitled") == 0);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
 /* ------------------------------------------------------------------ */
 /* Playtest process and native pickers (POSIX)                         */
 /* ------------------------------------------------------------------ */
@@ -1921,6 +1998,7 @@ int main(void)
         CASE(files_that_will_not_open_list_why),
         CASE(box_and_shift_select_act_on_the_group),
         CASE(validation_rows_scroll_and_copy),
+        CASE(text_fields_select_copy_cut_and_paste),
         CASE(campaign_view_reorders_renames_and_saves),
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),

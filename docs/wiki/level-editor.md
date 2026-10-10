@@ -112,7 +112,7 @@ selects the next entity down and wraps back to the top. The status bar says
 which one is selected (`Selected Coin (2 of 2 here)`). (Some Linux window
 managers take `Alt+click` for themselves; the second click works everywhere.) Esc cancels a field edit, returns to Select, or
 clears the selection. Printable shortcuts do not switch tools while a text field
-is active; Ctrl+C/Ctrl+V inside a text field copy and paste text. File/history
+is active; Ctrl+C / Ctrl+X / Ctrl+V inside a text field copy, cut and paste the selected text. File/history
 shortcuts accept Command on macOS as well as Ctrl.
 
 If a hand-edited file or a property field leaves the level invalid, the canvas
@@ -205,7 +205,14 @@ to the 16 px floor-piece grid.
 Inside an active field, `Left` / `Right` move the caret one character,
 `Home` / `End` jump to either end, typing inserts at the caret, and `Backspace`
 / `Delete` remove the character before / after it (whole UTF-8 characters, so
-`é` never splits in half). `Tab` applies the field and moves to the next field
+`é` never splits in half). `Ctrl+Left` / `Ctrl+Right` jump to the start of the
+previous word or the end of the next one. Holding `Shift` with any of these
+caret keys selects the text the caret passes over; `Ctrl+A` selects the whole
+field, and in a field already being edited a click moves the caret and a drag
+selects (the click that starts editing a field leaves the caret at the end,
+ready to append). Typing, `Backspace`, `Delete` or a paste replace the
+selection; `Ctrl+C` and `Ctrl+X` copy or cut it, and with nothing selected
+they copy nothing and the status bar says how to select. `Tab` applies the field and moves to the next field
 of the side panel, `Shift+Tab` to the previous one (wrapping at either end); a
 value that cannot be stored keeps the focus where it is. Dropdowns (a rail's
 layout, an axe's mode, the music track...) have their place in that order too:
