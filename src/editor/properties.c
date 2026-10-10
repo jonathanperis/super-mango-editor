@@ -1986,6 +1986,9 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     draw_section_title(es, x, start_y, " Level Config", &es->config_open);
 
     if (!es->config_open) {
+        /* Nothing is drawn, so the wheel must not reach a hidden message
+         * list: the palette now fills the place where it was. */
+        msg_list_top = msg_list_bottom = 0;
         editor_end_change_tracking(es);
         return;
     }
