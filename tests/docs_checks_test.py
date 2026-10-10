@@ -89,6 +89,11 @@ class DocsChecksTest(unittest.TestCase):
         self.assertTrue(drift.file_defines_function(source, "MACRO"))
         # A call inside a body is not a definition.
         self.assertFalse(drift.file_defines_function(source, "other"))
+        # Nor is a call on the same file-scope line as another definition.
+        one_line = "int wrapper(void) { return target(); }\nint target(void);\n"
+        self.assertTrue(drift.file_defines_function(one_line, "wrapper"))
+        self.assertTrue(drift.file_defines_function(one_line, "target"))
+        self.assertFalse(drift.file_defines_function(one_line.splitlines()[0], "target"))
 
     def test_code_fences_close_like_commonmark(self):
         # A shorter or different fence line inside a fence is content, so the
