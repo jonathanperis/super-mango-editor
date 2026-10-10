@@ -9,6 +9,10 @@
  * and relink every next_phase to match the order.  Save writes the changed
  * level files and then the manifest, each atomically.
  *
+ * The view has an undo history of its own (Ctrl+Z / Ctrl+Y while it is
+ * open), apart from the level's: each of those edits is one step.  Revert
+ * goes back to the files on disk in one go.
+ *
  * While the view is open it covers the canvas; the level being edited is
  * untouched (unless Save rewrites that very file, which is then reloaded).
  */
@@ -32,6 +36,14 @@
 #define CAMPAIGN_NAME_FIELD_ID 7000                /* + row index          */
 
 /*
+ * CAMPAIGN_HISTORY_MAX — how many edits the view can undo.  A step is under
+ * a kilobyte (it names the level file instead of copying the level), so
+ * the whole history is a fixed part of the view; once it is full, the
+ * oldest step is dropped for each new one.
+ */
+#define CAMPAIGN_HISTORY_MAX 64
+
+/*
  * editor_campaign_open — Load manifest_path (NULL: CAMPAIGN_MANIFEST_PATH)
  * and every level it lists, and show the view.  A manifest that cannot be
  * read is refused (status bar says why).  Returns 0 or -1.
@@ -48,11 +60,44 @@ int editor_campaign_close(EditorState *es, int force);
 /*
  * editor_campaign_revert — Throw away the view's unsaved changes (a name
  * being typed included) by reading the manifest and its levels again.
- * Like Close, the first call with unsaved changes only warns.  Returns 1
- * when reverted, 0 when it only warned or there was nothing to revert,
- * -1 when the manifest can no longer be read (the view is then closed).
+ * Like Close, the first call with unsaved changes only warns.  The undo
+ * history is cleared with them.  Returns 1 when reverted, 0 when it only
+ * warned or there was nothing to revert, -1 when the manifest can no
+ * longer be read (the view is then closed).
  */
 int editor_campaign_revert(EditorState *es);
+
+/*
+ * editor_campaign_undo / editor_campaign_redo — Take back the newest edit
+ * made in the view (a move, remove, add, rename or relink), or make the
+ * edit undone last again.  A name being typed is applied first, as its own
+ * step.  A new edit clears what could be redone; Save keeps the history
+ * (undoing past a Save shows the campaign as unsaved again); Revert and
+ * closing the view clear it.
+ *
+ * A row that left the list comes back by reading its level file again.
+ * When that file no longer loads, the step is refused: the list is left
+ * unchanged and the status bar says so.
+ *
+ * Return 1 when a step was replayed, 0 when there was none, -1 when the
+ * step was refused (status bar says why).
+ */
+int editor_campaign_undo(EditorState *es);
+int editor_campaign_redo(EditorState *es);
+
+/* How many steps Undo and Redo can replay right now.  For tests. */
+int editor_campaign_undo_steps(const EditorState *es);
+int editor_campaign_redo_steps(const EditorState *es);
+
+/*
+ * editor_campaign_finish_name — Apply the name being typed in the view, as
+ * one step of its history.  editor_finish_field_edit calls this first, so
+ * that however a name is applied (Enter, a click elsewhere, Ctrl+S...) it
+ * is recorded here and never in the level's undo stack.  Returns 1 when a
+ * name field was active and is now settled, 0 when the active field is not
+ * one of the view's.
+ */
+int editor_campaign_finish_name(EditorState *es);
 
 /* Free the view's memory (editor shutdown). */
 void editor_campaign_free(EditorState *es);
@@ -81,7 +126,8 @@ int editor_campaign_add(EditorState *es, const char *path);
 
 /* Point every listed level's next_phase at the entry after it (the last
  * at none), so the chain matches the order shown.  Returns how many
- * levels changed. */
+ * levels changed: 0 too when there is no memory to remember the old links
+ * for Undo, in which case none is changed. */
 int editor_campaign_link_in_order(EditorState *es);
 
 /*
@@ -104,3 +150,9 @@ void editor_campaign_wheel(EditorState *es, float wheel);
  * none); NULL while the view is closed.  Read-only, for tests. */
 const CampaignCatalog *editor_campaign_entries(const EditorState *es);
 const char *editor_campaign_problem(const EditorState *es);
+
+#ifdef MANGO_TESTING
+/* Test seam (test builds only): while `fail` is 1, the history's one
+ * allocation (the old links a relink keeps for Undo) fails. */
+void editor_campaign_test_fail_history_allocation(int fail);
+#endif
