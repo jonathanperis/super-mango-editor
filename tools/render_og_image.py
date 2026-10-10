@@ -7,6 +7,10 @@ from the repository root after changing the template, and commit the image
 it writes. Needs Chrome (set CHROME to its path if it is not found) and the
 website's font packages: the template loads Pixelify Sans from
 docs/node_modules, so run `bun install` in docs/ first. No network is used.
+
+The machine also needs at least one installed font. With none at all (a bare
+container), Chrome has nothing to lay the text out with while the web font
+loads, the font faces fail, and the picture comes out with no text.
 """
 from __future__ import annotations
 
@@ -43,6 +47,11 @@ def main() -> None:
     # picture would look right enough to be committed by mistake.
     if not FONT_CSS.is_file():
         sys.exit(f"{FONT_CSS.relative_to(ROOT)} not found; run `bun install` in docs/ first")
+    # fc-list is fontconfig's "which fonts are installed" (Linux; macOS and
+    # Windows always have system fonts and usually no fc-list).
+    fc_list = shutil.which("fc-list")
+    if fc_list and not subprocess.run([fc_list], capture_output=True, text=True).stdout.strip():
+        sys.exit("no system fonts are installed; Chrome would render the picture without its text")
     subprocess.run(
         [
             find_chrome(),
