@@ -848,6 +848,136 @@ static int symlinked_save_updates_target(void)
 #endif
 }
 
+/* 1 when the level file at path loads and carries this name. */
+static int saved_level_is_named(const char *path, const char *name)
+{
+    LevelDef loaded;
+    return level_load_toml(path, &loaded) == 0 && strcmp(loaded.name, name) == 0;
+}
+
+/*
+ * A Windows save replaces the level with ReplaceFileW, which can stop
+ * halfway: the old file already moved away, the new one not yet in place.
+ * The save must then move the new file in by itself, trying a few times, and
+ * if no try works it must keep the temporary file, the only copy left.
+ *
+ * No test can make the real ReplaceFileW stop halfway, so a seam reports
+ * that failure in its place and removes the old file, as the real failure
+ * would.  Everything after that is production code: on Windows the real
+ * MoveFileExW fallback and its retry loop run here.  POSIX has no such
+ * failure (rename() is one step), so there the seam leads into the same
+ * loop around rename(), which keeps these cases running on every platform.
+ *
+ * Each case also refuses some of the fallback's tries:
+ *   0                      the first real move finishes the save;
+ *   all but one            the last try finishes it (the retry loop);
+ *   every one              nothing works and the temporary file is kept.
+ */
+static int half_done_replace_is_finished_or_kept(void)
+{
+    const char *target = TEST_OUT "test_half_replace.toml";
+    const struct {
+        int refused_moves;
+        int kept;               /* 1: the save ends with the temp file kept */
+        const char *name;       /* the level name this save writes */
+    } cases[] = {
+        {0, 0, "Moved at once"},
+        {SERIALIZER_REPLACE_MOVE_TRIES - 1, 0, "Moved on the last try"},
+        {SERIALIZER_REPLACE_MOVE_TRIES, 1, "Kept in the temporary file"},
+    };
+    char temp[SERIALIZER_IO_PATH_MAX];
+    LevelDef def;
+    int failed = 0;
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    /* A save's temporary file is the first free name of this form; nothing
+     * else is using it, so this is the file each save below writes. */
+    if (serializer_make_temp_path(target, temp, sizeof(temp)) != 0)
+        return fail("half replace: temporary path too long");
+    (void)serializer_remove_utf8(temp);
+
+    for (size_t i = 0; !failed && i < sizeof(cases) / sizeof(cases[0]); i++) {
+        int result;
+        int tries;
+
+        /* The seam only acts on a replace, so the old file comes first. */
+        snprintf(def.name, sizeof(def.name), "Original");
+        if (level_save_toml(&def, target) != 0)
+            return fail("half replace: could not save the original");
+
+        snprintf(def.name, sizeof(def.name), "%s", cases[i].name);
+        serializer_test_set_half_replace(cases[i].refused_moves);
+        result = level_save_toml(&def, target);
+        tries = serializer_test_fallback_tries();
+        serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+
+        if (!cases[i].kept) {
+            /* At least one try is the real move.  It is "at least" and not
+             * "exactly" because a real Windows move may itself need a second
+             * go while a scanner still holds the file just written. */
+            if (expect_int_value("half replace: save result", result, 0) ||
+                expect_int_value("half replace: fallback ran",
+                                 tries > cases[i].refused_moves, 1) ||
+                expect_int_value("half replace: target holds the new level",
+                                 saved_level_is_named(target, cases[i].name), 1) ||
+                expect_int_value("half replace: no temporary file left",
+                                 serializer_file_exists_utf8(temp), 0) ||
+                expect_str_value("half replace: no kept path",
+                                 level_save_kept_temp_path(), ""))
+                failed = 1;
+        } else {
+            /* Every try was refused, so the count is exact.  The old file is
+             * gone (the half-done replace took it) and the new level lives
+             * on in the temporary file, whose path the save reports. */
+            if (expect_int_value("half replace: kept result", result,
+                                 SERIALIZER_REPLACE_TEMP_KEPT) ||
+                expect_int_value("half replace: every try used", tries,
+                                 SERIALIZER_REPLACE_MOVE_TRIES) ||
+                expect_str_value("half replace: kept path reported",
+                                 level_save_kept_temp_path(), temp) ||
+                expect_int_value("half replace: temporary file holds the level",
+                                 saved_level_is_named(temp, cases[i].name), 1) ||
+                expect_int_value("half replace: target is gone",
+                                 serializer_file_exists_utf8(target), 0))
+                failed = 1;
+        }
+    }
+
+    /* The next save starts clean: it works and forgets the kept path. */
+    if (!failed && (level_save_toml(&def, target) != 0 ||
+                    level_save_kept_temp_path()[0] != '\0'))
+        failed = fail("half replace: a later save did not start clean");
+
+    /* The player profile, ghost runs and the editor's Campaign view write a
+     * temporary file themselves and install it with serializer_install_temp,
+     * which deletes that file after an ordinary failure.  After this failure
+     * it must not: the file is the only copy left. */
+    if (!failed) {
+        char written[SERIALIZER_IO_PATH_MAX];
+        int result;
+
+        snprintf(def.name, sizeof(def.name), "Installed copy kept");
+        if (level_write_temp(&def, target, written, sizeof(written)) != 0)
+            return fail("half replace: could not write a temporary file");
+        serializer_test_set_half_replace(SERIALIZER_REPLACE_MOVE_TRIES);
+        result = serializer_install_temp(written, target, 0);
+        serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+        if (expect_int_value("half replace: install result", result,
+                             SERIALIZER_REPLACE_TEMP_KEPT) ||
+            expect_int_value("half replace: install kept its temporary file",
+                             saved_level_is_named(written, def.name), 1) ||
+            expect_int_value("half replace: install target is gone",
+                             serializer_file_exists_utf8(target), 0))
+            failed = 1;
+        (void)serializer_remove_utf8(written);
+    }
+
+    (void)serializer_remove_utf8(temp);
+    (void)serializer_remove_utf8(target);
+    return failed;
+}
+
 static int rich_level_roundtrip(void)
 {
     const char *path = TEST_OUT "test_rich_level_roundtrip.toml";
@@ -1339,6 +1469,7 @@ int main(void)
     if (escaped_strings_roundtrip() != 0) return 1;
     if (control_chars_roundtrip() != 0) return 1;
     if (symlinked_save_updates_target() != 0) return 1;
+    if (half_done_replace_is_finished_or_kept() != 0) return 1;
     if (rich_level_roundtrip() != 0) return 1;
     if (independent_star_color_counts_roundtrip() != 0) return 1;
     if (missing_physics_uses_engine_defaults() != 0) return 1;

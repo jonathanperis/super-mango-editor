@@ -28,6 +28,13 @@
 
 static int serializer_test_failure = SERIALIZER_TEST_FAILURE_NONE;
 static int serializer_test_failure_skip = 0;  /* replaces to let through first */
+static int serializer_test_refused_moves = 0; /* fallback tries still to refuse */
+#ifdef MANGO_TESTING
+/* Only the tests read this count, so only test builds keep it: a variable
+ * that is written and never read is a warning (an error under -Werror) in
+ * newer compilers. */
+static int serializer_test_fallback_try_count = 0; /* fallback tries made */
+#endif
 
 #ifdef _WIN32
 wchar_t *serializer_utf8_to_wide(const char *path)
@@ -230,12 +237,25 @@ void serializer_test_set_failure(int failure)
 {
     serializer_test_failure = failure;
     serializer_test_failure_skip = 0;
+    serializer_test_refused_moves = 0;
+    serializer_test_fallback_try_count = 0;
 }
 
 void serializer_test_set_failure_after(int failure, int skip)
 {
-    serializer_test_failure = failure;
+    serializer_test_set_failure(failure);
     serializer_test_failure_skip = skip > 0 ? skip : 0;
+}
+
+void serializer_test_set_half_replace(int refused_moves)
+{
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_REPLACE_HALF_DONE);
+    serializer_test_refused_moves = refused_moves > 0 ? refused_moves : 0;
+}
+
+int serializer_test_fallback_tries(void)
+{
+    return serializer_test_fallback_try_count;
 }
 #endif
 
@@ -547,6 +567,98 @@ int serializer_resolve_save_target(const char *path, char *buf, size_t buf_size)
     return 0;
 }
 
+/*
+ * take_half_done_replace — Test seam for the half-finished Windows replace
+ * (SERIALIZER_TEST_FAILURE_REPLACE_HALF_DONE).  Returns 1 when the caller
+ * must act as if its first step had moved the original away and then failed.
+ * The original is really deleted here, because that is the state the real
+ * failure leaves behind: only the temporary file still holds the level.
+ * Always 0 in normal runs, where nothing can arm the seam.
+ */
+static int take_half_done_replace(const char *target_path)
+{
+    if (serializer_test_failure != SERIALIZER_TEST_FAILURE_REPLACE_HALF_DONE) return 0;
+    serializer_test_failure = SERIALIZER_TEST_FAILURE_NONE;
+    (void)serializer_remove_utf8(target_path);
+    return 1;
+}
+
+/* Test seam: counts one try of the fallback move and returns 1 when a test
+ * asked for this try to fail.  Always 0 in normal runs. */
+static int take_refused_move(void)
+{
+#ifdef MANGO_TESTING
+    serializer_test_fallback_try_count++;
+#endif
+    if (serializer_test_refused_moves <= 0) return 0;
+    serializer_test_refused_moves--;
+    return 1;
+}
+
+#ifdef _WIN32
+typedef wchar_t SerializerNativeChar;  /* Windows file calls take UTF-16 */
+#else
+typedef char SerializerNativeChar;
+#endif
+
+/* One try at moving the temporary file onto the target name, replacing
+ * whatever is there.  Returns 0 when the move happened. */
+static int move_into_place(const SerializerNativeChar *temp,
+                           const SerializerNativeChar *target)
+{
+#ifdef _WIN32
+    return MoveFileExW(temp, target,
+                       MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)
+           ? 0 : -1;
+#else
+    return rename(temp, target);
+#endif
+}
+
+/* Give whatever still holds the file a moment to let go of it. */
+static void wait_before_next_move(void)
+{
+#ifdef _WIN32
+    Sleep(100);
+#endif
+    /* POSIX: nothing is waited for, because only a test gets this far there
+     * (see finish_half_done_replace). */
+}
+
+/*
+ * finish_half_done_replace — Move the finished temporary file onto the
+ * target name after a replace that stopped halfway.
+ *
+ * Windows' ReplaceFileW works in steps: it renames the original out of the
+ * way, then moves the new file in.  When the second step fails (an antivirus
+ * scanner holding the file open is a common cause) the original may already
+ * be gone, and the temporary file is then the only copy of the level, so it
+ * must never be deleted.  A plain move finishes the job.  A scanner usually
+ * lets go within a fraction of a second, so the move is tried a few times,
+ * 100 ms apart.  Returns 0 once a move works, or
+ * SERIALIZER_REPLACE_TEMP_KEPT when every try failed: the caller keeps the
+ * temporary file.
+ *
+ * rename() on POSIX is a single step and cannot stop halfway, so there only
+ * the test seam calls this.  That lets the tests check the counting of tries
+ * on every platform, while Windows runs the real MoveFileExW.
+ */
+static int finish_half_done_replace(const SerializerNativeChar *temp,
+                                    const SerializerNativeChar *target)
+{
+    int real_moves = 0;
+
+    for (int attempt = 0; attempt < SERIALIZER_REPLACE_MOVE_TRIES; attempt++) {
+        if (take_refused_move()) continue;   /* a test refused this try */
+        /* Wait only after a real move failed: that is when something else
+         * may still hold the file.  A try refused by a test never waits, so
+         * no test depends on the clock. */
+        if (real_moves++ > 0) wait_before_next_move();
+        if (move_into_place(temp, target) == 0) return 0;
+    }
+    return SERIALIZER_REPLACE_TEMP_KEPT;
+}
+
 int serializer_replace_file(const char *temp_path, const char *target_path)
 {
     if (!temp_path || !target_path) return -1;
@@ -571,36 +683,23 @@ int serializer_replace_file(const char *temp_path, const char *target_path)
             DWORD attributes = GetFileAttributesW(wide_target);
 
             if (attributes != INVALID_FILE_ATTRIBUTES) {
-                if (ReplaceFileW(wide_target, wide_temp, NULL,
-                                 0, NULL, NULL)) {
+                /* A test can stand in for a ReplaceFileW that stopped
+                 * halfway; ReplaceFileW itself is then not called. */
+                int half_done = take_half_done_replace(target_path);
+
+                if (!half_done && ReplaceFileW(wide_target, wide_temp, NULL,
+                                               0, NULL, NULL)) {
                     result = 0;
                 } else {
-                    /*
-                     * ReplaceFileW works in steps: it renames the original
-                     * out of the way, then moves the new file in.  These two
-                     * errors mean the first step happened but the second did
-                     * not (an antivirus scanner holding the file open is a
-                     * common cause).  The original may already be gone, and
-                     * the temporary file is then the only copy of the level,
-                     * so it must never be deleted.  Finish the job with a
-                     * plain move.  A scanner usually lets go within a
-                     * fraction of a second, so try a few times, 100 ms
-                     * apart; if every try fails, tell the caller to keep
-                     * the temporary file.
-                     */
-                    DWORD error = GetLastError();
+                    /* These two errors mean ReplaceFileW moved the original
+                     * away but did not move the new file in.  Any other
+                     * error left the target as it was, and the save simply
+                     * failed (-1). */
+                    DWORD error = half_done ? ERROR_UNABLE_TO_MOVE_REPLACEMENT_2
+                                            : GetLastError();
                     if (error == ERROR_UNABLE_TO_MOVE_REPLACEMENT ||
                         error == ERROR_UNABLE_TO_MOVE_REPLACEMENT_2) {
-                        result = SERIALIZER_REPLACE_TEMP_KEPT;
-                        for (int attempt = 0; attempt < 5; attempt++) {
-                            if (attempt > 0) Sleep(100);
-                            if (MoveFileExW(wide_temp, wide_target,
-                                            MOVEFILE_REPLACE_EXISTING |
-                                            MOVEFILE_WRITE_THROUGH)) {
-                                result = 0;
-                                break;
-                            }
-                        }
+                        result = finish_half_done_replace(wide_temp, wide_target);
                     }
                 }
             } else if (GetLastError() == ERROR_FILE_NOT_FOUND) {
@@ -615,6 +714,14 @@ int serializer_replace_file(const char *temp_path, const char *target_path)
         return result;
     }
 #else
+    if (take_half_done_replace(target_path)) {
+        /* Only a test gets here: rename() never stops halfway.  The seam has
+         * removed the original, as the Windows failure would have; finish
+         * the way Windows does, so the same tests run on every platform. */
+        int result = finish_half_done_replace(temp_path, target_path);
+        if (result == 0) serializer_sync_parent_dir_or_warn(target_path);
+        return result;
+    }
     /* POSIX rename is atomic within one filesystem, but this is not a
      * compare-and-replace operation; callers recheck fingerprints first.
      * rename() replaces a symlink itself, never the file it points to, so a

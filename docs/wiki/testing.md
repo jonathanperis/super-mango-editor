@@ -100,6 +100,20 @@ checkout. Test objects are also built with `-DMANGO_TESTING`, which turns on the
 fake controller input); the game and editor binaries are built without it, so
 they do not contain those functions.
 
+`level-serializer-test` also covers the Windows save that stops halfway (the
+old file already moved away, the new one not yet in place). No test can make
+the real `ReplaceFileW` stop between its two steps, so a seam
+(`serializer_test_set_half_replace`) reports that failure in its place and
+removes the old file, as the real failure would. Everything after that is
+production code: on the Windows CI legs the real `MoveFileExW` fallback and its
+retry loop run, and on macOS/Linux, where `rename()` cannot stop halfway, the
+seam leads into the same loop around `rename()`. The cases check that the first
+move finishes the save, that the last of the five tries can still finish it,
+and that when no try works the save reports "temporary file kept", names that
+file and leaves the new level in it (also through `serializer_install_temp`,
+which the profile and the Campaign view use). A try the test refuses never
+waits, so none of this depends on the clock.
+
 The session harness compiles the production display boundary's Web path against
 test-owned platform calls. It verifies that visible and hidden Web windows leave
 raylib's blocking FPS limiter disabled. This guards the non-Asyncify browser loop

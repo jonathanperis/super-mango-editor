@@ -97,8 +97,14 @@ int serializer_resolve_save_target(const char *path, char *buf, size_t buf_size)
  * caller may delete the temporary file).  It returns
  * SERIALIZER_REPLACE_TEMP_KEPT when the target may already be gone and the
  * temporary file is the only complete copy: the caller must NOT delete it,
- * and should tell the user where it is. */
+ * and should tell the user where it is.
+ *
+ * That last result is a Windows one.  Its replace call works in two steps
+ * and can stop between them; the function then moves the new file in itself,
+ * trying up to SERIALIZER_REPLACE_MOVE_TRIES times, and keeps the temporary
+ * file only when every try fails. */
 #define SERIALIZER_REPLACE_TEMP_KEPT (-3)
+#define SERIALIZER_REPLACE_MOVE_TRIES 5
 int serializer_replace_file(const char *temp_path, const char *target_path);
 
 /* Install a completed sibling only when target is still absent (also synced).
@@ -138,11 +144,29 @@ int serializer_install_temp(const char *temp_path, const char *target_path,
 /* serializer_replace_file fails and leaves the target as it was (-1), as a
  * rename refused by the OS would. */
 #define SERIALIZER_TEST_FAILURE_REPLACE 8
+/* The first step of serializer_replace_file fails the way Windows'
+ * ReplaceFileW does with ERROR_UNABLE_TO_MOVE_REPLACEMENT_2: the original is
+ * taken away (the seam deletes it) and the new file is not moved in.  Unlike
+ * REPLACE_STRANDED, which returns at once, the function then carries on into
+ * its REAL fallback: MoveFileExW and its retry loop on Windows.  POSIX has
+ * no such failure of its own (rename() is one step), so there only this seam
+ * reaches the fallback, which uses rename().  Arm it with
+ * serializer_test_set_half_replace. */
+#define SERIALIZER_TEST_FAILURE_REPLACE_HALF_DONE 9
 #ifdef MANGO_TESTING
 void serializer_test_set_failure(int failure);  /* test builds only */
 /* Like serializer_test_set_failure, but REPLACE_STRANDED and REPLACE only
  * fire on the (skip + 1)th replace: "the third file of a save fails". */
 void serializer_test_set_failure_after(int failure, int skip);
+/* Arm REPLACE_HALF_DONE for the next replace of an existing file, and make
+ * the first refused_moves tries of the fallback fail too without touching
+ * the disk: 0 lets the first real move run, and
+ * SERIALIZER_REPLACE_MOVE_TRIES or more means no try succeeds, so the
+ * temporary file is kept. */
+void serializer_test_set_half_replace(int refused_moves);
+/* How many tries the fallback has made since a seam was last set, refused
+ * ones included.  0 means the fallback never ran. */
+int serializer_test_fallback_tries(void);
 #endif
 
 /* 1 when the injected test failure is `failure` (it is then used up);
