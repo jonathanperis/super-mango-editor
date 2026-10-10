@@ -18,6 +18,7 @@
  */
 #include "app_session.h"
 #include "../shared/platform.h"  /* str_copy */
+#include "../shared/geometry.h"  /* float_same_value */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -261,7 +262,8 @@ static void session_track_resume(AppSession *session, const GameState *game, int
         return;
     }
     int paused = game->screen.paused || game->screen.pause_reasons;
-    int moved = game->world.respawn_x != session->resume_respawn_x || game->world.respawn_y != session->resume_respawn_y;
+    int moved = !float_same_value(game->world.respawn_x, session->resume_respawn_x) ||
+                !float_same_value(game->world.respawn_y, session->resume_respawn_y);
     int pause_began = paused && !session->resume_was_paused;
     session->resume_was_paused = paused;
     if (!leaving && !moved && !pause_began) return;
