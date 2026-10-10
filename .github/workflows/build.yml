@@ -150,7 +150,13 @@ jobs:
       - name: Start rendered-test display and audio (Linux)
         if: matrix.target == 'native' && runner.os == 'Linux'
         run: |
-          Xvfb :99 -screen 0 1280x1024x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          # -noreset: an X server normally resets itself when its last
+          # client disconnects. The tests are the only client and close and
+          # reopen their window many times, so every close started a reset,
+          # and a window opened while one was under way had its connection
+          # dropped: "X11: Failed to open display :99", twice in about 40
+          # runs. With this option the server never resets.
+          Xvfb :99 -screen 0 1280x1024x24 -noreset > "$RUNNER_TEMP/xvfb.log" 2>&1 &
           # Xvfb starts in the background; with raylib restored from the
           # cache the tests can reach the display before it listens, so wait
           # for its socket (up to 30 s) instead of racing it.
@@ -443,7 +449,13 @@ jobs:
 
       - name: Start rendered-test display and audio
         run: |
-          Xvfb :99 -screen 0 1280x1024x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          # -noreset: an X server normally resets itself when its last
+          # client disconnects. The tests are the only client and close and
+          # reopen their window many times, so every close started a reset,
+          # and a window opened while one was under way had its connection
+          # dropped: "X11: Failed to open display :99", twice in about 40
+          # runs. With this option the server never resets.
+          Xvfb :99 -screen 0 1280x1024x24 -noreset > "$RUNNER_TEMP/xvfb.log" 2>&1 &
           # Xvfb starts in the background; with raylib restored from the
           # cache the tests can reach the display before it listens, so wait
           # for its socket (up to 30 s) instead of racing it.
