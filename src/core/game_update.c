@@ -16,6 +16,7 @@
 #include "../collision/game_collision.h"
 #include "../effects/game_effects.h"
 #include "../levels/level_session.h"  /* game_level_start_point_respawn_y */
+#include "../shared/geometry.h"      /* float_same_value */
 
 int game_update_active(GameState *gs, float dt, int cam_x)
 {
@@ -43,7 +44,7 @@ int game_update_active(GameState *gs, float dt, int cam_x)
      * ground there (level_session.c says why). */
     float respawn_x = gs->world.respawn_x;
     game_checkpoint_update(gs);
-    if (gs->world.respawn_x != respawn_x) game_level_start_point_respawn_y(gs);
+    if (!float_same_value(gs->world.respawn_x, respawn_x)) game_level_start_point_respawn_y(gs);
     game_effects_update(gs, dt);
     game_bouncepads_update_animations(gs, dt);
 

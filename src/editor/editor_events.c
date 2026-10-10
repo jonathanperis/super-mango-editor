@@ -10,6 +10,7 @@
 #include "editor_playtest.h"
 #include "editor_session.h"
 #include "editor_undo_apply.h"
+#include "../shared/geometry.h"  /* float_same_value */
 #include "tools.h"
 #include "entity_meta.h"   /* editor_select_none */
 
@@ -369,7 +370,7 @@ static void editor_canvas_wheel(EditorState *es, const InputEvent *event)
          * not suddenly jump back to 1x. */
         if (index < 0) index = 0;
         if (index > last) index = last;
-        if ((float)zooms[index] != es->camera.zoom)
+        if (!float_same_value((float)zooms[index], es->camera.zoom))
             canvas_set_zoom(es, (float)zooms[index], event->x, event->y);
     } else if (event->mods & INPUT_SHIFT) {
         float amount = event->wheel != 0.0f ? event->wheel : event->wheel_x;
