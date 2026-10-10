@@ -25,7 +25,7 @@
       "depNameTemplate": "emscripten-core/emsdk"
     },
     {
-      "description": "raylib source pin: the tag and its commit (also in the archive URL). The sha256 and patches.json need a manual update, so CI fails until a maintainer finishes the bump.",
+      "description": "raylib source pin: the tag, its commit and the archive URL built from that commit are rewritten together (tools/build_raylib.py refuses a manifest where they disagree). The sha256 and patches.json need a manual update, so CI fails until a maintainer finishes the bump.",
       "customType": "regex",
       "managerFilePatterns": ["/^vendor/raylib/manifest\\.json$/"],
       "matchStrings": [
@@ -33,7 +33,8 @@
       ],
       "datasourceTemplate": "github-tags",
       "depNameTemplate": "raysan5/raylib",
-      "versioningTemplate": "loose"
+      "versioningTemplate": "loose",
+      "autoReplaceStringTemplate": "\"version\": \"{{{newValue}}}\",\n  \"commit\": \"{{{newDigest}}}\",\n  \"url\": \"https://codeload.github.com/raysan5/raylib/tar.gz/{{{newDigest}}}\""
     },
     {
       "description": "Vendored tomlc17 release. Renovate cannot re-import the sources and re-apply the project patches, so this only reports new releases on the Dependency Dashboard (see vendor/tomlc17/README.md).",
