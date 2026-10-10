@@ -150,3 +150,17 @@ code instead: nine float equality notes (#154–#162) now go through
 bit for bit; the over-long Next Level case (#163) became
 `session_open_next_level`; and the always-false coin-limit comparison (#153)
 is compiled only when `MAX_COINS` is below the 64 bits of the coin mask.
+
+After the stack landed, the analysis of `main` itself reported two more
+findings of the same class that the pull-request runs had not shown:
+
+| Alerts | Input and operation | Assessment |
+| --- | --- | --- |
+| #180 | `editor_recovery.c`: writing the autosave snapshot | Same as #148 and #126: the snapshot path is below the private preference root that `HOME`/`XDG_DATA_HOME` select, with a generated name; level documents cannot redirect it. |
+| #181 | `main.c`: does the `--level` path typed on the command line exist in the folder the game was started from | New. Same class as #75/#152: a local command-line path under the invoking user's permissions. The check only asks whether the file exists, to decide if the typed path means a file in the launch folder or a bundled level; nothing is opened here, and the level loader that opens it later is the reviewed #84/#177 route. |
+
+These two findings (#180, #181) were dismissed as false positives after
+explicit maintainer authorization on 2026-10-10. The same run's two notes were
+fixed in code: the float field's limit step moved out of an over-long switch
+case into `limit_float_edit` (#179), and the ignored `fchown` result is kept
+in a named variable instead of an empty `if` (#178).
