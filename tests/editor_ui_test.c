@@ -1254,7 +1254,8 @@ done:
     return failed;
 }
 
-/* A scratch game folder: levels/a, b, c chained and listed in order. */
+/* A scratch game folder: levels/a, b, c chained and listed in order, and
+ * levels/d not listed (see enter_ui_campaign). */
 #define UI_CAMPAIGN_ROOT TEST_OUT "ui-campaign-root"
 static int write_ui_campaign_level(const char *path, const char *name, const char *next)
 {
@@ -1264,6 +1265,44 @@ static int write_ui_campaign_level(const char *path, const char *name, const cha
              "[last_star]\nx = 300.0\ny = 200.0\n%s%s%s", name,
              next[0] ? "next_phase = \"" : "", next, next[0] ? "\"\n" : "");
     return write_text_file(path, text);
+}
+
+/*
+ * Write the scratch campaign afresh, so each test starts from the same
+ * files whatever the one before it saved, and make it the working folder
+ * (the view names levels relative to it, as the game does).  The folder
+ * the test came from goes in cwd, to return to.  Returns 0, or -1 with the
+ * working folder unchanged.
+ */
+static int enter_ui_campaign(char *cwd, size_t cwd_size)
+{
+    test_make_folder(UI_CAMPAIGN_ROOT);
+    test_make_folder(UI_CAMPAIGN_ROOT "/levels");
+    test_make_folder(UI_CAMPAIGN_ROOT "/levels/campaigns");
+    if (write_ui_campaign_level(UI_CAMPAIGN_ROOT "/levels/a.toml", "Alpha", "levels/b.toml") ||
+        write_ui_campaign_level(UI_CAMPAIGN_ROOT "/levels/b.toml", "Bravo", "levels/c.toml") ||
+        write_ui_campaign_level(UI_CAMPAIGN_ROOT "/levels/c.toml", "Charlie", "") ||
+        write_ui_campaign_level(UI_CAMPAIGN_ROOT "/levels/d.toml", "Delta", "") ||
+        write_text_file(UI_CAMPAIGN_ROOT "/levels/campaigns/main.toml",
+                        "format_version = 1\nlevels = [\"levels/a.toml\", "
+                        "\"levels/b.toml\", \"levels/c.toml\"]\n"))
+        return -1;
+    if (test_working_folder(cwd, cwd_size) != 0) return -1;
+    return test_change_folder(UI_CAMPAIGN_ROOT);
+}
+
+/* The view's rows as their files' letters, in order: "abc" for a.toml,
+ * b.toml and c.toml ("" while the view is closed). */
+static const char *campaign_rows(const EditorState *es)
+{
+    static char letters[16];
+    const CampaignCatalog *view = editor_campaign_entries(es);
+    size_t count = 0;
+
+    for (; view && count < view->count && count < sizeof(letters) - 1; count++)
+        letters[count] = view->levels[count].path[sizeof("levels/") - 1];
+    letters[count] = '\0';
+    return letters;
 }
 
 /* Click button `index` of the Campaign view's bottom row. */
@@ -1288,17 +1327,7 @@ static int campaign_view_reorders_renames_and_saves(void)
     CampaignCatalog reloaded = {0};
     const CampaignCatalog *view;
     CHECK(open_editor(&es, NULL) == 0);
-    test_make_folder(UI_CAMPAIGN_ROOT);
-    test_make_folder(UI_CAMPAIGN_ROOT "/levels");
-    test_make_folder(UI_CAMPAIGN_ROOT "/levels/campaigns");
-    CHECK(write_ui_campaign_level(UI_CAMPAIGN_ROOT "/levels/a.toml", "Alpha", "levels/b.toml") == 0);
-    CHECK(write_ui_campaign_level(UI_CAMPAIGN_ROOT "/levels/b.toml", "Bravo", "levels/c.toml") == 0);
-    CHECK(write_ui_campaign_level(UI_CAMPAIGN_ROOT "/levels/c.toml", "Charlie", "") == 0);
-    CHECK(write_text_file(UI_CAMPAIGN_ROOT "/levels/campaigns/main.toml",
-                          "format_version = 1\nlevels = [\"levels/a.toml\", "
-                          "\"levels/b.toml\", \"levels/c.toml\"]\n") == 0);
-    CHECK(test_working_folder(cwd, sizeof(cwd)) == 0);
-    CHECK(test_change_folder(UI_CAMPAIGN_ROOT) == 0);
+    CHECK(enter_ui_campaign(cwd, sizeof(cwd)) == 0);
     moved = 1;
 
     es.tool = TOOL_PLACE;
@@ -1386,6 +1415,462 @@ static int campaign_view_reorders_renames_and_saves(void)
     CHECK(es.level.coin_count == 1);
 done:
     campaign_catalog_cleanup(&reloaded);
+    if (moved && test_change_folder(cwd) != 0) failed = 1;
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/* Click row `row` of the Campaign view on its file name, which selects it. */
+static void click_campaign_row(EditorState *es, int row)
+{
+    click_frame(es, CAMPAIGN_VIEW_X + 20, CAMPAIGN_ROWS_Y + row * CAMPAIGN_ROW_H + 8);
+}
+
+/* Click the name field of row `row`, which starts typing in it. */
+static void click_campaign_name(EditorState *es, int row)
+{
+    click_frame(es, CAMPAIGN_NAME_X + 10, CAMPAIGN_ROWS_Y + row * CAMPAIGN_ROW_H + 8);
+}
+
+/*
+ * The Campaign view has a history of its own: every edit made there (move,
+ * remove, add, relink) is one step that Ctrl+Z takes back and Ctrl+Y or
+ * Ctrl+Shift+Z makes again, and a new edit forgets what was undone.
+ */
+static int campaign_undo_and_redo_replay_each_edit(void)
+{
+    int failed = 0;
+    EditorState es;
+    char cwd[4096];
+    int moved = 0;
+    const CampaignCatalog *view;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(enter_ui_campaign(cwd, sizeof(cwd)) == 0);
+    moved = 1;
+    key_frame(&es, KEY_M, INPUT_CTRL);
+    view = editor_campaign_entries(&es);
+    CHECK(view && strcmp(campaign_rows(&es), "abc") == 0);
+
+    /* Nothing done yet: the keys say so and change nothing. */
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strstr(es.status_message, "nothing to undo") != NULL);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(strstr(es.status_message, "nothing to redo") != NULL);
+    CHECK(strcmp(campaign_rows(&es), "abc") == 0);
+
+    /* Move: select c and press Up; each of the three keys does its part. */
+    click_campaign_row(&es, 2);
+    click_campaign_button(&es, 0);
+    CHECK(strcmp(campaign_rows(&es), "acb") == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strcmp(campaign_rows(&es), "abc") == 0);
+    CHECK(strstr(es.status_message, "Undid: moved levels/c.toml") != NULL);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(strcmp(campaign_rows(&es), "acb") == 0);
+    CHECK(strstr(es.status_message, "Redid: moved levels/c.toml") != NULL);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    key_frame(&es, KEY_Z, INPUT_CTRL | INPUT_SHIFT);
+    CHECK(strcmp(campaign_rows(&es), "acb") == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strcmp(campaign_rows(&es), "abc") == 0);
+    CHECK(editor_campaign_undo_steps(&es) == 0 && editor_campaign_redo_steps(&es) == 1);
+
+    /* Remove b: undo reads its file again and puts it back where it was. */
+    click_campaign_row(&es, 1);
+    click_campaign_button(&es, 2);
+    CHECK(strcmp(campaign_rows(&es), "ac") == 0);
+    CHECK(editor_campaign_redo_steps(&es) == 0);      /* a new edit: no redo */
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strcmp(campaign_rows(&es), "abc") == 0);
+    CHECK(view->levels[1].loaded && strcmp(view->levels[1].level.name, "Bravo") == 0);
+    CHECK(strcmp(view->levels[1].level.next_phase, "levels/c.toml") == 0);
+    CHECK(view->levels[0].available && view->levels[1].available && view->levels[2].available);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(strcmp(campaign_rows(&es), "ac") == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strcmp(campaign_rows(&es), "abc") == 0);
+
+    /* Add d (the picker's answer, given straight to the view). */
+    CHECK(editor_campaign_add(&es, "levels/d.toml") == 0);
+    CHECK(strcmp(campaign_rows(&es), "abcd") == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strcmp(campaign_rows(&es), "abc") == 0);
+    CHECK(editor_campaign_unsaved(&es) == 0);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(strcmp(campaign_rows(&es), "abcd") == 0);
+    CHECK(view->levels[3].loaded && strcmp(view->levels[3].level.name, "Delta") == 0);
+
+    /* Link in order must remember the old links to be undone.  Without
+     * the memory for them it changes none, and records nothing. */
+    editor_campaign_test_fail_history_allocation(1);
+    click_campaign_button(&es, 4);
+    editor_campaign_test_fail_history_allocation(0);
+    CHECK(strstr(es.status_message, "Not linked: out of memory") != NULL);
+    CHECK(view->levels[2].level.next_phase[0] == '\0');
+    CHECK(editor_campaign_undo_steps(&es) == 1);
+    /* With it, c is linked to d, and that is one step too. */
+    click_campaign_button(&es, 4);
+    CHECK(strcmp(view->levels[2].level.next_phase, "levels/d.toml") == 0);
+    CHECK(editor_campaign_undo_steps(&es) == 2);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(view->levels[2].level.next_phase[0] == '\0');
+    CHECK(!view->levels[2].available);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(strcmp(view->levels[2].level.next_phase, "levels/d.toml") == 0);
+    CHECK(view->levels[2].available);
+
+    /* A new edit after an undo forgets the undone step. */
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(editor_campaign_redo_steps(&es) == 1);
+    click_campaign_row(&es, 0);
+    click_campaign_button(&es, 1);
+    CHECK(strcmp(campaign_rows(&es), "bacd") == 0);
+    CHECK(editor_campaign_redo_steps(&es) == 0);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(strstr(es.status_message, "nothing to redo") != NULL);
+    CHECK(strcmp(campaign_rows(&es), "bacd") == 0);
+
+    /* All the way back is the campaign the files hold. */
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strcmp(campaign_rows(&es), "abc") == 0);
+    CHECK(editor_campaign_undo_steps(&es) == 0);
+    CHECK(editor_campaign_unsaved(&es) == 0);
+done:
+    editor_campaign_test_fail_history_allocation(0);
+    if (moved && test_change_folder(cwd) != 0) failed = 1;
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/*
+ * A rename is one step for each name applied, however many keys it took
+ * and however it was applied (Enter, a click elsewhere, or the undo key
+ * itself).  Typing alone is not a step.
+ */
+static int campaign_rename_is_one_undo_step(void)
+{
+    int failed = 0;
+    EditorState es;
+    char cwd[4096];
+    int moved = 0;
+    const CampaignCatalog *view;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(enter_ui_campaign(cwd, sizeof(cwd)) == 0);
+    moved = 1;
+    key_frame(&es, KEY_M, INPUT_CTRL);
+    view = editor_campaign_entries(&es);
+    CHECK(view && view->count == 3);
+
+    /* Three keystrokes in three frames, then Enter. */
+    click_campaign_name(&es, 0);
+    CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID);
+    push_text("1");
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    push_text("2");
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(editor_campaign_undo_steps(&es) == 0);
+    push_text("3");
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(strcmp(view->levels[0].level.name, "Alpha123") == 0);
+    CHECK(editor_campaign_undo_steps(&es) == 1);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strcmp(view->levels[0].level.name, "Alpha") == 0);
+    CHECK(strcmp(view->levels[0].display_name, "Alpha") == 0);
+    CHECK(editor_campaign_unsaved(&es) == 0);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(strcmp(view->levels[0].level.name, "Alpha123") == 0);
+    CHECK(strcmp(view->levels[0].display_name, "Alpha123") == 0);
+    CHECK(editor_campaign_unsaved(&es) == 1);
+
+    /* Enter on a name left as it was is no edit, so no step. */
+    click_campaign_name(&es, 2);
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(es.ui.active_id == 0 && editor_campaign_undo_steps(&es) == 1);
+
+    /* A click in another row's field applies the name being typed. */
+    click_campaign_name(&es, 1);
+    push_text("?");
+    click_campaign_name(&es, 2);
+    CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID + 2);
+    CHECK(strcmp(view->levels[1].level.name, "Bravo?") == 0);
+    CHECK(editor_campaign_undo_steps(&es) == 2);
+
+    /* Ctrl+Z while typing applies the typed name as a step and takes that
+     * step back at once: the name is as before, and Ctrl+Y brings the
+     * typed one. */
+    push_text("#");
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.ui.active_id == 0);
+    CHECK(strcmp(view->levels[2].level.name, "Charlie") == 0);
+    CHECK(editor_campaign_undo_steps(&es) == 2 && editor_campaign_redo_steps(&es) == 1);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(strcmp(view->levels[2].level.name, "Charlie#") == 0);
+
+    /* Each name comes back in turn, and none of this was a level edit. */
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strcmp(view->levels[1].level.name, "Bravo") == 0);
+    CHECK(strcmp(view->levels[0].level.name, "Alpha123") == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strcmp(view->levels[0].level.name, "Alpha") == 0);
+    CHECK(editor_campaign_unsaved(&es) == 0);
+    CHECK(es.undo->top == 0 && es.undo->redo_top == 0 && !es.modified);
+done:
+    if (moved && test_change_folder(cwd) != 0) failed = 1;
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/*
+ * The history holds the latest CAMPAIGN_HISTORY_MAX steps: one edit more
+ * drops the oldest, which can then no longer be undone.
+ */
+static int campaign_history_keeps_the_latest_steps(void)
+{
+    int failed = 0;
+    EditorState es;
+    char cwd[4096];
+    int moved = 0;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(enter_ui_campaign(cwd, sizeof(cwd)) == 0);
+    moved = 1;
+    key_frame(&es, KEY_M, INPUT_CTRL);
+    CHECK(es.campaign != NULL);
+
+    /* One move more than fits: b and c change places each time. */
+    for (int i = 0; i < CAMPAIGN_HISTORY_MAX + 1; i++)
+        CHECK(editor_campaign_move(&es, 1, +1) == 0);
+    CHECK(strcmp(campaign_rows(&es), "acb") == 0);   /* an odd number of swaps */
+    CHECK(editor_campaign_undo_steps(&es) == CAMPAIGN_HISTORY_MAX);
+
+    /* Every step kept can be undone; the first move is beyond reach. */
+    for (int i = 0; i < CAMPAIGN_HISTORY_MAX; i++)
+        CHECK(editor_campaign_undo(&es) == 1);
+    CHECK(editor_campaign_undo(&es) == 0);
+    CHECK(strstr(es.status_message, "nothing to undo") != NULL);
+    CHECK(strcmp(campaign_rows(&es), "acb") == 0);
+    CHECK(editor_campaign_unsaved(&es) == 1);
+    CHECK(editor_campaign_redo_steps(&es) == CAMPAIGN_HISTORY_MAX);
+    for (int i = 0; i < CAMPAIGN_HISTORY_MAX; i++)
+        CHECK(editor_campaign_redo(&es) == 1);
+    CHECK(editor_campaign_redo(&es) == 0);
+    CHECK(strcmp(campaign_rows(&es), "acb") == 0);
+done:
+    if (moved && test_change_folder(cwd) != 0) failed = 1;
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/*
+ * A row that left the list comes back by reading its level file again.  A
+ * name changed and not yet saved is in no file, so the step keeps it; and
+ * while the file cannot be read, the step is refused and the list stays as
+ * it is.
+ */
+static int campaign_undo_reads_the_level_file_again(void)
+{
+    int failed = 0;
+    EditorState es;
+    char cwd[4096];
+    int moved = 0;
+    const CampaignCatalog *view;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(enter_ui_campaign(cwd, sizeof(cwd)) == 0);
+    moved = 1;
+    key_frame(&es, KEY_M, INPUT_CTRL);
+    view = editor_campaign_entries(&es);
+    CHECK(view && view->count == 3);
+
+    /* Rename b without saving, then remove it. */
+    click_campaign_name(&es, 1);
+    push_text("2");
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(strcmp(view->levels[1].level.name, "Bravo2") == 0);
+    click_campaign_row(&es, 1);
+    click_campaign_button(&es, 2);
+    CHECK(strcmp(campaign_rows(&es), "ac") == 0);
+
+    /* Its file disappears: undo says so and changes nothing. */
+    CHECK(remove("levels/b.toml") == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strstr(es.status_message, "Cannot undo: levels/b.toml no longer loads") != NULL);
+    CHECK(strcmp(campaign_rows(&es), "ac") == 0);
+    CHECK(editor_campaign_undo_steps(&es) == 2 && editor_campaign_redo_steps(&es) == 0);
+    /* A file that is there but broken is refused the same way. */
+    CHECK(write_text_file("levels/b.toml", "format_version = \n") == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strstr(es.status_message, "no longer loads") != NULL);
+    CHECK(strcmp(campaign_rows(&es), "ac") == 0);
+
+    /* The file is back: the same undo now works, and the row has the name
+     * it showed, which the file never held. */
+    CHECK(write_ui_campaign_level("levels/b.toml", "Bravo", "levels/c.toml") == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strcmp(campaign_rows(&es), "abc") == 0);
+    CHECK(view->levels[1].loaded && strcmp(view->levels[1].level.name, "Bravo2") == 0);
+    CHECK(editor_campaign_unsaved(&es) == 1);
+    key_frame(&es, KEY_Z, INPUT_CTRL);               /* ...and then the rename */
+    CHECK(strcmp(view->levels[1].level.name, "Bravo") == 0);
+    CHECK(editor_campaign_unsaved(&es) == 0);
+
+    /* Redoing an Add reads the file too. */
+    CHECK(editor_campaign_add(&es, "levels/d.toml") == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(remove("levels/d.toml") == 0);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(strstr(es.status_message, "Cannot redo: levels/d.toml no longer loads") != NULL);
+    CHECK(strcmp(campaign_rows(&es), "abc") == 0);
+    CHECK(editor_campaign_redo_steps(&es) == 1);
+done:
+    if (moved && test_change_folder(cwd) != 0) failed = 1;
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/*
+ * The unsaved mark compares the view with the files, so it follows the
+ * history: undoing back to what was saved is "nothing unsaved", Save makes
+ * the list as it stands the saved one, and Revert and reopening the view
+ * start a new history.
+ */
+static int campaign_unsaved_mark_follows_the_history(void)
+{
+    int failed = 0;
+    EditorState es;
+    char cwd[4096];
+    int moved = 0;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(enter_ui_campaign(cwd, sizeof(cwd)) == 0);
+    moved = 1;
+    key_frame(&es, KEY_M, INPUT_CTRL);
+    CHECK(es.campaign != NULL && editor_campaign_unsaved(&es) == 0);
+
+    /* Edit, undo, redo. */
+    click_campaign_row(&es, 2);
+    click_campaign_button(&es, 0);                   /* a c b */
+    CHECK(editor_campaign_unsaved(&es) == 1);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(editor_campaign_unsaved(&es) == 0);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(editor_campaign_unsaved(&es) == 1);
+
+    /* Save: the list as it stands, relinked, is now the saved one. */
+    click_campaign_button(&es, 4);
+    click_campaign_button(&es, 5);
+    CHECK(strstr(es.status_message, "Campaign saved") != NULL);
+    CHECK(editor_campaign_unsaved(&es) == 0);
+    CHECK(editor_campaign_undo_steps(&es) == 2);     /* Save keeps the history */
+
+    /* Undoing past the Save differs from the files again, step by step,
+     * and redoing arrives back at the saved campaign. */
+    key_frame(&es, KEY_Z, INPUT_CTRL);               /* the links */
+    CHECK(strcmp(campaign_rows(&es), "acb") == 0 && editor_campaign_unsaved(&es) == 1);
+    key_frame(&es, KEY_Z, INPUT_CTRL);               /* the move */
+    CHECK(strcmp(campaign_rows(&es), "abc") == 0 && editor_campaign_unsaved(&es) == 1);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(editor_campaign_unsaved(&es) == 1);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(strcmp(campaign_rows(&es), "acb") == 0 && editor_campaign_unsaved(&es) == 0);
+
+    /* Revert (asked twice) reads the files again and clears the history. */
+    click_campaign_row(&es, 0);
+    click_campaign_button(&es, 1);                   /* c a b */
+    CHECK(editor_campaign_undo_steps(&es) == 3);
+    click_campaign_button(&es, 6);
+    CHECK(editor_campaign_undo_steps(&es) == 3);     /* only warned so far */
+    click_campaign_button(&es, 6);
+    CHECK(strcmp(campaign_rows(&es), "acb") == 0 && editor_campaign_unsaved(&es) == 0);
+    CHECK(editor_campaign_undo_steps(&es) == 0 && editor_campaign_redo_steps(&es) == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strstr(es.status_message, "nothing to undo") != NULL);
+    CHECK(strcmp(campaign_rows(&es), "acb") == 0);
+
+    /* So does closing the view and opening it again. */
+    click_campaign_row(&es, 0);
+    click_campaign_button(&es, 1);                   /* c a b */
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(editor_campaign_redo_steps(&es) == 1 && editor_campaign_unsaved(&es) == 0);
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(es.campaign == NULL);
+    key_frame(&es, KEY_M, INPUT_CTRL);
+    CHECK(es.campaign != NULL);
+    CHECK(editor_campaign_undo_steps(&es) == 0 && editor_campaign_redo_steps(&es) == 0);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(strcmp(campaign_rows(&es), "acb") == 0);
+done:
+    if (moved && test_change_folder(cwd) != 0) failed = 1;
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/*
+ * While the Campaign view is open the undo keys belong to it: the level's
+ * own undo stack and the level are left alone, whether or not the view has
+ * a step to replay.  With the view closed the keys undo the level again.
+ */
+static int campaign_undo_keys_leave_the_level_history_alone(void)
+{
+    static const int mods[] = { INPUT_CTRL, INPUT_CTRL | INPUT_SHIFT };
+    int failed = 0;
+    EditorState es;
+    char cwd[4096];
+    int moved = 0;
+    uint64_t level;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(enter_ui_campaign(cwd, sizeof(cwd)) == 0);
+    moved = 1;
+
+    /* One step in the level's history: a coin. */
+    es.tool = TOOL_PLACE;
+    es.palette_type = ENT_COIN;
+    click_frame(&es, 400, 500);
+    CHECK(es.level.coin_count == 1 && es.undo->top == 1 && es.undo->redo_top == 0);
+    level = doc_hash(&es);
+
+    /* An empty campaign history must not let the keys fall through. */
+    key_frame(&es, KEY_M, INPUT_CTRL);
+    CHECK(es.campaign != NULL);
+    for (size_t i = 0; i < sizeof(mods) / sizeof(mods[0]); i++) {
+        key_frame(&es, KEY_Z, mods[i]);
+        CHECK(es.undo->top == 1 && es.undo->redo_top == 0 && doc_hash(&es) == level);
+    }
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(es.undo->top == 1 && es.undo->redo_top == 0 && doc_hash(&es) == level);
+
+    /* Nor do campaign steps: a move and a rename, undone and redone. */
+    click_campaign_row(&es, 2);
+    click_campaign_button(&es, 0);
+    click_campaign_name(&es, 0);
+    push_text("!");
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(editor_campaign_undo_steps(&es) == 2);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strcmp(campaign_rows(&es), "abc") == 0);
+    CHECK(es.undo->top == 1 && es.undo->redo_top == 0 && doc_hash(&es) == level);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    key_frame(&es, KEY_Z, INPUT_CTRL | INPUT_SHIFT);
+    CHECK(strcmp(campaign_rows(&es), "acb") == 0);
+    CHECK(es.undo->top == 1 && es.undo->redo_top == 0 && doc_hash(&es) == level);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(editor_campaign_unsaved(&es) == 0);
+
+    /* Back in the level, the same keys undo and redo the coin. */
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(es.campaign == NULL);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 0 && es.undo->top == 0 && es.undo->redo_top == 1);
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(es.level.coin_count == 1 && doc_hash(&es) == level);
+done:
     if (moved && test_change_folder(cwd) != 0) failed = 1;
     clear_dialog_seams();
     close_editor(&es);
@@ -2080,6 +2565,12 @@ int main(void)
         CASE(validation_rows_scroll_and_copy),
         CASE(text_fields_select_copy_cut_and_paste),
         CASE(campaign_view_reorders_renames_and_saves),
+        CASE(campaign_undo_and_redo_replay_each_edit),
+        CASE(campaign_rename_is_one_undo_step),
+        CASE(campaign_history_keeps_the_latest_steps),
+        CASE(campaign_undo_reads_the_level_file_again),
+        CASE(campaign_unsaved_mark_follows_the_history),
+        CASE(campaign_undo_keys_leave_the_level_history_alone),
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),
         CASE(playtest_from_here_passes_the_start_point),

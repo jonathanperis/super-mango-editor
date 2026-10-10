@@ -7,13 +7,18 @@
  * src/levels/campaign_catalog.c).  Next to each entry it remembers what
  * the level file held when it was read (name, next_phase, fingerprint), to
  * know which files a Save must rewrite and that nobody else changed them.
+ *
+ * Every edit is also noted in a small history (CampaignStep below), so
+ * Ctrl+Z and Ctrl+Y walk back and forth through them.  A step records what
+ * was done, not a copy of the level it was done to: a LevelDef is far too
+ * big to keep one per step, and its file is still on disk to read again.
  */
 
 #include "editor_campaign.h"
 
 #include <stdio.h>    /* snprintf */
 #include <stdlib.h>   /* realloc, free, calloc */
-#include <string.h>   /* memmove, strcmp, strrchr */
+#include <string.h>   /* memmove, memcpy, strcmp, strrchr */
 
 #include "editor_files.h"    /* editor_path_for_display */
 #include "editor_session.h"  /* editor_set_status, editor_finish_field_edit */
@@ -30,13 +35,80 @@ typedef struct {
     SerializerFileFingerprint fingerprint;
 } CampaignDisk;
 
+/* One line of the manifest file as the view read or last wrote it. */
+typedef struct {
+    char path[CAMPAIGN_LEVEL_PATH_SIZE];
+} CampaignListed;
+
+/* What "Link in order" found in one row, kept so the relink can be undone. */
+typedef struct {
+    char next[sizeof(((LevelDef *)0)->next_phase)];  /* its next_phase before */
+    int relinked;                                    /* 1 when it was changed */
+} CampaignOldLink;
+
+/* The edits the view can undo.  s_step_kinds below is indexed by these. */
+typedef enum {
+    STEP_ADD,      /* a level was appended to the list              */
+    STEP_REMOVE,   /* a row was taken out                           */
+    STEP_MOVE,     /* a row changed places with its neighbour       */
+    STEP_RENAME,   /* a level's name was changed                    */
+    STEP_LINK,     /* "Link in order" rewrote the next_phase chain  */
+    STEP_KIND_COUNT
+} CampaignStepKind;
+
+/*
+ * CampaignStep — one undoable edit, small enough to keep
+ * CAMPAIGN_HISTORY_MAX of them inside the view.
+ *
+ * Undo replays the newest step backwards and redo replays it forwards, so
+ * whenever a step is replayed the list is exactly as the edit left (or
+ * found) it, and `row` still names the same row.  A row that left the list
+ * (an undone Add, a Remove) comes back by reading its level file again
+ * from `path`.  What the designer had changed in that row without saving
+ * is not in the file, so a Remove keeps it here to put back on top.
+ */
+typedef struct {
+    CampaignStepKind kind;
+    int row;                 /* the row the edit acted on                  */
+    int to_row;              /* STEP_MOVE: where that row went             */
+    char path[CAMPAIGN_LEVEL_PATH_SIZE];   /* the row's level file ("" for */
+                                           /* a relink, which has no row)  */
+    int loaded;              /* add, remove: did the file load back then?  */
+
+    /* STEP_RENAME: the name before and after.  STEP_REMOVE: old_name and
+     * `next` are the name and next_phase the row showed, and the two flags
+     * say which of them differed from its file (were not saved yet). */
+    char old_name[LEVEL_NAME_CAPACITY];
+    char new_name[LEVEL_NAME_CAPACITY];
+    char next[sizeof(((LevelDef *)0)->next_phase)];
+    int renamed;
+    int relinked;
+
+    /* STEP_LINK: what the relink found, one per row of the list.  The
+     * step owns this block; it is NULL for every other kind. */
+    CampaignOldLink *old_links;
+} CampaignStep;
+
+/*
+ * CampaignHistory — the steps, oldest first.  steps[0 .. applied) are in
+ * effect and can be undone; steps[applied .. count) were undone and can be
+ * redone.  Undo and redo only move `applied`, so neither needs memory.
+ */
+typedef struct {
+    CampaignStep steps[CAMPAIGN_HISTORY_MAX];
+    int count;
+    int applied;
+} CampaignHistory;
+
 struct EditorCampaign {
     char manifest_path[EDITOR_PATH_MAX];
     SerializerFileFingerprint manifest_fingerprint;  /* as read or saved  */
     CampaignCatalog catalog;   /* the entries, in the order shown        */
     CampaignDisk *disk;        /* disk[i] belongs to catalog.levels[i]   */
-    size_t capacity;           /* room in both arrays                    */
-    int manifest_changed;      /* entries added, removed or reordered    */
+    CampaignListed *listed;    /* the manifest file's own list           */
+    size_t listed_count;
+    size_t capacity;           /* room in all three arrays               */
+    CampaignHistory history;   /* the edits Ctrl+Z / Ctrl+Y replay       */
     int selected;              /* highlighted row, -1 for none           */
     int scroll;                /* first row shown                        */
     int close_armed;           /* Close was refused once for unsaved work */
@@ -48,11 +120,17 @@ struct EditorCampaign {
 /* Entries                                                             */
 /* ------------------------------------------------------------------ */
 
-/* Make room for `count` entries in both parallel arrays. */
+/*
+ * Make room for `count` entries in all three arrays.  `listed` is only
+ * written by a Save, but it grows with the others so that a Save always
+ * has room to note the list it wrote: it must not run out of memory after
+ * the files are already on disk.
+ */
 static int reserve(EditorCampaign *c, size_t count)
 {
     CampaignLevel *levels;
     CampaignDisk *disk;
+    CampaignListed *listed;
     size_t capacity = c->capacity ? c->capacity : 8;
 
     if (count <= c->capacity) return 0;
@@ -63,6 +141,9 @@ static int reserve(EditorCampaign *c, size_t count)
     disk = realloc(c->disk, capacity * sizeof(*disk));
     if (!disk) return -1;
     c->disk = disk;
+    listed = realloc(c->listed, capacity * sizeof(*listed));
+    if (!listed) return -1;
+    c->listed = listed;
     c->capacity = capacity;
     return 0;
 }
@@ -87,6 +168,29 @@ static int level_changed(const EditorCampaign *c, size_t i)
     return entry->loaded &&
            (strcmp(entry->level.name, c->disk[i].disk_name) != 0 ||
             strcmp(entry->level.next_phase, c->disk[i].disk_next) != 0);
+}
+
+/* Note the list the manifest file holds now: after reading it, or after
+ * Save wrote it.  The array always has the room (see reserve). */
+static void remember_list(EditorCampaign *c)
+{
+    for (size_t i = 0; i < c->catalog.count; i++)
+        memcpy(c->listed[i].path, c->catalog.levels[i].path, sizeof(c->listed[i].path));
+    c->listed_count = c->catalog.count;
+}
+
+/*
+ * Does the list (which levels, in which order) differ from the manifest
+ * file?  Comparing with the file's own list, rather than raising a flag on
+ * every edit, is what lets Undo take the unsaved mark away again: a list
+ * undone back to the saved order is simply no different from the file.
+ */
+static int list_changed(const EditorCampaign *c)
+{
+    if (c->catalog.count != c->listed_count) return 1;
+    for (size_t i = 0; i < c->catalog.count; i++)
+        if (strcmp(c->catalog.levels[i].path, c->listed[i].path) != 0) return 1;
+    return 0;
 }
 
 /* Any edit means a refused Close or Revert must be asked again. */
@@ -133,7 +237,7 @@ int editor_campaign_unsaved(const EditorState *es)
     const EditorCampaign *c = es ? es->campaign : NULL;
     int typing;
     if (!c) return 0;
-    if (c->manifest_changed) return 1;
+    if (list_changed(c)) return 1;
     /* A name typed but not yet applied is work too: quitting must ask. */
     typing = name_being_typed(es);
     if (typing >= 0 && strcmp(es->ui.edit_buf, c->catalog.levels[typing].level.name) != 0)
@@ -141,6 +245,307 @@ int editor_campaign_unsaved(const EditorState *es)
     for (size_t i = 0; i < c->catalog.count; i++)
         if (level_changed(c, i)) return 1;
     return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Rows                                                                */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The three ways the list changes shape.  The edits below and the history
+ * that replays them share these, so an undone edit goes through the very
+ * code the edit itself went through.
+ */
+
+/* Rows a and b change places, each with what the view knows of its file. */
+static void swap_rows(EditorCampaign *c, int a, int b)
+{
+    CampaignLevel entry = c->catalog.levels[a];
+    CampaignDisk disk = c->disk[a];
+
+    c->catalog.levels[a] = c->catalog.levels[b];
+    c->catalog.levels[b] = entry;
+    c->disk[a] = c->disk[b];
+    c->disk[b] = disk;
+}
+
+/* Take row `row` out of the list; the rows below it move up one. */
+static void take_out(EditorCampaign *c, int row)
+{
+    size_t after = c->catalog.count - (size_t)row - 1;
+
+    memmove(&c->catalog.levels[row], &c->catalog.levels[row + 1],
+            after * sizeof(c->catalog.levels[0]));
+    memmove(&c->disk[row], &c->disk[row + 1], after * sizeof(c->disk[0]));
+    c->catalog.count--;
+    if (c->selected >= (int)c->catalog.count) c->selected = (int)c->catalog.count - 1;
+}
+
+/*
+ * put_in — Make the level file `path` row `row`: the rows from there on
+ * move down one and the file is read into the gap.  Returns the new row's
+ * entry (loaded or not, as campaign_entry_load found the file), or NULL
+ * with the list unchanged when there is no memory for one more row.
+ */
+static CampaignLevel *put_in(EditorCampaign *c, int row, const char *path)
+{
+    size_t after = c->catalog.count - (size_t)row;
+    CampaignLevel *entry;
+
+    if (reserve(c, c->catalog.count + 1) != 0) return NULL;
+    memmove(&c->catalog.levels[row + 1], &c->catalog.levels[row],
+            after * sizeof(c->catalog.levels[0]));
+    memmove(&c->disk[row + 1], &c->disk[row], after * sizeof(c->disk[0]));
+    c->catalog.count++;
+    entry = &c->catalog.levels[row];
+    memset(entry, 0, sizeof(*entry));
+    memcpy(entry->path, path, strlen(path) + 1);
+    campaign_entry_load(entry);
+    remember_disk(entry, &c->disk[row]);
+    return entry;
+}
+
+/* The next_phase that makes row `row` follow the order shown: the level in
+ * the row below it, or none ("") for the last row. */
+static const char *next_in_order(const EditorCampaign *c, size_t row)
+{
+    return row + 1 < c->catalog.count ? c->catalog.levels[row + 1].path : "";
+}
+
+/* ------------------------------------------------------------------ */
+/* History                                                             */
+/* ------------------------------------------------------------------ */
+
+#ifdef MANGO_TESTING
+static int s_test_history_allocation_fails;
+
+void editor_campaign_test_fail_history_allocation(int fail)
+{
+    s_test_history_allocation_fails = fail;
+}
+#endif
+
+/* The one allocation the history makes (a relink's old links) goes through
+ * here, so a test can make it fail. */
+static void *history_alloc(size_t count, size_t size)
+{
+#ifdef MANGO_TESTING
+    if (s_test_history_allocation_fails) return NULL;
+#endif
+    return calloc(count, size);
+}
+
+/* Forget steps[from .. count) and free what they own. */
+static void forget_steps(CampaignHistory *history, int from)
+{
+    for (int i = from; i < history->count; i++) free(history->steps[i].old_links);
+    history->count = from;
+    if (history->applied > from) history->applied = from;
+}
+
+/*
+ * record — Note an edit that was just made.  The step is copied in; a
+ * relink's old_links block now belongs to the history.  Recording never
+ * fails: the steps live inside the view, and a full history drops its
+ * oldest step to make room.
+ */
+static void record(EditorCampaign *c, const CampaignStep *step)
+{
+    CampaignHistory *history = &c->history;
+
+    /* A new edit starts a new future: the undone steps describe a list
+     * that will never exist again, so they can no longer be redone. */
+    forget_steps(history, history->applied);
+    if (history->count == CAMPAIGN_HISTORY_MAX) {
+        free(history->steps[0].old_links);
+        memmove(&history->steps[0], &history->steps[1],
+                (CAMPAIGN_HISTORY_MAX - 1) * sizeof(history->steps[0]));
+        history->count--;
+    }
+    history->steps[history->count++] = *step;
+    history->applied = history->count;
+}
+
+/* Note that row `row` was renamed from old_name (LEVEL_NAME_CAPACITY
+ * bytes) to the name it holds now. */
+static void record_rename(EditorCampaign *c, int row, const char *old_name)
+{
+    const CampaignLevel *entry = &c->catalog.levels[row];
+    CampaignStep step = {0};
+
+    step.kind = STEP_RENAME;
+    step.row = row;
+    memcpy(step.path, entry->path, sizeof(step.path));
+    memcpy(step.old_name, old_name, sizeof(step.old_name));
+    memcpy(step.new_name, entry->level.name, sizeof(step.new_name));
+    record(c, &step);
+}
+
+/*
+ * put_back — Return the row a step describes to the list by reading its
+ * level file again.  A row that showed a loaded level must load again:
+ * when its file is gone or broken the list is left exactly as it was and
+ * the status bar says why (-1), rather than hand back a row that has
+ * quietly lost its level.  A row that never loaded comes back as it was.
+ */
+static int put_back(EditorState *es, EditorCampaign *c, const CampaignStep *step, int redo)
+{
+    const char *verb = redo ? "redo" : "undo";
+    CampaignLevel *entry = put_in(c, step->row, step->path);
+
+    if (!entry) {
+        editor_set_status(es, "Cannot %s: out of memory", verb);
+        return -1;
+    }
+    if (step->loaded && !entry->loaded) {
+        take_out(c, step->row);
+        editor_set_status(es, "Cannot %s: %s no longer loads. Put the file back, or use Revert",
+                          verb, step->path);
+        return -1;
+    }
+    /* Only what the designer had changed goes on top of the file, so a
+     * name or link the file gained in the meantime is not written over. */
+    if (entry->loaded && step->renamed)
+        memcpy(entry->level.name, step->old_name, sizeof(entry->level.name));
+    if (entry->loaded && step->relinked)
+        memcpy(entry->level.next_phase, step->next, sizeof(entry->level.next_phase));
+    c->selected = step->row;
+    return 0;
+}
+
+/* Take the row a step describes out again, leaving the highlight where
+ * the Remove button leaves it: on the row that moved into its place. */
+static int take_back(EditorCampaign *c, const CampaignStep *step)
+{
+    c->selected = step->row;
+    take_out(c, step->row);
+    return 0;
+}
+
+/*
+ * The replay functions: one per kind of step, each able to run its edit
+ * backwards (redo == 0) and forwards again (redo == 1).  They return 0, or
+ * -1 with the list unchanged and the reason in the status bar.
+ */
+static int replay_add(EditorState *es, EditorCampaign *c, const CampaignStep *step, int redo)
+{
+    return redo ? put_back(es, c, step, redo) : take_back(c, step);
+}
+
+static int replay_remove(EditorState *es, EditorCampaign *c, const CampaignStep *step, int redo)
+{
+    return redo ? take_back(c, step) : put_back(es, c, step, redo);
+}
+
+static int replay_move(EditorState *es, EditorCampaign *c, const CampaignStep *step, int redo)
+{
+    (void)es;
+    swap_rows(c, step->row, step->to_row);
+    c->selected = redo ? step->to_row : step->row;
+    return 0;
+}
+
+static int replay_rename(EditorState *es, EditorCampaign *c, const CampaignStep *step, int redo)
+{
+    CampaignLevel *entry = &c->catalog.levels[step->row];
+
+    (void)es;
+    memcpy(entry->level.name, redo ? step->new_name : step->old_name,
+           sizeof(entry->level.name));
+    c->selected = step->row;
+    return 0;
+}
+
+static int replay_link(EditorState *es, EditorCampaign *c, const CampaignStep *step, int redo)
+{
+    (void)es;
+    /* Only the rows the relink changed are touched, in either direction.
+     * The list has the rows it had then, so old_links[i] is row i and the
+     * row below it is the one the relink pointed it at. */
+    for (size_t i = 0; i < c->catalog.count; i++) {
+        char *next_phase = c->catalog.levels[i].level.next_phase;
+        size_t size = sizeof(c->catalog.levels[i].level.next_phase);
+
+        if (!step->old_links[i].relinked) continue;
+        if (redo) snprintf(next_phase, size, "%s", next_in_order(c, i));
+        else memcpy(next_phase, step->old_links[i].next, size);
+    }
+    return 0;
+}
+
+/* What each kind of step is called in the status bar, and how to replay it. */
+static const struct {
+    const char *done;
+    int (*replay)(EditorState *es, EditorCampaign *c, const CampaignStep *step, int redo);
+} s_step_kinds[STEP_KIND_COUNT] = {
+    [STEP_ADD]    = {"added",                        replay_add},
+    [STEP_REMOVE] = {"removed",                      replay_remove},
+    [STEP_MOVE]   = {"moved",                        replay_move},
+    [STEP_RENAME] = {"renamed",                      replay_rename},
+    [STEP_LINK]   = {"linked the levels in order",   replay_link},
+};
+
+/* Undo the newest edit in effect, or redo the one undone last. */
+static int walk_history(EditorState *es, int redo)
+{
+    EditorCampaign *c = es ? es->campaign : NULL;
+    CampaignHistory *history;
+    const CampaignStep *step;
+
+    /* A name being typed is applied first, as an edit of its own: undo
+     * then takes that very name back, and it can be redone. */
+    if (!c || !finish_edit(es)) return -1;
+    history = &c->history;
+    if (redo ? history->applied == history->count : history->applied == 0) {
+        editor_set_status(es, "Campaign: nothing to %s", redo ? "redo" : "undo");
+        return 0;
+    }
+    step = &history->steps[redo ? history->applied : history->applied - 1];
+    if (s_step_kinds[step->kind].replay(es, c, step, redo) != 0) return -1;
+    history->applied += redo ? 1 : -1;
+    edited(c);
+    editor_campaign_check(es);
+    editor_set_status(es, "%s: %s%s%s", redo ? "Redid" : "Undid", s_step_kinds[step->kind].done,
+                      step->path[0] ? " " : "", step->path);
+    return 1;
+}
+
+int editor_campaign_undo(EditorState *es)
+{
+    return walk_history(es, 0);
+}
+
+int editor_campaign_redo(EditorState *es)
+{
+    return walk_history(es, 1);
+}
+
+int editor_campaign_undo_steps(const EditorState *es)
+{
+    return es && es->campaign ? es->campaign->history.applied : 0;
+}
+
+int editor_campaign_redo_steps(const EditorState *es)
+{
+    const CampaignHistory *history = es && es->campaign ? &es->campaign->history : NULL;
+    return history ? history->count - history->applied : 0;
+}
+
+int editor_campaign_finish_name(EditorState *es)
+{
+    int row = name_being_typed(es);
+    char before[LEVEL_NAME_CAPACITY];
+    int result;
+
+    if (row < 0) return 0;
+    memcpy(before, es->campaign->catalog.levels[row].level.name, sizeof(before));
+    result = ui_apply_active_edit(&es->ui);
+    if (result == 2) {
+        record_rename(es->campaign, row, before);
+        edited(es->campaign);
+        editor_campaign_check(es);
+    }
+    return result != 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -180,14 +585,18 @@ int editor_campaign_open(EditorState *es, const char *manifest_path)
     }
     c->capacity = c->catalog.count;
     c->disk = calloc(c->capacity ? c->capacity : 1, sizeof(*c->disk));
-    if (!c->disk) {
+    c->listed = calloc(c->capacity ? c->capacity : 1, sizeof(*c->listed));
+    if (!c->disk || !c->listed) {
         campaign_catalog_cleanup(&c->catalog);
+        free(c->disk);
+        free(c->listed);
         free(c);
         editor_set_status(es, "Campaign: out of memory");
         return -1;
     }
     for (size_t i = 0; i < c->catalog.count; i++)
         remember_disk(&c->catalog.levels[i], &c->disk[i]);
+    remember_list(c);
     c->selected = c->catalog.count > 0 ? 0 : -1;
     es->campaign = c;
     editor_campaign_check(es);
@@ -199,8 +608,10 @@ int editor_campaign_open(EditorState *es, const char *manifest_path)
 void editor_campaign_free(EditorState *es)
 {
     if (!es || !es->campaign) return;
+    forget_steps(&es->campaign->history, 0);
     campaign_catalog_cleanup(&es->campaign->catalog);
     free(es->campaign->disk);
+    free(es->campaign->listed);
     free(es->campaign);
     es->campaign = NULL;
 }
@@ -239,8 +650,10 @@ int editor_campaign_revert(EditorState *es)
         editor_set_status(es, "Revert discards your campaign changes: Revert again to confirm");
         return 0;
     }
-    /* The view has no undo history of its own; reading the manifest and
-     * its levels again is the way back.  A name being typed goes too. */
+    /* Reading the manifest and its levels again is the way back to the
+     * files in one go.  The edit history goes with the old view (its steps
+     * describe a list that no longer exists), and so does a name being
+     * typed. */
     if (name_being_typed(es) >= 0) ui_cancel_active_edit(&es->ui);
     memcpy(path, c->manifest_path, sizeof(path));
     selected = c->selected;
@@ -262,20 +675,18 @@ int editor_campaign_move(EditorState *es, int index, int delta)
 {
     EditorCampaign *c = es ? es->campaign : NULL;
     int other = index + delta;
-    CampaignLevel entry;
-    CampaignDisk disk;
+    CampaignStep step = {0};
 
     if (!c || index < 0 || (size_t)index >= c->catalog.count) return -1;
     if (other < 0 || (size_t)other >= c->catalog.count) return -1;
     if (!finish_edit(es)) return -1;
-    entry = c->catalog.levels[index];
-    c->catalog.levels[index] = c->catalog.levels[other];
-    c->catalog.levels[other] = entry;
-    disk = c->disk[index];
-    c->disk[index] = c->disk[other];
-    c->disk[other] = disk;
+    step.kind = STEP_MOVE;
+    step.row = index;
+    step.to_row = other;
+    memcpy(step.path, c->catalog.levels[index].path, sizeof(step.path));
+    swap_rows(c, index, other);
+    record(c, &step);
     c->selected = other;
-    c->manifest_changed = 1;
     edited(c);
     editor_campaign_check(es);
     return 0;
@@ -284,19 +695,27 @@ int editor_campaign_move(EditorState *es, int index, int delta)
 int editor_campaign_remove(EditorState *es, int index)
 {
     EditorCampaign *c = es ? es->campaign : NULL;
-    size_t after;
+    const CampaignLevel *entry;
+    CampaignStep step = {0};
 
     if (!c || index < 0 || (size_t)index >= c->catalog.count) return -1;
     if (!finish_edit(es)) return -1;
-    editor_set_status(es, "Removed %s from the campaign (the file stays)",
-                      c->catalog.levels[index].path);
-    after = c->catalog.count - (size_t)index - 1;
-    memmove(&c->catalog.levels[index], &c->catalog.levels[index + 1],
-            after * sizeof(c->catalog.levels[0]));
-    memmove(&c->disk[index], &c->disk[index + 1], after * sizeof(c->disk[0]));
-    c->catalog.count--;
-    if (c->selected >= (int)c->catalog.count) c->selected = (int)c->catalog.count - 1;
-    c->manifest_changed = 1;
+    entry = &c->catalog.levels[index];
+    step.kind = STEP_REMOVE;
+    step.row = index;
+    step.loaded = entry->loaded;
+    memcpy(step.path, entry->path, sizeof(step.path));
+    /* A name or link changed here and not saved yet is in no file: the
+     * step keeps it, for Undo to put back on the row (see put_back). */
+    if (entry->loaded) {
+        step.renamed = strcmp(entry->level.name, c->disk[index].disk_name) != 0;
+        step.relinked = strcmp(entry->level.next_phase, c->disk[index].disk_next) != 0;
+        memcpy(step.old_name, entry->level.name, sizeof(step.old_name));
+        memcpy(step.next, entry->level.next_phase, sizeof(step.next));
+    }
+    editor_set_status(es, "Removed %s from the campaign (the file stays)", entry->path);
+    take_out(c, index);
+    record(c, &step);
     edited(c);
     editor_campaign_check(es);
     return 0;
@@ -308,6 +727,7 @@ int editor_campaign_add(EditorState *es, const char *path)
     char candidate[CAMPAIGN_LEVEL_PATH_SIZE];
     const char *name;
     CampaignLevel *entry;
+    CampaignStep step = {0};
 
     if (!c || !path || !path[0]) return -1;
     if (!finish_edit(es)) return -1;
@@ -337,19 +757,17 @@ int editor_campaign_add(EditorState *es, const char *path)
             return -1;
         }
     }
-    if (reserve(c, c->catalog.count + 1) != 0) {
+    step.kind = STEP_ADD;
+    step.row = (int)c->catalog.count;   /* a new level goes last */
+    entry = put_in(c, step.row, candidate);
+    if (!entry) {
         editor_set_status(es, "Not added: out of memory");
         return -1;
     }
-
-    entry = &c->catalog.levels[c->catalog.count];
-    memset(entry, 0, sizeof(*entry));
-    memcpy(entry->path, candidate, strlen(candidate) + 1);
-    campaign_entry_load(entry);
-    remember_disk(entry, &c->disk[c->catalog.count]);
-    c->catalog.count++;
-    c->selected = (int)c->catalog.count - 1;
-    c->manifest_changed = 1;
+    step.loaded = entry->loaded;
+    memcpy(step.path, entry->path, sizeof(step.path));
+    record(c, &step);
+    c->selected = step.row;
     edited(c);
     editor_campaign_check(es);
     editor_set_status(es, "Added %s%s", candidate,
@@ -360,18 +778,35 @@ int editor_campaign_add(EditorState *es, const char *path)
 int editor_campaign_link_in_order(EditorState *es)
 {
     EditorCampaign *c = es ? es->campaign : NULL;
+    CampaignStep step = {0};
     int changed = 0;
 
     if (!c || !finish_edit(es)) return 0;
+    /* Undoing a relink needs each changed row's link as it was, and
+     * nothing else holds those.  The memory for them is asked for before
+     * any link changes: without it the links stay as they are, rather
+     * than change with no way back. */
+    step.kind = STEP_LINK;
+    step.old_links = history_alloc(c->catalog.count ? c->catalog.count : 1,
+                                   sizeof(*step.old_links));
+    if (!step.old_links) {
+        editor_set_status(es, "Not linked: out of memory");
+        return 0;
+    }
     for (size_t i = 0; i < c->catalog.count; i++) {
         CampaignLevel *entry = &c->catalog.levels[i];
-        const char *next = i + 1 < c->catalog.count ? c->catalog.levels[i + 1].path : "";
+        const char *next = next_in_order(c, i);
         if (!entry->loaded || strcmp(entry->level.next_phase, next) == 0) continue;
+        memcpy(step.old_links[i].next, entry->level.next_phase,
+               sizeof(step.old_links[i].next));
+        step.old_links[i].relinked = 1;
         /* Paths are at most CAMPAIGN_LEVEL_PATH_SIZE - 1 bytes, which
          * next_phase (256 bytes) always holds. */
         snprintf(entry->level.next_phase, sizeof(entry->level.next_phase), "%s", next);
         changed++;
     }
+    if (changed > 0) record(c, &step);   /* the history owns old_links now */
+    else free(step.old_links);
     edited(c);
     editor_campaign_check(es);
     if (changed > 0)
@@ -447,7 +882,7 @@ static int write_temps(EditorState *es, EditorCampaign *c, CampaignSavePlan *pla
             return -1;
         }
     }
-    if (c->manifest_changed) {
+    if (list_changed(c)) {
         CampaignSaveFile *file = &plan->files[plan->count++];
         file->entry = -1;
         memcpy(file->target, c->manifest_path, sizeof(file->target));
@@ -540,7 +975,7 @@ static int install_temps(EditorState *es, EditorCampaign *c, CampaignSavePlan *p
             remember_disk(&c->catalog.levels[file->entry], &c->disk[file->entry]);
             levels++;
         } else {
-            c->manifest_changed = 0;
+            remember_list(c);
             (void)serializer_fingerprint_utf8(c->manifest_path, &c->manifest_fingerprint);
         }
         installed++;
@@ -692,9 +1127,15 @@ static void draw_row(EditorState *es, EditorCampaign *c, int i, int y)
     snprintf(text, sizeof(text), "%d. %s", i + 1, entry->path);
     ui_label(&es->ui, CAMPAIGN_VIEW_X, y + 2, text);
     if (entry->loaded) {
+        /* The field stores a new name itself (Enter, Tab); the name it
+         * replaces is kept here for the history.  Typing is not an edit
+         * until then, so a rename is one step however long it took. */
+        char before[LEVEL_NAME_CAPACITY];
+        memcpy(before, entry->level.name, sizeof(before));
         if (ui_text_field(&es->ui, CAMPAIGN_NAME_FIELD_ID + i, CAMPAIGN_NAME_X, y,
                           CAMPAIGN_NAME_W, entry->level.name,
                           (int)sizeof(entry->level.name))) {
+            record_rename(c, i, before);
             edited(c);
             editor_campaign_check(es);
         }
