@@ -852,6 +852,15 @@ done:
     return failed;
 }
 
+/* The screen pixel showing world point (wx, wy): canvas_screen_to_world
+ * backwards. */
+static void world_to_screen(const EditorState *es, float wx, float wy, float *sx, float *sy)
+{
+    float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+    *sx = (wx - es->camera.x) * zoom;
+    *sy = (wy - es->camera.y) * zoom + (float)TOOLBAR_H;
+}
+
 /*
  * Snap to grid (key S) applies to placing as well as dragging; Shift
  * inverts it for one click or drag.  The status bar shows whether it is on.
@@ -900,6 +909,31 @@ static int snap_toggle_applies_to_placing_and_dragging(void)
         const CoinPlacement *moved = &es.level.coins[es.selection.index];
         CHECK(fmodf(moved->x, (float)TILE_SIZE) == 0.0f);
         CHECK(fmodf(moved->y, (float)TILE_SIZE) == 0.0f);
+    }
+
+    /* Select: Shift pressed once the drag is under way moves freely, read
+     * at each motion event; the position at release is the one kept. */
+    {
+        const int index = es.selection.index;
+        float gx, gy, before_x = es.level.coins[index].x;
+        world_to_screen(&es, es.level.coins[index].x + 4.0f,
+                        es.level.coins[index].y + 4.0f, &gx, &gy);
+        push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, (int)gx, (int)gy);
+        push_event(INPUT_MOUSE_MOVE, 0, INPUT_SHIFT, (int)gx + 31, (int)gy + 5);
+        push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, INPUT_SHIFT, (int)gx + 31, (int)gy + 5);
+        ui_frame(&es, (int)gx + 31, (int)gy + 5);
+        CHECK(es.selection.index == index && es.level.coins[index].x != before_x);
+        CHECK(fmodf(es.level.coins[index].x, (float)TILE_SIZE) != 0.0f);
+        /* Shift at the press does not drag at all: it takes the coin out
+         * of the selection. */
+        before_x = es.level.coins[index].x;
+        world_to_screen(&es, es.level.coins[index].x + 4.0f,
+                        es.level.coins[index].y + 4.0f, &gx, &gy);
+        push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, INPUT_SHIFT, (int)gx, (int)gy);
+        push_event(INPUT_MOUSE_MOVE, 0, INPUT_SHIFT, (int)gx + 60, (int)gy);
+        push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, INPUT_SHIFT, (int)gx + 60, (int)gy);
+        ui_frame(&es, (int)gx + 60, (int)gy);
+        CHECK(es.level.coins[index].x == before_x && editor_selection_count(&es) == 0);
     }
 
     key_frame(&es, KEY_S, 0);
