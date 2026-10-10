@@ -75,10 +75,17 @@ def check_site(out: Path) -> list[str]:
     elif home.find(policy[0]) > home.find("<script"):
         failures.append("index.html: CSP meta must precede every script")
     # Fonts are self-hosted; no style or font may come from another origin.
-    for directive in ("style-src", "font-src"):
+    # Each directive has an exact allowlist, so a wildcard such as
+    # `font-src *` fails as surely as a named remote host does.
+    allowed_sources = {
+        "style-src": {"'self'", "'unsafe-inline'"},
+        "font-src": {"'self'"},
+    }
+    for directive, allowed in allowed_sources.items():
         sources = re.search(rf"{directive}([^;\"]*)", policy[0]) if policy else None
-        if not sources or "http" in sources.group(1):
-            failures.append(f"index.html: CSP {directive} must not allow a remote host (fonts are self-hosted)")
+        if not sources or not sources.group(1).split() or set(sources.group(1).split()) - allowed:
+            failures.append(
+                f"index.html: CSP {directive} may only list {' '.join(sorted(allowed))} (fonts are self-hosted)")
 
     # No page or stylesheet may ask a font CDN for anything: every visitor's
     # browser would otherwise contact Google on each page view.
