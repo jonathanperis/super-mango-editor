@@ -29,6 +29,12 @@ def main() -> None:
     parser.add_argument("--archive", type=Path)
     args = parser.parse_args()
     pin = json.loads((ROOT / "vendor/raylib/manifest.json").read_text(encoding="utf-8"))
+    # The commit names the folder inside the archive and the URL names the
+    # archive, so a bump that changes one and not the other (a half-applied
+    # Renovate update, say) would keep building the old source under the new
+    # version. Refuse it here rather than trust the two to stay in step.
+    if not pin["url"].endswith("/" + pin["commit"]):
+        raise SystemExit("vendor/raylib/manifest.json: url is not the archive of the pinned commit")
     build = args.build_dir.resolve()
     build.mkdir(parents=True, exist_ok=True)
     # --archive lets several build directories (and CI caches) share one
