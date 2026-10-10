@@ -9,6 +9,7 @@
 #include "level_validate.h"
 #include "../player/player.h"  /* JUMP_VY: the jump-height check */
 #include "../screens/hud.h"    /* MAX_HEARTS: the initial_hearts limit */
+#include "../shared/geometry.h" /* float_same_value: the flame-on-gap rule */
 
 #define MAX_INITIAL_LIVES 999
 #define MAX_SCORE_PER_LIFE 999999
@@ -730,6 +731,65 @@ static int validate_level_settings(const LevelDef *def,
     return 0;
 }
 
+float level_jumping_spider_min_gap_speed(void)
+{
+    /*
+     * Count the fixed steps of one jump exactly as jumping_spiders_update
+     * moves the spider: each step adds gravity to vy, then vy to y, until
+     * y is back at the floor (0). With the shipped constants that is 39.
+     */
+    const float dt = 1.0f / (float)TARGET_FPS;   /* GAME_FIXED_STEP */
+    float y = 0.0f, vy = JSPIDER_JUMP_VY;
+    int air_steps = 0;
+    do {
+        vy += JSPIDER_GRAVITY * dt;
+        y += vy * dt;
+        air_steps++;
+    } while (y < 0.0f);
+    /*
+     * The leap starts with the art centre snapped to the gap's near edge.
+     * The spider then moves on every later step before it next looks for
+     * a gap: the air steps after the first, plus the step after landing,
+     * air_steps moves in all. They must carry the centre a whole
+     * FLOOR_GAP_W, or it lands still over the gap, snaps back and leaps
+     * again forever. Rounded up to the next 0.01 px/s, so a speed written
+     * with two decimals that passes also clears the gap.
+     */
+    float speed = (float)FLOOR_GAP_W / ((float)air_steps * dt);
+    return ceilf(speed * 100.0f) / 100.0f;
+}
+
+/*
+ * validate_jumping_spider_gaps — A jumping spider whose patrol reaches a
+ * floor gap must be fast enough to jump it
+ * (level_jumping_spider_min_gap_speed). Its art centre, the point the gap
+ * test uses, moves between these two x values.
+ */
+static int validate_jumping_spider_gaps(const LevelDef *def,
+                                        char *err, size_t err_size, IssueSink *sink)
+{
+    const float min_speed = level_jumping_spider_min_gap_speed();
+    const float centre = (float)JSPIDER_ART_X + (float)JSPIDER_ART_W / 2.0f;
+    for (int i = 0; i < def->jumping_spider_count; i++) {
+        const JumpingSpiderPlacement *p = &def->jumping_spiders[i];
+        float lo = p->patrol_x0 + centre;
+        float hi = p->patrol_x1 - (float)JSPIDER_FRAME_W + centre;
+        int reaches_gap = 0;
+        for (int g = 0; g < def->floor_gap_count; g++) {
+            float gx = (float)def->floor_gaps[g];
+            if (lo < gx + (float)FLOOR_GAP_W && gx <= hi) reaches_gap = 1;
+        }
+        if (!reaches_gap || !isfinite(p->vx) || fabsf(p->vx) >= min_speed) continue;
+        if (err && err_size > 0)
+            snprintf(err, err_size,
+                     "jumping_spiders[%d].vx is %.2f; its patrol reaches a floor gap, "
+                     "and jumping one needs at least %.2f px/s either way",
+                     i, p->vx, min_speed);
+        if (stop_here(sink, err)) return -1;
+    }
+    return 0;
+}
+
 /*
  * validate_entity_motion — Every per-entity speed must be finite and
  * bounded. Enemy patrol speeds follow the tighter MAX_PATROL_SPEED rule;
@@ -1238,20 +1298,6 @@ static int validate_blades(const LevelDef *def, char *err, size_t err_size,
     return 0;
 }
 
-/* same_position — Whether two coordinates are exactly the same value,
- * compared bit for bit as ui.c and serializer_emit.c do: the flame rule is
- * "on this gap", not "close to it".  Adding 0.0f first turns -0.0 into +0.0,
- * so a flame written as -0.0 still matches the gap at 0. */
-static int same_position(float a, float b)
-{
-    uint32_t bits_a, bits_b;
-    a += 0.0f;
-    b += 0.0f;
-    memcpy(&bits_a, &a, sizeof(bits_a));
-    memcpy(&bits_b, &b, sizeof(bits_b));
-    return bits_a == bits_b;
-}
-
 /* validate_flame_gap — A flame's x is the gap_x it erupts from (see
  * load_blue_flames), so it must be one of the level's floor gaps.  Without
  * this, a flame placed on solid floor rises out of the grass. */
@@ -1260,7 +1306,7 @@ static int validate_flame_gap(const LevelDef *def, char *err, size_t err_size,
 {
     if (validate_gap_x(err, err_size, field, x, world_w) != 0) return -1;
     for (int g = 0; g < def->floor_gap_count; g++) {
-        if (same_position(x, (float)def->floor_gaps[g])) return 0;
+        if (float_same_value(x, (float)def->floor_gaps[g])) return 0;
     }
     if (err && err_size > 0) {
         snprintf(err, err_size, "%s is %.2f (must match a floor gap x)",
@@ -1382,6 +1428,7 @@ static int validate_runtime(const LevelDef *def, char *err, size_t err_size,
     if (validate_level_paths(def, err, err_size, sink) != 0) return -1;
     if (validate_physics_finite(def, err, err_size, sink) != 0) return -1;
     if (validate_entity_motion(def, err, err_size, sink) != 0) return -1;
+    if (validate_jumping_spider_gaps(def, err, err_size, sink) != 0) return -1;
 
     /* Player start and checkpoints must lie inside the world. */
     if (validate_player_start(def, err, err_size, world_w, sink) != 0) return -1;

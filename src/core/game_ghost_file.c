@@ -24,7 +24,8 @@
  *
  * Storage: natively a file next to the profile (game_ghost_file_path),
  * written through a temporary file like the profile itself; in a browser a
- * localStorage entry per level. Ghosts are not shared between profiles.
+ * localStorage entry per level, all of them within GHOST_WEB_BUDGET. Ghosts
+ * are not shared between profiles.
  */
 #include "game_ghost.h"
 #include "../game.h"  /* GameState: this file reads its fields */
@@ -36,6 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "game_timing.h"  /* GAME_FIXED_STEP */
 #include "tomlc17.h"
 #include "../shared/platform.h"       /* str_copy */
 #include "../shared/printf_format.h"
@@ -47,6 +49,38 @@
 #define GHOST_SAMPLE_DIGITS 10
 /* A ghost's time can be at most its steps plus a little rounding. */
 #define GHOST_TIME_MAX ((float)GHOST_MAX_STEPS / TARGET_FPS + 1.0f)
+
+/*
+ * ghost_time_matches_steps — Is `time` the time a run of `steps` steps
+ * shows?
+ *
+ * The session keeps the run with the smaller time, so a time that does not
+ * belong to its samples (a hand edit to `time = 0`) would make a ghost no
+ * real run could ever beat. The level timer starts at 0 and adds
+ * GAME_FIXED_STEP once per step, in float (game_update.c); after 18000
+ * steps that sum is about 0.03 s short of steps / 60, more than one step.
+ * So repeat the same float sum here, and accept a time within one step of
+ * it.
+ */
+static int ghost_time_matches_steps(double time, int steps)
+{
+    float expected = 0.0f;
+    for (int i = 0; i < steps; i++) expected += GAME_FIXED_STEP;
+    return fabs(time - (double)expected) <= (double)GAME_FIXED_STEP;
+}
+
+/*
+ * GHOST_WEB_BUDGET — the most localStorage all browser ghosts may use
+ * together, in characters (keys included; ghost text is ASCII).
+ *
+ * localStorage holds about 5 million characters per site, and on
+ * <user>.github.io every project page of that user is the same site. The
+ * profile, which holds the player's results and settings, lives there too,
+ * and a ghost must never take the space a profile save needs. One million
+ * characters keeps five of the longest (five-minute) ghosts or dozens of
+ * ordinary ones; past it, the ghosts written longest ago are deleted first.
+ */
+#define GHOST_WEB_BUDGET (1024 * 1024)
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -64,9 +98,48 @@ EM_JS(int, ghost_browser_read, (const char *key, char *out, int capacity), {
         return size + 1;
     } catch (_) { return -1; }
 });
-EM_JS(int, ghost_browser_write, (const char *key, const char *text), {
+/*
+ * Write one ghost within `budget` characters for all ghosts together.
+ * 'super-mango-ghost-order-v1' lists the ghost entries from least to most
+ * recently written; an entry it does not list (lost order, older build)
+ * counts as the oldest. Older ghosts are deleted until the new one fits
+ * the budget, and again one by one if the browser still reports its quota
+ * full. A ghost larger than the whole budget is not written at all.
+ */
+EM_JS(int, ghost_browser_write, (const char *key, const char *text, int budget), {
+    const prefix = 'super-mango-ghost-v1:', orderKey = 'super-mango-ghost-order-v1';
     try {
-        localStorage.setItem('super-mango-ghost-v1:' + UTF8ToString(key), UTF8ToString(text));
+        const name = prefix + UTF8ToString(key), value = UTF8ToString(text);
+        const size = k => k.length + (localStorage.getItem(k) || "").length;
+        if (name.length + value.length > budget) return 0;
+        let order = [];
+        try {
+            const saved = JSON.parse(localStorage.getItem(orderKey) || '[]');
+            if (Array.isArray(saved)) order = saved.filter(k => typeof k === 'string');
+        } catch (_) { order = []; }
+        const present = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith(prefix) && k !== name) present.push(k);
+        }
+        // Oldest first: unlisted entries, then the listed ones in order.
+        const listed = order.filter(k => present.includes(k));
+        const others = present.filter(k => !listed.includes(k)).concat(listed);
+        let used = name.length + value.length;
+        for (const k of others) used += size(k);
+        while (used > budget && others.length) {
+            const oldest = others.shift();
+            used -= size(oldest);
+            localStorage.removeItem(oldest);
+        }
+        for (;;) {
+            try { localStorage.setItem(name, value); break; } catch (error) {
+                if (!others.length) return 0;
+                localStorage.removeItem(others.shift());
+            }
+        }
+        // Losing the order list only makes eviction order less exact.
+        try { localStorage.setItem(orderKey, JSON.stringify(others.concat([name]))); } catch (_) {}
         return 1;
     } catch (_) { return 0; }
 });
@@ -167,7 +240,7 @@ int game_ghost_decode(GameGhostTrack *out, const char *text)
         } else failed = 1;  /* unknown key */
     }
     /* Samples are decoded last, once `steps` says how many to expect. */
-    if (!failed && version && seen == 63) {
+    if (!failed && version && seen == 63 && ghost_time_matches_steps(out->time, steps)) {
         out->samples = malloc((size_t)steps * sizeof(*out->samples));
         failed = !out->samples || decode_frames(frames, out, steps);
         out->count = steps;
@@ -199,7 +272,8 @@ int game_ghost_encode(const GameGhostTrack *track, char *text, size_t capacity)
     size_t used = 0;
     if (!track || !text || !capacity || !game_profile_key_valid(track->level) ||
         track->count < 1 || track->count > GHOST_MAX_STEPS || !track->samples ||
-        !isfinite(track->time) || track->time < 0.0f || track->time > GHOST_TIME_MAX) return -1;
+        !isfinite(track->time) || track->time < 0.0f || track->time > GHOST_TIME_MAX ||
+        !ghost_time_matches_steps(track->time, track->count)) return -1;
     /* The key passed game_profile_key_valid, which refuses quotes,
      * backslashes and control characters, so it needs no TOML escaping. */
     if (append(text, capacity, &used,
@@ -283,17 +357,53 @@ int game_ghost_load(const GameProfile *profile, const char *level_key, GameGhost
     return found;
 }
 
+/*
+ * stored_ghost_is_as_fast — Should the stored ghost stay?
+ *
+ * The session decides to save a run by comparing it with the ghost it
+ * loaded when the level opened. Another game window or browser tab on the
+ * same profile may have stored a faster one since, so the save reads the
+ * stored ghost again right before writing. It stays when it is a valid
+ * ghost of the same level version and at least as fast; a damaged ghost or
+ * one for another version of the level is replaced, as on load.
+ */
+static int stored_ghost_is_as_fast(const GameProfile *profile, const GameGhostTrack *track)
+{
+    GameGhostTrack stored;
+    int keep = game_ghost_load(profile, track->level, &stored) == 1 &&
+               stored.level_hash == track->level_hash && stored.time <= track->time;
+    game_ghost_track_free(&stored);
+    return keep;
+}
+
 int game_ghost_save(const GameProfile *profile, const GameGhostTrack *track)
 {
-    if (!profile || !profile->enabled || !track) return -1;
+    if (!profile || !profile->enabled || !track) return GHOST_SAVE_FAILED;
     char *text = malloc(GHOST_TEXT_MAX);
-    if (!text) return -1;
+    if (!text) return GHOST_SAVE_FAILED;
     int result = game_ghost_encode(track, text, GHOST_TEXT_MAX);
 #ifdef __EMSCRIPTEN__
-    if (!result && !ghost_browser_write(track->level, text)) result = -1;
+    /* localStorage is synchronous, and this read, compare and write run in
+     * one go without returning to the browser, so no other tab's script
+     * runs in between. */
+    if (!result && stored_ghost_is_as_fast(profile, track)) {
+        free(text);
+        return GHOST_SAVE_KEPT;
+    }
+    if (!result && !ghost_browser_write(track->level, text, GHOST_WEB_BUDGET)) result = -1;
 #else
     char path[SERIALIZER_IO_PATH_MAX], temporary[SERIALIZER_IO_PATH_MAX] = "";
     if (!result && game_ghost_file_path(profile->path, track->level, path, sizeof(path))) result = -1;
+    /* Hold the profile's lock from the comparison to the replacement, the
+     * way game_profile_save does, so another instance cannot write a
+     * faster ghost in between. */
+    GameProfileLock *lock = result ? NULL : game_profile_lock(profile);
+    if (!lock) result = -1;
+    if (lock && stored_ghost_is_as_fast(profile, track)) {
+        game_profile_unlock(lock);
+        free(text);
+        return GHOST_SAVE_KEPT;
+    }
     FILE *fp = result ? NULL : serializer_open_temp(path, temporary, sizeof(temporary));
     if (!result && !fp) result = -1;
     if (fp) {
@@ -310,7 +420,8 @@ int game_ghost_save(const GameProfile *profile, const GameGhostTrack *track)
                 fprintf(stderr, "Ghost save incomplete; the ghost is kept in '%s'\n", temporary);
         }
     }
+    game_profile_unlock(lock);
 #endif
     free(text);
-    return result ? -1 : 0;
+    return result ? GHOST_SAVE_FAILED : GHOST_SAVE_WRITTEN;
 }

@@ -14,7 +14,7 @@
 #include "level_path.h"                   /* level_resolve_path */
 #include "level_ref.h"                    /* level_ref_valid */
 #include "../shared/platform.h"           /* str_copy */
-#include "../shared/serializer.h"         /* level_load_toml, serializer_save_file */
+#include "../shared/serializer.h"         /* level_load_toml, serializer_write_temp */
 #include "../shared/serializer_io.h"      /* serializer_file_exists_utf8 */
 #include "../shared/serializer_emit.h"    /* write_toml_string */
 #include "../../vendor/tomlc17/tomlc17.h"
@@ -350,7 +350,10 @@ done:
  * that must name entry i+1 (and the last entry must have none). A level
  * that breaks the order is marked unavailable rather than rejecting the
  * whole campaign. The comparison uses paths only, so a level before an
- * unavailable entry stays playable; its Next Level reports the failure.
+ * unavailable entry stays playable, but the game's Next Level refuses to
+ * open that entry and says so, as the menu refuses to start it; so does
+ * --continue (session_campaign_refusal in app_session.c). Only --level,
+ * which loads one file directly, bypasses the manifest.
  */
 static void campaign_check_chain(CampaignCatalog *catalog, int report)
 {
@@ -503,7 +506,8 @@ static void emit_manifest(FILE *fp, const void *context)
     fputs("]\n", fp);
 }
 
-int campaign_manifest_save(const char *manifest_path, const CampaignCatalog *catalog)
+int campaign_manifest_write_temp(const char *manifest_path, const CampaignCatalog *catalog,
+                                 char *temp_path, size_t temp_path_size)
 {
     char err[160];
 
@@ -512,5 +516,6 @@ int campaign_manifest_save(const char *manifest_path, const CampaignCatalog *cat
         fprintf(stderr, "campaign: not saving '%s': %s\n", manifest_path, err);
         return -1;
     }
-    return serializer_save_file(manifest_path, emit_manifest, catalog);
+    return serializer_write_temp(manifest_path, emit_manifest, catalog,
+                                 temp_path, temp_path_size);
 }

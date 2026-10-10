@@ -176,14 +176,19 @@ static int inspection_and_replay(void)
     GameExperiment *before = gs.screen.experiment;
     CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment-invalid.toml") == -1 && gs.screen.experiment == before);
     /* Rows are [input, 9 physics values]. Format 1 rows (with a leading
-     * frame duration) came from the variable-timestep engine: refused. */
+     * frame duration) came from the variable-timestep engine: refused.
+     * Format 2 rows are well formed, but were recorded while the camera
+     * still panned in from x = 0, which changes when waiting spike blocks
+     * start: refused too, rather than replayed into another run. */
     const char *bad_rows[] = {
         "[0, nan, 250, 750, 600, 550, 100, 350, 180, 80]",
         "[64, 100, 250, 750, 600, 550, 100, 350, 180, 80]",
         "[0, 1e100, 250, 750, 600, 550, 100, 350, 180, 80]",
-        "[0.016, 0, 100, 250, 750, 600, 550, 100, 350, 180, 80]"
+        "[0.016, 0, 100, 250, 750, 600, 550, 100, 350, 180, 80]",
+        "[0, 100, 250, 750, 600, 550, 100, 350, 180, 80]"
     };
-    const int bad_versions[] = {2, 2, 2, 1};
+    const int bad_versions[] = {EXPERIMENT_FORMAT_VERSION, EXPERIMENT_FORMAT_VERSION,
+                                EXPERIMENT_FORMAT_VERSION, 1, 2};
     for (size_t i = 0; i < sizeof(bad_rows) / sizeof(bad_rows[0]); i++) {
         bad = fopen(TEST_OUT "school-experiment-invalid.toml", "w");
         CHECK(bad != NULL);

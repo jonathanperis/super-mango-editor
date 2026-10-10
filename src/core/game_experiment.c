@@ -1,7 +1,7 @@
 /* Experiments record simulation steps, not wall-clock frames. Pauses therefore
  * do not consume tape; each row holds one fixed GAME_FIXED_STEP step's semantic
- * input and movement tuning (format_version 2). Version 1 captures came from
- * the variable-timestep engine and are refused with a "record it again" error.
+ * input and movement tuning (format_version 3). Older captures are refused with
+ * a "record it again" error (EXPERIMENT_FORMAT_VERSION says why for each).
  * Replays require unchanged level bytes and the same engine version. */
 #include "game_experiment.h"
 #include "../shared/platform.h"  /* str_copy */
@@ -228,6 +228,15 @@ int game_experiment_load(GameState *gs, const char *path)
          * durations that the fixed-step engine cannot reproduce. */
         fprintf(stderr, "Error: %s was recorded before fixed-step simulation "
                         "(format_version 1); record it again\n", path);
+        goto done;
+    }
+    if (version.type == TOML_INT64 && version.u.int64 == 2) {
+        /* Recorded while the camera still panned in from x = 0 and eased
+         * back after a lost life. Spike blocks wait until the camera shows
+         * them, so with the camera snapping now they can start on other
+         * steps and the run would quietly go another way. */
+        fprintf(stderr, "Error: %s was recorded before the camera snapped to the level "
+                        "start and respawn point (format_version 2); record it again\n", path);
         goto done;
     }
     if (version.type != TOML_INT64 || version.u.int64 != EXPERIMENT_FORMAT_VERSION ||

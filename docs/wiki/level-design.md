@@ -269,7 +269,7 @@ levels = [
 
 The manifest order drives the native selector and generated [Level Catalog](../level-catalog/): Creator's Playground, then Volcanic Depths 1 and 2. `make validate-levels` checks the manifest, campaign levels and `levels/labs/*.toml`. The editor's [Campaign view](../level-editor/#campaign-view) (`Ctrl+M`) edits the manifest with the same rules: reorder, add, remove and rename levels, and relink every `next_phase` to the order in one step.
 
-At runtime, breaking the Version, Membership or Paths rules rejects the whole manifest. A listed file that is missing or invalid, or that breaks Progression, only disables its own entry: the menu lists it greyed out as "Unavailable: <reason>" (`level file not found`, `level file is invalid`, `next_phase is out of campaign order`, `final level has a next_phase`) and keeps every other level playable. A manifest with no playable entry is rejected. `--level <path>` bypasses the selector and can open a valid TOML file outside the campaign. The mechanics museum remains a separate collection of standalone examples.
+At runtime, breaking the Version, Membership or Paths rules rejects the whole manifest. A listed file that is missing or invalid, or that breaks Progression, only disables its own entry: the menu lists it greyed out as "Unavailable: <reason>" (`level file not found`, `level file is invalid`, `next_phase is out of campaign order`, `final level has a next_phase`) and keeps every other level playable. A disabled entry is not reachable through the campaign at all: the previous level's **Next Level** refuses it with "Next level is unavailable in the campaign", and `--continue` opens the selector instead. A manifest with no playable entry is rejected. `--level <path>` bypasses the selector and the manifest, and can open any valid TOML file, a disabled entry's included. The mechanics museum remains a separate collection of standalone examples.
 
 ---
 
@@ -293,6 +293,8 @@ frame_index = 0      # starting animation frame (0–2)
 ### Jumping Spiders
 
 Variant that leaps across sea gaps. Uses the spider's position, velocity and patrol fields, but has no authored `frame_index`.
+
+Its jump lasts 39 fixed steps (−200 px/s up against 600 px/s² of its own gravity), and it must carry the spider across a whole 32 px floor gap in that time. So when a floor gap lies between the patrol ends, `vx` must be at least about 49.24 px/s either way (`level_jumping_spider_min_gap_speed()` in `level_validate.c`, derived from those constants); a slower spider would land back over the gap and hop in place forever, and the level is refused. A jumping spider with no gap in its patrol may walk at any valid speed.
 
 ```toml
 [[jumping_spiders]]

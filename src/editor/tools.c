@@ -311,15 +311,14 @@ static int get_entity_anchor(const LevelDef *level, EntityType type, int index,
 }
 
 /*
- * move_placement --- Return a copy of `from` shifted by (dx, dy) world px.
+ * editor_move_placement --- see tools.h.  This is the one place that knows
+ * which fields hold each type's position.
  *
  * Working with a delta from the original placement makes this the exact
  * inverse of get_entity_anchor: a zero delta returns identical bytes, so a
- * click without movement can never change the document.  Types whose y is
- * derived from the floor or water ignore dy; rail riders are positioned by
- * their rail and do not move at all.
+ * click without movement can never change the document.
  */
-static PlacementData move_placement(EntityType type, const PlacementData *from,
+PlacementData editor_move_placement(EntityType type, const PlacementData *from,
                                     float dx, float dy)
 {
     PlacementData pd = *from;
@@ -699,30 +698,25 @@ static int rail_rider_index(EntityType type, const PlacementData *pd)
     return -1;
 }
 
-int editor_add_placement(EditorState *es, EntityType type,
-                         const PlacementData *pd, const char *action)
+int editor_insert_checked(LevelDef *level, EntityType type,
+                          const PlacementData *pd, const char *action,
+                          PlacementData *before, char *why, size_t why_size)
 {
-    LevelDef *level;
     int singleton;
     int count;
     int index;
     int rail_index;
-    PlacementData before;
-    Command cmd;
     char error[128];
 
-    if (!es || !pd || type < 0 || type >= ENT_COUNT) return -1;
+    if (!level || !pd || !before || !why || type < 0 || type >= ENT_COUNT) return -1;
     if (!action) action = "add";
-    level = &es->level;
     singleton = editor_entity_type_is_singleton(type);
-    editor_selection_reconcile(es);
 
     /* Check capacity — every entity type has a fixed-size array */
     count = editor_entity_count(level, type);
     if (!singleton && count >= editor_entity_capacity(type)) {
-        editor_set_status(es, "Cannot %s %s: limit of %d reached", action,
-                          editor_entity_type_name(type),
-                          editor_entity_capacity(type));
+        snprintf(why, why_size, "Cannot %s %s: limit of %d reached", action,
+                 editor_entity_type_name(type), editor_entity_capacity(type));
         return -1;
     }
 
@@ -731,13 +725,13 @@ int editor_add_placement(EditorState *es, EntityType type,
     rail_index = rail_rider_index(type, pd);
     if (rail_index >= 0 || type == ENT_SPIKE_BLOCK) {
         if (level->rail_count == 0) {
-            editor_set_status(es, "Cannot %s %s: place a rail first", action,
-                              editor_entity_type_name(type));
+            snprintf(why, why_size, "Cannot %s %s: place a rail first", action,
+                     editor_entity_type_name(type));
             return -1;
         }
         if (rail_index < 0 || rail_index >= level->rail_count) {
-            editor_set_status(es, "Cannot %s %s: rail %d does not exist in this level",
-                              action, editor_entity_type_name(type), rail_index);
+            snprintf(why, why_size, "Cannot %s %s: rail %d does not exist in this level",
+                     action, editor_entity_type_name(type), rail_index);
             return -1;
         }
     }
@@ -746,19 +740,22 @@ int editor_add_placement(EditorState *es, EntityType type,
      * reports it as a field value. */
     if ((type == ENT_BLUE_FLAME || type == ENT_FIRE_FLAME) &&
         level->floor_gap_count == 0) {
-        editor_set_status(es, "Cannot %s %s: place a floor gap first", action,
-                          editor_entity_type_name(type));
+        snprintf(why, why_size, "Cannot %s %s: place a floor gap first", action,
+                 editor_entity_type_name(type));
         return -1;
     }
 
-    memset(&before, 0, sizeof(before));
+    memset(before, 0, sizeof(*before));
     if (singleton) {
         index = 0;
-        before = editor_snapshot_entity(level, type, 0);
+        *before = editor_snapshot_entity(level, type, 0);
         (void)editor_entity_write(level, type, 0, pd);
     } else {
         index = count;  /* append: new entities draw on top of older ones */
-        if (editor_entity_insert(level, type, index, pd) != 0) return -1;
+        if (editor_entity_insert(level, type, index, pd) != 0) {
+            snprintf(why, why_size, "Cannot %s %s", action, editor_entity_type_name(type));
+            return -1;
+        }
     }
 
     /*
@@ -768,10 +765,30 @@ int editor_add_placement(EditorState *es, EntityType type,
      * leave a level the canvas refuses to draw.
      */
     if (level_validate_runtime(level, error, sizeof(error)) != 0) {
-        if (singleton) (void)editor_entity_write(level, type, 0, &before);
+        if (singleton) (void)editor_entity_write(level, type, 0, before);
         else (void)editor_entity_remove(level, type, index);
-        editor_set_status(es, "Cannot %s %s here: %s", action,
-                          editor_entity_type_name(type), error);
+        snprintf(why, why_size, "Cannot %s %s here: %s", action,
+                 editor_entity_type_name(type), error);
+        return -1;
+    }
+    return index;
+}
+
+int editor_add_placement(EditorState *es, EntityType type,
+                         const PlacementData *pd, const char *action)
+{
+    PlacementData before;
+    Command cmd;
+    char why[192];
+    int singleton;
+    int index;
+
+    if (!es || !pd || type < 0 || type >= ENT_COUNT) return -1;
+    singleton = editor_entity_type_is_singleton(type);
+    editor_selection_reconcile(es);
+    index = editor_insert_checked(&es->level, type, pd, action, &before, why, sizeof(why));
+    if (index < 0) {
+        editor_set_status(es, "%s", why);
         return -1;
     }
 
@@ -1315,7 +1332,7 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
 
     for (int i = 0; i < es->drag_count; i++) {
         const Selection *item = &es->drag_items[i];
-        PlacementData moved = move_placement(item->type, &es->drag_befores[i], dx, dy);
+        PlacementData moved = editor_move_placement(item->type, &es->drag_befores[i], dx, dy);
         editor_clamp_placement(&es->level, item->type, &moved);
         previous[i] = editor_snapshot_entity(&es->level, item->type, item->index);
         (void)editor_entity_write(&es->level, item->type, item->index, &moved);
@@ -1382,7 +1399,7 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
     /* Move every selected entity, exactly as a drag by (dx, dy) would. */
     for (int i = 0; i < count; i++) {
         before[i] = editor_snapshot_entity(&es->level, items[i].type, items[i].index);
-        after[i] = move_placement(items[i].type, &before[i], dx, dy);
+        after[i] = editor_move_placement(items[i].type, &before[i], dx, dy);
         editor_clamp_placement(&es->level, items[i].type, &after[i]);
         (void)editor_entity_write(&es->level, items[i].type, items[i].index, &after[i]);
         if (memcmp(&before[i], &after[i], sizeof(after[i])) != 0) changed++;

@@ -14,6 +14,7 @@
 #include "game_checkpoint.h"
 #include "game_state.h"
 #include "../levels/level.h"
+#include "../shared/geometry.h"  /* float_same_value */
 #include "../shared/platform.h"  /* str_copy */
 
 void game_resume_capture(const GameState *gs, GameResume *resume)
@@ -55,16 +56,16 @@ static int resume_fits_level(const GameState *gs, const LevelDef *def, const Gam
     if (resume->checkpoint >= 0) {
         /* An authored checkpoint: the respawn is exactly its x/y. */
         if (resume->checkpoint >= def->checkpoint_count) return 0;
-        return resume->respawn_x == def->checkpoints[resume->checkpoint].x &&
-               resume->respawn_y == def->checkpoints[resume->checkpoint].y;
+        return float_same_value(resume->respawn_x, def->checkpoints[resume->checkpoint].x) &&
+               float_same_value(resume->respawn_y, def->checkpoints[resume->checkpoint].y);
     }
     if (def->checkpoint_count > 0) {
         /* Authored checkpoints exist but none was reached: the level start. */
-        return resume->respawn_x == start_x && resume->respawn_y == start_y;
+        return float_same_value(resume->respawn_x, start_x) && float_same_value(resume->respawn_y, start_y);
     }
     /* Automatic screen checkpoints move only x, along the floor of the
      * screens already entered; y stays the start's. */
-    return resume->respawn_y == start_y && resume->respawn_x >= 0.0f &&
+    return float_same_value(resume->respawn_y, start_y) && resume->respawn_x >= 0.0f &&
            resume->respawn_x < (float)gs->world.runtime.world_w &&
            resume->legacy_screen <= gs->world.runtime.world_w / GAME_W;
 }

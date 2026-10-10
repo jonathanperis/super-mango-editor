@@ -4,7 +4,7 @@
  *
  * The game's start menu loads it (campaign_catalog_load); the editor's
  * Campaign view edits it with the same rules (campaign_catalog_check) and
- * writes it back (campaign_manifest_save).  The rules only read level files,
+ * writes it back (campaign_manifest_write_temp).  The rules only read level files,
  * so they live apart from the game's active-level code in level_session.c.
  */
 #pragma once
@@ -23,6 +23,9 @@
  * One manifest entry. A level file that is missing, invalid or out of the
  * campaign order does not take the whole menu down: its entry stays listed
  * with available == 0 and a short reason, and the menu shows it disabled.
+ * The game's campaign flow (Play, Continue, Next Level, --continue) never
+ * starts an unavailable entry; only --level, which bypasses the manifest,
+ * can still load its file.
  * level is only meaningful when loaded is 1; available is loaded plus the
  * order and name rules (campaign_catalog_check).
  */
@@ -89,10 +92,12 @@ void campaign_entry_load(CampaignLevel *entry);
 int campaign_catalog_check(CampaignCatalog *catalog, char *err, size_t err_size);
 
 /*
- * campaign_manifest_save — Write the catalog's paths as a v1 manifest at
- * manifest_path, through the same temporary-file-and-replace path a level
- * save uses, so a failure leaves the old manifest whole.  Refuses (-1) a
- * catalog whose paths break the path rules.  Returns 0, -1, or
- * SERIALIZER_REPLACE_TEMP_KEPT (serializer.h).
+ * campaign_manifest_write_temp — Write the catalog's paths as a v1
+ * manifest into a new temporary file next to manifest_path, whose name goes
+ * in temp_path (see serializer_write_temp).  The caller installs it with
+ * serializer_install_temp once every other file of the same save is
+ * written too, so a failure leaves the old manifest whole.  Refuses (-1) a
+ * catalog whose paths break the path rules.  Returns 0 or -1.
  */
-int campaign_manifest_save(const char *manifest_path, const CampaignCatalog *catalog);
+int campaign_manifest_write_temp(const char *manifest_path, const CampaignCatalog *catalog,
+                                 char *temp_path, size_t temp_path_size);

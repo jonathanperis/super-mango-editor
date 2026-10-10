@@ -65,6 +65,9 @@
 #define PANEL_LABEL_X (CANVAS_W + 40)
 #define PANEL_FIELD_X (CANVAS_W + 140)
 #define PANEL_FAR_X   (CANVAS_W + 300)
+/* Level Config rows (the panel is open and unscrolled at start). */
+#define CFG_NAME_Y    (TOOLBAR_H + 64 + 4)
+#define CFG_SCREENS_Y (TOOLBAR_H + 136 + 4)
 
 static RenderTexture2D tiny_target;
 
@@ -144,6 +147,7 @@ static void ui_frame(EditorState *es, int mx, int my)
     while (input_poll(&event)) editor_handle_event(es, &event);
     es->mouse_x = es->ui.mouse_x = mx;
     es->mouse_y = es->ui.mouse_y = my;
+    es->ui.mouse_down = es->mouse_down;
     if (es->playing) editor_check_play_status(es);
     /* Like editor_run_frame, revalidate (which also checks asset files on
      * disk) only when the document changed. */
@@ -787,6 +791,25 @@ static int arrow_keys_nudge_and_backspace_deletes(void)
     CHECK(es.level.coin_count == coins - 1 && es.selection.index < 0);
     key_frame(&es, KEY_Z, INPUT_CTRL);
     CHECK(es.level.coin_count == coins);
+
+    /* After a field commit with Enter the panel has the focus: a Backspace
+     * still meant for the field deletes nothing.  Delete still does, and a
+     * click on the canvas gives Backspace back. */
+    CHECK(place_and_select_coin(&es, 360, 300) == 0);
+    click_frame(&es, CANVAS_W + 60, CFG_NAME_Y);
+    CHECK(es.ui.active_id != 0);
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(es.ui.active_id == 0 && es.selection.index >= 0);
+    const int before_backspace = es.level.coin_count;
+    key_frame(&es, KEY_BACKSPACE, 0);
+    CHECK(es.level.coin_count == before_backspace && es.selection.index >= 0);
+    CHECK(strstr(es.status_message, "Backspace deletes on the canvas") != NULL);
+    key_frame(&es, KEY_DELETE, 0);
+    CHECK(es.level.coin_count == before_backspace - 1);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(place_and_select_coin(&es, 420, 300) == 0);
+    key_frame(&es, KEY_BACKSPACE, 0);
+    CHECK(es.level.coin_count == before_backspace);
 done:
     clear_dialog_seams();
     close_editor(&es);
@@ -827,6 +850,15 @@ done:
     clear_dialog_seams();
     close_editor(&es);
     return failed;
+}
+
+/* The screen pixel showing world point (wx, wy): canvas_screen_to_world
+ * backwards. */
+static void world_to_screen(const EditorState *es, float wx, float wy, float *sx, float *sy)
+{
+    float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+    *sx = (wx - es->camera.x) * zoom;
+    *sy = (wy - es->camera.y) * zoom + (float)TOOLBAR_H;
 }
 
 /*
@@ -877,6 +909,31 @@ static int snap_toggle_applies_to_placing_and_dragging(void)
         const CoinPlacement *moved = &es.level.coins[es.selection.index];
         CHECK(fmodf(moved->x, (float)TILE_SIZE) == 0.0f);
         CHECK(fmodf(moved->y, (float)TILE_SIZE) == 0.0f);
+    }
+
+    /* Select: Shift pressed once the drag is under way moves freely, read
+     * at each motion event; the position at release is the one kept. */
+    {
+        const int index = es.selection.index;
+        float gx, gy, before_x = es.level.coins[index].x;
+        world_to_screen(&es, es.level.coins[index].x + 4.0f,
+                        es.level.coins[index].y + 4.0f, &gx, &gy);
+        push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, (int)gx, (int)gy);
+        push_event(INPUT_MOUSE_MOVE, 0, INPUT_SHIFT, (int)gx + 31, (int)gy + 5);
+        push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, INPUT_SHIFT, (int)gx + 31, (int)gy + 5);
+        ui_frame(&es, (int)gx + 31, (int)gy + 5);
+        CHECK(es.selection.index == index && es.level.coins[index].x != before_x);
+        CHECK(fmodf(es.level.coins[index].x, (float)TILE_SIZE) != 0.0f);
+        /* Shift at the press does not drag at all: it takes the coin out
+         * of the selection. */
+        before_x = es.level.coins[index].x;
+        world_to_screen(&es, es.level.coins[index].x + 4.0f,
+                        es.level.coins[index].y + 4.0f, &gx, &gy);
+        push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, INPUT_SHIFT, (int)gx, (int)gy);
+        push_event(INPUT_MOUSE_MOVE, 0, INPUT_SHIFT, (int)gx + 60, (int)gy);
+        push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, INPUT_SHIFT, (int)gx + 60, (int)gy);
+        ui_frame(&es, (int)gx + 60, (int)gy);
+        CHECK(es.level.coins[index].x == before_x && editor_selection_count(&es) == 0);
     }
 
     key_frame(&es, KEY_S, 0);
@@ -1039,6 +1096,68 @@ done:
     return failed;
 }
 
+/*
+ * Every validation row can be reached: more rows than fit scroll with the
+ * wheel over them, each one is clickable, and the row clicked last is
+ * what Ctrl+C copies (until a click elsewhere).
+ */
+static int validation_rows_scroll_and_copy(void)
+{
+    int failed = 0;
+    EditorState es;
+    const int row_x = CANVAS_W + 60, row_y = TOOLBAR_H + 28 + 8 + 20 + 9;
+    char first[EDITOR_VALIDATION_MESSAGE_LEN];
+    CHECK(open_editor(&es, NULL) == 0);
+    cfg_scroll(-100000);   /* an earlier case may have scrolled the panel */
+
+    /* Twelve coins below the world: twelve errors, eight rows shown. */
+    es.level.coin_count = 12;
+    for (int i = 0; i < 12; i++)
+        es.level.coins[i] = (CoinPlacement){100.0f + 30.0f * (float)i, 9999.0f};
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.validation_report.message_count == 12);
+    CHECK(es.message_scroll == 0);
+    snprintf(first, sizeof(first), "%s", es.validation_report.messages[0]);
+
+    /* The first row takes you to coin 0, and Ctrl+C copies the row. */
+    click_frame(&es, row_x, row_y);
+    CHECK(es.selection.type == ENT_COIN && es.selection.index == 0);
+    CHECK(es.focus_area == EDITOR_FOCUS_MESSAGES);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    CHECK(strcmp(editor_test_clipboard(), first) == 0);
+    CHECK(strncmp(es.status_message, "Copied: coins[0]", 16) == 0);
+    key_frame(&es, KEY_ESCAPE, 0);
+
+    /* The wheel over the rows scrolls them, not the panel; the first row
+     * shown is now message 4, and clicking it goes to coin 4. */
+    push_wheel(row_x, row_y, -4.0f, 0);
+    ui_frame(&es, row_x, row_y);
+    CHECK(es.message_scroll == 4);
+    click_frame(&es, row_x, row_y);
+    CHECK(es.selection.type == ENT_COIN && es.selection.index == 4);
+    key_frame(&es, KEY_ESCAPE, 0);
+    /* It stops at the last full window: rows 5-12. */
+    push_wheel(row_x, row_y, -20.0f, 0);
+    ui_frame(&es, row_x, row_y);
+    CHECK(es.message_scroll == 12 - EDITOR_VALIDATION_VISIBLE_ROWS);
+    click_frame(&es, row_x, row_y + 18 * (EDITOR_VALIDATION_VISIBLE_ROWS - 1));
+    CHECK(es.selection.type == ENT_COIN && es.selection.index == 11);
+    key_frame(&es, KEY_ESCAPE, 0);
+
+    /* A click on the canvas takes the focus away: Ctrl+C copies entities
+     * again, not the row. */
+    editor_test_set_clipboard("");
+    click_frame(&es, NEUTRAL_X, TOOLBAR_H + 200);
+    CHECK(es.focus_area == EDITOR_FOCUS_CANVAS);
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    CHECK(editor_test_clipboard()[0] == '\0');
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
 /* Write `text` to `path`; 0 on success. */
 static int write_text_file(const char *path, const char *text)
 {
@@ -1100,10 +1219,15 @@ static int files_that_will_not_open_list_why(void)
     CHECK(strncmp(es.load_report.messages[1], "line 6: coins[0].x", 18) == 0);
     CHECK(strstr(es.load_report.file, "ui_invalid_rules.toml") != NULL);
 
-    /* The panel shows them; clicking the heading hides them. */
+    /* The panel shows them; a row can be selected and copied... */
     CHECK(es.config_open == 1);
     int with_list = editor_config_total_height(&es);
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    click_frame(&es, heading_x, heading_y + 18);
+    CHECK(es.focus_area == EDITOR_FOCUS_MESSAGES && es.load_report.count == 2);
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    CHECK(strncmp(editor_test_clipboard(), "line 11: spiders[0].vx", 22) == 0);
+    /* ...and clicking the heading hides them. */
     click_frame(&es, heading_x, heading_y);
     CHECK(es.load_report.count == 0);
     CHECK(editor_config_total_height(&es) < with_list);
@@ -1214,6 +1338,32 @@ static int campaign_view_reorders_renames_and_saves(void)
     CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID);
     key_frame(&es, KEY_ESCAPE, 0);
     CHECK(es.ui.active_id == 0 && es.campaign != NULL);
+
+    /* A name typed but not applied is unsaved work: quitting only warns. */
+    click_frame(&es, CAMPAIGN_NAME_X + 10, CAMPAIGN_ROWS_Y + 8);
+    push_text("#");
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(editor_campaign_unsaved(&es) == 1);
+    push_event(INPUT_QUIT, 0, 0, 0, 0);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.running && es.campaign != NULL);
+    CHECK(strstr(es.status_message, "Unsaved campaign changes") != NULL);
+    key_frame(&es, KEY_ESCAPE, 0);                   /* drop the typing */
+    CHECK(editor_campaign_unsaved(&es) == 0);
+
+    /* Revert (asked twice, like Close) puts back what is on disk. */
+    click_frame(&es, CAMPAIGN_VIEW_X + 20, CAMPAIGN_ROWS_Y + 2 * CAMPAIGN_ROW_H + 8);
+    click_campaign_button(&es, 0);                   /* b above c... */
+    CHECK(strcmp(view->levels[1].path, "levels/b.toml") == 0);
+    click_campaign_button(&es, 6);
+    CHECK(strstr(es.status_message, "Revert again") != NULL);
+    view = editor_campaign_entries(&es);
+    CHECK(strcmp(view->levels[1].path, "levels/b.toml") == 0);
+    click_campaign_button(&es, 6);
+    view = editor_campaign_entries(&es);
+    CHECK(view && strcmp(view->levels[1].path, "levels/c.toml") == 0);
+    CHECK(editor_campaign_unsaved(&es) == 0);
+    CHECK(strstr(es.status_message, "reverted") != NULL);
 
     /* Esc goes back to the level. */
     key_frame(&es, KEY_ESCAPE, 0);
@@ -1367,9 +1517,6 @@ done:
 /* Text editing: caret keys and Tab                                    */
 /* ------------------------------------------------------------------ */
 
-/* Level Config rows (the panel is open and unscrolled at start). */
-#define CFG_NAME_Y    (TOOLBAR_H + 64 + 4)
-#define CFG_SCREENS_Y (TOOLBAR_H + 136 + 4)
 
 static void text_frame(EditorState *es, const char *text)
 {
@@ -1448,6 +1595,118 @@ static int text_fields_move_the_caret_and_tab_between_fields(void)
     CHECK(es.ui.active_id == 9011 && es.level.screen_count == 5);
     key_frame(&es, KEY_ESCAPE, 0);
     CHECK(es.ui.active_id == 0);
+
+    /* Dropdowns are in the Tab order: Tab from the axe's y field opens its
+     * mode list, Down + Enter picks Spin as one undo step, and Tab from an
+     * open list closes it and moves on. */
+    es.level.axe_trap_count = 1;
+    es.level.axe_traps[0] = (AxeTrapPlacement){.pillar_x = 500.0f, .mode = AXE_MODE_PENDULUM};
+    editor_select_only(&es, ENT_AXE_TRAP, 0);
+    es.panel_open = 1;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    ui_focus_field(&es.ui, (int)ENT_AXE_TRAP * 100 + 4);          /* y */
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.active_id == (int)ENT_AXE_TRAP * 100 + 4);
+    undo_top = es.undo->top;
+    key_frame(&es, KEY_TAB, 0);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.active_id == 0 && es.ui.dropdown_open_id == (int)ENT_AXE_TRAP * 100 + 2);
+    key_frame(&es, KEY_DOWN, 0);
+    key_frame(&es, KEY_DOWN, 0);                                  /* stops at Spin */
+    CHECK(es.ui.dropdown_highlight == 1 && es.level.axe_traps[0].mode == AXE_MODE_PENDULUM);
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(es.ui.dropdown_open_id == 0 && es.level.axe_traps[0].mode == AXE_MODE_SPIN);
+    CHECK(es.undo->top == undo_top + 1);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.axe_traps[0].mode == AXE_MODE_PENDULUM);
+    /* Shift+Tab from the reopened list goes back to y; Esc just closes. */
+    ui_focus_field(&es.ui, (int)ENT_AXE_TRAP * 100 + 2);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.dropdown_open_id == (int)ENT_AXE_TRAP * 100 + 2);
+    key_frame(&es, KEY_TAB, INPUT_SHIFT);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.dropdown_open_id == 0 && es.ui.active_id == (int)ENT_AXE_TRAP * 100 + 4);
+    key_frame(&es, KEY_ESCAPE, 0);
+    ui_focus_field(&es.ui, (int)ENT_AXE_TRAP * 100 + 2);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(es.ui.dropdown_open_id == 0 && es.level.axe_traps[0].mode == AXE_MODE_PENDULUM);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/*
+ * Text selection: Shift+arrows, Ctrl+A and a mouse drag select; Ctrl+Left /
+ * Right jump a word (Shift: selecting it); Ctrl+C / X / V and typing act on
+ * the selection; all in whole UTF-8 characters.
+ */
+static int text_fields_select_copy_cut_and_paste(void)
+{
+    int failed = 0;
+    EditorState es;
+    const int field_left = CANVAS_W + 55, field_right = CANVAS_W + 55 + 310;
+    CHECK(open_editor(&es, NULL) == 0);
+    cfg_scroll(-100000);
+    editor_test_set_clipboard("");
+
+    click_frame(&es, CANVAS_W + 60, CFG_NAME_Y);
+    CHECK(es.ui.active_id == 9000 && strcmp(es.ui.edit_buf, "Untitled") == 0);
+    /* Nothing selected: Ctrl+C copies nothing and says how to select. */
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    CHECK(editor_test_clipboard()[0] == '\0' && strstr(es.status_message, "Nothing selected"));
+    /* Ctrl+A, Ctrl+C: the whole field. */
+    key_frame(&es, KEY_A, INPUT_CTRL);
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    CHECK(strcmp(editor_test_clipboard(), "Untitled") == 0);
+    /* Shift+Left twice selects "ed"; Ctrl+X cuts it. */
+    key_frame(&es, KEY_END, 0);
+    key_frame(&es, KEY_LEFT, INPUT_SHIFT);
+    key_frame(&es, KEY_LEFT, INPUT_SHIFT);
+    key_frame(&es, KEY_X, INPUT_CTRL);
+    CHECK(strcmp(editor_test_clipboard(), "ed") == 0 && strcmp(es.ui.edit_buf, "Untitl") == 0);
+    /* Ctrl+Left jumps to the start of the word; Ctrl+V pastes there. */
+    key_frame(&es, KEY_LEFT, INPUT_CTRL);
+    CHECK(es.ui.edit_cursor == 0);
+    key_frame(&es, KEY_V, INPUT_CTRL);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(strcmp(es.ui.edit_buf, "edUntitl") == 0);
+    /* Typing replaces a selection; word jumps step over whole UTF-8
+     * characters, so Ctrl+Shift+Right selects "w\xc3\xb6rld" whole. */
+    key_frame(&es, KEY_A, INPUT_CTRL);
+    text_frame(&es, "H\xc3\xa9 llo w\xc3\xb6rld");
+    CHECK(strcmp(es.ui.edit_buf, "H\xc3\xa9 llo w\xc3\xb6rld") == 0);
+    key_frame(&es, KEY_LEFT, INPUT_CTRL);
+    CHECK(es.ui.edit_cursor == (int)strlen("H\xc3\xa9 llo "));
+    key_frame(&es, KEY_RIGHT, INPUT_CTRL | INPUT_SHIFT);
+    key_frame(&es, KEY_C, INPUT_CTRL);
+    CHECK(strcmp(editor_test_clipboard(), "w\xc3\xb6rld") == 0);
+    /* Shift+Left from inside a two-byte character's neighbour takes it
+     * whole: select "\xc3\xa9" and delete it. */
+    key_frame(&es, KEY_HOME, 0);
+    key_frame(&es, KEY_RIGHT, 0);
+    key_frame(&es, KEY_RIGHT, INPUT_SHIFT);
+    key_frame(&es, KEY_DELETE, 0);
+    CHECK(strcmp(es.ui.edit_buf, "H llo w\xc3\xb6rld") == 0);
+    /* Left without Shift ends a selection at its start. */
+    key_frame(&es, KEY_END, INPUT_SHIFT);
+    key_frame(&es, KEY_LEFT, 0);
+    CHECK(es.ui.edit_cursor == 1 && es.ui.edit_anchor < 0);
+
+    /* A press past the end of the text and a drag to the field's left
+     * edge select everything; Backspace deletes the selection. */
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, field_right - 10, CFG_NAME_Y);
+    ui_frame(&es, field_right - 10, CFG_NAME_Y);
+    CHECK(es.ui.active_id == 9000 && es.ui.edit_cursor == (int)strlen(es.ui.edit_buf));
+    ui_frame(&es, field_left + 1, CFG_NAME_Y);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, field_left + 1, CFG_NAME_Y);
+    ui_frame(&es, field_left + 1, CFG_NAME_Y);
+    CHECK(es.ui.edit_cursor == 0 && es.ui.edit_anchor == (int)strlen(es.ui.edit_buf));
+    key_frame(&es, KEY_BACKSPACE, 0);
+    CHECK(es.ui.edit_buf[0] == '\0');
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(strcmp(es.level.name, "Untitled") == 0);
 done:
     clear_dialog_seams();
     close_editor(&es);
@@ -1772,6 +2031,8 @@ int main(void)
         CASE(validation_messages_take_you_to_the_problem),
         CASE(files_that_will_not_open_list_why),
         CASE(box_and_shift_select_act_on_the_group),
+        CASE(validation_rows_scroll_and_copy),
+        CASE(text_fields_select_copy_cut_and_paste),
         CASE(campaign_view_reorders_renames_and_saves),
 #ifndef _WIN32
         CASE(playtest_status_follows_the_game_process),

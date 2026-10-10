@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
+#define _XOPEN_SOURCE 700  /* glibc declares realpath only for X/Open */
 #include "platform.h"
 #include <errno.h>
 #include <stdio.h>
@@ -120,6 +121,38 @@ char *preference_path_at(const char *base, const char *organization, const char 
     return result;
 }
 
+char *executable_folder(const char *executable)
+{
+    char *resolved = NULL;
+#ifndef _WIN32
+    /*
+     * A program started through a symbolic link (a link in /usr/local/bin,
+     * as Homebrew makes, or one the player made on the desktop) must find
+     * assets/ next to the real file, not next to the link. macOS reports the
+     * path the program was started by, link included; Linux's
+     * /proc/self/exe is already resolved, so realpath changes nothing
+     * there. realpath(path, NULL) allocates the result (POSIX.1-2008). If
+     * it fails, the path as given is the best there is.
+     */
+    resolved = realpath(executable, NULL);
+#endif
+    const char *path = resolved ? resolved : executable;
+    const char *last = strrchr(path, '/');
+    const char *backslash = strrchr(path, '\\');
+    if (!last || (backslash && backslash > last)) last = backslash;
+    char *result = NULL;
+    if (last) {
+        size_t size = (size_t)(last - path) + 1;  /* keep the separator */
+        result = malloc(size + 1);
+        if (result) {
+            memcpy(result, path, size);
+            result[size] = 0;
+        }
+    }
+    free(resolved);
+    return result;
+}
+
 char *application_path(void)
 {
     char path[4096];
@@ -137,13 +170,5 @@ char *application_path(void)
     if (length <= 0 || length >= (ssize_t)sizeof(path) - 1) return NULL;
     path[length] = 0;
 #endif
-    char *last = strrchr(path, '/');
-    char *backslash = strrchr(path, '\\');
-    if (!last || (backslash && backslash > last)) last = backslash;
-    if (!last) return NULL;
-    last[1] = 0;
-    size_t size = strlen(path) + 1;
-    char *result = malloc(size);
-    if (result) memcpy(result, path, size);
-    return result;
+    return executable_folder(path);
 }

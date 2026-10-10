@@ -93,10 +93,24 @@
 _Static_assert(EDITOR_MAX_SELECTION <= UNDO_GROUP_MAX,
                "an undo step must fit a whole selection");
 
+/*
+ * EditorFocusArea — where the last left click landed.  A few keys mean
+ * different things in different places: Backspace deletes the selected
+ * entities only when the canvas has the focus, so a Backspace meant for a
+ * field just committed with Enter cannot delete them by surprise.
+ */
+typedef enum {
+    EDITOR_FOCUS_CANVAS = 0,   /* the level (also at start-up)            */
+    EDITOR_FOCUS_PANEL,        /* a panel, the toolbar, the status bar... */
+    EDITOR_FOCUS_MESSAGES      /* a validation or load-problem row: Ctrl+C
+                                * copies its text                         */
+} EditorFocusArea;
+
 typedef struct {
     uint64_t id;
     uint64_t timestamp;
     unsigned long owner_pid;  /* process that wrote it; 0 = unknown (old file) */
+    uint64_t owner_start;     /* when that process started; 0 = unknown     */
     char source_path[EDITOR_PATH_MAX];
     char snapshot_path[EDITOR_PATH_MAX];
     char metadata_path[EDITOR_PATH_MAX];
@@ -466,6 +480,13 @@ typedef struct {
      * keys of the latest mouse event, which tools and the ghost read. */
     int            snap_to_grid;
     int            input_mods;
+    EditorFocusArea focus_area;   /* where the last left click landed */
+    /* The validation list in the Level Config panel: the first row shown,
+     * the wheel's leftover fraction of a row, and the text of the row (or
+     * load-problem row) clicked last, which Ctrl+C copies. */
+    int            message_scroll;
+    float          message_wheel_accum;
+    char           selected_message[EDITOR_VALIDATION_MESSAGE_LEN];
     int            running;       /* 1 = main loop active, 0 = exit requested  */
     int            panel_scroll;  /* scroll offset (px) for the right panel    */
     /*

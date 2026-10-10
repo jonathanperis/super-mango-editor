@@ -1,8 +1,8 @@
 /*
  * editor_main.c — Standalone editor entry point.
  *
- * Initialize one EditorState, optionally load a TOML document, run frames,
- * and clean up. editor_init owns graphics setup; this silent tool needs no
+ * Initialize one EditorState (on the heap), optionally load a TOML
+ * document, run frames, and clean up. editor_init owns graphics setup; this silent tool needs no
  * audio device. --smoke-test renders five frames rather than opening a loop.
  */
 #include "editor.h"
@@ -41,10 +41,19 @@ int main(int argc, char **argv)
             fprintf(stderr, "Warning: assets/ and levels/ were not found here or "
                             "next to the executable\n");
     }
-    /* Aggregate initialization gives pointers NULL and numeric members zero.
-     * That lets startup failure use the same cleanup path as normal exit. */
-    EditorState editor = {0};
-    if (editor_init(&editor, smoke)) {
+    /* An EditorState is about 200 KB (the level, its last valid copy, the
+     * clipboard...), too much for the stack of a thread on Windows (1 MB in
+     * all), so it lives on the heap.  calloc gives pointers NULL and numeric
+     * members zero, which lets a failed start-up use the same cleanup path
+     * as a normal exit. */
+    EditorState *editor = calloc(1, sizeof(*editor));
+    if (!editor) {
+        fprintf(stderr, "Error: out of memory starting the editor\n");
+        free(typed_path);
+        return EXIT_FAILURE;
+    }
+    if (editor_init(editor, smoke)) {
+        free(editor);
         free(typed_path);
         return EXIT_FAILURE;
     }
@@ -53,24 +62,25 @@ int main(int argc, char **argv)
         if (smoke) {
             /* Render the requested document without discovering personal
              * recovery/recent-file data or allocating persistence identities. */
-            result = editor_path_fits(path) ? level_load_toml(path, &editor.level) : -1;
+            result = editor_path_fits(path) ? level_load_toml(path, &editor->level) : -1;
             if (!result) {
-                str_copy(editor.file_path, path, sizeof(editor.file_path));
-                editor_sync_config_resources(&editor);
-                editor_set_document_save_point(&editor);
+                str_copy(editor->file_path, path, sizeof(editor->file_path));
+                editor_sync_config_resources(editor);
+                editor_set_document_save_point(editor);
             }
         } else
-            result = editor_load_level(&editor, path);
+            result = editor_load_level(editor, path);
         if (result)
             fprintf(stderr, "Warning: could not load '%s' — starting empty\n", path);
     }
     if (!smoke)
-        editor_loop(&editor);
+        editor_loop(editor);
     else
-        for (int frame = 0; frame < 5 && editor.running; frame++)
-            editor_run_frame(&editor);
-    int result = smoke && !editor.running ? EXIT_FAILURE : EXIT_SUCCESS;
-    editor_cleanup(&editor);
+        for (int frame = 0; frame < 5 && editor->running; frame++)
+            editor_run_frame(editor);
+    int result = smoke && !editor->running ? EXIT_FAILURE : EXIT_SUCCESS;
+    editor_cleanup(editor);
+    free(editor);
     free(typed_path);
     return result;
 }

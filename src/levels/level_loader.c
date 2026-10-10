@@ -753,6 +753,9 @@ void level_apply(GameState *gs, const LevelDef *def)
     world->checkpoint_feedback_kind = CHECKPOINT_FEEDBACK_NONE;
     world->checkpoint_feedback_until = 0;
     world->legacy_checkpoint_screen = 0;
+    /* A new level, or F8's restart of this one, starts its simulated clock
+     * at 0, so a restarted run counts the same steps as the first one. */
+    world->sim_steps = 0;
     world->player.spawn_x = world->respawn_x;
     world->player.spawn_y = world->respawn_y;
     world->player.x = world->respawn_x + (TILE_SIZE - world->player.w) / 2.0f;

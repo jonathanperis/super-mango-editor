@@ -40,6 +40,21 @@ class DocsChecksTest(unittest.TestCase):
              drift.check_inspector_keys_doc, "inspector key F10 is handled"),
             ("architecture.md", "| `ladders_render` |", "| `vines_render` |",
              drift.check_render_order_doc, "missing from the render order table"),
+            ("c-concepts.md", "`campaign_catalog_load()` in `src/levels/campaign_catalog.c`",
+             "`campaign_catalog_load()` in `src/levels/level_session.c`", drift.check_function_locations,
+             "`campaign_catalog_load()` is not defined in `src/levels/level_session.c`"),
+            ("c-concepts.md", "`undo_group_begin()` and `undo_push()` in `src/editor/undo.c`",
+             "`undo_group_begin()` and `editor_push()` in `src/editor/undo.c`", drift.check_function_locations,
+             "`editor_push()` is not defined in `src/editor/undo.c`"),
+            ("entity-walkthrough.md", "`level_validate_runtime()` (`src/levels/level_validate.c`",
+             "`level_validate_runtime()` (`src/levels/level_check.c`", drift.check_function_locations,
+             "`src/levels/level_check.c` does not exist"),
+            ("index.md", "33 render layers drawn", "32 render layers drawn",
+             drift.check_content_counts, "says 32 render layers; the render order table"),
+            ("developer-guide.md", "The full 33-layer order", "The full 34-layer order",
+             drift.check_content_counts, "says 34 render layers"),
+            ("architecture.md", "| 33 | Debug overlay", "| 34 | Debug overlay",
+             drift.check_content_counts, "must number its layers 1..N"),
         ]
         original_read = drift.read
         for name, old, new, check, expected in cases:
@@ -56,6 +71,24 @@ class DocsChecksTest(unittest.TestCase):
                     check()
                 self.assertTrue(any(expected in error for error in drift.FAILURES), drift.FAILURES)
         drift.FAILURES.clear()
+
+    def test_function_locations_on_the_current_manual(self):
+        # Every "`foo()` in `src/...`" claim in the manual holds today, and the
+        # pattern sees the claims (so a regex that matched nothing would fail).
+        drift.FAILURES.clear()
+        drift.check_function_locations()
+        self.assertEqual(drift.FAILURES, [])
+        text = drift.read(drift.DOCS / "c-concepts.md")
+        claims = [match.group(1) for match in drift.FUNCTION_LOCATION_RE.finditer(text)]
+        self.assertIn("`campaign_manifest_load_entries()`", claims)
+        self.assertIn("`texture_load()` and `texture_unload()`", claims)
+
+    def test_function_definition_lookup(self):
+        source = "static int\nhelper(void)\n{\n    return other(1);\n}\n#define MACRO(x) (x)\n"
+        self.assertTrue(drift.file_defines_function(source, "helper"))
+        self.assertTrue(drift.file_defines_function(source, "MACRO"))
+        # A call inside a body is not a definition.
+        self.assertFalse(drift.file_defines_function(source, "other"))
 
     def test_code_fences_close_like_commonmark(self):
         # A shorter or different fence line inside a fence is content, so the

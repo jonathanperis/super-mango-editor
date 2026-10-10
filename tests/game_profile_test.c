@@ -5,11 +5,13 @@
 #include <string.h>
 #include "collectibles/coin.h"  /* MAX_COINS */
 #include "core/app_session.h"
+#include "collision/collision_damage.h"  /* game_restart_after_game_over */
 #include "core/game_checkpoint.h"
 #include "core/game_experiment.h"
 #include "core/game_ghost.h"
 #include "core/game_overlay.h"
 #include "core/game_resume.h"
+#include "core/game_timing.h"   /* GAME_FIXED_STEP */
 #include "core/game_profile.h"
 #include "shared/platform.h"  /* clock_millis, preference_path_at */
 #include "shared/serializer_io.h"
@@ -542,6 +544,8 @@ static int persistent_session(void)
     puts("profile session: continue to a removed stage");
     session=session_create(&config);
     CHECK(session && !session->game && session->menu && session->screen==APP_SCREEN_MENU);
+    /* ...and says why, as a failed Play does, instead of a silent menu. */
+    CHECK(strstr(session->menu->error_message,"could not be loaded")!=NULL);
     session_destroy(&session);
     config.level_path="levels/00_sandbox_01.toml"; config.smoke_test_frames=1;
     session=session_create(&config);
@@ -700,6 +704,11 @@ static int ghost_codec_and_paths(void)
         "time = 0.05\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\nextra = 1\n",
         "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
         "time = 0.05\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n",              /* no steps */
+        /* A time that 3 steps (0.05 s) cannot take: 0 would be unbeatable. */
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n",
+        "format_version = 1\nlevel = \"levels/a.toml\"\nlevel_hash = \"00000000000000ff\"\n"
+        "time = 0.1\nsteps = 3\nframes = [\"0450011c000451011c00\", \"0452011c22\"]\n",
     };
     GameGhostTrack track = {0};
     char *text = malloc(GHOST_TEXT_MAX), *again = malloc(GHOST_TEXT_MAX);
@@ -714,6 +723,21 @@ static int ghost_codec_and_paths(void)
     CHECK(game_ghost_decode(&track, text) == 0 && game_ghost_encode(&track, again, GHOST_TEXT_MAX) == 0);
     CHECK(!strcmp(text, again));
     CHECK(game_ghost_encode(&track, text, 40) == -1);  /* does not fit */
+    track.time = 0.0f;  /* not the time of 3 steps */
+    CHECK(game_ghost_encode(&track, text, GHOST_TEXT_MAX) == -1);
+    track.time = 0.05f;
+    /* Five minutes of steps: the level timer's float sum ends ~0.03 s
+     * (two steps) short of 300 s, and a real run's time must still pass. */
+    {
+        GameGhostTrack longest = {.level = "levels/a.toml", .count = GHOST_MAX_STEPS};
+        longest.samples = calloc(GHOST_MAX_STEPS, sizeof(*longest.samples));
+        CHECK(longest.samples);
+        for (int i = 0; i < GHOST_MAX_STEPS; i++) longest.time += GAME_FIXED_STEP;
+        int encoded = game_ghost_encode(&longest, text, GHOST_TEXT_MAX);
+        game_ghost_track_free(&longest);
+        CHECK(encoded == 0 && game_ghost_decode(&longest, text) == 0);
+        game_ghost_track_free(&longest);
+    }
     game_ghost_track_free(&track);
     for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
         if (game_ghost_decode(&track, bad[i]) != -1 || track.samples) {
@@ -839,6 +863,229 @@ fail:
     return 1;
 }
 
+/*
+ * A run started with --start-x / --start-checkpoint (the editor's
+ * "Playtest from here") skipped part of the level. It used to record its
+ * short time as the best time and its recording as the ghost, and to save
+ * its respawn point as the Continue point, replacing the real one with a
+ * point --continue then refused. Now it writes none of the three, and it
+ * leaves the real Continue point alone even when it finishes the level.
+ */
+static int start_point_runs_leave_the_profile_alone(void)
+{
+    char path[160], lock_path[176], ghost_path[200];
+    const char *level = "levels/00_sandbox_01.toml";
+    snprintf(path, sizeof(path), TEST_OUT "profile-start-point-%llu.toml", (unsigned long long)clock_millis());
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+    CHECK(game_ghost_file_path(path, level, ghost_path, sizeof(ghost_path)) == 0);
+    AppSessionConfig config = {.level_path = level, .profile_enabled = 1, .profile_path = path};
+
+    /* A normal run leaves a Continue point in the third screen, score 30. */
+    AppSession *session = session_create(&config);
+    CHECK(session && session->game);
+    session->game->world.player.x = 2.0f * GAME_W + 50.0f;
+    game_checkpoint_update(session->game);
+    session->game->world.score = 30;
+    session->game->screen.route = GAME_ROUTE_EXIT;
+    session_frame(session);
+    session_destroy(&session);
+
+    /* A playtest from x 300 moves its respawn point, pauses and finishes. */
+    config.start.kind = LEVEL_START_AT_X;
+    config.start.x = 300.0f;
+    session = session_create(&config);
+    CHECK(session && session->game);
+    GameState *game = session->game;
+    game->world.player.x = 3.0f * GAME_W + 50.0f;
+    game_checkpoint_update(game);
+    game->world.score = 99;
+    game_overlay_set_pause_reason(game, GAME_PAUSE_REASON_PLAYER, 1);
+    session_frame(session);
+    const GameResume *saved = game_profile_resume(&session->profile, level);
+    CHECK(saved && saved->score == 30 && saved->legacy_screen == 2);
+    game_overlay_set_pause_reason(game, GAME_PAUSE_REASON_PLAYER, 0);
+    finish_run(session, 30, 0.5f);
+    CHECK(game->screen.profile_completion_recorded);
+    CHECK(!game_profile_result(&session->profile, level));
+    CHECK(serializer_probe_path_utf8(ghost_path) == SERIALIZER_PATH_MISSING);
+    saved = game_profile_resume(&session->profile, level);
+    CHECK(saved && saved->score == 30);
+    session_destroy(&session);
+
+    /* The real Continue point still works. */
+    config.start.kind = LEVEL_START_DEFAULT;
+    config.level_path = NULL;
+    config.continue_last = 1;
+    session = session_create(&config);
+    CHECK(session && session->game && session->game->screen.resumed && session->game->world.score == 30);
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 0;
+fail:
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 1;
+}
+
+/*
+ * The ghost races from step 0 of the level. A run that picks the level up
+ * part-way (Continue, or a --start-x playtest) used to show it too, from
+ * the level start, where it had nothing to do with the player. It is now
+ * hidden for those runs and shown again for the next whole one.
+ */
+static int ghost_hidden_on_partial_runs(void)
+{
+    char path[160], lock_path[176], ghost_path[200];
+    const char *level = "levels/00_sandbox_01.toml";
+    snprintf(path, sizeof(path), TEST_OUT "profile-ghost-hidden-%llu.toml", (unsigned long long)clock_millis());
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+    CHECK(game_ghost_file_path(path, level, ghost_path, sizeof(ghost_path)) == 0);
+    AppSessionConfig config = {.level_path = level, .profile_enabled = 1, .profile_path = path};
+    AppSession *session = session_create(&config);
+    CHECK(session && session->game);
+    finish_run(session, 30, 0.5f);
+    session->game->screen.route = GAME_ROUTE_REPLAY;
+    session_frame(session);
+    CHECK(session->game->screen.ghost->best.count == 30);
+    CHECK(game_ghost_current(session->game) != NULL);  /* a whole run races it */
+
+    /* Leave a Continue point in the third screen. */
+    session->game->world.player.x = 2.0f * GAME_W + 50.0f;
+    game_checkpoint_update(session->game);
+    session->game->screen.route = GAME_ROUTE_EXIT;
+    session_frame(session);
+    session_destroy(&session);
+
+    config.level_path = NULL;
+    config.continue_last = 1;
+    session = session_create(&config);
+    CHECK(session && session->game && session->game->screen.resumed);
+    CHECK(session->game->screen.ghost && session->game->screen.ghost->best.count == 30);
+    game_ghost_step(session->game);
+    CHECK(game_ghost_current(session->game) == NULL);
+    session_destroy(&session);
+
+    config.level_path = level;
+    config.continue_last = 0;
+    config.start.kind = LEVEL_START_AT_X;
+    config.start.x = 300.0f;
+    session = session_create(&config);
+    CHECK(session && session->game && session->game->screen.ghost);
+    game_ghost_step(session->game);
+    CHECK(game_ghost_current(session->game) == NULL);
+    /* Retry after Game Over is a whole attempt again: the ghost returns. */
+    session->game->screen.game_over = 1;
+    game_restart_after_game_over(session->game);
+    game_ghost_step(session->game);
+    CHECK(game_ghost_current(session->game) != NULL);
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 0;
+fail:
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 1;
+}
+
+/*
+ * Two game windows on one profile: this one loaded no ghost, then another
+ * stored a faster run before this one finished. The save used to trust
+ * the ghost loaded at level open and wrote the slower run over the faster
+ * one. It now reads the stored ghost again first and keeps it.
+ */
+static int ghost_save_keeps_a_faster_stored_run(void)
+{
+    char path[160], lock_path[176], ghost_path[200];
+    const char *level = "levels/00_sandbox_01.toml";
+    snprintf(path, sizeof(path), TEST_OUT "profile-ghost-race-%llu.toml", (unsigned long long)clock_millis());
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+    CHECK(game_ghost_file_path(path, level, ghost_path, sizeof(ghost_path)) == 0);
+    AppSessionConfig config = {.level_path = level, .profile_enabled = 1, .profile_path = path};
+    GameGhostTrack other = {.level = "levels/00_sandbox_01.toml", .count = 15, .time = 0.25f};
+    AppSession *session = session_create(&config);
+    CHECK(session && session->game && session->game->screen.ghost->best.count == 0);
+
+    /* The other window's faster run: 15 steps, 0.25 s. */
+    other.level_hash = session->game->world.source_level_hash;
+    other.samples = calloc(15, sizeof(*other.samples));
+    CHECK(other.samples);
+    CHECK(game_ghost_save(&session->profile, &other) == GHOST_SAVE_WRITTEN);
+    game_ghost_track_free(&other);
+
+    /* This window finishes in 0.5 s: the faster stored ghost stays. */
+    finish_run(session, 30, 0.5f);
+    CHECK(game_ghost_load(&session->profile, level, &other) == 1);
+    CHECK(other.count == 15 && other.time == 0.25f);
+    game_ghost_track_free(&other);
+
+    /* A faster run than the stored one still replaces it. */
+    session->game->screen.route = GAME_ROUTE_REPLAY;
+    session_frame(session);
+    finish_run(session, 6, 0.1f);
+    CHECK(game_ghost_load(&session->profile, level, &other) == 1 && other.count == 6);
+    game_ghost_track_free(&other);
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 0;
+fail:
+    game_ghost_track_free(&other);
+    session_destroy(&session);
+    remove(ghost_path); remove(path); remove(lock_path);
+    return 1;
+}
+
+/*
+ * The manifest marks an entry unavailable when it breaks the campaign
+ * order, and the menu refuses to start it. Next Level and --continue used
+ * to open it anyway. Both now refuse it and say so; --level still loads
+ * the file directly (decision D-003).
+ */
+static int campaign_flow_refuses_unavailable_entries(void)
+{
+    char path[160], lock_path[176];
+    const char *campaign = "tests/fixtures/runtime/campaign_out_of_order.toml";
+    const char *sandbox = "levels/00_sandbox_01.toml";
+    snprintf(path, sizeof(path), TEST_OUT "profile-campaign-%llu.toml", (unsigned long long)clock_millis());
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+
+    /* Next Level into the unavailable sandbox entry is refused. */
+    AppSessionConfig config = {.level_path = "levels/01_lugio_01.toml", .campaign_path = campaign};
+    AppSession *session = session_create(&config);
+    CHECK(session && session->game);
+    LevelDef *def = session->game->world.level_def;
+    snprintf(def->next_phase, sizeof(def->next_phase), "%s", sandbox);
+    game_complete_level(session->game);
+    session->game->screen.route = GAME_ROUTE_NEXT_LEVEL;
+    session_frame(session);
+    CHECK(session->game && session->game->screen.completion.next_phase_failed == NEXT_PHASE_UNAVAILABLE);
+    CHECK(!strcmp(session->game->world.level_path, "levels/01_lugio_01.toml"));
+    CHECK(strstr(session->status_message, "unavailable") != NULL);
+    session_destroy(&session);
+
+    /* --level bypasses the manifest: the same file still loads. */
+    config.level_path = sandbox;
+    config.profile_enabled = 1;
+    config.profile_path = path;
+    session = session_create(&config);
+    CHECK(session && session->game);
+    CHECK(!strcmp(session->profile.data.last_level, sandbox));
+    session_destroy(&session);  /* saves last_level = the sandbox */
+
+    /* --continue to it falls back to the menu, with the reason shown. */
+    config.level_path = NULL;
+    config.continue_last = 1;
+    session = session_create(&config);
+    CHECK(session && !session->game && session->menu);
+    CHECK(strstr(session->menu->error_message, "unavailable") != NULL);
+    session_destroy(&session);
+    remove(path); remove(lock_path);
+    return 0;
+fail:
+    session_destroy(&session);
+    remove(path); remove(lock_path);
+    return 1;
+}
+
 /* Collect raylib warnings so a test can see what the session logged. */
 static char last_warning[256];
 static void capture_warning(int level, const char *text, va_list args)
@@ -904,6 +1151,12 @@ int game_profile_contract_test(void)
     puts("profile: ghost codec and session");
     if (ghost_codec_and_paths()) return 1;
     if (ghost_session_keeps_the_fastest_run()) return 1;
+    puts("profile: start-point runs");
+    if (start_point_runs_leave_the_profile_alone()) return 1;
+    if (ghost_hidden_on_partial_runs()) return 1;
+    if (ghost_save_keeps_a_faster_stored_run()) return 1;
+    puts("profile: campaign flow");
+    if (campaign_flow_refuses_unavailable_entries()) return 1;
     puts("game_profile_contract_test: ok");
     return 0;
 }

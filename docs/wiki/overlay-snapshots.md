@@ -21,6 +21,7 @@ true pixel golden-image testing is available.
 - `Level Complete!`
 - `Lives: %d`
 - `Next level failed to load`
+- `Next level is unavailable in the campaign`
 - `Paused`
 - `Score: %d`
 - `Time: %02d:%02d`
@@ -46,6 +47,7 @@ true pixel golden-image testing is available.
 - `Level Complete!`
 - `Lives: %d`
 - `Next level failed to load`
+- `Next level is unavailable in the campaign`
 - `Score: %d`
 - `Time: %02d:%02d`
 - `Up/Down or D-pad: Select`

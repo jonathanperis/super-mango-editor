@@ -1,34 +1,39 @@
 /*
  * editor_validation.c — Pure validation checks used by the level editor.
+ *
+ * Every rule the game applies comes from level_validate_runtime_each, so
+ * the editor and the game can never disagree about what is valid.  The
+ * editor adds only what the game cannot know without the files at hand:
+ * that each asset or next_phase file exists, plus two warnings.
  */
 
 #include "editor_validation.h"
 
+#include "../effects/fog.h"         /* MAX_FOG_TEXTURES */
+#include "../effects/parallax.h"    /* MAX_BACKGROUND_LAYERS */
 #include "../levels/level_loader.h"
-#include "../levels/level_validate.h" /* shared path-shape helpers */
+#include "../levels/level_validate.h" /* LevelIssueLocation */
 #include "../shared/serializer_io.h"
+#include "../surfaces/platform.h"   /* MAX_PLATFORMS */
 
-#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
-static int path_exists(const char *path)
-{
-    if (!path || path[0] == '\0') return 1;
-    return serializer_file_exists_utf8(path);
-}
+/* Every path field a level has: music, floor tile, next_phase, one tile
+ * per platform and one per layer. */
+#define PATH_FIELDS_MAX (3 + MAX_PLATFORMS + 2 * MAX_BACKGROUND_LAYERS + MAX_FOG_TEXTURES)
 
-static int is_safe_repo_path_shape(const char *path)
-{
-    if (!path || path[0] == '\0') return 1;
-    if (path[0] == '/' || strchr(path, '\\') != NULL ||
-        (isalpha((unsigned char)path[0]) && path[1] == ':')) {
-        return 0;
-    }
-    if (level_path_has_parent_segment(path) || level_path_has_control_char(path))
-        return 0;
-    return 1;
-}
+/*
+ * One validation pass: the report being filled, and the path fields the
+ * game's rules already rejected (unsafe, wrong folder or file type).  Such
+ * a path already has its error; checking whether it exists would report
+ * the same field twice, and would probe a path that may point anywhere.
+ */
+typedef struct {
+    EditorValidationReport *report;
+    char rejected[PATH_FIELDS_MAX][48];
+    int rejected_count;
+} ValidationPass;
 
 static void report_add_at(EditorValidationReport *report, int is_error,
                           const LevelIssueLocation *where,
@@ -77,30 +82,47 @@ static LevelIssueLocation location(const char *path)
     return where;
 }
 
+/* 1 when a field name names a path: "music_path", "platforms[2].tile_path",
+ * "fog_layers[0].path" or "next_phase". */
+static int is_path_field(const char *field, size_t length)
+{
+    return (length >= 4 && memcmp(field + length - 4, "path", 4) == 0) ||
+           (length == 10 && memcmp(field, "next_phase", 10) == 0);
+}
+
 /* level_validate_runtime_each hands every runtime error to this, with its
- * location already read from the message. */
+ * location already read from the message.  Runtime messages begin with the
+ * field they are about, which is how a rejected path field is noted. */
 static void add_runtime_issue(void *context, const char *message,
                               const LevelIssueLocation *where)
 {
-    report_add_at((EditorValidationReport *)context, 1, where, "%s", message, NULL);
+    ValidationPass *pass = context;
+    size_t length = strcspn(message, " ");
+
+    report_add_at(pass->report, 1, where, "%s", message, NULL);
+    if (is_path_field(message, length) && pass->rejected_count < PATH_FIELDS_MAX &&
+        length < sizeof(pass->rejected[0])) {
+        memcpy(pass->rejected[pass->rejected_count], message, length);
+        pass->rejected[pass->rejected_count][length] = '\0';
+        pass->rejected_count++;
+    }
 }
 
-static void check_path(EditorValidationReport *report, const char *field,
-                       const char *path)
+/* The editor's own check of a path the game accepted: does the file exist? */
+static void check_path(ValidationPass *pass, const char *field, const char *path)
 {
     if (!path || path[0] == '\0') return;
-    if (!is_safe_repo_path_shape(path)) {
-        report_add(report, 1, "%s unsafe: %s", field, path);
-        return;
-    }
-    if (!path_exists(path)) {
-        report_add(report, 1, "%s missing: %s", field, path);
-    }
+    for (int i = 0; i < pass->rejected_count; i++)
+        if (strcmp(pass->rejected[i], field) == 0) return;
+    if (!serializer_file_exists_utf8(path))
+        report_add(pass->report, 1, "%s missing: %s", field, path);
 }
 
 int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
 {
     char field[64];
+    /* Static: about 2.6 KB of field names; the editor is single-threaded. */
+    static ValidationPass pass;
 
     if (!report) return -1;
     memset(report, 0, sizeof(*report));
@@ -111,33 +133,33 @@ int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
     }
 
     /* Every runtime rule the game applies, each failure its own message
-     * (the game itself stops at the first one). */
-    (void)level_validate_runtime_each(def, add_runtime_issue, report);
+     * (the game itself stops at the first one).  Nothing below repeats
+     * one: screen_count 0, say, is the game's default of 4 screens, and
+     * fine here too. */
+    pass.report = report;
+    pass.rejected_count = 0;
+    (void)level_validate_runtime_each(def, add_runtime_issue, &pass);
 
-    if (def->screen_count <= 0) {
-        report_add(report, 1, "%s", "screen_count must be > 0", NULL);
-    }
-
-    check_path(report, "music_path", def->music_path);
-    check_path(report, "floor_tile_path", def->floor_tile_path);
-    check_path(report, "next_phase", def->next_phase);
+    check_path(&pass, "music_path", def->music_path);
+    check_path(&pass, "floor_tile_path", def->floor_tile_path);
+    check_path(&pass, "next_phase", def->next_phase);
 
     for (int i = 0; i < def->platform_count && i < MAX_PLATFORMS; i++) {
         snprintf(field, sizeof(field), "platforms[%d].tile_path", i);
-        check_path(report, field, def->platforms[i].tile_path);
+        check_path(&pass, field, def->platforms[i].tile_path);
     }
 
     for (int i = 0; i < def->background_layer_count && i < MAX_BACKGROUND_LAYERS; i++) {
         snprintf(field, sizeof(field), "background_layers[%d].path", i);
-        check_path(report, field, def->background_layers[i].path);
+        check_path(&pass, field, def->background_layers[i].path);
     }
     for (int i = 0; i < def->foreground_layer_count && i < MAX_BACKGROUND_LAYERS; i++) {
         snprintf(field, sizeof(field), "foreground_layers[%d].path", i);
-        check_path(report, field, def->foreground_layers[i].path);
+        check_path(&pass, field, def->foreground_layers[i].path);
     }
     for (int i = 0; i < def->fog_layer_count && i < MAX_FOG_TEXTURES; i++) {
         snprintf(field, sizeof(field), "fog_layers[%d].path", i);
-        check_path(report, field, def->fog_layers[i].path);
+        check_path(&pass, field, def->fog_layers[i].path);
     }
 
     if (def->name[0] == '\0') {

@@ -56,9 +56,10 @@ void game_ghost_step(GameState *gs)
 {
     GameGhost *ghost = gs->screen.ghost;
     if (!ghost) return;
-    /* A run continued from a saved point began part-way through the level,
-     * so its recording could never be a whole run: stop recording it. */
-    if (gs->screen.resumed) ghost->recording = 0;
+    /* A run continued from a saved point, or started at a playtest start
+     * point, began part-way through the level, so its recording could
+     * never be a whole run: stop recording it. */
+    if (gs->screen.resumed || gs->screen.start_point_run) ghost->recording = 0;
     if (ghost->recording) {
         if (ghost->run_count == GHOST_MAX_STEPS) {
             ghost->recording = 0;  /* too long to keep; see GHOST_MAX_STEPS */
@@ -79,6 +80,11 @@ const GhostSample *game_ghost_current(const GameState *gs)
 {
     const GameGhost *ghost = gs->screen.ghost;
     if (!ghost || !gs->screen.profile || !gs->screen.profile->data.settings.ghost || ghost->best.count == 0) return NULL;
+    /* The best run is raced from the level start. A run that picked the
+     * level up part-way (Continue, or a --start-x playtest) is somewhere
+     * else at step 0, so a ghost there would race nothing: hide it until
+     * a whole attempt (Retry, Replay) starts. */
+    if (gs->screen.resumed || gs->screen.start_point_run) return NULL;
     /* step counts the steps already simulated; after step n the real Mango
      * shows the result of step n, which the best run recorded as sample
      * n - 1. Before the first step the ghost waits on its first sample. */
@@ -91,7 +97,8 @@ int game_ghost_take_run(const GameState *gs, GameGhostTrack *out)
 {
     const GameGhost *ghost = gs->screen.ghost;
     memset(out, 0, sizeof(*out));
-    if (!ghost || !ghost->recording || gs->screen.resumed || ghost->run_count == 0 ||
+    if (!ghost || !ghost->recording || gs->screen.resumed || gs->screen.start_point_run ||
+        ghost->run_count == 0 ||
         !gs->screen.profile_level_key[0]) return -1;
     out->samples = malloc((size_t)ghost->run_count * sizeof(*out->samples));
     if (!out->samples) return -1;

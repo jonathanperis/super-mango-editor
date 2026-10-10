@@ -34,17 +34,21 @@ typedef enum {
     EDITOR_RECOVERY_RECOVER = 1, /* load this copy                       */
     EDITOR_RECOVERY_NEXT = 2,    /* look at the next copy                */
     EDITOR_RECOVERY_DISCARD = 3, /* delete this copy's files             */
-    EDITOR_RECOVERY_BACK = 4     /* from "More...": ask about it again   */
+    EDITOR_RECOVERY_BACK = 4,    /* from "More...": ask about it again   */
+    EDITOR_RECOVERY_DISCARD_ALL = 5 /* delete every copy offered         */
 } EditorRecoveryAction;
 
 /* Show the native recovery picker (Cancel / Recover / Discard, with
- * "More..." for Discard / Next when there are several copies).  Returns the
- * chosen entry's index (its id is left in es->pending_recovery_id), or -1
- * when cancelled or when every copy was discarded. */
+ * "More..." for Discard... / Next when there are several copies, and
+ * Discard... asking "this copy or all of them").  Returns the chosen
+ * entry's index (its id is left in es->pending_recovery_id), or -1 when
+ * cancelled or when every copy was discarded. */
 int editor_choose_recovery(EditorState *es);
 
 /* Delete snapshot files that have lost their .meta (they can never be
- * offered), except this editor's own.  Returns how many were removed. */
+ * offered), except this editor's own and any written in the last five
+ * minutes (another editor may be about to write its .meta).  Returns how
+ * many were removed. */
 int editor_clean_orphan_recoveries(EditorState *es);
 
 /* Load one recovery snapshot, found by its id, as an unsaved document. */
@@ -59,6 +63,14 @@ void editor_retire_matching_recovery(EditorState *es, const char *destination);
 
 /* Retire the current document recovery after a save or explicit discard. */
 void editor_retire_current_recovery(EditorState *es);
+
+/* When process `pid` started, as a number only comparable with another
+ * answer for the same pid on this machine (Linux: clock ticks after boot;
+ * Windows: a FILETIME); 0 when not known.  Together with the pid it names
+ * one process even after the system hands the pid to another program.
+ * Other systems (macOS, the browser) always answer 0, and the pid alone
+ * decides. */
+uint64_t editor_process_start_time(unsigned long pid);
 
 /* Non-zero when the file name in path is a recovery snapshot
  * (editor_recovery_<16 hex digits>.toml); such files are never saved over. */

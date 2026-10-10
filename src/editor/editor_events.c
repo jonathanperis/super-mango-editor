@@ -10,8 +10,34 @@
 #include "editor_playtest.h"
 #include "editor_session.h"
 #include "editor_undo_apply.h"
+#include "../shared/geometry.h"  /* float_same_value */
 #include "tools.h"
 #include "entity_meta.h"   /* editor_select_none */
+
+#include <stdio.h>    /* snprintf */
+#include <string.h>   /* strlen */
+
+/*
+ * The system clipboard, through raylib.  Test builds use a buffer of their
+ * own instead: the headless raylib the tests run on has no clipboard.
+ */
+#ifdef MANGO_TESTING
+static char s_test_clipboard[UI_EDIT_BUFFER_SIZE];
+
+const char *editor_test_clipboard(void) { return s_test_clipboard; }
+
+void editor_test_set_clipboard(const char *text)
+{
+    snprintf(s_test_clipboard, sizeof(s_test_clipboard), "%s", text ? text : "");
+}
+
+static void clipboard_set(const char *text) { editor_test_set_clipboard(text); }
+static const char *clipboard_get(void) { return s_test_clipboard; }
+#else
+static void clipboard_set(const char *text) { SetClipboardText(text); }
+/* Borrowed from raylib; do not free. */
+static const char *clipboard_get(void) { return GetClipboardText(); }
+#endif
 
 /*
  * note_redone_place — Remember an entity a redone CMD_PLACE put back, so a
@@ -84,27 +110,73 @@ static void editor_key(EditorState *es, const InputEvent *event)
     }
     /* An active text field owns ordinary typing. The digit '2' in a field
      * must not also select the Place tool. Modifiers come from this event. */
+    /* An open dropdown list owns the keys that work it: Up / Down,
+     * Home / End, Enter, Tab and Esc.  Other keys are ignored rather than
+     * reaching the canvas under the list. */
+    if (es->ui.dropdown_open_id && !es->ui.active_id && !ctrl) {
+        switch (key) {
+        case KEY_UP:    ui_dropdown_key(&es->ui, UI_KEY_UP);   break;
+        case KEY_DOWN:  ui_dropdown_key(&es->ui, UI_KEY_DOWN); break;
+        case KEY_HOME:  ui_dropdown_key(&es->ui, UI_KEY_HOME); break;
+        case KEY_END:   ui_dropdown_key(&es->ui, UI_KEY_END);  break;
+        case KEY_ENTER: case KEY_KP_ENTER: ui_dropdown_key(&es->ui, UI_KEY_PICK); break;
+        case KEY_TAB:   ui_focus_next(&es->ui, shift ? -1 : 1); break;
+        case KEY_ESCAPE: es->ui.dropdown_open_id = 0;           break;
+        default: break;
+        }
+        return;
+    }
     if (es->ui.active_id && !ctrl && key != KEY_ESCAPE && key != KEY_F5) {
         /* Caret keys act at once, in the order they were pressed, so
          * "type, Left, type" in one frame lands where it should. */
+        /* Shift with a caret key selects what the caret passes over. */
         switch (key) {
-        case KEY_BACKSPACE: ui_edit_key(&es->ui, UI_KEY_BACKSPACE); break;
-        case KEY_DELETE:    ui_edit_key(&es->ui, UI_KEY_DELETE);    break;
-        case KEY_LEFT:      ui_edit_key(&es->ui, UI_KEY_LEFT);      break;
-        case KEY_RIGHT:     ui_edit_key(&es->ui, UI_KEY_RIGHT);     break;
-        case KEY_HOME:      ui_edit_key(&es->ui, UI_KEY_HOME);      break;
-        case KEY_END:       ui_edit_key(&es->ui, UI_KEY_END);       break;
+        case KEY_BACKSPACE: ui_edit_key(&es->ui, UI_KEY_BACKSPACE, 0); break;
+        case KEY_DELETE:    ui_edit_key(&es->ui, UI_KEY_DELETE, 0);    break;
+        case KEY_LEFT:      ui_edit_key(&es->ui, UI_KEY_LEFT, shift);  break;
+        case KEY_RIGHT:     ui_edit_key(&es->ui, UI_KEY_RIGHT, shift); break;
+        case KEY_HOME:      ui_edit_key(&es->ui, UI_KEY_HOME, shift);  break;
+        case KEY_END:       ui_edit_key(&es->ui, UI_KEY_END, shift);   break;
         case KEY_TAB:       ui_focus_next(&es->ui, shift ? -1 : 1); break;
         case KEY_ENTER: case KEY_KP_ENTER: es->ui.key_return = 1;  break;
         default: break;
         }
         return;
     }
-    if (es->ui.active_id && ctrl && (key == KEY_C || key == KEY_V)) {
-        if (key == KEY_C) SetClipboardText(es->ui.edit_buf);
-        else {
-            const char *text = GetClipboardText(); /* borrowed by raylib; do not free */
-            if (text) ui_queue_text_input(&es->ui, text);
+    /* A validation or load-problem row clicked last: Ctrl+C copies its
+     * text (even when the click put the caret in the field it is about). */
+    if (ctrl && key == KEY_C && es->focus_area == EDITOR_FOCUS_MESSAGES &&
+        es->selected_message[0]) {
+        clipboard_set(es->selected_message);
+        editor_set_status(es, "Copied: %s", es->selected_message);
+        return;
+    }
+    /* Ctrl with a field active edits text: copy, cut and paste act on the
+     * selection, Ctrl+A selects everything, Ctrl+Left / Right jump a word
+     * (with Shift, selecting it). */
+    if (es->ui.active_id && ctrl &&
+        (key == KEY_C || key == KEY_X || key == KEY_V || key == KEY_A ||
+         key == KEY_LEFT || key == KEY_RIGHT)) {
+        char selected[UI_EDIT_BUFFER_SIZE];
+        switch (key) {
+        case KEY_C: case KEY_X:
+            if (ui_edit_selected_text(&es->ui, selected, sizeof(selected)) == 0) {
+                editor_set_status(es, "Nothing selected to %s: Shift+arrows, a drag or "
+                                  "Ctrl+A select text", key == KEY_C ? "copy" : "cut");
+                break;
+            }
+            clipboard_set(selected);
+            if (key == KEY_X) ui_edit_delete_selection(&es->ui);
+            break;
+        case KEY_V: {
+            const char *text = clipboard_get();
+            if (text) ui_queue_text_input(&es->ui, text);   /* replaces the selection */
+            break;
+        }
+        case KEY_A:     ui_edit_key(&es->ui, UI_KEY_SELECT_ALL, 0);     break;
+        case KEY_LEFT:  ui_edit_key(&es->ui, UI_KEY_WORD_LEFT, shift);  break;
+        case KEY_RIGHT: ui_edit_key(&es->ui, UI_KEY_WORD_RIGHT, shift); break;
+        default: break;
         }
         return;
     }
@@ -205,10 +277,21 @@ static void editor_key(EditorState *es, const InputEvent *event)
                 : "Snap to grid off (hold Shift to snap)");
         }
         break;
-    case KEY_DELETE:
     case KEY_BACKSPACE:
-        /* Backspace too: many laptop keyboards (Macs) have no Delete key.
-         * Inside a text field it edits text instead (handled above). */
+        /* Backspace too deletes: many laptop keyboards (Macs) have no Delete
+         * key.  Inside a text field it edits text instead (handled above).
+         * But right after Enter commits a field, a Backspace still meant
+         * for that field would delete the selection, so Backspace deletes
+         * only while the canvas has the focus (the last click was on it). */
+        if (es->selection.index < 0) break;
+        if (es->focus_area != EDITOR_FOCUS_CANVAS) {
+            editor_set_status(es, "Backspace deletes on the canvas: click it first, "
+                              "or press Delete");
+            break;
+        }
+        if (editor_finish_field_edit(es)) tools_delete_selected(es);
+        break;
+    case KEY_DELETE:
         if (es->selection.index >= 0 && editor_finish_field_edit(es)) tools_delete_selected(es);
         break;
     case KEY_LEFT: case KEY_RIGHT: case KEY_UP: case KEY_DOWN: {
@@ -287,7 +370,7 @@ static void editor_canvas_wheel(EditorState *es, const InputEvent *event)
          * not suddenly jump back to 1x. */
         if (index < 0) index = 0;
         if (index > last) index = last;
-        if ((float)zooms[index] != es->camera.zoom)
+        if (!float_same_value((float)zooms[index], es->camera.zoom))
             canvas_set_zoom(es, (float)zooms[index], event->x, event->y);
     } else if (event->mods & INPUT_SHIFT) {
         float amount = event->wheel != 0.0f ? event->wheel : event->wheel_x;
@@ -353,6 +436,8 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
              * placing or deleting under it as well would be a surprise. */
             if (ui_press(&es->ui)) break;
             es->mouse_down = 1;
+            es->focus_area = canvas_contains(event->x, event->y) && !es->campaign
+                           ? EDITOR_FOCUS_CANVAS : EDITOR_FOCUS_PANEL;
             /* Over the Campaign view the canvas tools are asleep; its
              * widgets read the click from ui.mouse_clicked. */
             if (canvas_contains(event->x, event->y) && !es->campaign &&

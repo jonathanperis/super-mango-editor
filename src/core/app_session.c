@@ -18,6 +18,7 @@
  */
 #include "app_session.h"
 #include "../shared/platform.h"  /* str_copy */
+#include "../shared/geometry.h"  /* float_same_value */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,15 +51,44 @@ static void session_emit(AppSession *session, AppSessionLifecycleEvent event, co
     if (session->hooks.lifecycle) session->hooks.lifecycle(event, path, session->hooks.userdata);
 }
 
-static int session_load_catalog(AppSession *session)
+static int session_read_catalog(AppSession *session)
 {
     if (session->catalog_loaded) return 0;
-    if (campaign_catalog_load(CAMPAIGN_MANIFEST_PATH, &session->catalog)) {
+    if (campaign_catalog_load(session->campaign_path, &session->catalog)) return -1;
+    session->catalog_loaded = 1;
+    return 0;
+}
+
+static int session_load_catalog(AppSession *session)
+{
+    if (session_read_catalog(session)) {
         copy_path(session->status_message, sizeof(session->status_message), "Campaign manifest unavailable");
         return -1;
     }
-    session->catalog_loaded = 1;
     return 0;
+}
+
+/*
+ * session_campaign_refusal — Why the campaign will not play `path`, or
+ * NULL when it may.
+ *
+ * The manifest marks an entry unavailable when its file is missing or
+ * invalid, or when it breaks the campaign order (campaign_check_chain).
+ * The menu already refuses such an entry; Next Level and --continue ask
+ * here too, so the campaign flow never reaches a level its own menu greys
+ * out. A level the manifest does not list (a lab, a --level file) has no
+ * campaign rule to break, and without a readable manifest there is none
+ * to apply. --level itself never asks: it loads a file directly and
+ * bypasses the manifest on purpose.
+ */
+static const char *session_campaign_refusal(AppSession *session, const char *path)
+{
+    if (!path || !path[0] || session_read_catalog(session)) return NULL;
+    for (size_t i = 0; i < session->catalog.count; i++) {
+        const CampaignLevel *entry = &session->catalog.levels[i];
+        if (!strcmp(entry->path, path)) return entry->available ? NULL : entry->problem;
+    }
+    return NULL;
 }
 
 static void session_free_owned(AppSession *session)
@@ -220,15 +250,20 @@ static void session_track_resume(AppSession *session, const GameState *game, int
 {
     GameProfile *profile = &session->profile;
     /* Labs and editor playtests have no profile key; F8 experiments are
-     * debug runs, which never touch the personal profile anyway. */
-    if (!game->screen.profile_level_key[0] || game->screen.experiment) return;
+     * debug runs, which never touch the personal profile anyway. A run from
+     * a --start-x / --start-checkpoint point neither records a point (its
+     * respawn may be one no normal run could save, which game_resume_apply
+     * would refuse) nor clears the real one when it ends. */
+    if (!game->screen.profile_level_key[0] || game->screen.experiment ||
+        game->screen.start_point_run) return;
     if (game->screen.completion.complete || game->screen.game_over) {
         /* A finished or lost attempt leaves nothing to continue. */
         if (game_profile_resume(profile, game->screen.profile_level_key)) game_profile_clear_resume(profile);
         return;
     }
     int paused = game->screen.paused || game->screen.pause_reasons;
-    int moved = game->world.respawn_x != session->resume_respawn_x || game->world.respawn_y != session->resume_respawn_y;
+    int moved = !float_same_value(game->world.respawn_x, session->resume_respawn_x) ||
+                !float_same_value(game->world.respawn_y, session->resume_respawn_y);
     int pause_began = paused && !session->resume_was_paused;
     session->resume_was_paused = paused;
     if (!leaving && !moved && !pause_began) return;
@@ -304,8 +339,9 @@ static void session_load_ghost(AppSession *session, GameState *game)
 /*
  * A finished run becomes the level's ghost when there is none yet (or only
  * one for another version of the level, which was never loaded) or when it
- * beat the stored ghost's time. A run continued from a saved point, or one
- * longer than GHOST_MAX_STEPS, recorded no whole run and is skipped.
+ * beat the stored ghost's time. A run continued from a saved point or
+ * started at a --start-x / --start-checkpoint point, or one longer than
+ * GHOST_MAX_STEPS, recorded no whole run and is skipped.
  */
 static void session_save_ghost(AppSession *session, GameState *game)
 {
@@ -313,8 +349,13 @@ static void session_save_ghost(AppSession *session, GameState *game)
     if (!game->screen.ghost || !session->profile.enabled || !session->profile.writable) return;
     if (game_ghost_take_run(game, &run)) return;
     const GameGhostTrack *best = &game->screen.ghost->best;
-    if ((best->count == 0 || run.time < best->time) && game_ghost_save(&session->profile, &run))
-        TraceLog(LOG_WARNING, "Ghost for %s was not saved (storage full or unavailable)", run.level);
+    if (best->count == 0 || run.time < best->time) {
+        int saved = game_ghost_save(&session->profile, &run);
+        if (saved == GHOST_SAVE_FAILED)
+            TraceLog(LOG_WARNING, "Ghost for %s was not saved (storage full or unavailable)", run.level);
+        else if (saved == GHOST_SAVE_KEPT)
+            TraceLog(LOG_INFO, "Ghost for %s kept: another game saved a faster run meanwhile", run.level);
+    }
     /* Whatever comes next (Replay, Next Level, Level Select) loads the
      * stored ghost again, so this game does not need the new one. */
     game_ghost_track_free(&run);
@@ -323,12 +364,25 @@ static void session_save_ghost(AppSession *session, GameState *game)
 /*
  * session_load_assets — Load the shared sprites and sounds the first time a
  * game opens; later games reuse them. A failed load is undone, so the next
- * attempt (another Play) starts clean. Returns 0 when they are loaded.
+ * attempt (another Play) starts clean, and the missing file is named in
+ * session->load_error. A sprite or sound that was missing from an earlier
+ * load is tried again each time, so putting the file back fixes the next
+ * Play without restarting. No game holds a copy of the set at this point
+ * (Replay closes its game first), so filling empty slots is safe. Returns
+ * 0 when the set is loaded.
  */
 static int session_load_assets(AppSession *session)
 {
-    if (session->assets_loaded) return 0;
+    if (session->assets_loaded) {
+        game_resources_reload_missing(&session->assets);
+        return 0;
+    }
     if (game_resources_load(&session->assets) != 0) {
+        const char *missing = game_resources_missing_required(&session->assets);
+        const char *name = missing ? strrchr(missing, '/') : NULL;
+        if (missing)
+            snprintf(session->load_error, sizeof(session->load_error), "Missing file: %s",
+                     name ? name + 1 : missing);
         game_resources_unload(&session->assets);
         return -1;
     }
@@ -338,6 +392,7 @@ static int session_load_assets(AppSession *session)
 
 static GameState *session_make_game(AppSession *session, const char *path, const GameInputPhysicalState *inherited)
 {
+    session->load_error[0] = '\0';
     if (session_load_assets(session) != 0) return NULL;
     GameState *game = calloc(1, sizeof(*game));
     if (!game) return NULL;
@@ -357,6 +412,8 @@ static GameState *session_make_game(AppSession *session, const char *path, const
     game->screen.start_checkpoint = session->start.checkpoint;
     session->start.kind = LEVEL_START_DEFAULT;
     if (game_init(game)) {
+        /* Keep its reason (a missing sprite, say) for the menu. */
+        copy_path(session->load_error, sizeof(session->load_error), game->screen.load_error);
         free(game);
         return NULL;
     }
@@ -411,6 +468,20 @@ static int session_open_menu(AppSession *session)
     return 0;
 }
 
+/*
+ * session_show_load_failure — Tell the player a level did not open, on the
+ * menu that is showing instead. Play and --continue both land here, so a
+ * failed start never just leaves the player at the menu without a word.
+ */
+static void session_show_load_failure(AppSession *session, const char *path)
+{
+    /* Name the cause when the game gave one (a missing sprite or sound). */
+    copy_path(session->status_message, sizeof(session->status_message),
+              session->load_error[0] ? session->load_error : "Selected level could not be loaded");
+    TraceLog(LOG_WARNING, "Level could not be loaded: %s (%s)", path, session->status_message);
+    if (session->menu) start_menu_set_error(session->menu, session->status_message);
+}
+
 static void session_end(AppSession *session, int fatal)
 {
     if (session->ended) return;
@@ -440,8 +511,7 @@ static void session_apply_menu_route(AppSession *session)
         start_menu_get_input_state(session->menu, &inherited);
         GameState *candidate = session_make_game(session, session->menu->selected_level_path, &inherited);
         if (!candidate) {
-            copy_path(session->status_message, sizeof(session->status_message), "Selected level could not be loaded");
-            start_menu_set_error(session->menu, session->status_message);
+            session_show_load_failure(session, session->menu->selected_level_path);
             session->menu->route = MENU_ROUTE_NONE;
         } else {
             /* Continue starts from the saved point; Play from the start. */
@@ -455,6 +525,56 @@ static void session_apply_menu_route(AppSession *session)
         session->route = route == MENU_ROUTE_EXIT ? APP_ROUTE_MENU_EXIT : APP_ROUTE_FATAL;
         session_end(session, route != MENU_ROUTE_EXIT);
     }
+}
+
+/*
+ * session_open_next_level — Follow the finished level's next_phase.
+ *
+ * Three outcomes: the campaign refuses the level (it is listed as
+ * unavailable), the level loads and becomes a fresh attempt, or the load
+ * fails. In the two failing cases the finished level stays on screen, so
+ * Replay, Level Select and Exit still work; the session's status message
+ * says which one happened.
+ */
+static void session_open_next_level(AppSession *session, GameState *game)
+{
+    char path[GAME_LEVEL_PATH_MAX];
+
+    session->route = APP_ROUTE_GAME_NEXT_LEVEL;
+    copy_path(path, sizeof(path), game->screen.completion.next_phase);
+    const char *refused = session_campaign_refusal(session, path);
+    if (refused) {
+        /* Like a failed load below, but the reason is the campaign's. */
+        game->screen.completion.next_phase_failed = NEXT_PHASE_UNAVAILABLE;
+        game->screen.terminal_action_index = 0;
+        copy_path(session->status_message, sizeof(session->status_message),
+                  "Next level is unavailable in the campaign");
+        TraceLog(LOG_WARNING, "%s: %s (%s)", session->status_message, path, refused);
+    } else if (!game_load_next_phase(game)) {
+        session_profile_key(game, path);
+        game_profile_select(&session->profile, game->screen.profile_level_key);
+        /* The new level is played from its start: a whole attempt. */
+        game->screen.resumed = 0;
+        game->screen.start_point_run = 0;
+        session_watch_resume(session, game);
+        /* A new level, a new race: restart the recording, load its ghost. */
+        game_ghost_restart(game);
+        game_ghost_track_free(game->screen.ghost ? &game->screen.ghost->best : NULL);
+        session_load_ghost(session, game);
+        session->preferences_applied = 0;
+        game_timing_restart_clock(game);
+        game_input_arm_release_latch(game, NULL);
+    } else {
+        /* The current level is untouched, so Replay, Level Select and
+         * Exit still work. Say what happened, drop the dead Next Level
+         * row and focus the first remaining action. */
+        game->screen.completion.next_phase_failed = NEXT_PHASE_LOAD_FAILED;
+        game->screen.terminal_action_index = 0;
+        copy_path(session->status_message, sizeof(session->status_message), "Next level failed to load");
+        TraceLog(LOG_WARNING, "%s: %s", session->status_message, path);
+    }
+    game->screen.route = GAME_ROUTE_NONE;
+    session->route = APP_ROUTE_NONE;
 }
 
 static void session_apply_game_route(AppSession *session)
@@ -476,31 +596,7 @@ static void session_apply_game_route(AppSession *session)
     game->screen.route = GAME_ROUTE_NONE;
     switch (route) {
     case GAME_ROUTE_NEXT_LEVEL:
-        session->route = APP_ROUTE_GAME_NEXT_LEVEL;
-        copy_path(path, sizeof(path), game->screen.completion.next_phase);
-        if (!game_load_next_phase(game)) {
-            session_profile_key(game, path);
-            game_profile_select(&session->profile, game->screen.profile_level_key);
-            game->screen.resumed = 0;  /* the new level is played from its start */
-            session_watch_resume(session, game);
-            /* A new level, a new race: restart the recording, load its ghost. */
-            game_ghost_restart(game);
-            game_ghost_track_free(game->screen.ghost ? &game->screen.ghost->best : NULL);
-            session_load_ghost(session, game);
-            session->preferences_applied = 0;
-            game_timing_restart_clock(game);
-            game_input_arm_release_latch(game, NULL);
-        } else {
-            /* The current level is untouched, so Replay, Level Select and
-             * Exit still work. Say what happened, drop the dead Next Level
-             * row and focus the first remaining action. */
-            game->screen.completion.next_phase_failed = 1;
-            game->screen.terminal_action_index = 0;
-            copy_path(session->status_message, sizeof(session->status_message), "Next level failed to load");
-            TraceLog(LOG_WARNING, "%s: %s", session->status_message, path);
-        }
-        game->screen.route = GAME_ROUTE_NONE;
-        session->route = APP_ROUTE_NONE;
+        session_open_next_level(session, game);
         break;
     case GAME_ROUTE_REPLAY:
         /*
@@ -559,9 +655,18 @@ AppSession *session_create(const AppSessionConfig *config)
     const char *level = config ? config->level_path : NULL;
     if (!session) return NULL;
     game_profile_init(&session->profile);
-    if ((level && strlen(level) >= sizeof(session->boot_level_path)) ||
-        (config && config->replay_script_path && strlen(config->replay_script_path) >= sizeof(session->replay_script_path)) ||
-        (config && config->replay_dir && strlen(config->replay_dir) >= sizeof(session->replay_dir))) {
+    /* Say which path does not fit: main.c just exits when this fails. */
+    const char *too_long = NULL;
+    if (level && strlen(level) >= sizeof(session->boot_level_path)) too_long = "--level";
+    else if (config && config->replay_script_path &&
+             strlen(config->replay_script_path) >= sizeof(session->replay_script_path))
+        too_long = "--replay-script";
+    else if (config && config->replay_dir && strlen(config->replay_dir) >= sizeof(session->replay_dir))
+        too_long = "--replay-dir";
+    else if (config && config->campaign_path && strlen(config->campaign_path) >= sizeof(session->campaign_path))
+        too_long = "the campaign manifest path";
+    if (too_long) {
+        fprintf(stderr, "Error: %s is too long\n", too_long);
         free(session);
         return NULL;
     }
@@ -570,6 +675,8 @@ AppSession *session_create(const AppSessionConfig *config)
     session->smoke_test_frames = config ? config->smoke_test_frames : 0;
     if (config && config->hooks) session->hooks = *config->hooks;
     if (config) session->start = config->start;
+    copy_path(session->campaign_path, sizeof(session->campaign_path),
+              config && config->campaign_path ? config->campaign_path : CAMPAIGN_MANIFEST_PATH);
     copy_path(session->replay_script_path, sizeof(session->replay_script_path), config ? config->replay_script_path : NULL);
     copy_path(session->replay_dir, sizeof(session->replay_dir), config ? config->replay_dir : NULL);
     /* Acquire process resources before a screen loads GPU/audio assets. Tests
@@ -586,19 +693,33 @@ AppSession *session_create(const AppSessionConfig *config)
         if (game_profile_open(&session->profile, config->profile_path)) TraceLog(LOG_WARNING, "%s", session->profile.status);
     } else copy_path(session->profile.status, sizeof(session->profile.status), "Saving disabled; settings apply to this run.");
     int continued = 0;  /* the level came from the profile, not the command line */
+    int refused = 0;    /* ...but the campaign no longer offers it */
     if (!level && config && config->continue_last && session->profile.data.last_level[0]) {
-        level = session->profile.data.last_level;
-        continued = 1;
+        const char *problem = session_campaign_refusal(session, session->profile.data.last_level);
+        if (problem) {
+            refused = 1;
+            copy_path(session->status_message, sizeof(session->status_message),
+                      "Last stage is unavailable in the campaign");
+            TraceLog(LOG_WARNING, "%s: %s (%s)", session->status_message,
+                     session->profile.data.last_level, problem);
+        } else {
+            level = session->profile.data.last_level;
+            continued = 1;
+        }
     }
     if (level && level[0]) {
         copy_path(session->boot_level_path, sizeof(session->boot_level_path), level);
         /* An explicit --level that fails is an error. A remembered stage
-         * that no longer loads falls back to the selector instead. */
-        if (session_open_game(session, session->boot_level_path, NULL) &&
-            (!continued || session_open_menu(session))) goto fail;
+         * that no longer loads falls back to the selector instead, which
+         * says so the way a failed Play does. */
+        if (session_open_game(session, session->boot_level_path, NULL)) {
+            if (!continued || session_open_menu(session)) goto fail;
+            session_show_load_failure(session, session->boot_level_path);
+        }
         /* --continue also picks the stage up at its saved Continue point. */
         if (continued && session->game) session_apply_resume(session, session->game);
     } else if (session_open_menu(session)) goto fail;
+    if (refused && session->menu) start_menu_set_error(session->menu, session->status_message);
     if (config && config->experiment_path && (!session->game || game_experiment_load(session->game, config->experiment_path))) goto fail;
     return session;
 fail:
@@ -629,9 +750,11 @@ static void session_step(AppSession *session, int callback_owned)
         if (game->screen.completion.complete && !game->screen.profile_completion_recorded) {
             game->screen.profile_completion_recorded = 1;
             /* A level outside levels/ (a lab, an editor playtest) has no
-             * profile key and is simply not recorded. A refusal for a keyed
-             * level means a lost result, so say so. */
-            if (game->screen.profile_level_key[0] &&
+             * profile key and is simply not recorded, and neither is a run
+             * from a start point: it skipped part of the level, so its
+             * time would be a false best. A refusal for a keyed level means
+             * a lost result, so say so. */
+            if (game->screen.profile_level_key[0] && !game->screen.start_point_run &&
                 game_profile_record(&session->profile, game->screen.profile_level_key, game->world.score-game->world.level_score_start,
                                     game->screen.completion.coins_collected, game->screen.completion.elapsed) != 0)
                 TraceLog(LOG_WARNING, "Profile: result for %s was not recorded (profile full or values out of range)",

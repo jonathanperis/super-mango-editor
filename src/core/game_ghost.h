@@ -93,13 +93,15 @@ void game_ghost_restart(GameState *gs);
 void game_ghost_step(GameState *gs);
 
 /* The best run's sample to draw for the current step, or NULL when there
- * is nothing to draw: no best run, the Ghost setting is off, or the best
- * run has already reached its star. game_render.c draws it. */
+ * is nothing to draw: no best run, the Ghost setting is off, this run
+ * started part-way (Continue or a start point), or the best run has
+ * already reached its star. game_render.c draws it. */
 const GhostSample *game_ghost_current(const GameState *gs);
 
 /* Copy this finished attempt into out (owned; free with
  * game_ghost_track_free). Returns -1 when the attempt cannot be a ghost:
- * it continued from a saved point, ran too long, or recorded nothing. */
+ * it continued from a saved point or a start point, ran too long, or
+ * recorded nothing. */
 int game_ghost_take_run(const GameState *gs, GameGhostTrack *out);
 
 /* Make track the run to race (takes ownership of its samples). */
@@ -111,11 +113,13 @@ void game_ghost_cleanup(GameState *gs);
 /* ---- Text format and storage (game_ghost_file.c) -------------------- */
 
 /* Strict parse of ghost text into out (owned on success). -1 on any
- * damage: wrong version, sizes, digits, or a sample count that does not
- * match `steps`. */
+ * damage: wrong version, sizes, digits, a sample count that does not
+ * match `steps`, or a `time` more than one step away from the time
+ * `steps` fixed steps take. */
 int game_ghost_decode(GameGhostTrack *out, const char *text);
 
-/* Write track as text. -1 when it does not fit or is out of range. */
+/* Write track as text. -1 when it does not fit or is out of range (the
+ * same rules decoding applies, so whatever is written reads back). */
 int game_ghost_encode(const GameGhostTrack *track, char *text, size_t capacity);
 
 /* Native ghost file for a level: next to the profile file, named after it,
@@ -128,5 +132,15 @@ int game_ghost_file_path(const char *profile_path, const char *level_key,
  * owned), 0 none stored, -1 unreadable or invalid. */
 int game_ghost_load(const GameProfile *profile, const char *level_key, GameGhostTrack *out);
 
-/* Store track as its level's ghost, replacing an older one. 0 or -1. */
+/* What game_ghost_save did. */
+enum {
+    GHOST_SAVE_FAILED = -1,  /* not stored: storage full, busy or failed  */
+    GHOST_SAVE_WRITTEN = 0,  /* track is now its level's ghost            */
+    GHOST_SAVE_KEPT = 1      /* the stored ghost (same level version) was
+                                read again and is at least as fast: kept */
+};
+
+/* Store track as its level's ghost unless the ghost stored right now is
+ * at least as fast (another window or tab may have saved one since this
+ * game loaded it). Returns a GHOST_SAVE_* value. */
 int game_ghost_save(const GameProfile *profile, const GameGhostTrack *track);

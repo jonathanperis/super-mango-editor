@@ -32,6 +32,7 @@ typedef struct {
 
 struct EditorCampaign {
     char manifest_path[EDITOR_PATH_MAX];
+    SerializerFileFingerprint manifest_fingerprint;  /* as read or saved  */
     CampaignCatalog catalog;   /* the entries, in the order shown        */
     CampaignDisk *disk;        /* disk[i] belongs to catalog.levels[i]   */
     size_t capacity;           /* room in both arrays                    */
@@ -39,6 +40,7 @@ struct EditorCampaign {
     int selected;              /* highlighted row, -1 for none           */
     int scroll;                /* first row shown                        */
     int close_armed;           /* Close was refused once for unsaved work */
+    int revert_armed;          /* Revert was refused once, likewise       */
     char problem[160];         /* campaign-wide problem, "" when none    */
 };
 
@@ -87,10 +89,20 @@ static int level_changed(const EditorCampaign *c, size_t i)
             strcmp(entry->level.next_phase, c->disk[i].disk_next) != 0);
 }
 
-/* Any edit means a refused Close must be asked again. */
+/* Any edit means a refused Close or Revert must be asked again. */
 static void edited(EditorCampaign *c)
 {
     c->close_armed = 0;
+    c->revert_armed = 0;
+}
+
+/* The entry whose name field is being typed in, or -1. */
+static int name_being_typed(const EditorState *es)
+{
+    int row = es->ui.active_id - CAMPAIGN_NAME_FIELD_ID;
+    if (!es->campaign || es->ui.active_id < CAMPAIGN_NAME_FIELD_ID ||
+        (size_t)row >= es->campaign->catalog.count) return -1;
+    return row;
 }
 
 /* Settle a half-typed name before the list changes under its field. */
@@ -119,8 +131,13 @@ const char *editor_campaign_problem(const EditorState *es)
 int editor_campaign_unsaved(const EditorState *es)
 {
     const EditorCampaign *c = es ? es->campaign : NULL;
+    int typing;
     if (!c) return 0;
     if (c->manifest_changed) return 1;
+    /* A name typed but not yet applied is work too: quitting must ask. */
+    typing = name_being_typed(es);
+    if (typing >= 0 && strcmp(es->ui.edit_buf, c->catalog.levels[typing].level.name) != 0)
+        return 1;
     for (size_t i = 0; i < c->catalog.count; i++)
         if (level_changed(c, i)) return 1;
     return 0;
@@ -149,6 +166,10 @@ int editor_campaign_open(EditorState *es, const char *manifest_path)
         return -1;
     }
     memcpy(c->manifest_path, manifest_path, strlen(manifest_path) + 1);
+    /* Fingerprint first, read second: if another program changes the
+     * manifest in between, Save sees a difference and refuses, rather than
+     * overwriting a change the view never showed. */
+    (void)serializer_fingerprint_utf8(manifest_path, &c->manifest_fingerprint);
     /* The parse half of the game's load: a campaign the start menu would
      * refuse (no playable level) still opens here, to be repaired. */
     if (campaign_catalog_read(manifest_path, &c->catalog) != 0) {
@@ -195,11 +216,41 @@ int editor_campaign_close(EditorState *es, int force)
         return 0;
     }
     /* A name being typed belongs to the view going away. */
-    if (es->ui.active_id >= CAMPAIGN_NAME_FIELD_ID &&
-        es->ui.active_id < CAMPAIGN_NAME_FIELD_ID + 1000)
-        ui_cancel_active_edit(&es->ui);
+    if (name_being_typed(es) >= 0) ui_cancel_active_edit(&es->ui);
     editor_campaign_free(es);
     editor_set_status(es, "Campaign closed");
+    return 1;
+}
+
+int editor_campaign_revert(EditorState *es)
+{
+    EditorCampaign *c = es ? es->campaign : NULL;
+    char path[EDITOR_PATH_MAX];
+    int selected;
+    int scroll;
+
+    if (!c) return -1;
+    if (!editor_campaign_unsaved(es)) {
+        editor_set_status(es, "Campaign: nothing to revert; it matches the files on disk");
+        return 0;
+    }
+    if (!c->revert_armed) {
+        c->revert_armed = 1;
+        editor_set_status(es, "Revert discards your campaign changes: Revert again to confirm");
+        return 0;
+    }
+    /* The view has no undo history of its own; reading the manifest and
+     * its levels again is the way back.  A name being typed goes too. */
+    if (name_being_typed(es) >= 0) ui_cancel_active_edit(&es->ui);
+    memcpy(path, c->manifest_path, sizeof(path));
+    selected = c->selected;
+    scroll = c->scroll;
+    editor_campaign_free(es);
+    if (editor_campaign_open(es, path) != 0) return -1;   /* status says why */
+    c = es->campaign;
+    if (selected < (int)c->catalog.count) c->selected = selected;
+    c->scroll = scroll;   /* editor_campaign_render clamps it */
+    editor_set_status(es, "Campaign reverted to the files on disk");
     return 1;
 }
 
@@ -335,11 +386,176 @@ int editor_campaign_link_in_order(EditorState *es)
 /* Saving                                                              */
 /* ------------------------------------------------------------------ */
 
+/*
+ * One file a Campaign Save rewrites: where it goes, the temporary file that
+ * holds its new text, and which entry it belongs to (-1 for the manifest).
+ */
+typedef struct {
+    int entry;
+    char target[EDITOR_PATH_MAX];
+    char temp[EDITOR_PATH_MAX];
+} CampaignSaveFile;
+
+/* Every file of one Save: a level file per changed entry, plus the
+ * manifest.  Allocated per Save, since a campaign can list many levels. */
+typedef struct {
+    CampaignSaveFile *files;
+    int count;
+} CampaignSavePlan;
+
+/* Delete the temporary files from index `from` on and free the plan. */
+static void discard_temps(CampaignSavePlan *plan, int from)
+{
+    for (int k = from; k < plan->count; k++)
+        if (plan->files[k].temp[0]) serializer_remove_temp(plan->files[k].temp);
+    free(plan->files);
+    plan->files = NULL;
+    plan->count = 0;
+}
+
+/*
+ * write_temps — Phase one of a Save: list the files to rewrite and write
+ * each one's new text to a temporary sibling.  Returns 0, or -1 (status
+ * set) with every temporary already written deleted again.
+ */
+static int write_temps(EditorState *es, EditorCampaign *c, CampaignSavePlan *plan)
+{
+    plan->count = 0;
+    plan->files = calloc(c->catalog.count + 1, sizeof(*plan->files));
+    if (!plan->files) {
+        editor_set_status(es, "Campaign not saved: out of memory");
+        return -1;
+    }
+    for (size_t i = 0; i < c->catalog.count; i++) {
+        CampaignSaveFile *file = &plan->files[plan->count];
+        if (!level_changed(c, i)) continue;
+        file->entry = (int)i;
+        if (level_resolve_path(c->catalog.levels[i].path, file->target,
+                               sizeof(file->target)) != 0) {
+            editor_set_status(es, "Campaign not saved: cannot find %s",
+                              c->catalog.levels[i].path);
+            discard_temps(plan, 0);
+            return -1;
+        }
+        plan->count++;
+        if (level_write_temp(&c->catalog.levels[i].level, file->target,
+                             file->temp, sizeof(file->temp)) != 0) {
+            file->temp[0] = '\0';
+            editor_set_status(es, "Campaign not saved: writing %s failed; no file "
+                              "was changed", c->catalog.levels[i].path);
+            discard_temps(plan, 0);
+            return -1;
+        }
+    }
+    if (c->manifest_changed) {
+        CampaignSaveFile *file = &plan->files[plan->count++];
+        file->entry = -1;
+        memcpy(file->target, c->manifest_path, sizeof(file->target));
+        if (campaign_manifest_write_temp(c->manifest_path, &c->catalog,
+                                         file->temp, sizeof(file->temp)) != 0) {
+            file->temp[0] = '\0';
+            editor_set_status(es, "Campaign not saved: writing %s failed; no file "
+                              "was changed", c->manifest_path);
+            discard_temps(plan, 0);
+            return -1;
+        }
+    }
+    return 0;
+}
+
+/* Does every file in the plan, the manifest included, still hold what the
+ * view read?  When one does not, nothing may be installed (status set,
+ * returns 0): another program changed it, and its change wins. */
+static int plan_still_matches_disk(EditorState *es, const EditorCampaign *c,
+                                   const CampaignSavePlan *plan)
+{
+    for (int k = 0; k < plan->count; k++) {
+        const CampaignSaveFile *file = &plan->files[k];
+        const SerializerFileFingerprint *expected =
+            file->entry >= 0 ? &c->disk[file->entry].fingerprint : &c->manifest_fingerprint;
+        SerializerFileFingerprint now;
+        if (!expected->valid || serializer_fingerprint_utf8(file->target, &now) != 1 ||
+            !serializer_fingerprint_equal(&now, expected) ||
+            serializer_test_take_failure(SERIALIZER_TEST_FAILURE_SOURCE_CHANGED)) {
+            editor_set_status(es, "Campaign not saved: %s changed on disk; close and "
+                              "reopen the Campaign view",
+                              file->entry >= 0 ? c->catalog.levels[file->entry].path
+                                               : c->manifest_path);
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/*
+ * install_temps — Phase two: put each temporary file in its target's place.
+ * Returns how many level files were installed, or -1 when one file failed:
+ * the files before it are written (and remembered as saved), the ones
+ * after it are not, and the status names the count and the failed file.
+ */
+static int install_temps(EditorState *es, EditorCampaign *c, CampaignSavePlan *plan)
+{
+    int installed = 0;
+    int levels = 0;
+
+    for (int k = 0; k < plan->count; k++) {
+        CampaignSaveFile *file = &plan->files[k];
+        int result = serializer_install_temp(file->temp, file->target, 0);
+        const char *name = file->entry >= 0 ? c->catalog.levels[file->entry].path
+                                            : c->manifest_path;
+        if (result == SERIALIZER_REPLACE_TEMP_KEPT) {
+            /* Windows moved the old file aside but could not move the new
+             * one in: the temporary file is the only complete copy, so it
+             * stays, and the designer needs its name. */
+            char lead[96];   /* the words below with two counts of up to 11 characters */
+            char shown[sizeof(es->status_message)];
+            int room;
+            snprintf(lead, sizeof(lead), "Campaign partly saved (%d of %d files written). ",
+                     installed, plan->count);
+            /* The status bar holds what is left after the words around the
+             * path; a longer path keeps its end, the file's own name. */
+            room = (int)sizeof(es->status_message) - (int)strlen(lead) - (int)strlen(name) -
+                   (int)sizeof("Save incomplete: the new  is safe in ");
+            if (room < 24) room = 24;
+            editor_path_for_display(file->temp, shown, (size_t)room);
+            fprintf(stderr, "campaign: could not finish replacing '%s'; it is kept in '%s'\n",
+                    file->target, file->temp);
+            editor_report_save_failure(es, result, name, lead, shown);
+            file->temp[0] = '\0';           /* never delete the kept copy */
+            discard_temps(plan, k + 1);
+            return -1;
+        }
+        if (result != 0) {
+            if (installed == 0)
+                editor_set_status(es, "Campaign not saved: writing %s failed; no file "
+                                  "was changed", name);
+            else
+                editor_set_status(es, "Campaign partly saved: %d of %d files written; "
+                                  "writing %s failed", installed, plan->count, name);
+            discard_temps(plan, k + 1);
+            return -1;
+        }
+        /* Written: this file now matches the view, whatever happens next. */
+        if (file->entry >= 0) {
+            remember_disk(&c->catalog.levels[file->entry], &c->disk[file->entry]);
+            levels++;
+        } else {
+            c->manifest_changed = 0;
+            (void)serializer_fingerprint_utf8(c->manifest_path, &c->manifest_fingerprint);
+        }
+        installed++;
+    }
+    discard_temps(plan, plan->count);
+    return levels;
+}
+
 int editor_campaign_save(EditorState *es)
 {
     EditorCampaign *c = es ? es->campaign : NULL;
     char reload[EDITOR_PATH_MAX] = "";
-    int written = 0;
+    int reload_entry = -1;
+    CampaignSavePlan plan;
+    int written;
     int unloaded = 0;
 
     if (!c || !finish_edit(es)) return -1;
@@ -387,41 +603,35 @@ int editor_campaign_save(EditorState *es)
             return -1;
         }
         memcpy(reload, es->file_path, sizeof(reload));
+        reload_entry = (int)i;
     }
 
-    /* 3. Each changed level file, through the checked save: if someone
-     *    else changed the file since the view read it, it is left alone. */
-    for (size_t i = 0; i < c->catalog.count; i++) {
-        CampaignLevel *entry = &c->catalog.levels[i];
-        char resolved[EDITOR_PATH_MAX];
-        int result;
-        if (!level_changed(c, i)) continue;
-        if (level_resolve_path(entry->path, resolved, sizeof(resolved)) != 0) {
-            editor_set_status(es, "Campaign not saved: cannot find %s", entry->path);
-            return -1;
-        }
-        result = level_save_toml_checked(&entry->level, resolved, SERIALIZER_SAVE_REPLACE,
-                                         &c->disk[i].fingerprint);
-        if (result == -2) {
-            editor_set_status(es, "Campaign not saved: %s changed on disk; close and reopen "
-                              "the Campaign view", entry->path);
-            return -1;
-        }
-        if (result != 0) {
-            editor_set_status(es, "Campaign not saved: writing %s failed", entry->path);
-            return -1;
-        }
-        remember_disk(entry, &c->disk[i]);
-        written++;
-    }
+    /* 3. Write every file this save changes to a temporary file next to
+     *    it: the changed levels, then the manifest when its list changed.
+     *    Nothing is replaced yet, so any failure here leaves the campaign
+     *    on disk exactly as it was. */
+    if (write_temps(es, c, &plan) != 0) return -1;
 
-    /* 4. The manifest, when its list changed. */
-    if (c->manifest_changed) {
-        if (campaign_manifest_save(c->manifest_path, &c->catalog) != 0) {
-            editor_set_status(es, "Campaign not saved: writing %s failed", c->manifest_path);
-            return -1;
+    /* 4. Install them, one quick rename each.  Right before, every target
+     *    must still hold what the view read: the window in which another
+     *    program could slip a change in is now as short as it can be.
+     *    A rename can still fail half-way (a full disk, a file locked on
+     *    Windows); the status then says exactly which files were written. */
+    if (!plan_still_matches_disk(es, c, &plan)) {
+        discard_temps(&plan, 0);
+        return -1;
+    }
+    written = install_temps(es, c, &plan);
+    if (written < 0) {
+        /* The open level may be among the files that did get written: show
+         * it as it now is, and keep the failure in the status bar. */
+        if (reload_entry >= 0 && !level_changed(c, (size_t)reload_entry)) {
+            char failure[sizeof(es->status_message)];
+            memcpy(failure, es->status_message, sizeof(failure));
+            (void)editor_load_level(es, reload);
+            editor_set_status(es, "%s", failure);
         }
-        c->manifest_changed = 0;
+        return -1;
     }
     c->close_armed = 0;
 
@@ -500,11 +710,11 @@ static void draw_row(EditorState *es, EditorCampaign *c, int i, int y)
 static void draw_buttons(EditorState *es, EditorCampaign *c)
 {
     static const char *labels[] = {
-        "Up", "Down", "Remove", "Add level...", "Link in order", "Save", "Close"
+        "Up", "Down", "Remove", "Add level...", "Link in order", "Save", "Revert", "Close"
     };
     int y = CAMPAIGN_BUTTONS_Y;
 
-    for (int b = 0; b < 7; b++) {
+    for (int b = 0; b < (int)(sizeof(labels) / sizeof(labels[0])); b++) {
         int x = CAMPAIGN_VIEW_X + b * CAMPAIGN_BUTTON_STEP;
         if (!ui_button(&es->ui, x, y, CAMPAIGN_BUTTON_W, 24, labels[b])) continue;
         switch (b) {
@@ -520,9 +730,10 @@ static void draw_buttons(EditorState *es, EditorCampaign *c)
         }
         case 4: (void)editor_campaign_link_in_order(es); break;
         case 5: (void)editor_campaign_save(es); break;
-        case 6: (void)editor_campaign_close(es, 0); break;
+        case 6: (void)editor_campaign_revert(es); break;
+        case 7: (void)editor_campaign_close(es, 0); break;
         }
-        /* Close frees the view; nothing below may touch it. */
+        /* Close and Revert free the view; nothing below may touch it. */
         return;
     }
 }

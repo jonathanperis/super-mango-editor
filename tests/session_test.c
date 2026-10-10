@@ -7,7 +7,8 @@
 #ifdef _WIN32
 #include <direct.h>   /* _chdir */
 #else
-#include <unistd.h>   /* chdir */
+#include <sys/stat.h> /* mkdir */
+#include <unistd.h>   /* chdir, symlink, rmdir */
 #endif
 
 #include "input/input_backend.h"
@@ -22,6 +23,7 @@
 #include "core/game_completion.h"
 #include "core/game_experiment.h"
 #include "core/game_overlay.h"
+#include "core/game_resources.h"  /* game_resources_load, _reload_missing */
 #include "core/game_player_step.h"
 #include "core/game_terminal.h"
 #include "core/game_timing.h"
@@ -33,6 +35,7 @@
 #include "levels/level_loader.h"
 #include "levels/level_path.h"
 #include "levels/level_resources.h"
+#include "levels/level_start.h"  /* level_ground_top_at */
 #include "player/player_surfaces.h"
 #include "player/player_internal.h"
 
@@ -395,6 +398,71 @@ static int same_path_spelling_prefix(const char *path, const char *prefix,
  * must move it to the folder that holds assets/ and levels/, and turn typed
  * paths into absolute ones first so they keep their meaning.
  */
+/*
+ * The asset root is the folder of the executable. Started through a
+ * symbolic link, that must be the real file's folder: macOS reports the
+ * link's path, which pointed the game at the link's folder, where no
+ * assets/ is. executable_folder resolves links (the same code on every
+ * POSIX system, so Linux tests it too).
+ */
+static int executable_folder_follows_links(void)
+{
+    int failed = 0;
+    char *folder = executable_folder("/no-such-folder/game");
+    failed |= expect_int("unresolvable path keeps its folder",
+                         folder != NULL && strcmp(folder, "/no-such-folder/") == 0, 1);
+    free(folder);
+#ifndef _WIN32
+    const char *real_dir = TEST_OUT "exe-real", *real = TEST_OUT "exe-real/game";
+    const char *link = TEST_OUT "exe-link";
+    (void)mkdir(real_dir, 0700);
+    FILE *fp = fopen(real, "w");
+    if (!fp) return 1;
+    fclose(fp);
+    remove(link);
+    if (symlink("exe-real/game", link) != 0) {
+        remove(real);
+        return 1;
+    }
+    folder = executable_folder(link);
+    size_t size = folder ? strlen(folder) : 0;
+    failed |= expect_int("link resolved to the real folder",
+                         size > 10 && strcmp(folder + size - 10, "/exe-real/") == 0, 1);
+    free(folder);
+    remove(link);
+    remove(real);
+    rmdir(real_dir);
+#endif
+    return failed;
+}
+
+/*
+ * main.c makes a relative --replay-dir absolute before the session copies
+ * it. That copy was 256 bytes, so a deep working folder made
+ * session_create return NULL and the game exit without a word. It now
+ * holds GAME_LEVEL_PATH_MAX bytes, and a path longer than that is named
+ * in an error.
+ */
+static int long_replay_dir_fits_the_session(void)
+{
+    static char dir[GAME_LEVEL_PATH_MAX + 8];
+    AppSessionConfig config = {.level_path = "levels/00_sandbox_01.toml", .replay_dir = dir};
+    AppSession *session;
+    memset(dir, 'd', 600);
+    dir[0] = '/';
+    dir[600] = '\0';
+    session = session_create(&config);
+    int failed = expect_int("600-byte replay folder accepted", session != NULL, 1);
+    if (session) failed |= expect_int("kept whole", (int)strlen(session->game->screen.replay_dir), 600);
+    session_destroy(&session);
+    memset(dir, 'd', GAME_LEVEL_PATH_MAX);
+    dir[GAME_LEVEL_PATH_MAX] = '\0';
+    session = session_create(&config);
+    failed |= expect_int("over-long replay folder refused", session == NULL, 1);
+    session_destroy(&session);
+    return failed;
+}
+
 static int asset_root_moves_a_foreign_working_folder(void)
 {
     int failed = 1;
@@ -494,6 +562,48 @@ static int start_points_place_the_first_game(void)
     session_destroy(&session);
     if (failed) return 1;
 
+    /* x 595: the column's centre is on the floor beside the pillar at 600,
+     * but the player's physics box (centre +-9 px) overlaps the pillar, and
+     * that is what collision tests, so the player stands on the pillar. The
+     * old centre-only test put the start on the floor, inside the pillar. */
+    memset(&config, 0, sizeof(config));
+    config.level_path = fixture;
+    config.start.kind = LEVEL_START_AT_X;
+    config.start.x = 595.0f;
+    session = session_create(&config);
+    if (!session || !session->game) {
+        fprintf(stderr, "session_test: start-x 595 session_create failed\n");
+        session_destroy(&session);
+        return 1;
+    }
+    failed |= expect_float("box over the pillar edge", session->game->world.respawn_y,
+                           (float)(FLOOR_Y - 2 * TILE_SIZE + 16));
+    session_destroy(&session);
+    if (failed) return 1;
+
+    /* The same rule for a surface over a gap: a float platform ending at
+     * 404 covers the box of a column centred on 410, over the gap at 400,
+     * which the centre test refused as "nothing to stand on". */
+    {
+        LevelDef def;
+        LevelStart request = {.kind = LEVEL_START_AT_X, .x = 410.0f};
+        LevelStartPoint point;
+        char err[128];
+        level_def_init_defaults(&def);
+        def.floor_gap_count = 1;
+        def.floor_gaps[0] = 400;
+        def.float_platform_count = 1;
+        def.float_platforms[0].x = 404.0f - 2.0f * FLOAT_PLATFORM_PIECE_W;
+        def.float_platforms[0].y = 200.0f;
+        def.float_platforms[0].tile_count = 2;
+        failed |= expect_int("float platform over the gap", level_start_resolve(&def, &request, &point, err, sizeof(err)), 0);
+        failed |= expect_float("stands on it", point.spawn_y, 200.0f);
+        /* x 416: the box [407, 425) misses it: still nothing to stand on. */
+        request.x = 416.0f;
+        failed |= expect_int("box clear of it", level_start_resolve(&def, &request, &point, err, sizeof(err)), -1);
+        if (failed) return 1;
+    }
+
     /* Over the floor gap at 400 there is nothing to stand on; checkpoint 5
      * does not exist.  Neither creates a session. */
     memset(&config, 0, sizeof(config));
@@ -515,6 +625,111 @@ static int start_points_place_the_first_game(void)
         return 1;
     }
     return 0;
+}
+
+/*
+ * A level without authored checkpoints saves one at each new screen,
+ * moving respawn_x only. After --start-x on the 3-tile pillar at x 256,
+ * the next screen's respawn kept the pillar's height, in mid-air over the
+ * floor. On a start-point run the height now follows the ground under the
+ * new respawn column; a normal run keeps the level start's height, so
+ * recorded runs do not change.
+ */
+static int start_point_respawns_follow_the_ground(void)
+{
+    const char *level = "levels/00_sandbox_01.toml";
+    AppSessionConfig config = {.level_path = level};
+    AppSession *session;
+    GameState *game;
+    float top = 0.0f;
+    int failed = 0;
+
+    config.start.kind = LEVEL_START_AT_X;
+    config.start.x = 280.0f;
+    session = session_create(&config);
+    if (!session || !session->game) {
+        fprintf(stderr, "session_test: sandbox start-x session_create failed\n");
+        session_destroy(&session);
+        return 1;
+    }
+    game = session->game;
+    failed |= expect_float("start on the 3-tile pillar", game->world.respawn_y,
+                           level_platform_top_y(3));
+    game->world.player.x = 2.0f * GAME_W + 50.0f;
+    game_update_active(game, GAME_FIXED_STEP, (int)game->world.camera.x);
+    failed |= expect_int("screen checkpoint saved", game->world.legacy_checkpoint_screen, 2);
+    failed |= expect_int("ground under the new respawn",
+                         level_ground_top_at(game->world.level_def, game->world.respawn_x, &top), 1);
+    failed |= expect_float("respawn on that ground", game->world.respawn_y, top);
+    failed |= expect_int("not the pillar's height", game->world.respawn_y != level_platform_top_y(3), 1);
+    session_destroy(&session);
+
+    /* A normal run: the same checkpoint keeps the level start's height. */
+    config.start.kind = LEVEL_START_DEFAULT;
+    session = session_create(&config);
+    if (!session || !session->game) {
+        fprintf(stderr, "session_test: sandbox session_create failed\n");
+        session_destroy(&session);
+        return 1;
+    }
+    game = session->game;
+    float start_y = game->world.respawn_y;
+    game->world.player.x = 2.0f * GAME_W + 50.0f;
+    game_update_active(game, GAME_FIXED_STEP, (int)game->world.camera.x);
+    failed |= expect_int("normal run checkpoint saved", game->world.legacy_checkpoint_screen, 2);
+    failed |= expect_float("normal run keeps the start height", game->world.respawn_y, start_y);
+    session_destroy(&session);
+    return failed;
+}
+
+/*
+ * The shared sprites are loaded once per session now, so a sprite whose
+ * file was missing at that moment stayed missing for every later game,
+ * and a level that needs it failed with only "Selected level could not
+ * be loaded". The failure now names the file, and each new game tries the
+ * missing files again, so putting the file back fixes the next Play.
+ */
+static int missing_shared_sprite_is_named_and_retried(void)
+{
+    const char *level = "tests/fixtures/runtime/hazards.toml";  /* has spike rows */
+    GameAssets assets;
+    int failed = 0;
+
+    /* A set loaded while spike.png was missing. */
+    if (game_resources_load(&assets) != 0) return 1;
+    texture_unload(assets.textures.spike);
+    assets.textures.spike = NULL;
+    GameState *game = calloc(1, sizeof(*game));
+    if (!game) { game_resources_unload(&assets); return 1; }
+    game->assets = assets;  /* borrowed, as the session lends it */
+    strcpy(game->world.level_path, level);
+    failed |= expect_int("level needing it fails", game_init(game) != 0, 1);
+    failed |= expect_int("failure names the file",
+                         strcmp(game->screen.load_error, "Missing file: spike.png"), 0);
+    free(game);
+    game_resources_reload_missing(&assets);
+    failed |= expect_int("reload fills the slot", assets.textures.spike != NULL, 1);
+    game_resources_unload(&assets);
+    if (failed) return 1;
+
+    /* Through the session: the slot empties after the set was loaded, and
+     * the next Play from the menu loads the file again and opens. */
+    AppSessionConfig config = {.level_path = level};
+    AppSession *session = session_create(&config);
+    if (!session || !session->game) { session_destroy(&session); return 1; }
+    session->game->screen.route = GAME_ROUTE_LEVEL_SELECT;
+    session_frame(session);
+    failed |= expect_int("back at the menu", session->menu != NULL, 1);
+    if (!session->menu) { session_destroy(&session); return 1; }
+    texture_unload(session->assets.textures.spike);
+    session->assets.textures.spike = NULL;
+    str_copy(session->menu->selected_level_path, level, sizeof(session->menu->selected_level_path));
+    session->menu->route = MENU_ROUTE_PLAY;
+    session_frame(session);
+    failed |= expect_int("next Play opens the level", session->game != NULL, 1);
+    failed |= expect_int("the sprite is back", session->assets.textures.spike != NULL, 1);
+    session_destroy(&session);
+    return failed;
 }
 
 static int failed_initial_level_does_not_create_session(void)
@@ -1496,8 +1711,11 @@ int main(void)
         CASE(campaign_broken_level_disables_only_its_entry),
         CASE(physical_release_latch_blocks_transition_input),
         CASE(failed_initial_level_does_not_create_session),
+        CASE(missing_shared_sprite_is_named_and_retried),
         CASE(start_points_place_the_first_game),
+        CASE(start_point_respawns_follow_the_ground),
         CASE(asset_root_moves_a_foreign_working_folder),
+        CASE(executable_folder_follows_links), CASE(long_replay_dir_fits_the_session),
         CASE(direct_game_boot_repairs_input_and_keeps_controller_runtime),
         CASE(immediate_play_preserves_window_and_input_latch),
         CASE(repeated_menu_game_ownership), CASE(checkpoint_transitions_use_production_paths),

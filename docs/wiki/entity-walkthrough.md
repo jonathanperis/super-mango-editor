@@ -191,8 +191,7 @@ placement struct. Follow the existing `ENT_COIN` code in each place:
 | `properties.c` | Write `draw_token_properties()` with x/y fields that call `editor_commit_change()`, and point `[ENT_TOKEN]` at it in `s_property_panels` |
 | `hit_test.c` | Add a bounds case to `editor_entity_bounds()` and put `ENT_TOKEN` into `s_hit_order`, which is the exact reverse of the canvas draw order |
 | `canvas.c` | A render function for Tokens, called from `canvas_render()` beside `render_coins()` |
-| `tools.c` | Clamp case in `editor_clamp_placement()`, move case in `move_placement()` and defaults in `default_placement()` |
-| `editor_clipboard.c` | Add the `offset_pasted_copy()` case; the shared `editor_add_placement()` already refuses a full array |
+| `tools.c` | Clamp case in `editor_clamp_placement()`, move case in `editor_move_placement()` (drag, nudge and paste all move through it) and defaults in `default_placement()` |
 | `editor_session.c` | Add `EDITOR_HASH_ARRAY` for tokens to the document hash so the dirty marker sees Token edits |
 
 You do not have to remember the switches: they have no `default:` case, so
@@ -279,6 +278,6 @@ automatically. A brand-new source directory needs its own wildcard line there.
 - [ ] Render call in `src/render/game_render.c` at the right layer
 - [ ] Texture row in `game_resources.c` (and `game_resources_require_level_textures()` if optional)
 - [ ] Hitbox in `src/core/debug.c` and `debug_log()` calls for significant events
-- [ ] Editor integration (section 5): the `s_entity_meta` row and palette slot, undo union, property panel, hit test, canvas, tools, clipboard, document hash
+- [ ] Editor integration (section 5): the `s_entity_meta` row and palette slot, undo union, property panel, hit test, canvas, tools (whose move case also moves pasted copies), document hash
 - [ ] Tests (section 6), then `make builder test CC=clang`, `make validate-levels`, `make docs-drift`
 - [ ] Play it with `make run-level-debug LEVEL=...` and check the hitboxes match the sprite

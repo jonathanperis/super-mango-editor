@@ -163,6 +163,12 @@ typedef enum {
     GAME_ROUTE_SMOKE_EXIT
 } GameRoute;
 
+/* GameCompletionState.next_phase_failed: why Next Level did not open. */
+enum {
+    NEXT_PHASE_LOAD_FAILED = 1, /* the next file did not load              */
+    NEXT_PHASE_UNAVAILABLE = 2  /* the campaign lists it as unavailable    */
+};
+
 typedef struct {
     int   complete;           /* 1 = last star collected; show overlay     */
     float level_elapsed;      /* active level timer in seconds             */
@@ -171,7 +177,7 @@ typedef struct {
     int   coin_total;         /* total coins shown at completion summary   */
     float elapsed;            /* elapsed seconds shown at summary          */
     int   pending_next_phase; /* Enter/Start loads next phase              */
-    int   next_phase_failed;  /* 1 = Next Level load failed: hide it, say so */
+    int   next_phase_failed;  /* NEXT_PHASE_*: Next Level refused, hide it, say so */
     char  next_phase[256];    /* next TOML path shown/loaded               */
 } GameCompletionState;
 
@@ -312,8 +318,8 @@ typedef struct {
     CheckpointFeedbackKind checkpoint_feedback_kind; /* explicit HUD cue reason */
     uint32_t      checkpoint_feedback_until; /* cue expiry, game_checkpoint_clock_ms time */
     int           legacy_checkpoint_screen; /* last automatic screen boundary   */
-    double        sim_time;    /* seconds simulated so far; only fixed steps
-                                  advance it, so a pause stops it            */
+    uint32_t      sim_steps;   /* fixed steps simulated since the level was
+                                  applied; a pause runs none, so it stops  */
 } GameWorld;
 
 /*
@@ -348,6 +354,9 @@ typedef struct {
 
     /* ---- How the session opened this screen ---------------------------- */
     int           smoke_test_frames; /* >0 = exit after this many frames     */
+    /* Why game_init could not open the level, for the menu to show (for
+     * example "Missing file: spike.png"); "" when it did not say. */
+    char          load_error[96];
     unsigned int  random_seed;
     /* --start-x / --start-checkpoint (levels/level_start.h): where the
      * first attempt at world.level_path starts.  start_kind is a
@@ -358,7 +367,7 @@ typedef struct {
 
     /* ---- Scripted replay input ------------------------------------------ */
     char          replay_script_path[256]; /* optional replay script name     */
-    char          replay_dir[256]; /* folder holding replay scripts; "" = default */
+    char          replay_dir[GAME_LEVEL_PATH_MAX]; /* replay script folder; "" = default */
     unsigned int  replay_input_mask; /* replay keys active for this frame    */
     unsigned int  replay_held_mask;  /* replay keys held across frames       */
     int           replay_frame; /* current deterministic replay frame     */
@@ -372,6 +381,10 @@ typedef struct {
     char profile_level_key[256];
     int profile_completion_recorded;
     int resumed;        /* 1 = this run started from a saved Continue point */
+    /* 1 = this attempt began at a --start-x / --start-checkpoint point: a
+     * playtest of part of the level, so it records no best result, ghost or
+     * Continue point. Retry, Replay and Next Level start whole attempts. */
+    int start_point_run;
     struct GameGhost *ghost; /* owned time-trial recorder and best run; NULL without a profile */
 
     /* ---- Debug tools ------------------------------------------------------ */

@@ -68,7 +68,30 @@ EM_JS(int, profile_browser_begin_write, (const char *text, const char *baseline)
             const saved = localStorage.getItem('super-mango-profile-v2');
             const current = saved === null ? localStorage.getItem('super-mango-profile-v1') : saved;
             if (current !== expected) { operation.status = -1; return; }
-            localStorage.setItem('super-mango-profile-v2', value);
+            try { localStorage.setItem('super-mango-profile-v2', value); } catch (full) {
+                // Storage is full. Results and settings matter more than any
+                // time-trial ghost (game_ghost_file.c), so delete ghosts,
+                // least recently written first, until the profile fits.
+                const prefix = 'super-mango-ghost-v1:', orderKey = 'super-mango-ghost-order-v1';
+                let order = [];
+                try { order = JSON.parse(localStorage.getItem(orderKey) || '[]'); } catch (_) { order = []; }
+                if (!Array.isArray(order)) order = [];
+                const ghosts = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (k && k.startsWith(prefix)) ghosts.push(k);
+                }
+                const listed = order.filter(k => ghosts.includes(k));
+                const doomed = ghosts.filter(k => !listed.includes(k)).concat(listed);
+                if (!doomed.length) throw full;
+                localStorage.removeItem(orderKey);
+                for (;;) {
+                    localStorage.removeItem(doomed.shift());
+                    try { localStorage.setItem('super-mango-profile-v2', value); break; } catch (again) {
+                        if (!doomed.length) throw again;
+                    }
+                }
+            }
             operation.status = 2; // confirmed commit, not merely a queued request
         }).catch(function() {
             if (operation.status === 1) operation.status = -1;
@@ -190,9 +213,13 @@ static int resume_valid(const GameResume *r)
         !isfinite(r->respawn_x) || !isfinite(r->respawn_y) ||
         r->respawn_x < -1e6f || r->respawn_x > 1e6f || r->respawn_y < -1e6f || r->respawn_y > 1e6f ||
         !isfinite(r->elapsed) || r->elapsed < 0 || r->elapsed > 1e9f) return 0;
-    /* No coin beyond the most a level can place. */
+    /* No coin beyond the most a level can place. The mask has 64 bits and
+     * MAX_COINS is 64 today, so there is no bit to refuse; the check is
+     * compiled only if the limit is ever lowered. */
+#if MAX_COINS < 64
     for (int i = MAX_COINS; i < 64; i++)
         if (r->coins & ((uint64_t)1 << i)) return 0;
+#endif
     return 1;
 }
 
@@ -496,6 +523,32 @@ static void unlock_profile(ProfileLock lock)
 #else
     close(lock);
 #endif
+}
+
+/* The lock file outlives every holder, so the opaque handle game_ghost.c
+ * gets is only a heap copy of the OS handle. */
+struct GameProfileLock {
+    ProfileLock handle;
+};
+
+GameProfileLock *game_profile_lock(const GameProfile *profile)
+{
+    if (!profile || !profile->path[0]) return NULL;
+    GameProfileLock *lock = malloc(sizeof(*lock));
+    if (!lock) return NULL;
+    lock->handle = lock_profile(profile->path);
+    if (lock->handle == PROFILE_LOCK_INVALID) {
+        free(lock);
+        return NULL;
+    }
+    return lock;
+}
+
+void game_profile_unlock(GameProfileLock *lock)
+{
+    if (!lock) return;
+    unlock_profile(lock->handle);
+    free(lock);
 }
 
 /* 1 existing, 0 absent, -1 failed. Never mistake unreadable data for absence. */

@@ -11,8 +11,8 @@
 #include "tools.h"       /* editor_clamp_placement, editor_add_placement */
 #include "editor_undo_apply.h" /* editor_apply_undo_command (group rollback) */
 
-/* How far a pasted copy moves so it does not hide the original (see
- * offset_pasted_copy for which way each type moves). */
+/* How far a pasted copy moves, right and down, so it does not hide the
+ * original (see offset_pasted_copy). */
 #define PASTE_OFFSET 24.0f
 
 /*
@@ -133,134 +133,28 @@ void editor_clipboard_after_rail_insert(EditorState *es, int index)
 }
 
 /*
- * offset_pasted_copy — Move a copied placement by PASTE_OFFSET.
- *
- * Every type stores its position in different fields (patrolling enemies
- * also carry a patrol range that must move with them), so this is the one
- * per-type switch in the clipboard.  Free-floating things move right and
- * down; things tied to the floor move only right; rail riders move along
- * their rail; floor gaps move one whole gap width.
+ * offset_pasted_copy — Move a copied placement by PASTE_OFFSET right and
+ * down, exactly as dragging it that far would (editor_move_placement):
+ * things tied to the floor move only right, floor gaps one whole gap
+ * width.  The one paste-only rule is for rail riders, which a drag leaves
+ * where their rail puts them: a copy steps along its rail instead, so it
+ * does not hide the original.
  */
 static void offset_pasted_copy(EntityType type, PlacementData *d)
 {
-    switch (type) {
-    case ENT_COIN:
-        d->coin.x += PASTE_OFFSET;
-        d->coin.y += PASTE_OFFSET;
-        break;
-    case ENT_STAR_YELLOW:
-        d->star_yellow.x += PASTE_OFFSET;
-        d->star_yellow.y += PASTE_OFFSET;
-        break;
-    case ENT_STAR_GREEN:
-        d->star_green.x += PASTE_OFFSET;
-        d->star_green.y += PASTE_OFFSET;
-        break;
-    case ENT_STAR_RED:
-        d->star_red.x += PASTE_OFFSET;
-        d->star_red.y += PASTE_OFFSET;
-        break;
-    case ENT_LAST_STAR:
-    case ENT_PLAYER_SPAWN:
-        d->last_star.x += PASTE_OFFSET;
-        d->last_star.y += PASTE_OFFSET;
-        break;
-    case ENT_SPIDER:
-        d->spider.x += PASTE_OFFSET;
-        d->spider.patrol_x0 += PASTE_OFFSET;
-        d->spider.patrol_x1 += PASTE_OFFSET;
-        break;
-    case ENT_JUMPING_SPIDER:
-        d->jumping_spider.x += PASTE_OFFSET;
-        d->jumping_spider.patrol_x0 += PASTE_OFFSET;
-        d->jumping_spider.patrol_x1 += PASTE_OFFSET;
-        break;
-    case ENT_BIRD:
-    case ENT_FASTER_BIRD:
-        d->bird.x += PASTE_OFFSET;
-        d->bird.patrol_x0 += PASTE_OFFSET;
-        d->bird.patrol_x1 += PASTE_OFFSET;
-        break;
-    case ENT_FISH:
-    case ENT_FASTER_FISH:
-        d->fish.x += PASTE_OFFSET;
-        d->fish.patrol_x0 += PASTE_OFFSET;
-        d->fish.patrol_x1 += PASTE_OFFSET;
-        break;
-    case ENT_AXE_TRAP:
-        d->axe_trap.pillar_x += PASTE_OFFSET;
-        break;
-    case ENT_CIRCULAR_SAW:
-        d->circular_saw.x += PASTE_OFFSET;
-        d->circular_saw.patrol_x0 += PASTE_OFFSET;
-        d->circular_saw.patrol_x1 += PASTE_OFFSET;
-        break;
-    case ENT_SPIKE_ROW:
-        d->spike_row.x += PASTE_OFFSET;
-        break;
-    case ENT_SPIKE_PLATFORM:
-        d->spike_platform.x += PASTE_OFFSET;
-        d->spike_platform.y += PASTE_OFFSET;
-        break;
-    case ENT_SPIKE_BLOCK:
-        /* Spike blocks ride a rail: move along it instead of in x/y. */
+    if (type == ENT_SPIKE_BLOCK) {
         d->spike_block.t_offset += PASTE_OFFSET / (float)RAIL_TILE_W;
-        break;
-    case ENT_BLUE_FLAME:
-        d->blue_flame.x += PASTE_OFFSET;
-        break;
-    case ENT_FIRE_FLAME:
-        d->fire_flame.x += PASTE_OFFSET;
-        break;
-    case ENT_FLOAT_PLATFORM:
-        /* RAIL mode ignores x/y (the rail positions it): move along it. */
-        if (d->float_platform.mode == FLOAT_PLATFORM_RAIL) {
-            d->float_platform.t_offset += PASTE_OFFSET / (float)RAIL_TILE_W;
-        } else {
-            d->float_platform.x += PASTE_OFFSET;
-            d->float_platform.y += PASTE_OFFSET;
-        }
-        break;
-    case ENT_BRIDGE:
-        d->bridge.x += PASTE_OFFSET;
-        break;
-    case ENT_BOUNCEPAD_SMALL:
-    case ENT_BOUNCEPAD_MEDIUM:
-    case ENT_BOUNCEPAD_HIGH:
-        d->bouncepad.x += PASTE_OFFSET;
-        break;
-    case ENT_PLATFORM:
-        d->platform.x += PASTE_OFFSET;
-        break;
-    case ENT_VINE:
-        d->vine.x += PASTE_OFFSET;
-        break;
-    case ENT_LADDER:
-        d->ladder.x += PASTE_OFFSET;
-        break;
-    case ENT_ROPE:
-        d->rope.x += PASTE_OFFSET;
-        break;
-    case ENT_FLOOR_GAP:
-        /* Gaps live on the 32-px floor grid; step one whole gap instead. */
-        d->floor_gap += FLOOR_GAP_W;
-        break;
-    case ENT_CHECKPOINT:
-        d->checkpoint.x += PASTE_OFFSET;
-        d->checkpoint.y += PASTE_OFFSET;
-        break;
-    case ENT_RAIL:
-        d->rail.x += (int)PASTE_OFFSET;
-        break;
-    case ENT_COUNT:
-        break;
+    } else if (type == ENT_FLOAT_PLATFORM && d->float_platform.mode == FLOAT_PLATFORM_RAIL) {
+        d->float_platform.t_offset += PASTE_OFFSET / (float)RAIL_TILE_W;
+    } else {
+        *d = editor_move_placement(type, d, PASTE_OFFSET, PASTE_OFFSET);
     }
 }
 
 /*
  * rollback_group — Take back the entries of `group` already recorded, newest
- * first, and forget them (they must not come back with Redo).  A group
- * paste or duplicate is all or nothing.
+ * first, and forget them (they must not come back with Redo).  Only a
+ * failure plan_items could not foresee gets here.
  */
 static void rollback_group(EditorState *es, int group)
 {
@@ -272,38 +166,36 @@ static void rollback_group(EditorState *es, int group)
 }
 
 /*
- * add_items — Add one offset copy of each item as a single undo step and
- * select the copies.  Shared by Paste and Duplicate; verb ("paste") goes
- * into editor_add_placement's messages, title ("Paste") starts our own.
+ * plan_items — Work out every copy before adding any, on a scratch copy of
+ * the level: the rail each rider rides, the offset and clamp, and whether
+ * each add would succeed (room, rail, floor gap, validation).  Recording
+ * the first copy in history would drop everything Redo could bring back,
+ * so a group that cannot be added whole must be refused before that.
  *
  * Rails go first, so a rider whose rail was copied with it (rail_item)
  * can ride the new copy of that rail.  Any other rider re-attaches to the
  * rail it was copied from: in this document that rail is tracked by index,
  * so it is found even after it moved and never confused with an identical
  * rail; in another document a rail with the same shape and position is
- * used.  With neither, or when a copy cannot be added (a full array, a
- * failed validation...), everything added so far is taken back and the
- * status bar explains.  On success out_data[i] holds the copy of item i.
- * Returns how many copies were added (0 on failure).
+ * used.  On success order[] lists the items in the order to add them and
+ * planned[i] is the copy of item i; on failure the status bar says why.
  */
-static int add_items(EditorState *es, const EditorClipboardItem *items, int count,
-                     const char *verb, const char *title, PlacementData *out_data)
+static int plan_items(EditorState *es, const EditorClipboardItem *items, int count,
+                      const char *verb, const char *title,
+                      int *order, PlacementData *planned)
 {
+    /* Static: a LevelDef is large, and the editor is single-threaded. */
+    static LevelDef scratch;
     static int new_index[EDITOR_MAX_SELECTION];
-    static Selection added[EDITOR_MAX_SELECTION];
-    int added_count = 0;
-    int group;
+    int ordered = 0;
 
-    /* One entry per copy; without room for them, add nothing. */
-    group = undo_group_begin(es->undo, count);
-    if (group == 0) {
-        editor_set_status(es, "%s cancelled: cannot allocate undo history", title);
-        return 0;
-    }
+    scratch = es->level;
     for (int pass = 0; pass < 2; pass++) {
         for (int i = 0; i < count; i++) {
             const EditorClipboardItem *item = &items[i];
             PlacementData d = item->data;
+            PlacementData before;
+            char why[192];
             int *rail_index;
 
             if ((item->type == ENT_RAIL) != (pass == 0)) continue;
@@ -312,14 +204,12 @@ static int add_items(EditorState *es, const EditorClipboardItem *items, int coun
                 int found = -1;
                 if (item->rail_item >= 0) {
                     found = new_index[item->rail_item];
-                } else if (item->rail_index >= 0 && item->rail_index < es->level.rail_count) {
+                } else if (item->rail_index >= 0 && item->rail_index < scratch.rail_count) {
                     found = item->rail_index;
                 }
-                for (int r = 0; found < 0 && item->has_rail && r < es->level.rail_count; r++)
-                    if (same_rail(&es->level.rails[r], &item->rail)) found = r;
+                for (int r = 0; found < 0 && item->has_rail && r < scratch.rail_count; r++)
+                    if (same_rail(&scratch.rails[r], &item->rail)) found = r;
                 if (found < 0) {
-                    undo_group_end(es->undo);
-                    rollback_group(es, group);
                     editor_set_status(es, "%s blocked: the copied %s's rail is not in this level",
                                       title, editor_entity_type_name(item->type));
                     return 0;
@@ -327,17 +217,58 @@ static int add_items(EditorState *es, const EditorClipboardItem *items, int coun
                 *rail_index = found;
             }
             offset_pasted_copy(item->type, &d);
-            editor_clamp_placement(&es->level, item->type, &d);
-            if (editor_add_placement(es, item->type, &d, verb) != 0) {
-                /* editor_add_placement already said why. */
-                undo_group_end(es->undo);
-                rollback_group(es, group);
+            editor_clamp_placement(&scratch, item->type, &d);
+            new_index[i] = editor_insert_checked(&scratch, item->type, &d, verb,
+                                                 &before, why, sizeof(why));
+            if (new_index[i] < 0) {
+                editor_set_status(es, "%s", why);
                 return 0;
             }
-            new_index[i] = es->selection.index;
-            added[added_count++] = es->selection;
-            if (out_data) out_data[i] = d;
+            planned[i] = d;
+            order[ordered++] = i;
         }
+    }
+    return 1;
+}
+
+/*
+ * add_items — Add one offset copy of each item as a single undoable step
+ * and select the copies.  Shared by Paste and Duplicate; verb ("paste")
+ * goes into the refusal messages, title ("Paste") starts our own.  When
+ * any copy cannot be added (a full array, a missing rail, a failed
+ * validation...) nothing is added and the history, Redo included, is left
+ * as it was.  On success out_data[i] holds the copy of item i.  Returns
+ * how many copies were added (0 on failure).
+ */
+static int add_items(EditorState *es, const EditorClipboardItem *items, int count,
+                     const char *verb, const char *title, PlacementData *out_data)
+{
+    static Selection added[EDITOR_MAX_SELECTION];
+    static PlacementData planned[EDITOR_MAX_SELECTION];
+    static int order[EDITOR_MAX_SELECTION];
+    int added_count = 0;
+    int group;
+
+    if (!plan_items(es, items, count, verb, title, order, planned)) return 0;
+
+    /* One entry per copy; without room for them, add nothing. */
+    group = undo_group_begin(es->undo, count);
+    if (group == 0) {
+        editor_set_status(es, "%s cancelled: cannot allocate undo history", title);
+        return 0;
+    }
+    /* The same adds, in the same order, on the same level as the plan:
+     * each succeeds, and the copies get the indices the plan gave them. */
+    for (int k = 0; k < count; k++) {
+        int i = order[k];
+        if (editor_add_placement(es, items[i].type, &planned[i], verb) != 0) {
+            /* editor_add_placement already said why. */
+            undo_group_end(es->undo);
+            rollback_group(es, group);
+            return 0;
+        }
+        added[added_count++] = es->selection;
+        if (out_data) out_data[i] = planned[i];
     }
     undo_group_end(es->undo);
     (void)editor_select_items(es, added, added_count);

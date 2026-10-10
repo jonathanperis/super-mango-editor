@@ -38,7 +38,7 @@ make run-editor    # build game + editor, then launch editor
 
 | Area | Size | Contents |
 |------|------|----------|
-| Toolbar | 1280 × 32 px | Tool selector (Select / Place / Delete), Grid and Debug toggles, zoom dropdown, file buttons (New, Open, Save As, Save), Play (Stop while a playtest runs) |
+| Toolbar | 1280 × 32 px | Tool selector (Select / Place / Delete), Grid and Debug toggles, zoom dropdown, Campaign (`[Campaign]` while the [Campaign View](#campaign-view) is open; clicking it then closes the view), file buttons (New, Open, Save As, Save), Play (Stop while a playtest runs) |
 | Canvas | 896 × 656 px | Scrollable level view with zoom. All entity types drawn at game-accurate sizes |
 | Panel | 384 × 656 px | Entity palette, properties inspector, level config (collapsible sections) |
 | Status bar | 1280 × 32 px | Cursor world coordinates, snap-to-grid state, active tool, validation summary, entity count (every placement except the player spawn), current filename with ` *` when modified, latest status message |
@@ -93,7 +93,11 @@ what still uses it). Deleting an unused rail renumbers the references to later
 rails, and undo restores the original numbering.
 
 The `Delete` key, or `Backspace` (laptops without a Delete key), removes the
-selection; inside a text field both edit text instead. The arrow keys nudge the
+selection; inside a text field both edit text instead. `Backspace` deletes the
+selection only while the canvas has the focus, that is, when your last click
+was on the canvas: right after `Enter` commits a field, a `Backspace` still
+meant for that field deletes nothing and the status bar says to click the
+canvas or press `Delete`, which works wherever the focus is. The arrow keys nudge the
 selection 1 px, or 16 px with `Shift`, following the same rules as a drag
 (floor-bound entities move only sideways, rail riders stay on their rail, and
 nothing leaves the world or makes the level invalid). A quick run of nudges of
@@ -108,7 +112,7 @@ selects the next entity down and wraps back to the top. The status bar says
 which one is selected (`Selected Coin (2 of 2 here)`). (Some Linux window
 managers take `Alt+click` for themselves; the second click works everywhere.) Esc cancels a field edit, returns to Select, or
 clears the selection. Printable shortcuts do not switch tools while a text field
-is active; Ctrl+C/Ctrl+V inside a text field copy and paste text. File/history
+is active; Ctrl+C / Ctrl+X / Ctrl+V inside a text field copy, cut and paste the selected text. File/history
 shortcuts accept Command on macOS as well as Ctrl.
 
 If a hand-edited file or a property field leaves the level invalid, the canvas
@@ -178,7 +182,12 @@ dropdown such as an axe's `mode` opens its list); a message about a Level
 Config value focuses that field, unfolding its group and scrolling the panel
 to it (a layer's asset dropdown opens, `fog_layers[1].speed` takes the
 caret). Clicking the `Validation: ...` summary in the status bar does the same
-for the first message. The level-wide fields are:
+for the first message. The panel shows eight messages at a time; when there
+are more, a `Rows 1-8 of N` line says so and the mouse wheel over the messages
+scrolls through them (elsewhere in the panel it scrolls the panel). The message
+clicked last stays highlighted, and `Ctrl+C` copies its text until you click
+somewhere else, even when the click put the caret in the field it names. The
+level-wide fields are:
 
 - `name`, `description`, `generated_by`
 - `screen_count` (1–99; world width = screen_count × 400 px)
@@ -196,9 +205,20 @@ to the 16 px floor-piece grid.
 Inside an active field, `Left` / `Right` move the caret one character,
 `Home` / `End` jump to either end, typing inserts at the caret, and `Backspace`
 / `Delete` remove the character before / after it (whole UTF-8 characters, so
-`é` never splits in half). `Tab` applies the field and moves to the next field
+`é` never splits in half). `Ctrl+Left` / `Ctrl+Right` jump to the start of the
+previous word or the end of the next one. Holding `Shift` with any of these
+caret keys selects the text the caret passes over; `Ctrl+A` selects the whole
+field, and in a field already being edited a click moves the caret and a drag
+selects (the click that starts editing a field leaves the caret at the end,
+ready to append). Typing, `Backspace`, `Delete` or a paste replace the
+selection; `Ctrl+C` and `Ctrl+X` copy or cut it, and with nothing selected
+they copy nothing and the status bar says how to select. `Tab` applies the field and moves to the next field
 of the side panel, `Shift+Tab` to the previous one (wrapping at either end); a
-value that cannot be stored keeps the focus where it is.
+value that cannot be stored keeps the focus where it is. Dropdowns (a rail's
+layout, an axe's mode, the music track...) have their place in that order too:
+`Tab` onto one opens its list, `Up` / `Down` (or `Home` / `End`) move the
+highlight, `Enter` picks the highlighted option as one undo step, `Esc` closes
+the list without a change, and `Tab` / `Shift+Tab` close it and move on.
 
 Leaving a field applies what you typed: Return, a click on the canvas or
 another field, or any command (Save, Undo, a shortcut) stores a valid value as
@@ -234,7 +254,7 @@ it never reaches the canvas or the fields under the list.
 | Pan up / down | `Shift + Mouse Wheel` over the canvas (at 3× and 5× the 300 px world is taller than the canvas); macOS reports Shift+wheel as horizontal scroll, which also pans up/down here |
 | Change zoom | Toolbar dropdown (zooms around the canvas centre) or `Ctrl + Mouse Wheel` (zooms around the cursor; 1×, 2×, 3×, 5×, stopping at 1× and 5×) |
 | Snap to grid on / off | `S` (status bar shows `Snap: on` / `Snap: off`). Placing and dragging then put the entity's corner on the 48 px grid |
-| Snap just this once (or not) | Hold `Shift` while placing or dragging: it does the opposite of the `S` setting |
+| Snap just this once (or not) | `Shift` does the opposite of the `S` setting, read at each mouse event. **Place**: hold it as you click; the entity lands the other way. **Select**: press it only once the drag has started (`Shift` at the press adds to or takes from the selection instead of dragging); while it is held the move snaps the other way, letting go mid-drag switches back, the entity follows at the next mouse movement, and where it is when the button comes up is where it stays |
 | Toggle grid | `G` |
 
 The canvas renders the level in WYSIWYG — entity positions and sizes match the game exactly at zoom 1.0 (logical pixel = 1 canvas pixel). At zoom 2.0 each logical pixel maps to 2 canvas pixels. One wheel notch pans 48 canvas pixels and scrolls a side panel 20 px. Trackpads report fractions of a notch; the editor adds them up, so small swipes scroll the side panels too, and a `Ctrl` pinch or swipe changes zoom once per whole notch.
@@ -243,7 +263,7 @@ The canvas renders the level in WYSIWYG — entity positions and sizes match the
 
 ## Undo / Redo
 
-The editor keeps an undo stack for placement, movement, deletion, property and Level Config changes. It holds the latest 256 steps (`UNDO_MAX`); older ones are dropped. An action on several entities at once (a nudge, move, delete, paste or duplicate of a multi-selection) records one entry per entity, up to 64 (`UNDO_GROUP_MAX`), in a single step: it costs one of the 256 slots, undoes and redoes in one go, and the oldest step is always dropped whole. If the editor cannot get the memory to record such an action, it refuses the action and the level is left unchanged. A new edit clears the redo stack.
+The editor keeps an undo stack for placement, movement, deletion, property and Level Config changes. It holds the latest 256 steps (`UNDO_MAX`); older ones are dropped. An action on several entities at once (a nudge, move, delete, paste or duplicate of a multi-selection) records one entry per entity, up to 64 (`UNDO_GROUP_MAX`), in a single step: it costs one of the 256 slots, undoes and redoes in one go, and the oldest step is always dropped whole. If the editor cannot get the memory to record such an action, it refuses the action and the level is left unchanged. A new edit clears the redo stack; an edit that is refused (a paste into a full array, say) is not an edit and leaves it alone.
 
 | Action | Shortcut |
 |--------|----------|
@@ -254,7 +274,7 @@ The undo stack is in-memory only — it is cleared when a new file is opened or 
 
 The editor keeps recent files (the last 5) and recovery snapshots for modified levels in its OS preference directory, retaining the `Super Mango/Editor/` organization/application suffix. Autosave runs every 30 seconds while the level is modified. Recovery snapshots must load through the same validation as any level, so while the current level has validation errors autosave writes the most recent valid version of the document instead ("Autosaved last valid version"); if nothing newer than the saved file is valid, it skips that round. Every attempt, successful or not, restarts the 30-second timer, so a failing autosave reports `Autosave failed; retrying in 30 s` at most once per interval.
 
-The folder holds at most 32 recovery copies. When leftover copies fill it, autosave pauses with `Autosave paused: 32 old recovery copies fill the folder; Ctrl+R to recover or discard them` instead of failing silently. `Ctrl+R` shows one copy at a time (source file and time) with **Cancel / Recover / Discard**; with several copies the third button is **More...**, which offers **Back / Discard / Next**. Discard deletes that copy's files. Each copy records the process id of the editor that wrote it: a copy whose editor is still running (a second editor window, say) is that editor's live work and is never offered or deleted by another one. A snapshot file that lost its `.meta` description can never be offered, so the editor deletes such orphans when it starts.
+The folder holds at most 32 recovery copies. When leftover copies fill it, autosave pauses with `Autosave paused: 32 old recovery copies fill the folder; Ctrl+R to recover or discard them` instead of failing silently. `Ctrl+R` shows one copy at a time (source file and time) with **Cancel / Recover / Discard**; with several copies the third button is **More...**, which offers **Back / Discard... / Next**, and **Discard...** asks **Back / This copy / All N copies**. Discard deletes that copy's files; **All N copies** deletes every copy offered (never another running editor's live copy) and closes the picker. Each copy records the process id of the editor that wrote it, and on Windows and Linux also when that editor started: a copy whose editor is still running (a second editor window, say) is that editor's live work and is never offered or deleted by another one. The start time tells a crashed editor from an unrelated program that later got the same process id, so such a crash copy is still offered; on macOS only the process id is compared, and the copy reappears once that program ends. A snapshot file that lost its `.meta` description can never be offered, so the editor deletes such orphans when it starts, once they are more than five minutes old (a younger one may be another editor's first snapshot, whose `.meta` is written right after it).
 
 ---
 
@@ -266,7 +286,7 @@ The folder holds at most 32 recovery copies. When leftover copies fill it, autos
 | Paste (offset from original) | `Ctrl+V` |
 | Duplicate the selection (offset, clipboard untouched) | `Ctrl+D` |
 
-`Ctrl+C` copies the whole selection. Each pasted entity is moved a little so it does not hide the original (24 px right, and down for free-floating things; along the rail for rail riders; one gap width for floor gaps), and the pasted copies become the selection. A rail copied together with its riders pastes as a new rail carrying the copied riders. A paste is all or nothing: if one copy cannot be added, none is. Each further
+`Ctrl+C` copies the whole selection. Each pasted entity is moved a little so it does not hide the original: exactly where dragging it 24 px right and 24 px down would put it (things whose height comes from the floor or water move only right, floor gaps one whole gap width), except rail riders, which step along their rail, and the pasted copies become the selection. A rail copied together with its riders pastes as a new rail carrying the copied riders. A paste is all or nothing: if one copy cannot be added, none is. Each further
 `Ctrl+V` steps one more offset from the previous copy, so repeated pastes lay
 out a row instead of stacking on one spot; a new `Ctrl+C` starts again from the
 copied entity.
@@ -301,7 +321,7 @@ Enabling **Debug Mode** in the toolbar adds `--debug` to the game launch, showin
 
 ### Playtest From Here
 
-**Shift+F5** playtests from a point instead of the level's start. With exactly one checkpoint selected, the game starts on that checkpoint (`--start-checkpoint <n>`); otherwise it starts with the player centred on the world x under the mouse (`--start-x <px>`), standing on the highest surface there: the ground floor, a pillar, a bridge, or a fixed or crumbling float platform. The selected checkpoint's properties also have a **Playtest from here** button. The point is checked with the game's own rules first, so pointing over a floor gap with nothing above it, or away from the canvas with no checkpoint selected, is refused in the status bar (`Playtest from here: nothing to stand on at x 416 (a floor gap)`) and nothing is launched. In the game the start point is also where a lost life comes back to, until a later checkpoint is crossed; Retry after Game Over starts the level from its own start (see the [runtime flags](../controls/#runtime-flags-for-input-and-ci)).
+**Shift+F5** playtests from a point instead of the level's start. With exactly one checkpoint selected, the game starts on that checkpoint (`--start-checkpoint <n>`); otherwise it starts with the player centred on the world x under the mouse (`--start-x <px>`), standing on the highest surface there: the ground floor, a pillar, a bridge, or a fixed or crumbling float platform. Surfaces are found with the player's physics box, the same way collision finds them, so an x just beside a pillar starts on its top. The selected checkpoint's properties also have a **Playtest from here** button. The point is checked with the game's own rules first, so pointing over a floor gap with nothing above it, or away from the canvas with no checkpoint selected, is refused in the status bar (`Playtest from here: nothing to stand on at x 416 (a floor gap)`) and nothing is launched. In the game the start point is also where a lost life comes back to, until a later checkpoint is crossed; Retry after Game Over starts the level from its own start (see the [runtime flags](../controls/#runtime-flags-for-input-and-ci)). A run that starts part-way through records no best time, ghost or Continue point (editor playtests also pass `--no-save`).
 
 ---
 
@@ -315,10 +335,11 @@ Enabling **Debug Mode** in the toolbar adds `--debug` to the game launch, showin
 | Remove | Take the selected level out of the campaign; its file is not touched |
 | Add level... | Pick a level file with the native picker; it must sit directly in `levels/` (the [level-reference rule](../level-design/#level-references)) and not be listed already |
 | Link in order | Set every listed level's `[last_star].next_phase` to the row below it, and clear the last one's, so the chain matches the order shown |
-| Save (`Ctrl+S`) | Write each level whose name or `next_phase` changed, then the manifest, each through the atomic temporary-file save |
-| Close (`Esc`) | Back to the level; with unsaved campaign changes the first Close (or quit) only warns, the second discards them |
+| Save (`Ctrl+S`) | Write each level whose name or `next_phase` changed, and the manifest, to temporary files first; replace the real files only once all of them are written |
+| Revert | Throw away every unsaved change in the view (a name being typed included) by reading the manifest and its levels again; with unsaved changes the first Revert only warns, the second reverts |
+| Close (`Esc`, `Ctrl+M`, or the toolbar's `[Campaign]` button) | Back to the level; with unsaved campaign changes the first Close (or quit) only warns, the second discards them. A first `Esc` while a name is being typed only cancels the typing |
 
-Save is refused while the rules find something this view can fix: a campaign-wide problem, or a level that is out of order or has no name (Link in order fixes the order). A listed file that does not load is the file's own problem and may stay listed; the menu shows it disabled. Before writing anything, Save checks that every level file it would rewrite still holds what the view read, so a file changed by another program is never overwritten and no half-written chain is left; it also refuses to rewrite the level open in the editor while that level has unsaved changes, and reloads it afterwards when it was clean. While the view is open, clicks on it never reach the canvas and level shortcuts are ignored.
+Save is refused while the rules find something this view can fix: a campaign-wide problem, or a level that is out of order or has no name (Link in order fixes the order). A listed file that does not load is the file's own problem and may stay listed; the menu shows it disabled. Before writing anything, and again right before replacing the files, Save checks that every file it would rewrite (each changed level and the manifest itself) still holds what the view read when it opened, so a file changed by another program is never overwritten; it also refuses to rewrite the level open in the editor while that level has unsaved changes, and reloads it afterwards when it was clean. A failure while writing the temporary files changes nothing on disk. The replacing itself is one quick rename per file, so it can fail half-way only if the system refuses a rename (a full disk, a file locked by another program on Windows); the status bar then says how many files were written and which one failed (`Campaign partly saved: 2 of 4 files written; writing levels/b.toml failed`), and the next Save writes the rest. If Windows moved a file aside and then could not move the new one in, the temporary file is the only complete copy: it is kept, and the status bar names it (`Campaign partly saved (1 of 4 files written). Save incomplete: the new levels/b.toml is safe in <path>`). The view has no undo history of its own: Revert is the way back to the files on disk. A name typed but not yet applied counts as an unsaved change, so the title shows ` *` and quitting asks first. When the list is longer than the view, the mouse wheel over it scrolls the rows. While the view is open, clicks on it never reach the canvas and level shortcuts are ignored.
 
 ---
 
@@ -338,11 +359,11 @@ The title bar and status bar show an asterisk (`*`) after the filename when ther
 
 Saved files are plain TOML — they can be edited in any text editor and immediately reloaded in the editor or game.
 
-Saves write a sibling temporary file, flush it, then atomically rename it over the destination and (on macOS/Linux) sync the containing directory so the new entry survives a crash. On macOS/Linux a newly created level gets ordinary document permissions (`0666` minus your umask, usually `0644`), while recovery snapshots and playtest copies stay private to you (`0600`); replacing an existing file keeps its permissions, and its owner and group where the system allows it. On Windows the replace can stop halfway (the old file already moved aside, the new one not yet in place, for example while a virus scanner holds the file); the editor then retries with a plain move, and if that fails too it keeps the temporary file, never deletes it, and names it in the status bar: `Save incomplete: your level is safe in <path>`. Before replacing a file, Save checks that it still holds what the editor last read or wrote; if another program changed it, Save asks **Cancel / Replace / Save As**. If the file changes in the moment between that question and the write, nothing is written and the status bar says `Save stopped: <path> changed on disk; nothing was written. Save again to replace it or Save As`. **Save** on a symlinked level updates the file the link points to and keeps the link, but only while the link still points at the file the editor opened; otherwise it asks you to use Save As. **Save As** refuses a destination that is a symbolic link (`Save failed: <path> is a symbolic link; choose another name`) and refuses the editor's private recovery and playtest files.
+Saves write a sibling temporary file, flush it, then atomically rename it over the destination and (on macOS/Linux) sync the containing directory so the new entry survives a crash. On macOS/Linux a newly created level gets ordinary document permissions (`0666` minus your umask, usually `0644`), while recovery snapshots and playtest copies stay private to you (`0600`); replacing an existing file keeps its permissions, and its owner and group where the system allows it. On Windows the replace can stop halfway (the old file already moved aside, the new one not yet in place, for example while a virus scanner holds the file); the editor then finishes with a plain move, trying up to five times 100 ms apart, and if every try fails it keeps the temporary file, never deletes it, and names it in the status bar: `Save incomplete: your level is safe in <path>`. Before replacing a file, Save checks that it still holds what the editor last read or wrote; if another program changed it, Save asks **Cancel / Replace / Save As**. If the file changes in the moment between that question and the write, nothing is written and the status bar says `Save stopped: <path> changed on disk; nothing was written. Save again to replace it or Save As`. **Save** on a symlinked level updates the file the link points to and keeps the link, but only while the link still points at the file the editor opened; otherwise it asks you to use Save As. **Save As** refuses a destination that is a symbolic link (`Save failed: <path> is a symbolic link; choose another name`) and refuses the editor's private recovery and playtest files.
 
-Save, autosave, and Play run `editor_validate_level()` first. Errors include everything `level_validate_runtime()` rejects (bad counts, out-of-world placements, invalid checkpoints, unsafe paths, a `next_phase` that breaks the level-reference rule), a `screen_count` below 1, and asset or `next_phase` files that do not exist. They block persistence and playtest, and the status bar reports `Save blocked: <first error>`. An empty level name or a Last Star left at the origin are warnings only. The status bar shows `Validation: OK` or `Validation: N error(s), M warning(s)`; the Level Config panel lists the messages. Every broken rule gets its own message (the game itself stops at the first), so a level with a bad coin and a frozen spider shows both at once; the panel lists up to 16 and ends with `... and N more` when there are others.
+Save, autosave, and Play run `editor_validate_level()` first. Errors include everything `level_validate_runtime()` rejects (bad counts, out-of-world placements, invalid checkpoints, unsafe paths, a `next_phase` that breaks the level-reference rule, a negative `screen_count`) and, for paths those rules accept, asset or `next_phase` files that do not exist; no field is reported twice. Like the game, the editor reads `screen_count = 0` as the default of four screens. They block persistence and playtest, and the status bar reports `Save blocked: <first error>`. An empty level name or a Last Star left at the origin are warnings only. The status bar shows `Validation: OK` or `Validation: N error(s), M warning(s)`; the Level Config panel lists the messages. Every broken rule gets its own message (the game itself stops at the first), so a level with a bad coin and a frozen spider shows both at once; the report keeps the first 256 messages (`EDITOR_VALIDATION_MAX_MESSAGES`), more than a hand-written level produces, and ends with `... and N more` when there are others.
 
-A file that will not open is not loaded (the current document stays), and the status bar says `Load failed: <file>: <first problem>`. The Level Config panel then starts with `Could not open <file>`, listing why: a TOML syntax error with its line (`line 3: TOML syntax: ...`), a schema error with the line of the bad value (`line 9: root.coins[1].x has type string, expected finite number`), or every runtime rule the file breaks, each with its line. Clicking that heading hides the list; opening a level or starting a new one clears it.
+A file that will not open is not loaded (the current document stays), and the status bar says `Load failed: <file>: <first problem>`. The Level Config panel then starts with `Could not open <file>`, listing why: a TOML syntax error with its line (`line 3: TOML syntax: ...`), a schema error with the line of the bad value (`line 9: root.coins[1].x has type string, expected finite number`), or every runtime rule the file breaks, each with its line. Clicking a row selects it and `Ctrl+C` copies it, line number included. Clicking that heading hides the list; opening a level or starting a new one clears it.
 
 CI can initialize the editor, render five bounded frames, and exit with:
 

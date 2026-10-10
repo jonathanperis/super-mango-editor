@@ -27,6 +27,7 @@
 #endif
 
 static int serializer_test_failure = SERIALIZER_TEST_FAILURE_NONE;
+static int serializer_test_failure_skip = 0;  /* replaces to let through first */
 
 #ifdef _WIN32
 wchar_t *serializer_utf8_to_wide(const char *path)
@@ -228,6 +229,13 @@ int serializer_make_temp_path(const char *path, char *buf, size_t buf_size)
 void serializer_test_set_failure(int failure)
 {
     serializer_test_failure = failure;
+    serializer_test_failure_skip = 0;
+}
+
+void serializer_test_set_failure_after(int failure, int skip)
+{
+    serializer_test_failure = failure;
+    serializer_test_failure_skip = skip > 0 ? skip : 0;
 }
 #endif
 
@@ -540,9 +548,15 @@ int serializer_resolve_save_target(const char *path, char *buf, size_t buf_size)
 int serializer_replace_file(const char *temp_path, const char *target_path)
 {
     if (!temp_path || !target_path) return -1;
-    if (serializer_test_failure == SERIALIZER_TEST_FAILURE_REPLACE_STRANDED) {
-        serializer_test_failure = SERIALIZER_TEST_FAILURE_NONE;
-        return SERIALIZER_REPLACE_TEMP_KEPT;
+    if (serializer_test_failure == SERIALIZER_TEST_FAILURE_REPLACE_STRANDED ||
+        serializer_test_failure == SERIALIZER_TEST_FAILURE_REPLACE) {
+        if (serializer_test_failure_skip > 0) {
+            serializer_test_failure_skip--;    /* this replace goes through */
+        } else {
+            int stranded = serializer_test_failure == SERIALIZER_TEST_FAILURE_REPLACE_STRANDED;
+            serializer_test_failure = SERIALIZER_TEST_FAILURE_NONE;
+            return stranded ? SERIALIZER_REPLACE_TEMP_KEPT : -1;
+        }
     }
 
 #ifdef _WIN32
@@ -566,19 +580,24 @@ int serializer_replace_file(const char *temp_path, const char *target_path)
                      * not (an antivirus scanner holding the file open is a
                      * common cause).  The original may already be gone, and
                      * the temporary file is then the only copy of the level,
-                     * so it must never be deleted.  Try once more with a
-                     * plain move; if that fails too, tell the caller to keep
+                     * so it must never be deleted.  Finish the job with a
+                     * plain move.  A scanner usually lets go within a
+                     * fraction of a second, so try a few times, 100 ms
+                     * apart; if every try fails, tell the caller to keep
                      * the temporary file.
                      */
                     DWORD error = GetLastError();
                     if (error == ERROR_UNABLE_TO_MOVE_REPLACEMENT ||
                         error == ERROR_UNABLE_TO_MOVE_REPLACEMENT_2) {
-                        if (MoveFileExW(wide_temp, wide_target,
-                                        MOVEFILE_REPLACE_EXISTING |
-                                        MOVEFILE_WRITE_THROUGH)) {
-                            result = 0;
-                        } else {
-                            result = SERIALIZER_REPLACE_TEMP_KEPT;
+                        result = SERIALIZER_REPLACE_TEMP_KEPT;
+                        for (int attempt = 0; attempt < 5; attempt++) {
+                            if (attempt > 0) Sleep(100);
+                            if (MoveFileExW(wide_temp, wide_target,
+                                            MOVEFILE_REPLACE_EXISTING |
+                                            MOVEFILE_WRITE_THROUGH)) {
+                                result = 0;
+                                break;
+                            }
                         }
                     }
                 }

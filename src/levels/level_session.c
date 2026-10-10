@@ -58,6 +58,22 @@ static LevelDef *read_stable_level(const char *path, uint64_t *hash)
  * cannot fail, and a failed load before it leaves the current level, path
  * and hash untouched. gs takes ownership of staged.
  */
+/*
+ * require_shared_sprites — Check that every shared sprite the level draws
+ * is loaded. A missing one is named on stderr and, by file name only so it
+ * fits one line of the menu, in gs->screen.load_error. 0 or -1.
+ */
+static int require_shared_sprites(GameState *gs, const LevelDef *def)
+{
+    const char *missing = game_resources_missing_level_texture(&gs->assets, def);
+    if (!missing) return 0;
+    fprintf(stderr, "Required gameplay texture unavailable: %s\n", missing);
+    const char *name = strrchr(missing, '/');
+    snprintf(gs->screen.load_error, sizeof(gs->screen.load_error), "Missing file: %s",
+             name ? name + 1 : missing);
+    return -1;
+}
+
 static void game_level_commit(GameState *gs, LevelDef *staged, uint64_t hash)
 {
     free(gs->world.level_def);
@@ -76,6 +92,9 @@ static void game_level_commit(GameState *gs, LevelDef *staged, uint64_t hash)
  * The point becomes the respawn point, so a lost life comes back here
  * rather than at the level's start, until a later checkpoint is crossed.
  * Checkpoints already behind it count as reached, without the banner.
+ * The attempt is marked start_point_run: it skipped part of the level, so
+ * its time is no best time, its recording no ghost, and its respawn point
+ * no Continue point (app_session.c checks the flag).
  * Returns -1 (after saying why) when the level has no such start.
  */
 static int apply_start_request(GameState *gs, const LevelDef *def)
@@ -98,9 +117,32 @@ static int apply_start_request(GameState *gs, const LevelDef *def)
     gs->world.player.spawn_x = point.spawn_x;
     gs->world.player.spawn_y = point.spawn_y;
     player_reset(&gs->world.player);
+    gs->screen.start_point_run = 1;
     /* Show the start point at once instead of panning from the left edge. */
     game_camera_snap(gs);
     return 0;
+}
+
+/*
+ * game_level_start_point_respawn_y — Keep a start-point run's respawn on
+ * the ground.
+ *
+ * A level without authored checkpoints saves one at each newly entered
+ * screen, and that moves only respawn_x (game_checkpoint_update): on a
+ * normal run respawn_y stays the level start's height, and recorded runs
+ * depend on that, so it is left alone. A --start-x run starts at the height
+ * of one particular column, such as the top of a pillar. Carried to a later
+ * column, that height would put the player in mid-air, or level with
+ * nothing, inside a taller pillar. So on such a run the height follows the
+ * new column, chosen by the same rule as the start point itself.
+ */
+void game_level_start_point_respawn_y(GameState *gs)
+{
+    const LevelDef *def = (const LevelDef *)gs->world.runtime.current_level;
+    float top;
+    if (!gs->screen.start_point_run || !def) return;
+    /* The column search skips floor gaps, so the floor is always found. */
+    if (level_ground_top_at(def, gs->world.respawn_x, &top)) gs->world.respawn_y = top;
 }
 
 int game_level_load_initial(GameState *gs)
@@ -126,7 +168,7 @@ int game_level_load_initial(GameState *gs)
     }
 
     /* Parse and required sprites are checked before replacing active storage. */
-    if (game_resources_require_level_textures(gs, loaded) != 0) {
+    if (require_shared_sprites(gs, loaded) != 0) {
         free(loaded);
         return -1;
     }
@@ -155,7 +197,7 @@ int game_load_next_phase(GameState *gs)
         fprintf(stderr, "Error: Failed to load next phase: %s\n", safe_path);
         return -1;
     }
-    if (game_resources_require_level_textures(gs, next_level) != 0) {
+    if (require_shared_sprites(gs, next_level) != 0) {
         free(next_level);
         return -1;
     }

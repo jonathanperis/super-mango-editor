@@ -43,7 +43,7 @@ The selector lists every campaign level (up to five rows at a time, scrolling wi
 
 When the profile holds a Continue point for the selected level (see [Continue](#continue)), a **Continue** button appears to the left of **Play**, the line under them says where it picks up (`Continue from checkpoint 2: 120 pts, 2 lives`), and the hint line adds `C/X: continue`. **Play** still starts the level from its beginning.
 
-The mouse can also click a list row to select that level, **Continue**, **Play** and the **Settings (F1 / Y)** button. The selected level wraps at either end of the manifest-defined catalog. A held confirm carried from a prior screen must be released before it can start the selected level. A missing or malformed manifest, or one with no playable level, prevents the native menu from opening. A single listed level that fails to load stays in the selector, greyed out with an "Unavailable" reason, and cannot be started; the rest remain playable (see [Campaign Manifest](../level-design/#campaign-manifest-v1)).
+The mouse can also click a list row to select that level, **Continue**, **Play** and the **Settings (F1 / Y)** button. The selected level wraps at either end of the manifest-defined catalog. A held confirm carried from a prior screen must be released before it can start the selected level. A missing or malformed manifest, or one with no playable level, prevents the native menu from opening. A single listed level that fails to load or breaks the campaign order stays in the selector, greyed out with an "Unavailable" reason, and the campaign never starts it: not with **Play** or **Continue**, not through another level's **Next Level** (the completion overlay says "Next level is unavailable in the campaign" and drops that row), and not with `--continue` (which opens the selector with "Last stage is unavailable in the campaign"). The rest remain playable (see [Campaign Manifest](../level-design/#campaign-manifest-v1)). `--level` still opens such a file directly, since it bypasses the manifest.
 
 ## Pause and Terminal Overlays
 
@@ -96,7 +96,9 @@ when its tab is hidden, the only warning before a tab closes), and when the play
 leaves the level part-way with Exit or Level Select. It holds the respawn point,
 score, lives, the coins already collected and the level timer, plus the level
 file's content hash. Finishing the level or losing its last life clears it; the
-profile keeps only one, for the most recent level.
+profile keeps only one, for the most recent level. A run started with
+`--start-x` or `--start-checkpoint` never records, replaces or clears it (see the
+[runtime flags](#runtime-flags-for-input-and-ci)).
 
 **Continue** in the start menu, or `--continue` on the command line, reopens that
 level and puts the player on the saved respawn point exactly as a lost life would:
@@ -127,17 +129,31 @@ the same way twice.
   reduced motion holds one pose per animation instead of cycling frames.
 - A ghost is bound to its level file's content hash: after the level is edited
   the old ghost is ignored, and the next finished run replaces it.
-- Runs continued from a Continue point, and runs longer than five minutes
-  (`GHOST_MAX_STEPS`), are not whole runs and never become ghosts. Debug, smoke,
+- Runs continued from a Continue point or started with `--start-x` /
+  `--start-checkpoint`, and runs longer than five minutes (`GHOST_MAX_STEPS`),
+  are not whole runs and never become ghosts. Those that pick the level up
+  part-way do not show the ghost either: it races from the level start, so it
+  returns with the next whole attempt (Retry or Replay). Debug, smoke,
   replay, experiment and `--no-save` runs have no ghost at all.
 - Native ghosts are TOML files next to the profile, named after it and the
   level: `profile-ghost-01_lugio_01.toml` beside `profile.toml` (or
   `<name>-ghost-<level>.toml` beside an explicit `--profile <name>.toml`). They
-  are written through a temporary file like the profile. Browser ghosts use one
-  `localStorage` entry per level, `super-mango-ghost-v1:<level path>`; when storage
-  is full the ghost is simply not saved and a warning is logged. A ghost text of
+  are written through a temporary file like the profile. Just before writing,
+  the stored ghost is read again (natively while holding the profile's lock
+  file), so a faster ghost that another game window or browser tab saved in the
+  meantime is kept rather than overwritten by a slower run. Browser ghosts use one
+  `localStorage` entry per level, `super-mango-ghost-v1:<level path>`. The
+  profile and every other page of the same site share that storage (about 5
+  million characters), so all ghosts together stay within one million
+  characters (`GHOST_WEB_BUDGET`): past it, the ghosts written longest ago are
+  deleted first (`super-mango-ghost-order-v1` lists them oldest first). When
+  storage is full anyway, a ghost save deletes older ghosts until it fits, and a
+  profile save deletes ghosts until the profile fits; a ghost that still cannot
+  be saved is skipped with a warning. A ghost text of
   five minutes is about 180 KB; anything over 256 KB, or damaged in any way, is
-  ignored.
+  ignored. Damage includes a `time` more than one 1/60 s step away from the time
+  its `steps` take, so a hand-edited `time = 0` cannot make a ghost no run could
+  beat.
 
 Native profiles use `profile.toml` under the OS preference root plus `SuperMango/SuperMango/`,
 or an explicit `--profile PATH`. A native save writes a sibling temporary file and
@@ -231,7 +247,7 @@ browser download), where `<seconds>` is the calendar time (seconds since
 says which of "Nothing recorded; F8 starts a recording", "Export failed: file
 names already taken" or "Export failed: could not write the file" stopped an
 export. The file
-(`format_version = 2`) has one row per step, `[input bits, nine movement
+(`format_version = 3`) has one row per step, `[input bits, nine movement
 values]`, plus the level path, the seed and `level_hash`, a hash of the level
 file's exact bytes.
 
@@ -239,9 +255,13 @@ Replay it with `--level <same level> --experiment <file>`. The game checks the
 format version, the seed, the 1–36,000 step count and that the level file
 still hashes to `level_hash`, then plays the recorded inputs, ignores live
 movement and freezes after the last step. A changed level is rejected rather
-than silently producing a different run. So is a `format_version = 1` file:
-it came from the earlier variable-timestep engine and cannot be replayed
-faithfully, so record it again. The engine version is not checked, so replay
+than silently producing a different run. So is an older format, with a
+"record it again" error: a `format_version = 1` file came from the earlier
+variable-timestep engine, and a `format_version = 2` file was recorded while
+the camera still panned in from the left edge at a level start and eased back
+after a lost life. The camera now snaps there at once, and a waiting spike
+block starts moving when the camera first shows it, so in a version-2 capture
+it could start on a different step and the run would quietly go another way. The engine version is not checked, so replay
 with the same build. Recordings are not save games: they hold no pause time,
 audio or pixels. See [Mechanics Museum](../mechanics-museum/) for levels to
 try it on.
@@ -254,9 +274,9 @@ try it on.
 | `--debug` | Enables the inspector, FPS/frame interval, memory, hitboxes and event log; disables personal-profile persistence. |
 | `--sandbox` | Loads `levels/00_sandbox_01.toml` directly (whichever of `--sandbox`/`--level` comes last wins). |
 | `--level <path>` | Starts gameplay from a specific TOML file and skips the start menu. |
-| `--start-x <px>` | With `--level`: starts the first attempt with the player centred on world x `<px>` (a whole number, 0 to the level width), standing on the highest surface under it (ground floor, pillar, bridge, or a fixed or crumbling float platform). A lost life respawns there until a later checkpoint is crossed; checkpoints already behind it count as reached. Over a floor gap with nothing above it, or outside the level, the game exits with an error. The editor's **Playtest from here** passes it. |
-| `--start-checkpoint <n>` | With `--level`: starts the first attempt on authored checkpoint `<n>` (0-based `[[checkpoints]]` order), exactly where its respawn puts the player. A checkpoint the level does not have is an error. Only one of `--start-x` / `--start-checkpoint` may be given, neither combines with `--replay-script` or `--experiment`, and both apply to the first game only: Retry after Game Over, Replay and the next phase start at the level's own start. |
-| `--continue` | Opens the last saved stage if available and no explicit level was supplied, at its saved [Continue](#continue) point when it has one; otherwise, or when that stage no longer loads, opens the selector. Runs that do not read the profile (`--no-save`, `--debug`, smoke, replay scripts) always open the selector. |
+| `--start-x <px>` | With `--level`: starts the first attempt with the player centred on world x `<px>` (a whole number, 0 to the level width), standing on the highest surface under it (ground floor, pillar, bridge, or a fixed or crumbling float platform), found with the collision code's own tests: the floor, its gaps and bridges under the column's centre, pillars and float platforms anywhere under the player's 18 px physics box. A lost life respawns there until a later checkpoint is crossed; checkpoints already behind it count as reached. In a level without authored checkpoints, the automatic checkpoint saved at each new screen then also stands the respawn on the highest surface of its new column (a normal run keeps the level start's height there, as before). Over a floor gap with nothing above it, or outside the level, the game exits with an error. The editor's **Playtest from here** passes it. |
+| `--start-checkpoint <n>` | With `--level`: starts the first attempt on authored checkpoint `<n>` (0-based `[[checkpoints]]` order), exactly where its respawn puts the player. A checkpoint the level does not have is an error. Only one of `--start-x` / `--start-checkpoint` may be given, neither combines with `--replay-script` or `--experiment`, and both apply to the first game only: Retry after Game Over, Replay and the next phase start at the level's own start. That first attempt skipped part of the level, so it is a playtest even when the profile is saved: it records no best result and no ghost, and it neither saves nor clears a Continue point; the profile's settings still apply. |
+| `--continue` | Opens the last saved stage if available and no explicit level was supplied, at its saved [Continue](#continue) point when it has one; otherwise, or when the campaign lists that stage as unavailable, or when it no longer loads, opens the selector (in the last two cases with the reason under **Play**, as a failed **Play** shows it). Runs that do not read the profile (`--no-save`, `--debug`, smoke, replay scripts) always open the selector. |
 | `--profile <path>` | Uses an explicit native profile file. |
 | `--no-save` | Keeps settings/results in memory only; does not read or write the personal profile. |
 | `--experiment <path>` | Replays an exported capture; requires `--level` (whose bytes must match the capture's `level_hash`), enables debug/no-save, and cannot combine with `--replay-script`. |
@@ -271,8 +291,11 @@ An unknown option, or a value flag whose value is missing or starts with `-`, ex
 `levels/` relative to the working folder. When that folder does not hold them
 (a desktop shortcut, a file manager, `../out/super-mango`), both programs move
 to the executable's folder, or one or two folders above it, before loading
-anything. `--profile`, `--experiment`, `--replay-dir` and the editor's document
-path are read relative to the folder you started in. `--level` is too when the
+anything. A program started through a symbolic link uses the folder of the real
+file the link points to (on macOS and Linux alike). `--profile`, `--experiment`,
+`--replay-dir` and the editor's document path are read relative to the folder
+you started in, and are made absolute before the move; a resulting path longer
+than 1023 bytes is refused with an error naming the flag. `--level` is too when the
 file exists there; otherwise it names a bundled level such as
 `levels/labs/01_collision.toml`. F9 experiment exports then land in the
 asset folder.

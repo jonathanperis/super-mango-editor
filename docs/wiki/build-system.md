@@ -14,7 +14,9 @@ On this page: [Makefile overview](#makefile-overview) ·
 The project uses a **GNU Makefile** with explicit per-directory wildcards. New `.c` files in recognized source directories are compiled automatically; a new source directory needs only a matching `SRCS` wildcard (plus `EDITOR_SRCS` if the editor links it), because one pattern rule compiles every `src/` path into `out/obj/`.
 
 ```makefile
-CC      ?= clang
+ifeq ($(origin CC),default)
+CC      = clang   # /c/msys64/ucrt64/bin/clang.exe on Windows
+endif
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic -I$(RAYLIB_BUILD)/build/raylib/include
 LIBS    = $(RAYLIB_LIB) $(PLATFORM_LIBS)
 OUTDIR  = out
@@ -72,16 +74,31 @@ does not recompile the game.
 ### Flag stamps
 
 Make only compares timestamps, so it cannot notice on its own that a compiler
-or flag changed. Three one-line stamp files record the settings each tree was
-built with: `$(OBJDIR)/build-flags.txt` (`CC`, `BUILD_MODE`, `RAYLIB_PLATFORM`,
-`CFLAGS`, `TEST_CFLAGS`, the per-object test flags and `LIBS`, which carry
-`EXTRA_CFLAGS`/`EXTRA_LDFLAGS`), `$(RAYLIB_BUILD)/make-options.txt` (the
-`build_raylib.py` options) and `$(OBJDIR)/web/build-flags.txt` (the Emscripten
-pin and Web flags). While parsing the Makefile, Make reads each stamp back and
-rewrites it only when the text differs. Every object lists its stamp as a
-prerequisite, so a changed setting rebuilds exactly what it affects (for
-example `make BUILD_MODE=release` after a debug build in the same `OUTDIR`
-recompiles everything with `-O2`), and an unchanged one rebuilds nothing.
+or flag changed. One-line stamp files record the settings each part of a tree
+was built with, compile and link settings apart:
+
+| Stamp | Records | Rebuilds when it changes |
+|-------|---------|--------------------------|
+| `$(OBJDIR)/build-flags.txt` | `CC`, `CFLAGS` (with `EXTRA_CFLAGS`), `PROJECT_INCLUDES` | game, editor and tool objects |
+| `$(OBJDIR)/test-flags.txt` | `CC`, `TEST_CFLAGS`, `PROJECT_INCLUDES`, every per-object `TEST_OBJ_FLAGS_<source>` extra and the text of the two per-object lookups | test copies of objects |
+| `$(OBJDIR)/link-flags.txt` | `CC`, `CFLAGS`, `TEST_CFLAGS`, `LIBS` (with `EXTRA_LDFLAGS`), `EDITOR_LIBS`, `TEST_LIBS`, `MATH_LIBS` | every native program is relinked; no object recompiles |
+| `$(OBJDIR)/fuzz-flags.txt` | `CC`, `FUZZ_FLAGS`, `LIBS`, `MATH_LIBS` | the two fuzz replay programs |
+| `$(RAYLIB_BUILD)/make-options.txt` | the `build_raylib.py` options | raylib |
+| `$(WEB_RAYLIB_BUILD)/make-options.txt` | the Emscripten pin and `WEB_RAYLIB_OPTIONS` | Web raylib |
+| `$(OBJDIR)/web/build-flags.txt` | the Emscripten pin, `WEB_CFLAGS` (with `WEB_OPT` and `EXTRA_WEB_CFLAGS`), `WEB_INCLUDES` | Web objects |
+| `$(OBJDIR)/web/link-flags.txt` | the Emscripten pin, `WEB_OPT`, `EXTRA_WEB_CFLAGS`, `WEB_FLAGS`, `WEB_LINK_FLAGS`, `WEB_DEBUG_LINK_FLAGS` | both Web pages are relinked; no object recompiles |
+
+While parsing the Makefile, Make reads each stamp back and rewrites it only
+when the text differs. Every output lists its stamp as a prerequisite, so a
+changed setting rebuilds the outputs that use it (for example
+`make BUILD_MODE=release` after a debug build in the same `OUTDIR` recompiles
+everything with `-O2`, while `make EXTRA_LDFLAGS=...` only relinks and a new
+`--pre-js` in `WEB_FLAGS` only relinks the Web pages), and an
+unchanged one rebuilds nothing. That holds for edits to the Makefile itself
+because recipes carry no literal flags: every flag a compile or link recipe
+passes (include paths in `PROJECT_INCLUDES`, `-lm` in `MATH_LIBS`, the per-object
+test renames in `TEST_OBJ_FLAGS_<source>`) lives in a variable a stamp records.
+A new flag belongs in one of those variables, never in recipe text.
 Test sources (`tests/*.c`) and `tools/level_check.c` compile through the same
 object rules with `-MMD -MP`, so editing a shared test header such as
 `tests/test_paths.h` rebuilds exactly the tests that include it.
@@ -411,7 +428,7 @@ make dist-native
 
 ### `make dist-wasm`
 
-Depends on `asset-budget` and `make web`, whose HTML outputs are file targets over the Web objects (and through them the sources and headers), `web/` host files, `assets/`, `levels/`, the Web raylib library and the Web flag stamp; emcc only reruns when one of them is newer, so a stale WASM build is never packaged. Archives include HTML/JS/WASM/data files, README and third-party notices.
+Depends on `asset-budget` and `make web`, whose HTML outputs are file targets over the Web objects (and through them the sources and headers), `web/` host files, `assets/`, `levels/`, the Web raylib library and the Web link flag stamp; emcc only reruns when one of them is newer, so a stale WASM build is never packaged. Archives include HTML/JS/WASM/data files, README and third-party notices.
 
 ```sh
 make dist-wasm   # runs make web first when its outputs are stale
@@ -654,9 +671,12 @@ out/
 ├── raylib/                              ← verified source, applied patches and CMake build
 │   ├── make-options.txt                 ← raylib flag stamp
 │   └── build-done.stamp                 ← last successful build_raylib.py run
-├── raylib-web/                          ← Emscripten raylib build (make web)
+├── raylib-web/                          ← Emscripten raylib build and its flag stamp (make web)
 └── obj/
-    ├── build-flags.txt                  ← flag stamp for every native object
+    ├── build-flags.txt                  ← flag stamp for game, editor and tool objects
+    ├── test-flags.txt                   ← flag stamp for test objects
+    ├── link-flags.txt                   ← flag stamp for linking native programs
+    ├── fuzz-flags.txt                   ← flag stamp for the fuzz replay programs
     ├── src/                             ← game/editor objects mirror source paths
     │   ├── core/*.o / *.d
     │   ├── editor/*.o / *.d
@@ -665,6 +685,6 @@ out/
     ├── tests/                           ← test-flag copies, same mirrored paths (make test)
     │   └── tests/*.o / *.d              ← the test sources themselves
     ├── tools/level_check.o / .d         ← level checker (make validate-levels)
-    ├── web/                             ← emcc objects and Web flag stamp (make web)
+    ├── web/                             ← emcc objects, Web compile and link flag stamps (make web)
     └── vendor/tomlc17/tomlc17.o / .d
 ```

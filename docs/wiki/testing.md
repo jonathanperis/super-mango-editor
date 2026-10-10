@@ -65,7 +65,13 @@ It also runs `tests/validate_levels_test.py` and `tests/gen_sounds_test.py`. The
 cover static boot wiring, host lifecycle, storage conflicts, touch ownership,
 canvas keyboard scoping, native/WASM archive contracts and the CodeQL SARIF
 filter without a browser. Native harnesses cover parser/serializer, validation, runtime, editor,
-profile, checkpoint, simulation and session behavior.
+profile, checkpoint, simulation and session behavior. The session, profile and
+mechanics cases include the Continue point (its codec, migration and round trip, and
+refusing a point the level no longer fits), the time-trial ghost (codec, paths,
+keeping the fastest run, racing it), Level Select's best results, `--start-x` /
+`--start-checkpoint` start points, the asset root found from the executable's
+folder, Replay reusing the session's shared sprites and sounds, and Replay
+replacing the game in place under the browser-style callback loop.
 `gameplay-mechanics-test` loads small levels from `tests/fixtures/runtime/`
 (climbing, hazards, creatures) and steps them through `game_update_active`:
 climbing on and off ladders, ropes and vines; the blue flame's eruption timing
@@ -80,8 +86,10 @@ level, settings open). It also replays
 `--replay-script` scripts (from a `--replay-dir` under the test output) and
 rejects malformed ones. `editor-ui-test` drives the editor with input events
 (palette picks, place, select, drag, delete, undo, wheel zoom/pan, property
-and config panel clicks) and checks the resulting
-document and undo history. It and `editor-validation-test` edit a campaign in a
+and config panel clicks, box and Shift selection acting on the group, arrow-key
+nudges, Ctrl+D, the snap toggle, Alt+click cycling, text-field caret and Tab,
+validation messages that select the problem, the Campaign view and Playtest
+from here) and checks the resulting document and undo history. It and `editor-validation-test` edit a campaign in a
 scratch game folder, made and entered through `tests/test_folders.h`, so those
 cases run on Windows too. On POSIX it also covers the playtest process status
 and the native file pickers through stand-in `osascript`/`zenity` scripts. They write scratch files
@@ -217,10 +225,12 @@ units and owner/borrower contracts still need their existing regression checks.
 - the [render order table](../architecture/#render-order-back-to-front) matches the call order in `src/render/game_render.c`;
 - every "N native binaries" claim in the manual, README and `.specs/project/` matches `TEST_TARGETS`, and `STATE.md` lists each test binary;
 - every constant the docs place in a particular `src/` header (written as the constant name, "in", then the header path) is really defined there, and so are the camera constants;
+- every function the docs place in a particular `src/` file (written as `name()`, or a list such as `a()` and `b()`, then "in" or "(" and the file path) is defined or declared in that file;
 - the README's workflow trigger summary matches each workflow's `on:` block, and no page credits the drift check to the Docs workflow (only `build.yml` runs it);
 - the README prerequisites name Node.js (`make test` runs Node tests) with the Node version CI uses;
 - level, screen and lab counts in `PRODUCT.md`, the README and `.specs/project/` match `docs/src/generated/project.json` and `levels/`;
-- the Emscripten version is the same in the Makefile, `build.yml` and every page that quotes it.
+- every render layer count ("N render layers", "N-layer order") in the manual, README, `PRODUCT.md` and `.specs/project/` matches the rows of the [render order table](../architecture/#render-order-back-to-front), numbered 1..N;
+- the Emscripten version is the same in the Makefile, `build.yml` and the files the check lists in `EMSCRIPTEN_MENTIONS` (the READMEs, the Build System page, `vendor/raylib/README.md` and `web/keyboard-scope.js`). Dated reports such as `docs/AUDIT_IMPLEMENTATION.md` keep the version they were written against.
 
 Each failure names the page and line to fix.
 

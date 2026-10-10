@@ -11,12 +11,16 @@
 #include "shared/graphics.h"
 #include "shared/text.h"
 
+#include <time.h>
+
 #ifdef _WIN32
 #include <direct.h>
 #include <process.h>
 #include <io.h>
 #include <sys/stat.h>
+#include <sys/utime.h>  /* _utime: backdate a file */
 #else
+#include <utime.h>      /* utime: backdate a file */
 #include <errno.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -148,19 +152,32 @@ static int make_test_preference_root(char *root, size_t root_size)
 #endif
 }
 
+/* Delete the files one editor kept in its preference folder. */
+static void remove_state_files(const EditorState *state)
+{
+    for (int i = 0; i < state->recovery_entry_count; i++) {
+        remove(state->recovery_entries[i].metadata_path);
+        remove(state->recovery_entries[i].snapshot_path);
+    }
+    remove(state->autosave_path);
+    remove(state->playtest_path);
+    remove(state->recent_path);
+}
+
 static void cleanup_test_preference_root(const char *root,
                                          EditorState *states, int state_count)
 {
     if (!root || root[0] == '\0' || !states) return;
-    for (int s = 0; s < state_count; s++) {
-        for (int i = 0; i < states[s].recovery_entry_count; i++) {
-            remove(states[s].recovery_entries[i].metadata_path);
-            remove(states[s].recovery_entries[i].snapshot_path);
-        }
-        remove(states[s].autosave_path);
-        remove(states[s].playtest_path);
-        remove(states[s].recent_path);
-    }
+    for (int s = 0; s < state_count; s++) remove_state_files(&states[s]);
+    remove_directory(root);
+}
+
+/* The same for editors that are not neighbours in one array. */
+static void cleanup_test_preference_root_of(const char *root,
+                                            EditorState *const *states, int state_count)
+{
+    if (!root || root[0] == '\0' || !states) return;
+    for (int s = 0; s < state_count; s++) remove_state_files(states[s]);
     remove_directory(root);
 }
 
@@ -351,6 +368,48 @@ static int warns_without_blocking(void)
     return 0;
 }
 
+/*
+ * The editor lists every error the game's rules find and adds only what
+ * the game cannot check: that files exist.  It never says the same thing
+ * twice, and accepts what the game accepts, such as screen_count 0 (the
+ * game's default of four screens).
+ */
+static int editor_checks_do_not_repeat_runtime_errors(void)
+{
+    LevelDef def;
+    EditorValidationReport report;
+
+    fill_valid_minimal(&def);
+    def.screen_count = 0;
+    if (expect_int("screen_count 0 accepted", editor_validate_level(&def, &report), 0) != 0 ||
+        expect_int("screen_count 0 errors", report.error_count, 0) != 0)
+        return 1;
+
+    def.screen_count = -1;
+    if (expect_int("negative screens refused", editor_validate_level(&def, &report), -1) != 0 ||
+        expect_int("negative screens once", report.error_count, 1) != 0 ||
+        expect_prefix("negative screens message", report.messages[0], "screen_count") != 0)
+        return 1;
+
+    /* A path in the wrong folder is the game's error; "missing" would
+     * be a second message about the same field. */
+    fill_valid_minimal(&def);
+    snprintf(def.music_path, sizeof(def.music_path), "%s", "music/missing.wav");
+    if (expect_int("wrong folder refused", editor_validate_level(&def, &report), -1) != 0 ||
+        expect_int("wrong folder once", report.error_count, 1) != 0 ||
+        expect_int("game's wording", strstr(report.messages[0], "must match") != NULL, 1) != 0)
+        return 1;
+
+    /* A path the game accepts but whose file is missing: the editor's own. */
+    snprintf(def.music_path, sizeof(def.music_path), "%s", "assets/sounds/missing.wav");
+    if (expect_int("missing refused", editor_validate_level(&def, &report), -1) != 0 ||
+        expect_int("missing once", report.error_count, 1) != 0 ||
+        expect_prefix("missing message", report.messages[0],
+                      "music_path missing: assets/sounds/missing.wav") != 0)
+        return 1;
+    return 0;
+}
+
 static int rejects_unsafe_asset_paths(void)
 {
     LevelDef def;
@@ -362,8 +421,8 @@ static int rejects_unsafe_asset_paths(void)
     if (expect_int("unsafe floor path result",
                    editor_validate_level(&def, &report), -1) != 0)
         return 1;
-    if (report.error_count < 1) {
-        fprintf(stderr, "editor_validation_test: unsafe floor path should report error\n");
+    if (report.error_count != 1) {
+        fprintf(stderr, "editor_validation_test: unsafe floor path should report exactly one error\n");
         return 1;
     }
 
@@ -377,8 +436,8 @@ static int rejects_unsafe_asset_paths(void)
     if (expect_int("unsafe platform path result",
                    editor_validate_level(&def, &report), -1) != 0)
         return 1;
-    if (report.error_count < 1) {
-        fprintf(stderr, "editor_validation_test: unsafe platform path should report error\n");
+    if (report.error_count != 1) {
+        fprintf(stderr, "editor_validation_test: unsafe platform path should report exactly one error\n");
         return 1;
     }
 
@@ -387,8 +446,8 @@ static int rejects_unsafe_asset_paths(void)
     if (expect_int("unsafe next phase result",
                    editor_validate_level(&def, &report), -1) != 0)
         return 1;
-    if (report.error_count < 1) {
-        fprintf(stderr, "editor_validation_test: unsafe next phase should report error\n");
+    if (report.error_count != 1) {
+        fprintf(stderr, "editor_validation_test: unsafe next phase should report exactly one error\n");
         return 1;
     }
 
@@ -719,12 +778,11 @@ static int unreadable_existing_probe_is_not_missing(void)
                       SERIALIZER_PATH_EXISTING);
 }
 
-static int recovery_entries_survive_restart_and_sessions(void)
+static int recovery_entries_survive_restart_and_sessions_with(EditorState *first,
+                                                              EditorState *second,
+                                                              EditorState *restarted)
 {
     const char *source = TEST_OUT "editor_manifest_source.toml";
-    EditorState first = {0};
-    EditorState second = {0};
-    EditorState restarted = {0};
     char root[EDITOR_PATH_MAX];
     char first_snapshot[EDITOR_PATH_MAX] = {0};
     char second_snapshot[EDITOR_PATH_MAX] = {0};
@@ -737,51 +795,51 @@ static int recovery_entries_survive_restart_and_sessions(void)
     remove(source);
     if (write_text_file(source, "name = \"manifest source\"\nscreen_count = 1\n") != 0)
         goto cleanup;
-    strncpy(first.file_path, source, sizeof(first.file_path) - 1);
-    strncpy(second.file_path, source, sizeof(second.file_path) - 1);
-    editor_level_init_defaults(&first.level);
-    editor_level_init_defaults(&second.level);
-    first.modified = 1;
-    second.modified = 1;
-    first.last_autosave_ms = (uint32_t)clock_millis() - 30001u;
-    second.last_autosave_ms = (uint32_t)clock_millis() - 30001u;
-    if (editor_set_preference_root(&first, root) != 0 ||
-        editor_set_preference_root(&second, root) != 0 ||
-        editor_init_persistence_paths(&first) != 0 ||
-        editor_init_persistence_paths(&second) != 0) goto cleanup;
+    strncpy(first->file_path, source, sizeof(first->file_path) - 1);
+    strncpy(second->file_path, source, sizeof(second->file_path) - 1);
+    editor_level_init_defaults(&first->level);
+    editor_level_init_defaults(&second->level);
+    first->modified = 1;
+    second->modified = 1;
+    first->last_autosave_ms = (uint32_t)clock_millis() - 30001u;
+    second->last_autosave_ms = (uint32_t)clock_millis() - 30001u;
+    if (editor_set_preference_root(first, root) != 0 ||
+        editor_set_preference_root(second, root) != 0 ||
+        editor_init_persistence_paths(first) != 0 ||
+        editor_init_persistence_paths(second) != 0) goto cleanup;
     /* Same-size EDITOR_PATH_MAX arrays: copy the whole terminated path. */
-    memcpy(first_snapshot, first.autosave_path, sizeof(first_snapshot));
-    memcpy(second_snapshot, second.autosave_path, sizeof(second_snapshot));
-    editor_maybe_autosave(&first);
-    editor_maybe_autosave(&second);
+    memcpy(first_snapshot, first->autosave_path, sizeof(first_snapshot));
+    memcpy(second_snapshot, second->autosave_path, sizeof(second_snapshot));
+    editor_maybe_autosave(first);
+    editor_maybe_autosave(second);
     if (expect_int("session snapshots differ",
                    strcmp(first_snapshot, second_snapshot) != 0, 1) != 0)
         goto cleanup;
     if (expect_int("first snapshot root", path_stays_in_root(root, first_snapshot), 1) != 0 ||
         expect_int("second snapshot root", path_stays_in_root(root, second_snapshot), 1) != 0 ||
         expect_int("first metadata root",
-                   path_stays_in_root(root, first.recovery_entries[0].metadata_path), 1) != 0)
+                   path_stays_in_root(root, first->recovery_entries[0].metadata_path), 1) != 0)
         goto cleanup;
 
-    if (editor_set_preference_root(&restarted, root) != 0 ||
-        editor_init_persistence_paths(&restarted) != 0 ||
-        expect_int("restart recovery count", restarted.recovery_entry_count, 2) != 0)
+    if (editor_set_preference_root(restarted, root) != 0 ||
+        editor_init_persistence_paths(restarted) != 0 ||
+        expect_int("restart recovery count", restarted->recovery_entry_count, 2) != 0)
         goto cleanup;
     if (expect_int("restart source identity",
-                   strcmp(restarted.recovery_entries[0].source_path, source) == 0 ||
-                   strcmp(restarted.recovery_entries[1].source_path, source) == 0,
+                   strcmp(restarted->recovery_entries[0].source_path, source) == 0 ||
+                   strcmp(restarted->recovery_entries[1].source_path, source) == 0,
                    1) != 0)
         goto cleanup;
 
     {
-        uint64_t before_hash = editor_document_hash(&restarted.level);
+        uint64_t before_hash = editor_document_hash(&restarted->level);
         char before_path[EDITOR_PATH_MAX];
-        memcpy(before_path, restarted.file_path, sizeof(before_path));
+        memcpy(before_path, restarted->file_path, sizeof(before_path));
         editor_test_set_recovery_choice(0);
-        if (expect_int("recovery picker cancel", editor_choose_recovery(&restarted), -1) != 0 ||
+        if (expect_int("recovery picker cancel", editor_choose_recovery(restarted), -1) != 0 ||
             expect_int("recovery picker leaves document",
-                       editor_document_hash(&restarted.level) == before_hash &&
-                       strcmp(restarted.file_path, before_path) == 0, 1) != 0)
+                       editor_document_hash(&restarted->level) == before_hash &&
+                       strcmp(restarted->file_path, before_path) == 0, 1) != 0)
             goto cleanup;
     }
 
@@ -791,29 +849,29 @@ static int recovery_entries_survive_restart_and_sessions(void)
                  root) >= (int)sizeof(malformed)) goto cleanup;
     if (write_text_file(malformed, "not-a-recovery-record\n") != 0) goto cleanup;
     if (expect_int("malformed recovery ignored",
-                   editor_discover_recoveries(&restarted), 0) != 0 ||
+                   editor_discover_recoveries(restarted), 0) != 0 ||
         expect_int("malformed recovery leaves valid entries",
-                   restarted.recovery_entry_count, 2) != 0)
+                   restarted->recovery_entry_count, 2) != 0)
         goto cleanup;
 
     file_dialog_test_set_open_result(FILE_DIALOG_CANCELLED, NULL);
-    editor_open_level_file(&restarted);
+    editor_open_level_file(restarted);
     if (expect_int("cancelled picker preserves recovery",
-                   restarted.recovery_entry_count, 2) != 0)
+                   restarted->recovery_entry_count, 2) != 0)
         goto cleanup;
     file_dialog_test_set_open_result(FILE_DIALOG_SELECTED,
                                      TEST_OUT "editor_missing_open.toml");
-    editor_open_level_file(&restarted);
+    editor_open_level_file(restarted);
     if (expect_int("failed open preserves recovery",
-                   restarted.recovery_entry_count, 2) != 0)
+                   restarted->recovery_entry_count, 2) != 0)
         goto cleanup;
 
     {
         InputEvent recovery_event;
         char modal_save_path[] = TEST_OUT "editor_recovery_modal_save.toml";
         remove(modal_save_path);
-        editor_level_init_defaults(&restarted.level);
-        restarted.modified = 1;
+        editor_level_init_defaults(&restarted->level);
+        restarted->modified = 1;
         editor_test_set_recovery_choice(1);
         editor_test_set_discard_choice(2);
         file_dialog_test_set_save_result(FILE_DIALOG_SELECTED, modal_save_path);
@@ -821,11 +879,11 @@ static int recovery_entries_survive_restart_and_sessions(void)
         recovery_event.type = INPUT_KEY_DOWN;
         recovery_event.key = KEY_R;
         recovery_event.mods = INPUT_CTRL;
-        editor_handle_event(&restarted, &recovery_event);
+        editor_handle_event(restarted, &recovery_event);
         if (expect_int("save during recovery selection preserves entries",
-                       restarted.recovery_entry_count, 2) != 0 ||
+                       restarted->recovery_entry_count, 2) != 0 ||
             expect_string("save during recovery resolves selected source",
-                          restarted.file_path, source) != 0)
+                          restarted->file_path, source) != 0)
             goto cleanup;
         remove(modal_save_path);
     }
@@ -835,18 +893,18 @@ static int recovery_entries_survive_restart_and_sessions(void)
     if (write_text_file(blocked_root, "block discovery\n") != 0) goto cleanup;
     {
         char saved_root[EDITOR_PATH_MAX];
-        memcpy(saved_root, restarted.recovery_root_path, sizeof(saved_root));
-        memcpy(restarted.recovery_root_path, blocked_root,
-               sizeof(restarted.recovery_root_path));
-        editor_retire_current_recovery(&restarted);
-        memcpy(restarted.recovery_root_path, saved_root, sizeof(saved_root));
+        memcpy(saved_root, restarted->recovery_root_path, sizeof(saved_root));
+        memcpy(restarted->recovery_root_path, blocked_root,
+               sizeof(restarted->recovery_root_path));
+        editor_retire_current_recovery(restarted);
+        memcpy(restarted->recovery_root_path, saved_root, sizeof(saved_root));
     }
     if (expect_int("discovery failure preserves snapshot",
                    editor_file_exists(first_snapshot), 1) != 0)
         goto cleanup;
 
-    editor_retire_current_recovery(&first);
-    editor_retire_current_recovery(&second);
+    editor_retire_current_recovery(first);
+    editor_retire_current_recovery(second);
     result = 0;
 
 cleanup:
@@ -855,9 +913,22 @@ cleanup:
     editor_test_set_recovery_choice(-1);
     editor_test_set_discard_choice(-1);
     if (blocked_root[0] != '\0') remove(blocked_root);
-    cleanup_test_preference_root(root, (EditorState[]){first, second, restarted}, 3);
+    cleanup_test_preference_root_of(root, (EditorState *[]){first, second, restarted}, 3);
     remove(source);
     remove(malformed);
+    return result;
+}
+
+/* An EditorState is about 200 KB and Windows gives a thread 1 MB of stack,
+ * so the 3 this test needs come from the heap. */
+static int recovery_entries_survive_restart_and_sessions(void)
+{
+    EditorState *states = calloc(3, sizeof(*states));
+    int result;
+
+    if (!states) return 1;
+    result = recovery_entries_survive_restart_and_sessions_with(&states[0], &states[1], &states[2]);
+    free(states);
     return result;
 }
 
@@ -922,53 +993,52 @@ static int utf8_wide_path_conversion_roundtrip(void)
 }
 #endif
 
-static int recovery_metadata_and_failed_save_contract(void)
+static int recovery_metadata_and_failed_save_contract_with(EditorState *es,
+                                                           EditorState *recovered)
 {
     const char *recovery = TEST_OUT "editor_recovery_contract.toml";
     const char *valid = TEST_OUT "editor_recovery_valid.toml";
     const char *target = TEST_OUT "editor_recovery_target.toml";
-    EditorState es;
-    EditorState recovered;
     char metadata[EDITOR_PATH_MAX];
 
     ensure_out_dir();
     remove(recovery);
     remove(valid);
     remove(target);
-    memset(&es, 0, sizeof(es));
-    editor_level_init_defaults(&es.level);
-    strncpy(es.file_path, target, sizeof(es.file_path) - 1);
-    strncpy(es.autosave_path, recovery, sizeof(es.autosave_path) - 1);
+    memset(es, 0, sizeof(*es));
+    editor_level_init_defaults(&es->level);
+    strncpy(es->file_path, target, sizeof(es->file_path) - 1);
+    strncpy(es->autosave_path, recovery, sizeof(es->autosave_path) - 1);
     /* This fixture owns an absent destination; reach the injected write failure
      * instead of relying on a headless native confirmation to fail first. */
-    es.source_state = EDITOR_SOURCE_EXPECTED_MISSING;
+    es->source_state = EDITOR_SOURCE_EXPECTED_MISSING;
 
-    if (level_save_toml(&es.level, valid) != 0 ||
-        level_save_toml_recovery(&es.level, recovery, target) != 0)
+    if (level_save_toml(&es->level, valid) != 0 ||
+        level_save_toml_recovery(&es->level, recovery, target) != 0)
         goto cleanup;
     if (level_read_recovery_path(recovery, metadata, sizeof(metadata)) != 1 ||
         expect_string("recovery metadata", metadata, target) != 0)
         goto cleanup;
-    editor_retire_matching_recovery(&es, TEST_OUT "other-document.toml");
+    editor_retire_matching_recovery(es, TEST_OUT "other-document.toml");
     if (expect_int("stale recovery retained", editor_file_exists(recovery), 1) != 0)
         goto cleanup;
     if (copy_file_with_bad_recovery_metadata(valid, recovery) != 0)
         goto cleanup;
-    memset(&recovered, 0, sizeof(recovered));
-    strncpy(recovered.autosave_path, recovery,
-            sizeof(recovered.autosave_path) - 1);
-    if (expect_int("malformed metadata recovery", editor_recover_autosave(&recovered), 0) != 0)
+    memset(recovered, 0, sizeof(*recovered));
+    strncpy(recovered->autosave_path, recovery,
+            sizeof(recovered->autosave_path) - 1);
+    if (expect_int("malformed metadata recovery", editor_recover_autosave(recovered), 0) != 0)
         goto cleanup;
-    if (expect_int("malformed metadata untitled", recovered.file_path[0], '\0') != 0)
+    if (expect_int("malformed metadata untitled", recovered->file_path[0], '\0') != 0)
         goto cleanup;
-    if (expect_int("malformed metadata dirty", recovered.modified, 1) != 0)
+    if (expect_int("malformed metadata dirty", recovered->modified, 1) != 0)
         goto cleanup;
 
-    if (level_save_toml_recovery(&es.level, recovery, target) != 0)
+    if (level_save_toml_recovery(&es->level, recovery, target) != 0)
         goto cleanup;
-    es.modified = 1;
+    es->modified = 1;
     serializer_test_set_failure(SERIALIZER_TEST_FAILURE_WRITE);
-    if (expect_int("failed explicit save", editor_save_current_level(&es), -1) != 0) {
+    if (expect_int("failed explicit save", editor_save_current_level(es), -1) != 0) {
         serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
         goto cleanup;
     }
@@ -976,7 +1046,7 @@ static int recovery_metadata_and_failed_save_contract(void)
     if (expect_int("failed save keeps recovery", editor_file_exists(recovery), 1) != 0)
         goto cleanup;
 
-    editor_retire_matching_recovery(&es, target);
+    editor_retire_matching_recovery(es, target);
     if (expect_int("matching recovery retired", editor_file_exists(recovery), 0) != 0)
         goto cleanup;
 
@@ -992,40 +1062,51 @@ cleanup:
     return 1;
 }
 
-static int playtest_destination_isolated(void)
+/* An EditorState is about 200 KB and Windows gives a thread 1 MB of stack,
+ * so the 2 this test needs come from the heap. */
+static int recovery_metadata_and_failed_save_contract(void)
 {
-    EditorState es;
-    EditorState second = {0};
+    EditorState *states = calloc(2, sizeof(*states));
+    int result;
+
+    if (!states) return 1;
+    result = recovery_metadata_and_failed_save_contract_with(&states[0], &states[1]);
+    free(states);
+    return result;
+}
+
+static int playtest_destination_isolated_with(EditorState *es, EditorState *second)
+{
     char root[EDITOR_PATH_MAX];
     char playtest_path[EDITOR_PATH_MAX];
     uint64_t saved_hash;
     int saved_modified;
 
-    memset(&es, 0, sizeof(es));
-    editor_level_init_defaults(&es.level);
+    memset(es, 0, sizeof(*es));
+    editor_level_init_defaults(&es->level);
     if (make_test_preference_root(root, sizeof(root)) != 0) return 1;
-    if (editor_set_preference_root(&es, root) != 0) goto cleanup;
-    strncpy(es.file_path, TEST_OUT "active_editor_document.toml",
-            sizeof(es.file_path) - 1);
-    es.modified = 1;
-    es.saved_document_hash = editor_document_hash(&es.level);
-    es.saved_document_hash_valid = 1;
-    saved_hash = es.saved_document_hash;
-    saved_modified = es.modified;
-    remove(es.file_path);
+    if (editor_set_preference_root(es, root) != 0) goto cleanup;
+    strncpy(es->file_path, TEST_OUT "active_editor_document.toml",
+            sizeof(es->file_path) - 1);
+    es->modified = 1;
+    es->saved_document_hash = editor_document_hash(&es->level);
+    es->saved_document_hash_valid = 1;
+    saved_hash = es->saved_document_hash;
+    saved_modified = es->modified;
+    remove(es->file_path);
 
-    if (editor_init_persistence_paths(&es) != 0 ||
-        editor_prepare_playtest_level(&es, playtest_path,
+    if (editor_init_persistence_paths(es) != 0 ||
+        editor_prepare_playtest_level(es, playtest_path,
                                       sizeof(playtest_path)) != 0)
         goto cleanup;
-    memset(&second, 0, sizeof(second));
-    if (editor_set_preference_root(&second, root) != 0 ||
-        editor_init_persistence_paths(&second) != 0 ||
+    memset(second, 0, sizeof(*second));
+    if (editor_set_preference_root(second, root) != 0 ||
+        editor_init_persistence_paths(second) != 0 ||
         expect_int("untitled recovery paths unique",
-                   strcmp(es.autosave_path, second.autosave_path) == 0, 0) != 0)
+                   strcmp(es->autosave_path, second->autosave_path) == 0, 0) != 0)
         goto cleanup;
     if (expect_int("playtest differs from active",
-                   strcmp(playtest_path, es.file_path) == 0, 0) != 0)
+                   strcmp(playtest_path, es->file_path) == 0, 0) != 0)
         goto cleanup;
     if (expect_int("playtest stays in preference root",
                    path_stays_in_root(root, playtest_path), 1) != 0)
@@ -1035,27 +1116,40 @@ static int playtest_destination_isolated(void)
         goto cleanup;
     if (expect_int("playtest file exists", editor_file_exists(playtest_path), 1) != 0)
         goto cleanup;
-    if (expect_int("playtest preserves dirty", es.modified, saved_modified) != 0)
+    if (expect_int("playtest preserves dirty", es->modified, saved_modified) != 0)
         goto cleanup;
     if (expect_int("playtest preserves save point",
-                   es.saved_document_hash == saved_hash, 1) != 0)
+                   es->saved_document_hash == saved_hash, 1) != 0)
         goto cleanup;
     if (expect_int("playtest does not create active file",
-                   editor_file_exists(es.file_path), 0) != 0)
+                   editor_file_exists(es->file_path), 0) != 0)
         goto cleanup;
 
-    editor_retire_playtest_level(&es);
+    editor_retire_playtest_level(es);
     if (expect_int("playtest retired", editor_file_exists(playtest_path), 0) != 0)
         goto cleanup;
-    cleanup_test_preference_root(root, (EditorState[]){es, second}, 2);
+    cleanup_test_preference_root_of(root, (EditorState *[]){es, second}, 2);
     return 0;
 
 cleanup:
-    editor_retire_playtest_level(&es);
-    editor_retire_playtest_level(&second);
-    cleanup_test_preference_root(root, (EditorState[]){es, second}, 2);
-    remove(es.file_path);
+    editor_retire_playtest_level(es);
+    editor_retire_playtest_level(second);
+    cleanup_test_preference_root_of(root, (EditorState *[]){es, second}, 2);
+    remove(es->file_path);
     return 1;
+}
+
+/* An EditorState is about 200 KB and Windows gives a thread 1 MB of stack,
+ * so the 2 this test needs come from the heap. */
+static int playtest_destination_isolated(void)
+{
+    EditorState *states = calloc(2, sizeof(*states));
+    int result;
+
+    if (!states) return 1;
+    result = playtest_destination_isolated_with(&states[0], &states[1]);
+    free(states);
+    return result;
 }
 
 static int invalid_save_preserves_existing_file(void)
@@ -1109,12 +1203,11 @@ cleanup:
     return 1;
 }
 
-static int autosave_recovery_preserves_destination(void)
+static int autosave_recovery_preserves_destination_with(EditorState *es,
+                                                        EditorState *recovered)
 {
     const char *destination = EDITOR_TEST_RECOVERY_DEST;
     const char *save_as_path = TEST_OUT "editor_recovered_save_as.toml";
-    EditorState es = {0};
-    EditorState recovered = {0};
     char root[EDITOR_PATH_MAX] = {0};
     uint64_t recovery_id;
 
@@ -1123,76 +1216,88 @@ static int autosave_recovery_preserves_destination(void)
     remove(save_as_path);
     if (make_test_preference_root(root, sizeof(root)) != 0) return 1;
 
-    editor_level_init_defaults(&es.level);
-    es.level.coin_count = 1;
-    es.level.coins[0].x = 64.0f;
-    es.level.coins[0].y = 96.0f;
-    strncpy(es.file_path, destination, sizeof(es.file_path) - 1);
-    if (editor_set_preference_root(&es, root) != 0 ||
-        editor_init_persistence_paths(&es) != 0) goto cleanup;
-    es.modified = 1;
-    es.last_autosave_ms = (uint32_t)clock_millis() - 30001u;
+    editor_level_init_defaults(&es->level);
+    es->level.coin_count = 1;
+    es->level.coins[0].x = 64.0f;
+    es->level.coins[0].y = 96.0f;
+    strncpy(es->file_path, destination, sizeof(es->file_path) - 1);
+    if (editor_set_preference_root(es, root) != 0 ||
+        editor_init_persistence_paths(es) != 0) goto cleanup;
+    es->modified = 1;
+    es->last_autosave_ms = (uint32_t)clock_millis() - 30001u;
 
-    editor_maybe_autosave(&es);
-    if (expect_int("autosave exists", editor_file_exists(es.autosave_path), 1) != 0)
+    editor_maybe_autosave(es);
+    if (expect_int("autosave exists", editor_file_exists(es->autosave_path), 1) != 0)
         goto cleanup;
-    if (expect_int("autosave remains dirty", es.modified, 1) != 0) goto cleanup;
-    if (expect_string("autosave keeps destination", es.file_path,
+    if (expect_int("autosave remains dirty", es->modified, 1) != 0) goto cleanup;
+    if (expect_string("autosave keeps destination", es->file_path,
                       destination) != 0) goto cleanup;
-    if (expect_prefix("autosave status", es.status_message,
+    if (expect_prefix("autosave status", es->status_message,
                       "Autosaved recovery copy") != 0) goto cleanup;
     if (expect_int("autosave does not create destination",
                    editor_file_exists(EDITOR_TEST_RECOVERY_DEST), 0) != 0)
         goto cleanup;
 
-    if (editor_set_preference_root(&recovered, root) != 0 ||
-        editor_init_persistence_paths(&recovered) != 0 ||
-        expect_int("recovery discovery", recovered.recovery_entry_count, 1) != 0)
+    if (editor_set_preference_root(recovered, root) != 0 ||
+        editor_init_persistence_paths(recovered) != 0 ||
+        expect_int("recovery discovery", recovered->recovery_entry_count, 1) != 0)
         goto cleanup;
-    recovery_id = recovered.recovery_entries[0].id;
-    if (expect_int("recover result", editor_recover_entry_by_id(&recovered,
+    recovery_id = recovered->recovery_entries[0].id;
+    if (expect_int("recover result", editor_recover_entry_by_id(recovered,
                                                                   recovery_id), 0) != 0)
         goto cleanup;
-    if (expect_int("recovered stays dirty", recovered.modified, 1) != 0)
+    if (expect_int("recovered stays dirty", recovered->modified, 1) != 0)
         goto cleanup;
-    if (expect_string("recovered destination", recovered.file_path,
+    if (expect_string("recovered destination", recovered->file_path,
                       destination) != 0) goto cleanup;
-    if (expect_int("recovery not recent", recovered.recent_file_count, 0) != 0)
+    if (expect_int("recovery not recent", recovered->recent_file_count, 0) != 0)
         goto cleanup;
-    if (expect_prefix("recovery status", recovered.status_message,
+    if (expect_prefix("recovery status", recovered->status_message,
                       "Recovered unsaved changes") != 0) goto cleanup;
 
     if (expect_int("recovered source unknown",
-                   recovered.source_state, EDITOR_SOURCE_UNKNOWN) != 0)
+                   recovered->source_state, EDITOR_SOURCE_UNKNOWN) != 0)
         goto cleanup;
-    recovered.level.coins[0].x = 128.0f;
+    recovered->level.coins[0].x = 128.0f;
     file_dialog_test_set_save_result(FILE_DIALOG_SELECTED, save_as_path);
-    if (editor_save_current_level_as(&recovered) != 0) goto cleanup;
-    if (expect_int("recovered Save As clean", recovered.modified, 0) != 0)
+    if (editor_save_current_level_as(recovered) != 0) goto cleanup;
+    if (expect_int("recovered Save As clean", recovered->modified, 0) != 0)
         goto cleanup;
     if (expect_int("normal save retires recovery copy",
-                   editor_file_exists(es.autosave_path), 0) != 0)
+                   editor_file_exists(es->autosave_path), 0) != 0)
         goto cleanup;
 
-    cleanup_test_preference_root(root, (EditorState[]){es, recovered}, 2);
+    cleanup_test_preference_root_of(root, (EditorState *[]){es, recovered}, 2);
     remove(destination);
     remove(save_as_path);
     return 0;
 
 cleanup:
     file_dialog_test_set_save_result(-1, NULL);
-    cleanup_test_preference_root(root, (EditorState[]){es, recovered}, 2);
+    cleanup_test_preference_root_of(root, (EditorState *[]){es, recovered}, 2);
     remove(destination);
     remove(save_as_path);
     return 1;
 }
 
-static int editor_save_workflows_enforce_baselines(void)
+/* An EditorState is about 200 KB and Windows gives a thread 1 MB of stack,
+ * so the 2 this test needs come from the heap. */
+static int autosave_recovery_preserves_destination(void)
+{
+    EditorState *states = calloc(2, sizeof(*states));
+    int result;
+
+    if (!states) return 1;
+    result = autosave_recovery_preserves_destination_with(&states[0], &states[1]);
+    free(states);
+    return result;
+}
+
+static int editor_save_workflows_enforce_baselines_with(EditorState *es,
+                                                        EditorState *create_only)
 {
     const char *existing = TEST_OUT "editor_save_workflow_existing.toml";
     const char *appearing = TEST_OUT "editor_save_workflow_appearing.toml";
-    EditorState es = {0};
-    EditorState create_only = {0};
     char root[EDITOR_PATH_MAX] = {0};
     int result = 1;
 
@@ -1202,33 +1307,33 @@ static int editor_save_workflows_enforce_baselines(void)
     if (write_text_file(existing, "old bytes\n") != 0 ||
         make_test_preference_root(root, sizeof(root)) != 0) goto cleanup;
 
-    editor_level_init_defaults(&es.level);
-    es.modified = 1;
-    if (editor_set_preference_root(&es, root) != 0 ||
-        editor_init_persistence_paths(&es) != 0) goto cleanup;
+    editor_level_init_defaults(&es->level);
+    es->modified = 1;
+    if (editor_set_preference_root(es, root) != 0 ||
+        editor_init_persistence_paths(es) != 0) goto cleanup;
     file_dialog_test_set_save_result(FILE_DIALOG_SELECTED, existing);
     editor_test_set_overwrite_choice(1);
-    if (expect_int("editor Save As existing", editor_save_current_level_as(&es), 0) != 0 ||
-        expect_int("editor Save As existing clean", es.modified, 0) != 0)
+    if (expect_int("editor Save As existing", editor_save_current_level_as(es), 0) != 0 ||
+        expect_int("editor Save As existing clean", es->modified, 0) != 0)
         goto cleanup;
 
-    es.level.coin_score++;
+    es->level.coin_score++;
     if (write_text_file(existing, "external bytes\n") != 0) goto cleanup;
     editor_test_set_external_choice(EDITOR_EXTERNAL_REPLACE);
     if (expect_int("editor normal external replace",
-                   editor_save_current_level(&es), 0) != 0)
+                   editor_save_current_level(es), 0) != 0)
         goto cleanup;
 
-    editor_level_init_defaults(&create_only.level);
-    create_only.modified = 1;
-    if (editor_set_preference_root(&create_only, root) != 0 ||
-        editor_init_persistence_paths(&create_only) != 0) goto cleanup;
+    editor_level_init_defaults(&create_only->level);
+    create_only->modified = 1;
+    if (editor_set_preference_root(create_only, root) != 0 ||
+        editor_init_persistence_paths(create_only) != 0) goto cleanup;
     file_dialog_test_set_save_result(FILE_DIALOG_SELECTED, appearing);
     serializer_test_set_failure(SERIALIZER_TEST_FAILURE_TARGET_APPEARED);
     if (expect_int("editor Save As create-only race",
-                   editor_save_current_level_as(&create_only), -1) != 0 ||
+                   editor_save_current_level_as(create_only), -1) != 0 ||
         expect_int("create-only race keeps untitled",
-                   create_only.file_path[0], '\0') != 0)
+                   create_only->file_path[0], '\0') != 0)
         goto cleanup;
     serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
     result = 0;
@@ -1238,9 +1343,22 @@ cleanup:
     file_dialog_test_set_save_result(-1, NULL);
     editor_test_set_overwrite_choice(-1);
     editor_test_set_external_choice((EditorExternalChoice)-1);
-    cleanup_test_preference_root(root, (EditorState[]){es, create_only}, 2);
+    cleanup_test_preference_root_of(root, (EditorState *[]){es, create_only}, 2);
     remove(existing);
     remove(appearing);
+    return result;
+}
+
+/* An EditorState is about 200 KB and Windows gives a thread 1 MB of stack,
+ * so the 2 this test needs come from the heap. */
+static int editor_save_workflows_enforce_baselines(void)
+{
+    EditorState *states = calloc(2, sizeof(*states));
+    int result;
+
+    if (!states) return 1;
+    result = editor_save_workflows_enforce_baselines_with(&states[0], &states[1]);
+    free(states);
     return result;
 }
 
@@ -1964,6 +2082,24 @@ static int last_star_text_property_undo_redo(void)
         goto fail;
     if (expect_int("last star text redo dirty", es.modified, 1) != 0) goto fail;
 
+    /* The text lives on the heap; when it cannot be recorded, the edit is
+     * taken back rather than left without an undo step. */
+    editor_begin_change_tracking(&es, EDITOR_CHANGE_ENTITY);
+    editor_capture_change_before(&es, EDITOR_LAST_STAR_NEXT_PHASE_WIDGET);
+    strncpy(es.level.next_phase, "levels/other.toml", sizeof(es.level.next_phase) - 1);
+    undo_test_limit_allocations(0);
+    editor_commit_change(&es);
+    undo_test_limit_allocations(-1);
+    if (expect_string("unrecorded text taken back", es.level.next_phase,
+                      "levels/new.toml") != 0 ||
+        expect_int("still one step", es.undo->top, 1) != 0 ||
+        expect_prefix("cancel reported", es.status_message,
+                      "Edit cancelled: cannot allocate undo history") != 0)
+        goto fail;
+
+    /* An entry without text costs no allocation and stores none. */
+    if (expect_int("text off the entry", (int)(sizeof(UndoEntry) < 256), 1) != 0) goto fail;
+
     undo_destroy(es.undo);
     return 0;
 
@@ -2432,15 +2568,43 @@ static int validation_reports_every_runtime_error(void)
         expect_int("nothing hidden", editor_validation_hidden_count(&report), 0) != 0)
         return 1;
 
-    /* More errors than the list holds: the counts keep them all. */
+    /* Every coin, star, climbable, platform, bridge and pad left of the
+     * world (or worse): more errors than the report keeps.  It keeps the
+     * first EDITOR_VALIDATION_MAX_MESSAGES, and the counts keep them all. */
     editor_level_init_defaults(&level);
-    level.coin_count = EDITOR_VALIDATION_MAX_MESSAGES + 4;
-    for (int i = 0; i < level.coin_count; i++)
-        level.coins[i] = (CoinPlacement){-5.0f, 100.0f};
+    level.coin_count = MAX_COINS;
+    for (int i = 0; i < MAX_COINS; i++) level.coins[i] = (CoinPlacement){-5.0f, 100.0f};
+    level.star_yellow_count = level.star_green_count = level.star_red_count = 16;
+    for (int i = 0; i < 16; i++) {
+        level.star_yellows[i] = (StarYellowPlacement){-5.0f, 100.0f};
+        level.star_greens[i] = (StarGreenPlacement){-5.0f, 100.0f};
+        level.star_reds[i] = (StarRedPlacement){-5.0f, 100.0f};
+    }
+    level.vine_count = MAX_VINES;
+    for (int i = 0; i < MAX_VINES; i++) level.vines[i] = (VinePlacement){-5.0f, 100.0f, 3, 0};
+    level.ladder_count = level.rope_count = 16;
+    for (int i = 0; i < 16; i++) {
+        level.ladders[i] = (LadderPlacement){-5.0f, 100.0f, 3};
+        level.ropes[i] = (RopePlacement){-5.0f, 100.0f, 3};
+    }
+    level.platform_count = MAX_PLATFORMS;
+    for (int i = 0; i < MAX_PLATFORMS; i++)
+        level.platforms[i] = (PlatformPlacement){.x = -5.0f, .tile_height = 1, .tile_width = 1};
+    level.bridge_count = MAX_BRIDGES;
+    for (int i = 0; i < MAX_BRIDGES; i++) level.bridges[i] = (BridgePlacement){-5.0f, 100.0f, 3};
+    level.bouncepad_small_count = MAX_BOUNCEPADS_SMALL;
+    level.bouncepad_medium_count = MAX_BOUNCEPADS_MEDIUM;
+    level.bouncepad_high_count = MAX_BOUNCEPADS_HIGH;
+    for (int i = 0; i < 16; i++) {
+        level.bouncepads_small[i] = (BouncepadPlacement){.x = -5.0f};
+        level.bouncepads_medium[i] = (BouncepadPlacement){.x = -5.0f};
+        level.bouncepads_high[i] = (BouncepadPlacement){.x = -5.0f};
+    }
     (void)editor_validate_level(&level, &report);
-    if (expect_int("listed", report.message_count, EDITOR_VALIDATION_MAX_MESSAGES) != 0 ||
-        expect_int("counted", report.error_count, EDITOR_VALIDATION_MAX_MESSAGES + 4) != 0 ||
-        expect_int("hidden", editor_validation_hidden_count(&report) >= 4, 1) != 0)
+    if (expect_int("more than kept", report.error_count > EDITOR_VALIDATION_MAX_MESSAGES, 1) != 0 ||
+        expect_int("listed", report.message_count, EDITOR_VALIDATION_MAX_MESSAGES) != 0 ||
+        expect_int("hidden", editor_validation_hidden_count(&report),
+                   report.error_count - EDITOR_VALIDATION_MAX_MESSAGES) != 0)
         return 1;
 
     /* A bad count is reported alone: the arrays cannot be walked. */
@@ -2640,6 +2804,178 @@ done:
     return result;
 }
 
+/* 1 when a save of `path` left its first-choice temporary file behind. */
+static int temp_left_for(const char *path)
+{
+    char temp[4096];
+    return serializer_make_temp_path(path, temp, sizeof(temp)) == 0 &&
+           serializer_file_exists_utf8(temp);
+}
+
+/* The next_phase levels/<file> holds on disk now ("?" when it won't load). */
+static const char *next_on_disk(const char *path)
+{
+    static LevelDef level;
+    level_def_init_defaults(&level);
+    return level_load_toml(path, &level) == 0 ? level.next_phase : "?";
+}
+
+/*
+ * Campaign Save writes every changed file to a temporary file first and
+ * only then replaces them, one quick rename each.  A failure while writing
+ * changes nothing on disk and leaves no temporary file; a rename failing
+ * half-way says how many files were written and which one failed, and the
+ * next Save finishes the job.
+ */
+static int campaign_save_writes_everything_before_replacing(void)
+{
+    static const char *const files[] = {
+        "levels/a.toml", "levels/b.toml", "levels/c.toml", CAMPAIGN_MANIFEST_PATH
+    };
+    EditorState es;
+    char cwd[4096];
+    CampaignCatalog reloaded = {0};
+    int result = 1;
+
+    memset(&es, 0, sizeof(es));
+    editor_level_init_defaults(&es.level);
+    if (make_campaign_root() != 0 || test_working_folder(cwd, sizeof(cwd)) != 0 ||
+        test_change_folder(CAMPAIGN_ROOT) != 0) return 1;
+
+    /* a c b: three levels to relink, and the manifest: four files. */
+    if (expect_int("opens", editor_campaign_open(&es, NULL), 0) != 0 ||
+        editor_campaign_move(&es, 2, -1) != 0 ||
+        expect_int("linked", editor_campaign_link_in_order(&es), 3) != 0)
+        goto done;
+
+    /* Writing the first temporary file fails: nothing changes at all. */
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_WRITE);
+    if (expect_int("write failure refused", editor_campaign_save(&es), -1) != 0 ||
+        expect_prefix("write failure status", es.status_message,
+                      "Campaign not saved: writing levels/a.toml failed; no file was changed") != 0 ||
+        expect_int("a untouched", strcmp(next_on_disk("levels/a.toml"), "levels/b.toml"), 0) != 0 ||
+        campaign_catalog_load(CAMPAIGN_MANIFEST_PATH, &reloaded) != 0 ||
+        expect_int("manifest untouched", strcmp(campaign_order(&reloaded),
+                                                "a.toml b.toml c.toml"), 0) != 0)
+        goto done;
+    campaign_catalog_cleanup(&reloaded);
+    for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); i++)
+        if (expect_int("no temporary file after a write failure", temp_left_for(files[i]), 0) != 0)
+            goto done;
+
+    /* Every file is written, then the third rename (levels/b.toml) fails:
+     * a and c are in place, b and the manifest are not, and the status
+     * says so; their temporary files are gone. */
+    serializer_test_set_failure_after(SERIALIZER_TEST_FAILURE_REPLACE, 2);
+    if (expect_int("rename failure", editor_campaign_save(&es), -1) != 0 ||
+        expect_prefix("partial status", es.status_message,
+                      "Campaign partly saved: 2 of 4 files written; writing levels/b.toml failed") != 0 ||
+        expect_int("a written", strcmp(next_on_disk("levels/a.toml"), "levels/c.toml"), 0) != 0 ||
+        expect_int("c written", strcmp(next_on_disk("levels/c.toml"), "levels/b.toml"), 0) != 0 ||
+        expect_int("b not written", strcmp(next_on_disk("levels/b.toml"), "levels/c.toml"), 0) != 0 ||
+        expect_int("still unsaved", editor_campaign_unsaved(&es), 1) != 0)
+        goto done;
+    for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); i++)
+        if (expect_int("no temporary file after a rename failure", temp_left_for(files[i]), 0) != 0)
+            goto done;
+
+    /* Saving again writes only what is left: b and the manifest. */
+    if (expect_int("second save", editor_campaign_save(&es), 0) != 0 ||
+        expect_prefix("second save status", es.status_message,
+                      "Campaign saved: 3 levels, 1 level file updated") != 0 ||
+        campaign_catalog_load(CAMPAIGN_MANIFEST_PATH, &reloaded) != 0 ||
+        expect_int("game reads a c b", strcmp(campaign_order(&reloaded), "a.toml c.toml b.toml"), 0) != 0 ||
+        expect_int("every entry playable", reloaded.levels[0].available &&
+                   reloaded.levels[1].available && reloaded.levels[2].available, 1) != 0)
+        goto done;
+
+    /* Windows can move a file aside and then fail to move the new one in
+     * (the seam acts it out): that temporary file is the only complete
+     * copy, so it stays, and the status bar names it. */
+    if (editor_campaign_move(&es, 2, -1) != 0 ||          /* a b c */
+        expect_int("relinked", editor_campaign_link_in_order(&es), 3) != 0)
+        goto done;
+    serializer_test_set_failure_after(SERIALIZER_TEST_FAILURE_REPLACE_STRANDED, 1);
+    if (expect_int("stranded", editor_campaign_save(&es), -1) != 0 ||
+        expect_prefix("stranded status", es.status_message,
+                      "Campaign partly saved (1 of 4 files written). Save incomplete: "
+                      "the new levels/b.toml is safe in ") != 0 ||
+        expect_int("names the copy", strstr(es.status_message, "b.toml.tmp.") != NULL, 1) != 0 ||
+        expect_int("kept copy stays", temp_left_for("levels/b.toml"), 1) != 0 ||
+        expect_int("c temporary gone", temp_left_for("levels/c.toml"), 0) != 0 ||
+        expect_int("manifest temporary gone", temp_left_for(CAMPAIGN_MANIFEST_PATH), 0) != 0)
+        goto done;
+    {
+        char kept[4096];
+        if (serializer_make_temp_path("levels/b.toml", kept, sizeof(kept)) == 0)
+            serializer_remove_temp(kept);
+    }
+    result = 0;
+
+done:
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+    campaign_catalog_cleanup(&reloaded);
+    editor_campaign_free(&es);
+    if (test_change_folder(cwd) != 0) result = 1;
+    return result;
+}
+
+/*
+ * The manifest is fingerprinted when the view opens, like each level file:
+ * a manifest another program rewrote since is never overwritten, whether
+ * the change came before Save or during it (the seam), and Save then
+ * writes nothing at all.
+ */
+static int campaign_save_keeps_a_manifest_changed_by_hand(void)
+{
+    static const char hand_edit[] =
+        "format_version = 1\nlevels = [\n    \"levels/a.toml\",\n"
+        "    \"levels/b.toml\",\n    \"levels/c.toml\",\n    \"levels/d.toml\",\n]\n";
+    EditorState es;
+    char cwd[4096];
+    CampaignCatalog reloaded = {0};
+    int result = 1;
+
+    memset(&es, 0, sizeof(es));
+    editor_level_init_defaults(&es.level);
+    if (make_campaign_root() != 0 || test_working_folder(cwd, sizeof(cwd)) != 0 ||
+        test_change_folder(CAMPAIGN_ROOT) != 0) return 1;
+
+    /* Remove c and relink: b changes, and so does the manifest. */
+    if (expect_int("opens", editor_campaign_open(&es, NULL), 0) != 0 ||
+        editor_campaign_remove(&es, 2) != 0 ||
+        expect_int("linked", editor_campaign_link_in_order(&es), 1) != 0)
+        goto done;
+
+    /* Changed during the save, after the temporary files were written. */
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_SOURCE_CHANGED);
+    if (expect_int("late change refused", editor_campaign_save(&es), -1) != 0 ||
+        expect_int("late change status", strstr(es.status_message, "changed on disk") != NULL, 1) != 0 ||
+        expect_int("b untouched", strcmp(next_on_disk("levels/b.toml"), "levels/c.toml"), 0) != 0 ||
+        expect_int("no b temporary", temp_left_for("levels/b.toml"), 0) != 0 ||
+        expect_int("no manifest temporary", temp_left_for(CAMPAIGN_MANIFEST_PATH), 0) != 0)
+        goto done;
+
+    /* Changed by hand before Save: the manifest names the hand edit. */
+    if (write_text_file(CAMPAIGN_MANIFEST_PATH, hand_edit) != 0 ||
+        expect_int("hand edit refused", editor_campaign_save(&es), -1) != 0 ||
+        expect_prefix("hand edit status", es.status_message,
+                      "Campaign not saved: " CAMPAIGN_MANIFEST_PATH " changed on disk") != 0 ||
+        expect_int("b still untouched", strcmp(next_on_disk("levels/b.toml"), "levels/c.toml"), 0) != 0 ||
+        campaign_catalog_read(CAMPAIGN_MANIFEST_PATH, &reloaded) != 0 ||
+        expect_int("hand edit kept", strcmp(campaign_order(&reloaded),
+                                            "a.toml b.toml c.toml d.toml"), 0) != 0)
+        goto done;
+    result = 0;
+
+done:
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+    campaign_catalog_cleanup(&reloaded);
+    editor_campaign_free(&es);
+    if (test_change_folder(cwd) != 0) result = 1;
+    return result;
+}
+
 /*
  * A rail copied together with the spike block riding it pastes as a new
  * rail with the copy riding the NEW rail; deleting the pair is one undo
@@ -2694,17 +3030,28 @@ static int group_copy_and_delete_keep_riders_with_their_rail(void)
                    editor_document_hash(&es.level) == editor_document_hash(&original), 1) != 0)
         goto fail;
 
-    /* A group paste that cannot complete adds nothing at all. */
+    /* A group paste or duplicate that cannot complete adds nothing at all,
+     * and is refused before anything is recorded: the undone delete above
+     * can still be redone. */
     es.level.coin_count = MAX_COINS - 1;
     for (int i = 0; i < MAX_COINS - 1; i++) es.level.coins[i] = (CoinPlacement){10.0f, 10.0f};
     (void)editor_select_items(&es, (Selection[]){{ENT_COIN, 0}, {ENT_COIN, 1}}, 2);
     editor_copy_selected(&es);
     {
         int top = es.undo->top;
+        int redo = es.undo->redo_top;
+        if (expect_int("a delete to redo", redo > 0, 1) != 0) goto fail;
         editor_paste_clipboard(&es);
         if (expect_int("all or nothing", es.level.coin_count, MAX_COINS - 1) != 0 ||
             expect_int("no history left", es.undo->top, top) != 0 ||
-            expect_int("nothing to redo", es.undo->redo_top, 0) != 0) goto fail;
+            expect_int("redo kept after paste", es.undo->redo_top, redo) != 0 ||
+            expect_prefix("paste refusal", es.status_message, "Cannot paste Coin: limit of") != 0)
+            goto fail;
+        editor_duplicate_selection(&es);
+        if (expect_int("duplicate all or nothing", es.level.coin_count, MAX_COINS - 1) != 0 ||
+            expect_int("no duplicate history", es.undo->top, top) != 0 ||
+            expect_int("redo kept after duplicate", es.undo->redo_top, redo) != 0)
+            goto fail;
     }
     undo_destroy(es.undo);
     return 0;
@@ -3336,10 +3683,9 @@ cleanup:
     return result;
 }
 
-static int recovery_metadata_keeps_longest_source_path(void)
+static int recovery_metadata_keeps_longest_source_path_with(EditorState *es,
+                                                            EditorState *restarted)
 {
-    EditorState es = {0};
-    EditorState restarted = {0};
     char root[EDITOR_PATH_MAX] = {0};
     char long_path[EDITOR_PATH_MAX];
     size_t length = 1020;  /* just under EDITOR_PATH_MAX - 1 */
@@ -3352,25 +3698,38 @@ static int recovery_metadata_keeps_longest_source_path(void)
     if (strlen(long_path) != length || !editor_path_fits(long_path)) return 1;
 
     if (make_test_preference_root(root, sizeof(root)) != 0 ||
-        editor_set_preference_root(&es, root) != 0 ||
-        editor_set_preference_root(&restarted, root) != 0) return 1;
-    editor_level_init_defaults(&es.level);
-    memcpy(es.file_path, long_path, length + 1);
-    if (editor_init_persistence_paths(&es) != 0) goto cleanup;
-    es.modified = 1;
-    es.last_autosave_ms = (uint32_t)clock_millis() - 30001u;
-    editor_maybe_autosave(&es);
+        editor_set_preference_root(es, root) != 0 ||
+        editor_set_preference_root(restarted, root) != 0) return 1;
+    editor_level_init_defaults(&es->level);
+    memcpy(es->file_path, long_path, length + 1);
+    if (editor_init_persistence_paths(es) != 0) goto cleanup;
+    es->modified = 1;
+    es->last_autosave_ms = (uint32_t)clock_millis() - 30001u;
+    editor_maybe_autosave(es);
 
     /* A restarted editor must rediscover it with the full source path. */
-    if (editor_init_persistence_paths(&restarted) != 0 ||
-        expect_int("long path entry found", restarted.recovery_entry_count, 1) != 0 ||
+    if (editor_init_persistence_paths(restarted) != 0 ||
+        expect_int("long path entry found", restarted->recovery_entry_count, 1) != 0 ||
         expect_int("long path round trip",
-                   strcmp(restarted.recovery_entries[0].source_path, long_path) == 0,
+                   strcmp(restarted->recovery_entries[0].source_path, long_path) == 0,
                    1) != 0) goto cleanup;
     result = 0;
 
 cleanup:
-    cleanup_test_preference_root(root, (EditorState[]){es, restarted}, 2);
+    cleanup_test_preference_root_of(root, (EditorState *[]){es, restarted}, 2);
+    return result;
+}
+
+/* An EditorState is about 200 KB and Windows gives a thread 1 MB of stack,
+ * so the 2 this test needs come from the heap. */
+static int recovery_metadata_keeps_longest_source_path(void)
+{
+    EditorState *states = calloc(2, sizeof(*states));
+    int result;
+
+    if (!states) return 1;
+    result = recovery_metadata_keeps_longest_source_path_with(&states[0], &states[1]);
+    free(states);
     return result;
 }
 
@@ -3620,12 +3979,11 @@ fail:
     return 1;
 }
 
-static int staged_edit_save_and_quit_boundaries(void)
+static int staged_edit_save_and_quit_boundaries_with(EditorState *save_state,
+                                                     EditorState *quit_state,
+                                                     EditorState *selection_state)
 {
     const char *target = TEST_OUT "editor_staged_command.toml";
-    EditorState save_state = {0};
-    EditorState quit_state = {0};
-    EditorState selection_state = {0};
     EditorWidgetTestContext context = {0};
     char root[EDITOR_PATH_MAX] = {0};
     LevelDef initial;
@@ -3641,118 +3999,118 @@ static int staged_edit_save_and_quit_boundaries(void)
     remove(target);
     if (level_save_toml(&initial, target) != 0) goto fail;
 
-    save_state.level = initial;
-    ui_init(&save_state.ui, context.font);
-    save_state.undo = undo_create();
-    strncpy(save_state.file_path, target, sizeof(save_state.file_path) - 1);
-    if (!save_state.undo || editor_set_preference_root(&save_state, root) != 0 ||
-        editor_init_persistence_paths(&save_state) != 0 ||
+    save_state->level = initial;
+    ui_init(&save_state->ui, context.font);
+    save_state->undo = undo_create();
+    strncpy(save_state->file_path, target, sizeof(save_state->file_path) - 1);
+    if (!save_state->undo || editor_set_preference_root(save_state, root) != 0 ||
+        editor_init_persistence_paths(save_state) != 0 ||
         serializer_fingerprint_utf8(target,
-                                                        &save_state.source_fingerprint) != 1)
+                                                        &save_state->source_fingerprint) != 1)
         goto fail;
-    save_state.source_state = EDITOR_SOURCE_EXPECTED_EXISTING;
-    editor_set_document_save_point(&save_state);
-    save_state.selection.type = ENT_COIN;
-    save_state.selection.index = 0;
-    ui_begin_frame(&save_state.ui);
-    save_state.ui.mouse_clicked = 1;
-    save_state.ui.mouse_x = 4;
-    save_state.ui.mouse_y = 4;
-    (void)ui_float_field(&save_state.ui, 301, 0, 0, 120,
-                         &save_state.level.coins[0].x);
+    save_state->source_state = EDITOR_SOURCE_EXPECTED_EXISTING;
+    editor_set_document_save_point(save_state);
+    save_state->selection.type = ENT_COIN;
+    save_state->selection.index = 0;
+    ui_begin_frame(&save_state->ui);
+    save_state->ui.mouse_clicked = 1;
+    save_state->ui.mouse_x = 4;
+    save_state->ui.mouse_y = 4;
+    (void)ui_float_field(&save_state->ui, 301, 0, 0, 120,
+                         &save_state->level.coins[0].x);
     memset(&event, 0, sizeof(event));
     event.type = INPUT_TEXT;
     strncpy(event.text, "7", sizeof(event.text) - 1);
-    editor_handle_event(&save_state, &event);
+    editor_handle_event(save_state, &event);
     event.text[0] = '2';
     event.text[1] = '\0';
-    editor_handle_event(&save_state, &event);
+    editor_handle_event(save_state, &event);
     memset(&event, 0, sizeof(event));
     event.type = INPUT_KEY_DOWN;
     event.key = KEY_S;
     event.mods = INPUT_CTRL;
     editor_test_set_finish_field_choice(1);
-    editor_handle_event(&save_state, &event);
-    if (expect_prefix("staged Save succeeds", save_state.status_message,
+    editor_handle_event(save_state, &event);
+    if (expect_prefix("staged Save succeeds", save_state->status_message,
                       "Saved ") != 0 ||
-        expect_float_value("staged Save value", save_state.level.coins[0].x,
+        expect_float_value("staged Save value", save_state->level.coins[0].x,
                            72.0f) != 0 ||
-        expect_int("staged Save clean", save_state.modified, 0) != 0 ||
-        expect_int("staged Save command", save_state.undo->top, 1) != 0)
+        expect_int("staged Save clean", save_state->modified, 0) != 0 ||
+        expect_int("staged Save command", save_state->undo->top, 1) != 0)
         goto fail;
 
-    editor_level_init_defaults(&quit_state.level);
-    quit_state.level.coin_count = 1;
-    quit_state.level.coins[0].x = 0.0f;
-    ui_init(&quit_state.ui, context.font);
-    quit_state.undo = undo_create();
-    if (!quit_state.undo || editor_set_preference_root(&quit_state, root) != 0 ||
-        editor_init_persistence_paths(&quit_state) != 0) goto fail;
-    editor_set_document_save_point(&quit_state);
-    quit_state.selection.type = ENT_COIN;
-    quit_state.selection.index = 0;
-    ui_begin_frame(&quit_state.ui);
-    quit_state.ui.mouse_clicked = 1;
-    quit_state.ui.mouse_x = 4;
-    quit_state.ui.mouse_y = 4;
-    (void)ui_float_field(&quit_state.ui, 301, 0, 0, 120,
-                         &quit_state.level.coins[0].x);
+    editor_level_init_defaults(&quit_state->level);
+    quit_state->level.coin_count = 1;
+    quit_state->level.coins[0].x = 0.0f;
+    ui_init(&quit_state->ui, context.font);
+    quit_state->undo = undo_create();
+    if (!quit_state->undo || editor_set_preference_root(quit_state, root) != 0 ||
+        editor_init_persistence_paths(quit_state) != 0) goto fail;
+    editor_set_document_save_point(quit_state);
+    quit_state->selection.type = ENT_COIN;
+    quit_state->selection.index = 0;
+    ui_begin_frame(&quit_state->ui);
+    quit_state->ui.mouse_clicked = 1;
+    quit_state->ui.mouse_x = 4;
+    quit_state->ui.mouse_y = 4;
+    (void)ui_float_field(&quit_state->ui, 301, 0, 0, 120,
+                         &quit_state->level.coins[0].x);
     memset(&event, 0, sizeof(event));
     event.type = INPUT_TEXT;
     strncpy(event.text, "8", sizeof(event.text) - 1);
-    editor_handle_event(&quit_state, &event);
+    editor_handle_event(quit_state, &event);
     event.text[0] = '0';
     event.text[1] = '\0';
-    editor_handle_event(&quit_state, &event);
+    editor_handle_event(quit_state, &event);
     editor_test_set_finish_field_choice(1);
     editor_test_set_discard_choice(1);
     memset(&event, 0, sizeof(event));
     event.type = INPUT_QUIT;
-    quit_state.running = 1;
-    editor_handle_event(&quit_state, &event);
-    if (expect_int("staged Quit confirmation", quit_state.running, 0) != 0 ||
-        expect_float_value("staged Quit value", quit_state.level.coins[0].x,
+    quit_state->running = 1;
+    editor_handle_event(quit_state, &event);
+    if (expect_int("staged Quit confirmation", quit_state->running, 0) != 0 ||
+        expect_float_value("staged Quit value", quit_state->level.coins[0].x,
                            80.0f) != 0 ||
-        expect_int("staged Quit field closed", quit_state.ui.active_id, 0) != 0)
+        expect_int("staged Quit field closed", quit_state->ui.active_id, 0) != 0)
         goto fail;
 
-    editor_level_init_defaults(&selection_state.level);
-    selection_state.level.coin_count = 1;
-    selection_state.level.coins[0].x = 0.0f;
-    selection_state.undo = undo_create();
-    ui_init(&selection_state.ui, context.font);
-    if (!selection_state.undo) goto fail;
-    editor_set_document_save_point(&selection_state);
-    selection_state.selection.type = ENT_COIN;
-    selection_state.selection.index = 0;
-    ui_begin_frame(&selection_state.ui);
-    selection_state.ui.mouse_clicked = 1;
-    selection_state.ui.mouse_x = 4;
-    selection_state.ui.mouse_y = 4;
-    (void)ui_float_field(&selection_state.ui, 301, 0, 0, 120,
-                         &selection_state.level.coins[0].x);
+    editor_level_init_defaults(&selection_state->level);
+    selection_state->level.coin_count = 1;
+    selection_state->level.coins[0].x = 0.0f;
+    selection_state->undo = undo_create();
+    ui_init(&selection_state->ui, context.font);
+    if (!selection_state->undo) goto fail;
+    editor_set_document_save_point(selection_state);
+    selection_state->selection.type = ENT_COIN;
+    selection_state->selection.index = 0;
+    ui_begin_frame(&selection_state->ui);
+    selection_state->ui.mouse_clicked = 1;
+    selection_state->ui.mouse_x = 4;
+    selection_state->ui.mouse_y = 4;
+    (void)ui_float_field(&selection_state->ui, 301, 0, 0, 120,
+                         &selection_state->level.coins[0].x);
     memset(&event, 0, sizeof(event));
     event.type = INPUT_TEXT;
     strncpy(event.text, "9", sizeof(event.text) - 1);
-    editor_handle_event(&selection_state, &event);
+    editor_handle_event(selection_state, &event);
     memset(&event, 0, sizeof(event));
     event.type = INPUT_KEY_DOWN;
     event.key = KEY_TWO;
-    editor_handle_event(&selection_state, &event);
+    editor_handle_event(selection_state, &event);
     if (expect_float_value("typing leaves value staged",
-                           selection_state.level.coins[0].x, 0.0f) != 0 ||
-        expect_int("typing does not select a tool", selection_state.tool, TOOL_SELECT) != 0 ||
-        expect_int("typing keeps active field", selection_state.ui.active_id, 301) != 0) goto fail;
+                           selection_state->level.coins[0].x, 0.0f) != 0 ||
+        expect_int("typing does not select a tool", selection_state->tool, TOOL_SELECT) != 0 ||
+        expect_int("typing keeps active field", selection_state->ui.active_id, 301) != 0) goto fail;
 
-    undo_destroy(save_state.undo);
-    undo_destroy(quit_state.undo);
-    undo_destroy(selection_state.undo);
-    ui_cleanup(&save_state.ui);
-    ui_cleanup(&quit_state.ui);
-    ui_cleanup(&selection_state.ui);
-    cleanup_test_preference_root(root,
-                                 (EditorState[]){save_state, quit_state,
-                                                 selection_state}, 3);
+    undo_destroy(save_state->undo);
+    undo_destroy(quit_state->undo);
+    undo_destroy(selection_state->undo);
+    ui_cleanup(&save_state->ui);
+    ui_cleanup(&quit_state->ui);
+    ui_cleanup(&selection_state->ui);
+    cleanup_test_preference_root_of(root,
+                                    (EditorState *[]){save_state, quit_state,
+                                                      selection_state}, 3);
     editor_widget_test_context_cleanup(&context);
     remove(target);
     return 0;
@@ -3760,18 +4118,31 @@ static int staged_edit_save_and_quit_boundaries(void)
 fail:
     editor_test_set_finish_field_choice(-1);
     editor_test_set_discard_choice(-1);
-    cleanup_test_preference_root(root,
-                                 (EditorState[]){save_state, quit_state,
-                                                 selection_state}, 3);
-    undo_destroy(save_state.undo);
-    undo_destroy(quit_state.undo);
-    undo_destroy(selection_state.undo);
-    ui_cleanup(&save_state.ui);
-    ui_cleanup(&quit_state.ui);
-    ui_cleanup(&selection_state.ui);
+    cleanup_test_preference_root_of(root,
+                                    (EditorState *[]){save_state, quit_state,
+                                                      selection_state}, 3);
+    undo_destroy(save_state->undo);
+    undo_destroy(quit_state->undo);
+    undo_destroy(selection_state->undo);
+    ui_cleanup(&save_state->ui);
+    ui_cleanup(&quit_state->ui);
+    ui_cleanup(&selection_state->ui);
     editor_widget_test_context_cleanup(&context);
     remove(target);
     return 1;
+}
+
+/* An EditorState is about 200 KB and Windows gives a thread 1 MB of stack,
+ * so the 3 this test needs come from the heap. */
+static int staged_edit_save_and_quit_boundaries(void)
+{
+    EditorState *states = calloc(3, sizeof(*states));
+    int result;
+
+    if (!states) return 1;
+    result = staged_edit_save_and_quit_boundaries_with(&states[0], &states[1], &states[2]);
+    free(states);
+    return result;
 }
 
 /*
@@ -4024,6 +4395,20 @@ static int write_recovery_pair(const char *root, unsigned long long id,
     return write_text_file(path, line);
 }
 
+/* Make a file look `seconds` old, as if written that long ago. */
+static int backdate_file(const char *path, long seconds)
+{
+#ifdef _WIN32
+    struct _utimbuf times;
+    times.actime = times.modtime = time(NULL) - seconds;
+    return _utime(path, &times);
+#else
+    struct utimbuf times;
+    times.actime = times.modtime = time(NULL) - seconds;
+    return utime(path, &times);
+#endif
+}
+
 static int recovery_pair_exists(const char *root, unsigned long long id,
                                 const char *suffix)
 {
@@ -4056,12 +4441,22 @@ static int recovery_folder_stays_manageable(void)
 
     if (make_test_preference_root(root, sizeof(root)) != 0) return 1;
 
-    /* A .toml whose .meta is gone is swept at start-up. */
-    if (write_recovery_pair(root, 0xabc, 0, 0) != 0) goto cleanup;
+    /* A .toml whose .meta is gone is swept at start-up, once it is old
+     * enough; one written moments ago may be another editor's first
+     * snapshot, whose .meta comes right after, and stays. */
+    if (write_recovery_pair(root, 0xabc, 0, 0) != 0 ||
+        write_recovery_pair(root, 0xabd, 0, 0) != 0) goto cleanup;
+    {
+        char path[EDITOR_PATH_MAX + 64];   /* root, then the file name */
+        snprintf(path, sizeof(path), "%s/editor_recovery_%016llx.toml", root, 0xabcull);
+        if (backdate_file(path, 10 * 60) != 0) goto cleanup;
+    }
     if (editor_set_preference_root(&es, root) != 0 ||
         editor_init_persistence_paths(&es) != 0 ||
-        expect_int("orphan swept", recovery_pair_exists(root, 0xabc, ".toml"), 0) != 0)
+        expect_int("orphan swept", recovery_pair_exists(root, 0xabc, ".toml"), 0) != 0 ||
+        expect_int("fresh orphan kept", recovery_pair_exists(root, 0xabd, ".toml"), 1) != 0)
         goto cleanup;
+    remove_recovery_pair(root, 0xabd);
 
     /* Old copies fill every slot: autosave says so, and leaves no orphan. */
     for (int i = 0; i < EDITOR_MAX_RECOVERY_ENTRIES; i++)
@@ -4105,6 +4500,21 @@ static int recovery_folder_stays_manageable(void)
         remove_recovery_pair(root, first_id + (unsigned long long)i);
     editor_retire_current_recovery(&es);
 
+    /* Discard all deletes every copy offered and ends the picker. */
+    if (write_recovery_pair(root, 0x2001, 0, 1) != 0 ||
+        write_recovery_pair(root, 0x2002, 0, 1) != 0 ||
+        write_recovery_pair(root, 0x2003, 0, 1) != 0 ||
+        editor_discover_recoveries(&es) != 0 ||
+        expect_int("three copies offered", es.recovery_entry_count, 3) != 0) goto cleanup;
+    editor_test_set_recovery_choice(EDITOR_RECOVERY_DISCARD_ALL);
+    if (expect_int("discard all", editor_choose_recovery(&es), -1) != 0 ||
+        expect_int("none left", es.recovery_entry_count, 0) != 0 ||
+        expect_string("discard all reported", es.status_message,
+                      "Discarded 3 recovery copies") != 0 ||
+        expect_int("snapshot gone", recovery_pair_exists(root, 0x2002, ".toml"), 0) != 0 ||
+        expect_int("metadata gone", recovery_pair_exists(root, 0x2003, ".meta"), 0) != 0)
+        goto cleanup;
+
     /* Discarding the only copy ends the picker. */
     if (write_recovery_pair(root, 0x2000, 0, 1) != 0 ||
         editor_discover_recoveries(&es) != 0 ||
@@ -4135,6 +4545,36 @@ static int recovery_folder_stays_manageable(void)
             goto cleanup;
     }
 #endif
+#ifdef __linux__
+    /* Version 3 also records when the owner started.  The same pid with a
+     * different start time is another program that got the number after
+     * the editor crashed: that copy is offered.  (Linux reads start times;
+     * elsewhere the pid alone decides, as checked above.) */
+    {
+        unsigned long parent = (unsigned long)getppid();
+        unsigned long long start = (unsigned long long)editor_process_start_time(parent);
+        char path[EDITOR_PATH_MAX + 64];   /* root, then the file name */
+        char line[160];
+        int ok = 1;
+        if (expect_int("start time known", start != 0, 1) != 0) goto cleanup;
+        for (int k = 0; k < 2; k++) {
+            unsigned long long id = 0x3002ull + (unsigned long long)k;
+            snprintf(path, sizeof(path), "%s/editor_recovery_%016llx.toml", root, id);
+            ok = ok && write_text_file(path, "name = \"left over\"\n") == 0;
+            snprintf(path, sizeof(path), "%s/editor_recovery_%016llx.meta", root, id);
+            snprintf(line, sizeof(line), "3\t%016llx\t1700000000\t%lu\t%llu\t-\n",
+                     id, parent, start + (unsigned long long)k);
+            ok = ok && write_text_file(path, line) == 0;
+        }
+        if (!ok || editor_discover_recoveries(&es) != 0 ||
+            expect_int("crashed and reused-pid copies offered", es.recovery_entry_count, 2) != 0 ||
+            expect_int("live v3 copy hidden",
+                       es.recovery_entries[0].id != 0x3002 && es.recovery_entries[1].id != 0x3002, 1) != 0 ||
+            expect_int("reused pid offered",
+                       es.recovery_entries[0].id == 0x3003 || es.recovery_entries[1].id == 0x3003, 1) != 0)
+            goto cleanup;
+    }
+#endif
     result = 0;
 
 cleanup:
@@ -4142,9 +4582,13 @@ cleanup:
     for (int i = 0; i < EDITOR_MAX_RECOVERY_ENTRIES; i++)
         remove_recovery_pair(root, first_id + (unsigned long long)i);
     remove_recovery_pair(root, 0xabc);
+    remove_recovery_pair(root, 0xabd);
     remove_recovery_pair(root, 0x2000);
+    for (unsigned long long id = 0x2001; id <= 0x2003; id++) remove_recovery_pair(root, id);
     remove_recovery_pair(root, 0x3000);
     remove_recovery_pair(root, 0x3001);
+    remove_recovery_pair(root, 0x3002);
+    remove_recovery_pair(root, 0x3003);
     cleanup_test_preference_root(root, &es, 1);
     return result;
 }
@@ -5043,6 +5487,54 @@ done:
  * third... copies all landed on the first copy's spot, and a second floor
  * gap was even refused as a duplicate.  Now every paste steps once more.
  */
+/*
+ * A pasted copy lands where dragging the original 24 px right and down
+ * would put it: one shared helper (editor_move_placement) moves both, so a
+ * bird's height or a saw's y can no longer follow a drag but not a paste.
+ */
+static int paste_moves_like_a_drag(void)
+{
+    static const EntityType types[] = { ENT_BIRD, ENT_CIRCULAR_SAW, ENT_BRIDGE, ENT_COIN };
+    EditorState es = {0};
+    int failed = 1;
+
+    editor_level_init_defaults(&es.level);
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+    es.level.bird_count = 1;
+    es.level.birds[0] = (BirdPlacement){200.0f, 100.0f, 30.0f, 150.0f, 250.0f, 0};
+    es.level.circular_saw_count = 1;
+    es.level.circular_saws[0] = (CircularSawPlacement){300.0f, 120.0f, 280.0f, 340.0f, 1};
+    es.level.bridge_count = 1;
+    es.level.bridges[0] = (BridgePlacement){500.0f, 150.0f, 3};
+    es.level.coin_count = 1;
+    es.level.coins[0] = (CoinPlacement){100.0f, 100.0f};
+    if (level_is_valid("paste-like-drag base", &es.level) != 0) goto done;
+
+    for (size_t t = 0; t < sizeof(types) / sizeof(types[0]); t++) {
+        EntityType type = types[t];
+        PlacementData original = editor_snapshot_entity(&es.level, type, 0);
+        PlacementData dragged = editor_move_placement(type, &original, 24.0f, 24.0f);
+        PlacementData pasted;
+        editor_clamp_placement(&es.level, type, &dragged);
+        es.selection.type = type;
+        es.selection.index = 0;
+        editor_copy_selected(&es);
+        editor_paste_clipboard(&es);
+        if (expect_int("one copy", editor_entity_count(&es.level, type), 2) != 0) goto done;
+        pasted = editor_snapshot_entity(&es.level, type, 1);
+        if (expect_int(editor_entity_type_name(type),
+                       memcmp(&pasted, &dragged, sizeof(pasted)) == 0, 1) != 0)
+            goto done;
+    }
+    if (expect_float_value("bird height moved", es.level.birds[1].base_y, 124.0f) != 0)
+        goto done;
+    failed = 0;
+done:
+    undo_destroy(es.undo);
+    return failed;
+}
+
 static int repeated_paste_steps_each_copy(void)
 {
     EditorState es = {0};
@@ -5263,6 +5755,7 @@ int main(void)
     if (rejects_bad_runtime_link() != 0) return 1;
     if (warns_without_blocking() != 0) return 1;
     if (rejects_unsafe_asset_paths() != 0) return 1;
+    if (editor_checks_do_not_repeat_runtime_errors() != 0) return 1;
     if (save_and_load_resets_editor_session() != 0) return 1;
     if (invalid_save_preserves_existing_file() != 0) return 1;
     if (atomic_save_replaces_and_preserves_on_injected_errors() != 0) return 1;
@@ -5299,6 +5792,8 @@ int main(void)
     if (validation_errors_report_where_they_are() != 0) return 1;
     if (validation_reports_every_runtime_error() != 0) return 1;
     if (campaign_view_edits_and_saves_the_manifest() != 0) return 1;
+    if (campaign_save_writes_everything_before_replacing() != 0) return 1;
+    if (campaign_save_keeps_a_manifest_changed_by_hand() != 0) return 1;
     if (float_platform_rail_switch_rechecks_its_rail() != 0) return 1;
     if (drag_round_trips_and_follows_grab_point() != 0) return 1;
     if (editor_mutations_keep_level_valid() != 0) return 1;
@@ -5324,6 +5819,7 @@ int main(void)
     if (new_level_resets_previews() != 0) return 1;
     if (rail_rider_paste_follows_its_rail() != 0) return 1;
     if (repeated_paste_steps_each_copy() != 0) return 1;
+    if (paste_moves_like_a_drag() != 0) return 1;
     if (extreme_floats_round_trip_through_save() != 0) return 1;
     if (create_only_save_without_hard_links() != 0) return 1;
 

@@ -7,6 +7,7 @@
 #include "player/player.h"  /* JUMP_VY */
 #include "screens/hud.h"    /* MAX_HEARTS */
 #include "levels/level_ref.h"
+#include "levels/level_validate.h"  /* level_jumping_spider_min_gap_speed */
 
 static int expect_valid_level(void)
 {
@@ -747,6 +748,60 @@ static int expect_patrol_speeds_are_bounded(void)
     return 0;
 }
 
+/*
+ * A jumping spider slower than level_jumping_spider_min_gap_speed cannot
+ * clear a floor gap: it lands back over it and hops in place forever. The
+ * validator refuses one whose patrol reaches a gap, either way, and leaves
+ * a slow spider alone when no gap is in its path.
+ */
+static int expect_jumping_spiders_fast_enough_for_gaps(void)
+{
+    LevelDef def;
+    char err[200];
+    float min_speed = level_jumping_spider_min_gap_speed();
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.floor_gap_count = 1;
+    def.floor_gaps[0] = 192;
+    def.jumping_spider_count = 1;
+    def.jumping_spiders[0].x = 100.0f;
+    def.jumping_spiders[0].patrol_x0 = 100.0f;
+    def.jumping_spiders[0].patrol_x1 = 300.0f;
+
+    if (!(min_speed > 45.0f && min_speed < JSPIDER_SPEED)) {
+        fprintf(stderr, "level_validate_test: jumping spider minimum %.2f\n", min_speed);
+        return 1;
+    }
+    const float accepted[] = {JSPIDER_SPEED, -JSPIDER_SPEED, min_speed, -min_speed};
+    for (size_t i = 0; i < sizeof(accepted) / sizeof(accepted[0]); i++) {
+        def.jumping_spiders[0].vx = accepted[i];
+        if (level_validate_runtime(&def, err, sizeof(err)) != 0) {
+            fprintf(stderr, "level_validate_test: jumping spider vx %.2f rejected: %s\n",
+                    accepted[i], err);
+            return 1;
+        }
+    }
+    const float rejected[] = {45.0f, -45.0f, min_speed - 0.01f};
+    for (size_t i = 0; i < sizeof(rejected) / sizeof(rejected[0]); i++) {
+        def.jumping_spiders[0].vx = rejected[i];
+        if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+            strstr(err, "jumping_spiders[0].vx") == NULL) {
+            fprintf(stderr, "level_validate_test: slow jumping spider vx %.2f accepted\n",
+                    rejected[i]);
+            return 1;
+        }
+    }
+    /* No gap between the patrol ends: any valid speed will do. */
+    def.jumping_spiders[0].vx = 20.0f;
+    def.floor_gaps[0] = 352;
+    if (level_validate_runtime(&def, err, sizeof(err)) != 0) {
+        fprintf(stderr, "level_validate_test: slow spider without a gap rejected: %s\n", err);
+        return 1;
+    }
+    return 0;
+}
+
 static int expect_rejected_climbable_extents(void)
 {
     LevelDef def;
@@ -1008,6 +1063,7 @@ int main(void)
     if (expect_rail_speeds_forward_and_bounded() != 0) return 1;
     if (expect_patrols_fit_the_sprite() != 0) return 1;
     if (expect_patrol_speeds_are_bounded() != 0) return 1;
+    if (expect_jumping_spiders_fast_enough_for_gaps() != 0) return 1;
     if (expect_rejected_unsafe_paths() != 0) return 1;
 
     puts("level_validate_test: ok");

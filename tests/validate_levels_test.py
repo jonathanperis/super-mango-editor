@@ -188,7 +188,7 @@ def main() -> int:
 def check_campaign_display_names() -> None:
     """A campaign entry must have something to show in the level selector.
 
-    The game (campaign_derive_display_name in level_session.c) shows `name`,
+    The game (campaign_derive_display_name in campaign_catalog.c) shows `name`,
     or the file name when `name` is blank, and refuses a campaign whose
     entry would show nothing.  `levels/   .toml` passes every path rule, so
     with an empty `name` it used to pass validation and then fail in game.

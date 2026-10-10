@@ -29,18 +29,26 @@ void game_checkpoint_feedback_clear_expired(GameState *gs, uint32_t now)
 uint32_t game_checkpoint_clock_ms(const GameState *gs)
 {
     /*
-     * Convert through uint64_t: converting a double larger than UINT32_MAX
-     * straight to uint32_t is undefined in C, while the 64-bit value can be
-     * cut to 32 bits safely. The result wraps after ~49 days of play, and the
-     * deadline checks compare with signed differences so they survive that.
+     * Whole steps, converted to milliseconds in integers: step n is at
+     * floor(n * 1000 / 60) ms. A deadline 1200 ms after any step is then
+     * reached exactly 72 steps later (900 ms: 54), every time. The clock
+     * used to add each step's float dt to a double and truncate; that
+     * only came out exact because 1.0f / 60 happens to round up, so the
+     * sum never fell just short of a whole millisecond.
+     *
+     * The product is taken in 64 bits, then cut to 32 bits, which wraps
+     * after ~49 days of play; the deadline checks compare with signed
+     * differences, so they survive that.
      */
-    return (uint32_t)(uint64_t)(gs->world.sim_time * 1000.0);
+    return (uint32_t)((uint64_t)gs->world.sim_steps * 1000u / TARGET_FPS);
 }
 
 void game_checkpoint_feedback_tick(GameState *gs, float dt)
 {
     if (!gs) return;
-    gs->world.sim_time += dt;
+    /* Every step the loop runs is GAME_FIXED_STEP long; a zero dt (an
+     * ended experiment replay) simulates nothing and counts no step. */
+    if (dt > 0.0f) gs->world.sim_steps++;
     game_checkpoint_feedback_clear_expired(gs, game_checkpoint_clock_ms(gs));
 }
 

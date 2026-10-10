@@ -7,11 +7,18 @@
 #define EXPERIMENT_MAX_FRAMES 36000
 
 /*
- * Capture file format. Version 2 records one row per fixed simulation step
- * (GAME_FIXED_STEP seconds each), so rows hold no duration. Version 1 came
- * from the variable-timestep engine and cannot be replayed faithfully.
+ * Capture file format. Rows are one fixed simulation step each
+ * (GAME_FIXED_STEP seconds), so they hold no duration. The version names
+ * the engine behaviour a capture depends on, and older ones are refused
+ * with "record it again" because they could replay differently:
+ *   1  variable-timestep engine: its rows hold frame durations.
+ *   2  fixed step, but the camera panned from x = 0 at a level start and
+ *      eased back after a lost life. The camera now snaps to the start and
+ *      to the respawn point, and waiting spike blocks start when the
+ *      camera reveals them, so they can start on other steps.
+ *   3  the current engine.
  */
-#define EXPERIMENT_FORMAT_VERSION 2
+#define EXPERIMENT_FORMAT_VERSION 3
 
 /* One recorded simulation step: the input and tuning in effect. */
 typedef struct {
