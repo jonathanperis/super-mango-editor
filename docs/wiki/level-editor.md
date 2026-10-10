@@ -254,7 +254,7 @@ it never reaches the canvas or the fields under the list.
 | Pan up / down | `Shift + Mouse Wheel` over the canvas (at 3× and 5× the 300 px world is taller than the canvas); macOS reports Shift+wheel as horizontal scroll, which also pans up/down here |
 | Change zoom | Toolbar dropdown (zooms around the canvas centre) or `Ctrl + Mouse Wheel` (zooms around the cursor; 1×, 2×, 3×, 5×, stopping at 1× and 5×) |
 | Snap to grid on / off | `S` (status bar shows `Snap: on` / `Snap: off`). Placing and dragging then put the entity's corner on the 48 px grid |
-| Snap just this once (or not) | Hold `Shift` while placing or dragging: it does the opposite of the `S` setting |
+| Snap just this once (or not) | `Shift` does the opposite of the `S` setting, read at each mouse event. **Place**: hold it as you click; the entity lands the other way. **Select**: press it only once the drag has started (`Shift` at the press adds to or takes from the selection instead of dragging); while it is held the move snaps the other way, letting go mid-drag switches back, the entity follows at the next mouse movement, and where it is when the button comes up is where it stays |
 | Toggle grid | `G` |
 
 The canvas renders the level in WYSIWYG — entity positions and sizes match the game exactly at zoom 1.0 (logical pixel = 1 canvas pixel). At zoom 2.0 each logical pixel maps to 2 canvas pixels. One wheel notch pans 48 canvas pixels and scrolls a side panel 20 px. Trackpads report fractions of a notch; the editor adds them up, so small swipes scroll the side panels too, and a `Ctrl` pinch or swipe changes zoom once per whole notch.
