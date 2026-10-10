@@ -49,6 +49,9 @@ Bare launch loads the validated v1 `levels/campaigns/main.toml` selector. `--lev
 ### D-004: Fixed Simulation Step
 Gameplay advances in fixed 1/60 s steps from a frame-time accumulator instead of a variable frame `dt`, so physics results do not depend on the display refresh rate.
 
+### D-005: The Site Stays on github.io
+The website and the browser game stay at `https://jonathanperis.github.io/super-mango-editor/`; there is no custom domain (decided 2026-10-10). Browser storage is therefore shared with the account's other GitHub Pages sites, which `SECURITY.md` documents as an accepted risk: the game treats every stored value as untrusted input. A custom domain would isolate that storage, but it needs an owned domain and DNS, and players' saved profiles and ghosts are tied to the current address and would not carry over.
+
 ## Current Counts
 
 | Area | Count | Source |
