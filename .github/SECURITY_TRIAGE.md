@@ -117,3 +117,36 @@ explicit maintainer authorization on 2026-10-07. No query or check is disabled.
 
 This finding (#152) was dismissed as a false positive after explicit
 maintainer authorization on 2026-10-08. No query or check is disabled.
+
+## Audit stack (PRs #326–#334)
+
+The October audit stack moved file operations behind new helpers
+(`serializer_install_temp`, `editor_read_stable_level`), split `GameState`
+(`gs->world.level_path`), and added three features that touch files: ghost
+runs stored beside the profile, the editor's Campaign view, and the resume
+slot in the profile. The C/C++ analysis reissued the path-injection class at
+the moved lines and reported it at the new ones. Each was read against the
+desktop permission boundary above:
+
+| Alerts | Input and operation | Assessment |
+| --- | --- | --- |
+| #177 | `editor_files.c`: `editor_load_level` reads the symlink-resolved target of the document named on the command line | Same as #130/#84: intentional selection by the local user; resolving once and reading that exact file is what lets plain Save refuse a link repointed after load. |
+| #175, #176 | `editor_files.c`: plain Save creates or replaces the opened document's write target | Same as #127–#129: the target is the opened document; the replace is checked against the fingerprint taken at load, and the create-only policy is used when the file did not exist. |
+| #173, #174 | `editor_files.c`: Save As fingerprints and writes the destination returned by the native dialog | Same as #59/#60 and #94–#102: the user picks the destination; private editor paths are refused, an existing target needs confirmation and is replaced only if unchanged since the fingerprint. |
+| #172 | `editor_files.c`: the private playtest snapshot | Same as #86–#93: `HOME`/`XDG_DATA_HOME` select the per-user root and a fixed suffix selects the file; the old `levels/_playtest.toml` location is refused. |
+| #171 | `editor_main.c`: `--smoke-test` loads the level named on the command line | Same as #84/#85/#106: intentional selection; overlong paths are rejected before opening, and smoke reads no recovery or recent-file data. |
+| #170 | `editor_campaign.c`: Campaign view "Add" checks that `levels/<name>` exists | New. Only the file-name part of the picked path is used, joined to the fixed `levels/` prefix and accepted by `campaign_entry_path_valid` (no separators, no device names) before the existence check. The pick is accepted only when it is that very file. Nothing is opened or written here. |
+| #168, #169 | `game_profile.c`: the profile save installs its temp file over the profile through `serializer_install_temp` | Same as #56–#58 and #145/#146: the path is the explicit `--profile` option or the per-user preference root, never a field of the profile document. The helper is the shared replace step that keeps the temp file when a Windows replace stops halfway. |
+| #167 | `game_experiment.c`: fingerprint of the level already loaded | Same as #76: it fingerprints `gs->world.level_path` and compares the content hash; the experiment document's own `level_path` string is never opened. |
+| #164, #165, #166 | `game_ghost_file.c`: reading and saving a level's ghost file | New. `game_ghost_file_path` builds the name from the profile's path (as in #56–#58) plus `-ghost-<level>.toml`, where `<level>` comes from a key `game_profile_key_valid` accepted: `levels/NAME.toml` with no path separator, control character or Windows device name. The file therefore stays beside the profile. Reads are size-capped and validated; saves go through an exclusively created temp file and the same install step, under the profile's lock. |
+
+These 14 findings (#164–#177) were dismissed as false positives after
+explicit maintainer authorization on 2026-10-10, as in the earlier rounds. No
+query or check is disabled.
+
+The same analysis raised eleven lower-severity findings, which were fixed in
+code instead: nine float equality notes (#154–#162) now go through
+`float_same_value` in `src/shared/geometry.h`, which compares stored values
+bit for bit; the over-long Next Level case (#163) became
+`session_open_next_level`; and the always-false coin-limit comparison (#153)
+is compiled only when `MAX_COINS` is below the 64 bits of the coin mask.
