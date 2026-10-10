@@ -13,30 +13,29 @@ void display_present(RenderTexture2D target);
 /* Asset slots own heap-stable raylib values. Borrowers never unload a slot.
  * Texture2D itself is a small handle, not the image pixels. Allocating a slot
  * preserves explicit NULL-on-failure and shared-pointer ownership throughout
- * the entity code; it does not allocate another copy of the GPU image. */
-static inline Texture2D *texture_load(const char *path)
-{
-    Texture2D value = LoadTexture(path);
-    if (!IsTextureValid(value)) return NULL;
-    Texture2D *texture = malloc(sizeof(*texture));
-    if (!texture) {
-        UnloadTexture(value);
-        return NULL;
-    }
-    *texture = value;
-    /* Nearest-neighbor sampling keeps pixel-art edges sharp when scaled. */
-    SetTextureFilter(value, TEXTURE_FILTER_POINT);
-    return texture;
-}
+ * the entity code; it does not allocate another copy of the GPU image.
+ * The three functions below are defined in texture.c. */
 
-static inline void texture_unload(Texture2D *texture)
-{
-    if (!texture) return;
-    /* A UI cache eviction can occur before EndDrawing flushes queued draws. */
-    rlDrawRenderBatchActive();
-    UnloadTexture(*texture);
-    free(texture);
-}
+/* Decode an image file and upload it. Returns an owned handle, or NULL when
+ * the file is missing or is not an image. */
+Texture2D *texture_load(const char *path);
+
+/* Put a valid raylib texture into an owned handle, with the nearest-neighbour
+ * filter pixel art needs. Every handle is made here: texture_load passes the
+ * file it decoded, font_texture (text.h) a label it drew. When memory runs
+ * out it unloads value and returns NULL. */
+Texture2D *texture_own(Texture2D value);
+
+/* Release the GPU image and the handle. NULL is ignored. */
+void texture_unload(Texture2D *texture);
+
+#ifdef MANGO_TESTING
+/* Test builds only. texture_test_loads: image files texture_load has decoded
+ * so far. texture_test_live: handles that exist right now, so a test can
+ * check that every one made during a session was unloaded exactly once. */
+int texture_test_loads(void);
+int texture_test_live(void);
+#endif
 
 /*
  * DESTROY_TEX — unload a texture slot and clear it, in one statement.

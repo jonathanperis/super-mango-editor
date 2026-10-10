@@ -19,6 +19,16 @@ typedef struct {
 static EffectVoice voices[EFFECT_VOICES];
 static MusicTrack *current_music;
 
+#ifdef MANGO_TESTING
+/* Test builds count sound and music files loaded and still alive (audio.h). */
+static int s_test_sound_loads, s_test_sounds_live;
+static int s_test_music_loads, s_test_music_live;
+int sound_test_loads(void) { return s_test_sound_loads; }
+int sound_test_live(void) { return s_test_sounds_live; }
+int music_test_loads(void) { return s_test_music_loads; }
+int music_test_live(void) { return s_test_music_live; }
+#endif
+
 int audio_open(void)
 {
     InitAudioDevice();
@@ -58,6 +68,10 @@ SoundEffect *sound_load(const char *path)
         return NULL;
     }
     *sound = (SoundEffect){sample, 1.0f};
+#ifdef MANGO_TESTING
+    s_test_sound_loads++;
+    s_test_sounds_live++;
+#endif
     return sound;
 }
 
@@ -70,6 +84,9 @@ void sound_unload(SoundEffect *sound)
         if (voices[i].owner == sound) voice_clear(&voices[i]);
     UnloadSound(sound->sample);
     free(sound);
+#ifdef MANGO_TESTING
+    s_test_sounds_live--;
+#endif
 }
 
 void sound_play(SoundEffect *sound, int volume)
@@ -113,6 +130,10 @@ MusicTrack *music_load(const char *path)
     }
     stream.looping = true;
     music->stream = stream;
+#ifdef MANGO_TESTING
+    s_test_music_loads++;
+    s_test_music_live++;
+#endif
     return music;
 }
 
@@ -128,6 +149,9 @@ void music_unload(MusicTrack *music)
     if (current_music == music) music_stop();
     UnloadMusicStream(music->stream);
     free(music);
+#ifdef MANGO_TESTING
+    s_test_music_live--;
+#endif
 }
 
 void music_play(MusicTrack *music)

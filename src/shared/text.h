@@ -18,6 +18,12 @@ typedef struct {
  * it before closing the context; that frees only the handle, not the font. */
 TextFont *font_load(void);
 void font_unload(TextFont *font);
+#ifdef MANGO_TESTING
+/* Test builds only: handles font_load has made so far, and how many of
+ * them have not been passed to font_unload yet. */
+int font_test_loads(void);
+int font_test_live(void);
+#endif
 /* Returns 0 on success, -1 on failure; either output pointer may be NULL. */
 int font_measure(TextFont *font, const char *text, int *width, int *height);
 /* Rasterize a label into a separate owned texture. Cache/reuse it as needed;
