@@ -9,9 +9,9 @@
  * and relink every next_phase to match the order.  Save writes the changed
  * level files and then the manifest, each atomically.
  *
- * The view has an undo history of its own (Ctrl+Z / Ctrl+Y while it is
- * open), apart from the level's: each of those edits is one step.  Revert
- * goes back to the files on disk in one go.
+ * The view has an undo history of its own (the Undo and Redo buttons, or
+ * Ctrl+Z / Ctrl+Y while it is open), apart from the level's: each of those
+ * edits is one step.  Revert goes back to the files on disk in one go.
  *
  * While the view is open it covers the canvas; the level being edited is
  * untouched (unless Save rewrites that very file, which is then reloaded).
@@ -28,12 +28,49 @@
 #define CAMPAIGN_NAME_X        330                 /* the level name field */
 #define CAMPAIGN_NAME_W        220
 #define CAMPAIGN_BUTTONS_Y     (TOOLBAR_H + CANVAS_H - 40)
-#define CAMPAIGN_BUTTON_W      96
-#define CAMPAIGN_BUTTON_STEP   (CAMPAIGN_BUTTON_W + 8)
-/* Buttons, left to right: Up, Down, Remove, Add level..., Link in order,
- * Save, Revert, Close.  Button i starts at
- * CAMPAIGN_VIEW_X + i * CAMPAIGN_BUTTON_STEP. */
+#define CAMPAIGN_BUTTON_W      80
+#define CAMPAIGN_BUTTON_H      24
+#define CAMPAIGN_BUTTON_STEP   (CAMPAIGN_BUTTON_W + 6)
+/* How many rows fit between the header and the buttons.  The 8 pixels kept
+ * free above the buttons, and what is left over of a row, hold the one-line
+ * notice below. */
+#define CAMPAIGN_VISIBLE_ROWS  ((CAMPAIGN_BUTTONS_Y - 8 - CAMPAIGN_ROWS_Y) / CAMPAIGN_ROW_H)
+/* A one-line notice between the last row and the buttons, shown while Undo
+ * is stopped at a step it cannot replay. */
+#define CAMPAIGN_NOTICE_Y      (CAMPAIGN_BUTTONS_Y - 14)
 #define CAMPAIGN_NAME_FIELD_ID 7000                /* + row index          */
+
+/*
+ * The buttons along the bottom, left to right: the edits of the list, then
+ * its history, then the files.  Button b starts at
+ * CAMPAIGN_VIEW_X + b * CAMPAIGN_BUTTON_STEP.
+ */
+typedef enum {
+    CAMPAIGN_BUTTON_UP,
+    CAMPAIGN_BUTTON_DOWN,
+    CAMPAIGN_BUTTON_REMOVE,
+    CAMPAIGN_BUTTON_ADD,       /* "Add level..."                           */
+    CAMPAIGN_BUTTON_LINK,      /* "Link in order"                          */
+    CAMPAIGN_BUTTON_UNDO,      /* disabled while there is nothing to undo  */
+    CAMPAIGN_BUTTON_REDO,      /* disabled while there is nothing to redo  */
+    CAMPAIGN_BUTTON_SAVE,
+    CAMPAIGN_BUTTON_REVERT,
+    CAMPAIGN_BUTTON_CLOSE,
+    CAMPAIGN_BUTTON_COUNT
+} CampaignButton;
+
+/* The whole row must end no further right than the row highlight does,
+ * inside the canvas: the side panel starts at CANVAS_W and would cover a
+ * button drawn past it.  A button added to the enum above without room for
+ * it stops the build. */
+_Static_assert(CAMPAIGN_VIEW_X + (CAMPAIGN_BUTTON_COUNT - 1) * CAMPAIGN_BUTTON_STEP +
+               CAMPAIGN_BUTTON_W <= CANVAS_W - CAMPAIGN_VIEW_X,
+               "the Campaign view's buttons must fit in the canvas");
+/* The notice (one line of text) must clear the last row above it, whose
+ * highlight starts 2 pixels above the row, and the buttons below it. */
+_Static_assert(CAMPAIGN_ROWS_Y - 2 + CAMPAIGN_VISIBLE_ROWS * CAMPAIGN_ROW_H <= CAMPAIGN_NOTICE_Y &&
+               CAMPAIGN_NOTICE_Y + TEXT_FONT_SIZE <= CAMPAIGN_BUTTONS_Y,
+               "the Campaign view's notice must fit between the rows and the buttons");
 
 /*
  * CAMPAIGN_HISTORY_MAX — how many edits the view can undo.  A step is under
@@ -79,8 +116,20 @@ int editor_campaign_revert(EditorState *es);
  * When that file no longer loads, the step is refused: the list is left
  * unchanged and the status bar says so.
  *
+ * A refused Undo would leave every older step out of reach, so it can be
+ * skipped.  The first refusal only says so; the view then shows a notice
+ * and its Undo button reads "Undo...".  From the second Undo on (file still
+ * not loading) the editor asks, and only the answer "Skip this step" drops
+ * the step: the removed level then stays out of the list, and the older
+ * steps are rewritten for a list without that row, so each of them still
+ * undoes and redoes exactly what it did to the other rows.  An older step
+ * that only acted on that row has nothing left to do and goes with it; the
+ * status bar says what was skipped and how many such steps went.  A refused
+ * Redo is not skipped: any new edit clears the steps to redo anyway.
+ *
  * Return 1 when a step was replayed, 0 when there was none, -1 when the
- * step was refused (status bar says why).
+ * step was refused (status bar says why), 2 when a refused Undo step was
+ * skipped (the list is unchanged).
  */
 int editor_campaign_undo(EditorState *es);
 int editor_campaign_redo(EditorState *es);
@@ -88,6 +137,11 @@ int editor_campaign_redo(EditorState *es);
 /* How many steps Undo and Redo can replay right now.  For tests. */
 int editor_campaign_undo_steps(const EditorState *es);
 int editor_campaign_redo_steps(const EditorState *es);
+
+/* 1 while the newest step was refused by Undo because its level file does
+ * not load, and nothing has changed the history since: the next Undo that
+ * is refused too offers to skip it. */
+int editor_campaign_undo_blocked(const EditorState *es);
 
 /*
  * editor_campaign_finish_name — Apply the name being typed in the view, as

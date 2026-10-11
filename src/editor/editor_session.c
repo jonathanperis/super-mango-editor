@@ -22,6 +22,7 @@ static int editor_test_finish_choice = -1;
 static int editor_test_discard_choice = -1;
 static int editor_test_overwrite_choice = -1;
 static EditorExternalChoice editor_test_external_choice = (EditorExternalChoice)-1;
+static int editor_test_skip_step_choice = -1;
 
 #ifdef MANGO_TESTING
 void editor_test_set_finish_field_choice(int button_id)
@@ -42,6 +43,11 @@ void editor_test_set_overwrite_choice(int button_id)
 void editor_test_set_external_choice(EditorExternalChoice choice)
 {
     editor_test_external_choice = choice;
+}
+
+void editor_test_set_skip_step_choice(int button_id)
+{
+    editor_test_skip_step_choice = button_id;
 }
 #endif /* MANGO_TESTING */
 
@@ -423,6 +429,40 @@ int editor_confirm_overwrite(EditorState *es, const char *path)
     }
 
     return button_id == 1;
+}
+
+int editor_confirm_skip_undo_step(EditorState *es, const char *path)
+{
+    /* In EditorSkipStepChoice order.  Three buttons, because the dialog's
+     * default (what Enter chooses) must not be its cancel button, and it
+     * must not be the one button that loses something either. */
+    const char *buttons[] = {"Cancel", "Keep the step", "Skip this step"};
+    /* The words below are under 320 bytes; the rest is room for the path.
+     * They are kept short: the Windows dialog shows about seven lines. */
+    char message[CAMPAIGN_LEVEL_PATH_SIZE + 320];
+    int button_id = EDITOR_SKIP_STEP_CANCEL;
+
+    if (!es || !path) return 0;
+
+    if (editor_test_skip_step_choice >= 0) {
+        int result = editor_test_skip_step_choice;
+        editor_test_skip_step_choice = -1;
+        return result == EDITOR_SKIP_STEP_SKIP;
+    }
+
+    snprintf(message, sizeof(message),
+             "%s no longer loads, so Undo cannot put it back in the campaign.\n\n"
+             "Skip this step? The level stays out of the campaign; unsaved changes to "
+             "its row, and earlier edits of that row alone, are forgotten. Undo then "
+             "goes on to the edits made before it.", path);
+    /* Enter keeps the step, and so do Cancel, closing the dialog and a
+     * dialog that cannot be shown: only the Skip button itself drops it. */
+    if (dialog_choice("Skip This Undo Step?", message, buttons, 3, EDITOR_SKIP_STEP_KEEP,
+                      EDITOR_SKIP_STEP_CANCEL, &button_id) != 0) {
+        editor_set_status(es, "Undo step kept: confirmation failed");
+        return 0;
+    }
+    return button_id == EDITOR_SKIP_STEP_SKIP;
 }
 
 EditorExternalChoice editor_confirm_external_change(EditorState *es)

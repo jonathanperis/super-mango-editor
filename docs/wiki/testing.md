@@ -92,7 +92,7 @@ validation messages that select the problem, the Campaign view and Playtest
 from here) and checks the resulting document and undo history. It and `editor-validation-test` edit a campaign in a
 scratch game folder, made and entered through `tests/test_folders.h`, so those
 cases run on Windows too. On POSIX it also covers the playtest process status
-and the native file pickers through stand-in `osascript`/`zenity` scripts. They write scratch files
+and the native file pickers and the Campaign view's skip-this-step dialog through stand-in `osascript`/`zenity` scripts. They write scratch files
 under the build's own `OUTDIR` (`TEST_OUT` in `tests/test_paths.h`), so
 `make test`, `make sanitize` and `make coverage` can run at the same time in one
 checkout. Test objects are also built with `-DMANGO_TESTING`, which turns on the
