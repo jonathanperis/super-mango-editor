@@ -48,10 +48,3 @@ void game_bouncepads_handle_hit(GameState *gs, int bounce_idx)
         debug_log(&gs->screen.debug, "BOUNCE %s", name);
     }
 }
-
-void game_bouncepads_update_animations(GameState *gs, float dt)
-{
-    bouncepads_update(gs->world.bouncepads_medium, gs->world.bouncepad_medium_count, dt);
-    bouncepads_update(gs->world.bouncepads_small, gs->world.bouncepad_small_count, dt);
-    bouncepads_update(gs->world.bouncepads_high, gs->world.bouncepad_high_count, dt);
-}

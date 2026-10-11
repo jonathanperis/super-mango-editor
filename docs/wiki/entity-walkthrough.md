@@ -246,11 +246,11 @@ A Token sits still. An enemy or hazard adds three things:
 
 - **An update function.** Write one that walks the whole array, in the shape
   of `circular_saws_update(CircularSaw *saws, int count, float dt)`, named
-  after your new type, and call it from the focused helper in `src/core/`
-  (these calls are written out, not a table, because each kind's update
-  takes different inputs):
-  `game_actors.c` updates enemies (it calls `spiders_update()`), `game_hazards.c`
-  updates hazards (it calls `circular_saws_update()`). `dt` is always the fixed
+  after your new type. Then, in `src/core/game_update.c`, write a small
+  `update_<things>()` beside `update_circular_saws()` that calls it with the
+  inputs it needs, and add one row to the `s_update_steps` table. The row's
+  place in the table is when your type moves in the step: above the
+  `collision` row if it can hurt the player. `dt` is always the fixed
   1/60 s step; see [Developer Guide](../developer-guide/#adding-physics-to-an-entity)
   for the physics pattern.
 - **Damage.** In `src/collision/game_collision.c`, write a
@@ -275,7 +275,7 @@ automatically. A brand-new source directory needs its own wildcard line there.
 - [ ] Placement struct, array and count in `LevelDef` (`src/levels/level.h`); runtime array and count in `GameWorld` (`src/game.h`), stored by value
 - [ ] Schema entry, loader, saver and C/Python validation (section 3)
 - [ ] `load_<entities>()` in `level_loader.c` and its `s_level_loaders` row: `LOAD_EVERY_LIFE` unless it awards score (then `LOAD_ONCE`)
-- [ ] Update call in the matching `src/core/` helper; pickup code, or a `_touches()` function and `s_damage_sources` row, in `src/collision/game_collision.c`
+- [ ] `update_<entities>()` in `src/core/game_update.c` and its `s_update_steps` row; pickup code, or a `_touches()` function and `s_damage_sources` row, in `src/collision/game_collision.c`
 - [ ] Render call in `src/render/game_render.c` at the right layer
 - [ ] Texture row in `game_resources.c` (and `game_resources_require_level_textures()` if optional)
 - [ ] Hitbox in `src/core/debug.c` and `debug_log()` calls for significant events

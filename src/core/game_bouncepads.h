@@ -13,4 +13,3 @@ void game_bouncepads_lists(const GameState *gs,
 
 /* Start the squash animation and sound for the pad at a flat list index. */
 void game_bouncepads_handle_hit(GameState *gs, int bounce_idx);
-void game_bouncepads_update_animations(GameState *gs, float dt);

@@ -46,11 +46,9 @@ src/
 │   ├── game_timing.h / .c        Fixed-step accumulator and frame clock
 │   ├── game_lifecycle.c          `game_init` / `game_cleanup` implementation
 │   ├── game_loop.c               Active-game frame runner (game_frame)
-│   ├── game_update.h / .c        Top-level update orchestration
+│   ├── game_update.h / .c        s_update_steps table: one fixed step, in order
 │   ├── game_player_step.h / .c   Player update/collision step wrapper
-│   ├── game_actors.h / .c        Enemy and spike-block update calls
-│   ├── game_hazards.h / .c       Hazard update calls
-│   ├── game_bouncepads.h / .c    Bouncepad update/render helpers
+│   ├── game_bouncepads.h / .c    Bouncepad list views and hit response
 │   ├── game_float_platforms.h / .c Float-platform update helpers
 │   ├── game_bridges.h / .c       Bridge update helpers
 │   ├── game_checkpoint.h / .c    Checkpoint/respawn helpers
@@ -117,7 +115,6 @@ src/
 │   └── serializer_types.h / .c  Enum/string conversion helpers
 ├── effects/
 │   ├── fog.h / .c                Atmospheric fog overlay: init, slide, spawn, render
-│   ├── game_effects.h / .c       Per-level effect reload/cleanup helpers
 │   ├── parallax.h / .c           Multi-layer scrolling background: init, tiled render, cleanup
 │   └── water.h / .c              Animated water strip: init, scroll, tile render
 ├── entities/
