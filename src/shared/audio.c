@@ -143,10 +143,15 @@ void music_stop(void)
     current_music = NULL;
 }
 
+void music_stop_track(MusicTrack *music)
+{
+    if (music && current_music == music) music_stop();
+}
+
 void music_unload(MusicTrack *music)
 {
     if (!music) return;
-    if (current_music == music) music_stop();
+    music_stop_track(music);
     UnloadMusicStream(music->stream);
     free(music);
 #ifdef MANGO_TESTING

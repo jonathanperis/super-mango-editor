@@ -89,6 +89,7 @@ src/
 ├── shared/
 │   ├── graphics.h / .c          Window, sprite pivots and logical presentation; declares the texture handles
 │   ├── texture.c                `texture_load`, `texture_own`, `texture_unload`: owned texture handles
+│   ├── asset_cache.h / .c       Reference-counted cache of loaded files, keyed by path
 │   ├── geometry.h              Integer hitboxes and half-open intersection
 │   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
 │   ├── text.h / .c              Borrowed built-in font, text measurement, centred drawing and label texture creation
@@ -579,6 +580,7 @@ reports it, resident memory in MB.
 |---|---|
 | `shared/graphics.h`, `shared/graphics.c` | Sprite pivots/flips and logical-canvas presentation |
 | `shared/texture.c` | Texture ownership: a malloc'd handle, `NULL` on failure, one owner unloads it |
+| `shared/asset_cache.h`, `shared/asset_cache.c` | A reference count: holders per file, idle entries, and why freeing waits for `asset_cache_trim` |
 | `shared/geometry.h` | Integer, half-open hitboxes; overflow-safe edge arithmetic |
 | `shared/audio.h`, `shared/audio.c` | Owned samples, borrowed alias data, per-play volume and music pumping |
 | `shared/text.h`, `shared/text.c` | CPU image versus GPU texture; borrowing raylib's built-in font |

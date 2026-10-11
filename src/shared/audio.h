@@ -35,6 +35,8 @@ void music_unload(MusicTrack *music);
  * but does not free it; that remains the asset owner's responsibility. */
 void music_play(MusicTrack *music);
 void music_stop(void);
+/* Stop music only if it is the active stream; another one keeps playing. */
+void music_stop_track(MusicTrack *music);
 void music_pause(void);
 void music_resume(void);
 /* Pump the active stream every session frame, including overlay frames. */
