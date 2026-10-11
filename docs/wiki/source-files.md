@@ -89,7 +89,7 @@ src/
 ├── shared/
 │   ├── graphics.h / .c          Window, sprite pivots and logical presentation; declares the texture handles
 │   ├── texture.c                `texture_load`, `texture_own`, `texture_unload`: owned texture handles
-│   ├── asset_cache.h / .c       Session's reference-counted cache of level files, player sheet, HUD icon, font
+│   ├── asset_cache.h / .c       Session's reference-counted cache of level files, player sheet, HUD icon, font, menu logo and sound
 │   ├── geometry.h              Integer hitboxes and half-open intersection
 │   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
 │   ├── text.h / .c              Borrowed built-in font, text measurement, centred drawing and label texture creation
@@ -410,6 +410,8 @@ Bridges gameplay and the profile's one Continue point (`GameResume`, defined in 
 
 **Role:** Start menu screen with `start_menu_logo.png` and a wrapped level list backed by the validated ordered catalog from `levels/campaigns/main.toml`. Each row shows the profile's cleared mark, best time (`m:ss.cc`) and best coins (`start_menu_level_row`). Entries whose level file failed to load stay listed but greyed out, with their reason; Play refuses them. The AppSession can reopen it after a terminal **Level Select** action without restarting the process.
 
+**Files it holds:** `start_menu_init` creates the menu's render target (owned by the menu) and acquires three things from the asset cache passed to `start_menu_create(catalog, cache)`: the font handle, `start_menu_logo.png` and `confirm_ui.wav`. `start_menu_cleanup` frees the render target, cuts a confirm sound that is still playing (`sound_stop`) and releases the three. `AppSession` keeps a reference of its own to each from the first menu until the session ends (`session_keep_menu_files`), so only the first menu of a session reads the two files; every later one, after Level Select, reads nothing. With `cache == NULL` (a menu made without a session, as tests do) the menu loads its own copies and frees them on cleanup.
+
 **Key functions:** `start_menu_create`, `start_menu_frame`, `start_menu_level_row`, `start_menu_format_time`, `start_menu_get_input_state`, `start_menu_close`
 
 ### `core/game_terminal.h` / `core/game_terminal.c`
@@ -418,7 +420,7 @@ Builds the single valid terminal-action list used by both rendering and input. C
 
 ### `core/app_session.h` / `core/app_session.c`
 
-Owns one heap-allocated application session and its active menu or game screen. Without `--level`, it loads and retains the validated v1 campaign catalog; the menu uses the catalog's names and ordered paths. A direct `--level` session bypasses the catalog. The first game it opens loads the shared sprites and sounds into `session->assets`; every game gets a copy of those pointers and the session unloads them once, in `session_runtime_cleanup`. It also owns `session->cache`, the asset cache every game acquires its level's files from (and the player sheet, HUD icon and font), so Replay, Retry and going back into the same level read nothing from disk, and another level reads only the files it adds; `session_runtime_cleanup` clears the cache once. The session consumes explicit game routes after each rendered frame: next level stays in the current game; replay replaces the game with the same TOML path in place (native and browser alike); level select returns to the menu. It also keeps the profile's Continue point current (`session_track_resume`), drops one whose level file changed before the menu opens, and applies it for the menu's **Continue** and for `--continue`.
+Owns one heap-allocated application session and its active menu or game screen. Without `--level`, it loads and retains the validated v1 campaign catalog; the menu uses the catalog's names and ordered paths. A direct `--level` session bypasses the catalog. The first game it opens loads the shared sprites and sounds into `session->assets`; every game gets a copy of those pointers and the session unloads them once, in `session_runtime_cleanup`. It also owns `session->cache`, the asset cache every game acquires its level's files from (and the player sheet, HUD icon and font), so Replay, Retry and going back into the same level read nothing from disk, and another level reads only the files it adds; `session_runtime_cleanup` clears the cache once. The start menu's font, logo and confirm sound are in the same cache, with one reference held by the session itself so they stay loaded between menus. The session consumes explicit game routes after each rendered frame: next level stays in the current game; replay replaces the game with the same TOML path in place (native and browser alike); level select returns to the menu. It also keeps the profile's Continue point current (`session_track_resume`), drops one whose level file changed before the menu opens, and applies it for the menu's **Continue** and for `--continue`.
 
 ---
 

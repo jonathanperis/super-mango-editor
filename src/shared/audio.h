@@ -29,6 +29,8 @@ void sound_unload(SoundEffect *sound);
 void sound_play(SoundEffect *sound, int volume);
 void sound_set_volume(SoundEffect *sound, int volume);
 void sound_stop_all(void);
+/* Silence every voice playing this one sound; the sample stays loaded. */
+void sound_stop(SoundEffect *sound);
 MusicTrack *music_load(const char *path);
 void music_unload(MusicTrack *music);
 /* Only one music stream is active. Starting another stops the previous one

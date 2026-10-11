@@ -206,22 +206,30 @@ int start_menu_init(StartMenu *menu)
     menu->frame_target = LoadRenderTexture(MENU_GAME_W, MENU_GAME_H);
     if (!IsRenderTextureValid(menu->frame_target)) return -1;
     SetTextureFilter(menu->frame_target.texture, TEXTURE_FILTER_POINT);
-    menu->font = font_load();
+    /*
+     * The font, logo and confirm sound come from the asset cache. The first
+     * menu of a session reads the two files; a menu opened later (after
+     * Level Select) gets the same three back, because AppSession keeps a
+     * reference of its own between menus. The cache owns them; this menu
+     * holds one reference to each until start_menu_cleanup.
+     */
+    menu->font = asset_cache_font_acquire(menu->cache);
     if (!menu->font) return -1;
-    menu->logo_tex = texture_load("assets/sprites/screens/start_menu_logo.png");
-    menu->snd_confirm = sound_load("assets/sounds/screens/confirm_ui.wav");
+    menu->logo_tex = asset_cache_texture_acquire(menu->cache, START_MENU_LOGO_PATH);
+    menu->snd_confirm = asset_cache_sound_acquire(menu->cache, START_MENU_CONFIRM_PATH);
     /* Start on the first playable entry; a loaded catalog always has one. */
     int first = campaign_first_available(menu->catalog);
     select_level(menu, first >= 0 ? first : 0);
     return 0;
 }
 
-StartMenu *start_menu_create(const CampaignCatalog *catalog)
+StartMenu *start_menu_create(const CampaignCatalog *catalog, AssetCache *cache)
 {
     if (!catalog || !catalog->levels || !catalog->count || !IsWindowReady()) return NULL;
     StartMenu *menu = calloc(1, sizeof(*menu));
     if (!menu) return NULL;
     menu->catalog = catalog;
+    menu->cache = cache;
     if (start_menu_init(menu)) {
         start_menu_close(&menu);
         return NULL;
@@ -339,13 +347,16 @@ int start_menu_frame(StartMenu *menu)
 void start_menu_cleanup(StartMenu *menu)
 {
     if (!menu) return;
-    /* Free owned screen resources while the shared context is still alive.
-     * Clearing slots prevents another cleanup from reusing released handles. */
-    sound_unload(menu->snd_confirm);
+    /* Release this menu's references while the shared context is still alive.
+     * Clearing slots prevents another cleanup from releasing them twice.
+     * Releasing does not unload a sound the session still holds, so cut the
+     * confirm sound here, as unloading it used to. */
+    sound_stop(menu->snd_confirm);
+    asset_cache_sound_release(menu->cache, menu->snd_confirm);
     menu->snd_confirm = NULL;
-    texture_unload(menu->logo_tex);
+    asset_cache_texture_release(menu->cache, menu->logo_tex);
     menu->logo_tex = NULL;
-    font_unload(menu->font);
+    asset_cache_font_release(menu->cache, menu->font);
     menu->font = NULL;
     if (IsRenderTextureValid(menu->frame_target))
         UnloadRenderTexture(menu->frame_target);
