@@ -594,6 +594,18 @@ The release job needs the legs that ship an archive (`build`), the
 attests archives a failing gate blocks; the Windows Clang, `Desktop backend`
 and `Coverage (Linux x86_64)` jobs report separately and never block a release.
 
+**Why a pull request can wait an hour or two.** The jobs themselves take
+about five minutes. `Build (macOS arm64)` is a required check, and GitHub's
+hosted macOS runners are limited per account, not per repository: five run at
+a time for everything the owner has. When another repository starts many
+macOS jobs together, this repository's one macOS job waits in the queue behind
+them, and the pull request waits with it. Nothing in this workflow can shorten
+that. The fix belongs in the repository that takes the runners: a
+`max-parallel` limit on its macOS matrix leaves runners free (the owner's
+`jonlib` repository runs its macOS shards three at a time for this reason). If
+a run sits on a queued macOS job, look at the account's other running
+workflows before suspecting this one.
+
 **Toolchain drift under `-Werror`.** Linux/macOS use the runner image's
 compilers and the WebAssembly leg pins Emscripten 6.0.9, but Windows uses
 MSYS2, a rolling distribution: `setup-msys2` runs with `update: true` and
