@@ -9,9 +9,10 @@
  * know which files a Save must rewrite and that nobody else changed them.
  *
  * Every edit is also noted in a small history (CampaignStep below), so
- * Ctrl+Z and Ctrl+Y walk back and forth through them.  A step records what
- * was done, not a copy of the level it was done to: a LevelDef is far too
- * big to keep one per step, and its file is still on disk to read again.
+ * Undo and Redo (the buttons, or Ctrl+Z and Ctrl+Y) walk back and forth
+ * through them.  A step records what was done, not a copy of the level it
+ * was done to: a LevelDef is far too big to keep one per step, and its file
+ * is still on disk to read again.
  */
 
 #include "editor_campaign.h"
@@ -40,9 +41,15 @@ typedef struct {
     char path[CAMPAIGN_LEVEL_PATH_SIZE];
 } CampaignListed;
 
-/* What "Link in order" found in one row, kept so the relink can be undone. */
+/*
+ * What "Link in order" did to one row, kept so the relink can be undone and
+ * redone.  The link it wrote is kept too, not worked out again from the row
+ * below: once a row has left the history for good (see skip_blocked_step),
+ * the row below is no longer the one this row was pointed at.
+ */
 typedef struct {
     char next[sizeof(((LevelDef *)0)->next_phase)];  /* its next_phase before */
+    char to[sizeof(((LevelDef *)0)->next_phase)];    /* ...and after          */
     int relinked;                                    /* 1 when it was changed */
 } CampaignOldLink;
 
@@ -66,6 +73,11 @@ typedef enum {
  * (an undone Add, a Remove) comes back by reading its level file again
  * from `path`.  What the designer had changed in that row without saving
  * is not in the file, so a Remove keeps it here to put back on top.
+ *
+ * The one thing that rewrites a recorded step is skipping a Remove that can
+ * no longer be undone (skip_blocked_step): the older steps then get the row
+ * numbers they would have had if that row had never been listed, which
+ * keeps the sentence above true for the list as it is from then on.
  */
 typedef struct {
     CampaignStepKind kind;
@@ -84,9 +96,11 @@ typedef struct {
     int renamed;
     int relinked;
 
-    /* STEP_LINK: what the relink found, one per row of the list.  The
-     * step owns this block; it is NULL for every other kind. */
+    /* STEP_LINK: what the relink did, one per row of the list, and how
+     * many rows that was.  The step owns this block; it is NULL for every
+     * other kind. */
     CampaignOldLink *old_links;
+    int rows;
 } CampaignStep;
 
 /*
@@ -108,7 +122,9 @@ struct EditorCampaign {
     CampaignListed *listed;    /* the manifest file's own list           */
     size_t listed_count;
     size_t capacity;           /* room in all three arrays               */
-    CampaignHistory history;   /* the edits Ctrl+Z / Ctrl+Y replay       */
+    CampaignHistory history;   /* the edits Undo and Redo replay         */
+    int undo_blocked;          /* Undo refused the newest step: its level */
+                               /* file did not load (see undo_refused)    */
     int selected;              /* highlighted row, -1 for none           */
     int scroll;                /* first row shown                        */
     int close_armed;           /* Close was refused once for unsaved work */
@@ -209,6 +225,15 @@ static int name_being_typed(const EditorState *es)
     return row;
 }
 
+/* Is a name being typed that differs from the one its row holds?  It is
+ * not an edit yet, but the next command will apply it as one. */
+static int typed_name_differs(const EditorState *es)
+{
+    int row = name_being_typed(es);
+    return row >= 0 &&
+           strcmp(es->ui.edit_buf, es->campaign->catalog.levels[row].level.name) != 0;
+}
+
 /* Settle a half-typed name before the list changes under its field. */
 static int finish_edit(EditorState *es)
 {
@@ -235,13 +260,10 @@ const char *editor_campaign_problem(const EditorState *es)
 int editor_campaign_unsaved(const EditorState *es)
 {
     const EditorCampaign *c = es ? es->campaign : NULL;
-    int typing;
     if (!c) return 0;
     if (list_changed(c)) return 1;
     /* A name typed but not yet applied is work too: quitting must ask. */
-    typing = name_being_typed(es);
-    if (typing >= 0 && strcmp(es->ui.edit_buf, c->catalog.levels[typing].level.name) != 0)
-        return 1;
+    if (typed_name_differs(es)) return 1;
     for (size_t i = 0; i < c->catalog.count; i++)
         if (level_changed(c, i)) return 1;
     return 0;
@@ -364,6 +386,7 @@ static void record(EditorCampaign *c, const CampaignStep *step)
     }
     history->steps[history->count++] = *step;
     history->applied = history->count;
+    c->undo_blocked = 0;   /* the newest step is another one now */
 }
 
 /* Note that row `row` was renamed from old_name (LEVEL_NAME_CAPACITY
@@ -382,26 +405,43 @@ static void record_rename(EditorCampaign *c, int row, const char *old_name)
 }
 
 /*
+ * What a replay function answers.  A refusal leaves the list unchanged and
+ * the reason in the status bar.  REPLAY_FILE_GONE is the one refusal the
+ * designer can get past from inside the view (see undo_refused).
+ */
+enum {
+    REPLAY_DONE      =  0,
+    REPLAY_REFUSED   = -1,   /* no memory for one more row                  */
+    REPLAY_FILE_GONE = -2    /* the row's level file no longer loads        */
+};
+
+/*
  * put_back — Return the row a step describes to the list by reading its
  * level file again.  A row that showed a loaded level must load again:
  * when its file is gone or broken the list is left exactly as it was and
- * the status bar says why (-1), rather than hand back a row that has
- * quietly lost its level.  A row that never loaded comes back as it was.
+ * the status bar says why (REPLAY_FILE_GONE), rather than hand back a row
+ * that has quietly lost its level.  A row that never loaded comes back as
+ * it was.
  */
 static int put_back(EditorState *es, EditorCampaign *c, const CampaignStep *step, int redo)
 {
-    const char *verb = redo ? "redo" : "undo";
     CampaignLevel *entry = put_in(c, step->row, step->path);
 
     if (!entry) {
-        editor_set_status(es, "Cannot %s: out of memory", verb);
-        return -1;
+        editor_set_status(es, "Cannot %s: out of memory", redo ? "redo" : "undo");
+        return REPLAY_REFUSED;
     }
     if (step->loaded && !entry->loaded) {
         take_out(c, step->row);
-        editor_set_status(es, "Cannot %s: %s no longer loads. Put the file back, or use Revert",
-                          verb, step->path);
-        return -1;
+        /* The status bar shows only the start of a long message, so the
+         * file comes first and the way out last. */
+        if (redo)
+            editor_set_status(es, "Cannot redo: %s no longer loads. Put the file back, "
+                              "or use Revert", step->path);
+        else
+            editor_set_status(es, "Cannot undo: %s no longer loads. Put the file back, "
+                              "or Undo again to skip this step", step->path);
+        return REPLAY_FILE_GONE;
     }
     /* Only what the designer had changed goes on top of the file, so a
      * name or link the file gained in the meantime is not written over. */
@@ -410,7 +450,7 @@ static int put_back(EditorState *es, EditorCampaign *c, const CampaignStep *step
     if (entry->loaded && step->relinked)
         memcpy(entry->level.next_phase, step->next, sizeof(entry->level.next_phase));
     c->selected = step->row;
-    return 0;
+    return REPLAY_DONE;
 }
 
 /* Take the row a step describes out again, leaving the highlight where
@@ -419,13 +459,14 @@ static int take_back(EditorCampaign *c, const CampaignStep *step)
 {
     c->selected = step->row;
     take_out(c, step->row);
-    return 0;
+    return REPLAY_DONE;
 }
 
 /*
  * The replay functions: one per kind of step, each able to run its edit
- * backwards (redo == 0) and forwards again (redo == 1).  They return 0, or
- * -1 with the list unchanged and the reason in the status bar.
+ * backwards (redo == 0) and forwards again (redo == 1).  They return
+ * REPLAY_DONE, or one of the refusals above with the list unchanged and the
+ * reason in the status bar.
  */
 static int replay_add(EditorState *es, EditorCampaign *c, const CampaignStep *step, int redo)
 {
@@ -442,7 +483,7 @@ static int replay_move(EditorState *es, EditorCampaign *c, const CampaignStep *s
     (void)es;
     swap_rows(c, step->row, step->to_row);
     c->selected = redo ? step->to_row : step->row;
-    return 0;
+    return REPLAY_DONE;
 }
 
 static int replay_rename(EditorState *es, EditorCampaign *c, const CampaignStep *step, int redo)
@@ -453,24 +494,22 @@ static int replay_rename(EditorState *es, EditorCampaign *c, const CampaignStep 
     memcpy(entry->level.name, redo ? step->new_name : step->old_name,
            sizeof(entry->level.name));
     c->selected = step->row;
-    return 0;
+    return REPLAY_DONE;
 }
 
 static int replay_link(EditorState *es, EditorCampaign *c, const CampaignStep *step, int redo)
 {
     (void)es;
     /* Only the rows the relink changed are touched, in either direction.
-     * The list has the rows it had then, so old_links[i] is row i and the
-     * row below it is the one the relink pointed it at. */
-    for (size_t i = 0; i < c->catalog.count; i++) {
-        char *next_phase = c->catalog.levels[i].level.next_phase;
-        size_t size = sizeof(c->catalog.levels[i].level.next_phase);
+     * The list has the rows the step describes, so old_links[i] is row i. */
+    for (int i = 0; i < step->rows; i++) {
+        const CampaignOldLink *link = &step->old_links[i];
 
-        if (!step->old_links[i].relinked) continue;
-        if (redo) snprintf(next_phase, size, "%s", next_in_order(c, i));
-        else memcpy(next_phase, step->old_links[i].next, size);
+        if (!link->relinked) continue;
+        memcpy(c->catalog.levels[i].level.next_phase, redo ? link->to : link->next,
+               sizeof(link->next));
     }
-    return 0;
+    return REPLAY_DONE;
 }
 
 /* What each kind of step is called in the status bar, and how to replay it. */
@@ -485,12 +524,160 @@ static const struct {
     [STEP_LINK]   = {"linked the levels in order",   replay_link},
 };
 
+/*
+ * skip_blocked_step — Drop the newest step in effect, a Remove that Undo
+ * cannot replay, so that the steps before it can be undone again.  Returns
+ * how many of those older steps were dropped with it.
+ *
+ * The list on screen does not change: the removed row stays out.  What
+ * changes is the past.  The older steps were recorded while that row was
+ * still listed, so their row numbers count it: undoing "moved row 3 to row
+ * 2" on a list that is one row shorter would move the wrong level, or reach
+ * past the end of the list.  Each older step is therefore rewritten as the
+ * same edit on a list that never had the row.
+ *
+ * `gone` follows the missing row back through time: it is the place the
+ * row had right after the step being looked at.  A step that touched other
+ * rows keeps its meaning and only has the rows below the missing one
+ * renumbered.  A step that acted on the missing row alone (its rename, a
+ * swap with it, the relink of it and nothing else) has nothing left to do
+ * and is dropped.  The walk ends at the Add that brought the row in, if the
+ * history still holds it: before that the row was not there to be counted.
+ */
+static int skip_blocked_step(EditorCampaign *c)
+{
+    CampaignHistory *history = &c->history;
+    int blocked = history->applied - 1;
+    int gone = history->steps[blocked].row;
+    int drop[CAMPAIGN_HISTORY_MAX] = {0};
+    int dropped = 0;
+    int kept = 0;
+
+    drop[blocked] = 1;
+    for (int i = blocked - 1; i >= 0 && gone >= 0; i--) {
+        CampaignStep *step = &history->steps[i];
+
+        switch (step->kind) {
+        case STEP_ADD:
+            /* A level is added as the last row, so the missing row is
+             * either this very level or one above it. */
+            if (step->row == gone) {
+                drop[i] = 1;
+                gone = -1;
+            } else {
+                step->row--;
+            }
+            break;
+        case STEP_REMOVE:
+            /* Before this step the list had one more row, at step->row.
+             * It was either above the missing row, which then stood one
+             * place lower, or below it. */
+            if (step->row <= gone) gone++;
+            else step->row--;
+            break;
+        case STEP_MOVE:
+            /* Two neighbours changed places.  If the missing row was one
+             * of them, the other one never moved past anything that is
+             * still there. */
+            if (step->to_row == gone) {
+                drop[i] = 1;
+                gone = step->row;
+            } else if (step->row == gone) {
+                drop[i] = 1;
+                gone = step->to_row;
+            } else if (step->row > gone) {
+                step->row--;
+                step->to_row--;
+            }
+            break;
+        case STEP_RENAME:
+            if (step->row == gone) drop[i] = 1;
+            else if (step->row > gone) step->row--;
+            break;
+        case STEP_LINK: {
+            /* Take the missing row's entry out of the block.  The row that
+             * was pointed at it keeps that link (old_links[].to), exactly
+             * as the list shows it now. */
+            int relinked = 0;
+
+            memmove(&step->old_links[gone], &step->old_links[gone + 1],
+                    (size_t)(step->rows - gone - 1) * sizeof(step->old_links[0]));
+            step->rows--;
+            for (int row = 0; row < step->rows; row++) relinked |= step->old_links[row].relinked;
+            if (!relinked) drop[i] = 1;
+            break;
+        }
+        case STEP_KIND_COUNT:
+            break;
+        }
+    }
+
+    /* Close the gaps.  Every dropped step was in effect, so `applied`
+     * comes down by as many; the undone steps after them move along
+     * untouched: they describe the list as it is now. */
+    for (int i = 0; i < history->count; i++) {
+        if (drop[i]) {
+            free(history->steps[i].old_links);
+            dropped++;
+            continue;
+        }
+        history->steps[kept++] = history->steps[i];
+    }
+    history->count = kept;
+    history->applied -= dropped;
+    c->undo_blocked = 0;
+    return dropped - 1;   /* not counting the blocked step itself */
+}
+
+/*
+ * undo_refused — Undo could not put a removed row back because its level
+ * file no longer loads (put_back has said so in the status bar).
+ *
+ * Left at that, the step would stand in the way of every older one until
+ * the file came back.  So the step can be skipped, but never by accident:
+ * the first refusal only tells, because a designer holding Ctrl+Z to walk
+ * back several steps must not lose one on the way.  From the second on the
+ * editor asks, and only the answer "Skip this step" drops it.  Returns -1
+ * while the step is kept, 2 once it is skipped.
+ */
+static int undo_refused(EditorState *es, EditorCampaign *c)
+{
+    char path[CAMPAIGN_LEVEL_PATH_SIZE];
+    char refusal[sizeof(es->status_message)];
+    int dropped;
+
+    if (!c->undo_blocked) {
+        c->undo_blocked = 1;
+        return -1;
+    }
+    /* The step is about to go; its file's name is needed after that. */
+    memcpy(path, c->history.steps[c->history.applied - 1].path, sizeof(path));
+    memcpy(refusal, es->status_message, sizeof(refusal));
+    if (!editor_confirm_skip_undo_step(es, path)) {
+        /* A dialog that could not be shown has said so itself; a "Keep
+         * the step" leaves the refusal there, so say what was decided. */
+        if (strcmp(es->status_message, refusal) == 0)
+            editor_set_status(es, "Undo step kept: %s no longer loads. Put the file back, "
+                              "then Undo", path);
+        return -1;
+    }
+    dropped = skip_blocked_step(c);
+    if (dropped == 0)
+        editor_set_status(es, "Skipped: removed %s (it stays out of the campaign)", path);
+    else
+        editor_set_status(es, "Skipped: removed %s (it stays out of the campaign), and %d "
+                          "older step%s that changed nothing else", path, dropped,
+                          dropped == 1 ? "" : "s");
+    return 2;
+}
+
 /* Undo the newest edit in effect, or redo the one undone last. */
 static int walk_history(EditorState *es, int redo)
 {
     EditorCampaign *c = es ? es->campaign : NULL;
     CampaignHistory *history;
     const CampaignStep *step;
+    int result;
 
     /* A name being typed is applied first, as an edit of its own: undo
      * then takes that very name back, and it can be redone. */
@@ -501,8 +688,11 @@ static int walk_history(EditorState *es, int redo)
         return 0;
     }
     step = &history->steps[redo ? history->applied : history->applied - 1];
-    if (s_step_kinds[step->kind].replay(es, c, step, redo) != 0) return -1;
+    result = s_step_kinds[step->kind].replay(es, c, step, redo);
+    if (result == REPLAY_FILE_GONE && !redo) return undo_refused(es, c);
+    if (result != REPLAY_DONE) return -1;
     history->applied += redo ? 1 : -1;
+    c->undo_blocked = 0;   /* the newest step is another one now */
     edited(c);
     editor_campaign_check(es);
     editor_set_status(es, "%s: %s%s%s", redo ? "Redid" : "Undid", s_step_kinds[step->kind].done,
@@ -529,6 +719,11 @@ int editor_campaign_redo_steps(const EditorState *es)
 {
     const CampaignHistory *history = es && es->campaign ? &es->campaign->history : NULL;
     return history ? history->count - history->applied : 0;
+}
+
+int editor_campaign_undo_blocked(const EditorState *es)
+{
+    return es && es->campaign ? es->campaign->undo_blocked : 0;
 }
 
 int editor_campaign_finish_name(EditorState *es)
@@ -787,6 +982,7 @@ int editor_campaign_link_in_order(EditorState *es)
      * any link changes: without it the links stay as they are, rather
      * than change with no way back. */
     step.kind = STEP_LINK;
+    step.rows = (int)c->catalog.count;
     step.old_links = history_alloc(c->catalog.count ? c->catalog.count : 1,
                                    sizeof(*step.old_links));
     if (!step.old_links) {
@@ -803,6 +999,7 @@ int editor_campaign_link_in_order(EditorState *es)
         /* Paths are at most CAMPAIGN_LEVEL_PATH_SIZE - 1 bytes, which
          * next_phase (256 bytes) always holds. */
         snprintf(entry->level.next_phase, sizeof(entry->level.next_phase), "%s", next);
+        memcpy(step.old_links[i].to, entry->level.next_phase, sizeof(step.old_links[i].to));
         changed++;
     }
     if (changed > 0) record(c, &step);   /* the history owns old_links now */
@@ -1085,12 +1282,6 @@ int editor_campaign_save(EditorState *es)
 #define CAMPAIGN_RED   ((Color){0xFF, 0x70, 0x70, 0xFF})
 #define CAMPAIGN_GREEN ((Color){0x70, 0xE0, 0x80, 0xFF})
 
-/* How many rows fit between the header and the buttons. */
-static int visible_rows(void)
-{
-    return (CAMPAIGN_BUTTONS_Y - 8 - CAMPAIGN_ROWS_Y) / CAMPAIGN_ROW_H;
-}
-
 void editor_campaign_wheel(EditorState *es, float wheel)
 {
     EditorCampaign *c = es ? es->campaign : NULL;
@@ -1098,7 +1289,7 @@ void editor_campaign_wheel(EditorState *es, float wheel)
 
     if (!c) return;
     c->scroll -= (int)wheel;
-    max_scroll = (int)c->catalog.count - visible_rows();
+    max_scroll = (int)c->catalog.count - CAMPAIGN_VISIBLE_ROWS;
     if (c->scroll > max_scroll) c->scroll = max_scroll;
     if (c->scroll < 0) c->scroll = 0;
 }
@@ -1147,32 +1338,82 @@ static void draw_row(EditorState *es, EditorCampaign *c, int i, int y)
                    entry->available ? CAMPAIGN_GREEN : CAMPAIGN_RED);
 }
 
+/*
+ * While Undo is stopped at a step it cannot replay, say so in the view
+ * itself, between the rows and the buttons.  The status bar said it first,
+ * but it shows only the start of a long message, and the next message
+ * replaces it; the way out must stay in sight for as long as it is needed.
+ */
+static void draw_undo_notice(EditorState *es, const EditorCampaign *c)
+{
+    const CampaignStep *step;
+    char shown[40];   /* a longer path keeps its end, the file's own name */
+    char text[sizeof(shown) + 128];   /* the words below are under 128 bytes */
+
+    if (!c->undo_blocked) return;
+    step = &c->history.steps[c->history.applied - 1];
+    editor_path_for_display(step->path, shown, sizeof(shown));
+    snprintf(text, sizeof(text), "Undo is stopped: %s was removed and no longer loads. "
+             "Put the file back, or press Undo again to skip that step.", shown);
+    ui_label_color(&es->ui, CAMPAIGN_VIEW_X, CAMPAIGN_NOTICE_Y, text, CAMPAIGN_RED);
+}
+
 /* The button row along the bottom of the view. */
 static void draw_buttons(EditorState *es, EditorCampaign *c)
 {
-    static const char *labels[] = {
-        "Up", "Down", "Remove", "Add level...", "Link in order", "Save", "Revert", "Close"
+    static const char *labels[CAMPAIGN_BUTTON_COUNT] = {
+        [CAMPAIGN_BUTTON_UP]     = "Up",
+        [CAMPAIGN_BUTTON_DOWN]   = "Down",
+        [CAMPAIGN_BUTTON_REMOVE] = "Remove",
+        [CAMPAIGN_BUTTON_ADD]    = "Add level...",
+        [CAMPAIGN_BUTTON_LINK]   = "Link in order",
+        [CAMPAIGN_BUTTON_UNDO]   = "Undo",
+        [CAMPAIGN_BUTTON_REDO]   = "Redo",
+        [CAMPAIGN_BUTTON_SAVE]   = "Save",
+        [CAMPAIGN_BUTTON_REVERT] = "Revert",
+        [CAMPAIGN_BUTTON_CLOSE]  = "Close",
     };
+    /* Undo also has work when a name is being typed: the click applies the
+     * name as a step and takes it back, as Ctrl+Z does. */
+    int can_undo = c->history.applied > 0 || typed_name_differs(es);
+    int can_redo = c->history.applied < c->history.count;
     int y = CAMPAIGN_BUTTONS_Y;
 
-    for (int b = 0; b < (int)(sizeof(labels) / sizeof(labels[0])); b++) {
+    for (int b = 0; b < CAMPAIGN_BUTTON_COUNT; b++) {
         int x = CAMPAIGN_VIEW_X + b * CAMPAIGN_BUTTON_STEP;
-        if (!ui_button(&es->ui, x, y, CAMPAIGN_BUTTON_W, 24, labels[b])) continue;
+        const char *label = labels[b];
+
+        if ((b == CAMPAIGN_BUTTON_UNDO && !can_undo) ||
+            (b == CAMPAIGN_BUTTON_REDO && !can_redo)) {
+            ui_button_disabled(&es->ui, x, y, CAMPAIGN_BUTTON_W, CAMPAIGN_BUTTON_H, label);
+            continue;
+        }
+        if (b == CAMPAIGN_BUTTON_UNDO && c->undo_blocked) {
+            /* The next Undo may ask a question (hence the dots, as on
+             * "Add level..."), and the red line ties the button to the
+             * notice above it. */
+            label = "Undo...";
+            DrawRectangle(x, y + CAMPAIGN_BUTTON_H, CAMPAIGN_BUTTON_W, 2, CAMPAIGN_RED);
+        }
+        if (!ui_button(&es->ui, x, y, CAMPAIGN_BUTTON_W, CAMPAIGN_BUTTON_H, label)) continue;
         switch (b) {
-        case 0: (void)editor_campaign_move(es, c->selected, -1); break;
-        case 1: (void)editor_campaign_move(es, c->selected, +1); break;
-        case 2: (void)editor_campaign_remove(es, c->selected); break;
-        case 3: {
+        case CAMPAIGN_BUTTON_UP:     (void)editor_campaign_move(es, c->selected, -1); break;
+        case CAMPAIGN_BUTTON_DOWN:   (void)editor_campaign_move(es, c->selected, +1); break;
+        case CAMPAIGN_BUTTON_REMOVE: (void)editor_campaign_remove(es, c->selected); break;
+        case CAMPAIGN_BUTTON_ADD: {
             char picked[EDITOR_PATH_MAX];
             if (finish_edit(es) &&
                 file_dialog_open(picked, (int)sizeof(picked)) == FILE_DIALOG_SELECTED)
                 (void)editor_campaign_add(es, picked);
             break;
         }
-        case 4: (void)editor_campaign_link_in_order(es); break;
-        case 5: (void)editor_campaign_save(es); break;
-        case 6: (void)editor_campaign_revert(es); break;
-        case 7: (void)editor_campaign_close(es, 0); break;
+        case CAMPAIGN_BUTTON_LINK:   (void)editor_campaign_link_in_order(es); break;
+        /* The very functions Ctrl+Z and Ctrl+Y call (editor_events.c). */
+        case CAMPAIGN_BUTTON_UNDO:   (void)editor_campaign_undo(es); break;
+        case CAMPAIGN_BUTTON_REDO:   (void)editor_campaign_redo(es); break;
+        case CAMPAIGN_BUTTON_SAVE:   (void)editor_campaign_save(es); break;
+        case CAMPAIGN_BUTTON_REVERT: (void)editor_campaign_revert(es); break;
+        case CAMPAIGN_BUTTON_CLOSE:  (void)editor_campaign_close(es, 0); break;
         }
         /* Close and Revert free the view; nothing below may touch it. */
         return;
@@ -1204,11 +1445,12 @@ void editor_campaign_render(EditorState *es)
     ui_label_color(&es->ui, CAMPAIGN_NAME_X + CAMPAIGN_NAME_W + 12, TOOLBAR_H + 50,
                    "Game's verdict", UI_TEXT_DIM);
 
-    rows = visible_rows();
+    rows = CAMPAIGN_VISIBLE_ROWS;
     if (c->scroll > (int)c->catalog.count - rows) c->scroll = (int)c->catalog.count - rows;
     if (c->scroll < 0) c->scroll = 0;
     for (int i = c->scroll; i < (int)c->catalog.count && i < c->scroll + rows; i++)
         draw_row(es, c, i, CAMPAIGN_ROWS_Y + (i - c->scroll) * CAMPAIGN_ROW_H);
 
+    draw_undo_notice(es, c);
     draw_buttons(es, c);
 }
