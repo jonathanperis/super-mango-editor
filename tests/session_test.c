@@ -1681,6 +1681,8 @@ int game_profile_contract_test(void);
 int game_simulation_contract_test(void);
 int audio_contract_test(void);
 int web_frame_pacing_contract_test(void);
+/* tests/asset_cache_test.c */
+int asset_cache_contract_test(void);
 
 static int setup_raylib(void)
 {
@@ -1700,6 +1702,7 @@ int main(void)
         CASE(game_simulation_contract_test), CASE(game_profile_contract_test),
         CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),
         CASE(replay_reuses_the_session_assets),
+        CASE(asset_cache_contract_test),
         CASE(menu_mouse_and_path_boundaries), CASE(level_select_lists_best_results),
         CASE(collision_lifetime_and_pickups),
         CASE(coins_stay_collected_across_life_loss), CASE(settings_keep_music_paused_after_refocus),

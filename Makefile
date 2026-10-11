@@ -225,7 +225,7 @@ TEST_SOURCE_DIR  = $(TEST_OBJDIR)/tests
 TEST_SOURCE_OBJS = $(patsubst %.c,$(TEST_OBJDIR)/%.o,$(filter-out tests/fuzz_%.c tests/parser_allocation_test.c,$(wildcard tests/*.c)))
 # tools/level_check.c (validate-levels) is compiled the same way, with CFLAGS.
 TOOL_OBJS = $(OBJDIR)/tools/level_check.o
-PLATFORM_OBJS = $(addprefix $(OBJDIR)/src/shared/,audio.o graphics.o platform.o text.o texture.o) $(OBJDIR)/src/input/input_backend.o
+PLATFORM_OBJS = $(addprefix $(OBJDIR)/src/shared/,asset_cache.o audio.o graphics.o platform.o text.o texture.o) $(OBJDIR)/src/input/input_backend.o
 # Every TEST_*_OBJ / TEST_*_OBJS variable above, so new ones need no extra list.
 TEST_OBJECTS := $(foreach name,$(filter %_OBJ %_OBJS,$(filter TEST_%,$(.VARIABLES))),$($(name)))
 TEST_DEPS           = $(patsubst %.o,%.d,$(filter $(TEST_OBJDIR)/%,$(TEST_OBJECTS)))
@@ -674,7 +674,7 @@ $(OUTDIR)/game-overlay-test: $(TEST_SOURCE_DIR)/game_overlay_test.o $(TEST_GAME_
 $(OUTDIR)/game-events-test: $(TEST_SOURCE_DIR)/game_events_test.o $(TEST_GAME_EVENTS_OBJ) $(TEST_GAME_INPUT_OBJ) $(TEST_WEB_INPUT_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_TERMINAL_OBJ) $(TEST_SETTINGS_OBJ) $(TEST_BINDINGS_OBJ) $(TEST_EDITOR_UI_OBJ)
 	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
 
-$(OUTDIR)/session-test: $(TEST_SOURCE_DIR)/session_test.o $(TEST_SOURCE_DIR)/game_profile_test.o $(TEST_SOURCE_DIR)/simulation_test.o $(TEST_SOURCE_DIR)/audio_contract_test.o $(TEST_SOURCE_DIR)/web_frame_pacing_test.o $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
+$(OUTDIR)/session-test: $(TEST_SOURCE_DIR)/session_test.o $(TEST_SOURCE_DIR)/game_profile_test.o $(TEST_SOURCE_DIR)/simulation_test.o $(TEST_SOURCE_DIR)/audio_contract_test.o $(TEST_SOURCE_DIR)/web_frame_pacing_test.o $(TEST_SOURCE_DIR)/asset_cache_test.o $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
 	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
 
 $(OUTDIR)/game-checkpoint-test: $(TEST_SOURCE_DIR)/game_checkpoint_test.o $(TEST_GAME_CHECKPOINT_OBJ)
