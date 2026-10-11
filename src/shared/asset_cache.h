@@ -6,6 +6,8 @@
  * the HUD coin icon and the HUD font are needed by every game. A Replay
  * closes one GameState and opens another on the same level, so loading these
  * with the game and freeing them with it read the same files again each time.
+ * The start menu's logo, confirm sound and font are in the same position:
+ * every return to Level Select opens a new menu.
  *
  * The cache keeps one entry per file path. Two words describe an entry:
  *
@@ -31,8 +33,8 @@
  * Rules for callers:
  *   - Every successful acquire is paired with exactly one release of the
  *     pointer it returned. Clear your copy of the pointer after releasing.
- *   - Never call texture_unload, music_unload or font_unload on something
- *     you acquired: that would free it under the other holders.
+ *   - Never call texture_unload, sound_unload, music_unload or font_unload
+ *     on something you acquired: that would free it under the other holders.
  *   - Acquiring returns NULL when the file cannot be loaded. Nothing is
  *     remembered about the failure, so the next acquire tries the file
  *     again. Releasing NULL does nothing.
@@ -41,7 +43,7 @@
  */
 #pragma once
 
-#include "audio.h"     /* MusicTrack */
+#include "audio.h"     /* MusicTrack, SoundEffect */
 #include "graphics.h"  /* Texture2D */
 #include "text.h"      /* TextFont */
 
@@ -52,14 +54,16 @@
  * How many entries the cache can hold. One game holds at most 51 (8
  * background layers, 4 fog layers, 32 platform tiles, a floor tileset, two
  * water strips, the player sheet, the HUD icon, the music and the font;
- * level_resources.c checks this at compile time). The rest is room for the
- * previous level's idle entries. When the table is full, acquire unloads
- * the idle entries to make room.
+ * level_resources.c checks this at compile time), and the start menu's logo
+ * and confirm sound make 53. The rest is room for the previous level's idle
+ * entries. When the table is full, acquire unloads the idle entries to make
+ * room.
  */
 #define ASSET_CACHE_MAX 64
 
 typedef enum {
     ASSET_TEXTURE,
+    ASSET_SOUND,
     ASSET_MUSIC,
     ASSET_FONT
 } AssetKind;
@@ -67,8 +71,8 @@ typedef enum {
 typedef struct {
     AssetKind kind;
     char      path[ASSET_CACHE_PATH_SIZE];  /* the key; "" for the font  */
-    void     *asset;    /* Texture2D *, MusicTrack * or TextFont *, by kind;
-                           never NULL in a used entry                     */
+    void     *asset;    /* Texture2D *, SoundEffect *, MusicTrack * or
+                           TextFont *, by kind; never NULL in a used entry */
     int       holders;  /* acquires not yet released; 0 = idle           */
 } CachedAsset;
 
@@ -84,6 +88,12 @@ typedef struct AssetCache {
 /* The texture for path: the cached one, or a newly loaded one. */
 Texture2D *asset_cache_texture_acquire(AssetCache *cache, const char *path);
 void asset_cache_texture_release(AssetCache *cache, Texture2D *texture);
+
+/* The sound effect for path. Releasing does not stop a sound that is
+ * playing (unlike music, it is short and does not loop); a holder that
+ * wants silence calls sound_stop first. */
+SoundEffect *asset_cache_sound_acquire(AssetCache *cache, const char *path);
+void asset_cache_sound_release(AssetCache *cache, SoundEffect *sound);
 
 /* The music stream for path. A track stops playing when its last holder
  * releases it; it stays loaded, rewound to its start, until the next trim. */

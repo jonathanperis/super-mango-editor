@@ -1,7 +1,7 @@
 /*
  * asset_cache_test.c — Which files are read, and when they are freed.
  *
- * Two cases, both run by session-test (which opens the window and the audio
+ * The cases are run by session-test (which opens the window and the audio
  * device before each case and links the counting builds of the loaders):
  *
  *   asset_cache_contract_test   the cache alone: holders, idle entries,
@@ -9,6 +9,11 @@
  *   session_asset_reuse_test    a whole session: Replay, Retry, Level
  *                               Select -> Play and Next Level read from
  *                               disk only what the session does not hold.
+ *   menu_files_are_read_once_test  the start menu's logo, sound and font
+ *                               are read by the first menu only.
+ *   game_without_session_frees_its_files_test, and the menu's twin: no
+ *                               session, so no cache; each loads and
+ *                               frees its own copies.
  *
  * "Loads" below always means calls that really read a file, counted inside
  * texture_load, sound_load, music_load and font_load themselves, so a load
@@ -24,13 +29,16 @@
 #include "core/game_resources.h"         /* DEFAULT_FLOOR_TILE_PATH */
 #include "game.h"
 #include "levels/level.h"
+#include "levels/campaign_catalog.h"
 #include "levels/level_session.h"
+#include "screens/start_menu.h"
 #include "shared/asset_cache.h"
 #include "shared/platform.h"             /* str_copy */
 
 #define COIN_PNG  "assets/sprites/collectibles/coin.png"
 #define STAR_PNG  "assets/sprites/collectibles/star_yellow.png"
 #define MUSIC_WAV "assets/sounds/levels/water.wav"
+#define SOUND_WAV "assets/sounds/collectibles/coin.wav"
 
 typedef struct {
     int textures, sounds, music, fonts;
@@ -147,7 +155,7 @@ static int holders_are_counted_and_idle_entries_stay_loaded(void)
     return failed;
 }
 
-static int music_and_font_are_shared_too(void)
+static int sound_music_and_font_are_shared_too(void)
 {
     AssetCache cache = {0};
     Counts live = live_now(), mark = loads_now();
@@ -156,13 +164,22 @@ static int music_and_font_are_shared_too(void)
     MusicTrack *music = asset_cache_music_acquire(&cache, MUSIC_WAV);
     TextFont *font = asset_cache_font_acquire(&cache);
     TextFont *font_again = asset_cache_font_acquire(&cache);
-    if (!music || !font) {
-        fprintf(stderr, "asset_cache_test: music or font did not load\n");
+    SoundEffect *sound = asset_cache_sound_acquire(&cache, SOUND_WAV);
+    SoundEffect *sound_again = asset_cache_sound_acquire(&cache, SOUND_WAV);
+    if (!music || !font || !sound) {
+        fprintf(stderr, "asset_cache_test: sound, music or font did not load\n");
         asset_cache_clear(&cache);
         return 1;
     }
     failed |= expect_int("one font handle for both holders", font_again == font, 1);
-    failed |= expect_counts("one music file, one font", loads_since(&mark), (Counts){0, 0, 1, 1});
+    failed |= expect_int("one sound for both holders", sound_again == sound, 1);
+    failed |= expect_counts("one sound, one music file, one font", loads_since(&mark),
+                            (Counts){0, 1, 1, 1});
+
+    /* A sound outlives the holder that released it while another holds it. */
+    asset_cache_sound_release(&cache, sound);
+    failed |= expect_int("released sound is still loaded", sound_test_live(), live.sounds + 1);
+    asset_cache_sound_release(&cache, sound_again);
 
     /* Releasing the last holder silences the track but keeps it loaded. */
     music_play(music);
@@ -183,7 +200,7 @@ static int music_and_font_are_shared_too(void)
     asset_cache_font_release(&cache, font_again);
     asset_cache_trim(&cache);
     failed |= expect_int("trim empties an all-idle cache", cache.count, 0);
-    failed |= expect_counts("music and font unloaded once", live_now(), live);
+    failed |= expect_counts("sound, music and font unloaded once", live_now(), live);
     return failed;
 }
 
@@ -308,7 +325,7 @@ static int null_cache_loads_private_copies(void)
 int asset_cache_contract_test(void)
 {
     return holders_are_counted_and_idle_entries_stay_loaded() |
-           music_and_font_are_shared_too() |
+           sound_music_and_font_are_shared_too() |
            missing_file_is_tried_again() |
            full_table_makes_room_from_idle_entries() |
            null_cache_loads_private_copies();
@@ -372,7 +389,9 @@ static const LevelDef *active_level(const AppSession *session)
 
 /*
  * After a level has opened, the cache holds exactly that level's files:
- * each one held, none idle, nothing left over from the level before.
+ * each one held, none idle, nothing left over from the level before. Once
+ * a menu has been open it also holds the menu's logo, which the session
+ * keeps for the next menu.
  */
 static int expect_cache_holds_level(const char *step, const AppSession *session)
 {
@@ -390,11 +409,44 @@ static int expect_cache_holds_level(const char *step, const AppSession *session)
             failed = 1;
         }
     }
-    if (expect_int(step, textures, files.count) || expect_int(step, cache_idle_count(cache), 0)) {
+    int menu_textures = session->menu_logo != NULL;
+    if (expect_int(step, textures, files.count + menu_textures) || expect_int(step, cache_idle_count(cache), 0)) {
         fprintf(stderr, "asset_cache_test: %s: cache holds other files than the level's\n", step);
         failed = 1;
     }
     return failed;
+}
+
+/* With the game closed and the menu open, every file of the level that was
+ * played is still in the cache, held by nobody. */
+static int expect_level_files_idle(const AssetCache *cache, const FileSet *files)
+{
+    int failed = 0;
+    for (int i = 0; i < files->count; i++) {
+        const CachedAsset *entry = cache_entry(cache, files->paths[i]);
+        if (!entry || entry->holders != 0) {
+            fprintf(stderr, "asset_cache_test: %s is not idle while the menu is open\n", files->paths[i]);
+            failed = 1;
+        }
+    }
+    return failed;
+}
+
+/* Leave the game for the menu, as Level Select does. 0 when the menu opened. */
+static int go_to_level_select(AppSession *session)
+{
+    session->game->screen.route = GAME_ROUTE_LEVEL_SELECT;
+    session_frame(session);
+    return !session->menu;
+}
+
+/* Press Play on path. 0 when the game opened. */
+static int play_from_menu(AppSession *session, const char *path)
+{
+    str_copy(session->menu->selected_level_path, path, sizeof(session->menu->selected_level_path));
+    session->menu->route = MENU_ROUTE_PLAY;
+    session_frame(session);
+    return !session->game;
 }
 
 /* Finish the level with Next Level chosen, as the completion screen does. */
@@ -461,19 +513,16 @@ int session_asset_reuse_test(void)
     game_restart_after_game_over(session->game);
     failed |= expect_no_loads("Retry reads nothing", &mark);
 
-    /* Level Select, then Play the same level. The menu loads its own logo,
-     * sound and font; the game that follows loads nothing. */
-    session->game->screen.route = GAME_ROUTE_LEVEL_SELECT;
-    session_frame(session);
-    if (!session->menu) goto broken;
-    failed |= expect_int("the closed game's files wait, idle", cache_idle_count(&session->cache),
-                         session->cache.count);
+    /* Level Select, then Play the same level. This session began in a game,
+     * so this is its first menu: it reads its logo and confirm sound (the
+     * font is the one the HUD already made). The game that follows reads
+     * nothing. */
+    if (go_to_level_select(session)) goto broken;
+    failed |= expect_level_files_idle(&session->cache, &before);
     failed |= expect_int("an idle track is silent", IsMusicStreamPlaying(track->stream), 0);
-    (void)loads_since(&mark);
-    str_copy(session->menu->selected_level_path, sandbox, sizeof(session->menu->selected_level_path));
-    session->menu->route = MENU_ROUTE_PLAY;
-    session_frame(session);
-    if (!session->game) goto broken;
+    failed |= expect_counts("the first menu reads its logo and sound", loads_since(&mark),
+                            (Counts){1, 1, 0, 0});
+    if (play_from_menu(session, sandbox)) goto broken;
     failed |= expect_no_loads("going back into the level reads nothing", &mark);
     failed |= expect_cache_holds_level("back in the level", session);
 
@@ -506,14 +555,9 @@ int session_asset_reuse_test(void)
     /* Level Select, then Play a different level: the same rule through a
      * new GameState. Only the files the chosen level adds are read. */
     before = after;
-    session->game->screen.route = GAME_ROUTE_LEVEL_SELECT;
-    session_frame(session);
-    if (!session->menu) goto broken;
-    (void)loads_since(&mark);
-    str_copy(session->menu->selected_level_path, sandbox, sizeof(session->menu->selected_level_path));
-    session->menu->route = MENU_ROUTE_PLAY;
-    session_frame(session);
-    if (!session->game) goto broken;
+    if (go_to_level_select(session)) goto broken;
+    failed |= expect_no_loads("the second menu reads nothing", &mark);
+    if (play_from_menu(session, sandbox)) goto broken;
     level_textures(active_level(session), &after);
     added = count_missing_from(&after, &before);
     failed |= expect_int("the chosen level adds files", added > 0, 1);
@@ -550,5 +594,88 @@ int game_without_session_frees_its_files_test(void)
     failed |= expect_int("next level loads", game_load_next_phase(&gs), 0);
     game_cleanup(&gs);
     failed |= expect_counts("the game freed what it loaded", live_now(), live);
+    return failed;
+}
+
+/*
+ * The start menu's logo, confirm sound and font are read by the first menu
+ * of a session and by no later one, whatever happened in between: the
+ * session keeps a reference to each while games are on screen.
+ */
+int menu_files_are_read_once_test(void)
+{
+    const char *sandbox = "levels/00_sandbox_01.toml";
+    Counts live = live_now(), mark = loads_now();
+    int failed = 0;
+
+    AppSessionConfig config = {0};  /* no level: the session opens the menu */
+    AppSession *session = session_create(&config);
+    if (!session || !session->menu) {
+        session_destroy(&session);
+        return 1;
+    }
+    failed |= expect_counts("the first menu reads its logo, sound and font", loads_since(&mark),
+                            (Counts){1, 1, 0, 1});
+    Texture2D *logo = session->menu->logo_tex;
+    SoundEffect *confirm = session->menu->snd_confirm;
+    TextFont *font = session->menu->font;
+    failed |= expect_int("the menu has all three", logo && confirm && font, 1);
+    failed |= expect_int("the menu uses the session's cache", session->menu->cache == &session->cache, 1);
+
+    /* Menu -> game -> Level Select: the second menu. */
+    if (play_from_menu(session, sandbox)) goto broken;
+    failed |= expect_int("the game's HUD shares the menu's font", session->game->screen.hud.font == font, 1);
+    (void)loads_since(&mark);  /* the level's own files */
+    if (go_to_level_select(session)) goto broken;
+    failed |= expect_no_loads("the second menu reads nothing", &mark);
+    failed |= expect_int("same logo", session->menu->logo_tex == logo, 1);
+    failed |= expect_int("same confirm sound", session->menu->snd_confirm == confirm, 1);
+    failed |= expect_int("same font", session->menu->font == font, 1);
+
+    /* Game again, a Replay and a Next Level (each load trims the cache
+     * while no menu is open), then Level Select: the third menu. */
+    if (play_from_menu(session, sandbox) || replay(session) || go_to_next_level(session)) goto broken;
+    failed |= expect_int("the logo survives the trims", cache_entry(&session->cache, START_MENU_LOGO_PATH) != NULL, 1);
+    (void)loads_since(&mark);  /* the next level's own files */
+    if (go_to_level_select(session)) goto broken;
+    failed |= expect_no_loads("the third menu reads nothing", &mark);
+    failed |= expect_int("still the same logo", session->menu->logo_tex == logo, 1);
+
+    /* Fourth menu, straight after a game that loaded nothing new. */
+    if (play_from_menu(session, sandbox) || go_to_level_select(session)) goto broken;
+    failed |= expect_int("same confirm sound again", session->menu->snd_confirm == confirm, 1);
+
+    /* The session ends with the menu open: everything is freed once. */
+    session_destroy(&session);
+    failed |= expect_counts("session end leaves nothing loaded", live_now(), live);
+    return failed;
+
+broken:
+    fprintf(stderr, "asset_cache_test: a menu step did not open its screen\n");
+    session_destroy(&session);
+    return 1;
+}
+
+/* A menu made without a session has no cache: it loads its own three
+ * files each time and frees them when it closes. */
+int menu_without_session_frees_its_files_test(void)
+{
+    CampaignCatalog catalog = {0};
+    Counts live = live_now(), mark = loads_now();
+    int failed = 0;
+
+    if (campaign_catalog_load(CAMPAIGN_MANIFEST_PATH, &catalog) != 0) return 1;
+    for (int round = 0; round < 2; round++) {
+        StartMenu *menu = start_menu_create(&catalog, NULL);
+        if (!menu) {
+            campaign_catalog_cleanup(&catalog);
+            return 1;
+        }
+        failed |= expect_counts("a menu without a cache loads its own files", loads_since(&mark),
+                                (Counts){1, 1, 0, 1});
+        start_menu_close(&menu);
+        failed |= expect_counts("and frees them when it closes", live_now(), live);
+    }
+    campaign_catalog_cleanup(&catalog);
     return failed;
 }

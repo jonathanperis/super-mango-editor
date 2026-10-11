@@ -17,7 +17,8 @@ main()
   └── session_create(config)
        ├── initialise one raylib window/context, semantic input and audio device
        │   └── device polling and platform teardown stay on the application thread
-       ├── no `--level` → start_menu_create()
+       ├── no `--level` → start_menu_create(), its font, logo and confirm
+       │   sound acquired from the session's asset cache
        └── `--level` / `--sandbox` → session_open_game()
             ├── first game only: load the shared sprites and sounds (GameAssets)
             └── game_init(gs), with a copy of those GameAssets and a pointer
@@ -43,7 +44,8 @@ session_run(session)
 
 session_destroy(session) / browser terminal cleanup
   ├── close active menu or game screen
-  ├── clear the asset cache, then unload the shared GameAssets, each once
+  ├── release the session's hold on the menu's files, clear the asset
+  │   cache, then unload the shared GameAssets, each once
   ├── clear input handlers and sound voices after screen assets are released
   ├── CloseAudioDevice → CloseWindow
   └── free AppSession
@@ -369,6 +371,8 @@ The cache keeps one entry per file path, with a count of **holders**: acquires t
 | Next Level from `00_sandbox_01` (other scenery) | 12 textures and 1 music track; the sandbox's 7 are unloaded |
 
 Memory stays bounded by the level, not by how many levels were visited: the cache holds the current level's files (at most 15 textures, 3.1 MiB of pixels, in the shipped levels) plus, between closing one level and finishing the load of the next, the previous level's. Keeping every file until the session ends would also have made Replay free, but its size would grow with each level added; the nine shipped levels together name 25 images (5.7 MiB).
+
+The start menu uses the same cache for its font, logo and confirm sound. Nothing would hold those three while a game is on screen, so the trim after the next level load would unload them and every return to Level Select would read them again. `AppSession` therefore takes a reference of its own to each when the first menu opens and keeps it until the session ends (`session_keep_menu_files`): a holder that exists only to keep something loaded. The first menu of a session reads one texture and one sound; later menus read nothing. They cost 12 KiB of pixels and a 0.22 s sound.
 
 The cache and `GameAssets` are two answers to the same question, "who frees this?". The shared sprites never go away while the session runs, so a game simply borrows the pointers and nobody counts. A level's files should go away when no level uses them any more, and only a count can tell when that is.
 

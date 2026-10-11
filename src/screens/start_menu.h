@@ -10,6 +10,7 @@
  */
 #pragma once
 
+#include "../shared/asset_cache.h"  /* AssetCache — the menu's three files come from it */
 #include "../shared/text.h"
 #include "../shared/audio.h"
 
@@ -29,14 +30,23 @@ typedef enum {
 
 typedef MenuRoute MenuResult;
 
+/* The two files the menu loads; AppSession holds them between menus. */
+#define START_MENU_LOGO_PATH    "assets/sprites/screens/start_menu_logo.png"
+#define START_MENU_CONFIRM_PATH "assets/sounds/screens/confirm_ui.wav"
+
 /*
  * StartMenu — resources and state for the start menu screen.
+ *
+ * The menu owns its render target. Its font, logo and confirm sound are
+ * held from the asset cache, one reference each, taken in start_menu_init
+ * and given back in start_menu_cleanup.
  */
 typedef struct {
     RenderTexture2D frame_target;
-    TextFont *font;
-    Texture2D *logo_tex;
-    SoundEffect *snd_confirm;
+    AssetCache *cache;        /* borrowed from AppSession; NULL = load directly */
+    TextFont *font;           /* held from the asset cache */
+    Texture2D *logo_tex;      /* held from the asset cache */
+    SoundEffect *snd_confirm; /* held from the asset cache */
     int controller; /* raylib device index + 1 */
     int           confirm_release_required;
     int           route_waiting_render;
@@ -75,11 +85,14 @@ int start_menu_can_continue(const StartMenu *menu);
 /* Write seconds as m:ss.cc, rounded to hundredths ("--" when negative). */
 void start_menu_format_time(float seconds, char *out, size_t size);
 
-/* Initialise the start menu: load font and logo. */
+/* Initialise the start menu: create its canvas and get the font, logo and
+ * confirm sound from menu->cache. */
 int start_menu_init(StartMenu *menu);
 
-/* Allocate, initialise, and own a complete menu screen. */
-StartMenu *start_menu_create(const CampaignCatalog *catalog);
+/* Allocate, initialise, and own a complete menu screen. Its font, logo and
+ * confirm sound come from cache, which must outlive the menu; NULL loads
+ * them for this menu alone. */
+StartMenu *start_menu_create(const CampaignCatalog *catalog, AssetCache *cache);
 
 /* Show a recoverable menu load error without losing the current selection. */
 void start_menu_set_error(StartMenu *menu, const char *message);
@@ -94,7 +107,8 @@ void start_menu_refresh_controller(StartMenu *menu);
 /* Execute one menu frame. Returns 1 only after presentation. */
 int start_menu_frame(StartMenu *menu);
 
-/* Release all start menu resources. */
+/* Free the canvas and give the font, logo and confirm sound back to the
+ * cache; a confirm sound still playing is cut off. */
 void start_menu_cleanup(StartMenu *menu);
 
 /* Close and free a menu screen, nulling caller ownership. */
