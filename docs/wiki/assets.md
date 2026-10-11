@@ -195,7 +195,7 @@ records attribution and unresolved license evidence.
 | File | Used By | Description |
 |------|---------|-------------|
 | `hud_coins.png` | `hud.c` | Coin count UI icon used in the HUD |
-| `start_menu_logo.png` | `start_menu.c` | Game logo displayed on the start menu screen |
+| `start_menu_logo.png` | `start_menu.c` | Game logo displayed on the start menu screen; read once per session through the asset cache |
 
 ### Text font
 

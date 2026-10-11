@@ -105,6 +105,37 @@ static void session_repair_web_input(AppSession *session)
     session_emit(session, APP_SESSION_EVENT_WEB_INPUT_REPAIRED, NULL);
 }
 
+/*
+ * session_keep_menu_files — Hold the start menu's font, logo and confirm
+ * sound for the rest of the session.
+ *
+ * A menu acquires these three itself and releases them when it closes.
+ * With no other holder they would be idle while a game is on screen, and
+ * the trim after the next level load would unload them, so every return to
+ * Level Select would read the files again. The session therefore takes one
+ * reference of its own to each. A file that could not be loaded leaves its
+ * slot empty and is tried again when the next menu opens.
+ */
+static void session_keep_menu_files(AppSession *session)
+{
+    AssetCache *cache = &session->cache;
+    if (!session->menu_font) session->menu_font = asset_cache_font_acquire(cache);
+    if (!session->menu_logo) session->menu_logo = asset_cache_texture_acquire(cache, START_MENU_LOGO_PATH);
+    if (!session->menu_confirm)
+        session->menu_confirm = asset_cache_sound_acquire(cache, START_MENU_CONFIRM_PATH);
+}
+
+/* Give those three references back; the menu is closed by now. */
+static void session_release_menu_files(AppSession *session)
+{
+    asset_cache_sound_release(&session->cache, session->menu_confirm);
+    asset_cache_texture_release(&session->cache, session->menu_logo);
+    asset_cache_font_release(&session->cache, session->menu_font);
+    session->menu_confirm = NULL;
+    session->menu_logo = NULL;
+    session->menu_font = NULL;
+}
+
 static void session_runtime_cleanup(AppSession *session)
 {
     /* Several failure/exit routes meet here. The flag makes teardown happen
@@ -119,6 +150,7 @@ static void session_runtime_cleanup(AppSession *session)
     /* Every screen is closed by now, so nothing holds a file in the asset
      * cache and nothing borrows the shared sprites and sounds; unload both
      * while the GPU and audio device still exist. */
+    session_release_menu_files(session);
     asset_cache_clear(&session->cache);
     if (session->assets_loaded) {
         game_resources_unload(&session->assets);
@@ -456,7 +488,8 @@ static int session_open_menu(AppSession *session)
     game_web_input_clear_touch();
     input_clear();
     session_drop_stale_resume(session);
-    session->menu = start_menu_create(&session->catalog);
+    session_keep_menu_files(session);
+    session->menu = start_menu_create(&session->catalog, &session->cache);
     if (!session->menu) return -1;
     session->menu->profile = &session->profile;
     session->menu->settings_menu = &session->settings;

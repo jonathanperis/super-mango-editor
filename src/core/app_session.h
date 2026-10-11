@@ -82,6 +82,14 @@ typedef struct AppSession {
      * What the next level does not need is unloaded once that level has
      * loaded (asset_cache_trim), and everything when the session ends. */
     AssetCache cache;
+    /* The session's own references to the start menu's font, logo and
+     * confirm sound, taken when the first menu opens and kept until the
+     * session ends. Each menu holds its own while it is open; these keep
+     * the three loaded while a game is on screen, so opening the menu again
+     * reads nothing. */
+    TextFont *menu_font;
+    Texture2D *menu_logo;
+    SoundEffect *menu_confirm;
     CampaignCatalog catalog; /* owned once loaded (menu, Next Level, --continue) */
     int catalog_loaded;
     char campaign_path[GAME_LEVEL_PATH_MAX]; /* the manifest catalog is read from */

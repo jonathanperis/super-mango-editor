@@ -275,7 +275,7 @@ static int campaign_broken_level_disables_only_its_entry(void)
         expect_int("first playable", campaign_first_available(&catalog), 1))
         goto done;
 
-    menu = start_menu_create(&catalog);
+    menu = start_menu_create(&catalog, NULL);
     if (!menu) goto done;
     menu->confirm_release_required = 0;
     if (expect_int("menu starts on a playable level", menu->selected_level, 1)) goto done;
@@ -1274,7 +1274,7 @@ static int menu_mouse_and_path_boundaries(void)
 {
     CampaignCatalog catalog = {0};
     if (campaign_catalog_load(CAMPAIGN_MANIFEST_PATH, &catalog)) return 1;
-    StartMenu *menu = start_menu_create(&catalog);
+    StartMenu *menu = start_menu_create(&catalog, NULL);
     if (!menu) { campaign_catalog_cleanup(&catalog); return 1; }
     input_clear();
     Vector2 logical = input_pointer_to_logical((Vector2){400,368});
@@ -1560,7 +1560,7 @@ static int level_select_lists_best_results(void)
     int failed = 1;
 
     if (campaign_catalog_load(CAMPAIGN_MANIFEST_PATH, &catalog) || catalog.count < 3) goto done;
-    menu = start_menu_create(&catalog);
+    menu = start_menu_create(&catalog, NULL);
     if (!menu) goto done;
     game_profile_init(&profile);
     menu->profile = &profile;
@@ -1685,6 +1685,8 @@ int web_frame_pacing_contract_test(void);
 int asset_cache_contract_test(void);
 int session_asset_reuse_test(void);
 int game_without_session_frees_its_files_test(void);
+int menu_files_are_read_once_test(void);
+int menu_without_session_frees_its_files_test(void);
 
 static int setup_raylib(void)
 {
@@ -1706,6 +1708,7 @@ int main(void)
         CASE(replay_reuses_the_session_assets),
         CASE(asset_cache_contract_test), CASE(session_asset_reuse_test),
         CASE(game_without_session_frees_its_files_test),
+        CASE(menu_files_are_read_once_test), CASE(menu_without_session_frees_its_files_test),
         CASE(menu_mouse_and_path_boundaries), CASE(level_select_lists_best_results),
         CASE(collision_lifetime_and_pickups),
         CASE(coins_stay_collected_across_life_loss), CASE(settings_keep_music_paused_after_refocus),

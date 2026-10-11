@@ -22,6 +22,7 @@ static void *asset_load(AssetKind kind, const char *path)
 {
     switch (kind) {
     case ASSET_TEXTURE: return texture_load(path);
+    case ASSET_SOUND:   return sound_load(path);
     case ASSET_MUSIC:   return music_load(path);
     case ASSET_FONT:    return font_load();
     }
@@ -32,6 +33,7 @@ static void asset_unload(AssetKind kind, void *asset)
 {
     switch (kind) {
     case ASSET_TEXTURE: texture_unload(asset); break;
+    case ASSET_SOUND:   sound_unload(asset);   break;  /* stops its voices   */
     case ASSET_MUSIC:   music_unload(asset);   break;  /* stops it if playing */
     case ASSET_FONT:    font_unload(asset);    break;
     }
@@ -147,6 +149,16 @@ Texture2D *asset_cache_texture_acquire(AssetCache *cache, const char *path)
 void asset_cache_texture_release(AssetCache *cache, Texture2D *texture)
 {
     cache_release(cache, ASSET_TEXTURE, texture);
+}
+
+SoundEffect *asset_cache_sound_acquire(AssetCache *cache, const char *path)
+{
+    return cache_acquire(cache, ASSET_SOUND, path);
+}
+
+void asset_cache_sound_release(AssetCache *cache, SoundEffect *sound)
+{
+    cache_release(cache, ASSET_SOUND, sound);
 }
 
 MusicTrack *asset_cache_music_acquire(AssetCache *cache, const char *path)

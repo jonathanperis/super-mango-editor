@@ -56,7 +56,7 @@ be available for level authors without being selected by a current campaign or l
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `confirm_ui.wav` | `SoundEffect` | `menu->snd_confirm` | Two quick square blips (E5, B5); played on menu confirmation |
+| `confirm_ui.wav` | `SoundEffect` | `menu->snd_confirm` | Two quick square blips (E5, B5); played on menu confirmation. Held from the session's asset cache, so only the first menu of a session reads it |
 
 ### Levels — `assets/sounds/levels/`
 

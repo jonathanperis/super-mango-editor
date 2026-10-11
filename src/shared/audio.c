@@ -75,13 +75,19 @@ SoundEffect *sound_load(const char *path)
     return sound;
 }
 
+void sound_stop(SoundEffect *sound)
+{
+    if (!sound) return;
+    for (int i = 0; i < EFFECT_VOICES; i++)
+        if (voices[i].owner == sound) voice_clear(&voices[i]);
+}
+
 void sound_unload(SoundEffect *sound)
 {
     if (!sound) return;
     /* Release every alias referencing this sample before freeing the sample
      * itself; otherwise an audio callback could still read the shared bytes. */
-    for (int i = 0; i < EFFECT_VOICES; i++)
-        if (voices[i].owner == sound) voice_clear(&voices[i]);
+    sound_stop(sound);
     UnloadSound(sound->sample);
     free(sound);
 #ifdef MANGO_TESTING
