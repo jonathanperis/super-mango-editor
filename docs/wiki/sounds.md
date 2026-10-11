@@ -96,7 +96,7 @@ Memory test build uses miniaudio's null backend and does not prove audible outpu
 
 | Aspect | `SoundEffect` (effects) | `MusicTrack` (background music) |
 |--------|----------------------------|-------------------------------|
-| Project API | `sound_load`, `sound_play` | `music_load`, `music_play`, `music_update` |
+| Project API | `sound_load`, `sound_play` | `asset_cache_music_acquire` (calls `music_load`), `music_play`, `music_update` |
 | Loading | Fully decoded into RAM | Decoded on demand from the backing file/resource |
 | Best for | Short, triggered sounds | Long looping tracks |
 | Simultaneous | One shared pool of eight independent raylib sound aliases | One active stream |
@@ -158,8 +158,10 @@ Ambient tracks are short loops: the generator crossfades each recording's tail
 into its head so `MusicTrack` can repeat it without a click.
 
 ```c
-// Load (streaming — not fully decoded into RAM)
-gs->world.music = music_load("assets/sounds/levels/new_track.wav");
+// Acquire from the session's asset cache (streaming, not fully decoded
+// into RAM). The file is opened the first time; a Replay gets the same
+// track back.
+gs->world.music = asset_cache_music_acquire(gs->cache, "assets/sounds/levels/new_track.wav");
 if (!gs->world.music) { /* handle error */ }
 
 // Start (loop forever)
@@ -171,8 +173,9 @@ music_set_volume(64); // 50%
 // AppSession pumps this once per frame, including overlay frames
 music_update();
 
-// Stop and free
-music_unload(gs->world.music);
+// Stop and let go. The cache stops the track and frees it later, once
+// no level uses it (never call music_unload on an acquired track).
+asset_cache_music_release(gs->cache, gs->world.music);
 gs->world.music = NULL;
 ```
 

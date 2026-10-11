@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../game_assets.h"     /* GameAssets, owned here */
+#include "../shared/asset_cache.h"  /* AssetCache, owned here */
 #include "../game_constants.h"  /* GAME_LEVEL_PATH_MAX */
 #include "../game_fwd.h"        /* GameState, used by pointer only */
 #include "../screens/start_menu.h"
@@ -73,6 +74,14 @@ typedef struct AppSession {
      * reuse them. */
     GameAssets assets;
     int assets_loaded;
+    /* The files that depend on the level (backgrounds, fog, water strip,
+     * floor tileset, platform tiles, music), plus the player sheet and the
+     * HUD's icon and font. Each game acquires what it needs from here and
+     * releases it when it closes; the files stay loaded in between, so a
+     * Replay or going back into the same level reads nothing from disk.
+     * What the next level does not need is unloaded once that level has
+     * loaded (asset_cache_trim), and everything when the session ends. */
+    AssetCache cache;
     CampaignCatalog catalog; /* owned once loaded (menu, Next Level, --continue) */
     int catalog_loaded;
     char campaign_path[GAME_LEVEL_PATH_MAX]; /* the manifest catalog is read from */

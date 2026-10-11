@@ -24,7 +24,7 @@ The player module is split across focused files under `src/player/`. `player.h` 
 
 ```text
 player_init
-  ├── texture_load("assets/sprites/player/player.png")
+  ├── asset_cache_texture_acquire(cache, "assets/sprites/player/player.png")
   ├── 48x48 frame setup from 192x288 sheet (4 cols x 6 rows)
   ├── default spawn (overridden by LevelDef)
   └── player_apply_default_physics
@@ -39,7 +39,7 @@ per rendered frame
 player_get_hitbox                -> inset AABB for damage/collision checks
 
 player_reset                     -> restore spawn/state; keep texture + tunable physics
-player_cleanup                   -> texture_unload
+player_cleanup                   -> asset_cache_texture_release
 ```
 
 ---
@@ -47,7 +47,7 @@ player_cleanup                   -> texture_unload
 ## Public API
 
 ```c
-int player_init(Player *player);
+int player_init(Player *player, AssetCache *cache);
 void player_apply_default_physics(Player *player);
 void player_handle_input(Player *player, SoundEffect *snd_jump,
                          unsigned int replay_input_mask,
@@ -73,7 +73,7 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
 void player_render(Player *player, int cam_x);
 IntRect player_get_hitbox(const Player *player);
 void player_reset(Player *player);
-void player_cleanup(Player *player);
+void player_cleanup(Player *player, AssetCache *cache);
 ```
 
 `player_update` receives the three bouncepad arrays as `BouncepadList` views
@@ -103,7 +103,9 @@ being lifted back onto the grass.
 | Runtime spawn | `level_load` may override from `LevelDef.player_start_x/y` |
 | Physics defaults | `player_apply_default_physics`, then optional LevelDef overrides |
 
-`player_init` returns `0` after loading the required player texture and `-1` if the texture cannot be loaded, allowing `game_init` to clean up the partially initialized runtime.
+`player_init` returns `0` after getting the required player texture and `-1` if the texture cannot be loaded, allowing `game_init` to clean up the partially initialized runtime.
+
+The player does not own its sprite sheet. `player_init` asks the session's asset cache (`src/shared/asset_cache.h`) for it and holds one reference; `player_cleanup` gives that reference back and clears `player->texture`. The first game of a session decodes `player.png`; a Replay's new `Player` is handed the same texture and reads no file. Pass the same `cache` to both functions. `NULL` is allowed (a `GameState` without a session): the sheet is then loaded for that `Player` alone and freed by `player_cleanup`.
 
 Default display size is 48×48 logical pixels. `PLAYER_FLOOR_SINK = 16` sinks the frame into the floor to compensate for transparent sprite padding.
 

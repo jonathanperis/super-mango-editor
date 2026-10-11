@@ -7,13 +7,17 @@
 #include "game_constants.h" /* GAME_W, GAME_H */
 #include <stdio.h>
 
+#define WATER_DEFAULT_PATH "assets/sprites/foregrounds/water.png"
+
 /* ─── public API ──────────────────────────────────────────────────── */
 
-int water_init(Water *w)
+int water_init(Water *w, AssetCache *cache)
 {
-    w->texture = texture_load("assets/sprites/foregrounds/water.png");
-    if (!w->texture) {
-        fprintf(stderr, "water_init: cannot load assets/sprites/foregrounds/water.png\n");
+    w->level_strip = NULL;
+    w->default_strip = asset_cache_texture_acquire(cache, WATER_DEFAULT_PATH);
+    w->texture = w->default_strip;
+    if (!w->default_strip) {
+        fprintf(stderr, "water_init: cannot load " WATER_DEFAULT_PATH "\n");
         return -1;
     }
     w->scroll_x = 0.0f;
@@ -21,17 +25,22 @@ int water_init(Water *w)
 }
 
 /*
- * water_reload_texture — Replace the water texture with a different asset.
+ * water_reload_texture — Draw a different strip from now on.
  * Used when the level's foreground layers specify lava or another strip
  * instead of the default water.  Keeps scroll state intact.
+ *
+ * The new strip is acquired before the old one is released, and only a
+ * successful acquire replaces anything: a strip that fails to load leaves
+ * the current one on screen.
  */
-void water_reload_texture(Water *w, const char *path)
+void water_reload_texture(Water *w, AssetCache *cache, const char *path)
 {
     if (!path || path[0] == '\0') return;
 
-    Texture2D *new_tex = texture_load(path);
+    Texture2D *new_tex = asset_cache_texture_acquire(cache, path);
     if (new_tex) {
-        texture_unload(w->texture);
+        asset_cache_texture_release(cache, w->level_strip);
+        w->level_strip = new_tex;
         w->texture = new_tex;
     } else {
         fprintf(stderr, "water_reload_texture: cannot load %s\n", path);
@@ -81,10 +90,12 @@ void water_render(const Water *w)
     }
 }
 
-void water_cleanup(Water *w)
+void water_cleanup(Water *w, AssetCache *cache)
 {
-    if (w->texture) {
-        texture_unload(w->texture);
-        w->texture = NULL;
-    }
+    /* One release per held strip. texture only named one of them. */
+    asset_cache_texture_release(cache, w->level_strip);
+    asset_cache_texture_release(cache, w->default_strip);
+    w->level_strip = NULL;
+    w->default_strip = NULL;
+    w->texture = NULL;
 }

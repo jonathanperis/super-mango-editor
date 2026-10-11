@@ -66,7 +66,7 @@ static const struct {
  * texture, which the render function uses to compute the tile offset and
  * ensure full horizontal coverage of the canvas.
  */
-void parallax_init(ParallaxSystem *ps)
+void parallax_init(ParallaxSystem *ps, AssetCache *cache)
 {
     ps->count = LAYER_COUNT;
 
@@ -79,10 +79,11 @@ void parallax_init(ParallaxSystem *ps)
         layer->texture = NULL;
 
         /*
-         * Decode the PNG and upload it to GPU memory.
+         * Get the image from the asset cache: decoded and uploaded to GPU
+         * memory the first time, handed back as it is afterwards.
          * Returns NULL on failure (file not found, unsupported format, etc.).
          */
-        layer->texture = texture_load(LAYER_CONFIG[i].path);
+        layer->texture = asset_cache_texture_acquire(cache, LAYER_CONFIG[i].path);
         if (!layer->texture) {
             fprintf(stderr, "Warning: parallax layer %s not loaded\n", LAYER_CONFIG[i].path);
             continue;   /* leave tex_w/tex_h at 0; render will skip this layer */
@@ -107,7 +108,7 @@ void parallax_init(ParallaxSystem *ps)
  * of the internal LAYER_CONFIG table.  Used when the LevelDef provides its
  * own parallax configuration.  count is clamped to MAX_BACKGROUND_LAYERS.
  */
-void parallax_init_from_def(ParallaxSystem *ps,
+void parallax_init_from_def(ParallaxSystem *ps, AssetCache *cache,
                             const char (*paths)[64], const float *speeds, int count)
 {
     if (count > MAX_BACKGROUND_LAYERS) count = MAX_BACKGROUND_LAYERS;
@@ -121,7 +122,7 @@ void parallax_init_from_def(ParallaxSystem *ps,
         layer->tex_h   = 0;
         layer->texture = NULL;
 
-        layer->texture = texture_load(paths[i]);
+        layer->texture = asset_cache_texture_acquire(cache, paths[i]);
         if (!layer->texture) {
             fprintf(stderr, "Warning: parallax layer %s not loaded\n", paths[i]);
             continue;
@@ -214,18 +215,16 @@ void parallax_render(const ParallaxSystem *ps, int cam_x)
 /* ------------------------------------------------------------------ */
 
 /*
- * parallax_cleanup — Destroy every GPU texture owned by the parallax system.
+ * parallax_cleanup — Release every layer's image to the asset cache.
  *
- * Must be called before closing the graphics context. Failed asset slots
- * remain NULL and are skipped during cleanup.
+ * The cache owns the textures; each layer only gives back the reference it
+ * acquired. Failed asset slots are NULL, and releasing NULL does nothing.
  */
-void parallax_cleanup(ParallaxSystem *ps)
+void parallax_cleanup(ParallaxSystem *ps, AssetCache *cache)
 {
     for (int i = 0; i < ps->count; i++) {
-        if (ps->layers[i].texture) {
-            texture_unload(ps->layers[i].texture);
-            ps->layers[i].texture = NULL;
-        }
+        asset_cache_texture_release(cache, ps->layers[i].texture);
+        ps->layers[i].texture = NULL;
         ps->layers[i].tex_w = 0;
         ps->layers[i].tex_h = 0;
         ps->layers[i].speed = 0.0f;

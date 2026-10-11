@@ -10,6 +10,7 @@
  */
 #pragma once
 
+#include "../shared/asset_cache.h"  /* AssetCache — hud_init asks it for the font and icon */
 #include "../shared/text.h"
 
 #define MAX_HEARTS      3     /* maximum hearts the player can have        */
@@ -24,10 +25,14 @@
 /*
  * Hud — resources needed by the HUD renderer.
  *
- * font     : owned handle to raylib's built-in font at TEXT_FONT_SIZE px.
+ * font     : raylib's built-in font at TEXT_FONT_SIZE px, held from the
+ *            asset cache (one reference).
  * star_tex : borrowed star_yellow.png used as the health indicator.
- * coin_icon: owned hud_coins.png texture beside the score.
+ * coin_icon: hud_coins.png beside the score, held from the asset cache.
  * player_icon: borrowed player sprite sheet, cropped for the lives counter.
+ *
+ * "Held" and "borrowed" differ in who must act at cleanup: hud_cleanup
+ * releases the two held ones to the cache and leaves the borrowed ones alone.
  */
 /*
  * HUD_COIN_ICON_SIZE — display size of the coin icon next to the score.
@@ -35,9 +40,9 @@
 #define HUD_COIN_ICON_SIZE  12
 
 typedef struct {
-    TextFont *font;           /* owned HUD font */
+    TextFont *font;           /* held from the asset cache */
     Texture2D *star_tex;      /* borrowed heart indicator */
-    Texture2D *coin_icon;     /* owned coin icon */
+    Texture2D *coin_icon;     /* held from the asset cache */
     Texture2D *player_icon;   /* borrowed player sprite sheet */
 } Hud;
 
@@ -62,8 +67,9 @@ typedef struct {
 /* Fill layout for these values; needs hud->font to measure the text. */
 void hud_layout(const Hud *hud, int hearts, int lives, int score, HudLayout *layout);
 
-/* Load the font; accept shared textures from GameState to avoid duplicates. */
-int hud_init(Hud *hud, Texture2D *star_tex, Texture2D *player_tex);
+/* Get the font and coin icon from cache (NULL = load them for this Hud
+ * alone); accept shared textures from GameState to avoid duplicates. */
+int hud_init(Hud *hud, AssetCache *cache, Texture2D *star_tex, Texture2D *player_tex);
 
 /*
  * hud_render — Draw the full HUD overlay.
@@ -82,5 +88,6 @@ void hud_render(const Hud *hud,
 int hud_checkpoint_feedback_visible(int feedback_kind, uint32_t deadline, uint32_t now);
 const char *hud_checkpoint_feedback_label(int feedback_kind, int checkpoint_index);
 
-/* Release the owned font/coin icon; leave borrowed star/player textures alive. */
-void hud_cleanup(Hud *hud);
+/* Give the font and coin icon back to the cache hud_init took them from;
+ * leave the borrowed star/player textures alone. */
+void hud_cleanup(Hud *hud, AssetCache *cache);

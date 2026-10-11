@@ -25,8 +25,9 @@ table), and the shared texture slot in
 once per session. Static
 entities need even less: a coin stores only its placement state in `Coin` and
 exposes just `coins_render()`, and collection is handled in `src/collision/`.
-Only the player has `player_init()` and `player_cleanup()`, because it owns its
-sprite.
+Only the player has `player_init()` and `player_cleanup()`, because it gets its
+own sprite: it holds a reference to the sheet in the session's asset cache
+(`src/shared/asset_cache.h`) and gives it back at cleanup.
 
 ## 1. Follow one existing coin
 
