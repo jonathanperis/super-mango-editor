@@ -29,6 +29,31 @@ Only the player has `player_init()` and `player_cleanup()`, because it gets its
 own sprite: it holds a reference to the sheet in the session's asset cache
 (`src/shared/asset_cache.h`) and gives it back at cleanup.
 
+## The four tables
+
+The module knows *how* its kind behaves. *When* that happens in a frame is
+written down in four tables, one per job. Each is a plain array of structs
+whose rows hold a function pointer, and one `for` loop walks it from the top,
+so the order of the rows is the order things happen in:
+
+| Table | File | A row is | What the row order decides |
+|-------|------|----------|----------------------------|
+| `s_level_loaders` | `src/levels/level_loader.c` | `load_<things>()` and `LOAD_ONCE` or `LOAD_EVERY_LIFE` | what is placed first (rails before the blocks that ride them) |
+| `s_update_steps` | `src/core/game_update.c` | a name and `update_<things>()` | the simulation order of one fixed step |
+| `s_damage_sources` | `src/collision/game_collision.c` | a debug name, the count field and `<thing>_touches()` | which hit counts when two happen in one step |
+| `s_render_layers` | `src/render/game_render.c` | the layer number, a name and `render_<layer>()` | what is drawn over what |
+
+Every row points at a small function written beside the others like it. That
+function is deliberately boring: it calls the module's own function with the
+arguments that kind needs. Read `update_jumping_spiders()` in
+`src/core/game_update.c` to see that jumping spiders depend on the floor
+gaps, a sound, the player's x and the camera, and `render_vines()` in
+`src/render/game_render.c` to see that vines take two textures.
+
+A kind does not need a row in every table. A coin never moves, so it has a
+loader row and a render row and no update row; its pickup is written in
+`game_collide()`, because collecting is not damage. A spider has all four.
+
 ## 1. Follow one existing coin
 
 Open `levels/labs/01_collision.toml`. Its `[[coins]]` record contains x/y values.
@@ -53,7 +78,10 @@ Open `levels/labs/01_collision.toml`. Its `[[coins]]` record contains x/y values
    hitbox with `rect_intersects()`, deactivates the coin, calls
    `game_award_score(gs, gs->world.rules.coin_score)` and plays the pickup sound.
 6. `coins_render()` in `src/collectibles/coin.c` draws only active entries,
-   subtracting camera x at draw time; `src/render/game_render.c` calls it.
+   subtracting camera x at draw time. `render_coins()` in
+   `src/render/game_render.c` calls it; that function is row 15 of the
+   `s_render_layers` table, so coins are drawn over the ropes (row 14) and
+   under the stars (row 16).
 7. The editor saves the same `LevelDef` through `src/shared/serializer_save.c`,
    where `write_world_and_collectibles()` emits each `[[coins]]` table.
 
@@ -118,7 +146,31 @@ Token awards score, so follow the coin rule: `LOAD_ONCE`, **not**
 `LOAD_EVERY_LIFE`, or `level_reset()` would bring tokens back after every
 lost life and a player could farm points and bonus lives by dying on purpose. Reactivate tokens
 beside the coins in `game_restart_after_game_over()` so Retry starts a fresh
-attempt. Wire `tokens_render()` into `src/render/game_render.c` beside coins.
+attempt.
+
+Drawing is the second table. In `src/render/game_render.c`, write
+`render_tokens()` beside `render_coins()`:
+
+```c
+/* Layer 16: tokens. */
+static void render_tokens(GameState *gs, int cam_x)
+{
+    tokens_render(gs->world.tokens, gs->world.token_count,
+                  gs->assets.textures.coin, cam_x);
+}
+```
+
+Then give it a row in `s_render_layers` just below the coins,
+`{ 16, "tokens", render_tokens },`, and add one to the number of every row
+after it. The manual lists the same layers: add a `Tokens` row that names
+`tokens_render` as layer 16 of the
+[render order](../architecture/#render-order-back-to-front) table and
+renumber the rows after it there too. `make docs-drift` compares the two
+tables row by row and names each row that differs. It also checks the layer
+count quoted elsewhere, for example in the README, so those need
+the new number.
+
+A Token does not move, so it has no row in `s_update_steps`.
 
 In `game_collide()`, follow the coin collision loop. On overlap, clear `active`,
 call `game_award_score(gs, TOKEN_SCORE)` and optionally play the existing pickup
@@ -248,11 +300,25 @@ A Token sits still. An enemy or hazard adds three things:
   of `circular_saws_update(CircularSaw *saws, int count, float dt)`, named
   after your new type. Then, in `src/core/game_update.c`, write a small
   `update_<things>()` beside `update_circular_saws()` that calls it with the
-  inputs it needs, and add one row to the `s_update_steps` table. The row's
-  place in the table is when your type moves in the step: above the
-  `collision` row if it can hurt the player. `dt` is always the fixed
-  1/60 s step; see [Developer Guide](../developer-guide/#adding-physics-to-an-entity)
-  for the physics pattern.
+  inputs it needs, and add one row to the `s_update_steps` table:
+
+  ```c
+  static void update_circular_saws(GameState *gs, const StepInputs *in)
+  {
+      circular_saws_update(gs->world.circular_saws, gs->world.circular_saw_count, in->dt);
+  }
+  ```
+
+  `StepInputs` carries what a step hands to every row: the step time
+  (`in->dt`, always the fixed 1/60 s), the camera's left edge (`in->cam_x`)
+  and what the player landed on (`in->support`). Everything else comes from
+  `gs`. The row's place in the table is when your type moves in the step:
+  above the `collision` row if it can hurt the player, so its hitbox is
+  tested where this step put it. Add the row to the
+  [update order](../architecture/#update-order-one-fixed-step) table in the
+  manual as well; `make docs-drift` compares the two. See
+  [Developer Guide](../developer-guide/#adding-physics-to-an-entity) for the
+  physics pattern.
 - **Damage.** In `src/collision/game_collision.c`, write a
   `<thing>_touches()` function beside `circular_saw_touches()`: skip an
   inactive item, build its box with your `_get_hitbox` helper and test it
@@ -262,9 +328,10 @@ A Token sits still. An enemy or hazard adds three things:
   step wins. `game_collide()` passes that hit to `apply_damage()` in
   `src/collision/collision_damage.c`, which handles hearts, knockback and the
   hurt-immunity timer.
-- **Render order.** Put the render call in `src/render/game_render.c` at the
-  right depth; the [render order](../architecture/#render-order-back-to-front)
-  table lists every layer.
+- **Render order.** As for the Token in section 4: a `render_<things>()`
+  function and a row in `s_render_layers` at the right depth. The
+  [render order](../architecture/#render-order-back-to-front) table lists
+  every layer. Enemies go between the moving hazards and the player.
 
 New `.c` files in an existing `src/` subdirectory are picked up by the Makefile
 automatically. A brand-new source directory needs its own wildcard line there.
@@ -275,8 +342,10 @@ automatically. A brand-new source directory needs its own wildcard line there.
 - [ ] Placement struct, array and count in `LevelDef` (`src/levels/level.h`); runtime array and count in `GameWorld` (`src/game.h`), stored by value
 - [ ] Schema entry, loader, saver and C/Python validation (section 3)
 - [ ] `load_<entities>()` in `level_loader.c` and its `s_level_loaders` row: `LOAD_EVERY_LIFE` unless it awards score (then `LOAD_ONCE`)
-- [ ] `update_<entities>()` in `src/core/game_update.c` and its `s_update_steps` row; pickup code, or a `_touches()` function and `s_damage_sources` row, in `src/collision/game_collision.c`
-- [ ] Render call in `src/render/game_render.c` at the right layer
+- [ ] If it moves: `update_<entities>()` in `src/core/game_update.c` and its `s_update_steps` row, above `collision` if it can hurt
+- [ ] If it hurts: a `_touches()` function and its `s_damage_sources` row in `src/collision/game_collision.c`; if it is collected, pickup code in `game_collide()`
+- [ ] `render_<entities>()` in `src/render/game_render.c` and its `s_render_layers` row at the right layer, with the rows after it renumbered
+- [ ] The same rows in the manual's [update order](../architecture/#update-order-one-fixed-step) and [render order](../architecture/#render-order-back-to-front) tables (`make docs-drift` compares them with the code)
 - [ ] Texture row in `game_resources.c` (and `game_resources_require_level_textures()` if optional)
 - [ ] Hitbox in `src/core/debug.c` and `debug_log()` calls for significant events
 - [ ] Editor integration (section 5): the `s_entity_meta` row and palette slot, undo union, property panel, hit test, canvas, tools (whose move case also moves pasted copies), document hash

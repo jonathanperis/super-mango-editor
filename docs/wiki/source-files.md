@@ -362,6 +362,35 @@ every step, live or replayed, has the same `dt`. `AppSession` is the only loop o
 
 Frees all resources in reverse init order.
 
+### The four tables
+
+What happens to each kind of entity, and when, is listed in four tables.
+Each is a `static const` array of structs holding a function pointer, walked
+top to bottom by one loop, with one small function per row above it:
+
+| Table | File | Walked by | A row |
+|-------|------|-----------|-------|
+| `s_level_loaders` | `levels/level_loader.c` | `level_apply` (every row), `level_reset` (the `LOAD_EVERY_LIFE` rows) | `{ load_spiders, LOAD_EVERY_LIFE }` |
+| `s_update_steps` | `core/game_update.c` | `game_update_active`, once per fixed step, after the player has moved | `{ "spiders", update_spiders }` |
+| `s_damage_sources` | `collision/game_collision.c` | `game_collide`, until the first hit | `{ "spider", WORLD_COUNT(spider_count), spider_touches }` |
+| `s_render_layers` | `render/game_render.c` | `game_render_frame`, once per frame | `{ 25, "spiders", render_spiders }` |
+
+`core/game_update.c` holds `StepInputs` (the step time, the camera x and what
+the player landed on), one `update_<things>()` per row, the table, and
+`game_update_active`, which moves the player (`core/game_player_step.c`),
+samples authored checkpoints, tests the floor gaps, walks the table until it
+ends or the step costs a life, and moves the camera. Collision and the
+screen checkpoints are rows of the table. `core/game_float_platforms.c`
+(rider carry) and `core/game_bridges.c` (crumble start, debug log) keep the
+logic their rows call.
+
+`render/game_render.c` holds one `render_<layer>()` per layer, the table, and
+`game_render_frame`, which clears the canvas, walks the table, then draws
+the pause/game-over/completion overlay and the settings panel on top and
+presents the frame. `make docs-drift` checks `s_update_steps` and
+`s_render_layers` against the Update Order and Render Order tables in
+[Architecture](../architecture/).
+
 ---
 
 ## Player Module (`player/`)
