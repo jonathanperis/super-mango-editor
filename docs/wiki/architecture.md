@@ -107,10 +107,12 @@ game_frame(gs) {
                      terminal state blocks them; each step runs, in order:
                      → game_player_step (sampled input, motion, surface landing, bounce response)
                      → authored checkpoint sampling → lethal floor-gap detection
-                     → actors → moving platforms/rider carry → bridges → hazards
-                     → game_collide (enemy/hazard damage, coins/stars, completion)
-                     → legacy checkpoints → effects → bouncepad animation → camera
-                     Death/game-over returns early after camera update, avoiding stale collisions.
+                     → the s_update_steps table, row by row (see Update Order below):
+                       enemies → spike blocks → float platforms/rider carry → bridges
+                       → hazards → game_collide (enemy/hazard damage, coins/stars,
+                       completion) → legacy checkpoints → water, fog, bouncepad animation
+                     → camera
+                     A lost life or game over skips the remaining rows; the camera still moves.
   4. Render       — clear → parallax background → platforms → floor tiles
                     → float platforms → spike rows → spike platforms → bridges
                     → bouncepads (medium, small, high) → rails
@@ -168,6 +170,47 @@ while such a screen owns input, not on zero-step frames.
 Render-only timers (debug FPS readout, log ages) use real frame time.
 
 During an active game update, authored checkpoints are sampled after player movement and before lethal collision handling. Legacy screen-boundary checkpoint sampling runs only when the active level has no authored records.
+
+### Update Order (one fixed step)
+
+`game_update_active()` in `src/core/game_update.c` runs one step. It moves the
+player first (`game_player_step`: sampled input, motion, landing on surfaces,
+bounce response), samples authored checkpoints and tests for a fall into a
+floor gap. Then it walks the `s_update_steps` table, top to bottom, and last
+it moves the camera. A step that costs a life or ends the game skips the rows
+that are left; the camera still moves.
+
+Each row of `s_update_steps` is a name and a small `update_<things>()`
+function in the same file. That function calls the one in the last column
+with the inputs its kind needs, so it is the place to see what a kind
+depends on. `make docs-drift` checks this table against `s_update_steps`:
+the same names in the same order, each row calling the function listed here.
+
+| Row | Name | Calls | Reads, besides its own array and the step time |
+|-----|------|-------|------------------------------------------------|
+| 1 | spiders | `spiders_update` | floor gaps |
+| 2 | jumping spiders | `jumping_spiders_update` | floor gaps, attack sound, player x, camera |
+| 3 | birds | `birds_update` | flap sound, player x, camera |
+| 4 | faster birds | `faster_birds_update` | flap sound, player x, camera |
+| 5 | fish | `fish_update` | world width |
+| 6 | faster fish | `faster_fish_update` | world width |
+| 7 | spike blocks | `spike_blocks_update` | camera (a block waits until it is on screen) |
+| 8 | float platforms | `game_float_platforms_update` | the float platform the player landed on; moves a rail rider |
+| 9 | bridges | `game_bridges_update` | the bridge the player landed on, player x |
+| 10 | axe traps | `axe_traps_update` | axe sound, player x, camera |
+| 11 | circular saws | `circular_saws_update` | nothing else |
+| 12 | blue flames | `blue_flames_update` | nothing else |
+| 13 | fire flames | `blue_flames_update` | nothing else (the same module, a second array) |
+| 14 | collision | `game_collide` | the whole world: damage, coins, stars, the level's end |
+| 15 | screen checkpoints | `game_checkpoint_update` | player x; only levels without authored checkpoints |
+| 16 | water | `water_update` | whether the level has water |
+| 17 | fog | `fog_update` | whether the level has fog |
+| 18 | bouncepads (medium) | `bouncepads_update` | nothing else |
+| 19 | bouncepads (small) | `bouncepads_update` | nothing else |
+| 20 | bouncepads (high) | `bouncepads_update` | nothing else |
+
+Rows 1 to 13 run before collision so that hitboxes are tested where this step
+put them. Rows 16 to 20 only animate.
 
 ### Render Order (back to front)
 
