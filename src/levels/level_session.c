@@ -83,6 +83,14 @@ static void game_level_commit(GameState *gs, LevelDef *staged, uint64_t hash)
     level_apply(gs, staged);
     game_completion_reset_summary(gs);
     level_resources_apply(gs, staged);
+    /*
+     * The new level now holds every file it needs. Whatever is still idle
+     * in the asset cache was used only by the previous level (or by the
+     * game a Replay or Level Select closed), so unload it now: the cache
+     * keeps one level's files, not every level visited. After a Replay of
+     * the same level nothing is idle and this unloads nothing.
+     */
+    asset_cache_trim(gs->cache);
 }
 
 /*

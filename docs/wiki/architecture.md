@@ -20,10 +20,13 @@ main()
        ├── no `--level` → start_menu_create()
        └── `--level` / `--sandbox` → session_open_game()
             ├── first game only: load the shared sprites and sounds (GameAssets)
-            └── game_init(gs), with a copy of those GameAssets
+            └── game_init(gs), with a copy of those GameAssets and a pointer
+                 │   to the session's asset cache
                  ├── create a screen-owned logical render target
-                 ├── load TOML level data, player, HUD, the level's own files
-                 │   (background, floor, water, fog, music) and entities
+                 ├── load TOML level data and entities; acquire the player
+                 │   sheet, HUD icon and font and the level's own files
+                 │   (background, floor, water, fog, tiles, music) from the cache
+                 ├── trim the cache: unload what the previous level left idle
                  └── arm release latch and repair browser keyboard state
 
 session_run(session)
@@ -31,14 +34,16 @@ session_run(session)
   └── WebAssembly: register one Emscripten callback for session_frame(session)
        ├── start menu frame → Play or Exit route
        └── game_frame(gs) → Next Level, Replay, Level Select, or Exit route
-            ├── Next Level: load resolved phase in current GameState
+            ├── Next Level: load resolved phase in current GameState; only
+            │   the files the new level adds are read
             ├── Replay (native and browser): close game, open same path in place,
-            │   reusing the session's GameAssets
-            └── Level Select: close game only, open start menu
+            │   reusing the session's GameAssets and every cached file
+            └── Level Select: close game only, open start menu; the level's
+                files stay in the cache, idle, until another level opens
 
 session_destroy(session) / browser terminal cleanup
   ├── close active menu or game screen
-  ├── unload the shared GameAssets, once
+  ├── clear the asset cache, then unload the shared GameAssets, each once
   ├── clear input handlers and sound voices after screen assets are released
   ├── CloseAudioDevice → CloseWindow
   └── free AppSession
@@ -324,6 +329,7 @@ typedef struct GameState {
     GameScreen screen;
     GameAssets assets;            /* a copy of the session's pointers */
     int        owns_assets;       /* 1 only when game_init loaded them */
+    AssetCache *cache;            /* the session's cache; NULL without one */
 } GameState;
 ```
 
@@ -331,11 +337,40 @@ typedef struct GameState {
 
 - `world` is the level itself: what is in it, where it is and how the player is doing (hearts, lives, score, checkpoints). "What happens to a spider each frame" is a walk over `gs->world.spiders`. `screen` is how this screen presents and steers that level: the HUD, the pause, game-over and completion overlays, routes, the frame clock, input, replay scripts and debug tools.
 - Textures are grouped in `TextureResources` (`gs->assets.textures.*`) and sound effects in `AudioResources` (`gs->assets.audio.*`) so loading and cleanup walk one table each (`src/core/game_resources.c`).
-- Those shared sprites and sounds belong to the session, not the game: `AppSession` loads one `GameAssets` when the first game opens, copies it into every `GameState` it creates and unloads it once when the session ends, so Replay, Level Select → Play and Next Level reuse the same textures. A copy holds the same pointers, so a game only borrows them (`owns_assets` stays 0) and `game_cleanup` leaves them loaded. A `GameState` started without a session (the tests do this) loads a private set in `game_init` and unloads it in `game_cleanup`. Everything a level file names (background layers, floor tileset, water strip, fog, platform tiles, music) is in `world` and is loaded and released with the level (`src/levels/level_resources.c`).
+- Those shared sprites and sounds belong to the session, not the game: `AppSession` loads one `GameAssets` when the first game opens, copies it into every `GameState` it creates and unloads it once when the session ends, so Replay, Level Select → Play and Next Level reuse the same textures. A copy holds the same pointers, so a game only borrows them (`owns_assets` stays 0) and `game_cleanup` leaves them loaded. A `GameState` started without a session (the tests do this) loads a private set in `game_init` and unloads it in `game_cleanup`. Everything a level file names (background layers, floor tileset, water strip, fog, platform tiles, music) is in `world` and is acquired and released with the level (`src/levels/level_resources.c`).
+- Those level files, and the player sheet, HUD coin icon and font, come from the session's **asset cache** (`AssetCache`, `src/shared/asset_cache.h`), described in the next section. `gs->cache` is a borrowed pointer to it.
 - `Player` is **embedded by value**, not a pointer. This avoids a heap allocation and keeps the struct self-contained. The same applies to `Platform`, `Water`, `FogSystem`, all entity arrays and the three parts themselves.
 - Owning pointers are cleared after release. Borrowed pointers and aliases still require correct lifetime handling.
 - Active-game storage is heap-owned and zero-initialized before initialization; the structs above are an abridged ownership map, not complete declarations.
 - The resolved respawn state is `respawn_x`, `respawn_y`, and `checkpoint_index`; `legacy_checkpoint_screen` is used only when the active level has no authored records. `checkpoint_index` and `respawn_x`/`respawn_y` are always written together (on load, on retry and when a record is reached), so a valid index always names the current respawn.
+
+### The asset cache: files that outlive a game
+
+A Replay closes one `GameState` and opens another on the same level. Loading a level's files with the game and freeing them with it therefore read the same PNGs and the same music again each time. `AppSession` owns one `AssetCache` (`src/shared/asset_cache.h`) for the whole run, and every game acquires its files from it:
+
+```c
+player->texture = asset_cache_texture_acquire(cache, "assets/sprites/player/player.png");
+/* ... the game runs ... */
+asset_cache_texture_release(cache, player->texture);
+player->texture = NULL;
+```
+
+The cache keeps one entry per file path, with a count of **holders**: acquires that have not been released yet. This is a reference count. Three rules follow from it:
+
+- **Acquire** returns the cached texture when the path is already there (no file is read) and loads it otherwise. A file that fails to load is not remembered, so the next game tries it again.
+- **Release** only lowers the count. An entry with no holders is *idle*: still loaded, because the next game very likely wants it. A released music track is also stopped and rewound.
+- **Trim** (`asset_cache_trim`) unloads the idle entries. `game_level_commit` calls it once a level has finished loading: the new level then holds everything it needs, so what is still idle belonged only to the level before.
+
+| Step | Files read from disk on `01_lugio_01` |
+|------|----------------------------------------|
+| First game of the session | 45 textures (30 shared, 15 of the level), 8 sounds, 1 music track |
+| Replay, Retry, Level Select → Play the same level | none |
+| Next Level to `02_lugio_02` (same scenery and music) | none |
+| Next Level from `00_sandbox_01` (other scenery) | 12 textures and 1 music track; the sandbox's 7 are unloaded |
+
+Memory stays bounded by the level, not by how many levels were visited: the cache holds the current level's files (at most 15 textures, 3.1 MiB of pixels, in the shipped levels) plus, between closing one level and finishing the load of the next, the previous level's. Keeping every file until the session ends would also have made Replay free, but its size would grow with each level added; the nine shipped levels together name 25 images (5.7 MiB).
+
+The cache and `GameAssets` are two answers to the same question, "who frees this?". The shared sprites never go away while the session runs, so a game simply borrows the pointers and nobody counts. A level's files should go away when no level uses them any more, and only a count can tell when that is.
 
 ### Authored Checkpoint Flow
 

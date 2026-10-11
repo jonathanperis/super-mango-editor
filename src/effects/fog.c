@@ -117,7 +117,7 @@ static void fog_spawn(FogSystem *fog) {
  * If count is 0, no textures are loaded and no fog waves will spawn —
  * fog_update and fog_render become safe no-ops.
  */
-void fog_init(FogSystem *fog,
+void fog_init(FogSystem *fog, AssetCache *cache,
               const char (*paths)[64], int count)
 {
     /*
@@ -143,10 +143,11 @@ void fog_init(FogSystem *fog,
 
     for (int i = 0; i < count; i++) {
         /*
-         * Decode the PNG and upload it to GPU memory.
+         * Get the image from the asset cache, which decodes the PNG and
+         * uploads it to GPU memory only the first time it is asked for.
          * Returns NULL on failure (file not found, corrupt PNG, etc.).
          */
-        fog->textures[i] = texture_load(paths[i]);
+        fog->textures[i] = asset_cache_texture_acquire(cache, paths[i]);
         if (!fog->textures[i]) {
             fprintf(stderr, "Warning: fog layer %s not loaded\n", paths[i]);
             continue;
@@ -278,18 +279,16 @@ void fog_render(FogSystem *fog) {
 /* ------------------------------------------------------------------ */
 
 /*
- * fog_cleanup — release every GPU texture owned by the fog system.
+ * fog_cleanup — give every fog image back to the asset cache.
  *
  * Must be called before the renderer is destroyed. Setting each pointer
- * to NULL after freeing makes accidental double-frees safe, because
- * texture_unload(NULL) is a no-op.
+ * to NULL after releasing makes a second cleanup safe, because releasing
+ * NULL does nothing.
  */
-void fog_cleanup(FogSystem *fog) {
+void fog_cleanup(FogSystem *fog, AssetCache *cache) {
     for (int i = 0; i < fog->tex_count; i++) {
-        if (fog->textures[i]) {
-            texture_unload(fog->textures[i]);
-            fog->textures[i] = NULL;
-        }
+        asset_cache_texture_release(cache, fog->textures[i]);
+        fog->textures[i] = NULL;
     }
     for (int i = 0; i < FOG_MAX; i++) {
         fog->instances[i].active = 0;

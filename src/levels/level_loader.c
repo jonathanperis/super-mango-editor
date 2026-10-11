@@ -106,66 +106,82 @@ static int s_test_tile_loads;
 int level_loader_test_tile_loads(void) { return s_test_tile_loads; }
 #endif
 
-static PlatformTile *platform_tile_find(PlatformTileCache *cache, const char *path)
+static PlatformTile *platform_tile_find(PlatformTileCache *tiles, const char *path)
 {
-    for (int i = 0; i < cache->count; i++)
-        if (strcmp(cache->tiles[i].path, path) == 0) return &cache->tiles[i];
+    for (int i = 0; i < tiles->count; i++)
+        if (strcmp(tiles->tiles[i].path, path) == 0) return &tiles->tiles[i];
     return NULL;
 }
 
 /*
- * platform_tiles_keep_used — Unload the tiles the new level does not name.
+ * platform_tiles_keep_used — Release the tiles the new level does not name.
  *
- * Step 1 marks every cached path that def still uses; step 2 unloads the
- * rest and closes the gaps. A Replay or an F8 restart of the same level
- * therefore keeps every texture, and the cache never holds more than one
- * entry per platform, so MAX_PLATFORMS entries are always enough.
+ * Step 1 marks every listed path that def still uses; step 2 releases the
+ * rest to the asset cache and closes the gaps. A Replay or an F8 restart of
+ * the same level therefore keeps every texture, and the list never holds
+ * more than one entry per platform, so MAX_PLATFORMS entries are always
+ * enough.
  */
-static void platform_tiles_keep_used(PlatformTileCache *cache, const LevelDef *def)
+static void platform_tiles_keep_used(PlatformTileCache *tiles, AssetCache *cache, const LevelDef *def)
 {
-    for (int i = 0; i < cache->count; i++) cache->tiles[i].in_use = 0;
+    for (int i = 0; i < tiles->count; i++) tiles->tiles[i].in_use = 0;
     for (int i = 0; i < def->platform_count; i++) {
-        PlatformTile *tile = platform_tile_find(cache, def->platforms[i].tile_path);
+        PlatformTile *tile = platform_tile_find(tiles, def->platforms[i].tile_path);
         if (tile) tile->in_use = 1;
     }
     int kept = 0;
-    for (int i = 0; i < cache->count; i++) {
-        if (cache->tiles[i].in_use) cache->tiles[kept++] = cache->tiles[i];
-        else texture_unload(cache->tiles[i].texture);
+    for (int i = 0; i < tiles->count; i++) {
+        if (tiles->tiles[i].in_use) tiles->tiles[kept++] = tiles->tiles[i];
+        else asset_cache_texture_release(cache, tiles->tiles[i].texture);
     }
-    cache->count = kept;
+    tiles->count = kept;
 }
 
-/* Return the shared texture for path, loading it on first use. */
-static Texture2D *platform_tile_acquire(PlatformTileCache *cache, const char *path)
+/* Add path to the level's tile list, acquiring its image once. */
+static void platform_tile_add(PlatformTileCache *tiles, AssetCache *cache, const char *path)
 {
-    PlatformTile *tile = platform_tile_find(cache, path);
-    if (tile) return tile->texture;
-    if (cache->count >= MAX_PLATFORMS) return NULL;  /* unreachable; see above */
+    if (platform_tile_find(tiles, path)) return;
+    if (tiles->count >= MAX_PLATFORMS) return;  /* unreachable; see above */
 
-    tile = &cache->tiles[cache->count++];
+    PlatformTile *tile = &tiles->tiles[tiles->count++];
     str_copy(tile->path, path, sizeof(tile->path));
     tile->in_use = 1;
-    tile->texture = texture_load(path);
+    tile->texture = asset_cache_texture_acquire(cache, path);
 #ifdef MANGO_TESTING
     s_test_tile_loads++;
 #endif
     if (!tile->texture)
         fprintf(stderr, "Warning: Failed to load platform tile %s: %s\n",
                 path, "texture unavailable");
-    return tile->texture;
+}
+
+/*
+ * platform_tiles_sync — Make the level's tile list match def.
+ *
+ * Afterwards the list holds exactly one entry for every distinct tile_path
+ * in def, each with one reference to its image in the asset cache.
+ * level_apply calls this before the loader table runs, because it is the
+ * one load step that needs gs->cache; load_platforms then only looks the
+ * textures up.
+ */
+static void platform_tiles_sync(PlatformTileCache *tiles, AssetCache *cache, const LevelDef *def)
+{
+    platform_tiles_keep_used(tiles, cache, def);
+    for (int i = 0; i < def->platform_count; i++)
+        if (def->platforms[i].tile_path[0] != '\0')
+            platform_tile_add(tiles, cache, def->platforms[i].tile_path);
 }
 
 void level_release_platform_tiles(GameState *gs)
 {
     /* Platforms only borrow these; forget their pointers first. */
     for (int i = 0; i < gs->world.platform_count; i++) gs->world.platforms[i].tex = NULL;
-    PlatformTileCache *cache = &gs->world.platform_tiles;
-    for (int i = 0; i < cache->count; i++) {
-        texture_unload(cache->tiles[i].texture);
-        cache->tiles[i].texture = NULL;
+    PlatformTileCache *tiles = &gs->world.platform_tiles;
+    for (int i = 0; i < tiles->count; i++) {
+        asset_cache_texture_release(gs->cache, tiles->tiles[i].texture);
+        tiles->tiles[i].texture = NULL;
     }
-    cache->count = 0;
+    tiles->count = 0;
 }
 
 /*
@@ -176,14 +192,14 @@ void level_release_platform_tiles(GameState *gs)
  * a tile_width of 0 means one tile.
  *
  * If a platform specifies a tile_path, it borrows that image from
- * world->platform_tiles, which loads each distinct path once.  Otherwise it
+ * world->platform_tiles, which holds each distinct path once
+ * (platform_tiles_sync has already run).  Otherwise it
  * is drawn with the shared default pillar texture, gs->assets.textures.platform
  * (grass_platform.png, loaded by game_resources.c and passed as default_tex
  * to platforms_render).
  */
 static void load_platforms(GameWorld *world, const LevelDef *def)
 {
-    platform_tiles_keep_used(&world->platform_tiles, def);
 
     for (int i = 0; i < def->platform_count; i++) {
         const PlatformPlacement *p = &def->platforms[i];
@@ -196,8 +212,10 @@ static void load_platforms(GameWorld *world, const LevelDef *def)
         platform->tex = NULL;
 
         /* Borrow the level's shared copy of this platform's tileset. */
-        if (p->tile_path[0] != '\0')
-            platform->tex = platform_tile_acquire(&world->platform_tiles, p->tile_path);
+        if (p->tile_path[0] != '\0') {
+            PlatformTile *tile = platform_tile_find(&world->platform_tiles, p->tile_path);
+            if (tile) platform->tex = tile->texture;
+        }
     }
     world->platform_count = def->platform_count;
 }
@@ -735,6 +753,9 @@ void level_apply(GameState *gs, const LevelDef *def)
     /* Set world width from screen_count (default 4 screens if not specified) */
     int screens = (def->screen_count > 0) ? def->screen_count : 4;
     world->runtime.world_w = screens * GAME_W;
+
+    /* ---- Platform tile images, held from the asset cache ------------ */
+    platform_tiles_sync(&world->platform_tiles, gs->cache, def);
 
     /* ---- Every placement array, in table order ---------------------- */
     for (int i = 0; i < ARRAY_LEN(s_level_loaders); i++)

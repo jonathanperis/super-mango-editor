@@ -89,7 +89,7 @@ src/
 ├── shared/
 │   ├── graphics.h / .c          Window, sprite pivots and logical presentation; declares the texture handles
 │   ├── texture.c                `texture_load`, `texture_own`, `texture_unload`: owned texture handles
-│   ├── asset_cache.h / .c       Reference-counted cache of loaded files, keyed by path
+│   ├── asset_cache.h / .c       Session's reference-counted cache of level files, player sheet, HUD icon, font
 │   ├── geometry.h              Integer hitboxes and half-open intersection
 │   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
 │   ├── text.h / .c              Borrowed built-in font, text measurement, centred drawing and label texture creation
@@ -338,17 +338,17 @@ void game_complete_level(GameState *gs);
 
 ## Runtime Core (`core/app_session.c`, `core/game_lifecycle.c`, `core/game_loop.c`, `core/game_resources.c`)
 
-**Role:** `app_session.c` owns the app-level frame loop, window/audio lifetime, the shared sprites and sounds (`GameAssets`), menu/game swaps, in-place replay and shutdown. `game_lifecycle.c` owns active-game `game_init` / `game_cleanup`; `game_loop.c` owns `game_frame`; the shared sprite and sound tables and their load/unload live in `game_resources.c`, a level's own files in `levels/level_resources.c`.
+**Role:** `app_session.c` owns the app-level frame loop, window/audio lifetime, the shared sprites and sounds (`GameAssets`), the asset cache (`AssetCache`), menu/game swaps, in-place replay and shutdown. `game_lifecycle.c` owns active-game `game_init` / `game_cleanup`; `game_loop.c` owns `game_frame`; the shared sprite and sound tables and their load/unload live in `game_resources.c`, a level's own files in `levels/level_resources.c`.
 
 ### `game_init(GameState *gs)`
 
 Creates all runtime resources:
 
 1. Screen-owned 400x300 render target in the existing session context (`game_window_init`)
-2. Shared textures for entities, hazards, collectibles and surfaces, plus sound effects: borrowed from the session, which loaded them with `game_resources_load` when its first game opened; only a `GameState` with no session loads its own here (`owns_assets`). Generated sounds come from `tools/gen_sounds.py`; the default water strip follows (`water_init`)
+2. Shared textures for entities, hazards, collectibles and surfaces, plus sound effects: borrowed from the session, which loaded them with `game_resources_load` when its first game opened; only a `GameState` with no session loads its own here (`owns_assets`). Generated sounds come from `tools/gen_sounds.py`; the default water strip follows (`water_init`). From this step on, every file is acquired from `gs->cache`, the session's asset cache, so a Replay finds it already loaded
 3. Player sprite and default physics (`player_init`)
 4. HUD (raylib's built-in font, coin icon, borrowed star/player textures) and, with `--debug`, the debug overlay
-5. TOML level load from the selected campaign entry or direct `--level` path, then level-wide resources (`level_resources_apply`, owned by `gs->world`): parallax, floor/platform tiles, foreground strip, fog, water, music and level contents
+5. TOML level load from the selected campaign entry or direct `--level` path, then level-wide resources (`level_resources_apply`, held by `gs->world`): parallax, floor/platform tiles, foreground strip, fog, water, music and level contents; `game_level_commit` then trims the cache, unloading what the previous level left idle
 6. Optional `--replay-script` load
 7. Discover the first available raylib gamepad index
 
@@ -384,7 +384,7 @@ Frees all resources in reverse init order.
 - `level_apply(GameState *gs, const LevelDef *def)` -- the copy step alone, for a definition `level_load_toml` already validated; it cannot fail. The level session parses and validates a level once, checks its sprites, then swaps the heap-staged `LevelDef` in and applies it, so a failed Next Level never replaces the current level
 - `level_reset(GameState *gs, const LevelDef *def)` -- restore mutable level state after death/retry; collected coins stay collected (Retry re-activates them)
 - `s_level_loaders` (static, in `level_loader.c`) -- one row per placement array: its `load_<things>()` function and whether it runs once per level (`LOAD_ONCE`) or after every lost life too (`LOAD_EVERY_LIFE`). `level_apply` runs every row in order, `level_reset` only the `LOAD_EVERY_LIFE` ones
-- `level_release_platform_tiles(GameState *gs)` -- unload the platform tile textures; `GameState.world.platform_tiles` loads each distinct `tile_path` once and every platform naming it borrows that texture, so a level with 23 stone pillars decodes `stone_platform.png` once, and reloading the same level (Replay, F8) decodes nothing
+- `level_release_platform_tiles(GameState *gs)` -- release the platform tile textures to the asset cache; `GameState.world.platform_tiles` holds each distinct `tile_path` once and every platform naming it borrows that texture, so a level with 23 stone pillars decodes `stone_platform.png` once, and reloading the same level (Replay, F8) decodes nothing
 - `level_load_toml(const char *path, LevelDef *def)` -- parse TOML into heap staging storage, run runtime validation, free TOML data, then assign the validated `LevelDef` to the caller. A `LevelDef` is about 16 KB; game load paths never keep one in a local variable (the browser stack is 64 KB), and `level.h` stops the build if it outgrows `LEVEL_DEF_SIZE_BUDGET`
 - `level_apply_player_physics(Player *player, const LevelDef *def)` -- reset player movement tunables to engine defaults, then apply non-negative level overrides
 - `level_validate_counts(const LevelDef *def, char *err, size_t err_size)` -- reject out-of-range array counts
@@ -418,7 +418,7 @@ Builds the single valid terminal-action list used by both rendering and input. C
 
 ### `core/app_session.h` / `core/app_session.c`
 
-Owns one heap-allocated application session and its active menu or game screen. Without `--level`, it loads and retains the validated v1 campaign catalog; the menu uses the catalog's names and ordered paths. A direct `--level` session bypasses the catalog. The first game it opens loads the shared sprites and sounds into `session->assets`; every game gets a copy of those pointers and the session unloads them once, in `session_runtime_cleanup`, so Replay and Play load only the files their level names. The session consumes explicit game routes after each rendered frame: next level stays in the current game; replay replaces the game with the same TOML path in place (native and browser alike); level select returns to the menu. It also keeps the profile's Continue point current (`session_track_resume`), drops one whose level file changed before the menu opens, and applies it for the menu's **Continue** and for `--continue`.
+Owns one heap-allocated application session and its active menu or game screen. Without `--level`, it loads and retains the validated v1 campaign catalog; the menu uses the catalog's names and ordered paths. A direct `--level` session bypasses the catalog. The first game it opens loads the shared sprites and sounds into `session->assets`; every game gets a copy of those pointers and the session unloads them once, in `session_runtime_cleanup`. It also owns `session->cache`, the asset cache every game acquires its level's files from (and the player sheet, HUD icon and font), so Replay, Retry and going back into the same level read nothing from disk, and another level reads only the files it adds; `session_runtime_cleanup` clears the cache once. The session consumes explicit game routes after each rendered frame: next level stays in the current game; replay replaces the game with the same TOML path in place (native and browser alike); level select returns to the menu. It also keeps the profile's Continue point current (`session_track_resume`), drops one whose level file changed before the menu opens, and applies it for the menu's **Continue** and for `--continue`.
 
 ---
 

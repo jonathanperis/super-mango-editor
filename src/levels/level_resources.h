@@ -1,6 +1,7 @@
 /*
- * level_resources.h — Load and release the files a level names
- * (background, floor tileset, water strip, fog, music), owned by gs->world.
+ * level_resources.h — Get and release the files a level names (background,
+ * floor tileset, water strip, fog, music). gs->world holds them from the
+ * asset cache, gs->cache.
  */
 #pragma once
 

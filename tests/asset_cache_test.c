@@ -1,20 +1,32 @@
 /*
  * asset_cache_test.c — Which files are read, and when they are freed.
  *
- * asset_cache_contract_test checks the cache alone: holders, idle entries,
- * trim, a full table, a missing file. session-test runs it (that binary
- * opens the window and the audio device before each case and links the
- * counting builds of the loaders).
+ * Two cases, both run by session-test (which opens the window and the audio
+ * device before each case and links the counting builds of the loaders):
+ *
+ *   asset_cache_contract_test   the cache alone: holders, idle entries,
+ *                               trim, a full table, a missing file.
+ *   session_asset_reuse_test    a whole session: Replay, Retry, Level
+ *                               Select -> Play and Next Level read from
+ *                               disk only what the session does not hold.
  *
  * "Loads" below always means calls that really read a file, counted inside
- * texture_load, sound_load, music_load and font_load themselves.
+ * texture_load, sound_load, music_load and font_load themselves, so a load
+ * that went around the cache would be counted too.
  */
 #include <stdio.h>
 #include <string.h>
 
 #include "test_paths.h"
 
+#include "collision/collision_damage.h"  /* game_restart_after_game_over */
+#include "core/app_session.h"
+#include "core/game_resources.h"         /* DEFAULT_FLOOR_TILE_PATH */
+#include "game.h"
+#include "levels/level.h"
+#include "levels/level_session.h"
 #include "shared/asset_cache.h"
+#include "shared/platform.h"             /* str_copy */
 
 #define COIN_PNG  "assets/sprites/collectibles/coin.png"
 #define STAR_PNG  "assets/sprites/collectibles/star_yellow.png"
@@ -71,6 +83,13 @@ static const CachedAsset *cache_entry(const AssetCache *cache, const char *path)
     for (int i = 0; i < cache->count; i++)
         if (strcmp(cache->entries[i].path, path) == 0) return &cache->entries[i];
     return NULL;
+}
+
+static int cache_idle_count(const AssetCache *cache)
+{
+    int idle = 0;
+    for (int i = 0; i < cache->count; i++) idle += cache->entries[i].holders == 0;
+    return idle;
 }
 
 /* ------------------------------------------------------------------ */
@@ -293,4 +312,243 @@ int asset_cache_contract_test(void)
            missing_file_is_tried_again() |
            full_table_makes_room_from_idle_entries() |
            null_cache_loads_private_copies();
+}
+
+/* ------------------------------------------------------------------ */
+/* A whole session                                                     */
+/* ------------------------------------------------------------------ */
+
+#define MAX_LEVEL_FILES (MAX_BACKGROUND_LAYERS + MAX_FOG_TEXTURES + MAX_PLATFORMS + 8)
+
+typedef struct {
+    char paths[MAX_LEVEL_FILES][ASSET_CACHE_PATH_SIZE];
+    int  count;
+} FileSet;
+
+static int file_set_has(const FileSet *set, const char *path)
+{
+    for (int i = 0; i < set->count; i++)
+        if (strcmp(set->paths[i], path) == 0) return 1;
+    return 0;
+}
+
+static void file_set_add(FileSet *set, const char *path)
+{
+    if (!path[0] || file_set_has(set, path) || set->count >= MAX_LEVEL_FILES) return;
+    str_copy(set->paths[set->count++], path, ASSET_CACHE_PATH_SIZE);
+}
+
+/*
+ * level_textures — Every image a game on this level holds in the cache,
+ * worked out from the LevelDef alone (not from the cache under test): its
+ * own layers, strip, floor and platform tiles, plus the three every game
+ * holds.
+ */
+static void level_textures(const LevelDef *def, FileSet *set)
+{
+    set->count = 0;
+    file_set_add(set, "assets/sprites/foregrounds/water.png");
+    file_set_add(set, "assets/sprites/player/player.png");
+    file_set_add(set, "assets/sprites/screens/hud_coins.png");
+    for (int i = 0; i < def->background_layer_count; i++) file_set_add(set, def->background_layers[i].path);
+    for (int i = 0; i < def->fog_layer_count; i++) file_set_add(set, def->fog_layers[i].path);
+    if (def->foreground_layer_count > 0)
+        file_set_add(set, def->foreground_layers[def->foreground_layer_count - 1].path);
+    if (strcmp(def->floor_tile_path, DEFAULT_FLOOR_TILE_PATH) != 0) file_set_add(set, def->floor_tile_path);
+    for (int i = 0; i < def->platform_count; i++) file_set_add(set, def->platforms[i].tile_path);
+}
+
+static int count_missing_from(const FileSet *set, const FileSet *other)
+{
+    int missing = 0;
+    for (int i = 0; i < set->count; i++) missing += !file_set_has(other, set->paths[i]);
+    return missing;
+}
+
+static const LevelDef *active_level(const AppSession *session)
+{
+    return (const LevelDef *)session->game->world.runtime.current_level;
+}
+
+/*
+ * After a level has opened, the cache holds exactly that level's files:
+ * each one held, none idle, nothing left over from the level before.
+ */
+static int expect_cache_holds_level(const char *step, const AppSession *session)
+{
+    static FileSet files;
+    const LevelDef *def = active_level(session);
+    const AssetCache *cache = &session->cache;
+    int textures = 0, failed = 0;
+
+    level_textures(def, &files);
+    for (int i = 0; i < cache->count; i++) textures += cache->entries[i].kind == ASSET_TEXTURE;
+    for (int i = 0; i < files.count; i++) {
+        const CachedAsset *entry = cache_entry(cache, files.paths[i]);
+        if (!entry || entry->holders < 1) {
+            fprintf(stderr, "asset_cache_test: %s: %s is not held\n", step, files.paths[i]);
+            failed = 1;
+        }
+    }
+    if (expect_int(step, textures, files.count) || expect_int(step, cache_idle_count(cache), 0)) {
+        fprintf(stderr, "asset_cache_test: %s: cache holds other files than the level's\n", step);
+        failed = 1;
+    }
+    return failed;
+}
+
+/* Finish the level with Next Level chosen, as the completion screen does. */
+static int go_to_next_level(AppSession *session)
+{
+    GameState *game = session->game;
+    char next[sizeof(game->screen.completion.next_phase)];
+    /* Copy the path: the level change frees the LevelDef it comes from. */
+    str_copy(next, active_level(session)->next_phase, sizeof(next));
+    str_copy(game->screen.completion.next_phase, next, sizeof(game->screen.completion.next_phase));
+    game->screen.route = GAME_ROUTE_NEXT_LEVEL;
+    session_frame(session);
+    return !session->game || strcmp(session->game->world.level_path, next) != 0;
+}
+
+static int replay(AppSession *session)
+{
+    int opened = session->game_open_count;
+    session->game->screen.route = GAME_ROUTE_REPLAY;
+    session_frame(session);
+    return !session->game || session->game_open_count != opened + 1;
+}
+
+int session_asset_reuse_test(void)
+{
+    const char *sandbox = "levels/00_sandbox_01.toml";
+    static FileSet before, after;
+    Counts live = live_now(), mark = loads_now();
+    int failed = 0;
+
+    AppSessionConfig config = {.level_path = sandbox};
+    AppSession *session = session_create(&config);
+    if (!session || !session->game) {
+        session_destroy(&session);
+        return 1;
+    }
+
+    /* The first game really reads its files; without this the zeros below
+     * would prove nothing. The shared sprites and sounds, then the level's
+     * own images, its music and the font. */
+    level_textures(active_level(session), &before);
+    Counts opened = loads_since(&mark);
+    failed |= expect_int("level has its own files", before.count > 3, 1);
+    int shared_textures = (int)(sizeof(TextureResources) / sizeof(Texture2D *));
+    int shared_sounds = (int)(sizeof(AudioResources) / sizeof(SoundEffect *));
+    failed |= expect_counts("first open reads every file once", opened,
+                            (Counts){shared_textures + before.count, shared_sounds, 1, 1});
+    failed |= expect_int("game borrows the session's cache", session->game->cache == &session->cache, 1);
+    failed |= expect_cache_holds_level("first open", session);
+
+    /* Replay: a new GameState on the same level. */
+    Texture2D *sheet = session->game->world.player.texture;
+    MusicTrack *track = session->game->world.music;
+    if (replay(session)) goto broken;
+    failed |= expect_no_loads("Replay reads nothing", &mark);
+    failed |= expect_int("Replay reuses the player sheet", session->game->world.player.texture == sheet, 1);
+    failed |= expect_int("Replay reuses the music track", session->game->world.music == track, 1);
+    failed |= expect_int("Replay restarts the music",
+                         track && IsMusicStreamPlaying(track->stream), 1);
+    failed |= expect_cache_holds_level("Replay", session);
+
+    /* Retry after game over: the same GameState starts the level again. */
+    session->game->screen.game_over = 1;
+    game_restart_after_game_over(session->game);
+    failed |= expect_no_loads("Retry reads nothing", &mark);
+
+    /* Level Select, then Play the same level. The menu loads its own logo,
+     * sound and font; the game that follows loads nothing. */
+    session->game->screen.route = GAME_ROUTE_LEVEL_SELECT;
+    session_frame(session);
+    if (!session->menu) goto broken;
+    failed |= expect_int("the closed game's files wait, idle", cache_idle_count(&session->cache),
+                         session->cache.count);
+    failed |= expect_int("an idle track is silent", IsMusicStreamPlaying(track->stream), 0);
+    (void)loads_since(&mark);
+    str_copy(session->menu->selected_level_path, sandbox, sizeof(session->menu->selected_level_path));
+    session->menu->route = MENU_ROUTE_PLAY;
+    session_frame(session);
+    if (!session->game) goto broken;
+    failed |= expect_no_loads("going back into the level reads nothing", &mark);
+    failed |= expect_cache_holds_level("back in the level", session);
+
+    /* Next Level to a level with other scenery: only its new files are
+     * read, and the old level's files are unloaded once it has opened. */
+    int live_textures = texture_test_live();
+    if (go_to_next_level(session)) goto broken;
+    level_textures(active_level(session), &after);
+    int added = count_missing_from(&after, &before), dropped = count_missing_from(&before, &after);
+    failed |= expect_int("the next level adds files", added > 0, 1);
+    failed |= expect_int("the next level drops files", dropped > 0, 1);
+    failed |= expect_counts("Next Level reads only what it adds", loads_since(&mark),
+                            (Counts){added, 0, 1, 0});
+    failed |= expect_int("the old level's files are unloaded", texture_test_live(),
+                         live_textures + added - dropped);
+    failed |= expect_int("one music track is loaded", music_test_live(), live.music + 1);
+    failed |= expect_cache_holds_level("Next Level", session);
+
+    if (replay(session)) goto broken;
+    failed |= expect_no_loads("Replay of the next level reads nothing", &mark);
+
+    /* Next Level to a level with the same scenery and music: nothing. */
+    before = after;
+    if (go_to_next_level(session)) goto broken;
+    level_textures(active_level(session), &after);
+    failed |= expect_int("this level shares every file", count_missing_from(&after, &before), 0);
+    failed |= expect_no_loads("Next Level with the same files reads nothing", &mark);
+    failed |= expect_cache_holds_level("second Next Level", session);
+
+    /* Level Select, then Play a different level: the same rule through a
+     * new GameState. Only the files the chosen level adds are read. */
+    before = after;
+    session->game->screen.route = GAME_ROUTE_LEVEL_SELECT;
+    session_frame(session);
+    if (!session->menu) goto broken;
+    (void)loads_since(&mark);
+    str_copy(session->menu->selected_level_path, sandbox, sizeof(session->menu->selected_level_path));
+    session->menu->route = MENU_ROUTE_PLAY;
+    session_frame(session);
+    if (!session->game) goto broken;
+    level_textures(active_level(session), &after);
+    added = count_missing_from(&after, &before);
+    failed |= expect_int("the chosen level adds files", added > 0, 1);
+    failed |= expect_counts("Play of another level reads only what it adds", loads_since(&mark),
+                            (Counts){added, 0, 1, 0});
+    failed |= expect_cache_holds_level("Play of another level", session);
+
+    /* The end of the session unloads everything, each thing once. */
+    session_destroy(&session);
+    failed |= expect_counts("session end leaves nothing loaded", live_now(), live);
+    return failed;
+
+broken:
+    fprintf(stderr, "asset_cache_test: a session step did not open its screen\n");
+    session_destroy(&session);
+    return 1;
+}
+
+/*
+ * A GameState without a session has no cache: it loads its files itself
+ * and frees them itself, through a level change as well.
+ */
+int game_without_session_frees_its_files_test(void)
+{
+    static GameState gs;
+    Counts live = live_now();
+    int failed = 0;
+
+    memset(&gs, 0, sizeof(gs));
+    str_copy(gs.world.level_path, "levels/00_sandbox_01.toml", sizeof(gs.world.level_path));
+    if (game_init(&gs) != 0) return 1;
+    failed |= expect_int("no session, no cache", gs.cache == NULL, 1);
+    failed |= expect_int("it owns its shared sprites", gs.owns_assets, 1);
+    failed |= expect_int("next level loads", game_load_next_phase(&gs), 0);
+    game_cleanup(&gs);
+    failed |= expect_counts("the game freed what it loaded", live_now(), live);
+    return failed;
 }

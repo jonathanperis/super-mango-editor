@@ -60,16 +60,24 @@ void player_apply_default_physics(Player *player)
 }
 
 /*
- * player_init — Load the sprite and place the player in the center of the window.
+ * player_init — Get the sprite and place the player in the center of the window.
  */
-int player_init(Player *player)
+int player_init(Player *player, AssetCache *cache)
 {
     /*
-     * Decode the PNG sprite sheet and upload it to the GPU.
+     * Ask the asset cache for the sprite sheet. The first game of a session
+     * decodes the PNG and uploads it to the GPU; every later game (a Replay,
+     * another level) is handed that same texture and reads no file.
+     *
+     * Who owns it: the cache. This Player holds one reference, and
+     * player_cleanup gives it back with asset_cache_texture_release. The
+     * player never calls texture_unload on it. (With cache == NULL the
+     * sheet is loaded for this Player alone and freed on release.)
+     *
      * The sheet is 192×288 px and contains a 4-column × 6-row grid of 48×48
      * frames. We only draw one frame at a time using a source clipping rect.
      */
-    player->texture = texture_load("assets/sprites/player/player.png");
+    player->texture = asset_cache_texture_acquire(cache, "assets/sprites/player/player.png");
     if (!player->texture) {
         fprintf(stderr, "Failed to load assets/sprites/player/player.png\n");
         return -1;
@@ -218,14 +226,14 @@ void player_reset(Player *player)
 }
 
 /*
- * player_cleanup — Release GPU memory held by the player's texture.
+ * player_cleanup — Give the sprite sheet back to the asset cache.
  *
- * Must run before closing the graphics context that owns the GPU texture.
+ * Pass the same cache player_init received. The cache decides when the GPU
+ * memory is freed: not now, if the next game is about to ask for the sheet
+ * again. Clearing the pointer makes a second cleanup harmless.
  */
-void player_cleanup(Player *player)
+void player_cleanup(Player *player, AssetCache *cache)
 {
-    if (player->texture) {
-        texture_unload(player->texture);
-        player->texture = NULL;
-    }
+    asset_cache_texture_release(cache, player->texture);
+    player->texture = NULL;
 }

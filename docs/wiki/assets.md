@@ -37,6 +37,11 @@ assets/
 
 Several visual elements are configurable per TOML level file, allowing different themes without changing code:
 
+Every file named here is loaded through the session's asset cache
+(`src/shared/asset_cache.h`), keyed by its path. Replay, Retry and going back
+into the same level read none of them again; another level reads only the
+files it adds, and the files it does not use are unloaded once it has opened.
+
 ### Floor Tile
 
 ```toml
@@ -339,14 +344,29 @@ table row first; the C side then loads it as described on the
 
 ## Loading an Asset
 
+There are three ways to get a texture, and they differ in who frees it.
+
 ```c
-// In game_init or an entity's init function:
+// 1. Own it. Right for something one owner loads and frees itself.
 Texture2D *tex = texture_load("assets/sprites/collectibles/coin.png");
 if (!tex) {
     fprintf(stderr, "Failed to load assets/sprites/collectibles/coin.png\n");
     return -1;
 }
-
 // At cleanup (reverse init order):
 texture_unload(tex); tex = NULL;
+
+// 2. Borrow it. A sprite every level uses is already loaded in the
+//    session's GameAssets; game code reads the pointer and never frees it.
+coins_render(gs->world.coins, gs->world.coin_count, gs->assets.textures.coin, cam_x);
+
+// 3. Hold a reference. A file a level names (or the player sheet, the HUD
+//    icon) comes from the session's asset cache, which reads it once.
+Texture2D *layer = asset_cache_texture_acquire(gs->cache, def->background_layers[0].path);
+// At cleanup, exactly once per acquire; never texture_unload(layer):
+asset_cache_texture_release(gs->cache, layer); layer = NULL;
 ```
+
+To add a sprite every level uses, add a row to the tables in
+`src/core/game_resources.c` (way 2). To add a file that depends on the
+level, acquire it in `src/levels/level_resources.c` (way 3).

@@ -20,6 +20,7 @@
  */
 #pragma once
 
+#include "../shared/asset_cache.h"  /* AssetCache — layers are held from it */
 #include "../shared/graphics.h"
 
 /*
@@ -39,14 +40,15 @@
  *            0.0 = static, 0.5 = half speed, 1.0 = full world speed.
  */
 typedef struct {
-    Texture2D *texture;     /* GPU image handle; NULL = failed to load */
+    Texture2D *texture;     /* held from the asset cache; NULL = failed to load */
     int          tex_w;     /* natural width  of the loaded PNG in pixels      */
     int          tex_h;     /* natural height of the loaded PNG in pixels      */
     float        speed;     /* parallax fraction: how fast this layer scrolls  */
 } ParallaxLayer;
 
 /*
- * ParallaxSystem — owns all layers and the active layer count.
+ * ParallaxSystem — all layers and the active layer count. Each layer holds
+ * one reference to its image in the asset cache.
  * Stored by value inside GameState — no heap allocation needed.
  */
 typedef struct {
@@ -62,8 +64,11 @@ typedef struct {
  * Layer paths and speed factors are defined in a static table inside
  * parallax.c.  Each layer is non-fatal: a missing PNG prints a warning
  * and leaves that layer's texture NULL (it will be skipped at render time).
+ *
+ * The images come from cache, so a level reloaded with the same layers
+ * reads no file. cache may be NULL: each layer is then loaded privately.
  */
-void parallax_init(ParallaxSystem *ps);
+void parallax_init(ParallaxSystem *ps, AssetCache *cache);
 
 /*
  * parallax_init_from_def — Load layers from level definition data.
@@ -75,7 +80,7 @@ void parallax_init(ParallaxSystem *ps);
  *
  * count must be <= MAX_BACKGROUND_LAYERS; excess entries are silently ignored.
  */
-void parallax_init_from_def(ParallaxSystem *ps,
+void parallax_init_from_def(ParallaxSystem *ps, AssetCache *cache,
                             const char (*paths)[64], const float *speeds, int count);
 
 /*
@@ -98,9 +103,9 @@ int parallax_layer_offset(const ParallaxLayer *layer, int cam_x);
 void parallax_render(const ParallaxSystem *ps, int cam_x);
 
 /*
- * parallax_cleanup — Destroy all GPU textures owned by the parallax system.
+ * parallax_cleanup — Give every layer's image back to the asset cache.
  *
- * Must be called before the renderer is destroyed.
- * NULL textures (failed loads) are safely skipped.
+ * Pass the cache the layers were loaded from. Must be called before the
+ * renderer is destroyed. NULL textures (failed loads) are safely skipped.
  */
-void parallax_cleanup(ParallaxSystem *ps);
+void parallax_cleanup(ParallaxSystem *ps, AssetCache *cache);

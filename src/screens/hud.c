@@ -2,7 +2,8 @@
  * hud.c — Screen-space feedback on the 400x300 logical canvas.
  *
  * World sprites subtract camera X; HUD elements do not move with the world.
- * The HUD owns its font and coin icon, but borrows the star/player textures.
+ * The HUD holds its font and coin icon from the asset cache, and borrows the
+ * star/player textures.
  * Text is measured before right alignment so wider scores keep their margin.
  */
 #include "hud.h"
@@ -24,9 +25,12 @@ const char *hud_checkpoint_feedback_label(int kind, int index)
     return "CP";
 }
 
-int hud_init(Hud *hud, Texture2D *star, Texture2D *player)
+int hud_init(Hud *hud, AssetCache *cache, Texture2D *star, Texture2D *player)
 {
-    hud->font = font_load();
+    /* The cache owns the font handle and the coin icon; this Hud holds one
+     * reference to each, so a Replay's new Hud gets the same two back
+     * without loading anything. hud_cleanup releases them. */
+    hud->font = asset_cache_font_acquire(cache);
     if (!hud->font) {
         fprintf(stderr, "Failed to prepare raylib's default font\n");
         return -1;
@@ -34,8 +38,8 @@ int hud_init(Hud *hud, Texture2D *star, Texture2D *player)
     hud->star_tex = star;
     hud->player_icon = player;
     /* Borrowing lets gameplay and HUD share images. Cleanup below must not
-     * unload these two textures: their owners are outside this Hud. */
-    hud->coin_icon = texture_load("assets/sprites/screens/hud_coins.png");
+     * release these two textures: the Hud never acquired them. */
+    hud->coin_icon = asset_cache_texture_acquire(cache, "assets/sprites/screens/hud_coins.png");
     return 0;
 }
 
@@ -92,9 +96,10 @@ void hud_render(const Hud *hud, int hearts, int lives, int score,
     }
 }
 
-void hud_cleanup(Hud *hud)
+void hud_cleanup(Hud *hud, AssetCache *cache)
 {
-    texture_unload(hud->coin_icon);
-    font_unload(hud->font);
+    /* One release per acquire in hud_init; then forget every pointer. */
+    asset_cache_texture_release(cache, hud->coin_icon);
+    asset_cache_font_release(cache, hud->font);
     *hud = (Hud){0};
 }

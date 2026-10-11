@@ -30,6 +30,8 @@
  *   gs->screen.paused         the game screen around it
  *   gs->assets.textures.coin  the sprites and sounds every level uses
  *                             (borrowed from AppSession, which owns them)
+ * and gs->cache points at the session's asset cache, where the level's own
+ * images and music are counted in and out.
  *
  * The cost is visible below: to embed `Spider spiders[MAX_SPIDERS]` the
  * compiler must know sizeof(Spider), so game.h has to include every header
@@ -49,6 +51,7 @@
 #include "shared/graphics.h"        /* Texture2D, RenderTexture2D, IntRect */
 #include "shared/audio.h"           /* MusicTrack pointer */
 #include "game_assets.h"            /* GameAssets: shared sprites and sounds */
+#include "shared/asset_cache.h"     /* AssetCache: GameState borrows the session's */
 #include "game_fwd.h"               /* the GameState typedef name */
 #include <stdint.h>                 /* uint32_t, uint64_t fields */
 
@@ -182,19 +185,21 @@ typedef struct {
 } GameCompletionState;
 
 /*
- * PlatformTileCache — one texture per distinct platform tile image.
+ * PlatformTileCache — the level's list of platform tile images, one entry
+ * per distinct path.
  *
  * Many pillars in a level share one tileset (02_lugio_02 draws 23 of them
  * from stone_platform.png). Decoding that PNG once per pillar wasted load
- * time and GPU memory, so level_loader.c keeps one entry per path: the cache
- * owns each texture and every Platform::tex naming that path borrows it.
+ * time and GPU memory, so level_loader.c keeps one entry per path: the entry
+ * holds one reference to the image in the asset cache (gs->cache) and every
+ * Platform::tex naming that path borrows the pointer.
  * An entry whose image failed to load keeps texture == NULL, so the warning
- * prints once and the file is not read again.
+ * prints once per level load and the file is not read again until the next.
  */
 #define PLATFORM_TILE_PATH_SIZE 64  /* same capacity as PlatformPlacement::tile_path */
 typedef struct {
     char       path[PLATFORM_TILE_PATH_SIZE];
-    Texture2D *texture;   /* owned GPU texture; NULL when loading failed */
+    Texture2D *texture;   /* held from the asset cache; NULL when loading failed */
     int        in_use;    /* scratch mark while a new level is applied   */
 } PlatformTile;
 
@@ -213,8 +218,9 @@ typedef struct {
  * and writes it, and a lost life or Retry resets parts of it. "What
  * happens to a spider each frame" happens to gs->world.spiders[i]. The
  * level's own scenery images (parallax layers,
- * fog, water strip, platform tiles) are owned here too, because they are
- * loaded and replaced together with the level.
+ * fog, water strip, platform tiles) are held here too, because they are
+ * acquired and replaced together with the level. "Held" means the world has
+ * one reference to each in the asset cache (gs->cache), which owns them.
  */
 typedef struct {
     /* ---- Which level, and its level-wide settings ------------------- */
@@ -228,7 +234,7 @@ typedef struct {
     Player        player;      /* the player, stored by value (not a pointer) */
     GameCamera    camera;      /* viewport scroll position; updated every frame*/
 
-    /* ---- Scenery and music: loaded with the level, owned here ------------ */
+    /* ---- Scenery and music: acquired with the level, held here ----------- */
     ParallaxSystem parallax;   /* multi-layer scrolling background            */
     Texture2D    *floor_tile;  /* the level's floor tileset; NULL = the shared
                                   default, gs->assets.textures.floor_tile    */
@@ -239,7 +245,7 @@ typedef struct {
     /* ---- Static geometry ------------------------------------------------- */
     Platform      platforms[MAX_PLATFORMS]; /* one-way pillar definitions     */
     int           platform_count;           /* how many platforms are active  */
-    PlatformTileCache platform_tiles;       /* owns the textures platforms borrow */
+    PlatformTileCache platform_tiles;       /* holds the textures platforms borrow */
     int           floor_gaps[MAX_FLOOR_GAPS]; /* left-edge x of each floor gap     */
     int           floor_gap_count;           /* number of active floor gaps       */
     Rail          rails[MAX_RAILS];/* level rail loop definitions                 */
@@ -414,12 +420,19 @@ typedef struct {
  * alone. A GameState started without a session (the tests do this) finds
  * its assets empty, so game_init loads a private set and sets owns_assets;
  * only then does game_cleanup unload them.
+ *
+ * cache is the session's asset cache (shared/asset_cache.h). The files that
+ * depend on the level, and the player sheet, HUD icon and font, are acquired
+ * from it and released to it, so they too can outlive this GameState: a
+ * Replay's new game finds them still loaded. The pointer is borrowed; NULL
+ * (a game without a session) makes every acquire load a private copy.
  */
 typedef struct GameState {
     GameWorld  world;
     GameScreen screen;
     GameAssets assets;       /* the shared sprites and sounds (see above)   */
     int        owns_assets;  /* 1 = game_init loaded assets; 0 = borrowed   */
+    AssetCache *cache;       /* borrowed from AppSession; NULL = load directly */
 } GameState;
 
 /* ------------------------------------------------------------------ */

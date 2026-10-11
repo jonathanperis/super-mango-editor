@@ -1168,12 +1168,12 @@ static int parallax_scrolls_and_wraps(void)
     const char paths[2][64] = {"assets/sprites/backgrounds/sky_blue.png",
                                "assets/sprites/backgrounds/missing_layer.png"};
     const float speeds[2] = {0.0f, 0.25f};
-    parallax_init_from_def(&ps, paths, speeds, 2);
+    parallax_init_from_def(&ps, NULL, paths, speeds, 2);  /* NULL: no asset cache */
     CHECK(ps.count == 2);
     CHECK(ps.layers[0].texture && ps.layers[0].tex_w > 0 && ps.layers[0].speed == 0.0f);
     CHECK(!ps.layers[1].texture && ps.layers[1].tex_w == 0 && ps.layers[1].speed == 0.25f);
 done:
-    parallax_cleanup(&ps);
+    parallax_cleanup(&ps, NULL);
     if (!failed && ps.count != 0) failed = 1;
     return failed;
 }
