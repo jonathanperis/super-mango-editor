@@ -619,7 +619,7 @@ LEARNING_PAGES = [
 
 # Names that only exist inside the Token exercise in entity-walkthrough.md.
 EXERCISE_NAMES = {"MAX_TOKENS", "TOKEN_SCORE", "tokens_render", "tokens_update", "load_tokens",
-                  "draw_token_properties"}
+                  "render_tokens", "draw_token_properties"}
 
 # Backticked src/ paths that deliberately name something absent from the
 # repository, with the reason. Ignored local folders are read from .gitignore.
