@@ -12,9 +12,9 @@
  *   3. game_update_active, which moves the player, walks the table, and
  *      moves the camera.
  *
- * Two other tables work the same way: s_level_loaders (level_loader.c)
- * fills the world and s_damage_sources (game_collision.c) lists what hurts
- * the player.
+ * The other three tables work the same way: s_level_loaders (level_loader.c)
+ * fills the world, s_damage_sources (game_collision.c) lists what hurts the
+ * player, and s_render_layers (game_render.c) draws the frame.
  */
 
 #include "game_update.h"
@@ -236,18 +236,18 @@ static void update_bouncepads_high(GameState *gs, const StepInputs *in)
  *     so hitboxes are tested where this step put them.
  *   - Float platforms and bridges read what the player landed on, so they
  *     run after the player (game_update_active moves the player first).
- *   - The rows below collision only animate. A step that costs a life
- *     skips them (see game_update_active).
- * Moving a row changes what a seeded run does, so recorded runs and the
- * replay tests would no longer match.
+ *   - The last five rows only animate. A step that costs a life skips
+ *     them (see game_update_active).
+ * Moving a row can change what a seeded run does, and then recorded runs
+ * and the replay tests no longer match.
  *
  * To add an enemy, say a bat: write its module (bat.h / bat.c with
  * bats_update and bats_render), then add one row in each table:
  *   - s_level_loaders  (level_loader.c)    load_bats        fills the array
  *   - s_update_steps   (here)              update_bats      moves them
  *   - s_damage_sources (game_collision.c)  bat_touches      hurts the player
+ *   - s_render_layers  (game_render.c)     render_bats      draws them
  * Each row needs its small function, written next to the others like it.
- * Then call bats_render at the right depth in game_render.c.
  */
 typedef void (*UpdateFn)(GameState *gs, const StepInputs *in);
 

@@ -236,7 +236,8 @@ units and owner/borrower contracts still need their existing regression checks.
 - backticked `name()` functions on the learning pages are defined in `src/`, `tests/` or `labs/`;
 - constant values in [Constants Reference](../constants-reference/) and in `#define` snippets match the source;
 - the [debug inspector key table](../controls/#debug-inspector-keys) matches `src/core/game_inspector.c`;
-- the [render order table](../architecture/#render-order-back-to-front) matches the call order in `src/render/game_render.c`;
+- the [render order table](../architecture/#render-order-back-to-front) matches the `s_render_layers` table in `src/render/game_render.c`, row for row, and nothing is drawn outside that table;
+- the [update order table](../architecture/#update-order-one-fixed-step) matches the `s_update_steps` table in `src/core/game_update.c`, row for row;
 - every "N native binaries" claim in the manual, README and `.specs/project/` matches `TEST_TARGETS`, and `STATE.md` lists each test binary;
 - every constant the docs place in a particular `src/` header (written as the constant name, "in", then the header path) is really defined there, and so are the camera constants;
 - every function the docs place in a particular `src/` file (written as `name()`, or a list such as `a()` and `b()`, then "in" or "(" and the file path) is defined or declared in that file;
