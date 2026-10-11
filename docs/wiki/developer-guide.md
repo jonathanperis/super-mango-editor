@@ -105,6 +105,25 @@ tests. The [Entity Walkthrough](../entity-walkthrough/) is the one place that
 lists every step, with the module pattern, the resource table row, the editor
 files and a checklist. Follow it rather than copying an existing entity by eye.
 
+In the game itself, a kind is a module plus one row in each table it takes
+part in. The tables are plain arrays of structs with a function pointer, and
+each is walked by one `for` loop, top to bottom:
+
+| Table | File | Its rows, in order, are |
+|-------|------|-------------------------|
+| `s_level_loaders` | `src/levels/level_loader.c` | what a level load (and a lost life) places in the world |
+| `s_update_steps` | `src/core/game_update.c` | one fixed step of the simulation, after the player has moved |
+| `s_damage_sources` | `src/collision/game_collision.c` | the enemies and hazards tested against the player; the first hit counts |
+| `s_render_layers` | `src/render/game_render.c` | the frame's 33 render layers, back to front |
+
+A row names a small function written beside the others like it
+(`load_spiders`, `update_spiders`, `spider_touches`, `render_spiders`). The
+update and render ones call the entity's module with the inputs that kind
+needs. To change *when* something happens, move its row. To change *what*
+happens, edit the module. Moving a row in `s_level_loaders` or
+`s_update_steps` can change what a seeded run does, and then recorded
+experiments and the replay tests no longer match.
+
 ---
 
 ## Adding Physics to an Entity
@@ -231,8 +250,10 @@ within a frame. Release cached textures before their font and graphics context.
 
 Draw back to front (the painter's algorithm). The full 33-layer order, with
 the function that draws each layer, is in
-[Architecture](../architecture/#render-order-back-to-front); put a new
-entity's render call in `src/render/game_render.c` at the matching place.
+[Architecture](../architecture/#render-order-back-to-front). That table and
+`s_render_layers` in `src/render/game_render.c` are the same list: give a new
+entity a `render_<things>()` function and a row at the matching place in
+both. `make docs-drift` fails while they differ.
 
 ---
 
