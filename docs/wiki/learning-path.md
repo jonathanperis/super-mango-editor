@@ -232,7 +232,7 @@ array in both orders and expects the same landing height.
 **Goal:** follow transitions between waiting, moving and damaging states.
 
 **Read first:** `src/hazards/blue_flame.c`, `src/entities/fish.c`,
-`src/core/game_hazards.c` and `src/collision/game_collision.c`.
+`src/core/game_update.c` and `src/collision/game_collision.c`.
 
 **Steps:**
 
@@ -258,7 +258,7 @@ position, and why must a waiting flame never cause damage?
 <details>
 <summary>Hint</summary>
 
-Look at the order of the calls in `game_update_active()` in
+Look at the order of the rows in the `s_update_steps` table in
 `src/core/game_update.c`, and at the `BLUE_FLAME_WAITING` check in
 `game_collision.c`.
 
@@ -267,9 +267,11 @@ Look at the order of the calls in `game_update_active()` in
 <details>
 <summary>Answer</summary>
 
-`game_update_active()` moves the hazards (`game_hazards_update()`) and only
-then calls `game_collide()`. So collision sees where everything is at the end
-of the step, the same positions that will be drawn. If it used the old
+`game_update_active()` walks the `s_update_steps` table from the top. The
+hazard rows (circular saws, flames and the rest) come before the collision
+row, so every hazard moves and only then does `game_collide()` run. Collision
+therefore sees where everything is at the end of the step, the same positions
+that will be drawn. If it used the old
 positions, a saw that moved into the player would be drawn overlapping them
 without hurting them until the next step, and the result would depend on the
 order of updates. The test starts a saw one pixel outside the player's hitbox,

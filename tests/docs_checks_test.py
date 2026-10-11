@@ -40,6 +40,12 @@ class DocsChecksTest(unittest.TestCase):
              drift.check_inspector_keys_doc, "inspector key F10 is handled"),
             ("architecture.md", "| `ladders_render` |", "| `vines_render` |",
              drift.check_render_order_doc, "missing from the render order table"),
+            ("architecture.md", "| 14 | collision |", "| 14 | collisions |",
+             drift.check_update_order_doc, "update row 14 is `collisions`, but row 14 of `s_update_steps`"),
+            ("architecture.md", "| 5 | fish | `fish_update` |", "| 5 | fish | `fishes_update` |",
+             drift.check_update_order_doc, "names `fishes_update`, which `update_fish()`"),
+            ("architecture.md", "| 20 | bouncepads (high) |", "| 21 | bouncepads (high) |",
+             drift.check_update_order_doc, "must number its rows 1..N"),
             ("c-concepts.md", "`campaign_catalog_load()` in `src/levels/campaign_catalog.c`",
              "`campaign_catalog_load()` in `src/levels/level_session.c`", drift.check_function_locations,
              "`campaign_catalog_load()` is not defined in `src/levels/level_session.c`"),
@@ -60,6 +66,35 @@ class DocsChecksTest(unittest.TestCase):
         for name, old, new, check, expected in cases:
             with self.subTest(name=name):
                 target = drift.DOCS / name
+                self.assertIn(old, original_read(target))
+
+                def mutated(path):
+                    text = original_read(path)
+                    return text.replace(old, new) if path == target else text
+
+                drift.FAILURES.clear()
+                with patch.object(drift, "read", side_effect=mutated):
+                    check()
+                self.assertTrue(any(expected in error for error in drift.FAILURES), drift.FAILURES)
+        drift.FAILURES.clear()
+
+    def test_code_tables_must_match_the_manual(self):
+        # The same gates from the other side: the manual stays as it is and a
+        # table in the code loses a row, has two rows swapped, or is renamed.
+        fish = '    { "fish",                update_fish               },\n'
+        faster_fish = '    { "faster fish",         update_faster_fish        },\n'
+        cases = [
+            ("src/core/game_update.c", '    { "collision",           update_collision          },\n', "",
+             drift.check_update_order_doc, "has 20 rows; `s_update_steps` in src/core/game_update.c has 19"),
+            ("src/core/game_update.c", fish + faster_fish, faster_fish + fish,
+             drift.check_update_order_doc, "update row 5 is `fish`, but row 5 of `s_update_steps`"),
+            ("src/core/game_update.c", "UpdateStep s_update_steps[]", "UpdateStep s_steps[]",
+             drift.check_update_order_doc, "no `s_update_steps` table found"),
+        ]
+        original_read = drift.read
+        for rel, old, new, check, expected in cases:
+            with self.subTest(source=rel, expected=expected):
+                target = ROOT / rel
                 self.assertIn(old, original_read(target))
 
                 def mutated(path):

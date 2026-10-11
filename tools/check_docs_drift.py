@@ -994,6 +994,58 @@ def check_render_order_doc() -> None:
              "which is missing from the render order table")
 
 
+def c_table_rows(source: str, table: str) -> list[list[str]]:
+    """The rows of a `static const T table[] = { {a, b}, ... };` initializer:
+    each row's fields, in order, with the quotes taken off strings. Comments
+    are ignored, so the section comments between rows do not count."""
+    source = C_COMMENT_RE.sub(" ", source)
+    found = re.search(rf"\b{table}\s*\[\s*\]\s*=\s*\{{(.*?)\n\}};", source, re.S)
+    if not found:
+        return []
+    return [[field.strip().strip('"') for field in row.split(",")]
+            for row in re.findall(r"\{([^{}]*)\}", found.group(1))]
+
+
+def numbered_doc_rows(heading: str) -> list[list[str]] | None:
+    """The cells of every numbered row of the table under `heading` in
+    architecture.md (None when the section is missing)."""
+    section = read(DOCS / "architecture.md").split(heading, 1)
+    if len(section) != 2:
+        return None
+    rows = re.findall(r"^\|\s*(\d+)\s*\|(.+)\|\s*$", section[1].split("\n### ", 1)[0], re.M)
+    return [[number] + [cell.strip() for cell in cells.split("|")] for number, cells in rows]
+
+
+def check_update_order_doc() -> None:
+    """architecture.md's Update Order table and s_update_steps list the same
+    names in the same order, and each row's function calls what the manual
+    says it calls."""
+    rel = "src/core/game_update.c"
+    source = read(ROOT / rel)
+    steps = c_table_rows(source, "s_update_steps")
+    if not steps:
+        fail(f"{rel}: no `s_update_steps` table found; tools/check_docs_drift.py reads it")
+        return
+    rows = numbered_doc_rows("### Update Order (one fixed step)")
+    if rows is None:
+        fail("docs/wiki/architecture.md: missing `### Update Order (one fixed step)` section")
+        return
+    if [int(row[0]) for row in rows] != list(range(1, len(rows) + 1)):
+        fail("docs/wiki/architecture.md: the update order table must number its rows 1..N in order")
+    if len(rows) != len(steps):
+        fail(f"docs/wiki/architecture.md: the update order table has {len(rows)} rows; "
+             f"`s_update_steps` in {rel} has {len(steps)}")
+    bodies = c_function_bodies(source)
+    for (number, name, calls, *_), (step_name, function) in zip(rows, steps):
+        if name != step_name:
+            fail(f"docs/wiki/architecture.md: update row {number} is `{name}`, but row {number} of "
+                 f"`s_update_steps` in {rel} is `{step_name}`; fix the order or the name")
+        for called in re.findall(r"`(\w+)`", calls):
+            if not re.search(rf"\b{called}\s*\(", bodies.get(function, "")):
+                fail(f"docs/wiki/architecture.md: update row {number} ({name}) names `{called}`, "
+                     f"which `{function}()` in {rel} does not call")
+
+
 def main() -> int:
     check_test_targets_documented()
     check_source_file_map()
@@ -1027,6 +1079,7 @@ def main() -> int:
     check_constant_values()
     check_inspector_keys_doc()
     check_render_order_doc()
+    check_update_order_doc()
 
     if FAILURES:
         print("docs drift check failed:")
