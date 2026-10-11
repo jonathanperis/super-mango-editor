@@ -912,6 +912,25 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label)
 /* ------------------------------------------------------------------ */
 
 /*
+ * ui_button_disabled — Draw a button that cannot be used right now.
+ *
+ * It keeps its place and its label, so the row it sits in does not jump
+ * around as it comes and goes, but it looks switched off: a darker box, a
+ * dim label and no hover highlight.  It takes no click, which is why it
+ * returns nothing: the caller has no command to run.
+ */
+void ui_button_disabled(UIState *ui, int x, int y, int w, int h, const char *label)
+{
+    int tw = 0, th = 0;
+
+    draw_rect(x, y, w, h, UI_TITLE_BG);
+    font_measure(ui->font, label, &tw, &th);
+    draw_text(ui, x + (w - tw) / 2, y + (h - th) / 2, label, UI_TEXT_DIM);
+}
+
+/* ------------------------------------------------------------------ */
+
+/*
  * ui_label — Draw text at (x, y) in the default UI_TEXT colour.
  *
  * This is the most common widget — just a text string, no background,

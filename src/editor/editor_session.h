@@ -40,6 +40,19 @@ int editor_confirm_discard_changes(EditorState *es, const char *action);
 /* Ask user whether an existing Save As target may be replaced. */
 int editor_confirm_overwrite(EditorState *es, const char *path);
 
+/* The buttons of the skip-this-undo-step prompt, in the order shown. */
+typedef enum {
+    EDITOR_SKIP_STEP_CANCEL = 0,   /* also: the dialog was closed           */
+    EDITOR_SKIP_STEP_KEEP = 1,     /* the default: Enter changes nothing    */
+    EDITOR_SKIP_STEP_SKIP = 2      /* the only answer that drops the step   */
+} EditorSkipStepChoice;
+
+/* Ask whether the Campaign view may drop an Undo step it cannot replay,
+ * because the level file `path` it must read no longer loads.  Returns 1
+ * only when the designer chose "Skip this step"; "Keep the step" is the
+ * dialog's default, and it and Cancel both return 0. */
+int editor_confirm_skip_undo_step(EditorState *es, const char *path);
+
 typedef enum {
     EDITOR_EXTERNAL_CANCEL = 0,
     EDITOR_EXTERNAL_REPLACE = 1,
@@ -59,4 +72,7 @@ void editor_test_set_finish_field_choice(int button_id);
 void editor_test_set_discard_choice(int button_id);
 void editor_test_set_overwrite_choice(int button_id);
 void editor_test_set_external_choice(EditorExternalChoice choice);
+/* Answer for the skip-this-undo-step prompt: an EditorSkipStepChoice, or
+ * -1 for no canned answer.  Used up by the next prompt. */
+void editor_test_set_skip_step_choice(int button_id);
 #endif
