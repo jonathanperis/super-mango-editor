@@ -46,6 +46,10 @@ class DocsChecksTest(unittest.TestCase):
              drift.check_update_order_doc, "names `fishes_update`, which `update_fish()`"),
             ("architecture.md", "| 20 | bouncepads (high) |", "| 21 | bouncepads (high) |",
              drift.check_update_order_doc, "must number its rows 1..N"),
+            ("architecture.md", "| 25 | Spiders |", "| 25 | Crabs |",
+             drift.check_render_order_doc, "render layer 25 is `Crabs`, but layer 25 of `s_render_layers`"),
+            ("architecture.md", "| `spike_blocks_render` |", "| `spike_block_render` |",
+             drift.check_render_order_doc, "render layer 22 names `spike_block_render`, which `render_spike_blocks()`"),
             ("c-concepts.md", "`campaign_catalog_load()` in `src/levels/campaign_catalog.c`",
              "`campaign_catalog_load()` in `src/levels/level_session.c`", drift.check_function_locations,
              "`campaign_catalog_load()` is not defined in `src/levels/level_session.c`"),
@@ -83,6 +87,7 @@ class DocsChecksTest(unittest.TestCase):
         # table in the code loses a row, has two rows swapped, or is renamed.
         fish = '    { "fish",                update_fish               },\n'
         faster_fish = '    { "faster fish",         update_faster_fish        },\n'
+        player_layer = '    { 30, "player",               render_player            },\n'
         cases = [
             ("src/core/game_update.c", '    { "collision",           update_collision          },\n', "",
              drift.check_update_order_doc, "has 20 rows; `s_update_steps` in src/core/game_update.c has 19"),
@@ -90,6 +95,21 @@ class DocsChecksTest(unittest.TestCase):
              drift.check_update_order_doc, "update row 5 is `fish`, but row 5 of `s_update_steps`"),
             ("src/core/game_update.c", "UpdateStep s_update_steps[]", "UpdateStep s_steps[]",
              drift.check_update_order_doc, "no `s_update_steps` table found"),
+            ("src/render/game_render.c", player_layer, "",
+             drift.check_render_order_doc, "has 33 layers; `s_render_layers` in src/render/game_render.c has 32"),
+            ("src/render/game_render.c", player_layer, "",
+             drift.check_render_order_doc, "`s_render_layers` must number its layers 1..N in order"),
+            ("src/render/game_render.c", '"fish",                 render_fish ', '"sharks",               render_fish ',
+             drift.check_render_order_doc, "but layer 19 of `s_render_layers` in src/render/game_render.c is `sharks`"),
+            ("src/render/game_render.c", "    fish_render(gs->world.fish,", "    faster_fish_render(gs->world.fish,",
+             drift.check_render_order_doc, "render layer 19 names `fish_render`, which `render_fish()`"),
+            ("src/render/game_render.c", "    fish_render(gs->world.fish,", "    faster_fish_render(gs->world.fish,",
+             drift.check_render_order_doc, "`render_fish()` (layer 19) calls `faster_fish_render`, which is missing"),
+            ("src/render/game_render.c", "    draw_overlay(gs);\n",
+             "    player_render(&gs->world.player, cam_x);\n    draw_overlay(gs);\n",
+             drift.check_render_order_doc, "game_render_frame() calls `player_render` itself"),
+            ("src/render/game_render.c", "RenderLayer s_render_layers[]", "RenderLayer s_layers[]",
+             drift.check_render_order_doc, "no `s_render_layers` table found"),
         ]
         original_read = drift.read
         for rel, old, new, check, expected in cases:

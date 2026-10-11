@@ -948,50 +948,20 @@ def c_function_bodies(source: str) -> dict[str, str]:
     return bodies
 
 
-def render_call_sequence() -> str:
-    """game_render_frame()'s body with each call to a helper defined in
-    game_render.c replaced by that helper's own (expanded) body, so the text
-    lists every draw call in the order the frame makes it. The helper's name
-    stays in front of its body, so the table may name a helper as well."""
-    bodies = c_function_bodies(read(ROOT / "src" / "render" / "game_render.c"))
-
-    def expand(name: str, seen: tuple[str, ...]) -> str:
+def expanded_body(bodies: dict[str, str], name: str) -> str:
+    """The body of function `name` with each call to another function of the
+    same file replaced by that function's own (expanded) body, so the text
+    lists every call `name` ends up making. A helper's name stays in front of
+    its body, so a table may name the helper as well."""
+    def expand(current: str, seen: tuple[str, ...]) -> str:
         def inline(match: re.Match[str]) -> str:
             callee = match.group(1)
             if callee not in bodies or callee in seen:
                 return match.group(0)
             return f"{callee}( {expand(callee, seen + (callee,))} ) ("
-        return re.sub(r"\b(\w+)\s*\(", inline, bodies.get(name, ""))
+        return re.sub(r"\b(\w+)\s*\(", inline, bodies.get(current, ""))
 
-    return "game_render_frame( " + expand("game_render_frame", ("game_render_frame",))
-
-
-def check_render_order_doc() -> None:
-    body = render_call_sequence()
-    arch = DOCS / "architecture.md"
-    text = read(arch)
-    section = text.split("### Render Order (back to front)", 1)
-    if len(section) != 2:
-        fail("docs/wiki/architecture.md: missing `### Render Order (back to front)` section")
-        return
-    rows = render_order_rows()
-    position = 0
-    listed: set[str] = set()
-    for layer, drawn_by in rows:
-        if drawn_by.startswith("inline"):
-            continue
-        for name in re.findall(r"`(\w+)`", drawn_by):
-            listed.add(name)
-            found = re.search(rf"\b{name}\s*\(", body[position:])
-            if not found:
-                fail(f"docs/wiki/architecture.md: render layer {layer} names `{name}`, which "
-                     "game_render_frame() does not call at that point; fix the order or the name")
-                continue
-            position += found.end()
-    calls = set(re.findall(r"\b(\w+_render)\s*\(", body))
-    for name in sorted(calls - listed - {"game_render_frame", "settings_menu_render"}):
-        fail(f"docs/wiki/architecture.md: game_render_frame() calls `{name}`, "
-             "which is missing from the render order table")
+    return expand(name, (name,))
 
 
 def c_table_rows(source: str, table: str) -> list[list[str]]:
@@ -1014,6 +984,55 @@ def numbered_doc_rows(heading: str) -> list[list[str]] | None:
         return None
     rows = re.findall(r"^\|\s*(\d+)\s*\|(.+)\|\s*$", section[1].split("\n### ", 1)[0], re.M)
     return [[number] + [cell.strip() for cell in cells.split("|")] for number, cells in rows]
+
+
+def check_render_order_doc() -> None:
+    """architecture.md's Render Order table and s_render_layers list the same
+    layers in the same order: row N of the manual starts with the name of
+    row N of the code and names exactly the *_render functions that row's
+    render_<layer>() calls. Nothing is drawn outside the table unnoticed."""
+    rel = "src/render/game_render.c"
+    source = read(ROOT / rel)
+    layers = c_table_rows(source, "s_render_layers")
+    if not layers:
+        fail(f"{rel}: no `s_render_layers` table found; tools/check_docs_drift.py reads it")
+        return
+    if [row[0] for row in layers] != [str(number) for number in range(1, len(layers) + 1)]:
+        fail(f"{rel}: `s_render_layers` must number its layers 1..N in order")
+    functions = [row[2] for row in layers]
+    for function in sorted({name for name in functions if functions.count(name) > 1}):
+        fail(f"{rel}: `{function}` is in more than one row of `s_render_layers`")
+    rows = numbered_doc_rows("### Render Order (back to front)")
+    if rows is None:
+        fail("docs/wiki/architecture.md: missing `### Render Order (back to front)` section")
+        return
+    if len(rows) != len(layers):
+        fail(f"docs/wiki/architecture.md: the render order table has {len(rows)} layers; "
+             f"`s_render_layers` in {rel} has {len(layers)}")
+    bodies = c_function_bodies(source)
+    for (layer, what, drawn_by, *_), (number, name, function) in zip(rows, layers):
+        if not what.lower().startswith(name.lower()):
+            fail(f"docs/wiki/architecture.md: render layer {layer} is `{what.split(':')[0]}`, but layer "
+                 f"{number} of `s_render_layers` in {rel} is `{name}`; fix the order, or start the "
+                 "What cell with that name")
+        # The row's own function counts as named too ("`render_floor`, a loop").
+        body = f"{function}( {expanded_body(bodies, function)}"
+        named = set(re.findall(r"`(\w+)`", drawn_by))
+        for called in sorted(named):
+            if not re.search(rf"\b{called}\s*\(", body):
+                fail(f"docs/wiki/architecture.md: render layer {layer} names `{called}`, which "
+                     f"`{function}()` in {rel} does not call; fix the order or the name")
+        for called in sorted(set(re.findall(r"\b(\w+_render)\s*\(", body)) - named):
+            fail(f"docs/wiki/architecture.md: `{function}()` (layer {number}) calls `{called}`, "
+                 "which is missing from the render order table")
+    # The frame itself draws only through the table; the settings panel and
+    # the overlays (render_*_overlay) go on top of every layer.
+    frame = expanded_body(bodies, "game_render_frame")
+    outside = set(re.findall(r"\b(\w+_render)\s*\(", frame)) - {"settings_menu_render"}
+    outside |= {function for function in functions if re.search(rf"\b{function}\s*\(", frame)}
+    for called in sorted(outside):
+        fail(f"{rel}: game_render_frame() calls `{called}` itself; draw it from a row of "
+             "`s_render_layers` so the render order table stays complete")
 
 
 def check_update_order_doc() -> None:

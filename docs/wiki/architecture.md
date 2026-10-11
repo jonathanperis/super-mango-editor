@@ -113,7 +113,8 @@ game_frame(gs) {
                        completion) → legacy checkpoints → water, fog, bouncepad animation
                      → camera
                      A lost life or game over skips the remaining rows; the camera still moves.
-  4. Render       — clear → parallax background → platforms → floor tiles
+  4. Render       — clear → the s_render_layers table, row by row (see Render Order below):
+                    parallax background → platforms → floor tiles
                     → float platforms → spike rows → spike platforms → bridges
                     → bouncepads (medium, small, high) → rails
                      → vines → ladders → ropes → coins → yellow/green/red stars → last star
@@ -214,20 +215,24 @@ put them. Rows 16 to 20 only animate.
 
 ### Render Order (back to front)
 
-Each row names the function that draws the layer, in the order
-`game_render_frame()` reaches it. The frame calls a short list of `draw_*`
-helpers in `src/render/game_render.c`, each drawing a run of neighbouring
-layers (`draw_ground`, `draw_surfaces`, `draw_collectibles`,
-`draw_water_layer`, `draw_moving_hazards`, `draw_enemies`, `draw_ghost`,
-`draw_foreground`, `draw_hud_and_overlays`), and those call the functions below.
-`make docs-drift` follows the helpers and checks that this order matches the
-source.
+This table is the `s_render_layers` table in `src/render/game_render.c`, row
+for row. Each row there is the layer's number, its name, and a small
+`render_<layer>()` function in the same file (`render_spiders`,
+`render_water`, ...) that calls the function in the last column with the
+array, count and texture it needs. `game_render_frame()` clears the canvas
+and walks the table from row 1, so a later row covers an earlier one.
+
+`make docs-drift` keeps the two tables in step: the same number of layers,
+each **What** cell starting with the code row's name, and each **Drawn by**
+cell naming exactly the `*_render` functions that row's `render_<layer>()`
+calls. It also fails if `game_render_frame()` draws a layer without going
+through the table.
 
 | Layer | What | Drawn by |
 |-------|------|----------|
 | 1 | Background: per-level `background_layers` from `assets/sprites/backgrounds/`, tiled with each layer's scroll speed | `parallax_render` |
 | 2 | Platforms: 9-slice pillar stacks, drawn before the floor so they sink into the ground | `platforms_render` |
-| 3 | Floor: the level's floor tile across the world at `FLOOR_Y`, with floor-gap openings | `draw_floor`, a loop in `game_render.c` |
+| 3 | Floor: the level's floor tile across the world at `FLOOR_Y`, with floor-gap openings | `render_floor`, a loop in `game_render.c` |
 | 4 | Float platforms: 3-slice hovering surfaces (static, crumble, rail) | `float_platforms_render` |
 | 5 | Spike rows on the floor | `spike_rows_render` |
 | 6 | Spike platforms | `spike_platforms_render` |
@@ -253,10 +258,10 @@ source.
 | 26 | Jumping spiders | `jumping_spiders_render` |
 | 27 | Birds | `birds_render` |
 | 28 | Faster birds | `faster_birds_render` |
-| 29 | Time-trial ghost: the best run's Mango, translucent (see [Controls](../controls/#time-trial-ghost)) | `draw_ghost`, a helper in `game_render.c` |
+| 29 | Time-trial ghost: the best run's Mango, translucent (see [Controls](../controls/#time-trial-ghost)) | `render_ghost` in `game_render.c` |
 | 30 | Player | `player_render` |
 | 31 | Fog: per-level `fog_layers` from `assets/sprites/foregrounds/` | `fog_render` |
-| 32 | HUD: hearts, lives, score | `hud_render` |
+| 32 | HUD: hearts, lives, score. With the high-contrast setting, the player's outline and a dark strip behind the HUD are drawn first | `hud_render` |
 | 33 | Debug overlay and inspector panels, with `--debug` | `debug_render`, `game_inspector_render` |
 
 > **Note:** Per-level visual layers are split by role: `background_layers` feed the parallax renderer, `foreground_layers` select the water/lava foreground strip texture, and `fog_layers` feed the atmospheric fog system. Fog renders before the HUD so hearts/lives/score remain legible.
