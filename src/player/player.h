@@ -8,6 +8,7 @@
 
 #include "../shared/graphics.h"
 #include "../shared/audio.h"
+#include "../shared/asset_cache.h"      /* AssetCache — player_init asks it for the sprite sheet */
 #include "../surfaces/platform.h"       /* Platform, MAX_PLATFORMS — needed for player_update signature */
 #include "../surfaces/bouncepad.h"      /* Bouncepad — needed for player_update signature */
 #include "../surfaces/float_platform.h" /* FloatPlatform — needed for player_update signature */
@@ -100,11 +101,13 @@ typedef struct {
     float     spawn_x;          /* level-defined spawn x (platform top-left)           */
     float     spawn_y;          /* level-defined spawn y (platform top; adjusted by -h + FLOOR_SINK) */
     IntRect      frame;   /* source rect: which part of the sheet to draw */
-    Texture2D   *texture; /* owned GPU image handle; NULL until initialized */
+    Texture2D   *texture; /* sprite sheet held from the asset cache (one
+                             reference); NULL until initialized */
 } Player;
 
-/* Load the player texture and set its initial position. */
-int player_init(Player *player);
+/* Get the player's sprite sheet from cache and set the initial position.
+ * cache may be NULL: the sheet is then loaded for this Player alone. */
+int player_init(Player *player, AssetCache *cache);
 
 /* Restore tunable movement physics to engine defaults. */
 void player_apply_default_physics(Player *player);
@@ -174,5 +177,5 @@ IntRect player_get_hitbox(const Player *player);
 /* Reset the player's position and state without reloading the texture. */
 void player_reset(Player *player);
 
-/* Release the player's GPU texture. */
-void player_cleanup(Player *player);
+/* Give the sprite sheet back to the cache player_init took it from. */
+void player_cleanup(Player *player, AssetCache *cache);

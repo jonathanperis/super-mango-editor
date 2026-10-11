@@ -116,8 +116,10 @@ static void session_runtime_cleanup(AppSession *session)
 #endif
     session->runtime_cleaned = 1;
     session->runtime_cleanup_count++;
-    /* Every screen is closed by now, so nothing borrows the shared sprites
-     * and sounds; release them while the GPU and audio device still exist. */
+    /* Every screen is closed by now, so nothing holds a file in the asset
+     * cache and nothing borrows the shared sprites and sounds; unload both
+     * while the GPU and audio device still exist. */
+    asset_cache_clear(&session->cache);
     if (session->assets_loaded) {
         game_resources_unload(&session->assets);
         session->assets_loaded = 0;
@@ -400,6 +402,10 @@ static GameState *session_make_game(AppSession *session, const char *path, const
      * pointers (owns_assets stays 0), so game_cleanup leaves them loaded
      * for the next game and session_runtime_cleanup unloads them once. */
     game->assets = session->assets;
+    /* Lend the asset cache too. The game acquires its level's files from it
+     * and releases them in game_cleanup; the cache keeps them loaded, so the
+     * next game on the same level finds every one of them already there. */
+    game->cache = &session->cache;
     game->screen.debug_mode = session->debug_mode;
     game->screen.random_seed = session->random_seed;
     game->screen.smoke_test_frames = session->smoke_test_frames;
@@ -608,14 +614,16 @@ static void session_apply_game_route(AppSession *session)
          * WebGL context could not be torn down and rebuilt inside the
          * browser's frame callback. Since the raylib port this session owns
          * the one window, GL context and audio device for the whole run; a
-         * GameState owns only its render target and its level's own files
-         * (the shared sprites and sounds stay with the session), which
-         * is exactly what Level Select and Play already swap in place on the
-         * web. Staying on the page also keeps the browser's unlocked audio
-         * (a reloaded page needs a new click or key press before it may play
-         * sound) and the profile held in memory, even an unsaved one. The
-         * old game is freed before the new one loads, so the WebAssembly
-         * heap reuses its blocks instead of growing on every Replay.
+         * GameState owns only its render target (the shared sprites and
+         * sounds, and the cache holding its level's files, stay with the
+         * session), which is exactly what Level Select and Play already
+         * swap in place on the web. Staying on the page also keeps the
+         * browser's unlocked audio (a reloaded page needs a new click or key
+         * press before it may play sound) and the profile held in memory,
+         * even an unsaved one. The old game is freed before the new one
+         * loads, so the WebAssembly heap reuses its blocks instead of
+         * growing on every Replay; the files it released wait in the cache,
+         * idle, and the new game acquires every one of them again.
          */
         session->route = APP_ROUTE_GAME_REPLAY;
         /* Keep an independent path before the old GameState is freed. */

@@ -42,11 +42,17 @@ int game_init(GameState *gs)
         if (game_resources_load(&gs->assets) != 0) goto fail;
     }
 
-    /* The default water strip; a level may swap it (level_resources_apply). */
-    if (water_init(&gs->world.water) != 0) goto fail;
+    /*
+     * From here on, files come from gs->cache, the session's asset cache
+     * (NULL without a session: each file is then loaded for this game
+     * alone). On a Replay every acquire below finds its file still loaded.
+     */
 
-    /* Set up the player (loads texture, sets initial position on the floor). */
-    if (player_init(&gs->world.player) != 0) goto fail;
+    /* The default water strip; a level may swap it (level_resources_apply). */
+    if (water_init(&gs->world.water, gs->cache) != 0) goto fail;
+
+    /* Set up the player (gets its texture, sets initial position on the floor). */
+    if (player_init(&gs->world.player, gs->cache) != 0) goto fail;
 
     /* A safe value until the level says where the player starts; the
      * camera is snapped to the real start once the level is loaded. */
@@ -57,8 +63,8 @@ int game_init(GameState *gs)
      * paths come from the active level definition.
      */
 
-    /* Load HUD font and icon textures while the renderer is available. */
-    if (hud_init(&gs->screen.hud, gs->assets.textures.star_yellow,
+    /* Get the HUD font and icon textures while the renderer is available. */
+    if (hud_init(&gs->screen.hud, gs->cache, gs->assets.textures.star_yellow,
                  gs->world.player.texture) != 0) {
         goto fail;
     }
@@ -105,8 +111,8 @@ fail:
  * game_cleanup — Free every resource owned by the game.
  *
  * Cleanup mirrors game_init() in reverse. Renderer-dependent resources are
- * destroyed before the renderer, and every helper nulls pointers after free so
- * partial init failure can safely call game_cleanup().
+ * released before the renderer, and every helper nulls pointers after release
+ * so partial init failure can safely call game_cleanup().
  */
 void game_cleanup(GameState *gs)
 {
@@ -125,8 +131,8 @@ void game_cleanup(GameState *gs)
     /* Free level storage owned by GameState before renderer-backed assets. */
     game_level_session_cleanup(gs);
 
-    /* Free HUD resources (font + generated textures, renderer-dependent). */
-    hud_cleanup(&gs->screen.hud);
+    /* Release the HUD's font and coin icon to the asset cache. */
+    hud_cleanup(&gs->screen.hud, gs->cache);
 
     /* Silence this game's sound effects; their samples may outlive it. */
     sound_stop_all();
@@ -135,8 +141,8 @@ void game_cleanup(GameState *gs)
      * platform tiles and background layers. */
     level_resources_cleanup(gs);
 
-    /* Free player texture before shared texture resources. */
-    player_cleanup(&gs->world.player);
+    /* Release the player texture before the shared texture resources. */
+    player_cleanup(&gs->world.player, gs->cache);
 
     /* Unload the shared sprites and sounds only if this GameState loaded
      * them; borrowed ones belong to AppSession and stay loaded for the
@@ -144,6 +150,9 @@ void game_cleanup(GameState *gs)
     if (gs->owns_assets) game_resources_unload(&gs->assets);
     gs->owns_assets = 0;
     memset(&gs->assets, 0, sizeof(gs->assets));
+    /* Every reference is released; forget the borrowed cache as well. It
+     * still holds the files, idle, for the session's next game. */
+    gs->cache = NULL;
 
     game_window_cleanup(gs);
 }

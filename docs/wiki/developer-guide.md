@@ -63,6 +63,7 @@ they preserve explicit ownership, logical coordinates and saved-binding IDs.
   fonts, and all screen resources before the graphics/audio context. Reverse
   initialization order is a useful way to achieve this, not a reason to free a
   borrowed resource twice.
+- A file a level names, or one every game needs, is acquired from the session's asset cache, not loaded directly: `asset_cache_texture_acquire(gs->cache, path)` and one `asset_cache_texture_release` for it at cleanup. The cache owns it and decides when to unload, so never pass an acquired texture, track or font to `texture_unload`, `music_unload` or `font_unload`. Direct `texture_load` remains right for something one screen owns outright, such as the start menu's logo.
 - Use `float` for positions and velocities. Preserve integer `IntRect` hitbox construction and edge rules; convert to raylib `Rectangle` at drawing boundaries.
 - Asset and level paths stay relative (`"assets/..."`, `"levels/..."`). Startup moves a foreign working folder to the asset root once (`src/shared/asset_root.c`), so no module needs to build absolute asset paths. A new command-line *path* option must be made absolute in `main.c` before that move, as `--profile` is.
 
@@ -171,17 +172,21 @@ sound_play(gs->assets.audio.<name>, 128); // null-safe; per-play volume in autho
 Background music uses raylib streams through the project `MusicTrack` owner. Runtime levels provide the active music path through TOML:
 
 ```c
-// Load from current LevelDef
-gs->world.music = music_load(def->music_path);
+// Acquire from the session's asset cache, by the current LevelDef's path
+gs->world.music = asset_cache_music_acquire(gs->cache, def->music_path);
 
 // Play (looping)
 music_play(gs->world.music);
 music_set_volume(64); // 50%; normal sessions combine level/user/mute settings
 
-// Cleanup
-music_unload(gs->world.music);
+// Cleanup: give the reference back. The cache stops the track and keeps
+// it loaded for the next game on this level.
+asset_cache_music_release(gs->cache, gs->world.music);
 gs->world.music = NULL;
 ```
+
+`music_load` / `music_unload` are still what the cache itself calls; game
+code goes through the cache so a Replay does not open the file again.
 
 ---
 
@@ -207,6 +212,11 @@ font_draw_centered(font, "Paused", GAME_W / 2, 92, WHITE);
 // Cleanup before closing the graphics context (frees only the handle)
 font_unload(font);
 ```
+
+The HUD takes its `TextFont` handle and coin icon from the session's asset
+cache instead (`asset_cache_font_acquire`, `asset_cache_texture_acquire` in
+`hud_init`; one release each in `hud_cleanup`), so a Replay's new HUD gets
+the same two back.
 
 The HUD renders hearts (health), life counter and score. It is drawn after game entities; terminal/settings overlays can cover it. `hud_layout()` computes every HUD rectangle once; `hud_render` draws into them and the `--debug` hitbox view outlines the same ones, so a layout change needs one edit.
 

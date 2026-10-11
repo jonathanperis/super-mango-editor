@@ -8,6 +8,7 @@
  */
 #pragma once
 
+#include "../shared/asset_cache.h"  /* AssetCache — fog images are held from it */
 #include "../shared/graphics.h"
 
 /*
@@ -41,13 +42,14 @@ typedef struct {
 } FogInstance;
 
 /*
- * FogSystem — owns the loaded textures and the pool of active instances.
+ * FogSystem — the fog images (each held from the asset cache, one reference)
+ * and the pool of active instances.
  * Stored by value inside GameState — no heap allocation needed.
  * tex_count tracks how many textures were actually loaded from the level
  * definition (may be less than MAX_FOG_TEXTURES).
  */
 typedef struct {
-    Texture2D *textures[MAX_FOG_TEXTURES]; /* GPU images for the fog assets */
+    Texture2D *textures[MAX_FOG_TEXTURES]; /* held from the asset cache    */
     int          tex_count;                  /* number of textures loaded       */
     FogInstance  instances[FOG_MAX];         /* pool of simultaneous fog layers */
 } FogSystem;
@@ -63,8 +65,10 @@ typedef struct {
  * If count is 0, no textures are loaded and no fog waves will spawn.
  * Each texture is non-fatal: a missing asset prints a warning and leaves
  * its pointer NULL (fog_render silently skips NULL entries).
+ *
+ * The images come from cache (NULL = load them for this FogSystem alone).
  */
-void fog_init(FogSystem *fog,
+void fog_init(FogSystem *fog, AssetCache *cache,
               const char (*paths)[64], int count);
 
 /* Advance every active instance; spawn the next wave when it is time. */
@@ -73,5 +77,5 @@ void fog_update(FogSystem *fog, float dt);
 /* Draw all active fog layers — call this after player_render (topmost). */
 void fog_render(FogSystem *fog);
 
-/* Release all GPU textures owned by the fog system. */
-void fog_cleanup(FogSystem *fog);
+/* Give every fog image back to the cache fog_init took it from. */
+void fog_cleanup(FogSystem *fog, AssetCache *cache);
