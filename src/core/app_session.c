@@ -616,6 +616,62 @@ static void session_open_next_level(AppSession *session, GameState *game)
     session->route = APP_ROUTE_NONE;
 }
 
+/*
+ * session_replay_game — Start the same level again, in place.
+ *
+ * Native and browser builds both replace the game in place.
+ *
+ * Browser Replay used to save the level path in sessionStorage and
+ * reload the whole page. That dates from the SDL2 build, where every
+ * GameState created its own window and renderer, and the canvas's
+ * WebGL context could not be torn down and rebuilt inside the
+ * browser's frame callback. Since the raylib port this session owns
+ * the one window, GL context and audio device for the whole run; a
+ * GameState owns only its render target (the shared sprites and
+ * sounds, and the cache holding its level's files, stay with the
+ * session), which is exactly what Level Select and Play already
+ * swap in place on the web. Staying on the page also keeps the
+ * browser's unlocked audio (a reloaded page needs a new click or key
+ * press before it may play sound) and the profile held in memory,
+ * even an unsaved one. The old game is freed before the new one
+ * loads, so the WebAssembly heap reuses its blocks instead of
+ * growing on every Replay; the files it released wait in the cache,
+ * idle, and the new game acquires every one of them again.
+ */
+static void session_replay_game(AppSession *session, GameState *game)
+{
+    char path[GAME_LEVEL_PATH_MAX];
+    GameInputPhysicalState inherited;
+
+    session->route = APP_ROUTE_GAME_REPLAY;
+    /* Keep an independent path before the old GameState is freed. */
+    copy_path(path, sizeof(path), game->world.level_path);
+    game_input_read_physical(game->screen.controller, &inherited);
+    session_close_game(session);
+    if (session_open_game(session, path, &inherited)) session_end(session, 1);
+    else session->route = APP_ROUTE_NONE;
+}
+
+/*
+ * session_open_level_select — Leave the game for the level selector.
+ *
+ * The campaign is read again first: if it no longer loads, the game stays
+ * open and the status message says why, because closing it would leave
+ * nothing to show.
+ */
+static void session_open_level_select(AppSession *session)
+{
+    session->route = APP_ROUTE_GAME_LEVEL_SELECT;
+    if (session_load_catalog(session)) {
+        copy_path(session->status_message, sizeof(session->status_message), "Level Select unavailable: campaign manifest failed");
+        session->route = APP_ROUTE_NONE;
+        return;
+    }
+    session_close_game(session);
+    if (session_open_menu(session)) session_end(session, 1);
+    else session->route = APP_ROUTE_NONE;
+}
+
 static void session_apply_game_route(AppSession *session)
 {
     /* Routes are requests, not nested main loops. Consume them after the
@@ -623,7 +679,6 @@ static void session_apply_game_route(AppSession *session)
     GameState *game = session->game;
     if (!game) return;
     GameRoute route = game->screen.route;
-    char path[GAME_LEVEL_PATH_MAX];
     if (route == GAME_ROUTE_NONE && !game->screen.running) route = GAME_ROUTE_EXIT;
     if (route == GAME_ROUTE_NONE) return;
     /* Leaving a level part-way keeps a Continue point; record it before the
@@ -638,47 +693,10 @@ static void session_apply_game_route(AppSession *session)
         session_open_next_level(session, game);
         break;
     case GAME_ROUTE_REPLAY:
-        /*
-         * Native and browser builds both replace the game in place.
-         *
-         * Browser Replay used to save the level path in sessionStorage and
-         * reload the whole page. That dates from the SDL2 build, where every
-         * GameState created its own window and renderer, and the canvas's
-         * WebGL context could not be torn down and rebuilt inside the
-         * browser's frame callback. Since the raylib port this session owns
-         * the one window, GL context and audio device for the whole run; a
-         * GameState owns only its render target (the shared sprites and
-         * sounds, and the cache holding its level's files, stay with the
-         * session), which is exactly what Level Select and Play already
-         * swap in place on the web. Staying on the page also keeps the
-         * browser's unlocked audio (a reloaded page needs a new click or key
-         * press before it may play sound) and the profile held in memory,
-         * even an unsaved one. The old game is freed before the new one
-         * loads, so the WebAssembly heap reuses its blocks instead of
-         * growing on every Replay; the files it released wait in the cache,
-         * idle, and the new game acquires every one of them again.
-         */
-        session->route = APP_ROUTE_GAME_REPLAY;
-        /* Keep an independent path before the old GameState is freed. */
-        copy_path(path, sizeof(path), game->world.level_path);
-        {
-            GameInputPhysicalState inherited;
-            game_input_read_physical(game->screen.controller, &inherited);
-            session_close_game(session);
-            if (session_open_game(session, path, &inherited)) session_end(session, 1);
-            else session->route = APP_ROUTE_NONE;
-        }
+        session_replay_game(session, game);
         break;
     case GAME_ROUTE_LEVEL_SELECT:
-        session->route = APP_ROUTE_GAME_LEVEL_SELECT;
-        if (session_load_catalog(session)) {
-            copy_path(session->status_message, sizeof(session->status_message), "Level Select unavailable: campaign manifest failed");
-            session->route = APP_ROUTE_NONE;
-            return;
-        }
-        session_close_game(session);
-        if (session_open_menu(session)) session_end(session, 1);
-        else session->route = APP_ROUTE_NONE;
+        session_open_level_select(session);
         break;
     default:
         session->route = route == GAME_ROUTE_SMOKE_EXIT ? APP_ROUTE_SMOKE_EXIT :
