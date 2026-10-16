@@ -16,9 +16,11 @@
  *      eased back after a lost life. The camera now snaps to the start and
  *      to the respawn point, and waiting spike blocks start when the
  *      camera reveals them, so they can start on other steps.
- *   3  the current engine.
+ *   3  fog waves and fish jump timers drew from one random stream, so a
+ *      level with fog gave its fish other jump times than it does now.
+ *   4  the current engine: gameplay and fog have separate streams.
  */
-#define EXPERIMENT_FORMAT_VERSION 3
+#define EXPERIMENT_FORMAT_VERSION 4
 
 /* One recorded simulation step: the input and tuning in effect. */
 typedef struct {

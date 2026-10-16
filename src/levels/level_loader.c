@@ -21,7 +21,6 @@
  *               collected during the current attempt stay collected.
  */
 
-#include "../core/game_random.h"
 #include "../game.h"  /* GameState: this file reads its fields */
 #include "../shared/platform.h"  /* str_copy */
 #include <stdio.h>     /* fprintf, stderr */
@@ -67,8 +66,8 @@
  * rand_range — return a pseudo-random float in [lo, hi].
  * Used to stagger fish jump timers so they don't all leap simultaneously.
  */
-static float rand_range(float lo, float hi) {
-    return lo + game_random_unit() * (hi - lo);
+static float rand_range(RandomStream *rng, float lo, float hi) {
+    return lo + random_unit(rng) * (hi - lo);
 }
 
 /* ------------------------------------------------------------------ */
@@ -363,7 +362,7 @@ static void load_faster_birds(GameWorld *world, const LevelDef *def)
  * seeded replays would give different fish different jump times.
  */
 static void load_fish_array(Fish *fish, const FishPlacement *placed, int count,
-                            float jump_min, float jump_max)
+                            float jump_min, float jump_max, RandomStream *rng)
 {
     float water_y = (float)(GAME_H - WATER_ART_H) - FISH_RENDER_H / 2.0f;
 
@@ -374,7 +373,7 @@ static void load_fish_array(Fish *fish, const FishPlacement *placed, int count,
         fish[i].vy            = 0.0f;
         fish[i].patrol_x0     = placed[i].patrol_x0;
         fish[i].patrol_x1     = placed[i].patrol_x1;
-        fish[i].jump_timer    = rand_range(jump_min, jump_max);
+        fish[i].jump_timer    = rand_range(rng, jump_min, jump_max);
         fish[i].water_y       = water_y;
         fish[i].frame_index   = 0;
         fish[i].anim_timer_ms = 0;
@@ -384,14 +383,14 @@ static void load_fish_array(Fish *fish, const FishPlacement *placed, int count,
 static void load_fish(GameWorld *world, const LevelDef *def)
 {
     load_fish_array(world->fish, def->fish, def->fish_count,
-                    FISH_JUMP_MIN, FISH_JUMP_MAX);
+                    FISH_JUMP_MIN, FISH_JUMP_MAX, &world->random);
     world->fish_count = def->fish_count;
 }
 
 static void load_faster_fish(GameWorld *world, const LevelDef *def)
 {
     load_fish_array(world->faster_fish, def->faster_fish, def->faster_fish_count,
-                    FFISH_JUMP_MIN, FFISH_JUMP_MAX);
+                    FFISH_JUMP_MIN, FFISH_JUMP_MAX, &world->random);
     world->faster_fish_count = def->faster_fish_count;
 }
 

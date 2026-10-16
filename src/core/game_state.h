@@ -29,3 +29,12 @@
  * exists after the reset.
  */
 void reset_current_level(GameState *gs, int *fp_prev_riding);
+
+/*
+ * game_seed_random — start both of the world's random streams from seed.
+ *
+ * game_init calls it before the level loads, and an experiment restart
+ * calls it with the recorded seed. The effects stream gets a fixed
+ * variation of the seed so the two streams never produce the same numbers.
+ */
+void game_seed_random(GameState *gs, unsigned int seed);

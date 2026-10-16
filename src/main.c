@@ -13,7 +13,6 @@
 #include <string.h>
 #include "game.h"
 #include "core/app_session.h"
-#include "core/game_random.h"
 #include "shared/asset_root.h"
 #include "shared/serializer_io.h"  /* serializer_file_exists_utf8 */
 
@@ -219,7 +218,6 @@ int main(int argc, char **argv)
     /* A fixed seed makes enemy/decorative randomness reproducible. A normal
      * run without --seed varies its starting state using a monotonic clock. */
     if (!seed_set) config.random_seed = (unsigned int)clock_millis();
-    game_random_seed(config.random_seed);
     /* session_create unwinds partially initialized resources on failure. */
     AppSession *session = session_create(&config);
     /* session_create copied every path it keeps (or opened the file). */

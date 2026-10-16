@@ -70,7 +70,7 @@ Debug experiment captures (`src/core/game_experiment.h`):
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `EXPERIMENT_FORMAT_VERSION` | `3` | One row per fixed step, `[input, physics...]`, no duration column; version 1 (variable timestep) and version 2 (camera panned in at a level start and after a lost life) captures are rejected |
+| `EXPERIMENT_FORMAT_VERSION` | `4` | One row per fixed step, `[input, physics...]`, no duration column; version 1 (variable timestep), version 2 (camera panned in at a level start and after a lost life) and version 3 (fog and fish shared one random stream) captures are rejected |
 | `EXPERIMENT_MAX_FRAMES` | `36000` | Steps one capture can hold (10 minutes at 60 steps/s) |
 
 ### Tiles and Floor

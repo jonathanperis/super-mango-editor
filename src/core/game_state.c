@@ -28,3 +28,11 @@ void reset_current_level(GameState *gs, int *fp_prev_riding)
      * from where they died. Show it at once instead of panning back. */
     game_camera_snap(gs);
 }
+
+void game_seed_random(GameState *gs, unsigned int seed)
+{
+    random_seed(&gs->world.random, seed);
+    /* Any fixed, nonzero bit pattern works; this one is the fractional part
+     * of sqrt(2), the first SHA-256 initial hash word. */
+    random_seed(&gs->world.effects_random, seed ^ UINT32_C(0x6a09e667));
+}

@@ -51,6 +51,7 @@
 #include "shared/graphics.h"        /* Texture2D, RenderTexture2D, IntRect */
 #include "shared/audio.h"           /* MusicTrack pointer */
 #include "shared/fixed_step.h"      /* FixedStepClock, in GameLoopState */
+#include "shared/random.h"          /* RandomStream, in GameWorld */
 #include "game_assets.h"            /* GameAssets: shared sprites and sounds */
 #include "shared/asset_cache.h"     /* AssetCache: GameState borrows the session's */
 #include "game_fwd.h"               /* the GameState typedef name */
@@ -228,6 +229,11 @@ typedef struct {
     uint64_t      source_level_hash; /* source bytes corresponding to active LevelDef */
     LevelRuntime  runtime;     /* active LevelDef pointer, level width, effect flags */
     GameRules     rules;       /* score/life and collectible rule values             */
+    /* Two streams, both seeded by game_seed_random: gameplay draws only from
+     * `random` (fish jump timers), decoration only from `effects_random`
+     * (fog waves), so fog can never change when a fish jumps. */
+    RandomStream  random;
+    RandomStream  effects_random;
 
     /* ---- The player and the camera that follows them -------------------- */
     Player        player;      /* the player, stored by value (not a pointer) */

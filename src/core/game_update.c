@@ -105,13 +105,14 @@ static void update_faster_birds(GameState *gs, const StepInputs *in)
 /* Fish swim and leap from the water, and stay inside the world's width. */
 static void update_fish(GameState *gs, const StepInputs *in)
 {
-    fish_update(gs->world.fish, gs->world.fish_count, in->dt, gs->world.runtime.world_w);
+    fish_update(gs->world.fish, gs->world.fish_count, in->dt, gs->world.runtime.world_w,
+                &gs->world.random);
 }
 
 static void update_faster_fish(GameState *gs, const StepInputs *in)
 {
     faster_fish_update(gs->world.faster_fish, gs->world.faster_fish_count, in->dt,
-                       gs->world.runtime.world_w);
+                       gs->world.runtime.world_w, &gs->world.random);
 }
 
 /* ------------------------------------------------------------------ */
@@ -196,7 +197,7 @@ static void update_water(GameState *gs, const StepInputs *in)
 
 static void update_fog(GameState *gs, const StepInputs *in)
 {
-    if (gs->world.runtime.fog_enabled) fog_update(&gs->world.fog, in->dt);
+    if (gs->world.runtime.fog_enabled) fog_update(&gs->world.fog, in->dt, &gs->world.effects_random);
 }
 
 /* One module (bouncepad.c), three arrays: the squash animation a hit

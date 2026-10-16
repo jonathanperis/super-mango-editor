@@ -451,7 +451,7 @@ is full the oldest step's snapshots are freed before it is dropped
 keyboard layout and rendering.
 
 **Read first:** `src/input/game_web_input.c`, `web/touch-controls.js`,
-`src/core/game_experiment.c`, `src/core/game_random.c`.
+`src/core/game_experiment.c`, `src/shared/random.c`.
 
 **Steps:**
 
@@ -491,8 +491,8 @@ on different compilers and CPUs.
 Every input to the simulation is pinned. Input comes from the recorded action
 bits, not the keyboard (the test, `inspection_and_replay()` in
 `tests/simulation_test.c`, holds Left the whole time and the result still
-matches). Every step is exactly 1/60 s. The random generator
-(`game_random()`) starts from the recorded seed. The level file must hash to
+matches). Every step is exactly 1/60 s. Both random streams (gameplay and
+fog, `game_seed_random()`) start from the recorded seed. The level file must hash to
 the recorded `level_hash`, or the replay is refused. With the same engine
 build, the same steps run in the same order on the same data.
 
