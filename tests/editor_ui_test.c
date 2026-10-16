@@ -3195,6 +3195,112 @@ done:
  * Right jump a word (Shift: selecting it); Ctrl+C / X / V and typing act on
  * the selection; all in whole UTF-8 characters.
  */
+/*
+ * Up / Down step the active number field (Shift: ten steps) inside its
+ * limits, as a staged edit that Return commits in one undo step.  Text
+ * fields ignore them.
+ */
+static int up_and_down_step_number_fields(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+    int undo_top = es.undo->top;
+    CHECK(es.level.screen_count == 4);
+
+    click_frame(&es, CANVAS_W + 90, CFG_SCREENS_Y);
+    CHECK(es.ui.active_id == 9011);
+    key_frame(&es, KEY_UP, 0);
+    CHECK(strcmp(es.ui.edit_buf, "5") == 0);
+    key_frame(&es, KEY_UP, INPUT_SHIFT);
+    CHECK(strcmp(es.ui.edit_buf, "15") == 0);
+    CHECK(es.level.screen_count == 4);            /* staged, not stored */
+    for (int i = 0; i < 10; i++) key_frame(&es, KEY_UP, INPUT_SHIFT);
+    CHECK(strcmp(es.ui.edit_buf, "99") == 0);     /* the field's maximum */
+    key_frame(&es, KEY_DOWN, INPUT_SHIFT);
+    CHECK(strcmp(es.ui.edit_buf, "89") == 0);
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(es.ui.active_id == 0 && es.level.screen_count == 89);
+    CHECK(es.undo->top == undo_top + 1);
+
+    /* Down stops at the minimum; a half-typed value steps from the
+     * stored one. */
+    click_frame(&es, CANVAS_W + 90, CFG_SCREENS_Y);
+    key_frame(&es, KEY_END, 0);
+    key_frame(&es, KEY_BACKSPACE, 0);
+    key_frame(&es, KEY_BACKSPACE, 0);
+    text_frame(&es, "-");
+    key_frame(&es, KEY_DOWN, 0);
+    CHECK(strcmp(es.ui.edit_buf, "88") == 0);
+    for (int i = 0; i < 10; i++) key_frame(&es, KEY_DOWN, INPUT_SHIFT);
+    CHECK(strcmp(es.ui.edit_buf, "1") == 0);
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(es.level.screen_count == 89);
+
+    /* A text field keeps its text and caret. */
+    click_frame(&es, CANVAS_W + 60, CFG_NAME_Y);
+    CHECK(es.ui.active_id == 9000);
+    key_frame(&es, KEY_HOME, 0);
+    key_frame(&es, KEY_UP, 0);
+    key_frame(&es, KEY_DOWN, 0);
+    CHECK(strcmp(es.ui.edit_buf, "Untitled") == 0 && es.ui.edit_cursor == 0);
+    key_frame(&es, KEY_ESCAPE, 0);
+done:
+    close_editor(&es);
+    return failed;
+}
+
+/* Float fields step by 1 from 10 up and by 0.1 below, without float
+ * error showing, step over 0 when 0 is refused, and keep to the limits;
+ * an int field with a step uses it. */
+static int number_field_steps_suit_the_field(void)
+{
+    int failed = 0;
+    UIState ui;
+    float small = 0.2f, big = 12.5f, speed = 0.1f;
+    int snapped = 32;
+    ui_init(&ui, NULL);
+
+#define ACTIVATE(call) do { ui_begin_frame(&ui); ui.mouse_x = ui.mouse_y = 5; \
+        ui.mouse_clicked = 1; (void)(call); } while (0)
+    ACTIVATE(ui_float_field_limited(&ui, 1, 0, 0, 100, &small, -1.0f, 1.0f));
+    CHECK(ui.active_id == 1);
+    ui_edit_key(&ui, UI_KEY_UP, 0);
+    CHECK(strcmp(ui.edit_buf, "0.3") == 0);
+    ui_edit_key(&ui, UI_KEY_UP, 0);
+    ui_edit_key(&ui, UI_KEY_UP, 0);
+    CHECK(strcmp(ui.edit_buf, "0.5") == 0);
+    ui_edit_key(&ui, UI_KEY_UP, 1);
+    CHECK(strcmp(ui.edit_buf, "1") == 0);         /* the limit */
+    CHECK(ui_apply_active_edit(&ui) == 2 && small == 1.0f);
+
+    ACTIVATE(ui_float_field(&ui, 2, 0, 0, 100, &big));
+    ui_edit_key(&ui, UI_KEY_UP, 0);
+    CHECK(strcmp(ui.edit_buf, "13.5") == 0);
+    ui_edit_key(&ui, UI_KEY_DOWN, 1);
+    CHECK(strcmp(ui.edit_buf, "3.5") == 0);
+    ui_edit_key(&ui, UI_KEY_DOWN, 0);
+    CHECK(strcmp(ui.edit_buf, "3.4") == 0);
+    ui_cancel_active_edit(&ui);
+
+    ACTIVATE(ui_float_field_nonzero(&ui, 3, 0, 0, 100, &speed, 5.0f));
+    ui_edit_key(&ui, UI_KEY_DOWN, 0);
+    CHECK(strcmp(ui.edit_buf, "-0.1") == 0);      /* 0 is skipped */
+    ui_cancel_active_edit(&ui);
+
+    ACTIVATE(ui_int_field_limited(&ui, 4, 0, 0, 100, &snapped, 0, 64, 16));
+    ui_edit_key(&ui, UI_KEY_UP, 0);
+    CHECK(strcmp(ui.edit_buf, "48") == 0);
+    ui_edit_key(&ui, UI_KEY_UP, 1);
+    CHECK(strcmp(ui.edit_buf, "64") == 0);
+    ui_edit_key(&ui, UI_KEY_DOWN, 1);
+    CHECK(strcmp(ui.edit_buf, "0") == 0);
+#undef ACTIVATE
+done:
+    ui_cleanup(&ui);
+    return failed;
+}
+
 static int text_fields_select_copy_cut_and_paste(void)
 {
     int failed = 0;
@@ -3693,6 +3799,8 @@ int main(void)
         CASE(properties_panel_handles_every_entity_type),
         CASE(level_config_sections_resize_the_panel),
         CASE(text_fields_move_the_caret_and_tab_between_fields),
+        CASE(up_and_down_step_number_fields),
+        CASE(number_field_steps_suit_the_field),
         CASE(arrow_keys_nudge_and_backspace_deletes),
         CASE(ctrl_d_duplicates_with_a_stepping_offset),
         CASE(snap_toggle_applies_to_placing_and_dragging),
