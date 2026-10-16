@@ -22,6 +22,8 @@
  * Layout from left to right:
  *   [Select] [Place] [Delete] | [Grid] | [Debug] | Zoom | [Campaign] |
  *   [Contrast] | file buttons
+ *
+ * Each control has a tooltip naming its shortcut, when it has one.
  */
 void editor_render_toolbar(EditorState *es)
 {
@@ -35,6 +37,7 @@ void editor_render_toolbar(EditorState *es)
     if (ui_button(&es->ui, bx, by, bw, bh, "Select")) {
         es->tool = TOOL_SELECT;
     }
+    ui_tooltip(&es->ui, "Select and move entities (1)");
     if (es->tool == TOOL_SELECT) {
         DrawRectangle(bx, by+bh, bw, 2, ui_color(&es->ui, UI_COLOR_SELECTED));
     }
@@ -43,6 +46,7 @@ void editor_render_toolbar(EditorState *es)
     if (ui_button(&es->ui, bx, by, bw, bh, "Place")) {
         es->tool = TOOL_PLACE;
     }
+    ui_tooltip(&es->ui, "Place the palette's entity (2)");
     if (es->tool == TOOL_PLACE) {
         DrawRectangle(bx, by+bh, bw, 2, ui_color(&es->ui, UI_COLOR_SELECTED));
     }
@@ -51,6 +55,7 @@ void editor_render_toolbar(EditorState *es)
     if (ui_button(&es->ui, bx, by, bw, bh, "Delete")) {
         es->tool = TOOL_DELETE;
     }
+    ui_tooltip(&es->ui, "Delete what you click (3)");
     if (es->tool == TOOL_DELETE) {
         DrawRectangle(bx, by+bh, bw, 2, ui_color(&es->ui, UI_COLOR_SELECTED));
     }
@@ -60,12 +65,14 @@ void editor_render_toolbar(EditorState *es)
     if (ui_button(&es->ui, bx, by, 56, bh, grid_label)) {
         es->show_grid ^= 1;
     }
+    ui_tooltip(&es->ui, "Show the grid (G)");
 
     bx += 60;
     const char *dbg_label = es->debug_play ? "[Debug]" : " Debug ";
     if (ui_button(&es->ui, bx, by, 56, bh, dbg_label)) {
         es->debug_play ^= 1;
     }
+    ui_tooltip(&es->ui, "Playtest with the game's --debug overlay");
 
     bx += 60;
     static const char *zoom_opts[] = {
@@ -85,6 +92,7 @@ void editor_render_toolbar(EditorState *es)
         /* Zoom around the canvas centre so the view stays on the same area. */
         canvas_set_zoom(es, (float)zoom_vals[sel], CANVAS_W / 2, TOOLBAR_H + CANVAS_H / 2);
     }
+    ui_tooltip(&es->ui, "Zoom (Ctrl+wheel)");
 
     /* The Campaign view (Ctrl+M) covers the canvas; the button closes it
      * again (asking first about unsaved campaign edits). */
@@ -93,6 +101,7 @@ void editor_render_toolbar(EditorState *es)
         if (es->campaign) (void)editor_campaign_close(es, 0);
         else (void)editor_campaign_open(es, NULL);
     }
+    ui_tooltip(&es->ui, "Campaign view (Ctrl+M)");
 
     /* High contrast re-themes every widget and panel (UI_STYLE_HIGH_CONTRAST:
      * black faces, white outlines, text at 7:1 or more). The level canvas
@@ -105,27 +114,32 @@ void editor_render_toolbar(EditorState *es)
         if (es->settings_path[0] != '\0' && editor_save_settings(es) != 0)
             editor_set_status(es, "Could not save the Contrast setting");
     }
+    ui_tooltip(&es->ui, "High-contrast colours");
 
     int rx = EDITOR_W - 4 - 52;
     if (es->playing) {
         if (ui_button(&es->ui, rx, by, 52, bh, "Stop")) {
             editor_stop_play(es);
         }
+        ui_tooltip(&es->ui, "Stop the playtest");
     } else {
         if (ui_button(&es->ui, rx, by, 52, bh, "Play")) {
             editor_play_test(es);
         }
+        ui_tooltip(&es->ui, "Playtest (F5; Shift+F5 from here)");
     }
 
     rx -= 64 + 4;
     if (ui_button(&es->ui, rx, by, 64, bh, "Save")) {
         (void)editor_save_current_level(es);
     }
+    ui_tooltip(&es->ui, "Save (Ctrl+S)");
 
     rx -= 64 + 4;
     if (ui_button(&es->ui, rx, by, 64, bh, "Save As")) {
         (void)editor_save_current_level_as(es);
     }
+    ui_tooltip(&es->ui, "Save As (Ctrl+Shift+S)");
 
     rx -= 64 + 4;
     if (ui_button(&es->ui, rx, by, 64, bh, "Open")) {
@@ -133,6 +147,7 @@ void editor_render_toolbar(EditorState *es)
             editor_open_level_file(es);
         }
     }
+    ui_tooltip(&es->ui, "Open (Ctrl+O, or drop a .toml on the window)");
 
     rx -= 64 + 4;
     if (ui_button(&es->ui, rx, by, 64, bh, "New")) {
@@ -140,6 +155,7 @@ void editor_render_toolbar(EditorState *es)
             editor_reset_new_level(es);
         }
     }
+    ui_tooltip(&es->ui, "New level (Ctrl+N)");
 }
 
 /*

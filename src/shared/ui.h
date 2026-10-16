@@ -14,6 +14,7 @@
  */
 #pragma once
 #include <stddef.h>
+#include <stdint.h>
 #include "text.h"
 #include "../levels/level.h"
 
@@ -168,6 +169,25 @@ typedef struct {
      * and the y it was drawn at, so a scrolling panel can bring it into
      * view.  The panel clears focus_landed_id once it has scrolled. */
     int focus_landed_id, focus_landed_y;
+    /*
+     * Tooltips (ui_tooltip).  The owner sets time_ms each frame (any
+     * millisecond clock; tests set it by hand) and view_w / view_h to the
+     * size of what it draws into, so a tip near an edge stays inside.
+     * last_x .. last_h is the widget drawn last, the one ui_tooltip is
+     * about.  tooltip_x .. tooltip_h is the widget the pointer has rested
+     * on since tooltip_since_ms; tooltip_text is this frame's tip for it,
+     * and tooltip_shown says ui_draw_overlays drew it, in tip_box.
+     */
+    uint32_t time_ms;
+    int view_w, view_h;
+    int last_x, last_y, last_w, last_h;
+    const char *tooltip_text;   /* borrowed until ui_draw_overlays */
+    int tooltip_x, tooltip_y, tooltip_w, tooltip_h;
+    uint32_t tooltip_since_ms;
+    int tooltip_seen;           /* a tip was asked for this frame        */
+    int tooltip_dismissed;      /* a click on the widget hid it          */
+    int tooltip_shown;
+    int tip_box[4];             /* x, y, w, h of the box last drawn      */
     /* Capture undo before a change; finish/block a field edit before commands. */
     UIBeforeChangeFn before_change;
     void *before_change_context;
@@ -192,7 +212,8 @@ void ui_begin_frame(UIState *ui);
  * goes to that list (to pick an option or close it); mouse_clicked stays 0,
  * so no other widget reacts. Returns 1 when the press was taken this way. */
 int ui_press(UIState *ui);
-/* Draw the open dropdown list on top of everything else drawn this frame. */
+/* Draw the open dropdown list, then any tooltip that is due, on top of
+ * everything else drawn this frame. */
 void ui_draw_overlays(UIState *ui);
 /* Append UTF-8 input without splitting a codepoint if the queue fills. */
 void ui_queue_text_input(UIState *ui, const char *text);
@@ -232,6 +253,15 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label);
 /* The same button while its command has nothing to act on: drawn darker with
  * a dim label, without a hover highlight, and it never takes a click. */
 void ui_button_disabled(UIState *ui, int x, int y, int w, int h, const char *label);
+/*
+ * Give the widget drawn just before this call a tooltip: once the pointer
+ * has rested on it for UI_TOOLTIP_DELAY_MS, ui_draw_overlays shows `text`
+ * in a box by the pointer.  Pressing the mouse on the widget hides the tip
+ * until the pointer moves to another widget.  The text is borrowed until
+ * ui_draw_overlays (a string literal is the usual choice).
+ */
+#define UI_TOOLTIP_DELAY_MS 500u
+void ui_tooltip(UIState *ui, const char *text);
 /* UTF-8 labels, drawn from the font atlas with DrawTextEx. Coordinates and
  * measurements are logical canvas pixels. */
 void ui_label(UIState *ui, int x, int y, const char *text);
