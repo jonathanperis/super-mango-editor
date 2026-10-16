@@ -26,11 +26,9 @@ int font_test_live(void);
 #endif
 /* Returns 0 on success, -1 on failure; either output pointer may be NULL. */
 int font_measure(TextFont *font, const char *text, int *width, int *height);
-/* Rasterize a label into a separate owned texture. Cache/reuse it as needed;
- * release with texture_unload. Characters outside the font's 224 glyphs
- * (ASCII plus Latin-1) draw as raylib's '?' fallback. */
-Texture2D *font_texture(TextFont *font, const char *text, Color color);
-/* Draw directly into the current render target; no separate label texture. */
+/* Draw directly into the current render target from the font's atlas.
+ * Characters outside the font's 224 glyphs (ASCII plus Latin-1) draw as
+ * raylib's '?' fallback. */
 void font_draw(TextFont *font, const char *text, int x, int y, Color color);
 /* Draw text whose middle lands on center_x (y is still the top edge). Every
  * centred label in the game (menu, overlays, debug title) uses this one. */

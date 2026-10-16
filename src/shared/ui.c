@@ -581,35 +581,10 @@ static void draw_rect(int x, int y, int w, int h, Color c)
 static void draw_text(UIState *ui, int x, int y,
                        const char *text, Color c)
 {
-    if (!ui->font || !text || !text[0]) return;
-    UITextCacheEntry *entry = NULL;
-    uint32_t color = (uint32_t)c.r << 24 | (uint32_t)c.g << 16 | (uint32_t)c.b << 8 | c.a;
-    if (strlen(text) < UI_TEXT_CACHE_BYTES) {
-        entry = &ui->text_cache[0];
-        for (int i = 0; i < UI_TEXT_CACHE_COUNT; i++) {
-            UITextCacheEntry *candidate = &ui->text_cache[i];
-            if (candidate->texture && candidate->color == color && !strcmp(candidate->text, text)) {
-                candidate->used = ++ui->text_clock;
-                IntRect dst = {x, y, candidate->w, candidate->h};
-                sprite_draw(candidate->texture, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
-                return;
-            }
-            if (candidate->used < entry->used) entry = candidate;
-        }
-    }
-    Texture2D *texture = font_texture(ui->font, text, c);
-    if (!texture) return;
-    IntRect dst = {x, y, texture->width, texture->height};
-    sprite_draw(texture, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
-    if (entry) {
-        texture_unload(entry->texture);
-        entry->texture = texture;
-        memcpy(entry->text, text, strlen(text) + 1);
-        entry->color = color;
-        entry->used = ++ui->text_clock;
-        entry->w = dst.w;
-        entry->h = dst.h;
-    } else texture_unload(texture);
+    if (!ui->font || !text || !text[0] || !IsWindowReady()) return;
+    /* raylib's default font is one atlas texture, so each label is drawn
+     * glyph by glyph from it in the shared batch: nothing to cache. */
+    font_draw(ui->font, text, x, y, c);
 }
 
 /*
@@ -782,11 +757,8 @@ void ui_init(UIState *ui, TextFont *font)
 
 void ui_cleanup(UIState *ui)
 {
-    for (int i = 0; i < UI_TEXT_CACHE_COUNT; i++) {
-        texture_unload(ui->text_cache[i].texture);
-        ui->text_cache[i] = (UITextCacheEntry){0};
-    }
-    ui->text_clock = 0;
+    /* UIState owns no textures: labels are drawn from the font's atlas. */
+    (void)ui;
 }
 
 /* ------------------------------------------------------------------ */
