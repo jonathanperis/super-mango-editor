@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function host(file, pattern) {
+function host(file, pattern, options = {}) {
     const nodes = new Map();
     const listeners = new Map();
     let reloads = 0, storageReads = 0;
@@ -21,6 +21,7 @@ function host(file, pattern) {
             scrollIntoView(options) { this.scrollOptions = options; },
             querySelector(selector) { return nodes.get(selector); },
             getAttribute(name) { return name === 'data-start-game' ? (id === 'debug-btn' ? 'debug' : 'play') : null; },
+            requestFullscreen() { this.fullscreenRequests = (this.fullscreenRequests || 0) + 1; return Promise.resolve(); },
         };
         Object.defineProperty(node, 'innerHTML', {
             set() { this.children = []; }, get() { return ''; },
@@ -28,11 +29,13 @@ function host(file, pattern) {
         return node;
     }
     for (const id of ['canvas', 'game-status', 'play-btn', 'debug-btn', 'play',
-                       'status', 'touch-controls', 'game-viewport', '.cabinet-standby', '.cabinet-standby-note']) nodes.set(id, element(id));
+                       'status', 'touch-controls', 'game-viewport', '.cabinet-standby', '.cabinet-standby-note',
+                       'canvas-container', 'fullscreen-btn']) nodes.set(id, element(id));
+    nodes.get('fullscreen-btn').hidden = true;
     const status = nodes.get('game-status');
     for (const id of ['.cabinet-standby', '.cabinet-standby-note', 'play-btn', 'debug-btn']) status.appendChild(nodes.get(id));
     const document = {
-        activeElement: null, body: element('body'),
+        activeElement: null, body: element('body'), fullscreenEnabled: options.fullscreen !== false,
         getElementById(id) { return nodes.get(id); },
         createElement() { return element(); },
         querySelectorAll() { return [nodes.get('play-btn'), nodes.get('debug-btn')]; },
@@ -115,4 +118,16 @@ assert.equal(shell.touch.enabled, false);
 assert.equal(shell.nodes.get('status').style.pointerEvents, 'auto');
 shell.nodes.get('status').children[0].onclick();
 assert.equal(shell.reloads(), 1);
+
+// The page's Fullscreen button (the game cannot request it from its own
+// frame callback) takes the whole container, then hands the keyboard back.
+const button = shell.nodes.get('fullscreen-btn');
+assert.equal(button.hidden, false, 'fullscreen button hidden where fullscreen works');
+shell.document.activeElement = button;
+button.handlers.get('click')();
+assert.equal(shell.nodes.get('canvas-container').fullscreenRequests, 1);
+assert.equal(shell.nodes.get('canvas').fullscreenRequests, undefined, 'canvas went fullscreen without its container');
+assert.equal(shell.document.activeElement, shell.nodes.get('canvas'), 'keyboard stayed on the button');
+const noFullscreen = host('web/shell.html', /<script>([\s\S]*?)<\/script\b[^>]*>/i, { fullscreen: false });
+assert.equal(noFullscreen.nodes.get('fullscreen-btn').hidden, true, 'fullscreen button shown where it cannot work');
 console.log('web_host_test: ok');
