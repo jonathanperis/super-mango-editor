@@ -5,7 +5,7 @@
 #include "floor_gap_collision.h"
 #include "../game.h"  /* GameState: this file reads its fields */
 
-#include "../mangolib/maudio.h"
+#include "../shared/audio.h"
 
 #include "collision_damage.h"
 #include "../effects/water.h"

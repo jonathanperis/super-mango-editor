@@ -10,7 +10,7 @@
 #include "editor_playtest.h"
 #include "editor_session.h"
 #include "editor_undo_apply.h"
-#include "../mangolib/mangomath.h" /* float_same_value */
+#include "../shared/geometry.h"  /* float_same_value */
 #include "tools.h"
 #include "entity_meta.h"   /* editor_select_none */
 

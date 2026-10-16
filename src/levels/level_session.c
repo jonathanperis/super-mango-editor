@@ -18,8 +18,8 @@
 #include "../core/game_completion.h"
 #include "../core/game_resources.h"
 #include "../core/game_experiment.h"
-#include "../mangolib/mcore.h"   /* str_copy */
-#include "serializer.h"
+#include "../shared/platform.h"  /* str_copy */
+#include "../shared/serializer.h"
 
 /*
  * read_stable_level — Parse, validate and fingerprint a level into the heap.

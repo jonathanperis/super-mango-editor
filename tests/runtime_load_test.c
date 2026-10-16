@@ -3,7 +3,7 @@
 
 #include "levels/level_loader.h"
 #include "game.h"  /* GameState: this file reads its fields */
-#include "mangolib/mgfx.h"    /* display_open */
+#include "shared/graphics.h"  /* display_open */
 
 #define TEST_PLAYER_W 48
 #define TEST_PLAYER_H 48

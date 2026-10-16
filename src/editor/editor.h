@@ -24,15 +24,15 @@
  */
 #pragma once
 
-#include "../mangolib/mtext.h"
-#include "../mangolib/mcore.h"
-#include "../mangolib/minput.h"
+#include "../shared/text.h"
+#include "../shared/platform.h"
+#include "../input/input_backend.h"
 #include <stdint.h>        /* uint64_t — document save-point fingerprint */
 #include "../levels/level.h" /* LevelDef — the data-driven level definition we edit */
-#include "../mangolib/mangogui.h" /* UIState — shared immediate-mode widgets */
+#include "../shared/ui.h"  /* UIState — shared immediate-mode widgets */
 #include "undo.h"          /* UndoStack, PlacementData — undo system + clipboard */
 #include "editor_validation.h" /* EditorValidationReport                         */
-#include "../mangolib/mfile.h"       /* SerializerFileFingerprint */
+#include "../shared/serializer_io.h" /* SerializerFileFingerprint */
 
 /* ------------------------------------------------------------------ */
 /* Constants — editor window layout                                    */

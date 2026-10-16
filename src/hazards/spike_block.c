@@ -2,7 +2,7 @@
  * spike_block.c — SpikeBlock: a rail-riding hazard that pushes the player.
  */
 
-#include "../mangolib/mgfx.h"
+#include "../shared/graphics.h"
 #include <stdio.h>
 
 #include "spike_block.h"

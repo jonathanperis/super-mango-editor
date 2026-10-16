@@ -10,9 +10,9 @@
  */
 #pragma once
 
-#include "../mangolib/massets.h"    /* AssetCache — the menu's three files come from it */
-#include "../mangolib/mtext.h"
-#include "../mangolib/maudio.h"
+#include "../shared/asset_cache.h"  /* AssetCache — the menu's three files come from it */
+#include "../shared/text.h"
+#include "../shared/audio.h"
 
 #include "../input/game_input.h"
 #include "../levels/level_session.h"

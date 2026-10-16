@@ -7,10 +7,10 @@
  * relative to the working folder, as the game does. POSIX spells the calls
  * mkdir, getcwd and chdir; Windows spells them _mkdir, _wgetcwd and _wchdir,
  * and the last two take UTF-16, converted with the serializer's UTF-8
- * helpers exactly as src/mangolib/masset_root.c does.
+ * helpers exactly as src/shared/asset_root.c does.
  *
  * Include it after defining _POSIX_C_SOURCE (getcwd and chdir need it under
- * -std=c11), in a test that links src/mangolib/mfile.c.
+ * -std=c11), in a test that links src/shared/serializer_io.c.
  */
 #ifndef MANGO_TEST_FOLDERS_H
 #define MANGO_TEST_FOLDERS_H
@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mangolib/mfile.h"         /* serializer_utf8_to_wide, _wide_to_utf8 */
+#include "shared/serializer_io.h"   /* serializer_utf8_to_wide, _wide_to_utf8 */
 
 #ifdef _WIN32
 #include <direct.h>     /* _mkdir, _wgetcwd, _wchdir */

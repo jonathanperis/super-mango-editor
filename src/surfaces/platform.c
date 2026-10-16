@@ -6,7 +6,7 @@
  * landing zone — collision logic lives in player_update (player.c).
  */
 
-#include "../mangolib/mgfx.h"
+#include "../shared/graphics.h"
 #include <stdio.h>
 
 #include "platform.h"

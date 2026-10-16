@@ -6,7 +6,7 @@
  * fields specific to the selected entity type — position, patrol range,
  * animation frame, mode dropdown, etc.
  *
- * The panel uses the immediate-mode UI widgets from mangogui.h (ui_float_field,
+ * The panel uses the immediate-mode UI widgets from ui.h (ui_float_field,
  * ui_int_field, ui_dropdown, ui_label, ui_panel, ui_separator) so every
  * field is re-rendered each frame and edits flow directly into the LevelDef
  * stored in EditorState.

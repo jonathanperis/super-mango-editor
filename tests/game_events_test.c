@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "mangolib/minput.h"
+#include "input/input_backend.h"
 
 #include "core/game_overlay.h"
 #include "core/game_terminal.h"

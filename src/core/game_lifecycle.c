@@ -5,7 +5,6 @@
 #include "../game.h"
 
 #include "game_camera.h"
-#include "game_state.h"    /* game_seed_random */
 #include "game_resources.h"
 #include "game_experiment.h"
 #include "game_ghost.h"
@@ -17,7 +16,7 @@
 #include "../levels/level_session.h"
 #include "../player/player.h"
 #include "../screens/hud.h"
-#include "../mangolib/maudio.h" /* sound_stop_all */
+#include "../shared/audio.h"  /* sound_stop_all */
 
 #include <string.h>           /* memset */
 
@@ -73,8 +72,6 @@ int game_init(GameState *gs)
     /* Initialise debug overlay if --debug was passed on the CLI. */
     if (gs->screen.debug_mode) debug_init(&gs->screen.debug);
 
-    /* Seed before the level loads: fish jump timers draw from the stream. */
-    game_seed_random(gs, gs->screen.random_seed);
     if (game_level_load_initial(gs) != 0) goto fail;
     if (game_replay_load(gs) != 0) goto fail;
 

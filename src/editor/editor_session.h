@@ -4,7 +4,7 @@
 #pragma once
 
 #include "editor.h"  /* EditorState */
-#include "../mangolib/mprintf_format.h" /* PRINTF_FORMAT */
+#include "../shared/printf_format.h" /* PRINTF_FORMAT */
 
 /* Format the editor status bar message (printf-style; the compiler checks
  * every call's arguments against fmt). */

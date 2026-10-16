@@ -3,7 +3,7 @@
 
 The native game and editor load assets and levels from paths relative to the
 asset folder; started from elsewhere they change to the executable's folder
-first (src/mangolib/masset_root.c). So assets/ and levels/ must sit beside the
+first (src/shared/asset_root.c). So assets/ and levels/ must sit beside the
 executables: shipping only the executable is not enough. This helper builds
 that runnable folder and compresses it into a zip file.
 """

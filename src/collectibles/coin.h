@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include "../mangolib/mgfx.h"
+#include "../shared/graphics.h"
 
 #define MAX_COINS       64     /* coin slots across the full world         */
 #define COIN_DISPLAY_W  16     /* render width  in logical pixels          */

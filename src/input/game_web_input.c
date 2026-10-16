@@ -4,7 +4,7 @@
 
 #include "game_web_input.h"
 
-#include "../mangolib/minput.h"
+#include "input_backend.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>  /* EM_JS — JavaScript compiled into the glue file */

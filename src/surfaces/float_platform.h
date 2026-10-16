@@ -20,7 +20,7 @@
  */
 #pragma once
 
-#include "../mangolib/mgfx.h"
+#include "../shared/graphics.h"
 #include "rail.h"   /* Rail — needed for the RAIL mode pointer */
 
 /* ---- Sprite constants ---------------------------------------------------- */

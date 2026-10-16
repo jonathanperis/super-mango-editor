@@ -9,7 +9,7 @@
  */
 #pragma once
 
-#include "../mangolib/mgfx.h"
+#include "../shared/graphics.h"
 
 /*
  * MAX_PLATFORMS — upper bound on how many platforms the game can hold.

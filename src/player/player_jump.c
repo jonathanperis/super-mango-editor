@@ -4,7 +4,7 @@
 
 #include "player_jump.h"
 
-#include "../mangolib/maudio.h"
+#include "../shared/audio.h"
 
 #include "player_internal.h"
 
