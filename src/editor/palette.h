@@ -41,5 +41,3 @@
  */
 void palette_render(EditorState *es, int start_y, int available_h);
 
-/* Scroll the palette content by delta pixels (positive = down). */
-void palette_scroll(int delta);

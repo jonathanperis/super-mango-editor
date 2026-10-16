@@ -70,28 +70,12 @@ int g_fg_open   = 0;
 int g_fog_open  = 0;
 int g_phys_open = 0;
 
-/*
- * cfg_scroll_y — vertical scroll offset (px) for the Level Config content.
- *
- * When the config panel has more content than fits in the visible area,
- * scrolling shifts content upward.  Clamped to [0, max] in
- * level_config_render each frame.
- */
-static int cfg_scroll_y = 0;
 
 /* The part of the screen the scrolled config content shows this frame
  * (set by level_config_render); rows outside it cannot be clicked. */
 static int cfg_clip_top = 0;
 static int cfg_clip_bottom = 0;
 
-/*
- * cfg_scroll — Adjust the Level Config scroll offset by a pixel delta.
- * Called from editor.c's mouse wheel handler.
- */
-void cfg_scroll(int delta) {
-    cfg_scroll_y += delta;
-    if (cfg_scroll_y < 0) cfg_scroll_y = 0;
-}
 
 /* ------------------------------------------------------------------ */
 /* Dropdown option arrays                                              */
@@ -1413,9 +1397,8 @@ static int config_validation(EditorState *es, int x, int y)
     y += 20;
 
     /* Keep the window on the list as it shrinks or grows. */
-    if (es->message_scroll > count - shown) es->message_scroll = count - shown;
-    if (es->message_scroll < 0) es->message_scroll = 0;
-    first = es->message_scroll;
+    ui_scroll_clamp(&es->message_scroll, count, shown);
+    first = es->message_scroll.offset;
     msg_list_top = msg_list_bottom = 0;
     if (count > shown) {
         msg_list_top = y;
@@ -1994,30 +1977,17 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     }
 
     /*
-     * Scroll clamping — clamp cfg_scroll_y so we never scroll past the
-     * last pixel of content.  title_h is the fixed header that never
-     * scrolls; content_visible_h is the drawable area below it.
+     * Only the content below the fixed title scrolls (es->config_scroll,
+     * moved by the wheel in editor_panels.c). ui_scroll_begin keeps the
+     * offset within the content, clips drawing to the area below the title
+     * and returns where the content's top edge goes; ui_scroll_end below
+     * clears the clip.
      */
-    int title_h          = ROW_H + 4;
+    int title_h           = ROW_H + 4;
     int content_visible_h = cfg_h - title_h;
-    int content_total_h   = total_content_h - title_h;
-    int max_scroll = content_total_h - content_visible_h;
-    if (max_scroll < 0)        max_scroll = 0;
-    if (cfg_scroll_y > max_scroll) cfg_scroll_y = max_scroll;
-
-    /*
-     * Clip rect — restrict all content drawing to the area below the
-     * title bar.  Anything that would scroll off the top or bottom edge
-     * is invisible.  We clear the clip rect at the end of this function.
-     */
-    int content_top = start_y + title_h;
-    BeginScissorMode(x, content_top, PROP_W, content_visible_h);
-
-    /*
-     * y — the running vertical cursor for content rendering.
-     * Subtracting cfg_scroll_y shifts content upward as the user scrolls.
-     */
-    int y = content_top + 8 - cfg_scroll_y;
+    int content_top       = start_y + title_h;
+    int y = ui_scroll_begin(&es->config_scroll, x, content_top, PROP_W, content_visible_h,
+                            total_content_h - title_h) + 8;
     cfg_clip_top = content_top;
     cfg_clip_bottom = content_top + content_visible_h;
     y = config_validation(es, x, y);
@@ -2031,7 +2001,7 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     y = config_foreground_layers(es, x, y);
     (void)config_fog_layers(es, x, y);
 
-    EndScissorMode();
+    ui_scroll_end();
     editor_end_change_tracking(es);
     show_field_note(es);
 
@@ -2040,12 +2010,8 @@ void level_config_render(EditorState *es, int start_y, int available_h,
      * the top of this function keeps the result in range next frame). */
     if (es->ui.focus_landed_id >= 9000) {
         int field_top = es->ui.focus_landed_y;
-        int field_bottom = field_top + 20;
-        if (field_top < cfg_clip_top)
-            cfg_scroll_y -= cfg_clip_top - field_top + 8;
-        else if (field_bottom > cfg_clip_bottom)
-            cfg_scroll_y += field_bottom - cfg_clip_bottom + 8;
-        if (cfg_scroll_y < 0) cfg_scroll_y = 0;
+        ui_scroll_reveal(&es->config_scroll, field_top, field_top + 20,
+                         cfg_clip_top, cfg_clip_bottom, 8);
         es->ui.focus_landed_id = 0;
     }
 }

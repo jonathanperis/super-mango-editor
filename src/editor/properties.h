@@ -60,14 +60,6 @@ void level_config_render(EditorState *es, int start_y, int available_h,
                          int total_content_h);
 
 /*
- * cfg_scroll — Adjust the Level Config scroll offset by a pixel delta.
- *
- * Called from the editor's mouse wheel handler when the cursor is over
- * the Level Config section.  Clamping happens inside level_config_render.
- */
-void cfg_scroll(int delta);
-
-/*
  * properties_message_list_contains — 1 when (x, y) is over the validation
  * rows as last drawn and there are more rows than fit, so the wheel there
  * scrolls the list instead of the panel.
