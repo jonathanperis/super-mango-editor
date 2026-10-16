@@ -255,6 +255,13 @@ toggle and by the game's settings menu when the high-contrast setting is on.
 `editor_ui_test` checks that the default still matches the `UI_*` colours and
 that every high-contrast text colour keeps 7:1 on every face.
 
+`ui_tooltip(ui, text)`, called right after a widget, gives that widget a
+tooltip: once the pointer has rested on it for `UI_TOOLTIP_DELAY_MS` (500 ms),
+`ui_draw_overlays` draws the text in a `UI_COLOR_TITLE` box by the pointer
+(with the style's border, when it has one), kept inside `view_w` × `view_h`.
+The delay is timed with `UIState.time_ms`, which the owner sets each frame
+(`editor_run_frame` from `clock_millis`), so a test can step the clock by hand.
+
 A scrolled panel or list keeps a `UIScroll` (offset plus the wheel's leftover
 fraction), modelled on raygui's `GuiScrollPanel`. `ui_scroll_wheel` turns wheel
 notches into whole pixels or rows and keeps a trackpad's fractions for the next

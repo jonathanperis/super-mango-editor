@@ -20,6 +20,7 @@ void editor_run_frame(EditorState *es)
     /* Clear one-shot flags before draining commands. Otherwise the previous
      * click or Return key would be applied again on the following frame. */
     ui_begin_frame(&es->ui);
+    es->ui.time_ms = now;   /* tooltips time how long the pointer rests */
     input_collect();
     InputEvent event;
     while (input_poll(&event))

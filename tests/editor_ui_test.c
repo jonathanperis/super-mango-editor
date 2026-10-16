@@ -468,6 +468,69 @@ done:
     return failed;
 }
 
+/* Rest the pointer at (x, y) until time_ms, and run that frame. */
+static void hover_frame(EditorState *es, int x, int y, uint32_t time_ms)
+{
+    es->ui.time_ms = time_ms;
+    ui_frame(es, x, y);
+}
+
+/*
+ * Toolbar tooltips: shown once the pointer has rested on a button for
+ * UI_TOOLTIP_DELAY_MS, restarted by moving to another button, hidden by a
+ * click until the pointer leaves, and kept inside the window at its edge.
+ */
+static int toolbar_tooltips_wait_then_name_the_shortcut(void)
+{
+    int failed = 0;
+    EditorState es;
+    const int select_x = 30, grid_x = 4 + 3 * (64 + 4) + 16 + 20, bar_y = 15;
+    CHECK(open_editor(&es, NULL) == 0);
+
+    hover_frame(&es, select_x, bar_y, 1000);
+    CHECK(es.ui.tooltip_text && strstr(es.ui.tooltip_text, "(1)") != NULL);
+    CHECK(!es.ui.tooltip_shown);
+    hover_frame(&es, select_x + 3, bar_y, 1000 + UI_TOOLTIP_DELAY_MS - 1);
+    CHECK(!es.ui.tooltip_shown);
+    hover_frame(&es, select_x, bar_y, 1000 + UI_TOOLTIP_DELAY_MS);
+    CHECK(es.ui.tooltip_shown);
+    /* Below and right of the pointer, inside the window. */
+    CHECK(es.ui.tip_box[0] > select_x && es.ui.tip_box[1] > bar_y);
+
+    /* Another button starts its own wait. */
+    hover_frame(&es, grid_x, bar_y, 2000);
+    CHECK(es.ui.tooltip_text && strcmp(es.ui.tooltip_text, "Show the grid (G)") == 0);
+    CHECK(!es.ui.tooltip_shown);
+    hover_frame(&es, grid_x, bar_y, 2600);
+    CHECK(es.ui.tooltip_shown);
+
+    /* A click hides it while the pointer stays... */
+    CHECK(es.show_grid);
+    push_click(grid_x, bar_y);
+    hover_frame(&es, grid_x, bar_y, 2700);
+    CHECK(!es.show_grid);
+    hover_frame(&es, grid_x, bar_y, 5000);
+    CHECK(!es.ui.tooltip_shown);
+    /* ...and leaving the button resets it. */
+    hover_frame(&es, NEUTRAL_X, NEUTRAL_Y, 5100);
+    CHECK(es.ui.tooltip_text == NULL && !es.ui.tooltip_shown);
+    hover_frame(&es, grid_x, bar_y, 5200);
+    CHECK(!es.ui.tooltip_shown);
+    hover_frame(&es, grid_x, bar_y, 5700);
+    CHECK(es.ui.tooltip_shown);
+
+    /* Play sits at the right edge: its tip moves left to stay inside. */
+    hover_frame(&es, EDITOR_W - 10, bar_y, 6000);
+    CHECK(es.ui.tooltip_text && strstr(es.ui.tooltip_text, "F5") != NULL);
+    hover_frame(&es, EDITOR_W - 10, bar_y, 7000);
+    CHECK(es.ui.tooltip_shown);
+    CHECK(es.ui.tip_box[0] + es.ui.tip_box[2] <= EDITOR_W);
+    CHECK(es.ui.tip_box[0] < EDITOR_W - 10);
+done:
+    close_editor(&es);
+    return failed;
+}
+
 /* The default style is the editor look the UI_* colours describe, with no
  * control outlines; the high-contrast style keeps every text colour at the
  * WCAG AAA ratio (7:1) or more on every face it is drawn on. */
@@ -3541,6 +3604,7 @@ int main(void)
         CASE(ui_scrollbar_pages_drags_and_uses_its_clicks),
         CASE(ui_styles_keep_the_default_look_and_high_contrast),
         CASE(toolbar_contrast_toggles_the_high_contrast_style),
+        CASE(toolbar_tooltips_wait_then_name_the_shortcut),
         CASE(floor_reaches_both_canvas_edges_at_any_scroll),
         CASE(palette_clicks_choose_what_the_place_tool_adds),
         CASE(canvas_place_select_drag_delete_and_undo),
