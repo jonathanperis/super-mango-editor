@@ -2,7 +2,7 @@
  * game_timing.c — Fixed-step frame timing and loop bookkeeping helpers.
  *
  * See game_timing.h for why the simulation uses a fixed step. The clock
- * itself is shared/fixed_step.c; this file supplies the game's limits and
+ * itself is mangolib/mtiming.c; this file supplies the game's limits and
  * the deterministic smoke/replay mode.
  */
 

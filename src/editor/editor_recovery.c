@@ -63,8 +63,8 @@
 #include "editor_files.h"      /* preference paths, atomic writes, loading */
 #include "editor_session.h"    /* editor_set_status, editor_document_hash */
 #include "editor_validation.h" /* editor_validate_level */
-#include "../shared/serializer.h"    /* level_save_toml_recovery */
-#include "../shared/serializer_io.h" /* UTF-8 file I/O */
+#include "../levels/serializer.h"    /* level_save_toml_recovery */
+#include "../mangolib/mfile.h"       /* UTF-8 file I/O */
 
 #define EDITOR_AUTOSAVE_MS   30000u
 #define EDITOR_STATUS_HOLD_MS 5000u  /* keep a fresh status message this long */

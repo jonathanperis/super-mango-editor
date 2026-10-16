@@ -31,7 +31,7 @@ for the current latest release.
 In scope:
 
 - **TOML level and campaign parsing**: the vendored `tomlc17` parser, the
-  serializer/loader in `src/shared/` and `src/levels/`, and level validation.
+  serializer/loader in `src/levels/` with file I/O in `src/mangolib/mfile.c`, and level validation.
   Crashes, memory-safety bugs, hangs or unbounded allocation from a crafted
   level file are in scope.
 - **Player profiles and replay/experiment files**: native profile files in the

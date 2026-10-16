@@ -4,7 +4,7 @@
  * a "record it again" error (EXPERIMENT_FORMAT_VERSION says why for each).
  * Replays require unchanged level bytes and the same engine version. */
 #include "game_experiment.h"
-#include "../shared/platform.h"  /* str_copy */
+#include "../mangolib/mcore.h"   /* str_copy */
 #include "game_state.h"   /* game_seed_random */
 #include "game_camera.h"
 #include "game_completion.h"
@@ -12,7 +12,7 @@
 #include "game_timing.h"
 #include "../levels/level_loader.h"
 #include "../levels/level_resources.h"
-#include "../shared/serializer_emit.h"
+#include "../levels/serializer_emit.h"
 #include "tomlc17.h"
 #include <limits.h>
 #include <math.h>

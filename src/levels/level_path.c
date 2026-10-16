@@ -15,7 +15,7 @@
 #if defined(_WIN32)
 #include <windows.h>
 #include <stdlib.h>
-#include "../shared/serializer_io.h"
+#include "../mangolib/mfile.h"
 #ifndef MAX_PATH
 #define MAX_PATH 260
 #endif

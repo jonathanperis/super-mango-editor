@@ -31,7 +31,7 @@
 #include "editor_files.h"    /* private playtest snapshot lifecycle */
 #include "editor_session.h" /* editor status/title/persist helpers */
 #include "entity_meta.h"     /* editor_selection_count */
-#include "../shared/serializer_io.h"
+#include "../mangolib/mfile.h"
 
 #if defined(MANGO_TESTING) && !defined(_WIN32)
 static int (*editor_test_launch)(const char *const *argv);

@@ -120,7 +120,7 @@ instead of hoping a tool will catch the overflow.
 
 ## AddressSanitizer: using a texture after freeing it
 
-`texture_load()` in `src/shared/texture.c` mallocs a small `Texture2D` handle
+`texture_load()` in `src/mangolib/mtexture.c` mallocs a small `Texture2D` handle
 and `texture_unload()` frees it. Whoever owns the pointer must clear it after
 freeing. `labs/debugging/texture_after_free.c` forgets, then draws one more
 frame:

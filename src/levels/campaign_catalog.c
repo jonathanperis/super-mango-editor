@@ -13,10 +13,10 @@
 
 #include "level_path.h"                   /* level_resolve_path */
 #include "level_ref.h"                    /* level_ref_valid */
-#include "../shared/platform.h"           /* str_copy */
-#include "../shared/serializer.h"         /* level_load_toml, serializer_write_temp */
-#include "../shared/serializer_io.h"      /* serializer_file_exists_utf8 */
-#include "../shared/serializer_emit.h"    /* write_toml_string */
+#include "../mangolib/mcore.h"            /* str_copy */
+#include "serializer.h"                   /* level_load_toml, serializer_write_temp */
+#include "../mangolib/mfile.h"            /* serializer_file_exists_utf8 */
+#include "serializer_emit.h"              /* write_toml_string */
 #include "../../vendor/tomlc17/tomlc17.h"
 
 static int campaign_key_matches(const char *supplied, int supplied_len,

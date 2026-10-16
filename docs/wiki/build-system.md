@@ -36,14 +36,14 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(wildcard $(SRCDIR)/render/*.c) \
           $(wildcard $(SRCDIR)/screens/*.c) \
           $(wildcard $(SRCDIR)/surfaces/*.c) \
-          $(wildcard $(SRCDIR)/shared/*.c) \
+          $(wildcard $(SRCDIR)/mangolib/*.c) \
           vendor/tomlc17/tomlc17.c
 OBJS    = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
 DEPS    = $(OBJS:.o=.d)
 ```
 
 This abbreviated source-list example omits platform detection and build-mode flags.
-Both applications include `src/shared/serializer_load_checkpoints.c` and the other shared serializer/UI modules.
+Both applications include `src/levels/serializer_load_checkpoints.c` and the other shared serializer/UI modules.
 
 raylib **6.0** is fetched from the source/checksum pin in `vendor/raylib/manifest.json`.
 `tools/build_raylib.py` verifies the archive, applies the documented replacements
@@ -239,7 +239,7 @@ from any other folder, the game and editor first change to the folder that holds
 `assets/` and `levels/`: the executable's own folder (a release zip) or one or two
 folders above it (`out/super-mango`, `out/release/super-mango` in a checkout).
 Command-line paths are made absolute before that move, so they keep meaning the
-folder they were typed in (`src/shared/asset_root.c`).
+folder they were typed in (`src/mangolib/masset_root.c`).
 
 ### `make run-debug`
 
@@ -267,7 +267,7 @@ make run-level-debug LEVEL=levels/labs/01_collision.toml
 
 ### `make editor`
 
-Compiles the standalone level editor into `out/super-mango-editor`. The editor is a separate binary with its own source files in `src/editor/` and the tomlc17 TOML parser from `vendor/tomlc17/`.
+Compiles the standalone level editor into `out/super-mango-editor`. The editor is a separate binary with its own source files in `src/editor/`, the level serializer from `src/levels/`, the tomlc17 TOML parser from `vendor/tomlc17/`, and Mangolib. The game and the editor both link Mangolib as `out/libmango.a`.
 
 ```sh
 make editor
@@ -346,7 +346,7 @@ regression suites.
 
 ### `make validate-levels`
 
-Builds `out/level-check` (`tools/level_check.c`) and loads every `levels/*.toml` and `levels/labs/*.toml` through the game's own loader and validator, `level_load_toml()`. The rules live in one place, `src/levels/level_validate.c` and `src/shared/serializer_parse.c`: schema, counts, geometry, rails, checkpoints and path shapes. The checker needs no window or GPU; it reuses the game's objects (and so builds raylib once, for its headers).
+Builds `out/level-check` (`tools/level_check.c`) and loads every `levels/*.toml` and `levels/labs/*.toml` through the game's own loader and validator, `level_load_toml()`. The rules live in one place, `src/levels/level_validate.c` and `src/levels/serializer_parse.c`: schema, counts, geometry, rails, checkpoints and path shapes. The checker needs no window or GPU; it reuses the game's objects (and so builds raylib once, for its headers).
 
 `tools/validate_levels.py` then makes the checks a single file cannot: referenced assets and `next_phase` targets exist, checked-in levels state `format_version` and a positive `screen_count`, the required v1 `levels/campaigns/main.toml` manifest lists real levels in order as a linear chain, and asset literals in `src/` exist. Its `validate_schema()` only mirrors the type schema so `make docs-drift` can check the manual's partial TOML snippets without a compiler.
 

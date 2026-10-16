@@ -14,8 +14,8 @@
  */
 #pragma once
 
-#include "../shared/asset_cache.h"  /* AssetCache — the strips are held from it */
-#include "../shared/graphics.h"
+#include "../mangolib/massets.h"    /* AssetCache — the strips are held from it */
+#include "../mangolib/mgfx.h"
 
 #define WATER_FRAMES        8    /* frames in the sheet                    */
 #define WATER_FRAME_W      48    /* full slot width in the sheet (px)      */

@@ -6,7 +6,7 @@
  * a phase-passed event.
  */
 
-#include "../shared/graphics.h"
+#include "../mangolib/mgfx.h"
 
 #include "last_star.h"
 #include "game_constants.h" /* FLOOR_Y, TILE_SIZE, GAME_W */

@@ -11,8 +11,8 @@
  */
 #pragma once
 
-#include "../shared/printf_format.h"
-#include "../shared/text.h"
+#include "../mangolib/mprintf_format.h"
+#include "../mangolib/mtext.h"
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */

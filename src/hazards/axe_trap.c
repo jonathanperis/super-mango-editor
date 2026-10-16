@@ -7,7 +7,7 @@
  * extremes / rotation completion.
  */
 
-#include "../shared/graphics.h"
+#include "../mangolib/mgfx.h"
 #include <math.h>    /* sinf, fabsf, fmodf, M_PI */
 #include <stdio.h>
 

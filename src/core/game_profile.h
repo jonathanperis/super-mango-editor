@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../input/input_backend.h"
+#include "../mangolib/minput.h"
 #include <stddef.h>
 #include <stdint.h>  /* uint64_t: the level hash and coin mask in GameResume */
 

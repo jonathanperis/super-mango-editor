@@ -38,7 +38,7 @@ comments are intentional, even when shorter code could do the same job:
   a useful explanation solely because the implementation is now shorter.
 
 raylib APIs use names such as `LoadTexture` and `DrawTexturePro`. The snake-case
-helpers in `src/shared/` and `src/input/input_backend.*` belong to this project;
+helpers in `src/mangolib/` (Mangolib, the engine layer) belong to this project;
 they preserve explicit ownership, logical coordinates and saved-binding IDs.
 
 ### Naming
@@ -65,7 +65,7 @@ they preserve explicit ownership, logical coordinates and saved-binding IDs.
   borrowed resource twice.
 - A file a level names, or one every game needs, is acquired from the session's asset cache, not loaded directly: `asset_cache_texture_acquire(gs->cache, path)` and one `asset_cache_texture_release` for it at cleanup. The cache owns it and decides when to unload, so never pass an acquired texture, sound, track or font to `texture_unload`, `sound_unload`, `music_unload` or `font_unload`. The start menu gets its font, logo and confirm sound the same way. Direct `texture_load` remains right for something with one owner for its whole life, such as the rows of the shared sprite table in `src/core/game_resources.c`.
 - Use `float` for positions and velocities. Preserve integer `IntRect` hitbox construction and edge rules; convert to raylib `Rectangle` at drawing boundaries.
-- Asset and level paths stay relative (`"assets/..."`, `"levels/..."`). Startup moves a foreign working folder to the asset root once (`src/shared/asset_root.c`), so no module needs to build absolute asset paths. A new command-line *path* option must be made absolute in `main.c` before that move, as `--profile` is.
+- Asset and level paths stay relative (`"assets/..."`, `"levels/..."`). Startup moves a foreign working folder to the asset root once (`src/mangolib/masset_root.c`), so no module needs to build absolute asset paths. A new command-line *path* option must be made absolute in `main.c` before that move, as `--profile` is.
 
 ### Coordinate System
 

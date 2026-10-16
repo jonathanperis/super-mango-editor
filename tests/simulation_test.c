@@ -12,7 +12,7 @@
 #include "input/game_events.h"
 #include "player/player_internal.h"
 #include "player/player_jump.h"
-#include "shared/platform.h"   /* clock_millis */
+#include "mangolib/mcore.h"    /* clock_millis */
 #include "test_paths.h"         /* TEST_OUT scratch directory */
 #include <math.h>
 #include <stdio.h>

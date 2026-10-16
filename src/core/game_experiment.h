@@ -2,7 +2,7 @@
 #pragma once
 #include "../game.h"
 #include "game_inspector.h"
-#include "../shared/serializer_io.h"
+#include "../mangolib/mfile.h"
 
 #define EXPERIMENT_MAX_FRAMES 36000
 

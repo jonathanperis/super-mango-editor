@@ -8,7 +8,7 @@
 #include "../game.h"  /* GameState: this file reads its fields */
 #include "game_web_input.h"
 
-#include "input_backend.h"
+#include "../mangolib/minput.h"
 
 static int s_test_physical_override;
 static GameInputPhysicalState s_test_physical_state;

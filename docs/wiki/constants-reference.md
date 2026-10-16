@@ -204,11 +204,11 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 
 | Value | Location | Description |
 |-------|----------|-------------|
-| `EFFECT_VOICES = 8` | `src/shared/audio.c` | Global pool of simultaneous effect aliases; a new play is dropped when all are busy |
+| `EFFECT_VOICES = 8` | `src/mangolib/maudio.c` | Global pool of simultaneous effect aliases; a new play is dropped when all are busy |
 | `0..128` | level/profile audio settings | Authored/saved volume units; normalized to raylib's `0..1` at the audio boundary |
 
 raylib/miniaudio negotiates the device's format, channels and sample rate;
-`audio_open` (`src/shared/audio.c`) just calls `InitAudioDevice` and does not
+`audio_open` (`src/mangolib/maudio.c`) just calls `InitAudioDevice` and does not
 hard-code a sample format or mixer buffer size. The game needs a working audio
 device to start. Music volume
 is authored per level and multiplied by the saved music-volume preference;

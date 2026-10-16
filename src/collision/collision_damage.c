@@ -13,7 +13,7 @@
 #include "../core/game_ghost.h"
 #include "../hazards/spike_block.h"  /* SPIKE_PUSH_SPEED, SPIKE_PUSH_VY */
 
-#include "../shared/audio.h"
+#include "../mangolib/maudio.h"
 #include <math.h>       /* sqrtf */
 
 void game_restart_after_game_over(GameState *gs)

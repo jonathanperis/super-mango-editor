@@ -6,7 +6,7 @@
  * but touching the spikes from sides or below deals damage.
  */
 
-#include "../shared/graphics.h"
+#include "../mangolib/mgfx.h"
 #include <stdio.h>
 
 #include "spike_platform.h"

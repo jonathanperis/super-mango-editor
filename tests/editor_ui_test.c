@@ -50,7 +50,7 @@
 #include "editor/properties.h"
 #include "editor/tools.h"
 #include "levels/level_loader.h"
-#include "shared/serializer.h"
+#include "levels/serializer.h"
 #include "test_folders.h"
 #include "test_paths.h"
 

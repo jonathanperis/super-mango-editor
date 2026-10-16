@@ -8,9 +8,9 @@
  */
 #pragma once
 
-#include "../shared/asset_cache.h"  /* AssetCache — fog images are held from it */
-#include "../shared/graphics.h"
-#include "../shared/random.h"      /* RandomStream — fog waves draw from one */
+#include "../mangolib/massets.h"    /* AssetCache — fog images are held from it */
+#include "../mangolib/mgfx.h"
+#include "../mangolib/mrandom.h"   /* RandomStream — fog waves draw from one */
 
 /*
  * MAX_FOG_TEXTURES — maximum number of fog texture assets the system can hold.

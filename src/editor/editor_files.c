@@ -31,8 +31,8 @@
 #include "editor_session.h"    /* editor status/title/persist helpers */
 #include "editor_clipboard.h"  /* editor_clipboard_forget_rails */
 #include "file_dialog.h"       /* file_dialog_open */
-#include "../shared/serializer.h"    /* shared level format */
-#include "../shared/serializer_io.h" /* UTF-8 file I/O */
+#include "../levels/serializer.h"    /* shared level format */
+#include "../mangolib/mfile.h"       /* UTF-8 file I/O */
 #include "undo.h"              /* undo_clear */
 #include "entity_meta.h"       /* editor_select_none */
 

@@ -6,7 +6,7 @@
 
 #include <stdio.h>     /* fprintf, stderr */
 
-#include "../shared/graphics.h" /* DESTROY_TEX */
+#include "../mangolib/mgfx.h"   /* DESTROY_TEX */
 
 /*
  * editor_textures_load — Load all entity sprite sheets from assets/.

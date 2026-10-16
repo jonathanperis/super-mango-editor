@@ -6,8 +6,8 @@
  */
 #pragma once
 
-#include "../shared/graphics.h"
-#include "../shared/random.h"   /* RandomStream — jump delays draw from one */
+#include "../mangolib/mgfx.h"
+#include "../mangolib/mrandom.h" /* RandomStream — jump delays draw from one */
 
 #define MAX_FISH           16       /* maximum simultaneous fish instances     */
 #define FISH_FRAMES         2       /* horizontal frames in Fish_2.png (96×48) */

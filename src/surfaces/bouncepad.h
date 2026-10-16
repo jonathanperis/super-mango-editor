@@ -14,7 +14,7 @@
  */
 #pragma once
 
-#include "../shared/graphics.h"
+#include "../mangolib/mgfx.h"
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
