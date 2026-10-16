@@ -95,6 +95,7 @@ src/
 │   ├── platform.h / .c          Monotonic time, UTF-8 copying and OS preference/executable paths
 │   ├── asset_root.h / .c        Move a foreign working folder to the one holding assets/ and levels/
 │   ├── utf8.h                   Strict UTF-8 checks for loaded strings and typed text
+│   ├── hex.h                    Fixed-width lowercase hex reader for ghost and resume values
 │   ├── printf_format.h          PRINTF_FORMAT: lets GCC/Clang check printf-style format arguments
 │   ├── ui.h / .c                 Immediate-mode widgets shared by editor and game settings
 │   ├── serializer.h / .c         TOML save/load public API anchor
@@ -618,6 +619,7 @@ reports it, resident memory in MB.
 | `shared/platform.h`, `shared/platform.c` | Monotonic elapsed time, UTF-8 copying and caller-owned OS paths |
 | `shared/asset_root.h`, `shared/asset_root.c` | Why relative paths depend on the working folder, and how startup finds the asset root |
 | `shared/utf8.h` | What makes a UTF-8 byte sequence valid (overlong forms, surrogates, truncation) |
+| `shared/hex.h` | Why 64-bit values are stored as hex strings, and a reader that refuses what the writer never produces |
 | `shared/printf_format.h` | How a compiler attribute lets our own printf-style wrappers get format-string checks |
 | `input/input_backend.h`, `input/input_backend.c` | Ordered events versus held state, logical pointer mapping and saved-binding translation |
 

@@ -7,6 +7,7 @@
 #include "player_internal.h"
 #include "../game_constants.h" /* FLOOR_Y, FLOOR_GAP_W */
 #include "../shared/raymath_inline.h" /* Clamp */
+#include "../shared/geometry.h"       /* span_find */
 
 /*
  * FLOAT_PLATFORM_STICK_TOL — tolerance in logical pixels for the stay-on check.
@@ -60,20 +61,17 @@ void player_resolve_floor_collision(Player *player,
      * is kept one pixel in, because a centre exactly on gx + FLOOR_GAP_W
      * counts as ground.
      */
-    if (prev_bottom > (float)FLOOR_Y) {
-        for (int g = 0; g < floor_gap_count; g++) {
-            float gx = (float)floor_gaps[g];
-            if (prev_center_x < gx || prev_center_x >= gx + (float)FLOOR_GAP_W)
-                continue;
-            float center_x = player->x + player->w / 2.0f;
-            float wall_left = gx;
-            float wall_right = gx + (float)FLOOR_GAP_W - 1.0f;
-            if (center_x < wall_left || center_x > wall_right) {
-                float held = Clamp(center_x, wall_left, wall_right);
-                player->x  = held - player->w / 2.0f;
-                player->vx = 0.0f;
-            }
-            break;
+    int inside = prev_bottom > (float)FLOOR_Y
+               ? span_find(prev_center_x, floor_gaps, floor_gap_count, FLOOR_GAP_W) : -1;
+    if (inside >= 0) {
+        float gx = (float)floor_gaps[inside];
+        float center_x = player->x + player->w / 2.0f;
+        float wall_left = gx;
+        float wall_right = gx + (float)FLOOR_GAP_W - 1.0f;
+        if (center_x < wall_left || center_x > wall_right) {
+            float held = Clamp(center_x, wall_left, wall_right);
+            player->x  = held - player->w / 2.0f;
+            player->vx = 0.0f;
         }
     }
 
@@ -83,14 +81,7 @@ void player_resolve_floor_collision(Player *player,
      * falls through into the water below.
      */
     float phys_center_x = player->x + player->w / 2.0f;
-    int over_ground = 1;
-    for (int g = 0; g < floor_gap_count; g++) {
-        float gx = (float)floor_gaps[g];
-        if (phys_center_x >= gx && phys_center_x < gx + (float)FLOOR_GAP_W) {
-            over_ground = 0;
-            break;
-        }
-    }
+    int over_ground = span_find(phys_center_x, floor_gaps, floor_gap_count, FLOOR_GAP_W) < 0;
 
     if (over_ground && player->y >= ground_snap) {
         player->y = ground_snap;   /* snap to floor in all cases */
@@ -384,17 +375,21 @@ void player_resolve_spike_platform_ceiling_collision(Player *player,
     }
 }
 
-void player_resolve_world_bounds(Player *player, int world_w) {
+void player_clamp_world_x(Player *player, int world_w) {
     /*
-     * Horizontal clamp — keep the PHYSICS body inside the logical canvas.
-     * We clamp the inset edge (x + PHYS_PAD_X), not the sprite left edge,
-     * so the transparent side-padding can slide off-screen while the visible
+     * Keep the PHYSICS body inside the world horizontally. We clamp the
+     * inset edge (x + PHYS_PAD_X), not the sprite left edge, so the
+     * transparent side-padding can slide off-screen while the visible
      * character stays flush with the border instead of stopping early.
      */
     if (player->x + PHYS_PAD_X < 0.0f)
         player->x = -(float)PHYS_PAD_X;
     if (player->x + player->w - PHYS_PAD_X > world_w)
         player->x = (float)(world_w - player->w + PHYS_PAD_X);
+}
+
+void player_resolve_world_bounds(Player *player, int world_w) {
+    player_clamp_world_x(player, world_w);
 
     /*
      * Ceiling clamp — stop upward movement when the physics top hits the

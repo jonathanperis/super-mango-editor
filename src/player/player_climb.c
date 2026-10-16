@@ -6,6 +6,7 @@
 
 #include "player_animation.h"
 #include "player_internal.h"
+#include "player_surfaces.h"   /* player_clamp_world_x */
 
 /* Extra pixels on each side of the climbable sprite that count as grabbable. */
 #define PLAYER_CLIMB_GRAB_PAD 4
@@ -190,11 +191,8 @@ int player_update_climbing(Player *player, float dt,
         player->vy      = 0.0f;
     }
 
-    /* Horizontal world clamp (same logic as normal path). */
-    if (player->x + PHYS_PAD_X < 0.0f)
-        player->x = -(float)PHYS_PAD_X;
-    if (player->x + player->w - PHYS_PAD_X > world_w)
-        player->x = (float)(world_w - player->w + PHYS_PAD_X);
+    /* Horizontal world clamp (same as the normal path, without its ceiling). */
+    player_clamp_world_x(player, world_w);
 
     player_animate(player, dt * 1000.0f);
     return 1;

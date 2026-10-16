@@ -5,6 +5,7 @@
  */
 
 #include "entity_utils.h"
+#include "../shared/geometry.h"  /* span_find */
 
 /* ------------------------------------------------------------------ */
 
@@ -98,8 +99,8 @@ void patrol_update(float *x, float *vx, float entity_w,
  * it is about to step onto air, not one frame earlier or later.
  *
  * On a match we snap the entity back to the gap edge (based on travel
- * direction) and reverse velocity, keeping its speed.  The 'break' exits
- * after the first gap match; an entity cannot straddle two gaps
+ * direction) and reverse velocity, keeping its speed.  span_find stops
+ * at the first gap match; an entity cannot straddle two gaps
  * simultaneously at FLOOR_GAP_W=32.
  *
  * The art centre is only tested once per step, so this works only while one
@@ -113,20 +114,18 @@ void patrol_gap_reverse(float *x, float *vx,
 {
     float art_center = *x + art_x_offset + art_w * 0.5f;
     float gw = (float)floor_gap_w;
+    int g = span_find(art_center, floor_gaps, floor_gap_count, floor_gap_w);
 
-    for (int g = 0; g < floor_gap_count; g++) {
+    if (g >= 0) {
         float gx = (float)floor_gaps[g];
-        if (art_center >= gx && art_center < gx + gw) {
-            if (*vx > 0.0f) {
-                /* Travelling right — snap left edge of art to gap left edge. */
-                *x  = gx - art_x_offset - art_w;
-                *vx = -*vx;
-            } else {
-                /* Travelling left — snap left edge of art to gap right edge. */
-                *x  = gx + gw - art_x_offset;
-                *vx = -*vx;
-            }
-            break;
+        if (*vx > 0.0f) {
+            /* Travelling right — snap left edge of art to gap left edge. */
+            *x  = gx - art_x_offset - art_w;
+            *vx = -*vx;
+        } else {
+            /* Travelling left — snap left edge of art to gap right edge. */
+            *x  = gx + gw - art_x_offset;
+            *vx = -*vx;
         }
     }
 }
