@@ -197,6 +197,11 @@ typedef struct {
      * the changes, for tests.
      */
     int cursor_wish, cursor_shown, cursor_changes;
+    /* The clip rectangle set with ui_clip_begin (or ui_scroll_begin), so
+     * code that has to leave the frame being drawn (an in-window prompt)
+     * can put it back afterwards.  raylib keeps no such record. */
+    int clip_active;
+    int clip_x, clip_y, clip_w, clip_h;
     /* Capture undo before a change; finish/block a field edit before commands. */
     UIBeforeChangeFn before_change;
     void *before_change_context;
@@ -331,10 +336,16 @@ void ui_separator(UIState *ui, int x, int y, int w);
 int ui_scroll_wheel(UIScroll *scroll, float wheel, float units_per_notch);
 /* Keep the offset within 0 .. content - view (0 when everything fits). */
 void ui_scroll_clamp(UIScroll *scroll, int content, int view);
+/* Clip drawing to (x, y, w, h) with raylib's scissor, and remember it in
+ * the UIState (clip_*).  Every scissor the owner sets goes through these,
+ * so the active clip is always known.  Clips do not nest. */
+void ui_clip_begin(UIState *ui, int x, int y, int w, int h);
+void ui_clip_end(UIState *ui);
 /* For a pixel panel: clamp, clip drawing to the view (x, y, w, view_h)
  * and return where the content's top edge goes. Pair with ui_scroll_end. */
-int ui_scroll_begin(UIScroll *scroll, int x, int y, int w, int view_h, int content_h);
-void ui_scroll_end(void);
+int ui_scroll_begin(UIState *ui, UIScroll *scroll, int x, int y, int w, int view_h,
+                    int content_h);
+void ui_scroll_end(UIState *ui);
 /* Scroll just far enough that [top, bottom) is inside [view_top,
  * view_bottom) with margin to spare; ui_scroll_begin limits the result. */
 void ui_scroll_reveal(UIScroll *scroll, int top, int bottom,
