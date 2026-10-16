@@ -189,6 +189,14 @@ typedef struct {
     int tooltip_dismissed;      /* a click on the widget hid it          */
     int tooltip_shown;
     int tip_box[4];             /* x, y, w, h of the box last drawn      */
+    /*
+     * The mouse cursor (a raylib MouseCursor).  Widgets and the owner
+     * say what this frame wants in cursor_wish (ui_begin_frame resets it
+     * to the arrow); ui_apply_cursor sets it once at the end of the frame,
+     * and only when it differs from cursor_shown.  cursor_changes counts
+     * the changes, for tests.
+     */
+    int cursor_wish, cursor_shown, cursor_changes;
     /* Capture undo before a change; finish/block a field edit before commands. */
     UIBeforeChangeFn before_change;
     void *before_change_context;
@@ -251,6 +259,16 @@ void ui_dropdown_key(UIState *ui, UIEditKey key);
  * opens its list. */
 void ui_focus_field(UIState *ui, int id);
 
+/* Ask for a mouse cursor (MOUSE_CURSOR_*) for this frame; the last ask
+ * wins.  Editable fields ask for the I-beam while the pointer is on them. */
+void ui_set_cursor(UIState *ui, int cursor);
+/* End of frame: show the cursor this frame asked for (the resize arrows
+ * while a scrollbar thumb is dragged), calling raylib only when it
+ * changes.  raylib's GLFW backend makes a new system cursor on every
+ * SetMouseCursor and never frees it, so calling it every frame would
+ * pile them up.  A hidden window or the Memory test backend has no
+ * cursor to set; there only cursor_shown follows. */
+void ui_apply_cursor(UIState *ui);
 /* Draw a button and return 1 on its click frame, not every held-mouse frame.
  * An active edit must finish before the caller executes the button command. */
 int ui_button(UIState *ui, int x, int y, int w, int h, const char *label);

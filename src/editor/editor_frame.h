@@ -12,3 +12,8 @@
 
 /* Run one full editor frame. */
 void editor_run_frame(EditorState *es);
+
+/* End of a frame's drawing: show the mouse cursor the frame asked for
+ * (the four-way arrows while entities are dragged, the I-beam over a
+ * field), touching the system cursor only when it changes. */
+void editor_update_cursor(EditorState *es);
