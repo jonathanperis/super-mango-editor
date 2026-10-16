@@ -1595,3 +1595,68 @@ void ui_scroll_reveal(UIScroll *scroll, int top, int bottom,
     else if (bottom > view_bottom) scroll->offset += bottom - view_bottom + margin;
     if (scroll->offset < 0) scroll->offset = 0;
 }
+
+/* The thumb's place and length on a track of h pixels; 0 when it all fits. */
+static int scrollbar_thumb(int y, int h, int view, int content, int offset,
+                           int *thumb_y, int *thumb_h)
+{
+    if (content <= view || view <= 0 || h <= 0) return 0;
+    int length = (int)((int64_t)h * view / content);
+    if (length < 12) length = 12;
+    if (length > h) length = h;
+    int max_offset = content - view;
+    if (offset < 0) offset = 0;
+    if (offset > max_offset) offset = max_offset;
+    *thumb_h = length;
+    *thumb_y = y + (int)((int64_t)(h - length) * offset / max_offset);
+    return 1;
+}
+
+int ui_scrollbar_input(UIState *ui, UIScroll *scroll, int x, int y, int w, int h,
+                       int view, int content)
+{
+    int thumb_y, thumb_h, before;
+
+    if (!ui || !scroll) return 0;
+    before = scroll->offset;
+    if (!scrollbar_thumb(y, h, view, content, scroll->offset, &thumb_y, &thumb_h)) {
+        if (ui->scroll_drag == scroll) ui->scroll_drag = NULL;
+        return 0;
+    }
+    if (ui->scroll_drag == scroll) {
+        if (!ui->mouse_down) {
+            ui->scroll_drag = NULL;
+        } else {
+            /* Put the thumb where the pointer holds it, as a share of the
+             * track it can travel, rounded to the nearest unit. */
+            int travel = h - thumb_h;
+            int top = ui->mouse_y - ui->scroll_grab - y;
+            if (top < 0) top = 0;
+            if (top > travel) top = travel;
+            scroll->offset = travel > 0
+                ? (int)(((int64_t)top * (content - view) * 2 + travel) / (2 * (int64_t)travel)) : 0;
+        }
+    } else if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h)) {
+        if (ui->mouse_y >= thumb_y && ui->mouse_y < thumb_y + thumb_h) {
+            ui->scroll_drag = scroll;
+            ui->scroll_grab = ui->mouse_y - thumb_y;
+        } else {
+            scroll->offset += ui->mouse_y < thumb_y ? -view : view;
+        }
+        ui->mouse_clicked = 0;   /* the bar used this click */
+    }
+    ui_scroll_clamp(scroll, content, view);
+    return scroll->offset != before;
+}
+
+void ui_scrollbar_draw(UIState *ui, const UIScroll *scroll, int x, int y, int w, int h,
+                       int view, int content)
+{
+    int thumb_y, thumb_h;
+
+    if (!ui || !scroll ||
+        !scrollbar_thumb(y, h, view, content, scroll->offset, &thumb_y, &thumb_h)) return;
+    draw_rect(x, y, w, h, ui_color(ui, UI_COLOR_TITLE));
+    draw_rect(x, thumb_y, w, thumb_h,
+              ui_color(ui, ui->scroll_drag == scroll ? UI_COLOR_ACCENT : UI_COLOR_TEXT_DIM));
+}

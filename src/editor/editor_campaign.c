@@ -803,6 +803,8 @@ int editor_campaign_open(EditorState *es, const char *manifest_path)
 void editor_campaign_free(EditorState *es)
 {
     if (!es || !es->campaign) return;
+    /* Its scrollbar cannot stay grabbed once the view is gone. */
+    if (es->ui.scroll_drag == &es->campaign->scroll) es->ui.scroll_drag = NULL;
     forget_steps(&es->campaign->history, 0);
     campaign_catalog_cleanup(&es->campaign->catalog);
     free(es->campaign->disk);
@@ -1445,9 +1447,14 @@ void editor_campaign_render(EditorState *es)
                    "Game's verdict", ui_color(&es->ui, UI_COLOR_TEXT_DIM));
 
     rows = CAMPAIGN_VISIBLE_ROWS;
+    /* The scrollbar sits right of the rows and takes its clicks first. */
+    (void)ui_scrollbar_input(&es->ui, &c->scroll, CAMPAIGN_SCROLLBAR_X, CAMPAIGN_ROWS_Y - 2,
+                             SCROLLBAR_W, rows * CAMPAIGN_ROW_H, rows, (int)c->catalog.count);
     ui_scroll_clamp(&c->scroll, (int)c->catalog.count, rows);
     for (int i = c->scroll.offset; i < (int)c->catalog.count && i < c->scroll.offset + rows; i++)
         draw_row(es, c, i, CAMPAIGN_ROWS_Y + (i - c->scroll.offset) * CAMPAIGN_ROW_H);
+    ui_scrollbar_draw(&es->ui, &c->scroll, CAMPAIGN_SCROLLBAR_X, CAMPAIGN_ROWS_Y - 2,
+                      SCROLLBAR_W, rows * CAMPAIGN_ROW_H, rows, (int)c->catalog.count);
 
     draw_undo_notice(es, c);
     draw_buttons(es, c);

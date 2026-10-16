@@ -61,6 +61,8 @@
  */
 #define CANVAS_W      896
 #define PANEL_W       384
+/* Width of the panels' and lists' scrollbars, in pixels. */
+#define SCROLLBAR_W   5
 
 /*
  * TOOLBAR_H — height of the top toolbar strip (tool selector, file buttons).
