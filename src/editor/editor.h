@@ -482,20 +482,17 @@ typedef struct {
     int            snap_to_grid;
     int            input_mods;
     EditorFocusArea focus_area;   /* where the last left click landed */
-    /* The validation list in the Level Config panel: the first row shown,
-     * the wheel's leftover fraction of a row, and the text of the row (or
-     * load-problem row) clicked last, which Ctrl+C copies. */
-    int            message_scroll;
-    float          message_wheel_accum;
+    /* The validation list in the Level Config panel: its scroll in rows,
+     * and the text of the row (or load-problem row) clicked last, which
+     * Ctrl+C copies. */
+    UIScroll       message_scroll;
     char           selected_message[EDITOR_VALIDATION_MESSAGE_LEN];
     int            running;       /* 1 = main loop active, 0 = exit requested  */
-    int            panel_scroll;  /* scroll offset (px) for the right panel    */
-    /*
-     * Trackpads report the wheel in fractions of a notch.  These keep the
-     * part that has not yet added up to a whole step: panel pixels for the
-     * side panels, notches for Ctrl+wheel zoom.
-     */
-    float          panel_wheel_accum;
+    /* Side panels scrolled in pixels; each keeps its own trackpad remainder. */
+    UIScroll       config_scroll;
+    UIScroll       palette_scroll;
+    /* Trackpads report the wheel in fractions of a notch: Ctrl+wheel zoom
+     * waits until they add up to one whole notch. */
     float          zoom_wheel_accum;
     int            panel_open;    /* 1 = properties panel expanded, 0 = collapsed  */
     int            config_open;   /* 1 = level config panel expanded, 0 = collapsed */

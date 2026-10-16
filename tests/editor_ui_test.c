@@ -289,6 +289,34 @@ static int scan_palette(EditorState *es, int top, int bottom, int picked[ENT_COU
     return found;
 }
 
+/* UIScroll: trackpad fractions add up to whole units, the offset stays
+ * within the content, and reveal moves just far enough. */
+static int ui_scroll_keeps_fractions_and_stays_in_range(void)
+{
+    int failed = 0;
+    UIScroll rows = {0};
+    for (int i = 0; i < 3; i++) CHECK(ui_scroll_wheel(&rows, -0.25f, 1.0f) == 0);
+    CHECK(rows.offset == 0);
+    CHECK(ui_scroll_wheel(&rows, -0.25f, 1.0f) == 1 && rows.offset == 1);
+    (void)ui_scroll_wheel(&rows, 5.0f, 1.0f);           /* far past the top */
+    CHECK(rows.offset == 0);
+
+    UIScroll pixels = {0};
+    CHECK(ui_scroll_wheel(&pixels, -0.1f, 20.0f) == 2 && pixels.offset == 2);
+    pixels.offset = 500;
+    ui_scroll_clamp(&pixels, 300, 100);                 /* 200 px can scroll */
+    CHECK(pixels.offset == 200);
+    ui_scroll_clamp(&pixels, 50, 100);                  /* everything fits */
+    CHECK(pixels.offset == 0);
+
+    ui_scroll_reveal(&pixels, 300, 320, 100, 200, 8);   /* below the view */
+    CHECK(pixels.offset == 128);
+    ui_scroll_reveal(&pixels, 90, 110, 100, 200, 8);    /* above the view */
+    CHECK(pixels.offset == 110);
+done:
+    return failed;
+}
+
 /* WCAG relative luminance of an sRGB colour. */
 static double luminance(Color c)
 {
@@ -1189,7 +1217,6 @@ static int validation_rows_scroll_and_copy(void)
     const int row_x = CANVAS_W + 60, row_y = TOOLBAR_H + 28 + 8 + 20 + 9;
     char first[EDITOR_VALIDATION_MESSAGE_LEN];
     CHECK(open_editor(&es, NULL) == 0);
-    cfg_scroll(-100000);   /* an earlier case may have scrolled the panel */
 
     /* Twelve coins below the world: twelve errors, eight rows shown. */
     es.level.coin_count = 12;
@@ -1197,7 +1224,7 @@ static int validation_rows_scroll_and_copy(void)
         es.level.coins[i] = (CoinPlacement){100.0f + 30.0f * (float)i, 9999.0f};
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     CHECK(es.validation_report.message_count == 12);
-    CHECK(es.message_scroll == 0);
+    CHECK(es.message_scroll.offset == 0);
     snprintf(first, sizeof(first), "%s", es.validation_report.messages[0]);
 
     /* The first row takes you to coin 0, and Ctrl+C copies the row. */
@@ -1221,14 +1248,14 @@ static int validation_rows_scroll_and_copy(void)
      * shown is now message 4, and clicking it goes to coin 4. */
     push_wheel(row_x, row_y, -4.0f, 0);
     ui_frame(&es, row_x, row_y);
-    CHECK(es.message_scroll == 4);
+    CHECK(es.message_scroll.offset == 4);
     click_frame(&es, row_x, row_y);
     CHECK(es.selection.type == ENT_COIN && es.selection.index == 4);
     key_frame(&es, KEY_ESCAPE, 0);
     /* It stops at the last full window: rows 5-12. */
     push_wheel(row_x, row_y, -20.0f, 0);
     ui_frame(&es, row_x, row_y);
-    CHECK(es.message_scroll == 12 - EDITOR_VALIDATION_VISIBLE_ROWS);
+    CHECK(es.message_scroll.offset == 12 - EDITOR_VALIDATION_VISIBLE_ROWS);
     click_frame(&es, row_x, row_y + 18 * (EDITOR_VALIDATION_VISIBLE_ROWS - 1));
     CHECK(es.selection.type == ENT_COIN && es.selection.index == 11);
     key_frame(&es, KEY_ESCAPE, 0);
@@ -1277,7 +1304,6 @@ static int files_that_will_not_open_list_why(void)
     /* The list starts the Level Config content, above the summary. */
     const int heading_x = CANVAS_W + 60, heading_y = TOOLBAR_H + 28 + 8 + 9;
     CHECK(open_editor(&es, NULL) == 0);
-    cfg_scroll(-100000);   /* an earlier case may have scrolled the panel */
     uint64_t before = doc_hash(&es);
 
     /* Line 3 is not "key = value". */
@@ -2787,7 +2813,6 @@ static int text_fields_select_copy_cut_and_paste(void)
     EditorState es;
     const int field_left = CANVAS_W + 55, field_right = CANVAS_W + 55 + 310;
     CHECK(open_editor(&es, NULL) == 0);
-    cfg_scroll(-100000);
     editor_test_set_clipboard("");
 
     click_frame(&es, CANVAS_W + 60, CFG_NAME_Y);
@@ -3268,6 +3293,7 @@ int main(void)
 #endif
     const struct { const char *name; int (*run)(void); } cases[] = {
 #define CASE(fn) {#fn, fn}
+        CASE(ui_scroll_keeps_fractions_and_stays_in_range),
         CASE(ui_styles_keep_the_default_look_and_high_contrast),
         CASE(toolbar_contrast_toggles_the_high_contrast_style),
         CASE(palette_clicks_choose_what_the_place_tool_adds),

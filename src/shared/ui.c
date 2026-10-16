@@ -1547,3 +1547,51 @@ int ui_text_width(UIState *ui, const char *text)
     font_measure(ui->font, text, &w, NULL);
     return w;
 }
+
+/* ------------------------------------------------------------------ */
+/* Scrolling                                                           */
+/* ------------------------------------------------------------------ */
+
+int ui_scroll_wheel(UIScroll *scroll, float wheel, float units_per_notch)
+{
+    int units;
+
+    if (!scroll) return 0;
+    scroll->carry += -wheel * units_per_notch;
+    units = (int)scroll->carry;            /* toward 0, sign kept */
+    scroll->carry -= (float)units;
+    scroll->offset += units;
+    if (scroll->offset < 0) scroll->offset = 0;
+    return units;
+}
+
+void ui_scroll_clamp(UIScroll *scroll, int content, int view)
+{
+    int max_offset = content - view;
+
+    if (!scroll) return;
+    if (max_offset < 0) max_offset = 0;
+    if (scroll->offset > max_offset) scroll->offset = max_offset;
+    if (scroll->offset < 0) scroll->offset = 0;
+}
+
+int ui_scroll_begin(UIScroll *scroll, int x, int y, int w, int view_h, int content_h)
+{
+    ui_scroll_clamp(scroll, content_h, view_h);
+    BeginScissorMode(x, y, w, view_h);
+    return y - (scroll ? scroll->offset : 0);
+}
+
+void ui_scroll_end(void)
+{
+    EndScissorMode();
+}
+
+void ui_scroll_reveal(UIScroll *scroll, int top, int bottom,
+                      int view_top, int view_bottom, int margin)
+{
+    if (!scroll) return;
+    if (top < view_top) scroll->offset -= view_top - top + margin;
+    else if (bottom > view_bottom) scroll->offset += bottom - view_bottom + margin;
+    if (scroll->offset < 0) scroll->offset = 0;
+}

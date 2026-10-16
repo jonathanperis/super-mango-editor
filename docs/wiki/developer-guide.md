@@ -255,6 +255,14 @@ toggle and by the game's settings menu when the high-contrast setting is on.
 `editor_ui_test` checks that the default still matches the `UI_*` colours and
 that every high-contrast text colour keeps 7:1 on every face.
 
+A scrolled panel or list keeps a `UIScroll` (offset plus the wheel's leftover
+fraction), modelled on raygui's `GuiScrollPanel`. `ui_scroll_wheel` turns wheel
+notches into whole pixels or rows and keeps a trackpad's fractions for the next
+event; `ui_scroll_begin`/`ui_scroll_end` clamp the offset, clip drawing to the
+view and say where the content starts; `ui_scroll_reveal` scrolls a field into
+view. The editor's palette, Level Config, validation list and Campaign rows all
+use it.
+
 ---
 
 ## Render Layer Order
