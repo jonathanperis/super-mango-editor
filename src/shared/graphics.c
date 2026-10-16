@@ -30,7 +30,7 @@ static void display_set_icon(void)
 }
 #endif
 
-int display_open(int width, int height, const char *title, int hidden)
+int display_open(int width, int height, const char *title, int hidden, int resizable)
 {
     SetTraceLogLevel(LOG_WARNING);
     unsigned int flags = hidden ? FLAG_WINDOW_HIDDEN : FLAG_VSYNC_HINT;
@@ -50,9 +50,15 @@ int display_open(int width, int height, const char *title, int hidden)
      * Those systems already give the window one device pixel per unit. */
     flags |= FLAG_WINDOW_HIGHDPI;
 #endif
+    if (resizable) flags |= FLAG_WINDOW_RESIZABLE;
     SetConfigFlags(flags);
     InitWindow(width, height, title);
     if (!IsWindowReady()) return -1;
+    /* A resizable window may grow, and display_present letterboxes the
+     * fixed canvas into it, but never shrinks below one whole canvas:
+     * smaller would shrink the canvas by a fraction and drop pixel rows,
+     * leaving text and one-pixel lines unreadable. */
+    if (resizable) SetWindowMinSize(width, height);
     /* Escape belongs to pause/cancel/menu actions, not automatic raylib exit. */
     SetExitKey(KEY_NULL);
 #if !defined(__EMSCRIPTEN__) && !defined(__APPLE__)

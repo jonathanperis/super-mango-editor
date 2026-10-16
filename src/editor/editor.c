@@ -16,7 +16,10 @@
 
 int editor_init(EditorState *es, int hidden)
 {
-    if (display_open(EDITOR_W, EDITOR_H, "Super Mango Editor", hidden)) return -1;
+    /* Resizable, down to EDITOR_W x EDITOR_H. The layout does not reflow:
+     * panels keep their 1280x720 positions and the whole canvas scales by
+     * the largest whole number the window fits (2x from 2560x1440). */
+    if (display_open(EDITOR_W, EDITOR_H, "Super Mango Editor", hidden, 1)) return -1;
     input_open(EDITOR_W, EDITOR_H);
     /* The window/context must exist before GPU resources are loaded. Draw
      * editor panels into this fixed-size target, then scale it for display. */

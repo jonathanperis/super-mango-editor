@@ -36,7 +36,7 @@ int web_frame_pacing_contract_test(void)
 {
     for (int hidden = 0; hidden <= 1; hidden++) {
         requested_fps = -1;
-        if (web_pacing_display_open(400, 300, "Web pacing", hidden) != 0 ||
+        if (web_pacing_display_open(400, 300, "Web pacing", hidden, 0) != 0 ||
             requested_fps != 0) {
             fprintf(stderr, "Web pacing: hidden=%d requested blocking FPS=%d\n",
                     hidden, requested_fps);

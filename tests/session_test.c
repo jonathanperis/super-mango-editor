@@ -1690,7 +1690,7 @@ int menu_without_session_frees_its_files_test(void);
 
 static int setup_raylib(void)
 {
-    if (display_open(WINDOW_W, WINDOW_H, "session regression", 1)) return 1;
+    if (display_open(WINDOW_W, WINDOW_H, "session regression", 1, 0)) return 1;
     input_open(GAME_W, GAME_H);
     game_input_test_set_physical_state(0, 0);
     return audio_open() != 0;
