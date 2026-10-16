@@ -90,6 +90,12 @@ failure is fatal; missing optional sound files warn and leave empty slots. The
 editor does not open an audio device. CI can use a virtual sink; the explicit
 Memory test build uses miniaudio's null backend and does not prove audible output.
 
+Browsers keep Web Audio suspended until the player interacts with the page.
+raylib's miniaudio resumes it on a click or tap only, so `web/audio-unlock.js`
+(linked into both Web pages with `--pre-js`) also resumes it on the first key
+or mouse press, for players who start from the keyboard. Escape does not count
+as an interaction, so it cannot start sound.
+
 ---
 
 ## Sound Effects vs. Music

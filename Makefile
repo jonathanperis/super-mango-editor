@@ -421,6 +421,7 @@ web-host-contract: ## Check: Web shell, storage and packaging contract tests
 	$(NODE) tests/profile_storage_test.cjs
 	$(NODE) tests/touch_controls_test.cjs
 	$(NODE) tests/keyboard_scope_test.cjs
+	$(NODE) tests/audio_unlock_test.cjs
 	python3 tests/package_release_test.py
 	python3 tests/filter_codeql_sarif_test.py
 
@@ -709,6 +710,7 @@ EMSCRIPTEN_VERSION ?= 6.0.9
 WEB_FLAGS = -s USE_GLFW=3 \
             --pre-js web/touch-controls.js \
             --pre-js web/keyboard-scope.js \
+            --pre-js web/audio-unlock.js \
             -s ALLOW_MEMORY_GROWTH=1 \
             --preload-file assets \
             --exclude-file 'assets/sprites/unused/*' \
