@@ -67,7 +67,7 @@
  * Used to stagger fish jump timers so they don't all leap simultaneously.
  */
 static float rand_range(RandomStream *rng, float lo, float hi) {
-    return lo + random_unit(rng) * (hi - lo);
+    return lo + mrandom_unit(rng) * (hi - lo);
 }
 
 /* ------------------------------------------------------------------ */
