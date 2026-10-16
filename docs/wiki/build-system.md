@@ -90,7 +90,7 @@ was built with, compile and link settings apart:
 | `$(RAYLIB_BUILD)/make-options.txt` | the `build_raylib.py` options | raylib |
 | `$(WEB_RAYLIB_BUILD)/make-options.txt` | the Emscripten pin and `WEB_RAYLIB_OPTIONS` | Web raylib |
 | `$(OBJDIR)/web/build-flags.txt` | the Emscripten pin, `WEB_CFLAGS` (with `WEB_OPT` and `EXTRA_WEB_CFLAGS`), `WEB_INCLUDES` | Web objects |
-| `$(OBJDIR)/web/link-flags.txt` | the Emscripten pin, `WEB_OPT`, `EXTRA_WEB_CFLAGS`, `WEB_FLAGS`, `WEB_LINK_FLAGS`, `WEB_DEBUG_LINK_FLAGS` | both Web pages are relinked; no object recompiles |
+| `$(OBJDIR)/web/link-flags.txt` | the Emscripten pin, `WEB_OPT`, `EXTRA_WEB_CFLAGS`, `WEB_FLAGS`, `WEB_LINK_FLAGS` | the Web page is relinked (and the debug page re-derived); no object recompiles |
 
 While parsing the Makefile, Make reads each stamp back and rewrites it only
 when the text differs. Every output lists its stamp as a prerequisite, so a
@@ -293,14 +293,14 @@ Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). CI pins **6.
 make web
 ```
 
-Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). Each source compiles once into `out/obj/web/` (with `-MMD -MP` header tracking), and the normal and debug pages both link those objects, since they differ only at link time. The pinned raylib Web library is built separately with `emcmake`; the application links it with `USE_GLFW=3`. Uses a custom shell template from `web/shell.html`. Application sources compile with the native warning set (`-Wall -Wextra -Wpedantic`), minus the pedantic empty-declaration diagnostic that Emscripten's documented `EM_JS(...);` form triggers. `EXTRA_WEB_CFLAGS` appends flags (CI passes `-Werror`). After linking, `tools/web_csp.py` pins the minified shell's inline boot script hash into its same-origin Content-Security-Policy (`script-src 'self' 'wasm-unsafe-eval'`, no JavaScript eval); `tools/check_wasm_artifacts.py` re-verifies it.
+Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). Each source compiles once into `out/obj/web/` (with `-MMD -MP` header tracking) and links once. The pinned raylib Web library is built separately with `emcmake`; the application links it with `USE_GLFW=3`. Uses a custom shell template from `web/shell.html`. Application sources compile with the native warning set (`-Wall -Wextra -Wpedantic`), minus the pedantic empty-declaration diagnostic that Emscripten's documented `EM_JS(...);` form triggers. `EXTRA_WEB_CFLAGS` appends flags (CI passes `-Werror`). After linking, `tools/web_csp.py` pins the minified shell's inline boot script hash into its same-origin Content-Security-Policy (`script-src 'self' 'wasm-unsafe-eval'`, no JavaScript eval); `tools/check_wasm_artifacts.py` re-verifies it.
 
 The Web frame callback returns to Emscripten's animation-frame scheduler rather
 than using raylib's blocking FPS limiter. Asyncify is not required by this loop.
 Artifact compilation and HTTP delivery checks do not execute browser frames;
 startup/render changes also need the browser checks in [Testing](../testing/).
 
-The target also produces debug boot artifacts (`out/super-mango-debug.html` and companions) for direct debug HTML launches. The docs-site browser debug button uses the normal `super-mango.js` payload and passes `--debug` at boot.
+The target also produces `out/super-mango-debug.html` for direct debug HTML launches. It is not linked separately: `tools/web_debug_page.py` copies the built `super-mango.html`, inlines `web/debug-boot.js` (which sets `Module.__superMangoDebug`, so the shell passes `--debug`) just before the `super-mango.js` tag, and re-pins the CSP. Both pages therefore load the same `super-mango.js`, `.wasm` and `.data`; the debug page used to link byte-identical copies of them. The docs-site browser debug button uses the normal `super-mango.js` payload and passes `--debug` at boot.
 
 For release confidence, the **GitHub Actions WebAssembly build is authoritative**. Report local SDK/cache failures separately from application failures, and require the CI `make web`, artifact checks and Pages assembly checks. JavaScript syntax/WASM validation requires real Node.js; if a local `node` wrapper launches Bun, set `NODE` to the Node executable explicitly.
 
@@ -336,8 +336,8 @@ Current test binaries (17):
 Its `web-host-contract` prerequisite runs `tools/check_web_boot_contract.py`, the
 Node tests `tests/web_host_test.cjs`, `tests/profile_storage_test.cjs`,
 `tests/touch_controls_test.cjs`, `tests/keyboard_scope_test.cjs` and
-`tests/audio_unlock_test.cjs`, then `tests/package_release_test.py` and
-`tests/filter_codeql_sarif_test.py`
+`tests/audio_unlock_test.cjs`, then `tests/web_debug_page_test.py`,
+`tests/package_release_test.py` and `tests/filter_codeql_sarif_test.py`
 (`make web-host-contract` runs them alone). `tests/docs_checks_test.py` runs from
 `bun run check-site` instead. The native list above is the complete
 `TEST_TARGETS` inventory; profile, simulation and parser-boundary cases are linked
@@ -433,7 +433,7 @@ make dist-native
 
 ### `make dist-wasm`
 
-Depends on `asset-budget` and `make web`, whose HTML outputs are file targets over the Web objects (and through them the sources and headers), `web/` host files, `assets/`, `levels/`, the Web raylib library and the Web link flag stamp; emcc only reruns when one of them is newer, so a stale WASM build is never packaged. Archives include HTML/JS/WASM/data files, README and third-party notices.
+Depends on `asset-budget` and `make web`, whose HTML outputs are file targets over the Web objects (and through them the sources and headers), `web/` host files, `assets/`, `levels/`, the Web raylib library and the Web link flag stamp; emcc only reruns when one of them is newer, so a stale WASM build is never packaged. Archives include the game's HTML/JS/WASM/data files, the debug HTML page that shares them, README and third-party notices.
 
 ```sh
 make dist-wasm   # runs make web first when its outputs are stale
