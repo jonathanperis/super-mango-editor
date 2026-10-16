@@ -1,7 +1,7 @@
 /*
  * texture_after_free.c — Debugging lab: using a texture after freeing it.
  *
- * In the game, texture_load() in src/mangolib/mgfx.h mallocs a small
+ * In the game, texture_load() in src/shared/graphics.h mallocs a small
  * Texture2D handle and texture_unload() frees it. The owner (for example
  * the TextureResources table in src/core/game_resources.c) must clear its
  * pointer after the free, so nothing can reach the old memory again.

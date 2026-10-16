@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "../mangolib/mangomath.h"
+#include "../shared/geometry.h"
 
 #include "player.h"  /* Player, VineDecor, LadderDecor, RopeDecor */
 

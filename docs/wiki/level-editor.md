@@ -390,7 +390,7 @@ CI can initialize the editor, render five bounded frames, and exit with:
 
 ## Architecture
 
-The editor uses focused modules in `src/editor/`, the level serializer in `src/levels/` and Mangolib (`src/mangolib/`) for UI and file I/O:
+The editor uses focused modules in `src/editor/` and shared persistence/UI code in `src/shared/`:
 
 | File | Responsibility |
 |------|---------------|
@@ -410,10 +410,10 @@ The editor uses focused modules in `src/editor/`, the level serializer in `src/l
 | `tools.c` / `tools.h` | Mouse interaction for Select / Place / Delete tools |
 | `hit_test.c` / `hit_test.h` | Entity rectangles shared by click hit-testing and the selection outline; reverse-draw-order hit test |
 | `entity_meta.c` / `entity_meta.h` | The per-type table (names, category, capacity, where the placements live in `LevelDef`, the placement-ghost sprite) and the shared read/insert/remove helpers used by tools, undo and paste |
-| `src/mangolib/mangogui.c` / `mangogui.h` | Immediate-mode UI widget library shared with game settings |
+| `src/shared/ui.c` / `ui.h` | Immediate-mode UI widget library shared with game settings |
 | `undo.c` / `undo.h` | Undo stack and `PlacementData` clipboard union |
-| `src/levels/serializer.h`, `serializer_load.c`, `serializer_load_*.c` | Public TOML API and staged parsing into `LevelDef`, including strict checkpoints |
-| `src/levels/serializer_save.c`, `serializer_emit.c`, `src/mangolib/mfile.c` | TOML emission and atomic file persistence |
+| `src/shared/serializer.h`, `serializer_load.c`, `serializer_load_*.c` | Public TOML API and staged parsing into `LevelDef`, including strict checkpoints |
+| `src/shared/serializer_save.c`, `serializer_emit.c`, `serializer_io.c` | TOML emission and atomic file persistence |
 | `file_dialog.c`, `dialog_choice.c` | Native OS file picker and button prompts (macOS `osascript`, Linux `zenity`, Windows PowerShell) |
 
 The `EditorState` struct mirrors the game's `GameState` design: one container passed by pointer to every function, owning its raylib render target, textures, level data, camera, tools, undo history and UI state. Text uses raylib's built-in font, which the UI borrows and never unloads. The standalone editor owns its process window; native file pickers and confirmations use the existing OS-dialog boundary.

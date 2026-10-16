@@ -70,7 +70,7 @@ Debug experiment captures (`src/core/game_experiment.h`):
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `EXPERIMENT_FORMAT_VERSION` | `4` | One row per fixed step, `[input, physics...]`, no duration column; version 1 (variable timestep), version 2 (camera panned in at a level start and after a lost life) and version 3 (fog and fish shared one random stream) captures are rejected |
+| `EXPERIMENT_FORMAT_VERSION` | `3` | One row per fixed step, `[input, physics...]`, no duration column; version 1 (variable timestep) and version 2 (camera panned in at a level start and after a lost life) captures are rejected |
 | `EXPERIMENT_MAX_FRAMES` | `36000` | Steps one capture can hold (10 minutes at 60 steps/s) |
 
 ### Tiles and Floor
@@ -204,11 +204,11 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
 
 | Value | Location | Description |
 |-------|----------|-------------|
-| `EFFECT_VOICES = 8` | `src/mangolib/maudio.c` | Global pool of simultaneous effect aliases; a new play is dropped when all are busy |
+| `EFFECT_VOICES = 8` | `src/shared/audio.c` | Global pool of simultaneous effect aliases; a new play is dropped when all are busy |
 | `0..128` | level/profile audio settings | Authored/saved volume units; normalized to raylib's `0..1` at the audio boundary |
 
 raylib/miniaudio negotiates the device's format, channels and sample rate;
-`audio_open` (`src/mangolib/maudio.c`) just calls `InitAudioDevice` and does not
+`audio_open` (`src/shared/audio.c`) just calls `InitAudioDevice` and does not
 hard-code a sample format or mixer buffer size. The game needs a working audio
 device to start. Music volume
 is authored per level and multiplied by the saved music-volume preference;

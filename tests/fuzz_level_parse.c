@@ -27,7 +27,7 @@
 #include <string.h>
 #include <unistd.h>  /* getpid */
 
-#include "levels/serializer.h"
+#include "shared/serializer.h"
 #include "levels/level.h"
 #include "levels/level_ref.h"
 

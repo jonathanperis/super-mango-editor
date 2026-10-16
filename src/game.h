@@ -38,7 +38,7 @@
  * that defines a struct or MAX_* constant used by GameState. Those, and
  * game_constants.h, game_assets.h and game_fwd.h, are the ONLY includes
  * allowed here. Helpers a .c file merely calls (clock_millis, str_copy from
- * mangolib/mcore.h, collision helpers, ...) are included by that .c file
+ * shared/platform.h, collision helpers, ...) are included by that .c file
  * itself, so its dependencies stay visible where they are used.
  *
  * To keep that cost contained, only files that read GameState fields
@@ -48,12 +48,10 @@
  * the gameplay code and its tests, not the editor or the serializer.
  */
 
-#include "mangolib/mgfx.h"          /* Texture2D, RenderTexture2D, IntRect */
-#include "mangolib/maudio.h"        /* MusicTrack pointer */
-#include "mangolib/mtiming.h"       /* FixedStepClock, in GameLoopState */
-#include "mangolib/mrandom.h"       /* RandomStream, in GameWorld */
+#include "shared/graphics.h"        /* Texture2D, RenderTexture2D, IntRect */
+#include "shared/audio.h"           /* MusicTrack pointer */
 #include "game_assets.h"            /* GameAssets: shared sprites and sounds */
-#include "mangolib/massets.h"       /* AssetCache: GameState borrows the session's */
+#include "shared/asset_cache.h"     /* AssetCache: GameState borrows the session's */
 #include "game_fwd.h"               /* the GameState typedef name */
 #include <stdint.h>                 /* uint32_t, uint64_t fields */
 
@@ -140,12 +138,14 @@ typedef struct {
 /*
  * GameLoopState — bookkeeping for the fixed-step frame loop (game_timing.c).
  *
- * Real time between frames is added to `clock.accumulator`; the simulation
- * then consumes it in steps of exactly 1/TARGET_FPS seconds. Leftover time (less
+ * Real time between frames is added to `accumulator`; the simulation then
+ * consumes it in steps of exactly 1/TARGET_FPS seconds. Leftover time (less
  * than one step) waits for the next frame.
  */
 typedef struct {
-    FixedStepClock clock;  /* frame time → fixed steps (mangolib/mtiming.h)    */
+    double prev_time;      /* GetTime() seconds when the previous frame began   */
+    double accumulator;    /* real seconds waiting to be simulated              */
+    int    clock_started;  /* 0 = no previous frame time yet (first frame)      */
     int    fp_prev_riding; /* float platform player stood on last step          */
     int    smoke_frames_run; /* frames actually executed by a smoke run         */
 } GameLoopState;
@@ -229,11 +229,6 @@ typedef struct {
     uint64_t      source_level_hash; /* source bytes corresponding to active LevelDef */
     LevelRuntime  runtime;     /* active LevelDef pointer, level width, effect flags */
     GameRules     rules;       /* score/life and collectible rule values             */
-    /* Two streams, both seeded by game_seed_random: gameplay draws only from
-     * `random` (fish jump timers), decoration only from `effects_random`
-     * (fog waves), so fog can never change when a fish jumps. */
-    RandomStream  random;
-    RandomStream  effects_random;
 
     /* ---- The player and the camera that follows them -------------------- */
     Player        player;      /* the player, stored by value (not a pointer) */
@@ -426,7 +421,7 @@ typedef struct {
  * its assets empty, so game_init loads a private set and sets owns_assets;
  * only then does game_cleanup unload them.
  *
- * cache is the session's asset cache (mangolib/massets.h). The files that
+ * cache is the session's asset cache (shared/asset_cache.h). The files that
  * depend on the level, and the player sheet, HUD icon and font, are acquired
  * from it and released to it, so they too can outlive this GameState: a
  * Replay's new game finds them still loaded. The pointer is borrowed; NULL

@@ -4,7 +4,7 @@
 
 #include "game_bouncepads.h"
 
-#include "../mangolib/maudio.h"
+#include "../shared/audio.h"
 
 void game_bouncepads_lists(const GameState *gs,
                            BouncepadList lists[GAME_BOUNCEPAD_LIST_COUNT])

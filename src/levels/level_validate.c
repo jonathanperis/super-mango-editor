@@ -9,7 +9,7 @@
 #include "level_validate.h"
 #include "../player/player.h"  /* JUMP_VY: the jump-height check */
 #include "../screens/hud.h"    /* MAX_HEARTS: the initial_hearts limit */
-#include "../mangolib/mangomath.h" /* float_same_value: the flame-on-gap rule */
+#include "../shared/geometry.h" /* float_same_value: the flame-on-gap rule */
 
 #define MAX_INITIAL_LIVES 999
 #define MAX_SCORE_PER_LIFE 999999

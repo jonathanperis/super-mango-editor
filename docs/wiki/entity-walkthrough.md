@@ -27,7 +27,7 @@ entities need even less: a coin stores only its placement state in `Coin` and
 exposes just `coins_render()`, and collection is handled in `src/collision/`.
 Only the player has `player_init()` and `player_cleanup()`, because it gets its
 own sprite: it holds a reference to the sheet in the session's asset cache
-(`src/mangolib/massets.h`) and gives it back at cleanup.
+(`src/shared/asset_cache.h`) and gives it back at cleanup.
 
 ## The four tables
 
@@ -58,12 +58,12 @@ loader row and a render row and no update row; its pickup is written in
 
 Open `levels/labs/01_collision.toml`. Its `[[coins]]` record contains x/y values.
 
-1. `src/levels/serializer_parse.c` declares the schema entry
+1. `src/shared/serializer_parse.c` declares the schema entry
    `ROOT_TABLE_ARRAY("coins", XY_FIELDS, MAX_COINS)`: each element must be a
    table whose only keys are `x` and `y`, each a finite number (an omitted one
    reads as 0), and the array may not exceed `MAX_COINS`. Unknown fields are
    rejected.
-2. `serializer_load_collectibles()` (`src/levels/serializer_load_collectibles.c`)
+2. `serializer_load_collectibles()` (`src/shared/serializer_load_collectibles.c`)
    copies those values into `LevelDef.coins` with its `LOAD_XY_ARRAY` macro.
 3. `level_validate_runtime()` (`src/levels/level_validate.c`) first checks every
    count in `level_validate_counts()`, then checks that each coin lies inside
@@ -82,7 +82,7 @@ Open `levels/labs/01_collision.toml`. Its `[[coins]]` record contains x/y values
    `src/render/game_render.c` calls it; that function is row 15 of the
    `s_render_layers` table, so coins are drawn over the ropes (row 14) and
    under the stars (row 16).
-7. The editor saves the same `LevelDef` through `src/levels/serializer_save.c`,
+7. The editor saves the same `LevelDef` through `src/shared/serializer_save.c`,
    where `write_world_and_collectibles()` emits each `[[coins]]` table.
 
 The parser does **not** live in `level_loader.c`: that module translates an
@@ -110,7 +110,7 @@ never free it.
 ```c
 /* src/collectibles/token.h */
 #pragma once
-#include "../mangolib/mgfx.h"
+#include "../shared/graphics.h"
 #define MAX_TOKENS 32
 #define TOKEN_SCORE 250
 typedef struct { float x, y; int active; } Token;
@@ -128,9 +128,9 @@ new `.c` in `src/collectibles/` automatically.
 |------|-----------------|
 | `src/levels/level.h` | Include the Token header (for `MAX_TOKENS`); add `TokenPlacement { float x, y; }`, a bounded placement array and a count to `LevelDef` |
 | `src/game.h` | Include the Token header; add the runtime array and count to `GameWorld`, the `gs->world` part of `GameState` |
-| `src/levels/serializer_parse.c` | Register `ROOT_TABLE_ARRAY("tokens", XY_FIELDS, MAX_TOKENS)` |
-| `src/levels/serializer_load_collectibles.c` | Add `LOAD_XY_ARRAY("tokens", token_count, MAX_TOKENS, tokens)` |
-| `src/levels/serializer_save.c` | In `write_world_and_collectibles()`, emit every token as `[[tokens]]` with x/y through the existing float formatter |
+| `src/shared/serializer_parse.c` | Register `ROOT_TABLE_ARRAY("tokens", XY_FIELDS, MAX_TOKENS)` |
+| `src/shared/serializer_load_collectibles.c` | Add `LOAD_XY_ARRAY("tokens", token_count, MAX_TOKENS, tokens)` |
+| `src/shared/serializer_save.c` | In `write_world_and_collectibles()`, emit every token as `[[tokens]]` with x/y through the existing float formatter |
 | `src/levels/level_validate.c` | Add `CHECK_COUNT(token_count, MAX_TOKENS)` to `level_validate_counts()` and a world-bounds check per placement to `level_validate_runtime()` |
 | `tools/validate_levels.py` | Add `"tokens"` to `COUNT_LIMITS` (it reads `MAX_TOKENS` from the headers) and to the schema table as `XY_FIELDS` |
 

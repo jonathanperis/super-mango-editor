@@ -2,7 +2,7 @@
  * rail.c — Rail path building, rendering, and traversal helpers.
  */
 
-#include "../mangolib/mgfx.h"
+#include "../shared/graphics.h"
 #include <stdio.h>
 #include <math.h>
 #include <limits.h>

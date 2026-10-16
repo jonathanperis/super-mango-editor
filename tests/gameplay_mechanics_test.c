@@ -35,10 +35,10 @@
 #include "hazards/spike.h"
 #include "hazards/spike_block.h"
 #include "input/game_input.h"
-#include "mangolib/minput.h"
+#include "input/input_backend.h"
 #include "levels/level_validate.h"  /* level_jumping_spider_min_gap_speed */
 #include "player/player_internal.h"
-#include "mangolib/maudio.h"
+#include "shared/audio.h"
 #include "gameplay_mechanics_test.h"
 
 #define CLIMBING_LEVEL  "tests/fixtures/runtime/climbing.toml"

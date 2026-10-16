@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include "../mangolib/mgfx.h"
+#include "../shared/graphics.h"
 
 #define MAX_ROPES    16
 #define ROPE_W       16              /* display width (full sprite width)       */

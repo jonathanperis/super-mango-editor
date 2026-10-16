@@ -2,7 +2,7 @@
  * float_platform.c — FloatPlatform: hovering, crumbling, and rail-riding surfaces.
  */
 
-#include "../mangolib/mgfx.h"
+#include "../shared/graphics.h"
 #include <stdio.h>
 
 #include "float_platform.h"

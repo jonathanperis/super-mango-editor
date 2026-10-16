@@ -40,7 +40,7 @@
 #include "../hazards/circular_saw.h"
 #include "../hazards/spike_block.h"
 #include "../levels/level_session.h"  /* game_level_start_point_respawn_y */
-#include "../mangolib/mangomath.h"   /* float_same_value */
+#include "../shared/geometry.h"      /* float_same_value */
 #include "../surfaces/bouncepad.h"
 
 /*
@@ -105,14 +105,13 @@ static void update_faster_birds(GameState *gs, const StepInputs *in)
 /* Fish swim and leap from the water, and stay inside the world's width. */
 static void update_fish(GameState *gs, const StepInputs *in)
 {
-    fish_update(gs->world.fish, gs->world.fish_count, in->dt, gs->world.runtime.world_w,
-                &gs->world.random);
+    fish_update(gs->world.fish, gs->world.fish_count, in->dt, gs->world.runtime.world_w);
 }
 
 static void update_faster_fish(GameState *gs, const StepInputs *in)
 {
     faster_fish_update(gs->world.faster_fish, gs->world.faster_fish_count, in->dt,
-                       gs->world.runtime.world_w, &gs->world.random);
+                       gs->world.runtime.world_w);
 }
 
 /* ------------------------------------------------------------------ */
@@ -197,7 +196,7 @@ static void update_water(GameState *gs, const StepInputs *in)
 
 static void update_fog(GameState *gs, const StepInputs *in)
 {
-    if (gs->world.runtime.fog_enabled) fog_update(&gs->world.fog, in->dt, &gs->world.effects_random);
+    if (gs->world.runtime.fog_enabled) fog_update(&gs->world.fog, in->dt);
 }
 
 /* One module (bouncepad.c), three arrays: the squash animation a hit

@@ -14,8 +14,8 @@
 #include "game_checkpoint.h"
 #include "game_state.h"
 #include "../levels/level.h"
-#include "../mangolib/mangomath.h" /* float_same_value */
-#include "../mangolib/mcore.h"   /* str_copy */
+#include "../shared/geometry.h"  /* float_same_value */
+#include "../shared/platform.h"  /* str_copy */
 
 void game_resume_capture(const GameState *gs, GameResume *resume)
 {

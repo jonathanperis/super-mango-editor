@@ -26,8 +26,8 @@
 #include "file_dialog.h"     /* file_dialog_open */
 #include "../levels/campaign_catalog.h"
 #include "../levels/level_path.h"   /* level_resolve_path */
-#include "../levels/serializer.h"   /* level_save_toml_checked */
-#include "../mangolib/mangogui.h"
+#include "../shared/serializer.h"   /* level_save_toml_checked */
+#include "../shared/ui.h"
 
 /* What one entry's level file held when the view read or last wrote it. */
 typedef struct {

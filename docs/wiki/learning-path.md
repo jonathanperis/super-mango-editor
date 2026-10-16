@@ -31,14 +31,14 @@ before trying to generalize the engine:
 1. `src/main.c` chooses configuration; `src/core/app_session.c` owns the window,
    audio device and active screen. A menu/game transition changes the screen,
    not the process-wide graphics context.
-2. `src/mangolib/minput.c` collects ordered commands. `game_events.c`
+2. `src/input/input_backend.c` collects ordered commands. `game_events.c`
    decides who handles them; held movement is sampled separately in `game_input.c`.
 3. `src/core/game_loop.c` measures real time, runs zero or more fixed 1/60 s
-   simulation steps (`src/mangolib/mtiming.c` keeps the accumulator), then asks
-   `src/render/game_render.c` to draw once. `src/mangolib/mgfx.c` presents the
+   simulation steps (`src/core/game_timing.c` keeps the accumulator), then asks
+   `src/render/game_render.c` to draw once. `src/shared/graphics.c` presents the
    logical canvas in the window.
 4. `src/editor/editor_frame.c` shows the same sequence for immediate-mode
-   widgets. `src/mangolib/mangogui.h` explains staging an edit before changing the model.
+   widgets. `src/shared/ui.h` explains staging an edit before changing the model.
 
 `BeginDrawing`, `DrawTexturePro` and `UpdateMusicStream` are raylib APIs.
 `display_present`, `sprite_draw`, `font_load` and `sound_play` are small **project
@@ -173,7 +173,7 @@ velocity as constant for the whole step, so the result is off by an amount
 that depends on how long the step is: 413 px at 30 Hz, 403 px at 144 Hz, for a
 fall that should be 400 px. If `dt` were the real frame time, a jump would
 reach a different height on a 144 Hz monitor than on a 60 Hz one. With fixed
-1/60 s steps (the accumulator in `mtiming.c` decides only *how many* steps
+1/60 s steps (the accumulator in `game_timing.c` decides only *how many* steps
 to run each frame), the error is still there (406.7 px instead of 400), but it
 is the same everywhere, so jumps, replays and tests give the same result on
 every machine.
@@ -289,7 +289,7 @@ hurt by something they cannot see.
 running game and back out of the editor.
 
 **Read first:** the [Entity Walkthrough](../entity-walkthrough/),
-`src/levels/serializer_parse.c`, `src/levels/serializer_load_collectibles.c`
+`src/shared/serializer_parse.c`, `src/shared/serializer_load_collectibles.c`
 and `src/levels/level_loader.c`.
 
 **Steps:**
@@ -342,7 +342,7 @@ float (`isfinite()` in `serializer_parse.c`) and an array longer than its
 construction.
 
 **Read first:** `src/core/game_lifecycle.c`, `src/core/game_resources.c`,
-`src/mangolib/mfile.c`.
+`src/shared/serializer_io.c`.
 
 **Steps:**
 
@@ -379,8 +379,8 @@ What does `free(NULL)` do? And what value does `pointer` still hold right after
 pointer that is *not* `NULL` but points at memory that was already freed:
 `free()` does not change the caller's variable, so the check passes and the
 memory is freed twice (or read after the free). Setting the pointer to `NULL`
-right after the release, as `DESTROY_TEX` in `src/mangolib/mgfx.h` and
-`FREE_CHUNK` in `src/mangolib/maudio.h` do,
+right after the release, as `DESTROY_TEX` in `src/shared/graphics.h` and
+`FREE_CHUNK` in `src/shared/audio.h` do,
 makes a second cleanup call harmless. This is what lets `game_cleanup()` run
 after a half-finished `game_init()`. It only protects that one variable: any
 copy of the pointer elsewhere still dangles, which is why only the owner frees
@@ -451,7 +451,7 @@ is full the oldest step's snapshots are freed before it is dropped
 keyboard layout and rendering.
 
 **Read first:** `src/input/game_web_input.c`, `web/touch-controls.js`,
-`src/core/game_experiment.c`, `src/mangolib/mrandom.c`.
+`src/core/game_experiment.c`, `src/core/game_random.c`.
 
 **Steps:**
 
@@ -491,8 +491,8 @@ on different compilers and CPUs.
 Every input to the simulation is pinned. Input comes from the recorded action
 bits, not the keyboard (the test, `inspection_and_replay()` in
 `tests/simulation_test.c`, holds Left the whole time and the result still
-matches). Every step is exactly 1/60 s. Both random streams (gameplay and
-fog, `game_seed_random()`) start from the recorded seed. The level file must hash to
+matches). Every step is exactly 1/60 s. The random generator
+(`game_random()`) starts from the recorded seed. The level file must hash to
 the recorded `level_hash`, or the replay is refused. With the same engine
 build, the same steps run in the same order on the same data.
 

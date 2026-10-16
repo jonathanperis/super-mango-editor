@@ -11,7 +11,7 @@
  * to give a flickering fire effect.
  */
 
-#include "../mangolib/mgfx.h"
+#include "../shared/graphics.h"
 #include <stdio.h>
 
 #include "blue_flame.h"

@@ -10,7 +10,7 @@
  */
 #pragma once
 
-#include "../mangolib/mgfx.h"
+#include "../shared/graphics.h"
 
 #define MAX_VINES   24              /* upper bound on decoration instances   */
 #define VINE_W      16              /* sprite width  (natural size)          */

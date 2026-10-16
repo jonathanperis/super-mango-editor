@@ -1,7 +1,7 @@
 /* Opt-in teaching controls. Ordinary gameplay never depends on this state. */
 #pragma once
 #include "../game.h"
-#include "../mangolib/minput.h"
+#include "../input/input_backend.h"
 
 #define INSPECTOR_PHYSICS_COUNT 9
 

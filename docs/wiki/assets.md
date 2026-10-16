@@ -38,7 +38,7 @@ assets/
 Several visual elements are configurable per TOML level file, allowing different themes without changing code:
 
 Every file named here is loaded through the session's asset cache
-(`src/mangolib/massets.h`), keyed by its path. Replay, Retry and going back
+(`src/shared/asset_cache.h`), keyed by its path. Replay, Retry and going back
 into the same level read none of them again; another level reads only the
 files it adds, and the files it does not use are unloaded once it has opened.
 
@@ -200,7 +200,7 @@ records attribution and unresolved license evidence.
 ### Text font
 
 The HUD, menus, overlays and editor draw text with raylib's built-in default
-font through `src/mangolib/mtext.c`. It is a 10 px bitmap font compiled into raylib
+font through `src/shared/text.c`. It is a 10 px bitmap font compiled into raylib
 (zlib license), drawn at exactly `TEXT_FONT_SIZE` (10) with point filtering so
 each font pixel maps to one canvas pixel. It covers ASCII and Latin-1;
 other characters draw as `?`. No font file ships with the game.

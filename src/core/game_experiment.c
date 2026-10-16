@@ -4,15 +4,15 @@
  * a "record it again" error (EXPERIMENT_FORMAT_VERSION says why for each).
  * Replays require unchanged level bytes and the same engine version. */
 #include "game_experiment.h"
-#include "../mangolib/mcore.h"   /* str_copy */
-#include "game_state.h"   /* game_seed_random */
+#include "../shared/platform.h"  /* str_copy */
+#include "game_random.h"
 #include "game_camera.h"
 #include "game_completion.h"
 #include "game_overlay.h"   /* game_audio_apply_settings */
 #include "game_timing.h"
 #include "../levels/level_loader.h"
 #include "../levels/level_resources.h"
-#include "../levels/serializer_emit.h"
+#include "../shared/serializer_emit.h"
 #include "tomlc17.h"
 #include <limits.h>
 #include <math.h>
@@ -41,7 +41,7 @@ void game_experiment_cleanup(GameState *gs)
 
 static void restart(GameState *gs, unsigned int seed)
 {
-    game_seed_random(gs, seed);
+    game_random_seed(seed);
     /* The active definition has already passed validation, so apply it
      * again without re-checking. Repeat initialization in the same order so
      * random enemy timers and fog consume the same stream. */
