@@ -47,6 +47,7 @@ int editor_init(EditorState *es, int hidden)
          * recent documents or recovery files just to exercise drawing. */
         (void)editor_init_persistence_paths(es);
         editor_load_recent_files(es);
+        editor_load_settings(es);
     }
     editor_textures_load(es);
     editor_level_init_defaults(&es->level);
