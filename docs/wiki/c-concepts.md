@@ -97,7 +97,7 @@ the arithmetic.
 | Saturating addition | `game_award_score()` in `src/core/game_score.c` | `amount > INT_MAX - gs->world.score ? INT_MAX : gs->world.score + amount` never computes a sum that does not fit. |
 | Wider arithmetic for the hard part | the bonus-life lines in `game_award_score()` | The threshold maths uses `int64_t`, which has room for any product here, then clamps back to `int`. |
 | Parsing numbers safely | `unsigned_argument()` in `src/main.c` | `strtoul` instead of `atoi`: `errno` catches overflow, `end` catches trailing junk like `7x`, and `value > UINT_MAX` is checked before narrowing to `unsigned int`. |
-| Unsigned wraparound on purpose | `editor_hash_bytes()` in `src/editor/editor_session.c`; `random_next()` in `src/mangolib/mrandom.c` | Unsigned overflow is defined (it wraps), which the FNV-1a hash and the xorshift generator rely on. |
+| Unsigned wraparound on purpose | `editor_hash_bytes()` in `src/editor/editor_session.c`; `mrandom_next()` in `src/mangolib/mrandom.c` | Unsigned overflow is defined (it wraps), which the FNV-1a hash and the xorshift generator rely on. |
 
 [Debugging C](../debugging-c/) shows the UBSan report you get from the naive
 version of the score addition.

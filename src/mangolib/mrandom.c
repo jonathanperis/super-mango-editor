@@ -1,11 +1,11 @@
 #include "mrandom.h"
 
-void random_seed(RandomStream *stream, uint32_t seed)
+void mrandom_seed(RandomStream *stream, uint32_t seed)
 {
     stream->state = seed ? seed : UINT32_C(0x9e3779b9);
 }
 
-uint32_t random_next(RandomStream *stream)
+uint32_t mrandom_next(RandomStream *stream)
 {
     uint32_t x = stream->state ? stream->state : 1;
     x ^= x << 13;
@@ -15,7 +15,7 @@ uint32_t random_next(RandomStream *stream)
     return x;
 }
 
-float random_unit(RandomStream *stream)
+float mrandom_unit(RandomStream *stream)
 {
-    return (float)(random_next(stream) >> 8) / 16777215.0f;
+    return (float)(mrandom_next(stream) >> 8) / 16777215.0f;
 }
