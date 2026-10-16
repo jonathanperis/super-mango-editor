@@ -14,6 +14,7 @@
 #include "tools.h"
 #include "entity_meta.h"   /* editor_select_none */
 
+#include <ctype.h>    /* tolower */
 #include <stdio.h>    /* snprintf */
 #include <string.h>   /* strlen */
 
@@ -38,6 +39,115 @@ static void clipboard_set(const char *text) { SetClipboardText(text); }
 /* Borrowed from raylib; do not free. */
 static const char *clipboard_get(void) { return GetClipboardText(); }
 #endif
+
+/*
+ * Files dropped on the window, through raylib.  Test builds read a list a
+ * test hands over instead: the headless raylib the tests run on has no
+ * window to drop onto.
+ */
+#ifdef MANGO_TESTING
+static char **s_test_drop_paths;
+static unsigned int s_test_drop_count;
+
+void editor_test_drop_files(const char *const *paths, unsigned int count)
+{
+    /* raylib's list is not const either; nothing here writes through it. */
+    s_test_drop_paths = (char **)paths;
+    s_test_drop_count = paths ? count : 0;
+}
+
+static int dropped_files_take(FilePathList *files)
+{
+    if (s_test_drop_count == 0) return 0;
+    files->count = s_test_drop_count;
+    files->paths = s_test_drop_paths;
+    s_test_drop_count = 0;
+    s_test_drop_paths = NULL;
+    return 1;
+}
+
+static void dropped_files_release(FilePathList files) { (void)files; }
+#else
+static int dropped_files_take(FilePathList *files)
+{
+    if (!IsFileDropped()) return 0;
+    *files = LoadDroppedFiles();
+    return 1;
+}
+
+/* raylib would free a stale list when the next drop arrives, but
+ * unloading each drop at once keeps its paths from lingering. */
+static void dropped_files_release(FilePathList files) { UnloadDroppedFiles(files); }
+#endif
+
+/*
+ * raylib copies each dropped path into a MAX_FILEPATH_LENGTH buffer and
+ * cuts a longer path short without saying so.  The macro is private to
+ * raylib's rcore.c, which sets it to 256 on Windows and 4096 elsewhere; a
+ * path that fills the buffer may have lost its end, so it is refused
+ * rather than opening some other file.
+ */
+#ifdef _WIN32
+#define EDITOR_DROP_PATH_LIMIT 256
+#else
+#define EDITOR_DROP_PATH_LIMIT 4096
+#endif
+
+/* ".toml" at the end of path, in any case (Windows and macOS file names
+ * are usually case-insensitive, so LEVEL.TOML is the same kind of file). */
+static int path_is_toml(const char *path)
+{
+    static const char suffix[] = ".toml";
+    size_t length = strlen(path), suffix_length = sizeof(suffix) - 1;
+    if (length <= suffix_length) return 0;
+    for (size_t i = 0; i < suffix_length; i++)
+        if (tolower((unsigned char)path[length - suffix_length + i]) != suffix[i])
+            return 0;
+    return 1;
+}
+
+/* Open the one level in a drop, the way Ctrl+1..5 opens a recent one. */
+static void open_dropped_level(EditorState *es, const FilePathList *files)
+{
+    if (es->playing) {
+        editor_set_status(es, "Playtest running: click Stop or close the game window to edit");
+        return;
+    }
+    /* A drag owns the document until the button is released (see
+     * editor_key); a load would pull the level out from under it. */
+    if (es->dragging) {
+        editor_set_status(es, "Release the mouse to finish the move first (Esc cancels it)");
+        return;
+    }
+    if (files->count != 1 || !files->paths[0] || !path_is_toml(files->paths[0])) {
+        editor_set_status(es, "Drop one .toml level to open it");
+        return;
+    }
+    const char *path = files->paths[0];
+    if (strlen(path) >= EDITOR_DROP_PATH_LIMIT - 1) {
+        editor_set_status(es, "Dropped path is too long to open safely: use Ctrl+O");
+        return;
+    }
+    /* The Campaign view covers the canvas; close it first, as Ctrl+M or
+     * Esc would.  With unsaved campaign edits the first close only arms
+     * (editor_campaign_close), so a second drop discards them. */
+    if (es->campaign && !editor_campaign_close(es, 0)) {
+        editor_set_status(es, "Unsaved campaign changes: Save them, or drop the level "
+                          "again to discard them");
+        return;
+    }
+    /* editor_load_level reports success or the reason it failed. */
+    if (editor_confirm_discard_changes(es, "open the dropped level"))
+        (void)editor_load_level(es, path);
+}
+
+void editor_handle_dropped_files(EditorState *es)
+{
+    FilePathList files = {0};
+    if (!dropped_files_take(&files)) return;
+    open_dropped_level(es, &files);
+    dropped_files_release(files);
+}
 
 /*
  * note_redone_place — Remember an entity a redone CMD_PLACE put back, so a

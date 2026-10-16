@@ -377,9 +377,12 @@ The ` *` in the title compares the view with the files, so it follows the histor
 | Save As | `Ctrl+Shift+S` / Save As button | Native file picker for new path |
 | Recover autosave | `Ctrl+R` | Recover or discard a leftover recovery snapshot |
 | Recent file | `Ctrl+1` through `Ctrl+5` | Open a recent file |
+| Open by drag-and-drop | Drop one `.toml` file on the window | Opens it like a recent file; closes the Campaign view first |
 | Campaign view | `Ctrl+M` / Campaign button | Edit the campaign manifest (see [Campaign View](#campaign-view)) |
 
-The title bar and status bar show an asterisk (`*`) after the filename when there are unsaved changes. New, Open, a recent file, recovery and quit first ask **Save / Discard / Cancel** when the level has been modified; Save continues only if the save succeeds. On Linux these three-button prompts use zenity's extra button.
+The title bar and status bar show an asterisk (`*`) after the filename when there are unsaved changes. New, Open, a recent file, a dropped level, recovery and quit first ask **Save / Discard / Cancel** when the level has been modified; Save continues only if the save succeeds. On Linux these three-button prompts use zenity's extra button.
+
+A drop opens a level only when it is exactly one file ending in `.toml` (in any letter case); two files, or a picture, leave the document alone and the status bar says `Drop one .toml level to open it`. Drops are ignored while a playtest runs. If the Campaign view has unsaved changes, the first drop only warns (`Save them, or drop the level again to discard them`) and a second drop closes the view and opens the level. raylib copies a dropped path into a fixed buffer (256 bytes on Windows, 4096 elsewhere) and cuts a longer one short, so a path that fills it is refused; open such a file with `Ctrl+O`.
 
 Saved files are plain TOML — they can be edited in any text editor and immediately reloaded in the editor or game.
 

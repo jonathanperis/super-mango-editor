@@ -24,6 +24,8 @@ void editor_run_frame(EditorState *es)
     InputEvent event;
     while (input_poll(&event))
         editor_handle_event(es, &event);
+    /* A file dropped on the window arrives outside the event queue. */
+    editor_handle_dropped_files(es);
 
     /* Hover uses the latest sampled pointer. Commands above carry their own
      * event-time coordinates, so a quick click is not moved by later motion. */
