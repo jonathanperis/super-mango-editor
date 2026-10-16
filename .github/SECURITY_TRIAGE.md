@@ -164,3 +164,17 @@ explicit maintainer authorization on 2026-10-10. The same run's two notes were
 fixed in code: the float field's limit step moved out of an over-long switch
 case into `limit_float_edit` (#179), and the ignored `fchown` result is kept
 in a named variable instead of an empty `if` (#178).
+
+## Mangolib move (PR #343)
+
+PR #343 moved the engine layer into `src/mangolib/`; `src/shared/serializer_io.c`
+became `src/mangolib/mfile.c` with only its header comment and own `#include`
+changed. The analysis of `main` after the merge reported one finding again at the
+new path, at the same line and columns and with the same message:
+
+| Alerts | Input and operation | Assessment |
+| --- | --- | --- |
+| #183 | `mfile.c`: opening the parent directory of a saved file to `fsync` it after the atomic rename | Same as #131: the directory comes from a save path the user chose or from the private preference root that `HOME`/`XDG_DATA_HOME` select, under the invoking user's permissions; it is opened read-only and only synced. |
+
+This finding (#183) was dismissed as a false positive after explicit maintainer
+authorization on 2026-10-16.
