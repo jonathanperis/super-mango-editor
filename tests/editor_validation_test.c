@@ -2700,6 +2700,14 @@ static int write_campaign_level(const char *path, const char *name, const char *
  * so the tests run inside it and never touch the real levels/.
  */
 #define CAMPAIGN_ROOT TEST_OUT "campaign-root"
+
+/* TEST_OUT follows OUTDIR, which may be relative (as in CI) or absolute;
+ * a full path is built from the working folder only in the first case. */
+static int test_path_is_absolute(const char *path)
+{
+    if (path[0] == '/' || path[0] == '\\') return 1;
+    return path[0] != '\0' && path[1] == ':';   /* a Windows drive letter */
+}
 static int make_campaign_root(void)
 {
     test_make_folder(CAMPAIGN_ROOT);
@@ -2791,7 +2799,9 @@ static int campaign_view_edits_and_saves_the_manifest(void)
     if (expect_int("outside levels/", editor_campaign_add(&es, "other/e.toml"), -1) != 0 ||
         expect_int("already listed", editor_campaign_add(&es, "levels/a.toml"), -1) != 0 ||
         expect_int("missing file", editor_campaign_add(&es, "levels/zz.toml"), -1) != 0 ||
-        snprintf(absolute_d, sizeof(absolute_d), "%s/%s/levels/d.toml", cwd,
+        snprintf(absolute_d, sizeof(absolute_d), "%s%s%s/levels/d.toml",
+                 test_path_is_absolute(CAMPAIGN_ROOT) ? "" : cwd,
+                 test_path_is_absolute(CAMPAIGN_ROOT) ? "" : "/",
                  CAMPAIGN_ROOT) >= (int)sizeof(absolute_d) ||
         expect_int("picked by its full path", editor_campaign_add(&es, absolute_d), 0) != 0 ||
         expect_int("listed as levels/d.toml", strcmp(view->levels[3].path, "levels/d.toml"), 0) != 0 ||
