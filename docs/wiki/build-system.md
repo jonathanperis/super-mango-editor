@@ -172,7 +172,7 @@ and forth recompiles each time, so give long-lived flag combinations their own
 
 `make content-inventory` regenerates public counts and the raw asset inventory;
 `make asset-budget` checks freshness and the 4 MiB raw playable-asset budget
-(2 MiB of it for generated sounds). `make sounds` regenerates the WAV files
+(1 MiB of it for generated sounds). `make sounds` regenerates the QOA files
 from `tools/gen_sounds.py`; `make docs-drift` runs its `--check` mode.
 `make timing-lab` prints a small integration experiment for 30/60/144 Hz that
 shows why the game simulates fixed 1/60 s steps instead of a variable frame dt.
@@ -235,7 +235,7 @@ Asset and level paths are relative to the process's working folder:
 
 ```c
 texture_load("assets/sprites/backgrounds/sky_blue.png");
-sound_load("assets/sounds/player/player_jump.wav");
+sound_load("assets/sounds/player/player_jump.qoa");
 ```
 
 `make run` starts the game from the repo root, where those paths resolve. Started

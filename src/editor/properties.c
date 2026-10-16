@@ -1544,13 +1544,13 @@ static int config_level_fields(EditorState *es, int x, int y)
 static int config_music(EditorState *es, int x, int y)
 {
     static const char *music_names[] = {
-        "(none)", "water.wav", "lava.wav", "winds.wav"
+        "(none)", "water.qoa", "lava.qoa", "winds.qoa"
     };
     static const char *music_paths[] = {
         "",
-        "assets/sounds/levels/water.wav",
-        "assets/sounds/levels/lava.wav",
-        "assets/sounds/levels/winds.wav"
+        "assets/sounds/levels/water.qoa",
+        "assets/sounds/levels/lava.qoa",
+        "assets/sounds/levels/winds.qoa"
     };
     static const int music_count = 4;
 

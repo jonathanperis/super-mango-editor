@@ -3,7 +3,7 @@
  */
 
 #include <stddef.h> /* size_t */
-#include <string.h> /* strncpy */
+#include <string.h> /* memcpy, strcmp, strlen, strncmp, strncpy */
 
 #include "serializer_load_config.h"
 #include "serializer_parse.h"
@@ -13,6 +13,27 @@ static void copy_config_string(char *dst, size_t dst_size, const char *src) {
 
     strncpy(dst, src ? src : "", dst_size - 1);
     dst[dst_size - 1] = '\0';
+}
+
+/*
+ * The shipped ambient loops were WAV files until they became QOA. A level
+ * saved before then names a file that no longer ships, so those three
+ * names, and only those, are read as their QOA replacements: the level
+ * keeps its music, and the editor saves the new name. Any other .wav path
+ * is the level's own sound and is left alone.
+ */
+static void rename_shipped_wav_loop(char *path) {
+    static const char dir[] = "assets/sounds/levels/";
+    static const char *const loops[] = {"water.wav", "lava.wav", "winds.wav"};
+    const size_t dir_len = sizeof(dir) - 1;
+
+    if (strncmp(path, dir, dir_len) != 0) return;
+    for (size_t i = 0; i < sizeof(loops) / sizeof(loops[0]); i++) {
+        if (strcmp(path + dir_len, loops[i]) == 0) {
+            memcpy(path + strlen(path) - 3, "qoa", 3);
+            return;
+        }
+    }
 }
 
 void serializer_load_config(toml_datum_t top, LevelDef *def) {
@@ -26,6 +47,7 @@ void serializer_load_config(toml_datum_t top, LevelDef *def) {
     {
         const char *mp = get_str(top, "music_path", "");
         copy_config_string(def->music_path, sizeof(def->music_path), mp);
+        rename_shipped_wav_loop(def->music_path);
     }
     def->music_volume = get_int(top, "music_volume", 0);
 

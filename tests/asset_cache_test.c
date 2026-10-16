@@ -37,8 +37,8 @@
 
 #define COIN_PNG  "assets/sprites/collectibles/coin.png"
 #define STAR_PNG  "assets/sprites/collectibles/star_yellow.png"
-#define MUSIC_WAV "assets/sounds/levels/water.wav"
-#define SOUND_WAV "assets/sounds/collectibles/coin.wav"
+#define MUSIC_QOA "assets/sounds/levels/water.qoa"
+#define SOUND_QOA "assets/sounds/collectibles/coin.qoa"
 
 typedef struct {
     int textures, sounds, music, fonts;
@@ -161,11 +161,11 @@ static int sound_music_and_font_are_shared_too(void)
     Counts live = live_now(), mark = loads_now();
     int failed = 0;
 
-    MusicTrack *music = asset_cache_music_acquire(&cache, MUSIC_WAV);
+    MusicTrack *music = asset_cache_music_acquire(&cache, MUSIC_QOA);
     TextFont *font = asset_cache_font_acquire(&cache);
     TextFont *font_again = asset_cache_font_acquire(&cache);
-    SoundEffect *sound = asset_cache_sound_acquire(&cache, SOUND_WAV);
-    SoundEffect *sound_again = asset_cache_sound_acquire(&cache, SOUND_WAV);
+    SoundEffect *sound = asset_cache_sound_acquire(&cache, SOUND_QOA);
+    SoundEffect *sound_again = asset_cache_sound_acquire(&cache, SOUND_QOA);
     if (!music || !font || !sound) {
         fprintf(stderr, "asset_cache_test: sound, music or font did not load\n");
         asset_cache_clear(&cache);
@@ -188,12 +188,12 @@ static int sound_music_and_font_are_shared_too(void)
     failed |= expect_int("idle track is stopped", IsMusicStreamPlaying(music->stream), 0);
     failed |= expect_int("idle track is still loaded", music_test_live(), live.music + 1);
     failed |= expect_int("same track for the next holder",
-                         asset_cache_music_acquire(&cache, MUSIC_WAV) == music, 1);
+                         asset_cache_music_acquire(&cache, MUSIC_QOA) == music, 1);
     failed |= expect_no_loads("reacquiring music and font reads nothing", &mark);
 
     /* A texture and a music file may not be confused by their kind. */
     failed |= expect_int("a track is not a texture",
-                         asset_cache_texture_acquire(&cache, MUSIC_WAV) == NULL, 1);
+                         asset_cache_texture_acquire(&cache, MUSIC_QOA) == NULL, 1);
 
     asset_cache_music_release(&cache, music);
     asset_cache_font_release(&cache, font);
@@ -242,6 +242,46 @@ static int missing_file_is_tried_again(void)
 
     asset_cache_clear(&cache);
     failed |= expect_counts("nothing left behind", live_now(), live);
+    return failed;
+}
+
+/*
+ * The shipped sounds are QOA, but a level may still name a WAV of its own,
+ * so WAV sounds and music keep loading (and unloading cleanly: raylib's WAV
+ * music decoder carries a source fix, see vendor/raylib/README.md).
+ */
+static int wav_sound_and_music_still_load(void)
+{
+    /* One file per kind: the cache never hands one path out as two kinds. */
+    const char *sound_path = TEST_OUT "asset-cache-sound.wav";
+    const char *music_path = TEST_OUT "asset-cache-music.wav";
+    static short pcm[2205];
+    AssetCache cache = {0};
+    Counts live = live_now();
+    int failed = 0;
+
+    if (strlen(music_path) >= ASSET_CACHE_PATH_SIZE) return 0;  /* an unusually long OUTDIR */
+    for (int i = 0; i < 2205; i++) pcm[i] = (short)((i % 50) * 400 - 10000);
+    Wave wave = {.frameCount = 2205, .sampleRate = 22050, .sampleSize = 16,
+                 .channels = 1, .data = pcm};
+    if (!ExportWave(wave, sound_path) || !ExportWave(wave, music_path)) {
+        fprintf(stderr, "asset_cache_test: cannot write %s\n", music_path);
+        return 1;
+    }
+    SoundEffect *sound = asset_cache_sound_acquire(&cache, sound_path);
+    MusicTrack *music = asset_cache_music_acquire(&cache, music_path);
+    failed |= expect_int("a WAV sound loads", sound != NULL, 1);
+    failed |= expect_int("a WAV track loads", music != NULL, 1);
+    if (music) {
+        music_play(music);
+        failed |= expect_int("the WAV track plays", IsMusicStreamPlaying(music->stream), 1);
+        asset_cache_music_release(&cache, music);
+    }
+    if (sound) asset_cache_sound_release(&cache, sound);
+    asset_cache_clear(&cache);
+    remove(sound_path);
+    remove(music_path);
+    failed |= expect_counts("WAV sound and track unloaded", live_now(), live);
     return failed;
 }
 
@@ -309,7 +349,7 @@ static int null_cache_loads_private_copies(void)
     Texture2D *one = asset_cache_texture_acquire(NULL, COIN_PNG);
     Texture2D *two = asset_cache_texture_acquire(NULL, COIN_PNG);
     TextFont *font = asset_cache_font_acquire(NULL);
-    MusicTrack *music = asset_cache_music_acquire(NULL, MUSIC_WAV);
+    MusicTrack *music = asset_cache_music_acquire(NULL, MUSIC_QOA);
     failed |= expect_int("private copies are separate", one && two && one != two, 1);
     failed |= expect_counts("each acquire loads", loads_since(&mark), (Counts){2, 0, 1, 1});
     asset_cache_texture_release(NULL, one);
@@ -327,6 +367,7 @@ int asset_cache_contract_test(void)
     return holders_are_counted_and_idle_entries_stay_loaded() |
            sound_music_and_font_are_shared_too() |
            missing_file_is_tried_again() |
+           wav_sound_and_music_still_load() |
            full_table_makes_room_from_idle_entries() |
            null_cache_loads_private_copies();
 }

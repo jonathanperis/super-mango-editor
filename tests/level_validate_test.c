@@ -886,6 +886,12 @@ static void set_wrong_music_type(LevelDef *def)
             sizeof(def->music_path) - 1);
 }
 
+static void set_unsupported_music_format(LevelDef *def)
+{
+    strncpy(def->music_path, "assets/sounds/levels/water.ogg",
+            sizeof(def->music_path) - 1);
+}
+
 static void set_wrong_floor_root(LevelDef *def)
 {
     strncpy(def->floor_tile_path, "assets/sprites/player/player.png",
@@ -937,12 +943,34 @@ static void set_unsafe_control_char(LevelDef *def)
             sizeof(def->music_path) - 1);
 }
 
+/* The shipped sounds are QOA; a level's own WAV sound is still accepted. */
+static int expect_qoa_and_wav_music_accepted(void)
+{
+    static const char *const paths[] = {
+        "assets/sounds/levels/water.qoa", "assets/sounds/levels/custom.wav"
+    };
+    for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
+        LevelDef def;
+        char err[128];
+        level_def_init_defaults(&def);
+        def.screen_count = 1;
+        strncpy(def.music_path, paths[i], sizeof(def.music_path) - 1);
+        if (level_validate_runtime(&def, err, sizeof(err)) != 0) {
+            fprintf(stderr, "level_validate_test: %s rejected: %s\n", paths[i], err);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static int expect_rejected_unsafe_paths(void)
 {
     if (reject_path_case("music traversal", set_unsafe_music_parent) != 0) return 1;
     if (reject_path_case("floor absolute path", set_unsafe_floor_absolute) != 0) return 1;
     if (reject_path_case("platform tile traversal", set_unsafe_platform_tile) != 0) return 1;
     if (reject_path_case("music wrong type", set_wrong_music_type) != 0) return 1;
+    if (reject_path_case("music format raylib is built without",
+                         set_unsupported_music_format) != 0) return 1;
     if (reject_path_case("floor wrong root", set_wrong_floor_root) != 0) return 1;
     if (reject_path_case("background absolute path", set_unsafe_background_absolute) != 0) return 1;
     if (reject_path_case("foreground traversal", set_unsafe_foreground_parent) != 0) return 1;
@@ -1065,6 +1093,7 @@ int main(void)
     if (expect_patrol_speeds_are_bounded() != 0) return 1;
     if (expect_jumping_spiders_fast_enough_for_gaps() != 0) return 1;
     if (expect_rejected_unsafe_paths() != 0) return 1;
+    if (expect_qoa_and_wav_music_accepted() != 0) return 1;
 
     puts("level_validate_test: ok");
     return 0;

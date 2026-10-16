@@ -5,12 +5,17 @@
 ---
 
 All audio files live in `assets/sounds/`, organized into categorized subdirectories.
-They are mono 16-bit 22050 Hz `.wav` files synthesized by `tools/gen_sounds.py`
+They are mono 22050 Hz `.qoa` files synthesized by `tools/gen_sounds.py`
 (see [Generated Sounds](../assets/#generated-sounds)); run `make sounds` to
-regenerate them. Regeneration skips files whose samples are within 1 LSB of the
-new output, and `make docs-drift` runs `tools/gen_sounds.py --check` with the same
-tolerance. raylib handles decoded `Sound` samples and streamed `Music`;
+regenerate them. QOA ("Quite OK Audio") is a lossy format raylib reads natively:
+it stores 16-bit samples in 3.2 bits each, a fifth of a WAV's size, and decodes
+with a few integer operations per sample. `tools/qoa.py` writes it byte for byte
+as raylib's own encoder (`qoa.h`) does. Regeneration skips files that still
+match, and `make docs-drift` runs `tools/gen_sounds.py --check`; see
+[Generated Sounds](../assets/#generated-sounds) for what "match" allows.
+raylib handles decoded `Sound` samples and streamed `Music`;
 the project-owned `SoundEffect` and `MusicTrack` types manage their lifetimes.
+WAV files still load, so a level may name a `.wav` sound of its own.
 
 ---
 
@@ -23,56 +28,56 @@ be available for level authors without being selected by a current campaign or l
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `player_jump.wav` | `SoundEffect` | `gs->assets.audio.jump` | Rising square-wave blip; played when a jump starts, including buffered/coyote jumps and climb dismounts |
-| `player_hit.wav` | `SoundEffect` | `gs->assets.audio.hit` | Noisy descending thud; played when the player takes damage |
+| `player_jump.qoa` | `SoundEffect` | `gs->assets.audio.jump` | Rising square-wave blip; played when a jump starts, including buffered/coyote jumps and climb dismounts |
+| `player_hit.qoa` | `SoundEffect` | `gs->assets.audio.hit` | Noisy descending thud; played when the player takes damage |
 
 ### Collectibles — `assets/sounds/collectibles/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `coin.wav` | `SoundEffect` | `gs->assets.audio.coin` | Two-tone chime (B5 then E6); played when the player collects a coin |
+| `coin.qoa` | `SoundEffect` | `gs->assets.audio.coin` | Two-tone chime (B5 then E6); played when the player collects a coin |
 
 ### Entities — `assets/sounds/entities/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `bird.wav` | `SoundEffect` | `gs->assets.audio.flap` | Two soft band-passed noise puffs; played for each bird wing flap |
-| `spider.wav` | `SoundEffect` | `gs->assets.audio.spider_attack` | Hiss, rising zip and leg clicks; played when a jumping spider leaps at a gap |
-| `fish.wav` | `SoundEffect` | `gs->assets.audio.dive` | Filtered noise splash plus rising bubbles; played when the player falls into a water gap |
+| `bird.qoa` | `SoundEffect` | `gs->assets.audio.flap` | Two soft band-passed noise puffs; played for each bird wing flap |
+| `spider.qoa` | `SoundEffect` | `gs->assets.audio.spider_attack` | Hiss, rising zip and leg clicks; played when a jumping spider leaps at a gap |
+| `fish.qoa` | `SoundEffect` | `gs->assets.audio.dive` | Filtered noise splash plus rising bubbles; played when the player falls into a water gap |
 
 ### Hazards — `assets/sounds/hazards/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `axe_trap.wav` | `SoundEffect` | `gs->assets.audio.axe` | Filter-swept noise whoosh; played for axe trap swing |
+| `axe_trap.qoa` | `SoundEffect` | `gs->assets.audio.axe` | Filter-swept noise whoosh; played for axe trap swing |
 
 ### Surfaces — `assets/sounds/surfaces/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `bouncepad.wav` | `SoundEffect` | `gs->assets.audio.spring` | Sine "boing" with fading vibrato; played when the player lands on a bouncepad |
+| `bouncepad.qoa` | `SoundEffect` | `gs->assets.audio.spring` | Sine "boing" with fading vibrato; played when the player lands on a bouncepad |
 
 ### Screens — `assets/sounds/screens/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `confirm_ui.wav` | `SoundEffect` | `menu->snd_confirm` | Two quick square blips (E5, B5); played on menu confirmation. Held from the session's asset cache, so only the first menu of a session reads it |
+| `confirm_ui.qoa` | `SoundEffect` | `menu->snd_confirm` | Two quick square blips (E5, B5); played on menu confirmation. Held from the session's asset cache, so only the first menu of a session reads it |
 
 ### Levels — `assets/sounds/levels/`
 
 | File | Type | GameState Field | Description |
 |------|------|-----------------|-------------|
-| `water.wav` | `MusicTrack` | `gs->world.music` | 6 s seamless loop: filtered-noise wash and surf with slow swells and bubbles; water-themed levels |
-| `lava.wav` | `MusicTrack` | `gs->world.music` | 6 s seamless loop: low brown-noise rumble, sizzle, slow bubbles and crackles; lava-themed levels |
-| `winds.wav` | `MusicTrack` | `gs->world.music` | 8 s seamless loop: band-limited noise with drifting band and gusts; available, no current level selects it |
+| `water.qoa` | `MusicTrack` | `gs->world.music` | 6 s seamless loop: filtered-noise wash and surf with slow swells and bubbles; water-themed levels |
+| `lava.qoa` | `MusicTrack` | `gs->world.music` | 6 s seamless loop: low brown-noise rumble, sizzle, slow bubbles and crackles; lava-themed levels |
+| `winds.qoa` | `MusicTrack` | `gs->world.music` | 8 s seamless loop: band-limited noise with drifting band and gusts; available, no current level selects it |
 
 ---
 
 ## No Reserve Sounds
 
-There is no `assets/sounds/unused/` directory: every WAV is generated and
-loaded. `tools/gen_sounds.py --check` fails if a WAV appears that the generator
-does not produce, so unlicensed media cannot slip back into releases.
+There is no `assets/sounds/unused/` directory: every sound is generated and
+loaded. `tools/gen_sounds.py --check` fails if a QOA or WAV file appears that the
+generator does not produce, so unlicensed media cannot slip back into releases.
 
 ---
 
@@ -110,21 +115,22 @@ as an interaction, so it cannot start sound.
 
 Sound effects use raylib `LoadSound` and are fully decoded into memory. Music is selected
 by each level's `music_path` and loaded through `LoadMusicStream`. Native decoding can
-read incrementally from disk; WebAssembly preloads these WAV files into its
+read incrementally from disk; WebAssembly preloads these files into its
 virtual filesystem, so streaming playback does not remove their download or
-backing-storage cost. See [Asset Inventory](../asset-inventory/).
+backing-storage cost (QOA keeps it small: all twelve sounds take about 206 KiB,
+down from 1 MiB as WAV). See [Asset Inventory](../asset-inventory/).
 
 ---
 
 ## Adding a New Sound Effect
 
 1. Add a recipe and a `SOUNDS` row to `tools/gen_sounds.py`, then run `make sounds`
-   to write `assets/sounds/<category>/<name>.wav`.
+   to write `assets/sounds/<category>/<name>.qoa`.
 2. Add a `SoundEffect *<name>` field to `AudioResources` in `game.h`.
 3. Add a row to the `s_optional_chunks` table in `src/core/game_resources.c`:
 
 ```c
-{ CHUNK_FIELD(<name>), "assets/sounds/<category>/<name>.wav", "<name>.wav" },
+{ CHUNK_FIELD(<name>), "assets/sounds/<category>/<name>.qoa", "<name>.qoa" },
 ```
 
    `game_resources_load` loads every row through `sound_load`, printing a
@@ -161,13 +167,17 @@ see `vendor/raylib/README.md` and the [Build System](../build-system/).
 ## Adding a New Music Track
 
 Ambient tracks are short loops: the generator crossfades each recording's tail
-into its head so `MusicTrack` can repeat it without a click.
+into its head so `MusicTrack` can repeat it without a click. raylib's QOA stream
+(`qoaplay`) loops at the exact sample: after the last sample it rewinds and
+decodes the first frame again, with the encoder's starting predictor state.
+`tests/gen_sounds_test.py` checks that seam on the decoded samples, which differ
+slightly from the generator's because QOA is lossy.
 
 ```c
 // Acquire from the session's asset cache (streaming, not fully decoded
 // into RAM). The file is opened the first time; a Replay gets the same
 // track back.
-gs->world.music = asset_cache_music_acquire(gs->cache, "assets/sounds/levels/new_track.wav");
+gs->world.music = asset_cache_music_acquire(gs->cache, "assets/sounds/levels/new_track.qoa");
 if (!gs->world.music) { /* handle error */ }
 
 // Start (loop forever)

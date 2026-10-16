@@ -32,7 +32,7 @@ typedef MenuRoute MenuResult;
 
 /* The two files the menu loads; AppSession holds them between menus. */
 #define START_MENU_LOGO_PATH    "assets/sprites/screens/start_menu_logo.png"
-#define START_MENU_CONFIRM_PATH "assets/sounds/screens/confirm_ui.wav"
+#define START_MENU_CONFIRM_PATH "assets/sounds/screens/confirm_ui.qoa"
 
 /*
  * StartMenu — resources and state for the start menu screen.

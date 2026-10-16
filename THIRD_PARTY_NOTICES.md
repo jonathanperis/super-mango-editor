@@ -39,12 +39,15 @@ derived for additional biomes; those modifications are recorded in Git history.
 
 ## Audio
 
-Every WAV under `assets/sounds/` is original project work, synthesized from
-code by `tools/gen_sounds.py` (oscillators, envelopes, seeded noise and simple
-filters; no recorded or sampled material). The generated files are covered by
-the project's MIT license in `LICENSE`. `make sounds` regenerates them;
-`make docs-drift` fails if a committed sound differs from the generator's output
-by more than 1 LSB per sample (platform math libraries may round differently).
+Every QOA file under `assets/sounds/` is original project work, synthesized
+from code by `tools/gen_sounds.py` (oscillators, envelopes, seeded noise and
+simple filters; no recorded or sampled material) and encoded by `tools/qoa.py`,
+the project's own port of the QOA reference encoder in raylib's `qoa.h` (MIT,
+Dominic Szablewski; part of raylib, notice above). The generated files are
+covered by the project's MIT license in `LICENSE`. `make sounds` regenerates
+them; `make docs-drift` fails if a committed sound is not the generator's
+output (platform math libraries may round a sample differently, which the
+check tolerates).
 
 ## Font
 

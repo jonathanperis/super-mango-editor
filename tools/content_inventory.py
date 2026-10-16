@@ -12,7 +12,7 @@ from validate_levels import campaign_manifest_entries
 ROOT = Path(__file__).resolve().parents[1]
 MIB = 1024 * 1024
 ASSET_BUDGET = 4 * MIB  # Raw playable assets; not compressed transfer size.
-SOUND_BUDGET = 2 * MIB  # Generated WAVs (tools/gen_sounds.py); all preloaded on Web.
+SOUND_BUDGET = 1 * MIB  # Generated QOA sounds (tools/gen_sounds.py); all preloaded on Web.
 
 
 def asset_files(root: Path = ROOT) -> list[Path]:

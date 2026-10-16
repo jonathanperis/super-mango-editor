@@ -518,7 +518,7 @@ typedef struct {
     float player_start_y;
 
     /* Background sound */
-    char  music_path[64];   /* path to .wav sound file, empty = no sound */
+    char  music_path[64];   /* .qoa (or .wav) sound file, empty = no sound */
     int   music_volume;     /* authored 0..LEVEL_MUSIC_VOLUME_MAX volume units */
 
     /* Floor tile texture */
