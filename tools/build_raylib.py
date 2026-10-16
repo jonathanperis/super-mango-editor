@@ -86,10 +86,25 @@ def main() -> None:
             # Release executables link as PIE on Linux; the static library
             # must be position independent regardless of compiler defaults.
             command += ["-DCMAKE_POSITION_INDEPENDENT_CODE=ON"]
-    # config.h guards individual flags. Keep all upstream defaults, especially
-    # EndDrawing's automatic polling/pacing; CMake's customization mode enables
-    # additional features unless every option is explicitly pinned.
-    flags = ["-DSUPPORT_SCREEN_CAPTURE=0"]
+    # config.h wraps every SUPPORT_* default in #ifndef and the sources test
+    # them with #if, so a -D...=0 here switches one feature off and leaves the
+    # other upstream defaults alone, especially EndDrawing's automatic
+    # polling/pacing. CUSTOMIZE_BUILD stays OFF: that mode drops config.h and
+    # turns on extra features unless every option is pinned explicitly.
+    #
+    # The game and editor are 2D, draw with the built-in font, load only PNG
+    # images and WAV/QOA sounds, and use GenImageColor (outside the generation
+    # block) as their only generated image. Everything else is compiled out:
+    # 3D models, other file formats, image export and procedural images, the
+    # compression/hash helpers, input recording, gestures, the 3D camera,
+    # clipboard images, and the F12 screenshot shortcut.
+    flags = ["-DSUPPORT_SCREEN_CAPTURE=0", "-DSUPPORT_MODULE_RMODELS=0",
+             *(f"-DSUPPORT_FILEFORMAT_{name}=0" for name in
+               ("BMP", "GIF", "QOI", "DDS", "TTF", "FNT", "OGG", "MP3", "XM", "MOD")),
+             "-DSUPPORT_IMAGE_EXPORT=0", "-DSUPPORT_IMAGE_GENERATION=0",
+             "-DSUPPORT_COMPRESSION_API=0", "-DSUPPORT_AUTOMATION_EVENTS=0",
+             "-DSUPPORT_GESTURES_SYSTEM=0", "-DSUPPORT_CAMERA_SYSTEM=0",
+             "-DSUPPORT_CLIPBOARD_IMAGE=0"]
     if args.platform == "memory" or args.null_audio:
         # Only miniaudio's null backend: playback "succeeds" without hardware.
         flags += ["-DMA_ENABLE_ONLY_SPECIFIC_BACKENDS", "-DMA_ENABLE_NULL"]
