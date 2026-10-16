@@ -431,6 +431,7 @@ web-host-contract: ## Check: Web shell, storage and packaging contract tests
 	$(NODE) tests/touch_controls_test.cjs
 	$(NODE) tests/keyboard_scope_test.cjs
 	$(NODE) tests/audio_unlock_test.cjs
+	python3 tests/web_debug_page_test.py
 	python3 tests/package_release_test.py
 	python3 tests/filter_codeql_sarif_test.py
 
@@ -732,18 +733,19 @@ WEB_FLAGS = -s USE_GLFW=3 \
 WEB_OPT = -O2
 WEB_CFLAGS = -std=c11 -Wall -Wextra -Wpedantic -Wno-extra-semi $(WEB_OPT) -D_GNU_SOURCE $(EXTRA_WEB_CFLAGS)
 WEB_LINK_FLAGS = -s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]'
-WEB_DEBUG_LINK_FLAGS = --post-js web/debug-boot.js
 WEB_HTML = $(OUTDIR)/super-mango.html
+# The debug page runs the same program as the normal page and differs only by
+# one inline marker script (web/debug-boot.js), so it is not linked at all:
+# tools/web_debug_page.py derives it from the built normal page, and it loads
+# that page's super-mango.js, .wasm and .data instead of identical copies.
 WEB_DEBUG_HTML = $(OUTDIR)/super-mango-debug.html
-# The normal and debug pages compile the same sources with the same flags and
-# differ only when linking (--post-js), so every source compiles once into
-# $(WEB_OBJDIR) and both pages link those objects. The .d files track headers.
+# Every source compiles once into $(WEB_OBJDIR). The .d files track headers.
 WEB_OBJS = $(patsubst %.c,$(WEB_OBJDIR)/%.o,$(SRCS))
 WEB_INCLUDES = -I$(WEB_RAYLIB_BUILD)/build/raylib/include $(PROJECT_INCLUDES)
-# The .js/.wasm/.data siblings are emitted with each HTML file. Listing every
+# The .js/.wasm/.data siblings are emitted with the HTML file. Listing every
 # link input lets `web` (and dist-wasm through it) skip emcc only when fresh.
 WEB_LINK_INPUTS = $(WEB_OBJS) $(WEB_RAYLIB_LIB) $(WEB_LINK_FLAGS_STAMP) \
-                  $(wildcard web/*) $(wildcard assets/* assets/*/* assets/*/*/*) \
+                  $(filter-out web/debug-boot.js,$(wildcard web/*)) $(wildcard assets/* assets/*/* assets/*/*/*) \
                   $(wildcard levels/* levels/*/*) tools/web_csp.py
 
 web: $(WEB_HTML) $(WEB_DEBUG_HTML) ## Build: WebAssembly game with Emscripten (emcc on PATH)
@@ -776,10 +778,8 @@ $(WEB_HTML): $(WEB_LINK_INPUTS) | $(OUTDIR) web-toolchain
 		$(WEB_LINK_FLAGS)
 	python3 tools/web_csp.py $@
 
-$(WEB_DEBUG_HTML): $(WEB_LINK_INPUTS) | $(OUTDIR) web-toolchain
-	emcc $(WEB_OPT) $(EXTRA_WEB_CFLAGS) $(WEB_OBJS) $(WEB_RAYLIB_LIB) -o $@ $(WEB_FLAGS) \
-		$(WEB_LINK_FLAGS) $(WEB_DEBUG_LINK_FLAGS)
-	python3 tools/web_csp.py $@
+$(WEB_DEBUG_HTML): $(WEB_HTML) web/debug-boot.js tools/web_debug_page.py tools/web_csp.py
+	python3 tools/web_debug_page.py $(WEB_HTML) $@
 
 dist-native: release asset-budget ## Package: Native game and editor release zip in DISTDIR
 	@if [ -n "$${RELEASE_DLL_DIR:-}" ]; then \
@@ -810,7 +810,7 @@ clean: ## Other: Remove OUTDIR, OUTDIR-sanitize and DISTDIR
 #   link-flags.txt        every native program            LIBS and the other link inputs
 #   fuzz-flags.txt        the fuzz replay programs        FUZZ_FLAGS (they compile and link at once)
 #   web/build-flags.txt   Emscripten objects              WEB_CFLAGS WEB_INCLUDES
-#   web/link-flags.txt    the two Web pages               WEB_OPT WEB_FLAGS WEB_LINK_FLAGS ...
+#   web/link-flags.txt    the normal Web page             WEB_OPT WEB_FLAGS WEB_LINK_FLAGS ...
 #   raylib*/make-options.txt  raylib's "done" file        build_raylib.py options
 #
 # Each stamp is read back while Make parses this file. Only when the text
@@ -838,7 +838,7 @@ LINK_BUILD_FLAGS = $(call stamp_vars,CC CFLAGS TEST_CFLAGS LIBS EDITOR_LIBS TEST
 FUZZ_BUILD_FLAGS = $(call stamp_vars,CC FUZZ_FLAGS LIBS MATH_LIBS)
 WEB_BUILD_FLAGS  = $(call stamp_vars,EMSCRIPTEN_VERSION WEB_CFLAGS WEB_INCLUDES)
 WEB_LINK_BUILD_FLAGS = $(call stamp_vars,EMSCRIPTEN_VERSION WEB_OPT EXTRA_WEB_CFLAGS WEB_FLAGS \
-                         WEB_LINK_FLAGS WEB_DEBUG_LINK_FLAGS)
+                         WEB_LINK_FLAGS)
 WEB_RAYLIB_BUILD_OPTIONS = $(call stamp_vars,EMSCRIPTEN_VERSION WEB_RAYLIB_OPTIONS)
 
 # $(call flag_stamp,FILE,VARIABLE): FILE holds VARIABLE's text, rewritten only

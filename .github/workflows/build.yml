@@ -1072,7 +1072,8 @@ jobs:
       - name: Copy WASM artifacts into docs output
         run: |
           unzip -q wasm-build/super-mango-wasm.zip -d wasm-build/unpacked
-          cp wasm-build/unpacked/super-mango-wasm/super-mango{,-debug}.{html,js,wasm,data} docs/out/
+          cp wasm-build/unpacked/super-mango-wasm/super-mango.{html,js,wasm,data} \
+            wasm-build/unpacked/super-mango-wasm/super-mango-debug.html docs/out/
 
       - name: Smoke Pages WASM assembly
         run: |
@@ -1083,7 +1084,7 @@ jobs:
           python3 -m http.server 4173 --directory docs/out >/tmp/super-mango-pages.log 2>&1 &
           server_pid=$!
           trap 'kill $server_pid' EXIT
-          for path in / /super-mango{,-debug}.{html,js,wasm,data}; do
+          for path in / /super-mango.{html,js,wasm,data} /super-mango-debug.html; do
             curl --retry 5 --retry-delay 1 --retry-connrefused -fsS "http://127.0.0.1:4173$path" >/dev/null
           done
 

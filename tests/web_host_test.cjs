@@ -106,7 +106,9 @@ assert.equal(page.storageReads(), 0, 'Dashboard read a replay boot intent');
 
 const shell = host('web/shell.html', /<script>([\s\S]*?)<\/script\b[^>]*>/i);
 let args;
-shell.window.Module.__superMangoDebug = true;
+// The debug page inlines web/debug-boot.js after the shell's boot script.
+vm.runInContext(fs.readFileSync(path.join(__dirname, '../web/debug-boot.js'), 'utf8'), shell.context);
+assert.equal(shell.window.Module.__superMangoDebug, true);
 shell.window.Module.callMain = value => { args = value; return 0; };
 shell.window.Module.onRuntimeInitialized();
 assert(args.includes('--debug'), 'standalone debug payload omitted debug argument');

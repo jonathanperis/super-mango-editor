@@ -84,6 +84,21 @@ def check_js_asset_references(js_path: Path) -> int:
     return 0
 
 
+def check_debug_page(html_path: Path) -> int:
+    # The debug page shares the normal page's program: it must load
+    # super-mango.js and set the debug marker before that script runs.
+    text = html_path.read_text(encoding="utf-8")
+    marker = text.find("__superMangoDebug = true")
+    program = text.find("src=super-mango.js")
+    if program < 0:
+        program = text.find('src="super-mango.js"')
+    if marker < 0 or program < 0 or marker > program:
+        return fail(f"{display(html_path)} must set the debug marker before loading super-mango.js")
+    if "super-mango-debug.js" in text:
+        return fail(f"{display(html_path)} still loads a separate debug program")
+    return 0
+
+
 def check_zip(zip_path: Path, required: bool) -> int:
     if not zip_path.exists():
         if required:
@@ -112,16 +127,19 @@ def main() -> int:
         if rc != 0:
             return rc
 
-    for stem in ("super-mango", "super-mango-debug"):
-        html = out_dir / f"{stem}.html"
+    for name in ("super-mango.html", "super-mango-debug.html"):
+        html = out_dir / name
         for problem in csp_problems(html.read_text(encoding="utf-8")):
             return fail(f"{display(html)}: {problem}")
-        rc = check_js_asset_references(out_dir / f"{stem}.js")
-        if rc != 0:
-            return rc
-        rc = run_node_check(out_dir / f"{stem}.js", out_dir / f"{stem}.wasm")
-        if rc != 0:
-            return rc
+    rc = check_debug_page(out_dir / "super-mango-debug.html")
+    if rc != 0:
+        return rc
+    rc = check_js_asset_references(out_dir / "super-mango.js")
+    if rc != 0:
+        return rc
+    rc = run_node_check(out_dir / "super-mango.js", out_dir / "super-mango.wasm")
+    if rc != 0:
+        return rc
     rc = check_zip(zip_path, required=args.zip is not None)
     if rc != 0:
         return rc
