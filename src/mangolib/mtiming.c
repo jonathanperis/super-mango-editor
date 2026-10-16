@@ -5,12 +5,12 @@
  *   while (accumulator >= step) { update(step); accumulator -= step; }
  *   render();
  *
- * The caller runs update() once per step fixed_step_take returns.
+ * The caller runs update() once per step mtiming_take returns.
  */
 
 #include "mtiming.h"
 
-float fixed_step_frame_seconds(FixedStepClock *clock, double max_seconds)
+float mtiming_frame_seconds(FixedStepClock *clock, double max_seconds)
 {
     /* GetTime() is raylib's monotonic clock in seconds (a double), so frame
      * times keep sub-millisecond precision instead of whole milliseconds. */
@@ -24,7 +24,7 @@ float fixed_step_frame_seconds(FixedStepClock *clock, double max_seconds)
     return (float)seconds;
 }
 
-int fixed_step_take(FixedStepClock *clock, float seconds, double step, int max_steps)
+int mtiming_take(FixedStepClock *clock, float seconds, double step, int max_steps)
 {
     int steps = 0;
 

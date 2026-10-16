@@ -14,12 +14,12 @@ float game_timing_frame_seconds(GameState *gs)
     /* Deterministic runs must not depend on how fast this machine is. */
     if (gs->screen.smoke_test_frames > 0 || gs->screen.replay_script_path[0])
         return GAME_FIXED_STEP;
-    return fixed_step_frame_seconds(&gs->screen.loop.clock, GAME_MAX_FRAME_SECONDS);
+    return mtiming_frame_seconds(&gs->screen.loop.clock, GAME_MAX_FRAME_SECONDS);
 }
 
 int game_timing_take_steps(GameState *gs, float seconds)
 {
-    return fixed_step_take(&gs->screen.loop.clock, seconds, GAME_FIXED_STEP,
+    return mtiming_take(&gs->screen.loop.clock, seconds, GAME_FIXED_STEP,
                            GAME_MAX_STEPS_PER_FRAME);
 }
 

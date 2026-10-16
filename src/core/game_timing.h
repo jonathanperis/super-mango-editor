@@ -68,7 +68,7 @@ int game_timing_take_steps(GameState *gs, float seconds);
  */
 static inline void game_timing_restart_clock(GameState *gs)
 {
-    fixed_step_restart(&gs->screen.loop.clock, GAME_FIXED_STEP);
+    mtiming_restart(&gs->screen.loop.clock, GAME_FIXED_STEP);
 }
 
 /* Count down smoke-test frames and stop the game when the budget reaches zero. */
