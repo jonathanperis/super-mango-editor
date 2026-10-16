@@ -280,6 +280,15 @@ $(WEB_RAYLIB_DONE): $(RAYLIB_INPUTS) $(WEB_RAYLIB_OPTIONS_STAMP) $(if $(wildcard
 $(RAYLIB_LIB): $(RAYLIB_DONE) ;
 $(WEB_RAYLIB_LIB): $(WEB_RAYLIB_DONE) ;
 
+# CI keys its compiled-raylib caches on this text: the option definitions as
+# written, not their per-run values (the compiler is fingerprinted separately).
+# Other Makefile edits then keep the caches. A restored tree stays correct
+# either way, because its make-options.txt stamp still triggers a rebuild
+# when the options a run passes differ from the ones it was built with.
+.PHONY: raylib-options
+raylib-options:
+	@printf '%s\n' $(call shell_quote,$(value RAYLIB_OPTIONS)) $(call shell_quote,$(value WEB_RAYLIB_OPTIONS))
+
 $(OUTDIR):
 	mkdir -p $(OUTDIR) $(OBJDIR) $(OBJDIR)/tests
 

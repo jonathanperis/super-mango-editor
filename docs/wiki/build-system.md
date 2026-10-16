@@ -628,16 +628,21 @@ paths through `editor_path_for_display()` and checks `snprintf` results where
 truncation would change behaviour. Build jobs use Python 3.12 from
 `actions/setup-python` on Linux/macOS (MSYS2 supplies Python on Windows) and
 restore the pinned raylib source archive from `actions/cache` via
-`RAYLIB_ARCHIVE`; the archive is SHA-256 verified on every use. Every native
-build leg (Linux, macOS and Windows) caches its compiled debug raylib trees
-(`out/raylib`, plus `out/headless/raylib` for the Memory-backend tests), and the
-sanitizers job caches its sanitizer tree; the release tree that ships is never
-cached. CMake records absolute paths and per-compiler settings, so the key must
-match exactly: it covers the pin, patches, `Makefile`, `tools/build_raylib.py`,
-runner image, workspace path and the leg's compiler (`MANGO_CC`) and CMake
-versions. `make` still runs `build_raylib.py` on a restored
-tree, which re-verifies the archive and re-runs CMake; CMake then rebuilds
-anything its own dependency tracking finds stale.
+`RAYLIB_ARCHIVE`; the archive is SHA-256 verified on every use. Every job that
+compiles raylib caches the compiled tree: each native build leg (Linux, macOS
+and Windows) its debug trees (`out/raylib`, plus `out/headless/raylib` for the
+Memory-backend tests), the WebAssembly leg `out/raylib-web`, and the
+sanitizers, coverage, Windows Clang, Desktop backend and CodeQL C/C++ jobs
+their own trees. The release tree that ships (`dist-native`) is never cached.
+CMake records absolute paths and per-compiler settings, so the key must match
+exactly: it covers the pin, patches, `tools/build_raylib.py`, the Makefile's
+raylib option definitions (printed by `make raylib-options`), runner image,
+workspace path and the job's compiler (or Emscripten) and CMake versions.
+Hashing only the option definitions, not the whole `Makefile`, keeps the caches
+across unrelated Makefile edits. `make` still runs `build_raylib.py` on a
+restored tree, which re-verifies the archive and re-runs CMake; CMake then
+rebuilds anything its own dependency tracking finds stale, and a restored
+`make-options.txt` stamp that differs from the run's options forces that run.
 
 Renovate (`renovate.json`, on top of the shared `jonathanperis/.github` preset)
 watches the pins that no package manager owns, through regex `customManagers`:
