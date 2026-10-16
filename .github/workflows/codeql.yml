@@ -37,6 +37,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 
+      # Same fingerprint and exact-match key as the build workflow's caches
+      # (see its sanitizers job). This tree also holds the downloaded source
+      # archive, which build_raylib.py re-verifies on every use. raylib is
+      # still built, or found up to date, before CodeQL starts extracting.
+      - name: Fingerprint the raylib toolchain
+        id: toolchain
+        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; clang --version; cmake --version; make -s raylib-options; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache compiled raylib
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            out/raylib
+            !out/raylib/raylib-*/examples
+            !out/raylib/raylib-*/projects
+          key: raylib-build-linux-codeql-${{ steps.toolchain.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+
       - name: Build pinned third-party raylib before extraction
         run: make out/raylib/build/raylib/libraylib.a
 
