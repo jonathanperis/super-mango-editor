@@ -317,6 +317,44 @@ done:
     return failed;
 }
 
+/* A scrollbar: a track click moves one view, dragging the thumb scrolls in
+ * proportion, its clicks are used up, and with nothing to scroll it is
+ * absent and lets clicks through. */
+static int ui_scrollbar_pages_drags_and_uses_its_clicks(void)
+{
+    int failed = 0;
+    UIState ui;
+    UIScroll scroll = {0};
+    ui_init(&ui, NULL);
+
+    /* view 100 of 400 on a 100 px track: a 25 px thumb at the top. */
+    ui.mouse_x = 2; ui.mouse_y = 80; ui.mouse_clicked = 1;
+    CHECK(ui_scrollbar_input(&ui, &scroll, 0, 0, 5, 100, 100, 400) == 1);
+    CHECK(scroll.offset == 100 && ui.mouse_clicked == 0 && ui.scroll_drag == NULL);
+
+    /* The thumb now spans y 25..50: take it at 30 and drag to the bottom. */
+    ui.mouse_y = 30; ui.mouse_clicked = 1; ui.mouse_down = 1;
+    (void)ui_scrollbar_input(&ui, &scroll, 0, 0, 5, 100, 100, 400);
+    CHECK(ui.scroll_drag == &scroll && ui.scroll_grab == 5 && ui.mouse_clicked == 0);
+    ui.mouse_clicked = 0; ui.mouse_y = 200;
+    CHECK(ui_scrollbar_input(&ui, &scroll, 0, 0, 5, 100, 100, 400) == 1);
+    CHECK(scroll.offset == 300);
+    ui.mouse_y = 5 + 37;              /* thumb top at 37 of 75: half way */
+    (void)ui_scrollbar_input(&ui, &scroll, 0, 0, 5, 100, 100, 400);
+    CHECK(scroll.offset == 148);
+    ui.mouse_down = 0;
+    (void)ui_scrollbar_input(&ui, &scroll, 0, 0, 5, 100, 100, 400);
+    CHECK(ui.scroll_drag == NULL && scroll.offset == 148);
+
+    /* Everything fits: no bar, the click is left for the content. */
+    UIScroll fits = {0};
+    ui.mouse_y = 50; ui.mouse_clicked = 1;
+    CHECK(ui_scrollbar_input(&ui, &fits, 0, 0, 5, 100, 100, 80) == 0);
+    CHECK(ui.mouse_clicked == 1 && fits.offset == 0);
+done:
+    return failed;
+}
+
 /* WCAG relative luminance of an sRGB colour. */
 static double luminance(Color c)
 {
@@ -396,6 +434,21 @@ static int palette_clicks_choose_what_the_place_tool_adds(void)
     int picked[ENT_COUNT] = {0};
     CHECK(open_editor(&es, NULL) == 0);
 
+    /* Level Config is taller than its part of the column: a click low on
+     * its scrollbar's track scrolls it a page and changes nothing else. */
+    {
+        uint64_t hash_before = doc_hash(&es);
+        CHECK(es.config_open == 1 && es.config_scroll.offset == 0);
+        const int bar_x = CANVAS_W + PANEL_W - 2, bar_y = TOOLBAR_H + 28 + 290;
+        ui_frame(&es, bar_x, bar_y);
+        click_frame(&es, bar_x, bar_y);
+        CHECK(es.config_scroll.offset > 0 && es.config_open == 1);
+        CHECK(doc_hash(&es) == hash_before && es.ui.active_id == 0);
+        push_wheel(PANEL_LABEL_X, TOOLBAR_H + 100, 200.0f, 0);   /* back to the top */
+        ui_frame(&es, PANEL_LABEL_X, TOOLBAR_H + 100);
+        CHECK(es.config_scroll.offset == 0);
+    }
+
     /* Collapse Level Config by its header so the palette gets the column. */
     CHECK(es.config_open == 1);
     click_frame(&es, PANEL_LABEL_X, TOOLBAR_H + 8);
@@ -433,6 +486,7 @@ static int palette_clicks_choose_what_the_place_tool_adds(void)
     push_wheel(PANEL_LABEL_X, palette_top + 100, 80.0f, 0);   /* back to the top */
     ui_frame(&es, PANEL_LABEL_X, palette_top + 100);
     CHECK(found >= 15);
+
     CHECK(!picked[ENT_PLAYER_SPAWN] || editor_entity_type_is_singleton(ENT_PLAYER_SPAWN));
     CHECK(doc_hash(&es) == es.saved_document_hash && es.undo->top == 0);
 
@@ -3294,6 +3348,7 @@ int main(void)
     const struct { const char *name; int (*run)(void); } cases[] = {
 #define CASE(fn) {#fn, fn}
         CASE(ui_scroll_keeps_fractions_and_stays_in_range),
+        CASE(ui_scrollbar_pages_drags_and_uses_its_clicks),
         CASE(ui_styles_keep_the_default_look_and_high_contrast),
         CASE(toolbar_contrast_toggles_the_high_contrast_style),
         CASE(palette_clicks_choose_what_the_place_tool_adds),

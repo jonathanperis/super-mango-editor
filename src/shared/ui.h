@@ -71,6 +71,19 @@ typedef enum {
     UI_COLOR_COUNT
 } UIColorRole;
 
+/*
+ * UIScroll — one scrolled list or panel, in the manner of raygui's
+ * GuiScrollPanel: content taller than its view shows from `offset` units
+ * down (pixels for a panel, rows for a list). A trackpad sends fractions
+ * of a wheel notch, so the part that is not yet a whole unit waits in
+ * `carry` for the next event; truncating each event alone would turn
+ * every small swipe into nothing. A zeroed UIScroll is at the top.
+ */
+typedef struct {
+    int   offset;  /* units scrolled past the top, 0 .. content - view */
+    float carry;   /* wheel movement not yet a whole unit              */
+} UIScroll;
+
 typedef struct {
     Color color[UI_COLOR_COUNT];
     int   border_width;  /* px of UI_COLOR_BORDER around controls; 0 = none */
@@ -83,6 +96,10 @@ typedef struct {
     /* ---- Initialized once ---- */
     TextFont *font; /* borrowed; labels are drawn straight from its atlas */
     UIStyle   style; /* UI_STYLE_DEFAULT after ui_init; replace to re-theme */
+    /* The scrollbar thumb being dragged (NULL = none) and where on the
+     * thumb the pointer took it, in pixels from its top. */
+    UIScroll *scroll_drag;
+    int       scroll_grab;
     /* ---- Input for this frame, filled after ui_begin_frame ---- */
     int mouse_x, mouse_y,       /* logical canvas coordinates */
         mouse_clicked,         /* press edge: a button acts once */
@@ -250,18 +267,6 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
 /* A horizontal divider, drawn in logical pixels. */
 void ui_separator(UIState *ui, int x, int y, int w);
 
-/*
- * UIScroll — one scrolled list or panel, in the manner of raygui's
- * GuiScrollPanel: content taller than its view shows from `offset` units
- * down (pixels for a panel, rows for a list). A trackpad sends fractions
- * of a wheel notch, so the part that is not yet a whole unit waits in
- * `carry` for the next event; truncating each event alone would turn
- * every small swipe into nothing. A zeroed UIScroll is at the top.
- */
-typedef struct {
-    int   offset;  /* units scrolled past the top, 0 .. content - view */
-    float carry;   /* wheel movement not yet a whole unit              */
-} UIScroll;
 
 /* Apply a wheel delta in notches (positive = up) at units_per_notch and
  * return how many whole units it moved. The offset never goes below 0;
@@ -277,5 +282,21 @@ void ui_scroll_end(void);
  * view_bottom) with margin to spare; ui_scroll_begin limits the result. */
 void ui_scroll_reveal(UIScroll *scroll, int top, int bottom,
                       int view_top, int view_bottom, int margin);
+
+/*
+ * A vertical scrollbar in (x, y, w, h) for a view of `view` units over
+ * `content` units; nothing when everything fits. The thumb's length shows
+ * how much is visible and its place where; dragging it scrolls, and a click
+ * on the track above or below it moves one view.
+ *
+ * Call ui_scrollbar_input BEFORE the scrolled content handles clicks: a
+ * click on the bar is used up (mouse_clicked cleared) so the row under it
+ * is not picked too. Call ui_scrollbar_draw after the content, outside its
+ * clip. Returns 1 when the offset changed.
+ */
+int ui_scrollbar_input(UIState *ui, UIScroll *scroll, int x, int y, int w, int h,
+                       int view, int content);
+void ui_scrollbar_draw(UIState *ui, const UIScroll *scroll, int x, int y, int w, int h,
+                       int view, int content);
 /* Measure with the same font used for drawing, for centered/aligned labels. */
 int ui_text_width(UIState *ui, const char *text);
