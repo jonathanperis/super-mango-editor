@@ -127,17 +127,13 @@ static void render_grid(EditorState *es);
 /*
  * draw_outline — Draw a rectangular outline with a given line thickness.
  *
- * Four filled edges preserve integer placement at every editor zoom level.
+ * raylib's DrawRectangleLinesEx draws four filled edges, so integer inputs
+ * keep integer placement at every editor zoom level (DrawRectangleLines
+ * would draw GL lines with a half-pixel offset instead).
  */
 static void draw_outline(int x, int y, int w, int h, int thickness, Color color) {
-    /* Top edge */
-    DrawRectangle(x, y, w, thickness, color);
-    /* Bottom edge */
-    DrawRectangle(x, y+h-thickness, w, thickness, color);
-    /* Left edge (between top and bottom) */
-    DrawRectangle(x, y+thickness, thickness, h-2*thickness, color);
-    /* Right edge */
-    DrawRectangle(x+w-thickness, y+thickness, thickness, h-2*thickness, color);
+    DrawRectangleLinesEx((Rectangle){(float)x, (float)y, (float)w, (float)h},
+                         (float)thickness, color);
 }
 
 /* ------------------------------------------------------------------ */
