@@ -17,8 +17,8 @@
  * the frame order; low-level drawing belongs to the screens/render modules.
  */
 #include "app_session.h"
-#include "../mangolib/mcore.h"   /* str_copy */
-#include "../mangolib/mangomath.h" /* float_same_value */
+#include "../shared/platform.h"  /* str_copy */
+#include "../shared/geometry.h"  /* float_same_value */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,7 +32,7 @@
 #include "game_resources.h"
 #include "game_resume.h"
 #include "game_timing.h"
-#include "../mangolib/mfile.h"        /* serializer_fingerprint_utf8 */
+#include "../shared/serializer_io.h"  /* serializer_fingerprint_utf8 */
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -440,11 +440,6 @@ static GameState *session_make_game(AppSession *session, const char *path, const
     game->cache = &session->cache;
     game->screen.debug_mode = session->debug_mode;
     game->screen.random_seed = session->random_seed;
-    /* Each later game (Replay, the next level, a menu start) gets the next
-     * value of a stream started from --seed: still reproducible, but not a
-     * repeat of this game's fish and fog. */
-    RandomStream next_seed = {session->random_seed};
-    session->random_seed = mrandom_next(&next_seed);
     game->screen.smoke_test_frames = session->smoke_test_frames;
     copy_path(game->world.level_path, sizeof(game->world.level_path), path);
     copy_path(game->screen.replay_script_path, sizeof(game->screen.replay_script_path), session->replay_script_path);

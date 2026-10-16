@@ -8,8 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mangolib/mgfx.h"
-#include "mangolib/mtext.h"
+#include "shared/graphics.h"
+#include "shared/text.h"
 
 #include <time.h>
 
@@ -38,14 +38,14 @@
 #include "editor/editor_validation.h"
 #include "editor/entity_meta.h"
 #include "editor/file_dialog.h"
-#include "levels/serializer.h"
-#include "levels/serializer_emit.h"
-#include "mangolib/mfile.h"
+#include "shared/serializer.h"
+#include "shared/serializer_emit.h"
+#include "shared/serializer_io.h"
 #include "test_folders.h"
 #include "test_paths.h"  /* TEST_OUT scratch directory */
 #include "editor/tools.h"
 #include "editor/undo.h"
-#include "mangolib/mangogui.h"
+#include "shared/ui.h"
 #include "editor/canvas.h"
 #include "editor/editor_playtest.h"
 #include "editor/editor_campaign.h"

@@ -9,8 +9,8 @@
  */
 #pragma once
 
-#include "mangolib/mgfx.h"     /* Texture2D */
-#include "mangolib/maudio.h"   /* SoundEffect */
+#include "shared/graphics.h"   /* Texture2D */
+#include "shared/audio.h"      /* SoundEffect */
 
 /*
  * TextureResources — one slot per shared sprite sheet. game_resources.c

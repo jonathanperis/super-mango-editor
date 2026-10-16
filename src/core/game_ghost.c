@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../mangolib/mcore.h"   /* str_copy */
+#include "../shared/platform.h"  /* str_copy */
 
 int game_ghost_begin(GameState *gs)
 {

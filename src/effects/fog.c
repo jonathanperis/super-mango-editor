@@ -10,6 +10,7 @@
  */
 
 #include <stdio.h>
+#include "../core/game_random.h"
 
 #include "fog.h"
 #include "game_constants.h" /* GAME_W, GAME_H (logical canvas)  */
@@ -63,7 +64,7 @@
  * If all slots are occupied, the spawn is silently skipped — this should
  * not happen with FOG_MAX = 4 and the durations used here.
  */
-static void fog_spawn(FogSystem *fog, RandomStream *rng) {
+static void fog_spawn(FogSystem *fog) {
     /* Find the first inactive slot in the pool */
     for (int i = 0; i < FOG_MAX; i++) {
         if (fog->instances[i].active) continue;
@@ -71,16 +72,16 @@ static void fog_spawn(FogSystem *fog, RandomStream *rng) {
         FogInstance *inst = &fog->instances[i];
 
         /* Random texture: pick from however many were loaded for this level */
-        inst->tex_index = (int)(mrandom_next(rng) % (unsigned int)fog->tex_count);
+        inst->tex_index = (int)(game_random() % (unsigned int)fog->tex_count);
 
         /* Random direction: +1 (left→right) or -1 (right→left) */
-        inst->dir = (mrandom_next(rng) % 2) ? +1 : -1;
+        inst->dir = (game_random() % 2) ? +1 : -1;
 
         /*
          * Random duration between FOG_DURATION_MIN and FOG_DURATION_MAX.
          * Scale the reproducible unit interval to the desired duration range.
          */
-        float t      = mrandom_unit(rng);
+        float t      = game_random_unit();
         inst->duration = FOG_DURATION_MIN + t * (FOG_DURATION_MAX - FOG_DURATION_MIN);
 
         /*
@@ -117,11 +118,13 @@ static void fog_spawn(FogSystem *fog, RandomStream *rng) {
  * fog_update and fog_render become safe no-ops.
  */
 void fog_init(FogSystem *fog, AssetCache *cache,
-              const char (*paths)[64], int count, RandomStream *rng)
+              const char (*paths)[64], int count)
 {
     /*
-     * No seeding here: game_init seeds rng from the game's seed (--seed, or
-     * the clock when none is given). Reseeding here would discard --seed.
+     * No seeding here: main.c seeds the random generator at start-up (from
+     * --seed, or the clock when none is given). Reseeding here would
+     * discard --seed and also change enemy randomness whenever a level
+     * reloads its fog textures.
      */
 
     /* Zero-init the instance pool so every slot starts as inactive */
@@ -155,7 +158,7 @@ void fog_init(FogSystem *fog, AssetCache *cache,
 
     /* Spawn the very first fog wave so the effect starts immediately */
     if (fog->tex_count > 0)
-        fog_spawn(fog, rng);
+        fog_spawn(fog);
 }
 
 /* ------------------------------------------------------------------ */
@@ -181,7 +184,7 @@ void fog_init(FogSystem *fog, AssetCache *cache,
  * Deactivation:
  *   When elapsed >= duration the pan is complete; free the slot.
  */
-void fog_update(FogSystem *fog, float dt, RandomStream *rng) {
+void fog_update(FogSystem *fog, float dt) {
     for (int i = 0; i < FOG_MAX; i++) {
         FogInstance *inst = &fog->instances[i];
         if (!inst->active) continue;
@@ -205,7 +208,7 @@ void fog_update(FogSystem *fog, float dt, RandomStream *rng) {
         if (!inst->spawned_next &&
             inst->elapsed >= inst->duration - FOG_OVERLAP) {
             inst->spawned_next = 1;
-            fog_spawn(fog, rng);
+            fog_spawn(fog);
         }
 
         /* Free the slot once the image has fully left the opposite side */

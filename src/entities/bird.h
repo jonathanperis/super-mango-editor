@@ -13,8 +13,8 @@
  */
 #pragma once
 
-#include "../mangolib/mgfx.h"
-#include "../mangolib/maudio.h"
+#include "../shared/graphics.h"
+#include "../shared/audio.h"
 
 /* ---- Constants ---------------------------------------------------------- */
 

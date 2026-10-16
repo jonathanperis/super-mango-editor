@@ -38,11 +38,12 @@ src/
 │   ├── game_ghost_file.c         Ghost text format and its native file / browser storage
 │   ├── game_inspector.h / .c     Simulation stepping, slow motion, tuning, status panel and F5 key help
 │   ├── game_experiment.h / .c    Bounded capture/export/replay with level fingerprints
+│   ├── game_random.h / .c        Reproducible unsigned PRNG for native/WASM
 │   ├── debug.h / .c              Debug overlay: FPS/frame budget/memory, hitboxes, event log
 │   ├── entity_utils.h / .c       Shared entity helper functions
 │   ├── game_state.h / .c         GameState reset helpers
 │   ├── game_window.h / .c        Screen-owned logical render target
-│   ├── game_timing.h / .c        The game's step limits and deterministic smoke/replay frames, over shared/fixed_step
+│   ├── game_timing.h / .c        Fixed-step accumulator and frame clock
 │   ├── game_lifecycle.c          `game_init` / `game_cleanup` implementation
 │   ├── game_loop.c               Active-game frame runner (game_frame)
 │   ├── game_update.h / .c        s_update_steps table: one fixed step, in order
@@ -83,23 +84,35 @@ src/
 │   ├── editor_undo_apply.h / .c  Undo operation application
 │   ├── file_dialog.h / .c        Native file dialogs
 │   └── undo.h / .c               Compact history with owned config snapshots; `undo_push(stack, const Command *)`
-├── mangolib/
-│   ├── mangolib.h               Umbrella header: every Mangolib module (raylib + libc only)
-│   ├── mgfx.h / .c              Window, sprite pivots and logical presentation; declares the texture handles
-│   ├── mtexture.c               `texture_load`, `texture_own`, `texture_unload`: owned texture handles
-│   ├── massets.h / .c           Session's reference-counted cache of level files, player sheet, HUD icon, font, menu logo and sound
-│   ├── mangomath.h             Integer hitboxes and half-open intersection
-│   ├── maudio.h / .c            Bounded sound voices, music streaming and device ownership
-│   ├── mtext.h / .c             Borrowed built-in font, text measurement, centred drawing and label texture creation
-│   ├── mcore.h / .c             Monotonic time, UTF-8 copying and OS preference/executable paths
-│   ├── mtiming.h / .c           Game-independent fixed-step clock: frame seconds in, whole steps out
-│   ├── mrandom.h / .c           Caller-owned reproducible random streams (xorshift32) for native/WASM
-│   ├── masset_root.h / .c       Move a foreign working folder to the one holding assets/ and levels/
-│   ├── mutf8.h                  Strict UTF-8 checks for loaded strings and typed text
-│   ├── mprintf_format.h         PRINTF_FORMAT: lets GCC/Clang check printf-style format arguments
-│   ├── mangogui.h / .c           Immediate-mode widgets shared by editor and game settings
-│   ├── minput.h / .c            raylib device sampling, versioned binding translation and command queue
-│   └── mfile.h / .c             UTF-8 path I/O, temp-file-then-rename saves, symlink checks
+├── shared/
+│   ├── graphics.h / .c          Window, sprite pivots and logical presentation; declares the texture handles
+│   ├── texture.c                `texture_load`, `texture_own`, `texture_unload`: owned texture handles
+│   ├── asset_cache.h / .c       Session's reference-counted cache of level files, player sheet, HUD icon, font, menu logo and sound
+│   ├── geometry.h              Integer hitboxes and half-open intersection
+│   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
+│   ├── text.h / .c              Borrowed built-in font, text measurement, centred drawing and label texture creation
+│   ├── platform.h / .c          Monotonic time, UTF-8 copying and OS preference/executable paths
+│   ├── asset_root.h / .c        Move a foreign working folder to the one holding assets/ and levels/
+│   ├── utf8.h                   Strict UTF-8 checks for loaded strings and typed text
+│   ├── printf_format.h          PRINTF_FORMAT: lets GCC/Clang check printf-style format arguments
+│   ├── ui.h / .c                 Immediate-mode widgets shared by editor and game settings
+│   ├── serializer.h / .c         TOML save/load public API anchor
+│   ├── serializer_emit.h / .c    TOML emission helpers; control bytes and DEL are written as \uXXXX escapes
+│   ├── serializer_io.h / .c      UTF-8 path I/O, temp-file-then-rename saves, symlink checks
+│   ├── serializer_load.c         `level_load_toml` staged parse orchestration
+│   ├── serializer_load_header.h / .c        TOML header/meta and floor-gap parsing
+│   ├── serializer_load_checkpoints.h / .c   Strict authored checkpoint parsing
+│   ├── serializer_load_geometry.h / .c      Rails and platforms parsing
+│   ├── serializer_load_collectibles.h / .c  Coin, star, last-star, next-phase parsing
+│   ├── serializer_load_enemies.h / .c       Enemy placement parsing
+│   ├── serializer_load_hazards.h / .c       Hazard placement parsing
+│   ├── serializer_load_surfaces.h / .c      Surface placement parsing
+│   ├── serializer_load_climbables.h / .c    Vine, ladder, rope parsing
+│   ├── serializer_load_layers.h / .c        Background/fog/foreground layer parsing
+│   ├── serializer_load_config.h / .c        Optional rule/config parsing
+│   ├── serializer_parse.h / .c  Shared TOML parse utilities
+│   ├── serializer_save.c        TOML save: write_level_toml calls one writer per section family
+│   └── serializer_types.h / .c  Enum/string conversion helpers
 ├── effects/
 │   ├── fog.h / .c                Atmospheric fog overlay: init, slide, spawn, render
 │   ├── parallax.h / .c           Multi-layer scrolling background: init, tiled render, cleanup
@@ -119,6 +132,7 @@ src/
 │   ├── axe_trap.h / .c           Swinging/spinning axe hazard
 │   └── blue_flame.h / .c         Blue/fire flame hazards: rise/flip/fall cycle
 ├── input/
+│   ├── input_backend.h / .c     raylib device sampling, versioned binding translation and command queue
 │   ├── game_bindings.c           Reserved-key/button and configurable binding validation
 │   ├── game_input.h / .c         Keyboard/gamepad action masks and cross-screen release latch
 │   ├── game_events.h / .c        Semantic input and terminal action dispatch
@@ -135,22 +149,6 @@ src/
 │   ├── campaign_catalog.h / .c   v1 campaign manifest: loading, the campaign rules, and saving (shared with the editor)
 │   ├── level_start.h / .c        Playtest start points (--start-x / --start-checkpoint), shared with the editor
 │   ├── phase_transition.h / .c   next_phase resolution and progress helpers
-│   ├── serializer.h / .c         TOML save/load public API anchor
-│   ├── serializer_emit.h / .c    TOML emission helpers; control bytes and DEL are written as \uXXXX escapes
-│   ├── serializer_load.c         `level_load_toml` staged parse orchestration
-│   ├── serializer_load_header.h / .c        TOML header/meta and floor-gap parsing
-│   ├── serializer_load_checkpoints.h / .c   Strict authored checkpoint parsing
-│   ├── serializer_load_geometry.h / .c      Rails and platforms parsing
-│   ├── serializer_load_collectibles.h / .c  Coin, star, last-star, next-phase parsing
-│   ├── serializer_load_enemies.h / .c       Enemy placement parsing
-│   ├── serializer_load_hazards.h / .c       Hazard placement parsing
-│   ├── serializer_load_surfaces.h / .c      Surface placement parsing
-│   ├── serializer_load_climbables.h / .c    Vine, ladder, rope parsing
-│   ├── serializer_load_layers.h / .c        Background/fog/foreground layer parsing
-│   ├── serializer_load_config.h / .c        Optional rule/config parsing
-│   ├── serializer_parse.h / .c  Shared TOML parse utilities
-│   ├── serializer_save.c        TOML save: write_level_toml calls one writer per section family
-│   ├── serializer_types.h / .c  Enum/string conversion helpers
 │   └── level_validate.h / .c     LevelDef count, schema-range and geometry validation
 ├── player/
 │   ├── player.h / .c             Public API + high-level glue
@@ -206,7 +204,7 @@ For a beginner's reading order, continue through `core/app_session.c`,
 ### Responsibilities
 
 - Parse startup, profile, experiment and smoke flags; see the complete [Controls reference](../controls/#runtime-flags-for-input-and-ci), including `--seed`, `--profile`, `--continue`, `--no-save` and `--experiment`
-- When the working folder holds no `assets/`, make typed paths absolute and move to the executable's folder (`asset_root_enter`, `mangolib/masset_root.c`); the editor's `editor_main.c` does the same
+- When the working folder holds no `assets/`, make typed paths absolute and move to the executable's folder (`asset_root_enter`, `shared/asset_root.c`); the editor's `editor_main.c` does the same
 - Delegate window, input and audio initialization to `session_create`
 - Route to the start menu, sandbox, or direct TOML level mode through `session_create()`
 - Run `session_run()`; native callers then destroy the session, while the browser callback frees it after terminal cleanup
@@ -277,7 +275,7 @@ An entity header such as `spider.h` still reaches about 160, because
 `GameState` is deliberately one struct that stores every entity array by
 value, so `game.h` includes exactly the headers whose structs or `MAX_*`
 constants that definition needs, plus `game_constants.h` — nothing else. Call-only helpers such as
-`mangolib/mcore.h` (`clock_millis`, `str_copy`) are included by the `.c` files
+`shared/platform.h` (`clock_millis`, `str_copy`) are included by the `.c` files
 that use them. Inside, `GameState` is three named parts stored by value,
 `world` (the level being played), `screen` (overlays, routes, timing, input,
 tools) and `assets` (shared sprites and sounds), so `gs->world.spiders[i]`
@@ -285,8 +283,8 @@ still leads straight to the data; the comment at the top of `game.h`
 explains the trade-off.
 
 ```c
-#include "mangolib/mgfx.h"            // Texture2D, RenderTexture2D, IntRect
-#include "mangolib/maudio.h"               // MusicTrack pointer
+#include "shared/graphics.h"            // Texture2D, RenderTexture2D, IntRect
+#include "shared/audio.h"               // MusicTrack pointer
 #include "game_assets.h"                // GameAssets: shared sprites and sounds
 #include "game_fwd.h"                   // the GameState typedef name
 #include <stdint.h>                     // uint32_t, uint64_t fields
@@ -356,7 +354,7 @@ Returns `0` on success. If a required window, texture, level, or subsystem resou
 ### `game_frame(GameState *gs)`
 
 `game_frame` performs one frame: real frame time -> events -> 0..5 fixed 1/60 s
-update steps -> render. Real time feeds an accumulator (`mangolib/mtiming.c`), so
+update steps -> render. Real time feeds an accumulator (`core/game_timing.c`), so
 every step, live or replayed, has the same `dt`. `AppSession` is the only loop owner. See
 [Architecture](../architecture/) for routes and render order.
 
@@ -604,30 +602,22 @@ The performance line shows the measured FPS, the frame interval in milliseconds
 (the time between rendered frames, not CPU utilization) and, where the OS
 reports it, resident memory in MB.
 
-### Mangolib: the engine layer (`mangolib/`)
-
-Mangolib sits between raylib and the game/editor and includes nothing but its own
-headers, raylib and the C library; `tools/check_layering.py` (part of
-`make docs-drift`) fails otherwise. The game and editor link it as `libmango.a`.
+### Shared raylib boundaries (`shared/` and `input/input_backend.*`)
 
 | Read | Learning purpose |
 |---|---|
-| `mangolib/mangolib.h` | One include for the whole layer, and a one-line map of its modules |
-| `mangolib/mgfx.h`, `mangolib/mgfx.c` | Sprite pivots/flips and logical-canvas presentation |
-| `mangolib/mtexture.c` | Texture ownership: a malloc'd handle, `NULL` on failure, one owner unloads it |
-| `mangolib/massets.h`, `mangolib/massets.c` | A reference count: holders per file, idle entries, and why freeing waits for `asset_cache_trim` |
-| `mangolib/mangomath.h` | Integer, half-open hitboxes; overflow-safe edge arithmetic |
-| `mangolib/maudio.h`, `mangolib/maudio.c` | Owned samples, borrowed alias data, per-play volume and music pumping |
-| `mangolib/mtext.h`, `mangolib/mtext.c` | CPU image versus GPU texture; borrowing raylib's built-in font |
-| `mangolib/mangogui.h`, `mangolib/mangogui.c` | Immediate-mode calls, stable widget IDs, staged edits and bounded label cache |
-| `mangolib/mcore.h`, `mangolib/mcore.c` | Monotonic elapsed time, UTF-8 copying and caller-owned OS paths |
-| `mangolib/mtiming.h`, `mangolib/mtiming.c` | The accumulator: clamped frame time, a step cap, and why restarts keep half a step |
-| `mangolib/mrandom.h`, `mangolib/mrandom.c` | Why each stream owns its state, and why gameplay and fog draw from separate streams |
-| `mangolib/masset_root.h`, `mangolib/masset_root.c` | Why relative paths depend on the working folder, and how startup finds the asset root |
-| `mangolib/mutf8.h` | What makes a UTF-8 byte sequence valid (overlong forms, surrogates, truncation) |
-| `mangolib/mprintf_format.h` | How a compiler attribute lets our own printf-style wrappers get format-string checks |
-| `mangolib/minput.h`, `mangolib/minput.c` | Ordered events versus held state, logical pointer mapping and saved-binding translation |
-| `mangolib/mfile.h`, `mangolib/mfile.c` | Wide-character paths on Windows, temp-file-then-rename saves and why a fingerprint streams the file |
+| `shared/graphics.h`, `shared/graphics.c` | Sprite pivots/flips and logical-canvas presentation |
+| `shared/texture.c` | Texture ownership: a malloc'd handle, `NULL` on failure, one owner unloads it |
+| `shared/asset_cache.h`, `shared/asset_cache.c` | A reference count: holders per file, idle entries, and why freeing waits for `asset_cache_trim` |
+| `shared/geometry.h` | Integer, half-open hitboxes; overflow-safe edge arithmetic |
+| `shared/audio.h`, `shared/audio.c` | Owned samples, borrowed alias data, per-play volume and music pumping |
+| `shared/text.h`, `shared/text.c` | CPU image versus GPU texture; borrowing raylib's built-in font |
+| `shared/ui.h`, `shared/ui.c` | Immediate-mode calls, stable widget IDs, staged edits and bounded label cache |
+| `shared/platform.h`, `shared/platform.c` | Monotonic elapsed time, UTF-8 copying and caller-owned OS paths |
+| `shared/asset_root.h`, `shared/asset_root.c` | Why relative paths depend on the working folder, and how startup finds the asset root |
+| `shared/utf8.h` | What makes a UTF-8 byte sequence valid (overlong forms, surrogates, truncation) |
+| `shared/printf_format.h` | How a compiler attribute lets our own printf-style wrappers get format-string checks |
+| `input/input_backend.h`, `input/input_backend.c` | Ordered events versus held state, logical pointer mapping and saved-binding translation |
 
 ### `core/entity_utils.h` / `core/entity_utils.c`
 

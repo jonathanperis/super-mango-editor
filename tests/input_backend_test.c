@@ -1,6 +1,6 @@
 /* No desktop needed: exercise the production callback adapter against a small
  * public-GLFW registration fixture, including chaining and restoration. */
-#include "mangolib/minput.h"
+#include "input/input_backend.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <stdio.h>

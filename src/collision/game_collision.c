@@ -37,7 +37,7 @@
 #include "../collectibles/last_star.h"
 #include "../collectibles/health_star.h"
 
-#include "../mangolib/maudio.h"
+#include "../shared/audio.h"
 
 #define ARRAY_LEN(arr) ((int)(sizeof(arr) / sizeof((arr)[0])))
 

@@ -20,7 +20,7 @@ super-mango-editor
 ├── editor_files/session/playtest.c/.h  save/load, recovery, recent files, playtest
 ├── editor_validation.c/.h in-memory validation report
 ├── file_dialog.c/.h, dialog_choice.c  native pickers and decision dialogs
-└── ../mangolib/mangogui.c/.h, serializer*.c/.h  immediate-mode widgets; LevelDef <-> TOML
+└── ../shared/ui.c/.h, serializer*.c/.h  immediate-mode widgets; LevelDef <-> TOML
 ```
 
 ## Build Integration

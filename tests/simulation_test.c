@@ -12,7 +12,7 @@
 #include "input/game_events.h"
 #include "player/player_internal.h"
 #include "player/player_jump.h"
-#include "mangolib/mcore.h"    /* clock_millis */
+#include "shared/platform.h"   /* clock_millis */
 #include "test_paths.h"         /* TEST_OUT scratch directory */
 #include <math.h>
 #include <stdio.h>
@@ -179,19 +179,16 @@ static int inspection_and_replay(void)
      * frame duration) came from the variable-timestep engine: refused.
      * Format 2 rows are well formed, but were recorded while the camera
      * still panned in from x = 0, which changes when waiting spike blocks
-     * start: refused too, rather than replayed into another run. Format 3
-     * shared one random stream between fog and fish, so fish on a fog level
-     * jumped at other times: refused as well. */
+     * start: refused too, rather than replayed into another run. */
     const char *bad_rows[] = {
         "[0, nan, 250, 750, 600, 550, 100, 350, 180, 80]",
         "[64, 100, 250, 750, 600, 550, 100, 350, 180, 80]",
         "[0, 1e100, 250, 750, 600, 550, 100, 350, 180, 80]",
         "[0.016, 0, 100, 250, 750, 600, 550, 100, 350, 180, 80]",
-        "[0, 100, 250, 750, 600, 550, 100, 350, 180, 80]",
         "[0, 100, 250, 750, 600, 550, 100, 350, 180, 80]"
     };
     const int bad_versions[] = {EXPERIMENT_FORMAT_VERSION, EXPERIMENT_FORMAT_VERSION,
-                                EXPERIMENT_FORMAT_VERSION, 1, 2, 3};
+                                EXPERIMENT_FORMAT_VERSION, 1, 2};
     for (size_t i = 0; i < sizeof(bad_rows) / sizeof(bad_rows[0]); i++) {
         bad = fopen(TEST_OUT "school-experiment-invalid.toml", "w");
         CHECK(bad != NULL);

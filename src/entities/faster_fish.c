@@ -17,10 +17,9 @@ static const FishSpec s_faster_fish = {
 
 /* ------------------------------------------------------------------ */
 
-void faster_fish_update(FasterFish *fish, int count, float dt, int world_w,
-                        RandomStream *rng)
+void faster_fish_update(FasterFish *fish, int count, float dt, int world_w)
 {
-    fish_variant_update(&s_faster_fish, fish, count, dt, world_w, rng);
+    fish_variant_update(&s_faster_fish, fish, count, dt, world_w);
 }
 
 void faster_fish_render(const FasterFish *fish, int count,

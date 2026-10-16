@@ -28,8 +28,7 @@
 typedef Fish FasterFish;
 
 /* Move fish, trigger jumps, and advance animation (fish.c with FFISH_* tuning). */
-void faster_fish_update(FasterFish *fish, int count, float dt, int world_w,
-                        RandomStream *rng);
+void faster_fish_update(FasterFish *fish, int count, float dt, int world_w);
 
 /* Draw all faster fish with camera offset. */
 void faster_fish_render(const FasterFish *fish, int count,

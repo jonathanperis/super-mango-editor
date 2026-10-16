@@ -10,8 +10,8 @@
  */
 #pragma once
 
-#include "../mangolib/massets.h"    /* AssetCache — hud_init asks it for the font and icon */
-#include "../mangolib/mtext.h"
+#include "../shared/asset_cache.h"  /* AssetCache — hud_init asks it for the font and icon */
+#include "../shared/text.h"
 
 #define MAX_HEARTS      3     /* maximum hearts the player can have        */
 #define DEFAULT_LIVES   3     /* lives the player starts with              */

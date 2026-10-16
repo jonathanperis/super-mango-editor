@@ -164,3 +164,18 @@ explicit maintainer authorization on 2026-10-10. The same run's two notes were
 fixed in code: the float field's limit step moved out of an over-long switch
 case into `limit_float_edit` (#179), and the ignored `fchown` result is kept
 in a named variable instead of an empty `if` (#178).
+
+## Mangolib move and its revert (PR #343)
+
+PR #343 moved `src/shared/serializer_io.c` to `src/mangolib/mfile.c` with only
+its header comment and own `#include` changed; the analysis of `main` then
+reported #131 again at the new path, at the same line and columns and with the
+same message:
+
+| Alerts | Input and operation | Assessment |
+| --- | --- | --- |
+| #183 | `mfile.c`: opening the parent directory of a saved file to `fsync` it after the atomic rename | Same as #131. The directory is that of the file being saved: a level the editor saves (a path the user opened or chose), the campaign manifest the editor saves and the level files it lists, or the profile and ghost files below the private preference root that `HOME`/`XDG_DATA_HOME` select (or an explicit `--profile` path). All are the invoking user's own local paths under their own permissions; the directory is opened read-only and only synced. |
+
+This finding (#183) was dismissed as a false positive after explicit maintainer
+authorization on 2026-10-16. The restructure was then reverted, so the code is
+back in `src/shared/serializer_io.c`, where #131 covers it.

@@ -6,9 +6,9 @@
  */
 #pragma once
 
-#include "../mangolib/mgfx.h"
-#include "../mangolib/maudio.h"
-#include "../mangolib/massets.h"        /* AssetCache — player_init asks it for the sprite sheet */
+#include "../shared/graphics.h"
+#include "../shared/audio.h"
+#include "../shared/asset_cache.h"      /* AssetCache — player_init asks it for the sprite sheet */
 #include "../surfaces/platform.h"       /* Platform, MAX_PLATFORMS — needed for player_update signature */
 #include "../surfaces/bouncepad.h"      /* Bouncepad — needed for player_update signature */
 #include "../surfaces/float_platform.h" /* FloatPlatform — needed for player_update signature */

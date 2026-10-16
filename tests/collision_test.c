@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "mangolib/mangomath.h"
+#include "shared/geometry.h"
 
 #include "entities/fish.h"
 #include "hazards/circular_saw.h"

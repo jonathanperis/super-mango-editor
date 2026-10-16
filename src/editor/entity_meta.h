@@ -12,7 +12,7 @@
 
 #include "editor.h"
 #include "../levels/level.h"
-#include "../mangolib/mangomath.h" /* IntRect */
+#include "../shared/geometry.h" /* IntRect */
 
 typedef enum {
     EDITOR_ENTITY_CATEGORY_WORLD = 0,

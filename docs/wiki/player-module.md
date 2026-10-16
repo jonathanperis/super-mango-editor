@@ -105,7 +105,7 @@ being lifted back onto the grass.
 
 `player_init` returns `0` after getting the required player texture and `-1` if the texture cannot be loaded, allowing `game_init` to clean up the partially initialized runtime.
 
-The player does not own its sprite sheet. `player_init` asks the session's asset cache (`src/mangolib/massets.h`) for it and holds one reference; `player_cleanup` gives that reference back and clears `player->texture`. The first game of a session decodes `player.png`; a Replay's new `Player` is handed the same texture and reads no file. Pass the same `cache` to both functions. `NULL` is allowed (a `GameState` without a session): the sheet is then loaded for that `Player` alone and freed by `player_cleanup`.
+The player does not own its sprite sheet. `player_init` asks the session's asset cache (`src/shared/asset_cache.h`) for it and holds one reference; `player_cleanup` gives that reference back and clears `player->texture`. The first game of a session decodes `player.png`; a Replay's new `Player` is handed the same texture and reads no file. Pass the same `cache` to both functions. `NULL` is allowed (a `GameState` without a session): the sheet is then loaded for that `Player` alone and freed by `player_cleanup`.
 
 Default display size is 48×48 logical pixels. `PLAYER_FLOOR_SINK = 16` sinks the frame into the floor to compensate for transparent sprite padding.
 

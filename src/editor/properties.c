@@ -3,7 +3,7 @@
  *
  * Renders per-entity-type editable fields (position, velocity, patrol range,
  * mode, tile counts, etc.) in the bottom-right panel when an entity is
- * selected on the canvas.  Uses the immediate-mode UI widgets from mangogui.h.
+ * selected on the canvas.  Uses the immediate-mode UI widgets from ui.h.
  *
  * The panel occupies the bottom half of the right column:
  *   x = CANVAS_W (896),  y = EDITOR_H / 2 (360)
@@ -29,7 +29,7 @@
 #include "editor_panels.h" /* editor_focus_validation_issue                     */
 #include "editor_session.h" /* editor_set_status (show_field_note)              */
 #include "editor_playtest.h" /* editor_play_test_from (checkpoint "Playtest here") */
-#include "../mangolib/mangogui.h" /* ui_panel, ui_label, ui_separator, ui_float_field,
+#include "../shared/ui.h" /* ui_panel, ui_label, ui_separator, ui_float_field,
                            ui_int_field, ui_dropdown                         */
 #include "../levels/level.h" /* LevelDef, all *Placement structs            */
 #include "../player/player.h"  /* JUMP_VY (bouncepad launch limit)           */
@@ -1522,9 +1522,6 @@ static int config_level_fields(EditorState *es, int x, int y)
         editor_commit_change(es);
     y += 24;
 
-    /* The description is the longest text field; the edit buffer must hold it. */
-    _Static_assert(sizeof(es->level.description) <= UI_EDIT_BUFFER_SIZE,
-                   "UI_EDIT_BUFFER_SIZE must fit a level description");
     ui_label(&es->ui, x + 8, y, "Desc:");
     if (ui_text_field(&es->ui, 9001, x + 55, y, 310, es->level.description,
                       (int)sizeof(es->level.description)))

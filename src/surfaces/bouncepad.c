@@ -8,7 +8,7 @@
  * game_bouncepads_handle_hit then sets state = BOUNCE_ACTIVE here to start the animation.
  */
 
-#include "../mangolib/mgfx.h"
+#include "../shared/graphics.h"
 #include <stdio.h>
 
 #include "bouncepad.h"

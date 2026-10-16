@@ -6,15 +6,16 @@
  * Keeping those jobs separate lets native and browser builds share the game.
  */
 #include <errno.h>
-#include "mangolib/mcore.h"   /* clock_millis */
+#include "shared/platform.h"  /* clock_millis */
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "game.h"
 #include "core/app_session.h"
-#include "mangolib/masset_root.h"
-#include "mangolib/mfile.h"        /* serializer_file_exists_utf8 */
+#include "core/game_random.h"
+#include "shared/asset_root.h"
+#include "shared/serializer_io.h"  /* serializer_file_exists_utf8 */
 
 static const char *argument(int argc, char **argv, int *index)
 {
@@ -218,6 +219,7 @@ int main(int argc, char **argv)
     /* A fixed seed makes enemy/decorative randomness reproducible. A normal
      * run without --seed varies its starting state using a monotonic clock. */
     if (!seed_set) config.random_seed = (unsigned int)clock_millis();
+    game_random_seed(config.random_seed);
     /* session_create unwinds partially initialized resources on failure. */
     AppSession *session = session_create(&config);
     /* session_create copied every path it keeps (or opened the file). */

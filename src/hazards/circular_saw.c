@@ -6,7 +6,7 @@
  * knockback, just like spike blocks and axe traps.
  */
 
-#include "../mangolib/mgfx.h"
+#include "../shared/graphics.h"
 #include <stdio.h>
 
 #include "circular_saw.h"

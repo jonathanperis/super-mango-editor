@@ -316,7 +316,7 @@ x = 192.0   # left edge of the sea gap
 All entity–player collision uses **AABB (axis-aligned bounding box)** overlap tests on integer `IntRect`s. Entity hitboxes are inset from the sprite frame to match visible art bounds only — transparent padding is excluded.
 
 ```c
-/* src/mangolib/mangomath.h — half-open boxes: [x, x+w) */
+/* src/shared/geometry.h — half-open boxes: [x, x+w) */
 static inline int rect_intersects(const IntRect *a, const IntRect *b)
 {
     return a && b && a->w > 0 && a->h > 0 && b->w > 0 && b->h > 0 &&

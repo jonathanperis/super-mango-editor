@@ -187,7 +187,7 @@ Selecting **Replay** on a completion overlay replaces the game in place, exactly
 
 `--debug` (or `make run-level-debug LEVEL=...`) opens the simulation inspector
 and turns off saving to your personal profile. The game always advances in
-fixed 1/60 s steps (`src/mangolib/mtiming.c` keeps an accumulator of real
+fixed 1/60 s steps (`src/core/game_timing.c` keeps an accumulator of real
 time), so the inspector controls *how many* steps run, never how long one is.
 
 ### Debug inspector keys
@@ -247,7 +247,7 @@ browser download), where `<seconds>` is the calendar time (seconds since
 says which of "Nothing recorded; F8 starts a recording", "Export failed: file
 names already taken" or "Export failed: could not write the file" stopped an
 export. The file
-(`format_version = 4`) has one row per step, `[input bits, nine movement
+(`format_version = 3`) has one row per step, `[input bits, nine movement
 values]`, plus the level path, the seed and `level_hash`, a hash of the level
 file's exact bytes.
 
