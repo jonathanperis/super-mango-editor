@@ -3,6 +3,7 @@
 #include "game_profile.h"
 #include "../collectibles/coin.h"  /* MAX_COINS: the most coins a level holds */
 #include "../game_constants.h"      /* MAX_CHECKPOINTS */
+#include "../shared/hex.h"           /* hex_parse_lower */
 #include "../levels/level_ref.h"
 #include "../shared/platform.h"
 #include "../shared/printf_format.h"
@@ -185,15 +186,7 @@ static int number(toml_datum_t value, float *out)
 static int hex64(toml_datum_t value, uint64_t *out)
 {
     if (value.type != TOML_STRING || value.u.str.len != 16) return -1;
-    uint64_t result = 0;
-    for (int i = 0; i < 16; i++) {
-        char c = value.u.str.ptr[i];
-        int digit = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : -1;
-        if (digit < 0) return -1;
-        result = (result << 4) | (uint64_t)digit;
-    }
-    *out = result;
-    return 0;
+    return hex_parse_lower(value.u.str.ptr, 16, out);
 }
 
 /*

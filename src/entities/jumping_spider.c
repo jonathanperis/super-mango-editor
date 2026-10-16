@@ -16,6 +16,7 @@
 #include "jumping_spider.h"
 #include "../game_constants.h"      /* FLOOR_Y, GAME_W, FLOOR_GAP_W */
 #include "../core/entity_utils.h"  /* patrol_update, animate_frame_ms */
+#include "../shared/geometry.h"    /* span_find */
 
 #define JSPIDER_AUDIBLE_RANGE  ((float)GAME_W)
 #define JSPIDER_VOL_MAX        128
@@ -40,33 +41,29 @@ void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
          *   - Airborne       → do nothing; let the spider fly over.
          */
         float art_center = s->x + JSPIDER_ART_X + JSPIDER_ART_W / 2.0f;
-        if (s->on_ground) {
-            for (int g = 0; g < floor_gap_count; g++) {
-                float gx = (float)floor_gaps[g];
-                if (art_center >= gx && art_center < gx + (float)FLOOR_GAP_W) {
-                    /* Snap back to the gap edge and leap */
-                    if (s->vx > 0.0f)
-                        s->x = gx - JSPIDER_ART_X - JSPIDER_ART_W / 2.0f;
-                    else
-                        s->x = gx + (float)FLOOR_GAP_W - JSPIDER_ART_X - JSPIDER_ART_W / 2.0f;
+        int g = s->on_ground ? span_find(art_center, floor_gaps, floor_gap_count, FLOOR_GAP_W) : -1;
+        if (g >= 0) {
+            float gx = (float)floor_gaps[g];
+            /* Snap back to the gap edge and leap */
+            if (s->vx > 0.0f)
+                s->x = gx - JSPIDER_ART_X - JSPIDER_ART_W / 2.0f;
+            else
+                s->x = gx + (float)FLOOR_GAP_W - JSPIDER_ART_X - JSPIDER_ART_W / 2.0f;
 
-                    s->vy        = JSPIDER_JUMP_VY;
-                    s->on_ground = 0;
+            s->vy        = JSPIDER_JUMP_VY;
+            s->on_ground = 0;
 
-                    /* Play attack sound with distance-based volume */
-                    if (snd_attack) {
-                        float spider_cx = s->x + JSPIDER_ART_X + JSPIDER_ART_W / 2.0f;
-                        int on_screen = (spider_cx >= (float)cam_x - JSPIDER_FRAME_W &&
-                                         spider_cx <= (float)cam_x + GAME_W + JSPIDER_FRAME_W);
-                        if (on_screen) {
-                            float dist = fabsf(player_x - spider_cx);
-                            int vol = sound_volume_for_distance(dist, JSPIDER_AUDIBLE_RANGE, JSPIDER_VOL_MAX);
-                            if (vol > 0) {
-                                sound_play(snd_attack, vol);
-                            }
-                        }
+            /* Play attack sound with distance-based volume */
+            if (snd_attack) {
+                float spider_cx = s->x + JSPIDER_ART_X + JSPIDER_ART_W / 2.0f;
+                int on_screen = (spider_cx >= (float)cam_x - JSPIDER_FRAME_W &&
+                                 spider_cx <= (float)cam_x + GAME_W + JSPIDER_FRAME_W);
+                if (on_screen) {
+                    float dist = fabsf(player_x - spider_cx);
+                    int vol = sound_volume_for_distance(dist, JSPIDER_AUDIBLE_RANGE, JSPIDER_VOL_MAX);
+                    if (vol > 0) {
+                        sound_play(snd_attack, vol);
                     }
-                    break;
                 }
             }
         }

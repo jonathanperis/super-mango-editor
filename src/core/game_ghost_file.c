@@ -40,6 +40,7 @@
 #include "game_timing.h"  /* GAME_FIXED_STEP */
 #include "tomlc17.h"
 #include "../shared/platform.h"       /* str_copy */
+#include "../shared/hex.h"             /* hex_parse_lower */
 #include "../shared/printf_format.h"
 #include "../shared/serializer_io.h"
 
@@ -147,27 +148,6 @@ EM_JS(int, ghost_browser_write, (const char *key, const char *text, int budget),
 
 /* ---- Decoding ------------------------------------------------------ */
 
-/* Value of one hex digit, or -1. Lowercase only, as encode writes it. */
-static int hex_digit(char c)
-{
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    return -1;
-}
-
-/* Read `digits` hex digits from text into *out; -1 on a bad digit. */
-static int hex_value(const char *text, int digits, uint64_t *out)
-{
-    uint64_t value = 0;
-    for (int i = 0; i < digits; i++) {
-        int digit = hex_digit(text[i]);
-        if (digit < 0) return -1;
-        value = (value << 4) | (uint64_t)digit;
-    }
-    *out = value;
-    return 0;
-}
-
 /* Decode the frames array into out->samples (already sized to `steps`). */
 static int decode_frames(toml_datum_t frames, GameGhostTrack *out, int steps)
 {
@@ -181,8 +161,8 @@ static int decode_frames(toml_datum_t frames, GameGhostTrack *out, int steps)
         for (int at = 0; at < text.u.str.len; at += GHOST_SAMPLE_DIGITS) {
             uint64_t x, y, cell;
             const char *sample = text.u.str.ptr + at;
-            if (count == steps || hex_value(sample, 4, &x) || hex_value(sample + 4, 4, &y) ||
-                hex_value(sample + 8, 2, &cell) || cell > GHOST_CELL_MAX) return -1;
+            if (count == steps || hex_parse_lower(sample, 4, &x) || hex_parse_lower(sample + 4, 4, &y) ||
+                hex_parse_lower(sample + 8, 2, &cell) || cell > GHOST_CELL_MAX) return -1;
             out->samples[count].x = (uint16_t)x;
             out->samples[count].y = (uint16_t)y;
             out->samples[count].cell = (uint8_t)cell;
@@ -222,7 +202,7 @@ int game_ghost_decode(GameGhostTrack *out, const char *text)
             seen |= 2;
         } else if (!strcmp(key, "level_hash")) {
             failed = value.type != TOML_STRING || value.u.str.len != 16 ||
-                     hex_value(value.u.str.ptr, 16, &out->level_hash);
+                     hex_parse_lower(value.u.str.ptr, 16, &out->level_hash);
             seen |= 4;
         } else if (!strcmp(key, "time")) {
             double time = value.type == TOML_FP64 ? value.u.fp64 :
