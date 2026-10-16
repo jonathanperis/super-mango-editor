@@ -6,6 +6,8 @@
 #define display_open web_pacing_display_open
 #define display_present web_pacing_display_present
 #define display_viewport web_pacing_display_viewport
+#define display_scale_fit web_pacing_display_scale_fit
+#define display_keep_on_monitor web_pacing_display_keep_on_monitor
 #define SetTraceLogLevel web_pacing_trace
 #define SetConfigFlags web_pacing_flags
 #define InitWindow web_pacing_init

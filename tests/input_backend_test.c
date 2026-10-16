@@ -148,3 +148,49 @@ int display_viewport_test(void)
     window_ready = 0;
     return failed;
 }
+
+static int fit_is(const char *name, int requested, int monitor_w, int monitor_h, int expected)
+{
+    int got = display_scale_fit(requested, 400, 300, monitor_w, monitor_h);
+    if (got == expected) return 0;
+    fprintf(stderr, "window scale %s: got %dx, expected %dx\n", name, got, expected);
+    return 1;
+}
+
+static int moved_is(const char *name, IntRect window, IntRect monitor, int x, int y)
+{
+    IntRect got = display_keep_on_monitor(window, monitor);
+    if (got.x == x && got.y == y && got.w == window.w && got.h == window.h) return 0;
+    fprintf(stderr, "keep on monitor %s: got %d,%d, expected %d,%d\n", name, got.x, got.y, x, y);
+    return 1;
+}
+
+/* The game's window_scale setting is capped to what the monitor can show,
+ * with room for the title bar and taskbar, and the grown window is moved
+ * back onto the monitor. */
+int display_window_fit_test(void)
+{
+    int failed = 0;
+    failed |= fit_is("4x on 1080p", 4, 1920, 1080, 3);   /* 1600x1200 is too tall */
+    failed |= fit_is("3x on 1080p", 3, 1920, 1080, 3);   /* 1200x900 leaves 180 px */
+    failed |= fit_is("2x on 1080p", 2, 1920, 1080, 2);   /* never raised */
+    failed |= fit_is("4x on 1440p", 4, 2560, 1440, 4);
+    failed |= fit_is("3x on 1366x768", 3, 1366, 768, 2);
+    failed |= fit_is("2x on 1024x768", 2, 1024, 768, 2);
+    failed |= fit_is("2x on 800x600", 2, 800, 600, 1);
+    failed |= fit_is("tiny monitor", 4, 320, 200, 1);    /* never below 1x */
+    failed |= fit_is("unknown monitor", 3, 0, 0, 3);     /* Memory backend */
+    failed |= fit_is("bad setting", 0, 1920, 1080, 1);
+
+    IntRect hd = {0, 0, 1920, 1080};
+    failed |= moved_is("already on", (IntRect){100, 100, 1200, 900}, hd, 100, 100);
+    failed |= moved_is("hanging off bottom right", (IntRect){900, 400, 1200, 900}, hd, 720, 180);
+    failed |= moved_is("under the title bar", (IntRect){-50, 0, 800, 600}, hd, 0, 40);
+    /* A second monitor to the right of the first, at x 1920. */
+    IntRect right = {1920, 0, 1280, 1024};
+    failed |= moved_is("second monitor", (IntRect){2500, 300, 1200, 900}, right, 2000, 124);
+    /* Larger than the monitor: keep the top-left corner on it. */
+    failed |= moved_is("too large", (IntRect){300, 300, 1600, 1200}, (IntRect){0, 0, 1280, 720}, 0, 40);
+    failed |= moved_is("unknown monitor", (IntRect){-500, -500, 800, 600}, (IntRect){0}, -500, -500);
+    return failed;
+}

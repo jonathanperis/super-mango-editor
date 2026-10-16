@@ -16,6 +16,22 @@ void display_present(RenderTexture2D target);
  * input_pointer_to_logical inverts it, so clicks match what is drawn. */
 Rectangle display_viewport(int window_w, int window_h, int canvas_w, int canvas_h);
 
+/* Room a window leaves around itself on a monitor for its title bar,
+ * borders and the system's taskbar or menu bar, in window units. */
+#define DISPLAY_DECORATION_MARGIN 80
+
+/* The largest whole-number scale from 1 to requested whose window (canvas
+ * times scale) fits a monitor_w x monitor_h monitor with the decoration
+ * margin to spare. Never below 1; an unknown (zero) monitor size leaves
+ * requested as it is. */
+int display_scale_fit(int requested, int canvas_w, int canvas_h, int monitor_w, int monitor_h);
+
+/* Where to put window (its client area) so that it lies on monitor, with
+ * room above it for the title bar: the same rectangle moved as little as
+ * possible. A window larger than the monitor keeps its top-left corner on
+ * it. Only x and y change. */
+IntRect display_keep_on_monitor(IntRect window, IntRect monitor);
+
 /* Asset slots own heap-stable raylib values. Borrowers never unload a slot.
  * Texture2D itself is a small handle, not the image pixels. Allocating a slot
  * preserves explicit NULL-on-failure and shared-pointer ownership throughout
