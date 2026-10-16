@@ -197,7 +197,7 @@ TEST_BINDINGS_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/game_bindings.o
 TEST_SETTINGS_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/screens/settings_menu.o
 # These need no test flags, so tests link the game's own objects.
 TEST_GAME_TERMINAL_OBJ = $(OBJDIR)/src/core/game_terminal.o
-TEST_GAME_RANDOM_OBJ = $(OBJDIR)/src/core/game_random.o
+TEST_RANDOM_OBJ = $(OBJDIR)/src/shared/random.o
 TEST_GAME_GHOST_OBJ = $(OBJDIR)/src/core/game_ghost.o
 TEST_GAME_CHECKPOINT_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/core/game_checkpoint.o
 TEST_HUD_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/screens/hud.o
@@ -632,7 +632,7 @@ $(OUTDIR)/level-validate-test: $(TEST_SOURCE_DIR)/level_validate_test.o $(TEST_V
 	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
 $(OUTDIR)/runtime-load-test: $(TEST_SOURCE_DIR)/runtime_load_test.o $(TEST_LEVEL_LOADER_OBJ) \
-		$(TEST_GAME_RANDOM_OBJ) \
+		$(TEST_RANDOM_OBJ) \
 		$(TEST_VALIDATE_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_RAIL_OBJ) \
 		$(TEST_SPIKE_BLOCK_OBJ) $(TEST_FLOAT_PLATFORM_OBJ) \
 		$(TEST_BOUNCEPAD_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
@@ -645,7 +645,7 @@ $(OUTDIR)/entity-utils-test: $(TEST_SOURCE_DIR)/entity_utils_test.o $(TEST_ENTIT
 	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
 $(OUTDIR)/collision-test: $(TEST_SOURCE_DIR)/collision_test.o $(TEST_SPIKE_PLATFORM_OBJ) \
-		$(TEST_FISH_OBJ) $(TEST_CIRCULAR_SAW_OBJ) $(TEST_ENTITY_UTILS_OBJ) $(TEST_GAME_RANDOM_OBJ)
+		$(TEST_FISH_OBJ) $(TEST_CIRCULAR_SAW_OBJ) $(TEST_ENTITY_UTILS_OBJ) $(TEST_RANDOM_OBJ)
 	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
 $(OUTDIR)/phase-transition-test: $(TEST_SOURCE_DIR)/phase_transition_test.o $(TEST_PHASE_OBJ)

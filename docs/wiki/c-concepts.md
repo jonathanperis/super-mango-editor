@@ -76,7 +76,7 @@ pairs in a table and writes the logic once.
 |------|------------------|----------------|
 | `_Static_assert` on a table's length | `s_hit_order` in `src/editor/hit_test.c` | `sizeof(s_hit_order) / sizeof(s_hit_order[0]) == ENT_COUNT`: add an entity type and forget this list, and the build fails instead of the editor silently ignoring clicks on it. The same check guards `s_palette_order` and `s_entity_meta` in `entity_meta.c`, `s_property_panels` in `properties.c` and the inspector's `fields` table. |
 | Letting the compiler check `printf` formats | `PRINTF_FORMAT` in `src/shared/printf_format.h`, used by `editor_set_status()` | A function taking `const char *fmt, ...` hides its arguments from the compiler; GCC and Clang's `format(printf, ...)` attribute makes `-Wformat` check each call as it does `printf`. |
-| `static` at file scope | `s_required_textures` in `game_resources.c`; `state` in `src/core/game_random.c` | `static` outside a function means "visible only in this file". Other files cannot reach the random generator's state; they call `game_random_seed()` and `game_random()`. Helpers like `texture_slot()` are `static` for the same reason. |
+| `static` at file scope | `s_required_textures` and `texture_slot()` in `game_resources.c` | `static` outside a function means "visible only in this file". Other files cannot reach the table or the helper; they use the functions `game_resources.h` declares. |
 | Warnings as a safety net | `-Wall -Wextra -Wpedantic` in the Makefile | The code is kept warning-free; see the [Developer Guide](../developer-guide/). |
 
 ## Cleaning up after a failure
@@ -97,7 +97,7 @@ the arithmetic.
 | Saturating addition | `game_award_score()` in `src/core/game_score.c` | `amount > INT_MAX - gs->world.score ? INT_MAX : gs->world.score + amount` never computes a sum that does not fit. |
 | Wider arithmetic for the hard part | the bonus-life lines in `game_award_score()` | The threshold maths uses `int64_t`, which has room for any product here, then clamps back to `int`. |
 | Parsing numbers safely | `unsigned_argument()` in `src/main.c` | `strtoul` instead of `atoi`: `errno` catches overflow, `end` catches trailing junk like `7x`, and `value > UINT_MAX` is checked before narrowing to `unsigned int`. |
-| Unsigned wraparound on purpose | `editor_hash_bytes()` in `src/editor/editor_session.c`; `game_random()` in `src/core/game_random.c` | Unsigned overflow is defined (it wraps), which the FNV-1a hash and the xorshift generator rely on. |
+| Unsigned wraparound on purpose | `editor_hash_bytes()` in `src/editor/editor_session.c`; `random_next()` in `src/shared/random.c` | Unsigned overflow is defined (it wraps), which the FNV-1a hash and the xorshift generator rely on. |
 
 [Debugging C](../debugging-c/) shows the UBSan report you get from the naive
 version of the score addition.

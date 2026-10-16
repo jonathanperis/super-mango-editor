@@ -247,7 +247,7 @@ browser download), where `<seconds>` is the calendar time (seconds since
 says which of "Nothing recorded; F8 starts a recording", "Export failed: file
 names already taken" or "Export failed: could not write the file" stopped an
 export. The file
-(`format_version = 3`) has one row per step, `[input bits, nine movement
+(`format_version = 4`) has one row per step, `[input bits, nine movement
 values]`, plus the level path, the seed and `level_hash`, a hash of the level
 file's exact bytes.
 

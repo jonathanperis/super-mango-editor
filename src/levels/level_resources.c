@@ -95,7 +95,8 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
         for (int i = 0; i < n; i++) {
             str_copy(fog_paths[i], def->fog_layers[i].path, 64);
         }
-        fog_init(&gs->world.fog, cache, (const char (*)[64])fog_paths, n);
+        fog_init(&gs->world.fog, cache, (const char (*)[64])fog_paths, n,
+                 &gs->world.effects_random);
     }
 
     /*

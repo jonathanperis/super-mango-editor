@@ -7,6 +7,7 @@
 #pragma once
 
 #include "../shared/graphics.h"
+#include "../shared/random.h"   /* RandomStream — jump delays draw from one */
 
 #define MAX_FISH           16       /* maximum simultaneous fish instances     */
 #define FISH_FRAMES         2       /* horizontal frames in Fish_2.png (96×48) */
@@ -70,10 +71,10 @@ typedef struct {
 
 /* Move fish with the given tuning, trigger random jumps, and animate. */
 void fish_variant_update(const FishSpec *spec, Fish *fish, int count,
-                         float dt, int world_w);
+                         float dt, int world_w, RandomStream *rng);
 
 /* Move regular fish, trigger random jumps, and advance animation. */
-void fish_update(Fish *fish, int count, float dt, int world_w);
+void fish_update(Fish *fish, int count, float dt, int world_w, RandomStream *rng);
 
 /* Draw all fish with camera-aware world-to-screen conversion. */
 void fish_render(const Fish *fish, int count,
