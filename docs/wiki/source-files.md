@@ -89,6 +89,7 @@ src/
 │   ├── texture.c                `texture_load`, `texture_own`, `texture_unload`: owned texture handles
 │   ├── asset_cache.h / .c       Session's reference-counted cache of level files, player sheet, HUD icon, font, menu logo and sound
 │   ├── geometry.h              Integer hitboxes and half-open intersection
+│   ├── raymath_inline.h        raylib's raymath as static inline (Clamp and friends, project flags)
 │   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
 │   ├── text.h / .c              Borrowed built-in font, text measurement and (centred) drawing from its atlas
 │   ├── platform.h / .c          Monotonic time, UTF-8 copying and OS preference/executable paths
@@ -610,6 +611,7 @@ reports it, resident memory in MB.
 | `shared/texture.c` | Texture ownership: a malloc'd handle, `NULL` on failure, one owner unloads it |
 | `shared/asset_cache.h`, `shared/asset_cache.c` | A reference count: holders per file, idle entries, and why freeing waits for `asset_cache_trim` |
 | `shared/geometry.h` | Integer, half-open hitboxes; overflow-safe edge arithmetic |
+| `shared/raymath_inline.h` | Why raymath is included static inline, and when using it would change replay numbers |
 | `shared/audio.h`, `shared/audio.c` | Owned samples, borrowed alias data, per-play volume and music pumping |
 | `shared/text.h`, `shared/text.c` | Borrowing raylib's built-in font and drawing glyphs from its one atlas texture |
 | `shared/ui.h`, `shared/ui.c` | Immediate-mode calls, stable widget IDs, staged edits and labels drawn from the font atlas |
