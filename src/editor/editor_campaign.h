@@ -27,6 +27,8 @@
 #define CAMPAIGN_ROW_H         24
 #define CAMPAIGN_NAME_X        330                 /* the level name field */
 #define CAMPAIGN_NAME_W        220
+/* Right of the rows, which end CAMPAIGN_VIEW_X before the canvas edge. */
+#define CAMPAIGN_SCROLLBAR_X   (CANVAS_W - CAMPAIGN_VIEW_X + 4)
 #define CAMPAIGN_BUTTONS_Y     (TOOLBAR_H + CANVAS_H - 40)
 #define CAMPAIGN_BUTTON_W      80
 #define CAMPAIGN_BUTTON_H      24

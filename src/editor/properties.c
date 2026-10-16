@@ -1986,8 +1986,12 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     int title_h           = ROW_H + 4;
     int content_visible_h = cfg_h - title_h;
     int content_top       = start_y + title_h;
+    int content_scroll_h  = total_content_h - title_h;
+    /* The scrollbar takes its clicks before the fields below can see them. */
+    (void)ui_scrollbar_input(&es->ui, &es->config_scroll, x + PROP_W - SCROLLBAR_W, content_top,
+                             SCROLLBAR_W, content_visible_h, content_visible_h, content_scroll_h);
     int y = ui_scroll_begin(&es->config_scroll, x, content_top, PROP_W, content_visible_h,
-                            total_content_h - title_h) + 8;
+                            content_scroll_h) + 8;
     cfg_clip_top = content_top;
     cfg_clip_bottom = content_top + content_visible_h;
     y = config_validation(es, x, y);
@@ -2002,6 +2006,8 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     (void)config_fog_layers(es, x, y);
 
     ui_scroll_end();
+    ui_scrollbar_draw(&es->ui, &es->config_scroll, x + PROP_W - SCROLLBAR_W, content_top,
+                      SCROLLBAR_W, content_visible_h, content_visible_h, content_scroll_h);
     editor_end_change_tracking(es);
     show_field_note(es);
 

@@ -278,8 +278,13 @@ void palette_render(EditorState *es, int start_y, int available_h)
      * the content, clips drawing to the view and returns where the content's
      * top goes: above content_top once earlier entries have scrolled away.
      */
+    int view_h = panel_h - TITLE_H;
+    int content_h = palette_content_height() - TITLE_H;
+    /* The scrollbar takes its clicks before the rows below can see them. */
+    (void)ui_scrollbar_input(&es->ui, &es->palette_scroll, panel_x + PANEL_W - SCROLLBAR_W,
+                             content_top, SCROLLBAR_W, view_h, view_h, content_h);
     int cursor_y = ui_scroll_begin(&es->palette_scroll, panel_x, content_top, PANEL_W,
-                                   panel_h - TITLE_H, palette_content_height() - TITLE_H);
+                                   view_h, content_h);
 
     /*
      * clip_bottom — the Y coordinate of the panel's bottom edge.
@@ -314,4 +319,6 @@ void palette_render(EditorState *es, int start_y, int available_h)
 
     /* Remove clip rect so other panels are not affected */
     ui_scroll_end();
+    ui_scrollbar_draw(&es->ui, &es->palette_scroll, panel_x + PANEL_W - SCROLLBAR_W,
+                      content_top, SCROLLBAR_W, view_h, view_h, content_h);
 }

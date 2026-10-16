@@ -260,8 +260,12 @@ fraction), modelled on raygui's `GuiScrollPanel`. `ui_scroll_wheel` turns wheel
 notches into whole pixels or rows and keeps a trackpad's fractions for the next
 event; `ui_scroll_begin`/`ui_scroll_end` clamp the offset, clip drawing to the
 view and say where the content starts; `ui_scroll_reveal` scrolls a field into
-view. The editor's palette, Level Config, validation list and Campaign rows all
-use it.
+view. `ui_scrollbar_input` (before the content, so a click on the bar is not
+also a click on the row under it) and `ui_scrollbar_draw` (after) add a
+scrollbar whose thumb can be dragged and whose track pages by one view. The
+editor's palette, Level Config, validation list and Campaign rows all use
+`UIScroll`; all but the validation list (which says "Rows 1-8 of 12") show a
+scrollbar.
 
 ---
 
