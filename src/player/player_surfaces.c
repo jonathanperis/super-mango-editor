@@ -6,6 +6,7 @@
 
 #include "player_internal.h"
 #include "../game_constants.h" /* FLOOR_Y, FLOOR_GAP_W */
+#include "../shared/raymath_inline.h" /* Clamp */
 
 /*
  * FLOAT_PLATFORM_STICK_TOL — tolerance in logical pixels for the stay-on check.
@@ -68,7 +69,7 @@ void player_resolve_floor_collision(Player *player,
             float wall_left = gx;
             float wall_right = gx + (float)FLOOR_GAP_W - 1.0f;
             if (center_x < wall_left || center_x > wall_right) {
-                float held = center_x < wall_left ? wall_left : wall_right;
+                float held = Clamp(center_x, wall_left, wall_right);
                 player->x  = held - player->w / 2.0f;
                 player->vx = 0.0f;
             }

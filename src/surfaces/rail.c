@@ -3,6 +3,7 @@
  */
 
 #include "../shared/graphics.h"
+#include "../shared/raymath_inline.h" /* Clamp */
 #include <stdio.h>
 #include <math.h>
 #include <limits.h>
@@ -264,8 +265,7 @@ void rail_get_world_pos(const Rail *r, float t, float *out_x, float *out_y) {
         if (t < 0.0f) t += (float)r->count;
         if (t >= (float)r->count) t = 0.0f;
     } else {
-        if (t < 0.0f) t = 0.0f;
-        if (t > (float)(r->count - 1)) t = (float)(r->count - 1);
+        t = Clamp(t, 0.0f, (float)(r->count - 1));
     }
     int   i    = (int)t;
     int   j    = (i + 1) % r->count;

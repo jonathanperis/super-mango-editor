@@ -8,6 +8,7 @@
 #include <stdio.h>   /* snprintf */
 
 #include "../game_constants.h"        /* FLOOR_Y, FLOOR_GAP_W, TILE_SIZE, GAME_W */
+#include "../shared/raymath_inline.h" /* Clamp */
 #include "../player/player_internal.h"  /* PLAYER_FRAME_W, PLAYER_PHYS_PAD_X */
 #include "../surfaces/float_platform.h" /* FLOAT_PLATFORM_PIECE_W */
 
@@ -131,9 +132,7 @@ int level_start_resolve(const LevelDef *def, const LevelStart *start,
             return -1;
         }
         /* Centre the player's column on x, kept inside the world. */
-        column = start->x - (float)TILE_SIZE / 2.0f;
-        if (column < 0.0f) column = 0.0f;
-        if (column > world_w - (float)TILE_SIZE) column = world_w - (float)TILE_SIZE;
+        column = Clamp(start->x - (float)TILE_SIZE / 2.0f, 0.0f, world_w - (float)TILE_SIZE);
         if (!level_ground_top_at(def, column, &top)) {
             if (err && err_size > 0)
                 snprintf(err, err_size,
