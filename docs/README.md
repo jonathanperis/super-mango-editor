@@ -135,7 +135,8 @@ origin is still shared; see the repository `SECURITY.md`.
 The browser game builds the same checksum-pinned raylib source as native builds,
 using the pinned Emscripten SDK's Web/GLFW backend. `web/keyboard-scope.js` scopes
 that SDK's keyboard handlers to the canvas; revisit its integration when changing
-the SDK. Host contract tests do not replace real-browser/device verification.
+the SDK. `web/audio-unlock.js` resumes raylib's suspended Web Audio on a key or
+mouse press, since miniaudio itself waits for a click or tap. Host contract tests do not replace real-browser/device verification.
 
 [AUDIT.md](AUDIT.md) (2026-09-17) and `AUDIT_IMPLEMENTATION.md` (2026-09-16, the
 Sandbox School delivery report) are historical, dated reports, not current status.

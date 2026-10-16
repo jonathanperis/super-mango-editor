@@ -335,8 +335,9 @@ Current test binaries (17):
 `make test` also runs `tests/validate_levels_test.py` and `tests/gen_sounds_test.py`.
 Its `web-host-contract` prerequisite runs `tools/check_web_boot_contract.py`, the
 Node tests `tests/web_host_test.cjs`, `tests/profile_storage_test.cjs`,
-`tests/touch_controls_test.cjs` and `tests/keyboard_scope_test.cjs`, then
-`tests/package_release_test.py` and `tests/filter_codeql_sarif_test.py`
+`tests/touch_controls_test.cjs`, `tests/keyboard_scope_test.cjs` and
+`tests/audio_unlock_test.cjs`, then `tests/package_release_test.py` and
+`tests/filter_codeql_sarif_test.py`
 (`make web-host-contract` runs them alone). `tests/docs_checks_test.py` runs from
 `bun run check-site` instead. The native list above is the complete
 `TEST_TARGETS` inventory; profile, simulation and parser-boundary cases are linked
