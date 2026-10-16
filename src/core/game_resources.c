@@ -93,14 +93,14 @@ static const TextureLoadSpec s_optional_textures[] = {
 };
 
 static const ChunkLoadSpec s_optional_chunks[] = {
-    { CHUNK_FIELD(spring), "assets/sounds/surfaces/bouncepad.wav", "bouncepad.wav" },
-    { CHUNK_FIELD(axe), "assets/sounds/hazards/axe_trap.wav", "axe_trap.wav" },
-    { CHUNK_FIELD(flap), "assets/sounds/entities/bird.wav", "bird.wav" },
-    { CHUNK_FIELD(spider_attack), "assets/sounds/entities/spider.wav", "spider.wav" },
-    { CHUNK_FIELD(dive), "assets/sounds/entities/fish.wav", "dive.wav" },
-    { CHUNK_FIELD(jump), "assets/sounds/player/player_jump.wav", "jump.wav" },
-    { CHUNK_FIELD(coin), "assets/sounds/collectibles/coin.wav", "coin.wav" },
-    { CHUNK_FIELD(hit), "assets/sounds/player/player_hit.wav", "hit.wav" }
+    { CHUNK_FIELD(spring), "assets/sounds/surfaces/bouncepad.qoa", "bouncepad.qoa" },
+    { CHUNK_FIELD(axe), "assets/sounds/hazards/axe_trap.qoa", "axe_trap.qoa" },
+    { CHUNK_FIELD(flap), "assets/sounds/entities/bird.qoa", "bird.qoa" },
+    { CHUNK_FIELD(spider_attack), "assets/sounds/entities/spider.qoa", "spider.qoa" },
+    { CHUNK_FIELD(dive), "assets/sounds/entities/fish.qoa", "dive.qoa" },
+    { CHUNK_FIELD(jump), "assets/sounds/player/player_jump.qoa", "jump.qoa" },
+    { CHUNK_FIELD(coin), "assets/sounds/collectibles/coin.qoa", "coin.qoa" },
+    { CHUNK_FIELD(hit), "assets/sounds/player/player_hit.qoa", "hit.qoa" }
 };
 
 static Texture2D **texture_slot(GameAssets *assets, size_t offset)

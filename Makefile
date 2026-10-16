@@ -444,9 +444,9 @@ level-catalog: ## Generate: Level catalog page from the campaign manifest
 overlay-snapshots: ## Generate: Overlay text snapshots page
 	python3 tools/generate_overlay_snapshots.py
 
-# Regenerate every assets/sounds WAV from tools/gen_sounds.py recipes.
+# Regenerate every assets/sounds QOA file from tools/gen_sounds.py recipes.
 .PHONY: sounds
-sounds: ## Generate: Every assets/sounds WAV from tools/gen_sounds.py
+sounds: ## Generate: Every assets/sounds QOA file from tools/gen_sounds.py
 	python3 tools/gen_sounds.py
 
 docs-drift: ## Check: Generated docs, sounds and manual facts match the code

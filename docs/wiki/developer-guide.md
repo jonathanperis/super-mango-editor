@@ -52,7 +52,7 @@ they preserve explicit ownership, logical coordinates and saved-binding IDs.
 | Constants (`#define`) | `UPPER_SNAKE_CASE` | `FLOOR_Y`, `TILE_SIZE` |
 | Local variables | `snake_case` | `dt`, `frame_ms`, `elapsed` |
 | Assets | `snake_case` under `assets/sprites/<category>/` | `player/player.png`, `collectibles/coin.png`, `entities/spider.png` |
-| Sounds | `component_descriptor.wav` under `assets/sounds/<category>/` | `player/player_jump.wav`, `collectibles/coin.wav`, `entities/bird.wav` |
+| Sounds | `component_descriptor.qoa` under `assets/sounds/<category>/` | `player/player_jump.qoa`, `collectibles/coin.qoa`, `entities/bird.qoa` |
 
 ### Memory and Safety Rules
 
@@ -166,16 +166,16 @@ one-way surfaces and the sprite's inset foot position in `player_surfaces.c`.
 
 ## Adding a New Sound Effect
 
-All sound files are `.wav` format, named with the convention `component_descriptor.wav`. They are synthesized by `tools/gen_sounds.py` (12 mono 16-bit 22050 Hz files); `make docs-drift` runs `gen_sounds.py --check` to catch committed files that drift from the generator. [Sounds](../sounds/) lists every file and where the game plays it.
+All sound files are `.qoa` format, named with the convention `component_descriptor.qoa`. They are synthesized by `tools/gen_sounds.py` (12 mono 22050 Hz files that raylib decodes to 16-bit samples); `make docs-drift` runs `gen_sounds.py --check` to catch committed files that drift from the generator. [Sounds](../sounds/) lists every file and where the game plays it.
 
 Steps to add a new sound:
 
-1. Add a generator for the sound to `tools/gen_sounds.py` and run `make sounds`; it writes `assets/sounds/<category>/<name>.wav`.
+1. Add a generator for the sound to `tools/gen_sounds.py` and run `make sounds`; it writes `assets/sounds/<category>/<name>.qoa`.
 2. Add `SoundEffect *<name>;` to `AudioResources` in `game.h`.
 3. Add a row to `s_optional_chunks` in `src/core/game_resources.c`. Loading is non-fatal (a missing file warns and leaves the slot NULL). The session loads the table once and lends the sounds to every game, and frees it in reverse order when it ends:
 
 ```c
-{ CHUNK_FIELD(<name>), "assets/sounds/<category>/<name>.wav", "<name>.wav" },
+{ CHUNK_FIELD(<name>), "assets/sounds/<category>/<name>.qoa", "<name>.qoa" },
 ```
 
 4. Play wherever needed:

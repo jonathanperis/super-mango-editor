@@ -78,7 +78,7 @@ COUNT_LIMITS = {
 
 PATH_KEYS = {"music_path", "floor_tile_path", "tile_path", "path", "next_phase"}
 
-ASSET_LITERAL_RE = re.compile(r'"(assets/[^"\n]+\.(?:png|wav|ttf))"')
+ASSET_LITERAL_RE = re.compile(r'"(assets/[^"\n]+\.(?:png|qoa|wav|ttf))"')
 
 
 # These schemas mirror serializer_parse.c for docs-drift's TOML snippet check
