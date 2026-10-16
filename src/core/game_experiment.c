@@ -5,7 +5,7 @@
  * Replays require unchanged level bytes and the same engine version. */
 #include "game_experiment.h"
 #include "../shared/platform.h"  /* str_copy */
-#include "game_random.h"
+#include "game_state.h"   /* game_seed_random */
 #include "game_camera.h"
 #include "game_completion.h"
 #include "game_overlay.h"   /* game_audio_apply_settings */
@@ -41,7 +41,7 @@ void game_experiment_cleanup(GameState *gs)
 
 static void restart(GameState *gs, unsigned int seed)
 {
-    game_random_seed(seed);
+    game_seed_random(gs, seed);
     /* The active definition has already passed validation, so apply it
      * again without re-checking. Repeat initialization in the same order so
      * random enemy timers and fog consume the same stream. */

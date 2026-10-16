@@ -38,7 +38,6 @@ src/
 │   ├── game_ghost_file.c         Ghost text format and its native file / browser storage
 │   ├── game_inspector.h / .c     Simulation stepping, slow motion, tuning, status panel and F5 key help
 │   ├── game_experiment.h / .c    Bounded capture/export/replay with level fingerprints
-│   ├── game_random.h / .c        Reproducible unsigned PRNG for native/WASM
 │   ├── debug.h / .c              Debug overlay: FPS/frame budget/memory, hitboxes, event log
 │   ├── entity_utils.h / .c       Shared entity helper functions
 │   ├── game_state.h / .c         GameState reset helpers
@@ -93,6 +92,7 @@ src/
 │   ├── text.h / .c              Borrowed built-in font, text measurement, centred drawing and label texture creation
 │   ├── platform.h / .c          Monotonic time, UTF-8 copying and OS preference/executable paths
 │   ├── fixed_step.h / .c        Game-independent fixed-step clock: frame seconds in, whole steps out
+│   ├── random.h / .c            Caller-owned reproducible random streams (xorshift32) for native/WASM
 │   ├── asset_root.h / .c        Move a foreign working folder to the one holding assets/ and levels/
 │   ├── utf8.h                   Strict UTF-8 checks for loaded strings and typed text
 │   ├── printf_format.h          PRINTF_FORMAT: lets GCC/Clang check printf-style format arguments
@@ -616,6 +616,7 @@ reports it, resident memory in MB.
 | `shared/ui.h`, `shared/ui.c` | Immediate-mode calls, stable widget IDs, staged edits and bounded label cache |
 | `shared/platform.h`, `shared/platform.c` | Monotonic elapsed time, UTF-8 copying and caller-owned OS paths |
 | `shared/fixed_step.h`, `shared/fixed_step.c` | The accumulator: clamped frame time, a step cap, and why restarts keep half a step |
+| `shared/random.h`, `shared/random.c` | Why each stream owns its state, and why gameplay and fog draw from separate streams |
 | `shared/asset_root.h`, `shared/asset_root.c` | Why relative paths depend on the working folder, and how startup finds the asset root |
 | `shared/utf8.h` | What makes a UTF-8 byte sequence valid (overlong forms, surrogates, truncation) |
 | `shared/printf_format.h` | How a compiler attribute lets our own printf-style wrappers get format-string checks |

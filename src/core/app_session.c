@@ -440,6 +440,11 @@ static GameState *session_make_game(AppSession *session, const char *path, const
     game->cache = &session->cache;
     game->screen.debug_mode = session->debug_mode;
     game->screen.random_seed = session->random_seed;
+    /* Each later game (Replay, the next level, a menu start) gets the next
+     * value of a stream started from --seed: still reproducible, but not a
+     * repeat of this game's fish and fog. */
+    RandomStream next_seed = {session->random_seed};
+    session->random_seed = random_next(&next_seed);
     game->screen.smoke_test_frames = session->smoke_test_frames;
     copy_path(game->world.level_path, sizeof(game->world.level_path), path);
     copy_path(game->screen.replay_script_path, sizeof(game->screen.replay_script_path), session->replay_script_path);

@@ -9,7 +9,6 @@
 
 #include <math.h>  /* fabsf */
 
-#include "../core/game_random.h"
 
 #include "fish.h"
 #include "../game_constants.h"     /* GRAVITY */
@@ -26,16 +25,16 @@ static const FishSpec s_regular_fish = {
 /* ------------------------------------------------------------------ */
 
 /* Return a random float in the inclusive range [min_s, max_s]. */
-static float fish_random_jump_delay(float min_s, float max_s)
+static float fish_random_jump_delay(RandomStream *rng, float min_s, float max_s)
 {
-    float t = game_random_unit();
+    float t = random_unit(rng);
     return min_s + (max_s - min_s) * t;
 }
 
 /* ------------------------------------------------------------------ */
 
 void fish_variant_update(const FishSpec *spec, Fish *fish, int count,
-                         float dt, int world_w)
+                         float dt, int world_w, RandomStream *rng)
 {
     for (int i = 0; i < count; i++) {
         Fish *f = &fish[i];
@@ -45,7 +44,7 @@ void fish_variant_update(const FishSpec *spec, Fish *fish, int count,
             f->jump_timer -= dt;
             if (f->jump_timer <= 0.0f) {
                 f->vy = spec->jump_vy;
-                f->jump_timer = fish_random_jump_delay(spec->jump_min, spec->jump_max);
+                f->jump_timer = fish_random_jump_delay(rng, spec->jump_min, spec->jump_max);
             }
         }
 
@@ -90,9 +89,9 @@ void fish_variant_update(const FishSpec *spec, Fish *fish, int count,
     }
 }
 
-void fish_update(Fish *fish, int count, float dt, int world_w)
+void fish_update(Fish *fish, int count, float dt, int world_w, RandomStream *rng)
 {
-    fish_variant_update(&s_regular_fish, fish, count, dt, world_w);
+    fish_variant_update(&s_regular_fish, fish, count, dt, world_w, rng);
 }
 
 /* ------------------------------------------------------------------ */

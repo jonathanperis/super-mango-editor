@@ -10,6 +10,7 @@
 
 #include "../shared/asset_cache.h"  /* AssetCache — fog images are held from it */
 #include "../shared/graphics.h"
+#include "../shared/random.h"      /* RandomStream — fog waves draw from one */
 
 /*
  * MAX_FOG_TEXTURES — maximum number of fog texture assets the system can hold.
@@ -67,12 +68,14 @@ typedef struct {
  * its pointer NULL (fog_render silently skips NULL entries).
  *
  * The images come from cache (NULL = load them for this FogSystem alone).
+ * rng picks each wave's image, direction and duration; give fog its own
+ * stream so fog waves never change gameplay randomness.
  */
 void fog_init(FogSystem *fog, AssetCache *cache,
-              const char (*paths)[64], int count);
+              const char (*paths)[64], int count, RandomStream *rng);
 
 /* Advance every active instance; spawn the next wave when it is time. */
-void fog_update(FogSystem *fog, float dt);
+void fog_update(FogSystem *fog, float dt, RandomStream *rng);
 
 /* Draw all active fog layers — call this after player_render (topmost). */
 void fog_render(FogSystem *fog);
