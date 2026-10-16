@@ -179,3 +179,17 @@ same message:
 This finding (#183) was dismissed as a false positive after explicit maintainer
 authorization on 2026-10-16. The restructure was then reverted, so the code is
 back in `src/shared/serializer_io.c`, where #131 covers it.
+
+## Editor settings file (PR #355)
+
+The editor's Contrast toggle is now remembered in `editor_settings.txt`, read at
+start-up and saved with the same exclusive-temp-then-rename write as the recent
+list:
+
+| Alerts | Input and operation | Assessment |
+| --- | --- | --- |
+| #188 | `editor_files.c`: reading `editor_settings.txt` | Same as #86–#93: the invoking user's `HOME`/`XDG_DATA_HOME` select the private preference root, and the fixed name `editor_settings.txt` selects the file; level documents cannot redirect it. Unknown keys and bad values are ignored. |
+| #187 | `editor_files.c`: the temp file for saving `editor_settings.txt` | Same as #125: the temp name is the settings path plus a pid suffix beside it, created exclusively and renamed over the settings file. |
+
+These two findings (#187, #188) were dismissed as false positives after explicit
+maintainer authorization on 2026-10-16.
