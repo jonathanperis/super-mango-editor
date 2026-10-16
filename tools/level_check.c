@@ -19,7 +19,7 @@
 
 #include <stdio.h>
 
-#include "shared/serializer.h"
+#include "levels/serializer.h"
 #include "levels/level.h"
 
 int main(int argc, char **argv)

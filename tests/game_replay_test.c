@@ -30,7 +30,7 @@
 #include "core/game_update.h"
 #include "input/game_events.h"
 #include "input/game_replay.h"
-#include "input/input_backend.h"
+#include "mangolib/minput.h"
 #include "player/player.h"
 #include "gameplay_mechanics_test.h"
 #include "test_paths.h"

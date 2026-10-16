@@ -17,7 +17,7 @@
 #include "../levels/level_session.h"
 #include "../player/player.h"
 #include "../screens/hud.h"
-#include "../shared/audio.h"  /* sound_stop_all */
+#include "../mangolib/maudio.h" /* sound_stop_all */
 
 #include <string.h>           /* memset */
 

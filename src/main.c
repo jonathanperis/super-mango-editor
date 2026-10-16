@@ -6,15 +6,15 @@
  * Keeping those jobs separate lets native and browser builds share the game.
  */
 #include <errno.h>
-#include "shared/platform.h"  /* clock_millis */
+#include "mangolib/mcore.h"   /* clock_millis */
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "game.h"
 #include "core/app_session.h"
-#include "shared/asset_root.h"
-#include "shared/serializer_io.h"  /* serializer_file_exists_utf8 */
+#include "mangolib/masset_root.h"
+#include "mangolib/mfile.h"        /* serializer_file_exists_utf8 */
 
 static const char *argument(int argc, char **argv, int *index)
 {

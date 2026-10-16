@@ -2,7 +2,7 @@
 #include "../game.h"  /* GameState: this file reads its fields */
 
 #include "../screens/settings_menu.h" /* SettingsMenu.open */
-#include "../shared/audio.h"          /* music_pause, music_resume */
+#include "../mangolib/maudio.h"       /* music_pause, music_resume */
 #include "../levels/level.h"          /* LevelDef.music_volume */
 #include "game_profile.h"             /* GameProfile, GameSettings */
 

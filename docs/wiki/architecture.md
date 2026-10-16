@@ -388,7 +388,7 @@ typedef struct GameState {
 - `world` is the level itself: what is in it, where it is and how the player is doing (hearts, lives, score, checkpoints). "What happens to a spider each frame" is a walk over `gs->world.spiders`. `screen` is how this screen presents and steers that level: the HUD, the pause, game-over and completion overlays, routes, the frame clock, input, replay scripts and debug tools.
 - Textures are grouped in `TextureResources` (`gs->assets.textures.*`) and sound effects in `AudioResources` (`gs->assets.audio.*`) so loading and cleanup walk one table each (`src/core/game_resources.c`).
 - Those shared sprites and sounds belong to the session, not the game: `AppSession` loads one `GameAssets` when the first game opens, copies it into every `GameState` it creates and unloads it once when the session ends, so Replay, Level Select → Play and Next Level reuse the same textures. A copy holds the same pointers, so a game only borrows them (`owns_assets` stays 0) and `game_cleanup` leaves them loaded. A `GameState` started without a session (the tests do this) loads a private set in `game_init` and unloads it in `game_cleanup`. Everything a level file names (background layers, floor tileset, water strip, fog, platform tiles, music) is in `world` and is acquired and released with the level (`src/levels/level_resources.c`).
-- Those level files, and the player sheet, HUD coin icon and font, come from the session's **asset cache** (`AssetCache`, `src/shared/asset_cache.h`), described in the next section. `gs->cache` is a borrowed pointer to it.
+- Those level files, and the player sheet, HUD coin icon and font, come from the session's **asset cache** (`AssetCache`, `src/mangolib/massets.h`), described in the next section. `gs->cache` is a borrowed pointer to it.
 - `Player` is **embedded by value**, not a pointer. This avoids a heap allocation and keeps the struct self-contained. The same applies to `Platform`, `Water`, `FogSystem`, all entity arrays and the three parts themselves.
 - Owning pointers are cleared after release. Borrowed pointers and aliases still require correct lifetime handling.
 - Active-game storage is heap-owned and zero-initialized before initialization; the structs above are an abridged ownership map, not complete declarations.
@@ -396,7 +396,7 @@ typedef struct GameState {
 
 ### The asset cache: files that outlive a game
 
-A Replay closes one `GameState` and opens another on the same level. Loading a level's files with the game and freeing them with it therefore read the same PNGs and the same music again each time. `AppSession` owns one `AssetCache` (`src/shared/asset_cache.h`) for the whole run, and every game acquires its files from it:
+A Replay closes one `GameState` and opens another on the same level. Loading a level's files with the game and freeing them with it therefore read the same PNGs and the same music again each time. `AppSession` owns one `AssetCache` (`src/mangolib/massets.h`) for the whole run, and every game acquires its files from it:
 
 ```c
 player->texture = asset_cache_texture_acquire(cache, "assets/sprites/player/player.png");
@@ -449,7 +449,7 @@ aliases are released before their owning context/sample/device. The game
 requires an audio device: if none can be opened, session creation fails. Menu/game transitions retain the same
 window, including when a candidate level fails to load.
 
-Version-1 profile binding numbers (USB HID keyboard usage IDs; the ones code names directly are `BINDING_KEY_*` in `src/input/input_backend.h`) are translated explicitly. Unsupported legacy
+Version-1 profile binding numbers (USB HID keyboard usage IDs; the ones code names directly are `BINDING_KEY_*` in `src/mangolib/minput.h`) are translated explicitly. Unsupported legacy
 media/paddle/touchpad bindings retain their stored values and show a remap warning;
 fixed keyboard navigation remains available. Native preference paths retain both
 organization and application components. Browser input handlers are scoped to

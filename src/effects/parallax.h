@@ -20,8 +20,8 @@
  */
 #pragma once
 
-#include "../shared/asset_cache.h"  /* AssetCache — layers are held from it */
-#include "../shared/graphics.h"
+#include "../mangolib/massets.h"    /* AssetCache — layers are held from it */
+#include "../mangolib/mgfx.h"
 
 /*
  * MAX_BACKGROUND_LAYERS — maximum number of background layers the system can hold.

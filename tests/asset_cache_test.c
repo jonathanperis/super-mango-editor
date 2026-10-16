@@ -32,8 +32,8 @@
 #include "levels/campaign_catalog.h"
 #include "levels/level_session.h"
 #include "screens/start_menu.h"
-#include "shared/asset_cache.h"
-#include "shared/platform.h"             /* str_copy */
+#include "mangolib/massets.h"
+#include "mangolib/mcore.h"              /* str_copy */
 
 #define COIN_PNG  "assets/sprites/collectibles/coin.png"
 #define STAR_PNG  "assets/sprites/collectibles/star_yellow.png"

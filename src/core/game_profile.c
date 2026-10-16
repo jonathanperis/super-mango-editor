@@ -4,9 +4,9 @@
 #include "../collectibles/coin.h"  /* MAX_COINS: the most coins a level holds */
 #include "../game_constants.h"      /* MAX_CHECKPOINTS */
 #include "../levels/level_ref.h"
-#include "../shared/platform.h"
-#include "../shared/printf_format.h"
-#include "../shared/serializer_io.h"
+#include "../mangolib/mcore.h"
+#include "../mangolib/mprintf_format.h"
+#include "../mangolib/mfile.h"
 #include "tomlc17.h"
 #include <errno.h>
 #include <limits.h>

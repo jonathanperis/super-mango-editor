@@ -118,29 +118,35 @@ SRCS    = $(wildcard $(SRCDIR)/*.c) \
           $(wildcard $(SRCDIR)/render/*.c) \
           $(wildcard $(SRCDIR)/screens/*.c) \
           $(wildcard $(SRCDIR)/surfaces/*.c) \
-          $(wildcard $(SRCDIR)/shared/*.c) \
+          $(wildcard $(SRCDIR)/mangolib/*.c) \
           vendor/tomlc17/tomlc17.c
 OBJS    = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
+# The game and the editor link Mangolib as one archive, the way they link
+# libraylib.a; tests keep linking the individual objects (some swap one out
+# for a test double).
+MANGOLIB_OBJS = $(patsubst %.c,$(OBJDIR)/%.o,$(wildcard $(SRCDIR)/mangolib/*.c))
+MANGOLIB_LIB  = $(OUTDIR)/libmango.a
 DEPS    = $(OBJS:.o=.d)
 # The session test drives input and save failures through the MANGO_TESTING
 # seams, so those two modules come from the test tree as well. So do the
 # texture, sound, music and font loaders, whose test builds count loads.
-SESSION_RUNTIME_OBJS = $(filter-out $(OBJDIR)/src/main.o $(OBJDIR)/src/shared/audio.o \
+SESSION_RUNTIME_OBJS = $(filter-out $(OBJDIR)/src/main.o $(OBJDIR)/src/mangolib/maudio.o \
                          $(OBJDIR)/src/core/app_session.o $(OBJDIR)/src/input/game_input.o \
-                         $(OBJDIR)/src/shared/serializer_io.o $(OBJDIR)/src/shared/texture.o \
-                         $(OBJDIR)/src/shared/text.o,$(OBJS)) \
+                         $(OBJDIR)/src/mangolib/mfile.o $(OBJDIR)/src/mangolib/mtexture.o \
+                         $(OBJDIR)/src/mangolib/mtext.o,$(OBJS)) \
                        $(TEST_AUDIO_OBJ) $(TEST_SESSION_OBJ) $(TEST_GAME_INPUT_OBJ) \
                        $(TEST_TEXTURE_OBJ) $(TEST_TEXT_OBJ) \
-                       $(TEST_OBJDIR)/$(SHARED_DIR)/serializer_io.o
+                       $(TEST_OBJDIR)/$(MANGOLIB_DIR)/mfile.o
 
 # ── Editor (standalone level editor) ─────────────────────────────────
 EDITOR_DIR    = src/editor
-SHARED_DIR    = src/shared
+# Mangolib: the engine layer (raylib + libc only; tools/check_layering.py).
+MANGOLIB_DIR  = src/mangolib
 VENDOR_DIR    = vendor/tomlc17
-EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(wildcard $(SHARED_DIR)/*.c) $(VENDOR_DIR)/tomlc17.c \
+EDITOR_SRCS   = $(wildcard $(EDITOR_DIR)/*.c) $(wildcard $(MANGOLIB_DIR)/*.c) \
+                $(wildcard src/levels/serializer*.c) $(VENDOR_DIR)/tomlc17.c \
                 src/surfaces/rail.c src/levels/level_validate.c src/levels/level_ref.c \
-                src/levels/level_start.c src/levels/campaign_catalog.c src/levels/level_path.c \
-                src/input/input_backend.c
+                src/levels/level_start.c src/levels/campaign_catalog.c src/levels/level_path.c
 EDITOR_OBJS   = $(patsubst %.c,$(OBJDIR)/%.o,$(EDITOR_SRCS))
 EDITOR_DEPS   = $(EDITOR_OBJS:.o=.d)
 EDITOR_TARGET = $(OUTDIR)/super-mango-editor
@@ -166,8 +172,9 @@ SMOKE_SEEDS   ?= 1 7 23
 # One pattern rule (after the fuzz targets) builds every one of them; adding a
 # test object is just a new variable here plus its use in a link rule below.
 TEST_OBJDIR = $(OBJDIR)/tests
-TEST_SERIALIZER_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(SHARED_DIR)/%.o,serializer serializer_emit \
-                       serializer_io serializer_load serializer_load_checkpoints \
+TEST_SERIALIZER_OBJS = $(TEST_OBJDIR)/$(MANGOLIB_DIR)/mfile.o \
+                       $(patsubst %,$(TEST_OBJDIR)/src/levels/%.o,serializer serializer_emit \
+                       serializer_load serializer_load_checkpoints \
                        serializer_load_climbables serializer_load_collectibles \
                        serializer_load_config serializer_load_enemies serializer_load_geometry \
                        serializer_load_hazards serializer_load_header serializer_load_layers \
@@ -197,11 +204,11 @@ TEST_BINDINGS_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/game_bindings.o
 TEST_SETTINGS_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/screens/settings_menu.o
 # These need no test flags, so tests link the game's own objects.
 TEST_GAME_TERMINAL_OBJ = $(OBJDIR)/src/core/game_terminal.o
-TEST_RANDOM_OBJ = $(OBJDIR)/src/shared/random.o
+TEST_RANDOM_OBJ = $(OBJDIR)/src/mangolib/mrandom.o
 TEST_GAME_GHOST_OBJ = $(OBJDIR)/src/core/game_ghost.o
 TEST_GAME_CHECKPOINT_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/core/game_checkpoint.o
 TEST_HUD_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/screens/hud.o
-TEST_EDITOR_UI_OBJ = $(TEST_OBJDIR)/$(SHARED_DIR)/ui.o
+TEST_EDITOR_UI_OBJ = $(TEST_OBJDIR)/$(MANGOLIB_DIR)/mangogui.o
 TEST_EDITOR_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor_validation editor_files \
                    editor_recovery editor_session editor_undo_apply entity_meta editor_campaign) \
                    $(TEST_EDITOR_UI_OBJ) \
@@ -211,11 +218,11 @@ TEST_EDITOR_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor_validati
 # The editor's own window, chrome and frame, for editor-ui-test.
 TEST_EDITOR_FRAME_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor editor_chrome \
                    editor_frame editor_textures)
-TEST_AUDIO_OBJ     = $(TEST_OBJDIR)/$(SHARED_DIR)/audio.o
-TEST_TEXTURE_OBJ   = $(TEST_OBJDIR)/$(SHARED_DIR)/texture.o
-TEST_TEXT_OBJ      = $(TEST_OBJDIR)/$(SHARED_DIR)/text.o
+TEST_AUDIO_OBJ     = $(TEST_OBJDIR)/$(MANGOLIB_DIR)/maudio.o
+TEST_TEXTURE_OBJ   = $(TEST_OBJDIR)/$(MANGOLIB_DIR)/mtexture.o
+TEST_TEXT_OBJ      = $(TEST_OBJDIR)/$(MANGOLIB_DIR)/mtext.o
 TEST_SESSION_OBJ   = $(TEST_OBJDIR)/$(SRCDIR)/core/app_session.o
-TEST_INPUT_BACKEND_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/input/input_backend.o
+TEST_INPUT_BACKEND_OBJ = $(TEST_OBJDIR)/$(MANGOLIB_DIR)/minput.o
 TEST_LIBS           = $(LIBS)
 # Each test's own .c files (tests/rail_test.c and friends) compile through the
 # same test-object rule, into $(TEST_OBJDIR)/tests/, so their -MMD dependency
@@ -225,7 +232,7 @@ TEST_SOURCE_DIR  = $(TEST_OBJDIR)/tests
 TEST_SOURCE_OBJS = $(patsubst %.c,$(TEST_OBJDIR)/%.o,$(filter-out tests/fuzz_%.c tests/parser_allocation_test.c,$(wildcard tests/*.c)))
 # tools/level_check.c (validate-levels) is compiled the same way, with CFLAGS.
 TOOL_OBJS = $(OBJDIR)/tools/level_check.o
-PLATFORM_OBJS = $(addprefix $(OBJDIR)/src/shared/,asset_cache.o audio.o graphics.o platform.o text.o texture.o) $(OBJDIR)/src/input/input_backend.o
+PLATFORM_OBJS = $(addprefix $(OBJDIR)/$(MANGOLIB_DIR)/,massets.o maudio.o mgfx.o mcore.o mtext.o mtexture.o minput.o)
 # Every TEST_*_OBJ / TEST_*_OBJS variable above, so new ones need no extra list.
 TEST_OBJECTS := $(foreach name,$(filter %_OBJ %_OBJS,$(filter TEST_%,$(.VARIABLES))),$($(name)))
 TEST_DEPS           = $(patsubst %.o,%.d,$(filter $(TEST_OBJDIR)/%,$(TEST_OBJECTS)))
@@ -283,8 +290,12 @@ $(WEB_RAYLIB_LIB): $(WEB_RAYLIB_DONE) ;
 $(OUTDIR):
 	mkdir -p $(OUTDIR) $(OBJDIR) $(OBJDIR)/tests
 
-$(TARGET): $(OBJS) | $(OUTDIR)
-	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
+$(MANGOLIB_LIB): $(MANGOLIB_OBJS) | $(OUTDIR)
+	rm -f $@
+	$(AR) rcs $@ $^
+
+$(TARGET): $(filter-out $(MANGOLIB_OBJS),$(OBJS)) $(MANGOLIB_LIB) | $(OUTDIR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(MANGOLIB_LIB) $(LIBS)
 ifeq ($(OS),Windows_NT)
 else ifeq ($(shell uname -s),Darwin)
 	codesign --force --sign - $@
@@ -321,8 +332,8 @@ run-level-debug: all ## Run: run-level with the debug overlay
 # ── Editor targets ───────────────────────────────────────────────────
 editor: $(OUTDIR) $(EDITOR_TARGET) ## Build: Compile the level editor into OUTDIR
 
-$(EDITOR_TARGET): $(EDITOR_OBJS) | $(OUTDIR)
-	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(EDITOR_LIBS)
+$(EDITOR_TARGET): $(filter-out $(MANGOLIB_OBJS),$(EDITOR_OBJS)) $(MANGOLIB_LIB) | $(OUTDIR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(MANGOLIB_LIB) $(EDITOR_LIBS)
 ifeq ($(OS),Windows_NT)
 else ifeq ($(shell uname -s),Darwin)
 	codesign --force --sign - $@
@@ -369,7 +380,7 @@ test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser
 
 $(TEST_TARGETS): | $(OUTDIR)
 $(filter-out $(OUTDIR)/session-test $(OUTDIR)/game-events-test,$(TEST_TARGETS)): $(PLATFORM_OBJS)
-$(OUTDIR)/game-events-test: $(filter-out $(OBJDIR)/src/input/input_backend.o,$(PLATFORM_OBJS)) $(TEST_INPUT_BACKEND_OBJ) $(TEST_SOURCE_DIR)/input_backend_test.o
+$(OUTDIR)/game-events-test: $(filter-out $(OBJDIR)/$(MANGOLIB_DIR)/minput.o,$(PLATFORM_OBJS)) $(TEST_INPUT_BACKEND_OBJ) $(TEST_SOURCE_DIR)/input_backend_test.o
 $(OUTDIR)/editor-validation-test $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/editor/dialog_choice.o
 # A rebuilt dependency must refresh consumers and relink executables. Exported
 # headers retain upstream timestamps, so header mtimes alone are insufficient.
@@ -398,7 +409,8 @@ parser-encoding-probe:
 # single level cannot make: assets and next_phase targets exist, and the
 # campaign manifest chains. The checker reuses the game's objects in $(OBJDIR).
 LEVEL_CHECK = $(OUTDIR)/level-check
-LEVEL_CHECK_OBJS = $(filter $(OBJDIR)/$(SHARED_DIR)/serializer%.o,$(OBJS)) \
+LEVEL_CHECK_OBJS = $(filter $(OBJDIR)/src/levels/serializer%.o,$(OBJS)) \
+                   $(OBJDIR)/$(MANGOLIB_DIR)/mfile.o \
                    $(OBJDIR)/$(SRCDIR)/levels/level_validate.o \
                    $(OBJDIR)/$(SRCDIR)/levels/level_ref.o $(OBJDIR)/$(VENDOR_DIR)/tomlc17.o
 
@@ -446,6 +458,7 @@ docs-drift: ## Check: Generated docs, sounds and manual facts match the code
 	python3 tools/generate_overlay_snapshots.py --check
 	python3 tools/check_docs_drift.py
 	python3 tools/check_roadmap_quality.py
+	python3 tools/check_layering.py
 
 roadmap-quality: ## Check: Roadmap entries are complete
 	python3 tools/check_roadmap_quality.py
@@ -541,13 +554,14 @@ FUZZ_FLAGS = -std=c11 -g -O1 -Wall -Wextra -Wpedantic $(PROJECT_INCLUDES) \
              $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_RAYLIB_MEMORY,) \
              -fno-omit-frame-pointer -fsanitize=address,undefined \
              -fno-sanitize-recover=undefined $(EXTRA_CFLAGS)
-FUZZ_LEVEL_SRCS = tests/fuzz_level_parse.c $(wildcard $(SHARED_DIR)/serializer*.c) \
+FUZZ_LEVEL_SRCS = tests/fuzz_level_parse.c $(wildcard src/levels/serializer*.c) \
+                  $(MANGOLIB_DIR)/mfile.c \
                   src/levels/level_validate.c src/levels/level_ref.c $(VENDOR_DIR)/tomlc17.c
 FUZZ_PROFILE_SRCS = tests/fuzz_profile_decode.c src/core/game_profile.c \
                     src/core/game_ghost.c src/core/game_ghost_file.c \
-                    src/input/game_bindings.c src/input/input_backend.c \
-                    src/levels/level_ref.c src/shared/serializer_io.c \
-                    src/shared/platform.c $(VENDOR_DIR)/tomlc17.c
+                    src/input/game_bindings.c src/mangolib/minput.c \
+                    src/levels/level_ref.c src/mangolib/mfile.c \
+                    src/mangolib/mcore.c $(VENDOR_DIR)/tomlc17.c
 FUZZ_HEADERS = $(wildcard $(SRCDIR)/*.h $(SRCDIR)/*/*.h $(VENDOR_DIR)/*.h)
 # Seeds are read in place: shipped levels, schema fixtures, extra edge cases.
 FUZZ_LEVEL_SEEDS = levels levels/labs tests/fixtures/serializer_v1 \
@@ -602,11 +616,11 @@ $(TEST_OBJDIR)/%.o: %.c | $(OUTDIR)
 
 # These rename raylib/GLFW calls so the tests can supply recording doubles in
 # their place.
-TEST_OBJ_FLAGS_src/shared/audio = -DSetMusicVolume=test_SetMusicVolume \
+TEST_OBJ_FLAGS_src/mangolib/maudio = -DSetMusicVolume=test_SetMusicVolume \
 	-DLoadSoundAlias=test_LoadSoundAlias -DSetSoundVolume=test_SetSoundVolume \
 	-DUnloadSoundAlias=test_UnloadSoundAlias -DUnloadSound=test_UnloadSound
 TEST_OBJ_FLAGS_src/core/app_session = -DSetWindowSize=test_SetWindowSize
-TEST_OBJ_FLAGS_src/input/input_backend = -UMANGO_RAYLIB_MEMORY \
+TEST_OBJ_FLAGS_src/mangolib/minput = -UMANGO_RAYLIB_MEMORY \
 	-DIsWindowReady=test_input_window_ready -DGetScreenWidth=test_input_screen_width -DGetScreenHeight=test_input_screen_height \
 	-DglfwGetCurrentContext=test_input_current_context -DglfwGetCursorPos=test_input_cursor_pos \
 	-DglfwSetKeyCallback=test_input_set_key -DglfwSetCharCallback=test_input_set_char \

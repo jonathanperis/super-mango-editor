@@ -187,7 +187,7 @@ Selecting **Replay** on a completion overlay replaces the game in place, exactly
 
 `--debug` (or `make run-level-debug LEVEL=...`) opens the simulation inspector
 and turns off saving to your personal profile. The game always advances in
-fixed 1/60 s steps (`src/shared/fixed_step.c` keeps an accumulator of real
+fixed 1/60 s steps (`src/mangolib/mtiming.c` keeps an accumulator of real
 time), so the inspector controls *how many* steps run, never how long one is.
 
 ### Debug inspector keys

@@ -17,8 +17,8 @@
  * the frame order; low-level drawing belongs to the screens/render modules.
  */
 #include "app_session.h"
-#include "../shared/platform.h"  /* str_copy */
-#include "../shared/geometry.h"  /* float_same_value */
+#include "../mangolib/mcore.h"   /* str_copy */
+#include "../mangolib/mangomath.h" /* float_same_value */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,7 +32,7 @@
 #include "game_resources.h"
 #include "game_resume.h"
 #include "game_timing.h"
-#include "../shared/serializer_io.h"  /* serializer_fingerprint_utf8 */
+#include "../mangolib/mfile.h"        /* serializer_fingerprint_utf8 */
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>

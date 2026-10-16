@@ -11,10 +11,10 @@
 #include <unistd.h>   /* chdir, symlink, rmdir */
 #endif
 
-#include "input/input_backend.h"
-#include "shared/asset_root.h"
-#include "shared/platform.h"  /* clock_wait */
-#include "shared/serializer_io.h"
+#include "mangolib/minput.h"
+#include "mangolib/masset_root.h"
+#include "mangolib/mcore.h"   /* clock_wait */
+#include "mangolib/mfile.h"
 #include "test_paths.h"
 
 #include "collision/collision_damage.h"

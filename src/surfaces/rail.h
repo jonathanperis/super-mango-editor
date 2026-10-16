@@ -13,7 +13,7 @@
  */
 #pragma once
 
-#include "../shared/graphics.h"
+#include "../mangolib/mgfx.h"
 
 /* ---- Connection direction bitmask flags ---------------------------------- */
 

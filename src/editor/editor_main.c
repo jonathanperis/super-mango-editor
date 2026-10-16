@@ -9,8 +9,8 @@
 #include "editor_frame.h"
 #include "editor_files.h"
 #include "editor_session.h"
-#include "../shared/asset_root.h"
-#include "../shared/serializer.h"
+#include "../mangolib/masset_root.h"
+#include "../levels/serializer.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,7 +26,7 @@ int main(int argc, char **argv)
     /* Palette art, level checks and Playtest all use paths such as
      * "assets/..." relative to the working folder. Started elsewhere, move
      * to the executable's folder, after making the document path absolute
-     * so it still names the file the user meant (see shared/asset_root.h). */
+     * so it still names the file the user meant (see mangolib/masset_root.h). */
     char *typed_path = NULL;
     if (!asset_root_contains("")) {
         if (path) {

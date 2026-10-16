@@ -40,7 +40,7 @@
 #include "../hazards/circular_saw.h"
 #include "../hazards/spike_block.h"
 #include "../levels/level_session.h"  /* game_level_start_point_respawn_y */
-#include "../shared/geometry.h"      /* float_same_value */
+#include "../mangolib/mangomath.h"   /* float_same_value */
 #include "../surfaces/bouncepad.h"
 
 /*

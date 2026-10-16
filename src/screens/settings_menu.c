@@ -1,6 +1,6 @@
 #include "settings_menu.h"
 #include "../input/game_input.h"  /* game_input_event_confirms */
-#include "../shared/platform.h"
+#include "../mangolib/mcore.h"
 #include <stdio.h>
 #include <string.h>
 

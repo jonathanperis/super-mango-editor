@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../game_assets.h"     /* GameAssets, owned here */
-#include "../shared/asset_cache.h"  /* AssetCache, owned here */
+#include "../mangolib/massets.h"    /* AssetCache, owned here */
 #include "../game_constants.h"  /* GAME_LEVEL_PATH_MAX */
 #include "../game_fwd.h"        /* GameState, used by pointer only */
 #include "../screens/start_menu.h"

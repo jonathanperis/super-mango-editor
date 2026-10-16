@@ -10,7 +10,7 @@
  */
 #pragma once
 
-#include "../shared/graphics.h"
+#include "../mangolib/mgfx.h"
 #include "../surfaces/rail.h"  /* Rail — the block needs a pointer to its rail */
 
 /* ------------------------------------------------------------------ */

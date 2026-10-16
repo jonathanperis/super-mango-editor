@@ -164,7 +164,7 @@ def check_runtime_error_docs() -> None:
 
 
 def check_collectible_source_guards() -> None:
-    parser = read(ROOT / "src" / "shared" / "serializer_load_collectibles.c")
+    parser = read(ROOT / "src" / "levels" / "serializer_load_collectibles.c")
     required_pairs = {
         "star_greens": "MAX_STAR_GREENS",
         "star_reds": "MAX_STAR_REDS",
@@ -172,7 +172,7 @@ def check_collectible_source_guards() -> None:
     for toml_key, max_token in required_pairs.items():
         pattern = rf'LOAD_XY_ARRAY\("{toml_key}",\s*[^,]+,\s*{max_token},'
         if not re.search(pattern, parser, re.S):
-            fail(f"src/shared/serializer_load_collectibles.c: `{toml_key}` must use `{max_token}`")
+            fail(f"src/levels/serializer_load_collectibles.c: `{toml_key}` must use `{max_token}`")
 
 
 def check_layer_snippets() -> None:

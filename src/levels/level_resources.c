@@ -8,7 +8,7 @@
  * The sprites every level shares are in gs->assets instead (game_resources.c).
  *
  * Every file here is acquired from gs->cache, the session's asset cache
- * (shared/asset_cache.h), and released to it. Releasing does not unload: a
+ * (mangolib/massets.h), and released to it. Releasing does not unload: a
  * Replay, or a next level with the same scenery, acquires the same paths a
  * moment later and reads nothing from disk. game_level_commit trims the
  * cache once the new level holds everything it needs.
@@ -18,7 +18,7 @@
 #include "../game.h"  /* GameState: this file reads its fields */
 #include "level_loader.h"        /* level_release_platform_tiles */
 #include "../core/game_resources.h"  /* DEFAULT_FLOOR_TILE_PATH */
-#include "../shared/platform.h"  /* str_copy */
+#include "../mangolib/mcore.h"   /* str_copy */
 
 #include <stdio.h>
 #include <string.h>   /* strcmp */

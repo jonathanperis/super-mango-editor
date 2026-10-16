@@ -7,7 +7,7 @@
  * player never stands on stay put, so running across a bridge drops the
  * bricks one by one behind the player.
  */
-#include "../shared/graphics.h"
+#include "../mangolib/mgfx.h"
 #include <math.h>   /* fabsf */
 
 #include "bridge.h"

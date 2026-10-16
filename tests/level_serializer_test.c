@@ -13,7 +13,7 @@
 #include <unistd.h>
 #endif
 
-#include "shared/serializer.h"
+#include "levels/serializer.h"
 #include "levels/level.h"
 #include "test_paths.h"         /* TEST_OUT scratch directory */
 

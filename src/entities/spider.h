@@ -19,7 +19,7 @@
  */
 #pragma once
 
-#include "../shared/graphics.h"
+#include "../mangolib/mgfx.h"
 
 #define MAX_SPIDERS     16     /* maximum simultaneous spiders on screen    */
 #define SPIDER_FRAMES    3     /* animation frames in Spider_1.png          */
