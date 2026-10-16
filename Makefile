@@ -543,9 +543,11 @@ FUZZ_FLAGS = -std=c11 -g -O1 -Wall -Wextra -Wpedantic $(PROJECT_INCLUDES) \
              -fno-sanitize-recover=undefined $(EXTRA_CFLAGS)
 FUZZ_LEVEL_SRCS = tests/fuzz_level_parse.c $(wildcard $(SHARED_DIR)/serializer*.c) \
                   src/levels/level_validate.c src/levels/level_ref.c $(VENDOR_DIR)/tomlc17.c
+# input_backend.c maps the pointer through graphics.c's display_viewport.
 FUZZ_PROFILE_SRCS = tests/fuzz_profile_decode.c src/core/game_profile.c \
                     src/core/game_ghost.c src/core/game_ghost_file.c \
                     src/input/game_bindings.c src/input/input_backend.c \
+                    src/shared/graphics.c \
                     src/levels/level_ref.c src/shared/serializer_io.c \
                     src/shared/platform.c $(VENDOR_DIR)/tomlc17.c
 FUZZ_HEADERS = $(wildcard $(SRCDIR)/*.h $(SRCDIR)/*/*.h $(VENDOR_DIR)/*.h)

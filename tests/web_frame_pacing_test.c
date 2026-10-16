@@ -5,6 +5,7 @@
 #define __EMSCRIPTEN__ 1
 #define display_open web_pacing_display_open
 #define display_present web_pacing_display_present
+#define display_viewport web_pacing_display_viewport
 #define SetTraceLogLevel web_pacing_trace
 #define SetConfigFlags web_pacing_flags
 #define InitWindow web_pacing_init

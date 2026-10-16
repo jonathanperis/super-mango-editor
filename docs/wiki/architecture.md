@@ -308,6 +308,14 @@ The game renders to a **400×300 `RenderTexture2D`**, configured with point
 filtering when the screen creates it. `display_present` applies aspect-preserving
 scaling and the render-texture Y correction. At 800×600 this gives a **2x** pixel
 scale. `input_pointer_to_logical` applies the inverse viewport transform once.
+Both take the viewport from `display_viewport`: once the window holds at least
+one whole canvas, it uses the largest whole-number scale that fits and centres
+it on whole-pixel offsets, so every canvas pixel covers the same square of
+window pixels (a 1920×1080 window shows the game at 3x, 1200×900, with black
+margins). A fractional scale would make nearest-neighbour sampling draw some
+columns one pixel wider than others, and the art would shimmer as it scrolls.
+Only a window smaller than the canvas gets a fractional fit, so that nothing
+is cut off.
 
 On macOS `display_open` also asks for raylib's `FLAG_WINDOW_HIGHDPI`, so a
 Retina display gets a full-density framebuffer instead of a half-density one
