@@ -94,6 +94,36 @@ Rectangle display_viewport(int window_w, int window_h, int canvas_w, int canvas_
     return (Rectangle){(window_w-width)/2, (window_h-height)/2, width, height};
 }
 
+int display_scale_fit(int requested, int canvas_w, int canvas_h, int monitor_w, int monitor_h)
+{
+    if (requested < 1) return 1;
+    if (monitor_w <= 0 || monitor_h <= 0 || canvas_w <= 0 || canvas_h <= 0) return requested;
+    int scale = requested;
+    while (scale > 1 && (canvas_w*scale > monitor_w - DISPLAY_DECORATION_MARGIN ||
+                         canvas_h*scale > monitor_h - DISPLAY_DECORATION_MARGIN)) scale--;
+    return scale;
+}
+
+/* One axis of display_keep_on_monitor: the window spans [pos, pos+size);
+ * lead is the room kept free before it (the title bar on the y axis). */
+static int keep_on_axis(int pos, int size, int start, int length, int lead)
+{
+    int last = start + length - size;  /* rightmost/lowest position that fits */
+    if (pos > last) pos = last;
+    if (pos < start + lead) pos = start + lead;
+    return pos;
+}
+
+IntRect display_keep_on_monitor(IntRect window, IntRect monitor)
+{
+    if (monitor.w <= 0 || monitor.h <= 0) return window;
+    /* GLFW positions the client area; its title bar sits above that. Half
+     * the margin covers a title bar on every desktop the game supports. */
+    window.x = keep_on_axis(window.x, window.w, monitor.x, monitor.w, 0);
+    window.y = keep_on_axis(window.y, window.h, monitor.y, monitor.h, DISPLAY_DECORATION_MARGIN/2);
+    return window;
+}
+
 void display_present(RenderTexture2D target)
 {
     /* Return from the logical render target to the real window framebuffer. */

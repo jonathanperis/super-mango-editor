@@ -501,21 +501,30 @@ static int persistent_session(void)
     session->profile.dirty=1; session->profile.revision++;
     event.key=KEY_ESCAPE;
     puts("profile session: close settings");
+    applied_width = applied_height = 0;   /* only this apply counts */
     input_push(&event); session_frame(session);
     CHECK(!session->settings.open && test_last_music_volume==0);
+#ifdef MANGO_MEMORY_TESTS
+    /* Memory has no monitors, so the requested 3x applies as it is. */
     CHECK(applied_width==1200 && applied_height==900);
-#ifndef MANGO_MEMORY_TESTS
-    /* Memory renders frames but has no OS resize implementation. The desktop
-     * suite additionally verifies that the real window applied the request.
-     * An OS may clamp a window to a smaller monitor (CI VMs often run at
-     * 1024x768), so the exact size is only required when it fits. */
+#else
+    /* The desktop suite additionally verifies that the real window applied
+     * the request. The session asks for the largest scale up to 3x that
+     * fits the monitor (CI VMs often run at 1024x768, which fits 2x), and
+     * an OS may still clamp the window, so the exact size is only required
+     * when it fits. A window already at that size is left alone, so then
+     * no resize is asked for at all. */
     {
         int monitor = GetCurrentMonitor();
-        if (GetMonitorWidth(monitor) > 1200 && GetMonitorHeight(monitor) > 900)
-            CHECK(GetScreenWidth()==1200 && GetScreenHeight()==900);
+        int fit = display_scale_fit(3, GAME_W, GAME_H, GetMonitorWidth(monitor), GetMonitorHeight(monitor));
+        CHECK((applied_width==GAME_W*fit && applied_height==GAME_H*fit) ||
+              (applied_width==0 && applied_height==0 &&
+               GetScreenWidth()==GAME_W*fit && GetScreenHeight()==GAME_H*fit));
+        if (GetMonitorWidth(monitor) > GAME_W*fit && GetMonitorHeight(monitor) > GAME_H*fit)
+            CHECK(GetScreenWidth()==GAME_W*fit && GetScreenHeight()==GAME_H*fit);
         else
-            CHECK(GetScreenWidth()>WINDOW_W/2 && GetScreenWidth()<=1200 &&
-                  GetScreenHeight()>0 && GetScreenHeight()<=900);
+            CHECK(GetScreenWidth()>0 && GetScreenWidth()<=GAME_W*fit &&
+                  GetScreenHeight()>0 && GetScreenHeight()<=GAME_H*fit);
     }
 #endif
     session->game->world.score=200;

@@ -19,6 +19,7 @@
 #include "app_session.h"
 #include "../shared/platform.h"  /* str_copy */
 #include "../shared/geometry.h"  /* float_same_value */
+#include "../shared/graphics.h"  /* display_scale_fit */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -213,6 +214,35 @@ static void session_profile_key(GameState *game, const char *source)
         copy_path(game->screen.profile_level_key, sizeof(game->screen.profile_level_key), key);
 }
 
+#ifndef __EMSCRIPTEN__
+/* Size the window to the window_scale setting, or to the largest smaller
+ * scale the current monitor can show: 4x (1600x1200) on a 1080p laptop
+ * would put the bottom of the game, and the window's own controls, off
+ * screen. The setting itself is kept, so the same profile still gets 4x
+ * on a bigger monitor. The Memory test backend has no monitors; there the
+ * size is 0 and the requested scale applies unchanged. */
+static void session_apply_window_scale(int requested)
+{
+    IntRect monitor = {0};
+#ifndef MANGO_RAYLIB_MEMORY
+    int index = GetCurrentMonitor();
+    Vector2 origin = GetMonitorPosition(index);
+    monitor = (IntRect){(int)origin.x, (int)origin.y, GetMonitorWidth(index), GetMonitorHeight(index)};
+#endif
+    int scale = display_scale_fit(requested, GAME_W, GAME_H, monitor.w, monitor.h);
+    if (GetScreenWidth() == GAME_W*scale && GetScreenHeight() == GAME_H*scale) return;
+    SetWindowSize(GAME_W*scale, GAME_H*scale);
+#ifndef MANGO_RAYLIB_MEMORY
+    /* Growing keeps the top-left corner where it was, so a window that
+     * was not near the top-left of the monitor would now hang off it. */
+    Vector2 at = GetWindowPosition();
+    IntRect window = {(int)at.x, (int)at.y, GAME_W*scale, GAME_H*scale};
+    IntRect moved = display_keep_on_monitor(window, monitor);
+    if (moved.x != window.x || moved.y != window.y) SetWindowPosition(moved.x, moved.y);
+#endif
+}
+#endif
+
 static void session_apply_preferences(AppSession *session)
 {
     /* Settings edit a profile in memory. Apply a changed revision after the
@@ -225,8 +255,7 @@ static void session_apply_preferences(AppSession *session)
         if (session->game) game_audio_apply_settings(session->game);
         if (session->menu) sound_set_volume(session->menu->snd_confirm, volume);
 #ifndef __EMSCRIPTEN__
-        if (IsWindowReady() && (GetScreenWidth() != GAME_W*s->window_scale || GetScreenHeight() != GAME_H*s->window_scale))
-            SetWindowSize(GAME_W*s->window_scale, GAME_H*s->window_scale);
+        if (IsWindowReady()) session_apply_window_scale(s->window_scale);
 #endif
         session->preferences_applied = 1;
         session->applied_settings_revision = session->profile.revision;
