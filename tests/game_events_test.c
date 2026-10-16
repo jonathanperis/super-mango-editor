@@ -14,6 +14,7 @@ static int load_next_phase_calls;
 int input_backend_contract_test(void);
 int display_viewport_test(void);
 int display_window_fit_test(void);
+int input_gamepad_mapping_test(void);
 
 /* Inspector ownership has production-path coverage in the simulation test. */
 int game_inspector_event(GameState *gs, const InputEvent *event)
@@ -318,6 +319,7 @@ int main(void)
     if (input_backend_contract_test()) return 1;
     if (display_viewport_test()) return 1;
     if (display_window_fit_test()) return 1;
+    if (input_gamepad_mapping_test()) return 1;
     if (game_web_input_touch(GAME_TOUCH_JUMP, 1) != 0) return 1;
     input_open(GAME_W, GAME_H);
 

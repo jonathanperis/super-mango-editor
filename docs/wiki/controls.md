@@ -18,7 +18,7 @@ Super Mango accepts keyboard input, raylib-mapped gamepads, browser touch contro
 | Drift while climbing | `A` / `D` or Left / Right arrows | D-Pad Left / Right or left stick X | Uses reduced climb drift speed. |
 | Jump off climbable | Space | A / Cross | Leaves the climbable and starts a normal jump. |
 
-The gamepad path translates raylib's standardized buttons to project action IDs. The analog stick defaults to an 8000-unit dead zone, adjustable in settings; raylib's normalized axes are converted to the existing saved units. Connection changes are sampled each frame on the application thread.
+The gamepad path translates raylib's standardized buttons to project action IDs. The analog stick defaults to an 8000-unit dead zone, adjustable in settings; raylib's normalized axes are converted to the existing saved units. Connection changes are sampled each frame on the application thread. On the desktop the game uses the first connected device GLFW has a gamepad mapping for (its built-in copy of SDL_GameControllerDB), and keeps it until it is unplugged: a joystick without a mapping, such as a racing wheel or a flight stick, would never report a button, so it is skipped rather than chosen ahead of a real gamepad.
 
 Existing profile binding numbers are preserved. Media keys, extra paddles or
 touchpad buttons unavailable through raylib retain their saved values and show
