@@ -12,8 +12,8 @@
  */
 #pragma once
 
-#include "../shared/graphics.h"
-#include "../shared/audio.h"
+#include "../mangolib/mgfx.h"
+#include "../mangolib/maudio.h"
 
 /* ------------------------------------------------------------------ */
 

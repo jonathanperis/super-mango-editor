@@ -14,7 +14,7 @@
 #include "editor_session.h"    /* editor reset/confirm helpers */
 #include "editor_validation.h" /* editor_validation_summary */
 #include "entity_meta.h"       /* editor_placed_entity_total */
-#include "../shared/ui.h"      /* ui_panel, ui_button, ui_label */
+#include "../mangolib/mangogui.h" /* ui_panel, ui_button, ui_label */
 
 /*
  * editor_render_toolbar — Draw the top toolbar (32 px tall, full width).

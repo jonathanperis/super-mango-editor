@@ -3,7 +3,7 @@
  *
  * Renders per-entity-type editable fields (position, velocity, patrol range,
  * mode, tile counts, etc.) in the bottom-right panel when an entity is
- * selected on the canvas.  Uses the immediate-mode UI widgets from ui.h.
+ * selected on the canvas.  Uses the immediate-mode UI widgets from mangogui.h.
  *
  * The panel occupies the bottom half of the right column:
  *   x = CANVAS_W (896),  y = EDITOR_H / 2 (360)
@@ -29,7 +29,7 @@
 #include "editor_panels.h" /* editor_focus_validation_issue                     */
 #include "editor_session.h" /* editor_set_status (show_field_note)              */
 #include "editor_playtest.h" /* editor_play_test_from (checkpoint "Playtest here") */
-#include "../shared/ui.h" /* ui_panel, ui_label, ui_separator, ui_float_field,
+#include "../mangolib/mangogui.h" /* ui_panel, ui_label, ui_separator, ui_float_field,
                            ui_int_field, ui_dropdown                         */
 #include "../levels/level.h" /* LevelDef, all *Placement structs            */
 #include "../player/player.h"  /* JUMP_VY (bouncepad launch limit)           */

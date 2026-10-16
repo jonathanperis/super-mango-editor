@@ -31,7 +31,7 @@
 
 #include "editor.h"    /* EditorState, EntityType, EditorTool, CANVAS_W, etc.  */
 #include "entity_meta.h" /* shared palette names/categories                    */
-#include "../shared/ui.h" /* UIState and shared widgets */
+#include "../mangolib/mangogui.h" /* UIState and shared widgets */
 
 /* ------------------------------------------------------------------ */
 /* Layout constants                                                    */
@@ -102,7 +102,7 @@ void palette_scroll(int delta) {
  * point_in_rect — test whether pixel (px, py) lies inside a rectangle.
  *
  * Duplicated here as a static function to keep palette.c self-contained
- * (ui.c has its own static copy).  In C, static functions are private
+ * (mangogui.c has its own static copy).  In C, static functions are private
  * to their translation unit, so identically named statics in different
  * .c files do not conflict at link time.
  */

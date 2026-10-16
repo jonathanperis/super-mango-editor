@@ -39,9 +39,9 @@
 
 #include "game_timing.h"  /* GAME_FIXED_STEP */
 #include "tomlc17.h"
-#include "../shared/platform.h"       /* str_copy */
-#include "../shared/printf_format.h"
-#include "../shared/serializer_io.h"
+#include "../mangolib/mcore.h"        /* str_copy */
+#include "../mangolib/mprintf_format.h"
+#include "../mangolib/mfile.h"
 
 /* Samples per line of the frames array: one second of play. */
 #define GHOST_SAMPLES_PER_LINE TARGET_FPS

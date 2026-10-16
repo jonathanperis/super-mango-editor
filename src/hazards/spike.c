@@ -6,7 +6,7 @@
  * they never fall or crumble — they are purely static hazards.
  */
 
-#include "../shared/graphics.h"
+#include "../mangolib/mgfx.h"
 #include <stdio.h>
 
 #include "spike.h"

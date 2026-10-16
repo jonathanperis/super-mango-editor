@@ -7,7 +7,7 @@
 
 #include "../player/player.h"
 
-#include "input_backend.h"
+#include "../mangolib/minput.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

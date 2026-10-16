@@ -10,7 +10,7 @@
  */
 #pragma once
 
-#include "../shared/graphics.h"
+#include "../mangolib/mgfx.h"
 
 #define MAX_LADDERS   16
 #define LADDER_W      16              /* sprite width  (px)                    */

@@ -9,7 +9,7 @@ Baseline editor is shipped. TOML is the only level workflow; no C exporter remai
 | Area | Status | Verification |
 |------|--------|--------------|
 | Standalone editor executable | Complete | `make editor`, `make run-editor` |
-| raylib UI shell (originally SDL2/SDL2_ttf) | Complete | `src/shared/ui.*`, `src/editor/editor.*` |
+| raylib UI shell (originally SDL2/SDL2_ttf) | Complete | `src/mangolib/mangogui.*`, `src/editor/editor.*` |
 | Canvas/palette/properties/tools | Complete baseline | `src/editor/canvas.*`, `palette.*`, `properties.*`, `tools.*` |
 | Undo/redo | Complete baseline | `src/editor/undo.*` |
 | Copy/paste | Complete baseline | `src/editor/tools.*`, `src/editor/undo.*` |

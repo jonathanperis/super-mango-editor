@@ -13,7 +13,7 @@
 #include "../effects/parallax.h"    /* MAX_BACKGROUND_LAYERS */
 #include "../levels/level_loader.h"
 #include "../levels/level_validate.h" /* LevelIssueLocation */
-#include "../shared/serializer_io.h"
+#include "../mangolib/mfile.h"
 #include "../surfaces/platform.h"   /* MAX_PLATFORMS */
 
 #include <stdio.h>

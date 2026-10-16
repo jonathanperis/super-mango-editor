@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "../input/input_backend.h"
+#include "../mangolib/minput.h"
 
 #include "editor.h"  /* EditorState */
 

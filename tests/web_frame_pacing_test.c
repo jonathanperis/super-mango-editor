@@ -11,7 +11,7 @@
 #define IsWindowReady web_pacing_ready
 #define SetExitKey web_pacing_exit_key
 #define SetTargetFPS web_pacing_target
-#include "../src/shared/graphics.c"
+#include "../src/mangolib/mgfx.c"
 
 #include <stdio.h>
 

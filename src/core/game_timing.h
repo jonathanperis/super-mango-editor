@@ -16,7 +16,7 @@
 #pragma once
 
 #include "../game.h"
-#include "../shared/fixed_step.h"
+#include "../mangolib/mtiming.h"
 
 /* Seconds simulated by one update step. */
 #define GAME_FIXED_STEP (1.0f / TARGET_FPS)

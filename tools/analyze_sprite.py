@@ -552,7 +552,7 @@ def analyze(path, frame_w=None, frame_h=None):
 
     # ── IntRect source rect snippet ─────────────────────────────────
     print("-" * 60)
-    print("  IntRect C Snippets (include shared/geometry.h)")
+    print("  IntRect C Snippets (include mangolib/mangomath.h)")
     print("-" * 60)
     print()
     print("  /* Source rect for frame (col, row): */")
