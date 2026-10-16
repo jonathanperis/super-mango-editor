@@ -3,8 +3,8 @@
  *
  * "Immediate-mode" means the caller issues widget calls every frame rather
  * than constructing a permanent tree of button objects. The caller owns the
- * edited model; UIState remembers only input, an active edit, dropdown state
- * and reusable text textures. Typical frame order:
+ * edited model; UIState remembers only input, an active edit and dropdown
+ * state. Typical frame order:
  *
  *   ui_begin_frame → collect input → call widgets → present the frame
  *
@@ -31,8 +31,6 @@ typedef enum {
 
 #define UI_EDIT_BUFFER_SIZE LEVEL_DESCRIPTION_CAPACITY
 #define UI_PENDING_TEXT_SIZE 4096
-#define UI_TEXT_CACHE_COUNT 64
-#define UI_TEXT_CACHE_BYTES 128
 /* Most editable fields one frame can draw; Tab moves through them in order. */
 #define UI_MAX_FIELDS 128
 
@@ -47,20 +45,8 @@ typedef enum {
 #define UI_INPUT_BG   (Color){0x1D,0x1D,0x1D,0xFF}
 
 typedef struct {
-    /* Each cache entry owns its texture. "used" is a recency counter; a full
-     * cache can evict an old label without growing memory for every string. */
-    Texture2D *texture;
-    char text[UI_TEXT_CACHE_BYTES];
-    uint32_t color;
-    uint64_t used;
-    int w, h;
-} UITextCacheEntry;
-
-typedef struct {
-    /* ---- Initialized once; cache entries retain state across frames ---- */
-    TextFont *font; /* borrowed; cache is released before the owning font */
-    UITextCacheEntry text_cache[UI_TEXT_CACHE_COUNT];
-    uint64_t text_clock;
+    /* ---- Initialized once ---- */
+    TextFont *font; /* borrowed; labels are drawn straight from its atlas */
     /* ---- Input for this frame, filled after ui_begin_frame ---- */
     int mouse_x, mouse_y,       /* logical canvas coordinates */
         mouse_clicked,         /* press edge: a button acts once */
@@ -138,7 +124,8 @@ typedef struct {
 
 /* Borrow the already-loaded font and initialize state. The caller owns it. */
 void ui_init(UIState *ui, TextFont *font);
-/* Free cached label textures before the font and graphics context are closed. */
+/* Pair with ui_init. UIState holds no resources today (labels are drawn from
+ * the font's atlas), so this does nothing; owners still call it. */
 void ui_cleanup(UIState *ui);
 /* Reset one-shot input, not retained edits. Call before processing commands. */
 void ui_begin_frame(UIState *ui);
@@ -186,8 +173,8 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label);
 /* The same button while its command has nothing to act on: drawn darker with
  * a dim label, without a hover highlight, and it never takes a click. */
 void ui_button_disabled(UIState *ui, int x, int y, int w, int h, const char *label);
-/* UTF-8 labels use a bounded cache for short strings and transient textures
- * for long ones. Coordinates and measurements are logical canvas pixels. */
+/* UTF-8 labels, drawn from the font atlas with DrawTextEx. Coordinates and
+ * measurements are logical canvas pixels. */
 void ui_label(UIState *ui, int x, int y, const char *text);
 void ui_label_color(UIState *ui, int x, int y, const char *text, Color color);
 /* Decorative background only: panels do not own widgets or handle input. */

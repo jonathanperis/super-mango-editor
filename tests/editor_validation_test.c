@@ -4600,28 +4600,14 @@ static int invalid_drafts_do_not_build_unsafe_previews(void)
     EditorState es = {0};
     if (editor_widget_test_context_init(&context) != 0) return 1;
     ui_init(&es.ui, context.font);
-    ui_label(&es.ui, 0, 0, "cached label");
-    Texture2D *cached = es.ui.text_cache[0].texture;
-    if (!cached) { editor_widget_test_context_cleanup(&context); return 1; }
-    for (int i = 0; i < 100; i++) ui_label(&es.ui, 0, 0, "cached label");
-    if (es.ui.text_cache[0].texture != cached || es.ui.text_cache[1].texture) {
-        ui_cleanup(&es.ui);
-        editor_widget_test_context_cleanup(&context);
-        return 1;
-    }
+    /* Labels draw from the font atlas: repeated labels leave nothing behind. */
+    for (int i = 0; i < 100; i++) ui_label(&es.ui, 0, 0, "repeated label");
     if (getenv("MANGO_BENCHMARK")) {
-        const int rounds=2000;
-        double start=GetTime();
-        for (int i=0;i<rounds;i++) ui_label(&es.ui,0,0,"cached label");
+        const int rounds = 2000;
+        double start = GetTime();
+        for (int i = 0; i < rounds; i++) ui_label(&es.ui, 0, 0, "repeated label");
         rlDrawRenderBatchActive();
-        double warm=GetTime()-start;
-        start=GetTime();
-        for (int i=0;i<rounds;i++) { ui_cleanup(&es.ui); ui_label(&es.ui,0,0,"cached label"); }
-        rlDrawRenderBatchActive();
-        double cold=GetTime()-start;
-        double frequency=1;
-        printf("text benchmark: %d labels cached=%.3fms uncached=%.3fms ratio=%.2fx\n",rounds,
-               warm*1000.0/frequency,cold*1000.0/frequency,(double)cold/(double)(warm?warm:1));
+        printf("text benchmark: %d labels %.3fms\n", rounds, (GetTime() - start) * 1000.0);
     }
     char text[4] = "";
     es.ui.active_id = 1;

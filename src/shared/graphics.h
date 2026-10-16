@@ -21,9 +21,8 @@ void display_present(RenderTexture2D target);
 Texture2D *texture_load(const char *path);
 
 /* Put a valid raylib texture into an owned handle, with the nearest-neighbour
- * filter pixel art needs. Every handle is made here: texture_load passes the
- * file it decoded, font_texture (text.h) a label it drew. When memory runs
- * out it unloads value and returns NULL. */
+ * filter pixel art needs. Every handle is made here; texture_load passes the
+ * file it decoded. When memory runs out it unloads value and returns NULL. */
 Texture2D *texture_own(Texture2D value);
 
 /* Release the GPU image and the handle. NULL is ignored. */
