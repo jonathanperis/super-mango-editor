@@ -70,18 +70,38 @@ int display_open(int width, int height, const char *title, int hidden)
     return 0;
 }
 
+Rectangle display_viewport(int window_w, int window_h, int canvas_w, int canvas_h)
+{
+    if (window_w <= 0 || window_h <= 0 || canvas_w <= 0 || canvas_h <= 0) return (Rectangle){0};
+    /* The smaller ratio keeps the aspect ratio; the rest stays black
+     * (letterboxing). Integer division picks the largest whole multiple
+     * that fits, so every canvas pixel covers the same square of window
+     * pixels: at 2.5x, nearest-neighbour sampling would draw alternate
+     * columns 2 and 3 pixels wide and the art would shimmer as it scrolls. */
+    int scale = window_w / canvas_w < window_h / canvas_h ? window_w / canvas_w : window_h / canvas_h;
+    if (scale >= 1) {
+        int width = canvas_w*scale, height = canvas_h*scale;
+        /* Whole-pixel offsets keep each canvas pixel on the window's grid. */
+        return (Rectangle){(float)((window_w-width)/2), (float)((window_h-height)/2),
+                           (float)width, (float)height};
+    }
+    /* A window smaller than the canvas cannot fit even 1x. Shrinking by a
+     * fraction drops some rows and columns, but it still shows everything,
+     * which beats cropping the HUD or the editor's panels. */
+    float sx = (float)window_w / canvas_w, sy = (float)window_h / canvas_h;
+    float fit = sx < sy ? sx : sy;
+    float width = canvas_w*fit, height = canvas_h*fit;
+    return (Rectangle){(window_w-width)/2, (window_h-height)/2, width, height};
+}
+
 void display_present(RenderTexture2D target)
 {
     /* Return from the logical render target to the real window framebuffer. */
     EndTextureMode();
     ClearBackground(BLACK);
-    /* Choose the smaller ratio to keep the aspect ratio. Unused space stays
-     * black (letterboxing). Input applies the inverse of this same mapping. */
-    float sx = (float)GetScreenWidth() / target.texture.width;
-    float sy = (float)GetScreenHeight() / target.texture.height;
-    float scale = sx < sy ? sx : sy;
-    float width = target.texture.width*scale, height = target.texture.height*scale;
-    Rectangle dest = {(GetScreenWidth()-width)/2, (GetScreenHeight()-height)/2, width, height};
+    /* Input applies the inverse of this same mapping. */
+    Rectangle dest = display_viewport(GetScreenWidth(), GetScreenHeight(),
+                                      target.texture.width, target.texture.height);
     /* Render textures have the opposite Y orientation to ordinary textures.
      * A negative source height flips this completed image for presentation. */
     Rectangle source = {0, 0, (float)target.texture.width, -(float)target.texture.height};

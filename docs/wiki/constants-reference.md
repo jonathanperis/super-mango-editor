@@ -45,7 +45,7 @@ these numbers includes `game_constants.h` on its own and does not depend on
 | `GAME_W` | `400` | Internal canvas width in logical pixels |
 | `GAME_H` | `300` | Internal canvas height in logical pixels |
 
-The 400×300 raylib render target is presented with point filtering at 800×600, producing a **2x pixel scale** (each logical pixel = 2×2 physical pixels). `display_present` and `input_pointer_to_logical` share the aspect-preserving viewport mapping.
+The 400×300 raylib render target is presented with point filtering at 800×600, producing a **2x pixel scale** (each logical pixel = 2×2 physical pixels). `display_present` and `input_pointer_to_logical` share the aspect-preserving viewport mapping (`display_viewport`): the largest whole-number scale that fits the window, or a fractional fit only when the window is smaller than the canvas.
 
 ### Timing
 

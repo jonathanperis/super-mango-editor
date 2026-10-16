@@ -9,6 +9,7 @@
 #include "input_backend.h"
 #include <stdio.h>
 #include <string.h>
+#include "../shared/graphics.h"  /* display_viewport */
 #include "../shared/platform.h"
 #ifndef MANGO_RAYLIB_MEMORY
 #define GLFW_INCLUDE_NONE
@@ -314,13 +315,13 @@ Vector2 input_mouse(void)
 
 Vector2 input_pointer_to_logical(Vector2 mouse)
 {
-    /* Invert display_present: remove letterbox margins, then divide by the
-     * smaller scale ratio. Do this once before widgets/world hit testing. */
-    float sx = (float)GetScreenWidth()/width, sy = (float)GetScreenHeight()/height;
-    float scale = sx < sy ? sx : sy;
-    if (scale <= 0) return (Vector2){-1, -1};
-    return (Vector2){(mouse.x-(GetScreenWidth()-width*scale)/2)/scale,
-                     (mouse.y-(GetScreenHeight()-height*scale)/2)/scale};
+    /* Invert display_present with the same viewport: remove the letterbox
+     * margin, then divide by the scale. Do this once before widgets/world
+     * hit testing. */
+    Rectangle view = display_viewport(GetScreenWidth(), GetScreenHeight(), width, height);
+    if (view.width <= 0 || view.height <= 0) return (Vector2){-1, -1};
+    float scale = view.width / width;
+    return (Vector2){(mouse.x-view.x)/scale, (mouse.y-view.y)/scale};
 }
 
 int input_modifiers(void)

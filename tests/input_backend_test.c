@@ -1,12 +1,14 @@
 /* No desktop needed: exercise the production callback adapter against a small
  * public-GLFW registration fixture, including chaining and restoration. */
 #include "input/input_backend.h"
+#include "shared/graphics.h"  /* display_viewport */
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <string.h>
 
 static int window_ready, prior_keys, prior_chars, prior_buttons;
+static int screen_w = 800, screen_h = 600;
 static GLFWkeyfun key_handler;
 static GLFWcharfun char_handler;
 static GLFWmousebuttonfun button_handler;
@@ -14,8 +16,8 @@ static GLFWcursorposfun cursor_handler;
 static GLFWscrollfun scroll_handler;
 
 bool test_input_window_ready(void) { return window_ready != 0; }
-int test_input_screen_width(void) { return 800; }
-int test_input_screen_height(void) { return 600; }
+int test_input_screen_width(void) { return screen_w; }
+int test_input_screen_height(void) { return screen_h; }
 GLFWwindow *test_input_current_context(void) { return (GLFWwindow *)(uintptr_t)1; }
 void test_input_cursor_pos(GLFWwindow *window, double *x, double *y)
 {
@@ -83,5 +85,66 @@ int input_backend_contract_test(void)
     if (key_handler != original_key || char_handler != original_char || button_handler != original_button) failed = 1;
     window_ready = 0;
     if (failed) fprintf(stderr, "input backend: ordered callbacks/modifiers/quick click failed\n");
+    return failed;
+}
+
+static int viewport_is(const char *name, int window_w, int window_h, int canvas_w, int canvas_h,
+                       float x, float y, float w, float h)
+{
+    Rectangle got = display_viewport(window_w, window_h, canvas_w, canvas_h);
+    if (got.x == x && got.y == y && got.width == w && got.height == h) return 0;
+    fprintf(stderr, "display viewport %s: got %g,%g %gx%g, expected %g,%g %gx%g\n",
+            name, got.x, got.y, got.width, got.height, x, y, w, h);
+    return 1;
+}
+
+static int pointer_is(const char *name, float px, float py, float x, float y)
+{
+    Vector2 got = input_pointer_to_logical((Vector2){px, py});
+    if (got.x == x && got.y == y) return 0;
+    fprintf(stderr, "pointer %s: got %g,%g, expected %g,%g\n", name, got.x, got.y, x, y);
+    return 1;
+}
+
+/* display_present and input_pointer_to_logical share display_viewport, so
+ * the picture and the clicks scale by the same whole number. */
+int display_viewport_test(void)
+{
+    int failed = 0;
+    /* Game canvas: 1080p fits 3x (1200x900), centred on whole pixels. */
+    failed |= viewport_is("1080p game", 1920, 1080, 400, 300, 360, 90, 1200, 900);
+    /* The default 2x window; a window just short of 2x drops to 1x rather
+     * than sampling at 1.9975x. */
+    failed |= viewport_is("2x game", 800, 600, 400, 300, 0, 0, 800, 600);
+    failed |= viewport_is("almost 2x", 799, 600, 400, 300, 199, 150, 400, 300);
+    /* Odd margins round down instead of landing on half pixels. */
+    failed |= viewport_is("odd margin", 1001, 701, 400, 300, 100, 50, 800, 600);
+    /* Editor canvas: its own size is exact; 1440p is exactly 2x. */
+    failed |= viewport_is("editor 1x", 1280, 720, 1280, 720, 0, 0, 1280, 720);
+    failed |= viewport_is("editor 1x + 1", 1281, 721, 1280, 720, 0, 0, 1280, 720);
+    failed |= viewport_is("editor 1440p", 2560, 1440, 1280, 720, 0, 0, 2560, 1440);
+    failed |= viewport_is("editor ultrawide", 3840, 1600, 1280, 720, 640, 80, 2560, 1440);
+    /* Below 1x the whole canvas still shows, at a fractional fit that keeps
+     * its aspect ratio (offsets may be fractional there). */
+    failed |= viewport_is("tiny game", 200, 150, 400, 300, 0, 0, 200, 150);
+    failed |= viewport_is("narrow game", 300, 300, 400, 300, 0, 37.5f, 300, 225);
+    failed |= viewport_is("short editor", 1280, 360, 1280, 720, 320, 0, 640, 360);
+    /* A minimised window reports no size: nothing is drawn or hit. */
+    failed |= viewport_is("empty window", 0, 0, 400, 300, 0, 0, 0, 0);
+    failed |= viewport_is("empty canvas", 800, 600, 0, 0, 0, 0, 0, 0);
+
+    window_ready = 1;
+    input_open(400, 300);
+    screen_w = 1920; screen_h = 1080;
+    failed |= pointer_is("1080p top-left", 360, 90, 0, 0);
+    failed |= pointer_is("1080p centre", 960, 540, 200, 150);
+    failed |= pointer_is("1080p left margin", 0, 90, -120, 0);
+    screen_w = 200; screen_h = 150;
+    failed |= pointer_is("half size", 100, 75, 200, 150);
+    screen_w = 0; screen_h = 0;
+    failed |= pointer_is("no window", 10, 10, -1, -1);
+    screen_w = 800; screen_h = 600;
+    input_close();
+    window_ready = 0;
     return failed;
 }
