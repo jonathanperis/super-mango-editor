@@ -90,7 +90,7 @@ src/
 │   ├── asset_cache.h / .c       Session's reference-counted cache of level files, player sheet, HUD icon, font, menu logo and sound
 │   ├── geometry.h              Integer hitboxes and half-open intersection
 │   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
-│   ├── text.h / .c              Borrowed built-in font, text measurement, centred drawing and label texture creation
+│   ├── text.h / .c              Borrowed built-in font, text measurement and (centred) drawing from its atlas
 │   ├── platform.h / .c          Monotonic time, UTF-8 copying and OS preference/executable paths
 │   ├── asset_root.h / .c        Move a foreign working folder to the one holding assets/ and levels/
 │   ├── utf8.h                   Strict UTF-8 checks for loaded strings and typed text
@@ -611,8 +611,8 @@ reports it, resident memory in MB.
 | `shared/asset_cache.h`, `shared/asset_cache.c` | A reference count: holders per file, idle entries, and why freeing waits for `asset_cache_trim` |
 | `shared/geometry.h` | Integer, half-open hitboxes; overflow-safe edge arithmetic |
 | `shared/audio.h`, `shared/audio.c` | Owned samples, borrowed alias data, per-play volume and music pumping |
-| `shared/text.h`, `shared/text.c` | CPU image versus GPU texture; borrowing raylib's built-in font |
-| `shared/ui.h`, `shared/ui.c` | Immediate-mode calls, stable widget IDs, staged edits and bounded label cache |
+| `shared/text.h`, `shared/text.c` | Borrowing raylib's built-in font and drawing glyphs from its one atlas texture |
+| `shared/ui.h`, `shared/ui.c` | Immediate-mode calls, stable widget IDs, staged edits and labels drawn from the font atlas |
 | `shared/platform.h`, `shared/platform.c` | Monotonic elapsed time, UTF-8 copying and caller-owned OS paths |
 | `shared/asset_root.h`, `shared/asset_root.c` | Why relative paths depend on the working folder, and how startup finds the asset root |
 | `shared/utf8.h` | What makes a UTF-8 byte sequence valid (overlong forms, surrogates, truncation) |

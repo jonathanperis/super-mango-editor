@@ -52,20 +52,6 @@ int font_measure(TextFont *font, const char *text, int *width, int *height)
     return 0;
 }
 
-Texture2D *font_texture(TextFont *font, const char *text, Color color)
-{
-    if (!font || !text || !text[0]) return NULL;
-    /* Image owns CPU pixels; Texture2D owns their GPU upload. Once uploaded,
-     * release the Image. */
-    Image image = ImageTextEx(font->font, text, (float)font->size,
-                              (float)font->spacing, color);
-    if (!IsImageValid(image)) return NULL;
-    Texture2D value = LoadTextureFromImage(image);
-    UnloadImage(image);
-    if (!IsTextureValid(value)) return NULL;
-    return texture_own(value);
-}
-
 void font_draw(TextFont *font, const char *text, int x, int y, Color color)
 {
     if (!font || !text) return;

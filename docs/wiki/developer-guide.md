@@ -216,7 +216,8 @@ creates it inside `InitWindow` and frees it in `CloseWindow`; `TextFont` only
 borrows it and must never pass it to `UnloadFont`. Text is drawn at the font's
 10 px base size (`TEXT_FONT_SIZE`) with point filtering, so every glyph pixel
 lands on one canvas pixel. Characters outside ASCII/Latin-1 draw as `?`.
-Cached label textures still have explicit owners.
+Labels are drawn straight from the font's atlas texture (`font_draw`, raylib's
+`DrawTextEx`), so no per-label texture exists to own or free.
 
 ```c
 // Borrow the default font (requires a live graphics context)
@@ -239,10 +240,9 @@ the same two back.
 
 The HUD renders hearts (health), life counter and score. It is drawn after game entities; terminal/settings overlays can cover it. `hud_layout()` computes every HUD rectangle once; `hud_render` draws into them and the `--debug` hitbox view outlines the same ones, so a layout change needs one edit.
 
-For repeated labels, reuse `UIState`'s bounded cache or `font_texture`. Rebuild
-only when content/appearance changes. `texture_unload` flushes pending raylib
-draws before freeing a texture, which matters when a cache entry is evicted
-within a frame. Release cached textures before their font and graphics context.
+Draw labels with `font_draw`/`font_draw_centered` every frame. raylib's default
+font is a single atlas texture and `DrawTextEx` batches its glyphs with the rest
+of the frame, so there is nothing to rasterize, cache or release per label.
 
 ---
 
