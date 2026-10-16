@@ -126,7 +126,7 @@ struct EditorCampaign {
     int undo_blocked;          /* Undo refused the newest step: its level */
                                /* file did not load (see undo_refused)    */
     int selected;              /* highlighted row, -1 for none           */
-    int scroll;                /* first row shown                        */
+    UIScroll scroll;           /* rows; offset is the first row shown    */
     int close_armed;           /* Close was refused once for unsaved work */
     int revert_armed;          /* Revert was refused once, likewise       */
     char problem[160];         /* campaign-wide problem, "" when none    */
@@ -833,7 +833,7 @@ int editor_campaign_revert(EditorState *es)
     EditorCampaign *c = es ? es->campaign : NULL;
     char path[EDITOR_PATH_MAX];
     int selected;
-    int scroll;
+    UIScroll scroll;
 
     if (!c) return -1;
     if (!editor_campaign_unsaved(es)) {
@@ -1285,13 +1285,12 @@ int editor_campaign_save(EditorState *es)
 void editor_campaign_wheel(EditorState *es, float wheel)
 {
     EditorCampaign *c = es ? es->campaign : NULL;
-    int max_scroll;
 
     if (!c) return;
-    c->scroll -= (int)wheel;
-    max_scroll = (int)c->catalog.count - CAMPAIGN_VISIBLE_ROWS;
-    if (c->scroll > max_scroll) c->scroll = max_scroll;
-    if (c->scroll < 0) c->scroll = 0;
+    /* One row per notch; a trackpad's fractions of a notch add up instead
+     * of each being cut to nothing. */
+    (void)ui_scroll_wheel(&c->scroll, wheel, 1.0f);
+    ui_scroll_clamp(&c->scroll, (int)c->catalog.count, CAMPAIGN_VISIBLE_ROWS);
 }
 
 /* One entry row: number, file, the level's name (editable), its verdict. */
@@ -1446,10 +1445,9 @@ void editor_campaign_render(EditorState *es)
                    "Game's verdict", ui_color(&es->ui, UI_COLOR_TEXT_DIM));
 
     rows = CAMPAIGN_VISIBLE_ROWS;
-    if (c->scroll > (int)c->catalog.count - rows) c->scroll = (int)c->catalog.count - rows;
-    if (c->scroll < 0) c->scroll = 0;
-    for (int i = c->scroll; i < (int)c->catalog.count && i < c->scroll + rows; i++)
-        draw_row(es, c, i, CAMPAIGN_ROWS_Y + (i - c->scroll) * CAMPAIGN_ROW_H);
+    ui_scroll_clamp(&c->scroll, (int)c->catalog.count, rows);
+    for (int i = c->scroll.offset; i < (int)c->catalog.count && i < c->scroll.offset + rows; i++)
+        draw_row(es, c, i, CAMPAIGN_ROWS_Y + (i - c->scroll.offset) * CAMPAIGN_ROW_H);
 
     draw_undo_notice(es, c);
     draw_buttons(es, c);

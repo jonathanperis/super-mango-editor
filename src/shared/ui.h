@@ -249,5 +249,33 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
                 const char **options, int count, int *selected);
 /* A horizontal divider, drawn in logical pixels. */
 void ui_separator(UIState *ui, int x, int y, int w);
+
+/*
+ * UIScroll — one scrolled list or panel, in the manner of raygui's
+ * GuiScrollPanel: content taller than its view shows from `offset` units
+ * down (pixels for a panel, rows for a list). A trackpad sends fractions
+ * of a wheel notch, so the part that is not yet a whole unit waits in
+ * `carry` for the next event; truncating each event alone would turn
+ * every small swipe into nothing. A zeroed UIScroll is at the top.
+ */
+typedef struct {
+    int   offset;  /* units scrolled past the top, 0 .. content - view */
+    float carry;   /* wheel movement not yet a whole unit              */
+} UIScroll;
+
+/* Apply a wheel delta in notches (positive = up) at units_per_notch and
+ * return how many whole units it moved. The offset never goes below 0;
+ * ui_scroll_clamp or ui_scroll_begin limit the other end. */
+int ui_scroll_wheel(UIScroll *scroll, float wheel, float units_per_notch);
+/* Keep the offset within 0 .. content - view (0 when everything fits). */
+void ui_scroll_clamp(UIScroll *scroll, int content, int view);
+/* For a pixel panel: clamp, clip drawing to the view (x, y, w, view_h)
+ * and return where the content's top edge goes. Pair with ui_scroll_end. */
+int ui_scroll_begin(UIScroll *scroll, int x, int y, int w, int view_h, int content_h);
+void ui_scroll_end(void);
+/* Scroll just far enough that [top, bottom) is inside [view_top,
+ * view_bottom) with margin to spare; ui_scroll_begin limits the result. */
+void ui_scroll_reveal(UIScroll *scroll, int top, int bottom,
+                      int view_top, int view_bottom, int margin);
 /* Measure with the same font used for drawing, for centered/aligned labels. */
 int ui_text_width(UIState *ui, const char *text);

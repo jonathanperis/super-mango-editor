@@ -66,17 +66,6 @@
 /* Scroll state — retained across frames                               */
 /* ------------------------------------------------------------------ */
 
-/*
- * scroll_y — vertical scroll offset in pixels for the palette content.
- *
- * When the palette has more entries than can fit in the visible area,
- * the user scrolls with the mouse wheel.  scroll_y tracks how many
- * pixels of content have been scrolled past the top edge.
- *
- * Static (file-scope) because this state must persist between frames
- * but is private to the palette module — no other file needs it.
- */
-static int scroll_y = 0;
 
 /*
  * category_open — tracks which categories are expanded (1) or collapsed (0).
@@ -84,15 +73,6 @@ static int scroll_y = 0;
  */
 static int category_open[EDITOR_ENTITY_CATEGORY_COUNT] = { 0 };
 
-/*
- * palette_scroll — Adjust the palette scroll offset by a pixel delta.
- * Called from the editor's mouse wheel handler when the cursor is over
- * the palette area.  The clamp in palette_render keeps it in range.
- */
-void palette_scroll(int delta) {
-    scroll_y += delta;
-    if (scroll_y < 0) scroll_y = 0;
-}
 
 /* ------------------------------------------------------------------ */
 /* Internal helpers — forward declarations                             */
@@ -281,17 +261,6 @@ void palette_render(EditorState *es, int start_y, int available_h)
 
     ui_panel(&es->ui, panel_x, panel_y, PANEL_W, panel_h);
 
-    /*
-     * Only the content below the title scrolls.  scrollable_h is how far
-     * that content extends past the visible area (0 when it all fits);
-     * palette_scroll() moves scroll_y and this keeps it in [0, scrollable_h].
-     */
-    int visible_h = panel_h - TITLE_H;
-    int scrollable_h = (palette_content_height() - TITLE_H) - visible_h;
-    if (scrollable_h < 0) scrollable_h = 0;
-    if (scroll_y < 0)             scroll_y = 0;
-    if (scroll_y > scrollable_h)  scroll_y = scrollable_h;
-
     palette_title_bar(es, panel_x, panel_y);
 
     /* If collapsed, just show the header bar */
@@ -303,7 +272,14 @@ void palette_render(EditorState *es, int start_y, int available_h)
 
     int content_top = panel_y + TITLE_H;
 
-    BeginScissorMode(panel_x, content_top, PANEL_W, panel_h-TITLE_H);
+    /*
+     * Only the content below the title scrolls (es->palette_scroll, moved by
+     * the wheel in editor_panels.c). ui_scroll_begin keeps the offset within
+     * the content, clips drawing to the view and returns where the content's
+     * top goes: above content_top once earlier entries have scrolled away.
+     */
+    int cursor_y = ui_scroll_begin(&es->palette_scroll, panel_x, content_top, PANEL_W,
+                                   panel_h - TITLE_H, palette_content_height() - TITLE_H);
 
     /*
      * clip_bottom — the Y coordinate of the panel's bottom edge.
@@ -312,13 +288,8 @@ void palette_render(EditorState *es, int start_y, int available_h)
      */
     int clip_bottom = panel_y + panel_h;
 
-    /*
-     * cursor_y — a running Y position that advances downward as we lay
-     * out each category header and entity row.  Starting scroll_y above
-     * the content top makes earlier entries disappear off the top.
-     */
-    int cursor_y = content_top - scroll_y;
-
+    /* cursor_y advances downward as each category header and entity row is
+     * laid out. */
     for (int cat = 0; cat < EDITOR_ENTITY_CATEGORY_COUNT; cat++) {
         EditorEntityCategory category = (EditorEntityCategory)cat;
 
@@ -342,5 +313,5 @@ void palette_render(EditorState *es, int start_y, int available_h)
     }
 
     /* Remove clip rect so other panels are not affected */
-    EndScissorMode();
+    ui_scroll_end();
 }

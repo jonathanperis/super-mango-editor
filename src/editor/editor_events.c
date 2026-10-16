@@ -269,7 +269,6 @@ static void editor_key(EditorState *es, const InputEvent *event)
         else if (es->tool == TOOL_PLACE || es->tool == TOOL_DELETE) es->tool = TOOL_SELECT;
         else if (es->selection.index >= 0) {
             editor_select_none(es);
-            es->panel_scroll = 0;
         }
         break;
     case KEY_F5:
