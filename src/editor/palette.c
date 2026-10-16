@@ -283,7 +283,7 @@ void palette_render(EditorState *es, int start_y, int available_h)
     /* The scrollbar takes its clicks before the rows below can see them. */
     (void)ui_scrollbar_input(&es->ui, &es->palette_scroll, panel_x + PANEL_W - SCROLLBAR_W,
                              content_top, SCROLLBAR_W, view_h, view_h, content_h);
-    int cursor_y = ui_scroll_begin(&es->palette_scroll, panel_x, content_top, PANEL_W,
+    int cursor_y = ui_scroll_begin(&es->ui, &es->palette_scroll, panel_x, content_top, PANEL_W,
                                    view_h, content_h);
 
     /*
@@ -318,7 +318,7 @@ void palette_render(EditorState *es, int start_y, int available_h)
     }
 
     /* Remove clip rect so other panels are not affected */
-    ui_scroll_end();
+    ui_scroll_end(&es->ui);
     ui_scrollbar_draw(&es->ui, &es->palette_scroll, panel_x + PANEL_W - SCROLLBAR_W,
                       content_top, SCROLLBAR_W, view_h, view_h, content_h);
 }

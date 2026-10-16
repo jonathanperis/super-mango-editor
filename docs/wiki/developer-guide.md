@@ -276,6 +276,11 @@ backend creates a new system cursor on every call and never frees it, so it
 must not be called every frame. The editor's `editor_update_cursor` adds the
 four-way arrows for an entity drag.
 
+Clip drawing with `ui_clip_begin` / `ui_clip_end` (or `ui_scroll_begin` /
+`ui_scroll_end`), never `BeginScissorMode` directly: `UIState` then knows the
+active clip, which the editor's in-window prompts (`dialog_choice.c`) end and
+set again when they open in the middle of a frame.
+
 A scrolled panel or list keeps a `UIScroll` (offset plus the wheel's leftover
 fraction), modelled on raygui's `GuiScrollPanel`. `ui_scroll_wheel` turns wheel
 notches into whole pixels or rows and keeps a trackpad's fractions for the next

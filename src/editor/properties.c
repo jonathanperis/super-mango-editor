@@ -1233,7 +1233,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
         ui_panel(&es->ui, prop_x, prop_y, PROP_W, prop_h);
         draw_section_title(es, prop_x, prop_y, header, &es->panel_open);
         if (!es->panel_open) return;
-        BeginScissorMode(prop_x, prop_y + ROW_H + 4, PROP_W, prop_h - ROW_H - 4);
+        ui_clip_begin(&es->ui, prop_x, prop_y + ROW_H + 4, PROP_W, prop_h - ROW_H - 4);
         y = prop_y + ROW_H + 8;
         for (int i = 0; i < n; i++) counts[items[i].type]++;
         for (int type = 0; type < ENT_COUNT; type++) {
@@ -1250,7 +1250,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
                        ui_color(&es->ui, UI_COLOR_TEXT_DIM));
         ui_label_color(&es->ui, CONTENT_X, y + 18,
                        "Shift+click adds or removes one.", ui_color(&es->ui, UI_COLOR_TEXT_DIM));
-        EndScissorMode();
+        ui_clip_end(&es->ui);
         return;
     }
 
@@ -1275,7 +1275,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
     es->ui.before_change_context = es;
 
     /* Clip content below the title bar */
-    BeginScissorMode(prop_x, prop_y+ROW_H+4, PROP_W, prop_h-ROW_H-4);
+    ui_clip_begin(&es->ui, prop_x, prop_y+ROW_H+4, PROP_W, prop_h-ROW_H-4);
 
     int y = prop_y + ROW_H + 8;
 
@@ -1295,7 +1295,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
      * entity has no field for (or another entity) must not linger. */
     s_focus_key[0] = '\0';
 
-    EndScissorMode();
+    ui_clip_end(&es->ui);
     editor_end_change_tracking(es);
 }
 
@@ -1990,7 +1990,7 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     /* The scrollbar takes its clicks before the fields below can see them. */
     (void)ui_scrollbar_input(&es->ui, &es->config_scroll, x + PROP_W - SCROLLBAR_W, content_top,
                              SCROLLBAR_W, content_visible_h, content_visible_h, content_scroll_h);
-    int y = ui_scroll_begin(&es->config_scroll, x, content_top, PROP_W, content_visible_h,
+    int y = ui_scroll_begin(&es->ui, &es->config_scroll, x, content_top, PROP_W, content_visible_h,
                             content_scroll_h) + 8;
     cfg_clip_top = content_top;
     cfg_clip_bottom = content_top + content_visible_h;
@@ -2005,7 +2005,7 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     y = config_foreground_layers(es, x, y);
     (void)config_fog_layers(es, x, y);
 
-    ui_scroll_end();
+    ui_scroll_end(&es->ui);
     ui_scrollbar_draw(&es->ui, &es->config_scroll, x + PROP_W - SCROLLBAR_W, content_top,
                       SCROLLBAR_W, content_visible_h, content_visible_h, content_scroll_h);
     editor_end_change_tracking(es);

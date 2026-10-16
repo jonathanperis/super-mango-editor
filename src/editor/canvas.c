@@ -180,7 +180,7 @@ void canvas_render(EditorState *es) {
      * Set a clip rectangle so that nothing we draw bleeds outside the canvas
      * area into the toolbar, status bar, or side panel.
      */
-    BeginScissorMode(0, TOOLBAR_H, CANVAS_W, CANVAS_H);
+    ui_clip_begin(&es->ui, 0, TOOLBAR_H, CANVAS_W, CANVAS_H);
 
     /* ---- Layer 1: Sky background ---- */
     render_sky(es);
@@ -249,7 +249,7 @@ void canvas_render(EditorState *es) {
     }
 
     /* Remove the clip rectangle so other UI elements can draw freely */
-    EndScissorMode();
+    ui_clip_end(&es->ui);
 }
 
 /* ------------------------------------------------------------------ */

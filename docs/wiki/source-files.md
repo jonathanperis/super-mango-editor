@@ -69,7 +69,7 @@ src/
 │   ├── entity_meta.h / .c        One table row per entity type (names, capacity, LevelDef storage, placement preview) plus shared read/insert/remove of placements
 │   ├── editor_frame.h / .c       Per-frame editor orchestration
 │   ├── editor_events.h / .c      Semantic input dispatch
-│   ├── dialog_choice.c          Native confirmation/error/recovery decisions
+│   ├── dialog_choice.h / .c      Two- and three-button prompts drawn in the editor window
 │   ├── editor_chrome.h / .c      Toolbar/status/panel chrome
 │   ├── editor_panels.h / .c      Palette/properties panel rendering
 │   ├── editor_layout.h / .c      Editor layout metrics

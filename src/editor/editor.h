@@ -341,6 +341,12 @@ typedef struct {
     /* Editor owns its process-wide context and logical render target. */
     RenderTexture2D frame_target;
     TextFont *font;
+    /* A copy of the last complete frame, shown dimmed behind an in-window
+     * prompt (dialog_choice.c), and the target texture mode is bound to
+     * while a frame is being drawn (NULL between frames), so a prompt that
+     * opens mid-frame can leave it and bind it again. */
+    RenderTexture2D prompt_backdrop;
+    RenderTexture2D *drawing_target;
 
     /* ---- Level data (the document being edited) ---------------------- */
     /*
