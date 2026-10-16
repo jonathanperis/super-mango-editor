@@ -911,26 +911,25 @@ void ui_queue_text_input(UIState *ui, const char *text)
 /* ------------------------------------------------------------------ */
 
 /*
- * ui_button — Draw a clickable rectangle with centred text.
- *
- * Visual states:
- *   Default — BTN colour (medium grey)
- *   Hover   — BTN_HOT colour (slightly lighter) when cursor is inside
+ * button_body — What ui_button and ui_toggle share: a face in role `face`,
+ * the style's outline (in `border` instead when that is not
+ * UI_COLOR_BORDER), the label centred, and the click.
  *
  * Returns 1 on the single frame the user clicks inside the button.
  * "Click" = mouse_clicked (button-down edge), not mouse_down (held).
  * This prevents repeated firing while the user holds the button.
  */
-int ui_button(UIState *ui, int x, int y, int w, int h, const char *label)
+static int button_body(UIState *ui, int x, int y, int w, int h, const char *label,
+                       UIColorRole face, UIColorRole border)
 {
     int hovered = point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
 
     note_widget(ui, x, y, w, h);
-
-    /* Choose background colour based on hover state. */
-    Color bg = ui_color(ui, hovered ? UI_COLOR_HOT : UI_COLOR_BUTTON);
-    draw_rect(x, y, w, h, bg);
-    draw_control_border(ui, x, y, w, h);
+    draw_rect(x, y, w, h, ui_color(ui, face));
+    if (border == UI_COLOR_BORDER) draw_control_border(ui, x, y, w, h);
+    else if (ui->style.border_width > 0 && IsWindowReady())
+        DrawRectangleLinesEx((Rectangle){(float)x, (float)y, (float)w, (float)h},
+                             (float)ui->style.border_width, ui_color(ui, border));
 
     /*
      * Centre the label text inside the button rectangle.
@@ -953,6 +952,36 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label)
         return 1;
     }
     return 0;
+}
+
+/*
+ * ui_button — Draw a clickable rectangle with centred text.
+ *
+ * Visual states:
+ *   Default — BTN colour (medium grey)
+ *   Hover   — BTN_HOT colour (slightly lighter) when cursor is inside
+ */
+int ui_button(UIState *ui, int x, int y, int w, int h, const char *label)
+{
+    int hovered = point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
+    return button_body(ui, x, y, w, h, label,
+                       hovered ? UI_COLOR_HOT : UI_COLOR_BUTTON, UI_COLOR_BORDER);
+}
+
+/*
+ * ui_toggle — A button that stays down while `on`.
+ *
+ * On, the face is UI_COLOR_SELECTED (the current tool, a shown grid),
+ * and a style with outlines draws it in the accent colour, so high
+ * contrast marks the state with more than a shade of blue.  Off, it
+ * looks and hovers like ui_button.
+ */
+int ui_toggle(UIState *ui, int x, int y, int w, int h, const char *label, int on)
+{
+    int hovered = point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
+    UIColorRole face = on ? UI_COLOR_SELECTED : hovered ? UI_COLOR_HOT : UI_COLOR_BUTTON;
+    return button_body(ui, x, y, w, h, label, face,
+                       on ? UI_COLOR_ACCENT : UI_COLOR_BORDER);
 }
 
 /* ------------------------------------------------------------------ */
