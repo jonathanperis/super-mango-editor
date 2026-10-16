@@ -25,8 +25,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WASM_FILES = [f"{stem}.{extension}" for stem in ("super-mango", "super-mango-debug")
-              for extension in ("html", "js", "wasm", "data")]
+# The debug page loads the normal page's .js/.wasm/.data (tools/web_debug_page.py),
+# so it ships as one HTML file.
+WASM_FILES = [f"super-mango.{extension}" for extension in ("html", "js", "wasm", "data")] + [
+    "super-mango-debug.html"]
 
 
 def copy_tree(src: Path, dst: Path, *, playable_assets: bool = False) -> None:

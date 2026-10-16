@@ -73,7 +73,7 @@ def main():
             assert b"raylib" in bundle.read("super-mango-wasm/licenses/raylib.txt")
             assert b"codec" in bundle.read("super-mango-wasm/licenses/raylib-dependencies/codec.h")
         check_reproducible_zips(root)
-        (root / "super-mango-debug.data").unlink()
+        (root / "super-mango-debug.html").unlink()
         try:
             package_release.package_wasm("super-mango-wasm", archive, root, raylib_build)
         except SystemExit:

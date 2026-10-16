@@ -61,10 +61,10 @@ It also runs `tests/validate_levels_test.py` and `tests/gen_sounds_test.py`. The
 `web-host-contract` prerequisite adds `tools/check_web_boot_contract.py`,
 `tests/web_host_test.cjs`, `tests/profile_storage_test.cjs`,
 `tests/touch_controls_test.cjs`, `tests/keyboard_scope_test.cjs`,
-`tests/audio_unlock_test.cjs`, `tests/package_release_test.py` and
-`tests/filter_codeql_sarif_test.py`. These
+`tests/audio_unlock_test.cjs`, `tests/web_debug_page_test.py`,
+`tests/package_release_test.py` and `tests/filter_codeql_sarif_test.py`. These
 cover static boot wiring, host lifecycle, storage conflicts, touch ownership,
-canvas keyboard scoping, keyboard audio unlock, native/WASM archive contracts and the CodeQL SARIF
+canvas keyboard scoping, keyboard audio unlock, the derived debug page, native/WASM archive contracts and the CodeQL SARIF
 filter without a browser. Native harnesses cover parser/serializer, validation, runtime, editor,
 profile, checkpoint, simulation and session behavior. The session, profile and
 mechanics cases include the Continue point (its codec, migration and round trip, and
