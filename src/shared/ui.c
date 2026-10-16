@@ -328,6 +328,59 @@ static int previous_word_start(const char *text, int at)
     return at;
 }
 
+/*
+ * step_number — Up / Down in a number field: add one step (ten with
+ * Shift) to the value being typed, or to the stored value when what is
+ * typed is not a number yet, and keep it inside the field's limits.  The
+ * result stays a staged edit like typing; Return, Tab or a click commits
+ * it.
+ *
+ * An integer field steps by its own step (1 when it has none).  A float
+ * field has no step of its own, so it uses one that suits its size: 1
+ * (a pixel, a pixel per second) for values of 10 or more, and 0.1 below
+ * that, where the fractions matter (parallax speeds, camera factors).
+ */
+static void step_number(UIState *ui, int direction, int big)
+{
+    int times = big ? 10 : 1;
+
+    if (ui->edit_type == UI_EDIT_INT) {
+        int value;
+        long long step = ui->edit_int_step > 1 ? ui->edit_int_step : 1;
+        if (!parse_int_value(ui->edit_buf, &value)) value = *(const int *)ui->edit_target;
+        long long next = (long long)value + direction * times * step;
+        if (ui->edit_int_min <= ui->edit_int_max) {
+            if (next < ui->edit_int_min) next = ui->edit_int_min;
+            if (next > ui->edit_int_max) next = ui->edit_int_max;
+        }
+        if (next < INT_MIN) next = INT_MIN;
+        if (next > INT_MAX) next = INT_MAX;
+        snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%d", (int)next);
+    } else if (ui->edit_type == UI_EDIT_FLOAT) {
+        float value;
+        if (!parse_float_value(ui->edit_buf, &value)) value = *(const float *)ui->edit_target;
+        double step = fabs((double)value) >= 10.0 ? 1.0 : 0.1;
+        double next = (double)value + direction * times * step;
+        /* A speed that must keep moving steps over 0. */
+        if (ui->edit_float_nonzero && fabs(next) < step / 2) next += direction * step;
+        if (ui->edit_float_min <= ui->edit_float_max) {
+            if (next < ui->edit_float_min) next = ui->edit_float_min;
+            if (next > ui->edit_float_max) next = ui->edit_float_max;
+        }
+        float stored = (float)next;
+        /* The shortest text that reads back as the same float: "0.3", not
+         * the "0.300000012" that %.9g prints for it, so steps of 0.1 do
+         * not show float error piling up. */
+        snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%.6g", stored);
+        if (!parse_float_value(ui->edit_buf, &value) || value != stored)
+            snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%.9g", stored);
+    } else {
+        return;   /* text and dropdowns: nothing to step */
+    }
+    ui->edit_cursor = (int)strlen(ui->edit_buf);
+    ui->edit_anchor = -1;
+}
+
 void ui_edit_key(UIState *ui, UIEditKey key, int extend)
 {
     int length;
@@ -368,7 +421,10 @@ void ui_edit_key(UIState *ui, UIEditKey key, int extend)
             erase_edit_range(ui, ui->edit_cursor,
                              next_char_start(ui->edit_buf, ui->edit_cursor));
         return;
-    case UI_KEY_UP: case UI_KEY_DOWN: case UI_KEY_PICK:
+    case UI_KEY_UP: case UI_KEY_DOWN:
+        step_number(ui, key == UI_KEY_UP ? 1 : -1, extend);
+        return;
+    case UI_KEY_PICK:
         return;   /* list keys: see ui_dropdown_key */
     }
     /* A caret move: with Shift it stretches the selection from where it
