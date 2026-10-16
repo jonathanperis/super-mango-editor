@@ -376,6 +376,76 @@ static int same_color(Color a, Color b)
     return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
 }
 
+/* ------------------------------------------------------------------ */
+/* Canvas                                                              */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The floor is drawn only where the canvas shows it, so check the one
+ * thing culling could break: the strip still reaches both canvas edges,
+ * scrolled anywhere and at any zoom, with gaps left open.  This renders
+ * the canvas alone into the window and reads it back.
+ */
+static int floor_reaches_both_canvas_edges_at_any_scroll(void)
+{
+    int failed = 0;
+    EditorState es;
+    Image shot = {0};
+    const Color backdrop = {255, 0, 255, 255};
+    const float zooms[] = {1.0f, 2.0f, 3.0f, 5.0f};  /* the zoom menu */
+    CHECK(open_editor(&es, NULL) == 0);
+    es.level.screen_count = 12;
+    es.level.floor_gaps[0] = 400;
+    es.level.floor_gaps[1] = 2000;
+    es.level.floor_gap_count = 2;
+    const float world_w = (float)(es.level.screen_count * GAME_W);
+    for (size_t z = 0; z < sizeof(zooms) / sizeof(zooms[0]); z++) {
+        for (int step = 0; step <= 8; step++) {
+            es.camera.zoom = zooms[z];
+            /* Start, end and odd fractional positions in between. */
+            es.camera.x = step * (world_w / 8.0f) + (step % 3) * 7.3f;
+            es.camera.y = 0.0f;
+            canvas_clamp_camera(&es);
+            /* Drawn straight to the window: the Memory backend reads back
+             * the framebuffer but not textures. */
+            BeginDrawing();
+            ClearBackground(backdrop);
+            canvas_render(&es);
+            rlDrawRenderBatchActive();
+            shot = LoadImageFromScreen();
+            EndDrawing();
+            CHECK(IsImageValid(shot) && shot.width == EDITOR_W && shot.height == EDITOR_H);
+#ifdef MANGO_MEMORY_TESTS
+            /* Memory readback is bottom-origin (and BGRA, which the
+             * magenta backdrop does not notice). */
+            ImageFlipVertical(&shot);
+#endif
+            /* Middle of the dirt row, in screen pixels. */
+            int sy = (int)((FLOOR_Y + TILE_SIZE / 2 - es.camera.y) * es.camera.zoom) + TOOLBAR_H;
+            for (int sx = 0; sx < CANVAS_W; sx++) {
+                float wx = sx / es.camera.zoom + es.camera.x;
+                int near_gap = 0;
+                for (int g = 0; g < es.level.floor_gap_count; g++)
+                    near_gap |= wx > es.level.floor_gaps[g] - 2.0f &&
+                                wx < es.level.floor_gaps[g] + FLOOR_GAP_W + 2.0f;
+                if (near_gap || wx >= world_w - 1.0f) continue;
+                Color c = GetImageColor(shot, sx, sy);
+                if (same_color(c, backdrop)) {
+                    fprintf(stderr, "floor missing at zoom %.1f camera %.1f sx %d\n",
+                            es.camera.zoom, es.camera.x, sx);
+                    CHECK(0);
+                }
+            }
+            UnloadImage(shot);
+            shot = (Image){0};
+        }
+    }
+done:
+    if (shot.data) UnloadImage(shot);
+    close_editor(&es);
+    return failed;
+}
+
 /* The default style is the editor look the UI_* colours describe, with no
  * control outlines; the high-contrast style keeps every text colour at the
  * WCAG AAA ratio (7:1) or more on every face it is drawn on. */
@@ -3351,6 +3421,7 @@ int main(void)
         CASE(ui_scrollbar_pages_drags_and_uses_its_clicks),
         CASE(ui_styles_keep_the_default_look_and_high_contrast),
         CASE(toolbar_contrast_toggles_the_high_contrast_style),
+        CASE(floor_reaches_both_canvas_edges_at_any_scroll),
         CASE(palette_clicks_choose_what_the_place_tool_adds),
         CASE(canvas_place_select_drag_delete_and_undo),
         CASE(properties_panel_handles_every_entity_type),
