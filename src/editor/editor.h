@@ -423,6 +423,7 @@ typedef struct {
     EditorRecoveryEntry recovery_entries[EDITOR_MAX_RECOVERY_ENTRIES];
     int            recovery_entry_count;
     char           recent_path[EDITOR_PATH_MAX];
+    char           settings_path[EDITOR_PATH_MAX]; /* editor_settings.txt */
     char           recent_files[5][EDITOR_PATH_MAX];
     int            recent_file_count;
     char           status_message[160];

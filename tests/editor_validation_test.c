@@ -162,6 +162,7 @@ static void remove_state_files(const EditorState *state)
     remove(state->autosave_path);
     remove(state->playtest_path);
     remove(state->recent_path);
+    remove(state->settings_path);
 }
 
 static void cleanup_test_preference_root(const char *root,
@@ -1652,6 +1653,60 @@ static int loads_recent_files_with_trim_and_limit(void)
 
     remove(EDITOR_WORKFLOW_RECENT_PATH);
     return 0;
+}
+
+/* The Contrast setting survives a restart, and the settings reader skips
+ * what it does not understand instead of failing. */
+static int editor_settings_survive_a_restart(void)
+{
+    char root[EDITOR_PATH_MAX] = {0};
+    EditorState first = {0}, next = {0};
+    EditorState *const states[] = {&first, &next};
+    FILE *fp;
+    int result = 1;
+
+    ensure_out_dir();
+    if (make_test_preference_root(root, sizeof(root)) != 0 ||
+        editor_set_preference_root(&first, root) != 0 ||
+        editor_init_persistence_paths(&first) != 0) goto cleanup;
+    ui_init(&first.ui, NULL);
+    editor_set_high_contrast(&first, 1);
+    if (expect_int("settings saved", editor_save_settings(&first), 0) != 0) goto cleanup;
+
+    if (editor_set_preference_root(&next, root) != 0 ||
+        editor_init_persistence_paths(&next) != 0) goto cleanup;
+    ui_init(&next.ui, NULL);
+    editor_load_settings(&next);
+    if (expect_int("contrast restored", next.high_contrast, 1) != 0 ||
+        expect_int("contrast style", next.ui.style.border_width,
+                   UI_STYLE_HIGH_CONTRAST.border_width) != 0) goto cleanup;
+
+    /* Unknown keys, bad values and an over-long line are skipped; the last
+     * valid high_contrast line wins. */
+    fp = fopen(next.settings_path, "wb");
+    if (!fp) goto cleanup;
+    fputs("unknown=7\nhigh_contrast=yes\n", fp);
+    for (int i = 0; i < 200; i++) fputc('x', fp);
+    fputs("high_contrast=1\nhigh_contrast=0\n", fp);
+    fclose(fp);
+    editor_set_high_contrast(&next, 1);
+    editor_load_settings(&next);
+    if (expect_int("contrast off from file", next.high_contrast, 0) != 0 ||
+        expect_int("default style back", next.ui.style.border_width, 0) != 0) goto cleanup;
+
+    /* Without a settings path (render smoke) saving reports failure and
+     * loading changes nothing. */
+    {
+        EditorState bare = {0};
+        ui_init(&bare.ui, NULL);
+        if (expect_int("no path save", editor_save_settings(&bare), -1) != 0) goto cleanup;
+        editor_load_settings(&bare);
+        if (expect_int("no path keeps default", bare.high_contrast, 0) != 0) goto cleanup;
+    }
+    result = 0;
+cleanup:
+    cleanup_test_preference_root_of(root, states, 2);
+    return result;
 }
 
 static int recent_files_skip_overlong_lines_and_line_breaks(void)
@@ -5790,6 +5845,7 @@ int main(void)
     if (load_fingerprints_the_bytes_it_parsed() != 0) return 1;
     if (recovery_metadata_keeps_longest_source_path() != 0) return 1;
     if (recent_files_skip_overlong_lines_and_line_breaks() != 0) return 1;
+    if (editor_settings_survive_a_restart() != 0) return 1;
     if (dialog_quoting_and_picked_paths_stay_literal() != 0) return 1;
     if (entity_table_has_a_row_for_every_type() != 0) return 1;
     if (document_hash_covers_every_entity_and_config_field() != 0) return 1;

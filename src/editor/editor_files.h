@@ -29,6 +29,20 @@ int editor_set_preference_root(EditorState *es, const char *root);
 /* Load recent file paths from persistent editor state. */
 void editor_load_recent_files(EditorState *es);
 
+/*
+ * Editor settings that outlive a session, kept in editor_settings.txt in the
+ * preference folder as `key=value` lines (today only high_contrast=0|1).
+ * Loading applies them (high_contrast sets es->ui.style); unknown keys and
+ * bad values are ignored, so an older or newer file still loads. Saving
+ * replaces the file atomically; it returns -1 without a settings path
+ * (render smoke and most tests have none).
+ */
+void editor_load_settings(EditorState *es);
+int editor_save_settings(const EditorState *es);
+
+/* Switch the high-contrast UI style on or off. */
+void editor_set_high_contrast(EditorState *es, int on);
+
 /* Explain in the status bar why saving `path` failed; result is what the
  * save returned (-2 changed on disk, SERIALIZER_REPLACE_TEMP_KEPT, or -1).
  * lead (may be NULL) is put in front.  kept_path is the temporary file that
