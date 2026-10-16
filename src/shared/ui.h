@@ -15,7 +15,6 @@
 #pragma once
 #include <stddef.h>
 #include "text.h"
-#include "../levels/level.h"
 
 typedef void (*UIBeforeChangeFn)(void *context, int widget_id);
 typedef int (*UIBeforeCommandFn)(void *context);
@@ -29,7 +28,9 @@ typedef enum {
     UI_KEY_UP, UI_KEY_DOWN, UI_KEY_PICK   /* open dropdown lists only */
 } UIEditKey;
 
-#define UI_EDIT_BUFFER_SIZE LEVEL_DESCRIPTION_CAPACITY
+/* Longest text one field can edit, terminator included. The UI does not know
+ * about levels; the editor asserts this fits the level description. */
+#define UI_EDIT_BUFFER_SIZE 4096
 #define UI_PENDING_TEXT_SIZE 4096
 #define UI_TEXT_CACHE_COUNT 64
 #define UI_TEXT_CACHE_BYTES 128

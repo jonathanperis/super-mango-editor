@@ -1522,6 +1522,9 @@ static int config_level_fields(EditorState *es, int x, int y)
         editor_commit_change(es);
     y += 24;
 
+    /* The description is the longest text field; the edit buffer must hold it. */
+    _Static_assert(sizeof(es->level.description) <= UI_EDIT_BUFFER_SIZE,
+                   "UI_EDIT_BUFFER_SIZE must fit a level description");
     ui_label(&es->ui, x + 8, y, "Desc:");
     if (ui_text_field(&es->ui, 9001, x + 55, y, 310, es->level.description,
                       (int)sizeof(es->level.description)))
