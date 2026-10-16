@@ -674,12 +674,13 @@ static void session_open_next_level(AppSession *session, GameState *game)
  * sounds, and the cache holding its level's files, stay with the
  * session), which is exactly what Level Select and Play already
  * swap in place on the web. Staying on the page also keeps the
- * browser's unlocked audio (a reloaded page needs a new click or key
- * press before it may play sound) and the profile held in memory,
- * even an unsaved one. The old game is freed before the new one
- * loads, so the WebAssembly heap reuses its blocks instead of
- * growing on every Replay; the files it released wait in the cache,
- * idle, and the new game acquires every one of them again.
+ * browser's unlocked audio (a reloaded page needs a new click, tap or
+ * key press before it may play sound; web/audio-unlock.js adds the
+ * key press, which raylib's miniaudio ignores) and the profile held
+ * in memory, even an unsaved one. The old game is freed before the
+ * new one loads, so the WebAssembly heap reuses its blocks instead
+ * of growing on every Replay; the files it released wait in the
+ * cache, idle, and the new game acquires every one of them again.
  */
 static void session_replay_game(AppSession *session, GameState *game)
 {
