@@ -241,6 +241,20 @@ static void session_apply_window_scale(int requested)
     if (moved.x != window.x || moved.y != window.y) SetWindowPosition(moved.x, moved.y);
 #endif
 }
+
+/* Fullscreen is raylib's borderless windowed mode: a window without a frame
+ * that covers the monitor at the desktop's own resolution. Unlike exclusive
+ * fullscreen it switches no video mode, so changing it is instant and other
+ * windows can still come to the front. display_present letterboxes the
+ * canvas at the largest whole-number scale the monitor fits. */
+static void session_apply_window(const GameSettings *s)
+{
+    int fullscreen = IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE) ? 1 : 0;
+    /* Leaving fullscreen puts back the window's earlier size and position. */
+    if (fullscreen != s->fullscreen) ToggleBorderlessWindowed();
+    /* The scale is a windowed size; it applies again on leaving. */
+    if (!s->fullscreen) session_apply_window_scale(s->window_scale);
+}
 #endif
 
 static void session_apply_preferences(AppSession *session)
@@ -255,7 +269,7 @@ static void session_apply_preferences(AppSession *session)
         if (session->game) game_audio_apply_settings(session->game);
         if (session->menu) sound_set_volume(session->menu->snd_confirm, volume);
 #ifndef __EMSCRIPTEN__
-        if (IsWindowReady()) session_apply_window_scale(s->window_scale);
+        if (IsWindowReady()) session_apply_window(s);
 #endif
         session->preferences_applied = 1;
         session->applied_settings_revision = session->profile.revision;

@@ -44,6 +44,19 @@ void test_SetWindowSize(int width, int height)
     applied_height = height;
     SetWindowSize(width, height);
 }
+/* Fullscreen is recorded, not performed: a test must not take over the
+ * desktop. Other window states still come from raylib. */
+static int borderless, borderless_toggles;
+void test_ToggleBorderlessWindowed(void)
+{
+    borderless = !borderless;
+    borderless_toggles++;
+}
+bool test_IsWindowState(unsigned int flag)
+{
+    if (flag == FLAG_BORDERLESS_WINDOWED_MODE) return borderless != 0;
+    return IsWindowState(flag);
+}
 void test_SetMusicVolume(Music music, float volume)
 {
     test_last_music_volume = volume;
@@ -274,6 +287,14 @@ static int resume_codec_and_migration(void)
     CHECK(game_profile_decode(decoded, "format_version = 2\nghost = 0\n") == 0 && decoded->settings.ghost == 0);
     CHECK(game_profile_decode(decoded, "format_version = 1\nghost = 0\n") == -1);
     CHECK(game_profile_decode(decoded, "format_version = 2\nghost = 2\n") == -1);
+    /* fullscreen is optional within version 2: older version-2 files load
+     * windowed, and it round-trips. A version-1 file never had it. */
+    CHECK(game_profile_decode(decoded, "format_version = 2\n") == 0 && decoded->settings.fullscreen == 0);
+    CHECK(game_profile_decode(decoded, "format_version = 2\nfullscreen = 1\n") == 0 && decoded->settings.fullscreen == 1);
+    CHECK(game_profile_encode(decoded, text, PROFILE_TEXT_MAX) == 0 && strstr(text, "\nfullscreen = 1\n"));
+    CHECK(game_profile_decode(decoded, text) == 0 && decoded->settings.fullscreen == 1);
+    CHECK(game_profile_decode(decoded, "format_version = 1\nfullscreen = 0\n") == -1);
+    CHECK(game_profile_decode(decoded, "format_version = 2\nfullscreen = 2\n") == -1);
     CHECK(game_profile_decode(decoded, version1) == 0);
     CHECK(game_profile_encode(decoded, text, PROFILE_TEXT_MAX) == 0);
     CHECK(!strncmp(text, "format_version = 2\n", 19) && !strstr(text, "[resume]"));
@@ -527,6 +548,21 @@ static int persistent_session(void)
                   GetScreenHeight()>0 && GetScreenHeight()<=GAME_H*fit);
     }
 #endif
+    /* Fullscreen goes borderless once and leaves the window size alone;
+     * turning it off comes back windowed at the window_scale size. */
+    puts("profile session: fullscreen");
+    applied_width = applied_height = 0;
+    session->profile.data.settings.fullscreen=1;
+    session->profile.dirty=1; session->profile.revision++;
+    session_frame(session);
+    CHECK(borderless && borderless_toggles==1 && applied_width==0);
+    session_frame(session);  /* applied once per change, not every frame */
+    CHECK(borderless_toggles==1);
+    session->profile.data.settings.fullscreen=0;
+    session->profile.data.settings.window_scale=1;
+    session->profile.dirty=1; session->profile.revision++;
+    session_frame(session);
+    CHECK(!borderless && borderless_toggles==2 && applied_width==GAME_W && applied_height==GAME_H);
     session->game->world.score=200;
     game_complete_level(session->game);
     puts("profile session: completion");
