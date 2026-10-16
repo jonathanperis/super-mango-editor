@@ -57,6 +57,7 @@ static void draw_text(UIState *ui, int x, int y,
  *   py must be between ry and ry+rh  (vertical)
  */
 static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh);
+static void note_widget(UIState *ui, int x, int y, int w, int h);
 
 static void notify_before_change(UIState *ui, int id)
 {
@@ -758,6 +759,15 @@ static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
            py >= ry && py < ry + rh;
 }
 
+/* Remember the widget just drawn, for a ui_tooltip call that follows it. */
+static void note_widget(UIState *ui, int x, int y, int w, int h)
+{
+    ui->last_x = x;
+    ui->last_y = y;
+    ui->last_w = w;
+    ui->last_h = h;
+}
+
 /* ------------------------------------------------------------------ */
 /* Lifecycle                                                           */
 /* ------------------------------------------------------------------ */
@@ -834,6 +844,13 @@ void ui_begin_frame(UIState *ui)
      */
     if (!ui->dropdown_seen) ui->dropdown_open_id = 0;
     ui->dropdown_seen    = 0;
+    /* The pointer left every widget with a tip: the next one it rests on
+     * starts its delay afresh. */
+    if (!ui->tooltip_seen) ui->tooltip_w = ui->tooltip_h = 0;
+    ui->tooltip_seen = 0;
+    ui->tooltip_text = NULL;
+    ui->tooltip_shown = 0;
+    ui->last_w = ui->last_h = 0;
     ui->dropdown_click   = 0;
     ui->dropdown_options = NULL;
     ui->dropdown_key_move = 0;
@@ -908,6 +925,8 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label)
 {
     int hovered = point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
 
+    note_widget(ui, x, y, w, h);
+
     /* Choose background colour based on hover state. */
     Color bg = ui_color(ui, hovered ? UI_COLOR_HOT : UI_COLOR_BUTTON);
     draw_rect(x, y, w, h, bg);
@@ -950,6 +969,7 @@ void ui_button_disabled(UIState *ui, int x, int y, int w, int h, const char *lab
 {
     int tw = 0, th = 0;
 
+    note_widget(ui, x, y, w, h);
     draw_rect(x, y, w, h, ui_color(ui, UI_COLOR_TITLE));
     draw_control_border(ui, x, y, w, h);
     font_measure(ui->font, label, &tw, &th);
@@ -1031,6 +1051,7 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
     int changed   = 0;
 
     /* --- Background and border --- */
+    note_widget(ui, x, y, w, h);
     draw_rect(x, y, w, h, ui_color(ui, UI_COLOR_INPUT));
 
     /*
@@ -1163,6 +1184,7 @@ static int float_field(UIState *ui, int id, int x, int y, int w,
     int changed   = 0;
 
     /* --- Background and border --- */
+    note_widget(ui, x, y, w, h);
     draw_rect(x, y, w, h, ui_color(ui, UI_COLOR_INPUT));
 
     draw_field_border(ui, x, y, w, h, is_active);
@@ -1255,6 +1277,7 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
     int changed   = 0;
 
     /* --- Background and border --- */
+    note_widget(ui, x, y, w, h);
     draw_rect(x, y, w, h, ui_color(ui, UI_COLOR_INPUT));
 
     draw_field_border(ui, x, y, w, h, is_active);
@@ -1387,6 +1410,7 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
         ui->field_order[ui->field_order_count++] = id;
 
     /* --- Draw the header (always visible) --- */
+    note_widget(ui, x, y, w, h);
     int hovered_header = point_in_rect(ui->mouse_x, ui->mouse_y,
                                        x, y, w, h);
     Color header_bg = ui_color(ui, hovered_header ? UI_COLOR_HOT : UI_COLOR_BUTTON);
@@ -1498,12 +1522,71 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
     return changed;
 }
 
+void ui_tooltip(UIState *ui, const char *text)
+{
+    if (!ui || !text || !text[0] || ui->last_w <= 0 || ui->last_h <= 0) return;
+    if (!point_in_rect(ui->mouse_x, ui->mouse_y, ui->last_x, ui->last_y,
+                       ui->last_w, ui->last_h)) return;
+    /* A new widget under the pointer starts the delay again. */
+    if (ui->tooltip_x != ui->last_x || ui->tooltip_y != ui->last_y ||
+        ui->tooltip_w != ui->last_w || ui->tooltip_h != ui->last_h) {
+        ui->tooltip_x = ui->last_x;
+        ui->tooltip_y = ui->last_y;
+        ui->tooltip_w = ui->last_w;
+        ui->tooltip_h = ui->last_h;
+        ui->tooltip_since_ms = ui->time_ms;
+        ui->tooltip_dismissed = 0;
+    }
+    /* Using the widget answers the question the tip was for. */
+    if (ui->mouse_clicked || ui->mouse_down) ui->tooltip_dismissed = 1;
+    ui->tooltip_seen = 1;
+    ui->tooltip_text = text;
+}
+
+/*
+ * draw_tooltip — The tip asked for this frame, once the pointer has rested
+ * long enough: a title-coloured box below and right of the pointer, moved
+ * back inside the view (or above the pointer) near an edge.
+ */
+static void draw_tooltip(UIState *ui)
+{
+    const int pad = 6;
+    int tw = 0, th = 0, w, h, x, y;
+    int view_w = ui->view_w > 0 ? ui->view_w : GetScreenWidth();
+    int view_h = ui->view_h > 0 ? ui->view_h : GetScreenHeight();
+
+    if (!ui->tooltip_text || ui->tooltip_dismissed || ui->dropdown_open_id != 0) return;
+    /* Unsigned subtraction: right across a wrap of the clock too. */
+    if ((uint32_t)(ui->time_ms - ui->tooltip_since_ms) < UI_TOOLTIP_DELAY_MS) return;
+    font_measure(ui->font, ui->tooltip_text, &tw, &th);
+    w = tw + 2 * pad;
+    h = th + 2 * pad;
+    /* Clear of the pointer's arrow, which hangs down and to the right. */
+    x = ui->mouse_x + 12;
+    y = ui->mouse_y + 20;
+    if (x + w > view_w) x = view_w - w;
+    if (y + h > view_h) y = ui->mouse_y - h - 4;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    draw_rect(x, y, w, h, ui_color(ui, UI_COLOR_TITLE));
+    draw_control_border(ui, x, y, w, h);
+    draw_text(ui, x + pad, y + pad, ui->tooltip_text, ui_color(ui, UI_COLOR_TEXT));
+    ui->tooltip_shown = 1;
+    ui->tip_box[0] = x;
+    ui->tip_box[1] = y;
+    ui->tip_box[2] = w;
+    ui->tip_box[3] = h;
+}
+
 void ui_draw_overlays(UIState *ui)
 {
     int h = 20;
 
-    if (!ui || ui->dropdown_open_id == 0 || !ui->dropdown_options) return;
-    for (int i = 0; i < ui->dropdown_count; i++) {
+    if (!ui) return;
+    /* A tip never shows over an open list (draw_tooltip checks), so the
+     * two cannot overlap; the list goes first anyway, the tip last. */
+    for (int i = 0; ui->dropdown_open_id != 0 && ui->dropdown_options &&
+                    i < ui->dropdown_count; i++) {
         int oy = ui->dropdown_y + i * h;   /* Y of this option row */
         int hovered = point_in_rect(ui->mouse_x, ui->mouse_y,
                                     ui->dropdown_x, oy, ui->dropdown_w, h);
@@ -1517,6 +1600,7 @@ void ui_draw_overlays(UIState *ui)
         draw_text(ui, ui->dropdown_x + 4, oy + 3,
                   ui->dropdown_options[i], ui_color(ui, UI_COLOR_TEXT));
     }
+    draw_tooltip(ui);
 }
 
 /* ------------------------------------------------------------------ */

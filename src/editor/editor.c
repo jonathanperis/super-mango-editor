@@ -43,6 +43,9 @@ int editor_init(EditorState *es, int hidden)
     /* Widgets borrow the font and call back before a document command so an
      * unfinished field edit can be applied, discarded or left active. */
     ui_init(&es->ui, es->font);
+    /* Tooltips stay inside the logical canvas, not the scaled window. */
+    es->ui.view_w = EDITOR_W;
+    es->ui.view_h = EDITOR_H;
     es->ui.before_command = editor_before_command;
     es->ui.before_command_context = es;
     if (!hidden) {
