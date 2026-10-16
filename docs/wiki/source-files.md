@@ -85,7 +85,7 @@ src/
 │   ├── file_dialog.h / .c        Native file dialogs
 │   └── undo.h / .c               Compact history with owned config snapshots; `undo_push(stack, const Command *)`
 ├── shared/
-│   ├── graphics.h / .c          Window, sprite pivots and logical presentation; declares the texture handles
+│   ├── graphics.h / .c          Window and icon, sprite pivots and logical presentation; declares the texture handles
 │   ├── texture.c                `texture_load`, `texture_own`, `texture_unload`: owned texture handles
 │   ├── asset_cache.h / .c       Session's reference-counted cache of level files, player sheet, HUD icon, font, menu logo and sound
 │   ├── geometry.h              Integer hitboxes and half-open intersection
@@ -608,7 +608,7 @@ reports it, resident memory in MB.
 
 | Read | Learning purpose |
 |---|---|
-| `shared/graphics.h`, `shared/graphics.c` | Sprite pivots/flips and logical-canvas presentation |
+| `shared/graphics.h`, `shared/graphics.c` | Window setup (including its icon), sprite pivots/flips and logical-canvas presentation |
 | `shared/texture.c` | Texture ownership: a malloc'd handle, `NULL` on failure, one owner unloads it |
 | `shared/asset_cache.h`, `shared/asset_cache.c` | A reference count: holders per file, idle entries, and why freeing waits for `asset_cache_trim` |
 | `shared/geometry.h` | Integer, half-open hitboxes; overflow-safe edge arithmetic |

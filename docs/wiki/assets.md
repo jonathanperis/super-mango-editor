@@ -224,6 +224,12 @@ other characters draw as `?`. No font file ships with the game.
 | 4 | `ANIM_CLIMB` | 2 | 100 ms/frame | Vine climbing cycle |
 | 5 | *(unused)* | -- | -- | Available for future states |
 
+The first idle frame (the top-left 48 x 48 cell) is also the game's and the
+editor's window icon on Windows and Linux: `display_open` in
+`src/shared/graphics.c` crops it when it opens a visible window. A missing
+sheet only leaves the system's default icon. macOS takes icons from the app
+bundle and the browser from the page's favicon, so neither uses it.
+
 ### Frame Source Rect Formula
 
 ```c
