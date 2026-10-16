@@ -244,6 +244,17 @@ Draw labels with `font_draw`/`font_draw_centered` every frame. raylib's default
 font is a single atlas texture and `DrawTextEx` batches its glyphs with the rest
 of the frame, so there is nothing to rasterize, cache or release per label.
 
+Widget colours come from the `UIStyle` in `UIState` (`src/shared/ui.h`), a table
+of colour roles in the manner of raygui's style properties: panel, title, input,
+button, hot, selected, text, dim text, accent, warning, error and border, plus a
+control `border_width`. Widgets pick a role by state (hovered, selected,
+disabled), and panels an owner draws itself should ask `ui_color(ui, role)` rather
+than use a fixed colour, so a style change reaches them too. `UI_STYLE_DEFAULT`
+is the editor look; `UI_STYLE_HIGH_CONTRAST` is used by the editor's Contrast
+toggle and by the game's settings menu when the high-contrast setting is on.
+`editor_ui_test` checks that the default still matches the `UI_*` colours and
+that every high-contrast text colour keeps 7:1 on every face.
+
 ---
 
 ## Render Layer Order

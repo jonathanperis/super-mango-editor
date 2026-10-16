@@ -38,7 +38,7 @@ make run-editor    # build game + editor, then launch editor
 
 | Area | Size | Contents |
 |------|------|----------|
-| Toolbar | 1280 × 32 px | Tool selector (Select / Place / Delete), Grid and Debug toggles, zoom dropdown, Campaign (`[Campaign]` while the [Campaign View](#campaign-view) is open; clicking it then closes the view), file buttons (New, Open, Save As, Save), Play (Stop while a playtest runs) |
+| Toolbar | 1280 × 32 px | Tool selector (Select / Place / Delete), Grid and Debug toggles, zoom dropdown, Campaign (`[Campaign]` while the [Campaign View](#campaign-view) is open; clicking it then closes the view), Contrast (`[Contrast]` while on: every panel, button and field switches to a high-contrast style, black with white outlines and text at 7:1 or more; the level canvas keeps its colours; not remembered between sessions), file buttons (New, Open, Save As, Save), Play (Stop while a playtest runs) |
 | Canvas | 896 × 656 px | Scrollable level view with zoom. All entity types drawn at game-accurate sizes |
 | Panel | 384 × 656 px | Entity palette, properties inspector, level config (collapsible sections) |
 | Status bar | 1280 × 32 px | Cursor world coordinates, snap-to-grid state, active tool, validation summary, entity count (every placement except the player spawn), current filename with ` *` when modified, latest status message |

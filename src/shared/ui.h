@@ -44,9 +44,45 @@ typedef enum {
 #define UI_TEXT_DIM   (Color){0x80,0x80,0x80,0xFF}
 #define UI_INPUT_BG   (Color){0x1D,0x1D,0x1D,0xFF}
 
+/*
+ * UIStyle — every colour the widgets draw, by role, like raygui's style
+ * table. Widgets pick a role by state (a hovered button draws
+ * UI_COLOR_HOT, the selected dropdown item UI_COLOR_SELECTED, a disabled
+ * button UI_COLOR_TITLE with UI_COLOR_TEXT_DIM), so swapping the table
+ * re-themes every widget and every panel that asks ui_color.
+ *
+ * UI_STYLE_DEFAULT is the editor look (the UI_* colours above);
+ * UI_STYLE_HIGH_CONTRAST keeps every text colour at 7:1 or more (WCAG AAA) against
+ * its background and outlines buttons, fields and dropdowns.
+ */
+typedef enum {
+    UI_COLOR_PANEL,     /* panel and window background                     */
+    UI_COLOR_TITLE,     /* title bars, disabled buttons                    */
+    UI_COLOR_INPUT,     /* field background                                */
+    UI_COLOR_BUTTON,    /* button and dropdown face                        */
+    UI_COLOR_HOT,       /* hovered or keyboard-highlighted face or row     */
+    UI_COLOR_SELECTED,  /* chosen item, text selection, current tool       */
+    UI_COLOR_TEXT,      /* labels and values                               */
+    UI_COLOR_TEXT_DIM,  /* hints, separators, inactive field borders       */
+    UI_COLOR_ACCENT,    /* active field border, symbols, highlights        */
+    UI_COLOR_WARNING,   /* a problem worth noticing (profile, bindings)    */
+    UI_COLOR_ERROR,     /* validation errors                               */
+    UI_COLOR_BORDER,    /* control outline, drawn when border_width > 0   */
+    UI_COLOR_COUNT
+} UIColorRole;
+
+typedef struct {
+    Color color[UI_COLOR_COUNT];
+    int   border_width;  /* px of UI_COLOR_BORDER around controls; 0 = none */
+} UIStyle;
+
+extern const UIStyle UI_STYLE_DEFAULT;
+extern const UIStyle UI_STYLE_HIGH_CONTRAST;
+
 typedef struct {
     /* ---- Initialized once ---- */
     TextFont *font; /* borrowed; labels are drawn straight from its atlas */
+    UIStyle   style; /* UI_STYLE_DEFAULT after ui_init; replace to re-theme */
     /* ---- Input for this frame, filled after ui_begin_frame ---- */
     int mouse_x, mouse_y,       /* logical canvas coordinates */
         mouse_clicked,         /* press edge: a button acts once */
@@ -121,6 +157,12 @@ typedef struct {
     UIBeforeCommandFn before_command;
     void *before_command_context;
 } UIState;
+
+/* The style's colour for a role; owners draw their own panels with it too. */
+static inline Color ui_color(const UIState *ui, UIColorRole role)
+{
+    return ui->style.color[role];
+}
 
 /* Borrow the already-loaded font and initialize state. The caller owns it. */
 void ui_init(UIState *ui, TextFont *font);

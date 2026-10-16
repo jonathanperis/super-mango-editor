@@ -289,6 +289,78 @@ static int scan_palette(EditorState *es, int top, int bottom, int picked[ENT_COU
     return found;
 }
 
+/* WCAG relative luminance of an sRGB colour. */
+static double luminance(Color c)
+{
+    double channel[3] = {c.r / 255.0, c.g / 255.0, c.b / 255.0};
+    for (int i = 0; i < 3; i++)
+        channel[i] = channel[i] <= 0.03928 ? channel[i] / 12.92
+                                           : pow((channel[i] + 0.055) / 1.055, 2.4);
+    return 0.2126 * channel[0] + 0.7152 * channel[1] + 0.0722 * channel[2];
+}
+
+static double contrast(Color a, Color b)
+{
+    double la = luminance(a), lb = luminance(b);
+    return la > lb ? (la + 0.05) / (lb + 0.05) : (lb + 0.05) / (la + 0.05);
+}
+
+static int same_color(Color a, Color b)
+{
+    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+}
+
+/* The default style is the editor look the UI_* colours describe, with no
+ * control outlines; the high-contrast style keeps every text colour at the
+ * WCAG AAA ratio (7:1) or more on every face it is drawn on. */
+static int ui_styles_keep_the_default_look_and_high_contrast(void)
+{
+    int failed = 0;
+    const UIStyle *d = &UI_STYLE_DEFAULT, *h = &UI_STYLE_HIGH_CONTRAST;
+    CHECK(same_color(d->color[UI_COLOR_PANEL], UI_BG) && same_color(d->color[UI_COLOR_TITLE], UI_TITLE_BG));
+    CHECK(same_color(d->color[UI_COLOR_INPUT], UI_INPUT_BG) && same_color(d->color[UI_COLOR_BUTTON], UI_BTN));
+    CHECK(same_color(d->color[UI_COLOR_HOT], UI_BTN_HOT) && same_color(d->color[UI_COLOR_SELECTED], UI_BTN_ACTIVE));
+    CHECK(same_color(d->color[UI_COLOR_TEXT], UI_TEXT) && same_color(d->color[UI_COLOR_TEXT_DIM], UI_TEXT_DIM));
+    CHECK(same_color(d->color[UI_COLOR_ACCENT], UI_ACCENT) && d->border_width == 0);
+    CHECK(h->border_width > 0);
+    const UIColorRole faces[] = {UI_COLOR_PANEL, UI_COLOR_TITLE, UI_COLOR_INPUT,
+                                 UI_COLOR_BUTTON, UI_COLOR_HOT, UI_COLOR_SELECTED};
+    const UIColorRole inks[] = {UI_COLOR_TEXT, UI_COLOR_TEXT_DIM};
+    for (size_t f = 0; f < sizeof(faces) / sizeof(faces[0]); f++)
+        for (size_t i = 0; i < sizeof(inks) / sizeof(inks[0]); i++)
+            CHECK(contrast(h->color[inks[i]], h->color[faces[f]]) >= 7.0);
+    const UIColorRole on_panels[] = {UI_COLOR_ACCENT, UI_COLOR_WARNING, UI_COLOR_ERROR, UI_COLOR_BORDER};
+    for (size_t i = 0; i < sizeof(on_panels) / sizeof(on_panels[0]); i++) {
+        CHECK(contrast(h->color[on_panels[i]], h->color[UI_COLOR_PANEL]) >= 7.0);
+        CHECK(contrast(h->color[on_panels[i]], h->color[UI_COLOR_TITLE]) >= 7.0);
+    }
+done:
+    return failed;
+}
+
+/* The toolbar's Contrast button switches every widget to the high-contrast
+ * style and back. */
+static int toolbar_contrast_toggles_the_high_contrast_style(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(es.high_contrast == 0 && es.ui.style.border_width == 0);
+    const int x = 520 + 42, y = 4 + 12;   /* centre of the Contrast button */
+    ui_frame(&es, x, y);
+    click_frame(&es, x, y);
+    CHECK(es.high_contrast == 1);
+    CHECK(es.ui.style.border_width == UI_STYLE_HIGH_CONTRAST.border_width);
+    CHECK(same_color(ui_color(&es.ui, UI_COLOR_TEXT), UI_STYLE_HIGH_CONTRAST.color[UI_COLOR_TEXT]));
+    ui_frame(&es, x, y);
+    click_frame(&es, x, y);
+    CHECK(es.high_contrast == 0 && es.ui.style.border_width == 0);
+    CHECK(same_color(ui_color(&es.ui, UI_COLOR_TEXT), UI_TEXT));
+done:
+    close_editor(&es);
+    return failed;
+}
+
 static int palette_clicks_choose_what_the_place_tool_adds(void)
 {
     int failed = 0;
@@ -3196,6 +3268,8 @@ int main(void)
 #endif
     const struct { const char *name; int (*run)(void); } cases[] = {
 #define CASE(fn) {#fn, fn}
+        CASE(ui_styles_keep_the_default_look_and_high_contrast),
+        CASE(toolbar_contrast_toggles_the_high_contrast_style),
         CASE(palette_clicks_choose_what_the_place_tool_adds),
         CASE(canvas_place_select_drag_delete_and_undo),
         CASE(properties_panel_handles_every_entity_type),

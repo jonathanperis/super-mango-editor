@@ -1250,7 +1250,7 @@ static void render_selection(EditorState *es) {
         int sy = w2s_y(es, r.y) - 2;
         int sw = w2s_w(es, (int)r.w) + 4;
         int sh = w2s_h(es, (int)r.h) + 4;
-        draw_outline(sx, sy, sw, sh, 2, UI_ACCENT);
+        draw_outline(sx, sy, sw, sh, 2, ui_color(&es->ui, UI_COLOR_ACCENT));
     }
 
     /* The rubber band of a box selection in progress. */
@@ -1260,7 +1260,7 @@ static void render_selection(EditorState *es) {
         float w = es->box_x0 < es->box_x1 ? es->box_x1 - es->box_x0 : es->box_x0 - es->box_x1;
         float h = es->box_y0 < es->box_y1 ? es->box_y1 - es->box_y0 : es->box_y0 - es->box_y1;
         draw_outline(w2s_x(es, x0), w2s_y(es, y0), w2s_w(es, (int)w),
-                     w2s_h(es, (int)h), 1, UI_ACCENT);
+                     w2s_h(es, (int)h), 1, ui_color(&es->ui, UI_COLOR_ACCENT));
     }
 }
 
@@ -1368,7 +1368,7 @@ static void render_grid(EditorState *es) {
         int sx = w2s_x(es, (float)wx);
         if (sx < -2 || sx > CANVAS_W + 2) continue;
 
-        DrawRectangle(sx,TOOLBAR_H,2,CANVAS_H,UI_ACCENT);
+        DrawRectangle(sx,TOOLBAR_H,2,CANVAS_H,ui_color(&es->ui, UI_COLOR_ACCENT));
     }
 
     /* ---- FLOOR_Y line (red, 2 px wide) ---- */
